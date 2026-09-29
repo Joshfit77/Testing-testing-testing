@@ -70,7 +70,7 @@
     text-decoration: none;
     color: var(--ash);
   }
-  .brand svg { width: 2.2rem; height: 2.2rem; flex: none; }
+  .brand svg { width: 2.4rem; height: 2.64rem; flex: none; }
   .brand span {
     font-family: var(--display);
     font-weight: 700;
@@ -103,7 +103,7 @@
     gap: 1.4rem;
     padding-block: clamp(3.5rem, 9vw, 7rem) clamp(3rem, 7vw, 5rem);
   }
-  .hero .mark { width: clamp(7rem, 16vw, 10rem); height: auto; }
+  .hero .mark { width: clamp(8rem, 18vw, 11rem); height: auto; filter: drop-shadow(0 0 28px rgba(232,185,90,.18)); }
   .hero h1 {
     margin: 0;
     font-family: var(--display);
@@ -258,146 +258,102 @@
     position: relative;
     overflow: hidden;
     border-top: 1px solid var(--stone-edge);
-    background:
-      linear-gradient(to bottom, var(--night) 0%, var(--stone) 100%);
-    padding-top: clamp(2.5rem, 6vw, 4rem);
-  }
-  .gate-scene .caption {
-    text-align: center;
-    margin: 0 auto 1.8rem;
-    padding-inline: 16px;
-    font-family: var(--display);
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    font-size: 0.8rem;
-    color: var(--dim);
+    background: var(--night);
+    padding-top: clamp(1.5rem, 4vw, 3rem);
   }
   .stage {
     position: relative;
-    width: min(100%, 34rem);
-    margin: 0 auto;
-    aspect-ratio: 34 / 30;
+    width: min(100%, 44rem);
     max-width: 100%;
+    margin: 0 auto;
+    aspect-ratio: 600 / 520;
+    perspective: 1100px;
+    perspective-origin: 50% 58%;
   }
-  /* Stone wall and arch */
-  .wall {
-    position: absolute;
-    inset: 0 0 18% 0;
-    background:
-      repeating-linear-gradient(to bottom, transparent 0 38px, rgba(0,0,0,.28) 38px 40px),
-      var(--stone);
-    -webkit-mask: linear-gradient(to right, transparent, #000 18%, #000 82%, transparent);
-            mask: linear-gradient(to right, transparent, #000 18%, #000 82%, transparent);
-  }
-  .doorway {
-    position: absolute;
-    left: 50%;
-    bottom: 18%;
-    width: 34%;
-    height: 72%;
-    transform: translateX(-50%);
-    perspective: 700px;
-  }
-  .frame {
-    position: absolute;
-    inset: -6% -9% 0 -9%;
-    border-radius: 999px 999px 0 0;
-    background: var(--stone-edge);
-    box-shadow: inset 0 0 0 2px rgba(0,0,0,.35);
-  }
-  .opening {
-    position: absolute;
-    inset: 0;
-    border-radius: 999px 999px 0 0;
-    overflow: hidden;
-    background: radial-gradient(ellipse at 50% 70%, var(--glow) 0%, var(--gold) 45%, #8a5d1c 100%);
-  }
-  .opening::after { /* distant cross in the light */
-    content: "";
-    position: absolute;
-    left: 50%;
-    top: 26%;
-    height: 30%;
-    transform: translateX(-50%);
-    background:
-      linear-gradient(var(--glow), var(--glow)) center 28% / 100% 14% no-repeat,
-      linear-gradient(var(--glow), var(--glow)) center / 30% 100% no-repeat;
-    width: 22%;
-    opacity: 0.9;
-    filter: drop-shadow(0 0 6px #fff);
-  }
+  .stage > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .glow-wall { opacity: .18; transition: opacity 2.2s ease .3s; }
+  .spill { opacity: .08; transition: opacity 2s ease .4s; }
+  .rim { opacity: .25; transition: opacity 2s ease .3s; }
+  .open .glow-wall { opacity: 1; }
+  .open .spill { opacity: 1; }
+  .open .rim { opacity: .75; }
+
+  /* Door leaves sit exactly in the opening (x 240-360, y 150-430 of 600 x 520) and swing inward */
   .leaf {
     position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 50%;
-    background:
-      repeating-linear-gradient(to right, transparent 0 22%, var(--wood-line) 22% 24%),
-      var(--wood);
-    transition: transform 1.8s cubic-bezier(.55,.05,.25,1);
-    backface-visibility: hidden;
+    top: 28.846%;
+    width: 9.9%;
+    height: 53.3%;
+    transition: transform 2.4s cubic-bezier(.45,.05,.25,1);
   }
-  .leaf.left  { left: 0;  transform-origin: left center;  border-radius: 999px 0 0 0 / 999px 0 0 0; }
-  .leaf.right { right: 0; transform-origin: right center; border-radius: 0 999px 0 0 / 0 999px 0 0; }
-  .leaf::after { /* iron ring handle */
-    content: "";
-    position: absolute;
-    top: 55%;
-    width: 14%;
-    aspect-ratio: 1;
-    border: 2px solid #1a1410;
-    border-radius: 50%;
-  }
-  .leaf.left::after  { right: 10%; }
-  .leaf.right::after { left: 10%; }
-  .open .leaf.left  { transform: rotateY(-82deg); }
-  .open .leaf.right { transform: rotateY(82deg); }
+  .leaf svg { display: block; width: 100%; height: 100%; }
+  .leaf.left  { left: 40%;    transform-origin: 0 50%; }
+  .leaf.right { left: 50.1%;  transform-origin: 100% 50%; }
+  .leaf .shade { opacity: 0; transition: opacity 2.4s ease; }
+  .open .leaf.left  { transform: rotateY(78deg); }
+  .open .leaf.right { transform: rotateY(-78deg); }
+  .open .leaf .shade { opacity: .55; }
 
-  /* Light spilling onto the ground */
-  .spill {
-    position: absolute;
-    left: 50%;
-    bottom: 0;
-    width: 70%;
-    height: 18%;
-    transform: translateX(-50%);
-    background: radial-gradient(ellipse at 50% 0%, rgba(232,185,90,.55), transparent 70%);
-    opacity: 0;
-    transition: opacity 1.6s ease 0.4s;
-  }
-  .ground {
-    position: absolute;
-    inset: auto 0 0 0;
-    height: 18%;
-    background: linear-gradient(to bottom, #171b23, var(--night));
-  }
-  .open .spill { opacity: 1; }
-
-  /* The traveler */
+  /* The traveler: starts in the foreground, walks up to the threshold and on into the light */
   .traveler {
     position: absolute;
     left: 50%;
-    bottom: 1%;
-    width: 13%;
+    bottom: 0;
+    width: 16.667%;
     transform-origin: 50% 100%;
-    transform: translate(-50%, 0) scale(1.35);
-    opacity: 1;
+    transform: translateX(-50%) scale(1.18);
+    filter: drop-shadow(0 0 1.2px rgba(255, 214, 140, .55));
   }
   .traveler svg { display: block; width: 100%; height: auto; }
-  .traveler .figure { fill: #0b0d12; }
-  .walking .traveler { animation: enter 4.2s cubic-bezier(.4,.1,.5,1) 1.3s forwards; }
-  .walking .traveler svg { animation: bob 0.55s ease-in-out 1.3s 7 alternate; }
-  @keyframes enter {
-    0%   { transform: translate(-50%, 0) scale(1.35); opacity: 1; }
-    75%  { transform: translate(-50%, -118%) scale(0.62); opacity: 1; }
-    100% { transform: translate(-50%, -128%) scale(0.5); opacity: 0; }
+  .traveler .leg, .traveler .arm { transform-box: fill-box; transform-origin: 50% 0; }
+  .walking .traveler {
+    animation: approach 6s cubic-bezier(.35,.1,.55,1) 1.5s forwards;
+    filter: drop-shadow(0 0 1.6px rgba(255, 214, 140, .9));
   }
-  @keyframes bob { from { transform: translateY(0); } to { transform: translateY(-3%); } }
-  .entered .traveler { transform: translate(-50%, -128%) scale(0.5); opacity: 0; }
+  .walking .traveler .body   { animation: sway 1s ease-in-out 1.5s 6; }
+  .walking .traveler .leg-l  { animation: stepL 1s ease-in-out 1.5s 6; }
+  .walking .traveler .leg-r  { animation: stepR 1s ease-in-out 1.5s 6; }
+  .walking .traveler .arm-l  { animation: swingL 1s ease-in-out 1.5s 6; }
+  .walking .traveler .arm-r  { animation: swingR 1s ease-in-out 1.5s 6; }
+  .walking .traveler .shadow { animation: shadowFade 6s linear 1.5s forwards; }
+  @keyframes approach {
+    0%   { transform: translateX(-50%) translateY(0) scale(1.18); opacity: 1; }
+    78%  { transform: translateX(-50%) translateY(-34.6%) scale(.78); opacity: 1; }
+    100% { transform: translateX(-50%) translateY(-44%) scale(.6); opacity: 0; }
+  }
+  @keyframes sway {
+    0%, 100% { transform: translate(0, 0); }
+    25% { transform: translate(-1.2px, -1.6px); }
+    50% { transform: translate(0, 0); }
+    75% { transform: translate(1.2px, -1.6px); }
+  }
+  /* seen from behind, the stepping leg lifts and shortens; the planted leg stays long */
+  @keyframes stepL {
+    0%, 50%, 100% { transform: scaleY(1); }
+    25% { transform: scaleY(.9) translateX(1px); }
+  }
+  @keyframes stepR {
+    0%, 50%, 100% { transform: scaleY(1); }
+    75% { transform: scaleY(.9) translateX(-1px); }
+  }
+  @keyframes swingL {
+    0%, 50%, 100% { transform: rotate(0); }
+    25% { transform: rotate(-3deg) scaleY(.96); }
+    75% { transform: rotate(3deg); }
+  }
+  @keyframes swingR {
+    0%, 50%, 100% { transform: rotate(0); }
+    25% { transform: rotate(-3deg); }
+    75% { transform: rotate(3deg) scaleY(.96); }
+  }
+  @keyframes shadowFade { 0% { opacity: .5; } 60% { opacity: 1; } 100% { opacity: 1; } }
+  .traveler .shadow { opacity: .35; }
+  .entered .traveler { transform: translateX(-50%) translateY(-44%) scale(.6); opacity: 0; }
+  .entered .glow-wall, .entered .spill { opacity: 1; }
 
   .replay {
     display: block;
-    margin: 1.5rem auto 0;
+    margin: 1.2rem auto 0;
     background: none;
     border: 1px solid var(--stone-edge);
     color: var(--dim);
@@ -408,6 +364,41 @@
     cursor: pointer;
   }
   .replay:hover { color: var(--gold); border-color: var(--gold); }
+
+  .verse {
+    margin: 0 auto;
+    padding: clamp(2.5rem, 6vw, 4rem) max(16px, 4vw) clamp(2.5rem, 6vw, 3.5rem);
+    max-width: 46rem;
+    text-align: center;
+    display: grid;
+    gap: 1.1rem;
+    justify-items: center;
+  }
+  .verse blockquote { background: none; border: 0; padding: 0; }
+  .verse p {
+    margin: 0;
+    font-family: var(--display);
+    font-size: clamp(1.1rem, 2.6vw, 1.5rem);
+    line-height: 1.6;
+    color: #f2eee4;
+    text-wrap: balance;
+  }
+  .verse figcaption {
+    font-size: 0.8rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--gold);
+  }
+  .verse figcaption::before, .verse figcaption::after {
+    content: "";
+    display: inline-block;
+    width: 2rem;
+    height: 1px;
+    background: var(--gold);
+    vertical-align: middle;
+    margin: 0 .8rem;
+    opacity: .6;
+  }
 
   footer.site {
     background: var(--night);
@@ -430,22 +421,47 @@
 
   @media (prefers-reduced-motion: reduce) {
     html { scroll-behavior: auto; }
-    .leaf, .spill { transition: none; }
-    .walking .traveler, .walking .traveler svg { animation: none; }
-    .walking .traveler { transform: translate(-50%, -118%) scale(0.62); }
+    .leaf, .leaf .shade, .glow-wall, .spill, .rim { transition: none; }
+    .walking .traveler, .walking .traveler * { animation: none !important; }
+    .walking .traveler { transform: translateX(-50%) translateY(-34.6%) scale(.78); }
   }
 </style>
 </head>
 <body>
 
-<!-- Logo: a Latin cross standing inside a narrow arched gate -->
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<!-- Logo: a gold cross inside a stone arched gate -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
   <defs>
-    <symbol id="logo" viewBox="0 0 64 64">
-      <path d="M14 60 V26 A18 18 0 0 1 50 26 V60" fill="none" stroke="currentColor" stroke-width="3"/>
-      <path d="M8 60 H56" stroke="currentColor" stroke-width="3"/>
-      <rect x="29.5" y="14" width="5" height="40" fill="currentColor"/>
-      <rect x="21" y="24" width="22" height="5" fill="currentColor"/>
+    <linearGradient id="lgStoneA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a39d94"/><stop offset="1" stop-color="#5f5b57"/></linearGradient>
+    <linearGradient id="lgStoneB" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#948e86"/><stop offset="1" stop-color="#54514e"/></linearGradient>
+    <linearGradient id="lgInside" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#07080b"/><stop offset=".7" stop-color="#1b1710"/><stop offset="1" stop-color="#5a4219"/></linearGradient>
+    <linearGradient id="lgGold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff3cf"/><stop offset=".28" stop-color="#e9bd5f"/>
+      <stop offset=".55" stop-color="#9c6a1d"/><stop offset=".78" stop-color="#f0cf82"/><stop offset="1" stop-color="#7d5418"/>
+    </linearGradient>
+    <linearGradient id="lgGoldFace" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fbe3a4"/><stop offset=".5" stop-color="#d7a246"/><stop offset="1" stop-color="#a5731f"/>
+    </linearGradient>
+    <filter id="lgShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="1.2" dy="1.8" stdDeviation="1.2" flood-color="#000" flood-opacity=".7"/>
+    </filter>
+    <symbol id="logo" viewBox="0 0 120 132">
+      <path d="M34 120 V58 A26 26 0 0 1 86 58 V120 Z" fill="url(#lgInside)"/>
+      <g stroke="#2b2927" stroke-width=".8">
+        <rect x="20" y="58" width="14" height="20" fill="url(#lgStoneA)"/>
+        <rect x="18" y="79" width="16" height="20" fill="url(#lgStoneB)"/>
+        <rect x="20" y="100" width="14" height="20" fill="url(#lgStoneA)"/>
+        <rect x="86" y="58" width="14" height="20" fill="url(#lgStoneB)"/>
+        <rect x="86" y="79" width="16" height="20" fill="url(#lgStoneA)"/>
+        <rect x="86" y="100" width="14" height="20" fill="url(#lgStoneB)"/>
+        <path d="M34 57.3 A26 26 0 0 1 36.3 47.4 L23.5 41.7 A40 40 0 0 0 20 56.9Z" fill="url(#lgStoneB)"/><path d="M36.9 46.1 A26 26 0 0 1 43.2 38.1 L34.2 27.4 A40 40 0 0 0 24.5 39.6Z" fill="url(#lgStoneA)"/><path d="M44.4 37.2 A26 26 0 0 1 53.5 32.8 L50 19.3 A40 40 0 0 0 35.9 26Z" fill="url(#lgStoneB)"/><path d="M54.9 32.5 A26 26 0 0 1 65.1 32.5 L69 12.9 A46 46 0 0 0 51 12.9Z" fill="url(#lgStoneA)"/><path d="M66.5 32.8 A26 26 0 0 1 75.6 37.2 L84.1 26 A40 40 0 0 0 70 19.3Z" fill="url(#lgStoneA)"/><path d="M76.8 38.1 A26 26 0 0 1 83.1 46.1 L95.5 39.6 A40 40 0 0 0 85.8 27.4Z" fill="url(#lgStoneA)"/><path d="M83.7 47.4 A26 26 0 0 1 86 57.3 L100 56.9 A40 40 0 0 0 96.5 41.7Z" fill="url(#lgStoneB)"/>
+        <rect x="8" y="120" width="104" height="9" rx="1" fill="url(#lgStoneB)"/>
+      </g>
+      <path d="M8 120.6 H112" stroke="#c9c3b9" stroke-width=".8" opacity=".6"/>
+      <g filter="url(#lgShadow)">
+        <path d="M55.5 38 H64.5 V55 H78 V65 H64.5 V116 H55.5 V65 H42 V55 H55.5 Z" fill="url(#lgGold)"/>
+        <path d="M57.8 40.5 H62.2 V57.3 H75.6 V62.7 H62.2 V113.5 H57.8 V62.7 H44.4 V57.3 H57.8 Z" fill="url(#lgGoldFace)"/>
+      </g>
     </symbol>
   </defs>
 </svg>
@@ -470,7 +486,7 @@
 <main id="top">
   <section class="hero">
     <div class="wrap">
-      <svg class="mark" viewBox="0 0 64 64" style="color: var(--gold)" role="img" aria-label="Narrow Gate Designs cross logo"><use href="#logo"/></svg>
+      <svg class="mark" viewBox="0 0 120 132" style="color: var(--gold)" role="img" aria-label="Narrow Gate Designs cross logo"><use href="#logo"/></svg>
       <h1>Narrow Gate<em>Designs</em></h1>
       <p class="lede">Branding, websites and print for churches, ministries and small businesses who want their work to say something true.</p>
       <a class="cta" href="#contact">Start a project</a>
@@ -513,8 +529,8 @@
         <p>Every project starts with listening. We want to understand your people and your mission before we draw a single line.</p>
       </div>
       <blockquote>
-        <p>“Enter through the narrow gate. For wide is the gate and broad is the road that leads to destruction… But small is the gate and narrow the road that leads to life.”</p>
-        <cite>Matthew 7:13–14</cite>
+        <p>“Enter through the narrow gate.”</p>
+        <cite>Matthew 7:13</cite>
       </blockquote>
     </div>
   </section>
@@ -545,32 +561,168 @@
 
   <!-- Doors opening with someone entering -->
   <section class="gate-scene" aria-label="Animation: the gate doors open and a person walks through into the light">
-    <p class="caption">Small is the gate</p>
     <div class="stage" id="stage">
-      <div class="wall"></div>
-      <div class="ground"></div>
-      <div class="spill"></div>
-      <div class="doorway">
-        <div class="frame"></div>
-        <div class="opening"></div>
-        <div class="leaf left"></div>
-        <div class="leaf right"></div>
+      <svg class="bg" viewBox="0 0 600 520" aria-hidden="true">
+        <defs>
+          <filter id="grit" x="0" y="0" width="100%" height="100%">
+            <feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="3"/>
+            <feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .55 -.18"/>
+            <feComposite in2="SourceGraphic" operator="in"/>
+          </filter>
+          <radialGradient id="vignette" cx=".5" cy=".55" r=".62">
+            <stop offset=".45" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#0d0f14" stop-opacity=".96"/>
+          </radialGradient>
+          <radialGradient id="wallGlow" cx=".5" cy=".62" r=".45">
+            <stop offset="0" stop-color="#f3c874" stop-opacity=".55"/><stop offset=".5" stop-color="#e8b95a" stop-opacity=".16"/><stop offset="1" stop-color="#e8b95a" stop-opacity="0"/>
+          </radialGradient>
+          <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#f1c56a"/><stop offset=".55" stop-color="#fff4d6"/><stop offset="1" stop-color="#ffffff"/>
+          </linearGradient>
+          <linearGradient id="land" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#e7c27a"/><stop offset="1" stop-color="#9c7132"/>
+          </linearGradient>
+          <linearGradient id="road" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#fff8e6"/><stop offset="1" stop-color="#f0d39a"/>
+          </linearGradient>
+          <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#1c2029"/><stop offset="1" stop-color="#0e1016"/>
+          </linearGradient>
+          <linearGradient id="spillG" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#f6cf80" stop-opacity=".75"/><stop offset="1" stop-color="#e8b95a" stop-opacity="0"/>
+          </linearGradient>
+          <clipPath id="openingClip"><path d="M240 430 V210 A60 60 0 0 1 360 210 V430 Z"/></clipPath>
+        </defs>
+        <rect width="600" height="430" fill="#15181f"/>
+        <g><rect x="-45.5" y="1.5" width="46" height="27" rx="3" fill="#262b35"/><rect x="3.5" y="1.5" width="56" height="27" rx="3" fill="#252a34"/><rect x="62.5" y="1.5" width="48" height="27" rx="3" fill="#2b303b"/><rect x="113.5" y="1.5" width="69" height="27" rx="3" fill="#252a34"/><rect x="185.5" y="1.5" width="58" height="27" rx="3" fill="#252a34"/><rect x="246.5" y="1.5" width="78" height="27" rx="3" fill="#2b303b"/><rect x="327.5" y="1.5" width="46" height="27" rx="3" fill="#23272f"/><rect x="376.5" y="1.5" width="79" height="27" rx="3" fill="#252a34"/><rect x="458.5" y="1.5" width="57" height="27" rx="3" fill="#2e333d"/><rect x="518.5" y="1.5" width="83" height="27" rx="3" fill="#262b35"/><rect x="-11.5" y="31.5" width="79" height="27" rx="3" fill="#262b35"/><rect x="70.5" y="31.5" width="68" height="27" rx="3" fill="#252a34"/><rect x="141.5" y="31.5" width="57" height="27" rx="3" fill="#252a34"/><rect x="201.5" y="31.5" width="78" height="27" rx="3" fill="#23272f"/><rect x="282.5" y="31.5" width="51" height="27" rx="3" fill="#22262f"/><rect x="336.5" y="31.5" width="69" height="27" rx="3" fill="#282d38"/><rect x="408.5" y="31.5" width="77" height="27" rx="3" fill="#252a34"/><rect x="488.5" y="31.5" width="79" height="27" rx="3" fill="#22262f"/><rect x="570.5" y="31.5" width="78" height="27" rx="3" fill="#23272f"/><rect x="-51.5" y="61.5" width="54" height="27" rx="3" fill="#252a34"/><rect x="5.5" y="61.5" width="80" height="27" rx="3" fill="#262b35"/><rect x="88.5" y="61.5" width="83" height="27" rx="3" fill="#282d38"/><rect x="174.5" y="61.5" width="66" height="27" rx="3" fill="#252a34"/><rect x="243.5" y="61.5" width="78" height="27" rx="3" fill="#2e333d"/><rect x="324.5" y="61.5" width="47" height="27" rx="3" fill="#262b35"/><rect x="374.5" y="61.5" width="46" height="27" rx="3" fill="#262b35"/><rect x="423.5" y="61.5" width="56" height="27" rx="3" fill="#2b303b"/><rect x="482.5" y="61.5" width="86" height="27" rx="3" fill="#262b35"/><rect x="571.5" y="61.5" width="70" height="27" rx="3" fill="#23272f"/><rect x="-28.5" y="91.5" width="72" height="27" rx="3" fill="#262b35"/><rect x="46.5" y="91.5" width="72" height="27" rx="3" fill="#22262f"/><rect x="121.5" y="91.5" width="62" height="27" rx="3" fill="#282d38"/><rect x="186.5" y="91.5" width="93" height="27" rx="3" fill="#282d38"/><rect x="282.5" y="91.5" width="87" height="27" rx="3" fill="#23272f"/><rect x="372.5" y="91.5" width="58" height="27" rx="3" fill="#252a34"/><rect x="433.5" y="91.5" width="79" height="27" rx="3" fill="#22262f"/><rect x="515.5" y="91.5" width="76" height="27" rx="3" fill="#2b303b"/><rect x="594.5" y="91.5" width="99" height="27" rx="3" fill="#22262f"/><rect x="-54.5" y="121.5" width="71" height="27" rx="3" fill="#22262f"/><rect x="19.5" y="121.5" width="81" height="27" rx="3" fill="#252a34"/><rect x="103.5" y="121.5" width="50" height="27" rx="3" fill="#262b35"/><rect x="156.5" y="121.5" width="69" height="27" rx="3" fill="#282d38"/><rect x="228.5" y="121.5" width="91" height="27" rx="3" fill="#22262f"/><rect x="322.5" y="121.5" width="52" height="27" rx="3" fill="#2b303b"/><rect x="377.5" y="121.5" width="69" height="27" rx="3" fill="#252a34"/><rect x="449.5" y="121.5" width="85" height="27" rx="3" fill="#252a34"/><rect x="537.5" y="121.5" width="91" height="27" rx="3" fill="#262b35"/><rect x="-44.5" y="151.5" width="93" height="27" rx="3" fill="#23272f"/><rect x="51.5" y="151.5" width="63" height="27" rx="3" fill="#22262f"/><rect x="117.5" y="151.5" width="87" height="27" rx="3" fill="#22262f"/><rect x="207.5" y="151.5" width="81" height="27" rx="3" fill="#2b303b"/><rect x="291.5" y="151.5" width="80" height="27" rx="3" fill="#23272f"/><rect x="374.5" y="151.5" width="72" height="27" rx="3" fill="#252a34"/><rect x="449.5" y="151.5" width="96" height="27" rx="3" fill="#252a34"/><rect x="548.5" y="151.5" width="60" height="27" rx="3" fill="#2b303b"/><rect x="-52.5" y="181.5" width="85" height="27" rx="3" fill="#252a34"/><rect x="35.5" y="181.5" width="46" height="27" rx="3" fill="#2e333d"/><rect x="84.5" y="181.5" width="87" height="27" rx="3" fill="#22262f"/><rect x="174.5" y="181.5" width="84" height="27" rx="3" fill="#262b35"/><rect x="261.5" y="181.5" width="86" height="27" rx="3" fill="#23272f"/><rect x="350.5" y="181.5" width="71" height="27" rx="3" fill="#22262f"/><rect x="424.5" y="181.5" width="88" height="27" rx="3" fill="#2b303b"/><rect x="515.5" y="181.5" width="99" height="27" rx="3" fill="#2e333d"/><rect x="-30.5" y="211.5" width="44" height="27" rx="3" fill="#2b303b"/><rect x="16.5" y="211.5" width="65" height="27" rx="3" fill="#282d38"/><rect x="84.5" y="211.5" width="82" height="27" rx="3" fill="#252a34"/><rect x="169.5" y="211.5" width="74" height="27" rx="3" fill="#252a34"/><rect x="246.5" y="211.5" width="56" height="27" rx="3" fill="#23272f"/><rect x="305.5" y="211.5" width="61" height="27" rx="3" fill="#282d38"/><rect x="369.5" y="211.5" width="90" height="27" rx="3" fill="#282d38"/><rect x="462.5" y="211.5" width="68" height="27" rx="3" fill="#2b303b"/><rect x="533.5" y="211.5" width="101" height="27" rx="3" fill="#23272f"/><rect x="-39.5" y="241.5" width="48" height="27" rx="3" fill="#282d38"/><rect x="11.5" y="241.5" width="71" height="27" rx="3" fill="#2b303b"/><rect x="85.5" y="241.5" width="78" height="27" rx="3" fill="#22262f"/><rect x="166.5" y="241.5" width="99" height="27" rx="3" fill="#282d38"/><rect x="268.5" y="241.5" width="95" height="27" rx="3" fill="#2b303b"/><rect x="366.5" y="241.5" width="98" height="27" rx="3" fill="#262b35"/><rect x="467.5" y="241.5" width="60" height="27" rx="3" fill="#2e333d"/><rect x="530.5" y="241.5" width="69" height="27" rx="3" fill="#22262f"/><rect x="-51.5" y="271.5" width="99" height="27" rx="3" fill="#2b303b"/><rect x="50.5" y="271.5" width="57" height="27" rx="3" fill="#282d38"/><rect x="110.5" y="271.5" width="48" height="27" rx="3" fill="#282d38"/><rect x="161.5" y="271.5" width="52" height="27" rx="3" fill="#282d38"/><rect x="216.5" y="271.5" width="85" height="27" rx="3" fill="#282d38"/><rect x="304.5" y="271.5" width="43" height="27" rx="3" fill="#2b303b"/><rect x="350.5" y="271.5" width="96" height="27" rx="3" fill="#262b35"/><rect x="449.5" y="271.5" width="54" height="27" rx="3" fill="#22262f"/><rect x="506.5" y="271.5" width="61" height="27" rx="3" fill="#252a34"/><rect x="570.5" y="271.5" width="52" height="27" rx="3" fill="#2b303b"/><rect x="-42.5" y="301.5" width="66" height="27" rx="3" fill="#262b35"/><rect x="26.5" y="301.5" width="79" height="27" rx="3" fill="#22262f"/><rect x="108.5" y="301.5" width="51" height="27" rx="3" fill="#2e333d"/><rect x="162.5" y="301.5" width="97" height="27" rx="3" fill="#262b35"/><rect x="262.5" y="301.5" width="82" height="27" rx="3" fill="#2e333d"/><rect x="347.5" y="301.5" width="86" height="27" rx="3" fill="#2e333d"/><rect x="436.5" y="301.5" width="46" height="27" rx="3" fill="#2b303b"/><rect x="485.5" y="301.5" width="100" height="27" rx="3" fill="#23272f"/><rect x="588.5" y="301.5" width="92" height="27" rx="3" fill="#23272f"/><rect x="-51.5" y="331.5" width="94" height="27" rx="3" fill="#262b35"/><rect x="45.5" y="331.5" width="68" height="27" rx="3" fill="#2b303b"/><rect x="116.5" y="331.5" width="68" height="27" rx="3" fill="#2b303b"/><rect x="187.5" y="331.5" width="49" height="27" rx="3" fill="#2b303b"/><rect x="239.5" y="331.5" width="83" height="27" rx="3" fill="#2b303b"/><rect x="325.5" y="331.5" width="46" height="27" rx="3" fill="#282d38"/><rect x="374.5" y="331.5" width="47" height="27" rx="3" fill="#282d38"/><rect x="424.5" y="331.5" width="71" height="27" rx="3" fill="#282d38"/><rect x="498.5" y="331.5" width="50" height="27" rx="3" fill="#22262f"/><rect x="551.5" y="331.5" width="81" height="27" rx="3" fill="#252a34"/><rect x="-14.5" y="361.5" width="43" height="27" rx="3" fill="#262b35"/><rect x="31.5" y="361.5" width="52" height="27" rx="3" fill="#262b35"/><rect x="86.5" y="361.5" width="49" height="27" rx="3" fill="#22262f"/><rect x="138.5" y="361.5" width="82" height="27" rx="3" fill="#252a34"/><rect x="223.5" y="361.5" width="47" height="27" rx="3" fill="#23272f"/><rect x="273.5" y="361.5" width="56" height="27" rx="3" fill="#262b35"/><rect x="332.5" y="361.5" width="67" height="27" rx="3" fill="#282d38"/><rect x="402.5" y="361.5" width="83" height="27" rx="3" fill="#22262f"/><rect x="488.5" y="361.5" width="65" height="27" rx="3" fill="#262b35"/><rect x="556.5" y="361.5" width="66" height="27" rx="3" fill="#2b303b"/><rect x="-15.5" y="391.5" width="50" height="27" rx="3" fill="#23272f"/><rect x="37.5" y="391.5" width="74" height="27" rx="3" fill="#2b303b"/><rect x="114.5" y="391.5" width="73" height="27" rx="3" fill="#2b303b"/><rect x="190.5" y="391.5" width="62" height="27" rx="3" fill="#252a34"/><rect x="255.5" y="391.5" width="52" height="27" rx="3" fill="#252a34"/><rect x="310.5" y="391.5" width="90" height="27" rx="3" fill="#22262f"/><rect x="403.5" y="391.5" width="90" height="27" rx="3" fill="#22262f"/><rect x="496.5" y="391.5" width="73" height="27" rx="3" fill="#23272f"/><rect x="572.5" y="391.5" width="87" height="27" rx="3" fill="#282d38"/><rect x="-41.5" y="421.5" width="44" height="27" rx="3" fill="#282d38"/><rect x="5.5" y="421.5" width="76" height="27" rx="3" fill="#22262f"/><rect x="84.5" y="421.5" width="52" height="27" rx="3" fill="#2e333d"/><rect x="139.5" y="421.5" width="77" height="27" rx="3" fill="#252a34"/><rect x="219.5" y="421.5" width="91" height="27" rx="3" fill="#262b35"/><rect x="313.5" y="421.5" width="62" height="27" rx="3" fill="#2e333d"/><rect x="378.5" y="421.5" width="98" height="27" rx="3" fill="#252a34"/><rect x="479.5" y="421.5" width="87" height="27" rx="3" fill="#23272f"/><rect x="569.5" y="421.5" width="59" height="27" rx="3" fill="#262b35"/></g>
+        <rect width="600" height="430" filter="url(#grit)" fill="#000"/>
+        <rect class="glow-wall" width="600" height="430" fill="url(#wallGlow)"/>
+        <!-- The world beyond the gate: a narrow road toward a distant hill and cross -->
+        <g clip-path="url(#openingClip)">
+          <rect x="240" y="150" width="120" height="280" fill="url(#sky)"/>
+          <path d="M240 352 Q270 336 292 340 Q318 330 360 348 V430 H240 Z" fill="url(#land)"/>
+          <path d="M296 341 L304 341 L336 430 L264 430 Z" fill="url(#road)"/>
+          <path d="M318 336 Q324 326 332 330 Q340 333 346 340 Z" fill="#b48c4c" opacity=".7"/>
+          <g fill="#8a6a36" opacity=".75"><rect x="330.6" y="310" width="2.2" height="21"/><rect x="326.2" y="315" width="11" height="2"/></g>
+          <circle cx="300" cy="300" r="40" fill="#fff" opacity=".35"/>
+        </g>
+        <!-- Floor in front of the gate -->
+        <rect y="430" width="600" height="90" fill="url(#floor)"/>
+        <g stroke="#0b0d11" stroke-width="1.2" opacity=".8">
+          <path d="M0 448 H600"/><path d="M0 472 H600"/><path d="M0 503 H600"/>
+          <path d="M270 430 L200 520"/><path d="M330 430 L400 520"/><path d="M230 430 L90 520"/><path d="M370 430 L510 520"/><path d="M300 430 V520"/>
+        </g>
+        <path class="spill" d="M240 430 H360 L470 520 H130 Z" fill="url(#spillG)"/>
+        <rect width="600" height="520" fill="url(#vignette)"/>
+      </svg>
+      <div class="leaf left">
+        <svg viewBox="0 0 60 280" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="plankl0" x1="0" x2="1"><stop offset="0" stop-color="#4a3325"/><stop offset=".5" stop-color="#5a3f2d"/><stop offset="1" stop-color="#3e2a1e"/></linearGradient>
+            <linearGradient id="plankl1" x1="0" x2="1"><stop offset="0" stop-color="#43301f"/><stop offset=".5" stop-color="#533a29"/><stop offset="1" stop-color="#39271b"/></linearGradient>
+            <linearGradient id="ironl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a3a3f"/><stop offset=".5" stop-color="#1c1c20"/><stop offset="1" stop-color="#101013"/></linearGradient>
+            <filter id="grainl" x="0" y="0" width="100%" height="100%">
+              <feTurbulence type="fractalNoise" baseFrequency=".55 .012" numOctaves="3" seed="11"/>
+              <feColorMatrix values="0 0 0 0 .06  0 0 0 0 .035  0 0 0 0 .02  2.2 0 0 0 -.95"/>
+            </filter>
+            <clipPath id="leafClipl"><path d="M0 280 V60 A60 60 0 0 1 60 0 V280 Z"/></clipPath>
+          </defs>
+          <g clip-path="url(#leafClipl)">
+            <rect x="0" y="0" width="15" height="280" fill="url(#plankl0)"/><path d="M0.5 0 V280" stroke="#1a110b" stroke-width="1.2"/><rect x="15" y="0" width="15" height="280" fill="url(#plankl1)"/><path d="M15.5 0 V280" stroke="#1a110b" stroke-width="1.2"/><rect x="30" y="0" width="15" height="280" fill="url(#plankl0)"/><path d="M30.5 0 V280" stroke="#1a110b" stroke-width="1.2"/><rect x="45" y="0" width="15" height="280" fill="url(#plankl1)"/><path d="M45.5 0 V280" stroke="#1a110b" stroke-width="1.2"/>
+            <rect width="60" height="280" filter="url(#grainl)"/>
+            <path d="M0 46 H58" stroke="url(#ironl)" stroke-width="9" stroke-linecap="round"/><path d="M0 150 H58" stroke="url(#ironl)" stroke-width="9" stroke-linecap="round"/><path d="M0 246 H58" stroke="url(#ironl)" stroke-width="9" stroke-linecap="round"/><circle cx="8" cy="46" r="1.7" fill="#5a5a5e"/><circle cx="7.5" cy="45.4" r=".6" fill="#9a9aa0"/><circle cx="22" cy="46" r="1.7" fill="#5a5a5e"/><circle cx="21.5" cy="45.4" r=".6" fill="#9a9aa0"/><circle cx="38" cy="46" r="1.7" fill="#5a5a5e"/><circle cx="37.5" cy="45.4" r=".6" fill="#9a9aa0"/><circle cx="52" cy="46" r="1.7" fill="#5a5a5e"/><circle cx="51.5" cy="45.4" r=".6" fill="#9a9aa0"/><circle cx="8" cy="150" r="1.7" fill="#5a5a5e"/><circle cx="7.5" cy="149.4" r=".6" fill="#9a9aa0"/><circle cx="22" cy="150" r="1.7" fill="#5a5a5e"/><circle cx="21.5" cy="149.4" r=".6" fill="#9a9aa0"/><circle cx="38" cy="150" r="1.7" fill="#5a5a5e"/><circle cx="37.5" cy="149.4" r=".6" fill="#9a9aa0"/><circle cx="52" cy="150" r="1.7" fill="#5a5a5e"/><circle cx="51.5" cy="149.4" r=".6" fill="#9a9aa0"/><circle cx="8" cy="246" r="1.7" fill="#5a5a5e"/><circle cx="7.5" cy="245.4" r=".6" fill="#9a9aa0"/><circle cx="22" cy="246" r="1.7" fill="#5a5a5e"/><circle cx="21.5" cy="245.4" r=".6" fill="#9a9aa0"/><circle cx="38" cy="246" r="1.7" fill="#5a5a5e"/><circle cx="37.5" cy="245.4" r=".6" fill="#9a9aa0"/><circle cx="52" cy="246" r="1.7" fill="#5a5a5e"/><circle cx="51.5" cy="245.4" r=".6" fill="#9a9aa0"/>
+            <circle cx="48" cy="176" r="5" fill="#1b1b1f"/>
+            <circle cx="48" cy="188" r="8" fill="none" stroke="#232327" stroke-width="3"/>
+            <path d="M40 188 A8 8 0 0 1 48 180" fill="none" stroke="#6c6c72" stroke-width="1"/>
+            <rect width="60" height="280" class="shade" fill="#000"/>
+          </g>
+          <path d="M0 280 V60 A60 60 0 0 1 60 0 V280 Z" fill="none" stroke="#1a110b" stroke-width="2"/>
+        </svg>
       </div>
+      <div class="leaf right">
+        <svg viewBox="0 0 60 280" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="plankr0" x1="0" x2="1"><stop offset="0" stop-color="#4a3325"/><stop offset=".5" stop-color="#5a3f2d"/><stop offset="1" stop-color="#3e2a1e"/></linearGradient>
+            <linearGradient id="plankr1" x1="0" x2="1"><stop offset="0" stop-color="#43301f"/><stop offset=".5" stop-color="#533a29"/><stop offset="1" stop-color="#39271b"/></linearGradient>
+            <linearGradient id="ironr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a3a3f"/><stop offset=".5" stop-color="#1c1c20"/><stop offset="1" stop-color="#101013"/></linearGradient>
+            <filter id="grainr" x="0" y="0" width="100%" height="100%">
+              <feTurbulence type="fractalNoise" baseFrequency=".55 .012" numOctaves="3" seed="19"/>
+              <feColorMatrix values="0 0 0 0 .06  0 0 0 0 .035  0 0 0 0 .02  2.2 0 0 0 -.95"/>
+            </filter>
+            <clipPath id="leafClipr"><path d="M60 280 V60 A60 60 0 0 0 0 0 V280 Z"/></clipPath>
+          </defs>
+          <g clip-path="url(#leafClipr)">
+            <rect x="0" y="0" width="15" height="280" fill="url(#plankr0)"/><path d="M0.5 0 V280" stroke="#1a110b" stroke-width="1.2"/><rect x="15" y="0" width="15" height="280" fill="url(#plankr1)"/><path d="M15.5 0 V280" stroke="#1a110b" stroke-width="1.2"/><rect x="30" y="0" width="15" height="280" fill="url(#plankr0)"/><path d="M30.5 0 V280" stroke="#1a110b" stroke-width="1.2"/><rect x="45" y="0" width="15" height="280" fill="url(#plankr1)"/><path d="M45.5 0 V280" stroke="#1a110b" stroke-width="1.2"/>
+            <rect width="60" height="280" filter="url(#grainr)"/>
+            <path d="M2 46 H60" stroke="url(#ironr)" stroke-width="9" stroke-linecap="round"/><path d="M2 150 H60" stroke="url(#ironr)" stroke-width="9" stroke-linecap="round"/><path d="M2 246 H60" stroke="url(#ironr)" stroke-width="9" stroke-linecap="round"/><circle cx="8" cy="46" r="1.7" fill="#5a5a5e"/><circle cx="7.5" cy="45.4" r=".6" fill="#9a9aa0"/><circle cx="22" cy="46" r="1.7" fill="#5a5a5e"/><circle cx="21.5" cy="45.4" r=".6" fill="#9a9aa0"/><circle cx="38" cy="46" r="1.7" fill="#5a5a5e"/><circle cx="37.5" cy="45.4" r=".6" fill="#9a9aa0"/><circle cx="52" cy="46" r="1.7" fill="#5a5a5e"/><circle cx="51.5" cy="45.4" r=".6" fill="#9a9aa0"/><circle cx="8" cy="150" r="1.7" fill="#5a5a5e"/><circle cx="7.5" cy="149.4" r=".6" fill="#9a9aa0"/><circle cx="22" cy="150" r="1.7" fill="#5a5a5e"/><circle cx="21.5" cy="149.4" r=".6" fill="#9a9aa0"/><circle cx="38" cy="150" r="1.7" fill="#5a5a5e"/><circle cx="37.5" cy="149.4" r=".6" fill="#9a9aa0"/><circle cx="52" cy="150" r="1.7" fill="#5a5a5e"/><circle cx="51.5" cy="149.4" r=".6" fill="#9a9aa0"/><circle cx="8" cy="246" r="1.7" fill="#5a5a5e"/><circle cx="7.5" cy="245.4" r=".6" fill="#9a9aa0"/><circle cx="22" cy="246" r="1.7" fill="#5a5a5e"/><circle cx="21.5" cy="245.4" r=".6" fill="#9a9aa0"/><circle cx="38" cy="246" r="1.7" fill="#5a5a5e"/><circle cx="37.5" cy="245.4" r=".6" fill="#9a9aa0"/><circle cx="52" cy="246" r="1.7" fill="#5a5a5e"/><circle cx="51.5" cy="245.4" r=".6" fill="#9a9aa0"/>
+            <circle cx="12" cy="176" r="5" fill="#1b1b1f"/>
+            <circle cx="12" cy="188" r="8" fill="none" stroke="#232327" stroke-width="3"/>
+            <path d="M4 188 A8 8 0 0 1 12 180" fill="none" stroke="#6c6c72" stroke-width="1"/>
+            <rect width="60" height="280" class="shade" fill="#000"/>
+          </g>
+          <path d="M60 280 V60 A60 60 0 0 0 0 0 V280 Z" fill="none" stroke="#1a110b" stroke-width="2"/>
+        </svg>
+      </div>
+      <svg class="frame" viewBox="0 0 600 520" aria-hidden="true">
+        <defs>
+          <linearGradient id="stA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#565d69"/><stop offset="1" stop-color="#343945"/></linearGradient>
+          <linearGradient id="stB" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4d5460"/><stop offset="1" stop-color="#2f343f"/></linearGradient>
+          <linearGradient id="stC" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5c6370"/><stop offset="1" stop-color="#383d48"/></linearGradient>
+          <linearGradient id="rimLight" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#f3c874" stop-opacity="0"/><stop offset=".5" stop-color="#f3c874" stop-opacity=".9"/><stop offset="1" stop-color="#f3c874" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <g stroke="#15181f" stroke-width="1"><path d="M240 209.3 A60 60 0 0 1 242.2 193.8 L205.6 183.5 A98 98 0 0 0 202 208.8Z" fill="url(#stB)"/><path d="M242.6 192.4 A60 60 0 0 1 249.1 178.2 L216.9 158 A98 98 0 0 0 206.3 181.2Z" fill="url(#stA)"/><path d="M249.9 176.9 A60 60 0 0 1 260.2 165.1 L234.9 136.7 A98 98 0 0 0 218.2 156Z" fill="url(#stB)"/><path d="M261.3 164.2 A60 60 0 0 1 274.4 155.7 L258.2 121.4 A98 98 0 0 0 236.7 135.2Z" fill="url(#stA)"/><path d="M275.7 155.1 A60 60 0 0 1 290.7 150.7 L284.9 113.2 A98 98 0 0 0 260.4 120.4Z" fill="url(#stC)"/><path d="M292.2 150.5 A60 60 0 0 1 307.8 150.5 L314.3 100.9 A110 110 0 0 0 285.7 100.9Z" fill="url(#stC)"/><path d="M309.3 150.7 A60 60 0 0 1 324.3 155.1 L339.6 120.4 A98 98 0 0 0 315.1 113.2Z" fill="url(#stC)"/><path d="M325.6 155.7 A60 60 0 0 1 338.7 164.2 L363.3 135.2 A98 98 0 0 0 341.8 121.4Z" fill="url(#stB)"/><path d="M339.8 165.1 A60 60 0 0 1 350.1 176.9 L381.8 156 A98 98 0 0 0 365.1 136.7Z" fill="url(#stC)"/><path d="M350.9 178.2 A60 60 0 0 1 357.4 192.4 L393.7 181.2 A98 98 0 0 0 383.1 158Z" fill="url(#stA)"/><path d="M357.8 193.8 A60 60 0 0 1 360 209.3 L398 208.8 A98 98 0 0 0 394.4 183.5Z" fill="url(#stC)"/><rect x="197" y="211" width="42" height="42" rx="2" fill="url(#stA)"/><rect x="207" y="255" width="32" height="42" rx="2" fill="url(#stB)"/><rect x="197" y="299" width="42" height="42" rx="2" fill="url(#stC)"/><rect x="207" y="343" width="32" height="42" rx="2" fill="url(#stA)"/><rect x="197" y="387" width="42" height="42" rx="2" fill="url(#stB)"/><rect x="361" y="211" width="42" height="42" rx="2" fill="url(#stB)"/><rect x="361" y="255" width="32" height="42" rx="2" fill="url(#stC)"/><rect x="361" y="299" width="42" height="42" rx="2" fill="url(#stA)"/><rect x="361" y="343" width="32" height="42" rx="2" fill="url(#stB)"/><rect x="361" y="387" width="42" height="42" rx="2" fill="url(#stC)"/></g><g filter="url(#grit)" opacity=".5"><path d="M240 209.3 A60 60 0 0 1 242.2 193.8 L205.6 183.5 A98 98 0 0 0 202 208.8Z" fill="url(#stB)"/><path d="M242.6 192.4 A60 60 0 0 1 249.1 178.2 L216.9 158 A98 98 0 0 0 206.3 181.2Z" fill="url(#stA)"/><path d="M249.9 176.9 A60 60 0 0 1 260.2 165.1 L234.9 136.7 A98 98 0 0 0 218.2 156Z" fill="url(#stB)"/><path d="M261.3 164.2 A60 60 0 0 1 274.4 155.7 L258.2 121.4 A98 98 0 0 0 236.7 135.2Z" fill="url(#stA)"/><path d="M275.7 155.1 A60 60 0 0 1 290.7 150.7 L284.9 113.2 A98 98 0 0 0 260.4 120.4Z" fill="url(#stC)"/><path d="M292.2 150.5 A60 60 0 0 1 307.8 150.5 L314.3 100.9 A110 110 0 0 0 285.7 100.9Z" fill="url(#stC)"/><path d="M309.3 150.7 A60 60 0 0 1 324.3 155.1 L339.6 120.4 A98 98 0 0 0 315.1 113.2Z" fill="url(#stC)"/><path d="M325.6 155.7 A60 60 0 0 1 338.7 164.2 L363.3 135.2 A98 98 0 0 0 341.8 121.4Z" fill="url(#stB)"/><path d="M339.8 165.1 A60 60 0 0 1 350.1 176.9 L381.8 156 A98 98 0 0 0 365.1 136.7Z" fill="url(#stC)"/><path d="M350.9 178.2 A60 60 0 0 1 357.4 192.4 L393.7 181.2 A98 98 0 0 0 383.1 158Z" fill="url(#stA)"/><path d="M357.8 193.8 A60 60 0 0 1 360 209.3 L398 208.8 A98 98 0 0 0 394.4 183.5Z" fill="url(#stC)"/><rect x="197" y="211" width="42" height="42" rx="2" fill="url(#stA)"/><rect x="207" y="255" width="32" height="42" rx="2" fill="url(#stB)"/><rect x="197" y="299" width="42" height="42" rx="2" fill="url(#stC)"/><rect x="207" y="343" width="32" height="42" rx="2" fill="url(#stA)"/><rect x="197" y="387" width="42" height="42" rx="2" fill="url(#stB)"/><rect x="361" y="211" width="42" height="42" rx="2" fill="url(#stB)"/><rect x="361" y="255" width="32" height="42" rx="2" fill="url(#stC)"/><rect x="361" y="299" width="42" height="42" rx="2" fill="url(#stA)"/><rect x="361" y="343" width="32" height="42" rx="2" fill="url(#stB)"/><rect x="361" y="387" width="42" height="42" rx="2" fill="url(#stC)"/></g>
+        <!-- warm light catching the inner edge of the stones -->
+        <path class="rim" d="M240 430 V210 A60 60 0 0 1 360 210 V430" fill="none" stroke="#f3c874" stroke-width="2.5"/>
+        <rect x="222" y="430" width="156" height="9" rx="2" fill="#4a505b"/>
+        <rect x="222" y="430" width="156" height="1.6" fill="url(#rimLight)" class="rim"/>
+      </svg>
       <div class="traveler" aria-hidden="true">
-        <!-- A person seen from behind, walking toward the door -->
-        <svg viewBox="0 0 40 100">
-          <g class="figure">
-            <circle cx="20" cy="11" r="8"/>
-            <path d="M9 24 Q20 19 31 24 L33 58 Q20 61 7 58 Z"/>
-            <path d="M9 26 L3 52 L7 53 L13 30 Z"/>
-            <path d="M31 26 L37 52 L33 53 L27 30 Z"/>
-            <path d="M10 57 L12 97 L18 97 L20 60 Z"/>
-            <path d="M30 57 L28 97 L22 97 L20 60 Z"/>
+        <svg viewBox="0 0 100 260" overflow="visible" aria-hidden="true">
+          <defs>
+            <linearGradient id="shadowG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity=".75"/><stop offset="1" stop-color="#000" stop-opacity="0"/></linearGradient>
+            <linearGradient id="coat" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#1b1e25"/><stop offset=".5" stop-color="#101217"/><stop offset="1" stop-color="#1b1e25"/></linearGradient>
+          </defs>
+          <!-- shadow cast toward the viewer by the light behind -->
+          <path class="shadow" d="M36 256 L64 256 L86 330 L14 330 Z" fill="url(#shadowG)"/>
+          <g class="body">
+            <g class="leg leg-l">
+              <path d="M32 124 L50 124 L49 156 Q48 190 46.5 236 L35.5 236 Q34 190 33 156 Z" fill="#12141a"/>
+              <path d="M34.5 234 L47 234 Q48.5 246 47 256 Q41 258.5 35 256 Q33 246 34.5 234 Z" fill="#07080a"/>
+            </g>
+            <g class="leg leg-r">
+              <path d="M50 124 L68 124 L67 156 Q66 190 64.5 236 L53.5 236 Q52 190 51 156 Z" fill="#12141a"/>
+              <path d="M53 234 L65.5 234 Q67 246 65 256 Q59 258.5 53 256 Q51.5 246 53 234 Z" fill="#07080a"/>
+            </g>
+            <g class="arm arm-l">
+              <path d="M27 50 Q20 54 19.5 68 L17 112 Q16.5 122 18 128 L25 128 Q25 120 26 112 L30 70 Z" fill="#16181e"/>
+              <path d="M17.6 127 Q16 136 19 141 Q23 143 25 137 L25 127 Z" fill="#1f1b19"/>
+            </g>
+            <g class="arm arm-r">
+              <path d="M73 50 Q80 54 80.5 68 L83 112 Q83.5 122 82 128 L75 128 Q75 120 74 112 L70 70 Z" fill="#16181e"/>
+              <path d="M82.4 127 Q84 136 81 141 Q77 143 75 137 L75 127 Z" fill="#1f1b19"/>
+            </g>
+            <path d="M44.5 34 H55.5 V46 H44.5 Z" fill="#1f1b19"/>
+            <!-- coat, seen from behind, with a center seam and hem -->
+            <path d="M31 45 Q50 38 69 45 Q76.5 48 76 58 L74 104 Q73.5 124 72 134 Q50 138 28 134 Q26.5 124 26 104 L24 58 Q23.5 48 31 45 Z" fill="url(#coat)"/>
+            <path d="M50 44 V135" stroke="#0a0b0e" stroke-width="1"/>
+            <path d="M40 43 Q50 47 60 43 L58 40 Q50 43 42 40 Z" fill="#0c0d11"/>
+            <!-- head and hair -->
+            <ellipse cx="50" cy="22" rx="12.5" ry="14.5" fill="#0c0c0f"/>
+            <path d="M37.8 20 Q38 6 50 6.5 Q62 6 62.2 20 Q62 30 58 34 Q50 36.5 42 34 Q38 30 37.8 20 Z" fill="#121013"/>
+            <ellipse cx="37.4" cy="23" rx="2" ry="4" fill="#1f1b19"/>
+            <ellipse cx="62.6" cy="23" rx="2" ry="4" fill="#1f1b19"/>
           </g>
         </svg>
       </div>
     </div>
     <button class="replay" id="replay" type="button">Open the gate again</button>
+    <figure class="verse">
+      <blockquote>
+        <p>“Enter through the narrow gate. For wide is the gate and broad is the road that leads to destruction, and many enter through it. But small is the gate and narrow the road that leads to life, and only a few find it.”</p>
+      </blockquote>
+      <figcaption>Matthew 7:13–14</figcaption>
+    </figure>
     <footer class="site">
       <div class="wrap">
         <span>© <span id="year">2026</span> Narrow Gate Designs</span>
@@ -597,7 +749,7 @@
       timer = setTimeout(function () {
         stage.classList.remove('walking');
         stage.classList.add('entered');
-      }, 5700);
+      }, 7600);
     }
 
     document.getElementById('replay').addEventListener('click', play);
