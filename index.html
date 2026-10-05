@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Beauty and Praise — Herbs &amp; Healthy Reminders</title>
+  <meta name="description" content="Beauty and Praise: a gentle guide to everyday herbs and simple healthy reminders.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;700&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <nav class="nav container">
+      <a href="#top" class="logo">🌿 Beauty <span>&amp;</span> Praise</a>
+      <button class="nav-toggle" aria-label="Open menu" aria-expanded="false">☰</button>
+      <ul class="nav-links">
+        <li><a href="#herbs">Herbs</a></li>
+        <li><a href="#reminders">Reminders</a></li>
+        <li><a href="#about">About</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main id="top">
+    <!-- Hero -->
+    <section class="hero">
+      <div class="container hero-inner">
+        <p class="eyebrow">Nourish body &amp; spirit</p>
+        <h1>Beauty and Praise</h1>
+        <p class="lead">A gentle guide to the herbs that grow around us and the small daily habits that keep us well.</p>
+        <div class="hero-actions">
+          <a href="#herbs" class="btn btn-primary">Explore herbs</a>
+          <a href="#reminders" class="btn btn-ghost">Today's reminders</a>
+        </div>
+        <blockquote class="verse" id="daily-verse"></blockquote>
+      </div>
+    </section>
+
+    <!-- Herbs -->
+    <section id="herbs" class="section">
+      <div class="container">
+        <h2>Herb Garden</h2>
+        <p class="section-intro">Learn about common herbs, how people use them, and what to be careful about.</p>
+
+        <div class="herb-controls">
+          <input type="search" id="herb-search" placeholder="Search herbs (e.g. calming, digestion)…" aria-label="Search herbs">
+          <div class="filters" id="herb-filters" role="group" aria-label="Filter herbs by benefit"></div>
+        </div>
+
+        <div class="herb-grid" id="herb-grid"></div>
+        <p class="empty" id="herb-empty" hidden>No herbs match your search.</p>
+      </div>
+    </section>
+
+    <!-- Reminders -->
+    <section id="reminders" class="section section-alt">
+      <div class="container">
+        <h2>Healthy Reminders</h2>
+        <p class="section-intro">Small steps, done daily. Tick them off as you go — your progress resets each morning.</p>
+
+        <div class="reminder-layout">
+          <div class="card tip-card">
+            <h3>Reminder of the moment</h3>
+            <p id="tip-text" class="tip-text"></p>
+            <button class="btn btn-primary" id="next-tip">Another reminder</button>
+          </div>
+
+          <div class="card checklist-card">
+            <div class="checklist-head">
+              <h3>Today's checklist</h3>
+              <span id="progress-label">0 / 0</span>
+            </div>
+            <div class="progress"><div class="progress-bar" id="progress-bar"></div></div>
+            <ul class="checklist" id="checklist"></ul>
+            <form id="add-habit" class="add-habit">
+              <input type="text" id="habit-input" placeholder="Add your own reminder…" maxlength="80" aria-label="New reminder">
+              <button class="btn btn-primary" type="submit">Add</button>
+            </form>
+          </div>
+
+          <div class="card water-card">
+            <h3>Water tracker</h3>
+            <p>Aim for about 8 glasses today.</p>
+            <div class="glasses" id="glasses" aria-label="Glasses of water"></div>
+            <p class="water-count"><span id="water-count">0</span> of 8 glasses</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- About -->
+    <section id="about" class="section">
+      <div class="container about">
+        <h2>About Beauty and Praise</h2>
+        <p>Beauty and Praise celebrates the gifts of creation — the leaves, roots and flowers that have comforted people for generations — and encourages simple, grateful habits for a healthier life.</p>
+        <p class="disclaimer"><strong>Please note:</strong> The information on this site is for general education only and is not medical advice. Herbs can interact with medicines and may not be safe during pregnancy or for certain conditions. Always talk with a doctor or qualified health professional before starting any herb or supplement.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>🌿 Beauty and Praise · Made with gratitude · <span id="year"></span></p>
+    </div>
+  </footer>
+
+  <script src="data.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
