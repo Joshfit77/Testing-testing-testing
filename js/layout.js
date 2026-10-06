@@ -121,6 +121,8 @@ const ICONS = {
   pot: '<path d="M5 10h14l-1.5 10h-11L5 10zM12 10V5M12 7c-2-3-5-3-6-2 1 2 4 3 6 2zm0-1c2-3 5-3 6-2-1 2-4 3-6 2z" />',
   cup: '<path d="M4 8h13v5a6 6 0 0 1-6 6h-1a6 6 0 0 1-6-6V8zM17 10h1.5a2.5 2.5 0 0 1 0 5H17M8 3v2M12 3v2" />',
   book: '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2V5zM4 19a2 2 0 0 1 2-2h13" />',
+  clock: '<circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />',
+  calendar: '<rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" />',
   print: '<path d="M7 8V3h10v5M7 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M7 14h10v7H7z" />',
   mail: '<path d="M3 6h18v12H3zM3 7l9 6 9-6" />',
   instagram: '<rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r="0.6" />',
@@ -210,8 +212,13 @@ function siteMenu() {
       { href: "interactions.html", label: "Safety Checker", desc: "Is it safe with my medicines?", highlight: true },
       ...SAFETY_GUIDES.map((g) => ({ href: `safety/${g.id}.html`, label: g.short, small: true }))
     ] },
-    { id: "bible", label: "Bible", href: "bible.html" },
+    { id: "bible", label: "Bible", items: [
+      { href: "bible.html", label: "Herbs & Fruits of the Bible", desc: "Every herb and fruit in Scripture" },
+      { href: "devotional.html", label: "Weekly Devotional", desc: "A verse, prayer & habit each week" }
+    ] },
     { id: "learn", label: "Learn", items: [
+      { href: "myplan.html", label: "My Plan", desc: "Your saved herbs, plan & checklist", highlight: true },
+      { href: "recipes.html", label: "Recipes", desc: "Teas, syrups, smoothies & more" },
       { href: "reminders.html", label: "Healthy Living", desc: "Daily checklist, water & reminders" },
       { href: "quiz.html", label: "Knowledge Quiz", desc: "Test what you know" },
       { href: "journal.html", label: "Journal", desc: "Articles & seasonal tips" },
@@ -224,7 +231,8 @@ const PAGE_GROUP = {
   herbs: "browse", herb: "browse", fruits: "browse", fruit: "browse", stacks: "browse",
   guides: "help", guide: "help", finder: "help",
   interactions: "safety", safetyguide: "safety",
-  bible: "bible",
+  bible: "bible", devotional: "bible",
+  myplan: "learn", recipes: "learn", recipe: "learn",
   living: "learn", quiz: "learn", journal: "learn", about: "learn", legal: "learn"
 };
 
@@ -288,7 +296,8 @@ function renderChrome() {
         <div class="header-actions">
           <a href="finder.html" class="btn btn-primary btn-small header-cta">What should I take?</a>
           <button class="icon-btn search-btn" aria-label="Search">${icon("search")}</button>
-          <a href="herbs.html?saved=1" class="icon-btn" aria-label="Your saved herbs">${icon("heart")}</a>
+          <a href="myplan.html" class="icon-btn" aria-label="My Plan — your saved herbs"${page === "myplan" ? ' aria-current="page"' : ""}>${icon("heart")}</a>
+          <a href="es/index.html" class="lang-link" lang="es" hreflang="es" aria-label="Español">ES</a>
         </div>
       </div>
     </header>
@@ -297,6 +306,7 @@ function renderChrome() {
         <button class="icon-btn drawer-close" aria-label="Close menu">${icon("close")}</button>
         <a href="finder.html" class="btn btn-primary drawer-cta">What should I take?</a>
         <nav class="drawer-nav" aria-label="Menu">${mobile}</nav>
+        <p class="drawer-extra"><a href="myplan.html">${icon("heart")} My Plan</a><a href="es/index.html" lang="es">Español</a></p>
         <p class="drawer-verse">“${dailyPick(VERSES).text}”</p>
       </div>
     </div>
@@ -337,7 +347,7 @@ function renderChrome() {
         ${footCol(menu[0])}
         <div><h3>Help Me With</h3><ul><li><a href="finder.html">What should I take?</a></li>${TOPIC_GUIDES.slice(0, 4).map((g) => `<li><a href="guides/${g.id}.html">${g.short}</a></li>`).join("")}<li><a href="guides.html">All guides</a></li></ul></div>
         ${footCol(menu[2])}
-        <div><h3>Learn</h3><ul><li><a href="bible.html">Herbs &amp; fruits of the Bible</a></li>${menu[4].items.map((i) => `<li><a href="${i.href}">${i.label}</a></li>`).join("")}</ul></div>
+        <div><h3>Learn</h3><ul>${[...menu[3].items, ...menu[4].items.filter((i) => i.href !== "about.html")].map((i) => `<li><a href="${i.href}">${i.label}</a></li>`).join("")}<li><a href="about.html">About Us</a></li><li><a href="es/index.html" lang="es">Español</a></li></ul></div>
       </div>
       <div class="container footer-bottom">
         <p>© ${new Date().getFullYear()} Beauty &amp; Praise. All rights reserved.</p>

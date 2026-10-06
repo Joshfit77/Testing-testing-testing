@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Builds one real page per herb (herbs/<id>.html) and per fruit (fruits/<id>.html), plus
+// Builds one real page per herb, fruit, guide and recipe (herbs/<id>.html, fruits/<id>.html, …),
+// the list of your own photos (js/my-photos.js), plus
 // sitemap.xml and robots.txt, so search engines can find and index every page.
 //
 // Run from the project folder whenever you change herb or fruit data:
@@ -21,12 +22,12 @@ const read = (f) => fs.readFileSync(path.join(root, f), "utf8");
 const ctx = {};
 vm.createContext(ctx);
 vm.runInContext(
-  ["js/herbs-data.js", "js/herbs-summary.js", "js/herbs-benefits.js", "js/herbs-pharm.js", "js/herbs-caps.js", "js/fruits-data.js", "js/stacks.js", "js/content.js", "js/interactions.js", "js/guides.js"]
+  ["js/herbs-data.js", "js/herbs-summary.js", "js/herbs-benefits.js", "js/herbs-pharm.js", "js/herbs-caps.js", "js/fruits-data.js", "js/stacks.js", "js/content.js", "js/interactions.js", "js/guides.js", "js/recipes.js"]
     .map(read).join("\n") +
-    "\nthis.D = { HERBS, SUMMARY, BENEFITS, PHARM, CAPS, FRUITS, CATEGORIES, EVIDENCE, STACKS, ARTICLES, INTERACTIONS, IX_DETAILS, TOPIC_GUIDES, SAFETY_GUIDES };",
+    "\nthis.D = { HERBS, SUMMARY, BENEFITS, PHARM, CAPS, FRUITS, CATEGORIES, EVIDENCE, STACKS, ARTICLES, INTERACTIONS, IX_DETAILS, TOPIC_GUIDES, SAFETY_GUIDES, RECIPES, RECIPE_TYPES };",
   ctx
 );
-const { HERBS, SUMMARY, BENEFITS, PHARM, CAPS, FRUITS, CATEGORIES, EVIDENCE, STACKS, ARTICLES, INTERACTIONS, IX_DETAILS, TOPIC_GUIDES, SAFETY_GUIDES } = ctx.D;
+const { HERBS, SUMMARY, BENEFITS, PHARM, CAPS, FRUITS, CATEGORIES, EVIDENCE, STACKS, ARTICLES, INTERACTIONS, IX_DETAILS, TOPIC_GUIDES, SAFETY_GUIDES, RECIPES, RECIPE_TYPES } = ctx.D;
 
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const firstSentences = (text, max = 155) => {
@@ -66,6 +67,25 @@ const breadcrumb = (section, sectionUrl, name, url) => ({
     { "@type": "ListItem", position: 3, name, item: url }
   ]
 });
+
+// ---------- Your own photos ----------
+// Drop a photo named after an herb or fruit into images/herbs/ or images/fruits/
+// (e.g. images/herbs/chamomile.jpg, images/fruits/apple.jpg) and it replaces the Wikipedia photo.
+const PHOTO_EXT = /\.(jpe?g|png|webp|avif)$/i;
+const myPhotos = {};
+const unknownPhotos = [];
+for (const [dir, list, prefix] of [["herbs", HERBS, ""], ["fruits", FRUITS, "fruit:"]]) {
+  const folder = path.join(root, "images", dir);
+  fs.mkdirSync(folder, { recursive: true });
+  for (const file of fs.readdirSync(folder).filter((f) => PHOTO_EXT.test(f)).sort()) {
+    const id = file.replace(PHOTO_EXT, "").toLowerCase();
+    if (list.some((x) => x.id === id)) myPhotos[prefix + id] = { src: `images/${dir}/${file}`, credit: "Photo: Beauty & Praise" };
+    else unknownPhotos.push(`images/${dir}/${file}`);
+  }
+}
+fs.writeFileSync(path.join(root, "js", "my-photos.js"),
+  `// Made by scripts/build.js from the photos in images/herbs/ and images/fruits/. Don't edit by hand.\nconst MY_PHOTOS = ${JSON.stringify(myPhotos, null, 2)};\n`);
+if (unknownPhotos.length) console.warn(`These photos don't match an herb or fruit id and were skipped:\n  ${unknownPhotos.join("\n  ")}`);
 
 // ---------- Herbs ----------
 const herbTemplate = read("herb.html");
@@ -210,15 +230,50 @@ for (const g of SAFETY_GUIDES) {
   fs.writeFileSync(path.join(root, "safety", `${g.id}.html`), page(safetyTemplate, { title, description, url, image: ogImage, id: g.id, main, jsonld }));
 }
 
+// ---------- Recipes ----------
+const recipeTemplate = read("recipe.html");
+fs.mkdirSync(path.join(root, "recipes"), { recursive: true });
+const isoTime = (t) => { const m = /^(\d+) minutes?$/.exec(t) || /^(\d+) hours?$/.exec(t); return m ? (t.includes("hour") ? `PT${m[1]}H` : `PT${m[1]}M`) : undefined; };
+for (const r of RECIPES) {
+  const url = `${SITE_URL}recipes/${r.id}.html`;
+  const title = `${r.name} — Easy Herbal Recipe | Beauty & Praise`;
+  const description = firstSentences(r.intro);
+  const main = `    <article class="container narrow prose static-content">
+      <p><a href="index.html">Home</a> / <a href="recipes.html">Recipes</a> / ${esc(r.name)}</p>
+      <h1>${esc(r.name)}</h1>
+      <p>${esc(RECIPE_TYPES[r.type])} · ${esc(r.time)} · Makes ${esc(r.yield)}</p>
+      <p>${esc(r.intro)}</p>
+      <h2>Ingredients</h2>
+      <ul>${r.ingredients.map(([a, i]) => `<li>${esc(a)} ${esc(i)}</li>`).join("")}</ul>
+      <h2>Steps</h2>
+      <ol>${r.steps.map((t) => `<li>${esc(t)}</li>`).join("")}</ol>
+      <h2>Tips</h2>
+      <ul>${r.tips.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>
+      <h2>Storage</h2>
+      <p>${esc(r.storage)}</p>
+      <h2>Safety</h2>
+      <p>${esc(r.safety)}</p>
+    </article>`;
+  const jsonld = { "@context": "https://schema.org", "@graph": [
+    { "@type": "Recipe", name: r.name, description, url, image: ogImage, author: { "@type": "Organization", name: "Beauty & Praise" },
+      recipeCategory: RECIPE_TYPES[r.type], recipeYield: r.yield, totalTime: isoTime(r.time),
+      recipeIngredient: r.ingredients.map(([a, i]) => `${a} ${i}`),
+      recipeInstructions: r.steps.map((t) => ({ "@type": "HowToStep", text: t })) },
+    breadcrumb("Recipes", "recipes.html", r.name, url)
+  ] };
+  fs.writeFileSync(path.join(root, "recipes", `${r.id}.html`), page(recipeTemplate, { title, description, url, image: ogImage, id: r.id, main, jsonld }));
+}
+
 // ---------- Sitemap & robots ----------
 const today = new Date().toISOString().slice(0, 10);
-const rootPages = ["", "herbs.html", "fruits.html", "stacks.html", "guides.html", "interactions.html", "quiz.html", "finder.html", "bible.html", "reminders.html", "journal.html", "about.html", "privacy.html", "terms.html", "disclaimer.html"];
+const rootPages = ["", "herbs.html", "fruits.html", "stacks.html", "guides.html", "interactions.html", "quiz.html", "finder.html", "bible.html", "devotional.html", "recipes.html", "myplan.html", "reminders.html", "journal.html", "about.html", "privacy.html", "terms.html", "disclaimer.html", "es/", "es/seguridad.html"];
 const urls = [
   ...rootPages.map((p) => SITE_URL + p),
   ...HERBS.map((h) => `${SITE_URL}herbs/${h.id}.html`),
   ...FRUITS.map((f) => `${SITE_URL}fruits/${f.id}.html`),
   ...TOPIC_GUIDES.map((g) => `${SITE_URL}guides/${g.id}.html`),
   ...SAFETY_GUIDES.map((g) => `${SITE_URL}safety/${g.id}.html`),
+  ...RECIPES.map((r) => `${SITE_URL}recipes/${r.id}.html`),
   ...STACKS.map((s) => `${SITE_URL}stacks.html?s=${s.id}`),
   ...ARTICLES.map((a) => `${SITE_URL}journal.html?a=${a.id}`)
 ];
@@ -226,4 +281,4 @@ fs.writeFileSync(path.join(root, "sitemap.xml"),
   `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `  <url><loc>${esc(u)}</loc><lastmod>${today}</lastmod></url>`).join("\n")}\n</urlset>\n`);
 fs.writeFileSync(path.join(root, "robots.txt"), `User-agent: *\nAllow: /\n\nSitemap: ${SITE_URL}sitemap.xml\n`);
 
-console.log(`Built ${HERBS.length} herb pages, ${FRUITS.length} fruit pages, ${TOPIC_GUIDES.length + SAFETY_GUIDES.length} guide pages and a sitemap with ${urls.length} URLs for ${SITE_URL}`);
+console.log(`Built ${HERBS.length} herb pages, ${FRUITS.length} fruit pages, ${TOPIC_GUIDES.length + SAFETY_GUIDES.length} guide pages, ${RECIPES.length} recipe pages, ${Object.keys(myPhotos).length} of your own photos and a sitemap with ${urls.length} URLs for ${SITE_URL}`);

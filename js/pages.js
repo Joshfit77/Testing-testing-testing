@@ -401,7 +401,8 @@ function initHerb() {
 
     <section class="section section-tint">
       <div class="container">
-        <div class="section-head"><div><p class="eyebrow">Keep exploring</p><h2>Related herbs</h2></div>
+        ${recipeSection(recipesFor((r) => r.herbs.includes(h.id)), `Recipes with ${h.name.split(" (")[0]}`)}
+        <div class="section-head${recipesFor((r) => r.herbs.includes(h.id)).length ? " stack-head" : ""}"><div><p class="eyebrow">Keep exploring</p><h2>Related herbs</h2></div>
           <a class="text-link" href="herbs.html?cat=${h.cats[0]}">More ${CATEGORIES[h.cats[0]]} ${icon("arrow")}</a></div>
         <div class="herb-grid">${related.map(herbCard).join("")}</div>
         <nav class="prev-next">
@@ -521,6 +522,8 @@ function initLiving() {
       <div class="rhythm-head">${icon(r.icon)}<h3>${r.time}</h3>${i === nowIdx ? '<span class="pill">Now</span>' : ""}</div>
       <ul>${r.items.map((x) => `<li>${x}</li>`).join("")}</ul>
     </div>`).join("");
+
+  $("#living-devo").innerHTML = devotionalCard(thisWeeksDevotional(), true);
 
   // Seasons
   const month = new Date().getMonth();
@@ -882,7 +885,8 @@ function initFruit() {
 
     <section class="section section-tint">
       <div class="container">
-        <div class="section-head"><div><p class="eyebrow">Keep exploring</p><h2>Related fruits</h2></div>
+        ${recipeSection(recipesFor((r) => r.fruits.includes(fr.id)), `Recipes with ${fr.name.split(" (")[0]}`)}
+        <div class="section-head${recipesFor((r) => r.fruits.includes(fr.id)).length ? " stack-head" : ""}"><div><p class="eyebrow">Keep exploring</p><h2>Related fruits</h2></div>
           <a class="text-link" href="fruits.html?cat=${fr.cats[0]}">More for ${CATEGORIES[fr.cats[0]]} ${icon("arrow")}</a></div>
         <div class="herb-grid">${related.map(fruitCard).join("")}</div>
         <nav class="prev-next">
@@ -1180,20 +1184,30 @@ function initFinder() {
 
       ${leftOut.length ? `<div class="card"><h3 class="plan-h">Left out for your safety</h3><ul class="ix-list">${leftOut.map((id) => `<li class="ix-avoid"><span class="ix-badge">Avoid</span><span><a href="${herbUrl(id)}"><strong>${findHerb(id).name}</strong></a> — ${hitsFor(id).filter((x) => x.level === "avoid").map((x) => `${x.e.label}: ${x.note}`).join(" ")}</span></li>`).join("")}</ul></div>` : ""}
 
+      ${recipesFor((r) => r.guide === g.id && !r.herbs.some((x) => levelFor(x) === "avoid")).length && !isChild ? `<div class="card"><h3 class="plan-h">Recipes to make at home</h3><div class="recipe-grid">${recipesFor((r) => r.guide === g.id && !r.herbs.some((x) => levelFor(x) === "avoid")).slice(0, 3).map(recipeCard).join("")}</div></div>` : ""}
+
       <section class="verse-band plan-verse"><blockquote><p>“${g.verse.text}”</p><cite>${g.verse.ref} (${BIBLE_VERSION})</cite></blockquote></section>
 
       <div class="btn-row center-row plan-actions">
         <button class="btn btn-primary" data-print>Print my plan</button>
+        <a class="btn btn-outline" href="myplan.html">Saved to My Plan ${icon("heart")}</a>
         <button class="btn btn-outline" data-restart>Start over</button>
         <a class="btn btn-outline" href="${guideUrl(g.id)}">Read the full ${g.short.toLowerCase()} guide</a>
       </div>
       <p class="small muted center">These suggestions are for education only and are not medical advice. Please check with your doctor or pharmacist before starting any herb, especially if you take medicine.</p>
     </div>`;
+    const d = new Date();
+    store.set("bp-plan", { ...a, top, fruits, date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}` });
     app.querySelector("[data-print]").addEventListener("click", () => window.print());
     app.querySelector("[data-restart]").addEventListener("click", () => { Object.assign(a, { goal: null, duration: null, who: null, drugs: [], meds: [], conds: [], form: null }); step = 0; show(); });
     app.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  const saved = store.get("bp-plan", null);
+  if (params.get("plan") === "saved" && saved && TOPIC_GUIDES.some((g) => g.id === saved.goal) && WHO_OPTIONS.some((w) => w.id === saved.who)) {
+    ["goal", "duration", "who", "drugs", "meds", "conds", "form"].forEach((k) => { if (k in saved) a[k] = saved[k]; });
+    return results();
+  }
   const preset = params.get("goal");
   if (TOPIC_GUIDES.some((g) => g.id === preset)) { a.goal = preset; step = 1; }
   show();
@@ -1406,6 +1420,7 @@ function initGuide() {
         <div class="section-head"><div><p class="eyebrow">Nourish from the inside</p><h2>Fruits that help</h2></div></div>
         <div class="herb-grid">${g.fruits.map((id) => fruitCard(FRUITS.find((f) => f.id === id))).join("")}</div>
         ${g.stacks.length ? `<div class="section-head stack-head"><div><p class="eyebrow">Better together</p><h2>Herbal stacks</h2></div></div><div class="stack-grid">${g.stacks.map((id) => stackCard(STACKS.find((s) => s.id === id))).join("")}</div>` : ""}
+        ${recipeSection(recipesFor((r) => r.guide === g.id || r.herbs.some((x) => g.herbs.slice(0, 4).includes(x))).slice(0, 4))}
         <div class="section-head stack-head"><div><p class="eyebrow">Keep exploring</p><h2>More guides</h2></div></div>
         <div class="bible-links">${TOPIC_GUIDES.filter((x) => x !== g).map((x) => `<a class="ix-chip" href="${guideUrl(x.id)}">${x.short}</a>`).join("")}</div>
       </div>
@@ -1471,4 +1486,282 @@ function initAbout() {
   });
 }
 
-({ home: initHome, herbs: initHerbs, fruits: initFruits, fruit: initFruit, interactions: initInteractions, quiz: initQuiz, finder: initFinder, guides: initGuides, guide: initGuide, safetyguide: initSafetyGuide, bible: initBible, stacks: initStacks, herb: initHerb, living: initLiving, journal: initJournal, about: initAbout })[document.body.dataset.page]?.();
+/* ---------------- Recipes ---------------- */
+const recipeUrl = (id) => `recipes/${id}.html`;
+const recipeVisual = (r, large = false) => r.herbs.length ? visual(findHerb(r.herbs[0]), large) : fruitVisual(FRUITS.find((f) => f.id === r.fruits[0]), large);
+const recipesFor = (test) => RECIPES.filter(test);
+
+function recipeCard(r) {
+  return `<a class="recipe-card" href="${recipeUrl(r.id)}">
+    <span class="recipe-photo">${recipeVisual(r)}</span>
+    <span class="recipe-body">
+      <span class="recipe-type">${RECIPE_TYPES[r.type]}</span>
+      <strong>${r.name}</strong>
+      <span class="recipe-meta">${icon("clock")} ${r.time} · ${r.yield}</span>
+    </span>
+  </a>`;
+}
+
+function recipeSection(list, title = "Recipes to try") {
+  return list.length ? `<div class="section-head stack-head"><div><p class="eyebrow">Make it at home</p><h2>${title}</h2></div><a class="text-link" href="recipes.html">All recipes ${icon("arrow")}</a></div>
+    <div class="recipe-grid">${list.map(recipeCard).join("")}</div>` : "";
+}
+
+function initRecipes() {
+  let type = params.get("type") || "all";
+  $("#recipes-main").innerHTML = `
+    <section class="page-hero">
+      <div class="container">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span aria-current="page">Recipes</span></nav>
+        <h1>Herbal Recipes</h1>
+        <p class="lead">Simple, step-by-step recipes for teas, drinks, syrups, kitchen favorites and gentle skin care — made with the herbs and fruits in our library.</p>
+      </div>
+    </section>
+    <section class="section section-top-tight">
+      <div class="container">
+        <div class="chips" id="recipe-tabs">${[["all", "All recipes"], ...Object.entries(RECIPE_TYPES)].map(([k, l]) => `<button class="chip" data-type="${k}">${l}</button>`).join("")}</div>
+        <div class="recipe-grid" id="recipe-grid"></div>
+      </div>
+    </section>`;
+  const draw = () => {
+    $("#recipe-tabs").querySelectorAll(".chip").forEach((b) => b.classList.toggle("active", b.dataset.type === type));
+    $("#recipe-grid").innerHTML = RECIPES.filter((r) => type === "all" || r.type === type).map(recipeCard).join("");
+  };
+  $("#recipe-tabs").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-type]"); if (!b) return;
+    type = b.dataset.type;
+    history.replaceState(null, "", type === "all" ? "recipes.html" : `recipes.html?type=${type}`);
+    draw();
+  });
+  draw();
+}
+
+function initRecipe() {
+  const r = RECIPES.find((x) => x.id === document.body.dataset.id);
+  if (!r) return;
+  const herbs = r.herbs.map(findHerb), fruits = r.fruits.map((id) => FRUITS.find((f) => f.id === id));
+  const guide = TOPIC_GUIDES.find((g) => g.id === r.guide);
+  const more = RECIPES.filter((x) => x !== r && (x.type === r.type || x.herbs.some((h) => r.herbs.includes(h)))).slice(0, 4);
+  $("#recipe-main").innerHTML = `
+    <section class="stack-hero">
+      <div class="container">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><a href="recipes.html">Recipes</a><span>/</span><span aria-current="page">${r.name}</span></nav>
+        <div class="stack-hero-grid">
+          <div>
+            <p class="eyebrow">${RECIPE_TYPES[r.type]}</p>
+            <h1>${r.name}</h1>
+            <p class="lead">${r.intro}</p>
+            <div class="recipe-facts"><span>${icon("clock")} ${r.time}</span><span>${icon("leaf")} Makes ${r.yield}</span></div>
+            <button class="btn btn-outline" data-print>${icon("print")} Print recipe</button>
+          </div>
+          <div class="stack-hero-photos">${[...herbs.map((h) => [herbUrl(h.id), visual(h)]), ...fruits.map((f) => [fruitUrl(f.id), fruitVisual(f)])].slice(0, 4).map(([u, v], i) => `<a href="${u}" class="shp shp-${i}">${i === 0 ? v.replace('class="pf"', 'class="pf pf-large"') : v}</a>`).join("")}</div>
+        </div>
+      </div>
+    </section>
+    <section class="section">
+      <div class="container recipe-layout">
+        <aside class="card recipe-ingredients">
+          <h2>Ingredients</h2>
+          <ul class="ingredient-list">${r.ingredients.map(([amt, item], i) => `<li><input type="checkbox" id="ing-${i}"><label for="ing-${i}"><strong>${amt}</strong> ${item}</label></li>`).join("")}</ul>
+          <p class="small muted">Tick off each ingredient as you gather it.</p>
+        </aside>
+        <div class="recipe-steps-col">
+          <h2>Step by step</h2>
+          <ol class="recipe-steps">${r.steps.map((t) => `<li>${t}</li>`).join("")}</ol>
+          <h2>Tips</h2>
+          <ul class="check-list">${r.tips.map((t) => `<li>${icon("check")}${t}</li>`).join("")}</ul>
+          <h2>Storage</h2>
+          <p>${r.storage}</p>
+          <div class="caution-card">${icon("shield", "icon info-icon")}<div><p><strong>Safety:</strong> ${r.safety}</p>
+            <p class="small">Taking medicine? <a href="interactions.html${r.herbs[0] ? `?item=${r.herbs[0]}` : ""}">Check it with the safety checker</a>.</p></div></div>
+          <h2>What's in it</h2>
+          <div class="bible-links">${herbs.map((h) => `<a class="ix-chip" href="${herbUrl(h.id)}">${h.name} ${icon("arrow")}</a>`).join("")}${fruits.map((f) => `<a class="ix-chip" href="${fruitUrl(f.id)}">${f.name} ${icon("arrow")}</a>`).join("")}${guide ? `<a class="ix-chip" href="${guideUrl(guide.id)}">Guide: ${guide.short} ${icon("arrow")}</a>` : ""}</div>
+        </div>
+      </div>
+    </section>
+    <section class="section section-tint">
+      <div class="container">${recipeSection(more, "More recipes")}</div>
+    </section>`;
+  $("#recipe-main [data-print]").addEventListener("click", () => window.print());
+}
+
+/* ---------------- Weekly devotional ---------------- */
+function devotionalCard(w = thisWeeksDevotional(), compact = false) {
+  const h = findHerb(w.herb), fr = FRUITS.find((f) => f.id === w.fruit), r = RECIPES.find((x) => x.id === w.recipe);
+  return `<div class="devo-card${compact ? " compact" : ""}">
+    <div class="devo-text">
+      <p class="eyebrow">This week's devotional · Week ${DEVOTIONAL_WEEKS.indexOf(w) + 1} of ${DEVOTIONAL_WEEKS.length}</p>
+      <h3>${w.theme}</h3>
+      <blockquote>“${w.text}”</blockquote>
+      <cite>${w.ref} (${BIBLE_VERSION})</cite>
+      ${compact ? "" : `<p>${w.reflection}</p><p class="devo-prayer"><strong>Pray:</strong> ${w.prayer}</p>`}
+      <p class="devo-habit">${icon("check")}<span><strong>This week's habit:</strong> ${w.habit}</span></p>
+      ${compact ? `<a class="text-link" href="devotional.html">Read this week's devotional ${icon("arrow")}</a>` : ""}
+    </div>
+    ${compact ? "" : `<div class="devo-picks">
+      <a class="devo-pick" href="${herbUrl(h.id)}"><span class="mini-art">${visual(h)}</span><span><em>Herb of the week</em><strong>${h.name}</strong></span></a>
+      <a class="devo-pick" href="${fruitUrl(fr.id)}"><span class="mini-art">${fruitVisual(fr)}</span><span><em>Fruit of the week</em><strong>${fr.name}</strong></span></a>
+      ${r ? `<a class="devo-pick" href="${recipeUrl(r.id)}"><span class="mini-art">${recipeVisual(r)}</span><span><em>Recipe of the week</em><strong>${r.name}</strong></span></a>` : ""}
+    </div>`}
+  </div>`;
+}
+
+// A calendar file with a weekly repeating reminder (works with Apple, Google and Outlook calendars).
+function downloadReminder(day, time) {
+  const [hh, mm] = time.split(":");
+  const now = new Date();
+  const days = { MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 0 };
+  const first = new Date(now.getFullYear(), now.getMonth(), now.getDate() + ((days[day] - now.getDay() + 7) % 7 || 7));
+  const pad = (n) => String(n).padStart(2, "0");
+  const dt = `${first.getFullYear()}${pad(first.getMonth() + 1)}${pad(first.getDate())}T${hh}${mm}00`;
+  const end = `${first.getFullYear()}${pad(first.getMonth() + 1)}${pad(first.getDate())}T${hh}${pad(Math.min(59, +mm + 15))}00`;
+  const link = new URL("devotional.html", document.baseURI).href;
+  const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
+  const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Beauty and Praise//Devotional//EN", "BEGIN:VEVENT",
+    `UID:devotional-${stamp}@beautyandpraise`, `DTSTAMP:${stamp}`, `DTSTART:${dt}`, `DTEND:${end}`, `RRULE:FREQ=WEEKLY;BYDAY=${day}`,
+    "SUMMARY:Beauty & Praise weekly devotional", `DESCRIPTION:Your verse\\, reflection and healthy habit for the week: ${link}`, `URL:${link}`,
+    "BEGIN:VALARM", "TRIGGER:PT0M", "ACTION:DISPLAY", "DESCRIPTION:Time for this week's devotional", "END:VALARM",
+    "END:VEVENT", "END:VCALENDAR"].join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([ics], { type: "text/calendar" }));
+  a.download = "beauty-and-praise-devotional.ics";
+  document.body.appendChild(a); a.click(); a.remove();
+  toast("Calendar reminder downloaded — open it to add it to your calendar.");
+}
+
+function initDevotional() {
+  const idx = devotionalIndex();
+  $("#devotional-main").innerHTML = `
+    <section class="page-hero">
+      <div class="container">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><a href="bible.html">Bible</a><span>/</span><span aria-current="page">Weekly Devotional</span></nav>
+        <h1>Weekly Devotional</h1>
+        <p class="lead">One verse, a short reflection, a prayer and one healthy habit for the week. A new devotional begins every Monday.</p>
+      </div>
+    </section>
+    <section class="section section-top-tight">
+      <div class="container narrow" id="devo-this-week">${devotionalCard()}</div>
+    </section>
+    <section class="section section-tint">
+      <div class="container narrow">
+        <div class="card devo-remind">
+          <h2>Get a weekly reminder</h2>
+          <p class="muted">Add a repeating reminder to your phone's calendar — it links back here each week.</p>
+          <div class="devo-remind-row">
+            <label>Day <select class="field" id="devo-day">${[["MO", "Monday"], ["TU", "Tuesday"], ["WE", "Wednesday"], ["TH", "Thursday"], ["FR", "Friday"], ["SA", "Saturday"], ["SU", "Sunday"]].map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select></label>
+            <label>Time <input type="time" class="field" id="devo-time" value="07:30"></label>
+            <button class="btn btn-primary" id="devo-ics">${icon("calendar")} Add to my calendar</button>
+          </div>
+          <p class="small muted">Prefer email? Join the Beauty &amp; Praise Letter at the bottom of this page.</p>
+        </div>
+      </div>
+    </section>
+    <section class="section">
+      <div class="container">
+        <div class="section-head"><div><p class="eyebrow">All ${DEVOTIONAL_WEEKS.length} weeks</p><h2>The devotional series</h2></div></div>
+        <div class="devo-list">${DEVOTIONAL_WEEKS.map((w, i) => `<button class="devo-week${i === idx ? " current" : ""}" data-week="${i}"><span>Week ${i + 1}${i === idx ? " · This week" : ""}</span><strong>${w.theme}</strong><em>${w.ref}</em></button>`).join("")}</div>
+        <p class="small muted bible-copyright">${BIBLE_COPYRIGHT}</p>
+      </div>
+    </section>`;
+  $("#devo-ics").addEventListener("click", () => downloadReminder($("#devo-day").value, $("#devo-time").value || "07:30"));
+  $(".devo-list").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-week]"); if (!b) return;
+    const w = DEVOTIONAL_WEEKS[+b.dataset.week];
+    $("#devo-this-week").innerHTML = devotionalCard(w).replace("This week's devotional", +b.dataset.week === idx ? "This week's devotional" : "Devotional");
+    $("#devo-this-week").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+
+/* ---------------- My Plan ---------------- */
+function initMyPlan() {
+  const main = $("#myplan-main");
+  const today = todayKey();
+  const draw = () => {
+    const fav = favorites.all();
+    const savedHerbs = fav.filter((k) => !k.startsWith("fruit:")).map(findHerb).filter(Boolean);
+    const savedFruits = fav.filter((k) => k.startsWith("fruit:")).map((k) => FRUITS.find((f) => f.id === k.slice(6))).filter(Boolean);
+    const plan = store.get("bp-plan", null);
+    const ix = store.get("bp-ix2", null);
+    const habits = store.get("bp-habits", DEFAULT_HABITS);
+    let done = store.get("bp-done", { date: today, items: [] });
+    if (done.date !== today) done = { date: today, items: [] };
+    let water = store.get("bp-water", { date: today, count: 0 });
+    if (water.date !== today) water = { date: today, count: 0 };
+    const g = plan && TOPIC_GUIDES.find((x) => x.id === plan.goal);
+    const who = plan && WHO_OPTIONS.find((w) => w.id === plan.who);
+    const ixWho = ix && WHO_OPTIONS.find((w) => w.id === ix.who);
+    const ixList = ix ? [...(ix.drugs || []), ...(ix.meds || []).map((m) => INTERACTIONS.find((x) => x.id === m)?.label), ...(ix.conds || []).map((c) => INTERACTIONS.find((x) => x.id === c)?.label)].filter(Boolean) : [];
+    const planRecipes = recipesFor((r) => (g && r.guide === g.id) || r.herbs.some((h) => fav.includes(h) || (plan?.top || []).includes(h))).slice(0, 4);
+    const nDone = habits.filter((x) => done.items.includes(x)).length;
+
+    main.innerHTML = `
+      <section class="page-hero">
+        <div class="container">
+          <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span aria-current="page">My Plan</span></nav>
+          <h1>My Plan</h1>
+          <p class="lead">Everything you've saved, your personal plan and today's habits — all in one place. It's saved only on this device.</p>
+        </div>
+      </section>
+      <section class="section section-top-tight">
+        <div class="container myplan-grid">
+          <div class="card myplan-plan">
+            <p class="eyebrow">My personal plan</p>
+            ${g ? `<h2>${g.title.replace("Natural ", "")}</h2>
+              <p class="muted">For: ${who ? who.label : "Adult"} · made ${formatDate(plan.date)}</p>
+              <div class="myplan-herbs">${(plan.top || []).map(findHerb).filter(Boolean).map((h) => `<a class="devo-pick" href="${herbUrl(h.id)}"><span class="mini-art">${visual(h)}</span><span><em>Top herb</em><strong>${h.name}</strong></span></a>`).join("")}</div>
+              <div class="btn-row"><a class="btn btn-primary" href="finder.html?plan=saved">See my full plan</a><a class="btn btn-outline" href="finder.html">Make a new plan</a></div>`
+            : `<h2>You don't have a plan yet</h2><p class="muted">Answer 6 quick questions and we'll suggest herbs, fruits and habits that fit you — and save them here.</p><a class="btn btn-primary" href="finder.html">What should I take? ${icon("arrow")}</a>`}
+          </div>
+          <div class="card myplan-today">
+            <p class="eyebrow">Today</p>
+            <h2>${nDone} of ${habits.length} habits done</h2>
+            <div class="progress"><div class="progress-bar" style="width:${habits.length ? (nDone / habits.length) * 100 : 0}%"></div></div>
+            <ul class="checklist myplan-checklist">${habits.map((h, i) => `<li><input type="checkbox" id="mp-habit-${i}" data-habit="${i}" ${done.items.includes(h) ? "checked" : ""}><label for="mp-habit-${i}"></label></li>`).join("")}</ul>
+            <p class="myplan-water">${icon("drop")} <strong>${water.count} of 8</strong> glasses of water <button class="btn btn-small btn-outline" id="mp-water">+1 glass</button></p>
+            <a class="text-link" href="reminders.html">Edit habits &amp; reminders ${icon("arrow")}</a>
+          </div>
+        </div>
+      </section>
+      <section class="section section-tint">
+        <div class="container narrow">${devotionalCard(thisWeeksDevotional(), true)}</div>
+      </section>
+      <section class="section">
+        <div class="container">
+          <div class="section-head"><div><p class="eyebrow">${savedHerbs.length + savedFruits.length} saved</p><h2>My saved herbs &amp; fruits</h2></div><a class="text-link" href="herbs.html">Browse herbs ${icon("arrow")}</a></div>
+          ${savedHerbs.length || savedFruits.length ? `<div class="herb-grid">${savedHerbs.map(herbCard).join("")}${savedFruits.map(fruitCard).join("")}</div>`
+            : `<div class="card empty-card"><p>Nothing saved yet. Tap the ${icon("heart")} on any herb to save it here.</p></div>`}
+        </div>
+      </section>
+      <section class="section section-tint">
+        <div class="container">
+          <div class="card myplan-safety">
+            <div><p class="eyebrow">My safety check</p>
+              ${ixList.length || (ixWho && ixWho.id !== "adult") ? `<h2>Saved: ${[ixWho?.label, ...ixList].filter(Boolean).join(" · ")}</h2><p class="muted">Re-check any time you start a new herb or medicine.</p>`
+                : `<h2>Check herbs with your medicines</h2><p class="muted">Tell us your medicines, pregnancy or health conditions and see what's safe.</p>`}
+            </div>
+            <a class="btn btn-primary" href="interactions.html">Open the safety checker</a>
+          </div>
+          ${recipeSection(planRecipes.length ? planRecipes : RECIPES.slice(0, 4), planRecipes.length ? "Recipes for my plan" : "Recipes to try")}
+          <p class="center"><button class="text-btn" id="mp-clear">Clear everything saved on this device</button></p>
+        </div>
+      </section>`;
+    main.querySelectorAll("[data-habit]").forEach((box) => {
+      box.nextElementSibling.textContent = habits[+box.dataset.habit];
+      box.addEventListener("change", () => {
+        const h = habits[+box.dataset.habit];
+        done.items = box.checked ? [...done.items, h] : done.items.filter((x) => x !== h);
+        store.set("bp-done", done); draw();
+      });
+    });
+    $("#mp-water").addEventListener("click", () => { water.count = Math.min(8, water.count + 1); store.set("bp-water", water); draw(); });
+    $("#mp-clear").addEventListener("click", () => {
+      if (!confirm("Clear your saved herbs, plan, checklist and safety answers on this device?")) return;
+      ["bp-favorites", "bp-plan", "bp-ix2", "bp-habits", "bp-done", "bp-water"].forEach((k) => { try { localStorage.removeItem(k); } catch {} });
+      draw(); toast("Cleared.");
+    });
+  };
+  draw();
+  document.addEventListener("favorites-changed", draw);
+}
+
+({ home: initHome, herbs: initHerbs, fruits: initFruits, fruit: initFruit, interactions: initInteractions, quiz: initQuiz, finder: initFinder, guides: initGuides, guide: initGuide, safetyguide: initSafetyGuide, bible: initBible, stacks: initStacks, herb: initHerb, living: initLiving, journal: initJournal, about: initAbout, recipes: initRecipes, recipe: initRecipe, devotional: initDevotional, myplan: initMyPlan })[document.body.dataset.page]?.();
