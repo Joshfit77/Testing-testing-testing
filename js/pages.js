@@ -71,11 +71,13 @@ function stackCard(st) {
 
 /* ---------------- Home ---------------- */
 function initHome() {
-  const featured = dailyPick(FOODS), fruit = dailyPick(FRUITS, 11), herb = dailyPick(HERBS);
+  const herb = dailyPick(HERBS);
   $("#hero-art").innerHTML = `
     <div class="hero-emblem" role="img" aria-label="Beauty & Praise — a wooden cross framed by leaves and flowers">${LOGO_MARK}</div>
-    <a class="arch-circle c1" href="${foodUrl(featured.id)}" aria-label="Food of the day: ${featured.name}">${foodVisual(featured)}</a>
-    <a class="arch-circle c2" href="${fruitUrl(fruit.id)}" aria-label="${fruit.name}">${fruitVisual(fruit)}</a>`;
+    <figure class="hero-verse">
+      <blockquote>“Beloved, I pray that in all respects you may prosper and be in good health, just as your soul prospers.”</blockquote>
+      <figcaption>3 John 1:2 (${BIBLE_VERSION})</figcaption>
+    </figure>`;
 
   attachSearch($("#hero-search"), $("#hero-suggest"));
 
