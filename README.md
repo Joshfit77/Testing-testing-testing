@@ -86,7 +86,7 @@ Keep wellness language conservative: foods, remedies and herbs "may support", "m
 English verses use the NASB 1995 and Spanish verses use La Biblia de las Américas (LBLA), both from The Lockman Foundation; the copyright notices are in the footers. Verses were typed in by hand, so please check each one against a printed Bible before launch.
 
 ## Logo
-- `images/logo-mark.svg` — the emblem (also the browser-tab icon)
+- `images/logo-mark.svg` — the emblem: a wooden cross in morning light framed by a wreath of leaves and blossoms (also the browser-tab icon)
 - `images/logo.svg` — the full logo with the name
 - `images/og-image.png` — the preview image shown when the site is shared
 
