@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Healthy Living — Beauty &amp; Praise</title>
+  <meta name="description" content="Daily healthy reminders, a habit checklist, water tracker and seasonal wellness tips.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Ccircle cx='24' cy='24' r='24' fill='%232e4636'/%3E%3Cpath d='M24 39V15M24 30c-6 0-9-4-9-9 5 0 9 3 9 9zM24 25c6 0 9-4 9-9-5 0-9 3-9 9z' stroke='%23f6f1e7' fill='%23f6f1e7' stroke-width='1.4'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body data-page="living">
+  <div id="site-header"></div>
+  <main>
+    <section class="page-hero">
+      <div class="container">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span aria-current="page">Healthy Living</span></nav>
+        <h1>Healthy Living</h1>
+        <p class="lead">Gentle reminders and simple tools to care for the body you've been given — one small, faithful step at a time.</p>
+      </div>
+    </section>
+
+    <section class="section section-top-tight" id="today">
+      <div class="container dashboard">
+        <div class="card tip-card">
+          <p class="eyebrow light">Reminder of the moment</p>
+          <p id="tip-text" class="tip-text"></p>
+          <button class="btn btn-light" id="next-tip">Show another</button>
+        </div>
+
+        <div class="card checklist-card">
+          <div class="checklist-head">
+            <div>
+              <p class="eyebrow">Today</p>
+              <h2>Daily checklist</h2>
+              <p class="muted" id="progress-label"></p>
+            </div>
+            <div class="ring" id="progress-ring"><span id="progress-pct">0%</span></div>
+          </div>
+          <div class="progress"><div class="progress-bar" id="progress-bar"></div></div>
+          <ul class="checklist" id="checklist"></ul>
+          <form id="add-habit" class="add-habit">
+            <input type="text" id="habit-input" class="field" placeholder="Add your own healthy habit…" maxlength="80" aria-label="New habit">
+            <button class="btn btn-primary" type="submit">Add</button>
+          </form>
+          <button class="text-btn" id="reset-habits">Restore default list</button>
+          <p class="small muted">Your checklist starts fresh every morning and is saved only on this device.</p>
+        </div>
+
+        <div class="card water-card">
+          <p class="eyebrow">Hydration</p>
+          <h2>Water tracker</h2>
+          <p class="muted">Aim for about eight glasses today — more in hot weather or when active.</p>
+          <div class="glasses" id="glasses"></div>
+          <p class="water-count" id="water-count"></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-tint" id="rhythm-section">
+      <div class="container">
+        <div class="section-head center"><div><p class="eyebrow">From sunrise to rest</p><h2>Your daily rhythm</h2></div></div>
+        <div class="rhythm-grid" id="rhythm"></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <div class="section-head center"><div><p class="eyebrow">A time for everything</p><h2>Seasonal wellness</h2></div></div>
+        <div class="season-grid" id="seasons"></div>
+      </div>
+    </section>
+
+    <section class="section section-tint">
+      <div class="container narrow center">
+        <p class="eyebrow">A gentle note</p>
+        <h2>Care for yourself, and let others care for you</h2>
+        <p class="lead">These reminders are encouragement, not medical advice. Keep up with regular check-ups, and reach out to your doctor whenever something doesn't feel right.</p>
+      </div>
+    </section>
+  </main>
+  <div id="site-footer"></div>
+  <script src="js/herbs-data.js"></script>
+  <script src="js/content.js"></script>
+  <script src="js/art.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/pages.js"></script>
+</body>
+</html>

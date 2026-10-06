@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About — Beauty &amp; Praise</title>
+  <meta name="description" content="The story and mission behind Beauty & Praise, frequently asked questions, and how to get in touch.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Ccircle cx='24' cy='24' r='24' fill='%232e4636'/%3E%3Cpath d='M24 39V15M24 30c-6 0-9-4-9-9 5 0 9 3 9 9zM24 25c6 0 9-4 9-9-5 0-9 3-9 9z' stroke='%23f6f1e7' fill='%23f6f1e7' stroke-width='1.4'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body data-page="about">
+  <div id="site-header"></div>
+  <main>
+    <section class="page-hero">
+      <div class="container">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span aria-current="page">About</span></nav>
+        <h1>Our Story</h1>
+        <p class="lead">Beauty &amp; Praise celebrates the gifts of creation and the simple, grateful habits that help us flourish.</p>
+      </div>
+    </section>
+
+    <section class="section section-top-tight">
+      <div class="container about-grid">
+        <div class="about-art" id="about-art"></div>
+        <div class="prose">
+          <p class="eyebrow">Why we began</p>
+          <h2>Beauty in every leaf, praise in every day</h2>
+          <p>For generations, families have turned to the garden and the kitchen cupboard for comfort — a cup of chamomile at bedtime, ginger for an upset stomach, thyme and honey for a cough. These traditions carry wisdom and beauty worth remembering.</p>
+          <p>Beauty &amp; Praise was created to gather that knowledge in one welcoming place, with clear information on how each herb is traditionally used, how to prepare it, and — just as importantly — when to be careful.</p>
+          <p>Alongside our herb library, we share gentle daily reminders: drink water, step into the sunshine, rest well, and give thanks. Small steps, taken faithfully, add up to a healthier life.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-tint">
+      <div class="container">
+        <div class="section-head center"><div><p class="eyebrow">What guides us</p><h2>Our values</h2></div></div>
+        <div class="values-grid">
+          <div class="value-card"><span class="value-num">I</span><h3>Gratitude</h3><p>We see every herb and every healthy day as a gift, and we believe thankfulness is good for the soul.</p></div>
+          <div class="value-card"><span class="value-num">II</span><h3>Honesty</h3><p>We describe traditional uses plainly, avoid exaggerated claims, and always include safety cautions.</p></div>
+          <div class="value-card"><span class="value-num">III</span><h3>Simplicity</h3><p>Wellness shouldn't be complicated. We focus on small, practical steps anyone can take.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container narrow">
+        <div class="section-head center"><div><p class="eyebrow">Questions</p><h2>Frequently asked</h2></div></div>
+        <div class="faq">
+          <details><summary>Is the information on this site medical advice?</summary><p>No. Everything here is for general education. Herbs can interact with medicines and aren't right for everyone. Please talk with your doctor or pharmacist before using herbs medicinally, especially if you are pregnant, breastfeeding, taking medicine, or caring for a child.</p></details>
+          <details><summary>Where does your herb information come from?</summary><p>Our profiles bring together long-standing traditional use with findings from published research, described in plain language. Where evidence is limited or mixed, we say so.</p></details>
+          <details><summary>How do the daily checklist and water tracker work?</summary><p>They save your progress in your own browser, on your device only. Nothing is sent to us. Your checklist and water count reset each morning.</p></details>
+          <details><summary>How do I save my favorite herbs?</summary><p>Tap the heart on any herb card or profile. Find all your saved herbs using the heart icon in the top menu.</p></details>
+          <details><summary>Do you sell herbs or supplements?</summary><p>Not at this time. We recommend buying from reputable suppliers that test their products for quality and correct identification.</p></details>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-tint" id="contact">
+      <div class="container contact-grid">
+        <div>
+          <p class="eyebrow">Get in touch</p>
+          <h2>We'd love to hear from you</h2>
+          <p class="lead">Have a question, a favorite herb you'd like us to add, or a story to share? Send us a note.</p>
+        </div>
+        <form class="contact-form card" id="contact-form">
+          <div class="form-row">
+            <label>Name<input class="field" name="name" required></label>
+            <label>Email<input class="field" type="email" name="email" required></label>
+          </div>
+          <label>Topic
+            <select class="field" name="topic">
+              <option>General question</option>
+              <option>Suggest an herb</option>
+              <option>Feedback on the site</option>
+            </select>
+          </label>
+          <label>Message<textarea class="field" name="message" rows="5" required></textarea></label>
+          <button class="btn btn-primary" type="submit">Send message</button>
+        </form>
+      </div>
+    </section>
+  </main>
+  <div id="site-footer"></div>
+  <script src="js/herbs-data.js"></script>
+  <script src="js/content.js"></script>
+  <script src="js/art.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/pages.js"></script>
+</body>
+</html>
