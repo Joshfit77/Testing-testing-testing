@@ -48,8 +48,12 @@ const Photos = (() => {
   const MAX_AGE = 7 * 24 * 3600 * 1000;
   const API = "https://en.wikipedia.org/w/api.php";
 
-  // Photo keys: an herb id ("chamomile") or "fruit:" + a fruit id ("fruit:apple").
+  // Photo keys: an herb id ("chamomile"), "fruit:" + a fruit id ("fruit:apple") or "food:" + a food id ("food:eggs").
   function itemFor(key) {
+    if (key.startsWith("food:")) {
+      const fd = typeof FOODS !== "undefined" && FOODS.find((x) => x.id === key.slice(5));
+      return fd ? { item: fd, titles: [fd.wiki, fd.name] } : null;
+    }
     if (key.startsWith("fruit:")) {
       const fr = typeof FRUITS !== "undefined" && FRUITS.find((x) => x.id === key.slice(6));
       return fr ? { item: fr, titles: [FRUIT_WIKI_TITLES[fr.id], fr.name.replace(/\s*\(.*\)/, ""), fr.latin] } : null;
@@ -158,6 +162,19 @@ const Photos = (() => {
 // Markup for an herb image: illustration now, real photo when it arrives.
 function visual(h, large = false) {
   return `<span class="pf${large ? " pf-large" : ""}" data-photo="${h.id}" role="img" aria-label="${h.name} (${h.latin})">${Art.herb(h)}</span>`;
+}
+
+// Same for a food.
+function foodVisual(fd, large = false) {
+  return `<span class="pf${large ? " pf-large" : ""}" data-photo="food:${fd.id}" role="img" aria-label="${fd.name}">${Art.food(fd)}</span>`;
+}
+
+// Any herb, fruit or food by key ("ginger", "fruit:lemon", "food:honey"). No key → a simple leaf.
+function keyVisual(key, large = false) {
+  if (!key) return `<span class="pf pf-icon">${icon("leaf")}</span>`;
+  const it = itemOf(key);
+  if (!it) return "";
+  return key.startsWith("fruit:") ? fruitVisual(it, large) : key.startsWith("food:") ? foodVisual(it, large) : visual(it, large);
 }
 
 // Same for a fruit.

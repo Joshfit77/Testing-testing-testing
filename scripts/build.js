@@ -22,12 +22,12 @@ const read = (f) => fs.readFileSync(path.join(root, f), "utf8");
 const ctx = {};
 vm.createContext(ctx);
 vm.runInContext(
-  ["js/herbs-data.js", "js/herbs-summary.js", "js/herbs-benefits.js", "js/herbs-pharm.js", "js/herbs-caps.js", "js/fruits-data.js", "js/stacks.js", "js/content.js", "js/interactions.js", "js/guides.js", "js/recipes.js"]
+  ["js/herbs-data.js", "js/herbs-summary.js", "js/herbs-benefits.js", "js/herbs-pharm.js", "js/herbs-caps.js", "js/fruits-data.js", "js/foods-data.js", "js/remedies.js", "js/stacks.js", "js/content.js", "js/interactions.js", "js/guides.js", "js/recipes.js"]
     .map(read).join("\n") +
-    "\nthis.D = { HERBS, SUMMARY, BENEFITS, PHARM, CAPS, FRUITS, CATEGORIES, EVIDENCE, STACKS, ARTICLES, INTERACTIONS, IX_DETAILS, TOPIC_GUIDES, SAFETY_GUIDES, RECIPES, RECIPE_TYPES };",
+    "\nthis.D = { HERBS, SUMMARY, BENEFITS, PHARM, CAPS, FRUITS, CATEGORIES, EVIDENCE, STACKS, ARTICLES, INTERACTIONS, IX_DETAILS, TOPIC_GUIDES, SAFETY_GUIDES, RECIPES, RECIPE_TYPES, FOODS, FOOD_GROUPS, REMEDIES, REMEDY_CATS, REMEDY_SOURCES, foodProfile };",
   ctx
 );
-const { HERBS, SUMMARY, BENEFITS, PHARM, CAPS, FRUITS, CATEGORIES, EVIDENCE, STACKS, ARTICLES, INTERACTIONS, IX_DETAILS, TOPIC_GUIDES, SAFETY_GUIDES, RECIPES, RECIPE_TYPES } = ctx.D;
+const { HERBS, SUMMARY, BENEFITS, PHARM, CAPS, FRUITS, CATEGORIES, EVIDENCE, STACKS, ARTICLES, INTERACTIONS, IX_DETAILS, TOPIC_GUIDES, SAFETY_GUIDES, RECIPES, RECIPE_TYPES, FOODS, FOOD_GROUPS, REMEDIES, REMEDY_CATS, REMEDY_SOURCES, foodProfile } = ctx.D;
 
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const firstSentences = (text, max = 155) => {
@@ -132,45 +132,107 @@ for (const h of HERBS) {
   fs.writeFileSync(path.join(root, "herbs", `${h.id}.html`), page(herbTemplate, { title, description, url, image: ogImage, id: h.id, main, jsonld }));
 }
 
-// ---------- Fruits ----------
+// ---------- Fruits & foods (one shared page structure) ----------
+const evidenceLabel = { R: "Well researched", P: "Some research", T: "Traditional use" };
+function foodArticle(p, crumb, crumbUrl) {
+  return `    <article class="container narrow prose static-content">
+      <p><a href="index.html">Home</a> / <a href="${crumbUrl}">${crumb}</a> / ${esc(p.name)}</p>
+      <h1>${esc(p.name)}</h1>
+      <p><em>${esc(p.sub)}</em></p>
+      <h2>What it is</h2>
+      <p>${esc(p.what)}</p>
+      ${p.kind === "fruit" ? `<p>${esc(p.summary)}</p>` : ""}
+      <h2>Key nutrients</h2>
+      <ul>${p.nutrients.map((n) => `<li>${esc(n)}</li>`).join("")}</ul>
+      <h2>Potential benefits</h2>
+      ${p.benefits.map(([e, t, d]) => `<h3>${esc(t)} (${evidenceLabel[e]})</h3><p>${esc(d)}</p>`).join("\n      ")}
+      <h2>Best ways to eat it</h2>
+      <ul>${p.uses.map((u) => `<li>${esc(u)}</li>`).join("")}</ul>
+      <h2>Typical serving</h2>
+      <p>${esc(p.serving[0])} (about ${p.serving[1]} g).</p>
+      <h2>When to eat it</h2>
+      <p>${esc(p.when)}</p>
+      <h2>Who may benefit</h2>
+      <ul>${p.who.map((w) => `<li>${esc(w)}</li>`).join("")}</ul>
+      <h2>Possible downsides</h2>
+      <ul>${p.downsides.map((d) => `<li>${esc(d)}</li>`).join("")}</ul>
+      ${p.allergies ? `<h2>Allergies &amp; interactions</h2><p>${esc(p.allergies)}</p>` : ""}
+      <h2>Pregnancy &amp; breastfeeding</h2>
+      <p>${esc(p.pregnancy)}</p>
+      <h2>Sources &amp; references</h2>
+      <ul>${p.refs.map(([l, u]) => `<li><a href="${u}">${esc(l)}</a></li>`).join("")}</ul>
+      <p><small>For education only — not medical advice.</small></p>
+    </article>`;
+}
+const articleLd = (headline, description, url, alt, section, sectionUrl) => ({
+  "@context": "https://schema.org",
+  "@graph": [
+    { "@type": "Article", headline, description, url, image: ogImage, publisher: { "@type": "Organization", name: "Beauty & Praise" }, about: { "@type": "Thing", name: headline, ...(alt ? { alternateName: alt } : {}) } },
+    breadcrumb(section, sectionUrl, headline, url)
+  ]
+});
+
 const fruitTemplate = read("fruit.html");
 fs.mkdirSync(path.join(root, "fruits"), { recursive: true });
 for (const fr of FRUITS) {
   const url = `${SITE_URL}fruits/${fr.id}.html`;
   const title = `${fr.name}: Benefits, Nutrition & How to Eat It — Beauty & Praise`;
   const description = firstSentences(fr.summary);
+  const main = foodArticle(foodProfile(fr, "fruit", INTERACTIONS), "Fruit Library", "fruits.html");
+  fs.writeFileSync(path.join(root, "fruits", `${fr.id}.html`), page(fruitTemplate, { title, description, url, image: ogImage, id: fr.id, main, jsonld: articleLd(fr.name, description, url, fr.latin, "Fruit Library", "fruits.html") }));
+}
+
+const foodTemplate = read("food.html");
+fs.mkdirSync(path.join(root, "foods"), { recursive: true });
+for (const fd of FOODS) {
+  const url = `${SITE_URL}foods/${fd.id}.html`;
+  const title = `${fd.name}: Nutrition, Benefits, Serving Size & Safety — Beauty & Praise`;
+  const description = firstSentences(fd.what);
+  const main = foodArticle(foodProfile(fd, "food", INTERACTIONS), "Food Library", "foods.html");
+  fs.writeFileSync(path.join(root, "foods", `${fd.id}.html`), page(foodTemplate, { title, description, url, image: ogImage, id: fd.id, main, jsonld: articleLd(fd.name, description, url, null, "Food Library", "foods.html") }));
+}
+
+// ---------- Natural remedies ----------
+const remedyTemplate = read("remedy.html");
+fs.mkdirSync(path.join(root, "remedies"), { recursive: true });
+for (const r of REMEDIES) {
+  const url = `${SITE_URL}remedies/${r.id}.html`;
+  const title = `${r.name}: How to Make It, Amounts & Safety — Beauty & Praise`;
+  const description = firstSentences(r.intro);
   const main = `    <article class="container narrow prose static-content">
-      <p><a href="index.html">Home</a> / <a href="fruits.html">Fruit Library</a> / ${esc(fr.name)}</p>
-      <h1>${esc(fr.name)}</h1>
-      <p><em>${esc(fr.latin)}</em> · ${esc(fr.family)} · In season: ${esc(fr.season)}</p>
-      <h2>What it does for you</h2>
-      <p>${esc(fr.summary)}</p>
-      <h2>Key nutrients</h2>
-      <ul>${fr.nutrients.map((n) => `<li>${esc(n)}</li>`).join("")}</ul>
-      <h2>Benefits explained</h2>
-      ${fr.benefits.map(([e, t, d]) => `<h3>${esc(t)} (${EVIDENCE[e].label})</h3><p>${esc(d)}</p>`).join("\n      ")}
-      <h2>How to use it</h2>
-      <ul>${fr.uses.map((u) => `<li>${esc(u)}</li>`).join("")}</ul>
-      <h2>How much to eat</h2>
-      <p>One serving: ${esc(fr.serving[0])} (about ${fr.serving[1]} g).</p>
-      <h2>Choosing &amp; storing</h2>
-      <p>${esc(fr.pick)}</p>
-      <h2>Safety &amp; cautions</h2>
-      <p>${esc(fr.caution)}</p>
+      <p><a href="index.html">Home</a> / <a href="remedies.html">Natural Remedies</a> / ${esc(r.name)}</p>
+      <h1>${esc(r.name)}</h1>
+      <p>${esc(r.intro)}</p>
+      <h2>What it may help with</h2>
+      <ul>${r.helps.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>
+      <h2>Ingredients</h2>
+      <ul>${r.ingredients.map(([a, i]) => `<li>${esc(a)} ${esc(i)}</li>`).join("")}</ul>
+      <h2>How to make it</h2>
+      <ol>${r.steps.map((t) => `<li>${esc(t)}</li>`).join("")}</ol>
+      <h2>Suggested amount</h2>
+      <p>${esc(r.amount)}</p>
+      <h2>How often</h2>
+      <p>${esc(r.often)}</p>
+      <h2>Evidence level: ${evidenceLabel[r.evidence[0]]}</h2>
+      <p>${esc(r.evidence[1])}</p>
+      <h2>Safety warnings</h2>
+      <ul>${r.safety.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>
+      <h2>When to seek medical care instead</h2>
+      <ul>${r.seekCare.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>
+      <p><small>For education only — not medical advice.</small></p>
     </article>`;
-  const jsonld = {
-    "@context": "https://schema.org",
-    "@graph": [
-      { "@type": "Article", headline: fr.name, description, url, image: ogImage, publisher: { "@type": "Organization", name: "Beauty & Praise" }, about: { "@type": "Thing", name: fr.name, alternateName: fr.latin } },
-      breadcrumb("Fruit Library", "fruits.html", fr.name, url)
-    ]
-  };
-  fs.writeFileSync(path.join(root, "fruits", `${fr.id}.html`), page(fruitTemplate, { title, description, url, image: ogImage, id: fr.id, main, jsonld }));
+  const jsonld = { "@context": "https://schema.org", "@graph": [
+    { "@type": "HowTo", name: r.name, description, url, image: ogImage,
+      supply: r.ingredients.map(([a, i]) => ({ "@type": "HowToSupply", name: `${a} ${i}`.trim() })),
+      step: r.steps.map((t) => ({ "@type": "HowToStep", text: t })) },
+    breadcrumb("Natural Remedies", "remedies.html", r.name, url)
+  ] };
+  fs.writeFileSync(path.join(root, "remedies", `${r.id}.html`), page(remedyTemplate, { title, description, url, image: ogImage, id: r.id, main, jsonld }));
 }
 
 // ---------- Wellness guides ----------
 const herbName = (id) => HERBS.find((h) => h.id === id).name;
-const itemName = (k) => k.startsWith("fruit:") ? FRUITS.find((f) => f.id === k.slice(6)).name : herbName(k);
+const itemName = (k) => k.startsWith("fruit:") ? FRUITS.find((f) => f.id === k.slice(6)).name : k.startsWith("food:") ? FOODS.find((f) => f.id === k.slice(5)).name : herbName(k);
 const guideTemplate = read("guide.html");
 fs.mkdirSync(path.join(root, "guides"), { recursive: true });
 for (const g of TOPIC_GUIDES) {
@@ -183,6 +245,8 @@ for (const g of TOPIC_GUIDES) {
       <p>${esc(g.intro)}</p>
       <h2>Start with the basics</h2>
       <ul>${g.lifestyle.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>
+      <h2>Foods that may help</h2>
+      <ul>${FOODS.filter((fd) => fd.goals.includes(g.id)).map((fd) => `<li><a href="foods/${fd.id}.html">${esc(fd.name)}</a></li>`).join("")}</ul>
       <h2>Herbs that may help</h2>
       <ul>${g.herbs.map((id) => `<li><a href="herbs/${id}.html">${esc(herbName(id))}</a> — ${esc(BENEFITS[id][0][1])}: ${esc(BENEFITS[id][0][2])}</li>`).join("")}</ul>
       <h2>Fruits that help</h2>
@@ -266,11 +330,13 @@ for (const r of RECIPES) {
 
 // ---------- Sitemap & robots ----------
 const today = new Date().toISOString().slice(0, 10);
-const rootPages = ["", "herbs.html", "fruits.html", "stacks.html", "guides.html", "interactions.html", "quiz.html", "finder.html", "bible.html", "devotional.html", "recipes.html", "myplan.html", "reminders.html", "journal.html", "about.html", "privacy.html", "terms.html", "disclaimer.html", "es/", "es/seguridad.html"];
+const rootPages = ["", "foods.html", "remedies.html", "herbs.html", "fruits.html", "stacks.html", "guides.html", "interactions.html", "quiz.html", "finder.html", "bible.html", "devotional.html", "recipes.html", "myplan.html", "reminders.html", "journal.html", "about.html", "privacy.html", "terms.html", "disclaimer.html", "es/", "es/seguridad.html"];
 const urls = [
   ...rootPages.map((p) => SITE_URL + p),
   ...HERBS.map((h) => `${SITE_URL}herbs/${h.id}.html`),
   ...FRUITS.map((f) => `${SITE_URL}fruits/${f.id}.html`),
+  ...FOODS.map((f) => `${SITE_URL}foods/${f.id}.html`),
+  ...REMEDIES.map((r) => `${SITE_URL}remedies/${r.id}.html`),
   ...TOPIC_GUIDES.map((g) => `${SITE_URL}guides/${g.id}.html`),
   ...SAFETY_GUIDES.map((g) => `${SITE_URL}safety/${g.id}.html`),
   ...RECIPES.map((r) => `${SITE_URL}recipes/${r.id}.html`),
@@ -281,4 +347,4 @@ fs.writeFileSync(path.join(root, "sitemap.xml"),
   `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `  <url><loc>${esc(u)}</loc><lastmod>${today}</lastmod></url>`).join("\n")}\n</urlset>\n`);
 fs.writeFileSync(path.join(root, "robots.txt"), `User-agent: *\nAllow: /\n\nSitemap: ${SITE_URL}sitemap.xml\n`);
 
-console.log(`Built ${HERBS.length} herb pages, ${FRUITS.length} fruit pages, ${TOPIC_GUIDES.length + SAFETY_GUIDES.length} guide pages, ${RECIPES.length} recipe pages, ${Object.keys(myPhotos).length} of your own photos and a sitemap with ${urls.length} URLs for ${SITE_URL}`);
+console.log(`Built ${HERBS.length} herb pages, ${FRUITS.length} fruit pages, ${FOODS.length} food pages, ${REMEDIES.length} remedy pages, ${TOPIC_GUIDES.length + SAFETY_GUIDES.length} guide pages, ${RECIPES.length} recipe pages, ${Object.keys(myPhotos).length} of your own photos and a sitemap with ${urls.length} URLs for ${SITE_URL}`);

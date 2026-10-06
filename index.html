@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Beauty &amp; Praise — Herbs, Wellness &amp; Gratitude</title>
-  <meta name="description" content="A gentle guide to 100+ herbs and simple, healthy daily reminders.">
+  <title>Beauty &amp; Praise — Real Food, Natural Remedies &amp; Healthy Habits</title>
+  <meta name="description" content="Real food, natural remedies, herbs and simple daily habits to support everyday wellness — with practical amounts, safety notes and easy ways to use them.">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Beauty &amp; Praise">
-  <meta property="og:title" content="Beauty &amp; Praise — Herbs, Wellness &amp; Gratitude">
-  <meta property="og:description" content="A gentle guide to 100+ herbs and simple, healthy daily reminders.">
+  <meta property="og:title" content="Beauty &amp; Praise — Real Food, Natural Remedies &amp; Healthy Habits">
+  <meta property="og:description" content="Real food, natural remedies, herbs and simple daily habits to support everyday wellness — with practical amounts, safety notes and easy ways to use them.">
   <meta property="og:image" content="images/og-image.png">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" type="image/svg+xml" href="images/logo-mark.svg">
@@ -23,61 +23,94 @@
     <section class="hero">
       <div class="container hero-grid">
         <div class="hero-copy">
-          <p class="eyebrow">Herbs · Fruits · Wellness · Gratitude</p>
+          <p class="eyebrow">Food · Natural remedies · Herbs · Healthy habits</p>
           <h1>Natural wellness, <em>made simple.</em></h1>
-          <p class="lead">Find the right herbs and fruits for what you need, see how much to take, and check that they're safe with your medicines — all in one place.</p>
-          <form class="hero-search" role="search" action="herbs.html">
+          <p class="lead">Discover foods, natural remedies, herbs, and everyday habits that can support your body — with simple guides, practical amounts, safety information, and easy ways to use them.</p>
+          <form class="hero-search" role="search" action="foods.html">
             <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M11 4a7 7 0 1 1 0 14 7 7 0 0 1 0-14zm10 17-5-5"/></svg>
-            <input type="search" name="q" id="hero-search" placeholder="Search — try “sleep”, “ginger” or “blueberry”" aria-label="Search herbs, fruits and guides" autocomplete="off">
+            <input type="search" name="q" id="hero-search" placeholder="Try “sleep”, “headache”, “ginger”, “blueberries”, “high-protein foods” or “digestion”" aria-label="Search foods, remedies, herbs and wellness goals" autocomplete="off">
           </form>
           <ul class="search-suggest hero-suggest" id="hero-suggest"></ul>
         </div>
         <div class="hero-art" id="hero-art"></div>
       </div>
-      <div class="container start-grid">
+      <div class="container start-grid start-grid-4">
         <a class="start-card primary" href="finder.html">
           <span class="start-num">1</span>
-          <span><strong>What should I take?</strong><em>Answer 6 quick questions and get a personal plan.</em></span>
+          <span><strong>What should I eat?</strong><em>Find foods, fruits, vegetables, herbs, and natural options based on your wellness goal.</em></span>
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+        <a class="start-card" href="remedies.html">
+          <span class="start-num">2</span>
+          <span><strong>Natural remedies</strong><em>Explore simple home and food-based remedies for common wellness needs.</em></span>
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         </a>
         <a class="start-card" href="interactions.html">
-          <span class="start-num">2</span>
-          <span><strong>Is it safe for me?</strong><em>Check herbs with your medicines, pregnancy and health.</em></span>
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-        </a>
-        <a class="start-card" href="herbs.html">
           <span class="start-num">3</span>
-          <span><strong>Browse herbs &amp; fruits</strong><em>200+ easy guides with benefits and doses.</em></span>
+          <span><strong>Is it safe for me?</strong><em>Check herbs, supplements, foods, medicines, pregnancy considerations, allergies, and health conditions.</em></span>
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+        <a class="start-card" href="foods.html">
+          <span class="start-num">4</span>
+          <span><strong>Browse foods &amp; remedies</strong><em>Browse guides for foods, fruits, vegetables, herbs, teas, spices, and natural remedies.</em></span>
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         </a>
       </div>
-    </section>
-
-    <section class="section">
-      <div class="container">
-        <div class="section-head center"><div><p class="eyebrow">Start here</p><h2>What do you need help with?</h2></div></div>
-        <div class="need-grid" id="need-grid"></div>
-        <p class="center need-safety">Pregnant, breastfeeding, caring for a child or over 65? <span id="safety-links"></span></p>
-      </div>
-    </section>
-
-    <section class="section section-tint">
-      <div class="container feature" id="feature"></div>
     </section>
 
     <section class="section">
       <div class="container">
         <div class="section-head">
-          <div><p class="eyebrow">Most loved</p><h2>Popular herbs &amp; fruits</h2></div>
-          <div class="head-links"><a class="text-link" href="herbs.html">All herbs <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a><a class="text-link" href="fruits.html">All fruits <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div>
+          <div><p class="eyebrow">Start with your plate</p><h2>Food as the Foundation</h2><p class="muted section-sub">Real, everyday foods are the base of lasting wellness. Choose a category to see what to eat, how much and why.</p></div>
+          <a class="text-link" href="foods.html">Food library <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        </div>
+        <div class="guide-grid cat-grid" id="food-cats"></div>
+      </div>
+    </section>
+
+    <section class="section section-tint">
+      <div class="container">
+        <div class="section-head">
+          <div><p class="eyebrow">Simple &amp; time-tested</p><h2>Natural Remedies</h2><p class="muted section-sub">Gentle home and food-based remedies with exact amounts, evidence levels and clear signs for when to see a doctor.</p></div>
+          <a class="text-link" href="remedies.html">All remedies <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        </div>
+        <div class="guide-grid cat-grid" id="remedy-cats"></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <div class="section-head">
+          <div><p class="eyebrow">Most loved</p><h2>Popular foods &amp; natural remedies</h2></div>
+          <div class="head-links"><a class="text-link" href="foods.html">All foods <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a><a class="text-link" href="remedies.html">All remedies <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div>
         </div>
         <div class="herb-grid" id="popular-grid"></div>
+        <div class="recipe-grid popular-remedies" id="popular-remedies"></div>
+      </div>
+    </section>
+
+    <section class="section section-tint">
+      <div class="container">
+        <div class="section-head center"><div><p class="eyebrow">Wellness goals</p><h2>What do you need help with?</h2></div></div>
+        <div class="need-grid" id="need-grid"></div>
+        <p class="center need-safety">Pregnant, breastfeeding, caring for a child or over 65? <span id="safety-links"></span></p>
       </div>
     </section>
 
     <section class="verse-band" id="verse-band"></section>
 
     <section class="section">
+      <div class="container">
+        <div class="section-head">
+          <div><p class="eyebrow">A supporting role</p><h2>Herbs &amp; Botanicals</h2><p class="muted section-sub">Teas, spices and traditional herbs that can complement a food-first approach — with research notes, doses and safety for each.</p></div>
+          <div class="head-links"><a class="text-link" href="herbs.html">Herb library <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a><a class="text-link" href="stacks.html">Herbal stacks <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div>
+        </div>
+        <div class="feature" id="feature"></div>
+        <div class="herb-grid home-herbs" id="herb-grid-home"></div>
+      </div>
+    </section>
+
+    <section class="section section-tint">
       <div class="container">
         <div class="section-head">
           <div><p class="eyebrow">From the journal</p><h2>Latest articles</h2></div>
@@ -94,6 +127,8 @@
   <script src="js/herbs-pharm.js"></script>
   <script src="js/herbs-caps.js"></script>
   <script src="js/fruits-data.js"></script>
+  <script src="js/foods-data.js"></script>
+  <script src="js/remedies.js"></script>
   <script src="js/stacks.js"></script>
   <script src="js/interactions.js"></script>
   <script src="js/drugs.js"></script>

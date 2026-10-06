@@ -1229,3 +1229,64 @@ body[data-page="es"] .note-card .btn { margin-top: 6px; color: var(--cream); }
 .founder-verse cite { display: block; margin-top: 8px; font-family: var(--sans); font-style: normal; font-size: 0.75rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--clay); }
 .founder-sign { font-family: var(--serif); font-style: italic; font-size: 1.6rem; color: var(--forest); margin-top: 8px; }
 @media (max-width: 900px) { .founder { grid-template-columns: 1fr; gap: 36px; } .founder-photo { max-width: 420px; margin: 0 auto; width: 100%; } }
+
+/* ---------- Food-first homepage & new sections ---------- */
+.section-sub { max-width: 640px; margin: 10px 0 0; }
+.start-grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.start-grid-4 .start-card { align-items: flex-start; }
+.start-grid-4 .start-card strong { font-size: 1.3rem; }
+.cat-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; }
+.cat-grid .guide-card { padding: 20px; }
+.cat-grid .guide-card h3 { font-size: 1.35rem; line-height: 1.15; }
+.cat-grid .guide-card p { font-size: 0.92rem; }
+.popular-remedies { margin-top: 32px; }
+.home-herbs { margin-top: 40px; }
+.guide-foods { margin: 8px 0 36px; }
+.food-note { margin-top: 40px; }
+.pf-icon { display: grid; place-items: center; background: var(--sage-soft); color: var(--forest); }
+.pf-icon .icon { width: 42%; height: 42%; }
+.mini-art .pf-icon .icon { width: 55%; height: 55%; }
+.source-list { padding-left: 20px; }
+.source-list li { margin-bottom: 6px; }
+.source-list a { color: var(--forest); word-break: break-word; }
+.plain-list { margin: 0; padding-left: 18px; }
+.plain-list li { margin-bottom: 6px; }
+.remedy-dose { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
+.remedy-dose .eyebrow { margin: 0 0 4px; }
+.remedy-dose p:not(.eyebrow) { margin: 0 0 14px; }
+.quick-doses .qd-when { margin: 0; color: rgba(246, 241, 231, 0.92); line-height: 1.55; }
+.recipe-facts .evidence { font-size: 0.72rem; }
+.recipe-meta .evidence { font-size: 0.62rem; padding: 2px 8px; }
+
+/* The broader seven-item menu needs a little more room. */
+@media (max-width: 1440px) {
+  .header-cta { display: none; }
+  .nav-top { padding: 10px 10px; font-size: 0.74rem !important; letter-spacing: 0.06em !important; }
+}
+@media (max-width: 1250px) {
+  .main-nav ul { gap: 0 !important; }
+  .nav-top { padding: 8px 8px; font-size: 0.7rem !important; letter-spacing: 0.04em !important; }
+}
+@media (max-width: 1180px) {
+  .menu-btn { display: inline-grid; }
+  .main-nav { display: none; }
+  .logo { margin: 0 auto; }
+}
+@media (max-width: 1100px) {
+  .cat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .start-grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .cat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .cat-grid .guide-card { padding: 14px; }
+  .cat-grid .guide-card h3 { font-size: 1.15rem; }
+  .cat-grid .guide-card p { display: none; }
+  .cat-grid .guide-photos .mini-art { width: 40px; height: 40px; }
+  .start-grid-4 { grid-template-columns: 1fr; }
+}
+.start-grid-4 .start-card { position: relative; flex-direction: column; gap: 12px; padding: 24px 22px; }
+.start-grid-4 .start-card > .icon { position: absolute; top: 26px; right: 22px; }
+@media (max-width: 640px) {
+  .start-grid-4 .start-card { flex-direction: row; align-items: center; padding: 18px 44px 18px 18px; }
+  .start-grid-4 .start-card > .icon { top: 50%; transform: translateY(-50%); }
+}

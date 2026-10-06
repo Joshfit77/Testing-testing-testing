@@ -322,5 +322,22 @@ const Art = (() => {
     return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Illustration of ${fr.name}" preserveAspectRatio="xMidYMid slice">${bg}${art}</svg>`;
   }
 
-  return { herb, fruit, shade };
+  // Foods: a bowl of food for grains, seeds, dairy and the like; otherwise drawn like a fruit shape.
+  function food(fd, opts = {}) {
+    if (fd.art !== "bowl") return fruit({ ...fd, shape: fd.art || "round", id: "food-" + fd.id }, opts);
+    const r = rng(hash("food-" + fd.id));
+    const bg = opts.bare ? "" : `<rect width="200" height="200" fill="${shade(fd.color, 0.86)}"/><circle cx="100" cy="104" r="78" fill="${shade(fd.color, 0.76)}"/>`;
+    let art = leaf(150, 70, 30, 36, 14, FOLIAGE) + leaf(146, 72, -20, 28, 11, shade(FOLIAGE, 0.1));
+    art += `<ellipse cx="100" cy="112" rx="62" ry="16" fill="${shade(fd.color, -0.1)}"/>`;
+    for (let i = 0; i < 34; i++) {
+      const a = r() * Math.PI, d = r();
+      art += `<circle cx="${f(100 + Math.cos(a) * 56 * d * (r() > 0.5 ? 1 : -1))}" cy="${f(108 - Math.sin(a) * 14 * d)}" r="${f(3 + r() * 4)}" fill="${shade(fd.color, (r() - 0.5) * 0.5)}"/>`;
+    }
+    art += `<path d="M38 112 Q40 162 100 166 Q160 162 162 112 Z" fill="#f6f1e7" stroke="#d8cdb8" stroke-width="1.5"/>`;
+    art += `<path d="M52 128 Q100 140 148 128" stroke="${shade(fd.color, 0.2)}" stroke-width="3" fill="none" opacity="0.6"/>`;
+    art += `<ellipse cx="100" cy="168" rx="26" ry="5" fill="#d8cdb8"/>`;
+    return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Illustration of ${fd.name}" preserveAspectRatio="xMidYMid slice">${bg}${art}</svg>`;
+  }
+
+  return { herb, fruit, food, shade };
 })();

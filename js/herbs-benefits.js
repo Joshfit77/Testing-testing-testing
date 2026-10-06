@@ -47,7 +47,7 @@ const BENEFITS = {
   ],
   thyme: [
     ["P", "Cough relief", "Thymol and carvacrol relax the airway muscles and help loosen mucus. Clinical trials of thyme combined with ivy leaf found people with acute bronchitis stopped coughing sooner than with placebo."],
-    ["P", "Fights germs", "Thyme oil is strongly antimicrobial in laboratory studies. Thymol is the active ingredient in some well-known antiseptic mouthwashes."],
+    ["P", "May help fight germs", "Thyme oil is strongly antimicrobial in laboratory studies. Thymol is the active ingredient in some well-known antiseptic mouthwashes."],
     ["T", "Sore throats", "Warm thyme tea with honey is a traditional European throat remedy, and thyme is officially approved in Germany for symptoms of bronchitis."]
   ],
   sage: [
@@ -57,7 +57,7 @@ const BENEFITS = {
   ],
   oregano: [
     ["P", "Rich in antioxidants", "Dried oregano is one of the most antioxidant-rich culinary herbs, thanks mainly to rosmarinic acid, carvacrol and thymol."],
-    ["P", "Fights germs", "Carvacrol and thymol show strong antibacterial and antifungal activity in laboratory studies. Human research is still limited, so oregano oil is not a replacement for medical treatment."],
+    ["P", "May help fight germs", "Carvacrol and thymol show strong antibacterial and antifungal activity in laboratory studies. Human research is still limited, so oregano oil is not a replacement for medical treatment."],
     ["T", "Coughs and congestion", "Oregano tea and steam are traditional Mediterranean remedies to ease coughs and clear a stuffy nose."]
   ],
   basil: [
@@ -82,7 +82,7 @@ const BENEFITS = {
   ],
   dill: [
     ["T", "Gas and colic", "Dill seed oil (carvone and limonene) relaxes the digestive tract. 'Gripe water' made with dill has been given for colic for centuries."],
-    ["P", "Fights germs", "Dill oil shows antibacterial activity in laboratory studies, one reason it was traditionally used in pickling."],
+    ["P", "May help fight germs", "Dill oil shows antibacterial activity in laboratory studies, one reason it was traditionally used in pickling."],
     ["T", "Minerals and vitamins", "Dill seed contains calcium and other minerals, and fresh fronds add vitamins A and C."]
   ],
   fennel: [
@@ -97,7 +97,7 @@ const BENEFITS = {
   ],
   lemongrass: [
     ["T", "Digestive aid", "Citral, lemongrass's main oil, relaxes the stomach. It is a traditional remedy for indigestion and cramps in Brazil and Southeast Asia."],
-    ["P", "Fights germs", "Lemongrass oil is active against many fungi and bacteria in laboratory studies, which is why it's popular in natural cleaners."],
+    ["P", "May help fight germs", "Lemongrass oil is active against many fungi and bacteria in laboratory studies, which is why it's popular in natural cleaners."],
     ["T", "Relaxation", "In Brazilian folk medicine, lemongrass tea (capim-santo) is a beloved calming drink, though human studies are mixed."]
   ],
   "lemon-verbena": [
@@ -128,7 +128,7 @@ const BENEFITS = {
   nutmeg: [
     ["T", "Restful sleep", "A tiny pinch in warm milk is a traditional bedtime remedy. Myristicin may have mild sedative effects, but evidence is anecdotal — and larger amounts are harmful."],
     ["T", "Settling digestion", "Used in small amounts in traditional medicine to ease diarrhea, gas and indigestion."],
-    ["P", "Fights mouth bacteria", "Laboratory studies show nutmeg compounds are active against bacteria that cause tooth decay."]
+    ["P", "May help fight mouth bacteria", "Laboratory studies show nutmeg compounds are active against bacteria that cause tooth decay."]
   ],
   "black-pepper": [
     ["R", "Better absorption of nutrients", "Piperine slows the enzymes that break down certain compounds in the gut and liver. In one study, it increased the absorption of curcumin from turmeric by up to 2,000%."],
@@ -327,7 +327,7 @@ const BENEFITS = {
   ],
   eucalyptus: [
     ["P", "Clearing congestion", "Eucalyptol (1,8-cineole) helps thin mucus and calm airway inflammation. Clinical trials of cineole capsules found faster relief in sinusitis and bronchitis."],
-    ["P", "Fights germs", "Eucalyptus oil is antibacterial and is used in some mouthwashes and wound products."],
+    ["P", "May help fight germs", "Eucalyptus oil is antibacterial and is used in some mouthwashes and wound products."],
     ["T", "Muscle aches", "Eucalyptus is a common ingredient in warming rubs for sore muscles."]
   ],
   "tea-tree": [
@@ -413,7 +413,7 @@ const BENEFITS = {
   "olive-leaf": [
     ["P", "Healthy blood pressure", "Oleuropein helps relax blood vessels. In one clinical trial, olive leaf extract lowered blood pressure about as well as the medicine captopril in people with mild hypertension."],
     ["P", "Blood sugar", "A small trial found olive leaf extract improved insulin sensitivity in overweight men."],
-    ["P", "Fights germs", "Olive leaf extract shows antibacterial and antiviral activity in laboratory studies."]
+    ["P", "May help fight germs", "Olive leaf extract shows antibacterial and antiviral activity in laboratory studies."]
   ],
   bilberry: [
     ["P", "Eye health", "Bilberry anthocyanins support the retina and may reduce eye fatigue, though the wartime 'night vision' story was likely a myth."],
@@ -438,7 +438,7 @@ const BENEFITS = {
   "bay-laurel": [
     ["T", "Digestion", "Bay leaves help with the digestion of heavy dishes and are traditionally used for gas and bloating."],
     ["P", "Blood sugar and cholesterol", "A small study found ground bay leaves improved blood sugar and cholesterol in people with type 2 diabetes."],
-    ["T", "Fights germs", "Bay leaf oil is antibacterial and antifungal in laboratory studies."]
+    ["T", "May help fight germs", "Bay leaf oil is antibacterial and antifungal in laboratory studies."]
   ],
   juniper: [
     ["T", "Digestion", "Juniper's bitter, aromatic compounds stimulate digestion, which is why it is paired with rich meats and cabbage."],
@@ -458,7 +458,7 @@ const BENEFITS = {
   caraway: [
     ["R", "Indigestion", "Clinical trials found caraway oil combined with peppermint oil relieved fullness, bloating and pain in functional dyspepsia."],
     ["T", "Gas and colic", "Caraway relaxes the digestive tract and is a traditional remedy for gas and colic."],
-    ["P", "Fights germs", "Caraway oil shows antibacterial and antifungal activity in laboratory studies."]
+    ["P", "May help fight germs", "Caraway oil shows antibacterial and antifungal activity in laboratory studies."]
   ],
   mustard: [
     ["T", "Warming plasters", "Mustard plasters increase blood flow to the skin, traditionally used to ease chest congestion and muscle aches."],

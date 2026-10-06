@@ -1,11 +1,15 @@
 # Beauty & Praise 🌿
 
-A website about herbs, fruits and healthy reminders.
+A food-first wellness website: real food, natural remedies, healthy habits and herbs as a supporting category — with practical amounts, safety notes and a faith-friendly heart.
 
 ## Pages
 | Page | File | What's on it |
 |---|---|---|
-| Home | `index.html` | Hero, categories, herb of the day, popular herbs, fruits, stacks, verse, tools, articles |
+| Home | `index.html` | Food-first hero and search, 4 start cards, Food as the Foundation, Natural Remedies, popular foods & remedies, wellness goals, verse, Herbs & Botanicals, journal |
+| Food Library | `foods.html` | Everyday foods with 10 categories (`foods.html?cat=protein`) and search (`?q=`) |
+| Food pages | `foods/<id>.html` | Shared food/fruit layout: what it is, key nutrients, potential benefits, best ways to eat it, typical serving, when to eat it, who may benefit, possible downsides, allergies & interactions, pregnancy & breastfeeding, sources |
+| Natural Remedies | `remedies.html` | Home & food-based remedies in 10 categories (`remedies.html?cat=sleep`) |
+| Remedy pages | `remedies/<id>.html` | What it may help with, ingredients, exact steps, suggested amount, how often, evidence level, safety warnings, when to seek medical care, sources |
 | Herb Library | `herbs.html` | All 107 herbs with search, filters, A–Z, saved herbs |
 | Herb pages | `herbs/<id>.html` | One page per herb: benefits at a glance, body effects, chemistry, benefits explained, capsule & herb doses, uses, preparation, growing, safety, medicine interactions, buying tips |
 | Fruit Library | `fruits.html` | All 100 fruits with search, benefit, season and A–Z filters |
@@ -58,6 +62,8 @@ If you sell products or use affiliate links, keep claims educational: in the U.S
 - `js/herbs-pharm.js` — body effects, active compounds and detailed doses
 - `js/herbs-caps.js` — the capsule (mg) and herb-by-itself doses
 - `js/fruits-data.js` — the 100 fruits
+- `js/foods-data.js` — everyday foods, the Food as the Foundation categories, reference links, and the shared food/fruit page structure (`foodProfile`)
+- `js/remedies.js` — natural remedies and their categories
 - `js/stacks.js` — the herbal stacks
 - `js/interactions.js` — the safety checker's medicine groups, health situations, flagged herbs/fruits, and "what could happen / what to do" text
 - `js/drugs.js` — medicine names (generic and brand) the safety checker recognizes
@@ -72,6 +78,9 @@ If you sell products or use affiliate links, keep claims educational: in the U.S
 
 ## Photos
 Herb and fruit photos load in the visitor's browser from Wikipedia / Wikimedia Commons (free-licensed images); each page credits the photographer and license. If a photo can't load, a drawn illustration is shown instead. **To use your own photos:** put them in `images/herbs/` or `images/fruits/`, named exactly like the page address — e.g. `images/herbs/chamomile.jpg` for `herbs/chamomile.html`, `images/fruits/apple.jpg` for `fruits/apple.html` (.jpg, .png or .webp; about 1200 px wide is plenty) — then run `node scripts/build.js`. Your photo replaces the Wikipedia one everywhere on the site. To choose a different credit line, add it to `PHOTO_OVERRIDES` in `js/photos.js` instead (fruits use keys like `"fruit:apple"`). If a Wikipedia photo is a poor match, change the article in `WIKI_TITLES` or `FRUIT_WIKI_TITLES` in the same file.
+
+## Wording
+Keep wellness language conservative: foods, remedies and herbs "may support", "may help" or "have been studied for" — never "cures" or "treats". Food and remedy pages link to their sources (USDA FoodData Central, NIH fact sheets, FDA, CDC); please spot-check those links after launch.
 
 ## Scripture
 English verses use the NASB 1995 and Spanish verses use La Biblia de las Américas (LBLA), both from The Lockman Foundation; the copyright notices are in the footers. Verses were typed in by hand, so please check each one against a printed Bible before launch.

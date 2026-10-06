@@ -413,3 +413,46 @@ const IX_DETAILS = {
   reflux: { what: "Some herbs and acidic fruits relax the valve at the top of the stomach or irritate it.", todo: "Notice your triggers, try smaller portions, and choose gentler options like chamomile or ginger." },
   "older-adults": { what: "With age the body clears herbs and medicines more slowly, and many people take several medicines. Drowsiness can lead to falls, and bleeding risk rises.", todo: "Bring every bottle — prescriptions, herbs, vitamins — to a pharmacist for a 'brown bag' review once a year." }
 };
+
+// ---------- Everyday foods ("food:<id>") ----------
+// Added to the existing medicine and health-situation entries so foods show up in the safety checker too.
+[
+  ["blood-thinners", "caution", { "food:spinach": "Very high in vitamin K — keep the amount of greens you eat steady from week to week.", "food:kale": "Very high in vitamin K — keep intake steady.", "food:broccoli": "Contains vitamin K — keep intake steady.", "food:flaxseed": "Large amounts may add to bleeding risk." }],
+  ["antidepressants", "caution", { "food:sauerkraut": "Fermented foods contain tyramine — avoid with MAOI antidepressants.", "food:dark-chocolate": "Contains caffeine and a little tyramine — keep amounts small with MAOIs." }],
+  ["thyroid", "caution", { "food:tofu": "Soy may reduce absorption of thyroid medicine — take your medicine about 4 hours apart from soy.", "food:flaxseed": "Fiber can slow absorption — take thyroid medicine 1–2 hours apart." }],
+  ["diabetes", "caution", { "food:honey": "Adds sugar — count it in your carbohydrates.", "food:chia-seeds": "May lower blood sugar slightly." }],
+  ["immunosuppressants", "caution", { "food:kefir": "Contains live microbes — ask your doctor if your immune system is suppressed.", "food:sauerkraut": "Raw sauerkraut contains live microbes — ask your doctor first." }],
+  ["stimulants", "caution", { "food:dark-chocolate": "Contains caffeine." }],
+  ["pregnancy", "caution", { "food:salmon": "Eat it cooked; avoid raw sushi and refrigerated smoked salmon unless cooked.", "food:eggs": "Cook until yolks and whites are firm.", "food:dark-chocolate": "Counts toward the 200 mg daily caffeine limit.", "food:flaxseed": "Food amounts are likely fine; avoid large amounts and supplements." }],
+  ["children", "caution", { "food:honey": "Never give honey to babies under 1 year (infant botulism).", "food:almonds": "Whole nuts are a choking hazard under age 4.", "food:walnuts": "Whole nuts are a choking hazard under age 4.", "food:chia-seeds": "Always soak first — dry seeds can swell in the throat." }],
+  ["kidney", "caution", { "food:spinach": "High in oxalate and potassium — follow your kidney diet.", "food:beets": "High in oxalate.", "food:sweet-potato": "High in potassium.", "food:bone-broth": "Often high in sodium and potassium." }],
+  ["high-bp", "caution", { "food:sauerkraut": "High in sodium — keep portions small.", "food:cottage-cheese": "Often high in sodium — compare labels.", "food:bone-broth": "Often high in sodium — choose low-sodium." }],
+  ["reflux", "caution", { "food:dark-chocolate": "May trigger heartburn." }]
+].forEach(([id, level, notes]) => Object.assign(INTERACTIONS.find((x) => x.id === id)[level], notes));
+
+// Common food allergies and intolerances.
+INTERACTIONS.push(
+  { id: "milk-allergy", type: "condition", label: "Milk allergy", examples: "not the same as lactose intolerance",
+    avoid: { "food:greek-yogurt": "Contains milk.", "food:cottage-cheese": "Contains milk.", "food:kefir": "Contains milk." },
+    caution: { "food:dark-chocolate": "Many chocolates contain milk — check the label." } },
+  { id: "egg-allergy", type: "condition", label: "Egg allergy", examples: "",
+    avoid: { "food:eggs": "Contains egg." }, caution: {} },
+  { id: "fish-allergy", type: "condition", label: "Fish allergy", examples: "",
+    avoid: { "food:salmon": "Fish.", "food:sardines": "Fish." }, caution: {} },
+  { id: "nut-allergy", type: "condition", label: "Tree nut or peanut allergy", examples: "almonds, walnuts, cashews, peanuts",
+    avoid: { "food:almonds": "Tree nut.", "food:walnuts": "Tree nut." },
+    caution: { "fruit:coconut": "Classed as a tree nut on U.S. labels, though most people with nut allergies tolerate it — ask your allergist.", "food:dark-chocolate": "Often made on shared equipment with nuts." } },
+  { id: "soy-allergy", type: "condition", label: "Soy allergy", examples: "",
+    avoid: { "food:tofu": "Made from soy." }, caution: { "food:dark-chocolate": "Often contains soy lecithin." } },
+  { id: "celiac", type: "condition", label: "Celiac disease or gluten sensitivity", examples: "",
+    avoid: {}, caution: { "food:oats": "Usually cross-contaminated with wheat — choose certified gluten-free oats.", "food:bone-broth": "Some store-bought broths contain wheat — check the label." } }
+);
+
+Object.assign(IX_DETAILS, {
+  "milk-allergy": { what: "Milk allergy can cause hives, vomiting, wheezing or, rarely, life-threatening anaphylaxis. (Lactose intolerance is different — it causes gas and bloating, not an allergic reaction.)", todo: "Avoid all milk products, read labels for milk, whey and casein, and carry your epinephrine if prescribed." },
+  "egg-allergy": { what: "Egg allergy can cause skin, stomach or breathing reactions, and occasionally anaphylaxis.", todo: "Avoid eggs and foods containing them; read labels; follow your allergist's plan." },
+  "fish-allergy": { what: "Fish allergy is usually lifelong and can cause severe reactions, sometimes even from cooking fumes.", todo: "Avoid fish your allergist has not cleared, and carry epinephrine if prescribed. Get omega-3s from walnuts, chia and flax instead." },
+  "nut-allergy": { what: "Nut allergies are one of the most common causes of severe food reactions (anaphylaxis).", todo: "Avoid nuts and products made on shared equipment if your allergist advises it, and always carry your epinephrine. Pumpkin and chia seeds are usually safe alternatives — ask your allergist." },
+  "soy-allergy": { what: "Soy allergy can cause hives, stomach upset or breathing trouble.", todo: "Avoid tofu, soy milk and edamame and read labels for soy ingredients." },
+  celiac: { what: "In celiac disease, gluten from wheat, barley and rye damages the small intestine, even in small amounts.", todo: "Choose certified gluten-free products, especially oats, and read labels carefully." }
+});

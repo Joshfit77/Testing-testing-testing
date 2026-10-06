@@ -56,7 +56,7 @@ const PHARM = {
     daily: [3, 6], limit: "Avoid medicinal doses in pregnancy."
   },
   thyme: {
-    body: [["Respiratory system", "Loosens mucus and calms coughing."], ["Immune system", "Fights germs in the mouth and throat."], ["Digestive system", "Relieves gas."]],
+    body: [["Respiratory system", "Loosens mucus and calms coughing."], ["Immune system", "May help fight germs in the mouth and throat."], ["Digestive system", "Relieves gas."]],
     chem: [["Thymol", "Phenolic monoterpene", "Breaks open bacterial and fungal cell membranes and relaxes the smooth muscle of the airways."], ["Carvacrol", "Phenolic monoterpene", "Strong antimicrobial that also helps the tiny hairs (cilia) in the airways clear mucus."], ["Luteolin and other flavonoids", "Flavonoids", "Anti-inflammatory and antispasmodic."]],
     dose: [["Dried herb as tea (per cup)", 1, 2, "3–4 times a day"]],
     daily: [3, 10], limit: "Short-term use during coughs and colds."
@@ -146,7 +146,7 @@ const PHARM = {
     daily: null, limit: "Never swallow clove oil; keep away from children."
   },
   cardamom: {
-    body: [["Digestive system", "Relieves gas and heaviness."], ["Heart & blood vessels", "May lower blood pressure."], ["Mouth", "Fights bad-breath bacteria."]],
+    body: [["Digestive system", "Relieves gas and heaviness."], ["Heart & blood vessels", "May lower blood pressure."], ["Mouth", "May help fight bad-breath bacteria."]],
     chem: [["1,8-Cineole", "Monoterpene oxide", "Antispasmodic and antimicrobial; also helps loosen mucus."], ["α-Terpinyl acetate", "Ester", "The main aroma; relaxes the gut."], ["Limonene", "Monoterpene", "Supports digestion."]],
     dose: [["Ground cardamom in food or drink", 0.5, 1.5, "1–2 times a day"]],
     daily: [1, 3], limit: "Food amounts are safe."
@@ -248,7 +248,7 @@ const PHARM = {
     daily: [3, 7.5], limit: "Talk to your doctor if you take blood pressure medicine."
   },
   "aloe-vera": {
-    body: [["Skin", "Cools and heals burns and sunburn."], ["Skin", "Hydrates and calms irritation."], ["Gums", "Reduces gum inflammation (gels and rinses)."]],
+    body: [["Skin", "Cools and may help soothe minor burns and sunburn."], ["Skin", "Hydrates and calms irritation."], ["Gums", "Reduces gum inflammation (gels and rinses)."]],
     chem: [["Acemannan", "Polysaccharide", "Hydrates, encourages skin cells to multiply, and supports wound healing."], ["Glycoproteins & salicylic acid", "Proteins / phenolic acid", "Reduce inflammation and pain."], ["Aloin (in the yellow latex)", "Anthraquinone glycoside", "A strong laxative that irritates the bowel — the reason to drain the latex and avoid eating aloe."]],
     dose: [["Fresh inner-leaf gel on the skin", "Thin layer", null, "3–4 times a day"]],
     daily: null, limit: "For use on the skin. Do not eat aloe latex.", ext: true
@@ -398,7 +398,7 @@ const PHARM = {
     daily: null, limit: "Never swallow eucalyptus oil from a bottle; keep away from children's faces."
   },
   "tea-tree": {
-    body: [["Skin", "Reduces acne."], ["Skin & nails", "Fights fungal infections."], ["Skin", "Antiseptic for minor cuts."]],
+    body: [["Skin", "May help reduce acne."], ["Skin & nails", "Has antifungal activity."], ["Skin", "Antiseptic for minor cuts."]],
     chem: [["Terpinen-4-ol", "Monoterpene alcohol", "Damages the membranes of bacteria and fungi and reduces histamine-driven skin inflammation."], ["γ-Terpinene & α-terpinene", "Monoterpenes", "Support the antimicrobial action."], ["1,8-Cineole", "Monoterpene oxide", "Can irritate skin; good oils keep it low."]],
     dose: [["5% gel or diluted oil for acne", "Thin layer", null, "1–2 times a day"], ["25–50% solution for athlete's foot", "Thin layer", null, "2 times a day"]],
     daily: null, limit: "External use only — toxic if swallowed. Toxic to cats and dogs.", ext: true

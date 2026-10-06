@@ -926,7 +926,7 @@ const HERBS = [
     part: "berry", cats: ["women", "kitchen", "immunity"], color: "#b3203a",
     summary: "A tart North American berry for urinary wellness.",
     about: "Native Americans used cranberries for food, dye and medicine. Cranberries contain proanthocyanidins (PACs), which may help stop certain bacteria from sticking to the bladder wall. Studies suggest regular cranberry products may reduce the risk of repeat urinary tract infections in some women.",
-    uses: ["Helping to prevent repeat urinary tract infections", "A vitamin C-rich addition to the diet", "Sauces, muffins, salads and trail mix"],
+    uses: ["May help reduce repeat urinary tract infections", "A vitamin C-rich addition to the diet", "Sauces, muffins, salads and trail mix"],
     prep: "Choose unsweetened juice diluted with water, or capsules standardized for PACs.",
     flavor: "Very tart and astringent.",
     grow: "Grows in sandy bogs; fields are flooded at harvest so the berries float.",

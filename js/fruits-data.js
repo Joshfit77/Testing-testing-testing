@@ -213,7 +213,7 @@ F("kumquat", "Kumquat", "Citrus japonica", "Rutaceae (citrus family)", "citrus",
 F("lemon", "Lemon", "Citrus limon", "Rutaceae (citrus family)", "citrus", "#f2d43a", "Year-round", ["immunity", "digestion", "kitchen"],
   "Lemons bring bright flavor and vitamin C to food and drink. Their citric acid may help prevent some kidney stones. Lemon water is an easy way to drink more water through the day. The peel is rich in flavonoids and aromatic oils. A squeeze of lemon also helps the body absorb iron from plant foods.",
   ["Vitamin C", "Citric acid", "Flavonoids (hesperidin)", "Fiber (pectin)"],
-  [["P", "Kidney stones", "Citrate from lemon juice can raise urine citrate and help prevent calcium kidney stones."], ["P", "Iron absorption", "Vitamin C greatly increases absorption of iron from beans, greens and grains."], ["T", "Sore throats", "Warm lemon and honey is a classic remedy for scratchy throats."]],
+  [["P", "Kidney stones", "Citrate from lemon juice can raise urine citrate, which may help prevent calcium kidney stones."], ["P", "Iron absorption", "Vitamin C greatly increases absorption of iron from beans, greens and grains."], ["T", "Sore throats", "Warm lemon and honey is a classic remedy for scratchy throats."]],
   ["Squeeze into water or tea.", "Use juice and zest in dressings and marinades.", "Finish fish, vegetables and grains with a squeeze.", "Mix with honey and ginger for a soothing drink."],
   ["Juice of ½ lemon", 25], "Choose heavy, glossy lemons. Refrigerate in a bag for up to a month.",
   "Lemon's acid can erode tooth enamel — drink lemon water with a straw and rinse after. May trigger heartburn.");

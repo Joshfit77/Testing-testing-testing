@@ -1,4 +1,4 @@
-// Simple herbal recipes. herbs/fruits link to their pages; guide links to the matching wellness guide.
+// Simple herbal recipes. herbs/fruits/foods link to their pages; guide links to the matching wellness guide.
 // ingredients: [amount, item]
 
 const RECIPE_TYPES = { tea: "Teas", drink: "Drinks & Smoothies", syrup: "Syrups & Remedies", food: "In the Kitchen", body: "Skin, Hair & Bath" };
@@ -6,7 +6,7 @@ const RECIPE_TYPES = { tea: "Teas", drink: "Drinks & Smoothies", syrup: "Syrups 
 const RECIPES = [
   {
     id: "sleepy-time-tea", name: "Sleepy-Time Herbal Tea", type: "tea", time: "10 minutes", yield: "1 mug", guide: "sleep",
-    herbs: ["chamomile", "lemon-balm", "lavender"], fruits: [],
+    herbs: ["chamomile", "lemon-balm", "lavender"], fruits: [], foods: ["honey"],
     intro: "A gentle, floral bedtime tea that helps you wind down. Chamomile and lemon balm calm the nerves, and a tiny pinch of lavender adds a relaxing aroma.",
     ingredients: [["1 tsp", "dried chamomile flowers"], ["1 tsp", "dried lemon balm leaf"], ["1 small pinch", "dried lavender buds"], ["1 cup (240 ml)", "just-boiled water"], ["1 tsp (optional)", "honey"]],
     steps: ["Put the chamomile, lemon balm and lavender in a tea infuser or teapot.", "Pour the just-boiled water over the herbs.", "Cover the mug or pot (this keeps the calming oils in) and steep for 8–10 minutes.", "Strain, stir in honey if you like, and sip slowly 30–60 minutes before bed."],
@@ -16,7 +16,7 @@ const RECIPES = [
   },
   {
     id: "ginger-lemon-honey", name: "Ginger, Lemon & Honey Tea", type: "tea", time: "15 minutes", yield: "2 mugs", guide: "cold-flu",
-    herbs: ["ginger"], fruits: ["lemon"],
+    herbs: ["ginger"], fruits: ["lemon"], foods: ["honey"],
     intro: "A warming classic for chilly days, scratchy throats and queasy stomachs.",
     ingredients: [["2-inch (5 cm) piece", "fresh ginger, thinly sliced"], ["2 cups (480 ml)", "water"], ["½", "lemon, juiced"], ["1–2 tsp", "raw honey"]],
     steps: ["Add the sliced ginger and water to a small pot.", "Bring to a boil, then simmer gently for 10 minutes.", "Turn off the heat and stir in the lemon juice.", "Pour into mugs, let cool for a minute, then stir in honey."],
@@ -26,7 +26,7 @@ const RECIPES = [
   },
   {
     id: "golden-milk", name: "Golden Milk", type: "drink", time: "10 minutes", yield: "1 mug", guide: "joints",
-    herbs: ["turmeric", "ginger", "cinnamon", "black-pepper"], fruits: [],
+    herbs: ["turmeric", "ginger", "cinnamon", "black-pepper"], fruits: [], foods: ["honey"],
     intro: "A creamy, comforting drink from Indian tradition. Black pepper and a little fat help your body absorb turmeric's curcumin.",
     ingredients: [["1 cup (240 ml)", "milk (dairy, oat, almond or coconut)"], ["1 tsp", "ground turmeric"], ["½ tsp", "ground ginger"], ["½ tsp", "ground cinnamon"], ["1 pinch", "black pepper"], ["1 tsp", "honey or maple syrup"], ["2 drops (optional)", "vanilla extract"]],
     steps: ["Pour the milk into a small pot over medium-low heat.", "Whisk in the turmeric, ginger, cinnamon and black pepper.", "Heat until steaming, whisking often — don't let it boil.", "Simmer gently for 3–5 minutes, then stir in honey and vanilla and pour into a mug."],
@@ -36,7 +36,7 @@ const RECIPES = [
   },
   {
     id: "elderberry-syrup", name: "Homemade Elderberry Syrup", type: "syrup", time: "1 hour", yield: "About 2 cups", guide: "immunity",
-    herbs: ["elderberry", "ginger", "cinnamon", "clove"], fruits: [],
+    herbs: ["elderberry", "ginger", "cinnamon", "clove"], fruits: [], foods: ["honey"],
     intro: "A rich, spiced syrup to keep on hand for cold and flu season.",
     ingredients: [["⅔ cup", "dried elderberries"], ["3½ cups (840 ml)", "water"], ["2 tbsp", "fresh ginger, sliced"], ["1", "cinnamon stick"], ["4", "whole cloves"], ["1 cup (240 ml)", "raw honey"]],
     steps: ["Add the elderberries, water, ginger, cinnamon and cloves to a pot.", "Bring to a boil, then simmer uncovered for 40–45 minutes until reduced by about half.", "Mash the berries, then strain through a fine sieve or cloth.", "Let cool until just warm (not hot), then stir in the honey.", "Pour into a clean glass jar and refrigerate."],
@@ -46,7 +46,7 @@ const RECIPES = [
   },
   {
     id: "thyme-honey-syrup", name: "Thyme & Honey Cough Syrup", type: "syrup", time: "20 minutes", yield: "About 1 cup", guide: "cold-flu",
-    herbs: ["thyme"], fruits: ["lemon"],
+    herbs: ["thyme"], fruits: ["lemon"], foods: ["honey"],
     intro: "A simple kitchen remedy for coughs and sore throats. Thyme helps loosen mucus and honey coats the throat.",
     ingredients: [["2 tbsp", "dried thyme (or a handful of fresh sprigs)"], ["1 cup (240 ml)", "water"], ["½ cup (120 ml)", "raw honey"], ["1 tbsp", "lemon juice"]],
     steps: ["Bring the water to a boil, add the thyme, cover and turn off the heat.", "Steep for 15 minutes, then strain.", "Let the tea cool until warm, then stir in the honey and lemon juice until smooth.", "Pour into a clean jar."],
@@ -56,7 +56,7 @@ const RECIPES = [
   },
   {
     id: "hibiscus-iced-tea", name: "Ruby Hibiscus Iced Tea", type: "drink", time: "10 minutes + chilling", yield: "4 glasses", guide: "heart",
-    herbs: ["hibiscus", "spearmint"], fruits: ["lime"],
+    herbs: ["hibiscus", "spearmint"], fruits: ["lime"], foods: ["honey"],
     intro: "A tart, ruby-red cooler that's naturally caffeine-free and studied for supporting healthy blood pressure.",
     ingredients: [["¼ cup", "dried hibiscus"], ["4 cups (1 L)", "water"], ["1", "lime, sliced"], ["A few sprigs", "fresh mint"], ["1–2 tbsp (optional)", "honey"]],
     steps: ["Pour 2 cups of just-boiled water over the hibiscus and steep for 10 minutes.", "Strain and stir in honey while warm.", "Add the remaining 2 cups of cold water, the lime and the mint.", "Chill and serve over ice."],
@@ -76,7 +76,7 @@ const RECIPES = [
   },
   {
     id: "blueberry-power-smoothie", name: "Blueberry Power Smoothie", type: "drink", time: "5 minutes", yield: "1 large glass", guide: "memory",
-    herbs: ["cinnamon"], fruits: ["blueberry", "banana"],
+    herbs: ["cinnamon"], fruits: ["blueberry", "banana"], foods: ["spinach", "flaxseed", "chia-seeds", "greek-yogurt"],
     intro: "A creamy purple smoothie packed with anthocyanins, fiber and steady energy.",
     ingredients: [["1 cup", "frozen blueberries"], ["1", "ripe banana"], ["1 handful", "spinach"], ["1 tbsp", "ground flaxseed or chia seeds"], ["1 cup (240 ml)", "milk or plain yogurt"], ["½ tsp", "ground cinnamon"]],
     steps: ["Add everything to a blender.", "Blend until smooth, adding a splash of water if it's too thick.", "Pour and enjoy right away."],
@@ -96,7 +96,7 @@ const RECIPES = [
   },
   {
     id: "garden-herb-pesto", name: "Garden Herb Pesto", type: "food", time: "10 minutes", yield: "About 1 cup", guide: "heart",
-    herbs: ["basil", "parsley", "garlic"], fruits: ["lemon"],
+    herbs: ["basil", "parsley", "garlic"], fruits: ["lemon"], foods: ["walnuts", "olive-oil"],
     intro: "A bright, garlicky sauce full of fresh herbs and heart-healthy olive oil.",
     ingredients: [["2 cups", "fresh basil leaves"], ["½ cup", "fresh parsley"], ["2 cloves", "garlic"], ["⅓ cup", "walnuts or pine nuts"], ["½ cup", "grated Parmesan"], ["½ cup (120 ml)", "extra virgin olive oil"], ["1 tbsp", "lemon juice"], ["To taste", "salt and pepper"]],
     steps: ["Crush the garlic and let it rest for 10 minutes (this boosts allicin).", "Pulse the basil, parsley, garlic and nuts in a food processor.", "Add the Parmesan and lemon juice and pulse again.", "With the motor running, drizzle in the olive oil until smooth. Season to taste."],
@@ -136,7 +136,7 @@ const RECIPES = [
   },
   {
     id: "soothing-oatmeal-bath", name: "Soothing Oatmeal Bath", type: "body", time: "5 minutes + soaking", yield: "1 bath", guide: "skin",
-    herbs: ["oat-straw", "lavender"], fruits: [],
+    herbs: ["oat-straw", "lavender"], fruits: [], foods: ["oats"],
     intro: "A gentle soak for itchy, dry or sun-irritated skin, using the same colloidal oatmeal recommended for eczema.",
     ingredients: [["1 cup", "plain rolled oats"], ["2 tbsp (optional)", "dried lavender or chamomile"], ["1", "clean muslin bag or old sock (optional)"]],
     steps: ["Blend the oats (and flowers) in a blender until they become a very fine powder.", "Test: a spoonful stirred into warm water should turn it milky.", "Sprinkle the powder into a warm (not hot) running bath and stir, or tie it in a muslin bag.", "Soak for 15–20 minutes, then pat skin dry and moisturize."],
