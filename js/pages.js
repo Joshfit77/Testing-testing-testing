@@ -923,6 +923,19 @@ const WHO_OPTIONS = [
   { id: "senior", label: "An adult 65 or older", sub: "", flags: ["older-adults"] }
 ];
 
+// The "Who is this for?" choices that make sense for each goal — no pregnancy questions for
+// men's health or menopause, for example. Labels can be reworded per goal; ids and flags stay the same.
+const WHO_BY_GOAL = {
+  "mens-health": [["adult", "A man", "18–64"], ["senior", "A man 65 or older"], ["child", "A teen boy", "under 18"]],
+  menopause: [["adult", "A woman in perimenopause or menopause", "under 65"], ["senior", "A woman 65 or older"]],
+  "womens-cycle": [["adult", "A woman", "18 or older, not pregnant"], ["ttc", "Trying to get pregnant"], ["breastfeeding", "Breastfeeding"], ["child", "A teen girl", "under 18"]]
+};
+function whoOptionsFor(goal) {
+  const custom = WHO_BY_GOAL[goal];
+  if (!custom) return WHO_OPTIONS;
+  return custom.map(([id, label, sub]) => ({ ...WHO_OPTIONS.find((w) => w.id === id), label, sub: sub || "" }));
+}
+
 const TRIMESTER_NOTES = {
   1: "First trimester: this is when the baby's organs form, so keep herbs to food amounts. For nausea, ginger up to about 1 g dried a day (or a weak cup of ginger tea) is widely used — ask your midwife.",
   2: "Second trimester: keep avoiding the herbs below. For heartburn try smaller meals (and skip peppermint); for constipation try kiwi, prunes and water.",
@@ -1062,7 +1075,7 @@ function initFinder() {
   const STEPS = [
     { key: "goal", title: "What would you like help with?", render: () => `<div class="quiz-grid finder-goals">${TOPIC_GUIDES.map((g) => `<label class="quiz-card"><input type="radio" name="goal" value="${g.id}" ${a.goal === g.id ? "checked" : ""}><span>${icon(g.icon)}${g.short}</span></label>`).join("")}</div>` },
     { key: "duration", title: "How long has this been bothering you?", render: () => `<div class="who-grid">${[["days", "It just started", "a few days"], ["weeks", "A few weeks", ""], ["months", "Months or longer", ""], ["well", "It's not a problem", "I just want to stay well"]].map(([v, l, sub]) => `<label class="quiz-card who-card"><input type="radio" name="duration" value="${v}" ${a.duration === v ? "checked" : ""}><span><strong>${l}</strong>${sub ? `<em>${sub}</em>` : ""}</span></label>`).join("")}</div>` },
-    { key: "who", title: "Who is this for?", render: () => `<div class="who-grid">${WHO_OPTIONS.map((w) => `<label class="quiz-card who-card"><input type="radio" name="who" value="${w.id}" ${a.who === w.id ? "checked" : ""}><span><strong>${w.label}</strong>${w.sub ? `<em>${w.sub}</em>` : ""}</span></label>`).join("")}</div>` },
+    { key: "who", title: "Who is this for?", render: () => `<div class="who-grid">${whoOptionsFor(a.goal).map((w) => `<label class="quiz-card who-card"><input type="radio" name="who" value="${w.id}" ${a.who === w.id ? "checked" : ""}><span><strong>${w.label}</strong>${w.sub ? `<em>${w.sub}</em>` : ""}</span></label>`).join("")}</div>` },
     { key: "meds", title: "Do you take any medicines?", optional: true, render: () => `
       <label class="ix-item-label">Type the name on your bottle (brand or generic)
         <input type="search" id="f-drug" class="field" placeholder="e.g. Eliquis, Zoloft, metformin, birth control…" autocomplete="off">
@@ -1092,6 +1105,7 @@ function initFinder() {
     const next = app.querySelector("[data-next]");
     app.querySelectorAll('input[type="radio"]').forEach((r) => r.addEventListener("change", () => {
       a[st.key] = r.value; next.disabled = false;
+      if (st.key === "goal" && !whoOptionsFor(a.goal).some((w) => w.id === a.who)) a.who = null;
       setTimeout(() => { step++; step < STEPS.length ? show() : results(); }, 220);
     }));
     app.querySelectorAll('input[name="med"]').forEach((c) => c.addEventListener("change", () => { a.meds = [...app.querySelectorAll('input[name="med"]:checked')].map((i) => i.value); }));
@@ -1117,7 +1131,7 @@ function initFinder() {
 
   function results() {
     const g = TOPIC_GUIDES.find((x) => x.id === a.goal);
-    const who = WHO_OPTIONS.find((w) => w.id === a.who);
+    const who = whoOptionsFor(a.goal).find((w) => w.id === a.who) || WHO_OPTIONS.find((w) => w.id === a.who);
     const ids = [...new Set([...who.flags, ...a.meds, ...a.drugs.flatMap((d) => (DRUGS.find((x) => x[0] === d) || [, []])[1]), ...a.conds])];
     const entries = INTERACTIONS.filter((x) => ids.includes(x.id));
     const hitsFor = (key) => entries.map((e) => e.avoid[key] ? { level: "avoid", e, note: e.avoid[key] } : e.caution[key] ? { level: "caution", e, note: e.caution[key] } : null).filter(Boolean);
@@ -1688,7 +1702,7 @@ function initMyPlan() {
     let water = store.get("bp-water", { date: today, count: 0 });
     if (water.date !== today) water = { date: today, count: 0 };
     const g = plan && TOPIC_GUIDES.find((x) => x.id === plan.goal);
-    const who = plan && WHO_OPTIONS.find((w) => w.id === plan.who);
+    const who = plan && whoOptionsFor(plan.goal).find((w) => w.id === plan.who);
     const ixWho = ix && WHO_OPTIONS.find((w) => w.id === ix.who);
     const ixList = ix ? [...(ix.drugs || []), ...(ix.meds || []).map((m) => INTERACTIONS.find((x) => x.id === m)?.label), ...(ix.conds || []).map((c) => INTERACTIONS.find((x) => x.id === c)?.label)].filter(Boolean) : [];
     const planRecipes = recipesFor((r) => (g && r.guide === g.id) || r.herbs.some((h) => fav.includes(h) || (plan?.top || []).includes(h))).slice(0, 4);
