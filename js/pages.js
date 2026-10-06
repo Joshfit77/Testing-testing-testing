@@ -184,6 +184,34 @@ function amountUnits(min, max) {
   return `<span class="u"><b>${range(min * 1000, max * 1000, "mg")}</b></span><span class="u">${range(min, max, "g")}</span><span class="u">${range(min / OZ, max / OZ, "oz")}</span>`;
 }
 
+function quickDoses(h) {
+  const c = CAPS[h.id];
+  if (!c) return "";
+  const capHtml = typeof c.cap === "string"
+    ? `<p class="qd-none">${c.cap}</p>`
+    : `<p class="qd-amount">${range(c.cap[0], c.cap[1], "mg")}</p>
+       <p class="qd-units">${range(c.cap[0] / 1000, c.cap[1] / 1000, "g")} · ${range(c.cap[0] / 1000 / OZ, c.cap[1] / 1000 / OZ, "oz")}</p>
+       <p class="qd-what">${c.cap[2]}</p>
+       <p class="qd-freq">${icon("check")}${c.cap[3]}</p>`;
+  let herbHtml;
+  if (!c.herb) herbHtml = `<p class="qd-none">For use on the skin only — do not swallow.</p>`;
+  else if (typeof c.herb[0] === "string") herbHtml = `<p class="qd-amount qd-text">${c.herb[0]}</p><p class="qd-what">${c.herb[2]}</p>${c.herb[3] ? `<p class="qd-freq">${icon("check")}${c.herb[3]}</p>` : ""}`;
+  else herbHtml = `<p class="qd-amount">${range(c.herb[0], c.herb[1], "g")}</p>
+       <p class="qd-units">${range(c.herb[0] * 1000, c.herb[1] * 1000, "mg")} · ${range(c.herb[0] / OZ, c.herb[1] / OZ, "oz")}</p>
+       <p class="qd-what">${c.herb[2]}</p>
+       <p class="qd-freq">${icon("check")}${c.herb[3]}</p>`;
+  return `<div class="quick-doses">
+    <div class="qd-card">
+      <div class="qd-head"><span class="qd-icon">${icon("shield")}</span><div><p class="eyebrow">Capsule form</p><p class="qd-per">Per person · 100 lb and over</p></div></div>
+      ${capHtml}
+    </div>
+    <div class="qd-card">
+      <div class="qd-head"><span class="qd-icon">${icon("leaf")}</span><div><p class="eyebrow">The herb by itself</p><p class="qd-per">Per person · 100 lb and over</p></div></div>
+      ${herbHtml}
+    </div>
+  </div>`;
+}
+
 function doseSection(h, ph) {
   const rows = ph.dose.map(([form, min, max, freq]) => `
     <tr>
@@ -192,10 +220,11 @@ function doseSection(h, ph) {
       <td>${freq}</td>
     </tr>`).join("");
   return `<section id="dose"><h2>How much to take</h2>
+    ${quickDoses(h)}
     ${ph.ext ? `<div class="caution-card ext-card">${icon("shield", "icon info-icon")}<p><strong>For use on the skin only — do not swallow.</strong></p></div>` : ""}
     <div class="dose-card">
       <div class="dose-head">
-        <div><p class="eyebrow">Adult dose</p><h3>For adults 100 lb (45 kg) and over</h3></div>
+        <div><p class="eyebrow">Every form in detail</p><h3>For adults 100 lb (45 kg) and over</h3></div>
         <span class="dose-badge">Per serving</span>
       </div>
       <div class="table-wrap"><table class="dose-table">
@@ -208,7 +237,8 @@ function doseSection(h, ph) {
     <details class="evidence-key dose-notes"><summary>How to read these amounts</summary>
       <ul>
         <li>These are typical adult amounts from traditional herbal references (such as the German Commission E and ESCOP monographs) and the doses used in clinical studies.</li>
-        <li><strong>Herbal doses are not multiplied by body weight.</strong> The same adult dose applies whether you weigh 100 lb or 250 lb — taking more because you weigh more can be unsafe.</li>
+        <li><strong>"Per person, 100 lb and over" means one adult serving.</strong> Herbal doses are not multiplied by body weight — the same adult dose applies whether you weigh 100 lb or 250 lb, and taking more because you weigh more can be unsafe.</li>
+        <li>Capsule amounts are what each dose should contain, as listed on the supplement label (often 1–2 capsules). Check the label: if it gives a lower "per capsule" amount, you may need two.</li>
         <li>Not for children or anyone under 100 lb unless a doctor or qualified herbalist advises a child's dose.</li>
         <li>Start at the low end, take one new herb at a time, and stop if you notice side effects.</li>
         <li>For reference: 1 teaspoon of dried leaf or flower weighs roughly 1–2 g; 1 teaspoon of seeds or powder roughly 2–3 g; 1 ounce = 28.35 g = 28,350 mg.</li>

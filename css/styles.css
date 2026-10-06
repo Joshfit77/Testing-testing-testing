@@ -673,3 +673,23 @@ select.field { cursor: pointer; }
   .dose-table th, .dose-table td { border: none; padding: 2px 0; }
   .dose-table tbody th { width: 100%; font-weight: 600; }
 }
+
+/* Quick doses: capsule form and herb by itself */
+.quick-doses { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+.qd-card { padding: 24px; border-radius: var(--radius); background: var(--forest); color: var(--cream); }
+.qd-card:nth-child(2) { background: var(--forest-2); }
+.qd-head { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; }
+.qd-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: rgba(246, 241, 231, 0.12); color: #e7c9a5; flex: none; }
+.qd-head .eyebrow { color: #e7c9a5; margin: 0; }
+.qd-per { margin: 2px 0 0; font-size: 0.82rem; color: rgba(246, 241, 231, 0.75); }
+.quick-doses .qd-amount { font-family: var(--serif); font-size: 2.4rem; font-weight: 600; line-height: 1; margin: 0 0 6px; color: var(--white); }
+.quick-doses .qd-amount.qd-text { font-size: 1.5rem; line-height: 1.2; }
+.quick-doses .qd-units { font-size: 0.9rem; color: rgba(246, 241, 231, 0.7); margin: 0 0 12px; }
+.quick-doses .qd-what { margin: 0 0 10px; font-size: 0.97rem; }
+.quick-doses .qd-freq { display: flex; gap: 8px; margin: 0; font-size: 0.92rem; color: rgba(246, 241, 231, 0.85); }
+.qd-freq .icon { color: #e7c9a5; width: 18px; height: 18px; margin-top: 2px; }
+.quick-doses .qd-none { margin: 0; font-size: 1rem; color: rgba(246, 241, 231, 0.9); }
+@media (max-width: 640px) {
+  .quick-doses { grid-template-columns: 1fr; }
+  .quick-doses .qd-amount { font-size: 2rem; }
+}

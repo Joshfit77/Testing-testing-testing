@@ -19,6 +19,7 @@ No build step — open `index.html` in a browser, or publish with GitHub Pages.
 ## Edit content
 - `js/herbs-data.js` — the 100 herbs and the categories
 - `js/herbs-benefits.js` — the "Benefits explained" section for every herb
+- `js/herbs-caps.js` — the two headline doses on each herb page: capsule form (mg) and the herb by itself (g), per person 100 lb and over
 - `js/herbs-pharm.js` — what each herb does in the body, its active compounds and how they work, and typical adult doses (shown in mg, g and oz)
 - `js/stacks.js` — the herbal stacks
 - `js/content.js` — reminders, default checklist, verses, daily rhythm, seasons and journal articles
