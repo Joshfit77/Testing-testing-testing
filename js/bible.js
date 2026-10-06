@@ -26,3 +26,50 @@ const BIBLE_PLANTS = [
   { name: "The Land of Plenty", ref: "Deuteronomy 8:8", verse: "A land of wheat, and barley, and vines, and fig trees, and pomegranates; a land of oil olive, and honey;", note: "The seven foods of the Promised Land describe God's abundant provision.", link: { fruit: "pomegranate" }, extra: [{ fruit: "fig" }, { fruit: "grape" }, { fruit: "olive" }, { fruit: "date" }] },
   { name: "Leaves for Healing", ref: "Ezekiel 47:12", verse: "and the fruit thereof shall be for meat, and the leaf thereof for medicine.", note: "Ezekiel's vision of the river from the temple describes trees whose fruit feeds and whose leaves heal." }
 ];
+
+BIBLE_PLANTS.push(
+  { name: "Herbs for Our Good", ref: "Psalm 104:14", verse: "He causeth the grass to grow for the cattle, and herb for the service of man: that he may bring forth food out of the earth;", note: "The psalmist praises God for providing plants to nourish people and animals alike." },
+  { name: "Almond", ref: "Numbers 17:8", verse: "and, behold, the rod of Aaron for the house of Levi was budded, and brought forth buds, and bloomed blossoms, and yielded almonds.", note: "Aaron's dry staff miraculously blossomed and bore almonds overnight — a sign of God's chosen priesthood." },
+  { name: "Myrtle", ref: "Isaiah 55:13", verse: "Instead of the thorn shall come up the fir tree, and instead of the brier shall come up the myrtle tree:", note: "The fragrant myrtle is a picture of restoration — beauty replacing thorns." },
+  { name: "Spikenard", ref: "Mark 14:3", verse: "there came a woman having an alabaster box of ointment of spikenard very precious; and she brake the box, and poured it on his head.", note: "A costly fragrant oil poured out in an act of love and worship." },
+  { name: "Grapes of Eshcol", ref: "Numbers 13:23", verse: "And they came unto the brook of Eshcol, and cut down from thence a branch with one cluster of grapes, and they bare it between two upon a staff; and they brought of the pomegranates, and of the figs.", note: "The spies returned with fruit so large it took two men to carry — proof of the good land God promised.", link: { fruit: "grape" }, extra: [{ fruit: "pomegranate" }, { fruit: "fig" }] },
+  { name: "Sycamore Fig", ref: "Luke 19:4", verse: "And he ran before, and climbed up into a sycomore tree to see him: for he was to pass that way.", note: "Zacchaeus climbed a sycamore fig to see Jesus, and his life was changed that day.", link: { fruit: "fig" } },
+  { name: "The Tree of Life", ref: "Revelation 22:2", verse: "and the leaves of the tree were for the healing of the nations.", note: "The Bible ends where it began — with a tree of life, now bringing healing to every people." }
+);
+
+// A short reflection for each entry, shown on the Bible page.
+const BIBLE_REFLECTIONS = {
+  "Hyssop": "What would you like God to wash clean in your life today?",
+  "Mustard Seed": "Small faith, planted and tended, can grow beyond what you imagine.",
+  "Mint, Anise & Cumin": "Faithfulness in small things matters — but never more than mercy and love.",
+  "Coriander": "God provides daily bread, often in ways we don't expect.",
+  "Garlic": "When we long for 'the good old days,' remember God is leading somewhere better.",
+  "Saffron & Cinnamon": "Love is meant to be a garden — fragrant, abundant and cared for.",
+  "Sweet Cinnamon": "Even everyday spices can be set apart for holy purposes.",
+  "Frankincense & Myrrh": "Bring your best gifts to Him, however simple they seem.",
+  "Aloes": "Acts of love and courage honor God, even in grief.",
+  "Bitter Herbs": "God remembers our hard seasons and leads us into freedom.",
+  "Every Herb": "Generosity is good — and so is justice and the love of God.",
+  "Balm of Gilead": "There is healing for the heart that only God can bring.",
+  "Olive": "After every storm, God offers peace and a new beginning.",
+  "The Green Olive Tree": "Put down deep roots in God's mercy, and you'll stay green.",
+  "Fig": "God cares for our bodies and uses the gifts of creation to heal.",
+  "Pomegranate": "Beauty and worship belong together.",
+  "The Vine": "Stay connected to Jesus, and good fruit will grow.",
+  "Date Palm": "Even in dry places, the righteous can flourish.",
+  "Apple": "Choose words today that are as lovely as golden fruit.",
+  "The Land of Plenty": "Take time to thank God for the food on your table.",
+  "Leaves for Healing": "God's river of life brings both nourishment and healing.",
+  "Herbs for Our Good": "Every herb in your garden is a gift to receive with thanks.",
+  "Almond": "God can bring blossom and fruit from what looks dry and dead.",
+  "Myrtle": "Where there were thorns, God can grow something beautiful.",
+  "Spikenard": "Love that gives generously is never wasted.",
+  "Grapes of Eshcol": "God's promises are bigger and better than our fears.",
+  "Sycamore Fig": "No one is too small or too far away to be seen by Jesus.",
+  "The Tree of Life": "Healing for every nation — that's the hope we hold."
+};
+
+// Find the Bible entry that names a given herb or fruit.
+function bibleEntryFor(kind, id) {
+  return BIBLE_PLANTS.find((b) => [b.link, ...(b.extra || [])].some((l) => l && l[kind] === id));
+}

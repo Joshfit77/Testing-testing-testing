@@ -341,3 +341,72 @@ const INTERACTIONS = [
     caution: { peppermint: "Relaxes the valve at the top of the stomach.", "fruit:orange": "Citrus may trigger heartburn.", "fruit:grapefruit": "Citrus may trigger heartburn.", "fruit:lemon": "Acidic.", "fruit:tomato": "May trigger heartburn.", cayenne: "May worsen reflux.", turmeric: "May worsen reflux.", schisandra: "Traditional caution." }
   }
 ];
+
+// ---------- Extra medicine groups ----------
+INTERACTIONS.splice(INTERACTIONS.findIndex((x) => x.type === "condition"), 0,
+  {
+    id: "pain-relievers", type: "med", label: "Anti-inflammatory pain relievers (NSAIDs)", examples: "ibuprofen (Advil, Motrin), naproxen (Aleve), diclofenac, celecoxib (Celebrex), meloxicam",
+    avoid: { meadowsweet: "Contains salicylates — doubles up on the same effect and stomach risk." },
+    caution: {
+      ginkgo: "Both can increase bleeding.", garlic: "Supplements may add to bleeding risk.", ginger: "Large amounts may add to bleeding risk.",
+      turmeric: "Supplements may add to bleeding and stomach irritation.", feverfew: "May add to bleeding risk.", "black-seed": "May slow clotting.",
+      "fruit:tamarind": "May increase absorption of some pain relievers."
+    }
+  },
+  {
+    id: "stimulants", type: "med", label: "ADHD stimulants", examples: "methylphenidate (Ritalin, Concerta), amphetamine (Adderall, Vyvanse)",
+    avoid: {},
+    caution: {
+      "green-tea": "Caffeine adds to stimulant effects — racing heart, jitters, poor sleep.", "yerba-mate": "Caffeine adds to stimulant effects.",
+      ginseng: "May add to stimulation and raise blood pressure.", rhodiola: "May add to stimulation.", "fruit:grapefruit": "May change levels of some stimulants."
+    }
+  }
+);
+
+INTERACTIONS.push({
+  id: "older-adults", type: "condition", label: "Age 65 or older", examples: "",
+  avoid: { licorice: "Raises blood pressure and lowers potassium — risky with heart and kidney changes of aging." },
+  caution: {
+    valerian: "Drowsiness raises the risk of falls.", passionflower: "Drowsiness raises the risk of falls.", hops: "Drowsiness raises the risk of falls.",
+    skullcap: "Drowsiness raises the risk of falls.", ginkgo: "Bleeding risk, especially with aspirin or blood thinners.", garlic: "Supplements may increase bleeding.",
+    "st-johns-wort": "Interacts with many common medicines.", ginseng: "May affect blood pressure and blood sugar.", hawthorn: "Adds to heart medicines.",
+    dandelion: "Diuretic — can cause dehydration.", horsetail: "Diuretic and lowers potassium.", "fruit:grapefruit": "Interacts with many common medicines for older adults.",
+    "fruit:starfruit": "Dangerous if kidney function is reduced."
+  }
+});
+
+// Plain-language detail for each medicine group or situation: what could happen, and what to do.
+const IX_DETAILS = {
+  "blood-thinners": { what: "Some herbs also thin the blood or change how blood thinners work. Together they can cause easy bruising, nosebleeds, bleeding gums — or dangerous internal bleeding. Others make warfarin weaker, raising the risk of clots and stroke.", todo: "Don't start any herb or supplement without asking the doctor or clinic that manages your blood thinner. Keep vitamin K foods (greens, parsley) steady from day to day. Get help right away for black stools, blood in urine, a bad headache or bleeding that won't stop." },
+  "pain-relievers": { what: "NSAIDs already thin the blood a little and can irritate the stomach. Herbs that do the same can add up, raising the risk of stomach bleeding and bruising.", todo: "Use the lowest NSAID dose for the shortest time, take it with food, and check with a pharmacist before adding herbs that affect bleeding." },
+  diabetes: { what: "Many herbs gently lower blood sugar. On top of diabetes medicine — especially insulin or sulfonylureas like glipizide — this can push blood sugar too low (shakiness, sweating, confusion).", todo: "Add one herb at a time, check your blood sugar more often for the first two weeks, and tell your doctor. Keep a fast-acting sugar nearby." },
+  "blood-pressure": { what: "Some herbs lower blood pressure, which can add to your medicine and cause dizziness or fainting. Others — like licorice — raise blood pressure and work against your medicine. Grapefruit can make some blood pressure pills much stronger.", todo: "Check your blood pressure at home when you start an herb, stand up slowly, and ask your doctor before combining. Avoid grapefruit if you take amlodipine, felodipine or nifedipine." },
+  antidepressants: { what: "St. John's wort plus an antidepressant can cause serotonin syndrome: agitation, fast heartbeat, high temperature, muscle twitching. Other herbs can change mood medicines or add to their effects.", todo: "Never combine St. John's wort with antidepressants. Talk to your prescriber before adding any mood herb, and don't stop antidepressants suddenly. Seek emergency care for serotonin syndrome symptoms." },
+  sedatives: { what: "Calming herbs add to the drowsiness from sleep medicines, anxiety medicines, opioid pain relievers and alcohol. This can slow breathing and cause falls or car accidents.", todo: "Don't combine calming herbs with sleep or anxiety medicines or alcohol unless your doctor agrees. Never drive after taking them together." },
+  stimulants: { what: "Caffeine-containing and energizing herbs add to stimulant medicines, causing a racing heart, anxiety, high blood pressure and poor sleep.", todo: "Limit caffeine from tea and mate, avoid energizing herbs, and ask the prescriber before adding any." },
+  hormones: { what: "St. John's wort speeds up how the body clears birth control hormones, which can cause breakthrough bleeding and unplanned pregnancy. Herbs with hormone-like effects may interfere with hormone therapy or fertility treatment.", todo: "Avoid St. John's wort entirely with hormonal birth control — or use a backup method. Tell your fertility or menopause doctor about every herb you take." },
+  thyroid: { what: "Some herbs change thyroid hormone levels or how well thyroid medicine is absorbed, which can make you feel hyper (jittery) or hypo (tired).", todo: "Take thyroid medicine on an empty stomach, apart from herbs and supplements, and recheck thyroid blood tests 6–8 weeks after starting an herb." },
+  immunosuppressants: { what: "Herbs that stimulate the immune system work against these medicines. St. John's wort and grapefruit change transplant drug levels, which can lead to organ rejection or toxicity.", todo: "Transplant patients should avoid all herbal supplements unless their transplant team approves. Others should check with their specialist first." },
+  lithium: { what: "Diuretic herbs and changes in caffeine change how the kidneys clear lithium. Lithium levels can rise to toxic levels (shaking, confusion, vomiting).", todo: "Don't add diuretic herbs. Keep caffeine and fluid intake steady, and get lithium levels checked if anything changes." },
+  diuretics: { what: "Herbs that also make you pass water can add to dehydration and low potassium. Licorice drains potassium further, which can cause dangerous heart rhythms.", todo: "Avoid licorice. Ask your doctor before diuretic herbs, and watch for dizziness, cramps or weakness." },
+  heart: { what: "Licorice and diuretic herbs lower potassium, making digoxin more toxic. Hawthorn adds to heart medicines. St. John's wort lowers digoxin levels.", todo: "Only use heart-related herbs under your cardiologist's care, and report any palpitations or dizziness." },
+  statins: { what: "Grapefruit and pomelo block the enzyme that breaks down several statins, raising levels and the risk of muscle damage. St. John's wort can make some statins weaker.", todo: "Avoid grapefruit with simvastatin, lovastatin and atorvastatin. Report unexplained muscle pain or dark urine to your doctor." },
+  "liver-processed": { what: "Most prescription medicines are broken down by liver enzymes. St. John's wort speeds these enzymes up (medicines stop working well); grapefruit slows some down (medicines build up).", todo: "Ask your pharmacist about each herb and fruit juice you use — they can check your exact medicines." },
+  pregnancy: { what: "Some herbs can stimulate the womb, act like hormones, or harm a developing baby. Others are fine in food amounts but not as teas, capsules or extracts.", todo: "Stick to food amounts of culinary herbs, ask your midwife or doctor before any herbal tea or supplement, and never use essential oils by mouth. See the pregnancy guide for trimester-by-trimester tips." },
+  breastfeeding: { what: "Many herbs pass into breast milk, and a few (like sage and peppermint in large amounts) may reduce milk supply.", todo: "Use food amounts, introduce one herbal tea at a time, and watch your baby for fussiness, rash or changes in feeding. Ask a lactation consultant before using herbs for milk supply." },
+  children: { what: "Children's bodies process herbs differently, and some — like eucalyptus oil, neem oil and star anise — can be dangerous even in small amounts.", todo: "Ask your pediatrician before giving any herb. Never give honey under age 1, never put essential oils near a young child's face, and keep all oils and supplements locked away." },
+  surgery: { what: "Herbs that thin the blood, change blood sugar or interact with anesthesia can cause bleeding or complications during and after surgery.", todo: "Stop herbal supplements 2 weeks before surgery (or as your surgeon advises) and tell your surgical team everything you take." },
+  liver: { what: "A few herbs have rare links to liver injury, and a damaged liver clears herbs and medicines more slowly.", todo: "Avoid the herbs listed, don't take high-dose extracts, and ask your liver specialist before using anything new. Report yellow skin, dark urine or tummy pain right away." },
+  kidney: { what: "Weak kidneys can't clear potassium, oxalate or certain toxins well. Starfruit can be fatal, and high-potassium foods need to follow your kidney diet.", todo: "Never eat starfruit, follow your kidney diet for potassium, and ask your nephrologist before any herb." },
+  "high-bp": { what: "Licorice, ginseng and caffeine-containing herbs can raise blood pressure.", todo: "Avoid licorice and check your blood pressure if you use energizing herbs." },
+  autoimmune: { what: "Immune-boosting herbs may stir up an overactive immune system and trigger flares.", todo: "Avoid immune stimulants like echinacea and astragalus, and ask your specialist first." },
+  "hormone-sensitive": { what: "Herbs with estrogen-like or hormonal effects could, in theory, feed hormone-sensitive tissue.", todo: "Avoid hormonal herbs and discuss any herb with your oncologist or gynecologist." },
+  "daisy-allergy": { what: "Herbs from the daisy family can trigger the same allergy — itching, rash, wheezing or, rarely, a severe reaction.", todo: "Avoid these herbs or try a tiny amount first. Get emergency help for swelling of the face or trouble breathing." },
+  "latex-allergy": { what: "Proteins in some fruits look like latex to the immune system (latex-fruit syndrome), causing itching, swelling or worse.", todo: "Be careful with these fruits, and carry your emergency medicine if you've had a severe latex reaction." },
+  "aspirin-allergy": { what: "Meadowsweet contains natural salicylates, the same family as aspirin.", todo: "Avoid meadowsweet entirely." },
+  gallstones: { what: "Herbs that stimulate bile can trigger gallbladder pain if a stone blocks the duct.", todo: "Ask your doctor before using bile-stimulating herbs." },
+  epilepsy: { what: "A few herbs and essential oils can lower the seizure threshold.", todo: "Avoid hyssop and sage in medicinal amounts and never use rosemary oil internally." },
+  bipolar: { what: "Some mood herbs can trigger mania or interact with mood stabilizers.", todo: "Avoid St. John's wort and rhodiola, and ask your psychiatrist about any herb." },
+  reflux: { what: "Some herbs and acidic fruits relax the valve at the top of the stomach or irritate it.", todo: "Notice your triggers, try smaller portions, and choose gentler options like chamomile or ginger." },
+  "older-adults": { what: "With age the body clears herbs and medicines more slowly, and many people take several medicines. Drowsiness can lead to falls, and bleeding risk rises.", todo: "Bring every bottle — prescriptions, herbs, vitamins — to a pharmacist for a 'brown bag' review once a year." }
+};

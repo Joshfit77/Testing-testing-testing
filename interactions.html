@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Herb &amp; Medicine Interaction Checker — Beauty &amp; Praise</title>
-  <meta name="description" content="Check which herbs and fruits to avoid or use with caution with your medicines and health conditions.">
+  <title>Herb &amp; Medicine Safety Checker — Beauty &amp; Praise</title>
+  <meta name="description" content="Check which herbs and fruits to avoid with your medicines, pregnancy, breastfeeding, children and health conditions — in plain language.">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Beauty &amp; Praise">
-  <meta property="og:title" content="Herb &amp; Medicine Interaction Checker — Beauty &amp; Praise">
-  <meta property="og:description" content="Check which herbs and fruits to avoid or use with caution with your medicines and health conditions.">
+  <meta property="og:title" content="Herb &amp; Medicine Safety Checker — Beauty &amp; Praise">
+  <meta property="og:description" content="Check which herbs and fruits to avoid with your medicines, pregnancy, breastfeeding, children and health conditions — in plain language.">
   <meta property="og:image" content="images/og-image.png">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" type="image/svg+xml" href="images/logo-mark.svg">
@@ -22,33 +22,50 @@
   <main>
     <section class="page-hero">
       <div class="container">
-        <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span aria-current="page">Interaction Checker</span></nav>
-        <h1>Herb &amp; Medicine Interaction Checker</h1>
-        <p class="lead">Herbs and some fruits can change how medicines work. Tick what applies to you to see which herbs, fruits and stacks to avoid or use with caution.</p>
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span aria-current="page">Safety Checker</span></nav>
+        <h1>Herb &amp; Medicine Safety Checker</h1>
+        <p class="lead">Answer three simple questions to see which herbs, fruits and stacks to avoid or use with care — what could happen, and what to do.</p>
       </div>
     </section>
-
     <section class="section section-top-tight">
       <div class="container ix-layout">
         <div class="ix-form">
-          <div class="card">
-            <h2>1. Medicines you take</h2>
-            <div class="ix-options" id="ix-meds"></div>
+          <div class="card ix-step">
+            <p class="step-num">Step 1</p>
+            <h2>Who is this for?</h2>
+            <div class="who-grid" id="ix-who"></div>
           </div>
-          <div class="card">
-            <h2>2. Health situations</h2>
+          <div class="card ix-step">
+            <p class="step-num">Step 2</p>
+            <h2>What medicines do you take?</h2>
+            <label class="ix-item-label">Type the name on your bottle (brand or generic)
+              <input type="search" id="ix-drug" class="field" placeholder="e.g. Eliquis, Zoloft, metformin, birth control…" autocomplete="off">
+            </label>
+            <ul class="drug-suggest" id="ix-drug-suggest"></ul>
+            <div class="drug-chips" id="ix-drug-chips"></div>
+            <details class="ix-groups"><summary>Or choose the type of medicine</summary>
+              <div class="ix-options" id="ix-meds"></div>
+            </details>
+          </div>
+          <div class="card ix-step">
+            <p class="step-num">Step 3</p>
+            <h2>Any health conditions?</h2>
             <div class="ix-options" id="ix-conds"></div>
           </div>
         </div>
         <div class="ix-side">
           <div class="card ix-sticky">
-            <h2>3. Your results</h2>
-            <label class="ix-item-label">Check a specific herb, fruit or stack
+            <p class="step-num">Your results</p>
+            <p class="ix-summary" id="ix-summary"></p>
+            <label class="ix-item-label">Check one herb, fruit or stack (optional)
               <select id="ix-item" class="field"></select>
             </label>
             <div id="ix-results" aria-live="polite"></div>
-            <button class="text-btn" id="ix-clear">Clear all</button>
-            <p class="small muted">Your choices are saved only in this browser. This checker covers common interactions but not every medicine — always ask your pharmacist.</p>
+            <div class="ix-actions">
+              <button class="btn btn-outline" id="ix-print">Print for my doctor</button>
+              <button class="text-btn" id="ix-clear">Start over</button>
+            </div>
+            <p class="small muted">Your answers are saved only in this browser. This checker covers common interactions but not every medicine — always ask your pharmacist. See also our <a href="guides.html#safety">safety guides</a>.</p>
           </div>
         </div>
       </div>
@@ -63,7 +80,10 @@
   <script src="js/fruits-data.js"></script>
   <script src="js/stacks.js"></script>
   <script src="js/interactions.js"></script>
+  <script src="js/drugs.js"></script>
+  <script src="js/guides.js"></script>
   <script src="js/bible.js"></script>
+  <script src="js/quiz-questions.js"></script>
   <script src="js/content.js"></script>
   <script src="js/art.js"></script>
   <script src="js/layout.js"></script>

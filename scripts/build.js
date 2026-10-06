@@ -21,12 +21,12 @@ const read = (f) => fs.readFileSync(path.join(root, f), "utf8");
 const ctx = {};
 vm.createContext(ctx);
 vm.runInContext(
-  ["js/herbs-data.js", "js/herbs-summary.js", "js/herbs-benefits.js", "js/herbs-pharm.js", "js/herbs-caps.js", "js/fruits-data.js", "js/stacks.js", "js/content.js"]
+  ["js/herbs-data.js", "js/herbs-summary.js", "js/herbs-benefits.js", "js/herbs-pharm.js", "js/herbs-caps.js", "js/fruits-data.js", "js/stacks.js", "js/content.js", "js/interactions.js", "js/guides.js"]
     .map(read).join("\n") +
-    "\nthis.D = { HERBS, SUMMARY, BENEFITS, PHARM, CAPS, FRUITS, CATEGORIES, EVIDENCE, STACKS, ARTICLES };",
+    "\nthis.D = { HERBS, SUMMARY, BENEFITS, PHARM, CAPS, FRUITS, CATEGORIES, EVIDENCE, STACKS, ARTICLES, INTERACTIONS, IX_DETAILS, TOPIC_GUIDES, SAFETY_GUIDES };",
   ctx
 );
-const { HERBS, SUMMARY, BENEFITS, PHARM, CAPS, FRUITS, CATEGORIES, EVIDENCE, STACKS, ARTICLES } = ctx.D;
+const { HERBS, SUMMARY, BENEFITS, PHARM, CAPS, FRUITS, CATEGORIES, EVIDENCE, STACKS, ARTICLES, INTERACTIONS, IX_DETAILS, TOPIC_GUIDES, SAFETY_GUIDES } = ctx.D;
 
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const firstSentences = (text, max = 155) => {
@@ -148,13 +148,77 @@ for (const fr of FRUITS) {
   fs.writeFileSync(path.join(root, "fruits", `${fr.id}.html`), page(fruitTemplate, { title, description, url, image: ogImage, id: fr.id, main, jsonld }));
 }
 
+// ---------- Wellness guides ----------
+const herbName = (id) => HERBS.find((h) => h.id === id).name;
+const itemName = (k) => k.startsWith("fruit:") ? FRUITS.find((f) => f.id === k.slice(6)).name : herbName(k);
+const guideTemplate = read("guide.html");
+fs.mkdirSync(path.join(root, "guides"), { recursive: true });
+for (const g of TOPIC_GUIDES) {
+  const url = `${SITE_URL}guides/${g.id}.html`;
+  const title = `${g.title} — Herbs, Fruits & Tips | Beauty & Praise`;
+  const description = firstSentences(g.intro);
+  const main = `    <article class="container narrow prose static-content">
+      <p><a href="index.html">Home</a> / <a href="guides.html">Guides</a> / ${esc(g.short)}</p>
+      <h1>${esc(g.title)}</h1>
+      <p>${esc(g.intro)}</p>
+      <h2>Start with the basics</h2>
+      <ul>${g.lifestyle.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>
+      <h2>Herbs that may help</h2>
+      <ul>${g.herbs.map((id) => `<li><a href="herbs/${id}.html">${esc(herbName(id))}</a> — ${esc(BENEFITS[id][0][1])}: ${esc(BENEFITS[id][0][2])}</li>`).join("")}</ul>
+      <h2>Fruits that help</h2>
+      <ul>${g.fruits.map((id) => `<li><a href="fruits/${id}.html">${esc(FRUITS.find((f) => f.id === id).name)}</a></li>`).join("")}</ul>
+      <h2>Safety first</h2>
+      <p>${esc(g.cautions)}</p>
+      <h2>When to see a doctor</h2>
+      <ul>${g.doctor.map((d) => `<li>${esc(d)}</li>`).join("")}</ul>
+      <blockquote>“${esc(g.verse.text)}” — ${esc(g.verse.ref)}</blockquote>
+    </article>`;
+  const jsonld = { "@context": "https://schema.org", "@graph": [
+    { "@type": "Article", headline: g.title, description, url, image: ogImage, publisher: { "@type": "Organization", name: "Beauty & Praise" } },
+    breadcrumb("Guides", "guides.html", g.short, url)
+  ] };
+  fs.writeFileSync(path.join(root, "guides", `${g.id}.html`), page(guideTemplate, { title, description, url, image: ogImage, id: g.id, main, jsonld }));
+}
+
+// ---------- Safety guides ----------
+const safetyTemplate = read("safety-guide.html");
+fs.mkdirSync(path.join(root, "safety"), { recursive: true });
+for (const g of SAFETY_GUIDES) {
+  const ix = INTERACTIONS.find((x) => x.id === g.ix);
+  const url = `${SITE_URL}safety/${g.id}.html`;
+  const title = `${g.title}: What's Safe, What to Avoid | Beauty & Praise`;
+  const description = firstSentences(g.intro);
+  const main = `    <article class="container narrow prose static-content">
+      <p><a href="index.html">Home</a> / <a href="guides.html">Guides</a> / ${esc(g.short)}</p>
+      <h1>${esc(g.title)}</h1>
+      <p>${esc(g.intro)}</p>
+      ${g.sections.map((sec) => `<h2>${esc(sec.h)}</h2>${sec.list ? `<ul>${sec.list.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : `<p>${esc(sec.p)}</p>`}`).join("\n      ")}
+      <h2>What could happen &amp; what to do</h2>
+      <p>${esc(IX_DETAILS[ix.id].what)}</p>
+      <p>${esc(IX_DETAILS[ix.id].todo)}</p>
+      <h2>Herbs &amp; fruits to avoid</h2>
+      <ul>${Object.entries(ix.avoid).map(([k, n]) => `<li>${esc(itemName(k))} — ${esc(n)}</li>`).join("")}</ul>
+      <h2>Use with caution</h2>
+      <ul>${Object.entries(ix.caution).map(([k, n]) => `<li>${esc(itemName(k))} — ${esc(n)}</li>`).join("")}</ul>
+      <h2>Get help right away if…</h2>
+      <ul>${g.emergency.map((d) => `<li>${esc(d)}</li>`).join("")}</ul>
+    </article>`;
+  const jsonld = { "@context": "https://schema.org", "@graph": [
+    { "@type": "Article", headline: g.title, description, url, image: ogImage, publisher: { "@type": "Organization", name: "Beauty & Praise" } },
+    breadcrumb("Guides", "guides.html", g.short, url)
+  ] };
+  fs.writeFileSync(path.join(root, "safety", `${g.id}.html`), page(safetyTemplate, { title, description, url, image: ogImage, id: g.id, main, jsonld }));
+}
+
 // ---------- Sitemap & robots ----------
 const today = new Date().toISOString().slice(0, 10);
-const rootPages = ["", "herbs.html", "fruits.html", "stacks.html", "interactions.html", "quiz.html", "bible.html", "reminders.html", "journal.html", "about.html", "privacy.html", "terms.html", "disclaimer.html"];
+const rootPages = ["", "herbs.html", "fruits.html", "stacks.html", "guides.html", "interactions.html", "quiz.html", "finder.html", "bible.html", "reminders.html", "journal.html", "about.html", "privacy.html", "terms.html", "disclaimer.html"];
 const urls = [
   ...rootPages.map((p) => SITE_URL + p),
   ...HERBS.map((h) => `${SITE_URL}herbs/${h.id}.html`),
   ...FRUITS.map((f) => `${SITE_URL}fruits/${f.id}.html`),
+  ...TOPIC_GUIDES.map((g) => `${SITE_URL}guides/${g.id}.html`),
+  ...SAFETY_GUIDES.map((g) => `${SITE_URL}safety/${g.id}.html`),
   ...STACKS.map((s) => `${SITE_URL}stacks.html?s=${s.id}`),
   ...ARTICLES.map((a) => `${SITE_URL}journal.html?a=${a.id}`)
 ];
@@ -162,4 +226,4 @@ fs.writeFileSync(path.join(root, "sitemap.xml"),
   `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `  <url><loc>${esc(u)}</loc><lastmod>${today}</lastmod></url>`).join("\n")}\n</urlset>\n`);
 fs.writeFileSync(path.join(root, "robots.txt"), `User-agent: *\nAllow: /\n\nSitemap: ${SITE_URL}sitemap.xml\n`);
 
-console.log(`Built ${HERBS.length} herb pages, ${FRUITS.length} fruit pages and a sitemap with ${urls.length} URLs for ${SITE_URL}`);
+console.log(`Built ${HERBS.length} herb pages, ${FRUITS.length} fruit pages, ${TOPIC_GUIDES.length + SAFETY_GUIDES.length} guide pages and a sitemap with ${urls.length} URLs for ${SITE_URL}`);

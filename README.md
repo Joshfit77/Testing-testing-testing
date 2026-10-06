@@ -11,16 +11,20 @@ A website about herbs, fruits and healthy reminders.
 | Fruit Library | `fruits.html` | All 100 fruits with search, benefit, season and A–Z filters |
 | Fruit pages | `fruits/<id>.html` | One page per fruit: what it does, nutrients, benefits, how to use, serving size, choosing & storing, safety, interactions |
 | Herbal Stacks | `stacks.html` | 14 herb combinations with shopping list, printable recipe card and medicine checks (`stacks.html?s=<id>`) |
-| Interaction checker | `interactions.html` | Tick medicines and health situations to see herbs, fruits and stacks to avoid or use with caution |
-| Find my herb quiz | `quiz.html` | Three questions → personal herb, stack and fruit suggestions that skip unsafe matches |
-| Herbs & fruits of the Bible | `bible.html` | Scripture (KJV) with links to each plant |
+| Guides | `guides.html` | Hub for the wellness and safety guides |
+| Wellness guides | `guides/<id>.html` | 15 guides (sleep, stress, digestion, immunity, colds & flu, heart, blood sugar, skin, hair, joints, energy, memory, monthly cycle, menopause, men's health) with habits, herbs + doses, fruits, stacks, a verse, safety and when to see a doctor |
+| Safety guides | `safety/<id>.html` | Pregnancy (by trimester), breastfeeding, children (by age), adults 65+, before surgery |
+| Safety checker | `interactions.html` | Step by step: who it's for (incl. pregnancy trimester, breastfeeding, child, 65+), type medicine names (brand or generic), health conditions → what to avoid, what could happen and what to do; printable |
+| Quiz | `quiz.html` | 10-question multiple-choice quiz on herbs, fruits, safety or plants of the Bible, with explanations and best scores |
+| Herb finder | `finder.html` | Three questions → personal herb, stack and fruit suggestions that skip unsafe matches |
+| Herbs & fruits of the Bible | `bible.html` | 28 scripture passages (KJV) with reflections and links to each plant; every herb and fruit page also has a scripture card |
 | Healthy Living | `reminders.html` | Reminders, daily checklist, water tracker, daily rhythm, seasons |
 | Journal | `journal.html` | Articles (`journal.html?a=<id>`) |
 | About | `about.html` | Story, values, FAQ, contact form |
 | Legal | `privacy.html`, `terms.html`, `disclaimer.html` | Privacy policy, terms of use, medical disclaimer (templates — have them reviewed for your situation) |
 
 ## Building the herb and fruit pages
-The 200 pages in `herbs/` and `fruits/`, plus `sitemap.xml` and `robots.txt`, are generated. After changing any herb or fruit data, run:
+The 220 pages in `herbs/`, `fruits/`, `guides/` and `safety/`, plus `sitemap.xml` and `robots.txt`, are generated. After changing any herb, fruit or guide data, run:
 
 ```
 node scripts/build.js
@@ -50,8 +54,11 @@ If you sell products or use affiliate links, keep claims educational: in the U.S
 - `js/herbs-caps.js` — the capsule (mg) and herb-by-itself doses
 - `js/fruits-data.js` — the 100 fruits
 - `js/stacks.js` — the herbal stacks
-- `js/interactions.js` — the interaction checker's medicines, health situations and flagged herbs/fruits
-- `js/bible.js` — the Bible page
+- `js/interactions.js` — the safety checker's medicine groups, health situations, flagged herbs/fruits, and "what could happen / what to do" text
+- `js/drugs.js` — medicine names (generic and brand) the safety checker recognizes
+- `js/guides.js` — the wellness and safety guides, and the verses used on herb and fruit pages
+- `js/quiz-questions.js` — quiz questions (the first option is the right answer; options are shuffled on screen)
+- `js/bible.js` — the Bible page and its reflections
 - `js/content.js` — reminders, checklist, verses, daily rhythm, seasons and journal articles
 - `js/layout.js` — site name, menu, header, footer, form and shop settings. Replace the `#` social links in the footer with your own profiles.
 

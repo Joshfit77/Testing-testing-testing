@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Find My Herb Quiz — Beauty &amp; Praise</title>
-  <meta name="description" content="Answer a few questions to find herbs, herbal stacks and fruits that suit your goal and health situation.">
+  <title>Herb &amp; Fruit Quiz — Beauty &amp; Praise</title>
+  <meta name="description" content="Test what you know about herbs, fruits, herbal safety and the plants of the Bible.">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Beauty &amp; Praise">
-  <meta property="og:title" content="Find My Herb Quiz — Beauty &amp; Praise">
-  <meta property="og:description" content="Answer a few questions to find herbs, herbal stacks and fruits that suit your goal and health situation.">
+  <meta property="og:title" content="Herb &amp; Fruit Quiz — Beauty &amp; Praise">
+  <meta property="og:description" content="Test what you know about herbs, fruits, herbal safety and the plants of the Bible.">
   <meta property="og:image" content="images/og-image.png">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" type="image/svg+xml" href="images/logo-mark.svg">
@@ -22,40 +22,14 @@
   <main>
     <section class="page-hero">
       <div class="container">
-        <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span aria-current="page">Find My Herb</span></nav>
-        <h1>Find My Herb</h1>
-        <p class="lead">Answer three quick questions and we'll suggest herbs, stacks and fruits that suit your goal — and leave out any that don't fit your health situation.</p>
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span aria-current="page">Quiz</span></nav>
+        <h1>The Beauty &amp; Praise Quiz</h1>
+        <p class="lead">How well do you know your herbs, fruits and the plants of the Bible? Ten questions, instant answers and a short lesson with every question.</p>
       </div>
     </section>
-
     <section class="section section-top-tight">
-      <div class="container">
-        <form id="quiz-form" class="quiz">
-          <div class="card">
-            <h2>1. What would you like help with?</h2>
-            <div class="quiz-grid" id="quiz-goals"></div>
-          </div>
-          <div class="card">
-            <h2>2. How do you like to take herbs?</h2>
-            <div class="quiz-grid quiz-forms">
-              <label class="quiz-card"><input type="radio" name="form" value="any" checked><span>Any way</span></label>
-              <label class="quiz-card"><input type="radio" name="form" value="tea"><span>As a tea</span></label>
-              <label class="quiz-card"><input type="radio" name="form" value="capsule"><span>Capsules</span></label>
-              <label class="quiz-card"><input type="radio" name="form" value="food"><span>In my cooking</span></label>
-            </div>
-          </div>
-          <div class="card">
-            <h2>3. Does anything apply to you?</h2>
-            <p class="muted">We'll leave out herbs that aren't a good fit. Skip this if nothing applies.</p>
-            <h3 class="quiz-sub">Health situations</h3>
-            <div class="ix-options" id="quiz-situations"></div>
-            <h3 class="quiz-sub">Medicines</h3>
-            <div class="ix-options" id="quiz-meds"></div>
-          </div>
-          <div class="center"><button class="btn btn-primary" type="submit">Show my results</button></div>
-        </form>
-        <div id="quiz-results" class="quiz-results" hidden></div>
-      </div>
+      <div class="container narrow" id="quiz-app"></div>
+      <div class="container narrow center finder-link"><p class="muted">Looking for herbs that suit you? Try the <a href="finder.html">Herb Finder</a>.</p></div>
     </section>
   </main>
   <div id="site-footer"></div>
@@ -67,7 +41,10 @@
   <script src="js/fruits-data.js"></script>
   <script src="js/stacks.js"></script>
   <script src="js/interactions.js"></script>
+  <script src="js/drugs.js"></script>
+  <script src="js/guides.js"></script>
   <script src="js/bible.js"></script>
+  <script src="js/quiz-questions.js"></script>
   <script src="js/content.js"></script>
   <script src="js/art.js"></script>
   <script src="js/layout.js"></script>

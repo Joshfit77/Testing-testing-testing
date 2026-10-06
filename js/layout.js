@@ -17,17 +17,21 @@ const SITE = {
     { href: "herbs.html", label: "Herbs", page: "herbs" },
     { href: "fruits.html", label: "Fruits", page: "fruits" },
     { href: "stacks.html", label: "Stacks", page: "stacks" },
-    { href: "interactions.html", label: "Interactions", page: "interactions" },
+    { href: "guides.html", label: "Guides", page: "guides" },
+    { href: "interactions.html", label: "Safety Checker", page: "interactions" },
+    { href: "quiz.html", label: "Quiz", page: "quiz" },
+    { href: "bible.html", label: "Bible", page: "bible" },
     { href: "reminders.html", label: "Healthy Living", page: "living" },
-    { href: "journal.html", label: "Journal", page: "journal" },
-    { href: "about.html", label: "About", page: "about" }
+    { href: "journal.html", label: "Journal", page: "journal", drawerOnly: true },
+    { href: "about.html", label: "About", page: "about", drawerOnly: true }
   ],
   tools: [
-    { href: "interactions.html", label: "Herb & medicine interaction checker" },
-    { href: "quiz.html", label: "Find my herb quiz" },
+    { href: "interactions.html", label: "Herb & medicine safety checker" },
+    { href: "guides.html#safety", label: "Pregnancy, children & safety guides" },
+    { href: "quiz.html", label: "Herb & fruit quiz" },
+    { href: "finder.html", label: "Herb finder" },
     { href: "bible.html", label: "Herbs & fruits of the Bible" },
-    { href: "stacks.html", label: "Herbal stacks & recipe cards" },
-    { href: "fruits.html", label: "Fruit library" }
+    { href: "guides.html", label: "Wellness guides" }
   ]
 };
 
@@ -191,15 +195,16 @@ function formatDate(iso) {
 
 function renderChrome() {
   const page = document.body.dataset.page;
-  const navItem = (n) => `<li><a href="${n.href}"${n.page === page ? ' aria-current="page"' : ""}>${n.label}</a></li>`;
+  const activePage = { herb: "herbs", fruit: "fruits", guide: "guides", safetyguide: "guides", finder: "quiz" }[page] || page;
+  const navItem = (n) => `<li><a href="${n.href}"${n.page === activePage ? ' aria-current="page"' : ""}>${n.label}</a></li>`;
   const mainLinks = SITE.nav.filter((n) => !n.drawerOnly).map(navItem).join("");
   const links = SITE.nav
-    .map((n) => `<li><a href="${n.href}"${n.page === page ? ' aria-current="page"' : ""}>${n.label}</a></li>`)
+    .map(navItem)
     .join("");
 
   document.getElementById("site-header").innerHTML = `
     <div class="announce">
-      <p>Now featuring <a href="herbs.html">100 herb profiles</a> &amp; <a href="fruits.html">100 fruit guides</a> — plus a free <a href="interactions.html">interaction checker</a></p>
+      <p>Now featuring <a href="herbs.html">100 herb profiles</a> &amp; <a href="fruits.html">100 fruit guides</a> — plus a free <a href="interactions.html">safety checker</a> &amp; <a href="quiz.html">quiz</a></p>
     </div>
     <header class="header">
       <div class="container header-inner">
