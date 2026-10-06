@@ -1306,3 +1306,9 @@ body[data-page="es"] .note-card .btn { margin-top: 6px; color: var(--cream); }
 .br-add .icon { width: 14px; height: 14px; }
 @media (max-width: 900px) { .body-reminders { grid-template-columns: 1fr; } }
 @media (max-width: 480px) { .br-num { width: 22px; font-size: 1.1rem; } .br-icon { display: none; } .body-reminder { gap: 10px; padding: 12px; } }
+
+/* Bigger emblem so the cross and flowers are easy to see */
+.header .logo-mark { width: 66px; height: 66px; }
+.footer .logo-mark { width: 76px; height: 76px; }
+@media (max-width: 900px) { .header .logo-mark { width: 52px; height: 52px; } }
+@media (max-width: 400px) { .header .logo-mark { width: 46px; height: 46px; } }
