@@ -7,7 +7,8 @@ const STACK_GROUPS = {
   immune: "Immunity & Breathing",
   vitality: "Energy & Beauty",
   body: "Heart & Body",
-  women: "Women's Wellness"
+  women: "Women's Wellness",
+  men: "Men's Vitality"
 };
 
 const STACKS = [
@@ -208,6 +209,29 @@ const STACKS = [
     duration: "Start 2–3 days before your period and continue for the first few days.",
     tips: ["Gentle movement and stretching can ease cramps.", "Use warmth on your lower abdomen.", "Rest well and eat iron-rich foods.", "See a doctor for very heavy or severe pain."],
     avoid: ["Pregnancy (unless advised by your midwife)", "Hormone-sensitive conditions (fennel)", "Daisy allergy (chamomile)", "Blood thinners (ginger in larger amounts)"]
+  },
+  {
+    id: "testosterone-support", name: "Men's Testosterone Support", group: "men", color: "#8a5a2e",
+    tagline: "A research-based stack to support healthy testosterone, strength, drive and stamina in men.",
+    intro: "Testosterone naturally declines with age, stress, poor sleep and extra body fat. This stack combines the herbs with the best human evidence for supporting healthy testosterone. In clinical trials, ashwagandha raised testosterone by roughly 15–20% in men while lowering the stress hormone cortisol, which competes with testosterone production. Fenugreek extract improved libido, strength and, in some trials, testosterone levels. Nettle root binds sex-hormone-binding globulin (SHBG), which may leave more 'free' testosterone available to the body, and Korean ginseng supports energy and improved erectile function in several trials. Ginger adds antioxidant support for male reproductive health. Herbs support healthy levels; they are not a replacement for medical testosterone treatment, and the biggest gains come from sleep, strength training and a healthy weight.",
+    herbs: [
+      { id: "ashwagandha", parts: "300 mg extract, twice a day", role: "Raised testosterone about 15–20% and lowered cortisol in clinical trials; also improved strength and sperm quality." },
+      { id: "fenugreek", parts: "500–600 mg seed extract, once a day", role: "Improved libido and strength, and raised testosterone in some trials, likely through its saponins." },
+      { id: "nettle", parts: "300 mg root extract, once a day", role: "Root lignans bind SHBG, which may free up more active testosterone; also supports prostate health." },
+      { id: "ginseng", parts: "200 mg Korean red ginseng extract, once a day", role: "Supports energy, stamina and erectile function; reduces fatigue." },
+      { id: "ginger", parts: "500 mg powdered root, once a day", role: "Antioxidant that may protect testosterone-producing cells; one small study in infertile men found higher testosterone and better sperm health." }
+    ],
+    method: [
+      "Morning, with breakfast: ashwagandha 300 mg, fenugreek 500–600 mg, Korean ginseng 200 mg and ginger 500 mg.",
+      "Evening, with dinner: ashwagandha 300 mg and nettle root 300 mg.",
+      "Take capsules with a full glass of water and food to avoid stomach upset.",
+      "Start with ashwagandha alone for one week, then add the others one at a time so you can spot any side effects.",
+      "Ask your doctor for a blood test before you start and after 8–12 weeks to see how your levels respond."
+    ],
+    dose: "Per person, adult men 18 and over (100 lb and up): the amounts above, split between morning and evening.",
+    duration: "8–12 weeks, then take a 2–4 week break. Ginseng should be paused after 3 months.",
+    tips: ["Sleep 7–9 hours — testosterone is made mostly during deep sleep.", "Lift weights or do resistance training 3 times a week.", "Reach and keep a healthy weight; belly fat converts testosterone to estrogen.", "Get enough zinc (meat, shellfish, pumpkin seeds) and vitamin D (sunlight, eggs, fish).", "Limit alcohol and manage stress, which raises cortisol."],
+    avoid: ["Women, teenagers and anyone under 18", "Prostate or breast cancer, or other hormone-sensitive conditions", "Already on testosterone therapy or other hormone medicines — talk to your doctor", "Thyroid conditions or thyroid medicine (ashwagandha)", "Diabetes medicine (fenugreek and ginseng lower blood sugar)", "Blood thinners or upcoming surgery (ginger, ginseng, fenugreek)", "High blood pressure, insomnia or anxiety (ginseng can be stimulating)", "Liver disease (rare liver problems reported with ashwagandha)", "See a doctor for symptoms of low testosterone such as constant fatigue, low drive or erectile problems — they can have other causes"]
   },
   {
     id: "hair-nails", name: "Hair & Nail Nourish", group: "vitality", color: "#5d8c55",

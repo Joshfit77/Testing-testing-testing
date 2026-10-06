@@ -86,10 +86,17 @@ function icon(name, cls = "icon") {
   return `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
 }
 
-const LOGO_MARK = `<svg class="logo-mark" viewBox="0 0 48 48" aria-hidden="true">
-  <circle cx="24" cy="24" r="22.5" fill="none" stroke="currentColor" stroke-width="1.2"/>
-  <path d="M24 39V15" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-  <path d="M24 30c-6 0-9-4-9-9 5 0 9 3 9 9zM24 25c6 0 9-4 9-9-5 0-9 3-9 9zM24 18c-3-1-4-4-3-8 3 1 4 4 3 8z" fill="currentColor"/>
+const LOGO_MARK = `<svg class="logo-mark" viewBox="0 0 64 64" aria-hidden="true">
+  <circle cx="32" cy="32" r="30.5" fill="#f6f1e7" stroke="#2e4636" stroke-width="1.6"/>
+    <circle cx="32" cy="32" r="27" fill="none" stroke="#2e4636" stroke-width="0.6" stroke-dasharray="1.2 2.2"/>
+    <path d="M32 9.5V13M24.2 11.6l1.6 2.8M39.8 11.6l-1.6 2.8M18.6 16.6l2.6 1.8M45.4 16.6l-2.6 1.8" stroke="#b5654a" stroke-width="1.5" stroke-linecap="round"/>
+    <path d="M32 53V30" stroke="#2e4636" stroke-width="1.6" stroke-linecap="round"/>
+    <path d="M31.4 50C20.5 47 13.5 38 15.5 24.5C25.5 23.5 31.4 31 31.4 41Z" fill="#2e4636"/>
+    <path d="M32.6 50C43.5 47 50.5 38 48.5 24.5C38.5 23.5 32.6 31 32.6 41Z" fill="#4f7259"/>
+    <path d="M30 46.5C25 41 21 34 17.6 26.6M24.6 39.5l-4.4.4M27.4 43.2l-3.6 1.2M22.4 35.4l-3.6-.6" stroke="#f6f1e7" stroke-width="0.9" stroke-linecap="round" fill="none" opacity="0.85"/>
+    <path d="M34 46.5C39 41 43 34 46.4 26.6M39.4 39.5l4.4.4M36.6 43.2l3.6 1.2M41.6 35.4l3.6-.6" stroke="#f6f1e7" stroke-width="0.9" stroke-linecap="round" fill="none" opacity="0.85"/>
+    <path d="M32 16.5C36.2 20 36.6 25.6 32 30.5C27.4 25.6 27.8 20 32 16.5Z" fill="#b5654a"/>
+    <path d="M32 19.5V28" stroke="#f6f1e7" stroke-width="0.8" stroke-linecap="round" opacity="0.8"/>
 </svg>`;
 
 function herbCard(h) {

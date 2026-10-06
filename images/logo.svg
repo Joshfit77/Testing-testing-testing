@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 80" width="720" height="160">
+  <rect width="360" height="80" fill="#fbf8f2"/>
+  <g transform="translate(8 8)">
+  <circle cx="32" cy="32" r="30.5" fill="#f6f1e7" stroke="#2e4636" stroke-width="1.6"/>
+  <circle cx="32" cy="32" r="27" fill="none" stroke="#2e4636" stroke-width="0.6" stroke-dasharray="1.2 2.2"/>
+  <path d="M32 9.5V13M24.2 11.6l1.6 2.8M39.8 11.6l-1.6 2.8M18.6 16.6l2.6 1.8M45.4 16.6l-2.6 1.8" stroke="#b5654a" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M32 53V30" stroke="#2e4636" stroke-width="1.6" stroke-linecap="round"/>
+  <path d="M31.4 50C20.5 47 13.5 38 15.5 24.5C25.5 23.5 31.4 31 31.4 41Z" fill="#2e4636"/>
+  <path d="M32.6 50C43.5 47 50.5 38 48.5 24.5C38.5 23.5 32.6 31 32.6 41Z" fill="#4f7259"/>
+  <path d="M30 46.5C25 41 21 34 17.6 26.6M24.6 39.5l-4.4.4M27.4 43.2l-3.6 1.2M22.4 35.4l-3.6-.6" stroke="#f6f1e7" stroke-width="0.9" stroke-linecap="round" fill="none" opacity="0.85"/>
+  <path d="M34 46.5C39 41 43 34 46.4 26.6M39.4 39.5l4.4.4M36.6 43.2l3.6 1.2M41.6 35.4l3.6-.6" stroke="#f6f1e7" stroke-width="0.9" stroke-linecap="round" fill="none" opacity="0.85"/>
+  <path d="M32 16.5C36.2 20 36.6 25.6 32 30.5C27.4 25.6 27.8 20 32 16.5Z" fill="#b5654a"/>
+  <path d="M32 19.5V28" stroke="#f6f1e7" stroke-width="0.8" stroke-linecap="round" opacity="0.8"/>
+  </g>
+  <text x="84" y="44" font-family="'Cormorant Garamond', Georgia, serif" font-size="34" font-weight="600" fill="#2e4636">Beauty <tspan fill="#b5654a" font-style="italic" font-weight="500">&amp;</tspan> Praise</text>
+  <text x="86" y="64" font-family="'Jost', Helvetica, Arial, sans-serif" font-size="9.5" letter-spacing="3" fill="#66746b">HERBS · WELLNESS · GRATITUDE</text>
+</svg>

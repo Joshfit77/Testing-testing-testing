@@ -125,7 +125,7 @@ p { margin: 0 0 1em; }
 .header { position: sticky; top: 0; z-index: 40; background: rgba(251, 248, 242, 0.94); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
 .header-inner { display: flex; align-items: center; gap: 24px; height: 84px; }
 .logo { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--forest); }
-.logo-mark { width: 44px; height: 44px; flex: none; }
+.logo-mark { width: 52px; height: 52px; flex: none; }
 .logo-text { display: flex; flex-direction: column; line-height: 1; }
 .logo-name { font-family: var(--serif); font-size: 1.65rem; font-weight: 600; }
 .logo-name em { color: var(--clay); font-style: italic; font-weight: 500; }
@@ -465,7 +465,7 @@ select.field { cursor: pointer; }
   .main-nav { display: none; }
   .header-inner { height: 72px; gap: 8px; }
   .logo { margin: 0 auto; }
-  .logo-mark { width: 36px; height: 36px; }
+  .logo-mark { width: 42px; height: 42px; }
   .logo-name { font-size: 1.35rem; }
   .logo-tag { display: none; }
   .header-actions .icon-btn:last-child { display: none; }
@@ -692,4 +692,13 @@ select.field { cursor: pointer; }
 @media (max-width: 640px) {
   .quick-doses { grid-template-columns: 1fr; }
   .quick-doses .qd-amount { font-size: 2rem; }
+}
+
+/* Benefits at a glance */
+.prose .glance { padding: 28px 32px; border-radius: var(--radius); background: var(--cream); border-left: 3px solid var(--clay); }
+.glance .eyebrow { margin-bottom: 10px; }
+.prose .glance-text { margin: 0; font-family: var(--serif); font-size: 1.35rem; line-height: 1.5; color: var(--forest); }
+@media (max-width: 640px) {
+  .prose .glance { padding: 22px 20px; }
+  .prose .glance-text { font-size: 1.2rem; }
 }

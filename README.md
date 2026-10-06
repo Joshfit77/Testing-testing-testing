@@ -8,7 +8,7 @@ A website about herbs and healthy reminders.
 | Home | `index.html` | Hero, browse-by-need categories, herb of the day, popular herbs, verse of the day, latest articles |
 | Herb Library | `herbs.html` | All 100 herbs with search, category / part filters, A–Z jump, saved-herbs filter |
 | Herb profile | `herb.html?id=…` | Detailed profile for each herb: real photo, overview, benefits explained (with evidence level), traditional uses, preparation, growing, safety, stacks it appears in, related herbs |
-| Herbal Stacks | `stacks.html` | 13 herb combinations (Gentle Cleanse, Restful Sleep, Immune Syrup…) with amounts, recipe, dose, duration and who should avoid them; each opens at `stacks.html?s=…` |
+| Herbal Stacks | `stacks.html` | 14 herb combinations (Gentle Cleanse, Restful Sleep, Immune Syrup…) with amounts, recipe, dose, duration and who should avoid them; each opens at `stacks.html?s=…` |
 | Healthy Living | `reminders.html` | Reminder of the moment, daily checklist, water tracker, daily rhythm, seasonal wellness |
 | Journal | `journal.html` | Six articles (each opens at `journal.html?a=…`) |
 | About | `about.html` | Story, values, FAQ, contact form |
@@ -18,6 +18,7 @@ No build step — open `index.html` in a browser, or publish with GitHub Pages.
 
 ## Edit content
 - `js/herbs-data.js` — the 100 herbs and the categories
+- `js/herbs-summary.js` — the 5-sentence "Benefits at a glance" for every herb
 - `js/herbs-benefits.js` — the "Benefits explained" section for every herb
 - `js/herbs-caps.js` — the two headline doses on each herb page: capsule form (mg) and the herb by itself (g), per person 100 lb and over
 - `js/herbs-pharm.js` — what each herb does in the body, its active compounds and how they work, and typical adult doses (shown in mg, g and oz)
@@ -27,6 +28,10 @@ No build step — open `index.html` in a browser, or publish with GitHub Pages.
 
 ## Photos
 Herb photos load in the visitor's browser from Wikipedia / Wikimedia Commons (free-licensed images); each herb page credits the photographer and license. If a photo can't load, a drawn illustration is shown instead. To use your own photo for an herb, put it in an `images/` folder and add it to `PHOTO_OVERRIDES` in `js/photos.js`. If a Wikipedia photo is a poor match, change that herb's article in `WIKI_TITLES` in the same file.
+
+## Logo
+- `images/logo-mark.svg` — the emblem (also used as the browser-tab icon)
+- `images/logo.svg` — the full logo with the name, for social media or print
 
 ## Other files
 - `css/styles.css` — all styling

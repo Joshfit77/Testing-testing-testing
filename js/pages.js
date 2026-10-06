@@ -304,6 +304,7 @@ function initHerb() {
         <aside class="toc">
           <p class="eyebrow">On this page</p>
           <ul>
+            <li><a href="#glance">Benefits at a glance</a></li>
             <li><a href="#overview">Overview</a></li>
             <li><a href="#body">What it does in your body</a></li>
             <li><a href="#chemistry">How it works chemically</a></li>
@@ -316,6 +317,10 @@ function initHerb() {
           </ul>
         </aside>
         <article class="prose">
+          <section id="glance" class="glance">
+            <p class="eyebrow">Benefits at a glance</p>
+            <p class="glance-text">${SUMMARY[h.id]}</p>
+          </section>
           <section id="overview"><h2>Overview</h2><p>${h.about}</p></section>
           <section id="body"><h2>What it does in your body</h2>
             <div class="body-grid">${ph.body.map(([sys, txt]) => `<div class="body-item"><p class="eyebrow">${sys}</p><p>${txt}</p></div>`).join("")}</div>
