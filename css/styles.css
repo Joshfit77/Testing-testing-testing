@@ -523,3 +523,104 @@ select.field { cursor: pointer; }
   .herb-hero-art { max-width: 240px; }
   .section { padding: 16px 0; }
 }
+
+/* =========================================================
+   Photos, benefits and herbal stacks
+   ========================================================= */
+
+/* Photo frame: illustration underneath, real photo fades in over it */
+.pf { position: relative; display: block; width: 100%; height: 100%; overflow: hidden; }
+.pf > svg { width: 100%; height: 100%; }
+.pf > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; }
+.pf[data-state="photo"] > img { opacity: 1; transition: opacity 0.6s ease, transform 0.5s; }
+.herb-card:hover .pf > img, .article-card a:hover .pf > img { transform: scale(1.05); }
+
+.herb-hero-figure { margin: 0; }
+.photo-credit { margin-top: 10px; font-size: 0.72rem; color: var(--muted); text-align: center; line-height: 1.4; }
+.photo-credit a { color: var(--muted); }
+.photo-credit:empty { display: none; }
+
+/* Benefits */
+.benefit-list { display: grid; gap: 16px; margin: 20px 0 16px; }
+.benefit { padding: 22px 24px; background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); }
+.benefit-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 6px; }
+.benefit h3 { font-size: 1.45rem; margin: 0; }
+.benefit p { margin: 0; color: var(--ink); }
+.evidence { flex: none; display: inline-block; font-size: 0.66rem; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; padding: 5px 10px; border-radius: 999px; white-space: nowrap; }
+.ev-R { background: var(--forest); color: var(--cream); }
+.ev-P { background: var(--sage-soft); color: var(--forest); }
+.ev-T { background: #f3e6d3; color: #7a5a2e; }
+.evidence-key summary { cursor: pointer; color: var(--clay); font-size: 0.9rem; }
+.evidence-key ul { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 10px; font-size: 0.92rem; color: var(--muted); }
+.evidence-key li { display: flex; gap: 12px; align-items: baseline; }
+
+/* Stack cards */
+.stack-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+.stack-card { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; transition: transform 0.25s, box-shadow 0.25s; }
+.stack-card:hover { transform: translateY(-4px); box-shadow: var(--shadow); }
+.stack-card a { display: block; text-decoration: none; height: 100%; }
+.stack-photos { display: flex; gap: 2px; aspect-ratio: 4 / 3; background: var(--line); }
+.sp-main { flex: 1.6; min-width: 0; }
+.sp-side { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sp-side .pf { flex: 1; min-height: 0; height: auto; }
+.prose > h2:not(:first-child) { margin-top: 1.6em; }
+.stack-body { padding: 22px 24px 26px; }
+.stack-body .eyebrow { margin-bottom: 6px; }
+.stack-body h3 { font-size: 1.7rem; margin-bottom: 6px; }
+.stack-body p { color: var(--muted); margin-bottom: 10px; }
+.stack-herbs { font-size: 0.82rem; letter-spacing: 0.04em; color: var(--forest) !important; margin: 0 !important; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 36px; }
+.chip { padding: 9px 18px; border-radius: 999px; border: 1px solid var(--line); background: var(--white); cursor: pointer; font-size: 0.9rem; transition: background 0.2s; }
+.chip:hover { border-color: var(--sage); }
+.chip.active { background: var(--forest); border-color: var(--forest); color: var(--cream); }
+.note-card { display: flex; gap: 16px; margin-top: 48px; padding: 22px 26px; border-radius: var(--radius); background: var(--cream); }
+.note-card p { margin: 0; }
+
+/* Stack detail */
+.stack-hero { padding: 48px 0 64px; background: linear-gradient(180deg, var(--cream), var(--paper)); }
+.stack-hero-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+.stack-hero-photos { display: grid; grid-template-columns: 1.4fr 1fr; grid-template-rows: repeat(3, 1fr); gap: 12px; height: 460px; }
+.shp { display: block; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+.shp-0 { grid-row: span 3; border-radius: 999px 999px var(--radius) var(--radius); }
+.stack-herb-list { display: grid; gap: 14px; margin: 20px 0 8px; }
+.stack-herb { display: flex; gap: 18px; align-items: center; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); text-decoration: none; transition: border-color 0.2s; }
+.stack-herb:hover { border-color: var(--sage); }
+.stack-herb-photo { width: 92px; height: 92px; border-radius: 12px; overflow: hidden; flex: none; }
+.stack-herb-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.stack-herb-name { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+.stack-herb-name strong { font-family: var(--serif); font-size: 1.35rem; color: var(--forest); font-weight: 600; }
+.amount { font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--clay); }
+.stack-herb .latin { font-size: 0.95rem; }
+.stack-herb-role { font-size: 0.95rem; color: var(--muted); }
+.steps { counter-reset: step; list-style: none; padding: 0; margin: 0 0 1.4em; }
+.steps li { counter-increment: step; position: relative; padding: 12px 0 12px 52px; border-bottom: 1px solid var(--line); }
+.steps li::before { content: counter(step); position: absolute; left: 0; top: 10px; width: 34px; height: 34px; border-radius: 50%; background: var(--forest); color: var(--cream); display: grid; place-items: center; font-family: var(--serif); font-size: 1.1rem; }
+.caution-list { margin: 0 0 8px; padding-left: 18px; }
+.caution-list li { margin-bottom: 4px; }
+
+/* Herb page: stacks this herb appears in */
+.stack-mini-list { display: grid; gap: 12px; }
+.stack-mini { display: flex; gap: 16px; align-items: center; padding: 14px 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); text-decoration: none; }
+.stack-mini:hover { border-color: var(--sage); }
+.stack-mini-photos { display: flex; flex: none; }
+.stack-mini-photos .mini-art { border: 2px solid var(--white); margin-left: -10px; }
+.stack-mini-photos .mini-art:first-child { margin-left: 0; }
+.stack-mini strong { display: block; font-family: var(--serif); font-size: 1.3rem; color: var(--forest); }
+.stack-mini em { font-style: normal; font-size: 0.9rem; color: var(--muted); }
+
+@media (max-width: 1080px) {
+  .main-nav ul { gap: 18px; }
+  .main-nav a { font-size: 0.74rem; letter-spacing: 0.12em; }
+}
+@media (max-width: 900px) {
+  .stack-grid { grid-template-columns: 1fr 1fr; }
+  .stack-hero-grid { grid-template-columns: 1fr; gap: 32px; }
+  .stack-hero-photos { height: 360px; }
+}
+@media (max-width: 640px) {
+  .stack-grid { grid-template-columns: 1fr; }
+  .benefit-head { flex-direction: column; gap: 8px; }
+  .stack-herb-photo { width: 72px; height: 72px; }
+  .stack-hero-photos { height: 300px; }
+}

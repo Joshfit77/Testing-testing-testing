@@ -12,7 +12,7 @@ function articleCard(a, big = false) {
   const h = findHerb(a.herb);
   return `<article class="article-card${big ? " article-card-big" : ""}">
     <a href="journal.html?a=${a.id}">
-      <div class="article-art">${Art.herb(h)}</div>
+      <div class="article-art">${visual(h)}</div>
       <div class="article-body">
         <p class="meta"><span>${a.category}</span> · ${formatDate(a.date)} · ${a.read} min read</p>
         <h3>${a.title}</h3>
@@ -23,14 +23,31 @@ function articleCard(a, big = false) {
   </article>`;
 }
 
+function stackCard(st) {
+  return `<article class="stack-card">
+    <a href="stacks.html?s=${st.id}">
+      <div class="stack-photos">
+        <div class="sp-main">${visual(findHerb(st.herbs[0].id))}</div>
+        <div class="sp-side">${st.herbs.slice(1, 4).map((x) => visual(findHerb(x.id))).join("")}</div>
+      </div>
+      <div class="stack-body">
+        <p class="eyebrow">${STACK_GROUPS[st.group]}</p>
+        <h3>${st.name}</h3>
+        <p>${st.tagline}</p>
+        <p class="stack-herbs">${st.herbs.map((x) => findHerb(x.id).name.split(" (")[0]).join(" · ")}</p>
+      </div>
+    </a>
+  </article>`;
+}
+
 /* ---------------- Home ---------------- */
 function initHome() {
   const featured = dailyPick(HERBS);
   const side = [dailyPick(HERBS, 37), dailyPick(HERBS, 71)];
   $("#hero-art").innerHTML = `
-    <a class="arch arch-main" href="herb.html?id=${featured.id}">${Art.herb(featured)}<span class="arch-label">Herb of the day · ${featured.name}</span></a>
-    <a class="arch-circle c1" href="herb.html?id=${side[0].id}" aria-label="${side[0].name}">${Art.herb(side[0])}</a>
-    <a class="arch-circle c2" href="herb.html?id=${side[1].id}" aria-label="${side[1].name}">${Art.herb(side[1])}</a>`;
+    <a class="arch arch-main" href="herb.html?id=${featured.id}">${visual(featured, true)}<span class="arch-label">Herb of the day · ${featured.name}</span></a>
+    <a class="arch-circle c1" href="herb.html?id=${side[0].id}" aria-label="${side[0].name}">${visual(side[0])}</a>
+    <a class="arch-circle c2" href="herb.html?id=${side[1].id}" aria-label="${side[1].name}">${visual(side[1])}</a>`;
 
   const marquee = Object.values(CATEGORIES).map((c) => `<span>${c}</span>${icon("leaf")}`).join("");
   $("#marquee").innerHTML = `<div class="marquee-track">${marquee}${marquee}</div>`;
@@ -47,7 +64,7 @@ function initHome() {
     .join("");
 
   $("#feature").innerHTML = `
-    <div class="feature-art">${Art.herb(featured)}</div>
+    <div class="feature-art">${visual(featured, true)}</div>
     <div class="feature-copy">
       <p class="eyebrow">Herb of the day</p>
       <h2>${featured.name}</h2>
@@ -59,6 +76,8 @@ function initHome() {
 
   const popular = ["chamomile", "lavender", "ginger", "turmeric", "peppermint", "elderberry", "holy-basil", "rosemary"];
   $("#popular-grid").innerHTML = popular.map((id) => herbCard(findHerb(id))).join("");
+
+  $("#stack-grid").innerHTML = ["gentle-cleanse", "restful-sleep", "immune-syrup"].map((id) => stackCard(STACKS.find((x) => x.id === id))).join("");
 
   const verse = dailyPick(VERSES);
   $("#verse-band").innerHTML = `<blockquote><p>“${verse.text}”</p><cite>${verse.ref}</cite></blockquote>`;
@@ -171,13 +190,17 @@ function initHerb() {
     .slice(0, 4);
   const saved = favorites.has(h.id);
   const partLabel = h.part[0].toUpperCase() + h.part.slice(1);
+  const inStacks = STACKS.filter((st) => st.herbs.some((x) => x.id === h.id));
 
   main.innerHTML = `
     <section class="herb-hero">
       <div class="container">
         <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><a href="herbs.html">Herb Library</a><span>/</span><span aria-current="page">${h.name}</span></nav>
         <div class="herb-hero-grid">
-          <div class="herb-hero-art arch">${Art.herb(h)}</div>
+          <figure class="herb-hero-figure">
+            <div class="herb-hero-art arch">${visual(h, true)}</div>
+            <figcaption class="photo-credit" id="photo-credit"></figcaption>
+          </figure>
           <div class="herb-hero-copy">
             <div class="tag-row">${h.cats.map((c) => `<a class="tag" href="herbs.html?cat=${c}">${CATEGORIES[c]}</a>`).join("")}</div>
             <h1>${h.name}</h1>
@@ -203,6 +226,7 @@ function initHerb() {
           <p class="eyebrow">On this page</p>
           <ul>
             <li><a href="#overview">Overview</a></li>
+            <li><a href="#benefits">Benefits explained</a></li>
             <li><a href="#uses">Traditional uses</a></li>
             <li><a href="#prepare">How to prepare</a></li>
             <li><a href="#grow">Growing &amp; harvesting</a></li>
@@ -211,6 +235,21 @@ function initHerb() {
         </aside>
         <article class="prose">
           <section id="overview"><h2>Overview</h2><p>${h.about}</p></section>
+          <section id="benefits"><h2>Benefits explained</h2>
+            <p class="muted">What ${h.name.split(" (")[0].toLowerCase()} may do for you, how it works, and how strong the evidence is.</p>
+            <div class="benefit-list">${(BENEFITS[h.id] || []).map(([e, t, d]) => `
+              <div class="benefit">
+                <div class="benefit-head"><h3>${t}</h3><span class="evidence ev-${e}" title="${EVIDENCE[e].note}">${EVIDENCE[e].label}</span></div>
+                <p>${d}</p>
+              </div>`).join("")}
+            </div>
+            <details class="evidence-key"><summary>What do the evidence labels mean?</summary>
+              <ul>${Object.entries(EVIDENCE).map(([k, v]) => `<li><span class="evidence ev-${k}">${v.label}</span> ${v.note}</li>`).join("")}</ul>
+            </details>
+          </section>
+          ${inStacks.length ? `<section id="stacks"><h2>Found in these herbal stacks</h2>
+            <div class="stack-mini-list">${inStacks.map((st) => `<a class="stack-mini" href="stacks.html?s=${st.id}"><span class="stack-mini-photos">${st.herbs.slice(0, 3).map((x) => `<span class="mini-art">${visual(findHerb(x.id))}</span>`).join("")}</span><span><strong>${st.name}</strong><em>${st.herbs.find((x) => x.id === h.id).role}</em></span></a>`).join("")}</div>
+          </section>` : ""}
           <section id="uses"><h2>Traditional uses</h2>
             <ul class="check-list">${h.uses.map((u) => `<li>${icon("check")}${u}</li>`).join("")}</ul>
           </section>
@@ -241,6 +280,17 @@ function initHerb() {
         </nav>
       </div>
     </section>`;
+
+  Photos.credit(h.id).then((c) => {
+    const el = $("#photo-credit");
+    if (!c || !el) return;
+    if (c.text) { el.textContent = c.text; return; }
+    el.innerHTML = `Photo: <span></span> · <a target="_blank" rel="noopener"></a>`;
+    el.querySelector("span").textContent = c.artist;
+    const a = el.querySelector("a");
+    a.href = c.url;
+    a.textContent = c.license ? `${c.license} via Wikimedia Commons` : "Wikimedia Commons";
+  });
 }
 
 /* ---------------- Healthy living ---------------- */
@@ -349,7 +399,7 @@ function initLiving() {
     return `<div class="season-card${current ? " current" : ""}">
       <div class="season-head"><h3>${s.name}</h3>${current ? '<span class="pill">This season</span>' : ""}</div>
       <p>${s.text}</p>
-      <div class="season-herbs">${s.herbs.map((id) => { const h = findHerb(id); return `<a href="herb.html?id=${id}"><span class="mini-art">${Art.herb(h)}</span>${h.name}</a>`; }).join("")}</div>
+      <div class="season-herbs">${s.herbs.map((id) => { const h = findHerb(id); return `<a href="herb.html?id=${id}"><span class="mini-art">${visual(h)}</span>${h.name}</a>`; }).join("")}</div>
     </div>`;
   }).join("");
 }
@@ -392,13 +442,13 @@ function initJournal() {
           <h1>${a.title}</h1>
           <p class="meta">${formatDate(a.date)} · ${a.read} min read · By the Beauty &amp; Praise team</p>
         </div>
-        <div class="container article-banner">${Art.herb(h)}</div>
+        <div class="container article-banner">${visual(h, true)}</div>
       </header>
       <div class="container narrow prose article-prose">
         <p class="lead">${a.excerpt}</p>
         ${body}
         <div class="article-herb">
-          <span class="mini-art">${Art.herb(h)}</span>
+          <span class="mini-art">${visual(h)}</span>
           <div><p class="eyebrow">Featured herb</p><a href="herb.html?id=${h.id}"><strong>${h.name}</strong> — ${h.summary}</a></div>
         </div>
       </div>
@@ -411,10 +461,103 @@ function initJournal() {
     </section>`;
 }
 
+/* ---------------- Herbal stacks ---------------- */
+function initStacks() {
+  const main = $("#stacks-main");
+  const st = STACKS.find((x) => x.id === params.get("s"));
+  if (!st) {
+    let group = params.get("g") || "all";
+    main.innerHTML = `
+      <section class="page-hero">
+        <div class="container">
+          <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span aria-current="page">Herbal Stacks</span></nav>
+          <h1>Herbal Stacks</h1>
+          <p class="lead">Herbs work beautifully together. Each stack combines herbs with complementary benefits for one goal — with exact amounts, a simple recipe, how long to use it, and who should avoid it.</p>
+        </div>
+      </section>
+      <section class="section section-top-tight">
+        <div class="container">
+          <div class="chips" id="stack-chips">${[["all", "All stacks"], ...Object.entries(STACK_GROUPS)].map(([k, v]) => `<button class="chip" data-g="${k}">${v}</button>`).join("")}</div>
+          <div class="stack-grid" id="stack-grid"></div>
+          <div class="note-card">${icon("shield", "icon info-icon")}<p><strong>Before you start a stack:</strong> combining herbs combines their cautions too. Read the "Who should avoid" list for each stack, and check with your doctor or pharmacist if you are pregnant, breastfeeding, taking medicine or have a health condition.</p></div>
+        </div>
+      </section>`;
+    const render = () => {
+      $("#stack-grid").innerHTML = STACKS.filter((x) => group === "all" || x.group === group).map(stackCard).join("");
+      document.querySelectorAll("#stack-chips .chip").forEach((c) => c.classList.toggle("active", c.dataset.g === group));
+    };
+    $("#stack-chips").addEventListener("click", (e) => {
+      const c = e.target.closest(".chip");
+      if (c) { group = c.dataset.g; render(); }
+    });
+    render();
+    return;
+  }
+
+  document.title = `${st.name} Herbal Stack — Beauty & Praise`;
+  const others = STACKS.filter((x) => x !== st && x.group === st.group).concat(STACKS.filter((x) => x !== st && x.group !== st.group)).slice(0, 3);
+  main.innerHTML = `
+    <section class="stack-hero">
+      <div class="container">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><a href="stacks.html">Herbal Stacks</a><span>/</span><span aria-current="page">${st.name}</span></nav>
+        <div class="stack-hero-grid">
+          <div>
+            <p class="eyebrow">${STACK_GROUPS[st.group]} · ${st.herbs.length} herbs</p>
+            <h1>${st.name}</h1>
+            <p class="lead">${st.tagline}</p>
+            <dl class="facts">
+              <div><dt>How much</dt><dd>${st.dose}</dd></div>
+              <div><dt>How long</dt><dd>${st.duration}</dd></div>
+            </dl>
+          </div>
+          <div class="stack-hero-photos">${st.herbs.slice(0, 4).map((x, i) => `<a href="herb.html?id=${x.id}" class="shp shp-${i}">${visual(findHerb(x.id), i === 0)}</a>`).join("")}</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container narrow prose">
+        <h2>Why it works</h2>
+        <p>${st.intro}</p>
+
+        <h2>What's in it</h2>
+        <div class="stack-herb-list">${st.herbs.map((x) => { const h = findHerb(x.id); return `
+          <a class="stack-herb" href="herb.html?id=${h.id}">
+            <span class="stack-herb-photo">${visual(h)}</span>
+            <span class="stack-herb-text">
+              <span class="stack-herb-name"><strong>${h.name}</strong><span class="amount">${x.parts}</span></span>
+              <em class="latin">${h.latin}</em>
+              <span class="stack-herb-role">${x.role}</span>
+            </span>
+          </a>`; }).join("")}
+        </div>
+
+        <h2>How to make it</h2>
+        <ol class="steps">${st.method.map((m) => `<li>${m}</li>`).join("")}</ol>
+
+        <h2>Make it work better</h2>
+        <ul class="check-list">${st.tips.map((t) => `<li>${icon("check")}${t}</li>`).join("")}</ul>
+
+        <h2>Who should avoid this stack</h2>
+        <div class="caution-card">${icon("shield", "icon info-icon")}
+          <div><ul class="caution-list">${st.avoid.map((a) => `<li>${a}</li>`).join("")}</ul>
+          <p class="small">This stack is for general education and is not medical advice. Stop if you notice any side effects, and talk with your doctor or pharmacist before using herbs if you take medicine or have a health condition.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-tint">
+      <div class="container">
+        <div class="section-head"><div><p class="eyebrow">Keep exploring</p><h2>More herbal stacks</h2></div><a class="text-link" href="stacks.html">All stacks ${icon("arrow")}</a></div>
+        <div class="stack-grid">${others.map(stackCard).join("")}</div>
+      </div>
+    </section>`;
+}
+
 /* ---------------- About ---------------- */
 function initAbout() {
   $("#about-art").innerHTML = ["rose", "lavender", "chamomile"].map((id, i) =>
-    `<div class="about-art-${i}">${Art.herb(findHerb(id))}</div>`).join("");
+    `<div class="about-art-${i}">${visual(findHerb(id))}</div>`).join("");
 
   const form = $("#contact-form");
   form.addEventListener("submit", (e) => {
@@ -431,4 +574,4 @@ function initAbout() {
   });
 }
 
-({ home: initHome, herbs: initHerbs, herb: initHerb, living: initLiving, journal: initJournal, about: initAbout })[document.body.dataset.page]?.();
+({ home: initHome, herbs: initHerbs, stacks: initStacks, herb: initHerb, living: initLiving, journal: initJournal, about: initAbout })[document.body.dataset.page]?.();

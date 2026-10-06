@@ -8,6 +8,7 @@ const SITE = {
   nav: [
     { href: "index.html", label: "Home", page: "home" },
     { href: "herbs.html", label: "Herb Library", page: "herbs" },
+    { href: "stacks.html", label: "Herbal Stacks", page: "stacks" },
     { href: "reminders.html", label: "Healthy Living", page: "living" },
     { href: "journal.html", label: "Journal", page: "journal" },
     { href: "about.html", label: "About", page: "about" }
@@ -95,7 +96,7 @@ function herbCard(h) {
   const saved = favorites.has(h.id);
   return `<article class="herb-card">
     <a href="herb.html?id=${h.id}" class="herb-card-link" aria-label="${h.name}">
-      <div class="herb-card-art">${Art.herb(h)}</div>
+      <div class="herb-card-art">${visual(h)}</div>
       <div class="herb-card-body">
         <p class="herb-card-cat">${CATEGORIES[h.cats[0]]}</p>
         <h3>${h.name}</h3>
@@ -218,6 +219,7 @@ function renderChrome() {
       </div>
       <div class="container footer-bottom">
         <p>© ${new Date().getFullYear()} Beauty &amp; Praise. All rights reserved.</p>
+        <p>Herb photographs from <a href="https://commons.wikimedia.org" target="_blank" rel="noopener">Wikimedia Commons</a> contributors — credits on each herb page.</p>
         <p>For education only — not medical advice. Always consult your healthcare provider.</p>
       </div>
     </footer>`;
@@ -255,7 +257,7 @@ function renderChrome() {
     if (q.length < 2) return;
     searchHerbs(q).slice(0, 6).forEach((h) => {
       const li = document.createElement("li");
-      li.innerHTML = `<a href="herb.html?id=${h.id}"><span class="mini-art">${Art.herb(h)}</span><span><strong>${h.name}</strong><em>${h.latin}</em></span></a>`;
+      li.innerHTML = `<a href="herb.html?id=${h.id}"><span class="mini-art">${visual(h)}</span><span><strong>${h.name}</strong><em>${h.latin}</em></span></a>`;
       suggest.appendChild(li);
     });
   });
