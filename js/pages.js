@@ -72,12 +72,7 @@ function stackCard(st) {
 /* ---------------- Home ---------------- */
 function initHome() {
   const herb = dailyPick(HERBS);
-  $("#hero-art").innerHTML = `
-    <div class="hero-emblem" role="img" aria-label="Beauty & Praise — a wooden cross framed by leaves and flowers">${LOGO_MARK}</div>
-    <figure class="hero-verse">
-      <blockquote>“Beloved, I pray that in all respects you may prosper and be in good health, just as your soul prospers.”</blockquote>
-      <figcaption>3 John 1:2 (${BIBLE_VERSION})</figcaption>
-    </figure>`;
+  // The hero emblem and verse are written directly in index.html.
 
   attachSearch($("#hero-search"), $("#hero-suggest"));
 
