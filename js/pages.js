@@ -78,19 +78,11 @@ function initHome() {
     <a class="arch-circle c1" href="${herbUrl(side[0].id)}" aria-label="${side[0].name}">${visual(side[0])}</a>
     <a class="arch-circle c2" href="${herbUrl(side[1].id)}" aria-label="${side[1].name}">${visual(side[1])}</a>`;
 
-  const marquee = Object.values(CATEGORIES).map((c) => `<span>${c}</span>${icon("leaf")}`).join("");
-  $("#marquee").innerHTML = `<div class="marquee-track">${marquee}${marquee}</div>`;
+  attachSearch($("#hero-search"), $("#hero-suggest"));
 
-  $("#category-grid").innerHTML = Object.entries(CATEGORIES)
-    .map(([key, label]) => {
-      const count = HERBS.filter((h) => h.cats.includes(key)).length;
-      return `<a class="category-tile" href="herbs.html?cat=${key}">
-        <span class="category-icon">${icon(CATEGORY_ICONS[key])}</span>
-        <span class="category-name">${label}</span>
-        <span class="category-count">${count} herbs</span>
-      </a>`;
-    })
-    .join("");
+  $("#need-grid").innerHTML = TOPIC_GUIDES.map((g) => `<a class="need-tile" href="${guideUrl(g.id)}">
+    <span class="category-icon">${icon(g.icon)}</span><span class="need-name">${g.short}</span></a>`).join("");
+  $("#safety-links").innerHTML = SAFETY_GUIDES.map((g) => `<a href="${safetyUrl(g.id)}">${g.short}</a>`).join(" · ");
 
   $("#feature").innerHTML = `
     <div class="feature-art">${visual(featured, true)}</div>
@@ -98,21 +90,16 @@ function initHome() {
       <p class="eyebrow">Herb of the day</p>
       <h2>${featured.name}</h2>
       <p class="latin">${featured.latin}</p>
-      <p class="lead">${featured.about}</p>
-      <ul class="check-list">${featured.uses.map((u) => `<li>${icon("check")}${u}</li>`).join("")}</ul>
+      <p class="lead">${SUMMARY[featured.id]}</p>
       <a class="btn btn-primary" href="${herbUrl(featured.id)}">Read the full profile</a>
     </div>`;
 
-  const popular = ["chamomile", "lavender", "ginger", "turmeric", "peppermint", "elderberry", "holy-basil", "rosemary"];
-  $("#popular-grid").innerHTML = popular.map((id) => herbCard(findHerb(id))).join("");
-
-  $("#help-chips").innerHTML = TOPIC_GUIDES.map((g) => `<a class="help-chip" href="${guideUrl(g.id)}">${icon(g.icon)}<span>${g.short}</span></a>`).join("") +
-    SAFETY_GUIDES.slice(0, 3).map((g) => `<a class="help-chip safety" href="${safetyUrl(g.id)}">${icon("shield")}<span>${g.short}</span></a>`).join("");
-  $("#fruit-preview").innerHTML = ["blueberry", "pomegranate", "kiwi", "avocado"].map((id) => fruitCard(FRUITS.find((f) => f.id === id))).join("");
-  $("#stack-grid").innerHTML = ["gentle-cleanse", "restful-sleep", "immune-syrup"].map((id) => stackCard(STACKS.find((x) => x.id === id))).join("");
+  const herbs = ["chamomile", "ginger", "turmeric", "elderberry"].map((id) => herbCard(findHerb(id)));
+  const fruits = ["blueberry", "pomegranate", "kiwi", "avocado"].map((id) => fruitCard(FRUITS.find((f) => f.id === id)));
+  $("#popular-grid").innerHTML = herbs.concat(fruits).join("");
 
   const verse = dailyPick(VERSES);
-  $("#verse-band").innerHTML = `<blockquote><p>“${verse.text}”</p><cite>${verse.ref}</cite></blockquote>`;
+  $("#verse-band").innerHTML = `<blockquote><p>“${verse.text}”</p><cite>${verse.ref} (${BIBLE_VERSION})</cite></blockquote>`;
 
   $("#journal-grid").innerHTML = ARTICLES.slice(0, 3).map((a) => articleCard(a)).join("");
 }

@@ -193,18 +193,89 @@ function formatDate(iso) {
   return new Date(iso + "T12:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 }
 
+// The main menu: a few clear groups instead of many separate links.
+function siteMenu() {
+  return [
+    { id: "browse", label: "Herbs & Fruits", items: [
+      { href: "herbs.html", label: "Herb Library", desc: "100 herbs from A to Z" },
+      { href: "fruits.html", label: "Fruit Library", desc: "100 fruits and what they do" },
+      { href: "stacks.html", label: "Herbal Stacks", desc: "Herbs that work well together" }
+    ] },
+    { id: "help", label: "Help Me With", wide: true, items: [
+      { href: "finder.html", label: "What should I take?", desc: "6 quick questions → your personal plan", highlight: true },
+      ...TOPIC_GUIDES.map((g) => ({ href: `guides/${g.id}.html`, label: g.short, small: true })),
+      { href: "guides.html", label: "All guides →", small: true }
+    ] },
+    { id: "safety", label: "Safety", items: [
+      { href: "interactions.html", label: "Safety Checker", desc: "Is it safe with my medicines?", highlight: true },
+      ...SAFETY_GUIDES.map((g) => ({ href: `safety/${g.id}.html`, label: g.short, small: true }))
+    ] },
+    { id: "bible", label: "Bible", href: "bible.html" },
+    { id: "learn", label: "Learn", items: [
+      { href: "reminders.html", label: "Healthy Living", desc: "Daily checklist, water & reminders" },
+      { href: "quiz.html", label: "Knowledge Quiz", desc: "Test what you know" },
+      { href: "journal.html", label: "Journal", desc: "Articles & seasonal tips" },
+      { href: "about.html", label: "About Us", desc: "Our story & contact" }
+    ] }
+  ];
+}
+
+const PAGE_GROUP = {
+  herbs: "browse", herb: "browse", fruits: "browse", fruit: "browse", stacks: "browse",
+  guides: "help", guide: "help", finder: "help",
+  interactions: "safety", safetyguide: "safety",
+  bible: "bible",
+  living: "learn", quiz: "learn", journal: "learn", about: "learn", legal: "learn"
+};
+
+// Search across herbs, fruits, guides and stacks. Fills a <ul> with suggestions.
+function fillSuggestions(q, list) {
+  q = q.trim().toLowerCase();
+  list.innerHTML = "";
+  if (q.length < 2) return;
+  const rows = [];
+  const has = (...t) => t.join(" ").toLowerCase().includes(q);
+  TOPIC_GUIDES.filter((g) => has(g.short, g.title)).slice(0, 2).forEach((g) =>
+    rows.push(`<a href="${guideUrlFor(g.id)}"><span class="mini-art suggest-icon">${icon(g.icon)}</span><span><strong>${g.short}</strong><em>Guide</em></span></a>`));
+  SAFETY_GUIDES.filter((g) => has(g.short, g.title)).slice(0, 1).forEach((g) =>
+    rows.push(`<a href="safety/${g.id}.html"><span class="mini-art suggest-icon">${icon("shield")}</span><span><strong>${g.title}</strong><em>Safety guide</em></span></a>`));
+  STACKS.filter((st) => has(st.name, st.tagline)).slice(0, 2).forEach((st) =>
+    rows.push(`<a href="stacks.html?s=${st.id}"><span class="mini-art">${visual(findHerb(st.herbs[0].id))}</span><span><strong>${st.name}</strong><em>Herbal stack</em></span></a>`));
+  searchHerbs(q).slice(0, 4).forEach((h) =>
+    rows.push(`<a href="${herbUrl(h.id)}"><span class="mini-art">${visual(h)}</span><span><strong>${h.name}</strong><em>${h.latin} · Herb</em></span></a>`));
+  searchFruits(q).slice(0, 3).forEach((fr) =>
+    rows.push(`<a href="${fruitUrl(fr.id)}"><span class="mini-art">${fruitVisual(fr)}</span><span><strong>${fr.name}</strong><em>${fr.latin} · Fruit</em></span></a>`));
+  list.innerHTML = rows.length ? rows.map((r) => `<li>${r}</li>`).join("") : `<li class="no-match">No matches — try a herb, fruit or need like “sleep”.</li>`;
+}
+const guideUrlFor = (id) => `guides/${id}.html`;
+
+function attachSearch(input, list) {
+  input.addEventListener("input", () => fillSuggestions(input.value, list));
+  input.form?.addEventListener("submit", (e) => {
+    const first = list.querySelector("a");
+    if (first) { e.preventDefault(); location.href = first.getAttribute("href"); }
+  });
+}
+
 function renderChrome() {
   const page = document.body.dataset.page;
-  const activePage = { herb: "herbs", fruit: "fruits", guide: "guides", safetyguide: "guides", finder: "quiz" }[page] || page;
-  const navItem = (n) => `<li><a href="${n.href}"${n.page === activePage ? ' aria-current="page"' : ""}>${n.label}</a></li>`;
-  const mainLinks = SITE.nav.filter((n) => !n.drawerOnly).map(navItem).join("");
-  const links = SITE.nav
-    .map(navItem)
-    .join("");
+  const group = PAGE_GROUP[page] || "";
+  const menu = siteMenu();
+
+  const desktop = menu.map((m) => m.href
+    ? `<li><a class="nav-top" href="${m.href}"${group === m.id ? ' aria-current="page"' : ""}>${m.label}</a></li>`
+    : `<li class="nav-group${m.wide ? " wide" : ""}">
+        <button class="nav-top" aria-expanded="false"${group === m.id ? ' aria-current="page"' : ""}>${m.label}<svg class="caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></button>
+        <div class="nav-panel">${m.items.map((i) => `<a href="${i.href}" class="${i.highlight ? "nav-highlight" : ""}${i.small ? " nav-small" : ""}"><strong>${i.label}</strong>${i.desc ? `<span>${i.desc}</span>` : ""}</a>`).join("")}</div>
+      </li>`).join("");
+
+  const mobile = `<a class="drawer-home" href="index.html">Home</a>` + menu.map((m) => m.href
+    ? `<a class="drawer-link" href="${m.href}">${m.label}</a>`
+    : `<details class="drawer-group"${group === m.id ? " open" : ""}><summary>${m.label}</summary>${m.items.map((i) => `<a href="${i.href}"${i.highlight ? ' class="nav-highlight"' : ""}>${i.label}</a>`).join("")}</details>`).join("");
 
   document.getElementById("site-header").innerHTML = `
     <div class="announce">
-      <p>Now featuring <a href="herbs.html">100 herb profiles</a> &amp; <a href="fruits.html">100 fruit guides</a> — plus a free <a href="interactions.html">safety checker</a> &amp; <a href="quiz.html">quiz</a></p>
+      <p>Not sure where to start? <a href="finder.html">Take the 1-minute “What should I take?” quiz</a></p>
     </div>
     <header class="header">
       <div class="container header-inner">
@@ -213,9 +284,10 @@ function renderChrome() {
           ${LOGO_MARK}
           <span class="logo-text"><span class="logo-name">Beauty <em>&amp;</em> Praise</span><span class="logo-tag">${SITE.tagline}</span></span>
         </a>
-        <nav class="main-nav" aria-label="Main"><ul>${mainLinks}</ul></nav>
+        <nav class="main-nav" aria-label="Main"><ul>${desktop}</ul></nav>
         <div class="header-actions">
-          <button class="icon-btn search-btn" aria-label="Search herbs and fruits">${icon("search")}</button>
+          <a href="finder.html" class="btn btn-primary btn-small header-cta">What should I take?</a>
+          <button class="icon-btn search-btn" aria-label="Search">${icon("search")}</button>
           <a href="herbs.html?saved=1" class="icon-btn" aria-label="Your saved herbs">${icon("heart")}</a>
         </div>
       </div>
@@ -223,19 +295,21 @@ function renderChrome() {
     <div class="drawer" hidden>
       <div class="drawer-panel">
         <button class="icon-btn drawer-close" aria-label="Close menu">${icon("close")}</button>
-        <ul>${links}</ul>
+        <a href="finder.html" class="btn btn-primary drawer-cta">What should I take?</a>
+        <nav class="drawer-nav" aria-label="Menu">${mobile}</nav>
         <p class="drawer-verse">“${dailyPick(VERSES).text}”</p>
       </div>
     </div>
     <div class="search-overlay" hidden>
       <form class="search-form" action="herbs.html" role="search">
         ${icon("search")}
-        <input type="search" name="q" placeholder="Search herbs &amp; fruits — try “sleep” or “mango”" aria-label="Search herbs and fruits" autocomplete="off">
+        <input type="search" name="q" placeholder="Search herbs, fruits or needs — try “sleep” or “mango”" aria-label="Search" autocomplete="off">
         <button type="button" class="icon-btn search-close" aria-label="Close search">${icon("close")}</button>
       </form>
       <ul class="search-suggest"></ul>
     </div>`;
 
+  const footCol = (m) => `<div><h3>${m.label}</h3><ul>${(m.items || [{ href: m.href, label: "Herbs & fruits of the Bible" }]).filter((i) => !i.small || m.id === "safety").slice(0, 6).map((i) => `<li><a href="${i.href}">${i.label}</a></li>`).join("")}</ul></div>`;
   document.getElementById("site-footer").innerHTML = `
     <section class="newsletter">
       <div class="container newsletter-inner">
@@ -260,18 +334,10 @@ function renderChrome() {
             <a href="#" aria-label="Facebook">${icon("facebook")}</a>
           </div>
         </div>
-        <div>
-          <h3>Explore</h3>
-          <ul>${SITE.nav.map((n) => `<li><a href="${n.href}">${n.label}</a></li>`).join("")}</ul>
-        </div>
-        <div>
-          <h3>Tools</h3>
-          <ul>${SITE.tools.map((t) => `<li><a href="${t.href}">${t.label}</a></li>`).join("")}</ul>
-        </div>
-        <div>
-          <h3>Read</h3>
-          <ul>${ARTICLES.slice(0, 4).map((a) => `<li><a href="journal.html?a=${a.id}">${a.title}</a></li>`).join("")}</ul>
-        </div>
+        ${footCol(menu[0])}
+        <div><h3>Help Me With</h3><ul><li><a href="finder.html">What should I take?</a></li>${TOPIC_GUIDES.slice(0, 4).map((g) => `<li><a href="guides/${g.id}.html">${g.short}</a></li>`).join("")}<li><a href="guides.html">All guides</a></li></ul></div>
+        ${footCol(menu[2])}
+        <div><h3>Learn</h3><ul><li><a href="bible.html">Herbs &amp; fruits of the Bible</a></li>${menu[4].items.map((i) => `<li><a href="${i.href}">${i.label}</a></li>`).join("")}</ul></div>
       </div>
       <div class="container footer-bottom">
         <p>© ${new Date().getFullYear()} Beauty &amp; Praise. All rights reserved.</p>
@@ -281,6 +347,20 @@ function renderChrome() {
         <p class="scripture-copyright">${typeof BIBLE_COPYRIGHT !== "undefined" ? BIBLE_COPYRIGHT : ""}</p>
       </div>
     </footer>`;
+
+  // Desktop dropdowns: open on hover (CSS) or click/keyboard (here).
+  const groups = document.querySelectorAll(".nav-group");
+  const closeAll = (except) => groups.forEach((g) => { if (g !== except) { g.classList.remove("open"); g.querySelector(".nav-top").setAttribute("aria-expanded", "false"); } });
+  groups.forEach((g) => {
+    const btn = g.querySelector(".nav-top");
+    btn.addEventListener("click", () => {
+      const open = !g.classList.contains("open");
+      closeAll(g);
+      g.classList.toggle("open", open);
+      btn.setAttribute("aria-expanded", open);
+    });
+  });
+  document.addEventListener("click", (e) => { if (!e.target.closest(".nav-group")) closeAll(); });
 
   // Mobile drawer
   const drawer = document.querySelector(".drawer");
@@ -307,23 +387,9 @@ function renderChrome() {
   overlay.querySelector(".search-close").addEventListener("click", () => setSearch(false));
   overlay.addEventListener("click", (e) => { if (e.target === overlay) setSearch(false); });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") { setSearch(false); setDrawer(false); }
+    if (e.key === "Escape") { setSearch(false); setDrawer(false); closeAll(); }
   });
-  input.addEventListener("input", () => {
-    const q = input.value.trim().toLowerCase();
-    suggest.innerHTML = "";
-    if (q.length < 2) return;
-    searchHerbs(q).slice(0, 5).forEach((h) => {
-      const li = document.createElement("li");
-      li.innerHTML = `<a href="${herbUrl(h.id)}"><span class="mini-art">${visual(h)}</span><span><strong>${h.name}</strong><em>${h.latin} · Herb</em></span></a>`;
-      suggest.appendChild(li);
-    });
-    if (typeof FRUITS !== "undefined") searchFruits(q).slice(0, 4).forEach((fr) => {
-      const li = document.createElement("li");
-      li.innerHTML = `<a href="${fruitUrl(fr.id)}"><span class="mini-art">${fruitVisual(fr)}</span><span><strong>${fr.name}</strong><em>${fr.latin} · Fruit</em></span></a>`;
-      suggest.appendChild(li);
-    });
-  });
+  attachSearch(input, suggest);
 
   // Newsletter: posts to SITE.newsletterEndpoint when one is set.
   const newsletter = document.querySelector(".newsletter-form");

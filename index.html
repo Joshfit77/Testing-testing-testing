@@ -23,111 +23,61 @@
     <section class="hero">
       <div class="container hero-grid">
         <div class="hero-copy">
-          <p class="eyebrow">Herbs · Wellness · Gratitude</p>
-          <h1>Rooted in creation, <em>growing</em> in wellness.</h1>
-          <p class="lead">Discover the herbs that have comforted people for generations, and the small daily habits that help us flourish — body, mind and spirit.</p>
-          <div class="btn-row">
-            <a href="herbs.html" class="btn btn-primary">Explore the herb library</a>
-            <a href="reminders.html" class="btn btn-outline">Today's reminders</a>
-          </div>
-          <dl class="stats">
-            <div><dt>100</dt><dd>Herb profiles</dd></div>
-            <div><dt>100</dt><dd>Fruit guides</dd></div>
-            <div><dt>14</dt><dd>Herbal stacks</dd></div>
-          </dl>
+          <p class="eyebrow">Herbs · Fruits · Wellness · Gratitude</p>
+          <h1>Natural wellness, <em>made simple.</em></h1>
+          <p class="lead">Find the right herbs and fruits for what you need, see how much to take, and check that they're safe with your medicines — all in one place.</p>
+          <form class="hero-search" role="search" action="herbs.html">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M11 4a7 7 0 1 1 0 14 7 7 0 0 1 0-14zm10 17-5-5"/></svg>
+            <input type="search" name="q" id="hero-search" placeholder="Search — try “sleep”, “ginger” or “blueberry”" aria-label="Search herbs, fruits and guides" autocomplete="off">
+          </form>
+          <ul class="search-suggest hero-suggest" id="hero-suggest"></ul>
         </div>
         <div class="hero-art" id="hero-art"></div>
       </div>
+      <div class="container start-grid">
+        <a class="start-card primary" href="finder.html">
+          <span class="start-num">1</span>
+          <span><strong>What should I take?</strong><em>Answer 6 quick questions and get a personal plan.</em></span>
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+        <a class="start-card" href="interactions.html">
+          <span class="start-num">2</span>
+          <span><strong>Is it safe for me?</strong><em>Check herbs with your medicines, pregnancy and health.</em></span>
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+        <a class="start-card" href="herbs.html">
+          <span class="start-num">3</span>
+          <span><strong>Browse herbs &amp; fruits</strong><em>200 easy guides with benefits and doses.</em></span>
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+      </div>
     </section>
-
-    <div class="marquee" id="marquee" aria-hidden="true"></div>
 
     <section class="section">
       <div class="container">
-        <div class="section-head center">
-          <div><p class="eyebrow">Browse by need</p><h2>Find the right herb for you</h2></div>
-        </div>
-        <div class="category-grid" id="category-grid"></div>
+        <div class="section-head center"><div><p class="eyebrow">Start here</p><h2>What do you need help with?</h2></div></div>
+        <div class="need-grid" id="need-grid"></div>
+        <p class="center need-safety">Pregnant, breastfeeding, caring for a child or over 65? <span id="safety-links"></span></p>
       </div>
     </section>
 
     <section class="section section-tint">
-      <div class="container">
-        <div class="section-head"><div><p class="eyebrow">Guides</p><h2>What do you need help with?</h2></div><a class="text-link" href="guides.html">All guides <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div>
-        <div class="help-chips" id="help-chips"></div>
-      </div>
-    </section>
-
-    <section class="section">
       <div class="container feature" id="feature"></div>
     </section>
 
     <section class="section">
       <div class="container">
         <div class="section-head">
-          <div><p class="eyebrow">Most loved</p><h2>Popular herbs</h2></div>
-          <a class="text-link" href="herbs.html">View all 100 herbs <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+          <div><p class="eyebrow">Most loved</p><h2>Popular herbs &amp; fruits</h2></div>
+          <div class="head-links"><a class="text-link" href="herbs.html">All herbs <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a><a class="text-link" href="fruits.html">All fruits <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div>
         </div>
         <div class="herb-grid" id="popular-grid"></div>
-      </div>
-    </section>
-
-    <section class="section">
-      <div class="container">
-        <div class="section-head">
-          <div><p class="eyebrow">Nature's sweetness</p><h2>From the fruit library</h2></div>
-          <a class="text-link" href="fruits.html">View all 100 fruits <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-        </div>
-        <div class="herb-grid" id="fruit-preview"></div>
-      </div>
-    </section>
-
-    <section class="section section-tint">
-      <div class="container">
-        <div class="section-head">
-          <div><p class="eyebrow">Better together</p><h2>Herbal stacks</h2></div>
-          <a class="text-link" href="stacks.html">See all 14 stacks <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-        </div>
-        <div class="stack-grid" id="stack-grid"></div>
       </div>
     </section>
 
     <section class="verse-band" id="verse-band"></section>
 
     <section class="section">
-      <div class="container">
-        <div class="section-head center"><div><p class="eyebrow">Free tools</p><h2>Use herbs wisely</h2></div></div>
-        <div class="tool-grid">
-          <a class="tool-card" href="interactions.html"><span class="category-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6l-8-3z"/></svg></span><h3>Safety checker</h3><p>Type your medicines, tell us if you're pregnant or breastfeeding, and see what to avoid — in plain language.</p></a>
-          <a class="tool-card" href="finder.html"><span class="category-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 9a3 3 0 1 1 4 2.8c-.6.3-1 .9-1 1.6V14M12 17.5v.5"/><circle cx="12" cy="12" r="9"/></svg></span><h3>What should I take?</h3><p>Six quick questions → a personal plan of herbs, doses, fruits and habits that's safe for your medicines.</p></a>
-          <a class="tool-card" href="bible.html"><span class="category-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2V5zM4 19a2 2 0 0 1 2-2h13"/></svg></span><h3>Herbs of the Bible</h3><p>Hyssop, mustard seed, olive, fig and more — with scripture.</p></a>
-        </div>
-      </div>
-    </section>
-
-    <section class="section">
-      <div class="container">
-        <div class="section-head center">
-          <div><p class="eyebrow">Healthy living</p><h2>Small steps, done daily</h2></div>
-        </div>
-        <div class="promo-grid">
-          <a class="promo-card" href="reminders.html#today">
-            <span class="promo-num">01</span><h3>Daily checklist</h3>
-            <p>Tick off simple habits — water, movement, gratitude, rest — and watch your progress grow.</p>
-          </a>
-          <a class="promo-card" href="reminders.html#today">
-            <span class="promo-num">02</span><h3>Water tracker</h3>
-            <p>A gentle nudge to stay hydrated, one glass at a time.</p>
-          </a>
-          <a class="promo-card" href="reminders.html#rhythm-section">
-            <span class="promo-num">03</span><h3>Daily rhythm</h3>
-            <p>Morning to evening, a simple flow of healthy reminders and herbal teas.</p>
-          </a>
-        </div>
-      </div>
-    </section>
-
-    <section class="section section-tint">
       <div class="container">
         <div class="section-head">
           <div><p class="eyebrow">From the journal</p><h2>Latest articles</h2></div>
