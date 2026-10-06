@@ -169,6 +169,54 @@ function initHerbs() {
   render();
 }
 
+/* ---------------- Dose formatting ---------------- */
+const OZ = 28.3495;
+function sig(n) {
+  if (n >= 100) return Math.round(n).toLocaleString("en-US");
+  if (n >= 10) return String(Math.round(n * 10) / 10);
+  return String(Number(n.toPrecision(2)));
+}
+function range(a, b, unit) {
+  return a === b ? `${sig(a)} ${unit}` : `${sig(a)}–${sig(b)} ${unit}`;
+}
+// Grams → "300 mg · 0.3 g · 0.011 oz"
+function amountUnits(min, max) {
+  return `<span class="u"><b>${range(min * 1000, max * 1000, "mg")}</b></span><span class="u">${range(min, max, "g")}</span><span class="u">${range(min / OZ, max / OZ, "oz")}</span>`;
+}
+
+function doseSection(h, ph) {
+  const rows = ph.dose.map(([form, min, max, freq]) => `
+    <tr>
+      <th scope="row">${form}</th>
+      <td class="units">${typeof min === "string" ? `<span class="u"><b>${min}</b></span>` : amountUnits(min, max)}</td>
+      <td>${freq}</td>
+    </tr>`).join("");
+  return `<section id="dose"><h2>How much to take</h2>
+    ${ph.ext ? `<div class="caution-card ext-card">${icon("shield", "icon info-icon")}<p><strong>For use on the skin only — do not swallow.</strong></p></div>` : ""}
+    <div class="dose-card">
+      <div class="dose-head">
+        <div><p class="eyebrow">Adult dose</p><h3>For adults 100 lb (45 kg) and over</h3></div>
+        <span class="dose-badge">Per serving</span>
+      </div>
+      <div class="table-wrap"><table class="dose-table">
+        <thead><tr><th>How it's taken</th><th>Amount (mg · g · oz)</th><th>How often</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+      ${ph.daily ? `<p class="dose-daily"><span>Usual daily total</span>${amountUnits(ph.daily[0], ph.daily[1])}</p>` : ""}
+      ${ph.limit ? `<p class="dose-limit">${icon("check")}${ph.limit}</p>` : ""}
+    </div>
+    <details class="evidence-key dose-notes"><summary>How to read these amounts</summary>
+      <ul>
+        <li>These are typical adult amounts from traditional herbal references (such as the German Commission E and ESCOP monographs) and the doses used in clinical studies.</li>
+        <li><strong>Herbal doses are not multiplied by body weight.</strong> The same adult dose applies whether you weigh 100 lb or 250 lb — taking more because you weigh more can be unsafe.</li>
+        <li>Not for children or anyone under 100 lb unless a doctor or qualified herbalist advises a child's dose.</li>
+        <li>Start at the low end, take one new herb at a time, and stop if you notice side effects.</li>
+        <li>For reference: 1 teaspoon of dried leaf or flower weighs roughly 1–2 g; 1 teaspoon of seeds or powder roughly 2–3 g; 1 ounce = 28.35 g = 28,350 mg.</li>
+      </ul>
+    </details>
+  </section>`;
+}
+
 /* ---------------- Single herb ---------------- */
 function initHerb() {
   const h = findHerb(params.get("id"));
@@ -190,6 +238,7 @@ function initHerb() {
     .slice(0, 4);
   const saved = favorites.has(h.id);
   const partLabel = h.part[0].toUpperCase() + h.part.slice(1);
+  const ph = PHARM[h.id];
   const inStacks = STACKS.filter((st) => st.herbs.some((x) => x.id === h.id));
 
   main.innerHTML = `
@@ -226,7 +275,10 @@ function initHerb() {
           <p class="eyebrow">On this page</p>
           <ul>
             <li><a href="#overview">Overview</a></li>
+            <li><a href="#body">What it does in your body</a></li>
+            <li><a href="#chemistry">How it works chemically</a></li>
             <li><a href="#benefits">Benefits explained</a></li>
+            <li><a href="#dose">How much to take</a></li>
             <li><a href="#uses">Traditional uses</a></li>
             <li><a href="#prepare">How to prepare</a></li>
             <li><a href="#grow">Growing &amp; harvesting</a></li>
@@ -235,6 +287,18 @@ function initHerb() {
         </aside>
         <article class="prose">
           <section id="overview"><h2>Overview</h2><p>${h.about}</p></section>
+          <section id="body"><h2>What it does in your body</h2>
+            <div class="body-grid">${ph.body.map(([sys, txt]) => `<div class="body-item"><p class="eyebrow">${sys}</p><p>${txt}</p></div>`).join("")}</div>
+          </section>
+          <section id="chemistry"><h2>How it works chemically</h2>
+            <p class="muted">The active compounds in ${h.name.split(" (")[0].toLowerCase()}, what kind of molecule each one is, and what it does in the body.</p>
+            <div class="chem-list">${ph.chem.map(([c, type, how]) => `
+              <div class="chem">
+                <div class="chem-name"><strong>${c}</strong><span>${type}</span></div>
+                <p>${how}</p>
+              </div>`).join("")}
+            </div>
+          </section>
           <section id="benefits"><h2>Benefits explained</h2>
             <p class="muted">What ${h.name.split(" (")[0].toLowerCase()} may do for you, how it works, and how strong the evidence is.</p>
             <div class="benefit-list">${(BENEFITS[h.id] || []).map(([e, t, d]) => `
@@ -247,6 +311,7 @@ function initHerb() {
               <ul>${Object.entries(EVIDENCE).map(([k, v]) => `<li><span class="evidence ev-${k}">${v.label}</span> ${v.note}</li>`).join("")}</ul>
             </details>
           </section>
+          ${doseSection(h, ph)}
           ${inStacks.length ? `<section id="stacks"><h2>Found in these herbal stacks</h2>
             <div class="stack-mini-list">${inStacks.map((st) => `<a class="stack-mini" href="stacks.html?s=${st.id}"><span class="stack-mini-photos">${st.herbs.slice(0, 3).map((x) => `<span class="mini-art">${visual(findHerb(x.id))}</span>`).join("")}</span><span><strong>${st.name}</strong><em>${st.herbs.find((x) => x.id === h.id).role}</em></span></a>`).join("")}</div>
           </section>` : ""}

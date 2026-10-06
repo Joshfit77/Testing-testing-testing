@@ -19,6 +19,7 @@ No build step — open `index.html` in a browser, or publish with GitHub Pages.
 ## Edit content
 - `js/herbs-data.js` — the 100 herbs and the categories
 - `js/herbs-benefits.js` — the "Benefits explained" section for every herb
+- `js/herbs-pharm.js` — what each herb does in the body, its active compounds and how they work, and typical adult doses (shown in mg, g and oz)
 - `js/stacks.js` — the herbal stacks
 - `js/content.js` — reminders, default checklist, verses, daily rhythm, seasons and journal articles
 - `js/layout.js` — site name, navigation, header and footer. Set `SITE.email` to your email address so the contact form works, and replace the `#` social links in the footer with your own profiles.

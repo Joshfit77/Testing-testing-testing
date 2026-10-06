@@ -624,3 +624,52 @@ select.field { cursor: pointer; }
   .stack-herb-photo { width: 72px; height: 72px; }
   .stack-hero-photos { height: 300px; }
 }
+
+/* =========================================================
+   Body systems, chemistry and dosing
+   ========================================================= */
+.body-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.body-item { padding: 20px 22px; border-radius: var(--radius); background: var(--cream); }
+.body-item .eyebrow { margin-bottom: 6px; }
+.body-item p:last-child { margin: 0; font-size: 1rem; }
+.chem-list { display: grid; gap: 0; border-top: 1px solid var(--line); margin-top: 16px; }
+.chem { display: grid; grid-template-columns: 240px 1fr; gap: 24px; padding: 18px 0; border-bottom: 1px solid var(--line); }
+.chem-name strong { display: block; font-family: var(--serif); font-size: 1.3rem; color: var(--forest); line-height: 1.2; }
+.chem-name span { display: inline-block; margin-top: 6px; font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--clay); }
+.chem p { margin: 0; }
+
+.dose-card { border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); padding: 26px 28px; box-shadow: var(--shadow); }
+.dose-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px; }
+.dose-head h3 { margin: 0; font-size: 1.6rem; }
+.dose-head .eyebrow { margin-bottom: 4px; }
+.dose-badge { flex: none; font-size: 0.68rem; letter-spacing: 0.14em; text-transform: uppercase; padding: 6px 12px; border-radius: 999px; background: var(--sage-soft); color: var(--forest); }
+.table-wrap { overflow-x: auto; }
+.dose-table { width: 100%; border-collapse: collapse; font-size: 0.97rem; }
+.dose-table th, .dose-table td { text-align: left; vertical-align: top; padding: 14px 12px 14px 0; border-bottom: 1px solid var(--line); }
+.dose-table thead th { font-size: 0.7rem; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); padding-top: 0; }
+.dose-table tbody th { font-weight: 500; width: 38%; }
+.units .u { display: block; color: var(--muted); white-space: nowrap; }
+.units .u b { color: var(--forest); font-weight: 600; font-size: 1.05rem; }
+.dose-daily { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin: 18px 0 0; padding: 14px 18px; border-radius: 10px; background: var(--cream); }
+.dose-daily > span:first-child { font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--clay); width: 100%; }
+.dose-daily .u { color: var(--muted); }
+.dose-daily .u b { color: var(--forest); font-size: 1.1rem; }
+.dose-limit { display: flex; gap: 10px; margin: 14px 0 0; font-size: 0.95rem; }
+.dose-limit .icon { color: var(--clay); margin-top: 3px; }
+.ext-card { margin-bottom: 16px; padding: 16px 20px; align-items: center; }
+.dose-notes { margin-top: 16px; }
+.dose-notes li { display: list-item; margin-left: 18px; list-style: disc; }
+
+@media (max-width: 900px) {
+  .body-grid { grid-template-columns: 1fr; }
+  .chem { grid-template-columns: 1fr; gap: 6px; }
+}
+@media (max-width: 640px) {
+  .dose-card { padding: 20px 16px; }
+  .dose-head { flex-direction: column; gap: 8px; }
+  .dose-table thead { display: none; }
+  .dose-table, .dose-table tbody, .dose-table tr, .dose-table th, .dose-table td { display: block; width: 100%; }
+  .dose-table tr { padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .dose-table th, .dose-table td { border: none; padding: 2px 0; }
+  .dose-table tbody th { width: 100%; font-weight: 600; }
+}
