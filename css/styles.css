@@ -1312,3 +1312,18 @@ body[data-page="es"] .note-card .btn { margin-top: 6px; color: var(--cream); }
 .footer .logo-mark { width: 76px; height: 76px; }
 @media (max-width: 900px) { .header .logo-mark { width: 52px; height: 52px; } }
 @media (max-width: 400px) { .header .logo-mark { width: 46px; height: 46px; } }
+
+/* Big logo emblem in the homepage hero */
+.hero-emblem { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 500px; max-width: 94%; aspect-ratio: 1; border-radius: 50%; box-shadow: 0 30px 60px rgba(46, 70, 54, 0.18), 0 8px 20px rgba(46, 70, 54, 0.1); animation: emblem-in 0.9s ease-out both; }
+.hero-emblem .logo-mark { width: 100%; height: 100%; display: block; }
+.hero-art .arch-circle.c1 { left: 0; top: 24px; width: 140px; height: 140px; z-index: 2; }
+.hero-art .arch-circle.c2 { right: 0; bottom: 24px; width: 120px; height: 120px; z-index: 2; }
+@keyframes emblem-in { from { opacity: 0; transform: translate(-50%, -46%) scale(0.96); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+@media (max-width: 900px) { .hero-emblem { width: 400px; } }
+@media (max-width: 640px) {
+  .hero-art { height: 360px; }
+  .hero-emblem { width: 330px; }
+  .hero-art .arch-circle.c1 { width: 92px; height: 92px; top: 0; }
+  .hero-art .arch-circle.c2 { width: 84px; height: 84px; bottom: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .hero-emblem { animation: none; } }

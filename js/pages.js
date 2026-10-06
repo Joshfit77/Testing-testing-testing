@@ -73,9 +73,9 @@ function stackCard(st) {
 function initHome() {
   const featured = dailyPick(FOODS), fruit = dailyPick(FRUITS, 11), herb = dailyPick(HERBS);
   $("#hero-art").innerHTML = `
-    <a class="arch arch-main" href="${foodUrl(featured.id)}">${foodVisual(featured, true)}<span class="arch-label">Food of the day · ${featured.name}</span></a>
-    <a class="arch-circle c1" href="${fruitUrl(fruit.id)}" aria-label="${fruit.name}">${fruitVisual(fruit)}</a>
-    <a class="arch-circle c2" href="${herbUrl(herb.id)}" aria-label="${herb.name}">${visual(herb)}</a>`;
+    <div class="hero-emblem" role="img" aria-label="Beauty & Praise — a wooden cross framed by leaves and flowers">${LOGO_MARK}</div>
+    <a class="arch-circle c1" href="${foodUrl(featured.id)}" aria-label="Food of the day: ${featured.name}">${foodVisual(featured)}</a>
+    <a class="arch-circle c2" href="${fruitUrl(fruit.id)}" aria-label="${fruit.name}">${fruitVisual(fruit)}</a>`;
 
   attachSearch($("#hero-search"), $("#hero-suggest"));
 
