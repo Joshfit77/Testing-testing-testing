@@ -264,5 +264,63 @@ const Art = (() => {
     return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Illustration of ${h.name}" preserveAspectRatio="xMidYMid slice">${bg}${art}</svg>`;
   }
 
-  return { herb, shade };
+
+  // ---------- Fruits ----------
+  // A whole fruit plus a cut half, drawn according to the fruit's general shape.
+  function fruitBody(shape, x, y, size, color, r) {
+    const dark = shade(color, -0.35), light = shade(color, 0.35);
+    let out = "";
+    const shine = (cx, cy, rr) => `<ellipse cx="${f(cx - rr * 0.35)}" cy="${f(cy - rr * 0.4)}" rx="${f(rr * 0.22)}" ry="${f(rr * 0.13)}" transform="rotate(-30 ${f(cx - rr * 0.35)} ${f(cy - rr * 0.4)})" fill="#fff" opacity="0.45"/>`;
+    if (shape === "long") {
+      out += `<path d="M${x - size * 1.3} ${y + size * 0.2} Q${x} ${y - size * 1.1} ${x + size * 1.3} ${y - size * 0.4} Q${x + size * 0.2} ${y + size * 0.6} ${x - size * 1.3} ${y + size * 0.2}Z" fill="${color}" stroke="${dark}" stroke-width="1"/>`;
+      out += `<path d="M${x - size * 1.1} ${y + size * 0.05} Q${x} ${y - size * 0.75} ${x + size * 1.1} ${y - size * 0.35}" stroke="${light}" stroke-width="2" fill="none" opacity="0.6"/>`;
+      out += `<path d="M${x + size * 1.3} ${y - size * 0.4} l6 -6" stroke="${shade(color, -0.5)}" stroke-width="3" stroke-linecap="round"/>`;
+    } else if (shape === "pear") {
+      out += `<path d="M${x} ${y - size * 1.1} C${x + size * 0.45} ${y - size * 1.1} ${x + size * 0.4} ${y - size * 0.4} ${x + size * 0.8} ${y + size * 0.1} C${x + size * 1.2} ${y + size * 0.7} ${x + size * 0.8} ${y + size * 1.1} ${x} ${y + size * 1.1} C${x - size * 0.8} ${y + size * 1.1} ${x - size * 1.2} ${y + size * 0.7} ${x - size * 0.8} ${y + size * 0.1} C${x - size * 0.4} ${y - size * 0.4} ${x - size * 0.45} ${y - size * 1.1} ${x} ${y - size * 1.1}Z" fill="${color}" stroke="${dark}" stroke-width="1"/>`;
+      out += shine(x, y + size * 0.4, size * 0.9);
+    } else if (shape === "melon") {
+      out += `<ellipse cx="${x}" cy="${y}" rx="${f(size * 1.25)}" ry="${f(size)}" fill="${color}" stroke="${dark}" stroke-width="1"/>`;
+      for (let i = -2; i <= 2; i++) out += `<path d="M${x + i * size * 0.4} ${f(y - size * 0.97)} Q${f(x + i * size * 0.62)} ${y} ${x + i * size * 0.4} ${f(y + size * 0.97)}" stroke="${dark}" stroke-width="1.2" fill="none" opacity="0.45"/>`;
+      out += shine(x, y, size);
+    } else {
+      out += `<circle cx="${x}" cy="${y}" r="${size}" fill="${color}" stroke="${dark}" stroke-width="1"/>`;
+      if (shape === "citrus") for (let i = 0; i < 26; i++) { const a = r() * Math.PI * 2, d = r() * size * 0.85; out += `<circle cx="${f(x + Math.cos(a) * d)}" cy="${f(y + Math.sin(a) * d)}" r="0.9" fill="${dark}" opacity="0.35"/>`; }
+      if (shape === "spiky") for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2; out += `<path d="M${f(x + Math.cos(a) * size * 0.92)} ${f(y + Math.sin(a) * size * 0.92)} L${f(x + Math.cos(a) * size * 1.18)} ${f(y + Math.sin(a) * size * 1.18)}" stroke="${dark}" stroke-width="2.2" stroke-linecap="round"/>`; }
+      if (shape === "spiky") for (let i = 0; i < 18; i++) { const a = r() * Math.PI * 2, d = r() * size * 0.75; out += `<path d="M${f(x + Math.cos(a) * d)} ${f(y + Math.sin(a) * d - 2)} l2 3 l-4 0z" fill="${dark}" opacity="0.4"/>`; }
+      out += shine(x, y, size);
+      out += `<path d="M${x} ${y - size} q2 -8 -2 -12" stroke="#6b4a2a" stroke-width="2.5" fill="none" stroke-linecap="round"/>`;
+    }
+    return out;
+  }
+
+  function fruitHalf(shape, x, y, size, color) {
+    const flesh = shape === "citrus" || shape === "melon" || shape === "berry" ? shade(color, 0.25) : shade(color, 0.55);
+    let out = `<circle cx="${x}" cy="${y}" r="${size}" fill="${color}" stroke="${shade(color, -0.35)}" stroke-width="1"/>`;
+    out += `<circle cx="${x}" cy="${y}" r="${f(size * 0.86)}" fill="${flesh}"/>`;
+    if (shape === "citrus") {
+      for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI * 2; out += `<line x1="${x}" y1="${y}" x2="${f(x + Math.cos(a) * size * 0.84)}" y2="${f(y + Math.sin(a) * size * 0.84)}" stroke="#fff" stroke-width="1.2" opacity="0.7"/>`; }
+      out += `<circle cx="${x}" cy="${y}" r="${f(size * 0.12)}" fill="#fff" opacity="0.7"/>`;
+    } else {
+      for (let i = 0; i < 7; i++) { const a = (i / 7) * Math.PI * 2; out += `<ellipse cx="${f(x + Math.cos(a) * size * 0.35)}" cy="${f(y + Math.sin(a) * size * 0.35)}" rx="2.2" ry="3.6" transform="rotate(${f(a * 57.3 + 90)} ${f(x + Math.cos(a) * size * 0.35)} ${f(y + Math.sin(a) * size * 0.35)})" fill="${shade(color, -0.55)}" opacity="0.75"/>`; }
+    }
+    return out;
+  }
+
+  function fruit(fr, opts = {}) {
+    const r = rng(hash("fruit-" + fr.id));
+    const bg = opts.bare ? "" : `<rect width="200" height="200" fill="${shade(fr.color, 0.86)}"/><circle cx="100" cy="104" r="78" fill="${shade(fr.color, 0.76)}"/>`;
+    let art = "";
+    if (fr.shape === "berry") {
+      // Reuse the berry-branch drawing used for herbs.
+      art = drawBerry({ color: fr.color, id: fr.id }, r);
+    } else {
+      art += leaf(118, 62, 40, 46, 18, FOLIAGE) + leaf(112, 64, -10, 36, 14, shade(FOLIAGE, 0.1));
+      art += fruitBody(fr.shape, 92, 108, fr.shape === "melon" ? 46 : 40, fr.color, r);
+      if (fr.shape !== "long") art += fruitHalf(fr.shape, 142, 148, 26, fr.color);
+      else art += fruitBody("long", 120, 150, 22, shade(fr.color, 0.1), r);
+    }
+    return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Illustration of ${fr.name}" preserveAspectRatio="xMidYMid slice">${bg}${art}</svg>`;
+  }
+
+  return { herb, fruit, shade };
 })();

@@ -702,3 +702,142 @@ select.field { cursor: pointer; }
   .prose .glance { padding: 22px 20px; }
   .prose .glance-text { font-size: 1.2rem; }
 }
+
+/* =========================================================
+   Fruits, interaction checker, quiz, Bible page, legal, print
+   ========================================================= */
+.nutrient-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.nutrient { padding: 8px 16px; border-radius: 999px; background: var(--sage-soft); color: var(--forest); font-size: 0.92rem; }
+.quick-doses.one { grid-template-columns: 1fr; max-width: 520px; }
+
+/* Interaction lists */
+.ix-title { font-size: 1.4rem; margin: 28px 0 12px; }
+.ix-list { list-style: none; padding: 0; margin: 0 0 16px; display: grid; gap: 8px; }
+.ix-list li { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: 10px; background: var(--white); border: 1px solid var(--line); font-size: 0.96rem; }
+.ix-badge { flex: none; font-size: 0.66rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; padding: 4px 9px; border-radius: 999px; margin-top: 2px; }
+.ix-avoid .ix-badge, .ix-verdict.ix-avoid { background: #f6dcd6; color: #9b2f1d; }
+.ix-caution .ix-badge, .ix-verdict.ix-caution, .ix-caution-badge { background: #f6ead0; color: #7a5a1a; }
+.ix-verdict.ix-ok { background: var(--sage-soft); color: var(--forest); }
+.ix-list li.ix-avoid { border-left: 3px solid #c0533c; }
+.ix-list li.ix-caution { border-left: 3px solid #c9a24a; }
+.ix-layout { display: grid; grid-template-columns: 1.3fr 1fr; gap: 24px; align-items: start; }
+.ix-form { display: grid; gap: 24px; }
+.ix-form h2, .ix-side h2, .quiz h2 { font-size: 1.7rem; }
+.ix-options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ix-option { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
+.ix-option:hover { border-color: var(--sage); }
+.ix-option:has(input:checked) { background: var(--sage-soft); border-color: var(--forest); }
+.ix-option input { accent-color: var(--forest); width: 18px; height: 18px; margin-top: 3px; flex: none; }
+.ix-option strong { display: block; font-weight: 500; }
+.ix-option em { display: block; font-style: normal; font-size: 0.8rem; color: var(--muted); line-height: 1.4; margin-top: 2px; }
+.ix-sticky { position: sticky; top: 110px; max-height: calc(100vh - 130px); overflow-y: auto; }
+.ix-item-label { display: grid; gap: 8px; font-size: 0.78rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 18px; }
+.ix-item-label .field { text-transform: none; letter-spacing: normal; }
+.ix-empty { display: flex; gap: 14px; padding: 18px; border-radius: 10px; background: var(--cream); }
+.ix-empty p { margin: 0; }
+.ix-verdict { padding: 18px 20px; border-radius: 12px; margin-bottom: 14px; }
+.ix-verdict .eyebrow { margin-bottom: 4px; color: inherit; opacity: 0.8; }
+.ix-verdict h3 { margin: 0; font-size: 1.4rem; color: inherit; }
+.ix-group { padding: 16px 0; border-bottom: 1px solid var(--line); }
+.ix-group h3 { font-size: 1.35rem; margin-bottom: 8px; }
+.ix-head { margin: 10px 0 6px; }
+.ix-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ix-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--white); font-size: 0.88rem; text-decoration: none; }
+.ix-chip:hover { border-color: var(--sage); }
+.ix-chip .icon { width: 14px; height: 14px; }
+
+/* Buying tips */
+.buy-card { padding: 24px 26px; border-radius: var(--radius); border: 1px dashed var(--sage); background: var(--white); }
+.buy-card h3 { font-size: 1.5rem; }
+.buy-card .check-list { margin-bottom: 12px; }
+
+/* Stack shopping list */
+.shopping-list { list-style: none; padding: 0; margin: 0 0 1.4em; }
+.shopping-list li { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.shopping-list label { display: flex; gap: 10px; align-items: baseline; cursor: pointer; }
+.shopping-list input { accent-color: var(--forest); width: 18px; height: 18px; }
+.shopping-list em { color: var(--muted); }
+.print-btn { margin-top: 18px; }
+.print-only { display: none; }
+
+/* Quiz */
+.quiz { display: grid; gap: 24px; }
+.quiz-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.quiz-card input { position: absolute; opacity: 0; pointer-events: none; }
+.quiz-card span { display: flex; align-items: center; gap: 10px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; transition: border-color 0.2s, background 0.2s; height: 100%; }
+.quiz-card span .icon { color: var(--clay); }
+.quiz-card input:checked + span { background: var(--forest); border-color: var(--forest); color: var(--cream); }
+.quiz-card input:checked + span .icon { color: #e7c9a5; }
+.quiz-card input:focus-visible + span { outline: 2px solid var(--clay); outline-offset: 2px; }
+.quiz-sub { font-size: 1.4rem; margin: 28px 0 14px; }
+.quiz-results { margin-top: 56px; }
+
+/* Bible */
+.bible-list { display: grid; gap: 24px; max-width: 980px; }
+.bible-card { display: grid; grid-template-columns: 220px 1fr; gap: 28px; padding: 22px; border-radius: var(--radius); background: var(--white); border: 1px solid var(--line); }
+.bible-art { display: block; border-radius: 12px; overflow: hidden; aspect-ratio: 1; }
+.bible-art-plain { display: grid; place-items: center; background: var(--cream); color: var(--clay); }
+.bible-art-plain .icon { width: 48px; height: 48px; }
+.bible-body h3 { font-size: 1.8rem; margin-bottom: 10px; }
+.bible-body blockquote { margin: 0 0 12px; font-family: var(--serif); font-style: italic; font-size: 1.3rem; line-height: 1.45; color: var(--forest); }
+.bible-links { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* Tools on home page */
+.tool-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.tool-card { display: block; padding: 32px 28px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--white); text-decoration: none; transition: transform 0.25s, box-shadow 0.25s; }
+.tool-card:hover { transform: translateY(-4px); box-shadow: var(--shadow); }
+.tool-card .category-icon { margin-bottom: 14px; }
+.tool-card p { color: var(--muted); margin: 0; }
+
+/* Legal pages */
+.legal h2 { font-size: 1.8rem; margin-top: 1.4em; }
+.legal ul { padding-left: 20px; }
+.legal li { margin-bottom: 8px; }
+.legal-links a { text-decoration: underline; text-underline-offset: 3px; }
+
+/* Header with more menu items */
+@media (max-width: 1420px) {
+  .main-nav ul { gap: 20px; }
+  .main-nav a { font-size: 0.74rem; letter-spacing: 0.12em; }
+  .logo-tag { display: none; }
+}
+@media (max-width: 1080px) {
+  .ix-layout { grid-template-columns: 1fr; }
+  .ix-sticky { position: static; max-height: none; }
+  .quiz-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 900px) {
+  .tool-grid { grid-template-columns: 1fr; }
+  .bible-card { grid-template-columns: 140px 1fr; gap: 18px; }
+}
+@media (max-width: 640px) {
+  .ix-options { grid-template-columns: 1fr; }
+  .quiz-grid { grid-template-columns: 1fr 1fr; }
+  .bible-card { grid-template-columns: 1fr; }
+  .bible-art { max-width: 220px; }
+}
+
+/* Print: recipe cards and guides */
+@media print {
+  .stack-hero-photos, .print-btn, .ix-title, .ix-list, #stacks-main .section-tint, .text-link, #buying { display: none !important; }
+  .print-only { display: block; }
+  .stack-hero { background: none; padding: 0 0 8px; }
+  .stack-hero h1 { font-size: 2.2rem; }
+  .prose h2 { font-size: 1.4rem; margin-top: 1em; }
+  .stack-herb { break-inside: avoid; border: none; padding: 4px 0; }
+  .stack-herb-photo { display: none; }
+  .steps li { break-inside: avoid; }
+  body { font-size: 12pt; }
+}
+.ix-layout > *, .ix-form > * { min-width: 0; }
+.ix-item-label .field { width: 100%; min-width: 0; }
+.main-nav a { white-space: nowrap; }
+@media (max-width: 1180px) {
+  .main-nav ul { gap: 14px; }
+  .main-nav a { font-size: 0.7rem; letter-spacing: 0.08em; }
+}
+@media (max-width: 1000px) {
+  .menu-btn { display: inline-grid; }
+  .main-nav { display: none; }
+  .logo { margin: 0 auto; }
+}

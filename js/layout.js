@@ -3,17 +3,59 @@
 const SITE = {
   name: "Beauty & Praise",
   tagline: "Herbs · Wellness · Gratitude",
-  // Change this to your real email address so the contact form reaches you.
+  // Change this to your real email address so the contact form can fall back to email.
   email: "",
+  // Free form services (see README): paste your endpoints here to make the forms work.
+  //   contactEndpoint:    a Formspree form URL, e.g. "https://formspree.io/f/abcdwxyz"
+  //   newsletterEndpoint: a Formspree form URL or your newsletter provider's embed form URL
+  contactEndpoint: "",
+  newsletterEndpoint: "",
+  // Affiliate or shop links shown on herb pages, keyed by herb id, e.g. { ashwagandha: "https://..." }
+  shop: {},
   nav: [
-    { href: "index.html", label: "Home", page: "home" },
-    { href: "herbs.html", label: "Herb Library", page: "herbs" },
-    { href: "stacks.html", label: "Herbal Stacks", page: "stacks" },
+    { href: "index.html", label: "Home", page: "home", drawerOnly: true },
+    { href: "herbs.html", label: "Herbs", page: "herbs" },
+    { href: "fruits.html", label: "Fruits", page: "fruits" },
+    { href: "stacks.html", label: "Stacks", page: "stacks" },
+    { href: "interactions.html", label: "Interactions", page: "interactions" },
     { href: "reminders.html", label: "Healthy Living", page: "living" },
     { href: "journal.html", label: "Journal", page: "journal" },
     { href: "about.html", label: "About", page: "about" }
+  ],
+  tools: [
+    { href: "interactions.html", label: "Herb & medicine interaction checker" },
+    { href: "quiz.html", label: "Find my herb quiz" },
+    { href: "bible.html", label: "Herbs & fruits of the Bible" },
+    { href: "stacks.html", label: "Herbal stacks & recipe cards" },
+    { href: "fruits.html", label: "Fruit library" }
   ]
 };
+
+// Page addresses for individual herbs and fruits (one real page each, built by scripts/build.js).
+const herbUrl = (id) => `herbs/${id}.html`;
+const fruitUrl = (id) => `fruits/${id}.html`;
+
+// Herb and fruit pages live in subfolders and use <base href="../">, so in-page "#section" links
+// would otherwise jump to the home page. Scroll to the section instead.
+document.addEventListener("click", (e) => {
+  const a = e.target.closest('a[href^="#"]');
+  if (!a || a.getAttribute("href").length < 2) return;
+  const target = document.getElementById(a.getAttribute("href").slice(1));
+  if (!target) return;
+  e.preventDefault();
+  target.scrollIntoView({ behavior: "smooth", block: "start" });
+  history.replaceState(null, "", location.pathname + location.search + a.getAttribute("href"));
+});
+
+// Send a form to a form service. Resolves true when it was accepted.
+async function postForm(endpoint, data) {
+  try {
+    const res = await fetch(endpoint, { method: "POST", body: data, headers: { Accept: "application/json" } });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
 
 // localStorage can be unavailable (private mode, blocked storage), so wrap it.
 const store = {
@@ -102,7 +144,7 @@ const LOGO_MARK = `<svg class="logo-mark" viewBox="0 0 64 64" aria-hidden="true"
 function herbCard(h) {
   const saved = favorites.has(h.id);
   return `<article class="herb-card">
-    <a href="herb.html?id=${h.id}" class="herb-card-link" aria-label="${h.name}">
+    <a href="${herbUrl(h.id)}" class="herb-card-link" aria-label="${h.name}">
       <div class="herb-card-art">${visual(h)}</div>
       <div class="herb-card-body">
         <p class="herb-card-cat">${CATEGORIES[h.cats[0]]}</p>
@@ -149,13 +191,15 @@ function formatDate(iso) {
 
 function renderChrome() {
   const page = document.body.dataset.page;
+  const navItem = (n) => `<li><a href="${n.href}"${n.page === page ? ' aria-current="page"' : ""}>${n.label}</a></li>`;
+  const mainLinks = SITE.nav.filter((n) => !n.drawerOnly).map(navItem).join("");
   const links = SITE.nav
     .map((n) => `<li><a href="${n.href}"${n.page === page ? ' aria-current="page"' : ""}>${n.label}</a></li>`)
     .join("");
 
   document.getElementById("site-header").innerHTML = `
     <div class="announce">
-      <p>Now featuring <a href="herbs.html">100 detailed herb profiles</a> — new journal articles every month</p>
+      <p>Now featuring <a href="herbs.html">100 herb profiles</a> &amp; <a href="fruits.html">100 fruit guides</a> — plus a free <a href="interactions.html">interaction checker</a></p>
     </div>
     <header class="header">
       <div class="container header-inner">
@@ -164,9 +208,9 @@ function renderChrome() {
           ${LOGO_MARK}
           <span class="logo-text"><span class="logo-name">Beauty <em>&amp;</em> Praise</span><span class="logo-tag">${SITE.tagline}</span></span>
         </a>
-        <nav class="main-nav" aria-label="Main"><ul>${links}</ul></nav>
+        <nav class="main-nav" aria-label="Main"><ul>${mainLinks}</ul></nav>
         <div class="header-actions">
-          <button class="icon-btn search-btn" aria-label="Search herbs">${icon("search")}</button>
+          <button class="icon-btn search-btn" aria-label="Search herbs and fruits">${icon("search")}</button>
           <a href="herbs.html?saved=1" class="icon-btn" aria-label="Your saved herbs">${icon("heart")}</a>
         </div>
       </div>
@@ -181,7 +225,7 @@ function renderChrome() {
     <div class="search-overlay" hidden>
       <form class="search-form" action="herbs.html" role="search">
         ${icon("search")}
-        <input type="search" name="q" placeholder="Search 100 herbs — try “sleep” or “ginger”" aria-label="Search herbs" autocomplete="off">
+        <input type="search" name="q" placeholder="Search herbs &amp; fruits — try “sleep” or “mango”" aria-label="Search herbs and fruits" autocomplete="off">
         <button type="button" class="icon-btn search-close" aria-label="Close search">${icon("close")}</button>
       </form>
       <ul class="search-suggest"></ul>
@@ -216,8 +260,8 @@ function renderChrome() {
           <ul>${SITE.nav.map((n) => `<li><a href="${n.href}">${n.label}</a></li>`).join("")}</ul>
         </div>
         <div>
-          <h3>Browse herbs</h3>
-          <ul>${["calming", "sleep", "digestion", "immunity", "skin", "kitchen"].map((c) => `<li><a href="herbs.html?cat=${c}">${CATEGORIES[c]}</a></li>`).join("")}</ul>
+          <h3>Tools</h3>
+          <ul>${SITE.tools.map((t) => `<li><a href="${t.href}">${t.label}</a></li>`).join("")}</ul>
         </div>
         <div>
           <h3>Read</h3>
@@ -226,7 +270,8 @@ function renderChrome() {
       </div>
       <div class="container footer-bottom">
         <p>© ${new Date().getFullYear()} Beauty &amp; Praise. All rights reserved.</p>
-        <p>Herb photographs from <a href="https://commons.wikimedia.org" target="_blank" rel="noopener">Wikimedia Commons</a> contributors — credits on each herb page.</p>
+        <p class="legal-links"><a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · <a href="disclaimer.html">Medical disclaimer</a></p>
+        <p>Herb and fruit photographs from <a href="https://commons.wikimedia.org" target="_blank" rel="noopener">Wikimedia Commons</a> contributors — credits on each page.</p>
         <p>For education only — not medical advice. Always consult your healthcare provider.</p>
       </div>
     </footer>`;
@@ -262,19 +307,41 @@ function renderChrome() {
     const q = input.value.trim().toLowerCase();
     suggest.innerHTML = "";
     if (q.length < 2) return;
-    searchHerbs(q).slice(0, 6).forEach((h) => {
+    searchHerbs(q).slice(0, 5).forEach((h) => {
       const li = document.createElement("li");
-      li.innerHTML = `<a href="herb.html?id=${h.id}"><span class="mini-art">${visual(h)}</span><span><strong>${h.name}</strong><em>${h.latin}</em></span></a>`;
+      li.innerHTML = `<a href="${herbUrl(h.id)}"><span class="mini-art">${visual(h)}</span><span><strong>${h.name}</strong><em>${h.latin} · Herb</em></span></a>`;
+      suggest.appendChild(li);
+    });
+    if (typeof FRUITS !== "undefined") searchFruits(q).slice(0, 4).forEach((fr) => {
+      const li = document.createElement("li");
+      li.innerHTML = `<a href="${fruitUrl(fr.id)}"><span class="mini-art">${fruitVisual(fr)}</span><span><strong>${fr.name}</strong><em>${fr.latin} · Fruit</em></span></a>`;
       suggest.appendChild(li);
     });
   });
 
-  // Newsletter (no mailing service connected yet)
-  document.querySelector(".newsletter-form").addEventListener("submit", (e) => {
+  // Newsletter: posts to SITE.newsletterEndpoint when one is set.
+  const newsletter = document.querySelector(".newsletter-form");
+  newsletter.querySelector("input").name = "email";
+  newsletter.addEventListener("submit", async (e) => {
     e.preventDefault();
-    e.target.reset();
-    toast("Thank you! Our newsletter is launching soon.");
+    if (!SITE.newsletterEndpoint) {
+      toast("Thank you! Our newsletter is launching soon.");
+      newsletter.reset();
+      return;
+    }
+    const ok = await postForm(SITE.newsletterEndpoint, new FormData(newsletter));
+    toast(ok ? "You're subscribed — welcome to the Beauty & Praise Letter!" : "Sorry, something went wrong. Please try again.");
+    if (ok) newsletter.reset();
   });
+}
+
+function searchFruits(q) {
+  q = q.toLowerCase();
+  const catHits = Object.entries(CATEGORIES).filter(([, label]) => label.toLowerCase().includes(q)).map(([k]) => k);
+  return FRUITS.filter((fr) =>
+    [fr.name, fr.latin, fr.summary, fr.nutrients.join(" ")].join(" ").toLowerCase().includes(q) ||
+    fr.cats.some((c) => catHits.includes(c))
+  ).sort((a, b) => (b.name.toLowerCase().startsWith(q) ? 1 : 0) - (a.name.toLowerCase().startsWith(q) ? 1 : 0));
 }
 
 function searchHerbs(q) {

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Herb &amp; Medicine Interaction Checker — Beauty &amp; Praise</title>
+  <meta name="description" content="Check which herbs and fruits to avoid or use with caution with your medicines and health conditions.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Beauty &amp; Praise">
+  <meta property="og:title" content="Herb &amp; Medicine Interaction Checker — Beauty &amp; Praise">
+  <meta property="og:description" content="Check which herbs and fruits to avoid or use with caution with your medicines and health conditions.">
+  <meta property="og:image" content="images/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" type="image/svg+xml" href="images/logo-mark.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body data-page="interactions">
+  <div id="site-header"></div>
+  <main>
+    <section class="page-hero">
+      <div class="container">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span aria-current="page">Interaction Checker</span></nav>
+        <h1>Herb &amp; Medicine Interaction Checker</h1>
+        <p class="lead">Herbs and some fruits can change how medicines work. Tick what applies to you to see which herbs, fruits and stacks to avoid or use with caution.</p>
+      </div>
+    </section>
+
+    <section class="section section-top-tight">
+      <div class="container ix-layout">
+        <div class="ix-form">
+          <div class="card">
+            <h2>1. Medicines you take</h2>
+            <div class="ix-options" id="ix-meds"></div>
+          </div>
+          <div class="card">
+            <h2>2. Health situations</h2>
+            <div class="ix-options" id="ix-conds"></div>
+          </div>
+        </div>
+        <div class="ix-side">
+          <div class="card ix-sticky">
+            <h2>3. Your results</h2>
+            <label class="ix-item-label">Check a specific herb, fruit or stack
+              <select id="ix-item" class="field"></select>
+            </label>
+            <div id="ix-results" aria-live="polite"></div>
+            <button class="text-btn" id="ix-clear">Clear all</button>
+            <p class="small muted">Your choices are saved only in this browser. This checker covers common interactions but not every medicine — always ask your pharmacist.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <div id="site-footer"></div>
+  <script src="js/herbs-data.js"></script>
+  <script src="js/herbs-summary.js"></script>
+  <script src="js/herbs-benefits.js"></script>
+  <script src="js/herbs-pharm.js"></script>
+  <script src="js/herbs-caps.js"></script>
+  <script src="js/fruits-data.js"></script>
+  <script src="js/stacks.js"></script>
+  <script src="js/interactions.js"></script>
+  <script src="js/bible.js"></script>
+  <script src="js/content.js"></script>
+  <script src="js/art.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/photos.js"></script>
+  <script src="js/pages.js"></script>
+</body>
+</html>

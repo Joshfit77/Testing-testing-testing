@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Find My Herb Quiz — Beauty &amp; Praise</title>
+  <meta name="description" content="Answer a few questions to find herbs, herbal stacks and fruits that suit your goal and health situation.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Beauty &amp; Praise">
+  <meta property="og:title" content="Find My Herb Quiz — Beauty &amp; Praise">
+  <meta property="og:description" content="Answer a few questions to find herbs, herbal stacks and fruits that suit your goal and health situation.">
+  <meta property="og:image" content="images/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" type="image/svg+xml" href="images/logo-mark.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body data-page="quiz">
+  <div id="site-header"></div>
+  <main>
+    <section class="page-hero">
+      <div class="container">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span aria-current="page">Find My Herb</span></nav>
+        <h1>Find My Herb</h1>
+        <p class="lead">Answer three quick questions and we'll suggest herbs, stacks and fruits that suit your goal — and leave out any that don't fit your health situation.</p>
+      </div>
+    </section>
+
+    <section class="section section-top-tight">
+      <div class="container">
+        <form id="quiz-form" class="quiz">
+          <div class="card">
+            <h2>1. What would you like help with?</h2>
+            <div class="quiz-grid" id="quiz-goals"></div>
+          </div>
+          <div class="card">
+            <h2>2. How do you like to take herbs?</h2>
+            <div class="quiz-grid quiz-forms">
+              <label class="quiz-card"><input type="radio" name="form" value="any" checked><span>Any way</span></label>
+              <label class="quiz-card"><input type="radio" name="form" value="tea"><span>As a tea</span></label>
+              <label class="quiz-card"><input type="radio" name="form" value="capsule"><span>Capsules</span></label>
+              <label class="quiz-card"><input type="radio" name="form" value="food"><span>In my cooking</span></label>
+            </div>
+          </div>
+          <div class="card">
+            <h2>3. Does anything apply to you?</h2>
+            <p class="muted">We'll leave out herbs that aren't a good fit. Skip this if nothing applies.</p>
+            <h3 class="quiz-sub">Health situations</h3>
+            <div class="ix-options" id="quiz-situations"></div>
+            <h3 class="quiz-sub">Medicines</h3>
+            <div class="ix-options" id="quiz-meds"></div>
+          </div>
+          <div class="center"><button class="btn btn-primary" type="submit">Show my results</button></div>
+        </form>
+        <div id="quiz-results" class="quiz-results" hidden></div>
+      </div>
+    </section>
+  </main>
+  <div id="site-footer"></div>
+  <script src="js/herbs-data.js"></script>
+  <script src="js/herbs-summary.js"></script>
+  <script src="js/herbs-benefits.js"></script>
+  <script src="js/herbs-pharm.js"></script>
+  <script src="js/herbs-caps.js"></script>
+  <script src="js/fruits-data.js"></script>
+  <script src="js/stacks.js"></script>
+  <script src="js/interactions.js"></script>
+  <script src="js/bible.js"></script>
+  <script src="js/content.js"></script>
+  <script src="js/art.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/photos.js"></script>
+  <script src="js/pages.js"></script>
+</body>
+</html>
