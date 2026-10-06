@@ -103,5 +103,12 @@ const CAPS = {
   violet: { cap: "Not commonly sold as capsules — use the leaves and flowers as tea.", herb: [1, 2, "Dried leaf and flower steeped as tea (per cup)", "Up to 3 times a day"] },
   "rose-hips": { cap: [2250, 2500, "Rose hip powder (usually 3–4 capsules)", "2 times a day"], herb: [2.5, 5, "Rose hip powder in food or water", "1–2 times a day"] },
   "black-seed": { cap: [500, 1500, "Black seed oil softgels", "1–2 times a day"], herb: [1, 2, "Ground seeds in food", "1–2 times a day"] },
-  neem: { cap: "Never swallow neem oil. Neem leaf capsules should only be used with medical guidance.", herb: null }
+  neem: { cap: "Never swallow neem oil. Neem leaf capsules should only be used with medical guidance.", herb: null },
+  "tongkat-ali": { cap: [200, 400, "Standardized root water extract", "Once a day, in the morning"], herb: ["Usually taken as extract", null, "The raw root is very bitter and hard to dose — use a tested extract", ""] },
+  "shilajit": { cap: [250, 250, "Purified shilajit extract", "Twice a day, with food"], herb: [0.3, 0.5, "Purified resin (about a pea-sized piece) dissolved in warm water", "Once a day"] },
+  "mucuna": { cap: [300, 500, "Standardized seed extract (15% L-dopa)", "1–2 times a day, with food"], herb: [2.5, 5, "Powdered seeds stirred into milk or a smoothie", "Once a day, with food"] },
+  "tribulus": { cap: [250, 750, "Standardized fruit extract", "1–2 times a day, with food"], herb: [3, 6, "Dried fruit simmered as tea (Chinese medicine style)", "Once a day"] },
+  "maca": { cap: [1500, 3000, "Gelatinized maca root", "Once a day (usually 3–6 capsules)"], herb: [3, 5, "Gelatinized powder in smoothies, oatmeal or coffee", "Once a day"] },
+  "horny-goat-weed": { cap: [250, 500, "Extract standardized to 10–20% icariin", "Once or twice a day"], herb: [3, 6, "Dried leaf simmered as tea", "Once a day"] },
+  "cordyceps": { cap: [1000, 3000, "Cordyceps extract (Cs-4 or C. militaris)", "Once a day, or split morning and midday"], herb: [3, 6, "Dried fruiting bodies simmered in soup or tea", "Once a day"] }
 };

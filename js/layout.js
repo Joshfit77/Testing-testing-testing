@@ -199,7 +199,7 @@ function formatDate(iso) {
 function siteMenu() {
   return [
     { id: "browse", label: "Herbs & Fruits", items: [
-      { href: "herbs.html", label: "Herb Library", desc: "100 herbs from A to Z" },
+      { href: "herbs.html", label: "Herb Library", desc: `${HERBS.length} herbs from A to Z` },
       { href: "fruits.html", label: "Fruit Library", desc: "100 fruits and what they do" },
       { href: "stacks.html", label: "Herbal Stacks", desc: "Herbs that work well together" }
     ] },

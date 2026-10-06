@@ -60,6 +60,6 @@ const DRUGS = [
   // Other liver-processed medicines
   ["carbamazepine", ["liver-processed"], "Tegretol"], ["phenytoin", ["liver-processed"], "Dilantin"], ["lamotrigine", ["liver-processed"], "Lamictal"],
   ["valproate", ["liver-processed"], "Depakote"], ["HIV medicines", ["liver-processed"], "Biktarvy, Genvoya, Triumeq, Descovy"],
-  ["sildenafil", ["liver-processed"], "Viagra"], ["tadalafil", ["liver-processed"], "Cialis"], ["omeprazole", ["liver-processed"], "Prilosec"],
+  ["nitroglycerin", ["heart"], "Nitrostat"], ["isosorbide mononitrate", ["heart"], "Imdur"], ["sildenafil", ["liver-processed"], "Viagra"], ["tadalafil", ["liver-processed"], "Cialis"], ["omeprazole", ["liver-processed"], "Prilosec"],
   ["cancer treatment (chemotherapy)", ["liver-processed", "immunosuppressants"], ""]
 ];

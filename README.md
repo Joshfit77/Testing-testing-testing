@@ -6,7 +6,7 @@ A website about herbs, fruits and healthy reminders.
 | Page | File | What's on it |
 |---|---|---|
 | Home | `index.html` | Hero, categories, herb of the day, popular herbs, fruits, stacks, verse, tools, articles |
-| Herb Library | `herbs.html` | All 100 herbs with search, filters, A–Z, saved herbs |
+| Herb Library | `herbs.html` | All 107 herbs with search, filters, A–Z, saved herbs |
 | Herb pages | `herbs/<id>.html` | One page per herb: benefits at a glance, body effects, chemistry, benefits explained, capsule & herb doses, uses, preparation, growing, safety, medicine interactions, buying tips |
 | Fruit Library | `fruits.html` | All 100 fruits with search, benefit, season and A–Z filters |
 | Fruit pages | `fruits/<id>.html` | One page per fruit: what it does, nutrients, benefits, how to use, serving size, choosing & storing, safety, interactions |
@@ -52,7 +52,7 @@ Add links to `SITE.shop` in `js/layout.js`, keyed by herb id, e.g. `{ ashwagandh
 If you sell products or use affiliate links, keep claims educational: in the U.S., herbs and supplements can't be marketed as diagnosing, treating, curing or preventing a disease, and supplement marketing should carry the FDA disclaimer statement. The privacy policy already mentions affiliate links.
 
 ## Edit content
-- `js/herbs-data.js` — the 100 herbs and the categories
+- `js/herbs-data.js` — the 107 herbs and the categories
 - `js/herbs-summary.js` — the 5-sentence "Benefits at a glance" for every herb
 - `js/herbs-benefits.js` — the "Benefits explained" section for every herb
 - `js/herbs-pharm.js` — body effects, active compounds and detailed doses

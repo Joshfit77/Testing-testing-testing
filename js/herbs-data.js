@@ -318,7 +318,7 @@ const HERBS = [
   },
   {
     id: "fenugreek", name: "Fenugreek", latin: "Trigonella foenum-graecum", family: "Fabaceae (pea family)",
-    part: "seed", cats: ["digestion", "women", "kitchen", "heart"], color: "#c99b3c",
+    part: "seed", cats: ["digestion", "women", "men", "kitchen", "heart"], color: "#c99b3c",
     summary: "Maple-scented seeds used for digestion and nursing mothers.",
     about: "Fenugreek is one of the oldest cultivated plants, used in ancient Egypt and throughout India, where both the seeds (methi) and leaves are common in cooking. It is a widely used traditional herb for supporting breast milk supply, and has been studied for blood sugar support.",
     uses: ["Traditionally used to support breast milk supply", "Soothing digestion when soaked seeds are eaten", "Flavoring curries, dals, pickles and flatbreads"],
@@ -549,7 +549,7 @@ const HERBS = [
   },
   {
     id: "ashwagandha", name: "Ashwagandha", latin: "Withania somnifera", family: "Solanaceae (nightshade family)",
-    part: "root", cats: ["calming", "energy", "sleep"], color: "#a8784a",
+    part: "root", cats: ["calming", "energy", "sleep", "men"], color: "#a8784a",
     summary: "Ayurveda's famous adaptogen for stress and sleep.",
     about: "Its Sanskrit name means 'smell of the horse,' referring to its odor and its reputation for giving the strength of a horse. Used in Ayurveda for over 3,000 years, it has become popular as an adaptogen; several clinical studies found it reduced stress scores and improved sleep quality.",
     uses: ["Supporting a sense of calm during stressful periods", "Encouraging restful sleep", "Traditional support for strength and stamina"],
@@ -1118,5 +1118,82 @@ const HERBS = [
     flavor: "Extremely bitter.",
     grow: "A fast-growing, drought-hardy tropical tree.",
     caution: "Neem oil is toxic if swallowed, especially for children and infants. Avoid internal use during pregnancy or when trying to conceive. Patch-test on skin first."
+  },
+  {
+    id: "tongkat-ali", name: "Tongkat Ali", latin: "Eurycoma longifolia", family: "Simaroubaceae (quassia family)",
+    part: "root", cats: ["men", "energy"], color: "#9a6a3a",
+    summary: "Malaysia's 'longjack' root, the best-studied herb for low testosterone.",
+    about: "Tongkat ali is a small tree from the rainforests of Malaysia and Indonesia, nicknamed longjack for its long, twisting roots. The bitter root has been boiled into tonics for men's vitality for generations. Modern trials of standardized water extracts found it raised total and free testosterone, especially in men with low levels, stressed adults and older men.",
+    uses: ["Supporting healthy testosterone in men with low or borderline levels", "Traditional tonic for drive, energy and stamina", "Easing the stress-hormone load that drains testosterone"],
+    prep: "Use a standardized hot-water root extract (such as LJ100 or Physta) from a brand that tests for heavy metals. The raw root is extremely bitter and hard to dose.",
+    flavor: "Intensely bitter.",
+    grow: "A slow-growing understory tree of tropical rainforests; roots are harvested after several years.",
+    caution: "Can cause restlessness, trouble sleeping or irritability. Some products have been found contaminated with mercury or lead — buy third-party-tested extracts. Not for pregnancy or breastfeeding, anyone under 18, or men with prostate cancer or other hormone-sensitive conditions. Talk to your doctor if you take hormone, heart or blood pressure medicine."
+  },
+  {
+    id: "shilajit", name: "Shilajit", latin: "Asphaltum punjabianum", family: "Mineral pitch formed from ancient plant matter (not a plant itself)",
+    part: "bark", cats: ["men", "energy"], color: "#4a3626",
+    summary: "A tar-like mountain resin shown to raise total and free testosterone.",
+    about: "Shilajit is a sticky, dark resin that seeps from rocks in the Himalayas and other high mountains in summer. It forms over centuries as plant material slowly breaks down. In Ayurveda it is a rasayana — a rejuvenating tonic — prized for strength and vitality, and purified extracts are now studied for testosterone and energy.",
+    uses: ["Supporting total and free testosterone in middle-aged men", "Ayurvedic tonic for strength, stamina and vitality", "Supporting energy and recovery"],
+    prep: "Use only purified, lab-tested shilajit extract. Dissolve a pea-sized piece of resin in warm water or tea, or take capsules with food.",
+    flavor: "Smoky, bitter and earthy.",
+    grow: "Not grown — it is collected from rock crevices high in the mountains.",
+    caution: "Raw or unpurified shilajit can contain heavy metals, fungus and other contaminants — use only purified, tested products. May raise uric acid (avoid with gout) and iron levels (avoid with iron overload). May lower blood sugar. Not for pregnancy, breastfeeding, anyone under 18, or hormone-sensitive conditions."
+  },
+  {
+    id: "mucuna", name: "Mucuna (Velvet Bean)", latin: "Mucuna pruriens", family: "Fabaceae (pea family)",
+    part: "seed", cats: ["men", "energy"], color: "#7a5a48",
+    summary: "A velvety bean rich in L-dopa, studied for male fertility and testosterone.",
+    about: "Mucuna is a climbing tropical bean whose pods are covered in hairs that cause intense itching, earning it the name cowhage. Its seeds are one of nature's richest sources of L-dopa, the building block of dopamine and a Parkinson's medicine. In Ayurveda (kapikacchu) it has been used for male vitality and fertility for thousands of years.",
+    uses: ["Traditional support for male fertility and vitality", "Supporting mood and motivation through dopamine", "Studied as a natural source of L-dopa in Parkinson's disease (only under a doctor's care)"],
+    prep: "Use cleaned, powdered seeds or a standardized extract (usually 15% L-dopa). Never handle raw pods — the hairs cause severe itching.",
+    flavor: "Earthy and bean-like.",
+    grow: "A vigorous tropical climbing vine, often grown as a soil-building cover crop.",
+    caution: "Contains L-dopa, which acts like a medicine. Do not combine with Parkinson's medicine, MAOIs or other antidepressants, antipsychotics or ADHD stimulants. Can cause nausea, headaches, a racing heart, insomnia and, rarely, confusion. Avoid with bipolar disorder, psychosis, heart rhythm problems, melanoma, pregnancy and breastfeeding. Stop 2 weeks before surgery."
+  },
+  {
+    id: "tribulus", name: "Tribulus", latin: "Tribulus terrestris", family: "Zygophyllaceae (caltrop family)",
+    part: "seed", cats: ["men"], color: "#b8a040",
+    summary: "The spiny 'puncture vine' sold in testosterone boosters — better for libido.",
+    about: "Tribulus is a low, sprawling weed whose spiny fruits can puncture bare feet and bike tires, earning it the name puncture vine. It has long been used in Ayurveda (gokshura) and Chinese medicine as a tonic. It became famous in sports supplements, but careful human trials have mostly found it does not raise testosterone.",
+    uses: ["Traditional tonic for libido and sexual health", "Sometimes used for erectile function", "Traditional support for urinary health in Ayurveda"],
+    prep: "Use a standardized fruit extract (often 40–60% saponins), taken with food.",
+    flavor: "Bitter.",
+    grow: "A tough annual weed of hot, dry, sandy ground — wear shoes!",
+    caution: "Human trials mostly show it does not raise testosterone, so don't rely on it for that. Can upset the stomach. Rare cases of kidney and liver injury have been reported with high doses. May lower blood sugar and blood pressure. Avoid in pregnancy, breastfeeding, hormone-sensitive conditions and kidney disease."
+  },
+  {
+    id: "maca", name: "Maca", latin: "Lepidium meyenii", family: "Brassicaceae (cabbage family)",
+    part: "root", cats: ["men", "women", "energy"], color: "#d9b86a",
+    summary: "A Peruvian root for libido and energy — without changing hormone levels.",
+    about: "Maca is a radish-like root grown on the high plateaus of the Andes, more than 13,000 feet up, where little else will grow. The Inca valued it as a food for strength and fertility. Today it is usually eaten as a malty powder stirred into smoothies and oatmeal.",
+    uses: ["Supporting libido in men and women", "A nourishing food for energy and stamina", "Traditional support for fertility"],
+    prep: "Stir gelatinized (cooked) maca powder into smoothies, oatmeal or coffee. Gelatinized maca is easier to digest than raw.",
+    flavor: "Malty, nutty and slightly butterscotch-like.",
+    grow: "A hardy root crop of very high, cold mountain plateaus.",
+    caution: "Generally safe as a food. Raw maca can upset the stomach and contains goitrogens — use cooked (gelatinized) maca if you have thyroid problems. Avoid concentrated supplements in pregnancy, breastfeeding and hormone-sensitive conditions."
+  },
+  {
+    id: "horny-goat-weed", name: "Horny Goat Weed", latin: "Epimedium grandiflorum", family: "Berberidaceae (barberry family)",
+    part: "leaf", cats: ["men"], color: "#b07a9a",
+    summary: "A Chinese leaf with a famous name, used for drive and erectile function.",
+    about: "Legend says a Chinese goat herder noticed his flock became unusually frisky after grazing on this plant, giving it its name (yin yang huo). Its leaves have been used in Chinese medicine for libido, stamina and strong bones. Its main compound, icariin, is well studied in the lab, but human research is still limited.",
+    uses: ["Traditional support for libido and erectile function", "Traditional Chinese tonic for bone strength", "A common ingredient in men's vitality blends"],
+    prep: "Simmer dried leaves as tea, or use an extract standardized for icariin.",
+    flavor: "Bitter and slightly astringent.",
+    grow: "A shade-loving woodland ground cover with delicate spurred flowers (barrenwort).",
+    caution: "High doses can cause dizziness, dry mouth, nosebleeds, a fast heartbeat and muscle spasms. May lower blood pressure and slow clotting. Do not combine with Viagra-type medicines (sildenafil, tadalafil) or nitrates. Avoid with heart rhythm problems, hormone-sensitive conditions, pregnancy and breastfeeding."
+  },
+  {
+    id: "cordyceps", name: "Cordyceps", latin: "Cordyceps militaris", family: "Cordycipitaceae",
+    part: "mushroom", cats: ["energy", "men", "immunity"], color: "#d8823a",
+    summary: "An orange energy mushroom used for stamina and vitality.",
+    about: "Wild cordyceps grows from caterpillars high in the Himalayas and was once so rare it cost more than gold. Today supplements come from cultivated Cordyceps militaris or a fermented strain called Cs-4. In Tibetan and Chinese medicine it has long been used for stamina, the lungs and men's vitality.",
+    uses: ["Supporting stamina and exercise capacity", "Traditional tonic for male vitality and libido", "Supporting lung and immune health"],
+    prep: "Use cultivated fruiting-body or Cs-4 extracts. Dried cordyceps can also be simmered in soups and broths.",
+    flavor: "Mild, earthy and slightly sweet.",
+    grow: "Cultivated on grain or rice; wild cordyceps grows on insect larvae at high altitude.",
+    caution: "Usually well tolerated; may cause mild stomach upset. Stimulates the immune system — avoid with autoimmune disease or immune-suppressing medicines. May slow clotting and lower blood sugar. Avoid in pregnancy and breastfeeding, and stop 2 weeks before surgery."
   }
 ];

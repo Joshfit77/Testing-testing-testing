@@ -23,7 +23,9 @@ const WIKI_TITLES = {
   "aloe-vera": "Aloe vera", "holy-basil": "Ocimum tenuiflorum", chasteberry: "Vitex agnus-castus",
   "raspberry-leaf": "Rubus idaeus", elderflower: "Sambucus nigra", parsley: "Parsley", dill: "Dill",
   "bay-laurel": "Laurus nobilis", "black-seed": "Nigella sativa", chicory: "Chicory", lovage: "Lovage",
-  caraway: "Caraway", moringa: "Moringa oleifera", neem: "Azadirachta indica", "tea-tree": "Melaleuca alternifolia"
+  caraway: "Caraway", moringa: "Moringa oleifera", neem: "Azadirachta indica", "tea-tree": "Melaleuca alternifolia",
+  "tongkat-ali": "Eurycoma longifolia", shilajit: "Shilajit", mucuna: "Mucuna pruriens", tribulus: "Tribulus terrestris",
+  maca: "Maca", "horny-goat-weed": "Epimedium", cordyceps: "Cordyceps militaris"
 };
 
 // Wikipedia article titles for fruits, where the plain name isn't the best match.

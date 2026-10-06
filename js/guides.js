@@ -145,10 +145,10 @@ const TOPIC_GUIDES = [
   },
   {
     id: "mens-health", title: "Natural Support for Men's Health", short: "Men's Health", icon: "leaf",
-    intro: "Men's health covers energy, strength, heart, prostate and hormones. Ashwagandha raised testosterone in several trials, nettle root and saw palmetto are traditional prostate herbs, and lycopene from cooked tomatoes and watermelon supports prostate and heart health. Regular check-ups catch problems early.",
+    intro: "Men's health covers energy, strength, heart, prostate and hormones. For testosterone, tongkat ali, purified shilajit and ashwagandha have the best human trials for raising total testosterone, and tongkat ali and shilajit also raised free testosterone — the part your body can actually use. Nettle root and saw palmetto are traditional prostate herbs, and lycopene from cooked tomatoes and watermelon supports prostate and heart health. Regular check-ups catch problems early.",
     lifestyle: ["Do strength training at least twice a week.", "Sleep 7–9 hours — testosterone is made during deep sleep.", "Keep a healthy waistline.", "Limit alcohol and don't smoke.", "Get regular check-ups, including blood pressure and prostate screening as advised."],
-    herbs: ["ashwagandha", "fenugreek", "nettle", "saw-palmetto", "ginseng", "ginger"],
-    fruits: ["pomegranate", "tomato", "pumpkin", "watermelon"], stacks: ["testosterone-support"],
+    herbs: ["tongkat-ali", "ashwagandha", "shilajit", "fenugreek", "nettle", "saw-palmetto", "ginseng", "mucuna"],
+    fruits: ["pomegranate", "tomato", "pumpkin", "watermelon"], stacks: ["free-testosterone", "testosterone-support"],
     verse: { text: "Have I not commanded you? Be strong and courageous! Do not tremble or be dismayed, for the LORD your God is with you wherever you go.", ref: "Joshua 1:9" },
     cautions: "Hormonal herbs are not for anyone with prostate cancer or on testosterone therapy. Ginseng can raise blood pressure and affect blood sugar.",
     doctor: ["Changes in urination: weak stream, getting up often at night, or blood", "Erectile problems — they can be an early sign of heart disease", "Constant fatigue, low drive or mood changes"]

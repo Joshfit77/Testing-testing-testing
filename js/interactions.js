@@ -12,7 +12,7 @@ const INTERACTIONS = [
       meadowsweet: "Contains salicylates, like aspirin.",
       "fruit:goji-berry": "May strongly increase the effect of warfarin."
     },
-    caution: {
+    caution: { "horny-goat-weed": "May slow clotting.", "cordyceps": "May slow clotting.",
       garlic: "Supplements may increase bleeding risk; food amounts are fine.",
       ginger: "Larger amounts (over about 4 g a day) may increase bleeding.",
       turmeric: "Curcumin supplements may increase bleeding.",
@@ -40,7 +40,7 @@ const INTERACTIONS = [
   {
     id: "diabetes", type: "med", label: "Diabetes medicines", examples: "metformin, insulin, glipizide, sitagliptin, semaglutide",
     avoid: {},
-    caution: {
+    caution: { "tribulus": "May lower blood sugar.", "cordyceps": "May lower blood sugar.", "shilajit": "May lower blood sugar.", "mucuna": "May lower blood sugar.",
       fenugreek: "Lowers blood sugar — may add to your medicine's effect.",
       cinnamon: "May lower blood sugar.",
       "holy-basil": "May lower blood sugar.",
@@ -71,7 +71,7 @@ const INTERACTIONS = [
       licorice: "Raises blood pressure and lowers potassium — works against your medicine.",
       "fruit:grapefruit": "Blocks the breakdown of some blood pressure medicines (such as amlodipine, felodipine, nifedipine)."
     },
-    caution: {
+    caution: { "horny-goat-weed": "May lower blood pressure further.", "tribulus": "May lower blood pressure.", "mucuna": "Can change blood pressure.", "tongkat-ali": "Reduced the absorption of propranolol in a study.",
       hibiscus: "Lowers blood pressure — may add to your medicine.",
       hawthorn: "May lower blood pressure.",
       "olive-leaf": "Lowers blood pressure.",
@@ -90,7 +90,7 @@ const INTERACTIONS = [
   },
   {
     id: "antidepressants", type: "med", label: "Antidepressants & mood medicines", examples: "sertraline, fluoxetine, escitalopram, venlafaxine, bupropion, MAOIs, triptans",
-    avoid: {
+    avoid: { "mucuna": "Its L-dopa with MAOIs can cause a dangerous rise in blood pressure; may also interact with other mood medicines.",
       "st-johns-wort": "Risk of serotonin syndrome — a dangerous reaction.",
       nutmeg: "Large amounts affect brain chemistry — keep to culinary pinches."
     },
@@ -128,7 +128,7 @@ const INTERACTIONS = [
       "st-johns-wort": "Makes birth control pills less effective — risk of pregnancy.",
       chasteberry: "Acts on hormones; may interfere with birth control and fertility treatment."
     },
-    caution: {
+    caution: { "tongkat-ali": "Raises testosterone — don't combine with testosterone or other hormone therapy without your doctor.", "shilajit": "Raises testosterone and DHEA.", "tribulus": "Hormonal effects.", "mucuna": "Changes prolactin and testosterone.", "horny-goat-weed": "Hormone-like effects.",
       "red-clover": "Contains plant estrogens.",
       hops: "Contains a strong plant estrogen.",
       fennel: "Weak estrogen-like effects.",
@@ -141,7 +141,7 @@ const INTERACTIONS = [
   {
     id: "thyroid", type: "med", label: "Thyroid medicines", examples: "levothyroxine (Synthroid), liothyronine, methimazole",
     avoid: {},
-    caution: {
+    caution: { "maca": "Raw maca contains goitrogens — choose cooked (gelatinized) maca.",
       ashwagandha: "May raise thyroid hormone levels.",
       "lemon-balm": "May reduce thyroid activity.",
       moringa: "May affect thyroid medicine.",
@@ -151,7 +151,7 @@ const INTERACTIONS = [
   },
   {
     id: "immunosuppressants", type: "med", label: "Immune-suppressing medicines", examples: "cyclosporine, tacrolimus (transplants), methotrexate, prednisone, biologics for autoimmune disease",
-    avoid: {
+    avoid: { "cordyceps": "Stimulates the immune system.",
       "st-johns-wort": "Lowers cyclosporine and tacrolimus levels — risk of transplant rejection.",
       echinacea: "Stimulates the immune system — works against your medicine.",
       astragalus: "Stimulates the immune system.",
@@ -202,7 +202,7 @@ const INTERACTIONS = [
       licorice: "Lowers potassium, which increases digoxin's toxic effects.",
       "st-johns-wort": "Lowers digoxin levels."
     },
-    caution: {
+    caution: { "horny-goat-weed": "May speed the heart; never combine with nitrates (nitroglycerin, isosorbide).", "mucuna": "Can cause a racing or irregular heartbeat.", "tongkat-ali": "Reduced the absorption of propranolol in a study.",
       hawthorn: "Adds to the effect of heart medicines — use only with your doctor.",
       ginseng: "May interfere with digoxin and its blood tests.",
       horsetail: "Lowers potassium.",
@@ -225,7 +225,7 @@ const INTERACTIONS = [
     avoid: {
       "st-johns-wort": "Switches on liver enzymes that break down many medicines, making them less effective."
     },
-    caution: {
+    caution: { "horny-goat-weed": "Don't combine with Viagra- or Cialis-type medicines.", "mucuna": "Don't combine with Parkinson's medicine (levodopa) or antipsychotics.",
       schisandra: "Changes how the liver processes many medicines.",
       "black-pepper": "Piperine supplements (not food amounts) change medicine levels.",
       garlic: "Supplements may lower levels of some HIV medicines.",
@@ -238,7 +238,7 @@ const INTERACTIONS = [
   // ---------- Health situations ----------
   {
     id: "pregnancy", type: "condition", label: "Pregnant or trying to conceive", examples: "",
-    avoid: {
+    avoid: { "tongkat-ali": "Raises testosterone — not for pregnancy.", "shilajit": "Not studied in pregnancy; affects hormones.", "mucuna": "Contains L-dopa, a medicine.", "tribulus": "Harmed developing babies in animal studies.", "maca": "Avoid concentrated supplements.", "horny-goat-weed": "Hormone-like effects.", "cordyceps": "Not studied in pregnancy.",
       sage: "Thujone in medicinal amounts.", "holy-basil": "Avoid when pregnant or trying to conceive.", parsley: "Large medicinal amounts, seed and oil can stimulate the uterus.",
       fenugreek: "May stimulate contractions.", licorice: "Linked to pregnancy complications.", "slippery-elm": "Traditional caution.", hibiscus: "Avoid in pregnancy.",
       "aloe-vera": "Do not take aloe by mouth.", "red-clover": "Hormonal effects.", ginseng: "Avoid in pregnancy.", ashwagandha: "Avoid in pregnancy.",
@@ -261,18 +261,18 @@ const INTERACTIONS = [
   },
   {
     id: "breastfeeding", type: "condition", label: "Breastfeeding", examples: "",
-    avoid: { sage: "May reduce milk supply.", "st-johns-wort": "Passes into milk.", ginseng: "Not enough safety information.", chasteberry: "May reduce milk supply.", "red-clover": "Hormonal effects.", licorice: "Avoid large amounts." },
-    caution: { peppermint: "Large amounts may reduce milk supply.", parsley: "Large amounts may reduce milk supply.", fenugreek: "Commonly used to support milk — can upset baby's stomach; talk to a lactation consultant.", fennel: "Used for milk supply; avoid fennel oil.", valerian: "Not well studied." }
+    avoid: { "tongkat-ali": "Affects hormones; not studied.", "shilajit": "Not studied.", "mucuna": "L-dopa lowers prolactin and can reduce milk supply.", "tribulus": "Not studied.", "horny-goat-weed": "Not studied.", "cordyceps": "Not studied.", sage: "May reduce milk supply.", "st-johns-wort": "Passes into milk.", ginseng: "Not enough safety information.", chasteberry: "May reduce milk supply.", "red-clover": "Hormonal effects.", licorice: "Avoid large amounts." },
+    caution: { "maca": "Fine as food; avoid supplements.", peppermint: "Large amounts may reduce milk supply.", parsley: "Large amounts may reduce milk supply.", fenugreek: "Commonly used to support milk — can upset baby's stomach; talk to a lactation consultant.", fennel: "Used for milk supply; avoid fennel oil.", valerian: "Not well studied." }
   },
   {
     id: "children", type: "condition", label: "For a child or baby", examples: "",
-    avoid: {
+    avoid: { "tongkat-ali": "Raises testosterone — not for anyone under 18.", "shilajit": "Not for anyone under 18.", "mucuna": "Contains L-dopa, a medicine.", "tribulus": "Hormonal effects; not for under 18.", "horny-goat-weed": "Not for under 18.", "cordyceps": "Not studied in children.",
       eucalyptus: "Oil is dangerous for young children — never near the face or swallowed.", "tea-tree": "Toxic if swallowed.", neem: "Neem oil can be fatal to children.",
       "star-anise": "Never give to babies.", nutmeg: "Toxic in larger amounts.", meadowsweet: "Salicylates — risk of Reye's syndrome under 16.",
       "st-johns-wort": "Not for children.", ginseng: "Not for children.", licorice: "Avoid.", "fruit:lychee": "Never give unripe lychee or lychee on an empty stomach.",
       "fruit:ackee": "Unripe ackee is poisonous."
     },
-    caution: {
+    caution: { "maca": "Fine as food; avoid supplements.",
       peppermint: "Never apply peppermint oil near a baby's or young child's face.", chamomile: "Weak tea is traditionally used — ask your pediatrician.",
       valerian: "Not recommended under 3.", "fruit:grape": "Cut lengthwise for young children to prevent choking.", "fruit:cherry": "Pit cherries for children.",
       "fruit:honeydew": "Wash rind well.", elderberry: "Syrup with honey is not for babies under 1."
@@ -280,18 +280,18 @@ const INTERACTIONS = [
   },
   {
     id: "surgery", type: "condition", label: "Surgery in the next 2 weeks", examples: "",
-    avoid: { ginkgo: "Increases bleeding.", garlic: "Supplements increase bleeding.", ginseng: "Affects bleeding and blood sugar.", feverfew: "Increases bleeding.", reishi: "Increases bleeding.", valerian: "Interacts with anesthesia — taper off.", "st-johns-wort": "Interacts with anesthesia medicines." },
+    avoid: { "horny-goat-weed": "May increase bleeding.", "cordyceps": "May slow clotting.", "mucuna": "Interacts with anesthesia — stop 2 weeks before.", ginkgo: "Increases bleeding.", garlic: "Supplements increase bleeding.", ginseng: "Affects bleeding and blood sugar.", feverfew: "Increases bleeding.", reishi: "Increases bleeding.", valerian: "Interacts with anesthesia — taper off.", "st-johns-wort": "Interacts with anesthesia medicines." },
     caution: { ginger: "Supplements may increase bleeding.", turmeric: "Supplements may increase bleeding.", fenugreek: "May affect bleeding and blood sugar.", "black-seed": "May slow clotting.", cumin: "May affect blood sugar." }
   },
   {
     id: "liver", type: "condition", label: "Liver disease", examples: "",
     avoid: { ashwagandha: "Rare cases of liver injury.", skullcap: "Products contaminated with germander can harm the liver.", "gotu-kola": "Avoid with liver disease.", "fruit:noni": "Rare reports of liver injury." },
-    caution: { "green-tea": "High-dose extracts linked to liver injury; tea is fine.", turmeric: "High-dose supplements rarely linked to liver injury.", cinnamon: "Cassia's coumarin can harm the liver.", reishi: "Rare liver problems with powder.", "milk-thistle": "Used for the liver — but only under your doctor's care." }
+    caution: { "tongkat-ali": "Limited long-term safety data; buy tested products.", "tribulus": "Rare reports of liver injury at high doses.", "green-tea": "High-dose extracts linked to liver injury; tea is fine.", turmeric: "High-dose supplements rarely linked to liver injury.", cinnamon: "Cassia's coumarin can harm the liver.", reishi: "Rare liver problems with powder.", "milk-thistle": "Used for the liver — but only under your doctor's care." }
   },
   {
     id: "kidney", type: "condition", label: "Kidney disease", examples: "",
-    avoid: { "fruit:starfruit": "Contains a toxin that damaged kidneys cannot remove — can be fatal.", "fruit:noni": "Very high in potassium.", juniper: "Can irritate the kidneys.", licorice: "Affects potassium and fluid balance.", horsetail: "Avoid.", lovage: "Avoid." },
-    caution: { parsley: "Avoid large amounts.", "fruit:banana": "High in potassium — follow your kidney diet.", "fruit:coconut": "Coconut water is high in potassium.", "fruit:avocado": "High in potassium.", cranberry: "May increase kidney stone risk.", "rose-hips": "High vitamin C may increase kidney stones.", "fruit:acerola": "Very high vitamin C." }
+    avoid: { "tribulus": "Rare reports of kidney injury.", "fruit:starfruit": "Contains a toxin that damaged kidneys cannot remove — can be fatal.", "fruit:noni": "Very high in potassium.", juniper: "Can irritate the kidneys.", licorice: "Affects potassium and fluid balance.", horsetail: "Avoid.", lovage: "Avoid." },
+    caution: { "shilajit": "Rich in minerals — ask your doctor first.", parsley: "Avoid large amounts.", "fruit:banana": "High in potassium — follow your kidney diet.", "fruit:coconut": "Coconut water is high in potassium.", "fruit:avocado": "High in potassium.", cranberry: "May increase kidney stone risk.", "rose-hips": "High vitamin C may increase kidney stones.", "fruit:acerola": "Very high vitamin C." }
   },
   {
     id: "high-bp", type: "condition", label: "High blood pressure", examples: "",
@@ -301,12 +301,12 @@ const INTERACTIONS = [
   {
     id: "autoimmune", type: "condition", label: "Autoimmune condition", examples: "lupus, rheumatoid arthritis, MS, Hashimoto's, type 1 diabetes",
     avoid: { echinacea: "Stimulates the immune system.", astragalus: "Stimulates the immune system." },
-    caution: { elderberry: "Stimulates the immune system.", elderflower: "May stimulate the immune system.", ashwagandha: "May stimulate the immune system.", reishi: "Affects immune activity." }
+    caution: { "cordyceps": "Stimulates the immune system.", elderberry: "Stimulates the immune system.", elderflower: "May stimulate the immune system.", ashwagandha: "May stimulate the immune system.", reishi: "Affects immune activity." }
   },
   {
     id: "hormone-sensitive", type: "condition", label: "Hormone-sensitive condition", examples: "breast, uterine, ovarian or prostate cancer, endometriosis, fibroids",
-    avoid: { "red-clover": "Plant estrogens.", hops: "Strong plant estrogen.", chasteberry: "Hormonal effects.", "saw-palmetto": "Hormonal effects." },
-    caution: { fennel: "Weak estrogen-like effects.", anise: "Weak estrogen-like effects.", licorice: "May affect hormones.", fenugreek: "May affect hormones.", ashwagandha: "May raise testosterone." }
+    avoid: { "tongkat-ali": "Raises testosterone.", "shilajit": "Raises testosterone and DHEA.", "tribulus": "Hormonal effects.", "horny-goat-weed": "Hormone-like effects.", "red-clover": "Plant estrogens.", hops: "Strong plant estrogen.", chasteberry: "Hormonal effects.", "saw-palmetto": "Hormonal effects." },
+    caution: { "mucuna": "Changes prolactin and testosterone.", "maca": "Concentrated extracts may have hormone-like effects.", "cordyceps": "Raised sex hormones in animal studies.", fennel: "Weak estrogen-like effects.", anise: "Weak estrogen-like effects.", licorice: "May affect hormones.", fenugreek: "May affect hormones.", ashwagandha: "May raise testosterone." }
   },
   {
     id: "daisy-allergy", type: "condition", label: "Ragweed, daisy or marigold allergy", examples: "",
@@ -335,8 +335,8 @@ const INTERACTIONS = [
   },
   {
     id: "bipolar", type: "condition", label: "Bipolar disorder", examples: "",
-    avoid: { "st-johns-wort": "May trigger mania.", rhodiola: "May trigger mania." },
-    caution: { ginseng: "May trigger mania.", saffron: "Affects mood." }
+    avoid: { "mucuna": "Raises dopamine — may trigger mania.", "st-johns-wort": "May trigger mania.", rhodiola: "May trigger mania." },
+    caution: { "tongkat-ali": "Raises testosterone and may affect mood and sleep.", ginseng: "May trigger mania.", saffron: "Affects mood." }
   },
   {
     id: "reflux", type: "condition", label: "Heartburn or acid reflux", examples: "",
@@ -359,7 +359,7 @@ INTERACTIONS.splice(INTERACTIONS.findIndex((x) => x.type === "condition"), 0,
   {
     id: "stimulants", type: "med", label: "ADHD stimulants", examples: "methylphenidate (Ritalin, Concerta), amphetamine (Adderall, Vyvanse)",
     avoid: {},
-    caution: {
+    caution: { "mucuna": "Both raise dopamine — may cause overstimulation.", "tongkat-ali": "May add to restlessness and poor sleep.",
       "green-tea": "Caffeine adds to stimulant effects — racing heart, jitters, poor sleep.", "yerba-mate": "Caffeine adds to stimulant effects.",
       ginseng: "May add to stimulation and raise blood pressure.", rhodiola: "May add to stimulation.", "fruit:grapefruit": "May change levels of some stimulants."
     }
@@ -369,7 +369,7 @@ INTERACTIONS.splice(INTERACTIONS.findIndex((x) => x.type === "condition"), 0,
 INTERACTIONS.push({
   id: "older-adults", type: "condition", label: "Age 65 or older", examples: "",
   avoid: { licorice: "Raises blood pressure and lowers potassium — risky with heart and kidney changes of aging." },
-  caution: {
+  caution: { "horny-goat-weed": "Can cause dizziness and a fast heartbeat.", "mucuna": "Older adults are more sensitive to L-dopa side effects.",
     valerian: "Drowsiness raises the risk of falls.", passionflower: "Drowsiness raises the risk of falls.", hops: "Drowsiness raises the risk of falls.",
     skullcap: "Drowsiness raises the risk of falls.", ginkgo: "Bleeding risk, especially with aspirin or blood thinners.", garlic: "Supplements may increase bleeding.",
     "st-johns-wort": "Interacts with many common medicines.", ginseng: "May affect blood pressure and blood sugar.", hawthorn: "Adds to heart medicines.",

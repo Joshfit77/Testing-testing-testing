@@ -612,5 +612,47 @@ const PHARM = {
     chem: [["Nimbidin & nimbin", "Limonoids (triterpenes)", "Anti-inflammatory and antibacterial."], ["Azadirachtin", "Limonoid", "Insect-repellent and insecticidal; the reason neem is used in organic pest sprays."], ["Quercetin", "Flavonoid", "Antioxidant."]],
     dose: [["Neem oil diluted (1 part to 10 parts carrier oil)", "Thin layer", null, "1–2 times a day"], ["Neem gel or toothpaste", "As directed", null, "2 times a day"]],
     daily: null, limit: "For external use only — neem oil is toxic if swallowed, especially for children.", ext: true
+  },
+  "tongkat-ali": {
+    body: [["Hormones", "Helps the testes make more testosterone and may free more of it."], ["Stress response", "Lowers cortisol."], ["Reproductive system", "Supports libido and sperm health."]],
+    chem: [["Eurycomanone", "Quassinoid", "In lab studies on testosterone-making Leydig cells, it blocks aromatase (which turns testosterone into estrogen) and phosphodiesterase, boosting testosterone production."], ["Eurypeptides", "Small peptides", "Thought to help release bound testosterone and support energy."], ["Polysaccharides & glycoproteins", "Water-soluble compounds", "The main components of the standardized water extracts used in trials."]],
+    dose: [["Standardized water extract (e.g. LJ100, Physta)", 0.2, 0.4, "Once a day, in the morning"]],
+    daily: [0.2, 0.4], limit: "Studied for 4–12 weeks. Many people cycle it (for example 5 days on, 2 off, or 8–12 weeks then a break)."
+  },
+  "shilajit": {
+    body: [["Hormones", "Raises total and free testosterone and DHEA."], ["Energy", "Supports cellular energy in the mitochondria."], ["Reproductive system", "Supports sperm count and movement."]],
+    chem: [["Fulvic acid", "Humic substance", "Carries minerals into cells and acts as an antioxidant; may support mitochondrial energy."], ["Dibenzo-α-pyrones", "Aromatic compounds", "Support CoQ10 in the mitochondria, helping cells make energy."], ["Trace minerals", "Zinc, magnesium, iron and others", "Zinc and magnesium are needed for normal testosterone production."]],
+    dose: [["Purified shilajit extract (e.g. PrimaVie)", 0.25, 0.25, "Twice a day, with food"]],
+    daily: [0.5, 0.5], limit: "Studied for 90 days."
+  },
+  "mucuna": {
+    body: [["Hormones", "Lowers prolactin and raises LH and testosterone."], ["Brain", "Raises dopamine, supporting mood and motivation."], ["Reproductive system", "Supports sperm health."]],
+    chem: [["L-dopa (levodopa)", "Amino acid", "Becomes dopamine in the brain; dopamine lowers prolactin and supports the brain signal (GnRH → LH) that drives testosterone production."], ["Tetrahydroisoquinolines", "Alkaloids", "Minor compounds that may act on the brain."], ["Phenolic antioxidants", "Polyphenols", "Protect sperm from oxidative damage."]],
+    dose: [["Seed powder (as used in fertility studies)", 2.5, 5, "Once a day, with food"], ["Standardized extract (15% L-dopa)", 0.3, 0.5, "1–2 times a day, with food"]],
+    daily: [2.5, 5], limit: "Studies lasted 3 months. Best used with a doctor's guidance."
+  },
+  "tribulus": {
+    body: [["Reproductive system", "May improve libido and erectile function."], ["Hormones", "Little effect on testosterone in most human trials."], ["Urinary system", "Traditionally a mild diuretic."]],
+    chem: [["Protodioscin", "Steroidal saponin", "Proposed to raise luteinizing hormone and convert to DHEA; these effects have not been reliably seen in people."], ["Tribulosin & other saponins", "Steroidal saponins", "May relax blood vessels, supporting erectile function."], ["Kaempferol & quercetin glycosides", "Flavonoids", "Antioxidant."]],
+    dose: [["Standardized fruit extract (40–60% saponins)", 0.25, 0.75, "1–2 times a day, with food"]],
+    daily: [0.75, 1.5], limit: "Studied for up to 12 weeks."
+  },
+  "maca": {
+    body: [["Brain", "Supports libido and mood."], ["Reproductive system", "Supports sperm health."], ["Energy", "A nourishing source of carbohydrates, protein and minerals."]],
+    chem: [["Macamides", "Fatty acid amides", "Unique to maca; may act on the body's endocannabinoid system, influencing mood and desire."], ["Glucosinolates", "Sulfur compounds", "Break down into isothiocyanates — and are why raw maca can affect the thyroid."], ["Macaenes", "Polyunsaturated fatty acids", "May contribute to the effect on energy and libido."]],
+    dose: [["Gelatinized root powder", 1.5, 3, "Once a day"]],
+    daily: [1.5, 3], limit: "Studied for up to 4 months; safe as a regular food."
+  },
+  "horny-goat-weed": {
+    body: [["Circulation", "May improve blood flow for erections."], ["Hormones", "Raised testosterone in animal studies."], ["Bones", "Supports bone density."]],
+    chem: [["Icariin", "Prenylated flavonol glycoside", "Weakly inhibits PDE5 and boosts nitric oxide, relaxing blood vessels; raised testosterone in animal studies."], ["Epimedins A, B and C", "Flavonoid glycosides", "Related compounds that support bone-building cells."], ["Icaritin", "Flavonoid", "An active breakdown product with mild hormone-like effects."]],
+    dose: [["Extract (10–20% icariin)", 0.25, 0.5, "Once or twice a day"], ["Dried leaf as tea", 3, 6, "Once a day"]],
+    daily: [0.25, 1], limit: "Avoid high doses; usually taken for up to 3 months."
+  },
+  "cordyceps": {
+    body: [["Energy", "Supports stamina and oxygen use."], ["Hormones", "Raised testosterone in animal studies."], ["Immune system", "Activates immune cells."]],
+    chem: [["Cordycepin (3′-deoxyadenosine)", "Nucleoside", "Acts on energy-sensing (AMPK) pathways and stimulated testosterone production in Leydig cells in lab studies."], ["Beta-glucans", "Polysaccharides", "Activate immune cells."], ["Adenosine", "Nucleoside", "Supports blood flow and cellular energy."]],
+    dose: [["Mushroom extract (Cs-4 or C. militaris)", 1, 3, "Once a day, or split"]],
+    daily: [1, 3], limit: "Studied for up to 12 weeks."
   }
 };

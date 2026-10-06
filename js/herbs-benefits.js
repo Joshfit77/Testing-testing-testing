@@ -509,5 +509,46 @@ const BENEFITS = {
     ["P", "Gum health", "Neem gel reduced plaque and gum inflammation in clinical studies."],
     ["P", "Blemish-prone skin", "Neem is antibacterial and anti-inflammatory, which may help with acne."],
     ["T", "Scalp care", "Neem oil is traditionally used for dandruff and to keep head lice away."]
+  ],
+  "tongkat-ali": [
+    ["R", "Higher total testosterone", "A 2022 systematic review and meta-analysis of randomized trials found tongkat ali extract significantly raised total testosterone. The effect was strongest in men with low testosterone and in older men; men with normal levels saw small or no change."],
+    ["P", "More free testosterone", "In men with age-related low testosterone, 200 mg a day of standardized extract for one month raised both total and free testosterone, and many men moved back into the normal range. Lab work suggests it lowers SHBG, the protein that binds testosterone so the body can't use it."],
+    ["P", "Lower stress hormones", "In a 4-week trial in moderately stressed adults, 200 mg a day lowered cortisol by about 16% and raised testosterone by about 37%, while improving tension, anger and fatigue scores."],
+    ["P", "Libido and sperm health", "Small trials found improved sexual desire, erectile function scores, and sperm count, movement and shape in men with fertility problems."]
+  ],
+  "shilajit": [
+    ["P", "Higher total and free testosterone", "In a 90-day randomized, placebo-controlled trial in healthy men aged 45–55, purified shilajit (250 mg twice a day) significantly raised total testosterone, free testosterone and DHEA compared with placebo."],
+    ["P", "Sperm health", "In a small study of men with low sperm counts, purified shilajit for 90 days raised sperm count and motility as well as testosterone."],
+    ["P", "Energy and fatigue", "Animal and small human studies suggest shilajit supports mitochondrial energy, reduces fatigue and helps retain muscle strength."],
+    ["T", "Ayurvedic rejuvenator", "A classic rasayana in Ayurveda, used for strength, longevity and male vitality for centuries."]
+  ],
+  "mucuna": [
+    ["P", "Higher testosterone in infertile men", "In clinical studies of infertile men, 5 g of seed powder a day for three months raised testosterone and luteinizing hormone (LH) and lowered prolactin."],
+    ["P", "Sperm quality", "The same studies found improved sperm count and motility and lower oxidative stress in semen, and some couples went on to conceive."],
+    ["P", "Mood and motivation", "Its L-dopa raises dopamine in the brain. Small trials in Parkinson's disease found it worked about as quickly as standard L-dopa medicine — but that use belongs only under a doctor's care."],
+    ["T", "Ayurvedic vitality tonic", "Known as kapikacchu, it has a long history as a tonic for male strength and fertility."]
+  ],
+  "tribulus": [
+    ["P", "Libido and erectile function", "Several randomized trials found tribulus extract (around 750–1,500 mg a day) improved sexual desire and erectile function scores in men and women compared with placebo."],
+    ["P", "Testosterone — mostly no effect", "A systematic review found tribulus did not raise testosterone in healthy men or athletes in most trials. A few small studies in men with low testosterone or fertility problems saw modest rises, so results are mixed at best."],
+    ["T", "Traditional men's tonic", "In Ayurveda (gokshura) and Chinese medicine, tribulus fruit has been used for vitality, urinary health and fertility for centuries."]
+  ],
+  "maca": [
+    ["P", "Libido", "Randomized trials found 1.5–3 g of maca a day improved sexual desire in healthy men after 8–12 weeks, with similar benefits reported in women."],
+    ["P", "Testosterone — no change", "In the same trials, maca did not change blood testosterone, estrogen or other reproductive hormones — its effect on desire seems to work independently of hormones."],
+    ["P", "Sperm quality", "Small studies found improved semen volume, sperm count and motility after 3–4 months."],
+    ["P", "Mood and energy", "Small trials found maca eased anxiety and low mood and improved energy, especially in women after menopause."]
+  ],
+  "horny-goat-weed": [
+    ["P", "Erectile function", "Icariin weakly blocks PDE5, the enzyme targeted by erectile-dysfunction medicines, and raised nitric oxide in lab studies. Human trials are few and small."],
+    ["P", "Testosterone (animal studies)", "Icariin raised testosterone and improved sperm in animal studies; this has not yet been shown in men."],
+    ["P", "Bone strength", "A two-year trial in women after menopause found Epimedium flavonoids helped prevent bone loss."],
+    ["T", "Traditional libido tonic", "Used in Chinese medicine (yin yang huo) for drive, stamina and vitality for centuries."]
+  ],
+  "cordyceps": [
+    ["P", "Stamina and exercise", "In a 12-week trial in older adults, the Cs-4 extract (1 g three times a day) improved aerobic capacity; results in young athletes are mixed."],
+    ["P", "Testosterone (animal studies)", "Cordyceps extracts and cordycepin raised testosterone in animal and cell studies by stimulating testosterone-making Leydig cells. Human trials have not confirmed this."],
+    ["P", "Immune support", "Its polysaccharides activate immune cells such as natural killer cells in lab and early human studies."],
+    ["T", "Traditional vitality tonic", "Used in Tibetan and Chinese medicine for the lungs, kidneys, energy and libido."]
   ]
 };
