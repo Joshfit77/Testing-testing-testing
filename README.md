@@ -39,6 +39,8 @@ The 234 pages in `herbs/`, `fruits/`, `guides/`, `safety/` and `recipes/`, plus 
 node scripts/build.js
 ```
 
+The build also stamps every CSS/JS/icon link with a version (`?v=…`) so visitors see updates right away instead of an old cached copy — always run it before pushing.
+
 Open `scripts/build.js` and set `SITE_URL` to your live address first (for example `https://www.yourdomain.com/`). It's currently set to the GitHub Pages address.
 
 After the site is live, submit `sitemap.xml` in [Google Search Console](https://search.google.com/search-console) so Google finds every page.

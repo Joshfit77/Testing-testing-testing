@@ -68,6 +68,18 @@ const breadcrumb = (section, sectionUrl, name, url) => ({
   ]
 });
 
+// ---------- Cache-busting ----------
+// Stamp every local stylesheet, script and icon link with a version so visitors get the newest
+// files right after an update instead of an old copy their browser saved.
+const STAMP = Date.now().toString(36);
+for (const file of fs.readdirSync(root).filter((f) => f.endsWith(".html")).concat(["es/index.html", "es/seguridad.html"])) {
+  const full = path.join(root, file);
+  if (!fs.existsSync(full)) continue;
+  const html = fs.readFileSync(full, "utf8");
+  const next = html.replace(/((?:src|href)="(?:css|js|images)\/[^"?]+\.(?:css|js|svg))(?:\?v=[\w]+)?"/g, `$1?v=${STAMP}"`);
+  if (next !== html) fs.writeFileSync(full, next);
+}
+
 // ---------- Your own photos ----------
 // Drop a photo named after an herb, fruit or food into images/herbs/, images/fruits/ or images/foods/
 // (e.g. images/herbs/chamomile.jpg, images/fruits/apple.jpg, images/foods/chicken-breast.jpg) and it replaces the Wikipedia photo.
