@@ -28,8 +28,8 @@ const SITE = {
   tools: [
     { href: "interactions.html", label: "Herb & medicine safety checker" },
     { href: "guides.html#safety", label: "Pregnancy, children & safety guides" },
-    { href: "quiz.html", label: "Herb & fruit quiz" },
-    { href: "finder.html", label: "Herb finder" },
+    { href: "finder.html", label: "What should I take? quiz" },
+    { href: "quiz.html", label: "Herb & fruit knowledge quiz" },
     { href: "bible.html", label: "Herbs & fruits of the Bible" },
     { href: "guides.html", label: "Wellness guides" }
   ]
@@ -278,6 +278,7 @@ function renderChrome() {
         <p class="legal-links"><a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · <a href="disclaimer.html">Medical disclaimer</a></p>
         <p>Herb and fruit photographs from <a href="https://commons.wikimedia.org" target="_blank" rel="noopener">Wikimedia Commons</a> contributors — credits on each page.</p>
         <p>For education only — not medical advice. Always consult your healthcare provider.</p>
+        <p class="scripture-copyright">${typeof BIBLE_COPYRIGHT !== "undefined" ? BIBLE_COPYRIGHT : ""}</p>
       </div>
     </footer>`;
 

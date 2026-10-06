@@ -1052,70 +1052,192 @@ function initInteractions() {
   render();
 }
 
-/* ---------------- Herb finder ---------------- */
-const QUIZ_GOALS = ["sleep", "calming", "digestion", "immunity", "energy", "skin", "heart", "aches", "respiratory", "women", "men"];
-const GOAL_GROUPS = { sleep: ["calm"], calming: ["calm"], digestion: ["cleanse"], immunity: ["immune"], respiratory: ["immune"], energy: ["vitality"], skin: ["vitality"], heart: ["body"], aches: ["body"], women: ["women"], men: ["men"] };
-const QUIZ_SITUATIONS = ["pregnancy", "breastfeeding", "children", "liver", "kidney", "high-bp", "autoimmune", "hormone-sensitive", "daisy-allergy", "surgery"];
+/* ---------------- "What should I take?" quiz ---------------- */
+const GUIDE_CATS = { sleep: "sleep", stress: "calming", digestion: "digestion", immunity: "immunity", "cold-flu": "respiratory", heart: "heart", "blood-sugar": null, skin: "skin", hair: "skin", joints: "aches", energy: "energy", memory: "energy", "womens-cycle": "women", menopause: "women", "mens-health": "men" };
+
+function drugMatches(q) {
+  const norm = (t) => t.toLowerCase().replace(/[^a-z0-9 ]/g, "");
+  q = norm(q);
+  if (q.length < 2) return [];
+  return DRUGS.filter(([name, , brands]) => norm(name).includes(q) || norm(brands).includes(q)).slice(0, 8);
+}
 
 function initFinder() {
-  $("#quiz-goals").innerHTML = QUIZ_GOALS.map((g, i) => `<label class="quiz-card"><input type="radio" name="goal" value="${g}" ${i === 0 ? "checked" : ""}><span>${icon(CATEGORY_ICONS[g] || "leaf")}${CATEGORIES[g]}</span></label>`).join("");
-  $("#quiz-meds").innerHTML = INTERACTIONS.filter((x) => x.type === "med").map((x) => `<label class="ix-option"><input type="checkbox" name="flag" value="${x.id}"><span><strong>${x.label}</strong></span></label>`).join("");
-  $("#quiz-situations").innerHTML = QUIZ_SITUATIONS.map((id) => INTERACTIONS.find((x) => x.id === id)).map((x) => `<label class="ix-option"><input type="checkbox" name="flag" value="${x.id}"><span><strong>${x.label}</strong></span></label>`).join("");
+  const app = $("#finder-app");
+  const a = { goal: null, duration: null, who: null, drugs: [], meds: [], conds: [], form: null };
+  let step = 0;
+  const condOptions = INTERACTIONS.filter((x) => x.type === "condition" && !["pregnancy", "breastfeeding", "children", "older-adults"].includes(x.id));
 
-  $("#quiz-form").addEventListener("submit", (e) => {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    const goal = fd.get("goal"), form = fd.get("form"), flags = fd.getAll("flag");
-    const entries = INTERACTIONS.filter((x) => flags.includes(x.id));
-    const levelFor = (key) => entries.some((x) => x.avoid[key]) ? "avoid" : entries.some((x) => x.caution[key]) ? "caution" : "ok";
-    const score = (h) => {
-      const b = BENEFITS[h.id] || [];
-      let n = b.filter(([e]) => e === "R").length * 3 + b.filter(([e]) => e === "P").length;
-      if (h.cats[0] === goal) n += 3;
-      const c = CAPS[h.id];
-      if (form === "capsule" && c && Array.isArray(c.cap)) n += 2;
-      if (form === "tea" && c && c.herb && /tea/i.test(c.herb[2] || "")) n += 2;
-      if (form === "food" && h.cats.includes("kitchen")) n += 3;
-      if (levelFor(h.id) === "caution") n -= 2;
+  const STEPS = [
+    { key: "goal", title: "What would you like help with?", render: () => `<div class="quiz-grid finder-goals">${TOPIC_GUIDES.map((g) => `<label class="quiz-card"><input type="radio" name="goal" value="${g.id}" ${a.goal === g.id ? "checked" : ""}><span>${icon(g.icon)}${g.short}</span></label>`).join("")}</div>` },
+    { key: "duration", title: "How long has this been bothering you?", render: () => `<div class="who-grid">${[["days", "It just started", "a few days"], ["weeks", "A few weeks", ""], ["months", "Months or longer", ""], ["well", "It's not a problem", "I just want to stay well"]].map(([v, l, sub]) => `<label class="quiz-card who-card"><input type="radio" name="duration" value="${v}" ${a.duration === v ? "checked" : ""}><span><strong>${l}</strong>${sub ? `<em>${sub}</em>` : ""}</span></label>`).join("")}</div>` },
+    { key: "who", title: "Who is this for?", render: () => `<div class="who-grid">${WHO_OPTIONS.map((w) => `<label class="quiz-card who-card"><input type="radio" name="who" value="${w.id}" ${a.who === w.id ? "checked" : ""}><span><strong>${w.label}</strong>${w.sub ? `<em>${w.sub}</em>` : ""}</span></label>`).join("")}</div>` },
+    { key: "meds", title: "Do you take any medicines?", optional: true, render: () => `
+      <label class="ix-item-label">Type the name on your bottle (brand or generic)
+        <input type="search" id="f-drug" class="field" placeholder="e.g. Eliquis, Zoloft, metformin, birth control…" autocomplete="off">
+      </label>
+      <ul class="drug-suggest" id="f-suggest"></ul>
+      <div class="drug-chips" id="f-chips"></div>
+      <details class="ix-groups"><summary>Or choose the type of medicine</summary>
+        <div class="ix-options">${INTERACTIONS.filter((x) => x.type === "med").map((x) => `<label class="ix-option"><input type="checkbox" name="med" value="${x.id}" ${a.meds.includes(x.id) ? "checked" : ""}><span><strong>${x.label}</strong><em>${x.examples}</em></span></label>`).join("")}</div>
+      </details>
+      <p class="muted small">No medicines? Just tap Next.</p>` },
+    { key: "conds", title: "Do any of these apply to you?", optional: true, render: () => `<div class="ix-options">${condOptions.map((x) => `<label class="ix-option"><input type="checkbox" name="cond" value="${x.id}" ${a.conds.includes(x.id) ? "checked" : ""}><span><strong>${x.label}</strong>${x.examples ? `<em>${x.examples}</em>` : ""}</span></label>`).join("")}</div><p class="muted small">None of these? Just tap Next.</p>` },
+    { key: "form", title: "How do you like to take herbs?", render: () => `<div class="who-grid">${[["tea", "As a tea"], ["capsule", "Capsules"], ["food", "In my food"], ["any", "Any way"]].map(([v, l]) => `<label class="quiz-card who-card"><input type="radio" name="form" value="${v}" ${a.form === v ? "checked" : ""}><span><strong>${l}</strong></span></label>`).join("")}</div>` }
+  ];
+
+  function show() {
+    const st = STEPS[step];
+    app.innerHTML = `<div class="card finder-step">
+      <div class="quiz-progress"><span>Question ${step + 1} of ${STEPS.length}</span><span>${Math.round((step / STEPS.length) * 100)}% done</span></div>
+      <div class="progress"><div class="progress-bar" style="width:${(step / STEPS.length) * 100}%"></div></div>
+      <h2>${st.title}</h2>
+      <div class="finder-body">${st.render()}</div>
+      <div class="finder-nav">
+        ${step ? `<button class="btn btn-outline" data-back>Back</button>` : "<span></span>"}
+        <button class="btn btn-primary" data-next ${!st.optional && !a[st.key] ? "disabled" : ""}>${step === STEPS.length - 1 ? "See my plan" : "Next"}</button>
+      </div>
+    </div>`;
+    const next = app.querySelector("[data-next]");
+    app.querySelectorAll('input[type="radio"]').forEach((r) => r.addEventListener("change", () => {
+      a[st.key] = r.value; next.disabled = false;
+      setTimeout(() => { step++; step < STEPS.length ? show() : results(); }, 220);
+    }));
+    app.querySelectorAll('input[name="med"]').forEach((c) => c.addEventListener("change", () => { a.meds = [...app.querySelectorAll('input[name="med"]:checked')].map((i) => i.value); }));
+    app.querySelectorAll('input[name="cond"]').forEach((c) => c.addEventListener("change", () => { a.conds = [...app.querySelectorAll('input[name="cond"]:checked')].map((i) => i.value); }));
+    if (st.key === "meds") {
+      const input = $("#f-drug"), sug = $("#f-suggest"), chips = $("#f-chips");
+      const drawChips = () => { chips.innerHTML = a.drugs.map((d) => `<span class="drug-chip"><strong>${d}</strong><button type="button" data-remove="${d}" aria-label="Remove ${d}">${icon("close")}</button></span>`).join(""); };
+      const add = (name) => { if (!a.drugs.includes(name)) a.drugs.push(name); input.value = ""; sug.innerHTML = ""; drawChips(); };
+      input.addEventListener("input", () => {
+        const hits = drugMatches(input.value);
+        sug.innerHTML = hits.map(([n, , b]) => `<li><button type="button" data-drug="${n}"><strong>${n}</strong>${b ? ` <em>(${b})</em>` : ""}</button></li>`).join("") ||
+          (input.value.trim().length > 2 ? `<li class="no-match">Not in our list yet — choose the type of medicine below.</li>` : "");
+      });
+      input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); const h = drugMatches(input.value)[0]; if (h) add(h[0]); } });
+      sug.addEventListener("click", (e) => { const b = e.target.closest("[data-drug]"); if (b) add(b.dataset.drug); });
+      chips.addEventListener("click", (e) => { const b = e.target.closest("[data-remove]"); if (b) { a.drugs = a.drugs.filter((d) => d !== b.dataset.remove); drawChips(); } });
+      drawChips();
+    }
+    next.addEventListener("click", () => { step++; step < STEPS.length ? show() : results(); });
+    app.querySelector("[data-back]")?.addEventListener("click", () => { step--; show(); });
+    app.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function results() {
+    const g = TOPIC_GUIDES.find((x) => x.id === a.goal);
+    const who = WHO_OPTIONS.find((w) => w.id === a.who);
+    const ids = [...new Set([...who.flags, ...a.meds, ...a.drugs.flatMap((d) => (DRUGS.find((x) => x[0] === d) || [, []])[1]), ...a.conds])];
+    const entries = INTERACTIONS.filter((x) => ids.includes(x.id));
+    const hitsFor = (key) => entries.map((e) => e.avoid[key] ? { level: "avoid", e, note: e.avoid[key] } : e.caution[key] ? { level: "caution", e, note: e.caution[key] } : null).filter(Boolean);
+    const levelFor = (key) => { const h = hitsFor(key); return h.some((x) => x.level === "avoid") ? "avoid" : h.length ? "caution" : "ok"; };
+    const skinGoal = ["skin", "hair"].includes(g.id);
+    const cat = GUIDE_CATS[g.id];
+    const pool = [...new Set([...g.herbs, ...(cat ? HERBS.filter((h) => h.cats.includes(cat)).map((h) => h.id) : [])])].filter((id) => id !== "nutmeg" && (skinGoal || !PHARM[id]?.ext));
+    const score = (id) => {
+      const b = BENEFITS[id] || [], c = CAPS[id];
+      let n = (g.herbs.includes(id) ? (8 - g.herbs.indexOf(id)) * 2 : 0) + b.filter(([e]) => e === "R").length * 3 + b.filter(([e]) => e === "P").length;
+      if (a.form === "capsule" && c && Array.isArray(c.cap)) n += 3;
+      if (a.form === "tea" && c && c.herb && /tea/i.test(c.herb[2] || "")) n += 3;
+      if (a.form === "food" && findHerb(id).cats.includes("kitchen")) n += 4;
+      if (levelFor(id) === "caution") n -= 4;
       return n;
     };
-    // Nutmeg is left out: its safe amount is a tiny culinary pinch.
-    const herbs = HERBS.filter((h) => h.cats.includes(goal) && h.id !== "nutmeg" && levelFor(h.id) !== "avoid" && !PHARM[h.id]?.ext).sort((a, b) => score(b) - score(a)).slice(0, 6);
-    const excluded = HERBS.filter((h) => h.cats.includes(goal) && levelFor(h.id) === "avoid");
-    const fruits = FRUITS.filter((f) => f.cats.includes(goal) && levelFor("fruit:" + f.id) !== "avoid").slice(0, 4);
-    const stacks = STACKS.filter((st) => (GOAL_GROUPS[goal] || []).includes(st.group) && !st.herbs.some((x) => levelFor(x.id) === "avoid"));
+    const safe = pool.filter((id) => levelFor(id) !== "avoid").sort((x, y) => score(y) - score(x));
+    const leftOut = pool.filter((id) => levelFor(id) === "avoid" && g.herbs.includes(id));
+    const top = safe.slice(0, 3), more = safe.slice(3, 7);
+    const stacks = g.stacks.map((id) => STACKS.find((s) => s.id === id)).filter((st) => !st.herbs.some((x) => levelFor(x.id) === "avoid"));
+    const fruits = [...new Set([...g.fruits, ...FRUITS.filter((f) => cat && f.cats.includes(cat)).map((f) => f.id)])].filter((id) => levelFor("fruit:" + id) !== "avoid").slice(0, 4);
+    const isChild = a.who === "child";
 
-    const out = $("#quiz-results");
-    out.hidden = false;
-    out.innerHTML = `
-      <div class="section-head"><div><p class="eyebrow">Your results</p><h2>Herbs for ${CATEGORIES[goal].toLowerCase()}</h2></div></div>
-      ${flags.length ? `<p class="muted">We left out ${excluded.length} herb${excluded.length === 1 ? "" : "s"} that ${excluded.length === 1 ? "isn't" : "aren't"} a good fit for what you told us${excluded.length ? `: ${excluded.map((h) => h.name).join(", ")}` : ""}. Herbs marked "Caution" need a check with your doctor or pharmacist first.</p>` : ""}
-      ${herbs.length ? `<div class="herb-grid">${herbs.map((h) => herbCard(h).replace('<p class="herb-card-cat">', levelFor(h.id) === "caution" ? '<p class="herb-card-cat"><span class="ix-badge ix-caution-badge">Caution</span> ' : '<p class="herb-card-cat">')).join("")}</div>` : `<p>We couldn't find a safe match. Please talk with your doctor about options.</p>`}
-      ${stacks.length ? `<h3 class="quiz-sub">Herbal stacks for this goal</h3><div class="stack-grid">${stacks.map(stackCard).join("")}</div>` : ""}
-      ${fruits.length ? `<h3 class="quiz-sub">Fruits that help</h3><div class="herb-grid">${fruits.map(fruitCard).join("")}</div>` : ""}
-      <div class="note-card">${icon("shield", "icon info-icon")}<p>These suggestions are for education only. Please check with your doctor or pharmacist before starting any herb, especially if you take medicine.</p></div>`;
-    out.scrollIntoView({ behavior: "smooth" });
-  });
+    const doseFor = (id) => {
+      const c = CAPS[id]; if (!c) return "";
+      const capTxt = Array.isArray(c.cap) ? `Capsule: ${range(c.cap[0], c.cap[1], "mg")} ${c.cap[2].toLowerCase()}, ${c.cap[3].toLowerCase()}` : "";
+      const herbTxt = c.herb ? (typeof c.herb[0] === "number" ? `${c.herb[2]}: ${range(c.herb[0], c.herb[1], "g")}, ${c.herb[3].toLowerCase()}` : `${c.herb[2]}`) : "For use on the skin only.";
+      return a.form === "capsule" ? (capTxt || herbTxt) : a.form === "any" ? [herbTxt, capTxt].filter(Boolean).join(" · ") : (herbTxt || capTxt);
+    };
+    const herbCardPlan = (id, i) => {
+      const h = findHerb(id), b = (BENEFITS[id] || [])[0], hits = hitsFor(id);
+      return `<div class="plan-herb">
+        <span class="plan-rank">${i + 1}</span>
+        <a class="stack-herb-photo" href="${herbUrl(id)}">${visual(h)}</a>
+        <div>
+          <h3><a href="${herbUrl(id)}">${h.name}</a> ${b ? `<span class="evidence ev-${b[0]}">${EVIDENCE[b[0]].label}</span>` : ""}</h3>
+          ${b ? `<p><strong>Why:</strong> ${b[2]}</p>` : `<p>${h.summary}</p>`}
+          ${isChild ? `<p class="plan-dose">Ask your pediatrician for a child's dose.</p>` : `<p class="plan-dose"><strong>How much (adults 100 lb+):</strong> ${doseFor(id)}</p>`}
+          ${hits.map((x) => `<p class="plan-caution"><span class="ix-badge ix-caution-badge">Caution</span> ${x.e.label}: ${x.note}</p>`).join("")}
+        </div>
+      </div>`;
+    };
+
+    app.innerHTML = `<div class="plan">
+      <div class="card plan-head">
+        <p class="eyebrow">Your plan</p>
+        <h2>${g.title.replace("Natural ", "")}</h2>
+        <p class="muted">For: ${who.label}${a.drugs.length || a.meds.length ? " · taking " + [...a.drugs, ...a.meds.map((m) => INTERACTIONS.find((x) => x.id === m).label)].join(", ") : ""}${a.conds.length ? " · " + a.conds.map((c) => INTERACTIONS.find((x) => x.id === c).label).join(", ") : ""}</p>
+        ${a.duration === "months" ? `<div class="note-card plan-doctor">${icon("shield", "icon info-icon")}<div><p><strong>Because this has lasted months, please also see your doctor.</strong> Ongoing problems can have causes that need treatment. Get help especially if you notice:</p><ul>${g.doctor.map((d) => `<li>${d}</li>`).join("")}</ul></div></div>` : ""}
+        ${who.flags.includes("pregnancy") ? `<div class="note-card">${icon("leaf", "icon info-icon")}<p>${who.trimester ? TRIMESTER_NOTES[who.trimester] : "When you're trying to conceive, follow the same care as early pregnancy."} <a href="${safetyUrl("pregnancy")}">Read the pregnancy guide</a>.</p></div>` : ""}
+        ${a.who === "breastfeeding" ? `<div class="note-card">${icon("leaf", "icon info-icon")}<p>Introduce one herbal tea at a time and watch your baby for changes. <a href="${safetyUrl("breastfeeding")}">Read the breastfeeding guide</a>.</p></div>` : ""}
+        ${isChild ? `<div class="note-card">${icon("shield", "icon info-icon")}<p><strong>For children, please ask your pediatrician before giving any herb.</strong> Fruits and healthy habits are the safest place to start. <a href="${safetyUrl("children")}">Read the children's guide</a>.</p></div>` : ""}
+      </div>
+
+      <div class="card"><h3 class="plan-h">1. Start with these habits</h3><ul class="check-list">${g.lifestyle.slice(0, 3).map((t) => `<li>${icon("check")}${t}</li>`).join("")}</ul></div>
+
+      ${top.length ? `<div class="card"><h3 class="plan-h">2. Your top herbs</h3>${top.map(herbCardPlan).join("")}
+        ${more.length ? `<p class="plan-more"><strong>Also worth a look:</strong> ${more.map((id) => `<a class="ix-chip" href="${herbUrl(id)}">${findHerb(id).name}${levelFor(id) === "caution" ? " (caution)" : ""}</a>`).join(" ")}</p>` : ""}
+      </div>` : `<div class="card"><h3 class="plan-h">2. Herbs</h3><p>We couldn't find an herb for this goal that's a good fit for your situation. Please talk with your doctor or pharmacist about safe options.</p></div>`}
+
+      ${stacks.length && !isChild ? `<div class="card"><h3 class="plan-h">3. A stack to try</h3><div class="stack-grid">${stacks.map(stackCard).join("")}</div></div>` : ""}
+
+      <div class="card"><h3 class="plan-h">${stacks.length && !isChild ? "4" : "3"}. Fruits that help</h3><div class="herb-grid">${fruits.map((id) => fruitCard(FRUITS.find((f) => f.id === id))).join("")}</div></div>
+
+      ${leftOut.length ? `<div class="card"><h3 class="plan-h">Left out for your safety</h3><ul class="ix-list">${leftOut.map((id) => `<li class="ix-avoid"><span class="ix-badge">Avoid</span><span><a href="${herbUrl(id)}"><strong>${findHerb(id).name}</strong></a> — ${hitsFor(id).filter((x) => x.level === "avoid").map((x) => `${x.e.label}: ${x.note}`).join(" ")}</span></li>`).join("")}</ul></div>` : ""}
+
+      <section class="verse-band plan-verse"><blockquote><p>“${g.verse.text}”</p><cite>${g.verse.ref} (${BIBLE_VERSION})</cite></blockquote></section>
+
+      <div class="btn-row center-row plan-actions">
+        <button class="btn btn-primary" data-print>Print my plan</button>
+        <button class="btn btn-outline" data-restart>Start over</button>
+        <a class="btn btn-outline" href="${guideUrl(g.id)}">Read the full ${g.short.toLowerCase()} guide</a>
+      </div>
+      <p class="small muted center">These suggestions are for education only and are not medical advice. Please check with your doctor or pharmacist before starting any herb, especially if you take medicine.</p>
+    </div>`;
+    app.querySelector("[data-print]").addEventListener("click", () => window.print());
+    app.querySelector("[data-restart]").addEventListener("click", () => { Object.assign(a, { goal: null, duration: null, who: null, drugs: [], meds: [], conds: [], form: null }); step = 0; show(); });
+    app.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  const preset = params.get("goal");
+  if (TOPIC_GUIDES.some((g) => g.id === preset)) { a.goal = preset; step = 1; }
+  show();
 }
 
 /* ---------------- Herbs & fruits of the Bible ---------------- */
 function initBible() {
-  $("#bible-intro").innerHTML = `<blockquote><p>“${BIBLE_INTRO.text}”</p><cite>${BIBLE_INTRO.ref} (KJV)</cite></blockquote>`;
-  const linkFor = (l) => l.herb ? { url: herbUrl(l.herb), name: findHerb(l.herb).name, vis: visual(findHerb(l.herb)) } : (() => { const f = FRUITS.find((x) => x.id === l.fruit); return { url: fruitUrl(f.id), name: f.name, vis: fruitVisual(f) }; })();
-  $("#bible-list").innerHTML = BIBLE_PLANTS.map((b) => {
-    const links = [b.link, ...(b.extra || [])].filter(Boolean).map(linkFor);
+  $("#bible-intro").innerHTML = `<blockquote><p>“${BIBLE_INTRO.text.replace(/^Then God said, "|"$/g, "")}”</p><cite>${BIBLE_INTRO.ref} (${BIBLE_VERSION})</cite></blockquote>`;
+  const linkFor = (l) => l.herb
+    ? { url: herbUrl(l.herb), name: findHerb(l.herb).name, vis: visual(findHerb(l.herb)) }
+    : (() => { const f = FRUITS.find((x) => x.id === l.fruit); return { url: fruitUrl(f.id), name: f.name, vis: fruitVisual(f) }; })();
+  const card = (b) => {
+    const links = [b.link, ...(b.extra || [])].map(linkFor);
     return `<article class="bible-card">
-      ${links[0] ? `<a class="bible-art" href="${links[0].url}">${links[0].vis}</a>` : `<div class="bible-art bible-art-plain">${icon("leaf")}</div>`}
+      <a class="bible-art" href="${links[0].url}">${links[0].vis}</a>
       <div class="bible-body">
         <p class="eyebrow">${b.ref}</p>
         <h3>${b.name}</h3>
         <blockquote>“${b.verse}”</blockquote>
         <p class="muted">${b.note}</p>
         ${BIBLE_REFLECTIONS[b.name] ? `<p class="bible-reflect">${icon("leaf")}<span><strong>Reflect:</strong> ${BIBLE_REFLECTIONS[b.name]}</span></p>` : ""}
-        ${links.length ? `<div class="bible-links">${links.map((l) => `<a class="ix-chip" href="${l.url}">${l.name} ${icon("arrow")}</a>`).join("")}</div>` : ""}
+        <div class="bible-links">${links.map((l) => `<a class="ix-chip" href="${l.url}">${l.name} ${icon("arrow")}</a>`).join("")}</div>
       </div>
     </article>`;
-  }).join("");
+  };
+  $("#bible-list").innerHTML = `
+    <div class="section-head"><div><p class="eyebrow">${BIBLE_PLANTS.filter((b) => b.kind === "herb").length} passages</p><h2>Herbs in Scripture</h2></div></div>
+    ${BIBLE_PLANTS.filter((b) => b.kind === "herb").map(card).join("")}
+    <div class="section-head bible-fruit-head"><div><p class="eyebrow">${BIBLE_PLANTS.filter((b) => b.kind === "fruit").length} passages</p><h2>Fruits in Scripture</h2></div></div>
+    ${BIBLE_PLANTS.filter((b) => b.kind === "fruit").map(card).join("")}
+    <p class="small muted bible-copyright">${BIBLE_COPYRIGHT}</p>`;
 }
 
 
@@ -1126,7 +1248,7 @@ function scriptureCard(kind, item) {
   return `<section id="scripture" class="scripture-card">
     <p class="eyebrow">${entry ? `${item.name.split(" (")[0]} in the Bible` : "A verse to carry with you"}</p>
     <blockquote>“${verse.text}”</blockquote>
-    <cite>${verse.ref} (KJV)</cite>
+    <cite>${verse.ref} (${BIBLE_VERSION})</cite>
     ${entry ? `<p class="scripture-note">${entry.note}</p>` : ""}
     <a class="text-link" href="bible.html">Herbs &amp; fruits of the Bible ${icon("arrow")}</a>
   </section>`;
@@ -1146,8 +1268,13 @@ function initQuiz() {
 
   function startScreen() {
     const topics = [["mixed", "Mixed — a bit of everything"], ...Object.entries(QUIZ_TOPICS)];
-    app.innerHTML = `<div class="card quiz-start">
-      <h2>Choose a topic</h2>
+    app.innerHTML = `<a class="card finder-promo" href="finder.html">
+      <span class="category-icon">${icon("leaf")}</span>
+      <span><strong>What should I take?</strong><em>Answer 6 quick questions and get a personal plan of herbs, doses, fruits and habits — safely matched to your medicines and situation.</em></span>
+      ${icon("arrow")}
+    </a>
+    <div class="card quiz-start">
+      <h2>Or test your knowledge</h2>
       <p class="muted">10 questions · instant answers with explanations · your best score is saved on this device</p>
       <div class="quiz-topic-grid">${topics.map(([id, label]) => `<button class="quiz-topic" data-topic="${id}"><strong>${label}</strong><span>${id === "mixed" ? QUIZ_QUESTIONS.length : QUIZ_QUESTIONS.filter((q) => q.t === id).length} questions${best[id] !== undefined ? ` · Best: ${best[id]}/10` : ""}</span></button>`).join("")}</div>
     </div>`;
@@ -1266,6 +1393,7 @@ function initGuide() {
             <p class="eyebrow">Wellness guide</p>
             <h1>${g.title}</h1>
             <p class="lead">${g.intro}</p>
+            <a class="btn btn-primary" href="finder.html?goal=${g.id}">Get my personal plan ${icon("arrow")}</a>
           </div>
           <div class="stack-hero-photos">${g.herbs.slice(0, 4).map((id, i) => `<a href="${herbUrl(id)}" class="shp shp-${i}">${visual(findHerb(id), i === 0)}</a>`).join("")}</div>
         </div>
@@ -1285,7 +1413,7 @@ function initGuide() {
         <ul class="doctor-list">${g.doctor.map((d) => `<li>${d}</li>`).join("")}</ul>
       </div>
     </section>
-    <section class="verse-band"><blockquote><p>“${g.verse.text}”</p><cite>${g.verse.ref}</cite></blockquote></section>
+    <section class="verse-band"><blockquote><p>“${g.verse.text}”</p><cite>${g.verse.ref} (${BIBLE_VERSION})</cite></blockquote></section>
     <section class="section section-tint">
       <div class="container">
         <div class="section-head"><div><p class="eyebrow">Nourish from the inside</p><h2>Fruits that help</h2></div></div>

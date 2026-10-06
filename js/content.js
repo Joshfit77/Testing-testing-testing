@@ -33,15 +33,15 @@ const DEFAULT_HABITS = [
 ];
 
 const VERSES = [
-  { text: "I praise you because I am fearfully and wonderfully made.", ref: "Psalm 139:14" },
-  { text: "He causeth the grass to grow for the cattle, and herb for the service of man.", ref: "Psalm 104:14" },
-  { text: "A cheerful heart is good medicine.", ref: "Proverbs 17:22" },
-  { text: "Gracious words are a honeycomb, sweet to the soul and healing to the bones.", ref: "Proverbs 16:24" },
-  { text: "Let everything that has breath praise the Lord.", ref: "Psalm 150:6" },
-  { text: "He has made everything beautiful in its time.", ref: "Ecclesiastes 3:11" },
-  { text: "The leaves of the tree were for the healing of the nations.", ref: "Revelation 22:2" },
-  { text: "Come to me, all you who are weary and burdened, and I will give you rest.", ref: "Matthew 11:28" },
-  { text: "Consider the lilies of the field, how they grow.", ref: "Matthew 6:28" }
+  { text: "I will give thanks to You, for I am fearfully and wonderfully made.", ref: "Psalm 139:14" },
+  { text: "He causes the grass to grow for the cattle, And vegetation for the labor of man, So that he may bring forth food from the earth.", ref: "Psalm 104:14" },
+  { text: "A joyful heart is good medicine.", ref: "Proverbs 17:22" },
+  { text: "Pleasant words are a honeycomb, Sweet to the soul and healing to the bones.", ref: "Proverbs 16:24" },
+  { text: "Let everything that has breath praise the LORD.", ref: "Psalm 150:6" },
+  { text: "He has made everything appropriate in its time.", ref: "Ecclesiastes 3:11" },
+  { text: "O taste and see that the LORD is good.", ref: "Psalm 34:8" },
+  { text: "Come to Me, all who are weary and heavy-laden, and I will give you rest.", ref: "Matthew 11:28" },
+  { text: "Observe how the lilies of the field grow; they do not toil nor do they spin.", ref: "Matthew 6:28" }
 ];
 
 const DAILY_RHYTHM = [
@@ -127,7 +127,7 @@ const ARTICLES = [
     date: "2026-08-29", read: 4, herb: "rose",
     excerpt: "Researchers have found that a simple habit of gratitude is linked to greater wellbeing. Here's how to begin.",
     body: [
-      { p: "'Give thanks in all circumstances' is an ancient call — and modern research suggests it's good for us too. Studies of gratitude journaling have found links with improved mood, better sleep and greater life satisfaction." },
+      { p: "'In everything give thanks' (1 Thessalonians 5:18) is an ancient call — and modern research suggests it's good for us too. Studies of gratitude journaling have found links with improved mood, better sleep and greater life satisfaction." },
       { h: "Why it may help" },
       { p: "Gratitude gently shifts our attention toward what is good and present, rather than what is missing. Over time, this practice can change how we notice and remember our days." },
       { h: "Simple ways to start" },

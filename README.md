@@ -16,8 +16,8 @@ A website about herbs, fruits and healthy reminders.
 | Safety guides | `safety/<id>.html` | Pregnancy (by trimester), breastfeeding, children (by age), adults 65+, before surgery |
 | Safety checker | `interactions.html` | Step by step: who it's for (incl. pregnancy trimester, breastfeeding, child, 65+), type medicine names (brand or generic), health conditions → what to avoid, what could happen and what to do; printable |
 | Quiz | `quiz.html` | 10-question multiple-choice quiz on herbs, fruits, safety or plants of the Bible, with explanations and best scores |
-| Herb finder | `finder.html` | Three questions → personal herb, stack and fruit suggestions that skip unsafe matches |
-| Herbs & fruits of the Bible | `bible.html` | 28 scripture passages (KJV) with reflections and links to each plant; every herb and fruit page also has a scripture card |
+| What should I take? quiz | `finder.html` | Six questions, one at a time → a personal plan of herbs with doses, a stack, fruits and habits, leaving out anything unsafe for your medicines or situation (`finder.html?goal=sleep` starts on a goal) |
+| Herbs & fruits of the Bible | `bible.html` | 24 scripture passages (NASB 1995) naming herbs and fruits on the site, with reflections and links to each plant; every herb and fruit page also has a scripture card |
 | Healthy Living | `reminders.html` | Reminders, daily checklist, water tracker, daily rhythm, seasons |
 | Journal | `journal.html` | Articles (`journal.html?a=<id>`) |
 | About | `about.html` | Story, values, FAQ, contact form |

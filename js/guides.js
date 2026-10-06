@@ -1,6 +1,6 @@
 // Wellness guides (one page per goal) and safety guides (pregnancy, children, etc.).
 // Herbs, fruits and stacks are listed by id; details are pulled from their own data.
-// Verses are quoted from the King James Version (public domain).
+// Verses are quoted from the New American Standard Bible (NASB 1995).
 
 const TOPIC_GUIDES = [
   {
@@ -9,7 +9,7 @@ const TOPIC_GUIDES = [
     lifestyle: ["Go to bed and wake up at the same times every day, even on weekends.", "Get bright daylight in the morning and dim the lights after dinner.", "Put screens away 60 minutes before bed.", "Avoid caffeine after early afternoon and alcohol close to bedtime.", "Keep your bedroom cool, dark and quiet, and reserve your bed for sleep."],
     herbs: ["chamomile", "valerian", "lemon-balm", "passionflower", "lavender", "ashwagandha"],
     fruits: ["tart-cherry", "kiwi", "cherry", "jujube"], stacks: ["restful-sleep"],
-    verse: { text: "I will both lay me down in peace, and sleep: for thou, LORD, only makest me dwell in safety.", ref: "Psalm 4:8" },
+    verse: { text: "In peace I will both lie down and sleep, For You alone, O LORD, make me to dwell in safety.", ref: "Psalm 4:8" },
     cautions: "Calming herbs add to the drowsiness of sleep medicines, anxiety medicines, opioid pain relievers and alcohol — don't combine them without your doctor. Never drive after taking sedating herbs.",
     doctor: ["Loud snoring, gasping or stopping breathing at night (possible sleep apnea)", "Trouble sleeping most nights for more than 3 months", "Falling asleep during the day, especially while driving", "Restless, crawling feelings in the legs at night"]
   },
@@ -19,7 +19,7 @@ const TOPIC_GUIDES = [
     lifestyle: ["Take three slow breaths, breathing out longer than you breathe in, several times a day.", "Move your body daily — a 20-minute walk lowers stress hormones.", "Write down worries, then one thing you're thankful for.", "Spend time in prayer, quiet reflection or nature.", "Limit caffeine and news before bed."],
     herbs: ["ashwagandha", "lavender", "holy-basil", "lemon-balm", "rhodiola", "passionflower"],
     fruits: ["blueberry", "avocado", "orange", "banana"], stacks: ["calm-resilience"],
-    verse: { text: "Peace I leave with you, my peace I give unto you: not as the world giveth, give I unto you. Let not your heart be troubled, neither let it be afraid.", ref: "John 14:27" },
+    verse: { text: "Peace I leave with you; My peace I give to you; not as the world gives do I give to you. Do not let your heart be troubled, nor let it be fearful.", ref: "John 14:27" },
     cautions: "Never combine St. John's wort with antidepressants. Calming herbs can add to sleep and anxiety medicines. Herbs are not a substitute for treatment of anxiety disorders or depression.",
     doctor: ["Panic attacks or anxiety that stops you doing daily activities", "Low mood most days for two weeks or more", "Thoughts of harming yourself — call or text 988 (U.S. Suicide & Crisis Lifeline) right away"]
   },
@@ -29,7 +29,7 @@ const TOPIC_GUIDES = [
     lifestyle: ["Eat slowly and chew well.", "Take a 10-minute walk after meals.", "Drink water through the day and add fiber gradually.", "Notice trigger foods — a food diary helps.", "Eat your last meal 2–3 hours before bed."],
     herbs: ["peppermint", "ginger", "fennel", "caraway", "chamomile", "dandelion"],
     fruits: ["kiwi", "prune", "papaya", "pineapple"], stacks: ["digestive-comfort", "gentle-cleanse"],
-    verse: { text: "Whether therefore ye eat, or drink, or whatsoever ye do, do all to the glory of God.", ref: "1 Corinthians 10:31" },
+    verse: { text: "Whether, then, you eat or drink or whatever you do, do all to the glory of God.", ref: "1 Corinthians 10:31" },
     cautions: "Peppermint can worsen heartburn. Bitter herbs like dandelion may trigger gallbladder pain if you have gallstones. Ongoing digestive symptoms need a medical check.",
     doctor: ["Blood in your stool or black, tarry stools", "Unexplained weight loss or trouble swallowing", "Severe or worsening belly pain", "A change in bowel habits lasting more than 3 weeks", "Age 45 or older and not yet screened for colon cancer"]
   },
@@ -39,7 +39,7 @@ const TOPIC_GUIDES = [
     lifestyle: ["Sleep 7–9 hours — even one short night weakens immune defenses.", "Wash hands often, especially before eating.", "Eat a rainbow of fruits and vegetables every day.", "Stay active and manage stress.", "Stay up to date with the vaccines your doctor recommends."],
     herbs: ["elderberry", "echinacea", "garlic", "astragalus", "ginger", "holy-basil"],
     fruits: ["acerola", "guava", "kiwi", "orange"], stacks: ["immune-syrup"],
-    verse: { text: "Beloved, I wish above all things that thou mayest prosper and be in health, even as thy soul prospereth.", ref: "3 John 1:2" },
+    verse: { text: "Beloved, I pray that in all respects you may prosper and be in good health, just as your soul prospers.", ref: "3 John 1:2" },
     cautions: "Immune-stimulating herbs like echinacea and astragalus are not for people with autoimmune conditions or on immune-suppressing medicines. Always cook elderberries.",
     doctor: ["Frequent, severe or unusual infections", "Infections that don't improve with usual treatment", "Fever with a stiff neck, rash or confusion — seek urgent care"]
   },
@@ -49,7 +49,7 @@ const TOPIC_GUIDES = [
     lifestyle: ["Rest — your body heals while you sleep.", "Drink plenty of warm fluids: tea, broth and water.", "Gargle with warm salt water for a sore throat.", "Use a humidifier or steamy shower to loosen mucus.", "Stay home to protect others while you're sick."],
     herbs: ["thyme", "elderberry", "ginger", "marshmallow-root", "eucalyptus", "mullein"],
     fruits: ["lemon", "kiwi", "pineapple", "orange"], stacks: ["throat-cough", "clear-breathing", "immune-syrup"],
-    verse: { text: "The Spirit of God hath made me, and the breath of the Almighty hath given me life.", ref: "Job 33:4" },
+    verse: { text: "The Spirit of God has made me, And the breath of the Almighty gives me life.", ref: "Job 33:4" },
     cautions: "Never give honey to babies under 1. Keep eucalyptus oil away from young children's faces and never swallow it. Licorice should be short-term only.",
     doctor: ["Trouble breathing, chest pain or blue lips — call emergency services", "Fever above 103°F (39.4°C) or lasting more than 3 days", "Symptoms that improve and then suddenly get worse", "A cough lasting more than 3 weeks", "Babies under 3 months with any fever"]
   },
@@ -59,7 +59,7 @@ const TOPIC_GUIDES = [
     lifestyle: ["Walk at least 30 minutes on most days.", "Cook with olive oil, garlic and plenty of vegetables.", "Cut back on salt, processed meats and sugary drinks.", "Don't smoke, and limit alcohol.", "Check your blood pressure regularly at home."],
     herbs: ["hibiscus", "garlic", "hawthorn", "olive-leaf", "green-tea", "cinnamon"],
     fruits: ["pomegranate", "blueberry", "avocado", "olive"], stacks: ["heart-harmony"],
-    verse: { text: "Keep thy heart with all diligence; for out of it are the issues of life.", ref: "Proverbs 4:23" },
+    verse: { text: "Watch over your heart with all diligence, For from it flow the springs of life.", ref: "Proverbs 4:23" },
     cautions: "Several heart herbs add to blood pressure and heart medicines. Grapefruit interacts with many heart medicines. Licorice raises blood pressure. Always involve your doctor.",
     doctor: ["Chest pain, pressure or pain spreading to the arm or jaw — call emergency services", "Blood pressure above 180/120", "Sudden shortness of breath, fainting or a racing irregular heartbeat", "Swelling in the legs with breathlessness"]
   },
@@ -69,7 +69,7 @@ const TOPIC_GUIDES = [
     lifestyle: ["Fill half your plate with non-starchy vegetables.", "Pair carbohydrates with protein, fiber or healthy fat.", "Take a 10–15 minute walk after meals.", "Choose whole fruit over juice.", "Sleep well — poor sleep raises blood sugar."],
     herbs: ["fenugreek", "cinnamon", "holy-basil", "ginseng", "olive-leaf", "moringa"],
     fruits: ["bitter-melon", "blueberry", "apple", "raspberry"], stacks: [],
-    verse: { text: "Prove thy servants, I beseech thee, ten days; and let them give us pulse to eat, and water to drink.", ref: "Daniel 1:12" },
+    verse: { text: "Please test your servants for ten days, and let us be given some vegetables to eat and water to drink.", ref: "Daniel 1:12" },
     cautions: "Blood-sugar herbs can push sugar too low with insulin or sulfonylureas. Check your blood sugar more often when starting an herb, and never stop diabetes medicine on your own.",
     doctor: ["Extreme thirst, frequent urination or blurred vision", "Blood sugar readings repeatedly above your target", "Shakiness, sweating or confusion (low blood sugar)", "Slow-healing sores on the feet"]
   },
@@ -79,7 +79,7 @@ const TOPIC_GUIDES = [
     lifestyle: ["Wear sunscreen every day — it's the best anti-aging step there is.", "Cleanse gently and moisturize while skin is damp.", "Drink water and eat colorful fruits and vegetables.", "Sleep 7–9 hours — skin repairs overnight.", "Patch-test any new product on a small area first."],
     herbs: ["calendula", "aloe-vera", "tea-tree", "gotu-kola", "rose", "witch-hazel"],
     fruits: ["tomato", "mango", "avocado", "sea-buckthorn"], stacks: ["glowing-skin"],
-    verse: { text: "I will praise thee; for I am fearfully and wonderfully made: marvellous are thy works; and that my soul knoweth right well.", ref: "Psalm 139:14" },
+    verse: { text: "I will give thanks to You, for I am fearfully and wonderfully made; Wonderful are Your works, And my soul knows it very well.", ref: "Psalm 139:14" },
     cautions: "Tea tree oil must always be diluted and never swallowed. Calendula and other daisy-family herbs can cause allergy. Stop any product that causes redness or itching.",
     doctor: ["A mole that changes size, shape or color, or bleeds", "A sore that doesn't heal in 3 weeks", "Severe acne, eczema or a rash with fever"]
   },
@@ -89,7 +89,7 @@ const TOPIC_GUIDES = [
     lifestyle: ["Eat enough protein, iron and zinc.", "Massage your scalp for a few minutes daily.", "Limit heat styling and tight hairstyles.", "Manage stress — it can trigger shedding months later.", "Be gentle with nails and keep them moisturized."],
     herbs: ["rosemary", "nettle", "horsetail", "saw-palmetto", "oat-straw", "neem"],
     fruits: ["pumpkin", "avocado", "amla", "guava"], stacks: ["hair-nails"],
-    verse: { text: "But even the very hairs of your head are all numbered. Fear not therefore: ye are of more value than many sparrows.", ref: "Luke 12:7" },
+    verse: { text: "Indeed, the very hairs of your head are all numbered. Do not fear; you are more valuable than many sparrows.", ref: "Luke 12:7" },
     cautions: "Horsetail should be thiaminase-free and used short-term. Neem oil is for the scalp only — never swallow it.",
     doctor: ["Sudden, patchy or rapid hair loss", "Hair loss with fatigue, weight changes or feeling cold (possible thyroid problem)", "Brittle, spoon-shaped nails (possible low iron)"]
   },
@@ -99,7 +99,7 @@ const TOPIC_GUIDES = [
     lifestyle: ["Keep moving: walking, swimming and cycling are joint-friendly.", "Strengthen the muscles around sore joints.", "Maintain a healthy weight — every pound lost takes pressure off the knees.", "Use warmth for stiffness and cold for swelling.", "Eat oily fish, olive oil and colorful fruits."],
     herbs: ["turmeric", "ginger", "rose-hips", "arnica", "cayenne", "nettle"],
     fruits: ["tart-cherry", "cherry", "pineapple", "olive"], stacks: ["golden-joint"],
-    verse: { text: "He healeth the broken in heart, and bindeth up their wounds.", ref: "Psalm 147:3" },
+    verse: { text: "He heals the brokenhearted And binds up their wounds.", ref: "Psalm 147:3" },
     cautions: "Turmeric and ginger supplements may add to bleeding with blood thinners. Arnica is for unbroken skin only and must never be swallowed.",
     doctor: ["A hot, red, swollen joint, especially with fever", "Joint pain after an injury, or you can't bear weight", "Morning stiffness lasting more than an hour (possible inflammatory arthritis)", "Pain that wakes you at night"]
   },
@@ -109,7 +109,7 @@ const TOPIC_GUIDES = [
     lifestyle: ["Get morning daylight to set your body clock.", "Eat regular meals with protein and fiber.", "Drink water — mild dehydration causes fatigue.", "Take short movement breaks every hour.", "Protect your sleep."],
     herbs: ["green-tea", "rhodiola", "ginseng", "ashwagandha", "yerba-mate", "moringa"],
     fruits: ["banana", "date", "raisin", "coconut"], stacks: ["morning-focus"],
-    verse: { text: "But they that wait upon the LORD shall renew their strength; they shall mount up with wings as eagles; they shall run, and not be weary; and they shall walk, and not faint.", ref: "Isaiah 40:31" },
+    verse: { text: "Yet those who wait for the LORD Will gain new strength; They will mount up with wings like eagles, They will run and not get tired, They will walk and not become weary.", ref: "Isaiah 40:31" },
     cautions: "Caffeine-containing herbs add to ADHD stimulants and can raise blood pressure. Ginseng and rhodiola can disturb sleep if taken late in the day.",
     doctor: ["Tiredness lasting more than a few weeks despite good sleep", "Fatigue with shortness of breath, pale skin or feeling cold (possible anemia or thyroid problem)", "Low mood or loss of interest in things you enjoy"]
   },
@@ -119,7 +119,7 @@ const TOPIC_GUIDES = [
     lifestyle: ["Exercise regularly — it grows new brain connections.", "Keep learning: read, memorize scripture, learn a skill.", "Stay connected with friends and family.", "Sleep 7–9 hours — the brain clears waste during sleep.", "Protect your hearing and control blood pressure."],
     herbs: ["bacopa", "ginkgo", "rosemary", "sage", "gotu-kola", "green-tea"],
     fruits: ["blueberry", "honeyberry", "pomegranate", "avocado"], stacks: ["morning-focus"],
-    verse: { text: "For God hath not given us the spirit of fear; but of power, and of love, and of a sound mind.", ref: "2 Timothy 1:7" },
+    verse: { text: "For God has not given us a spirit of timidity, but of power and love and discipline.", ref: "2 Timothy 1:7" },
     cautions: "Ginkgo increases bleeding risk, especially with blood thinners or before surgery. Bacopa can upset the stomach — take it with food.",
     doctor: ["Memory problems that affect daily life or that others notice", "Getting lost in familiar places", "Sudden confusion, slurred speech or face drooping — call emergency services (possible stroke)"]
   },
@@ -129,7 +129,7 @@ const TOPIC_GUIDES = [
     lifestyle: ["Use a hot water bottle on your lower belly for cramps.", "Keep gently active — walking and stretching ease cramps.", "Eat iron-rich foods during and after your period.", "Cut back on salt and caffeine before your period to reduce bloating.", "Track your cycle so you can plan ahead."],
     herbs: ["chasteberry", "ginger", "fennel", "raspberry-leaf", "chamomile", "saffron"],
     fruits: ["banana", "raspberry", "pomegranate", "date"], stacks: ["cycle-comfort"],
-    verse: { text: "Strength and honour are her clothing; and she shall rejoice in time to come.", ref: "Proverbs 31:25" },
+    verse: { text: "Strength and dignity are her clothing, And she smiles at the future.", ref: "Proverbs 31:25" },
     cautions: "Chasteberry interferes with hormonal birth control and fertility treatment. Avoid hormonal herbs if you are pregnant or trying to conceive.",
     doctor: ["Bleeding that soaks a pad or tampon every hour", "Severe pain that stops daily activities", "Missed periods (when not pregnant) or bleeding between periods", "PMS mood changes that feel overwhelming"]
   },
@@ -139,7 +139,7 @@ const TOPIC_GUIDES = [
     lifestyle: ["Dress in layers and keep your bedroom cool.", "Do weight-bearing exercise and strength training for bones.", "Eat calcium-rich foods and get enough vitamin D.", "Limit alcohol, spicy foods and hot drinks if they trigger flushes.", "Keep a steady sleep routine."],
     herbs: ["sage", "red-clover", "hops", "valerian", "anise", "st-johns-wort"],
     fruits: ["prune", "fig", "kiwi", "tart-cherry"], stacks: ["restful-sleep"],
-    verse: { text: "And even to your old age I am he; and even to hoar hairs will I carry you:", ref: "Isaiah 46:4" },
+    verse: { text: "Even to your old age I will be the same, And even to your graying years I will bear you!", ref: "Isaiah 46:4" },
     cautions: "Avoid plant-estrogen herbs with breast cancer or other hormone-sensitive conditions. St. John's wort interacts with many medicines and should only be used with your doctor.",
     doctor: ["Any bleeding after menopause", "Symptoms that seriously affect your sleep, work or relationships", "Low mood or anxiety", "Questions about bone density testing or hormone therapy"]
   },
@@ -149,7 +149,7 @@ const TOPIC_GUIDES = [
     lifestyle: ["Do strength training at least twice a week.", "Sleep 7–9 hours — testosterone is made during deep sleep.", "Keep a healthy waistline.", "Limit alcohol and don't smoke.", "Get regular check-ups, including blood pressure and prostate screening as advised."],
     herbs: ["ashwagandha", "fenugreek", "nettle", "saw-palmetto", "ginseng", "ginger"],
     fruits: ["pomegranate", "tomato", "pumpkin", "watermelon"], stacks: ["testosterone-support"],
-    verse: { text: "Be strong and of a good courage; be not afraid, neither be thou dismayed: for the LORD thy God is with thee whithersoever thou goest.", ref: "Joshua 1:9" },
+    verse: { text: "Have I not commanded you? Be strong and courageous! Do not tremble or be dismayed, for the LORD your God is with you wherever you go.", ref: "Joshua 1:9" },
     cautions: "Hormonal herbs are not for anyone with prostate cancer or on testosterone therapy. Ginseng can raise blood pressure and affect blood sugar.",
     doctor: ["Changes in urination: weak stream, getting up often at night, or blood", "Erectile problems — they can be an early sign of heart disease", "Constant fatigue, low drive or mood changes"]
   }
@@ -222,5 +222,5 @@ const CATEGORY_VERSES = {
   energy: TOPIC_GUIDES[10].verse,
   women: TOPIC_GUIDES[12].verse,
   men: TOPIC_GUIDES[14].verse,
-  kitchen: { text: "O taste and see that the LORD is good: blessed is the man that trusteth in him.", ref: "Psalm 34:8" }
+  kitchen: { text: "O taste and see that the LORD is good; How blessed is the man who takes refuge in Him!", ref: "Psalm 34:8" }
 };

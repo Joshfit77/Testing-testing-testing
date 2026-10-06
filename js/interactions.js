@@ -250,6 +250,9 @@ const INTERACTIONS = [
     },
     caution: {
       ginger: "Up to about 1 g dried a day is generally considered safe for morning sickness — ask your midwife.",
+      lavender: "Avoid lavender oil capsules; little safety data in pregnancy — ask your midwife before regular tea.",
+      "lemon-balm": "Little safety data in pregnancy — ask your midwife before regular use.",
+      chamomile: "Occasional weak tea is commonly used, but data is limited — ask your midwife.",
       "raspberry-leaf": "Only with your midwife's guidance, usually in the third trimester.",
       turmeric: "Food amounts are fine; avoid supplements.", "green-tea": "Limit caffeine to 200 mg a day.", fennel: "Food amounts only.",
       nutmeg: "Culinary pinches only.", saffron: "Culinary amounts only.", "black-seed": "Food amounts only.", marjoram: "Food amounts only.",

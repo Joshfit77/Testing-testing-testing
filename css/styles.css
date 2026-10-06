@@ -975,3 +975,44 @@ select.field { cursor: pointer; }
 .quiz-option.wrong { background: #f4d3cb; border-color: #b4472f; }
 .quiz-option.right::after { content: "  ✓"; color: #3f7a3a; }
 .quiz-option.wrong::after { content: "  ✗"; color: #b4472f; }
+.bible-fruit-head { margin-top: 48px; }
+.bible-copyright { margin-top: 32px; }
+.scripture-copyright { flex-basis: 100%; font-size: 0.72rem; opacity: 0.7; }
+
+/* "What should I take?" quiz */
+.finder-step h2 { font-size: clamp(1.7rem, 3vw, 2.2rem); margin: 18px 0 20px; }
+.finder-goals { grid-template-columns: repeat(3, 1fr); }
+.finder-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 24px; }
+.finder-nav .btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+.finder-promo { display: flex; align-items: center; gap: 18px; text-decoration: none; margin-bottom: 24px; background: var(--forest); color: var(--cream); border: none; transition: transform 0.2s; }
+.finder-promo:hover { transform: translateY(-2px); }
+.finder-promo strong { display: block; font-family: var(--serif); font-size: 1.7rem; }
+.finder-promo em { display: block; font-style: normal; opacity: 0.85; }
+.finder-promo > .icon { flex: none; width: 28px; height: 28px; color: #e7c9a5; }
+.finder-promo .category-icon { flex: none; background: rgba(246, 241, 231, 0.12); color: #e7c9a5; }
+.plan { display: grid; gap: 20px; }
+.plan-head h2 { margin-bottom: 4px; }
+.plan-head .note-card { margin-top: 16px; }
+.plan-doctor ul { margin: 8px 0 0; padding-left: 18px; }
+.plan-h { font-size: 1.6rem; margin-bottom: 14px; }
+.plan-herb { display: grid; grid-template-columns: 34px 88px 1fr; gap: 16px; align-items: start; padding: 16px 0; border-top: 1px solid var(--line); }
+.plan-herb:first-of-type { border-top: none; }
+.plan-rank { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--clay); color: #fff; font-family: var(--serif); font-size: 1.2rem; }
+.plan-herb .stack-herb-photo { width: 88px; height: 88px; }
+.plan-herb h3 { font-size: 1.5rem; margin-bottom: 6px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.plan-herb h3 a { text-decoration: none; }
+.plan-herb p { margin: 0 0 6px; }
+.plan-dose { color: var(--forest); }
+.plan-caution { font-size: 0.92rem; }
+.plan-more { margin: 14px 0 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.plan-verse { border-radius: var(--radius); padding: 56px 24px; }
+@media (max-width: 640px) {
+  .finder-goals { grid-template-columns: 1fr 1fr; }
+  .plan-herb { grid-template-columns: 30px 64px 1fr; gap: 12px; }
+  .plan-herb .stack-herb-photo { width: 64px; height: 64px; }
+  .finder-promo strong { font-size: 1.35rem; }
+}
+@media print {
+  body[data-page="finder"] .page-hero, .plan-actions { display: none !important; }
+  .plan .card { box-shadow: none; break-inside: avoid; }
+}
