@@ -27,7 +27,7 @@ A food-first wellness website: real food, natural remedies, healthy habits and h
 | Recipe pages | `recipes/<id>.html` | Ingredients checklist, numbered steps, tips, storage, safety, links to the herbs, fruits and guide; printable. Herb, fruit and guide pages show matching recipes |
 | Weekly Devotional | `devotional.html` | A 12-week series (verse, reflection, prayer, habit, herb/fruit/recipe of the week) that changes every Monday, plus a weekly calendar reminder (.ics) for phones. This week's devotional also shows on Healthy Living and My Plan |
 | Español | `es/index.html`, `es/seguridad.html` | Hand-written Spanish home page and safety guide (pregnancy, breastfeeding, children, medicines, Poison Control), plus a "Traducir todo el sitio" button that opens the rest of the site in Google Translate (machine translation) |
-| Healthy Living | `reminders.html` | 100 natural reminders for the body (`reminders.html#body-reminders`, edit in `js/content.js`), plus | Reminders, daily checklist, water tracker, daily rhythm, seasons |
+| Healthy Living | `reminders.html` | 100 natural reminders for the body (`reminders.html#body-reminders`, edit in `js/content.js`), plus reminders, daily checklist, water tracker, daily rhythm, seasons |
 | Journal | `journal.html` | Articles (`journal.html?a=<id>`) |
 | About | `about.html` | Story, values, FAQ, contact form |
 | Legal | `privacy.html`, `terms.html`, `disclaimer.html` | Privacy policy, terms of use, medical disclaimer (templates — have them reviewed for your situation) |
