@@ -69,12 +69,12 @@ const breadcrumb = (section, sectionUrl, name, url) => ({
 });
 
 // ---------- Your own photos ----------
-// Drop a photo named after an herb or fruit into images/herbs/ or images/fruits/
-// (e.g. images/herbs/chamomile.jpg, images/fruits/apple.jpg) and it replaces the Wikipedia photo.
-const PHOTO_EXT = /\.(jpe?g|png|webp|avif)$/i;
+// Drop a photo named after an herb, fruit or food into images/herbs/, images/fruits/ or images/foods/
+// (e.g. images/herbs/chamomile.jpg, images/fruits/apple.jpg, images/foods/chicken-breast.jpg) and it replaces the Wikipedia photo.
+const PHOTO_EXT = /\.(jpe?g|png|webp|avif)$/i; // .svg drawings are left for photos.js overrides
 const myPhotos = {};
 const unknownPhotos = [];
-for (const [dir, list, prefix] of [["herbs", HERBS, ""], ["fruits", FRUITS, "fruit:"]]) {
+for (const [dir, list, prefix] of [["herbs", HERBS, ""], ["fruits", FRUITS, "fruit:"], ["foods", FOODS, "food:"]]) {
   const folder = path.join(root, "images", dir);
   fs.mkdirSync(folder, { recursive: true });
   for (const file of fs.readdirSync(folder).filter((f) => PHOTO_EXT.test(f)).sort()) {

@@ -1290,3 +1290,19 @@ body[data-page="es"] .note-card .btn { margin-top: 6px; color: var(--cream); }
   .start-grid-4 .start-card { flex-direction: row; align-items: center; padding: 18px 44px 18px 18px; }
   .start-grid-4 .start-card > .icon { top: 50%; transform: translateY(-50%); }
 }
+
+/* ---------- 100 natural reminders for the body ---------- */
+.body-reminders { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.body-reminder { display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); min-width: 0; transition: border-color 0.3s, box-shadow 0.3s; }
+.body-reminder.spot { border-color: var(--clay); box-shadow: 0 0 0 3px rgba(181, 101, 74, 0.18); }
+.br-num { flex: none; width: 30px; font-family: var(--serif); font-size: 1.3rem; font-weight: 600; color: var(--clay); text-align: center; }
+.br-icon { flex: none; width: 38px; height: 38px; border-radius: 50%; background: var(--sage-soft); color: var(--forest); display: grid; place-items: center; }
+.br-icon .icon { width: 18px; height: 18px; }
+.body-reminder p { flex: 1; margin: 0; line-height: 1.45; min-width: 0; }
+.body-reminder p em { display: block; font-style: normal; font-size: 0.68rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-bottom: 2px; }
+.br-add { flex: none; display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); background: var(--paper); color: var(--forest); border-radius: 999px; padding: 6px 12px; font-size: 0.78rem; cursor: pointer; white-space: nowrap; }
+.br-add:hover { border-color: var(--forest); }
+.br-add.added { background: var(--forest); border-color: var(--forest); color: var(--cream); }
+.br-add .icon { width: 14px; height: 14px; }
+@media (max-width: 900px) { .body-reminders { grid-template-columns: 1fr; } }
+@media (max-width: 480px) { .br-num { width: 22px; font-size: 1.1rem; } .br-icon { display: none; } .body-reminder { gap: 10px; padding: 12px; } }

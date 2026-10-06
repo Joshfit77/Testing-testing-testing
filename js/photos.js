@@ -4,13 +4,15 @@
 // the drawn illustration. Once the photo list arrives, a photo is laid over the illustration;
 // if a photo can't be found or the request fails, the illustration simply stays.
 //
-// To use your own photo, the easy way: put it in images/herbs/ or images/fruits/, named after the
-// herb or fruit (images/herbs/chamomile.jpg, images/fruits/apple.jpg), then run `node scripts/build.js`.
+// To use your own photo, the easy way: put it in images/herbs/, images/fruits/ or images/foods/, named after the
+// herb, fruit or food (images/herbs/chamomile.jpg, images/fruits/apple.jpg, images/foods/eggs.jpg), then run `node scripts/build.js`.
 // Or add it to PHOTO_OVERRIDES below by hand to choose your own credit line, e.g.
 //   chamomile: { src: "images/chamomile.jpg", credit: "Photo by Jane Doe" }
 
-const PHOTO_OVERRIDES = Object.assign({}, typeof MY_PHOTOS !== "undefined" ? MY_PHOTOS : {}, {
-});
+const PHOTO_OVERRIDES = Object.assign({
+  // A cooked, plated meal instead of Wikipedia's raw whole chicken.
+  "food:chicken-breast": { src: "images/foods/chicken-breast.svg", credit: "Illustration: Beauty & Praise" }
+}, typeof MY_PHOTOS !== "undefined" ? MY_PHOTOS : {});
 
 // Wikipedia article titles where the herb's common or Latin name isn't the best match.
 const WIKI_TITLES = {

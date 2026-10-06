@@ -433,14 +433,15 @@ function initLiving() {
 
   // Reminder of the moment
   const tipText = $("#tip-text");
-  let tip = Math.floor(Math.random() * REMINDERS.length);
+  const TIPS = [...REMINDERS, ...BODY_REMINDERS.map((r) => r[1])];
+  let tip = Math.floor(Math.random() * TIPS.length);
   const showTip = () => {
     tipText.classList.remove("fade");
     void tipText.offsetWidth;
-    tipText.textContent = REMINDERS[tip];
+    tipText.textContent = TIPS[tip];
     tipText.classList.add("fade");
   };
-  $("#next-tip").addEventListener("click", () => { tip = (tip + 1) % REMINDERS.length; showTip(); });
+  $("#next-tip").addEventListener("click", () => { tip = (tip + 1) % TIPS.length; showTip(); });
   showTip();
 
   // Checklist
@@ -527,6 +528,37 @@ function initLiving() {
     </div>`).join("");
 
   $("#living-devo").innerHTML = devotionalCard(thisWeeksDevotional(), true);
+
+  // 100 natural reminders for the body
+  let group = "all";
+  const bodyList = $("#body-list");
+  $("#body-chips").innerHTML = [["all", "All 100"], ...Object.entries(BODY_REMINDER_GROUPS).map(([k, g]) => [k, g.label])].map(([k, l]) => `<button class="chip" data-g="${k}">${l}</button>`).join("");
+  function renderBody() {
+    $("#body-chips").querySelectorAll(".chip").forEach((c) => c.classList.toggle("active", c.dataset.g === group));
+    bodyList.innerHTML = BODY_REMINDERS.map(([g, text], i) => ({ g, text, i })).filter((r) => group === "all" || r.g === group).map(({ g, text, i }) => `
+      <li class="body-reminder" id="reminder-${i + 1}">
+        <span class="br-num">${i + 1}</span>
+        <span class="br-icon">${icon(BODY_REMINDER_GROUPS[g].icon)}</span>
+        <p><em>${BODY_REMINDER_GROUPS[g].label}</em>${text}</p>
+        <button class="br-add${habits.includes(text) ? " added" : ""}" data-add="${i}" aria-label="Add to my daily checklist">${habits.includes(text) ? `${icon("check")} Added` : "+ Checklist"}</button>
+      </li>`).join("");
+  }
+  $("#body-chips").addEventListener("click", (e) => { const c = e.target.closest("[data-g]"); if (c) { group = c.dataset.g; renderBody(); } });
+  bodyList.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-add]"); if (!b) return;
+    const text = BODY_REMINDERS[+b.dataset.add][1];
+    if (!habits.includes(text)) { habits.push(text); save(); renderChecklist(); toast("Added to your daily checklist."); }
+    renderBody();
+  });
+  $("#random-reminder").addEventListener("click", () => {
+    group = "all"; renderBody();
+    const i = Math.floor(Math.random() * BODY_REMINDERS.length);
+    const el = $(`#reminder-${i + 1}`);
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    list.querySelectorAll(".body-reminder.spot").forEach((x) => x.classList.remove("spot"));
+    el.classList.add("spot");
+  });
+  renderBody();
 
   // Seasons
   const month = new Date().getMonth();

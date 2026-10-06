@@ -229,6 +229,7 @@ function siteMenu() {
       { href: "journal.html", label: "Journal", desc: "Articles & seasonal tips" },
       { href: "devotional.html", label: "Weekly Devotional", desc: "A verse, prayer & habit each week" },
       { href: "reminders.html", label: "Healthy Living", desc: "Daily checklist, water & reminders" },
+      { href: "reminders.html#body-reminders", label: "100 Body Reminders", desc: "Simple ways to care for your body" },
       { href: "myplan.html", label: "My Plan", desc: "Your saved items, plan & checklist" },
       { href: "quiz.html", label: "Knowledge Quiz", desc: "Test what you know" },
       { href: "about.html", label: "About Us", desc: "Our story & contact" }
