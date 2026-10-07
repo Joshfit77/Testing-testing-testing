@@ -464,3 +464,26 @@ function searchHerbs(q) {
 }
 
 renderChrome();
+
+// Keep the logo and the menu from ever overlapping. Fonts and screen sizes vary, so measure:
+// if the full menu doesn't fit beside the logo, switch to the ☰ menu button instead.
+function fitHeader() {
+  const header = document.querySelector(".header");
+  const logo = header && header.querySelector(".logo");
+  const nav = header && header.querySelector(".main-nav");
+  const actions = header && header.querySelector(".header-actions");
+  if (!header || !logo || !nav || !actions) return;
+  header.classList.remove("nav-compact", "no-cta");
+  if (getComputedStyle(nav).display === "none") return;
+  const fits = () => {
+    const l = logo.getBoundingClientRect(), a = actions.getBoundingClientRect(), list = nav.querySelector("ul");
+    return list.scrollWidth <= nav.clientWidth + 1 && nav.getBoundingClientRect().left >= l.right + 28 && list.getBoundingClientRect().right <= a.left - 8;
+  };
+  if (fits()) return;
+  header.classList.add("no-cta");          // 1) drop the header button (it's also in the top bar)
+  if (!fits()) header.classList.add("nav-compact"); // 2) still too tight: use the ☰ menu
+}
+fitHeader();
+window.addEventListener("resize", fitHeader);
+window.addEventListener("load", fitHeader);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitHeader);

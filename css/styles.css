@@ -1337,3 +1337,20 @@ body[data-page="es"] .note-card .btn { margin-top: 6px; color: var(--cream); }
 @keyframes emblem-rise { from { opacity: 0; transform: translateY(12px) scale(0.97); } to { opacity: 1; transform: none; } }
 @media (max-width: 900px) { .hero-art { min-height: 0; padding-top: 12px; } .hero-art .hero-emblem { width: 360px; } }
 @media (max-width: 640px) { .hero-art { height: auto; } .hero-art .hero-emblem { width: 300px; } .hero-verse { margin-top: -24px; padding: 18px 20px; } .hero-verse blockquote { font-size: 1.15rem; } }
+
+/* Header: logo never shrinks; menu takes the remaining room or collapses to ☰ (see fitHeader) */
+.header-inner { gap: 20px; }
+.header .logo { flex: none; }
+.main-nav { flex: 1 1 auto; min-width: 0; display: flex; justify-content: center; }
+.header.nav-compact .main-nav { display: none; }
+.header.nav-compact .menu-btn { display: inline-grid; }
+.header.nav-compact .header-cta { display: none; }
+.header.nav-compact .header-actions { margin-left: auto; }
+@media (max-width: 1180px) { .main-nav { display: none; } }
+.header .container.header-inner { max-width: 1480px; }
+.header.no-cta .header-cta { display: none; }
+@media (min-width: 1181px) { .header-cta { display: inline-flex; } }
+.header-inner { gap: 36px; }
+@media (max-width: 1180px) { .header-inner { gap: 8px; } }
+.main-nav .nav-top { padding: 10px 10px; font-size: 0.74rem !important; letter-spacing: 0.06em !important; }
+@media (max-width: 1250px) { .main-nav .nav-top { padding: 8px 8px; font-size: 0.7rem !important; letter-spacing: 0.04em !important; } }
