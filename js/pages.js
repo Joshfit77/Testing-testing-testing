@@ -8,20 +8,6 @@ const CATEGORY_ICONS = {
   skin: "drop", heart: "heart", energy: "sun", women: "leaf", men: "leaf", aches: "leaf", kitchen: "pot"
 };
 
-function articleCard(a, big = false) {
-  const h = findHerb(a.herb);
-  return `<article class="article-card${big ? " article-card-big" : ""}">
-    <a href="journal.html?a=${a.id}">
-      <div class="article-art">${visual(h)}</div>
-      <div class="article-body">
-        <p class="meta"><span>${a.category}</span> · ${formatDate(a.date)} · ${a.read} min read</p>
-        <h3>${a.title}</h3>
-        <p>${a.excerpt}</p>
-        <span class="text-link">Read article ${icon("arrow")}</span>
-      </div>
-    </a>
-  </article>`;
-}
 
 // Which medicines and health situations flag this herb ("chamomile") or fruit ("fruit:apple").
 function interactionsFor(key) {
@@ -71,37 +57,18 @@ function stackCard(st) {
 
 /* ---------------- Home ---------------- */
 function initHome() {
-  const herb = dailyPick(HERBS);
-  // The hero emblem and verse are written directly in index.html.
-
   attachSearch($("#hero-search"), $("#hero-suggest"));
 
-  $("#food-cats").innerHTML = FOOD_CATEGORIES.map(foodCatCard).join("");
-  $("#remedy-cats").innerHTML = Object.keys(REMEDY_CATS).map(remedyCatCard).join("");
+  const paths = [
+    { href: "foods.html", key: "fruit:pomegranate", title: "Foods", text: "Real, everyday foods — what they offer, how much to eat and when.", cta: "Explore foods" },
+    { href: "remedies.html", key: "ginger", title: "Natural Remedies", text: "Gentle teas, soaks and home remedies with clear amounts and safety.", cta: "Find a remedy" },
+    { href: "herbs.html", key: "chamomile", title: "Herbs", text: "Time-honored herbs as a supporting role — with research and doses.", cta: "Meet the herbs" }
+  ];
+  $("#art-paths").innerHTML = paths.map((p) => `<a class="art-path" href="${p.href}">
+    <span class="art-path-frame">${keyVisual(p.key, true)}</span>
+    <span class="art-path-body"><strong>${p.title}</strong><span>${p.text}</span><em>${p.cta} ${icon("arrow")}</em></span>
+  </a>`).join("");
 
-  $("#popular-grid").innerHTML = ["fruit:blueberry", "food:eggs", "ginger", "food:greek-yogurt", "food:salmon", "food:honey", "food:oats", "turmeric",
-    "fruit:avocado", "fruit:banana", "garlic", "chamomile"].map(cardFor).join("");
-  $("#popular-remedies").innerHTML = ["ginger-tea-nausea", "honey-lemon-warm-water", "chamomile-bedtime-tea", "peppermint-tea-bloating"].map((id) => remedyCard(findRemedy(id))).join("");
-
-  $("#need-grid").innerHTML = TOPIC_GUIDES.map((g) => `<a class="need-tile" href="${guideUrl(g.id)}">
-    <span class="category-icon">${icon(g.icon)}</span><span class="need-name">${g.short}</span></a>`).join("");
-  $("#safety-links").innerHTML = SAFETY_GUIDES.map((g) => `<a href="${safetyUrl(g.id)}">${g.short}</a>`).join(" · ");
-
-  const verse = dailyPick(VERSES);
-  $("#verse-band").innerHTML = `<blockquote><p>“${verse.text}”</p><cite>${verse.ref} (${BIBLE_VERSION})</cite></blockquote>`;
-
-  $("#feature").innerHTML = `
-    <div class="feature-art">${visual(herb, true)}</div>
-    <div class="feature-copy">
-      <p class="eyebrow">Herb of the day</p>
-      <h2>${herb.name}</h2>
-      <p class="latin">${herb.latin}</p>
-      <p class="lead">${SUMMARY[herb.id]}</p>
-      <a class="btn btn-primary" href="${herbUrl(herb.id)}">Read the full profile</a>
-    </div>`;
-  $("#herb-grid-home").innerHTML = ["peppermint", "lemon-balm", "cinnamon", "elderberry", "rosemary"].filter((id) => id !== herb.id).slice(0, 4).map((id) => herbCard(findHerb(id))).join("");
-
-  $("#journal-grid").innerHTML = ARTICLES.slice(0, 3).map((a) => articleCard(a)).join("");
 }
 
 /* ---------------- Herb library ---------------- */
@@ -401,8 +368,7 @@ function initHerb() {
 
     <section class="section section-tint">
       <div class="container">
-        ${recipeSection(recipesFor((r) => r.herbs.includes(h.id)), `Recipes with ${h.name.split(" (")[0]}`)}
-        <div class="section-head${recipesFor((r) => r.herbs.includes(h.id)).length ? " stack-head" : ""}"><div><p class="eyebrow">Keep exploring</p><h2>Related herbs</h2></div>
+        <div class="section-head"><div><p class="eyebrow">Keep exploring</p><h2>Related herbs</h2></div>
           <a class="text-link" href="herbs.html?cat=${h.cats[0]}">More ${CATEGORIES[h.cats[0]]} ${icon("arrow")}</a></div>
         <div class="herb-grid">${related.map(herbCard).join("")}</div>
         <nav class="prev-next">
@@ -524,7 +490,6 @@ function initLiving() {
       <ul>${r.items.map((x) => `<li>${x}</li>`).join("")}</ul>
     </div>`).join("");
 
-  $("#living-devo").innerHTML = devotionalCard(thisWeeksDevotional(), true);
 
   // 100 natural reminders for the body
   let group = "all";
@@ -570,61 +535,6 @@ function initLiving() {
 }
 
 /* ---------------- Journal ---------------- */
-function initJournal() {
-  const a = ARTICLES.find((x) => x.id === params.get("a"));
-  const main = $("#journal-main");
-  if (!a) {
-    const [first, ...rest] = ARTICLES;
-    main.innerHTML = `
-      <section class="page-hero">
-        <div class="container">
-          <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span aria-current="page">Journal</span></nav>
-          <h1>The Journal</h1>
-          <p class="lead">Guides, seasonal wisdom and gentle encouragement for a healthier, more grateful life.</p>
-        </div>
-      </section>
-      <section class="section">
-        <div class="container">
-          ${articleCard(first, true)}
-          <div class="journal-grid">${rest.map((x) => articleCard(x)).join("")}</div>
-        </div>
-      </section>`;
-    return;
-  }
-
-  document.title = `${a.title} — Beauty & Praise`;
-  const h = findHerb(a.herb);
-  const body = a.body.map((b) =>
-    b.h ? `<h2>${b.h}</h2>` : b.list ? `<ul class="check-list">${b.list.map((x) => `<li>${icon("check")}${x}</li>`).join("")}</ul>` : `<p>${b.p}</p>`
-  ).join("");
-  const more = ARTICLES.filter((x) => x !== a).slice(0, 3);
-  main.innerHTML = `
-    <article>
-      <header class="article-hero">
-        <div class="container narrow">
-          <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><a href="journal.html">Journal</a><span>/</span><span aria-current="page">${a.category}</span></nav>
-          <p class="eyebrow">${a.category}</p>
-          <h1>${a.title}</h1>
-          <p class="meta">${formatDate(a.date)} · ${a.read} min read · By the Beauty &amp; Praise team</p>
-        </div>
-        <div class="container article-banner">${visual(h, true)}</div>
-      </header>
-      <div class="container narrow prose article-prose">
-        <p class="lead">${a.excerpt}</p>
-        ${body}
-        <div class="article-herb">
-          <span class="mini-art">${visual(h)}</span>
-          <div><p class="eyebrow">Featured herb</p><a href="${herbUrl(h.id)}"><strong>${h.name}</strong> — ${h.summary}</a></div>
-        </div>
-      </div>
-    </article>
-    <section class="section section-tint">
-      <div class="container">
-        <div class="section-head"><h2>Keep reading</h2><a class="text-link" href="journal.html">All articles ${icon("arrow")}</a></div>
-        <div class="journal-grid">${more.map((x) => articleCard(x)).join("")}</div>
-      </div>
-    </section>`;
-}
 
 /* ---------------- Herbal stacks ---------------- */
 function initStacks() {
@@ -760,61 +670,10 @@ function seasonsOf(text) {
   return out;
 }
 
-function initFruits() {
-  const PAGE = 24;
-  const state = { q: params.get("q") || "", cat: params.get("cat") || "all", season: "all", sort: "az", letter: "", saved: params.get("saved") === "1", shown: PAGE };
-  const search = $("#fruit-search"), catSel = $("#fruit-cat"), seasonSel = $("#fruit-season"), sortSel = $("#fruit-sort");
-  const savedBox = $("#fruit-saved"), grid = $("#fruit-grid"), count = $("#fruit-count"), more = $("#fruit-more");
-
-  const usedCats = Object.keys(CATEGORIES).filter((k) => FRUITS.some((fr) => fr.cats.includes(k)));
-  catSel.innerHTML = `<option value="all">All benefits</option>` + usedCats.map((k) => `<option value="${k}">${CATEGORIES[k]}</option>`).join("");
-  seasonSel.innerHTML = `<option value="all">Any season</option>` + SEASON_NAMES.map((n) => `<option value="${n}">${n}</option>`).join("");
-  search.value = state.q;
-  catSel.value = CATEGORIES[state.cat] ? state.cat : "all";
-  savedBox.checked = state.saved;
-
-  const letters = [...new Set(FRUITS.map((fr) => fr.name[0].toUpperCase()))];
-  $("#fruit-az").innerHTML = `<button class="az-btn active" data-letter="">All</button>` +
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map((l) => `<button class="az-btn" data-letter="${l}" ${letters.includes(l) ? "" : "disabled"}>${l}</button>`).join("");
-
-  function results() {
-    let list = state.q.trim() ? searchFruits(state.q.trim()) : [...FRUITS];
-    if (state.cat !== "all") list = list.filter((fr) => fr.cats.includes(state.cat));
-    if (state.season === "Year-round") list = list.filter((fr) => /year-round/i.test(fr.season));
-    else if (state.season !== "all") list = list.filter((fr) => seasonsOf(fr.season).includes(state.season.toLowerCase()));
-    if (state.letter) list = list.filter((fr) => fr.name[0].toUpperCase() === state.letter);
-    if (state.saved) { const fav = favorites.all(); list = list.filter((fr) => fav.includes("fruit:" + fr.id)); }
-    if (!state.q.trim() || state.sort !== "az") { list.sort((a, b) => a.name.localeCompare(b.name)); if (state.sort === "za") list.reverse(); }
-    return list;
-  }
-  function render() {
-    const list = results();
-    grid.innerHTML = list.slice(0, state.shown).map(fruitCard).join("");
-    count.textContent = `${list.length} ${list.length === 1 ? "fruit" : "fruits"}`;
-    more.hidden = list.length <= state.shown;
-    $("#fruit-empty").hidden = list.length > 0;
-  }
-  const reset = () => { state.shown = PAGE; render(); };
-  search.addEventListener("input", () => { state.q = search.value; reset(); });
-  catSel.addEventListener("change", () => { state.cat = catSel.value; reset(); });
-  seasonSel.addEventListener("change", () => { state.season = seasonSel.value; reset(); });
-  sortSel.addEventListener("change", () => { state.sort = sortSel.value; reset(); });
-  savedBox.addEventListener("change", () => { state.saved = savedBox.checked; reset(); });
-  $("#fruit-az").addEventListener("click", (e) => {
-    const b = e.target.closest(".az-btn");
-    if (!b || b.disabled) return;
-    state.letter = b.dataset.letter;
-    document.querySelectorAll("#fruit-az .az-btn").forEach((x) => x.classList.toggle("active", x === b));
-    reset();
-  });
-  more.addEventListener("click", () => { state.shown += PAGE; render(); });
-  document.addEventListener("favorites-changed", () => { if (state.saved) render(); });
-  render();
-}
 
 function initFruit() {
   const fr = FRUITS.find((x) => x.id === (document.body.dataset.id || params.get("id")));
-  if (!fr) return notFound($("#fruit-main"), "Fruit", "fruits.html", "Browse the fruit library");
+  if (!fr) return notFound($("#fruit-main"), "Fruit", "foods.html", "Browse foods & fruits");
   renderFoodProfile(foodProfile(fr, "fruit", INTERACTIONS), $("#fruit-main"));
 }
 
@@ -1113,13 +972,11 @@ function initFinder() {
 
       ${leftOut.length ? `<div class="card"><h3 class="plan-h">Left out for your safety</h3><ul class="ix-list">${leftOut.map((k) => `<li class="ix-avoid"><span class="ix-badge">Avoid</span><span><a href="${itemUrl(k)}"><strong>${itemName(k)}</strong></a> — ${hitsFor(k).filter((x) => x.level === "avoid").map((x) => `${x.e.label}: ${x.note}`).join(" ")}</span></li>`).join("")}</ul></div>` : ""}
 
-      ${recipesFor((r) => r.guide === g.id && !r.herbs.some((x) => levelFor(x) === "avoid")).length && !isChild ? `<div class="card"><h3 class="plan-h">Recipes to make at home</h3><div class="recipe-grid">${recipesFor((r) => r.guide === g.id && !r.herbs.some((x) => levelFor(x) === "avoid")).slice(0, 3).map(recipeCard).join("")}</div></div>` : ""}
 
       <section class="verse-band plan-verse"><blockquote><p>“${g.verse.text}”</p><cite>${g.verse.ref} (${BIBLE_VERSION})</cite></blockquote></section>
 
       <div class="btn-row center-row plan-actions">
         <button class="btn btn-primary" data-print>Print my plan</button>
-        <a class="btn btn-outline" href="myplan.html">Saved to My Plan ${icon("heart")}</a>
         <button class="btn btn-outline" data-restart>Start over</button>
         <a class="btn btn-outline" href="${guideUrl(g.id)}">Read the full ${g.short.toLowerCase()} guide</a>
       </div>
@@ -1191,91 +1048,11 @@ function shuffle(list) {
   return a;
 }
 
-function initQuiz() {
-  const app = $("#quiz-app");
-  const best = store.get("bp-quiz-best", {});
-  let game = null;
-
-  function startScreen() {
-    const topics = [["mixed", "Mixed — a bit of everything"], ...Object.entries(QUIZ_TOPICS)];
-    app.innerHTML = `<a class="card finder-promo" href="finder.html">
-      <span class="category-icon">${icon("leaf")}</span>
-      <span><strong>What should I eat?</strong><em>Answer 6 quick questions and get a personal plan of foods, natural remedies, habits and herbs — safely matched to your medicines and situation.</em></span>
-      ${icon("arrow")}
-    </a>
-    <div class="card quiz-start">
-      <h2>Or test your knowledge</h2>
-      <p class="muted">10 questions · instant answers with explanations · your best score is saved on this device</p>
-      <div class="quiz-topic-grid">${topics.map(([id, label]) => `<button class="quiz-topic" data-topic="${id}"><strong>${label}</strong><span>${id === "mixed" ? QUIZ_QUESTIONS.length : QUIZ_QUESTIONS.filter((q) => q.t === id).length} questions${best[id] !== undefined ? ` · Best: ${best[id]}/10` : ""}</span></button>`).join("")}</div>
-    </div>`;
-  }
-
-  function start(topic) {
-    const pool = topic === "mixed" ? QUIZ_QUESTIONS : QUIZ_QUESTIONS.filter((q) => q.t === topic);
-    game = { topic, questions: shuffle(pool).slice(0, 10).map((q) => ({ ...q, options: shuffle(q.o) })), i: 0, score: 0, missed: [] };
-    question();
-  }
-
-  const learnLink = (link) => link.bible ? `<a class="text-link" href="bible.html">Herbs &amp; fruits of the Bible ${icon("arrow")}</a>`
-    : link.herb ? `<a class="text-link" href="${herbUrl(link.herb)}">Learn about ${findHerb(link.herb).name} ${icon("arrow")}</a>`
-    : `<a class="text-link" href="${fruitUrl(link.fruit)}">Learn about ${FRUITS.find((f) => f.id === link.fruit).name} ${icon("arrow")}</a>`;
-
-  function question() {
-    const q = game.questions[game.i];
-    const n = game.questions.length;
-    app.innerHTML = `<div class="card quiz-q">
-      <div class="quiz-progress"><span>Question ${game.i + 1} of ${n}</span><span>Score: ${game.score}</span></div>
-      <div class="progress"><div class="progress-bar" style="width:${(game.i / n) * 100}%"></div></div>
-      <p class="eyebrow">${QUIZ_TOPICS[q.t]}</p>
-      <h2>${q.q}</h2>
-      <div class="quiz-options">${q.options.map((o) => `<button class="quiz-option" data-answer="${o.replace(/"/g, "&quot;")}">${o}</button>`).join("")}</div>
-      <div class="quiz-feedback" aria-live="polite"></div>
-    </div>`;
-    app.querySelector(".quiz-options").addEventListener("click", (e) => {
-      const btn = e.target.closest(".quiz-option");
-      if (!btn || app.querySelector(".quiz-option[disabled]")) return;
-      const correct = q.o[0];
-      const right = btn.dataset.answer === correct;
-      if (right) game.score++; else game.missed.push({ q, chosen: btn.dataset.answer });
-      app.querySelectorAll(".quiz-option").forEach((b) => {
-        b.disabled = true;
-        if (b.dataset.answer === correct) b.classList.add("right");
-        else if (b === btn) b.classList.add("wrong");
-      });
-      app.querySelector(".quiz-feedback").innerHTML = `<div class="quiz-explain ${right ? "is-right" : "is-wrong"}">
-        <p class="quiz-verdict">${right ? "✓ Correct!" : `✗ Not quite — the answer is <strong>${correct}</strong>.`}</p>
-        <p>${q.e}</p>
-        ${learnLink(q.link)}
-      </div>
-      <button class="btn btn-primary quiz-next">${game.i + 1 < n ? "Next question" : "See my score"}</button>`;
-      app.querySelector(".quiz-next").addEventListener("click", () => { game.i++; game.i < n ? question() : finish(); });
-      app.querySelector(".quiz-next").focus();
-    });
-  }
-
-  function finish() {
-    const n = game.questions.length, pct = game.score / n;
-    if (best[game.topic] === undefined || game.score > best[game.topic]) { best[game.topic] = game.score; store.set("bp-quiz-best", best); }
-    const message = pct === 1 ? "Perfect score — you're a true herbalist!" : pct >= 0.8 ? "Wonderful! You really know your stuff." : pct >= 0.5 ? "Good job! A little more reading and you'll ace it." : "A great start — every question is a chance to learn.";
-    app.innerHTML = `<div class="card quiz-end">
-      <p class="eyebrow">${game.topic === "mixed" ? "Mixed quiz" : QUIZ_TOPICS[game.topic]}</p>
-      <div class="quiz-score"><span>${game.score}</span>/ ${n}</div>
-      <h2>${message}</h2>
-      <p class="muted">Best score: ${best[game.topic]}/${n}</p>
-      <div class="btn-row center-row"><button class="btn btn-primary" data-again>Play again</button><button class="btn btn-outline" data-topics>Choose another topic</button></div>
-      ${game.missed.length ? `<h3 class="quiz-sub">Review the ones you missed</h3><div class="quiz-review">${game.missed.map(({ q, chosen }) => `<div class="quiz-review-item"><p><strong>${q.q}</strong></p><p>Your answer: ${chosen} · Correct: <strong>${q.o[0]}</strong></p><p class="muted">${q.e}</p>${learnLink(q.link)}</div>`).join("")}</div>` : ""}
-    </div>`;
-    app.querySelector("[data-again]").addEventListener("click", () => start(game.topic));
-    app.querySelector("[data-topics]").addEventListener("click", startScreen);
-  }
-
-  app.addEventListener("click", (e) => { const t = e.target.closest("[data-topic]"); if (t) start(t.dataset.topic); });
-  startScreen();
-}
 
 /* ---------------- Wellness & safety guides ---------------- */
-const guideUrl = (id) => `guides/${id}.html`;
-const safetyUrl = (id) => `safety/${id}.html`;
+const guideUrl = (id) => `finder.html?goal=${id}`; // each wellness goal opens the "What should I eat?" planner
+const SAFETY_WHO = { pregnancy: "preg1", breastfeeding: "breastfeeding", children: "child", "older-adults": "senior" };
+const safetyUrl = (id) => SAFETY_WHO[id] ? `interactions.html?who=${SAFETY_WHO[id]}` : "interactions.html";
 
 function doseLine(id) {
   const c = CAPS[id];
@@ -1285,118 +1062,14 @@ function doseLine(id) {
   return "";
 }
 
-function initGuides() {
-  $("#guide-grid").innerHTML = TOPIC_GUIDES.map((g) => `<a class="guide-card" href="${guideUrl(g.id)}">
-    <span class="guide-photos">${g.herbs.slice(0, 3).map((id) => `<span class="mini-art">${visual(findHerb(id))}</span>`).join("")}</span>
-    <h3>${g.short}</h3>
-    <p>${g.intro.split(/(?<=\.)\s/)[0]}</p>
-    <span class="text-link">Read the guide ${icon("arrow")}</span>
-  </a>`).join("");
-  $("#safety-grid").innerHTML = SAFETY_GUIDES.map((g) => `<a class="guide-card safety" href="${safetyUrl(g.id)}">
-    <span class="category-icon">${icon("shield")}</span>
-    <h3>${g.short}</h3>
-    <p>${g.intro.split(/(?<=\.)\s/)[0]}</p>
-    <span class="text-link">Read the guide ${icon("arrow")}</span>
-  </a>`).join("");
-}
 
 const guideFoods = (g) => FOODS.filter((fd) => fd.goals.includes(g.id));
 
-function initGuide() {
-  const g = TOPIC_GUIDES.find((x) => x.id === document.body.dataset.id);
-  if (!g) return;
-  const herbRow = (id) => {
-    const h = findHerb(id), b = (BENEFITS[id] || [])[0];
-    return `<a class="guide-herb" href="${herbUrl(id)}">
-      <span class="stack-herb-photo">${visual(h)}</span>
-      <span class="stack-herb-text">
-        <span class="stack-herb-name"><strong>${h.name}</strong>${b ? `<span class="evidence ev-${b[0]}">${EVIDENCE[b[0]].label}</span>` : ""}</span>
-        <span class="stack-herb-role">${b ? `<strong>${b[1]}:</strong> ${b[2]}` : h.summary}</span>
-        <span class="guide-dose">${doseLine(id)}</span>
-      </span>
-    </a>`;
-  };
-  $("#guide-main").innerHTML = `
-    <section class="stack-hero">
-      <div class="container">
-        <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><a href="guides.html">Guides</a><span>/</span><span aria-current="page">${g.short}</span></nav>
-        <div class="stack-hero-grid">
-          <div>
-            <p class="eyebrow">Wellness guide</p>
-            <h1>${g.title}</h1>
-            <p class="lead">${g.intro}</p>
-            <a class="btn btn-primary" href="finder.html?goal=${g.id}">Get my personal plan ${icon("arrow")}</a>
-          </div>
-          <div class="stack-hero-photos">${g.herbs.slice(0, 4).map((id, i) => `<a href="${herbUrl(id)}" class="shp shp-${i}">${visual(findHerb(id), i === 0)}</a>`).join("")}</div>
-        </div>
-      </div>
-    </section>
-    <section class="section">
-      <div class="container narrow prose">
-        <h2>Start with the basics</h2>
-        <ul class="check-list">${g.lifestyle.map((t) => `<li>${icon("check")}${t}</li>`).join("")}</ul>
-        ${guideFoods(g).length ? `<h2>Foods that may help</h2>
-        <p class="muted">Start with your plate — these everyday foods may support this goal as part of a balanced diet.</p>
-        <div class="herb-grid guide-foods">${guideFoods(g).slice(0, 6).map(foodCard).join("")}</div>` : ""}
-        <h2>Herbs that may help</h2>
-        <p class="muted">Herbs can play a supporting role. Each is listed with its best-supported benefit and a typical adult dose (100 lb and over). Tap any herb for the full profile.</p>
-        <div class="stack-herb-list">${g.herbs.map(herbRow).join("")}</div>
-        <h2>Safety first</h2>
-        <div class="caution-card">${icon("shield", "icon info-icon")}<div><p>${g.cautions}</p>
-          <p class="small">Check your own medicines and situation with our <a href="interactions.html">interaction checker</a>.</p></div></div>
-        <h2>When to see a doctor</h2>
-        <ul class="doctor-list">${g.doctor.map((d) => `<li>${d}</li>`).join("")}</ul>
-      </div>
-    </section>
-    <section class="verse-band"><blockquote><p>“${g.verse.text}”</p><cite>${g.verse.ref} (${BIBLE_VERSION})</cite></blockquote></section>
-    <section class="section section-tint">
-      <div class="container">
-        <div class="section-head"><div><p class="eyebrow">Nourish from the inside</p><h2>Fruits that help</h2></div></div>
-        <div class="herb-grid">${g.fruits.map((id) => fruitCard(FRUITS.find((f) => f.id === id))).join("")}</div>
-        ${remedySection(REMEDIES.filter((r) => REMEDY_CATS[r.cat].guide === g.id))}
-        ${g.stacks.length ? `<div class="section-head stack-head"><div><p class="eyebrow">Better together</p><h2>Herbal stacks</h2></div></div><div class="stack-grid">${g.stacks.map((id) => stackCard(STACKS.find((s) => s.id === id))).join("")}</div>` : ""}
-        ${recipeSection(recipesFor((r) => r.guide === g.id || r.herbs.some((x) => g.herbs.slice(0, 4).includes(x))).slice(0, 4))}
-        <div class="section-head stack-head"><div><p class="eyebrow">Keep exploring</p><h2>More guides</h2></div></div>
-        <div class="bible-links">${TOPIC_GUIDES.filter((x) => x !== g).map((x) => `<a class="ix-chip" href="${guideUrl(x.id)}">${x.short}</a>`).join("")}</div>
-      </div>
-    </section>`;
-}
 
-function initSafetyGuide() {
-  const g = SAFETY_GUIDES.find((x) => x.id === document.body.dataset.id);
-  if (!g) return;
-  const ix = INTERACTIONS.find((x) => x.id === g.ix);
-  const whoParam = { pregnancy: "preg1", breastfeeding: "breastfeeding", children: "child", "older-adults": "senior", surgery: "adult" }[g.id];
-  const list = (obj, level) => Object.entries(obj).map(([k, n]) => `<li class="ix-${level}"><span class="ix-badge">${level === "avoid" ? "Avoid" : "Caution"}</span><span><a href="${itemUrl(k)}"><strong>${itemName(k)}</strong></a> — ${n}</span></li>`).join("");
-  $("#safety-main").innerHTML = `
-    <section class="page-hero">
-      <div class="container">
-        <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><a href="guides.html">Guides</a><span>/</span><span aria-current="page">${g.short}</span></nav>
-        <p class="eyebrow">Safety guide</p>
-        <h1>${g.title}</h1>
-        <p class="lead">${g.intro}</p>
-        <a class="btn btn-primary" href="interactions.html?who=${whoParam}">Check my medicines ${icon("arrow")}</a>
-      </div>
-    </section>
-    <section class="section section-top-tight">
-      <div class="container narrow prose">
-        ${g.sections.map((sec) => `<h2>${sec.h}</h2>${sec.list ? `<ul class="check-list">${sec.list.map((t) => `<li>${icon("check")}${t}</li>`).join("")}</ul>` : `<p>${sec.p}</p>`}`).join("")}
-        <h2>What could happen &amp; what to do</h2>
-        <div class="ix-explain"><p><strong>What could happen:</strong> ${IX_DETAILS[ix.id].what}</p><p><strong>What to do:</strong> ${IX_DETAILS[ix.id].todo}</p></div>
-        ${Object.keys(ix.avoid).length ? `<h2>Herbs &amp; fruits to avoid</h2><ul class="ix-list">${list(ix.avoid, "avoid")}</ul>` : ""}
-        ${Object.keys(ix.caution).length ? `<h2>Use with caution</h2><ul class="ix-list">${list(ix.caution, "caution")}</ul>` : ""}
-        <h2>Get help right away if…</h2>
-        <ul class="doctor-list emergency">${g.emergency.map((d) => `<li>${d}</li>`).join("")}</ul>
-        <p class="small muted">In an emergency call your local emergency number. In the U.S., Poison Control is 1-800-222-1222.</p>
-        <h2>Other safety guides</h2>
-        <div class="bible-links">${SAFETY_GUIDES.filter((x) => x !== g).map((x) => `<a class="ix-chip" href="${safetyUrl(x.id)}">${x.short}</a>`).join("")}</div>
-      </div>
-    </section>`;
-}
 
 /* ---------------- About ---------------- */
 function initAbout() {
-  $("#about-art").innerHTML = ["rose", "lavender", "chamomile"].map((id, i) =>
+  $("#about-art").innerHTML = ["hibiscus", "lavender", "chamomile"].map((id, i) =>
     `<div class="about-art-${i}">${visual(findHerb(id))}</div>`).join("");
 
   const form = $("#contact-form");
@@ -1422,283 +1095,16 @@ function initAbout() {
 }
 
 /* ---------------- Recipes ---------------- */
-const recipeUrl = (id) => `recipes/${id}.html`;
-const recipeVisual = (r, large = false) => r.herbs.length ? visual(findHerb(r.herbs[0]), large) : fruitVisual(FRUITS.find((f) => f.id === r.fruits[0]), large);
-const recipesFor = (test) => RECIPES.filter(test);
 
-function recipeCard(r) {
-  return `<a class="recipe-card" href="${recipeUrl(r.id)}">
-    <span class="recipe-photo">${recipeVisual(r)}</span>
-    <span class="recipe-body">
-      <span class="recipe-type">${RECIPE_TYPES[r.type]}</span>
-      <strong>${r.name}</strong>
-      <span class="recipe-meta">${icon("clock")} ${r.time} · ${r.yield}</span>
-    </span>
-  </a>`;
-}
 
-function recipeSection(list, title = "Recipes to try") {
-  return list.length ? `<div class="section-head stack-head"><div><p class="eyebrow">Make it at home</p><h2>${title}</h2></div><a class="text-link" href="recipes.html">All recipes ${icon("arrow")}</a></div>
-    <div class="recipe-grid">${list.map(recipeCard).join("")}</div>` : "";
-}
 
-function initRecipes() {
-  let type = params.get("type") || "all";
-  $("#recipes-main").innerHTML = `
-    <section class="page-hero">
-      <div class="container">
-        <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span aria-current="page">Recipes</span></nav>
-        <h1>Herbal Recipes</h1>
-        <p class="lead">Simple, step-by-step recipes for teas, drinks, syrups, kitchen favorites and gentle skin care — made with the herbs and fruits in our library.</p>
-      </div>
-    </section>
-    <section class="section section-top-tight">
-      <div class="container">
-        <div class="chips" id="recipe-tabs">${[["all", "All recipes"], ...Object.entries(RECIPE_TYPES)].map(([k, l]) => `<button class="chip" data-type="${k}">${l}</button>`).join("")}</div>
-        <div class="recipe-grid" id="recipe-grid"></div>
-      </div>
-    </section>`;
-  const draw = () => {
-    $("#recipe-tabs").querySelectorAll(".chip").forEach((b) => b.classList.toggle("active", b.dataset.type === type));
-    $("#recipe-grid").innerHTML = RECIPES.filter((r) => type === "all" || r.type === type).map(recipeCard).join("");
-  };
-  $("#recipe-tabs").addEventListener("click", (e) => {
-    const b = e.target.closest("[data-type]"); if (!b) return;
-    type = b.dataset.type;
-    history.replaceState(null, "", type === "all" ? "recipes.html" : `recipes.html?type=${type}`);
-    draw();
-  });
-  draw();
-}
 
-function initRecipe() {
-  const r = RECIPES.find((x) => x.id === document.body.dataset.id);
-  if (!r) return;
-  const herbs = r.herbs.map(findHerb), fruits = r.fruits.map((id) => FRUITS.find((f) => f.id === id)), foods = (r.foods || []).map(findFood);
-  const guide = TOPIC_GUIDES.find((g) => g.id === r.guide);
-  const more = RECIPES.filter((x) => x !== r && (x.type === r.type || x.herbs.some((h) => r.herbs.includes(h)))).slice(0, 4);
-  $("#recipe-main").innerHTML = `
-    <section class="stack-hero">
-      <div class="container">
-        <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><a href="recipes.html">Recipes</a><span>/</span><span aria-current="page">${r.name}</span></nav>
-        <div class="stack-hero-grid">
-          <div>
-            <p class="eyebrow">${RECIPE_TYPES[r.type]}</p>
-            <h1>${r.name}</h1>
-            <p class="lead">${r.intro}</p>
-            <div class="recipe-facts"><span>${icon("clock")} ${r.time}</span><span>${icon("leaf")} Makes ${r.yield}</span></div>
-            <button class="btn btn-outline" data-print>${icon("print")} Print recipe</button>
-          </div>
-          <div class="stack-hero-photos">${[...herbs.map((h) => [herbUrl(h.id), visual(h)]), ...fruits.map((f) => [fruitUrl(f.id), fruitVisual(f)]), ...foods.map((f) => [foodUrl(f.id), foodVisual(f)])].slice(0, 4).map(([u, v], i) => `<a href="${u}" class="shp shp-${i}">${i === 0 ? v.replace('class="pf"', 'class="pf pf-large"') : v}</a>`).join("")}</div>
-        </div>
-      </div>
-    </section>
-    <section class="section">
-      <div class="container recipe-layout">
-        <aside class="card recipe-ingredients">
-          <h2>Ingredients</h2>
-          <ul class="ingredient-list">${r.ingredients.map(([amt, item], i) => `<li><input type="checkbox" id="ing-${i}"><label for="ing-${i}"><strong>${amt}</strong> ${item}</label></li>`).join("")}</ul>
-          <p class="small muted">Tick off each ingredient as you gather it.</p>
-        </aside>
-        <div class="recipe-steps-col">
-          <h2>Step by step</h2>
-          <ol class="recipe-steps">${r.steps.map((t) => `<li>${t}</li>`).join("")}</ol>
-          <h2>Tips</h2>
-          <ul class="check-list">${r.tips.map((t) => `<li>${icon("check")}${t}</li>`).join("")}</ul>
-          <h2>Storage</h2>
-          <p>${r.storage}</p>
-          <div class="caution-card">${icon("shield", "icon info-icon")}<div><p><strong>Safety:</strong> ${r.safety}</p>
-            <p class="small">Taking medicine? <a href="interactions.html${r.herbs[0] ? `?item=${r.herbs[0]}` : ""}">Check it with the safety checker</a>.</p></div></div>
-          <h2>What's in it</h2>
-          <div class="bible-links">${herbs.map((h) => `<a class="ix-chip" href="${herbUrl(h.id)}">${h.name} ${icon("arrow")}</a>`).join("")}${fruits.map((f) => `<a class="ix-chip" href="${fruitUrl(f.id)}">${f.name} ${icon("arrow")}</a>`).join("")}${foods.map((f) => `<a class="ix-chip" href="${foodUrl(f.id)}">${f.name} ${icon("arrow")}</a>`).join("")}${guide ? `<a class="ix-chip" href="${guideUrl(guide.id)}">Guide: ${guide.short} ${icon("arrow")}</a>` : ""}</div>
-        </div>
-      </div>
-    </section>
-    <section class="section section-tint">
-      <div class="container">${recipeSection(more, "More recipes")}</div>
-    </section>`;
-  $("#recipe-main [data-print]").addEventListener("click", () => window.print());
-}
 
-/* ---------------- Weekly devotional ---------------- */
-function devotionalCard(w = thisWeeksDevotional(), compact = false) {
-  const h = findHerb(w.herb), fr = FRUITS.find((f) => f.id === w.fruit), r = RECIPES.find((x) => x.id === w.recipe);
-  return `<div class="devo-card${compact ? " compact" : ""}">
-    <div class="devo-text">
-      <p class="eyebrow">This week's devotional · Week ${DEVOTIONAL_WEEKS.indexOf(w) + 1} of ${DEVOTIONAL_WEEKS.length}</p>
-      <h3>${w.theme}</h3>
-      <blockquote>“${w.text}”</blockquote>
-      <cite>${w.ref} (${BIBLE_VERSION})</cite>
-      ${compact ? "" : `<p>${w.reflection}</p><p class="devo-prayer"><strong>Pray:</strong> ${w.prayer}</p>`}
-      <p class="devo-habit">${icon("check")}<span><strong>This week's habit:</strong> ${w.habit}</span></p>
-      ${compact ? `<a class="text-link" href="devotional.html">Read this week's devotional ${icon("arrow")}</a>` : ""}
-    </div>
-    ${compact ? "" : `<div class="devo-picks">
-      <a class="devo-pick" href="${herbUrl(h.id)}"><span class="mini-art">${visual(h)}</span><span><em>Herb of the week</em><strong>${h.name}</strong></span></a>
-      <a class="devo-pick" href="${fruitUrl(fr.id)}"><span class="mini-art">${fruitVisual(fr)}</span><span><em>Fruit of the week</em><strong>${fr.name}</strong></span></a>
-      ${r ? `<a class="devo-pick" href="${recipeUrl(r.id)}"><span class="mini-art">${recipeVisual(r)}</span><span><em>Recipe of the week</em><strong>${r.name}</strong></span></a>` : ""}
-    </div>`}
-  </div>`;
-}
 
 // A calendar file with a weekly repeating reminder (works with Apple, Google and Outlook calendars).
-function downloadReminder(day, time) {
-  const [hh, mm] = time.split(":");
-  const now = new Date();
-  const days = { MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6, SU: 0 };
-  const first = new Date(now.getFullYear(), now.getMonth(), now.getDate() + ((days[day] - now.getDay() + 7) % 7 || 7));
-  const pad = (n) => String(n).padStart(2, "0");
-  const dt = `${first.getFullYear()}${pad(first.getMonth() + 1)}${pad(first.getDate())}T${hh}${mm}00`;
-  const end = `${first.getFullYear()}${pad(first.getMonth() + 1)}${pad(first.getDate())}T${hh}${pad(Math.min(59, +mm + 15))}00`;
-  const link = new URL("devotional.html", document.baseURI).href;
-  const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
-  const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Beauty and Praise//Devotional//EN", "BEGIN:VEVENT",
-    `UID:devotional-${stamp}@beautyandpraise`, `DTSTAMP:${stamp}`, `DTSTART:${dt}`, `DTEND:${end}`, `RRULE:FREQ=WEEKLY;BYDAY=${day}`,
-    "SUMMARY:Beauty & Praise weekly devotional", `DESCRIPTION:Your verse\\, reflection and healthy habit for the week: ${link}`, `URL:${link}`,
-    "BEGIN:VALARM", "TRIGGER:PT0M", "ACTION:DISPLAY", "DESCRIPTION:Time for this week's devotional", "END:VALARM",
-    "END:VEVENT", "END:VCALENDAR"].join("\r\n");
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([ics], { type: "text/calendar" }));
-  a.download = "beauty-and-praise-devotional.ics";
-  document.body.appendChild(a); a.click(); a.remove();
-  toast("Calendar reminder downloaded — open it to add it to your calendar.");
-}
 
-function initDevotional() {
-  const idx = devotionalIndex();
-  $("#devotional-main").innerHTML = `
-    <section class="page-hero">
-      <div class="container">
-        <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><a href="bible.html">Bible</a><span>/</span><span aria-current="page">Weekly Devotional</span></nav>
-        <h1>Weekly Devotional</h1>
-        <p class="lead">One verse, a short reflection, a prayer and one healthy habit for the week. A new devotional begins every Monday.</p>
-      </div>
-    </section>
-    <section class="section section-top-tight">
-      <div class="container narrow" id="devo-this-week">${devotionalCard()}</div>
-    </section>
-    <section class="section section-tint">
-      <div class="container narrow">
-        <div class="card devo-remind">
-          <h2>Get a weekly reminder</h2>
-          <p class="muted">Add a repeating reminder to your phone's calendar — it links back here each week.</p>
-          <div class="devo-remind-row">
-            <label>Day <select class="field" id="devo-day">${[["MO", "Monday"], ["TU", "Tuesday"], ["WE", "Wednesday"], ["TH", "Thursday"], ["FR", "Friday"], ["SA", "Saturday"], ["SU", "Sunday"]].map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select></label>
-            <label>Time <input type="time" class="field" id="devo-time" value="07:30"></label>
-            <button class="btn btn-primary" id="devo-ics">${icon("calendar")} Add to my calendar</button>
-          </div>
-          <p class="small muted">Prefer email? Join the Beauty &amp; Praise Letter at the bottom of this page.</p>
-        </div>
-      </div>
-    </section>
-    <section class="section">
-      <div class="container">
-        <div class="section-head"><div><p class="eyebrow">All ${DEVOTIONAL_WEEKS.length} weeks</p><h2>The devotional series</h2></div></div>
-        <div class="devo-list">${DEVOTIONAL_WEEKS.map((w, i) => `<button class="devo-week${i === idx ? " current" : ""}" data-week="${i}"><span>Week ${i + 1}${i === idx ? " · This week" : ""}</span><strong>${w.theme}</strong><em>${w.ref}</em></button>`).join("")}</div>
-        <p class="small muted bible-copyright">${BIBLE_COPYRIGHT}</p>
-      </div>
-    </section>`;
-  $("#devo-ics").addEventListener("click", () => downloadReminder($("#devo-day").value, $("#devo-time").value || "07:30"));
-  $(".devo-list").addEventListener("click", (e) => {
-    const b = e.target.closest("[data-week]"); if (!b) return;
-    const w = DEVOTIONAL_WEEKS[+b.dataset.week];
-    $("#devo-this-week").innerHTML = devotionalCard(w).replace("This week's devotional", +b.dataset.week === idx ? "This week's devotional" : "Devotional");
-    $("#devo-this-week").scrollIntoView({ behavior: "smooth", block: "start" });
-  });
-}
 
 /* ---------------- My Plan ---------------- */
-function initMyPlan() {
-  const main = $("#myplan-main");
-  const today = todayKey();
-  const draw = () => {
-    const fav = favorites.all();
-    const savedHerbs = fav.filter((k) => !k.includes(":")).map(findHerb).filter(Boolean);
-    const savedFruits = fav.filter((k) => k.startsWith("fruit:")).map((k) => FRUITS.find((f) => f.id === k.slice(6))).filter(Boolean);
-    const savedFoods = fav.filter((k) => k.startsWith("food:")).map((k) => findFood(k.slice(5))).filter(Boolean);
-    const plan = store.get("bp-plan", null);
-    const ix = store.get("bp-ix2", null);
-    const habits = store.get("bp-habits", DEFAULT_HABITS);
-    let done = store.get("bp-done", { date: today, items: [] });
-    if (done.date !== today) done = { date: today, items: [] };
-    let water = store.get("bp-water", { date: today, count: 0 });
-    if (water.date !== today) water = { date: today, count: 0 };
-    const g = plan && TOPIC_GUIDES.find((x) => x.id === plan.goal);
-    const who = plan && whoOptionsFor(plan.goal).find((w) => w.id === plan.who);
-    const ixWho = ix && WHO_OPTIONS.find((w) => w.id === ix.who);
-    const ixList = ix ? [...(ix.drugs || []), ...(ix.meds || []).map((m) => INTERACTIONS.find((x) => x.id === m)?.label), ...(ix.conds || []).map((c) => INTERACTIONS.find((x) => x.id === c)?.label)].filter(Boolean) : [];
-    const planRecipes = recipesFor((r) => (g && r.guide === g.id) || r.herbs.some((h) => fav.includes(h) || (plan?.top || []).includes(h))).slice(0, 4);
-    const nDone = habits.filter((x) => done.items.includes(x)).length;
-
-    main.innerHTML = `
-      <section class="page-hero">
-        <div class="container">
-          <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span aria-current="page">My Plan</span></nav>
-          <h1>My Plan</h1>
-          <p class="lead">Everything you've saved, your personal plan and today's habits — all in one place. It's saved only on this device.</p>
-        </div>
-      </section>
-      <section class="section section-top-tight">
-        <div class="container myplan-grid">
-          <div class="card myplan-plan">
-            <p class="eyebrow">My personal plan</p>
-            ${g ? `<h2>${g.title.replace("Natural ", "")}</h2>
-              <p class="muted">For: ${who ? who.label : "Adult"} · made ${formatDate(plan.date)}</p>
-              <div class="myplan-herbs">${(plan.top || []).map(findHerb).filter(Boolean).map((h) => `<a class="devo-pick" href="${herbUrl(h.id)}"><span class="mini-art">${visual(h)}</span><span><em>Top herb</em><strong>${h.name}</strong></span></a>`).join("")}</div>
-              <div class="btn-row"><a class="btn btn-primary" href="finder.html?plan=saved">See my full plan</a><a class="btn btn-outline" href="finder.html">Make a new plan</a></div>`
-            : `<h2>You don't have a plan yet</h2><p class="muted">Answer 6 quick questions and we'll suggest foods, remedies, habits and herbs that fit you — and save them here.</p><a class="btn btn-primary" href="finder.html">What should I take? ${icon("arrow")}</a>`}
-          </div>
-          <div class="card myplan-today">
-            <p class="eyebrow">Today</p>
-            <h2>${nDone} of ${habits.length} habits done</h2>
-            <div class="progress"><div class="progress-bar" style="width:${habits.length ? (nDone / habits.length) * 100 : 0}%"></div></div>
-            <ul class="checklist myplan-checklist">${habits.map((h, i) => `<li><input type="checkbox" id="mp-habit-${i}" data-habit="${i}" ${done.items.includes(h) ? "checked" : ""}><label for="mp-habit-${i}"></label></li>`).join("")}</ul>
-            <p class="myplan-water">${icon("drop")} <strong>${water.count} of 8</strong> glasses of water <button class="btn btn-small btn-outline" id="mp-water">+1 glass</button></p>
-            <a class="text-link" href="reminders.html">Edit habits &amp; reminders ${icon("arrow")}</a>
-          </div>
-        </div>
-      </section>
-      <section class="section section-tint">
-        <div class="container narrow">${devotionalCard(thisWeeksDevotional(), true)}</div>
-      </section>
-      <section class="section">
-        <div class="container">
-          <div class="section-head"><div><p class="eyebrow">${savedHerbs.length + savedFruits.length + savedFoods.length} saved</p><h2>My saved foods, fruits &amp; herbs</h2></div><a class="text-link" href="foods.html">Browse foods ${icon("arrow")}</a></div>
-          ${savedHerbs.length || savedFruits.length || savedFoods.length ? `<div class="herb-grid">${savedFoods.map(foodCard).join("")}${savedFruits.map(fruitCard).join("")}${savedHerbs.map(herbCard).join("")}</div>`
-            : `<div class="card empty-card"><p>Nothing saved yet. Tap the ${icon("heart")} on any food, fruit or herb to save it here.</p></div>`}
-        </div>
-      </section>
-      <section class="section section-tint">
-        <div class="container">
-          <div class="card myplan-safety">
-            <div><p class="eyebrow">My safety check</p>
-              ${ixList.length || (ixWho && ixWho.id !== "adult") ? `<h2>Saved: ${[ixWho?.label, ...ixList].filter(Boolean).join(" · ")}</h2><p class="muted">Re-check any time you start a new herb or medicine.</p>`
-                : `<h2>Check herbs with your medicines</h2><p class="muted">Tell us your medicines, pregnancy or health conditions and see what's safe.</p>`}
-            </div>
-            <a class="btn btn-primary" href="interactions.html">Open the safety checker</a>
-          </div>
-          ${recipeSection(planRecipes.length ? planRecipes : RECIPES.slice(0, 4), planRecipes.length ? "Recipes for my plan" : "Recipes to try")}
-          <p class="center"><button class="text-btn" id="mp-clear">Clear everything saved on this device</button></p>
-        </div>
-      </section>`;
-    main.querySelectorAll("[data-habit]").forEach((box) => {
-      box.nextElementSibling.textContent = habits[+box.dataset.habit];
-      box.addEventListener("change", () => {
-        const h = habits[+box.dataset.habit];
-        done.items = box.checked ? [...done.items, h] : done.items.filter((x) => x !== h);
-        store.set("bp-done", done); draw();
-      });
-    });
-    $("#mp-water").addEventListener("click", () => { water.count = Math.min(8, water.count + 1); store.set("bp-water", water); draw(); });
-    $("#mp-clear").addEventListener("click", () => {
-      if (!confirm("Clear your saved herbs, plan, checklist and safety answers on this device?")) return;
-      ["bp-favorites", "bp-plan", "bp-ix2", "bp-habits", "bp-done", "bp-water"].forEach((k) => { try { localStorage.removeItem(k); } catch {} });
-      draw(); toast("Cleared.");
-    });
-  };
-  draw();
-  document.addEventListener("favorites-changed", draw);
-}
 
 /* ---------------- Foods, fruits & remedies: shared cards ---------------- */
 const foodCat = (id) => FOOD_CATEGORIES.find((c) => c.id === id);
@@ -1794,7 +1200,7 @@ function initFoods() {
         <div class="chips" id="food-chips">${[["all", "All foods"], ...FOOD_CATEGORIES.map((c) => [c.id, c.label])].map(([k, l]) => `<button class="chip" data-cat="${k}">${l}</button>`).join("")}</div>
         <div id="food-cat-intro"></div>
         <div class="herb-grid" id="food-grid"></div>
-        <p class="center muted" id="food-empty" hidden>No foods match — try another word, or browse the <a href="fruits.html">fruit library</a>.</p>
+        <p class="center muted" id="food-empty" hidden>No foods match — try another word.</p>
         <div id="food-fruits"></div>
         <div class="note-card food-note">${icon("shield", "icon info-icon")}<p>Foods support health as part of an overall way of eating — no single food cures or prevents disease. If you have allergies, take medicine or are pregnant, check the notes on each page or use the <a href="interactions.html">safety checker</a>.</p></div>
       </div>
@@ -1805,14 +1211,14 @@ function initFoods() {
     const q = state.q.trim().toLowerCase();
     const c = foodCat(state.cat);
     let foods = q ? searchFoods(singular(q)) : [...FOODS];
-    let fruits = q ? searchFruits(singular(q)) : [];
-    if (c) { foods = foods.filter((fd) => fd.cats.includes(c.id)); fruits = (q ? fruits : FRUITS).filter((fr) => foodCatsOf(fr, "fruit").includes(c.id)); }
+    let fruits = q ? searchFruits(singular(q)) : [...FRUITS];
+    if (c) { foods = foods.filter((fd) => fd.cats.includes(c.id)); fruits = fruits.filter((fr) => foodCatsOf(fr, "fruit").includes(c.id)); }
     $("#food-chips").querySelectorAll(".chip").forEach((b) => b.classList.toggle("active", b.dataset.cat === state.cat));
     $("#food-cat-intro").innerHTML = c ? `<div class="section-head"><div><p class="eyebrow">Food category</p><h2>${c.label}</h2><p class="muted">${c.text}</p></div></div>` : "";
     $("#food-grid").innerHTML = foods.map(foodCard).join("");
     $("#food-empty").hidden = foods.length + fruits.length > 0;
-    $("#food-fruits").innerHTML = fruits.length ? `<div class="section-head stack-head"><div><p class="eyebrow">${fruits.length} fruits</p><h2>${c ? `Fruits for ${c.label.replace(/^Foods for /, "").toLowerCase()}` : "Matching fruits"}</h2></div><a class="text-link" href="fruits.html">Fruit library ${icon("arrow")}</a></div>
-      <div class="herb-grid">${fruits.slice(0, 8).map(fruitCard).join("")}</div>` : "";
+    $("#food-fruits").innerHTML = fruits.length ? `<div class="section-head stack-head"><div><p class="eyebrow">${fruits.length} fruits</p><h2>${c ? `Fruits for ${c.label.replace(/^Foods for /, "").toLowerCase()}` : q ? "Matching fruits" : "Fruits"}</h2></div></div>
+      <div class="herb-grid">${fruits.map(fruitCard).join("")}</div>` : "";
   }
   const sync = () => history.replaceState(null, "", "foods.html" + (state.cat !== "all" ? `?cat=${state.cat}` : ""));
   $("#food-chips").addEventListener("click", (e) => { const b = e.target.closest("[data-cat]"); if (!b) return; state.cat = b.dataset.cat; sync(); render(); });
@@ -1833,7 +1239,7 @@ function renderFoodProfile(p, main) {
   const saved = favorites.has(p.key);
   const [servingText, servingG] = p.serving;
   const short = p.name.split(" (")[0];
-  const recipes = recipesFor((r) => (isFruit ? r.fruits : r.foods || []).includes(p.id));
+  const recipes = [];
   const remedies = REMEDIES.filter((r) => r.items.includes(p.key));
   const vis = isFruit ? fruitVisual(p, true) : foodVisual(p, true);
   const toc = [["what", "What it is"], ["nutrients", "Key nutrients"], ["benefits", "Potential benefits"], ["use", "Best ways to eat it"], ["amount", "Serving & when to eat"],
@@ -1842,7 +1248,7 @@ function renderFoodProfile(p, main) {
   main.innerHTML = `
     <section class="herb-hero">
       <div class="container">
-        <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><a href="${isFruit ? "fruits.html" : "foods.html"}">${isFruit ? "Fruit Library" : "Food Library"}</a><span>/</span><span aria-current="page">${p.name}</span></nav>
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><a href="foods.html">Foods</a><span>/</span><span aria-current="page">${p.name}</span></nav>
         <div class="herb-hero-grid">
           <figure class="herb-hero-figure">
             <div class="herb-hero-art arch">${vis}</div>
@@ -1935,7 +1341,6 @@ function renderFoodProfile(p, main) {
 
     <section class="section section-tint">
       <div class="container">
-        ${recipeSection(recipes, `Recipes with ${short}`)}
         ${remedySection(remedies, `Remedies with ${short}`)}
         <div class="section-head${recipes.length || remedies.length ? " stack-head" : ""}"><div><p class="eyebrow">Keep exploring</p><h2>Related ${isFruit ? "fruits" : "foods"}</h2></div>
           <a class="text-link" href="foods.html?cat=${p.foodCats[0]}">More ${foodCat(p.foodCats[0]).label.toLowerCase()} ${icon("arrow")}</a></div>
@@ -2010,7 +1415,7 @@ function initRemedy() {
   if (!r) return notFound(main, "Remedy", "remedies.html", "Browse natural remedies");
   const c = REMEDY_CATS[r.cat];
   const guide = TOPIC_GUIDES.find((g) => g.id === c.guide);
-  const recipe = r.recipe && RECIPES.find((x) => x.id === r.recipe);
+  const recipe = null;
   const more = REMEDIES.filter((x) => x !== r && x.cat === r.cat).concat(REMEDIES.filter((x) => x !== r && x.cat !== r.cat && REMEDY_CATS[x.cat].guide && REMEDY_CATS[x.cat].guide === c.guide)).slice(0, 4);
   const [ev, evText] = r.evidence;
   const refs = r.sources.map((k) => REMEDY_SOURCES[k]).filter(Boolean);
@@ -2054,7 +1459,7 @@ function initRemedy() {
           <p class="muted">A home remedy isn't the right choice if you notice any of these. In an emergency, call 911.</p>
           <ul class="doctor-list">${r.seekCare.map((t) => `<li>${t}</li>`).join("")}</ul>
           ${r.items.length || guide || recipe ? `<h2>Learn more</h2>
-          <div class="bible-links">${r.items.map((k) => `<a class="ix-chip" href="${itemUrl(k)}">${itemName(k)} ${icon("arrow")}</a>`).join("")}${recipe ? `<a class="ix-chip" href="${recipeUrl(recipe.id)}">Recipe: ${recipe.name} ${icon("arrow")}</a>` : ""}${guide ? `<a class="ix-chip" href="${guideUrl(guide.id)}">Guide: ${guide.short} ${icon("arrow")}</a>` : ""}</div>` : ""}
+          <div class="bible-links">${r.items.map((k) => `<a class="ix-chip" href="${itemUrl(k)}">${itemName(k)} ${icon("arrow")}</a>`).join("")}${guide ? `<a class="ix-chip" href="${guideUrl(guide.id)}">Guide: ${guide.short} ${icon("arrow")}</a>` : ""}</div>` : ""}
           ${refs.length ? `<h2>Sources</h2>${sourceList(refs)}` : ""}
           <p class="small muted">For general education, not medical advice. Home remedies may help with comfort for mild symptoms; they do not cure illness.</p>
         </div>
@@ -2066,4 +1471,4 @@ function initRemedy() {
   $("#remedy-main [data-print]").addEventListener("click", () => window.print());
 }
 
-({ home: initHome, herbs: initHerbs, fruits: initFruits, fruit: initFruit, interactions: initInteractions, quiz: initQuiz, finder: initFinder, guides: initGuides, guide: initGuide, safetyguide: initSafetyGuide, bible: initBible, stacks: initStacks, herb: initHerb, living: initLiving, journal: initJournal, about: initAbout, foods: initFoods, food: initFood, remedies: initRemedies, remedy: initRemedy, recipes: initRecipes, recipe: initRecipe, devotional: initDevotional, myplan: initMyPlan })[document.body.dataset.page]?.();
+({ home: initHome, herbs: initHerbs, fruit: initFruit, interactions: initInteractions, finder: initFinder, bible: initBible, stacks: initStacks, herb: initHerb, living: initLiving, about: initAbout, foods: initFoods, food: initFood, remedies: initRemedies, remedy: initRemedy })[document.body.dataset.page]?.();

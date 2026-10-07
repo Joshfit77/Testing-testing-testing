@@ -11,28 +11,7 @@ const SITE = {
   contactEndpoint: "",
   newsletterEndpoint: "",
   // Affiliate or shop links shown on herb pages, keyed by herb id, e.g. { ashwagandha: "https://..." }
-  shop: {},
-  nav: [
-    { href: "index.html", label: "Home", page: "home", drawerOnly: true },
-    { href: "herbs.html", label: "Herbs", page: "herbs" },
-    { href: "fruits.html", label: "Fruits", page: "fruits" },
-    { href: "stacks.html", label: "Stacks", page: "stacks" },
-    { href: "guides.html", label: "Guides", page: "guides" },
-    { href: "interactions.html", label: "Safety Checker", page: "interactions" },
-    { href: "quiz.html", label: "Quiz", page: "quiz" },
-    { href: "bible.html", label: "Bible", page: "bible" },
-    { href: "reminders.html", label: "Healthy Living", page: "living" },
-    { href: "journal.html", label: "Journal", page: "journal", drawerOnly: true },
-    { href: "about.html", label: "About", page: "about", drawerOnly: true }
-  ],
-  tools: [
-    { href: "interactions.html", label: "Herb & medicine safety checker" },
-    { href: "guides.html#safety", label: "Pregnancy, children & safety guides" },
-    { href: "finder.html", label: "What should I take? quiz" },
-    { href: "quiz.html", label: "Herb & fruit knowledge quiz" },
-    { href: "bible.html", label: "Herbs & fruits of the Bible" },
-    { href: "guides.html", label: "Wellness guides" }
-  ]
+  shop: {}
 };
 
 // Page addresses for individual herbs and fruits (one real page each, built by scripts/build.js).
@@ -197,54 +176,22 @@ function formatDate(iso) {
   return new Date(iso + "T12:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 }
 
-// The main menu: Home | Foods | Natural Remedies | Herbs | Wellness Goals | Safety Checker | Journal
+// The main menu: just five simple tabs.
 function siteMenu() {
   return [
     { id: "home", label: "Home", href: "index.html" },
-    { id: "foods", label: "Foods", wide: true, items: [
-      { href: "foods.html", label: "Food Library", desc: "Everyday foods — what they do and how much", highlight: true },
-      { href: "fruits.html", label: "Fruit Library", desc: `${FRUITS.length} fruits and what they do` },
-      { href: "recipes.html", label: "Recipes", desc: "Teas, smoothies, soups & more" },
-      ...FOOD_CATEGORIES.map((c) => ({ href: `foods.html?cat=${c.id}`, label: c.label, small: true }))
-    ] },
-    { id: "remedies", label: "Natural Remedies", wide: true, items: [
-      { href: "remedies.html", label: "All natural remedies", desc: "Simple home & food-based remedies", highlight: true },
-      ...Object.entries(REMEDY_CATS).map(([k, c]) => ({ href: `remedies.html?cat=${k}`, label: c.label, small: true }))
-    ] },
-    { id: "herbs", label: "Herbs", items: [
-      { href: "herbs.html", label: "Herb Library", desc: `${HERBS.length} herbs & botanicals from A to Z` },
-      { href: "stacks.html", label: "Herbal Stacks", desc: "Herbs that work well together" },
-      { href: "bible.html", label: "Herbs & Fruits of the Bible", desc: "Every herb and fruit in Scripture" }
-    ] },
-    { id: "goals", label: "Wellness Goals", wide: true, items: [
-      { href: "finder.html", label: "What should I eat?", desc: "6 quick questions → your personal plan", highlight: true },
-      ...TOPIC_GUIDES.map((g) => ({ href: `guides/${g.id}.html`, label: g.short, small: true })),
-      { href: "guides.html", label: "All wellness goals →", small: true }
-    ] },
-    { id: "safety", label: "Safety Checker", items: [
-      { href: "interactions.html", label: "Safety Checker", desc: "Foods, herbs, medicines, pregnancy & allergies", highlight: true },
-      ...SAFETY_GUIDES.map((g) => ({ href: `safety/${g.id}.html`, label: g.short, small: true }))
-    ] },
-    { id: "journal", label: "Journal", items: [
-      { href: "journal.html", label: "Journal", desc: "Articles & seasonal tips" },
-      { href: "devotional.html", label: "Weekly Devotional", desc: "A verse, prayer & habit each week" },
-      { href: "reminders.html", label: "Healthy Living", desc: "Daily checklist, water & reminders" },
-      { href: "reminders.html#body-reminders", label: "100 Body Reminders", desc: "Simple ways to care for your body" },
-      { href: "myplan.html", label: "My Plan", desc: "Your saved items, plan & checklist" },
-      { href: "quiz.html", label: "Knowledge Quiz", desc: "Test what you know" },
-      { href: "about.html", label: "About Us", desc: "Our story & contact" }
-    ] }
+    { id: "foods", label: "Foods", href: "foods.html" },
+    { id: "remedies", label: "Remedies", href: "remedies.html" },
+    { id: "herbs", label: "Herbs", href: "herbs.html" },
+    { id: "story", label: "Our Story", href: "about.html" }
   ];
 }
 
 const PAGE_GROUP = {
-  home: "home",
-  foods: "foods", food: "foods", fruits: "foods", fruit: "foods", recipes: "foods", recipe: "foods",
+  home: "home", foods: "foods", food: "foods", fruit: "foods",
   remedies: "remedies", remedy: "remedies",
-  herbs: "herbs", herb: "herbs", stacks: "herbs", bible: "herbs",
-  guides: "goals", guide: "goals", finder: "goals",
-  interactions: "safety", safetyguide: "safety",
-  journal: "journal", devotional: "journal", living: "journal", myplan: "journal", quiz: "journal", about: "journal", legal: "journal"
+  herbs: "herbs", herb: "herbs", stacks: "herbs",
+  about: "story"
 };
 
 // Search across foods, remedies, guides, herbs, fruits and stacks. Fills a <ul> with suggestions.
@@ -263,8 +210,6 @@ function fillSuggestions(q, list) {
     rows.push(`<a href="remedies.html?cat=${k}"><span class="mini-art suggest-icon">${icon(c.icon)}</span><span><strong>Remedies for ${c.label.toLowerCase()}</strong><em>Natural remedies</em></span></a>`));
   TOPIC_GUIDES.filter((g) => has(g.short, g.title)).slice(0, 2).forEach((g) =>
     rows.push(`<a href="${guideUrlFor(g.id)}"><span class="mini-art suggest-icon">${icon(g.icon)}</span><span><strong>${g.short}</strong><em>Wellness goal</em></span></a>`));
-  SAFETY_GUIDES.filter((g) => has(g.short, g.title)).slice(0, 1).forEach((g) =>
-    rows.push(`<a href="safety/${g.id}.html"><span class="mini-art suggest-icon">${icon("shield")}</span><span><strong>${g.title}</strong><em>Safety guide</em></span></a>`));
   searchFoods(one).slice(0, 3).forEach((fd) =>
     rows.push(`<a href="${foodUrl(fd.id)}"><span class="mini-art">${foodVisual(fd)}</span><span><strong>${fd.name}</strong><em>${FOOD_GROUPS[fd.group]} · Food</em></span></a>`));
   REMEDIES.filter((r) => has(r.name, r.helps.join(" "))).slice(0, 2).forEach((r) =>
@@ -277,7 +222,7 @@ function fillSuggestions(q, list) {
     rows.push(`<a href="stacks.html?s=${st.id}"><span class="mini-art">${visual(findHerb(st.herbs[0].id))}</span><span><strong>${st.name}</strong><em>Herbal stack</em></span></a>`));
   list.innerHTML = rows.length ? rows.slice(0, 10).map((r) => `<li>${r}</li>`).join("") : `<li class="no-match">No matches — try a food, remedy or need like “sleep”.</li>`;
 }
-const guideUrlFor = (id) => `guides/${id}.html`;
+const guideUrlFor = (id) => `finder.html?goal=${id}`;
 
 function attachSearch(input, list) {
   input.addEventListener("input", () => fillSuggestions(input.value, list));
@@ -304,9 +249,6 @@ function renderChrome() {
     : `<details class="drawer-group"${group === m.id ? " open" : ""}><summary>${m.label}</summary>${m.items.map((i) => `<a href="${i.href}"${i.highlight ? ' class="nav-highlight"' : ""}>${i.label}</a>`).join("")}</details>`).join("");
 
   document.getElementById("site-header").innerHTML = `
-    <div class="announce">
-      <p>Not sure where to start? <a href="finder.html">Take the 1-minute “What should I eat?” quiz</a></p>
-    </div>
     <header class="header">
       <div class="container header-inner">
         <button class="icon-btn menu-btn" aria-label="Open menu" aria-expanded="false">${icon("menu")}</button>
@@ -318,8 +260,6 @@ function renderChrome() {
         <div class="header-actions">
           <a href="finder.html" class="btn btn-primary btn-small header-cta">What should I eat?</a>
           <button class="icon-btn search-btn" aria-label="Search">${icon("search")}</button>
-          <a href="myplan.html" class="icon-btn" aria-label="My Plan — your saved herbs"${page === "myplan" ? ' aria-current="page"' : ""}>${icon("heart")}</a>
-          <a href="es/index.html" class="lang-link" lang="es" hreflang="es" aria-label="Español">ES</a>
         </div>
       </div>
     </header>
@@ -328,7 +268,7 @@ function renderChrome() {
         <button class="icon-btn drawer-close" aria-label="Close menu">${icon("close")}</button>
         <a href="finder.html" class="btn btn-primary drawer-cta">What should I eat?</a>
         <nav class="drawer-nav" aria-label="Menu">${mobile}</nav>
-        <p class="drawer-extra"><a href="myplan.html">${icon("heart")} My Plan</a><a href="es/index.html" lang="es">Español</a></p>
+        <p class="drawer-extra"><a href="interactions.html">${icon("shield")} Safety checker</a><a href="es/index.html" lang="es">Español</a></p>
         <p class="drawer-verse">“${dailyPick(VERSES).text}”</p>
       </div>
     </div>
@@ -366,10 +306,9 @@ function renderChrome() {
             <a href="#" aria-label="Facebook">${icon("facebook")}</a>
           </div>
         </div>
-        ${footCol("Foods &amp; Remedies", [["foods.html", "Food Library"], ["fruits.html", "Fruit Library"], ["remedies.html", "Natural Remedies"], ["recipes.html", "Recipes"], ["foods.html?cat=protein", "Protein-rich foods"]])}
-        ${footCol("Wellness Goals", [["finder.html", "What should I eat?"], ...TOPIC_GUIDES.slice(0, 4).map((g) => [`guides/${g.id}.html`, g.short]), ["guides.html", "All wellness goals"]])}
-        ${footCol("Herbs &amp; Safety", [["herbs.html", "Herb Library"], ["stacks.html", "Herbal Stacks"], ["bible.html", "Herbs &amp; Fruits of the Bible"], ["interactions.html", "Safety Checker"], ["safety/pregnancy.html", "Pregnancy guide"]])}
-        ${footCol("Journal", [["journal.html", "Journal"], ["devotional.html", "Weekly Devotional"], ["reminders.html", "Healthy Living"], ["myplan.html", "My Plan"], ["quiz.html", "Knowledge Quiz"], ["about.html", "About Us"], ["es/index.html", "Español"]])}
+        ${footCol("Explore", [["foods.html", "Foods"], ["remedies.html", "Natural Remedies"], ["herbs.html", "Herbs"], ["about.html", "Our Story"]])}
+        ${footCol("Helpful tools", [["finder.html", "What should I eat?"], ["interactions.html", "Safety Checker"], ["reminders.html", "Daily reminders"], ["stacks.html", "Herbal stacks"]])}
+        ${footCol("Faith", [["bible.html", "Herbs &amp; Fruits of the Bible"], ["es/index.html", "Español"]])}
       </div>
       <div class="container footer-bottom">
         <p>© ${new Date().getFullYear()} Beauty &amp; Praise. All rights reserved.</p>

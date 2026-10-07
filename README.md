@@ -3,37 +3,23 @@
 A food-first wellness website: real food, natural remedies, healthy habits and herbs as a supporting category — with practical amounts, safety notes and a faith-friendly heart.
 
 ## Pages
+The site is kept simple: five tabs — **Home · Foods · Remedies · Herbs · Our Story**.
+
 | Page | File | What's on it |
 |---|---|---|
-| Home | `index.html` | Food-first hero and search, 4 start cards, Food as the Foundation, Natural Remedies, popular foods & remedies, wellness goals, verse, Herbs & Botanicals, journal |
-| Food Library | `foods.html` | Everyday foods with 10 categories (`foods.html?cat=protein`) and search (`?q=`) |
-| Food pages | `foods/<id>.html` | Shared food/fruit layout: what it is, key nutrients, potential benefits, best ways to eat it, typical serving, when to eat it, who may benefit, possible downsides, allergies & interactions, pregnancy & breastfeeding, sources |
-| Natural Remedies | `remedies.html` | Home & food-based remedies in 10 categories (`remedies.html?cat=sleep`) |
-| Remedy pages | `remedies/<id>.html` | What it may help with, ingredients, exact steps, suggested amount, how often, evidence level, safety warnings, when to seek medical care, sources |
-| Herb Library | `herbs.html` | All 107 herbs with search, filters, A–Z, saved herbs |
-| Herb pages | `herbs/<id>.html` | One page per herb: benefits at a glance, body effects, chemistry, benefits explained, capsule & herb doses, uses, preparation, growing, safety, medicine interactions, buying tips |
-| Fruit Library | `fruits.html` | All 100 fruits with search, benefit, season and A–Z filters |
-| Fruit pages | `fruits/<id>.html` | One page per fruit: what it does, nutrients, benefits, how to use, serving size, choosing & storing, safety, interactions |
-| Herbal Stacks | `stacks.html` | 14 herb combinations with shopping list, printable recipe card and medicine checks (`stacks.html?s=<id>`) |
-| Guides | `guides.html` | Hub for the wellness and safety guides |
-| Wellness guides | `guides/<id>.html` | 15 guides (sleep, stress, digestion, immunity, colds & flu, heart, blood sugar, skin, hair, joints, energy, memory, monthly cycle, menopause, men's health) with habits, herbs + doses, fruits, stacks, a verse, safety and when to see a doctor |
-| Safety guides | `safety/<id>.html` | Pregnancy (by trimester), breastfeeding, children (by age), adults 65+, before surgery |
-| Safety checker | `interactions.html` | Step by step: who it's for (incl. pregnancy trimester, breastfeeding, child, 65+), type medicine names (brand or generic), health conditions → what to avoid, what could happen and what to do; printable |
-| Quiz | `quiz.html` | 10-question multiple-choice quiz on herbs, fruits, safety or plants of the Bible, with explanations and best scores |
-| What should I take? quiz | `finder.html` | Six questions, one at a time → a personal plan of herbs with doses, a stack, fruits and habits, leaving out anything unsafe for your medicines or situation (`finder.html?goal=sleep` starts on a goal) |
-| Herbs & fruits of the Bible | `bible.html` | 24 scripture passages (NASB 1995) naming herbs and fruits on the site, with reflections and links to each plant; every herb and fruit page also has a scripture card |
-| My Plan | `myplan.html` | Saved herbs & fruits, the latest "What should I take?" plan (`finder.html?plan=saved` reopens it), today's checklist and water, this week's devotional, safety-checker answers, recipes. Everything is stored only in the visitor's browser |
-| Recipes | `recipes.html` | 14 step-by-step recipes (teas, drinks, syrups, kitchen, skin & bath) with a type filter |
-| Recipe pages | `recipes/<id>.html` | Ingredients checklist, numbered steps, tips, storage, safety, links to the herbs, fruits and guide; printable. Herb, fruit and guide pages show matching recipes |
-| Weekly Devotional | `devotional.html` | A 12-week series (verse, reflection, prayer, habit, herb/fruit/recipe of the week) that changes every Monday, plus a weekly calendar reminder (.ics) for phones. This week's devotional also shows on Healthy Living and My Plan |
-| Español | `es/index.html`, `es/seguridad.html` | Hand-written Spanish home page and safety guide (pregnancy, breastfeeding, children, medicines, Poison Control), plus a "Traducir todo el sitio" button that opens the rest of the site in Google Translate (machine translation) |
-| Healthy Living | `reminders.html` | 100 natural reminders for the body (`reminders.html#body-reminders`, edit in `js/content.js`), plus reminders, daily checklist, water tracker, daily rhythm, seasons |
-| Journal | `journal.html` | Articles (`journal.html?a=<id>`) |
-| About | `about.html` | Story, values, FAQ, contact form |
-| Legal | `privacy.html`, `terms.html`, `disclaimer.html` | Privacy policy, terms of use, medical disclaimer (templates — have them reviewed for your situation) |
+| Home | `index.html` | The cross emblem, a verse, search, Amanda's testimony, three paths (Foods, Remedies, Herbs) and the "What should I eat?" invitation |
+| Foods | `foods.html` | Everyday foods and fruits with 10 categories (`foods.html?cat=protein`) and search |
+| Food & fruit pages | `foods/<id>.html`, `fruits/<id>.html` | What it is, nutrients, benefits, serving, timing, who may benefit, downsides, allergies, pregnancy, sources |
+| Natural Remedies | `remedies.html`, `remedies/<id>.html` | Home and food-based remedies with amounts, evidence and when to see a doctor |
+| Herbs | `herbs.html`, `herbs/<id>.html` | A curated set of herbs with doses and safety; `stacks.html` for herbal stacks |
+| Our Story | `about.html` | Amanda's story, values, FAQ and contact |
+| Tools (linked from pages and the footer) | `finder.html`, `interactions.html`, `reminders.html`, `bible.html` | "What should I eat?" planner, safety checker, 100 body reminders, herbs & fruits of the Bible |
+| Legal & Spanish | `privacy.html`, `terms.html`, `disclaimer.html`, `es/` | |
 
-## Building the herb and fruit pages
-The 234 pages in `herbs/`, `fruits/`, `guides/`, `safety/` and `recipes/`, plus `js/my-photos.js`, `sitemap.xml` and `robots.txt`, are generated. After changing any herb, fruit, guide or recipe data, or adding photos, run:
+**Which herbs and fruits appear** is set in `js/prune.js` (`KEEP_HERBS`, `KEEP_FRUITS`). Add an id there and rebuild to bring one back — all original data is still in `herbs-data.js` and `fruits-data.js`. Removed pages (quiz, journal, devotional, My Plan, recipes, guide pages) are still in the git history if you ever want them back.
+
+## Building the pages
+The pages in `herbs/`, `fruits/`, `foods/` and `remedies/`, plus `js/my-photos.js`, `sitemap.xml` and `robots.txt`, are generated. After changing any herb, fruit, guide or recipe data, or adding photos, run:
 
 ```
 node scripts/build.js
