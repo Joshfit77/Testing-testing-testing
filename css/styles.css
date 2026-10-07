@@ -1431,3 +1431,14 @@ body[data-page="es"] .note-card .btn { margin-top: 6px; color: var(--cream); }
 @media (max-width: 900px) { .footer-grid { grid-template-columns: 1fr 1fr; } }
 .fav-btn, .fav-inline { display: none !important; }
 .art-portrait { max-width: 440px; justify-self: center; width: 100%; }
+
+/* Amanda's section: photo centered in the middle of the page, testimony below */
+.art-story-grid { grid-template-columns: 1fr; justify-items: center; gap: 48px; text-align: center; }
+.art-portrait { max-width: 400px; width: 100%; justify-self: center; margin: 0 auto; }
+.art-story-text { max-width: 680px; margin: 0 auto; }
+.art-story-text .drop::first-letter { float: none; font-size: inherit; padding: 0; color: inherit; }
+.art-story-text .founder-verse { text-align: center; border-left: none; border-top: 2px solid var(--clay); border-radius: 0 0 var(--radius) var(--radius); max-width: 520px; margin-left: auto; margin-right: auto; }
+@media (max-width: 640px) { .art-portrait { max-width: 300px; } }
+.art-portrait img { height: auto; aspect-ratio: 4 / 5; object-position: 38% 22%; }
+.art-story-head { margin-bottom: 0; }
+.art-portrait img { object-position: 50% 30%; }
