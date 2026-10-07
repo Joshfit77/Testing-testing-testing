@@ -1479,3 +1479,96 @@ body[data-page="es"] .note-card .btn { margin-top: 6px; color: var(--cream); }
 .art-path:nth-child(2)::before { background: #f1cf8a; }
 .art-path:nth-child(3)::before { background: #a9c3a2; }
 .art-portrait .portrait-wreath { border: none; border-radius: 0; box-shadow: none; aspect-ratio: auto; object-fit: contain; }
+
+/* =========================================================
+   Artistic layer for every inner page
+   (flowers in the hero corners, painted washes, framed cards)
+   ========================================================= */
+body.artful { background:
+  radial-gradient(ellipse 50% 40% at 0% 30%, rgba(227, 160, 138, 0.07), transparent 70%),
+  radial-gradient(ellipse 50% 40% at 100% 60%, rgba(138, 165, 143, 0.08), transparent 70%),
+  radial-gradient(ellipse 50% 40% at 30% 100%, rgba(247, 217, 154, 0.08), transparent 70%),
+  var(--paper); background-attachment: fixed; }
+
+/* Page heroes: a painted watercolor wash with blossoms in the corners */
+.art-page-hero { position: relative; overflow: hidden; isolation: isolate; padding-bottom: 70px !important; background:
+  radial-gradient(ellipse 34% 60% at 12% 20%, rgba(232, 165, 160, 0.30), transparent 70%),
+  radial-gradient(ellipse 30% 55% at 88% 80%, rgba(169, 195, 162, 0.38), transparent 70%),
+  radial-gradient(ellipse 40% 50% at 55% 0%, rgba(241, 207, 138, 0.26), transparent 70%),
+  linear-gradient(180deg, #f8efe2, var(--paper)) !important; }
+.art-page-hero > .container { position: relative; z-index: 1; }
+.hero-flora { position: absolute; z-index: 0; width: 260px; height: 260px; pointer-events: none; opacity: 0.9; }
+.hero-flora.hf-left { left: -30px; bottom: -40px; transform: rotate(-8deg); }
+.hero-flora.hf-right { right: -30px; top: -20px; transform: scale(-1, -1) rotate(-8deg); }
+.hero-ornament { position: absolute; z-index: 1; left: 50%; bottom: 18px; transform: translateX(-50%); width: 200px; height: auto; opacity: 0.9; }
+
+/* Simple list-page heroes are centered like a title page */
+.art-page-hero.page-hero { text-align: center; padding-top: 70px; }
+.art-page-hero.page-hero .crumbs { justify-content: center; }
+.art-page-hero.page-hero .lead { max-width: 680px; margin-left: auto; margin-right: auto; }
+.art-page-hero h1 { font-size: clamp(2.6rem, 5.5vw, 4.2rem); text-shadow: 0 2px 0 rgba(255, 253, 248, 0.8); }
+.art-page-hero .eyebrow { font-family: "Great Vibes", var(--serif); text-transform: none; letter-spacing: 0; font-size: 1.7rem; color: var(--clay); margin-bottom: 4px; }
+
+/* Detail-page pictures: a soft glowing halo and a gold frame line */
+.art-page-hero .herb-hero-figure, .art-page-hero .stack-hero-photos { position: relative; }
+.art-page-hero .herb-hero-figure::before { content: ""; position: absolute; inset: -6% -10%; z-index: -1; border-radius: 50%; filter: blur(30px); background:
+  radial-gradient(circle at 35% 35%, rgba(247, 217, 154, 0.6), transparent 60%),
+  radial-gradient(circle at 70% 70%, rgba(227, 160, 138, 0.5), transparent 60%); }
+.art-page-hero .herb-hero-art { border: 6px solid #fffdf8; box-shadow: 0 0 0 1.5px var(--gold), 0 26px 60px rgba(46, 70, 54, 0.2); }
+.art-page-hero .shp { border: 5px solid #fffdf8; box-shadow: 0 0 0 1px rgba(184, 150, 79, 0.6), 0 16px 36px rgba(46, 70, 54, 0.16); }
+
+/* Section headings get a small cross-and-leaf ornament beneath */
+.artful .section-head h2::after, .artful .prose > h2::after, .artful .section > .container > h2::after {
+  content: ""; display: block; width: 130px; height: 22px; margin-top: 10px;
+  background: url("../images/ornament.svg") no-repeat left center / contain; }
+.artful .section-head.center h2::after, .artful .center > h2::after { margin-left: auto; margin-right: auto; background-position: center; }
+
+/* Tinted sections become soft watercolor paper */
+.artful .section-tint { background:
+  radial-gradient(ellipse 40% 50% at 8% 10%, rgba(232, 165, 160, 0.16), transparent 70%),
+  radial-gradient(ellipse 40% 50% at 92% 90%, rgba(169, 195, 162, 0.2), transparent 70%),
+  #f6efe3; }
+
+/* Cards: warm paper with a fine gold frame, like a pressed-flower print */
+.artful .herb-card, .artful .recipe-card, .artful .stack-card, .artful .card {
+  background: #fffdf8; outline: 1px solid rgba(184, 150, 79, 0.45); outline-offset: -8px;
+  box-shadow: 0 1px 0 #efe6d4, 0 14px 34px rgba(46, 70, 54, 0.08); }
+.artful .herb-card:hover, .artful .recipe-card:hover, .artful .stack-card:hover {
+  box-shadow: 0 1px 0 #efe6d4, 0 24px 50px rgba(46, 70, 54, 0.16); }
+.artful .note-card { background: #fffdf8; border: 1px solid var(--line); outline: 1px solid rgba(184, 150, 79, 0.35); outline-offset: -7px; }
+
+/* Filter chips: soft pills with a gold edge */
+.artful .chip { background: #fffdf8; border-color: rgba(184, 150, 79, 0.45); }
+.artful .chip.active, .artful .chip:hover { background: var(--forest); border-color: var(--forest); color: var(--cream); }
+
+/* Long reading pages (legal, safety, Spanish) are set as a letter */
+body[data-page="legal"] main .prose, body[data-page="es"] main .section .prose {
+  position: relative; background: #fffdf8; border: 1px solid var(--line); border-radius: 6px; padding: 44px 56px;
+  box-shadow: 0 1px 0 #efe6d4, 0 20px 50px rgba(46, 70, 54, 0.08); outline: 1px solid rgba(184, 150, 79, 0.35); outline-offset: -11px; }
+
+/* Footer: a verse in script, an ornament, and a botanical sprig */
+.footer { position: relative; overflow: hidden; background: var(--forest) url("../images/botanical.svg") no-repeat left -90px bottom -120px / 300px auto; }
+.footer-verse { text-align: center; padding-bottom: 48px; margin-bottom: 48px; border-bottom: 1px solid rgba(246, 241, 231, 0.15); }
+.footer-verse .ornament { margin: 0 auto 10px; width: 200px; height: auto; filter: brightness(1.6) saturate(0.8); }
+.footer-verse .script { text-align: center; color: #f3dfc4; font-size: clamp(1.9rem, 4vw, 2.8rem); margin: 0; line-height: 1.3; }
+.footer-verse cite { display: block; margin-top: 6px; font-style: normal; font-size: 0.72rem; letter-spacing: 0.2em; text-transform: uppercase; color: #e7c9a5; }
+.newsletter { background:
+  radial-gradient(ellipse 40% 80% at 10% 50%, rgba(232, 165, 160, 0.25), transparent 70%),
+  radial-gradient(ellipse 40% 80% at 90% 50%, rgba(241, 207, 138, 0.2), transparent 70%), var(--clay); }
+
+@media (max-width: 900px) {
+  .hero-flora { width: 190px; height: 190px; opacity: 0.6; }
+}
+@media (max-width: 640px) {
+  .hero-flora { width: 140px; height: 140px; opacity: 0.45; }
+  .hero-flora.hf-left { left: -40px; bottom: -40px; }
+  .hero-flora.hf-right { right: -40px; top: -30px; }
+  .art-page-hero.page-hero { padding-top: 44px; }
+  .art-page-hero .eyebrow { font-size: 1.45rem; }
+  body[data-page="legal"] main .prose, body[data-page="es"] main .section .prose { padding: 30px 22px; }
+}
+@media print { .hero-flora, .hero-ornament, .footer-verse { display: none !important; } }
+/* Two-column detail heroes keep the text clear: flowers only in the top-right corner */
+.art-page-hero:not(.page-hero) .hf-left { display: none; }
+.footer { background-position: right -70px top -70px; background-size: 260px auto; }
+@media (max-width: 640px) { .footer { background-image: none; } }

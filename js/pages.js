@@ -1472,3 +1472,4 @@ function initRemedy() {
 }
 
 ({ home: initHome, herbs: initHerbs, fruit: initFruit, interactions: initInteractions, finder: initFinder, bible: initBible, stacks: initStacks, herb: initHerb, living: initLiving, about: initAbout, foods: initFoods, food: initFood, remedies: initRemedies, remedy: initRemedy })[document.body.dataset.page]?.();
+decorateArt();

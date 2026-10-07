@@ -296,6 +296,11 @@ function renderChrome() {
       </div>
     </section>
     <footer class="footer">
+      <div class="footer-verse container">
+        <img class="ornament" src="images/ornament.svg" alt="" aria-hidden="true" width="240" height="40">
+        <p class="script">Let everything that has breath praise the LORD.</p>
+        <cite>Psalm 150:6 (NASB 1995)</cite>
+      </div>
       <div class="container footer-grid">
         <div class="footer-brand">
           <a href="index.html" class="logo logo-light">${LOGO_MARK}<span class="logo-text"><span class="logo-name">Beauty <em>&amp;</em> Praise</span><span class="logo-tag">${SITE.tagline}</span></span></a>
@@ -403,6 +408,7 @@ function searchHerbs(q) {
 }
 
 renderChrome();
+decorateArt();
 
 // Keep the logo and the menu from ever overlapping. Fonts and screen sizes vary, so measure:
 // if the full menu doesn't fit beside the logo, switch to the ☰ menu button instead.
@@ -426,3 +432,15 @@ fitHeader();
 window.addEventListener("resize", fitHeader);
 window.addEventListener("load", fitHeader);
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitHeader);
+
+// Paint every inner page like the homepage: flowers in the hero corners and an ornament beneath.
+function decorateArt() {
+  if (document.body.dataset.page === "home") return;
+  document.body.classList.add("artful");
+  const hero = document.querySelector("main .page-hero, main .herb-hero, main .stack-hero, main > .hero");
+  if (!hero || hero.querySelector(".hero-flora")) return;
+  hero.classList.add("art-page-hero");
+  const flora = (side) => `<img class="hero-flora hf-${side}" src="images/flora-corner.svg" alt="" aria-hidden="true" width="300" height="300">`;
+  hero.insertAdjacentHTML("afterbegin", flora("left") + flora("right"));
+  hero.insertAdjacentHTML("beforeend", `<img class="ornament hero-ornament" src="images/ornament.svg" alt="" aria-hidden="true" width="240" height="40">`);
+}
