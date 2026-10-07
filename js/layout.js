@@ -297,7 +297,7 @@ function renderChrome() {
     </section>
     <footer class="footer">
       <div class="footer-verse container">
-        <img class="ornament" src="images/ornament.svg" alt="" aria-hidden="true" width="240" height="40">
+        <img class="footer-olive" src="images/olive-branch.svg" alt="" aria-hidden="true" width="530" height="150">
         <p class="script">Let everything that has breath praise the LORD.</p>
         <cite>Psalm 150:6 (NASB 1995)</cite>
       </div>
@@ -408,7 +408,6 @@ function searchHerbs(q) {
 }
 
 renderChrome();
-decorateArt();
 
 // Keep the logo and the menu from ever overlapping. Fonts and screen sizes vary, so measure:
 // if the full menu doesn't fit beside the logo, switch to the ☰ menu button instead.
@@ -433,14 +432,71 @@ window.addEventListener("resize", fitHeader);
 window.addEventListener("load", fitHeader);
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitHeader);
 
-// Paint every inner page like the homepage: flowers in the hero corners and an ornament beneath.
+// Scripture woven into each page, chosen to fit what the page is about (NASB 1995).
+// Herb, food and fruit profiles already carry their own verse card, so they are not listed here.
+const PAGE_SCRIPTURE = {
+  foods: ["after", "Whether, then, you eat or drink or whatever you do, do all to the glory of God.", "1 Corinthians 10:31"],
+  herbs: ["after", "He causes the grass to grow for the cattle, and vegetation for the labor of man, so that he may bring forth food from the earth.", "Psalm 104:14"],
+  remedies: ["after", "Do not be wise in your own eyes; fear the LORD and turn away from evil. It will be healing to your body and refreshment to your bones.", "Proverbs 3:7–8"],
+  remedy: ["end", "My son, give attention to my words; incline your ear to my sayings. Do not let them depart from your sight; keep them in the midst of your heart. For they are life to those who find them and health to all their body.", "Proverbs 4:20–22"],
+  stacks: ["after", "Behold, I have given you every plant yielding seed that is on the surface of all the earth, and every tree which has fruit yielding seed; it shall be food for you.", "Genesis 1:29"],
+  finder: ["after", "Be anxious for nothing, but in everything by prayer and supplication with thanksgiving let your requests be made known to God.", "Philippians 4:6"],
+  interactions: ["after", "Or do you not know that your body is a temple of the Holy Spirit who is in you, whom you have from God, and that you are not your own? For you have been bought with a price: therefore glorify God in your body.", "1 Corinthians 6:19–20"],
+  living: ["after", "Look at the birds of the air, that they do not sow, nor reap nor gather into barns, and yet your heavenly Father feeds them. Are you not worth much more than they?", "Matthew 6:26"],
+  about: ["after", "And do not be conformed to this world, but be transformed by the renewing of your mind, so that you may prove what the will of God is, that which is good and acceptable and perfect.", "Romans 12:2"]
+};
+const scriptureBlock = ([, text, ref]) => `<section class="page-scripture"><div class="container"><blockquote class="scripture scripture-band"><p>“${text}”</p><cite>${ref} · NASB 1995</cite></blockquote></div></section>`;
+
+// Dress every inner page like the homepage: botanical line art in the hero, a verse that fits the page.
 function decorateArt() {
-  if (document.body.dataset.page === "home") return;
+  const page = document.body.dataset.page;
+  if (page === "home") return initMotion();
   document.body.classList.add("artful");
   const hero = document.querySelector("main .page-hero, main .herb-hero, main .stack-hero, main > .hero");
-  if (!hero || hero.querySelector(".hero-flora")) return;
+  if (!hero || hero.querySelector(".hero-flora")) return initMotion();
   hero.classList.add("art-page-hero");
-  const flora = (side) => `<img class="hero-flora hf-${side}" src="images/flora-corner.svg" alt="" aria-hidden="true" width="300" height="300">`;
-  hero.insertAdjacentHTML("afterbegin", flora("left") + flora("right"));
-  hero.insertAdjacentHTML("beforeend", `<img class="ornament hero-ornament" src="images/ornament.svg" alt="" aria-hidden="true" width="240" height="40">`);
+  const title = hero.classList.contains("page-hero") && hero.querySelector("h1");
+  if (title && !title.children.length) { // editorial accent: the last word in italic
+    const words = title.textContent.trim().split(/\s+/);
+    if (words.length > 1) {
+      const em = document.createElement("em");
+      em.textContent = words.pop();
+      title.textContent = words.join(" ") + " ";
+      title.append(em);
+    }
+  }
+  hero.insertAdjacentHTML("afterbegin", `<img class="hero-flora hf-left" src="images/wildflowers.svg" alt="" aria-hidden="true" width="300" height="640" data-parallax="-0.06"><img class="hero-flora hf-right" src="images/olive-branch.svg" alt="" aria-hidden="true" width="530" height="150" data-parallax="0.04">`);
+  const verse = PAGE_SCRIPTURE[page];
+  if (verse && !document.querySelector(".page-scripture")) {
+    if (verse[0] === "after") hero.insertAdjacentHTML("afterend", scriptureBlock(verse));
+    else document.querySelector("main").insertAdjacentHTML("beforeend", scriptureBlock(verse));
+  }
+  initMotion();
 }
+
+// Calm motion: sections fade up as they arrive, botanical art drifts a little on scroll.
+function initMotion() {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches || !("IntersectionObserver" in window)) return;
+  document.documentElement.classList.add("motion");
+  initMotion.io = initMotion.io || new IntersectionObserver((entries) => entries.forEach((e) => {
+    if (e.isIntersecting) { e.target.classList.add("in"); initMotion.io.unobserve(e.target); }
+  }), { rootMargin: "0px 0px -6% 0px", threshold: 0.06 });
+  document.querySelectorAll("main > section:not(.reveal), .footer-verse:not(.reveal)").forEach((el) => {
+    el.classList.add("reveal");
+    initMotion.io.observe(el);
+  });
+  if (initMotion.drift) return;
+  initMotion.drift = true;
+  let queued = false;
+  const drift = () => {
+    queued = false;
+    document.querySelectorAll("[data-parallax]").forEach((el) => {
+      const r = el.getBoundingClientRect();
+      if (r.bottom < -200 || r.top > innerHeight + 200) return;
+      el.style.setProperty("--py", `${((r.top + r.height / 2 - innerHeight / 2) * parseFloat(el.dataset.parallax)).toFixed(1)}px`);
+    });
+  };
+  addEventListener("scroll", () => { if (!queued) { queued = true; requestAnimationFrame(drift); } }, { passive: true });
+  drift();
+}
+decorateArt();

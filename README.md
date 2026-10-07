@@ -71,7 +71,7 @@ Herb and fruit photos load in the visitor's browser from Wikipedia / Wikimedia C
 Keep wellness language conservative: foods, remedies and herbs "may support", "may help" or "have been studied for" — never "cures" or "treats". Food and remedy pages link to their sources (USDA FoodData Central, NIH fact sheets, FDA, CDC); please spot-check those links after launch.
 
 ## Scripture
-English verses use the NASB 1995 and Spanish verses use La Biblia de las Américas (LBLA), both from The Lockman Foundation; the copyright notices are in the footers. Verses were typed in by hand, so please check each one against a printed Bible before launch.
+English verses use the NASB 1995 and Spanish verses use La Biblia de las Américas (LBLA), both from The Lockman Foundation; the copyright notices are in the footers. Verses were typed in by hand, so please check each one against a printed Bible before launch. Each inner page shows one verse chosen for its topic — edit them in `PAGE_SCRIPTURE` in `js/layout.js`.
 
 ## Logo
 - `images/logo-mark.svg` — the emblem: a wooden cross in morning light framed by a wreath of leaves and blossoms (also the browser-tab icon)
@@ -79,7 +79,10 @@ English verses use the NASB 1995 and Spanish verses use La Biblia de las Améric
 - `images/og-image.png` — the preview image shown when the site is shared
 
 ## Other files
-- `css/styles.css` — all styling
+- `css/styles.css` — the original styling
+- `css/editorial.css` — the editorial design system loaded on top of it: colors (ivory, sage, deep olive, dusty rose, muted gold, terracotta), typography (Cormorant Garamond + DM Sans), buttons, Scripture blocks, botanical decorations, image frames, calm scroll animations (off when the visitor prefers reduced motion) and the mobile layouts
+- `images/olive-branch.svg`, `images/wildflowers.svg` — botanical line drawings used in heroes, Scripture blocks and the footer
+- `images/amanda.jpg` — Amanda's photo, shown unaltered on the homepage and Our Story page
 - `js/art.js` — fallback illustrations for herbs and fruits
 - `js/pages.js` — page behavior
 - `js/photos.js` — loads and credits photos
