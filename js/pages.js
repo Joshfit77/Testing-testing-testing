@@ -69,6 +69,13 @@ function initHome() {
     <span class="rl-path-body"><span class="rl-path-kicker">${p.kicker}</span><strong>${p.title}</strong><span>${p.text}</span><em>${p.cta} ${icon("arrow")}</em></span>
   </a>`).join("");
 
+  // The autumn harvest table: fall fruits and vegetables as framed oil paintings.
+  const harvest = ["fruit:apple", "fruit:pumpkin", "fruit:pear", "fruit:pomegranate", "food:sweet-potato", "fruit:fig", "food:beets", "fruit:grape", "food:carrots", "food:kale"].filter(itemOf);
+  $("#harvest-grid").innerHTML = harvest.map((k, i) => `<a class="harvest-item h-${i + 1}" href="${itemUrl(k)}">
+    <span class="frame">${keyVisual(k, i < 2)}</span>
+    <span class="plaque">${itemName(k).split(" (")[0]}</span>
+  </a>`).join("");
+
 }
 
 /* ---------------- Herb library ---------------- */

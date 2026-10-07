@@ -167,8 +167,10 @@ function visual(h, large = false) {
 }
 
 // Same for a food.
+// Fruits and vegetables are shown as oil paintings (the "oil-paint" filter in layout.js).
 function foodVisual(fd, large = false) {
-  return `<span class="pf${large ? " pf-large" : ""}" data-photo="food:${fd.id}" role="img" aria-label="${fd.name}">${Art.food(fd)}</span>`;
+  const paint = fd.group === "vegetables" ? " pf-paint" : "";
+  return `<span class="pf${large ? " pf-large" : ""}${paint}" data-photo="food:${fd.id}" role="img" aria-label="${fd.name}">${Art.food(fd)}</span>`;
 }
 
 // Any herb, fruit or food by key ("ginger", "fruit:lemon", "food:honey"). No key → a simple leaf.
@@ -181,5 +183,5 @@ function keyVisual(key, large = false) {
 
 // Same for a fruit.
 function fruitVisual(fr, large = false) {
-  return `<span class="pf${large ? " pf-large" : ""}" data-photo="fruit:${fr.id}" role="img" aria-label="${fr.name} (${fr.latin})">${Art.fruit(fr)}</span>`;
+  return `<span class="pf pf-paint${large ? " pf-large" : ""}" data-photo="fruit:${fr.id}" role="img" aria-label="${fr.name} (${fr.latin})">${Art.fruit(fr)}</span>`;
 }

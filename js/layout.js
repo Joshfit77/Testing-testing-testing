@@ -248,6 +248,24 @@ function renderChrome() {
     ? `<a class="drawer-link" href="${m.href}">${m.label}</a>`
     : `<details class="drawer-group"${group === m.id ? " open" : ""}><summary>${m.label}</summary>${m.items.map((i) => `<a href="${i.href}"${i.highlight ? ' class="nav-highlight"' : ""}>${i.label}</a>`).join("")}</details>`).join("");
 
+  // An oil-painting filter for fruit and vegetable pictures: brush-stroke wobble, palette-knife dabs,
+  // canvas texture lit from the upper left, and a warm autumn glaze. Pure SVG — no images or libraries.
+  if (!document.getElementById("oil-paint")) document.body.insertAdjacentHTML("afterbegin", `<svg class="filter-defs" width="0" height="0" aria-hidden="true" focusable="false"><defs>
+    <filter id="oil-paint" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.018 0.035" numOctaves="2" seed="4" result="flow"/>
+      <feDisplacementMap in="SourceGraphic" in2="flow" scale="18" xChannelSelector="R" yChannelSelector="G" result="brushed"/>
+      <feMorphology in="brushed" operator="dilate" radius="4" result="d1"/>
+      <feMorphology in="d1" operator="erode" radius="3" result="d2"/>
+      <feGaussianBlur in="d2" stdDeviation="1.2" result="soft"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.1 0.25" numOctaves="2" seed="11" result="flow2"/>
+      <feDisplacementMap in="soft" in2="flow2" scale="9" xChannelSelector="G" yChannelSelector="R" result="dabs"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.22 0.07" numOctaves="3" seed="9" result="bristle"/>
+      <feDiffuseLighting in="bristle" surfaceScale="1.5" lighting-color="#ffffff" result="light"><feDistantLight azimuth="235" elevation="62"/></feDiffuseLighting>
+      <feComposite in="dabs" in2="light" operator="arithmetic" k1="0.36" k2="0.72" k3="0" k4="0" result="lit"/>
+      <feColorMatrix in="lit" type="saturate" values="1.2" result="rich"/>
+      <feColorMatrix in="rich" type="matrix" values="1.07 0.06 0 0 0.02  0.03 0.96 0.02 0 0.01  0 0.05 0.8 0 0  0 0 0 1 0"/>
+    </filter></defs></svg>`);
+
   document.getElementById("site-header").innerHTML = `
     <header class="header">
       <div class="container header-inner">
@@ -458,8 +476,14 @@ const SCENES = {
   "lemons-basket": ["https://images.unsplash.com/photo-1554884133-995b1e4c1645", "Yellow lemons in a woven wicker basket", "Hayley Maxwell"],
   "windowsill": ["https://images.unsplash.com/photo-1591133569797-227d95ea8fd8", "Spring flowers on a sunny window sill", "Tetiana Shadrina"],
   "peony-jar": ["https://images.unsplash.com/photo-1565889673228-c963fae33465", "A blush peony in a mason jar", "Jessica Johnston"],
+  "fall-apples": ["https://images.unsplash.com/photo-1474564862106-1f23d10b9d72", "A heap of fresh red apples", "Krishnam Moosaddee"],
+  "fall-leaves": ["https://images.unsplash.com/photo-1441205400075-68a01d4c5108", "Dried autumn leaves in many colors", "kazuend"],
+  "fall-coffee-leaf": ["https://images.unsplash.com/photo-1541253227331-5d8857b020c1", "A maple leaf held beside a morning cup", "Clay Banks"],
+  "nectarines": ["https://images.unsplash.com/photo-1560379563-9ef710ee89ab", "Ripe stone fruit in a woven basket", "Frank Zhang"],
   "hands-flowers": ["https://images.unsplash.com/photo-1429341565469-c014916dc816", "Hands tending small white flowers in a glass jar", "SnapbyThree"]
 };
+// Photographs of fruit and vegetables are painted, like the fruit and vegetable pictures across the site.
+const PAINTED_SCENES = ["fall-apples", "hero-figs", "hero-berries", "foods-board", "lemons-basket", "nectarines"];
 const sceneUrl = (slot, w) => {
   const mine = typeof MY_SCENES !== "undefined" && MY_SCENES[slot];
   if (mine) return mine;
@@ -469,7 +493,7 @@ const sceneSrcset = (slot) => (typeof MY_SCENES !== "undefined" && MY_SCENES[slo
 // A photograph, printed on paper; if it can't load, a plain linen frame stays instead.
 function scene(slot, cls = "", sizes = "(max-width: 700px) 92vw, 46vw") {
   if (!SCENES[slot]) return "";
-  return `<figure class="photo ${cls}"><img src="${sceneUrl(slot, 1200)}" srcset="${sceneSrcset(slot)}" sizes="${sizes}" alt="${SCENES[slot][1]}" loading="lazy" decoding="async" data-credit="Photo: ${SCENES[slot][2]} / Unsplash" onerror="this.closest('.photo').classList.add('photo-missing')"></figure>`;
+  return `<figure class="photo ${cls}${PAINTED_SCENES.includes(slot) ? " paint" : ""}"><img src="${sceneUrl(slot, 1200)}" srcset="${sceneSrcset(slot)}" sizes="${sizes}" alt="${SCENES[slot][1]}" loading="lazy" decoding="async" data-credit="Photo: ${SCENES[slot][2]} / Unsplash" onerror="this.closest('.photo').classList.add('photo-missing')"></figure>`;
 }
 // Static pages mark photo spots with <img data-scene="name">; fill them in here.
 function fillScenes() {
@@ -480,6 +504,7 @@ function fillScenes() {
     const set = sceneSrcset(slot);
     if (set) img.srcset = set;
     if (!img.alt) img.alt = SCENES[slot][1];
+    if (PAINTED_SCENES.includes(slot)) img.closest(".photo")?.classList.add("paint");
     img.dataset.credit = `Photo: ${SCENES[slot][2]} / Unsplash`;
     img.addEventListener("error", () => img.closest(".photo")?.classList.add("photo-missing"));
   });
@@ -495,7 +520,7 @@ const PAGE_SCRIPTURE = {
   stacks: ["after", "Behold, I have given you every plant yielding seed that is on the surface of all the earth, and every tree which has fruit yielding seed; it shall be food for you.", "Genesis 1:29", "garden-bed"],
   finder: ["after", "Be anxious for nothing, but in everything by prayer and supplication with thanksgiving let your requests be made known to God.", "Philippians 4:6", "bible-tea"],
   interactions: ["after", "Or do you not know that your body is a temple of the Holy Spirit who is in you, whom you have from God, and that you are not your own? For you have been bought with a price: therefore glorify God in your body.", "1 Corinthians 6:19–20", "bible-rose"],
-  living: ["after", "Look at the birds of the air, that they do not sow, nor reap nor gather into barns, and yet your heavenly Father feeds them. Are you not worth much more than they?", "Matthew 6:26", "window-flowers"],
+  living: ["after", "Look at the birds of the air, that they do not sow, nor reap nor gather into barns, and yet your heavenly Father feeds them. Are you not worth much more than they?", "Matthew 6:26", "fall-coffee-leaf"],
   about: ["after", "And do not be conformed to this world, but be transformed by the renewing of your mind, so that you may prove what the will of God is, that which is good and acceptable and perfect.", "Romans 12:2", "bible-psalms"]
 };
 const scriptureBlock = ([, text, ref, photo]) => `<section class="page-scripture"><div class="container verse-spread">
@@ -504,7 +529,7 @@ const scriptureBlock = ([, text, ref, photo]) => `<section class="page-scripture
 </div></section>`;
 
 // A photograph for the top of each list page.
-const PAGE_PHOTO = { foods: "lemons-basket", remedies: "remedy-tea", herbs: "garden-bed", stacks: "dahlia-jars", finder: "plan-notebook",
+const PAGE_PHOTO = { foods: "nectarines", remedies: "remedy-tea", herbs: "garden-bed", stacks: "dahlia-jars", finder: "plan-notebook",
   interactions: "window-plants", living: "windowsill", about: "hands-flowers", bible: "bible-psalms", legal: "peony-jar" };
 
 // Name the photographers whose pictures appear on this page, at the foot of the page.
