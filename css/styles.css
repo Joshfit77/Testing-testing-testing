@@ -1442,3 +1442,10 @@ body[data-page="es"] .note-card .btn { margin-top: 6px; color: var(--cream); }
 .art-portrait img { height: auto; aspect-ratio: 4 / 5; object-position: 38% 22%; }
 .art-story-head { margin-bottom: 0; }
 .art-portrait img { object-position: 50% 30%; }
+
+/* Amanda's homepage portrait: a smaller, centered round photo */
+.art-portrait { max-width: 300px; }
+.art-portrait img { aspect-ratio: 1 / 1; border-radius: 50%; object-position: 50% 50%; border: 6px solid var(--paper); box-shadow: 0 0 0 2px var(--gold), 0 24px 50px rgba(46, 70, 54, 0.18); }
+.art-portrait::before { display: none; }
+.art-portrait figcaption { bottom: -14px; }
+@media (max-width: 640px) { .art-portrait { max-width: 240px; } }
