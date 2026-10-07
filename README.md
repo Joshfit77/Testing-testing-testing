@@ -65,6 +65,8 @@ If you sell products or use affiliate links, keep claims educational: in the U.S
 - `js/layout.js` — site name, menu, header, footer, form and shop settings. Replace the `#` social links in the footer with your own profiles.
 
 ## Photos
+**Lifestyle photographs** (the homepage, the top of each page and beside each verse) are real photographs from [Unsplash](https://unsplash.com), free to use under the Unsplash License. They are listed by name in `SCENES` at the end of `js/layout.js`, and the footer of each page names the photographers shown on it. To use your own photo instead — always the best choice — save it in `images/scenes/` with the same name (for example `images/scenes/hero-figs.jpg`) and run `node scripts/build.js`. If a photo ever fails to load, a plain linen frame shows in its place.
+
 Herb and fruit photos load in the visitor's browser from Wikipedia / Wikimedia Commons (free-licensed images); each page credits the photographer and license. If a photo can't load, a drawn illustration is shown instead. **To use your own photos:** put them in `images/herbs/`, `images/fruits/` or `images/foods/`, named exactly like the page address — e.g. `images/herbs/chamomile.jpg` for `herbs/chamomile.html`, `images/fruits/apple.jpg` for `fruits/apple.html` (.jpg, .png or .webp; about 1200 px wide is plenty) — then run `node scripts/build.js`. Your photo replaces the Wikipedia one everywhere on the site. To choose a different credit line, add it to `PHOTO_OVERRIDES` in `js/photos.js` instead (fruits use keys like `"fruit:apple"`). If a Wikipedia photo is a poor match, change the article in `WIKI_TITLES` or `FRUIT_WIKI_TITLES` in the same file.
 
 ## Wording
@@ -80,8 +82,8 @@ English verses use the NASB 1995 and Spanish verses use La Biblia de las Améric
 
 ## Other files
 - `css/styles.css` — the original styling
-- `css/editorial.css` — the editorial design system loaded on top of it: colors (ivory, sage, deep olive, dusty rose, muted gold, terracotta), typography (Cormorant Garamond + DM Sans), buttons, Scripture blocks, botanical decorations, image frames, calm scroll animations (off when the visitor prefers reduced motion) and the mobile layouts
-- `images/olive-branch.svg`, `images/wildflowers.svg` — botanical line drawings used in heroes, Scripture blocks and the footer
+- `css/editorial.css` — the "real life" design system loaded on top of it: warm cream and linen backgrounds, olive, rose, wood and brass tones, Cormorant Garamond + DM Sans, photographs shown as paper prints, Scripture set beside photographs, calm scroll animations (off when the visitor prefers reduced motion) and the mobile layouts
+- `images/olive-branch.svg` — the one small botanical drawing, used as an accent beside verse references and in the footer
 - `images/amanda.jpg` — Amanda's photo, shown unaltered on the homepage and Our Story page
 - `js/art.js` — fallback illustrations for herbs and fruits
 - `js/pages.js` — page behavior

@@ -318,8 +318,9 @@ function renderChrome() {
       <div class="container footer-bottom">
         <p>© ${new Date().getFullYear()} Beauty &amp; Praise. All rights reserved.</p>
         <p class="legal-links"><a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · <a href="disclaimer.html">Medical disclaimer</a></p>
-        <p>Herb and fruit photographs from <a href="https://commons.wikimedia.org" target="_blank" rel="noopener">Wikimedia Commons</a> contributors — credits on each page.</p>
+        <p>Lifestyle photographs from <a href="https://unsplash.com" target="_blank" rel="noopener">Unsplash</a> photographers; herb and fruit photographs from <a href="https://commons.wikimedia.org" target="_blank" rel="noopener">Wikimedia Commons</a> contributors — credits on each page.</p>
         <p>For education only — not medical advice. Always consult your healthcare provider.</p>
+        <p class="photo-credits"></p>
         <p class="scripture-copyright">${typeof BIBLE_COPYRIGHT !== "undefined" ? BIBLE_COPYRIGHT : ""}</p>
       </div>
     </footer>`;
@@ -432,28 +433,96 @@ window.addEventListener("resize", fitHeader);
 window.addEventListener("load", fitHeader);
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitHeader);
 
-// Scripture woven into each page, chosen to fit what the page is about (NASB 1995).
+// ---------- Real photography ----------
+// Lifestyle photographs from Unsplash (free to use under the Unsplash License), each shot on a real camera.
+// To use your own photo instead, save it as images/scenes/<name>.jpg (e.g. images/scenes/hero-figs.jpg)
+// and run `node scripts/build.js` — it replaces the photo everywhere that name is used.
+// [image address, description (alt text), photographer]
+const SCENES = {
+  "hero-figs": ["https://images.unsplash.com/photo-1569243177055-f4855fc83949", "Sliced lemons and fresh figs on a plate in morning sunlight", "Weronika Karczewska"],
+  "hero-tea": ["https://images.unsplash.com/38/QoR8Bv1S2SEqH6UcSJCA_Tea.jpg", "A ceramic teacup resting on an open book beside pink flowers", "Carli Jeen"],
+  "hero-berries": ["https://images.unsplash.com/photo-1457347876270-97799484c564", "Two ceramic cups of fresh blueberries on a brown cloth", "Joanna Kosinska"],
+  "pressed-flowers": ["https://images.unsplash.com/photo-1568884209881-a474eb38199d", "Dried flowers lying on creased linen", "Weronika Karczewska"],
+  "bible-tea": ["https://images.unsplash.com/photo-1580651521938-df6336ec8bde", "An open Bible with flowers and a cup of tea", "Sixteen Miles Out"],
+  "bible-rose": ["https://images.unsplash.com/photo-1573177201559-b6eed209d3dc", "An open Bible with a pink rose and petals", "Alabaster Co"],
+  "bible-psalms": ["https://images.unsplash.com/photo-1571167530149-c1105da4c2c7", "The Book of Psalms beside fresh green leaves and flowers", "Alabaster Co"],
+  "foods-board": ["https://images.unsplash.com/photo-1555521275-c51f3e4a95c3", "A sliced pomegranate on a wooden chopping board", "Pratiksha Mohanty"],
+  "remedy-tea": ["https://images.unsplash.com/photo-1571742457994-1ff4736ebfe7", "A warm mug on a woven saucer beside books and autumn leaves", "Olesia Buiar"],
+  "herb-basket": ["https://images.unsplash.com/photo-1496660988113-291c5f308503", "A wicker basket of freshly gathered hedgerow plants", "Annie Spratt"],
+  "plan-notebook": ["https://images.unsplash.com/photo-1571785880387-a37073314dea", "An open notebook beside a mug and a candle", "Kevin Wiegand"],
+  "window-flowers": ["https://images.unsplash.com/photo-1591880908902-d02f5e1db88f", "Wild cow parsley in a ceramic vase by a window", "Elena Kloppenburg"],
+  "dahlia-jars": ["https://images.unsplash.com/photo-1448216118999-7a3f98dc37f2", "Garden dahlias in simple glass jars", "Maria"],
+  "window-plants": ["https://images.unsplash.com/photo-1584555912530-1b2c29c946e9", "Small potted plants on a wooden table by a window", "Jornada Produtora"],
+  "garden-bed": ["https://images.unsplash.com/photo-1591857177580-dc82b9ac4e1e", "Herbs and salad greens growing in a raised garden bed", "Markus Spiske"],
+  "bread-linen": ["https://images.unsplash.com/photo-1586871309760-4cceac05ea12", "Fresh bread on a linen cloth", "Camille Brodard"],
+  "lemons-basket": ["https://images.unsplash.com/photo-1554884133-995b1e4c1645", "Yellow lemons in a woven wicker basket", "Hayley Maxwell"],
+  "windowsill": ["https://images.unsplash.com/photo-1591133569797-227d95ea8fd8", "Spring flowers on a sunny window sill", "Tetiana Shadrina"],
+  "peony-jar": ["https://images.unsplash.com/photo-1565889673228-c963fae33465", "A blush peony in a mason jar", "Jessica Johnston"],
+  "hands-flowers": ["https://images.unsplash.com/photo-1429341565469-c014916dc816", "Hands tending small white flowers in a glass jar", "SnapbyThree"]
+};
+const sceneUrl = (slot, w) => {
+  const mine = typeof MY_SCENES !== "undefined" && MY_SCENES[slot];
+  if (mine) return mine;
+  return SCENES[slot] ? `${SCENES[slot][0]}?auto=format&fit=crop&w=${w}&q=72` : "";
+};
+const sceneSrcset = (slot) => (typeof MY_SCENES !== "undefined" && MY_SCENES[slot]) ? "" : [520, 900, 1400, 2000].map((w) => `${sceneUrl(slot, w)} ${w}w`).join(", ");
+// A photograph, printed on paper; if it can't load, a plain linen frame stays instead.
+function scene(slot, cls = "", sizes = "(max-width: 700px) 92vw, 46vw") {
+  if (!SCENES[slot]) return "";
+  return `<figure class="photo ${cls}"><img src="${sceneUrl(slot, 1200)}" srcset="${sceneSrcset(slot)}" sizes="${sizes}" alt="${SCENES[slot][1]}" loading="lazy" decoding="async" data-credit="Photo: ${SCENES[slot][2]} / Unsplash" onerror="this.closest('.photo').classList.add('photo-missing')"></figure>`;
+}
+// Static pages mark photo spots with <img data-scene="name">; fill them in here.
+function fillScenes() {
+  document.querySelectorAll("img[data-scene]:not([src])").forEach((img) => {
+    const slot = img.dataset.scene;
+    if (!SCENES[slot]) return;
+    img.src = sceneUrl(slot, 1200);
+    const set = sceneSrcset(slot);
+    if (set) img.srcset = set;
+    if (!img.alt) img.alt = SCENES[slot][1];
+    img.dataset.credit = `Photo: ${SCENES[slot][2]} / Unsplash`;
+    img.addEventListener("error", () => img.closest(".photo")?.classList.add("photo-missing"));
+  });
+}
+
+// ---------- Scripture woven into each page (NASB 1995), each beside a fitting photograph ----------
 // Herb, food and fruit profiles already carry their own verse card, so they are not listed here.
 const PAGE_SCRIPTURE = {
-  foods: ["after", "Whether, then, you eat or drink or whatever you do, do all to the glory of God.", "1 Corinthians 10:31"],
-  herbs: ["after", "He causes the grass to grow for the cattle, and vegetation for the labor of man, so that he may bring forth food from the earth.", "Psalm 104:14"],
-  remedies: ["after", "Do not be wise in your own eyes; fear the LORD and turn away from evil. It will be healing to your body and refreshment to your bones.", "Proverbs 3:7–8"],
-  remedy: ["end", "My son, give attention to my words; incline your ear to my sayings. Do not let them depart from your sight; keep them in the midst of your heart. For they are life to those who find them and health to all their body.", "Proverbs 4:20–22"],
-  stacks: ["after", "Behold, I have given you every plant yielding seed that is on the surface of all the earth, and every tree which has fruit yielding seed; it shall be food for you.", "Genesis 1:29"],
-  finder: ["after", "Be anxious for nothing, but in everything by prayer and supplication with thanksgiving let your requests be made known to God.", "Philippians 4:6"],
-  interactions: ["after", "Or do you not know that your body is a temple of the Holy Spirit who is in you, whom you have from God, and that you are not your own? For you have been bought with a price: therefore glorify God in your body.", "1 Corinthians 6:19–20"],
-  living: ["after", "Look at the birds of the air, that they do not sow, nor reap nor gather into barns, and yet your heavenly Father feeds them. Are you not worth much more than they?", "Matthew 6:26"],
-  about: ["after", "And do not be conformed to this world, but be transformed by the renewing of your mind, so that you may prove what the will of God is, that which is good and acceptable and perfect.", "Romans 12:2"]
+  foods: ["after", "Whether, then, you eat or drink or whatever you do, do all to the glory of God.", "1 Corinthians 10:31", "bread-linen"],
+  herbs: ["after", "He causes the grass to grow for the cattle, and vegetation for the labor of man, so that he may bring forth food from the earth.", "Psalm 104:14", "bible-psalms"],
+  remedies: ["after", "Do not be wise in your own eyes; fear the LORD and turn away from evil. It will be healing to your body and refreshment to your bones.", "Proverbs 3:7–8", "bible-rose"],
+  remedy: ["end", "My son, give attention to my words; incline your ear to my sayings. Do not let them depart from your sight; keep them in the midst of your heart. For they are life to those who find them and health to all their body.", "Proverbs 4:20–22", "bible-tea"],
+  stacks: ["after", "Behold, I have given you every plant yielding seed that is on the surface of all the earth, and every tree which has fruit yielding seed; it shall be food for you.", "Genesis 1:29", "garden-bed"],
+  finder: ["after", "Be anxious for nothing, but in everything by prayer and supplication with thanksgiving let your requests be made known to God.", "Philippians 4:6", "bible-tea"],
+  interactions: ["after", "Or do you not know that your body is a temple of the Holy Spirit who is in you, whom you have from God, and that you are not your own? For you have been bought with a price: therefore glorify God in your body.", "1 Corinthians 6:19–20", "bible-rose"],
+  living: ["after", "Look at the birds of the air, that they do not sow, nor reap nor gather into barns, and yet your heavenly Father feeds them. Are you not worth much more than they?", "Matthew 6:26", "window-flowers"],
+  about: ["after", "And do not be conformed to this world, but be transformed by the renewing of your mind, so that you may prove what the will of God is, that which is good and acceptable and perfect.", "Romans 12:2", "bible-psalms"]
 };
-const scriptureBlock = ([, text, ref]) => `<section class="page-scripture"><div class="container"><blockquote class="scripture scripture-band"><p>“${text}”</p><cite>${ref} · NASB 1995</cite></blockquote></div></section>`;
+const scriptureBlock = ([, text, ref, photo]) => `<section class="page-scripture"><div class="container verse-spread">
+  ${scene(photo, "print verse-photo", "(max-width: 700px) 80vw, 30vw")}
+  <blockquote class="scripture verse-paper"><p>“${text}”</p><cite>${ref} · NASB 1995</cite></blockquote>
+</div></section>`;
 
-// Dress every inner page like the homepage: botanical line art in the hero, a verse that fits the page.
+// A photograph for the top of each list page.
+const PAGE_PHOTO = { foods: "lemons-basket", remedies: "remedy-tea", herbs: "garden-bed", stacks: "dahlia-jars", finder: "plan-notebook",
+  interactions: "window-plants", living: "windowsill", about: "hands-flowers", bible: "bible-psalms", legal: "peony-jar" };
+
+// Name the photographers whose pictures appear on this page, at the foot of the page.
+function creditPhotos() {
+  const el = document.querySelector(".photo-credits");
+  if (!el) return;
+  const names = [...new Set([...document.querySelectorAll("img[data-credit]")].map((i) => i.dataset.credit.replace(/^Photo: | \/ Unsplash$/g, "")))];
+  el.textContent = names.length ? `Photography on this page: ${names.join(", ")} (Unsplash).` : "";
+}
+
+// Dress every inner page: a real photograph in the hero and a verse that fits the page.
 function decorateArt() {
+  fillScenes();
   const page = document.body.dataset.page;
-  if (page === "home") return initMotion();
+  if (page === "home") { creditPhotos(); return initMotion(); }
   document.body.classList.add("artful");
   const hero = document.querySelector("main .page-hero, main .herb-hero, main .stack-hero, main > .hero");
-  if (!hero || hero.querySelector(".hero-flora")) return initMotion();
+  if (!hero || hero.classList.contains("art-page-hero")) return initMotion();
   hero.classList.add("art-page-hero");
   const title = hero.classList.contains("page-hero") && hero.querySelector("h1");
   if (title && !title.children.length) { // editorial accent: the last word in italic
@@ -465,16 +534,21 @@ function decorateArt() {
       title.append(em);
     }
   }
-  hero.insertAdjacentHTML("afterbegin", `<img class="hero-flora hf-left" src="images/wildflowers.svg" alt="" aria-hidden="true" width="300" height="640" data-parallax="-0.06"><img class="hero-flora hf-right" src="images/olive-branch.svg" alt="" aria-hidden="true" width="530" height="150" data-parallax="0.04">`);
+  const photo = hero.classList.contains("page-hero") && PAGE_PHOTO[page];
+  if (photo) {
+    hero.classList.add("has-photo");
+    hero.querySelector(".container").insertAdjacentHTML("beforeend", `<div class="hero-photo">${scene(photo, "print", "(max-width: 900px) 92vw, 40vw").replace(' loading="lazy"', ' fetchpriority="high"')}</div>`);
+  }
   const verse = PAGE_SCRIPTURE[page];
   if (verse && !document.querySelector(".page-scripture")) {
     if (verse[0] === "after") hero.insertAdjacentHTML("afterend", scriptureBlock(verse));
     else document.querySelector("main").insertAdjacentHTML("beforeend", scriptureBlock(verse));
   }
+  creditPhotos();
   initMotion();
 }
 
-// Calm motion: sections fade up as they arrive, botanical art drifts a little on scroll.
+// Calm motion: sections fade up as they arrive, photographs drift a touch on scroll.
 function initMotion() {
   if (matchMedia("(prefers-reduced-motion: reduce)").matches || !("IntersectionObserver" in window)) return;
   document.documentElement.classList.add("motion");
@@ -499,4 +573,5 @@ function initMotion() {
   addEventListener("scroll", () => { if (!queued) { queued = true; requestAnimationFrame(drift); } }, { passive: true });
   drift();
 }
-decorateArt();
+// (pages.js calls decorateArt() once each page has drawn its content.)
+document.addEventListener("DOMContentLoaded", fillScenes);

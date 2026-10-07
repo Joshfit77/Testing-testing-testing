@@ -60,18 +60,14 @@ function initHome() {
   attachSearch($("#hero-search"), $("#hero-suggest"));
 
   const paths = [
-    { href: "foods.html", key: "fruit:pomegranate", title: "Foods", kicker: "The foundation", text: "Real, everyday foods — what they offer, how much to eat and when.", cta: "Explore foods" },
-    { href: "remedies.html", key: "ginger", title: "Natural Remedies", kicker: "From the kitchen", text: "Gentle teas, soaks and home remedies with clear amounts and safety.", cta: "Find a remedy" },
-    { href: "herbs.html", key: "chamomile", title: "Herbs", kicker: "A supporting role", text: "Time-honored herbs as a supporting role — with research and doses.", cta: "Meet the herbs" }
+    { href: "foods.html", photo: "foods-board", title: "Foods", kicker: "No. 01 — The foundation", text: "Real, everyday foods — what they offer, how much to eat and when.", cta: "Explore foods" },
+    { href: "remedies.html", photo: "remedy-tea", title: "Natural Remedies", kicker: "No. 02 — From the kitchen", text: "Gentle teas, soaks and home remedies with clear amounts and safety.", cta: "Find a remedy" },
+    { href: "herbs.html", photo: "herb-basket", title: "Herbs", kicker: "No. 03 — A supporting role", text: "Time-honored herbs as a supporting role — with research and doses.", cta: "Meet the herbs" }
   ];
-  $("#art-paths").innerHTML = paths.map((p, i) => `<a class="ed-path ed-path-${i + 1}" href="${p.href}">
-    <span class="ed-path-num" aria-hidden="true">0${i + 1}</span>
-    <span class="ed-path-img">${keyVisual(p.key, true)}<span class="ed-path-tag">${p.kicker}</span></span>
-    <span class="ed-path-body"><strong>${p.title}</strong><span>${p.text}</span><em>${p.cta} ${icon("arrow")}</em></span>
+  $("#art-paths").innerHTML = paths.map((p, i) => `<a class="rl-path rl-path-${i + 1}" href="${p.href}">
+    ${scene(p.photo, "rl-path-photo", i === 1 ? "(max-width: 900px) 92vw, 34vw" : "(max-width: 900px) 92vw, 56vw")}
+    <span class="rl-path-body"><span class="rl-path-kicker">${p.kicker}</span><strong>${p.title}</strong><span>${p.text}</span><em>${p.cta} ${icon("arrow")}</em></span>
   </a>`).join("");
-  const heroPhoto = (id, key) => { const el = $(id); if (el) el.innerHTML = keyVisual(key, true); };
-  heroPhoto("#hero-photo-1", "lavender");
-  heroPhoto("#hero-photo-2", "fruit:fig");
 
 }
 
@@ -1073,8 +1069,8 @@ const guideFoods = (g) => FOODS.filter((fd) => fd.goals.includes(g.id));
 
 /* ---------------- About ---------------- */
 function initAbout() {
-  $("#about-art").innerHTML = ["hibiscus", "lavender", "chamomile"].map((id, i) =>
-    `<div class="about-art-${i}">${visual(findHerb(id))}</div>`).join("");
+  $("#about-art").innerHTML = ["bread-linen", "lemons-basket", "dahlia-jars"].map((slot, i) =>
+    `<div class="about-art-${i}">${scene(slot, "print", "(max-width: 900px) 70vw, 30vw")}</div>`).join("");
 
   const form = $("#contact-form");
   form.addEventListener("submit", (e) => {
