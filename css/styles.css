@@ -1449,3 +1449,33 @@ body[data-page="es"] .note-card .btn { margin-top: 6px; color: var(--cream); }
 .art-portrait::before { display: none; }
 .art-portrait figcaption { bottom: -14px; }
 @media (max-width: 640px) { .art-portrait { max-width: 240px; } }
+
+/* ---------- Amanda's section as artwork ---------- */
+.art-story { background:
+  radial-gradient(ellipse 40% 35% at 50% 18%, rgba(227, 160, 138, 0.16), transparent 70%),
+  radial-gradient(ellipse 30% 30% at 20% 70%, rgba(138, 165, 143, 0.14), transparent 70%),
+  radial-gradient(ellipse 30% 30% at 80% 75%, rgba(247, 217, 154, 0.18), transparent 70%); }
+.art-portrait { position: relative; width: 400px; max-width: 86vw; aspect-ratio: 1; margin: 0 auto; }
+.art-portrait .portrait-glow { position: absolute; inset: 4%; border-radius: 50%; background:
+  radial-gradient(circle at 35% 35%, rgba(247, 217, 154, 0.55), transparent 60%),
+  radial-gradient(circle at 70% 70%, rgba(227, 160, 138, 0.45), transparent 60%); filter: blur(18px); }
+.art-portrait .portrait-photo { position: absolute; inset: 17%; width: 66%; height: 66%; aspect-ratio: auto; object-fit: cover; border-radius: 50%; border: 5px solid #fffdf8; box-shadow: 0 18px 40px rgba(46, 70, 54, 0.22); }
+.art-portrait .portrait-wreath { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.art-portrait figcaption { bottom: 6%; font-family: "Great Vibes", var(--serif); font-style: normal; font-size: 1.9rem; padding: 2px 22px; background: rgba(255, 253, 248, 0.95); box-shadow: 0 6px 16px rgba(46, 70, 54, 0.12); }
+
+.letter { position: relative; background: #fffdf8; border: 1px solid var(--line); border-radius: 6px; padding: 40px 56px 44px; box-shadow: 0 1px 0 #efe6d4, 0 20px 50px rgba(46, 70, 54, 0.1); text-align: left; }
+.letter::before { content: ""; position: absolute; inset: 10px; border: 1px solid rgba(184, 150, 79, 0.35); border-radius: 3px; pointer-events: none; }
+.letter .ornament { margin: 0 auto 18px; }
+.letter .drop::first-letter { float: left; font-family: var(--serif); font-size: 4.4rem; line-height: 0.8; padding: 6px 10px 0 0; color: var(--clay); }
+.letter .founder-verse { margin: 18px auto 22px; }
+.script { font-family: "Great Vibes", var(--serif); font-style: normal; font-size: 2.4rem; color: var(--forest); text-align: right; margin: 10px 0 0; }
+@media (max-width: 640px) { .letter { padding: 30px 24px 32px; } .art-portrait figcaption { font-size: 1.5rem; } }
+
+/* Soft watercolor wash behind each of the three paths */
+.art-path { position: relative; }
+.art-path-frame { position: relative; z-index: 1; }
+.art-path::before { content: ""; position: absolute; z-index: 0; top: -18px; left: 8%; right: 8%; height: 72%; border-radius: 50% 50% 46% 54%; filter: blur(22px); opacity: 0.55; transform: rotate(-4deg); }
+.art-path:nth-child(1)::before { background: #e8a5a0; }
+.art-path:nth-child(2)::before { background: #f1cf8a; }
+.art-path:nth-child(3)::before { background: #a9c3a2; }
+.art-portrait .portrait-wreath { border: none; border-radius: 0; box-shadow: none; aspect-ratio: auto; object-fit: contain; }
