@@ -1248,7 +1248,7 @@ const PAINTINGS = {
 };
 // Frames painted in the browser (js/oilpaint.js) from a photograph of the food itself.
 const PAINTED_FRAMES = {
-  "oil-greens": { photos: ["food:spinach", "food:kale"], placard: ["Leafy Greens", "Oil study, Beauty & Praise"] },
+  "oil-greens": { photos: ["food:spinach", "food:kale"], placard: ["Leafy Greens"] },
 };
 const COMMONS_API = "https://commons.wikimedia.org/w/api.php?format=json&origin=*&action=query&prop=imageinfo&iiprop=url&iiurlwidth=1000";
 
@@ -1283,8 +1283,8 @@ function paintFoodArt() {
     fig.innerHTML = `<div class="gilt-canvas" role="img" aria-label="${name}"><span>${name}</span></div>`;
   };
   const hang = (fig, img, placard) => {
-    img.alt = placard ? `${placard[0]}, oil painting by ${placard[1]}` : `Oil painting: ${nameOf(fig)}`;
-    fig.innerHTML = `<div class="gilt-canvas"></div>` + (placard ? `<figcaption class="placard"><em>${placard[0]}</em><span>${[placard[1], placard[2]].filter(Boolean).join(", ")}</span></figcaption>` : "");
+    img.alt = `Oil painting: ${placard ? placard[0] : nameOf(fig)}`;
+    fig.innerHTML = `<div class="gilt-canvas"></div>` + (placard ? `<figcaption class="placard"><em>${placard[0]}</em></figcaption>` : "");
     fig.firstChild.append(img);
     fig.classList.add("hung");
   };
@@ -1521,7 +1521,7 @@ function paintSwatches() {
   const paintOne = (el) => {
     el.dataset.state = "loading";
     Photos.load([el.dataset.paint])
-      .then((map) => { const p = map[el.dataset.paint]; if (!p) throw 0; return OilPaint.paint(p.src, 480, 360); })
+      .then((map) => { const p = map[el.dataset.paint]; if (!p) throw 0; return /^https?:/.test(p.src) ? OilPaint.paint(p.src, 480, 360) : p.src; })
       .then((url) => { el.innerHTML = `<img src="${url}" alt="">`; el.dataset.state = "painted"; })
       .catch(() => { el.dataset.state = "none"; });
   };
