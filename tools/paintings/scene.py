@@ -196,7 +196,7 @@ class Scene:
         grain = noise(H, W, 2.0, octaves=2)
         grain = ndi.gaussian_filter(grain, (0.6, 18))
         streak = 0.5 + 0.5 * np.sin(self.yy * 0.9 + 6 * ndi.gaussian_filter(noise(H, W, 30), 4))
-        wcol = rgb(*wood) * (0.82 + 0.16 * streak + 0.18 * grain)[..., None]
+        wcol = rgb(*wood) * (0.9 + 0.05 * streak + 0.12 * ndi.gaussian_filter(grain, (1.5, 30)))[..., None]
         lightx = np.clip(1.1 - np.abs(x - 0.35) * 1.1, 0.55, 1.1)
         wcol *= (lightx * (1.05 - 0.35 * np.clip(t, 0, 1)))[..., None]
         table = (self.yy >= hy).astype(np.float32)
@@ -304,6 +304,7 @@ def bowl(sc, cx, cy, rw, depth, color=(205, 190, 160), inside=None, glaze=0.45, 
         # thin bright rim highlight on the lip
         lip = np.clip(rim - sc.ellipse(cx, cy, rw * 0.965, rim_ry * 0.9), 0, 1)
         lip *= np.clip(1.0 - (sc.xx - cx) / rw * 0.6, 0.3, 1.3)
+        lip *= np.clip((sc.yy - cy) / (rim_ry * 0.3) + 0.5, 0, 1)  # only the front lip, never across the contents
         sc.img += (lip * 0.22)[..., None]
 
     return inner, draw_front

@@ -13,12 +13,12 @@ def job(args):
     try:
         t = time.time()
         mod = importlib.import_module(GROUPS[group])
-        from painter import paint, save
+        from painter import refined, save
         ref = mod.SCENES[sid]()
         os.makedirs(f"out/{group}", exist_ok=True)
         save(ref, f"out/{group}/{sid}-ref.jpg", (500, 375))
         if not ref_only:
-            out = paint(ref, seed=hash(sid) % 1000)
+            out = refined(ref, seed=sum(map(ord, sid)) % 1000)
             save(out, f"out/{group}/{sid}.jpg", size)
         return f"{sid} {time.time() - t:.0f}s"
     except Exception:

@@ -14,7 +14,7 @@ def _lum(a):
 
 
 def paint(ref, radii=(20, 11, 6, 3), threshold=0.05, max_len=7, min_len=2, curve=0.4, seed=3,
-          jitter=0.035, bristles=True, edge_stop=0.22, keep=0.18):
+          jitter=0.035, bristles=True, edge_stop=0.22, keep=0.18, bristle_var=0.07, relief=0.16, weave=0.028, bloom=0.0, soften=0.0):
     """ref: float RGB 0..1 (H, W, 3). Returns float RGB 0..1."""
     rng = np.random.default_rng(seed)
     H, W = ref.shape[:2]
@@ -76,17 +76,33 @@ def paint(ref, radii=(20, 11, 6, 3), threshold=0.05, max_len=7, min_len=2, curve
                     break
                 ldx, ldy = dx, dy
                 pts.append((x, y))
-            _stroke(draw, hdraw, pts, col, R, rng, jitter, bristles)
+            _stroke(draw, hdraw, pts, col, R, rng, jitter, bristles, bristle_var)
     out = np.asarray(canvas, np.float32) / 255
     hm = np.asarray(hmap, np.float32) / 255
     # glaze: let a little of the fully modelled form show through, as in a finished painting
+    if soften:
+        out = ndi.gaussian_filter(out, (soften, soften, 0))
     out = out * (1 - keep) + ref * keep
-    return finish(out, hm, rng)
+    out = finish(out, hm, rng, relief=relief, weave=weave)
+    if bloom:
+        # a soft glow around the brightest passages, like light on varnish
+        L = _lum(out)
+        glow = ndi.gaussian_filter(np.clip(L - 0.55, 0, 1)[..., None] * out, (18, 18, 0))
+        out = np.clip(out + glow * bloom, 0, 1)
+    return out
 
 
-def _stroke(draw, hdraw, pts, col, R, rng, jitter, bristles):
+def refined(ref, seed=3):
+    """The site's finish: smooth, blended forms with a quiet brush texture and a warm glow."""
+    sm = ndi.gaussian_filter(ref, (0.8, 0.8, 0))
+    return paint(sm, radii=(16, 8, 4), threshold=0.04, max_len=8, curve=0.3, seed=seed, jitter=0.012,
+                 bristle_var=0.025, edge_stop=0.14, keep=0.62, relief=0.05, weave=0.007, bloom=0.35, soften=0.7)
+
+
+def _stroke(draw, hdraw, pts, col, R, rng, jitter, bristles, bristle_var=0.07):
     # each stroke mixes slightly differently on the palette
-    c = np.clip(col * (1 + rng.normal(0, jitter, 3)) + rng.normal(0, jitter * 0.4), 0, 1)
+    # value varies a little from stroke to stroke; hue stays true so whites never turn pink or green
+    c = np.clip(col * (1 + rng.normal(0, jitter)), 0, 1)
     fill = tuple(int(v * 255) for v in c)
     w = max(1, int(R * 2))
     hv = int(90 + rng.random() * 165)
@@ -109,7 +125,7 @@ def _stroke(draw, hdraw, pts, col, R, rng, jitter, bristles):
         k = max(2, int(R / 1.6))
         for j in range(k):
             off = (rng.random() * 2 - 1) * R * 0.8
-            cc = np.clip(c * (1 + rng.normal(0, 0.07)) + rng.normal(0, 0.02), 0, 1)
+            cc = np.clip(c * (1 + rng.normal(0, bristle_var)), 0, 1)
             line = [tuple(p) for p in (P + nrm * off)]
             draw.line(line, fill=tuple(int(v * 255) for v in cc), width=max(1, int(R * 0.35)), joint="curve")
             hdraw.line(line, fill=int(min(255, hv + rng.integers(-60, 60))), width=max(1, int(R * 0.3)))
