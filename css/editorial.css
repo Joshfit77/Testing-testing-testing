@@ -353,3 +353,27 @@ body[data-page="legal"] main .prose, body[data-page="es"] main .section .prose {
 body.artful { background: var(--ivory); }
 .section--cream.section-tint, .artful .section--cream { background: var(--cream); }
 .page-scripture .scripture blockquote { font-size: clamp(1.6rem, 3vw, 2.5rem); line-height: 1.22; }
+
+/* ---------- oil paintings in gilded frames (Foods page, Remedies, remedy pages) ---------- */
+.gilt { display: block; width: 100%; margin: 0; }
+.gilt-canvas { position: relative; aspect-ratio: 4 / 3; overflow: hidden; border: 16px solid transparent;
+  border-image: linear-gradient(135deg, #8a6420 0%, #f3dc8e 18%, #b88a2c 34%, #f7e3a1 52%, #9c7224 70%, #e9c96f 86%, #7d5a1c 100%) 1;
+  background: #2a231a;
+  box-shadow: 0 0 0 1px #5d4314, 0 28px 60px rgba(40, 30, 15, .32), 0 6px 14px rgba(40, 30, 15, .2); }
+.gilt-canvas img { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; min-height: 0; object-fit: cover; filter: none; animation: gilt-in .9s ease both; }
+.gilt-canvas::after { position: absolute; inset: 0; content: ""; pointer-events: none; box-shadow: inset 0 0 0 5px #3a2e1c, inset 0 0 0 6px #c9a456, inset 0 0 26px 6px rgba(0, 0, 0, .45); }
+@keyframes gilt-in { from { opacity: 0; } to { opacity: 1; } }
+.gilt-hero .gilt-canvas { aspect-ratio: 5 / 4; border-width: 22px; }
+.gilt-small .gilt-canvas { aspect-ratio: 4 / 5; border-width: 10px; }
+.placard { display: table; margin: 16px auto 0; padding: 7px 16px 6px; max-width: 92%; text-align: center; line-height: 1.3;
+  background: linear-gradient(180deg, #f1dc9c, #c99f45 55%, #b38a33); color: #3b2b0e; border-radius: 2px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .6) inset, 0 4px 10px rgba(40, 30, 15, .25); font-family: "Cormorant Garamond", Georgia, serif; }
+.placard em { display: block; font-size: 15px; font-weight: 600; }
+.gilt-small .placard { margin-top: 10px; padding: 5px 9px; }
+.gilt-small .placard em { font-size: 12.5px; }
+/* a remedy's own page: its painting beside the title */
+.remedy-hero-art { max-width: 560px; width: 100%; justify-self: end; }
+.remedy-hero-art .gilt { transform: rotate(.8deg); }
+.remedy-hero-items { margin: 22px 0 0; text-align: center; font-size: 14px; color: var(--muted, #6e7169); }
+.remedy-hero-items a { color: var(--forest, #314232); font-weight: 600; }
+@media (max-width: 650px) { .gilt-canvas { border-width: 12px; } .gilt-hero .gilt-canvas { border-width: 14px; } .remedy-hero-art .gilt { transform: none; } }

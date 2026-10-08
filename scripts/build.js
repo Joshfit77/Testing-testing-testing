@@ -91,7 +91,7 @@ for (const [dir, list, prefix] of [["herbs", HERBS, ""], ["fruits", FRUITS, "fru
   fs.mkdirSync(folder, { recursive: true });
   for (const file of fs.readdirSync(folder).filter((f) => PHOTO_EXT.test(f)).sort()) {
     const id = file.replace(PHOTO_EXT, "").toLowerCase();
-    if (list.some((x) => x.id === id)) myPhotos[prefix + id] = { src: `images/${dir}/${file}`, credit: "Photo: Beauty & Praise" };
+    if (list.some((x) => x.id === id)) myPhotos[prefix + id] = { src: `images/${dir}/${file}`, credit: "Image: Beauty & Praise" };
     else unknownPhotos.push(`images/${dir}/${file}`);
   }
 }

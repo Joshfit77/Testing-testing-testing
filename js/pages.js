@@ -1207,7 +1207,6 @@ function initFoods() {
     $("#food-empty").hidden = foods.length + fruits.length > 0;
     $("#food-fruits").innerHTML = fruits.length ? `<div class="fd-subhead"><h3>${c ? `Fruits for ${c.label.replace(/^Foods for /, "").toLowerCase()}` : q ? "Matching fruits" : "Fruits"}</h3></div>
       <div class="swatch-grid">${fruits.map((f) => foodSwatch(f, "fruit")).join("")}</div>` : "";
-    paintSwatches();
   }
   const sync = () => history.replaceState(null, "", "foods.html" + (state.cat !== "all" ? `?cat=${state.cat}` : ""));
   const toList = () => $("#all-foods").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
@@ -1222,97 +1221,37 @@ function initFoods() {
   if (state.cat !== "all" || state.q) requestAnimationFrame(toList);
 }
 
-// Each frame names its painting. A file uploaded as images/<name>.jpg (e.g. images/oil-berries.jpg)
-// always wins, with nothing to rebuild; until then the frame hangs a lush public-domain museum oil
-// painting from Wikimedia Commons, with a small plaque naming it.
-// [Commons file, search for the same painting if the file is ever renamed, title, artist, year]
-const PAINTINGS = {
-  "oil-food-abundance": ["Jan van Huysum - Fruit Piece - Google Art Project.jpg", "Jan van Huysum fruit piece", "Fruit Piece", "Jan van Huysum", "1722"],
-  "oil-berries": ["Jan Davidsz. de Heem - Still-Life with Flowers and Fruit - WGA11281.jpg", "de Heem still life flowers fruit", "Still Life with Flowers and Fruit", "Jan Davidsz. de Heem", "17th c."],
-  "oil-citrus": ["Luis Egidio Meléndez - Still-Life with Oranges and Walnuts, 1772.jpg", "Meléndez oranges walnuts", "Still Life with Oranges and Walnuts", "Luis Meléndez", "1772"],
-  "oil-roots": ["James Peale - Still Life with Vegetables - Google Art Project.jpg", "James Peale still life vegetables", "Still Life with Vegetables", "James Peale", "c. 1826"],
-  "oil-avocado-olive": ["Jean Siméon Chardin - Still-Life with Jar of Olives - WGA04777.jpg", "Chardin jar of olives", "Still Life with Jar of Olives", "Jean-Siméon Chardin", "1760"],
-  "oil-herbs": ["Rachel Ruysch - Still Life with Fruit, a Bird's Nest and Insects NTII DMS 814164.jpg", "Rachel Ruysch still life fruit", "Fruit, a Bird's Nest and Insects", "Rachel Ruysch", "c. 1710"],
-  "oil-pomegranate": ["Tom Roberts, 1883 - Still life with pomegranates.jpg", "still life pomegranates painting", "Still Life with Pomegranates", "Tom Roberts", "1883"],
-  "oil-honey": ["Luis Meléndez - Still Life with Oranges, Jars, and Boxes of Sweets - Google Art Project.jpg", "Meléndez oranges jars boxes of sweets", "Oranges, Jars and Boxes of Sweets", "Luis Meléndez", "1760s"],
-  "oil-ginger": ["Jean Siméon Chardin - Still Life with Teapot, Grapes, Chestnuts, and a Pear - 83.177 - Museum of Fine Arts.jpg", "Chardin teapot grapes chestnuts pear", "Teapot, Grapes, Chestnuts and a Pear", "Jean-Siméon Chardin", "1764"],
-  "oil-honey-lemon": ["Raphaelle Peale - Lemons and Sugar - 1946.150.1 - Reading Public Museum.jpg", "Raphaelle Peale lemons sugar", "Lemons and Sugar", "Raphaelle Peale", "c. 1822"],
-  "oil-peppermint": ["Liotard, Jean-Étienne - Still Life- Tea Set - Google Art Project.jpg", "Liotard still life tea set", "Still Life: Tea Set", "Jean-Étienne Liotard", "c. 1781"],
-  "oil-chamomile": ["Henri Fantin-Latour (1836-1904) - Still Life, Pansies and Daisies - WA1937.66 - Ashmolean Museum.jpg", "Fantin-Latour daisies still life", "Still Life, Pansies and Daisies", "Henri Fantin-Latour", "19th c."],
-  "oil-turmeric": ["Still Life with Teapot and Fruit MET DT1027.jpg", "still life teapot fruit Metropolitan", "Still Life with Teapot and Fruit", "The Met collection", ""],
-  "oil-elderberry": ["Coorte 5.jpg", "Adriaen Coorte still life", "Still Life", "Adriaen Coorte", "c. 1700"],
-  "oil-garlic": ["Vincent van Gogh - Red cabbages and garlic - Google Art Project.jpg", "van Gogh red cabbages garlic", "Red Cabbages and Garlic", "Vincent van Gogh", "1887"],
-  "oil-cinnamon": ["Paul Cézanne, Still Life With Apples, c. 1890.jpg", "Cézanne still life apples", "Still Life with Apples", "Paul Cézanne", "c. 1890"],
-  "oil-rosemary": ["Luis Meléndez - Still Life with Fruit and Jug - Google Art Project.jpg", "Meléndez still life fruit jug", "Still Life with Fruit and Jug", "Luis Meléndez", "1760s"],
-  "oil-thyme": ["Adriaen Coorte - Still Life with Wild Strawberries - 1106 - Mauritshuis.jpg", "Adriaen Coorte wild strawberries", "Still Life with Wild Strawberries", "Adriaen Coorte", "1705"],
+// The Foods page's framed oil paintings: images/oil-<name>.jpg, each with a small plaque naming it.
+// Replace any of those files with your own painting of the same name and it hangs in that frame.
+const ART_TITLES = {
+  "oil-food-abundance": "A Table of Abundance", "oil-berries": "Berries", "oil-citrus": "Citrus", "oil-greens": "Leafy Greens",
+  "oil-roots": "Roots", "oil-avocado-olive": "Healthy Fats", "oil-herbs": "Fresh Herbs", "oil-pomegranate": "Pomegranates",
+  "oil-honey": "Honey", "oil-ginger": "Ginger Tea", "oil-honey-lemon": "Honey & Lemon", "oil-peppermint": "Peppermint Tea",
+  "oil-chamomile": "Chamomile", "oil-turmeric": "Turmeric", "oil-elderberry": "Elderberry", "oil-garlic": "Garlic",
+  "oil-cinnamon": "Cinnamon", "oil-rosemary": "Rosemary", "oil-thyme": "Thyme",
 };
-// Frames painted in the browser (js/oilpaint.js) from a photograph of the food itself.
-const PAINTED_FRAMES = {
-  "oil-greens": { photos: ["food:spinach", "food:kale"], placard: ["Leafy Greens"] },
-};
-const COMMONS_API = "https://commons.wikimedia.org/w/api.php?format=json&origin=*&action=query&prop=imageinfo&iiprop=url&iiurlwidth=1000";
+const artSrc = (key) => (typeof MY_ART !== "undefined" && MY_ART[key]) || `images/${key}.jpg`;
 
-// Looks up every painting in one request; a file that has been renamed is found again by search.
-function findPaintings(keys) {
-  const file = (k) => "File:" + PAINTINGS[k][0].replace(/_/g, " ");
-  const search = (k) => fetch(`${COMMONS_API}&generator=search&gsrnamespace=6&gsrlimit=1&gsrsearch=${encodeURIComponent(PAINTINGS[k][1] + " filetype:bitmap")}`)
-    .then((r) => r.json())
-    .then((d) => { const pg = Object.values((d.query && d.query.pages) || {})[0]; const ii = pg && pg.imageinfo && pg.imageinfo[0]; return ii ? ii.thumburl || ii.url : null; })
-    .catch(() => null);
-  return fetch(`${COMMONS_API}&titles=${encodeURIComponent(keys.map(file).join("|"))}`)
-    .then((r) => r.json())
-    .then((data) => {
-      const q = data.query || {};
-      const norm = Object.fromEntries((q.normalized || []).map((n) => [n.from, n.to]));
-      const found = {};
-      Object.values(q.pages || {}).forEach((pg) => { const ii = pg.imageinfo && pg.imageinfo[0]; if (ii) found[pg.title] = ii.thumburl || ii.url; });
-      return Object.fromEntries(keys.map((k) => [k, found[norm[file(k)] || file(k)] || null]));
-    })
-    .catch(() => ({}))
-    .then((urls) => (k) => (urls[k] ? Promise.resolve(urls[k]) : search(k)));
+// A painting in a gilded frame; `plaque` adds the small brass title plate underneath.
+function giltFrame(src, alt, { plaque = "", cls = "", lazy = true } = {}) {
+  return `<figure class="gilt ${cls}"><div class="gilt-canvas"><img src="${src}" alt="${alt}"${lazy ? ' loading="lazy"' : ""} decoding="async"></div>${plaque ? `<figcaption class="placard"><em>${plaque}</em></figcaption>` : ""}</figure>`;
 }
 
 function paintFoodArt() {
-  const art = typeof MY_ART !== "undefined" ? MY_ART : {};
-  const frames = [...document.querySelectorAll("figure.gilt[data-art]")];
-  if (!frames.length) return;
-  const nameOf = (fig) => (fig.closest("[class*=card], section")?.querySelector("h3") || {}).textContent || "Beauty & Praise";
-  const emptyFrame = (fig) => {
-    const name = nameOf(fig).replace(/,.*$/, "");
-    fig.classList.add("unhung");
-    fig.innerHTML = `<div class="gilt-canvas" role="img" aria-label="${name}"><span>${name}</span></div>`;
-  };
-  const hang = (fig, img, placard) => {
-    img.alt = `Oil painting: ${placard ? placard[0] : nameOf(fig)}`;
-    fig.innerHTML = `<div class="gilt-canvas"></div>` + (placard ? `<figcaption class="placard"><em>${placard[0]}</em></figcaption>` : "");
-    fig.firstChild.append(img);
-    fig.classList.add("hung");
-  };
-  const load = (src, ok, fail) => {
-    const img = new Image();
-    img.decoding = "async";
-    img.referrerPolicy = "no-referrer";
-    img.onload = () => ok(img);
-    img.onerror = fail;
-    img.src = src;
-  };
-  const lookup = findPaintings(frames.map((f) => f.dataset.art).filter((k) => PAINTINGS[k]));
-  frames.forEach((fig) => {
+  document.querySelectorAll("figure.gilt[data-art]").forEach((fig) => {
     const key = fig.dataset.art;
-    const museum = () => {
-      const painted = PAINTED_FRAMES[key];
-      if (painted) {
-        return Photos.load(painted.photos)
-          .then((map) => { const p = painted.photos.map((k) => map[k]).find(Boolean); if (!p) throw 0; const big = p.src.replace(/\/(\d+)px-/, "/1280px-"); return OilPaint.paint(big, 1000, 750).catch(() => OilPaint.paint(p.src, 1000, 750)); })
-          .then((url) => load(url, (img) => hang(fig, img, painted.placard), () => emptyFrame(fig)))
-          .catch(() => emptyFrame(fig));
-      }
-      if (!PAINTINGS[key]) return emptyFrame(fig);
-      lookup.then((get) => get(key)).then((url) => url ? load(url, (img) => hang(fig, img, PAINTINGS[key].slice(2)), () => emptyFrame(fig)) : emptyFrame(fig));
-    };
-    load(art[key] || `images/${key}.jpg`, (img) => hang(fig, img, null), museum);
+    const title = ART_TITLES[key] || "";
+    fig.outerHTML = giltFrame(artSrc(key), `Oil painting: ${title}`, { plaque: title, cls: fig.className.replace(/\bgilt\b/, "").trim(), lazy: !fig.classList.contains("gilt-hero") });
   });
 }
+
+// Each remedy's oil painting (images/remedies/<id>.jpg); a few share a painting from the Foods page.
+const REMEDY_ART_SHARED = {
+  "peppermint-tea-bloating": "images/oil-peppermint.jpg", "ginger-tea-nausea": "images/oil-ginger.jpg",
+  "chamomile-bedtime-tea": "images/oil-chamomile.jpg", "honey-lemon-warm-water": "images/oil-honey-lemon.jpg",
+  "tart-cherry-juice": "images/fruits/tart-cherry.jpg", "oatmeal-soak": "images/foods/oats.jpg",
+};
+const remedyArt = (id) => REMEDY_ART_SHARED[id] || `images/remedies/${id}.jpg`;
 
 /* ---------------- Food & fruit pages (one shared layout) ---------------- */
 function renderFoodProfile(p, main) {
@@ -1467,15 +1406,22 @@ function initRemedies() {
   let cat = REMEDY_CATS[params.get("cat")] ? params.get("cat") : "all";
   document.body.classList.add("remedies-page");
   $("#remedies-main").innerHTML = `
-    <section class="remedies-hero">
-      <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span aria-current="page">Natural Remedies</span></nav>
-      <span class="art-food-label">THE NATURAL CABINET</span>
-      <h1>Natural <em>Remedies</em></h1>
-      <p class="remedies-lead">Simple home and food-based remedies for everyday wellness needs — with exact amounts, how often to use them, how strong the evidence is, and when to see a doctor instead.</p>
+    <section class="remedies-hero rm-hero">
+      <div class="rm-hero-copy">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span aria-current="page">Natural Remedies</span></nav>
+        <span class="art-food-label">THE NATURAL CABINET</span>
+        <h1>Natural <em>Remedies</em></h1>
+        <p class="remedies-lead">Simple home and food-based remedies for everyday wellness needs — with exact amounts, how often to use them, how strong the evidence is, and when to see a doctor instead.</p>
+        <a class="rm-hero-link" href="#remedy-grid">Walk the gallery ${icon("arrow")}</a>
+      </div>
+      <div class="rm-hero-art">
+        ${giltFrame("images/oil-ginger.jpg", "Oil painting: ginger tea", { plaque: "Ginger Tea", cls: "gilt-hero rm-hero-main", lazy: false })}
+        ${giltFrame("images/oil-chamomile.jpg", "Oil painting: chamomile tea", { plaque: "Chamomile", cls: "gilt-small rm-hero-side", lazy: false })}
+      </div>
     </section>
     <div class="remedy-filters" id="remedy-chips">${[["all", "All remedies"], ...Object.entries(REMEDY_CATS).map(([k, c]) => [k, c.label])].map(([k, l]) => `<button type="button" data-cat="${k}">${l}</button>`).join("")}</div>
     <div id="remedy-intro"></div>
-    <section class="remedy-gallery" id="remedy-grid"></section>
+    <section class="rm-wall"><div class="remedy-gallery rm-gallery" id="remedy-grid"></div></section>
     <section class="art-scripture">
       <blockquote>“Do not be wise in your own eyes; fear the LORD and turn away from evil. It will be healing to your body and refreshment to your bones.”</blockquote>
       <cite>PROVERBS 3:7–8 · NASB 1995</cite>
@@ -1499,12 +1445,13 @@ function initRemedies() {
   draw();
 }
 
-// A remedy as a colored card: words only, no picture (colors come from the card's position).
+// A remedy as a framed oil painting with a museum label underneath.
 function remedyArtCard(r) {
   const [ev] = r.evidence;
-  return `<a class="remedy-art-card no-art" href="${remedyUrl(r.id)}">
-    <div class="remedy-art-copy">
-      <small>${REMEDY_CATS[r.cat].label.toUpperCase()}</small>
+  return `<a class="rm-card" href="${remedyUrl(r.id)}">
+    ${giltFrame(remedyArt(r.id), `Oil painting: ${r.name}`)}
+    <div class="rm-label">
+      <small>${REMEDY_CATS[r.cat].label}</small>
       <h3>${r.name}</h3>
       <p>${r.intro.split(/(?<=\.)\s/)[0]}</p>
       <p class="remedy-art-meta">${icon("clock")} ${r.time} · <span class="evidence ev-${ev}">${EVIDENCE[ev].label}</span></p>
@@ -1512,32 +1459,17 @@ function remedyArtCard(r) {
   </a>`;
 }
 
-// A food or fruit as a colored card for the Foods page guide: words only, no photograph.
-// Each card in the food guide shows its own food as an oil painting (js/oilpaint.js), painted
-// from the food's photograph as the card scrolls into view. No photo, no painting: the card keeps its color.
-let swatchWatch;
-function paintSwatches() {
-  if (typeof OilPaint === "undefined") return;
-  const paintOne = (el) => {
-    el.dataset.state = "loading";
-    Photos.load([el.dataset.paint])
-      .then((map) => { const p = map[el.dataset.paint]; if (!p) throw 0; return /^https?:/.test(p.src) ? OilPaint.paint(p.src, 480, 360) : p.src; })
-      .then((url) => { el.innerHTML = `<img src="${url}" alt="">`; el.dataset.state = "painted"; })
-      .catch(() => { el.dataset.state = "none"; });
-  };
-  swatchWatch = swatchWatch || ("IntersectionObserver" in window
-    ? new IntersectionObserver((list) => list.forEach((e) => { if (e.isIntersecting) { swatchWatch.unobserve(e.target); paintOne(e.target); } }), { rootMargin: "300px 0px" })
-    : null);
-  document.querySelectorAll(".swatch-art[data-paint]:not([data-state])").forEach((el) => (swatchWatch ? swatchWatch.observe(el) : paintOne(el)));
-}
-
+// A food or fruit as a colored card for the Foods page guide, topped with its own oil painting
+// (images/foods/<id>.jpg or images/fruits/<id>.jpg, listed by build.js in MY_PHOTOS).
 function foodSwatch(item, kind) {
   const isFruit = kind === "fruit";
   const href = isFruit ? fruitUrl(item.id) : foodUrl(item.id);
   const label = isFruit ? (CATEGORIES[item.cats[0]] || "Fruit") : foodCat(item.cats[0]).label;
   const sub = isFruit ? item.latin : FOOD_GROUPS[item.group];
   const text = (isFruit ? item.summary : item.what).split(/(?<=\.)\s/)[0];
-  return `<a class="food-swatch" href="${href}"><span class="swatch-art" data-paint="${kind}:${item.id}" aria-hidden="true"></span><small>${label}</small><strong>${item.name}</strong><em>${sub}</em><span>${text}</span></a>`;
+  const own = typeof MY_PHOTOS !== "undefined" && MY_PHOTOS[`${kind}:${item.id}`];
+  const art = own ? `<span class="swatch-art"><img src="${own.src}" alt="" loading="lazy" decoding="async"></span>` : "";
+  return `<a class="food-swatch" href="${href}">${art}<small>${label}</small><strong>${item.name}</strong><em>${sub}</em><span>${text}</span></a>`;
 }
 
 function initRemedy() {
@@ -1562,7 +1494,8 @@ function initRemedy() {
             <div class="recipe-facts"><span>${icon("clock")} ${r.time}</span><span class="evidence ev-${ev}" title="${EVIDENCE[ev].note}">Evidence: ${EVIDENCE[ev].label}</span></div>
             <button class="btn btn-secondary" data-print>${icon("print")} Print remedy</button>
           </div>
-          <div class="stack-hero-photos">${r.items.length ? r.items.slice(0, 4).map((k, i) => `<a href="${itemUrl(k)}" class="shp shp-${i}">${keyVisual(k, i === 0)}</a>`).join("") : `<div class="shp shp-0">${remedyVisual(r, true)}</div>`}</div>
+          <div class="remedy-hero-art">${giltFrame(remedyArt(r.id), `Oil painting: ${r.name}`, { lazy: false })}
+            ${r.items.length ? `<p class="remedy-hero-items">Made with ${r.items.filter(itemOf).map((k) => `<a href="${itemUrl(k)}">${itemOf(k).name.split(" (")[0]}</a>`).join(", ")}</p>` : ""}</div>
         </div>
       </div>
     </section>
