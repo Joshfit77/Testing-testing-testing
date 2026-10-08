@@ -162,8 +162,59 @@ a.remedy-art-card, a.remedy-card { color: inherit; text-decoration: none; }
 .food-swatch span { margin-top: auto; padding-top: 12px; font-size: 13.5px; line-height: 1.55; color: #4d554e; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 @media (max-width: 1000px) { .swatch-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 700px) { .swatch-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } .food-swatch { min-height: 150px; padding: 18px 16px; } .food-swatch strong { font-size: 25px; } .food-swatch span { display: none; } }
-/* gallery: a full first row (8 + 4), then two halves */
-.foods-art .gallery-card:nth-child(3), .foods-art .gallery-card:nth-child(4) { grid-column: span 6; }
-.foods-art .gallery-card:nth-child(3) .gallery-image img, .foods-art .gallery-card:nth-child(4) .gallery-image img,
-.foods-art .gallery-card:nth-child(3) .art-panel, .foods-art .gallery-card:nth-child(4) .art-panel { aspect-ratio: 16 / 10; }
-@media (max-width: 650px) { .foods-art .gallery-card:nth-child(3), .foods-art .gallery-card:nth-child(4) { grid-column: 1 / -1; } }
+/* ---------- gilded frames: museum oil paintings hung on the Foods page ---------- */
+.foods-art .hero-art-main, .foods-art .food-art, .foods-art .gallery-image { background: none; box-shadow: none; transform: none; }
+.foods-art .hero-art-main::after { content: none; }
+.gilt { display: block; width: 100%; margin: 0; }
+.foods-art .hero-art, .foods-art .hero-art-main { width: 100%; }
+.gilt-canvas { position: relative; aspect-ratio: 4 / 3; overflow: hidden; padding: 0;
+  border: 16px solid transparent;
+  border-image: linear-gradient(135deg, #8a6420 0%, #f3dc8e 18%, #b88a2c 34%, #f7e3a1 52%, #9c7224 70%, #e9c96f 86%, #7d5a1c 100%) 1;
+  background: #2a231a;
+  box-shadow: 0 0 0 1px #5d4314, inset 0 0 0 5px #3a2e1c, inset 0 0 0 6px #c9a456, inset 0 0 22px 10px rgba(0,0,0,.55), 0 28px 60px rgba(40, 30, 15, .32), 0 6px 14px rgba(40, 30, 15, .2); }
+.foods-art .gilt-canvas img { min-height: 0; aspect-ratio: auto; box-shadow: none; filter: none; background: none; }
+.foods-art .gilt-canvas img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; animation: gilt-in .9s ease both; }
+@keyframes gilt-in { from { opacity: 0; } to { opacity: 1; } }
+.gilt-canvas::after { position: absolute; inset: 0; content: ""; pointer-events: none; box-shadow: inset 0 0 0 5px #3a2e1c, inset 0 0 0 6px #c9a456, inset 0 0 26px 6px rgba(0,0,0,.45); }
+.gilt-hero .gilt-canvas { aspect-ratio: 5 / 4; border-width: 22px; }
+.gilt-small .gilt-canvas { aspect-ratio: 4 / 5; border-width: 10px; }
+.gilt.unhung .gilt-canvas { display: grid; place-items: center; background: url("../images/olive-branch.svg") no-repeat center 80% / 38% auto, linear-gradient(140deg, #f4d2bd, #fae3cb 50%, #dfe7d4); }
+.gilt.unhung .gilt-canvas span { font-family: "Cormorant Garamond", Georgia, serif; font-size: clamp(30px, 4vw, 56px); font-style: italic; color: var(--forest); text-align: center; padding: 0 12px; }
+.gilt-small.unhung .gilt-canvas span { font-size: 26px; }
+/* a small brass museum plaque under each painting */
+.placard { display: table; margin: 16px auto 0; padding: 7px 16px 6px; max-width: 92%; text-align: center; line-height: 1.3;
+  background: linear-gradient(180deg, #f1dc9c, #c99f45 55%, #b38a33); color: #3b2b0e; border-radius: 2px;
+  box-shadow: 0 1px 0 rgba(255,255,255,.6) inset, 0 4px 10px rgba(40,30,15,.25); font-family: "Cormorant Garamond", Georgia, serif; }
+.placard em { display: block; font-size: 15px; font-weight: 600; }
+.placard span { display: block; font-family: "DM Sans", Arial, sans-serif; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; }
+.gilt-small .placard { margin-top: 10px; padding: 5px 9px; }
+.gilt-small .placard em { font-size: 12.5px; }
+.gilt-small .placard span { font-size: 8.5px; letter-spacing: .1em; }
+.foods-art .food-art .gilt { transform: rotate(-.6deg); }
+.foods-art .food-feature.reverse .food-art .gilt { transform: rotate(.6deg); }
+
+/* gallery wall: four equal framed paintings, two by two */
+.foods-art .gallery-section { background: radial-gradient(circle at 50% 0%, rgba(255,255,255,.55), transparent 60%), linear-gradient(180deg, #efe2cb, #e4d2b3); }
+.foods-art .gallery-wall { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 56px 48px; }
+.foods-art .gallery-wall .gallery-card, .foods-art .gallery-wall .gallery-card.large { grid-column: auto; text-align: center; }
+.foods-art .gallery-wall .gallery-card h3 { margin-top: 18px; }
+.foods-art .gallery-wall .gallery-card p { max-width: 440px; margin: 0 auto; }
+.foods-art .gallery-card:hover .gilt-canvas img { transform: none; }
+.foods-art .gallery-card:hover .gilt-canvas { box-shadow: 0 0 0 1px #5d4314, 0 36px 70px rgba(40, 30, 15, .38), 0 8px 18px rgba(40, 30, 15, .22); }
+
+/* remedy cards: a small framed painting beside the words */
+.foods-art .remedy-card { grid-template-columns: 190px 1fr; align-items: start; gap: 24px; padding: 22px; min-height: 0; }
+.foods-art .remedy-card .gilt { width: 100%; }
+
+@media (max-width: 650px) {
+  .foods-art .gallery-wall { grid-template-columns: 1fr; gap: 44px; }
+  .foods-art .remedy-card { grid-template-columns: 1fr; }
+  .gilt-small .gilt-canvas { aspect-ratio: 16 / 10; }
+  .gilt-canvas { border-width: 12px; }
+  .gilt-hero .gilt-canvas { border-width: 14px; }
+  .foods-art .food-art .gilt, .foods-art .food-feature.reverse .food-art .gilt { transform: none; }
+}
+/* the frame keeps its place while its painting is on the way */
+.gilt:empty { aspect-ratio: 4 / 3; background: linear-gradient(135deg, #8a6420, #f3dc8e 30%, #b88a2c 60%, #e9c96f); padding: 16px; background-clip: border-box; }
+.gilt-hero:empty { aspect-ratio: 5 / 4; }
+.gilt-small:empty { aspect-ratio: 4 / 5; }

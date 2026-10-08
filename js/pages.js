@@ -1221,31 +1221,85 @@ function initFoods() {
   if (state.cat !== "all" || state.q) requestAnimationFrame(toList);
 }
 
-// Each picture names its painting (images/oil-*.jpg, listed by build.js in MY_ART). Until that file is
-// added, the picture shows a real photograph of the same food instead.
+// Each frame names its painting. A file uploaded as images/<name>.jpg (e.g. images/oil-berries.jpg)
+// always wins, with nothing to rebuild; until then the frame hangs a lush public-domain museum oil
+// painting from Wikimedia Commons, with a small plaque naming it.
+// [Commons file, search for the same painting if the file is ever renamed, title, artist, year]
+const PAINTINGS = {
+  "oil-food-abundance": ["Jan van Huysum - Fruit Piece - Google Art Project.jpg", "Jan van Huysum fruit piece", "Fruit Piece", "Jan van Huysum", "1722"],
+  "oil-berries": ["Jan Davidsz. de Heem - Still-Life with Flowers and Fruit - WGA11281.jpg", "de Heem still life flowers fruit", "Still Life with Flowers and Fruit", "Jan Davidsz. de Heem", "17th c."],
+  "oil-citrus": ["Luis Egidio Meléndez - Still-Life with Oranges and Walnuts, 1772.jpg", "Meléndez oranges walnuts", "Still Life with Oranges and Walnuts", "Luis Meléndez", "1772"],
+  "oil-greens": ["Frans Snyders - Still Life with Dead Game, Fruits and Vegetables in a Market.jpg", "Snyders fruits vegetables market still life", "Fruits and Vegetables in a Market", "Frans Snyders", "1614"],
+  "oil-roots": ["James Peale - Still Life with Vegetables - Google Art Project.jpg", "James Peale still life vegetables", "Still Life with Vegetables", "James Peale", "c. 1826"],
+  "oil-avocado-olive": ["Jean Siméon Chardin - Still-Life with Jar of Olives - WGA04777.jpg", "Chardin jar of olives", "Still Life with Jar of Olives", "Jean-Siméon Chardin", "1760"],
+  "oil-herbs": ["Rachel Ruysch - Still Life with Fruit, a Bird's Nest and Insects NTII DMS 814164.jpg", "Rachel Ruysch still life fruit", "Fruit, a Bird's Nest and Insects", "Rachel Ruysch", "c. 1710"],
+  "oil-pomegranate": ["Tom Roberts, 1883 - Still life with pomegranates.jpg", "still life pomegranates painting", "Still Life with Pomegranates", "Tom Roberts", "1883"],
+  "oil-honey": ["Luis Meléndez - Still Life with Oranges, Jars, and Boxes of Sweets - Google Art Project.jpg", "Meléndez oranges jars boxes of sweets", "Oranges, Jars and Boxes of Sweets", "Luis Meléndez", "1760s"],
+  "oil-ginger": ["Jean Siméon Chardin - Still Life with Teapot, Grapes, Chestnuts, and a Pear - 83.177 - Museum of Fine Arts.jpg", "Chardin teapot grapes chestnuts pear", "Teapot, Grapes, Chestnuts and a Pear", "Jean-Siméon Chardin", "1764"],
+  "oil-honey-lemon": ["Raphaelle Peale - Lemons and Sugar - 1946.150.1 - Reading Public Museum.jpg", "Raphaelle Peale lemons sugar", "Lemons and Sugar", "Raphaelle Peale", "c. 1822"],
+  "oil-peppermint": ["Liotard, Jean-Étienne - Still Life- Tea Set - Google Art Project.jpg", "Liotard still life tea set", "Still Life: Tea Set", "Jean-Étienne Liotard", "c. 1781"],
+  "oil-chamomile": ["Henri Fantin-Latour (1836-1904) - Still Life, Pansies and Daisies - WA1937.66 - Ashmolean Museum.jpg", "Fantin-Latour daisies still life", "Still Life, Pansies and Daisies", "Henri Fantin-Latour", "19th c."],
+  "oil-turmeric": ["Still Life with Teapot and Fruit MET DT1027.jpg", "still life teapot fruit Metropolitan", "Still Life with Teapot and Fruit", "The Met collection", ""],
+  "oil-elderberry": ["Coorte 5.jpg", "Adriaen Coorte still life", "Still Life", "Adriaen Coorte", "c. 1700"],
+  "oil-garlic": ["Vincent van Gogh - Red cabbages and garlic - Google Art Project.jpg", "van Gogh red cabbages garlic", "Red Cabbages and Garlic", "Vincent van Gogh", "1887"],
+  "oil-cinnamon": ["Paul Cézanne, Still Life With Apples, c. 1890.jpg", "Cézanne still life apples", "Still Life with Apples", "Paul Cézanne", "c. 1890"],
+  "oil-rosemary": ["Luis Meléndez - Still Life with Fruit and Jug - Google Art Project.jpg", "Meléndez still life fruit jug", "Still Life with Fruit and Jug", "Luis Meléndez", "1760s"],
+  "oil-thyme": ["Adriaen Coorte - Still Life with Wild Strawberries - 1106 - Mauritshuis.jpg", "Adriaen Coorte wild strawberries", "Still Life with Wild Strawberries", "Adriaen Coorte", "1705"],
+};
+const COMMONS_API = "https://commons.wikimedia.org/w/api.php?format=json&origin=*&action=query&prop=imageinfo&iiprop=url&iiurlwidth=1000";
+
+// Looks up every painting in one request; a file that has been renamed is found again by search.
+function findPaintings(keys) {
+  const file = (k) => "File:" + PAINTINGS[k][0].replace(/_/g, " ");
+  const search = (k) => fetch(`${COMMONS_API}&generator=search&gsrnamespace=6&gsrlimit=1&gsrsearch=${encodeURIComponent(PAINTINGS[k][1] + " filetype:bitmap")}`)
+    .then((r) => r.json())
+    .then((d) => { const pg = Object.values((d.query && d.query.pages) || {})[0]; const ii = pg && pg.imageinfo && pg.imageinfo[0]; return ii ? ii.thumburl || ii.url : null; })
+    .catch(() => null);
+  return fetch(`${COMMONS_API}&titles=${encodeURIComponent(keys.map(file).join("|"))}`)
+    .then((r) => r.json())
+    .then((data) => {
+      const q = data.query || {};
+      const norm = Object.fromEntries((q.normalized || []).map((n) => [n.from, n.to]));
+      const found = {};
+      Object.values(q.pages || {}).forEach((pg) => { const ii = pg.imageinfo && pg.imageinfo[0]; if (ii) found[pg.title] = ii.thumburl || ii.url; });
+      return Object.fromEntries(keys.map((k) => [k, found[norm[file(k)] || file(k)] || null]));
+    })
+    .catch(() => ({}))
+    .then((urls) => (k) => (urls[k] ? Promise.resolve(urls[k]) : search(k)));
+}
+
 function paintFoodArt() {
   const art = typeof MY_ART !== "undefined" ? MY_ART : {};
-  document.querySelectorAll("img[data-art]").forEach((img) => {
-    if (art[img.dataset.art]) { img.src = art[img.dataset.art]; return; }
-    const fb = img.dataset.fallback || "";
-    if (fb.startsWith("scene:") && SCENES[fb.slice(6)]) {
-      const slot = fb.slice(6);
-      img.srcset = sceneSrcset(slot);
-      img.sizes = "(max-width: 950px) 92vw, 46vw";
-      img.dataset.credit = `Photo: ${SCENES[slot][2]} / Unsplash`;
-      img.src = sceneUrl(slot, 1200);
-      return;
-    }
-    // No painting yet and no fitting photograph: remedy cards simply show their words;
-    // other spots show a quiet color panel with the food's name.
-    const card = img.closest(".remedy-card");
-    if (card) { card.classList.add("no-art"); img.remove(); return; }
-    const panel = document.createElement("div");
-    panel.className = "art-panel";
-    panel.setAttribute("role", "img");
-    panel.setAttribute("aria-label", img.alt);
-    panel.innerHTML = `<span>${img.dataset.panel || img.alt}</span>`;
-    img.replaceWith(panel);
+  const frames = [...document.querySelectorAll("figure.gilt[data-art]")];
+  if (!frames.length) return;
+  const nameOf = (fig) => (fig.closest("[class*=card], section")?.querySelector("h3") || {}).textContent || "Beauty & Praise";
+  const emptyFrame = (fig) => {
+    const name = nameOf(fig).replace(/,.*$/, "");
+    fig.classList.add("unhung");
+    fig.innerHTML = `<div class="gilt-canvas" role="img" aria-label="${name}"><span>${name}</span></div>`;
+  };
+  const hang = (fig, img, placard) => {
+    img.alt = placard ? `${placard[0]}, oil painting by ${placard[1]}` : `Oil painting: ${nameOf(fig)}`;
+    fig.innerHTML = `<div class="gilt-canvas"></div>` + (placard ? `<figcaption class="placard"><em>${placard[0]}</em><span>${[placard[1], placard[2]].filter(Boolean).join(", ")}</span></figcaption>` : "");
+    fig.firstChild.append(img);
+    fig.classList.add("hung");
+  };
+  const load = (src, ok, fail) => {
+    const img = new Image();
+    img.decoding = "async";
+    img.referrerPolicy = "no-referrer";
+    img.onload = () => ok(img);
+    img.onerror = fail;
+    img.src = src;
+  };
+  const lookup = findPaintings(frames.map((f) => f.dataset.art).filter((k) => PAINTINGS[k]));
+  frames.forEach((fig) => {
+    const key = fig.dataset.art;
+    const museum = () => {
+      if (!PAINTINGS[key]) return emptyFrame(fig);
+      lookup.then((get) => get(key)).then((url) => url ? load(url, (img) => hang(fig, img, PAINTINGS[key].slice(2)), () => emptyFrame(fig)) : emptyFrame(fig));
+    };
+    load(art[key] || `images/${key}.jpg`, (img) => hang(fig, img, null), museum);
   });
 }
 
