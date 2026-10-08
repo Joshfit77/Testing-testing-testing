@@ -64,10 +64,12 @@ function initHome() {
     { href: "remedies.html", photo: "remedy-tea", title: "Natural Remedies", kicker: "From the kitchen", text: "Gentle teas, soaks and home remedies with clear amounts and safety.", cta: "Find a remedy" },
     { href: "herbs.html", photo: "herb-basket", title: "Herbs", kicker: "A supporting role", text: "Time-honored herbs as a supporting role — with research and doses.", cta: "Meet the herbs" }
   ];
-  $("#art-paths").innerHTML = paths.map((p, i) => `<a class="hc-path hc-path-${i + 1}" href="${p.href}">
-    ${scene(p.photo, "hc-path-photo", i === 0 ? "(max-width: 900px) 92vw, 56vw" : "(max-width: 900px) 92vw, 34vw")}
-    <span class="hc-path-body"><span class="hc-path-kicker"><b>0${i + 1}</b> ${p.kicker}</span><strong>${p.title}</strong><span>${p.text}</span><em>${p.cta} ${icon("arrow")}</em></span>
-  </a>`).join("");
+  // Three paths: one large feature beside a stack of two (css/site.css .paths-grid)
+  const pathCard = (p, i, cls) => `<a class="${cls}" href="${p.href}">
+    <img src="${sceneUrl(p.photo, i ? 900 : 1400)}" srcset="${sceneSrcset(p.photo)}" sizes="${i ? "(max-width: 900px) 92vw, 34vw" : "(max-width: 900px) 92vw, 56vw"}" alt="${SCENES[p.photo][1]}" loading="lazy" decoding="async" data-credit="Photo: ${SCENES[p.photo][2]} / Unsplash">
+    <div class="path-content"><p class="eyebrow">0${i + 1} · ${p.kicker}</p><h3>${p.title}</h3><p>${p.text}</p><span class="path-cta">${p.cta} ${icon("arrow")}</span></div>
+  </a>`;
+  $("#art-paths").innerHTML = pathCard(paths[0], 0, "path-feature") + `<div class="path-stack">${paths.slice(1).map((p, i) => pathCard(p, i + 1, "path-small")).join("")}</div>`;
 
 }
 
@@ -283,7 +285,7 @@ function initHerb() {
             </dl>
             <div class="herb-actions">
               <button class="btn btn-primary fav-inline${saved ? " saved" : ""}" data-fav="${h.id}" aria-pressed="${saved}">${icon("heart")}<span>Save herb</span></button>
-              <button class="btn btn-outline" onclick="window.print()">${icon("print")}<span>Print profile</span></button>
+              <button class="btn btn-secondary" onclick="window.print()">${icon("print")}<span>Print profile</span></button>
             </div>
           </div>
         </div>
@@ -366,11 +368,11 @@ function initHerb() {
       </div>
     </section>
 
-    <section class="section section-tint">
+    <section class="section section--cream section-tint">
       <div class="container">
         <div class="section-head"><div><p class="eyebrow">Keep exploring</p><h2>Related herbs</h2></div>
           <a class="text-link" href="herbs.html?cat=${h.cats[0]}">More ${CATEGORIES[h.cats[0]]} ${icon("arrow")}</a></div>
-        <div class="herb-grid">${related.map(herbCard).join("")}</div>
+        <div class="herb-grid editorial-grid">${related.map(herbCard).join("")}</div>
         <nav class="prev-next">
           <a href="${herbUrl(prev.id)}"><span>← Previous</span><strong>${prev.name}</strong></a>
           <a href="${herbUrl(next.id)}"><span>Next →</span><strong>${next.name}</strong></a>
@@ -554,7 +556,7 @@ function initStacks() {
         <div class="container">
           <div class="chips" id="stack-chips">${[["all", "All stacks"], ...Object.entries(STACK_GROUPS)].map(([k, v]) => `<button class="chip" data-g="${k}">${v}</button>`).join("")}</div>
           <div class="stack-grid" id="stack-grid"></div>
-          <div class="note-card">${icon("shield", "icon info-icon")}<p><strong>Before you start a stack:</strong> combining herbs combines their cautions too. Read the "Who should avoid" list for each stack, and check with your doctor or pharmacist if you are pregnant, breastfeeding, taking medicine or have a health condition.</p></div>
+          <div class="notice note-card">${icon("shield", "icon info-icon")}<p><strong>Before you start a stack:</strong> combining herbs combines their cautions too. Read the "Who should avoid" list for each stack, and check with your doctor or pharmacist if you are pregnant, breastfeeding, taking medicine or have a health condition.</p></div>
         </div>
       </section>`;
     const render = () => {
@@ -584,7 +586,7 @@ function initStacks() {
               <div><dt>How much</dt><dd>${st.dose}</dd></div>
               <div><dt>How long</dt><dd>${st.duration}</dd></div>
             </dl>
-            <button class="btn btn-outline print-btn" onclick="window.print()">${icon("print")}<span>Print recipe card</span></button>
+            <button class="btn btn-secondary print-btn" onclick="window.print()">${icon("print")}<span>Print recipe card</span></button>
           </div>
           <div class="stack-hero-photos">${st.herbs.slice(0, 4).map((x, i) => `<a href="${herbUrl(x.id)}" class="shp shp-${i}">${visual(findHerb(x.id), i === 0)}</a>`).join("")}</div>
         </div>
@@ -628,7 +630,7 @@ function initStacks() {
       </div>
     </section>
 
-    <section class="section section-tint">
+    <section class="section section--cream section-tint">
       <div class="container">
         <div class="section-head"><div><p class="eyebrow">Keep exploring</p><h2>More herbal stacks</h2></div><a class="text-link" href="stacks.html">All stacks ${icon("arrow")}</a></div>
         <div class="stack-grid">${others.map(stackCard).join("")}</div>
@@ -641,11 +643,11 @@ function initStacks() {
 function fruitCard(fr) {
   const key = "fruit:" + fr.id;
   const saved = favorites.has(key);
-  return `<article class="herb-card">
+  return `<article class="herb-card editorial-item">
     <a href="${fruitUrl(fr.id)}" class="herb-card-link" aria-label="${fr.name}">
-      <div class="herb-card-art">${fruitVisual(fr)}</div>
+      <div class="herb-card-art editorial-image">${fruitVisual(fr)}</div>
       <div class="herb-card-body">
-        <p class="herb-card-cat">${CATEGORIES[fr.cats[0]]}</p>
+        <p class="herb-card-cat editorial-meta">${CATEGORIES[fr.cats[0]]}</p>
         <h3>${fr.name}</h3>
         <p class="latin">${fr.latin}</p>
         <p class="herb-card-summary">${fr.summary.split(/(?<=\.)\s/)[0]}</p>
@@ -717,7 +719,7 @@ function initInteractions() {
   const conds = INTERACTIONS.filter((x) => x.type === "condition" && !["pregnancy", "breastfeeding", "children", "older-adults"].includes(x.id));
 
   // Step 1: who
-  $("#ix-who").innerHTML = WHO_OPTIONS.map((w) => `<label class="quiz-card who-card"><input type="radio" name="who" value="${w.id}" ${state.who === w.id ? "checked" : ""}><span><strong>${w.label}</strong>${w.sub ? `<em>${w.sub}</em>` : ""}</span></label>`).join("");
+  $("#ix-who").innerHTML = WHO_OPTIONS.map((w) => `<label class="quiz-card who-card"><input type="radio" name="who" value="${w.id}" ${state.who === w.id ? "checked" : ""}><span class="option"><strong>${w.label}</strong>${w.sub ? `<em>${w.sub}</em>` : ""}</span></label>`).join("");
   $("#ix-who").addEventListener("change", (e) => { state.who = e.target.value; render(); });
 
   // Step 2: medicines — type a name, or tick a group
@@ -785,7 +787,7 @@ function initInteractions() {
       out.innerHTML = `<div class="ix-empty">${icon("shield", "icon info-icon")}<p>Choose who this is for, add your medicines, and tick any health conditions. Your results will appear here.</p></div>`;
       return;
     }
-    const trimester = who.trimester ? `<div class="note-card trimester-note">${icon("leaf", "icon info-icon")}<p>${TRIMESTER_NOTES[who.trimester]} <a href="safety/pregnancy.html">Read the full pregnancy guide</a>.</p></div>` : "";
+    const trimester = who.trimester ? `<div class="notice note-card trimester-note">${icon("leaf", "icon info-icon")}<p>${TRIMESTER_NOTES[who.trimester]} <a href="safety/pregnancy.html">Read the full pregnancy guide</a>.</p></div>` : "";
 
     if (state.item) {
       const keys = state.item.startsWith("stack:") ? STACKS.find((st) => st.id === state.item.slice(6)).herbs.map((x) => x.id) : [state.item];
@@ -841,9 +843,9 @@ function initFinder() {
   const condOptions = INTERACTIONS.filter((x) => x.type === "condition" && !["pregnancy", "breastfeeding", "children", "older-adults"].includes(x.id));
 
   const STEPS = [
-    { key: "goal", title: "What would you like help with?", render: () => `<div class="quiz-grid finder-goals">${TOPIC_GUIDES.map((g) => `<label class="quiz-card"><input type="radio" name="goal" value="${g.id}" ${a.goal === g.id ? "checked" : ""}><span>${icon(g.icon)}${g.short}</span></label>`).join("")}</div>` },
-    { key: "duration", title: "How long has this been bothering you?", render: () => `<div class="who-grid">${[["days", "It just started", "a few days"], ["weeks", "A few weeks", ""], ["months", "Months or longer", ""], ["well", "It's not a problem", "I just want to stay well"]].map(([v, l, sub]) => `<label class="quiz-card who-card"><input type="radio" name="duration" value="${v}" ${a.duration === v ? "checked" : ""}><span><strong>${l}</strong>${sub ? `<em>${sub}</em>` : ""}</span></label>`).join("")}</div>` },
-    { key: "who", title: "Who is this for?", render: () => `<div class="who-grid">${whoOptionsFor(a.goal).map((w) => `<label class="quiz-card who-card"><input type="radio" name="who" value="${w.id}" ${a.who === w.id ? "checked" : ""}><span><strong>${w.label}</strong>${w.sub ? `<em>${w.sub}</em>` : ""}</span></label>`).join("")}</div>` },
+    { key: "goal", title: "What would you like help with?", render: () => `<div class="quiz-grid finder-goals">${TOPIC_GUIDES.map((g) => `<label class="quiz-card"><input type="radio" name="goal" value="${g.id}" ${a.goal === g.id ? "checked" : ""}><span class="option">${icon(g.icon)}${g.short}</span></label>`).join("")}</div>` },
+    { key: "duration", title: "How long has this been bothering you?", render: () => `<div class="who-grid">${[["days", "It just started", "a few days"], ["weeks", "A few weeks", ""], ["months", "Months or longer", ""], ["well", "It's not a problem", "I just want to stay well"]].map(([v, l, sub]) => `<label class="quiz-card who-card"><input type="radio" name="duration" value="${v}" ${a.duration === v ? "checked" : ""}><span class="option"><strong>${l}</strong>${sub ? `<em>${sub}</em>` : ""}</span></label>`).join("")}</div>` },
+    { key: "who", title: "Who is this for?", render: () => `<div class="who-grid">${whoOptionsFor(a.goal).map((w) => `<label class="quiz-card who-card"><input type="radio" name="who" value="${w.id}" ${a.who === w.id ? "checked" : ""}><span class="option"><strong>${w.label}</strong>${w.sub ? `<em>${w.sub}</em>` : ""}</span></label>`).join("")}</div>` },
     { key: "meds", title: "Do you take any medicines?", optional: true, render: () => `
       <label class="ix-item-label">Type the name on your bottle (brand or generic)
         <input type="search" id="f-drug" class="field" placeholder="e.g. Eliquis, Zoloft, metformin, birth control…" autocomplete="off">
@@ -855,18 +857,18 @@ function initFinder() {
       </details>
       <p class="muted small">No medicines? Just tap Next.</p>` },
     { key: "conds", title: "Do any of these apply to you?", optional: true, render: () => `<div class="ix-options">${condOptions.map((x) => `<label class="ix-option"><input type="checkbox" name="cond" value="${x.id}" ${a.conds.includes(x.id) ? "checked" : ""}><span><strong>${x.label}</strong>${x.examples ? `<em>${x.examples}</em>` : ""}</span></label>`).join("")}</div><p class="muted small">None of these? Just tap Next.</p>` },
-    { key: "form", title: "How do you like to take herbs?", render: () => `<div class="who-grid">${[["tea", "As a tea"], ["capsule", "Capsules"], ["food", "In my food"], ["any", "Any way"]].map(([v, l]) => `<label class="quiz-card who-card"><input type="radio" name="form" value="${v}" ${a.form === v ? "checked" : ""}><span><strong>${l}</strong></span></label>`).join("")}</div>` }
+    { key: "form", title: "How do you like to take herbs?", render: () => `<div class="who-grid">${[["tea", "As a tea"], ["capsule", "Capsules"], ["food", "In my food"], ["any", "Any way"]].map(([v, l]) => `<label class="quiz-card who-card"><input type="radio" name="form" value="${v}" ${a.form === v ? "checked" : ""}><span class="option"><strong>${l}</strong></span></label>`).join("")}</div>` }
   ];
 
   function show() {
     const st = STEPS[step];
-    app.innerHTML = `<div class="card finder-step">
+    app.innerHTML = `<div class="card finder-step tool-shell">
       <div class="quiz-progress"><span>Question ${step + 1} of ${STEPS.length}</span><span>${Math.round((step / STEPS.length) * 100)}% done</span></div>
-      <div class="progress"><div class="progress-bar" style="width:${(step / STEPS.length) * 100}%"></div></div>
+      <div class="progress progress-track"><div class="progress-bar" style="width:${(step / STEPS.length) * 100}%"></div></div>
       <h2>${st.title}</h2>
       <div class="finder-body">${st.render()}</div>
       <div class="finder-nav">
-        ${step ? `<button class="btn btn-outline" data-back>Back</button>` : "<span></span>"}
+        ${step ? `<button class="btn btn-secondary" data-back>Back</button>` : "<span></span>"}
         <button class="btn btn-primary" data-next ${!st.optional && !a[st.key] ? "disabled" : ""}>${step === STEPS.length - 1 ? "See my plan" : "Next"}</button>
       </div>
     </div>`;
@@ -952,15 +954,15 @@ function initFinder() {
         <p class="eyebrow">Your plan</p>
         <h2>${g.title.replace("Natural ", "")}</h2>
         <p class="muted">For: ${who.label}${a.drugs.length || a.meds.length ? " · taking " + [...a.drugs, ...a.meds.map((m) => INTERACTIONS.find((x) => x.id === m).label)].join(", ") : ""}${a.conds.length ? " · " + a.conds.map((c) => INTERACTIONS.find((x) => x.id === c).label).join(", ") : ""}</p>
-        ${a.duration === "months" ? `<div class="note-card plan-doctor">${icon("shield", "icon info-icon")}<div><p><strong>Because this has lasted months, please also see your doctor.</strong> Ongoing problems can have causes that need treatment. Get help especially if you notice:</p><ul>${g.doctor.map((d) => `<li>${d}</li>`).join("")}</ul></div></div>` : ""}
-        ${who.flags.includes("pregnancy") ? `<div class="note-card">${icon("leaf", "icon info-icon")}<p>${who.trimester ? TRIMESTER_NOTES[who.trimester] : "When you're trying to conceive, follow the same care as early pregnancy."} <a href="${safetyUrl("pregnancy")}">Read the pregnancy guide</a>.</p></div>` : ""}
-        ${a.who === "breastfeeding" ? `<div class="note-card">${icon("leaf", "icon info-icon")}<p>Introduce one herbal tea at a time and watch your baby for changes. <a href="${safetyUrl("breastfeeding")}">Read the breastfeeding guide</a>.</p></div>` : ""}
-        ${isChild ? `<div class="note-card">${icon("shield", "icon info-icon")}<p><strong>For children, please ask your pediatrician before giving any herb.</strong> Fruits and healthy habits are the safest place to start. <a href="${safetyUrl("children")}">Read the children's guide</a>.</p></div>` : ""}
+        ${a.duration === "months" ? `<div class="notice note-card plan-doctor">${icon("shield", "icon info-icon")}<div><p><strong>Because this has lasted months, please also see your doctor.</strong> Ongoing problems can have causes that need treatment. Get help especially if you notice:</p><ul>${g.doctor.map((d) => `<li>${d}</li>`).join("")}</ul></div></div>` : ""}
+        ${who.flags.includes("pregnancy") ? `<div class="notice note-card">${icon("leaf", "icon info-icon")}<p>${who.trimester ? TRIMESTER_NOTES[who.trimester] : "When you're trying to conceive, follow the same care as early pregnancy."} <a href="${safetyUrl("pregnancy")}">Read the pregnancy guide</a>.</p></div>` : ""}
+        ${a.who === "breastfeeding" ? `<div class="notice note-card">${icon("leaf", "icon info-icon")}<p>Introduce one herbal tea at a time and watch your baby for changes. <a href="${safetyUrl("breastfeeding")}">Read the breastfeeding guide</a>.</p></div>` : ""}
+        ${isChild ? `<div class="notice note-card">${icon("shield", "icon info-icon")}<p><strong>For children, please ask your pediatrician before giving any herb.</strong> Fruits and healthy habits are the safest place to start. <a href="${safetyUrl("children")}">Read the children's guide</a>.</p></div>` : ""}
       </div>
 
       <div class="card"><h3 class="plan-h">${n++}. Start with these habits</h3><ul class="check-list">${g.lifestyle.slice(0, 3).map((t) => `<li>${icon("check")}${t}</li>`).join("")}</ul></div>
 
-      <div class="card"><h3 class="plan-h">${n++}. Foods to focus on</h3><p class="muted">Food is the foundation — build your meals around these.</p><div class="herb-grid">${[...foods.map((k) => cardFor(k)), ...fruits.slice(0, 8 - foods.length).map((id) => fruitCard(FRUITS.find((f) => f.id === id)))].join("")}</div></div>
+      <div class="card"><h3 class="plan-h">${n++}. Foods to focus on</h3><p class="muted">Food is the foundation — build your meals around these.</p><div class="herb-grid editorial-grid">${[...foods.map((k) => cardFor(k)), ...fruits.slice(0, 8 - foods.length).map((id) => fruitCard(FRUITS.find((f) => f.id === id)))].join("")}</div></div>
 
       ${remedies.length ? `<div class="card"><h3 class="plan-h">${n++}. Simple natural remedies</h3><div class="recipe-grid">${remedies.map(remedyCard).join("")}</div></div>` : ""}
 
@@ -977,8 +979,8 @@ function initFinder() {
 
       <div class="btn-row center-row plan-actions">
         <button class="btn btn-primary" data-print>Print my plan</button>
-        <button class="btn btn-outline" data-restart>Start over</button>
-        <a class="btn btn-outline" href="${guideUrl(g.id)}">Read the full ${g.short.toLowerCase()} guide</a>
+        <button class="btn btn-secondary" data-restart>Start over</button>
+        <a class="btn btn-secondary" href="${guideUrl(g.id)}">Read the full ${g.short.toLowerCase()} guide</a>
       </div>
       <p class="small muted center">These suggestions are for education only and are not medical advice. Please check with your doctor or pharmacist before starting any herb, especially if you take medicine.</p>
     </div>`;
@@ -1032,7 +1034,7 @@ function initBible() {
 function scriptureCard(kind, item) {
   const entry = bibleEntryFor(kind, item.id);
   const verse = entry ? { text: entry.verse, ref: entry.ref } : CATEGORY_VERSES[item.cats.find((c) => CATEGORY_VERSES[c])] || CATEGORY_VERSES.kitchen;
-  return `<section id="scripture" class="scripture-card">
+  return `<section id="scripture" class="scripture scripture-card">
     <p class="eyebrow">${entry ? `${item.name.split(" (")[0]} in the Bible` : "A verse to carry with you"}</p>
     <blockquote>“${verse.text}”</blockquote>
     <cite>${verse.ref} (${BIBLE_VERSION})</cite>
@@ -1112,11 +1114,11 @@ const foodCat = (id) => FOOD_CATEGORIES.find((c) => c.id === id);
 function foodCard(fd) {
   const key = "food:" + fd.id;
   const saved = favorites.has(key);
-  return `<article class="herb-card">
+  return `<article class="herb-card editorial-item">
     <a href="${foodUrl(fd.id)}" class="herb-card-link" aria-label="${fd.name}">
-      <div class="herb-card-art">${foodVisual(fd)}</div>
+      <div class="herb-card-art editorial-image">${foodVisual(fd)}</div>
       <div class="herb-card-body">
-        <p class="herb-card-cat">${foodCat(fd.cats[0]).label}</p>
+        <p class="herb-card-cat editorial-meta">${foodCat(fd.cats[0]).label}</p>
         <h3>${fd.name}</h3>
         <p class="latin">${FOOD_GROUPS[fd.group]}</p>
         <p class="herb-card-summary">${fd.what.split(/(?<=\.)\s/)[0]}</p>
@@ -1187,24 +1189,24 @@ function initFoods() {
   const featured = ["eggs", "salmon", "sweet-potato"].map(findFood).filter(Boolean);
   const firstSentence = (t) => t.split(/(?<=\.)\s/)[0];
   $("#foods-main").innerHTML = `
-    <section class="fd-hero">
-      <div class="container fd-hero-grid">
-        <div class="fd-hero-copy">
+    <section class="hero fd-hero">
+      <div class="container hero-grid">
+        <div class="hero-copy">
           <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span aria-current="page">Foods</span></nav>
-          <p class="label">The Beauty &amp; Praise food guide</p>
-          <h1 class="display">Food as the <em>Foundation</em></h1>
+          <p class="eyebrow">The Beauty &amp; Praise food guide</p>
+          <h1 class="hero-title">Food as the <em>Foundation</em></h1>
           <p class="lead">Everyday foods that can support your body — what's in them, how much to eat, when to eat them and who should be careful. Pick a goal or search for a food.</p>
-          <label class="fd-search">${icon("search")}<input type="search" id="food-search" placeholder="Search foods — try “protein”, “eggs” or “fiber”" aria-label="Search foods" autocomplete="off"></label>
+          <label class="search-shell fd-search">${icon("search")}<input type="search" id="food-search" placeholder="Search foods — try “protein”, “eggs” or “fiber”" aria-label="Search foods" autocomplete="off"></label>
         </div>
-        <div class="fd-hero-photo">${scene("nectarines", "", "(max-width: 900px) 92vw, 46vw").replace(' loading="lazy"', ' fetchpriority="high"')}</div>
+        <div class="hero-image-wrap"><div class="hero-image"><img src="${sceneUrl("nectarines", 1200)}" srcset="${sceneSrcset("nectarines")}" sizes="(max-width: 900px) 92vw, 44vw" alt="${SCENES.nectarines[1]}" fetchpriority="high" decoding="async" data-credit="Photo: ${SCENES.nectarines[2]} / Unsplash" onerror="this.closest('.hero-image').classList.add('photo-missing')"></div></div>
       </div>
     </section>
 
-    <section class="fd-philosophy">
+    <section class="section section--paper fd-philosophy">
       <div class="container fd-phil-grid">
         <div class="fd-phil-head">
-          <p class="label">Our philosophy</p>
-          <h2 class="display-2">Start at the <em>table</em>.</h2>
+          <p class="eyebrow">Our philosophy</p>
+          <h2>Start at the <span class="editorial-italic">table</span>.</h2>
         </div>
         <div class="fd-phil-text">
           <p class="fd-phil-lead">Real, whole foods are the everyday foundation of a healthy life. Herbs and home remedies can play a supporting role, but what we eat day after day matters most.</p>
@@ -1213,27 +1215,27 @@ function initFoods() {
             <li><span>II.</span><div><strong>Enough, not perfect.</strong> Every guide gives a typical serving and a good time of day to enjoy it.</div></li>
             <li><span>III.</span><div><strong>Wisdom for your body.</strong> Allergies, medicines and pregnancy notes are on every food page.</div></li>
           </ol>
-          <blockquote class="fd-verse-inline"><p>“Behold, I have given you every plant yielding seed that is on the surface of all the earth, and every tree which has fruit yielding seed; it shall be food for you.”</p><cite>Genesis 1:29 · NASB 1995</cite></blockquote>
+          <div class="scripture scripture--inline"><blockquote>“Behold, I have given you every plant yielding seed that is on the surface of all the earth, and every tree which has fruit yielding seed; it shall be food for you.”</blockquote><cite>Genesis 1:29 · NASB 1995</cite></div>
         </div>
       </div>
     </section>
 
-    <section class="fd-index" id="browse">
+    <section class="section fd-index" id="browse">
       <div class="container">
-        <div class="fd-head"><p class="label">Browse by need</p><h2>What would you like food <em>to help with?</em></h2></div>
+        <div class="section-intro"><p class="eyebrow">Browse by need</p><h2>What would you like food <span class="editorial-italic">to help with?</span></h2></div>
         <div class="fd-cats" id="food-chips">
-          ${FOOD_CATEGORIES.map((c, i) => `<button class="fd-cat chip" data-cat="${c.id}"><span class="fd-cat-n">${String(i + 1).padStart(2, "0")}</span><span class="fd-cat-t">${c.label}</span><span class="fd-cat-d">${c.text}</span></button>`).join("")}
+          ${FOOD_CATEGORIES.map((c, i) => `<button class="fd-cat" data-cat="${c.id}"><span class="fd-cat-n">${String(i + 1).padStart(2, "0")}</span><span class="fd-cat-t">${c.label}</span><span class="fd-cat-d">${c.text}</span></button>`).join("")}
         </div>
       </div>
     </section>
 
-    <section class="fd-featured">
+    <section class="section section--paper fd-featured">
       <div class="container">
-        <div class="fd-head"><p class="label">Featured foods</p><h2>Three everyday <em>staples</em></h2></div>
-        ${featured.map((fd, i) => `<article class="fd-story${i % 2 ? " fd-story-flip" : ""}">
-          <a class="fd-story-img" href="${foodUrl(fd.id)}" tabindex="-1" aria-hidden="true">${foodVisual(fd, true)}</a>
-          <div class="fd-story-text">
-            <p class="label">${FOOD_GROUPS[fd.group]}</p>
+        <div class="section-intro"><p class="eyebrow">Featured foods</p><h2>Three everyday <span class="editorial-italic">staples</span></h2></div>
+        ${featured.map((fd, i) => `<article class="story-grid fd-story${i % 2 ? " fd-story-flip" : ""}">
+          <a class="story-photo fd-story-img" href="${foodUrl(fd.id)}" tabindex="-1" aria-hidden="true">${foodVisual(fd, true)}</a>
+          <div class="story-copy fd-story-text">
+            <p class="editorial-meta">${FOOD_GROUPS[fd.group]}</p>
             <h3><a href="${foodUrl(fd.id)}">${fd.name}</a></h3>
             <p>${fd.what}</p>
             <dl class="fd-facts"><div><dt>Typical serving</dt><dd>${fd.serving[0]}</dd></div><div><dt>When</dt><dd>${fd.when}</dd></div></dl>
@@ -1243,41 +1245,40 @@ function initFoods() {
       </div>
     </section>
 
-    <section class="fd-library" id="all-foods">
+    <section class="section fd-library" id="all-foods">
       <div class="container">
         <div class="fd-head fd-head-row">
-          <div><p class="label" id="food-count"></p><h2 id="food-list-title">Every food in the guide</h2><p class="muted" id="food-cat-intro"></p></div>
+          <div><p class="eyebrow" id="food-count"></p><h2 id="food-list-title">Every food in the guide</h2><p class="muted" id="food-cat-intro"></p></div>
           <button class="text-link" id="food-reset" type="button" hidden>Show all foods</button>
         </div>
-        <div class="fd-grid" id="food-grid"></div>
+        <div class="editorial-grid" id="food-grid"></div>
         <p class="center muted" id="food-empty" hidden>No foods match — try another word.</p>
         <div id="food-fruits"></div>
       </div>
     </section>
 
-    <section class="fd-verse">
+    <section class="section section--cream fd-verse">
       <div class="container">
-        <img src="images/olive-branch.svg" width="530" height="150" alt="" aria-hidden="true">
-        <blockquote><p>“Whether, then, you eat or drink or whatever you do, do all to the glory of God.”</p><cite>1 Corinthians 10:31 · NASB 1995</cite></blockquote>
+        <div class="scripture"><blockquote>“Whether, then, you eat or drink or whatever you do, do all to the glory of God.”</blockquote><cite>1 Corinthians 10:31 · NASB 1995</cite></div>
       </div>
     </section>
 
-    <section class="fd-practical">
+    <section class="section section--paper fd-practical">
       <div class="container">
-        <div class="fd-head"><p class="label">Using this guide</p><h2>Practical, <em>not complicated</em></h2></div>
+        <div class="section-intro"><p class="eyebrow">Using this guide</p><h2>Practical, <span class="editorial-italic">not complicated</span></h2></div>
         <div class="fd-practical-grid">
           <div><h3>How much</h3><p>Each food lists a typical serving in everyday measures — a cup, a handful, one medium piece — so you know what “enough” looks like.</p></div>
           <div><h3>When to eat it</h3><p>Some foods suit breakfast, some a meal before exercise, some an evening snack. Every guide suggests a good time of day.</p></div>
-          <div><h3>Who should be careful</h3><p>Foods support health as part of an overall way of eating — no single food cures or prevents disease. If you have allergies, take medicine or are pregnant, check the notes on each page or use the <a href="interactions.html">safety checker</a>.</p></div>
+          <div class="notice"><h3>Who should be careful</h3><p>Foods support health as part of an overall way of eating — no single food cures or prevents disease. If you have allergies, take medicine or are pregnant, check the notes on each page or use the <a href="interactions.html">safety checker</a>.</p></div>
         </div>
       </div>
     </section>
 
-    <section class="fd-next">
+    <section class="section section--paper fd-next">
       <div class="container fd-next-grid">
-        <a href="finder.html"><span class="label">Next step</span><strong>What should I eat?</strong><span>Six gentle questions and a simple plan.</span></a>
-        <a href="remedies.html"><span class="label">From the kitchen</span><strong>Natural remedies</strong><span>Teas, soaks and simple home remedies.</span></a>
-        <a href="interactions.html"><span class="label">Be wise</span><strong>Safety checker</strong><span>Check foods and herbs with your medicines.</span></a>
+        <a href="finder.html"><span class="eyebrow">Next step</span><strong>What should I eat?</strong><span>Six gentle questions and a simple plan.</span></a>
+        <a href="remedies.html"><span class="eyebrow">From the kitchen</span><strong>Natural remedies</strong><span>Teas, soaks and simple home remedies.</span></a>
+        <a href="interactions.html"><span class="eyebrow">Be wise</span><strong>Safety checker</strong><span>Check foods and herbs with your medicines.</span></a>
       </div>
     </section>`;
   const search = $("#food-search");
@@ -1296,7 +1297,7 @@ function initFoods() {
     $("#food-grid").innerHTML = foods.map(foodCard).join("");
     $("#food-empty").hidden = foods.length + fruits.length > 0;
     $("#food-fruits").innerHTML = fruits.length ? `<div class="fd-subhead"><h3>${c ? `Fruits for ${c.label.replace(/^Foods for /, "").toLowerCase()}` : q ? "Matching fruits" : "Fruits"}</h3></div>
-      <div class="fd-grid">${fruits.map(fruitCard).join("")}</div>` : "";
+      <div class="editorial-grid">${fruits.map(fruitCard).join("")}</div>` : "";
   }
   const sync = () => history.replaceState(null, "", "foods.html" + (state.cat !== "all" ? `?cat=${state.cat}` : ""));
   $("#food-chips").addEventListener("click", (e) => {
@@ -1351,7 +1352,7 @@ function renderFoodProfile(p, main) {
             </dl>
             <div class="herb-actions">
               <button class="btn btn-primary fav-inline${saved ? " saved" : ""}" data-fav="${p.key}" aria-pressed="${saved}">${icon("heart")}<span>Save</span></button>
-              <button class="btn btn-outline" onclick="window.print()">${icon("print")}<span>Print guide</span></button>
+              <button class="btn btn-secondary" onclick="window.print()">${icon("print")}<span>Print guide</span></button>
             </div>
           </div>
         </div>
@@ -1425,12 +1426,12 @@ function renderFoodProfile(p, main) {
       </div>
     </section>
 
-    <section class="section section-tint">
+    <section class="section section--cream section-tint">
       <div class="container">
         ${remedySection(remedies, `Remedies with ${short}`)}
         <div class="section-head${recipes.length || remedies.length ? " stack-head" : ""}"><div><p class="eyebrow">Keep exploring</p><h2>Related ${isFruit ? "fruits" : "foods"}</h2></div>
           <a class="text-link" href="foods.html?cat=${p.foodCats[0]}">More ${foodCat(p.foodCats[0]).label.toLowerCase()} ${icon("arrow")}</a></div>
-        <div class="herb-grid">${related.map(isFruit ? fruitCard : foodCard).join("")}</div>
+        <div class="herb-grid editorial-grid">${related.map(isFruit ? fruitCard : foodCard).join("")}</div>
         <nav class="prev-next">
           <a href="${pageUrl(prev.id)}"><span>← Previous</span><strong>${prev.name}</strong></a>
           <a href="${pageUrl(next.id)}"><span>Next →</span><strong>${next.name}</strong></a>
@@ -1476,7 +1477,7 @@ function initRemedies() {
         <div class="chips" id="remedy-chips">${[["all", "All remedies"], ...Object.entries(REMEDY_CATS).map(([k, c]) => [k, c.label])].map(([k, l]) => `<button class="chip" data-cat="${k}">${l}</button>`).join("")}</div>
         <div id="remedy-intro"></div>
         <div class="recipe-grid" id="remedy-grid"></div>
-        <div class="note-card food-note">${icon("shield", "icon info-icon")}<p><strong>Home remedies are for mild, everyday symptoms.</strong> They may help you feel more comfortable, but they don't replace medical care. Each remedy lists warning signs that mean it's time to call a doctor — and in an emergency, call 911.</p></div>
+        <div class="notice note-card food-note">${icon("shield", "icon info-icon")}<p><strong>Home remedies are for mild, everyday symptoms.</strong> They may help you feel more comfortable, but they don't replace medical care. Each remedy lists warning signs that mean it's time to call a doctor — and in an emergency, call 911.</p></div>
       </div>
     </section>`;
   const draw = () => {
@@ -1515,7 +1516,7 @@ function initRemedy() {
             <h1>${r.name}</h1>
             <p class="lead">${r.intro}</p>
             <div class="recipe-facts"><span>${icon("clock")} ${r.time}</span><span class="evidence ev-${ev}" title="${EVIDENCE[ev].note}">Evidence: ${EVIDENCE[ev].label}</span></div>
-            <button class="btn btn-outline" data-print>${icon("print")} Print remedy</button>
+            <button class="btn btn-secondary" data-print>${icon("print")} Print remedy</button>
           </div>
           <div class="stack-hero-photos">${r.items.length ? r.items.slice(0, 4).map((k, i) => `<a href="${itemUrl(k)}" class="shp shp-${i}">${keyVisual(k, i === 0)}</a>`).join("") : `<div class="shp shp-0">${remedyVisual(r, true)}</div>`}</div>
         </div>
@@ -1551,7 +1552,7 @@ function initRemedy() {
         </div>
       </div>
     </section>
-    <section class="section section-tint">
+    <section class="section section--cream section-tint">
       <div class="container">${remedySection(more, "More remedies")}</div>
     </section>`;
   $("#remedy-main [data-print]").addEventListener("click", () => window.print());

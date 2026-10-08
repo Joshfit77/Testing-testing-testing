@@ -82,7 +82,9 @@ English verses use the NASB 1995 and Spanish verses use La Biblia de las Améric
 
 ## Other files
 - `css/styles.css` — the original styling
-- `css/editorial.css` — the "real life" design system loaded on top of it: warm cream and linen backgrounds, olive, rose, wood and brass tones, Cormorant Garamond + DM Sans, photographs shown as paper prints, Scripture set beside photographs, calm scroll animations (off when the visitor prefers reduced motion) and the mobile layouts
+- `css/site.css` — the global design system (colors, type, buttons, hero, Scripture, story, paths, editorial grid, forms, notices, footer, reveals)
+- `css/editorial.css` — the migration layer: maps the site's existing components onto `site.css` and protects working parts from its global element rules
+- `js/site.js` — scroll reveals and smooth in-page links
 - `images/olive-branch.svg` — the one small botanical drawing, used as an accent beside verse references and in the footer
 - `images/amanda.jpg` — Amanda's photo, shown unaltered on the homepage and Our Story page
 - `js/art.js` — fallback illustrations for herbs and fruits

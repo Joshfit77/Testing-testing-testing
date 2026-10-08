@@ -130,11 +130,11 @@ const LOGO_MARK = `<svg class="logo-mark" viewBox="0 0 64 64" aria-hidden="true"
 
 function herbCard(h) {
   const saved = favorites.has(h.id);
-  return `<article class="herb-card">
+  return `<article class="herb-card editorial-item">
     <a href="${herbUrl(h.id)}" class="herb-card-link" aria-label="${h.name}">
-      <div class="herb-card-art">${visual(h)}</div>
+      <div class="herb-card-art editorial-image">${visual(h)}</div>
       <div class="herb-card-body">
-        <p class="herb-card-cat">${CATEGORIES[h.cats[0]]}</p>
+        <p class="herb-card-cat editorial-meta">${CATEGORIES[h.cats[0]]}</p>
         <h3>${h.name}</h3>
         <p class="latin">${h.latin}</p>
         <p class="herb-card-summary">${h.summary}</p>
@@ -249,14 +249,14 @@ function renderChrome() {
     : `<details class="drawer-group"${group === m.id ? " open" : ""}><summary>${m.label}</summary>${m.items.map((i) => `<a href="${i.href}"${i.highlight ? ' class="nav-highlight"' : ""}>${i.label}</a>`).join("")}</details>`).join("");
 
   document.getElementById("site-header").innerHTML = `
-    <header class="header">
-      <div class="container header-inner">
+    <header class="header site-header">
+      <div class="container header-inner nav">
         <button class="icon-btn menu-btn" aria-label="Open menu" aria-expanded="false">${icon("menu")}</button>
         <a href="index.html" class="logo" aria-label="${SITE.name} home">
           ${LOGO_MARK}
           <span class="logo-text"><span class="logo-name">Beauty <em>&amp;</em> Praise</span><span class="logo-tag">${SITE.tagline}</span></span>
         </a>
-        <nav class="main-nav" aria-label="Main"><ul>${desktop}</ul></nav>
+        <nav class="main-nav" aria-label="Main"><ul class="nav-links">${desktop}</ul></nav>
         <div class="header-actions">
           <a href="finder.html" class="btn btn-primary btn-small header-cta">What should I eat?</a>
           <button class="icon-btn search-btn" aria-label="Search">${icon("search")}</button>
@@ -291,11 +291,11 @@ function renderChrome() {
         </div>
         <form class="newsletter-form">
           <input type="email" required placeholder="Your email address" aria-label="Email address">
-          <button class="btn btn-light" type="submit">Subscribe</button>
+          <button class="btn btn-primary" type="submit">Subscribe</button>
         </form>
       </div>
     </section>
-    <footer class="footer">
+    <footer class="footer site-footer">
       <div class="footer-verse container">
         <img class="footer-olive" src="images/olive-branch.svg" alt="" aria-hidden="true" width="530" height="150">
         <p class="script">Let everything that has breath praise the LORD.</p>
@@ -501,9 +501,8 @@ const PAGE_SCRIPTURE = {
   living: ["after", "Look at the birds of the air, that they do not sow, nor reap nor gather into barns, and yet your heavenly Father feeds them. Are you not worth much more than they?", "Matthew 6:26", "fall-coffee-leaf"],
   about: ["after", "And do not be conformed to this world, but be transformed by the renewing of your mind, so that you may prove what the will of God is, that which is good and acceptable and perfect.", "Romans 12:2", "bible-psalms"]
 };
-const scriptureBlock = ([, text, ref, photo]) => `<section class="page-scripture"><div class="container verse-spread">
-  ${scene(photo, "print verse-photo", "(max-width: 700px) 80vw, 30vw")}
-  <blockquote class="scripture verse-paper"><p>“${text}”</p><cite>${ref} · NASB 1995</cite></blockquote>
+const scriptureBlock = ([, text, ref]) => `<section class="section section--paper page-scripture"><div class="container">
+  <div class="scripture"><blockquote>“${text}”</blockquote><cite>${ref} · NASB 1995</cite></div>
 </div></section>`;
 
 // A photograph for the top of each list page.
@@ -518,14 +517,15 @@ function creditPhotos() {
   el.textContent = names.length ? `Photography on this page: ${names.join(", ")} (Unsplash).` : "";
 }
 
-// Dress every inner page: a real photograph in the hero and a verse that fits the page.
+// Dress every inner page in the shared design system (css/site.css):
+// list pages get the editorial hero (words + one photograph), and each page a verse that fits it.
 function decorateArt() {
   fillScenes();
   const page = document.body.dataset.page;
-  if (page === "home") { creditPhotos(); return initMotion(); }
+  if (page === "home") { creditPhotos(); return markReveals(); }
   document.body.classList.add("artful");
   const hero = document.querySelector("main .page-hero, main .herb-hero, main .stack-hero, main > .hero");
-  if (!hero || hero.classList.contains("art-page-hero")) { creditPhotos(); return initMotion(); }
+  if (!hero || hero.classList.contains("art-page-hero")) { creditPhotos(); return markReveals(); }
   hero.classList.add("art-page-hero");
   const title = hero.classList.contains("page-hero") && hero.querySelector("h1");
   if (title && !title.children.length) { // editorial accent: the last word in italic
@@ -537,10 +537,18 @@ function decorateArt() {
       title.append(em);
     }
   }
+  if (title) title.classList.add("hero-title");
   const photo = hero.classList.contains("page-hero") && PAGE_PHOTO[page];
-  if (photo) {
-    hero.classList.add("has-photo");
-    hero.querySelector(".container").insertAdjacentHTML("beforeend", `<div class="hero-photo">${scene(photo, "print", "(max-width: 900px) 92vw, 40vw").replace(' loading="lazy"', ' fetchpriority="high"')}</div>`);
+  if (photo && SCENES[photo]) {
+    // .hero > .container.hero-grid > [.hero-copy (the existing words), .hero-image-wrap > .hero-image > img]
+    const box = hero.querySelector(".container");
+    const copy = document.createElement("div");
+    copy.className = "hero-copy";
+    copy.append(...box.childNodes);
+    box.classList.add("hero-grid");
+    box.append(copy);
+    box.insertAdjacentHTML("beforeend", `<div class="hero-image-wrap"><div class="hero-image"><img src="${sceneUrl(photo, 1200)}" srcset="${sceneSrcset(photo)}" sizes="(max-width: 900px) 92vw, 44vw" alt="${SCENES[photo][1]}" fetchpriority="high" decoding="async" data-credit="Photo: ${SCENES[photo][2]} / Unsplash" onerror="this.closest('.hero-image').classList.add('photo-missing')"></div></div>`);
+    hero.classList.add("hero", "has-photo");
   }
   const verse = PAGE_SCRIPTURE[page];
   if (verse && !document.querySelector(".page-scripture")) {
@@ -548,33 +556,17 @@ function decorateArt() {
     else document.querySelector("main").insertAdjacentHTML("beforeend", scriptureBlock(verse));
   }
   creditPhotos();
-  initMotion();
+  markReveals();
 }
 
-// Calm motion: sections fade up as they arrive, photographs drift a touch on scroll.
-function initMotion() {
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches || !("IntersectionObserver" in window)) return;
-  document.documentElement.classList.add("motion");
-  initMotion.io = initMotion.io || new IntersectionObserver((entries) => entries.forEach((e) => {
-    if (e.isIntersecting) { e.target.classList.add("in"); initMotion.io.unobserve(e.target); }
-  }), { rootMargin: "0px 0px -6% 0px", threshold: 0.06 });
-  document.querySelectorAll("main > section:not(.reveal), .footer-verse:not(.reveal)").forEach((el) => {
-    el.classList.add("reveal");
-    initMotion.io.observe(el);
+// Gentle fade-up on scroll, handled by js/site.js. It reveals an element once 12% of it is on screen,
+// so only sections short enough to reach that are marked — long lists are never hidden.
+function markReveals() {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  document.querySelectorAll("main > section:not(.reveal)").forEach((el) => {
+    if (el.offsetHeight && el.offsetHeight < innerHeight * 3) el.classList.add("reveal");
   });
-  if (initMotion.drift) return;
-  initMotion.drift = true;
-  let queued = false;
-  const drift = () => {
-    queued = false;
-    document.querySelectorAll("[data-parallax]").forEach((el) => {
-      const r = el.getBoundingClientRect();
-      if (r.bottom < -200 || r.top > innerHeight + 200) return;
-      el.style.setProperty("--py", `${((r.top + r.height / 2 - innerHeight / 2) * parseFloat(el.dataset.parallax)).toFixed(1)}px`);
-    });
-  };
-  addEventListener("scroll", () => { if (!queued) { queued = true; requestAnimationFrame(drift); } }, { passive: true });
-  drift();
 }
+
 // (pages.js calls decorateArt() once each page has drawn its content.)
 document.addEventListener("DOMContentLoaded", fillScenes);
