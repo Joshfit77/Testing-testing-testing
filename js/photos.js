@@ -9,10 +9,7 @@
 // Or add it to PHOTO_OVERRIDES below by hand to choose your own credit line, e.g.
 //   chamomile: { src: "images/chamomile.jpg", credit: "Photo by Jane Doe" }
 
-const PHOTO_OVERRIDES = Object.assign({
-  // A cooked, plated meal instead of Wikipedia's raw whole chicken.
-  "food:chicken-breast": { src: "images/foods/chicken-breast.svg", credit: "Illustration: Beauty & Praise" }
-}, typeof MY_PHOTOS !== "undefined" ? MY_PHOTOS : {});
+const PHOTO_OVERRIDES = Object.assign({}, typeof MY_PHOTOS !== "undefined" ? MY_PHOTOS : {});
 
 // Wikipedia article titles where the herb's common or Latin name isn't the best match.
 const WIKI_TITLES = {
@@ -167,10 +164,8 @@ function visual(h, large = false) {
 }
 
 // Same for a food.
-// Fruits and vegetables are shown as oil paintings (the "oil-paint" filter in layout.js).
 function foodVisual(fd, large = false) {
-  const paint = fd.group === "vegetables" ? " pf-paint" : "";
-  return `<span class="pf${large ? " pf-large" : ""}${paint}" data-photo="food:${fd.id}" role="img" aria-label="${fd.name}">${Art.food(fd)}</span>`;
+  return `<span class="pf${large ? " pf-large" : ""}" data-photo="food:${fd.id}" role="img" aria-label="${fd.name}">${Art.food(fd)}</span>`;
 }
 
 // Any herb, fruit or food by key ("ginger", "fruit:lemon", "food:honey"). No key → a simple leaf.
@@ -183,5 +178,5 @@ function keyVisual(key, large = false) {
 
 // Same for a fruit.
 function fruitVisual(fr, large = false) {
-  return `<span class="pf pf-paint${large ? " pf-large" : ""}" data-photo="fruit:${fr.id}" role="img" aria-label="${fr.name} (${fr.latin})">${Art.fruit(fr)}</span>`;
+  return `<span class="pf${large ? " pf-large" : ""}" data-photo="fruit:${fr.id}" role="img" aria-label="${fr.name} (${fr.latin})">${Art.fruit(fr)}</span>`;
 }

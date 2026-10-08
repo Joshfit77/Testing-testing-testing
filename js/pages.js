@@ -60,20 +60,13 @@ function initHome() {
   attachSearch($("#hero-search"), $("#hero-suggest"));
 
   const paths = [
-    { href: "foods.html", photo: "foods-board", title: "Foods", kicker: "No. 01 — The foundation", text: "Real, everyday foods — what they offer, how much to eat and when.", cta: "Explore foods" },
-    { href: "remedies.html", photo: "remedy-tea", title: "Natural Remedies", kicker: "No. 02 — From the kitchen", text: "Gentle teas, soaks and home remedies with clear amounts and safety.", cta: "Find a remedy" },
-    { href: "herbs.html", photo: "herb-basket", title: "Herbs", kicker: "No. 03 — A supporting role", text: "Time-honored herbs as a supporting role — with research and doses.", cta: "Meet the herbs" }
+    { href: "foods.html", photo: "foods-board", title: "Foods", kicker: "The foundation", text: "Real, everyday foods — what they offer, how much to eat and when to eat them.", cta: "Explore foods" },
+    { href: "remedies.html", photo: "remedy-tea", title: "Natural Remedies", kicker: "From the kitchen", text: "Gentle teas, soaks and home remedies with clear amounts and safety.", cta: "Find a remedy" },
+    { href: "herbs.html", photo: "herb-basket", title: "Herbs", kicker: "A supporting role", text: "Time-honored herbs as a supporting role — with research and doses.", cta: "Meet the herbs" }
   ];
-  $("#art-paths").innerHTML = paths.map((p, i) => `<a class="rl-path rl-path-${i + 1}" href="${p.href}">
-    ${scene(p.photo, "rl-path-photo", i === 1 ? "(max-width: 900px) 92vw, 34vw" : "(max-width: 900px) 92vw, 56vw")}
-    <span class="rl-path-body"><span class="rl-path-kicker">${p.kicker}</span><strong>${p.title}</strong><span>${p.text}</span><em>${p.cta} ${icon("arrow")}</em></span>
-  </a>`).join("");
-
-  // The autumn harvest table: fall fruits and vegetables as framed oil paintings.
-  const harvest = ["fruit:apple", "fruit:pumpkin", "fruit:pear", "fruit:pomegranate", "food:sweet-potato", "fruit:fig", "food:beets", "fruit:grape", "food:carrots", "food:kale"].filter(itemOf);
-  $("#harvest-grid").innerHTML = harvest.map((k, i) => `<a class="harvest-item h-${i + 1}" href="${itemUrl(k)}">
-    <span class="frame">${keyVisual(k, i < 2)}</span>
-    <span class="plaque">${itemName(k).split(" (")[0]}</span>
+  $("#art-paths").innerHTML = paths.map((p, i) => `<a class="hc-path hc-path-${i + 1}" href="${p.href}">
+    ${scene(p.photo, "hc-path-photo", i === 0 ? "(max-width: 900px) 92vw, 56vw" : "(max-width: 900px) 92vw, 34vw")}
+    <span class="hc-path-body"><span class="hc-path-kicker"><b>0${i + 1}</b> ${p.kicker}</span><strong>${p.title}</strong><span>${p.text}</span><em>${p.cta} ${icon("arrow")}</em></span>
   </a>`).join("");
 
 }
@@ -1191,25 +1184,100 @@ const sourceList = (refs) => `<ol class="source-list">${refs.map(([label, url]) 
 /* ---------------- Food library ---------------- */
 function initFoods() {
   const state = { cat: foodCat(params.get("cat")) ? params.get("cat") : "all", q: params.get("q") || "" };
+  const featured = ["eggs", "salmon", "sweet-potato"].map(findFood).filter(Boolean);
+  const firstSentence = (t) => t.split(/(?<=\.)\s/)[0];
   $("#foods-main").innerHTML = `
-    <section class="page-hero">
-      <div class="container">
-        <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span aria-current="page">Foods</span></nav>
-        <h1>Food as the Foundation</h1>
-        <p class="lead">Everyday foods that can support your body — what's in them, how much to eat, when to eat them and who should be careful. Pick a goal or search for a food.</p>
+    <section class="fd-hero">
+      <div class="container fd-hero-grid">
+        <div class="fd-hero-copy">
+          <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span aria-current="page">Foods</span></nav>
+          <p class="label">The Beauty &amp; Praise food guide</p>
+          <h1 class="display">Food as the <em>Foundation</em></h1>
+          <p class="lead">Everyday foods that can support your body — what's in them, how much to eat, when to eat them and who should be careful. Pick a goal or search for a food.</p>
+          <label class="fd-search">${icon("search")}<input type="search" id="food-search" placeholder="Search foods — try “protein”, “eggs” or “fiber”" aria-label="Search foods" autocomplete="off"></label>
+        </div>
+        <div class="fd-hero-photo">${scene("nectarines", "", "(max-width: 900px) 92vw, 46vw").replace(' loading="lazy"', ' fetchpriority="high"')}</div>
       </div>
     </section>
-    <section class="section section-top-tight">
-      <div class="container">
-        <div class="filters">
-          <label class="search-field">${icon("search")}<input type="search" id="food-search" placeholder="Search foods — try “protein”, “eggs” or “fiber”" aria-label="Search foods" autocomplete="off"></label>
+
+    <section class="fd-philosophy">
+      <div class="container fd-phil-grid">
+        <div class="fd-phil-head">
+          <p class="label">Our philosophy</p>
+          <h2 class="display-2">Start at the <em>table</em>.</h2>
         </div>
-        <div class="chips" id="food-chips">${[["all", "All foods"], ...FOOD_CATEGORIES.map((c) => [c.id, c.label])].map(([k, l]) => `<button class="chip" data-cat="${k}">${l}</button>`).join("")}</div>
-        <div id="food-cat-intro"></div>
-        <div class="herb-grid" id="food-grid"></div>
+        <div class="fd-phil-text">
+          <p class="fd-phil-lead">Real, whole foods are the everyday foundation of a healthy life. Herbs and home remedies can play a supporting role, but what we eat day after day matters most.</p>
+          <ol class="fd-principles">
+            <li><span>I.</span><div><strong>Whole foods first.</strong> Vegetables, fruit, beans, whole grains, fish, eggs and nuts — as close to the way they were made as possible.</div></li>
+            <li><span>II.</span><div><strong>Enough, not perfect.</strong> Every guide gives a typical serving and a good time of day to enjoy it.</div></li>
+            <li><span>III.</span><div><strong>Wisdom for your body.</strong> Allergies, medicines and pregnancy notes are on every food page.</div></li>
+          </ol>
+          <blockquote class="fd-verse-inline"><p>“Behold, I have given you every plant yielding seed that is on the surface of all the earth, and every tree which has fruit yielding seed; it shall be food for you.”</p><cite>Genesis 1:29 · NASB 1995</cite></blockquote>
+        </div>
+      </div>
+    </section>
+
+    <section class="fd-index" id="browse">
+      <div class="container">
+        <div class="fd-head"><p class="label">Browse by need</p><h2>What would you like food <em>to help with?</em></h2></div>
+        <div class="fd-cats" id="food-chips">
+          ${FOOD_CATEGORIES.map((c, i) => `<button class="fd-cat chip" data-cat="${c.id}"><span class="fd-cat-n">${String(i + 1).padStart(2, "0")}</span><span class="fd-cat-t">${c.label}</span><span class="fd-cat-d">${c.text}</span></button>`).join("")}
+        </div>
+      </div>
+    </section>
+
+    <section class="fd-featured">
+      <div class="container">
+        <div class="fd-head"><p class="label">Featured foods</p><h2>Three everyday <em>staples</em></h2></div>
+        ${featured.map((fd, i) => `<article class="fd-story${i % 2 ? " fd-story-flip" : ""}">
+          <a class="fd-story-img" href="${foodUrl(fd.id)}" tabindex="-1" aria-hidden="true">${foodVisual(fd, true)}</a>
+          <div class="fd-story-text">
+            <p class="label">${FOOD_GROUPS[fd.group]}</p>
+            <h3><a href="${foodUrl(fd.id)}">${fd.name}</a></h3>
+            <p>${fd.what}</p>
+            <dl class="fd-facts"><div><dt>Typical serving</dt><dd>${fd.serving[0]}</dd></div><div><dt>When</dt><dd>${fd.when}</dd></div></dl>
+            <a class="text-link" href="${foodUrl(fd.id)}">Read the full guide ${icon("arrow")}</a>
+          </div>
+        </article>`).join("")}
+      </div>
+    </section>
+
+    <section class="fd-library" id="all-foods">
+      <div class="container">
+        <div class="fd-head fd-head-row">
+          <div><p class="label" id="food-count"></p><h2 id="food-list-title">Every food in the guide</h2><p class="muted" id="food-cat-intro"></p></div>
+          <button class="text-link" id="food-reset" type="button" hidden>Show all foods</button>
+        </div>
+        <div class="fd-grid" id="food-grid"></div>
         <p class="center muted" id="food-empty" hidden>No foods match — try another word.</p>
         <div id="food-fruits"></div>
-        <div class="note-card food-note">${icon("shield", "icon info-icon")}<p>Foods support health as part of an overall way of eating — no single food cures or prevents disease. If you have allergies, take medicine or are pregnant, check the notes on each page or use the <a href="interactions.html">safety checker</a>.</p></div>
+      </div>
+    </section>
+
+    <section class="fd-verse">
+      <div class="container">
+        <img src="images/olive-branch.svg" width="530" height="150" alt="" aria-hidden="true">
+        <blockquote><p>“Whether, then, you eat or drink or whatever you do, do all to the glory of God.”</p><cite>1 Corinthians 10:31 · NASB 1995</cite></blockquote>
+      </div>
+    </section>
+
+    <section class="fd-practical">
+      <div class="container">
+        <div class="fd-head"><p class="label">Using this guide</p><h2>Practical, <em>not complicated</em></h2></div>
+        <div class="fd-practical-grid">
+          <div><h3>How much</h3><p>Each food lists a typical serving in everyday measures — a cup, a handful, one medium piece — so you know what “enough” looks like.</p></div>
+          <div><h3>When to eat it</h3><p>Some foods suit breakfast, some a meal before exercise, some an evening snack. Every guide suggests a good time of day.</p></div>
+          <div><h3>Who should be careful</h3><p>Foods support health as part of an overall way of eating — no single food cures or prevents disease. If you have allergies, take medicine or are pregnant, check the notes on each page or use the <a href="interactions.html">safety checker</a>.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="fd-next">
+      <div class="container fd-next-grid">
+        <a href="finder.html"><span class="label">Next step</span><strong>What should I eat?</strong><span>Six gentle questions and a simple plan.</span></a>
+        <a href="remedies.html"><span class="label">From the kitchen</span><strong>Natural remedies</strong><span>Teas, soaks and simple home remedies.</span></a>
+        <a href="interactions.html"><span class="label">Be wise</span><strong>Safety checker</strong><span>Check foods and herbs with your medicines.</span></a>
       </div>
     </section>`;
   const search = $("#food-search");
@@ -1220,17 +1288,28 @@ function initFoods() {
     let foods = q ? searchFoods(singular(q)) : [...FOODS];
     let fruits = q ? searchFruits(singular(q)) : [...FRUITS];
     if (c) { foods = foods.filter((fd) => fd.cats.includes(c.id)); fruits = fruits.filter((fr) => foodCatsOf(fr, "fruit").includes(c.id)); }
-    $("#food-chips").querySelectorAll(".chip").forEach((b) => b.classList.toggle("active", b.dataset.cat === state.cat));
-    $("#food-cat-intro").innerHTML = c ? `<div class="section-head"><div><p class="eyebrow">Food category</p><h2>${c.label}</h2><p class="muted">${c.text}</p></div></div>` : "";
+    $("#food-chips").querySelectorAll("[data-cat]").forEach((b) => b.classList.toggle("active", b.dataset.cat === state.cat));
+    $("#food-list-title").innerHTML = c ? c.label : q ? `Foods matching “${q.replace(/[<>&"]/g, "")}”` : "Every food in the guide";
+    $("#food-cat-intro").textContent = c ? c.text : "";
+    $("#food-count").textContent = `${foods.length} foods · ${fruits.length} fruits`;
+    $("#food-reset").hidden = !c && !q;
     $("#food-grid").innerHTML = foods.map(foodCard).join("");
     $("#food-empty").hidden = foods.length + fruits.length > 0;
-    $("#food-fruits").innerHTML = fruits.length ? `<div class="section-head stack-head"><div><p class="eyebrow">${fruits.length} fruits</p><h2>${c ? `Fruits for ${c.label.replace(/^Foods for /, "").toLowerCase()}` : q ? "Matching fruits" : "Fruits"}</h2></div></div>
-      <div class="herb-grid">${fruits.map(fruitCard).join("")}</div>` : "";
+    $("#food-fruits").innerHTML = fruits.length ? `<div class="fd-subhead"><h3>${c ? `Fruits for ${c.label.replace(/^Foods for /, "").toLowerCase()}` : q ? "Matching fruits" : "Fruits"}</h3></div>
+      <div class="fd-grid">${fruits.map(fruitCard).join("")}</div>` : "";
   }
   const sync = () => history.replaceState(null, "", "foods.html" + (state.cat !== "all" ? `?cat=${state.cat}` : ""));
-  $("#food-chips").addEventListener("click", (e) => { const b = e.target.closest("[data-cat]"); if (!b) return; state.cat = b.dataset.cat; sync(); render(); });
+  $("#food-chips").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-cat]"); if (!b) return;
+    state.cat = state.cat === b.dataset.cat ? "all" : b.dataset.cat;
+    sync(); render();
+    $("#all-foods").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  });
+  $("#food-reset").addEventListener("click", () => { state.cat = "all"; state.q = ""; search.value = ""; sync(); render(); });
   search.addEventListener("input", () => { state.q = search.value; render(); });
+  search.addEventListener("keydown", (e) => { if (e.key === "Enter") $("#all-foods").scrollIntoView(); });
   render();
+  if (state.cat !== "all" || state.q) requestAnimationFrame(() => $("#all-foods").scrollIntoView());
 }
 
 /* ---------------- Food & fruit pages (one shared layout) ---------------- */

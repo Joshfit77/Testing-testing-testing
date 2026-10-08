@@ -123,7 +123,7 @@ const FOODS = [
     sources: ["fish", "pregnancy", "allergens"]
   },
   {
-    id: "chicken-breast", name: "Chicken Breast", group: "protein", cats: ["protein", "energy"], goals: ["energy", "mens-health", "hair"], color: "#e8c9a0", art: "pear", wiki: "Chicken as food",
+    id: "chicken-breast", name: "Chicken Breast", group: "protein", cats: ["protein", "energy"], goals: ["energy", "mens-health", "hair"], color: "#e8c9a0", art: "pear", wiki: "Roast chicken",
     what: "Skinless chicken breast is a lean, versatile protein that takes on the flavor of whatever you cook it with. It's low in fat and rich in B vitamins.",
     nutrients: ["About 26 g protein per 3 oz (85 g) cooked", "Niacin (vitamin B3)", "Vitamin B6", "Selenium", "Phosphorus"],
     benefits: [["R", "Lean protein for muscle", "Chicken provides high-quality protein with little saturated fat, which supports muscle repair and fullness."],
