@@ -95,13 +95,16 @@ for (const [dir, list, prefix] of [["herbs", HERBS, ""], ["fruits", FRUITS, "fru
     else unknownPhotos.push(`images/${dir}/${file}`);
   }
 }
+// Paintings for the Foods page: images/oil-<name>.jpg (e.g. images/oil-berries.jpg).
+const myArt = {};
+for (const file of fs.readdirSync(path.join(root, "images")).filter((f) => /^oil-[\w-]+\.(jpe?g|png|webp|avif)$/i.test(f)).sort()) myArt[file.replace(/\.\w+$/, "").toLowerCase()] = `images/${file}`;
 // Your own lifestyle photos: images/scenes/<name>.jpg replaces the photo of that name in SCENES (js/layout.js).
 const myScenes = {};
 const scenesDir = path.join(root, "images", "scenes");
 fs.mkdirSync(scenesDir, { recursive: true });
 for (const file of fs.readdirSync(scenesDir).filter((f) => PHOTO_EXT.test(f)).sort()) myScenes[file.replace(PHOTO_EXT, "").toLowerCase()] = `images/scenes/${file}`;
 fs.writeFileSync(path.join(root, "js", "my-photos.js"),
-  `// Made by scripts/build.js from the photos in images/herbs/, images/fruits/, images/foods/ and images/scenes/. Don't edit by hand.\nconst MY_PHOTOS = ${JSON.stringify(myPhotos, null, 2)};\nconst MY_SCENES = ${JSON.stringify(myScenes, null, 2)};\n`);
+  `// Made by scripts/build.js from the photos in images/herbs/, images/fruits/, images/foods/ and images/scenes/. Don't edit by hand.\nconst MY_PHOTOS = ${JSON.stringify(myPhotos, null, 2)};\nconst MY_SCENES = ${JSON.stringify(myScenes, null, 2)};\nconst MY_ART = ${JSON.stringify(myArt, null, 2)};\n`);
 if (unknownPhotos.length) console.warn(`These photos don't match an herb or fruit id and were skipped:\n  ${unknownPhotos.join("\n  ")}`);
 
 // Start each section fresh so pages for removed items don't linger.
