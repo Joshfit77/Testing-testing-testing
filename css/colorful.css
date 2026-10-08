@@ -1,0 +1,169 @@
+/* ============================================================
+   BEAUTY & PRAISE — COLORFUL ARTISTIC SYSTEM
+   Apply to Foods + Remedies
+============================================================ */
+
+:root {
+  --forest: #243b2b;
+  --olive: #526748;
+
+  --cream: #fff8e8;
+  --butter: #f6df8e;
+
+  --berry: #a64260;
+  --berry-light: #efd0da;
+
+  --plum: #72496f;
+  --plum-light: #e6d3e5;
+
+  --terracotta: #cc7556;
+  --terracotta-light: #f0c9b7;
+
+  --orange: #df8832;
+  --orange-light: #f8d8a3;
+
+  --sage: #9fb18f;
+  --sage-light: #dae5ce;
+
+  --mint: #badbc6;
+  --rose: #dfaab6;
+  --gold: #d6aa3f;
+
+  --ink: #283229;
+}
+
+/* REMOVE BLAND WHITE PAGE FEEL */
+body {
+  background: linear-gradient(135deg, #fff7e7 0%, #f9eee2 35%, #edf2df 70%, #f6e5e7 100%) !important;
+  color: var(--ink);
+}
+
+/* REMOVE ALL PHOTO-STYLE FOOD IMAGES FROM THE MAIN FOOD GRID */
+.food-card img, .food-item img, .remedy-card img, .food-feature img { filter: none !important; }
+
+/* ARTISTIC FOOD FEATURE */
+.art-food-section { position: relative; display: grid; grid-template-columns: 1fr 1fr; min-height: 720px; align-items: center; padding: 90px 7vw; overflow: hidden; }
+.art-food-section:nth-child(4n + 1) { background: linear-gradient(130deg, #f2d0d8, #fff4df 55%, #dfe9d3); }
+.art-food-section:nth-child(4n + 2) { background: linear-gradient(130deg, #f7dc96, #fff2d4 55%, #efbf91); }
+.art-food-section:nth-child(4n + 3) { background: linear-gradient(130deg, #c8dbb7, #edf3df 50%, #d9c6de); }
+.art-food-section:nth-child(4n) { background: linear-gradient(130deg, #eab79f, #fae3cb 50%, #e5c4d6); }
+.art-food-copy { position: relative; z-index: 3; max-width: 590px; }
+.art-food-number { display: block; margin-bottom: -30px; font-family: Georgia, serif; font-size: 135px; line-height: 1; color: rgba(35, 59, 43, .09); }
+.art-food-label { display: block; margin-bottom: 15px; font-size: 12px; font-weight: 800; letter-spacing: .22em; color: var(--forest); }
+.art-food-copy h2 { margin: 0; font-family: Georgia, serif; font-size: clamp(55px, 6.5vw, 95px); line-height: .92; font-weight: 500; letter-spacing: -.045em; color: var(--forest); }
+.art-food-copy h2 em { display: block; margin-top: 8px; color: var(--berry); font-weight: 400; }
+.art-food-copy p { margin-top: 25px; max-width: 570px; font-size: 17px; line-height: 1.85; color: #596057; }
+
+/* OIL PAINTING FRAME */
+.oil-art { position: relative; max-width: 600px; margin-left: auto; }
+.oil-art::before { position: absolute; top: -22px; left: -22px; width: 100%; height: 100%; border: 2px solid rgba(82, 103, 72, .22); content: ""; }
+.oil-art img { position: relative; z-index: 2; width: 100%; aspect-ratio: 4 / 5; object-fit: cover; box-shadow: 0 35px 80px rgba(70, 45, 35, .22); filter: none !important; }
+.paint-caption { position: absolute; z-index: 4; bottom: 25px; left: -30px; padding: 15px 20px; background: #fff9ea; box-shadow: 0 15px 35px rgba(40, 45, 36, .14); font-family: Georgia, serif; font-size: 19px; font-style: italic; color: var(--forest); }
+
+/* COLORFUL BENEFITS */
+.benefit-pills { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+.benefit-pills span { padding: 10px 14px; border: 1px solid rgba(35,59,43,.16); background: rgba(255,255,255,.58); font-size: 13px; font-weight: 700; color: var(--forest); }
+
+/* REMEDIES PAGE — NO MORE BEIGE DATABASE */
+.remedies-page { background: linear-gradient(145deg, #f6e9d2, #e7ead5 30%, #f1d9dc 60%, #f4dfbd); }
+.remedies-hero { position: relative; padding: 100px 8vw; overflow: hidden;
+  background: radial-gradient(circle at 10% 20%, rgba(166, 66, 96, .22), transparent 25%), radial-gradient(circle at 90% 70%, rgba(214, 170, 63, .28), transparent 28%), linear-gradient(130deg, #f8eadc, #e6eedb, #eed4dc); }
+.remedies-hero h1 { max-width: 850px; margin: 0; font-family: Georgia, serif; font-size: clamp(58px, 8vw, 110px); line-height: .9; color: var(--forest); }
+.remedies-hero h1 em { color: var(--berry); font-weight: 400; }
+
+/* REMEDY FILTER BUTTONS */
+.remedy-filters { display: flex; flex-wrap: wrap; gap: 10px; padding: 30px 7vw; background: rgba(255,255,255,.58); }
+.remedy-filters button { padding: 11px 18px; border: 1px solid rgba(35, 59, 43, .15); border-radius: 100px; background: #fff9ec; color: var(--forest); font-weight: 700; cursor: pointer; transition: .25s ease; }
+.remedy-filters button:nth-child(3n + 1):hover, .remedy-filters button.active { background: var(--forest); color: white; }
+.remedy-filters button:nth-child(3n + 2):hover { background: var(--berry); color: white; }
+.remedy-filters button:nth-child(3n):hover { background: var(--terracotta); color: white; }
+
+/* REMEDY GALLERY */
+.remedy-gallery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; padding: 70px 7vw 110px; }
+.remedy-art-card { display: grid; grid-template-columns: 210px 1fr; min-height: 290px; overflow: hidden; box-shadow: 0 18px 45px rgba(46, 45, 36, .10); transition: transform .3s ease, box-shadow .3s ease; }
+.remedy-art-card:hover { transform: translateY(-5px); box-shadow: 0 26px 60px rgba(46, 45, 36, .16); }
+.remedy-art-card:nth-child(8n + 1) { background: var(--sage-light); }
+.remedy-art-card:nth-child(8n + 2) { background: var(--orange-light); }
+.remedy-art-card:nth-child(8n + 3) { background: var(--berry-light); }
+.remedy-art-card:nth-child(8n + 4) { background: #f5df94; }
+.remedy-art-card:nth-child(8n + 5) { background: var(--plum-light); }
+.remedy-art-card:nth-child(8n + 6) { background: #cbe3d5; }
+.remedy-art-card:nth-child(8n + 7) { background: var(--terracotta-light); }
+.remedy-art-card:nth-child(8n) { background: #e7dbb8; }
+.remedy-art-card img { width: 100%; height: 100%; min-height: 290px; object-fit: cover; filter: none !important; }
+.remedy-art-copy { padding: 28px; }
+.remedy-art-copy small { font-size: 11px; font-weight: 800; letter-spacing: .17em; color: var(--forest); }
+.remedy-art-copy h3 { margin: 7px 0 10px; font-family: Georgia, serif; font-size: 38px; line-height: 1; color: var(--forest); }
+.remedy-art-copy p { color: #4d554e; line-height: 1.7; }
+
+/* COLORFUL SCRIPTURE */
+.art-scripture { position: relative; padding: 100px 30px; overflow: hidden; text-align: center; background: linear-gradient(135deg, #8d3d59, #714d71); color: white; }
+.art-scripture blockquote { max-width: 900px; margin: auto; font-family: Georgia, serif; font-size: clamp(32px, 5vw, 64px); font-style: italic; line-height: 1.15; }
+.art-scripture cite { display: block; margin-top: 22px; color: #f5dfaa; letter-spacing: .16em; font-size: 12px; }
+
+/* MOBILE */
+@media (max-width: 850px) {
+  .art-food-section { grid-template-columns: 1fr; gap: 50px; }
+  .oil-art { margin: 0; max-width: 100%; }
+  .remedy-gallery { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .art-food-section { padding: 65px 24px; }
+  .art-food-number { font-size: 82px; margin-bottom: -10px; }
+  .remedy-art-card { grid-template-columns: 1fr; }
+  .remedy-art-card img { min-height: 0; aspect-ratio: 16 / 10; }
+}
+
+/* ============================================================
+   ADDITIONS for parts of the existing pages
+============================================================ */
+/* serif headings in the site's Cormorant, Georgia as the fallback */
+.art-food-number, .art-food-copy h2, .paint-caption, .remedies-hero h1, .remedy-art-copy h3, .art-scripture blockquote, .food-swatch strong, .art-panel span { font-family: "Cormorant Garamond", Georgia, serif; }
+.remedies-hero h1 { font-weight: 600; letter-spacing: -.04em; }
+.remedies-hero .crumbs { margin-bottom: 22px; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: #6e7169; }
+.remedies-lead { max-width: 680px; margin-top: 24px; font-size: 18px; line-height: 1.8; color: #596057; }
+
+/* remedy cards are links; with no picture they are one column of words */
+a.remedy-art-card, a.remedy-card { color: inherit; text-decoration: none; }
+.remedy-art-card.no-art, .foods-art .remedy-card.no-art { grid-template-columns: 1fr; min-height: 0; }
+.remedy-art-card.no-art .remedy-art-copy { padding: 34px 36px 30px; }
+.remedy-art-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 14px 0 0; font-size: 14px; }
+.remedy-art-meta .icon { width: 15px; height: 15px; }
+.remedy-art-meta .evidence { background: rgba(255,255,255,.6); color: var(--forest); border-radius: 100px; padding: 2px 10px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+.foods-art .remedy-card.no-art { padding: 30px 32px; }
+.foods-art .remedy-card.no-art .remedy-copy h3 { font-size: 42px; }
+.remedy-cat-intro { padding: 50px 7vw 0; max-width: 900px; }
+.remedy-cat-intro h2 { margin: 0 0 10px; font-family: "Cormorant Garamond", Georgia, serif; font-size: clamp(40px, 5vw, 64px); color: var(--forest); }
+.remedy-cat-intro p { color: #596057; }
+.remedy-note-wrap { padding: 60px 7vw 90px; }
+
+/* a quiet color panel in place of a painting that hasn't been added yet */
+.art-panel { display: grid; place-items: center; aspect-ratio: 4 / 5; padding: 30px; text-align: center;
+  background: url("../images/olive-branch.svg") no-repeat center 78% / 42% auto, linear-gradient(140deg, var(--terracotta-light), #fae3cb 50%, var(--sage-light)); box-shadow: 0 30px 80px rgba(49, 48, 39, .14); }
+.art-panel span { font-size: clamp(40px, 5vw, 68px); font-style: italic; line-height: 1; color: var(--forest); }
+.gallery-card.large .art-panel { aspect-ratio: 16 / 9; }
+.gallery-card:nth-child(4n) .art-panel { background-color: transparent; background-image: url("../images/olive-branch.svg"), linear-gradient(140deg, #f7dc96, #fff2d4 55%, #efbf91); }
+
+/* the food guide: colored word cards instead of a photo grid */
+.swatch-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.food-swatch { display: flex; flex-direction: column; gap: 4px; min-height: 210px; padding: 24px 22px 22px; color: var(--forest); text-decoration: none; box-shadow: 0 12px 30px rgba(46, 45, 36, .08); transition: transform .3s ease, box-shadow .3s ease; }
+.food-swatch:hover { transform: translateY(-4px); box-shadow: 0 22px 46px rgba(46, 45, 36, .14); }
+.food-swatch:nth-child(8n + 1) { background: var(--sage-light); }
+.food-swatch:nth-child(8n + 2) { background: var(--orange-light); }
+.food-swatch:nth-child(8n + 3) { background: var(--berry-light); }
+.food-swatch:nth-child(8n + 4) { background: #f5df94; }
+.food-swatch:nth-child(8n + 5) { background: var(--plum-light); }
+.food-swatch:nth-child(8n + 6) { background: #cbe3d5; }
+.food-swatch:nth-child(8n + 7) { background: var(--terracotta-light); }
+.food-swatch:nth-child(8n) { background: #e7dbb8; }
+.food-swatch small { font-size: 10.5px; font-weight: 800; letter-spacing: .17em; text-transform: uppercase; }
+.food-swatch strong { margin-top: 6px; font-size: 32px; font-weight: 600; line-height: 1; letter-spacing: -.02em; }
+.food-swatch em { font-family: "Cormorant Garamond", Georgia, serif; font-size: 17px; color: #596057; }
+.food-swatch span { margin-top: auto; padding-top: 12px; font-size: 13.5px; line-height: 1.55; color: #4d554e; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+@media (max-width: 1000px) { .swatch-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .swatch-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } .food-swatch { min-height: 150px; padding: 18px 16px; } .food-swatch strong { font-size: 25px; } .food-swatch span { display: none; } }
+/* gallery: a full first row (8 + 4), then two halves */
+.foods-art .gallery-card:nth-child(3), .foods-art .gallery-card:nth-child(4) { grid-column: span 6; }
+.foods-art .gallery-card:nth-child(3) .gallery-image img, .foods-art .gallery-card:nth-child(4) .gallery-image img,
+.foods-art .gallery-card:nth-child(3) .art-panel, .foods-art .gallery-card:nth-child(4) .art-panel { aspect-ratio: 16 / 10; }
+@media (max-width: 650px) { .foods-art .gallery-card:nth-child(3), .foods-art .gallery-card:nth-child(4) { grid-column: 1 / -1; } }

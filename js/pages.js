@@ -1203,10 +1203,10 @@ function initFoods() {
     $("#food-cat-intro").textContent = c ? c.text : introText;
     $("#food-count").textContent = `${foods.length} foods · ${fruits.length} fruits`;
     $("#food-reset").hidden = !c && !q;
-    $("#food-grid").innerHTML = foods.map(foodCard).join("");
+    $("#food-grid").innerHTML = foods.map((f) => foodSwatch(f, "food")).join("");
     $("#food-empty").hidden = foods.length + fruits.length > 0;
     $("#food-fruits").innerHTML = fruits.length ? `<div class="fd-subhead"><h3>${c ? `Fruits for ${c.label.replace(/^Foods for /, "").toLowerCase()}` : q ? "Matching fruits" : "Fruits"}</h3></div>
-      <div class="editorial-grid">${fruits.map(fruitCard).join("")}</div>` : "";
+      <div class="swatch-grid">${fruits.map((f) => foodSwatch(f, "fruit")).join("")}</div>` : "";
   }
   const sync = () => history.replaceState(null, "", "foods.html" + (state.cat !== "all" ? `?cat=${state.cat}` : ""));
   const toList = () => $("#all-foods").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
@@ -1225,7 +1225,6 @@ function initFoods() {
 // added, the picture shows a real photograph of the same food instead.
 function paintFoodArt() {
   const art = typeof MY_ART !== "undefined" ? MY_ART : {};
-  const pending = [];
   document.querySelectorAll("img[data-art]").forEach((img) => {
     if (art[img.dataset.art]) { img.src = art[img.dataset.art]; return; }
     const fb = img.dataset.fallback || "";
@@ -1235,13 +1234,19 @@ function paintFoodArt() {
       img.sizes = "(max-width: 950px) 92vw, 46vw";
       img.dataset.credit = `Photo: ${SCENES[slot][2]} / Unsplash`;
       img.src = sceneUrl(slot, 1200);
-    } else if (fb) pending.push(img);
+      return;
+    }
+    // No painting yet and no fitting photograph: remedy cards simply show their words;
+    // other spots show a quiet color panel with the food's name.
+    const card = img.closest(".remedy-card");
+    if (card) { card.classList.add("no-art"); img.remove(); return; }
+    const panel = document.createElement("div");
+    panel.className = "art-panel";
+    panel.setAttribute("role", "img");
+    panel.setAttribute("aria-label", img.alt);
+    panel.innerHTML = `<span>${img.dataset.panel || img.alt}</span>`;
+    img.replaceWith(panel);
   });
-  if (!pending.length) return;
-  Photos.load(pending.map((img) => img.dataset.fallback)).then((map) => pending.forEach((img) => {
-    const p = map[img.dataset.fallback];
-    if (p) { img.referrerPolicy = "no-referrer"; img.src = p.src; }
-  }));
 }
 
 /* ---------------- Food & fruit pages (one shared layout) ---------------- */
@@ -1395,28 +1400,30 @@ function initFood() {
 /* ---------------- Natural remedies ---------------- */
 function initRemedies() {
   let cat = REMEDY_CATS[params.get("cat")] ? params.get("cat") : "all";
+  document.body.classList.add("remedies-page");
   $("#remedies-main").innerHTML = `
-    <section class="page-hero">
-      <div class="container">
-        <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span aria-current="page">Natural Remedies</span></nav>
-        <h1>Natural Remedies</h1>
-        <p class="lead">Simple home and food-based remedies for everyday wellness needs — with exact amounts, how often to use them, how strong the evidence is, and when to see a doctor instead.</p>
-      </div>
+    <section class="remedies-hero">
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span>/</span><span aria-current="page">Natural Remedies</span></nav>
+      <span class="art-food-label">THE NATURAL CABINET</span>
+      <h1>Natural <em>Remedies</em></h1>
+      <p class="remedies-lead">Simple home and food-based remedies for everyday wellness needs — with exact amounts, how often to use them, how strong the evidence is, and when to see a doctor instead.</p>
     </section>
-    <section class="section section-top-tight">
-      <div class="container">
-        <div class="chips" id="remedy-chips">${[["all", "All remedies"], ...Object.entries(REMEDY_CATS).map(([k, c]) => [k, c.label])].map(([k, l]) => `<button class="chip" data-cat="${k}">${l}</button>`).join("")}</div>
-        <div id="remedy-intro"></div>
-        <div class="recipe-grid" id="remedy-grid"></div>
-        <div class="notice note-card food-note">${icon("shield", "icon info-icon")}<p><strong>Home remedies are for mild, everyday symptoms.</strong> They may help you feel more comfortable, but they don't replace medical care. Each remedy lists warning signs that mean it's time to call a doctor — and in an emergency, call 911.</p></div>
-      </div>
+    <div class="remedy-filters" id="remedy-chips">${[["all", "All remedies"], ...Object.entries(REMEDY_CATS).map(([k, c]) => [k, c.label])].map(([k, l]) => `<button type="button" data-cat="${k}">${l}</button>`).join("")}</div>
+    <div id="remedy-intro"></div>
+    <section class="remedy-gallery" id="remedy-grid"></section>
+    <section class="art-scripture">
+      <blockquote>“Do not be wise in your own eyes; fear the LORD and turn away from evil. It will be healing to your body and refreshment to your bones.”</blockquote>
+      <cite>PROVERBS 3:7–8 · NASB 1995</cite>
+    </section>
+    <section class="remedy-note-wrap">
+      <div class="notice note-card food-note">${icon("shield", "icon info-icon")}<p><strong>Home remedies are for mild, everyday symptoms.</strong> They may help you feel more comfortable, but they don't replace medical care. Each remedy lists warning signs that mean it's time to call a doctor — and in an emergency, call 911.</p></div>
     </section>`;
   const draw = () => {
-    $("#remedy-chips").querySelectorAll(".chip").forEach((b) => b.classList.toggle("active", b.dataset.cat === cat));
+    $("#remedy-chips").querySelectorAll("[data-cat]").forEach((b) => b.classList.toggle("active", b.dataset.cat === cat));
     const c = REMEDY_CATS[cat];
     const guide = c && TOPIC_GUIDES.find((g) => g.id === c.guide);
-    $("#remedy-intro").innerHTML = c ? `<div class="section-head"><div><p class="eyebrow">Natural remedies</p><h2>${c.label}</h2><p class="muted">${c.text}</p></div>${guide ? `<a class="text-link" href="${guideUrl(guide.id)}">${guide.short} guide ${icon("arrow")}</a>` : ""}</div>` : "";
-    $("#remedy-grid").innerHTML = REMEDIES.filter((r) => cat === "all" || r.cat === cat).map(remedyCard).join("");
+    $("#remedy-intro").innerHTML = c ? `<div class="remedy-cat-intro"><span class="art-food-label">NATURAL REMEDIES</span><h2>${c.label}</h2><p>${c.text}</p>${guide ? `<a class="text-link" href="${guideUrl(guide.id)}">${guide.short} guide ${icon("arrow")}</a>` : ""}</div>` : "";
+    $("#remedy-grid").innerHTML = REMEDIES.filter((r) => cat === "all" || r.cat === cat).map(remedyArtCard).join("");
   };
   $("#remedy-chips").addEventListener("click", (e) => {
     const b = e.target.closest("[data-cat]"); if (!b) return;
@@ -1425,6 +1432,29 @@ function initRemedies() {
     draw();
   });
   draw();
+}
+
+// A remedy as a colored card: words only, no picture (colors come from the card's position).
+function remedyArtCard(r) {
+  const [ev] = r.evidence;
+  return `<a class="remedy-art-card no-art" href="${remedyUrl(r.id)}">
+    <div class="remedy-art-copy">
+      <small>${REMEDY_CATS[r.cat].label.toUpperCase()}</small>
+      <h3>${r.name}</h3>
+      <p>${r.intro.split(/(?<=\.)\s/)[0]}</p>
+      <p class="remedy-art-meta">${icon("clock")} ${r.time} · <span class="evidence ev-${ev}">${EVIDENCE[ev].label}</span></p>
+    </div>
+  </a>`;
+}
+
+// A food or fruit as a colored card for the Foods page guide: words only, no photograph.
+function foodSwatch(item, kind) {
+  const isFruit = kind === "fruit";
+  const href = isFruit ? fruitUrl(item.id) : foodUrl(item.id);
+  const label = isFruit ? (CATEGORIES[item.cats[0]] || "Fruit") : foodCat(item.cats[0]).label;
+  const sub = isFruit ? item.latin : FOOD_GROUPS[item.group];
+  const text = (isFruit ? item.summary : item.what).split(/(?<=\.)\s/)[0];
+  return `<a class="food-swatch" href="${href}"><small>${label}</small><strong>${item.name}</strong><em>${sub}</em><span>${text}</span></a>`;
 }
 
 function initRemedy() {
