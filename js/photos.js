@@ -127,8 +127,14 @@ const Photos = (() => {
         img.loading = "lazy";
         img.referrerPolicy = "no-referrer";
         img.onload = () => { el.dataset.state = "photo"; };
-        img.onerror = () => { img.remove(); el.dataset.state = "none"; };
-        img.src = el.classList.contains("pf-large") ? sized(p.src, 1200) : p.src;
+        // Large pictures ask Wikimedia for a bigger standard size; if that size isn't available
+        // (the original is smaller, or the size isn't offered), fall back to the size the lookup returned.
+        const big = el.classList.contains("pf-large") && !p.credit ? sized(p.src, 1280) : p.src;
+        img.onerror = () => {
+          if (img.src !== p.src && big !== p.src) { img.src = p.src; return; }
+          img.remove(); el.dataset.state = "none";
+        };
+        img.src = big;
         el.appendChild(img);
       });
     });
