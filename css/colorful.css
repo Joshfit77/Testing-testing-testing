@@ -218,3 +218,13 @@ a.remedy-art-card, a.remedy-card { color: inherit; text-decoration: none; }
 .gilt:empty { aspect-ratio: 4 / 3; background: linear-gradient(135deg, #8a6420, #f3dc8e 30%, #b88a2c 60%, #e9c96f); padding: 16px; background-clip: border-box; }
 .gilt-hero:empty { aspect-ratio: 5 / 4; }
 .gilt-small:empty { aspect-ratio: 4 / 5; }
+
+/* food guide cards: each food as a small framed oil painting */
+.swatch-art { display: block; position: relative; aspect-ratio: 4 / 3; margin: -8px -6px 18px; overflow: hidden;
+  border: 7px solid transparent; border-image: linear-gradient(135deg, #8a6420, #f3dc8e 22%, #b88a2c 45%, #f7e3a1 62%, #9c7224 82%, #e9c96f) 1;
+  background: linear-gradient(140deg, #3a2f22, #241d15); box-shadow: inset 0 0 0 2px #3a2e1c, 0 10px 22px rgba(40, 30, 15, .22); }
+.swatch-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; animation: gilt-in .8s ease both; }
+.swatch-art::after { position: absolute; inset: 0; content: ""; pointer-events: none; box-shadow: inset 0 0 0 2px #3a2e1c, inset 0 0 0 3px rgba(201, 164, 86, .7), inset 0 0 18px rgba(0, 0, 0, .45); }
+.swatch-art[data-state="none"] { display: none; }
+.food-swatch:hover .swatch-art { box-shadow: inset 0 0 0 2px #3a2e1c, 0 16px 30px rgba(40, 30, 15, .3); }
+@media (max-width: 700px) { .food-swatch .swatch-art { display: block; margin: -4px -4px 12px; border-width: 5px; } .food-swatch .swatch-art[data-state="none"] { display: none; } }

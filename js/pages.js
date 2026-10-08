@@ -1207,6 +1207,7 @@ function initFoods() {
     $("#food-empty").hidden = foods.length + fruits.length > 0;
     $("#food-fruits").innerHTML = fruits.length ? `<div class="fd-subhead"><h3>${c ? `Fruits for ${c.label.replace(/^Foods for /, "").toLowerCase()}` : q ? "Matching fruits" : "Fruits"}</h3></div>
       <div class="swatch-grid">${fruits.map((f) => foodSwatch(f, "fruit")).join("")}</div>` : "";
+    paintSwatches();
   }
   const sync = () => history.replaceState(null, "", "foods.html" + (state.cat !== "all" ? `?cat=${state.cat}` : ""));
   const toList = () => $("#all-foods").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
@@ -1229,7 +1230,6 @@ const PAINTINGS = {
   "oil-food-abundance": ["Jan van Huysum - Fruit Piece - Google Art Project.jpg", "Jan van Huysum fruit piece", "Fruit Piece", "Jan van Huysum", "1722"],
   "oil-berries": ["Jan Davidsz. de Heem - Still-Life with Flowers and Fruit - WGA11281.jpg", "de Heem still life flowers fruit", "Still Life with Flowers and Fruit", "Jan Davidsz. de Heem", "17th c."],
   "oil-citrus": ["Luis Egidio Meléndez - Still-Life with Oranges and Walnuts, 1772.jpg", "Meléndez oranges walnuts", "Still Life with Oranges and Walnuts", "Luis Meléndez", "1772"],
-  "oil-greens": ["Frans Snyders - Still Life with Dead Game, Fruits and Vegetables in a Market.jpg", "Snyders fruits vegetables market still life", "Fruits and Vegetables in a Market", "Frans Snyders", "1614"],
   "oil-roots": ["James Peale - Still Life with Vegetables - Google Art Project.jpg", "James Peale still life vegetables", "Still Life with Vegetables", "James Peale", "c. 1826"],
   "oil-avocado-olive": ["Jean Siméon Chardin - Still-Life with Jar of Olives - WGA04777.jpg", "Chardin jar of olives", "Still Life with Jar of Olives", "Jean-Siméon Chardin", "1760"],
   "oil-herbs": ["Rachel Ruysch - Still Life with Fruit, a Bird's Nest and Insects NTII DMS 814164.jpg", "Rachel Ruysch still life fruit", "Fruit, a Bird's Nest and Insects", "Rachel Ruysch", "c. 1710"],
@@ -1245,6 +1245,10 @@ const PAINTINGS = {
   "oil-cinnamon": ["Paul Cézanne, Still Life With Apples, c. 1890.jpg", "Cézanne still life apples", "Still Life with Apples", "Paul Cézanne", "c. 1890"],
   "oil-rosemary": ["Luis Meléndez - Still Life with Fruit and Jug - Google Art Project.jpg", "Meléndez still life fruit jug", "Still Life with Fruit and Jug", "Luis Meléndez", "1760s"],
   "oil-thyme": ["Adriaen Coorte - Still Life with Wild Strawberries - 1106 - Mauritshuis.jpg", "Adriaen Coorte wild strawberries", "Still Life with Wild Strawberries", "Adriaen Coorte", "1705"],
+};
+// Frames painted in the browser (js/oilpaint.js) from a photograph of the food itself.
+const PAINTED_FRAMES = {
+  "oil-greens": { photos: ["food:spinach", "food:kale"], placard: ["Leafy Greens", "Oil study, Beauty & Praise"] },
 };
 const COMMONS_API = "https://commons.wikimedia.org/w/api.php?format=json&origin=*&action=query&prop=imageinfo&iiprop=url&iiurlwidth=1000";
 
@@ -1296,6 +1300,13 @@ function paintFoodArt() {
   frames.forEach((fig) => {
     const key = fig.dataset.art;
     const museum = () => {
+      const painted = PAINTED_FRAMES[key];
+      if (painted) {
+        return Photos.load(painted.photos)
+          .then((map) => { const p = painted.photos.map((k) => map[k]).find(Boolean); if (!p) throw 0; const big = p.src.replace(/\/(\d+)px-/, "/1280px-"); return OilPaint.paint(big, 1000, 750).catch(() => OilPaint.paint(p.src, 1000, 750)); })
+          .then((url) => load(url, (img) => hang(fig, img, painted.placard), () => emptyFrame(fig)))
+          .catch(() => emptyFrame(fig));
+      }
       if (!PAINTINGS[key]) return emptyFrame(fig);
       lookup.then((get) => get(key)).then((url) => url ? load(url, (img) => hang(fig, img, PAINTINGS[key].slice(2)), () => emptyFrame(fig)) : emptyFrame(fig));
     };
@@ -1502,13 +1513,31 @@ function remedyArtCard(r) {
 }
 
 // A food or fruit as a colored card for the Foods page guide: words only, no photograph.
+// Each card in the food guide shows its own food as an oil painting (js/oilpaint.js), painted
+// from the food's photograph as the card scrolls into view. No photo, no painting: the card keeps its color.
+let swatchWatch;
+function paintSwatches() {
+  if (typeof OilPaint === "undefined") return;
+  const paintOne = (el) => {
+    el.dataset.state = "loading";
+    Photos.load([el.dataset.paint])
+      .then((map) => { const p = map[el.dataset.paint]; if (!p) throw 0; return OilPaint.paint(p.src, 480, 360); })
+      .then((url) => { el.innerHTML = `<img src="${url}" alt="">`; el.dataset.state = "painted"; })
+      .catch(() => { el.dataset.state = "none"; });
+  };
+  swatchWatch = swatchWatch || ("IntersectionObserver" in window
+    ? new IntersectionObserver((list) => list.forEach((e) => { if (e.isIntersecting) { swatchWatch.unobserve(e.target); paintOne(e.target); } }), { rootMargin: "300px 0px" })
+    : null);
+  document.querySelectorAll(".swatch-art[data-paint]:not([data-state])").forEach((el) => (swatchWatch ? swatchWatch.observe(el) : paintOne(el)));
+}
+
 function foodSwatch(item, kind) {
   const isFruit = kind === "fruit";
   const href = isFruit ? fruitUrl(item.id) : foodUrl(item.id);
   const label = isFruit ? (CATEGORIES[item.cats[0]] || "Fruit") : foodCat(item.cats[0]).label;
   const sub = isFruit ? item.latin : FOOD_GROUPS[item.group];
   const text = (isFruit ? item.summary : item.what).split(/(?<=\.)\s/)[0];
-  return `<a class="food-swatch" href="${href}"><small>${label}</small><strong>${item.name}</strong><em>${sub}</em><span>${text}</span></a>`;
+  return `<a class="food-swatch" href="${href}"><span class="swatch-art" data-paint="${kind}:${item.id}" aria-hidden="true"></span><small>${label}</small><strong>${item.name}</strong><em>${sub}</em><span>${text}</span></a>`;
 }
 
 function initRemedy() {
