@@ -101,7 +101,7 @@ def chicken_breast():
     for i, (x, y, a) in enumerate([(120, 520, -0.25), (150, 570, 0.05)]):
         sprig(sc, x, y, 200, a, needle=14, seed=60 + i, count=26)
     roast_chicken(sc, 440, 500, 230, seed=1)
-    citrus_half(sc, 820, 360, 70, seed=3)
+    citrus_half(sc, 860, 440, 64, seed=3)
     citrus_half(sc, 260, 660, 56, seed=4)
     for k, (x, y) in enumerate([(700, 650), (760, 670)]):
         sphere_fruit(sc, x, y, 30, (200, 36, 30), ks=0.8, seed=k, stem=False, dimple=False)
@@ -495,7 +495,7 @@ def olive_oil():
     bottle(sc, 400, 120, 210, 500, liquid=(190, 170, 40), level=0.62)
     bowl_of(sc, 680, 560, 150, 100, lambda sc, cx, cy, rw, rh: heap(sc, cx, cy, rw, rh, 22,
             lambda sc, x, y, i, g: small_round(sc, x, y, 24, (110, 120, 40) if i % 3 else (60, 40, 50), ks=0.8, squash=0.75, angle=g.random() * 3, seed=i), seed=3), color=(200, 184, 150))
-    branch_leaves(sc, [(620, 380), (760, 360), (930, 410)], 90, 12, (110, 130, 96), seed=7, every=0.1)
+    branch_leaves(sc, [(560, 660), (720, 690), (900, 700)], 90, 12, (110, 130, 96), seed=7, every=0.12)
     return done(sc)
 
 

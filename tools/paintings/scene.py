@@ -141,14 +141,34 @@ class Scene:
             sh = sh * clip[sl]
         self.img[sl] *= (1 - strength * np.clip(sh, 0, 1))[..., None]
 
-    def contact(self, mask, size=None):
-        """A cast shadow down-right of the object plus a tight dark contact line."""
+    def contact(self, mask, size=None, strength=1.0):
+        """Ground an object: a shadow cast flat along the tabletop away from the light, a soft pool
+        of shade beneath it, and a dark crease exactly where it touches the surface."""
         ys, xs = np.nonzero(mask > 0.5)
         if not len(ys):
             return
-        R = max(np.ptp(ys), np.ptp(xs)) / 2 if size is None else size
-        self.shadow(mask, R * 0.32, R * 0.16, R * 0.28, 0.5)
-        self.shadow(mask, R * 0.06, R * 0.05, R * 0.06, 0.55)
+        top, bottom, left, right = ys.min(), ys.max(), xs.min(), xs.max()
+        hh, ww = max(4, bottom - top), max(4, right - left)
+        squash, lean = 0.3, 0.75
+        y0, y1 = max(0, int(top - hh * 0.3)), min(self.h, int(bottom + hh * 0.2 + 10))
+        x0, x1 = max(0, int(left - ww * 0.2 - 10)), min(self.w, int(right + hh * 0.9 + ww * 0.2 + 10))
+        sl = (slice(y0, y1), slice(x0, x1))
+        yy, xx = self.yy[sl], self.xx[sl]
+        # cast shadow: the silhouette laid down on the table, leaning right and back
+        height = (bottom - yy) / squash
+        ys_src = bottom - height
+        xs_src = xx - lean * np.clip(height, 0, None) * squash * 1.4
+        cast = ndi.map_coordinates(mask, [ys_src, xs_src], order=1, mode="constant") * (yy <= bottom + 2)
+        cast = ndi.gaussian_filter(cast, max(1.5, hh * 0.05))
+        # pool of shade under the object
+        cx = (left + right) / 2
+        pool = np.exp(-(((xx - cx - ww * 0.06) / (ww * 0.55)) ** 2 + ((yy - bottom + hh * 0.02) / max(3, hh * 0.08)) ** 2))
+        # dark crease right at the base
+        crease = ndi.gaussian_filter(ndi.shift(mask[sl], (max(2, hh * 0.025), 0), order=1), max(1, hh * 0.02))
+        floor = (yy >= getattr(self, "horizon", 0) - 2).astype(np.float32)
+        shade = np.clip(0.5 * cast * floor + 0.4 * pool + 0.6 * crease, 0, 0.88) * strength
+        shade *= (1 - mask[sl] * 0.9)
+        self.img[sl] *= (1 - shade)[..., None]
 
     def shade(self, mask, color, h=None, R=None, amb=0.42, kd=0.75, ks=0.35, shin=28, bump=None,
               strength=1.0, rim=0.12, flat=0.0, ao=0.35, clip=None, spec_color=None, translucency=0.0):

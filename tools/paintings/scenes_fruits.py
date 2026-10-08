@@ -209,9 +209,10 @@ def grape_bunch(sc, cx, cy, w, h, color, seed, r=30):
 
 def grape():
     sc = stage(61, CLOTH_L, horizon=0.38)
-    leaf(sc, 600, 260, 260, 150, 0.9, (70, 106, 44), curl=0.2, seed=2)
-    grape_bunch(sc, 430, 330, 300, 340, (80, 40, 90), 1)
-    grape_bunch(sc, 700, 400, 240, 280, (170, 190, 80), 2, r=28)
+    plate(sc, 520, 600, 400, color=(222, 214, 196), rimcol=(80, 100, 130))
+    leaf(sc, 300, 560, 220, 120, -0.3, (70, 106, 44), curl=0.2, seed=2)
+    grape_bunch(sc, 420, 400, 280, 240, (80, 40, 90), 1)
+    grape_bunch(sc, 650, 430, 230, 210, (170, 190, 80), 2, r=27)
     return done(sc)
 
 
@@ -322,7 +323,7 @@ def peach():
         pit = sc.ellipse(cx, cy, 34, 44)
         sc.over(rgb(170, 70, 40) * (0.8 + 0.3 * noise(sc.h, sc.w, 1.5, seed=3))[..., None], pit)
     cut_disc(sc, 740, 580, 100, 100, 0, (220, 110, 70), 5, (250, 190, 90), seed=3, center=lambda sc, inner: center(sc, inner, 740, 580))
-    leaf(sc, 400, 360, 150, 46, -0.6, (70, 110, 46), seed=4)
+    leaf(sc, 600, 640, 150, 46, 0.3, (70, 110, 46), seed=4)
     return done(sc)
 
 
@@ -331,7 +332,7 @@ def pear_shape(sc, cx, cy, r, color, seed, angle=0.0, hue=None):
     col = mottled(sc, rgb(*color), 0.14, 12, seed, hue=None if hue is None else rgb(*hue))
     col = speckle(sc, None, col, rgb(*(np.array(color) * 0.6)), 0.0015, 0.8, seed)
     body(sc, pts, col, ks=0.35, shin=24, seed=seed)
-    st = sc.stroke_mask([(cx + np.sin(angle) * r * 1.4, cy - r * 1.4), (cx + 14 + np.sin(angle) * r * 1.6, cy - r * 1.85)], 7)
+    st = sc.stroke_mask([(cx + np.sin(angle) * r * 0.9, cy - r * 0.86), (cx + 6 + np.sin(angle) * r * 1.1, cy - r * 1.15), (cx + 16 + np.sin(angle) * r * 1.2, cy - r * 1.3)], 7)
     sc.over(solid(sc, (90, 70, 40)), st)
 
 
@@ -425,7 +426,7 @@ def olive():
         c = (100, 120, 40) if g.random() > 0.4 else (50, 34, 46)
         small_round(sc, x, y, 30, c, ks=0.9, shin=60, squash=0.75, angle=g.random() * 3, seed=i)
     bowl_of(sc, 520, 450, 250, 160, lambda sc, cx, cy, rw, rh: heap(sc, cx, cy, rw, rh, 40, o, seed=2), color=(216, 200, 160), band=(60, 90, 130))
-    branch_leaves(sc, [(560, 260), (700, 300), (900, 360)], 110, 14, (110, 130, 96), seed=7, every=0.08)
+    branch_leaves(sc, [(640, 560), (760, 600), (920, 640)], 100, 14, (110, 130, 96), seed=7, every=0.1)
     for k in range(4):
         o(sc, 760 + k * 40, 660 + (k % 2) * 20, 90 + k, G(k))
     return done(sc)

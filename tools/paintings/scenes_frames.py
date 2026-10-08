@@ -7,8 +7,7 @@ def abundance():
     sc = stage(101, [(0, 520), (620, 480), (720, 750), (0, 750)], horizon=0.42)
     jug(sc, 760, 200, 190, 250, color=(200, 180, 140), band=(80, 100, 130))
     daisy_bunch(sc, 760, 180, 150, 9, seed=3)
-    leaf(sc, 650, 190, 150, 50, -2.4, (70, 110, 50), seed=5)
-    grape_bunch(sc, 300, 300, 230, 260, (90, 40, 90), 1, r=26)
+    grape_bunch(sc, 250, 400, 210, 190, (90, 40, 90), 1, r=25)
     bowl_of(sc, 470, 420, 230, 150, lambda sc, cx, cy, rw, rh: fruit_group(sc, [
         (cx - 110, cy - 20, 78, (180, 30, 30), dict(hue=(220, 170, 60), seed=1, scale=12)),
         (cx + 10, cy - 50, 80, (230, 140, 30), dict(seed=2, scale=8)),
@@ -106,7 +105,7 @@ def fats():
             lambda sc, x, y, i, g: small_round(sc, x, y, 22, (110, 120, 40) if i % 3 else (60, 40, 50), ks=0.8, squash=0.75, angle=g.random() * 3, seed=i), seed=3), color=(200, 184, 150))
     spill(sc, 400, 670, 120, 40, 7, lambda sc, x, y, i, g: walnut(sc, x, y, 30, g.random() * 3, i), 5)
     spill(sc, 820, 680, 90, 30, 8, lambda sc, x, y, i, g: almond(sc, x, y, 20, g.random() * 3, i), 6)
-    branch_leaves(sc, [(470, 330), (600, 300), (720, 330)], 80, 11, (110, 130, 96), seed=7, every=0.1)
+    branch_leaves(sc, [(420, 690), (560, 700), (690, 690)], 80, 11, (110, 130, 96), seed=7, every=0.12)
     return done(sc)
 
 
@@ -134,7 +133,7 @@ def pomegranates():
     for (x, y, r, sd) in [(780, 560, 120, 3), (440, 640, 90, 4)]:
         cut_disc(sc, x, y, r, r, 0, (160, 30, 40), 6, (236, 210, 170), seed=sd, center=lambda sc, inner, x=x, y=y, r=r: arils(sc, inner, x, y, r))
     spill(sc, 200, 660, 120, 40, 18, lambda sc, x, y, i, g: small_round(sc, x, y, 9, (190, 20, 40), ks=1.0, shin=70, seed=i), 8)
-    leaf(sc, 860, 360, 150, 50, -0.5, (70, 110, 50), seed=11)
+    leaf(sc, 900, 690, 150, 50, -2.8, (70, 110, 50), seed=11)
     return done(sc)
 
 
@@ -202,8 +201,9 @@ def turmeric():
 def elderberry():
     sc = stage(115, CLOTH_L, horizon=0.42)
     bottle(sc, 300, 170, 170, 400, liquid=(70, 16, 40), level=0.7)
-    elderberry_cluster(sc, 600, 330, 180, 200, seed=1)
-    elderberry_cluster(sc, 800, 420, 140, 160, seed=2)
+    plate(sc, 680, 600, 260, color=(222, 214, 196), rimcol=(90, 70, 110))
+    elderberry_cluster(sc, 620, 470, 150, 110, seed=1)
+    elderberry_cluster(sc, 770, 500, 120, 90, seed=2)
     for k in range(4):
         leaf(sc, 640 + k * 60, 640, 130, 40, -2.6 + k * 0.4, (70, 110, 50), seed=k)
     return done(sc)

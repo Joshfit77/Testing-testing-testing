@@ -263,3 +263,14 @@ a.remedy-art-card, a.remedy-card { color: inherit; text-decoration: none; }
   .remedies-page .remedy-filters { justify-content: flex-start; }
 }
 .foods-art .gilt-hero .placard { display: none; }
+
+/* paintings hang flat on the wall and cards sit on the page: short, close shadows only */
+.gilt-canvas { box-shadow: 0 0 0 1px #5d4314, 0 3px 6px rgba(40, 30, 15, .28), 0 10px 22px rgba(40, 30, 15, .16); }
+.foods-art .gallery-card:hover .gilt-canvas, .rm-card .gilt-canvas, .rm-card:hover .gilt-canvas { box-shadow: 0 0 0 1px #5d4314, 0 3px 6px rgba(0, 0, 0, .35), 0 12px 26px rgba(0, 0, 0, .25); }
+.foods-art .food-art .gilt, .foods-art .food-feature.reverse .food-art .gilt, .rm-hero-main, .remedy-hero-art .gilt { transform: none; }
+.swatch-art { box-shadow: inset 0 0 0 2px #3a2e1c, 0 2px 5px rgba(40, 30, 15, .25); }
+.food-swatch, .food-swatch:hover { box-shadow: 0 1px 2px rgba(46, 45, 36, .08); transform: none; }
+.food-swatch:hover .swatch-art { box-shadow: inset 0 0 0 2px #3a2e1c, 0 3px 8px rgba(40, 30, 15, .3); }
+.rm-card:hover { transform: none; }
+.rm-label { margin-top: 0; width: 100%; box-shadow: none; border-top: 3px solid #c9a456; }
+.foods-art .remedy-card, .foods-art .remedy-card:hover { transform: none; box-shadow: 0 1px 3px rgba(0, 0, 0, .12); }
