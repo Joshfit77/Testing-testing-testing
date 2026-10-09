@@ -144,3 +144,12 @@
 .fp-col-berry { --c: #8e2f55; } .fp-col-citrus { --c: #e8a33a; } .fp-col-green { --c: #4f7a3f; } .fp-col-root { --c: #d06a2c; }
 .fp-col-olive { --c: #7c8a3a; } .fp-col-herb { --c: #5f8f6a; } .fp-col-pom { --c: #b8323f; } .fp-col-honey { --c: #d9a23a; }
 @media (max-width: 560px) { .fp-col { padding: 22px 16px 18px; } .fp-swatch { width: 34px; height: 34px; margin-bottom: 12px; } }
+
+/* collections with a photograph across the top of each tile */
+.fp-col { padding: 0; }
+.fp-col::before { display: none; }
+.fp-col .fp-col-photo .gilt-canvas { aspect-ratio: 4 / 3; border-radius: 0; }
+.fp-col-body { position: relative; display: flex; flex: 1; flex-direction: column; padding: 20px 22px 22px; border-top: 4px solid var(--c); }
+.fp-col h3 { margin: 0 0 6px !important; }
+.fp-col .fp-links { padding-top: 14px; }
+@media (max-width: 560px) { .fp-col-body { padding: 14px 14px 16px; } }
