@@ -9,68 +9,22 @@
 // Or add it to PHOTO_OVERRIDES below by hand to choose your own credit line, e.g.
 //   chamomile: { src: "images/chamomile.jpg", credit: "Photo by Jane Doe" }
 
-// Stock photographs for every food and fruit, from Unsplash (free to use under the Unsplash License).
-// Each is linked by its Unsplash photo ID; if one ever fails to load, the site's own oil painting
-// of that food (images/paintings/) shows instead. Your own photo in images/foods/ or images/fruits/ wins over both.
-const STOCK_PHOTOS = {
-  "food:eggs": "jZBUNwNqH7U",
-  "food:greek-yogurt": "9Uphjae3YnU",
-  "food:salmon": "BzPldTqssWU",
-  "food:sardines": "N8-bMqUMS8g",
-  "food:chicken-breast": "4qJlXK4mYzU",
-  "food:lean-beef": "mlUa_2dp3z8",
-  "food:tofu": "ee8N1SNfBc0",
-  "food:chickpeas": "5352eOUYay4",
-  "food:black-beans": "1YsJ-d45ud0",
-  "food:kefir": "e0cEh3LURnI",
-  "food:oats": "W9OKrxBqiZA",
-  "food:spinach": "Y2xyssByhdc",
-  "food:broccoli": "fccAsIqdpeM",
-  "food:sweet-potato": "AJdFf7JJs_A",
-  "food:carrots": "0_90J7szLxI",
-  "food:almonds": "pnSWzbL_S40",
-  "food:walnuts": "-apPxtu6N2s",
-  "food:pumpkin-seeds": "v_N35OYZfoI",
-  "food:olive-oil": "c_xqdv4QIcU",
-  "food:honey": "RQHzRELE2Ss",
-  "food:dark-chocolate": "-JeZAUkvhYU",
-  "food:bone-broth": "xqiTvFFee6Y",
-  "fruit:apple": "hRbt11o8cEU",
-  "fruit:avocado": "VKSZ-IwsHFU",
-  "fruit:banana": "BXPGt8_E2uI",
-  "fruit:blackberry": "LXYMLvWw8wU",
-  "fruit:blueberry": "0uns8eQn_g8",
-  "fruit:cherry": "SO11-kYeaQQ",
-  "fruit:tart-cherry": "AtIg8HRSerg",
-  "fruit:coconut": "IMXk_P4oh8Q",
-  "fruit:date": "Ae6qKztd0Xw",
-  "fruit:fig": "n683IXChLM0",
-  "fruit:grape": "ParEKRxfI9I",
-  "fruit:grapefruit": "64tMvtVomjw",
-  "fruit:kiwi": "p5Ljx_H2F8o",
-  "fruit:lemon": "JPISiZVFEcw",
-  "fruit:lime": "LXwE4AE9Fws",
-  "fruit:mango": "yOqstdu16tc",
-  "fruit:orange": "hWQoKSYtolM",
-  "fruit:papaya": "bFBjeuHxGjU",
-  "fruit:peach": "9Hj_9qDLYVw",
-  "fruit:pear": "OWGdchQiEMA",
-  "fruit:pineapple": "SpP3InZud7E",
-  "fruit:pomegranate": "NZQBS00c8pA",
-  "fruit:raspberry": "iQGnrLu6eXE",
-  "fruit:strawberry": "vaMwTXEz79U",
-  "fruit:watermelon": "mORp4jw1uQ8",
-  "fruit:olive": "IUe72LHZDgk",
-  "fruit:tomato": "eb26eV-ys_k",
-  "fruit:cucumber": "PBt7ok7ygt0",
-  "fruit:pumpkin": "nn0whk6nzv4",
-};
+// Stock photographs for the foods, fruits and remedies: free-licensed images on Wikimedia Commons
+// (many are Unsplash and Pexels photographs). Each is the Commons file name; if one ever fails to load,
+// the site's own oil painting shows instead. Your own photo in images/foods/ or images/fruits/ wins over both.
+const STOCK_PHOTOS = {};
+const commonsUrl = (file, width = 1000) => `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(file.replace(/ /g, "_"))}?width=${width}`;
 const stockPhoto = (key) => {
-  const id = STOCK_PHOTOS[key];
-  if (!id) return null;
+  const file = STOCK_PHOTOS[key];
+  if (!file) return null;
   const [kind, name] = key.split(":");
-  return { src: `https://unsplash.com/photos/${id}/download?w=1200`, credit: "Photo: Unsplash", link: `https://unsplash.com/photos/${id}`, fallback: `images/paintings/${kind}s/${name}.jpg` };
+  return { src: commonsUrl(file), small: commonsUrl(file, 640), credit: "Photo: Wikimedia Commons", fallback: kind === "remedy" ? remedyPainting(name) : `images/paintings/${kind}s/${name}.jpg` };
 };
+const remedyPainting = (id) => ({
+  "peppermint-tea-bloating": "images/oil-peppermint.jpg", "ginger-tea-nausea": "images/oil-ginger.jpg",
+  "chamomile-bedtime-tea": "images/oil-chamomile.jpg", "honey-lemon-warm-water": "images/oil-honey-lemon.jpg",
+  "tart-cherry-juice": "images/paintings/fruits/tart-cherry.jpg", "oatmeal-soak": "images/paintings/foods/oats.jpg",
+})[id] || `images/remedies/${id}.jpg`;
 const paintingOf = (kind, id) => ({ src: `images/paintings/${kind}s/${id}.jpg`, credit: "Image: Beauty & Praise" });
 const PHOTO_OVERRIDES = Object.assign({},
   Object.fromEntries([...(typeof FOODS !== "undefined" ? FOODS : []).map((f) => [`food:${f.id}`, paintingOf("food", f.id)]),

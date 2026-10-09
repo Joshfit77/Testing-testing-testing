@@ -1233,8 +1233,8 @@ const ART_TITLES = {
 const artSrc = (key) => (typeof MY_ART !== "undefined" && MY_ART[key]) || `images/${key}.jpg`;
 
 // A painting in a gilded frame; `plaque` adds the small brass title plate underneath.
-function giltFrame(src, alt, { plaque = "", cls = "", lazy = true } = {}) {
-  return `<figure class="gilt ${cls}"><div class="gilt-canvas"><img src="${src}" alt="${alt}"${lazy ? ' loading="lazy"' : ""} decoding="async"></div>${plaque ? `<figcaption class="placard"><em>${plaque}</em></figcaption>` : ""}</figure>`;
+function giltFrame(src, alt, { plaque = "", cls = "", lazy = true, fallback = "" } = {}) {
+  return `<figure class="gilt ${cls}"><div class="gilt-canvas"><img src="${src}" alt="${alt}"${lazy ? ' loading="lazy"' : ""} decoding="async"${fallback && fallback !== src ? ` onerror="this.onerror=null;this.src='${fallback}'"` : ""}></div>${plaque ? `<figcaption class="placard"><em>${plaque}</em></figcaption>` : ""}</figure>`;
 }
 
 function paintFoodArt() {
@@ -1245,13 +1245,9 @@ function paintFoodArt() {
   });
 }
 
-// Each remedy's oil painting (images/remedies/<id>.jpg); a few share a painting from the Foods page.
-const REMEDY_ART_SHARED = {
-  "peppermint-tea-bloating": "images/oil-peppermint.jpg", "ginger-tea-nausea": "images/oil-ginger.jpg",
-  "chamomile-bedtime-tea": "images/oil-chamomile.jpg", "honey-lemon-warm-water": "images/oil-honey-lemon.jpg",
-  "tart-cherry-juice": "images/fruits/tart-cherry.jpg", "oatmeal-soak": "images/foods/oats.jpg",
-};
-const remedyArt = (id) => REMEDY_ART_SHARED[id] || `images/remedies/${id}.jpg`;
+// Each remedy's picture: its stock photo (photos.js), or its oil painting when there is none.
+const remedyArt = (id) => (stockPhoto(`remedy:${id}`) || {}).src || remedyPainting(id);
+const remedyFallback = (id) => remedyPainting(id);
 
 /* ---------------- Food & fruit pages (one shared layout) ---------------- */
 function renderFoodProfile(p, main) {
@@ -1449,7 +1445,7 @@ function initRemedies() {
 function remedyArtCard(r) {
   const [ev] = r.evidence;
   return `<a class="rm-card" href="${remedyUrl(r.id)}">
-    ${giltFrame(remedyArt(r.id), `Oil painting: ${r.name}`)}
+    ${giltFrame(remedyArt(r.id), r.name, { fallback: remedyFallback(r.id) })}
     <div class="rm-label">
       <small>${REMEDY_CATS[r.cat].label}</small>
       <h3>${r.name}</h3>
@@ -1468,7 +1464,7 @@ function foodSwatch(item, kind) {
   const sub = isFruit ? item.latin : FOOD_GROUPS[item.group];
   const text = (isFruit ? item.summary : item.what).split(/(?<=\.)\s/)[0];
   const pic = PHOTO_OVERRIDES[`${kind}:${item.id}`];
-  const art = pic ? `<span class="swatch-art"><img src="${pic.src.replace("w=1200", "w=640")}" alt="${item.name}" loading="lazy" decoding="async"${pic.fallback ? ` onerror="this.onerror=null;this.src='${pic.fallback}'"` : ""}></span>` : "";
+  const art = pic ? `<span class="swatch-art"><img src="${pic.small || pic.src}" alt="${item.name}" loading="lazy" decoding="async"${pic.fallback ? ` onerror="this.onerror=null;this.src='${pic.fallback}'"` : ""}></span>` : "";
   return `<a class="food-swatch" href="${href}">${art}<small>${label}</small><strong>${item.name}</strong><em>${sub}</em><span>${text}</span></a>`;
 }
 
@@ -1494,7 +1490,7 @@ function initRemedy() {
             <div class="recipe-facts"><span>${icon("clock")} ${r.time}</span><span class="evidence ev-${ev}" title="${EVIDENCE[ev].note}">Evidence: ${EVIDENCE[ev].label}</span></div>
             <button class="btn btn-secondary" data-print>${icon("print")} Print remedy</button>
           </div>
-          <div class="remedy-hero-art">${giltFrame(remedyArt(r.id), `Oil painting: ${r.name}`, { lazy: false })}
+          <div class="remedy-hero-art">${giltFrame(remedyArt(r.id), r.name, { lazy: false, fallback: remedyFallback(r.id) })}
             ${r.items.length ? `<p class="remedy-hero-items">Made with ${r.items.filter(itemOf).map((k) => `<a href="${itemUrl(k)}">${itemOf(k).name.split(" (")[0]}</a>`).join(", ")}</p>` : ""}</div>
         </div>
       </div>
