@@ -523,7 +523,7 @@ function decorateArt() {
   fillScenes();
   const page = document.body.dataset.page;
   if (page === "home") { creditPhotos(); return markReveals(); }
-  if (document.querySelector("main.foods-art")) return creditPhotos(); // the Foods page carries its own design
+  if (document.querySelector("main.foods-art, main.fp")) return creditPhotos(); // the Foods page carries its own design
   document.body.classList.add("artful");
   const hero = document.querySelector("main .page-hero, main .herb-hero, main .stack-hero, main > .hero");
   if (!hero || hero.classList.contains("art-page-hero")) { creditPhotos(); return markReveals(); }
