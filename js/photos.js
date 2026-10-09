@@ -13,6 +13,14 @@
 // (many are Unsplash and Pexels photographs). Each is the Commons file name; if one ever fails to load,
 // the site's own oil painting shows instead. Your own photo in images/foods/ or images/fruits/ wins over both.
 const STOCK_PHOTOS = {
+  "food:kale": "Kale1.jpg",
+  "food:cottage-cheese": "Cottagecheese200px.jpg",
+  "remedy:salt-water-gargle": "Glass cup of beverage (Unsplash).jpg",
+  "remedy:saline-nasal-rinse": "Ice water with lemon.jpg",
+  "remedy:steam-inhalation": "Hot coffee on a cold day (Unsplash).jpg",
+  "remedy:peppermint-oil-temples": "PeppermintEssentialOil.png",
+  "remedy:chicken-vegetable-soup": "Bowl of chicken soup.jpg",
+  "remedy:fruit-infused-water": "Ice water with lemon.jpg",
   "food:eggs": "Bowl of Eggs (Unsplash).jpg",
   "food:greek-yogurt": "Yogurt fruit bowl.jpg",
   "food:salmon": "Grilled plated salmon fillet.jpg",
@@ -95,7 +103,7 @@ const stockPhoto = (key) => {
   const file = STOCK_PHOTOS[key];
   if (!file) return null;
   const [kind, name] = key.split(":");
-  return { src: commonsUrl(file), small: commonsUrl(file, 640), credit: "Photo: Wikimedia Commons", fallback: kind === "remedy" ? remedyPainting(name) : `images/paintings/${kind}s/${name}.jpg` };
+  return { src: commonsUrl(file), small: commonsUrl(file, 640), credit: "Photo: Wikimedia Commons" };
 };
 const remedyPainting = (id) => ({
   "peppermint-tea-bloating": "images/oil-peppermint.jpg", "ginger-tea-nausea": "images/oil-ginger.jpg",

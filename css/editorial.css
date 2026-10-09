@@ -377,3 +377,8 @@ body.artful { background: var(--ivory); }
 .remedy-hero-items { margin: 22px 0 0; text-align: center; font-size: 14px; color: var(--muted, #6e7169); }
 .remedy-hero-items a { color: var(--forest, #314232); font-weight: 600; }
 @media (max-width: 650px) { .gilt-canvas { border-width: 12px; } .gilt-hero .gilt-canvas { border-width: 14px; } .remedy-hero-art .gilt { transform: none; } }
+
+/* photographs: clean, softly rounded, no gilded frame */
+.gilt-canvas, .rm-card .gilt-canvas, .gilt-hero .gilt-canvas, .gilt-small .gilt-canvas { border: 0 !important; border-image: none !important; border-radius: 10px; background: #e9dfcc; box-shadow: 0 10px 28px rgba(40, 30, 15, .16) !important; }
+.gilt-canvas::after { display: none; }
+.placard { display: none !important; }

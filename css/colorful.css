@@ -281,3 +281,10 @@ a.remedy-art-card, a.remedy-card { color: inherit; text-decoration: none; }
 .food-swatch:hover .swatch-art { box-shadow: none; }
 .food-swatch .swatch-art img { transition: transform .5s ease; }
 .food-swatch:hover .swatch-art img { transform: scale(1.04); }
+
+/* photographs: clean, softly rounded, no gilded frame */
+.gilt-canvas, .rm-card .gilt-canvas, .gilt-hero .gilt-canvas, .gilt-small .gilt-canvas, .rm-card:hover .gilt-canvas, .foods-art .gallery-card:hover .gilt-canvas { border: 0 !important; border-image: none !important; border-radius: 10px; background: #e9dfcc; box-shadow: 0 10px 28px rgba(40, 30, 15, .16) !important; }
+.gilt-canvas::after { display: none; }
+.placard { display: none !important; }
+.rm-label { border-radius: 0 0 10px 10px; border-top: 0; }
+.rm-card .gilt-canvas { border-radius: 10px 10px 0 0; }

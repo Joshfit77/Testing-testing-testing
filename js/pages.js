@@ -1230,18 +1230,40 @@ const ART_TITLES = {
   "oil-chamomile": "Chamomile", "oil-turmeric": "Turmeric", "oil-elderberry": "Elderberry", "oil-garlic": "Garlic",
   "oil-cinnamon": "Cinnamon", "oil-rosemary": "Rosemary", "oil-thyme": "Thyme",
 };
-const artSrc = (key) => (typeof MY_ART !== "undefined" && MY_ART[key]) || `images/${key}.jpg`;
+// Stock photos for those spots (Wikimedia Commons file names); the painting stays as the fallback.
+const ART_PHOTOS = {
+  "oil-food-abundance": "Fruits and Vegetables (Unsplash).jpg",
+  "oil-berries": "Blackberry Basket (Unsplash).jpg",
+  "oil-citrus": "Jonathan Pielmayer 2017 (Unsplash).jpg",
+  "oil-greens": "Spinach Plant Nourishment Meal Fresh Healthy Bio.jpg",
+  "oil-roots": "Carrots of many colors.jpg",
+  "oil-avocado-olive": "Olive Oil (Unsplash).jpg",
+  "oil-herbs": "Basil leaves.jpg",
+  "oil-pomegranate": "Pomegranate fruit - whole and piece with arils.jpg",
+  "oil-honey": "Runny hunny.jpg",
+  "oil-ginger": "Lemon and ginger tea ,Tanzania.jpg",
+  "oil-honey-lemon": "Herbal Tea (Unsplash).jpg",
+  "oil-peppermint": "Mint tea in a glass (35948546).jpg",
+  "oil-chamomile": "Fresh-cut chamomile (Unsplash).jpg",
+  "oil-turmeric": "Curcuma longa roots.jpg",
+  "oil-elderberry": "Elderberry (Sambucus nigra) (4654531348).jpg",
+  "oil-garlic": "Garlic bulbs and cloves.jpg",
+  "oil-cinnamon": "Cinnamomum verum spices.jpg",
+  "oil-rosemary": "Rosemary Plant.jpg",
+  "oil-thyme": "Fresh thyme.jpg"
+};
+const artSrc = (key) => (typeof MY_ART !== "undefined" && MY_ART[key]) || (ART_PHOTOS[key] ? commonsUrl(ART_PHOTOS[key], 1200) : `images/${key}.jpg`);
 
 // A painting in a gilded frame; `plaque` adds the small brass title plate underneath.
 function giltFrame(src, alt, { plaque = "", cls = "", lazy = true, fallback = "" } = {}) {
-  return `<figure class="gilt ${cls}"><div class="gilt-canvas"><img src="${src}" alt="${alt}"${lazy ? ' loading="lazy"' : ""} decoding="async"${fallback && fallback !== src ? ` onerror="this.onerror=null;this.src='${fallback}'"` : ""}></div>${plaque ? `<figcaption class="placard"><em>${plaque}</em></figcaption>` : ""}</figure>`;
+  return `<figure class="gilt ${cls}"><div class="gilt-canvas"><img src="${src}" alt="${alt}"${lazy ? ' loading="lazy"' : ""} decoding="async" onerror="this.closest('figure').style.display='none'"></div>${plaque ? `<figcaption class="placard"><em>${plaque}</em></figcaption>` : ""}</figure>`;
 }
 
 function paintFoodArt() {
   document.querySelectorAll("figure.gilt[data-art]").forEach((fig) => {
     const key = fig.dataset.art;
     const title = ART_TITLES[key] || "";
-    fig.outerHTML = giltFrame(artSrc(key), `Oil painting: ${title}`, { plaque: title, cls: fig.className.replace(/\bgilt\b/, "").trim(), lazy: !fig.classList.contains("gilt-hero") });
+    fig.outerHTML = giltFrame(artSrc(key), title, { cls: fig.className.replace(/\bgilt\b/, "").trim(), lazy: !fig.classList.contains("gilt-hero"), fallback: `images/${key}.jpg` });
   });
 }
 
@@ -1411,8 +1433,8 @@ function initRemedies() {
         <a class="rm-hero-link" href="#remedy-grid">Walk the gallery ${icon("arrow")}</a>
       </div>
       <div class="rm-hero-art">
-        ${giltFrame("images/oil-ginger.jpg", "Oil painting: ginger tea", { plaque: "Ginger Tea", cls: "gilt-hero rm-hero-main", lazy: false })}
-        ${giltFrame("images/oil-chamomile.jpg", "Oil painting: chamomile tea", { plaque: "Chamomile", cls: "gilt-small rm-hero-side", lazy: false })}
+        ${giltFrame(artSrc("oil-ginger"), "Ginger tea", { cls: "gilt-hero rm-hero-main", lazy: false, fallback: "images/oil-ginger.jpg" })}
+        ${giltFrame(artSrc("oil-chamomile"), "Chamomile", { cls: "gilt-small rm-hero-side", lazy: false, fallback: "images/oil-chamomile.jpg" })}
       </div>
     </section>
     <div class="remedy-filters" id="remedy-chips">${[["all", "All remedies"], ...Object.entries(REMEDY_CATS).map(([k, c]) => [k, c.label])].map(([k, l]) => `<button type="button" data-cat="${k}">${l}</button>`).join("")}</div>
@@ -1464,7 +1486,7 @@ function foodSwatch(item, kind) {
   const sub = isFruit ? item.latin : FOOD_GROUPS[item.group];
   const text = (isFruit ? item.summary : item.what).split(/(?<=\.)\s/)[0];
   const pic = PHOTO_OVERRIDES[`${kind}:${item.id}`];
-  const art = pic ? `<span class="swatch-art"><img src="${pic.small || pic.src}" alt="${item.name}" loading="lazy" decoding="async"${pic.fallback ? ` onerror="this.onerror=null;this.src='${pic.fallback}'"` : ""}></span>` : "";
+  const art = pic ? `<span class="swatch-art"><img src="${pic.small || pic.src}" alt="${item.name}" loading="lazy" decoding="async" onerror="this.parentNode.remove()"></span>` : "";
   return `<a class="food-swatch" href="${href}">${art}<small>${label}</small><strong>${item.name}</strong><em>${sub}</em><span>${text}</span></a>`;
 }
 
