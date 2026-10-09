@@ -1224,24 +1224,24 @@ function initFoods() {
 // The Foods page pictures: stock photos (ART_PHOTOS below), or your own images/oil-<name>.jpg if you add one.
 // Replace any of those files with your own painting of the same name and it hangs in that frame.
 const ART_TITLES = {
-  "oil-food-abundance": "A Table of Abundance", "oil-berries": "Berries", "oil-citrus": "Citrus", "oil-greens": "Leafy Greens",
-  "oil-roots": "Roots", "oil-avocado-olive": "Healthy Fats", "oil-herbs": "Fresh Herbs", "oil-pomegranate": "Pomegranates",
-  "oil-honey": "Honey", "oil-ginger": "Ginger Tea", "oil-honey-lemon": "Honey & Lemon", "oil-peppermint": "Peppermint Tea",
-  "oil-chamomile": "Chamomile", "oil-turmeric": "Turmeric", "oil-elderberry": "Elderberry", "oil-garlic": "Garlic",
+  "oil-food-abundance": "Farmer's Market Produce (Unsplash).jpg",
+  "oil-roots": "Organic Carrots (Unsplash).jpg",
+  "oil-honey": "Bellingham Farmers Market 1 (Unsplash).jpg",
+  "oil-chamomile": "Fragrant chamomile (Unsplash).jpg",
   "oil-cinnamon": "Cinnamon", "oil-rosemary": "Rosemary", "oil-thyme": "Thyme",
 };
 // Stock photos for those spots (Wikimedia Commons file names); the painting stays as the fallback.
 const ART_PHOTOS = {
   "oil-food-abundance": "Fruits and Vegetables (Unsplash).jpg",
-  "oil-berries": "Blackberry Basket (Unsplash).jpg",
+  "oil-berries": "Fruit Platter (Unsplash).jpg",
   "oil-citrus": "Jonathan Pielmayer 2017 (Unsplash).jpg",
-  "oil-greens": "Spinach Plant Nourishment Meal Fresh Healthy Bio.jpg",
+  "oil-greens": "Fresh Salad (Unsplash).jpg",
   "oil-roots": "Carrots of many colors.jpg",
-  "oil-avocado-olive": "Olive Oil (Unsplash).jpg",
-  "oil-herbs": "Basil leaves.jpg",
+  "oil-avocado-olive": "Avocado and Egg Toast (Unsplash).jpg",
+  "oil-herbs": "Fresh Herbs (Unsplash).jpg",
   "oil-pomegranate": "Pomegranate fruit - whole and piece with arils.jpg",
   "oil-honey": "Runny hunny.jpg",
-  "oil-ginger": "Lemon and ginger tea ,Tanzania.jpg",
+  "oil-ginger": "Kremlin cup of tea with candy. (Unsplash).jpg",
   "oil-honey-lemon": "Herbal Tea (Unsplash).jpg",
   "oil-peppermint": "Mint tea in a glass (35948546).jpg",
   "oil-chamomile": "Fresh-cut chamomile (Unsplash).jpg",
