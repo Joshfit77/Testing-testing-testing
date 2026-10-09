@@ -274,3 +274,10 @@ a.remedy-art-card, a.remedy-card { color: inherit; text-decoration: none; }
 .rm-card:hover { transform: none; }
 .rm-label { margin-top: 0; width: 100%; box-shadow: none; border-top: 3px solid #c9a456; }
 .foods-art .remedy-card, .foods-art .remedy-card:hover { transform: none; box-shadow: 0 1px 3px rgba(0, 0, 0, .12); }
+
+/* food guide cards: a clean photograph across the top of each card */
+.food-swatch .swatch-art { border: 0; border-image: none; border-radius: 6px; margin: -10px -8px 18px; background: #e9dfcc; box-shadow: none; }
+.food-swatch .swatch-art::after { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .06); border-radius: 6px; }
+.food-swatch:hover .swatch-art { box-shadow: none; }
+.food-swatch .swatch-art img { transition: transform .5s ease; }
+.food-swatch:hover .swatch-art img { transform: scale(1.04); }

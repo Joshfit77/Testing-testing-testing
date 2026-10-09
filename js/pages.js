@@ -1459,16 +1459,16 @@ function remedyArtCard(r) {
   </a>`;
 }
 
-// A food or fruit as a colored card for the Foods page guide, topped with its own oil painting
-// (images/foods/<id>.jpg or images/fruits/<id>.jpg, listed by build.js in MY_PHOTOS).
+// A food or fruit as a colored card for the Foods page guide, topped with its photograph
+// (your own in images/foods/ or images/fruits/, otherwise the Unsplash stock photo in photos.js).
 function foodSwatch(item, kind) {
   const isFruit = kind === "fruit";
   const href = isFruit ? fruitUrl(item.id) : foodUrl(item.id);
   const label = isFruit ? (CATEGORIES[item.cats[0]] || "Fruit") : foodCat(item.cats[0]).label;
   const sub = isFruit ? item.latin : FOOD_GROUPS[item.group];
   const text = (isFruit ? item.summary : item.what).split(/(?<=\.)\s/)[0];
-  const own = typeof MY_PHOTOS !== "undefined" && MY_PHOTOS[`${kind}:${item.id}`];
-  const art = own ? `<span class="swatch-art"><img src="${own.src}" alt="" loading="lazy" decoding="async"></span>` : "";
+  const pic = PHOTO_OVERRIDES[`${kind}:${item.id}`];
+  const art = pic ? `<span class="swatch-art"><img src="${pic.src.replace("w=1200", "w=640")}" alt="${item.name}" loading="lazy" decoding="async"${pic.fallback ? ` onerror="this.onerror=null;this.src='${pic.fallback}'"` : ""}></span>` : "";
   return `<a class="food-swatch" href="${href}">${art}<small>${label}</small><strong>${item.name}</strong><em>${sub}</em><span>${text}</span></a>`;
 }
 

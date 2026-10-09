@@ -9,7 +9,22 @@
 // Or add it to PHOTO_OVERRIDES below by hand to choose your own credit line, e.g.
 //   chamomile: { src: "images/chamomile.jpg", credit: "Photo by Jane Doe" }
 
-const PHOTO_OVERRIDES = Object.assign({}, typeof MY_PHOTOS !== "undefined" ? MY_PHOTOS : {});
+// Stock photographs for every food and fruit, from Unsplash (free to use under the Unsplash License).
+// Each is linked by its Unsplash photo ID; if one ever fails to load, the site's own oil painting
+// of that food (images/paintings/) shows instead. Your own photo in images/foods/ or images/fruits/ wins over both.
+const STOCK_PHOTOS = {};
+const stockPhoto = (key) => {
+  const id = STOCK_PHOTOS[key];
+  if (!id) return null;
+  const [kind, name] = key.split(":");
+  return { src: `https://unsplash.com/photos/${id}/download?w=1200`, credit: "Photo: Unsplash", link: `https://unsplash.com/photos/${id}`, fallback: `images/paintings/${kind}s/${name}.jpg` };
+};
+const paintingOf = (kind, id) => ({ src: `images/paintings/${kind}s/${id}.jpg`, credit: "Image: Beauty & Praise" });
+const PHOTO_OVERRIDES = Object.assign({},
+  Object.fromEntries([...(typeof FOODS !== "undefined" ? FOODS : []).map((f) => [`food:${f.id}`, paintingOf("food", f.id)]),
+    ...(typeof FRUITS !== "undefined" ? FRUITS : []).map((f) => [`fruit:${f.id}`, paintingOf("fruit", f.id)])]),
+  Object.fromEntries(Object.keys(STOCK_PHOTOS).map((k) => [k, stockPhoto(k)])),
+  typeof MY_PHOTOS !== "undefined" ? MY_PHOTOS : {});
 
 // Wikipedia article titles where the herb's common or Latin name isn't the best match.
 const WIKI_TITLES = {
@@ -132,6 +147,7 @@ const Photos = (() => {
         const big = el.classList.contains("pf-large") && !p.credit ? sized(p.src, 1280) : p.src;
         img.onerror = () => {
           if (img.src !== p.src && big !== p.src) { img.src = p.src; return; }
+          if (p.fallback && !img.src.endsWith(p.fallback)) { img.src = p.fallback; return; }
           img.remove(); el.dataset.state = "none";
         };
         img.src = big;
