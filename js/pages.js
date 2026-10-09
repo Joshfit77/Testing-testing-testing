@@ -1221,7 +1221,7 @@ function initFoods() {
   if (state.cat !== "all" || state.q) requestAnimationFrame(toList);
 }
 
-// The Foods page's framed oil paintings: images/oil-<name>.jpg, each with a small plaque naming it.
+// The Foods page pictures: stock photos (ART_PHOTOS below), or your own images/oil-<name>.jpg if you add one.
 // Replace any of those files with your own painting of the same name and it hangs in that frame.
 const ART_TITLES = {
   "oil-food-abundance": "A Table of Abundance", "oil-berries": "Berries", "oil-citrus": "Citrus", "oil-greens": "Leafy Greens",
@@ -1263,13 +1263,13 @@ function paintFoodArt() {
   document.querySelectorAll("figure.gilt[data-art]").forEach((fig) => {
     const key = fig.dataset.art;
     const title = ART_TITLES[key] || "";
-    fig.outerHTML = giltFrame(artSrc(key), title, { cls: fig.className.replace(/\bgilt\b/, "").trim(), lazy: !fig.classList.contains("gilt-hero"), fallback: `images/${key}.jpg` });
+    fig.outerHTML = giltFrame(artSrc(key), title, { cls: fig.className.replace(/\bgilt\b/, "").trim(), lazy: !fig.classList.contains("gilt-hero"), fallback: "" });
   });
 }
 
 // Each remedy's picture: its stock photo (photos.js), or its oil painting when there is none.
 const remedyArt = (id) => (stockPhoto(`remedy:${id}`) || {}).src || remedyPainting(id);
-const remedyFallback = (id) => remedyPainting(id);
+const remedyFallback = () => "";
 
 /* ---------------- Food & fruit pages (one shared layout) ---------------- */
 function renderFoodProfile(p, main) {
@@ -1433,8 +1433,8 @@ function initRemedies() {
         <a class="rm-hero-link" href="#remedy-grid">Walk the gallery ${icon("arrow")}</a>
       </div>
       <div class="rm-hero-art">
-        ${giltFrame(artSrc("oil-ginger"), "Ginger tea", { cls: "gilt-hero rm-hero-main", lazy: false, fallback: "images/oil-ginger.jpg" })}
-        ${giltFrame(artSrc("oil-chamomile"), "Chamomile", { cls: "gilt-small rm-hero-side", lazy: false, fallback: "images/oil-chamomile.jpg" })}
+        ${giltFrame(artSrc("oil-ginger"), "Ginger tea", { cls: "gilt-hero rm-hero-main", lazy: false, fallback: "" })}
+        ${giltFrame(artSrc("oil-chamomile"), "Chamomile", { cls: "gilt-small rm-hero-side", lazy: false, fallback: "" })}
       </div>
     </section>
     <div class="remedy-filters" id="remedy-chips">${[["all", "All remedies"], ...Object.entries(REMEDY_CATS).map(([k, c]) => [k, c.label])].map(([k, l]) => `<button type="button" data-cat="${k}">${l}</button>`).join("")}</div>
