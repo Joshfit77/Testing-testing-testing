@@ -1,0 +1,156 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Narrow Gate Fitness design tokens — premium black & gold.
+ * The app is dark-first; all tokens are defined for the dark surface.
+ */
+:root {
+  --background: #090909;
+  --card: #171717;
+  --elevated: #232323;
+  --gold: #c9a54c;
+  --gold-highlight: #e6c76e;
+  --gold-muted: #8c7139;
+  --foreground: #ffffff;
+  --muted-foreground: #b7b7b7;
+  --border: #35302a;
+  --success: #37956d;
+  --destructive: #d45c5c;
+  --radius: 1rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--foreground);
+  --color-popover: var(--elevated);
+  --color-popover-foreground: var(--foreground);
+  --color-elevated: var(--elevated);
+  --color-primary: var(--gold);
+  --color-primary-foreground: #0b0b0b;
+  --color-gold: var(--gold);
+  --color-gold-highlight: var(--gold-highlight);
+  --color-gold-muted: var(--gold-muted);
+  --color-secondary: var(--elevated);
+  --color-secondary-foreground: var(--foreground);
+  --color-muted: var(--elevated);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--elevated);
+  --color-accent-foreground: var(--foreground);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-border: var(--border);
+  --color-input: var(--border);
+  --color-ring: var(--gold);
+
+  --radius-sm: calc(var(--radius) - 8px);
+  --radius-md: calc(var(--radius) - 4px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-oswald), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  --animate-fade-up: fade-up 0.35s ease-out both;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes shimmer {
+    from {
+      background-position: -400px 0;
+    }
+    to {
+      background-position: 400px 0;
+    }
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    color-scheme: dark;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "ss01", "cv11";
+  }
+  :focus-visible {
+    outline: 2px solid var(--gold-highlight);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--gold) 40%, transparent);
+  }
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
+}
+
+@layer utilities {
+  .text-gold-gradient {
+    background: linear-gradient(135deg, var(--gold-highlight) 0%, var(--gold) 45%, var(--gold-muted) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .bg-gold-gradient {
+    background: linear-gradient(135deg, var(--gold-highlight) 0%, var(--gold) 50%, var(--gold-muted) 100%);
+  }
+  .bg-card-gradient {
+    background: radial-gradient(120% 140% at 0% 0%, rgba(201, 165, 76, 0.12) 0%, rgba(23, 23, 23, 0) 55%), var(--card);
+  }
+  .hero-glow {
+    background:
+      radial-gradient(60% 60% at 80% 0%, rgba(230, 199, 110, 0.16) 0%, rgba(9, 9, 9, 0) 70%),
+      radial-gradient(50% 50% at 0% 100%, rgba(140, 113, 57, 0.18) 0%, rgba(9, 9, 9, 0) 70%);
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  .skeleton {
+    background: linear-gradient(90deg, #1c1c1c 0px, #2a2a2a 120px, #1c1c1c 240px);
+    background-size: 800px 100%;
+    animation: var(--animate-shimmer);
+  }
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
