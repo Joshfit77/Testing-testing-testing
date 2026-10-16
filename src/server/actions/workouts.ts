@@ -4,8 +4,11 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { draftSnapshotSchema, editWorkoutSchema, finishWorkoutSchema } from "@/lib/validation/schemas";
-import { requireUser } from "@/server/auth";
+import { getProfile, requireUser } from "@/server/auth";
 import { logError } from "@/server/log";
+import { badgesUnlockedBySession, type BadgeIconName, type BadgeTier } from "@/lib/domain/achievements";
+import { isoDateInTz } from "@/lib/domain/dates";
+import { getAchievementStats } from "@/server/services/achievements";
 import { deleteWorkout, discardDraft, editWorkout, finishWorkout, saveDraftSnapshot, WorkoutError, type NewRecord } from "@/server/services/workouts";
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: string };
@@ -38,7 +41,29 @@ export async function discardWorkoutAction(clientId: string): Promise<Result<nul
   }
 }
 
-export async function finishWorkoutAction(input: unknown): Promise<Result<{ sessionId: string; volumeKg: number; records: NewRecord[] }>> {
+export interface UnlockedBadge {
+  id: string;
+  name: string;
+  description: string;
+  icon: BadgeIconName;
+  tier: BadgeTier;
+}
+
+/** Badges this session unlocked. Best-effort: a failure here never fails the finish. */
+async function unlockedBadges(supabase: Awaited<ReturnType<typeof getServerSupabase>>, userId: string, sessionId: string): Promise<UnlockedBadge[]> {
+  try {
+    const tz = (await getProfile(userId))?.timezone ?? "UTC";
+    const stats = await getAchievementStats(supabase, userId, tz);
+    return badgesUnlockedBySession(stats, sessionId, isoDateInTz(new Date(), tz)).map(({ id, name, description, icon, tier }) => ({ id, name, description, icon, tier }));
+  } catch (err) {
+    logError("workouts.finish.badges", err);
+    return [];
+  }
+}
+
+export async function finishWorkoutAction(
+  input: unknown,
+): Promise<Result<{ sessionId: string; volumeKg: number; records: NewRecord[]; badges: UnlockedBadge[] }>> {
   const user = await requireUser();
   const parsed = finishWorkoutSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Some workout values are invalid. Check weights, reps and RPE." };
@@ -48,8 +73,9 @@ export async function finishWorkoutAction(input: unknown): Promise<Result<{ sess
   try {
     const supabase = await getServerSupabase();
     const res = await finishWorkout(supabase, user.id, parsed.data);
+    const badges = res.alreadyCompleted ? [] : await unlockedBadges(supabase, user.id, res.sessionId);
     revalidatePath("/", "layout");
-    return { ok: true, data: { sessionId: res.sessionId, volumeKg: res.volumeKg, records: res.records } };
+    return { ok: true, data: { sessionId: res.sessionId, volumeKg: res.volumeKg, records: res.records, badges } };
   } catch (err) {
     logError("workouts.finish", err);
     return { ok: false, error: err instanceof WorkoutError && err.code === "invalid" ? "One of the exercises is no longer available." : "We couldn't save your workout. It's still on this device — please try again." };

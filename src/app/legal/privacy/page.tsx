@@ -9,7 +9,7 @@ export default function PrivacyPage() {
       <ul>
         <li>Account data: email address, display name.</li>
         <li>Training profile: age (to confirm adult eligibility), height, weight, goals, experience, equipment and preferences.</li>
-        <li>Activity data you log: workouts, sets, personal records, bodyweight, optional body measurements, nutrition and water.</li>
+        <li>Activity data you log: workouts, sets, personal records, bodyweight, optional body measurements, optional progress photos (stored privately; visible only to you), nutrition and water.</li>
         <li>
           Optional sensitive wellness information (physical limitation notes, recovery check-ins) — stored only after you give explicit
           consent, and you can withdraw it at any time.
