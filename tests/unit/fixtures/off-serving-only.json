@@ -1,0 +1,19 @@
+{
+  "code": "0049000028911",
+  "product": {
+    "brands": "Example Drinks",
+    "code": "0049000028911",
+    "nutriments": {
+      "energy-kj_serving": 586,
+      "carbohydrates_serving": 35,
+      "proteins_serving": 0,
+      "fat_serving": 0
+    },
+    "product_name_en": "Cola 330 ml can",
+    "serving_size": "1 can (330 ml)",
+    "serving_quantity": 330,
+    "serving_quantity_unit": "ml"
+  },
+  "status": 1,
+  "status_verbose": "product found"
+}

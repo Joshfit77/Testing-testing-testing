@@ -82,6 +82,29 @@ Display prices default to $9.99/month (Plus), $30/month (Pro) and $200/year (All
 
 Get a free key at https://fdc.nal.usda.gov/api-key-signup.html and set `USDA_FDC_API_KEY`. Without it, users can still log custom foods and manual entries.
 
+### Barcode scanning (Open Food Facts)
+
+The Scan tab in **Add food** looks products up on [Open Food Facts](https://world.openfoodfacts.org) (`GET /api/foods/barcode?code=…`). No API key is needed; requests send the User-Agent `NarrowGateFitness/1.0 (contact via app)`. Your server must be able to reach `world.openfoodfacts.org`. The data is crowd-sourced and is labelled in the app as "Open Food Facts (community data) — check the label". The camera needs HTTPS (or `localhost`) and the `Permissions-Policy: camera=(self)` header set in `next.config.ts`. People can always type the barcode digits instead.
+
+### Exercise videos
+
+Admins can upload a demo video or image per exercise in **Admin → Exercises → (exercise) → Demonstration media → Upload a file** (MP4/WebM/JPEG/PNG/WebP, max 50 MB, stored in the public `exercise-media` bucket under `<slug>/`). Uploaded videos play muted and looped on the exercise page. Deleting media also deletes its uploaded file.
+
+To make a consistent set of AI-generated demo clips:
+
+1. `npm run videos:prompts` regenerates `docs/exercise-video-prompts.md` / `.csv` from `src/data/exercises.ts`: one prompt per exercise with the same athlete and set, plus "Must show" / "Must NOT show" review checklists. Read the guide at the top of that file first.
+2. Save each reviewed clip as `<slug>.mp4` (or `.webm`, `.jpg`, `.png`, `.webp`) in one folder.
+3. Import them in bulk with the service-role key (from the environment or `.env.local`: `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`):
+   ```bash
+   # check the plan first — nothing is uploaded
+   npm run videos:import -- ./clips --license "AI-generated, owned by Narrow Gate Fitness" --attribution "Narrow Gate Fitness" --dry-run
+   # then upload for real
+   npm run videos:import -- ./clips --license "AI-generated, owned by Narrow Gate Fitness" --attribution "Narrow Gate Fitness"
+   ```
+   Files are stored at `<slug>/<slug>.<ext>`; re-running overwrites the file and updates its row. Add `--replace` to also remove that exercise's other uploaded media of the same type. Unknown slugs, unsupported types and files over 50 MB are skipped and listed in the summary. Replaced files may stay cached by browsers/CDN for up to an hour.
+
+**Review every clip for correct form before publishing** — AI video often gets technique subtly wrong, and imported media is visible to users immediately.
+
 ## 4. Deploying to Supabase + Vercel
 
 ### Supabase (production)

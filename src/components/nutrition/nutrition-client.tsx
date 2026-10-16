@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input, NativeSelect } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BarcodeScanner } from "@/components/nutrition/barcode-scanner";
 import { initialActionState, type ActionState } from "@/lib/action-state";
 import { MEAL_TYPES } from "@/lib/domain/meals";
 import { caloriesFromMacros } from "@/lib/domain/nutrition";
@@ -79,6 +80,7 @@ export function AddFoodDialog({ date, myFoods, commonFoods, searchEnabled }: { d
   const [status, setStatus] = useState("logged");
   const [result, setResult] = useState<ActionState | null>(null);
   const [pending, startTransition] = useTransition();
+  const [tab, setTab] = useState("search");
 
   // Search state
   const [q, setQ] = useState("");
@@ -138,7 +140,7 @@ export function AddFoodDialog({ date, myFoods, commonFoods, searchEnabled }: { d
       </p>
       <p className="text-xs text-muted-foreground">
         {f.serving_size} {f.serving_unit}: {Number(f.calories)} kcal · P {Number(f.protein_g)}g · C {Number(f.carbs_g)}g · F {Number(f.fat_g)}g
-        {f.source === "usda" ? " · USDA" : ""}
+        {f.source === "usda" ? " · USDA" : f.source === "openfoodfacts" ? " · Open Food Facts (community data) — check the label" : ""}
       </p>
       <div className="mt-2 flex items-center gap-2">
         <Input
@@ -176,10 +178,13 @@ export function AddFoodDialog({ date, myFoods, commonFoods, searchEnabled }: { d
               {result.message}
             </p>
           )}
-          <Tabs defaultValue="search" className="mt-4">
+          <Tabs value={tab} onValueChange={setTab} className="mt-4">
             <TabsList className="w-full">
               <TabsTrigger value="search" className="flex-1">
                 Search
+              </TabsTrigger>
+              <TabsTrigger value="scan" className="flex-1">
+                Scan
               </TabsTrigger>
               <TabsTrigger value="mine" className="flex-1">
                 My foods
@@ -244,6 +249,17 @@ export function AddFoodDialog({ date, myFoods, commonFoods, searchEnabled }: { d
                   </section>
                 )}
               </div>
+            </TabsContent>
+
+            <TabsContent value="scan">
+              <BarcodeScanner
+                pending={pending}
+                onLog={submit}
+                onEnterManually={(name) => {
+                  if (name) setManual((m) => ({ ...m, name: name.slice(0, 160), isEstimate: false }));
+                  setTab("manual");
+                }}
+              />
             </TabsContent>
 
             <TabsContent value="mine">

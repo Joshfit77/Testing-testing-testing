@@ -6,6 +6,7 @@ import { getServerSupabase, getServiceSupabase } from "@/lib/supabase/server";
 import { actionError, actionInvalid, actionOk, type ActionState } from "@/lib/action-state";
 import { adminCategorySchema, adminContentSchema, adminExerciseSchema, adminProgramSchema } from "@/lib/validation/schemas";
 import { MOVEMENT_PATTERNS } from "@/lib/domain/types";
+import { EXERCISE_MEDIA_BUCKET, parseExerciseMediaPath } from "@/lib/exercise-media";
 import { requireAdmin } from "@/server/auth";
 import { isServiceRoleConfigured } from "@/server/env";
 import { logError } from "@/server/log";
@@ -94,14 +95,94 @@ export async function addExerciseMediaAction(_prev: ActionState, formData: FormD
   return actionOk("Media added.");
 }
 
+/**
+ * Records a file the admin already uploaded from the browser to the exercise-media bucket
+ * (the bucket's storage policy only lets admins write). Verifies the path is inside this
+ * exercise's folder and that the object exists.
+ */
+export async function addUploadedExerciseMediaAction(input: unknown): Promise<ActionState> {
+  const { user } = await requireAdmin();
+  const parsed = z
+    .object({
+      exerciseId: uuid,
+      storagePath: z.string().max(200),
+      license: z.string().trim().min(2).max(200),
+      attribution: z.string().trim().max(200).optional().default(""),
+      altText: z.string().trim().min(3).max(200),
+      confirm: z.literal(true, { message: "Confirm you have the right to use this media" }),
+    })
+    .safeParse(input);
+  if (!parsed.success) return actionInvalid(parsed.error);
+  const v = parsed.data;
+  const supabase = await getServerSupabase();
+  const { data: ex } = await supabase.from("exercises").select("slug").eq("id", v.exerciseId).maybeSingle();
+  if (!ex) return actionError("Exercise not found.");
+  const slug = ex.slug as string;
+  const info = parseExerciseMediaPath(slug, v.storagePath);
+  if (!info) return actionError("That file isn't in this exercise's media folder.");
+  const fileName = v.storagePath.slice(slug.length + 1);
+  const { data: listed, error: listErr } = await supabase.storage.from(EXERCISE_MEDIA_BUCKET).list(slug, { search: fileName, limit: 10 });
+  if (listErr) {
+    logError("admin.media_verify", listErr);
+    return actionError("Couldn't verify the upload. Try again.");
+  }
+  if (!listed?.some((o) => o.name === fileName)) return actionError("The uploaded file wasn't found in storage. Upload it again.");
+  const { data, error } = await supabase
+    .from("exercise_media")
+    .insert({ exercise_id: v.exerciseId, media_type: info.mediaType, storage_path: v.storagePath, license: v.license, attribution: v.attribution || null, alt_text: v.altText })
+    .select("id")
+    .single();
+  if (error) {
+    logError("admin.media_insert", error);
+    // Don't leave an orphaned file behind.
+    await supabase.storage.from(EXERCISE_MEDIA_BUCKET).remove([v.storagePath]);
+    return actionError("Couldn't save the media record. The upload was removed — try again.");
+  }
+  await audit(user.id, "exercise_media.create", "exercise_media", data.id as string, { exerciseId: v.exerciseId, storagePath: v.storagePath, license: v.license });
+  revalidatePath("/admin/exercises");
+  revalidatePath(`/train/exercises/${slug}`);
+  return actionOk("Media uploaded and added.");
+}
+
+/** Removes an uploaded file that never got a media record (e.g. saving the record failed in the browser). */
+export async function discardExerciseMediaUploadAction(input: unknown): Promise<ActionState> {
+  await requireAdmin();
+  const parsed = z.object({ exerciseId: uuid, storagePath: z.string().max(200) }).safeParse(input);
+  if (!parsed.success) return actionInvalid(parsed.error);
+  const supabase = await getServerSupabase();
+  const { data: ex } = await supabase.from("exercises").select("slug").eq("id", parsed.data.exerciseId).maybeSingle();
+  if (!ex || !parseExerciseMediaPath(ex.slug as string, parsed.data.storagePath)) return actionError("Invalid path.");
+  const { count } = await supabase.from("exercise_media").select("id", { count: "exact", head: true }).eq("storage_path", parsed.data.storagePath);
+  if (count) return actionError("That file is in use.");
+  const { error } = await supabase.storage.from(EXERCISE_MEDIA_BUCKET).remove([parsed.data.storagePath]);
+  if (error) return actionError("Couldn't remove the file.");
+  return actionOk();
+}
+
 export async function deleteExerciseMediaAction(formData: FormData): Promise<void> {
   const { user } = await requireAdmin();
   const id = uuid.safeParse(formData.get("id"));
   if (!id.success) return;
   const supabase = await getServerSupabase();
-  await supabase.from("exercise_media").delete().eq("id", id.data);
-  await audit(user.id, "exercise_media.delete", "exercise_media", id.data);
+  const { data: row } = await supabase.from("exercise_media").select("storage_path, exercise:exercises(slug)").eq("id", id.data).maybeSingle();
+  const { error } = await supabase.from("exercise_media").delete().eq("id", id.data);
+  if (error) {
+    logError("admin.media_delete", error);
+    return;
+  }
+  const storagePath = (row?.storage_path as string | null | undefined) ?? null;
+  if (storagePath) {
+    // Only delete the file if no other media row still points at it.
+    const { count } = await supabase.from("exercise_media").select("id", { count: "exact", head: true }).eq("storage_path", storagePath);
+    if (!count) {
+      const { error: rmErr } = await supabase.storage.from(EXERCISE_MEDIA_BUCKET).remove([storagePath]);
+      if (rmErr) logError("admin.media_delete_object", rmErr, { storagePath });
+    }
+  }
+  await audit(user.id, "exercise_media.delete", "exercise_media", id.data, storagePath ? { storagePath } : {});
   revalidatePath("/admin/exercises");
+  const slug = (row?.exercise as unknown as { slug?: string } | null)?.slug;
+  if (slug) revalidatePath(`/train/exercises/${slug}`);
 }
 
 export async function saveProgramAction(_prev: ActionState, formData: FormData): Promise<ActionState> {

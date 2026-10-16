@@ -1,0 +1,12 @@
+{
+  "code": "5000000000005",
+  "product": {
+    "brands": "Example Foods",
+    "code": "5000000000005",
+    "nutriments": {},
+    "product_name": "  Mystery   Crackers ",
+    "quantity": "200 g"
+  },
+  "status": 1,
+  "status_verbose": "product found"
+}

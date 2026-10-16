@@ -8,6 +8,8 @@ import { titleCase } from "@/lib/utils";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { publicEnv } from "@/lib/env";
 import { formVideoSearchUrl, videoEmbedUrl } from "@/lib/media";
+import { exerciseMediaPublicUrl } from "@/lib/exercise-media";
+import { DemoVideo } from "@/components/train/demo-video";
 import { requireOnboardedUser } from "@/server/auth";
 
 export const metadata = { title: "Exercise" };
@@ -26,7 +28,7 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
   const alts = (altsRes.data ?? []).map((a) => a.alt as unknown as { slug: string; name: string; difficulty: string }).filter(Boolean);
   const media = mediaRes.data ?? [];
   const mediaUrl = (m: (typeof media)[number]) =>
-    (m.external_url as string | null) ?? `${publicEnv.supabaseUrl}/storage/v1/object/public/exercise-media/${m.storage_path as string}`;
+    (m.external_url as string | null) ?? exerciseMediaPublicUrl(publicEnv.supabaseUrl, m.storage_path as string);
 
   return (
     <div className="space-y-6">
@@ -62,6 +64,8 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
                       referrerPolicy="strict-origin-when-cross-origin"
                       allowFullScreen
                     />
+                  ) : m.media_type === "video" && m.storage_path && !m.external_url ? (
+                    <DemoVideo src={mediaUrl(m)} label={(m.alt_text as string) || `${ex.name} demonstration`} />
                   ) : m.media_type === "video" ? (
                     <video src={mediaUrl(m)} controls preload="metadata" playsInline className="w-full rounded-xl" aria-label={(m.alt_text as string) || ex.name} />
                   ) : (

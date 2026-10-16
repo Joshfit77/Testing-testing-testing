@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Trash2 } from "lucide-react";
 import { ActionForm } from "@/components/admin/action-form";
+import { ExerciseMediaUpload } from "@/components/admin/exercise-media-upload";
 import { AdminNav } from "@/components/admin/admin-nav";
 import { PageHeader } from "@/components/common/page-header";
 import { ActionButton } from "@/components/common/action-button";
@@ -10,6 +11,8 @@ import { Label } from "@/components/ui/label";
 import { MOVEMENT_PATTERNS } from "@/lib/domain/types";
 import type { ExerciseRow } from "@/lib/types/db";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { publicEnv } from "@/lib/env";
+import { exerciseMediaPublicUrl } from "@/lib/exercise-media";
 import { requireAdmin } from "@/server/auth";
 import { addExerciseMediaAction, deleteExerciseMediaAction, saveExerciseAction } from "@/server/actions/admin";
 
@@ -134,14 +137,26 @@ export default async function AdminExercisesPage({ searchParams }: { searchParam
                 {(media ?? []).map((m) => (
                   <li key={m.id as string} className="flex items-center justify-between gap-2 rounded-lg bg-elevated/60 px-3 py-2">
                     <span className="truncate">
-                      {m.media_type as string}: {(m.external_url as string) ?? (m.storage_path as string)} · {m.license as string}
+                      {m.media_type as string}:{" "}
+                      <a
+                        href={(m.external_url as string | null) ?? exerciseMediaPublicUrl(publicEnv.supabaseUrl, m.storage_path as string)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-gold-highlight hover:underline"
+                      >
+                        {(m.external_url as string | null) ?? `${m.storage_path as string} (uploaded)`}
+                      </a>{" "}
+                      · {m.license as string}
                     </span>
-                    <ActionButton action={deleteExerciseMediaAction} fields={{ id: m.id as string }} size="icon-sm" variant="ghost" aria-label="Delete media">
-<Trash2 aria-hidden />
+                    <ActionButton action={deleteExerciseMediaAction} fields={{ id: m.id as string }} size="icon-sm" variant="ghost" aria-label="Delete media" confirmMessage={m.storage_path ? "Delete this media and its uploaded file?" : "Delete this media link?"}>
+                      <Trash2 aria-hidden />
                     </ActionButton>
                   </li>
                 ))}
               </ul>
+              <h3 className="mb-2 text-sm font-semibold">Upload a file</h3>
+              <ExerciseMediaUpload exerciseId={ex.id} slug={ex.slug} exerciseName={ex.name} />
+              <h3 className="mb-2 mt-6 border-t border-border pt-4 text-sm font-semibold">Or add an HTTPS link</h3>
               <ActionForm action={addExerciseMediaAction} submitLabel="Add media" resetOnSuccess>
                 <input type="hidden" name="exerciseId" value={ex.id} />
                 <div className="grid gap-3 md:grid-cols-2">
