@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { CheckCircle2, Lock, Target, Trash2, Trophy } from "lucide-react";
+import { Award, CheckCircle2, Lock, Target, Trash2, Trophy } from "lucide-react";
 import { BarSeriesChart, CATEGORICAL, LineSeriesChart } from "@/components/charts/charts";
 import { PageHeader } from "@/components/common/page-header";
-import { EmptyState } from "@/components/common/states";
+import { EmptyState, Notice } from "@/components/common/states";
 import { GoalForm, MeasurementForm, WeightForm } from "@/components/progress/progress-forms";
+import { ProgressPhotos } from "@/components/progress/progress-photos";
 import { ActionButton } from "@/components/common/action-button";
 import { Button } from "@/components/ui/button";
 import { ProgressBar } from "@/components/ui/progress-bar";
@@ -15,6 +16,9 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { deleteWeightAction, setGoalStatusAction } from "@/server/actions/progress";
 import { BIG_THREE, getNutritionDaily, getPersonalBests, getStrengthSeries, getTrainingBuckets } from "@/server/services/progress";
+import { listProgressPhotos } from "@/server/services/progress-photos";
+import { logError } from "@/server/log";
+import type { ProgressPhotoView } from "@/lib/domain/progress-photos";
 
 export const metadata = { title: "Progress" };
 
@@ -45,7 +49,12 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
   const start = rangeStart(range, today);
   const byMonth = range === "1y";
 
-  const [weightsRes, training, bests, goalsRes, exercisesRes, measurementsRes] = await Promise.all([
+  // Photos are available on every plan. A failure here shouldn't take down the whole page.
+  const photosPromise: Promise<ProgressPhotoView[] | null> = listProgressPhotos(supabase, user.id).catch((err: unknown) => {
+    logError("progress.photos", err);
+    return null;
+  });
+  const [weightsRes, training, bests, goalsRes, exercisesRes, measurementsRes, photos] = await Promise.all([
     supabase.from("weight_entries").select("id, recorded_on, weight_kg").eq("user_id", user.id).gte("recorded_on", start).order("recorded_on"),
     getTrainingBuckets(supabase, user.id, start, today, tz, byMonth),
     getPersonalBests(supabase, user.id),
@@ -54,6 +63,7 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
     advanced
       ? supabase.from("measurement_entries").select("recorded_on, waist_cm, chest_cm, hips_cm, arm_cm, thigh_cm, body_fat_pct").eq("user_id", user.id).gte("recorded_on", start).order("recorded_on")
       : Promise.resolve({ data: [] }),
+    photosPromise,
   ]);
   const exercises = exercisesRes.data ?? [];
   const exBySlug = new Map(exercises.map((e) => [e.slug as string, e]));
@@ -110,7 +120,18 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Progress" title="Progress & analytics" description="Every rep you log adds up. Here's the trend." />
+      <PageHeader
+        eyebrow="Progress"
+        title="Progress & analytics"
+        description="Every rep you log adds up. Here's the trend."
+        actions={
+          <Button asChild variant="outline">
+            <Link href="/progress/badges">
+              <Award aria-hidden /> Badges
+            </Link>
+          </Button>
+        }
+      />
 
       <nav aria-label="Time range" className="flex gap-2">
         {(Object.keys(RANGES) as RangeKey[]).map((r) => (
@@ -178,6 +199,12 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
           )}
         </section>
       </div>
+
+      {photos ? (
+        <ProgressPhotos photos={photos} userId={user.id} units={units} today={today} />
+      ) : (
+        <Notice tone="error">We couldn&apos;t load your progress photos right now. Please refresh to try again.</Notice>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <BarSeriesChart

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, CreditCard, Download, LogOut, SlidersHorizontal } from "lucide-react";
+import { Award, ChevronRight, CreditCard, Download, LogOut, SlidersHorizontal } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { DeleteAccountForm, ProfileForm, WithdrawConsentForm } from "@/components/profile/profile-forms";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,16 @@ export default async function ProfilePage() {
             <span>
               <span className="block font-semibold">Plans &amp; billing</span>
               <span className="block text-xs text-muted-foreground">Current plan: {getPlans()[plan].name}</span>
+            </span>
+          </span>
+          <ChevronRight className="size-4 text-gold" aria-hidden />
+        </Link>
+        <Link href="/progress/badges" className="flex items-center justify-between rounded-2xl border border-border bg-card p-4 hover:border-gold-muted">
+          <span className="flex items-center gap-3">
+            <Award className="size-5 text-gold" aria-hidden />
+            <span>
+              <span className="block font-semibold">Badges</span>
+              <span className="block text-xs text-muted-foreground">Achievements earned from your training</span>
             </span>
           </span>
           <ChevronRight className="size-4 text-gold" aria-hidden />

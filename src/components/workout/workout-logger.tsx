@@ -27,7 +27,8 @@ import {
 } from "@/lib/domain/workout-draft";
 import { cancelRestNotification, hapticSuccess, scheduleRestNotification } from "@/lib/native";
 import { clearLocalDraft, loadLocalDraft, saveLocalDraft } from "@/lib/workout-storage";
-import { discardWorkoutAction, finishWorkoutAction, syncWorkoutDraftAction } from "@/server/actions/workouts";
+import { discardWorkoutAction, finishWorkoutAction, syncWorkoutDraftAction, type UnlockedBadge } from "@/server/actions/workouts";
+import { BadgeMedallion } from "@/components/achievements/badge-icon";
 import { ExerciseCard } from "./exercise-card";
 import { ExercisePicker, type CatalogItem } from "./exercise-picker";
 
@@ -55,6 +56,7 @@ type SyncState = "idle" | "saving" | "synced" | "local";
 interface FinishResult {
   volumeKg: number;
   records: { exerciseId: string; recordType: string; value: number }[];
+  badges: UnlockedBadge[];
   durationSeconds: number;
 }
 
@@ -295,6 +297,27 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
             </ul>
           </section>
         )}
+        {result.badges.length > 0 && (
+          <section className="space-y-2 text-left" aria-labelledby="badges-unlocked-title">
+            <h2 id="badges-unlocked-title" className="font-display text-lg font-semibold uppercase text-gold-highlight">
+              Badge unlocked!
+            </h2>
+            <ul className="space-y-2">
+              {result.badges.map((b) => (
+                <li key={b.id} className="flex items-center gap-4 rounded-2xl border border-gold-muted bg-gold/5 p-4 motion-safe:animate-fade-up">
+                  <BadgeMedallion icon={b.icon} tier={b.tier} earned />
+                  <div>
+                    <p className="font-semibold">{b.name}</p>
+                    <p className="text-sm text-muted-foreground">{b.description}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <Link href="/progress/badges" className="inline-flex min-h-11 items-center text-sm font-semibold text-gold-highlight underline-offset-4 hover:underline">
+              See all badges
+            </Link>
+          </section>
+        )}
         {template?.cooldown && template.cooldown.length > 0 && (
           <section className="rounded-2xl border border-border bg-card p-4 text-left">
             <h2 className="mb-2 font-display text-lg font-semibold uppercase">Cooldown</h2>
@@ -362,7 +385,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
     }
     clearLocalDraft(userId);
     void cancelRestNotification();
-    setResult({ volumeKg: res.data.volumeKg, records: res.data.records, durationSeconds: elapsedSeconds(finalDraft, endedAt) });
+    setResult({ volumeKg: res.data.volumeKg, records: res.data.records, badges: res.data.badges ?? [], durationSeconds: elapsedSeconds(finalDraft, endedAt) });
     setPhase("finished");
     window.scrollTo({ top: 0 });
   };

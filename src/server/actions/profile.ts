@@ -7,6 +7,7 @@ import { actionError, actionInvalid, actionOk, type ActionState } from "@/lib/ac
 import { profileUpdateSchema } from "@/lib/validation/schemas";
 import { requireUser } from "@/server/auth";
 import { isServiceRoleConfigured } from "@/server/env";
+import { removeUserStorage } from "@/server/services/account";
 import { cancelStripeSubscriptionsForUser } from "@/server/services/billing";
 import { logError } from "@/server/log";
 
@@ -71,8 +72,8 @@ export async function deleteAccountAction(_prev: ActionState, formData: FormData
   try {
     await cancelStripeSubscriptionsForUser(user.id);
     const admin = getServiceSupabase();
-    const { data: files } = await admin.storage.from("avatars").list(user.id);
-    if (files?.length) await admin.storage.from("avatars").remove(files.map((f) => `${user.id}/${f.name}`));
+    // Rows cascade with the auth user; storage objects don't, so remove them first.
+    await removeUserStorage(admin, user.id);
     const { error } = await admin.auth.admin.deleteUser(user.id);
     if (error) throw error;
   } catch (err) {
