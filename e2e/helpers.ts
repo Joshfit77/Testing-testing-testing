@@ -54,3 +54,23 @@ export async function completeOnboarding(page: Page) {
   await page.getByRole("button", { name: "Build my plan" }).click();
   await page.waitForURL(/\/home/, { timeout: 30_000 });
 }
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321";
+// The local Supabase CLI's standard demo service-role key (public, local-only). Never a real secret.
+const LOCAL_SERVICE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ??
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU";
+
+/** Test-only: grant a plan directly in the local database (stands in for a completed Stripe checkout). */
+export async function grantPlan(email: string, plan: "plus" | "pro") {
+  const headers = { apikey: LOCAL_SERVICE_KEY, Authorization: `Bearer ${LOCAL_SERVICE_KEY}`, "Content-Type": "application/json" };
+  const users = (await (await fetch(`${SUPABASE_URL}/auth/v1/admin/users?per_page=1000`, { headers })).json()) as { users: { id: string; email: string }[] };
+  const user = users.users.find((u) => u.email === email);
+  if (!user) throw new Error(`No user ${email}`);
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/user_entitlements`, {
+    method: "POST",
+    headers: { ...headers, Prefer: "resolution=merge-duplicates" },
+    body: JSON.stringify({ user_id: user.id, plan, source: "admin" }),
+  });
+  if (!res.ok) throw new Error(`grantPlan failed: ${res.status} ${await res.text()}`);
+}

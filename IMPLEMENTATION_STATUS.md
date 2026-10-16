@@ -11,8 +11,8 @@ Verification ran against a full local Supabase stack (Postgres 17, GoTrue auth, 
 - `npm run typecheck`: clean (strict TypeScript, `noUncheckedIndexedAccess`)
 - `npm run lint`: clean
 - `npm run build`: production build succeeds
-- `npm run test:unit`: 39 tests for domain logic and catalog integrity
-- `npm run test:integration`: 23 tests against the real database. They cover RLS isolation, role escalation, entitlement tampering, admin privacy, consent enforcement, cascade on account deletion, workout drafts, idempotent finish, PR detection and recalculation, program advancement, Stripe webhook signature, idempotency and subscription lifecycle, and AI gating and quotas.
+- `npm run test:unit`: 44 tests for domain logic and catalog integrity
+- `npm run test:integration`: 24 tests against the real database. They cover RLS isolation, role escalation, entitlement tampering, admin privacy, consent enforcement, cascade on account deletion, workout drafts, idempotent finish, PR detection and recalculation, program advancement, Stripe webhook signature, idempotency and subscription lifecycle, and AI gating and quotas.
 - `npm run test:e2e`: Playwright (mobile viewport) against `next start`. Covers sign-up, email confirmation via Mailpit, onboarding, the dashboard, starting a program session, logging sets, reload-restore, pause/resume, finishing with PRs, history, sign-out and sign-in, password-reset email, the under-18 block, free-plan gating (premium program, nutrition, AI, billing page), bodyweight and goals, the consent-gated recovery check-in, and the faith opt-in and journal.
 
 ## Feature checklist
@@ -29,9 +29,10 @@ Verification ran against a full local Supabase stack (Postgres 17, GoTrue auth, 
 | History edit/delete, PRs, volume, frequency | ✅ Done & integration-tested | |
 | Dashboard | ✅ Done | |
 | Progress analytics (7d/30d/90d/1y) | ✅ Done | Advanced charts are gated server-side to Plus and Pro. |
-| Nutrition | ✅ Done (manual/custom flows verified by typecheck/build) | **USDA search needs `USDA_FDC_API_KEY`**. It wasn't exercised live here because outbound access to that API wasn't tested. |
+| Food log (nutrition) | ✅ Done & e2e-tested | A main "Food" tab. Search works out of the box on 94 built-in common foods (typical values, labeled as estimates); logging a serving is e2e-tested. **USDA search additionally needs `USDA_FDC_API_KEY`** and wasn't exercised live here. |
 | AI coach (chat, plan generation, approval, metering, rate limits, fallback) | ✅ Implemented; gating/quotas integration-tested | **Live model calls need `ANTHROPIC_API_KEY`**. No real completions were made in this environment. Prompt quality should be evaluated with real usage. |
 | Optional Faith & Discipline | ✅ Done & e2e-tested | |
+| Pricing: Plus $9.99/mo, Pro $30/mo, All Access Yearly $200/yr (grants Pro) | ✅ Done; yearly price → Pro mapping integration-tested | Needs `STRIPE_PRICE_PRO_YEARLY`; without it the yearly card says it isn't configured. |
 | Stripe checkout, portal, webhooks, entitlements | ✅ Implemented; webhook & entitlement logic integration-tested with signed synthetic events | **Checkout and the Billing Portal need real Stripe keys and prices.** They weren't run end to end against Stripe here. |
 | Admin (catalog, media, categories, content, flags, subscriptions, metrics, audit) | ✅ Done | Admin RLS and privacy are integration-tested. The admin UI was verified by typecheck and build only. |
 | Installable PWA | ✅ Done | Manifest, icons, service worker and offline page. |
@@ -45,7 +46,7 @@ Verification ran against a full local Supabase stack (Postgres 17, GoTrue auth, 
 2. **Loading boundaries.** Next 15.5 aborted same-route re-renders after server actions when a route-level `loading.tsx` Suspense boundary was present (reproduced: about 40–90% failure). Skeleton `loading.tsx` files are therefore only on read-only routes. Mutation-heavy routes rely on the global navigation progress bar. One-click mutations use `ActionButton` (action + `router.refresh()`).
 3. **Burst rate limiting** for AI and food search is in-memory per server instance. Monthly AI quotas are durable (database). For multi-instance production, consider a shared store (e.g. Upstash Redis) for burst limits.
 4. **Scripture text** is KJV (public domain outside the UK) and was entered from a well-known text. Verify every verse against an authoritative KJV source before publication.
-5. **Exercise media.** None is bundled. The UI says so honestly. Admins can add licensed media (a license field and confirmation are required).
+5. **Exercise videos.** No videos are bundled (we don't own any). Every exercise page has a "Watch form videos" button that opens a YouTube search, and admins can attach a YouTube, Vimeo or direct video link per exercise, which plays inside the app (privacy-enhanced YouTube embed). A license/permission confirmation is required.
 6. **Nutrition estimates** are deliberately simple (bodyweight-based) and always labeled as estimates. There is no sex/age-based BMR, by design (minimal data collection).
 7. **Offline.** An in-progress workout keeps working offline once the logger page is open, and it syncs when you reconnect. Other pages need a connection (offline page shown).
 8. **Admin program editing** covers metadata, publishing, tier and per-exercise prescriptions. Adding or removing weeks, days or exercises in curated programs is done through `src/data/programs.ts` plus `npm run seed:generate`.

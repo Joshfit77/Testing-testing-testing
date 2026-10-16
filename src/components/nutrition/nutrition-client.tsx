@@ -3,13 +3,13 @@
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { Droplets, Loader2, Plus, Search, Undo2 } from "lucide-react";
 import { FieldError, FormMessage, SubmitButton } from "@/components/common/form-status";
-import { Notice } from "@/components/common/states";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input, NativeSelect } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { initialActionState, type ActionState } from "@/lib/action-state";
+import { MEAL_TYPES } from "@/lib/domain/meals";
 import { caloriesFromMacros } from "@/lib/domain/nutrition";
 import {
   addWaterAction,
@@ -21,12 +21,7 @@ import {
   updateGoalsAction,
 } from "@/server/actions/nutrition";
 
-export const MEAL_TYPES = [
-  ["breakfast", "Breakfast"],
-  ["lunch", "Lunch"],
-  ["dinner", "Dinner"],
-  ["snack", "Snack"],
-] as const;
+
 
 export interface MyFood {
   id: string;
@@ -78,7 +73,7 @@ function MealControls({ mealType, setMealType, status, setStatus, idPrefix }: { 
   );
 }
 
-export function AddFoodDialog({ date, myFoods, searchEnabled }: { date: string; myFoods: MyFood[]; searchEnabled: boolean }) {
+export function AddFoodDialog({ date, myFoods, commonFoods, searchEnabled }: { date: string; myFoods: MyFood[]; commonFoods: MyFood[]; searchEnabled: boolean }) {
   const [open, setOpen] = useState(false);
   const [mealType, setMealType] = useState("breakfast");
   const [status, setStatus] = useState("logged");
@@ -133,6 +128,36 @@ export function AddFoodDialog({ date, myFoods, searchEnabled }: { date: string; 
   const macroCalories = caloriesFromMacros({ protein_g: Number(manual.protein_g || 0), carbs_g: Number(manual.carbs_g || 0), fat_g: Number(manual.fat_g || 0) });
   const mismatch = manual.calories && macroCalories > 0 && Math.abs(macroCalories - manualCalories) > Math.max(30, manualCalories * 0.2);
   const filtered = myFoods.filter((f) => !filter || f.name.toLowerCase().includes(filter.toLowerCase()));
+  const terms = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const commonMatches = (terms.length ? commonFoods.filter((f) => terms.every((w) => f.name.toLowerCase().includes(w))) : commonFoods).slice(0, terms.length ? 30 : 12);
+
+  const foodRow = (f: MyFood, tag?: string) => (
+    <li key={f.id} className="rounded-xl border border-border bg-elevated/50 p-3">
+      <p className="text-sm font-semibold">
+        {f.name} {f.is_estimate && <span className="text-[11px] font-normal text-gold">({tag ?? "estimate"})</span>}
+      </p>
+      <p className="text-xs text-muted-foreground">
+        {f.serving_size} {f.serving_unit}: {Number(f.calories)} kcal · P {Number(f.protein_g)}g · C {Number(f.carbs_g)}g · F {Number(f.fat_g)}g
+        {f.source === "usda" ? " · USDA" : ""}
+      </p>
+      <div className="mt-2 flex items-center gap-2">
+        <Input
+          type="number"
+          inputMode="decimal"
+          step="0.25"
+          min="0.25"
+          aria-label={`Servings of ${f.name}`}
+          value={servings[f.id] ?? "1"}
+          onChange={(e) => setServings((s) => ({ ...s, [f.id]: e.target.value }))}
+          className="h-10 w-20"
+        />
+        <span className="text-xs text-muted-foreground">servings</span>
+        <Button size="sm" className="ml-auto" disabled={pending || !(Number(servings[f.id] ?? 1) > 0)} onClick={() => submit({ source: "food", foodId: f.id, servings: Number(servings[f.id] ?? 1) })}>
+          Add
+        </Button>
+      </div>
+    </li>
+  );
 
   return (
     <>
@@ -151,7 +176,7 @@ export function AddFoodDialog({ date, myFoods, searchEnabled }: { date: string; 
               {result.message}
             </p>
           )}
-          <Tabs defaultValue={searchEnabled ? "search" : myFoods.length ? "mine" : "manual"} className="mt-4">
+          <Tabs defaultValue="search" className="mt-4">
             <TabsList className="w-full">
               <TabsTrigger value="search" className="flex-1">
                 Search
@@ -165,86 +190,69 @@ export function AddFoodDialog({ date, myFoods, searchEnabled }: { date: string; 
             </TabsList>
 
             <TabsContent value="search">
-              {!searchEnabled ? (
-                <Notice tone="info">Food database search isn&apos;t configured on this server. Use My foods or Manual entry.</Notice>
-              ) : (
-                <>
-                  <label className="relative block">
-                    <span className="sr-only">Search foods</span>
-                    <Search className="pointer-events-none absolute left-3 top-3.5 size-4 text-muted-foreground" aria-hidden />
-                    <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. greek yogurt, banana" className="pl-9" />
-                  </label>
-                  <p className="mt-2 text-[11px] text-muted-foreground">Values per 100 g from USDA FoodData Central. Enter the grams you ate.</p>
-                  {searchError && <p className="mt-2 text-sm text-[#f08a8a]">{searchError}</p>}
-                  <ul className="mt-2 max-h-80 space-y-2 overflow-y-auto" aria-live="polite" aria-busy={searching}>
-                    {searching && (
-                      <li className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
-                        <Loader2 className="size-4 animate-spin" aria-hidden /> Searching…
-                      </li>
-                    )}
-                    {!searching && q.trim().length >= 2 && results.length === 0 && !searchError && <li className="py-4 text-sm text-muted-foreground">No matches.</li>}
-                    {results.map((f) => (
-                      <li key={f.fdcId} className="rounded-xl border border-border bg-elevated/50 p-3">
-                        <p className="text-sm font-semibold">{f.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {f.brand ? `${f.brand} · ` : ""}
-                          {f.calories} kcal · P {f.protein_g}g · C {f.carbs_g}g · F {f.fat_g}g per 100 g
-                          {f.householdServing ? ` · label serving ${f.householdServing}` : ""}
-                        </p>
-                        <div className="mt-2 flex items-center gap-2">
-                          <Input
-                            type="number"
-                            inputMode="decimal"
-                            aria-label={`Grams of ${f.name}`}
-                            value={grams[f.fdcId] ?? "100"}
-                            onChange={(e) => setGrams((g) => ({ ...g, [f.fdcId]: e.target.value }))}
-                            className="h-10 w-24"
-                          />
-                          <span className="text-xs text-muted-foreground">g</span>
-                          <Button size="sm" className="ml-auto" disabled={pending} onClick={() => submit({ source: "usda", fdcId: f.fdcId, grams: Number(grams[f.fdcId] ?? 100) })}>
-                            Add
-                          </Button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              )}
+              <label className="relative block">
+                <span className="sr-only">Search foods</span>
+                <Search className="pointer-events-none absolute left-3 top-3.5 size-4 text-muted-foreground" aria-hidden />
+                <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. chicken, banana, rice" className="pl-9" />
+              </label>
+              <div className="mt-2 max-h-96 space-y-3 overflow-y-auto" aria-live="polite" aria-busy={searching}>
+                <section aria-label="Common foods">
+                  <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">{terms.length ? "Common foods" : "Popular foods"}</p>
+                  {commonMatches.length ? (
+                    <ul className="mt-2 space-y-2">{commonMatches.map((f) => foodRow(f, "typical values"))}</ul>
+                  ) : (
+                    <p className="py-2 text-sm text-muted-foreground">{commonFoods.length ? "No common foods match." : "No built-in foods are loaded on this server yet."}</p>
+                  )}
+                  <p className="mt-2 text-[11px] text-muted-foreground">Typical values; check the label when you have it.</p>
+                </section>
+                {searchEnabled && terms.length > 0 && (
+                  <section aria-label="Food database">
+                    <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">USDA food database · per 100 g</p>
+                    {searchError && <p className="mt-2 text-sm text-[#f08a8a]">{searchError}</p>}
+                    <ul className="mt-2 space-y-2">
+                      {searching && (
+                        <li className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+                          <Loader2 className="size-4 animate-spin" aria-hidden /> Searching…
+                        </li>
+                      )}
+                      {!searching && q.trim().length >= 2 && results.length === 0 && !searchError && <li className="py-2 text-sm text-muted-foreground">No matches.</li>}
+                      {results.map((f) => (
+                        <li key={f.fdcId} className="rounded-xl border border-border bg-elevated/50 p-3">
+                          <p className="text-sm font-semibold">{f.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {f.brand ? `${f.brand} · ` : ""}
+                            {f.calories} kcal · P {f.protein_g}g · C {f.carbs_g}g · F {f.fat_g}g per 100 g
+                            {f.householdServing ? ` · label serving ${f.householdServing}` : ""}
+                          </p>
+                          <div className="mt-2 flex items-center gap-2">
+                            <Input
+                              type="number"
+                              inputMode="decimal"
+                              aria-label={`Grams of ${f.name}`}
+                              value={grams[f.fdcId] ?? "100"}
+                              onChange={(e) => setGrams((g) => ({ ...g, [f.fdcId]: e.target.value }))}
+                              className="h-10 w-24"
+                            />
+                            <span className="text-xs text-muted-foreground">g</span>
+                            <Button size="sm" className="ml-auto" disabled={pending} onClick={() => submit({ source: "usda", fdcId: f.fdcId, grams: Number(grams[f.fdcId] ?? 100) })}>
+                              Add
+                            </Button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+              </div>
             </TabsContent>
 
             <TabsContent value="mine">
               {myFoods.length === 0 ? (
-                <p className="py-4 text-sm text-muted-foreground">No saved foods yet. Create one below the food log, or search the database.</p>
+                <p className="py-4 text-sm text-muted-foreground">No saved foods yet. Create one below the food log, or use Search.</p>
               ) : (
                 <>
                   <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter my foods" aria-label="Filter my foods" />
-                  <ul className="mt-2 max-h-80 space-y-2 overflow-y-auto">
-                    {filtered.map((f) => (
-                      <li key={f.id} className="rounded-xl border border-border bg-elevated/50 p-3">
-                        <p className="text-sm font-semibold">
-                          {f.name} {f.is_estimate && <span className="text-[11px] font-normal text-gold">(estimate)</span>}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {f.serving_size} {f.serving_unit}: {f.calories} kcal · P {f.protein_g}g · C {f.carbs_g}g · F {f.fat_g}g
-                          {f.source === "usda" ? " · USDA" : ""}
-                        </p>
-                        <div className="mt-2 flex items-center gap-2">
-                          <Input
-                            type="number"
-                            inputMode="decimal"
-                            step="0.25"
-                            aria-label={`Servings of ${f.name}`}
-                            value={servings[f.id] ?? "1"}
-                            onChange={(e) => setServings((s) => ({ ...s, [f.id]: e.target.value }))}
-                            className="h-10 w-20"
-                          />
-                          <span className="text-xs text-muted-foreground">servings</span>
-                          <Button size="sm" className="ml-auto" disabled={pending} onClick={() => submit({ source: "food", foodId: f.id, servings: Number(servings[f.id] ?? 1) })}>
-                            Add
-                          </Button>
-                        </div>
-                      </li>
-                    ))}
+                  <ul className="mt-2 max-h-80 space-y-2 overflow-y-auto">{filtered.map((f) => foodRow(f))}
                   </ul>
                 </>
               )}

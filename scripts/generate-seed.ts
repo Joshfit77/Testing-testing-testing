@@ -8,6 +8,7 @@ import path from "node:path";
 import { EXERCISES } from "../src/data/exercises";
 import { PROGRAM_CATEGORIES, PROGRAMS } from "../src/data/programs";
 import { FEATURE_FLAGS, SEED_CONTENT } from "../src/data/content";
+import { COMMON_FOODS } from "../src/data/foods";
 import { expandProgram } from "../src/lib/domain/program-expansion";
 
 /** Deterministic UUID derived from a stable key, so re-running the seed is idempotent. */
@@ -137,6 +138,14 @@ for (const c of SEED_CONTENT) {
   );
 }
 lines.push("");
+lines.push("-- Built-in common foods (public, owner_id = null). Typical values, stored as estimates.");
+for (const food of COMMON_FOODS) {
+  lines.push(
+    `insert into public.foods (id, owner_id, name, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g, fiber_g, source, source_ref, is_estimate) values (${q(stableUuid(`food:${food.slug}`))}, null, ${q(food.name)}, ${num(food.servingSize)}, ${q(food.servingUnit)}, ${num(food.calories)}, ${num(food.protein_g)}, ${num(food.carbs_g)}, ${num(food.fat_g)}, ${num(food.fiber_g)}, 'curated', ${q(food.slug)}, true) on conflict (id) do update set name = excluded.name, serving_size = excluded.serving_size, serving_unit = excluded.serving_unit, calories = excluded.calories, protein_g = excluded.protein_g, carbs_g = excluded.carbs_g, fat_g = excluded.fat_g, fiber_g = excluded.fiber_g;`,
+  );
+}
+lines.push("");
+
 lines.push("commit;");
 
 const out = path.resolve(process.cwd(), "supabase/seed.sql");

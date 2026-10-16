@@ -18,6 +18,8 @@ export interface PlanConfig {
   name: string;
   /** Display price in US cents per month. Billing uses the configured Stripe price. */
   priceCents: number;
+  /** Optional yearly option (US cents per year) that grants this plan. */
+  yearlyPriceCents?: number;
   tagline: string;
   features: Feature[];
   /** AI coach messages per calendar month. */
@@ -65,12 +67,13 @@ export function getPlans(): Record<Plan, PlanConfig> {
       ],
       aiMonthlyLimit: envInt("PLAN_PLUS_AI_MONTHLY_LIMIT", 60),
       aiPlanMonthlyLimit: 0,
-      highlights: ["Full program library", "Advanced analytics", "Nutrition tracking", "AI coach (limited)"],
+      highlights: ["Full program library", "Advanced analytics", "Food tracking", "AI coach (limited)"],
     },
     pro: {
       id: "pro",
       name: "Pro",
-      priceCents: envInt("PLAN_PRO_PRICE_CENTS", 1999),
+      priceCents: envInt("PLAN_PRO_PRICE_CENTS", 3000),
+      yearlyPriceCents: envInt("PLAN_PRO_YEARLY_PRICE_CENTS", 20000),
       tagline: "Personal coaching, powered by AI.",
       features: [...FEATURES],
       aiMonthlyLimit: envInt("PLAN_PRO_AI_MONTHLY_LIMIT", 400),
@@ -133,8 +136,17 @@ export function effectivePlanFromSubscription(
 }
 
 export function formatPrice(cents: number): string {
-  return cents === 0 ? "Free" : `$${(cents / 100).toFixed(2)}`;
+  if (cents === 0) return "Free";
+  return cents % 100 === 0 ? `$${cents / 100}` : `$${(cents / 100).toFixed(2)}`;
 }
+
+/** Percentage saved by paying yearly instead of 12 monthly payments (rounded down). */
+export function yearlySavingsPercent(monthlyCents: number, yearlyCents: number): number {
+  if (monthlyCents <= 0 || yearlyCents <= 0) return 0;
+  return Math.max(0, Math.floor((1 - yearlyCents / (monthlyCents * 12)) * 100));
+}
+
+export type BillingInterval = "month" | "year";
 
 /** Best effective plan across all of a user's subscriptions (e.g. an old canceled one plus a new active one). */
 export function entitlementFromSubscriptions(

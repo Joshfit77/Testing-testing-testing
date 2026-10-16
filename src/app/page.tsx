@@ -4,14 +4,14 @@ import { Bot, Check, Dumbbell, HeartPulse, LineChart, Salad, ShieldCheck } from 
 import { Logo } from "@/components/common/logo";
 import { Button } from "@/components/ui/button";
 import { isSupabaseConfigured } from "@/lib/env";
-import { formatPrice, getPlans, PLAN_ORDER } from "@/lib/domain/plans";
+import { formatPrice, getPlans, PLAN_ORDER, yearlySavingsPercent } from "@/lib/domain/plans";
 import { getCurrentUser } from "@/server/auth";
 
 const FEATURES = [
   { icon: Dumbbell, title: "Programs that adapt", body: "Strength, hypertrophy, strongman, combat conditioning, mobility and more — matched to your goals and equipment." },
   { icon: HeartPulse, title: "Log every rep", body: "A fast workout logger with rest timer, substitutions and personal records. Your session survives reloads." },
   { icon: Bot, title: "AI coach", body: "Ask about technique, progression and recovery. Plan changes are always previewed before they're saved." },
-  { icon: Salad, title: "Nutrition", body: "Track calories, macros and water. Estimates are clearly labeled — nothing is invented." },
+  { icon: Salad, title: "Food tracking", body: "Log meals from 90+ common foods or your own, and track calories, macros and water. Estimates are clearly labeled." },
   { icon: LineChart, title: "Progress you can see", body: "Bodyweight, lift trends, volume and consistency charts with 7-day to 1-year views." },
   { icon: ShieldCheck, title: "Private by design", body: "Your data is isolated to your account. Export or delete it any time." },
 ];
@@ -81,7 +81,7 @@ export default async function LandingPage() {
           <h2 id="pricing-title" className="font-display text-3xl font-bold uppercase tracking-wide">
             Simple plans
           </h2>
-          <div className="mt-8 grid gap-4 md:grid-cols-3">
+          <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {PLAN_ORDER.map((id) => {
               const p = plans[id];
               const featured = id === "plus";
@@ -106,6 +106,23 @@ export default async function LandingPage() {
                 </div>
               );
             })}
+            {plans.pro.yearlyPriceCents ? (
+              <div className="rounded-2xl border border-gold-muted bg-card-gradient p-6">
+                <p className="font-display text-xl font-semibold uppercase tracking-wider text-gold-highlight">All Access Yearly</p>
+                <p className="mt-2 text-3xl font-bold">
+                  {formatPrice(plans.pro.yearlyPriceCents)}
+                  <span className="text-sm font-normal text-muted-foreground"> / year</span>
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">Everything, billed once a year. Save {yearlySavingsPercent(plans.pro.priceCents, plans.pro.yearlyPriceCents)}%.</p>
+                <ul className="mt-5 space-y-2 text-sm">
+                  {["Everything in Pro", "All programs, food tracking & analytics", "Full AI coaching & plan generation"].map((h) => (
+                    <li key={h} className="flex gap-2">
+                      <Check className="mt-0.5 size-4 shrink-0 text-gold" aria-hidden /> {h}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </div>
         </section>
       </main>

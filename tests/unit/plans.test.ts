@@ -1,4 +1,4 @@
-import { canAccessTier, effectivePlanFromSubscription, getPlans, hasFeature } from "@/lib/domain/plans";
+import { canAccessTier, effectivePlanFromSubscription, formatPrice, getPlans, hasFeature, yearlySavingsPercent } from "@/lib/domain/plans";
 
 describe("plans & entitlements", () => {
   it("gates features by plan", () => {
@@ -16,9 +16,18 @@ describe("plans & entitlements", () => {
   it("uses default prices and AI limits", () => {
     const plans = getPlans();
     expect(plans.plus.priceCents).toBe(999);
-    expect(plans.pro.priceCents).toBe(1999);
+    expect(plans.pro.priceCents).toBe(3000);
+    expect(plans.pro.yearlyPriceCents).toBe(20000);
     expect(plans.pro.aiMonthlyLimit).toBeGreaterThan(plans.plus.aiMonthlyLimit);
     expect(plans.free.aiMonthlyLimit).toBe(0);
+  });
+  it("formats prices and yearly savings", () => {
+    expect(formatPrice(0)).toBe("Free");
+    expect(formatPrice(999)).toBe("$9.99");
+    expect(formatPrice(3000)).toBe("$30");
+    expect(formatPrice(20000)).toBe("$200");
+    expect(yearlySavingsPercent(3000, 20000)).toBe(44);
+    expect(yearlySavingsPercent(0, 20000)).toBe(0);
   });
   it("respects env overrides", () => {
     process.env.PLAN_PLUS_AI_MONTHLY_LIMIT = "5";

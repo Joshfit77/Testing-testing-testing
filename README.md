@@ -25,7 +25,7 @@ One codebase ships three ways:
 - **AI coach**: server-side Anthropic Claude calls, safety-scoped coaching, a context built from the user's own data, rate limits and monthly metering, and Zod-validated plan generation with preview and approval before saving. It degrades gracefully when no key is configured.
 - **Recovery & mobility**: readiness check-ins (consent-gated), mobility and low-impact routines, rest-day activities, modifications, and the option to skip any painful exercise.
 - **Optional Faith & Discipline**: KJV (public-domain) scripture by theme, verse of the day, a private journal, discipline goals with streaks, and devotionals.
-- **Subscriptions**: Free / Plus ($9.99) / Pro ($19.99) defaults, configurable by env. Stripe Checkout, Billing Portal, signature-verified idempotent webhooks, and server-side entitlements.
+- **Subscriptions**: Free / Plus ($9.99/month) / Pro ($30/month) / All Access Yearly ($200/year, everything in Pro) defaults, configurable by env. Stripe Checkout, Billing Portal, signature-verified idempotent webhooks, and server-side entitlements.
 - **Admin**: role-protected pages for exercises (licensed media only), programs and prescriptions, categories, content, subscriptions, feature flags, aggregate metrics and an audit log. Admins never see users' health or journal data.
 - **Security**: Postgres Row Level Security on every table, Zod validation on every input, no secrets in client bundles, CSRF-safe server actions plus same-origin checks on cookie-authenticated API routes, and structured error logging that excludes private data.
 

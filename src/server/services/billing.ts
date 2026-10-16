@@ -2,7 +2,7 @@ import "server-only";
 import Stripe from "stripe";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { publicEnv } from "@/lib/env";
-import { entitlementFromSubscriptions, type SubscriptionStatus } from "@/lib/domain/plans";
+import { entitlementFromSubscriptions, type BillingInterval, type SubscriptionStatus } from "@/lib/domain/plans";
 import type { Plan } from "@/lib/domain/types";
 import { isServiceRoleConfigured, serverEnv } from "@/server/env";
 import { logError } from "@/server/log";
@@ -17,13 +17,16 @@ export function getStripe(): Stripe {
 
 export type PaidPlan = Exclude<Plan, "free">;
 
-export function priceIdForPlan(plan: PaidPlan): string {
+/** Stripe price for a plan and interval. Only Pro has a yearly option ("everything, billed yearly"). */
+export function priceIdForPlan(plan: PaidPlan, interval: BillingInterval = "month"): string {
+  if (interval === "year") return plan === "pro" ? serverEnv.stripePriceProYearly : "";
   return plan === "pro" ? serverEnv.stripePricePro : serverEnv.stripePricePlus;
 }
 
 export function planForPriceId(priceId: string | null | undefined): PaidPlan | null {
   if (!priceId) return null;
   if (priceId === serverEnv.stripePricePro) return "pro";
+  if (serverEnv.stripePriceProYearly && priceId === serverEnv.stripePriceProYearly) return "pro";
   if (priceId === serverEnv.stripePricePlus) return "plus";
   return null;
 }
@@ -38,13 +41,15 @@ async function getOrCreateCustomer(userId: string, email: string | undefined): P
   return customer.id;
 }
 
-export async function createCheckoutSession(userId: string, email: string | undefined, plan: PaidPlan): Promise<string> {
+export async function createCheckoutSession(userId: string, email: string | undefined, plan: PaidPlan, interval: BillingInterval = "month"): Promise<string> {
+  const price = priceIdForPlan(plan, interval);
+  if (!price) throw new Error(`No Stripe price configured for ${plan}/${interval}`);
   const customer = await getOrCreateCustomer(userId, email);
   const session = await getStripe().checkout.sessions.create({
     mode: "subscription",
     customer,
     client_reference_id: userId,
-    line_items: [{ price: priceIdForPlan(plan), quantity: 1 }],
+    line_items: [{ price, quantity: 1 }],
     subscription_data: { metadata: { user_id: userId } },
     allow_promotion_codes: true,
     success_url: `${publicEnv.siteUrl}/profile/billing?checkout=success`,

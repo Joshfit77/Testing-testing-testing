@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AlertTriangle, ArrowLeft, CheckCircle2, ImageOff, Lightbulb } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, ExternalLink, Lightbulb, PlayCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { EQUIPMENT_LABELS, type Equipment } from "@/lib/domain/types";
 import type { ExerciseRow } from "@/lib/types/db";
 import { titleCase } from "@/lib/utils";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { publicEnv } from "@/lib/env";
+import { formVideoSearchUrl, videoEmbedUrl } from "@/lib/media";
 import { requireOnboardedUser } from "@/server/auth";
 
 export const metadata = { title: "Exercise" };
@@ -51,8 +52,18 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
             <div className="space-y-3 p-3">
               {media.map((m) => (
                 <figure key={m.id as string}>
-                  {m.media_type === "video" ? (
-                    <video src={mediaUrl(m)} controls preload="metadata" className="w-full rounded-xl" aria-label={(m.alt_text as string) || ex.name} />
+                  {m.media_type === "video" && videoEmbedUrl(mediaUrl(m)) ? (
+                    <iframe
+                      src={videoEmbedUrl(mediaUrl(m))!}
+                      title={(m.alt_text as string) || `${ex.name} demonstration`}
+                      className="aspect-video w-full rounded-xl"
+                      loading="lazy"
+                      allow="encrypted-media; picture-in-picture; fullscreen"
+                      referrerPolicy="strict-origin-when-cross-origin"
+                      allowFullScreen
+                    />
+                  ) : m.media_type === "video" ? (
+                    <video src={mediaUrl(m)} controls preload="metadata" playsInline className="w-full rounded-xl" aria-label={(m.alt_text as string) || ex.name} />
                   ) : (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={mediaUrl(m)} alt={(m.alt_text as string) || `${ex.name} demonstration`} className="w-full rounded-xl" loading="lazy" />
@@ -66,13 +77,22 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
             </div>
           ) : (
             <div className="flex aspect-video flex-col items-center justify-center gap-2 bg-elevated/40 p-6 text-center">
-              <ImageOff className="size-8 text-gold-muted" aria-hidden />
-              <p className="text-sm font-semibold">No demonstration media yet</p>
-              <p className="max-w-xs text-xs text-muted-foreground">
-                Properly licensed demonstrations can be added by an administrator. Follow the written steps below.
-              </p>
+              <PlayCircle className="size-10 text-gold" aria-hidden />
+              <p className="text-sm font-semibold">No built-in video for this exercise yet</p>
+              <p className="max-w-xs text-xs text-muted-foreground">An admin can add a YouTube, Vimeo or uploaded video. Until then, watch a form video or follow the steps below.</p>
             </div>
           )}
+          <div className="border-t border-border p-3">
+            <a
+              href={formVideoSearchUrl(ex.name)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-gold-muted px-4 text-sm font-semibold text-gold-highlight hover:bg-gold/10"
+            >
+              <PlayCircle className="size-4" aria-hidden /> Watch form videos <ExternalLink className="size-3.5" aria-hidden />
+            </a>
+            <p className="mt-1 text-[11px] text-muted-foreground">Opens YouTube search. Videos there are made by other creators.</p>
+          </div>
         </section>
 
         <section className="rounded-2xl border border-border bg-card p-5" aria-label="Muscles and equipment">

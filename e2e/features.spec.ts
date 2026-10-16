@@ -1,9 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { completeOnboarding, signUpAndConfirm, uniqueEmail } from "./helpers";
+import { completeOnboarding, grantPlan, signUpAndConfirm, uniqueEmail } from "./helpers";
 
 test.describe("feature access, subscriptions and core sections", () => {
+  let email = "";
   test.beforeEach(async ({ page }) => {
-    await signUpAndConfirm(page, uniqueEmail("feat"));
+    email = uniqueEmail("feat");
+    await signUpAndConfirm(page, email);
   });
 
   test("onboarding blocks under-18 users", async ({ page }) => {
@@ -68,5 +70,26 @@ test.describe("feature access, subscriptions and core sections", () => {
     await page.getByRole("textbox", { name: "Reflection" }).fill("Grateful for strength today.");
     await page.getByRole("button", { name: "Save entry" }).click();
     await expect(page.getByText("Entry saved. Only you can see it.")).toBeVisible();
+  });
+
+  test("food log: search built-in foods and log a serving (Plus)", async ({ page }) => {
+    await completeOnboarding(page);
+    await grantPlan(email, "plus");
+    await page.goto("/nutrition");
+    await expect(page.getByRole("heading", { name: "Food", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Add food" }).click();
+    await page.getByPlaceholder("e.g. chicken, banana, rice").fill("banana");
+    const row = page.getByRole("listitem").filter({ hasText: "Banana" }).first();
+    await row.getByLabel("Servings of Banana").fill("2");
+    await row.getByRole("button", { name: "Add" }).click();
+    await expect(page.getByText("Logged Banana.")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByText("Banana").first()).toBeVisible();
+    await expect(page.getByText("210").first()).toBeVisible();
+
+    await page.goto("/profile/billing");
+    await expect(page.getByText("All Access Yearly")).toBeVisible();
+    await expect(page.getByText("$200")).toBeVisible();
+    await expect(page.getByText(/^\$30\s*\/ month$/)).toBeVisible();
   });
 });

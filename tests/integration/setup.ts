@@ -18,4 +18,5 @@ process.env.STRIPE_SECRET_KEY = "sk_test_integration_dummy";
 process.env.STRIPE_WEBHOOK_SECRET = "whsec_integration_dummy";
 process.env.STRIPE_PRICE_PLUS = "price_test_plus";
 process.env.STRIPE_PRICE_PRO = "price_test_pro";
+process.env.STRIPE_PRICE_PRO_YEARLY = "price_test_pro_yearly";
 process.env.ANTHROPIC_API_KEY = "sk-ant-integration-dummy";

@@ -154,7 +154,7 @@ export default async function AdminExercisesPage({ searchParams }: { searchParam
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="externalUrl">HTTPS URL</Label>
-                    <Input id="externalUrl" name="externalUrl" type="url" required placeholder="https://" />
+                    <Input id="externalUrl" name="externalUrl" type="url" required placeholder="https:// — YouTube, Vimeo or a direct video/image file" />
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="license">License</Label>

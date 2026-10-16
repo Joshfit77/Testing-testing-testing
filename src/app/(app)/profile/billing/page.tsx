@@ -4,11 +4,11 @@ import { PageHeader } from "@/components/common/page-header";
 import { Notice } from "@/components/common/states";
 import { CheckoutButton, PortalButton } from "@/components/profile/billing-buttons";
 import { Badge } from "@/components/ui/badge";
-import { formatPrice, getPlans, PLAN_ORDER, planRank } from "@/lib/domain/plans";
+import { formatPrice, getPlans, PLAN_ORDER, planRank, yearlySavingsPercent } from "@/lib/domain/plans";
 import { titleCase } from "@/lib/utils";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
-import { isStripeConfigured } from "@/server/env";
+import { isStripeConfigured, isYearlyBillingConfigured } from "@/server/env";
 import { getNativePlatform } from "@/server/native";
 
 export const metadata = { title: "Plans & billing" };
@@ -25,6 +25,8 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   const plans = getPlans();
   const sub = subsRes.data;
   const stripeReady = isStripeConfigured();
+  const yearlyReady = isYearlyBillingConfigured();
+  const yearlyCents = plans.pro.yearlyPriceCents ?? 0;
   const periodEnd = sub?.current_period_end ? new Date(sub.current_period_end as string).toLocaleDateString("en-US", { dateStyle: "long" }) : null;
 
   return (
@@ -73,7 +75,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
         </div>
       </section>
 
-      <ul className="grid gap-4 md:grid-cols-3">
+      <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {PLAN_ORDER.map((id) => {
           const p = plans[id];
           const isCurrent = id === plan;
@@ -111,9 +113,36 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
             </li>
           );
         })}
+        {yearlyCents > 0 && (
+          <li className="rounded-2xl border border-gold-muted bg-card-gradient p-5">
+            <div className="flex items-center justify-between">
+              <p className="font-display text-xl font-semibold uppercase tracking-wider">All Access Yearly</p>
+              <Badge>Save {yearlySavingsPercent(plans.pro.priceCents, yearlyCents)}%</Badge>
+            </div>
+            <p className="mt-2 text-3xl font-bold">
+              {formatPrice(yearlyCents)}
+              <span className="text-sm font-normal text-muted-foreground"> / year</span>
+            </p>
+            <p className="text-sm text-muted-foreground">Everything in every plan, billed once a year.</p>
+            <ul className="mt-4 space-y-2 text-sm">
+              {["Everything in Pro", "All programs, food tracking & analytics", "Full AI coaching & plan generation", `About ${formatPrice(Math.round(yearlyCents / 12))} a month`].map((h) => (
+                <li key={h} className="flex gap-2">
+                  <Check className="mt-0.5 size-4 shrink-0 text-gold" aria-hidden /> {h}
+                </li>
+              ))}
+            </ul>
+            {plan === "free" && stripeReady && yearlyReady && !native && (
+              <div className="mt-5">
+                <CheckoutButton plan="pro" interval="year" label="Choose yearly" featured />
+              </div>
+            )}
+            {plan === "free" && stripeReady && !yearlyReady && !native && <p className="mt-5 text-xs text-muted-foreground">Yearly billing isn&apos;t configured on this server yet.</p>}
+            {plan !== "free" && stripeReady && !native && <p className="mt-5 text-xs text-muted-foreground">Switch via Manage billing.</p>}
+          </li>
+        )}
       </ul>
       <p className="text-xs text-muted-foreground">
-        Subscriptions renew monthly until canceled. Cancel any time in Manage billing; you keep access until the end of the paid period. Prices are configurable
+        Monthly plans renew monthly and the yearly plan renews yearly, until canceled. Cancel any time in Manage billing; you keep access until the end of the paid period. Prices are configurable
         defaults and may change with notice.
       </p>
     </div>

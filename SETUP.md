@@ -60,11 +60,12 @@ AI_RATE_LIMIT_PER_MINUTE=6
 
 ### Stripe subscriptions
 
-1. Create two recurring monthly prices in Stripe (Plus, Pro) and set:
+1. Create recurring prices in Stripe — Plus ($9.99/month), Pro ($30/month) and, optionally, All Access Yearly ($200/year, which grants Pro) — and set:
    ```
    STRIPE_SECRET_KEY=sk_test_...
    STRIPE_PRICE_PLUS=price_...
    STRIPE_PRICE_PRO=price_...
+   STRIPE_PRICE_PRO_YEARLY=price_...   # optional; the yearly card shows "not configured" without it
    ```
 2. Enable the **Customer portal** in Stripe (Settings → Billing → Customer portal), including plan switching and cancellation.
 3. Webhook endpoint: `https://<your-domain>/api/stripe/webhook`, with these events:
@@ -75,7 +76,7 @@ AI_RATE_LIMIT_PER_MINUTE=6
    Set `STRIPE_WEBHOOK_SECRET=whsec_...`.
 4. Local testing: run `stripe listen --forward-to localhost:3000/api/stripe/webhook` and use the printed secret. Test card: `4242 4242 4242 4242`.
 
-Display prices default to $9.99 and $19.99 and can be overridden with `PLAN_PLUS_PRICE_CENTS` / `PLAN_PRO_PRICE_CENTS`. Keep them in sync with your Stripe prices.
+Display prices default to $9.99/month (Plus), $30/month (Pro) and $200/year (All Access Yearly). Override them with `PLAN_PLUS_PRICE_CENTS`, `PLAN_PRO_PRICE_CENTS` and `PLAN_PRO_YEARLY_PRICE_CENTS`. Keep them in sync with your Stripe prices.
 
 ### Food search (USDA FoodData Central)
 

@@ -152,7 +152,7 @@ export function AppShell({ children, userId, displayName, faithEnabled, isAdmin,
         aria-label="Primary"
         className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-border bg-[#0d0d0d]/95 backdrop-blur-xl md:hidden"
       >
-        <ul className="grid grid-cols-5">
+        <ul className="grid grid-cols-6">
           {mobilePrimary.map((item) => {
             const active = isActive(pathname, item.href);
             return (

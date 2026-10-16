@@ -198,14 +198,14 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                       sublabel={`/ ${data.nutrition.goalProtein ?? 0}g protein`}
                     />
                   </div>
-                  {data.nutrition.goalIsEstimate && <p className="text-center text-[11px] text-muted-foreground">Targets are estimates — adjust them in Nutrition.</p>}
+                  {data.nutrition.goalIsEstimate && <p className="text-center text-[11px] text-muted-foreground">Targets are estimates — adjust them in Food.</p>}
                   <Button asChild variant="secondary" size="sm" className="w-full">
                     <Link href="/nutrition">Log food</Link>
                   </Button>
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  Set your targets in <Link href="/nutrition" className="text-gold-highlight underline">Nutrition</Link>.
+                  Set your targets in <Link href="/nutrition" className="text-gold-highlight underline">Food</Link>.
                 </p>
               )
             ) : (

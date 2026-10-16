@@ -8,7 +8,6 @@ import {
   CustomFoodForm,
   GoalsForm,
   LogTemplateForm,
-  MEAL_TYPES,
   SaveMealForm,
   WaterCard,
   type MyFood,
@@ -27,8 +26,9 @@ import { isFoodSearchConfigured } from "@/server/env";
 import { isFlagEnabled } from "@/server/flags";
 import { deleteCustomFoodAction, deleteMealItemAction, deleteTemplateAction, markPlannedEatenAction } from "@/server/actions/nutrition";
 import { getNutritionDaily } from "@/server/services/progress";
+import { MEAL_TYPES } from "@/lib/domain/meals";
 
-export const metadata = { title: "Nutrition" };
+export const metadata = { title: "Food" };
 
 interface MealRow {
   id: string;
@@ -46,7 +46,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
   if (!hasFeature(plan, "nutrition_tracking")) {
     return (
       <div className="space-y-6">
-        <PageHeader eyebrow="Nutrition" title="Nutrition" description="Calories, macros, water, saved meals and meal planning." />
+        <PageHeader eyebrow="Food log" title="Food" description="Track calories, macros and water, save meals and plan ahead." />
         <EmptyState
           icon={Lock}
           title="Included with Plus and Pro"
@@ -64,7 +64,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
   const today = isoDateInTz(new Date(), profile.timezone);
   const date = sp.date && /^\d{4}-\d{2}-\d{2}$/.test(sp.date) ? sp.date : today;
   const supabase = await getServerSupabase();
-  const [mealsRes, goalsRes, waterRes, foodsRes, templatesRes, plannedRes, history, flag] = await Promise.all([
+  const [mealsRes, goalsRes, waterRes, foodsRes, templatesRes, plannedRes, history, flag, commonRes] = await Promise.all([
     supabase
       .from("meals")
       .select("id, meal_type, status, name, meal_items(id, name, servings, calories, protein_g, carbs_g, fat_g, is_estimate)")
@@ -87,6 +87,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
       .limit(14),
     getNutritionDaily(supabase, user.id, addDays(today, -13), today),
     isFlagEnabled("food_search"),
+    supabase.from("foods").select("id, name, brand, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g, is_estimate, source").is("owner_id", null).order("name"),
   ]);
 
   const meals = (mealsRes.data ?? []) as unknown as MealRow[];
@@ -97,6 +98,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
   const goals = goalsRes.data as { calories: number; protein_g: number; carbs_g: number; fat_g: number; water_ml: number; is_estimate: boolean } | null;
   const water = (waterRes.data ?? []).reduce((s, w) => s + (w.amount_ml as number), 0);
   const myFoods = (foodsRes.data ?? []) as MyFood[];
+  const commonFoods = (commonRes.data ?? []) as MyFood[];
   const templates = (templatesRes.data ?? []) as unknown as { id: string; name: string; yield_servings: number; meal_items: { calories: number; protein_g: number }[] }[];
   const upcoming = (plannedRes.data ?? []) as unknown as { id: string; eaten_on: string; meal_type: string; meal_items: { name: string }[] }[];
   const label = date === today ? "Today" : new Date(`${date}T00:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" });
@@ -104,7 +106,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Nutrition" title="Nutrition" description="Fuel your training. Estimates are always labeled." actions={<AddFoodDialog date={date} myFoods={myFoods} searchEnabled={searchEnabled} />} />
+      <PageHeader eyebrow="Food log" title="Food" description="Track what you eat. Search common foods, save your own, or enter anything by hand." actions={<AddFoodDialog date={date} myFoods={myFoods} commonFoods={commonFoods} searchEnabled={searchEnabled} />} />
 
       <nav className="flex items-center justify-between rounded-2xl border border-border bg-card p-2" aria-label="Choose day">
         <Button asChild variant="ghost" size="icon" aria-label="Previous day">

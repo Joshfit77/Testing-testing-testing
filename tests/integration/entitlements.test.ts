@@ -75,6 +75,17 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
     expect(await plan()).toMatchObject({ plan: "free" });
   });
 
+  it("grants Pro for the yearly all-access price", async () => {
+    const yearly = await createTestUser("yearly");
+    try {
+      await syncSubscription(fakeSubscription({ metadata: { user_id: yearly.id }, items: { object: "list", data: [{ id: "si_y", price: { id: "price_test_pro_yearly" }, current_period_end: Math.floor(Date.now() / 1000) + 365 * 86400 }] } }));
+      const { data } = await serviceClient().from("user_entitlements").select("plan").eq("user_id", yearly.id).single();
+      expect(data).toMatchObject({ plan: "pro" });
+    } finally {
+      await deleteTestUser(yearly);
+    }
+  });
+
   it("ignores subscriptions with unknown prices or users", async () => {
     await syncSubscription(fakeSubscription({ metadata: { user_id: user.id }, items: { object: "list", data: [{ id: "si", price: { id: "price_unknown" } }] } }));
     expect(await plan()).toMatchObject({ plan: "free" });
