@@ -30,7 +30,7 @@ test.describe("40 Days Through the Narrow Gate", () => {
     await day.getByLabel("Trained today").check();
     await day.getByLabel("Note (optional)").fill("Choosing the narrow way today.");
     await day.getByRole("button", { name: "Save check-in" }).click();
-    await expect(day.getByText("Day 1 complete.")).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: "Day 1 complete." })).toBeVisible();
     await page.keyboard.press("Escape");
 
     await expect(page.getByText("1 of 40 days complete")).toBeVisible();

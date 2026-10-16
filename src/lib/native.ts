@@ -47,6 +47,8 @@ export async function scheduleRestNotification(endsAtIso: string, exerciseName?:
           title: "Rest complete",
           body: exerciseName ? `Time for your next set of ${exerciseName}.` : "Time for your next set.",
           schedule: { at, allowWhileIdle: true },
+          // Inexact is fine for a rest timer and avoids Android 12+ sending users to the "Alarms & reminders" settings screen.
+          isExactNotification: false,
         },
       ],
     });

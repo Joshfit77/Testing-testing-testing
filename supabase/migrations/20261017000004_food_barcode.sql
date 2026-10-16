@@ -12,3 +12,10 @@ create policy foods_insert_own on public.foods
     (owner_id = (select auth.uid()) and source in ('custom', 'usda', 'openfoodfacts'))
     or (owner_id is null and public.is_admin())
   );
+
+-- Cached USDA / Open Food Facts foods are upserted with ON CONFLICT (owner_id, source, source_ref).
+-- Postgres can't use a *partial* unique index for that, so the original index made those upserts fail
+-- (error 42P10). A plain unique index behaves the same for rows without a source_ref, because
+-- NULLs never conflict with each other.
+drop index if exists public.foods_owner_source_ref;
+create unique index foods_owner_source_ref on public.foods (owner_id, source, source_ref);
