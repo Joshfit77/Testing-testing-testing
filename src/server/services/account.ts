@@ -26,6 +26,8 @@ const USER_TABLES: { table: string; column: string }[] = [
   { table: "faith_journal_entries", column: "user_id" },
   { table: "discipline_goals", column: "user_id" },
   { table: "discipline_checkins", column: "user_id" },
+  { table: "challenge_enrollments", column: "user_id" },
+  { table: "challenge_checkins", column: "user_id" },
   { table: "subscriptions", column: "user_id" },
   { table: "user_entitlements", column: "user_id" },
 ];

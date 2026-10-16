@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { OnboardingWizard } from "@/components/onboarding/onboarding-wizard";
+import { WorkoutReminders } from "@/components/profile/workout-reminders";
 import type { DietaryPreference, Equipment, ExperienceLevel, PrimaryGoal, ProgramType } from "@/lib/domain/types";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
@@ -41,6 +42,7 @@ export default async function PreferencesPage() {
           faithEnabled: profile.faith_enabled,
         }}
       />
+      <WorkoutReminders faithEnabled={profile.faith_enabled} />
     </div>
   );
 }
