@@ -3,6 +3,7 @@ import { useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { Button, type ButtonProps } from "@/components/ui/button";
 import type { ActionState } from "@/lib/action-state";
+import { useActionToast } from "@/components/ui/toaster";
 
 export function SubmitButton({ children, pendingLabel, ...props }: ButtonProps & { pendingLabel?: string }) {
   const { pending } = useFormStatus();
@@ -14,10 +15,12 @@ export function SubmitButton({ children, pendingLabel, ...props }: ButtonProps &
   );
 }
 
+/** Success messages pop up as a toast; errors stay next to the form so they're easy to fix. */
 export function FormMessage({ state }: { state: ActionState }) {
-  if (!state.message) return null;
+  useActionToast(state);
+  if (!state.message || state.ok) return null;
   return (
-    <p role={state.ok ? "status" : "alert"} className={state.ok ? "text-sm text-[#5fc49a]" : "text-sm text-[#f08a8a]"}>
+    <p role="alert" className="animate-fade-in text-sm text-[#f08a8a]">
       {state.message}
     </p>
   );

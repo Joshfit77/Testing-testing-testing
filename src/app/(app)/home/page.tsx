@@ -144,14 +144,14 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       </section>
 
       {/* Stat tiles */}
-      <section className="grid grid-cols-2 gap-3 md:grid-cols-4" aria-label="Training summary">
+      <section className="stagger grid grid-cols-2 gap-3 md:grid-cols-4" aria-label="Training summary">
         {[
           { icon: CalendarCheck, label: "This week", value: String(data.workoutsThisWeek), sub: "workouts" },
           { icon: Dumbbell, label: "All time", value: String(data.workoutsTotal), sub: "workouts completed" },
           { icon: Flame, label: "Day streak", value: String(data.dayStreak), sub: data.dayStreak === 1 ? "day" : "days" },
           { icon: Medal, label: "Week streak", value: String(data.weekStreak), sub: data.weekStreak === 1 ? "week" : "weeks" },
         ].map((t) => (
-          <div key={t.label} className="rounded-2xl border border-border bg-card p-4">
+          <div key={t.label} className="lift rounded-2xl border border-border bg-card p-4">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <t.icon className="size-4 text-gold" aria-hidden />
               {t.label}

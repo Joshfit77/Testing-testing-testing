@@ -161,11 +161,18 @@ export function AppShell({ children, userId, displayName, faithEnabled, isAdmin,
                   href={item.href}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-semibold",
+                    "flex h-16 flex-col items-center justify-center gap-0.5 text-[11px] font-semibold transition-colors duration-200 active:scale-95",
                     active ? "text-gold-highlight" : "text-muted-foreground",
                   )}
                 >
-                  <item.icon className={cn("size-5", active && "text-gold")} aria-hidden />
+                  <span
+                    className={cn(
+                      "flex h-7 w-11 items-center justify-center rounded-full transition-all duration-300",
+                      active ? "scale-100 bg-gold/15" : "scale-90 bg-transparent",
+                    )}
+                  >
+                    <item.icon className={cn("size-5 transition-colors", active && "text-gold")} aria-hidden />
+                  </span>
                   {item.label}
                 </Link>
               </li>
@@ -178,11 +185,13 @@ export function AppShell({ children, userId, displayName, faithEnabled, isAdmin,
               aria-haspopup="dialog"
               aria-expanded={moreOpen}
               className={cn(
-                "flex h-16 w-full flex-col items-center justify-center gap-1 text-[11px] font-semibold",
+                "flex h-16 w-full flex-col items-center justify-center gap-0.5 text-[11px] font-semibold transition-colors duration-200 active:scale-95",
                 moreActive ? "text-gold-highlight" : "text-muted-foreground",
               )}
             >
-              <Ellipsis className={cn("size-5", moreActive && "text-gold")} aria-hidden />
+              <span className={cn("flex h-7 w-11 items-center justify-center rounded-full transition-all duration-300", moreActive ? "scale-100 bg-gold/15" : "scale-90")}>
+                <Ellipsis className={cn("size-5", moreActive && "text-gold")} aria-hidden />
+              </span>
               More
             </button>
           </li>
@@ -195,7 +204,7 @@ export function AppShell({ children, userId, displayName, faithEnabled, isAdmin,
             <DialogTitle>More</DialogTitle>
             <DialogDescription>Signed in as {displayName}</DialogDescription>
           </DialogHeader>
-          <ul className="grid grid-cols-2 gap-2">
+          <ul className="stagger grid grid-cols-2 gap-2">
             {mobileMore.map((item) => {
               const active = isActive(pathname, item.href);
               return (
@@ -204,7 +213,7 @@ export function AppShell({ children, userId, displayName, faithEnabled, isAdmin,
                     href={item.href}
                     aria-current={active ? "page" : undefined}
                     className={cn(
-                      "flex h-20 flex-col items-start justify-between rounded-2xl border p-3 text-sm font-semibold",
+                      "lift flex h-20 flex-col items-start justify-between rounded-2xl border p-3 text-sm font-semibold",
                       active ? "border-gold-muted bg-gold/10 text-gold-highlight" : "border-border bg-elevated",
                     )}
                   >

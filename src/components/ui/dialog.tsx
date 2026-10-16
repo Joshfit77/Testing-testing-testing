@@ -13,18 +13,19 @@ export const DialogContent = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { side?: "center" | "bottom" }
 >(({ className, children, side = "center", ...props }, ref) => (
   <DialogPrimitive.Portal>
-    <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm data-[state=open]:animate-fade-up" />
+    <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out" />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
         "fixed z-50 flex max-h-[90dvh] w-full flex-col overflow-y-auto border border-border bg-card p-5 shadow-2xl focus-visible:outline-none",
         side === "center"
-          ? "left-1/2 top-1/2 max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-2xl"
-          : "inset-x-0 bottom-0 rounded-t-3xl pb-[calc(1.25rem+env(safe-area-inset-bottom))] md:left-1/2 md:top-1/2 md:bottom-auto md:max-w-lg md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl",
+          ? "left-1/2 top-1/2 max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-2xl data-[state=open]:animate-pop-in data-[state=closed]:animate-pop-out"
+          : "inset-x-0 bottom-0 rounded-t-3xl pb-[calc(1.25rem+env(safe-area-inset-bottom))] data-[state=open]:animate-sheet-in data-[state=closed]:animate-sheet-out md:left-1/2 md:top-1/2 md:bottom-auto md:max-w-lg md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl md:data-[state=open]:animate-pop-in md:data-[state=closed]:animate-pop-out",
         className,
       )}
       {...props}
     >
+      {side === "bottom" && <span aria-hidden className="mx-auto -mt-2 mb-3 block h-1.5 w-10 shrink-0 rounded-full bg-border md:hidden" />}
       {children}
       <DialogPrimitive.Close className="absolute right-3 top-3 rounded-lg p-2 text-muted-foreground hover:bg-elevated hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold-highlight">
         <X className="size-5" />

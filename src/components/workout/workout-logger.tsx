@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Cloud, CloudOff, Flag, Loader2, Minus, Pause, Play, Plus, Timer, Trash2, Trophy, X } from "lucide-react";
+import { Celebration } from "@/components/common/celebration";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input, Textarea } from "@/components/ui/input";
@@ -263,14 +264,15 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
   if (phase === "finished" && result) {
     return (
       <div className="mx-auto max-w-xl space-y-6 text-center">
-        <div className="mx-auto flex size-20 items-center justify-center rounded-full bg-gold-gradient text-black">
+        <Celebration pieces={result.records.length > 0 ? 160 : 70} />
+        <div className="mx-auto flex size-20 animate-bounce-in items-center justify-center rounded-full bg-gold-gradient text-black shadow-[0_0_40px_-6px_rgba(230,199,110,0.7)]">
           <Trophy className="size-9" aria-hidden />
         </div>
         <div>
           <h1 className="font-display text-4xl font-bold uppercase">Workout complete</h1>
           <p className="mt-2 text-muted-foreground">Faithful in the small things. Well done.</p>
         </div>
-        <dl className="grid grid-cols-2 gap-3">
+        <dl className="stagger grid grid-cols-2 gap-3">
           <div className="rounded-2xl border border-border bg-card p-4">
             <dt className="text-xs uppercase tracking-wider text-muted-foreground">Duration</dt>
             <dd className="font-display text-2xl font-semibold">{formatDuration(result.durationSeconds)}</dd>
@@ -281,7 +283,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
           </div>
         </dl>
         {result.records.length > 0 && (
-          <section className="rounded-2xl border border-gold-muted bg-gold/5 p-4 text-left" aria-labelledby="prs-title">
+          <section className="animate-bounce-in rounded-2xl border border-gold-muted bg-gold/5 p-4 text-left [animation-delay:250ms]" aria-labelledby="prs-title">
             <h2 id="prs-title" className="mb-2 font-display text-lg font-semibold uppercase text-gold-highlight">
               New personal records
             </h2>

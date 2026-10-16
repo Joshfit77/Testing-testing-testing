@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { Loader2 } from "lucide-react";
 import { Button, type ButtonProps } from "@/components/ui/button";
+import { confirmDialog } from "@/components/ui/confirm";
 
 /**
  * A button that invokes a server action with fixed fields, then refreshes the current route.
@@ -31,8 +32,8 @@ export function ActionButton({
       {...props}
       disabled={pending || props.disabled}
       aria-busy={pending}
-      onClick={() => {
-        if (confirmMessage && !window.confirm(confirmMessage)) return;
+      onClick={async () => {
+        if (confirmMessage && !(await confirmDialog({ title: confirmMessage, confirmLabel: props.variant === "destructive" ? "Delete" : "Confirm", destructive: props.variant === "destructive" }))) return;
         start(async () => {
           const fd = new FormData();
           for (const [k, v] of Object.entries(fields)) fd.set(k, v);

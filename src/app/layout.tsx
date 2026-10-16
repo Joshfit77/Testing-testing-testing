@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Oswald } from "next/font/google";
 import { NativeInit } from "@/components/shell/native-init";
 import { ServiceWorkerRegistration } from "@/components/shell/sw-register";
+import { ConfirmHost } from "@/components/ui/confirm";
+import { Toaster } from "@/components/ui/toaster";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
@@ -33,6 +35,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${inter.variable} ${oswald.variable} dark`}>
       <body className="font-sans">
         {children}
+        <Toaster />
+        <ConfirmHost />
         <ServiceWorkerRegistration />
         <NativeInit />
       </body>
