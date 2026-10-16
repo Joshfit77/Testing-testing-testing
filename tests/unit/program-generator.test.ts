@@ -70,6 +70,15 @@ describe("starter program generator", () => {
     expect(a.deloadFinalWeek).toBe(true);
   });
 
+  it("prefers loaded, experience-appropriate lifts for strength goals", () => {
+    const p = buildStarterProgram({ ...base, days_per_week: 3, equipment: ["barbell", "rack", "bench", "dumbbell", "pull_up_bar"] }, catalog);
+    const squat = p.days[0]!.exercises[0]!;
+    const e = bySlug.get(squat.ex)!;
+    expect(e.pattern).toBe("squat");
+    expect(e.equipment.some((x) => ["barbell", "dumbbell", "kettlebell"].includes(x))).toBe(true);
+    expect(e.difficulty).not.toBe("beginner");
+  });
+
   it("varies exercises across repeated day types", () => {
     const p = buildStarterProgram(base, catalog);
     const upperA = p.days[0]!.exercises.map((e) => e.ex);

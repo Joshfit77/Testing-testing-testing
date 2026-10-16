@@ -116,6 +116,19 @@ function schemeFor(goal: PrimaryGoal, experience: ExperienceLevel, slotIndex: nu
   return s;
 }
 
+const LOADED: Equipment[] = ["barbell", "dumbbell", "kettlebell", "trap_bar", "machine", "cable", "sandbag", "landmine"];
+
+/** Prefer movements that match the user's experience and, for strength/muscle goals, external load. */
+function candidateScore(e: CatalogExercise, answers: GeneratorAnswers, maxDifficulty: number, lowImpact: boolean): number {
+  const gap = maxDifficulty - DIFFICULTY_RANK[e.difficulty];
+  let score = gap === 0 ? 2 : gap === 1 ? 1 : 0;
+  const loadGoal = ["build_strength", "build_muscle", "athletic_performance"].includes(answers.primary_goal);
+  const owned = new Set(answers.equipment);
+  if (loadGoal && e.equipment.some((x) => LOADED.includes(x) && owned.has(x))) score += 3;
+  if (lowImpact && e.lowImpact) score += 2;
+  return score;
+}
+
 function exercisesPerSession(minutes: number): number {
   return Math.min(7, Math.max(3, Math.round(minutes / 10)));
 }
@@ -149,9 +162,10 @@ export function buildStarterProgram(answers: GeneratorAnswers, catalog: CatalogE
     slots.forEach((pattern, slotIndex) => {
       const candidates = pool
         .filter((e) => e.pattern === pattern && !chosen.has(e.slug))
-        .sort((a, b) => (usage.get(a.slug) ?? 0) - (usage.get(b.slug) ?? 0) || a.slug.localeCompare(b.slug));
+        .map((e) => ({ e, score: candidateScore(e, answers, maxDifficulty, lowImpact) - 3 * (usage.get(e.slug) ?? 0) }))
+        .sort((a, b) => b.score - a.score || a.e.slug.localeCompare(b.e.slug));
       if (candidates.length === 0) return;
-      const pick = candidates[occurrence % candidates.length] ?? candidates[0]!;
+      const pick = candidates[0]!.e;
       chosen.add(pick.slug);
       usage.set(pick.slug, (usage.get(pick.slug) ?? 0) + 1);
 

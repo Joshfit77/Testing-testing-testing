@@ -135,3 +135,20 @@ export function effectivePlanFromSubscription(
 export function formatPrice(cents: number): string {
   return cents === 0 ? "Free" : `$${(cents / 100).toFixed(2)}`;
 }
+
+/** Best effective plan across all of a user's subscriptions (e.g. an old canceled one plus a new active one). */
+export function entitlementFromSubscriptions(
+  subs: { plan: Exclude<Plan, "free">; status: SubscriptionStatus; current_period_end: string | null }[],
+  now: Date = new Date(),
+): { plan: Plan; validUntil: string | null } {
+  let best: Plan = "free";
+  let validUntil: string | null = null;
+  for (const s of subs) {
+    const p = effectivePlanFromSubscription(s, now);
+    if (planRank(p) > planRank(best)) {
+      best = p;
+      validUntil = s.current_period_end;
+    }
+  }
+  return { plan: best, validUntil };
+}
