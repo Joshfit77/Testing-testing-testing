@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bot, CalendarCheck, ChevronRight, Dumbbell, Flame, HeartPulse, Lock, Medal, Play, Sparkles, Trophy } from "lucide-react";
+import { BookOpenText, Bot, CalendarCheck, ChevronRight, Dumbbell, Flame, HeartPulse, Lock, Medal, Play, Sparkles, Trophy } from "lucide-react";
 import { AreaSeriesChart, BarSeriesChart } from "@/components/charts/charts";
 import { Notice } from "@/components/common/states";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +14,7 @@ import type { Equipment, ExperienceLevel, PrimaryGoal, ProgramType } from "@/lib
 import { displayWeight, formatDuration, formatWeight, weightUnit } from "@/lib/domain/units";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
+import { getTodaysDevotional } from "@/server/services/challenge";
 import { getDashboardData } from "@/server/services/dashboard";
 import { getActiveProgram } from "@/server/services/training";
 
@@ -82,6 +83,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const lowReadiness = data.readiness?.band === "low";
   const trainedYesterdayAndToday = data.dayStreak >= 3;
   const verse = profile.faith_enabled ? scriptureForDate(data.today) : null;
+  const todaysDevotional = profile.faith_enabled ? await getTodaysDevotional(supabase, user.id, data.today) : null;
   const startHref = active?.today ? `/train/workout?day=${active.today.id}&up=${active.userProgramId}` : "/train/workout";
 
   return (
@@ -368,6 +370,26 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             </Link>
           </p>
         </aside>
+      )}
+
+      {todaysDevotional && (
+        <Link
+          href="/faith#todays-devotional"
+          className="flex min-h-11 items-center justify-between gap-3 rounded-2xl border border-border bg-card px-4 py-3 hover:border-gold-muted"
+        >
+          <span className="flex min-w-0 items-center gap-3">
+            <BookOpenText className="size-5 shrink-0 text-gold" aria-hidden />
+            <span className="min-w-0">
+              <span className="block text-xs font-semibold uppercase tracking-[0.2em] text-gold">
+                Today&apos;s devotional{todaysDevotional.challengeDay ? ` · Day ${todaysDevotional.challengeDay} of 40` : ""}
+              </span>
+              <span className="block truncate text-sm font-semibold">
+                {todaysDevotional.devotional.title} · {todaysDevotional.devotional.reference}
+              </span>
+            </span>
+          </span>
+          <ChevronRight className="size-4 shrink-0 text-gold" aria-hidden />
+        </Link>
       )}
     </div>
   );

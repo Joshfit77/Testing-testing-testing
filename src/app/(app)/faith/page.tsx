@@ -2,15 +2,18 @@ import Link from "next/link";
 import { BookOpen, CheckCircle2, Circle, Cross, Flame, Lock, NotebookPen, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/states";
+import { FaithChallenge } from "@/components/faith/faith-challenge";
 import { DisciplineGoalForm, JournalForm } from "@/components/faith/faith-forms";
 import { Badge } from "@/components/ui/badge";
 import { ActionButton } from "@/components/common/action-button";
 import { Button } from "@/components/ui/button";
 import { FAITH_MOTIVATIONS, SCRIPTURES, THEME_LABELS, TRANSLATION, scriptureForDate, type FaithTheme } from "@/data/content";
+import { devotionalForDate } from "@/lib/domain/challenge";
 import { addDays, isoDateInTz, startOfWeek } from "@/lib/domain/dates";
 import { cn } from "@/lib/utils";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
+import { getChallengeState } from "@/server/services/challenge";
 import { archiveDisciplineGoalAction, deleteJournalEntryAction, setFaithEnabledAction, toggleDisciplineCheckinAction } from "@/server/actions/faith";
 
 export const metadata = { title: "Faith & Discipline" };
@@ -47,11 +50,12 @@ Turn on Faith &amp; Discipline
   const theme = sp.theme && sp.theme in THEME_LABELS ? (sp.theme as FaithTheme) : null;
   const scriptures = theme ? SCRIPTURES.filter((s) => s.themes.includes(theme)) : SCRIPTURES;
 
-  const [journalRes, goalsRes, checkinsRes, devotionalsRes] = await Promise.all([
+  const [journalRes, goalsRes, checkinsRes, devotionalsRes, challenge] = await Promise.all([
     supabase.from("faith_journal_entries").select("id, entry_date, theme, scripture_ref, title, body").eq("user_id", user.id).order("entry_date", { ascending: false }).limit(20),
     supabase.from("discipline_goals").select("id, title, cadence").eq("user_id", user.id).eq("is_active", true).order("created_at"),
     supabase.from("discipline_checkins").select("goal_id, checked_on").eq("user_id", user.id).gte("checked_on", addDays(today, -60)),
     supabase.from("content_items").select("id, title, body, scripture_ref").eq("kind", "devotional").eq("is_published", true).order("published_at", { ascending: false }).limit(6),
+    getChallengeState(supabase, user.id, profile.timezone),
   ]);
   const journal = journalRes.data ?? [];
   const goals = goalsRes.data ?? [];
@@ -91,6 +95,16 @@ Turn on Faith &amp; Discipline
           <Flame className="size-4 text-gold" aria-hidden /> {motivation}
         </p>
       </section>
+
+      <FaithChallenge
+        today={challenge.today}
+        rotatingDay={devotionalForDate(challenge.today).day}
+        enrollment={challenge.active ? { id: challenge.active.id, startedOn: challenge.active.startedOn } : null}
+        currentDay={challenge.currentDay}
+        checkins={challenge.checkins}
+        workoutDates={challenge.workoutDates}
+        lastCompletedAt={challenge.lastCompleted?.completedAt ?? null}
+      />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="discipline-title">
