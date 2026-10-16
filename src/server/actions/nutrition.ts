@@ -11,6 +11,9 @@ import { customFoodSchema, mealTypeSchema, nutritionGoalsSchema, savedMealSchema
 import { assertFeature, EntitlementError, requireUser } from "@/server/auth";
 import { isFoodSearchConfigured } from "@/server/env";
 import { getFood } from "@/server/services/food-database";
+import { lookupBarcode, OffUnavailableError } from "@/server/services/open-food-facts";
+import { barcodeLookupCandidates } from "@/lib/barcode";
+import { nutritionForAmount } from "@/lib/open-food-facts";
 import { logError } from "@/server/log";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -24,6 +27,7 @@ async function nutritionCtx() {
 
 function guard(err: unknown, scope: string): ActionState {
   if (err instanceof EntitlementError) return actionError("Nutrition tracking is included with Plus and Pro.");
+  if (err instanceof OffUnavailableError) return actionError("Open Food Facts isn't responding right now. Try again in a moment.");
   logError(scope, err);
   return actionError("Something went wrong. Please try again.");
 }
@@ -48,6 +52,13 @@ async function findOrCreateMeal(supabase: SupabaseClient, userId: string, date: 
 const logFoodInput = z.discriminatedUnion("source", [
   z.object({ source: z.literal("food"), foodId: uuid, servings: z.number().positive().max(100) }),
   z.object({ source: z.literal("usda"), fdcId: z.string().regex(/^\d{1,10}$/), grams: z.number().positive().max(5000) }),
+  z.object({
+    source: z.literal("barcode"),
+    code: z.string().regex(/^\d{8,14}$/),
+    format: z.enum(["ean13", "upca", "upce", "ean8"]).optional(),
+    unit: z.enum(["serving", "g"]),
+    quantity: z.number().positive().max(5000),
+  }),
   z.object({
     source: z.literal("manual"),
     name: z.string().trim().min(1).max(160),
@@ -109,6 +120,63 @@ export async function logFoodAction(input: unknown): Promise<ActionState> {
       if (cErr) throw cErr;
       const servings = Math.round((item.grams / 100) * 100) / 100;
       row = { food_id: cached.id as string, name: `${ext.name} (${item.grams} g)`.slice(0, 160), servings, is_estimate: false, ...scaleMacros(ext, servings) };
+    } else if (item.source === "barcode") {
+      if (item.unit === "serving" && item.quantity > 100) return actionError("That's a lot of servings — check the amount.");
+      const candidates = barcodeLookupCandidates(item.code, item.format);
+      if (!candidates) return actionError("That barcode isn't valid.");
+      // Re-fetch from Open Food Facts server-side — never trust client-supplied nutrition numbers.
+      const found = await lookupBarcode(candidates);
+      if (found.status !== "found") return actionError("That product has no nutrition info in Open Food Facts. Enter it manually.");
+      const p = found.product;
+      const amount = item.unit === "g" ? { grams: item.quantity } : { servings: item.quantity };
+      const values = nutritionForAmount(p, amount);
+      if (!values) return actionError(item.unit === "g" ? "This product only lists nutrition per serving — log it in servings." : "This product doesn't list a serving size — log it in grams.");
+      // Cache per 100 g/ml when available (like USDA foods), otherwise per label serving.
+      const base = p.per100 ? { size: 100, unit: p.unit as string, v: p.per100 } : { size: 1, unit: "serving", v: p.perServing! };
+      const { data: cached, error: cErr } = await supabase
+        .from("foods")
+        .upsert(
+          {
+            owner_id: user.id,
+            name: p.name.slice(0, 160),
+            brand: p.brand?.slice(0, 120) ?? null,
+            serving_size: base.size,
+            serving_unit: base.unit,
+            calories: base.v.calories,
+            protein_g: base.v.protein_g,
+            carbs_g: base.v.carbs_g,
+            fat_g: base.v.fat_g,
+            fiber_g: base.v.fiber_g,
+            source: "openfoodfacts",
+            source_ref: p.code,
+            // Crowd-sourced label data, not a guess; the UI labels it "Open Food Facts (community data) — check the label".
+            is_estimate: false,
+          },
+          { onConflict: "owner_id,source,source_ref" },
+        )
+        .select("id")
+        .single();
+      if (cErr) throw cErr;
+      const grams = item.unit === "g" ? item.quantity : p.servingQuantity ? Math.round(p.servingQuantity * item.quantity * 10) / 10 : null;
+      // meal_items.servings is a multiplier of the cached food row (per 100 g/ml, or per label serving).
+      const servings =
+        base.size === 1
+          ? item.quantity
+          : grams != null
+            ? Math.round((grams / 100) * 100) / 100
+            : Math.round((values.calories / Math.max(base.v.calories, 0.1)) * 100) / 100;
+      const amountLabel =
+        item.unit === "g" ? `${item.quantity} ${p.unit}` : `${item.quantity} serving${item.quantity === 1 ? "" : "s"}${grams != null ? `, ${grams} ${p.unit}` : ""}`;
+      row = {
+        food_id: cached.id as string,
+        name: `${p.name} (${amountLabel})`.slice(0, 160),
+        servings,
+        is_estimate: false,
+        calories: values.calories,
+        protein_g: values.protein_g,
+        carbs_g: values.carbs_g,
+        fat_g: values.fat_g,
+      };
     } else {
       row = {
         food_id: null,
