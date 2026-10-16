@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Narrow Gate Fitness</string>
+    <string name="title_activity_main">Narrow Gate Fitness</string>
+    <string name="package_name">com.narrowgatefitness.app</string>
+    <string name="custom_url_scheme">com.narrowgatefitness.app</string>
+</resources>

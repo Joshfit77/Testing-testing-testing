@@ -14,6 +14,7 @@ import {
   type MyFood,
 } from "@/components/nutrition/nutrition-client";
 import { Badge } from "@/components/ui/badge";
+import { ActionButton } from "@/components/common/action-button";
 import { Button } from "@/components/ui/button";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { ProgressRing } from "@/components/ui/progress-ring";
@@ -210,12 +211,9 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
                           {Math.round(Number(i.calories))} kcal · P {Number(i.protein_g)} · C {Number(i.carbs_g)} · F {Number(i.fat_g)}
                         </p>
                       </div>
-                      <form action={deleteMealItemAction}>
-                        <input type="hidden" name="id" value={i.id} />
-                        <Button type="submit" size="icon-sm" variant="ghost" aria-label={`Remove ${i.name}`}>
-                          <Trash2 aria-hidden />
-                        </Button>
-                      </form>
+                      <ActionButton action={deleteMealItemAction} fields={{ id: i.id }} size="icon-sm" variant="ghost" aria-label={`Remove ${i.name}`}>
+<Trash2 aria-hidden />
+                      </ActionButton>
                     </li>
                   ))}
                 </ul>
@@ -235,12 +233,9 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
                   <span className="text-sm">
                     <span className="font-semibold capitalize">{m.meal_type}</span>: {m.meal_items.map((i) => i.name).join(", ")}
                   </span>
-                  <form action={markPlannedEatenAction}>
-                    <input type="hidden" name="mealId" value={m.id} />
-                    <Button type="submit" size="sm" variant="secondary">
-                      Mark eaten
-                    </Button>
-                  </form>
+                  <ActionButton action={markPlannedEatenAction} fields={{ mealId: m.id }} size="sm" variant="secondary">
+Mark eaten
+                  </ActionButton>
                 </li>
               ))}
             </ul>
@@ -308,12 +303,9 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
                           makes {Number(t.yield_servings)}
                         </p>
                       </div>
-                      <form action={deleteTemplateAction}>
-                        <input type="hidden" name="id" value={t.id} />
-                        <Button type="submit" size="icon-sm" variant="ghost" aria-label={`Delete ${t.name}`}>
-                          <Trash2 aria-hidden />
-                        </Button>
-                      </form>
+                      <ActionButton action={deleteTemplateAction} fields={{ id: t.id }} size="icon-sm" variant="ghost" aria-label={`Delete ${t.name}`}>
+<Trash2 aria-hidden />
+                      </ActionButton>
                     </div>
                     <LogTemplateForm templateId={t.id} date={date} />
                   </li>
@@ -356,12 +348,9 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
                       {f.source === "usda" ? " · USDA" : ""}
                     </span>
                   </span>
-                  <form action={deleteCustomFoodAction}>
-                    <input type="hidden" name="id" value={f.id} />
-                    <Button type="submit" size="icon-sm" variant="ghost" aria-label={`Delete ${f.name}`}>
-                      <Trash2 aria-hidden />
-                    </Button>
-                  </form>
+                  <ActionButton action={deleteCustomFoodAction} fields={{ id: f.id }} size="icon-sm" variant="ghost" aria-label={`Delete ${f.name}`}>
+<Trash2 aria-hidden />
+                  </ActionButton>
                 </li>
               ))}
             </ul>

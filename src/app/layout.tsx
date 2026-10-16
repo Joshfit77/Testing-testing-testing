@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Oswald } from "next/font/google";
+import { NativeInit } from "@/components/shell/native-init";
 import { ServiceWorkerRegistration } from "@/components/shell/sw-register";
 import "./globals.css";
 
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="font-sans">
         {children}
         <ServiceWorkerRegistration />
+        <NativeInit />
       </body>
     </html>
   );

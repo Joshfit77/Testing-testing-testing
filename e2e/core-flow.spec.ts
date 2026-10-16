@@ -43,12 +43,9 @@ test.describe("authentication, onboarding and workout logging", () => {
     await expect(page.getByRole("heading", { name: "Workout history" })).toBeVisible();
     await expect(page.locator("main").getByRole("link").filter({ hasText: /exercises/ }).first()).toBeVisible();
 
-    // Sign out and back in.
+    // Sign out (from the profile page) and back in.
     await page.goto("/profile");
-    await page.getByRole("button", { name: "Sign out" }).first().click().catch(async () => {
-      await page.getByRole("button", { name: "More" }).click();
-      await page.getByRole("button", { name: "Sign out" }).click();
-    });
+    await page.locator("main").getByRole("button", { name: "Sign out" }).click();
     await page.waitForURL(/\/login/);
     await page.getByLabel("Email").fill(email);
     await page.getByLabel("Password", { exact: true }).fill(PASSWORD);

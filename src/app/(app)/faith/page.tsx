@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/states";
 import { DisciplineGoalForm, JournalForm } from "@/components/faith/faith-forms";
 import { Badge } from "@/components/ui/badge";
+import { ActionButton } from "@/components/common/action-button";
 import { Button } from "@/components/ui/button";
 import { FAITH_MOTIVATIONS, SCRIPTURES, THEME_LABELS, TRANSLATION, scriptureForDate, type FaithTheme } from "@/data/content";
 import { addDays, isoDateInTz, startOfWeek } from "@/lib/domain/dates";
@@ -29,10 +30,11 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
             self-control and stewardship, a private reflection journal, discipline goals and devotionals from a Christian perspective. It is entirely
             optional — none of it is required for training, and it never appears in your workouts or AI coach unless you bring it up.
           </p>
-          <form action={setFaithEnabledAction} className="mt-6">
-            <input type="hidden" name="enabled" value="true" />
-            <Button type="submit">Turn on Faith &amp; Discipline</Button>
-          </form>
+          <div className="mt-6">
+          <ActionButton action={setFaithEnabledAction} fields={{ enabled: "true" }}>
+Turn on Faith &amp; Discipline
+          </ActionButton>
+          </div>
         </section>
       </div>
     );
@@ -102,29 +104,26 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
                 const s = goalStatus(g as { id: string; cadence: string });
                 return (
                   <li key={g.id as string} className="flex items-center gap-3 rounded-xl bg-elevated/60 px-3 py-2">
-                    <form action={toggleDisciplineCheckinAction}>
-                      <input type="hidden" name="goalId" value={g.id as string} />
-                      <button
-                        type="submit"
-                        aria-pressed={s.done}
-                        aria-label={`${s.done ? "Uncheck" : "Check off"} ${g.title as string} for ${g.cadence === "weekly" ? "this week" : "today"}`}
-                        className="flex size-10 items-center justify-center rounded-lg text-gold hover:bg-card"
-                      >
-                        {s.done ? <CheckCircle2 className="size-6" /> : <Circle className="size-6 text-muted-foreground" />}
-                      </button>
-                    </form>
+                    <ActionButton
+                      action={toggleDisciplineCheckinAction}
+                      fields={{ goalId: g.id as string }}
+                      variant="ghost"
+                      size="icon"
+                      aria-pressed={s.done}
+                      aria-label={`${s.done ? "Uncheck" : "Check off"} ${g.title as string} for ${g.cadence === "weekly" ? "this week" : "today"}`}
+                      className="text-gold"
+                    >
+                      {s.done ? <CheckCircle2 className="size-6" /> : <Circle className="size-6 text-muted-foreground" />}
+                    </ActionButton>
                     <div className="min-w-0 flex-1">
                       <p className={cn("text-sm font-semibold", s.done && "text-gold-highlight")}>{g.title as string}</p>
                       <p className="text-xs text-muted-foreground">
                         {g.cadence === "weekly" ? "Weekly" : "Daily"} · {s.streak} {g.cadence === "weekly" ? "week" : "day"} streak
                       </p>
                     </div>
-                    <form action={archiveDisciplineGoalAction}>
-                      <input type="hidden" name="goalId" value={g.id as string} />
-                      <Button type="submit" variant="ghost" size="icon-sm" aria-label={`Remove ${g.title as string}`}>
-                        <Trash2 aria-hidden />
-                      </Button>
-                    </form>
+                    <ActionButton action={archiveDisciplineGoalAction} fields={{ goalId: g.id as string }} variant="ghost" size="icon-sm" aria-label={`Remove ${g.title as string}`}>
+<Trash2 aria-hidden />
+                    </ActionButton>
                   </li>
                 );
               })}
@@ -176,12 +175,9 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
                     <Button asChild variant="ghost" size="sm">
                       <Link href={`/faith?edit=${j.id}#journal-new`}>Edit</Link>
                     </Button>
-                    <form action={deleteJournalEntryAction}>
-                      <input type="hidden" name="id" value={j.id as string} />
-                      <Button type="submit" variant="ghost" size="icon-sm" aria-label="Delete entry">
-                        <Trash2 aria-hidden />
-                      </Button>
-                    </form>
+                    <ActionButton action={deleteJournalEntryAction} fields={{ id: j.id as string }} variant="ghost" size="icon-sm" aria-label="Delete entry">
+<Trash2 aria-hidden />
+                    </ActionButton>
                   </div>
                 </div>
                 <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-sm text-muted-foreground">{j.body as string}</p>
@@ -250,12 +246,11 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
 
       <section className="rounded-2xl border border-border bg-card p-5">
         <p className="text-sm text-muted-foreground">Prefer to hide this section? You can turn it back on any time from your profile.</p>
-        <form action={setFaithEnabledAction} className="mt-3">
-          <input type="hidden" name="enabled" value="false" />
-          <Button type="submit" variant="secondary">
-            Hide Faith &amp; Discipline
-          </Button>
-        </form>
+        <div className="mt-3">
+        <ActionButton action={setFaithEnabledAction} fields={{ enabled: "false" }} variant="secondary">
+Hide Faith &amp; Discipline
+        </ActionButton>
+        </div>
       </section>
     </div>
   );

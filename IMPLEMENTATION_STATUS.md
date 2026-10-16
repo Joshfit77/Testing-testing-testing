@@ -1,0 +1,62 @@
+# Implementation status
+
+_Last updated: 2026-10-16._
+
+This file separates what was **verified in this environment** from what **needs external credentials or accounts** and what is **not done yet**.
+
+## How it was verified
+
+Verification ran against a full local Supabase stack (Postgres 17, GoTrue auth, PostgREST, Storage, Mailpit) started with `npx supabase start`:
+
+- `npm run typecheck`: clean (strict TypeScript, `noUncheckedIndexedAccess`)
+- `npm run lint`: clean
+- `npm run build`: production build succeeds
+- `npm run test:unit`: 39 tests for domain logic and catalog integrity
+- `npm run test:integration`: 23 tests against the real database. They cover RLS isolation, role escalation, entitlement tampering, admin privacy, consent enforcement, cascade on account deletion, workout drafts, idempotent finish, PR detection and recalculation, program advancement, Stripe webhook signature, idempotency and subscription lifecycle, and AI gating and quotas.
+- `npm run test:e2e`: Playwright (mobile viewport) against `next start`. Covers sign-up, email confirmation via Mailpit, onboarding, the dashboard, starting a program session, logging sets, reload-restore, pause/resume, finishing with PRs, history, sign-out and sign-in, password-reset email, the under-18 block, free-plan gating (premium program, nutrition, AI, billing page), bodyweight and goals, the consent-gated recovery check-in, and the faith opt-in and journal.
+
+## Feature checklist
+
+| Area | Status | Notes |
+| --- | --- | --- |
+| Design system & shell (black/gold, sidebar, bottom nav + More, skeletons, empty/error states) | ✅ Done | Verified visually with screenshots. A gold progress bar shows during navigation. |
+| Auth: sign-up, confirm, login/logout, reset, sessions, profile edit | ✅ Done & e2e-tested | Uses Supabase PKCE `/auth/callback` and token-hash `/auth/confirm`. |
+| Data export & account deletion | ✅ Done | Deletion cascade is tested at the DB level. The deletion UI flow needs the service-role key. |
+| Onboarding (adult-only, consent-gated limitations) + starter program | ✅ Done & e2e-tested | |
+| Exercise library (95) & programs (18 across 16 categories) | ✅ Done | Integrity unit tests cover the catalog. |
+| MMA / athletic templates, mobility & recovery | ✅ Done | Two session-library programs and a recovery page. |
+| Workout logger (all listed features) + restore | ✅ Done & tested | Unit, integration and e2e. |
+| History edit/delete, PRs, volume, frequency | ✅ Done & integration-tested | |
+| Dashboard | ✅ Done | |
+| Progress analytics (7d/30d/90d/1y) | ✅ Done | Advanced charts are gated server-side to Plus and Pro. |
+| Nutrition | ✅ Done (manual/custom flows verified by typecheck/build) | **USDA search needs `USDA_FDC_API_KEY`**. It wasn't exercised live here because outbound access to that API wasn't tested. |
+| AI coach (chat, plan generation, approval, metering, rate limits, fallback) | ✅ Implemented; gating/quotas integration-tested | **Live model calls need `ANTHROPIC_API_KEY`**. No real completions were made in this environment. Prompt quality should be evaluated with real usage. |
+| Optional Faith & Discipline | ✅ Done & e2e-tested | |
+| Stripe checkout, portal, webhooks, entitlements | ✅ Implemented; webhook & entitlement logic integration-tested with signed synthetic events | **Checkout and the Billing Portal need real Stripe keys and prices.** They weren't run end to end against Stripe here. |
+| Admin (catalog, media, categories, content, flags, subscriptions, metrics, audit) | ✅ Done | Admin RLS and privacy are integration-tested. The admin UI was verified by typecheck and build only. |
+| Installable PWA | ✅ Done | Manifest, icons, service worker and offline page. |
+| iOS & Android shells (Capacitor 8) | ✅ Projects generated and synced, icons/splash generated | **Not compiled here**: Android SDK downloads are blocked in this environment, and iOS needs macOS/Xcode. Build steps are in SETUP.md. |
+| API boundary for native clients | ✅ `/api/v1/me`, `/programs`, `/workouts`, `/api/ai/chat` with Bearer auth | |
+| Legal pages | ⚠️ Placeholders | Clearly marked **for legal review**. |
+
+## Known limitations & decisions
+
+1. **Store billing.** Apple and Google generally require in-app purchase for digital subscriptions bought in-app. The native shells hide Stripe checkout (they're detected via the user-agent token `NarrowGateApp`). **Next step:** integrate RevenueCat (or StoreKit 2 and Play Billing directly). Add a server webhook that writes `subscriptions` and `user_entitlements` with a `source` of `apple` or `google`. Extend the `user_entitlements.source` check constraint accordingly.
+2. **Loading boundaries.** Next 15.5 aborted same-route re-renders after server actions when a route-level `loading.tsx` Suspense boundary was present (reproduced: about 40–90% failure). Skeleton `loading.tsx` files are therefore only on read-only routes. Mutation-heavy routes rely on the global navigation progress bar. One-click mutations use `ActionButton` (action + `router.refresh()`).
+3. **Burst rate limiting** for AI and food search is in-memory per server instance. Monthly AI quotas are durable (database). For multi-instance production, consider a shared store (e.g. Upstash Redis) for burst limits.
+4. **Scripture text** is KJV (public domain outside the UK) and was entered from a well-known text. Verify every verse against an authoritative KJV source before publication.
+5. **Exercise media.** None is bundled. The UI says so honestly. Admins can add licensed media (a license field and confirmation are required).
+6. **Nutrition estimates** are deliberately simple (bodyweight-based) and always labeled as estimates. There is no sex/age-based BMR, by design (minimal data collection).
+7. **Offline.** An in-progress workout keeps working offline once the logger page is open, and it syncs when you reconnect. Other pages need a connection (offline page shown).
+8. **Admin program editing** covers metadata, publishing, tier and per-exercise prescriptions. Adding or removing weeks, days or exercises in curated programs is done through `src/data/programs.ts` plus `npm run seed:generate`.
+9. **Conversation history in the AI coach** shows as a sidebar on large screens. On mobile, users start new chats or reopen one from a link; a mobile history drawer is a small follow-up.
+
+## Next steps (in priority order)
+
+1. Add real credentials in a staging environment. Run Stripe test-mode checkout, portal and cancellation end to end, plus a live AI chat and plan generation, then review AI output quality and safety.
+2. Integrate store billing (RevenueCat) for the iOS and Android apps. Then enable in-app upgrades in the native shells.
+3. Build and run the native apps on devices. Verify local notifications, haptics and the splash screen. Add push notifications (workout reminders) and optionally HealthKit / Health Connect to strengthen App Store review (Guideline 4.2).
+4. Have counsel complete the privacy policy and terms. Fill in the App Store privacy labels and the Play Data safety form.
+5. Add Universal Links / App Links so email confirmation and reset links open the app.
+6. Add a shared rate-limit store and production error monitoring (e.g. Sentry with PII scrubbing).
+7. Add a mobile conversation-history drawer to the AI coach, and expand admin program structure editing.

@@ -1,6 +1,6 @@
 import { AdminNav } from "@/components/admin/admin-nav";
 import { PageHeader } from "@/components/common/page-header";
-import { Button } from "@/components/ui/button";
+import { ActionButton } from "@/components/common/action-button";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireAdmin } from "@/server/auth";
 import { toggleFlagAction } from "@/server/actions/admin";
@@ -22,13 +22,9 @@ export default async function AdminFlagsPage() {
               <p className="font-mono text-sm font-semibold">{f.key as string}</p>
               <p className="text-xs text-muted-foreground">{f.description as string}</p>
             </div>
-            <form action={toggleFlagAction}>
-              <input type="hidden" name="key" value={f.key as string} />
-              <input type="hidden" name="enabled" value={f.enabled ? "false" : "true"} />
-              <Button type="submit" size="sm" variant={f.enabled ? "default" : "secondary"} aria-label={`${f.key as string} is ${f.enabled ? "on" : "off"}. Toggle`}>
-                {f.enabled ? "On" : "Off"}
-              </Button>
-            </form>
+            <ActionButton action={toggleFlagAction} fields={{ key: f.key as string, enabled: f.enabled ? "false" : "true" }} size="sm" variant={f.enabled ? "default" : "secondary"} aria-label={`${f.key as string} is ${f.enabled ? "on" : "off"}. Toggle`}>
+{f.enabled ? "On" : "Off"}
+            </ActionButton>
           </li>
         ))}
       </ul>

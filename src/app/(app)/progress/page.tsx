@@ -4,6 +4,7 @@ import { BarSeriesChart, CATEGORICAL, LineSeriesChart } from "@/components/chart
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/states";
 import { GoalForm, MeasurementForm, WeightForm } from "@/components/progress/progress-forms";
+import { ActionButton } from "@/components/common/action-button";
 import { Button } from "@/components/ui/button";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { isoDateInTz, parseRange, RANGES, rangeStart, type RangeKey } from "@/lib/domain/dates";
@@ -166,12 +167,9 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
                     <span className="text-muted-foreground">{w.date}</span>
                     <span className="flex items-center gap-2">
                       {w.weight} {weightUnit(units)}
-                      <form action={deleteWeightAction}>
-                        <input type="hidden" name="id" value={w.id} />
-                        <button type="submit" className="rounded p-1 text-muted-foreground hover:text-destructive" aria-label={`Delete weight entry for ${w.date}`}>
-                          <Trash2 className="size-3.5" />
-                        </button>
-                      </form>
+                      <ActionButton action={deleteWeightAction} fields={{ id: w.id }} variant="ghost" size="icon-sm" aria-label={`Delete weight entry for ${w.date}`}>
+                        <Trash2 className="size-3.5" />
+                      </ActionButton>
                     </span>
                   </li>
                 ))}
@@ -307,23 +305,22 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
                           {g.target_date ? ` · by ${g.target_date}` : ""}
                         </p>
                       </div>
-                      <form action={setGoalStatusAction} className="flex gap-1">
-                        <input type="hidden" name="id" value={g.id as string} />
+                      <div className="flex gap-1">
                         {done ? (
-                          <Button type="submit" name="status" value="archived" size="sm" variant="ghost">
+                          <ActionButton action={setGoalStatusAction} fields={{ id: g.id as string, status: "archived" }} size="sm" variant="ghost">
                             Archive
-                          </Button>
+                          </ActionButton>
                         ) : (
                           <>
-                            <Button type="submit" name="status" value="completed" size="sm" variant="secondary" aria-label={`Mark ${g.title} complete`}>
+                            <ActionButton action={setGoalStatusAction} fields={{ id: g.id as string, status: "completed" }} size="sm" variant="secondary" aria-label={`Mark ${g.title} complete`}>
                               <CheckCircle2 aria-hidden /> Done
-                            </Button>
-                            <Button type="submit" name="status" value="archived" size="icon-sm" variant="ghost" aria-label={`Archive ${g.title}`}>
+                            </ActionButton>
+                            <ActionButton action={setGoalStatusAction} fields={{ id: g.id as string, status: "archived" }} size="icon-sm" variant="ghost" aria-label={`Archive ${g.title}`}>
                               <Trash2 aria-hidden />
-                            </Button>
+                            </ActionButton>
                           </>
                         )}
-                      </form>
+                      </div>
                     </div>
                     <ProgressBar className="mt-3" value={done ? 100 : p.pct} label={`${g.title} progress`} />
                   </li>

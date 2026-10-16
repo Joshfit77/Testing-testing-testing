@@ -3,6 +3,7 @@ import { BookOpen, Clock, HeartPulse, History, Lock, Pause, Play, Plus, Trash2 }
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/states";
 import { Badge } from "@/components/ui/badge";
+import { ActionButton } from "@/components/common/action-button";
 import { Button } from "@/components/ui/button";
 import { canAccessTier } from "@/lib/domain/plans";
 import type { Plan } from "@/lib/domain/types";
@@ -97,11 +98,9 @@ export default async function TrainPage({ searchParams }: { searchParams: Promis
               <Button asChild variant="secondary">
                 <Link href={`/train/programs/${active.programSlug}`}>View plan</Link>
               </Button>
-              <form action={pauseActiveProgramAction}>
-                <Button type="submit" variant="ghost">
-                  <Pause aria-hidden /> Pause
-                </Button>
-              </form>
+              <ActionButton action={pauseActiveProgramAction} fields={{  }} variant="ghost">
+<Pause aria-hidden /> Pause
+              </ActionButton>
             </div>
           </div>
         </section>
@@ -149,12 +148,9 @@ export default async function TrainPage({ searchParams }: { searchParams: Promis
                         {m.status === "paused" && ` · week ${m.current_week}`}
                       </p>
                     </Link>
-                    <form action={removeSavedProgramAction}>
-                      <input type="hidden" name="userProgramId" value={m.id} />
-                      <Button type="submit" variant="ghost" size="icon-sm" aria-label={`Remove ${m.program.name} from my programs`}>
-                        <Trash2 aria-hidden />
-                      </Button>
-                    </form>
+                    <ActionButton action={removeSavedProgramAction} fields={{ userProgramId: m.id }} variant="ghost" size="icon-sm" aria-label={`Remove ${m.program.name} from my programs`}>
+<Trash2 aria-hidden />
+                    </ActionButton>
                   </li>
                 ),
             )}

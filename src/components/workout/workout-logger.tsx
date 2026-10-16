@@ -25,6 +25,7 @@ import {
   type ExerciseRef,
   type WorkoutDraft,
 } from "@/lib/domain/workout-draft";
+import { cancelRestNotification, hapticSuccess, scheduleRestNotification } from "@/lib/native";
 import { clearLocalDraft, loadLocalDraft, saveLocalDraft } from "@/lib/workout-storage";
 import { discardWorkoutAction, finishWorkoutAction, syncWorkoutDraftAction } from "@/server/actions/workouts";
 import { ExerciseCard } from "./exercise-card";
@@ -191,7 +192,17 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
     if (online && draft && phase === "active" && sync === "local") void pushToServer(draft);
   }, [online, draft, phase, sync, pushToServer]);
 
-  const dispatch = useCallback((action: DraftAction) => setDraft((d) => (d ? workoutReducer(d, action) : d)), []);
+  const dispatch = useCallback((action: DraftAction) => {
+    if (action.type === "toggleSetComplete") void hapticSuccess();
+    setDraft((d) => (d ? workoutReducer(d, action) : d));
+  }, []);
+
+  // Native: schedule a local notification for the end of rest so it fires while the app is backgrounded.
+  const restEndsAt = draft?.rest.endsAt ?? null;
+  useEffect(() => {
+    if (restEndsAt) void scheduleRestNotification(restEndsAt);
+    else void cancelRestNotification();
+  }, [restEndsAt]);
 
   // Rest timer completion feedback.
   const rest = draft ? restRemaining(draft, now) : 0;
@@ -350,6 +361,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
       return;
     }
     clearLocalDraft(userId);
+    void cancelRestNotification();
     setResult({ volumeKg: res.data.volumeKg, records: res.data.records, durationSeconds: elapsedSeconds(finalDraft, endedAt) });
     setPhase("finished");
     window.scrollTo({ top: 0 });

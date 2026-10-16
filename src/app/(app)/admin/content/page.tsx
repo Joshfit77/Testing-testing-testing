@@ -2,7 +2,7 @@ import { Trash2 } from "lucide-react";
 import { ActionForm } from "@/components/admin/action-form";
 import { AdminNav } from "@/components/admin/admin-nav";
 import { PageHeader } from "@/components/common/page-header";
-import { Button } from "@/components/ui/button";
+import { ActionButton } from "@/components/common/action-button";
 import { Input, NativeSelect, Textarea } from "@/components/ui/input";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireAdmin } from "@/server/auth";
@@ -55,12 +55,9 @@ export default async function AdminContentPage() {
                 <Fields c={c} />
               </ActionForm>
             </div>
-            <form action={deleteContentAction}>
-              <input type="hidden" name="id" value={c.id} />
-              <Button type="submit" variant="ghost" size="icon-sm" aria-label={`Delete ${c.title}`}>
-                <Trash2 aria-hidden />
-              </Button>
-            </form>
+            <ActionButton action={deleteContentAction} fields={{ id: c.id }} variant="ghost" size="icon-sm" aria-label={`Delete ${c.title}`}>
+<Trash2 aria-hidden />
+            </ActionButton>
           </li>
         ))}
       </ul>

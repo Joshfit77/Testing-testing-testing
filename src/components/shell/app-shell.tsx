@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { cn } from "@/lib/utils";
 import { isActive, visibleNav } from "./nav-config";
 import { ActiveWorkoutPill } from "./active-workout-pill";
+import { NavigationProgress } from "./navigation-progress";
 import { OfflineBanner } from "./offline-banner";
 
 interface AppShellProps {
@@ -56,6 +57,7 @@ export function AppShell({ children, userId, displayName, faithEnabled, isAdmin,
 
   return (
     <div className="min-h-dvh bg-background">
+      <NavigationProgress />
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-gold focus:px-4 focus:py-2 focus:text-black">
         Skip to content
       </a>

@@ -2,7 +2,7 @@ import { Trash2 } from "lucide-react";
 import { ActionForm } from "@/components/admin/action-form";
 import { AdminNav } from "@/components/admin/admin-nav";
 import { PageHeader } from "@/components/common/page-header";
-import { Button } from "@/components/ui/button";
+import { ActionButton } from "@/components/common/action-button";
 import { Input } from "@/components/ui/input";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireAdmin } from "@/server/auth";
@@ -45,12 +45,9 @@ export default async function AdminCategoriesPage() {
                   <Fields c={c as { slug: string; name: string; description: string; sort_order: number }} />
                 </ActionForm>
               </div>
-              <form action={deleteCategoryAction}>
-                <input type="hidden" name="id" value={c.id as string} />
-                <Button type="submit" variant="ghost" size="icon-sm" aria-label={`Delete ${c.name as string}`}>
-                  <Trash2 aria-hidden />
-                </Button>
-              </form>
+              <ActionButton action={deleteCategoryAction} fields={{ id: c.id as string }} variant="ghost" size="icon-sm" aria-label={`Delete ${c.name as string}`}>
+<Trash2 aria-hidden />
+              </ActionButton>
             </div>
           </li>
         ))}

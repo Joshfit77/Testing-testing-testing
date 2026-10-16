@@ -3,6 +3,7 @@ import { Trash2 } from "lucide-react";
 import { ActionForm } from "@/components/admin/action-form";
 import { AdminNav } from "@/components/admin/admin-nav";
 import { PageHeader } from "@/components/common/page-header";
+import { ActionButton } from "@/components/common/action-button";
 import { Button } from "@/components/ui/button";
 import { Input, NativeSelect, Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -135,12 +136,9 @@ export default async function AdminExercisesPage({ searchParams }: { searchParam
                     <span className="truncate">
                       {m.media_type as string}: {(m.external_url as string) ?? (m.storage_path as string)} · {m.license as string}
                     </span>
-                    <form action={deleteExerciseMediaAction}>
-                      <input type="hidden" name="id" value={m.id as string} />
-                      <Button type="submit" size="icon-sm" variant="ghost" aria-label="Delete media">
-                        <Trash2 aria-hidden />
-                      </Button>
-                    </form>
+                    <ActionButton action={deleteExerciseMediaAction} fields={{ id: m.id as string }} size="icon-sm" variant="ghost" aria-label="Delete media">
+<Trash2 aria-hidden />
+                    </ActionButton>
                   </li>
                 ))}
               </ul>
