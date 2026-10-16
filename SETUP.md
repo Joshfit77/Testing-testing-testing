@@ -139,12 +139,13 @@ To test on a device against your dev machine, use `CAP_SERVER_URL=http://<LAN-IP
 1. `npm run cap:ios` opens Xcode.
 2. Select your Team (Signing & Capabilities) and set the bundle ID and version/build number.
 3. Product → Archive, then distribute to App Store Connect.
-4. In App Store Connect, provide the privacy "nutrition labels": account email, fitness data, health-related wellness notes (optional, consent-based), and purchase history if you add IAP. Add the privacy policy URL and a demo account for review.
+4. The app ships an App privacy manifest (`ios/App/App/PrivacyInfo.xcprivacy`): no tracking; email, name, fitness, optional health/wellness notes, user content and purchase history collected for app functionality only. `Info.plist` declares `ITSAppUsesNonExemptEncryption = false` (standard HTTPS only), so uploads skip the export-compliance question. Version is 1.0.0 (build 1); bump `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in Xcode for each release.
+5. In App Store Connect, provide the privacy "nutrition labels" matching that manifest: account email, fitness data, health-related wellness notes (optional, consent-based), and purchase history if you add IAP. Add the privacy policy URL and a demo account for review.
 
 ### Android (Google Play)
 
 1. `npm run cap:android` opens Android Studio.
-2. Set the `applicationId`, `versionCode` and `versionName` in `android/app/build.gradle`.
+2. Set the `applicationId` and bump `versionCode` (currently 1) / `versionName` (currently 1.0.0) in `android/app/build.gradle` for each release.
 3. Build → Generate Signed App Bundle (`.aab`) with your upload key.
 4. Upload to Play Console. Complete Data safety (same data as above), the content rating, and the target audience (adults).
 
