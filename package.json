@@ -19,7 +19,8 @@
     "cap:android": "cap open android",
     "cap:ios": "cap open ios",
     "db:reset": "supabase db reset",
-    "db:start": "supabase start"
+    "db:start": "supabase start",
+    "db:bundle": "bash scripts/bundle-sql.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",
