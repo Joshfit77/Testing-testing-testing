@@ -13,3 +13,6 @@ test-results
 .DS_Store
 supabase/.temp
 screenshots/
+
+# Local agent worktrees
+.claude/worktrees/
