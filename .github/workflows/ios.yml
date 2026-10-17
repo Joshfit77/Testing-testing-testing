@@ -1,0 +1,131 @@
+name: iOS
+
+# 1) "simulator" (runs on every push to the paths below): proves the iPhone app compiles, using the
+#    offline edition. No Apple account needed. Produces an .app for the iOS Simulator on a Mac.
+# 2) "testflight" (manual only): signs and uploads a build to App Store Connect / TestFlight.
+#    Needs an Apple Developer account and these repository secrets:
+#      APPLE_TEAM_ID       10-character Team ID (developer.apple.com > Membership)
+#      ASC_KEY_ID          App Store Connect API key ID
+#      ASC_ISSUER_ID       App Store Connect API issuer ID
+#      ASC_KEY_P8_BASE64   the .p8 key file, base64-encoded
+#    Also create the app record in App Store Connect with bundle ID com.narrowgatefitness.app
+#    (or change CAP_APP_ID / the Xcode bundle ID to one you own first).
+on:
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "simulator = compile check only; testflight = sign and upload (needs secrets)"
+        type: choice
+        options: [simulator, testflight]
+        default: simulator
+      edition:
+        description: "offline = everything on the phone; online = loads your deployed site"
+        type: choice
+        options: [offline, online]
+        default: offline
+      server_url:
+        description: "Deployed site URL (only for the online edition), e.g. https://app.yourdomain.com"
+        required: false
+  push:
+    branches: [main, claude/sharp-cray-8y0uuv]
+    paths:
+      - "standalone/**"
+      - "ios/**"
+      - "capacitor.config.ts"
+      - ".github/workflows/ios.yml"
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  simulator:
+    if: github.event_name == 'push' || inputs.job == 'simulator'
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Copy the offline edition into the iOS project
+        run: CAP_MODE=standalone npx cap sync ios
+      - name: Build for the iOS Simulator (unsigned)
+        run: |
+          xcodebuild -version
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+      - name: Package
+        run: |
+          cd build/Build/Products/Debug-iphonesimulator
+          ditto -c -k --keepParent App.app "$GITHUB_WORKSPACE/NarrowGateFitness-iOS-Simulator.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NarrowGateFitness-iOS-Simulator
+          path: NarrowGateFitness-iOS-Simulator.zip
+
+  testflight:
+    if: github.event_name == 'workflow_dispatch' && inputs.job == 'testflight'
+    runs-on: macos-latest
+    timeout-minutes: 60
+    env:
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+    steps:
+      - name: Check secrets
+        run: |
+          for v in APPLE_TEAM_ID ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8_BASE64; do
+            if [ -z "${!v}" ]; then echo "::error::Missing repository secret $v (see the comment at the top of ios.yml)"; exit 1; fi
+          done
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Sync the chosen edition
+        env:
+          SERVER_URL: ${{ inputs.server_url }}
+        run: |
+          if [ "${{ inputs.edition }}" = "online" ]; then
+            if [ -z "$SERVER_URL" ]; then echo "::error::server_url is required for the online edition"; exit 1; fi
+            CAP_SERVER_URL="$SERVER_URL" npx cap sync ios
+          else
+            CAP_MODE=standalone npx cap sync ios
+          fi
+      - name: Write the App Store Connect key
+        run: |
+          mkdir -p "$RUNNER_TEMP/asc"
+          echo "$ASC_KEY_P8_BASE64" | base64 --decode > "$RUNNER_TEMP/asc/AuthKey_${ASC_KEY_ID}.p8"
+      - name: Archive (automatic signing with the API key)
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/asc/AuthKey_${ASC_KEY_ID}.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            archive
+      - name: Upload to App Store Connect (TestFlight)
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>${APPLE_TEAM_ID}</string>
+            <key>signingStyle</key><string>automatic</string>
+          </dict></plist>
+          PLIST
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/asc/AuthKey_${ASC_KEY_ID}.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID"
