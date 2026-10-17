@@ -264,6 +264,24 @@
   .intro-verse { margin: 6px 0 0; max-width: 520px; padding: 22px; border-radius: 20px; border: 1px solid var(--gold-lo); background: linear-gradient(160deg, #1d180c, #111 70%); display: grid; gap: 12px; animation: pageIn .6s .2s cubic-bezier(.2,.8,.3,1) both; }
   .intro-verse .verse { margin: 0; font-size: clamp(17px, 4.4vw, 21px); }
   .intro-cta { min-height: 52px; padding: 0 26px; font-size: 16px; animation: pageIn .6s .45s cubic-bezier(.2,.8,.3,1) both; }
+  /* Entering the narrow gate: white-light transition from the intro to sign-up */
+  .gatefx { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; overflow: hidden; background: radial-gradient(60% 50% at 50% 55%, #1a160c, #050505 70%); animation: fadeIn .35s ease both; pointer-events: all; }
+  .gatefx-rays { position: absolute; left: 50%; top: 56%; width: 240vmax; height: 240vmax; margin: -120vmax 0 0 -120vmax; border-radius: 50%; background: repeating-conic-gradient(from 0deg, rgba(255,255,255,.22) 0deg 3deg, rgba(255,255,255,0) 3deg 12deg); -webkit-mask: radial-gradient(circle, #000 0, rgba(0,0,0,.6) 12%, transparent 45%); mask: radial-gradient(circle, #000 0, rgba(0,0,0,.6) 12%, transparent 45%); opacity: 0; animation: gfRays 2.3s ease-in both; }
+  .gatefx-gate { position: relative; width: min(56vw, 240px); transform-origin: 50% 66%; animation: gfZoom 2.3s cubic-bezier(.55,0,.75,.2) both; }
+  .gatefx-gate svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .gatefx-door { animation: gfDoor 2.3s ease-in both; }
+  .gatefx-halo { position: absolute; left: 50%; top: 66%; width: 70%; aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.95), rgba(255,250,230,.45) 35%, rgba(255,255,255,0) 70%); filter: blur(6px); animation: gfHalo 2.3s ease-in both; pointer-events: none; }
+  .gatefx-spark { position: absolute; left: 50%; top: 56%; width: 4px; height: 4px; margin: -2px; border-radius: 50%; background: #fff; box-shadow: 0 0 8px 2px rgba(255,255,255,.9); opacity: 0; animation: gfSpark var(--d, 1.4s) var(--w, .3s) cubic-bezier(.5,0,.9,.4) both; }
+  .gatefx-flash { position: absolute; inset: 0; background: #fff; opacity: 0; animation: gfFlash 2.3s ease-in both; }
+  .gatefx.out { animation: fadeOut .7s ease forwards; }
+  .gatefx.out > :not(.gatefx-flash) { visibility: hidden; }
+  .gatefx.out .gatefx-flash { opacity: 1; animation: none; }
+  @keyframes gfRays { 0% { opacity: 0; transform: rotate(0deg) scale(.6) } 35% { opacity: .9 } 100% { opacity: 1; transform: rotate(35deg) scale(1.4) } }
+  @keyframes gfZoom { 0% { transform: scale(.9); opacity: 0 } 12% { transform: scale(1); opacity: 1 } 40% { transform: scale(1.12) } 100% { transform: scale(14) } }
+  @keyframes gfDoor { 0% { fill-opacity: .15 } 30% { fill-opacity: .85 } 100% { fill-opacity: 1 } }
+  @keyframes gfHalo { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.4) } 30% { opacity: .9 } 100% { opacity: 1; transform: translate(-50%, -50%) scale(3) } }
+  @keyframes gfSpark { 0% { opacity: 0; transform: translate(0, 0) scale(.4) } 20% { opacity: 1 } 100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(3) } }
+  @keyframes gfFlash { 0%, 62% { opacity: 0 } 92%, 100% { opacity: 1 } }
   .scripture-bar { border-left: 3px solid var(--gold); padding: 10px 14px; background: #15120b; border-radius: 0 12px 12px 0; }
   /* Motion */
   @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
@@ -1232,6 +1250,30 @@ const GOALS = [["build_strength", "Build strength"], ["build_muscle", "Build mus
 let SU = null;
 function newSetup() { const me = S.me || {}; SU = { step: 0, name: S.name && S.name !== "Athlete" ? S.name : "", email: S.email || "", weight: S.bw.length ? String(toDisp(currentBwKg())) : "", age: me.age ? String(me.age) : "", sex: me.sex || null, heightCm: me.heightCm || null, ft: "", inch: "", cm: "", goal: S.goal || null, experience: me.experience || null, days: me.days || 4, diet: S.diet || "balanced", err: "" };
   if (SU.heightCm) { SU.ft = String(Math.floor(SU.heightCm / 2.54 / 12)); SU.inch = String(Math.round(SU.heightCm / 2.54 - +SU.ft * 12)); SU.cm = String(Math.round(SU.heightCm)); } }
+// Pressing "Enter the narrow gate": fly through a glowing gate into white light, then reveal sign-up.
+let gateBusy = false;
+function enterGate() {
+  if (gateBusy) return;
+  const done = () => go("welcome", {}, false);
+  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return done();
+  gateBusy = true;
+  const sparks = Array.from({ length: 28 }, () => {
+    const a = Math.random() * Math.PI * 2, r = 55 + Math.random() * 45;
+    return `<i class="gatefx-spark" style="--dx:${(Math.cos(a) * r).toFixed(1)}vmax;--dy:${(Math.sin(a) * r).toFixed(1)}vmax;--w:${(.15 + Math.random() * .9).toFixed(2)}s;--d:${(1 + Math.random() * .6).toFixed(2)}s"></i>`;
+  }).join("");
+  const fx = document.createElement("div");
+  fx.className = "gatefx"; fx.setAttribute("aria-hidden", "true");
+  fx.innerHTML = `<div class="gatefx-rays"></div>${sparks}<div class="gatefx-gate"><div class="gatefx-halo"></div>
+    <svg viewBox="0 0 200 240"><defs><linearGradient id="gfx-gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#F3DD9A"/><stop offset="50%" stop-color="#C9A54C"/><stop offset="100%" stop-color="#8C7139"/></linearGradient>
+    <radialGradient id="gfx-light" cx="50%" cy="65%" r="70%"><stop offset="0%" stop-color="#fff"/><stop offset="60%" stop-color="#FFF8E1"/><stop offset="100%" stop-color="#F3DD9A"/></radialGradient></defs>
+    <path d="M40 222V96a60 60 0 0 1 120 0v126" fill="none" stroke="url(#gfx-gold)" stroke-width="10" stroke-linecap="round"/>
+    <path class="gatefx-door" d="M78 222V124a22 22 0 0 1 44 0v98z" fill="url(#gfx-light)"/>
+    <path d="M78 222V124a22 22 0 0 1 44 0v98" fill="none" stroke="url(#gfx-gold)" stroke-width="4"/>
+    <path d="M20 224h160" stroke="url(#gfx-gold)" stroke-width="8" stroke-linecap="round"/></svg></div><div class="gatefx-flash"></div>`;
+  document.body.appendChild(fx);
+  setTimeout(() => { done(); fx.classList.add("out"); }, 2200);
+  setTimeout(() => { fx.remove(); gateBusy = false; }, 2950);
+}
 function vWelcome() {
   return `<section class="hero" style="padding:28px 22px;gap:18px;text-align:left">
     <div class="row" style="gap:12px;flex-wrap:nowrap">${GATE(44)}<div class="brand-name" style="font-size:24px">NARROW GATE <span>FITNESS</span></div></div>
@@ -1536,7 +1578,7 @@ document.addEventListener("click", ev => {
     case "fday": { const cur = R.p.day ? new Date(R.p.day + "T12:00:00").getTime() : Date.now(); const n = +d.n; const nd = n === 0 ? Date.now() : cur + n * DAY; R.p = { day: Math.min(startOfDay(nd), startOfDay(Date.now())) === startOfDay(Date.now()) ? undefined : dayKey(nd) }; render(); break; }
     case "verse": R.p = { vi: +d.n }; render(); break;
     case "b-open": newBuilder(); go("build"); break;
-    case "intro-go": go("welcome", {}, false); break;
+    case "intro-go": enterGate(); break;
     case "explore": seed(); registerCustom(); stack.length = 0; go("home", {}, false); toast("Sample data loaded. Reset any time in Profile."); break;
     case "su-set": SU[d.k] = d.v; SU.err = ""; render(); break;
     case "su-back": SU.step = Math.max(0, SU.step - 1); SU.err = ""; render(); pageAnim(); break;
