@@ -1,5 +1,6 @@
 "use client";
 
+import { EQUIPMENT_PRESETS } from "@/lib/domain/equipment-presets";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -91,12 +92,6 @@ const RECOMMENDED_EQUIPMENT: Record<CustomProgramType, Equipment[]> = {
   agility: [],
 };
 
-const EQUIPMENT_PRESETS: { label: string; items: Equipment[] }[] = [
-  { label: "Full gym", items: EQUIPMENT.filter((e) => e !== "heavy_bag" && e !== "strongman_implements") as Equipment[] },
-  { label: "Home gym", items: ["barbell", "rack", "bench", "dumbbell", "pull_up_bar", "band", "kettlebell"] },
-  { label: "Dumbbells only", items: ["dumbbell", "bench", "band"] },
-  { label: "Bodyweight only", items: ["bodyweight", "mat"] },
-];
 
 const MINUTE_OPTIONS = [20, 30, 40, 45, 50, 60, 75, 90, 120];
 

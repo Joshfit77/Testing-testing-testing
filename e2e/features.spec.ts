@@ -10,12 +10,15 @@ test.describe("feature access, subscriptions and core sections", () => {
 
   test("onboarding blocks under-18 users", async ({ page }) => {
     await page.waitForURL(/\/onboarding/);
+    await page.getByRole("button", { name: "Build strength", exact: true }).click();
+    await page.getByRole("button", { name: /^Continue/ }).click();
+    await page.getByRole("button", { name: "Female", exact: true }).click();
+    await page.getByRole("button", { name: /^Continue/ }).click();
     await page.getByLabel("Age").fill("16");
-    await page.getByLabel("Height (ft)").fill("5");
-    await page.getByLabel("Height (in)").fill("6");
-    await page.getByLabel(/Bodyweight/).fill("140");
-    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByRole("button", { name: /^Continue/ }).click();
     await expect(page.getByText(/available to adults \(18\+\)/)).toBeVisible();
+    // Still on the age question.
+    await expect(page.getByLabel("Age")).toBeVisible();
   });
 
   test("free plan: premium programs, nutrition and AI are locked server-side; billing explains state", async ({ page }) => {

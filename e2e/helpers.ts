@@ -39,20 +39,56 @@ export async function signUpAndConfirm(page: Page, email: string, name = "Test A
   await page.goto(link);
 }
 
-export async function completeOnboarding(page: Page) {
+export interface OnboardingAnswers {
+  goal?: string;
+  sex?: "Male" | "Female" | "Prefer not to say";
+  age?: string;
+  feet?: string;
+  inches?: string;
+  weightLb?: string;
+  goalWeightLb?: string;
+  pace?: RegExp;
+  activity?: RegExp;
+  experience?: string;
+  equipment?: RegExp;
+  diet?: RegExp;
+}
+
+/** Answer the guided sign-up questionnaire (one question per screen) and submit it. Ends on the plan summary. */
+export async function answerOnboarding(page: Page, a: OnboardingAnswers = {}) {
+  const next = () => page.getByRole("button", { name: /^Continue/ }).click();
   await page.waitForURL(/\/onboarding/);
-  await page.getByLabel("Age").fill("34");
-  await page.getByRole("button", { name: "Male", exact: true }).click();
-  await page.getByLabel("Height (ft)").fill("5");
-  await page.getByLabel("Height (in)").fill("10");
-  await page.getByLabel(/Bodyweight/).fill("185");
-  await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByRole("button", { name: "Build strength" }).click();
-  await page.getByRole("button", { name: "1–3 years" }).click();
-  await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByRole("button", { name: "Home gym" }).click();
-  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: a.goal ?? "Build strength", exact: true }).click();
+  await next();
+  await page.getByRole("button", { name: a.sex ?? "Male", exact: true }).click();
+  await next();
+  await page.getByLabel("Age").fill(a.age ?? "34");
+  await next();
+  await page.getByLabel("Height (ft)").fill(a.feet ?? "5");
+  await page.getByLabel("Height (in)").fill(a.inches ?? "10");
+  await next();
+  await page.getByLabel(/Current weight/).fill(a.weightLb ?? "185");
+  await next();
+  if (a.goalWeightLb) await page.getByLabel(/Goal weight/).fill(a.goalWeightLb);
+  if (a.pace) await page.getByRole("button", { name: a.pace }).click();
+  await next();
+  await page.getByRole("button", { name: a.activity ?? /^Lightly active/ }).click();
+  await next();
+  await page.getByRole("button", { name: a.experience ?? "1–3 years", exact: true }).click();
+  await next();
+  await next(); // schedule: 3 days × 45 min by default
+  await page.getByRole("button", { name: a.equipment ?? /^Home gym/ }).click();
+  await next();
+  if (a.diet) await page.getByRole("button", { name: a.diet }).click();
+  await next();
   await page.getByRole("button", { name: "Build my plan" }).click();
+  await page.waitForURL(/\/plan/, { timeout: 60_000 });
+}
+
+/** Default onboarding (strength, male, 34, 5 ft 10 in, 185 lb, lightly active, home gym), then go Home. */
+export async function completeOnboarding(page: Page) {
+  await answerOnboarding(page);
+  await page.getByRole("link", { name: /Go to Home/ }).click();
   await page.waitForURL(/\/home/, { timeout: 30_000 });
 }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { EQUIPMENT_PRESETS } from "@/lib/domain/equipment-presets";
 import { useState, useTransition } from "react";
 import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -43,12 +44,6 @@ const DIET_LABELS: Record<DietaryPreference, string> = {
   kosher: "Kosher",
 };
 
-const EQUIPMENT_PRESETS: { label: string; items: Equipment[] }[] = [
-  { label: "Full gym", items: EQUIPMENT.filter((e) => e !== "heavy_bag" && e !== "strongman_implements") as Equipment[] },
-  { label: "Home gym", items: ["barbell", "rack", "bench", "dumbbell", "pull_up_bar", "band", "kettlebell"] },
-  { label: "Dumbbells only", items: ["dumbbell", "bench", "band"] },
-  { label: "Bodyweight only", items: ["bodyweight", "mat"] },
-];
 
 export interface OnboardingInitial extends Partial<OnboardingInput> {
   displayName?: string;

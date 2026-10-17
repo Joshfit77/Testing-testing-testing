@@ -8,6 +8,8 @@ import {
   PROGRAM_TYPES,
 } from "@/lib/domain/types";
 import { CARDIO_MODALITIES, CUSTOM_PROGRAM_TYPES, CUSTOM_TYPES, SHOW_DIVISIONS, weeksRange } from "@/lib/domain/custom-programs";
+import { ACTIVITY_LEVELS, isWeeklyRate } from "@/lib/domain/calorie-budget";
+import { SESSION_MINUTES } from "@/lib/domain/starter-program";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
 const optionalNumber = (min: number, max: number) =>
@@ -64,6 +66,44 @@ export const onboardingSchema = z
     path: ["limitations"],
   });
 export type OnboardingInput = z.infer<typeof onboardingSchema>;
+
+/** Weekly weight change in kg: one of WEEKLY_RATES_KG. */
+export const weeklyRateSchema = z.coerce.number().refine(isWeeklyRate, "Choose a weekly pace");
+const goalWeightSchema = z.preprocess(
+  (v) => (v === "" || v === null || v === undefined ? null : Number(v)),
+  z.number().min(25, "Check your goal weight").max(400, "Check your goal weight").nullable(),
+);
+
+/** The guided sign-up questionnaire (one question per screen, submitted once at the end). */
+export const onboardingPlanSchema = z.object({
+  displayName: z.string().trim().min(1, "Please enter your name").max(60),
+  primaryGoal: z.enum(PRIMARY_GOALS, { message: "Choose your main goal" }),
+  sex: z.enum(["male", "female", "unspecified"], { message: "Choose male, female or prefer not to say" }),
+  age: z.coerce.number().int().min(18, "Narrow Gate Fitness is available to adults (18+) at launch.").max(100, "Check your age"),
+  unitSystem: unitSystemSchema,
+  heightCm: z.coerce.number().min(90, "Check your height").max(260, "Check your height"),
+  weightKg: z.coerce.number().min(25, "Check your weight").max(400, "Check your weight"),
+  goalWeightKg: goalWeightSchema,
+  weeklyChangeKg: weeklyRateSchema,
+  activityLevel: z.enum(ACTIVITY_LEVELS, { message: "Choose how active you are outside workouts" }),
+  experience: z.enum(EXPERIENCE_LEVELS, { message: "Choose your training experience" }),
+  daysPerWeek: z.coerce.number().int().min(1).max(7),
+  sessionMinutes: z.coerce
+    .number()
+    .int()
+    .refine((m) => (SESSION_MINUTES as readonly number[]).includes(m), "Choose a session length"),
+  equipment: z.array(z.enum(EQUIPMENT)).min(1, "Choose your equipment").max(EQUIPMENT.length),
+  dietType: z.enum(DIET_TYPES).default("balanced"),
+  faithEnabled: z.boolean().default(false),
+});
+export type OnboardingPlanInput = z.input<typeof onboardingPlanSchema>;
+
+/** Goal weight, pace and activity used to recalculate the calorie budget from the Food page. */
+export const budgetSettingsSchema = z.object({
+  goalWeightKg: goalWeightSchema,
+  weeklyChangeKg: weeklyRateSchema,
+  activityLevel: z.enum(ACTIVITY_LEVELS, { message: "Choose an activity level" }),
+});
 
 export const profileUpdateSchema = z.object({
   displayName: z.string().trim().min(1).max(60),

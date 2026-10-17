@@ -4,14 +4,18 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { actionError, actionInvalid, type ActionState } from "@/lib/action-state";
+import { fieldErrors } from "@/lib/validation/schemas";
 import { isoDateInTz } from "@/lib/domain/dates";
-import { estimateNutritionTargets } from "@/lib/domain/nutrition";
 import { buildStarterProgram } from "@/lib/domain/program-generator";
-import { onboardingSchema, type OnboardingInput } from "@/lib/validation/schemas";
+import { onboardingPlanSchema, onboardingSchema, type OnboardingInput, type OnboardingPlanInput } from "@/lib/validation/schemas";
 import { requireUser } from "@/server/auth";
 import { loadExercises, toCatalog } from "@/server/services/catalog";
 import { activateProgram, createPrivateProgram } from "@/server/services/programs";
 import { logError } from "@/server/log";
+import { buildAndActivateCustomProgram } from "@/server/services/custom-programs";
+import { estimateAndSaveTargets, waterTargetMl } from "@/server/services/nutrition-targets";
+import { calorieBudget, rateTowardGoal, type WeeklyRateKg } from "@/lib/domain/calorie-budget";
+import { starterProgramInput } from "@/lib/domain/starter-program";
 
 export async function saveOnboardingAction(input: OnboardingInput & { rebuildProgram?: boolean }): Promise<ActionState> {
   const user = await requireUser();
@@ -61,26 +65,7 @@ export async function saveOnboardingAction(input: OnboardingInput & { rebuildPro
     if (wErr) throw wErr;
 
     const { data: goals } = await supabase.from("nutrition_goals").select("user_id, is_estimate").eq("user_id", user.id).maybeSingle();
-    if (!goals || goals.is_estimate) {
-      const t = estimateNutritionTargets({
-        weightKg: v.weightKg,
-        trainingDaysPerWeek: v.daysPerWeek,
-        goal: v.primaryGoal,
-        sex: v.sex,
-        age: v.age,
-        heightCm: v.heightCm,
-        diet: v.dietType,
-      });
-      await supabase.from("nutrition_goals").upsert({
-        user_id: user.id,
-        calories: t.calories,
-        protein_g: t.protein_g,
-        carbs_g: t.carbs_g,
-        fat_g: t.fat_g,
-        water_ml: t.water_ml,
-        is_estimate: true,
-      });
-    }
+    if (!goals || goals.is_estimate) await estimateAndSaveTargets(supabase, user.id);
 
     if (firstTime || input.rebuildProgram) {
       const catalog = toCatalog(await loadExercises(supabase));
@@ -106,4 +91,112 @@ export async function saveOnboardingAction(input: OnboardingInput & { rebuildPro
   revalidatePath("/", "layout");
   if (firstTime) redirect("/home?welcome=1");
   return { ok: true, message: input.rebuildProgram ? "Saved. Your starter program has been rebuilt and activated." : "Your training preferences were saved.", at: Date.now() };
+}
+
+/**
+ * Finish the guided sign-up questionnaire: save the answers and a bodyweight entry, set a calorie budget
+ * (an estimate), build the starter program through the custom-program path and make it active, then
+ * show the plan summary. Onboarding is only marked complete once everything above has been saved, so a
+ * failure leaves the user on the questionnaire to try again.
+ */
+export async function completeOnboardingAction(input: OnboardingPlanInput): Promise<ActionState> {
+  const user = await requireUser();
+  const parsed = onboardingPlanSchema.safeParse(input);
+  if (!parsed.success) {
+    const errors = fieldErrors(parsed.error);
+    return actionError(Object.values(errors)[0] ?? "Please check your answers.", errors);
+  }
+  const v = parsed.data;
+  const supabase = await getServerSupabase();
+
+  const { data: existing } = await supabase.from("profiles").select("onboarding_completed_at, timezone").eq("id", user.id).single();
+  if (existing?.onboarding_completed_at) redirect("/plan");
+  const today = isoDateInTz(new Date(), existing?.timezone ?? "UTC");
+  const weeklyChangeKg = rateTowardGoal(v.weightKg, v.goalWeightKg, v.weeklyChangeKg as WeeklyRateKg);
+
+  try {
+    const { error: pErr } = await supabase
+      .from("profiles")
+      .update({
+        display_name: v.displayName,
+        unit_system: v.unitSystem,
+        birth_year: new Date().getUTCFullYear() - v.age,
+        height_cm: v.heightCm,
+        sex: v.sex,
+        faith_enabled: v.faithEnabled,
+      })
+      .eq("id", user.id);
+    if (pErr) throw pErr;
+
+    const { error: aErr } = await supabase.from("onboarding_answers").upsert({
+      user_id: user.id,
+      primary_goal: v.primaryGoal,
+      experience: v.experience,
+      days_per_week: v.daysPerWeek,
+      session_minutes: v.sessionMinutes,
+      equipment: [...new Set(v.equipment)],
+      preferred_types: [],
+      dietary_preferences: ["no_preference"],
+      diet_type: v.dietType,
+      goal_weight_kg: v.goalWeightKg,
+      weekly_change_kg: weeklyChangeKg,
+      activity_level: v.activityLevel,
+    });
+    if (aErr) throw aErr;
+
+    const { error: wErr } = await supabase
+      .from("weight_entries")
+      .upsert({ user_id: user.id, recorded_on: today, weight_kg: v.weightKg }, { onConflict: "user_id,recorded_on" });
+    if (wErr) throw wErr;
+
+    const { data: goals } = await supabase.from("nutrition_goals").select("is_estimate").eq("user_id", user.id).maybeSingle();
+    if (!goals || goals.is_estimate) {
+      const b = calorieBudget({
+        sex: v.sex,
+        age: v.age,
+        heightCm: v.heightCm,
+        weightKg: v.weightKg,
+        activity: v.activityLevel,
+        weeklyChangeKg,
+        goal: v.primaryGoal,
+        diet: v.dietType,
+      });
+      const { error: gErr } = await supabase.from("nutrition_goals").upsert({
+        user_id: user.id,
+        calories: b.calories,
+        protein_g: b.protein_g,
+        carbs_g: b.carbs_g,
+        fat_g: b.fat_g,
+        water_ml: waterTargetMl(v.weightKg, { daysPerWeek: v.daysPerWeek, goal: v.primaryGoal }),
+        is_estimate: true,
+      });
+      if (gErr) throw gErr;
+    }
+
+    await buildAndActivateCustomProgram(
+      supabase,
+      user.id,
+      starterProgramInput({
+        goal: v.primaryGoal,
+        experience: v.experience,
+        daysPerWeek: v.daysPerWeek,
+        sessionMinutes: v.sessionMinutes,
+        age: v.age,
+        heightCm: v.heightCm,
+        bodyweightKg: v.weightKg,
+        equipment: [...new Set(v.equipment)],
+        units: v.unitSystem,
+      }),
+      "starter",
+    );
+
+    const { error: doneErr } = await supabase.from("profiles").update({ onboarding_completed_at: new Date().toISOString() }).eq("id", user.id);
+    if (doneErr) throw doneErr;
+  } catch (err) {
+    logError("onboarding.complete", err);
+    return actionError("We couldn't finish setting up your plan. Please try again.");
+  }
+
+  revalidatePath("/", "layout");
+  redirect("/plan?new=1");
 }

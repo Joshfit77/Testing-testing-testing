@@ -20,21 +20,36 @@ test.describe("welcome, sign-up and diets", () => {
     await page.goto(await getEmailLink(email, /http:\/\/127\.0\.0\.1:54321\/auth\/v1\/verify[^"'\s<]+/));
 
     await page.waitForURL(/\/onboarding/);
-    await page.getByLabel(/Bodyweight/).fill("150");
+    await page.getByRole("button", { name: "Lose body fat", exact: true }).click();
+    await page.getByRole("button", { name: /^Continue/ }).click();
+    // Sex is required (only used for calorie math).
+    await expect(page.getByText(/only used to estimate your daily calories/i)).toBeVisible();
+    await page.getByRole("button", { name: /^Continue/ }).click();
+    await expect(page.getByText("Please choose male, female or prefer not to say.")).toBeVisible();
+    await page.getByRole("button", { name: /^Back/ }).click();
+    await page.getByRole("button", { name: /^Continue/ }).click();
+    await page.getByRole("button", { name: "Female", exact: true }).click();
+    await page.getByRole("button", { name: /^Continue/ }).click();
     await page.getByLabel("Age").fill("29");
+    await page.getByRole("button", { name: /^Continue/ }).click();
     await page.getByLabel("Height (ft)").fill("5");
     await page.getByLabel("Height (in)").fill("5");
-    await page.getByRole("button", { name: "Continue" }).click();
-    await expect(page.getByText("Please choose male, female or prefer not to say.")).toBeVisible();
-    await page.getByRole("button", { name: "Female", exact: true }).click();
-    await page.getByRole("button", { name: "Continue" }).click();
-    await page.getByRole("button", { name: "Lose body fat" }).click();
-    await page.getByRole("button", { name: "Under 1 year" }).click();
-    await page.getByRole("button", { name: "Continue" }).click();
-    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByRole("button", { name: /^Continue/ }).click();
+    await page.getByLabel(/Current weight/).fill("150");
+    await page.getByRole("button", { name: /^Continue/ }).click();
+    await page.getByRole("button", { name: /^Continue/ }).click(); // weight goal is optional
+    await page.getByRole("button", { name: /^Not very active/ }).click();
+    await page.getByRole("button", { name: /^Continue/ }).click();
+    await page.getByRole("button", { name: "Under 1 year", exact: true }).click();
+    await page.getByRole("button", { name: /^Continue/ }).click();
+    await page.getByRole("button", { name: /^Continue/ }).click();
+    await page.getByRole("button", { name: /^Dumbbells only/ }).click();
+    await page.getByRole("button", { name: /^Continue/ }).click();
     await page.getByRole("button", { name: /Mediterranean/ }).click();
+    await page.getByRole("button", { name: /^Continue/ }).click();
     await page.getByRole("button", { name: "Build my plan" }).click();
-    await page.waitForURL(/\/home/, { timeout: 30_000 });
+    await page.waitForURL(/\/plan/, { timeout: 60_000 });
+    await expect(page.getByRole("heading", { name: "Your plan is ready" })).toBeVisible();
 
     await page.goto("/nutrition/diets");
     await expect(page.getByRole("button", { name: /Mediterranean.*Your diet/ })).toBeVisible();

@@ -28,6 +28,9 @@ export interface OnboardingRow {
   limitations: string | null;
   dietary_preferences: string[];
   diet_type: string;
+  goal_weight_kg: number | null;
+  weekly_change_kg: number | null;
+  activity_level: "sedentary" | "light" | "active" | "very_active" | null;
 }
 
 export interface ExerciseRow {

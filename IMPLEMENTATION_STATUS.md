@@ -1,6 +1,6 @@
 # Implementation status
 
-_Last updated: 2026-10-16._
+_Last updated: 2026-10-17._
 
 This file separates what was **verified in this environment** from what **needs external credentials or accounts** and what is **not done yet**.
 
@@ -46,6 +46,8 @@ Verification ran against a full local Supabase stack (Postgres 17, GoTrue auth, 
 | Workout reminders | ✅ Built, unit-tested | **Not tested on a device.** Works only in the iPhone/Android app. |
 | Barcode scanner | ✅ Built, unit-tested | **Not tested with a real camera.** Open Food Facts couldn't be reached from this environment; parsing follows its documented format. |
 | Exercise video tools | ✅ Built | Admin upload, prompt sheet (`docs/exercise-video-prompts.md`) and bulk import (`npm run videos:import`). Not run against a hosted Supabase project. |
+| Guided onboarding questionnaire + plan summary (`/plan`) | ✅ Done, e2e-tested | 12 screens, client + Zod server validation. Stores `goal_weight_kg`, `weekly_change_kg`, `activity_level` on `onboarding_answers` (migration `20261017000007`, owner-only RLS, integration-tested). The starter program is built with `starterProgramInput` + `buildCustomProgram` through the same service as Build my program (`src/server/services/custom-programs.ts`). Onboarding is marked complete only after everything is saved. |
+| Calorie budget & food diary (budget strip, quick add, copy yesterday, recent/frequent, weekly summary, weight goal, 5-week projection, budget recalculation) | ✅ Done, unit- and e2e-tested | Budget = Mifflin-St Jeor × activity outside workouts ± the weekly pace, with a 25% deficit cap and a 1,200/1,350/1,500 kcal floor; always labelled an estimate. Exercise calories are a MET-based estimate (strength ≈ 5 MET) from finished workout duration. Accounts created before this change have no budget fields: the strip uses their stored targets and the projection is hidden until they set a pace and activity. Budget settings live on the (Plus/Pro) Food page, so free users can't change them after onboarding yet. |
 | Supplements (reference list, diet-fit notes, personal stack, daily check-off) | ✅ Done, e2e- and integration-tested (RLS) | Free on every plan at `/nutrition/supplements`. Doses and evidence ratings are general information and should get a professional review before launch. |
 | Steps (manual entry, goal, 7-day Home card, 30-day Progress chart) | ✅ Done, e2e- and integration-tested (RLS, constraints) | Tables `daily_steps`, `supplement_stack`, `supplement_logs` and `profiles.step_goal` (migration `20261017000006`). |
 | Apple Health / Health Connect step sync | ✅ Built, domain logic unit-tested | **Not tested on a device.** Needs the HealthKit capability on the Apple App ID/Xcode target with an `NSHealthShareUsageDescription`, and on Android 8+ the Health Connect app plus the `READ_STEPS` permission in the manifest. iOS never reveals a read denial, so "no steps found" points users to Health > Sharing. Days with no steps are never written, so a sync can't wipe a hand-entered count. |
@@ -58,7 +60,7 @@ Verification ran against a full local Supabase stack (Postgres 17, GoTrue auth, 
 3. **Burst rate limiting** for AI and food search is in-memory per server instance. Monthly AI quotas are durable (database). For multi-instance production, consider a shared store (e.g. Upstash Redis) for burst limits.
 4. **Scripture text** is KJV (public domain outside the UK) and was entered from a well-known text. Verify every verse against an authoritative KJV source before publication.
 5. **Exercise videos.** No videos are bundled (we don't own any). Every exercise page has a "Watch form videos" button that opens a YouTube search, and admins can attach a YouTube, Vimeo or direct video link per exercise, which plays inside the app (privacy-enhanced YouTube embed). A license/permission confirmation is required.
-6. **Nutrition estimates** are deliberately simple (bodyweight-based) and always labeled as estimates. There is no sex/age-based BMR, by design (minimal data collection).
+6. **Nutrition estimates** use Mifflin-St Jeor (sex, age, height, weight) times an activity level once onboarding has collected them, and fall back to a bodyweight rule otherwise. They are always labeled as estimates, not dietary advice.
 7. **Offline.** An in-progress workout keeps working offline once the logger page is open, and it syncs when you reconnect. Other pages need a connection (offline page shown).
 8. **Admin program editing** covers metadata, publishing, tier and per-exercise prescriptions. Adding or removing weeks, days or exercises in curated programs is done through `src/data/programs.ts` plus `npm run seed:generate`.
 9. **Conversation history in the AI coach** shows as a sidebar on large screens. On mobile, users start new chats or reopen one from a link; a mobile history drawer is a small follow-up.

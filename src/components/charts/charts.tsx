@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Table2, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -145,7 +145,11 @@ function ChartTooltip({
   );
 }
 
-type ChartProps = Omit<ChartFrameProps, "children"> & { yDomain?: [number | string, number | string] };
+type ChartProps = Omit<ChartFrameProps, "children"> & {
+  yDomain?: [number | string, number | string];
+  /** Optional horizontal target line (e.g. a daily calorie goal). */
+  referenceLine?: { value: number; label: string };
+};
 
 export function BarSeriesChart(props: ChartProps) {
   const { data, xKey, series } = props;
@@ -158,6 +162,15 @@ export function BarSeriesChart(props: ChartProps) {
           <XAxis dataKey={xKey} {...AXIS} tickFormatter={formatX} minTickGap={8} />
           <YAxis {...AXIS} allowDecimals={false} tickFormatter={(v: number) => formatValue(v)} width={48} />
           <Tooltip cursor={{ fill: "rgba(201,165,76,0.08)" }} content={<ChartTooltip formatX={formatX} formatValue={formatValue} />} />
+          {props.referenceLine && (
+            <ReferenceLine
+              y={props.referenceLine.value}
+              stroke="#e8e2d0"
+              strokeDasharray="4 4"
+              ifOverflow="extendDomain"
+              label={{ value: props.referenceLine.label, position: "insideTopRight", fill: "#a39e90", fontSize: 11 }}
+            />
+          )}
           {series.map((s, i) => (
             <Bar
               key={s.key}

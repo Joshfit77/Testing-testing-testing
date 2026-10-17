@@ -5,10 +5,10 @@ import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { actionError, actionInvalid, actionOk, type ActionState } from "@/lib/action-state";
-import { estimateNutritionTargets, scaleMacros, type Macros, type Sex } from "@/lib/domain/nutrition";
-import { DIET_TYPES, DIETS, isDietType } from "@/lib/domain/diets";
-import type { PrimaryGoal } from "@/lib/domain/types";
-import { customFoodSchema, mealTypeSchema, nutritionGoalsSchema, savedMealSchema, waterSchema } from "@/lib/validation/schemas";
+import { scaleMacros, type Macros } from "@/lib/domain/nutrition";
+import { DIET_TYPES, DIETS } from "@/lib/domain/diets";
+import { rateTowardGoal, type WeeklyRateKg } from "@/lib/domain/calorie-budget";
+import { budgetSettingsSchema, customFoodSchema, mealTypeSchema, nutritionGoalsSchema, savedMealSchema, waterSchema } from "@/lib/validation/schemas";
 import { assertFeature, EntitlementError, requireUser } from "@/server/auth";
 import { isFoodSearchConfigured } from "@/server/env";
 import { getFood } from "@/server/services/food-database";
@@ -16,6 +16,7 @@ import { lookupBarcode, OffUnavailableError } from "@/server/services/open-food-
 import { barcodeLookupCandidates } from "@/lib/barcode";
 import { nutritionForAmount } from "@/lib/open-food-facts";
 import { logError } from "@/server/log";
+import { estimateAndSaveTargets } from "@/server/services/nutrition-targets";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const uuid = z.string().uuid();
@@ -352,33 +353,6 @@ export async function undoWaterAction(formData: FormData): Promise<void> {
   revalidatePath("/nutrition");
 }
 
-/**
- * Re-estimate the user's targets from their latest bodyweight, profile (sex, age, height),
- * training answers and diet style. Returns false when there isn't enough data yet.
- */
-async function estimateAndSaveTargets(supabase: SupabaseClient, userId: string): Promise<boolean> {
-  const [{ data: w }, { data: a }, { data: p }] = await Promise.all([
-    supabase.from("weight_entries").select("weight_kg").eq("user_id", userId).order("recorded_on", { ascending: false }).limit(1).maybeSingle(),
-    supabase.from("onboarding_answers").select("primary_goal, days_per_week, diet_type").eq("user_id", userId).maybeSingle(),
-    supabase.from("profiles").select("sex, birth_year, height_cm").eq("id", userId).maybeSingle(),
-  ]);
-  if (!w || !a) return false;
-  const t = estimateNutritionTargets({
-    weightKg: Number(w.weight_kg),
-    trainingDaysPerWeek: a.days_per_week as number,
-    goal: a.primary_goal as PrimaryGoal,
-    sex: (p?.sex as Sex | null) ?? null,
-    age: p?.birth_year ? new Date().getUTCFullYear() - (p.birth_year as number) : null,
-    heightCm: p?.height_cm ? Number(p.height_cm) : null,
-    diet: isDietType(a.diet_type) ? a.diet_type : "balanced",
-  });
-  const { error } = await supabase
-    .from("nutrition_goals")
-    .upsert({ user_id: userId, calories: t.calories, protein_g: t.protein_g, carbs_g: t.carbs_g, fat_g: t.fat_g, water_ml: t.water_ml, is_estimate: true });
-  if (error) throw error;
-  return true;
-}
-
 /** Change the user's diet style. Estimated targets follow the new diet; custom targets are kept. */
 export async function updateDietAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   try {
@@ -422,5 +396,102 @@ export async function updateGoalsAction(_prev: ActionState, formData: FormData):
     return actionOk("Targets saved.");
   } catch (err) {
     return guard(err, "nutrition.goals");
+  }
+}
+
+const ITEM_COLUMNS = "food_id, name, servings, calories, protein_g, carbs_g, fat_g, is_estimate";
+
+/**
+ * Copy logged food from one day to another (MyFitnessPal's "copy from yesterday"): one meal, or the whole
+ * day when no meal type is given. Items are added to the target day's meals; nothing is removed.
+ */
+export async function copyMealsAction(input: unknown): Promise<ActionState> {
+  try {
+    const { user, supabase } = await nutritionCtx();
+    const parsed = z.object({ fromDate: isoDate, toDate: isoDate, mealType: mealTypeSchema.optional() }).safeParse(input);
+    if (!parsed.success) return actionError("Choose a day to copy from.");
+    const { fromDate, toDate, mealType } = parsed.data;
+    if (fromDate === toDate) return actionError("Choose a different day to copy from.");
+    let q = supabase
+      .from("meals")
+      .select(`meal_type, meal_items(${ITEM_COLUMNS})`)
+      .eq("user_id", user.id)
+      .eq("eaten_on", fromDate)
+      .eq("status", "logged")
+      .eq("is_template", false);
+    if (mealType) q = q.eq("meal_type", mealType);
+    const { data: meals, error: mErr } = await q;
+    if (mErr) throw mErr;
+    const source = ((meals ?? []) as unknown as { meal_type: string; meal_items: Record<string, unknown>[] }[]).filter((m) => m.meal_items.length);
+    if (!source.length) return actionError(mealType ? "There's nothing logged for that meal on the day before." : "There's nothing logged on the day before.");
+    let copied = 0;
+    for (const type of [...new Set(source.map((m) => m.meal_type))]) {
+      const items = source.filter((m) => m.meal_type === type).flatMap((m) => m.meal_items);
+      const mealId = await findOrCreateMeal(supabase, user.id, toDate, type, "logged");
+      const { error } = await supabase.from("meal_items").insert(items.map((i) => ({ ...i, meal_id: mealId, user_id: user.id })));
+      if (error) throw error;
+      copied += items.length;
+    }
+    revalidatePath("/nutrition");
+    revalidatePath("/home");
+    return actionOk(`Copied ${copied} ${copied === 1 ? "item" : "items"}.`);
+  } catch (err) {
+    return guard(err, "nutrition.copy");
+  }
+}
+
+/** One-tap re-log of a food the user logged before (recent / frequent foods). */
+export async function relogItemAction(input: unknown): Promise<ActionState> {
+  try {
+    const { user, supabase } = await nutritionCtx();
+    const parsed = z.object({ itemId: uuid, date: isoDate, mealType: mealTypeSchema, status: z.enum(["logged", "planned"]).default("logged") }).safeParse(input);
+    if (!parsed.success) return actionError("Choose a food to add.");
+    const { itemId, date, mealType, status } = parsed.data;
+    const { data: item } = await supabase.from("meal_items").select(ITEM_COLUMNS).eq("id", itemId).eq("user_id", user.id).maybeSingle();
+    if (!item) return actionError("That food couldn't be found. It may have been deleted.");
+    const mealId = await findOrCreateMeal(supabase, user.id, date, mealType, status);
+    const { error } = await supabase.from("meal_items").insert({ ...item, meal_id: mealId, user_id: user.id });
+    if (error) throw error;
+    revalidatePath("/nutrition");
+    revalidatePath("/home");
+    return actionOk(`${status === "planned" ? "Planned" : "Logged"} ${item.name as string}.`);
+  } catch (err) {
+    return guard(err, "nutrition.relog");
+  }
+}
+
+/**
+ * Change goal weight, weekly pace and activity level, then recalculate the calorie budget (saved as an
+ * estimate). People who want their own numbers use "Save targets" instead.
+ */
+export async function updateBudgetAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    const { user, supabase } = await nutritionCtx();
+    const parsed = budgetSettingsSchema.safeParse(Object.fromEntries(formData));
+    if (!parsed.success) return actionInvalid(parsed.error);
+    const v = parsed.data;
+    const [{ data: w }, { data: p }] = await Promise.all([
+      supabase.from("weight_entries").select("weight_kg").eq("user_id", user.id).order("recorded_on", { ascending: false }).limit(1).maybeSingle(),
+      supabase.from("profiles").select("birth_year, height_cm").eq("id", user.id).maybeSingle(),
+    ]);
+    if (!w) return actionError("Log your bodyweight first so we can calculate your budget.");
+    if (!p?.birth_year || !p.height_cm) return actionError("Add your age and height in Training preferences first.");
+    const weeklyChangeKg = rateTowardGoal(Number(w.weight_kg), v.goalWeightKg, v.weeklyChangeKg as WeeklyRateKg);
+    const { data: updated, error } = await supabase
+      .from("onboarding_answers")
+      .update({ goal_weight_kg: v.goalWeightKg, weekly_change_kg: weeklyChangeKg, activity_level: v.activityLevel })
+      .eq("user_id", user.id)
+      .select("user_id");
+    if (error) throw error;
+    if (!updated?.length) return actionError("Finish setting up your profile first.");
+    if (!(await estimateAndSaveTargets(supabase, user.id))) return actionError("Log your bodyweight first so we can calculate your budget.");
+    revalidatePath("/nutrition");
+    revalidatePath("/home");
+    revalidatePath("/plan");
+    return actionOk(
+      weeklyChangeKg !== v.weeklyChangeKg ? "Budget recalculated. We pointed your pace toward your goal weight." : "Budget recalculated from your goal, pace and activity.",
+    );
+  } catch (err) {
+    return guard(err, "nutrition.budget");
   }
 }

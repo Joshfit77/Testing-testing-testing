@@ -12,11 +12,13 @@ import { BarcodeScanner } from "@/components/nutrition/barcode-scanner";
 import { initialActionState, type ActionState } from "@/lib/action-state";
 import { MEAL_TYPES } from "@/lib/domain/meals";
 import { caloriesFromMacros } from "@/lib/domain/nutrition";
+import type { QuickFood } from "@/lib/domain/diary";
 import {
   addWaterAction,
   createCustomFoodAction,
   logFoodAction,
   logTemplateAction,
+  relogItemAction,
   saveMealTemplateAction,
   undoWaterAction,
   updateGoalsAction,
@@ -76,13 +78,30 @@ function MealControls({ mealType, setMealType, status, setStatus, idPrefix }: { 
   );
 }
 
-export function AddFoodDialog({ date, myFoods, commonFoods, searchEnabled, dietName }: { date: string; myFoods: MyFood[]; commonFoods: MyFood[]; searchEnabled: boolean; dietName?: string }) {
+export function AddFoodDialog({
+  date,
+  myFoods,
+  commonFoods,
+  searchEnabled,
+  dietName,
+  recent = [],
+  frequent = [],
+}: {
+  date: string;
+  myFoods: MyFood[];
+  commonFoods: MyFood[];
+  searchEnabled: boolean;
+  dietName?: string;
+  recent?: QuickFood[];
+  frequent?: QuickFood[];
+}) {
   const [open, setOpen] = useState(false);
   const [mealType, setMealType] = useState("breakfast");
   const [status, setStatus] = useState("logged");
   const [result, setResult] = useState<ActionState | null>(null);
   const [pending, startTransition] = useTransition();
-  const [tab, setTab] = useState("search");
+  const hasRecent = recent.length > 0;
+  const [tab, setTab] = useState(hasRecent ? "recent" : "search");
 
   // Search state
   const [q, setQ] = useState("");
@@ -129,6 +148,26 @@ export function AddFoodDialog({ date, myFoods, commonFoods, searchEnabled, dietN
       setResult(res);
     });
 
+  const relog = (itemId: string) =>
+    startTransition(async () => {
+      setResult(await relogItemAction({ itemId, date, mealType, status }));
+    });
+
+  const quickRow = (f: QuickFood, showCount: boolean) => (
+    <li key={f.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-elevated/50 px-3 py-2">
+      <span className="min-w-0">
+        <span className="block truncate text-sm font-semibold">{f.name}</span>
+        <span className="text-xs text-muted-foreground">
+          {Math.round(f.calories)} kcal · P {Number(f.protein_g)} · C {Number(f.carbs_g)} · F {Number(f.fat_g)}
+          {showCount ? ` · logged ${f.count}×` : ""}
+        </span>
+      </span>
+      <Button size="sm" disabled={pending} onClick={() => relog(f.id)} aria-label={`Add ${f.name} again`}>
+        <Plus aria-hidden /> Add
+      </Button>
+    </li>
+  );
+
   const manualCalories = Number(manual.calories || 0);
   const macroCalories = caloriesFromMacros({ protein_g: Number(manual.protein_g || 0), carbs_g: Number(manual.carbs_g || 0), fat_g: Number(manual.fat_g || 0) });
   const mismatch = manual.calories && macroCalories > 0 && Math.abs(macroCalories - manualCalories) > Math.max(30, manualCalories * 0.2);
@@ -168,7 +207,13 @@ export function AddFoodDialog({ date, myFoods, commonFoods, searchEnabled, dietN
 
   return (
     <>
-      <Button onClick={() => { setOpen(true); setResult(null); }}>
+      <Button
+        onClick={() => {
+          setOpen(true);
+          setResult(null);
+          if (hasRecent && tab === "search") setTab("recent");
+        }}
+      >
         <Plus aria-hidden /> Add food
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
@@ -185,6 +230,11 @@ export function AddFoodDialog({ date, myFoods, commonFoods, searchEnabled, dietN
           )}
           <Tabs value={tab} onValueChange={setTab} className="mt-4">
             <TabsList className="w-full">
+              {hasRecent && (
+                <TabsTrigger value="recent" className="flex-1">
+                  Recent
+                </TabsTrigger>
+              )}
               <TabsTrigger value="search" className="flex-1">
                 Search
               </TabsTrigger>
@@ -198,6 +248,24 @@ export function AddFoodDialog({ date, myFoods, commonFoods, searchEnabled, dietN
                 Manual
               </TabsTrigger>
             </TabsList>
+
+            {hasRecent && (
+              <TabsContent value="recent">
+                <div className="max-h-96 space-y-4 overflow-y-auto">
+                  {frequent.length > 0 && (
+                    <section aria-label="Frequent foods">
+                      <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Frequent</p>
+                      <ul className="mt-2 space-y-2">{frequent.map((f) => quickRow(f, true))}</ul>
+                    </section>
+                  )}
+                  <section aria-label="Recent foods">
+                    <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Recent</p>
+                    <ul className="mt-2 space-y-2">{recent.map((f) => quickRow(f, false))}</ul>
+                  </section>
+                  <p className="text-[11px] text-muted-foreground">One tap adds the same amount you logged last time to the meal chosen above.</p>
+                </div>
+              </TabsContent>
+            )}
 
             <TabsContent value="search">
               <label className="relative block">

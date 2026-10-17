@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { Logo } from "@/components/common/logo";
 import { SetupRequired } from "@/components/common/setup-required";
-import { OnboardingWizard } from "@/components/onboarding/onboarding-wizard";
+import { OnboardingQuestionnaire } from "@/components/onboarding/onboarding-questionnaire";
 import { isSupabaseConfigured } from "@/lib/env";
 import { getProfile, requireUser } from "@/server/auth";
 
@@ -19,10 +19,10 @@ export default async function OnboardingPage() {
         <Logo />
         <h1 className="mt-8 font-display text-4xl font-bold uppercase">Let&apos;s build your plan</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          A few questions so we can match programs to your goals, schedule and equipment. You can change any answer later.
+          About a dozen quick questions. We&apos;ll use them to build your first training program and a daily calorie budget. You can change any answer later.
         </p>
         <div className="mt-8">
-          <OnboardingWizard initial={{ displayName: profile?.display_name ?? "" }} />
+          <OnboardingQuestionnaire initialName={profile?.display_name ?? ""} />
         </div>
       </div>
     </div>

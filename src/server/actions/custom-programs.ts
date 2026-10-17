@@ -5,11 +5,10 @@ import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { actionError, actionInvalid, type ActionState } from "@/lib/action-state";
 import { isoDateInTz } from "@/lib/domain/dates";
-import { buildCustomProgram, resolveGoalMaxes, resolveMaxes } from "@/lib/domain/custom-programs";
+import { resolveGoalMaxes, resolveMaxes } from "@/lib/domain/custom-programs";
 import { customProgramSchema, type CustomProgramFormInput } from "@/lib/validation/schemas";
 import { requireOnboardedUser } from "@/server/auth";
-import { loadExercises, toCatalog } from "@/server/services/catalog";
-import { activateProgram, createPrivateProgram } from "@/server/services/programs";
+import { buildAndActivateCustomProgram } from "@/server/services/custom-programs";
 import { logError } from "@/server/log";
 
 /** Durable per-user limit on how many custom programs can be built per hour. */
@@ -52,8 +51,9 @@ export async function buildCustomProgramAction(input: CustomProgramFormInput): P
       .upsert({ user_id: user.id, recorded_on: today, weight_kg: v.weightKg }, { onConflict: "user_id,recorded_on" });
     if (wErr) throw wErr;
 
-    const catalog = toCatalog(await loadExercises(supabase));
-    const seed = buildCustomProgram(
+    await buildAndActivateCustomProgram(
+      supabase,
+      user.id,
       {
         type: v.type,
         goal: v.goal,
@@ -71,10 +71,8 @@ export async function buildCustomProgramAction(input: CustomProgramFormInput): P
         division: v.division ?? null,
         equipment: v.equipment,
       },
-      catalog,
+      "custom",
     );
-    const programId = await createPrivateProgram(supabase, user.id, seed, "custom");
-    await activateProgram(supabase, user.id, programId);
   } catch (err) {
     logError("custom-program.build", err, { type: v.type });
     return actionError("We couldn't build your program. Please try again.");

@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { BookMarked, CalendarClock, ChevronLeft, ChevronRight, Lock, Pill, Salad, Trash2, UtensilsCrossed } from "lucide-react";
+import { BookMarked, CalendarClock, ChevronLeft, ChevronRight, Lock, Pill, Salad, Scale, Trash2, TrendingUp } from "lucide-react";
 import { BarSeriesChart } from "@/components/charts/charts";
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/states";
+import { BudgetForm, CopyMealButton, QuickAddDialog } from "@/components/nutrition/diary-client";
 import {
   AddFoodDialog,
   CustomFoodForm,
@@ -26,6 +27,10 @@ import { isFoodSearchConfigured } from "@/server/env";
 import { isFlagEnabled } from "@/server/flags";
 import { deleteCustomFoodAction, deleteMealItemAction, deleteTemplateAction, markPlannedEatenAction } from "@/server/actions/nutrition";
 import { getNutritionDaily } from "@/server/services/progress";
+import { loadBudgetContext } from "@/server/services/nutrition-targets";
+import { exerciseCalories, projectWeightKg, remainingCalories, weeksToGoal } from "@/lib/domain/calorie-budget";
+import { formatLongDate, goalDate, paceLabel, recentAndFrequent, weeklySummary, weightGoalProgress, workoutMinutes, type DiaryItem } from "@/lib/domain/diary";
+import { formatWeight } from "@/lib/domain/units";
 import { COMMON_FOODS } from "@/data/foods";
 import { DIETS, fitsDiet, isDietType } from "@/lib/domain/diets";
 import { MEAL_TYPES } from "@/lib/domain/meals";
@@ -74,7 +79,8 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
   const today = isoDateInTz(new Date(), profile.timezone);
   const date = sp.date && /^\d{4}-\d{2}-\d{2}$/.test(sp.date) ? sp.date : today;
   const supabase = await getServerSupabase();
-  const [mealsRes, goalsRes, waterRes, foodsRes, templatesRes, plannedRes, history, flag, commonRes, dietRes] = await Promise.all([
+  const prevDate = addDays(date, -1);
+  const [mealsRes, goalsRes, waterRes, foodsRes, templatesRes, plannedRes, history, flag, commonRes, dietRes, prevRes, recentRes, workoutsRes, ctx] = await Promise.all([
     supabase
       .from("meals")
       .select("id, meal_type, status, name, meal_items(id, name, servings, calories, protein_g, carbs_g, fat_g, is_estimate)")
@@ -99,6 +105,24 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
     isFlagEnabled("food_search"),
     supabase.from("foods").select("id, name, brand, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g, is_estimate, source, source_ref").is("owner_id", null).order("name"),
     supabase.from("onboarding_answers").select("diet_type").eq("user_id", user.id).maybeSingle(),
+    supabase.from("meals").select("meal_type, meal_items(id)").eq("user_id", user.id).eq("eaten_on", prevDate).eq("status", "logged").eq("is_template", false),
+    supabase
+      .from("meal_items")
+      .select("id, name, calories, protein_g, carbs_g, fat_g, created_at, meal:meals!inner(eaten_on, status, is_template)")
+      .eq("user_id", user.id)
+      .eq("meal.is_template", false)
+      .eq("meal.status", "logged")
+      .gte("meal.eaten_on", addDays(today, -30))
+      .order("created_at", { ascending: false })
+      .limit(300),
+    supabase
+      .from("workout_sessions")
+      .select("started_at, ended_at, paused_seconds")
+      .eq("user_id", user.id)
+      .eq("status", "completed")
+      .gte("started_at", `${addDays(date, -1)}T00:00:00Z`)
+      .lt("started_at", `${addDays(date, 2)}T00:00:00Z`),
+    loadBudgetContext(supabase, user.id),
   ]);
 
   const meals = (mealsRes.data ?? []) as unknown as MealRow[];
@@ -119,30 +143,42 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
   const upcoming = (plannedRes.data ?? []) as unknown as { id: string; eaten_on: string; meal_type: string; meal_items: { name: string }[] }[];
   const label = date === today ? "Today" : new Date(`${date}T00:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" });
   const searchEnabled = isFoodSearchConfigured() && flag;
+  const units = profile.unit_system;
+
+  // Previous day's logged meals, for "copy from yesterday".
+  const prevCounts = new Map<string, number>();
+  for (const m of (prevRes.data ?? []) as unknown as { meal_type: string; meal_items: { id: string }[] }[])
+    prevCounts.set(m.meal_type, (prevCounts.get(m.meal_type) ?? 0) + m.meal_items.length);
+  const prevTotal = [...prevCounts.values()].reduce((a, b) => a + b, 0);
+  const prevLabel = date === today ? "yesterday" : new Date(`${prevDate}T00:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+
+  // Recent and frequent foods (last 30 days) for one-tap re-logging.
+  const { recent, frequent } = recentAndFrequent(
+    ((recentRes.data ?? []) as unknown as { id: string; name: string; calories: number; protein_g: number; carbs_g: number; fat_g: number; created_at: string }[]).map(
+      (i): DiaryItem => ({ id: i.id, name: i.name, calories: Number(i.calories), protein_g: Number(i.protein_g), carbs_g: Number(i.carbs_g), fat_g: Number(i.fat_g), loggedAt: i.created_at }),
+    ),
+  );
+
+  // Exercise: estimated calories from this day's finished workouts (strength ≈ 5 MET) at the latest bodyweight.
+  const workouts = ((workoutsRes.data ?? []) as { started_at: string; ended_at: string | null; paused_seconds: number }[]).filter(
+    (w) => isoDateInTz(new Date(w.started_at), profile.timezone) === date,
+  );
+  const workoutMins = workouts.reduce((s, w) => s + workoutMinutes(w.started_at, w.ended_at, w.paused_seconds), 0);
+  const exercise = ctx ? exerciseCalories(workoutMins, ctx.weightKg) : 0;
+  const food = Math.round(totals.calories);
+  const remaining = goals ? remainingCalories(goals.calories, food, exercise) : null;
+  const projected = date === today && ctx?.budget ? projectWeightKg(ctx.weightKg, ctx.budget.maintenance, food, exercise, 5) : null;
+
+  // Weekly summary: the last 7 days ending today.
+  const week = history.slice(-7);
+  const summary = weeklySummary(week, goals?.calories ?? null);
+
+  // Weight goal.
+  const weeksLeft = ctx?.budget && ctx.goalWeightKg ? weeksToGoal(ctx.weightKg, ctx.goalWeightKg, ctx.budget.effectiveWeeklyChangeKg) : null;
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Food log" title="Food" description="Track what you eat. Search common foods, save your own, or enter anything by hand." actions={<AddFoodDialog date={date} myFoods={myFoods} commonFoods={commonFoods} searchEnabled={searchEnabled} dietName={diet.name} />} />
-
-      <Link href="/nutrition/diets" className="lift flex items-center justify-between gap-3 rounded-2xl border border-gold-muted/60 bg-card-gradient p-4">
-        <span>
-          <span className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">Your diet</span>
-          <span className="mt-1 block font-display text-xl font-semibold uppercase">{diet.name}</span>
-          <span className="block text-sm text-muted-foreground">{diet.eatingWindow ?? diet.tagline}</span>
-        </span>
-        <span className="shrink-0 text-sm font-semibold text-gold-highlight">Change</span>
-      </Link>
-
-      <Link href="/nutrition/supplements" className="lift flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-4">
-        <span>
-          <span className="flex items-center gap-2 font-display text-lg font-semibold uppercase">
-            <Pill className="size-4 text-gold" aria-hidden /> Supplements
-          </span>
-          <span className="block text-sm text-muted-foreground">Evidence, doses and your daily stack.</span>
-        </span>
-        <ChevronRight className="size-4 shrink-0 text-gold" aria-hidden />
-      </Link>
-
+      <PageHeader eyebrow="Food log" title="Food" description="Track what you eat. Search common foods, save your own, or enter anything by hand." actions={<AddFoodDialog date={date} myFoods={myFoods} commonFoods={commonFoods} searchEnabled={searchEnabled} dietName={diet.name} recent={recent} frequent={frequent} />} />
       <nav className="flex items-center justify-between rounded-2xl border border-border bg-card p-2" aria-label="Choose day">
         <Button asChild variant="ghost" size="icon" aria-label="Previous day">
           <Link href={`/nutrition?date=${addDays(date, -1)}`}>
@@ -163,6 +199,61 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
           </Link>
         </Button>
       </nav>
+
+      <section aria-labelledby="budget-strip-title" className="rounded-2xl border border-gold-muted/60 bg-card-gradient p-4">
+        <h2 id="budget-strip-title" className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">
+          Calories remaining
+        </h2>
+        {goals && remaining != null ? (
+          <>
+            <div className="mt-3 grid grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] items-center gap-1 text-center" data-testid="budget-equation">
+              <div>
+                <p className="font-display text-xl font-bold tabular-nums sm:text-2xl" data-testid="budget-goal">{goals.calories}</p>
+                <p className="text-[11px] text-muted-foreground">Goal</p>
+              </div>
+              <span className="text-muted-foreground" aria-hidden>−</span>
+              <div>
+                <p className="font-display text-xl font-bold tabular-nums sm:text-2xl" data-testid="budget-food">{food}</p>
+                <p className="text-[11px] text-muted-foreground">Food</p>
+              </div>
+              <span className="text-muted-foreground" aria-hidden>+</span>
+              <div>
+                <p className="font-display text-xl font-bold tabular-nums sm:text-2xl" data-testid="budget-exercise">{exercise}</p>
+                <p className="text-[11px] text-muted-foreground">Exercise (est.)</p>
+              </div>
+              <span className="text-muted-foreground" aria-hidden>=</span>
+              <div>
+                <p className={`font-display text-xl font-bold tabular-nums sm:text-2xl ${remaining < 0 ? "text-[#f08a8a]" : "text-gold-highlight"}`} data-testid="budget-remaining">
+                  {remaining}
+                </p>
+                <p className="text-[11px] text-muted-foreground">Remaining</p>
+              </div>
+            </div>
+            <p className="sr-only">
+              Goal {goals.calories} minus food {food} plus exercise {exercise} equals {remaining} calories remaining.
+            </p>
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              {goals.is_estimate ? "Goal is an estimate. " : "Goal is your custom target. "}
+              {workouts.length
+                ? `Exercise is estimated from ${workoutMins} min of logged workouts at your latest bodyweight.`
+                : ctx
+                  ? "Finish a workout to add its estimated calories here."
+                  : "Log your bodyweight to estimate workout calories."}
+            </p>
+            {projected != null && (
+              <p className="mt-2 flex items-start gap-2 rounded-xl border border-border bg-card/60 px-3 py-2 text-sm" data-testid="projection">
+                <TrendingUp className="mt-0.5 size-4 shrink-0 text-gold" aria-hidden />
+                <span>
+                  If every day were like today, you&apos;d weigh about <span className="font-semibold">{formatWeight(projected, units)}</span> in 5 weeks.
+                  <span className="block text-[11px] text-muted-foreground">An estimate from today&apos;s food and exercise, not a prediction.</span>
+                </span>
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="mt-2 text-sm text-muted-foreground">Set your daily targets below to see your calories remaining.</p>
+        )}
+      </section>
 
       <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
         <section className="bg-card-gradient rounded-2xl border border-border p-5" aria-labelledby="totals-title">
@@ -217,25 +308,32 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
       </div>
 
       <section aria-labelledby="meals-title" className="space-y-3">
-        <h2 id="meals-title" className="font-display text-2xl font-bold uppercase">
-          Meals
-        </h2>
-        {logged.length === 0 && planned.length === 0 ? (
-          <EmptyState icon={UtensilsCrossed} title="Nothing logged yet" description="Use “Add food” to search, pick a saved food, or enter values manually." />
-        ) : (
-          MEAL_TYPES.map(([type, title]) => {
-            const ms = logged.filter((m) => m.meal_type === type);
-            if (!ms.length) return null;
-            const items = ms.flatMap((m) => m.meal_items);
-            const mt = sumMacros(items.map((i) => ({ calories: Number(i.calories), protein_g: Number(i.protein_g) })));
-            return (
-              <div key={type} className="rounded-2xl border border-border bg-card p-4">
-                <div className="mb-2 flex items-center justify-between">
-                  <h3 className="font-display text-lg font-semibold uppercase">{title}</h3>
-                  <span className="text-sm tabular-nums text-muted-foreground">
-                    {Math.round(mt.calories)} kcal · {Math.round(mt.protein_g)}g protein
-                  </span>
-                </div>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 id="meals-title" className="font-display text-2xl font-bold uppercase">
+            Meals
+          </h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <QuickAddDialog date={date} />
+            {prevTotal > 0 && <CopyMealButton fromDate={prevDate} toDate={date} label={date === today ? "Copy yesterday" : `Copy all from ${prevLabel}`} />}
+          </div>
+        </div>
+        {logged.length === 0 && planned.length === 0 && (
+          <p className="text-sm text-muted-foreground">Nothing logged yet. Use &ldquo;Add food&rdquo; to search, pick a recent or saved food, or quick add calories.</p>
+        )}
+        {MEAL_TYPES.map(([type, title]) => {
+          const ms = logged.filter((m) => m.meal_type === type);
+          const items = ms.flatMap((m) => m.meal_items);
+          const mt = sumMacros(items.map((i) => ({ calories: Number(i.calories), protein_g: Number(i.protein_g) })));
+          const prevCount = prevCounts.get(type) ?? 0;
+          return (
+            <div key={type} className="rounded-2xl border border-border bg-card p-4" data-testid={`meal-${type}`}>
+              <div className="mb-2 flex items-center justify-between">
+                <h3 className="font-display text-lg font-semibold uppercase">{title}</h3>
+                <span className="text-sm tabular-nums text-muted-foreground">
+                  {Math.round(mt.calories)} kcal · {Math.round(mt.protein_g)}g protein
+                </span>
+              </div>
+              {items.length > 0 && (
                 <ul className="divide-y divide-border">
                   {items.map((i) => (
                     <li key={i.id} className="flex items-center justify-between gap-3 py-2">
@@ -249,16 +347,26 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
                         </p>
                       </div>
                       <ActionButton action={deleteMealItemAction} fields={{ id: i.id }} size="icon-sm" variant="ghost" aria-label={`Remove ${i.name}`}>
-<Trash2 aria-hidden />
+                        <Trash2 aria-hidden />
                       </ActionButton>
                     </li>
                   ))}
                 </ul>
-                {ms[0] && <div className="mt-3 border-t border-border pt-3"><SaveMealForm mealId={ms[0].id} defaultName={`${title} ${date}`} /></div>}
+              )}
+              <div className="mt-2 flex flex-wrap items-center gap-1">
+                <QuickAddDialog date={date} mealType={type} compact />
+                {prevCount > 0 && (
+                  <CopyMealButton fromDate={prevDate} toDate={date} mealType={type} label={`Copy ${title.toLowerCase()} from ${prevLabel} (${prevCount})`} />
+                )}
               </div>
-            );
-          })
-        )}
+              {ms[0] && (
+                <div className="mt-3 border-t border-border pt-3">
+                  <SaveMealForm mealId={ms[0].id} defaultName={`${title} ${date}`} />
+                </div>
+              )}
+            </div>
+          );
+        })}
         {planned.length > 0 && (
           <div className="rounded-2xl border border-dashed border-gold-muted/60 bg-card/60 p-4">
             <h3 className="mb-2 flex items-center gap-2 font-display text-lg font-semibold uppercase">
@@ -279,6 +387,82 @@ Mark eaten
           </div>
         )}
       </section>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="space-y-2">
+          <BarSeriesChart
+            title="This week"
+            description={goals ? `Calories per day vs your ${goals.calories} kcal goal (before exercise)` : "Calories per day"}
+            data={week.map((d) => ({ date: d.date, calories: d.calories }))}
+            xKey="date"
+            xFormat="weekday"
+            decimals={0}
+            valueSuffix=" kcal"
+            series={[{ key: "calories", label: "Calories" }]}
+            referenceLine={goals ? { value: goals.calories, label: "Goal" } : undefined}
+            emptyMessage="Log food this week to see your summary."
+          />
+          <dl className="grid grid-cols-3 gap-2 text-center" data-testid="weekly-summary">
+            <div className="rounded-xl border border-border bg-card p-2">
+              <dt className="text-[11px] uppercase tracking-widest text-muted-foreground">Daily average</dt>
+              <dd className="font-display text-lg font-bold tabular-nums">{summary.daysLogged ? `${summary.average} kcal` : "—"}</dd>
+            </div>
+            <div className="rounded-xl border border-border bg-card p-2">
+              <dt className="text-[11px] uppercase tracking-widest text-muted-foreground">Under goal</dt>
+              <dd className="font-display text-lg font-bold tabular-nums">{goals ? `${summary.under} of ${summary.daysLogged}` : "—"}</dd>
+            </div>
+            <div className="rounded-xl border border-border bg-card p-2">
+              <dt className="text-[11px] uppercase tracking-widest text-muted-foreground">Over goal</dt>
+              <dd className="font-display text-lg font-bold tabular-nums">{goals ? `${summary.over} of ${summary.daysLogged}` : "—"}</dd>
+            </div>
+          </dl>
+          <p className="text-[11px] text-muted-foreground">Averages count only days with food logged ({summary.daysLogged} of the last 7).</p>
+        </div>
+
+        <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="weight-goal-title">
+          <h2 id="weight-goal-title" className="mb-3 flex items-center gap-2 font-display text-lg font-semibold uppercase">
+            <Scale className="size-4 text-gold" aria-hidden /> Weight goal
+          </h2>
+          {ctx ? (
+            ctx.goalWeightKg ? (
+              <div className="space-y-3">
+                <dl className="grid grid-cols-3 gap-2 text-center">
+                  {(
+                    [
+                      ["Start", ctx.startWeightKg],
+                      ["Current", ctx.weightKg],
+                      ["Goal", ctx.goalWeightKg],
+                    ] as const
+                  ).map(([l, v]) => (
+                    <div key={l} className="rounded-xl border border-border bg-elevated/40 p-2">
+                      <dt className="text-[11px] uppercase tracking-widest text-muted-foreground">{l}</dt>
+                      <dd className="font-display text-lg font-bold tabular-nums">{formatWeight(v, units)}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <ProgressBar value={weightGoalProgress(ctx.startWeightKg, ctx.weightKg, ctx.goalWeightKg)} label="Progress toward goal weight" />
+                <p className="text-sm text-muted-foreground">
+                  {weightGoalProgress(ctx.startWeightKg, ctx.weightKg, ctx.goalWeightKg)}% of the way.{" "}
+                  {weeksLeft === 0
+                    ? "You've reached your goal weight."
+                    : weeksLeft != null
+                      ? `At ${paceLabel(ctx.budget!.effectiveWeeklyChangeKg, units).toLowerCase()}, estimated goal date ${formatLongDate(goalDate(today, weeksLeft))}.`
+                      : "Choose a pace toward your goal below to see an estimated goal date."}
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Current weight {formatWeight(ctx.weightKg, units)}. Set a goal weight under Daily targets to track progress toward it.
+              </p>
+            )
+          ) : (
+            <p className="text-sm text-muted-foreground">Log your bodyweight to start tracking a weight goal.</p>
+          )}
+          <Button asChild variant="secondary" size="sm" className="mt-3">
+            <Link href="/progress#log-weight">Log weight</Link>
+          </Button>
+        </section>
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <BarSeriesChart
@@ -311,10 +495,40 @@ Mark eaten
         </section>
       </div>
 
+
+      <Link href="/nutrition/diets" className="lift flex items-center justify-between gap-3 rounded-2xl border border-gold-muted/60 bg-card-gradient p-4">
+        <span>
+          <span className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">Your diet</span>
+          <span className="mt-1 block font-display text-xl font-semibold uppercase">{diet.name}</span>
+          <span className="block text-sm text-muted-foreground">{diet.eatingWindow ?? diet.tagline}</span>
+        </span>
+        <span className="shrink-0 text-sm font-semibold text-gold-highlight">Change</span>
+      </Link>
+
+      <Link href="/nutrition/supplements" className="lift flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-4">
+        <span>
+          <span className="flex items-center gap-2 font-display text-lg font-semibold uppercase">
+            <Pill className="size-4 text-gold" aria-hidden /> Supplements
+          </span>
+          <span className="block text-sm text-muted-foreground">Evidence, doses and your daily stack.</span>
+        </span>
+        <ChevronRight className="size-4 shrink-0 text-gold" aria-hidden />
+      </Link>
+
       <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="targets-title">
         <h2 id="targets-title" className="mb-3 font-display text-xl font-bold uppercase">
           Daily targets
         </h2>
+        <div className="mb-5 space-y-2 rounded-xl border border-border bg-elevated/40 p-4">
+          <h3 className="text-sm font-semibold">Calorie budget</h3>
+          <p className="text-xs text-muted-foreground">
+            Change your goal weight, weekly pace or daily activity and we&apos;ll recalculate your calories and macros (an estimate).
+            {ctx?.budget ? ` Maintenance is about ${ctx.budget.maintenance} kcal/day before workouts.` : ""}
+          </p>
+          <BudgetForm units={units} goalWeightKg={ctx?.goalWeightKg ?? null} weeklyChangeKg={ctx?.weeklyChangeKg ?? null} activity={ctx?.activity ?? null} />
+        </div>
+        <h3 className="mb-2 text-sm font-semibold">Custom targets</h3>
+        <p className="mb-3 text-xs text-muted-foreground">Prefer your own numbers? Enter them here; they replace the estimate until you recalculate.</p>
         <GoalsForm goals={goals} />
       </section>
 
