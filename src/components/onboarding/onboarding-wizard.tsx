@@ -42,7 +42,7 @@ const DIET_LABELS: Record<DietaryPreference, string> = {
 };
 
 const EQUIPMENT_PRESETS: { label: string; items: Equipment[] }[] = [
-  { label: "Full gym", items: EQUIPMENT.filter((e) => e !== "heavy_bag") as Equipment[] },
+  { label: "Full gym", items: EQUIPMENT.filter((e) => e !== "heavy_bag" && e !== "strongman_implements") as Equipment[] },
   { label: "Home gym", items: ["barbell", "rack", "bench", "dumbbell", "pull_up_bar", "band", "kettlebell"] },
   { label: "Dumbbells only", items: ["dumbbell", "bench", "band"] },
   { label: "Bodyweight only", items: ["bodyweight", "mat"] },

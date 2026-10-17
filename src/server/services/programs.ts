@@ -16,9 +16,10 @@ export async function createPrivateProgram(
   supabase: SupabaseClient,
   userId: string,
   seed: ProgramSeed,
-  source: "starter" | "ai",
+  source: "starter" | "ai" | "custom",
 ): Promise<string> {
-  const slugs = [...new Set(seed.days.flatMap((d) => d.exercises.map((e) => e.ex)))];
+  const allDays = [...seed.days, ...(seed.weekTemplates ?? []).flatMap((w) => w.days)];
+  const slugs = [...new Set(allDays.flatMap((d) => d.exercises.map((e) => e.ex)))];
   const { data: exRows, error: exErr } = await supabase.from("exercises").select("id, slug").in("slug", slugs);
   if (exErr) throw exErr;
   const idBySlug = new Map((exRows ?? []).map((r) => [r.slug as string, r.id as string]));

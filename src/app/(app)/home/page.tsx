@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookOpenText, Bot, CalendarCheck, ChevronRight, Dumbbell, Flame, HeartPulse, Lock, Medal, Play, Sparkles, Trophy } from "lucide-react";
+import { BookOpenText, Bot, CalendarCheck, ChevronRight, Dumbbell, Flame, HeartPulse, Lock, Medal, Play, Sparkles, Trophy, Wand2 } from "lucide-react";
 import { AreaSeriesChart, BarSeriesChart } from "@/components/charts/charts";
 import { Notice } from "@/components/common/states";
 import { Badge } from "@/components/ui/badge";
@@ -92,6 +92,14 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         <Notice tone="success">Welcome to Narrow Gate Fitness, {name}! Your starter program is ready — today&apos;s session is below.</Notice>
       )}
       {sp.password === "updated" && <Notice tone="success">Your password was updated.</Notice>}
+      {sp.built && active && (
+        <Notice tone="success">
+          Your custom program &ldquo;{active.programName}&rdquo; is built and active.{" "}
+          <Link href={`/train/programs/${active.programSlug}`} className="font-semibold text-gold-highlight underline">
+            See the full plan
+          </Link>
+        </Notice>
+      )}
 
       {/* Hero: today's workout */}
       <section className="bg-card-gradient relative overflow-hidden rounded-3xl border border-border p-5 md:p-8" aria-labelledby="today-title">
@@ -138,10 +146,23 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                 <Play aria-hidden /> Start workout
               </Link>
             </Button>
-            <Button asChild size="lg" variant="secondary">
-              <Link href="/train">Programs</Link>
-            </Button>
+            {active?.today ? (
+              <Button asChild size="lg" variant="secondary">
+                <Link href="/train">Programs</Link>
+              </Button>
+            ) : (
+              <Button asChild size="lg" variant="secondary">
+                <Link href="/train/build">
+                  <Wand2 aria-hidden /> Build my program
+                </Link>
+              </Button>
+            )}
           </div>
+          {active?.today && (
+            <Link href="/train/build" className="relative inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-gold-highlight hover:underline md:absolute md:right-8 md:top-6">
+              <Wand2 className="size-4" aria-hidden /> Build a custom program
+            </Link>
+          )}
         </div>
       </section>
 
