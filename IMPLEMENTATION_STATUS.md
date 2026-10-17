@@ -11,9 +11,9 @@ Verification ran against a full local Supabase stack (Postgres 17, GoTrue auth, 
 - `npm run typecheck`: clean (strict TypeScript, `noUncheckedIndexedAccess`)
 - `npm run lint`: clean
 - `npm run build`: production build succeeds
-- `npm run test:unit`: 44 tests for domain logic and catalog integrity
-- `npm run test:integration`: 24 tests against the real database. They cover RLS isolation, role escalation, entitlement tampering, admin privacy, consent enforcement, cascade on account deletion, workout drafts, idempotent finish, PR detection and recalculation, program advancement, Stripe webhook signature, idempotency and subscription lifecycle, and AI gating and quotas.
-- `npm run test:e2e`: Playwright (mobile viewport) against `next start`. Covers sign-up, email confirmation via Mailpit, onboarding, the dashboard, starting a program session, logging sets, reload-restore, pause/resume, finishing with PRs, history, sign-out and sign-in, password-reset email, the under-18 block, free-plan gating (premium program, nutrition, AI, billing page), bodyweight and goals, the consent-gated recovery check-in, and the faith opt-in and journal.
+- `npm run test:unit`: 151 tests for domain logic, catalog integrity, the program generator, badges, barcode parsing, devotional content, reminders and the program-builder UI
+- `npm run test:integration`: 44 tests against the real database (including progress-photo, challenge, custom-program and barcode-food privacy rules). They cover RLS isolation, role escalation, entitlement tampering, admin privacy, consent enforcement, cascade on account deletion, workout drafts, idempotent finish, PR detection and recalculation, program advancement, Stripe webhook signature, idempotency and subscription lifecycle, and AI gating and quotas.
+- `npm run test:e2e`: Playwright (mobile viewport) against `next start`. Covers sign-up, email confirmation via Mailpit, onboarding, the dashboard, starting a program session, logging sets, reload-restore, pause/resume, finishing with PRs, history, sign-out and sign-in, password-reset email, the under-18 block, free-plan gating (premium program, nutrition, AI, billing page), bodyweight and goals, the consent-gated recovery check-in, the faith opt-in and journal, logging a built-in food, the 40-day challenge check-in, and building a custom program.
 
 ## Feature checklist
 
@@ -38,6 +38,13 @@ Verification ran against a full local Supabase stack (Postgres 17, GoTrue auth, 
 | Installable PWA | ✅ Done | Manifest, icons, service worker and offline page. |
 | iOS & Android shells (Capacitor 8) | ✅ Projects generated and synced, icons/splash generated | **Not compiled here**: Android SDK downloads are blocked in this environment, and iOS needs macOS/Xcode. Build steps are in SETUP.md. |
 | API boundary for native clients | ✅ `/api/v1/me`, `/programs`, `/workouts`, `/api/ai/chat` with Bearer auth | |
+| Build my program (12 types) | ✅ Done & e2e-tested | Generated plans are unit-tested for every type and experience level. Coaching content is general guidance; show prep defers nutrition and peak week to a qualified coach. |
+| Progress photos | ✅ Done & integration-tested (privacy) | Photo upload has not been tested on a real phone camera. |
+| Badges | ✅ Done | 24 badges computed from existing data. |
+| 40-day devotional challenge | ✅ Done & e2e-tested | **Every KJV verse needs a word-for-word check against an authoritative text before launch.** |
+| Workout reminders | ✅ Built, unit-tested | **Not tested on a device.** Works only in the iPhone/Android app. |
+| Barcode scanner | ✅ Built, unit-tested | **Not tested with a real camera.** Open Food Facts couldn't be reached from this environment; parsing follows its documented format. |
+| Exercise video tools | ✅ Built | Admin upload, prompt sheet (`docs/exercise-video-prompts.md`) and bulk import (`npm run videos:import`). Not run against a hosted Supabase project. |
 | Legal pages | ⚠️ Placeholders | Clearly marked **for legal review**. |
 
 ## Known limitations & decisions
