@@ -256,6 +256,15 @@
   :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
   body.bare #bnav, body.bare #side, body.bare #restbar { display: none; }
   @media (min-width: 900px) { body.bare main { margin-left: auto; margin-right: auto; max-width: 640px; } body.bare .demo-bar { margin-left: 0; } }
+  .intro { min-height: calc(100vh - 140px); display: grid; align-content: center; justify-items: center; gap: 18px; text-align: center; position: relative; padding: 24px 0 8px; }
+  .intro-glow { position: absolute; inset: -40px -16px auto; height: 420px; background: radial-gradient(50% 50% at 50% 30%, rgba(230,199,110,.18), rgba(9,9,9,0) 70%); pointer-events: none; animation: glow 4s ease-in-out infinite alternate; }
+  @keyframes glow { from { opacity: .6 } to { opacity: 1 } }
+  .intro-mark svg { filter: drop-shadow(0 0 22px rgba(230,199,110,.35)); }
+  .intro-brand { font-size: clamp(28px, 7vw, 40px); }
+  .intro-verse { margin: 6px 0 0; max-width: 520px; padding: 22px; border-radius: 20px; border: 1px solid var(--gold-lo); background: linear-gradient(160deg, #1d180c, #111 70%); display: grid; gap: 12px; animation: pageIn .6s .2s cubic-bezier(.2,.8,.3,1) both; }
+  .intro-verse .verse { margin: 0; font-size: clamp(17px, 4.4vw, 21px); }
+  .intro-cta { min-height: 52px; padding: 0 26px; font-size: 16px; animation: pageIn .6s .45s cubic-bezier(.2,.8,.3,1) both; }
+  .scripture-bar { border-left: 3px solid var(--gold); padding: 10px 14px; background: #15120b; border-radius: 0 12px 12px 0; }
   /* Motion */
   @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
   @keyframes fadeOut { from { opacity: 1 } to { opacity: 0 } }
@@ -483,7 +492,7 @@ function renderNav() {
   const moreOn = !NAV.some(n => n.v === sec);
   $("bnav").innerHTML = NAV.map(n => `<button class="nav-btn ${sec === n.v ? "on" : ""}" data-a="go" data-to="${n.v}" aria-current="${sec === n.v ? "page" : "false"}"><span class="pill">${icon(n.i)}</span><span>${n.l}</span></button>`).join("")
     + `<button class="nav-btn ${moreOn ? "on" : ""}" data-a="more"><span class="pill">${icon("more")}</span><span>More</span></button>`;
-  $("side").innerHTML = `<div class="brand"><div class="brand-name">NARROW GATE <span>FITNESS</span></div><div class="brand-tag">ROOTED IN FAITH. BUILT FOR STRENGTH.</div></div>`
+  $("side").innerHTML = `<div class="brand"><div style="margin-bottom:12px">${GATE(40)}</div><div class="brand-name">NARROW GATE <span>FITNESS</span></div><div class="brand-tag">ROOTED IN FAITH. BUILT FOR STRENGTH.</div></div>`
     + [...NAV, ...MORE].filter(n => !n.faith || S.faith).map(n => `<button class="nav-btn ${sec === n.v ? "on" : ""}" data-a="go" data-to="${n.v}">${icon(n.i)}<span>${n.l}</span></button>`).join("");
 }
 
@@ -1201,6 +1210,23 @@ function reminderSection() {
     ${r.days.length ? `<p class="small gold">In the app: ${r.days.map(i => names[i]).join(", ")} at ${esc(r.time)}.</p>` : `<p class="small dim">No days picked.</p>`}</section>`;
 }
 
+/* ---------- Intro: the narrow gate ---------- */
+const GATE = (size = 64) => `<svg width="${size}" height="${size}" viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="gg${size}" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#E6C76E"/><stop offset="55%" stop-color="#C9A54C"/><stop offset="100%" stop-color="#8C7139"/></linearGradient></defs><rect x="1" y="1" width="46" height="46" rx="12" fill="#171717" stroke="#35302A"/><path d="M12 38V20a12 12 0 0 1 24 0v18" fill="none" stroke="url(#gg${size})" stroke-width="3.5" stroke-linecap="round"/><path d="M21 38V24a3 3 0 0 1 6 0v14" fill="url(#gg${size})"/><path d="M9 38h30" stroke="url(#gg${size})" stroke-width="3" stroke-linecap="round"/></svg>`;
+function vIntro() {
+  return `<section class="intro">
+    <div class="intro-glow" aria-hidden="true"></div>
+    <div class="intro-mark bounce-in">${GATE(84)}</div>
+    <div class="brand-name intro-brand">NARROW GATE <span>FITNESS</span></div>
+    <div class="eyebrow" style="text-align:center">Rooted in faith. Built for strength.</div>
+    <figure class="intro-verse">
+      <blockquote class="verse">“Enter ye in at the strait gate: for wide is the gate, and broad is the way, that leadeth to destruction, and many there be which go in thereat: Because strait is the gate, and narrow is the way, which leadeth unto life, and few there be that find it.”</blockquote>
+      <figcaption class="gold small">Matthew 7:13–14 (KJV)</figcaption>
+    </figure>
+    <button class="btn primary intro-cta" data-a="intro-go">Enter the narrow gate ${icon("chev")}</button>
+    <p class="tiny dim" style="text-align:center">Your strength. His glory.</p>
+  </section>`;
+}
+
 /* ---------- Welcome, sign-up and setup ---------- */
 const GOALS = [["build_strength", "Build strength"], ["build_muscle", "Build muscle"], ["lose_fat", "Lose fat"], ["improve_conditioning", "Improve conditioning"], ["athletic_performance", "Athletic performance"], ["general_health", "General health"]];
 let SU = null;
@@ -1208,7 +1234,7 @@ function newSetup() { const me = S.me || {}; SU = { step: 0, name: S.name && S.n
   if (SU.heightCm) { SU.ft = String(Math.floor(SU.heightCm / 2.54 / 12)); SU.inch = String(Math.round(SU.heightCm / 2.54 - +SU.ft * 12)); SU.cm = String(Math.round(SU.heightCm)); } }
 function vWelcome() {
   return `<section class="hero" style="padding:28px 22px;gap:18px;text-align:left">
-    <div class="brand-name" style="font-size:26px">NARROW GATE <span>FITNESS</span></div>
+    <div class="row" style="gap:12px;flex-wrap:nowrap">${GATE(44)}<div class="brand-name" style="font-size:24px">NARROW GATE <span>FITNESS</span></div></div>
     <div class="eyebrow">Welcome · Rooted in faith. Built for strength.</div>
     <h1 style="font-size:clamp(34px,8vw,52px)">Choose the <span class="gold">narrow way</span>. Train with purpose.</h1>
     <p class="muted">Programs built around you, a fast workout logger, food tracking with diets, progress photos, an AI coach and an optional faith section.</p>
@@ -1220,6 +1246,7 @@ function vWelcome() {
 }
 function vSignup() {
   return `${header("Create your account", "Welcome", true)}
+  <div class="scripture-bar"><p class="verse" style="font-size:16px">“I can do all things through Christ which strengtheneth me.”</p><p class="tiny gold" style="margin-top:4px">Philippians 4:13 (KJV)</p></div>
   <p class="muted">Free forever plan. No card required. Next, we'll ask your weight, age, sex and height to set up your plan.</p>
   <form class="card stack" data-form="signup">
     <label class="f">Name<input class="input" name="name" required maxlength="60" autocomplete="given-name" value="${esc(SU ? SU.name : "")}"></label>
@@ -1227,7 +1254,7 @@ function vSignup() {
     <label class="f">Password<input class="input" type="password" name="password" required minlength="8" autocomplete="new-password" placeholder="At least 8 characters"></label>
     <label class="row small" style="gap:10px;flex-wrap:nowrap"><input type="checkbox" name="adult" required style="width:22px;height:22px;accent-color:#c9a54c"> I confirm I am 18 years of age or older.</label>
     <button class="btn primary block">Create account</button>
-    <p class="tiny dim">This preview doesn't create a real account or send email; your details stay in this browser. The full app sends a confirmation email.</p>
+    <p class="tiny dim">This offline edition doesn't create an online account or send email; your details stay on this device. The online app sends a confirmation email.</p>
   </form>`;
 }
 const SETUP_STEPS = ["About you", "Your goal", "Your diet"];
@@ -1431,10 +1458,10 @@ function pickerRows(q, mode) {
 }
 
 /* ---------- Render ---------- */
-const VIEWS = { welcome: vWelcome, signup: vSignup, setup: vSetup, diets: vDiets, build: vBuild, badges: vBadges, home: vHome, train: vTrain, program: vProgram, library: vLibrary, exercise: vExercise, logger: vLogger, summary: vSummary, history: vHistory, workout: vWorkout, progress: vProgress, nutrition: vNutrition, faith: vFaith, coach: vCoach, profile: vProfile };
+const VIEWS = { intro: vIntro, welcome: vWelcome, signup: vSignup, setup: vSetup, diets: vDiets, build: vBuild, badges: vBadges, home: vHome, train: vTrain, program: vProgram, library: vLibrary, exercise: vExercise, logger: vLogger, summary: vSummary, history: vHistory, workout: vWorkout, progress: vProgress, nutrition: vNutrition, faith: vFaith, coach: vCoach, profile: vProfile };
 function render() {
   for (const k in CHARTS) delete CHARTS[k];
-  document.body.classList.toggle("bare", ["welcome", "signup", "setup"].includes(R.v));
+  document.body.classList.toggle("bare", ["intro", "welcome", "signup", "setup"].includes(R.v));
   renderNav();
   $("main").innerHTML = (VIEWS[R.v] || vNotFound)();
   drawCharts(); renderRest();
@@ -1509,6 +1536,7 @@ document.addEventListener("click", ev => {
     case "fday": { const cur = R.p.day ? new Date(R.p.day + "T12:00:00").getTime() : Date.now(); const n = +d.n; const nd = n === 0 ? Date.now() : cur + n * DAY; R.p = { day: Math.min(startOfDay(nd), startOfDay(Date.now())) === startOfDay(Date.now()) ? undefined : dayKey(nd) }; render(); break; }
     case "verse": R.p = { vi: +d.n }; render(); break;
     case "b-open": newBuilder(); go("build"); break;
+    case "intro-go": go("welcome", {}, false); break;
     case "explore": seed(); registerCustom(); stack.length = 0; go("home", {}, false); toast("Sample data loaded. Reset any time in Profile."); break;
     case "su-set": SU[d.k] = d.v; SU.err = ""; render(); break;
     case "su-back": SU.step = Math.max(0, SU.step - 1); SU.err = ""; render(); pageAnim(); break;
@@ -1552,7 +1580,7 @@ document.addEventListener("click", ev => {
     case "ask": sendChat(d.q); break;
     case "stop": if (coachBusy) coachBusy.abort(); break;
     case "clearchat": S.chat = []; save(); render(); break;
-    case "reset": confirmBox(d.mode === "seed" ? "Reload sample data?" : "Start fresh?", "This replaces everything saved in this preview: workouts, bodyweight, meals, journal and chat.", d.mode === "seed" ? "Reload" : "Erase everything", () => { if (d.mode === "seed") seed(); else { S = blank(); save(); } stack.length = 0; closeOverlay(); go(d.mode === "seed" ? "home" : "welcome", {}, false); toast(d.mode === "seed" ? "Sample data reloaded." : "All preview data erased."); }); break;
+    case "reset": confirmBox(d.mode === "seed" ? "Reload sample data?" : "Start fresh?", "This replaces everything saved in this preview: workouts, bodyweight, meals, journal and chat.", d.mode === "seed" ? "Reload" : "Erase everything", () => { if (d.mode === "seed") seed(); else { S = blank(); save(); } stack.length = 0; closeOverlay(); go(d.mode === "seed" ? "home" : "intro", {}, false); toast(d.mode === "seed" ? "Sample data reloaded." : "All preview data erased."); }); break;
   }
 });
 document.addEventListener("input", ev => {
@@ -1662,7 +1690,7 @@ setInterval(() => {
 
 /* Boot */
 S = load();
-if (!S) { S = blank(); R = { v: "welcome", p: {} }; }
+if (!S) { S = blank(); R = { v: "intro", p: {} }; }
 if (!Array.isArray(S.myFoods)) S.myFoods = [];
 registerCustom();
 render();
