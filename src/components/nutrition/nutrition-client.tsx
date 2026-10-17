@@ -36,6 +36,8 @@ export interface MyFood {
   fat_g: number;
   is_estimate: boolean;
   source: string;
+  /** Built-in foods only: whether it fits the user's diet style. */
+  fitsDiet?: boolean;
 }
 
 interface SearchFood {
@@ -74,7 +76,7 @@ function MealControls({ mealType, setMealType, status, setStatus, idPrefix }: { 
   );
 }
 
-export function AddFoodDialog({ date, myFoods, commonFoods, searchEnabled }: { date: string; myFoods: MyFood[]; commonFoods: MyFood[]; searchEnabled: boolean }) {
+export function AddFoodDialog({ date, myFoods, commonFoods, searchEnabled, dietName }: { date: string; myFoods: MyFood[]; commonFoods: MyFood[]; searchEnabled: boolean; dietName?: string }) {
   const [open, setOpen] = useState(false);
   const [mealType, setMealType] = useState("breakfast");
   const [status, setStatus] = useState("logged");
@@ -91,6 +93,7 @@ export function AddFoodDialog({ date, myFoods, commonFoods, searchEnabled }: { d
   // My foods
   const [servings, setServings] = useState<Record<string, string>>({});
   const [filter, setFilter] = useState("");
+  const [dietOnly, setDietOnly] = useState(false);
   // Manual
   const [manual, setManual] = useState({ name: "", calories: "", protein_g: "", carbs_g: "", fat_g: "", isEstimate: true });
 
@@ -131,12 +134,14 @@ export function AddFoodDialog({ date, myFoods, commonFoods, searchEnabled }: { d
   const mismatch = manual.calories && macroCalories > 0 && Math.abs(macroCalories - manualCalories) > Math.max(30, manualCalories * 0.2);
   const filtered = myFoods.filter((f) => !filter || f.name.toLowerCase().includes(filter.toLowerCase()));
   const terms = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const commonMatches = (terms.length ? commonFoods.filter((f) => terms.every((w) => f.name.toLowerCase().includes(w))) : commonFoods).slice(0, terms.length ? 30 : 12);
+  const pool = dietOnly ? commonFoods.filter((f) => f.fitsDiet) : commonFoods;
+  const commonMatches = (terms.length ? pool.filter((f) => terms.every((w) => f.name.toLowerCase().includes(w))) : pool).slice(0, terms.length ? 30 : 12);
 
   const foodRow = (f: MyFood, tag?: string) => (
     <li key={f.id} className="rounded-xl border border-border bg-elevated/50 p-3">
       <p className="text-sm font-semibold">
         {f.name} {f.is_estimate && <span className="text-[11px] font-normal text-gold">({tag ?? "estimate"})</span>}
+        {f.fitsDiet && dietName && <span className="ml-1.5 rounded-full border border-[#2f5a3d] px-2 py-0.5 align-middle text-[10px] font-semibold text-[#8fd3a5]">Fits {dietName}</span>}
       </p>
       <p className="text-xs text-muted-foreground">
         {f.serving_size} {f.serving_unit}: {Number(f.calories)} kcal · P {Number(f.protein_g)}g · C {Number(f.carbs_g)}g · F {Number(f.fat_g)}g
@@ -200,6 +205,12 @@ export function AddFoodDialog({ date, myFoods, commonFoods, searchEnabled }: { d
                 <Search className="pointer-events-none absolute left-3 top-3.5 size-4 text-muted-foreground" aria-hidden />
                 <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. chicken, banana, rice" className="pl-9" />
               </label>
+              {dietName && (
+                <label className="mt-2 flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={dietOnly} onChange={(e) => setDietOnly(e.target.checked)} className="size-5 accent-[#C9A54C]" />
+                  Only show foods that fit {dietName}
+                </label>
+              )}
               <div className="mt-2 max-h-96 space-y-3 overflow-y-auto" aria-live="polite" aria-busy={searching}>
                 <section aria-label="Common foods">
                   <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">{terms.length ? "Common foods" : "Popular foods"}</p>

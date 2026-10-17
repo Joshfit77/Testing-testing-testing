@@ -73,7 +73,7 @@ export function SignInForm({ next }: { next?: string }) {
   );
 }
 
-export function SignUpForm() {
+export function SignUpForm({ defaultEmail = "" }: { defaultEmail?: string }) {
   const [state, action] = useActionState(signUpAction, initialActionState);
   if (state.ok) {
     return (
@@ -96,7 +96,7 @@ export function SignUpForm() {
       </div>
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
-        <Input id="email" name="email" type="email" autoComplete="email" required aria-invalid={Boolean(fe.email)} aria-describedby="email-error" />
+        <Input id="email" name="email" type="email" autoComplete="email" required defaultValue={defaultEmail} aria-invalid={Boolean(fe.email)} aria-describedby="email-error" />
         <FieldError id="email-error" message={fe.email} />
       </div>
       <div className="space-y-2">

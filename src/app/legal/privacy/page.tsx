@@ -8,7 +8,7 @@ export default function PrivacyPage() {
       <h2>What we collect</h2>
       <ul>
         <li>Account data: email address, display name.</li>
-        <li>Training profile: age (to confirm adult eligibility), height, weight, goals, experience, equipment and preferences.</li>
+        <li>Training profile: age (to confirm adult eligibility and estimate calories), sex (male, female or not specified, used only for calorie estimates), height, weight, goals, experience, equipment, diet style and preferences.</li>
         <li>Activity data you log: workouts, sets, personal records, bodyweight, optional body measurements, optional progress photos (stored privately; visible only to you), nutrition and water.</li>
         <li>
           Optional sensitive wellness information (physical limitation notes, recovery check-ins) — stored only after you give explicit

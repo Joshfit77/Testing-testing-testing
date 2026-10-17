@@ -38,6 +38,7 @@ Verification ran against a full local Supabase stack (Postgres 17, GoTrue auth, 
 | Installable PWA | ✅ Done | Manifest, icons, service worker and offline page. |
 | iOS & Android shells (Capacitor 8) | ✅ Projects generated and synced, icons/splash generated | **Not compiled here**: Android SDK downloads are blocked in this environment, and iOS needs macOS/Xcode. Build steps are in SETUP.md. |
 | API boundary for native clients | ✅ `/api/v1/me`, `/programs`, `/workouts`, `/api/ai/chat` with Bearer auth | |
+| Welcome page, sex in onboarding, 13 diet styles | ✅ Done & e2e-tested | Calorie targets use Mifflin-St Jeor when sex, age and height are known. Diet guidance is general education with safety notes. |
 | Build my program (12 types) | ✅ Done & e2e-tested | Generated plans are unit-tested for every type and experience level. Coaching content is general guidance; show prep defers nutrition and peak week to a qualified coach. |
 | Progress photos | ✅ Done & integration-tested (privacy) | Photo upload has not been tested on a real phone camera. |
 | Badges | ✅ Done | 24 badges computed from existing data. |

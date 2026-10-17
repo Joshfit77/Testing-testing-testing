@@ -1,4 +1,5 @@
 import type { PrimaryGoal } from "./types";
+import { macroSplitForDiet, type DietType } from "./diets";
 
 export interface Macros {
   calories: number;
@@ -36,28 +37,52 @@ export function caloriesFromMacros(m: Pick<Macros, "protein_g" | "carbs_g" | "fa
   return Math.round(m.protein_g * 4 + m.carbs_g * 4 + m.fat_g * 9);
 }
 
+export type Sex = "male" | "female" | "unspecified";
+
+/** Resting energy (kcal/day) by the Mifflin-St Jeor equation. "unspecified" uses the midpoint. */
+export function mifflinStJeor(weightKg: number, heightCm: number, age: number, sex: Sex): number {
+  const base = 10 * weightKg + 6.25 * heightCm - 5 * age;
+  return base + (sex === "male" ? 5 : sex === "female" ? -161 : -78);
+}
+
+/** Activity multiplier from weekly training days. */
+export function activityFactor(trainingDaysPerWeek: number): number {
+  const d = Math.min(Math.max(trainingDaysPerWeek, 0), 7);
+  if (d <= 1) return 1.3;
+  if (d <= 3) return 1.45;
+  if (d <= 5) return 1.6;
+  return 1.75;
+}
+
 /**
- * A deliberately simple, clearly-labelled ESTIMATE of daily targets from bodyweight,
- * training frequency and goal. It does not account for sex, age, body composition,
- * medical conditions, pregnancy or medications, and is not dietary advice.
+ * A clearly-labelled ESTIMATE of daily targets. With sex, age and height it uses the
+ * Mifflin-St Jeor equation times an activity factor; otherwise a simple bodyweight rule.
+ * Macros follow the chosen diet style. It does not account for body composition, medical
+ * conditions, pregnancy or medications, and is not dietary advice.
  */
 export function estimateNutritionTargets(input: {
   weightKg: number;
   trainingDaysPerWeek: number;
   goal: PrimaryGoal;
+  sex?: Sex | null;
+  age?: number | null;
+  heightCm?: number | null;
+  diet?: DietType | null;
 }): Macros & { water_ml: number; is_estimate: true } {
   const { weightKg, trainingDaysPerWeek, goal } = input;
-  // Rough maintenance: ~29–35 kcal/kg depending on activity.
-  const kcalPerKg = 29 + Math.min(Math.max(trainingDaysPerWeek, 0), 6);
-  let calories = weightKg * kcalPerKg;
+  let calories: number;
+  if (input.sex && input.age && input.heightCm) {
+    calories = mifflinStJeor(weightKg, input.heightCm, input.age, input.sex) * activityFactor(trainingDaysPerWeek);
+  } else {
+    // Rough maintenance: ~29–35 kcal/kg depending on activity.
+    calories = weightKg * (29 + Math.min(Math.max(trainingDaysPerWeek, 0), 6));
+  }
   if (goal === "lose_fat") calories *= 0.85; // modest ~15% deficit — never aggressive
   if (goal === "build_muscle") calories *= 1.08; // small surplus
   calories = clamp(Math.round(calories / 10) * 10, 1200, 5000);
 
   const proteinPerKg = goal === "lose_fat" || goal === "build_muscle" || goal === "build_strength" ? 1.8 : 1.4;
-  const protein_g = Math.round(weightKg * proteinPerKg);
-  const fat_g = Math.round(Math.max(weightKg * 0.8, (calories * 0.25) / 9));
-  const carbs_g = Math.max(0, Math.round((calories - protein_g * 4 - fat_g * 9) / 4));
+  const { protein_g, carbs_g, fat_g } = macroSplitForDiet(calories, weightKg, input.diet ?? "balanced", proteinPerKg);
   const water_ml = clamp(Math.round((weightKg * 33) / 50) * 50, 1500, 5000);
   return { calories, protein_g, carbs_g, fat_g, water_ml, is_estimate: true };
 }

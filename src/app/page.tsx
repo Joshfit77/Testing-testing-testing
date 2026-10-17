@@ -40,7 +40,7 @@ export default async function LandingPage() {
       <main>
         <section className="hero-glow relative overflow-hidden">
           <div className="mx-auto max-w-6xl px-4 pb-20 pt-14 md:px-8 md:pb-28 md:pt-24">
-            <p className="animate-fade-up text-xs font-semibold uppercase tracking-[0.4em] text-gold">Rooted in faith. Built for strength.</p>
+            <p className="animate-fade-up text-xs font-semibold uppercase tracking-[0.4em] text-gold">Welcome · Rooted in faith. Built for strength.</p>
             <h1 className="animate-fade-up mt-4 max-w-3xl font-display text-5xl font-bold uppercase leading-[0.95] tracking-tight md:text-7xl">
               Choose the <span className="text-gold-gradient">narrow way</span>. Train with purpose.
             </h1>
@@ -48,14 +48,29 @@ export default async function LandingPage() {
               Premium training programs, precise workout tracking, nutrition and an AI coach — for every athlete, whatever you
               believe. An optional faith and discipline section is there if you want it.
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Button asChild size="lg">
-                <Link href="/signup">Create your free account</Link>
+            <form action="/signup" method="get" className="animate-fade-up mt-8 max-w-xl rounded-2xl border border-gold-muted/50 bg-card/80 p-3 backdrop-blur [animation-delay:120ms] sm:flex sm:items-center sm:gap-2">
+              <label htmlFor="welcome-email" className="sr-only">
+                Email
+              </label>
+              <input
+                id="welcome-email"
+                name="email"
+                type="email"
+                required
+                autoComplete="email"
+                placeholder="Enter your email"
+                className="h-13 w-full rounded-xl border border-border bg-background px-4 text-base outline-none focus-visible:border-gold sm:flex-1"
+              />
+              <Button type="submit" size="lg" className="mt-2 w-full sm:mt-0 sm:w-auto">
+                Sign up free
               </Button>
-              <Button asChild size="lg" variant="secondary">
-                <Link href="/login">I already have an account</Link>
-              </Button>
-            </div>
+            </form>
+            <p className="mt-4 text-sm text-muted-foreground">
+              Already have an account?{" "}
+              <Link href="/login" className="font-semibold text-gold-highlight hover:underline">
+                Sign in
+              </Link>
+            </p>
             <p className="mt-6 text-xs text-muted-foreground">
               Inspired by Matthew 7:13–14 — &ldquo;strait is the gate, and narrow is the way, which leadeth unto life.&rdquo; (KJV)
             </p>

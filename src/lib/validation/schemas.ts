@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DIET_TYPES } from "@/lib/domain/diets";
 import {
   DIETARY_PREFERENCES,
   EQUIPMENT,
@@ -54,6 +55,8 @@ export const onboardingSchema = z
     limitations: z.string().trim().max(1000).optional().default(""),
     wellnessConsent: z.boolean().default(false),
     dietaryPreferences: z.array(z.enum(DIETARY_PREFERENCES)).max(DIETARY_PREFERENCES.length),
+    sex: z.enum(["male", "female", "unspecified"], { message: "Choose male, female or prefer not to say" }),
+    dietType: z.enum(DIET_TYPES).default("balanced"),
     faithEnabled: z.boolean().default(false),
   })
   .refine((v) => !v.limitations || v.wellnessConsent, {

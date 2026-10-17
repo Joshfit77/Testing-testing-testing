@@ -29,6 +29,8 @@ import {
 } from "@/lib/domain/types";
 import type { OnboardingInput } from "@/lib/validation/schemas";
 import { saveOnboardingAction } from "@/server/actions/onboarding";
+import { DIET_TYPES, DIETS, type DietType } from "@/lib/domain/diets";
+import type { Sex } from "@/lib/domain/nutrition";
 
 const DIET_LABELS: Record<DietaryPreference, string> = {
   no_preference: "No preference",
@@ -69,7 +71,7 @@ function Chip({ selected, onClick, children }: { selected: boolean; onClick: () 
   );
 }
 
-const STEPS = ["About you", "Your goal", "Your schedule", "Preferences"] as const;
+const STEPS = ["About you", "Your goal", "Your schedule", "Diet & preferences"] as const;
 
 export function OnboardingWizard({ initial, mode = "create" }: { initial: OnboardingInitial; mode?: "create" | "edit" }) {
   const [step, setStep] = useState(0);
@@ -93,6 +95,8 @@ export function OnboardingWizard({ initial, mode = "create" }: { initial: Onboar
   const [minutes, setMinutes] = useState(initial.sessionMinutes ?? 45);
   const [equipment, setEquipment] = useState<Equipment[]>(initial.equipment ?? ["bodyweight", "mat"]);
   const [types, setTypes] = useState<ProgramType[]>(initial.preferredTypes ?? []);
+  const [sex, setSex] = useState<Sex | null>(initial.sex ?? null);
+  const [dietType, setDietType] = useState<DietType>(initial.dietType ?? "balanced");
   const [diet, setDiet] = useState<DietaryPreference[]>(initial.dietaryPreferences ?? ["no_preference"]);
   const [limitations, setLimitations] = useState(initial.limitations ?? "");
   const [consent, setConsent] = useState(initial.wellnessConsent ?? false);
@@ -129,6 +133,7 @@ export function OnboardingWizard({ initial, mode = "create" }: { initial: Onboar
       const a = Number(age);
       if (!age || !Number.isFinite(a)) return "Please enter your age.";
       if (a < 18) return "Narrow Gate Fitness is available to adults (18+) at launch.";
+      if (!sex) return "Please choose male, female or prefer not to say.";
       const h = heightCm();
       if (!h || h < 90 || h > 260) return "Please enter a valid height.";
       const w = weight ? toKg(Number(weight), units) : 0;
@@ -164,6 +169,8 @@ export function OnboardingWizard({ initial, mode = "create" }: { initial: Onboar
       limitations: limitations.trim(),
       wellnessConsent: consent,
       dietaryPreferences: diet.length ? diet : ["no_preference"],
+      sex: sex!,
+      dietType,
       faithEnabled: faith,
       rebuildProgram: mode === "create" ? true : rebuild,
     };
@@ -201,11 +208,6 @@ export function OnboardingWizard({ initial, mode = "create" }: { initial: Onboar
               <Input id="ob-name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={60} autoComplete="given-name" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="ob-age">Age</Label>
-              <Input id="ob-age" type="number" inputMode="numeric" min={18} max={100} value={age} onChange={(e) => setAge(e.target.value)} />
-              <p className="text-xs text-muted-foreground">Used only to confirm you&apos;re an adult and tailor recommendations.</p>
-            </div>
-            <div className="space-y-2">
               <span className="text-sm font-medium">Units</span>
               <div className="grid grid-cols-2 gap-2" role="group" aria-label="Units">
                 <Chip selected={units === "imperial"} onClick={() => switchUnits("imperial")}>
@@ -215,6 +217,30 @@ export function OnboardingWizard({ initial, mode = "create" }: { initial: Onboar
                   Metric (kg, cm)
                 </Chip>
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ob-weight">Bodyweight ({units === "imperial" ? "lb" : "kg"})</Label>
+              <Input id="ob-weight" type="number" inputMode="decimal" step="0.1" value={weight} onChange={(e) => setWeight(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ob-age">Age</Label>
+              <Input id="ob-age" type="number" inputMode="numeric" min={18} max={100} value={age} onChange={(e) => setAge(e.target.value)} />
+              <p className="text-xs text-muted-foreground">Used to confirm you&apos;re an adult and to estimate your calorie needs.</p>
+            </div>
+            <div className="space-y-2">
+              <span className="text-sm font-medium">Sex</span>
+              <div className="grid grid-cols-3 gap-2" role="group" aria-label="Sex">
+                <Chip selected={sex === "male"} onClick={() => setSex("male")}>
+                  Male
+                </Chip>
+                <Chip selected={sex === "female"} onClick={() => setSex("female")}>
+                  Female
+                </Chip>
+                <Chip selected={sex === "unspecified"} onClick={() => setSex("unspecified")}>
+                  Prefer not to say
+                </Chip>
+              </div>
+              <p className="text-xs text-muted-foreground">Only used to estimate your daily calories. Never shared.</p>
             </div>
             {units === "imperial" ? (
               <div className="grid grid-cols-2 gap-3">
@@ -233,10 +259,6 @@ export function OnboardingWizard({ initial, mode = "create" }: { initial: Onboar
                 <Input id="ob-cm" type="number" inputMode="decimal" min={90} max={260} value={cm} onChange={(e) => setCm(e.target.value)} />
               </div>
             )}
-            <div className="space-y-2">
-              <Label htmlFor="ob-weight">Bodyweight ({units === "imperial" ? "lb" : "kg"})</Label>
-              <Input id="ob-weight" type="number" inputMode="decimal" step="0.1" value={weight} onChange={(e) => setWeight(e.target.value)} />
-            </div>
           </fieldset>
         )}
 
@@ -315,18 +337,32 @@ export function OnboardingWizard({ initial, mode = "create" }: { initial: Onboar
         {step === 3 && (
           <div className="space-y-6">
             <fieldset className="space-y-3">
-              <legend className="font-display text-2xl font-bold uppercase">Training styles you enjoy</legend>
-              <p className="text-sm text-muted-foreground">Optional — choose any that interest you.</p>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {PROGRAM_TYPES.map((t) => (
-                  <Chip key={t} selected={types.includes(t)} onClick={() => toggle(types, t, setTypes)}>
-                    {PROGRAM_TYPE_LABELS[t]}
-                  </Chip>
+              <legend className="font-display text-2xl font-bold uppercase">Your diet</legend>
+              <p className="text-sm text-muted-foreground">Sets your calorie and macro targets and marks foods that fit. You can change it any time in Food.</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {DIET_TYPES.map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    aria-pressed={dietType === d}
+                    onClick={() => setDietType(d)}
+                    className={cn(
+                      "lift flex min-h-11 flex-col items-start gap-0.5 rounded-xl border px-3.5 py-2.5 text-left transition-colors",
+                      dietType === d ? "border-gold bg-gold/12" : "border-border bg-elevated hover:border-gold-muted",
+                    )}
+                  >
+                    <span className={cn("flex items-center gap-2 text-sm font-semibold", dietType === d && "text-gold-highlight")}>
+                      {dietType === d && <Check className="size-4 shrink-0" aria-hidden />}
+                      {DIETS[d].name}
+                    </span>
+                    <span className="text-xs text-muted-foreground">{DIETS[d].tagline}</span>
+                  </button>
                 ))}
               </div>
+              {DIETS[dietType].caution && <Notice tone="warning">{DIETS[dietType].caution}</Notice>}
             </fieldset>
             <fieldset className="space-y-3">
-              <legend className="font-display text-xl font-bold uppercase">Dietary preferences</legend>
+              <legend className="font-display text-xl font-bold uppercase">Food restrictions</legend>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {DIETARY_PREFERENCES.map((d) => (
                   <Chip
@@ -337,6 +373,17 @@ export function OnboardingWizard({ initial, mode = "create" }: { initial: Onboar
                     }
                   >
                     {DIET_LABELS[d]}
+                  </Chip>
+                ))}
+              </div>
+            </fieldset>
+            <fieldset className="space-y-3">
+              <legend className="font-display text-xl font-bold uppercase">Training styles you enjoy</legend>
+              <p className="text-sm text-muted-foreground">Optional — choose any that interest you.</p>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {PROGRAM_TYPES.map((t) => (
+                  <Chip key={t} selected={types.includes(t)} onClick={() => toggle(types, t, setTypes)}>
+                    {PROGRAM_TYPE_LABELS[t]}
                   </Chip>
                 ))}
               </div>

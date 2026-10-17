@@ -5,6 +5,8 @@ import { OnboardingWizard } from "@/components/onboarding/onboarding-wizard";
 import { WorkoutReminders } from "@/components/profile/workout-reminders";
 import type { DietaryPreference, Equipment, ExperienceLevel, PrimaryGoal, ProgramType } from "@/lib/domain/types";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { isDietType } from "@/lib/domain/diets";
+import type { Sex } from "@/lib/domain/nutrition";
 import { requireOnboardedUser } from "@/server/auth";
 
 export const metadata = { title: "Training preferences" };
@@ -40,6 +42,8 @@ export default async function PreferencesPage() {
           limitations: (a?.limitations as string | null) ?? "",
           wellnessConsent: Boolean(profile.wellness_consent_at),
           faithEnabled: profile.faith_enabled,
+          sex: (profile.sex as Sex | null) ?? undefined,
+          dietType: isDietType(a?.diet_type) ? a.diet_type : "balanced",
         }}
       />
       <WorkoutReminders faithEnabled={profile.faith_enabled} />

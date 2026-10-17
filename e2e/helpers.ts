@@ -42,6 +42,7 @@ export async function signUpAndConfirm(page: Page, email: string, name = "Test A
 export async function completeOnboarding(page: Page) {
   await page.waitForURL(/\/onboarding/);
   await page.getByLabel("Age").fill("34");
+  await page.getByRole("button", { name: "Male", exact: true }).click();
   await page.getByLabel("Height (ft)").fill("5");
   await page.getByLabel("Height (in)").fill("10");
   await page.getByLabel(/Bodyweight/).fill("185");

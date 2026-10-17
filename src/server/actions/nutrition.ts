@@ -5,7 +5,8 @@ import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { actionError, actionInvalid, actionOk, type ActionState } from "@/lib/action-state";
-import { estimateNutritionTargets, scaleMacros, type Macros } from "@/lib/domain/nutrition";
+import { estimateNutritionTargets, scaleMacros, type Macros, type Sex } from "@/lib/domain/nutrition";
+import { DIET_TYPES, DIETS, isDietType } from "@/lib/domain/diets";
 import type { PrimaryGoal } from "@/lib/domain/types";
 import { customFoodSchema, mealTypeSchema, nutritionGoalsSchema, savedMealSchema, waterSchema } from "@/lib/validation/schemas";
 import { assertFeature, EntitlementError, requireUser } from "@/server/auth";
@@ -351,20 +352,66 @@ export async function undoWaterAction(formData: FormData): Promise<void> {
   revalidatePath("/nutrition");
 }
 
+/**
+ * Re-estimate the user's targets from their latest bodyweight, profile (sex, age, height),
+ * training answers and diet style. Returns false when there isn't enough data yet.
+ */
+async function estimateAndSaveTargets(supabase: SupabaseClient, userId: string): Promise<boolean> {
+  const [{ data: w }, { data: a }, { data: p }] = await Promise.all([
+    supabase.from("weight_entries").select("weight_kg").eq("user_id", userId).order("recorded_on", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("onboarding_answers").select("primary_goal, days_per_week, diet_type").eq("user_id", userId).maybeSingle(),
+    supabase.from("profiles").select("sex, birth_year, height_cm").eq("id", userId).maybeSingle(),
+  ]);
+  if (!w || !a) return false;
+  const t = estimateNutritionTargets({
+    weightKg: Number(w.weight_kg),
+    trainingDaysPerWeek: a.days_per_week as number,
+    goal: a.primary_goal as PrimaryGoal,
+    sex: (p?.sex as Sex | null) ?? null,
+    age: p?.birth_year ? new Date().getUTCFullYear() - (p.birth_year as number) : null,
+    heightCm: p?.height_cm ? Number(p.height_cm) : null,
+    diet: isDietType(a.diet_type) ? a.diet_type : "balanced",
+  });
+  const { error } = await supabase
+    .from("nutrition_goals")
+    .upsert({ user_id: userId, calories: t.calories, protein_g: t.protein_g, carbs_g: t.carbs_g, fat_g: t.fat_g, water_ml: t.water_ml, is_estimate: true });
+  if (error) throw error;
+  return true;
+}
+
+/** Change the user's diet style. Estimated targets follow the new diet; custom targets are kept. */
+export async function updateDietAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    const user = await requireUser();
+    const supabase = await getServerSupabase();
+    const diet = z.enum(DIET_TYPES).safeParse(formData.get("diet"));
+    if (!diet.success) return actionError("Choose a diet.");
+    const { data: updated, error } = await supabase.from("onboarding_answers").update({ diet_type: diet.data }).eq("user_id", user.id).select("user_id");
+    if (error) throw error;
+    if (!updated?.length) return actionError("Finish setting up your profile first.");
+    const { data: goals } = await supabase.from("nutrition_goals").select("is_estimate").eq("user_id", user.id).maybeSingle();
+    let message = `Your diet is now ${DIETS[diet.data].name}.`;
+    if (!goals || goals.is_estimate) {
+      if (await estimateAndSaveTargets(supabase, user.id)) message += " Your targets were updated to match.";
+    } else {
+      message += " Your custom targets were kept; use Re-estimate to switch to this diet's split.";
+    }
+    revalidatePath("/nutrition");
+    revalidatePath("/nutrition/diets");
+    revalidatePath("/home");
+    return actionOk(message);
+  } catch (err) {
+    return guard(err, "nutrition.diet");
+  }
+}
+
 export async function updateGoalsAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   try {
     const { user, supabase } = await nutritionCtx();
     if (formData.get("intent") === "estimate") {
-      const [{ data: w }, { data: a }] = await Promise.all([
-        supabase.from("weight_entries").select("weight_kg").eq("user_id", user.id).order("recorded_on", { ascending: false }).limit(1).maybeSingle(),
-        supabase.from("onboarding_answers").select("primary_goal, days_per_week").eq("user_id", user.id).maybeSingle(),
-      ]);
-      if (!w || !a) return actionError("Log your bodyweight first so we can estimate targets.");
-      const t = estimateNutritionTargets({ weightKg: Number(w.weight_kg), trainingDaysPerWeek: a.days_per_week as number, goal: a.primary_goal as PrimaryGoal });
-      const { error } = await supabase.from("nutrition_goals").upsert({ user_id: user.id, calories: t.calories, protein_g: t.protein_g, carbs_g: t.carbs_g, fat_g: t.fat_g, water_ml: t.water_ml, is_estimate: true });
-      if (error) throw error;
+      if (!(await estimateAndSaveTargets(supabase, user.id))) return actionError("Log your bodyweight first so we can estimate targets.");
       revalidatePath("/nutrition");
-      return actionOk("Targets re-estimated from your latest bodyweight and goal.");
+      return actionOk("Targets re-estimated from your latest bodyweight, goal and diet.");
     }
     const parsed = nutritionGoalsSchema.safeParse(Object.fromEntries(formData));
     if (!parsed.success) return actionInvalid(parsed.error);

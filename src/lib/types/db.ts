@@ -7,6 +7,7 @@ export interface ProfileRow {
   unit_system: UnitSystem;
   birth_year: number | null;
   height_cm: number | null;
+  sex: "male" | "female" | "unspecified" | null;
   faith_enabled: boolean;
   wellness_consent_at: string | null;
   onboarding_completed_at: string | null;
@@ -25,6 +26,7 @@ export interface OnboardingRow {
   preferred_types: string[];
   limitations: string | null;
   dietary_preferences: string[];
+  diet_type: string;
 }
 
 export interface ExerciseRow {

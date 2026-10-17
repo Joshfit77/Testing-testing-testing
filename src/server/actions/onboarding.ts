@@ -33,6 +33,7 @@ export async function saveOnboardingAction(input: OnboardingInput & { rebuildPro
         unit_system: v.unitSystem,
         birth_year: new Date().getUTCFullYear() - v.age,
         height_cm: v.heightCm,
+        sex: v.sex,
         faith_enabled: v.faithEnabled,
         wellness_consent_at: consentAt,
         onboarding_completed_at: existing?.onboarding_completed_at ?? new Date().toISOString(),
@@ -50,6 +51,7 @@ export async function saveOnboardingAction(input: OnboardingInput & { rebuildPro
       preferred_types: v.preferredTypes,
       limitations: v.wellnessConsent && v.limitations ? v.limitations : null,
       dietary_preferences: v.dietaryPreferences,
+      diet_type: v.dietType,
     });
     if (aErr) throw aErr;
 
@@ -60,7 +62,15 @@ export async function saveOnboardingAction(input: OnboardingInput & { rebuildPro
 
     const { data: goals } = await supabase.from("nutrition_goals").select("user_id, is_estimate").eq("user_id", user.id).maybeSingle();
     if (!goals || goals.is_estimate) {
-      const t = estimateNutritionTargets({ weightKg: v.weightKg, trainingDaysPerWeek: v.daysPerWeek, goal: v.primaryGoal });
+      const t = estimateNutritionTargets({
+        weightKg: v.weightKg,
+        trainingDaysPerWeek: v.daysPerWeek,
+        goal: v.primaryGoal,
+        sex: v.sex,
+        age: v.age,
+        heightCm: v.heightCm,
+        diet: v.dietType,
+      });
       await supabase.from("nutrition_goals").upsert({
         user_id: user.id,
         calories: t.calories,
