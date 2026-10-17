@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookOpen, Clock, HeartPulse, History, Lock, Pause, Play, Plus, Trash2 } from "lucide-react";
+import { BookOpen, ChevronRight, Clock, HeartPulse, History, Lock, Pause, Play, Plus, Trash2, Wand2 } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/states";
 import { Badge } from "@/components/ui/badge";
@@ -107,14 +107,36 @@ export default async function TrainPage({ searchParams }: { searchParams: Promis
       ) : (
         <EmptyState
           title="No active program"
-          description="Start a program from the library below, or log a free-form workout."
+          description="Build a custom program, start one from the library below, or log a free-form workout."
           action={
-            <Button asChild variant="secondary">
-              <Link href="#library">Browse programs</Link>
-            </Button>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button asChild>
+                <Link href="/train/build">Build my program</Link>
+              </Button>
+              <Button asChild variant="secondary">
+                <Link href="#library">Browse programs</Link>
+              </Button>
+            </div>
           }
         />
       )}
+
+      <Link
+        href="/train/build"
+        className="group relative flex items-center gap-4 overflow-hidden rounded-2xl border border-gold-muted/60 bg-gold/5 p-5 transition-all hover:-translate-y-0.5 hover:border-gold"
+      >
+        <span className="rounded-2xl bg-gold-gradient p-3 text-primary-foreground">
+          <Wand2 className="size-6" aria-hidden />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-display text-xl font-bold uppercase leading-tight">Build my program</span>
+          <span className="mt-0.5 block text-sm text-muted-foreground">
+            Strength, powerlifting, bench, squat or deadlift only, MMA, cardio, bodybuilding, show prep, strongman, speed or agility —
+            built around your numbers, goals and equipment. Free on every plan.
+          </span>
+        </span>
+        <ChevronRight className="size-5 shrink-0 text-gold transition-transform group-hover:translate-x-0.5" aria-hidden />
+      </Link>
 
       <section className="grid gap-3 sm:grid-cols-3" aria-label="Training tools">
         {[
@@ -144,7 +166,8 @@ export default async function TrainPage({ searchParams }: { searchParams: Promis
                       <p className="truncate font-semibold">{m.program.name}</p>
                       <p className="text-xs text-muted-foreground">
                         {titleCase(m.status)}
-                        {m.program.source !== "curated" && ` · ${m.program.source === "ai" ? "AI-generated" : "Personal starter"}`}
+                        {m.program.source !== "curated" &&
+                          ` · ${m.program.source === "ai" ? "AI-generated" : m.program.source === "custom" ? "Custom built" : "Personal starter"}`}
                         {m.status === "paused" && ` · week ${m.current_week}`}
                       </p>
                     </Link>

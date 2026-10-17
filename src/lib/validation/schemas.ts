@@ -6,6 +6,7 @@ import {
   PRIMARY_GOALS,
   PROGRAM_TYPES,
 } from "@/lib/domain/types";
+import { CARDIO_MODALITIES, CUSTOM_PROGRAM_TYPES, CUSTOM_TYPES, SHOW_DIVISIONS, weeksRange } from "@/lib/domain/custom-programs";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
 const optionalNumber = (min: number, max: number) =>
@@ -68,6 +69,44 @@ export const profileUpdateSchema = z.object({
   timezone: z.string().trim().min(1).max(64),
   faithEnabled: z.boolean(),
 });
+
+// --------------------------------------------------------------------------- Custom program builder
+const liftEntrySchema = z
+  .object({
+    weightKg: z.number().min(10, "Check the weight").max(500, "Check the weight"),
+    reps: z.number().int().min(1).max(12, "Use a set of 12 reps or fewer"),
+  })
+  .nullable()
+  .optional();
+const goalLiftSchema = z.number().min(10).max(600).nullable().optional();
+
+export const customProgramSchema = z
+  .object({
+    type: z.enum(CUSTOM_PROGRAM_TYPES),
+    goal: z.string().trim().min(1).max(40),
+    experience: z.enum(EXPERIENCE_LEVELS),
+    daysPerWeek: z.number().int().min(2).max(6),
+    sessionMinutes: z.number().int().min(20).max(120),
+    weeks: z.number().int().min(4).max(24),
+    age: z.number().int().min(18, "Narrow Gate Fitness is for adults (18+) at launch").max(100),
+    heightCm: z.number().min(90, "Check your height").max(260, "Check your height"),
+    weightKg: z.number().min(25, "Check your weight").max(400, "Check your weight"),
+    lifts: z.object({ squat: liftEntrySchema, bench: liftEntrySchema, deadlift: liftEntrySchema, press: liftEntrySchema }).default({}),
+    goalLifts: z.object({ squat: goalLiftSchema, bench: goalLiftSchema, deadlift: goalLiftSchema, press: goalLiftSchema }).default({}),
+    cardio: z.object({ modality: z.enum(CARDIO_MODALITIES), continuousMinutes: z.number().int().min(0).max(180) }).nullable().optional(),
+    division: z.enum(SHOW_DIVISIONS).nullable().optional(),
+    equipment: z.array(z.enum(EQUIPMENT)).max(EQUIPMENT.length),
+  })
+  .superRefine((v, ctx) => {
+    const cfg = CUSTOM_TYPES[v.type];
+    if (!cfg.goals.some((g) => g.id === v.goal)) ctx.addIssue({ code: "custom", path: ["goal"], message: "Choose a goal for this program type" });
+    if (v.daysPerWeek < cfg.days.min || v.daysPerWeek > cfg.days.max)
+      ctx.addIssue({ code: "custom", path: ["daysPerWeek"], message: `Choose ${cfg.days.min}–${cfg.days.max} days per week` });
+    const wr = weeksRange(v.type, v.goal);
+    if (v.weeks < wr.min || v.weeks > wr.max) ctx.addIssue({ code: "custom", path: ["weeks"], message: `Choose ${wr.min}–${wr.max} weeks` });
+    if (v.type === "show_prep" && !v.division) ctx.addIssue({ code: "custom", path: ["division"], message: "Choose your division" });
+  });
+export type CustomProgramFormInput = z.input<typeof customProgramSchema>;
 
 // --------------------------------------------------------------------------- Workouts
 const setSchema = z.object({

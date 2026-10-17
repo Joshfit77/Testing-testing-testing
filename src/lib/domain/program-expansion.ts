@@ -66,6 +66,25 @@ function adjustExercise(ex: ProgramExerciseSeed, seed: ProgramSeed, week: number
 
 /** Expand a program's weekly template into concrete weeks with progression applied. */
 export function expandProgram(seed: ProgramSeed): ExpandedWeek[] {
+  if (seed.weekTemplates) {
+    if (seed.weekTemplates.length !== seed.weeks) {
+      throw new Error(`Program ${seed.slug} has ${seed.weekTemplates.length} week templates but ${seed.weeks} weeks`);
+    }
+    return seed.weekTemplates.map((wk, wi) => ({
+      weekNumber: wi + 1,
+      focus: wk.focus,
+      isDeload: Boolean(wk.isDeload),
+      days: wk.days.map((d, i) => ({
+        dayNumber: i + 1,
+        name: d.name,
+        focus: d.focus,
+        minutes: d.minutes,
+        warmup: d.warmup ?? seed.warmup,
+        cooldown: d.cooldown ?? seed.cooldown,
+        exercises: d.exercises.map((ex, position) => ({ ...ex, position })),
+      })),
+    }));
+  }
   const weeks: ExpandedWeek[] = [];
   for (let w = 1; w <= seed.weeks; w++) {
     const isDeload = Boolean(seed.deloadFinalWeek && seed.weeks > 1 && w === seed.weeks);

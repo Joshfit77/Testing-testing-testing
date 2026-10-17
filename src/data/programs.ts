@@ -22,6 +22,13 @@ export interface ProgramDaySeed {
 
 export type ProgressionModel = "linear_rpe" | "volume_wave" | "steady" | "density";
 
+/** One explicitly prescribed week (used by periodized programs with week-specific loads). */
+export interface ProgramWeekSeed {
+  focus: string;
+  isDeload?: boolean;
+  days: ProgramDaySeed[];
+}
+
 export interface ProgramSeed {
   slug: string;
   name: string;
@@ -42,7 +49,13 @@ export interface ProgramSeed {
   deloadFinalWeek?: boolean;
   warmup: string[];
   cooldown: string[];
+  /** The weekly template (or, with `weekTemplates`, the first week's days — used for summaries). */
   days: ProgramDaySeed[];
+  /**
+   * Optional explicit prescription for every week. When present it must contain exactly `weeks`
+   * entries; each week is used verbatim (no generic progression is applied).
+   */
+  weekTemplates?: ProgramWeekSeed[];
 }
 
 export interface CategorySeed {
@@ -54,14 +67,21 @@ export interface CategorySeed {
 export const PROGRAM_CATEGORIES: CategorySeed[] = [
   { slug: "strength", name: "Strength Training", description: "Get measurably stronger on fundamental lifts." },
   { slug: "powerlifting", name: "Powerlifting", description: "Squat, bench press and deadlift focused training." },
+  { slug: "bench-press", name: "Bench Press Specialization", description: "Higher-frequency bench training to drive up your press." },
+  { slug: "squat-specialization", name: "Squat Specialization", description: "Focused squat volume, variations and support work." },
+  { slug: "deadlift-specialization", name: "Deadlift Specialization", description: "Pull more: deadlift variations plus posterior-chain strength." },
   { slug: "strongman", name: "Strongman", description: "Odd objects, carries and full-body strength." },
   { slug: "hypertrophy", name: "Bodybuilding & Hypertrophy", description: "Build muscle with productive volume." },
+  { slug: "show-prep", name: "Physique Show Prep", description: "Hypertrophy and conditioning for a bodybuilding or physique stage." },
   { slug: "athletic-performance", name: "Explosive Athletic Performance", description: "Power, speed and resilient athleticism." },
+  { slug: "speed", name: "Speed Training", description: "Sprint mechanics, acceleration and maximal velocity." },
+  { slug: "agility", name: "Agility & Change of Direction", description: "Footwork, cutting and reactive agility drills." },
   { slug: "mma-conditioning", name: "MMA Conditioning", description: "Energy systems and strength for mixed martial arts." },
   { slug: "boxing-conditioning", name: "Boxing Conditioning", description: "Round-based work capacity, footwork and shoulder endurance." },
   { slug: "grappling-conditioning", name: "Wrestling & Grappling Conditioning", description: "Grip, hips and repeat-effort endurance for the mat." },
   { slug: "functional-conditioning", name: "Functional Conditioning", description: "Mixed-modal, high-variety conditioning circuits." },
   { slug: "weight-loss-cardio", name: "Weight Loss & Cardio", description: "Sustainable activity to support fat loss and heart health." },
+  { slug: "cardiovascular", name: "Cardiovascular Endurance", description: "Build your aerobic engine: zone 2, intervals and run/walk progressions." },
   { slug: "beginner", name: "Beginner Training", description: "Learn the basics and build a consistent habit." },
   { slug: "womens-strength", name: "Women's Strength Training", description: "Progressive strength training designed with women's goals and feedback in mind — not lighter by default." },
   { slug: "active-aging", name: "Active Aging & Low-Impact", description: "Joint-friendly strength, balance and mobility." },
@@ -98,6 +118,54 @@ const CONDITIONING_WARMUP = [
   "World's greatest stretch × 3 per side",
   "2 × 10-second build-up efforts at moderate intensity",
 ];
+
+export const SPRINT_WARMUP = [
+  "5 minutes easy jog, skipping or jump rope",
+  "Leg swings front-to-back and side-to-side × 10 each leg",
+  "World's greatest stretch × 3 per side",
+  "A-skips and wall drills × 2 rounds",
+  "3 build-up runs of 30–40 m at 60%, 75% and 90% effort",
+];
+
+const secondsLabel = (s: number) => (s % 60 === 0 ? `${s / 60} min` : `${s} s`);
+
+/** Run/walk progression: [run A, walk A, rounds A, run B, walk B, rounds B] in seconds per week. */
+const RUN_WALK_WEEKS: ProgramWeekSeed[] = (
+  [
+    [60, 90, 8, 90, 120, 7],
+    [90, 90, 8, 120, 90, 7],
+    [120, 60, 8, 180, 90, 6],
+    [180, 90, 5, 300, 90, 4],
+    [300, 90, 4, 480, 120, 3],
+    [600, 120, 2, 900, 120, 2],
+    [1080, 0, 1, 1320, 0, 1],
+    [900, 0, 1, 1800, 0, 1],
+  ] as const
+).map(([runA, walkA, roundsA, runB, walkB, roundsB], i) => {
+  const session = (run: number, walk: number, rounds: number): ProgramExerciseSeed =>
+    walk === 0
+      ? { ex: "zone-2-run", sets: 1, seconds: run, rest: 0, notes: `${secondsLabel(run)} of continuous easy, conversational running.` }
+      : {
+          ex: "run-walk-intervals",
+          sets: rounds,
+          seconds: run,
+          rest: walk,
+          notes: `Run ${secondsLabel(run)} easy, then walk briskly for ${secondsLabel(walk)} (the rest). ${rounds} rounds.`,
+        };
+  return {
+    focus: i === 7 ? "Goal week: an easier start, then 30 minutes of continuous running" : `Build easy running time (week ${i + 1})`,
+    days: [
+      { name: i >= 6 ? "Continuous Run" : "Run/Walk A", focus: "Easy running", minutes: 35, exercises: [session(runA, walkA, roundsA)] },
+      {
+        name: "Steady Walk",
+        focus: "Aerobic base, low impact",
+        minutes: 35,
+        exercises: [{ ex: "brisk-walk", sets: 1, seconds: 1800, rest: 0, notes: "Conversational pace; add incline if it feels too easy." }],
+      },
+      { name: i >= 6 ? "Long Run" : "Run/Walk B", focus: "Longer easy running", minutes: 40, exercises: [session(runB, walkB, roundsB)] },
+    ],
+  };
+});
 
 export const PROGRAMS: ProgramSeed[] = [
   // ------------------------------------------------------------ Beginner (free)
@@ -1264,6 +1332,443 @@ export const PROGRAMS: ProgramSeed[] = [
         ],
       },
     ],
+  },
+  // ------------------------------------------------------------ Lift specializations (plus)
+  {
+    slug: "bench-press-specialist",
+    name: "Bench Press Specialist",
+    summary: "Bench three times a week — heavy, volume and paused — with the upper-back and triceps work to support it.",
+    description:
+      "An 8-week bench block for lifters who want a bigger press. Day 1 is heavy, Day 2 builds volume with close-grip work, and Day 3 " +
+      "practises competition-style paused reps. Lower-body training is kept to maintenance so your recovery goes to the bench. " +
+      "Use the custom program builder if you want exact loads calculated from your max.",
+    category: "bench-press",
+    types: ["powerlifting", "strength"],
+    difficulty: "intermediate",
+    weeks: 8,
+    sessionMinutes: 60,
+    goals: ["build_strength", "build_muscle"],
+    equipment: ["barbell", "rack", "bench", "dumbbell", "cable", "pull_up_bar"],
+    tier: "plus",
+    progression:
+      "Target RPE rises by about 0.5 per week. When every set of the main bench lift is completed at or below the target RPE, add " +
+      "2.5 kg / 5 lb next week. Week 8 is a deload — or test a new max at the end of it if you feel fresh.",
+    progressionModel: "linear_rpe",
+    deloadFinalWeek: true,
+    warmup: STANDARD_WARMUP,
+    cooldown: STANDARD_COOLDOWN,
+    days: [
+      {
+        name: "Heavy Bench",
+        focus: "Low-rep competition bench + upper back",
+        minutes: 60,
+        exercises: [
+          { ex: "bench-press", sets: 5, reps: "3", rest: 180, rpe: 7.5, intensity: "~80–85% 1RM", notes: "Ramp up with 4–5 warm-up sets (10, 5, 3, 2, 1 reps)." },
+          { ex: "barbell-row", sets: 4, reps: "8", rest: 120, rpe: 7 },
+          { ex: "overhead-press", sets: 3, reps: "6", rest: 120, rpe: 7 },
+          { ex: "face-pull", sets: 3, reps: "15", rest: 60 },
+        ],
+      },
+      {
+        name: "Lower Maintenance",
+        focus: "Squat, hinge and core — keep the legs strong",
+        minutes: 50,
+        exercises: [
+          { ex: "back-squat", sets: 3, reps: "5", rest: 180, rpe: 7 },
+          { ex: "romanian-deadlift", sets: 3, reps: "8", rest: 120, rpe: 7 },
+          { ex: "walking-lunge", sets: 2, reps: "10 per side", rest: 90 },
+          { ex: "plank", sets: 3, seconds: 40, rest: 45 },
+        ],
+      },
+      {
+        name: "Bench Volume",
+        focus: "Close-grip strength and triceps",
+        minutes: 60,
+        exercises: [
+          { ex: "bench-press", sets: 4, reps: "6-8", rest: 150, rpe: 7, intensity: "~70–75% 1RM" },
+          { ex: "close-grip-bench-press", sets: 3, reps: "6", rest: 120, rpe: 7 },
+          { ex: "chin-up", sets: 4, reps: "6-8", rest: 90 },
+          { ex: "triceps-pushdown", sets: 3, reps: "12", rest: 60 },
+          { ex: "lateral-raise", sets: 3, reps: "15", rest: 45 },
+        ],
+      },
+      {
+        name: "Paused Bench",
+        focus: "Competition-style pauses and lockout",
+        minutes: 55,
+        exercises: [
+          { ex: "paused-bench-press", sets: 4, reps: "3", rest: 180, rpe: 7.5, intensity: "~75% 1RM", notes: "Hold each rep motionless on the chest for 1–2 seconds." },
+          { ex: "pin-press", sets: 3, reps: "4", rest: 150, rpe: 7, notes: "Pins 2–4 inches above the chest." },
+          { ex: "one-arm-dumbbell-row", sets: 3, reps: "10 per side", rest: 75 },
+          { ex: "overhead-triceps-extension", sets: 3, reps: "12", rest: 60 },
+        ],
+      },
+    ],
+  },
+  {
+    slug: "squat-specialist",
+    name: "Squat Specialist",
+    summary: "Three squat sessions a week — heavy, paused and tempo — plus targeted quad and posterior-chain work.",
+    description:
+      "An 8-week block for building a stronger squat. Heavy sets early in the week, pause squats for position and power out of the hole, " +
+      "and tempo squats for control. Upper-body work is kept to maintenance. Use the custom program builder for loads based on your max.",
+    category: "squat-specialization",
+    types: ["powerlifting", "strength"],
+    difficulty: "intermediate",
+    weeks: 8,
+    sessionMinutes: 65,
+    goals: ["build_strength", "build_muscle"],
+    equipment: ["barbell", "rack", "bench", "dumbbell", "machine", "pull_up_bar"],
+    tier: "plus",
+    progression:
+      "Target RPE rises by about 0.5 per week. Add 2.5–5 kg / 5–10 lb to the heavy squat when every set is completed at or below the " +
+      "target RPE. Week 8 is a deload.",
+    progressionModel: "linear_rpe",
+    deloadFinalWeek: true,
+    warmup: STANDARD_WARMUP,
+    cooldown: STANDARD_COOLDOWN,
+    days: [
+      {
+        name: "Heavy Squat",
+        focus: "Low-rep back squat",
+        minutes: 65,
+        exercises: [
+          { ex: "back-squat", sets: 5, reps: "3", rest: 210, rpe: 7.5, intensity: "~80–85% 1RM", notes: "Ramp up with 4–5 warm-up sets (10, 5, 3, 2, 1 reps)." },
+          { ex: "romanian-deadlift", sets: 3, reps: "8", rest: 150, rpe: 7 },
+          { ex: "leg-curl", sets: 3, reps: "12", rest: 60 },
+          { ex: "ab-wheel-rollout", sets: 3, reps: "8-10", rest: 60 },
+        ],
+      },
+      {
+        name: "Upper Maintenance",
+        focus: "Press and pull",
+        minutes: 50,
+        exercises: [
+          { ex: "bench-press", sets: 3, reps: "5", rest: 150, rpe: 7 },
+          { ex: "chin-up", sets: 3, reps: "6-8", rest: 90 },
+          { ex: "overhead-press", sets: 3, reps: "8", rest: 90, rpe: 7 },
+          { ex: "barbell-row", sets: 3, reps: "10", rest: 90 },
+        ],
+      },
+      {
+        name: "Pause Squat",
+        focus: "Strength out of the hole",
+        minutes: 60,
+        exercises: [
+          { ex: "pause-squat", sets: 4, reps: "4", rest: 180, rpe: 7, intensity: "~70% 1RM", notes: "2-second pause at depth, stay braced." },
+          { ex: "bulgarian-split-squat", sets: 3, reps: "8 per side", rest: 90 },
+          { ex: "leg-extension", sets: 3, reps: "12-15", rest: 60 },
+          { ex: "side-plank", sets: 3, seconds: 30, rest: 30 },
+        ],
+      },
+      {
+        name: "Tempo Squat & Hinge",
+        focus: "Control and posterior chain",
+        minutes: 60,
+        exercises: [
+          { ex: "tempo-squat", sets: 3, reps: "5", rest: 150, rpe: 6.5, intensity: "~65% 1RM", notes: "4-second lowering, normal speed up." },
+          { ex: "good-morning", sets: 3, reps: "8", rest: 120, rpe: 6.5 },
+          { ex: "leg-press", sets: 3, reps: "10-12", rest: 90 },
+          { ex: "standing-calf-raise", sets: 3, reps: "12-15", rest: 45 },
+        ],
+      },
+    ],
+  },
+  {
+    slug: "deadlift-specialist",
+    name: "Deadlift Specialist",
+    summary: "Two pulling days — heavy and variation — with hinge accessories, upper-back and grip work.",
+    description:
+      "An 8-week block for a stronger deadlift. Deadlifts are very fatiguing, so heavy pulls happen once a week, with a lighter " +
+      "variation day (deficit or block pulls) to target your sticking point. Squats and upper-body work support the pull. " +
+      "Use the custom program builder for loads based on your max.",
+    category: "deadlift-specialization",
+    types: ["powerlifting", "strength"],
+    difficulty: "intermediate",
+    weeks: 8,
+    sessionMinutes: 60,
+    goals: ["build_strength"],
+    equipment: ["barbell", "rack", "bench", "dumbbell", "cable", "pull_up_bar"],
+    tier: "plus",
+    progression:
+      "Target RPE rises by about 0.5 per week. Add 5 kg / 10 lb to the heavy deadlift when all sets are completed at or below the target " +
+      "RPE with a flat back. Week 8 is a deload.",
+    progressionModel: "linear_rpe",
+    deloadFinalWeek: true,
+    warmup: STANDARD_WARMUP,
+    cooldown: STANDARD_COOLDOWN,
+    days: [
+      {
+        name: "Heavy Deadlift",
+        focus: "Low-rep competition pull",
+        minutes: 60,
+        exercises: [
+          { ex: "conventional-deadlift", sets: 4, reps: "3", rest: 240, rpe: 7.5, intensity: "~80–85% 1RM", notes: "Ramp up with 4–5 warm-up sets. Reset each rep — no bouncing." },
+          { ex: "barbell-row", sets: 3, reps: "8", rest: 120, rpe: 7 },
+          { ex: "hip-thrust", sets: 3, reps: "10", rest: 90 },
+          { ex: "farmers-carry", sets: 3, seconds: 40, rest: 90, notes: "Heavy; builds grip for the deadlift." },
+        ],
+      },
+      {
+        name: "Upper Body",
+        focus: "Press and upper back",
+        minutes: 50,
+        exercises: [
+          { ex: "bench-press", sets: 4, reps: "5", rest: 150, rpe: 7 },
+          { ex: "pull-up", sets: 4, reps: "5-8", rest: 90 },
+          { ex: "seated-dumbbell-shoulder-press", sets: 3, reps: "10", rest: 90 },
+          { ex: "face-pull", sets: 3, reps: "15", rest: 60 },
+        ],
+      },
+      {
+        name: "Squat & Pull Variation",
+        focus: "Squat strength and deadlift sticking point",
+        minutes: 65,
+        exercises: [
+          { ex: "back-squat", sets: 4, reps: "5", rest: 180, rpe: 7 },
+          { ex: "deficit-deadlift", sets: 3, reps: "5", rest: 180, rpe: 7, intensity: "~65–70% 1RM", notes: "1–2 inch deficit. Swap for block pulls if lockout is your weak point." },
+          { ex: "good-morning", sets: 3, reps: "8", rest: 120, rpe: 6.5 },
+          { ex: "dead-hang", sets: 3, seconds: 40, rest: 60 },
+        ],
+      },
+    ],
+  },
+  // ------------------------------------------------------------ Show prep (plus)
+  {
+    slug: "physique-show-prep",
+    name: "Physique Show Prep",
+    summary: "Twelve weeks of high-volume hypertrophy, daily steps and planned conditioning, tapering into show week.",
+    description:
+      "A training plan for bodybuilding, classic, men's/women's physique, figure, bikini and wellness competitors. Five sessions per week " +
+      "keep volume high to hold muscle while conditioning is gradually increased. The final week is a training taper. Nutrition, " +
+      "water and peak-week strategy should be guided by a qualified coach or registered dietitian — this program does not prescribe " +
+      "extreme dieting or dehydration.",
+    category: "show-prep",
+    types: ["hypertrophy", "cardio"],
+    difficulty: "advanced",
+    weeks: 12,
+    sessionMinutes: 75,
+    goals: ["build_muscle", "lose_fat"],
+    equipment: ["barbell", "rack", "bench", "dumbbell", "cable", "machine", "pull_up_bar", "bike"],
+    tier: "plus",
+    progression:
+      "Add a rep or a small amount of load each week while keeping 1–2 reps in reserve. Add 5 minutes of low-intensity cardio per session " +
+      "every two weeks as needed. Week 12 is a taper: lower volume and keep posing practice daily.",
+    progressionModel: "volume_wave",
+    deloadFinalWeek: true,
+    warmup: STANDARD_WARMUP,
+    cooldown: [...STANDARD_COOLDOWN, "5 minutes posing practice (mandatory poses for your division)"],
+    days: [
+      {
+        name: "Chest & Back",
+        focus: "Upper-body width and thickness",
+        minutes: 75,
+        exercises: [
+          { ex: "incline-dumbbell-press", sets: 4, reps: "8-10", rest: 120, rpe: 8 },
+          { ex: "lat-pulldown", sets: 4, reps: "10-12", rest: 90, rpe: 8 },
+          { ex: "cable-chest-fly", sets: 3, reps: "12-15", rest: 60 },
+          { ex: "seated-cable-row", sets: 3, reps: "10-12", rest: 90 },
+          { ex: "bike-intervals", sets: 1, seconds: 1200, rest: 0, notes: "Low-intensity steady cardio (conversational pace)." },
+        ],
+      },
+      {
+        name: "Quads & Calves",
+        focus: "Leg development",
+        minutes: 75,
+        exercises: [
+          { ex: "back-squat", sets: 4, reps: "6-8", rest: 150, rpe: 8 },
+          { ex: "leg-press", sets: 3, reps: "12-15", rest: 90 },
+          { ex: "walking-lunge", sets: 3, reps: "12 per side", rest: 90 },
+          { ex: "leg-extension", sets: 3, reps: "15", rest: 60 },
+          { ex: "standing-calf-raise", sets: 4, reps: "12-15", rest: 45 },
+        ],
+      },
+      {
+        name: "Shoulders & Arms",
+        focus: "Delts, biceps and triceps",
+        minutes: 70,
+        exercises: [
+          { ex: "seated-dumbbell-shoulder-press", sets: 4, reps: "8-10", rest: 90, rpe: 8 },
+          { ex: "lateral-raise", sets: 4, reps: "15-20", rest: 45 },
+          { ex: "rear-delt-fly", sets: 3, reps: "15", rest: 45 },
+          { ex: "dumbbell-curl", sets: 3, reps: "10-12", rest: 60 },
+          { ex: "overhead-triceps-extension", sets: 3, reps: "10-12", rest: 60 },
+          { ex: "brisk-walk", sets: 1, seconds: 1200, rest: 0, notes: "Incline walk at a conversational pace." },
+        ],
+      },
+      {
+        name: "Hamstrings & Glutes",
+        focus: "Posterior chain",
+        minutes: 70,
+        exercises: [
+          { ex: "romanian-deadlift", sets: 4, reps: "8-10", rest: 120, rpe: 8 },
+          { ex: "hip-thrust", sets: 3, reps: "10-12", rest: 90 },
+          { ex: "leg-curl", sets: 4, reps: "12-15", rest: 60 },
+          { ex: "bulgarian-split-squat", sets: 3, reps: "10 per side", rest: 75 },
+          { ex: "hanging-knee-raise", sets: 3, reps: "12-15", rest: 45 },
+        ],
+      },
+      {
+        name: "Upper Pump & Conditioning",
+        focus: "Weak-point volume and intervals",
+        minutes: 60,
+        exercises: [
+          { ex: "dumbbell-bench-press", sets: 3, reps: "10-12", rest: 75 },
+          { ex: "one-arm-dumbbell-row", sets: 3, reps: "12 per side", rest: 60 },
+          { ex: "lateral-raise", sets: 3, reps: "20", rest: 45 },
+          { ex: "triceps-pushdown", sets: 3, reps: "15", rest: 45 },
+          { ex: "bike-intervals", sets: 8, seconds: 30, rest: 90, notes: "Hard 30 s / easy 90 s." },
+        ],
+      },
+    ],
+  },
+  // ------------------------------------------------------------ Speed & agility (plus)
+  {
+    slug: "speed-development",
+    name: "Speed Development",
+    summary: "Sprint mechanics, acceleration and max velocity with plyometrics and strength — always fully recovered.",
+    description:
+      "Three sessions a week to get faster: an acceleration day, a max-velocity day and a strength/power day. Speed is trained fresh " +
+      "with full rest between reps (2–5 minutes) — if a rep feels slower, the session is done. Find a flat track or field.",
+    category: "speed",
+    types: ["athletic"],
+    difficulty: "intermediate",
+    weeks: 6,
+    sessionMinutes: 50,
+    goals: ["athletic_performance"],
+    equipment: ["bodyweight", "barbell", "rack", "dumbbell", "box"],
+    tier: "plus",
+    progression:
+      "Add one sprint rep or 5 m of distance each week while quality is high. Never trade rest for volume. Week 6 halves volume to " +
+      "let speed show up — time a 20 m or 40 m sprint at the end of it.",
+    progressionModel: "steady",
+    deloadFinalWeek: true,
+    warmup: SPRINT_WARMUP,
+    cooldown: STANDARD_COOLDOWN,
+    days: [
+      {
+        name: "Acceleration",
+        focus: "First steps and drive phase",
+        minutes: 50,
+        exercises: [
+          { ex: "wall-drill", sets: 3, reps: "5 per side", rest: 45 },
+          { ex: "a-skip", sets: 3, reps: "20 m", rest: 45 },
+          { ex: "acceleration-sprint", sets: 6, reps: "20 m", rest: 120, notes: "Maximal effort, full walk-back recovery." },
+          { ex: "broad-jump", sets: 4, reps: "3", rest: 90 },
+          { ex: "dead-bug", sets: 2, reps: "8 per side", rest: 30 },
+        ],
+      },
+      {
+        name: "Strength & Power",
+        focus: "Force production",
+        minutes: 55,
+        exercises: [
+          { ex: "box-jump", sets: 4, reps: "3", rest: 90 },
+          { ex: "back-squat", sets: 4, reps: "4", rest: 180, rpe: 7.5 },
+          { ex: "romanian-deadlift", sets: 3, reps: "6", rest: 120, rpe: 7 },
+          { ex: "bulgarian-split-squat", sets: 3, reps: "6 per side", rest: 90 },
+          { ex: "standing-calf-raise", sets: 3, reps: "10", rest: 60, notes: "Pause at the bottom, explode up." },
+        ],
+      },
+      {
+        name: "Max Velocity",
+        focus: "Top speed and elastic stiffness",
+        minutes: 50,
+        exercises: [
+          { ex: "pogo-jumps", sets: 3, reps: "15 contacts", rest: 60 },
+          { ex: "bounding", sets: 3, reps: "30 m", rest: 120 },
+          { ex: "flying-sprint", sets: 4, reps: "20 m fly", rest: 240, notes: "20–30 m build-up, then 20 m at top speed." },
+          { ex: "single-leg-rdl", sets: 3, reps: "8 per side", rest: 60 },
+        ],
+      },
+    ],
+  },
+  {
+    slug: "agility-footwork",
+    name: "Agility & Footwork",
+    summary: "Ladder footwork, cone drills, reactive work and lateral plyometrics for quicker cuts.",
+    description:
+      "Three sessions per week to move faster in any direction. Planned change-of-direction drills teach deceleration and re-acceleration; " +
+      "reactive drills train you to read and respond. Cones can be any markers, and the ladder can be taped or chalked on the floor.",
+    category: "agility",
+    types: ["athletic"],
+    difficulty: "beginner",
+    weeks: 6,
+    sessionMinutes: 45,
+    goals: ["athletic_performance"],
+    equipment: ["bodyweight", "dumbbell", "box", "band"],
+    tier: "plus",
+    progression:
+      "Add one rep per drill each week while every rep stays sharp. Keep rest long enough (60–90 s) that each rep is fast. Week 6 reduces " +
+      "volume — time your 5-10-5 at the end of it.",
+    progressionModel: "steady",
+    deloadFinalWeek: true,
+    warmup: SPRINT_WARMUP,
+    cooldown: STANDARD_COOLDOWN,
+    days: [
+      {
+        name: "Footwork & Deceleration",
+        focus: "Rhythm, braking and lateral power",
+        minutes: 45,
+        exercises: [
+          { ex: "agility-ladder-drills", sets: 6, seconds: 15, rest: 45, notes: "Two-in, lateral in-out, Icky shuffle." },
+          { ex: "lateral-bound", sets: 3, reps: "4 per side", rest: 60, notes: "Stick each landing for 2 seconds." },
+          { ex: "pro-agility-shuttle", sets: 5, reps: "1", rest: 90 },
+          { ex: "reverse-lunge", sets: 3, reps: "8 per side", rest: 60 },
+          { ex: "side-plank", sets: 2, seconds: 30, rest: 30 },
+        ],
+      },
+      {
+        name: "Leg Strength",
+        focus: "Single-leg strength for cutting",
+        minutes: 45,
+        exercises: [
+          { ex: "goblet-squat", sets: 3, reps: "8", rest: 90, rpe: 7 },
+          { ex: "bulgarian-split-squat", sets: 3, reps: "8 per side", rest: 75 },
+          { ex: "single-leg-rdl", sets: 3, reps: "8 per side", rest: 60 },
+          { ex: "box-jump", sets: 3, reps: "4", rest: 75 },
+          { ex: "pallof-press", sets: 3, reps: "10 per side", rest: 45 },
+        ],
+      },
+      {
+        name: "Cone & Reactive",
+        focus: "Planned cuts and reaction",
+        minutes: 45,
+        exercises: [
+          { ex: "pogo-jumps", sets: 3, reps: "15 contacts", rest: 45 },
+          { ex: "t-drill", sets: 4, reps: "1", rest: 90 },
+          { ex: "three-cone-drill", sets: 4, reps: "1", rest: 90 },
+          { ex: "reactive-mirror-drill", sets: 6, seconds: 8, rest: 60, notes: "Partner leads; switch roles. Solo: react to random cues." },
+          { ex: "lateral-shuffle", sets: 3, seconds: 15, rest: 45 },
+        ],
+      },
+    ],
+  },
+  // ------------------------------------------------------------ Cardiovascular (free)
+  {
+    slug: "aerobic-base-run-walk",
+    name: "Aerobic Base: Run/Walk to 30 Minutes",
+    summary: "Go from walking to 30 minutes of continuous easy running in 8 weeks — about a 5K.",
+    description:
+      "A gradual run/walk progression for new or returning runners. Every run is easy and conversational (zone 2). Walking breaks " +
+      "are part of the plan, not a failure. Repeat any week that feels too hard. A bike or rower can replace any session if you need " +
+      "a lower-impact day.",
+    category: "cardiovascular",
+    types: ["cardio"],
+    difficulty: "beginner",
+    weeks: 8,
+    sessionMinutes: 35,
+    goals: ["improve_conditioning", "general_health", "lose_fat"],
+    equipment: ["bodyweight"],
+    tier: "free",
+    progression:
+      "Each week the run portions get longer and the walk breaks shorter, finishing with 30 minutes of continuous easy running. " +
+      "Week 8 starts lighter and ends with 30 minutes of continuous easy running — roughly a 5K for many runners.",
+    progressionModel: "steady",
+    warmup: ["5 minutes brisk walking", "Leg swings × 10 each leg", "Ankle circles × 10 each direction"],
+    cooldown: ["5 minutes easy walking", "Calf stretch — 30 seconds per side", "Standing quad stretch — 30 seconds per side"],
+    days: RUN_WALK_WEEKS[0]!.days,
+    weekTemplates: RUN_WALK_WEEKS,
   },
 ];
 

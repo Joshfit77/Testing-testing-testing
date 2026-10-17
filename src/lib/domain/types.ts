@@ -23,6 +23,7 @@ export const EQUIPMENT = [
   "battle_rope",
   "dip_station",
   "ab_wheel",
+  "strongman_implements",
 ] as const;
 export type Equipment = (typeof EQUIPMENT)[number];
 
@@ -51,6 +52,7 @@ export const EQUIPMENT_LABELS: Record<Equipment, string> = {
   battle_rope: "Battle rope",
   dip_station: "Dip station",
   ab_wheel: "Ab wheel",
+  strongman_implements: "Strongman implements (log, yoke, stones)",
 };
 
 export const MOVEMENT_PATTERNS = [

@@ -67,7 +67,7 @@ export interface ProgramRow {
   low_impact: boolean;
   is_published: boolean;
   owner_id: string | null;
-  source: "curated" | "starter" | "ai";
+  source: "curated" | "starter" | "ai" | "custom";
 }
 
 export interface ProgramExerciseRow {
