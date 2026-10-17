@@ -13,20 +13,28 @@ import type { CapacitorConfig } from "@capacitor/cli";
  */
 const serverUrl = process.env.CAP_SERVER_URL ?? "https://app.narrowgatefitness.example";
 const cleartext = process.env.CAP_ALLOW_CLEARTEXT === "true";
+/**
+ * CAP_MODE=standalone bundles the offline edition (standalone/index.html) instead of loading the
+ * server: every screen works on the device with data stored locally, but there are no accounts,
+ * payments or AI coach. Used for the downloadable test APK.
+ */
+const standalone = process.env.CAP_MODE === "standalone";
 
 const config: CapacitorConfig = {
   appId: process.env.CAP_APP_ID ?? "com.narrowgatefitness.app",
   appName: "Narrow Gate Fitness",
-  webDir: "native-shell",
+  webDir: standalone ? "standalone" : "native-shell",
   backgroundColor: "#090909",
   // The web app checks for this token to hide web-only purchase flows inside the store apps.
   appendUserAgent: "NarrowGateApp",
-  server: {
-    url: serverUrl,
-    cleartext,
-    errorPath: "error.html",
-    allowNavigation: [new URL(serverUrl).host],
-  },
+  server: standalone
+    ? { androidScheme: "https" }
+    : {
+        url: serverUrl,
+        cleartext,
+        errorPath: "error.html",
+        allowNavigation: [new URL(serverUrl).host],
+      },
   ios: {
     contentInset: "never",
     scheme: "Narrow Gate Fitness",

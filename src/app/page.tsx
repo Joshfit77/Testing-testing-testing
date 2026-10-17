@@ -40,6 +40,13 @@ export default async function LandingPage() {
       <main>
         <section className="hero-glow relative overflow-hidden">
           <div className="mx-auto max-w-6xl px-4 pb-20 pt-14 md:px-8 md:pb-28 md:pt-24">
+            <figure className="animate-fade-up mb-10 max-w-2xl rounded-2xl border border-gold-muted/60 bg-card-gradient p-5 shadow-[0_20px_60px_-30px_rgba(201,165,76,0.6)] md:p-6">
+              <blockquote className="font-serif text-lg leading-relaxed text-[#f1ead6] md:text-xl">
+                &ldquo;Enter ye in at the strait gate: for wide is the gate, and broad is the way, that leadeth to destruction, and many there be which go in
+                thereat: Because strait is the gate, and narrow is the way, which leadeth unto life, and few there be that find it.&rdquo;
+              </blockquote>
+              <figcaption className="mt-3 text-sm font-semibold text-gold">Matthew 7:13–14 (KJV)</figcaption>
+            </figure>
             <p className="animate-fade-up text-xs font-semibold uppercase tracking-[0.4em] text-gold">Welcome · Rooted in faith. Built for strength.</p>
             <h1 className="animate-fade-up mt-4 max-w-3xl font-display text-5xl font-bold uppercase leading-[0.95] tracking-tight md:text-7xl">
               Choose the <span className="text-gold-gradient">narrow way</span>. Train with purpose.
@@ -71,9 +78,7 @@ export default async function LandingPage() {
                 Sign in
               </Link>
             </p>
-            <p className="mt-6 text-xs text-muted-foreground">
-              Inspired by Matthew 7:13–14 — &ldquo;strait is the gate, and narrow is the way, which leadeth unto life.&rdquo; (KJV)
-            </p>
+
           </div>
         </section>
 
