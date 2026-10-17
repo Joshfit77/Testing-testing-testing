@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookMarked, CalendarClock, ChevronLeft, ChevronRight, Lock, Salad, Trash2, UtensilsCrossed } from "lucide-react";
+import { BookMarked, CalendarClock, ChevronLeft, ChevronRight, Lock, Pill, Salad, Trash2, UtensilsCrossed } from "lucide-react";
 import { BarSeriesChart } from "@/components/charts/charts";
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/states";
@@ -62,6 +62,10 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
         <Link href="/nutrition/diets" className="lift block rounded-2xl border border-border bg-card p-4">
           <span className="font-display text-lg font-semibold uppercase">Explore diets</span>
           <span className="block text-sm text-muted-foreground">Balanced, high protein, keto, Mediterranean, Daniel Fast and more — free for everyone.</span>
+        </Link>
+        <Link href="/nutrition/supplements" className="lift block rounded-2xl border border-border bg-card p-4">
+          <span className="font-display text-lg font-semibold uppercase">Supplements</span>
+          <span className="block text-sm text-muted-foreground">Creatine, protein, vitamin D and more — what the evidence says, plus a daily stack to check off. Free for everyone.</span>
         </Link>
       </div>
     );
@@ -127,6 +131,16 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
           <span className="block text-sm text-muted-foreground">{diet.eatingWindow ?? diet.tagline}</span>
         </span>
         <span className="shrink-0 text-sm font-semibold text-gold-highlight">Change</span>
+      </Link>
+
+      <Link href="/nutrition/supplements" className="lift flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-4">
+        <span>
+          <span className="flex items-center gap-2 font-display text-lg font-semibold uppercase">
+            <Pill className="size-4 text-gold" aria-hidden /> Supplements
+          </span>
+          <span className="block text-sm text-muted-foreground">Evidence, doses and your daily stack.</span>
+        </span>
+        <ChevronRight className="size-4 shrink-0 text-gold" aria-hidden />
       </Link>
 
       <nav className="flex items-center justify-between rounded-2xl border border-border bg-card p-2" aria-label="Choose day">

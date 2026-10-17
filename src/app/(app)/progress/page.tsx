@@ -8,7 +8,7 @@ import { ProgressPhotos } from "@/components/progress/progress-photos";
 import { ActionButton } from "@/components/common/action-button";
 import { Button } from "@/components/ui/button";
 import { ProgressBar } from "@/components/ui/progress-bar";
-import { isoDateInTz, parseRange, RANGES, rangeStart, type RangeKey } from "@/lib/domain/dates";
+import { addDays, isoDateInTz, parseRange, RANGES, rangeStart, type RangeKey } from "@/lib/domain/dates";
 import { hasFeature } from "@/lib/domain/plans";
 import { displayLength, displayWeight, formatDuration, formatWeight, kgToLb, lengthUnit, weightUnit } from "@/lib/domain/units";
 import { cn, titleCase } from "@/lib/utils";
@@ -19,6 +19,8 @@ import { BIG_THREE, getNutritionDaily, getPersonalBests, getStrengthSeries, getT
 import { listProgressPhotos } from "@/server/services/progress-photos";
 import { logError } from "@/server/log";
 import type { ProgressPhotoView } from "@/lib/domain/progress-photos";
+import { DEFAULT_STEP_GOAL, formatSteps } from "@/lib/domain/steps";
+import { getStepsDaily, type StepsSummary } from "@/server/services/steps";
 
 export const metadata = { title: "Progress" };
 
@@ -54,7 +56,12 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
     logError("progress.photos", err);
     return null;
   });
-  const [weightsRes, training, bests, goalsRes, exercisesRes, measurementsRes, photos] = await Promise.all([
+  // Steps (free on every plan): always the last 30 days. A failure here shouldn't take down the page either.
+  const stepsPromise: Promise<StepsSummary | null> = getStepsDaily(supabase, user.id, addDays(today, -29), today).catch((err: unknown) => {
+    logError("progress.steps", err);
+    return null;
+  });
+  const [weightsRes, training, bests, goalsRes, exercisesRes, measurementsRes, photos, steps] = await Promise.all([
     supabase.from("weight_entries").select("id, recorded_on, weight_kg").eq("user_id", user.id).gte("recorded_on", start).order("recorded_on"),
     getTrainingBuckets(supabase, user.id, start, today, tz, byMonth),
     getPersonalBests(supabase, user.id),
@@ -64,6 +71,7 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
       ? supabase.from("measurement_entries").select("recorded_on, waist_cm, chest_cm, hips_cm, arm_cm, thigh_cm, body_fat_pct").eq("user_id", user.id).gte("recorded_on", start).order("recorded_on")
       : Promise.resolve({ data: [] }),
     photosPromise,
+    stepsPromise,
   ]);
   const exercises = exercisesRes.data ?? [];
   const exBySlug = new Map(exercises.map((e) => [e.slug as string, e]));
@@ -199,6 +207,20 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
           )}
         </section>
       </div>
+
+      {steps && (
+        <BarSeriesChart
+          title="Steps"
+          description={`Last 30 days · ${formatSteps(steps.days.reduce((t, d) => t + d.steps, 0) / steps.days.length)} a day on average · goal ${formatSteps(profile.step_goal ?? DEFAULT_STEP_GOAL)}`}
+          data={steps.days.map((d) => ({ date: d.day, steps: d.steps }))}
+          xKey="date"
+          xFormat="date"
+          decimals={0}
+          valueSuffix=" steps"
+          series={[{ key: "steps", label: "Steps" }]}
+          emptyMessage="Log your steps on Home, or sync them in the phone app."
+        />
+      )}
 
       {photos ? (
         <ProgressPhotos photos={photos} userId={user.id} units={units} today={today} />

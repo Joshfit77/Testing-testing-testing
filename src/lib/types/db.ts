@@ -12,6 +12,7 @@ export interface ProfileRow {
   wellness_consent_at: string | null;
   onboarding_completed_at: string | null;
   timezone: string;
+  step_goal: number;
   avatar_path: string | null;
   created_at: string;
 }

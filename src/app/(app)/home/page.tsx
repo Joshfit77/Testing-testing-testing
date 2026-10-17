@@ -17,6 +17,11 @@ import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { getTodaysDevotional } from "@/server/services/challenge";
 import { getDashboardData } from "@/server/services/dashboard";
 import { getActiveProgram } from "@/server/services/training";
+import { getStepsDaily, type StepsSummary } from "@/server/services/steps";
+import { StepsCard } from "@/components/steps/steps-card";
+import { addDays, isoDateInTz } from "@/lib/domain/dates";
+import { DEFAULT_STEP_GOAL } from "@/lib/domain/steps";
+import { logError } from "@/server/log";
 
 export const metadata = { title: "Home" };
 
@@ -37,12 +42,19 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const sp = await searchParams;
   const { user, profile } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
-  const [plan, data, active, answersRes, programsRes] = await Promise.all([
+  const stepsToday = isoDateInTz(new Date(), profile.timezone);
+  // Steps are a side feature: if they can't load, the rest of Home still renders.
+  const stepsPromise: Promise<StepsSummary | null> = getStepsDaily(supabase, user.id, addDays(stepsToday, -6), stepsToday).catch((err: unknown) => {
+    logError("home.steps", err);
+    return null;
+  });
+  const [plan, data, active, answersRes, programsRes, steps] = await Promise.all([
     getUserPlan(user.id),
     getDashboardData(supabase, user.id, profile.timezone),
     getActiveProgram(supabase, user.id),
     supabase.from("onboarding_answers").select("*").eq("user_id", user.id).maybeSingle(),
     supabase.from("training_programs").select("slug, name, summary, goals, equipment, difficulty, tier, days_per_week, low_impact").eq("is_published", true),
+    stepsPromise,
   ]);
   const units = profile.unit_system;
   const hour = Number(new Intl.DateTimeFormat("en-US", { hour: "numeric", hour12: false, timeZone: profile.timezone }).format(new Date()));
@@ -243,6 +255,16 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           </CardContent>
         </Card>
       </div>
+
+      {steps && (
+        <StepsCard
+          today={stepsToday}
+          goal={profile.step_goal ?? DEFAULT_STEP_GOAL}
+          todaySteps={steps.days.at(-1)?.steps ?? 0}
+          todaySource={steps.lastSource}
+          week={steps.days}
+        />
+      )}
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
