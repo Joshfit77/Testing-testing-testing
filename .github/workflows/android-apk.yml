@@ -1,0 +1,61 @@
+name: Android APK
+
+# Builds a debug-signed APK of the offline edition (standalone/index.html) that can be installed
+# directly on an Android phone for testing, and publishes it as the "android-latest" release.
+# Not for the Play Store: store builds need your own signing key and the online app URL.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, claude/sharp-cray-8y0uuv]
+    paths:
+      - "standalone/**"
+      - "android/**"
+      - "capacitor.config.ts"
+      - "resources/**"
+      - ".github/workflows/android-apk.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Install dependencies
+        run: npm ci
+      - name: Accept Android SDK licenses
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+      - name: Copy the offline edition into the Android project
+        run: CAP_MODE=standalone npx cap sync android
+      - name: Build APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk NarrowGateFitness-offline.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NarrowGateFitness-offline-apk
+          path: NarrowGateFitness-offline.apk
+      - name: Publish as the android-latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete android-latest --yes --cleanup-tag || true
+          gh release create android-latest NarrowGateFitness-offline.apk \
+            --target "${{ github.sha }}" --prerelease \
+            --title "Narrow Gate Fitness: Android test app (offline edition)" \
+            --notes "Debug-signed test build of the offline edition. Install on Android by opening the APK (allow installs from this source when asked). Data is stored on the phone. Not for the Play Store."
