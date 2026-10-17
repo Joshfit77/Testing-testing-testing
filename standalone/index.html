@@ -215,7 +215,22 @@
   .rest-bar .clock { font-family: var(--display); font-size: 28px; font-weight: 700; color: var(--gold-hi); min-width: 74px; }
 
   /* Rings */
-  .rings { display: flex; gap: 18px; flex-wrap: wrap; }
+  .rings { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; justify-items: center; }
+  .ring span { text-align: center; }
+  .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .tile { display: grid; justify-items: center; gap: 4px; padding: 12px 6px 10px; text-align: center; color: inherit; cursor: pointer; }
+  .tile .tl { font-size: 11px; color: var(--muted); line-height: 1.25; }
+  .daynav { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 8px; }
+  .daynav b { text-align: center; font-family: var(--display); letter-spacing: .04em; text-transform: uppercase; }
+  .plist .li { width: 100%; text-align: left; color: inherit; cursor: pointer; }
+  .plist .li .t { white-space: normal; }
+  .clamp1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+  details.more > summary { list-style: none; cursor: pointer; color: var(--gold); font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; min-height: 36px; }
+  details.more > summary::-webkit-details-marker { display: none; }
+  details.more > summary svg { width: 16px; height: 16px; transition: transform .2s ease; }
+  details.more[open] > summary svg { transform: rotate(90deg); }
+  details.more > .stack { padding-top: 4px; }
+  @media (max-width: 380px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   .ring { display: grid; justify-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
 
   /* Chat */
@@ -624,31 +639,27 @@ function vHome() {
   else if (ns.done) heroBody = `<h2>Program complete</h2><p class="muted">You finished ${esc(ns.p.n)}. Well done. Pick your next block.</p><div><button class="btn primary" data-a="go" data-to="train">Choose next program</button></div>`;
   else heroBody = `<div class="eyebrow">Today · Week ${ns.w + 1}, Day ${ns.d + 1}</div><h2 style="font-size:26px">${esc(ns.day.n)}</h2><p class="muted small">${esc(ns.p.n)} · ${ns.day.x.length} exercises · about ${ns.p.min} min${ns.day.f ? " · " + esc(ns.day.f) : ""}</p>
     <div class="row"><button class="btn primary" data-a="start-next">${icon("play")}Start workout</button><button class="btn ghost" data-a="go" data-to="program" data-s="${ns.p.s}">View program</button></div>`;
+  const tile = (to, svg, label) => `<button class="card tile" data-a="go" data-to="${to}">${svg}<span class="tl">${label}</span></button>`;
+  const supN = supTaken(dayKey(now)).length, water = foodDay(dayKey(now)).water;
   return `${header(`${greet}, ${esc(S.name)}`, "Rooted in faith. Built for strength.")}
+  ${S.faith ? `<button class="card stack" style="text-align:left;gap:6px" data-a="go" data-to="faith"><div class="eyebrow">Verse of the day</div><p class="verse" style="font-size:17px">“${esc(sc.t)}”</p><p class="small gold">${esc(sc.r)} (KJV)</p></button>` : ""}
   ${draftCard}
   <section class="hero">${heroBody}</section>
-  <div class="grid3 stagger">
-    <div class="card tight stat"><span class="v num">${thisWeek.length}</span><span class="l">Workouts this week</span></div>
-    <div class="card tight stat"><span class="v num">${weekStreak()}</span><span class="l">Week streak</span></div>
-    <div class="card tight stat"><span class="v num">${fmtVol(vol30)}</span><span class="l">Volume, 30 days</span></div>
+  ${S.faith && S.ch ? `<button class="card gold-edge row between" style="text-align:left;flex-wrap:nowrap" data-a="ch-day" data-d="${chDay()}"><div><div class="eyebrow">Today's devotional · Day ${chDay()} of 40</div><b>${esc(DATA.dv[chDay() - 1].t)}</b></div>${icon("chev", "chev")}</button>` : ""}
+  <section class="stack" style="gap:10px"><div class="row between"><h2>Today</h2><span class="small muted num">${Math.max(0, t.kcal - Math.round(today.kcal))} kcal left</span></div><div class="tiles stagger">
+    ${tile("nutrition", ringSvg(today.kcal, t.kcal, "#c9a54c", 64), "Calories")}
+    ${tile("nutrition", ringSvg(today.p, t.p, "#4A86C0", 64), "Protein")}
+    ${tile("nutrition", ringSvg(water, t.water, "#5fb3c4", 64), "Water")}
+    ${tile("supps", ringSvg(supN, S.stack.length, "#9b7fd1", 64).replace(/>\d+<\/text>/, `>${supN}/${S.stack.length}</text>`), "Supplements")}
+  </div></section>
+  <div class="grid2">${stepsCard()}
+    <section class="card stack"><div class="row between"><h2>This week</h2><button class="btn sm ghost" data-a="go" data-to="progress">Progress</button></div>
+      <div class="row small muted" style="gap:14px"><span><b class="num" style="color:var(--fg)">${thisWeek.length}</b> workouts</span><span><b class="num" style="color:var(--fg)">${weekStreak()}</b> week streak</span><span><b class="num" style="color:var(--fg)">${fmtVol(vol30)}</b> lifted, 30 days</span></div>
+      ${chartSlot({ type: "bars", data: days, h: 130, min: 30, label: "Minutes trained per day this week" })}
+      ${prs.length ? `<div class="small"><span class="muted">Latest PR:</span> <b>${esc(exName(prs[0].s))}</b> <span class="gold num">${fmtW(prs[0].kg)}</span></div>` : ""}</section>
   </div>
-  <div class="grid2">
-    <section class="card stack"><div class="row between"><h2>This week</h2><span class="small muted">minutes trained</span></div>${chartSlot({ type: "bars", data: days, h: 150, min: 30, label: "Minutes trained per day this week" })}</section>
-    <section class="card stack"><div class="row between"><h2>Food today</h2><button class="btn sm ghost" data-a="go" data-to="nutrition">Log food</button></div>
-      <div class="rings"><div class="ring">${ringSvg(today.kcal, t.kcal, "#c9a54c")}<span>of ${t.kcal} kcal</span></div><div class="ring">${ringSvg(today.p, t.p, "#4A86C0")}<span>of ${t.p} g protein</span></div><div class="ring">${ringSvg(foodDay(dayKey(now)).water, t.water, "#5fb3c4")}<span>of ${t.water} glasses</span></div></div>
-      <p class="tiny dim">Targets are simple estimates from your bodyweight and goal, not medical advice.</p></section>
-  </div>
-  <div class="grid2">${stepsCard()}${stackCard()}</div>
-  <div class="grid2">
-    <section class="card stack"><div class="row between"><h2>Bodyweight</h2><button class="btn sm ghost" data-a="go" data-to="progress">Details</button></div>
-      ${S.bw.length ? `<div class="row" style="gap:6px;align-items:baseline"><span class="stat"><span class="v num">${toDisp(currentBwKg())}</span></span><span class="muted">${unit()}</span></div>${chartSlot({ series: [{ name: "Bodyweight", color: "#B08D3A", pts: S.bw.slice(-20).map(b => [b.t, toDisp(b.kg)]) }], h: 130, label: "Bodyweight trend" })}` : `<div class="empty">No entries yet.<button class="btn sm" data-a="go" data-to="progress">Log bodyweight</button></div>`}</section>
-    <section class="card stack"><div class="row between"><h2>Latest PRs</h2>${icon("trophy", "gold")}</div>
-      ${prs.length ? `<div class="list">${prs.map(r => `<div class="li"><div class="grow"><div class="t">${esc(exName(r.s))}</div><div class="small muted">${r.type} · ${fmtDate(r.t)}</div></div><div class="gold num" style="font-weight:700">${fmtW(r.kg)}</div></div>`).join("")}</div>` : `<div class="empty">Records appear here when you beat a previous best.</div>`}</section>
-  </div>
-  ${S.faith && S.ch ? `<button class="card gold-edge row between" style="text-align:left" data-a="ch-day" data-d="${chDay()}"><div><div class="eyebrow">Today's devotional · Day ${chDay()} of 40</div><b>${esc(DATA.dv[chDay() - 1].t)}</b></div>${icon("chev", "chev")}</button>` : ""}
-  ${S.faith ? `<section class="card stack"><div class="row between"><div class="eyebrow">Verse of the day</div><button class="btn sm ghost" data-a="go" data-to="faith">Faith</button></div><p class="verse">“${esc(sc.t)}”</p><p class="small gold">${esc(sc.r)} (KJV)</p></section>` : ""}
   <section class="card stack"><div class="row between"><h2>Ask your coach</h2>${icon("bot", "gold")}</div>
-    <div class="chips" style="flex-wrap:wrap">${["How should I warm up for squats?", "I missed two workouts. How do I get back on track?", "What should I eat before training?"].map(q => `<button class="chip" data-a="ask" data-q="${esc(q)}">${esc(q)}</button>`).join("")}</div></section>`;
+    <div class="chips" style="flex-wrap:wrap">${["How should I warm up for squats?", "What should I eat before training?"].map(q => `<button class="chip" data-a="ask" data-q="${esc(q)}">${esc(q)}</button>`).join("")}</div></section>`;
 }
 
 function vTrain() {
@@ -657,7 +668,7 @@ function vTrain() {
   const usedCats = [...new Set(DATA.pr.map(p => p.c))];
   const progs = DATA.pr.filter(p => cat === "all" || p.c === cat);
   return `${header("Train", "Programs & tools")}
-  <button class="card gold-edge prog-card" data-a="b-open" style="gap:6px"><div class="row" style="gap:10px"><span class="gold">${icon("plus")}</span><h2 style="font-size:20px">Build my program</h2></div><p class="small muted">Strength, powerlifting, bench, squat or deadlift only, MMA, cardio, bodybuilding, show prep, strongman, speed or agility, built from your height, age, weight, goals and numbers.</p></button>
+  <button class="card gold-edge prog-card" data-a="b-open" style="gap:6px"><div class="row" style="gap:10px"><span class="gold">${icon("plus")}</span><h2 style="font-size:20px">Build my program</h2></div><p class="small muted">12 program types, from powerlifting and MMA to show prep, built around your height, age, weight and goals.</p></button>
   ${(S.custom || []).length ? `<section class="stack"><h2>Your custom programs</h2><div class="cards stagger">${S.custom.slice().reverse().map(p => `<button class="card prog-card" data-a="go" data-to="program" data-s="${p.s}"><div class="row between"><span class="eyebrow" style="letter-spacing:.16em">Custom</span>${S.active && S.active.s === p.s ? `<span class="badge ok">Active</span>` : ""}</div><h3 style="font-size:17px">${esc(p.n)}</h3><p class="small muted">${esc(p.su)}</p></button>`).join("")}</div></section>` : ""}
   ${S.active && ns && !ns.done ? `<section class="hero"><div class="eyebrow">Current program</div><h2 style="font-size:24px">${esc(ns.p.n)}</h2>
     <div class="stack" style="gap:6px"><div class="row between small"><span class="muted">Week ${ns.w + 1} of ${ns.p.wk.length}</span><span class="muted">Next: ${esc(ns.day.n)}</span></div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(((ns.w * ns.week.days.length + ns.d) / (ns.p.wk.reduce((a, w) => a + w.days.length, 0))) * 100)}%"></div></div></div>
@@ -669,11 +680,11 @@ function vTrain() {
   </div>
   <section class="stack"><h2>Program library</h2>
     <div class="chips"><button class="chip ${cat === "all" ? "on" : ""}" data-a="cat" data-c="all">All</button>${usedCats.map(c => `<button class="chip ${cat === c ? "on" : ""}" data-a="cat" data-c="${c}">${esc(CAT[c] || titleCase(c))}</button>`).join("")}</div>
-    <div class="cards stagger">${progs.map(p => `<button class="card prog-card" data-a="go" data-to="program" data-s="${p.s}">
-      <div class="row between"><span class="eyebrow" style="letter-spacing:0.16em">${esc(CAT[p.c] || titleCase(p.c))}</span>${p.tier !== "free" ? `<span class="badge gold">${p.tier}</span>` : `<span class="badge">Free</span>`}</div>
-      <h3 style="font-size:18px">${esc(p.n)}</h3><p class="small muted">${esc(p.su)}</p>
-      <div class="row small dim" style="gap:14px"><span>${p.w} wk</span><span>${p.wk[0].days.length}×/week</span><span>~${p.min} min</span><span>${titleCase(p.d)}</span></div>
-      ${S.active && S.active.s === p.s ? `<span class="badge ok">Active</span>` : ""}</button>`).join("")}</div>
+    <div class="card tight plist"><div class="list">${progs.map(p => `<button class="li" data-a="go" data-to="program" data-s="${p.s}">
+      <div class="grow stack" style="gap:3px"><div class="row" style="gap:8px"><span class="t">${esc(p.n)}</span>${S.active && S.active.s === p.s ? `<span class="badge ok">Active</span>` : ""}</div>
+      <div class="small muted clamp1">${esc(p.su)}</div>
+      <div class="tiny dim">${esc(CAT[p.c] || titleCase(p.c))} · ${p.w} wk · ${p.wk[0].days.length}×/week · ~${p.min} min · ${titleCase(p.d)}</div></div>
+      ${p.tier !== "free" ? `<span class="badge gold">${p.tier}</span>` : `<span class="badge">Free</span>`}${icon("chev", "chev")}</button>`).join("")}</div></div>
   </section>`;
 }
 
@@ -869,7 +880,7 @@ function vProgress() {
   </div>
   ${photoSection()}
   <section class="card stack"><h2>Best lifts</h2>${bestRows.length ? `<table class="t"><thead><tr><th>Exercise</th><th>Best set</th><th style="text-align:right">Est. 1RM</th></tr></thead><tbody>${bestRows.map(([s, b]) => `<tr><td>${esc(exName(s))}</td><td class="num">${fmtW(b.w)} × ${b.r}</td><td class="num gold" style="text-align:right">${toDisp(b.v).toFixed(0)}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">No lifts logged yet.</div>`}</section>
-  <section class="card stack"><h2>Recent PRs</h2>${prs.length ? `<div class="list">${prs.slice(0, 10).map(r => `<div class="li"><div class="grow"><div class="t">${esc(exName(r.s))}</div><div class="small muted">${r.type} · ${fmtDate(r.t)}</div></div><b class="gold num">${fmtW(r.kg)}</b></div>`).join("")}</div>` : `<div class="empty">No records yet.</div>`}</section>`;
+  <section class="card stack"><h2>Recent PRs</h2>${prs.length ? `<div class="list">${prs.slice(0, 5).map(r => `<div class="li"><div class="grow"><div class="t">${esc(exName(r.s))}</div><div class="small muted">${r.type} · ${fmtDate(r.t)}</div></div><b class="gold num">${fmtW(r.kg)}</b></div>`).join("")}</div>` : `<div class="empty">No records yet.</div>`}</section>`;
 }
 
 /* ---------- Nutrition ---------- */
@@ -941,12 +952,13 @@ function vNutrition() {
   return `${header("Food", isToday ? "Today" : fmtDate(dt, { weekday: "long", month: "short", day: "numeric" }), false, `<button class="btn primary" data-a="addfood-open" data-k="${k}">${icon("plus")}Add food</button>`)}
   <button class="card gold-edge row between" style="text-align:left;flex-wrap:nowrap" data-a="go" data-to="diets"><div><div class="eyebrow">Your diet</div><h2 style="font-size:20px;margin-top:4px">${esc(NGB.DIETS[S.diet || "balanced"].name)}</h2><div class="small muted">${esc(NGB.DIETS[S.diet || "balanced"].eatingWindow || NGB.DIETS[S.diet || "balanced"].tagline)}</div></div><span class="small gold" style="font-weight:600">Change</span></button>
   <button class="card row between" style="text-align:left;flex-wrap:nowrap" data-a="go" data-to="supps"><div class="row" style="gap:12px;flex-wrap:nowrap">${icon("pill", "gold")}<div><b>Supplements</b><div class="small muted">${S.stack.length ? `${supTaken(dayKey(Date.now())).length} of ${S.stack.length} taken today` : "What works, how much to take, and your daily stack"}</div></div></div>${icon("chev", "chev")}</button>
-  <div class="row"><button class="btn sm" data-a="fday" data-n="-1">${icon("left")}Prev day</button>${isToday ? "" : `<button class="btn sm" data-a="fday" data-n="0">Today</button><button class="btn sm" data-a="fday" data-n="1">Next day${icon("chev")}</button>`}</div>
+  <div class="daynav"><button class="icon-btn" data-a="fday" data-n="-1" aria-label="Previous day">${icon("left")}</button><b>${isToday ? "Today" : fmtDate(dt, { weekday: "short", month: "short", day: "numeric" })}</b>${isToday ? `<span></span>` : `<button class="icon-btn" data-a="fday" data-n="1" aria-label="Next day">${icon("chev")}</button>`}</div>
+  ${isToday ? "" : `<div style="text-align:center;margin-top:-8px"><button class="btn sm ghost" data-a="fday" data-n="0">Back to today</button></div>`}
   <section class="card stack"><div class="rings">
-    <div class="ring">${ringSvg(s.kcal, t.kcal, "#c9a54c", 104)}<span>${t.kcal} kcal target</span></div>
-    <div class="ring">${ringSvg(s.p, t.p, "#4A86C0", 104)}<span>${t.p} g protein</span></div>
-    <div class="ring">${ringSvg(d.water, t.water, "#5fb3c4", 104)}<span>${t.water} glasses water</span></div></div>
-    <div class="row small muted" style="gap:16px"><span>Carbs <b class="num" style="color:var(--fg)">${Math.round(s.c)} / ${t.c} g</b></span><span>Fat <b class="num" style="color:var(--fg)">${Math.round(s.f)} / ${t.f} g</b></span><span>Remaining <b class="num" style="color:var(--fg)">${Math.max(0, t.kcal - Math.round(s.kcal))} kcal</b></span></div>
+    <div class="ring">${ringSvg(s.kcal, t.kcal, "#c9a54c", 88)}<span>${t.kcal} kcal target</span></div>
+    <div class="ring">${ringSvg(s.p, t.p, "#4A86C0", 88)}<span>${t.p} g protein</span></div>
+    <div class="ring">${ringSvg(d.water, t.water, "#5fb3c4", 88)}<span>${t.water} glasses water</span></div></div>
+    <div class="row small muted" style="gap:8px 16px;justify-content:center"><span>Carbs <b class="num" style="color:var(--fg)">${Math.round(s.c)} / ${t.c} g</b></span><span>Fat <b class="num" style="color:var(--fg)">${Math.round(s.f)} / ${t.f} g</b></span><span>Remaining <b class="num" style="color:var(--fg)">${Math.max(0, t.kcal - Math.round(s.kcal))} kcal</b></span></div>
     <div class="row"><button class="btn sm" data-a="water" data-n="1" data-k="${k}">${icon("droplet")}+1 glass</button>${d.water > 0 ? `<button class="btn sm ghost" data-a="water" data-n="-1" data-k="${k}">−1</button>` : ""}</div>
     <p class="tiny dim">Targets are estimates from your weight, age, sex, height, training days, goal and diet (Mifflin-St Jeor). They are not medical or dietetic advice.</p></section>
   ${MEALS.map(([m, l]) => { const items = byMeal(m); const kc = items.reduce((a, i) => a + (+i.kcal || 0), 0);
@@ -1022,7 +1034,6 @@ function stackList(k) {
   return `<div class="list">${S.stack.map(id => { const x = supById(id); if (!x) return ""; const on = taken.includes(id);
     return `<button class="li" style="text-align:left;width:100%" data-a="sup-take" data-id="${id}" aria-pressed="${on}"><span class="check ${on ? "on" : ""}" aria-hidden="true">${on ? icon("check") : ""}</span><div class="grow"><div class="t">${esc(x.name)}</div><div class="small muted">${esc(x.dose)}</div></div><span class="small ${on ? "gold" : "dim"}">${on ? "Taken" : "Tap when taken"}</span></button>`; }).join("")}</div>`;
 }
-const EV_CLASS = { strong: "gold", moderate: "", limited: "dim" };
 function vSupps() {
   const cat = R.p.cat || "all", diet = S.diet || "balanced", k = dayKey(Date.now());
   const list = SUPS.filter(x => cat === "all" || (cat === "stack" ? S.stack.includes(x.id) : x.category === cat));
@@ -1032,12 +1043,13 @@ function vSupps() {
     ${S.stack.length ? stackList(k) : `<p class="small muted">Nothing in your stack yet. Tap “Add to my stack” on anything below.</p>`}</section>
   <div class="chips" style="flex-wrap:wrap">${chip("all", "All")}${chip("stack", "My stack")}${NGB.SUPPLEMENT_CATEGORIES.map(c => chip(c, NGB.SUPPLEMENT_CATEGORY_LABELS[c])).join("")}</div>
   <div class="cards stagger">${list.map(x => { const inStack = S.stack.includes(x.id), fits = NGB.supplementFitsDiet(x, diet);
-    return `<article class="card stack" style="gap:8px"><div class="row between" style="align-items:flex-start;flex-wrap:nowrap"><h3 style="font-size:18px">${esc(x.name)}</h3><span class="tiny ${EV_CLASS[x.evidence]}" style="white-space:nowrap;font-weight:600">${esc(NGB.EVIDENCE_LABELS[x.evidence])}</span></div>
+    return `<article class="card stack" style="gap:8px"><div class="row between" style="align-items:flex-start;flex-wrap:nowrap"><h3 style="font-size:18px">${esc(x.name)}</h3><span class="badge ${x.evidence === "strong" ? "gold" : ""}" style="white-space:nowrap">${esc(NGB.EVIDENCE_LABELS[x.evidence])}</span></div>
       <p class="small">${esc(x.purpose)}</p>
-      <div class="small"><b>Dose:</b> <span class="muted">${esc(x.dose)}</span></div>
-      <div class="small"><b>When:</b> <span class="muted">${esc(x.timing)}</span></div>
-      <p class="tiny dim">${icon("info")} ${esc(x.cautions)}</p>
       ${fits ? "" : `<p class="tiny gold">Not suitable for your ${esc(NGB.DIETS[diet].name)} diet${x.alternative ? `. Try ${esc(x.alternative)} instead.` : "."}</p>`}
+      <details class="more"><summary>${icon("chev")}Dose, timing &amp; safety</summary><div class="stack" style="gap:6px">
+        <div class="small"><b>Dose:</b> <span class="muted">${esc(x.dose)}</span></div>
+        <div class="small"><b>When:</b> <span class="muted">${esc(x.timing)}</span></div>
+        <p class="small muted"><b style="color:var(--fg)">Caution:</b> ${esc(x.cautions)}</p></div></details>
       <div><button class="btn sm ${inStack ? "ghost" : "primary"}" data-a="sup-stack" data-id="${x.id}">${inStack ? `${icon("x")}Remove from my stack` : `${icon("plus")}Add to my stack`}</button></div></article>`; }).join("") || `<div class="card empty">Nothing here yet.</div>`}</div>
   <p class="tiny dim">${esc(NGB.SUPPLEMENT_DISCLAIMER)}</p>`;
 }
@@ -1540,9 +1552,9 @@ function vProfile() {
   <section class="card stack"><h2>Preferences</h2>
     <div class="row between"><span>Units</span><div class="row" style="gap:6px"><button class="chip ${S.units === "lb" ? "on" : ""}" data-a="units" data-u="lb">lb</button><button class="chip ${S.units === "kg" ? "on" : ""}" data-a="units" data-u="kg">kg</button></div></div>
     <div class="row between"><span>Faith &amp; Discipline section</span><div class="row" style="gap:6px"><button class="chip ${S.faith ? "on" : ""}" data-a="faith" data-on="1">On</button><button class="chip ${!S.faith ? "on" : ""}" data-a="faith" data-on="0">Off</button></div></div></section>
-  <section class="stack"><h2>Plans</h2><div class="cards stagger">
+  <details class="card more"><summary style="font-size:15px">${icon("chev")}Plans &amp; pricing: Free, Plus, Pro $30/mo, All Access $200/yr</summary><div class="stack"><div class="cards">
     ${[["Free", "$0", ["Starter programs", "Workout logger & history", "Basic progress"]], ["Plus", "$9.99", ["All programs", "Food tracking", "Advanced analytics", "AI coach chat"]], ["Pro", "$30", ["Everything in Plus", "AI-generated training plans", "Higher AI limits"]], ["All Access Yearly", "$200", ["Everything in Pro", "All programs, food tracking & analytics", "Full AI coaching & plans", "About $16.67 a month · save 44%"]]].map(([n, p, f]) => `<div class="card plan ${n === "All Access Yearly" ? "gold-edge" : ""}"><div class="row between"><h3>${n}</h3>${n === "All Access Yearly" ? `<span class="badge gold">Best value</span>` : ""}</div><div><span class="price">${p}</span>${p !== "$0" ? `<span class="muted small"> / ${n === "All Access Yearly" ? "year" : "month"}</span>` : ""}</div><ul class="dots small">${f.map(x => `<li>${x}</li>`).join("")}</ul></div>`).join("")}
-  </div><p class="tiny dim">Everything is unlocked in this preview. Subscriptions are paid through Stripe in the full web app.</p></section>
+  </div><p class="tiny dim">Everything is unlocked in this preview. Subscriptions are paid through Stripe in the full web app.</p></div></details>
   <section class="card stack"><h2>Your details</h2><p class="small muted">${S.me && S.me.sex ? `${S.me.age} years · ${S.me.sex === "unspecified" ? "Sex not specified" : titleCase(S.me.sex)} · ${S.units === "lb" ? `${Math.floor(S.me.heightCm / 2.54 / 12)} ft ${Math.round(S.me.heightCm / 2.54 % 12)} in` : `${Math.round(S.me.heightCm)} cm`} · ${fmtW(currentBwKg())} · ${esc(NGB.DIETS[S.diet || "balanced"].name)} diet` : "Add your weight, age, sex and height for better calorie targets."}</p><div><button class="btn" data-a="edit-details">Edit your details</button></div></section>
   ${reminderSection()}
   <section class="card stack"><h2>Preview data</h2><p class="small muted">${S.seeded ? "Sample workouts, bodyweight and meals were added so the charts aren't empty. " : ""}Everything here is stored only in this browser.</p>
