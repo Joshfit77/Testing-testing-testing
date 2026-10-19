@@ -78,12 +78,12 @@
     padding-bottom: env(safe-area-inset-bottom, 0px);
     padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px);
     background: rgba(12,12,12,0.96); border-top: 1px solid var(--line);
-    display: grid; grid-template-columns: repeat(6, 1fr);
+    display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
     backdrop-filter: blur(8px);
   }
   .nav-btn {
     background: none; border: 0; display: grid; place-items: center; align-content: center; gap: 3px;
-    color: var(--dim); font-size: 11px; font-weight: 500; min-height: 44px;
+    color: var(--dim); font-size: 10.5px; font-weight: 500; min-height: 44px; min-width: 0; white-space: nowrap; letter-spacing: -0.01em;
   }
   .nav-btn svg { width: 22px; height: 22px; }
   .nav-btn.on { color: var(--gold-hi); }
@@ -347,7 +347,7 @@
   .card, .btn, .chip, .check, .icon-btn, .disc { transition: transform .18s ease, border-color .2s ease, background-color .2s ease, box-shadow .2s ease; }
   .btn:active, .chip:active, .check:active, .icon-btn:active, button.card:active, .disc:active { transform: scale(.97); }
   @media (hover: hover) { button.card:hover, .prog-card:hover { transform: translateY(-2px); box-shadow: 0 14px 34px -22px rgba(201,165,76,.55); } }
-  .nav-btn .pill { display: grid; place-items: center; width: 44px; height: 28px; border-radius: 999px; transition: background-color .3s ease, transform .3s ease; transform: scale(.9); }
+  .nav-btn .pill { display: grid; place-items: center; width: 40px; height: 28px; border-radius: 999px; transition: background-color .3s ease, transform .3s ease; transform: scale(.9); }
   .nav-btn.on .pill { background: rgba(201,165,76,.16); transform: none; }
   .side .nav-btn .pill { width: auto; height: auto; background: none !important; transform: none; }
   .check.on svg { animation: bounceIn .35s ease-out both; }
@@ -535,18 +535,18 @@ function back() { const prev = stack.pop(); if (prev) { R = prev; render(); wind
 
 const NAV = [
   { v: "home", l: "Home", i: "home" },
-  { v: "train", l: "Train", i: "dumbbell" },
+  { v: "train", l: "Programs", i: "dumbbell" },
+  { v: "library", l: "Exercises", i: "book" },
   { v: "nutrition", l: "Food", i: "apple" },
-  { v: "coach", l: "AI Coach", i: "bot" },
+  { v: "coach", l: "Coach", i: "bot" },
   { v: "progress", l: "Progress", i: "chart" },
 ];
 const MORE = [
   { v: "faith", l: "Faith", i: "cross", faith: true },
   { v: "history", l: "History", i: "history" },
-  { v: "library", l: "Exercises", i: "book" },
   { v: "profile", l: "Profile", i: "user" },
 ];
-const SECTION = { supps: "nutrition", diets: "nutrition", home: "home", train: "train", program: "train", build: "train", library: "train", exercise: "train", logger: "train", summary: "train", coach: "coach", progress: "progress", badges: "progress", history: "history", workout: "history", nutrition: "nutrition", faith: "faith", profile: "profile" };
+const SECTION = { supps: "nutrition", diets: "nutrition", home: "home", train: "train", program: "train", build: "train", library: "library", exercise: "library", logger: "train", summary: "train", coach: "coach", progress: "progress", badges: "progress", history: "history", workout: "history", nutrition: "nutrition", faith: "faith", profile: "profile" };
 
 function renderNav() {
   const sec = SECTION[R.v] || "home";
@@ -698,7 +698,7 @@ function vTrain() {
   const usedCats = [...new Set(DATA.pr.map(p => p.c))];
   const disc = R.p.disc || "all", byDisc = {};
   DATA.pr.forEach(p => { const dz = NGB.disciplineForCategory(p.c); (byDisc[dz.id] = byDisc[dz.id] || []).push(p); });
-  return `${header("Train", "Programs & tools")}
+  return `${header("Programs", "Train with a plan")}
   <button class="card gold-edge prog-card" data-a="b-open" style="gap:6px"><div class="row" style="gap:10px"><span class="gold">${icon("plus")}</span><h2 style="font-size:20px">Build my program</h2></div><p class="small muted">12 program types, from powerlifting and MMA to show prep, built around your height, age, weight and goals.</p></button>
   ${(S.custom || []).length ? `<section class="stack"><h2>Your custom programs</h2><div class="cards stagger">${S.custom.slice().reverse().map(p => `<button class="card prog-card" data-a="go" data-to="program" data-s="${p.s}"><div class="row between"><span class="eyebrow" style="letter-spacing:.16em">Custom</span>${S.active && S.active.s === p.s ? `<span class="badge ok">Active</span>` : ""}</div><h3 style="font-size:17px">${esc(p.n)}</h3><p class="small muted">${esc(p.su)}</p></button>`).join("")}</div></section>` : ""}
   ${S.active && ns && !ns.done ? `<section class="hero"><div class="eyebrow">Current program</div><h2 style="font-size:24px">${esc(ns.p.n)}</h2>
@@ -747,15 +747,29 @@ function vProgram() {
   <section class="card stack"><h3>How to progress</h3><p class="small muted">${esc(p.pg)}</p></section>`;
 }
 
+const BODY_PARTS = [
+  ["chest", "Chest", e => e.p.some(m => /chest/.test(m))],
+  ["back", "Back", e => e.p.some(m => /upper back|lats|traps|spinal erectors/.test(m))],
+  ["shoulders", "Shoulders", e => e.p.some(m => /shoulder|delt/.test(m))],
+  ["arms", "Arms", e => e.p.some(m => /biceps|triceps|forearms/.test(m))],
+  ["legs", "Legs & glutes", e => e.p.some(m => /quadriceps|hamstrings|glutes|calves|adductors|hip flexors/.test(m))],
+  ["core", "Core", e => e.p.some(m => /core|obliques|abdominals/.test(m))],
+  ["conditioning", "Conditioning", e => ["conditioning", "cardio", "plyometric"].includes(e.c)],
+  ["mobility", "Mobility", e => e.c === "mobility"],
+];
 function exRows(q) {
   q = (q || "").trim().toLowerCase();
-  const list = DATA.ex.filter(e => !q || e.n.toLowerCase().includes(q) || e.p.some(m => m.includes(q)) || e.e.some(m => m.includes(q)) || e.c.includes(q));
-  if (!list.length) return `<div class="empty">No exercises match “${esc(q)}”.</div>`;
-  return list.map(e => `<button class="li" data-a="go" data-to="exercise" data-s="${e.s}"><div class="grow"><div class="t">${esc(e.n)}</div><div class="small muted">${e.p.map(titleCase).join(", ")} · ${e.e.map(titleCase).join(", ")}</div></div>${icon("chev", "chev")}</button>`).join("");
+  const part = BODY_PARTS.find(b => b[0] === R.p.part);
+  const list = DATA.ex.filter(e => (!part || part[2](e)) && (!q || e.n.toLowerCase().includes(q) || e.p.some(m => m.includes(q)) || e.e.some(m => m.includes(q)) || e.c.includes(q)));
+  if (!list.length) return `<div class="empty">No exercises match${q ? ` “${esc(q)}”` : ""}${part ? ` in ${part[1]}` : ""}.</div>`;
+  return list.map(e => `<button class="li" data-a="go" data-to="exercise" data-s="${e.s}"><div class="grow"><div class="t">${esc(e.n)}</div><div class="small muted">${e.p.map(titleCase).join(", ")} · ${e.e.length ? e.e.map(titleCase).join(", ") : "No equipment"}</div></div>${icon("chev", "chev")}</button>`).join("");
 }
 function vLibrary() {
-  return `${header("Exercise library", `${DATA.ex.length} exercises`, true)}
+  const part = R.p.part || "";
+  const count = part ? DATA.ex.filter(BODY_PARTS.find(b => b[0] === part)[2]).length : DATA.ex.length;
+  return `${header("Exercises", `${count} exercise guides with cues and videos`)}
   <label class="f"><span class="sr">Search</span><input class="input" id="exq" data-search="ex" placeholder="Search by name, muscle or equipment" value="${esc(R.p.q || "")}" autocomplete="off"></label>
+  <div class="chips"><button class="chip ${!part ? "on" : ""}" data-a="expart" data-c="">All</button>${BODY_PARTS.map(([id, l]) => `<button class="chip ${part === id ? "on" : ""}" data-a="expart" data-c="${id}">${l}</button>`).join("")}</div>
   <section class="card" style="padding:4px 16px"><div class="list" id="exlist">${exRows(R.p.q)}</div></section>`;
 }
 function vExercise() {
@@ -1963,6 +1977,7 @@ document.addEventListener("click", ev => {
     case "fday": { const cur = R.p.day ? new Date(R.p.day + "T12:00:00").getTime() : Date.now(); const n = +d.n; const nd = n === 0 ? Date.now() : cur + n * DAY; R.p = { day: Math.min(startOfDay(nd), startOfDay(Date.now())) === startOfDay(Date.now()) ? undefined : dayKey(nd) }; render(); break; }
     case "verse": R.p = { vi: +d.n }; render(); break;
     case "disc": R.p = { ...R.p, disc: d.c }; render(); break;
+    case "expart": R.p = { ...R.p, part: d.c || undefined }; render(); break;
     case "b-open": newBuilder(d.t || null); if (d.t) bDefaults(); go("build"); break;
     case "intro-go": enterGate(); break;
     case "explore": seed(); registerCustom(); stack.length = 0; go("home", {}, false); toast("Sample data loaded. Reset any time in Profile."); break;

@@ -152,7 +152,7 @@ export function AppShell({ children, userId, displayName, faithEnabled, isAdmin,
         aria-label="Primary"
         className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-border bg-[#0d0d0d]/95 backdrop-blur-xl md:hidden"
       >
-        <ul className="grid grid-cols-6">
+        <ul className="grid grid-cols-7">
           {mobilePrimary.map((item) => {
             const active = isActive(pathname, item.href);
             return (
@@ -161,13 +161,13 @@ export function AppShell({ children, userId, displayName, faithEnabled, isAdmin,
                   href={item.href}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "flex h-16 flex-col items-center justify-center gap-0.5 text-[11px] font-semibold transition-colors duration-200 active:scale-95",
+                    "flex h-16 min-w-0 flex-col items-center justify-center gap-0.5 whitespace-nowrap text-[10.5px] font-semibold tracking-tight transition-colors duration-200 active:scale-95",
                     active ? "text-gold-highlight" : "text-muted-foreground",
                   )}
                 >
                   <span
                     className={cn(
-                      "flex h-7 w-11 items-center justify-center rounded-full transition-all duration-300",
+                      "flex h-7 w-10 items-center justify-center rounded-full transition-all duration-300",
                       active ? "scale-100 bg-gold/15" : "scale-90 bg-transparent",
                     )}
                   >
@@ -185,11 +185,11 @@ export function AppShell({ children, userId, displayName, faithEnabled, isAdmin,
               aria-haspopup="dialog"
               aria-expanded={moreOpen}
               className={cn(
-                "flex h-16 w-full flex-col items-center justify-center gap-0.5 text-[11px] font-semibold transition-colors duration-200 active:scale-95",
+                "flex h-16 w-full min-w-0 flex-col items-center justify-center gap-0.5 whitespace-nowrap text-[10.5px] font-semibold tracking-tight transition-colors duration-200 active:scale-95",
                 moreActive ? "text-gold-highlight" : "text-muted-foreground",
               )}
             >
-              <span className={cn("flex h-7 w-11 items-center justify-center rounded-full transition-all duration-300", moreActive ? "scale-100 bg-gold/15" : "scale-90")}>
+              <span className={cn("flex h-7 w-10 items-center justify-center rounded-full transition-all duration-300", moreActive ? "scale-100 bg-gold/15" : "scale-90")}>
                 <Ellipsis className={cn("size-5", moreActive && "text-gold")} aria-hidden />
               </span>
               More
