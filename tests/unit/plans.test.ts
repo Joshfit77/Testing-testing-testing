@@ -15,9 +15,9 @@ describe("plans & entitlements", () => {
   });
   it("uses default prices and AI limits", () => {
     const plans = getPlans();
-    expect(plans.plus.priceCents).toBe(999);
-    expect(plans.pro.priceCents).toBe(3000);
-    expect(plans.pro.yearlyPriceCents).toBe(20000);
+    expect(plans.plus.priceCents).toBe(799);
+    expect(plans.pro.priceCents).toBe(1499);
+    expect(plans.pro.yearlyPriceCents).toBe(11999);
     expect(plans.pro.aiMonthlyLimit).toBeGreaterThan(plans.plus.aiMonthlyLimit);
     expect(plans.free.aiMonthlyLimit).toBe(0);
   });
@@ -27,6 +27,9 @@ describe("plans & entitlements", () => {
     expect(formatPrice(3000)).toBe("$30");
     expect(formatPrice(20000)).toBe("$200");
     expect(yearlySavingsPercent(3000, 20000)).toBe(44);
+    expect(yearlySavingsPercent(1499, 11999)).toBe(33);
+    expect(formatPrice(1499)).toBe("$14.99");
+    expect(formatPrice(11999)).toBe("$119.99");
     expect(yearlySavingsPercent(0, 20000)).toBe(0);
   });
   it("respects env overrides", () => {

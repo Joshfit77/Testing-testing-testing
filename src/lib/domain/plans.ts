@@ -54,7 +54,7 @@ export function getPlans(): Record<Plan, PlanConfig> {
     plus: {
       id: "plus",
       name: "Plus",
-      priceCents: envInt("PLAN_PLUS_PRICE_CENTS", 999),
+      priceCents: envInt("PLAN_PLUS_PRICE_CENTS", 799),
       tagline: "The complete training toolkit.",
       features: [
         "workout_logging",
@@ -72,8 +72,8 @@ export function getPlans(): Record<Plan, PlanConfig> {
     pro: {
       id: "pro",
       name: "Pro",
-      priceCents: envInt("PLAN_PRO_PRICE_CENTS", 3000),
-      yearlyPriceCents: envInt("PLAN_PRO_YEARLY_PRICE_CENTS", 20000),
+      priceCents: envInt("PLAN_PRO_PRICE_CENTS", 1499),
+      yearlyPriceCents: envInt("PLAN_PRO_YEARLY_PRICE_CENTS", 11999),
       tagline: "Personal coaching, powered by AI.",
       features: [...FEATURES],
       aiMonthlyLimit: envInt("PLAN_PRO_AI_MONTHLY_LIMIT", 400),

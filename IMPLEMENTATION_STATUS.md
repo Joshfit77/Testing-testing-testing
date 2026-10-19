@@ -32,7 +32,7 @@ Verification ran against a full local Supabase stack (Postgres 17, GoTrue auth, 
 | Food log (nutrition) | ✅ Done & e2e-tested | A main "Food" tab. Search works out of the box on 94 built-in common foods (typical values, labeled as estimates); logging a serving is e2e-tested. **USDA search additionally needs `USDA_FDC_API_KEY`** and wasn't exercised live here. |
 | AI coach (chat, plan generation, approval, metering, rate limits, fallback) | ✅ Implemented; gating/quotas integration-tested | **Live model calls need `ANTHROPIC_API_KEY`**. No real completions were made in this environment. Prompt quality should be evaluated with real usage. |
 | Optional Faith & Discipline | ✅ Done & e2e-tested | |
-| Pricing: Plus $9.99/mo, Pro $30/mo, All Access Yearly $200/yr (grants Pro) | ✅ Done; yearly price → Pro mapping integration-tested | Needs `STRIPE_PRICE_PRO_YEARLY`; without it the yearly card says it isn't configured. |
+| Pricing: Plus $7.99/mo, Pro $14.99/mo, All Access Yearly $119.99/yr (grants Pro) | ✅ Done; yearly price → Pro mapping integration-tested | Needs `STRIPE_PRICE_PRO_YEARLY`; without it the yearly card says it isn't configured. |
 | Stripe checkout, portal, webhooks, entitlements | ✅ Implemented; webhook & entitlement logic integration-tested with signed synthetic events | **Checkout and the Billing Portal need real Stripe keys and prices.** They weren't run end to end against Stripe here. |
 | Admin (catalog, media, categories, content, flags, subscriptions, metrics, audit) | ✅ Done | Admin RLS and privacy are integration-tested. The admin UI was verified by typecheck and build only. |
 | Installable PWA | ✅ Done | Manifest, icons, service worker and offline page. |

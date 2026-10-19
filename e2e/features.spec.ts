@@ -95,7 +95,7 @@ test.describe("feature access, subscriptions and core sections", () => {
 
     await page.goto("/profile/billing");
     await expect(page.getByText("All Access Yearly")).toBeVisible();
-    await expect(page.getByText("$200")).toBeVisible();
-    await expect(page.getByText(/^\$30\s*\/ month$/)).toBeVisible();
+    await expect(page.getByText("$119.99")).toBeVisible();
+    await expect(page.getByText(/^\$14\.99\s*\/ month$/)).toBeVisible();
   });
 });
