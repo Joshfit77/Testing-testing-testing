@@ -98,3 +98,33 @@ function clamp(n: number, min: number, max: number) {
 function round1(n: number) {
   return Math.round(n * 10) / 10;
 }
+
+export interface NutrientTotal {
+  total: number;
+  /** Items that reported this nutrient. */
+  count: number;
+}
+
+/**
+ * Daily fiber, sugar and sodium totals (MyFitnessPal's "Nutrients" view). Only items that report a value
+ * count, so the UI can say "from 3 of 5 foods with data" instead of treating missing data as zero.
+ */
+export function nutrientTotals(items: { fiber_g?: number | string | null; sugar_g?: number | string | null; sodium_mg?: number | string | null }[]): {
+  items: number;
+  fiber: NutrientTotal;
+  sugar: NutrientTotal;
+  sodium: NutrientTotal;
+} {
+  const sum = (key: "fiber_g" | "sugar_g" | "sodium_mg"): NutrientTotal => {
+    let total = 0;
+    let count = 0;
+    for (const i of items) {
+      const v = i[key];
+      if (v == null || v === "") continue;
+      total += Number(v);
+      count++;
+    }
+    return { total, count };
+  };
+  return { items: items.length, fiber: sum("fiber_g"), sugar: sum("sugar_g"), sodium: sum("sodium_mg") };
+}

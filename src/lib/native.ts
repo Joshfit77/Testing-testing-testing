@@ -89,3 +89,40 @@ export async function initNativeShell(): Promise<() => void> {
   }
   return () => cleanups.forEach((c) => c());
 }
+
+const BARCODE_PLUGIN = "CapacitorBarcodeScanner";
+
+/** True in the iPhone/Android app when the native barcode scanner plugin (@capacitor/barcode-scanner) is installed. */
+export function nativeBarcodeScannerAvailable(): boolean {
+  if (!isNativeApp()) return false;
+  const cap = (window as unknown as { Capacitor?: { isPluginAvailable?: (name: string) => boolean; PluginHeaders?: { name: string }[] } }).Capacitor;
+  if (cap?.isPluginAvailable) return cap.isPluginAvailable(BARCODE_PLUGIN);
+  return Boolean(cap?.PluginHeaders?.some((p) => p.name === BARCODE_PLUGIN));
+}
+
+export type NativeScanResult = { kind: "scanned"; code: string } | { kind: "cancelled" } | { kind: "denied" } | { kind: "error"; message: string };
+
+/**
+ * Opens the system barcode scanner (full-screen camera) and resolves with the code. The plugin rejects
+ * with OS-PLUG-BARC-0006 when the person cancels and OS-PLUG-BARC-0007 when camera access is denied.
+ */
+export async function scanBarcodeNative(): Promise<NativeScanResult> {
+  try {
+    const { CapacitorBarcodeScanner, CapacitorBarcodeScannerTypeHint } = await import("@capacitor/barcode-scanner");
+    const res = await CapacitorBarcodeScanner.scanBarcode({
+      hint: CapacitorBarcodeScannerTypeHint.ALL,
+      scanInstructions: "Line up the barcode on the package",
+      scanButton: false,
+      cancelButtonAccessibilityLabel: "Cancel scanning",
+    });
+    const code = (res?.ScanResult ?? "").trim();
+    return code ? { kind: "scanned", code } : { kind: "cancelled" };
+  } catch (err) {
+    const e = err as { code?: string; message?: string } | null;
+    const code = e?.code ?? "";
+    const message = e?.message ?? "";
+    if (code.endsWith("0006") || /cancel/i.test(message)) return { kind: "cancelled" };
+    if (code.endsWith("0007") || /permission|camera access/i.test(message)) return { kind: "denied" };
+    return { kind: "error", message };
+  }
+}

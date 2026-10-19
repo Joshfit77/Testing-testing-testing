@@ -5,7 +5,9 @@ import { normalizeOffProduct, OFF_FIELDS, type BarcodeLookup, type OffProductRes
  * Open Food Facts client (no API key). OFF asks every app to send a descriptive User-Agent.
  * https://openfoodfacts.github.io/openfoodfacts-server/api/
  */
-const BASE = "https://world.openfoodfacts.org/api/v2/product";
+// OFF_API_BASE_URL points at a mirror or a local mock (used by the end-to-end tests); defaults to the public API.
+const ORIGIN = /^https?:\/\//.test(process.env.OFF_API_BASE_URL ?? "") ? process.env.OFF_API_BASE_URL!.replace(/\/+$/, "") : "https://world.openfoodfacts.org";
+const BASE = `${ORIGIN}/api/v2/product`;
 export const OFF_USER_AGENT = "NarrowGateFitness/1.0 (contact via app)";
 
 export class OffUnavailableError extends Error {}

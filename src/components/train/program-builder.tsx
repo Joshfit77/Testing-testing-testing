@@ -31,7 +31,6 @@ import {
   buildCustomProgram,
   CARDIO_MODALITIES,
   CARDIO_MODALITY_LABELS,
-  CUSTOM_PROGRAM_TYPES,
   CUSTOM_TYPES,
   MAIN_LIFT_LABELS,
   resolveGoalMaxes,
@@ -44,6 +43,7 @@ import {
   type MainLift,
   type ShowDivision,
 } from "@/lib/domain/custom-programs";
+import { DISCIPLINES } from "@/lib/domain/disciplines";
 import { intensityLabel } from "@/lib/domain/program-expansion";
 import type { CatalogExercise } from "@/lib/domain/program-generator";
 import { estimateOneRepMax } from "@/lib/domain/strength";
@@ -430,32 +430,45 @@ export function ProgramBuilder({
         </h2>
 
         {step === "type" && (
-          <div className="grid gap-3 sm:grid-cols-2" role="group" aria-label="Program type">
-            {CUSTOM_PROGRAM_TYPES.map((t) => {
-              const c = CUSTOM_TYPES[t];
-              const Icon = TYPE_ICONS[t];
-              const selected = type === t;
-              return (
-                <button
-                  key={t}
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => chooseType(t)}
-                  className={cn(
-                    "flex min-h-20 items-start gap-3 rounded-2xl border p-4 text-left transition-all hover:-translate-y-0.5",
-                    selected ? "border-gold bg-gold/10 shadow-[0_8px_24px_-16px_rgba(201,165,76,0.8)]" : "border-border bg-elevated hover:border-gold-muted",
-                  )}
-                >
-                  <span className={cn("rounded-xl p-2.5", selected ? "bg-gold text-primary-foreground" : "bg-gold/10 text-gold")}>
-                    <Icon className="size-5" aria-hidden />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block font-display text-lg font-bold uppercase leading-tight">{c.label}</span>
-                    <span className="mt-0.5 block text-xs text-muted-foreground">{c.description}</span>
-                  </span>
-                </button>
-              );
-            })}
+          <div className="space-y-6" role="group" aria-label="Program type">
+            {DISCIPLINES.filter((dsc) => dsc.customTypes.length > 0).map((dsc) => (
+              <section key={dsc.id} aria-labelledby={`pb-dsc-${dsc.id}`}>
+                <h3 id={`pb-dsc-${dsc.id}`} className="text-xs font-semibold uppercase tracking-widest text-gold">
+                  {dsc.label}
+                </h3>
+                <p className="mb-2 mt-0.5 text-xs text-muted-foreground">{dsc.whoFor}</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {dsc.customTypes.map((t) => {
+                    const c = CUSTOM_TYPES[t];
+                    const Icon = TYPE_ICONS[t];
+                    const selected = type === t;
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() => chooseType(t)}
+                        className={cn(
+                          "flex min-h-20 items-start gap-3 rounded-2xl border p-4 text-left transition-all hover:-translate-y-0.5",
+                          selected ? "border-gold bg-gold/10 shadow-[0_8px_24px_-16px_rgba(201,165,76,0.8)]" : "border-border bg-elevated hover:border-gold-muted",
+                        )}
+                      >
+                        <span className={cn("rounded-xl p-2.5", selected ? "bg-gold text-primary-foreground" : "bg-gold/10 text-gold")}>
+                          <Icon className="size-5" aria-hidden />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block font-display text-lg font-bold uppercase leading-tight">{c.label}</span>
+                          <span className="mt-0.5 block text-xs text-muted-foreground">{c.description}</span>
+                          <span className="mt-1.5 block text-[11px] leading-snug text-muted-foreground/90">
+                            <span className="font-semibold text-foreground/80">A typical week:</span> {c.typicalWeek}
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
           </div>
         )}
 
@@ -494,6 +507,9 @@ export function ProgramBuilder({
 
         {step === "goals" && cfg && (
           <div className="space-y-6">
+            <p className="rounded-xl border border-border bg-elevated px-4 py-3 text-xs text-muted-foreground">
+              <span className="font-semibold text-foreground">Who it&apos;s for:</span> {cfg.whoFor}
+            </p>
             <fieldset className="space-y-3">
               <legend className="text-sm font-semibold">Your goal</legend>
               <div className="grid gap-2">

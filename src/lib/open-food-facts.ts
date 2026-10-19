@@ -6,6 +6,8 @@
  * Docs: https://openfoodfacts.github.io/openfoodfacts-server/api/ (GET /api/v2/product/{barcode})
  */
 
+import type { FoodBasis } from "@/lib/domain/food-basis";
+
 export const OFF_ATTRIBUTION = "Open Food Facts (community data) — check the label";
 export const OFF_FIELDS = [
   "code",
@@ -26,6 +28,9 @@ export interface NutritionValues {
   carbs_g: number;
   fat_g: number;
   fiber_g: number | null;
+  sugar_g?: number | null;
+  /** Milligrams (OFF reports sodium in grams). */
+  sodium_mg?: number | null;
 }
 
 export interface BarcodeProduct {
@@ -95,12 +100,19 @@ function readBasis(n: Record<string, unknown>, basis: "100g" | "serving", perHun
   const carbs = num(n[`carbohydrates_${basis}`], 100 * cap);
   const fat = num(n[`fat_${basis}`], 100 * cap);
   const fiber = num(n[`fiber_${basis}`], 100 * cap);
+  const sugar = num(n[`sugars_${basis}`], 100 * cap);
+  // Labels in many countries list salt instead of sodium; sodium = salt ÷ 2.5.
+  const salt = num(n[`salt_${basis}`], 100 * cap);
+  const sodiumG = num(n[`sodium_${basis}`], 100 * cap) ?? (salt == null ? null : salt / 2.5);
   const missing: BarcodeProduct["missing"] = [];
   if (protein == null) missing.push("protein");
   if (carbs == null) missing.push("carbs");
   if (fat == null) missing.push("fat");
   return {
-    values: { calories: round1(calories), protein_g: round1(protein ?? 0), carbs_g: round1(carbs ?? 0), fat_g: round1(fat ?? 0), fiber_g: fiber == null ? null : round1(fiber) },
+    values: { calories: round1(calories), protein_g: round1(protein ?? 0), carbs_g: round1(carbs ?? 0), fat_g: round1(fat ?? 0), fiber_g: fiber == null ? null : round1(fiber),
+      ...(sugar == null ? {} : { sugar_g: round1(sugar) }),
+      ...(sodiumG == null ? {} : { sodium_mg: Math.round(sodiumG * 1000) }),
+    },
     missing,
   };
 }
@@ -113,6 +125,8 @@ export function scaleNutrition(v: NutritionValues, factor: number): NutritionVal
     carbs_g: round1(v.carbs_g * factor),
     fat_g: round1(v.fat_g * factor),
     fiber_g: v.fiber_g == null ? null : round1(v.fiber_g * factor),
+    ...(v.sugar_g == null ? {} : { sugar_g: round1(v.sugar_g * factor) }),
+    ...(v.sodium_mg == null ? {} : { sodium_mg: Math.round(v.sodium_mg * factor) }),
   };
 }
 
@@ -165,4 +179,15 @@ export function normalizeOffProduct(json: OffProductResponse | null | undefined,
 export function nutritionForAmount(product: BarcodeProduct, amount: { servings: number } | { grams: number }): NutritionValues | null {
   if ("grams" in amount) return product.per100 ? scaleNutrition(product.per100, amount.grams / 100) : null;
   return product.perServing ? scaleNutrition(product.perServing, amount.servings) : null;
+}
+
+/**
+ * Amount basis for a found product: per 100 g/ml with the label serving as a unit, or — when the label
+ * gives only per-serving values without a weight — per serving.
+ */
+export function basisFromOffProduct(p: BarcodeProduct): FoodBasis {
+  if (p.per100) {
+    return { per100: p.per100, servingGrams: p.servingQuantity, servingLabel: p.servingLabel ?? (p.servingQuantity ? `${p.servingQuantity} ${p.unit}` : null), liquid: p.unit === "ml" };
+  }
+  return { per100: p.perServing!, servingOnly: true, servingLabel: p.servingLabel };
 }

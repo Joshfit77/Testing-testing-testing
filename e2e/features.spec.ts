@@ -82,10 +82,13 @@ test.describe("feature access, subscriptions and core sections", () => {
     await expect(page.getByRole("heading", { name: "Food", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Add food" }).click();
     await page.getByPlaceholder("e.g. chicken, banana, rice").fill("banana");
-    const row = page.getByRole("listitem").filter({ hasText: "Banana" }).first();
-    await row.getByLabel("Servings of Banana").fill("2");
-    await row.getByRole("button", { name: "Add" }).click();
-    await expect(page.getByText("Logged Banana.")).toBeVisible();
+    await page.getByRole("region", { name: "Common foods" }).getByRole("button", { name: /^Banana/ }).first().click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByLabel("Unit", { exact: true })).toHaveValue("serving");
+    await dialog.getByLabel("Amount", { exact: true }).fill("2");
+    await expect(dialog.getByTestId("amount-calories")).toHaveText("210");
+    await dialog.getByRole("button", { name: "Log food" }).click();
+    await expect(page.getByText(/Logged Banana \(2 × 1 medium/)).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(page.getByText("Banana").first()).toBeVisible();
     await expect(page.getByText("210").first()).toBeVisible();

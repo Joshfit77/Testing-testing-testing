@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/common/states";
 import { Badge } from "@/components/ui/badge";
 import { ActionButton } from "@/components/common/action-button";
 import { Button } from "@/components/ui/button";
+import { DISCIPLINES, disciplineForCategory, getDiscipline, groupByDiscipline } from "@/lib/domain/disciplines";
 import { canAccessTier } from "@/lib/domain/plans";
 import type { Plan } from "@/lib/domain/types";
 import { cn, titleCase } from "@/lib/utils";
@@ -28,8 +29,8 @@ interface ProgramCardRow {
   category_id: string | null;
 }
 
-export default async function TrainPage({ searchParams }: { searchParams: Promise<{ category?: string }> }) {
-  const { category } = await searchParams;
+export default async function TrainPage({ searchParams }: { searchParams: Promise<{ category?: string; discipline?: string }> }) {
+  const { category, discipline } = await searchParams;
   const { user } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
   const [plan, active, categoriesRes, programsRes, mineRes] = await Promise.all([
@@ -48,10 +49,22 @@ export default async function TrainPage({ searchParams }: { searchParams: Promis
       .neq("status", "active")
       .order("updated_at", { ascending: false }),
   ]);
-  const categories = categoriesRes.data ?? [];
+  const categories = (categoriesRes.data ?? []) as { id: string; slug: string; name: string }[];
   const selected = categories.find((c) => c.slug === category);
-  const programs = ((programsRes.data ?? []) as ProgramCardRow[]).filter((p) => !selected || p.category_id === selected.id);
-  const categoryName = new Map(categories.map((c) => [c.id as string, c.name as string]));
+  const categorySlug = new Map(categories.map((c) => [c.id, c.slug]));
+  const categoryName = new Map(categories.map((c) => [c.id, c.name]));
+  const disciplineOf = (p: ProgramCardRow) => disciplineForCategory(p.category_id ? categorySlug.get(p.category_id) : null);
+  // A category filter implies its discipline; otherwise ?discipline= narrows the library to one group.
+  const activeDiscipline = selected ? disciplineForCategory(selected.slug) : getDiscipline(discipline);
+  const allPrograms = (programsRes.data ?? []) as ProgramCardRow[];
+  const programs = allPrograms.filter((p) => (selected ? p.category_id === selected.id : !activeDiscipline || disciplineOf(p).id === activeDiscipline.id));
+  const groups = groupByDiscipline(programs, disciplineOf);
+  const disciplineCategories = activeDiscipline ? categories.filter((c) => activeDiscipline.categories.includes(c.slug)) : [];
+  const chip = (active: boolean) =>
+    cn(
+      "shrink-0 rounded-full border px-3.5 py-2 text-xs font-semibold",
+      active ? "border-gold bg-gold/10 text-gold-highlight" : "border-border text-muted-foreground hover:text-foreground",
+    );
   const mine = (mineRes.data ?? []) as unknown as {
     id: string;
     status: string;
@@ -131,8 +144,8 @@ export default async function TrainPage({ searchParams }: { searchParams: Promis
         <span className="min-w-0 flex-1">
           <span className="block font-display text-xl font-bold uppercase leading-tight">Build my program</span>
           <span className="mt-0.5 block text-sm text-muted-foreground">
-            Strength, powerlifting, bench, squat or deadlift only, MMA, cardio, bodybuilding, show prep, strongman, speed or agility —
-            built around your numbers, goals and equipment. Free on every plan.
+            Strength &amp; powerlifting, strongman, bodybuilding &amp; physique, combat sports, endurance, speed &amp; agility — built around
+            your numbers, goals, schedule and equipment. Free on every plan.
           </span>
         </span>
         <ChevronRight className="size-5 shrink-0 text-gold transition-transform group-hover:translate-x-0.5" aria-hidden />
@@ -185,70 +198,99 @@ export default async function TrainPage({ searchParams }: { searchParams: Promis
         <h2 id="library-title" className="mb-3 font-display text-xl font-bold uppercase">
           Program library
         </h2>
-        <nav aria-label="Program categories" className="scrollbar-none -mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1">
-          <Link
-            href="/train#library"
-            aria-current={!selected ? "page" : undefined}
-            className={cn(
-              "shrink-0 rounded-full border px-3.5 py-2 text-xs font-semibold",
-              !selected ? "border-gold bg-gold/10 text-gold-highlight" : "border-border text-muted-foreground hover:text-foreground",
-            )}
-          >
+        <p className="-mt-1 mb-3 text-sm text-muted-foreground">Programs grouped by discipline. Pick a discipline to see who it&apos;s for and what a week looks like.</p>
+        <nav aria-label="Program disciplines" className="scrollbar-none -mx-4 mb-3 flex gap-2 overflow-x-auto px-4 pb-1">
+          <Link href="/train#library" aria-current={!activeDiscipline ? "page" : undefined} className={chip(!activeDiscipline)}>
             All
           </Link>
-          {categories.map((c) => (
+          {DISCIPLINES.map((d) => (
             <Link
-              key={c.id as string}
-              href={`/train?category=${c.slug}#library`}
-              aria-current={selected?.id === c.id ? "page" : undefined}
-              className={cn(
-                "shrink-0 rounded-full border px-3.5 py-2 text-xs font-semibold",
-                selected?.id === c.id ? "border-gold bg-gold/10 text-gold-highlight" : "border-border text-muted-foreground hover:text-foreground",
-              )}
+              key={d.id}
+              href={`/train?discipline=${d.id}#library`}
+              aria-current={activeDiscipline?.id === d.id && !selected ? "page" : undefined}
+              className={chip(activeDiscipline?.id === d.id)}
             >
-              {c.name as string}
+              {d.label}
             </Link>
           ))}
         </nav>
+        {disciplineCategories.length > 1 && (
+          <nav aria-label="Program categories" className="scrollbar-none -mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1">
+            <Link href={`/train?discipline=${activeDiscipline!.id}#library`} aria-current={!selected ? "page" : undefined} className={chip(!selected)}>
+              All {activeDiscipline!.label}
+            </Link>
+            {disciplineCategories.map((c) => (
+              <Link key={c.id} href={`/train?category=${c.slug}#library`} aria-current={selected?.id === c.id ? "page" : undefined} className={chip(selected?.id === c.id)}>
+                {c.name}
+              </Link>
+            ))}
+          </nav>
+        )}
         {programs.length === 0 ? (
           <EmptyState title="No programs in this category yet" description="Check back soon, or explore another category." />
         ) : (
-          <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {programs.map((p) => {
-              const locked = !canAccessTier(plan, p.tier);
-              return (
-                <li key={p.id}>
-                  <Link
-                    href={`/train/programs/${p.slug}`}
-                    className="bg-card-gradient flex h-full flex-col rounded-2xl border border-border p-5 transition-all hover:-translate-y-0.5 hover:border-gold-muted"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="text-[11px] font-semibold uppercase tracking-widest text-gold">{p.category_id ? categoryName.get(p.category_id) : "Program"}</p>
-                      {locked ? (
-                        <Badge>
-                          <Lock className="size-3" aria-hidden /> {titleCase(p.tier)}
-                        </Badge>
-                      ) : (
-                        p.tier === "free" && <Badge variant="success">Free</Badge>
-                      )}
+          <div className="space-y-8">
+            {groups.map(({ discipline: d, items }) => (
+              <section key={d.id} aria-labelledby={`dsc-${d.id}`}>
+                <div className="mb-3 rounded-2xl border border-border bg-card/60 p-4">
+                  <h3 id={`dsc-${d.id}`} className="font-display text-lg font-bold uppercase leading-tight">
+                    {d.label}
+                  </h3>
+                  <dl className="mt-1.5 grid gap-1 text-xs text-muted-foreground md:grid-cols-2 md:gap-4">
+                    <div>
+                      <dt className="inline font-semibold text-foreground/80">Who it&apos;s for: </dt>
+                      <dd className="inline">{d.whoFor}</dd>
                     </div>
-                    <h3 className="mt-2 font-display text-xl font-bold uppercase leading-tight">{p.name}</h3>
-                    <p className="mt-2 flex-1 text-sm text-muted-foreground">{p.summary}</p>
-                    <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                      <Badge variant="secondary">{titleCase(p.difficulty)}</Badge>
-                      <Badge variant="secondary">
-                        {p.duration_weeks} {p.duration_weeks === 1 ? "week" : "weeks"}
-                      </Badge>
-                      <Badge variant="secondary">{p.days_per_week}×/week</Badge>
-                      <Badge variant="secondary">
-                        <Clock className="size-3" aria-hidden /> {p.session_minutes} min
-                      </Badge>
+                    <div>
+                      <dt className="inline font-semibold text-foreground/80">A typical week: </dt>
+                      <dd className="inline">{d.typicalWeek}</dd>
                     </div>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+                  </dl>
+                  {d.customTypes.length > 0 && (
+                    <Link href={`/train/build?type=${d.customTypes[0]}`} className="mt-2 inline-flex min-h-9 items-center gap-1 text-xs font-semibold text-gold hover:text-gold-highlight">
+                      <Wand2 className="size-3.5" aria-hidden /> Build a custom {d.label.toLowerCase()} program
+                    </Link>
+                  )}
+                </div>
+                <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {items.map((p) => {
+                    const locked = !canAccessTier(plan, p.tier);
+                    return (
+                      <li key={p.id}>
+                        <Link
+                          href={`/train/programs/${p.slug}`}
+                          className="bg-card-gradient flex h-full flex-col rounded-2xl border border-border p-5 transition-all hover:-translate-y-0.5 hover:border-gold-muted"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-[11px] font-semibold uppercase tracking-widest text-gold">{p.category_id ? categoryName.get(p.category_id) : "Program"}</p>
+                            {locked ? (
+                              <Badge>
+                                <Lock className="size-3" aria-hidden /> {titleCase(p.tier)}
+                              </Badge>
+                            ) : (
+                              p.tier === "free" && <Badge variant="success">Free</Badge>
+                            )}
+                          </div>
+                          <h4 className="mt-2 font-display text-xl font-bold uppercase leading-tight">{p.name}</h4>
+                          <p className="mt-2 flex-1 text-sm text-muted-foreground">{p.summary}</p>
+                          <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                            <Badge variant="secondary">{titleCase(p.difficulty)}</Badge>
+                            <Badge variant="secondary">
+                              {p.duration_weeks} {p.duration_weeks === 1 ? "week" : "weeks"}
+                            </Badge>
+                            <Badge variant="secondary">{p.days_per_week}×/week</Badge>
+                            <Badge variant="secondary">
+                              <Clock className="size-3" aria-hidden /> {p.session_minutes} min
+                            </Badge>
+                          </div>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ))}
+          </div>
         )}
       </section>
     </div>

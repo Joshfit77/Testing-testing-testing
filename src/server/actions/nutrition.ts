@@ -14,7 +14,9 @@ import { isFoodSearchConfigured } from "@/server/env";
 import { getFood } from "@/server/services/food-database";
 import { lookupBarcode, OffUnavailableError } from "@/server/services/open-food-facts";
 import { barcodeLookupCandidates } from "@/lib/barcode";
-import { nutritionForAmount } from "@/lib/open-food-facts";
+import { basisFromOffProduct } from "@/lib/open-food-facts";
+import { basisFromFoodRow, basisFromLegacyItem, basisUnits, computeAmount, sanitizeBasis, unitIdForLabel, type FoodBasis } from "@/lib/domain/food-basis";
+import { getLocalFood } from "@/server/services/usda-local";
 import { logError } from "@/server/log";
 import { estimateAndSaveTargets } from "@/server/services/nutrition-targets";
 
@@ -51,15 +53,17 @@ async function findOrCreateMeal(supabase: SupabaseClient, userId: string, date: 
   return created.id as string;
 }
 
+const amount = { quantity: z.number().positive().max(100_000), unitId: z.string().regex(/^(g|oz|lb|ml|floz|serving|p\d{1,2})$/) };
+
 const logFoodInput = z.discriminatedUnion("source", [
-  z.object({ source: z.literal("food"), foodId: uuid, servings: z.number().positive().max(100) }),
-  z.object({ source: z.literal("usda"), fdcId: z.string().regex(/^\d{1,10}$/), grams: z.number().positive().max(5000) }),
+  // Saved / built-in foods. `servings` is the older shape (a multiple of the food's serving).
+  z.object({ source: z.literal("food"), foodId: uuid, quantity: amount.quantity.optional(), unitId: amount.unitId.optional(), servings: z.number().positive().max(100).optional() }),
+  z.object({ source: z.literal("usda"), fdcId: z.string().regex(/^\d{1,10}$/), ...amount }),
   z.object({
     source: z.literal("barcode"),
     code: z.string().regex(/^\d{8,14}$/),
     format: z.enum(["ean13", "upca", "upce", "ean8"]).optional(),
-    unit: z.enum(["serving", "g"]),
-    quantity: z.number().positive().max(5000),
+    ...amount,
   }),
   z.object({
     source: z.literal("manual"),
@@ -79,6 +83,56 @@ const logFoodSchema = z.object({
   item: logFoodInput,
 });
 
+/** Columns written for an item measured against a nutrition basis (USDA, Open Food Facts, saved foods). */
+type AmountColumns = Pick<
+  MealItemRow,
+  "servings" | "calories" | "protein_g" | "carbs_g" | "fat_g" | "fiber_g" | "sugar_g" | "sodium_mg" | "grams" | "quantity" | "unit_label" | "amount_label" | "basis"
+>;
+
+interface MealItemRow extends Macros {
+  food_id: string | null;
+  name: string;
+  servings: number;
+  is_estimate: boolean;
+  fiber_g: number | null;
+  sugar_g: number | null;
+  sodium_mg: number | null;
+  grams: number | null;
+  quantity: number | null;
+  unit_label: string | null;
+  amount_label: string | null;
+  source: string | null;
+  basis: FoodBasis | null;
+}
+
+const LIMITS_ERROR = "That amount is too large to log — check the quantity and unit.";
+
+/** Turns a basis + amount into the stored columns; null when the unit doesn't exist for this food. */
+function amountColumns(basis: FoodBasis, quantity: number, unitId: string): AmountColumns | null {
+  const r = computeAmount(basis, quantity, unitId);
+  if (!r) return null;
+  const n = r.nutrition;
+  return {
+    servings: Math.max(0.01, Math.round(quantity * 100) / 100),
+    calories: n.calories,
+    protein_g: n.protein_g,
+    carbs_g: n.carbs_g,
+    fat_g: n.fat_g,
+    fiber_g: n.fiber_g,
+    sugar_g: n.sugar_g,
+    sodium_mg: n.sodium_mg,
+    grams: r.grams,
+    quantity: Math.round(quantity * 1000) / 1000,
+    unit_label: r.unit.label.slice(0, 100),
+    amount_label: r.amountLabel.slice(0, 160),
+    basis,
+  };
+}
+
+function withinLimits(c: AmountColumns): boolean {
+  return c.calories <= 99_999 && c.protein_g <= 9_999 && c.carbs_g <= 9_999 && c.fat_g <= 9_999 && (c.grams == null || c.grams <= 20_000) && c.servings <= 99_999;
+}
+
 export async function logFoodAction(input: unknown): Promise<ActionState> {
   try {
     const { user, supabase } = await nutritionCtx();
@@ -86,100 +140,8 @@ export async function logFoodAction(input: unknown): Promise<ActionState> {
     if (!parsed.success) return actionInvalid(parsed.error);
     const { date, mealType, status, item } = parsed.data;
 
-    let row: { food_id: string | null; name: string; servings: number; is_estimate: boolean } & Macros;
-    if (item.source === "food") {
-      const { data: food } = await supabase.from("foods").select("*").eq("id", item.foodId).maybeSingle();
-      if (!food) return actionError("Food not found.");
-      const m = scaleMacros({ calories: Number(food.calories), protein_g: Number(food.protein_g), carbs_g: Number(food.carbs_g), fat_g: Number(food.fat_g) }, item.servings);
-      row = { food_id: food.id as string, name: food.name as string, servings: item.servings, is_estimate: Boolean(food.is_estimate), ...m };
-    } else if (item.source === "usda") {
-      if (!isFoodSearchConfigured()) return actionError("Food search isn't configured.");
-      // Always re-read nutrition values from the database server-side — never trust client-supplied label data.
-      const ext = await getFood(item.fdcId);
-      if (!ext) return actionError("That food couldn't be loaded from the food database.");
-      const { data: cached, error: cErr } = await supabase
-        .from("foods")
-        .upsert(
-          {
-            owner_id: user.id,
-            name: ext.name.slice(0, 160),
-            brand: ext.brand?.slice(0, 120) ?? null,
-            serving_size: 100,
-            serving_unit: "g",
-            calories: ext.calories,
-            protein_g: ext.protein_g,
-            carbs_g: ext.carbs_g,
-            fat_g: ext.fat_g,
-            fiber_g: ext.fiber_g,
-            source: "usda",
-            source_ref: ext.fdcId,
-            is_estimate: false,
-          },
-          { onConflict: "owner_id,source,source_ref" },
-        )
-        .select("id")
-        .single();
-      if (cErr) throw cErr;
-      const servings = Math.round((item.grams / 100) * 100) / 100;
-      row = { food_id: cached.id as string, name: `${ext.name} (${item.grams} g)`.slice(0, 160), servings, is_estimate: false, ...scaleMacros(ext, servings) };
-    } else if (item.source === "barcode") {
-      if (item.unit === "serving" && item.quantity > 100) return actionError("That's a lot of servings — check the amount.");
-      const candidates = barcodeLookupCandidates(item.code, item.format);
-      if (!candidates) return actionError("That barcode isn't valid.");
-      // Re-fetch from Open Food Facts server-side — never trust client-supplied nutrition numbers.
-      const found = await lookupBarcode(candidates);
-      if (found.status !== "found") return actionError("That product has no nutrition info in Open Food Facts. Enter it manually.");
-      const p = found.product;
-      const amount = item.unit === "g" ? { grams: item.quantity } : { servings: item.quantity };
-      const values = nutritionForAmount(p, amount);
-      if (!values) return actionError(item.unit === "g" ? "This product only lists nutrition per serving — log it in servings." : "This product doesn't list a serving size — log it in grams.");
-      // Cache per 100 g/ml when available (like USDA foods), otherwise per label serving.
-      const base = p.per100 ? { size: 100, unit: p.unit as string, v: p.per100 } : { size: 1, unit: "serving", v: p.perServing! };
-      const { data: cached, error: cErr } = await supabase
-        .from("foods")
-        .upsert(
-          {
-            owner_id: user.id,
-            name: p.name.slice(0, 160),
-            brand: p.brand?.slice(0, 120) ?? null,
-            serving_size: base.size,
-            serving_unit: base.unit,
-            calories: base.v.calories,
-            protein_g: base.v.protein_g,
-            carbs_g: base.v.carbs_g,
-            fat_g: base.v.fat_g,
-            fiber_g: base.v.fiber_g,
-            source: "openfoodfacts",
-            source_ref: p.code,
-            // Crowd-sourced label data, not a guess; the UI labels it "Open Food Facts (community data) — check the label".
-            is_estimate: false,
-          },
-          { onConflict: "owner_id,source,source_ref" },
-        )
-        .select("id")
-        .single();
-      if (cErr) throw cErr;
-      const grams = item.unit === "g" ? item.quantity : p.servingQuantity ? Math.round(p.servingQuantity * item.quantity * 10) / 10 : null;
-      // meal_items.servings is a multiplier of the cached food row (per 100 g/ml, or per label serving).
-      const servings =
-        base.size === 1
-          ? item.quantity
-          : grams != null
-            ? Math.round((grams / 100) * 100) / 100
-            : Math.round((values.calories / Math.max(base.v.calories, 0.1)) * 100) / 100;
-      const amountLabel =
-        item.unit === "g" ? `${item.quantity} ${p.unit}` : `${item.quantity} serving${item.quantity === 1 ? "" : "s"}${grams != null ? `, ${grams} ${p.unit}` : ""}`;
-      row = {
-        food_id: cached.id as string,
-        name: `${p.name} (${amountLabel})`.slice(0, 160),
-        servings,
-        is_estimate: false,
-        calories: values.calories,
-        protein_g: values.protein_g,
-        carbs_g: values.carbs_g,
-        fat_g: values.fat_g,
-      };
-    } else {
+    let row: MealItemRow;
+    if (item.source === "manual") {
       row = {
         food_id: null,
         name: item.name,
@@ -189,16 +151,163 @@ export async function logFoodAction(input: unknown): Promise<ActionState> {
         protein_g: item.protein_g,
         carbs_g: item.carbs_g,
         fat_g: item.fat_g,
+        fiber_g: null,
+        sugar_g: null,
+        sodium_mg: null,
+        grams: null,
+        quantity: null,
+        unit_label: null,
+        amount_label: null,
+        source: "custom",
+        basis: null,
       };
+    } else {
+      // Nutrition values are always re-read server-side — never trusted from the client.
+      let basis: FoodBasis;
+      let meta: { food_id: string | null; name: string; is_estimate: boolean; source: string };
+      let quantity: number;
+      let unitId: string;
+      if (item.source === "food") {
+        const { data: food } = await supabase.from("foods").select("*").eq("id", item.foodId).maybeSingle();
+        if (!food) return actionError("Food not found.");
+        basis = basisFromFoodRow(food as Parameters<typeof basisFromFoodRow>[0]);
+        meta = { food_id: food.id as string, name: food.name as string, is_estimate: Boolean(food.is_estimate), source: `food:${food.id as string}` };
+        if (item.quantity != null && item.unitId) {
+          quantity = item.quantity;
+          unitId = item.unitId;
+        } else {
+          // Older clients: N servings of the food.
+          quantity = item.servings ?? 1;
+          unitId = basisUnits(basis).some((u) => u.id === "serving") ? "serving" : "g";
+          if (unitId === "g") quantity *= Number(food.serving_size);
+        }
+      } else if (item.source === "usda") {
+        const local = await getLocalFood(Number(item.fdcId));
+        if (local) {
+          basis = local.basis;
+          meta = { food_id: null, name: local.name, is_estimate: false, source: `usda:${local.fdcId}` };
+        } else {
+          if (!isFoodSearchConfigured()) return actionError("That food isn't in the food database.");
+          const ext = await getFood(item.fdcId);
+          if (!ext) return actionError("That food couldn't be loaded from the food database.");
+          const { data: cached, error: cErr } = await supabase
+            .from("foods")
+            .upsert(
+              {
+                owner_id: user.id,
+                name: ext.name.slice(0, 160),
+                brand: ext.brand?.slice(0, 120) ?? null,
+                serving_size: 100,
+                serving_unit: "g",
+                calories: ext.calories,
+                protein_g: ext.protein_g,
+                carbs_g: ext.carbs_g,
+                fat_g: ext.fat_g,
+                fiber_g: ext.fiber_g,
+                source: "usda",
+                source_ref: ext.fdcId,
+                is_estimate: false,
+              },
+              { onConflict: "owner_id,source,source_ref" },
+            )
+            .select("id")
+            .single();
+          if (cErr) throw cErr;
+          basis = { per100: { calories: ext.calories, protein_g: ext.protein_g, carbs_g: ext.carbs_g, fat_g: ext.fat_g, fiber_g: ext.fiber_g } };
+          meta = { food_id: cached.id as string, name: ext.name, is_estimate: false, source: `usda:${ext.fdcId}` };
+        }
+        quantity = item.quantity;
+        unitId = item.unitId;
+      } else {
+        const candidates = barcodeLookupCandidates(item.code, item.format);
+        if (!candidates) return actionError("That barcode isn't valid.");
+        // Re-fetch from Open Food Facts server-side — never trust client-supplied nutrition numbers.
+        const found = await lookupBarcode(candidates);
+        if (found.status !== "found") return actionError("That product has no nutrition info in Open Food Facts. Enter it manually.");
+        const p = found.product;
+        basis = basisFromOffProduct(p);
+        // Cache per 100 g/ml when available, otherwise per label serving, so it shows up in My foods.
+        const base = p.per100 ? { size: 100, unit: p.unit as string, v: p.per100 } : { size: 1, unit: "serving", v: p.perServing! };
+        const { data: cached, error: cErr } = await supabase
+          .from("foods")
+          .upsert(
+            {
+              owner_id: user.id,
+              name: p.name.slice(0, 160),
+              brand: p.brand?.slice(0, 120) ?? null,
+              serving_size: base.size,
+              serving_unit: base.unit,
+              calories: base.v.calories,
+              protein_g: base.v.protein_g,
+              carbs_g: base.v.carbs_g,
+              fat_g: base.v.fat_g,
+              fiber_g: base.v.fiber_g,
+              source: "openfoodfacts",
+              source_ref: p.code,
+              // Crowd-sourced label data, not a guess; the UI labels it "Open Food Facts (community data) — check the label".
+              is_estimate: false,
+            },
+            { onConflict: "owner_id,source,source_ref" },
+          )
+          .select("id")
+          .single();
+        if (cErr) throw cErr;
+        meta = { food_id: cached.id as string, name: p.brand ? `${p.name} (${p.brand})` : p.name, is_estimate: false, source: `off:${p.code}` };
+        quantity = item.quantity;
+        unitId = item.unitId;
+      }
+      const cols = amountColumns(basis, quantity, unitId);
+      if (!cols) return actionError("Choose one of the units listed for this food.");
+      if (!withinLimits(cols)) return actionError(LIMITS_ERROR);
+      row = { ...meta, name: meta.name.slice(0, 160), ...cols };
     }
     const mealId = await findOrCreateMeal(supabase, user.id, date, mealType, status);
     const { error } = await supabase.from("meal_items").insert({ meal_id: mealId, user_id: user.id, ...row });
     if (error) throw error;
     revalidatePath("/nutrition");
     revalidatePath("/home");
-    return actionOk(`${status === "planned" ? "Planned" : "Logged"} ${row.name}.`);
+    const amountText = row.amount_label ? ` (${row.amount_label})` : "";
+    return actionOk(`${status === "planned" ? "Planned" : "Logged"} ${row.name}${amountText}.`);
   } catch (err) {
     return guard(err, "nutrition.log");
+  }
+}
+
+/**
+ * Edit a logged item MyFitnessPal-style: change the amount, unit or meal. Nutrition is recomputed on the
+ * server from the item's stored basis (entries from before amounts were stored scale by servings).
+ */
+export async function updateMealItemAction(input: unknown): Promise<ActionState> {
+  try {
+    const { user, supabase } = await nutritionCtx();
+    const parsed = z.object({ id: uuid, mealType: mealTypeSchema, ...amount }).safeParse(input);
+    if (!parsed.success) return actionError("Enter an amount greater than zero.");
+    const { id, mealType, quantity, unitId } = parsed.data;
+    const { data: item } = await supabase
+      .from("meal_items")
+      .select("id, meal_id, name, servings, calories, protein_g, carbs_g, fat_g, basis, meal:meals!inner(id, eaten_on, meal_type, status, is_template)")
+      .eq("id", id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!item) return actionError("That entry couldn't be found. It may have been deleted.");
+    const meal = item.meal as unknown as { id: string; eaten_on: string; meal_type: string; status: "logged" | "planned"; is_template: boolean };
+    if (meal.is_template) return actionError("Saved meals can't be edited here.");
+    const basis = sanitizeBasis(item.basis) ?? basisFromLegacyItem(item as unknown as Parameters<typeof basisFromLegacyItem>[0]);
+    const cols = amountColumns(basis, quantity, unitId);
+    if (!cols) return actionError("Choose one of the units listed for this food.");
+    if (!withinLimits(cols)) return actionError(LIMITS_ERROR);
+    const mealId = mealType === meal.meal_type ? meal.id : await findOrCreateMeal(supabase, user.id, meal.eaten_on, mealType, meal.status);
+    const { error } = await supabase.from("meal_items").update({ ...cols, meal_id: mealId }).eq("id", id).eq("user_id", user.id);
+    if (error) throw error;
+    if (mealId !== meal.id) {
+      const { count } = await supabase.from("meal_items").select("id", { count: "exact", head: true }).eq("meal_id", meal.id);
+      if (!count) await supabase.from("meals").delete().eq("id", meal.id).eq("user_id", user.id).eq("is_template", false);
+    }
+    revalidatePath("/nutrition");
+    revalidatePath("/home");
+    return actionOk(`Updated ${item.name as string} (${cols.amount_label}).`);
+  } catch (err) {
+    return guard(err, "nutrition.update_item");
   }
 }
 
@@ -270,7 +379,7 @@ export async function saveMealTemplateAction(_prev: ActionState, formData: FormD
     const mealId = uuid.safeParse(formData.get("mealId"));
     if (!parsed.success) return actionInvalid(parsed.error);
     if (!mealId.success) return actionError("Choose a meal to save.");
-    const { data: items } = await supabase.from("meal_items").select("food_id, name, servings, calories, protein_g, carbs_g, fat_g, is_estimate").eq("meal_id", mealId.data).eq("user_id", user.id);
+    const { data: items } = await supabase.from("meal_items").select(ITEM_COLUMNS).eq("meal_id", mealId.data).eq("user_id", user.id);
     if (!items?.length) return actionError("That meal has no items.");
     const { data: tpl, error } = await supabase
       .from("meals")
@@ -297,19 +406,11 @@ export async function logTemplateAction(_prev: ActionState, formData: FormData):
     const { templateId, date, mealType, servings, status } = parsed.data;
     const { data: tpl } = await supabase.from("meals").select("id, name, yield_servings").eq("id", templateId).eq("user_id", user.id).eq("is_template", true).maybeSingle();
     if (!tpl) return actionError("Saved meal not found.");
-    const { data: items } = await supabase.from("meal_items").select("food_id, name, servings, calories, protein_g, carbs_g, fat_g, is_estimate").eq("meal_id", tpl.id);
+    const { data: items } = await supabase.from("meal_items").select(ITEM_COLUMNS).eq("meal_id", tpl.id);
     const factor = servings / Number(tpl.yield_servings);
     const mealId = await findOrCreateMeal(supabase, user.id, date, mealType, status);
     const { error } = await supabase.from("meal_items").insert(
-      (items ?? []).map((i) => ({
-        meal_id: mealId,
-        user_id: user.id,
-        food_id: i.food_id,
-        name: i.name,
-        servings: Math.round(Number(i.servings) * factor * 100) / 100 || 0.01,
-        ...scaleMacros({ calories: Number(i.calories), protein_g: Number(i.protein_g), carbs_g: Number(i.carbs_g), fat_g: Number(i.fat_g) }, factor),
-        is_estimate: i.is_estimate,
-      })),
+      ((items ?? []) as Record<string, unknown>[]).map((i) => ({ ...scaleItem(i, factor), meal_id: mealId, user_id: user.id })),
     );
     if (error) throw error;
     revalidatePath("/nutrition");
@@ -399,7 +500,31 @@ export async function updateGoalsAction(_prev: ActionState, formData: FormData):
   }
 }
 
-const ITEM_COLUMNS = "food_id, name, servings, calories, protein_g, carbs_g, fat_g, is_estimate";
+const ITEM_COLUMNS = "food_id, name, servings, calories, protein_g, carbs_g, fat_g, is_estimate, fiber_g, sugar_g, sodium_mg, grams, quantity, unit_label, amount_label, source, basis";
+
+/**
+ * Scales a stored item by `factor` (recipes logged as a different number of servings). Items with a basis
+ * are recomputed so the amount text stays right; older items scale their numbers.
+ */
+function scaleItem(i: Record<string, unknown>, factor: number): Record<string, unknown> {
+  if (factor === 1) return i;
+  const basis = sanitizeBasis(i.basis);
+  const unitId = basis ? unitIdForLabel(basis, i.unit_label as string | null) : null;
+  const cols = basis && unitId && Number(i.quantity) > 0 ? amountColumns(basis, Number(i.quantity) * factor, unitId) : null;
+  if (cols) return { ...i, ...cols };
+  const opt = (v: unknown, d = 1) => (v == null ? null : Math.round(Number(v) * factor * 10 ** d) / 10 ** d);
+  return {
+    ...i,
+    servings: Math.round(Number(i.servings) * factor * 100) / 100 || 0.01,
+    ...scaleMacros({ calories: Number(i.calories), protein_g: Number(i.protein_g), carbs_g: Number(i.carbs_g), fat_g: Number(i.fat_g) }, factor),
+    fiber_g: opt(i.fiber_g),
+    sugar_g: opt(i.sugar_g),
+    sodium_mg: opt(i.sodium_mg),
+    grams: opt(i.grams),
+    quantity: opt(i.quantity, 3),
+    amount_label: null,
+  };
+}
 
 /**
  * Copy logged food from one day to another (MyFitnessPal's "copy from yesterday"): one meal, or the whole

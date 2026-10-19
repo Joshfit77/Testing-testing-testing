@@ -80,7 +80,7 @@ Display prices default to $9.99/month (Plus), $30/month (Pro) and $200/year (All
 
 ### Food search (USDA FoodData Central)
 
-Get a free key at https://fdc.nal.usda.gov/api-key-signup.html and set `USDA_FDC_API_KEY`. Without it, users can still log custom foods and manual entries.
+Food search works without a key: it uses the bundled USDA SR Legacy database (public domain). A free key from https://fdc.nal.usda.gov/api-key-signup.html set as `USDA_FDC_API_KEY` additionally searches branded and survey foods from the FoodData Central API.
 
 ### Barcode scanning (Open Food Facts)
 

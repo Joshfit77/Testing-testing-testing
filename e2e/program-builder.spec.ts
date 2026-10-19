@@ -7,8 +7,17 @@ test.describe("Build my program", () => {
     await completeOnboarding(page);
 
     await page.goto("/train");
+    // The library and the type picker are organized by discipline.
+    await expect(page.getByRole("heading", { name: "Strongman", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Combat Sports" })).toBeVisible();
+    await page.getByRole("link", { name: "Bodybuilding & Physique", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Bodybuilding & Physique" })).toBeVisible();
+    await expect(page.getByText("Who it's for:").first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Strongman", exact: true })).toHaveCount(0);
     await page.getByRole("link", { name: /Build my program/ }).first().click();
     await page.waitForURL(/\/train\/build/);
+    await expect(page.getByRole("heading", { name: "Strength & Powerlifting" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Combat Sports" })).toBeVisible();
 
     const next = () => page.getByRole("button", { name: /^Next/ }).click();
     await page.getByRole("button", { name: /Bench Press Only/ }).click();

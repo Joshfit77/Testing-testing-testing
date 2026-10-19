@@ -479,7 +479,7 @@ export const PROGRAMS: ProgramSeed[] = [
           { ex: "pull-up", sets: 4, reps: "6-10", rest: 120, rpe: 8 },
           { ex: "dumbbell-bench-press", sets: 3, reps: "10-12", rest: 90 },
           { ex: "seated-cable-row", sets: 3, reps: "10-12", rest: 90 },
-          { ex: "dumbbell-curl", sets: 3, reps: "10-15", rest: 60 },
+          { ex: "incline-dumbbell-curl", sets: 3, reps: "10-15", rest: 60, notes: "Lengthened position: arms hang behind you; slow lowering." },
           { ex: "face-pull", sets: 3, reps: "15-20", rest: 60 },
         ],
       },
@@ -491,7 +491,7 @@ export const PROGRAMS: ProgramSeed[] = [
           { ex: "conventional-deadlift", sets: 3, reps: "5", rest: 180, rpe: 7 },
           { ex: "bulgarian-split-squat", sets: 3, reps: "8-12 per side", rest: 90, rpe: 8 },
           { ex: "hip-thrust", sets: 3, reps: "8-12", rest: 90, rpe: 8 },
-          { ex: "leg-curl", sets: 3, reps: "10-15", rest: 60 },
+          { ex: "seated-leg-curl", sets: 3, reps: "10-15", rest: 60, notes: "Seated curls train the hamstrings at longer lengths." },
           { ex: "hanging-knee-raise", sets: 3, reps: "10-15", rest: 60 },
         ],
       },
@@ -566,8 +566,9 @@ export const PROGRAMS: ProgramSeed[] = [
     name: "Strongman Foundations",
     summary: "Build odd-object strength, carries and pressing power with gym-accessible tools.",
     description:
-      "A strongman-inspired program that uses equipment found in many gyms — sandbags, sleds, dumbbells and barbells — to develop " +
-      "full-body strength, grip and conditioning. Event days end with a medley for work capacity.",
+      "A strongman program that uses equipment found in many gyms — sandbags, sleds, dumbbells and barbells — as substitutes for the " +
+      "log, circus dumbbell, stones, yoke and truck pull. Two max-effort days (overhead and deadlift) plus an odd-object day, with carries " +
+      "and drags programmed by distance and target time. Have real implements? Build a custom strongman program for full event days.",
     category: "strongman",
     types: ["strongman", "strength"],
     difficulty: "intermediate",
@@ -577,44 +578,46 @@ export const PROGRAMS: ProgramSeed[] = [
     equipment: ["barbell", "rack", "sandbag", "sled", "dumbbell", "kettlebell"],
     tier: "plus",
     progression:
-      "Increase carry distance/time or load by 5–10% each week when all sets are completed with good posture. Pressing follows RPE " +
-      "progression. Week 6 deloads volume by ~40%.",
+      "Moving events progress by load: when every run beats the target time with good posture, add weight next week. Pressing and " +
+      "pulling follow RPE progression. Week 6 deloads volume by ~40%.",
     progressionModel: "linear_rpe",
     deloadFinalWeek: true,
     warmup: STANDARD_WARMUP,
     cooldown: STANDARD_COOLDOWN,
     days: [
       {
-        name: "Press & Carry",
-        focus: "Overhead strength and loaded carries",
+        name: "Max Effort — Overhead & Carries",
+        focus: "Log-style pressing, a circus-dumbbell substitute and farmer's carries by distance",
         minutes: 70,
         exercises: [
-          { ex: "push-press", sets: 5, reps: "3", rest: 180, rpe: 7 },
-          { ex: "overhead-press", sets: 3, reps: "6", rest: 120, rpe: 7 },
-          { ex: "farmers-carry", sets: 4, seconds: 40, rest: 120, notes: "Heavy; aim for unbroken." },
+          { ex: "push-press", sets: 5, reps: "3", rest: 180, rpe: 7, notes: "Log substitute: dip and drive, lock out hard. Swap in a log or axle if your gym has one." },
+          { ex: "one-arm-dumbbell-push-press", sets: 3, reps: "5 per arm", rest: 120, rpe: 7, notes: "Circus dumbbell substitute." },
+          { ex: "farmers-carry", sets: 4, reps: "20 m", seconds: 15, rest: 120, notes: "Farmer's: 4 × 20 m (65 ft). Add 5 lb / 2.5 kg per hand when every run is under 15 s." },
           { ex: "barbell-row", sets: 3, reps: "8", rest: 90 },
+          { ex: "face-pull", sets: 2, reps: "15", rest: 45, notes: "Shoulder health for high-frequency pressing." },
         ],
       },
       {
-        name: "Legs & Odd Objects",
-        focus: "Squat strength and sandbag work",
+        name: "Squat & Odd Objects",
+        focus: "Zercher squats, sandbag loads (stone substitute) and a bear-hug carry",
         minutes: 70,
         exercises: [
-          { ex: "front-squat", sets: 4, reps: "5", rest: 180, rpe: 7 },
-          { ex: "sandbag-to-shoulder", sets: 5, reps: "2 per side", rest: 120 },
-          { ex: "sandbag-bear-hug-carry", sets: 4, seconds: 30, rest: 90 },
+          { ex: "zercher-squat", sets: 4, reps: "5", rest: 180, rpe: 7, notes: "Builds the lap position for stones, kegs and sandbags." },
+          { ex: "sandbag-load-over-bar", sets: 5, reps: "2", rest: 120, notes: "Stone substitute: lap, re-grip, extend. Move to a heavier bag when every rep is smooth." },
+          { ex: "sandbag-to-shoulder", sets: 3, reps: "2 per side", rest: 120 },
+          { ex: "sandbag-bear-hug-carry", sets: 4, reps: "20 m", seconds: 18, rest: 90, notes: "Keg/yoke substitute: 4 × 20 m. Go heavier when every run is under 18 s." },
           { ex: "hanging-knee-raise", sets: 3, reps: "10", rest: 60 },
         ],
       },
       {
-        name: "Pull & Medley",
-        focus: "Deadlift strength and conditioning",
+        name: "Max Effort — Deadlift & Medley",
+        focus: "Heavy pulls, an above-the-knee pull, a sled drag and grip",
         minutes: 70,
         exercises: [
           { ex: "conventional-deadlift", sets: 4, reps: "3", rest: 210, rpe: 7 },
-          { ex: "kettlebell-swing", sets: 3, reps: "15", rest: 90 },
-          { ex: "sled-push", sets: 4, seconds: 25, rest: 90, notes: "Medley: sled push straight into a farmer's carry if available." },
-          { ex: "dead-hang", sets: 3, seconds: 30, rest: 60 },
+          { ex: "block-pull", sets: 3, reps: "3", rest: 180, rpe: 7, notes: "Bar just above the knee — the height of many strongman deadlift events. Straps are fine." },
+          { ex: "sled-drag", sets: 4, reps: "20 m", seconds: 20, rest: 120, notes: "Truck-pull substitute: 4 × 20 m. Add load when every run is under 20 s. Medley: drag straight into a farmer's carry if you can." },
+          { ex: "dead-hang", sets: 3, seconds: 30, rest: 60, notes: "Double-overhand grip." },
         ],
       },
     ],
@@ -706,31 +709,32 @@ export const PROGRAMS: ProgramSeed[] = [
     cooldown: STANDARD_COOLDOWN,
     days: [
       {
-        name: "Strength & Power",
-        focus: "Force production",
+        name: "S&C 1 — Max Strength + Alactic Power",
+        focus: "Rotational power, heavy pulls, upper strength, neck and short all-out sprints",
         minutes: 55,
         exercises: [
-          { ex: "medicine-ball-rotational-throw", sets: 4, reps: "4 per side", rest: 60 },
-          { ex: "trap-bar-deadlift", sets: 4, reps: "4", rest: 150, rpe: 7 },
+          { ex: "medicine-ball-rotational-throw", sets: 4, reps: "4 per side", rest: 60, notes: "Hips lead, throw hard, reset between reps." },
+          { ex: "trap-bar-deadlift", sets: 4, reps: "4", rest: 150, rpe: 7, notes: "Leave 2–3 reps in reserve — no grinding." },
           { ex: "pull-up", sets: 4, reps: "5-8", rest: 120 },
           { ex: "landmine-press", sets: 3, reps: "6 per side", rest: 90 },
-          { ex: "farmers-carry", sets: 3, seconds: 40, rest: 75 },
+          { ex: "neck-isometrics", sets: 2, seconds: 15, rest: 30, notes: "Front, back and each side. Never train through neck pain." },
+          { ex: "bike-intervals", sets: 6, seconds: 8, rest: 90, notes: "Alactic power: 8 s all-out, 90 s easy. Every rep at max speed." },
         ],
       },
       {
-        name: "Anaerobic Rounds",
-        focus: "Fight-pace intervals",
-        minutes: 45,
+        name: "S&C 2 — Fight-Pace Rounds + Glycolytic",
+        focus: "5-minute rounds, sprawls and glycolytic intervals",
+        minutes: 50,
         exercises: [
-          { ex: "heavy-bag-rounds", sets: 5, seconds: 180, rest: 60, rpe: 8, notes: "Work round: 3 min. Mix 10-second flurries every 30 seconds." },
+          { ex: "heavy-bag-rounds", sets: 3, seconds: 300, rest: 60, rpe: 8, notes: "5-minute MMA rounds with a 10-second flurry every 30 seconds." },
           { ex: "sprawl", sets: 4, seconds: 30, rest: 30 },
           { ex: "kettlebell-swing", sets: 4, seconds: 30, rest: 30 },
-          { ex: "bike-intervals", sets: 6, seconds: 20, rest: 40, rpe: 9, notes: "All-out sprints." },
+          { ex: "bike-intervals", sets: 6, seconds: 20, rest: 40, rpe: 9, notes: "Glycolytic intervals: 20 s hard, 40 s easy. Skip if you spar hard today or tomorrow." },
         ],
       },
       {
-        name: "Aerobic Base & Grappling Endurance",
-        focus: "Recovery capacity",
+        name: "S&C 3 — Aerobic Base & Grappling Endurance",
+        focus: "Zone 2 engine, mat movement, grip and neck",
         minutes: 55,
         exercises: [
           { ex: "rowing-intervals", sets: 1, seconds: 1200, rest: 60, rpe: 5, notes: "Steady pace: you can speak in full sentences." },
@@ -738,6 +742,7 @@ export const PROGRAMS: ProgramSeed[] = [
           { ex: "bear-crawl", sets: 4, seconds: 30, rest: 30 },
           { ex: "dead-hang", sets: 3, seconds: 40, rest: 60 },
           { ex: "sandbag-bear-hug-carry", sets: 3, seconds: 40, rest: 60, notes: "Substitute a heavy goblet hold walk without a sandbag." },
+          { ex: "neck-isometrics", sets: 2, seconds: 15, rest: 30, notes: "Front, back and each side." },
         ],
       },
     ],
@@ -1542,7 +1547,7 @@ export const PROGRAMS: ProgramSeed[] = [
       "A training plan for bodybuilding, classic, men's/women's physique, figure, bikini and wellness competitors. Five sessions per week " +
       "keep volume high to hold muscle while conditioning is gradually increased. The final week is a training taper. Nutrition, " +
       "water and peak-week strategy should be guided by a qualified coach or registered dietitian — this program does not prescribe " +
-      "extreme dieting or dehydration.",
+      "extreme dieting, dehydration or sodium manipulation. Every session ends with posing practice.",
     category: "show-prep",
     types: ["hypertrophy", "cardio"],
     difficulty: "advanced",
@@ -1557,7 +1562,7 @@ export const PROGRAMS: ProgramSeed[] = [
     progressionModel: "volume_wave",
     deloadFinalWeek: true,
     warmup: STANDARD_WARMUP,
-    cooldown: [...STANDARD_COOLDOWN, "5 minutes posing practice (mandatory poses for your division)"],
+    cooldown: STANDARD_COOLDOWN,
     days: [
       {
         name: "Chest & Back",
@@ -1569,6 +1574,7 @@ export const PROGRAMS: ProgramSeed[] = [
           { ex: "cable-chest-fly", sets: 3, reps: "12-15", rest: 60 },
           { ex: "seated-cable-row", sets: 3, reps: "10-12", rest: 90 },
           { ex: "bike-intervals", sets: 1, seconds: 1200, rest: 0, notes: "Low-intensity steady cardio (conversational pace)." },
+          { ex: "posing-practice", sets: 1, seconds: 600, rest: 0, notes: "Mandatory poses, quarter turns and transitions for your division; hold each pose 10–20 s. Practise daily in the final weeks." },
         ],
       },
       {
@@ -1581,6 +1587,7 @@ export const PROGRAMS: ProgramSeed[] = [
           { ex: "walking-lunge", sets: 3, reps: "12 per side", rest: 90 },
           { ex: "leg-extension", sets: 3, reps: "15", rest: 60 },
           { ex: "standing-calf-raise", sets: 4, reps: "12-15", rest: 45 },
+          { ex: "posing-practice", sets: 1, seconds: 600, rest: 0, notes: "Mandatory poses, quarter turns and transitions for your division; hold each pose 10–20 s. Practise daily in the final weeks." },
         ],
       },
       {
@@ -1594,6 +1601,7 @@ export const PROGRAMS: ProgramSeed[] = [
           { ex: "dumbbell-curl", sets: 3, reps: "10-12", rest: 60 },
           { ex: "overhead-triceps-extension", sets: 3, reps: "10-12", rest: 60 },
           { ex: "brisk-walk", sets: 1, seconds: 1200, rest: 0, notes: "Incline walk at a conversational pace." },
+          { ex: "posing-practice", sets: 1, seconds: 600, rest: 0, notes: "Mandatory poses, quarter turns and transitions for your division; hold each pose 10–20 s. Practise daily in the final weeks." },
         ],
       },
       {
@@ -1606,6 +1614,7 @@ export const PROGRAMS: ProgramSeed[] = [
           { ex: "leg-curl", sets: 4, reps: "12-15", rest: 60 },
           { ex: "bulgarian-split-squat", sets: 3, reps: "10 per side", rest: 75 },
           { ex: "hanging-knee-raise", sets: 3, reps: "12-15", rest: 45 },
+          { ex: "posing-practice", sets: 1, seconds: 600, rest: 0, notes: "Mandatory poses, quarter turns and transitions for your division; hold each pose 10–20 s. Practise daily in the final weeks." },
         ],
       },
       {
@@ -1618,6 +1627,7 @@ export const PROGRAMS: ProgramSeed[] = [
           { ex: "lateral-raise", sets: 3, reps: "20", rest: 45 },
           { ex: "triceps-pushdown", sets: 3, reps: "15", rest: 45 },
           { ex: "bike-intervals", sets: 8, seconds: 30, rest: 90, notes: "Hard 30 s / easy 90 s." },
+          { ex: "posing-practice", sets: 1, seconds: 600, rest: 0, notes: "Mandatory poses, quarter turns and transitions for your division; hold each pose 10–20 s. Practise daily in the final weeks." },
         ],
       },
     ],

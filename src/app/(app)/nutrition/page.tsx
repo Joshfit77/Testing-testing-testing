@@ -13,7 +13,6 @@ import {
   WaterCard,
   type MyFood,
 } from "@/components/nutrition/nutrition-client";
-import { Badge } from "@/components/ui/badge";
 import { ActionButton } from "@/components/common/action-button";
 import { Button } from "@/components/ui/button";
 import { ProgressBar } from "@/components/ui/progress-bar";
@@ -32,6 +31,10 @@ import { exerciseCalories, projectWeightKg, remainingCalories, weeksToGoal } fro
 import { formatLongDate, goalDate, paceLabel, recentAndFrequent, weeklySummary, weightGoalProgress, workoutMinutes, type DiaryItem } from "@/lib/domain/diary";
 import { formatWeight } from "@/lib/domain/units";
 import { COMMON_FOODS } from "@/data/foods";
+import { EditableMealItem, type EditableItem } from "@/components/nutrition/food-amount";
+import { basisFromLegacyItem, defaultUnit, sanitizeBasis, unitIdForLabel } from "@/lib/domain/food-basis";
+import { nutrientTotals } from "@/lib/domain/nutrition";
+import { usdaCategories } from "@/server/services/usda-local";
 import { DIETS, fitsDiet, isDietType } from "@/lib/domain/diets";
 import { MEAL_TYPES } from "@/lib/domain/meals";
 
@@ -42,7 +45,63 @@ interface MealRow {
   meal_type: string;
   status: "logged" | "planned";
   name: string | null;
-  meal_items: { id: string; name: string; servings: number; calories: number; protein_g: number; carbs_g: number; fat_g: number; is_estimate: boolean }[];
+  meal_items: {
+    id: string;
+    name: string;
+    servings: number;
+    calories: number;
+    protein_g: number;
+    carbs_g: number;
+    fat_g: number;
+    is_estimate: boolean;
+    fiber_g: number | null;
+    sugar_g: number | null;
+    sodium_mg: number | null;
+    grams: number | null;
+    quantity: number | null;
+    unit_label: string | null;
+    amount_label: string | null;
+    source: string | null;
+    basis: unknown;
+  }[];
+}
+
+function fmt(n: number) {
+  return Math.round(n * 10) / 10;
+}
+
+/** Diary row data for the edit dialog: the stored basis (or one rebuilt from an older entry). */
+function editableItem(i: MealRow["meal_items"][number], mealType: string): EditableItem {
+  const stored = sanitizeBasis(i.basis);
+  const basis = stored ?? basisFromLegacyItem(i);
+  const savedUnit = stored ? unitIdForLabel(stored, i.unit_label) : null;
+  let unitId = "serving";
+  let quantity = Number(i.servings);
+  if (stored && savedUnit && Number(i.quantity) > 0) {
+    unitId = savedUnit;
+    quantity = Number(i.quantity);
+  } else if (stored && !stored.servingOnly && Number(i.grams) > 0) {
+    unitId = stored.liquid ? "ml" : "g";
+    quantity = Number(i.grams);
+  } else if (stored) {
+    ({ unitId, quantity } = defaultUnit(stored));
+  }
+  const amount = i.amount_label ?? (Number(i.servings) !== 1 ? `${Number(i.servings)} ×` : null);
+  return {
+    id: i.id,
+    name: i.name,
+    mealType,
+    basis,
+    quantity,
+    unitId,
+    isEstimate: i.is_estimate,
+    note: stored
+      ? null
+      : i.source === "custom"
+        ? "Entered by hand, so it scales by servings of the values you entered."
+        : "Logged before amounts were saved, so it scales by servings of what you logged.",
+    summary: `${amount ? `${amount} · ` : ""}${Math.round(Number(i.calories))} kcal · P ${fmt(Number(i.protein_g))} · C ${fmt(Number(i.carbs_g))} · F ${fmt(Number(i.fat_g))}`,
+  };
 }
 
 export default async function NutritionPage({ searchParams }: { searchParams: Promise<{ date?: string }> }) {
@@ -80,10 +139,10 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
   const date = sp.date && /^\d{4}-\d{2}-\d{2}$/.test(sp.date) ? sp.date : today;
   const supabase = await getServerSupabase();
   const prevDate = addDays(date, -1);
-  const [mealsRes, goalsRes, waterRes, foodsRes, templatesRes, plannedRes, history, flag, commonRes, dietRes, prevRes, recentRes, workoutsRes, ctx] = await Promise.all([
+  const [mealsRes, goalsRes, waterRes, foodsRes, templatesRes, plannedRes, history, flag, commonRes, dietRes, prevRes, recentRes, workoutsRes, ctx, categories] = await Promise.all([
     supabase
       .from("meals")
-      .select("id, meal_type, status, name, meal_items(id, name, servings, calories, protein_g, carbs_g, fat_g, is_estimate)")
+      .select("id, meal_type, status, name, meal_items(id, name, servings, calories, protein_g, carbs_g, fat_g, is_estimate, fiber_g, sugar_g, sodium_mg, grams, quantity, unit_label, amount_label, source, basis)")
       .eq("user_id", user.id)
       .eq("eaten_on", date)
       .eq("is_template", false)
@@ -123,6 +182,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
       .gte("started_at", `${addDays(date, -1)}T00:00:00Z`)
       .lt("started_at", `${addDays(date, 2)}T00:00:00Z`),
     loadBudgetContext(supabase, user.id),
+    usdaCategories(),
   ]);
 
   const meals = (mealsRes.data ?? []) as unknown as MealRow[];
@@ -130,6 +190,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
   const planned = meals.filter((m) => m.status === "planned");
   const totals = sumMacros(logged.flatMap((m) => m.meal_items.map((i) => ({ ...i, calories: Number(i.calories), protein_g: Number(i.protein_g), carbs_g: Number(i.carbs_g), fat_g: Number(i.fat_g) }))));
   const anyEstimate = logged.some((m) => m.meal_items.some((i) => i.is_estimate));
+  const nutrients = nutrientTotals(logged.flatMap((m) => m.meal_items));
   const goals = goalsRes.data as { calories: number; protein_g: number; carbs_g: number; fat_g: number; water_ml: number; is_estimate: boolean } | null;
   const water = (waterRes.data ?? []).reduce((s, w) => s + (w.amount_ml as number), 0);
   const myFoods = (foodsRes.data ?? []) as MyFood[];
@@ -142,7 +203,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
   const templates = (templatesRes.data ?? []) as unknown as { id: string; name: string; yield_servings: number; meal_items: { calories: number; protein_g: number }[] }[];
   const upcoming = (plannedRes.data ?? []) as unknown as { id: string; eaten_on: string; meal_type: string; meal_items: { name: string }[] }[];
   const label = date === today ? "Today" : new Date(`${date}T00:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" });
-  const searchEnabled = isFoodSearchConfigured() && flag;
+  const remoteSearch = isFoodSearchConfigured() && flag;
   const units = profile.unit_system;
 
   // Previous day's logged meals, for "copy from yesterday".
@@ -178,7 +239,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Food log" title="Food" description="Track what you eat. Search common foods, save your own, or enter anything by hand." actions={<AddFoodDialog date={date} myFoods={myFoods} commonFoods={commonFoods} searchEnabled={searchEnabled} dietName={diet.name} recent={recent} frequent={frequent} />} />
+      <PageHeader eyebrow="Food log" title="Food" description="Track what you eat. Search common foods, save your own, or enter anything by hand." actions={<AddFoodDialog date={date} myFoods={myFoods} commonFoods={commonFoods} remoteSearch={remoteSearch} categories={categories} dietName={diet.name} recent={recent} frequent={frequent} />} />
       <nav className="flex items-center justify-between rounded-2xl border border-border bg-card p-2" aria-label="Choose day">
         <Button asChild variant="ghost" size="icon" aria-label="Previous day">
           <Link href={`/nutrition?date=${addDays(date, -1)}`}>
@@ -289,6 +350,32 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
               ))}
             </div>
           </div>
+          <div className="mt-4 border-t border-border pt-3" data-testid="nutrient-totals">
+            <h3 className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Nutrients</h3>
+            {!(nutrients.fiber.count || nutrients.sugar.count || nutrients.sodium.count) ? (
+              <p className="mt-1 text-xs text-muted-foreground">Fiber, sugar and sodium appear here for foods logged from the food database or a barcode.</p>
+            ) : (
+              <dl className="mt-2 grid grid-cols-3 gap-2 text-center">
+                {(
+                  [
+                    ["Fiber", nutrients.fiber, "g", "nutrient-fiber"],
+                    ["Sugar", nutrients.sugar, "g", "nutrient-sugar"],
+                    ["Sodium", nutrients.sodium, "mg", "nutrient-sodium"],
+                  ] as const
+                ).map(([l, t, u, id]) => (
+                  <div key={l} className="rounded-xl border border-border bg-card/60 p-2">
+                    <dt className="text-[11px] text-muted-foreground">{l}</dt>
+                    <dd className="font-semibold tabular-nums" data-testid={id}>
+                      {t.count ? `${u === "mg" ? Math.round(t.total) : Math.round(t.total * 10) / 10} ${u}` : "—"}
+                    </dd>
+                    <dd className="text-[10px] text-muted-foreground">
+                      {t.count === nutrients.items ? "all foods" : `from ${t.count} of ${nutrients.items} foods with data`}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+          </div>
           {anyEstimate && <p className="mt-4 text-xs text-gold">Includes estimated entries (marked “estimate”).</p>}
           {goals ? (
             goals.calories - totals.calories > 0 && (
@@ -336,16 +423,8 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
               {items.length > 0 && (
                 <ul className="divide-y divide-border">
                   {items.map((i) => (
-                    <li key={i.id} className="flex items-center justify-between gap-3 py-2">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold">
-                          {i.name} {i.is_estimate && <Badge variant="outline">estimate</Badge>}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {Number(i.servings) !== 1 && `${Number(i.servings)} × · `}
-                          {Math.round(Number(i.calories))} kcal · P {Number(i.protein_g)} · C {Number(i.carbs_g)} · F {Number(i.fat_g)}
-                        </p>
-                      </div>
+                    <li key={i.id} className="flex items-center justify-between gap-3 py-1">
+                      <EditableMealItem item={editableItem(i, type)} />
                       <ActionButton action={deleteMealItemAction} fields={{ id: i.id }} size="icon-sm" variant="ghost" aria-label={`Remove ${i.name}`}>
                         <Trash2 aria-hidden />
                       </ActionButton>

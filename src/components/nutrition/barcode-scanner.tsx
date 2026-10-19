@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { barcodeInputError, barcodeLookupCandidates, cleanBarcodeInput, type RetailBarcodeFormat } from "@/lib/barcode";
-import { hapticSuccess, isNativeApp } from "@/lib/native";
-import { nutritionForAmount, OFF_ATTRIBUTION, type BarcodeLookup, type BarcodeProduct, type NutritionValues } from "@/lib/open-food-facts";
+import type { FoodChoice } from "@/lib/domain/food-basis";
+import { hapticSuccess, isNativeApp, nativeBarcodeScannerAvailable, scanBarcodeNative } from "@/lib/native";
+import { basisFromOffProduct, OFF_ATTRIBUTION, type BarcodeLookup, type BarcodeProduct } from "@/lib/open-food-facts";
 
 type CameraState =
   | { kind: "idle" }
@@ -27,14 +28,6 @@ interface ScanControls {
   switchTorch?: (on: boolean) => Promise<void>;
 }
 
-export interface BarcodeLogItem {
-  source: "barcode";
-  code: string;
-  format?: RetailBarcodeFormat;
-  unit: "serving" | "g";
-  quantity: number;
-}
-
 function cameraErrorMessage(err: unknown): string {
   const name = (err as { name?: string } | null)?.name ?? "";
   if (name === "NotAllowedError" || name === "SecurityError" || name === "PermissionDeniedError") {
@@ -50,22 +43,27 @@ function cameraErrorMessage(err: unknown): string {
 
 const FORMAT_MAP: Record<string, RetailBarcodeFormat> = { EAN_13: "ean13", UPC_A: "upca", UPC_E: "upce", EAN_8: "ean8" };
 
-function Values({ v, label }: { v: NutritionValues; label: string }) {
-  return (
-    <p className="text-xs text-muted-foreground">
-      <span className="font-semibold text-foreground">{label}:</span> {v.calories} kcal · P {v.protein_g}g · C {v.carbs_g}g · F {v.fat_g}g
-      {v.fiber_g != null ? ` · fiber ${v.fiber_g}g` : ""}
-    </p>
-  );
+/** The amount-step choice for a found product: label serving first, then g/oz (or ml/fl oz). */
+export function offChoice(product: BarcodeProduct, format?: RetailBarcodeFormat): FoodChoice {
+  const missing = product.missing.length ? ` Not listed on this product: ${product.missing.join(", ")} (counted as 0).` : "";
+  return {
+    key: `off:${product.code}`,
+    kind: "off",
+    ref: product.code,
+    format,
+    name: product.name,
+    detail: [product.brand, product.quantity, `barcode ${product.code}`].filter(Boolean).join(" · "),
+    basis: basisFromOffProduct(product),
+    note: `${OFF_ATTRIBUTION}.${missing}`,
+  };
 }
 
 export function BarcodeScanner({
-  pending,
-  onLog,
+  onFound,
   onEnterManually,
 }: {
-  pending: boolean;
-  onLog: (item: BarcodeLogItem) => void;
+  /** A product with nutrition was found: open the amount step for it. */
+  onFound: (choice: FoodChoice) => void;
   /** Switch to manual entry, optionally prefilling the food name. */
   onEnterManually: (name?: string) => void;
 }) {
@@ -78,8 +76,14 @@ export function BarcodeScanner({
   const [showTyped, setShowTyped] = useState(false);
   const [typed, setTyped] = useState("");
   const [typedError, setTypedError] = useState<string | null>(null);
-  const [unit, setUnit] = useState<"serving" | "g">("serving");
-  const [quantity, setQuantity] = useState("1");
+  const [native, setNative] = useState(false);
+  const [nativeMessage, setNativeMessage] = useState<string | null>(null);
+  const [nativeBusy, setNativeBusy] = useState(false);
+
+  // In the iPhone / Android app, use the system barcode scanner when the plugin is installed.
+  useEffect(() => {
+    setNative(isNativeApp() && nativeBarcodeScannerAvailable());
+  }, []);
 
   const stopCamera = useCallback(() => {
     sessionRef.current += 1; // invalidates any start that's still in flight
@@ -116,15 +120,39 @@ export function BarcodeScanner({
         return;
       }
       const result = json as BarcodeLookup;
-      if (result.status === "found") {
-        setUnit(result.product.perServing ? "serving" : "g");
-        setQuantity(result.product.perServing ? "1" : "100");
-      }
       setLookup({ kind: "done", code, format, result });
+      if (result.status === "found") onFound(offChoice(result.product, format));
     } catch {
-      setLookup({ kind: "error", code, message: "Lookup failed. Check your connection and try again." });
+      setLookup({
+        kind: "error",
+        code,
+        message: typeof navigator !== "undefined" && navigator.onLine === false ? "You're offline. Connect to the internet to look up products." : "Lookup failed. Check your connection and try again.",
+      });
     }
-  }, []);
+  }, [onFound]);
+
+  const startNative = async () => {
+    setNativeMessage(null);
+    setLookup({ kind: "none" });
+    setNativeBusy(true);
+    const res = await scanBarcodeNative();
+    setNativeBusy(false);
+    if (res.kind === "scanned") {
+      const err = barcodeInputError(res.code);
+      if (err) {
+        setNativeMessage(`That code (${res.code}) isn't a food product barcode (EAN or UPC). Try again or type the numbers.`);
+        return;
+      }
+      void hapticSuccess();
+      void runLookup(cleanBarcodeInput(res.code));
+    } else if (res.kind === "cancelled") {
+      setNativeMessage("Scan cancelled.");
+    } else if (res.kind === "denied") {
+      setNativeMessage("Camera access is turned off for Narrow Gate. Allow it in your phone's Settings for this app, then try again.");
+    } else {
+      setNativeMessage("The scanner couldn't start. Try again or type the barcode.");
+    }
+  };
 
   const startCamera = useCallback(async () => {
     setLookup({ kind: "none" });
@@ -217,8 +245,6 @@ export function BarcodeScanner({
 
   const active = camera.kind === "starting" || camera.kind === "scanning";
   const product: BarcodeProduct | null = lookup.kind === "done" && lookup.result.status === "found" ? lookup.result.product : null;
-  const qty = Number(quantity);
-  const preview = product && qty > 0 ? nutritionForAmount(product, unit === "g" ? { grams: qty } : { servings: qty }) : null;
 
   return (
     <div className="space-y-3">
@@ -268,11 +294,25 @@ export function BarcodeScanner({
         <div className="rounded-2xl border border-dashed border-border p-5 text-center">
           <ScanBarcode className="mx-auto size-10 text-gold" aria-hidden />
           <p className="mt-2 text-sm font-semibold">Scan a packaged food</p>
-          <p className="mx-auto mt-1 max-w-xs text-xs text-muted-foreground">Point your camera at the barcode (EAN or UPC). Nutrition comes from Open Food Facts, a community database.</p>
-          <Button type="button" className="mt-4" onClick={() => void startCamera()}>
-            <Camera aria-hidden /> Start camera
-          </Button>
+          <p className="mx-auto mt-1 max-w-xs text-xs text-muted-foreground">
+            Point your camera at the barcode (EAN or UPC). Serving sizes and nutrition come from Open Food Facts, a community database.
+          </p>
+          {native ? (
+            <Button type="button" className="mt-4" disabled={nativeBusy} onClick={() => void startNative()}>
+              {nativeBusy ? <Loader2 className="animate-spin" aria-hidden /> : <ScanBarcode aria-hidden />} Scan barcode
+            </Button>
+          ) : (
+            <Button type="button" className="mt-4" onClick={() => void startCamera()}>
+              <Camera aria-hidden /> Start camera
+            </Button>
+          )}
         </div>
+      )}
+
+      {nativeMessage && (
+        <p role="status" className="rounded-xl border border-border bg-elevated/50 p-3 text-sm text-muted-foreground">
+          {nativeMessage}
+        </p>
       )}
 
       {camera.kind === "error" && (
@@ -339,53 +379,17 @@ export function BarcodeScanner({
 
       {product && lookup.kind === "done" && (
         <div className="space-y-2 rounded-xl border border-border bg-elevated/50 p-3">
-          <div>
-            <p className="text-sm font-semibold">{product.name}</p>
-            <p className="text-xs text-muted-foreground">
-              {[product.brand, product.quantity].filter(Boolean).join(" · ")}
-              {product.servingLabel ? `${product.brand || product.quantity ? " · " : ""}serving ${product.servingLabel}` : ""}
-            </p>
-          </div>
-          {product.per100 && <Values v={product.per100} label={`Per 100 ${product.unit}`} />}
-          {product.perServing && <Values v={product.perServing} label={`Per serving${product.servingQuantity ? ` (${product.servingQuantity} ${product.unit})` : ""}`} />}
-          {product.missing.length > 0 && <p className="text-xs text-gold">Not listed: {product.missing.join(", ")} (counted as 0).</p>}
-          <p className="text-[11px] text-gold">{OFF_ATTRIBUTION}</p>
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="space-y-1">
-              <Label htmlFor="bc-qty" className="text-xs">
-                Amount
-              </Label>
-              <Input id="bc-qty" type="number" inputMode="decimal" min="0" step={unit === "g" ? "1" : "0.25"} value={quantity} onChange={(e) => setQuantity(e.target.value)} className="h-10 w-24" />
-            </div>
-            <div className="flex h-10 overflow-hidden rounded-xl border border-border text-sm" role="group" aria-label="Unit">
-              {product.perServing && (
-                <button type="button" aria-pressed={unit === "serving"} onClick={() => { setUnit("serving"); setQuantity("1"); }} className={`px-3 ${unit === "serving" ? "bg-gold/15 text-gold-highlight" : "text-muted-foreground"}`}>
-                  servings
-                </button>
-              )}
-              {product.per100 && (
-                <button type="button" aria-pressed={unit === "g"} onClick={() => { setUnit("g"); setQuantity(product.servingQuantity ? String(product.servingQuantity) : "100"); }} className={`px-3 ${unit === "g" ? "bg-gold/15 text-gold-highlight" : "text-muted-foreground"}`}>
-                  {product.unit}
-                </button>
-              )}
-            </div>
-            <Button
-              type="button"
-              className="ml-auto"
-              disabled={pending || !(qty > 0) || !preview}
-              onClick={() => onLog({ source: "barcode", code: lookup.code, format: lookup.format, unit, quantity: qty })}
-            >
-              {pending && <Loader2 className="animate-spin" aria-hidden />} Add
+          <p className="text-sm">
+            Found <span className="font-semibold">{product.name}</span>.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" onClick={() => onFound(offChoice(product, lookup.format))}>
+              Choose amount
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={reset}>
+              Scan another
             </Button>
           </div>
-          {preview && (
-            <p className="text-xs text-muted-foreground" aria-live="polite">
-              ≈ {preview.calories} kcal · P {preview.protein_g}g · C {preview.carbs_g}g · F {preview.fat_g}g
-            </p>
-          )}
-          <Button type="button" size="sm" variant="ghost" onClick={reset}>
-            Scan another
-          </Button>
         </div>
       )}
 

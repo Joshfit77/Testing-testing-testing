@@ -233,23 +233,36 @@ describe("custom program builder", () => {
     const meet = buildCustomProgram(input("powerlifting", { goal: "meet_prep", weeks: 12, maxesKg: { squat: 150, bench: 100, deadlift: 200 } }), catalog);
     expect(meet.weekTemplates!.at(-2)!.focus).toMatch(/^Peak/);
     expect(meet.weekTemplates!.at(-1)!.focus).toMatch(/Meet week/);
-    const testSquat = meet.weekTemplates!.at(-1)!.days[0]!.exercises[0]!;
-    expect(testSquat.reps).toBe("1");
-    expect(testSquat.notes).toMatch(/Attempts/);
+    // Meet week: opener practice first, meet day (all three lifts, three attempts each) last.
+    const meetWeek = meet.weekTemplates!.at(-1)!;
+    expect(meetWeek.days[0]!.name).toMatch(/Opener Practice/);
+    const meetDay = meetWeek.days.at(-1)!;
+    expect(meetDay.name).toBe("Meet Day — Squat, Bench, Deadlift");
+    expect(meetDay.exercises.map((e) => e.ex)).toEqual(["back-squat", "bench-press", "conventional-deadlift"]);
+    for (const e of meetDay.exercises) {
+      expect(e.reps).toBe("1");
+      expect(e.sets).toBe(3);
+      expect(e.notes).toMatch(/Attempts: opener/);
+    }
     expect(meet.deloadFinalWeek).toBe(false);
+    // Non-meet peaking goals still test each lift on its own day.
+    const test1rm = buildCustomProgram(input("squat", { goal: "increase_1rm", weeks: 8, maxesKg: { squat: 150 } }), catalog);
+    expect(test1rm.weekTemplates!.at(-1)!.days[0]!.exercises[0]!.notes).toMatch(/Max test/);
   });
 
   it("tapers MMA fight camps and show prep, with the coach note for show prep", () => {
     const fight = buildCustomProgram(input("mma", { goal: "fight_camp", weeks: 8 }), catalog);
     expect(fight.weekTemplates!.at(-1)!.focus).toMatch(/Fight week taper/);
-    const bagRounds = (w: number) => fight.weekTemplates![w]!.days[1]!.exercises.find((e) => e.ex === "heavy-bag-rounds")!;
-    expect(bagRounds(fight.weeks - 1).sets).toBeLessThan(bagRounds(fight.weeks - 2).sets);
+    const roundSeconds = (w: number) =>
+      fight.weekTemplates![w]!.days.flatMap((d) => d.exercises).filter((e) => e.ex === "heavy-bag-rounds").reduce((s, e) => s + e.sets * (e.seconds ?? 0), 0);
+    expect(roundSeconds(fight.weeks - 1)).toBeGreaterThan(0);
+    expect(roundSeconds(fight.weeks - 1)).toBeLessThan(roundSeconds(fight.weeks - 2));
 
     const show = buildCustomProgram(input("show_prep", { weeks: 16, division: "bikini" }), catalog);
     expect(show.description).toMatch(/qualified coach/);
     expect(show.description).not.toMatch(/dehydrat(e|ion) (to|for)/i);
     expect(show.weekTemplates!.at(-1)!.focus).toMatch(/Show week taper/);
-    expect(show.weekTemplates!.some((w) => w.days.some((d) => d.cooldown?.some((c) => c.includes("Posing practice"))))).toBe(true);
+    for (const w of show.weekTemplates!) for (const d of w.days) expect(d.exercises.some((e) => e.ex === "posing-practice"), d.name).toBe(true);
     const cardioMins = (w: number) =>
       show.weekTemplates![w]!.days.flatMap((d) => d.exercises).filter((e) => e.ex === "brisk-walk" || e.ex === "bike-intervals").reduce((s, e) => s + (e.seconds ?? 0), 0);
     expect(cardioMins(12)).toBeGreaterThan(cardioMins(0));
