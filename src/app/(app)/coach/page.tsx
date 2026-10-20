@@ -10,6 +10,8 @@ import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { isAiConfigured, isServiceRoleConfigured } from "@/server/env";
 import { isFlagEnabled } from "@/server/flags";
 import { getAiUsage } from "@/server/services/ai-coach";
+import { suggestedQuestions } from "@/lib/coach/context";
+import { loadAthleteSnapshot } from "@/server/coach/snapshot";
 
 export const metadata = { title: "AI Coach" };
 
@@ -38,12 +40,22 @@ export default async function CoachPage({ searchParams }: { searchParams: Promis
   else if (!entitled) disabledReason = "AI coaching is included with Plus and Pro.";
   else if (usage.chatUsed >= usage.chatLimit) disabledReason = `You've used all ${usage.chatLimit} AI messages for this month. Your allowance resets on the 1st.`;
 
+  // Starter questions from the user's own data (only for a new chat the user can actually send).
+  let suggestions: string[] | undefined;
+  if (!selected && !disabledReason) {
+    try {
+      suggestions = suggestedQuestions(await loadAthleteSnapshot(supabase, user.id));
+    } catch {
+      suggestions = undefined;
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="AI Coach"
         title="Your AI coach"
-        description="Personalized answers from your goals, equipment and training history."
+        description="Personalized coaching from your goals, program, workouts, food log and bodyweight."
         actions={
           <>
             {!entitled && (
@@ -59,6 +71,24 @@ export default async function CoachPage({ searchParams }: { searchParams: Promis
           </>
         }
       />
+      {conversations.length > 0 && (
+        <details className="rounded-2xl border border-border bg-card p-3 lg:hidden">
+          <summary className="cursor-pointer text-sm font-semibold">History ({conversations.length})</summary>
+          <ul className="mt-2 space-y-1">
+            {conversations.map((c) => (
+              <li key={c.id as string}>
+                <Link
+                  href={`/coach?c=${c.id}`}
+                  aria-current={c.id === selected ? "page" : undefined}
+                  className={cn("block truncate rounded-xl px-3 py-2 text-sm", c.id === selected ? "bg-gold/10 text-gold-highlight" : "text-muted-foreground hover:bg-elevated hover:text-foreground")}
+                >
+                  {c.title as string}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
       <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
         <nav aria-label="Conversations" className="hidden lg:block">
           <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">History</p>
@@ -89,6 +119,7 @@ export default async function CoachPage({ searchParams }: { searchParams: Promis
           disabledReason={disabledReason}
           canGeneratePlans={hasFeature(plan, "ai_plan_generation")}
           usage={{ used: usage.chatUsed, limit: usage.chatLimit }}
+          suggestions={suggestions}
           exerciseNames={Object.fromEntries((exRes.data ?? []).map((e) => [e.slug as string, e.name as string]))}
         />
       </div>

@@ -30,7 +30,7 @@ describe("program library", () => {
   it("defines at least 8 complete programs across all required categories", () => {
     expect(PROGRAMS.length).toBeGreaterThanOrEqual(8);
     const categories = new Set(PROGRAM_CATEGORIES.map((c) => c.slug));
-    expect(categories.size).toBe(23);
+    expect(categories.size).toBe(24);
     for (const c of categories) expect(PROGRAMS.some((p) => p.category === c), c).toBe(true);
   });
   it("references only real exercises with complete prescriptions", () => {
@@ -54,15 +54,26 @@ describe("program library", () => {
     expect(PROGRAMS.filter((p) => p.tier !== "free").length).toBeGreaterThanOrEqual(5);
   });
   it("expands weeks with a final deload when configured", () => {
-    const p = PROGRAMS.find((x) => x.slug === "barbell-strength-foundations")!;
+    const p = PROGRAMS.find((x) => x.slug === "bench-press-specialist")!;
     const weeks = expandProgram(p);
     expect(weeks).toHaveLength(p.weeks);
     expect(weeks.at(-1)!.isDeload).toBe(true);
-    const firstSquat = weeks[0]!.days[0]!.exercises[0]!;
-    const laterSquat = weeks[3]!.days[0]!.exercises[0]!;
-    expect(laterSquat.rpe!).toBeGreaterThan(firstSquat.rpe!);
-    const deloadSquat = weeks.at(-1)!.days[0]!.exercises[0]!;
-    expect(deloadSquat.sets).toBeLessThan(firstSquat.sets);
+    const firstBench = weeks[0]!.days[0]!.exercises[0]!;
+    const laterBench = weeks[3]!.days[0]!.exercises[0]!;
+    expect(laterBench.rpe!).toBeGreaterThan(firstBench.rpe!);
+    // Multi-set work never climbs past RPE 9.
+    for (const w of weeks) for (const d of w.days) for (const e of d.exercises) if (e.rpe && e.sets > 1) expect(e.rpe, `${w.weekNumber} ${e.ex}`).toBeLessThanOrEqual(9);
+    const deloadBench = weeks.at(-1)!.days[0]!.exercises[0]!;
+    expect(deloadBench.sets).toBeLessThan(firstBench.sets);
+    // Deload days state a shorter session.
+    expect(weeks.at(-1)!.days[0]!.minutes).toBeLessThan(weeks[0]!.days[0]!.minutes);
+  });
+  it("alternates the novice A/B workouts week to week and adds weight every session", () => {
+    const weeks = expandProgram(PROGRAMS.find((x) => x.slug === "barbell-strength-foundations")!);
+    expect(weeks[0]!.days.map((d) => d.name)).toEqual(["Workout A", "Workout B", "Workout A"]);
+    expect(weeks[1]!.days.map((d) => d.name)).toEqual(["Workout B", "Workout A", "Workout B"]);
+    for (const w of weeks) for (const d of w.days) expect(d.exercises[0]).toMatchObject({ ex: "back-squat", sets: 3, reps: "5" });
+    expect(weeks[0]!.days[0]!.exercises[0]!.intensity).toMatch(/every session/);
   });
 });
 

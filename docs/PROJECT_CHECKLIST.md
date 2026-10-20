@@ -1,0 +1,578 @@
+# Narrow Gate Fitness: project checklist
+
+Last audited: 2026-10-20, against `docs/SPEC.md` (sections 1–16) and `docs/design/reference-five-screens.png`.
+
+Update the statuses at the end of each stage (SPEC §16). A row moves to Working only when code and a test or a recorded manual check support it.
+
+**Scope.** The rows track the primary product: Next.js 15 App Router, Supabase (auth, RLS, `supabase/migrations`), Stripe, the server-side Anthropic coach, and the Capacitor iOS/Android shells that load the deployed site. The offline single-file edition (`standalone/index.html`, generated from a template outside the repo, localStorage only, no accounts) is covered by an **Offline** note under each section.
+
+**How statuses were set.** Each status comes from reading the code, migrations and tests at the audit date. Tests were not re-run during this audit because other agents were editing the tree at the time. Uncommitted work in progress counts as present but is flagged "(uncommitted)". That covers `src/lib/domain/session-time.ts`, `src/lib/domain/program-audit.ts`, `src/lib/exercise-motion/`, `src/lib/coach/`, `src/server/coach/` and the edits to the program templates.
+
+**Statuses:** Working · Partial · Missing · Requires External Setup · Requires Content Review.
+**Stages (SPEC §16):** 1 = storage, accounts, navigation, core logging · 2 = training, nutrition and faith flows · 3 = running, progress, body map, ranks, badges · 4 = coaching, wearables, accountability, content.
+
+---
+
+## 1. Visual design
+
+Offline: the same black and gold tokens, with the same oversized uppercase headings. There is no text-size setting.
+
+| ID | Requirement | Status | Evidence | Stage |
+|---|---|---|---|---|
+| 1.1 | Match the reference: compact layout, imagery, cards, spacing | Partial | The dark/gold shell exists (`src/components/shell/app-shell.tsx`), but there are no photo or image cards. Home is a large hero plus stat tiles, which doesn't match the reference's compact cards. | 1 |
+| 1.2 | Black backgrounds | Working | `--background: #090909` in `src/app/globals.css` | 1 |
+| 1.3 | Charcoal cards | Working | `--card: #171717`, `--elevated: #232323` | 1 |
+| 1.4 | White text | Working | `--foreground: #ffffff` | 1 |
+| 1.5 | Metallic gold accents | Working | `--gold #c9a54c`, plus the `.bg-gold-gradient` and `.text-gold-gradient` utilities | 1 |
+| 1.6 | Bronze shadows | Partial | No bronze token. `--gold-muted #8c7139` appears only at the end of the gradient. Bronze `#a8723f` is used only in `badge-icon.tsx`. | 1 |
+| 1.7 | Champagne highlights | Partial | `--gold-highlight #e6c76e` is a warm gold. There is no champagne token. | 1 |
+| 1.8 | Not bright yellow | Working | The palette is muted gold | 1 |
+| 1.9 | Body text about 16px | Working | Tailwind's default 16px base | 1 |
+| 1.10 | Secondary text about 14px | Partial | `text-sm` (14px) is common, but there are many 10–11px labels: `text-[10px]`, `text-[11px]`, and 10.5px in the bottom nav | 1 |
+| 1.11 | Headings 24–28px | Partial | `PageHeader` h1 is `text-3xl md:text-4xl` (30/36px). The Home hero h1 is `text-4xl md:text-5xl` (36/48px). The stat numbers are 36px. | 1 |
+| 1.12 | Controls 44–48px tall | Partial | Button `default` is h-11 (44px), but the `sm`/`icon-sm` variants are 36px and are used for the rest-timer and food-form controls (`src/components/ui/button.tsx`) | 1 |
+| 1.13 | Readable and balanced for ages 18–60 | Partial | The uppercase condensed display font (Oswald) and the small labels hurt readability | 1 |
+| 1.14 | Supports system text scaling | Partial | Most sizes are rem, but arbitrary px sizes don't scale. WebView text zoom is untested. | 1 |
+| 1.15 | Supports screen readers | Partial | Skip link, aria-labels, `aria-current` and `sr-only` are in place. There is no automated a11y audit (no axe tests). | 1 |
+| 1.16 | Default interface not oversized | Partial | The headings are oversized (see 1.11) | 1 |
+| 1.17 | Text-size preference in Settings | Missing | No setting found in `src/app/(app)/profile` | 1 |
+| 1.18 | Consistent icons, typography, radii, spacing and buttons | Partial | Lucide icons, radius tokens and the cva Button are consistent. Ad-hoc hex values (`#0d0d0d`, `#f08a8a`, `#141210`) and mixed heading sizes are not. | 1 |
+| 1.19 | Dashboard values come from real user data | Working | `src/server/services/dashboard.ts`. No illustrative numbers. | 1 |
+
+## 2. Navigation
+
+Offline: same nav as primary, `NAV` = Home, Programs, Exercises, Food, Coach, Progress, with Faith under `MORE`.
+
+| ID | Requirement | Status | Evidence | Stage |
+|---|---|---|---|---|
+| 2.1 | Exactly 5 bottom tabs: Home · Train · Run · Food · Faith | Missing | `src/components/shell/nav-config.ts` has 6 primary tabs (Home, Programs, Exercises, Food, Coach, Progress) plus More, in `grid-cols-7`. `tests/unit/nav-config.test.ts` asserts the current set. | 1 |
+| 2.2 | Run tab | Missing | No `/run` route | 1 |
+| 2.3 | Faith tab always present | Missing | Faith has `requiresFaith: true` and sits in More or the sidebar | 1 |
+| 2.4 | Icon and label visible on every tab | Working | `app-shell.tsx` renders the icon and label | 1 |
+| 2.5 | Consistent tab order and position | Working | Static `NAV_ITEMS`. The tab set itself must change (2.1). | 1 |
+| 2.6 | Compact gold-outlined "AI Coach" button with chat icon, top right of every main screen | Missing | The mobile header shows the logo and a plan pill. `PageHeader` has no coach button. Coach is a bottom tab. | 1 |
+| 2.7 | AI Coach button separate from the profile icon and clearly labeled | Missing | Neither the button nor the icon exists | 1 |
+| 2.8 | Profile icon opens Profile and Settings | Missing | Profile is reached through the More sheet or the desktop sidebar | 1 |
+| 2.9 | Home → My Progress grouping | Partial | `/progress` exists but is a bottom tab, not a page under Home | 1 |
+| 2.10 | My Progress → Overview | Working | `src/app/(app)/progress/page.tsx` | 1 |
+| 2.11 | My Progress → Body Map & Ranks | Missing | No route (see §10) | 3 |
+| 2.12 | My Progress → Badges | Working | `src/app/(app)/progress/badges/page.tsx` | 1 |
+| 2.13 | My Progress → History | Partial | Only workout history (`/train/history`). There is no combined activity history. | 1 |
+| 2.14 | Train → Current Workout | Working | `/train/workout` and `ActiveWorkoutPill` | 1 |
+| 2.15 | Train → Programs | Working | `/train` | 1 |
+| 2.16 | Train → Exercises | Working | `/train/exercises`, currently also its own bottom tab | 1 |
+| 2.17 | Train → Custom Workouts | Partial | Blank workout (`/train/workout?blank=1`) and program builder (`/train/build`). No saved custom workouts (see 6.20). | 2 |
+| 2.18 | Train → Workout History | Working | `/train/history`, `/train/history/[id]` | 1 |
+| 2.19 | Run → Run/Walk Tracker | Missing | No running code | 3 |
+| 2.20 | Run → Plans | Missing | Only the custom-program cardio type (see 7.7) | 3 |
+| 2.21 | Run → Goals | Missing | — | 3 |
+| 2.22 | Run → History | Missing | — | 3 |
+| 2.23 | Food → Diary | Working | `/nutrition` | 1 |
+| 2.24 | Food → Saved Meals | Partial | A section on `/nutrition`, not a screen of its own | 2 |
+| 2.25 | Food → Recipes | Partial | Shares the "Save as meal / recipe" template (see 8.15) | 2 |
+| 2.26 | Food → Meal Planner | Missing | Only a `planned` status on meals | 2 |
+| 2.27 | Food → Grocery List | Missing | — | 2 |
+| 2.28 | Food → Nutrition Insights | Partial | 7-day summary on `/nutrition` only | 2 |
+| 2.29 | Faith → Devotionals | Working | `/faith#devotionals`, `src/data/devotionals.ts` | 2 |
+| 2.30 | Faith → Scripture | Working | `/faith`, `src/data/content.ts` | 2 |
+| 2.31 | Faith → Prayer Journal | Partial | A "reflection journal" (`faith_journal_entries`), not labeled or structured as a prayer journal | 2 |
+| 2.32 | Faith → Daily Practices | Partial | Discipline goals and check-ins (`discipline_goals`, `discipline_checkins`) | 2 |
+| 2.33 | Faith → 40-Day Challenge | Working | `src/components/faith/faith-challenge.tsx`, `e2e/challenge.spec.ts` | 2 |
+| 2.34 | No duplicate screens; every link opens the same underlying feature | Partial | Mostly a single route per feature. Coach is both a tab and a set of Home prompts. Needs a re-check after the nav change. | 1 |
+
+## 3. Home
+
+Offline: Home has a greeting, today's workout and summaries. No calendar.
+
+| ID | Requirement | Status | Evidence | Stage |
+|---|---|---|---|---|
+| 3.1 | Personal greeting | Working | `greeting(hour)` + name in `src/app/(app)/home/page.tsx` | 1 |
+| 3.2 | Scripture image card | Partial | A text verse card, shown only when `faith_enabled`. No image. | 1 |
+| 3.3 | Today's workout with Start | Working | Hero card and `startHref` | 1 |
+| 3.4 | Resume an in-progress workout from Home | Partial | The button always reads "Start workout". Resuming works through the floating "Resume:" pill and the restore prompt in the logger. | 1 |
+| 3.5 | Nutrition summary | Partial | Calorie/protein rings, locked on the Free plan (`hasFeature(plan,"nutrition_tracking")`) | 1 |
+| 3.6 | Weekly activity summary | Partial | Workout stat tiles and streaks only. No runs or walks. | 1 |
+| 3.7 | Prominent My Progress button | Missing | The only link is "/progress#records" on the PR card | 1 |
+| 3.8 | Access to the training calendar | Missing | No calendar | 2 |
+| 3.9 | Compact AI Coach button | Partial | A coach prompt card. No header button (2.6). | 1 |
+| 3.10 | Focused overview; detail after tapping a card | Partial | Home stacks many cards: recommendations, recovery, coach, steps, PRs, weight chart | 1 |
+| 3.11 | Calendar combining workouts, runs, walks and rest days | Missing | — | 2 |
+| 3.12 | Reschedule sessions without losing completed history | Missing | Only `pauseActiveProgramAction` (`src/server/actions/programs.ts`) | 2 |
+
+## 4. Onboarding and personalization
+
+Offline: has its own onboarding and the program builder.
+
+| ID | Requirement | Status | Evidence | Stage |
+|---|---|---|---|---|
+| 4.1 | Primary goal | Working | `onboarding_answers.primary_goal`, `onboarding-questionnaire.tsx` | 2 |
+| 4.2 | Secondary goal | Missing | No column or step | 2 |
+| 4.3 | Training experience | Working | `experience` | 2 |
+| 4.4 | Age | Working | Age step. Under-18 block (`e2e/features.spec.ts`). | 2 |
+| 4.5 | Relevant body measurements (sex, height, weight, goal weight) | Working | Steps sex/height/weight/target. Migrations `20261017000005`, `20261017000007`. | 2 |
+| 4.6 | Available equipment | Working | `equipment[]` | 2 |
+| 4.7 | Days available | Working | `days_per_week` | 2 |
+| 4.8 | Session duration | Working | `session_minutes` | 2 |
+| 4.9 | Dietary preferences | Working | Diet style (13 diets), `src/lib/domain/diets.ts`, `e2e/welcome-diets.spec.ts` | 2 |
+| 4.10 | Nutrition goals | Working | Weight goal, pace and activity feed into the budget (`src/lib/domain/calorie-budget.ts`) | 2 |
+| 4.11 | Units | Working | Units toggle, `profiles.unit_system` | 2 |
+| 4.12 | Optional accessibility preferences | Missing | — | 2 |
+| 4.13 | Edit answers later | Working | `/profile/preferences` (`OnboardingWizard mode="edit"`) | 2 |
+| 4.14 | Preview how changes affect the plan | Partial | `/plan` summary after onboarding. Editing offers a rebuild but shows no before/after preview. | 2 |
+| 4.15 | Fix the 60-minute selection producing a plan labeled ~75 min | Partial | Library programs use `estimateSessionMinutes` (`src/lib/domain/session-time.ts`, uncommitted, audited in `tests/unit/program-library.test.ts`). Generated programs (`src/lib/domain/custom-programs.ts`) use a separate `estimateMinutes`, whose trimming stops at 2 exercises. Bodybuilding uses its own formula. `tests/unit/custom-programs.test.ts` only checks 5–240 min, not ≤ the chosen length. | 2 |
+| 4.16 | Duration counts sets, rest, warm-ups and transitions | Partial | `session-time.ts` covers all four. `custom-programs.ts` uses a different estimator, so there are two systems. | 2 |
+| 4.17 | Combined goals (e.g. strength + 5K) on a coordinated schedule | Missing | The builder takes one program type. Cardio only adds a note recommending strength work. | 2 |
+
+## 5. Train: programs
+
+Offline: the program library is grouped by discipline (`NGB.disciplineForCategory`) and has a builder. No search or filters.
+
+| ID | Requirement | Status | Evidence | Stage |
+|---|---|---|---|---|
+| 5.1 | Preserve all existing programs | Working | `src/data/programs.ts` (edits by another agent in progress), `tests/unit/catalog.test.ts`, `supabase/seed.sql` | 2 |
+| 5.2 | Searchable program catalog | Missing | `/train` has discipline/category chips only. No text search. | 2 |
+| 5.3 | Category: beginner and general fitness | Working | `beginner`, general discipline (`src/lib/domain/disciplines.ts`) | 2 |
+| 5.4 | Category: strength and powerlifting | Working | `strength` (4), `powerlifting` (3), `powerbuilding` | 2 |
+| 5.5 | Category: bench, squat and deadlift specialization | Working | `bench-press`, `squat-specialization`, `deadlift-specialization` | 2 |
+| 5.6 | Category: bodybuilding and muscle building | Working | `hypertrophy` (5), `show-prep` | 2 |
+| 5.7 | Category: strongman | Working | `strongman` (2) | 2 |
+| 5.8 | Category: MMA, boxing, wrestling and grappling conditioning | Working | `mma-conditioning` (4), `boxing-conditioning`, `grappling-conditioning` | 2 |
+| 5.9 | Category: functional fitness, circuits and intervals | Partial | 1 program (`functional-conditioning`) | 2 |
+| 5.10 | Category: athletic speed, agility and explosive power | Working | `speed`, `agility`, `athletic-performance` (2) | 2 |
+| 5.11 | Category: endurance and hybrid | Partial | `cardiovascular` (2), `weight-loss-cardio`. No hybrid program. | 2 |
+| 5.12 | Category: home, dumbbell, band and bodyweight | Partial | 1 program (`home-workouts`) | 2 |
+| 5.13 | Category: calisthenics | Missing | No category or program | 2 |
+| 5.14 | Category: active aging, seated and low-impact | Partial | `active-aging` (2), `low_impact` flag. No seated program. | 2 |
+| 5.15 | Category: mobility, flexibility, warm-ups, cooldowns and recovery | Working | `mobility-flexibility`, `recovery-deload`, `/train/recovery` | 2 |
+| 5.16 | The 13 spec categories form the browse structure | Partial | The UI groups 24 seed categories into 7 disciplines (`disciplines.ts`), not the spec's 13 | 2 |
+| 5.17 | Program states its goal and experience level | Working | `summary`, `difficulty` on `/train/programs/[slug]` | 2 |
+| 5.18 | Program states the equipment needed | Partial | Stored in `training_programs.equipment`. Not rendered on the program detail page. | 2 |
+| 5.19 | Program states its duration in weeks | Working | `duration_weeks` | 2 |
+| 5.20 | Program states sessions per week and approximate session length | Working | `days_per_week`, `session_minutes`. Accuracy is covered by 4.15. | 2 |
+| 5.21 | Program lists exercises, sets, reps, rest and progression | Working | Program detail page, `progression` text | 2 |
+| 5.22 | Program gives substitutions | Working | Alternatives shown per exercise (`exercise_alternatives`) | 2 |
+| 5.23 | Program gives lighter-week guidance | Working | Deload weeks, `DELOAD_NOTE`, `noDeloadReason` audit (`src/data/programs.ts`) | 2 |
+| 5.24 | Program states its completion requirements | Missing | No field or UI | 2 |
+| 5.25 | Filter: goal | Missing | `recommendPrograms` uses goal internally; no UI filter | 2 |
+| 5.26 | Filter: experience | Missing | — | 2 |
+| 5.27 | Filter: equipment | Missing | — | 2 |
+| 5.28 | Filter: schedule (days/week) | Missing | — | 2 |
+| 5.29 | Filter: session length | Missing | — | 2 |
+| 5.30 | No near-identical plans under different names | Partial | `src/lib/domain/program-audit.ts` and `scripts/audit-programs.ts` exist (uncommitted). The 5 hypertrophy and 4 strength plans need a duplicate review. | 2 |
+| 5.31 | Flag specialist programming for qualified review before publication | Missing | There is no review status or flag on `training_programs`. Show prep defers to a coach in its text only. | 2 |
+| 5.32 | Specialist programs reviewed (show prep, meet prep, combat, active aging) | Requires Content Review | Needs a qualified coach or physio | 2 |
+
+## 6. Workout player and exercise library
+
+Offline: has a logger with rest timer and vibration, but no supersets or previous performance. Exercise library with search.
+
+| ID | Requirement | Status | Evidence | Stage |
+|---|---|---|---|---|
+| 6.1 | Log sets, reps and weight | Working | `src/components/workout/exercise-card.tsx`, `e2e/core-flow.spec.ts` | 1 |
+| 6.2 | Log duration | Working | Timed sets and the stopwatch in `exercise-card.tsx` | 1 |
+| 6.3 | Log distance where applicable | Missing | The `workout_sets.distance_m` column exists (`20261016000001_core_schema.sql`). There is no input in the logger. | 2 |
+| 6.4 | Previous performance shown beside the current exercise | Missing | Only the program target (`DraftTarget`) is shown | 2 |
+| 6.5 | Rest timers | Working | `restRemaining`, ±15 s, skip (`workout-logger.tsx`). Native local notification. | 1 |
+| 6.6 | Rest-timer sound or vibration, as an option | Partial | `beep()` and `navigator.vibrate` always fire. No user toggle. | 2 |
+| 6.7 | Supersets | Missing | Not in the `workout-draft.ts` model | 2 |
+| 6.8 | Exercise substitutions | Working | `substituteExercise` action, `ExercisePicker` with suggested alternatives | 2 |
+| 6.9 | Add exercises | Working | `addExercise` | 1 |
+| 6.10 | Remove exercises | Working | `removeExercise` | 1 |
+| 6.11 | Reorder exercises | Working | `moveExercise` (Move up/down menu) | 2 |
+| 6.12 | Notes | Working | Workout notes and per-exercise notes | 1 |
+| 6.13 | Perceived difficulty | Working | Per-set RPE (`workout_sets.rpe`) | 2 |
+| 6.14 | Pause and resume | Working | `pause`/`resume` reducer, `pausedSeconds`, e2e | 1 |
+| 6.15 | Finish | Working | `finishWorkoutAction` (idempotent, integration-tested) | 1 |
+| 6.16 | Discard | Working | Confirm dialog, `discardWorkoutAction` | 1 |
+| 6.17 | Session summary | Working | Result screen (duration, volume, records, badges) | 1 |
+| 6.18 | Personal records on finish | Working | `detectNewRecords` (`src/lib/domain/strength.ts`), `tests/integration/workouts.test.ts` | 1 |
+| 6.19 | Custom workout creation | Partial | Blank workout plus added exercises. The program builder (`/train/build`) generates programs. | 2 |
+| 6.20 | Saved workout templates | Missing | A finished session can't be saved as a reusable template | 2 |
+| 6.21 | Save completed sets as the session progresses | Working | Saved to local storage immediately, with a debounced server sync (`syncWorkoutDraftAction`, `src/lib/workout-storage.ts`) | 1 |
+| 6.22 | Offline logging with later sync | Working | Offline notice, re-sync on `online`. Only the logger works offline; other pages show the offline page. | 1 |
+| 6.23 | Exercise library: search by name | Working | `ilike` on `/train/exercises` | 2 |
+| 6.24 | Exercise library: muscle group filter | Missing | The filters are category and equipment | 2 |
+| 6.25 | Exercise library: equipment filter | Working | `equipment` select | 2 |
+| 6.26 | Exercise library: difficulty filter | Missing | — | 2 |
+| 6.27 | Clear instructions | Working | Instructions and form cues on `/train/exercises/[slug]` | 2 |
+| 6.28 | Common mistakes | Working | `common_mistakes` section | 2 |
+| 6.29 | Instruction content expert-reviewed | Requires Content Review | `src/data/exercises.ts` has not been reviewed by a coach | 2 |
+| 6.30 | Specific, reviewed demonstration videos or animations | Partial | `src/lib/exercise-motion/` and `src/data/exercise-motions.ts` are being built (uncommitted) and not yet used by any page. Admins can attach videos. No reviewed media is bundled. | 2 |
+| 6.31 | Equipment alternatives | Working | `exercise_alternatives` on the exercise page | 2 |
+| 6.32 | Links from an exercise to its performance history | Partial | `/progress?ex=` has a per-exercise chart, but the exercise page doesn't link to it | 2 |
+| 6.33 | Replace broad YouTube searches with specific demonstrations | Missing | The "Watch form videos" YouTube search button is still on the exercise page | 2 |
+| 6.34 | No invented video assets; nothing labeled expert-reviewed when it isn't | Working | No such labels or assets found | 2 |
+
+## 7. Running and walking
+
+Offline: no running features. Steps can be entered and synced from Health Connect.
+
+| ID | Requirement | Status | Evidence | Stage |
+|---|---|---|---|---|
+| 7.1 | Run as a dedicated bottom tab | Missing | No route, table or component | 3 |
+| 7.2 | Outdoor Run | Missing | No geolocation code anywhere in `src/` | 3 |
+| 7.3 | Outdoor Walk | Missing | Only daily step counts exist (`daily_steps`) | 3 |
+| 7.4 | Treadmill/manual entry | Missing | — | 3 |
+| 7.5 | Miles and kilometers | Missing | `unit_system` exists but there are no distances to apply it to | 3 |
+| 7.6 | Distance or time goals | Missing | — | 3 |
+| 7.7 | Run/walk intervals | Partial | `custom-programs.ts` `first_5k` prescribes run/walk progressions as text. No interval timer. | 3 |
+| 7.8 | Beginner, 5K and 10K plans | Partial | A beginner/5K run-walk goal exists in the cardio builder. No 10K plan. | 3 |
+| 7.9 | History and weekly mileage | Missing | — | 3 |
+| 7.10 | Live: distance | Missing | — | 3 |
+| 7.11 | Live: elapsed time | Missing | — | 3 |
+| 7.12 | Live: moving time | Missing | — | 3 |
+| 7.13 | Live: current pace | Missing | — | 3 |
+| 7.14 | Live: average moving pace | Missing | — | 3 |
+| 7.15 | Live: GPS route | Missing | — | 3 |
+| 7.16 | Live: mile/km splits | Missing | — | 3 |
+| 7.17 | Start, Pause, Resume and Finish | Missing | — | 3 |
+| 7.18 | Request location when an outdoor session starts | Missing | No location plugin in `package.json`. No `NSLocation*` keys in `ios/App/App/Info.plist`. No location permission in `AndroidManifest.xml`. | 3 |
+| 7.19 | Wait for a usable GPS signal | Missing | — | 3 |
+| 7.20 | Filter inaccurate readings | Missing | — | 3 |
+| 7.21 | Smooth current pace | Missing | — | 3 |
+| 7.22 | Visibly handle lost signal; never invent movement | Missing | — | 3 |
+| 7.23 | Exclude paused time from moving pace | Missing | — | 3 |
+| 7.24 | No false route segments across pauses or outages | Missing | — | 3 |
+| 7.25 | Optional audio split announcements | Missing | — | 3 |
+| 7.26 | Background/locked-screen tracking investigated and implemented natively | Missing | No background-location plugin. Needs a real device to verify (see Blockers). | 3 |
+| 7.27 | Document browser-preview limits for background tracking | Missing | — | 3 |
+| 7.28 | Save summaries, routes, splits, notes and records | Missing | No `runs` table in `supabase/migrations` | 3 |
+| 7.29 | Delete runs | Missing | — | 3 |
+| 7.30 | Routes private by default | Missing | — | 3 |
+| 7.31 | Stop location tracking when the session ends | Missing | — | 3 |
+| 7.32 | Manual activities show no fabricated GPS route | Missing | — | 3 |
+
+## 8. Food and nutrition
+
+Offline: has a food diary, search, barcode, water, supplements and planned meals, all stored locally. No meal planner, grocery list or recipe builder.
+
+| ID | Requirement | Status | Evidence | Stage |
+|---|---|---|---|---|
+| 8.1 | Calorie and macro targets | Working | `nutrition_goals`, `src/server/services/nutrition-targets.ts`, `updateGoalsAction` | 1 |
+| 8.2 | Daily meals and snacks | Working | `meals` and `meal_items`, `/nutrition` | 1 |
+| 8.3 | Food search with source information | Working | USDA SR Legacy bundled (`src/data/usda-foods.json`, `src/server/services/usda-local.ts`). Sources labeled (USDA, Open Food Facts, built-in estimates). `meal_items.source`. | 1 |
+| 8.4 | Barcode scanning with real product lookup | Partial | Open Food Facts lookup (`src/server/services/open-food-facts.ts`, `src/components/nutrition/barcode-scanner.tsx`). Tested only against a local mock (`e2e/food-amounts.spec.ts`). Live Open Food Facts and a real camera are unverified. | 2 |
+| 8.5 | Missing products and denied camera fall back to manual entry | Working | Not-found, denied and cancelled messages with a manual path. `tests/unit/barcode.test.ts`. | 2 |
+| 8.6 | Manual food creation | Working | `createCustomFoodAction` | 1 |
+| 8.7 | Favorites | Missing | — | 1 |
+| 8.8 | Recent foods | Working | Recent and frequent lists, `relogItemAction`, `src/lib/domain/diary.ts` | 1 |
+| 8.9 | Saved meals | Working | Meal templates (`meals.is_template`), `saveMealTemplateAction`, `logTemplateAction` | 2 |
+| 8.10 | Copy a meal | Working | `copyMealsAction` with `mealType` | 2 |
+| 8.11 | Copy an entire day | Working | `copyMealsAction` without `mealType`, `e2e/nutrition-diary.spec.ts` | 2 |
+| 8.12 | Edit portions | Working | `updateMealItemAction`, `e2e/food-amounts.spec.ts` | 1 |
+| 8.13 | Move entries between meals | Working | The amount step changes the meal (`e2e/food-amounts.spec.ts`) | 1 |
+| 8.14 | Grams, ounces and food-specific serving units | Working | `src/lib/domain/food-units.ts`, migration `20261019000008_food_amounts.sql` | 1 |
+| 8.15 | Water tracking | Working | `water_entries`, `addWaterAction`, `undoWaterAction` | 2 |
+| 8.16 | Weekly nutrition summaries | Partial | Only a 7-day calorie summary (`weeklySummary`). No macro or nutrient breakdown. | 2 |
+| 8.17 | Recipe: add ingredients and amounts | Partial | A recipe can only be made by saving a logged meal. There is no standalone recipe builder. | 2 |
+| 8.18 | Recipe: set servings | Working | `yield_servings` | 2 |
+| 8.19 | Recipe: total and per-serving nutrition | Partial | Values are scaled at log time. Per-serving totals aren't shown in the recipe UI. | 2 |
+| 8.20 | Recipe: log full or partial servings | Working | `servings` input with 0.25 steps, `logTemplateAction` | 2 |
+| 8.21 | Recipe: historical diary values kept when a saved recipe changes | Working | Items are copied into `meal_items` at log time. Templates are immutable (they can only be deleted). | 2 |
+| 8.22 | Meal planner uses targets, diet preferences, allergy exclusions, budget and meal frequency | Missing | No planner. No allergy or budget fields. | 2 |
+| 8.23 | Meal planner: swap meals and adjust portions | Missing | — | 2 |
+| 8.24 | Grocery list that combines compatible ingredients | Missing | — | 2 |
+| 8.25 | Cost estimates labeled | Missing | — | 2 |
+| 8.26 | Planned meals kept separate from meals eaten | Working | `meals.status` planned/logged, `markPlannedEatenAction` | 2 |
+| 8.27 | Restaurant search with reliable data | Requires External Setup | Not built. Needs a licensed restaurant nutrition API and its credentials. | 4 |
+| 8.28 | Distinguish published values from estimates | Partial | Built-in foods are labeled as estimates and Open Food Facts as community data. No restaurant data yet. | 2 |
+| 8.29 | Food swaps with comparable portions and clear nutritional differences | Missing | — | 4 |
+| 8.30 | Photo-assisted logging that suggests foods and portions | Missing | — | 4 |
+| 8.31 | Photo logging: user confirms before saving | Missing | — | 4 |
+| 8.32 | Photo logging: asks about uncertain oils, sauces and ingredients; never presented as exact | Missing | — | 4 |
+| 8.33 | Weekly summary distinguishes missing or incomplete logs from zero intake | Partial | `weeklySummary` (`src/lib/domain/diary.ts`) treats a 0-kcal day as not logged. There's no "incomplete day" state. | 2 |
+| 8.34 | Missing nutrient data never silently becomes zero | Partial | Fiber, sugar and sodium totals say "from N of M foods with data". Not applied to the other nutrients or the weekly view. | 2 |
+| 8.35 | Supplement logging | Working | `/nutrition/supplements`, `supplement_stack`, `supplement_logs`, `e2e/supplements-steps.spec.ts` | 2 |
+| 8.36 | Sourced supplement and nutrition education | Requires Content Review | `src/data/supplements.ts` doses and evidence ratings, and `/nutrition/diets`, need a dietitian review and source citations | 4 |
+| 8.37 | No unsupported cleanse or detox claims | Working | No matches in `src/data` | 2 |
+| 8.38 | One consistent nutrition calculation system | Partial | Nutrition is recomputed on the server from the stored basis (`src/lib/domain/food-basis.ts`). Targets come from either `calorie-budget.ts` or the bodyweight fallback in `nutrition-targets.ts`. | 2 |
+| 8.39 | Prevent duplicate exercise imports | Partial | No exercise imports exist yet. Steps are upserted per day per source (`src/lib/domain/steps.ts`). | 4 |
+| 8.40 | Don't count the same activity twice when adjusting the calorie budget | Partial | The budget adds MET estimates for finished workouts to an activity level "outside workouts". Steps aren't added. Untested once runs and wearables arrive. | 2 |
+
+## 9. My Progress
+
+Offline: has a Progress tab with weight, PRs and badges.
+
+| ID | Requirement | Status | Evidence | Stage |
+|---|---|---|---|---|
+| 9.1 | Prominent Home → My Progress entry | Missing | See 3.7 | 1 |
+| 9.2 | Overview | Working | `/progress` | 3 |
+| 9.3 | Strength & Body Map | Missing | See §10 | 3 |
+| 9.4 | Badges | Working | `/progress/badges` | 3 |
+| 9.5 | History | Partial | Workouts only (`/train/history`) | 3 |
+| 9.6 | Weight trends | Working | Weight log and chart (`src/components/progress/progress-forms.tsx`, `e2e/features.spec.ts`) | 3 |
+| 9.7 | Measurements | Working | `measurement_entries` chart (optional) | 3 |
+| 9.8 | Optional progress photos | Working | `src/components/progress/progress-photos.tsx`, `tests/integration/progress-photos.test.ts`. Untested on a real camera. | 3 |
+| 9.9 | Completed workouts | Working | Training analytics on `/progress` | 3 |
+| 9.10 | Running and walking distance | Missing | Only a 30-day steps chart | 3 |
+| 9.11 | Personal records | Working | `#records` section | 3 |
+| 9.12 | Weekly consistency | Working | Weekly/monthly activity chart, week streak (`src/lib/domain/streak.ts`) | 3 |
+| 9.13 | Recent badges | Partial | Only a link to `/progress/badges`. No recent-badge list on the overview. | 3 |
+| 9.14 | Current assessed strength rank | Missing | No rank system | 3 |
+| 9.15 | Useful empty states | Working | `EmptyState` on goals, records and similar sections | 3 |
+
+## 10. Interactive body map and strength ranks
+
+Offline: none of this section exists.
+
+| ID | Requirement | Status | Evidence | Stage |
+|---|---|---|---|---|
+| 10.1 | Original front and back muscle diagrams | Missing | No body map anywhere in `src/` | 3 |
+| 10.2 | Tappable region: chest | Missing | — | 3 |
+| 10.3 | Tappable region: back | Missing | — | 3 |
+| 10.4 | Tappable region: shoulders | Missing | — | 3 |
+| 10.5 | Tappable region: arms | Missing | — | 3 |
+| 10.6 | Tappable region: core | Missing | — | 3 |
+| 10.7 | Tappable region: legs, with useful subdivisions | Missing | — | 3 |
+| 10.8 | Color muscle groups by rank | Missing | — | 3 |
+| 10.9 | Written legend and labels, so the map doesn't rely on color alone | Missing | — | 3 |
+| 10.10 | Region shows its current rank | Missing | — | 3 |
+| 10.11 | Region shows relevant exercises | Missing | Muscle data exists (`exercises.primary_muscles`) but nothing uses it for this | 3 |
+| 10.12 | Region shows personal records | Missing | `personal_records` exists | 3 |
+| 10.13 | Region shows performance history | Missing | — | 3 |
+| 10.14 | Region shows progress toward the next rank | Missing | — | 3 |
+| 10.15 | Region explains how its score is calculated | Missing | — | 3 |
+| 10.16 | Exact rank order: Bronze → Silver → Gold → Platinum → Diamond → Disciple | Missing | The only "bronze/silver/gold" in the code are badge tiers (`src/lib/domain/achievements.ts`) | 3 |
+| 10.17 | Disciple replaces Titan as the top rank | Missing | No "Titan" exists to replace. Disciple has to be built. | 3 |
+| 10.18 | Transparent, configurable, exercise-specific scoring | Missing | — | 3 |
+| 10.19 | Account for bodyweight where appropriate | Missing | Bodyweight is logged (`weight_entries`) | 3 |
+| 10.20 | Machines and movements not treated as interchangeable | Missing | — | 3 |
+| 10.21 | No strength inferred from photos | Missing | Nothing to violate yet; build it as a rule | 3 |
+| 10.22 | Thresholds not presented as validated standards | Missing | — | 3 |
+| 10.23 | Estimated 1RMs labeled | Partial | PR lists label "Est. 1RM" (`RECORD_LABEL` in Home). Epley is limited to ≤12 reps (`src/lib/domain/strength.ts`). | 3 |
+| 10.24 | Provisional scoring rules labeled | Missing | — | 3 |
+| 10.25 | "Not assessed" shown when data is insufficient | Missing | — | 3 |
+| 10.26 | Overall rank calculation explained, with missing assessments disclosed | Missing | — | 3 |
+| 10.27 | Representative scoring, so repeated similar logs don't inflate a rank | Missing | — | 3 |
+| 10.28 | Rank thresholds reviewed by a qualified coach | Requires Content Review | Needed once thresholds exist | 3 |
+
+## 11. Badges and achievements
+
+Offline: has a badges screen with its own list.
+
+| ID | Requirement | Status | Evidence | Stage |
+|---|---|---|---|---|
+| 11.1 | Earned and In Progress filters | Missing | `/progress/badges` groups by category and sorts earned first. No filter. | 3 |
+| 11.2 | Original badge artwork | Partial | Lucide icons inside tiered medallions (`src/components/achievements/badge-icon.tsx`) | 3 |
+| 11.3 | Names and descriptions | Working | `BADGES` in `src/lib/domain/achievements.ts` | 3 |
+| 11.4 | Exact requirements stated | Partial | Descriptions plus targets. Some are vague, e.g. "Beat one of your own records". | 3 |
+| 11.5 | Progress toward unlocking | Working | `ProgressBar`, `badgePercent` | 3 |
+| 11.6 | Earned dates | Working | Derived `earnedAt` | 3 |
+| 11.7 | Tappable badge detail screens | Missing | Cards aren't interactive | 3 |
+| 11.8 | Performance ranks kept separate from milestone badges | Partial | No ranks exist yet. The badge tiers reuse Bronze/Silver/Gold names and will collide with the rank ladder. | 3 |
+| 11.9 | First Step: first completed workout | Working | `first-workout` "First Step" | 3 |
+| 11.10 | Building Momentum: 10 workouts | Partial | Exists as `workouts-10` "Showing Up"; needs renaming | 3 |
+| 11.11 | Consistent Effort: 25 workouts | Partial | Exists as `workouts-25` "Committed"; needs renaming | 3 |
+| 11.12 | Committed: 50 workouts | Partial | Exists as `workouts-50` "Iron Habit". The name "Committed" is currently on 25. | 3 |
+| 11.13 | Century Club: 100 workouts | Partial | Exists as `workouts-100` "Centurion" | 3 |
+| 11.14 | First Recorded Best: first supported lift record | Partial | `first-pr` "New Best" counts `prMoments`; its semantics need to match "first supported lift record" | 3 |
+| 11.15 | Raising the Bar: improvement over an earlier lift record | Missing | No badge distinguishes an improvement from a first record | 3 |
+| 11.16 | Program Finisher: all required program sessions completed | Partial | `program-complete` "Finisher" uses `user_programs.status='completed'`, not a count of required sessions (5.24) | 3 |
+| 11.17 | First Mile | Missing | No run data | 3 |
+| 11.18 | First 5K | Missing | — | 3 |
+| 11.19 | First 10K | Missing | — | 3 |
+| 11.20 | Going the Distance: 100 running miles | Missing | — | 3 |
+| 11.21 | Walking Strong: 25 walking miles | Missing | — | 3 |
+| 11.22 | Faster Than Before | Missing | — | 3 |
+| 11.23 | Distinguish run from walk and GPS from manual | Missing | — | 3 |
+| 11.24 | Self-reported records not presented as verified | Partial | Nothing claims verification, but there's no explicit "self-reported" label | 3 |
+| 11.25 | Increasingly detailed original rank emblems | Missing | — | 3 |
+| 11.26 | Disciple: ornate metallic-gold narrow-gate emblem | Missing | — | 3 |
+| 11.27 | Stable activity IDs prevent duplicate awards | Working | Badges are derived and never stored. `badgesUnlockedBySession` uses session IDs (`src/server/actions/workouts.ts`, `tests/unit/achievements.test.ts`). | 3 |
+| 11.28 | Consistent recalculation after edited or deleted records | Working | Badges are derived on read. PR recalculation is integration-tested (`tests/integration/workouts.test.ts`). | 3 |
+| 11.29 | Short, dismissible celebrations | Partial | `src/components/common/celebration.tsx` confetti removes itself but has no dismiss control | 3 |
+| 11.30 | Celebrations respect reduced motion | Working | `prefers-reduced-motion` check | 3 |
+| 11.31 | Option to disable celebrations | Missing | — | 3 |
+| 11.32 | Celebrations never cover active exercise or run controls | Working | Only on the post-finish summary, with `pointer-events-none` | 3 |
+| 11.33 | Optional badge sharing with user-approved details | Missing | — | 3 |
+| 11.34 | Extra badges (volume, streak, food, faith, photo) kept or retired deliberately | Partial | 24 badges exist. The faith-count badges conflict with 12.18. | 3 |
+
+## 12. Faith
+
+Offline: Faith sits under More; it has the 40-day challenge and a journal.
+
+| ID | Requirement | Status | Evidence | Stage |
+|---|---|---|---|---|
+| 12.1 | Faith central: dedicated bottom tab | Missing | See 2.3. Faith is opt-in (`profiles.faith_enabled`, onboarding toggle). | 1 |
+| 12.2 | Home Scripture card | Partial | Shown only when faith is enabled (see 3.2) | 1 |
+| 12.3 | Daily Scripture | Working | `scriptureForDate` (`src/data/content.ts`) | 2 |
+| 12.4 | Scripture context | Working | A `reflection` per verse | 2 |
+| 12.5 | Devotionals | Working | `src/data/devotionals.ts`, `src/components/faith/devotional-content.tsx`, `tests/unit/devotionals.test.ts` | 2 |
+| 12.6 | Devotional content reviewed | Requires Content Review | Generated text, not pastor-reviewed | 2 |
+| 12.7 | Prayer journal | Partial | A private reflection journal (`faith_journal_entries`); not framed as prayer | 2 |
+| 12.8 | Daily practices | Partial | Discipline goals and check-ins | 2 |
+| 12.9 | "40 Days Through the Narrow Gate" challenge | Working | `challenge_enrollments`/`challenge_checkins` (`20261017000003_challenges.sql`), `e2e/challenge.spec.ts` | 2 |
+| 12.10 | Catch-up support | Working | Catch-up on missed days (`faith-challenge.tsx`, `src/lib/domain/challenge.ts`) | 2 |
+| 12.11 | Recognition of rest | Working | Rest-day check-in is a walk or mobility. Rest devotional (Mark 6:31). | 2 |
+| 12.12 | Optional reminders controlled by the user | Partial | Workout reminders have a faith-styled option (`src/lib/reminders.ts`, native only, untested on a device). No devotional or Scripture reminder. | 2 |
+| 12.13 | Licensed or public-domain Bible text | Requires Content Review | KJV (public domain outside the UK). Every verse must be checked against an authoritative text. | 2 |
+| 12.14 | Translation identified | Working | `TRANSLATION` constant, "(KJV)" labels | 2 |
+| 12.15 | Content-review workflow for devotionals | Partial | `content_items.is_published` only. No reviewer or status fields. The static devotionals bypass it. | 4 |
+| 12.16 | Generated content never labeled pastor-reviewed | Working | No such labels | 2 |
+| 12.17 | Journals private by default | Working | Owner-only RLS (`20261016000002_rls_policies.sql`, `tests/integration/rls.test.ts`). Hidden from admins and the coach. | 2 |
+| 12.18 | Spiritual maturity not scored (no fitness ranks, prayer counts or leaderboards) | Partial | No leaderboards. But the badges `journal-1`, `journal-10`, `discipline-7` and `discipline-30` reward counts of faith activity. | 2 |
+
+## 13. AI Coach
+
+Offline: the coach screen says it needs the online version.
+
+| ID | Requirement | Status | Evidence | Stage |
+|---|---|---|---|---|
+| 13.1 | Visible through the compact header button on every main tab | Missing | See 2.6 | 1 |
+| 13.2 | Dedicated conversation screen | Working | `src/app/(app)/coach/page.tsx`, `src/components/coach/coach-chat.tsx` | 4 |
+| 13.3 | Clear way back to the previous screen | Partial | Coach is a tab with no back control. Android hardware back is handled in `src/lib/native.ts`. | 1 |
+| 13.4 | Data connected only with the user's permission | Partial | The snapshot covers all users automatically. Only limitations are gated, by wellness consent (`src/server/coach/snapshot.ts`). No per-source toggles. | 4 |
+| 13.5 | Connected: goals and preferences | Working | `src/server/coach/snapshot.ts`, `src/lib/coach/context.ts` (uncommitted), `tests/unit/coach-context.test.ts` | 4 |
+| 13.6 | Connected: current program | Working | `get_program_week` (`src/server/coach/tools.ts`) | 4 |
+| 13.7 | Connected: workout history | Working | `get_recent_workouts`, `get_exercise_history` | 4 |
+| 13.8 | Connected: running history | Missing | No run data | 4 |
+| 13.9 | Connected: food logs | Working | `get_nutrition_summary` | 4 |
+| 13.10 | Connected: progress trends | Partial | Bodyweight is in the snapshot. No measurements or photos (correctly). No trend tool. | 4 |
+| 13.11 | Connected: recovery check-ins | Working | Latest readiness in the snapshot | 4 |
+| 13.12 | Explain progress | Partial | Prompt and tools exist; no live verification | 4 |
+| 13.13 | Suggest substitutions | Working | `propose_exercise_swap`, apply e2e (`e2e/coach.spec.ts`) | 4 |
+| 13.14 | Propose meals | Partial | Only `propose_nutrition_targets`. No meal proposals. | 4 |
+| 13.15 | Coordinate schedules | Missing | No schedule tool | 4 |
+| 13.16 | Weekly reviews | Partial | Only a Home prompt ("Review my consistency this month"). No structured weekly review. | 4 |
+| 13.17 | Show proposed changes and require approval before modifying anything | Working | `suggestion-card.tsx`, `applyCoachProposalAction`, `ai_messages.proposal` | 4 |
+| 13.18 | Identify missing information rather than invent it | Partial | Stated in the prompt (`src/lib/coach/knowledge.ts`); unverified live | 4 |
+| 13.19 | Fix the "Too many requests" failure | Partial | Burst limiter in memory per instance (`src/server/rate-limit.ts`). 429 + `Retry-After` and friendly messages (`src/server/services/ai-coach.ts`). Anthropic `RateLimitError` is mapped. No shared store, and not reproduced live. | 4 |
+| 13.20 | Loading state | Working | Streaming activity list | 4 |
+| 13.21 | Rate-limit handling in the UI | Partial | Shows the server message. No countdown or auto-retry. | 4 |
+| 13.22 | Service-failure handling | Partial | `fail()` paths in `coach-chat.tsx`. e2e covers only "not configured" and a mocked success; no 429/500 e2e. | 4 |
+| 13.23 | Retrying | Partial | Manual re-send only | 4 |
+| 13.24 | Preserve unsent messages | Partial | Input is restored on failure. Not persisted across navigation or reload. | 4 |
+| 13.25 | API secrets kept server-side | Working | `src/server/env.ts`; the client sees only `NEXT_PUBLIC_*` | 4 |
+| 13.26 | Live model access | Requires External Setup | Needs `ANTHROPIC_API_KEY` (models `COACH_MODEL_PRO`/`COACH_MODEL_PLUS`). No live call has been made. | 4 |
+| 13.27 | Not presented as a clinician or pastor | Working | `knowledge.ts`: "not a doctor, physiotherapist, dietitian or psychologist"; defers to a pastor | 4 |
+| 13.28 | Private journal entries not exposed by default | Working | Journal is excluded from the snapshot and tools | 4 |
+
+## 14. Recovery, education and accountability
+
+Offline: has a recovery page and Health Connect steps. No groups.
+
+| ID | Requirement | Status | Evidence | Stage |
+|---|---|---|---|---|
+| 14.1 | Optional sleep, energy and soreness check-ins | Working | `recovery_checkins` (sleep, energy, soreness, stress), `src/server/actions/recovery.ts`, `src/components/recovery/checkin-form.tsx`. Requires wellness consent (e2e). | 4 |
+| 14.2 | Check-ins presented as self-reported, not a diagnosis | Working | Copy on `/train/recovery`, `src/lib/domain/readiness.ts` | 4 |
+| 14.3 | Education: exercise technique | Partial | Exercise pages only. No library. | 4 |
+| 14.4 | Education: training principles | Missing | — | 4 |
+| 14.5 | Education: nutrition | Partial | `/nutrition/diets`, `/nutrition/supplements` | 4 |
+| 14.6 | Education: recovery | Partial | `/train/recovery` | 4 |
+| 14.7 | Education: biblical stewardship | Partial | Devotionals only | 4 |
+| 14.8 | Education shows sources and actual reviewer attribution | Missing | No source or reviewer fields | 4 |
+| 14.9 | Education content reviewed | Requires Content Review | Needs a coach, dietitian and pastor | 4 |
+| 14.10 | Private accountability groups for friends or churches | Missing | No groups tables in `supabase/migrations` | 4 |
+| 14.11 | Group invitations | Missing | — | 4 |
+| 14.12 | Explicit sharing choices | Missing | — | 4 |
+| 14.13 | Reporting and blocking tools | Missing | — | 4 |
+| 14.14 | Food, measurements, photos, routes and journals private unless deliberately shared | Working | Owner-only RLS on every user table (`tests/integration/rls.test.ts`, `progress-photos.test.ts`). Routes don't exist yet. | 1 |
+| 14.15 | Wearables: Apple Health steps | Requires External Setup | `src/lib/native-health.ts` (`@capgo/capacitor-health`). HealthKit entitlement and `NSHealthShareUsageDescription` are present. Needs an Apple Developer App ID capability and a device. | 4 |
+| 14.16 | Wearables: Health Connect steps | Partial | Code in `native-health.ts`. `AndroidManifest.xml` has no Health Connect `READ_STEPS` permission or rationale activity. Untested on a device. | 4 |
+| 14.17 | Wearable permission controls | Partial | Connect/sync UI on the steps card (`src/components/steps/steps-card.tsx`). No disconnect or revoke UI. | 4 |
+| 14.18 | Wearable deduplication | Working | Per-day, per-source steps; no-step days are never written (`tests/unit/steps.test.ts`) | 4 |
+| 14.19 | Unavailable APIs and requirements identified honestly | Working | `IMPLEMENTATION_STATUS.md`, in-app "no steps found" guidance | 4 |
+| 14.20 | Wearable workouts, runs or heart rate | Missing | Steps only | 4 |
+
+## 15. Smooth navigation and dependable data
+
+Offline: all data in localStorage on one device. No sync, accounts or export.
+
+| ID | Requirement | Status | Evidence | Stage |
+|---|---|---|---|---|
+| 15.1 | Preserve scroll position | Missing | No explicit restoration | 1 |
+| 15.2 | Preserve filters | Partial | Kept in URL query params (`/train`, `/train/exercises`). Lost when switching tabs. | 1 |
+| 15.3 | Preserve drafts across tab changes | Partial | Workout draft is kept locally and on the server. Coach input, journal and food forms are not. | 1 |
+| 15.4 | Preserve active sessions across tab changes | Working | `src/lib/workout-storage.ts`, `ActiveWorkoutPill` | 1 |
+| 15.5 | Predictable Back behavior | Partial | Android back calls `history.back` (`src/lib/native.ts`). In-page back links are inconsistent. | 1 |
+| 15.6 | No keyboard overlap | Missing | No `@capacitor/keyboard` or visualViewport handling; unverified | 1 |
+| 15.7 | No unexpected layout shifts | Partial | `loading.tsx` skeletons only on read-only routes (known Next 15.5 issue) | 1 |
+| 15.8 | Compact Return to Workout bar | Working | `src/components/shell/active-workout-pill.tsx` | 1 |
+| 15.9 | Compact Return to Run bar | Missing | No running | 3 |
+| 15.10 | Avoid unnecessary redirects and repeated confirmations | Partial | Unaudited. The middleware's onboarding redirects need review. | 1 |
+| 15.11 | Confirm destructive actions | Working | `src/components/ui/confirm.tsx`, discard dialog, history delete, account delete | 1 |
+| 15.12 | Account access (sign-up, login, logout) | Working | Supabase auth (`src/app/(auth)`, `e2e/core-flow.spec.ts`) | 1 |
+| 15.13 | Hosted accounts in production | Requires External Setup | Needs the owner's Supabase project and keys, a Vercel deploy and `CAP_SERVER_URL` | 1 |
+| 15.14 | Saving | Working | Server actions with RLS | 1 |
+| 15.15 | Account recovery (password reset) | Working | `/forgot-password`, `/reset-password`, e2e | 1 |
+| 15.16 | Synchronization | Partial | Server is the source of truth. Only the workout logger works offline and syncs later. | 1 |
+| 15.17 | Document what is local and what is synced | Partial | `IMPLEMENTATION_STATUS.md` limitation 7. No in-app explanation. | 1 |
+| 15.18 | Data export | Working | `/api/account/export` (`src/server/services/account.ts`, with signed photo links) | 1 |
+| 15.19 | Account deletion | Working | `deleteAccountAction`, cascade integration-tested. Needs `SUPABASE_SERVICE_ROLE_KEY` in production. | 1 |
+| 15.20 | Protect private records | Working | RLS (`20261016000002_rls_policies.sql`, `tests/integration/rls.test.ts`) | 1 |
+| 15.21 | Secrets kept out of client code | Working | `src/server/env.ts` | 1 |
+
+## 16. Process and completion
+
+| ID | Requirement | Status | Evidence | Stage |
+|---|---|---|---|---|
+| 16.1 | Persistent checklist with every requirement and a status | Working | This file | 1 |
+| 16.2 | Stage-end report: implemented, verified, remaining | Partial | `IMPLEMENTATION_STATUS.md` exists but predates the spec and marks spec-partial items "✅ Done" (e.g. "Workout logger (all listed features)") | 1 |
+| 16.3 | Requirements not dropped because they're absent from the mockup | Working | Tracked here | 1 |
+| 16.4 | Journey: finish a workout and reopen its saved history | Working | `e2e/core-flow.spec.ts` | 1 |
+| 16.5 | Journey: switch tabs during an active session without losing it | Partial | Reload-restore is e2e-tested. No tab-switch e2e. | 1 |
+| 16.6 | Journey: add, edit, copy and delete food with correct totals | Partial | Add, edit and copy are e2e-tested (`food-amounts.spec.ts`, `nutrition-diary.spec.ts`). The delete-plus-totals assertion is not. | 1 |
+| 16.7 | Journey: build and log a recipe serving | Missing | No test | 2 |
+| 16.8 | Journey: record, pause, resume, finish and reopen a run | Missing | No running | 3 |
+| 16.9 | Journey: update a record and award the correct badge only once | Partial | Unit and integration coverage of PRs and badges; no end-to-end journey | 3 |
+| 16.10 | Journey: edit or delete an activity and recalculate | Partial | `tests/integration/workouts.test.ts` (PR recalculation) | 3 |
+| 16.11 | Journey: open a muscle region and inspect its rank explanation | Missing | No body map | 3 |
+| 16.12 | Journey: save and recover a journal draft | Missing | No journal draft persistence (`src/components/faith/faith-forms.tsx`) | 2 |
+| 16.13 | Journey: use the AI Coach and handle a service failure gracefully | Partial | `e2e/coach.spec.ts` covers the not-configured state and a mocked success. No failure or 429 case. | 4 |
+| 16.14 | Journey: reopen the app and confirm saved data remains | Partial | Browser reload is e2e-tested. Native app relaunch is untested. | 1 |
+| 16.15 | Layouts verified on small and large phones | Partial | Playwright uses one mobile viewport. No small or large matrix. | 1 |
+| 16.16 | Placeholders, unconnected integrations and unreviewed content not described as finished | Partial | Legal pages are marked placeholders. `IMPLEMENTATION_STATUS.md` overstates several items (see 16.2). | 1 |
+
+## External setup (cross-cutting)
+
+| ID | Requirement | Status | Evidence | Stage |
+|---|---|---|---|---|
+| X.1 | Supabase project, migrations applied, auth email/SMTP | Requires External Setup | 11 migrations in `supabase/migrations`, `supabase/setup-all.sql` | 1 |
+| X.2 | Vercel (or other) deploy and `CAP_SERVER_URL` | Requires External Setup | `capacitor.config.ts` defaults to `app.narrowgatefitness.example` | 1 |
+| X.3 | Stripe products and prices, webhook secret | Requires External Setup | `src/app/api/stripe/webhook/route.ts`; `STRIPE_PRICE_*` | 1 |
+| X.4 | Store billing (Apple IAP / Google Play Billing) | Requires External Setup | Not built. The native shells hide Stripe checkout. | 4 |
+| X.5 | Anthropic API key | Requires External Setup | See 13.26 | 4 |
+| X.6 | USDA FDC API key (optional branded search) | Requires External Setup | `USDA_FDC_API_KEY` | 2 |
+| X.7 | Apple Developer account: HealthKit capability, signing, TestFlight | Requires External Setup | `.github/workflows/ios.yml` (`testflight` mode needs secrets) | 4 |
+| X.8 | Google Play Console: signing, Health Connect declaration | Requires External Setup | `.github/workflows/android-apk.yml` | 4 |
+| X.9 | Legal review of privacy policy and terms | Requires Content Review | `src/app/legal/*` are marked placeholders | 1 |
+
+---
+
+## Summary by stage
+
+Counts are taken from the tables above, including the X rows.
+
+| Stage | Working | Partial | Missing | Requires External Setup | Requires Content Review | Total |
+|---|---|---|---|---|---|---|
+| 1 | 53 | 35 | 14 | 4 | 1 | 107 |
+| 2 | 58 | 33 | 30 | 1 | 4 | 126 |
+| 3 | 17 | 19 | 81 | 0 | 1 | 118 |
+| 4 | 16 | 20 | 13 | 7 | 2 | 58 |
+| All | 144 | 107 | 138 | 12 | 8 | 409 |
+
+- **Stage 1.** Storage, auth, RLS, export/delete and core workout logging are solid. Most of the gaps are shell and navigation: the five-tab bar, the header AI Coach button, the profile icon, Home → My Progress, heading sizes and the text-size setting, plus scroll and filter preservation.
+- **Stage 2.** The program library and the food diary are broad. Missing: program search and filters, calisthenics, completion requirements, previous performance, supersets, saved workout templates, the meal planner and grocery list, a proper recipe builder, secondary and combined goals. The session-length fix is only partly done.
+- **Stage 3.** Running, the body map and ranks are entirely missing. Badges exist but need renaming and the run badges, filters, detail screens and sharing.
+- **Stage 4.** The coach is advanced but unverified live and lacks schedule, meal and weekly-review tools. Groups and the education library are missing. Wearables cover steps only and haven't been tested on a device.
+
+## Known decisions and conflicts
+
+1. **Bottom tabs.** The owner earlier asked for Programs and Exercises as bottom tabs, and the current nav (and `tests/unit/nav-config.test.ts`) reflects that. The spec now requires exactly Home · Train · Run · Food · Faith. Programs and Exercises move under Train, Coach moves to the header button, Progress moves under Home → My Progress, and Profile moves to a header icon. The nav test and the offline edition's `NAV` have to change with it.
+2. **Faith opt-in vs central.** Faith is currently optional (`profiles.faith_enabled`; hidden nav, Home verse and badges). The spec makes Faith a permanent tab with a Home Scripture card. Decide whether the opt-out survives as a "hide faith content" preference.
+3. **Plan gating.** Nutrition tracking, advanced progress charts and the coach are gated to Plus/Pro (`src/lib/domain/plans.ts`). The spec doesn't mention tiers, so confirm with the owner which spec features stay paid.
+4. **Badge names and tiers.** The existing names (Showing Up, Committed@25, Iron Habit, Centurion, New Best, Finisher) conflict with the spec's list, where Committed is the 50-workout badge. Earned dates are derived, so renaming loses no data. The badge tiers Bronze/Silver/Gold collide with the rank ladder and should be renamed or dropped.
+5. **Faith-count badges.** `journal-*` and `discipline-*` reward counts of faith activity, which conflicts with §12 ("not scored through prayer counts"). Remove them or reframe them.
+6. **Two session-length estimators.** `session-time.ts` (library) and `custom-programs.ts` `estimateMinutes` / bodybuilding formula (builder). Consolidate on one.
+7. **Exercise demos.** The YouTube search button must go once the `exercise-motion` animations are wired in. The animations must not be labeled expert-reviewed until they are.
+8. **Body map and ranks.** No body-rank image was supplied, so the design will be original. Thresholds will be labeled provisional.
+9. **Offline edition.** It is generated from a template outside the repo, so structural changes such as the 5-tab nav must be made there and regenerated. It can't be fixed in `standalone/index.html` directly.
+
+## Exact blockers (this sandbox)
+
+- **Outbound network.** Most hosts are unreachable, including Open Food Facts, USDA FDC, Stripe, Anthropic, Supabase cloud, Vercel and the Android SDK downloads. Barcode lookup, Stripe checkout and the portal, and the AI coach are tested only against local mocks or not at all.
+- **No live AI calls.** Coach answer quality, tool use, rate-limit behavior under real load and refusal fallbacks can't be verified here.
+- **No real device.** GPS accuracy, background and locked-screen location, camera barcode scanning, HealthKit/Health Connect, local notifications, haptics and keyboard overlap can't be tested. Running must ship with a "not verified on device" note until it is tested on a phone.
+- **No Mac.** iOS builds run only as GitHub Actions simulator compile checks (`.github/workflows/ios.yml`). TestFlight needs the owner's Apple credentials.
+- **No owner accounts.** There is no Supabase project, Stripe account, Anthropic key, Vercel project, Apple Developer account or Google Play Console access. Everything marked Requires External Setup waits on these.
+- **Content reviewers.** Pastor (devotionals, Scripture check), coach or physio (programs, exercise instructions, rank thresholds), dietitian (supplements, diets, education) and counsel (legal pages) aren't available here.

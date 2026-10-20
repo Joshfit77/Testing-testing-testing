@@ -25,12 +25,13 @@ Verification ran against a full local Supabase stack (Postgres 17, GoTrue auth, 
 | Onboarding (adult-only, consent-gated limitations) + starter program | ✅ Done & e2e-tested | |
 | Exercise library (95) & programs (18 across 16 categories) | ✅ Done | Integrity unit tests cover the catalog. |
 | MMA / athletic templates, mobility & recovery | ✅ Done | Two session-library programs and a recovery page. |
+| Program library research & audit (41 programs, 24 categories) | ✅ Done; unit- and e2e-tested | `docs/PROGRAM_RESEARCH.md` (sources, audit table, before → after). Week-by-week templates with deloads; `tests/unit/program-library.test.ts` checks slugs, DB limits, RPE/sets ranges, deloads, session length vs. prescription, 6–24 weekly hard sets per major muscle for hypertrophy programs, push:pull balance, a free program per discipline, and template specifics (training-max waves, peak/taper, fight camp, 80/20). `e2e/program-library.spec.ts` covers free/locked access and week views. Not reviewed by a qualified coach. The offline edition (`standalone/index.html`) still embeds the previous library. |
 | Workout logger (all listed features) + restore | ✅ Done & tested | Unit, integration and e2e. |
 | History edit/delete, PRs, volume, frequency | ✅ Done & integration-tested | |
 | Dashboard | ✅ Done | |
 | Progress analytics (7d/30d/90d/1y) | ✅ Done | Advanced charts are gated server-side to Plus and Pro. |
 | Food log (nutrition) | ✅ Done & e2e-tested | A main "Food" tab. Search works out of the box on 94 built-in common foods (typical values, labeled as estimates); logging a serving is e2e-tested. **USDA search additionally needs `USDA_FDC_API_KEY`** and wasn't exercised live here. |
-| AI coach (chat, plan generation, approval, metering, rate limits, fallback) | ✅ Implemented; gating/quotas integration-tested | **Live model calls need `ANTHROPIC_API_KEY`**. No real completions were made in this environment. Prompt quality should be evaluated with real usage. |
+| AI coach (streaming chat with tools, knowledge base, confirm-to-apply suggestions, plan generation, metering, fallback) | ✅ Implemented; unit-tested (context builder, tool schemas/validation/handlers with mocked Supabase, prompt assembly, faith on/off, plan gating) and e2e-tested against a local mock of the Messages API | Models: Pro `claude-opus-5-5`, Plus `claude-sonnet-5-5` (env `COACH_MODEL_PRO` / `COACH_MODEL_PLUS`), adaptive thinking at effort `medium`, server-side refusal fallbacks, cached static prompt (`src/lib/coach/knowledge.ts`, ~9k tokens) + per-user context. Tools: `get_recent_workouts`, `get_exercise_history`, `get_nutrition_summary`, `get_program_week`, `search_exercises`, `get_food_nutrition`, `calculate`, and proposals `propose_exercise_swap` / `propose_nutrition_targets` / `propose_bodyweight_log` (applied only by `applyCoachProposalAction` after the user taps Confirm; library programs get a "use Swap in the logger" card). e2e: `e2e/coach.spec.ts` needs the app started with `ANTHROPIC_API_KEY=e2e-test-key ANTHROPIC_BASE_URL=http://127.0.0.1:4600` and `E2E_ANTHROPIC_MOCK_PORT=4600`; without them it checks the honest "not configured" state. **No live API call was made here**: answer quality, real tool-calling behaviour, prompt-cache hit rates and refusal fallbacks need a staging check with a real key. No migration was needed (proposals reuse `ai_messages.proposal`). |
 | Optional Faith & Discipline | ✅ Done & e2e-tested | |
 | Pricing: Plus $7.99/mo, Pro $14.99/mo, All Access Yearly $119.99/yr (grants Pro) | ✅ Done; yearly price → Pro mapping integration-tested | Needs `STRIPE_PRICE_PRO_YEARLY`; without it the yearly card says it isn't configured. |
 | Stripe checkout, portal, webhooks, entitlements | ✅ Implemented; webhook & entitlement logic integration-tested with signed synthetic events | **Checkout and the Billing Portal need real Stripe keys and prices.** They weren't run end to end against Stripe here. |
@@ -64,7 +65,7 @@ Verification ran against a full local Supabase stack (Postgres 17, GoTrue auth, 
 6. **Nutrition estimates** use Mifflin-St Jeor (sex, age, height, weight) times an activity level once onboarding has collected them, and fall back to a bodyweight rule otherwise. They are always labeled as estimates, not dietary advice.
 7. **Offline.** An in-progress workout keeps working offline once the logger page is open, and it syncs when you reconnect. Other pages need a connection (offline page shown).
 8. **Admin program editing** covers metadata, publishing, tier and per-exercise prescriptions. Adding or removing weeks, days or exercises in curated programs is done through `src/data/programs.ts` plus `npm run seed:generate`.
-9. **Conversation history in the AI coach** shows as a sidebar on large screens. On mobile, users start new chats or reopen one from a link; a mobile history drawer is a small follow-up.
+9. **Conversation history in the AI coach** shows as a sidebar on large screens and as a collapsible "History" list on mobile.
 
 ## Next steps (in priority order)
 
@@ -74,4 +75,4 @@ Verification ran against a full local Supabase stack (Postgres 17, GoTrue auth, 
 4. Have counsel complete the privacy policy and terms. Fill in the App Store privacy labels and the Play Data safety form.
 5. Add Universal Links / App Links so email confirmation and reset links open the app.
 6. Add a shared rate-limit store and production error monitoring (e.g. Sentry with PII scrubbing).
-7. Add a mobile conversation-history drawer to the AI coach, and expand admin program structure editing.
+7. Expand admin program structure editing.

@@ -5,7 +5,7 @@ import { EmptyState } from "@/components/common/states";
 import { Badge } from "@/components/ui/badge";
 import { ActionButton } from "@/components/common/action-button";
 import { Button } from "@/components/ui/button";
-import { DISCIPLINES, disciplineForCategory, getDiscipline, groupByDiscipline } from "@/lib/domain/disciplines";
+import { DISCIPLINES, compareLibraryPrograms, disciplineForCategory, getDiscipline, groupByDiscipline } from "@/lib/domain/disciplines";
 import { canAccessTier } from "@/lib/domain/plans";
 import type { Plan } from "@/lib/domain/types";
 import { cn, titleCase } from "@/lib/utils";
@@ -57,7 +57,10 @@ export default async function TrainPage({ searchParams }: { searchParams: Promis
   // A category filter implies its discipline; otherwise ?discipline= narrows the library to one group.
   const activeDiscipline = selected ? disciplineForCategory(selected.slug) : getDiscipline(discipline);
   const allPrograms = (programsRes.data ?? []) as ProgramCardRow[];
-  const programs = allPrograms.filter((p) => (selected ? p.category_id === selected.id : !activeDiscipline || disciplineOf(p).id === activeDiscipline.id));
+  const libraryKey = (p: ProgramCardRow) => ({ category: p.category_id ? categorySlug.get(p.category_id) : null, difficulty: p.difficulty, name: p.name });
+  const programs = allPrograms
+    .filter((p) => (selected ? p.category_id === selected.id : !activeDiscipline || disciplineOf(p).id === activeDiscipline.id))
+    .sort((a, b) => compareLibraryPrograms(libraryKey(a), libraryKey(b)));
   const groups = groupByDiscipline(programs, disciplineOf);
   const disciplineCategories = activeDiscipline ? categories.filter((c) => activeDiscipline.categories.includes(c.slug)) : [];
   const chip = (active: boolean) =>

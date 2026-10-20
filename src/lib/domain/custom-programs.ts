@@ -874,6 +874,7 @@ function benchDays(ctx: Ctx, goal: GoalOption): DayBuilder[] {
     buildDay(ctx, "Heavy Bench", "Low-rep competition bench + upper back", [
       heavySlot(ctx, wk, "bench", OPT.bench, vb),
       acc(ctx, wk, OPT.row, "8", 120),
+      acc(ctx, wk, OPT.vPull, "6-10", 90, { notes: "Pulling volume balances three bench sessions a week." }),
       acc(ctx, wk, OPT.press, "8", 90),
       acc(ctx, wk, OPT.facePull, "15", 60),
     ]);
@@ -1936,8 +1937,8 @@ function bodybuildingProgram(ctx: Ctx, goal: GoalOption, opts: { showPrep: boole
     return days.map((day, di) => {
       const items = chosen[di]!.filter((c) => c.sets > 0);
       const extras = [conditioning(wk), posing(wk)].filter((e): e is ProgramExerciseSeed => e !== null);
-      const extraMinutes = extras.reduce((s, e) => s + (e.seconds ?? 0) / 60, 0);
-      const minutes = () => 8 + extraMinutes + items.reduce((s, c) => s + (c.sets * (40 + BB_REST[c.slot.kind])) / 60, 0);
+      const extraMinutes = () => extras.reduce((s, e) => s + (e.seconds ?? 0) / 60, 0);
+      const minutes = () => 8 + extraMinutes() + items.reduce((s, c) => s + (c.sets * (40 + BB_REST[c.slot.kind])) / 60, 0);
       while (minutes() > ctx.input.sessionMinutes) {
         const trimmable = items.filter((c) => c.sets > 2);
         if (!trimmable.length) break;
@@ -1945,6 +1946,17 @@ function bodybuildingProgram(ctx: Ctx, goal: GoalOption, opts: { showPrep: boole
         const victim = trimmable.reduce((a, b) => (score(b) >= score(a) ? b : a));
         victim.sets -= 1;
         if (wk.kind === "base" || wk.kind === "build") capped = true;
+      }
+      // Still over? Move part of the low-intensity cardio to a separate session so the stated length stays honest.
+      const cardio = extras.find((e) => e.ex !== "posing-practice");
+      const over = minutes() - ctx.input.sessionMinutes;
+      if (cardio && over > 0) {
+        const keep = Math.max(10, Math.round((cardio.seconds ?? 0) / 60 - over));
+        const moved = Math.round((cardio.seconds ?? 0) / 60) - keep;
+        if (moved > 0) {
+          cardio.seconds = keep * 60;
+          cardio.notes = `${cardio.notes ?? ""} Do the other ${moved} minutes as a separate walk later in the day.`.trim().slice(0, 500);
+        }
       }
       const exercises: ProgramExerciseSeed[] = items.map((c, i) => {
         const rpe = rpeFor(c.slot.kind, wk);
@@ -2335,6 +2347,8 @@ export function buildCustomProgram(input: CustomProgramInput, catalogList: Catal
   }
   if (meetLifts)
     notes.push("Meet week: opener practice early, light technique sessions, then meet day with three attempts per lift. Pick openers you could triple on a bad day.");
+  if (input.type === "cardio" && goal.id === "endurance" && input.daysPerWeek < 5)
+    notes.push("Add two short strength sessions a week (squats or split squats, calf raises, a hinge and a plank) — strength work improves running economy and resilience.");
   if (input.type === "cardio" && goal.id === "fat_loss")
     notes.push("Fat loss mainly comes from a sustainable calorie deficit; this plan supports it with activity and strength work to protect muscle.");
   if (input.type === "mma")

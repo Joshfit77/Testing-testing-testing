@@ -28,7 +28,7 @@ export const DISCIPLINES: Discipline[] = [
     whoFor: "Lifters who want a bigger squat, bench, deadlift and press — from first barbell sessions to meet day.",
     typicalWeek: "3–5 sessions built around the main lifts at set percentages or RPE, with planned deloads and a peak when you need one.",
     customTypes: ["strength", "powerlifting", "bench", "squat", "deadlift"],
-    categories: ["strength", "powerlifting", "bench-press", "squat-specialization", "deadlift-specialization", "womens-strength"],
+    categories: ["strength", "womens-strength", "powerbuilding", "powerlifting", "bench-press", "squat-specialization", "deadlift-specialization"],
   },
   {
     id: "strongman",
@@ -99,4 +99,23 @@ export function disciplineForCustomType(type: CustomProgramType): Discipline {
 /** Group items by discipline, keeping discipline order and dropping empty groups. */
 export function groupByDiscipline<T>(items: T[], disciplineOf: (item: T) => Discipline): { discipline: Discipline; items: T[] }[] {
   return DISCIPLINES.map((discipline) => ({ discipline, items: items.filter((i) => disciplineOf(i).id === discipline.id) })).filter((g) => g.items.length > 0);
+}
+
+const DIFFICULTY_ORDER: Record<string, number> = { beginner: 0, intermediate: 1, advanced: 2 };
+
+/**
+ * Library order inside a discipline: beginner → intermediate → advanced, then by the discipline's
+ * category order, then by name — so newcomers see the right starting point first.
+ */
+export function compareLibraryPrograms(
+  a: { category: string | null | undefined; difficulty: string; name: string },
+  b: { category: string | null | undefined; difficulty: string; name: string },
+): number {
+  const byDifficulty = (DIFFICULTY_ORDER[a.difficulty] ?? 9) - (DIFFICULTY_ORDER[b.difficulty] ?? 9);
+  if (byDifficulty) return byDifficulty;
+  const da = disciplineForCategory(a.category);
+  const db = disciplineForCategory(b.category);
+  if (da.id !== db.id) return DISCIPLINES.indexOf(da) - DISCIPLINES.indexOf(db);
+  const byCategory = da.categories.indexOf(a.category ?? "") - db.categories.indexOf(b.category ?? "");
+  return byCategory || a.name.localeCompare(b.name);
 }

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Bot, Check, ClipboardList, Loader2, MessageSquare, Send, Sparkles, Trash2, X } from "lucide-react";
+import { Bot, Check, CheckCircle2, ClipboardList, Copy, Loader2, MessageSquare, Search, Send, Sparkles, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -11,14 +11,16 @@ import { Notice } from "@/components/common/states";
 import { cn } from "@/lib/utils";
 import { formatDuration } from "@/lib/domain/units";
 import type { AiPlan } from "@/lib/validation/ai";
+import type { CoachProposal } from "@/lib/coach/tools";
 import { applyProposalAction, deleteConversationAction, dismissProposalAction } from "@/server/actions/coach";
 import { Markdown } from "./markdown";
+import { SuggestionCard } from "./suggestion-card";
 
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
-  proposal: AiPlan | null;
+  proposal: AiPlan | CoachProposal | null;
   proposal_status: "proposed" | "applied" | "dismissed" | null;
   created_at: string;
 }
@@ -32,19 +34,21 @@ interface Props {
   canGeneratePlans: boolean;
   usage: { used: number; limit: number };
   exerciseNames: Record<string, string>;
+  /** Starter questions built from the user's own data. */
+  suggestions?: string[];
 }
 
-const SUGGESTIONS = [
-  "How should I progress my main lifts over the next month?",
+const DEFAULT_SUGGESTIONS = [
+  "Why did my bench stall?",
+  "Plan my deload",
+  "What should I eat before my workout today?",
   "Suggest alternatives to barbell back squats",
-  "Explain how to brace properly for deadlifts",
-  "I'm sore and tired today — how should I adjust my workout?",
   "How much protein should I aim for?",
   "Review my training consistency",
 ];
 
 function PlanPreview({ message, names, onChange }: { message: ChatMessage; names: Record<string, string>; onChange: (status: ChatMessage["proposal_status"]) => void }) {
-  const plan = message.proposal!;
+  const plan = message.proposal as AiPlan;
   const [pending, start] = useTransition();
   const [result, setResult] = useState<{ ok: boolean; text: string; slug?: string } | null>(null);
   const act = (fn: () => Promise<{ ok: true; message: string; programSlug?: string } | { ok: false; error: string }>, status: ChatMessage["proposal_status"]) =>
@@ -120,7 +124,63 @@ function PlanPreview({ message, names, onChange }: { message: ChatMessage; names
   );
 }
 
-export function CoachChat({ conversationId: initialId, initialMessages, initialQuestion, enabled, disabledReason, canGeneratePlans, usage: initialUsage, exerciseNames }: Props) {
+const isCoachProposal = (p: ChatMessage["proposal"]): p is CoachProposal => Boolean(p && typeof p === "object" && "kind" in p);
+
+interface Activity {
+  label: string;
+  done: boolean;
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        } catch {
+          setCopied(false);
+        }
+      }}
+      className="inline-flex items-center gap-1 rounded-lg px-1.5 py-1 text-[11px] text-muted-foreground hover:bg-elevated hover:text-foreground"
+      aria-label={copied ? "Copied" : "Copy reply"}
+    >
+      {copied ? <Check className="size-3.5" aria-hidden /> : <Copy className="size-3.5" aria-hidden />} {copied ? "Copied" : "Copy"}
+    </button>
+  );
+}
+
+function ActivityList({ items, status }: { items: Activity[]; status: string | null }) {
+  if (!items.length && !status) return null;
+  return (
+    <ul className="space-y-1 text-xs text-muted-foreground" aria-label="Coach activity" data-testid="coach-activity">
+      {items.map((a, i) => (
+        <li key={i} className="flex items-center gap-1.5">
+          {a.done ? <CheckCircle2 className="size-3.5 text-gold" aria-hidden /> : <Search className="size-3.5 animate-pulse text-gold" aria-hidden />}
+          {a.label}
+        </li>
+      ))}
+      {status && !items.some((a) => !a.done) && (
+        <li className="flex items-center gap-1.5">
+          <Loader2 className="size-3.5 animate-spin" aria-hidden /> {status}
+        </li>
+      )}
+    </ul>
+  );
+}
+
+type StreamEvent =
+  | { type: "status"; text: string }
+  | { type: "tool"; name: string; label: string }
+  | { type: "text"; delta: string }
+  | { type: "reset" }
+  | { type: "done"; result: { conversationId: string; userMessage: ChatMessage; assistantMessage: ChatMessage; usage: { used: number; limit: number } } }
+  | { type: "error"; message?: string };
+
+export function CoachChat({ conversationId: initialId, initialMessages, initialQuestion, enabled, disabledReason, canGeneratePlans, usage: initialUsage, exerciseNames, suggestions }: Props) {
   const router = useRouter();
   const [conversationId, setConversationId] = useState(initialId);
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
@@ -129,42 +189,101 @@ export function CoachChat({ conversationId: initialId, initialMessages, initialQ
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [usage, setUsage] = useState(initialUsage);
+  const [draft, setDraft] = useState("");
+  const [activity, setActivity] = useState<Activity[]>([]);
+  const [status, setStatus] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const starters = suggestions?.length ? suggestions : DEFAULT_SUGGESTIONS;
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, sending]);
+  }, [messages, sending, draft, activity.length]);
+
+  const finish = (json: Extract<StreamEvent, { type: "done" }>["result"], optimisticId: string) => {
+    setMessages((m) => [...m.filter((x) => x.id !== optimisticId), json.userMessage, json.assistantMessage]);
+    setUsage(json.usage);
+    if (!conversationId) {
+      setConversationId(json.conversationId);
+      router.replace(`/coach?c=${json.conversationId}`, { scroll: false });
+      router.refresh();
+    }
+  };
 
   const send = async (text: string) => {
     const message = text.trim();
     if (!message || sending) return;
     setSending(true);
     setError(null);
+    setDraft("");
+    setActivity([]);
+    setStatus(mode === "plan" ? "Drafting your plan — this can take a little while…" : "Thinking…");
     const optimistic: ChatMessage = { id: `tmp-${Date.now()}`, role: "user", content: message, proposal: null, proposal_status: null, created_at: new Date().toISOString() };
     setMessages((m) => [...m, optimistic]);
     setInput("");
-    try {
-      const res = await fetch("/api/ai/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ conversationId, message, mode }) });
-      const json = await res.json();
-      if (!res.ok) {
-        setMessages((m) => m.filter((x) => x.id !== optimistic.id));
-        setInput(message);
-        setError(json.message ?? "Something went wrong. Please try again.");
-        return;
-      }
-      setMessages((m) => [...m.filter((x) => x.id !== optimistic.id), json.userMessage, json.assistantMessage]);
-      setUsage(json.usage);
-      if (!conversationId) {
-        setConversationId(json.conversationId);
-        router.replace(`/coach?c=${json.conversationId}`, { scroll: false });
-        router.refresh();
-      }
-    } catch {
+    const fail = (msg: string) => {
       setMessages((m) => m.filter((x) => x.id !== optimistic.id));
       setInput(message);
-      setError(navigator.onLine ? "Couldn't reach the server. Please try again." : "You're offline. The AI coach needs a connection.");
+      setError(msg);
+    };
+    try {
+      const res = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/x-ndjson" },
+        body: JSON.stringify({ conversationId, message, mode }),
+      });
+      if (!res.ok || !res.body) {
+        const json = await res.json().catch(() => ({}));
+        fail(json.message ?? "Something went wrong. Please try again.");
+        return;
+      }
+      if (!(res.headers.get("content-type") ?? "").includes("ndjson")) {
+        finish(await res.json(), optimistic.id);
+        return;
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let done = false;
+      const handle = (e: StreamEvent) => {
+        if (e.type === "status") setStatus(e.text);
+        else if (e.type === "tool") setActivity((a) => [...a.map((x) => ({ ...x, done: true })), { label: e.label, done: false }]);
+        else if (e.type === "text") {
+          setActivity((a) => a.map((x) => ({ ...x, done: true })));
+          setDraft((d) => d + e.delta);
+        } else if (e.type === "reset") setDraft("");
+        else if (e.type === "done") {
+          done = true;
+          finish(e.result, optimistic.id);
+        } else if (e.type === "error") {
+          done = true;
+          fail(e.message ?? "Something went wrong. Please try again.");
+        }
+      };
+      for (;;) {
+        const { value, done: eof } = await reader.read();
+        if (value) buffer += decoder.decode(value, { stream: true });
+        let nl: number;
+        while ((nl = buffer.indexOf("\n")) >= 0) {
+          const line = buffer.slice(0, nl).trim();
+          buffer = buffer.slice(nl + 1);
+          if (line) {
+            try {
+              handle(JSON.parse(line) as StreamEvent);
+            } catch {
+              /* ignore a malformed line */
+            }
+          }
+        }
+        if (eof) break;
+      }
+      if (!done) fail("The connection dropped before the coach finished. Please try again.");
+    } catch {
+      fail(navigator.onLine ? "Couldn't reach the server. Please try again." : "You're offline. The AI coach needs a connection.");
     } finally {
       setSending(false);
+      setDraft("");
+      setActivity([]);
+      setStatus(null);
     }
   };
 
@@ -222,10 +341,11 @@ export function CoachChat({ conversationId: initialId, initialMessages, initialQ
             </div>
             <p className="mt-3 font-display text-xl font-semibold uppercase">How can I help you train?</p>
             <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-              I use your goals, equipment and logged workouts to give specific advice. {canGeneratePlans ? "Switch to Plan mode to draft a new program you can review before saving." : ""}
+              I read your goals, program, workouts, food log and bodyweight to give specific advice, and I can suggest changes for you to confirm.{" "}
+              {canGeneratePlans ? "Switch to Plan mode to draft a new program you can review before saving." : ""}
             </p>
-            <div className="mx-auto mt-5 grid max-w-2xl gap-2 sm:grid-cols-2">
-              {SUGGESTIONS.map((s) => (
+            <div className="mx-auto mt-5 grid max-w-2xl gap-2 sm:grid-cols-2" aria-label="Suggested questions">
+              {starters.map((s) => (
                 <button key={s} disabled={!enabled} onClick={() => send(s)} className="rounded-xl border border-border bg-elevated/60 px-3 py-2.5 text-left text-sm hover:border-gold-muted disabled:opacity-50">
                   {s}
                 </button>
@@ -235,21 +355,37 @@ export function CoachChat({ conversationId: initialId, initialMessages, initialQ
         )}
         {messages.map((m) => (
           <div key={m.id} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
-            <div className={cn("max-w-[92%] rounded-2xl px-4 py-3 md:max-w-[80%]", m.role === "user" ? "bg-gold/15 text-foreground" : "border border-border bg-elevated/70")}>
+            <div className={cn("max-w-[92%] rounded-2xl px-4 py-3 md:max-w-[80%]", m.role === "user" ? "bg-gold/15 text-foreground" : "border border-border bg-elevated/70")} data-testid={m.role === "assistant" ? "coach-reply" : undefined}>
               {m.role === "assistant" ? <Markdown text={m.content} /> : <p className="whitespace-pre-wrap text-sm">{m.content}</p>}
-              {m.proposal && (
-                <PlanPreview
-                  message={m}
-                  names={exerciseNames}
-                  onChange={(status) => setMessages((list) => list.map((x) => (x.id === m.id ? { ...x, proposal_status: status } : x)))}
-                />
+              {m.proposal &&
+                (isCoachProposal(m.proposal) ? (
+                  <SuggestionCard
+                    messageId={m.id}
+                    proposal={m.proposal}
+                    status={m.proposal_status}
+                    onChange={(s) => setMessages((list) => list.map((x) => (x.id === m.id ? { ...x, proposal_status: s } : x)))}
+                  />
+                ) : (
+                  <PlanPreview
+                    message={m}
+                    names={exerciseNames}
+                    onChange={(s) => setMessages((list) => list.map((x) => (x.id === m.id ? { ...x, proposal_status: s } : x)))}
+                  />
+                ))}
+              {m.role === "assistant" && (
+                <div className="mt-1 flex justify-end">
+                  <CopyButton text={m.content} />
+                </div>
               )}
             </div>
           </div>
         ))}
         {sending && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
-            <Loader2 className="size-4 animate-spin" aria-hidden /> {mode === "plan" ? "Drafting your plan — this can take a little while…" : "Thinking…"}
+          <div className="flex justify-start" role="status">
+            <div className="max-w-[92%] space-y-2 rounded-2xl border border-border bg-elevated/70 px-4 py-3 md:max-w-[80%]">
+              <ActivityList items={activity} status={draft ? null : status} />
+              {draft && <Markdown text={draft} />}
+            </div>
           </div>
         )}
         <div ref={endRef} />
@@ -289,7 +425,7 @@ export function CoachChat({ conversationId: initialId, initialMessages, initialQ
           </Button>
         </form>
         <p className="mt-2 text-[11px] text-muted-foreground">
-          AI responses can be wrong and are not medical advice. Don&apos;t share sensitive health details you don&apos;t want stored. Stop any exercise that causes pain.
+          AI responses can be wrong and are not medical advice. Suggested changes only apply when you tap Confirm. Don&apos;t share sensitive health details you don&apos;t want stored. Stop any exercise that causes pain.
         </p>
       </div>
     </div>

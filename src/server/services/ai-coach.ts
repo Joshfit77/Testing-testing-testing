@@ -4,9 +4,13 @@ import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { getPlans, hasFeature } from "@/lib/domain/plans";
-import type { Plan, UnitSystem } from "@/lib/domain/types";
-import { displayWeight, weightUnit } from "@/lib/domain/units";
+import type { Plan } from "@/lib/domain/types";
 import { aiPlanOutputSchema, validateAiPlan, type AiPlan } from "@/lib/validation/ai";
+import { formatAthleteContext, type AthleteSnapshot } from "@/lib/coach/context";
+import { buildSystemBlocks, CHAT_MAX_TOKENS, fallbackParams, MAX_TOOL_ROUNDS, sanitizeAssistantContent, selectCoachModel } from "@/lib/coach/prompt";
+import { coachToolDefinitions, toolActivityLabel, type CoachProposal } from "@/lib/coach/tools";
+import { loadAthleteSnapshot } from "@/server/coach/snapshot";
+import { executeCoachTool, type ToolContext } from "@/server/coach/tools";
 import { isAiConfigured, isServiceRoleConfigured, serverEnv } from "@/server/env";
 import { isFlagEnabled } from "@/server/flags";
 import { rateLimit } from "@/server/rate-limit";
@@ -46,39 +50,27 @@ export const AI_ERROR_STATUS: Record<AiErrorCode, number> = {
   provider: 502,
 };
 
-const SYSTEM_PROMPT = `You are the Narrow Gate Fitness AI coach: a knowledgeable, encouraging strength and conditioning coach inside a fitness app.
-
-What you help with: personalized training plans, exercise technique and form cues, exercise alternatives, progressive overload, adjusting difficulty, recovery and deload guidance, organizing training schedules, realistic goal setting, basic nutrition concepts (protein, calories, hydration, meal timing), and reviewing the user's logged progress and consistency.
-
-Boundaries — always follow these:
-- You are not a doctor, physical therapist or dietitian. Never diagnose injuries or medical conditions, and never present advice as medical treatment or rehabilitation. If the user describes pain, injury, dizziness, chest pain, or other symptoms, recommend they stop the aggravating activity and consult a qualified healthcare professional; you may suggest pain-free alternatives in general terms.
-- Do not provide extreme dieting guidance (e.g. very-low-calorie diets, prolonged fasting for weight loss, dehydration or weight-cutting protocols), unproven "detox" or "cleanse" claims, or protocols for anabolic steroids, SARMs, prohormones, stimulant stacks or other unsafe supplements. Basic, evidence-supported information (e.g. creatine monohydrate, caffeine moderation, protein intake) is fine with a note to check with a professional if they have health conditions.
-- Keep calorie recommendations moderate (a deficit of roughly 10–20% below maintenance at most) and never recommend fewer than 1,200 kcal/day.
-- Don't reference religion unless the user brings it up first. Treat every user respectfully regardless of background.
-- Base advice on the athlete context provided. If information is missing, make a reasonable assumption and say so briefly. Use the user's preferred units.
-- Be concise and practical: short paragraphs, bullet lists for steps, specific sets/reps/RPE where helpful.
-- You cannot change the user's program directly. If they want a new or modified plan, tell them to switch to "Plan" mode so you can draft one for them to review and approve.`;
-
-const PLAN_INSTRUCTIONS = `Create a training plan for this user as structured output.
+const PLAN_INSTRUCTIONS = `Plan mode: create a training plan for this athlete as structured output.
 Rules:
-- Use ONLY exercise slugs from the provided catalog list, and only exercises the user's equipment allows.
-- 1–7 days per week (match the user's available days unless they asked otherwise), 3–8 exercises per day, realistic for their session length.
+- Use ONLY exercise slugs from the provided catalog list, and only exercises the athlete's equipment allows.
+- 1–7 days per week (match the athlete's available days unless they asked otherwise), 3–8 exercises per day, realistic for their session length.
 - reps as a string like "5", "8-12", "10 per side" or "AMRAP"; use seconds (and reps null) for timed exercises.
 - rest_seconds 30–240 typically; rpe 5–9 (null for mobility/timed work).
 - weeks 1–12. Include a clear progression description (how to add load/reps, when to deload).
-- Respect stated limitations by avoiding aggravating movements, without diagnosing anything.
-- In "reply", briefly explain the plan's logic in 3–6 sentences. Remind the user they can skip anything that causes pain.`;
+- Apply the coaching principles above: sensible weekly volume per muscle for their experience, main lifts first, progression and a deload.
+- Respect stated limitations and logged pain skips by avoiding aggravating movements, without diagnosing anything.
+- In "reply", briefly explain the plan's logic in 3–6 sentences. Remind the athlete they can skip anything that causes pain.`;
 
 let client: Anthropic | null = null;
 function getClient(): Anthropic {
-  if (!client) client = new Anthropic({ apiKey: serverEnv.anthropicApiKey, maxRetries: 2, timeout: 90_000 });
+  // baseURL comes from the SDK's standard ANTHROPIC_BASE_URL env var when set (e2e tests point it at a local mock).
+  if (!client) client = new Anthropic({ apiKey: serverEnv.anthropicApiKey, maxRetries: 2, timeout: 120_000 });
   return client;
 }
 
-/** Models that accept server-side refusal fallbacks ("default" routing). */
-const FALLBACK_MODELS = new Set(["claude-opus-5-5", "claude-opus-5", "claude-fable-5-1", "claude-sonnet-5-5"]);
-function fallbackParams(model: string) {
-  return FALLBACK_MODELS.has(model) ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {};
+/** Model for a plan tier (Pro: Claude Opus 5.5, Plus: Claude Sonnet 5.5; env-overridable). */
+export function coachModelFor(plan: Plan): string {
+  return selectCoachModel(plan, process.env);
 }
 
 function monthStartIso(): string {
@@ -123,77 +115,17 @@ async function recordUsage(userId: string, kind: "chat" | "plan", inputTokens: n
   if (error) logError("ai.usage_record", error);
 }
 
-/** Summarize the user's authorized training data for the model. Faith content is never included. */
-export async function buildAthleteContext(supabase: SupabaseClient, userId: string): Promise<{ text: string; units: UnitSystem; goal: string | null; equipment: string[] }> {
-  const [profileRes, answersRes, sessionsRes, prsRes, weightsRes, programRes, readinessRes, goalsRes] = await Promise.all([
-    supabase.from("profiles").select("unit_system, birth_year, height_cm, wellness_consent_at").eq("id", userId).single(),
-    supabase.from("onboarding_answers").select("*").eq("user_id", userId).maybeSingle(),
-    supabase
-      .from("workout_sessions")
-      .select("name, started_at, total_volume_kg, workout_exercises(skipped, skip_reason, exercise:exercises!workout_exercises_exercise_id_fkey(name), sets:workout_sets(reps, weight_kg, duration_seconds, rpe, completed, is_warmup))")
-      .eq("user_id", userId)
-      .eq("status", "completed")
-      .order("started_at", { ascending: false })
-      .limit(8),
-    supabase.from("personal_records").select("record_type, value, exercise:exercises(name)").eq("user_id", userId).eq("record_type", "estimated_1rm").order("value", { ascending: false }).limit(10),
-    supabase.from("weight_entries").select("recorded_on, weight_kg").eq("user_id", userId).order("recorded_on", { ascending: false }).limit(6),
-    supabase.from("user_programs").select("current_week, current_day, program:training_programs(name, duration_weeks)").eq("user_id", userId).eq("status", "active").maybeSingle(),
-    supabase.from("recovery_checkins").select("checked_on, readiness_score").eq("user_id", userId).order("checked_on", { ascending: false }).limit(1).maybeSingle(),
-    supabase.from("nutrition_goals").select("calories, protein_g, is_estimate").eq("user_id", userId).maybeSingle(),
-  ]);
-  const units = (profileRes.data?.unit_system as UnitSystem) ?? "imperial";
-  const u = weightUnit(units);
-  const w = (kg: number) => `${displayWeight(kg, units)} ${u}`;
-  const a = answersRes.data;
-  const lines: string[] = [`Units: ${units === "imperial" ? "pounds / inches" : "kilograms / centimetres"}`];
-  if (profileRes.data?.birth_year) lines.push(`Age: about ${new Date().getUTCFullYear() - (profileRes.data.birth_year as number)}`);
-  if (a) {
-    lines.push(
-      `Primary goal: ${a.primary_goal}`,
-      `Experience: ${a.experience}`,
-      `Availability: ${a.days_per_week} days/week, ~${a.session_minutes} minutes per session`,
-      `Equipment: ${(a.equipment as string[]).join(", ") || "bodyweight only"}`,
-      `Preferred training styles: ${(a.preferred_types as string[]).join(", ") || "none stated"}`,
-      `Dietary preferences: ${(a.dietary_preferences as string[]).join(", ")}`,
-    );
-    if (a.limitations && profileRes.data?.wellness_consent_at) lines.push(`User-reported limitations (consented; do not diagnose): ${a.limitations as string}`);
-  }
-  const prog = programRes.data?.program as unknown as { name: string; duration_weeks: number } | null;
-  if (prog) lines.push(`Active program: ${prog.name}, week ${programRes.data!.current_week}/${prog.duration_weeks}, next day ${programRes.data!.current_day}`);
-  const weights = weightsRes.data ?? [];
-  if (weights.length) lines.push(`Recent bodyweight: ${weights.map((x) => `${x.recorded_on as string}: ${w(Number(x.weight_kg))}`).join("; ")}`);
-  if (readinessRes.data) lines.push(`Latest readiness check-in: ${readinessRes.data.readiness_score}/100 on ${readinessRes.data.checked_on}`);
-  if (goalsRes.data) lines.push(`Nutrition targets: ${goalsRes.data.calories} kcal, ${goalsRes.data.protein_g} g protein${goalsRes.data.is_estimate ? " (estimated)" : ""}`);
-  const prs = prsRes.data ?? [];
-  if (prs.length) lines.push(`Best estimated 1RMs: ${prs.map((p) => `${(p.exercise as unknown as { name: string } | null)?.name}: ${w(Number(p.value))}`).join("; ")}`);
-  const sessions = (sessionsRes.data ?? []) as unknown as {
-    name: string;
-    started_at: string;
-    workout_exercises: { skipped: boolean; skip_reason: string | null; exercise: { name: string } | null; sets: { reps: number | null; weight_kg: number | null; duration_seconds: number | null; rpe: number | null; completed: boolean; is_warmup: boolean }[] }[];
-  }[];
-  if (sessions.length) {
-    lines.push(`Recent workouts (newest first, ${sessions.length}):`);
-    for (const s of sessions) {
-      const parts = s.workout_exercises.map((e) => {
-        if (e.skipped) return `${e.exercise?.name} (skipped${e.skip_reason ? `: ${e.skip_reason}` : ""})`;
-        const done = e.sets.filter((x) => x.completed && !x.is_warmup);
-        const top = done.reduce<(typeof done)[number] | null>((best, x) => (!best || (x.weight_kg ?? 0) > (best.weight_kg ?? 0) ? x : best), null);
-        const desc = top ? (top.duration_seconds ? `${top.duration_seconds}s` : `${top.weight_kg ? w(Number(top.weight_kg)) : "BW"} × ${top.reps ?? 0}${top.rpe ? ` @RPE ${top.rpe}` : ""}`) : "no completed sets";
-        return `${e.exercise?.name} ${done.length} sets, top ${desc}`;
-      });
-      lines.push(`- ${s.started_at.slice(0, 10)} ${s.name}: ${parts.join("; ")}`);
-    }
-  } else {
-    lines.push("No completed workouts logged yet.");
-  }
-  return { text: lines.join("\n"), units, goal: (a?.primary_goal as string) ?? null, equipment: (a?.equipment as string[]) ?? [] };
+/** Summarize the user's authorized data for the model (used by plan mode and the chat). */
+export async function buildAthleteContext(supabase: SupabaseClient, userId: string): Promise<{ text: string; snapshot: AthleteSnapshot }> {
+  const snapshot = await loadAthleteSnapshot(supabase, userId);
+  return { text: formatAthleteContext(snapshot), snapshot };
 }
 
 export interface CoachMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
-  proposal: AiPlan | null;
+  proposal: AiPlan | CoachProposal | null;
   proposal_status: "proposed" | "applied" | "dismissed" | null;
   created_at: string;
 }
@@ -205,6 +137,117 @@ export interface CoachTurnResult {
   usage: { used: number; limit: number };
 }
 
+/** Streamed progress for the chat UI. */
+export type CoachEvent =
+  | { type: "status"; text: string }
+  | { type: "tool"; name: string; label: string }
+  | { type: "text"; delta: string }
+  | { type: "reset" };
+
+const REFUSAL_REPLY = "I can't help with that request. I'm happy to help with training, technique, recovery or general nutrition questions instead.";
+
+interface ChatLoopResult {
+  reply: string;
+  proposal: CoachProposal | null;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+/** The streaming tool-use loop for chat mode. */
+async function runChatLoop(params: {
+  model: string;
+  system: Anthropic.Beta.BetaTextBlockParam[];
+  messages: Anthropic.Beta.BetaMessageParam[];
+  toolCtx: ToolContext;
+  onEvent: (e: CoachEvent) => void;
+  signal?: AbortSignal;
+}): Promise<ChatLoopResult> {
+  const { model, system, toolCtx, onEvent, signal } = params;
+  const messages = [...params.messages];
+  const tools = coachToolDefinitions();
+  const texts: string[] = [];
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let jsonRetries = 0;
+
+  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    const lastRound = round === MAX_TOOL_ROUNDS - 1;
+    const stream = getClient().beta.messages.stream(
+      {
+        model,
+        max_tokens: CHAT_MAX_TOKENS,
+        system,
+        messages,
+        tools,
+        // On the last allowed round, ask for a final answer without more tool calls.
+        tool_choice: lastRound ? { type: "none" } : { type: "auto" },
+        output_config: { effort: "medium" },
+        ...fallbackParams(model),
+      },
+      { signal },
+    );
+    let roundText = "";
+    stream.on("text", (delta) => {
+      roundText += delta;
+      onEvent({ type: "text", delta });
+    });
+    let message: Anthropic.Beta.BetaMessage;
+    try {
+      message = await stream.finalMessage();
+      jsonRetries = 0;
+    } catch (err) {
+      // With eager input streaming, an unparseable tool input rejects here; re-issue that turn (capped).
+      if (err instanceof Anthropic.APIError || err instanceof Anthropic.APIUserAbortError || jsonRetries++ >= 2) throw err;
+      if (roundText) onEvent({ type: "reset" });
+      onEvent({ type: "status", text: "Retrying…" });
+      round--;
+      continue;
+    }
+    inputTokens += (message.usage.input_tokens ?? 0) + (message.usage.cache_read_input_tokens ?? 0) + (message.usage.cache_creation_input_tokens ?? 0);
+    outputTokens += message.usage.output_tokens ?? 0;
+
+    if (message.stop_reason === "refusal") {
+      onEvent({ type: "reset" });
+      return { reply: REFUSAL_REPLY, proposal: null, inputTokens, outputTokens };
+    }
+    const text = message.content
+      .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")
+      .map((b) => b.text)
+      .join("")
+      .trim();
+    if (text) texts.push(text);
+
+    const toolUses = message.content.filter((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === "tool_use");
+    if (message.stop_reason === "pause_turn") {
+      messages.push({ role: "assistant", content: sanitizeAssistantContent(message.content) });
+      continue;
+    }
+    if (!toolUses.length) {
+      if (message.stop_reason === "max_tokens") texts.push("_(Response shortened — ask me to continue.)_");
+      break;
+    }
+    if (message.stop_reason === "max_tokens") {
+      // A truncated tool input can still parse; never run it.
+      texts.push("_(I ran out of room while checking your data — please ask again, maybe more specifically.)_");
+      break;
+    }
+
+    messages.push({ role: "assistant", content: sanitizeAssistantContent(message.content) });
+    if (text) onEvent({ type: "text", delta: "\n\n" });
+    const results: Anthropic.Beta.BetaToolResultBlockParam[] = [];
+    for (const call of toolUses) {
+      onEvent({ type: "tool", name: call.name, label: toolActivityLabel(call.name, call.input) });
+      const outcome = await executeCoachTool(toolCtx, call.name, call.input);
+      if (outcome.proposal && !toolCtx.proposal) toolCtx.proposal = outcome.proposal;
+      results.push({ type: "tool_result", tool_use_id: call.id, content: outcome.content, ...(outcome.isError ? { is_error: true } : {}) });
+    }
+    // All results for one assistant turn go back in a single user message.
+    messages.push({ role: "user", content: results });
+  }
+
+  return { reply: texts.join("\n\n").trim(), proposal: toolCtx.proposal, inputTokens, outputTokens };
+}
+
 export async function coachTurn(params: {
   supabase: SupabaseClient;
   userId: string;
@@ -212,8 +255,11 @@ export async function coachTurn(params: {
   conversationId: string | null;
   message: string;
   mode: "chat" | "plan";
+  onEvent?: (e: CoachEvent) => void;
+  signal?: AbortSignal;
 }): Promise<CoachTurnResult> {
   const { supabase, userId, plan, message, mode } = params;
+  const onEvent = params.onEvent ?? (() => {});
   const usage = await assertAiAllowed(userId, plan, mode);
 
   let conversationId = params.conversationId;
@@ -234,6 +280,7 @@ export async function coachTurn(params: {
     .from("ai_messages")
     .select("role, content")
     .eq("conversation_id", conversationId)
+    .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(20);
 
@@ -244,59 +291,49 @@ export async function coachTurn(params: {
     .single();
   if (umErr || !userRow) throw umErr ?? new Error("Message insert failed");
 
+  onEvent({ type: "status", text: "Reading your training log…" });
+  const { data: tzRow } = await supabase.from("profiles").select("timezone").eq("id", userId).maybeSingle();
   const context = await buildAthleteContext(supabase, userId);
   const messages: Anthropic.Beta.BetaMessageParam[] = [
     ...((history ?? []).reverse().map((m) => ({ role: m.role as "user" | "assistant", content: m.content as string })) as Anthropic.Beta.BetaMessageParam[]),
     { role: "user", content: message },
   ];
-  // The API requires alternating roles starting with a user turn; drop a leading assistant message if present.
+  // The API requires a user turn first; drop a leading assistant message if present.
   while (messages.length && messages[0]!.role !== "user") messages.shift();
 
-  const model = serverEnv.aiModel;
-  const system: Anthropic.Beta.BetaTextBlockParam[] = [
-    { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
-    { type: "text", text: `Athlete context (from the user's own logged data):\n${context.text}` },
-  ];
+  const model = coachModelFor(mode === "plan" ? "pro" : plan);
+  const system = buildSystemBlocks({ faithEnabled: context.snapshot.faithEnabled, plan, contextText: context.text });
 
   let reply = "";
-  let proposal: AiPlan | null = null;
+  let proposal: AiPlan | CoachProposal | null = null;
   let inputTokens = 0;
   let outputTokens = 0;
   try {
     if (mode === "chat") {
-      const res = await getClient().beta.messages.create({
-        model,
-        max_tokens: 2000,
-        system,
-        messages,
-        output_config: { effort: "low" },
-        ...fallbackParams(model),
-      });
-      inputTokens = res.usage.input_tokens;
-      outputTokens = res.usage.output_tokens;
-      if (res.stop_reason === "refusal") {
-        reply = "I can't help with that request. I'm happy to help with training, technique, recovery or general nutrition questions instead.";
-      } else {
-        reply = res.content
-          .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")
-          .map((b) => b.text)
-          .join("\n")
-          .trim();
-        if (res.stop_reason === "max_tokens") reply += "\n\n_(Response shortened — ask me to continue.)_";
-      }
+      const toolCtx: ToolContext = { supabase, userId, timeZone: (tzRow?.timezone as string) || "UTC", snapshot: context.snapshot, proposal: null };
+      onEvent({ type: "status", text: "Thinking…" });
+      const r = await runChatLoop({ model, system, messages, toolCtx, onEvent, signal: params.signal });
+      reply = r.reply;
+      proposal = r.proposal;
+      inputTokens = r.inputTokens;
+      outputTokens = r.outputTokens;
     } else {
+      onEvent({ type: "status", text: "Drafting your plan — this can take a little while…" });
       const { data: exRows } = await supabase.from("exercises").select("slug, name, equipment, difficulty, is_timed").eq("is_published", true);
       const catalog = (exRows ?? []).map((e) => `${e.slug} | ${e.name} | equipment: ${(e.equipment as string[]).join("/")} | ${e.difficulty}${e.is_timed ? " | timed" : ""}`);
       const knownSlugs = new Set((exRows ?? []).map((e) => e.slug as string));
-      const res = await getClient().beta.messages.parse({
-        model,
-        max_tokens: 12000,
-        system: [...system, { type: "text", text: `${PLAN_INSTRUCTIONS}\n\nExercise catalog (slug | name | equipment | difficulty):\n${catalog.join("\n")}` }],
-        messages,
-        output_config: { effort: "medium", format: betaZodOutputFormat(aiPlanOutputSchema) },
-        ...fallbackParams(model),
-      });
-      inputTokens = res.usage.input_tokens;
+      const res = await getClient().beta.messages.parse(
+        {
+          model,
+          max_tokens: 16_000,
+          system: [...system, { type: "text", text: `${PLAN_INSTRUCTIONS}\n\nExercise catalog (slug | name | equipment | difficulty):\n${catalog.join("\n")}` }],
+          messages,
+          output_config: { effort: "medium", format: betaZodOutputFormat(aiPlanOutputSchema) },
+          ...fallbackParams(model),
+        },
+        { signal: params.signal },
+      );
+      inputTokens = res.usage.input_tokens + (res.usage.cache_read_input_tokens ?? 0) + (res.usage.cache_creation_input_tokens ?? 0);
       outputTokens = res.usage.output_tokens;
       if (res.stop_reason === "refusal") {
         reply = "I can't create a plan for that request. Try describing your goal, schedule and equipment, and I'll draft one.";
@@ -316,6 +353,11 @@ export async function coachTurn(params: {
   } catch (err) {
     // Remove the orphaned user message so retries don't duplicate it.
     await supabase.from("ai_messages").delete().eq("id", userRow.id);
+    if (err instanceof Anthropic.APIUserAbortError) throw new AiError("provider", "The request was cancelled.");
+    if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
+      logError("ai.provider_auth", err, { status: err.status ?? null });
+      throw new AiError("not_configured", "The AI coach isn't configured correctly on this server (the AI provider rejected its key).");
+    }
     if (err instanceof Anthropic.RateLimitError) throw new AiError("rate_limited", "The AI service is busy. Please try again shortly.", 30);
     if (err instanceof Anthropic.APIConnectionError) throw new AiError("provider", "Couldn't reach the AI service. Please try again.");
     if (err instanceof Anthropic.APIError) {
@@ -331,7 +373,7 @@ export async function coachTurn(params: {
       conversation_id: conversationId,
       user_id: userId,
       role: "assistant",
-      content: reply || "Sorry — I didn't get a response. Please try again.",
+      content: (reply || "Sorry — I didn't get a response. Please try again.").slice(0, 20_000),
       proposal,
       proposal_status: proposal ? "proposed" : null,
     })
