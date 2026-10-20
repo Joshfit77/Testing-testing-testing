@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AlertTriangle, ArrowLeft, CheckCircle2, ExternalLink, Lightbulb, PlayCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ExternalLink, Lightbulb, PlayCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { EQUIPMENT_LABELS, type Equipment } from "@/lib/domain/types";
 import type { ExerciseRow } from "@/lib/types/db";
@@ -12,6 +12,7 @@ import { exerciseMediaPublicUrl } from "@/lib/exercise-media";
 import { DemoVideo } from "@/components/train/demo-video";
 import { ExerciseDemo } from "@/components/train/exercise-demo";
 import { requireOnboardedUser } from "@/server/auth";
+import { BackLink } from "@/components/platform/back-link";
 
 export const metadata = { title: "Exercise" };
 
@@ -35,9 +36,7 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
 
   return (
     <div className="space-y-6">
-      <Link href="/train/exercises" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="size-4" aria-hidden /> Exercise library
-      </Link>
+      <BackLink href="/train/exercises">Exercise library</BackLink>
 
       <header>
         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gold">{titleCase(ex.category)}</p>

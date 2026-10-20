@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { BookOpen, CheckCircle2, Circle, Cross, Flame, Lock, NotebookPen, Trash2 } from "lucide-react";
-import { PageHeader } from "@/components/common/page-header";
+import { BookOpen, CheckCircle2, Circle, Flame, Lock, NotebookPen, Trash2 } from "lucide-react";
+import { MainHeader } from "@/components/shell/main-header";
 import { EmptyState } from "@/components/common/states";
 import { FaithChallenge } from "@/components/faith/faith-challenge";
 import { DisciplineGoalForm, JournalForm } from "@/components/faith/faith-forms";
@@ -9,39 +9,19 @@ import { ActionButton } from "@/components/common/action-button";
 import { Button } from "@/components/ui/button";
 import { FAITH_MOTIVATIONS, SCRIPTURES, THEME_LABELS, TRANSLATION, scriptureForDate, type FaithTheme } from "@/data/content";
 import { devotionalForDate } from "@/lib/domain/challenge";
+import { verseExcerpt } from "@/lib/domain/scripture";
 import { addDays, isoDateInTz, startOfWeek } from "@/lib/domain/dates";
 import { cn } from "@/lib/utils";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
 import { getChallengeState } from "@/server/services/challenge";
-import { archiveDisciplineGoalAction, deleteJournalEntryAction, setFaithEnabledAction, toggleDisciplineCheckinAction } from "@/server/actions/faith";
+import { archiveDisciplineGoalAction, deleteJournalEntryAction, toggleDisciplineCheckinAction } from "@/server/actions/faith";
 
-export const metadata = { title: "Faith & Discipline" };
+export const metadata = { title: "Faith" };
 
 export default async function FaithPage({ searchParams }: { searchParams: Promise<{ theme?: string; edit?: string }> }) {
   const sp = await searchParams;
   const { user, profile } = await requireOnboardedUser();
-
-  if (!profile.faith_enabled) {
-    return (
-      <div className="space-y-6">
-        <PageHeader eyebrow="Optional" title="Faith & Discipline" />
-        <section className="rounded-2xl border border-border bg-card p-6">
-          <Cross className="size-8 text-gold" aria-hidden />
-          <p className="mt-4 max-w-2xl text-muted-foreground">
-            Narrow Gate Fitness takes its name from Matthew 7:13–14. This optional section offers scripture on perseverance, humility, discipline,
-            self-control and stewardship, a private reflection journal, discipline goals and devotionals from a Christian perspective. It is entirely
-            optional — none of it is required for training, and it never appears in your workouts or AI coach unless you bring it up.
-          </p>
-          <div className="mt-6">
-          <ActionButton action={setFaithEnabledAction} fields={{ enabled: "true" }}>
-Turn on Faith &amp; Discipline
-          </ActionButton>
-          </div>
-        </section>
-      </div>
-    );
-  }
 
   const supabase = await getServerSupabase();
   const today = isoDateInTz(new Date(), profile.timezone);
@@ -78,24 +58,23 @@ Turn on Faith &amp; Discipline
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Optional" title="Faith & Discipline" description="Rooted in faith. Built for strength." />
+      <MainHeader title="Faith" />
 
-      <section className="bg-card-gradient relative overflow-hidden rounded-3xl border border-gold-muted/50 p-6 md:p-8" aria-labelledby="verse-title">
-        <p id="verse-title" className="text-xs font-semibold uppercase tracking-[0.3em] text-gold">
-          Verse of the day
-        </p>
-        <blockquote className="mt-3 font-display text-2xl font-medium leading-snug md:text-3xl">&ldquo;{verse.text}&rdquo;</blockquote>
-        <p className="mt-3 text-sm text-muted-foreground">
-          {verse.reference} · {TRANSLATION.name} ({TRANSLATION.license})
-        </p>
-        <p className="mt-4 max-w-2xl text-sm text-foreground/85">
-          <strong className="text-gold-highlight">Reflect:</strong> {verse.reflection}
-        </p>
-        <p className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
-          <Flame className="size-4 text-gold" aria-hidden /> {motivation}
-        </p>
+      <section className="relative overflow-hidden rounded-2xl border border-border bg-card" aria-labelledby="verse-title">
+        {/* Decorative original artwork; the verse is the content. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/illustrations/cross-dusk.svg" alt="" aria-hidden className="absolute inset-0 size-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/10" aria-hidden />
+        <div className="relative flex min-h-52 flex-col justify-end p-4 md:min-h-64 md:p-6">
+          <h2 id="verse-title" className="text-xs font-semibold text-champagne/90">
+            Verse of the day
+          </h2>
+          <p className="mt-1 max-w-[20rem] font-serif text-2xl leading-snug text-white [text-shadow:0_1px_8px_rgba(0,0,0,0.6)]" aria-hidden>
+            {verseExcerpt(verse.text)}
+          </p>
+          <p className="mt-1.5 text-sm text-white/85">{verse.reference} (KJV)</p>
+        </div>
       </section>
-
       <FaithChallenge
         today={challenge.today}
         rotatingDay={devotionalForDate(challenge.today).day}
@@ -108,10 +87,10 @@ Turn on Faith &amp; Discipline
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="discipline-title">
-          <h2 id="discipline-title" className="mb-1 font-display text-xl font-bold uppercase">
-            Discipline goals
+          <h2 id="discipline-title" className="mb-1 font-display text-xl font-bold">
+            Today&apos;s focus
           </h2>
-          <p className="mb-4 text-xs text-muted-foreground">Small, faithful habits — check them off as you go.</p>
+          <p className="mb-4 text-sm text-muted-foreground">Daily practices: small, faithful habits. Check them off as you go.</p>
           {goals.length ? (
             <ul className="mb-4 space-y-2">
               {goals.map((g) => {
@@ -135,7 +114,7 @@ Turn on Faith &amp; Discipline
                         {g.cadence === "weekly" ? "Weekly" : "Daily"} · {s.streak} {g.cadence === "weekly" ? "week" : "day"} streak
                       </p>
                     </div>
-                    <ActionButton action={archiveDisciplineGoalAction} fields={{ goalId: g.id as string }} variant="ghost" size="icon-sm" aria-label={`Remove ${g.title as string}`}>
+                    <ActionButton action={archiveDisciplineGoalAction} fields={{ goalId: g.id as string }} variant="ghost" size="icon-sm" aria-label={`Remove ${g.title as string}`} confirmMessage={`Remove the goal “${g.title as string}”?`} confirmLabel="Remove">
 <Trash2 aria-hidden />
                     </ActionButton>
                   </li>
@@ -143,17 +122,17 @@ Turn on Faith &amp; Discipline
               })}
             </ul>
           ) : (
-            <p className="mb-4 text-sm text-muted-foreground">No discipline goals yet.</p>
+            <p className="mb-4 text-sm text-muted-foreground">No practices yet. Add one below, such as prayer, Scripture reading or a rest day.</p>
           )}
           <DisciplineGoalForm />
         </section>
 
         <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="journal-new">
           <h2 id="journal-new" className="mb-1 flex items-center gap-2 font-display text-xl font-bold uppercase">
-            <NotebookPen className="size-5 text-gold" aria-hidden /> {editing ? "Edit reflection" : "Reflection journal"}
+            <NotebookPen className="size-5 text-gold" aria-hidden /> {editing ? "Edit entry" : "Prayer & reflection journal"}
           </h2>
-          <p className="mb-4 flex items-center gap-1 text-xs text-muted-foreground">
-            <Lock className="size-3" aria-hidden /> Private to you — never visible to administrators or the AI coach.
+          <p className="mb-4 flex items-center gap-1 text-sm text-muted-foreground">
+            <Lock className="size-3.5" aria-hidden /> Private to you — never visible to administrators or the AI coach.
           </p>
           <JournalForm
             today={today}
@@ -189,7 +168,7 @@ Turn on Faith &amp; Discipline
                     <Button asChild variant="ghost" size="sm">
                       <Link href={`/faith?edit=${j.id}#journal-new`}>Edit</Link>
                     </Button>
-                    <ActionButton action={deleteJournalEntryAction} fields={{ id: j.id as string }} variant="ghost" size="icon-sm" aria-label="Delete entry">
+                    <ActionButton action={deleteJournalEntryAction} fields={{ id: j.id as string }} variant="ghost" size="icon-sm" aria-label="Delete entry" confirmMessage="Delete this journal entry?" confirmDetail="It can't be recovered." confirmLabel="Delete">
 <Trash2 aria-hidden />
                     </ActionButton>
                   </div>
@@ -201,12 +180,25 @@ Turn on Faith &amp; Discipline
         </section>
       )}
 
+      <section className="rounded-2xl border border-border bg-card p-4 text-[0.9375rem]" aria-label="Today's verse in full">
+        <blockquote className="font-serif text-lg leading-relaxed">&ldquo;{verse.text}&rdquo;</blockquote>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {verse.reference} · {TRANSLATION.name} ({TRANSLATION.license})
+        </p>
+        <p className="mt-3">
+          <strong className="text-gold-highlight">Reflect:</strong> {verse.reflection}
+        </p>
+        <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+          <Flame className="size-4 shrink-0 text-gold" aria-hidden /> {motivation}
+        </p>
+      </section>
+
       <section aria-labelledby="scripture-title">
         <h2 id="scripture-title" className="mb-3 flex items-center gap-2 font-display text-xl font-bold uppercase">
           <BookOpen className="size-5 text-gold" aria-hidden /> Scripture by theme
         </h2>
         <nav aria-label="Themes" className="scrollbar-none -mx-4 mb-4 flex gap-2 overflow-x-auto px-4">
-          <Link href="/faith#scripture-title" aria-current={!theme ? "page" : undefined} className={cn("shrink-0 rounded-full border px-3.5 py-2 text-xs font-semibold", !theme ? "border-gold bg-gold/10 text-gold-highlight" : "border-border text-muted-foreground")}>
+          <Link href="/faith#scripture-title" aria-current={!theme ? "page" : undefined} className={cn("inline-flex min-h-11 shrink-0 items-center rounded-full border px-4 text-sm font-semibold", !theme ? "border-gold bg-gold/10 text-gold-highlight" : "border-border text-muted-foreground")}>
             All
           </Link>
           {(Object.keys(THEME_LABELS) as (FaithTheme | "other")[])
@@ -216,7 +208,7 @@ Turn on Faith &amp; Discipline
                 key={t}
                 href={`/faith?theme=${t}#scripture-title`}
                 aria-current={theme === t ? "page" : undefined}
-                className={cn("shrink-0 rounded-full border px-3.5 py-2 text-xs font-semibold", theme === t ? "border-gold bg-gold/10 text-gold-highlight" : "border-border text-muted-foreground")}
+                className={cn("inline-flex min-h-11 shrink-0 items-center rounded-full border px-4 text-sm font-semibold", theme === t ? "border-gold bg-gold/10 text-gold-highlight" : "border-border text-muted-foreground")}
               >
                 {THEME_LABELS[t]}
               </Link>
@@ -258,14 +250,13 @@ Turn on Faith &amp; Discipline
         )}
       </section>
 
-      <section className="rounded-2xl border border-border bg-card p-5">
-        <p className="text-sm text-muted-foreground">Prefer to hide this section? You can turn it back on any time from your profile.</p>
-        <div className="mt-3">
-        <ActionButton action={setFaithEnabledAction} fields={{ enabled: "false" }} variant="secondary">
-Hide Faith &amp; Discipline
-        </ActionButton>
-        </div>
-      </section>
+      <p className="text-sm text-muted-foreground">
+        Faith is always here in its own tab. You can hide the Scripture card on Home in{" "}
+        <Link href="/profile#display" className="font-semibold text-gold-highlight underline">
+          Profile &amp; Settings
+        </Link>
+        .
+      </p>
     </div>
   );
 }

@@ -16,6 +16,8 @@ export function ActionButton({
   children,
   navigateTo,
   confirmMessage,
+  confirmLabel,
+  confirmDetail,
   ...props
 }: Omit<ButtonProps, "onClick" | "type"> & {
   action: (formData: FormData) => Promise<void>;
@@ -23,6 +25,10 @@ export function ActionButton({
   /** Navigate here after success instead of refreshing in place. */
   navigateTo?: string;
   confirmMessage?: string;
+  /** Label for the confirm button (defaults to "Delete" for destructive buttons, else "Confirm"). Setting it marks the action destructive. */
+  confirmLabel?: string;
+  /** Optional second line in the confirm dialog. */
+  confirmDetail?: string;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -33,7 +39,8 @@ export function ActionButton({
       disabled={pending || props.disabled}
       aria-busy={pending}
       onClick={async () => {
-        if (confirmMessage && !(await confirmDialog({ title: confirmMessage, confirmLabel: props.variant === "destructive" ? "Delete" : "Confirm", destructive: props.variant === "destructive" }))) return;
+        const destructive = props.variant === "destructive" || Boolean(confirmLabel);
+        if (confirmMessage && !(await confirmDialog({ title: confirmMessage, message: confirmDetail, confirmLabel: confirmLabel ?? (destructive ? "Delete" : "Confirm"), destructive }))) return;
         start(async () => {
           const fd = new FormData();
           for (const [k, v] of Object.entries(fields)) fd.set(k, v);

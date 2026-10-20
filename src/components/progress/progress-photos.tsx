@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/common/states";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input, Textarea } from "@/components/ui/input";
+import { useDraft } from "@/lib/use-draft";
 import { Label } from "@/components/ui/label";
 import { compressImage } from "@/lib/image-compress";
 import {
@@ -53,8 +54,11 @@ function UploadDialog({ open, onOpenChange, userId, units, today }: { open: bool
   const [preview, setPreview] = useState<string | null>(null);
   const [takenOn, setTakenOn] = useState(today);
   const [pose, setPose] = useState<PhotoPose>("front");
-  const [weight, setWeight] = useState("");
-  const [note, setNote] = useState("");
+  // The note and weight are kept as a draft on this device until the photo is saved (the image isn't).
+  const draft = useDraft("progress.photo", { weight: "", note: "" });
+  const { weight, note } = draft.value;
+  const setWeight = (w: string) => draft.setValue((d) => ({ ...d, weight: w }));
+  const setNote = (n: string) => draft.setValue((d) => ({ ...d, note: n }));
   const [stage, setStage] = useState<Stage>("idle");
   const [error, setError] = useState<string | null>(null);
   const busy = stage !== "idle";
@@ -66,12 +70,12 @@ function UploadDialog({ open, onOpenChange, userId, units, today }: { open: bool
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
-  const reset = () => {
+  /** Closing keeps the typed note/weight as a draft; `saved` also forgets it. */
+  const reset = (saved = false) => {
     setFile(null);
     setTakenOn(today);
     setPose("front");
-    setWeight("");
-    setNote("");
+    if (saved) draft.clear();
     setError(null);
   };
 
@@ -107,7 +111,7 @@ function UploadDialog({ open, onOpenChange, userId, units, today }: { open: bool
       return setError(res.error);
     }
     setStage("idle");
-    reset();
+    reset(true);
     onOpenChange(false);
     router.refresh();
   };

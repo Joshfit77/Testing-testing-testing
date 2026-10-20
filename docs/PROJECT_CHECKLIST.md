@@ -19,54 +19,54 @@ Offline: the same black and gold tokens, with the same oversized uppercase headi
 
 | ID | Requirement | Status | Evidence | Stage |
 |---|---|---|---|---|
-| 1.1 | Match the reference: compact layout, imagery, cards, spacing | Partial | The dark/gold shell exists (`src/components/shell/app-shell.tsx`), but there are no photo or image cards. Home is a large hero plus stat tiles, which doesn't match the reference's compact cards. | 1 |
+| 1.1 | Match the reference: compact layout, imagery, cards, spacing | Partial | Stage 1A: Home, Train, Food, Faith, Profile and My Progress restyled to the reference's compact cards (`MainHeader`, 12–16px radii, charcoal cards). Original SVG artwork `public/illustrations/mountains-sunrise.svg` (Home Scripture card) and `cross-dusk.svg` (Faith hero). Screenshots at 360×740 and 430×932 checked. No photo imagery for workouts/meals (none owned); Run screen belongs to Stage 1B. | 1 |
 | 1.2 | Black backgrounds | Working | `--background: #090909` in `src/app/globals.css` | 1 |
 | 1.3 | Charcoal cards | Working | `--card: #171717`, `--elevated: #232323` | 1 |
 | 1.4 | White text | Working | `--foreground: #ffffff` | 1 |
 | 1.5 | Metallic gold accents | Working | `--gold #c9a54c`, plus the `.bg-gold-gradient` and `.text-gold-gradient` utilities | 1 |
-| 1.6 | Bronze shadows | Partial | No bronze token. `--gold-muted #8c7139` appears only at the end of the gradient. Bronze `#a8723f` is used only in `badge-icon.tsx`. | 1 |
-| 1.7 | Champagne highlights | Partial | `--gold-highlight #e6c76e` is a warm gold. There is no champagne token. | 1 |
+| 1.6 | Bronze shadows | Working | `--bronze #8c6a2f` and `--bronze-shadow` tokens, `.shadow-bronze` on primary buttons and the My Progress button (`src/app/globals.css`, `src/components/ui/button.tsx`) | 1 |
+| 1.7 | Champagne highlights | Working | `--champagne #f1dfa8`; gold gradient champagne → gold → bronze (`.bg-gold-gradient`, `.text-gold-gradient`, logo, progress ring) | 1 |
 | 1.8 | Not bright yellow | Working | The palette is muted gold | 1 |
 | 1.9 | Body text about 16px | Working | Tailwind's default 16px base | 1 |
-| 1.10 | Secondary text about 14px | Partial | `text-sm` (14px) is common, but there are many 10–11px labels: `text-[10px]`, `text-[11px]`, and 10.5px in the bottom nav | 1 |
-| 1.11 | Headings 24–28px | Partial | `PageHeader` h1 is `text-3xl md:text-4xl` (30/36px). The Home hero h1 is `text-4xl md:text-5xl` (36/48px). The stat numbers are 36px. | 1 |
-| 1.12 | Controls 44–48px tall | Partial | Button `default` is h-11 (44px), but the `sm`/`icon-sm` variants are 36px and are used for the rest-timer and food-form controls (`src/components/ui/button.tsx`) | 1 |
-| 1.13 | Readable and balanced for ages 18–60 | Partial | The uppercase condensed display font (Oswald) and the small labels hurt readability | 1 |
-| 1.14 | Supports system text scaling | Partial | Most sizes are rem, but arbitrary px sizes don't scale. WebView text zoom is untested. | 1 |
+| 1.10 | Secondary text about 14px | Partial | Shell, Home, Train hub, Food top, Faith top, Profile and Progress use 14–15px secondary text; 10–11px sizes removed from those files. About 30 `text-[10px]`/`text-[11px]` uses remain in other components (workout logger, nutrition dialogs, charts). | 1 |
+| 1.11 | Headings 24–28px | Working | `MainHeader` and `PageHeader` h1 are 26px (28px on desktop), mixed case, Plus Jakarta Sans. Legacy `font-display uppercase` headings are neutralised globally (`.font-display.uppercase` in `globals.css`). | 1 |
+| 1.12 | Controls 44–48px tall | Partial | Button `default`/`icon` 44px; `sm`/`icon-sm` keep a compact look but get a 44px hit area (`after:-inset-1`); Switch has a 44px hit area; dialog close is 44px; header buttons, bottom tabs (64px) and chips on Train/Faith are ≥44px. Not every ad-hoc link across the app is audited. | 1 |
+| 1.13 | Readable and balanced for ages 18–60 | Partial | Oswald uppercase removed: Inter body, Plus Jakarta Sans headings, Lora for Scripture. Remaining small labels in untouched components (see 1.10). | 1 |
+| 1.14 | Supports system text scaling | Partial | Root size is `100%` (keeps the browser/OS setting) and the text-size preference scales it (`html[data-text-size]`). rem-based sizes in the restyled screens; some px sizes remain elsewhere. WebView text zoom untested on a device. | 1 |
 | 1.15 | Supports screen readers | Partial | Skip link, aria-labels, `aria-current` and `sr-only` are in place. There is no automated a11y audit (no axe tests). | 1 |
-| 1.16 | Default interface not oversized | Partial | The headings are oversized (see 1.11) | 1 |
-| 1.17 | Text-size preference in Settings | Missing | No setting found in `src/app/(app)/profile` | 1 |
-| 1.18 | Consistent icons, typography, radii, spacing and buttons | Partial | Lucide icons, radius tokens and the cva Button are consistent. Ad-hoc hex values (`#0d0d0d`, `#f08a8a`, `#141210`) and mixed heading sizes are not. | 1 |
+| 1.16 | Default interface not oversized | Working | Headings 26–28px, body 16px, secondary 14–15px on the main screens (screenshots in Stage 1A report) | 1 |
+| 1.17 | Text-size preference in Settings | Working | Profile & Settings → Display & Faith: Default / Large / Extra large (`src/components/profile/display-settings.tsx`), stored in `profiles.text_size` (migration `20261020000009_ui_prefs.sql`), applied before paint from localStorage (`src/app/layout.tsx`); persistence across reload covered by `e2e/navigation.spec.ts` | 1 |
+| 1.18 | Consistent icons, typography, radii, spacing and buttons | Partial | Shared `MainHeader`, Button/Input radii (10px controls, 12–16px cards, pill buttons), one icon set. Older sub-pages still carry some ad-hoc styles. | 1 |
 | 1.19 | Dashboard values come from real user data | Working | `src/server/services/dashboard.ts`. No illustrative numbers. | 1 |
 
 ## 2. Navigation
 
-Offline: same nav as primary, `NAV` = Home, Programs, Exercises, Food, Coach, Progress, with Faith under `MORE`.
+Offline: still the old nav (`NAV` = Home, Programs, Exercises, Food, Coach, Progress, with Faith under `MORE`); the primary app now has the five tabs.
 
 | ID | Requirement | Status | Evidence | Stage |
 |---|---|---|---|---|
-| 2.1 | Exactly 5 bottom tabs: Home · Train · Run · Food · Faith | Missing | `src/components/shell/nav-config.ts` has 6 primary tabs (Home, Programs, Exercises, Food, Coach, Progress) plus More, in `grid-cols-7`. `tests/unit/nav-config.test.ts` asserts the current set. | 1 |
-| 2.2 | Run tab | Missing | No `/run` route | 1 |
-| 2.3 | Faith tab always present | Missing | Faith has `requiresFaith: true` and sits in More or the sidebar | 1 |
+| 2.1 | Exactly 5 bottom tabs: Home · Train · Run · Food · Faith | Working | `MAIN_TABS` in `src/components/shell/nav-config.ts` (Home, Train, Run, Food, Faith), `grid-cols-5` bottom bar, More sheet removed; `tests/unit/nav-config.test.ts`, `e2e/navigation.spec.ts` | 1 |
+| 2.2 | Run tab | Working | `src/app/(app)/run/page.tsx` (Stage 1B). The Run tab entry in the nav is from Stage 1A. Covered by `e2e/run.spec.ts` | 1 |
+| 2.3 | Faith tab always present | Working | Faith is a main tab for every user; `faith_enabled` no longer gates the page or the 40-day challenge actions (`src/server/actions/challenge.ts`). `e2e/challenge.spec.ts`, `e2e/features.spec.ts` | 1 |
 | 2.4 | Icon and label visible on every tab | Working | `app-shell.tsx` renders the icon and label | 1 |
 | 2.5 | Consistent tab order and position | Working | Static `NAV_ITEMS`. The tab set itself must change (2.1). | 1 |
-| 2.6 | Compact gold-outlined "AI Coach" button with chat icon, top right of every main screen | Missing | The mobile header shows the logo and a plan pill. `PageHeader` has no coach button. Coach is a bottom tab. | 1 |
-| 2.7 | AI Coach button separate from the profile icon and clearly labeled | Missing | Neither the button nor the icon exists | 1 |
-| 2.8 | Profile icon opens Profile and Settings | Missing | Profile is reached through the More sheet or the desktop sidebar | 1 |
-| 2.9 | Home → My Progress grouping | Partial | `/progress` exists but is a bottom tab, not a page under Home | 1 |
+| 2.6 | Compact gold-outlined "AI Coach" button with chat icon, top right of every main screen | Working | `CoachButton` in `src/components/shell/main-header.tsx`: gold-outlined 34px pill with chat icon and the label "AI Coach", 44px touch target; on Home, Train, Food, Faith, My Progress, calendar, Programs and Profile. Run uses the same component (Stage 1B). `e2e/navigation.spec.ts` | 1 |
+| 2.7 | AI Coach button separate from the profile icon and clearly labeled | Working | Separate circular initials button (`ProfileButton`) with an accessible name; `e2e/navigation.spec.ts` | 1 |
+| 2.8 | Profile icon opens Profile and Settings | Working | Profile icon → `/profile` (Profile & Settings); `e2e/navigation.spec.ts` | 1 |
+| 2.9 | Home → My Progress grouping | Working | Home → My Progress button → `/progress` hub (Overview, Badges, History, Body Map & Ranks placeholder); the Home tab stays active under `/progress` and `/calendar` | 1 |
 | 2.10 | My Progress → Overview | Working | `src/app/(app)/progress/page.tsx` | 1 |
 | 2.11 | My Progress → Body Map & Ranks | Missing | No route (see §10) | 3 |
 | 2.12 | My Progress → Badges | Working | `src/app/(app)/progress/badges/page.tsx` | 1 |
-| 2.13 | My Progress → History | Partial | Only workout history (`/train/history`). There is no combined activity history. | 1 |
+| 2.13 | My Progress → History | Partial | Hub links History to `/train/history` (workouts). Runs/walks history arrives with Stage 1B. | 1 |
 | 2.14 | Train → Current Workout | Working | `/train/workout` and `ActiveWorkoutPill` | 1 |
-| 2.15 | Train → Programs | Working | `/train` | 1 |
+| 2.15 | Train → Programs | Working | Train hub `/train` → Programs `/train/programs` (library and discipline/category filters moved unchanged); `e2e/program-library.spec.ts`, `e2e/navigation.spec.ts` | 1 |
 | 2.16 | Train → Exercises | Working | `/train/exercises`, currently also its own bottom tab | 1 |
 | 2.17 | Train → Custom Workouts | Partial | Blank workout (`/train/workout?blank=1`) and program builder (`/train/build`). No saved custom workouts (see 6.20). | 2 |
 | 2.18 | Train → Workout History | Working | `/train/history`, `/train/history/[id]` | 1 |
-| 2.19 | Run → Run/Walk Tracker | Missing | No running code | 3 |
-| 2.20 | Run → Plans | Missing | Only the custom-program cardio type (see 7.7) | 3 |
-| 2.21 | Run → Goals | Missing | — | 3 |
-| 2.22 | Run → History | Missing | — | 3 |
+| 2.19 | Run → Run/Walk Tracker | Partial | Manual and treadmill entry work (`src/components/run/activity-form.tsx`). Outdoor Run shows an honest "GPS tracking is coming next" card with no Start button. Live tracking is Stage 3 (`docs/RUN_TRACKING_PLAN.md`). | 3 |
+| 2.20 | Run → Plans | Partial | `/run` links to the library's First 5K run/walk (couch-to-5K) and Half Marathon 80/20 programs, plus the cardio builder (`/train/build?type=cardio`). There's no 10K program in the library. | 3 |
+| 2.21 | Run → Goals | Partial | "Goals & records" on `/run` shows the best 1 mi/5K/10K times (`personalBests` in `src/lib/domain/activities.ts`), with self-reported times flagged. No user-set distance or time goals yet. | 3 |
+| 2.22 | Run → History | Working | `/run?tab=history`: grouped by week with run and walk totals, 12-week pages, plus detail, edit and delete. `e2e/run.spec.ts` | 3 |
 | 2.23 | Food → Diary | Working | `/nutrition` | 1 |
 | 2.24 | Food → Saved Meals | Partial | A section on `/nutrition`, not a screen of its own | 2 |
 | 2.25 | Food → Recipes | Partial | Shares the "Save as meal / recipe" template (see 8.15) | 2 |
@@ -78,7 +78,7 @@ Offline: same nav as primary, `NAV` = Home, Programs, Exercises, Food, Coach, Pr
 | 2.31 | Faith → Prayer Journal | Partial | A "reflection journal" (`faith_journal_entries`), not labeled or structured as a prayer journal | 2 |
 | 2.32 | Faith → Daily Practices | Partial | Discipline goals and check-ins (`discipline_goals`, `discipline_checkins`) | 2 |
 | 2.33 | Faith → 40-Day Challenge | Working | `src/components/faith/faith-challenge.tsx`, `e2e/challenge.spec.ts` | 2 |
-| 2.34 | No duplicate screens; every link opens the same underlying feature | Partial | Mostly a single route per feature. Coach is both a tab and a set of Home prompts. Needs a re-check after the nav change. | 1 |
+| 2.34 | No duplicate screens; every link opens the same underlying feature | Partial | Coach is now only the header button plus `/coach`; Progress only under Home. Weekly activity uses one service (`getWeeklyActivity`). Still to re-check after Run and Food sub-screens land. | 1 |
 
 ## 3. Home
 
@@ -87,15 +87,15 @@ Offline: Home has a greeting, today's workout and summaries. No calendar.
 | ID | Requirement | Status | Evidence | Stage |
 |---|---|---|---|---|
 | 3.1 | Personal greeting | Working | `greeting(hour)` + name in `src/app/(app)/home/page.tsx` | 1 |
-| 3.2 | Scripture image card | Partial | A text verse card, shown only when `faith_enabled`. No image. | 1 |
+| 3.2 | Scripture image card | Working | Image card with original artwork, verse excerpt, reference and KJV; whole card opens `/faith#todays-devotional`; can be hidden in Settings (default on). `e2e/navigation.spec.ts` | 1 |
 | 3.3 | Today's workout with Start | Working | Hero card and `startHref` | 1 |
-| 3.4 | Resume an in-progress workout from Home | Partial | The button always reads "Start workout". Resuming works through the floating "Resume:" pill and the restore prompt in the logger. | 1 |
-| 3.5 | Nutrition summary | Partial | Calorie/protein rings, locked on the Free plan (`hasFeature(plan,"nutrition_tracking")`) | 1 |
-| 3.6 | Weekly activity summary | Partial | Workout stat tiles and streaks only. No runs or walks. | 1 |
-| 3.7 | Prominent My Progress button | Missing | The only link is "/progress#records" on the PR card | 1 |
-| 3.8 | Access to the training calendar | Missing | No calendar | 2 |
-| 3.9 | Compact AI Coach button | Partial | A coach prompt card. No header button (2.6). | 1 |
-| 3.10 | Focused overview; detail after tapping a card | Partial | Home stacks many cards: recommendations, recovery, coach, steps, PRs, weight chart | 1 |
+| 3.4 | Resume an in-progress workout from Home | Working | Home and Train show "Resume workout" when a local draft exists or the server has an `in_progress` session (`src/components/home/today-workout-action.tsx`). `e2e/core-flow.spec.ts` (switch to Home mid-workout → Resume → same sets), `e2e/onboarding-plan.spec.ts` | 1 |
+| 3.5 | Nutrition summary | Working | Calories eaten / budget with a gold bar, taps to Food; honest locked state on Free | 1 |
+| 3.6 | Weekly activity summary | Partial | "This week" card from `getWeeklyActivity(userId, timezone)` (`src/server/services/activity-summary.ts`, `src/lib/domain/activity-week.ts`, `tests/unit/activity-week.test.ts`) with Mon–Sun bars; returns `workouts`, `runs`, `walks` (runs/walks empty until Stage 1B). | 1 |
+| 3.7 | Prominent My Progress button | Working | Gold-outlined My Progress button on Home; `e2e/navigation.spec.ts` | 1 |
+| 3.8 | Access to the training calendar | Partial | Home → Training calendar (`/calendar`): month grid of completed workouts, list of the month's sessions, and the next program sessions in order. Program sessions have no dates yet. | 2 |
+| 3.9 | Compact AI Coach button | Working | Header AI Coach pill (see 2.6) | 1 |
+| 3.10 | Focused overview; detail after tapping a card | Working | Home is greeting, Scripture card, today's workout, nutrition, this week, My Progress, calendar, and a Steps/Supplements/Recovery row. Steps moved to the My Progress hub (`/progress#steps`); PRs, weight chart, recovery and coach prompts live in Progress/Train/Coach. | 1 |
 | 3.11 | Calendar combining workouts, runs, walks and rest days | Missing | — | 2 |
 | 3.12 | Reschedule sessions without losing completed history | Missing | Only `pauseActiveProgramAction` (`src/server/actions/programs.ts`) | 2 |
 
@@ -116,7 +116,7 @@ Offline: has its own onboarding and the program builder.
 | 4.9 | Dietary preferences | Working | Diet style (13 diets), `src/lib/domain/diets.ts`, `e2e/welcome-diets.spec.ts` | 2 |
 | 4.10 | Nutrition goals | Working | Weight goal, pace and activity feed into the budget (`src/lib/domain/calorie-budget.ts`) | 2 |
 | 4.11 | Units | Working | Units toggle, `profiles.unit_system` | 2 |
-| 4.12 | Optional accessibility preferences | Missing | — | 2 |
+| 4.12 | Optional accessibility preferences | Partial | Text size and Reduce motion in Profile & Settings (Stage 1A); not asked during onboarding yet | 2 |
 | 4.13 | Edit answers later | Working | `/profile/preferences` (`OnboardingWizard mode="edit"`) | 2 |
 | 4.14 | Preview how changes affect the plan | Partial | `/plan` summary after onboarding. Editing offers a rebuild but shows no before/after preview. | 2 |
 | 4.15 | Fix the 60-minute selection producing a plan labeled ~75 min | Partial | Library programs use `estimateSessionMinutes` (`src/lib/domain/session-time.ts`, uncommitted, audited in `tests/unit/program-library.test.ts`). Generated programs (`src/lib/domain/custom-programs.ts`) use a separate `estimateMinutes`, whose trimming stops at 2 exercises. Bodybuilding uses its own formula. `tests/unit/custom-programs.test.ts` only checks 5–240 min, not ≤ the chosen length. | 2 |
@@ -209,15 +209,15 @@ Offline: no running features. Steps can be entered and synced from Health Connec
 
 | ID | Requirement | Status | Evidence | Stage |
 |---|---|---|---|---|
-| 7.1 | Run as a dedicated bottom tab | Missing | No route, table or component | 3 |
+| 7.1 | Run as a dedicated bottom tab | Working | `/run` hub (Stage 1B) with the Run tab in the bottom nav (Stage 1A) | 3 |
 | 7.2 | Outdoor Run | Missing | No geolocation code anywhere in `src/` | 3 |
-| 7.3 | Outdoor Walk | Missing | Only daily step counts exist (`daily_steps`) | 3 |
-| 7.4 | Treadmill/manual entry | Missing | — | 3 |
-| 7.5 | Miles and kilometers | Missing | `unit_system` exists but there are no distances to apply it to | 3 |
+| 7.3 | Outdoor Walk | Partial | Walks can be logged by hand (`kind = 'walk'`) and are totalled separately. No live outdoor walk tracking yet (Stage 3). | 3 |
+| 7.4 | Treadmill/manual entry | Working | Run or walk, outdoors or treadmill, date/time, distance (mi/km, optional for a time-only outdoor entry), duration, optional moving time, effort and notes. Zod validation in `src/server/actions/activities.ts`, idempotent client-generated id. Unit-, integration- and e2e-tested. | 3 |
+| 7.5 | Miles and kilometers | Working | Stored in metres. Shown in the profile's unit, and the entry form can switch mi/km. `tests/unit/activities.test.ts` | 3 |
 | 7.6 | Distance or time goals | Missing | — | 3 |
 | 7.7 | Run/walk intervals | Partial | `custom-programs.ts` `first_5k` prescribes run/walk progressions as text. No interval timer. | 3 |
-| 7.8 | Beginner, 5K and 10K plans | Partial | A beginner/5K run-walk goal exists in the cardio builder. No 10K plan. | 3 |
-| 7.9 | History and weekly mileage | Missing | — | 3 |
+| 7.8 | Beginner, 5K and 10K plans | Partial | The library has First 5K (run/walk) and Half Marathon, linked from `/run`, and a beginner/5K goal exists in the cardio builder. **No 10K plan.** | 3 |
+| 7.9 | History and weekly mileage | Working | Weekly run and walk totals in the user's time zone (`weeklyTotals`, unit-tested across time-zone boundaries). This week's totals are on `/run` and in History. Totals recalculate after edit and delete (e2e). | 3 |
 | 7.10 | Live: distance | Missing | — | 3 |
 | 7.11 | Live: elapsed time | Missing | — | 3 |
 | 7.12 | Live: moving time | Missing | — | 3 |
@@ -231,16 +231,16 @@ Offline: no running features. Steps can be entered and synced from Health Connec
 | 7.20 | Filter inaccurate readings | Missing | — | 3 |
 | 7.21 | Smooth current pace | Missing | — | 3 |
 | 7.22 | Visibly handle lost signal; never invent movement | Missing | — | 3 |
-| 7.23 | Exclude paused time from moving pace | Missing | — | 3 |
+| 7.23 | Exclude paused time from moving pace | Partial | Pace always uses `moving_s` (≤ `elapsed_s`, enforced by the DB). `movingSecondsFromSegments` is unit-tested for live tracking. The live pause UI is Stage 3. | 3 |
 | 7.24 | No false route segments across pauses or outages | Missing | — | 3 |
 | 7.25 | Optional audio split announcements | Missing | — | 3 |
-| 7.26 | Background/locked-screen tracking investigated and implemented natively | Missing | No background-location plugin. Needs a real device to verify (see Blockers). | 3 |
-| 7.27 | Document browser-preview limits for background tracking | Missing | — | 3 |
-| 7.28 | Save summaries, routes, splits, notes and records | Missing | No `runs` table in `supabase/migrations` | 3 |
-| 7.29 | Delete runs | Missing | — | 3 |
-| 7.30 | Routes private by default | Missing | — | 3 |
+| 7.26 | Background/locked-screen tracking investigated and implemented natively | Partial | Investigated: plugins, versions, Info.plist keys, Android permissions and the foreground service are in `docs/RUN_TRACKING_PLAN.md`. Not implemented, and needs a real device to verify. | 3 |
+| 7.27 | Document browser-preview limits for background tracking | Partial | Documented in `docs/RUN_TRACKING_PLAN.md`. The in-app notice comes with live tracking (Stage 3). | 3 |
+| 7.28 | Save summaries, routes, splits, notes and records | Partial | `activities` table (`supabase/migrations/20261020000010_activities.sql`) saves summaries and notes, and records are derived. `route` and `splits` columns exist, but nothing writes them until GPS tracking (Stage 3). | 3 |
+| 7.29 | Delete runs | Working | Soft delete with a confirmation dialog; weekly totals and records recalculate. `e2e/run.spec.ts`, `tests/integration/activities.test.ts` | 3 |
+| 7.30 | Routes private by default | Partial | `is_private default true`, owner-only RLS (integration-tested: other users and admins can't read). No routes are recorded yet. | 3 |
 | 7.31 | Stop location tracking when the session ends | Missing | — | 3 |
-| 7.32 | Manual activities show no fabricated GPS route | Missing | — | 3 |
+| 7.32 | Manual activities show no fabricated GPS route | Working | DB check `route is null or source = 'gps'` (integration-tested). The detail page shows "No route: manual entries don't have GPS data" and a Manual entry or Treadmill badge. | 3 |
 
 ## 8. Food and nutrition
 
@@ -254,7 +254,7 @@ Offline: has a food diary, search, barcode, water, supplements and planned meals
 | 8.4 | Barcode scanning with real product lookup | Partial | Open Food Facts lookup (`src/server/services/open-food-facts.ts`, `src/components/nutrition/barcode-scanner.tsx`). Tested only against a local mock (`e2e/food-amounts.spec.ts`). Live Open Food Facts and a real camera are unverified. | 2 |
 | 8.5 | Missing products and denied camera fall back to manual entry | Working | Not-found, denied and cancelled messages with a manual path. `tests/unit/barcode.test.ts`. | 2 |
 | 8.6 | Manual food creation | Working | `createCustomFoodAction` | 1 |
-| 8.7 | Favorites | Missing | — | 1 |
+| 8.7 | Favorites | Working | Star from search results, the amount step and diary rows; Favorites tab in Add food (`src/components/nutrition/favorite-star.tsx`, `setFoodFavoriteAction`). `food_favorites` table (migration `20261020000011`, owner-only RLS, `unique (user_id, food_key)`, stable `usda:`/`off:`/`food:` keys). `tests/integration/food-favorites.test.ts`, `e2e/journeys.spec.ts` | 1 |
 | 8.8 | Recent foods | Working | Recent and frequent lists, `relogItemAction`, `src/lib/domain/diary.ts` | 1 |
 | 8.9 | Saved meals | Working | Meal templates (`meals.is_template`), `saveMealTemplateAction`, `logTemplateAction` | 2 |
 | 8.10 | Copy a meal | Working | `copyMealsAction` with `mealType` | 2 |
@@ -295,7 +295,7 @@ Offline: has a Progress tab with weight, PRs and badges.
 
 | ID | Requirement | Status | Evidence | Stage |
 |---|---|---|---|---|
-| 9.1 | Prominent Home → My Progress entry | Missing | See 3.7 | 1 |
+| 9.1 | Prominent Home → My Progress entry | Working | See 3.7 | 1 |
 | 9.2 | Overview | Working | `/progress` | 3 |
 | 9.3 | Strength & Body Map | Missing | See §10 | 3 |
 | 9.4 | Badges | Working | `/progress/badges` | 3 |
@@ -374,7 +374,7 @@ Offline: has a badges screen with its own list.
 | 11.20 | Going the Distance: 100 running miles | Missing | — | 3 |
 | 11.21 | Walking Strong: 25 walking miles | Missing | — | 3 |
 | 11.22 | Faster Than Before | Missing | — | 3 |
-| 11.23 | Distinguish run from walk and GPS from manual | Missing | — | 3 |
+| 11.23 | Distinguish run from walk and GPS from manual | Partial | Activities store `kind` and `source`. Weekly totals separate runs from walks, and personal bests flag self-reported (manual/treadmill) vs GPS. Run badges themselves aren't built yet. | 3 |
 | 11.24 | Self-reported records not presented as verified | Partial | Nothing claims verification, but there's no explicit "self-reported" label | 3 |
 | 11.25 | Increasingly detailed original rank emblems | Missing | — | 3 |
 | 11.26 | Disciple: ornate metallic-gold narrow-gate emblem | Missing | — | 3 |
@@ -393,8 +393,8 @@ Offline: Faith sits under More; it has the 40-day challenge and a journal.
 
 | ID | Requirement | Status | Evidence | Stage |
 |---|---|---|---|---|
-| 12.1 | Faith central: dedicated bottom tab | Missing | See 2.3. Faith is opt-in (`profiles.faith_enabled`, onboarding toggle). | 1 |
-| 12.2 | Home Scripture card | Partial | Shown only when faith is enabled (see 3.2) | 1 |
+| 12.1 | Faith central: dedicated bottom tab | Working | See 2.3 | 1 |
+| 12.2 | Home Scripture card | Working | See 3.2 | 1 |
 | 12.3 | Daily Scripture | Working | `scriptureForDate` (`src/data/content.ts`) | 2 |
 | 12.4 | Scripture context | Working | A `reflection` per verse | 2 |
 | 12.5 | Devotionals | Working | `src/data/devotionals.ts`, `src/components/faith/devotional-content.tsx`, `tests/unit/devotionals.test.ts` | 2 |
@@ -418,9 +418,9 @@ Offline: the coach screen says it needs the online version.
 
 | ID | Requirement | Status | Evidence | Stage |
 |---|---|---|---|---|
-| 13.1 | Visible through the compact header button on every main tab | Missing | See 2.6 | 1 |
+| 13.1 | Visible through the compact header button on every main tab | Working | See 2.6 | 1 |
 | 13.2 | Dedicated conversation screen | Working | `src/app/(app)/coach/page.tsx`, `src/components/coach/coach-chat.tsx` | 4 |
-| 13.3 | Clear way back to the previous screen | Partial | Coach is a tab with no back control. Android hardware back is handled in `src/lib/native.ts`. | 1 |
+| 13.3 | Clear way back to the previous screen | Working | `BackButton` on `/coach` (history back, falls back to Home); `e2e/navigation.spec.ts` | 1 |
 | 13.4 | Data connected only with the user's permission | Partial | The snapshot covers all users automatically. Only limitations are gated, by wellness consent (`src/server/coach/snapshot.ts`). No per-source toggles. | 4 |
 | 13.5 | Connected: goals and preferences | Working | `src/server/coach/snapshot.ts`, `src/lib/coach/context.ts` (uncommitted), `tests/unit/coach-context.test.ts` | 4 |
 | 13.6 | Connected: current program | Working | `get_program_week` (`src/server/coach/tools.ts`) | 4 |
@@ -441,7 +441,7 @@ Offline: the coach screen says it needs the online version.
 | 13.21 | Rate-limit handling in the UI | Partial | Shows the server message. No countdown or auto-retry. | 4 |
 | 13.22 | Service-failure handling | Partial | `fail()` paths in `coach-chat.tsx`. e2e covers only "not configured" and a mocked success; no 429/500 e2e. | 4 |
 | 13.23 | Retrying | Partial | Manual re-send only | 4 |
-| 13.24 | Preserve unsent messages | Partial | Input is restored on failure. Not persisted across navigation or reload. | 4 |
+| 13.24 | Preserve unsent messages | Working | Coach input is a per-user draft (`useDraft`) that survives navigation and reload. A message that was mid-send is restored unless it was saved. On 429/500 the text goes back in the box with Try again. `e2e/coach.spec.ts` (mock 429 and 500) | 4 |
 | 13.25 | API secrets kept server-side | Working | `src/server/env.ts`; the client sees only `NEXT_PUBLIC_*` | 4 |
 | 13.26 | Live model access | Requires External Setup | Needs `ANTHROPIC_API_KEY` (models `COACH_MODEL_PRO`/`COACH_MODEL_PLUS`). No live call has been made. | 4 |
 | 13.27 | Not presented as a clinician or pastor | Working | `knowledge.ts`: "not a doctor, physiotherapist, dietitian or psychologist"; defers to a pastor | 4 |
@@ -480,25 +480,25 @@ Offline: all data in localStorage on one device. No sync, accounts or export.
 
 | ID | Requirement | Status | Evidence | Stage |
 |---|---|---|---|---|
-| 15.1 | Preserve scroll position | Missing | No explicit restoration | 1 |
-| 15.2 | Preserve filters | Partial | Kept in URL query params (`/train`, `/train/exercises`). Lost when switching tabs. | 1 |
-| 15.3 | Preserve drafts across tab changes | Partial | Workout draft is kept locally and on the server. Coach input, journal and food forms are not. | 1 |
-| 15.4 | Preserve active sessions across tab changes | Working | `src/lib/workout-storage.ts`, `ActiveWorkoutPill` | 1 |
-| 15.5 | Predictable Back behavior | Partial | Android back calls `history.back` (`src/lib/native.ts`). In-page back links are inconsistent. | 1 |
-| 15.6 | No keyboard overlap | Missing | No `@capacitor/keyboard` or visualViewport handling; unverified | 1 |
-| 15.7 | No unexpected layout shifts | Partial | `loading.tsx` skeletons only on read-only routes (known Next 15.5 issue) | 1 |
+| 15.1 | Preserve scroll position | Working | `src/components/shell/scroll-memory.tsx`: per path+query in sessionStorage, restored on Back/Forward and tab returns after content renders. Gives up as soon as you scroll; skips #anchors; instant jump. `e2e/journeys.spec.ts` | 1 |
+| 15.2 | Preserve filters | Working | Filters stay in URL params. Tab links return to the last screen and query per section (`lastHrefFor` / `useTabHrefs` in `src/lib/nav-memory.ts`). The Add-food tab, search text and food type are kept per session. `e2e/journeys.spec.ts` | 1 |
+| 15.3 | Preserve drafts across tab changes | Working | `useDraft` (`src/lib/use-draft.ts`, localStorage, per user, debounced, cleared on success, "Draft restored" notice). Covers the coach input, journal entry, manual food entry, custom food, quick add and progress-photo note. `tests/unit/drafts.test.tsx`, `e2e/journeys.spec.ts` | 1 |
+| 15.4 | Preserve active sessions across tab changes | Working | `src/lib/workout-storage.ts`, `ActiveWorkoutPill`; tab switch + reload e2e in `e2e/journeys.spec.ts` | 1 |
+| 15.5 | Predictable Back behavior | Working | In-app history stack (`src/lib/nav-memory.ts`). `BackButton` goes back only within the app, otherwise to the fallback. `BackLink` on detail screens (exercise, program, history, diets, supplements, exercise library) returns to the list you came from, with its filters and scroll, or else opens the parent. Android back uses `history.back`. `e2e/journeys.spec.ts` | 1 |
+| 15.6 | No keyboard overlap | Partial | `@capacitor/keyboard` 8.0.6 (`resize: native`, `resizeOnFullScreen`). On the web, `KeyboardAvoidance` uses visualViewport to hide the tab bar and Resume bar, lift bottom sheets and scroll the focused field into view (`src/components/platform/`). Helpers are unit-tested. **Not verified on a device** (needs `npx cap sync` and a native build). | 1 |
+| 15.7 | No unexpected layout shifts | Partial | Skeleton `loading.tsx` added for `/calendar` and `/progress/badges`. Charts reserve `h-56`. Mutation routes still use the progress bar (Next 15.5 issue, limitation 2). No automated CLS measurement. | 1 |
 | 15.8 | Compact Return to Workout bar | Working | `src/components/shell/active-workout-pill.tsx` | 1 |
 | 15.9 | Compact Return to Run bar | Missing | No running | 3 |
-| 15.10 | Avoid unnecessary redirects and repeated confirmations | Partial | Unaudited. The middleware's onboarding redirects need review. | 1 |
-| 15.11 | Confirm destructive actions | Working | `src/components/ui/confirm.tsx`, discard dialog, history delete, account delete | 1 |
+| 15.10 | Avoid unnecessary redirects and repeated confirmations | Working | Audited. The middleware now guards `/run`, `/calendar` and `/plan`, so signed-out deep links go to `/login?next=<path+query>` and return there. A signed-in `/login?next=` goes straight to `next`. `tests/unit/protected-routes.test.ts`, `e2e/journeys.spec.ts`. One confirmation per destructive action. | 1 |
+| 15.11 | Confirm destructive actions | Working | Audited every delete. Confirms added for diary entries, saved meals, saved foods, journal entries, discipline goals, weight entries, saved programs, coach conversations and admin content/categories (`ActionButton confirmMessage/confirmLabel`, `confirmDialog`). Discard, history delete, photo delete, run delete and account delete were already confirmed. | 1 |
 | 15.12 | Account access (sign-up, login, logout) | Working | Supabase auth (`src/app/(auth)`, `e2e/core-flow.spec.ts`) | 1 |
 | 15.13 | Hosted accounts in production | Requires External Setup | Needs the owner's Supabase project and keys, a Vercel deploy and `CAP_SERVER_URL` | 1 |
 | 15.14 | Saving | Working | Server actions with RLS | 1 |
 | 15.15 | Account recovery (password reset) | Working | `/forgot-password`, `/reset-password`, e2e | 1 |
-| 15.16 | Synchronization | Partial | Server is the source of truth. Only the workout logger works offline and syncs later. | 1 |
-| 15.17 | Document what is local and what is synced | Partial | `IMPLEMENTATION_STATUS.md` limitation 7. No in-app explanation. | 1 |
-| 15.18 | Data export | Working | `/api/account/export` (`src/server/services/account.ts`, with signed photo links) | 1 |
-| 15.19 | Account deletion | Working | `deleteAccountAction`, cascade integration-tested. Needs `SUPABASE_SERVICE_ROLE_KEY` in production. | 1 |
+| 15.16 | Synchronization | Partial | Server is the source of truth. Only the workout logger works offline and syncs later; drafts keep typed text when a save fails (`docs/DATA.md`). | 1 |
+| 15.17 | Document what is local and what is synced | Working | `docs/DATA.md` (tables, device keys, offline, export, deletion). No in-app explanation yet. | 1 |
+| 15.18 | Data export | Working | `/api/account/export` now also covers activities, supplements, steps, favorites, billing customer and custom-program structure. `tests/unit/account-coverage.test.ts` checks coverage against the migrations; `tests/integration/food-favorites.test.ts` | 1 |
+| 15.19 | Account deletion | Working | `deleteAccountAction`: cascade (checked against the migrations), private buckets emptied (bucket coverage test), device drafts cleared (`ForgetDeviceData`). Needs `SUPABASE_SERVICE_ROLE_KEY` in production. | 1 |
 | 15.20 | Protect private records | Working | RLS (`20261016000002_rls_policies.sql`, `tests/integration/rls.test.ts`) | 1 |
 | 15.21 | Secrets kept out of client code | Working | `src/server/env.ts` | 1 |
 
@@ -510,15 +510,15 @@ Offline: all data in localStorage on one device. No sync, accounts or export.
 | 16.2 | Stage-end report: implemented, verified, remaining | Partial | `IMPLEMENTATION_STATUS.md` exists but predates the spec and marks spec-partial items "✅ Done" (e.g. "Workout logger (all listed features)") | 1 |
 | 16.3 | Requirements not dropped because they're absent from the mockup | Working | Tracked here | 1 |
 | 16.4 | Journey: finish a workout and reopen its saved history | Working | `e2e/core-flow.spec.ts` | 1 |
-| 16.5 | Journey: switch tabs during an active session without losing it | Partial | Reload-restore is e2e-tested. No tab-switch e2e. | 1 |
-| 16.6 | Journey: add, edit, copy and delete food with correct totals | Partial | Add, edit and copy are e2e-tested (`food-amounts.spec.ts`, `nutrition-diary.spec.ts`). The delete-plus-totals assertion is not. | 1 |
+| 16.5 | Journey: switch tabs during an active session without losing it | Working | `e2e/journeys.spec.ts` (Food/Faith/Run/Home and back, plus reload) | 1 |
+| 16.6 | Journey: add, edit, copy and delete food with correct totals | Working | `e2e/journeys.spec.ts` (add 210 → edit 105 → copy +200 → confirmed delete → favorites re-log → reload) | 1 |
 | 16.7 | Journey: build and log a recipe serving | Missing | No test | 2 |
 | 16.8 | Journey: record, pause, resume, finish and reopen a run | Missing | No running | 3 |
 | 16.9 | Journey: update a record and award the correct badge only once | Partial | Unit and integration coverage of PRs and badges; no end-to-end journey | 3 |
-| 16.10 | Journey: edit or delete an activity and recalculate | Partial | `tests/integration/workouts.test.ts` (PR recalculation) | 3 |
+| 16.10 | Journey: edit or delete an activity and recalculate | Partial | `tests/integration/workouts.test.ts` (PR recalculation). Runs: `e2e/run.spec.ts` edits a run, deletes a walk and checks the weekly totals recalculate. Badge recalculation for runs comes with run badges. | 3 |
 | 16.11 | Journey: open a muscle region and inspect its rank explanation | Missing | No body map | 3 |
-| 16.12 | Journey: save and recover a journal draft | Missing | No journal draft persistence (`src/components/faith/faith-forms.tsx`) | 2 |
-| 16.13 | Journey: use the AI Coach and handle a service failure gracefully | Partial | `e2e/coach.spec.ts` covers the not-configured state and a mocked success. No failure or 429 case. | 4 |
+| 16.12 | Journey: save and recover a journal draft | Working | `e2e/journeys.spec.ts` (tab switch + reload restore, cleared on save) | 2 |
+| 16.13 | Journey: use the AI Coach and handle a service failure gracefully | Working | `e2e/coach.spec.ts`: mocked success, mocked 429 and 500 (message kept, survives reload, Try again sends it once). No live API run. | 4 |
 | 16.14 | Journey: reopen the app and confirm saved data remains | Partial | Browser reload is e2e-tested. Native app relaunch is untested. | 1 |
 | 16.15 | Layouts verified on small and large phones | Partial | Playwright uses one mobile viewport. No small or large matrix. | 1 |
 | 16.16 | Placeholders, unconnected integrations and unreviewed content not described as finished | Partial | Legal pages are marked placeholders. `IMPLEMENTATION_STATUS.md` overstates several items (see 16.2). | 1 |

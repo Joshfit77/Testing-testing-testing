@@ -55,7 +55,7 @@ export default async function AdminContentPage() {
                 <Fields c={c} />
               </ActionForm>
             </div>
-            <ActionButton action={deleteContentAction} fields={{ id: c.id }} variant="ghost" size="icon-sm" aria-label={`Delete ${c.title}`}>
+            <ActionButton action={deleteContentAction} fields={{ id: c.id }} variant="ghost" size="icon-sm" aria-label={`Delete ${c.title}`} confirmMessage={`Delete “${c.title}”?`} confirmLabel="Delete">
 <Trash2 aria-hidden />
             </ActionButton>
           </li>

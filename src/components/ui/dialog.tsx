@@ -27,7 +27,7 @@ export const DialogContent = React.forwardRef<
     >
       {side === "bottom" && <span aria-hidden className="mx-auto -mt-2 mb-3 block h-1.5 w-10 shrink-0 rounded-full bg-border md:hidden" />}
       {children}
-      <DialogPrimitive.Close className="absolute right-3 top-3 rounded-lg p-2 text-muted-foreground hover:bg-elevated hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold-highlight">
+      <DialogPrimitive.Close className="absolute right-2 top-2 flex size-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-elevated hover:text-foreground focus-visible:ring-2 focus-visible:ring-gold-highlight">
         <X className="size-5" />
         <span className="sr-only">Close</span>
       </DialogPrimitive.Close>

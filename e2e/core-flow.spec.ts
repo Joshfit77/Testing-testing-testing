@@ -27,6 +27,13 @@ test.describe("authentication, onboarding and workout logging", () => {
     await expect(page.getByLabel(/set 1 weight in lb/).first()).toHaveValue("135");
     await expect(page.getByRole("button", { name: /set 1 completed/ }).first()).toBeVisible();
 
+    // Switching to Home mid-workout offers Resume, which returns to the same session.
+    await page.getByRole("navigation", { name: "Main sections" }).last().getByRole("link", { name: "Home" }).click();
+    await page.waitForURL(/\/home/);
+    await page.getByRole("link", { name: /^Resume workout/ }).click();
+    await page.waitForURL(/\/train\/workout/);
+    await expect(page.getByLabel(/set 1 weight in lb/).first()).toHaveValue("135");
+
     // Pause/resume.
     await page.getByRole("button", { name: "Pause workout" }).click();
     await expect(page.getByText("Paused", { exact: true })).toBeVisible();

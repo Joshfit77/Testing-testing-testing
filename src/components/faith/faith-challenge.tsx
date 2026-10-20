@@ -78,7 +78,7 @@ export function FaithChallenge({ today, rotatingDay, enrollment, currentDay, che
     <>
       {/* Today's devotional */}
       <section id="todays-devotional" className="rounded-2xl border border-gold-muted/50 bg-card p-5 md:p-6" aria-labelledby="devotional-title">
-        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gold">
+        <p className="text-sm font-semibold text-gold">
           {enrolled ? `Today's devotional · Day ${currentDay} of ${CHALLENGE_DAYS}` : "Today's devotional"}
         </p>
         <h2 id="devotional-title" className="mt-2 font-display text-2xl font-bold uppercase leading-tight">
@@ -95,7 +95,7 @@ export function FaithChallenge({ today, rotatingDay, enrollment, currentDay, che
 
       {/* Challenge */}
       <section id="challenge" className="bg-card-gradient rounded-2xl border border-border p-5 md:p-6" aria-labelledby="challenge-title">
-        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gold">Faith &amp; fitness challenge</p>
+        <p className="text-sm font-semibold text-gold">Faith &amp; fitness challenge</p>
         <h2 id="challenge-title" className="mt-2 font-display text-2xl font-bold uppercase leading-tight">
           {CHALLENGE_NAME}
         </h2>
@@ -204,7 +204,7 @@ export function FaithChallenge({ today, rotatingDay, enrollment, currentDay, che
       <Dialog open={dialog?.kind === "read"} onOpenChange={closeDialog}>
         <DialogContent side="bottom">
           <DialogHeader>
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gold">Today&apos;s devotional</p>
+            <p className="text-sm font-semibold text-gold">Today&apos;s devotional</p>
             <DialogTitle>{todaysDevotional.title}</DialogTitle>
             <DialogDescription>{todaysDevotional.reference}</DialogDescription>
           </DialogHeader>
@@ -314,7 +314,7 @@ function DayView({
   return (
     <>
       <DialogHeader>
-        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gold">
+        <p className="text-sm font-semibold text-gold">
           Day {day.day} of {CHALLENGE_DAYS} · {isToday ? "Today" : formatDate(day.date)}
         </p>
         <DialogTitle>{devotional.title}</DialogTitle>

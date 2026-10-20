@@ -68,7 +68,7 @@ export async function saveProgressPhotoAction(input: unknown): Promise<Result> {
     await supabase.storage.from(PROGRESS_PHOTO_BUCKET).remove([v.path]);
     return { ok: false, error: "Couldn't save your photo. Please try again." };
   }
-  revalidatePath("/progress");
+  revalidatePath("/progress", "layout");
   return { ok: true };
 }
 
@@ -87,6 +87,6 @@ export async function deleteProgressPhotoAction(id: string): Promise<Result> {
   const { error: rmErr } = await supabase.storage.from(PROGRESS_PHOTO_BUCKET).remove([row.storage_path as string]);
   // The row is gone; a leftover object stays private and is purged with the account.
   if (rmErr) logError("progress_photos.delete_object", rmErr);
-  revalidatePath("/progress");
+  revalidatePath("/progress", "layout");
   return { ok: true };
 }

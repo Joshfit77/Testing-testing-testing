@@ -5,8 +5,12 @@ import { PROGRESS_PHOTO_BUCKET } from "@/lib/domain/progress-photos";
 /** How long the photo download links in an export stay valid. */
 const EXPORT_PHOTO_URL_TTL_SECONDS = 60 * 60;
 
-/** Tables containing the user's own rows (all readable by the user under RLS). */
-const USER_TABLES: { table: string; column: string }[] = [
+/**
+ * Tables containing the user's own rows (all readable by the user under RLS). Every table whose rows
+ * belong to a user (a column referencing auth.users ... on delete cascade) must be listed here or in
+ * NOT_EXPORTED below — tests/unit/account-coverage.test.ts checks this against supabase/migrations.
+ */
+export const USER_TABLES: { table: string; column: string }[] = [
   { table: "profiles", column: "id" },
   { table: "onboarding_answers", column: "user_id" },
   { table: "fitness_goals", column: "user_id" },
@@ -33,9 +37,25 @@ const USER_TABLES: { table: string; column: string }[] = [
   { table: "progress_photos", column: "user_id" },
   { table: "challenge_enrollments", column: "user_id" },
   { table: "challenge_checkins", column: "user_id" },
+  { table: "activities", column: "user_id" },
+  { table: "supplement_stack", column: "user_id" },
+  { table: "supplement_logs", column: "user_id" },
+  { table: "daily_steps", column: "user_id" },
+  { table: "food_favorites", column: "user_id" },
   { table: "subscriptions", column: "user_id" },
   { table: "user_entitlements", column: "user_id" },
+  { table: "billing_customers", column: "user_id" },
 ];
+
+/**
+ * User-linked tables deliberately left out of the export, with the reason. They still cascade (or are
+ * nulled) on account deletion.
+ */
+export const NOT_EXPORTED: Record<string, string> = {
+  // (program_weeks / program_days / program_exercises have no user column; owned programs' structure is
+  // exported as training_program_structure.)
+  admin_audit_logs: "Administrators' own audit trail (actor_id is set to null when that admin is deleted); not personal data of the user.",
+};
 
 export async function exportUserData(supabase: SupabaseClient, userId: string, email: string | undefined) {
   const out: Record<string, unknown> = {
@@ -53,6 +73,19 @@ export async function exportUserData(supabase: SupabaseClient, userId: string, e
       if (!data || data.length < 1000) break;
     }
     out[table] = rows;
+  }
+  // Programs you built: weeks, days and prescribed exercises live in child tables without a user column.
+  const ownedPrograms = ((out.training_programs as { id: string }[]) ?? []).map((p) => p.id);
+  if (ownedPrograms.length) {
+    const { data, error } = await supabase
+      .from("program_weeks")
+      .select("*, program_days(*, program_exercises(*))")
+      .in("program_id", ownedPrograms)
+      .order("week_number");
+    if (error) throw error;
+    out.training_program_structure = data ?? [];
+  } else {
+    out.training_program_structure = [];
   }
   try {
     out.progress_photo_files = await progressPhotoLinks(supabase, (out.progress_photos as { storage_path: string }[]) ?? []);

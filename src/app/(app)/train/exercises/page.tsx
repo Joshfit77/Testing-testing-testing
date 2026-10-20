@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/states";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import { titleCase } from "@/lib/utils";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
 import { ExerciseThumb } from "@/components/train/exercise-demo";
+import { BackLink } from "@/components/platform/back-link";
 
 export const metadata = { title: "Exercise library" };
 
@@ -48,12 +49,7 @@ export default async function ExercisesPage({
 
   return (
     <div className="space-y-6">
-      <Link
-        href="/train"
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="size-4" aria-hidden /> Train
-      </Link>
+      <BackLink href="/train">Train</BackLink>
       <PageHeader
         title="Exercise library"
         description="Technique guides, form cues, common mistakes and alternatives."

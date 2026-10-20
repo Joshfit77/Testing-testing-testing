@@ -2,7 +2,6 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { OnboardingWizard } from "@/components/onboarding/onboarding-wizard";
-import { WorkoutReminders } from "@/components/profile/workout-reminders";
 import type { DietaryPreference, Equipment, ExperienceLevel, PrimaryGoal, ProgramType } from "@/lib/domain/types";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { isDietType } from "@/lib/domain/diets";
@@ -46,7 +45,6 @@ export default async function PreferencesPage() {
           dietType: isDietType(a?.diet_type) ? a.diet_type : "balanced",
         }}
       />
-      <WorkoutReminders faithEnabled={profile.faith_enabled} />
     </div>
   );
 }

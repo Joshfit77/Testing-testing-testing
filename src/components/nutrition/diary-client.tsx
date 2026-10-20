@@ -14,6 +14,8 @@ import { MEAL_TYPES } from "@/lib/domain/meals";
 import type { UnitSystem } from "@/lib/domain/types";
 import { displayWeight, toKg, weightUnit } from "@/lib/domain/units";
 import { copyMealsAction, logFoodAction, updateBudgetAction } from "@/server/actions/nutrition";
+import { useDraft } from "@/lib/use-draft";
+import { DraftRestoredNotice } from "@/components/drafts/draft-notice";
 
 function ResultLine({ result }: { result: ActionState | null }) {
   if (!result?.message) return null;
@@ -28,7 +30,10 @@ function ResultLine({ result }: { result: ActionState | null }) {
 export function QuickAddDialog({ date, mealType: initialMeal = "breakfast", label = "Quick add", compact = false }: { date: string; mealType?: string; label?: string; compact?: boolean }) {
   const [open, setOpen] = useState(false);
   const [mealType, setMealType] = useState(initialMeal);
-  const [values, setValues] = useState({ calories: "", protein_g: "", carbs_g: "", fat_g: "" });
+  // Unsent numbers are kept as a draft on this device (one per Quick add button) until they're added.
+  const draft = useDraft(`food.quickadd.${compact ? initialMeal : "any"}`, { calories: "", protein_g: "", carbs_g: "", fat_g: "" });
+  const values = draft.value;
+  const setValues = draft.setValue;
   const [result, setResult] = useState<ActionState | null>(null);
   const [pending, start] = useTransition();
   const mealName = MEAL_TYPES.find(([v]) => v === mealType)?.[1] ?? "meal";
@@ -50,7 +55,7 @@ export function QuickAddDialog({ date, mealType: initialMeal = "breakfast", labe
         },
       });
       setResult(res.ok ? { ...res, message: `Added ${Math.round(Number(values.calories))} kcal to ${mealName}.` } : res);
-      if (res.ok) setValues({ calories: "", protein_g: "", carbs_g: "", fat_g: "" });
+      if (res.ok) draft.clear();
     });
 
   return (
@@ -74,6 +79,7 @@ export function QuickAddDialog({ date, mealType: initialMeal = "breakfast", labe
             <DialogTitle>Quick add calories</DialogTitle>
             <DialogDescription>For {date}. Use it when you know the numbers but not the food.</DialogDescription>
           </DialogHeader>
+          {draft.restored && <DraftRestoredNotice onDiscard={draft.clear} onDismiss={draft.dismissRestored} />}
           <form
             className="space-y-3"
             onSubmit={(e) => {

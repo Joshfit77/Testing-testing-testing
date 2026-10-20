@@ -29,7 +29,7 @@ export async function logWeightAction(_prev: ActionState, formData: FormData): P
     logError("progress.weight", error);
     return actionError("Couldn't save your weight.");
   }
-  revalidatePath("/progress");
+  revalidatePath("/progress", "layout");
   revalidatePath("/home");
   return actionOk("Bodyweight saved.");
 }
@@ -39,7 +39,7 @@ export async function deleteWeightAction(formData: FormData): Promise<void> {
   const id = z.string().uuid().safeParse(formData.get("id"));
   if (!id.success) return;
   await supabase.from("weight_entries").delete().eq("id", id.data).eq("user_id", user.id);
-  revalidatePath("/progress");
+  revalidatePath("/progress", "layout");
 }
 
 export async function logMeasurementAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -64,7 +64,7 @@ export async function logMeasurementAction(_prev: ActionState, formData: FormDat
     logError("progress.measurement", error);
     return actionError(error.code === "23514" ? "One of the measurements is out of range." : "Couldn't save measurements.");
   }
-  revalidatePath("/progress");
+  revalidatePath("/progress", "layout");
   return actionOk("Measurements saved.");
 }
 
@@ -106,7 +106,7 @@ export async function createGoalAction(_prev: ActionState, formData: FormData): 
     logError("progress.goal", error);
     return actionError("Couldn't create the goal.");
   }
-  revalidatePath("/progress");
+  revalidatePath("/progress", "layout");
   return actionOk("Goal added.");
 }
 
@@ -120,5 +120,5 @@ export async function setGoalStatusAction(formData: FormData): Promise<void> {
     .update({ status: status.data, completed_at: status.data === "completed" ? new Date().toISOString() : null })
     .eq("id", id.data)
     .eq("user_id", user.id);
-  revalidatePath("/progress");
+  revalidatePath("/progress", "layout");
 }

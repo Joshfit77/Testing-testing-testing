@@ -1,4 +1,5 @@
 import type { CapacitorConfig } from "@capacitor/cli";
+import { KeyboardResize, KeyboardStyle } from "@capacitor/keyboard";
 
 /**
  * Native iOS/Android shells for Narrow Gate Fitness.
@@ -52,12 +53,22 @@ const config: CapacitorConfig = {
       androidScaleType: "CENTER_CROP",
     },
     StatusBar: {
-      style: "DARK",
+      style: KeyboardStyle.Dark,
       backgroundColor: "#090909",
       overlaysWebView: false,
     },
     LocalNotifications: {
       iconColor: "#C9A54C",
+    },
+    // On-screen keyboard (@capacitor/keyboard): the web view itself shrinks above the keyboard
+    // ("native"), so fixed bottom bars and sheets move up with it and focused fields stay visible.
+    // resizeOnFullScreen keeps that working on Android when the app draws edge-to-edge.
+    // The web app also hides the tab bar and scrolls the focused field into view
+    // (src/components/platform/keyboard-avoidance.tsx). Run `npx cap sync` after installing.
+    Keyboard: {
+      resize: KeyboardResize.Native,
+      resizeOnFullScreen: true,
+      style: KeyboardStyle.Dark,
     },
   },
 };

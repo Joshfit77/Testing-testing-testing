@@ -1,10 +1,9 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import { WorkoutEditor, type EditableSession } from "@/components/workout/workout-editor";
 import type { CatalogItem } from "@/components/workout/exercise-picker";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
+import { BackLink } from "@/components/platform/back-link";
 
 export const metadata = { title: "Workout" };
 
@@ -77,9 +76,7 @@ export default async function WorkoutDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div className="space-y-6">
-      <Link href="/train/history" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="size-4" aria-hidden /> History
-      </Link>
+      <BackLink href="/train/history">History</BackLink>
       <WorkoutEditor session={editable} catalog={catalog} units={profile.unit_system} timezone={profile.timezone} />
     </div>
   );

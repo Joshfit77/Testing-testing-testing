@@ -2,6 +2,7 @@ import Link from "next/link";
 import { MessageSquarePlus } from "lucide-react";
 import { CoachChat, type ChatMessage } from "@/components/coach/coach-chat";
 import { PageHeader } from "@/components/common/page-header";
+import { BackButton } from "@/components/common/back-button";
 import { Button } from "@/components/ui/button";
 import { hasFeature } from "@/lib/domain/plans";
 import { cn } from "@/lib/utils";
@@ -52,9 +53,10 @@ export default async function CoachPage({ searchParams }: { searchParams: Promis
 
   return (
     <div className="space-y-6">
+      <BackButton />
       <PageHeader
-        eyebrow="AI Coach"
-        title="Your AI coach"
+        className="-mt-4"
+        title="AI Coach"
         description="Personalized coaching from your goals, program, workouts, food log and bodyweight."
         actions={
           <>

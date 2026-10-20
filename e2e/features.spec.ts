@@ -47,7 +47,7 @@ test.describe("feature access, subscriptions and core sections", () => {
 
   test("progress: log bodyweight and create a goal; recovery check-in requires consent", async ({ page }) => {
     await completeOnboarding(page);
-    await page.goto("/progress?range=7d");
+    await page.goto("/progress/overview?range=7d");
     await page.getByLabel(/^Weight \(lb\)/).fill("182.5");
     await page.getByRole("button", { name: "Save weight" }).click();
     await expect(page.getByText("Bodyweight saved.")).toBeVisible();
@@ -65,10 +65,10 @@ test.describe("feature access, subscriptions and core sections", () => {
     await expect(page.getByText(/^Readiness \d+\/100/)).toBeVisible();
   });
 
-  test("optional faith section is opt-in and journal entries save privately", async ({ page }) => {
+  test("Faith is always available and journal entries save privately", async ({ page }) => {
     await completeOnboarding(page);
     await page.goto("/faith");
-    await page.getByRole("button", { name: /Turn on Faith/ }).click();
+    await expect(page.getByRole("heading", { name: "Faith", level: 1 })).toBeVisible();
     await expect(page.getByText("Verse of the day")).toBeVisible();
     await page.getByRole("textbox", { name: "Reflection" }).fill("Grateful for strength today.");
     await page.getByRole("button", { name: "Save entry" }).click();

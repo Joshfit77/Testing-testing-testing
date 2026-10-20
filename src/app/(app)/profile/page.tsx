@@ -1,57 +1,48 @@
 import Link from "next/link";
-import { Award, ChevronRight, CreditCard, Download, LogOut, SlidersHorizontal } from "lucide-react";
-import { PageHeader } from "@/components/common/page-header";
+import { ChevronRight, CreditCard, Download, KeyRound, LogOut, SlidersHorizontal, TrendingUp } from "lucide-react";
+import { MainHeader } from "@/components/shell/main-header";
+import { DisplaySettings } from "@/components/profile/display-settings";
 import { DeleteAccountForm, ProfileForm, WithdrawConsentForm } from "@/components/profile/profile-forms";
+import { WorkoutReminders } from "@/components/profile/workout-reminders";
 import { Button } from "@/components/ui/button";
 import { getPlans } from "@/lib/domain/plans";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { signOutAction } from "@/server/actions/auth";
 
-export const metadata = { title: "Profile" };
+export const metadata = { title: "Profile & Settings" };
+
+const section = "rounded-2xl border border-border bg-card p-4 md:p-5";
+const h2 = "mb-3 text-lg font-semibold";
+
+function Row({ href, icon: Icon, title, body }: { href: string; icon: typeof ChevronRight; title: string; body: string }) {
+  return (
+    <Link href={href} className="flex min-h-14 items-center gap-3 px-4 py-3 hover:bg-elevated/50">
+      <Icon className="size-5 shrink-0 text-gold" aria-hidden />
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold">{title}</span>
+        <span className="block text-sm text-muted-foreground">{body}</span>
+      </span>
+      <ChevronRight className="size-4 shrink-0 text-gold" aria-hidden />
+    </Link>
+  );
+}
 
 export default async function ProfilePage() {
   const { user, profile } = await requireOnboardedUser();
   const plan = await getUserPlan(user.id);
   return (
-    <div className="space-y-6">
-      <PageHeader eyebrow="Profile" title={profile.display_name ?? "Profile"} description={user.email} />
+    <div className="space-y-4">
+      <MainHeader title="Profile & Settings" subtitle={<span className="block truncate">{user.email}</span>} />
 
-      <nav className="grid gap-3 sm:grid-cols-2" aria-label="Profile sections">
-        <Link href="/profile/preferences" className="flex items-center justify-between rounded-2xl border border-border bg-card p-4 hover:border-gold-muted">
-          <span className="flex items-center gap-3">
-            <SlidersHorizontal className="size-5 text-gold" aria-hidden />
-            <span>
-              <span className="block font-semibold">Training preferences</span>
-              <span className="block text-xs text-muted-foreground">Goals, schedule, equipment, diet</span>
-            </span>
-          </span>
-          <ChevronRight className="size-4 text-gold" aria-hidden />
-        </Link>
-        <Link href="/profile/billing" className="flex items-center justify-between rounded-2xl border border-border bg-card p-4 hover:border-gold-muted">
-          <span className="flex items-center gap-3">
-            <CreditCard className="size-5 text-gold" aria-hidden />
-            <span>
-              <span className="block font-semibold">Plans &amp; billing</span>
-              <span className="block text-xs text-muted-foreground">Current plan: {getPlans()[plan].name}</span>
-            </span>
-          </span>
-          <ChevronRight className="size-4 text-gold" aria-hidden />
-        </Link>
-        <Link href="/progress/badges" className="flex items-center justify-between rounded-2xl border border-border bg-card p-4 hover:border-gold-muted">
-          <span className="flex items-center gap-3">
-            <Award className="size-5 text-gold" aria-hidden />
-            <span>
-              <span className="block font-semibold">Badges</span>
-              <span className="block text-xs text-muted-foreground">Achievements earned from your training</span>
-            </span>
-          </span>
-          <ChevronRight className="size-4 text-gold" aria-hidden />
-        </Link>
+      <nav aria-label="Profile sections" className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
+        <Row href="/profile/preferences" icon={SlidersHorizontal} title="Edit onboarding details" body="Goals, schedule, equipment, diet and body details" />
+        <Row href="/profile/billing" icon={CreditCard} title="Plans & billing" body={`Current plan: ${getPlans()[plan].name}`} />
+        <Row href="/progress" icon={TrendingUp} title="My Progress" body="Overview, badges and history" />
       </nav>
 
-      <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="account-title">
-        <h2 id="account-title" className="mb-4 font-display text-xl font-bold uppercase">
-          Account
+      <section id="account" className={section} aria-labelledby="account-title">
+        <h2 id="account-title" className={h2}>
+          Account &amp; units
         </h2>
         <ProfileForm
           initial={{
@@ -62,22 +53,31 @@ export default async function ProfilePage() {
             faithEnabled: profile.faith_enabled,
           }}
         />
-        <p className="mt-4 text-xs text-muted-foreground">
-          Need to change your password? Use{" "}
-          <Link href="/forgot-password" className="text-gold-highlight underline">
-            password reset
-          </Link>
-          .
-        </p>
+        <Link href="/forgot-password" className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-gold-highlight hover:underline">
+          <KeyRound className="size-4" aria-hidden /> Change password
+        </Link>
       </section>
 
-      <section className="space-y-5 rounded-2xl border border-border bg-card p-5" aria-labelledby="privacy-title">
-        <h2 id="privacy-title" className="font-display text-xl font-bold uppercase">
+      <section id="display" className={section} aria-labelledby="display-title">
+        <h2 id="display-title" className={h2}>
+          Display &amp; Faith
+        </h2>
+        <DisplaySettings
+          initial={{ textSize: profile.text_size ?? "default", reduceMotion: profile.reduce_motion ?? false, homeScripture: profile.home_scripture ?? true }}
+        />
+      </section>
+
+      <div id="reminders">
+        <WorkoutReminders faithEnabled={profile.faith_enabled} />
+      </div>
+
+      <section id="privacy" className={`${section} space-y-5`} aria-labelledby="privacy-title">
+        <h2 id="privacy-title" className="text-lg font-semibold">
           Privacy &amp; data
         </h2>
         <div>
-          <p className="text-sm font-semibold">Export your data</p>
-          <p className="mb-2 text-xs text-muted-foreground">Download everything stored for your account as a JSON file.</p>
+          <p className="font-semibold">Export your data</p>
+          <p className="mb-2 text-sm text-muted-foreground">Download everything stored for your account as a JSON file.</p>
           <Button asChild variant="secondary">
             <a href="/api/account/export" download>
               <Download aria-hidden /> Download my data
@@ -85,8 +85,8 @@ export default async function ProfilePage() {
           </Button>
         </div>
         <div>
-          <p className="text-sm font-semibold">Optional wellness information</p>
-          <p className="mb-2 text-xs text-muted-foreground">
+          <p className="font-semibold">Optional wellness information</p>
+          <p className="mb-2 text-sm text-muted-foreground">
             {profile.wellness_consent_at
               ? `You gave consent on ${new Date(profile.wellness_consent_at).toLocaleDateString()}. Withdrawing deletes limitation notes and recovery check-ins.`
               : "You haven't consented to storing optional wellness information."}
@@ -94,14 +94,14 @@ export default async function ProfilePage() {
           {profile.wellness_consent_at && <WithdrawConsentForm />}
         </div>
         <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4">
-          <p className="text-sm font-semibold text-[#f08a8a]">Delete account</p>
-          <p className="mb-3 text-xs text-muted-foreground">This cancels any active subscription and permanently deletes your account and data. It can&apos;t be undone.</p>
+          <p className="font-semibold text-destructive-foreground">Delete account</p>
+          <p className="mb-3 text-sm text-muted-foreground">This cancels any active subscription and permanently deletes your account and data. It can&apos;t be undone.</p>
           <DeleteAccountForm />
         </div>
       </section>
 
       <form action={signOutAction}>
-        <Button type="submit" variant="ghost" className="w-full">
+        <Button type="submit" variant="secondary" className="w-full">
           <LogOut aria-hidden /> Sign out
         </Button>
       </form>

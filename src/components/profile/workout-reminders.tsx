@@ -84,7 +84,7 @@ export function WorkoutReminders({ faithEnabled }: { faithEnabled: boolean }) {
           <Smartphone className="mt-0.5 size-5 shrink-0 text-gold" aria-hidden />
           <p>
             Workout reminders work in the Narrow Gate Fitness app for iPhone and Android, where they&apos;re delivered even when the app is closed. Open{" "}
-            <strong>Profile → Training preferences</strong> in the app to choose your days and time. They aren&apos;t available in a web browser.
+            <strong>Profile &amp; Settings</strong> in the app to choose your days and time. They aren&apos;t available in a web browser.
           </p>
         </div>
       )}

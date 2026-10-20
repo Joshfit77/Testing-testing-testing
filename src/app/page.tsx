@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { isSupabaseConfigured } from "@/lib/env";
 import { formatPrice, getPlans, PLAN_ORDER, yearlySavingsPercent } from "@/lib/domain/plans";
 import { getCurrentUser } from "@/server/auth";
+import { ForgetDeviceData } from "@/components/platform/forget-device-data";
 
 const FEATURES = [
   { icon: Dumbbell, title: "Programs that adapt", body: "Strength, hypertrophy, strongman, combat conditioning, mobility and more — matched to your goals and equipment." },
@@ -16,7 +17,8 @@ const FEATURES = [
   { icon: ShieldCheck, title: "Private by design", body: "Your data is isolated to your account. Export or delete it any time." },
 ];
 
-export default async function LandingPage() {
+export default async function LandingPage({ searchParams }: { searchParams: Promise<{ deleted?: string }> }) {
+  const { deleted } = await searchParams;
   if (isSupabaseConfigured()) {
     const user = await getCurrentUser();
     if (user) redirect("/home");
@@ -25,6 +27,8 @@ export default async function LandingPage() {
 
   return (
     <div className="min-h-dvh">
+      {/* After account deletion, also forget the drafts and workout copy kept on this device. */}
+      {deleted === "1" && <ForgetDeviceData />}
       <header className="safe-top mx-auto flex h-20 max-w-6xl items-center justify-between px-4 md:px-8">
         <Logo />
         <nav className="flex items-center gap-2">

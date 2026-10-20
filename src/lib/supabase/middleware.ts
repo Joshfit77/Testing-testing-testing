@@ -1,8 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { publicEnv } from "@/lib/env";
+import { safeNextPath } from "@/lib/safe-redirect";
 
-const PROTECTED_PREFIXES = ["/home", "/train", "/coach", "/nutrition", "/progress", "/faith", "/profile", "/onboarding", "/admin"];
+// Every signed-in area. A signed-out visit is sent to /login with `next` (path + query) so signing in
+// lands back on the same screen instead of bouncing to /home.
+export const PROTECTED_PREFIXES = ["/home", "/train", "/run", "/coach", "/nutrition", "/progress", "/calendar", "/plan", "/faith", "/profile", "/onboarding", "/admin"];
 const AUTH_PAGES = ["/login", "/signup"];
 
 /** Refreshes the Supabase session cookie and guards protected routes. */
@@ -32,13 +35,16 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.search = "";
-    url.searchParams.set("next", path);
+    url.searchParams.set("next", path + request.nextUrl.search);
     return NextResponse.redirect(url);
   }
   if (user && AUTH_PAGES.includes(path)) {
+    // Already signed in: go where the login was meant to lead (e.g. an old tab's /login?next=/run).
+    const target = safeNextPath(request.nextUrl.searchParams.get("next"));
     const url = request.nextUrl.clone();
-    url.pathname = "/home";
-    url.search = "";
+    const [pathname, query = ""] = target.split("?");
+    url.pathname = pathname!;
+    url.search = query ? `?${query}` : "";
     return NextResponse.redirect(url);
   }
   return response;

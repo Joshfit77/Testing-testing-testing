@@ -14,6 +14,10 @@ export interface ProfileRow {
   timezone: string;
   step_goal: number;
   avatar_path: string | null;
+  /** Added in 20261020000009_ui_prefs; optional so older rows/mocks still type-check. */
+  text_size?: "default" | "large" | "xlarge";
+  reduce_motion?: boolean;
+  home_scripture?: boolean;
   created_at: string;
 }
 

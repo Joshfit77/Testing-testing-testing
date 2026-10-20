@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState, useTransition } from "react";
+import { useActionState, useEffect, useMemo, useState, useTransition } from "react";
 import { Droplets, Loader2, Plus, Search, Undo2, X } from "lucide-react";
 import { FieldError, FormMessage, SubmitButton } from "@/components/common/form-status";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,11 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarcodeScanner } from "@/components/nutrition/barcode-scanner";
 import { AmountPicker, basisSummary } from "@/components/nutrition/food-amount";
+import { FavoriteStar } from "@/components/nutrition/favorite-star";
+import { DraftRestoredNotice } from "@/components/drafts/draft-notice";
+import { logItemFor } from "@/lib/domain/food-favorites";
+import { useDraft } from "@/lib/use-draft";
+import { useSessionState } from "@/lib/nav-memory";
 import { basisFromFoodRow, defaultUnit, type FoodChoice } from "@/lib/domain/food-basis";
 import { prepareEntry, rankFoods } from "@/lib/domain/food-search";
 import { initialActionState, type ActionState } from "@/lib/action-state";
@@ -91,10 +96,23 @@ function searchErrorMessage(status: number, error?: string): string {
   return status >= 500 ? "Search is unavailable right now." : "Search failed.";
 }
 
-function ChoiceRow({ food, onPick, badge }: { food: FoodChoice; onPick: (f: FoodChoice) => void; badge?: React.ReactNode }) {
+function ChoiceRow({
+  food,
+  onPick,
+  badge,
+  favorite,
+  onFavorite,
+}: {
+  food: FoodChoice;
+  onPick: (f: FoodChoice) => void;
+  badge?: React.ReactNode;
+  /** Undefined hides the star. */
+  favorite?: boolean;
+  onFavorite?: (food: FoodChoice, on: boolean) => void;
+}) {
   return (
-    <li className="rounded-xl border border-border bg-elevated/50">
-      <button type="button" className="w-full px-3 py-2 text-left hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/40 rounded-xl" onClick={() => onPick(food)}>
+    <li className="flex items-center rounded-xl border border-border bg-elevated/50">
+      <button type="button" className="min-w-0 flex-1 rounded-xl px-3 py-2 text-left hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/40" onClick={() => onPick(food)}>
         <span className="block text-sm font-semibold">
           {food.name}
           {food.isEstimate && <span className="ml-1 text-[11px] font-normal text-gold">(typical values)</span>}
@@ -103,6 +121,7 @@ function ChoiceRow({ food, onPick, badge }: { food: FoodChoice; onPick: (f: Food
         {food.detail && <span className="block text-[11px] text-muted-foreground">{food.detail}</span>}
         <span className="block text-xs text-muted-foreground">{basisSummary(food.basis)}</span>
       </button>
+      {favorite !== undefined && <FavoriteStar food={food} initial={favorite} onChange={(on) => onFavorite?.(food, on)} className="mr-1" />}
     </li>
   );
 }
@@ -116,6 +135,7 @@ export function AddFoodDialog({
   dietName,
   recent = [],
   frequent = [],
+  favorites = [],
 }: {
   date: string;
   myFoods: MyFood[];
@@ -127,6 +147,8 @@ export function AddFoodDialog({
   dietName?: string;
   recent?: QuickFood[];
   frequent?: QuickFood[];
+  /** Starred foods (newest first). */
+  favorites?: FoodChoice[];
 }) {
   const [open, setOpen] = useState(false);
   const [mealType, setMealType] = useState("breakfast");
@@ -134,12 +156,26 @@ export function AddFoodDialog({
   const [result, setResult] = useState<ActionState | null>(null);
   const [pending, startTransition] = useTransition();
   const hasRecent = recent.length > 0;
-  const [tab, setTab] = useState(hasRecent ? "recent" : "search");
+  // The tab, search text and food type are remembered for this browser tab (sessionStorage), so they
+  // survive switching app sections and reopening the dialog.
+  // null = not chosen yet: then the default follows the data (Recent once you've logged something).
+  const [chosenTab, setTab] = useSessionState<string | null>("food.add.tab", null);
   const [picked, setPicked] = useState<FoodChoice | null>(null);
+  // Favorites: server list plus optimistic stars/un-stars made in this dialog.
+  const [favOverrides, setFavOverrides] = useState<Record<string, FoodChoice | null>>({});
+  useEffect(() => setFavOverrides({}), [favorites]);
+  const favList = useMemo(() => {
+    const base = favorites.filter((f) => favOverrides[f.key] !== null);
+    const added = Object.values(favOverrides).filter((f): f is FoodChoice => Boolean(f) && !favorites.some((x) => x.key === f!.key));
+    return [...added, ...base];
+  }, [favorites, favOverrides]);
+  const favKeys = useMemo(() => new Set(favList.map((f) => f.key)), [favList]);
+  const tab = chosenTab ?? (hasRecent ? "recent" : favList.length ? "favorites" : "search");
+  const onFavorite = (food: FoodChoice, on: boolean) => setFavOverrides((o) => ({ ...o, [food.key]: on ? food : null }));
 
   // Search / browse state
-  const [q, setQ] = useState("");
-  const [cat, setCat] = useState<number | null>(null);
+  const [q, setQ] = useSessionState("food.add.q", "");
+  const [cat, setCat] = useSessionState<number | null>("food.add.cat", null);
   const [results, setResults] = useState<FoodChoice[]>([]);
   const [remote, setRemote] = useState<FoodChoice[]>([]);
   const [remoteError, setRemoteError] = useState(false);
@@ -148,8 +184,10 @@ export function AddFoodDialog({
   const [moreLoading, setMoreLoading] = useState(false);
   const [filter, setFilter] = useState("");
   const [dietOnly, setDietOnly] = useState(false);
-  // Manual
-  const [manual, setManual] = useState({ name: "", calories: "", protein_g: "", carbs_g: "", fat_g: "", isEstimate: true });
+  // Manual entry: an unsent entry is kept as a draft on this device until it's logged.
+  const manualDraft = useDraft("food.manual", { name: "", calories: "", protein_g: "", carbs_g: "", fat_g: "", isEstimate: true });
+  const manual = manualDraft.value;
+  const setManual = manualDraft.setValue;
 
   const term = q.trim();
   useEffect(() => {
@@ -202,21 +240,19 @@ export function AddFoodDialog({
     }
   };
 
-  const submit = (item: unknown) =>
+  const submit = (item: unknown, onOk?: () => void) =>
     startTransition(async () => {
       const res = await logFoodAction({ date, mealType, status, item });
       setResult(res);
-      if (res.ok) setPicked(null);
+      if (res.ok) {
+        setPicked(null);
+        onOk?.();
+      }
     });
 
-  const logPicked = (food: FoodChoice, quantity: number, unitId: string) =>
-    submit(
-      food.kind === "usda"
-        ? { source: "usda", fdcId: food.ref, quantity, unitId }
-        : food.kind === "off"
-          ? { source: "barcode", code: food.ref, format: food.format, quantity, unitId }
-          : { source: "food", foodId: food.ref, quantity, unitId },
-    );
+  // After a food is logged the search box starts fresh next time (the tab and food type are kept).
+  const logPicked = (food: FoodChoice, quantity: number, unitId: string) => submit(logItemFor(food, quantity, unitId), () => setQ(""));
+  const star = (food: FoodChoice) => (favKeys.has(food.key) ? true : false);
 
   const pick = (f: FoodChoice) => {
     setResult(null);
@@ -264,9 +300,8 @@ export function AddFoodDialog({
           setOpen(true);
           setResult(null);
           setPicked(null);
-          setQ("");
-          setCat(null);
-          if (hasRecent && tab === "search") setTab("recent");
+          // A remembered tab that has nothing in it any more falls back to the default.
+          if ((chosenTab === "recent" && !hasRecent) || (chosenTab === "favorites" && !favList.length)) setTab(null);
         }}
       >
         <Plus aria-hidden /> Add food
@@ -296,6 +331,7 @@ export function AddFoodDialog({
                 onSubmit={(quantity, unitId) => logPicked(picked, quantity, unitId)}
                 onBack={() => setPicked(null)}
                 idPrefix="add-amount"
+                headerAction={<FavoriteStar food={picked} initial={favKeys.has(picked.key)} onChange={(on) => onFavorite(picked, on)} />}
               >
                 <div className="space-y-1">
                   <Label htmlFor="add-amount-status">Log as</Label>
@@ -310,12 +346,15 @@ export function AddFoodDialog({
             <>
               <MealControls mealType={mealType} setMealType={setMealType} status={status} setStatus={setStatus} idPrefix="add" />
               <Tabs value={tab} onValueChange={setTab} className="mt-4">
-                <TabsList className="w-full">
+                <TabsList className="w-full justify-start overflow-x-auto">
                   {hasRecent && (
                     <TabsTrigger value="recent" className="flex-1">
                       Recent
                     </TabsTrigger>
                   )}
+                  <TabsTrigger value="favorites" className="flex-1">
+                    Favorites
+                  </TabsTrigger>
                   <TabsTrigger value="search" className="flex-1">
                     Search
                   </TabsTrigger>
@@ -347,6 +386,23 @@ export function AddFoodDialog({
                     </div>
                   </TabsContent>
                 )}
+
+                <TabsContent value="favorites">
+                  {favList.length === 0 ? (
+                    <p className="py-4 text-sm text-muted-foreground">
+                      No favorites yet. Tap the star next to any food in Search, Scan, My foods or your diary to keep it here.
+                    </p>
+                  ) : (
+                    <section aria-label="Favorite foods">
+                      <ul className="space-y-2">
+                        {favList.map((f) => (
+                          <ChoiceRow key={f.key} food={f} onPick={pick} favorite onFavorite={onFavorite} />
+                        ))}
+                      </ul>
+                      <p className="mt-2 text-[11px] text-muted-foreground">Tap a food to choose the amount. Values are re-checked from the source when you log it.</p>
+                    </section>
+                  )}
+                </TabsContent>
 
                 <TabsContent value="search">
                   {cat != null && (
@@ -402,7 +458,7 @@ export function AddFoodDialog({
                         <p className={sectionTitle}>My foods</p>
                         <ul className="mt-2 space-y-2">
                           {myMatches.map((f) => (
-                            <ChoiceRow key={f.key} food={f} onPick={pick} />
+                            <ChoiceRow key={f.key} food={f} onPick={pick} favorite={star(f)} onFavorite={onFavorite} />
                           ))}
                         </ul>
                       </section>
@@ -419,7 +475,7 @@ export function AddFoodDialog({
                       ) : (
                         <ul className="mt-2 space-y-2">
                           {results.map((f) => (
-                            <ChoiceRow key={f.key} food={f} onPick={pick} />
+                            <ChoiceRow key={f.key} food={f} onPick={pick} favorite={star(f)} onFavorite={onFavorite} />
                           ))}
                         </ul>
                       )}
@@ -437,7 +493,7 @@ export function AddFoodDialog({
                         {commonMatches.length ? (
                           <ul className="mt-2 space-y-2">
                             {commonMatches.map((f) => (
-                              <ChoiceRow key={f.id} food={foodChoice(f, "common")} onPick={pick} badge={fitsBadge(f)} />
+                              <ChoiceRow key={f.id} food={foodChoice(f, "common")} onPick={pick} badge={fitsBadge(f)} favorite={favKeys.has(`food:${f.id}`)} onFavorite={onFavorite} />
                             ))}
                           </ul>
                         ) : (
@@ -455,7 +511,7 @@ export function AddFoodDialog({
                         ) : (
                           <ul className="mt-2 space-y-2">
                             {remote.map((f) => (
-                              <ChoiceRow key={f.key} food={f} onPick={pick} />
+                              <ChoiceRow key={f.key} food={f} onPick={pick} favorite={star(f)} onFavorite={onFavorite} />
                             ))}
                           </ul>
                         )}
@@ -482,7 +538,7 @@ export function AddFoodDialog({
                       <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter my foods" aria-label="Filter my foods" />
                       <ul className="mt-2 space-y-2">
                         {filtered.map((f) => (
-                          <ChoiceRow key={f.key} food={f} onPick={pick} />
+                          <ChoiceRow key={f.key} food={f} onPick={pick} favorite={star(f)} onFavorite={onFavorite} />
                         ))}
                       </ul>
                     </>
@@ -494,17 +550,21 @@ export function AddFoodDialog({
                     className="space-y-3"
                     onSubmit={(e) => {
                       e.preventDefault();
-                      submit({
-                        source: "manual",
-                        name: manual.name,
-                        calories: Number(manual.calories || 0),
-                        protein_g: Number(manual.protein_g || 0),
-                        carbs_g: Number(manual.carbs_g || 0),
-                        fat_g: Number(manual.fat_g || 0),
-                        isEstimate: manual.isEstimate,
-                      });
+                      submit(
+                        {
+                          source: "manual",
+                          name: manual.name,
+                          calories: Number(manual.calories || 0),
+                          protein_g: Number(manual.protein_g || 0),
+                          carbs_g: Number(manual.carbs_g || 0),
+                          fat_g: Number(manual.fat_g || 0),
+                          isEstimate: manual.isEstimate,
+                        },
+                        manualDraft.clear,
+                      );
                     }}
                   >
+                    {manualDraft.restored && <DraftRestoredNotice onDiscard={manualDraft.clear} onDismiss={manualDraft.dismissRestored} />}
                     <div className="space-y-1">
                       <Label htmlFor="man-name">Food</Label>
                       <Input id="man-name" required maxLength={160} value={manual.name} onChange={(e) => setManual({ ...manual, name: e.target.value })} />
@@ -545,26 +605,38 @@ export function AddFoodDialog({
   );
 }
 
+const BLANK_CUSTOM_FOOD = { name: "", brand: "", servingSize: "1", servingUnit: "serving", calories: "", protein_g: "0", carbs_g: "0", fat_g: "0", isEstimate: false };
+
 export function CustomFoodForm() {
   const [state, action] = useActionState(createCustomFoodAction, initialActionState);
+  // Unsaved values are kept on this device until the food is saved.
+  const draft = useDraft("food.custom", BLANK_CUSTOM_FOOD);
+  const v = draft.value;
+  const set = (k: keyof typeof BLANK_CUSTOM_FOOD) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    draft.setValue((d) => ({ ...d, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value }));
+  const clearDraft = draft.clear;
+  useEffect(() => {
+    if (state.ok && state.at) clearDraft();
+  }, [state.ok, state.at, clearDraft]);
   return (
-    <form action={action} className="space-y-3" key={state.ok ? state.at : "form"}>
+    <form action={action} className="space-y-3">
+      {draft.restored && <DraftRestoredNotice onDiscard={draft.clear} onDismiss={draft.dismissRestored} />}
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2 space-y-1 sm:col-span-1">
           <Label htmlFor="cf-name">Name</Label>
-          <Input id="cf-name" name="name" required maxLength={160} aria-invalid={Boolean(state.fieldErrors?.name)} />
+          <Input id="cf-name" name="name" required maxLength={160} value={v.name} onChange={set("name")} aria-invalid={Boolean(state.fieldErrors?.name)} />
         </div>
         <div className="col-span-2 space-y-1 sm:col-span-1">
           <Label htmlFor="cf-brand">Brand (optional)</Label>
-          <Input id="cf-brand" name="brand" maxLength={120} />
+          <Input id="cf-brand" name="brand" maxLength={120} value={v.brand} onChange={set("brand")} />
         </div>
         <div className="space-y-1">
           <Label htmlFor="cf-size">Serving size</Label>
-          <Input id="cf-size" name="servingSize" type="number" inputMode="decimal" step="any" required defaultValue="1" />
+          <Input id="cf-size" name="servingSize" type="number" inputMode="decimal" step="any" required value={v.servingSize} onChange={set("servingSize")} />
         </div>
         <div className="space-y-1">
           <Label htmlFor="cf-unit">Unit</Label>
-          <Input id="cf-unit" name="servingUnit" required defaultValue="serving" maxLength={30} />
+          <Input id="cf-unit" name="servingUnit" required maxLength={30} value={v.servingUnit} onChange={set("servingUnit")} />
         </div>
       </div>
       <div className="grid grid-cols-4 gap-2">
@@ -580,12 +652,12 @@ export function CustomFoodForm() {
             <Label htmlFor={`cf-${k}`} className="text-xs">
               {l}
             </Label>
-            <Input id={`cf-${k}`} name={k} type="number" inputMode="decimal" step="any" min={0} required defaultValue={k === "calories" ? "" : "0"} />
+            <Input id={`cf-${k}`} name={k} type="number" inputMode="decimal" step="any" min={0} required value={v[k]} onChange={set(k)} />
           </div>
         ))}
       </div>
       <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" name="isEstimate" className="size-5 accent-[#C9A54C]" />
+        <input type="checkbox" name="isEstimate" checked={v.isEstimate} onChange={set("isEstimate")} className="size-5 accent-[#C9A54C]" />
         Values are an estimate (not copied from a label)
       </label>
       <FormMessage state={state} />

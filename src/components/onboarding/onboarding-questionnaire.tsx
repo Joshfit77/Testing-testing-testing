@@ -474,11 +474,10 @@ export function OnboardingQuestionnaire({ initialName }: { initialName: string }
             <div className="flex items-start justify-between gap-4 rounded-xl border border-border bg-elevated/40 p-4">
               <div>
                 <p id="faith-label" className="text-sm font-semibold">
-                  Show the optional Faith &amp; Discipline section
+                  Faith-inspired coaching and reminders
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Scripture, reflection journal and discipline goals from a Christian perspective. Entirely optional and never required for workouts. You
-                  can change this any time.
+                  Let the AI coach and workout reminders draw on Scripture and faith language. The Faith tab is always available either way. You can change this any time.
                 </p>
               </div>
               <Switch checked={faith} onCheckedChange={setFaith} aria-labelledby="faith-label" />

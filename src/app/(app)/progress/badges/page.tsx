@@ -42,7 +42,7 @@ function BadgeCard({ badge, units }: { badge: BadgeState; units: UnitSystem }) {
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <p className={cn("font-semibold", !badge.earned && "text-muted-foreground")}>{badge.name}</p>
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{TIER_LABEL[badge.tier]}</span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{TIER_LABEL[badge.tier]}</span>
         </div>
         <p className="text-sm text-muted-foreground">{badge.description}</p>
         {badge.earned && badge.earnedAt ? (

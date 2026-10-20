@@ -22,12 +22,12 @@ export function ProgressRing({ value, size = 112, stroke = 10, label, sublabel, 
       <svg width={size} height={size} role="img" aria-label={`${ariaLabel}: ${Math.round(clamped)}%`} className="-rotate-90">
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#E6C76E" />
+            <stop offset="0%" stopColor="#F1DFA8" />
             <stop offset="60%" stopColor="#C9A54C" />
-            <stop offset="100%" stopColor="#8C7139" />
+            <stop offset="100%" stopColor="#8C6A2F" />
           </linearGradient>
         </defs>
-        <circle cx={size / 2} cy={size / 2} r={r} stroke="#232323" strokeWidth={stroke} fill="none" />
+        <circle cx={size / 2} cy={size / 2} r={r} stroke="#262626" strokeWidth={stroke} fill="none" />
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -43,7 +43,7 @@ export function ProgressRing({ value, size = 112, stroke = 10, label, sublabel, 
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
         {label != null && <span className="font-display text-xl font-semibold leading-none">{label}</span>}
-        {sublabel != null && <span className="mt-1 text-[11px] uppercase tracking-wider text-muted-foreground">{sublabel}</span>}
+        {sublabel != null && <span className="mt-1 text-xs text-muted-foreground">{sublabel}</span>}
       </div>
     </div>
   );

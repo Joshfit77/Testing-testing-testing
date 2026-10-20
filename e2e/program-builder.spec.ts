@@ -6,7 +6,7 @@ test.describe("Build my program", () => {
     await signUpAndConfirm(page, uniqueEmail("builder"));
     await completeOnboarding(page);
 
-    await page.goto("/train");
+    await page.goto("/train/programs");
     // The library and the type picker are organized by discipline.
     await expect(page.getByRole("heading", { name: "Strongman", exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Combat Sports" })).toBeVisible();

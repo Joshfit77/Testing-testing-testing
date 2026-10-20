@@ -45,7 +45,7 @@ export default async function AdminCategoriesPage() {
                   <Fields c={c as { slug: string; name: string; description: string; sort_order: number }} />
                 </ActionForm>
               </div>
-              <ActionButton action={deleteCategoryAction} fields={{ id: c.id as string }} variant="ghost" size="icon-sm" aria-label={`Delete ${c.name as string}`}>
+              <ActionButton action={deleteCategoryAction} fields={{ id: c.id as string }} variant="ghost" size="icon-sm" aria-label={`Delete ${c.name as string}`} confirmMessage={`Delete the category “${c.name as string}”?`} confirmLabel="Delete">
 <Trash2 aria-hidden />
               </ActionButton>
             </div>

@@ -1,4 +1,8 @@
+import { Suspense } from "react";
 import { AppShell } from "@/components/shell/app-shell";
+import { ScrollMemory } from "@/components/shell/scroll-memory";
+import { KeyboardAvoidance } from "@/components/platform/keyboard-avoidance";
+import { DraftUserProvider } from "@/lib/use-draft";
 import { SetupRequired } from "@/components/common/setup-required";
 import { isSupabaseConfigured } from "@/lib/env";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
@@ -13,12 +17,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <AppShell
       userId={user.id}
       displayName={profile.display_name ?? "Athlete"}
-      faithEnabled={profile.faith_enabled}
+      textSize={profile.text_size ?? "default"}
+      reduceMotion={profile.reduce_motion ?? false}
       isAdmin={profile.role === "admin"}
       plan={getPlans()[plan].name}
       signOutAction={signOutAction}
     >
-      {children}
+      {/* Stage 1C: scroll + section memory, keyboard avoidance and per-user form drafts. */}
+      <Suspense fallback={null}>
+        <ScrollMemory />
+      </Suspense>
+      <KeyboardAvoidance />
+      <DraftUserProvider userId={user.id}>{children}</DraftUserProvider>
     </AppShell>
   );
 }

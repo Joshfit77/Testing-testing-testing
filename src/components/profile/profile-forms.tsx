@@ -82,9 +82,9 @@ export function ProfileForm({
       <div className="flex items-start justify-between gap-4 rounded-xl border border-border bg-elevated/40 p-4">
         <div>
           <p id="faith-toggle" className="text-sm font-semibold">
-            Faith &amp; Discipline section
+            Faith-inspired coaching and reminders
           </p>
-          <p className="text-xs text-muted-foreground">Optional Christian content: scripture, reflection journal and discipline goals.</p>
+          <p className="text-sm text-muted-foreground">Let the AI coach and workout reminders draw on Scripture. The Faith tab is always available.</p>
         </div>
         <Switch checked={faith} onCheckedChange={setFaith} aria-labelledby="faith-toggle" />
       </div>

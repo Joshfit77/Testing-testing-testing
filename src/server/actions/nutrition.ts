@@ -19,6 +19,7 @@ import { basisFromFoodRow, basisFromLegacyItem, basisUnits, computeAmount, sanit
 import { getLocalFood } from "@/server/services/usda-local";
 import { logError } from "@/server/log";
 import { estimateAndSaveTargets } from "@/server/services/nutrition-targets";
+import { FAVORITE_KEY_PATTERN } from "@/lib/domain/food-favorites";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const uuid = z.string().uuid();
@@ -368,7 +369,55 @@ export async function deleteCustomFoodAction(formData: FormData): Promise<void> 
   if (!id.success) return;
   const supabase = await getServerSupabase();
   await supabase.from("foods").delete().eq("id", id.data).eq("owner_id", user.id);
+  // A favorite of a deleted saved food can no longer be logged.
+  await supabase.from("food_favorites").delete().eq("user_id", user.id).eq("food_key", `food:${id.data}`);
   revalidatePath("/nutrition");
+}
+
+const favoriteSchema = z.object({
+  key: z.string().regex(FAVORITE_KEY_PATTERN),
+  favorite: z.boolean(),
+  name: z.string().trim().min(1).max(160).optional(),
+  detail: z.string().max(200).optional(),
+  basis: z.unknown().optional(),
+  isEstimate: z.boolean().optional(),
+});
+
+/**
+ * Star or un-star a food. The name/detail/basis are kept only as a display snapshot for the Favorites
+ * tab; logging a favorite re-reads nutrition from the source on the server (logFoodAction).
+ */
+export async function setFoodFavoriteAction(input: unknown): Promise<ActionState> {
+  try {
+    const { user, supabase } = await nutritionCtx();
+    const parsed = favoriteSchema.safeParse(input);
+    if (!parsed.success) return actionError("That food can't be added to favorites.");
+    const { key, favorite, name, detail, isEstimate } = parsed.data;
+    if (!favorite) {
+      const { error } = await supabase.from("food_favorites").delete().eq("user_id", user.id).eq("food_key", key);
+      if (error) throw error;
+      revalidatePath("/nutrition");
+      return actionOk(`Removed ${name ?? "food"} from favorites.`);
+    }
+    const basis = sanitizeBasis(parsed.data.basis);
+    if (!basis || !name) return actionError("That food can't be added to favorites.");
+    if (key.startsWith("food:")) {
+      // Saved foods must be visible to this user (built-in, or their own).
+      const { data: food } = await supabase.from("foods").select("id").eq("id", key.slice(5)).maybeSingle();
+      if (!food) return actionError("Food not found.");
+    }
+    const { error } = await supabase
+      .from("food_favorites")
+      .upsert(
+        { user_id: user.id, food_key: key, name: name.slice(0, 160), detail: detail?.slice(0, 200) || null, basis, is_estimate: Boolean(isEstimate) },
+        { onConflict: "user_id,food_key" },
+      );
+    if (error) throw error;
+    revalidatePath("/nutrition");
+    return actionOk(`Added ${name} to favorites.`);
+  } catch (err) {
+    return guard(err, "nutrition.favorite");
+  }
 }
 
 /** Save a day's meal as a reusable template (saved meal or recipe with yield servings). */

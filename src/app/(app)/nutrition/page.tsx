@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { BookMarked, CalendarClock, ChevronLeft, ChevronRight, Lock, Pill, Salad, Scale, Trash2, TrendingUp } from "lucide-react";
 import { BarSeriesChart } from "@/components/charts/charts";
-import { PageHeader } from "@/components/common/page-header";
+import { MainHeader } from "@/components/shell/main-header";
 import { EmptyState } from "@/components/common/states";
 import { BudgetForm, CopyMealButton, QuickAddDialog } from "@/components/nutrition/diary-client";
 import {
@@ -32,6 +32,8 @@ import { formatLongDate, goalDate, paceLabel, recentAndFrequent, weeklySummary, 
 import { formatWeight } from "@/lib/domain/units";
 import { COMMON_FOODS } from "@/data/foods";
 import { EditableMealItem, type EditableItem } from "@/components/nutrition/food-amount";
+import { FavoriteStar } from "@/components/nutrition/favorite-star";
+import { choiceFromFavorite, isFavoritableKey, type FavoriteRow } from "@/lib/domain/food-favorites";
 import { basisFromLegacyItem, defaultUnit, sanitizeBasis, unitIdForLabel } from "@/lib/domain/food-basis";
 import { nutrientTotals } from "@/lib/domain/nutrition";
 import { usdaCategories } from "@/server/services/usda-local";
@@ -71,7 +73,7 @@ function fmt(n: number) {
 }
 
 /** Diary row data for the edit dialog: the stored basis (or one rebuilt from an older entry). */
-function editableItem(i: MealRow["meal_items"][number], mealType: string): EditableItem {
+function editableItem(i: MealRow["meal_items"][number], mealType: string, favoriteKeys: Set<string>): EditableItem {
   const stored = sanitizeBasis(i.basis);
   const basis = stored ?? basisFromLegacyItem(i);
   const savedUnit = stored ? unitIdForLabel(stored, i.unit_label) : null;
@@ -100,6 +102,8 @@ function editableItem(i: MealRow["meal_items"][number], mealType: string): Edita
       : i.source === "custom"
         ? "Entered by hand, so it scales by servings of the values you entered."
         : "Logged before amounts were saved, so it scales by servings of what you logged.",
+    sourceKey: isFavoritableKey(i.source) ? i.source : null,
+    favorite: Boolean(i.source && favoriteKeys.has(i.source)),
     summary: `${amount ? `${amount} · ` : ""}${Math.round(Number(i.calories))} kcal · P ${fmt(Number(i.protein_g))} · C ${fmt(Number(i.carbs_g))} · F ${fmt(Number(i.fat_g))}`,
   };
 }
@@ -112,7 +116,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
   if (!hasFeature(plan, "nutrition_tracking")) {
     return (
       <div className="space-y-6">
-        <PageHeader eyebrow="Food log" title="Food" description="Track calories, macros and water, save meals and plan ahead." />
+        <MainHeader title="Food" subtitle="Track calories, macros and water, save meals and plan ahead." />
         <EmptyState
           icon={Lock}
           title="Included with Plus and Pro"
@@ -139,7 +143,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
   const date = sp.date && /^\d{4}-\d{2}-\d{2}$/.test(sp.date) ? sp.date : today;
   const supabase = await getServerSupabase();
   const prevDate = addDays(date, -1);
-  const [mealsRes, goalsRes, waterRes, foodsRes, templatesRes, plannedRes, history, flag, commonRes, dietRes, prevRes, recentRes, workoutsRes, ctx, categories] = await Promise.all([
+  const [mealsRes, goalsRes, waterRes, foodsRes, templatesRes, plannedRes, history, flag, commonRes, dietRes, prevRes, recentRes, workoutsRes, ctx, categories, favoritesRes] = await Promise.all([
     supabase
       .from("meals")
       .select("id, meal_type, status, name, meal_items(id, name, servings, calories, protein_g, carbs_g, fat_g, is_estimate, fiber_g, sugar_g, sodium_mg, grams, quantity, unit_label, amount_label, source, basis)")
@@ -183,7 +187,10 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
       .lt("started_at", `${addDays(date, 2)}T00:00:00Z`),
     loadBudgetContext(supabase, user.id),
     usdaCategories(),
+    supabase.from("food_favorites").select("food_key, name, detail, basis, is_estimate").eq("user_id", user.id).order("created_at", { ascending: false }).limit(200),
   ]);
+  const favorites = ((favoritesRes.data ?? []) as FavoriteRow[]).map(choiceFromFavorite).filter((f): f is NonNullable<typeof f> => f != null);
+  const favoriteKeys = new Set(favorites.map((f) => f.key));
 
   const meals = (mealsRes.data ?? []) as unknown as MealRow[];
   const logged = meals.filter((m) => m.status === "logged");
@@ -239,17 +246,17 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Food log" title="Food" description="Track what you eat. Search common foods, save your own, or enter anything by hand." actions={<AddFoodDialog date={date} myFoods={myFoods} commonFoods={commonFoods} remoteSearch={remoteSearch} categories={categories} dietName={diet.name} recent={recent} frequent={frequent} />} />
-      <nav className="flex items-center justify-between rounded-2xl border border-border bg-card p-2" aria-label="Choose day">
+      <MainHeader title="Food" />
+      <nav className="-mt-4 -mb-1 flex items-center justify-center gap-2" aria-label="Choose day">
         <Button asChild variant="ghost" size="icon" aria-label="Previous day">
           <Link href={`/nutrition?date=${addDays(date, -1)}`}>
             <ChevronLeft aria-hidden />
           </Link>
         </Button>
-        <div className="text-center">
-          <p className="font-display text-lg font-semibold uppercase">{label}</p>
+        <div className="min-w-32 text-center">
+          <p className="text-base font-semibold">{label}</p>
           {date !== today && (
-            <Link href="/nutrition" className="text-xs text-gold-highlight hover:underline">
+            <Link href="/nutrition" className="text-sm text-gold-highlight hover:underline">
               Back to today
             </Link>
           )}
@@ -261,8 +268,67 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
         </Button>
       </nav>
 
+      <section className="rounded-2xl border border-border bg-card p-4 md:p-5" aria-labelledby="totals-title">
+        <h2 id="totals-title" className="sr-only">
+          Daily totals
+        </h2>
+        <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-center">
+          <ProgressRing
+            size={176}
+            stroke={12}
+            ariaLabel="Calories eaten of daily goal"
+            value={progressPct(totals.calories, goals?.calories ?? 0)}
+            label={<span className="text-3xl font-bold tabular-nums">{Math.round(totals.calories).toLocaleString()}</span>}
+            sublabel={
+              <>
+                <span className="block text-sm text-foreground/90">calories eaten</span>
+                {goals && <span className="mt-1 block">{goals.calories.toLocaleString()} daily goal</span>}
+              </>
+            }
+          />
+          <dl className="w-full flex-1 space-y-3">
+            {(
+              [
+                ["Protein", totals.protein_g, goals?.protein_g],
+                ["Carbs", totals.carbs_g, goals?.carbs_g],
+                ["Fat", totals.fat_g, goals?.fat_g],
+              ] as const
+            ).map(([l, v, g]) => (
+              <div key={l} className="grid grid-cols-[4.5rem_6.5rem_1fr] items-center gap-2 text-[0.9375rem]">
+                <dt className="font-semibold">{l}</dt>
+                <dd className="tabular-nums text-muted-foreground">
+                  {Math.round(v)}
+                  {g ? ` / ${g}` : ""} g
+                </dd>
+                <dd>
+                  <ProgressBar value={g ? progressPct(v, g) : 0} label={`${l} progress`} />
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+        {anyEstimate && <p className="mt-3 text-sm text-gold">Includes estimated entries (marked “estimate”).</p>}
+        {!goals && <p className="mt-3 text-sm text-muted-foreground">Set targets below to see progress.</p>}
+      </section>
+
+      <div className="space-y-2">
+        <div className="[&>button]:w-full">
+          <AddFoodDialog date={date} myFoods={myFoods} commonFoods={commonFoods} remoteSearch={remoteSearch} categories={categories} dietName={diet.name} recent={recent} frequent={frequent} favorites={favorites} />
+        </div>
+        <nav aria-label="Food tools" className="grid grid-cols-2 gap-2">
+          <Link href="#saved-title" className="flex min-h-12 items-center gap-2 rounded-2xl border border-border bg-card px-3 text-[0.9375rem] font-medium hover:border-gold-muted">
+            <BookMarked className="size-4 shrink-0 text-gold" aria-hidden />
+            <span className="min-w-0 flex-1">Saved meals</span>
+          </Link>
+          <Link href="/nutrition/supplements" className="flex min-h-12 items-center gap-2 rounded-2xl border border-border bg-card px-3 text-[0.9375rem] font-medium hover:border-gold-muted">
+            <Pill className="size-4 shrink-0 text-gold" aria-hidden />
+            <span className="min-w-0 flex-1">Supplements</span>
+          </Link>
+        </nav>
+      </div>
+
       <section aria-labelledby="budget-strip-title" className="rounded-2xl border border-gold-muted/60 bg-card-gradient p-4">
-        <h2 id="budget-strip-title" className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">
+        <h2 id="budget-strip-title" className="text-sm font-semibold text-gold">
           Calories remaining
         </h2>
         {goals && remaining != null ? (
@@ -270,30 +336,30 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
             <div className="mt-3 grid grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] items-center gap-1 text-center" data-testid="budget-equation">
               <div>
                 <p className="font-display text-xl font-bold tabular-nums sm:text-2xl" data-testid="budget-goal">{goals.calories}</p>
-                <p className="text-[11px] text-muted-foreground">Goal</p>
+                <p className="text-xs text-muted-foreground">Goal</p>
               </div>
               <span className="text-muted-foreground" aria-hidden>−</span>
               <div>
                 <p className="font-display text-xl font-bold tabular-nums sm:text-2xl" data-testid="budget-food">{food}</p>
-                <p className="text-[11px] text-muted-foreground">Food</p>
+                <p className="text-xs text-muted-foreground">Food</p>
               </div>
               <span className="text-muted-foreground" aria-hidden>+</span>
               <div>
                 <p className="font-display text-xl font-bold tabular-nums sm:text-2xl" data-testid="budget-exercise">{exercise}</p>
-                <p className="text-[11px] text-muted-foreground">Exercise (est.)</p>
+                <p className="text-xs text-muted-foreground">Exercise (est.)</p>
               </div>
               <span className="text-muted-foreground" aria-hidden>=</span>
               <div>
                 <p className={`font-display text-xl font-bold tabular-nums sm:text-2xl ${remaining < 0 ? "text-[#f08a8a]" : "text-gold-highlight"}`} data-testid="budget-remaining">
                   {remaining}
                 </p>
-                <p className="text-[11px] text-muted-foreground">Remaining</p>
+                <p className="text-xs text-muted-foreground">Remaining</p>
               </div>
             </div>
             <p className="sr-only">
               Goal {goals.calories} minus food {food} plus exercise {exercise} equals {remaining} calories remaining.
             </p>
-            <p className="mt-2 text-[11px] text-muted-foreground">
+            <p className="mt-2 text-xs text-muted-foreground">
               {goals.is_estimate ? "Goal is an estimate. " : "Goal is your custom target. "}
               {workouts.length
                 ? `Exercise is estimated from ${workoutMins} min of logged workouts at your latest bodyweight.`
@@ -306,7 +372,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
                 <TrendingUp className="mt-0.5 size-4 shrink-0 text-gold" aria-hidden />
                 <span>
                   If every day were like today, you&apos;d weigh about <span className="font-semibold">{formatWeight(projected, units)}</span> in 5 weeks.
-                  <span className="block text-[11px] text-muted-foreground">An estimate from today&apos;s food and exercise, not a prediction.</span>
+                  <span className="block text-xs text-muted-foreground">An estimate from today&apos;s food and exercise, not a prediction.</span>
                 </span>
               </p>
             )}
@@ -317,41 +383,9 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
       </section>
 
       <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
-        <section className="bg-card-gradient rounded-2xl border border-border p-5" aria-labelledby="totals-title">
-          <h2 id="totals-title" className="sr-only">
-            Daily totals
-          </h2>
-          <div className="flex flex-col items-center gap-6 sm:flex-row">
-            <ProgressRing
-              size={136}
-              ariaLabel="Calories"
-              value={progressPct(totals.calories, goals?.calories ?? 0)}
-              label={Math.round(totals.calories)}
-              sublabel={goals ? `of ${goals.calories} kcal` : "kcal"}
-            />
-            <div className="w-full flex-1 space-y-3">
-              {(
-                [
-                  ["Protein", totals.protein_g, goals?.protein_g],
-                  ["Carbs", totals.carbs_g, goals?.carbs_g],
-                  ["Fat", totals.fat_g, goals?.fat_g],
-                ] as const
-              ).map(([l, v, g]) => (
-                <div key={l}>
-                  <div className="mb-1 flex justify-between text-sm">
-                    <span>{l}</span>
-                    <span className="tabular-nums text-muted-foreground">
-                      {Math.round(v)}
-                      {g ? ` / ${g}` : ""} g
-                    </span>
-                  </div>
-                  <ProgressBar value={g ? progressPct(v, g) : 0} label={`${l} progress`} />
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="mt-4 border-t border-border pt-3" data-testid="nutrient-totals">
-            <h3 className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Nutrients</h3>
+        <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="nutrients-title">
+          <div data-testid="nutrient-totals">
+            <h2 id="nutrients-title" className="text-lg font-semibold">Nutrients</h2>
             {!(nutrients.fiber.count || nutrients.sugar.count || nutrients.sodium.count) ? (
               <p className="mt-1 text-xs text-muted-foreground">Fiber, sugar and sodium appear here for foods logged from the food database or a barcode.</p>
             ) : (
@@ -364,11 +398,11 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
                   ] as const
                 ).map(([l, t, u, id]) => (
                   <div key={l} className="rounded-xl border border-border bg-card/60 p-2">
-                    <dt className="text-[11px] text-muted-foreground">{l}</dt>
+                    <dt className="text-xs text-muted-foreground">{l}</dt>
                     <dd className="font-semibold tabular-nums" data-testid={id}>
                       {t.count ? `${u === "mg" ? Math.round(t.total) : Math.round(t.total * 10) / 10} ${u}` : "—"}
                     </dd>
-                    <dd className="text-[10px] text-muted-foreground">
+                    <dd className="text-xs text-muted-foreground">
                       {t.count === nutrients.items ? "all foods" : `from ${t.count} of ${nutrients.items} foods with data`}
                     </dd>
                   </div>
@@ -376,13 +410,8 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
               </dl>
             )}
           </div>
-          {anyEstimate && <p className="mt-4 text-xs text-gold">Includes estimated entries (marked “estimate”).</p>}
-          {goals ? (
-            goals.calories - totals.calories > 0 && (
-              <p className="mt-2 text-xs text-muted-foreground">{Math.round(goals.calories - totals.calories)} kcal remaining for the day.</p>
-            )
-          ) : (
-            <p className="mt-2 text-xs text-muted-foreground">Set targets below to see progress.</p>
+          {goals && goals.calories - totals.calories > 0 && (
+            <p className="mt-3 text-sm text-muted-foreground">{Math.round(goals.calories - totals.calories)} kcal remaining for the day.</p>
           )}
         </section>
 
@@ -424,8 +453,23 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
                 <ul className="divide-y divide-border">
                   {items.map((i) => (
                     <li key={i.id} className="flex items-center justify-between gap-3 py-1">
-                      <EditableMealItem item={editableItem(i, type)} />
-                      <ActionButton action={deleteMealItemAction} fields={{ id: i.id }} size="icon-sm" variant="ghost" aria-label={`Remove ${i.name}`}>
+                      <EditableMealItem item={editableItem(i, type, favoriteKeys)} />
+                      {isFavoritableKey(i.source) && (
+                        <FavoriteStar
+                          food={{ key: i.source, name: i.name, basis: sanitizeBasis(i.basis) ?? basisFromLegacyItem(i), isEstimate: i.is_estimate }}
+                          initial={favoriteKeys.has(i.source)}
+                        />
+                      )}
+                      <ActionButton
+                        action={deleteMealItemAction}
+                        fields={{ id: i.id }}
+                        size="icon-sm"
+                        variant="ghost"
+                        aria-label={`Remove ${i.name}`}
+                        confirmMessage={`Remove ${i.name} from ${title.toLowerCase()}?`}
+                        confirmDetail="Your totals for the day update right away."
+                        confirmLabel="Remove"
+                      >
                         <Trash2 aria-hidden />
                       </ActionButton>
                     </li>
@@ -483,19 +527,19 @@ Mark eaten
           />
           <dl className="grid grid-cols-3 gap-2 text-center" data-testid="weekly-summary">
             <div className="rounded-xl border border-border bg-card p-2">
-              <dt className="text-[11px] uppercase tracking-widest text-muted-foreground">Daily average</dt>
+              <dt className="text-xs uppercase tracking-widest text-muted-foreground">Daily average</dt>
               <dd className="font-display text-lg font-bold tabular-nums">{summary.daysLogged ? `${summary.average} kcal` : "—"}</dd>
             </div>
             <div className="rounded-xl border border-border bg-card p-2">
-              <dt className="text-[11px] uppercase tracking-widest text-muted-foreground">Under goal</dt>
+              <dt className="text-xs uppercase tracking-widest text-muted-foreground">Under goal</dt>
               <dd className="font-display text-lg font-bold tabular-nums">{goals ? `${summary.under} of ${summary.daysLogged}` : "—"}</dd>
             </div>
             <div className="rounded-xl border border-border bg-card p-2">
-              <dt className="text-[11px] uppercase tracking-widest text-muted-foreground">Over goal</dt>
+              <dt className="text-xs uppercase tracking-widest text-muted-foreground">Over goal</dt>
               <dd className="font-display text-lg font-bold tabular-nums">{goals ? `${summary.over} of ${summary.daysLogged}` : "—"}</dd>
             </div>
           </dl>
-          <p className="text-[11px] text-muted-foreground">Averages count only days with food logged ({summary.daysLogged} of the last 7).</p>
+          <p className="text-xs text-muted-foreground">Averages count only days with food logged ({summary.daysLogged} of the last 7).</p>
         </div>
 
         <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="weight-goal-title">
@@ -514,7 +558,7 @@ Mark eaten
                     ] as const
                   ).map(([l, v]) => (
                     <div key={l} className="rounded-xl border border-border bg-elevated/40 p-2">
-                      <dt className="text-[11px] uppercase tracking-widest text-muted-foreground">{l}</dt>
+                      <dt className="text-xs uppercase tracking-widest text-muted-foreground">{l}</dt>
                       <dd className="font-display text-lg font-bold tabular-nums">{formatWeight(v, units)}</dd>
                     </div>
                   ))}
@@ -538,7 +582,7 @@ Mark eaten
             <p className="text-sm text-muted-foreground">Log your bodyweight to start tracking a weight goal.</p>
           )}
           <Button asChild variant="secondary" size="sm" className="mt-3">
-            <Link href="/progress#log-weight">Log weight</Link>
+            <Link href="/progress/overview#log-weight">Log weight</Link>
           </Button>
         </section>
       </div>
@@ -577,7 +621,7 @@ Mark eaten
 
       <Link href="/nutrition/diets" className="lift flex items-center justify-between gap-3 rounded-2xl border border-gold-muted/60 bg-card-gradient p-4">
         <span>
-          <span className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">Your diet</span>
+          <span className="text-sm font-semibold text-gold">Your diet</span>
           <span className="mt-1 block font-display text-xl font-semibold uppercase">{diet.name}</span>
           <span className="block text-sm text-muted-foreground">{diet.eatingWindow ?? diet.tagline}</span>
         </span>
@@ -633,7 +677,7 @@ Mark eaten
                           makes {Number(t.yield_servings)}
                         </p>
                       </div>
-                      <ActionButton action={deleteTemplateAction} fields={{ id: t.id }} size="icon-sm" variant="ghost" aria-label={`Delete ${t.name}`}>
+                      <ActionButton action={deleteTemplateAction} fields={{ id: t.id }} size="icon-sm" variant="ghost" aria-label={`Delete ${t.name}`} confirmMessage={`Delete the saved meal “${t.name}”?`} confirmDetail="Entries you already logged from it stay in your diary." confirmLabel="Delete">
 <Trash2 aria-hidden />
                       </ActionButton>
                     </div>
@@ -678,7 +722,7 @@ Mark eaten
                       {f.source === "usda" ? " · USDA" : ""}
                     </span>
                   </span>
-                  <ActionButton action={deleteCustomFoodAction} fields={{ id: f.id }} size="icon-sm" variant="ghost" aria-label={`Delete ${f.name}`}>
+                  <ActionButton action={deleteCustomFoodAction} fields={{ id: f.id }} size="icon-sm" variant="ghost" aria-label={`Delete ${f.name}`} confirmMessage={`Delete ${f.name} from My foods?`} confirmDetail="Entries you already logged stay in your diary." confirmLabel="Delete">
 <Trash2 aria-hidden />
                   </ActionButton>
                 </li>

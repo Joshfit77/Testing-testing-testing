@@ -1318,6 +1318,130 @@ alter table public.meal_items
     or coalesce(jsonb_typeof(basis) = 'object' and jsonb_typeof(basis -> 'per100') = 'object' and octet_length(basis::text) <= 8000, false)
   );
 
+-- ===== supabase/migrations/20261020000009_ui_prefs.sql =====
+-- Display and Faith preferences shown in Profile & Settings (SPEC §1, §12).
+--   text_size      : root text scale on top of the system text size.
+--   reduce_motion  : turns off page animations and celebration confetti.
+--   home_scripture : show the Scripture card on Home (Faith itself is always available).
+alter table public.profiles
+  add column if not exists text_size text not null default 'default' check (text_size in ('default', 'large', 'xlarge')),
+  add column if not exists reduce_motion boolean not null default false,
+  add column if not exists home_scripture boolean not null default true;
+
+-- Self-editable like the other profile preferences (column-level grants).
+grant update (text_size, reduce_motion, home_scripture) on public.profiles to authenticated;
+
+-- ===== supabase/migrations/20261020000010_activities.sql =====
+-- Narrow Gate Fitness — runs and walks ("activities").
+--
+-- One row per run or walk. The row id is the stable activity id: the client generates it before
+-- the first save, so a double-submitted form or a retried upload is a no-op instead of a duplicate,
+-- and badges/records derived from activities can key on it.
+--
+-- Decisions (see docs/RUN_TRACKING_PLAN.md):
+-- * distance_m may be null only for a time-only manual entry ("a 30-minute walk"). Treadmill and
+--   GPS activities always have a distance. Pace is never stored: it's computed in code from
+--   distance_m and moving_s, so there is one source of truth.
+-- * moving_s excludes paused time and is never more than elapsed_s. Manual entries default it to
+--   elapsed_s when the user doesn't know their moving time.
+-- * route is only allowed for GPS activities, so manual/treadmill entries can never carry a route.
+-- * Soft delete (deleted_at): reads filter it out; records and badges recalculate from the
+--   remaining rows. The owner can also hard-delete (and account deletion cascades).
+-- * Duplicate imports: external_id (a wearable/health-app workout id) is unique per user and
+--   source, and two live GPS recordings can't start at the same instant.
+
+create table public.activities (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  kind text not null check (kind in ('run', 'walk')),
+  source text not null check (source in ('manual', 'treadmill', 'gps')),
+  started_at timestamptz not null,
+  timezone text not null default 'UTC' check (char_length(timezone) between 1 and 64),
+  distance_m numeric(9, 2) check (distance_m is null or (distance_m >= 0 and distance_m <= 500000)),
+  elapsed_s integer not null check (elapsed_s between 1 and 172800),
+  moving_s integer not null check (moving_s >= 1),
+  notes text check (notes is null or char_length(notes) <= 2000),
+  perceived_effort smallint check (perceived_effort is null or perceived_effort between 1 and 10),
+  route jsonb,
+  splits jsonb check (splits is null or jsonb_typeof(splits) = 'array'),
+  external_id text check (external_id is null or char_length(external_id) between 1 and 128),
+  is_private boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  deleted_at timestamptz,
+  constraint activities_moving_le_elapsed check (moving_s <= elapsed_s),
+  constraint activities_distance_required check (distance_m is not null or source = 'manual'),
+  constraint activities_route_gps_only check (route is null or source = 'gps')
+);
+
+create index activities_user_started_idx on public.activities (user_id, started_at desc) where deleted_at is null;
+create unique index activities_user_source_external_uidx on public.activities (user_id, source, external_id)
+  where external_id is not null;
+create unique index activities_user_gps_started_uidx on public.activities (user_id, source, started_at)
+  where source = 'gps' and deleted_at is null;
+
+create trigger activities_updated_at before update on public.activities
+  for each row execute function public.set_updated_at();
+
+-- ---------------------------------------------------------------------------
+-- Row Level Security: owner-only (no admin access; routes are private data)
+-- ---------------------------------------------------------------------------
+alter table public.activities enable row level security;
+
+create policy activities_select_own on public.activities
+  for select to authenticated using (user_id = (select auth.uid()));
+create policy activities_insert_own on public.activities
+  for insert to authenticated with check (user_id = (select auth.uid()));
+create policy activities_update_own on public.activities
+  for update to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
+create policy activities_delete_own on public.activities
+  for delete to authenticated using (user_id = (select auth.uid()));
+
+-- ===== supabase/migrations/20261020000011_food_favorites.sql =====
+-- Food favorites (SPEC §8 "Favorites and recent foods").
+--
+-- A favorite points at a food by the same stable source key that meal_items.source uses:
+--   usda:<fdcId>      USDA FoodData Central (bundled SR Legacy or the remote API)
+--   off:<barcode>     Open Food Facts product
+--   food:<uuid>       a row in public.foods (built-in common foods or the user's own saved foods)
+-- Hand-entered quick adds ("custom") have no stable identity and can't be favorited.
+--
+-- name / detail / basis are a display snapshot so the Favorites tab renders without a lookup. When a
+-- favorite is logged, nutrition is always re-read on the server from the source (logFoodAction), never
+-- taken from this snapshot.
+--
+-- Rows are private to their owner: owner-only RLS for select / insert / update / delete, no admin
+-- access, and they cascade away with the auth user on account deletion.
+
+create table public.food_favorites (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  food_key text not null check (food_key ~ '^(usda:[0-9]{1,10}|off:[0-9]{8,14}|food:[0-9a-f-]{36})$'),
+  name text not null check (char_length(name) between 1 and 160),
+  detail text check (char_length(detail) <= 200),
+  basis jsonb not null check (
+    coalesce(jsonb_typeof(basis) = 'object' and jsonb_typeof(basis -> 'per100') = 'object' and octet_length(basis::text) <= 8000, false)
+  ),
+  is_estimate boolean not null default false,
+  created_at timestamptz not null default now(),
+  constraint food_favorites_user_key_unique unique (user_id, food_key)
+);
+create index food_favorites_user_created_idx on public.food_favorites (user_id, created_at desc);
+
+alter table public.food_favorites enable row level security;
+
+create policy food_favorites_select_own on public.food_favorites
+  for select to authenticated using (user_id = (select auth.uid()));
+create policy food_favorites_insert_own on public.food_favorites
+  for insert to authenticated with check (user_id = (select auth.uid()));
+create policy food_favorites_update_own on public.food_favorites
+  for update to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
+create policy food_favorites_delete_own on public.food_favorites
+  for delete to authenticated using (user_id = (select auth.uid()));
+
+comment on table public.food_favorites is 'Foods a user starred for quick logging. Owner-only.';
+comment on column public.food_favorites.food_key is 'Stable source key, same format as meal_items.source (usda:/off:/food:).';
+
 -- ===== supabase/seed.sql =====
 -- AUTO-GENERATED by scripts/generate-seed.ts — do not edit by hand.
 -- Exercise descriptions are general fitness education, not medical advice.

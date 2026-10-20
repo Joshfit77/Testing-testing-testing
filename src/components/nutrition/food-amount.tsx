@@ -12,6 +12,8 @@ import { basisUnits, computeAmount, type FoodBasis, type FoodChoice } from "@/li
 import { parseQuantity } from "@/lib/domain/food-units";
 import { MEAL_TYPES } from "@/lib/domain/meals";
 import { updateMealItemAction } from "@/server/actions/nutrition";
+import { isFavoritableKey } from "@/lib/domain/food-favorites";
+import { FavoriteStar } from "./favorite-star";
 
 const fmt = (n: number | null | undefined, d = 1) => (n == null ? null : Number.isInteger(n) ? String(n) : n.toFixed(d).replace(/\.0$/, ""));
 
@@ -37,6 +39,7 @@ export function AmountPicker({
   onSubmit,
   onBack,
   idPrefix = "amt",
+  headerAction,
   children,
 }: {
   food: Pick<FoodChoice, "name" | "detail" | "basis" | "note" | "isEstimate">;
@@ -51,6 +54,8 @@ export function AmountPicker({
   idPrefix?: string;
   /** Extra controls (e.g. "Log as: Eaten / Planned"). */
   children?: React.ReactNode;
+  /** Shown beside the food name (e.g. the favorite star). */
+  headerAction?: React.ReactNode;
 }) {
   const units = basisUnits(food.basis);
   const [qtyText, setQtyText] = useState(String(Math.round(initialQuantity * 1000) / 1000));
@@ -80,13 +85,14 @@ export function AmountPicker({
             <ArrowLeft aria-hidden />
           </Button>
         )}
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="font-semibold leading-snug" data-testid="amount-food-name">
             {food.name} {food.isEstimate && <Badge variant="outline">typical values</Badge>}
           </p>
           {food.detail && <p className="text-xs text-muted-foreground">{food.detail}</p>}
           <p className="text-xs text-muted-foreground">{basisSummary(food.basis)}</p>
         </div>
+        {headerAction}
       </div>
 
       <div className="grid grid-cols-[6rem_1fr] gap-3">
@@ -191,6 +197,9 @@ export interface EditableItem {
   isEstimate: boolean;
   /** Why this entry only scales by servings (hand-entered or older entries); null for normal foods. */
   note: string | null;
+  /** Stable source key ("usda:…", "off:…", "food:…") when the food can be favorited. */
+  sourceKey?: string | null;
+  favorite?: boolean;
 }
 
 /** A diary row that opens the amount picker, prefilled, to change the amount, unit or meal. */
@@ -232,6 +241,11 @@ export function EditableMealItem({ item }: { item: EditableItem }) {
           {open && (
             <AmountPicker
               food={{ name: item.name, basis: item.basis }}
+              headerAction={
+                isFavoritableKey(item.sourceKey) ? (
+                  <FavoriteStar food={{ key: item.sourceKey, name: item.name, basis: item.basis, isEstimate: item.isEstimate }} initial={Boolean(item.favorite)} />
+                ) : undefined
+              }
               initialQuantity={item.quantity}
               initialUnitId={item.unitId}
               mealType={mealType}

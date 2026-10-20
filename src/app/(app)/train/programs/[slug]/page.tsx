@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Clock, Flame, Lock, Play, Repeat, Snowflake, TrendingUp } from "lucide-react";
+import { Clock, Flame, Lock, Play, Repeat, Snowflake, TrendingUp } from "lucide-react";
 import { Notice } from "@/components/common/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import type { ProgramRow } from "@/lib/types/db";
 import { cn, titleCase } from "@/lib/utils";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
+import { BackLink } from "@/components/platform/back-link";
 
 export const metadata = { title: "Program" };
 
@@ -102,12 +103,10 @@ export default async function ProgramDetailPage({
 
   return (
     <div className="space-y-6">
-      <Link href="/train" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="size-4" aria-hidden /> Train
-      </Link>
+      <BackLink href="/train/programs">Programs</BackLink>
 
       <header className="bg-card-gradient rounded-3xl border border-border p-5 md:p-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gold">
+        <p className="text-sm font-semibold text-gold">
           {(categoryRes.data?.name as string) ?? (program.source === "ai" ? "AI-generated" : "Personal program")}
         </p>
         <h1 className="mt-2 font-display text-4xl font-bold uppercase leading-none md:text-5xl">{program.name}</h1>

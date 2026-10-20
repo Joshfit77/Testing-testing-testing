@@ -1,5 +1,3 @@
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { Notice } from "@/components/common/states";
 import { SupplementsClient } from "@/components/supplements/supplements-client";
@@ -9,6 +7,7 @@ import { DIETS, isDietType } from "@/lib/domain/diets";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
 import { logError } from "@/server/log";
+import { BackLink } from "@/components/platform/back-link";
 
 export const metadata = { title: "Supplements" };
 
@@ -32,9 +31,7 @@ export default async function SupplementsPage() {
 
   return (
     <div className="space-y-6">
-      <Link href="/nutrition" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="size-4" aria-hidden /> Food
-      </Link>
+      <BackLink href="/nutrition">Food</BackLink>
       <PageHeader
         eyebrow="Food"
         title="Supplements"

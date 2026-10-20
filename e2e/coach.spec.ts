@@ -23,6 +23,8 @@ interface MockRequest {
 }
 
 const requests: MockRequest[] = [];
+/** While set, messages containing "flaky" get this HTTP error from the mock API (429 rate limit / 500). */
+let failMode: 429 | 500 | null = null;
 let mock: Server | null = null;
 let seq = 0;
 
@@ -120,6 +122,13 @@ test.beforeAll(async () => {
     }
     const body = JSON.parse(await readBody(req)) as MockRequest;
     requests.push(body);
+    if (failMode && JSON.stringify(body.messages).includes("flaky")) {
+      const type = failMode === 429 ? "rate_limit_error" : "api_error";
+      // retry-after-ms keeps the SDK's automatic retries fast.
+      res.writeHead(failMode, { "Content-Type": "application/json", "retry-after-ms": "10", "request-id": `req_e2e_fail_${++seq}` });
+      res.end(JSON.stringify({ type: "error", error: { type, message: `mock ${failMode}` } }));
+      return;
+    }
     const r = reply(body);
     res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "request-id": `req_e2e_${seq}` });
     const events = sseEvents(body.model, r.blocks, r.stop);
@@ -198,8 +207,11 @@ test.describe("AI coach", () => {
     await card2.getByRole("button", { name: "Confirm" }).click();
     await expect(card2.getByRole("status")).toContainText(/Swapped .+ for Push-Up in your next session\./);
     await expect(card2.getByText("applied", { exact: true })).toBeVisible();
+    // Home no longer lists exercises (Stage 1 redesign): the swap shows when the next session starts.
     await page.goto("/home");
-    await expect(page.getByText(/^Push-Up ·/)).toBeVisible();
+    await page.getByRole("link", { name: /Start workout/ }).click();
+    await page.waitForURL(/\/train\/workout/);
+    await expect(page.getByText("Push-Up", { exact: true }).first()).toBeVisible();
 
     // Nutrition targets: dismissing leaves targets unchanged.
     await page.goto("/coach");
@@ -233,5 +245,49 @@ test.describe("AI coach", () => {
     expect(first.system[0]!.text).toContain("Narrow Gate Fitness coach");
     expect(first.system.at(-1)!.text).toContain("Athlete context");
     expect(first.system.map((s) => s.text).join("\n")).not.toContain("Galatians 6:9");
+  });
+
+  test("a rate limit or service failure keeps the unsent message, survives a reload and offers retry", async ({ page }) => {
+    test.skip(!MOCK_PORT, "set E2E_ANTHROPIC_MOCK_PORT and start the app with ANTHROPIC_BASE_URL pointing at it");
+    const email = uniqueEmail("coach-fail");
+    await signUpAndConfirm(page, email);
+    await completeOnboarding(page);
+    await grantPlan(email, "plus");
+    await page.goto("/coach");
+    const box = page.getByLabel("Message the AI coach");
+    const question = "A flaky question about squat depth";
+
+    // 429 from the AI service: friendly error, the message goes back in the box, Try again offered.
+    failMode = 429;
+    await box.fill(question);
+    await page.getByRole("button", { name: "Send message" }).click();
+    const alert = page.getByRole("alert").filter({ hasText: /busy|try again/i });
+    await expect(alert).toBeVisible({ timeout: 30_000 });
+    await expect(alert).toContainText("Your message is still in the box below.");
+    await expect(box).toHaveValue(question);
+    await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+
+    // Reopen the app: the unsent message is still there.
+    await page.waitForTimeout(600);
+    await page.reload();
+    await expect(box).toHaveValue(question);
+    await expect(page.getByTestId("draft-restored")).toBeVisible();
+
+    // 500 from the AI service: same graceful handling.
+    failMode = 500;
+    await page.getByRole("button", { name: "Send message" }).click();
+    await expect(page.getByRole("alert").filter({ hasText: /try again/i })).toBeVisible({ timeout: 30_000 });
+    await expect(box).toHaveValue(question);
+
+    // The service recovers: Try again sends the same message once, and the draft is gone afterwards.
+    failMode = null;
+    await page.getByRole("button", { name: "Try again" }).click();
+    await expect(page.getByTestId("coach-reply").last()).toContainText("Happy to help with your training.", { timeout: 30_000 });
+    await expect(page.locator("p", { hasText: question })).toHaveCount(1);
+    await expect(box).toHaveValue("");
+    await page.waitForURL(/\/coach\?c=/);
+    await page.reload();
+    await expect(box).toHaveValue("");
+    await expect(page.locator("p", { hasText: question })).toHaveCount(1);
   });
 });

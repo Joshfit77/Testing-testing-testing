@@ -53,7 +53,7 @@ function WeekBars({ week, goal, today }: { week: StepsCardProps["week"]; goal: n
           ))}
         </div>
       </div>
-      <div className="mt-1 flex gap-1.5 text-center text-[10px] uppercase tracking-wider text-muted-foreground" aria-hidden>
+      <div className="mt-1 flex gap-1.5 text-center text-xs uppercase tracking-wider text-muted-foreground" aria-hidden>
         {week.map((d) => (
           <span key={d.day} className={cn("flex-1", d.day === today && "font-semibold text-gold-highlight")}>
             {weekday(d.day)}
@@ -156,7 +156,7 @@ function GoalForm({ goal, onDone }: { goal: number; onDone: () => void }) {
           Save goal
         </SubmitButton>
       </div>
-      <p id="step-goal-help" className="text-[11px] text-muted-foreground">
+      <p id="step-goal-help" className="text-xs text-muted-foreground">
         Between {formatSteps(STEP_GOAL_MIN)} and {formatSteps(STEP_GOAL_MAX)}.
       </p>
       <FieldError message={state.fieldErrors?.stepGoal} />
@@ -216,7 +216,7 @@ export function StepsCard({ today, goal, todaySteps, todaySource, week }: StepsC
               />
               <SubmitButton variant="secondary">Save</SubmitButton>
             </div>
-            <p id="steps-today-help" className="text-[11px] text-muted-foreground">
+            <p id="steps-today-help" className="text-xs text-muted-foreground">
               Replaces today&apos;s total.
             </p>
             <FieldError message={state.fieldErrors?.steps} />

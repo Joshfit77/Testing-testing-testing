@@ -3,11 +3,15 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Bot, Check, CheckCircle2, ClipboardList, Copy, Loader2, MessageSquare, Search, Send, Sparkles, Trash2, X } from "lucide-react";
+import { Bot, Check, CheckCircle2, ClipboardList, Copy, Loader2, MessageSquare, RotateCcw, Search, Send, Sparkles, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Notice } from "@/components/common/states";
+import { confirmDialog } from "@/components/ui/confirm";
+import { DraftRestoredNotice } from "@/components/drafts/draft-notice";
+import { clearDraft, readDraft, writeDraft } from "@/lib/drafts";
+import { useDraft, useDraftUserId } from "@/lib/use-draft";
 import { cn } from "@/lib/utils";
 import { formatDuration } from "@/lib/domain/units";
 import type { AiPlan } from "@/lib/validation/ai";
@@ -184,7 +188,14 @@ export function CoachChat({ conversationId: initialId, initialMessages, initialQ
   const router = useRouter();
   const [conversationId, setConversationId] = useState(initialId);
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
-  const [input, setInput] = useState(initialQuestion);
+  // The unsent message is a draft on this device (per user and conversation): it survives tab switches,
+  // reloads and failed sends (429/500/offline) until the coach has replied.
+  const draftKey = `coach.input.${initialId ?? "new"}`;
+  const userId = useDraftUserId();
+  const inputDraft = useDraft(draftKey, "");
+  const input = inputDraft.value;
+  const setInput = inputDraft.setValue;
+  const [restoredNotice, setRestoredNotice] = useState(false);
   const [mode, setMode] = useState<"chat" | "plan">("chat");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -194,12 +205,31 @@ export function CoachChat({ conversationId: initialId, initialMessages, initialQ
   const [status, setStatus] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const starters = suggestions?.length ? suggestions : DEFAULT_SUGGESTIONS;
+  const pendingKey = "coach.pending";
+
+  // A link like /coach?q=… prefills the box (it wins over an older draft).
+  useEffect(() => {
+    if (initialQuestion) setInput(initialQuestion);
+    // A message that was being sent when the page closed: bring it back unless it was saved.
+    const pending = readDraft<{ message: string; conversationId: string | null }>(userId, pendingKey);
+    if (!pending) return;
+    clearDraft(userId, pendingKey);
+    const p = pending.value;
+    const saved = initialMessages.some((m) => m.role === "user" && m.content === p.message);
+    if (!saved && p.conversationId === initialId) {
+      setInput((cur) => (cur.trim() ? cur : p.message));
+      setRestoredNotice(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on mount
+  }, []);
+  const showRestored = restoredNotice || inputDraft.restored;
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, sending, draft, activity.length]);
 
   const finish = (json: Extract<StreamEvent, { type: "done" }>["result"], optimisticId: string) => {
+    clearDraft(userId, pendingKey);
     setMessages((m) => [...m.filter((x) => x.id !== optimisticId), json.userMessage, json.assistantMessage]);
     setUsage(json.usage);
     if (!conversationId) {
@@ -219,9 +249,14 @@ export function CoachChat({ conversationId: initialId, initialMessages, initialQ
     setStatus(mode === "plan" ? "Drafting your plan — this can take a little while…" : "Thinking…");
     const optimistic: ChatMessage = { id: `tmp-${Date.now()}`, role: "user", content: message, proposal: null, proposal_status: null, created_at: new Date().toISOString() };
     setMessages((m) => [...m, optimistic]);
+    // Keep the message on the device until the coach has answered.
+    writeDraft(userId, pendingKey, { message, conversationId });
     setInput("");
+    setRestoredNotice(false);
+    inputDraft.dismissRestored();
     const fail = (msg: string) => {
       setMessages((m) => m.filter((x) => x.id !== optimistic.id));
+      clearDraft(userId, pendingKey);
       setInput(message);
       setError(msg);
     };
@@ -322,6 +357,13 @@ export function CoachChat({ conversationId: initialId, initialMessages, initialQ
               variant="ghost"
               aria-label="Delete conversation"
               onClick={async () => {
+                const ok = await confirmDialog({
+                  title: "Delete this conversation?",
+                  message: "The messages are removed from your account. Changes you already confirmed stay in place.",
+                  confirmLabel: "Delete",
+                  destructive: true,
+                });
+                if (!ok) return;
                 await deleteConversationAction(conversationId);
                 router.push("/coach");
                 router.refresh();
@@ -393,7 +435,32 @@ export function CoachChat({ conversationId: initialId, initialMessages, initialQ
 
       <div className="border-t border-border p-3">
         {!enabled && disabledReason && <Notice tone="info" className="mb-3">{disabledReason}</Notice>}
-        {error && <Notice tone="error" className="mb-3">{error}</Notice>}
+        {error && (
+          <Notice tone="error" className="mb-3">
+            <span className="block">{error}</span>
+            <span className="mt-1 block text-xs">Your message is still in the box below.</span>
+            {enabled && input.trim() && (
+              <Button type="button" size="sm" variant="secondary" className="mt-2" disabled={sending} onClick={() => void send(input)}>
+                <RotateCcw aria-hidden /> Try again
+              </Button>
+            )}
+          </Notice>
+        )}
+        {showRestored && !error && input.trim() !== "" && (
+          <div className="mb-3">
+            <DraftRestoredNotice
+              label="Unsent message restored"
+              onDiscard={() => {
+                setRestoredNotice(false);
+                inputDraft.clear();
+              }}
+              onDismiss={() => {
+                setRestoredNotice(false);
+                inputDraft.dismissRestored();
+              }}
+            />
+          </div>
+        )}
         <form
           className="flex items-end gap-2"
           onSubmit={(e) => {

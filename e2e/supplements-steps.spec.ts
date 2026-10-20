@@ -50,9 +50,11 @@ test.describe("supplements and steps", () => {
     await expect(page.getByText("Not suitable for your Vegan diet — try Plant protein (pea or soy blend).").first()).toBeVisible();
   });
 
-  test("steps can be entered by hand on Home and the goal changed", async ({ page }) => {
+  test("steps can be entered by hand (Home → Steps) and the goal changed", async ({ page }) => {
     await signUpAndConfirm(page, uniqueEmail("steps"));
     await completeOnboarding(page);
+    await page.getByRole("navigation", { name: "More for today" }).getByRole("link", { name: "Steps" }).click();
+    await page.waitForURL(/\/progress/);
 
     await expect(page.getByTestId("steps-today")).toHaveText("0 steps today");
     // On the web there's no health sync button, only a note.

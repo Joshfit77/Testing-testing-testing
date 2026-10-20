@@ -8,7 +8,7 @@ test.describe("program library", () => {
     await completeOnboarding(page);
 
     // Strength discipline: the novice program is free, listed before advanced programs.
-    await page.goto("/train?discipline=strength");
+    await page.goto("/train/programs?discipline=strength");
     const cards = page.locator("ul li h4");
     const names = await cards.allTextContents();
     const novice = names.findIndex((n) => /Novice Linear Progression/i.test(n));
