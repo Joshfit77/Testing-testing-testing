@@ -7,6 +7,7 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { ExerciseDemoMini } from "@/components/train/exercise-demo";
 import { displayWeight, formatDuration, toKg, weightUnit } from "@/lib/domain/units";
 import type { UnitSystem } from "@/lib/domain/types";
 import type { DraftAction, DraftExercise, DraftSet } from "@/lib/domain/workout-draft";
@@ -201,6 +202,7 @@ export function ExerciseCard({
   onSubstitute,
   onSkip,
   showComplete = true,
+  current = false,
 }: {
   exercise: DraftExercise;
   index: number;
@@ -210,6 +212,8 @@ export function ExerciseCard({
   onSubstitute: () => void;
   onSkip: () => void;
   showComplete?: boolean;
+  /** The exercise the athlete is on now: its demo loops inline. */
+  current?: boolean;
 }) {
   const [notesOpen, setNotesOpen] = useState(Boolean(exercise.notes));
   const done = exercise.sets.filter((s) => s.completed).length;
@@ -235,7 +239,8 @@ export function ExerciseCard({
   return (
     <section className="rounded-2xl border border-border bg-card p-4" aria-labelledby={`ex-${exercise.id}`}>
       <header className="mb-3 flex items-start justify-between gap-2">
-        <div className="min-w-0">
+        <ExerciseDemoMini slug={exercise.slug} name={exercise.name} animate={current} className="h-[60px] w-20" />
+        <div className="min-w-0 flex-1">
           <h3 id={`ex-${exercise.id}`} className="font-display text-lg font-semibold uppercase leading-tight">
             <Link href={`/train/exercises/${exercise.slug}`} target="_blank" className="hover:text-gold-highlight">
               {exercise.name}

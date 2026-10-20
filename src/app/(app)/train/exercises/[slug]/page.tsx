@@ -10,6 +10,7 @@ import { publicEnv } from "@/lib/env";
 import { formVideoSearchUrl, videoEmbedUrl } from "@/lib/media";
 import { exerciseMediaPublicUrl } from "@/lib/exercise-media";
 import { DemoVideo } from "@/components/train/demo-video";
+import { ExerciseDemo } from "@/components/train/exercise-demo";
 import { requireOnboardedUser } from "@/server/auth";
 
 export const metadata = { title: "Exercise" };
@@ -27,6 +28,8 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
   ]);
   const alts = (altsRes.data ?? []).map((a) => a.alt as unknown as { slug: string; name: string; difficulty: string }).filter(Boolean);
   const media = mediaRes.data ?? [];
+  const hasVideo = media.some((m) => m.media_type === "video");
+  const demoMeta = { name: ex.name, pattern: ex.movement_pattern, category: ex.category, equipment: ex.equipment, timed: ex.is_timed };
   const mediaUrl = (m: (typeof media)[number]) =>
     (m.external_url as string | null) ?? exerciseMediaPublicUrl(publicEnv.supabaseUrl, m.storage_path as string);
 
@@ -78,13 +81,19 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
                   </figcaption>
                 </figure>
               ))}
+              {hasVideo && (
+                <details className="rounded-xl border border-border">
+                  <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-gold-highlight">Animated demo</summary>
+                  <ExerciseDemo slug={ex.slug} name={ex.name} meta={demoMeta} className="aspect-video w-full rounded-b-xl" />
+                </details>
+              )}
             </div>
-          ) : (
-            <div className="flex aspect-video flex-col items-center justify-center gap-2 bg-elevated/40 p-6 text-center">
-              <PlayCircle className="size-10 text-gold" aria-hidden />
-              <p className="text-sm font-semibold">No built-in video for this exercise yet</p>
-              <p className="max-w-xs text-xs text-muted-foreground">An admin can add a YouTube, Vimeo or uploaded video. Until then, watch a form video or follow the steps below.</p>
-            </div>
+          ) : null}
+          {!hasVideo && (
+            <figure className={media.length ? "px-3 pb-3" : undefined}>
+              <ExerciseDemo slug={ex.slug} name={ex.name} meta={demoMeta} className={media.length ? "aspect-video w-full rounded-xl" : "aspect-video w-full"} />
+              <figcaption className="px-3 pt-2 text-[11px] text-muted-foreground">Animated illustration of correct technique — not filmed video. Use 0.5× to study each phase.</figcaption>
+            </figure>
           )}
           <div className="border-t border-border p-3">
             <a

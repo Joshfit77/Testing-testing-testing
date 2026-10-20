@@ -346,6 +346,8 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
   const elapsed = elapsedSeconds(draft, now);
   const summary = draftSummary(draft);
   const paused = Boolean(draft.pausedAt);
+  // The exercise being worked on: first one not skipped with sets still to complete.
+  const currentKey = draft.exercises.find((e) => !e.skipped && (e.sets.length === 0 || e.sets.some((s) => !s.completed)))?.id;
   const substituteTarget = draft.exercises.find((e) => e.id === substituteKey) ?? null;
 
   const finish = async () => {
@@ -494,6 +496,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
       {draft.exercises.map((e, i) => (
         <ExerciseCard
           key={e.id}
+          current={e.id === currentKey}
           exercise={e}
           index={i}
           total={draft.exercises.length}
