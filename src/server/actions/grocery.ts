@@ -46,7 +46,7 @@ export async function generateGroceryAction(input: unknown): Promise<ActionState
     if (error) throw error;
     if (!entries?.length) return actionError("No planned meals in those dates. Generate a meal plan first, or pick dates your plan covers.");
     const items: GroceryInput[] = entries.flatMap((e) =>
-      ((e.ingredients ?? []) as GroceryIngredient[]).map((i) => ({ key: i.key, name: i.name, quantity: Number(i.quantity) * Number(e.portion), unitLabel: i.unitLabel })),
+      ((e.ingredients ?? []) as GroceryIngredient[]).map((i) => ({ key: i.key, name: i.name, quantity: Number(i.quantity) * Number(e.portion), unitLabel: i.unitLabel, gramsPerUnit: i.gramsPerUnit ?? null })),
     );
     const units: UnitSystem = profile?.unit_system === "metric" ? "metric" : "imperial";
     const lines = mergeGroceries(items, units);

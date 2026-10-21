@@ -1,5 +1,5 @@
 "use client";
-import { isWorkoutDraft, type WorkoutDraft } from "@/lib/domain/workout-draft";
+import { migrateDraft, type WorkoutDraft } from "@/lib/domain/workout-draft";
 
 /** Local persistence of the in-progress workout, keyed per user so shared devices don't mix accounts. */
 const key = (userId: string) => `ngf.workout.draft.${userId}`;
@@ -9,8 +9,8 @@ export function loadLocalDraft(userId: string): WorkoutDraft | null {
   try {
     const raw = localStorage.getItem(key(userId));
     if (!raw) return null;
-    const parsed: unknown = JSON.parse(raw);
-    return isWorkoutDraft(parsed) ? parsed : null;
+    // Drafts saved by older versions of the app are upgraded to the current format.
+    return migrateDraft(JSON.parse(raw) as unknown);
   } catch {
     return null;
   }

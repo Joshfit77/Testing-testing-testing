@@ -47,6 +47,7 @@ export async function createPrivateProgram(
       warmup: seed.warmup,
       cooldown: seed.cooldown,
       low_impact: Boolean(seed.lowImpact),
+      needs_specialist_review: Boolean(seed.needsSpecialistReview),
       is_published: false,
       owner_id: userId,
       source,

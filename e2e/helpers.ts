@@ -52,6 +52,11 @@ export interface OnboardingAnswers {
   experience?: string;
   equipment?: RegExp;
   diet?: RegExp;
+  /** Optional second-goal step (skipped when not given). */
+  secondGoal?: string;
+  /** Optional display step (skipped when not given). */
+  textSize?: "Default" | "Large" | "Extra large";
+  reduceMotion?: boolean;
 }
 
 /** Answer the guided sign-up questionnaire (one question per screen) and submit it. Ends on the plan summary. */
@@ -60,6 +65,11 @@ export async function answerOnboarding(page: Page, a: OnboardingAnswers = {}) {
   await page.waitForURL(/\/onboarding/);
   await page.getByRole("button", { name: a.goal ?? "Build strength", exact: true }).click();
   await next();
+  // Optional second goal.
+  if (a.secondGoal) {
+    await page.getByRole("group", { name: "Second goal" }).getByRole("button", { name: a.secondGoal, exact: true }).click();
+    await next();
+  } else await page.getByRole("button", { name: "Skip", exact: true }).click();
   await page.getByRole("button", { name: a.sex ?? "Male", exact: true }).click();
   await next();
   await page.getByLabel("Age").fill(a.age ?? "34");
@@ -81,6 +91,12 @@ export async function answerOnboarding(page: Page, a: OnboardingAnswers = {}) {
   await next();
   if (a.diet) await page.getByRole("button", { name: a.diet }).click();
   await next();
+  // Optional display step (text size, reduce motion).
+  if (a.textSize || a.reduceMotion) {
+    if (a.textSize) await page.getByRole("radio", { name: new RegExp(a.textSize + "$") }).click();
+    if (a.reduceMotion) await page.getByRole("switch", { name: "Reduce motion" }).click();
+    await next();
+  } else await page.getByRole("button", { name: "Skip", exact: true }).click();
   await page.getByRole("button", { name: "Build my plan" }).click();
   await page.waitForURL(/\/plan/, { timeout: 60_000 });
 }

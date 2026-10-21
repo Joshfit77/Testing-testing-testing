@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AlertTriangle, CheckCircle2, ExternalLink, Lightbulb, PlayCircle } from "lucide-react";
+import { AlertTriangle, BarChart3, CheckCircle2, ChevronRight, ExternalLink, Lightbulb, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { EQUIPMENT_LABELS, type Equipment } from "@/lib/domain/types";
 import type { ExerciseRow } from "@/lib/types/db";
@@ -50,6 +50,18 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
         </div>
       </header>
 
+      <Link
+        href={`/train/exercises/${ex.slug}/history`}
+        className="flex min-h-14 items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 hover:border-gold-muted"
+      >
+        <BarChart3 className="size-5 shrink-0 text-gold" aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="block font-semibold">Your history</span>
+          <span className="block text-xs text-muted-foreground">Best set, estimated 1RM trend and your last sessions</span>
+        </span>
+        <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
+      </Link>
+
       <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
         <section aria-label="Demonstration media" className="overflow-hidden rounded-2xl border border-border bg-card">
           {media.length ? (
@@ -94,16 +106,16 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
               <figcaption className="px-3 pt-2 text-[11px] text-muted-foreground">Animated illustration of correct technique — not filmed video. Use 0.5× to study each phase.</figcaption>
             </figure>
           )}
-          <div className="border-t border-border p-3">
+          <div className="border-t border-border px-3 py-2">
             <a
               href={formVideoSearchUrl(ex.name)}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-gold-muted px-4 text-sm font-semibold text-gold-highlight hover:bg-gold/10"
+              className="inline-flex min-h-11 items-center gap-1.5 text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
             >
-              <PlayCircle className="size-4" aria-hidden /> Watch form videos <ExternalLink className="size-3.5" aria-hidden />
+              <Search className="size-3.5" aria-hidden /> Search YouTube for more <ExternalLink className="size-3" aria-hidden />
             </a>
-            <p className="mt-1 text-[11px] text-muted-foreground">Opens YouTube search. Videos there are made by other creators.</p>
+            <span className="text-[11px] text-muted-foreground"> — other creators&apos; videos, not reviewed by us.</span>
           </div>
         </section>
 

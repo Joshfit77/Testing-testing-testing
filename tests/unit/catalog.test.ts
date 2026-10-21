@@ -30,7 +30,7 @@ describe("program library", () => {
   it("defines at least 8 complete programs across all required categories", () => {
     expect(PROGRAMS.length).toBeGreaterThanOrEqual(8);
     const categories = new Set(PROGRAM_CATEGORIES.map((c) => c.slug));
-    expect(categories.size).toBe(24);
+    expect(categories.size).toBe(26);
     for (const c of categories) expect(PROGRAMS.some((p) => p.category === c), c).toBe(true);
   });
   it("references only real exercises with complete prescriptions", () => {

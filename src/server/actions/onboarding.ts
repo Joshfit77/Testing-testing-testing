@@ -39,6 +39,8 @@ export async function saveOnboardingAction(input: OnboardingInput & { rebuildPro
         height_cm: v.heightCm,
         sex: v.sex,
         faith_enabled: v.faithEnabled,
+        ...(v.textSize ? { text_size: v.textSize } : {}),
+        ...(v.reduceMotion !== undefined ? { reduce_motion: v.reduceMotion } : {}),
         wellness_consent_at: consentAt,
         onboarding_completed_at: existing?.onboarding_completed_at ?? new Date().toISOString(),
       })
@@ -56,6 +58,7 @@ export async function saveOnboardingAction(input: OnboardingInput & { rebuildPro
       limitations: v.wellnessConsent && v.limitations ? v.limitations : null,
       dietary_preferences: v.dietaryPreferences,
       diet_type: v.dietType,
+      ...(v.secondaryGoal !== undefined ? { secondary_goal: v.secondaryGoal } : {}),
     });
     if (aErr) throw aErr;
 
@@ -124,6 +127,9 @@ export async function completeOnboardingAction(input: OnboardingPlanInput): Prom
         height_cm: v.heightCm,
         sex: v.sex,
         faith_enabled: v.faithEnabled,
+        // Optional accessibility step; skipped = keep the defaults.
+        ...(v.textSize ? { text_size: v.textSize } : {}),
+        ...(v.reduceMotion !== undefined ? { reduce_motion: v.reduceMotion } : {}),
       })
       .eq("id", user.id);
     if (pErr) throw pErr;
@@ -131,6 +137,7 @@ export async function completeOnboardingAction(input: OnboardingPlanInput): Prom
     const { error: aErr } = await supabase.from("onboarding_answers").upsert({
       user_id: user.id,
       primary_goal: v.primaryGoal,
+      secondary_goal: v.secondaryGoal ?? null,
       experience: v.experience,
       days_per_week: v.daysPerWeek,
       session_minutes: v.sessionMinutes,
@@ -186,6 +193,7 @@ export async function completeOnboardingAction(input: OnboardingPlanInput): Prom
         bodyweightKg: v.weightKg,
         equipment: [...new Set(v.equipment)],
         units: v.unitSystem,
+        secondaryGoal: v.secondaryGoal ?? null,
       }),
       "starter",
     );

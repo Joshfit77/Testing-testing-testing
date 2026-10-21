@@ -20,7 +20,12 @@ export interface GroceryInput {
   quantity: number;
   /** The unit as picked, e.g. "g", "oz", "1 cup, chopped", "1 large". */
   unitLabel: string;
+  /** Weight of one unit, when known. Used to list label-style units ("NLEA serving", "pat") by weight. */
+  gramsPerUnit?: number | null;
 }
+
+/** Counted units nobody shops by; listed by weight instead when the weight is known. */
+const UNSHOPPABLE = /\b(serving|nlea|pat|portion|packet|scoop|container|order)\b/i;
 
 export type UnitClass = { dim: "mass"; factor: number } | { dim: "volume"; factor: number } | { dim: "count"; label: string; factor: number };
 
@@ -119,7 +124,8 @@ export function mergeGroceries(items: GroceryInput[], units: UnitSystem): Grocer
   const groups = new Map<string, Acc>();
   for (const i of items) {
     if (!(i.quantity > 0)) continue;
-    const u = classifyUnit(i.unitLabel);
+    let u = classifyUnit(i.unitLabel);
+    if (u.dim === "count" && i.gramsPerUnit && i.gramsPerUnit > 0 && UNSHOPPABLE.test(u.label)) u = { dim: "mass", factor: i.gramsPerUnit };
     const label = u.dim === "count" ? u.label.toLowerCase() : "";
     const gk = `${i.key}|${u.dim}|${label}`;
     const acc = groups.get(gk) ?? { key: i.key, name: i.name, dim: u.dim, countLabel: u.dim === "count" ? u.label : "", base: 0 };

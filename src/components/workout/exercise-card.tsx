@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, Check, ChevronDown, MessageSquare, Pause, Play, Plus, Repeat2, SkipForward, Trash2, Undo2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, ChevronDown, History, Link2, Unlink, MessageSquare, Pause, Play, Plus, Repeat2, SkipForward, Trash2, Undo2, X } from "lucide-react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { ExerciseDemoMini } from "@/components/train/exercise-demo";
 import { displayWeight, formatDuration, toKg, weightUnit } from "@/lib/domain/units";
 import type { UnitSystem } from "@/lib/domain/types";
 import type { DraftAction, DraftExercise, DraftSet } from "@/lib/domain/workout-draft";
+import { distanceMode, distanceUnit, formatDistance, fromMetres, toMetres } from "@/lib/domain/exercise-tracking";
 
 function parseNum(v: string): number | null {
   if (v.trim() === "") return null;
@@ -103,6 +104,19 @@ function Stopwatch({ onStop, label }: { onStop: (seconds: number) => void; label
   );
 }
 
+/** Column layout of the set rows: distance work and reps use two equal inputs, plain timed sets a timer. */
+function gridFor(exercise: DraftExercise): string {
+  return exercise.isTimed && !exercise.usesDistance ? "grid-cols-[2rem_1fr_3.2rem_3.4rem_2.75rem]" : "grid-cols-[2rem_1fr_1fr_3.4rem_2.75rem]";
+}
+
+function columnLabels(exercise: DraftExercise, units: UnitSystem): [string, string] {
+  const mode = exercise.usesDistance ? distanceMode(exercise.slug) : null;
+  if (mode === "loaded") return [weightUnit(units), distanceUnit(mode, units)];
+  if (mode === "cardio") return ["Seconds", distanceUnit(mode, units)];
+  if (exercise.isTimed) return ["Seconds", "Timer"];
+  return [weightUnit(units), "Reps"];
+}
+
 function SetRow({
   exercise,
   set,
@@ -110,6 +124,7 @@ function SetRow({
   units,
   dispatch,
   showComplete,
+  isNext = false,
 }: {
   exercise: DraftExercise;
   set: DraftSet;
@@ -117,15 +132,27 @@ function SetRow({
   units: UnitSystem;
   dispatch: (a: DraftAction) => void;
   showComplete: boolean;
+  isNext?: boolean;
 }) {
   const label = `${exercise.name} set ${index + 1}`;
   const update = (patch: Partial<DraftSet>) => dispatch({ type: "updateSet", exerciseKey: exercise.id, setId: set.id, patch });
+  const mode = exercise.usesDistance ? distanceMode(exercise.slug) : null;
+  const dUnit = mode ? distanceUnit(mode, units) : null;
+  const distanceCell = dUnit && (
+    <NumberCell
+      value={set.distanceM == null ? null : fromMetres(set.distanceM, dUnit)}
+      onCommit={(n) => update({ distanceM: n == null ? null : toMetres(n, dUnit) })}
+      label={`${label} distance in ${dUnit}`}
+      placeholder={dUnit}
+    />
+  );
   return (
     <li
       className={cn(
         "grid items-center gap-2 rounded-xl px-1 py-1.5 transition-colors",
-        exercise.isTimed ? "grid-cols-[2rem_1fr_3.2rem_3.4rem_2.75rem]" : "grid-cols-[2rem_1fr_1fr_3.4rem_2.75rem]",
+        gridFor(exercise),
         set.completed && "bg-success/10",
+        isNext && !set.completed && "ring-1 ring-gold-muted",
       )}
     >
       <button
@@ -137,7 +164,22 @@ function SetRow({
       >
         {set.isWarmup ? "W" : index + 1}
       </button>
-      {exercise.isTimed ? (
+      {mode === "loaded" ? (
+        <>
+          <NumberCell
+            value={set.weightKg == null ? null : displayWeight(set.weightKg, units)}
+            onCommit={(n) => update({ weightKg: n == null ? null : toKg(n, units) })}
+            label={`${label} weight in ${weightUnit(units)}`}
+            placeholder={weightUnit(units)}
+          />
+          {distanceCell}
+        </>
+      ) : mode === "cardio" ? (
+        <>
+          <NumberCell value={set.durationSeconds} onCommit={(n) => update({ durationSeconds: n == null ? null : Math.round(n) })} label={`${label} seconds`} inputMode="numeric" placeholder="sec" />
+          {distanceCell}
+        </>
+      ) : exercise.isTimed ? (
         <>
           <NumberCell value={set.durationSeconds} onCommit={(n) => update({ durationSeconds: n == null ? null : Math.round(n) })} label={`${label} seconds`} inputMode="numeric" placeholder="sec" />
           <Stopwatch label={label} onStop={(s) => update({ durationSeconds: s })} />
@@ -203,6 +245,9 @@ export function ExerciseCard({
   onSkip,
   showComplete = true,
   current = false,
+  lastTime = null,
+  nextSetId = null,
+  superset = null,
 }: {
   exercise: DraftExercise;
   index: number;
@@ -214,12 +259,24 @@ export function ExerciseCard({
   showComplete?: boolean;
   /** The exercise the athlete is on now: its demo loops inline. */
   current?: boolean;
+  /** "Last time: 3×5 @ 225 lb". */
+  lastTime?: string | null;
+  /** The set to do next (highlighted). */
+  nextSetId?: string | null;
+  /** Superset placement: its letter, this exercise's place in it, and whether the next exercise can be joined. */
+  superset?: { letter: string | null; position: number; size: number; canLinkNext: boolean } | null;
 }) {
   const [notesOpen, setNotesOpen] = useState(Boolean(exercise.notes));
   const done = exercise.sets.filter((s) => s.completed).length;
   const t = exercise.target;
   const targetText = t
-    ? [`${t.sets} × ${t.reps ?? (t.seconds ? formatDuration(t.seconds) : "")}`, t.intensity, t.rpe ? `RPE ${t.rpe}` : null].filter(Boolean).join(" · ")
+    ? [
+        `${t.sets} × ${t.reps ?? (t.distanceM ? formatDistance(t.distanceM, units) : t.seconds ? formatDuration(t.seconds) : "")}`,
+        t.intensity,
+        t.rpe ? `RPE ${t.rpe}` : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
     : null;
 
   if (exercise.skipped) {
@@ -236,8 +293,20 @@ export function ExerciseCard({
     );
   }
 
+  const [col1, col2] = columnLabels(exercise, units);
+  const inSuperset = Boolean(superset?.letter);
   return (
-    <section className="rounded-2xl border border-border bg-card p-4" aria-labelledby={`ex-${exercise.id}`}>
+    <section
+      className={cn("rounded-2xl border border-border bg-card p-4", inSuperset && "border-l-4 border-l-gold", current && "border-gold-muted")}
+      aria-labelledby={`ex-${exercise.id}`}
+      data-superset={superset?.letter ?? undefined}
+    >
+      {inSuperset && (
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gold">
+          Superset {superset!.letter} · {superset!.position + 1} of {superset!.size}
+          <span className="font-normal normal-case tracking-normal text-muted-foreground"> — alternate sets, rest after each round</span>
+        </p>
+      )}
       <header className="mb-3 flex items-start justify-between gap-2">
         <ExerciseDemoMini slug={exercise.slug} name={exercise.name} animate={current} className="h-[60px] w-20" />
         <div className="min-w-0 flex-1">
@@ -249,8 +318,13 @@ export function ExerciseCard({
           {exercise.substitutedFromName && <p className="text-xs text-muted-foreground">Substituted for {exercise.substitutedFromName}</p>}
           <p className="text-xs text-muted-foreground">
             {targetText && <span className="text-gold-highlight">Target {targetText} · </span>}
-            {done}/{exercise.sets.length} sets · rest {exercise.restSeconds}s
+            {done}/{exercise.sets.length} sets · rest {exercise.restSeconds}s{inSuperset && superset!.position < superset!.size - 1 ? " after the round" : ""}
           </p>
+          {lastTime && (
+            <p className="mt-0.5 flex items-center gap-1 text-xs text-foreground/85" data-testid="last-time">
+              <History className="size-3.5 shrink-0 text-gold" aria-hidden /> {lastTime}
+            </p>
+          )}
         </div>
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>
@@ -264,6 +338,8 @@ export function ExerciseCard({
                 { label: "Substitute exercise", icon: Repeat2, onSelect: onSubstitute },
                 { label: "Skip exercise", icon: SkipForward, onSelect: onSkip },
                 { label: notesOpen ? "Hide notes" : "Add notes", icon: MessageSquare, onSelect: () => setNotesOpen((o) => !o) },
+                ...(superset?.canLinkNext ? [{ label: inSuperset ? "Add next exercise to superset" : "Superset with next exercise", icon: Link2, onSelect: () => dispatch({ type: "linkSuperset", exerciseKey: exercise.id }) }] : []),
+                ...(inSuperset ? [{ label: "Remove from superset", icon: Unlink, onSelect: () => dispatch({ type: "unlinkSuperset", exerciseKey: exercise.id }) }] : []),
                 ...(index > 0 ? [{ label: "Move up", icon: ArrowUp, onSelect: () => dispatch({ type: "moveExercise", exerciseKey: exercise.id, direction: -1 }) }] : []),
                 ...(index < total - 1 ? [{ label: "Move down", icon: ArrowDown, onSelect: () => dispatch({ type: "moveExercise", exerciseKey: exercise.id, direction: 1 }) }] : []),
                 { label: "Remove exercise", icon: Trash2, onSelect: () => dispatch({ type: "removeExercise", exerciseKey: exercise.id }), danger: true },
@@ -284,28 +360,19 @@ export function ExerciseCard({
       <div
         className={cn(
           "grid gap-2 px-1 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground",
-          exercise.isTimed ? "grid-cols-[2rem_1fr_3.2rem_3.4rem_2.75rem]" : "grid-cols-[2rem_1fr_1fr_3.4rem_2.75rem]",
+          gridFor(exercise),
         )}
         aria-hidden
       >
         <span className="text-center">Set</span>
-        {exercise.isTimed ? (
-          <>
-            <span className="text-center">Seconds</span>
-            <span className="text-center">Timer</span>
-          </>
-        ) : (
-          <>
-            <span className="text-center">{weightUnit(units)}</span>
-            <span className="text-center">Reps</span>
-          </>
-        )}
+        <span className="text-center">{col1}</span>
+        <span className="text-center">{col2}</span>
         <span className="text-center">RPE</span>
         <span className="text-center">{showComplete ? "Done" : ""}</span>
       </div>
       <ol className="space-y-1">
         {exercise.sets.map((s, i) => (
-          <SetRow key={s.id} exercise={exercise} set={s} index={i} units={units} dispatch={dispatch} showComplete={showComplete} />
+          <SetRow key={s.id} exercise={exercise} set={s} index={i} units={units} dispatch={dispatch} showComplete={showComplete} isNext={s.id === nextSetId} />
         ))}
       </ol>
       <div className="mt-2 flex gap-2">

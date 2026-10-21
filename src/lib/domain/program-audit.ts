@@ -137,3 +137,19 @@ export function auditProgram(p: ProgramSeed): ProgramAudit {
 export function isHypertrophyProgram(p: Pick<ProgramSeed, "category" | "types" | "goals">): boolean {
   return ["hypertrophy", "show-prep", "powerbuilding"].includes(p.category) || (p.types[0] === "hypertrophy" && p.goals[0] === "build_muscle");
 }
+
+/**
+ * How alike two programs are, 0–1: the Jaccard overlap of their first-week prescriptions (exercise, sets and
+ * reps or time), discounted by a fifth unless they also share the schedule (days per week) and level. Barbell
+ * programs share the same big lifts, so comparing exercises alone would flag plans that are loaded quite
+ * differently. Used to keep near-identical plans with different names out of the library (SPEC §5).
+ */
+export function programSimilarity(a: ProgramSeed, b: ProgramSeed): number {
+  const ex = (p: ProgramSeed) => new Set(expandProgram(p)[0]!.days.flatMap((d) => d.exercises.map((e) => `${e.ex}:${e.sets}x${e.reps ?? e.seconds}`)));
+  const ea = ex(a);
+  const eb = ex(b);
+  const inter = [...ea].filter((x) => eb.has(x)).length;
+  const jaccard = inter / (ea.size + eb.size - inter || 1);
+  const sameShape = a.days.length === b.days.length && a.difficulty === b.difficulty;
+  return sameShape ? jaccard : jaccard * 0.8;
+}

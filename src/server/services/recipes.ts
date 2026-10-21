@@ -159,7 +159,11 @@ export interface GroceryIngredient {
   name: string;
   quantity: number;
   unitLabel: string;
+  /** Weight of one unit, so the grocery list can show label-style units by weight. */
+  gramsPerUnit?: number | null;
 }
+
+const gramsPerUnit = (i: IngredientAmount): number | null => computeAmount(i.basis, 1, i.unitId)?.grams ?? null;
 
 export interface PlannerDish extends PlanCandidate {
   /** Ingredients for one serving. */
@@ -217,7 +221,7 @@ export function recipeDish(r: RecipeView): PlannerDish {
     slots: userSlots(r.perServing.calories.value, r.name),
     per: r.perServing,
     ingredientNames: r.ingredients.map((i) => i.name),
-    ingredients: r.ingredients.map((i) => ({ key: groceryKey(i.source, i.name), name: i.name, quantity: i.quantity / r.servings, unitLabel: i.unitLabel })),
+    ingredients: r.ingredients.map((i) => ({ key: groceryKey(i.source, i.name), name: i.name, quantity: i.quantity / r.servings, unitLabel: i.unitLabel, gramsPerUnit: gramsPerUnit(i) })),
   });
 }
 
@@ -229,7 +233,7 @@ export function appDish(r: AppRecipeView): PlannerDish {
     slots: r.slots,
     per: r.perServing,
     ingredientNames: r.ingredients.map((i) => i.name),
-    ingredients: r.ingredients.map((i) => ({ key: groceryKey(i.source, i.name), name: i.name, quantity: i.quantity / r.servings, unitLabel: i.unitLabel })),
+    ingredients: r.ingredients.map((i) => ({ key: groceryKey(i.source, i.name), name: i.name, quantity: i.quantity / r.servings, unitLabel: i.unitLabel, gramsPerUnit: gramsPerUnit(i) })),
   });
 }
 

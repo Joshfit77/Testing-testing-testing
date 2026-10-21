@@ -22,6 +22,7 @@ test.describe("welcome, sign-up and diets", () => {
     await page.waitForURL(/\/onboarding/);
     await page.getByRole("button", { name: "Lose body fat", exact: true }).click();
     await page.getByRole("button", { name: /^Continue/ }).click();
+    await page.getByRole("button", { name: /^Continue/ }).click(); // optional second goal: Continue skips it too
     // Sex is required (only used for calorie math).
     await expect(page.getByText(/only used to estimate your daily calories/i)).toBeVisible();
     await page.getByRole("button", { name: /^Continue/ }).click();
@@ -47,6 +48,7 @@ test.describe("welcome, sign-up and diets", () => {
     await page.getByRole("button", { name: /^Continue/ }).click();
     await page.getByRole("button", { name: /Mediterranean/ }).click();
     await page.getByRole("button", { name: /^Continue/ }).click();
+    await page.getByRole("button", { name: "Skip", exact: true }).click(); // optional display step
     await page.getByRole("button", { name: "Build my plan" }).click();
     await page.waitForURL(/\/plan/, { timeout: 60_000 });
     await expect(page.getByRole("heading", { name: "Your plan is ready" })).toBeVisible();

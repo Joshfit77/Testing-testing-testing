@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Notice } from "@/components/common/states";
 import type { UnitSystem } from "@/lib/domain/types";
 import { formatDuration, formatWeight } from "@/lib/domain/units";
+import { formatDistance, usesDistance } from "@/lib/domain/exercise-tracking";
 import { createDraft, newId, workoutReducer, type DraftAction, type WorkoutDraft } from "@/lib/domain/workout-draft";
 import { deleteWorkoutAction, editWorkoutAction } from "@/server/actions/workouts";
 import { ExerciseCard } from "./exercise-card";
@@ -32,7 +33,7 @@ export interface EditableSession {
     notes: string;
     skipped: boolean;
     skipReason: "pain" | "equipment" | "time" | "other" | null;
-    sets: { reps: number | null; weightKg: number | null; durationSeconds: number | null; rpe: number | null; isWarmup: boolean; completed: boolean }[];
+    sets: { reps: number | null; weightKg: number | null; durationSeconds: number | null; distanceM: number | null; rpe: number | null; isWarmup: boolean; completed: boolean }[];
   }[];
 }
 
@@ -47,6 +48,8 @@ function toDraft(s: EditableSession): WorkoutDraft {
       slug: e.slug,
       name: e.name,
       isTimed: e.isTimed,
+      usesDistance: usesDistance(e.slug),
+      supersetId: null,
       substitutedFromId: e.substitutedFromId,
       substitutedFromName: null,
       notes: e.notes,
@@ -86,7 +89,7 @@ export function WorkoutEditor({ session, catalog, units, timezone }: { session: 
           notes: e.notes,
           skipped: e.skipped,
           skipReason: e.skipReason,
-          sets: e.sets.map(({ reps, weightKg, durationSeconds, rpe, isWarmup, completed }) => ({ reps, weightKg, durationSeconds, rpe, isWarmup, completed })),
+          sets: e.sets.map(({ reps, weightKg, durationSeconds, distanceM, rpe, isWarmup, completed }) => ({ reps, weightKg, durationSeconds, distanceM, rpe, isWarmup, completed })),
         })),
       });
       if (!res.ok) return setError(res.error);
@@ -202,8 +205,8 @@ export function WorkoutEditor({ session, catalog, units, timezone }: { session: 
                       <span className="text-muted-foreground">{s.isWarmup ? "Warm-up" : `Set ${j + 1}`}</span>
                       <span className={s.completed ? "tabular-nums" : "tabular-nums text-muted-foreground line-through"}>
                         {e.isTimed
-                          ? formatDuration(s.durationSeconds ?? 0)
-                          : `${s.weightKg != null ? formatWeight(s.weightKg, units) : "Bodyweight"} × ${s.reps ?? 0}`}
+                          ? [s.weightKg != null && usesDistance(e.slug) ? formatWeight(s.weightKg, units) : null, s.distanceM != null ? formatDistance(s.distanceM, units) : null, formatDuration(s.durationSeconds ?? 0)].filter(Boolean).join(" · ")
+                          : `${s.weightKg != null ? formatWeight(s.weightKg, units) : "Bodyweight"} × ${s.reps ?? 0}${s.distanceM != null ? ` · ${formatDistance(s.distanceM, units)}` : ""}`}
                         {s.rpe ? ` @ RPE ${s.rpe}` : ""}
                       </span>
                     </li>

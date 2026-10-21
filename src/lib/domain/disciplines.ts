@@ -60,7 +60,7 @@ export const DISCIPLINES: Discipline[] = [
     whoFor: "New runners, endurance athletes and anyone training for heart health, work capacity or fat loss.",
     typicalWeek: "Mostly easy zone 2 sessions plus one or two harder interval days, with strength circuits to keep muscle.",
     customTypes: ["cardio"],
-    categories: ["cardiovascular", "weight-loss-cardio", "functional-conditioning"],
+    categories: ["cardiovascular", "hybrid-training", "weight-loss-cardio", "functional-conditioning"],
   },
   {
     id: "speed_agility",
@@ -76,7 +76,7 @@ export const DISCIPLINES: Discipline[] = [
     whoFor: "Beginners, home trainees, active agers and anyone after health, mobility and a consistent habit.",
     typicalWeek: "2–4 approachable full-body sessions, home-friendly options, mobility work and planned recovery weeks.",
     customTypes: [],
-    categories: ["beginner", "home-workouts", "active-aging", "mobility-flexibility", "recovery-deload"],
+    categories: ["beginner", "home-workouts", "calisthenics", "active-aging", "mobility-flexibility", "recovery-deload"],
   },
 ];
 

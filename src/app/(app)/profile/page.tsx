@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, CreditCard, Download, KeyRound, LogOut, SlidersHorizontal, TrendingUp } from "lucide-react";
+import { BellRing, ChevronRight, CreditCard, Download, KeyRound, LogOut, SlidersHorizontal, TrendingUp } from "lucide-react";
 import { MainHeader } from "@/components/shell/main-header";
 import { DisplaySettings } from "@/components/profile/display-settings";
 import { DeleteAccountForm, ProfileForm, WithdrawConsentForm } from "@/components/profile/profile-forms";
@@ -35,7 +35,7 @@ export default async function ProfilePage() {
       <MainHeader title="Profile & Settings" subtitle={<span className="block truncate">{user.email}</span>} />
 
       <nav aria-label="Profile sections" className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
-        <Row href="/profile/preferences" icon={SlidersHorizontal} title="Edit onboarding details" body="Goals, schedule, equipment, diet and body details" />
+        <Row href="/profile/preferences" icon={SlidersHorizontal} title="Edit onboarding details" body="Goals (main and second), schedule, equipment, diet, body and display" />
         <Row href="/profile/billing" icon={CreditCard} title="Plans & billing" body={`Current plan: ${getPlans()[plan].name}`} />
         <Row href="/progress" icon={TrendingUp} title="My Progress" body="Overview, badges and history" />
       </nav>
@@ -67,8 +67,16 @@ export default async function ProfilePage() {
         />
       </section>
 
-      <div id="reminders">
+      <div id="reminders" className="space-y-2">
         <WorkoutReminders faithEnabled={profile.faith_enabled} />
+        <Link href="/faith/reminders" className="flex min-h-14 items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 hover:border-gold-muted">
+          <BellRing className="size-5 shrink-0 text-gold" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Faith reminders</span>
+            <span className="block text-sm text-muted-foreground">Devotional, prayer and practice reminders (optional)</span>
+          </span>
+          <ChevronRight className="size-4 shrink-0 text-gold" aria-hidden />
+        </Link>
       </div>
 
       <section id="privacy" className={`${section} space-y-5`} aria-labelledby="privacy-title">

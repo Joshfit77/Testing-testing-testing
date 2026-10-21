@@ -10,14 +10,14 @@ Every table below is private to its owner through row-level security (`user_id =
 
 | Area | Tables |
 | --- | --- |
-| Account & settings | `profiles` (name, units, birth year, height, sex, time zone, step goal, faith toggle, text size, reduce motion, Home scripture), `onboarding_answers`, `fitness_goals` |
-| Training | `user_programs`, `training_programs` (programs you built, plus their `program_weeks` / `program_days` / `program_exercises`), `workout_sessions`, `workout_exercises`, `workout_sets`, `personal_records` |
+| Account & settings | `profiles` (name, units, birth year, height, sex, time zone, step goal, faith toggle, text size, reduce motion, Home scripture), `onboarding_answers` (including the optional secondary goal), `fitness_goals` |
+| Training | `user_programs`, `training_programs` (programs you built, plus their `program_weeks` / `program_days` / `program_exercises`), `workout_sessions`, `workout_exercises`, `workout_sets`, `personal_records`, `planned_session_overrides` (sessions you moved on the training calendar; migration `20261021000020`), `workout_templates` + `workout_template_exercises` (saved custom workouts; migration `20261021000013`). Rest-timer alert settings are `profiles.rest_timer_sound` / `rest_timer_vibrate`. The in-progress workout draft (format v2; older v1 drafts are migrated on load) stays on the device and syncs as before |
 | Running & walking | `activities` (manual, treadmill and, later, GPS; soft delete with `deleted_at`) |
 | Body & recovery | `weight_entries`, `measurement_entries`, `recovery_checkins` (stored only with consent), `progress_photos` (metadata) |
 | Food | `foods` (your saved foods and cached USDA/Open Food Facts items), `meals`, `meal_items`, `nutrition_goals`, `water_entries`, `food_favorites` (migration `20261020000011`), `supplement_stack`, `supplement_logs`, and from migration `20261021000012`: `recipes`, `recipe_ingredients`, `meal_plan_settings` (meals per day, budget, allergies, dislikes), `meal_plans`, `meal_plan_entries`, `grocery_lists`, `grocery_items`, `nutrition_day_marks` |
 | Steps | `daily_steps` (manual, or synced from Apple Health / Health Connect) |
 | AI coach | `ai_conversations`, `ai_messages` (including proposals and whether you applied them), `ai_usage_events` |
-| Faith | `faith_journal_entries` (never sent to the AI coach), `discipline_goals`, `discipline_checkins`, `challenge_enrollments`, `challenge_checkins` |
+| Faith | `faith_journal_entries` (prayer journal: type, answered date and note; sent to the AI coach only for entries where you ticked "Share with AI Coach", off by default), `discipline_goals` (daily practices), `discipline_checkins`, `faith_reminders` (devotional / prayer / practice reminder settings; notifications themselves are scheduled on the phone), `challenge_enrollments`, `challenge_checkins` |
 | Billing | `subscriptions`, `user_entitlements`, `billing_customers` (written only by the server from Stripe webhooks) |
 
 **Storage buckets.** `avatars` and `progress-photos` are private, one folder per user (`<user id>/...`). `exercise-media` is a public catalog bucket that only administrators upload to. It holds no personal data.
@@ -52,6 +52,7 @@ Drafts are namespaced by user id, so on a shared device one account never sees a
 | `ngf.nav.stack` | In-app history, so Back buttons go back only when the previous screen is in the app and otherwise go to the section root |
 | `ngf.scroll.<path?query>` | Scroll position per screen (up to 60), restored on Back/Forward and tab returns (`src/components/shell/scroll-memory.tsx`) |
 | `ngf.ui.food.add.*` | Add-food dialog tab, search text and food type |
+| `ngf.faithRemindersSynced` | iPhone/Android app only: faith reminders were re-applied on this device this session |
 
 ### Service worker cache
 
@@ -59,7 +60,7 @@ Drafts are namespaced by user id, so on a shared device one account never sees a
 
 ### Native (iPhone/Android app)
 
-- Local notifications (rest timer, workout reminders) are scheduled with the OS by `@capacitor/local-notifications`.
+- Local notifications (rest timer, workout reminders, faith reminders) are scheduled with the OS by `@capacitor/local-notifications`. Faith reminder settings are saved to your account (`faith_reminders`) and re-applied on the phone when the app opens; a web browser can't show them.
 - Apple Health / Health Connect: step counts are **read** when you tap sync and then saved to `daily_steps`. Nothing is written back to Health.
 - Keyboard: `@capacitor/keyboard` 8.0.6 (`resize: native`). It stores nothing. Run `npx cap sync` and ship a new native build to include it.
 - Session cookies live in the WebView's cookie store, as in a browser.

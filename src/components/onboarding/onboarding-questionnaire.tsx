@@ -15,10 +15,14 @@ import {
   EXPERIENCE_LEVELS,
   GOAL_LABELS,
   PRIMARY_GOALS,
+  SECONDARY_GOAL_LABELS,
+  SECONDARY_GOALS,
   type ExperienceLevel,
   type PrimaryGoal,
+  type SecondaryGoal,
   type UnitSystem,
 } from "@/lib/domain/types";
+import { applyDisplayPrefs, type TextSize } from "@/components/shell/app-shell";
 import {
   ACTIVITY_INFO,
   ACTIVITY_LEVELS,
@@ -40,6 +44,7 @@ const WEIGHT_GOALS: PrimaryGoal[] = ["lose_fat", "build_muscle", "general_health
 
 const STEPS = [
   { id: "goal", title: "Main goal" },
+  { id: "second", title: "Second goal (optional)" },
   { id: "sex", title: "Sex" },
   { id: "age", title: "Age" },
   { id: "height", title: "Height" },
@@ -50,9 +55,18 @@ const STEPS = [
   { id: "schedule", title: "Schedule" },
   { id: "equipment", title: "Equipment" },
   { id: "diet", title: "Diet style" },
+  { id: "comfort", title: "Display (optional)" },
   { id: "finish", title: "Last step" },
 ] as const;
 type StepId = (typeof STEPS)[number]["id"];
+/** Steps that can be skipped without an answer. */
+const OPTIONAL_STEPS: readonly StepId[] = ["second", "comfort"];
+
+const TEXT_SIZES: { value: TextSize; label: string; sample: string }[] = [
+  { value: "default", label: "Default", sample: "text-base" },
+  { value: "large", label: "Large", sample: "text-lg" },
+  { value: "xlarge", label: "Extra large", sample: "text-xl" },
+];
 
 function Choice({
   selected,
@@ -125,6 +139,9 @@ export function OnboardingQuestionnaire({ initialName }: { initialName: string }
   const [dietType, setDietType] = useState<DietType>("balanced");
   const [name, setName] = useState(initialName);
   const [faith, setFaith] = useState(false);
+  const [secondGoal, setSecondGoal] = useState<SecondaryGoal | null>(null);
+  const [textSize, setTextSize] = useState<TextSize>("default");
+  const [reduceMotion, setReduceMotion] = useState(false);
 
   const current: StepId = STEPS[step]!.id;
   const unit = weightUnit(units);
@@ -167,6 +184,7 @@ export function OnboardingQuestionnaire({ initialName }: { initialName: string }
 
   const chooseGoal = (g: PrimaryGoal) => {
     setGoal(g);
+    if (secondGoal === g) setSecondGoal(null);
     setPace(defaultWeeklyRate(g));
     setShowGoalWeight(WEIGHT_GOALS.includes(g));
   };
@@ -175,6 +193,10 @@ export function OnboardingQuestionnaire({ initialName }: { initialName: string }
     switch (id) {
       case "goal":
         return goal ? null : "Choose your main goal.";
+      case "second":
+        return secondGoal && secondGoal === goal ? "Pick a different second goal, or skip." : null;
+      case "comfort":
+        return null;
       case "sex":
         return sex ? null : "Please choose male, female or prefer not to say.";
       case "age": {
@@ -219,6 +241,26 @@ export function OnboardingQuestionnaire({ initialName }: { initialName: string }
     if (!msg) setStep((s) => Math.min(STEPS.length - 1, s + 1));
   };
 
+  const skip = () => {
+    if (current === "second") setSecondGoal(null);
+    if (current === "comfort") {
+      setTextSize("default");
+      setReduceMotion(false);
+      applyDisplayPrefs("default", false);
+    }
+    setError(null);
+    setStep((s) => Math.min(STEPS.length - 1, s + 1));
+  };
+
+  const chooseTextSize = (t: TextSize) => {
+    setTextSize(t);
+    applyDisplayPrefs(t, reduceMotion);
+  };
+  const chooseReduceMotion = (on: boolean) => {
+    setReduceMotion(on);
+    applyDisplayPrefs(textSize, on);
+  };
+
   const back = () => {
     setError(null);
     setStep((s) => Math.max(0, s - 1));
@@ -253,6 +295,9 @@ export function OnboardingQuestionnaire({ initialName }: { initialName: string }
         equipment,
         dietType,
         faithEnabled: faith,
+        secondaryGoal: secondGoal,
+        textSize,
+        reduceMotion,
       });
       // On success the action redirects to the plan summary; we only get here on failure.
       if (res && !res.ok) setError(res.message ?? "Something went wrong. Please try again.");
@@ -298,6 +343,53 @@ export function OnboardingQuestionnaire({ initialName }: { initialName: string }
               {PRIMARY_GOALS.map((g) => (
                 <Choice key={g} selected={goal === g} onClick={() => chooseGoal(g)} title={GOAL_LABELS[g]} />
               ))}
+            </div>
+          </Question>
+        )}
+
+        {current === "second" && (
+          <Question
+            title="Anything else you're working toward?"
+            help="Optional. Your program is built around your main goal; we'll note this one on your plan so you can keep it in view. Skip if there's nothing else."
+          >
+            <div className="grid gap-2 sm:grid-cols-2" role="group" aria-label="Second goal">
+              {SECONDARY_GOALS.filter((g) => g !== goal).map((g) => (
+                <Choice key={g} selected={secondGoal === g} onClick={() => setSecondGoal(secondGoal === g ? null : g)} title={SECONDARY_GOAL_LABELS[g]} />
+              ))}
+            </div>
+          </Question>
+        )}
+
+        {current === "comfort" && (
+          <Question title="Make it comfortable to read" help="Optional. Changes apply right away, and you can change them later in Profile & Settings.">
+            <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Text size">
+              {TEXT_SIZES.map((t) => (
+                <button
+                  key={t.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={textSize === t.value}
+                  onClick={() => chooseTextSize(t.value)}
+                  className={cn(
+                    "flex min-h-14 flex-col items-center justify-center rounded-xl border px-2 py-2 text-center",
+                    textSize === t.value ? "border-gold bg-gold/12 text-gold-highlight" : "border-border bg-elevated hover:border-gold-muted",
+                  )}
+                >
+                  <span className={cn("font-semibold leading-none", t.sample)} aria-hidden>
+                    Aa
+                  </span>
+                  <span className="mt-1 text-xs">{t.label}</span>
+                </button>
+              ))}
+            </div>
+            <div className="flex min-h-11 items-center justify-between gap-4 rounded-xl border border-border bg-elevated/40 p-4">
+              <div>
+                <p id="ob-motion-label" className="text-sm font-semibold">
+                  Reduce motion
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">Turns off animations and transitions.</p>
+              </div>
+              <Switch checked={reduceMotion} onCheckedChange={chooseReduceMotion} aria-labelledby="ob-motion-label" />
             </div>
           </Question>
         )}
@@ -492,8 +584,8 @@ export function OnboardingQuestionnaire({ initialName }: { initialName: string }
         )}
 
         <div className="mt-6 flex items-center justify-between gap-3">
-          <Button type="button" variant="ghost" onClick={back} disabled={step === 0 || pending}>
-            <ArrowLeft aria-hidden /> Back
+          <Button type="button" variant="ghost" onClick={back} disabled={step === 0 || pending} className="px-3">
+            <ArrowLeft aria-hidden /> <span className={OPTIONAL_STEPS.includes(current) ? "sr-only sm:not-sr-only" : undefined}>Back</span>
           </Button>
           {last ? (
             <Button type="submit" disabled={pending} aria-busy={pending}>
@@ -501,9 +593,16 @@ export function OnboardingQuestionnaire({ initialName }: { initialName: string }
               {pending ? "Building your plan…" : "Build my plan"}
             </Button>
           ) : (
-            <Button type="submit">
-              Continue <ArrowRight aria-hidden />
-            </Button>
+            <div className="flex items-center gap-1">
+              {OPTIONAL_STEPS.includes(current) && (
+                <Button type="button" variant="ghost" onClick={skip}>
+                  Skip
+                </Button>
+              )}
+              <Button type="submit">
+                Continue <ArrowRight aria-hidden />
+              </Button>
+            </div>
           )}
         </div>
       </form>

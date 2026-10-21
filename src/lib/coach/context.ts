@@ -10,6 +10,7 @@ import { dailyStreak, weeklyStreak } from "@/lib/domain/streak";
 import { estimateOneRepMax } from "@/lib/domain/strength";
 import { displayWeight, weightUnit } from "@/lib/domain/units";
 import type { UnitSystem } from "@/lib/domain/types";
+import { JOURNAL_KIND_LABELS, type SharedJournalEntry } from "@/lib/domain/journal";
 
 export interface SnapshotSet {
   reps: number | null;
@@ -102,6 +103,11 @@ export interface AthleteSnapshot {
   readiness: { score: number; date: string } | null;
   challenge: { name: string; day: number; completedDays: number; totalDays: number } | null;
   faithEnabled: boolean;
+  /**
+   * Prayer-journal entries the user explicitly chose to share with the coach ("Share with AI Coach",
+   * off by default). Journals are otherwise never part of the context.
+   */
+  sharedJournal?: SharedJournalEntry[];
 }
 
 const round = (n: number, d = 0) => {
@@ -332,6 +338,14 @@ export function formatAthleteContext(s: AthleteSnapshot, opts: { maxWorkouts?: n
   if (s.readiness) lines.push(`Latest readiness check-in: ${s.readiness.score}/100 on ${s.readiness.date}.`);
   lines.push(`Supplement stack: ${s.supplements.length ? s.supplements.join(", ") : "none"}.`);
   if (s.challenge) lines.push(`Challenge: ${s.challenge.name}, day ${s.challenge.day}/${s.challenge.totalDays}, ${s.challenge.completedDays} days completed.`);
+  const shared = (s.sharedJournal ?? []).filter((j) => j.excerpt);
+  if (shared.length) {
+    lines.push("Journal entries the athlete chose to share with you (private; refer to them gently and only when relevant):");
+    for (const j of shared) {
+      const head = [JOURNAL_KIND_LABELS[j.kind], j.title, j.scriptureRef, j.answeredOn ? `answered ${j.answeredOn}` : null].filter(Boolean).join(", ");
+      lines.push(`- ${j.date} (${head}): ${j.excerpt}`);
+    }
+  }
   return lines.join("\n");
 }
 

@@ -7,7 +7,7 @@ import { ACTIVITY_INFO, weeksToGoal } from "@/lib/domain/calorie-budget";
 import { isoDateInTz } from "@/lib/domain/dates";
 import { formatLongDate, goalDate, paceLabel } from "@/lib/domain/diary";
 import { DIETS } from "@/lib/domain/diets";
-import { GOAL_LABELS } from "@/lib/domain/types";
+import { GOAL_LABELS, SECONDARY_GOAL_LABELS, type SecondaryGoal } from "@/lib/domain/types";
 import { formatWeight } from "@/lib/domain/units";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
@@ -24,11 +24,13 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
   const units = profile.unit_system;
   const today = isoDateInTz(new Date(), profile.timezone);
 
-  const [ctx, goalsRes, active] = await Promise.all([
+  const [ctx, goalsRes, active, secondRes] = await Promise.all([
     loadBudgetContext(supabase, user.id),
     supabase.from("nutrition_goals").select("calories, protein_g, carbs_g, fat_g, water_ml, is_estimate").eq("user_id", user.id).maybeSingle(),
     getActiveProgram(supabase, user.id),
+    supabase.from("onboarding_answers").select("secondary_goal").eq("user_id", user.id).maybeSingle(),
   ]);
+  const secondGoal = (secondRes.data?.secondary_goal as SecondaryGoal | null | undefined) ?? null;
   const goals = goalsRes.data as { calories: number; protein_g: number; carbs_g: number; fat_g: number; water_ml: number; is_estimate: boolean } | null;
 
   let program: { sessionMinutes: number; weekOne: { id: string; day_number: number; name: string; focus: string | null; estimated_minutes: number | null }[] } | null = null;
@@ -55,7 +57,9 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
         eyebrow={isNew ? "You're all set" : "Your plan"}
         title={isNew ? "Your plan is ready" : "Your plan"}
         description={
-          ctx ? `Built for your goal: ${GOAL_LABELS[ctx.goal]}. Rooted in faith. Built for strength.` : "Your training program and daily calorie budget."
+          ctx
+            ? `Built for your goal: ${GOAL_LABELS[ctx.goal]}.${secondGoal ? ` Also working toward: ${SECONDARY_GOAL_LABELS[secondGoal]} (noted; your program follows your main goal).` : ""} Rooted in faith. Built for strength.`
+            : "Your training program and daily calorie budget."
         }
       />
 

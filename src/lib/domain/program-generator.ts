@@ -1,5 +1,6 @@
 import type { ProgramDaySeed, ProgramExerciseSeed, ProgramSeed } from "@/data/programs";
 import { STANDARD_COOLDOWN, STANDARD_WARMUP } from "@/data/programs";
+import { fitSessionToMinutes, framingMinutes } from "./session-time";
 import { canAccessTier } from "./plans";
 import type { Difficulty, Equipment, ExerciseCategory, ExperienceLevel, MovementPattern, Plan, PrimaryGoal, ProgramType } from "./types";
 
@@ -181,18 +182,26 @@ export function buildStarterProgram(answers: GeneratorAnswers, catalog: CatalogE
         exercises.push({ ex: pick.slug, sets: 3, reps: "3-5", rest: 90, notes: "Stop the set if speed drops." });
       } else {
         const s = schemeFor(answers.primary_goal, answers.experience, slotIndex);
-        exercises.push({ ex: pick.slug, sets: s.sets, reps: pick.pattern === "core" ? "8-12" : s.reps, rest: s.rest, rpe: s.rpe });
+        // Unloaded bodyweight moves don't need the long rests (or ramp-up sets) of heavy barbell work.
+        const unloaded = pick.equipment.every((x) => ["bodyweight", "mat", "box", "bench"].includes(x));
+        exercises.push({ ex: pick.slug, sets: s.sets, reps: pick.pattern === "core" ? "8-12" : s.reps, rest: unloaded ? Math.min(s.rest, 90) : s.rest, rpe: s.rpe });
       }
     });
+
+    // Fit to the chosen length with the shared session-time estimate (warm-up, sets, rest, transitions), trimming
+    // accessories before the first two (main) exercises, so the label never exceeds the choice.
+    const fit = fitSessionToMinutes(exercises, answers.session_minutes, framingMinutes(STANDARD_WARMUP, STANDARD_COOLDOWN), (_e, i) => i < 2, { minExercises: 3 });
+    exercises.splice(0, exercises.length, ...fit.exercises);
 
     const suffix = (kindCounts.get(kind) ?? 1) > 1 || split.filter((k) => k === kind).length > 1 ? ` ${String.fromCharCode(65 + occurrence)}` : "";
     return {
       name: `${DAY_NAMES[kind]}${suffix}`,
       focus: kind === "conditioning" ? "Work capacity" : kind === "mobility" ? "Move well" : "Strength",
-      minutes: answers.session_minutes,
+      minutes: Math.max(10, fit.minutes),
       exercises,
     };
   });
+  const statedMinutes = Math.max(...days.map((d) => d.minutes));
 
   const novice = answers.experience === "new" || answers.experience === "beginner";
   const weeks = novice ? 4 : 6;
@@ -211,7 +220,7 @@ export function buildStarterProgram(answers: GeneratorAnswers, catalog: CatalogE
   return {
     slug: "starter",
     name: "Your Starter Program",
-    summary: `${split.length} sessions per week, about ${answers.session_minutes} minutes each, built around your goals and equipment.`,
+    summary: `${split.length} sessions per week, up to about ${statedMinutes} minutes each, built around your goals and equipment.`,
     description:
       "Generated from your onboarding answers. It favors exercises that match your equipment and experience. Swap any exercise " +
       "for an alternative, skip anything that causes pain, and update your answers at any time to rebuild it.",
@@ -219,7 +228,8 @@ export function buildStarterProgram(answers: GeneratorAnswers, catalog: CatalogE
     types: answers.preferred_types,
     difficulty: novice ? "beginner" : answers.experience === "advanced" ? "advanced" : "intermediate",
     weeks,
-    sessionMinutes: answers.session_minutes,
+    sessionMinutes: statedMinutes,
+    maxSessionMinutes: answers.session_minutes,
     goals: [answers.primary_goal],
     equipment: equipmentUsed,
     tier: "free",

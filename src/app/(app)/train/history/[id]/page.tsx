@@ -15,7 +15,7 @@ export default async function WorkoutDetailPage({ params }: { params: Promise<{ 
   const { data: session } = await supabase
     .from("workout_sessions")
     .select(
-      "id, name, notes, started_at, ended_at, paused_seconds, total_volume_kg, status, workout_exercises(id, position, notes, skipped, skip_reason, substituted_from_id, exercise:exercises!workout_exercises_exercise_id_fkey(id, slug, name, is_timed), sets:workout_sets(set_number, reps, weight_kg, duration_seconds, rpe, is_warmup, completed))",
+      "id, name, notes, started_at, ended_at, paused_seconds, total_volume_kg, status, workout_exercises(id, position, notes, skipped, skip_reason, substituted_from_id, exercise:exercises!workout_exercises_exercise_id_fkey(id, slug, name, is_timed), sets:workout_sets(set_number, reps, weight_kg, duration_seconds, distance_m, rpe, is_warmup, completed))",
     )
     .eq("id", id)
     .eq("user_id", user.id)
@@ -41,7 +41,7 @@ export default async function WorkoutDetailPage({ params }: { params: Promise<{ 
     skip_reason: "pain" | "equipment" | "time" | "other" | null;
     substituted_from_id: string | null;
     exercise: { id: string; slug: string; name: string; is_timed: boolean };
-    sets: { set_number: number; reps: number | null; weight_kg: number | null; duration_seconds: number | null; rpe: number | null; is_warmup: boolean; completed: boolean }[];
+    sets: { set_number: number; reps: number | null; weight_kg: number | null; duration_seconds: number | null; distance_m: number | null; rpe: number | null; is_warmup: boolean; completed: boolean }[];
   };
   const exercises = ((session.workout_exercises ?? []) as unknown as WE[]).sort((a, b) => a.position - b.position);
   const editable: EditableSession = {
@@ -67,6 +67,7 @@ export default async function WorkoutDetailPage({ params }: { params: Promise<{ 
           reps: s.reps,
           weightKg: s.weight_kg == null ? null : Number(s.weight_kg),
           durationSeconds: s.duration_seconds,
+          distanceM: s.distance_m == null ? null : Number(s.distance_m),
           rpe: s.rpe == null ? null : Number(s.rpe),
           isWarmup: s.is_warmup,
           completed: s.completed,

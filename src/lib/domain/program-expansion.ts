@@ -112,10 +112,16 @@ export function expandProgram(seed: ProgramSeed): ExpandedWeek[] {
       focus: weekFocus(seed, w, isDeload),
       isDeload,
       days: seed.days.map((d: ProgramDaySeed, i) => {
-        const exercises = d.exercises.map((ex, position) => ({ ...adjustExercise(ex, seed, w, isDeload), position }));
+        let exercises = d.exercises.map((ex, position) => ({ ...adjustExercise(ex, seed, w, isDeload), position }));
         // Keep the stated length honest as sets change (extra sets add time, deloads take less).
-        const delta = estimateSessionMinutes(exercises) - estimateSessionMinutes(d.exercises);
-        const minutes = delta === 0 ? d.minutes : Math.max(10, Math.round((d.minutes + delta) / 5) * 5);
+        let delta = estimateSessionMinutes(exercises) - estimateSessionMinutes(d.exercises);
+        // A chosen session length caps progression: no extra sets that would run past it.
+        if (seed.maxSessionMinutes && delta > 0 && d.minutes + delta > seed.maxSessionMinutes) {
+          exercises = exercises.map((e, i) => ({ ...e, sets: Math.min(e.sets, d.exercises[i]!.sets) }));
+          delta = estimateSessionMinutes(exercises) - estimateSessionMinutes(d.exercises);
+        }
+        const rounded = delta === 0 ? d.minutes : Math.max(10, Math.round((d.minutes + delta) / 5) * 5);
+        const minutes = seed.maxSessionMinutes && delta <= 0 ? Math.min(rounded, Math.max(d.minutes, seed.maxSessionMinutes)) : rounded;
         return {
           dayNumber: i + 1,
           name: d.name,

@@ -5,6 +5,7 @@
  * Mirrors the rest-timer pattern in ./native.ts: dynamic import, permission check, no-op on the web.
  */
 import { isNativeApp } from "@/lib/native";
+import { ALL_FAITH_REMINDER_IDS, buildFaithNotifications, type FaithReminder } from "@/lib/faith-reminders";
 import { ALL_REMINDER_IDS, buildReminderSchedule, reminderMessage, type ReminderSettings } from "@/lib/reminders";
 
 export type ReminderScheduleResult =
@@ -66,5 +67,37 @@ export async function pendingWorkoutReminderCount(): Promise<number | null> {
     return notifications.filter((n) => ALL_REMINDER_IDS.includes(n.id)).length;
   } catch {
     return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Faith reminders (devotional / prayer / practices). Same plugin, separate id range.
+// ---------------------------------------------------------------------------
+
+/**
+ * Replace this device's faith reminders with the given settings. Asks for notification permission only
+ * when at least one reminder is on. No-op (reason "not-native") in a web browser.
+ */
+export async function syncFaithReminders(reminders: FaithReminder[], opts: { askPermission?: boolean } = {}): Promise<ReminderScheduleResult> {
+  if (!isNativeApp()) return { ok: false, reason: "not-native" };
+  try {
+    const LocalNotifications = await plugin();
+    const entries = buildFaithNotifications(reminders);
+    if (entries.length) {
+      const perm = await LocalNotifications.checkPermissions();
+      if (perm.display !== "granted") {
+        if (!opts.askPermission) return { ok: false, reason: "permission-denied" };
+        const req = await LocalNotifications.requestPermissions();
+        if (req.display !== "granted") return { ok: false, reason: "permission-denied" };
+      }
+    }
+    await LocalNotifications.cancel({ notifications: ALL_FAITH_REMINDER_IDS.map((id) => ({ id })) });
+    if (!entries.length) return { ok: true, scheduled: 0 };
+    const res = await LocalNotifications.schedule({
+      notifications: entries.map((e) => ({ id: e.id, title: e.title, body: e.body, schedule: { on: e.on, allowWhileIdle: true }, isExactNotification: false })),
+    });
+    return { ok: true, scheduled: res.notifications.length };
+  } catch {
+    return { ok: false, reason: "error" };
   }
 }

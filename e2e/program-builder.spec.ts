@@ -7,12 +7,11 @@ test.describe("Build my program", () => {
     await completeOnboarding(page);
 
     await page.goto("/train/programs");
-    // The library and the type picker are organized by discipline.
+    // The library is organized by the spec's categories; the type picker by discipline.
     await expect(page.getByRole("heading", { name: "Strongman", exact: true })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Combat Sports" })).toBeVisible();
-    await page.getByRole("link", { name: "Bodybuilding & Physique", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Bodybuilding & Physique" })).toBeVisible();
-    await expect(page.getByText("Who it's for:").first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "MMA, boxing & grappling" })).toBeVisible();
+    await page.getByRole("navigation", { name: "Program categories" }).getByRole("link", { name: "Bodybuilding & muscle", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Bodybuilding & muscle" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Strongman", exact: true })).toHaveCount(0);
     await page.getByRole("link", { name: /Build my program/ }).first().click();
     await page.waitForURL(/\/train\/build/);
@@ -39,6 +38,9 @@ test.describe("Build my program", () => {
     await next(); // equipment (prefilled)
 
     await expect(page.getByText("Review your program")).toBeVisible();
+    // What changes compared with the active (onboarding) program, before anything is applied.
+    await expect(page.getByRole("heading", { name: "What changes from your current program" })).toBeVisible();
+    await expect(page.getByTestId("plan-changes")).toContainText("→");
     await expect(page.getByText(/70% · 185 lb/).first()).toBeVisible();
     await page.getByRole("button", { name: "Build & start program" }).click();
 

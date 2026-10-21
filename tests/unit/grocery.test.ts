@@ -102,3 +102,25 @@ describe("grocery merging", () => {
     expect(lines.map((l) => l.name)).toEqual(["Apple", "Spinach"]);
   });
 });
+
+describe("label-style units on the grocery list", () => {
+  it("lists NLEA servings and pats by weight when the weight is known, and keeps real counts", () => {
+    const lines = mergeGroceries(
+      [
+        { key: "usda:avocado", name: "Avocado", quantity: 2.5, unitLabel: "NLEA serving", gramsPerUnit: 30 },
+        { key: "usda:avocado", name: "Avocado", quantity: 50, unitLabel: "g" },
+        { key: "usda:butter", name: "Butter", quantity: 2, unitLabel: "1 pat (1\" sq, 1/3\" high)", gramsPerUnit: 5 },
+        { key: "usda:egg", name: "Egg", quantity: 3, unitLabel: "1 large", gramsPerUnit: 50 },
+      ],
+      "metric",
+    );
+    expect(lines.find((l) => l.name === "Avocado")).toMatchObject({ quantity: 125, unit: "g", note: null });
+    expect(lines.find((l) => l.name === "Butter")).toMatchObject({ quantity: 10, unit: "g" });
+    expect(lines.find((l) => l.name === "Egg")).toMatchObject({ quantity: 3, unit: "large" });
+  });
+
+  it("keeps a label-style unit as a count when no weight is known", () => {
+    const [line] = mergeGroceries([{ key: "x", name: "Bar", quantity: 2, unitLabel: "serving" }], "metric");
+    expect(line).toMatchObject({ quantity: 2, unit: "serving" });
+  });
+});

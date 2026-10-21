@@ -70,6 +70,7 @@ export async function buildCustomProgramAction(input: CustomProgramFormInput): P
         cardio: v.cardio ?? null,
         division: v.division ?? null,
         equipment: v.equipment,
+        combine: v.combine ?? null,
       },
       "custom",
     );

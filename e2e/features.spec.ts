@@ -12,6 +12,7 @@ test.describe("feature access, subscriptions and core sections", () => {
     await page.waitForURL(/\/onboarding/);
     await page.getByRole("button", { name: "Build strength", exact: true }).click();
     await page.getByRole("button", { name: /^Continue/ }).click();
+    await page.getByRole("button", { name: "Skip", exact: true }).click(); // optional second goal
     await page.getByRole("button", { name: "Female", exact: true }).click();
     await page.getByRole("button", { name: /^Continue/ }).click();
     await page.getByLabel("Age").fill("16");

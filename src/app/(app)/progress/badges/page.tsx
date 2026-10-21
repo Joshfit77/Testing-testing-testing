@@ -91,7 +91,7 @@ export default async function BadgesPage() {
     );
   }
 
-  const categories = BADGE_CATEGORIES.filter((c) => c.id !== "faith" || profile.faith_enabled);
+  const categories = BADGE_CATEGORIES;
   const visible = badges.filter((b) => categories.some((c) => c.id === b.category));
   const earned = visible.filter((b) => b.earned).length;
 

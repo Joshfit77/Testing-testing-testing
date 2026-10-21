@@ -1,4 +1,5 @@
 import {
+  COMBINABLE_TYPES,
   CUSTOM_TYPES,
   weeksRange,
   type CustomProgramInput,
@@ -35,6 +36,8 @@ export interface StarterAnswers {
   bodyweightKg: number;
   equipment: Equipment[];
   units: UnitSystem;
+  /** Optional second goal from onboarding (e.g. "run_5k"). */
+  secondaryGoal?: string | null;
 }
 
 export function starterProgramInput(a: StarterAnswers): CustomProgramInput {
@@ -43,13 +46,19 @@ export function starterProgramInput(a: StarterAnswers): CustomProgramInput {
   const novice = a.experience === "new" || a.experience === "beginner";
   const daysPerWeek = Math.min(cfg.days.max, Math.max(cfg.days.min, Math.round(a.daysPerWeek)));
   const sessionMinutes = Math.min(90, Math.max(30, Math.round(a.sessionMinutes || cfg.defaultMinutes)));
+  // A running or conditioning second goal becomes a combined week (two run days out of the days available) when
+  // the starter is a strength or muscle program and there are at least four days to share.
+  const combineGoal = a.secondaryGoal === "run_5k" ? "5k" : a.secondaryGoal === "improve_conditioning" ? "conditioning" : null;
+  const combine = combineGoal && COMBINABLE_TYPES.includes(type) && Math.round(a.daysPerWeek) >= 4 ? { goal: combineGoal, days: 2 } as const : null;
+  const weeksDefault = weeksRange(type, goal).default;
   return {
     type,
     goal,
+    ...(combine ? { combine } : {}),
     experience: a.experience,
-    daysPerWeek,
+    daysPerWeek: combine ? Math.max(cfg.days.min, Math.min(cfg.days.max, Math.round(a.daysPerWeek) - 2)) : daysPerWeek,
     sessionMinutes,
-    weeks: weeksRange(type, goal).default,
+    weeks: combine ? Math.min(16, Math.max(4, weeksDefault)) : weeksDefault,
     units: a.units,
     age: a.age,
     heightCm: a.heightCm,

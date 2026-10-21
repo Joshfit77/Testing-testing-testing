@@ -79,7 +79,7 @@ for (const p of PROGRAMS) {
   const pid = stableUuid(`program:${p.slug}`);
   lines.push(`delete from public.program_weeks where program_id = ${q(pid)};`);
   lines.push(
-    `insert into public.training_programs (id, slug, name, summary, description, category_id, difficulty, duration_weeks, days_per_week, session_minutes, goals, equipment, tier, progression, warmup, cooldown, low_impact, is_published, source) values (` +
+    `insert into public.training_programs (id, slug, name, summary, description, category_id, difficulty, duration_weeks, days_per_week, session_minutes, goals, equipment, tier, progression, warmup, cooldown, low_impact, needs_specialist_review, is_published, source) values (` +
       [
         q(pid),
         q(p.slug),
@@ -98,10 +98,11 @@ for (const p of PROGRAMS) {
         arr(p.warmup),
         arr(p.cooldown),
         bool(p.lowImpact),
+        bool(p.needsSpecialistReview),
         "true",
         q("curated"),
       ].join(", ") +
-      `) on conflict (slug) do update set name = excluded.name, summary = excluded.summary, description = excluded.description, category_id = excluded.category_id, difficulty = excluded.difficulty, duration_weeks = excluded.duration_weeks, days_per_week = excluded.days_per_week, session_minutes = excluded.session_minutes, goals = excluded.goals, equipment = excluded.equipment, tier = excluded.tier, progression = excluded.progression, warmup = excluded.warmup, cooldown = excluded.cooldown, low_impact = excluded.low_impact, is_published = true;`,
+      `) on conflict (slug) do update set name = excluded.name, summary = excluded.summary, description = excluded.description, category_id = excluded.category_id, difficulty = excluded.difficulty, duration_weeks = excluded.duration_weeks, days_per_week = excluded.days_per_week, session_minutes = excluded.session_minutes, goals = excluded.goals, equipment = excluded.equipment, tier = excluded.tier, progression = excluded.progression, warmup = excluded.warmup, cooldown = excluded.cooldown, low_impact = excluded.low_impact, needs_specialist_review = excluded.needs_specialist_review, is_published = true;`,
   );
   for (const week of expandProgram(p)) {
     const wid = stableUuid(`week:${p.slug}:${week.weekNumber}`);

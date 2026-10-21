@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Clock, Flame, Lock, Play, Repeat, Snowflake, TrendingUp } from "lucide-react";
+import { CheckCircle2, Clock, Dumbbell, Flag, Flame, Lock, Play, Repeat, ShieldAlert, Snowflake, TrendingUp } from "lucide-react";
 import { Notice } from "@/components/common/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ProgramActions } from "@/components/train/program-actions";
 import { canAccessTier } from "@/lib/domain/plans";
+import { completionRequirement, equipmentSummary, requiredSessions } from "@/lib/domain/program-catalog";
+import { EQUIPMENT_LABELS, type Equipment } from "@/lib/domain/types";
+import { getProgramSeed } from "@/data/programs";
 import { formatDuration } from "@/lib/domain/units";
 import type { ProgramRow } from "@/lib/types/db";
 import { cn, titleCase } from "@/lib/utils";
@@ -62,6 +65,12 @@ export default async function ProgramDetailPage({
     program.category_id ? supabase.from("program_categories").select("name, slug").eq("id", program.category_id).maybeSingle() : Promise.resolve({ data: null }),
   ]);
   const userProgram = upRes.data;
+  // Completion progress: sessions logged against this program run.
+  const { count: loggedSessions } = userProgram
+    ? await supabase.from("workout_sessions").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("user_program_id", userProgram.id).eq("status", "completed")
+    : { count: 0 };
+  const { total: totalSessions, required: requiredCount } = requiredSessions(program.days_per_week, program.duration_weeks);
+  const completionText = completionRequirement(program, program.source === "curated" ? getProgramSeed(program.slug)?.completion : null);
   const weeks = weeksRes.data ?? [];
   const locked = program.owner_id !== user.id && !canAccessTier(plan, program.tier);
   const isActive = userProgram?.status === "active";
@@ -131,6 +140,47 @@ export default async function ProgramDetailPage({
           <ProgramActions programId={program.id} locked={locked} isActive={isActive} isSaved={Boolean(userProgram)} />
         </div>
       </header>
+
+      {program.needs_specialist_review && (
+        <Notice tone="warning">
+          <ShieldAlert className="mr-1 inline size-4 text-gold" aria-hidden /> <strong>Not yet reviewed by a qualified coach.</strong> This is specialist
+          programming ({program.low_impact ? "active aging" : "competition or combat preparation"}). It follows published methods but hasn&apos;t been checked
+          by a qualified coach{program.low_impact ? " or physiotherapist" : ""} yet — work with one if you can.
+        </Notice>
+      )}
+
+      <section className="grid gap-4 md:grid-cols-2" aria-label="Equipment and completion">
+        <div className="rounded-2xl border border-border bg-card p-5">
+          <h2 className="flex items-center gap-2 font-display text-lg font-semibold uppercase">
+            <Dumbbell className="size-4 text-gold" aria-hidden /> Equipment needed
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground">{equipmentSummary(program.equipment)}</p>
+          {program.equipment.length > 0 && (
+            <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Equipment list">
+              {program.equipment.map((e) => (
+                <li key={e}>
+                  <Badge variant="secondary">{EQUIPMENT_LABELS[e as Equipment] ?? titleCase(e)}</Badge>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div className="rounded-2xl border border-border bg-card p-5">
+          <h2 className="flex items-center gap-2 font-display text-lg font-semibold uppercase">
+            <Flag className="size-4 text-gold" aria-hidden /> To complete it
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground">{completionText}</p>
+          {userProgram && (
+            <p className="mt-2 flex items-center gap-1.5 text-sm" aria-live="polite">
+              {(loggedSessions ?? 0) >= requiredCount && <CheckCircle2 className="size-4 text-success" aria-hidden />}
+              <span>
+                You&apos;ve logged <strong>{loggedSessions ?? 0}</strong> of {totalSessions} sessions
+                {(loggedSessions ?? 0) >= requiredCount ? " — requirement met." : ` (${requiredCount} needed).`}
+              </span>
+            </p>
+          )}
+        </div>
+      </section>
 
       {locked && (
         <Notice tone="info">

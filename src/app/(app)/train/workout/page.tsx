@@ -6,13 +6,15 @@ import type { Plan } from "@/lib/domain/types";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { getProgramDay } from "@/server/services/training";
-import { getServerDraft } from "@/server/services/workouts";
+import { getPreviousPerformance, getServerDraft } from "@/server/services/workouts";
+import { getTemplate } from "@/server/services/templates";
+import { migrateDraft } from "@/lib/domain/workout-draft";
 
 export const metadata = { title: "Workout" };
 
 const uuid = z.string().uuid();
 
-export default async function WorkoutPage({ searchParams }: { searchParams: Promise<{ day?: string; up?: string }> }) {
+export default async function WorkoutPage({ searchParams }: { searchParams: Promise<{ day?: string; up?: string; template?: string }> }) {
   const sp = await searchParams;
   const { user, profile } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
@@ -67,10 +69,48 @@ export default async function WorkoutPage({ searchParams }: { searchParams: Prom
     }
   }
 
+  const templateId = uuid.safeParse(sp.template);
+  if (!template && templateId.success) {
+    // Owner-only: getTemplate filters by user id (and RLS).
+    const saved = await getTemplate(supabase, user.id, templateId.data);
+    if (saved) {
+      template = {
+        name: saved.name,
+        userProgramId: null,
+        programDayId: null,
+        templateId: saved.id,
+        warmup: [],
+        cooldown: [],
+        exercises: saved.exercises.map((e) => ({
+          exercise: { id: e.exerciseId, slug: e.slug, name: e.name, isTimed: e.isTimed },
+          restSeconds: e.restSeconds,
+          supersetGroup: e.supersetGroup,
+          target: {
+            sets: e.sets,
+            reps: e.target === "reps" ? e.reps : null,
+            seconds: e.target === "time" ? e.durationSeconds : null,
+            distanceM: e.target === "distance" ? e.distanceM : null,
+          },
+        })),
+      };
+    } else {
+      notice = "That workout template wasn't found. Starting an empty workout instead.";
+    }
+  }
+
+  // "Last time" for the exercises this workout starts with (more are fetched as exercises are added).
+  const restored = migrateDraft(serverDraft);
+  const startIds = [...(template?.exercises.map((e) => e.exercise.id) ?? []), ...(restored?.exercises.map((e) => e.exerciseId) ?? [])];
+  const previous = await getPreviousPerformance(supabase, user.id, startIds).catch(() => ({}));
+
   return (
     <>
       {notice && <p className="mb-4 rounded-xl border border-gold-muted/50 bg-gold/5 px-4 py-3 text-sm">{notice}</p>}
-      <WorkoutLogger userId={user.id} units={profile.unit_system} catalog={catalog} alternatives={alternatives} serverDraft={serverDraft} template={template} />
+      <WorkoutLogger userId={user.id} units={profile.unit_system} catalog={catalog} alternatives={alternatives} serverDraft={serverDraft}
+        template={template}
+        previous={previous}
+        restAlerts={{ sound: profile.rest_timer_sound ?? true, vibrate: profile.rest_timer_vibrate ?? true }}
+      />
     </>
   );
 }

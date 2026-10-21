@@ -44,6 +44,17 @@ export interface ProgramSeed {
   equipment: Equipment[];
   tier: Plan;
   lowImpact?: boolean;
+  /**
+   * Specialist programming (show prep, meet prep, combat, active aging) that should be checked by a qualified
+   * coach or physio. Shown as "Not yet reviewed by a qualified coach" until such a review has happened.
+   */
+  needsSpecialistReview?: boolean;
+  /**
+   * The session length the user chose (generated programs). Week-to-week progression never adds sets past it.
+   */
+  maxSessionMinutes?: number;
+  /** Overrides the standard completion requirement (see completionRequirement in program-catalog.ts). */
+  completion?: string;
   progression: string;
   progressionModel: ProgressionModel;
   /** Insert a deload as the final week. */
@@ -93,6 +104,8 @@ export const PROGRAM_CATEGORIES: CategorySeed[] = [
   { slug: "womens-strength", name: "Women's Strength Training", description: "Progressive strength training designed with women's goals and feedback in mind — not lighter by default." },
   { slug: "active-aging", name: "Active Aging & Low-Impact", description: "Joint-friendly strength, balance and mobility." },
   { slug: "home-workouts", name: "Home Workouts", description: "Effective sessions with minimal equipment." },
+  { slug: "calisthenics", name: "Calisthenics", description: "Bodyweight strength through progressions: pull-ups, dips, push-ups, single-leg squats." },
+  { slug: "hybrid-training", name: "Hybrid Strength & Endurance", description: "Strength and running on one week, spaced so hard sessions don't collide." },
   { slug: "mobility-flexibility", name: "Mobility & Flexibility", description: "Move better and feel better." },
   { slug: "recovery-deload", name: "Recovery & Deload", description: "Planned lower-stress weeks to absorb training." },
 ];
@@ -1539,6 +1552,141 @@ const MOBILITY_DAYS: ProgramDaySeed[] = [
   ], MOBILITY_FRAME),
 ];
 
+// --------------------------------------------------------------------------- Stage 2B templates
+
+const CALI_WARMUP = ["3 minutes skipping or marching", "Wrist circles and rocking on hands and knees × 10", "Band pull-aparts × 15", "Bodyweight squats × 10", "Scapular pull-ups or dead-hang shrugs × 8"];
+const CALI_STRENGTH_WARMUP = ["3 minutes skipping or easy jog", "Wrist and shoulder circles × 10", "Scapular pull-ups × 8", "Bodyweight squats × 10", "Push-ups × 5 and a 20-second dead hang"];
+
+/** Calisthenics block: weeks 1–3 and 5–7 load (a set is added in weeks 3 and 7), weeks 4 and 8 deload. */
+function calisthenicsBlock(n: number): { deload: boolean; add: number; rpe: number; focus: string }[] {
+  return Array.from({ length: n }, (_, i) => {
+    const w = i + 1;
+    if (w % 4 === 0) return { deload: true, add: 0, rpe: 6, focus: "Deload — fewer sets and easier variations; keep every rep clean" };
+    const k = (w - 1) % 4;
+    return {
+      deload: false,
+      add: k === 2 ? 1 : 0,
+      rpe: 7 + k * 0.5,
+      focus: k === 0 ? `Block ${w < 4 ? 1 : 2}: own every rep in the range, about 3 reps in reserve` : k === 1 ? "Add reps; move up a progression when the top of the range is easy" : "One more set on the main pairs, 1–2 reps in reserve",
+    };
+  });
+}
+
+function calisthenicsFoundationWeeks(): ProgramWeekSeed[] {
+  return calisthenicsBlock(8).map((b, wi) => {
+    const sets = (base: number) => (b.deload ? Math.max(1, base - 1) : base + b.add);
+    const rpe = b.rpe;
+    const note = b.deload ? "Deload: an easier progression and stop well short of failure." : undefined;
+    const A = day("Full Body A", "Vertical pull, push-up, split squat and core", [
+      R("band-assisted-pull-up", sets(3), "5-8", 90, { rpe, notes: joinNotes("Use the lightest band that lets you hit 5. Strong already? Full pull-ups.", note) }),
+      R("push-up", sets(3), "5-12", 90, { rpe, notes: joinNotes("Incline push-ups until you can do 3 × 12 on the floor, then feet-elevated.", note) }),
+      R("bulgarian-split-squat", sets(3), "6-10 per side", 75, { rpe, notes: note }),
+      R("glute-bridge", 2, "10-15", 45, { rpe, notes: "Single-leg once 15 reps is easy." }),
+      R("hanging-knee-raise", 2, "6-12", 60),
+    ], { warmup: CALI_WARMUP });
+    const B = day("Full Body B", "Row, pike push-up, hinge and hang", [
+      R("inverted-row", sets(3), "6-12", 90, { rpe, notes: joinNotes("Under a sturdy table or low bar; walk the feet forward to make it harder.", note) }),
+      R("pike-push-up", sets(3), "5-10", 90, { rpe, notes: joinNotes("Hands and feet closer together, or feet on a step, as it gets easier.", note) }),
+      R("single-leg-rdl", sets(3), "8 per side", 60, { rpe, notes: note }),
+      R("bodyweight-squat", 2, "15-20", 45, { rpe }),
+      T("dead-hang", 2, 30, 60, { notes: "Build toward 60 seconds." }),
+      T("plank", 2, 40, 45),
+    ], { warmup: CALI_WARMUP });
+    const days = (wi + 1) % 2 === 1 ? [A, B, A] : [B, A, B];
+    return b.deload ? { focus: b.focus, isDeload: true, days } : { focus: b.focus, days };
+  });
+}
+
+function calisthenicsStrengthWeeks(): ProgramWeekSeed[] {
+  return calisthenicsBlock(8).map((b) => {
+    const sets = (base: number) => (b.deload ? Math.max(2, base - 2) : base + b.add);
+    const rpe = b.rpe;
+    const note = b.deload ? "Deload: bodyweight only, 3–4 reps in reserve." : undefined;
+    const w = { warmup: CALI_STRENGTH_WARMUP };
+    const days = [
+      day("Upper A", "Pull-ups and dips", [
+        R("pull-up", sets(4), "5-8", 150, { rpe, notes: joinNotes("Add 2–5 kg in a backpack when all sets reach 8.", note) }),
+        R("dips", sets(4), "6-10", 150, { rpe, notes: joinNotes("Shoulders down, controlled depth.", note) }),
+        R("inverted-row", 3, "8-12", 90, { rpe }),
+        R("pike-push-up", 3, "6-10", 90, { rpe, notes: "Feet on a bench to progress toward handstand push-ups." }),
+        R("hanging-knee-raise", 3, "8-12", 60),
+      ], w),
+      day("Lower A", "Single-leg squat strength and hamstrings", [
+        R("bulgarian-split-squat", sets(4), "6-10 per side", 120, { rpe, notes: joinNotes("Hold a backpack once 10 per side is easy.", note) }),
+        R("nordic-hamstring-curl", 3, "3-6", 120, { rpe, notes: "Lower as slowly as you can; push back up with your hands." }),
+        R("step-up", 3, "8 per side", 75, { rpe }),
+        T("copenhagen-plank", 2, 20, 45, { notes: "Per side. Bent top knee to start." }),
+        R("standing-calf-raise", 3, "12-20", 45, { notes: "Single-leg on a step." }),
+      ], w),
+      day("Upper B", "Chin-ups and push-ups", [
+        R("chin-up", sets(4), "5-8", 150, { rpe, notes: joinNotes("Add load when all sets reach 8.", note) }),
+        R("push-up", sets(4), "8-15", 90, { rpe, notes: joinNotes("Feet elevated; add a pause at the bottom when 15 is easy.", note) }),
+        R("dips", 3, "8-12", 120, { rpe }),
+        T("dead-hang", 3, 40, 60),
+        T("plank", 3, 45, 45),
+      ], w),
+      day("Lower B", "Hinge, lunge and mobility", [
+        R("single-leg-rdl", sets(3), "8-10 per side", 90, { rpe, notes: note }),
+        R("reverse-lunge", 3, "10 per side", 75, { rpe }),
+        R("glute-bridge", 3, "12-15", 60, { notes: "Single-leg." }),
+        T("side-plank", 2, 40, 30, { notes: "Per side." }),
+        T("deep-squat-hold", 2, 45, 30),
+      ], w),
+    ];
+    return b.deload ? { focus: b.focus, isDeload: true, days } : { focus: b.focus, days };
+  });
+}
+
+/**
+ * Hybrid week (concurrent training): heavy legs on Monday, intervals on Thursday, so a hard run is never on the
+ * same day as, or the day after/before, heavy squats and deadlifts. Deloads in weeks 4 and 8.
+ */
+function hybridWeeks(): ProgramWeekSeed[] {
+  const runWarm = ["5 minutes brisk walking or very easy jogging", "Leg swings × 10 each leg", "Ankle circles × 10 each direction", "3 relaxed 20-second strides"];
+  const runCool = ["5 minutes walking", "Calf stretch 30 seconds per side", "Hip flexor stretch 30 seconds per side"];
+  return Array.from({ length: 8 }, (_, i): ProgramWeekSeed => {
+    const w = i + 1;
+    const deload = w % 4 === 0;
+    const k = (w - 1) % 4; // 0..2 within a block, 3 = deload
+    const block = w <= 4 ? 0 : 1;
+    const rpe = deload ? 6 : 7 + k * 0.5;
+    const easyMin = deload ? 20 : 25 + 3 * k + 5 * block;
+    const longMin = deload ? 30 : 40 + 5 * k + 5 * block;
+    const intervalRounds = deload ? 3 : 4 + k;
+    const strengthSets = deload ? 2 : 3;
+    const dn = deload ? "Deload: about 60% of recent working weights." : undefined;
+    const days = [
+      day("Mon · Strength A (legs heavy)", "Squat, hinge and press — the week's heavy leg day", [
+        R("back-squat", strengthSets, "5", 180, { rpe, notes: joinNotes("Heavy legs today, so tomorrow's run stays easy.", dn) }),
+        R("romanian-deadlift", strengthSets, "8", 120, { rpe, notes: dn }),
+        R("bench-press", strengthSets, "5", 150, { rpe, notes: dn }),
+        R("pull-up", 3, "5-8", 90, { rpe }),
+      ]),
+      day("Tue · Easy Run", "Zone 2: conversational pace", [
+        T("zone-2-run", 1, easyMin * 60, 0, { notes: `${easyMin} minutes easy — you can speak in full sentences.` }),
+        R("standing-calf-raise", 2, "15", 45, { notes: "Runner's calves: slow on the way down." }),
+      ], { warmup: runWarm, cooldown: runCool }),
+      day("Thu · Intervals", "The week's one hard run — two days clear of heavy legs", [
+        T("running-intervals", intervalRounds, 180, 120, { rpe: deload ? 6 : 8, notes: deload ? "Steady, not hard: 3 min comfortably hard, 2 min easy." : "3 min at about 10K effort (hard but controlled), 2 min easy jog between." }),
+      ], { warmup: runWarm, cooldown: runCool }),
+      day("Fri · Strength B (upper emphasis)", "Press, pull and light single-leg work", [
+        R("overhead-press", strengthSets, "5", 150, { rpe, notes: dn }),
+        R("one-arm-dumbbell-row", 3, "8-10 per side", 90, { rpe }),
+        R("incline-dumbbell-press", 3, "8-10", 90, { rpe }),
+        R("reverse-lunge", 2, "8 per side", 75, { rpe: 6, notes: "Light — tomorrow is the long run." }),
+        T("side-plank", 2, 30, 30, { notes: "Per side." }),
+      ]),
+      day("Sat · Long Easy Run", "Endurance — the longest run of the week", [
+        T("zone-2-run", 1, longMin * 60, 0, { notes: `${longMin} minutes easy. Walk breaks are fine.` }),
+      ], { warmup: runWarm, cooldown: runCool }),
+    ];
+    const focus = deload
+      ? "Deload — fewer strength sets, shorter runs, no hard intervals"
+      : `Block ${block + 1}, week ${k + 1}: ${k === 0 ? "settle the weights and paces" : k === 1 ? "add a little weight and a few running minutes" : "the block's hardest week"}`;
+    return deload ? { focus, isDeload: true, days } : { focus, days };
+  });
+}
+
 export const PROGRAMS: ProgramSeed[] = [
   // =========================================================== General fitness
   {
@@ -1628,6 +1776,7 @@ export const PROGRAMS: ProgramSeed[] = [
     goals: ["general_health", "mobility", "build_strength"],
     equipment: ["bodyweight", "dumbbell", "band"],
     tier: "free",
+    needsSpecialistReview: true,
     lowImpact: true,
     progression:
       "Weeks 1–3: add reps before weight. Weeks 4–6: one extra set on most exercises. When an exercise feels easy (RPE 5 or less) at the top of " +
@@ -1676,6 +1825,7 @@ export const PROGRAMS: ProgramSeed[] = [
     goals: ["general_health", "build_strength", "build_muscle"],
     equipment: ["dumbbell", "bench", "band"],
     tier: "plus",
+    needsSpecialistReview: true,
     lowImpact: true,
     progression:
       "Weeks 1–3: sets of 10–12, adding a set by week 2. Week 4 is lighter. Weeks 5–7: heavier sets of 6–8 — add a little weight whenever every set " +
@@ -2143,6 +2293,7 @@ export const PROGRAMS: ProgramSeed[] = [
     goals: ["build_strength"],
     equipment: ["barbell", "rack", "bench", "dumbbell", "cable", "machine", "pull_up_bar"],
     tier: "plus",
+    needsSpecialistReview: true,
     progression:
       "Percentages are of your current 1RM and rise 2.5% a week through each phase. If a set is more than 1 RPE above target, stay at that weight. " +
       "Week 5 deloads; weeks 10–11 peak and taper (volume down 40–50%, intensity held); week 12 is meet week.",
@@ -2395,6 +2546,7 @@ export const PROGRAMS: ProgramSeed[] = [
     goals: ["build_muscle", "lose_fat"],
     equipment: ["barbell", "rack", "bench", "dumbbell", "cable", "machine", "pull_up_bar", "bike"],
     tier: "plus",
+    needsSpecialistReview: true,
     progression:
       "Keep the weights you're lifting and 1–3 reps in reserve — in a deficit, holding strength is the win. Low-intensity cardio rises from about 20 to " +
       "35 minutes per session over the prep and posing from 10 to 20 minutes; your coach adjusts both from weekly weigh-ins. Week 7 is lighter and " +
@@ -2423,6 +2575,7 @@ export const PROGRAMS: ProgramSeed[] = [
     goals: ["combat_sports", "build_strength", "athletic_performance"],
     equipment: ["barbell", "trap_bar", "dumbbell", "medicine_ball", "box", "pull_up_bar", "bench", "rack"],
     tier: "free",
+    needsSpecialistReview: true,
     progression:
       "Weeks 1–3: sets of 5, adding a set and a little load. Week 4 deloads. Weeks 5–7: heavier triples at the same low soreness. Week 8 deloads. " +
       "Neck and groin work progress by 5 seconds or 2 reps a week, never through pain.",
@@ -2447,6 +2600,7 @@ export const PROGRAMS: ProgramSeed[] = [
     goals: ["combat_sports", "improve_conditioning", "lose_fat"],
     equipment: ["jump_rope", "heavy_bag", "dumbbell", "medicine_ball", "bodyweight"],
     tier: "plus",
+    needsSpecialistReview: true,
     progression: "Conditioning adds a round or cuts 10 seconds of rest each week; strength work holds at about RPE 7. Week 4 keeps rounds but lowers intensity.",
     progressionModel: "density",
     deloadFinalWeek: true,
@@ -2489,6 +2643,7 @@ export const PROGRAMS: ProgramSeed[] = [
     goals: ["combat_sports", "improve_conditioning"],
     equipment: ["kettlebell", "sandbag", "pull_up_bar", "mat", "barbell", "dumbbell", "landmine"],
     tier: "plus",
+    needsSpecialistReview: true,
     progression: "Conditioning intervals add a round or cut 10 seconds of rest each week; lifts hold at RPE 7–8. Week 4 reduces volume by a third.",
     progressionModel: "density",
     deloadFinalWeek: true,
@@ -2534,6 +2689,7 @@ export const PROGRAMS: ProgramSeed[] = [
     goals: ["combat_sports", "improve_conditioning", "athletic_performance"],
     equipment: ["barbell", "trap_bar", "kettlebell", "medicine_ball", "bike", "jump_rope", "heavy_bag", "pull_up_bar", "mat", "sandbag", "landmine"],
     tier: "plus",
+    needsSpecialistReview: true,
     progression:
       "Glycolytic and aerobic intervals add a round or cut 10–15 seconds of rest each week while output stays consistent. Strength work holds at 2–3 " +
       "reps in reserve, and the 8-second alactic sprints keep their long rests so every rep is maximal. Week 6 tapers for a fight or test.",
@@ -2583,6 +2739,7 @@ export const PROGRAMS: ProgramSeed[] = [
     goals: ["combat_sports", "improve_conditioning", "athletic_performance"],
     equipment: ["trap_bar", "dumbbell", "medicine_ball", "bike", "heavy_bag", "pull_up_bar", "box", "landmine", "band", "mat", "bench"],
     tier: "plus",
+    needsSpecialistReview: true,
     progression:
       "Strength moves from sets of 5 (weeks 1–3) to heavy triples (4–6) to fast doubles (7). Alactic sprints stay at 1:8+ work-to-rest. Glycolytic " +
       "intervals shorten their rests through specific prep, and rounds grow from 3-minute aerobic-power rounds to five 5-minute fight-pace rounds. " +
@@ -2608,6 +2765,7 @@ export const PROGRAMS: ProgramSeed[] = [
     goals: ["combat_sports", "improve_conditioning"],
     equipment: ["kettlebell", "sandbag", "pull_up_bar", "mat", "bike", "rower", "jump_rope", "heavy_bag"],
     tier: "plus",
+    needsSpecialistReview: true,
     progression: "Repeat any session weekly, adding a round or reducing rest by 10 seconds when output holds steady.",
     progressionModel: "steady",
     noDeloadReason: "A one-week pick-list of sessions, not a block — use 1–2 a week alongside your main program.",
@@ -2893,6 +3051,270 @@ export const PROGRAMS: ProgramSeed[] = [
         R("landmine-press", 3, "8 per side", 75),
         R("chin-up", 3, "6-8", 90),
       ]),
+    ],
+  },
+  // =========================================================== Stage 2B: categories that were missing or thin
+  {
+    slug: "calisthenics-foundations",
+    name: "Calisthenics Foundations",
+    summary: "Three full-body bodyweight sessions a week: pull-ups, push-ups, dips, squats and core, built through progressions.",
+    description:
+      "Bodyweight strength built the way calisthenics communities teach it: a short list of pulling, pushing, leg and core movements, each with a " +
+      "ladder of progressions (band-assisted → full pull-up, incline → full push-up, split squat → rear-foot-elevated). Pull and push are paired so " +
+      "you rest one while working the other. You need a pull-up bar and a resistance band; a sturdy table or low bar works for rows.",
+    category: "calisthenics",
+    types: ["strength", "home"],
+    difficulty: "beginner",
+    weeks: 8,
+    sessionMinutes: 45,
+    goals: ["build_strength", "build_muscle", "general_health"],
+    equipment: ["bodyweight", "pull_up_bar", "band", "mat"],
+    tier: "free",
+    progression:
+      "Double progression on every movement: when you reach the top of the rep range on all sets, move to the next progression and start again " +
+      "at the bottom of the range (band-assisted → negatives → full pull-ups; incline → floor → feet-elevated push-ups). Week 4 and week 8 are lighter.",
+    progressionModel: "volume_wave",
+    warmup: ["3 minutes skipping or marching", "Wrist circles and rocking on hands and knees × 10", "Band pull-aparts × 15", "Bodyweight squats × 10", "Scapular pull-ups or dead-hang shrugs × 8"],
+    cooldown: STANDARD_COOLDOWN,
+    days: calisthenicsFoundationWeeks()[0]!.days,
+    weekTemplates: calisthenicsFoundationWeeks(),
+  },
+  {
+    slug: "calisthenics-strength-upper-lower",
+    name: "Calisthenics Strength: Upper / Lower",
+    summary: "Four sessions a week for people who can already do pull-ups and dips: weighted-progression upper days and single-leg lower days.",
+    description:
+      "For trainees with 3+ strict pull-ups and 5+ dips. Upper days pair vertical and horizontal pulling with dips and pike push-ups; lower days use " +
+      "single-leg squats, Nordic curls and Copenhagen planks so legs keep up without a barbell. Strength comes from low-rep sets taken 1–3 reps short " +
+      "of failure; add load with a backpack or move to a harder variation when the top of the range is easy.",
+    category: "calisthenics",
+    types: ["strength", "home"],
+    difficulty: "intermediate",
+    weeks: 8,
+    sessionMinutes: 45,
+    goals: ["build_strength", "build_muscle", "athletic_performance"],
+    equipment: ["bodyweight", "pull_up_bar", "dip_station", "bench", "mat"],
+    tier: "plus",
+    progression:
+      "Upper days: 4 sets of 5–8. When every set reaches 8, add 2–5 kg in a backpack or a harder variation. Lower days add reps, then slow the " +
+      "lowering to 3 seconds. Sets rise in the second half of each block; weeks 4 and 8 are deloads.",
+    progressionModel: "volume_wave",
+    warmup: ["3 minutes skipping or easy jog", "Wrist and shoulder circles × 10", "Scapular pull-ups × 8", "Bodyweight squats × 10", "Push-ups × 5 and a 20-second dead hang"],
+    cooldown: STANDARD_COOLDOWN,
+    days: calisthenicsStrengthWeeks()[0]!.days,
+    weekTemplates: calisthenicsStrengthWeeks(),
+  },
+  {
+    slug: "dumbbell-home-strength",
+    name: "Dumbbell Home Strength",
+    summary: "Three full-body sessions a week with a pair of adjustable dumbbells and a bench.",
+    description:
+      "A complete strength plan for a home setup: squat, hinge, lunge, press, row and carry patterns with dumbbells only. Sets stay 1–3 reps short of " +
+      "failure, which builds muscle and strength with modest loads. No bench? Do floor presses and supported rows on a sturdy chair.",
+    category: "home-workouts",
+    types: ["home", "strength"],
+    difficulty: "beginner",
+    weeks: 8,
+    sessionMinutes: 45,
+    goals: ["build_strength", "build_muscle", "general_health", "lose_fat"],
+    equipment: ["dumbbell", "bench", "bodyweight"],
+    tier: "plus",
+    progression:
+      "Double progression: work in the rep range until every set hits the top with 1–2 reps in reserve, then use the next dumbbell. When the " +
+      "heaviest dumbbell is too light, slow the lowering to 3 seconds or add a set. Week 8 is a deload.",
+    progressionModel: "linear_rpe",
+    deloadFinalWeek: true,
+    warmup: STANDARD_WARMUP,
+    cooldown: STANDARD_COOLDOWN,
+    days: [
+      day("Full Body A", "Squat, press and row", [
+        R("goblet-squat", 3, "8-12", 90, { rpe: 7 }),
+        R("dumbbell-bench-press", 3, "8-12", 90, { rpe: 7 }),
+        R("one-arm-dumbbell-row", 3, "10-12 per side", 75, { rpe: 7 }),
+        R("romanian-deadlift", 2, "10-12", 90, { rpe: 7, notes: "Dumbbells: push the hips back and keep them close to the legs." }),
+        T("plank", 2, 40, 45),
+      ]),
+      day("Full Body B", "Hinge, overhead press and single-leg work", [
+        R("romanian-deadlift", 3, "8-12", 90, { rpe: 7 }),
+        R("seated-dumbbell-shoulder-press", 3, "8-12", 90, { rpe: 7 }),
+        R("reverse-lunge", 3, "8-10 per side", 75, { rpe: 7 }),
+        R("chest-supported-row", 3, "10-12", 75, { rpe: 7 }),
+        T("suitcase-carry", 2, 40, 60, { notes: "Per side." }),
+      ]),
+      day("Full Body C", "Volume for chest, back, legs and arms", [
+        R("bulgarian-split-squat", 3, "8-10 per side", 90, { rpe: 7 }),
+        R("incline-dumbbell-press", 3, "10-12", 75, { rpe: 7.5 }),
+        R("one-arm-dumbbell-row", 3, "10-12 per side", 75, { rpe: 7.5 }),
+        R("dumbbell-curl", 2, "10-15", 60, { rpe: 8 }),
+        R("overhead-triceps-extension", 2, "10-15", 60, { rpe: 8 }),
+      ]),
+    ],
+  },
+  {
+    slug: "band-bodyweight-total-body",
+    name: "Bands & Bodyweight Total Body",
+    summary: "Three 30–35-minute sessions a week with resistance bands and your bodyweight — travel- and apartment-friendly.",
+    description:
+      "Resistance bands supply the pulling and isolation work that bodyweight alone can't; push-ups, squats, lunges and bridges cover the rest. " +
+      "Bands get harder as they stretch, so control the return. A set of loop bands (light, medium, heavy) and a door anchor is enough.",
+    category: "home-workouts",
+    types: ["home", "strength"],
+    difficulty: "beginner",
+    weeks: 6,
+    sessionMinutes: 35,
+    goals: ["general_health", "build_strength", "lose_fat"],
+    equipment: ["band", "bodyweight", "mat"],
+    tier: "plus",
+    progression:
+      "Add reps until you reach the top of each range, then use a heavier band or a harder variation (incline → floor push-up, bodyweight → " +
+      "single-leg bridge). Weeks 4–5 add a set to most exercises; week 6 is lighter.",
+    progressionModel: "volume_wave",
+    deloadFinalWeek: true,
+    warmup: ["3 minutes marching or skipping", "Band pass-throughs × 10", "Bodyweight squats × 10", "World's greatest stretch × 2 per side"],
+    cooldown: STANDARD_COOLDOWN,
+    days: [
+      day("Push & Legs", "Chest, shoulders and quads", [
+        R("push-up", 3, "6-15", 75, { rpe: 7, notes: "Incline push-ups if needed." }),
+        R("bodyweight-squat", 3, "15-20", 60, { rpe: 7 }),
+        R("lateral-raise", 3, "12-20", 45, { rpe: 8, notes: "With a band under your feet." }),
+        R("reverse-lunge", 2, "10 per side", 60, { rpe: 7 }),
+        R("triceps-pushdown", 2, "12-20", 45, { rpe: 8, notes: "Band anchored high on a door." }),
+      ], { warmup: ["3 minutes marching or skipping", "Band pass-throughs × 10", "Bodyweight squats × 10", "World's greatest stretch × 2 per side"] }),
+      day("Pull & Hinge", "Back, rear shoulders and hamstrings", [
+        R("band-row", 4, "12-15", 60, { rpe: 7 }),
+        R("glute-bridge", 3, "15-20", 45, { rpe: 7, notes: "Single-leg once 20 reps is easy." }),
+        R("face-pull", 3, "15-20", 45, { rpe: 7 }),
+        R("dumbbell-curl", 2, "12-20", 45, { rpe: 8, notes: "Band curls: stand on the band." }),
+        R("pallof-press", 2, "10 per side", 45),
+      ], { warmup: ["3 minutes marching or skipping", "Band pass-throughs × 10", "Bodyweight squats × 10", "World's greatest stretch × 2 per side"] }),
+      day("Full Body Circuit", "Strength endurance", [
+        R("pike-push-up", 3, "5-10", 60, { rpe: 7 }),
+        R("band-pull-apart", 3, "15-20", 30),
+        R("step-up", 3, "10 per side", 60, { notes: "Use a stair or sturdy step." }),
+        R("hip-abduction", 2, "15-20", 45, { notes: "Band around the knees." }),
+        T("side-plank", 2, 30, 30, { notes: "Per side." }),
+      ], { warmup: ["3 minutes marching or skipping", "Band pass-throughs × 10", "Bodyweight squats × 10", "World's greatest stretch × 2 per side"] }),
+    ],
+  },
+  {
+    slug: "kettlebell-circuit-intervals",
+    name: "Kettlebell & Bodyweight Circuits",
+    summary: "Three interval-circuit sessions a week: every-minute-on-the-minute strength, timed work:rest rounds and a short finisher.",
+    description:
+      "Functional conditioning without a full gym: kettlebell swings, goblet squats, push-ups, rows and carries arranged as timed circuits. EMOM blocks " +
+      "keep strength moves crisp; work:rest intervals (40:20, then 45:15) build work capacity. Stop a round early if form breaks — the clock serves the " +
+      "movement, not the other way round.",
+    category: "functional-conditioning",
+    types: ["functional", "cardio"],
+    difficulty: "intermediate",
+    weeks: 6,
+    sessionMinutes: 40,
+    goals: ["improve_conditioning", "lose_fat", "general_health"],
+    equipment: ["kettlebell", "dumbbell", "bodyweight", "jump_rope", "mat"],
+    tier: "plus",
+    progression:
+      "Density: each week the timed rounds get an extra round or a shorter rest; strength moves keep their full rest. Use a heavier kettlebell when " +
+      "all swing sets feel easy. Week 6 is a lighter week.",
+    progressionModel: "density",
+    deloadFinalWeek: true,
+    warmup: CONDITIONING_WARMUP,
+    cooldown: STANDARD_COOLDOWN,
+    days: [
+      day("EMOM Strength", "Every minute on the minute: swings, squats, push-ups", [
+        R("kettlebell-swing", 6, "12", 45, { rpe: 7, notes: "Start each set on the minute; rest the remainder." }),
+        R("goblet-squat", 5, "10", 45, { rpe: 7 }),
+        R("push-up", 5, "8-12", 45, { rpe: 7 }),
+        R("one-arm-dumbbell-row", 4, "10 per side", 45, { rpe: 7, notes: "A kettlebell works too." }),
+      ], { warmup: CONDITIONING_WARMUP }),
+      day("Work:Rest Intervals", "40 s on, 20 s off circuits", [
+        T("kettlebell-swing", 4, 40, 20, { notes: "Hard but controlled." }),
+        T("mountain-climber", 4, 40, 20),
+        T("jump-rope", 4, 40, 20),
+        T("step-back-burpee", 4, 40, 20),
+        T("plank", 3, 40, 20),
+      ], { warmup: CONDITIONING_WARMUP }),
+      day("Carries & Finisher", "Loaded carries, single-leg strength and a short finisher", [
+        T("farmers-carry", 4, 40, 60),
+        R("reverse-lunge", 3, "8 per side", 60, { rpe: 7 }),
+        T("suitcase-carry", 3, 30, 45, { notes: "Per side." }),
+        T("bear-crawl", 4, 20, 40),
+        T("jump-rope", 5, 30, 30, { notes: "Finisher: 30 s fast, 30 s easy." }),
+      ], { warmup: CONDITIONING_WARMUP }),
+    ],
+  },
+  {
+    slug: "hybrid-strength-and-run",
+    name: "Hybrid: Strength & 5K–10K Running",
+    summary: "Two full-body strength days and three runs a week, spaced so hard runs never land next to heavy leg days.",
+    description:
+      "Concurrent training for people who want to stay strong and run well. Interference is smallest when strength and running stay moderate in volume " +
+      "and hard sessions are spread out, so the week runs Monday strength, Tuesday easy run, Thursday intervals, Friday strength (upper emphasis), " +
+      "Saturday long easy run — about 80% of running easy. Keep at least a day between hard intervals and heavy squats or deadlifts.",
+    category: "hybrid-training",
+    types: ["strength", "cardio"],
+    difficulty: "intermediate",
+    weeks: 8,
+    sessionMinutes: 45,
+    goals: ["improve_conditioning", "build_strength", "general_health"],
+    equipment: ["barbell", "rack", "bench", "dumbbell", "pull_up_bar", "bodyweight"],
+    tier: "plus",
+    completion: "Complete at least 80% of the 40 sessions — at least 32 — including both strength days in the final loading week (week 7).",
+    progression:
+      "Strength: add a little weight when every set reaches its target at RPE 7–8. Running: easy and long runs grow about 10% a week, interval rounds " +
+      "rise from 4 to 6. Weeks 4 and 8 are lighter on both.",
+    progressionModel: "linear_rpe",
+    warmup: STANDARD_WARMUP,
+    cooldown: STANDARD_COOLDOWN,
+    days: hybridWeeks()[0]!.days,
+    weekTemplates: hybridWeeks(),
+  },
+  {
+    slug: "seated-strength-mobility",
+    name: "Seated Strength & Mobility",
+    summary: "Three chair-based sessions a week for strength, posture and mobility when standing exercise is hard.",
+    description:
+      "For adults who need or prefer to exercise seated — after illness, with balance or joint limits, or as a first step back. Every exercise is done " +
+      "on a sturdy chair without wheels (sit-to-stands use the chair as a target). Move slowly, breathe out on the effort and stop if anything causes " +
+      "pain or dizziness. If you have a heart, lung, bone or joint condition, check with your healthcare provider before starting.",
+    category: "active-aging",
+    types: ["low_impact", "strength", "mobility"],
+    difficulty: "beginner",
+    weeks: 6,
+    sessionMinutes: 30,
+    goals: ["general_health", "mobility", "build_strength"],
+    equipment: ["bodyweight", "dumbbell", "band"],
+    tier: "free",
+    lowImpact: true,
+    needsSpecialistReview: true,
+    progression:
+      "Weeks 1–3: add a rep or two each session. Weeks 4–5: add a set to most exercises, or a slightly heavier band or dumbbell. Week 6 is lighter. " +
+      "When sit-to-stands feel easy, cross your arms or slow the lowering.",
+    progressionModel: "volume_wave",
+    deloadFinalWeek: true,
+    warmup: ["Seated marching 1–2 minutes", "Shoulder rolls × 10", "Seated cat-cow × 8 breaths", "Ankle circles × 10 each direction"],
+    cooldown: ["Seated forward reach 30 seconds", "Seated figure-four stretch 30 seconds per side", "Slow breathing 1 minute"],
+    days: [
+      day("Seated Strength A", "Legs, pushing and posture", [
+        R("box-squat-to-chair", 3, "6-10", 75, { rpe: 6, notes: "Sit-to-stand: hands on thighs or armrests if needed; stand up briskly, sit down slowly." }),
+        R("seated-dumbbell-shoulder-press", 2, "8-12", 60, { rpe: 6, notes: "Seated on the chair, light dumbbells or water bottles." }),
+        R("band-row", 3, "10-12", 60, { rpe: 6, notes: "Seated, band around your feet." }),
+        R("seated-calf-raise", 2, "12-15", 45, { notes: "Seated; a dumbbell on each knee if it gets easy." }),
+        T("standing-march", 2, 45, 30, { notes: "Seated march: lift one knee then the other, sitting tall." }),
+      ], { warmup: ["Seated marching 1–2 minutes", "Shoulder rolls × 10", "Seated cat-cow × 8 breaths", "Ankle circles × 10 each direction"], cooldown: ["Seated forward reach 30 seconds", "Seated figure-four stretch 30 seconds per side", "Slow breathing 1 minute"] }),
+      day("Seated Mobility", "Spine, hips and shoulders", [
+        R("cat-cow", 2, "8 breaths", 30, { notes: "Seated: hands on knees, round then lengthen the back." }),
+        R("band-pass-through", 2, "8-10", 30, { notes: "Seated, wide grip; only as high as is comfortable." }),
+        T("figure-four-stretch", 2, 30, 15, { notes: "Seated: ankle on the opposite knee, lean forward gently." }),
+        R("band-pull-apart", 2, "12-15", 30),
+        T("standing-march", 2, 60, 30, { notes: "Seated march at a brisk pace." }),
+      ], { warmup: ["Seated marching 1–2 minutes", "Shoulder rolls × 10", "Seated cat-cow × 8 breaths", "Ankle circles × 10 each direction"], cooldown: ["Seated forward reach 30 seconds", "Seated figure-four stretch 30 seconds per side", "Slow breathing 1 minute"] }),
+      day("Seated Strength B", "Arms, trunk and sit-to-stand power", [
+        R("box-squat-to-chair", 3, "5-8", 75, { rpe: 6, notes: "Stand up as quickly as you safely can — speed builds the power that helps prevent falls." }),
+        R("dumbbell-curl", 2, "10-12", 45, { rpe: 6, notes: "Seated." }),
+        R("overhead-triceps-extension", 2, "10-12", 45, { rpe: 6, notes: "Seated, one light dumbbell held in both hands." }),
+        R("pallof-press", 2, "8 per side", 45, { notes: "Seated, band anchored to the side: press out and resist the twist." }),
+        R("face-pull", 2, "12-15", 45, { notes: "Seated, band anchored at head height." }),
+      ], { warmup: ["Seated marching 1–2 minutes", "Shoulder rolls × 10", "Seated cat-cow × 8 breaths", "Ankle circles × 10 each direction"], cooldown: ["Seated forward reach 30 seconds", "Seated figure-four stretch 30 seconds per side", "Slow breathing 1 minute"] }),
     ],
   },
 ];

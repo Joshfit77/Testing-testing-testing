@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BarChart3, BookOpen, ChevronRight, Dumbbell, HeartPulse, History, Pause, Plus, Wand2 } from "lucide-react";
+import { BarChart3, BookmarkCheck, ChevronRight, Dumbbell, HeartPulse, History, Pause, Plus, Wand2 } from "lucide-react";
 import { ActionButton } from "@/components/common/action-button";
 import { TodayWorkoutAction } from "@/components/home/today-workout-action";
 import { MainHeader } from "@/components/shell/main-header";
@@ -9,19 +9,30 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
 import { pauseActiveProgramAction } from "@/server/actions/programs";
 import { getActiveProgram } from "@/server/services/training";
+import { loadProgramSchedule } from "@/server/services/schedule";
+import { isoDateInTz } from "@/lib/domain/dates";
 
 export const metadata = { title: "Train" };
 
 const card = "rounded-2xl border border-border bg-card";
 
 export default async function TrainPage() {
-  const { user } = await requireOnboardedUser();
+  const { user, profile } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
-  const [active, inProgressRes] = await Promise.all([
+  const tz = profile.timezone ?? "UTC";
+  const [active, schedule, inProgressRes] = await Promise.all([
     getActiveProgram(supabase, user.id),
+    loadProgramSchedule(supabase, user.id, tz),
     supabase.from("workout_sessions").select("name").eq("user_id", user.id).eq("status", "in_progress").order("started_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
   const today = active?.today ?? null;
+  const todayIso = isoDateInTz(new Date(), tz);
+  // The calendar may have the next session planned (or moved) to a later day.
+  const next = schedule?.planned[0]?.dayId === today?.id ? schedule!.planned[0]! : null;
+  const plannedLater = next && next.date > todayIso ? next : null;
+  const plannedLabel = plannedLater
+    ? new Date(`${plannedLater.date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" })
+    : null;
   const startHref = today && active ? `/train/workout?day=${today.id}&up=${active.userProgramId}` : "/train/workout?blank=1";
 
   const tools = [
@@ -29,6 +40,7 @@ export default async function TrainPage() {
     { href: "/train/exercises", icon: Dumbbell, label: "Exercises" },
     { href: "/train/build", icon: Wand2, label: "Program builder" },
     { href: "/train/history", icon: History, label: "Workout history" },
+    { href: "/train/templates", icon: BookmarkCheck, label: "My workouts" },
     { href: "/train/workout?blank=1", icon: Plus, label: "Empty workout" },
     { href: "/train/recovery", icon: HeartPulse, label: "Recovery" },
   ];
@@ -116,7 +128,21 @@ export default async function TrainPage() {
                 ))}
               </ul>
               <div className="space-y-1 p-4 pt-3">
-                <TodayWorkoutAction userId={user.id} startHref={startHref} serverInProgress={(inProgressRes.data?.name as string | undefined) ?? null} />
+                {plannedLater && (
+                  <p className="pb-1 text-sm text-muted-foreground">
+                    Planned for {plannedLabel}
+                    {plannedLater.moved ? " (moved)" : ""} ·{" "}
+                    <Link href={`/calendar?day=${plannedLater.date}`} className="font-semibold text-gold-highlight hover:underline">
+                      Open calendar
+                    </Link>
+                  </p>
+                )}
+                <TodayWorkoutAction
+                  userId={user.id}
+                  startHref={startHref}
+                  serverInProgress={(inProgressRes.data?.name as string | undefined) ?? null}
+                  {...(plannedLater ? { startLabel: "Start workout early" } : {})}
+                />
                 <ActionButton action={pauseActiveProgramAction} fields={{}} variant="ghost" className="w-full" confirmMessage="Pause this program? You can resume it from Programs.">
                   <Pause aria-hidden /> Pause program
                 </ActionButton>
@@ -136,17 +162,13 @@ export default async function TrainPage() {
       </section>
 
       <nav aria-label="Training tools" className="grid grid-cols-2 gap-2">
-        {tools.map((t) => (
-          <Link key={t.href} href={t.href} className={`${card} flex min-h-14 items-center gap-2.5 px-3 py-2 text-[0.9375rem] font-medium leading-tight hover:border-gold-muted`}>
+        {tools.map((t, i) => (
+          <Link key={t.href} href={t.href} className={`${card} ${i === tools.length - 1 && tools.length % 2 === 1 ? "col-span-2" : ""} flex min-h-14 items-center gap-2.5 px-3 py-2 text-[0.9375rem] font-medium leading-tight hover:border-gold-muted`}>
             <t.icon className="size-5 shrink-0 text-gold" aria-hidden />
             <span className="min-w-0 flex-1">{t.label}</span>
           </Link>
         ))}
       </nav>
-      <p className="text-sm text-muted-foreground">
-        <BookOpen className="mr-1 inline size-4 align-[-3px] text-gold" aria-hidden />
-        Saved custom workout templates aren&apos;t available yet; the program builder creates a full custom program instead.
-      </p>
     </div>
   );
 }

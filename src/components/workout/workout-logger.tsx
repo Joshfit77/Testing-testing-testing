@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Cloud, CloudOff, Flag, Loader2, Minus, Pause, Play, Plus, Timer, Trash2, Trophy, X } from "lucide-react";
+import { BellRing, BookmarkPlus, Cloud, CloudOff, Flag, Loader2, Minus, Pause, Play, Plus, Timer, Trash2, Trophy, Vibrate, X } from "lucide-react";
 import { Celebration } from "@/components/common/celebration";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -16,8 +16,10 @@ import {
   createDraft,
   draftSummary,
   elapsedSeconds,
-  isWorkoutDraft,
+  migrateDraft,
   newerDraft,
+  nextUp,
+  supersetMembers,
   restRemaining,
   workoutReducer,
   type DraftAction,
@@ -28,7 +30,11 @@ import {
 } from "@/lib/domain/workout-draft";
 import { cancelRestNotification, hapticSuccess, scheduleRestNotification } from "@/lib/native";
 import { clearLocalDraft, loadLocalDraft, saveLocalDraft } from "@/lib/workout-storage";
-import { discardWorkoutAction, finishWorkoutAction, syncWorkoutDraftAction, type UnlockedBadge } from "@/server/actions/workouts";
+import { discardWorkoutAction, finishWorkoutAction, previousPerformanceAction, syncWorkoutDraftAction, type UnlockedBadge } from "@/server/actions/workouts";
+import { updateRestAlertsAction } from "@/server/actions/rest-alerts";
+import { createTemplateAction } from "@/server/actions/templates";
+import { lastTimeText, type PreviousPerformance } from "@/lib/domain/previous-performance";
+import { templateFromDraft } from "@/lib/domain/workout-templates";
 import { BadgeMedallion } from "@/components/achievements/badge-icon";
 import { ExerciseCard } from "./exercise-card";
 import { ExercisePicker, type CatalogItem } from "./exercise-picker";
@@ -37,9 +43,11 @@ export interface WorkoutTemplate {
   name: string;
   userProgramId: string | null;
   programDayId: string | null;
+  /** Set when started from a saved workout template. */
+  templateId?: string | null;
   warmup: string[];
   cooldown: string[];
-  exercises: { exercise: ExerciseRef; restSeconds: number; target: DraftTarget | null }[];
+  exercises: { exercise: ExerciseRef; restSeconds: number; target: DraftTarget | null; supersetGroup?: number | null }[];
 }
 
 interface LoggerProps {
@@ -49,6 +57,10 @@ interface LoggerProps {
   alternatives: Record<string, string[]>;
   serverDraft: unknown;
   template: WorkoutTemplate | null;
+  /** Latest completed performance per exercise id ("Last time"). */
+  previous?: Record<string, PreviousPerformance>;
+  /** Rest-timer alerts (Profile setting): a beep and/or a vibration when rest ends. */
+  restAlerts?: { sound: boolean; vibrate: boolean };
 }
 
 type Phase = "loading" | "conflict" | "active" | "finished";
@@ -94,7 +106,7 @@ function beep() {
   }
 }
 
-export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraft, template }: LoggerProps) {
+export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraft, template, previous = {}, restAlerts = { sound: true, vibrate: true } }: LoggerProps) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>("loading");
   const [draft, setDraft] = useState<WorkoutDraft | null>(null);
@@ -110,6 +122,13 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<FinishResult | null>(null);
   const [online, setOnline] = useState(true);
+  const [prev, setPrev] = useState<Record<string, PreviousPerformance>>(previous);
+  const asked = useRef(new Set(Object.keys(previous)));
+  const [alerts, setAlerts] = useState(restAlerts);
+  const [alertsError, setAlertsError] = useState<string | null>(null);
+  const [finishedDraft, setFinishedDraft] = useState<WorkoutDraft | null>(null);
+  const [templateName, setTemplateName] = useState("");
+  const [templateState, setTemplateState] = useState<{ saving: boolean; error: string | null; savedId: string | null }>({ saving: false, error: null, savedId: null });
   const restWasRunning = useRef(false);
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -118,7 +137,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
   const freshFromTemplate = useCallback((): WorkoutDraft => {
     const nowIso = new Date().toISOString();
     if (template) {
-      return createDraft({ name: template.name, now: nowIso, userProgramId: template.userProgramId, programDayId: template.programDayId, exercises: template.exercises });
+      return createDraft({ name: template.name, now: nowIso, userProgramId: template.userProgramId, programDayId: template.programDayId, templateId: template.templateId ?? null, exercises: template.exercises });
     }
     return createDraft({ name: defaultName(), now: nowIso });
   }, [template]);
@@ -126,10 +145,11 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
   // Restore on mount: prefer the most recently updated of local and server drafts.
   useEffect(() => {
     const local = loadLocalDraft(userId);
-    const server = isWorkoutDraft(serverDraft) ? serverDraft : null;
+    // Drafts saved by an older version of the app (v1) are migrated to the current format.
+    const server = migrateDraft(serverDraft);
     const existing = newerDraft(local, server);
     if (existing) {
-      const wantsDifferentSession = template && template.programDayId !== existing.programDayId;
+      const wantsDifferentSession = template && (template.programDayId !== existing.programDayId || (template.templateId ?? null) !== (existing.templateId ?? null));
       if (wantsDifferentSession) {
         setPendingExisting(existing);
         setPhase("conflict");
@@ -190,6 +210,20 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
     };
   }, [draft, phase, userId, pushToServer]);
 
+  // "Last time" for exercises added during the workout (the page preloads the starting ones).
+  const exerciseIds = draft ? draft.exercises.map((e) => e.exerciseId).join(",") : "";
+  useEffect(() => {
+    if (!exerciseIds || !navigator.onLine) return;
+    const missing = [...new Set(exerciseIds.split(","))].filter((id) => !asked.current.has(id));
+    if (!missing.length) return;
+    missing.forEach((id) => asked.current.add(id));
+    void previousPerformanceAction(missing)
+      .then((res) => {
+        if (res.ok) setPrev((p) => ({ ...p, ...res.data }));
+      })
+      .catch(() => missing.forEach((id) => asked.current.delete(id)));
+  }, [exerciseIds]);
+
   // Re-sync when coming back online.
   useEffect(() => {
     if (online && draft && phase === "active" && sync === "local") void pushToServer(draft);
@@ -214,11 +248,24 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
     if (rest > 0) restWasRunning.current = true;
     else if (restWasRunning.current && draft.rest.endsAt) {
       restWasRunning.current = false;
-      if ("vibrate" in navigator) navigator.vibrate?.([200, 100, 200]);
-      beep();
+      if (alerts.vibrate && "vibrate" in navigator) navigator.vibrate?.([200, 100, 200]);
+      if (alerts.sound) beep();
       dispatch({ type: "clearRest" });
     }
-  }, [rest, draft, dispatch]);
+  }, [rest, draft, dispatch, alerts]);
+
+  const saveAlerts = async (next: { sound: boolean; vibrate: boolean }) => {
+    const before = alerts;
+    setAlerts(next);
+    setAlertsError(null);
+    if (next.sound && !before.sound) beep(); // a short preview, which also unlocks audio on iOS
+    if (next.vibrate && !before.vibrate && "vibrate" in navigator) navigator.vibrate?.(80);
+    const res = await updateRestAlertsAction(next).catch(() => ({ ok: false as const, message: "You appear to be offline." }));
+    if (!res.ok) {
+      setAlerts(before);
+      setAlertsError(res.message ?? "Couldn't save that setting.");
+    }
+  };
 
   if (phase === "loading" || (!draft && phase === "active")) {
     return (
@@ -320,6 +367,42 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
             </Link>
           </section>
         )}
+        {finishedDraft && finishedDraft.exercises.some((e) => !e.skipped) && (
+          <section className="rounded-2xl border border-border bg-card p-4 text-left" aria-labelledby="save-template-title">
+            <h2 id="save-template-title" className="font-display text-lg font-semibold uppercase">
+              Save as a template
+            </h2>
+            {templateState.savedId ? (
+              <p className="mt-1 text-sm" role="status">
+                Saved to{" "}
+                <Link href="/train/templates" className="font-semibold text-gold-highlight underline-offset-4 hover:underline">
+                  My workouts
+                </Link>
+                . Start it again any time.
+              </p>
+            ) : (
+              <form
+                className="mt-2 flex flex-col gap-2 sm:flex-row"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setTemplateState({ saving: true, error: null, savedId: null });
+                  const input = { ...templateFromDraft(finishedDraft), name: templateName.trim() || finishedDraft.name };
+                  const res = await createTemplateAction(input).catch(() => ({ ok: false as const, error: "You appear to be offline. Try again when you're connected." }));
+                  setTemplateState(res.ok ? { saving: false, error: null, savedId: res.data.id } : { saving: false, error: res.error, savedId: null });
+                }}
+              >
+                <label htmlFor="template-name" className="sr-only">
+                  Template name
+                </label>
+                <Input id="template-name" value={templateName} onChange={(e) => setTemplateName(e.target.value)} placeholder={finishedDraft.name} maxLength={120} className="flex-1" />
+                <Button type="submit" variant="secondary" disabled={templateState.saving} aria-busy={templateState.saving}>
+                  {templateState.saving ? <Loader2 className="animate-spin" aria-hidden /> : <BookmarkPlus aria-hidden />} Save template
+                </Button>
+              </form>
+            )}
+            {templateState.error && <Notice tone="error" className="mt-2">{templateState.error}</Notice>}
+          </section>
+        )}
         {template?.cooldown && template.cooldown.length > 0 && (
           <section className="rounded-2xl border border-border bg-card p-4 text-left">
             <h2 className="mb-2 font-display text-lg font-semibold uppercase">Cooldown</h2>
@@ -346,8 +429,12 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
   const elapsed = elapsedSeconds(draft, now);
   const summary = draftSummary(draft);
   const paused = Boolean(draft.pausedAt);
-  // The exercise being worked on: first one not skipped with sets still to complete.
-  const currentKey = draft.exercises.find((e) => !e.skipped && (e.sets.length === 0 || e.sets.some((s) => !s.completed)))?.id;
+  // The set to do next: the first exercise with work left — inside a superset, alternating A1, B1, A2, B2.
+  const up = nextUp(draft);
+  const currentKey = up?.exerciseKey;
+  // Superset letters in order of appearance.
+  const letters = new Map<string, string>();
+  for (const e of draft.exercises) if (e.supersetId && !letters.has(e.supersetId)) letters.set(e.supersetId, String.fromCharCode(65 + letters.size));
   const substituteTarget = draft.exercises.find((e) => e.id === substituteKey) ?? null;
 
   const finish = async () => {
@@ -374,6 +461,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
           reps: s.reps,
           weightKg: s.weightKg,
           durationSeconds: s.durationSeconds,
+          distanceM: s.distanceM ?? null,
           rpe: s.rpe,
           isWarmup: s.isWarmup,
           completed: s.completed,
@@ -389,6 +477,8 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
     }
     clearLocalDraft(userId);
     void cancelRestNotification();
+    setFinishedDraft(finalDraft);
+    setTemplateName(finalDraft.name);
     setResult({ volumeKg: res.data.volumeKg, records: res.data.records, badges: res.data.badges ?? [], durationSeconds: elapsedSeconds(finalDraft, endedAt) });
     setPhase("finished");
     window.scrollTo({ top: 0 });
@@ -493,23 +583,54 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
         </div>
       )}
 
-      {draft.exercises.map((e, i) => (
-        <ExerciseCard
-          key={e.id}
-          current={e.id === currentKey}
-          exercise={e}
-          index={i}
-          total={draft.exercises.length}
-          units={units}
-          dispatch={dispatch}
-          onSubstitute={() => setSubstituteKey(e.id)}
-          onSkip={() => setSkipKey(e.id)}
-        />
-      ))}
+      {draft.exercises.map((e, i) => {
+        const members = e.supersetId ? supersetMembers(draft, e.id) : [];
+        const nextEx = draft.exercises[i + 1];
+        return (
+          <ExerciseCard
+            key={e.id}
+            current={e.id === currentKey}
+            exercise={e}
+            index={i}
+            total={draft.exercises.length}
+            units={units}
+            dispatch={dispatch}
+            onSubstitute={() => setSubstituteKey(e.id)}
+            onSkip={() => setSkipKey(e.id)}
+            lastTime={lastTimeText(prev[e.exerciseId], units, e.isTimed)}
+            nextSetId={up?.exerciseKey === e.id ? up.setId : null}
+            superset={{
+              letter: e.supersetId ? (letters.get(e.supersetId) ?? null) : null,
+              position: members.findIndex((m) => m.id === e.id),
+              size: members.length,
+              canLinkNext: Boolean(nextEx && (!e.supersetId || nextEx.supersetId !== e.supersetId)),
+            }}
+          />
+        );
+      })}
 
       <Button variant="outline" className="w-full" onClick={() => setPickerOpen(true)}>
         <Plus aria-hidden /> Add exercise
       </Button>
+
+      <section className="rounded-2xl border border-border bg-card p-4" aria-labelledby="rest-alerts-title">
+        <h2 id="rest-alerts-title" className="font-display text-lg font-semibold uppercase">
+          Rest timer alerts
+        </h2>
+        <p className="text-xs text-muted-foreground">When a rest ends. Saved to your profile.</p>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <Button type="button" variant={alerts.sound ? "default" : "secondary"} aria-pressed={alerts.sound} onClick={() => void saveAlerts({ ...alerts, sound: !alerts.sound })}>
+            <BellRing aria-hidden /> Sound {alerts.sound ? "on" : "off"}
+          </Button>
+          <Button type="button" variant={alerts.vibrate ? "default" : "secondary"} aria-pressed={alerts.vibrate} onClick={() => void saveAlerts({ ...alerts, vibrate: !alerts.vibrate })}>
+            <Vibrate aria-hidden /> Vibrate {alerts.vibrate ? "on" : "off"}
+          </Button>
+        </div>
+        {typeof navigator !== "undefined" && !("vibrate" in navigator) && alerts.vibrate && (
+          <p className="mt-1 text-xs text-muted-foreground">This browser can&apos;t vibrate (iPhone Safari doesn&apos;t support it); the installed app uses its own notification.</p>
+        )}
+        {alertsError && <Notice tone="error" className="mt-2">{alertsError}</Notice>}
+      </section>
 
       <section className="rounded-2xl border border-border bg-card p-4">
         <label htmlFor="workout-notes" className="font-display text-lg font-semibold uppercase">

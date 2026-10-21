@@ -11,6 +11,8 @@ import { isExerciseAvailable, type CatalogExercise } from "./program-generator";
 import type { Difficulty, Equipment, ExperienceLevel, PrimaryGoal, ProgramType, UnitSystem } from "./types";
 import { estimateOneRepMax } from "./strength";
 import { kgToLb, lbToKg } from "./units";
+import { estimateSessionMinutes, fitSessionToMinutes, framingMinutes } from "./session-time";
+import { COMBINE_LABELS, combineWeek, type CombineOption } from "./combined-goals";
 
 // --------------------------------------------------------------------------- Types & config
 
@@ -381,7 +383,12 @@ export interface CustomProgramInput {
   cardio?: { modality: CardioModality; continuousMinutes: number } | null;
   division?: ShowDivision | null;
   equipment: Equipment[];
+  /** A second goal on the same week (strength and bodybuilding only): running toward a 5K or conditioning. */
+  combine?: CombineOption | null;
 }
+
+/** Program types that can take a combined running/conditioning goal. */
+export const COMBINABLE_TYPES: CustomProgramType[] = ["strength", "bodybuilding"];
 
 // --------------------------------------------------------------------------- Loads
 
@@ -502,6 +509,8 @@ interface Ctx {
   novice: boolean;
   mainSets: number;
   accSets: number;
+  /** Warm-up + cool-down minutes counted in every session estimate. */
+  framing: number;
 }
 
 const DIFFICULTY_RANK: Record<Difficulty, number> = { beginner: 0, intermediate: 1, advanced: 2 };
@@ -560,12 +569,7 @@ function slotToExercise(ctx: Ctx, slot: Slot, slug: string, allowWarmup: boolean
   return out;
 }
 
-function estimateMinutes(ex: ProgramExerciseSeed): number {
-  const work = ex.seconds ?? 40;
-  return (ex.sets * (work + ex.rest)) / 60;
-}
-
-function buildDay(ctx: Ctx, name: string, focus: string, slots: Slot[], extra?: Partial<ProgramDaySeed>): ProgramDaySeed {
+function buildDay(ctx: Ctx, name: string, focus: string, slots: Slot[], extra?: Partial<ProgramDaySeed>, opts: { noFit?: boolean } = {}): ProgramDaySeed {
   const used = new Set<string>();
   const chosen: { ex: ProgramExerciseSeed; main: boolean }[] = [];
   for (const slot of slots) {
@@ -576,23 +580,15 @@ function buildDay(ctx: Ctx, name: string, focus: string, slots: Slot[], extra?: 
     const firstMain = Boolean(slot.main) && !chosen.some((c) => c.main);
     chosen.push({ ex: slotToExercise(ctx, slot, slug, firstMain), main: Boolean(slot.main) });
   }
-  // Fit the session: ~8 minutes of warm-up, then trim accessories from the end.
-  const budget = ctx.input.sessionMinutes - 8;
-  const total = () => chosen.reduce((s, c) => s + estimateMinutes(c.ex), 0);
-  while (total() > budget && chosen.length > 2) {
-    let idx = -1;
-    for (let i = chosen.length - 1; i >= 0; i--) {
-      if (!chosen[i]!.main) {
-        idx = i;
-        break;
-      }
-    }
-    if (idx < 0) break;
-    chosen.splice(idx, 1);
-  }
+  const framing = extra?.warmup ? framingMinutes(extra.warmup, extra.cooldown ?? STANDARD_COOLDOWN) : ctx.framing;
+  // Fit the session to the chosen length with the same estimate the label shows (accessories are cut first).
+  // Competition days (meet day, contest day) are never cut: their length is set by the event.
+  const fit = opts.noFit
+    ? { exercises: chosen.map((c) => c.ex), minutes: estimateSessionMinutes(chosen.map((c) => c.ex), framing) }
+    : fitSessionToMinutes(chosen.map((c) => c.ex), ctx.input.sessionMinutes, framing, (_e, i) => chosen[i]!.main);
   // Honest estimate: lighter weeks (deload, taper) show shorter sessions.
-  const minutes = Math.min(240, Math.max(15, Math.round(total() + 8)));
-  return { name, focus, minutes, exercises: chosen.map((c) => c.ex), ...extra };
+  const minutes = Math.min(240, Math.max(15, fit.minutes));
+  return { name, focus, minutes, exercises: fit.exercises, ...extra };
 }
 
 // --------------------------------------------------------------------------- Main-lift schemes
@@ -1082,6 +1078,8 @@ function meetWeekDays(ctx: Ctx, lifts: MainLift[], d: number): ProgramDaySeed[] 
         notes: `Attempts: opener ~90–92%${at(lift, 91)}, second ~95–97%${at(lift, 96)}, third ${third} only if the second moved well. Last warm-up about 85% roughly 5–8 minutes before your opener. ${COMMANDS[lift]}`,
       };
     }),
+    undefined,
+    { noFit: true },
   );
   return [opener, ...Array.from({ length: Math.max(0, d - 2) }, (_, i) => light(i + 1)), meetDay];
 }
@@ -1233,7 +1231,7 @@ function strongmanContestWeek(ctx: Ctx, d: number): ProgramDaySeed[] {
     { ...movingEvent(ctx, wk, "yoke", true), reps: "event", per: undefined, notes: contestNote },
     { ...movingEvent(ctx, wk, "farmers", true), reps: "event", per: undefined, notes: contestNote },
     { ...loadingEvent(ctx, wk, true), sets: 1, reps: "event", per: undefined, notes: contestNote },
-  ]);
+  ], undefined, { noFit: true });
   return [openers, ...Array.from({ length: Math.max(0, d - 2) }, (_, i) => easy(i + 1)), contestDay];
 }
 
@@ -1937,8 +1935,8 @@ function bodybuildingProgram(ctx: Ctx, goal: GoalOption, opts: { showPrep: boole
     return days.map((day, di) => {
       const items = chosen[di]!.filter((c) => c.sets > 0);
       const extras = [conditioning(wk), posing(wk)].filter((e): e is ProgramExerciseSeed => e !== null);
-      const extraMinutes = () => extras.reduce((s, e) => s + (e.seconds ?? 0) / 60, 0);
-      const minutes = () => 8 + extraMinutes() + items.reduce((s, c) => s + (c.sets * (40 + BB_REST[c.slot.kind])) / 60, 0);
+      const asSeed = (c: (typeof items)[number]): ProgramExerciseSeed => ({ ex: c.slug, sets: c.sets, reps: BB_REPS_FOR[c.slug] ?? BB_REPS[c.slot.kind], rest: BB_REST[c.slot.kind] });
+      const minutes = () => estimateSessionMinutes([...items.map(asSeed), ...extras], ctx.framing);
       while (minutes() > ctx.input.sessionMinutes) {
         const trimmable = items.filter((c) => c.sets > 2);
         if (!trimmable.length) break;
@@ -1967,8 +1965,10 @@ function bodybuildingProgram(ctx: Ctx, goal: GoalOption, opts: { showPrep: boole
           notes.push("Double progression: when every set reaches the top of the rep range at this effort, add the smallest load jump next time.");
         return { ex: c.slug, sets: c.sets, reps: BB_REPS_FOR[c.slug] ?? BB_REPS[c.slot.kind], rest: BB_REST[c.slot.kind], rpe, notes: notes.join(" ").slice(0, 500) };
       });
-      const all = [...exercises, ...extras];
-      return { name: day.name, focus: day.focus, minutes: Math.min(240, Math.max(15, Math.round(minutes()))), exercises: all };
+      // Safety net: the same fitting rules as every other session, so the label never exceeds the chosen length.
+      const fit = fitSessionToMinutes([...exercises, ...extras], ctx.input.sessionMinutes, ctx.framing, (e) => e.ex === "posing-practice");
+      if (fit.trimmed && (wk.kind === "base" || wk.kind === "build")) capped = true;
+      return { name: day.name, focus: day.focus, minutes: Math.min(240, Math.max(15, fit.minutes)), exercises: fit.exercises };
     });
   };
   return { builder, timeCapped: () => capped };
@@ -2221,6 +2221,13 @@ export function validateCustomInput(input: CustomProgramInput): string[] {
   const wr = weeksRange(input.type, input.goal);
   if (input.weeks < wr.min || input.weeks > wr.max) errors.push(`Choose ${wr.min}–${wr.max} weeks`);
   if (input.age < 18) errors.push("Narrow Gate Fitness is for adults (18+)");
+  if (input.combine) {
+    if (!COMBINABLE_TYPES.includes(input.type)) errors.push("A second goal can be added to strength or bodybuilding programs");
+    if (input.combine.days < 2 || input.combine.days > 3) errors.push("Choose 2–3 run or conditioning days");
+    if (input.daysPerWeek + input.combine.days > 7) errors.push("Strength and run days together can't be more than 7 a week");
+    const cr = weeksRange("cardio", input.combine.goal === "5k" ? "first_5k" : "endurance");
+    if (input.weeks < cr.min || input.weeks > cr.max) errors.push(`With a second goal, choose ${cr.min}–${cr.max} weeks`);
+  }
   return errors;
 }
 
@@ -2234,12 +2241,32 @@ export function buildCustomProgram(input: CustomProgramInput, catalogList: Catal
   const cfg = CUSTOM_TYPES[input.type];
   const goal = goalOption(input.type, input.goal)!;
   const novice = input.experience === "new" || input.experience === "beginner";
+  const speedish = input.type === "speed" || input.type === "agility";
+  const dayWarmup: string[] | undefined = speedish
+    ? [
+        "5 minutes easy jog, skipping or jump rope",
+        "Leg swings × 10 each direction, each leg",
+        "World's greatest stretch × 3 per side",
+        "A-skips and lateral shuffles × 2 rounds",
+        "3 build-up runs at 60%, 75% and 90% effort",
+      ]
+    : input.type === "cardio"
+      ? ["5 minutes brisk walking or very easy pace", "Leg swings × 10 each leg", "Ankle circles × 10 each direction"]
+      : input.type === "mma"
+        ? [
+            "5 minutes jump rope or easy shadowboxing",
+            "Hip openers, neck circles and world's greatest stretch × 3 per side",
+            "2 × 10-second build-up efforts",
+          ]
+        : undefined;
+
   const ctx: Ctx = {
     input,
     catalog: new Map(catalogList.map((e) => [e.slug, e])),
     novice,
     mainSets: { new: 3, beginner: 3, intermediate: 4, advanced: 5 }[input.experience],
     accSets: { new: 2, beginner: 3, intermediate: 3, advanced: 3 }[input.experience],
+    framing: framingMinutes(dayWarmup ?? STANDARD_WARMUP, STANDARD_COOLDOWN),
   };
 
   // Deload every 4th week for novices and lifters 50+, every 5th otherwise.
@@ -2277,25 +2304,6 @@ export function buildCustomProgram(input: CustomProgramInput, catalogList: Catal
     }
   })();
 
-  const speedish = input.type === "speed" || input.type === "agility";
-  const dayWarmup: string[] | undefined = speedish
-    ? [
-        "5 minutes easy jog, skipping or jump rope",
-        "Leg swings × 10 each direction, each leg",
-        "World's greatest stretch × 3 per side",
-        "A-skips and lateral shuffles × 2 rounds",
-        "3 build-up runs at 60%, 75% and 90% effort",
-      ]
-    : input.type === "cardio"
-      ? ["5 minutes brisk walking or very easy pace", "Leg swings × 10 each leg", "Ankle circles × 10 each direction"]
-      : input.type === "mma"
-        ? [
-            "5 minutes jump rope or easy shadowboxing",
-            "Hip openers, neck circles and world's greatest stretch × 3 per side",
-            "2 × 10-second build-up efforts",
-          ]
-        : undefined;
-
   const meetLifts: MainLift[] | null =
     goal.id === "meet_prep" ? (({ powerlifting: ["squat", "bench", "deadlift"], bench: ["bench"], squat: ["squat"], deadlift: ["deadlift"] }) as Partial<Record<CustomProgramType, MainLift[]>>)[input.type] ?? null : null;
   const weekDays = (wk: WeekPlan): ProgramDaySeed[] => {
@@ -2304,11 +2312,40 @@ export function buildCustomProgram(input: CustomProgramInput, catalogList: Catal
     if (bodybuilding) return bodybuilding.builder(wk);
     return builders!.map((b) => b(wk));
   };
-  const weekTemplates: ProgramWeekSeed[] = plans.map((wk) => ({
+  let weekTemplates: ProgramWeekSeed[] = plans.map((wk) => ({
     focus: weekFocus(input.type, wk, goal),
     isDeload: wk.kind === "deload",
     days: weekDays(wk).map((day) => ({ ...day, ...(dayWarmup && !day.warmup ? { warmup: dayWarmup } : {}) })),
   }));
+  // Combined goal: run days come from the endurance builder, then each week is laid out on weekdays so a hard
+  // run never sits on or next to a heavy leg day (see combined-goals.ts).
+  const combine = input.combine && COMBINABLE_TYPES.includes(input.type) ? input.combine : null;
+  if (combine) {
+    const cardioGoal = combine.goal === "5k" ? "first_5k" : "endurance";
+    const runs = buildCustomProgram(
+      {
+        ...input,
+        type: "cardio",
+        goal: cardioGoal,
+        daysPerWeek: 4,
+        cardio: input.cardio ?? { modality: "run", continuousMinutes: novice ? 10 : 20 },
+        division: null,
+        combine: null,
+      },
+      catalogList,
+    );
+    const priority = combine.goal === "5k" ? ["Easy Run A", "Long Easy Run", "Easy Run B"] : ["Intervals", "Zone 2 A", "Long Session"];
+    const lookup = (slug: string) => ctx.catalog.get(slug);
+    weekTemplates = weekTemplates.map((w, wi) => {
+      const runWeek = runs.weekTemplates![wi]!;
+      const picked = priority
+        .slice(0, combine.days)
+        .map((name) => runWeek.days.find((d) => d.name === name))
+        .filter((d): d is ProgramDaySeed => Boolean(d))
+        .map((d) => ({ ...d, warmup: d.warmup ?? ["5 minutes brisk walking or very easy pace", "Leg swings × 10 each leg", "Ankle circles × 10 each direction"] }));
+      return { ...w, focus: `${w.focus} · Running: ${runWeek.focus}`.slice(0, 300), days: combineWeek(w.days, picked, lookup) };
+    });
+  }
   const bb = bodybuilding as BBResult | null;
 
   const usedSlugs = new Set(weekTemplates.flatMap((w) => w.days.flatMap((d) => d.exercises.map((e) => e.ex))));
@@ -2356,9 +2393,17 @@ export function buildCustomProgram(input: CustomProgramInput, catalogList: Catal
       "Fit S&C around skills: lift after technique work on the same day (or 6+ hours apart) so hard days stay hard and easy days stay easy. Never put glycolytic intervals the day before hard sparring — hard sparring already counts as glycolytic conditioning. Recovery days are optional and easy.",
     );
   if (speedish) notes.push("Speed and agility are trained fresh: rest fully between reps and stop if quality drops.");
+  if (combine)
+    notes.push(
+      `Combined goal: ${combine.days} ${combine.goal === "5k" ? "run" : "conditioning"} sessions a week from the ${combine.goal === "5k" ? "first-5K run/walk" : "endurance"} template sit on their own days. Hard runs are never on or next to a heavy leg day; keep easy runs truly easy so your lifting recovers.`,
+    );
   notes.push("Stop any exercise that causes pain. This is general fitness guidance, not medical advice.");
 
   const firstDays = weekTemplates[0]!.days;
+  // The stated session length is the longest first-week session as estimated. It stays within the chosen length
+  // unless even the shortest version of a session can't fit (e.g. 20 minutes for heavy barbell work), in which
+  // case the honest, longer figure is shown and the builder says so.
+  const statedMinutes = Math.max(10, Math.max(...firstDays.map((d) => d.minutes)));
   const model: ProgressionModel = ["cardio", "mma", "speed", "agility"].includes(input.type)
     ? "density"
     : ["bodybuilding", "show_prep"].includes(input.type)
@@ -2369,18 +2414,19 @@ export function buildCustomProgram(input: CustomProgramInput, catalogList: Catal
 
   return {
     slug: "custom",
-    name: `${cfg.label}: ${goalLabel}${division}`.slice(0, 120),
-    summary: `${firstDays.length} sessions per week for ${input.weeks} weeks, about ${input.sessionMinutes} minutes each${peaking ? `, peaking in week ${input.weeks}` : ""}.`,
+    name: `${cfg.label}: ${goalLabel}${division}${combine ? ` + ${COMBINE_LABELS[combine.goal]}` : ""}`.slice(0, 120),
+    summary: `${firstDays.length} sessions per week for ${input.weeks} weeks, up to about ${statedMinutes} minutes each${peaking ? `, peaking in week ${input.weeks}` : ""}.`,
     description: notes.join(" "),
     category: cfg.category,
-    types: cfg.programTypes,
+    types: combine ? [...new Set([...cfg.programTypes, "cardio" as ProgramType])] : cfg.programTypes,
     difficulty,
     weeks: input.weeks,
-    sessionMinutes: input.sessionMinutes,
-    goals: cfg.primaryGoals,
+    sessionMinutes: statedMinutes,
+    goals: combine ? [...new Set([...cfg.primaryGoals, "improve_conditioning" as PrimaryGoal])] : cfg.primaryGoals,
     equipment: equipmentUsed,
     tier: "free",
     lowImpact: false,
+    needsSpecialistReview: input.type === "show_prep" || input.type === "mma" || goal.id === "meet_prep",
     progression: progressionText(input.type, goal, hasMaxes),
     progressionModel: model,
     deloadFinalWeek: !peaking,

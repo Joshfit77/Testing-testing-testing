@@ -9,7 +9,8 @@ import { logError } from "@/server/log";
 import { badgesUnlockedBySession, type BadgeIconName, type BadgeTier } from "@/lib/domain/achievements";
 import { isoDateInTz } from "@/lib/domain/dates";
 import { getAchievementStats } from "@/server/services/achievements";
-import { deleteWorkout, discardDraft, editWorkout, finishWorkout, saveDraftSnapshot, WorkoutError, type NewRecord } from "@/server/services/workouts";
+import { deleteWorkout, discardDraft, editWorkout, finishWorkout, getPreviousPerformance, saveDraftSnapshot, WorkoutError, type NewRecord } from "@/server/services/workouts";
+import type { PreviousPerformance } from "@/lib/domain/previous-performance";
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -110,5 +111,19 @@ export async function deleteWorkoutAction(sessionId: string): Promise<Result<nul
   } catch (err) {
     logError("workouts.delete", err);
     return { ok: false, error: "We couldn't delete this workout." };
+  }
+}
+
+/** Previous performance for exercises added during a workout (the page preloads the ones it starts with). */
+export async function previousPerformanceAction(exerciseIds: unknown): Promise<Result<Record<string, PreviousPerformance>>> {
+  const user = await requireUser();
+  const ids = z.array(z.string().uuid()).max(40).safeParse(exerciseIds);
+  if (!ids.success) return { ok: false, error: "Invalid exercises" };
+  try {
+    const supabase = await getServerSupabase();
+    return { ok: true, data: await getPreviousPerformance(supabase, user.id, ids.data) };
+  } catch (err) {
+    logError("workouts.previous", err);
+    return { ok: false, error: "Couldn't load your previous sets." };
   }
 }

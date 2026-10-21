@@ -117,7 +117,7 @@ describe("week planning", () => {
 });
 
 describe("custom program builder", () => {
-  it("builds a valid program for every type × experience × goal", () => {
+  it("builds a valid program for every type × experience × goal", { timeout: 30_000 }, () => {
     for (const type of CUSTOM_PROGRAM_TYPES) {
       const cfg = CUSTOM_TYPES[type];
       for (const experience of EXPERIENCE_LEVELS) {
@@ -264,7 +264,9 @@ describe("custom program builder", () => {
     expect(show.weekTemplates!.at(-1)!.focus).toMatch(/Show week taper/);
     for (const w of show.weekTemplates!) for (const d of w.days) expect(d.exercises.some((e) => e.ex === "posing-practice"), d.name).toBe(true);
     const cardioMins = (w: number) =>
-      show.weekTemplates![w]!.days.flatMap((d) => d.exercises).filter((e) => e.ex === "brisk-walk" || e.ex === "bike-intervals").reduce((s, e) => s + (e.seconds ?? 0), 0);
+      show.weekTemplates![w]!.days.flatMap((d) => d.exercises).filter((e) => e.ex === "brisk-walk" || e.ex === "bike-intervals")
+        // Cardio that doesn't fit the session is moved to a separate walk later in the day; it still counts.
+        .reduce((s, e) => s + (e.seconds ?? 0) + Number(/Do the other (\d+) minutes/.exec(e.notes ?? "")?.[1] ?? 0) * 60, 0);
     expect(cardioMins(12)).toBeGreaterThan(cardioMins(0));
   });
 

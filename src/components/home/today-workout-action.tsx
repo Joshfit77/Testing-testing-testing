@@ -10,7 +10,18 @@ import { DRAFT_EVENT, loadLocalDraft } from "@/lib/workout-storage";
  * Start or Resume for Home's "Today's workout" card. Resume when the server has an in-progress session
  * or this device holds an unfinished workout draft (the logger restores it at /train/workout).
  */
-export function TodayWorkoutAction({ userId, startHref, serverInProgress }: { userId: string; startHref: string; serverInProgress: string | null }) {
+export function TodayWorkoutAction({
+  userId,
+  startHref,
+  serverInProgress,
+  startLabel = "Start workout",
+}: {
+  userId: string;
+  startHref: string;
+  serverInProgress: string | null;
+  /** e.g. "Start workout early" when the next session is planned for a later day. */
+  startLabel?: string;
+}) {
   const [draftName, setDraftName] = useState<string | null>(null);
   useEffect(() => {
     const refresh = () => setDraftName(loadLocalDraft(userId)?.name ?? null);
@@ -36,7 +47,7 @@ export function TodayWorkoutAction({ userId, startHref, serverInProgress }: { us
   return (
     <Button asChild className="w-full">
       <Link href={startHref}>
-        <Play aria-hidden /> Start workout
+        <Play aria-hidden /> {startLabel}
       </Link>
     </Button>
   );

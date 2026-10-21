@@ -83,10 +83,10 @@ const FRIENDLY: Record<JsWeekday, string> = {
 const FAITH: Record<JsWeekday, string> = {
   0: "Strength renewed. A gentle session or walk honours the gift.",
   1: "The narrow way is a daily choice. Your workout is waiting.",
-  2: "Whatsoever ye do, do it heartily. Time to train.",
-  3: "Let us not be weary in well doing. Show up today.",
+  2: "“Whatsoever ye do, do it heartily” (Colossians 3:23, KJV). Time to train.",
+  3: "“Let us not be weary in well doing” (Galatians 6:9, KJV). Show up today.",
   4: "Faithful in little things: today's session counts.",
-  5: "Run with patience the race set before you. Time to train.",
+  5: "“Run with patience the race that is set before us” (Hebrews 12:1, KJV). Time to train.",
   6: "Steward the strength you've been given. Your workout is ready.",
 };
 

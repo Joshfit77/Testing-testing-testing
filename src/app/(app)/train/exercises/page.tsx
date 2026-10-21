@@ -10,9 +10,12 @@ import { titleCase } from "@/lib/utils";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
 import { ExerciseThumb } from "@/components/train/exercise-demo";
+import { MUSCLE_GROUPS, muscleGroup } from "@/lib/domain/muscle-groups";
 import { BackLink } from "@/components/platform/back-link";
 
 export const metadata = { title: "Exercise library" };
+
+const DIFFICULTIES = ["beginner", "intermediate", "advanced"] as const;
 
 const CATEGORIES = [
   "strength",
@@ -26,7 +29,7 @@ const CATEGORIES = [
 export default async function ExercisesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; category?: string; equipment?: string }>;
+  searchParams: Promise<{ q?: string; category?: string; equipment?: string; muscle?: string; difficulty?: string }>;
 }) {
   const sp = await searchParams;
   await requireOnboardedUser();
@@ -44,6 +47,9 @@ export default async function ExercisesPage({
     query = query.eq("category", sp.category);
   if (sp.equipment && (EQUIPMENT as readonly string[]).includes(sp.equipment))
     query = query.contains("equipment", [sp.equipment]);
+  const group = muscleGroup(sp.muscle);
+  if (group) query = query.overlaps("primary_muscles", [...group.muscles]);
+  if (sp.difficulty && (DIFFICULTIES as readonly string[]).includes(sp.difficulty)) query = query.eq("difficulty", sp.difficulty);
   const { data, error } = await query;
   const exercises = data ?? [];
 
@@ -56,10 +62,10 @@ export default async function ExercisesPage({
       />
 
       <form
-        className="grid gap-3 rounded-2xl border border-border bg-card p-4 md:grid-cols-[1fr_180px_200px_auto]"
+        className="grid grid-cols-2 gap-2 rounded-2xl border border-border bg-card p-3 md:grid-cols-[1fr_170px_170px_170px_170px_auto]"
         role="search"
       >
-        <label className="relative">
+        <label className="relative col-span-2 md:col-span-1">
           <span className="sr-only">Search exercises</span>
           <Search
             className="pointer-events-none absolute left-3 top-3.5 size-4 text-muted-foreground"
@@ -84,6 +90,22 @@ export default async function ExercisesPage({
             </option>
           ))}
         </NativeSelect>
+        <NativeSelect name="muscle" defaultValue={group?.id ?? ""} aria-label="Muscle group">
+          <option value="">All muscles</option>
+          {MUSCLE_GROUPS.map((g) => (
+            <option key={g.id} value={g.id}>
+              {g.label}
+            </option>
+          ))}
+        </NativeSelect>
+        <NativeSelect name="difficulty" defaultValue={sp.difficulty ?? ""} aria-label="Difficulty">
+          <option value="">Any difficulty</option>
+          {DIFFICULTIES.map((d) => (
+            <option key={d} value={d}>
+              {titleCase(d)}
+            </option>
+          ))}
+        </NativeSelect>
         <NativeSelect
           name="equipment"
           defaultValue={sp.equipment ?? ""}
@@ -96,7 +118,7 @@ export default async function ExercisesPage({
             </option>
           ))}
         </NativeSelect>
-        <Button type="submit" variant="secondary">
+        <Button type="submit" variant="secondary" className="col-span-2 md:col-span-1">
           Filter
         </Button>
       </form>

@@ -14,6 +14,7 @@ import { logError } from "@/server/log";
 import { getWeeklyActivity, type WeeklyActivity } from "@/server/services/activity-summary";
 import { getDashboardData } from "@/server/services/dashboard";
 import { getActiveProgram } from "@/server/services/training";
+import { loadProgramSchedule } from "@/server/services/schedule";
 import { buildWeeklyActivity } from "@/lib/domain/activity-week";
 import { verseExcerpt } from "@/lib/domain/scripture";
 
@@ -29,13 +30,17 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     logError("home.weekly", err);
     return buildWeeklyActivity(new Date(), profile.timezone, { workouts: [] });
   });
-  const [plan, data, active, weekly, inProgressRes, answersRes] = await Promise.all([
+  const [plan, data, active, weekly, inProgressRes, answersRes, schedule] = await Promise.all([
     getUserPlan(user.id),
     getDashboardData(supabase, user.id, profile.timezone),
     getActiveProgram(supabase, user.id),
     weeklyPromise,
     supabase.from("workout_sessions").select("name").eq("user_id", user.id).eq("status", "in_progress").order("started_at", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("onboarding_answers").select("days_per_week").eq("user_id", user.id).maybeSingle(),
+    loadProgramSchedule(supabase, user.id, profile.timezone).catch((err: unknown) => {
+      logError("home.schedule", err);
+      return null;
+    }),
   ]);
   const name = profile.display_name ?? "Athlete";
   const firstName = name.trim().split(/\s+/)[0] || name;
@@ -47,6 +52,12 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const sessionsThisWeek = weekly.workouts.length + weekly.runs.length + weekly.walks.length;
   const todayLong = new Date(`${data.today}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
   const today = active?.today ?? null;
+  // The training calendar's date for the next session (it may have been moved to another day).
+  const next = schedule?.planned[0] && today && schedule.planned[0].dayId === today.id ? schedule.planned[0] : null;
+  const plannedLater = next && next.date > data.today ? next : null;
+  const plannedLabel = plannedLater
+    ? new Date(`${plannedLater.date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" })
+    : null;
 
   return (
     <div className="space-y-4">
@@ -98,9 +109,16 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
       {/* Today's workout */}
       <section className={`${card} p-4`} aria-labelledby="today-title">
-        <h2 id="today-title" className="text-sm font-semibold text-muted-foreground">
-          Today&apos;s workout
-        </h2>
+        <div className="flex items-center justify-between gap-2">
+          <h2 id="today-title" className="text-sm font-semibold text-muted-foreground">
+            Today&apos;s workout
+          </h2>
+          {plannedLater && (
+            <span className="rounded-full border border-border px-2 py-0.5 text-xs font-semibold text-muted-foreground" data-testid="today-rest">
+              Rest day today
+            </span>
+          )}
+        </div>
         <Link
           href={active ? `/train/programs/${active.programSlug}` : "/train"}
           className="mt-2 flex min-h-14 items-center gap-3 rounded-xl hover:bg-elevated/50"
@@ -111,8 +129,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           </span>
           <span className="min-w-0 flex-1">
             <span className="block truncate text-lg font-semibold">{today ? today.name : active ? "Program complete" : "No program yet"}</span>
-            <span className="block text-sm text-muted-foreground">
-              {today
+            <span className="block text-sm text-muted-foreground" data-testid="today-detail">
+              {today && plannedLater
+                ? `Next session · planned for ${plannedLabel}${plannedLater.moved ? " (moved)" : ""}`
+                : today
                 ? [today.estimated_minutes ? `${today.estimated_minutes} min` : null, `${today.exercises.length} exercise${today.exercises.length === 1 ? "" : "s"}`]
                     .filter(Boolean)
                     .join(" · ")
@@ -124,8 +144,21 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
         </Link>
         <div className="mt-3">
-          <TodayWorkoutAction userId={user.id} startHref={startHref} serverInProgress={(inProgressRes.data?.name as string | undefined) ?? null} />
+          <TodayWorkoutAction
+            userId={user.id}
+            startHref={startHref}
+            serverInProgress={(inProgressRes.data?.name as string | undefined) ?? null}
+            startLabel={plannedLater ? "Start workout early" : "Start workout"}
+          />
         </div>
+        {next && (
+          <Link
+            href={`/calendar?day=${next.date}`}
+            className="mt-1 flex min-h-11 items-center justify-center gap-1.5 text-sm font-semibold text-gold-highlight hover:underline"
+          >
+            <CalendarDays className="size-4" aria-hidden /> {plannedLater ? "Change the date" : "Move to another day"}
+          </Link>
+        )}
         {!active && (
           <Link href="/train/build" className="mt-2 flex min-h-11 items-center justify-center gap-1.5 text-sm font-semibold text-gold-highlight hover:underline">
             <Wand2 className="size-4" aria-hidden /> Build my program
@@ -191,7 +224,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         <CalendarDays className="size-5 text-gold" aria-hidden />
         <span className="min-w-0 flex-1">
           <span className="block text-base font-semibold">Training calendar</span>
-          <span className="block truncate text-sm text-muted-foreground">Completed and upcoming sessions</span>
+          <span className="block truncate text-sm text-muted-foreground">Workouts, runs, walks and planned sessions</span>
         </span>
         <ChevronRight className="size-5 text-gold" aria-hidden />
       </Link>

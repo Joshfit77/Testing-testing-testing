@@ -7,11 +7,15 @@
  * Weights are kilograms; conversion to the user's units happens only for display.
  */
 import { addDays, startOfWeek } from "./dates";
-import { dailyStreak, weeklyStreak } from "./streak";
+import { weeklyStreak } from "./streak";
 import { KG_PER_LB } from "./units";
 
 export type BadgeTier = "bronze" | "silver" | "gold";
-export type BadgeCategory = "training" | "strength" | "consistency" | "nutrition" | "faith" | "milestones";
+/**
+ * There is deliberately no faith category: spiritual life is never scored (SPEC §12, checklist 12.18), so
+ * journal entries, prayers and practices earn no badges.
+ */
+export type BadgeCategory = "training" | "strength" | "consistency" | "nutrition" | "milestones";
 /** Lucide icon names; mapped to components in src/components/achievements/badge-icon.tsx. */
 export type BadgeIconName =
   | "Dumbbell"
@@ -43,7 +47,6 @@ export const BADGE_CATEGORIES: { id: BadgeCategory; label: string }[] = [
   { id: "strength", label: "Strength" },
   { id: "consistency", label: "Consistency" },
   { id: "nutrition", label: "Nutrition" },
-  { id: "faith", label: "Faith & discipline" },
   { id: "milestones", label: "Milestones" },
 ];
 
@@ -74,8 +77,6 @@ export interface AchievementStats {
   prs: PrEvent[];
   /** Days with at least one logged food item. */
   foodDays: string[];
-  journalDates: string[];
-  disciplineDates: string[];
   weightDates: string[];
   /** Completion dates of finished programs. */
   programsCompleted: string[];
@@ -87,8 +88,6 @@ export const emptyStats = (): AchievementStats => ({
   workouts: [],
   prs: [],
   foodDays: [],
-  journalDates: [],
-  disciplineDates: [],
   weightDates: [],
   programsCompleted: [],
   photoDates: [],
@@ -137,8 +136,6 @@ interface Derived {
   workoutDates: string[];
   prMoments: string[];
   foodDays: string[];
-  journalDates: string[];
-  disciplineDates: string[];
   weightDates: string[];
   programsCompleted: string[];
   photoDates: string[];
@@ -229,11 +226,6 @@ const weeklyStreakBadge: Evaluator = (s, target, today) => ({
   earnedAt: weeklyStreakEarnedAt(s.workoutDates, target),
 });
 
-const disciplineStreakBadge: Evaluator = (s, target, today) => ({
-  current: dailyStreak(s.disciplineDates, today),
-  earnedAt: dailyStreakEarnedAt(s.disciplineDates, target),
-});
-
 const workoutCount: Evaluator = countBadge((s) => s.workouts.map((w) => w.date));
 
 export const BADGE_CATALOG: CatalogEntry[] = [
@@ -288,11 +280,6 @@ export const BADGE_CATALOG: CatalogEntry[] = [
   { id: "food-7", name: "Fuel Tracker", description: "Log food on 7 different days.", icon: "Utensils", tier: "bronze", category: "nutrition", unit: "days", target: 7, evaluate: countBadge((s) => s.foodDays) },
   { id: "food-30", name: "Mindful Eater", description: "Log food on 30 different days.", icon: "Salad", tier: "silver", category: "nutrition", unit: "days", target: 30, evaluate: countBadge((s) => s.foodDays) },
   { id: "food-100", name: "Good Steward", description: "Log food on 100 different days.", icon: "Salad", tier: "gold", category: "nutrition", unit: "days", target: 100, evaluate: countBadge((s) => s.foodDays) },
-  // Faith & discipline
-  { id: "journal-1", name: "First Reflection", description: "Write your first journal entry.", icon: "BookOpen", tier: "bronze", category: "faith", unit: "count", target: 1, evaluate: countBadge((s) => s.journalDates) },
-  { id: "journal-10", name: "Faithful Writer", description: "Write 10 journal entries.", icon: "NotebookPen", tier: "silver", category: "faith", unit: "count", target: 10, evaluate: countBadge((s) => s.journalDates) },
-  { id: "discipline-7", name: "Seven Days Faithful", description: "Check in on a discipline goal 7 days in a row.", icon: "CheckCheck", tier: "silver", category: "faith", unit: "days", target: 7, evaluate: disciplineStreakBadge },
-  { id: "discipline-30", name: "Rooted", description: "Check in on a discipline goal 30 days in a row.", icon: "ShieldCheck", tier: "gold", category: "faith", unit: "days", target: 30, evaluate: disciplineStreakBadge },
   // Milestones
   { id: "program-complete", name: "Finisher", description: "Complete a training program.", icon: "Flag", tier: "gold", category: "milestones", unit: "count", target: 1, evaluate: countBadge((s) => s.programsCompleted) },
   { id: "first-photo", name: "Snapshot", description: "Add your first progress photo.", icon: "Camera", tier: "bronze", category: "milestones", unit: "count", target: 1, evaluate: countBadge((s) => s.photoDates) },
@@ -306,8 +293,6 @@ function derive(stats: AchievementStats): Derived {
     workoutDates: workouts.map((w) => w.date),
     prMoments: prMoments(stats.prs),
     foodDays: distinctSorted(stats.foodDays),
-    journalDates: sortedDates(stats.journalDates),
-    disciplineDates: distinctSorted(stats.disciplineDates),
     weightDates: sortedDates(stats.weightDates),
     programsCompleted: sortedDates(stats.programsCompleted),
     photoDates: sortedDates(stats.photoDates),

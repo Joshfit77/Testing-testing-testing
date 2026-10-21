@@ -6,6 +6,7 @@ import { challengeDayNumber } from "@/lib/domain/challenge";
 import { addDays, isoDateInTz } from "@/lib/domain/dates";
 import type { UnitSystem } from "@/lib/domain/types";
 import type { AthleteSnapshot, SnapshotProgram, SnapshotProgramDay, SnapshotWorkout } from "@/lib/coach/context";
+import { journalEntriesForCoach, COACH_JOURNAL_LIMIT } from "@/lib/domain/journal";
 import { loadBudgetContext } from "@/server/services/nutrition-targets";
 
 /**
@@ -139,7 +140,7 @@ export async function loadAthleteSnapshot(supabase: SupabaseClient, userId: stri
   const since120 = addDays(today, -120);
   const since7 = addDays(today, -6);
 
-  const [answersRes, workoutsRes, datesRes, prsRes, weightsRes, goalsRes, foodRes, stepsRes, suppRes, readinessRes, challengeRes, programRef, budgetCtx] = await Promise.all([
+  const [answersRes, workoutsRes, datesRes, prsRes, weightsRes, goalsRes, foodRes, stepsRes, suppRes, readinessRes, challengeRes, programRef, budgetCtx, journalRes] = await Promise.all([
     supabase
       .from("onboarding_answers")
       .select("primary_goal, experience, days_per_week, session_minutes, equipment, preferred_types, limitations, diet_type, goal_weight_kg, weekly_change_kg, activity_level")
@@ -176,6 +177,14 @@ export async function loadAthleteSnapshot(supabase: SupabaseClient, userId: stri
       .maybeSingle(),
     getActiveProgramRef(supabase, userId),
     loadBudgetContext(supabase, userId).catch(() => null),
+    // Prayer journal: private by default. Only entries the user explicitly shared with the coach are read.
+    supabase
+      .from("faith_journal_entries")
+      .select("entry_date, kind, title, scripture_ref, body, answered_on, share_with_coach")
+      .eq("user_id", userId)
+      .eq("share_with_coach", true)
+      .order("entry_date", { ascending: false })
+      .limit(COACH_JOURNAL_LIMIT),
   ]);
 
   const a = answersRes.data;
@@ -261,5 +270,7 @@ export async function loadAthleteSnapshot(supabase: SupabaseClient, userId: stri
     readiness: readinessRes.data ? { score: readinessRes.data.readiness_score as number, date: readinessRes.data.checked_on as string } : null,
     challenge,
     faithEnabled: Boolean(profile?.faith_enabled),
+    // Filtered again here so nothing unshared can reach the coach even if the query changes.
+    sharedJournal: journalEntriesForCoach(journalRes.data as Parameters<typeof journalEntriesForCoach>[0]),
   };
 }

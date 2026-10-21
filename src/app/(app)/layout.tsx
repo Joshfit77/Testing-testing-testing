@@ -8,6 +8,8 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { signOutAction } from "@/server/actions/auth";
 import { getPlans } from "@/lib/domain/plans";
+import { FaithReminderSync } from "@/components/faith/faith-reminders-settings";
+import { getFaithRemindersAction } from "@/server/actions/faith";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   if (!isSupabaseConfigured()) return <SetupRequired />;
@@ -28,6 +30,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <ScrollMemory />
       </Suspense>
       <KeyboardAvoidance />
+      {/* Stage 2C: in the iPhone/Android app, apply the account's faith reminders on this device. */}
+      <FaithReminderSync load={getFaithRemindersAction} />
       <DraftUserProvider userId={user.id}>{children}</DraftUserProvider>
     </AppShell>
   );

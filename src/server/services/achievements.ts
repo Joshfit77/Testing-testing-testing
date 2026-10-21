@@ -19,10 +19,11 @@ async function fetchAll<T>(page: (from: number, to: number) => PromiseLike<{ dat
 
 /**
  * Gather the narrow, per-event facts the achievements engine needs. Each query selects
- * only one or two small columns (dates, totals) — never sets, items or text bodies.
+ * only one or two small columns (dates, totals) — never sets, items or text bodies. Faith activity
+ * (journal, practices) is never read here: spiritual life is not scored.
  */
 export async function getAchievementStats(supabase: SupabaseClient, userId: string, tz: string): Promise<AchievementStats> {
-  const [workouts, prs, meals, journal, discipline, weights, programs, photos] = await Promise.all([
+  const [workouts, prs, meals, weights, programs, photos] = await Promise.all([
     fetchAll<{ id: string; started_at: string; total_volume_kg: number | string }>((a, b) =>
       supabase.from("workout_sessions").select("id, started_at, total_volume_kg").eq("user_id", userId).eq("status", "completed").order("started_at").order("id").range(a, b),
     ),
@@ -43,10 +44,6 @@ export async function getAchievementStats(supabase: SupabaseClient, userId: stri
         .limit(1, { referencedTable: "meal_items" })
         .range(a, b),
     ),
-    fetchAll<{ id: string; entry_date: string }>((a, b) => supabase.from("faith_journal_entries").select("id, entry_date").eq("user_id", userId).order("entry_date").order("id").range(a, b)),
-    fetchAll<{ goal_id: string; checked_on: string }>((a, b) =>
-      supabase.from("discipline_checkins").select("goal_id, checked_on").eq("user_id", userId).order("checked_on").order("goal_id").range(a, b),
-    ),
     fetchAll<{ id: string; recorded_on: string }>((a, b) => supabase.from("weight_entries").select("id, recorded_on").eq("user_id", userId).order("recorded_on").order("id").range(a, b)),
     fetchAll<{ id: string; completed_at: string | null; updated_at: string }>((a, b) =>
       supabase.from("user_programs").select("id, completed_at, updated_at").eq("user_id", userId).eq("status", "completed").order("id").range(a, b),
@@ -65,8 +62,6 @@ export async function getAchievementStats(supabase: SupabaseClient, userId: stri
     })),
     prs: prs.map((p) => ({ sessionId: p.session_id, exerciseId: p.exercise_id, recordType: p.record_type, achievedAt: p.achieved_at, date: day(p.achieved_at) })),
     foodDays: meals.map((m) => m.eaten_on),
-    journalDates: journal.map((j) => j.entry_date),
-    disciplineDates: discipline.map((c) => c.checked_on),
     weightDates: weights.map((w) => w.recorded_on),
     programsCompleted: programs.map((p) => day(p.completed_at ?? p.updated_at)),
     photoDates: photos.map((p) => day(p.created_at)),

@@ -7,7 +7,7 @@ test.describe("guided onboarding builds a plan", () => {
     await page.waitForURL(/\/onboarding/);
 
     // Progress bar + validation on a screen.
-    await expect(page.getByText("Question 1 of 12")).toBeVisible();
+    await expect(page.getByText("Question 1 of 14")).toBeVisible();
     await page.getByRole("button", { name: /^Continue/ }).click();
     await expect(page.getByText("Choose your main goal.")).toBeVisible();
 

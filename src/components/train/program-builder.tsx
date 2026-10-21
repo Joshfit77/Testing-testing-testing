@@ -27,8 +27,11 @@ import { Button } from "@/components/ui/button";
 import { Input, NativeSelect } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ProgressBar } from "@/components/ui/progress-bar";
+import { COMBINE_GOALS, COMBINE_LABELS, type CombineGoal } from "@/lib/domain/combined-goals";
+import { planChanges, summarizeSeed, type PlanSummary } from "@/lib/domain/plan-preview";
 import {
   buildCustomProgram,
+  COMBINABLE_TYPES,
   CARDIO_MODALITIES,
   CARDIO_MODALITY_LABELS,
   CUSTOM_TYPES,
@@ -158,10 +161,13 @@ export function ProgramBuilder({
   initial,
   initialType,
   catalog,
+  current = null,
 }: {
   initial: BuilderInitial;
   initialType: CustomProgramType | null;
   catalog: CatalogExercise[];
+  /** The active program, for the "what changes" preview on the review step. */
+  current?: PlanSummary | null;
 }) {
   const units = initial.units;
   const unit = weightUnit(units);
@@ -180,6 +186,8 @@ export function ProgramBuilder({
   const [minutes, setMinutes] = useState<number>(() => (initialType ? CUSTOM_TYPES[initialType].defaultMinutes : (initial.sessionMinutes ?? 45)));
   const [weeks, setWeeks] = useState<number>(() => (initialType ? weeksRange(initialType, CUSTOM_TYPES[initialType].goals[0]!.id).default : 8));
   const [division, setDivision] = useState<ShowDivision | null>(null);
+  const [combineGoal, setCombineGoal] = useState<CombineGoal | null>(null);
+  const [combineDays, setCombineDays] = useState(2);
 
   const [age, setAge] = useState(initial.age ? String(initial.age) : "");
   const initFt = initial.heightCm ? cmToFeetInches(initial.heightCm) : null;
@@ -221,6 +229,7 @@ export function ProgramBuilder({
     setMinutes(c.defaultMinutes);
     setWeeks(weeksRange(t, g.id).default);
     if (t !== "show_prep") setDivision(null);
+    if (!COMBINABLE_TYPES.includes(t)) setCombineGoal(null);
     setError(null);
   };
 
@@ -276,6 +285,7 @@ export function ProgramBuilder({
       if (!goalCfg) return "Choose a goal.";
       if (type === "show_prep" && !division) return "Choose your division.";
       if (weeks < wr.min || weeks > wr.max) return `Choose ${wr.min}–${wr.max} weeks.`;
+      if (combineGoal && days + combineDays > 7) return `${days} lifting days plus ${combineDays} run days is more than a week holds. Choose fewer days.`;
     }
     if (id === "numbers") {
       for (const l of cfg?.lifts ?? []) {
@@ -317,6 +327,7 @@ export function ProgramBuilder({
       cardio: cfg?.cardioInput ? { modality: goal === "first_5k" ? "run" : modality, continuousMinutes: continuous.trim() ? Math.round(num(continuous)) : 0 } : null,
       division: type === "show_prep" ? division : null,
       equipment: [...new Set(equipment)],
+      combine: combineGoal && COMBINABLE_TYPES.includes(type) ? { goal: combineGoal, days: combineDays } : null,
     };
   };
 
@@ -343,6 +354,7 @@ export function ProgramBuilder({
           cardio: p.cardio ?? null,
           division: p.division ?? null,
           equipment: p.equipment,
+          combine: p.combine ?? null,
         },
         catalog,
       );
@@ -351,7 +363,8 @@ export function ProgramBuilder({
     }
     // payload() reads the state listed here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, type, goal, experience, days, minutes, weeks, age, feet, inches, cm, weight, lifts, modality, continuous, division, equipment, catalog, units]);
+  }, [step, type, goal, experience, days, minutes, weeks, age, feet, inches, cm, weight, lifts, modality, continuous, division, equipment, catalog, units, combineGoal, combineDays]);
+  const changes = useMemo(() => (preview ? planChanges(current, summarizeSeed(preview)) : []), [preview, current]);
   const [previewWeek, setPreviewWeek] = useState(1);
   const names = useMemo(() => new Map(catalog.map((e) => [e.slug, e.name])), [catalog]);
 
@@ -541,6 +554,38 @@ export function ProgramBuilder({
               </fieldset>
             )}
 
+            {type && COMBINABLE_TYPES.includes(type) && (
+              <fieldset className="space-y-3">
+                <legend className="text-sm font-semibold">Add a second goal (optional)</legend>
+                <div className="grid grid-cols-3 gap-2" role="group" aria-label="Second goal">
+                  <Choice selected={!combineGoal} onClick={() => setCombineGoal(null)}>
+                    None
+                  </Choice>
+                  {COMBINE_GOALS.map((g) => (
+                    <Choice key={g} selected={combineGoal === g} onClick={() => setCombineGoal(g)}>
+                      {COMBINE_LABELS[g]}
+                    </Choice>
+                  ))}
+                </div>
+                {combineGoal && (
+                  <div className="space-y-2">
+                    <Label htmlFor="pb-combine-days">{combineGoal === "5k" ? "Run days per week" : "Conditioning days per week"}</Label>
+                    <NativeSelect id="pb-combine-days" value={combineDays} onChange={(e) => setCombineDays(Number(e.target.value))}>
+                      {[2, 3].map((d) => (
+                        <option key={d} value={d}>
+                          {d} days
+                        </option>
+                      ))}
+                    </NativeSelect>
+                    <p className="text-xs text-muted-foreground">
+                      {combineGoal === "5k" ? "Run days come from the first-5K run/walk plan" : "Sessions come from the endurance plan (one interval day, easy zone 2)"}. They go on
+                      their own days, and a hard run is never on or next to a heavy leg day.
+                    </p>
+                  </div>
+                )}
+              </fieldset>
+            )}
+
             <fieldset className="space-y-3">
               <legend className="text-sm font-semibold">Training experience</legend>
               <div className="grid gap-2 sm:grid-cols-2">
@@ -722,6 +767,32 @@ export function ProgramBuilder({
                     <Badge variant="secondary">{EXPERIENCE_LABELS[experience]}</Badge>
                   </div>
                 </div>
+
+                <section aria-labelledby="pb-changes" className="rounded-xl border border-gold-muted/50 bg-gold/5 p-4">
+                  <h3 id="pb-changes" className="text-sm font-semibold">
+                    {current ? "What changes from your current program" : "Your new plan"}
+                  </h3>
+                  {changes.length === 0 ? (
+                    <p className="mt-1 text-sm text-muted-foreground">Same schedule and session length as {current?.name}.</p>
+                  ) : (
+                    <ul className="mt-2 space-y-1 text-sm" data-testid="plan-changes">
+                      {changes.map((c) => (
+                        <li key={c.key} className="flex flex-wrap justify-between gap-x-3">
+                          <span className="text-muted-foreground">{c.label}</span>
+                          <span className="font-semibold tabular-nums">
+                            {c.before} → <span className="text-gold-highlight">{c.after}</span>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {preview.sessionMinutes > minutes && (
+                    <p className="mt-2 text-xs text-gold-highlight">
+                      The shortest version of these sessions takes about {preview.sessionMinutes} minutes, more than the {minutes} you chose. Choose a longer
+                      session or a lighter style.
+                    </p>
+                  )}
+                </section>
 
                 <div>
                   <p className="mb-2 text-sm font-semibold">Your block</p>

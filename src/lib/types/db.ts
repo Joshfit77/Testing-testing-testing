@@ -18,6 +18,8 @@ export interface ProfileRow {
   text_size?: "default" | "large" | "xlarge";
   reduce_motion?: boolean;
   home_scripture?: boolean;
+  rest_timer_sound?: boolean;
+  rest_timer_vibrate?: boolean;
   created_at: string;
 }
 
@@ -75,6 +77,7 @@ export interface ProgramRow {
   warmup: string[];
   cooldown: string[];
   low_impact: boolean;
+  needs_specialist_review: boolean;
   is_published: boolean;
   owner_id: string | null;
   source: "curated" | "starter" | "ai" | "custom";

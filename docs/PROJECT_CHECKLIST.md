@@ -61,7 +61,7 @@ Offline: still the old nav (`NAV` = Home, Programs, Exercises, Food, Coach, Prog
 | 2.14 | Train → Current Workout | Working | `/train/workout` and `ActiveWorkoutPill` | 1 |
 | 2.15 | Train → Programs | Working | Train hub `/train` → Programs `/train/programs` (library and discipline/category filters moved unchanged); `e2e/program-library.spec.ts`, `e2e/navigation.spec.ts` | 1 |
 | 2.16 | Train → Exercises | Working | `/train/exercises`, currently also its own bottom tab | 1 |
-| 2.17 | Train → Custom Workouts | Partial | Blank workout (`/train/workout?blank=1`) and program builder (`/train/build`). No saved custom workouts (see 6.20). | 2 |
+| 2.17 | Train → Custom Workouts | Working | Stage 2B: Train hub tile "My workouts" → `/train/templates` (build, start, edit, delete saved workouts; empty workout → save as template from the summary). The "not built yet" note is gone. `e2e/training-stage2.spec.ts`. | 2 |
 | 2.18 | Train → Workout History | Working | `/train/history`, `/train/history/[id]` | 1 |
 | 2.19 | Run → Run/Walk Tracker | Partial | Manual and treadmill entry work (`src/components/run/activity-form.tsx`). Outdoor Run shows an honest "GPS tracking is coming next" card with no Start button. Live tracking is Stage 3 (`docs/RUN_TRACKING_PLAN.md`). | 3 |
 | 2.20 | Run → Plans | Partial | `/run` links to the library's First 5K run/walk (couch-to-5K) and Half Marathon 80/20 programs, plus the cardio builder (`/train/build?type=cardio`). There's no 10K program in the library. | 3 |
@@ -75,8 +75,8 @@ Offline: still the old nav (`NAV` = Home, Programs, Exercises, Food, Coach, Prog
 | 2.28 | Food → Nutrition Insights | Working | `/nutrition/insights`: 7-day view with week navigation, per-day calories/macros vs target, average over logged days, not-logged vs logged-as-zero vs complete days, top protein and calorie sources (`src/lib/domain/nutrition-insights.ts`, `tests/unit/nutrition-insights.test.ts`). | 2 |
 | 2.29 | Faith → Devotionals | Working | `/faith#devotionals`, `src/data/devotionals.ts` | 2 |
 | 2.30 | Faith → Scripture | Working | `/faith`, `src/data/content.ts` | 2 |
-| 2.31 | Faith → Prayer Journal | Partial | A "reflection journal" (`faith_journal_entries`), not labeled or structured as a prayer journal | 2 |
-| 2.32 | Faith → Daily Practices | Partial | Discipline goals and check-ins (`discipline_goals`, `discipline_checkins`) | 2 |
+| 2.31 | Faith → Prayer Journal | Working | Stage 2C: "Prayer journal" card on Faith plus `/faith/journal` (search, filters: requests / still praying / answered / praise / reflections / shared) and `/faith/journal/[id]` (view, edit, mark answered with date and note, undo, share toggle, confirmed delete). Entry type Reflection / Prayer request / Praise; title, body, optional Scripture; device drafts. Migration `20261021000020_faith_calendar.sql`. `e2e/faith-calendar.spec.ts`, `tests/integration/faith-calendar.test.ts` | 2 |
+| 2.32 | Faith → Daily Practices | Working | Stage 2C: choose Scripture reading, prayer, gratitude, fasting, worship, rest/Sabbath or custom practices (`discipline_goals.practice`); check off today or the previous six days; weekly summary in gentle words; month history at `/faith/practices`. `src/lib/domain/practices.ts`, `tests/unit/practices.test.ts`, `e2e/faith-calendar.spec.ts` | 2 |
 | 2.33 | Faith → 40-Day Challenge | Working | `src/components/faith/faith-challenge.tsx`, `e2e/challenge.spec.ts` | 2 |
 | 2.34 | No duplicate screens; every link opens the same underlying feature | Partial | Coach is now only the header button plus `/coach`; Progress only under Home. Weekly activity uses one service (`getWeeklyActivity`). Still to re-check after Run and Food sub-screens land. | 1 |
 
@@ -93,11 +93,11 @@ Offline: Home has a greeting, today's workout and summaries. No calendar.
 | 3.5 | Nutrition summary | Working | Calories eaten / budget with a gold bar, taps to Food; honest locked state on Free | 1 |
 | 3.6 | Weekly activity summary | Partial | "This week" card from `getWeeklyActivity(userId, timezone)` (`src/server/services/activity-summary.ts`, `src/lib/domain/activity-week.ts`, `tests/unit/activity-week.test.ts`) with Mon–Sun bars; returns `workouts`, `runs`, `walks` (runs/walks empty until Stage 1B). | 1 |
 | 3.7 | Prominent My Progress button | Working | Gold-outlined My Progress button on Home; `e2e/navigation.spec.ts` | 1 |
-| 3.8 | Access to the training calendar | Partial | Home → Training calendar (`/calendar`): month grid of completed workouts, list of the month's sessions, and the next program sessions in order. Program sessions have no dates yet. | 2 |
+| 3.8 | Access to the training calendar | Working | Home → Training calendar and Home's "Change the date" link → `/calendar` (month and week views, Today, day panel, Up next). Protected by middleware (`PROTECTED_PREFIXES`). `e2e/navigation.spec.ts`, `e2e/faith-calendar.spec.ts` | 2 |
 | 3.9 | Compact AI Coach button | Working | Header AI Coach pill (see 2.6) | 1 |
 | 3.10 | Focused overview; detail after tapping a card | Working | Home is greeting, Scripture card, today's workout, nutrition, this week, My Progress, calendar, and a Steps/Supplements/Recovery row. Steps moved to the My Progress hub (`/progress#steps`); PRs, weight chart, recovery and coach prompts live in Progress/Train/Coach. | 1 |
-| 3.11 | Calendar combining workouts, runs, walks and rest days | Missing | — | 2 |
-| 3.12 | Reschedule sessions without losing completed history | Missing | Only `pauseActiveProgramAction` (`src/server/actions/programs.ts`) | 2 |
+| 3.11 | Calendar combining workouts, runs, walks and rest days | Working | `buildCalendar` (`src/lib/domain/calendar.ts`) merges completed workouts, runs, walks (from `activities`), dated planned program sessions (`src/lib/domain/training-schedule.ts`: next session today, then the program's usual weekdays) and rest days (from today to the last planned session). `tests/unit/calendar.test.ts`, `tests/unit/training-schedule.test.ts` | 2 |
+| 3.12 | Reschedule sessions without losing completed history | Partial | Move a planned session to another date on `/calendar` (`movePlannedSessionAction`, table `planned_session_overrides`, owner-only RLS); "Back to <date>" undoes it. Only pending sessions can move; completed workouts are never touched. Home's Today's workout follows the move ("Rest day today", "planned for … (moved)", Start workout early). `tests/unit/training-schedule.test.ts`, `tests/integration/faith-calendar.test.ts`, `e2e/faith-calendar.spec.ts`. **Train's Today's workout card doesn't show the planned date yet** (`src/app/(app)/train/**` belongs to the Train helper; the change is described in the Stage 2C report). | 2 |
 
 ## 4. Onboarding and personalization
 
@@ -106,7 +106,7 @@ Offline: has its own onboarding and the program builder.
 | ID | Requirement | Status | Evidence | Stage |
 |---|---|---|---|---|
 | 4.1 | Primary goal | Working | `onboarding_answers.primary_goal`, `onboarding-questionnaire.tsx` | 2 |
-| 4.2 | Secondary goal | Missing | No column or step | 2 |
+| 4.2 | Secondary goal | Partial | Optional "Second goal" step (skippable; includes Train for a 5K) in onboarding and in Profile → Edit onboarding details; `onboarding_answers.secondary_goal`; shown on `/plan`. It is recorded only: the program is still built around the main goal and the AI coach doesn't read it yet (coordinating combined goals, SPEC §4, isn't built). `e2e/faith-calendar.spec.ts` | 2 |
 | 4.3 | Training experience | Working | `experience` | 2 |
 | 4.4 | Age | Working | Age step. Under-18 block (`e2e/features.spec.ts`). | 2 |
 | 4.5 | Relevant body measurements (sex, height, weight, goal weight) | Working | Steps sex/height/weight/target. Migrations `20261017000005`, `20261017000007`. | 2 |
@@ -116,12 +116,12 @@ Offline: has its own onboarding and the program builder.
 | 4.9 | Dietary preferences | Working | Diet style (13 diets), `src/lib/domain/diets.ts`, `e2e/welcome-diets.spec.ts` | 2 |
 | 4.10 | Nutrition goals | Working | Weight goal, pace and activity feed into the budget (`src/lib/domain/calorie-budget.ts`) | 2 |
 | 4.11 | Units | Working | Units toggle, `profiles.unit_system` | 2 |
-| 4.12 | Optional accessibility preferences | Partial | Text size and Reduce motion in Profile & Settings (Stage 1A); not asked during onboarding yet | 2 |
+| 4.12 | Optional accessibility preferences | Working | Optional, skippable "Display" onboarding step (text size, reduce motion; applied live, saved to `profiles.text_size` / `reduce_motion`), also in Profile → Edit onboarding details and Profile & Settings. `e2e/faith-calendar.spec.ts`, `e2e/navigation.spec.ts` | 2 |
 | 4.13 | Edit answers later | Working | `/profile/preferences` (`OnboardingWizard mode="edit"`) | 2 |
-| 4.14 | Preview how changes affect the plan | Partial | `/plan` summary after onboarding. Editing offers a rebuild but shows no before/after preview. | 2 |
-| 4.15 | Fix the 60-minute selection producing a plan labeled ~75 min | Partial | Library programs use `estimateSessionMinutes` (`src/lib/domain/session-time.ts`, uncommitted, audited in `tests/unit/program-library.test.ts`). Generated programs (`src/lib/domain/custom-programs.ts`) use a separate `estimateMinutes`, whose trimming stops at 2 exercises. Bodybuilding uses its own formula. `tests/unit/custom-programs.test.ts` only checks 5–240 min, not ≤ the chosen length. | 2 |
-| 4.16 | Duration counts sets, rest, warm-ups and transitions | Partial | `session-time.ts` covers all four. `custom-programs.ts` uses a different estimator, so there are two systems. | 2 |
-| 4.17 | Combined goals (e.g. strength + 5K) on a coordinated schedule | Missing | The builder takes one program type. Cardio only adds a note recommending strength work. | 2 |
+| 4.14 | Preview how changes affect the plan | Working | Stage 2B: builder review step lists what changes from the active program (`planChanges`, `src/lib/domain/plan-preview.ts`); Training preferences has "Change my schedule" with a live before → after preview (days, average session, weeks) before Apply (`src/components/train/schedule-preview.tsx`, `applyScheduleChangeAction`). Unit (`tests/unit/plan-preview.test.ts`) and e2e. The onboarding wizard's own rebuild checkbox (an onboarding component) still rebuilds without a preview. | 2 |
+| 4.15 | Fix the 60-minute selection producing a plan labeled ~75 min | Working | Stage 2B: builder, onboarding starter (`buildCustomProgram`) and the legacy preferences generator (`program-generator.ts`) all label days with `estimateSessionMinutes` and fit with `fitSessionToMinutes`; later-week progression can't push past the choice (`maxSessionMinutes`). `tests/unit/session-fit.test.ts`: every type × goal × level at 45/60/75/90 min stays within the choice (meet/contest days exempt and labelled honestly); the builder warns when even the shortest session can't fit (e.g. 20 min of heavy barbell work). | 2 |
+| 4.16 | Duration counts sets, rest, warm-ups and transitions | Working | One estimator (`src/lib/domain/session-time.ts`): work + rest + ~1 min set-up/transition per exercise + ramp-up sets before heavy lifts + warm-up/cool-down. The builder's separate `estimateMinutes` and the bodybuilding formula were removed. Unit-tested. | 2 |
+| 4.17 | Combined goals (e.g. strength + 5K) on a coordinated schedule | Working | Stage 2B: builder "Add a second goal" (Run a 5K / Conditioning, 2–3 days) for strength and bodybuilding; onboarding's `secondary_goal = run_5k` (or improve_conditioning) with 4+ days builds a combined starter. Run days come from the first-5K/endurance builder; `src/lib/domain/combined-goals.ts` places sessions on weekdays so hard runs are never on/next to heavy leg days (no back-to-back heavy legs; lightest heavy day capped at RPE 7 if needed). Deterministic; `tests/unit/combined-goals.test.ts`. Not in e2e. | 2 |
 
 ## 5. Train: programs
 
@@ -130,36 +130,36 @@ Offline: the program library is grouped by discipline (`NGB.disciplineForCategor
 | ID | Requirement | Status | Evidence | Stage |
 |---|---|---|---|---|
 | 5.1 | Preserve all existing programs | Working | `src/data/programs.ts` (edits by another agent in progress), `tests/unit/catalog.test.ts`, `supabase/seed.sql` | 2 |
-| 5.2 | Searchable program catalog | Missing | `/train` has discipline/category chips only. No text search. | 2 |
+| 5.2 | Searchable program catalog | Working | Stage 2B: text search on `/train/programs` (name, summary, category, equipment, goals; every word prefix-matched), `filterCatalog` in `src/lib/domain/program-catalog.ts`; unit + e2e. | 2 |
 | 5.3 | Category: beginner and general fitness | Working | `beginner`, general discipline (`src/lib/domain/disciplines.ts`) | 2 |
 | 5.4 | Category: strength and powerlifting | Working | `strength` (4), `powerlifting` (3), `powerbuilding` | 2 |
 | 5.5 | Category: bench, squat and deadlift specialization | Working | `bench-press`, `squat-specialization`, `deadlift-specialization` | 2 |
 | 5.6 | Category: bodybuilding and muscle building | Working | `hypertrophy` (5), `show-prep` | 2 |
 | 5.7 | Category: strongman | Working | `strongman` (2) | 2 |
 | 5.8 | Category: MMA, boxing, wrestling and grappling conditioning | Working | `mma-conditioning` (4), `boxing-conditioning`, `grappling-conditioning` | 2 |
-| 5.9 | Category: functional fitness, circuits and intervals | Partial | 1 program (`functional-conditioning`) | 2 |
+| 5.9 | Category: functional fitness, circuits and intervals | Working | `functional-engine`, `lean-and-conditioned`, new `kettlebell-circuit-intervals` (EMOM + 40:20 intervals). Not coach-reviewed (5.32). | 2 |
 | 5.10 | Category: athletic speed, agility and explosive power | Working | `speed`, `agility`, `athletic-performance` (2) | 2 |
-| 5.11 | Category: endurance and hybrid | Partial | `cardiovascular` (2), `weight-loss-cardio`. No hybrid program. | 2 |
-| 5.12 | Category: home, dumbbell, band and bodyweight | Partial | 1 program (`home-workouts`) | 2 |
-| 5.13 | Category: calisthenics | Missing | No category or program | 2 |
-| 5.14 | Category: active aging, seated and low-impact | Partial | `active-aging` (2), `low_impact` flag. No seated program. | 2 |
+| 5.11 | Category: endurance and hybrid | Working | `cardiovascular` programs plus new `hybrid-training` category with `hybrid-strength-and-run` (heavy legs Mon, intervals Thu); the builder's combined goals (4.17). | 2 |
+| 5.12 | Category: home, dumbbell, band and bodyweight | Working | `home-bodyweight-strength`, new `dumbbell-home-strength` and `band-bodyweight-total-body`; Home also lists any program whose equipment fits a home (`specCategoriesFor`). | 2 |
+| 5.13 | Category: calisthenics | Working | New `calisthenics` category: `calisthenics-foundations` (free) and `calisthenics-strength-upper-lower`. Built from existing exercises (no L-sit/handstand demos were invented). | 2 |
+| 5.14 | Category: active aging, seated and low-impact | Working | `active-aging-low-impact`, `active-aging-strength-2-day`, new chair-based `seated-strength-mobility`. All flagged for specialist review (5.31). Demos show the standing version of some moves; notes say to do them seated. | 2 |
 | 5.15 | Category: mobility, flexibility, warm-ups, cooldowns and recovery | Working | `mobility-flexibility`, `recovery-deload`, `/train/recovery` | 2 |
-| 5.16 | The 13 spec categories form the browse structure | Partial | The UI groups 24 seed categories into 7 disciplines (`disciplines.ts`), not the spec's 13 | 2 |
+| 5.16 | The 13 spec categories form the browse structure | Working | `SPEC_CATEGORIES` (13) in `program-catalog.ts`; every library category maps to exactly one (unit-tested); category chips and groups on `/train/programs`. Builder type picker still uses the 7 disciplines. | 2 |
 | 5.17 | Program states its goal and experience level | Working | `summary`, `difficulty` on `/train/programs/[slug]` | 2 |
-| 5.18 | Program states the equipment needed | Partial | Stored in `training_programs.equipment`. Not rendered on the program detail page. | 2 |
+| 5.18 | Program states the equipment needed | Working | Program cards ("Pull-up bar and Resistance bands") and an "Equipment needed" section on the detail page. | 2 |
 | 5.19 | Program states its duration in weeks | Working | `duration_weeks` | 2 |
 | 5.20 | Program states sessions per week and approximate session length | Working | `days_per_week`, `session_minutes`. Accuracy is covered by 4.15. | 2 |
 | 5.21 | Program lists exercises, sets, reps, rest and progression | Working | Program detail page, `progression` text | 2 |
 | 5.22 | Program gives substitutions | Working | Alternatives shown per exercise (`exercise_alternatives`) | 2 |
 | 5.23 | Program gives lighter-week guidance | Working | Deload weeks, `DELOAD_NOTE`, `noDeloadReason` audit (`src/data/programs.ts`) | 2 |
-| 5.24 | Program states its completion requirements | Missing | No field or UI | 2 |
-| 5.25 | Filter: goal | Missing | `recommendPrograms` uses goal internally; no UI filter | 2 |
-| 5.26 | Filter: experience | Missing | — | 2 |
-| 5.27 | Filter: equipment | Missing | — | 2 |
-| 5.28 | Filter: schedule (days/week) | Missing | — | 2 |
-| 5.29 | Filter: session length | Missing | — | 2 |
-| 5.30 | No near-identical plans under different names | Partial | `src/lib/domain/program-audit.ts` and `scripts/audit-programs.ts` exist (uncommitted). The 5 hypertrophy and 4 strength plans need a duplicate review. | 2 |
-| 5.31 | Flag specialist programming for qualified review before publication | Missing | There is no review status or flag on `training_programs`. Show prep defers to a coach in its text only. | 2 |
+| 5.24 | Program states its completion requirements | Working | Cards and detail page: "Complete at least 80% of the N sessions — R or more — including the final week" (all sessions for one-week libraries; per-program override field). Detail page shows logged sessions vs required for your run of the program. | 2 |
+| 5.25 | Filter: goal | Working | URL filter `goal=`; unit + e2e. | 2 |
+| 5.26 | Filter: experience | Working | URL filter `experience=`. | 2 |
+| 5.27 | Filter: equipment | Working | "Equipment I have" presets (none, bar, bands, dumbbells, home gym, barbell home gym); a program matches when all it needs is in the set. e2e. | 2 |
+| 5.28 | Filter: schedule (days/week) | Working | "Up to N days" (`days=`). e2e. | 2 |
+| 5.29 | Filter: session length | Working | "Up to N min" (`minutes=`). e2e. | 2 |
+| 5.30 | No near-identical plans under different names | Working | `programSimilarity` (first-week prescription overlap) in `program-audit.ts`; every pair < 0.5 (max 0.28), enforced in `tests/unit/program-catalog.test.ts`. | 2 |
+| 5.31 | Flag specialist programming for qualified review before publication | Working | `needsSpecialistReview` / `training_programs.needs_specialist_review` (migration `20261021000013`): show prep, meet prep, combat and active-aging programs, plus built show-prep/MMA/meet-prep programs. UI: "Not yet reviewed by a qualified coach" on cards and detail. No review is claimed. | 2 |
 | 5.32 | Specialist programs reviewed (show prep, meet prep, combat, active aging) | Requires Content Review | Needs a qualified coach or physio | 2 |
 
 ## 6. Workout player and exercise library
@@ -170,11 +170,11 @@ Offline: has a logger with rest timer and vibration, but no supersets or previou
 |---|---|---|---|---|
 | 6.1 | Log sets, reps and weight | Working | `src/components/workout/exercise-card.tsx`, `e2e/core-flow.spec.ts` | 1 |
 | 6.2 | Log duration | Working | Timed sets and the stopwatch in `exercise-card.tsx` | 1 |
-| 6.3 | Log distance where applicable | Missing | The `workout_sets.distance_m` column exists (`20261016000001_core_schema.sql`). There is no input in the logger. | 2 |
-| 6.4 | Previous performance shown beside the current exercise | Missing | Only the program target (`DraftTarget`) is shown | 2 |
+| 6.3 | Log distance where applicable | Working | Carries/sleds log weight + distance (m or yd), runs/rows/bikes log time + distance (km or mi) (`src/lib/domain/exercise-tracking.ts`); saved to `workout_sets.distance_m`, shown in history. Unit, integration, e2e. | 2 |
+| 6.4 | Previous performance shown beside the current exercise | Working | "Last time: 3×5 @ 225 lb" on each exercise card (`previous-performance.ts`, `getPreviousPerformance`, preloaded and fetched for added exercises). Unit, integration, e2e. | 2 |
 | 6.5 | Rest timers | Working | `restRemaining`, ±15 s, skip (`workout-logger.tsx`). Native local notification. | 1 |
-| 6.6 | Rest-timer sound or vibration, as an option | Partial | `beep()` and `navigator.vibrate` always fire. No user toggle. | 2 |
-| 6.7 | Supersets | Missing | Not in the `workout-draft.ts` model | 2 |
+| 6.6 | Rest-timer sound or vibration, as an option | Working | "Rest timer alerts" Sound / Vibrate toggles in the logger, saved to `profiles.rest_timer_sound/vibrate`; Web Audio beep and `navigator.vibrate` where supported (not on iPhone Safari, which is said in the UI). Not tested on a device. | 2 |
+| 6.7 | Supersets | Working | Draft v2 `supersetId`: link/unlink from the exercise menu or a template; the logger alternates A1, B1, A2… and rests only after the round (longest rest). Unit (ordering, rest, normalisation) and e2e. | 2 |
 | 6.8 | Exercise substitutions | Working | `substituteExercise` action, `ExercisePicker` with suggested alternatives | 2 |
 | 6.9 | Add exercises | Working | `addExercise` | 1 |
 | 6.10 | Remove exercises | Working | `removeExercise` | 1 |
@@ -186,21 +186,21 @@ Offline: has a logger with rest timer and vibration, but no supersets or previou
 | 6.16 | Discard | Working | Confirm dialog, `discardWorkoutAction` | 1 |
 | 6.17 | Session summary | Working | Result screen (duration, volume, records, badges) | 1 |
 | 6.18 | Personal records on finish | Working | `detectNewRecords` (`src/lib/domain/strength.ts`), `tests/integration/workouts.test.ts` | 1 |
-| 6.19 | Custom workout creation | Partial | Blank workout plus added exercises. The program builder (`/train/build`) generates programs. | 2 |
-| 6.20 | Saved workout templates | Missing | A finished session can't be saved as a reusable template | 2 |
+| 6.19 | Custom workout creation | Working | Template builder from the exercise library: order, sets, reps / time / distance, rest, supersets (`/train/templates/new`). | 2 |
+| 6.20 | Saved workout templates | Working | Tables `workout_templates`, `workout_template_exercises` (owner-only RLS, export, cascade; integration-tested); start, edit, delete; save an empty workout as a template afterwards. e2e. | 2 |
 | 6.21 | Save completed sets as the session progresses | Working | Saved to local storage immediately, with a debounced server sync (`syncWorkoutDraftAction`, `src/lib/workout-storage.ts`) | 1 |
 | 6.22 | Offline logging with later sync | Working | Offline notice, re-sync on `online`. Only the logger works offline; other pages show the offline page. | 1 |
 | 6.23 | Exercise library: search by name | Working | `ilike` on `/train/exercises` | 2 |
-| 6.24 | Exercise library: muscle group filter | Missing | The filters are category and equipment | 2 |
+| 6.24 | Exercise library: muscle group filter | Working | 10 muscle groups (`src/lib/domain/muscle-groups.ts`) mapped to `primary_muscles`; every exercise is in at least one. e2e. | 2 |
 | 6.25 | Exercise library: equipment filter | Working | `equipment` select | 2 |
-| 6.26 | Exercise library: difficulty filter | Missing | — | 2 |
+| 6.26 | Exercise library: difficulty filter | Working | `difficulty=` select. e2e. | 2 |
 | 6.27 | Clear instructions | Working | Instructions and form cues on `/train/exercises/[slug]` | 2 |
 | 6.28 | Common mistakes | Working | `common_mistakes` section | 2 |
 | 6.29 | Instruction content expert-reviewed | Requires Content Review | `src/data/exercises.ts` has not been reviewed by a coach | 2 |
-| 6.30 | Specific, reviewed demonstration videos or animations | Partial | `src/lib/exercise-motion/` and `src/data/exercise-motions.ts` are being built (uncommitted) and not yet used by any page. Admins can attach videos. No reviewed media is bundled. | 2 |
+| 6.30 | Specific, reviewed demonstration videos or animations | Partial | Animated in-app demos for every exercise are the primary demonstration (uploaded specific videos still win when present). Not expert-reviewed; a few are approximate. | 2 |
 | 6.31 | Equipment alternatives | Working | `exercise_alternatives` on the exercise page | 2 |
-| 6.32 | Links from an exercise to its performance history | Partial | `/progress?ex=` has a per-exercise chart, but the exercise page doesn't link to it | 2 |
-| 6.33 | Replace broad YouTube searches with specific demonstrations | Missing | The "Watch form videos" YouTube search button is still on the exercise page | 2 |
+| 6.32 | Links from an exercise to its performance history | Working | "Your history" on each exercise page → `/train/exercises/[slug]/history`: best set, estimated 1RM trend (chart on Plus/Pro, per-session e1RM listed for everyone), recent sessions linking to history. e2e. | 2 |
+| 6.33 | Replace broad YouTube searches with specific demonstrations | Working | The "Watch form videos" button is gone; the animated demo (or an uploaded specific video) is the demonstration, and a small "Search YouTube for more" link remains, labelled as other creators' unreviewed videos. | 2 |
 | 6.34 | No invented video assets; nothing labeled expert-reviewed when it isn't | Working | No such labels or assets found | 2 |
 
 ## 7. Running and walking
@@ -385,7 +385,7 @@ Offline: has a badges screen with its own list.
 | 11.31 | Option to disable celebrations | Missing | — | 3 |
 | 11.32 | Celebrations never cover active exercise or run controls | Working | Only on the post-finish summary, with `pointer-events-none` | 3 |
 | 11.33 | Optional badge sharing with user-approved details | Missing | — | 3 |
-| 11.34 | Extra badges (volume, streak, food, faith, photo) kept or retired deliberately | Partial | 24 badges exist. The faith-count badges conflict with 12.18. | 3 |
+| 11.34 | Extra badges (volume, streak, food, faith, photo) kept or retired deliberately | Partial | 20 badges exist. The faith-count badges were retired deliberately in Stage 2C (12.18); the rest are still to be reviewed in Stage 3. | 3 |
 
 ## 12. Faith
 
@@ -399,18 +399,18 @@ Offline: Faith sits under More; it has the 40-day challenge and a journal.
 | 12.4 | Scripture context | Working | A `reflection` per verse | 2 |
 | 12.5 | Devotionals | Working | `src/data/devotionals.ts`, `src/components/faith/devotional-content.tsx`, `tests/unit/devotionals.test.ts` | 2 |
 | 12.6 | Devotional content reviewed | Requires Content Review | Generated text, not pastor-reviewed | 2 |
-| 12.7 | Prayer journal | Partial | A private reflection journal (`faith_journal_entries`); not framed as prayer | 2 |
-| 12.8 | Daily practices | Partial | Discipline goals and check-ins | 2 |
+| 12.7 | Prayer journal | Working | See 2.31. Private by default; "Share with AI Coach" per entry, off by default; the coach reads only shared entries (`journalEntriesForCoach`, `src/server/coach/snapshot.ts`), proven by `tests/unit/coach-journal.test.ts` | 2 |
+| 12.8 | Daily practices | Working | See 2.32. No streaks, scores or comparisons | 2 |
 | 12.9 | "40 Days Through the Narrow Gate" challenge | Working | `challenge_enrollments`/`challenge_checkins` (`20261017000003_challenges.sql`), `e2e/challenge.spec.ts` | 2 |
 | 12.10 | Catch-up support | Working | Catch-up on missed days (`faith-challenge.tsx`, `src/lib/domain/challenge.ts`) | 2 |
 | 12.11 | Recognition of rest | Working | Rest-day check-in is a walk or mobility. Rest devotional (Mark 6:31). | 2 |
-| 12.12 | Optional reminders controlled by the user | Partial | Workout reminders have a faith-styled option (`src/lib/reminders.ts`, native only, untested on a device). No devotional or Scripture reminder. | 2 |
-| 12.13 | Licensed or public-domain Bible text | Requires Content Review | KJV (public domain outside the UK). Every verse must be checked against an authoritative text. | 2 |
+| 12.12 | Optional reminders controlled by the user | Partial | Stage 2C: devotional, prayer and practice reminders at `/faith/reminders` (off by default; time and weekdays; saved to `faith_reminders`), scheduled as weekly local notifications in the iPhone/Android app (`syncFaithReminders`, re-applied on app open by `FaithReminderSync`). The web version says plainly that a browser can't deliver them. Workout reminders as before. **Native delivery not tested on a device** (no device here). `tests/unit/faith-reminders.test.ts`, `e2e/faith-calendar.spec.ts` | 2 |
+| 12.13 | Licensed or public-domain Bible text | Requires Content Review | Audited in Stage 2C: every verse shown in the app is KJV (public domain outside the UK): 18 verses in `src/data/content.ts`, 40 in `src/data/devotionals.ts` (also the coach's allowed list), Matthew 7:13–14 (welcome page), Philippians 4:13 (sign-up), and KJV fragments in reminder messages (Colossians 3:23, Galatians 6:9, Hebrews 12:1, 1 Thessalonians 5:17), each labelled KJV. Still needs a word-for-word check against an authoritative KJV text, and a UK decision (Crown letters patent). | 2 |
 | 12.14 | Translation identified | Working | `TRANSLATION` constant, "(KJV)" labels | 2 |
 | 12.15 | Content-review workflow for devotionals | Partial | `content_items.is_published` only. No reviewer or status fields. The static devotionals bypass it. | 4 |
 | 12.16 | Generated content never labeled pastor-reviewed | Working | No such labels | 2 |
-| 12.17 | Journals private by default | Working | Owner-only RLS (`20261016000002_rls_policies.sql`, `tests/integration/rls.test.ts`). Hidden from admins and the coach. | 2 |
-| 12.18 | Spiritual maturity not scored (no fitness ranks, prayer counts or leaderboards) | Partial | No leaderboards. But the badges `journal-1`, `journal-10`, `discipline-7` and `discipline-30` reward counts of faith activity. | 2 |
+| 12.17 | Journals private by default | Working | Owner-only RLS (`20261016000002_rls_policies.sql`, `tests/integration/rls.test.ts`, `tests/integration/faith-calendar.test.ts`). Hidden from admins; the coach sees an entry only when the user ticks "Share with AI Coach" (off by default, `tests/unit/coach-journal.test.ts`). | 2 |
+| 12.18 | Spiritual maturity not scored (no fitness ranks, prayer counts or leaderboards) | Working | Stage 2C removed the faith badges (`journal-1`, `journal-10`, `discipline-7`, `discipline-30`) and the faith badge category; achievements no longer read journal or practice data. Practices show gentle sentences only (no streaks, points or percentages; `tests/unit/practices.test.ts`, `tests/unit/achievements.test.ts`). No leaderboards. | 2 |
 
 ## 13. AI Coach
 

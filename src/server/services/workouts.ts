@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { bestsFromSets, detectNewRecords, totalVolume, type LoggedSet, type PersonalBest, type RecordType } from "@/lib/domain/strength";
 import type { EditWorkoutInput, FinishWorkoutInput } from "@/lib/validation/schemas";
+import { latestPerformances, type PreviousPerformance, type PreviousRow } from "@/lib/domain/previous-performance";
 import { advanceProgram } from "./training";
 
 export class WorkoutError extends Error {
@@ -106,6 +107,7 @@ async function insertExercises(supabase: SupabaseClient, userId: string, session
       reps: s.reps,
       weight_kg: s.weightKg,
       duration_seconds: s.durationSeconds,
+      distance_m: s.distanceM ?? null,
       rpe: s.rpe,
       is_warmup: s.isWarmup,
       completed: s.completed,
@@ -351,4 +353,23 @@ export async function listHistory(supabase: SupabaseClient, userId: string, limi
     paused_seconds: s.paused_seconds as number,
     exercise_count: (s.workout_exercises as unknown as { count: number }[])[0]?.count ?? 0,
   }));
+}
+
+/**
+ * The most recent completed performance of each exercise ("Last time: 3×5 @ 225 lb"), for the logger.
+ * Owner-scoped by user id (and RLS). Reads the newest rows only, so it stays cheap for long histories.
+ */
+export async function getPreviousPerformance(supabase: SupabaseClient, userId: string, exerciseIds: string[]): Promise<Record<string, PreviousPerformance>> {
+  const ids = [...new Set(exerciseIds)].slice(0, 40);
+  if (!ids.length) return {};
+  const { data, error } = await supabase
+    .from("workout_exercises")
+    .select("exercise_id, skipped, session:workout_sessions!inner(id, started_at, status), sets:workout_sets(set_number, reps, weight_kg, duration_seconds, distance_m, is_warmup, completed)")
+    .eq("user_id", userId)
+    .in("exercise_id", ids)
+    .eq("session.status", "completed")
+    .order("created_at", { ascending: false })
+    .limit(Math.min(400, ids.length * 12));
+  if (error) throw new WorkoutError(error.message);
+  return Object.fromEntries(latestPerformances((data ?? []) as unknown as PreviousRow[]));
 }
