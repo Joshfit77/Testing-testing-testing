@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookMarked, CalendarClock, ChevronLeft, ChevronRight, Lock, Pill, Salad, Scale, Trash2, TrendingUp } from "lucide-react";
+import { BarChart3, BookMarked, CalendarClock, CalendarDays, ChevronLeft, ChevronRight, CookingPot, Lock, Pill, Salad, Scale, ShoppingCart, Trash2, TrendingUp } from "lucide-react";
 import { BarSeriesChart } from "@/components/charts/charts";
 import { MainHeader } from "@/components/shell/main-header";
 import { EmptyState } from "@/components/common/states";
@@ -8,8 +8,7 @@ import {
   AddFoodDialog,
   CustomFoodForm,
   GoalsForm,
-  LogTemplateForm,
-  SaveMealForm,
+    SaveMealForm,
   WaterCard,
   type MyFood,
 } from "@/components/nutrition/nutrition-client";
@@ -24,10 +23,10 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { isFoodSearchConfigured } from "@/server/env";
 import { isFlagEnabled } from "@/server/flags";
-import { deleteCustomFoodAction, deleteMealItemAction, deleteTemplateAction, markPlannedEatenAction } from "@/server/actions/nutrition";
+import { deleteCustomFoodAction, deleteMealItemAction, markPlannedEatenAction } from "@/server/actions/nutrition";
 import { getNutritionDaily } from "@/server/services/progress";
 import { loadBudgetContext } from "@/server/services/nutrition-targets";
-import { exerciseCalories, projectWeightKg, remainingCalories, weeksToGoal } from "@/lib/domain/calorie-budget";
+import { projectWeightKg, remainingCalories, weeksToGoal } from "@/lib/domain/calorie-budget";
 import { formatLongDate, goalDate, paceLabel, recentAndFrequent, weeklySummary, weightGoalProgress, workoutMinutes, type DiaryItem } from "@/lib/domain/diary";
 import { formatWeight } from "@/lib/domain/units";
 import { COMMON_FOODS } from "@/data/foods";
@@ -39,6 +38,8 @@ import { nutrientTotals } from "@/lib/domain/nutrition";
 import { usdaCategories } from "@/server/services/usda-local";
 import { DIETS, fitsDiet, isDietType } from "@/lib/domain/diets";
 import { MEAL_TYPES } from "@/lib/domain/meals";
+import { exerciseForDay } from "@/lib/domain/exercise-energy";
+import { DayMarkControls } from "@/components/nutrition/day-mark";
 
 export const metadata = { title: "Food" };
 
@@ -103,6 +104,7 @@ function editableItem(i: MealRow["meal_items"][number], mealType: string, favori
         ? "Entered by hand, so it scales by servings of the values you entered."
         : "Logged before amounts were saved, so it scales by servings of what you logged.",
     sourceKey: isFavoritableKey(i.source) ? i.source : null,
+    source: i.source,
     favorite: Boolean(i.source && favoriteKeys.has(i.source)),
     summary: `${amount ? `${amount} · ` : ""}${Math.round(Number(i.calories))} kcal · P ${fmt(Number(i.protein_g))} · C ${fmt(Number(i.carbs_g))} · F ${fmt(Number(i.fat_g))}`,
   };
@@ -143,7 +145,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
   const date = sp.date && /^\d{4}-\d{2}-\d{2}$/.test(sp.date) ? sp.date : today;
   const supabase = await getServerSupabase();
   const prevDate = addDays(date, -1);
-  const [mealsRes, goalsRes, waterRes, foodsRes, templatesRes, plannedRes, history, flag, commonRes, dietRes, prevRes, recentRes, workoutsRes, ctx, categories, favoritesRes] = await Promise.all([
+  const [mealsRes, goalsRes, waterRes, foodsRes, templatesRes, plannedRes, history, flag, commonRes, dietRes, prevRes, recentRes, workoutsRes, ctx, categories, favoritesRes, stepsRes, activitiesRes, markRes] = await Promise.all([
     supabase
       .from("meals")
       .select("id, meal_type, status, name, meal_items(id, name, servings, calories, protein_g, carbs_g, fat_g, is_estimate, fiber_g, sugar_g, sodium_mg, grams, quantity, unit_label, amount_label, source, basis)")
@@ -188,6 +190,15 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
     loadBudgetContext(supabase, user.id),
     usdaCategories(),
     supabase.from("food_favorites").select("food_key, name, detail, basis, is_estimate").eq("user_id", user.id).order("created_at", { ascending: false }).limit(200),
+    supabase.from("daily_steps").select("steps").eq("user_id", user.id).eq("day", date).maybeSingle(),
+    supabase
+      .from("activities")
+      .select("kind, distance_m, moving_s, started_at")
+      .eq("user_id", user.id)
+      .is("deleted_at", null)
+      .gte("started_at", `${addDays(date, -1)}T00:00:00Z`)
+      .lt("started_at", `${addDays(date, 2)}T00:00:00Z`),
+    supabase.from("nutrition_day_marks").select("status").eq("user_id", user.id).eq("day", date).maybeSingle(),
   ]);
   const favorites = ((favoritesRes.data ?? []) as FavoriteRow[]).map(choiceFromFavorite).filter((f): f is NonNullable<typeof f> => f != null);
   const favoriteKeys = new Set(favorites.map((f) => f.key));
@@ -232,7 +243,14 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
     (w) => isoDateInTz(new Date(w.started_at), profile.timezone) === date,
   );
   const workoutMins = workouts.reduce((s, w) => s + workoutMinutes(w.started_at, w.ended_at, w.paused_seconds), 0);
-  const exercise = ctx ? exerciseCalories(workoutMins, ctx.weightKg) : 0;
+  // Runs and walks that day, and the step count: combined without double counting (exercise-energy.ts).
+  const dayActivities = ((activitiesRes.data ?? []) as { kind: "run" | "walk"; distance_m: number | null; moving_s: number; started_at: string }[])
+    .filter((a) => isoDateInTz(new Date(a.started_at), profile.timezone) === date)
+    .map((a) => ({ kind: a.kind, distance_m: a.distance_m == null ? null : Number(a.distance_m), moving_s: Number(a.moving_s) }));
+  const steps = stepsRes.data ? Number(stepsRes.data.steps) : null;
+  const ex = ctx ? exerciseForDay({ weightKg: ctx.weightKg, activity: ctx.activity, workoutMinutes: workoutMins, activities: dayActivities, steps }) : null;
+  const exercise = ex?.total ?? 0;
+  const dayMark = (markRes.data?.status as "complete" | "fasted" | undefined) ?? null;
   const food = Math.round(totals.calories);
   const remaining = goals ? remainingCalories(goals.calories, food, exercise) : null;
   const projected = date === today && ctx?.budget ? projectWeightKg(ctx.weightKg, ctx.budget.maintenance, food, exercise, 5) : null;
@@ -316,14 +334,21 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
           <AddFoodDialog date={date} myFoods={myFoods} commonFoods={commonFoods} remoteSearch={remoteSearch} categories={categories} dietName={diet.name} recent={recent} frequent={frequent} favorites={favorites} />
         </div>
         <nav aria-label="Food tools" className="grid grid-cols-2 gap-2">
-          <Link href="#saved-title" className="flex min-h-12 items-center gap-2 rounded-2xl border border-border bg-card px-3 text-[0.9375rem] font-medium hover:border-gold-muted">
-            <BookMarked className="size-4 shrink-0 text-gold" aria-hidden />
-            <span className="min-w-0 flex-1">Saved meals</span>
-          </Link>
-          <Link href="/nutrition/supplements" className="flex min-h-12 items-center gap-2 rounded-2xl border border-border bg-card px-3 text-[0.9375rem] font-medium hover:border-gold-muted">
-            <Pill className="size-4 shrink-0 text-gold" aria-hidden />
-            <span className="min-w-0 flex-1">Supplements</span>
-          </Link>
+          {(
+            [
+              ["/nutrition/recipes", "Recipes", CookingPot],
+              ["/nutrition/saved-meals", "Saved meals", BookMarked],
+              ["/nutrition/planner", "Meal planner", CalendarDays],
+              ["/nutrition/grocery", "Grocery list", ShoppingCart],
+              ["/nutrition/insights", "Insights", BarChart3],
+              ["/nutrition/supplements", "Supplements", Pill],
+            ] as const
+          ).map(([href, text, Icon]) => (
+            <Link key={href} href={href} className="flex min-h-12 items-center gap-2 rounded-2xl border border-border bg-card px-3 text-[0.9375rem] font-medium hover:border-gold-muted">
+              <Icon className="size-4 shrink-0 text-gold" aria-hidden />
+              <span className="min-w-0 flex-1">{text}</span>
+            </Link>
+          ))}
         </nav>
       </div>
 
@@ -359,14 +384,22 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
             <p className="sr-only">
               Goal {goals.calories} minus food {food} plus exercise {exercise} equals {remaining} calories remaining.
             </p>
-            <p className="mt-2 text-xs text-muted-foreground">
-              {goals.is_estimate ? "Goal is an estimate. " : "Goal is your custom target. "}
-              {workouts.length
-                ? `Exercise is estimated from ${workoutMins} min of logged workouts at your latest bodyweight.`
-                : ctx
-                  ? "Finish a workout to add its estimated calories here."
-                  : "Log your bodyweight to estimate workout calories."}
-            </p>
+            <p className="mt-2 text-xs text-muted-foreground">{goals.is_estimate ? "Goal is an estimate." : "Goal is your custom target."}</p>
+            {ex ? (
+              <div className="mt-2 text-xs text-muted-foreground" data-testid="exercise-breakdown">
+                <p>
+                  Exercise (estimate): workouts {ex.workouts}
+                  {workouts.length ? ` (${workoutMins} min)` : ""} + runs and walks {ex.activities} + extra steps {ex.steps}.
+                </p>
+                <p className="mt-0.5">
+                  {ex.baseline == null
+                    ? "Steps aren't added until your daily activity level is set, because we can't tell which steps your budget already covers."
+                    : `Your activity level already covers about ${ex.baseline.toLocaleString()} steps a day${ex.stepsFromActivities ? `, and about ${ex.stepsFromActivities.toLocaleString()} steps belong to the runs and walks counted above` : ""}; only steps beyond that add calories (${ex.extraSteps.toLocaleString()} of ${ex.stepCount.toLocaleString()} today), so nothing is counted twice.`}
+                </p>
+              </div>
+            ) : (
+              <p className="mt-2 text-xs text-muted-foreground">Log your bodyweight to estimate exercise calories.</p>
+            )}
             {projected != null && (
               <p className="mt-2 flex items-start gap-2 rounded-xl border border-border bg-card/60 px-3 py-2 text-sm" data-testid="projection">
                 <TrendingUp className="mt-0.5 size-4 shrink-0 text-gold" aria-hidden />
@@ -436,6 +469,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
         {logged.length === 0 && planned.length === 0 && (
           <p className="text-sm text-muted-foreground">Nothing logged yet. Use &ldquo;Add food&rdquo; to search, pick a recent or saved food, or quick add calories.</p>
         )}
+        <DayMarkControls date={date} mark={dayMark} hasFood={food > 0} />
         {MEAL_TYPES.map(([type, title]) => {
           const ms = logged.filter((m) => m.meal_type === type);
           const items = ms.flatMap((m) => m.meal_items);
@@ -539,7 +573,12 @@ Mark eaten
               <dd className="font-display text-lg font-bold tabular-nums">{goals ? `${summary.over} of ${summary.daysLogged}` : "—"}</dd>
             </div>
           </dl>
-          <p className="text-xs text-muted-foreground">Averages count only days with food logged ({summary.daysLogged} of the last 7).</p>
+          <p className="text-xs text-muted-foreground">
+            Averages count only days with food logged ({summary.daysLogged} of the last 7).{" "}
+            <Link href="/nutrition/insights" className="font-semibold text-gold-highlight underline">
+              Full weekly insights
+            </Link>
+          </p>
         </div>
 
         <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="weight-goal-title">
@@ -658,35 +697,19 @@ Mark eaten
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="saved-title">
           <h2 id="saved-title" className="mb-1 flex items-center gap-2 font-display text-xl font-bold uppercase">
-            <BookMarked className="size-5 text-gold" aria-hidden /> Saved meals &amp; recipes
+            <BookMarked className="size-5 text-gold" aria-hidden /> Saved meals
           </h2>
-          <p className="mb-4 text-xs text-muted-foreground">Save any logged meal above. Recipes with multiple servings divide nutrition per serving. Log or plan them for any date.</p>
-          {templates.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No saved meals yet.</p>
-          ) : (
-            <ul className="space-y-4">
-              {templates.map((t) => {
-                const tot = sumMacros(t.meal_items.map((i) => ({ calories: Number(i.calories), protein_g: Number(i.protein_g) })));
-                return (
-                  <li key={t.id} className="rounded-xl border border-border bg-elevated/40 p-3">
-                    <div className="mb-2 flex items-start justify-between gap-2">
-                      <div>
-                        <p className="font-semibold">{t.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Per serving: {Math.round(tot.calories / Number(t.yield_servings))} kcal · {Math.round(tot.protein_g / Number(t.yield_servings))}g protein ·
-                          makes {Number(t.yield_servings)}
-                        </p>
-                      </div>
-                      <ActionButton action={deleteTemplateAction} fields={{ id: t.id }} size="icon-sm" variant="ghost" aria-label={`Delete ${t.name}`} confirmMessage={`Delete the saved meal “${t.name}”?`} confirmDetail="Entries you already logged from it stay in your diary." confirmLabel="Delete">
-<Trash2 aria-hidden />
-                      </ActionButton>
-                    </div>
-                    <LogTemplateForm templateId={t.id} date={date} />
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+          <p className="mb-4 text-xs text-muted-foreground">Save any logged meal above with “Save as meal”, then log or plan it for any date.</p>
+          <Link href="/nutrition/saved-meals" className="flex min-h-11 items-center justify-between gap-2 rounded-xl border border-border bg-elevated/40 px-3 py-2 text-[0.9375rem] hover:border-gold-muted">
+            <span>
+              {templates.length ? `${templates.length} saved ${templates.length === 1 ? "meal" : "meals"}` : "No saved meals yet"}
+            </span>
+            <ChevronRight className="size-4 text-gold" aria-hidden />
+          </Link>
+          <Link href="/nutrition/recipes" className="mt-2 flex min-h-11 items-center justify-between gap-2 rounded-xl border border-border bg-elevated/40 px-3 py-2 text-[0.9375rem] hover:border-gold-muted">
+            <span>Recipes: build from ingredients with servings</span>
+            <ChevronRight className="size-4 text-gold" aria-hidden />
+          </Link>
           {upcoming.length > 0 && (
             <div className="mt-5">
               <h3 className="mb-2 text-sm font-semibold">Meal plan · upcoming</h3>

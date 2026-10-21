@@ -14,6 +14,7 @@ import { MEAL_TYPES } from "@/lib/domain/meals";
 import { updateMealItemAction } from "@/server/actions/nutrition";
 import { isFavoritableKey } from "@/lib/domain/food-favorites";
 import { FavoriteStar } from "./favorite-star";
+import { SourceBadge } from "./source-badge";
 
 const fmt = (n: number | null | undefined, d = 1) => (n == null ? null : Number.isInteger(n) ? String(n) : n.toFixed(d).replace(/\.0$/, ""));
 
@@ -45,8 +46,9 @@ export function AmountPicker({
   food: Pick<FoodChoice, "name" | "detail" | "basis" | "note" | "isEstimate">;
   initialQuantity: number;
   initialUnitId: string;
-  mealType: string;
-  onMealType: (v: string) => void;
+  /** Omit both to hide the Meal picker (e.g. recipe ingredients). */
+  mealType?: string;
+  onMealType?: (v: string) => void;
   pending: boolean;
   submitLabel: string;
   onSubmit: (quantity: number, unitId: string) => void;
@@ -88,6 +90,7 @@ export function AmountPicker({
         <div className="min-w-0 flex-1">
           <p className="font-semibold leading-snug" data-testid="amount-food-name">
             {food.name} {food.isEstimate && <Badge variant="outline">typical values</Badge>}
+            {"key" in food && typeof food.key === "string" && <SourceBadge source={food.key} isEstimate={Boolean(food.isEstimate)} className="ml-1" />}
           </p>
           {food.detail && <p className="text-xs text-muted-foreground">{food.detail}</p>}
           <p className="text-xs text-muted-foreground">{basisSummary(food.basis)}</p>
@@ -124,19 +127,23 @@ export function AmountPicker({
         {result ? `= ${result.amountLabel}` : "Enter an amount like 1, 1.5, 1 1/2 or 3/4."}
       </p>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <Label htmlFor={`${idPrefix}-meal`}>Meal</Label>
-          <NativeSelect id={`${idPrefix}-meal`} value={mealType} onChange={(e) => onMealType(e.target.value)}>
-            {MEAL_TYPES.map(([v, l]) => (
-              <option key={v} value={v}>
-                {l}
-              </option>
-            ))}
-          </NativeSelect>
+      {(onMealType || children) && (
+        <div className="grid grid-cols-2 gap-3">
+          {onMealType && (
+            <div className="space-y-1">
+              <Label htmlFor={`${idPrefix}-meal`}>Meal</Label>
+              <NativeSelect id={`${idPrefix}-meal`} value={mealType} onChange={(e) => onMealType(e.target.value)}>
+                {MEAL_TYPES.map(([v, l]) => (
+                  <option key={v} value={v}>
+                    {l}
+                  </option>
+                ))}
+              </NativeSelect>
+            </div>
+          )}
+          {children}
         </div>
-        {children}
-      </div>
+      )}
 
       <section aria-label="Nutrition for this amount" className="rounded-2xl border border-border bg-elevated/40 p-3" data-testid="amount-nutrition">
         <div className="flex items-baseline justify-between">
@@ -200,6 +207,8 @@ export interface EditableItem {
   /** Stable source key ("usda:…", "off:…", "food:…") when the food can be favorited. */
   sourceKey?: string | null;
   favorite?: boolean;
+  /** Stored meal_items.source, for the USDA / Label / Estimate badge. */
+  source?: string | null;
 }
 
 /** A diary row that opens the amount picker, prefilled, to change the amount, unit or meal. */
@@ -221,7 +230,7 @@ export function EditableMealItem({ item }: { item: EditableItem }) {
         aria-label={`Edit ${item.name}`}
       >
         <p className="truncate text-sm font-semibold">
-          {item.name} {item.isEstimate && <Badge variant="outline">estimate</Badge>}
+          {item.name} <SourceBadge source={item.source} isEstimate={item.isEstimate} />
         </p>
         <p className="text-xs text-muted-foreground">{item.summary}</p>
       </button>

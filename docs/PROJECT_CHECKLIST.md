@@ -68,11 +68,11 @@ Offline: still the old nav (`NAV` = Home, Programs, Exercises, Food, Coach, Prog
 | 2.21 | Run → Goals | Partial | "Goals & records" on `/run` shows the best 1 mi/5K/10K times (`personalBests` in `src/lib/domain/activities.ts`), with self-reported times flagged. No user-set distance or time goals yet. | 3 |
 | 2.22 | Run → History | Working | `/run?tab=history`: grouped by week with run and walk totals, 12-week pages, plus detail, edit and delete. `e2e/run.spec.ts` | 3 |
 | 2.23 | Food → Diary | Working | `/nutrition` | 1 |
-| 2.24 | Food → Saved Meals | Partial | A section on `/nutrition`, not a screen of its own | 2 |
-| 2.25 | Food → Recipes | Partial | Shares the "Save as meal / recipe" template (see 8.15) | 2 |
-| 2.26 | Food → Meal Planner | Missing | Only a `planned` status on meals | 2 |
-| 2.27 | Food → Grocery List | Missing | — | 2 |
-| 2.28 | Food → Nutrition Insights | Partial | 7-day summary on `/nutrition` only | 2 |
+| 2.24 | Food → Saved Meals | Working | Own screen `/nutrition/saved-meals` (per-serving nutrition with "at least" for gaps, source badges per item, log/plan to any date, confirmed delete); diary keeps "Save as meal". Food tools grid on `/nutrition`. Screenshot at 360 px checked. | 2 |
+| 2.25 | Food → Recipes | Working | `/nutrition/recipes` (list + app-made recipes), `/new`, `/[id]`, `/[id]/edit`, `/app/[slug]`. Tables `recipes`, `recipe_ingredients` (migration `20261021000012`). `e2e/recipes-planner.spec.ts` | 2 |
+| 2.26 | Food → Meal Planner | Working | `/nutrition/planner`, `src/lib/domain/meal-planner.ts` (deterministic), `src/server/actions/meal-plan.ts`. `tests/unit/meal-planner.test.ts`, `tests/unit/app-recipes.test.ts`, `e2e/recipes-planner.spec.ts` | 2 |
+| 2.27 | Food → Grocery List | Working | `/nutrition/grocery`: build from plan for a date range, check off, add own items, clear checked / clear all (`src/lib/domain/grocery.ts`, `src/server/actions/grocery.ts`). `tests/unit/grocery.test.ts`, `e2e/recipes-planner.spec.ts`. No cost estimates (see 8.25). | 2 |
+| 2.28 | Food → Nutrition Insights | Working | `/nutrition/insights`: 7-day view with week navigation, per-day calories/macros vs target, average over logged days, not-logged vs logged-as-zero vs complete days, top protein and calorie sources (`src/lib/domain/nutrition-insights.ts`, `tests/unit/nutrition-insights.test.ts`). | 2 |
 | 2.29 | Faith → Devotionals | Working | `/faith#devotionals`, `src/data/devotionals.ts` | 2 |
 | 2.30 | Faith → Scripture | Working | `/faith`, `src/data/content.ts` | 2 |
 | 2.31 | Faith → Prayer Journal | Partial | A "reflection journal" (`faith_journal_entries`), not labeled or structured as a prayer journal | 2 |
@@ -244,14 +244,14 @@ Offline: no running features. Steps can be entered and synced from Health Connec
 
 ## 8. Food and nutrition
 
-Offline: has a food diary, search, barcode, water, supplements and planned meals, all stored locally. No meal planner, grocery list or recipe builder.
+Offline: has a food diary, search, barcode, water, supplements and planned meals, all stored locally. No meal planner, grocery list or recipe builder (those are in the primary app only, Stage 2A).
 
 | ID | Requirement | Status | Evidence | Stage |
 |---|---|---|---|---|
 | 8.1 | Calorie and macro targets | Working | `nutrition_goals`, `src/server/services/nutrition-targets.ts`, `updateGoalsAction` | 1 |
 | 8.2 | Daily meals and snacks | Working | `meals` and `meal_items`, `/nutrition` | 1 |
 | 8.3 | Food search with source information | Working | USDA SR Legacy bundled (`src/data/usda-foods.json`, `src/server/services/usda-local.ts`). Sources labeled (USDA, Open Food Facts, built-in estimates). `meal_items.source`. | 1 |
-| 8.4 | Barcode scanning with real product lookup | Partial | Open Food Facts lookup (`src/server/services/open-food-facts.ts`, `src/components/nutrition/barcode-scanner.tsx`). Tested only against a local mock (`e2e/food-amounts.spec.ts`). Live Open Food Facts and a real camera are unverified. | 2 |
+| 8.4 | Barcode scanning with real product lookup | Requires External Setup | Code complete: Open Food Facts lookup (`src/server/services/open-food-facts.ts`, `src/components/nutrition/barcode-scanner.tsx`), server-side re-read through the shared `resolvePickedFood` (`src/server/services/food-resolve.ts`), now also usable for recipe ingredients (Scan tab in the ingredient picker); macros a label doesn't list are carried as `basis.missing` instead of counting as 0. Tested against a local mock (`e2e/food-amounts.spec.ts`). Live Open Food Facts and a real camera/device need checking outside this environment. | 2 |
 | 8.5 | Missing products and denied camera fall back to manual entry | Working | Not-found, denied and cancelled messages with a manual path. `tests/unit/barcode.test.ts`. | 2 |
 | 8.6 | Manual food creation | Working | `createCustomFoodAction` | 1 |
 | 8.7 | Favorites | Working | Star from search results, the amount step and diary rows; Favorites tab in Add food (`src/components/nutrition/favorite-star.tsx`, `setFoodFavoriteAction`). `food_favorites` table (migration `20261020000011`, owner-only RLS, `unique (user_id, food_key)`, stable `usda:`/`off:`/`food:` keys). `tests/integration/food-favorites.test.ts`, `e2e/journeys.spec.ts` | 1 |
@@ -263,31 +263,31 @@ Offline: has a food diary, search, barcode, water, supplements and planned meals
 | 8.13 | Move entries between meals | Working | The amount step changes the meal (`e2e/food-amounts.spec.ts`) | 1 |
 | 8.14 | Grams, ounces and food-specific serving units | Working | `src/lib/domain/food-units.ts`, migration `20261019000008_food_amounts.sql` | 1 |
 | 8.15 | Water tracking | Working | `water_entries`, `addWaterAction`, `undoWaterAction` | 2 |
-| 8.16 | Weekly nutrition summaries | Partial | Only a 7-day calorie summary (`weeklySummary`). No macro or nutrient breakdown. | 2 |
-| 8.17 | Recipe: add ingredients and amounts | Partial | A recipe can only be made by saving a logged meal. There is no standalone recipe builder. | 2 |
+| 8.16 | Weekly nutrition summaries | Working | `/nutrition/insights` (calories and macros per day vs targets, averages over logged days, top sources); `/nutrition` keeps its 7-day calorie card and links to it. `tests/unit/nutrition-insights.test.ts` | 2 |
+| 8.17 | Recipe: add ingredients and amounts | Working | Recipe builder with the food search, My foods and barcode (`src/components/nutrition/food-picker.tsx`, `recipe-editor.tsx`), amounts in g/oz/lb/household units via `computeAmount`; nutrition snapshotted server-side in the basis format (`saveRecipeAction`). Unsaved edits kept as a device draft (`food.recipe.*`). `e2e/recipes-planner.spec.ts` | 2 |
 | 8.18 | Recipe: set servings | Working | `yield_servings` | 2 |
-| 8.19 | Recipe: total and per-serving nutrition | Partial | Values are scaled at log time. Per-serving totals aren't shown in the recipe UI. | 2 |
+| 8.19 | Recipe: total and per-serving nutrition | Working | `NutrientTable` (total and per serving for calories, macros, fiber, sugar, sodium) from `src/lib/domain/recipes.ts`; `tests/unit/recipes.test.ts`; e2e checks 741 kcal total / 371 per serving. | 2 |
 | 8.20 | Recipe: log full or partial servings | Working | `servings` input with 0.25 steps, `logTemplateAction` | 2 |
 | 8.21 | Recipe: historical diary values kept when a saved recipe changes | Working | Items are copied into `meal_items` at log time. Templates are immutable (they can only be deleted). | 2 |
-| 8.22 | Meal planner uses targets, diet preferences, allergy exclusions, budget and meal frequency | Missing | No planner. No allergy or budget fields. | 2 |
-| 8.23 | Meal planner: swap meals and adjust portions | Missing | — | 2 |
-| 8.24 | Grocery list that combines compatible ingredients | Missing | — | 2 |
-| 8.25 | Cost estimates labeled | Missing | — | 2 |
+| 8.22 | Meal planner uses targets, diet preferences, allergy exclusions, budget and meal frequency | Working | Targets from `nutrition_goals` (the `calorie-budget.ts` budget unless custom) with the budget as fallback; diet style via ingredient tags (`src/lib/domain/food-tags.ts`); allergies and dislikes, meals per day 2–5 and budget low/medium/any in `meal_plan_settings`. Budget tiers are by ingredient type, not prices (stated in the UI). Allergy matching is by ingredient name, not a certified allergen check (stated in the UI). `tests/unit/meal-planner.test.ts`, `tests/unit/app-recipes.test.ts` | 2 |
+| 8.23 | Meal planner: swap meals and adjust portions | Working | Swap dialog offers alternatives that fit the meal (`alternativesFor`, re-checked on the server), ± quarter-serving portions, "Log this meal" copies to the diary. `e2e/recipes-planner.spec.ts` | 2 |
+| 8.24 | Grocery list that combines compatible ingredients | Working | `mergeGroceries`: weights add as g/oz/lb, volumes as ml/cups/tbsp, counted units only with the same unit; non-convertible amounts stay separate with a note. `tests/unit/grocery.test.ts` | 2 |
+| 8.25 | Cost estimates labeled | Missing | No sourced price table: BLS/USDA ERS average retail prices couldn't be fetched from this environment, so no prices are shown. The grocery screen says "No cost estimate" and why; nothing shows $0. Needs a dated, sourced price table (e.g. BLS Average Price Data) added in code. | 2 |
 | 8.26 | Planned meals kept separate from meals eaten | Working | `meals.status` planned/logged, `markPlannedEatenAction` | 2 |
 | 8.27 | Restaurant search with reliable data | Requires External Setup | Not built. Needs a licensed restaurant nutrition API and its credentials. | 4 |
-| 8.28 | Distinguish published values from estimates | Partial | Built-in foods are labeled as estimates and Open Food Facts as community data. No restaurant data yet. | 2 |
+| 8.28 | Distinguish published values from estimates | Working | `SourceBadge` (USDA / Label (· Open Food Facts) / Estimate / Calculated) on diary rows, search results, the amount step, recipe ingredients and saved-meal items (`src/components/nutrition/source-badge.tsx`). Restaurant data still not available (8.27). | 2 |
 | 8.29 | Food swaps with comparable portions and clear nutritional differences | Missing | — | 4 |
 | 8.30 | Photo-assisted logging that suggests foods and portions | Missing | — | 4 |
 | 8.31 | Photo logging: user confirms before saving | Missing | — | 4 |
 | 8.32 | Photo logging: asks about uncertain oils, sauces and ingredients; never presented as exact | Missing | — | 4 |
-| 8.33 | Weekly summary distinguishes missing or incomplete logs from zero intake | Partial | `weeklySummary` (`src/lib/domain/diary.ts`) treats a 0-kcal day as not logged. There's no "incomplete day" state. | 2 |
-| 8.34 | Missing nutrient data never silently becomes zero | Partial | Fiber, sugar and sodium totals say "from N of M foods with data". Not applied to the other nutrients or the weekly view. | 2 |
+| 8.33 | Weekly summary distinguishes missing or incomplete logs from zero intake | Working | Day states not logged / logged as zero / logged / complete, with "Mark day complete" and "I ate nothing this day" in the diary (`nutrition_day_marks`, `setDayMarkAction`); averages only over logged days. `tests/unit/nutrition-insights.test.ts` | 2 |
+| 8.34 | Missing nutrient data never silently becomes zero | Working | Recipes, saved meals and insights track coverage per nutrient and show "at least X" or "—" (`src/lib/domain/recipes.ts`); missing macros from labels carried as `basis.missing`; a logged recipe serving stores gaps as unknown. `tests/unit/recipes.test.ts` | 2 |
 | 8.35 | Supplement logging | Working | `/nutrition/supplements`, `supplement_stack`, `supplement_logs`, `e2e/supplements-steps.spec.ts` | 2 |
 | 8.36 | Sourced supplement and nutrition education | Requires Content Review | `src/data/supplements.ts` doses and evidence ratings, and `/nutrition/diets`, need a dietitian review and source citations | 4 |
 | 8.37 | No unsupported cleanse or detox claims | Working | No matches in `src/data` | 2 |
-| 8.38 | One consistent nutrition calculation system | Partial | Nutrition is recomputed on the server from the stored basis (`src/lib/domain/food-basis.ts`). Targets come from either `calorie-budget.ts` or the bodyweight fallback in `nutrition-targets.ts`. | 2 |
+| 8.38 | One consistent nutrition calculation system | Working | All food values go through `resolvePickedFood` (server) and `computeAmount`/`nutritionForGrams` (diary, recipes, planner, logged servings); planner targets come from the saved targets produced by `estimateAndSaveTargets`. Unit test checks recipe totals equal the diary maths. The bodyweight fallback for accounts without budget fields remains, behind that one entry point. | 2 |
 | 8.39 | Prevent duplicate exercise imports | Partial | No exercise imports exist yet. Steps are upserted per day per source (`src/lib/domain/steps.ts`). | 4 |
-| 8.40 | Don't count the same activity twice when adjusting the calorie budget | Partial | The budget adds MET estimates for finished workouts to an activity level "outside workouts". Steps aren't added. Untested once runs and wearables arrive. | 2 |
+| 8.40 | Don't count the same activity twice when adjusting the calorie budget | Working | `exerciseForDay` (`src/lib/domain/exercise-energy.ts`): workouts (MET) + runs/walks (distance or time) + only steps beyond the activity level's baseline and beyond the steps of logged runs/walks. Explained under the budget strip on `/nutrition`. `tests/unit/exercise-energy.test.ts`. Wearable workout imports don't exist yet (8.39). | 2 |
 
 ## 9. My Progress
 
@@ -512,7 +512,7 @@ Offline: all data in localStorage on one device. No sync, accounts or export.
 | 16.4 | Journey: finish a workout and reopen its saved history | Working | `e2e/core-flow.spec.ts` | 1 |
 | 16.5 | Journey: switch tabs during an active session without losing it | Working | `e2e/journeys.spec.ts` (Food/Faith/Run/Home and back, plus reload) | 1 |
 | 16.6 | Journey: add, edit, copy and delete food with correct totals | Working | `e2e/journeys.spec.ts` (add 210 → edit 105 → copy +200 → confirmed delete → favorites re-log → reload) | 1 |
-| 16.7 | Journey: build and log a recipe serving | Missing | No test | 2 |
+| 16.7 | Journey: build and log a recipe serving | Working | `e2e/recipes-planner.spec.ts` (build, check per-serving, log ½ serving, diary total 186, edit recipe leaves the diary entry unchanged) | 2 |
 | 16.8 | Journey: record, pause, resume, finish and reopen a run | Missing | No running | 3 |
 | 16.9 | Journey: update a record and award the correct badge only once | Partial | Unit and integration coverage of PRs and badges; no end-to-end journey | 3 |
 | 16.10 | Journey: edit or delete an activity and recalculate | Partial | `tests/integration/workouts.test.ts` (PR recalculation). Runs: `e2e/run.spec.ts` edits a run, deletes a walk and checks the weekly totals recalculate. Badge recalculation for runs comes with run badges. | 3 |
@@ -527,7 +527,7 @@ Offline: all data in localStorage on one device. No sync, accounts or export.
 
 | ID | Requirement | Status | Evidence | Stage |
 |---|---|---|---|---|
-| X.1 | Supabase project, migrations applied, auth email/SMTP | Requires External Setup | 11 migrations in `supabase/migrations`, `supabase/setup-all.sql` | 1 |
+| X.1 | Supabase project, migrations applied, auth email/SMTP | Requires External Setup | 12 migrations in `supabase/migrations`, `supabase/setup-all.sql` | 1 |
 | X.2 | Vercel (or other) deploy and `CAP_SERVER_URL` | Requires External Setup | `capacitor.config.ts` defaults to `app.narrowgatefitness.example` | 1 |
 | X.3 | Stripe products and prices, webhook secret | Requires External Setup | `src/app/api/stripe/webhook/route.ts`; `STRIPE_PRICE_*` | 1 |
 | X.4 | Store billing (Apple IAP / Google Play Billing) | Requires External Setup | Not built. The native shells hide Stripe checkout. | 4 |

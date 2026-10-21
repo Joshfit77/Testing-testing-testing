@@ -18,7 +18,16 @@ export interface FoodBasis {
   servingLabel?: string | null;
   liquid?: boolean;
   portions?: Portion[];
+  /**
+   * Macros the source didn't list (e.g. an Open Food Facts product without a protein value). They are
+   * stored as 0 in `per100` for the diary's running totals, but totals that include them are shown as
+   * incomplete ("at least …") rather than treated as a real zero (SPEC §8).
+   */
+  missing?: MacroKey[];
 }
+
+export type MacroKey = "protein_g" | "carbs_g" | "fat_g";
+const MACRO_KEYS: MacroKey[] = ["protein_g", "carbs_g", "fat_g"];
 
 export interface AmountResult {
   unit: FoodUnit;
@@ -149,6 +158,7 @@ export function sanitizeBasis(raw: unknown): FoodBasis | null {
         .slice(0, 20)
     : undefined;
   const servingGrams = n(b.servingGrams, 10_000);
+  const missing = Array.isArray(b.missing) ? MACRO_KEYS.filter((k) => (b.missing as unknown[]).includes(k)) : [];
   return {
     per100: {
       calories,
@@ -164,6 +174,7 @@ export function sanitizeBasis(raw: unknown): FoodBasis | null {
     ...(typeof b.servingLabel === "string" && b.servingLabel.trim() ? { servingLabel: b.servingLabel.trim().slice(0, 80) } : {}),
     ...(b.liquid === true ? { liquid: true } : {}),
     ...(portions?.length ? { portions } : {}),
+    ...(missing.length ? { missing } : {}),
   };
 }
 

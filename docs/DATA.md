@@ -14,7 +14,7 @@ Every table below is private to its owner through row-level security (`user_id =
 | Training | `user_programs`, `training_programs` (programs you built, plus their `program_weeks` / `program_days` / `program_exercises`), `workout_sessions`, `workout_exercises`, `workout_sets`, `personal_records` |
 | Running & walking | `activities` (manual, treadmill and, later, GPS; soft delete with `deleted_at`) |
 | Body & recovery | `weight_entries`, `measurement_entries`, `recovery_checkins` (stored only with consent), `progress_photos` (metadata) |
-| Food | `foods` (your saved foods and cached USDA/Open Food Facts items), `meals`, `meal_items`, `nutrition_goals`, `water_entries`, **`food_favorites`** (new, migration `20261020000011`), `supplement_stack`, `supplement_logs` |
+| Food | `foods` (your saved foods and cached USDA/Open Food Facts items), `meals`, `meal_items`, `nutrition_goals`, `water_entries`, `food_favorites` (migration `20261020000011`), `supplement_stack`, `supplement_logs`, and from migration `20261021000012`: `recipes`, `recipe_ingredients`, `meal_plan_settings` (meals per day, budget, allergies, dislikes), `meal_plans`, `meal_plan_entries`, `grocery_lists`, `grocery_items`, `nutrition_day_marks` |
 | Steps | `daily_steps` (manual, or synced from Apple Health / Health Connect) |
 | AI coach | `ai_conversations`, `ai_messages` (including proposals and whether you applied them), `ai_usage_events` |
 | Faith | `faith_journal_entries` (never sent to the AI coach), `discipline_goals`, `discipline_checkins`, `challenge_enrollments`, `challenge_checkins` |
@@ -23,6 +23,8 @@ Every table below is private to its owner through row-level security (`user_id =
 **Storage buckets.** `avatars` and `progress-photos` are private, one folder per user (`<user id>/...`). `exercise-media` is a public catalog bucket that only administrators upload to. It holds no personal data.
 
 **When it syncs.** Every save is a server action or API call that writes to the database straight away. Nothing waits in a queue, with one exception: the workout logger (see section 3). Pages read fresh data from the server when they open.
+
+**Recipes** keep a snapshot of each ingredient's nutrition basis (taken from the source on the server when it's added). Logging a serving writes one diary entry with its own per-serving snapshot (`meal_items.source = recipe:<id>`), so editing or deleting the recipe never changes the diary. Meal plan entries are planned meals only; "Log this meal" copies one into the diary. Grocery items from a plan are rebuilt when you build the list again; items you added are kept until you clear them.
 
 **Food favorites** store the food's stable key (`usda:<fdcId>`, `off:<barcode>`, `food:<uuid>`, the same format as `meal_items.source`) plus a snapshot of its name and nutrition basis for display. Logging a favorite always re-reads the nutrition from its source on the server. Only one favorite per food per user is allowed (`unique (user_id, food_key)`). Hand-entered quick adds can't be favorited.
 
@@ -34,7 +36,7 @@ All keys start with `ngf.`. Every read and write is wrapped, so a private window
 
 | Key | What | Cleared |
 | --- | --- | --- |
-| `ngf.draft.<userId>.<form>` | Unsent form drafts (`src/lib/drafts.ts`, `useDraft` in `src/lib/use-draft.ts`): `coach.input.<conversation>` (coach message), `coach.pending` (a message that was mid-send), `faith.journal.new` / `faith.journal.<entryId>`, `food.manual`, `food.custom`, `food.quickadd.<meal>`, `progress.photo` (note + weight, not the image) | On a successful save or send, with "Discard draft", after 30 days, or after account deletion |
+| `ngf.draft.<userId>.<form>` | Unsent form drafts (`src/lib/drafts.ts`, `useDraft` in `src/lib/use-draft.ts`): `coach.input.<conversation>` (coach message), `coach.pending` (a message that was mid-send), `faith.journal.new` / `faith.journal.<entryId>`, `food.manual`, `food.custom`, `food.quickadd.<meal>`, `food.recipe.new` / `food.recipe.<id>` (unsaved recipe, including its picked ingredients), `progress.photo` (note + weight, not the image) | On a successful save or send, with "Discard draft", after 30 days, or after account deletion |
 | `ngf.workout.draft.<userId>` | The in-progress workout (sets, timers, notes) | When the workout is finished or discarded |
 | `ngf.textSize`, `ngf.reduceMotion` | A mirror of your display settings, so the first paint is already the right size (the real values are on `profiles`) | Overwritten on every page load |
 | `ngf.sidebar.collapsed` | Desktop sidebar state | Never (not personal) |

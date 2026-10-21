@@ -186,8 +186,11 @@ export function nutritionForAmount(product: BarcodeProduct, amount: { servings: 
  * gives only per-serving values without a weight — per serving.
  */
 export function basisFromOffProduct(p: BarcodeProduct): FoodBasis {
+  // Macros the label didn't list are carried as `missing`, so totals can say "at least" instead of counting 0.
+  const missing = (p.missing ?? []).map((m) => `${m}_g` as const);
+  const extra = missing.length ? { missing } : {};
   if (p.per100) {
-    return { per100: p.per100, servingGrams: p.servingQuantity, servingLabel: p.servingLabel ?? (p.servingQuantity ? `${p.servingQuantity} ${p.unit}` : null), liquid: p.unit === "ml" };
+    return { per100: p.per100, servingGrams: p.servingQuantity, servingLabel: p.servingLabel ?? (p.servingQuantity ? `${p.servingQuantity} ${p.unit}` : null), liquid: p.unit === "ml", ...extra };
   }
-  return { per100: p.perServing!, servingOnly: true, servingLabel: p.servingLabel };
+  return { per100: p.perServing!, servingOnly: true, servingLabel: p.servingLabel, ...extra };
 }

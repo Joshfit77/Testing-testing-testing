@@ -2,21 +2,16 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { actionError, actionInvalid, actionOk, type ActionState } from "@/lib/action-state";
-import { scaleMacros, type Macros } from "@/lib/domain/nutrition";
 import { DIET_TYPES, DIETS } from "@/lib/domain/diets";
 import { rateTowardGoal, type WeeklyRateKg } from "@/lib/domain/calorie-budget";
 import { budgetSettingsSchema, customFoodSchema, mealTypeSchema, nutritionGoalsSchema, savedMealSchema, waterSchema } from "@/lib/validation/schemas";
 import { assertFeature, EntitlementError, requireUser } from "@/server/auth";
-import { isFoodSearchConfigured } from "@/server/env";
-import { getFood } from "@/server/services/food-database";
-import { lookupBarcode, OffUnavailableError } from "@/server/services/open-food-facts";
-import { barcodeLookupCandidates } from "@/lib/barcode";
-import { basisFromOffProduct } from "@/lib/open-food-facts";
-import { basisFromFoodRow, basisFromLegacyItem, basisUnits, computeAmount, sanitizeBasis, unitIdForLabel, type FoodBasis } from "@/lib/domain/food-basis";
-import { getLocalFood } from "@/server/services/usda-local";
+import { OffUnavailableError } from "@/server/services/open-food-facts";
+import { basisFromLegacyItem, sanitizeBasis } from "@/lib/domain/food-basis";
+import { amountFields, pickedFoodSchema, resolvePickedFood } from "@/server/services/food-resolve";
+import { amountColumns, findOrCreateMeal, ITEM_COLUMNS, LIMITS_ERROR, scaleItem, withinLimits, type MealItemRow } from "@/server/services/diary-write";
 import { logError } from "@/server/log";
 import { estimateAndSaveTargets } from "@/server/services/nutrition-targets";
 import { FAVORITE_KEY_PATTERN } from "@/lib/domain/food-favorites";
@@ -37,35 +32,10 @@ function guard(err: unknown, scope: string): ActionState {
   return actionError("Something went wrong. Please try again.");
 }
 
-async function findOrCreateMeal(supabase: SupabaseClient, userId: string, date: string, mealType: string, status: "logged" | "planned") {
-  const { data } = await supabase
-    .from("meals")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("eaten_on", date)
-    .eq("meal_type", mealType)
-    .eq("status", status)
-    .eq("is_template", false)
-    .limit(1)
-    .maybeSingle();
-  if (data) return data.id as string;
-  const { data: created, error } = await supabase.from("meals").insert({ user_id: userId, eaten_on: date, meal_type: mealType, status }).select("id").single();
-  if (error || !created) throw error ?? new Error("Meal insert failed");
-  return created.id as string;
-}
+const amount = amountFields;
 
-const amount = { quantity: z.number().positive().max(100_000), unitId: z.string().regex(/^(g|oz|lb|ml|floz|serving|p\d{1,2})$/) };
-
-const logFoodInput = z.discriminatedUnion("source", [
-  // Saved / built-in foods. `servings` is the older shape (a multiple of the food's serving).
-  z.object({ source: z.literal("food"), foodId: uuid, quantity: amount.quantity.optional(), unitId: amount.unitId.optional(), servings: z.number().positive().max(100).optional() }),
-  z.object({ source: z.literal("usda"), fdcId: z.string().regex(/^\d{1,10}$/), ...amount }),
-  z.object({
-    source: z.literal("barcode"),
-    code: z.string().regex(/^\d{8,14}$/),
-    format: z.enum(["ean13", "upca", "upce", "ean8"]).optional(),
-    ...amount,
-  }),
+const logFoodInput = z.union([
+  pickedFoodSchema,
   z.object({
     source: z.literal("manual"),
     name: z.string().trim().min(1).max(160),
@@ -83,56 +53,6 @@ const logFoodSchema = z.object({
   status: z.enum(["logged", "planned"]),
   item: logFoodInput,
 });
-
-/** Columns written for an item measured against a nutrition basis (USDA, Open Food Facts, saved foods). */
-type AmountColumns = Pick<
-  MealItemRow,
-  "servings" | "calories" | "protein_g" | "carbs_g" | "fat_g" | "fiber_g" | "sugar_g" | "sodium_mg" | "grams" | "quantity" | "unit_label" | "amount_label" | "basis"
->;
-
-interface MealItemRow extends Macros {
-  food_id: string | null;
-  name: string;
-  servings: number;
-  is_estimate: boolean;
-  fiber_g: number | null;
-  sugar_g: number | null;
-  sodium_mg: number | null;
-  grams: number | null;
-  quantity: number | null;
-  unit_label: string | null;
-  amount_label: string | null;
-  source: string | null;
-  basis: FoodBasis | null;
-}
-
-const LIMITS_ERROR = "That amount is too large to log — check the quantity and unit.";
-
-/** Turns a basis + amount into the stored columns; null when the unit doesn't exist for this food. */
-function amountColumns(basis: FoodBasis, quantity: number, unitId: string): AmountColumns | null {
-  const r = computeAmount(basis, quantity, unitId);
-  if (!r) return null;
-  const n = r.nutrition;
-  return {
-    servings: Math.max(0.01, Math.round(quantity * 100) / 100),
-    calories: n.calories,
-    protein_g: n.protein_g,
-    carbs_g: n.carbs_g,
-    fat_g: n.fat_g,
-    fiber_g: n.fiber_g,
-    sugar_g: n.sugar_g,
-    sodium_mg: n.sodium_mg,
-    grams: r.grams,
-    quantity: Math.round(quantity * 1000) / 1000,
-    unit_label: r.unit.label.slice(0, 100),
-    amount_label: r.amountLabel.slice(0, 160),
-    basis,
-  };
-}
-
-function withinLimits(c: AmountColumns): boolean {
-  return c.calories <= 99_999 && c.protein_g <= 9_999 && c.carbs_g <= 9_999 && c.fat_g <= 9_999 && (c.grams == null || c.grams <= 20_000) && c.servings <= 99_999;
-}
 
 export async function logFoodAction(input: unknown): Promise<ActionState> {
   try {
@@ -164,99 +84,10 @@ export async function logFoodAction(input: unknown): Promise<ActionState> {
       };
     } else {
       // Nutrition values are always re-read server-side — never trusted from the client.
-      let basis: FoodBasis;
-      let meta: { food_id: string | null; name: string; is_estimate: boolean; source: string };
-      let quantity: number;
-      let unitId: string;
-      if (item.source === "food") {
-        const { data: food } = await supabase.from("foods").select("*").eq("id", item.foodId).maybeSingle();
-        if (!food) return actionError("Food not found.");
-        basis = basisFromFoodRow(food as Parameters<typeof basisFromFoodRow>[0]);
-        meta = { food_id: food.id as string, name: food.name as string, is_estimate: Boolean(food.is_estimate), source: `food:${food.id as string}` };
-        if (item.quantity != null && item.unitId) {
-          quantity = item.quantity;
-          unitId = item.unitId;
-        } else {
-          // Older clients: N servings of the food.
-          quantity = item.servings ?? 1;
-          unitId = basisUnits(basis).some((u) => u.id === "serving") ? "serving" : "g";
-          if (unitId === "g") quantity *= Number(food.serving_size);
-        }
-      } else if (item.source === "usda") {
-        const local = await getLocalFood(Number(item.fdcId));
-        if (local) {
-          basis = local.basis;
-          meta = { food_id: null, name: local.name, is_estimate: false, source: `usda:${local.fdcId}` };
-        } else {
-          if (!isFoodSearchConfigured()) return actionError("That food isn't in the food database.");
-          const ext = await getFood(item.fdcId);
-          if (!ext) return actionError("That food couldn't be loaded from the food database.");
-          const { data: cached, error: cErr } = await supabase
-            .from("foods")
-            .upsert(
-              {
-                owner_id: user.id,
-                name: ext.name.slice(0, 160),
-                brand: ext.brand?.slice(0, 120) ?? null,
-                serving_size: 100,
-                serving_unit: "g",
-                calories: ext.calories,
-                protein_g: ext.protein_g,
-                carbs_g: ext.carbs_g,
-                fat_g: ext.fat_g,
-                fiber_g: ext.fiber_g,
-                source: "usda",
-                source_ref: ext.fdcId,
-                is_estimate: false,
-              },
-              { onConflict: "owner_id,source,source_ref" },
-            )
-            .select("id")
-            .single();
-          if (cErr) throw cErr;
-          basis = { per100: { calories: ext.calories, protein_g: ext.protein_g, carbs_g: ext.carbs_g, fat_g: ext.fat_g, fiber_g: ext.fiber_g } };
-          meta = { food_id: cached.id as string, name: ext.name, is_estimate: false, source: `usda:${ext.fdcId}` };
-        }
-        quantity = item.quantity;
-        unitId = item.unitId;
-      } else {
-        const candidates = barcodeLookupCandidates(item.code, item.format);
-        if (!candidates) return actionError("That barcode isn't valid.");
-        // Re-fetch from Open Food Facts server-side — never trust client-supplied nutrition numbers.
-        const found = await lookupBarcode(candidates);
-        if (found.status !== "found") return actionError("That product has no nutrition info in Open Food Facts. Enter it manually.");
-        const p = found.product;
-        basis = basisFromOffProduct(p);
-        // Cache per 100 g/ml when available, otherwise per label serving, so it shows up in My foods.
-        const base = p.per100 ? { size: 100, unit: p.unit as string, v: p.per100 } : { size: 1, unit: "serving", v: p.perServing! };
-        const { data: cached, error: cErr } = await supabase
-          .from("foods")
-          .upsert(
-            {
-              owner_id: user.id,
-              name: p.name.slice(0, 160),
-              brand: p.brand?.slice(0, 120) ?? null,
-              serving_size: base.size,
-              serving_unit: base.unit,
-              calories: base.v.calories,
-              protein_g: base.v.protein_g,
-              carbs_g: base.v.carbs_g,
-              fat_g: base.v.fat_g,
-              fiber_g: base.v.fiber_g,
-              source: "openfoodfacts",
-              source_ref: p.code,
-              // Crowd-sourced label data, not a guess; the UI labels it "Open Food Facts (community data) — check the label".
-              is_estimate: false,
-            },
-            { onConflict: "owner_id,source,source_ref" },
-          )
-          .select("id")
-          .single();
-        if (cErr) throw cErr;
-        meta = { food_id: cached.id as string, name: p.brand ? `${p.name} (${p.brand})` : p.name, is_estimate: false, source: `off:${p.code}` };
-        quantity = item.quantity;
-        unitId = item.unitId;
-      }
+      const resolved = await resolvePickedFood(supabase, user.id, item);
+      if (!resolved.ok) return actionError(resolved.error);
+      const { basis, quantity, unitId, ...rest } = resolved.food;
+      const meta = { food_id: rest.food_id, name: rest.name, is_estimate: rest.is_estimate, source: rest.source };
       const cols = amountColumns(basis, quantity, unitId);
       if (!cols) return actionError("Choose one of the units listed for this food.");
       if (!withinLimits(cols)) return actionError(LIMITS_ERROR);
@@ -547,32 +378,6 @@ export async function updateGoalsAction(_prev: ActionState, formData: FormData):
   } catch (err) {
     return guard(err, "nutrition.goals");
   }
-}
-
-const ITEM_COLUMNS = "food_id, name, servings, calories, protein_g, carbs_g, fat_g, is_estimate, fiber_g, sugar_g, sodium_mg, grams, quantity, unit_label, amount_label, source, basis";
-
-/**
- * Scales a stored item by `factor` (recipes logged as a different number of servings). Items with a basis
- * are recomputed so the amount text stays right; older items scale their numbers.
- */
-function scaleItem(i: Record<string, unknown>, factor: number): Record<string, unknown> {
-  if (factor === 1) return i;
-  const basis = sanitizeBasis(i.basis);
-  const unitId = basis ? unitIdForLabel(basis, i.unit_label as string | null) : null;
-  const cols = basis && unitId && Number(i.quantity) > 0 ? amountColumns(basis, Number(i.quantity) * factor, unitId) : null;
-  if (cols) return { ...i, ...cols };
-  const opt = (v: unknown, d = 1) => (v == null ? null : Math.round(Number(v) * factor * 10 ** d) / 10 ** d);
-  return {
-    ...i,
-    servings: Math.round(Number(i.servings) * factor * 100) / 100 || 0.01,
-    ...scaleMacros({ calories: Number(i.calories), protein_g: Number(i.protein_g), carbs_g: Number(i.carbs_g), fat_g: Number(i.fat_g) }, factor),
-    fiber_g: opt(i.fiber_g),
-    sugar_g: opt(i.sugar_g),
-    sodium_mg: opt(i.sodium_mg),
-    grams: opt(i.grams),
-    quantity: opt(i.quantity, 3),
-    amount_label: null,
-  };
 }
 
 /**

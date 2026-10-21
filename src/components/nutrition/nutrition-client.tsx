@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarcodeScanner } from "@/components/nutrition/barcode-scanner";
 import { AmountPicker, basisSummary } from "@/components/nutrition/food-amount";
 import { FavoriteStar } from "@/components/nutrition/favorite-star";
+import { SourceBadge } from "@/components/nutrition/source-badge";
 import { DraftRestoredNotice } from "@/components/drafts/draft-notice";
 import { logItemFor } from "@/lib/domain/food-favorites";
 import { useDraft } from "@/lib/use-draft";
@@ -74,7 +75,7 @@ function MealControls({ mealType, setMealType, status, setStatus, idPrefix }: { 
   );
 }
 
-function foodChoice(f: MyFood, kind: "mine" | "common"): FoodChoice {
+export function foodChoice(f: MyFood, kind: "mine" | "common"): FoodChoice {
   const tag = f.source === "usda" ? "USDA" : f.source === "openfoodfacts" ? "Open Food Facts (community data) — check the label" : kind === "common" ? "Built-in food · typical values" : "My food";
   return {
     key: `food:${f.id}`,
@@ -89,14 +90,14 @@ function foodChoice(f: MyFood, kind: "mine" | "common"): FoodChoice {
 
 type SearchState = { kind: "idle" } | { kind: "loading" } | { kind: "error"; message: string } | { kind: "done" };
 
-function searchErrorMessage(status: number, error?: string): string {
+export function searchErrorMessage(status: number, error?: string): string {
   if (error === "rate_limited") return "Too many searches — wait a moment.";
   if (error === "upgrade_required") return "Food search is part of nutrition tracking on Plus and Pro.";
   if (error === "unauthorized") return "Your session expired — sign in again.";
   return status >= 500 ? "Search is unavailable right now." : "Search failed.";
 }
 
-function ChoiceRow({
+export function ChoiceRow({
   food,
   onPick,
   badge,
@@ -115,7 +116,7 @@ function ChoiceRow({
       <button type="button" className="min-w-0 flex-1 rounded-xl px-3 py-2 text-left hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/40" onClick={() => onPick(food)}>
         <span className="block text-sm font-semibold">
           {food.name}
-          {food.isEstimate && <span className="ml-1 text-[11px] font-normal text-gold">(typical values)</span>}
+          {food.isEstimate && <span className="ml-1 text-[11px] font-normal text-gold">(typical values)</span>} <SourceBadge source={food.key} isEstimate={Boolean(food.isEstimate)} />
           {badge}
         </span>
         {food.detail && <span className="block text-[11px] text-muted-foreground">{food.detail}</span>}
@@ -753,7 +754,7 @@ export function SaveMealForm({ mealId, defaultName }: { mealId: string; defaultN
       <input type="hidden" name="mealId" value={mealId} />
       <div className="min-w-40 flex-1 space-y-1">
         <Label htmlFor={`sm-${mealId}`} className="text-xs">
-          Save as meal / recipe
+          Save as meal
         </Label>
         <Input id={`sm-${mealId}`} name="name" defaultValue={defaultName} maxLength={120} required className="h-9" />
       </div>
