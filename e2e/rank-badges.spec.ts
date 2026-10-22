@@ -43,6 +43,11 @@ test.describe("rank badges (Fitness, Food, Faith)", () => {
     await reveal.getByRole("button", { name: "Continue" }).click();
     await expect(page.getByRole("button", { name: "Seed, rank 1 of 9, earned" })).toBeVisible();
     await expect(page.getByRole("tab", { name: /Faith/ })).toContainText("Rank 1 of 9");
+    // An earned rank shows its verse on the badge list; locked ranks don't yet.
+    const faithRanks = page.getByRole("list", { name: "Faith ranks" });
+    await expect(faithRanks.getByText("Mark 4:26 (BSB)")).toBeVisible();
+    await expect(faithRanks.getByText(/The kingdom of God is like a man who scatters seed/)).toBeVisible();
+    await expect(faithRanks.getByText("1 Peter 2:2 (BSB)")).toHaveCount(0);
 
     // After a reload it is still earned, and the reveal doesn't repeat.
     await page.reload();

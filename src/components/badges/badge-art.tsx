@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, type ReactNode } from "react";
+import { BADGE_ARTWORK } from "@/components/badges/badge-artwork";
 import type { RankCategory } from "@/lib/domain/ranks";
 
 /**
@@ -14,12 +15,12 @@ import type { RankCategory } from "@/lib/domain/ranks";
  * meant for the one badge in focus, not a whole grid, and every animation stops under reduced motion
  * (the system setting or the app's own setting, see globals.css).
  *
- * The owner's painted artwork (public/badges/*.webp, cut from their badge reference images) is listed in
- * BADGE_IMAGE_OVERRIDES and shown instead of the vector drawing; the vector art stays as the fallback.
+ * The owner's 27 painted badge images (badge-artwork.ts) are listed in BADGE_IMAGE_OVERRIDES and shown instead
+ * of the vector drawing; the vector art stays as the fallback.
  */
 
 export const BADGE_IMAGE_OVERRIDES: Partial<Record<`${RankCategory}-${number}`, string>> = Object.fromEntries(
-  (["fitness", "food", "faith"] as const).flatMap((c) => [1, 2, 3, 4, 5, 6, 7, 8, 9].map((l) => [`${c}-${l}`, `/badges/${c}-${l}.webp`])),
+  BADGE_ARTWORK.map((b) => [`${b.category}-${b.rank}`, b.image]),
 );
 
 export function BadgeArt({

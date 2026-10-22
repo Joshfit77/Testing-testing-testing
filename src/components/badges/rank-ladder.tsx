@@ -9,18 +9,28 @@ import { cn } from "@/lib/utils";
  * The nine ranks of one category laid out like the owner's badge design: an ornate gold frame, the category
  * crest and title, then numbered rows with the painted artwork, the rank name in engraved gold capitals,
  * its Scripture reference and theme line. Every badge stays in full colour; locked ranks are dimmed a little
- * and carry a small lock, earned ranks a gold check, and the current rank glows.
+ * and carry a small lock, earned ranks a gold check and their verse in full, and the current rank glows.
  */
 
 const CREST: Record<RankCategory, typeof Dumbbell> = { fitness: Dumbbell, food: Flame, faith: Sprout };
 
-/** Wide scene artwork for Food and Faith rows (the shields stay square). */
+/** The owner's artwork for a row. */
 export function rowArt(category: RankCategory, level: number): string | undefined {
-  if (category === "fitness") return BADGE_IMAGE_OVERRIDES[`fitness-${level}`];
-  return `/badges/rows/${category}-${level}.webp`;
+  return BADGE_IMAGE_OVERRIDES[`${category}-${level}`];
 }
 
-export function RankLadder({ progress, onOpen }: { progress: CategoryProgress; onOpen: (r: RankState) => void }) {
+export function RankLadder({
+  progress,
+  onOpen,
+  verses,
+  translation,
+}: {
+  progress: CategoryProgress;
+  onOpen: (r: RankState) => void;
+  /** BSB text by reference; an earned rank shows its verse in full. */
+  verses: Record<string, string>;
+  translation: string;
+}) {
   const info = RANK_CATEGORIES.find((c) => c.id === progress.category)!;
   const Crest = CREST[progress.category];
   const unit = (n: number) => (n === 1 ? info.unit[0] : info.unit[1]);
@@ -46,7 +56,7 @@ export function RankLadder({ progress, onOpen }: { progress: CategoryProgress; o
               <button
                 type="button"
                 onClick={() => onOpen(r)}
-                className={cn("rank-row", r.earned ? "is-earned" : "is-locked", current && "is-current", r.category === "fitness" && "is-shield")}
+                className={cn("rank-row", r.earned ? "is-earned" : "is-locked", current && "is-current")}
                 aria-label={`${r.name}, rank ${r.level} of 9, ${r.earned ? "earned" : "locked"}`}
               >
                 <span className="rank-num" aria-hidden>
@@ -55,7 +65,7 @@ export function RankLadder({ progress, onOpen }: { progress: CategoryProgress; o
                 <span className="rank-art">
                   {art ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={art} alt="" draggable={false} loading={r.level > 4 ? "lazy" : undefined} />
+                    <img src={art} alt="" draggable={false} />
                   ) : null}
                   {r.earned ? null : (
                     <span className="rank-lock">
@@ -78,6 +88,14 @@ export function RankLadder({ progress, onOpen }: { progress: CategoryProgress; o
                   )}
                 </span>
               </button>
+              {r.earned && verses[r.reference] ? (
+                <figure className={cn("rank-verse", current && "is-current")}>
+                  <blockquote className="rank-verse-text">{verses[r.reference]}</blockquote>
+                  <figcaption className="rank-verse-ref">
+                    {r.reference} ({translation})
+                  </figcaption>
+                </figure>
+              ) : null}
             </li>
           );
         })}

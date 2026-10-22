@@ -130,7 +130,7 @@ export function RankBoard({ progress, verses, translation, initial = "fitness", 
         </button>
         <p className="text-xs text-muted-foreground">{info.counts}</p>
 
-        <RankLadder progress={current} onOpen={setOpen} />
+        <RankLadder progress={current} onOpen={setOpen} verses={verses} translation={translation} />
       </div>
 
       <Dialog open={open !== null} onOpenChange={(o) => !o && setOpen(null)}>

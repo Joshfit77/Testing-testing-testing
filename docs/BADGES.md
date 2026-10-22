@@ -54,22 +54,29 @@ change, such as 1 John 5:4, "everyone born of God overcomes the world".
 
 ## Artwork
 
-**In use now:** the owner's painted badge artwork. `public/badges/{fitness,food,faith}-{1-9}.webp` are 512 × 512 WebP
-images with transparent, feathered edges. They were cut from the owner's three badge reference screenshots
-(1290 × 2796) by `scripts/badge-art/crop-fitness.py and crop-food-faith.py`, about 28 KB each and 830 KB in total. The app shows them
-through `BADGE_IMAGE_OVERRIDES`:
+**In use now:** the owner's 27 badge images (`fitness-01-foundation.webp` … `faith-09-cedar.webp`), supplied as a
+package cut from their three badge posters.
 
+- **Source files:** kept unchanged in `scripts/badge-art/owner-27/`.
+- **App files:** `public/badges/` holds the same illustrations with the poster's leftover gold divider lines trimmed
+  off and the edges faded to transparent, so they sit cleanly on the black background. Nothing is redrawn,
+  recoloured or resized. `scripts/badge-art/prepare-owner-art.py` regenerates them (432 KB for all 27).
+- **Wiring:** `src/components/badges/badge-artwork.ts` maps each rank to its image (`getBadgeArtwork`), and
+  `BADGE_IMAGE_OVERRIDES` feeds it to the badge list, the detail view and the unlock reveal.
+  `tests/unit/badge-artwork.test.ts` checks that all 27 files exist.
+- **Verses on the list:** an earned rank shows its full BSB verse directly under its row. Locked ranks show the
+  reference and progress, and every rank's verse is in its detail view.
 - **Badge in focus:** a slow gold glow and a light sweep. Both stop under reduced motion.
-- **Locked badges:** shown in muted grey.
-- **Offline edition:** embeds the same images.
+- **Locked badges:** slightly dimmed, with a small lock.
+- **Offline edition:** embeds the same 27 images and shows the same verses.
 
 > **Rights:** these images came from the owner. Before the app goes to the App Store, confirm that you hold
 > commercial rights to them (for example, that they're your own or AI images you generated under terms that
 > allow commercial use).
 
-**Sharpness:** the cut-outs are about 230 px from the screenshots, upscaled to 512 px. They look sharp in the grid
-but slightly soft in the large detail view. For full sharpness, supply the original artwork, ideally 1024 px per
-badge (see "Commissioned painted artwork" below), and re-run the script or drop the files into `public/badges/`.
+**Sharpness:** the images are about 460–510 px wide and were taken from phone screenshots, so they look soft when
+shown large. To replace any of them, drop a higher-resolution file with the same name into
+`scripts/badge-art/owner-27/` and re-run the script.
 
 The vector drawing described next remains in `badge-art.tsx` as a fallback.
 
@@ -102,14 +109,14 @@ Rank 9 gets a second ring and a stronger glow. Ranks earned before this update a
 The reference image is painted and photo-real, which hand-built vector art can't fully match. The supplied image
 is also too small to use: about 100 px per badge, on a solid background. To use painted art:
 
-- **Files:** 27 images, one per rank, named `fitness-1.webp` … `fitness-9.webp`, `food-1.webp` … `food-9.webp`
-  and `faith-1.webp` … `faith-9.webp`.
+- **Files:** 27 images, one per rank, with the same names as now (`fitness-01-foundation.webp` …
+  `faith-09-cedar.webp`).
 - **Size:** 1024 × 1024 px, square, transparent background (WebP with alpha, or PNG). The badge should fill the
   central 90% and be centred on the same baseline.
 - **Style:** one artist or one consistent model and style across all 27, matte black-and-gold mood, the
   descriptions above, no text or numbers in the art, no watermark, and full commercial rights (original or
   properly licensed).
-- **Installing them:** put the files in `public/badges/` and list them in `BADGE_IMAGE_OVERRIDES` in
-  `badge-art.tsx`. The screen then shows the images instead of the vector art.
+- **Installing them:** put the files in `scripts/badge-art/owner-27/` and run `prepare-owner-art.py` (adjust its crop
+  boxes if the new files have no poster lines to trim).
 - **What changes with images:** the vector animations (shine, flicker, sway) only apply to the vector art, so
   painted images get the glow and unlock reveal but stay still otherwise.

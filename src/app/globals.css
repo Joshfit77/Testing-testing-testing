@@ -591,7 +591,6 @@ html[data-motion="reduce"] .badge-img-live::after { display: none; }
 }
 .rank-row:hover { background-color: rgba(201, 165, 76, 0.06); }
 .rank-row:focus-visible { outline: 2px solid #f1c862; outline-offset: 2px; }
-.rank-row.is-shield { grid-template-columns: 1.6rem minmax(0, 36%) minmax(0, 1fr); }
 .rank-row.is-current {
   background-color: rgba(201, 165, 76, 0.1);
   box-shadow: inset 0 0 0 1px rgba(241, 200, 98, 0.6), 0 0 18px -6px rgba(241, 200, 98, 0.6);
@@ -608,7 +607,6 @@ html[data-motion="reduce"] .badge-img-live::after { display: none; }
 }
 .rank-art { position: relative; display: grid; place-items: center; height: 100px; }
 .rank-art img { max-width: 100%; max-height: 100px; object-fit: contain; display: block; }
-.rank-row.is-shield .rank-art img { height: 104px; width: 104px; }
 .rank-row.is-locked .rank-art img { filter: brightness(0.78) saturate(0.9); }
 .rank-row.is-earned .rank-art img { filter: drop-shadow(0 0 10px rgba(241, 180, 80, 0.35)); }
 .rank-lock {
@@ -643,11 +641,20 @@ html[data-motion="reduce"] .badge-img-live::after { display: none; }
 .rank-state { margin-top: 3px; font-size: 0.7rem; color: #a9a294; display: inline-flex; align-items: center; gap: 4px; }
 .rank-state.is-done { color: #f1c862; font-weight: 600; }
 .rank-state svg { width: 12px; height: 12px; }
+/* An earned rank's verse, under its row. */
+.rank-verse {
+  margin: 0 6px 10px calc(1.6rem + 14px);
+  padding: 8px 12px;
+  border-left: 2px solid #e9b955;
+  border-radius: 0 8px 8px 0;
+  background: linear-gradient(90deg, rgba(201, 165, 76, 0.12), rgba(201, 165, 76, 0.02));
+}
+.rank-verse-text { display: block; font-family: var(--font-serif); font-size: 0.86rem; line-height: 1.5; color: #f1ead6; }
+.rank-verse-ref { display: block; margin-top: 4px; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.04em; color: #f1c862; }
 @media (min-width: 640px) {
   .rank-row { min-height: 120px; }
-  .rank-art, .rank-row.is-shield .rank-art img { height: 120px; }
+  .rank-art { height: 120px; }
   .rank-art img { max-height: 120px; }
-  .rank-row.is-shield .rank-art img { width: 120px; }
   .rank-name { font-size: 1.35rem; }
   .rank-ref, .rank-theme { font-size: 0.9rem; }
 }
