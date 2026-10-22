@@ -1,9 +1,8 @@
 import { RANKS, type RankCategory } from "@/lib/domain/ranks";
 
 /**
- * The owner's painted artwork for the 27 rank badges, one image per rank. The source files are kept unchanged
- * in scripts/badge-art/owner-27/. public/badges/ holds the same images with the poster's divider lines trimmed
- * off and the edges faded to transparent (scripts/badge-art/prepare-owner-art.py).
+ * The owner's painted artwork for the 27 rank badges, one image per rank, cut from their three original badge
+ * posters (scripts/badge-art/posters/, unchanged) by scripts/badge-art/crop-posters.py.
  */
 export interface BadgeArtwork {
   category: RankCategory;

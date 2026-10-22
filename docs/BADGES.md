@@ -54,13 +54,15 @@ change, such as 1 John 5:4, "everyone born of God overcomes the world".
 
 ## Artwork
 
-**In use now:** the owner's 27 badge images (`fitness-01-foundation.webp` … `faith-09-cedar.webp`), supplied as a
-package cut from their three badge posters.
+**In use now:** the artwork from the owner's three original badge posters (Fitness, Food, Faith; 1290 × 2796
+screenshots).
 
-- **Source files:** kept unchanged in `scripts/badge-art/owner-27/`.
-- **App files:** `public/badges/` holds the same illustrations with the poster's leftover gold divider lines trimmed
-  off and the edges faded to transparent, so they sit cleanly on the black background. Nothing is redrawn,
-  recoloured or resized. `scripts/badge-art/prepare-owner-art.py` regenerates them (432 KB for all 27).
+- **Source files:** the posters are kept unchanged (lossless) in `scripts/badge-art/posters/`.
+- **App files:** `scripts/badge-art/crop-posters.py` cuts each rank's art from between its number and its text,
+  inside the row's gold rules, into `public/badges/{category}-{NN}-{name}.webp` (about 600 × 210 px). Only the top
+  and bottom edges are faded; nothing is redrawn, recoloured or resized.
+- **Layout:** as on the posters, each row has the number in a gold hexagon, the art filling the middle and fading
+  out at the sides, and the name, reference and theme on the right. The subtitles match the posters.
 - **Wiring:** `src/components/badges/badge-artwork.ts` maps each rank to its image (`getBadgeArtwork`), and
   `BADGE_IMAGE_OVERRIDES` feeds it to the badge list, the detail view and the unlock reveal.
   `tests/unit/badge-artwork.test.ts` checks that all 27 files exist.
@@ -74,9 +76,9 @@ package cut from their three badge posters.
 > commercial rights to them (for example, that they're your own or AI images you generated under terms that
 > allow commercial use).
 
-**Sharpness:** the images are about 460–510 px wide and were taken from phone screenshots, so they look soft when
-shown large. To replace any of them, drop a higher-resolution file with the same name into
-`scripts/badge-art/owner-27/` and re-run the script.
+**Sharpness:** each row is about 210 px tall in the posters, so the art is sharp on the badge list but a little soft
+in the large detail view. Higher-resolution posters of the same layout can replace the files in
+`scripts/badge-art/posters/`; then re-run the script.
 
 The vector drawing described next remains in `badge-art.tsx` as a fallback.
 
@@ -116,7 +118,7 @@ is also too small to use: about 100 px per badge, on a solid background. To use 
 - **Style:** one artist or one consistent model and style across all 27, matte black-and-gold mood, the
   descriptions above, no text or numbers in the art, no watermark, and full commercial rights (original or
   properly licensed).
-- **Installing them:** put the files in `scripts/badge-art/owner-27/` and run `prepare-owner-art.py` (adjust its crop
-  boxes if the new files have no poster lines to trim).
+- **Installing them:** put the files in `public/badges/` with the names above (and stop using
+  `crop-posters.py`, which would overwrite them).
 - **What changes with images:** the vector animations (shine, flicker, sway) only apply to the vector art, so
   painted images get the glow and unlock reveal but stay still otherwise.

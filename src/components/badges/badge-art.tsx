@@ -46,9 +46,13 @@ export function BadgeArt({
   const style = locked ? { filter: "brightness(0.55) saturate(0.75)" } : undefined;
   if (override) {
     return (
-      <span className={["badge-img", animate && !locked ? "badge-img-live" : "", className].filter(Boolean).join(" ")} style={{ width: size, height: size }}>
+      // The painted art is a wide scene, so it gets a wide frame (about 1.6 : 1) instead of a square one.
+      <span
+        className={["badge-img", animate && !locked ? "badge-img-live" : "", className].filter(Boolean).join(" ")}
+        style={{ width: Math.round(size * 1.35), height: Math.round(size * 0.85) }}
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={override} alt={title ?? ""} width={size} height={size} style={style} draggable={false} />
+        <img src={override} alt={title ?? ""} style={style} draggable={false} />
       </span>
     );
   }

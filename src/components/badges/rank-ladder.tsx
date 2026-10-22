@@ -60,7 +60,7 @@ export function RankLadder({
                 aria-label={`${r.name}, rank ${r.level} of 9, ${r.earned ? "earned" : "locked"}`}
               >
                 <span className="rank-num" aria-hidden>
-                  {r.level}
+                  <span>{r.level}</span>
                 </span>
                 <span className="rank-art">
                   {art ? (
