@@ -137,3 +137,29 @@ export async function seedRows(email: string, table: string, rows: Record<string
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, { method: "POST", headers, body: JSON.stringify(rows.map((r) => ({ user_id: user.id, ...r }))) });
   if (!res.ok) throw new Error(`seedRows ${table} failed: ${res.status} ${await res.text()}`);
 }
+
+/** Test-only: the auth user id for an email (local database). */
+export async function userIdFor(email: string): Promise<string> {
+  const headers = { apikey: LOCAL_SERVICE_KEY, Authorization: `Bearer ${LOCAL_SERVICE_KEY}` };
+  const users = (await (await fetch(`${SUPABASE_URL}/auth/v1/admin/users?per_page=1000`, { headers })).json()) as { users: { id: string; email: string }[] };
+  const user = users.users.find((u) => u.email === email);
+  if (!user) throw new Error(`No user ${email}`);
+  return user.id;
+}
+
+/** Test-only: a service-role REST call against the local database (reading or seeding state). */
+export async function serviceRest<T = unknown>(path: string, init: { method?: string; body?: unknown; prefer?: string } = {}): Promise<T> {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    method: init.method ?? "GET",
+    headers: {
+      apikey: LOCAL_SERVICE_KEY,
+      Authorization: `Bearer ${LOCAL_SERVICE_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: init.prefer ?? "return=representation",
+    },
+    body: init.body === undefined ? undefined : JSON.stringify(init.body),
+  });
+  if (!res.ok) throw new Error(`${init.method ?? "GET"} ${path} failed: ${res.status} ${await res.text()}`);
+  const text = await res.text();
+  return (text ? JSON.parse(text) : null) as T;
+}

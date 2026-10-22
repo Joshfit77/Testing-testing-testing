@@ -14,6 +14,7 @@ import { estimateOneRepMax } from "@/lib/domain/strength";
 import { EQUIPMENT, type PrimaryGoal } from "@/lib/domain/types";
 import { KG_PER_LB } from "@/lib/domain/units";
 import { MEMORY_CATEGORIES, MEMORY_MAX_CHARS, type MemoryCategory } from "./memory";
+import { trainingChangeSchema, type TrainingChange } from "@/lib/domain/adaptive-training";
 
 const slug = z.string().trim().regex(/^[a-z0-9-]{2,80}$/, "Use an exercise slug like 'bench-press'.");
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD.");
@@ -71,6 +72,24 @@ export const TOOL_INPUT_SCHEMAS = {
     date: isoDate.nullable(),
     reason: z.string().trim().min(3).max(300),
   }),
+  get_training_review: z.strictObject({}),
+  propose_target_load: z.strictObject({
+    exercise_slug: slug,
+    weight: z.number().positive().max(2000),
+    unit: z.enum(["kg", "lb"]),
+    reps: z.number().int().min(1).max(100).nullable(),
+    reason: z.string().trim().min(3).max(300),
+  }),
+  propose_deload_week: z.strictObject({
+    keep_percent_of_sets: z.number().int().min(40).max(80),
+    rpe_cap: z.number().min(5).max(8),
+    reason: z.string().trim().min(3).max(300),
+  }),
+  propose_volume_change: z.strictObject({
+    exercise_slug: slug,
+    delta_sets: z.number().int().min(-2).max(2),
+    reason: z.string().trim().min(3).max(300),
+  }),
   propose_memory: z.strictObject({
     category: z.enum(MEMORY_CATEGORIES),
     content: z.string().trim().min(3).max(MEMORY_MAX_CHARS),
@@ -83,7 +102,16 @@ export const TOOL_INPUT_SCHEMAS = {
 export type ToolName = keyof typeof TOOL_INPUT_SCHEMAS;
 export type ToolInput<N extends ToolName> = z.infer<(typeof TOOL_INPUT_SCHEMAS)[N]>;
 export const TOOL_NAMES = Object.keys(TOOL_INPUT_SCHEMAS) as ToolName[];
-export const PROPOSAL_TOOLS = ["propose_exercise_swap", "propose_nutrition_targets", "propose_bodyweight_log", "propose_memory", "propose_forget_memory"] as const satisfies readonly ToolName[];
+export const PROPOSAL_TOOLS = [
+  "propose_exercise_swap",
+  "propose_nutrition_targets",
+  "propose_bodyweight_log",
+  "propose_target_load",
+  "propose_deload_week",
+  "propose_volume_change",
+  "propose_memory",
+  "propose_forget_memory",
+] as const satisfies readonly ToolName[];
 export const isToolName = (v: string): v is ToolName => v in TOOL_INPUT_SCHEMAS;
 
 type JsonSchema = Anthropic.Beta.BetaTool.InputSchema;
@@ -200,6 +228,44 @@ const DEFINITIONS: { name: ToolName; description: string; input_schema: JsonSche
     }),
   },
   {
+    name: "get_training_review",
+    description:
+      "Get the app's training review for this athlete: consistency against the plan, weekly working sets per muscle region against common ranges, estimated 1-rep-max trends and stalled lifts, recovery check-ins and logged effort versus plan, weeks since a lighter week, the app's own rule-based suggestions with their evidence, and what data is missing. Call this before recommending progression, a recovery week, volume or frequency changes, or plateau fixes.",
+    input_schema: obj({}),
+  },
+  {
+    name: "propose_target_load",
+    description:
+      "Suggest a target load (and reps) for the athlete's next session of one exercise, e.g. after they hit all their reps, or a reset after a stall. Shown beside the exercise in the workout logger once they accept. Nothing changes until they tap Accept (they can adjust it). Base it on their logged sets; don't jump more than one sensible step.",
+    input_schema: obj({
+      exercise_slug: str("Exercise slug from the context or a tool."),
+      weight: num("Target load in `unit`."),
+      unit: { type: "string", enum: ["kg", "lb"] },
+      reps: nullable(int("Target reps per set, 1–100; null to keep their program's reps.")),
+      reason: str("One or two sentences with the evidence, for the card."),
+    }),
+  },
+  {
+    name: "propose_deload_week",
+    description:
+      "Suggest turning the athlete's upcoming program week into a recovery (deload) week: same exercises, a share of the sets, effort capped. Only for their own editable program, and only when their data supports it (weeks since a lighter week, low check-ins, effort above plan, several stalled lifts) or they ask. Nothing changes until they accept; it can be undone.",
+    input_schema: obj({
+      keep_percent_of_sets: int("Share of sets to keep, 40–80 (typically 60)."),
+      rpe_cap: num("Highest effort for the week, RPE 5–8 (typically 7)."),
+      reason: str("The evidence, for the card."),
+    }),
+  },
+  {
+    name: "propose_volume_change",
+    description:
+      "Suggest adding or removing one or two sets of one exercise for the rest of the athlete's own program (deload weeks excluded). Use when weekly sets for a muscle are well outside the usual range and recovery supports it. Nothing changes until they accept; it can be undone.",
+    input_schema: obj({
+      exercise_slug: str("Slug of an exercise in their current program."),
+      delta_sets: int("Sets to add (1 or 2) or remove (-1 or -2)."),
+      reason: str("The evidence, for the card."),
+    }),
+  },
+  {
     name: "propose_memory",
     description:
       "Offer to remember something lasting the athlete told you, for future conversations: a secondary goal, an exercise they like or avoid, when or where they train, a food preference, a recovery preference, a milestone, or how they like to be coached. Nothing is saved unless the athlete taps Save (they can edit it first). Only use the athlete's own words and facts they stated; never guess or infer. Don't save what the app already stores (primary goal, experience level, equipment list, days per week, program, logs, targets, bodyweight), health or medical details, or anything from their prayer journal. Don't use it when memory is off. At most one per reply.",
@@ -253,6 +319,14 @@ export function toolActivityLabel(name: string, input: unknown): string {
       return "Preparing suggested nutrition targets…";
     case "propose_bodyweight_log":
       return "Preparing a bodyweight entry for you to confirm…";
+    case "get_training_review":
+      return "Reviewing your recent training…";
+    case "propose_target_load":
+      return "Preparing a target load for you to review…";
+    case "propose_deload_week":
+      return "Preparing a recovery week for you to review…";
+    case "propose_volume_change":
+      return "Preparing a volume change for you to review…";
     case "propose_memory":
       return "Preparing a note to remember, for you to approve…";
     case "propose_forget_memory":
@@ -268,6 +342,7 @@ export type CoachProposal =
   | { kind: "exercise_swap"; from: { slug: string; name: string }; to: { slug: string; name: string }; scope: "next_workout" | "rest_of_program"; reason: string; programName: string; editable: boolean }
   | { kind: "nutrition_targets"; calories: number; protein_g: number; carbs_g: number; fat_g: number; reason: string; previous: { calories: number; protein_g: number; carbs_g: number; fat_g: number } | null }
   | { kind: "bodyweight_log"; weightKg: number; date: string; display: string; reason: string }
+  | { kind: "training_change"; change: TrainingChange; summary: string; reason: string; units: "metric" | "imperial" }
   | { kind: "memory"; category: MemoryCategory; content: string }
   | { kind: "memory_forget"; memoryId: string; category: MemoryCategory; content: string };
 
@@ -291,6 +366,7 @@ export const coachProposalSchema = z.discriminatedUnion("kind", [
     previous: z.object({ calories: z.number(), protein_g: z.number(), carbs_g: z.number(), fat_g: z.number() }).nullable(),
   }),
   z.object({ kind: z.literal("bodyweight_log"), weightKg: z.number().min(25).max(400), date: isoDate, display: z.string().max(40), reason: z.string().max(300) }),
+  z.object({ kind: z.literal("training_change"), change: trainingChangeSchema, summary: z.string().max(300), reason: z.string().max(300), units: z.enum(["metric", "imperial"]) }),
   z.object({ kind: z.literal("memory"), category: z.enum(MEMORY_CATEGORIES), content: z.string().min(3).max(MEMORY_MAX_CHARS) }),
   z.object({ kind: z.literal("memory_forget"), memoryId: z.string().uuid(), category: z.enum(MEMORY_CATEGORIES), content: z.string().max(MEMORY_MAX_CHARS) }),
 ]);

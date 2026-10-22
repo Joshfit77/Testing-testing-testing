@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, Check, ChevronDown, History, Link2, Unlink, MessageSquare, Pause, Play, Plus, Repeat2, SkipForward, Trash2, Undo2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, ChevronDown, Crosshair, History, Link2, Unlink, MessageSquare, Pause, Play, Plus, Repeat2, SkipForward, Trash2, Undo2, X } from "lucide-react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
@@ -246,6 +246,7 @@ export function ExerciseCard({
   showComplete = true,
   current = false,
   lastTime = null,
+  coachTarget = null,
   nextSetId = null,
   superset = null,
 }: {
@@ -261,6 +262,8 @@ export function ExerciseCard({
   current?: boolean;
   /** "Last time: 3×5 @ 225 lb". */
   lastTime?: string | null;
+  /** "Your target: 102.5 kg × 5 reps" (accepted from the training review or the AI coach). */
+  coachTarget?: string | null;
   /** The set to do next (highlighted). */
   nextSetId?: string | null;
   /** Superset placement: its letter, this exercise's place in it, and whether the next exercise can be joined. */
@@ -323,6 +326,11 @@ export function ExerciseCard({
           {lastTime && (
             <p className="mt-0.5 flex items-center gap-1 text-xs text-foreground/85" data-testid="last-time">
               <History className="size-3.5 shrink-0 text-gold" aria-hidden /> {lastTime}
+            </p>
+          )}
+          {coachTarget && (
+            <p className="mt-0.5 flex items-center gap-1 text-xs text-gold-highlight" data-testid="coach-target">
+              <Crosshair className="size-3.5 shrink-0 text-gold" aria-hidden /> {coachTarget}
             </p>
           )}
         </div>

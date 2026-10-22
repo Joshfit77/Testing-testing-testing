@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { ArrowRight, Brain, Check, Dumbbell, Loader2, Pencil, Scale, Utensils, X } from "lucide-react";
+import { Activity, ArrowRight, Brain, Check, Dumbbell, Loader2, Pencil, Scale, Utensils, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { CoachProposal } from "@/lib/coach/tools";
 import { MEMORY_CATEGORIES, MEMORY_CATEGORY_LABELS, MEMORY_MAX_CHARS, type MemoryCategory } from "@/lib/coach/memory";
-import { Textarea } from "@/components/ui/input";
+import { Input, Textarea } from "@/components/ui/input";
+import { displayWeight, weightUnit } from "@/lib/domain/units";
 import { applyCoachProposalAction, dismissProposalAction } from "@/server/actions/coach";
 
 type Status = "proposed" | "applied" | "dismissed" | null;
@@ -33,18 +34,32 @@ export function SuggestionCard({ messageId, proposal, status, onChange }: { mess
   const [editing, setEditing] = useState(false);
   const [memCategory, setMemCategory] = useState<MemoryCategory>(proposal.kind === "memory" ? proposal.category : "other");
   const [memText, setMemText] = useState(proposal.kind === "memory" ? proposal.content : "");
+  const tc = proposal.kind === "training_change" ? proposal.change : null;
+  const tcUnits = proposal.kind === "training_change" ? proposal.units : "metric";
+  const [tWeight, setTWeight] = useState(tc?.kind === "exercise_target" ? String(displayWeight(tc.weightKg, tcUnits)) : "");
+  const [tReps, setTReps] = useState(tc?.kind === "exercise_target" && tc.reps ? String(tc.reps) : "");
+  const [tPercent, setTPercent] = useState(tc?.kind === "deload_week" ? String(Math.round(tc.setsFactor * 100)) : "60");
+  const [tRpe, setTRpe] = useState(tc?.kind === "deload_week" ? String(tc.rpeCap) : "7");
+  const [tDelta, setTDelta] = useState(tc?.kind === "volume_change" ? String(tc.deltaSets) : "1");
+  const trainingEdit = () => {
+    if (!tc || !editing) return undefined;
+    if (tc.kind === "exercise_target") return { weight: Number(tWeight), reps: tReps ? Number(tReps) : null };
+    if (tc.kind === "deload_week") return { setsPercent: Number(tPercent), rpeCap: Number(tRpe) };
+    return { deltaSets: Number(tDelta) };
+  };
 
   const canApply = proposal.kind !== "exercise_swap" || proposal.editable;
-  const Icon = proposal.kind === "exercise_swap" ? Dumbbell : proposal.kind === "nutrition_targets" ? Utensils : proposal.kind === "bodyweight_log" ? Scale : Brain;
+  const Icon = proposal.kind === "exercise_swap" ? Dumbbell : proposal.kind === "nutrition_targets" ? Utensils : proposal.kind === "bodyweight_log" ? Scale : proposal.kind === "training_change" ? Activity : Brain;
   const title = {
     exercise_swap: "Suggested exercise swap",
     nutrition_targets: "Suggested nutrition targets",
     bodyweight_log: "Log bodyweight",
+    training_change: "Suggested training change",
     memory: "Remember this?",
     memory_forget: "Forget this memory?",
   }[proposal.kind];
   const isMemory = proposal.kind === "memory" || proposal.kind === "memory_forget";
-  const confirmLabel = proposal.kind === "memory" ? "Save to memory" : proposal.kind === "memory_forget" ? "Forget" : "Confirm";
+  const confirmLabel = proposal.kind === "memory" ? "Save to memory" : proposal.kind === "memory_forget" ? "Forget" : proposal.kind === "training_change" ? (editing ? "Apply my version" : "Accept") : "Confirm";
   const declineLabel = proposal.kind === "memory" ? "Don't save" : proposal.kind === "memory_forget" ? "Keep it" : "Not now";
   const appliedLabel = proposal.kind === "memory" ? "saved" : proposal.kind === "memory_forget" ? "forgotten" : "applied";
   const declinedLabel = proposal.kind === "memory" ? "not saved" : proposal.kind === "memory_forget" ? "kept" : "dismissed";
@@ -136,6 +151,46 @@ export function SuggestionCard({ messageId, proposal, status, onChange }: { mess
           </div>
         ))}
 
+      {proposal.kind === "training_change" && (
+        <div className="mt-2 text-sm">
+          <p className="font-semibold">{proposal.summary}</p>
+          {editing && status === "proposed" && tc && (
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {tc.kind === "exercise_target" && (
+                <>
+                  <label className="text-xs text-muted-foreground">
+                    Load ({weightUnit(tcUnits)})
+                    <Input type="number" inputMode="decimal" step="0.5" value={tWeight} onChange={(e) => setTWeight(e.target.value)} className="mt-1" />
+                  </label>
+                  <label className="text-xs text-muted-foreground">
+                    Reps
+                    <Input type="number" inputMode="numeric" min="1" value={tReps} onChange={(e) => setTReps(e.target.value)} className="mt-1" />
+                  </label>
+                </>
+              )}
+              {tc.kind === "deload_week" && (
+                <>
+                  <label className="text-xs text-muted-foreground">
+                    Keep % of sets
+                    <Input type="number" min="40" max="80" step="5" value={tPercent} onChange={(e) => setTPercent(e.target.value)} className="mt-1" />
+                  </label>
+                  <label className="text-xs text-muted-foreground">
+                    Effort cap (RPE)
+                    <Input type="number" min="5" max="8" step="0.5" value={tRpe} onChange={(e) => setTRpe(e.target.value)} className="mt-1" />
+                  </label>
+                </>
+              )}
+              {tc.kind === "volume_change" && (
+                <label className="text-xs text-muted-foreground">
+                  Sets to add (−2 to 2)
+                  <Input type="number" min="-2" max="2" value={tDelta} onChange={(e) => setTDelta(e.target.value)} className="mt-1" />
+                </label>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {proposal.kind === "memory_forget" && (
         <div className="mt-2 text-sm">
           <p className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">{MEMORY_CATEGORY_LABELS[proposal.category]}</p>
@@ -162,16 +217,20 @@ export function SuggestionCard({ messageId, proposal, status, onChange }: { mess
                 disabled={pending}
                 onClick={() =>
                   act(
-                    () => applyCoachProposalAction(messageId, proposal.kind === "memory" && editing ? { category: memCategory, content: memText } : undefined),
+                    () =>
+                      applyCoachProposalAction(
+                        messageId,
+                        proposal.kind === "memory" && editing ? { category: memCategory, content: memText } : proposal.kind === "training_change" ? trainingEdit() : undefined,
+                      ),
                     "applied",
                   )
                 }
               >
                 {pending ? <Loader2 className="animate-spin" aria-hidden /> : <Check aria-hidden />} {confirmLabel}
               </Button>
-              {proposal.kind === "memory" && !editing && (
+              {(proposal.kind === "memory" || proposal.kind === "training_change") && !editing && (
                 <Button size="sm" variant="secondary" disabled={pending} onClick={() => setEditing(true)}>
-                  <Pencil aria-hidden /> Edit
+                  <Pencil aria-hidden /> {proposal.kind === "memory" ? "Edit" : "Modify"}
                 </Button>
               )}
               <Button size="sm" variant="ghost" disabled={pending} onClick={() => act(() => dismissProposalAction(messageId), "dismissed")}>

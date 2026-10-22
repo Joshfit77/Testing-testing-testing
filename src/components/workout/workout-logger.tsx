@@ -34,7 +34,7 @@ import { clearLocalDraft, loadLocalDraft, saveLocalDraft } from "@/lib/workout-s
 import { discardWorkoutAction, finishWorkoutAction, previousPerformanceAction, syncWorkoutDraftAction, type UnlockedBadge } from "@/server/actions/workouts";
 import { updateRestAlertsAction } from "@/server/actions/rest-alerts";
 import { createTemplateAction } from "@/server/actions/templates";
-import { lastTimeText, type PreviousPerformance } from "@/lib/domain/previous-performance";
+import { lastTimeText, targetText, type PreviousPerformance } from "@/lib/domain/previous-performance";
 import { templateFromDraft } from "@/lib/domain/workout-templates";
 import { BadgeMedallion } from "@/components/achievements/badge-icon";
 import { ExerciseCard } from "./exercise-card";
@@ -60,6 +60,8 @@ interface LoggerProps {
   template: WorkoutTemplate | null;
   /** Latest completed performance per exercise id ("Last time"). */
   previous?: Record<string, PreviousPerformance>;
+  /** Target loads the member accepted from the training review or the AI coach, by exercise id. */
+  targets?: Record<string, { weightKg: number | null; reps: number | null }>;
   /** Rest-timer alerts (Profile setting): a beep and/or a vibration when rest ends. */
   restAlerts?: { sound: boolean; vibrate: boolean };
   /** A message from the page about how the workout was set up (shown under the header). */
@@ -109,7 +111,7 @@ function beep() {
   }
 }
 
-export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraft, template, previous = {}, restAlerts = { sound: true, vibrate: true }, notice = null }: LoggerProps) {
+export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraft, template, previous = {}, targets: initialTargets = {}, restAlerts = { sound: true, vibrate: true }, notice = null }: LoggerProps) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>("loading");
   const [draft, setDraft] = useState<WorkoutDraft | null>(null);
@@ -127,6 +129,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
   const [result, setResult] = useState<FinishResult | null>(null);
   const [online, setOnline] = useState(true);
   const [prev, setPrev] = useState<Record<string, PreviousPerformance>>(previous);
+  const [targets, setTargets] = useState(initialTargets);
   const asked = useRef(new Set(Object.keys(previous)));
   const [alerts, setAlerts] = useState(restAlerts);
   const [alertsError, setAlertsError] = useState<string | null>(null);
@@ -223,7 +226,10 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
     missing.forEach((id) => asked.current.add(id));
     void previousPerformanceAction(missing)
       .then((res) => {
-        if (res.ok) setPrev((p) => ({ ...p, ...res.data }));
+        if (res.ok) {
+          setPrev((p) => ({ ...p, ...res.data }));
+          if (res.targets) setTargets((t) => ({ ...t, ...res.targets }));
+        }
       })
       .catch(() => missing.forEach((id) => asked.current.delete(id)));
   }, [exerciseIds]);
@@ -618,6 +624,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
             onSubstitute={() => setSubstituteKey(e.id)}
             onSkip={() => setSkipKey(e.id)}
             lastTime={lastTimeText(prev[e.exerciseId], units, e.isTimed)}
+            coachTarget={targetText(targets[e.exerciseId], units)}
             nextSetId={up?.exerciseKey === e.id ? up.setId : null}
             superset={{
               letter: e.supersetId ? (letters.get(e.supersetId) ?? null) : null,

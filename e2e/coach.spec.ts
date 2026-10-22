@@ -59,6 +59,10 @@ function reply(req: MockRequest): { blocks: Block[]; stop: string; delayMs: numb
   if (toolResult) {
     const prev = req.messages.at(-2)!;
     const call = (prev.content as { type: string; id?: string; name?: string }[]).find((c) => c.type === "tool_use" && c.id === toolResult.tool_use_id);
+    if (call?.name === "get_training_review") {
+      const data = JSON.parse(String(toolResult.content)) as { consistency?: { sessionsLast28: number }; data_gaps?: string[] };
+      return { delayMs: 0, stop: "end_turn", blocks: [{ type: "text", text: `Review: ${data.consistency?.sessionsLast28 ?? "?"} sessions in 4 weeks. Gaps: ${data.data_gaps?.length ?? 0}.` }] };
+    }
     if (call?.name === "get_exercise_history") {
       const data = JSON.parse(String(toolResult.content)) as { sessions_found?: number; error?: string };
       return {
@@ -76,6 +80,16 @@ function reply(req: MockRequest): { blocks: Block[]; stop: string; delayMs: numb
   }
   const text = String(typeof last.content === "string" ? last.content : "").toLowerCase();
   const system = req.system.map((b) => b.text).join("\n");
+  if (text.includes("review my training")) {
+    return { delayMs: 0, stop: "tool_use", blocks: [{ type: "tool_use", id: `toolu_e2e_${++seq}`, name: "get_training_review", input: {} }] };
+  }
+  if (text.includes("recovery week")) {
+    return {
+      delayMs: 0,
+      stop: "tool_use",
+      blocks: [{ type: "tool_use", id: `toolu_e2e_${++seq}`, name: "propose_deload_week", input: { keep_percent_of_sets: 60, rpe_cap: 7, reason: "You asked for a lighter week." } }],
+    };
+  }
   if (text.includes("remember")) {
     return {
       delayMs: 0,
@@ -274,6 +288,10 @@ test.describe("AI coach", () => {
       "propose_exercise_swap",
       "propose_nutrition_targets",
       "propose_bodyweight_log",
+      "get_training_review",
+      "propose_target_load",
+      "propose_deload_week",
+      "propose_volume_change",
       "propose_memory",
       "propose_forget_memory",
     ]);
@@ -432,5 +450,43 @@ test.describe("AI coach", () => {
     await expect(page.getByText("Nothing saved yet.")).toBeVisible();
     await page.getByRole("button", { name: "Turn memory off" }).click();
     await expect(page.getByRole("heading", { name: "Memory is off" })).toBeVisible();
+  });
+
+  test("adaptive coaching: reads the training review and applies an approved recovery week that can be undone", async ({ page }) => {
+    test.skip(!MOCK_PORT, "set E2E_ANTHROPIC_MOCK_PORT and start the app with ANTHROPIC_BASE_URL pointing at it");
+    const email = uniqueEmail("coach-adaptive");
+    await signUpAndConfirm(page, email);
+    await completeOnboarding(page);
+    await grantPlan(email, "pro");
+    await page.goto("/coach");
+    await page.getByRole("button", { name: "Allow and continue" }).click();
+    const box = page.getByLabel("Message the AI coach");
+    const sendMessage = async (text: string) => {
+      await expect(async () => {
+        await box.fill(text);
+        await page.waitForTimeout(250);
+        await expect(box).toHaveValue(text, { timeout: 500 });
+      }).toPass({ timeout: 15_000 });
+      await page.getByRole("button", { name: "Send message" }).click();
+    };
+
+    await sendMessage("Can you review my training?");
+    await expect(page.getByTestId("coach-activity").getByText("Reviewing your recent training…")).toBeVisible();
+    await expect(page.getByTestId("coach-reply").last()).toContainText("Review: 0 sessions in 4 weeks.", { timeout: 30_000 });
+
+    await sendMessage("I'd like a recovery week please");
+    const card = page.getByTestId("coach-suggestion").last();
+    await expect(card.getByText("Suggested training change")).toBeVisible({ timeout: 30_000 });
+    await expect(card.getByText(/as a recovery week: 60% of the sets, up to RPE 7/)).toBeVisible();
+    await card.getByRole("button", { name: "Modify" }).click();
+    await card.getByLabel("Keep % of sets").fill("50");
+    await card.getByRole("button", { name: "Apply my version" }).click();
+    await expect(card.getByRole("status")).toContainText("is now a recovery week: 50% of the sets");
+    await page.goto("/train/review");
+    const change = page.getByTestId("training-adjustment").first();
+    await expect(change).toContainText("recovery week");
+    await expect(change).toContainText("from the AI coach");
+    await change.getByRole("button", { name: "Undo" }).click();
+    await expect(page.getByRole("status")).toContainText("Undone:");
   });
 });

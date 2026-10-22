@@ -175,7 +175,7 @@ export function MemoryManager({
 
       {notice && (
         <Notice tone={notice.ok ? "success" : "error"}>
-          <span role={notice.ok ? "status" : "alert"}>{notice.text}</span>
+          {notice.text}
         </Notice>
       )}
 

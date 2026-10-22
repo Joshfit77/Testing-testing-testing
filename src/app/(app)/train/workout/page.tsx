@@ -6,7 +6,7 @@ import type { Plan } from "@/lib/domain/types";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { getProgramDay } from "@/server/services/training";
-import { getPreviousPerformance, getServerDraft } from "@/server/services/workouts";
+import { getExerciseTargets, getPreviousPerformance, getServerDraft } from "@/server/services/workouts";
 import { getTemplate } from "@/server/services/templates";
 import { migrateDraft } from "@/lib/domain/workout-draft";
 
@@ -101,7 +101,10 @@ export default async function WorkoutPage({ searchParams }: { searchParams: Prom
   // "Last time" for the exercises this workout starts with (more are fetched as exercises are added).
   const restored = migrateDraft(serverDraft);
   const startIds = [...(template?.exercises.map((e) => e.exercise.id) ?? []), ...(restored?.exercises.map((e) => e.exerciseId) ?? [])];
-  const previous = await getPreviousPerformance(supabase, user.id, startIds).catch(() => ({}));
+  const [previous, targets] = await Promise.all([
+    getPreviousPerformance(supabase, user.id, startIds).catch(() => ({})),
+    getExerciseTargets(supabase, user.id, startIds).catch(() => ({})),
+  ]);
 
   return (
     <>
@@ -109,6 +112,7 @@ export default async function WorkoutPage({ searchParams }: { searchParams: Prom
         notice={notice}
         template={template}
         previous={previous}
+        targets={targets}
         restAlerts={{ sound: profile.rest_timer_sound ?? true, vibrate: profile.rest_timer_vibrate ?? true }}
       />
     </>

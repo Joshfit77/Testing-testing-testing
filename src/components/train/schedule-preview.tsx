@@ -21,9 +21,9 @@ const MINUTE_OPTIONS = [30, 45, 60, 75, 90];
  * Training preferences: try a different schedule and see what it does to the plan before applying it
  * ("4 → 3 days, sessions 52 → 61 min"). Applying rebuilds the starter program from your saved answers.
  */
-export function SchedulePreview({ answers, catalog, current }: { answers: StarterAnswers; catalog: CatalogExercise[]; current: PlanSummary | null }) {
+export function SchedulePreview({ answers, catalog, current, suggestedDays }: { answers: StarterAnswers; catalog: CatalogExercise[]; current: PlanSummary | null; suggestedDays?: number }) {
   const router = useRouter();
-  const [days, setDays] = useState(answers.daysPerWeek);
+  const [days, setDays] = useState(suggestedDays ?? answers.daysPerWeek);
   const [minutes, setMinutes] = useState(answers.sessionMinutes);
   const [pending, start] = useTransition();
   const [result, setResult] = useState<{ ok: boolean; message?: string } | null>(null);
@@ -56,7 +56,7 @@ export function SchedulePreview({ answers, catalog, current }: { answers: Starte
   };
 
   return (
-    <section aria-labelledby="sched-title" className="space-y-3 rounded-2xl border border-border bg-card p-4">
+    <section id="schedule" aria-labelledby="sched-title" className="space-y-3 rounded-2xl border border-border bg-card p-4">
       <div>
         <h2 id="sched-title" className="text-lg font-semibold">
           Change my schedule

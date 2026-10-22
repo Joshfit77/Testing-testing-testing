@@ -387,3 +387,17 @@ export async function getPreviousPerformance(supabase: SupabaseClient, userId: s
   if (error) throw new WorkoutError(error.message);
   return Object.fromEntries(latestPerformances((data ?? []) as unknown as PreviousRow[]));
 }
+
+export interface ExerciseTarget {
+  weightKg: number | null;
+  reps: number | null;
+}
+
+/** Target loads the member accepted from the training review or the AI coach (Pro), by exercise id. */
+export async function getExerciseTargets(supabase: SupabaseClient, userId: string, exerciseIds: string[]): Promise<Record<string, ExerciseTarget>> {
+  const ids = [...new Set(exerciseIds)].slice(0, 40);
+  if (!ids.length) return {};
+  const { data, error } = await supabase.from("exercise_targets").select("exercise_id, weight_kg, reps").eq("user_id", userId).in("exercise_id", ids);
+  if (error) throw new WorkoutError(error.message);
+  return Object.fromEntries((data ?? []).map((t) => [t.exercise_id as string, { weightKg: t.weight_kg == null ? null : Number(t.weight_kg), reps: (t.reps as number | null) ?? null }]));
+}

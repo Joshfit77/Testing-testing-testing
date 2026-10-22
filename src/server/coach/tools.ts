@@ -17,6 +17,8 @@ import {
   type ToolName,
 } from "@/lib/coach/tools";
 import { checkProposedMemory, memoryInputSchema, memoryRef } from "@/lib/coach/memory";
+import { analyzeTraining, describeReviewForCoach, type TrainingChange } from "@/lib/domain/adaptive-training";
+import { loadReviewInput, upcomingWeek } from "@/server/services/adaptive-training";
 import { getActiveProgramRef, loadProgramWeek, mapWorkouts, WORKOUT_SELECT } from "./snapshot";
 
 /**
@@ -402,6 +404,59 @@ function proposeBodyweightLog(ctx: ToolContext, input: ToolInput<"propose_bodywe
   return { content: JSON.stringify({ status: "shown_to_athlete_for_confirmation", applied: false, weight: display, date }), isError: false, proposal };
 }
 
+async function getTrainingReviewTool(ctx: ToolContext): Promise<ToolOutcome> {
+  const { input } = await loadReviewInput(ctx.supabase, ctx.userId);
+  return ok({ unit: weightUnit(input.units), ...describeReviewForCoach(analyzeTraining(input), input.units) });
+}
+
+const proposed = (proposal: CoachProposal, extra: Record<string, unknown> = {}): ToolOutcome => ({
+  content: JSON.stringify({ status: "shown_to_athlete_for_approval", applied: false, note: "The card lets the athlete accept, adjust or decline it; it can be undone later. Explain the evidence briefly.", ...extra }),
+  isError: false,
+  proposal,
+});
+
+async function proposeTargetLoad(ctx: ToolContext, input: ToolInput<"propose_target_load">): Promise<ToolOutcome> {
+  const { data: ex } = await ctx.supabase.from("exercises").select("slug, name").eq("slug", input.exercise_slug).eq("is_published", true).maybeSingle();
+  if (!ex) return fail(`"${input.exercise_slug}" isn't in the exercise catalog. Use a slug from search_exercises or the context.`);
+  const kg = Math.round((input.unit === "kg" ? input.weight : input.weight * KG_PER_LB) * 100) / 100;
+  // Stay close to what the athlete has actually lifted, when there's a recent record.
+  const { input: review } = await loadReviewInput(ctx.supabase, ctx.userId);
+  const tops = review.workouts.flatMap((w) => w.exercises.filter((e) => e.slug === ex.slug).flatMap((e) => e.sets.map((x) => x.weightKg ?? 0)));
+  const best = tops.length ? Math.max(...tops) : 0;
+  if (best > 0 && (kg > best * 1.15 || kg < best * 0.5)) {
+    return fail(`That's far from their recent top set of ${displayWeight(best, review.units)} ${weightUnit(review.units)}. Suggest a load within one step of what they've logged, or explain instead.`);
+  }
+  const change: TrainingChange = { kind: "exercise_target", exerciseSlug: ex.slug as string, exerciseName: ex.name as string, weightKg: kg, reps: input.reps };
+  const display = `${displayWeight(kg, ctx.snapshot.units)} ${weightUnit(ctx.snapshot.units)}${input.reps ? ` × ${input.reps}` : ""}`;
+  return proposed({ kind: "training_change", change, summary: `Target for ${ex.name as string}: ${display}`, reason: input.reason, units: ctx.snapshot.units }, { based_on_recent_top_set: best ? displayWeight(best, review.units) : null });
+}
+
+async function proposeDeloadWeek(ctx: ToolContext, input: ToolInput<"propose_deload_week">): Promise<ToolOutcome> {
+  const ref = await getActiveProgramRef(ctx.supabase, ctx.userId);
+  if (!ref) return fail("The athlete has no active program.");
+  if (!ref.editable) return fail("This is a library program, which can't be edited. Describe the recovery week in text instead (about 60% of the sets at RPE 7 or less).");
+  const week = upcomingWeek(ref);
+  const { data: w } = await ctx.supabase.from("program_weeks").select("is_deload").eq("program_id", ref.programId).eq("week_number", week).maybeSingle();
+  if (!w) return fail(`Week ${week} wasn't found in the program.`);
+  if (w.is_deload) return fail(`Week ${week} is already a lighter week.`);
+  const change: TrainingChange = { kind: "deload_week", programId: ref.programId, weekNumber: week, setsFactor: input.keep_percent_of_sets / 100, rpeCap: input.rpe_cap };
+  return proposed({ kind: "training_change", change, summary: `Week ${week} of ${ref.name} as a recovery week: ${input.keep_percent_of_sets}% of the sets, up to RPE ${input.rpe_cap}`, reason: input.reason, units: ctx.snapshot.units });
+}
+
+async function proposeVolumeChange(ctx: ToolContext, input: ToolInput<"propose_volume_change">): Promise<ToolOutcome> {
+  if (input.delta_sets === 0) return fail("delta_sets must be -2, -1, 1 or 2.");
+  const ref = await getActiveProgramRef(ctx.supabase, ctx.userId);
+  if (!ref) return fail("The athlete has no active program.");
+  if (!ref.editable) return fail("This is a library program, which can't be edited. Suggest the change in text instead.");
+  const week = upcomingWeek(ref);
+  const program = await loadProgramWeek(ctx.supabase, ref.programId, week);
+  const ex = program?.days.flatMap((d) => d.exercises).find((e) => e.slug === input.exercise_slug);
+  if (!ex) return fail(`"${input.exercise_slug}" isn't in week ${week} of ${ref.name}. Call get_program_week for valid slugs.`);
+  const change: TrainingChange = { kind: "volume_change", programId: ref.programId, exerciseSlug: ex.slug, exerciseName: ex.name, fromWeek: week, deltaSets: input.delta_sets };
+  const n = Math.abs(input.delta_sets);
+  return proposed({ kind: "training_change", change, summary: `${input.delta_sets > 0 ? "Add" : "Remove"} ${n} set${n === 1 ? "" : "s"} ${input.delta_sets > 0 ? "to" : "from"} ${ex.name} from week ${week} on`, reason: input.reason, units: ctx.snapshot.units });
+}
+
 function proposeMemory(ctx: ToolContext, input: ToolInput<"propose_memory">): ToolOutcome {
   const memory = ctx.snapshot.memory ?? { enabled: false, wellnessConsent: false, items: [] };
   const parsed = memoryInputSchema.safeParse(input);
@@ -455,6 +510,14 @@ export async function executeCoachTool(ctx: ToolContext, name: string, rawInput:
         return proposeNutritionTargets(ctx, input as ToolInput<"propose_nutrition_targets">);
       case "propose_bodyweight_log":
         return proposeBodyweightLog(ctx, input as ToolInput<"propose_bodyweight_log">);
+      case "get_training_review":
+        return await getTrainingReviewTool(ctx);
+      case "propose_target_load":
+        return await proposeTargetLoad(ctx, input as ToolInput<"propose_target_load">);
+      case "propose_deload_week":
+        return await proposeDeloadWeek(ctx, input as ToolInput<"propose_deload_week">);
+      case "propose_volume_change":
+        return await proposeVolumeChange(ctx, input as ToolInput<"propose_volume_change">);
       case "propose_memory":
         return proposeMemory(ctx, input as ToolInput<"propose_memory">);
       case "propose_forget_memory":

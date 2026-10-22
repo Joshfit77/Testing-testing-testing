@@ -109,3 +109,10 @@ export function lastTimeText(prev: PreviousPerformance | undefined, units: UnitS
   const summary = summarizeSets(prev.sets, units, timed);
   return summary ? `Last time: ${summary}` : null;
 }
+
+/** "Target: 102.5 kg × 5" — a load the member accepted from the training review or the AI coach. */
+export function targetText(t: { weightKg: number | null; reps: number | null } | undefined, units: UnitSystem): string | null {
+  if (!t || (t.weightKg == null && t.reps == null)) return null;
+  const load = t.weightKg != null ? `${displayWeight(t.weightKg, units)} ${weightUnit(units)}` : null;
+  return `Your target: ${[load, t.reps ? `${load ? "× " : ""}${t.reps} reps` : null].filter(Boolean).join(" ")}`;
+}

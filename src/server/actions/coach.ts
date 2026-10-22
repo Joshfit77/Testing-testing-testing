@@ -13,6 +13,9 @@ import { addDays, isoDateInTz } from "@/lib/domain/dates";
 import type { Sex } from "@/lib/domain/nutrition";
 import { getActiveProgramRef } from "@/server/coach/snapshot";
 import { approvedChangeMemory, findDuplicateMemory, MEMORY_LIMIT, memoryInputSchema } from "@/lib/coach/memory";
+import { applyModification, trainingModifySchema } from "@/lib/domain/adaptive-training";
+import type { UnitSystem } from "@/lib/domain/types";
+import { applyTrainingChange, TrainingChangeError } from "@/server/services/adaptive-training";
 import type { CoachProposal } from "@/lib/coach/tools";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -101,7 +104,7 @@ export async function deleteConversationAction(conversationId: string): Promise<
  * from the explicit Confirm button on the suggestion card. Everything is re-validated here against the
  * user's current data; the model never writes anything itself.
  */
-export async function applyCoachProposalAction(messageId: string, edited?: { category: string; content: string }): Promise<Result> {
+export async function applyCoachProposalAction(messageId: string, edited?: Record<string, unknown>): Promise<Result> {
   const user = await requireUser();
   const id = z.string().uuid().safeParse(messageId);
   if (!id.success) return { ok: false, error: "Invalid suggestion." };
@@ -114,87 +117,117 @@ export async function applyCoachProposalAction(messageId: string, edited?: { cat
   if (!parsed.success) return { ok: false, error: "This suggestion can't be applied." };
   const p = parsed.data;
 
-  try {
-    let message: string;
-    if (p.kind === "exercise_swap") {
-      const ref = await getActiveProgramRef(supabase, user.id);
-      if (!ref) return { ok: false, error: "You don't have an active program anymore." };
-      if (!ref.editable || ref.name !== p.programName) return { ok: false, error: "This program can't be edited here. Use Swap in the workout logger instead." };
-      const { data: exRows } = await supabase.from("exercises").select("id, slug").in("slug", [p.from.slug, p.to.slug]);
-      const fromId = exRows?.find((e) => e.slug === p.from.slug)?.id as string | undefined;
-      const toId = exRows?.find((e) => e.slug === p.to.slug)?.id as string | undefined;
-      if (!fromId || !toId) return { ok: false, error: "One of those exercises is no longer available." };
-      const { data: rows } = await supabase
-        .from("program_exercises")
-        .select("id, day:program_days!inner(day_number, week:program_weeks!inner(program_id, week_number))")
-        .eq("exercise_id", fromId)
-        .eq("day.week.program_id", ref.programId)
-        .gte("day.week.week_number", ref.currentWeek);
-      const candidates = ((rows ?? []) as unknown as { id: string; day: { day_number: number; week: { week_number: number } } }[])
-        .map((r) => ({ id: r.id, week: r.day.week.week_number, day: r.day.day_number }))
-        .filter((r) => r.week > ref.currentWeek || r.day >= ref.currentDay || p.scope === "rest_of_program")
-        .sort((a, b) => a.week - b.week || a.day - b.day);
-      if (!candidates.length) return { ok: false, error: `${p.from.name} isn't in the rest of your program.` };
-      const first = candidates[0]!;
-      const target = p.scope === "next_workout" ? candidates.filter((c) => c.week === first.week && c.day === first.day) : candidates;
-      const { data: updated, error } = await supabase.from("program_exercises").update({ exercise_id: toId }).in("id", target.map((t) => t.id)).select("id");
-      if (error) throw error;
-      if (!updated?.length) return { ok: false, error: "Couldn't change this program. Use Swap in the workout logger instead." };
-      message = p.scope === "next_workout" ? `Swapped ${p.from.name} for ${p.to.name} in your next session.` : `Swapped ${p.from.name} for ${p.to.name} for the rest of the program.`;
-    } else if (p.kind === "nutrition_targets") {
-      const [{ data: prof }, { data: w }, { data: current }] = await Promise.all([
-        supabase.from("profiles").select("sex").eq("id", user.id).maybeSingle(),
-        supabase.from("weight_entries").select("weight_kg").eq("user_id", user.id).order("recorded_on", { ascending: false }).limit(1).maybeSingle(),
-        supabase.from("nutrition_goals").select("water_ml").eq("user_id", user.id).maybeSingle(),
-      ]);
-      const errors = checkNutritionTargets(p, { sex: (prof?.sex as Sex | null) ?? null, weightKg: w ? Number(w.weight_kg) : null });
-      if (errors.length) return { ok: false, error: errors[0]! };
-      const { error } = await supabase.from("nutrition_goals").upsert({
-        user_id: user.id,
-        calories: p.calories,
-        protein_g: p.protein_g,
-        carbs_g: p.carbs_g,
-        fat_g: p.fat_g,
-        water_ml: (current?.water_ml as number | undefined) ?? 2500,
-        is_estimate: false,
-      });
-      if (error) throw error;
-      message = `Targets updated: ${p.calories} kcal, ${p.protein_g} g protein.`;
-    } else if (p.kind === "memory") {
-      // The member may edit the note before saving it; whatever is saved is validated again here.
-      const input = memoryInputSchema.safeParse(edited ?? { category: p.category, content: p.content });
-      if (!input.success) return { ok: false, error: input.error.issues[0]?.message ?? "Invalid memory." };
-      const { data: prof } = await supabase.from("profiles").select("coach_memory_enabled").eq("id", user.id).maybeSingle();
-      if (!prof?.coach_memory_enabled) return { ok: false, error: "Memory is switched off. Turn it on in AI Coach → Memory first." };
-      const { data: existing } = await supabase.from("coach_memories").select("content").eq("user_id", user.id);
-      const dup = findDuplicateMemory(input.data.content, existing ?? []);
-      if (dup) return { ok: false, error: `Already remembered: "${dup.content}"` };
-      const { error } = await supabase.from("coach_memories").insert({ user_id: user.id, ...input.data, source: "coach", source_message_id: msg.id });
-      if (error) {
-        if (error.message.includes("coach_memory_limit")) return { ok: false, error: `You can keep up to ${MEMORY_LIMIT} memories. Delete some in AI Coach → Memory first.` };
-        throw error;
-      }
-      message = "Saved to your coaching memory.";
-    } else if (p.kind === "memory_forget") {
-      const { error, count } = await supabase.from("coach_memories").delete({ count: "exact" }).eq("id", p.memoryId).eq("user_id", user.id);
-      if (error) throw error;
-      message = count ? "Forgotten." : "That memory was already deleted.";
-    } else {
-      const { data: prof } = await supabase.from("profiles").select("timezone").eq("id", user.id).maybeSingle();
-      const today = isoDateInTz(new Date(), (prof?.timezone as string) || "UTC");
-      if (p.date > today || p.date < addDays(today, -365)) return { ok: false, error: "That date can't be logged." };
-      const { error } = await supabase.from("weight_entries").upsert({ user_id: user.id, recorded_on: p.date, weight_kg: p.weightKg }, { onConflict: "user_id,recorded_on" });
-      if (error) throw error;
-      message = `Logged ${p.display} for ${p.date}.`;
-    }
-    await supabase.from("ai_messages").update({ proposal_status: "applied" }).eq("id", msg.id).eq("user_id", user.id);
-    if (p.kind === "exercise_swap" || p.kind === "nutrition_targets") await rememberApprovedChange(supabase, user.id, msg.conversation_id as string, p);
-    revalidatePath("/", "layout");
-    return { ok: true, message };
-  } catch (err) {
-    logError("coach.apply_suggestion", err);
+  // Claim the suggestion first, so a second tap (or another tab) can't apply it twice.
+  const { data: claimed, error: claimErr } = await supabase
+    .from("ai_messages")
+    .update({ proposal_status: "applied" })
+    .eq("id", msg.id)
+    .eq("user_id", user.id)
+    .eq("proposal_status", "proposed")
+    .select("id");
+  if (claimErr) {
+    logError("coach.apply_suggestion_claim", claimErr);
     return { ok: false, error: "Couldn't apply that change. Please try again." };
   }
+  if (!claimed?.length) return { ok: false, error: "This suggestion was already handled." };
+  const outcome = await (async (): Promise<Result> => {
+    try {
+      let message: string;
+      if (p.kind === "exercise_swap") {
+        const ref = await getActiveProgramRef(supabase, user.id);
+        if (!ref) return { ok: false, error: "You don't have an active program anymore." };
+        if (!ref.editable || ref.name !== p.programName) return { ok: false, error: "This program can't be edited here. Use Swap in the workout logger instead." };
+        const { data: exRows } = await supabase.from("exercises").select("id, slug").in("slug", [p.from.slug, p.to.slug]);
+        const fromId = exRows?.find((e) => e.slug === p.from.slug)?.id as string | undefined;
+        const toId = exRows?.find((e) => e.slug === p.to.slug)?.id as string | undefined;
+        if (!fromId || !toId) return { ok: false, error: "One of those exercises is no longer available." };
+        const { data: rows } = await supabase
+          .from("program_exercises")
+          .select("id, day:program_days!inner(day_number, week:program_weeks!inner(program_id, week_number))")
+          .eq("exercise_id", fromId)
+          .eq("day.week.program_id", ref.programId)
+          .gte("day.week.week_number", ref.currentWeek);
+        const candidates = ((rows ?? []) as unknown as { id: string; day: { day_number: number; week: { week_number: number } } }[])
+          .map((r) => ({ id: r.id, week: r.day.week.week_number, day: r.day.day_number }))
+          .filter((r) => r.week > ref.currentWeek || r.day >= ref.currentDay || p.scope === "rest_of_program")
+          .sort((a, b) => a.week - b.week || a.day - b.day);
+        if (!candidates.length) return { ok: false, error: `${p.from.name} isn't in the rest of your program.` };
+        const first = candidates[0]!;
+        const target = p.scope === "next_workout" ? candidates.filter((c) => c.week === first.week && c.day === first.day) : candidates;
+        const { data: updated, error } = await supabase.from("program_exercises").update({ exercise_id: toId }).in("id", target.map((t) => t.id)).select("id");
+        if (error) throw error;
+        if (!updated?.length) return { ok: false, error: "Couldn't change this program. Use Swap in the workout logger instead." };
+        message = p.scope === "next_workout" ? `Swapped ${p.from.name} for ${p.to.name} in your next session.` : `Swapped ${p.from.name} for ${p.to.name} for the rest of the program.`;
+      } else if (p.kind === "nutrition_targets") {
+        const [{ data: prof }, { data: w }, { data: current }] = await Promise.all([
+          supabase.from("profiles").select("sex").eq("id", user.id).maybeSingle(),
+          supabase.from("weight_entries").select("weight_kg").eq("user_id", user.id).order("recorded_on", { ascending: false }).limit(1).maybeSingle(),
+          supabase.from("nutrition_goals").select("water_ml").eq("user_id", user.id).maybeSingle(),
+        ]);
+        const errors = checkNutritionTargets(p, { sex: (prof?.sex as Sex | null) ?? null, weightKg: w ? Number(w.weight_kg) : null });
+        if (errors.length) return { ok: false, error: errors[0]! };
+        const { error } = await supabase.from("nutrition_goals").upsert({
+          user_id: user.id,
+          calories: p.calories,
+          protein_g: p.protein_g,
+          carbs_g: p.carbs_g,
+          fat_g: p.fat_g,
+          water_ml: (current?.water_ml as number | undefined) ?? 2500,
+          is_estimate: false,
+        });
+        if (error) throw error;
+        message = `Targets updated: ${p.calories} kcal, ${p.protein_g} g protein.`;
+      } else if (p.kind === "training_change") {
+        // The member may adjust the suggestion first (load, reps, share of sets, effort cap, sets to add).
+        const mod = trainingModifySchema.safeParse(edited ?? {});
+        if (!mod.success) return { ok: false, error: mod.error.issues[0]?.message ?? "Invalid change." };
+        const { data: prof } = await supabase.from("profiles").select("unit_system").eq("id", user.id).maybeSingle();
+        const units = ((prof?.unit_system as UnitSystem) ?? "imperial") as UnitSystem;
+        try {
+          const r = await applyTrainingChange(supabase, user.id, applyModification(p.change, mod.data, units), { source: "coach", reason: p.reason, messageId: msg.id as string, units });
+          message = `${r.summary} You can undo it in Train → Training review.`;
+        } catch (err) {
+          if (err instanceof TrainingChangeError) return { ok: false, error: err.message };
+          throw err;
+        }
+      } else if (p.kind === "memory") {
+        // The member may edit the note before saving it; whatever is saved is validated again here.
+        const input = memoryInputSchema.safeParse(edited && "content" in edited ? edited : { category: p.category, content: p.content });
+        if (!input.success) return { ok: false, error: input.error.issues[0]?.message ?? "Invalid memory." };
+        const { data: prof } = await supabase.from("profiles").select("coach_memory_enabled").eq("id", user.id).maybeSingle();
+        if (!prof?.coach_memory_enabled) return { ok: false, error: "Memory is switched off. Turn it on in AI Coach → Memory first." };
+        const { data: existing } = await supabase.from("coach_memories").select("content").eq("user_id", user.id);
+        const dup = findDuplicateMemory(input.data.content, existing ?? []);
+        if (dup) return { ok: false, error: `Already remembered: "${dup.content}"` };
+        const { error } = await supabase.from("coach_memories").insert({ user_id: user.id, ...input.data, source: "coach", source_message_id: msg.id });
+        if (error) {
+          if (error.message.includes("coach_memory_limit")) return { ok: false, error: `You can keep up to ${MEMORY_LIMIT} memories. Delete some in AI Coach → Memory first.` };
+          throw error;
+        }
+        message = "Saved to your coaching memory.";
+      } else if (p.kind === "memory_forget") {
+        const { error, count } = await supabase.from("coach_memories").delete({ count: "exact" }).eq("id", p.memoryId).eq("user_id", user.id);
+        if (error) throw error;
+        message = count ? "Forgotten." : "That memory was already deleted.";
+      } else {
+        const { data: prof } = await supabase.from("profiles").select("timezone").eq("id", user.id).maybeSingle();
+        const today = isoDateInTz(new Date(), (prof?.timezone as string) || "UTC");
+        if (p.date > today || p.date < addDays(today, -365)) return { ok: false, error: "That date can't be logged." };
+        const { error } = await supabase.from("weight_entries").upsert({ user_id: user.id, recorded_on: p.date, weight_kg: p.weightKg }, { onConflict: "user_id,recorded_on" });
+        if (error) throw error;
+        message = `Logged ${p.display} for ${p.date}.`;
+      }
+      if (p.kind === "exercise_swap" || p.kind === "nutrition_targets") await rememberApprovedChange(supabase, user.id, msg.conversation_id as string, p);
+      revalidatePath("/", "layout");
+      return { ok: true, message };
+    } catch (err) {
+      logError("coach.apply_suggestion", err);
+      return { ok: false, error: "Couldn't apply that change. Please try again." };
+    }
+  })();
+  // Nothing was applied: let the member try again.
+  if (!outcome.ok) await supabase.from("ai_messages").update({ proposal_status: "proposed" }).eq("id", msg.id).eq("user_id", user.id);
+  return outcome;
 }
 
 /**

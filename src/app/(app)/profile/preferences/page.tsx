@@ -13,8 +13,10 @@ import { getActivePlanSummary } from "@/server/services/plan-summary";
 
 export const metadata = { title: "Training preferences" };
 
-export default async function PreferencesPage() {
+export default async function PreferencesPage({ searchParams }: { searchParams: Promise<{ days?: string }> }) {
   const { user, profile } = await requireOnboardedUser();
+  // The training review can link here with a suggested number of days to preview (nothing changes until applied).
+  const suggestedDays = Number.parseInt((await searchParams).days ?? "", 10);
   const supabase = await getServerSupabase();
   const [{ data: a }, { data: w }, exercises, current] = await Promise.all([
     supabase.from("onboarding_answers").select("*").eq("user_id", user.id).maybeSingle(),
@@ -44,6 +46,7 @@ export default async function PreferencesPage() {
           }}
           catalog={toCatalog(exercises)}
           current={current}
+          suggestedDays={suggestedDays >= 1 && suggestedDays <= 7 ? suggestedDays : undefined}
         />
       )}
       <OnboardingWizard

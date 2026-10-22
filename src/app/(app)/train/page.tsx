@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BarChart3, BookmarkCheck, CalendarDays, ChevronRight, Dumbbell, HeartPulse, History, Pause, Plus, Wand2 } from "lucide-react";
+import { Activity, BarChart3, BookmarkCheck, CalendarDays, ChevronRight, Dumbbell, HeartPulse, History, Pause, Plus, Wand2 } from "lucide-react";
 import { ActionButton } from "@/components/common/action-button";
 import { TodayWorkoutAction } from "@/components/home/today-workout-action";
 import { MainHeader } from "@/components/shell/main-header";
@@ -48,6 +48,7 @@ export default async function TrainPage() {
     { href: "/train/templates", icon: BookmarkCheck, label: "My workouts" },
     { href: "/train/workout?blank=1", icon: Plus, label: "Empty workout" },
     { href: "/train/recovery", icon: HeartPulse, label: "Recovery" },
+    { href: "/train/review", icon: Activity, label: hasFeature(plan, "advanced_recommendations") ? "Training review" : "Training review (Pro)" },
     { href: "/calendar", icon: CalendarDays, label: "Training calendar" },
   ];
 
