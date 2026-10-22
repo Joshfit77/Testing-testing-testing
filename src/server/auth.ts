@@ -3,7 +3,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { hasFeature, type Feature } from "@/lib/domain/plans";
+import { hasFeature, planFromEntitlement, type Feature } from "@/lib/domain/plans";
 import type { Plan } from "@/lib/domain/types";
 import type { ProfileRow } from "@/lib/types/db";
 
@@ -48,9 +48,7 @@ export async function requireAdmin(): Promise<{ user: User; profile: ProfileRow 
 export const getUserPlan = cache(async (userId: string): Promise<Plan> => {
   const supabase = await getServerSupabase();
   const { data } = await supabase.from("user_entitlements").select("plan, valid_until").eq("user_id", userId).maybeSingle();
-  if (!data) return "free";
-  if (data.valid_until && new Date(data.valid_until as string).getTime() < Date.now()) return "free";
-  return (data.plan as Plan) ?? "free";
+  return planFromEntitlement(data as { plan: string; valid_until: string | null } | null);
 });
 
 export class EntitlementError extends Error {

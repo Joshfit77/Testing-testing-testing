@@ -2,7 +2,7 @@ import "server-only";
 import Stripe from "stripe";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { publicEnv } from "@/lib/env";
-import { entitlementFromSubscriptions, legacyTermsApply, type BillingInterval, type LegacyAiTerms, type SubscriptionStatus } from "@/lib/domain/plans";
+import { entitlementFromSubscriptions, legacyTermsApply, planRank, type BillingInterval, type LegacyAiTerms, type SubscriptionStatus } from "@/lib/domain/plans";
 import type { Plan } from "@/lib/domain/types";
 import { storeRowAsSubscription } from "@/lib/billing/revenuecat";
 import { isServiceRoleConfigured, serverEnv } from "@/server/env";
@@ -12,7 +12,14 @@ let stripeClient: Stripe | null = null;
 
 export function getStripe(): Stripe {
   if (!serverEnv.stripeSecretKey) throw new Error("Stripe is not configured");
-  if (!stripeClient) stripeClient = new Stripe(serverEnv.stripeSecretKey, { appInfo: { name: "Narrow Gate Fitness" } });
+  if (!stripeClient) {
+    // STRIPE_API_BASE_URL points the client at a local stand-in in tests; production always uses Stripe.
+    const base = process.env.STRIPE_API_BASE_URL ? new URL(process.env.STRIPE_API_BASE_URL) : null;
+    stripeClient = new Stripe(serverEnv.stripeSecretKey, {
+      appInfo: { name: "Narrow Gate Fitness" },
+      ...(base ? { host: base.hostname, port: Number(base.port), protocol: base.protocol.replace(":", "") as "http" | "https" } : {}),
+    });
+  }
   return stripeClient;
 }
 
@@ -116,9 +123,9 @@ export async function recomputeEntitlement(userId: string): Promise<Plan> {
     if (sub) candidates.push({ ...sub, source: row.store === "play_store" ? "play_store" : "app_store" });
   }
   const { plan, validUntil, from } = entitlementFromSubscriptions(candidates);
-  const { data: current } = await admin.from("user_entitlements").select("source").eq("user_id", userId).maybeSingle();
-  // Manual admin grants are left alone unless a subscription now provides a paid plan.
-  if (current?.source === "admin" && plan === "free") return plan;
+  const { data: current } = await admin.from("user_entitlements").select("plan, source").eq("user_id", userId).maybeSingle();
+  // A manual admin grant stays unless a subscription now provides a higher plan.
+  if (current?.source === "admin" && planRank(current.plan as Plan) >= planRank(plan)) return current.plan as Plan;
   const { error: upErr } = await admin
     .from("user_entitlements")
     .upsert({ user_id: userId, plan, source: plan === "free" || !from ? "default" : from.source, valid_until: plan === "free" ? null : validUntil }, { onConflict: "user_id" });
@@ -191,9 +198,13 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<boolean> {
       case "customer.subscription.updated":
       case "customer.subscription.deleted":
       case "customer.subscription.paused":
-      case "customer.subscription.resumed":
-        await syncSubscription(event.data.object as Stripe.Subscription);
+      case "customer.subscription.resumed": {
+        // Stripe doesn't deliver events in order and retries failures hours later, so the event's snapshot may be
+        // older than what is already stored. Always sync the subscription's current state.
+        const snapshot = event.data.object as Stripe.Subscription;
+        await syncSubscription(await currentSubscription(stripe, snapshot));
         break;
+      }
       case "invoice.payment_failed":
       case "invoice.paid": {
         const invoice = event.data.object as Stripe.Invoice;
@@ -213,6 +224,18 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<boolean> {
     throw err;
   }
   return true;
+}
+
+/** The subscription as Stripe holds it now, or the event's snapshot if Stripe no longer has it. */
+async function currentSubscription(stripe: Stripe, snapshot: Stripe.Subscription): Promise<Stripe.Subscription> {
+  try {
+    const current = await stripe.subscriptions.retrieve(snapshot.id);
+    if (!current.metadata?.user_id && snapshot.metadata?.user_id) current.metadata = { ...current.metadata, user_id: snapshot.metadata.user_id };
+    return current;
+  } catch (err) {
+    if (isStripeMissing(err)) return snapshot;
+    throw err;
+  }
 }
 
 export async function cancelStripeSubscriptionsForUser(userId: string): Promise<void> {

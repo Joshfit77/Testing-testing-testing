@@ -1,8 +1,13 @@
+import { createServer, type Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import Stripe from "stripe";
 import { createTestUser, deleteTestUser, serviceClient, stackAvailable, type TestUser } from "./helpers";
 
 const available = await stackAvailable();
+
+/** What Stripe currently holds for each subscription (a local stand-in for GET /v1/subscriptions/:id). */
+const stripeSubs = new Map<string, Stripe.Subscription>();
+let stripeServer: Server;
 
 function fakeSubscription(overrides: Record<string, unknown>): Stripe.Subscription {
   const periodEnd = Math.floor(Date.now() / 1000) + 30 * 86400;
@@ -28,9 +33,19 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
   const plan = async () => (await serviceClient().from("user_entitlements").select("plan, source").eq("user_id", user.id).single()).data;
 
   beforeAll(async () => {
+    stripeServer = createServer((req, res) => {
+      const id = req.url?.match(/^\/v1\/subscriptions\/([^/?]+)/)?.[1];
+      const sub = id ? stripeSubs.get(decodeURIComponent(id)) : undefined;
+      if (!sub) return void res.writeHead(404, { "content-type": "application/json" }).end(JSON.stringify({ error: { type: "invalid_request_error", code: "resource_missing", message: "No such subscription" } }));
+      res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(sub));
+    });
+    await new Promise<void>((resolve) => stripeServer.listen(4613, "127.0.0.1", resolve));
     user = await createTestUser("subscriber");
   });
-  afterAll(async () => deleteTestUser(user));
+  afterAll(async () => {
+    await deleteTestUser(user);
+    await new Promise((resolve) => stripeServer.close(resolve));
+  });
 
   it("rejects webhooks without a valid Stripe signature", async () => {
     const body = JSON.stringify({ id: "evt_unsigned", type: "customer.subscription.updated", data: { object: {} } });
@@ -43,6 +58,7 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
 
   it("upgrades the entitlement from a verified subscription webhook, once per event", async () => {
     const sub = fakeSubscription({ metadata: { user_id: user.id } });
+    stripeSubs.set(sub.id, sub);
     const event = { id: `evt_${crypto.randomUUID()}`, object: "event", type: "customer.subscription.created", data: { object: sub } };
     const payload = JSON.stringify(event);
     const signature = Stripe.webhooks.generateTestHeaderString({ payload, secret: process.env.STRIPE_WEBHOOK_SECRET! });
@@ -64,8 +80,8 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
     await syncSubscription({ ...sub, items: { ...sub.items, data: [{ ...sub.items.data[0]!, price: { id: "price_test_pro" } }] } } as unknown as Stripe.Subscription);
     expect(await plan()).toMatchObject({ plan: "pro" });
 
-    // Canceled at period end: access continues until the period ends.
-    await syncSubscription({ ...sub, status: "canceled", cancel_at_period_end: true } as Stripe.Subscription);
+    // Set to cancel at the period end: Stripe keeps it active, and access continues until then.
+    await syncSubscription({ ...sub, status: "active", cancel_at_period_end: true } as Stripe.Subscription);
     expect((await plan())?.plan).not.toBe("free");
 
     const ended = { ...sub, status: "canceled", items: { ...sub.items, data: [{ ...sub.items.data[0]!, current_period_end: Math.floor(Date.now() / 1000) - 60 }] } };
@@ -171,6 +187,45 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
       await expect(assertAiAllowed(u.id, "plus", "chat")).resolves.toMatchObject({ chatLimit: 60 });
       await syncSubscription({ ...sub, status: "canceled", items: { ...sub.items, data: [{ ...sub.items.data[0]!, current_period_end: Math.floor(Date.now() / 1000) - 60 }] } } as unknown as Stripe.Subscription);
       await expect(assertAiAllowed(u.id, "free", "chat")).rejects.toMatchObject({ code: "not_entitled" });
+    } finally {
+      await deleteTestUser(u);
+    }
+  });
+
+  it("an immediately cancelled subscription ends access at once, and an admin grant isn't lowered by a subscription", async () => {
+    const u = await createTestUser("cancel-now");
+    const ent = async () => (await serviceClient().from("user_entitlements").select("plan, source").eq("user_id", u.id).single()).data;
+    try {
+      const sub = fakeSubscription({ metadata: { user_id: u.id } });
+      await syncSubscription(sub);
+      expect(await ent()).toMatchObject({ plan: "plus" });
+      // Cancelled now (or after failed renewals): the period end may still lie ahead, but nothing more is owed.
+      await syncSubscription({ ...sub, status: "canceled" } as Stripe.Subscription);
+      expect(await ent()).toMatchObject({ plan: "free" });
+
+      await serviceClient().from("user_entitlements").upsert({ user_id: u.id, plan: "pro", source: "admin" }, { onConflict: "user_id" });
+      await syncSubscription({ ...sub, id: `${sub.id}b` } as Stripe.Subscription);
+      expect(await ent()).toMatchObject({ plan: "pro", source: "admin" });
+    } finally {
+      await deleteTestUser(u);
+    }
+  });
+
+  it("a late, out-of-date subscription event can't undo the current state", async () => {
+    const u = await createTestUser("out-of-order");
+    const ent = async () => (await serviceClient().from("user_entitlements").select("plan").eq("user_id", u.id).single()).data?.plan;
+    try {
+      const current = fakeSubscription({ metadata: { user_id: u.id }, status: "active" });
+      stripeSubs.set(current.id, current);
+      await syncSubscription(current);
+      expect(await ent()).toBe("plus");
+      // The subscription's first event (still "incomplete") arrives late, after a retry.
+      const stale = { ...current, status: "incomplete" };
+      const payload = JSON.stringify({ id: `evt_${crypto.randomUUID()}`, object: "event", type: "customer.subscription.created", data: { object: stale } });
+      const signature = Stripe.webhooks.generateTestHeaderString({ payload, secret: process.env.STRIPE_WEBHOOK_SECRET! });
+      const res = await webhook(new NextRequest("http://localhost/api/stripe/webhook", { method: "POST", body: payload, headers: { "stripe-signature": signature } }));
+      expect(res.status).toBe(200);
+      expect(await ent()).toBe("plus");
     } finally {
       await deleteTestUser(u);
     }

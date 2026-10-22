@@ -1,4 +1,4 @@
-import { aiAllowance, APPROVED_YEARLY_PRICE_CENTS, canAccessTier, effectivePlanFromSubscription, formatPrice, getPlans, hasFeature, legacyTermsApply, yearlySavingsPercent } from "@/lib/domain/plans";
+import { aiAllowance, APPROVED_YEARLY_PRICE_CENTS, planFromEntitlement, canAccessTier, effectivePlanFromSubscription, formatPrice, getPlans, hasFeature, legacyTermsApply, yearlySavingsPercent } from "@/lib/domain/plans";
 
 describe("plans & entitlements", () => {
   it("gates features by plan: food logging free, Plus a complete non-AI toolkit, AI only on Pro", () => {
@@ -55,7 +55,10 @@ describe("plans & entitlements", () => {
     const future = "2026-11-22T00:00:00Z";
     const terms = { plan: "plus" as const, ends_at: null };
     expect(legacyTermsApply(terms, { plan: "plus", status: "active", current_period_end: future }, now)).toBe(true);
-    expect(legacyTermsApply(terms, { plan: "plus", status: "canceled", current_period_end: future }, now)).toBe(true);
+    // Set to cancel at the period end: Stripe keeps it active until then.
+    expect(legacyTermsApply(terms, { plan: "plus", status: "active", current_period_end: future }, now)).toBe(true);
+    // Cancelled outright: the terms end with it.
+    expect(legacyTermsApply(terms, { plan: "plus", status: "canceled", current_period_end: future }, now)).toBe(false);
     expect(legacyTermsApply(terms, { plan: "plus", status: "canceled", current_period_end: "2026-10-01T00:00:00Z" }, now)).toBe(false);
     expect(legacyTermsApply(terms, { plan: "pro", status: "active", current_period_end: future }, now)).toBe(false);
     expect(legacyTermsApply({ plan: "plus", ends_at: "2026-10-21T00:00:00Z" }, { plan: "plus", status: "active", current_period_end: future }, now)).toBe(false);
@@ -104,7 +107,8 @@ describe("plans & entitlements", () => {
     expect(effectivePlanFromSubscription(null, now)).toBe("free");
     expect(effectivePlanFromSubscription({ plan: "pro", status: "active", current_period_end: future }, now)).toBe("pro");
     expect(effectivePlanFromSubscription({ plan: "plus", status: "past_due", current_period_end: future }, now)).toBe("plus");
-    expect(effectivePlanFromSubscription({ plan: "plus", status: "canceled", current_period_end: future }, now)).toBe("plus");
+    // A cancelled subscription has ended, even if its period end lies ahead (immediate or dunning cancellation).
+    expect(effectivePlanFromSubscription({ plan: "plus", status: "canceled", current_period_end: future }, now)).toBe("free");
     expect(effectivePlanFromSubscription({ plan: "plus", status: "canceled", current_period_end: past }, now)).toBe("free");
     expect(effectivePlanFromSubscription({ plan: "pro", status: "unpaid", current_period_end: future }, now)).toBe("free");
     expect(effectivePlanFromSubscription({ plan: "pro", status: "active", current_period_end: past }, now)).toBe("free");
@@ -117,5 +121,16 @@ describe("database plan checks match the app", () => {
     const sql = readFileSync("supabase/migrations/20261023000024_plan_enforcement.sql", "utf8");
     const m = sql.match(/from public\.workout_templates where user_id = new\.user_id\) >= (\d+)/);
     expect(Number(m?.[1])).toBe(getPlans().free.templateLimit);
+  });
+});
+
+describe("planFromEntitlement", () => {
+  const now = new Date("2026-10-22T00:00:00Z");
+  it("grants the plan until valid_until passes, then Free", () => {
+    expect(planFromEntitlement(null, now)).toBe("free");
+    expect(planFromEntitlement({ plan: "pro", valid_until: null }, now)).toBe("pro");
+    expect(planFromEntitlement({ plan: "plus", valid_until: "2026-11-01T00:00:00Z" }, now)).toBe("plus");
+    expect(planFromEntitlement({ plan: "plus", valid_until: "2026-10-01T00:00:00Z" }, now)).toBe("free");
+    expect(planFromEntitlement({ plan: "gold", valid_until: null }, now)).toBe("free");
   });
 });

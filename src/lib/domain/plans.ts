@@ -178,8 +178,10 @@ export type SubscriptionStatus =
   | "paused";
 
 /**
- * Decide the effective plan for a subscription. Access continues during `past_due`
- * (Stripe is retrying payment) and until the period end after cancellation.
+ * Decide the effective plan for a subscription. Access continues during `past_due` (Stripe is retrying payment)
+ * and, for a subscription set to cancel at the period end, until then (Stripe keeps it `active` meanwhile). A
+ * `canceled` subscription has ended: Stripe uses it for immediate cancellations and after failed renewals, when
+ * the period end has already moved on although nothing was paid.
  */
 export function effectivePlanFromSubscription(
   sub: { plan: Exclude<Plan, "free">; status: SubscriptionStatus; current_period_end: string | null } | null,
@@ -192,8 +194,6 @@ export function effectivePlanFromSubscription(
     case "trialing":
     case "past_due":
       return periodActive ? sub.plan : "free";
-    case "canceled":
-      return sub.current_period_end && periodActive ? sub.plan : "free";
     default:
       return "free";
   }
@@ -281,4 +281,11 @@ export function legacyTermsApply(
 ): boolean {
   if (terms.ends_at && new Date(terms.ends_at).getTime() <= now.getTime()) return false;
   return sub.plan === terms.plan && effectivePlanFromSubscription(sub, now) === terms.plan;
+}
+
+/** The plan an entitlement row grants now: its plan while `valid_until` hasn't passed, otherwise Free. */
+export function planFromEntitlement(row: { plan: string | null; valid_until: string | null } | null, now: Date = new Date()): Plan {
+  if (!row?.plan) return "free";
+  if (row.valid_until && new Date(row.valid_until).getTime() < now.getTime()) return "free";
+  return (PLAN_ORDER as string[]).includes(row.plan) ? (row.plan as Plan) : "free";
 }
