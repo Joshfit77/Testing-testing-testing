@@ -14,11 +14,13 @@ import type { RankCategory } from "@/lib/domain/ranks";
  * meant for the one badge in focus, not a whole grid, and every animation stops under reduced motion
  * (the system setting or the app's own setting, see globals.css).
  *
- * If painted artwork is supplied later (docs/BADGES.md), drop it into public/badges and list it in
- * BADGE_IMAGE_OVERRIDES; this component then shows the image instead.
+ * The owner's painted artwork (public/badges/*.webp, cut from their badge reference images) is listed in
+ * BADGE_IMAGE_OVERRIDES and shown instead of the vector drawing; the vector art stays as the fallback.
  */
 
-export const BADGE_IMAGE_OVERRIDES: Partial<Record<`${RankCategory}-${number}`, string>> = {};
+export const BADGE_IMAGE_OVERRIDES: Partial<Record<`${RankCategory}-${number}`, string>> = Object.fromEntries(
+  (["fitness", "food", "faith"] as const).flatMap((c) => [1, 2, 3, 4, 5, 6, 7, 8, 9].map((l) => [`${c}-${l}`, `/badges/${c}-${l}.webp`])),
+);
 
 export function BadgeArt({
   category,
@@ -42,8 +44,12 @@ export function BadgeArt({
   const override = BADGE_IMAGE_OVERRIDES[`${category}-${level}`];
   const style = locked ? { filter: "grayscale(0.9) brightness(0.42) contrast(0.95)" } : undefined;
   if (override) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={override} alt={title ?? ""} width={size} height={size} className={className} style={style} />;
+    return (
+      <span className={["badge-img", animate && !locked ? "badge-img-live" : "", className].filter(Boolean).join(" ")} style={{ width: size, height: size }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={override} alt={title ?? ""} width={size} height={size} style={style} draggable={false} />
+      </span>
+    );
   }
   const lv = Math.max(1, Math.min(9, Math.round(level)));
   const art = category === "fitness" ? <FitnessBadge level={lv} uid={uid} /> : category === "food" ? <FoodBadge level={lv} uid={uid} /> : <FaithBadge level={lv} uid={uid} />;

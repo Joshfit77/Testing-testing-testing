@@ -453,3 +453,51 @@ html[data-motion="reduce"] .badge-reveal-ring {
     animation: none !important;
   }
 }
+
+/* Painted badge images: a soft gold glow, and a slow light sweep on the badge in focus. */
+.badge-img {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  overflow: hidden;
+  border-radius: 22%;
+}
+.badge-img > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.badge-img-live > img {
+  animation: badge-img-glow 3.6s ease-in-out infinite alternate;
+}
+.badge-img-live::after {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  background: linear-gradient(105deg, transparent 40%, rgba(255, 244, 214, 0.28) 50%, transparent 60%);
+  transform: translateX(-120%);
+  animation: badge-img-sweep 5.5s ease-in-out infinite;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+@keyframes badge-img-glow {
+  from { filter: drop-shadow(0 0 4px rgba(233, 185, 85, 0.25)) brightness(1); }
+  to { filter: drop-shadow(0 0 14px rgba(233, 185, 85, 0.55)) brightness(1.08); }
+}
+@keyframes badge-img-sweep {
+  0%, 55% { transform: translateX(-120%); }
+  100% { transform: translateX(120%); }
+}
+html[data-motion="reduce"] .badge-img-live > img,
+html[data-motion="reduce"] .badge-img-live::after {
+  animation: none !important;
+}
+html[data-motion="reduce"] .badge-img-live::after { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .badge-img-live > img,
+  .badge-img-live::after {
+    animation: none !important;
+  }
+  .badge-img-live::after { display: none; }
+}

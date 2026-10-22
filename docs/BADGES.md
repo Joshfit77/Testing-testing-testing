@@ -54,6 +54,25 @@ change, such as 1 John 5:4, "everyone born of God overcomes the world".
 
 ## Artwork
 
+**In use now:** the owner's painted badge artwork. `public/badges/{fitness,food,faith}-{1-9}.webp` are 512 × 512 WebP
+images with transparent, feathered edges. They were cut from the owner's three badge reference screenshots
+(1290 × 2796) by `scripts/badge-art/crop-fitness.py and crop-food-faith.py`, about 28 KB each and 830 KB in total. The app shows them
+through `BADGE_IMAGE_OVERRIDES`:
+
+- **Badge in focus:** a slow gold glow and a light sweep. Both stop under reduced motion.
+- **Locked badges:** shown in muted grey.
+- **Offline edition:** embeds the same images.
+
+> **Rights:** these images came from the owner. Before the app goes to the App Store, confirm that you hold
+> commercial rights to them (for example, that they're your own or AI images you generated under terms that
+> allow commercial use).
+
+**Sharpness:** the cut-outs are about 230 px from the screenshots, upscaled to 512 px. They look sharp in the grid
+but slightly soft in the large detail view. For full sharpness, supply the original artwork, ideally 1024 px per
+badge (see "Commissioned painted artwork" below), and re-run the script or drop the files into `public/badges/`.
+
+The vector drawing described next remains in `badge-art.tsx` as a fallback.
+
 `src/components/badges/badge-art.tsx` draws all 27 badges as original vector artwork. It has no external images,
 stays sharp on Retina screens at any size, and its visual language follows the reference:
 
