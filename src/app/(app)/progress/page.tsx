@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Award, ChevronRight, History, LineChart, PersonStanding } from "lucide-react";
+import { Award, ChevronRight, History, LineChart } from "lucide-react";
 import { MainHeader } from "@/components/shell/main-header";
 import { StepsCard } from "@/components/steps/steps-card";
 import { addDays, isoDateInTz } from "@/lib/domain/dates";
@@ -55,15 +55,6 @@ export default async function ProgressHubPage() {
             <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
           </Link>
         ))}
-        <div className="flex min-h-16 items-center gap-3 rounded-2xl border border-dashed border-border bg-card/50 px-4 py-3" aria-label="Body Map and Ranks, not built yet">
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-border bg-elevated text-muted-foreground">
-            <PersonStanding className="size-5" aria-hidden />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block font-semibold text-foreground/85">Body Map &amp; Ranks</span>
-            <span className="block text-sm text-muted-foreground">Not built yet. Strength ranks by muscle group (Bronze to Disciple) are planned for a later stage.</span>
-          </span>
-        </div>
       </nav>
 
       {steps && (

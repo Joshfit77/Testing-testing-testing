@@ -19,8 +19,9 @@ test.describe("navigation shell", () => {
     await page.getByRole("link", { name: /My Progress/ }).click();
     await page.waitForURL(/\/progress$/);
     await expect(page.getByRole("heading", { level: 1, name: "My Progress" })).toBeVisible();
-    await expect(page.getByText(/Body Map & Ranks/)).toBeVisible();
-    await expect(page.getByText(/Not built yet/)).toBeVisible();
+    // No "not built yet" placeholders in the store build (the body map is planned in docs/PRO_ROADMAP.md).
+    await expect(page.getByText(/Not built yet/)).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /Badges/ }).first()).toBeVisible();
     await page.goto("/calendar");
     await expect(page.getByRole("heading", { level: 1, name: "Training calendar" })).toBeVisible();
 

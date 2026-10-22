@@ -150,6 +150,18 @@ describe.skipIf(!available)("App Store / Google Play subscriptions via RevenueCa
     expect(rows).toEqual([{ product_id: "ngf_pro_monthly" }]);
   });
 
+  it("downgrade Pro → Plus takes effect when the store applies it, at renewal", async () => {
+    // Downgrade chosen: the store keeps Pro until the paid period ends.
+    setCustomer(user.id, { ngf_pro_monthly: sub({ unsubscribe_detected_at: null }) }, { pro: "ngf_pro_monthly", plus: "ngf_pro_monthly" });
+    await send({ type: "PRODUCT_CHANGE", app_user_id: user.id });
+    expect(await ent()).toMatchObject({ plan: "pro" });
+    // At renewal the Plus product takes over and Pro lapses.
+    setCustomer(user.id, { ngf_pro_monthly: sub({ expires_date: iso(-60_000) }), ngf_plus_monthly: sub({ purchase_date: iso(-30_000) }) }, { plus: "ngf_plus_monthly" });
+    await send({ type: "RENEWAL", app_user_id: user.id });
+    expect(await ent()).toMatchObject({ plan: "plus", source: "app_store" });
+    await expect(assertAiAllowed(user.id, "plus", "chat")).rejects.toMatchObject({ code: "not_entitled" });
+  });
+
   it("a refund ends access straight away", async () => {
     setCustomer(user.id, { ngf_pro_monthly: sub({ purchase_date: iso(-day) }) }, { pro: "ngf_pro_monthly" });
     await send({ type: "RENEWAL", app_user_id: user.id });
