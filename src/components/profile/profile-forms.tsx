@@ -114,6 +114,21 @@ export function DeleteAccountForm() {
         Type <strong>DELETE</strong> to permanently delete your account and all of your data
       </Label>
       <Input id="confirm-delete" name="confirm" autoComplete="off" aria-invalid={Boolean(state.fieldErrors?.confirm)} />
+      <div className="space-y-2">
+        <Label htmlFor="delete-password">Your password</Label>
+        <Input id="delete-password" name="password" type="password" autoComplete="current-password" aria-invalid={Boolean(state.fieldErrors?.password)} />
+      </div>
+      <div className="space-y-1.5 text-xs text-muted-foreground">
+        <p>
+          This removes your workouts, runs, nutrition logs, recipes and meal plans, progress photos, AI coach conversations, prayer journal and
+          everything else in your account. It can&apos;t be undone. Export your data first if you want a copy.
+        </p>
+        <p>A Plus or Pro subscription bought on this website is cancelled for you, with no further charges.</p>
+        <p>
+          If you subscribed through the App Store or Google Play, deleting your account doesn&apos;t stop those charges: cancel in your iPhone&apos;s
+          Settings → your name → Subscriptions, or in Google Play → Payments &amp; subscriptions.
+        </p>
+      </div>
       <FormMessage state={state} />
       <SubmitButton variant="destructive" pendingLabel="Deleting…">
         Delete my account

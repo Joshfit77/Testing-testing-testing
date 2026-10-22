@@ -191,12 +191,39 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<boolean> {
 
 export async function cancelStripeSubscriptionsForUser(userId: string): Promise<void> {
   if (!serverEnv.stripeSecretKey || !isServiceRoleConfigured()) return;
-  const { data } = await getServiceSupabase()
+  const { data, error } = await getServiceSupabase()
     .from("subscriptions")
     .select("stripe_subscription_id, status")
     .eq("user_id", userId)
     .in("status", ["active", "trialing", "past_due", "unpaid", "paused", "incomplete"]);
+  // Not knowing which subscriptions exist must stop the deletion, or the person could keep being billed.
+  if (error) throw error;
   for (const s of data ?? []) {
-    await getStripe().subscriptions.cancel(s.stripe_subscription_id as string);
+    try {
+      await getStripe().subscriptions.cancel(s.stripe_subscription_id as string);
+    } catch (err) {
+      // Already cancelled or removed in Stripe: nothing left to bill.
+      if (isStripeMissing(err)) continue;
+      throw err;
+    }
   }
+}
+
+/** Removes the Stripe customer (name, email, saved payment methods) after the account is deleted. */
+export async function deleteStripeCustomer(customerId: string): Promise<void> {
+  try {
+    await getStripe().customers.del(customerId);
+  } catch (err) {
+    if (isStripeMissing(err)) return;
+    throw err;
+  }
+}
+
+export function isStripeConfigured(): boolean {
+  return Boolean(serverEnv.stripeSecretKey);
+}
+
+function isStripeMissing(err: unknown): boolean {
+  const e = err as { code?: string; statusCode?: number } | null;
+  return e?.code === "resource_missing" || e?.statusCode === 404;
 }

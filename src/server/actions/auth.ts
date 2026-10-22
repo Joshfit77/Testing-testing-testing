@@ -89,6 +89,10 @@ export async function updatePasswordAction(_prev: ActionState, formData: FormDat
   const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
   if (error) {
     if (/different from the old/i.test(error.message)) return actionError("Choose a password you haven't used before.", { password: error.message });
+    // secure_password_change: an older session must sign in again before changing the password.
+    if (error.code === "reauthentication_needed" || /reauthenticat/i.test(error.message)) {
+      return actionError("For your security, sign out and sign in again, then change your password.");
+    }
     return actionError(error.message || "We couldn't update your password.");
   }
   redirect("/home?password=updated");

@@ -104,10 +104,23 @@ export async function assertAiAllowed(userId: string, plan: Plan, mode: "chat" |
   const perMinute = Number.parseInt(process.env.AI_RATE_LIMIT_PER_MINUTE ?? "6", 10) || 6;
   const burst = rateLimit(`ai:${userId}`, perMinute, 60_000);
   if (!burst.ok) throw new AiError("rate_limited", "You're sending messages quickly — please wait a moment.", burst.retryAfterSeconds);
+  // The in-memory limiter is per server instance; the usage table enforces the same limit across instances.
+  if ((await recentAiRequests(userId, 60_000)) >= perMinute) throw new AiError("rate_limited", "You're sending messages quickly — please wait a moment.", 60);
   const usage = await getAiUsage(userId, plan);
   if (usage.chatUsed >= usage.chatLimit) throw new AiError("quota", `You've used all ${usage.chatLimit} AI messages for this month.`);
   if (mode === "plan" && usage.planUsed >= usage.planLimit) throw new AiError("quota", `You've used all ${usage.planLimit} plan generations for this month.`);
   return usage;
+}
+
+/** AI requests this user made in the last `windowMs`, from the durable usage table. */
+async function recentAiRequests(userId: string, windowMs: number): Promise<number> {
+  const since = new Date(Date.now() - windowMs).toISOString();
+  const { count, error } = await getServiceSupabase().from("ai_usage_events").select("id", { count: "exact", head: true }).eq("user_id", userId).gte("created_at", since);
+  if (error) {
+    logError("ai.rate_window", error);
+    return 0;
+  }
+  return count ?? 0;
 }
 
 async function recordUsage(userId: string, kind: "chat" | "plan", inputTokens: number, outputTokens: number) {
