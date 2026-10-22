@@ -199,6 +199,7 @@ export function CoachChat({ conversationId: initialId, initialMessages, initialQ
   const [mode, setMode] = useState<"chat" | "plan">("chat");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [usage, setUsage] = useState(initialUsage);
   const [draft, setDraft] = useState("");
   const [activity, setActivity] = useState<Activity[]>([]);
@@ -363,11 +364,23 @@ export function CoachChat({ conversationId: initialId, initialMessages, initialQ
                   confirmLabel: "Delete",
                   destructive: true,
                 });
-                if (!ok) return;
-                await deleteConversationAction(conversationId);
-                router.push("/coach");
-                router.refresh();
+                if (!ok || deleting) return;
+                setDeleting(true);
+                try {
+                  const res = await deleteConversationAction(conversationId);
+                  if (!res.ok) {
+                    setError(res.error);
+                    return;
+                  }
+                  router.push("/coach");
+                  router.refresh();
+                } catch {
+                  setError("Couldn't delete the conversation. Check your connection and try again.");
+                } finally {
+                  setDeleting(false);
+                }
               }}
+              disabled={deleting}
             >
               <Trash2 aria-hidden />
             </Button>

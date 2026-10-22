@@ -1,5 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { logError } from "@/server/log";
 import { normalizeTemplateGroups, type TemplateExercise, type TemplateInput } from "@/lib/domain/workout-templates";
 
 export class TemplateError extends Error {
@@ -116,9 +117,22 @@ export async function updateTemplate(supabase: SupabaseClient, userId: string, i
   const { data, error } = await supabase.from("workout_templates").update({ name: input.name, notes: input.notes }).eq("id", id).eq("user_id", userId).select("id").maybeSingle();
   if (error) throw new TemplateError(error.message);
   if (!data) throw new TemplateError("Template not found", "not_found");
+  // Each position is unique, so the old exercises go first; if writing the new ones fails they're put back, so a
+  // failed save never leaves the template empty.
+  const { data: oldItems, error: readErr } = await supabase.from("workout_template_exercises").select("*").eq("template_id", id).eq("user_id", userId);
+  if (readErr) throw new TemplateError(readErr.message);
   const { error: delErr } = await supabase.from("workout_template_exercises").delete().eq("template_id", id).eq("user_id", userId);
   if (delErr) throw new TemplateError(delErr.message);
-  await writeItems(supabase, userId, id, input.exercises);
+  try {
+    await writeItems(supabase, userId, id, input.exercises);
+  } catch (err) {
+    await supabase.from("workout_template_exercises").delete().eq("template_id", id).eq("user_id", userId);
+    if (oldItems?.length) {
+      const { error: restoreErr } = await supabase.from("workout_template_exercises").insert(oldItems);
+      if (restoreErr) logError("templates.restore", restoreErr, { template: id });
+    }
+    throw err;
+  }
 }
 
 export async function deleteTemplate(supabase: SupabaseClient, userId: string, id: string): Promise<void> {

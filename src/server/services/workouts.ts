@@ -303,9 +303,23 @@ export async function editWorkout(supabase: SupabaseClient, userId: string, inpu
   const affected = new Set<string>([...(before ?? []).map((b) => b.exercise_id as string), ...input.exercises.map((e) => e.exerciseId)]);
 
   const volumeKg = computeSessionVolume(input.exercises);
-  const { error: delErr } = await supabase.from("workout_exercises").delete().eq("session_id", input.sessionId);
-  if (delErr) throw new WorkoutError(delErr.message);
-  await insertExercises(supabase, userId, input.sessionId, input.exercises);
+  // Write the new exercises first and only then remove the old ones, so a failed save never leaves the workout
+  // empty: on failure the partly written new rows are removed and the old ones stay.
+  const { data: oldRows, error: oldErr } = await supabase.from("workout_exercises").select("id").eq("session_id", input.sessionId).eq("user_id", userId);
+  if (oldErr) throw new WorkoutError(oldErr.message);
+  const oldIds = (oldRows ?? []).map((r) => r.id as string);
+  try {
+    await insertExercises(supabase, userId, input.sessionId, input.exercises);
+  } catch (err) {
+    let cleanup = supabase.from("workout_exercises").delete().eq("session_id", input.sessionId).eq("user_id", userId);
+    if (oldIds.length) cleanup = cleanup.not("id", "in", `(${oldIds.join(",")})`);
+    await cleanup;
+    throw err;
+  }
+  if (oldIds.length) {
+    const { error: delErr } = await supabase.from("workout_exercises").delete().in("id", oldIds).eq("user_id", userId);
+    if (delErr) throw new WorkoutError(delErr.message);
+  }
   const { error } = await supabase
     .from("workout_sessions")
     .update({ name: input.name, notes: input.notes || null, total_volume_kg: volumeKg })

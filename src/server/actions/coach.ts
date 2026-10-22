@@ -32,17 +32,35 @@ export async function applyProposalAction(messageId: string, activate: boolean):
   if (!validation.ok) return { ok: false, error: "This plan no longer passes validation and can't be saved." };
   const { data: answers } = await supabase.from("onboarding_answers").select("primary_goal").eq("user_id", user.id).maybeSingle();
 
+  // Claim the proposal first, so a second tap (or another tab) can't save the same plan twice.
+  const { data: claimed, error: claimErr } = await supabase
+    .from("ai_messages")
+    .update({ proposal_status: "applied" })
+    .eq("id", msg.id)
+    .eq("user_id", user.id)
+    .eq("proposal_status", "proposed")
+    .select("id");
+  if (claimErr) {
+    logError("coach.apply_claim", claimErr);
+    return { ok: false, error: "Couldn't save the plan. Please try again." };
+  }
+  if (!claimed?.length) return { ok: false, error: "This proposal was already handled." };
+
   try {
     const seed = aiPlanToProgramSeed(aiPlanStrictSchema.parse(validation.plan), answers?.primary_goal ? [answers.primary_goal as string] : []);
     const programId = await createPrivateProgram(supabase, user.id, seed, "ai");
     if (activate) await activateProgram(supabase, user.id, programId);
-    else await supabase.from("user_programs").insert({ user_id: user.id, program_id: programId, status: "saved" });
-    await supabase.from("ai_messages").update({ proposal_status: "applied" }).eq("id", msg.id);
+    else {
+      const { error: saveErr } = await supabase.from("user_programs").insert({ user_id: user.id, program_id: programId, status: "saved" });
+      if (saveErr) throw saveErr;
+    }
     const { data: p } = await supabase.from("training_programs").select("slug").eq("id", programId).single();
     revalidatePath("/", "layout");
     return { ok: true, message: activate ? "Plan saved and activated." : "Plan saved to My programs.", programSlug: p?.slug as string };
   } catch (err) {
     logError("coach.apply", err);
+    // Let them try again.
+    await supabase.from("ai_messages").update({ proposal_status: "proposed" }).eq("id", msg.id).eq("user_id", user.id);
     return { ok: false, error: "Couldn't save the plan. Please try again." };
   }
 }
@@ -52,7 +70,11 @@ export async function dismissProposalAction(messageId: string): Promise<Result> 
   const id = z.string().uuid().safeParse(messageId);
   if (!id.success) return { ok: false, error: "Invalid proposal." };
   const supabase = await getServerSupabase();
-  await supabase.from("ai_messages").update({ proposal_status: "dismissed" }).eq("id", id.data).eq("user_id", user.id).eq("proposal_status", "proposed");
+  const { error } = await supabase.from("ai_messages").update({ proposal_status: "dismissed" }).eq("id", id.data).eq("user_id", user.id).eq("proposal_status", "proposed");
+  if (error) {
+    logError("coach.dismiss", error);
+    return { ok: false, error: "Couldn't dismiss that suggestion. Please try again." };
+  }
   return { ok: true, message: "Dismissed." };
 }
 
@@ -61,7 +83,12 @@ export async function deleteConversationAction(conversationId: string): Promise<
   const id = z.string().uuid().safeParse(conversationId);
   if (!id.success) return { ok: false, error: "Invalid conversation." };
   const supabase = await getServerSupabase();
-  await supabase.from("ai_conversations").delete().eq("id", id.data).eq("user_id", user.id);
+  const { error, count } = await supabase.from("ai_conversations").delete({ count: "exact" }).eq("id", id.data).eq("user_id", user.id);
+  if (error) {
+    logError("coach.delete_conversation", error);
+    return { ok: false, error: "Couldn't delete the conversation. Please try again." };
+  }
+  if (!count) return { ok: false, error: "Conversation not found." };
   revalidatePath("/coach");
   return { ok: true, message: "Conversation deleted." };
 }

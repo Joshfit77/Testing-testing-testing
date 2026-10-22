@@ -62,6 +62,11 @@ export async function saveProgressPhotoAction(input: unknown): Promise<Result> {
     weight_kg: weightKg,
     note: v.note || null,
   });
+  // Already saved (a second tap or a retry of the same upload): the photo is there, so keep its file.
+  if (error?.code === "23505") {
+    revalidatePath("/progress", "layout");
+    return { ok: true };
+  }
   if (error) {
     logError("progress_photos.insert", error);
     // Don't leave an orphaned object behind.

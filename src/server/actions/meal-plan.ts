@@ -271,9 +271,21 @@ export async function logPlanMealAction(input: unknown): Promise<ActionState> {
       rows = [{ food_id: null, name: view.name.slice(0, 160), is_estimate: view.anyEstimate, source: key, ...cols }];
     }
     if (!rows.length) return actionError("That saved meal has no items.");
+    // Claim the entry first, so a second tap (or another tab) can't log the same meal twice.
+    const { data: claimed, error: claimErr } = await supabase
+      .from("meal_plan_entries")
+      .update({ logged_at: new Date().toISOString() })
+      .eq("id", e.id)
+      .eq("user_id", user.id)
+      .is("logged_at", null)
+      .select("id");
+    if (claimErr) throw claimErr;
+    if (!claimed?.length) return actionError("This meal is already in your diary.");
     const { error } = await supabase.from("meal_items").insert(rows.map((r) => ({ ...r, meal_id: mealId, user_id: user.id })));
-    if (error) throw error;
-    await supabase.from("meal_plan_entries").update({ logged_at: new Date().toISOString() }).eq("id", e.id).eq("user_id", user.id);
+    if (error) {
+      await supabase.from("meal_plan_entries").update({ logged_at: null }).eq("id", e.id).eq("user_id", user.id);
+      throw error;
+    }
     return actionOk(`Logged ${e.name as string} to your diary for ${e.plan_date as string}.`);
   } catch (err) {
     return guard(err, "planner.log");

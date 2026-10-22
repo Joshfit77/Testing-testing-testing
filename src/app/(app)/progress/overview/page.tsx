@@ -433,8 +433,9 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
         <h2 id="measure-title" className="mb-3 font-display text-2xl font-bold uppercase">
           Body measurements <span className="text-sm font-normal normal-case text-muted-foreground">(optional)</span>
         </h2>
-        {advanced ? (
-          <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+        {/* Logging measurements is basic progress (every plan); the trend chart is advanced analytics (Plus). */}
+        <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+          {advanced ? (
             <LineSeriesChart
               title="Measurements"
               description={`Waist, chest and hips (${lengthUnit(units)})`}
@@ -449,13 +450,13 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
               ]}
               emptyMessage="No measurements logged in this period."
             />
-            <section className="rounded-2xl border border-border bg-card p-5">
-              <MeasurementForm units={units} today={today} />
-            </section>
-          </div>
-        ) : (
-          <Locked title="Body measurement tracking" />
-        )}
+          ) : (
+            <Locked title="Measurement trends" />
+          )}
+          <section className="rounded-2xl border border-border bg-card p-5">
+            <MeasurementForm units={units} today={today} />
+          </section>
+        </div>
       </section>
       <p className="text-xs text-muted-foreground">
         Showing {start} to {today}.
