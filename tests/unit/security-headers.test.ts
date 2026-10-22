@@ -41,10 +41,11 @@ describe("security headers", () => {
 });
 
 describe("post-login redirects stay on this site", () => {
-  it.each(["https://evil.example", "//evil.example", "/\\evil.example", "javascript:alert(1)", "/home\r\nSet-Cookie: x=1", 42, null])("rejects %s", (v) => {
+  it.each(["https://evil.example", "//evil.example", "/\\evil.example", "javascript:alert(1)", "/home\r\nSet-Cookie: x=1", "/\t/evil.example", "/%09/evil.example".replace("%09", "\t"), "/\u0000/evil.example", "/a\\b", 42, null])("rejects %s", (v) => {
     expect(safeNextPath(v)).toBe("/home");
   });
   it("keeps same-site paths with their query", () => {
     expect(safeNextPath("/train/programs?goal=strength")).toBe("/train/programs?goal=strength");
+    expect(safeNextPath("/progress/badges?tab=faith#cedar")).toBe("/progress/badges?tab=faith#cedar");
   });
 });
