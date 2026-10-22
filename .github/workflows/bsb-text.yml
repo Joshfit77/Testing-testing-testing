@@ -1,0 +1,51 @@
+name: BSB Scripture text
+
+# Downloads the official Berean Standard Bible plain-text file (public domain) from the links on
+# https://berean.bible/downloads.htm, extracts the passages listed in scripts/bsb-references.json with
+# scripts/extract-bsb.mjs, and publishes the result as the "bsb-text" release for the app to use.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, claude/sharp-cray-8y0uuv, claude/security-nasb-deletion]
+    paths:
+      - "scripts/extract-bsb.mjs"
+      - "scripts/bsb-references.json"
+      - ".github/workflows/bsb-text.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Download the official BSB text
+        run: |
+          set -e
+          curl -fsSL --retry 3 -o downloads.htm https://berean.bible/downloads.htm
+          echo "Plain-text links on the downloads page:"
+          grep -oiE 'href="[^"]+\.txt"' downloads.htm | sed -E 's/href="([^"]+)"/\1/I' | tee links.txt
+          src=""
+          for url in $(grep -iE 'bsb\.txt$' links.txt) https://bereanbible.com/bsb.txt https://openbible.com/textfiles/bsb.txt; do
+            case "$url" in http*) ;; *) url="https://berean.bible/$url" ;; esac
+            if curl -fsSL --retry 3 -o bsb.txt "$url" && [ -s bsb.txt ]; then src="$url"; break; fi
+          done
+          test -n "$src"
+          echo "BSB_SOURCE=$src" >> "$GITHUB_ENV"
+          head -5 bsb.txt
+          wc -l bsb.txt
+      - name: Extract the app's passages
+        run: node scripts/extract-bsb.mjs bsb.txt scripts/bsb-references.json bsb-passages.json "$BSB_SOURCE"
+      - name: Publish as the bsb-text release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete bsb-text --yes --cleanup-tag || true
+          gh release create bsb-text bsb-passages.json --target "${{ github.sha }}" --prerelease \
+            --title "BSB passages used in the app" \
+            --notes "Extracted by scripts/extract-bsb.mjs from the official Berean Standard Bible text ($BSB_SOURCE), public domain. See bsb-passages.json for the file's SHA-256."
