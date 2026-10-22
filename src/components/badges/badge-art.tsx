@@ -43,16 +43,14 @@ export function BadgeArt({
 }) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
   const override = BADGE_IMAGE_OVERRIDES[`${category}-${level}`];
-  const style = locked ? { filter: "brightness(0.55) saturate(0.75)" } : undefined;
+  const style = locked ? { filter: "brightness(0.72) saturate(0.82)" } : undefined;
   if (override) {
     return (
-      // The painted art is a wide scene, so it gets a wide frame (about 1.6 : 1) instead of a square one.
-      <span
-        className={["badge-img", animate && !locked ? "badge-img-live" : "", className].filter(Boolean).join(" ")}
-        style={{ width: Math.round(size * 1.35), height: Math.round(size * 0.85) }}
-      >
+      // The painted art is a 2 : 1 scene: `size` sets the frame's height, its width is twice that (never wider
+      // than the space available), and the whole image is shown, centred, never cropped or stretched.
+      <span className={["badge-img", animate && !locked ? "badge-img-live" : "", className].filter(Boolean).join(" ")} style={{ width: size * 2 }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={override} alt={title ?? ""} style={style} draggable={false} />
+        <img src={override} alt={title ?? ""} style={style} draggable={false} decoding="async" />
       </span>
     );
   }

@@ -63,4 +63,47 @@ test.describe("rank badges (Fitness, Food, Faith)", () => {
     await expect(page.getByRole("heading", { name: "More achievements" })).toBeVisible();
     await expect(page.getByText("First Step")).toBeVisible();
   });
+  test("all 27 badge images load whole and line up at iPhone widths", async ({ page }) => {
+    await signUpAndConfirm(page, uniqueEmail("rankart"));
+    await answerOnboarding(page);
+    for (const width of [320, 375, 390, 430]) {
+      await page.setViewportSize({ width, height: 844 });
+      for (const tab of ["fitness", "food", "faith"]) {
+        await page.goto(`/progress/badges?tab=${tab}`);
+        const rows = page.locator(".rank-row");
+        await expect(rows).toHaveCount(9);
+        // Wait until every badge image has loaded and been laid out.
+        await expect
+          .poll(() => page.evaluate(() => [...document.querySelectorAll<HTMLImageElement>(".rank-art img")].filter((i) => i.complete && i.naturalWidth > 0 && i.getBoundingClientRect().width > 0).length))
+          .toBe(9);
+        const report = await page.evaluate(async () => {
+          const imgs = [...document.querySelectorAll<HTMLImageElement>(".rank-art img")];
+          await Promise.all(imgs.map((img) => img.decode().catch(() => undefined)));
+          const box = (el: Element) => el.getBoundingClientRect();
+          return {
+            overflow: document.documentElement.scrollWidth - window.innerWidth,
+            images: imgs.map((img) => ({ loaded: img.complete && img.naturalWidth > 0, natural: img.naturalWidth / img.naturalHeight, w: box(img).width, h: box(img).height })),
+            // Rank number, art and text share a vertical centre line.
+            centres: [...document.querySelectorAll(".rank-row")].map((row) =>
+              [".rank-num", ".rank-art", ".rank-text"].map((s) => { const b = box(row.querySelector(s)!); return b.top + b.height / 2; }),
+            ),
+            clippedNames: [...document.querySelectorAll<HTMLElement>(".rank-name")].filter((n) => n.scrollWidth > n.clientWidth + 1).map((n) => n.textContent),
+          };
+        });
+        const where = `${tab} at ${width}px`;
+        expect(report.overflow, where).toBeLessThanOrEqual(0);
+        expect(report.clippedNames, where).toEqual([]);
+        for (const img of report.images) {
+          expect(img.loaded, where).toBe(true);
+          expect(Math.abs(img.natural - 2), where).toBeLessThan(0.01); // every file is 2 : 1 ...
+          expect(Math.abs(img.w / img.h - 2), where).toBeLessThan(0.02); // ... and so is every box, so nothing is cropped
+          expect(img.w, where).toBeCloseTo(report.images[0]!.w, 0); // all nine the same size
+        }
+        for (const [num, art, text] of report.centres) {
+          expect(Math.abs(num! - art!), where).toBeLessThanOrEqual(2);
+          expect(Math.abs(text! - art!), where).toBeLessThanOrEqual(2);
+        }
+      }
+    }
+  });
 });

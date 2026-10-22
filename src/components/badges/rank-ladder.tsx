@@ -65,7 +65,7 @@ export function RankLadder({
                 <span className="rank-art">
                   {art ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={art} alt="" draggable={false} />
+                    <img src={art} alt="" draggable={false} decoding="async" />
                   ) : null}
                   {r.earned ? null : (
                     <span className="rank-lock">
@@ -82,9 +82,14 @@ export function RankLadder({
                       <Check aria-hidden /> Earned
                     </span>
                   ) : (
-                    <span className="rank-state">
-                      {Math.min(progress.count, r.threshold).toLocaleString("en-US")} / {r.threshold.toLocaleString("en-US")} {unit(r.threshold)}
-                    </span>
+                    <>
+                      <span className="rank-state">
+                        {Math.min(progress.count, r.threshold).toLocaleString("en-US")} / {r.threshold.toLocaleString("en-US")} {unit(r.threshold)}
+                      </span>
+                      <span className="rank-bar" aria-hidden>
+                        <span style={{ width: `${Math.min(100, Math.round((progress.count / r.threshold) * 100))}%` }} />
+                      </span>
+                    </>
                   )}
                 </span>
               </button>

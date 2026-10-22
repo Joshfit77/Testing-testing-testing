@@ -1,5 +1,6 @@
 "use client";
 
+import { Lock } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { BadgeArt } from "@/components/badges/badge-art";
 import { RankLadder } from "@/components/badges/rank-ladder";
@@ -108,9 +109,9 @@ export function RankBoard({ progress, verses, translation, initial = "fitness", 
           className="relative flex w-full items-center gap-4 overflow-hidden rounded-2xl border border-gold-muted/60 bg-card-gradient p-4 text-left shadow-[0_18px_50px_-30px_rgba(201,165,76,0.7)]"
         >
           <div className="pointer-events-none absolute -left-10 -top-10 size-48 rounded-full bg-gold/10 blur-3xl" aria-hidden />
-          <BadgeArt category={tab} level={current.current?.level ?? 1} size={112} locked={!current.current} animate={Boolean(current.current)} />
+          <BadgeArt category={tab} level={current.current?.level ?? 1} size={60} locked={!current.current} animate={Boolean(current.current)} />
           <div className="relative min-w-0 flex-1">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gold">{info.subtitle}</p>
+            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-gold">{info.subtitle}</p>
             <p className="mt-0.5 font-display text-2xl font-bold">{current.current ? current.current.name : "Your first rank awaits"}</p>
             <p className="text-sm text-muted-foreground">
               {current.current ? `Rank ${current.current.level} of 9` : `Start with ${current.ranks[0]!.name}`} · {current.count.toLocaleString("en-US")}{" "}
@@ -169,9 +170,13 @@ function RankDetail({ rank, progress, verse, translation }: { rank: RankState; p
   return (
     <div className="space-y-4">
       <div className="flex flex-col items-center text-center">
-        <div className="relative">
-          <div className={cn("pointer-events-none absolute inset-6 rounded-full blur-2xl", rank.earned ? "bg-gold/25" : "bg-transparent")} aria-hidden />
-          <BadgeArt category={rank.category} level={rank.level} size={184} locked={!rank.earned} animate={rank.earned} className="relative" />
+        <div className={cn("rank-detail-art", rank.earned ? "is-earned" : "is-locked")}>
+          <BadgeArt category={rank.category} level={rank.level} size={150} locked={!rank.earned} animate={rank.earned} />
+          {rank.earned ? null : (
+            <span className="rank-detail-lock">
+              <Lock aria-hidden /> Locked
+            </span>
+          )}
         </div>
         <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-gold">
           {info.label} · Rank {rank.level} of 9
@@ -206,12 +211,13 @@ function RankReveal({ rank, verse, translation, onClose }: { rank: RankState; ve
   const top = rank.level === 9;
   return (
     <div className="space-y-4 text-center">
-      <div className="relative mx-auto grid size-56 place-items-center">
-        <span className="badge-reveal-ring absolute inset-6 rounded-full border-2 border-gold/70" aria-hidden />
-        {top ? <span className="badge-reveal-ring absolute inset-0 rounded-full border border-gold/50 [animation-delay:0.35s]" aria-hidden /> : null}
-        <span className={cn("absolute inset-10 rounded-full blur-2xl", top ? "bg-gold/40" : "bg-gold/25")} aria-hidden />
+      {/* Rings and glow stack in one grid cell, centred on the art. */}
+      <div className="mx-auto grid place-items-center [&>*]:[grid-area:1/1]">
+        <span className="badge-reveal-ring size-44 rounded-full border-2 border-gold/70" aria-hidden />
+        {top ? <span className="badge-reveal-ring size-52 rounded-full border border-gold/50 [animation-delay:0.35s]" aria-hidden /> : null}
+        <span className={cn("h-28 w-56 rounded-full blur-2xl", top ? "bg-gold/35" : "bg-gold/20")} aria-hidden />
         <div className="badge-reveal relative">
-          <BadgeArt category={rank.category} level={rank.level} size={200} animate />
+          <BadgeArt category={rank.category} level={rank.level} size={140} animate />
         </div>
       </div>
       <div>

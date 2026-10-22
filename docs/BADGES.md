@@ -58,27 +58,63 @@ change, such as 1 John 5:4, "everyone born of God overcomes the world".
 screenshots).
 
 - **Source files:** the posters are kept unchanged (lossless) in `scripts/badge-art/posters/`.
-- **App files:** `scripts/badge-art/crop-posters.py` cuts each rank's art from between its number and its text,
-  inside the row's gold rules, into `public/badges/{category}-{NN}-{name}.webp` (about 600 × 210 px). Only the top
-  and bottom edges are faded; nothing is redrawn, recoloured or resized.
-- **Layout:** as on the posters, each row has the number in a gold hexagon, the art filling the middle and fading
-  out at the sides, and the name, reference and theme on the right. The subtitles match the posters.
+- **App files:** `scripts/badge-art/crop-posters.py` writes `public/badges/{category}-{NN}-{name}.webp`, one per rank.
+  - **Shape:** every image is exactly **2 : 1**.
+  - **Height:** the full row height between the poster's gold rules, at the poster's own pixels. Nothing is resized,
+    so nothing is stretched or upscaled.
+  - **Centring:** each image is centred on its subject (the weighted centre of the bright, coloured artwork). Before
+    this fix the subjects sat 25–50 px off-centre.
+  - **Padding:** where centring would run into the rank number or text, the canvas is left transparent instead. This
+    applies to Conqueror and Phoenix.
+  - **Compression:** saved as lossless WebP, so compression adds no smudging. The earlier files were lossy (quality
+    92), and lossy WebP also halves colour detail, which smeared red and blue edges. All 27 total 2.2 MB.
 - **Wiring:** `src/components/badges/badge-artwork.ts` maps each rank to its image (`getBadgeArtwork`), and
   `BADGE_IMAGE_OVERRIDES` feeds it to the badge list, the detail view and the unlock reveal.
-  `tests/unit/badge-artwork.test.ts` checks that all 27 files exist.
+- **Display:** every image sits in a 2 : 1 box with `object-fit: contain`, centred, so it's shown whole: never
+  cropped, stretched or distorted. The sides fade into the frame.
+  - **Earned art:** never has a CSS filter on it. The gold glow is a separate layer behind it.
+  - **Locked art:** a fixed, mild dim (brightness 0.72, saturation 0.82) plus a lock.
+- **Tests:**
+  - `tests/unit/badge-artwork.test.ts` checks that all 27 files exist, are 2 : 1 and are at least 190 px tall.
+  - `e2e/rank-badges.spec.ts` checks, at 320, 375, 390 and 430 px wide, that every image loads, every box is 2 : 1
+    and the same size, the number, art and text share a centre line, no name is cut off, and nothing scrolls sideways.
 - **Verses on the list:** an earned rank shows its full BSB verse directly under its row. Locked ranks show the
-  reference and progress, and every rank's verse is in its detail view.
-- **Badge in focus:** a slow gold glow and a light sweep. Both stop under reduced motion.
-- **Locked badges:** slightly dimmed, with a small lock.
-- **Offline edition:** embeds the same 27 images and shows the same verses.
+  reference, a progress bar and the count, and every rank's verse is in its detail view.
 
 > **Rights:** these images came from the owner. Before the app goes to the App Store, confirm that you hold
 > commercial rights to them (for example, that they're your own or AI images you generated under terms that
 > allow commercial use).
 
-**Sharpness:** each row is about 210 px tall in the posters, so the art is sharp on the badge list but a little soft
-in the large detail view. Higher-resolution posters of the same layout can replace the files in
-`scripts/badge-art/posters/`; then re-run the script.
+### Image quality: what the posters can and can't give
+
+The posters are phone screenshots. A resampling test (shrink, enlarge back, compare) shows they hold only about
+55–65 % of the detail their pixel size suggests, so they were already soft before any cropping. Each badge is
+382–582 px wide and 191–291 px tall, with roughly 120–180 px of real vertical detail.
+
+| Where it's shown | Size on screen (390 px phone) | Pixels needed on a 3× iPhone | Result |
+|---|---|---|---|
+| Badge list | ≈ 135 × 68 pt | ≈ 405 × 203 | About native size: as sharp as the source allows |
+| Current-rank card | 112 × 56 pt | 336 × 168 | Native or smaller: as sharp as the source allows |
+| Detail view and reveal | up to 300 × 150 pt | 900 × 450 | Enlarged about 2×: visibly soft |
+
+No CSS setting can add detail that isn't in the file. **All 27 need replacing for a crisp App Store release**:
+
+- **Softest, replace first:** the Food set, especially Torch, Spark, Flame and Ember.
+- **Also soft:** Faith 1–2 (Seed, Sprout) and Fitness 1 and 9 (Foundation, Conqueror).
+
+### Replacement artwork (production spec)
+
+- **Files:** 27 images with the same names as now (`fitness-01-foundation.webp` … `faith-09-cedar.webp`), one per
+  rank, of the same subjects and progression as the posters.
+- **Shape and size:** exactly **2 : 1**, ideally **1600 × 800 px** (minimum 1200 × 600). That covers the detail
+  view on a 3× iPhone.
+- **Composition:** subject centred, inside the middle 80 % of the width (the outer 7 % on each side fades out). No
+  rank number, text or poster lines in the image.
+- **Background:** transparent, or the same near-black as the app.
+- **Format:** lossless WebP or PNG (a WebP over about 300 KB can be lossy at quality 95+).
+- **Installing:** put them in `public/badges/` with the same names. Nothing else needs to change, and the unit test
+  checks the shape. Don't re-run `crop-posters.py` afterwards, or it will overwrite them.
+- **Don't use AI upscalers on the current crops:** they invent detail (fur, leaves, flames) that changes the art.
 
 The vector drawing described next remains in `badge-art.tsx` as a fallback.
 
@@ -105,20 +141,3 @@ or the app's own setting, shows still artwork.
 
 **Unlock.** A rank reached in the last week is revealed once per device, with a gold ring burst and its verse.
 Rank 9 gets a second ring and a stronger glow. Ranks earned before this update are marked as already seen.
-
-### Commissioned painted artwork (optional)
-
-The reference image is painted and photo-real, which hand-built vector art can't fully match. The supplied image
-is also too small to use: about 100 px per badge, on a solid background. To use painted art:
-
-- **Files:** 27 images, one per rank, with the same names as now (`fitness-01-foundation.webp` …
-  `faith-09-cedar.webp`).
-- **Size:** 1024 × 1024 px, square, transparent background (WebP with alpha, or PNG). The badge should fill the
-  central 90% and be centred on the same baseline.
-- **Style:** one artist or one consistent model and style across all 27, matte black-and-gold mood, the
-  descriptions above, no text or numbers in the art, no watermark, and full commercial rights (original or
-  properly licensed).
-- **Installing them:** put the files in `public/badges/` with the names above (and stop using
-  `crop-posters.py`, which would overwrite them).
-- **What changes with images:** the vector animations (shine, flicker, sway) only apply to the vector art, so
-  painted images get the glow and unlock reveal but stay still otherwise.
