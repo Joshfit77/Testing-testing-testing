@@ -3,7 +3,10 @@
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Loader2, Minus, Plus, Repeat2 } from "lucide-react";
+import { ArrowLeftRight, Check, Loader2, Minus, Plus, Repeat2 } from "lucide-react";
+import { FoodPickerDialog } from "@/components/nutrition/food-picker";
+import type { MyFood } from "@/components/nutrition/nutrition-client";
+import { logItemFor } from "@/lib/domain/food-favorites";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -11,7 +14,16 @@ import { Input, NativeSelect, Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { ActionState } from "@/lib/action-state";
 import type { Budget, DayFit, PlanNutrition } from "@/lib/domain/meal-planner";
-import { generatePlanAction, logPlanMealAction, planAlternativesAction, savePlannerSettingsAction, setPlanPortionAction, swapPlanMealAction, type SwapOption } from "@/server/actions/meal-plan";
+import {
+  generatePlanAction,
+  logPlanMealAction,
+  planAlternativesAction,
+  replacePlanIngredientAction,
+  savePlannerSettingsAction,
+  setPlanPortionAction,
+  swapPlanMealAction,
+  type SwapOption,
+} from "@/server/actions/meal-plan";
 
 function Message({ state }: { state: ActionState | null }) {
   if (!state?.message) return null;
@@ -143,6 +155,8 @@ export interface PlanMealView {
   nutrition: PlanNutrition;
   complete: boolean;
   logged: boolean;
+  /** Ingredient names for one serving, in the dish's order (for "Replace an ingredient"). */
+  ingredients: string[];
 }
 
 export interface PlanDayView {
@@ -179,11 +193,13 @@ function FitLine({ fit, target }: { fit: DayFit; target: PlanNutrition }) {
   );
 }
 
-function MealRow({ label, meal }: { label: string; meal: PlanMealView }) {
+function MealRow({ label, meal, myFoods }: { label: string; meal: PlanMealView; myFoods: MyFood[] }) {
   const router = useRouter();
   const [state, setState] = useState<ActionState | null>(null);
   const [pending, start] = useTransition();
   const [swapOpen, setSwapOpen] = useState(false);
+  const [replaceOpen, setReplaceOpen] = useState(false);
+  const [replaceIndex, setReplaceIndex] = useState<number | null>(null);
   const run = (fn: () => Promise<ActionState>) =>
     start(async () => {
       const res = await fn();
@@ -245,6 +261,11 @@ function MealRow({ label, meal }: { label: string; meal: PlanMealView }) {
         <Button type="button" variant="ghost" disabled={pending || meal.logged} onClick={() => setSwapOpen(true)} aria-label={`Swap ${label.toLowerCase()}: ${meal.name}`}>
           <Repeat2 aria-hidden /> Swap
         </Button>
+        {!meal.logged && meal.origin !== "saved_meal" && meal.ingredients.length > 0 && (
+          <Button type="button" variant="ghost" disabled={pending} onClick={() => setReplaceOpen(true)} aria-label={`Replace an ingredient in ${meal.name}`}>
+            <ArrowLeftRight aria-hidden /> Replace ingredient
+          </Button>
+        )}
         {!meal.logged && (
           <Button type="button" variant="secondary" disabled={pending} onClick={() => run(() => logPlanMealAction({ entryId: meal.entryId }))} aria-label={`Log this meal: ${meal.name}`}>
             {pending && <Loader2 className="animate-spin" aria-hidden />} Log this meal
@@ -253,6 +274,46 @@ function MealRow({ label, meal }: { label: string; meal: PlanMealView }) {
       </div>
       <Message state={state} />
       <SwapDialog open={swapOpen} onOpenChange={setSwapOpen} entryId={meal.entryId} current={meal.name} label={label} />
+      <Dialog open={replaceOpen} onOpenChange={setReplaceOpen}>
+        <DialogContent side="bottom" className="max-h-[85dvh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Replace an ingredient</DialogTitle>
+            <DialogDescription>
+              Choose what to replace in {meal.name}. A copy is saved as your recipe with the new ingredient, its nutrition taken from the food database, and the copy goes into this plan. The original dish stays as it is.
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="mt-3 space-y-2">
+            {meal.ingredients.map((name, i) => (
+              <li key={`${name}-${i}`}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="w-full justify-start text-left"
+                  onClick={() => {
+                    setReplaceIndex(i);
+                    setReplaceOpen(false);
+                  }}
+                >
+                  {name}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </DialogContent>
+      </Dialog>
+      <FoodPickerDialog
+        open={replaceIndex != null}
+        onOpenChange={(o) => !o && setReplaceIndex(null)}
+        myFoods={myFoods}
+        title={replaceIndex != null ? `Replace ${meal.ingredients[replaceIndex]?.split(",")[0] ?? "ingredient"}` : "Replace ingredient"}
+        submitLabel="Use this instead"
+        onPick={(food, quantity, unitId) => {
+          const index = replaceIndex;
+          setReplaceIndex(null);
+          if (index == null) return;
+          run(() => replacePlanIngredientAction({ entryId: meal.entryId, ingredientIndex: index, pick: logItemFor(food, quantity, unitId) }));
+        }}
+      />
     </li>
   );
 }
@@ -332,7 +393,7 @@ function SwapDialog({ open, onOpenChange, entryId, current, label }: { open: boo
   );
 }
 
-export function PlanDays({ days, target }: { days: PlanDayView[]; target: PlanNutrition }) {
+export function PlanDays({ days, target, myFoods = [] }: { days: PlanDayView[]; target: PlanNutrition; myFoods?: MyFood[] }) {
   return (
     <div className="space-y-4">
       {days.map((d) => (
@@ -342,7 +403,7 @@ export function PlanDays({ days, target }: { days: PlanDayView[]; target: PlanNu
           <ul className="mt-1 divide-y divide-border">
             {d.meals.map((m, i) =>
               m.meal ? (
-                <MealRow key={m.meal.entryId} label={m.label} meal={m.meal} />
+                <MealRow key={m.meal.entryId} label={m.label} meal={m.meal} myFoods={myFoods} />
               ) : (
                 <li key={`empty-${i}`} className="py-3 text-sm text-muted-foreground">
                   <span className="font-semibold text-gold">{m.label}</span>: nothing fits this meal with your settings.

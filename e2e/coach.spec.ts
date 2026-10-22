@@ -131,6 +131,37 @@ function reply(req: MockRequest): { blocks: Block[]; stop: string; delayMs: numb
   return { delayMs: 0, stop: "end_turn", blocks: [{ type: "text", text: "Happy to help with your training." }] };
 }
 
+/** Non-streaming structured replies (messages.parse): an AI meal plan from the dish list the app sent. */
+function structuredReply(req: MockRequest): Record<string, unknown> | null {
+  const system = req.system.map((b) => b.text).join("\n");
+  const user = String(typeof req.messages[0]?.content === "string" ? req.messages[0].content : "");
+  if (!system.includes("You arrange meal plans")) return null;
+  const days = Number(user.match(/Plan (\d+) day/)?.[1] ?? 1);
+  const slots = [...user.matchAll(/(\d+): [^(;]+\((breakfast|lunch|dinner|snack),/g)].map((m) => ({ index: Number(m[1]), slot: m[2]! }));
+  const dishes = user
+    .split("\n")
+    .filter((l) => /^(app|recipe|meal):/.test(l))
+    .map((l) => {
+      const [key, , meals] = l.split(" | ");
+      return { key: key!, meals: (meals ?? "").split("/") };
+    });
+  const plan = Array.from({ length: days }, (_, day) => {
+    const used = new Set<string>();
+    return {
+      day_index: day,
+      meals: slots.map((s, i) => {
+        // The first day's last meal names a dish that doesn't exist: the app must refill it.
+        if (day === 0 && i === slots.length - 1) return { slot_index: s.index, dish_key: "app:not-a-real-dish", portion: 1 };
+        const options = dishes.filter((d) => d.meals.includes(s.slot) && !used.has(d.key));
+        const pick = options[day % Math.max(1, options.length)] ?? options[0];
+        if (pick) used.add(pick.key);
+        return { slot_index: s.index, dish_key: pick?.key ?? "app:none", portion: 1 };
+      }),
+    };
+  });
+  return { summary: "High-protein days built from your dishes.", days: plan, assumptions: ["Quick breakfasts means under ten minutes."] };
+}
+
 async function readBody(req: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = [];
   for await (const c of req) chunks.push(c as Buffer);
@@ -153,6 +184,25 @@ test.beforeAll(async () => {
       res.writeHead(failMode, { "Content-Type": "application/json", "retry-after-ms": "10", "request-id": `req_e2e_fail_${++seq}` });
       res.end(JSON.stringify({ type: "error", error: { type, message: `mock ${failMode}` } }));
       return;
+    }
+    if (!body.stream) {
+      const structured = structuredReply(body);
+      if (structured) {
+        res.writeHead(200, { "Content-Type": "application/json", "request-id": `req_e2e_${++seq}` });
+        res.end(
+          JSON.stringify({
+            id: `msg_e2e_${seq}`,
+            type: "message",
+            role: "assistant",
+            model: body.model,
+            content: [{ type: "text", text: JSON.stringify(structured) }],
+            stop_reason: "end_turn",
+            stop_sequence: null,
+            usage: { input_tokens: 900, output_tokens: 300, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+          }),
+        );
+        return;
+      }
     }
     const r = reply(body);
     res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "request-id": `req_e2e_${seq}` });
@@ -488,5 +538,57 @@ test.describe("AI coach", () => {
     await expect(change).toContainText("from the AI coach");
     await change.getByRole("button", { name: "Undo" }).click();
     await expect(page.getByRole("status")).toContainText("Undone:");
+  });
+
+  test("AI meal plan: drafts from the member's dishes, the app computes the numbers, nothing saved until approved; ingredients can be replaced", async ({ page }) => {
+    test.skip(!MOCK_PORT, "set E2E_ANTHROPIC_MOCK_PORT and start the app with ANTHROPIC_BASE_URL pointing at it");
+    const email = uniqueEmail("ai-meals");
+    await signUpAndConfirm(page, email);
+    await completeOnboarding(page);
+    await grantPlan(email, "pro");
+    await page.goto("/coach");
+    await page.getByRole("button", { name: "Allow and continue" }).click();
+    await expect(page.getByLabel("Message the AI coach")).toBeVisible();
+
+    await page.goto("/nutrition/planner");
+    const panel = page.getByRole("region", { name: "AI meal plan" });
+    await panel.getByLabel("Days").selectOption("3");
+    await panel.getByLabel("Focus").selectOption("high_protein");
+    await panel.getByLabel("Notes (optional)").fill("quick breakfasts");
+    await panel.getByRole("button", { name: "Draft my plan" }).click();
+    await expect(panel.getByRole("status")).toContainText("Draft ready. 1 meal was filled or adjusted by the regular planner.", { timeout: 30_000 });
+    const draft = panel.getByTestId("ai-plan-draft");
+    await expect(draft.getByTestId("ai-plan-day")).toHaveCount(3);
+    await expect(draft.getByText("(filled by the planner)")).toHaveCount(1);
+    await expect(draft.getByText(/g per kg of bodyweight/)).toBeVisible();
+    await expect(draft.getByText("Assumed: Quick breakfasts means under ten minutes.")).toBeVisible();
+    await expect(draft.getByText("Not saved yet")).toBeVisible();
+    // Nothing is a plan yet.
+    await expect(page.getByTestId("plan-day")).toHaveCount(0);
+
+    // What went to the (mock) AI: the dish list and targets, on the fast model, as one structured request.
+    const sent = requests.find((r) => r.system.some((b) => b.text.includes("You arrange meal plans")))!;
+    expect(sent.model).toBe("claude-haiku-5-5");
+    const userText = String(sent.messages[0]!.content);
+    expect(userText).toContain("Focus: High protein.");
+    expect(userText).toContain("Member's notes: quick breakfasts");
+    expect(userText).toMatch(/app:[a-z0-9-]+ \| .+ \| (breakfast|lunch|dinner|snack)/);
+
+    await draft.getByRole("button", { name: "Approve & save plan" }).click();
+    await expect(page.getByTestId("plan-day")).toHaveCount(3, { timeout: 30_000 });
+    await expect(page.getByTestId("ai-plan-draft")).toHaveCount(0);
+
+    // Replace an ingredient in the first planned meal with a food from the database.
+    const meal = page.getByTestId("plan-meal").first();
+    const before = await meal.getByTestId("plan-meal-name").innerText();
+    await meal.getByRole("button", { name: /^Replace an ingredient in/ }).click();
+    await page.getByRole("dialog").getByRole("button").first().click();
+    const picker = page.getByRole("dialog");
+    await picker.getByPlaceholder("e.g. chicken, rice, olive oil").fill("banana");
+    await picker.getByRole("region", { name: "Food database results" }).getByRole("button").first().click();
+    await picker.getByRole("button", { name: "Use this instead" }).click();
+    await expect(meal.getByRole("status")).toContainText(/Replaced .+ with .+\. Saved as your recipe/, { timeout: 30_000 });
+    await expect(page.getByTestId("plan-meal").first().getByTestId("plan-meal-name")).not.toHaveText(before);
+    await expect(page.getByTestId("plan-meal").first()).toContainText("Your recipe");
   });
 });

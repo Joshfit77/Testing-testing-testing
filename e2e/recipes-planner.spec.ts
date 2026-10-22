@@ -75,6 +75,9 @@ test.describe("Recipes, meal planner and grocery list", () => {
 
     // ---- Generate a meal plan.
     await page.goto("/nutrition/planner");
+    // AI meal plans are Pro: a Plus member sees where to get them, not the AI form.
+    await expect(page.getByRole("region", { name: "AI meal plans" })).toContainText("Pro adds AI-arranged plans");
+    await expect(page.getByRole("button", { name: "Draft my plan" })).toHaveCount(0);
     await expect(page.getByText(/The plan is an estimate/)).toBeVisible();
     await page.getByRole("button", { name: "Generate a week" }).click();
     await expect(page.getByRole("status").filter({ hasText: /Plan ready/ })).toBeVisible();

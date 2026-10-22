@@ -15,6 +15,11 @@ import { deletePlanAction } from "@/server/actions/meal-plan";
 import { logError } from "@/server/log";
 import { loadCurrentPlan, loadPlannerPrefs, loadPlannerTargets, plannerSettings, planDays } from "@/server/services/meal-plan";
 import { plannerDishes } from "@/server/services/recipes";
+import type { MyFood } from "@/components/nutrition/nutrition-client";
+import { AiMealPlanPanel, type AiDraftView } from "@/components/nutrition/ai-meal-plan";
+import { getUserPlan } from "@/server/auth";
+import { getAiAllowance } from "@/server/services/ai-coach";
+import { draftView, loadDraft } from "@/server/services/ai-meal-plan";
 
 export const metadata = { title: "Meal planner" };
 
@@ -41,7 +46,32 @@ export default async function PlannerPage() {
       </div>
     );
   }
-  const dishes = targets ? await plannerDishes(supabase, user.id, prefs.includeApp) : [];
+  const [dishes, { data: foodRows }] = await Promise.all([
+    targets ? plannerDishes(supabase, user.id, prefs.includeApp) : Promise.resolve([]),
+    supabase.from("foods").select("id, name, brand, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g, is_estimate, source").eq("owner_id", user.id).order("name"),
+  ]);
+  const myFoods = (foodRows ?? []) as MyFood[];
+  // AI meal plans (Pro): the draft waiting for review, with every number computed now from the database values.
+  const aiEntitled = (await getAiAllowance(user.id, await getUserPlan(user.id))).chatLimit > 0;
+  const draft = aiEntitled ? await loadDraft(supabase, user.id).catch(() => null) : null;
+  const draftDays = draft ? draftView(draft, dishes) : [];
+  const aiDraft: AiDraftView | null = draft
+    ? {
+        focus: draft.focus,
+        notes: draft.notes,
+        summary: draft.summary,
+        targets: draft.targets,
+        days: draftDays.map((d) => {
+          const specs = slotsForMeals(draft.settings.mealsPerDay);
+          return {
+            date: d.date,
+            title: dayTitle(d.date, today),
+            fit: dayFit(d.meals, draft.targets.calories),
+            meals: d.meals.map((m, i) => ({ label: specs[i]?.label ?? "Meal", meal: m ? { name: m.name, portion: m.portion, nutrition: m.nutrition, complete: m.complete, by: m.by } : null })),
+          };
+        }),
+      }
+    : null;
   const settings = targets ? plannerSettings(targets, prefs) : null;
   const eligible = settings ? eligibleCandidates(dishes, settings) : [];
   const excluded = settings ? dishes.map((d) => exclusionReason(d, settings)).filter(Boolean).length : 0;
@@ -66,6 +96,7 @@ export default async function PlannerPage() {
                   nutrition: d.meals[i]!.nutrition,
                   complete: d.meals[i]!.complete,
                   logged: Boolean(e.logged_at),
+                  ingredients: (e.ingredients ?? []).map((i) => i.name),
                 }
               : null,
           })),
@@ -112,6 +143,8 @@ export default async function PlannerPage() {
         </section>
       )}
 
+      {targets && <AiMealPlanPanel entitled={aiEntitled} defaultStart={today} draft={aiDraft} />}
+
       {targets && (
         <section aria-labelledby="generate-title" className="rounded-2xl border border-gold-muted/60 bg-card-gradient p-4">
           <h2 id="generate-title" className="mb-3 text-lg font-semibold">
@@ -148,7 +181,7 @@ export default async function PlannerPage() {
           <p className="text-sm text-muted-foreground">
             Planned meals aren&apos;t in your diary until you tap <span className="font-semibold text-foreground">Log this meal</span>. Built for {plan.targets.calories.toLocaleString()} kcal a day.
           </p>
-          <PlanDays days={days} target={plan.targets} />
+          <PlanDays days={days} target={plan.targets} myFoods={myFoods} />
         </section>
       )}
 

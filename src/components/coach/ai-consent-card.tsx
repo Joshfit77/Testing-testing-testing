@@ -41,6 +41,7 @@ export function AiConsentCard() {
         <li>Limitation notes, only if you agreed to store wellness information</li>
         <li>Prayer-journal entries, only the ones you mark &ldquo;Share with AI Coach&rdquo;</li>
         <li>Coaching memories you chose to keep, only if you turn memory on</li>
+        <li>For an AI meal plan: your targets, planner settings (diet, budget, allergies, dislikes), your notes and the dish list</li>
       </ul>
       <p className="text-sm text-muted-foreground">
         Progress photos and unshared journal entries are never sent. Nothing is sent until you allow it, and you can turn this off any time in

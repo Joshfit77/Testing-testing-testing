@@ -144,9 +144,11 @@ function aiPerMinute(): number {
  * even if saving its reply later fails. Returns the usage row and the tier allowed (a chat that wanted the larger
  * model falls back to the fast one once that share is used up).
  */
+export type AiUsageKind = "chat" | "plan" | "meal_plan" | "food_photo" | "food_explain";
+
 async function reserveUsage(
   userId: string,
-  kind: "chat" | "plan",
+  kind: AiUsageKind,
   tier: ModelTier,
   usage: { chatLimit: number; planLimit: number; smartLimit: number },
 ): Promise<{ usageId: string; tier: ModelTier }> {
@@ -484,4 +486,41 @@ export async function coachTurn(params: {
     assistantMessage: assistantRow as CoachMessage,
     usage: { used: usage.chatUsed + 1, limit: usage.chatLimit },
   };
+}
+
+/**
+ * One AI request outside the coach chat (meal plans, food photos, food explanations), under the same rules as the
+ * chat: the member's AI allowance and rate limits, their AI data consent, a reservation counted before the provider
+ * is called (given back if the call fails), and token counts recorded afterwards. `run` makes the provider call.
+ */
+export async function withAiRequest<T>(
+  params: { supabase: SupabaseClient; userId: string; plan: Plan; kind: Exclude<AiUsageKind, "chat" | "plan">; tier?: ModelTier },
+  run: (ctx: { client: Anthropic; model: string }) => Promise<{ value: T; inputTokens: number; outputTokens: number }>,
+): Promise<T> {
+  const usage = await assertAiAllowed(params.userId, params.plan, "chat");
+  const { data: consent } = await params.supabase.from("profiles").select("ai_data_consent_at").eq("id", params.userId).maybeSingle();
+  if (!consent?.ai_data_consent_at) throw new AiError("consent_required", "Allow the AI features to use your data first (on the AI Coach screen).");
+  const reservation = await reserveUsage(params.userId, params.kind, params.tier ?? "fast", usage);
+  const model = coachModelIds(process.env)[reservation.tier];
+  let result: { value: T; inputTokens: number; outputTokens: number };
+  try {
+    result = await run({ client: getClient(), model });
+  } catch (err) {
+    await releaseUsage(reservation.usageId);
+    if (err instanceof AiError) throw err;
+    if (err instanceof Anthropic.APIUserAbortError) throw new AiError("provider", "The request was cancelled.");
+    if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
+      logError("ai.provider_auth", err, { status: err.status ?? null });
+      throw new AiError("not_configured", "The AI service isn't configured correctly on this server.");
+    }
+    if (err instanceof Anthropic.RateLimitError) throw new AiError("rate_limited", "The AI service is busy. Please try again shortly.", 30);
+    if (err instanceof Anthropic.APIConnectionError) throw new AiError("provider", "Couldn't reach the AI service. Please try again.");
+    if (err instanceof Anthropic.APIError) {
+      logError("ai.provider", err, { status: err.status ?? null, kind: params.kind });
+      throw new AiError("provider", "The AI service returned an error. Please try again.");
+    }
+    throw err;
+  }
+  await finalizeUsage(reservation.usageId, model, result.inputTokens, result.outputTokens);
+  return result.value;
 }

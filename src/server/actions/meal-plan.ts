@@ -2,14 +2,16 @@
 
 import { z } from "zod";
 import { actionError, actionOk, type ActionState } from "@/lib/action-state";
-import { BUDGETS, alternativesFor, cleanTerms, generatePlan, slotsForMeals, type PlannedMeal, type PlannerSettings } from "@/lib/domain/meal-planner";
+import { BUDGETS, alternativesFor, cleanTerms, generatePlan, slotsForMeals, type PlannerSettings } from "@/lib/domain/meal-planner";
 import { servingBasis } from "@/lib/domain/recipes";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { assertFeature, EntitlementError, requireUser } from "@/server/auth";
 import { logError } from "@/server/log";
 import { amountColumns, findOrCreateMeal, ITEM_COLUMNS, scaleItem } from "@/server/services/diary-write";
-import { addDaysIso, entryMeal, loadPlannerPrefs, loadPlannerTargets, PLAN_SELECT, plannerSettings, type PlanEntryRow, type PlanRow } from "@/server/services/meal-plan";
-import { appRecipeView, loadRecipe, plannerDishes, type PlannerDish } from "@/server/services/recipes";
+import { addDaysIso, entryMeal, loadPlannerPrefs, loadPlannerTargets, PLAN_SELECT, planEntryRow, plannerSettings, type PlanEntryRow, type PlanRow } from "@/server/services/meal-plan";
+import { appRecipeView, loadRecipe, plannerDishes, recipeDish, type PlannerDish } from "@/server/services/recipes";
+import { pickedFoodSchema, resolvePickedFood } from "@/server/services/food-resolve";
+import { computeAmount, type FoodBasis } from "@/lib/domain/food-basis";
 
 /**
  * Meal planner actions. Plans are built by the deterministic planner in src/lib/domain/meal-planner.ts
@@ -62,22 +64,6 @@ export async function savePlannerSettingsAction(input: unknown): Promise<ActionS
   }
 }
 
-function entryRow(planId: string, userId: string, date: string, m: PlannedMeal, dish: PlannerDish) {
-  return {
-    plan_id: planId,
-    user_id: userId,
-    plan_date: date,
-    slot: m.slotIndex,
-    meal_type: m.slot,
-    label: m.label,
-    source_key: m.key,
-    name: m.name.slice(0, 160),
-    portion: m.portion,
-    per_serving: { ...dish.perServing, complete: dish.complete },
-    ingredients: dish.ingredients.map((i) => ({ ...i, quantity: Math.round(i.quantity * 1000) / 1000 })),
-  };
-}
-
 export async function generatePlanAction(input: unknown): Promise<ActionState> {
   try {
     const { user, supabase } = await ctx();
@@ -110,7 +96,7 @@ export async function generatePlanAction(input: unknown): Promise<ActionState> {
       .single();
     if (error || !created) throw error ?? new Error("Plan insert failed");
     const byKey = new Map(dishes.map((d) => [d.key, d]));
-    const rows = plan.flatMap((d) => d.meals.flatMap((m) => (m ? [entryRow(created.id as string, user.id, d.date, m, byKey.get(m.key)!)] : [])));
+    const rows = plan.flatMap((d) => d.meals.flatMap((m) => (m ? [planEntryRow(created.id as string, user.id, d.date, m, byKey.get(m.key)!)] : [])));
     const { error: eErr } = await supabase.from("meal_plan_entries").insert(rows);
     if (eErr) throw eErr;
     const empty = plan.reduce((s, d) => s + d.meals.filter((m) => !m).length, 0);
@@ -192,7 +178,7 @@ export async function swapPlanMealAction(input: unknown): Promise<ActionState> {
     const pick = alternatives.find((a) => a.key === parsed.data.key);
     const dish = dishes.find((d) => d.key === parsed.data.key);
     if (!pick || !dish) return actionError("That option no longer fits this meal. Open Swap again for the current options.");
-    const row = entryRow(found.plan.id, user.id, found.entry.plan_date, pick, dish);
+    const row = planEntryRow(found.plan.id, user.id, found.entry.plan_date, pick, dish);
     const { error } = await supabase
       .from("meal_plan_entries")
       .update({ source_key: row.source_key, name: row.name, portion: row.portion, per_serving: row.per_serving, ingredients: row.ingredients })
@@ -299,4 +285,84 @@ export async function deletePlanAction(formData: FormData): Promise<void> {
   const supabase = await getServerSupabase();
   const { error } = await supabase.from("meal_plans").delete().eq("id", id.data).eq("user_id", user.id);
   if (error) logError("planner.delete", error);
+}
+
+/**
+ * "Replace an ingredient" in a planned meal: saves a personal copy of the dish as a recipe with that ingredient
+ * replaced by a food from the database (its nutrition read from its source, as in the recipe editor), and puts the
+ * copy in the plan at the same portion. The original dish is unchanged.
+ */
+export async function replacePlanIngredientAction(input: unknown): Promise<ActionState> {
+  try {
+    const { user, supabase } = await ctx();
+    const parsed = z.object({ entryId: uuid, ingredientIndex: z.number().int().min(0).max(59), pick: pickedFoodSchema }).safeParse(input);
+    if (!parsed.success) return actionError("Choose an ingredient and a replacement.");
+    const { entryId, ingredientIndex, pick } = parsed.data;
+    const found = await loadEntry(supabase, user.id, entryId);
+    if (!found) return actionError("That meal couldn't be found. It may have been replaced by a new plan.");
+    if (found.entry.logged_at) return actionError("This meal is already logged in your diary.");
+    const key = found.entry.source_key;
+    type Ing = { name: string; source: string; basis: FoodBasis; quantity: number; unitId: string; isEstimate: boolean };
+    let source: { name: string; servings: number; ingredients: Ing[] } | null = null;
+    if (key.startsWith("recipe:")) {
+      const r = await loadRecipe(supabase, user.id, key.slice(7));
+      if (r) source = { name: r.name, servings: r.servings, ingredients: r.ingredients.map((i) => ({ name: i.name, source: i.source, basis: i.basis, quantity: i.quantity, unitId: i.unitId, isEstimate: i.isEstimate })) };
+    } else if (key.startsWith("app:")) {
+      const r = await appRecipeView(key.slice(4));
+      if (r) source = { name: r.name, servings: r.servings, ingredients: r.ingredients.map((i) => ({ name: i.name, source: i.source, basis: i.basis, quantity: i.quantity, unitId: i.unitId, isEstimate: false })) };
+    } else {
+      return actionError("Saved meals are edited in Saved meals. Swap this meal or edit the saved meal instead.");
+    }
+    if (!source) return actionError("That dish couldn't be found. Swap this meal for another one.");
+    const old = source.ingredients[ingredientIndex];
+    if (!old) return actionError("That ingredient isn't in this dish any more.");
+    const r = await resolvePickedFood(supabase, user.id, pick);
+    if (!r.ok) return actionError(r.error);
+    const ingredients: Ing[] = source.ingredients.map((i, idx) =>
+      idx === ingredientIndex ? { name: r.food.name, source: r.food.source, basis: r.food.basis, quantity: r.food.quantity, unitId: r.food.unitId, isEstimate: r.food.is_estimate } : i,
+    );
+    const rows: Record<string, unknown>[] = [];
+    for (const [position, i] of ingredients.entries()) {
+      const amount = computeAmount(i.basis, i.quantity, i.unitId);
+      if (!amount) return actionError(`Choose one of the units listed for ${i.name}.`);
+      rows.push({
+        user_id: user.id,
+        position,
+        name: i.name.slice(0, 160),
+        source: i.source,
+        quantity: Math.round(i.quantity * 1000) / 1000,
+        unit_label: amount.unit.label.slice(0, 100),
+        grams: amount.grams,
+        amount_label: amount.amountLabel.slice(0, 160),
+        basis: i.basis,
+        is_estimate: i.isEstimate,
+      });
+    }
+    const shortNew = r.food.name.split(",")[0]!.trim();
+    const name = `${source.name} (with ${shortNew})`.slice(0, 120);
+    const { data: recipe, error: rErr } = await supabase
+      .from("recipes")
+      .insert({ user_id: user.id, name, servings: source.servings, notes: `Copy of ${source.name}: ${old.name} replaced with ${r.food.name}.`.slice(0, 2000) })
+      .select("id")
+      .single();
+    if (rErr || !recipe) throw rErr ?? new Error("Recipe insert failed");
+    const { error: iErr } = await supabase.from("recipe_ingredients").insert(rows.map((row) => ({ ...row, recipe_id: recipe.id })));
+    if (iErr) {
+      await supabase.from("recipes").delete().eq("id", recipe.id).eq("user_id", user.id);
+      throw iErr;
+    }
+    const view = await loadRecipe(supabase, user.id, recipe.id as string);
+    if (!view) throw new Error("New recipe not readable");
+    const dish = recipeDish(view);
+    const { error: uErr } = await supabase
+      .from("meal_plan_entries")
+      .update({ source_key: dish.key, name: dish.name.slice(0, 160), per_serving: { ...dish.perServing, complete: dish.complete }, ingredients: dish.ingredients.map((i) => ({ ...i, quantity: Math.round(i.quantity * 1000) / 1000 })) })
+      .eq("id", entryId)
+      .eq("user_id", user.id)
+      .is("logged_at", null);
+    if (uErr) throw uErr;
+    return actionOk(`Replaced ${old.name.split(",")[0]} with ${shortNew}. Saved as your recipe “${name}”.`);
+  } catch (err) {
+    return guard(err, "planner.replace_ingredient");
+  }
 }

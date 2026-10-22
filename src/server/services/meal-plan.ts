@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { isDietType, type DietType } from "@/lib/domain/diets";
 import { BUDGETS, slotsForMeals, type Budget, type PlanDay, type PlannedMeal, type PlannerSettings, type PlanNutrition } from "@/lib/domain/meal-planner";
 import { loadBudgetContext } from "@/server/services/nutrition-targets";
-import type { GroceryIngredient } from "@/server/services/recipes";
+import type { GroceryIngredient, PlannerDish } from "@/server/services/recipes";
 
 export interface PlannerPrefs {
   mealsPerDay: number;
@@ -136,3 +136,20 @@ export function planDays(plan: PlanRow): (PlanDay & { entries: (PlanEntryRow | n
 }
 
 export { addDaysIso };
+
+/** A meal_plan_entries row for a planned meal (nutrition and ingredients for one serving, as planned). */
+export function planEntryRow(planId: string, userId: string, date: string, m: PlannedMeal, dish: PlannerDish) {
+  return {
+    plan_id: planId,
+    user_id: userId,
+    plan_date: date,
+    slot: m.slotIndex,
+    meal_type: m.slot,
+    label: m.label,
+    source_key: m.key,
+    name: m.name.slice(0, 160),
+    portion: m.portion,
+    per_serving: { ...dish.perServing, complete: dish.complete },
+    ingredients: dish.ingredients.map((i) => ({ ...i, quantity: Math.round(i.quantity * 1000) / 1000 })),
+  };
+}

@@ -35,6 +35,7 @@ export const USER_TABLES: { table: string; column: string }[] = [
   { table: "exercise_targets", column: "user_id" },
   { table: "training_adjustments", column: "user_id" },
   { table: "training_recommendation_decisions", column: "user_id" },
+  { table: "meal_plan_drafts", column: "user_id" },
   { table: "faith_journal_entries", column: "user_id" },
   { table: "discipline_goals", column: "user_id" },
   { table: "discipline_checkins", column: "user_id" },
