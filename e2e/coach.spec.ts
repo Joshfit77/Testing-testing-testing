@@ -220,6 +220,22 @@ test.describe("AI coach", () => {
     const nCard = page.getByTestId("coach-suggestion").last();
     await expect(nCard.getByText("Suggested nutrition targets")).toBeVisible({ timeout: 30_000 });
     await expect(nCard.getByText("2400")).toBeVisible();
+    // The chat smooth-scrolls to the newest reply; tap once the scrolling has settled.
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          let last = -1;
+          let still = 0;
+          const tick = () => {
+            const y = window.scrollY;
+            still = y === last ? still + 1 : 0;
+            last = y;
+            if (still >= 5) resolve();
+            else requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+        }),
+    );
     await nCard.getByRole("button", { name: "Not now" }).click();
     await expect(nCard.getByText("dismissed", { exact: true })).toBeVisible();
     await expect(nCard.getByRole("button", { name: "Confirm" })).toHaveCount(0);
