@@ -7,7 +7,8 @@ import { actionError, actionInvalid, type ActionState } from "@/lib/action-state
 import { isoDateInTz } from "@/lib/domain/dates";
 import { resolveGoalMaxes, resolveMaxes } from "@/lib/domain/custom-programs";
 import { customProgramSchema, type CustomProgramFormInput } from "@/lib/validation/schemas";
-import { requireOnboardedUser } from "@/server/auth";
+import { hasFeature } from "@/lib/domain/plans";
+import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { buildAndActivateCustomProgram } from "@/server/services/custom-programs";
 import { logError } from "@/server/log";
 
@@ -16,10 +17,12 @@ const BUILDS_PER_HOUR = 10;
 
 /**
  * Build a personalized program from the /train/build answers, save it as a private program and
- * make it the active program. Available on every plan; custom programs are free for their owner.
+ * make it the active program. The builder is a Plus feature; a program already built stays its owner's on
+ * every plan (the onboarding starter program and schedule changes use the service directly and stay free).
  */
 export async function buildCustomProgramAction(input: CustomProgramFormInput): Promise<ActionState> {
   const { user, profile } = await requireOnboardedUser();
+  if (!hasFeature(await getUserPlan(user.id), "custom_program_builder")) return actionError("The program builder is included with Plus and Pro.");
   const parsed = customProgramSchema.safeParse(input);
   if (!parsed.success) return actionInvalid(parsed.error);
   const v = parsed.data;

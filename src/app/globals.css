@@ -698,6 +698,7 @@ html[data-motion="reduce"] .badge-img-live::after { display: none; }
 .rank-bar > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #a8701c, #f1c862); }
 .rank-bar.is-full > span { background: linear-gradient(90deg, #c48a26, #f6dc8c); }
 .rank-state.is-done { color: #f1c862; font-weight: 600; }
+.rank-state.is-plan { color: #e2c27a; }
 .rank-state svg { width: 12px; height: 12px; }
 /* The detail view's art: centred in a gold-edged panel that fits around it. The art stops at the size it can
    fill sharply (BADGE_MAX_SHARP_WIDTH, 191 px), rather than being stretched to the dialog's width. */

@@ -3,12 +3,14 @@
 import { z } from "zod";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { templateSchema } from "@/lib/validation/schemas";
-import { requireUser } from "@/server/auth";
+import { getPlans, hasFeature } from "@/lib/domain/plans";
+import { getUserPlan, requireUser } from "@/server/auth";
 import { logError } from "@/server/log";
 import { createTemplate, deleteTemplate, TemplateError, updateTemplate } from "@/server/services/templates";
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: string };
 
+/** Hard ceiling for everyone (keeps lists usable); Free has a lower plan limit (`templateLimit`). */
 const MAX_TEMPLATES = 100;
 
 function message(err: unknown): string {
@@ -24,7 +26,15 @@ export async function createTemplateAction(input: unknown): Promise<Result<{ id:
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Check the workout and try again." };
   try {
     const supabase = await getServerSupabase();
-    const { count } = await supabase.from("workout_templates").select("id", { count: "exact", head: true }).eq("user_id", user.id);
+    const [{ count }, plan] = await Promise.all([
+      supabase.from("workout_templates").select("id", { count: "exact", head: true }).eq("user_id", user.id),
+      getUserPlan(user.id),
+    ]);
+    const limit = getPlans()[plan].templateLimit;
+    if (!hasFeature(plan, "unlimited_templates") && limit !== null && (count ?? 0) >= limit) {
+      // Templates saved earlier (e.g. before a downgrade) are kept; only new ones are limited.
+      return { ok: false, error: `Free accounts can keep ${limit} workout templates. Delete one to save another, or upgrade to Plus for unlimited templates.` };
+    }
     if ((count ?? 0) >= MAX_TEMPLATES) return { ok: false, error: `You can keep up to ${MAX_TEMPLATES} workout templates. Delete one to save another.` };
     const id = await createTemplate(supabase, user.id, parsed.data);
     return { ok: true, data: { id } };

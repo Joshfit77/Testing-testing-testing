@@ -226,7 +226,7 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
       )}
 
       {photos ? (
-        <ProgressPhotos photos={photos} userId={user.id} units={units} today={today} />
+        <ProgressPhotos photos={photos} userId={user.id} units={units} today={today} canCompare={advanced} />
       ) : (
         <Notice tone="error">We couldn&apos;t load your progress photos right now. Please refresh to try again.</Notice>
       )}

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { answerOnboarding, signUpAndConfirm, uniqueEmail } from "./helpers";
+import { answerOnboarding, grantPlan, signUpAndConfirm, uniqueEmail } from "./helpers";
 
 test.describe("Stage 2C: faith flows, onboarding additions and the training calendar", () => {
   test("onboarding with a second goal and the display step, shown again in Edit onboarding details", async ({ page }) => {
@@ -98,8 +98,15 @@ test.describe("Stage 2C: faith flows, onboarding additions and the training cale
   });
 
   test("move a planned session on the calendar and Home's today's workout follows it", async ({ page }) => {
-    await signUpAndConfirm(page, uniqueEmail("cal2c"));
+    const email = uniqueEmail("cal2c");
+    await signUpAndConfirm(page, email);
     await answerOnboarding(page);
+
+    // Free accounts see the calendar but rescheduling is Plus.
+    await page.goto("/calendar");
+    await expect(page.getByRole("region", { name: "Up next" }).getByRole("link", { name: "Move to another day with Plus" }).first()).toBeVisible();
+    await grantPlan(email, "plus");
+
     await page.goto("/home");
     await expect(page.getByTestId("today-rest")).toHaveCount(0);
     await expect(page.getByRole("link", { name: /^Start workout$/ })).toBeVisible();

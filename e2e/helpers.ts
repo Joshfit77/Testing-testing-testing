@@ -127,3 +127,13 @@ export async function grantPlan(email: string, plan: "plus" | "pro") {
   });
   if (!res.ok) throw new Error(`grantPlan failed: ${res.status} ${await res.text()}`);
 }
+
+/** Test-only: insert rows for a user directly in the local database (seeding state a test doesn't build by hand). */
+export async function seedRows(email: string, table: string, rows: Record<string, unknown>[]) {
+  const headers = { apikey: LOCAL_SERVICE_KEY, Authorization: `Bearer ${LOCAL_SERVICE_KEY}`, "Content-Type": "application/json" };
+  const users = (await (await fetch(`${SUPABASE_URL}/auth/v1/admin/users?per_page=1000`, { headers })).json()) as { users: { id: string; email: string }[] };
+  const user = users.users.find((u) => u.email === email);
+  if (!user) throw new Error(`No user ${email}`);
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, { method: "POST", headers, body: JSON.stringify(rows.map((r) => ({ user_id: user.id, ...r }))) });
+  if (!res.ok) throw new Error(`seedRows ${table} failed: ${res.status} ${await res.text()}`);
+}

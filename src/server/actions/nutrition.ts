@@ -26,7 +26,7 @@ async function nutritionCtx() {
 }
 
 function guard(err: unknown, scope: string): ActionState {
-  if (err instanceof EntitlementError) return actionError("Nutrition tracking is included with Plus and Pro.");
+  if (err instanceof EntitlementError) return actionError("Food logging isn't available on your account right now.");
   if (err instanceof OffUnavailableError) return actionError("Open Food Facts isn't responding right now. Try again in a moment.");
   logError(scope, err);
   return actionError("Something went wrong. Please try again.");

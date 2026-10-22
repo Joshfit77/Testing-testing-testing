@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { actionError, type ActionState } from "@/lib/action-state";
+import { getPlans } from "@/lib/domain/plans";
 import { getUserPlan, requireUser } from "@/server/auth";
 import { isServiceRoleConfigured, isStripeConfigured, isYearlyBillingConfigured } from "@/server/env";
 import { getNativePlatform } from "@/server/native";
@@ -17,7 +18,8 @@ export async function startCheckoutAction(_prev: ActionState, formData: FormData
   if (interval.data === "year" && plan.data !== "pro") return actionError("Yearly billing is available for the all-access plan only.");
   if (await getNativePlatform()) return actionError("Subscriptions can't be purchased inside the mobile app yet.");
   if (!isStripeConfigured() || !isServiceRoleConfigured()) return actionError("Payments aren't configured on this server yet.");
-  if (interval.data === "year" && !isYearlyBillingConfigured()) return actionError("Yearly billing isn't configured on this server yet.");
+  // Yearly is offered only when both a display price and a Stripe price are configured.
+  if (interval.data === "year" && (!getPlans().pro.yearlyPriceCents || !isYearlyBillingConfigured())) return actionError("Yearly billing isn't offered right now.");
   const current = await getUserPlan(user.id);
   if (current !== "free") return actionError("You already have a subscription. Use “Manage billing” to change plans.");
   let url: string;

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useId, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, Check, Columns2, ImageOff, ImagePlus, Loader2, Lock, Trash2, X } from "lucide-react";
@@ -351,7 +352,20 @@ function CompareDialog({ pair, units, onClose }: { pair: [ProgressPhotoView, Pro
   );
 }
 
-export function ProgressPhotos({ photos, userId, units, today }: { photos: ProgressPhotoView[]; userId: string; units: UnitSystem; today: string }) {
+export function ProgressPhotos({
+  photos,
+  userId,
+  units,
+  today,
+  canCompare,
+}: {
+  photos: ProgressPhotoView[];
+  userId: string;
+  units: UnitSystem;
+  today: string;
+  /** Side-by-side comparisons are a Plus feature; adding and viewing photos is free. */
+  canCompare: boolean;
+}) {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [comparing, setComparing] = useState(false);
@@ -383,9 +397,16 @@ export function ProgressPhotos({ photos, userId, units, today }: { photos: Progr
           </p>
         </div>
         <div className="flex gap-2">
-          {photos.length >= 2 && !comparing && (
+          {photos.length >= 2 && !comparing && canCompare && (
             <Button variant="secondary" onClick={() => setComparing(true)}>
               <Columns2 aria-hidden /> Compare
+            </Button>
+          )}
+          {photos.length >= 2 && !canCompare && (
+            <Button asChild variant="secondary">
+              <Link href="/profile/billing">
+                <Columns2 aria-hidden /> Compare with Plus
+              </Link>
             </Button>
           )}
           {!comparing && (

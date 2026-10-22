@@ -4,7 +4,6 @@ import "server-only";
 export const serverEnv = {
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
   anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? "",
-  aiModel: process.env.AI_MODEL || "claude-opus-5-5",
   stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? "",
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
   stripePricePlus: process.env.STRIPE_PRICE_PLUS ?? "",

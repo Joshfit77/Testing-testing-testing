@@ -14,7 +14,7 @@ const SLOT_NAMES = { breakfast: "breakfast", lunch: "lunch", dinner: "dinner", s
 
 export default async function AppRecipePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const { allowed } = await nutritionPageUser();
+  const { allowed } = await nutritionPageUser("meal_planning");
   if (!allowed) return <NutritionLocked title="Recipe" description="Recipes and the meal planner are included with Plus and Pro." />;
   const r = await appRecipeView(slug);
   if (!r) notFound();

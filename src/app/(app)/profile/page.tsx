@@ -2,7 +2,7 @@ import Link from "next/link";
 import { BellRing, ChevronRight, CreditCard, Download, KeyRound, LogOut, SlidersHorizontal, TrendingUp } from "lucide-react";
 import { MainHeader } from "@/components/shell/main-header";
 import { DisplaySettings } from "@/components/profile/display-settings";
-import { DeleteAccountForm, ProfileForm, WithdrawConsentForm } from "@/components/profile/profile-forms";
+import { DeleteAccountForm, ProfileForm, WithdrawConsentForm, AiConsentOffForm } from "@/components/profile/profile-forms";
 import { WorkoutReminders } from "@/components/profile/workout-reminders";
 import { Button } from "@/components/ui/button";
 import { getPlans } from "@/lib/domain/plans";
@@ -100,6 +100,21 @@ export default async function ProfilePage() {
               : "You haven't consented to storing optional wellness information."}
           </p>
           {profile.wellness_consent_at && <WithdrawConsentForm />}
+        </div>
+        <div>
+          <p className="font-semibold">AI Coach data sharing</p>
+          <p className="mb-2 text-sm text-muted-foreground">
+            {profile.ai_data_consent_at
+              ? `On since ${new Date(profile.ai_data_consent_at).toLocaleDateString()}. The AI Coach sends your messages and the parts of your log it needs to Anthropic, the AI provider, to answer you.`
+              : "Off. The AI Coach (a Pro feature) asks before it sends anything to the AI provider."}
+          </p>
+          {profile.ai_data_consent_at ? (
+            <AiConsentOffForm />
+          ) : (
+            <Link href="/coach" className="text-sm text-gold-highlight underline-offset-4 hover:underline">
+              Review what&apos;s shared on the AI Coach screen
+            </Link>
+          )}
         </div>
         <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4">
           <p className="font-semibold text-destructive-foreground">Delete account</p>

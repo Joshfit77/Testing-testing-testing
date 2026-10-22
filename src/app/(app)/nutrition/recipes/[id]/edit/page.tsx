@@ -13,7 +13,7 @@ const MY_FOOD_COLUMNS = "id, name, brand, serving_size, serving_unit, calories, 
 
 export default async function EditRecipePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { user, allowed } = await nutritionPageUser();
+  const { user, allowed } = await nutritionPageUser("meal_planning");
   if (!allowed) return <NutritionLocked title="Edit recipe" description="Recipes are included with Plus and Pro." />;
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
   const supabase = await getServerSupabase();

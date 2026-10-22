@@ -1,37 +1,22 @@
 import Link from "next/link";
-import { Lock } from "lucide-react";
-import { EmptyState } from "@/components/common/states";
-import { PageHeader } from "@/components/common/page-header";
-import { BackLink } from "@/components/platform/back-link";
-import { Button } from "@/components/ui/button";
-import { hasFeature } from "@/lib/domain/plans";
+import { PlanLocked } from "@/components/common/plan-locked";
+import { hasFeature, type Feature } from "@/lib/domain/plans";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 
-/** Signed-in user for a Food sub-screen, and whether they have nutrition tracking (Plus / Pro). */
-export async function nutritionPageUser() {
+/**
+ * Signed-in user for a Food sub-screen, and whether their plan includes it. The food diary, search, barcode
+ * scanning, macros, saved meals and insights are free (`nutrition_tracking`); recipes, the meal planner and the
+ * grocery list are Plus (`meal_planning`).
+ */
+export async function nutritionPageUser(feature: Feature = "nutrition_tracking") {
   const { user, profile } = await requireOnboardedUser();
   const plan = await getUserPlan(user.id);
-  return { user, profile, allowed: hasFeature(plan, "nutrition_tracking") };
+  return { user, profile, allowed: hasFeature(plan, feature) };
 }
 
-/** The honest locked state for free accounts. */
+/** The honest locked state for a Plus food tool. */
 export function NutritionLocked({ title, description }: { title: string; description: string }) {
-  return (
-    <div className="space-y-6">
-      <BackLink href="/nutrition">Food</BackLink>
-      <PageHeader eyebrow="Food" title={title} />
-      <EmptyState
-        icon={Lock}
-        title="Included with Plus and Pro"
-        description={description}
-        action={
-          <Button asChild>
-            <Link href="/profile/billing">See plans</Link>
-          </Button>
-        }
-      />
-    </div>
-  );
+  return <PlanLocked back={{ href: "/nutrition", label: "Food" }} eyebrow="Food" title={title} plan="Plus" description={description} />;
 }
 
 /** Links between the Food tools, shown on each tool screen. */

@@ -4,7 +4,8 @@ import { z } from "zod";
 import { actionError, actionOk, type ActionState } from "@/lib/action-state";
 import { checkMove } from "@/lib/domain/training-schedule";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { getProfile, requireUser } from "@/server/auth";
+import { hasFeature } from "@/lib/domain/plans";
+import { getProfile, getUserPlan, requireUser } from "@/server/auth";
 import { logError } from "@/server/log";
 import { loadProgramSchedule } from "@/server/services/schedule";
 
@@ -17,10 +18,11 @@ const moveSchema = z.object({
  * Move a planned (not yet completed) session of the active program to another date. Completed
  * workouts are never touched: only sessions from the program pointer onwards can be moved, and the
  * override is keyed by the enrolment + program day. Moving it back to its usual date removes the
- * override. The client refreshes the route afterwards.
+ * override. The client refreshes the route afterwards. Rescheduling is a Plus feature.
  */
 export async function movePlannedSessionAction(input: { dayId: string; date: string }): Promise<ActionState> {
   const user = await requireUser();
+  if (!hasFeature(await getUserPlan(user.id), "advanced_calendar")) return actionError("Moving sessions to other days is included with Plus and Pro.");
   const parsed = moveSchema.safeParse(input);
   if (!parsed.success) return actionError(parsed.error.issues[0]?.message ?? "Choose a date.");
   const profile = await getProfile(user.id);
@@ -55,7 +57,7 @@ export async function movePlannedSessionAction(input: { dayId: string; date: str
   return actionOk(check.store === null ? `Back on its usual day, ${label}.` : `Moved to ${label}.`);
 }
 
-/** Put a moved session back on its default date. */
+/** Put a moved session back on its default date. Allowed on every plan, so a downgrade never strands a move. */
 export async function resetPlannedSessionAction(formData: FormData): Promise<void> {
   const user = await requireUser();
   const dayId = z.string().uuid().safeParse(formData.get("dayId"));

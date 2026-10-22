@@ -1,25 +1,39 @@
 import { canAccessTier, effectivePlanFromSubscription, formatPrice, getPlans, hasFeature, yearlySavingsPercent } from "@/lib/domain/plans";
 
 describe("plans & entitlements", () => {
-  it("gates features by plan", () => {
-    expect(hasFeature("free", "workout_logging")).toBe(true);
-    expect(hasFeature("free", "nutrition_tracking")).toBe(false);
-    expect(hasFeature("plus", "nutrition_tracking")).toBe(true);
-    expect(hasFeature("plus", "ai_plan_generation")).toBe(false);
-    expect(hasFeature("pro", "ai_plan_generation")).toBe(true);
+  it("gates features by plan: food logging free, Plus a complete non-AI toolkit, AI only on Pro", () => {
+    // Free: food & calorie logging with barcode scanning and macros (all `nutrition_tracking`), basic training.
+    for (const f of ["workout_logging", "starter_programs", "basic_progress", "nutrition_tracking"] as const) expect(hasFeature("free", f), f).toBe(true);
+    for (const f of ["full_program_library", "custom_program_builder", "unlimited_templates", "meal_planning", "advanced_analytics", "advanced_calendar", "full_rank_badges"] as const) {
+      expect(hasFeature("free", f), f).toBe(false);
+      expect(hasFeature("plus", f), f).toBe(true);
+      expect(hasFeature("pro", f), f).toBe(true);
+    }
+    for (const f of ["ai_coach", "ai_plan_generation", "advanced_recommendations"] as const) {
+      expect(hasFeature("plus", f), f).toBe(false);
+      expect(hasFeature("pro", f), f).toBe(true);
+    }
   });
   it("orders tiers", () => {
     expect(canAccessTier("free", "plus")).toBe(false);
     expect(canAccessTier("pro", "plus")).toBe(true);
     expect(canAccessTier("plus", "free")).toBe(true);
   });
-  it("uses default prices and AI limits", () => {
+  it("uses the final membership prices and limits", () => {
     const plans = getPlans();
-    expect(plans.plus.priceCents).toBe(799);
-    expect(plans.pro.priceCents).toBe(1499);
-    expect(plans.pro.yearlyPriceCents).toBe(11999);
-    expect(plans.pro.aiMonthlyLimit).toBeGreaterThan(plans.plus.aiMonthlyLimit);
+    expect(plans.free.priceCents).toBe(0);
+    expect(plans.plus.priceCents).toBe(1199);
+    expect(plans.pro.priceCents).toBe(2499);
+    expect(plans.pro.yearlyPriceCents).toBeUndefined();
     expect(plans.free.aiMonthlyLimit).toBe(0);
+    expect(plans.plus.aiMonthlyLimit).toBe(0);
+    expect(plans.pro.aiMonthlyLimit).toBe(150);
+    expect(plans.pro.aiSmartMonthlyLimit).toBe(15);
+    expect(plans.pro.aiPlanMonthlyLimit).toBeLessThanOrEqual(plans.pro.aiSmartMonthlyLimit);
+    expect(plans.free.templateLimit).toBe(3);
+    expect(plans.plus.templateLimit).toBeNull();
+    expect(plans.free.rankLevelLimit).toBe(3);
+    expect(plans.plus.rankLevelLimit).toBe(9);
   });
   it("formats prices and yearly savings", () => {
     expect(formatPrice(0)).toBe("Free");
@@ -33,9 +47,19 @@ describe("plans & entitlements", () => {
     expect(yearlySavingsPercent(0, 20000)).toBe(0);
   });
   it("respects env overrides", () => {
-    process.env.PLAN_PLUS_AI_MONTHLY_LIMIT = "5";
-    expect(getPlans().plus.aiMonthlyLimit).toBe(5);
-    delete process.env.PLAN_PLUS_AI_MONTHLY_LIMIT;
+    process.env.PLAN_PRO_AI_MONTHLY_LIMIT = "200";
+    process.env.PLAN_PRO_YEARLY_PRICE_CENTS = "19999";
+    process.env.PLAN_FREE_TEMPLATE_LIMIT = "5";
+    try {
+      expect(getPlans().pro.aiMonthlyLimit).toBe(200);
+      expect(getPlans().pro.aiSmartMonthlyLimit).toBe(20);
+      expect(getPlans().pro.yearlyPriceCents).toBe(19999);
+      expect(getPlans().free.templateLimit).toBe(5);
+    } finally {
+      delete process.env.PLAN_PRO_AI_MONTHLY_LIMIT;
+      delete process.env.PLAN_PRO_YEARLY_PRICE_CENTS;
+      delete process.env.PLAN_FREE_TEMPLATE_LIMIT;
+    }
   });
   it("derives effective plans from subscription state", () => {
     const now = new Date("2026-10-16T00:00:00Z");

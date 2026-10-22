@@ -2686,7 +2686,7 @@ async function sendChat(q) {
 function scrollChat() { const f = document.querySelector("[data-form=chat]"); if (f) f.scrollIntoView({ block: "end" }); }
 
 /* ---------- Profile ---------- */
-const PLANS = [["Free", "$0", ["Starter programs", "Workout logger & history", "Basic progress"]], ["Plus", "$7.99", ["All programs", "Food tracking", "Advanced analytics", "AI coach chat"]], ["Pro", "$14.99", ["Everything in Plus", "AI-generated training plans", "Higher AI limits"]], ["All Access Yearly", "$119.99", ["Everything in Pro", "All programs, food tracking & analytics", "Full AI coaching & plans", "About $10 a month · save 33%"]]];
+const PLANS = [["Free", "$0", ["Food & calorie logging with barcode scanning", "Macro tracking", "Workout logging & starter programs", "Basic progress & run tracking", "The complete Faith section, always free"]], ["Plus", "$11.99", ["Everything in Free", "Full program library & custom program builder", "Unlimited workout templates", "Meal planner, recipes & grocery lists", "Advanced progress & strength trends", "Progress-photo comparisons", "All Fitness & Food badges", "Reschedule sessions on your training calendar"]], ["Pro", "$24.99", ["Everything in Plus", "AI coach: 150 messages a month", "Personalized AI workout plans, saved only when you approve", "Exercise swaps and nutrition-target suggestions you approve"]]];
 function vPlans() {
   return `${header("Plans &amp; pricing", "Profile &amp; Settings", true)}
   <div class="cards">${PLANS.map(([n, p, f]) => `<div class="card plan ${n === "All Access Yearly" ? "gold-edge" : ""}"><div class="row between"><h3>${n}</h3>${n === "All Access Yearly" ? `<span class="badge gold">Best value</span>` : ""}</div><div><span class="price">${p}</span>${p !== "$0" ? `<span class="muted small"> / ${n === "All Access Yearly" ? "year" : "month"}</span>` : ""}</div><ul class="dots small">${f.map(x => `<li>${x}</li>`).join("")}</ul></div>`).join("")}</div>
@@ -2699,7 +2699,7 @@ function vProfile() {
   return `${mainHeader("Profile &amp; Settings", S.email ? `<div class="clamp1">${esc(S.email)}</div>` : "")}
   <section class="card" style="padding:4px 16px"><div class="list">
     ${item(`data-a="edit-details"`, "sliders", "Edit onboarding details", "Goals, schedule, equipment, diet and body details")}
-    ${item(`data-a="go" data-to="plans"`, "card", "Plans &amp; pricing", "Free, Plus $7.99, Pro $14.99, Yearly $119.99")}
+    ${item(`data-a="go" data-to="plans"`, "card", "Plans &amp; pricing", "Free, Plus $11.99, Pro $24.99")}
     ${item(`data-a="go" data-to="progress"`, "trend", "My Progress", "Overview, badges and history")}
   </div></section>
   <section class="card stack"><h2>Account &amp; units</h2>

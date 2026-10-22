@@ -18,8 +18,8 @@ const GATE_VERSE = scriptureText(
 const FEATURES = [
   { icon: Dumbbell, title: "Programs that adapt", body: "Strength, hypertrophy, strongman, combat conditioning, mobility and more — matched to your goals and equipment." },
   { icon: HeartPulse, title: "Log every rep", body: "A fast workout logger with rest timer, substitutions and personal records. Your session survives reloads." },
-  { icon: Bot, title: "AI coach", body: "Ask about technique, progression and recovery. Plan changes are always previewed before they're saved." },
-  { icon: Salad, title: "Food tracking", body: "Log meals from 90+ common foods or your own, and track calories, macros and water. Estimates are clearly labeled." },
+  { icon: Bot, title: "AI coach (Pro)", body: "Ask about technique, progression and recovery using your own log. Suggested changes are saved only when you approve them." },
+  { icon: Salad, title: "Free food tracking", body: "Search a USDA-based food database, scan barcodes and track calories, macros and water — free. Estimates are clearly labeled." },
   { icon: LineChart, title: "Progress you can see", body: "Bodyweight, lift trends, volume and consistency charts with 7-day to 1-year views." },
   { icon: ShieldCheck, title: "Private by design", body: "Your data is isolated to your account. Export or delete it any time." },
 ];

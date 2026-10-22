@@ -154,7 +154,7 @@ test.describe("AI coach", () => {
     const email = uniqueEmail("coach-off");
     await signUpAndConfirm(page, email);
     await completeOnboarding(page);
-    await grantPlan(email, "plus");
+    await grantPlan(email, "pro");
     await page.goto("/coach");
     await expect(page.getByText(/isn't configured on this server/)).toBeVisible();
     await expect(page.getByRole("button", { name: "Send message" })).toBeDisabled();
@@ -166,8 +166,13 @@ test.describe("AI coach", () => {
     const email = uniqueEmail("coach");
     await signUpAndConfirm(page, email);
     await completeOnboarding(page);
-    await grantPlan(email, "plus");
+    await grantPlan(email, "pro");
     await page.goto("/coach");
+
+    // Nothing is sent to the AI provider until the user allows it.
+    await expect(page.getByRole("heading", { name: /your data and the AI Coach/ })).toBeVisible();
+    await expect(page.getByLabel("Message the AI coach")).toHaveCount(0);
+    await page.getByRole("button", { name: "Allow and continue" }).click();
 
     // Starter questions are built from the user's data (new user with a starter program).
     const starters = page.getByLabel("Suggested questions");
@@ -183,7 +188,7 @@ test.describe("AI coach", () => {
     await expect(reply.getByRole("cell", { name: "3×5 @ RPE 7" })).toBeVisible();
     await expect(reply.getByText("Here's your bench plan.")).toBeVisible();
     await expect(reply).toContainText("I checked 0 logged bench sessions.");
-    await expect(page.getByText("1/60 messages this month")).toBeVisible();
+    await expect(page.getByText("1/150 messages this month")).toBeVisible();
     await reply.getByRole("button", { name: "Copy reply" }).click();
     await expect(reply.getByRole("button", { name: "Copied" })).toBeVisible();
 
@@ -241,8 +246,11 @@ test.describe("AI coach", () => {
     await expect(nCard.getByRole("button", { name: "Confirm" })).toHaveCount(0);
 
     // What the server sent to the (mock) API.
+    // Task-based routing: a "why has it stalled" review goes to the larger model, a simple swap to the fast one.
     const first = requests.find((r) => JSON.stringify(r.messages).includes("Why did my bench stall?"))!;
     expect(first.model).toBe("claude-sonnet-5-5");
+    const swap = requests.find((r) => JSON.stringify(r.messages.at(-1)).includes("Please swap my first exercise today"))!;
+    expect(swap.model).toBe("claude-haiku-5-5");
     expect(first.stream).toBe(true);
     expect(first.tools.map((t) => t.name)).toEqual([
       "get_recent_workouts",
@@ -268,8 +276,9 @@ test.describe("AI coach", () => {
     const email = uniqueEmail("coach-fail");
     await signUpAndConfirm(page, email);
     await completeOnboarding(page);
-    await grantPlan(email, "plus");
+    await grantPlan(email, "pro");
     await page.goto("/coach");
+    await page.getByRole("button", { name: "Allow and continue" }).click();
     const box = page.getByLabel("Message the AI coach");
     const question = "A flaky question about squat depth";
 

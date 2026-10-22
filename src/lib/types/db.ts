@@ -10,6 +10,8 @@ export interface ProfileRow {
   sex: "male" | "female" | "unspecified" | null;
   faith_enabled: boolean;
   wellness_consent_at: string | null;
+  /** When the user allowed the AI coach to send their data to the AI provider (null = not allowed). */
+  ai_data_consent_at?: string | null;
   onboarding_completed_at: string | null;
   timezone: string;
   step_goal: number;

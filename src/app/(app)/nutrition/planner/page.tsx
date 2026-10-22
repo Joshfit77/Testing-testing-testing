@@ -22,7 +22,7 @@ const dayTitle = (iso: string, today: string) =>
   `${iso === today ? "Today · " : ""}${new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" })}`;
 
 export default async function PlannerPage() {
-  const { user, profile, allowed } = await nutritionPageUser();
+  const { user, profile, allowed } = await nutritionPageUser("meal_planning");
   if (!allowed) return <NutritionLocked title="Meal planner" description="Plan a week of meals around your calorie and macro targets, diet, allergies and budget, then build a grocery list." />;
   const supabase = await getServerSupabase();
   const today = isoDateInTz(new Date(), profile.timezone);

@@ -35,7 +35,7 @@ export async function setDayMarkAction(input: unknown): Promise<ActionState> {
     if (error) throw error;
     return actionOk(status === "complete" ? "Day marked complete." : status === "fasted" ? "Logged as a day you ate nothing." : "Mark removed.");
   } catch (err) {
-    if (err instanceof EntitlementError) return actionError("Nutrition tracking is included with Plus and Pro.");
+    if (err instanceof EntitlementError) return actionError("Food logging isn't available on your account right now.");
     logError("nutrition.day_mark", err);
     return actionError("Something went wrong. Please try again.");
   }

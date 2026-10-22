@@ -23,7 +23,7 @@ const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 async function ctx() {
   const user = await requireUser();
-  await assertFeature(user.id, "nutrition_tracking");
+  await assertFeature(user.id, "meal_planning");
   return { user, supabase: await getServerSupabase() };
 }
 

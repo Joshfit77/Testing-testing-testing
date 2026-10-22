@@ -1,6 +1,6 @@
 import { createServer, type Server } from "node:http";
 import { expect, test, type Page } from "@playwright/test";
-import { completeOnboarding, grantPlan, signUpAndConfirm, uniqueEmail } from "./helpers";
+import { completeOnboarding, signUpAndConfirm, uniqueEmail } from "./helpers";
 
 /**
  * MyFitnessPal-style food log: USDA search with exact amounts in oz / g / household measures, editing an
@@ -56,11 +56,10 @@ async function openAddFood(page: Page) {
 }
 
 test.describe("food amounts (MyFitnessPal style)", () => {
-  test("search USDA foods, log ounces, edit to grams and another meal, browse by type, scan a barcode", async ({ page }) => {
+  test("on the Free plan: search USDA foods, log ounces, edit to grams and another meal, browse by type, scan a barcode", async ({ page }) => {
     const email = uniqueEmail("amounts");
     await signUpAndConfirm(page, email);
     await completeOnboarding(page);
-    await grantPlan(email, "plus");
     await page.goto("/nutrition");
 
     // Empty search: browse chips and popular foods.

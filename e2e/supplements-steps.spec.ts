@@ -8,7 +8,7 @@ test.describe("supplements and steps", () => {
 
     // Linked from the free Food view.
     await page.goto("/nutrition");
-    await page.getByRole("link", { name: /Supplements/ }).click();
+    await page.getByRole("link", { name: /Supplements/ }).first().click();
     await page.waitForURL(/\/nutrition\/supplements/);
     await expect(page.getByRole("heading", { name: "Supplements", level: 1 })).toBeVisible();
     await expect(page.getByText(/Your stack is empty/)).toBeVisible();

@@ -92,7 +92,7 @@ type SearchState = { kind: "idle" } | { kind: "loading" } | { kind: "error"; mes
 
 export function searchErrorMessage(status: number, error?: string): string {
   if (error === "rate_limited") return "Too many searches — wait a moment.";
-  if (error === "upgrade_required") return "Food search is part of nutrition tracking on Plus and Pro.";
+  if (error === "upgrade_required") return "Food search isn't available on your account right now.";
   if (error === "unauthorized") return "Your session expired — sign in again.";
   return status >= 500 ? "Search is unavailable right now." : "Search failed.";
 }

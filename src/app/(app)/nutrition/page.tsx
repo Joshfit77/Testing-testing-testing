@@ -1,8 +1,7 @@
 import Link from "next/link";
-import { BarChart3, BookMarked, CalendarClock, CalendarDays, ChevronLeft, ChevronRight, CookingPot, Lock, Pill, Salad, Scale, ShoppingCart, Trash2, TrendingUp } from "lucide-react";
+import { BarChart3, BookMarked, CalendarClock, CalendarDays, ChevronLeft, ChevronRight, CookingPot, Pill, Salad, Scale, ShoppingCart, Trash2, TrendingUp } from "lucide-react";
 import { BarSeriesChart } from "@/components/charts/charts";
 import { MainHeader } from "@/components/shell/main-header";
-import { EmptyState } from "@/components/common/states";
 import { BudgetForm, CopyMealButton, QuickAddDialog } from "@/components/nutrition/diary-client";
 import {
   AddFoodDialog,
@@ -18,9 +17,8 @@ import { ProgressBar } from "@/components/ui/progress-bar";
 import { ProgressRing } from "@/components/ui/progress-ring";
 import { addDays, isoDateInTz } from "@/lib/domain/dates";
 import { progressPct, sumMacros } from "@/lib/domain/nutrition";
-import { hasFeature } from "@/lib/domain/plans";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { getUserPlan, requireOnboardedUser } from "@/server/auth";
+import { requireOnboardedUser } from "@/server/auth";
 import { isFoodSearchConfigured } from "@/server/env";
 import { isFlagEnabled } from "@/server/flags";
 import { deleteCustomFoodAction, deleteMealItemAction, markPlannedEatenAction } from "@/server/actions/nutrition";
@@ -113,34 +111,7 @@ function editableItem(i: MealRow["meal_items"][number], mealType: string, favori
 export default async function NutritionPage({ searchParams }: { searchParams: Promise<{ date?: string }> }) {
   const sp = await searchParams;
   const { user, profile } = await requireOnboardedUser();
-  const plan = await getUserPlan(user.id);
-
-  if (!hasFeature(plan, "nutrition_tracking")) {
-    return (
-      <div className="space-y-6">
-        <MainHeader title="Food" subtitle="Track calories, macros and water, save meals and plan ahead." />
-        <EmptyState
-          icon={Lock}
-          title="Included with Plus and Pro"
-          description="Track calories, protein, carbs, fat and water, search a reliable food database, save meals and recipes, and plan ahead."
-          action={
-            <Button asChild>
-              <Link href="/profile/billing">See plans</Link>
-            </Button>
-          }
-        />
-        <Link href="/nutrition/diets" className="lift block rounded-2xl border border-border bg-card p-4">
-          <span className="font-display text-lg font-semibold uppercase">Explore diets</span>
-          <span className="block text-sm text-muted-foreground">Balanced, high protein, keto, Mediterranean, Daniel Fast and more — free for everyone.</span>
-        </Link>
-        <Link href="/nutrition/supplements" className="lift block rounded-2xl border border-border bg-card p-4">
-          <span className="font-display text-lg font-semibold uppercase">Supplements</span>
-          <span className="block text-sm text-muted-foreground">Creatine, protein, vitamin D and more — what the evidence says, plus a daily stack to check off. Free for everyone.</span>
-        </Link>
-      </div>
-    );
-  }
-
+  // The food diary, search, barcode scanning and macros are free on every plan.
   const today = isoDateInTz(new Date(), profile.timezone);
   const date = sp.date && /^\d{4}-\d{2}-\d{2}$/.test(sp.date) ? sp.date : today;
   const supabase = await getServerSupabase();

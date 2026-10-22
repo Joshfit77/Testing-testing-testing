@@ -11,7 +11,7 @@ import {
   SAFETY_RULES,
   SUPPLEMENT_KNOWLEDGE,
 } from "@/lib/coach/knowledge";
-import { buildSystemBlocks, DEFAULT_COACH_MODELS, fallbackParams, sanitizeAssistantContent, selectCoachModel } from "@/lib/coach/prompt";
+import { buildSystemBlocks, fallbackParams, sanitizeAssistantContent } from "@/lib/coach/prompt";
 
 const words = (s: string) => s.split(/\s+/).filter(Boolean).length;
 
@@ -81,7 +81,7 @@ describe("prompt assembly", () => {
   const contextText = "Today: 2026-10-19. Units: kg/cm.";
 
   it("caches the shared static prompt and appends the per-user context last", () => {
-    const blocks = buildSystemBlocks({ faithEnabled: false, plan: "plus", contextText });
+    const blocks = buildSystemBlocks({ faithEnabled: false, contextText });
     expect(blocks).toHaveLength(2);
     expect(blocks[0]).toEqual({ type: "text", text: COACH_STATIC_PROMPT, cache_control: { type: "ephemeral" } });
     expect(blocks[1]!.cache_control).toBeUndefined();
@@ -90,7 +90,7 @@ describe("prompt assembly", () => {
   });
 
   it("faith off: no verses, explicit no-religious-language instruction", () => {
-    const text = buildSystemBlocks({ faithEnabled: false, plan: "pro", contextText })
+    const text = buildSystemBlocks({ faithEnabled: false, contextText })
       .map((b) => b.text)
       .join("\n");
     expect(text).toContain(FAITH_DISABLED_INSTRUCTIONS);
@@ -99,25 +99,15 @@ describe("prompt assembly", () => {
   });
 
   it("faith on: a separately cached verse block, no faith-off instruction", () => {
-    const blocks = buildSystemBlocks({ faithEnabled: true, plan: "pro", contextText });
+    const blocks = buildSystemBlocks({ faithEnabled: true, contextText });
     expect(blocks).toHaveLength(3);
     expect(blocks[1]).toEqual({ type: "text", text: FAITH_ENABLED_INSTRUCTIONS, cache_control: { type: "ephemeral" } });
     expect(blocks.map((b) => b.text).join("\n")).not.toContain(FAITH_DISABLED_INSTRUCTIONS);
     expect(FAITH_ENABLED_INSTRUCTIONS).toMatch(/never preachy|don't preach/i);
   });
 
-  it("gates by plan: the plan note and the model differ for Plus and Pro", () => {
-    const plus = buildSystemBlocks({ faithEnabled: false, plan: "plus", contextText }).at(-1)!.text;
-    const pro = buildSystemBlocks({ faithEnabled: false, plan: "pro", contextText }).at(-1)!.text;
-    expect(plus).toContain("Plan: Plus");
-    expect(plus).toContain("Pro feature");
-    expect(pro).toContain("Plan: Pro");
-    expect(selectCoachModel("pro", {})).toBe("claude-opus-5-5");
-    expect(selectCoachModel("plus", {})).toBe("claude-sonnet-5-5");
-    expect(DEFAULT_COACH_MODELS).toEqual({ pro: "claude-opus-5-5", plus: "claude-sonnet-5-5" });
-    expect(selectCoachModel("pro", { AI_MODEL: "claude-opus-5" })).toBe("claude-opus-5");
-    expect(selectCoachModel("pro", { COACH_MODEL_PRO: "claude-fable-5-1", AI_MODEL: "x" })).toBe("claude-fable-5-1");
-    expect(selectCoachModel("plus", { COACH_MODEL_PLUS: "claude-haiku-5-5", AI_MODEL: "claude-opus-5" })).toBe("claude-haiku-5-5");
+  it("tells the model it's coaching a Pro member", () => {
+    expect(buildSystemBlocks({ faithEnabled: false, contextText }).at(-1)!.text).toContain("Plan: Pro");
   });
 
   it("keeps server-side refusal fallbacks for models that support them", () => {

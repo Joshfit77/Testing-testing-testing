@@ -237,11 +237,8 @@ ${COACH_VERSES.map((v) => `- ${v.reference} [${v.theme}]: ${v.text}`).join("\n")
 
 export const FAITH_DISABLED_INSTRUCTIONS = `Faith: this athlete has not turned on the optional faith section. Do not include scripture, prayer or religious language. If the athlete raises faith themselves, respond respectfully and briefly, without quoting scripture unless they ask for it.`;
 
-/** Extra instructions for each plan tier (tools differ by plan). */
-export const PLAN_NOTES: Record<"plus" | "pro", string> = {
-  plus: "Plan: Plus. Full coaching chat with read tools and suggested changes. Plan mode (drafting a whole new program) is a Pro feature — mention it only if they ask for a full new program.",
-  pro: "Plan: Pro. Full coaching chat with read tools and suggested changes. Plan mode drafts whole new programs for review.",
-};
+/** The coach is a Pro feature: full coaching chat with read tools, suggested changes and plan mode. */
+export const PRO_PLAN_NOTE = "Plan: Pro. Full coaching chat with read tools and suggested changes. Plan mode drafts whole new programs for review.";
 
 /**
  * Compact coaching rules for the offline/demo edition (no tools, different channel). Kept under

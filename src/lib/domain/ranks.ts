@@ -174,3 +174,38 @@ export function rankById(category: RankCategory, level: number): RankDefinition 
 }
 
 export const RANK_IDS = RANKS.map((r) => `${r.category}-${r.level}`);
+
+export interface PlanRankState extends RankState {
+  /** Above the plan's rank limit: shown, but earned and celebrated only on Plus/Pro. */
+  planLocked?: boolean;
+  /** For a plan-locked rank: the threshold has been reached, so upgrading reveals it at once. */
+  reached?: boolean;
+}
+
+export interface PlanCategoryProgress extends Omit<CategoryProgress, "ranks" | "current" | "next"> {
+  ranks: PlanRankState[];
+  current: PlanRankState | null;
+  next: PlanRankState | null;
+  /** True when ranks above `levelLimit` are plan-locked in this category. */
+  limited: boolean;
+}
+
+/**
+ * Apply a plan's rank limit for display. Fitness and Food ranks above `levelLimit` stay visible but count as not
+ * earned (`planLocked`, with `reached` when the threshold is met); Faith ranks are always free. Nothing is stored,
+ * so upgrading shows every rank already reached straight away, and a downgrade never deletes anything.
+ */
+export function applyRankPlanLimit(progress: CategoryProgress[], levelLimit: number): PlanCategoryProgress[] {
+  return progress.map((p) => {
+    if (p.category === "faith" || levelLimit >= 9) return { ...p, limited: false };
+    const ranks: PlanRankState[] = p.ranks.map((r) =>
+      r.level > levelLimit ? { ...r, earned: false, earnedAt: null, planLocked: true, reached: r.earned } : r,
+    );
+    const earned = ranks.filter((r) => r.earned);
+    const current = earned.length ? earned[earned.length - 1]! : null;
+    const next = ranks.find((r) => !r.earned && !r.planLocked) ?? null;
+    const from = current?.threshold ?? 0;
+    const percentToNext = next ? Math.max(0, Math.min(100, Math.round(((p.count - from) / (next.threshold - from)) * 100))) : 100;
+    return { ...p, ranks, current, next, percentToNext, limited: true };
+  });
+}

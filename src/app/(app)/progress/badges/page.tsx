@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { BADGE_CATEGORIES, badgePercent, computeAchievements, type BadgeState } from "@/lib/domain/achievements";
 import { isoDateInTz } from "@/lib/domain/dates";
-import { hasFeature } from "@/lib/domain/plans";
+import { getPlans, hasFeature } from "@/lib/domain/plans";
 import type { UnitSystem } from "@/lib/domain/types";
 import { displayWeight, weightUnit } from "@/lib/domain/units";
 import { cn } from "@/lib/utils";
@@ -17,7 +17,7 @@ import { logError } from "@/server/log";
 import { getAchievementStats } from "@/server/services/achievements";
 import { RankBoard } from "@/components/badges/rank-board";
 import { ACTIVE_TRANSLATION, BSB_PASSAGES } from "@/data/scripture";
-import { RANKS, allRankProgress, type CategoryProgress, type RankCategory } from "@/lib/domain/ranks";
+import { RANKS, allRankProgress, applyRankPlanLimit, type PlanCategoryProgress, type RankCategory } from "@/lib/domain/ranks";
 
 export const metadata = { title: "Badges" };
 
@@ -73,12 +73,14 @@ export default async function BadgesPage({ searchParams }: { searchParams: Promi
   const units = profile.unit_system;
 
   let badges: BadgeState[] | null = null;
-  let ranks: CategoryProgress[] = [];
+  let ranks: PlanCategoryProgress[] = [];
   const today = isoDateInTz(new Date(), tz);
   try {
     const stats = await getAchievementStats(supabase, user.id, tz);
     badges = computeAchievements(stats, today);
-    ranks = allRankProgress({ workoutDates: stats.workouts.map((w) => w.date), foodDays: stats.foodDays, faithDays: stats.faithDays });
+    // Free shows the first Fitness and Food ranks; Plus and Pro show all nine. Faith ranks are always free.
+    const rankLimit = hasFeature(plan, "full_rank_badges") ? 9 : getPlans()[plan].rankLevelLimit;
+    ranks = applyRankPlanLimit(allRankProgress({ workoutDates: stats.workouts.map((w) => w.date), foodDays: stats.foodDays, faithDays: stats.faithDays }), rankLimit);
   } catch (err) {
     logError("badges.load", err);
   }
@@ -143,14 +145,6 @@ export default async function BadgesPage({ searchParams }: { searchParams: Promi
             <h3 id={`cat-${cat.id}`} className="mb-3 font-display text-lg font-bold">
               {cat.label}
             </h3>
-            {cat.id === "nutrition" && !hasFeature(plan, "nutrition_tracking") && (
-              <p className="mb-3 text-xs text-muted-foreground">
-                Food logging is included with Plus and Pro.{" "}
-                <Link href="/profile/billing" className="text-gold-highlight underline">
-                  See plans
-                </Link>
-              </p>
-            )}
             <ul className="grid gap-3 md:grid-cols-2">
               {list.map((b) => (
                 <BadgeCard key={b.id} badge={b} units={units} />

@@ -20,7 +20,7 @@ export const metadata = { title: "Recipe" };
 
 export default async function RecipePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ saved?: string }> }) {
   const [{ id }, sp] = await Promise.all([params, searchParams]);
-  const { user, profile, allowed } = await nutritionPageUser();
+  const { user, profile, allowed } = await nutritionPageUser("meal_planning");
   if (!allowed) return <NutritionLocked title="Recipe" description="Recipes are included with Plus and Pro." />;
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
   const supabase = await getServerSupabase();

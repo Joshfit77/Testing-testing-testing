@@ -75,7 +75,7 @@ export async function applyCoachProposalAction(messageId: string): Promise<Resul
   const user = await requireUser();
   const id = z.string().uuid().safeParse(messageId);
   if (!id.success) return { ok: false, error: "Invalid suggestion." };
-  if (!hasFeature(await getUserPlan(user.id), "ai_coach")) return { ok: false, error: "Coach suggestions require Plus or Pro." };
+  if (!hasFeature(await getUserPlan(user.id), "ai_coach")) return { ok: false, error: "Coach suggestions are included with Pro." };
   const supabase = await getServerSupabase();
   const { data: msg } = await supabase.from("ai_messages").select("id, proposal, proposal_status").eq("id", id.data).eq("user_id", user.id).eq("role", "assistant").maybeSingle();
   if (!msg?.proposal) return { ok: false, error: "Suggestion not found." };

@@ -1,10 +1,12 @@
 import { BackLink } from "@/components/platform/back-link";
 import { PageHeader } from "@/components/common/page-header";
+import { PlanLocked } from "@/components/common/plan-locked";
 import { ProgramBuilder } from "@/components/train/program-builder";
 import { CUSTOM_PROGRAM_TYPES, type CustomProgramType } from "@/lib/domain/custom-programs";
 import type { Equipment, ExperienceLevel } from "@/lib/domain/types";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { requireOnboardedUser } from "@/server/auth";
+import { hasFeature } from "@/lib/domain/plans";
+import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { loadExercises, toCatalog } from "@/server/services/catalog";
 import { getActivePlanSummary } from "@/server/services/plan-summary";
 
@@ -13,6 +15,17 @@ export const metadata = { title: "Build my program" };
 export default async function BuildProgramPage({ searchParams }: { searchParams: Promise<{ type?: string }> }) {
   const { type } = await searchParams;
   const { user, profile } = await requireOnboardedUser();
+  if (!hasFeature(await getUserPlan(user.id), "custom_program_builder")) {
+    return (
+      <PlanLocked
+        back={{ href: "/train", label: "Train" }}
+        eyebrow="Build my program"
+        title="Your custom program"
+        plan="Plus"
+        description="Build a periodized program around your goal, numbers, schedule and equipment — strength, bodybuilding, running and more. Your starter program and the free programs stay available on every plan."
+      />
+    );
+  }
   const supabase = await getServerSupabase();
   const [{ data: answers }, { data: weight }, exercises, current] = await Promise.all([
     supabase.from("onboarding_answers").select("experience, days_per_week, session_minutes, equipment").eq("user_id", user.id).maybeSingle(),

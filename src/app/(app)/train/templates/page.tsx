@@ -9,7 +9,8 @@ import { formatDistance } from "@/lib/domain/exercise-tracking";
 import { formatDuration } from "@/lib/domain/units";
 import { prescriptionText, supersetLetter } from "@/lib/domain/workout-templates";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { requireOnboardedUser } from "@/server/auth";
+import { getPlans, hasFeature } from "@/lib/domain/plans";
+import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { deleteTemplateAction } from "@/server/actions/templates";
 import { listTemplates } from "@/server/services/templates";
 
@@ -18,19 +19,29 @@ export const metadata = { title: "My workouts" };
 export default async function TemplatesPage() {
   const { user, profile } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
-  const templates = await listTemplates(supabase, user.id);
+  const [templates, plan] = await Promise.all([listTemplates(supabase, user.id), getUserPlan(user.id)]);
   const units = profile.unit_system;
+  const limit = hasFeature(plan, "unlimited_templates") ? null : getPlans()[plan].templateLimit;
+  const atLimit = limit !== null && templates.length >= limit;
 
   return (
     <div className="space-y-5">
       <BackLink href="/train">Train</BackLink>
       <PageHeader title="My workouts" description="Saved custom workouts. Start one, edit it, or build a new one from the exercise library." />
       <div className="grid grid-cols-2 gap-2">
-        <Button asChild>
-          <Link href="/train/templates/new">
-            <Plus aria-hidden /> New workout
-          </Link>
-        </Button>
+        {atLimit ? (
+          <Button asChild variant="secondary">
+            <Link href="/profile/billing">
+              <Plus aria-hidden /> Unlimited with Plus
+            </Link>
+          </Button>
+        ) : (
+          <Button asChild>
+            <Link href="/train/templates/new">
+              <Plus aria-hidden /> New workout
+            </Link>
+          </Button>
+        )}
         <Button asChild variant="secondary">
           <Link href="/train/workout?blank=1">
             <Dumbbell aria-hidden /> Empty workout
@@ -38,6 +49,16 @@ export default async function TemplatesPage() {
         </Button>
       </div>
       <p className="text-xs text-muted-foreground">Logged an empty workout you liked? Save it as a template from the summary screen when you finish.</p>
+      {limit !== null && (
+        <p className="text-sm text-muted-foreground" data-testid="template-limit">
+          {templates.length} of {limit} saved workouts on Free.{" "}
+          {atLimit ? "Delete one to save another, or " : ""}
+          <Link href="/profile/billing" className="text-gold underline-offset-4 hover:underline">
+            {atLimit ? "upgrade to Plus" : "Plus"}
+          </Link>{" "}
+          {atLimit ? "for unlimited workouts." : "keeps unlimited workouts."}
+        </p>
+      )}
 
       {templates.length === 0 ? (
         <EmptyState title="No saved workouts yet" description="Build one from the exercise library — order, sets, reps, time or distance, rest and supersets." />

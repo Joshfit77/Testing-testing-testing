@@ -12,15 +12,17 @@ test.describe("rank badges (Fitness, Food, Faith)", () => {
     await expect(tabs.getByRole("tab", { name: /Fitness/ })).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("list", { name: "Fitness ranks" }).getByRole("listitem")).toHaveCount(9);
     await expect(page.getByRole("button", { name: "Foundation, rank 1 of 9, locked" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Conqueror, rank 9 of 9, locked" })).toBeVisible();
+    // On Free, Fitness and Food ranks 4–9 are shown as included with Plus (progress still counts).
+    await expect(page.getByRole("button", { name: "Conqueror, rank 9 of 9, included with Plus" })).toBeVisible();
 
     // Detail view: requirement, progress and the BSB verse.
-    await page.getByRole("button", { name: "Disciplined, rank 4 of 9, locked" }).click();
+    await page.getByRole("button", { name: "Disciplined, rank 4 of 9, included with Plus" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("heading", { name: "Disciplined" })).toBeVisible();
     await expect(dialog.getByText("Complete 50 workouts.")).toBeVisible();
     await expect(dialog.getByText("1 Corinthians 9:25–27 (BSB)")).toBeVisible();
     await expect(dialog.getByText(/trains with strict discipline/)).toBeVisible();
+    await expect(dialog.getByText(/Ranks 4–9 are included with Plus and Pro/)).toBeVisible();
     await page.keyboard.press("Escape");
 
     await tabs.getByRole("tab", { name: /Food/ }).click();

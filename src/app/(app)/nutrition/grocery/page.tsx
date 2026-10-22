@@ -17,7 +17,7 @@ export const metadata = { title: "Grocery list" };
 const fmtQty = (q: number) => (Number.isInteger(q) ? String(q) : String(Math.round(q * 100) / 100));
 
 export default async function GroceryPage() {
-  const { user, profile, allowed } = await nutritionPageUser();
+  const { user, profile, allowed } = await nutritionPageUser("meal_planning");
   if (!allowed) return <NutritionLocked title="Grocery list" description="Turn your meal plan into a combined grocery list, check items off and add your own." />;
   const supabase = await getServerSupabase();
   const today = isoDateInTz(new Date(), profile.timezone);

@@ -92,19 +92,30 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
     await expect(handleStripeEvent({ id: `evt_${crypto.randomUUID()}`, type: "ping", data: { object: {} } } as unknown as Stripe.Event)).resolves.toBe(true);
   });
 
-  it("enforces AI entitlements and monthly quotas server-side", async () => {
+  it("enforces AI entitlements and monthly quotas server-side: the coach is Pro-only", async () => {
     await expect(assertAiAllowed(user.id, "free", "chat")).rejects.toMatchObject({ code: "not_entitled" });
-    await expect(assertAiAllowed(user.id, "plus", "plan")).rejects.toMatchObject({ code: "plan_not_entitled" });
-    await expect(assertAiAllowed(user.id, "plus", "chat")).resolves.toMatchObject({ chatUsed: 0 });
+    await expect(assertAiAllowed(user.id, "plus", "chat")).rejects.toMatchObject({ code: "not_entitled" });
+    await expect(assertAiAllowed(user.id, "plus", "plan")).rejects.toMatchObject({ code: "not_entitled" });
+    await expect(assertAiAllowed(user.id, "pro", "chat")).resolves.toMatchObject({ chatUsed: 0, smartUsed: 0, chatLimit: 150, smartLimit: 15 });
 
-    process.env.PLAN_PLUS_AI_MONTHLY_LIMIT = "2";
+    // The larger model's monthly share is metered from the usage table: once it's used up, plan generation stops,
+    // while ordinary chat (on the fast model) keeps working.
+    // Earlier this month, but not in the last minute (that would trip the separate per-minute burst limit).
+    const now = new Date();
+    const earlier = new Date(Math.max(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1) + 1000, now.getTime() - 5 * 60_000)).toISOString();
+    await serviceClient()
+      .from("ai_usage_events")
+      .insert(Array.from({ length: 15 }, () => ({ user_id: user.id, kind: "chat", model: "claude-sonnet-5-5", model_tier: "smart", created_at: earlier })));
+    await expect(assertAiAllowed(user.id, "pro", "plan")).rejects.toMatchObject({ code: "quota" });
+    await expect(assertAiAllowed(user.id, "pro", "chat")).resolves.toMatchObject({ chatUsed: 15, smartUsed: 15 });
+
+    process.env.PLAN_PRO_AI_MONTHLY_LIMIT = "15";
     try {
-      await serviceClient().from("ai_usage_events").insert([{ user_id: user.id, kind: "chat" }, { user_id: user.id, kind: "chat" }]);
-      const err = await assertAiAllowed(user.id, "plus", "chat").catch((e) => e);
+      const err = await assertAiAllowed(user.id, "pro", "chat").catch((e) => e);
       expect(err).toBeInstanceOf(AiError);
       expect(err.code).toBe("quota");
     } finally {
-      delete process.env.PLAN_PLUS_AI_MONTHLY_LIMIT;
+      delete process.env.PLAN_PRO_AI_MONTHLY_LIMIT;
     }
   });
 });

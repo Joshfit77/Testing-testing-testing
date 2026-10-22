@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BarChart3, CalendarDays, ChevronRight, Dumbbell, Footprints, HeartPulse, Lock, Pill, TrendingUp, Utensils, Wand2 } from "lucide-react";
+import { BarChart3, CalendarDays, ChevronRight, Dumbbell, Footprints, HeartPulse, Pill, TrendingUp, Utensils, Wand2 } from "lucide-react";
 import { Notice } from "@/components/common/states";
 import { TodayWorkoutAction } from "@/components/home/today-workout-action";
 import { WeekBars } from "@/components/home/week-bars";
@@ -44,7 +44,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   ]);
   const name = profile.display_name ?? "Athlete";
   const firstName = name.trim().split(/\s+/)[0] || name;
-  const nutritionEnabled = hasFeature(plan, "nutrition_tracking");
   const showScripture = profile.home_scripture ?? true;
   const verse = scriptureForDate(data.today);
   const startHref = active?.today ? `/train/workout?day=${active.today.id}&up=${active.userProgramId}` : "/train/workout?blank=1";
@@ -160,20 +159,22 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           </Link>
         )}
         {!active && (
-          <Link href="/train/build" className="mt-2 flex min-h-11 items-center justify-center gap-1.5 text-sm font-semibold text-gold-highlight hover:underline">
-            <Wand2 className="size-4" aria-hidden /> Build my program
+          <Link
+            href={hasFeature(plan, "custom_program_builder") ? "/train/build" : "/train/programs"}
+            className="mt-2 flex min-h-11 items-center justify-center gap-1.5 text-sm font-semibold text-gold-highlight hover:underline"
+          >
+            <Wand2 className="size-4" aria-hidden /> {hasFeature(plan, "custom_program_builder") ? "Build my program" : "Choose a program"}
           </Link>
         )}
       </section>
 
       <div className="grid grid-cols-2 gap-3">
         {/* Nutrition summary */}
-        <Link href={nutritionEnabled ? "/nutrition" : "/profile/billing"} className={`${card} flex flex-col p-4 hover:border-gold-muted`}>
+        <Link href="/nutrition" className={`${card} flex flex-col p-4 hover:border-gold-muted`}>
           <span id="home-nutrition" className="flex items-center gap-2 text-sm font-semibold">
             <Utensils className="size-4 text-gold" aria-hidden /> Nutrition
           </span>
-          {nutritionEnabled ? (
-            data.nutrition.goalCalories ? (
+          {data.nutrition.goalCalories ? (
               <>
                 <span className="mt-2 text-xl font-bold tabular-nums">
                   {Math.round(data.nutrition.calories).toLocaleString()}
@@ -183,13 +184,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                 <ProgressBar className="mt-auto" value={progressPct(data.nutrition.calories, data.nutrition.goalCalories)} label="Calories eaten of daily budget" />
               </>
             ) : (
-              <span className="mt-2 text-sm text-muted-foreground">
-                {Math.round(data.nutrition.calories).toLocaleString()} calories logged. Set a daily target in Food.
-              </span>
-            )
-          ) : (
-            <span className="mt-2 flex items-start gap-1.5 text-sm text-muted-foreground">
-              <Lock className="mt-0.5 size-4 shrink-0 text-gold" aria-hidden /> Calorie tracking comes with Plus and Pro.
+            <span className="mt-2 text-sm text-muted-foreground">
+              {Math.round(data.nutrition.calories).toLocaleString()} calories logged. Set a daily target in Food.
             </span>
           )}
         </Link>

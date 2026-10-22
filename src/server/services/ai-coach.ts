@@ -7,7 +7,8 @@ import { getPlans, hasFeature } from "@/lib/domain/plans";
 import type { Plan } from "@/lib/domain/types";
 import { aiPlanOutputSchema, validateAiPlan, type AiPlan } from "@/lib/validation/ai";
 import { formatAthleteContext, type AthleteSnapshot } from "@/lib/coach/context";
-import { buildSystemBlocks, CHAT_MAX_TOKENS, fallbackParams, MAX_TOOL_ROUNDS, sanitizeAssistantContent, selectCoachModel } from "@/lib/coach/prompt";
+import { buildSystemBlocks, CHAT_MAX_TOKENS, fallbackParams, MAX_TOOL_ROUNDS, sanitizeAssistantContent } from "@/lib/coach/prompt";
+import { routeCoachRequest, type ModelTier } from "@/lib/coach/routing";
 import { coachToolDefinitions, toolActivityLabel, type CoachProposal } from "@/lib/coach/tools";
 import { loadAthleteSnapshot } from "@/server/coach/snapshot";
 import { executeCoachTool, type ToolContext } from "@/server/coach/tools";
@@ -20,6 +21,7 @@ export type AiErrorCode =
   | "not_configured"
   | "disabled"
   | "not_entitled"
+  | "consent_required"
   | "plan_not_entitled"
   | "quota"
   | "rate_limited"
@@ -42,6 +44,7 @@ export const AI_ERROR_STATUS: Record<AiErrorCode, number> = {
   not_configured: 503,
   disabled: 503,
   not_entitled: 403,
+  consent_required: 403,
   plan_not_entitled: 403,
   quota: 429,
   rate_limited: 429,
@@ -68,33 +71,35 @@ function getClient(): Anthropic {
   return client;
 }
 
-/** Model for a plan tier (Pro: Claude Opus 5.5, Plus: Claude Sonnet 5.5; env-overridable). */
-export function coachModelFor(plan: Plan): string {
-  return selectCoachModel(plan, process.env);
-}
-
 function monthStartIso(): string {
   const d = new Date();
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)).toISOString();
 }
 
+/**
+ * This month's AI usage against the plan's allowance. `chatUsed` counts every request (chat and plan),
+ * `planUsed` plan generations and `smartUsed` requests served by the larger model.
+ */
 export async function getAiUsage(userId: string, plan: Plan) {
-  const plans = getPlans();
-  if (!isServiceRoleConfigured()) return { chatUsed: 0, planUsed: 0, chatLimit: plans[plan].aiMonthlyLimit, planLimit: plans[plan].aiPlanMonthlyLimit };
+  const config = getPlans()[plan];
+  const limits = { chatLimit: config.aiMonthlyLimit, planLimit: config.aiPlanMonthlyLimit, smartLimit: config.aiSmartMonthlyLimit };
+  if (!isServiceRoleConfigured()) return { chatUsed: 0, planUsed: 0, smartUsed: 0, ...limits };
   const admin = getServiceSupabase();
   const since = monthStartIso();
-  const [chat, gen] = await Promise.all([
-    admin.from("ai_usage_events").select("id", { count: "exact", head: true }).eq("user_id", userId).gte("created_at", since),
-    admin.from("ai_usage_events").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("kind", "plan").gte("created_at", since),
+  const count = (q: ReturnType<typeof admin.from>) => q.select("id", { count: "exact", head: true }).eq("user_id", userId).gte("created_at", since);
+  const [chat, gen, smart] = await Promise.all([
+    count(admin.from("ai_usage_events")),
+    count(admin.from("ai_usage_events")).eq("kind", "plan"),
+    count(admin.from("ai_usage_events")).eq("model_tier", "smart"),
   ]);
-  return { chatUsed: chat.count ?? 0, planUsed: gen.count ?? 0, chatLimit: plans[plan].aiMonthlyLimit, planLimit: plans[plan].aiPlanMonthlyLimit };
+  return { chatUsed: chat.count ?? 0, planUsed: gen.count ?? 0, smartUsed: smart.count ?? 0, ...limits };
 }
 
 /** All server-side eligibility checks for an AI request. Throws AiError when not allowed. */
 export async function assertAiAllowed(userId: string, plan: Plan, mode: "chat" | "plan") {
   if (!isAiConfigured()) throw new AiError("not_configured", "The AI coach isn't configured on this server.");
   if (!(await isFlagEnabled("ai_coach"))) throw new AiError("disabled", "The AI coach is temporarily unavailable.");
-  if (!hasFeature(plan, "ai_coach")) throw new AiError("not_entitled", "AI coaching is included with Plus and Pro.");
+  if (!hasFeature(plan, "ai_coach")) throw new AiError("not_entitled", "AI coaching is included with Pro.");
   if (mode === "plan") {
     if (!hasFeature(plan, "ai_plan_generation")) throw new AiError("plan_not_entitled", "Personalized plan generation is included with Pro.");
     if (!(await isFlagEnabled("ai_plan_generation"))) throw new AiError("disabled", "Plan generation is temporarily unavailable.");
@@ -108,7 +113,9 @@ export async function assertAiAllowed(userId: string, plan: Plan, mode: "chat" |
   if ((await recentAiRequests(userId, 60_000)) >= perMinute) throw new AiError("rate_limited", "You're sending messages quickly — please wait a moment.", 60);
   const usage = await getAiUsage(userId, plan);
   if (usage.chatUsed >= usage.chatLimit) throw new AiError("quota", `You've used all ${usage.chatLimit} AI messages for this month.`);
-  if (mode === "plan" && usage.planUsed >= usage.planLimit) throw new AiError("quota", `You've used all ${usage.planLimit} plan generations for this month.`);
+  if (mode === "plan" && (usage.planUsed >= usage.planLimit || usage.smartUsed >= usage.smartLimit)) {
+    throw new AiError("quota", `You've used this month's plan generations. They reset on the 1st.`);
+  }
   return usage;
 }
 
@@ -123,8 +130,10 @@ async function recentAiRequests(userId: string, windowMs: number): Promise<numbe
   return count ?? 0;
 }
 
-async function recordUsage(userId: string, kind: "chat" | "plan", inputTokens: number, outputTokens: number) {
-  const { error } = await getServiceSupabase().from("ai_usage_events").insert({ user_id: userId, kind, input_tokens: inputTokens, output_tokens: outputTokens });
+async function recordUsage(userId: string, kind: "chat" | "plan", model: string, tier: ModelTier, inputTokens: number, outputTokens: number) {
+  const { error } = await getServiceSupabase()
+    .from("ai_usage_events")
+    .insert({ user_id: userId, kind, model, model_tier: tier, input_tokens: inputTokens, output_tokens: outputTokens });
   if (error) logError("ai.usage_record", error);
 }
 
@@ -274,6 +283,9 @@ export async function coachTurn(params: {
   const { supabase, userId, plan, message, mode } = params;
   const onEvent = params.onEvent ?? (() => {});
   const usage = await assertAiAllowed(userId, plan, mode);
+  // Nothing goes to the AI provider until the user has allowed it (and only while they keep it allowed).
+  const { data: consent } = await supabase.from("profiles").select("ai_data_consent_at").eq("id", userId).maybeSingle();
+  if (!consent?.ai_data_consent_at) throw new AiError("consent_required", "Allow the AI Coach to use your data first (on the AI Coach screen).");
 
   let conversationId = params.conversationId;
   if (conversationId) {
@@ -314,8 +326,9 @@ export async function coachTurn(params: {
   // The API requires a user turn first; drop a leading assistant message if present.
   while (messages.length && messages[0]!.role !== "user") messages.shift();
 
-  const model = coachModelFor(mode === "plan" ? "pro" : plan);
-  const system = buildSystemBlocks({ faithEnabled: context.snapshot.faithEnabled, plan, contextText: context.text });
+  const route = routeCoachRequest({ mode, message, smartUsed: usage.smartUsed, smartLimit: usage.smartLimit, env: process.env });
+  const model = route.model;
+  const system = buildSystemBlocks({ faithEnabled: context.snapshot.faithEnabled, contextText: context.text });
 
   let reply = "";
   let proposal: AiPlan | CoachProposal | null = null;
@@ -394,7 +407,7 @@ export async function coachTurn(params: {
     .single();
   if (amErr || !assistantRow) throw amErr ?? new Error("Assistant message insert failed");
   await supabase.from("ai_conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
-  await recordUsage(userId, mode, inputTokens, outputTokens);
+  await recordUsage(userId, mode, model, route.tier, inputTokens, outputTokens);
 
   return {
     conversationId,

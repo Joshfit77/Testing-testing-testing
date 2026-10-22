@@ -68,6 +68,26 @@ export async function withdrawWellnessConsentAction(_prev: ActionState): Promise
   return actionOk("Consent withdrawn. Limitation notes and recovery check-ins were deleted.");
 }
 
+/**
+ * Allow or withdraw sharing data with the AI provider for the AI coach. Withdrawing stops the coach (no further
+ * data is sent); past conversations stay in the account until the user deletes them.
+ */
+export async function setAiDataConsentAction(allow: boolean): Promise<ActionState> {
+  const user = await requireUser();
+  const supabase = await getServerSupabase();
+  const { error } = await supabase
+    .from("profiles")
+    .update({ ai_data_consent_at: allow ? new Date().toISOString() : null })
+    .eq("id", user.id);
+  if (error) {
+    logError("profile.ai_consent", error);
+    return actionError("Couldn't save your choice. Please try again.");
+  }
+  revalidatePath("/coach");
+  revalidatePath("/profile");
+  return actionOk(allow ? "AI Coach turned on." : "AI Coach data sharing turned off. The coach won't send anything until you allow it again.");
+}
+
 export async function deleteAccountAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireUser();
   if (formData.get("confirm") !== "DELETE") return actionError("Type DELETE to confirm.", { confirm: "Type DELETE" });

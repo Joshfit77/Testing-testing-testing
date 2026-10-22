@@ -1,10 +1,13 @@
 import { expect, test } from "@playwright/test";
-import { completeOnboarding, signUpAndConfirm, uniqueEmail } from "./helpers";
+import { completeOnboarding, grantPlan, signUpAndConfirm, uniqueEmail } from "./helpers";
 
 test.describe("Build my program", () => {
   test("builds a bench press specialization from a best set and makes it the active program", async ({ page }) => {
-    await signUpAndConfirm(page, uniqueEmail("builder"));
+    const email = uniqueEmail("builder");
+    await signUpAndConfirm(page, email);
     await completeOnboarding(page);
+    // The program builder is a Plus feature.
+    await grantPlan(email, "plus");
 
     await page.goto("/train/programs");
     // The library is organized by the spec's categories; the type picker by discipline.

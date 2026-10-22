@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { initialActionState } from "@/lib/action-state";
 import { cmToFeetInches, feetInchesToCm } from "@/lib/domain/units";
 import type { UnitSystem } from "@/lib/domain/types";
-import { deleteAccountAction, updateProfileAction, withdrawWellnessConsentAction } from "@/server/actions/profile";
+import { deleteAccountAction, updateProfileAction, withdrawWellnessConsentAction, setAiDataConsentAction } from "@/server/actions/profile";
 
 export function ProfileForm({
   initial,
@@ -100,6 +100,19 @@ export function WithdrawConsentForm() {
     <form action={action} className="space-y-2">
       <SubmitButton variant="secondary" pendingLabel="Removing…">
         Withdraw consent &amp; delete wellness data
+      </SubmitButton>
+      <FormMessage state={state} />
+    </form>
+  );
+}
+
+/** Turn off sharing data with the AI provider (turning it on happens on the AI Coach screen, with the full list). */
+export function AiConsentOffForm() {
+  const [state, action] = useActionState(async () => setAiDataConsentAction(false), initialActionState);
+  return (
+    <form action={action} className="space-y-2">
+      <SubmitButton variant="secondary" pendingLabel="Turning off…">
+        Turn off AI Coach data sharing
       </SubmitButton>
       <FormMessage state={state} />
     </form>

@@ -14,7 +14,7 @@ import { appRecipeViews, loadRecipes, type RecipeView } from "@/server/services/
 export const metadata = { title: "Recipes" };
 
 export default async function RecipesPage() {
-  const { user, allowed } = await nutritionPageUser();
+  const { user, allowed } = await nutritionPageUser("meal_planning");
   if (!allowed) return <NutritionLocked title="Recipes" description="Build recipes from the food database, see per-serving nutrition and log a serving to your diary." />;
   const supabase = await getServerSupabase();
   let recipes: RecipeView[] = [];

@@ -10,7 +10,7 @@ export const metadata = { title: "New recipe" };
 const MY_FOOD_COLUMNS = "id, name, brand, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g, is_estimate, source";
 
 export default async function NewRecipePage() {
-  const { user, allowed } = await nutritionPageUser();
+  const { user, allowed } = await nutritionPageUser("meal_planning");
   if (!allowed) return <NutritionLocked title="New recipe" description="Build recipes from the food database, see per-serving nutrition and log a serving to your diary." />;
   const supabase = await getServerSupabase();
   const { data } = await supabase.from("foods").select(MY_FOOD_COLUMNS).eq("owner_id", user.id).order("name");

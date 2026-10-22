@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Dumbbell, Footprints, Moon, PersonStanding, Undo2, CalendarClock } from "lucide-react";
+import { ChevronLeft, ChevronRight, Dumbbell, Footprints, Lock, Moon, PersonStanding, Undo2, CalendarClock } from "lucide-react";
 import { ActionButton } from "@/components/common/action-button";
 import { MoveSession } from "@/components/calendar/move-session";
 import { MainHeader } from "@/components/shell/main-header";
@@ -8,7 +8,8 @@ import { activeMinutes } from "@/lib/domain/activity-week";
 import { addDays, isoDateInTz, startOfWeek } from "@/lib/domain/dates";
 import { cn } from "@/lib/utils";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { requireOnboardedUser } from "@/server/auth";
+import { hasFeature } from "@/lib/domain/plans";
+import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { resetPlannedSessionAction } from "@/server/actions/calendar";
 import { loadProgramSchedule } from "@/server/services/schedule";
 
@@ -29,6 +30,8 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const sp = await searchParams;
   const { user, profile } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
+  // Viewing the calendar is free; moving planned sessions to other days is a Plus feature.
+  const canReschedule = hasFeature(await getUserPlan(user.id), "advanced_calendar");
   const tz = profile.timezone;
   const today = isoDateInTz(new Date(), tz);
   const view = sp.view === "week" ? "week" : "month";
@@ -86,7 +89,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     d.entries.length ? (
       <ul className="space-y-2">
         {d.entries.map((e) => (
-          <EntryRow key={e.id} entry={e} minDate={e.planned ? minDateFor(e.planned.index) : today} />
+          <EntryRow key={e.id} entry={e} minDate={e.planned ? minDateFor(e.planned.index) : today} canReschedule={canReschedule} />
         ))}
       </ul>
     ) : (
@@ -217,6 +220,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
                     planned: { dayId: p.dayId, moved: p.moved, defaultDate: p.defaultDate, index: p.index, week: p.week, day: p.day },
                   }}
                   minDate={minDateFor(p.index)}
+                  canReschedule={canReschedule}
                 />
               ))}
             </ul>
@@ -239,7 +243,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   );
 }
 
-function EntryRow({ entry: e, minDate }: { entry: CalendarEntry; minDate: string }) {
+function EntryRow({ entry: e, minDate, canReschedule }: { entry: CalendarEntry; minDate: string; canReschedule: boolean }) {
   const meta = KIND_META[e.kind];
   const Icon = meta.icon;
   const body = (
@@ -269,7 +273,13 @@ function EntryRow({ entry: e, minDate }: { entry: CalendarEntry; minDate: string
       <div className="flex min-h-10 items-center gap-3">{body}</div>
       {e.planned && (
         <div className="mt-2 flex flex-wrap items-start gap-2">
-          <MoveSession dayId={e.planned.dayId} name={e.title} date={e.date} minDate={minDate} />
+          {canReschedule ? (
+            <MoveSession dayId={e.planned.dayId} name={e.title} date={e.date} minDate={minDate} />
+          ) : (
+            <Link href="/profile/billing" className="inline-flex min-h-11 items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+              <Lock className="size-4 text-gold" aria-hidden /> Move to another day with Plus
+            </Link>
+          )}
           {e.planned.moved && (
             <ActionButton action={resetPlannedSessionAction} fields={{ dayId: e.planned.dayId }} variant="ghost" size="sm">
               <Undo2 aria-hidden /> Back to {fmt(e.planned.defaultDate, { weekday: "short", month: "short", day: "numeric" })}

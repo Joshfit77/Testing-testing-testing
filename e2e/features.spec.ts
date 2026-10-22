@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { completeOnboarding, grantPlan, signUpAndConfirm, uniqueEmail } from "./helpers";
+import { completeOnboarding, signUpAndConfirm, uniqueEmail } from "./helpers";
 
 test.describe("feature access, subscriptions and core sections", () => {
   let email = "";
@@ -22,7 +22,7 @@ test.describe("feature access, subscriptions and core sections", () => {
     await expect(page.getByLabel("Age")).toBeVisible();
   });
 
-  test("free plan: premium programs, nutrition and AI are locked server-side; billing explains state", async ({ page }) => {
+  test("free plan: premium programs, meal planning and AI are locked server-side; food logging is open; billing explains state", async ({ page }) => {
     await completeOnboarding(page);
 
     await page.goto("/train/programs/powerlifting-base-block");
@@ -35,10 +35,12 @@ test.describe("feature access, subscriptions and core sections", () => {
     await expect(page.getByRole("button", { name: /Start program/ })).toBeVisible();
 
     await page.goto("/nutrition");
+    await expect(page.getByRole("button", { name: "Add food" })).toBeVisible();
+    await page.goto("/nutrition/planner");
     await expect(page.getByText("Included with Plus and Pro")).toBeVisible();
 
     await page.goto("/coach");
-    await expect(page.getByText(/isn't configured on this server|included with Plus and Pro/).first()).toBeVisible();
+    await expect(page.getByText(/isn't configured on this server|included with Pro/).first()).toBeVisible();
     await expect(page.getByRole("button", { name: "Send message" })).toBeDisabled();
 
     await page.goto("/profile/billing");
@@ -76,9 +78,8 @@ test.describe("feature access, subscriptions and core sections", () => {
     await expect(page.getByText("Entry saved. Only you can see it.")).toBeVisible();
   });
 
-  test("food log: search built-in foods and log a serving (Plus)", async ({ page }) => {
+  test("food log on the Free plan: search built-in foods and log a serving", async ({ page }) => {
     await completeOnboarding(page);
-    await grantPlan(email, "plus");
     await page.goto("/nutrition");
     await expect(page.getByRole("heading", { name: "Food", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Add food" }).click();
@@ -95,8 +96,10 @@ test.describe("feature access, subscriptions and core sections", () => {
     await expect(page.getByText("210").first()).toBeVisible();
 
     await page.goto("/profile/billing");
-    await expect(page.getByText("All Access Yearly")).toBeVisible();
-    await expect(page.getByText("$119.99")).toBeVisible();
-    await expect(page.getByText(/^\$14\.99\s*\/ month$/)).toBeVisible();
+    await expect(page.getByText(/^\$11\.99\s*\/ month$/)).toBeVisible();
+    await expect(page.getByText(/^\$24\.99\s*\/ month$/)).toBeVisible();
+    await expect(page.getByText("AI coach: 150 messages a month")).toBeVisible();
+    // No yearly option unless the owner configures a yearly price.
+    await expect(page.getByText("All Access Yearly")).toHaveCount(0);
   });
 });
