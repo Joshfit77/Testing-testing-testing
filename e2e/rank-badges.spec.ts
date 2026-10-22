@@ -82,7 +82,14 @@ test.describe("rank badges (Fitness, Food, Faith)", () => {
           const box = (el: Element) => el.getBoundingClientRect();
           return {
             overflow: document.documentElement.scrollWidth - window.innerWidth,
-            images: imgs.map((img) => ({ loaded: img.complete && img.naturalWidth > 0, natural: img.naturalWidth / img.naturalHeight, w: box(img).width, h: box(img).height })),
+            images: imgs.map((img) => ({
+              loaded: img.complete && img.naturalWidth > 0,
+              natural: img.naturalWidth / img.naturalHeight,
+              w: box(img).width,
+              h: box(img).height,
+              // How much the screen enlarges the file (above 1 means drawing past its own detail).
+              upscale: (box(img).width * window.devicePixelRatio) / img.naturalWidth,
+            })),
             // Rank number, art and text share a vertical centre line.
             centres: [...document.querySelectorAll(".rank-row")].map((row) =>
               [".rank-num", ".rank-art", ".rank-text"].map((s) => { const b = box(row.querySelector(s)!); return b.top + b.height / 2; }),
@@ -98,6 +105,7 @@ test.describe("rank badges (Fitness, Food, Faith)", () => {
           expect(Math.abs(img.natural - 2), where).toBeLessThan(0.01); // every file is 2 : 1 ...
           expect(Math.abs(img.w / img.h - 2), where).toBeLessThan(0.02); // ... and so is every box, so nothing is cropped
           expect(img.w, where).toBeCloseTo(report.images[0]!.w, 0); // all nine the same size
+          expect(img.upscale, where).toBeLessThanOrEqual(1.1); // never stretched past the file's own detail
         }
         for (const [num, art, text] of report.centres) {
           expect(Math.abs(num! - art!), where).toBeLessThanOrEqual(2);

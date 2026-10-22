@@ -89,7 +89,9 @@
     }
     to {
       opacity: 1;
-      transform: translateY(0);
+      /* "none", not translateY(0): a transform left in place keeps the element on its own compositing layer,
+         which Safari can redraw images in at reduced quality. */
+      transform: none;
     }
   }
   @keyframes fade-in {
@@ -434,7 +436,8 @@ html[data-motion="reduce"] *::after {
 @keyframes badge-reveal {
   0% { transform: scale(0.6) rotate(-8deg); opacity: 0; filter: brightness(2.2); }
   60% { transform: scale(1.06) rotate(1deg); opacity: 1; filter: brightness(1.3); }
-  100% { transform: scale(1) rotate(0); filter: brightness(1); }
+  /* Ends with no transform or filter, so the art is drawn plainly once the reveal settles. */
+  100% { transform: none; filter: none; }
 }
 @keyframes badge-reveal-ring {
   0% { transform: scale(0.4); opacity: 0.9; }
@@ -463,9 +466,8 @@ html[data-motion="reduce"] .badge-reveal-ring {
   aspect-ratio: 2 / 1;
   overflow: hidden;
   border-radius: 14px;
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
 }
+.badge-img.is-locked > img { opacity: 0.66; }
 .badge-img > img {
   position: relative;
   z-index: 1;
@@ -592,7 +594,9 @@ html[data-motion="reduce"] .badge-img-live::after { display: none; }
   align-items: center;
   column-gap: 10px;
   width: 100%;
-  min-height: 96px;
+  /* Tall enough for a two-line theme, so rows share one height; only the longest texts on the narrowest
+     phones grow past it. */
+  min-height: 122px;
   padding: 10px 6px;
   text-align: left;
   color: inherit;
@@ -633,9 +637,11 @@ html[data-motion="reduce"] .badge-img-live::after { display: none; }
 .rank-frame {
   --rank-hex: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 46 52'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23fff1bf'/%3E%3Cstop offset='.5' stop-color='%23e9b955'/%3E%3Cstop offset='1' stop-color='%238a5a14'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M23 2 43 13.5v25L23 50 3 38.5v-25Z' fill='%23100d08' stroke='url(%23g)' stroke-width='2.4'/%3E%3Cpath d='M23 6.5 39 15.8v20.4L23 45.5 7 36.2V15.8Z' fill='none' stroke='%23a8701c' stroke-opacity='.55' stroke-width='1'/%3E%3C/svg%3E");
 }
-/* The painted art: a fixed 2 : 1 box, shown whole (contain) and centred, edges fading into the frame. No CSS
-   filter touches earned art, so its pixels are drawn as they are; the glow is a separate layer behind it. */
-.rank-art { position: relative; display: block; width: 100%; aspect-ratio: 2 / 1; }
+/* The painted art: a fixed 2 : 1 box, shown whole (contain) and centred. Its edges fade inside the image file,
+   so no CSS mask or filter touches it and its pixels are drawn as they are; the glow is a separate layer behind.
+   The box stops growing at 136 px (408 device pixels on a 3x iPhone), about the art's own width, so wider phones
+   don't enlarge it into blur; the art then sits centred in its column. */
+.rank-art { position: relative; display: block; justify-self: center; width: 100%; max-width: 136px; aspect-ratio: 2 / 1; }
 .rank-art img {
   position: absolute;
   inset: 0;
@@ -645,8 +651,6 @@ html[data-motion="reduce"] .badge-img-live::after { display: none; }
   object-fit: contain;
   object-position: 50% 50%;
   display: block;
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
 }
 .rank-row.is-earned .rank-art::before {
   content: "";
@@ -655,7 +659,8 @@ html[data-motion="reduce"] .badge-img-live::after { display: none; }
   background: radial-gradient(closest-side, rgba(241, 180, 80, 0.2), transparent);
   pointer-events: none;
 }
-.rank-row.is-locked .rank-art img { filter: brightness(0.72) saturate(0.82); }
+/* Locked art is dimmed with opacity (it fades towards the black frame), not a filter. */
+.rank-row.is-locked .rank-art img { opacity: 0.66; }
 .rank-lock {
   position: absolute;
   z-index: 2;
@@ -691,17 +696,21 @@ html[data-motion="reduce"] .badge-img-live::after { display: none; }
 /* Progress towards a locked rank. */
 .rank-bar { display: block; height: 4px; margin-top: 5px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
 .rank-bar > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #a8701c, #f1c862); }
+.rank-bar.is-full > span { background: linear-gradient(90deg, #c48a26, #f6dc8c); }
 .rank-state.is-done { color: #f1c862; font-weight: 600; }
 .rank-state svg { width: 12px; height: 12px; }
-/* The detail view's art: centred in a gold-edged panel, as large as the dialog allows (up to 300 px wide). */
+/* The detail view's art: centred in a gold-edged panel that fits around it. The art stops at the size it can
+   fill sharply (BADGE_MAX_SHARP_WIDTH, 191 px), rather than being stretched to the dialog's width. */
 .rank-detail-art {
   position: relative;
   display: grid;
   place-items: center;
-  width: 100%;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
   /* Clear of the dialog's close button. */
   margin-top: 28px;
-  padding: 12px 8px;
+  padding: 14px 30px;
   border-radius: 16px;
   border: 1px solid rgba(201, 165, 76, 0.3);
   background: radial-gradient(60% 75% at 50% 50%, rgba(201, 165, 76, 0.12), transparent 70%), #0b0a07;
@@ -745,6 +754,8 @@ html[data-motion="reduce"] .badge-img-live::after { display: none; }
 }
 @media (min-width: 640px) {
   .rank-row { min-height: 120px; column-gap: 16px; }
+  /* Tablets and desktops are 2x screens, where the art stays sharp up to about half its own width. */
+  .rank-art { max-width: 190px; }
   .rank-name { font-size: 1.35rem; }
   .rank-ref, .rank-theme { font-size: 0.9rem; }
 }

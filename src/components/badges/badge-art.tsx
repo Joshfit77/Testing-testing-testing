@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, type ReactNode } from "react";
-import { BADGE_ARTWORK } from "@/components/badges/badge-artwork";
+import { BADGE_ARTWORK, BADGE_MAX_SHARP_WIDTH, getBadgeArtwork } from "@/components/badges/badge-artwork";
 import type { RankCategory } from "@/lib/domain/ranks";
 
 /**
@@ -43,14 +43,20 @@ export function BadgeArt({
 }) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
   const override = BADGE_IMAGE_OVERRIDES[`${category}-${level}`];
-  const style = locked ? { filter: "brightness(0.72) saturate(0.82)" } : undefined;
+  const style = locked ? { filter: "brightness(0.55) saturate(0.75)" } : undefined;
   if (override) {
+    const art = getBadgeArtwork(category, level);
     return (
-      // The painted art is a 2 : 1 scene: `size` sets the frame's height, its width is twice that (never wider
-      // than the space available), and the whole image is shown, centred, never cropped or stretched.
-      <span className={["badge-img", animate && !locked ? "badge-img-live" : "", className].filter(Boolean).join(" ")} style={{ width: size * 2 }}>
+      // The painted art is a 2 : 1 scene: `size` sets the frame's height and its width is twice that, but never
+      // wider than the space available or than the art can fill sharply (BADGE_MAX_SHARP_WIDTH). The whole image
+      // is shown, centred, never cropped or stretched. No CSS mask or filter touches it: the edges fade inside the
+      // file, and a locked badge is dimmed with opacity.
+      <span
+        className={["badge-img", locked ? "is-locked" : "", animate && !locked ? "badge-img-live" : "", className].filter(Boolean).join(" ")}
+        style={{ width: Math.min(size * 2, BADGE_MAX_SHARP_WIDTH), maxWidth: "100%" }}
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={override} alt={title ?? ""} style={style} draggable={false} decoding="async" />
+        <img src={override} alt={title ?? ""} width={art?.width || undefined} height={art?.height || undefined} draggable={false} decoding="async" />
       </span>
     );
   }

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { BADGE_ARTWORK, getBadgeArtwork } from "@/components/badges/badge-artwork";
+import { BADGE_ARTWORK, BADGE_MAX_SHARP_WIDTH, MAX_DEVICE_UPSCALE, getBadgeArtwork } from "@/components/badges/badge-artwork";
 import { BADGE_IMAGE_OVERRIDES } from "@/components/badges/badge-art";
 import { RANKS } from "@/lib/domain/ranks";
 
@@ -42,6 +42,25 @@ describe("badge artwork", () => {
       const { width, height } = webpSize(file(art.image));
       expect(Math.abs(width - 2 * height), `${art.image} is ${width}x${height}`).toBeLessThanOrEqual(1);
       expect(height, art.image).toBeGreaterThanOrEqual(190);
+    }
+  });
+
+  it("knows each file's real pixel size (used for <img> width/height and the sharp-size limit)", () => {
+    for (const art of BADGE_ARTWORK) expect({ width: art.width, height: art.height }, art.image).toEqual(webpSize(file(art.image)));
+  });
+
+  it("large views never enlarge any badge more than 1.5x on a 3x iPhone", () => {
+    for (const art of BADGE_ARTWORK) expect((BADGE_MAX_SHARP_WIDTH * 3) / art.width, art.image).toBeLessThanOrEqual(MAX_DEVICE_UPSCALE);
+    expect(BADGE_MAX_SHARP_WIDTH).toBeGreaterThanOrEqual(180);
+  });
+
+  it("the edge fade is inside every file (fully transparent corners), so no CSS mask is needed", () => {
+    // A lossless WebP's alpha can't be read without a decoder here, so check the files are lossless with alpha:
+    // the VP8L header's alpha hint bit is set.
+    for (const art of BADGE_ARTWORK) {
+      const b = readFileSync(file(art.image));
+      expect(b.toString("ascii", 12, 16), art.image).toBe("VP8L");
+      expect((b.readUInt32LE(21) >> 28) & 1, art.image).toBe(1);
     }
   });
 });

@@ -70,16 +70,25 @@ screenshots).
     92), and lossy WebP also halves colour detail, which smeared red and blue edges. All 27 total 2.2 MB.
 - **Wiring:** `src/components/badges/badge-artwork.ts` maps each rank to its image (`getBadgeArtwork`), and
   `BADGE_IMAGE_OVERRIDES` feeds it to the badge list, the detail view and the unlock reveal.
-- **Display:** every image sits in a 2 : 1 box with `object-fit: contain`, centred, so it's shown whole: never
-  cropped, stretched or distorted. The sides fade into the frame.
-  - **Earned art:** never has a CSS filter on it. The gold glow is a separate layer behind it.
-  - **Locked art:** a fixed, mild dim (brightness 0.72, saturation 0.82) plus a lock.
+- **Display:** every image sits in a 2 : 1 box with `object-fit: contain` and `object-position: 50% 50%`, so it's
+  shown whole: never cropped, stretched or distorted. Plain `<img>` with the file's real `width`/`height`
+  (`badge-artwork-sizes.json`), not Next.js `<Image>`, so no image optimiser recompresses it.
+  - **No mask or filter on the art:** the edge fade is built into each file. Earned art has no CSS effect at all,
+    and its gold glow is a separate layer behind it. Locked art is dimmed with opacity (0.66) plus a lock.
+  - **Never enlarged past its detail:**
+    - **List:** the art box stops at 136 pt wide, about each file's own width on a 3× iPhone.
+    - **Detail view and reveal:** they stop at `BADGE_MAX_SHARP_WIDTH` (191 pt). That's the most any badge can be
+      shown before a 3× screen enlarges it more than 1.5×.
+  - **No lingering transforms:** animations end on `transform: none` / `filter: none`, so nothing stays on a
+    separate compositing layer once they finish.
 - **Tests:**
-  - `tests/unit/badge-artwork.test.ts` checks that all 27 files exist, are 2 : 1 and are at least 190 px tall.
+  - `tests/unit/badge-artwork.test.ts` checks that all 27 files exist, are 2 : 1, at least 190 px tall and lossless
+    with alpha, that their real sizes match `badge-artwork-sizes.json`, and that large views stay within 1.5×.
   - `e2e/rank-badges.spec.ts` checks, at 320, 375, 390 and 430 px wide, that every image loads, every box is 2 : 1
-    and the same size, the number, art and text share a centre line, no name is cut off, and nothing scrolls sideways.
-- **Verses on the list:** an earned rank shows its full BSB verse directly under its row. Locked ranks show the
-  reference, a progress bar and the count, and every rank's verse is in its detail view.
+    and the same size, no image is enlarged more than 1.1×, the number, art and text share a centre line, no name is
+    cut off, and nothing scrolls sideways.
+- **Verses on the list:** an earned rank shows its full BSB verse directly under its row. Every row has a progress
+  bar (full gold when earned) and its count, and every rank's verse is in its detail view.
 
 > **Rights:** these images came from the owner. Before the app goes to the App Store, confirm that you hold
 > commercial rights to them (for example, that they're your own or AI images you generated under terms that
@@ -87,20 +96,52 @@ screenshots).
 
 ### Image quality: what the posters can and can't give
 
-The posters are phone screenshots. A resampling test (shrink, enlarge back, compare) shows they hold only about
-55–65 % of the detail their pixel size suggests, so they were already soft before any cropping. Each badge is
-382–582 px wide and 191–291 px tall, with roughly 120–180 px of real vertical detail.
+The posters are phone screenshots. Two tests show what's in them:
 
-| Where it's shown | Size on screen (390 px phone) | Pixels needed on a 3× iPhone | Result |
-|---|---|---|---|
-| Badge list | ≈ 135 × 68 pt | ≈ 405 × 203 | About native size: as sharp as the source allows |
-| Current-rank card | 112 × 56 pt | 336 × 168 | Native or smaller: as sharp as the source allows |
-| Detail view and reveal | up to 300 × 150 pt | 900 × 450 | Enlarged about 2×: visibly soft |
+- **Resampling test (shrink, enlarge back, compare):** they hold only about 55–65 % of the detail their pixel size
+  suggests.
+- **8-pixel-block test:** they show no JPEG block artifacts (blockiness 1.01–1.03, where 1.0 means none). The
+  smudgy look is the art's own softness, not compression damage that could be undone.
 
-No CSS setting can add detail that isn't in the file. **All 27 need replacing for a crisp App Store release**:
+The Food poster has the least fine detail. "Enlarged" below is screen pixels ÷ file pixels on a 3× iPhone; above
+1.0 means the screen draws more pixels than the file has.
 
-- **Softest, replace first:** the Food set, especially Torch, Spark, Flame and Ember.
-- **Also soft:** Faith 1–2 (Seed, Sprout) and Fitness 1 and 9 (Foundation, Conqueror).
+| Badge | File (px) | Size | List, 390 pt phone | Detail view |
+|---|---|---|---|---|
+| fitness-01-foundation | 390 × 195 | 63 KB | 1.04× | 1.47× |
+| fitness-02-faithful | 400 × 200 | 72 KB | 1.01× | 1.43× |
+| fitness-03-endurance | 382 × 191 | 65 KB | 1.06× | 1.50× |
+| fitness-04-disciplined | 416 × 208 | 81 KB | 0.97× | 1.38× |
+| fitness-05-refined | 440 × 220 | 85 KB | 0.92× | 1.30× |
+| fitness-06-steadfast | 446 × 223 | 91 KB | 0.91× | 1.28× |
+| fitness-07-overcomer | 428 × 214 | 86 KB | 0.95× | 1.34× |
+| fitness-08-mighty | 454 × 227 | 90 KB | 0.89× | 1.26× |
+| fitness-09-conqueror | 564 × 282 | 117 KB | 0.72× | 1.02× |
+| food-01-spark | 400 × 200 | 55 KB | 1.01× | 1.43× |
+| food-02-ember | 404 × 202 | 66 KB | 1.00× | 1.42× |
+| food-03-flame | 428 × 214 | 68 KB | 0.95× | 1.34× |
+| food-04-torch | 418 × 209 | 57 KB | 0.97× | 1.37× |
+| food-05-blaze | 434 × 217 | 78 KB | 0.93× | 1.32× |
+| food-06-furnace | 446 × 223 | 83 KB | 0.91× | 1.28× |
+| food-07-forge | 426 × 213 | 73 KB | 0.95× | 1.35× |
+| food-08-inferno | 454 × 227 | 84 KB | 0.89× | 1.26× |
+| food-09-phoenix | 582 × 291 | 126 KB | 0.70× | 0.98× |
+| faith-01-seed | 394 × 197 | 62 KB | 1.03× | 1.45× |
+| faith-02-sprout | 412 × 206 | 64 KB | 0.98× | 1.39× |
+| faith-03-sapling | 424 × 212 | 73 KB | 0.96× | 1.35× |
+| faith-04-root | 418 × 209 | 74 KB | 0.97× | 1.37× |
+| faith-05-branch | 436 × 218 | 84 KB | 0.93× | 1.31× |
+| faith-06-vine | 448 × 224 | 87 KB | 0.90× | 1.28× |
+| faith-07-fruit | 426 × 213 | 82 KB | 0.95× | 1.35× |
+| faith-08-olive | 456 × 228 | 94 KB | 0.89× | 1.26× |
+| faith-09-cedar | 572 × 286 | 141 KB | 0.71× | 1.00× |
+
+Before this fix the detail view drew 300 pt wide, which enlarged the art 1.55–2.36×. The list is now drawn at about
+native size: as sharp as these files can be. **No code change can add detail that isn't in the files**, so for a
+crisp App Store release **all 27 need replacing**:
+
+- **Softest, replace first:** the Food set (Torch, Spark, Flame and Ember have the least detail).
+- **Then:** Seed, Sprout, Foundation and Conqueror.
 
 ### Replacement artwork (production spec)
 
@@ -108,12 +149,19 @@ No CSS setting can add detail that isn't in the file. **All 27 need replacing fo
   rank, of the same subjects and progression as the posters.
 - **Shape and size:** exactly **2 : 1**, ideally **1600 × 800 px** (minimum 1200 × 600). That covers the detail
   view on a 3× iPhone.
-- **Composition:** subject centred, inside the middle 80 % of the width (the outer 7 % on each side fades out). No
-  rank number, text or poster lines in the image.
+- **Composition:** subject centred, inside the middle 80 % of the width. No rank number, text or poster lines in
+  the image.
+- **Edges:** the app applies no CSS fade, so either use a transparent background or fade the outer 7 % of each side
+  (and about 10 px top and bottom) to transparent in the file itself.
 - **Background:** transparent, or the same near-black as the app.
 - **Format:** lossless WebP or PNG (a WebP over about 300 KB can be lossy at quality 95+).
-- **Installing:** put them in `public/badges/` with the same names. Nothing else needs to change, and the unit test
-  checks the shape. Don't re-run `crop-posters.py` afterwards, or it will overwrite them.
+- **Installing:**
+  1. Put them in `public/badges/` with the same names.
+  2. Update each file's `width`/`height` in `src/components/badges/badge-artwork-sizes.json`. The unit test fails
+     until they match, and it checks the shape.
+  3. With larger files, the detail view's sharp-size limit (`BADGE_MAX_SHARP_WIDTH`) rises on its own. The list's
+     136 pt cap is in `globals.css` (`.rank-art`) and can then be raised too.
+  4. Don't re-run `crop-posters.py` afterwards, or it will overwrite them.
 - **Don't use AI upscalers on the current crops:** they invent detail (fur, leaves, flames) that changes the art.
 
 The vector drawing described next remains in `badge-art.tsx` as a fallback.

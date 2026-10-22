@@ -8,8 +8,12 @@ Output: public/badges/{category}-{NN}-{name}.webp, one per rank, all exactly 2 :
         - centred on the badge's subject (found from where the bright, coloured artwork sits in the row);
         - where the 2 : 1 window would run past the art (into the rank number or the text), the canvas is left
           transparent instead, so the subject stays centred;
-        - top, bottom and any cut side edges fade to transparent;
+        - the edges fade to transparent inside the file itself (top and bottom 10 px, each side 7 % of the width),
+          so the app needs no CSS mask or filter to blend them, both of which can make Safari redraw the image
+          at lower quality;
         - saved as lossless WebP, so no compression smudging is added.
+Also writes src/components/badges/badge-artwork-sizes.json with each image's pixel size, which the app uses
+for the <img> width/height and to keep large views from enlarging the art more than 1.5x on a 3x iPhone.
 
 Replacing the art: a higher-resolution image with the same name and a 2 : 1 shape can be dropped into
 public/badges/ (see docs/BADGES.md). Don't re-run this script afterwards, or it will overwrite it.
@@ -17,6 +21,8 @@ public/badges/ (see docs/BADGES.md). Don't re-run this script afterwards, or it 
 Run: python3 scripts/badge-art/crop-posters.py
 """
 from pathlib import Path
+
+import json
 
 import numpy as np
 from PIL import Image
@@ -26,7 +32,7 @@ SRC = ROOT / "scripts/badge-art/posters"
 OUT = ROOT / "public/badges"
 INSET = 5  # px kept clear of each gold rule
 FEATHER_Y = 10  # px of fade at the top and bottom
-FEATHER_X = 18  # px of fade where the art itself is cut off at the side
+FEATHER_SIDE = 0.07  # share of the width that fades out on each side (the art reaches the canvas edge or is cut there)
 
 NAMES = {
     "fitness": ["foundation", "faithful", "endurance", "disciplined", "refined", "steadfast", "overcomer", "mighty", "conqueror"],
@@ -67,6 +73,7 @@ def ramp(n: int, feather: int, fade_start: bool, fade_end: bool) -> np.ndarray:
 
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
+    sizes = {}
     for cat, names in NAMES.items():
         poster = Image.open(SRC / f"{cat}.webp").convert("RGB")
         assert poster.size == (1290, 2796), poster.size
@@ -79,15 +86,26 @@ def main():
             cx = x0 + round(subject_x(band))
             left, right = cx - h, cx + h  # the 2 : 1 window centred on the subject
             src_l, src_r = max(left, x0), min(right, x1)
-            art = poster.crop((src_l, top, src_r, bottom)).convert("RGBA")
-            ax = ramp(art.width, FEATHER_X, src_l > left, src_r < right)
-            ay = ramp(h, FEATHER_Y, True, True)
-            art.putalpha(Image.fromarray((np.outer(ay, ax) * 255).astype(np.uint8), "L"))
             canvas = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-            canvas.paste(art, (src_l - left, 0))
+            canvas.paste(poster.crop((src_l, top, src_r, bottom)), (src_l - left, 0))
+            # Fade measured on the whole 2 : 1 canvas, so every badge fades the same way; where the art was padded
+            # (cut short of the canvas edge) its own cut edge fades too.
+            ax = ramp(w, round(w * FEATHER_SIDE), True, True)
+            pad_l, pad_r = src_l - left, right - src_r
+            if pad_l or pad_r:
+                inner = np.zeros(w)
+                inner[pad_l : w - pad_r] = ramp(w - pad_l - pad_r, round(w * FEATHER_SIDE / 2), pad_l > 0, pad_r > 0)
+                ax = ax * inner
+            ay = ramp(h, FEATHER_Y, True, True)
+            alpha = np.asarray(canvas.getchannel("A"), dtype=float) / 255 * np.outer(ay, ax)
+            canvas.putalpha(Image.fromarray((alpha * 255).round().astype(np.uint8), "L"))
             path = OUT / f"{cat}-{i + 1:02d}-{name}.webp"
             canvas.save(path, "WEBP", lossless=True, quality=100, method=6, exact=True)
+            sizes[f"/badges/{path.name}"] = {"width": w, "height": h}
             print(f"{path.name:28} {w}x{h}  subject x={cx}  padded left={src_l - left} right={right - src_r}")
+
+
+    (ROOT / "src/components/badges/badge-artwork-sizes.json").write_text(json.dumps(sizes, indent=2) + "\n")
 
 
 if __name__ == "__main__":

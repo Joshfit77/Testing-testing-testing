@@ -2,6 +2,7 @@
 
 import { Check, Dumbbell, Flame, Lock, Sprout } from "lucide-react";
 import { BADGE_IMAGE_OVERRIDES } from "@/components/badges/badge-art";
+import { getBadgeArtwork } from "@/components/badges/badge-artwork";
 import { RANK_CATEGORIES, type CategoryProgress, type RankCategory, type RankState } from "@/lib/domain/ranks";
 import { cn } from "@/lib/utils";
 
@@ -65,7 +66,14 @@ export function RankLadder({
                 <span className="rank-art">
                   {art ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={art} alt="" draggable={false} decoding="async" />
+                    <img
+                      src={art}
+                      alt=""
+                      width={getBadgeArtwork(r.category, r.level)?.width}
+                      height={getBadgeArtwork(r.category, r.level)?.height}
+                      draggable={false}
+                      decoding="async"
+                    />
                   ) : null}
                   {r.earned ? null : (
                     <span className="rank-lock">
@@ -78,9 +86,14 @@ export function RankLadder({
                   <span className="rank-ref">{r.reference}</span>
                   <span className="rank-theme">{r.theme}</span>
                   {r.earned ? (
-                    <span className="rank-state is-done">
-                      <Check aria-hidden /> Earned
-                    </span>
+                    <>
+                      <span className="rank-state is-done">
+                        <Check aria-hidden /> Earned
+                      </span>
+                      <span className="rank-bar is-full" aria-hidden>
+                        <span style={{ width: "100%" }} />
+                      </span>
+                    </>
                   ) : (
                     <>
                       <span className="rank-state">
