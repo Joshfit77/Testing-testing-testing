@@ -104,7 +104,7 @@ export const RANKS: RankDefinition[] = [
   R("faith", 6, "Vine", "John 15:1", "Remain and grow.", 80),
   R("faith", 7, "Fruit", "Galatians 5:22–23", "Bearing fruit in every good work.", 120),
   R("faith", 8, "Olive", "Psalm 52:8", "Flourish like an olive tree.", 180),
-  R("faith", 9, "Cedar", "Psalm 92:12", "Standing tall and flourishing.", 365),
+  R("faith", 9, "Cedar", "Psalm 92:12", "The righteous grow like a cedar in Lebanon.", 365),
 ];
 
 export interface RankState extends RankDefinition {

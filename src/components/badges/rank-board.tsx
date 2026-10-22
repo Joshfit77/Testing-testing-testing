@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Lock } from "lucide-react";
 import { BadgeArt } from "@/components/badges/badge-art";
+import { RankLadder } from "@/components/badges/rank-ladder";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { RANK_CATEGORIES, type CategoryProgress, type RankCategory, type RankState } from "@/lib/domain/ranks";
@@ -130,32 +130,7 @@ export function RankBoard({ progress, verses, translation, initial = "fitness", 
         </button>
         <p className="text-xs text-muted-foreground">{info.counts}</p>
 
-        <ul className="grid grid-cols-3 gap-3" aria-label={`${info.label} ranks`}>
-          {current.ranks.map((r) => (
-            <li key={r.level}>
-              <button
-                type="button"
-                onClick={() => setOpen(r)}
-                aria-label={`${r.name}, rank ${r.level} of 9, ${r.earned ? "earned" : "locked"}`}
-                className={cn(
-                  "group flex w-full flex-col items-center rounded-2xl border px-1.5 pb-2.5 pt-3 transition-colors",
-                  r.earned ? "border-gold-muted/50 bg-card shadow-[0_10px_28px_-18px_rgba(201,165,76,0.75)]" : "border-border bg-card/60",
-                )}
-              >
-                <span className="relative">
-                  <BadgeArt category={r.category} level={r.level} size={76} locked={!r.earned} />
-                  {!r.earned ? (
-                    <span className="absolute bottom-0 right-0 grid size-6 place-items-center rounded-full border border-border bg-background/90">
-                      <Lock className="size-3 text-muted-foreground" aria-hidden />
-                    </span>
-                  ) : null}
-                </span>
-                <span className={cn("mt-1.5 text-[0.8rem] font-semibold", r.earned ? "text-foreground" : "text-muted-foreground")}>{r.name}</span>
-                <span className="text-[0.7rem] text-muted-foreground">Rank {r.level}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
+        <RankLadder progress={current} onOpen={setOpen} />
       </div>
 
       <Dialog open={open !== null} onOpenChange={(o) => !o && setOpen(null)}>

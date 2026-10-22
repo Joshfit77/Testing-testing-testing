@@ -42,7 +42,7 @@ export function BadgeArt({
 }) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
   const override = BADGE_IMAGE_OVERRIDES[`${category}-${level}`];
-  const style = locked ? { filter: "grayscale(0.9) brightness(0.42) contrast(0.95)" } : undefined;
+  const style = locked ? { filter: "brightness(0.55) saturate(0.75)" } : undefined;
   if (override) {
     return (
       <span className={["badge-img", animate && !locked ? "badge-img-live" : "", className].filter(Boolean).join(" ")} style={{ width: size, height: size }}>

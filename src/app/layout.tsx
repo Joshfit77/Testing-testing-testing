@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Lora, Plus_Jakarta_Sans } from "next/font/google";
+import { Cinzel, Inter, Lora, Plus_Jakarta_Sans } from "next/font/google";
 import { NativeInit } from "@/components/shell/native-init";
 import { ServiceWorkerRegistration } from "@/components/shell/sw-register";
 import { ConfirmHost } from "@/components/ui/confirm";
@@ -8,6 +8,8 @@ import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 const heading = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-heading", weight: ["500", "600", "700", "800"], display: "swap" });
+// Engraved capitals for the rank badge ladders (matches the owner's badge artwork).
+const engraved = Cinzel({ subsets: ["latin"], variable: "--font-engraved", weight: ["600", "700", "800"], display: "swap" });
 const serif = Lora({ subsets: ["latin"], variable: "--font-serif-face", weight: ["500", "600"], style: ["normal", "italic"], display: "swap" });
 
 /**
@@ -39,7 +41,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${heading.variable} ${serif.variable} dark`} suppressHydrationWarning>
+    <html lang="en" className={`${inter.variable} ${heading.variable} ${serif.variable} ${engraved.variable} dark`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: PREFS_SCRIPT }} />
       </head>
