@@ -41,7 +41,8 @@ describe("badge artwork", () => {
     for (const art of BADGE_ARTWORK) {
       const { width, height } = webpSize(file(art.image));
       expect(Math.abs(width - 2 * height), `${art.image} is ${width}x${height}`).toBeLessThanOrEqual(1);
-      expect(height, art.image).toBeGreaterThanOrEqual(190);
+      // Tight crops (92 % of each poster row) at the poster's own pixels.
+      expect(height, art.image).toBeGreaterThanOrEqual(175);
     }
   });
 
@@ -51,16 +52,15 @@ describe("badge artwork", () => {
 
   it("large views never enlarge any badge more than 1.5x on a 3x iPhone", () => {
     for (const art of BADGE_ARTWORK) expect((BADGE_MAX_SHARP_WIDTH * 3) / art.width, art.image).toBeLessThanOrEqual(MAX_DEVICE_UPSCALE);
-    expect(BADGE_MAX_SHARP_WIDTH).toBeGreaterThanOrEqual(180);
+    expect(BADGE_MAX_SHARP_WIDTH).toBeGreaterThanOrEqual(175);
   });
 
-  it("the edge fade is inside every file (fully transparent corners), so no CSS mask is needed", () => {
-    // A lossless WebP's alpha can't be read without a decoder here, so check the files are lossless with alpha:
-    // the VP8L header's alpha hint bit is set.
+  it("every tile is lossless and fully opaque: crisp edges, no baked-in fades or empty padding", () => {
+    // Without a decoder here, read the lossless (VP8L) header: its alpha hint bit is clear for an opaque image.
     for (const art of BADGE_ARTWORK) {
       const b = readFileSync(file(art.image));
       expect(b.toString("ascii", 12, 16), art.image).toBe("VP8L");
-      expect((b.readUInt32LE(21) >> 28) & 1, art.image).toBe(1);
+      expect((b.readUInt32LE(21) >> 28) & 1, art.image).toBe(0);
     }
   });
 });

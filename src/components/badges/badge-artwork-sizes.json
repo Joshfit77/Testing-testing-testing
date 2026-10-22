@@ -1,110 +1,110 @@
 {
   "/badges/fitness-01-foundation.webp": {
-    "width": 390,
-    "height": 195
+    "width": 358,
+    "height": 179
   },
   "/badges/fitness-02-faithful.webp": {
-    "width": 400,
-    "height": 200
+    "width": 368,
+    "height": 184
   },
   "/badges/fitness-03-endurance.webp": {
+    "width": 352,
+    "height": 176
+  },
+  "/badges/fitness-04-disciplined.webp": {
     "width": 382,
     "height": 191
   },
-  "/badges/fitness-04-disciplined.webp": {
-    "width": 416,
-    "height": 208
-  },
   "/badges/fitness-05-refined.webp": {
-    "width": 440,
-    "height": 220
-  },
-  "/badges/fitness-06-steadfast.webp": {
-    "width": 446,
-    "height": 223
-  },
-  "/badges/fitness-07-overcomer.webp": {
-    "width": 428,
-    "height": 214
-  },
-  "/badges/fitness-08-mighty.webp": {
-    "width": 454,
-    "height": 227
-  },
-  "/badges/fitness-09-conqueror.webp": {
-    "width": 564,
-    "height": 282
-  },
-  "/badges/food-01-spark.webp": {
-    "width": 400,
-    "height": 200
-  },
-  "/badges/food-02-ember.webp": {
     "width": 404,
     "height": 202
   },
-  "/badges/food-03-flame.webp": {
-    "width": 428,
-    "height": 214
+  "/badges/fitness-06-steadfast.webp": {
+    "width": 410,
+    "height": 205
   },
-  "/badges/food-04-torch.webp": {
-    "width": 418,
-    "height": 209
-  },
-  "/badges/food-05-blaze.webp": {
-    "width": 434,
-    "height": 217
-  },
-  "/badges/food-06-furnace.webp": {
-    "width": 446,
-    "height": 223
-  },
-  "/badges/food-07-forge.webp": {
-    "width": 426,
-    "height": 213
-  },
-  "/badges/food-08-inferno.webp": {
-    "width": 454,
-    "height": 227
-  },
-  "/badges/food-09-phoenix.webp": {
-    "width": 582,
-    "height": 291
-  },
-  "/badges/faith-01-seed.webp": {
+  "/badges/fitness-07-overcomer.webp": {
     "width": 394,
     "height": 197
   },
-  "/badges/faith-02-sprout.webp": {
-    "width": 412,
-    "height": 206
-  },
-  "/badges/faith-03-sapling.webp": {
-    "width": 424,
-    "height": 212
-  },
-  "/badges/faith-04-root.webp": {
+  "/badges/fitness-08-mighty.webp": {
     "width": 418,
     "height": 209
   },
+  "/badges/fitness-09-conqueror.webp": {
+    "width": 518,
+    "height": 259
+  },
+  "/badges/food-01-spark.webp": {
+    "width": 368,
+    "height": 184
+  },
+  "/badges/food-02-ember.webp": {
+    "width": 372,
+    "height": 186
+  },
+  "/badges/food-03-flame.webp": {
+    "width": 394,
+    "height": 197
+  },
+  "/badges/food-04-torch.webp": {
+    "width": 384,
+    "height": 192
+  },
+  "/badges/food-05-blaze.webp": {
+    "width": 400,
+    "height": 200
+  },
+  "/badges/food-06-furnace.webp": {
+    "width": 410,
+    "height": 205
+  },
+  "/badges/food-07-forge.webp": {
+    "width": 392,
+    "height": 196
+  },
+  "/badges/food-08-inferno.webp": {
+    "width": 418,
+    "height": 209
+  },
+  "/badges/food-09-phoenix.webp": {
+    "width": 514,
+    "height": 257
+  },
+  "/badges/faith-01-seed.webp": {
+    "width": 362,
+    "height": 181
+  },
+  "/badges/faith-02-sprout.webp": {
+    "width": 380,
+    "height": 190
+  },
+  "/badges/faith-03-sapling.webp": {
+    "width": 390,
+    "height": 195
+  },
+  "/badges/faith-04-root.webp": {
+    "width": 384,
+    "height": 192
+  },
   "/badges/faith-05-branch.webp": {
-    "width": 436,
-    "height": 218
+    "width": 402,
+    "height": 201
   },
   "/badges/faith-06-vine.webp": {
-    "width": 448,
-    "height": 224
+    "width": 412,
+    "height": 206
   },
   "/badges/faith-07-fruit.webp": {
-    "width": 426,
-    "height": 213
+    "width": 392,
+    "height": 196
   },
   "/badges/faith-08-olive.webp": {
-    "width": 456,
-    "height": 228
+    "width": 420,
+    "height": 210
   },
   "/badges/faith-09-cedar.webp": {
-    "width": 572,
-    "height": 286
+    "width": 526,
+    "height": 263
   }
 }
