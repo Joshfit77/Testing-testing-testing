@@ -46,3 +46,24 @@ describe.skipIf(!available)("failed edits never wipe a workout or a template", a
     expect(data?.every((r) => (r.workout_sets as unknown[]).length === 2)).toBe(true);
   });
 });
+
+describe.skipIf(!available)("resuming a paused program keeps its place", async () => {
+  const { activateProgram } = await import("@/server/services/programs");
+  let user: TestUser;
+  beforeAll(async () => {
+    user = await createTestUser("resume");
+  });
+  afterAll(async () => deleteTestUser(user));
+
+  it("resume keeps the week and day; restart goes back to week 1", async () => {
+    const { serviceClient } = await import("./helpers");
+    const { data: prog } = await serviceClient().from("training_programs").select("id").eq("is_published", true).eq("tier", "free").limit(1).single();
+    const id = await activateProgram(user.client, user.id, prog!.id as string);
+    await user.client.from("user_programs").update({ current_week: 3, current_day: 2, status: "paused" }).eq("id", id);
+    await activateProgram(user.client, user.id, prog!.id as string);
+    const row = async () => (await user.client.from("user_programs").select("status, current_week, current_day").eq("id", id).single()).data;
+    expect(await row()).toMatchObject({ status: "active", current_week: 3, current_day: 2 });
+    await activateProgram(user.client, user.id, prog!.id as string, { restart: true });
+    expect(await row()).toMatchObject({ status: "active", current_week: 1, current_day: 1 });
+  });
+});

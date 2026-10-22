@@ -94,7 +94,7 @@ function Choice({
       <span className={cn("flex items-center gap-2 text-sm font-semibold", selected && "text-gold-highlight")}>
         {selected && <Check className="size-4 shrink-0" aria-hidden />}
         {title}
-        {badge && <span className="rounded-full border border-gold-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-gold">{badge}</span>}
+        {badge && <span className="rounded-full border border-gold-muted px-2 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wider text-gold">{badge}</span>}
       </span>
       {description && <span className="text-xs text-muted-foreground">{description}</span>}
     </button>

@@ -8,7 +8,20 @@ import { Button } from "@/components/ui/button";
 import { initialActionState } from "@/lib/action-state";
 import { saveProgramAction, startProgramAction } from "@/server/actions/programs";
 
-export function ProgramActions({ programId, locked, isActive, isSaved }: { programId: string; locked: boolean; isActive: boolean; isSaved: boolean }) {
+export function ProgramActions({
+  programId,
+  locked,
+  isActive,
+  isSaved,
+  pausedWeek = null,
+}: {
+  programId: string;
+  locked: boolean;
+  isActive: boolean;
+  isSaved: boolean;
+  /** Set when this program is paused: it resumes at this week (or can be restarted). */
+  pausedWeek?: number | null;
+}) {
   const [saveState, saveAction] = useActionState(saveProgramAction, initialActionState);
   const [startState, startAction] = useActionState(startProgramAction, initialActionState);
   if (locked) {
@@ -32,6 +45,22 @@ export function ProgramActions({ programId, locked, isActive, isSaved }: { progr
               <Play aria-hidden /> Continue program
             </Link>
           </Button>
+        ) : pausedWeek ? (
+          <>
+            <form action={startAction}>
+              <input type="hidden" name="programId" value={programId} />
+              <SubmitButton pendingLabel="Resuming…">
+                <Play aria-hidden /> Resume (week {pausedWeek})
+              </SubmitButton>
+            </form>
+            <form action={startAction}>
+              <input type="hidden" name="programId" value={programId} />
+              <input type="hidden" name="restart" value="1" />
+              <SubmitButton variant="secondary" pendingLabel="Restarting…">
+                Restart from week 1
+              </SubmitButton>
+            </form>
+          </>
         ) : (
           <form action={startAction}>
             <input type="hidden" name="programId" value={programId} />

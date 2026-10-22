@@ -359,7 +359,7 @@ export function ExerciseCard({
 
       <div
         className={cn(
-          "grid gap-2 px-1 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground",
+          "grid gap-2 px-1 pb-1 text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground",
           gridFor(exercise),
         )}
         aria-hidden

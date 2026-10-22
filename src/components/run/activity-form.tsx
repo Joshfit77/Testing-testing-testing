@@ -183,7 +183,7 @@ export function ActivityForm({ mode, initial, today }: { mode: "create" | "edit"
             aria-describedby={fid("duration-help")}
             required
           />
-          <p id={fid("duration-help")} className="text-[11px] text-muted-foreground">
+          <p id={fid("duration-help")} className="text-[0.6875rem] text-muted-foreground">
             Start to finish, e.g. 0:31:45
           </p>
           <FieldError message={err.duration} />
@@ -200,7 +200,7 @@ export function ActivityForm({ mode, initial, today }: { mode: "create" | "edit"
             aria-invalid={Boolean(err.moving)}
             aria-describedby={fid("moving-help")}
           />
-          <p id={fid("moving-help")} className="text-[11px] text-muted-foreground">
+          <p id={fid("moving-help")} className="text-[0.6875rem] text-muted-foreground">
             Optional. Without stops; pace uses this.
           </p>
           <FieldError message={err.moving} />

@@ -25,7 +25,7 @@ import {
   type CatalogFilters,
   type SpecCategoryId,
 } from "@/lib/domain/program-catalog";
-import { canAccessTier } from "@/lib/domain/plans";
+import { canAccessTier, hasFeature } from "@/lib/domain/plans";
 import type { Plan } from "@/lib/domain/types";
 import { cn, titleCase } from "@/lib/utils";
 import { getServerSupabase } from "@/lib/supabase/server";
@@ -82,6 +82,7 @@ export default async function ProgramsPage({ searchParams }: { searchParams: Pro
       .neq("status", "active")
       .order("updated_at", { ascending: false }),
   ]);
+  const canBuild = hasFeature(plan, "custom_program_builder");
   const categories = (categoriesRes.data ?? []) as { id: string; slug: string; name: string }[];
   const categorySlug = new Map(categories.map((c) => [c.id, c.slug]));
   const categoryName = new Map(categories.map((c) => [c.id, c.name]));
@@ -123,7 +124,10 @@ export default async function ProgramsPage({ searchParams }: { searchParams: Pro
         </span>
         <span className="min-w-0 flex-1">
           <span className="block font-semibold">Build my program</span>
-          <span className="block text-sm text-muted-foreground">Built around your numbers, goals, schedule and equipment — including combined goals like strength + a 5K. Free on every plan.</span>
+          <span className="block text-sm text-muted-foreground">
+            Built around your numbers, goals, schedule and equipment — including combined goals like strength + a 5K.{" "}
+            {canBuild ? "" : "Included with Plus and Pro."}
+          </span>
         </span>
         <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
       </Link>

@@ -128,7 +128,7 @@ export function TemplateEditor({ templateId, initial, catalog, units }: { templa
                 >
                   <div className="flex items-start gap-2">
                     <div className="min-w-0 flex-1">
-                      {e.supersetGroup != null && <p className="text-[11px] font-semibold uppercase tracking-wider text-gold">Superset {supersetLetter(e.supersetGroup)}</p>}
+                      {e.supersetGroup != null && <p className="text-[0.6875rem] font-semibold uppercase tracking-wider text-gold">Superset {supersetLetter(e.supersetGroup)}</p>}
                       <p className="font-semibold leading-tight">
                         {i + 1}. {e.name}
                       </p>
@@ -144,7 +144,7 @@ export function TemplateEditor({ templateId, initial, catalog, units }: { templa
                     </Button>
                   </div>
                   <div className="mt-2 grid grid-cols-[4.5rem_1fr] gap-2">
-                    <label className="space-y-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <label className="space-y-1 text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
                       Sets
                       <NativeSelect value={e.sets} onChange={(ev) => updateEx(e.key, { sets: Number(ev.target.value) })} aria-label={`${e.name} sets`}>
                         {Array.from({ length: 10 }, (_, k) => k + 1).map((n) => (
@@ -174,7 +174,7 @@ export function TemplateEditor({ templateId, initial, catalog, units }: { templa
                     </div>
                   </div>
                   <div className="mt-2 grid grid-cols-2 gap-2">
-                    <label className="space-y-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <label className="space-y-1 text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
                       {e.target === "reps" ? "Reps" : e.target === "time" ? "Seconds" : `Distance (${dUnit})`}
                       {e.target === "reps" && (
                         <Input value={e.reps} onChange={(ev) => updateEx(e.key, { reps: ev.target.value.slice(0, 20) })} aria-label={`${e.name} reps`} placeholder="e.g. 8-12" />
@@ -186,7 +186,7 @@ export function TemplateEditor({ templateId, initial, catalog, units }: { templa
                         <Input value={e.distance} inputMode="decimal" onChange={(ev) => updateEx(e.key, { distance: ev.target.value.replace(/[^0-9.,]/g, "").slice(0, 7) })} aria-label={`${e.name} distance in ${dUnit}`} placeholder={dUnit} />
                       )}
                     </label>
-                    <label className="space-y-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <label className="space-y-1 text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
                       Rest
                       <NativeSelect value={e.restSeconds} onChange={(ev) => updateEx(e.key, { restSeconds: Number(ev.target.value) })} aria-label={`${e.name} rest`}>
                         {[...new Set([...REST_OPTIONS, e.restSeconds])].sort((a, b) => a - b).map((r) => (

@@ -191,7 +191,7 @@ async function Overview({ userId, tz, unit, thisWeek, supabase }: { userId: stri
                   ) : (
                     <p className="font-display text-lg font-bold text-muted-foreground">—</p>
                   )}
-                  {b.best && <p className="text-[11px] text-muted-foreground">{b.best.selfReported ? "Self-reported" : "GPS"}</p>}
+                  {b.best && <p className="text-[0.6875rem] text-muted-foreground">{b.best.selfReported ? "Self-reported" : "GPS"}</p>}
                 </li>
               ))}
             </ul>

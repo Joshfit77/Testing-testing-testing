@@ -137,7 +137,13 @@ export default async function ProgramDetailPage({
           ))}
         </div>
         <div className="mt-6">
-          <ProgramActions programId={program.id} locked={locked} isActive={isActive} isSaved={Boolean(userProgram)} />
+          <ProgramActions
+            programId={program.id}
+            locked={locked}
+            isActive={isActive}
+            isSaved={Boolean(userProgram)}
+            pausedWeek={userProgram?.status === "paused" ? (userProgram.current_week as number) : null}
+          />
         </div>
       </header>
 

@@ -86,7 +86,7 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={mediaUrl(m)} alt={(m.alt_text as string) || `${ex.name} demonstration`} className="w-full rounded-xl" loading="lazy" />
                   )}
-                  <figcaption className="mt-1 text-[11px] text-muted-foreground">
+                  <figcaption className="mt-1 text-[0.6875rem] text-muted-foreground">
                     License: {m.license as string}
                     {m.attribution ? ` · ${m.attribution as string}` : ""}
                   </figcaption>
@@ -103,7 +103,7 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
           {!hasVideo && (
             <figure className={media.length ? "px-3 pb-3" : undefined}>
               <ExerciseDemo slug={ex.slug} name={ex.name} meta={demoMeta} className={media.length ? "aspect-video w-full rounded-xl" : "aspect-video w-full"} />
-              <figcaption className="px-3 pt-2 text-[11px] text-muted-foreground">Animated illustration of correct technique — not filmed video. Use 0.5× to study each phase.</figcaption>
+              <figcaption className="px-3 pt-2 text-[0.6875rem] text-muted-foreground">Animated illustration of correct technique — not filmed video. Use 0.5× to study each phase.</figcaption>
             </figure>
           )}
           <div className="border-t border-border px-3 py-2">
@@ -115,7 +115,7 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
             >
               <Search className="size-3.5" aria-hidden /> Search YouTube for more <ExternalLink className="size-3" aria-hidden />
             </a>
-            <span className="text-[11px] text-muted-foreground"> — other creators&apos; videos, not reviewed by us.</span>
+            <span className="text-[0.6875rem] text-muted-foreground"> — other creators&apos; videos, not reviewed by us.</span>
           </div>
         </section>
 

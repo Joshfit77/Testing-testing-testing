@@ -116,6 +116,8 @@ test.describe("Stage 1 journeys", () => {
     dialog = page.getByRole("dialog");
     await dialog.getByRole("tab", { name: "Favorites" }).click();
     await dialog.getByRole("region", { name: "Favorite foods" }).getByRole("button", { name: /^Banana/ }).click();
+    // The meal defaults to the time of day; this test logs to breakfast whatever time it runs.
+    await dialog.getByLabel("Meal", { exact: true }).selectOption("breakfast");
     await dialog.getByRole("button", { name: "Log food" }).click();
     await expect(dialog.getByRole("status")).toContainText("Logged Banana");
     await page.keyboard.press("Escape");

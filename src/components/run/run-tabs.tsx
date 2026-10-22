@@ -23,7 +23,7 @@ export function RunTabs({ active }: { active: RunTab }) {
           scroll={false}
           aria-current={active === t.id ? "page" : undefined}
           className={cn(
-            "flex min-h-11 items-center justify-center rounded-lg px-1 text-center text-[13px] font-semibold leading-tight transition-colors",
+            "flex min-h-11 items-center justify-center rounded-lg px-1 text-center text-[0.8125rem] font-semibold leading-tight transition-colors",
             active === t.id ? "bg-gold-gradient text-primary-foreground" : "text-muted-foreground hover:text-foreground",
           )}
         >

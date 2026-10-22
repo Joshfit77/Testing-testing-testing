@@ -1,12 +1,13 @@
 import Link from "next/link";
-import { BarChart3, BookmarkCheck, ChevronRight, Dumbbell, HeartPulse, History, Pause, Plus, Wand2 } from "lucide-react";
+import { BarChart3, BookmarkCheck, CalendarDays, ChevronRight, Dumbbell, HeartPulse, History, Pause, Plus, Wand2 } from "lucide-react";
 import { ActionButton } from "@/components/common/action-button";
 import { TodayWorkoutAction } from "@/components/home/today-workout-action";
 import { MainHeader } from "@/components/shell/main-header";
 import { Button } from "@/components/ui/button";
 import { formatDuration } from "@/lib/domain/units";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { requireOnboardedUser } from "@/server/auth";
+import { getUserPlan, requireOnboardedUser } from "@/server/auth";
+import { hasFeature } from "@/lib/domain/plans";
 import { pauseActiveProgramAction } from "@/server/actions/programs";
 import { getActiveProgram } from "@/server/services/training";
 import { loadProgramSchedule } from "@/server/services/schedule";
@@ -20,15 +21,19 @@ export default async function TrainPage() {
   const { user, profile } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
   const tz = profile.timezone ?? "UTC";
-  const [active, schedule, inProgressRes] = await Promise.all([
+  const [active, schedule, inProgressRes, plan] = await Promise.all([
     getActiveProgram(supabase, user.id),
     loadProgramSchedule(supabase, user.id, tz),
     supabase.from("workout_sessions").select("name").eq("user_id", user.id).eq("status", "in_progress").order("started_at", { ascending: false }).limit(1).maybeSingle(),
+    getUserPlan(user.id),
   ]);
+  const canBuild = hasFeature(plan, "custom_program_builder");
   const today = active?.today ?? null;
   const todayIso = isoDateInTz(new Date(), tz);
   // The calendar may have the next session planned (or moved) to a later day.
-  const next = schedule?.planned[0]?.dayId === today?.id ? schedule!.planned[0]! : null;
+  // (With no active program both are absent, so compare only when there is a session and a day.)
+  const first = schedule?.planned[0];
+  const next = first && today && first.dayId === today.id ? first : null;
   const plannedLater = next && next.date > todayIso ? next : null;
   const plannedLabel = plannedLater
     ? new Date(`${plannedLater.date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" })
@@ -38,11 +43,12 @@ export default async function TrainPage() {
   const tools = [
     { href: "/train/programs", icon: BarChart3, label: "Programs" },
     { href: "/train/exercises", icon: Dumbbell, label: "Exercises" },
-    { href: "/train/build", icon: Wand2, label: "Program builder" },
+    { href: "/train/build", icon: Wand2, label: canBuild ? "Program builder" : "Program builder (Plus)" },
     { href: "/train/history", icon: History, label: "Workout history" },
     { href: "/train/templates", icon: BookmarkCheck, label: "My workouts" },
     { href: "/train/workout?blank=1", icon: Plus, label: "Empty workout" },
     { href: "/train/recovery", icon: HeartPulse, label: "Recovery" },
+    { href: "/calendar", icon: CalendarDays, label: "Training calendar" },
   ];
 
   return (
@@ -76,11 +82,12 @@ export default async function TrainPage() {
           <div className={`${card} p-4`}>
             <p className="font-semibold">No active program</p>
             <p className="mt-1 text-sm text-muted-foreground">Build one around your goals, start one from the library, or log a free workout.</p>
+            {/* The builder is Plus; Free members get the program library first (it has free programs). */}
             <div className="mt-3 grid grid-cols-2 gap-2">
-              <Button asChild>
-                <Link href="/train/build">Build my program</Link>
+              <Button asChild variant={canBuild ? "default" : "secondary"}>
+                <Link href="/train/build">{canBuild ? "Build my program" : "Build (Plus)"}</Link>
               </Button>
-              <Button asChild variant="secondary">
+              <Button asChild variant={canBuild ? "secondary" : "default"}>
                 <Link href="/train/programs">Browse programs</Link>
               </Button>
             </div>

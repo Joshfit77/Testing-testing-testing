@@ -423,7 +423,7 @@ export function ProgramBuilder({
           <span className="text-gold">{STEP_LABELS[step]}</span>
         </div>
         <ProgressBar value={((stepIndex + 1) / steps.length) * 100} label="Program builder progress" />
-        <ol className="mt-3 hidden gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground sm:flex" aria-label="Steps">
+        <ol className="mt-3 hidden gap-2 text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground sm:flex" aria-label="Steps">
           {steps.map((s, i) => (
             <li key={s} aria-current={i === stepIndex ? "step" : undefined} className={cn("flex-1 truncate", i === stepIndex && "text-gold-highlight", i < stepIndex && "text-foreground/80")}>
               {i + 1}. {STEP_LABELS[s]}
@@ -472,7 +472,7 @@ export function ProgramBuilder({
                         <span className="min-w-0">
                           <span className="block font-display text-lg font-bold uppercase leading-tight">{c.label}</span>
                           <span className="mt-0.5 block text-xs text-muted-foreground">{c.description}</span>
-                          <span className="mt-1.5 block text-[11px] leading-snug text-muted-foreground/90">
+                          <span className="mt-1.5 block text-[0.6875rem] leading-snug text-muted-foreground/90">
                             <span className="font-semibold text-foreground/80">A typical week:</span> {c.typicalWeek}
                           </span>
                         </span>
@@ -810,7 +810,7 @@ export function ProgramBuilder({
                           )}
                         >
                           <span className="text-xs font-semibold">W{i + 1}</span>
-                          <span className="w-full truncate text-[10px] text-muted-foreground">{w.focus.split(":")[0]}</span>
+                          <span className="w-full truncate text-[0.6875rem] text-muted-foreground">{w.focus.split(":")[0]}</span>
                         </button>
                       </li>
                     ))}

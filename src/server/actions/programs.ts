@@ -48,7 +48,7 @@ export async function startProgramAction(_prev: ActionState, formData: FormData)
   if (!program) return actionError("Program not found.");
   if (!allowed) return actionError("This program requires an upgraded plan.");
   try {
-    await activateProgram(supabase, user.id, program.id as string);
+    await activateProgram(supabase, user.id, program.id as string, { restart: formData.get("restart") === "1" });
   } catch (err) {
     logError("programs.start", err);
     return actionError("Couldn't start the program. Please try again.");

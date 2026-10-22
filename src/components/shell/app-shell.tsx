@@ -151,7 +151,7 @@ export function AppShell({ children, userId, displayName, isAdmin, plan, textSiz
 
         <div className={cn("transition-[padding] duration-300", collapsed ? "md:pl-20" : "md:pl-64")}>
           <OfflineBanner />
-          <main id="main" className="mx-auto w-full max-w-6xl px-4 pb-32 pt-[calc(env(safe-area-inset-top)+0.25rem)] md:px-8 md:pb-12 md:pt-8">
+          <main id="main" className="mx-auto w-full max-w-6xl px-4 pb-[calc(10rem+env(safe-area-inset-bottom))] pt-[calc(env(safe-area-inset-top)+0.25rem)] md:px-8 md:pb-12 md:pt-8">
             {children}
           </main>
         </div>

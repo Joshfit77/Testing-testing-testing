@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input, NativeSelect } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { mealForTime } from "@/lib/domain/meal-time";
 import { BarcodeScanner } from "@/components/nutrition/barcode-scanner";
 import { AmountPicker, basisSummary } from "@/components/nutrition/food-amount";
 import { FavoriteStar } from "@/components/nutrition/favorite-star";
@@ -116,10 +117,10 @@ export function ChoiceRow({
       <button type="button" className="min-w-0 flex-1 rounded-xl px-3 py-2 text-left hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/40" onClick={() => onPick(food)}>
         <span className="block text-sm font-semibold">
           {food.name}
-          {food.isEstimate && <span className="ml-1 text-[11px] font-normal text-gold">(typical values)</span>} <SourceBadge source={food.key} isEstimate={Boolean(food.isEstimate)} />
+          {food.isEstimate && <span className="ml-1 text-[0.6875rem] font-normal text-gold">(typical values)</span>} <SourceBadge source={food.key} isEstimate={Boolean(food.isEstimate)} />
           {badge}
         </span>
-        {food.detail && <span className="block text-[11px] text-muted-foreground">{food.detail}</span>}
+        {food.detail && <span className="block text-[0.6875rem] text-muted-foreground">{food.detail}</span>}
         <span className="block text-xs text-muted-foreground">{basisSummary(food.basis)}</span>
       </button>
       {favorite !== undefined && <FavoriteStar food={food} initial={favorite} onChange={(on) => onFavorite?.(food, on)} className="mr-1" />}
@@ -153,6 +154,10 @@ export function AddFoodDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [mealType, setMealType] = useState("breakfast");
+  // Each time the food search opens, start on the meal for the time of day (on this device's clock).
+  useEffect(() => {
+    if (open) setMealType(mealForTime(new Date()));
+  }, [open]);
   const [status, setStatus] = useState("logged");
   const [result, setResult] = useState<ActionState | null>(null);
   const [pending, startTransition] = useTransition();
@@ -291,8 +296,8 @@ export function AddFoodDialog({
   const commonMatches = searching ? rankFoods(pool, term, (f) => prepareEntry(f.name), 8) : [];
   const loading = search.kind === "loading";
   const fitsBadge = (f: MyFood) =>
-    f.fitsDiet && dietName ? <span className="ml-1.5 rounded-full border border-[#2f5a3d] px-2 py-0.5 align-middle text-[10px] font-semibold text-[#8fd3a5]">Fits {dietName}</span> : null;
-  const sectionTitle = "text-[11px] font-semibold uppercase tracking-widest text-muted-foreground";
+    f.fitsDiet && dietName ? <span className="ml-1.5 rounded-full border border-[#2f5a3d] px-2 py-0.5 align-middle text-[0.6875rem] font-semibold text-[#8fd3a5]">Fits {dietName}</span> : null;
+  const sectionTitle = "text-[0.6875rem] font-semibold uppercase tracking-widest text-muted-foreground";
 
   return (
     <>
@@ -383,7 +388,7 @@ export function AddFoodDialog({
                         <p className={sectionTitle}>Recent</p>
                         <ul className="mt-2 space-y-2">{recent.map((f) => quickRow(f, false))}</ul>
                       </section>
-                      <p className="text-[11px] text-muted-foreground">One tap adds the same amount you logged last time to the meal chosen above.</p>
+                      <p className="text-[0.6875rem] text-muted-foreground">One tap adds the same amount you logged last time to the meal chosen above.</p>
                     </div>
                   </TabsContent>
                 )}
@@ -400,7 +405,7 @@ export function AddFoodDialog({
                           <ChoiceRow key={f.key} food={f} onPick={pick} favorite onFavorite={onFavorite} />
                         ))}
                       </ul>
-                      <p className="mt-2 text-[11px] text-muted-foreground">Tap a food to choose the amount. Values are re-checked from the source when you log it.</p>
+                      <p className="mt-2 text-[0.6875rem] text-muted-foreground">Tap a food to choose the amount. Values are re-checked from the source when you log it.</p>
                     </section>
                   )}
                 </TabsContent>
@@ -485,7 +490,7 @@ export function AddFoodDialog({
                           {moreLoading && <Loader2 className="animate-spin" aria-hidden />} Show more ({total - results.length} left)
                         </Button>
                       )}
-                      <p className="mt-2 text-[11px] text-muted-foreground">USDA FoodData Central (SR Legacy, public domain). Values per 100 g; pick any amount next.</p>
+                      <p className="mt-2 text-[0.6875rem] text-muted-foreground">USDA FoodData Central (SR Legacy, public domain). Values per 100 g; pick any amount next.</p>
                     </section>
 
                     {searching && (
@@ -500,7 +505,7 @@ export function AddFoodDialog({
                         ) : (
                           <p className="py-2 text-sm text-muted-foreground">{commonFoods.length ? "No built-in foods match." : "No built-in foods are loaded on this server yet."}</p>
                         )}
-                        <p className="mt-2 text-[11px] text-muted-foreground">Typical values; check the label when you have it.</p>
+                        <p className="mt-2 text-[0.6875rem] text-muted-foreground">Typical values; check the label when you have it.</p>
                       </section>
                     )}
 
@@ -739,7 +744,7 @@ export function GoalsForm({ goals }: { goals: { calories: number; protein_g: num
           Re-estimate
         </SubmitButton>
       </div>
-      <p className="text-[11px] text-muted-foreground">
+      <p className="text-[0.6875rem] text-muted-foreground">
         Estimates are general guidance, not dietary advice. If you have a medical condition, are pregnant, or have a history of disordered eating, consult a
         registered dietitian or physician.
       </p>

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BellRing, BookmarkPlus, Cloud, CloudOff, Flag, Loader2, Minus, Pause, Play, Plus, Timer, Trash2, Trophy, Vibrate, X } from "lucide-react";
 import { Celebration } from "@/components/common/celebration";
 import { Button } from "@/components/ui/button";
+import { confirmDialog } from "@/components/ui/confirm";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input, Textarea } from "@/components/ui/input";
 import { Notice } from "@/components/common/states";
@@ -61,6 +62,8 @@ interface LoggerProps {
   previous?: Record<string, PreviousPerformance>;
   /** Rest-timer alerts (Profile setting): a beep and/or a vibration when rest ends. */
   restAlerts?: { sound: boolean; vibrate: boolean };
+  /** A message from the page about how the workout was set up (shown under the header). */
+  notice?: string | null;
 }
 
 type Phase = "loading" | "conflict" | "active" | "finished";
@@ -106,7 +109,7 @@ function beep() {
   }
 }
 
-export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraft, template, previous = {}, restAlerts = { sound: true, vibrate: true } }: LoggerProps) {
+export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraft, template, previous = {}, restAlerts = { sound: true, vibrate: true }, notice = null }: LoggerProps) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>("loading");
   const [draft, setDraft] = useState<WorkoutDraft | null>(null);
@@ -118,6 +121,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
   const [substituteKey, setSubstituteKey] = useState<string | null>(null);
   const [skipKey, setSkipKey] = useState<string | null>(null);
   const [finishOpen, setFinishOpen] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<FinishResult | null>(null);
@@ -295,15 +299,29 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
           </Button>
           <Button
             variant="secondary"
+            disabled={discarding}
             onClick={async () => {
-              await discardWorkoutAction(pendingExisting.clientId).catch(() => null);
-              clearLocalDraft(userId);
-              setPendingExisting(null);
-              setDraft(freshFromTemplate());
-              setPhase("active");
+              // Discarding deletes the unfinished workout, so it asks first.
+              const ok = await confirmDialog({
+                title: `Discard ${pendingExisting.name}?`,
+                message: "The unfinished workout and the sets you logged in it are deleted. This can't be undone.",
+                confirmLabel: "Discard",
+                destructive: true,
+              });
+              if (!ok) return;
+              setDiscarding(true);
+              try {
+                await discardWorkoutAction(pendingExisting.clientId).catch(() => null);
+                clearLocalDraft(userId);
+                setPendingExisting(null);
+                setDraft(freshFromTemplate());
+                setPhase("active");
+              } finally {
+                setDiscarding(false);
+              }
             }}
           >
-            Discard &amp; start new
+            {discarding ? "Discarding…" : "Discard & start new"}
           </Button>
         </div>
       </div>
@@ -486,8 +504,9 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
 
   return (
     <div className="space-y-4 pb-24">
-      {/* Sticky header */}
-      <div className="sticky top-16 z-20 -mx-4 border-b border-border bg-background/90 px-4 py-3 backdrop-blur-xl md:top-0 md:-mx-8 md:px-8">
+      {/* Sticky header. On phones it starts at the very top of the screen (pulled up over the page's own top
+          padding) and pads itself below the status bar, so nothing scrolls into view above or behind it. */}
+      <div className="sticky top-0 z-20 -mx-4 -mt-[calc(env(safe-area-inset-top)+0.25rem)] border-b border-border bg-background/90 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-xl md:-mx-8 md:mt-0 md:px-8 md:pt-3">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
             <label htmlFor="workout-name" className="sr-only">
@@ -542,7 +561,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
           <div className="mt-3 flex items-center gap-3 rounded-xl border border-gold-muted/60 bg-gold/10 px-3 py-2" role="timer" aria-label="Rest timer">
             <Timer className="size-5 text-gold" aria-hidden />
             <div className="flex-1">
-              <p className="font-display text-2xl font-bold tabular-nums text-gold-highlight" aria-live="polite" aria-atomic>
+              <p className="font-display text-2xl font-bold tabular-nums text-gold-highlight">
                 {formatDuration(rest)}
               </p>
               <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-elevated">
@@ -562,6 +581,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
         )}
       </div>
 
+      {notice && <p className="rounded-xl border border-gold-muted/50 bg-gold/5 px-4 py-3 text-sm">{notice}</p>}
       {!online && <Notice tone="warning">You&apos;re offline. Keep logging — everything is saved on this device and will sync when you reconnect.</Notice>}
       {error && <Notice tone="error">{error}</Notice>}
 

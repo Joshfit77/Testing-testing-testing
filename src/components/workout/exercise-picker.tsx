@@ -61,7 +61,7 @@ export function ExercisePicker({
           <span className="block text-sm font-semibold">{item.name}</span>
           <span className="block text-xs text-muted-foreground">{item.primary.slice(0, 3).map(titleCase).join(", ")}</span>
         </span>
-        <span className="shrink-0 text-[11px] uppercase tracking-wider text-muted-foreground">{item.isTimed ? "Timed" : titleCase(item.category)}</span>
+        <span className="shrink-0 text-[0.6875rem] uppercase tracking-wider text-muted-foreground">{item.isTimed ? "Timed" : titleCase(item.category)}</span>
       </button>
     </li>
   );

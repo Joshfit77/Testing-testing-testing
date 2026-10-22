@@ -109,7 +109,18 @@ export async function createPrivateProgram(
 }
 
 /** Make a program the user's single active program (pausing any other active one). */
-export async function activateProgram(supabase: SupabaseClient, userId: string, programId: string): Promise<string> {
+/**
+ * Make a program the active one (pausing any other). A paused program resumes where it was left, unless `restart`
+ * is set; a new, saved or completed one starts at week 1, day 1.
+ */
+export async function activateProgram(supabase: SupabaseClient, userId: string, programId: string, options: { restart?: boolean } = {}): Promise<string> {
+  const { data: existing } = await supabase.from("user_programs").select("id, status").eq("user_id", userId).eq("program_id", programId).maybeSingle();
+  if (existing && (existing.status === "paused" || existing.status === "active") && !options.restart) {
+    await supabase.from("user_programs").update({ status: "paused" }).eq("user_id", userId).eq("status", "active").neq("id", existing.id);
+    const { error } = await supabase.from("user_programs").update({ status: "active" }).eq("id", existing.id).eq("user_id", userId);
+    if (error) throw error;
+    return existing.id as string;
+  }
   await supabase.from("user_programs").update({ status: "paused" }).eq("user_id", userId).eq("status", "active");
   const { data, error } = await supabase
     .from("user_programs")

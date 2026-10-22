@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Notice } from "@/components/common/states";
 import { confirmDialog } from "@/components/ui/confirm";
+import { prefersReducedMotion } from "@/lib/keyboard";
 import { DraftRestoredNotice } from "@/components/drafts/draft-notice";
 import { clearDraft, readDraft, writeDraft } from "@/lib/drafts";
 import { useDraft, useDraftUserId } from "@/lib/use-draft";
@@ -149,7 +150,7 @@ function CopyButton({ text }: { text: string }) {
           setCopied(false);
         }
       }}
-      className="inline-flex items-center gap-1 rounded-lg px-1.5 py-1 text-[11px] text-muted-foreground hover:bg-elevated hover:text-foreground"
+      className="inline-flex items-center gap-1 rounded-lg px-1.5 py-1 text-[0.6875rem] text-muted-foreground hover:bg-elevated hover:text-foreground"
       aria-label={copied ? "Copied" : "Copy reply"}
     >
       {copied ? <Check className="size-3.5" aria-hidden /> : <Copy className="size-3.5" aria-hidden />} {copied ? "Copied" : "Copy"}
@@ -226,7 +227,7 @@ export function CoachChat({ conversationId: initialId, initialMessages, initialQ
   const showRestored = restoredNotice || inputDraft.restored;
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    endRef.current?.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "end" });
   }, [messages, sending, draft, activity.length]);
 
   const finish = (json: Extract<StreamEvent, { type: "done" }>["result"], optimisticId: string) => {
@@ -343,7 +344,7 @@ export function CoachChat({ conversationId: initialId, initialMessages, initialQ
             title={canGeneratePlans ? undefined : "Plan generation is included with Pro"}
             className={cn("flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold disabled:opacity-50", mode === "plan" ? "bg-elevated text-gold-highlight" : "text-muted-foreground")}
           >
-            <Sparkles className="size-4" aria-hidden /> Plan {!canGeneratePlans && <span className="text-[10px] uppercase">Pro</span>}
+            <Sparkles className="size-4" aria-hidden /> Plan {!canGeneratePlans && <span className="text-[0.6875rem] uppercase">Pro</span>}
           </button>
         </div>
         <div className="flex items-center gap-3">
@@ -388,7 +389,11 @@ export function CoachChat({ conversationId: initialId, initialMessages, initialQ
         </div>
       </div>
 
-      <div className="flex-1 space-y-4 overflow-y-auto p-4" aria-live="polite">
+      {/* Screen readers hear each finished reply once (below), not the streamed text as it arrives. */}
+      <p className="sr-only" aria-live="polite">
+        {!sending && messages.at(-1)?.role === "assistant" ? `Coach replied: ${messages.at(-1)!.content.slice(0, 600)}` : ""}
+      </p>
+      <div className="flex-1 space-y-4 overflow-y-auto p-4">
         {messages.length === 0 && (
           <div className="py-6 text-center">
             <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-gold/10 text-gold">
@@ -436,7 +441,7 @@ export function CoachChat({ conversationId: initialId, initialMessages, initialQ
           </div>
         ))}
         {sending && (
-          <div className="flex justify-start" role="status">
+          <div className="flex justify-start" aria-busy="true">
             <div className="max-w-[92%] space-y-2 rounded-2xl border border-border bg-elevated/70 px-4 py-3 md:max-w-[80%]">
               <ActivityList items={activity} status={draft ? null : status} />
               {draft && <Markdown text={draft} />}
@@ -504,7 +509,7 @@ export function CoachChat({ conversationId: initialId, initialMessages, initialQ
             {sending ? <Loader2 className="animate-spin" aria-hidden /> : <Send aria-hidden />}
           </Button>
         </form>
-        <p className="mt-2 text-[11px] text-muted-foreground">
+        <p className="mt-2 text-[0.6875rem] text-muted-foreground">
           AI responses can be wrong and are not medical advice. Suggested changes only apply when you tap Confirm. Don&apos;t share sensitive health details you don&apos;t want stored. Stop any exercise that causes pain.
         </p>
       </div>

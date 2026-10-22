@@ -105,8 +105,8 @@ export default async function WorkoutPage({ searchParams }: { searchParams: Prom
 
   return (
     <>
-      {notice && <p className="mb-4 rounded-xl border border-gold-muted/50 bg-gold/5 px-4 py-3 text-sm">{notice}</p>}
       <WorkoutLogger userId={user.id} units={profile.unit_system} catalog={catalog} alternatives={alternatives} serverDraft={serverDraft}
+        notice={notice}
         template={template}
         previous={previous}
         restAlerts={{ sound: profile.rest_timer_sound ?? true, vibrate: profile.rest_timer_vibrate ?? true }}

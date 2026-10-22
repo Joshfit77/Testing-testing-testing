@@ -70,7 +70,7 @@ export default async function RecoveryPage() {
                 {[...checkins].reverse().map((c) => (
                   <li key={c.checked_on as string} className="flex-1 rounded-lg bg-elevated/60 px-1 py-2 text-center">
                     <span className="block font-display text-lg font-semibold">{c.readiness_score as number}</span>
-                    <span className="block text-[10px] text-muted-foreground">{(c.checked_on as string).slice(5)}</span>
+                    <span className="block text-[0.6875rem] text-muted-foreground">{(c.checked_on as string).slice(5)}</span>
                   </li>
                 ))}
               </ul>

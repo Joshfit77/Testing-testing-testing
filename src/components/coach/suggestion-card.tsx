@@ -73,12 +73,12 @@ export function SuggestionCard({ messageId, proposal, status, onChange }: { mess
             ] as const
           ).map(([label, value, prev, unit]) => (
             <div key={label} className="rounded-xl bg-elevated/60 p-2">
-              <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</dt>
+              <dt className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">{label}</dt>
               <dd className="font-semibold">
                 {value}
                 <span className="text-xs font-normal text-muted-foreground"> {unit}</span>
               </dd>
-              {prev != null && prev !== value && <dd className="text-[11px] text-muted-foreground">was {prev}</dd>}
+              {prev != null && prev !== value && <dd className="text-[0.6875rem] text-muted-foreground">was {prev}</dd>}
             </div>
           ))}
         </dl>

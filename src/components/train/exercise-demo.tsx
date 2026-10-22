@@ -134,7 +134,7 @@ export function ExerciseDemoMini({
               className="mt-3 aspect-video w-full rounded-xl"
             />
           )}
-          <p className="mt-2 text-[11px] text-muted-foreground">
+          <p className="mt-2 text-[0.6875rem] text-muted-foreground">
             Animated illustration of the movement — not filmed video.
           </p>
         </DialogContent>

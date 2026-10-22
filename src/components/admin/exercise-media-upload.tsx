@@ -136,7 +136,7 @@ export function ExerciseMediaUpload({ exerciseId, slug, exerciseName }: { exerci
           onChange={(e) => pick(e.target.files?.[0] ?? null)}
           className="h-auto py-2"
         />
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-[0.6875rem] text-muted-foreground">
           MP4/WebM video or JPEG/PNG/WebP image, up to 50 MB. Short 5–8 s loops work best. Saved to {EXERCISE_MEDIA_BUCKET}/{slug}/.
           {file ? ` Selected: ${file.name} (${formatSize(file.size)}).` : ""}
         </p>
@@ -145,7 +145,7 @@ export function ExerciseMediaUpload({ exerciseId, slug, exerciseName }: { exerci
         <div className="space-y-1">
           <div className="flex items-center justify-between gap-2">
             <Label htmlFor="upload-license">License</Label>
-            <button type="button" className="text-[11px] text-gold-highlight hover:underline" onClick={() => setLicense(AI_MEDIA_LICENSE)}>
+            <button type="button" className="text-[0.6875rem] text-gold-highlight hover:underline" onClick={() => setLicense(AI_MEDIA_LICENSE)}>
               Use AI-generated license
             </button>
           </div>

@@ -30,7 +30,7 @@ export function CheckinForm({ needsConsent }: { needsConsent: boolean }) {
               </label>
             ))}
           </div>
-          <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
+          <div className="mt-1 flex justify-between text-[0.6875rem] text-muted-foreground">
             <span>{s.low}</span>
             <span>{s.high}</span>
           </div>

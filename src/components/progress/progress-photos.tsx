@@ -451,7 +451,7 @@ export function ProgressPhotos({
                   )}
                 >
                   <PhotoImage photo={p} alt="" className="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
-                  <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-2 pb-1.5 pt-5 text-left text-[11px] leading-tight text-white">
+                  <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-2 pb-1.5 pt-5 text-left text-[0.6875rem] leading-tight text-white">
                     <span className="block font-semibold">{formatDate(p.takenOn)}</span>
                     <span className="block text-white/70">{titleCase(p.pose)}</span>
                   </span>

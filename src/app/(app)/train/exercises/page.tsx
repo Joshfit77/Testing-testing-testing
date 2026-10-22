@@ -160,7 +160,7 @@ export default async function ExercisesPage({
                       }}
                       className="h-full w-full"
                     />
-                    <span className="absolute bottom-0.5 left-0.5 rounded bg-black/60 px-1 text-[9px] font-semibold uppercase tracking-wider text-gold-highlight">
+                    <span className="absolute bottom-0.5 left-0.5 rounded bg-black/60 px-1 text-[0.6875rem] font-semibold uppercase tracking-wider text-gold-highlight">
                       Demo
                     </span>
                   </div>

@@ -161,7 +161,7 @@ export function AmountPicker({
             ] as const
           ).map(([l, v, id]) => (
             <div key={l} className="rounded-xl bg-card/60 p-2">
-              <dt className="text-[11px] text-muted-foreground">{l}</dt>
+              <dt className="text-[0.6875rem] text-muted-foreground">{l}</dt>
               <dd className="font-semibold tabular-nums" data-testid={id}>
                 {v == null ? "—" : `${fmt(v)} g`}
               </dd>
@@ -183,7 +183,7 @@ export function AmountPicker({
           </dl>
         )}
       </section>
-      {food.note && <p className="text-[11px] text-gold">{food.note}</p>}
+      {food.note && <p className="text-[0.6875rem] text-gold">{food.note}</p>}
 
       <Button type="submit" className="w-full" disabled={pending || !result}>
         {pending && <Loader2 className="animate-spin" aria-hidden />} {submitLabel}
