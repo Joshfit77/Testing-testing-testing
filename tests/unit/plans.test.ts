@@ -110,3 +110,12 @@ describe("plans & entitlements", () => {
     expect(effectivePlanFromSubscription({ plan: "pro", status: "active", current_period_end: past }, now)).toBe("free");
   });
 });
+
+describe("database plan checks match the app", () => {
+  it("the Free saved-workout limit in the database equals the app's default", async () => {
+    const { readFileSync } = await import("node:fs");
+    const sql = readFileSync("supabase/migrations/20261023000024_plan_enforcement.sql", "utf8");
+    const m = sql.match(/from public\.workout_templates where user_id = new\.user_id\) >= (\d+)/);
+    expect(Number(m?.[1])).toBe(getPlans().free.templateLimit);
+  });
+});

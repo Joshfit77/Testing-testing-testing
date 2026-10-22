@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { exportUserData } from "@/server/services/account";
-import { createTestUser, deleteTestUser, serviceClient, stackAvailable, type TestUser } from "./helpers";
+import { createTestUser, deleteTestUser, serviceClient, stackAvailable, type TestUser, grantPlan } from "./helpers";
 
 const available = await stackAvailable();
 
@@ -17,6 +17,8 @@ describe.skipIf(!available)("prayer journal, practices, faith reminders and plan
 
   beforeAll(async () => {
     [alice, bob, admin] = await Promise.all([createTestUser("fc-alice"), createTestUser("fc-bob"), createTestUser("fc-admin")]);
+    // Moving calendar sessions is a Plus feature, checked by the database too.
+    await Promise.all([grantPlan(alice, "plus"), grantPlan(bob, "plus")]);
     await serviceClient().from("profiles").update({ role: "admin" }).eq("id", admin.id);
     const c = alice.client;
     const { data: e, error: eErr } = await c

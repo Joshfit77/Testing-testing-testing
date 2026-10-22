@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { exportUserData } from "@/server/services/account";
-import { createTestUser, deleteTestUser, serviceClient, stackAvailable, type TestUser } from "./helpers";
+import { createTestUser, deleteTestUser, serviceClient, stackAvailable, type TestUser, grantPlan } from "./helpers";
 
 const available = await stackAvailable();
 
@@ -19,6 +19,8 @@ describe.skipIf(!available)("recipes, meal plans, grocery list and day marks: RL
 
   beforeAll(async () => {
     [alice, bob, admin] = await Promise.all([createTestUser("rp-alice"), createTestUser("rp-bob"), createTestUser("rp-admin")]);
+    // Recipes, the planner and grocery lists are Plus features, checked by the database too.
+    await Promise.all([grantPlan(alice, "plus"), grantPlan(bob, "plus")]);
     await serviceClient().from("profiles").update({ role: "admin" }).eq("id", admin.id);
     const c = alice.client;
     const { data: r, error: rErr } = await c.from("recipes").insert({ user_id: alice.id, name: "Rice bowl", servings: 2 }).select("id").single();
