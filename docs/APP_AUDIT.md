@@ -87,8 +87,8 @@ No data-loss or auth bugs were found. The 2,033 automated tests pass on this bra
 ## 4. Subscriptions and App Store readiness
 
 **Implemented in Stage 1** (see `docs/MEMBERSHIPS.md`):
-- **Free:** food logging, barcode, macros, basic training and run logging, starter programs, 3 templates, Fitness/Food ranks 1–3, and all of Faith.
-- **Plus ($11.99), no AI:** the full library, builder, unlimited templates, recipes/planner/grocery, advanced trends, photo comparisons, all ranks, and rescheduling.
+- **Free:** food logging, barcode, macros, basic training and run logging, starter programs, 5 templates, calendar viewing, every rank badge, and all of Faith.
+- **Plus ($11.99), no AI:** the full library, builder, unlimited templates, recipes/planner/grocery, advanced trends, photo comparisons, and scheduling/rescheduling.
 - **Pro ($24.99):** adds the AI coach (150/month) and AI plans.
 
 **Requirement status:**

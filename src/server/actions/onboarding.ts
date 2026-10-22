@@ -6,11 +6,8 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { actionError, actionInvalid, type ActionState } from "@/lib/action-state";
 import { fieldErrors } from "@/lib/validation/schemas";
 import { isoDateInTz } from "@/lib/domain/dates";
-import { buildStarterProgram } from "@/lib/domain/program-generator";
 import { onboardingPlanSchema, onboardingSchema, type OnboardingInput, type OnboardingPlanInput } from "@/lib/validation/schemas";
 import { requireUser } from "@/server/auth";
-import { loadExercises, toCatalog } from "@/server/services/catalog";
-import { activateProgram, createPrivateProgram } from "@/server/services/programs";
 import { logError } from "@/server/log";
 import { buildAndActivateCustomProgram } from "@/server/services/custom-programs";
 import { estimateAndSaveTargets, waterTargetMl } from "@/server/services/nutrition-targets";
@@ -71,20 +68,24 @@ export async function saveOnboardingAction(input: OnboardingInput & { rebuildPro
     if (!goals || goals.is_estimate) await estimateAndSaveTargets(supabase, user.id);
 
     if (firstTime || input.rebuildProgram) {
-      const catalog = toCatalog(await loadExercises(supabase));
-      const seed = buildStarterProgram(
-        {
-          primary_goal: v.primaryGoal,
+      // The same generator as sign-up and the schedule preview, so a rebuild gives the program the preview shows.
+      await buildAndActivateCustomProgram(
+        supabase,
+        user.id,
+        starterProgramInput({
+          goal: v.primaryGoal,
           experience: v.experience,
-          days_per_week: v.daysPerWeek,
-          session_minutes: v.sessionMinutes,
-          equipment: v.equipment,
-          preferred_types: v.preferredTypes,
-        },
-        catalog,
+          daysPerWeek: v.daysPerWeek,
+          sessionMinutes: v.sessionMinutes,
+          age: v.age,
+          heightCm: v.heightCm,
+          bodyweightKg: v.weightKg,
+          equipment: [...new Set(v.equipment)],
+          units: v.unitSystem,
+          secondaryGoal: v.secondaryGoal ?? null,
+        }),
+        "starter",
       );
-      const programId = await createPrivateProgram(supabase, user.id, seed, "starter");
-      await activateProgram(supabase, user.id, programId);
     }
   } catch (err) {
     logError("onboarding.save", err);

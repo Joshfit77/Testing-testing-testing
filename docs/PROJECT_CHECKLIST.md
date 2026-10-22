@@ -443,7 +443,7 @@ Offline: the coach screen says it needs the online version.
 | 13.23 | Retrying | Partial | Manual re-send only | 4 |
 | 13.24 | Preserve unsent messages | Working | Coach input is a per-user draft (`useDraft`) that survives navigation and reload. A message that was mid-send is restored unless it was saved. On 429/500 the text goes back in the box with Try again. `e2e/coach.spec.ts` (mock 429 and 500) | 4 |
 | 13.25 | API secrets kept server-side | Working | `src/server/env.ts`; the client sees only `NEXT_PUBLIC_*` | 4 |
-| 13.26 | Live model access | Requires External Setup | Needs `ANTHROPIC_API_KEY` (models `COACH_MODEL_PRO`/`COACH_MODEL_PLUS`). No live call has been made. | 4 |
+| 13.26 | Live model access | Requires External Setup | Needs `ANTHROPIC_API_KEY` (models `COACH_MODEL_FAST`/`COACH_MODEL_SMART`). No live call has been made. | 4 |
 | 13.27 | Not presented as a clinician or pastor | Working | `knowledge.ts`: "not a doctor, physiotherapist, dietitian or psychologist"; defers to a pastor | 4 |
 | 13.28 | Private journal entries not exposed by default | Working | Journal is excluded from the snapshot and tools | 4 |
 

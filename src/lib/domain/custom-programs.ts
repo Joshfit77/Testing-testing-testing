@@ -10,7 +10,7 @@ import { STANDARD_COOLDOWN, STANDARD_WARMUP } from "@/data/programs";
 import { isExerciseAvailable, type CatalogExercise } from "./program-generator";
 import type { Difficulty, Equipment, ExperienceLevel, PrimaryGoal, ProgramType, UnitSystem } from "./types";
 import { estimateOneRepMax } from "./strength";
-import { kgToLb, lbToKg } from "./units";
+import { kgToLb } from "./units";
 import { estimateSessionMinutes, fitSessionToMinutes, framingMinutes } from "./session-time";
 import { COMBINE_LABELS, combineWeek, type CombineOption } from "./combined-goals";
 
@@ -412,11 +412,6 @@ export function formatLoad(kg: number, units: UnitSystem): string {
 /** "75% · 225 lb" */
 export function percentIntensity(oneRmKg: number, pct: number, units: UnitSystem): string {
   return `${pct}% · ${formatLoad((oneRmKg * pct) / 100, units)}`;
-}
-
-/** Convert a rounded display load back to kilograms (for tests and displays). */
-export function displayLoadToKg(value: number, units: UnitSystem): number {
-  return units === "imperial" ? lbToKg(value) : value;
 }
 
 /** Barbell exercises whose loads can be prescribed as a percentage of each main lift's 1RM. */

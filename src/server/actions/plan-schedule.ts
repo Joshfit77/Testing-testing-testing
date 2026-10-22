@@ -7,6 +7,7 @@ import type { Equipment, ExperienceLevel, PrimaryGoal } from "@/lib/domain/types
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
 import { logError } from "@/server/log";
+import { rateLimit } from "@/server/rate-limit";
 import { buildAndActivateCustomProgram } from "@/server/services/custom-programs";
 
 const scheduleSchema = z.object({
@@ -32,13 +33,16 @@ export async function applyScheduleChangeAction(input: unknown): Promise<ActionS
       .maybeSingle();
     if (aErr) throw aErr;
     if (!a) return actionError("Complete your training preferences first.");
+    // Check everything the rebuild needs before changing anything, so a refusal leaves the answers as they were.
+    const { data: w } = await supabase.from("weight_entries").select("weight_kg").eq("user_id", user.id).order("recorded_on", { ascending: false }).limit(1).maybeSingle();
+    if (!profile.birth_year || !profile.height_cm || !w?.weight_kg) return actionError("Add your age, height and weight in Training preferences first.");
+    // Each rebuild saves a new private program, so it's limited like the program builder.
+    if (!rateLimit(`schedule-rebuild:${user.id}`, 10, 60 * 60_000).ok) return actionError("You've rebuilt your program several times in the last hour. Please try again later.");
     const { error: uErr } = await supabase
       .from("onboarding_answers")
       .update({ days_per_week: parsed.data.daysPerWeek, session_minutes: parsed.data.sessionMinutes })
       .eq("user_id", user.id);
     if (uErr) throw uErr;
-    const { data: w } = await supabase.from("weight_entries").select("weight_kg").eq("user_id", user.id).order("recorded_on", { ascending: false }).limit(1).maybeSingle();
-    if (!profile.birth_year || !profile.height_cm || !w?.weight_kg) return actionError("Add your age, height and weight in Training preferences first.");
     await buildAndActivateCustomProgram(
       supabase,
       user.id,

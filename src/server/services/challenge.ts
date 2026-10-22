@@ -1,7 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { CHALLENGE_SLUG, devotionalForDay, type Devotional } from "@/data/devotionals";
-import { challengeDayNumber, devotionalForDate, type ChallengeCheckin } from "@/lib/domain/challenge";
+import { CHALLENGE_SLUG } from "@/data/devotionals";
+import { challengeDayNumber, type ChallengeCheckin } from "@/lib/domain/challenge";
 import { addDays, isoDateInTz } from "@/lib/domain/dates";
 
 export interface ChallengeEnrollment {
@@ -41,18 +41,6 @@ export async function getActiveEnrollment(supabase: SupabaseClient, userId: stri
     .eq("status", "active")
     .maybeSingle();
   return toEnrollment(data);
-}
-
-/** Today's devotional for the home screen: the user's current challenge day, or the date's rotating devotional. */
-export async function getTodaysDevotional(
-  supabase: SupabaseClient,
-  userId: string,
-  today: string,
-): Promise<{ devotional: Devotional; challengeDay: number | null }> {
-  const active = await getActiveEnrollment(supabase, userId);
-  if (!active) return { devotional: devotionalForDate(today), challengeDay: null };
-  const day = challengeDayNumber(active.startedOn, today);
-  return { devotional: devotionalForDay(day), challengeDay: day };
 }
 
 export async function getChallengeState(supabase: SupabaseClient, userId: string, timezone: string): Promise<ChallengeState> {

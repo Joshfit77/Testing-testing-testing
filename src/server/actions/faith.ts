@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { actionError, actionInvalid, actionOk, type ActionState } from "@/lib/action-state";
@@ -19,13 +18,6 @@ import { logError } from "@/server/log";
 
 const uuid = z.string().uuid();
 const MAX_PRACTICES = 12;
-
-export async function setFaithEnabledAction(formData: FormData): Promise<void> {
-  const user = await requireUser();
-  const supabase = await getServerSupabase();
-  await supabase.from("profiles").update({ faith_enabled: formData.get("enabled") === "true" }).eq("id", user.id);
-  revalidatePath("/", "layout");
-}
 
 async function userToday(userId: string): Promise<string> {
   const profile = await getProfile(userId);

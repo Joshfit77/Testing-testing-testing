@@ -81,11 +81,11 @@ Error codes and statuses:
 
 ### `GET /api/foods/search?q=<query>`
 
-USDA FoodData Central search (Plus and Pro). Values are per 100 g. When food is logged, the server re-fetches its nutrition values by FDC ID.
+USDA FoodData Central search (every plan). Values are per 100 g. When food is logged, the server re-fetches its nutrition values by FDC ID.
 
 ### `GET /api/foods/barcode?code=<digits>[&format=ean13|upca|upce|ean8]`
 
-Open Food Facts product lookup by EAN-13 / UPC-A / UPC-E / EAN-8 barcode (Plus and Pro, cookie session, 30 lookups/minute). The check digit is validated first (`400 invalid_code`). Returns `{ status: "found", product }` with per-100 g/ml and per-serving nutrition, `{ status: "no_nutrition", product: { code, name, brand } }`, or `{ status: "not_found", code }`, plus an `attribution` string. Data is crowd-sourced. When logged (`logFoodAction` with `source: "barcode"`), the server re-fetches the product and never uses client-supplied numbers. Errors: `401 unauthorized`, `403 upgrade_required`, `429 rate_limited`, `502 lookup_failed`.
+Open Food Facts product lookup by EAN-13 / UPC-A / UPC-E / EAN-8 barcode (every plan, cookie session, 30 lookups/minute). The check digit is validated first (`400 invalid_code`). Returns `{ status: "found", product }` with per-100 g/ml and per-serving nutrition, `{ status: "no_nutrition", product: { code, name, brand } }`, or `{ status: "not_found", code }`, plus an `attribution` string. Data is crowd-sourced. When logged (`logFoodAction` with `source: "barcode"`), the server re-fetches the product and never uses client-supplied numbers. Errors: `401 unauthorized`, `403 upgrade_required`, `429 rate_limited`, `502 lookup_failed`.
 
 ### `GET /api/account/export`
 

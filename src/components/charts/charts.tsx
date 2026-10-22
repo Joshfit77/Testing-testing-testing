@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Table2, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -213,32 +213,6 @@ export function LineSeriesChart(props: ChartProps & { connectNulls?: boolean }) 
             />
           ))}
         </LineChart>
-      </ResponsiveContainer>
-    </ChartFrame>
-  );
-}
-
-export function AreaSeriesChart(props: ChartProps) {
-  const { data, xKey, series, yDomain } = props;
-  const { formatX, formatValue } = formatters(props.xFormat, props.valueSuffix, props.decimals);
-  const gid = useId().replace(/:/g, "");
-  const s = series[0]!;
-  return (
-    <ChartFrame {...props}>
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
-          <defs>
-            <linearGradient id={`area-${gid}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={SERIES_GOLD} stopOpacity={0.35} />
-              <stop offset="100%" stopColor={SERIES_GOLD} stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid vertical={false} stroke={GRID} />
-          <XAxis dataKey={xKey} {...AXIS} tickFormatter={formatX} minTickGap={16} />
-          <YAxis {...AXIS} domain={yDomain ?? ["dataMin - 2", "dataMax + 2"]} tickFormatter={formatValue} width={52} />
-          <Tooltip cursor={{ stroke: "#8C7139", strokeWidth: 1 }} content={<ChartTooltip formatX={formatX} formatValue={formatValue} />} />
-          <Area type="monotone" dataKey={s.key} name={s.label} stroke={SERIES_GOLD} strokeWidth={2} fill={`url(#area-${gid})`} connectNulls dot={{ r: 3, strokeWidth: 2, stroke: "#171717", fill: SERIES_GOLD }} />
-        </AreaChart>
       </ResponsiveContainer>
     </ChartFrame>
   );

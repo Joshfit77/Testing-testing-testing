@@ -127,8 +127,3 @@ export function checkMove(schedule: PlannedSession[], overrides: ScheduleInput["
   const clear = schedule.filter((x) => x.index > s.index && map.has(x.dayId) && map.get(x.dayId)! < to).map((x) => x.dayId);
   return { ok: true, store: to === s.defaultDate ? null : to, clear };
 }
-
-/** The pending session planned for `date`, if any (the first one, in program order). */
-export function sessionOn(schedule: PlannedSession[], date: string): PlannedSession | null {
-  return schedule.find((s) => s.date === date) ?? null;
-}

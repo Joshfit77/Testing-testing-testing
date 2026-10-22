@@ -168,9 +168,3 @@ export function allRankProgress(inputs: RankInputs): CategoryProgress[] {
 export function ranksEarnedOn(progress: CategoryProgress[], date: string): RankState[] {
   return progress.flatMap((p) => p.ranks.filter((r) => r.earnedAt === date));
 }
-
-export function rankById(category: RankCategory, level: number): RankDefinition | undefined {
-  return RANKS.find((r) => r.category === category && r.level === level);
-}
-
-export const RANK_IDS = RANKS.map((r) => `${r.category}-${r.level}`);

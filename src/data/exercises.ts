@@ -3401,7 +3401,3 @@ export const EXERCISES: ExerciseSeed[] = [
 ];
 
 export const EXERCISE_SLUGS = new Set(EXERCISES.map((e) => e.slug));
-
-export function getExerciseSeed(slug: string): ExerciseSeed | undefined {
-  return EXERCISES.find((e) => e.slug === slug);
-}
