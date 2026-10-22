@@ -55,12 +55,14 @@ describe("badge artwork", () => {
     expect(BADGE_MAX_SHARP_WIDTH).toBeGreaterThanOrEqual(175);
   });
 
-  it("every tile is lossless and fully opaque: crisp edges, no baked-in fades or empty padding", () => {
-    // Without a decoder here, read the lossless (VP8L) header: its alpha hint bit is clear for an opaque image.
+  it("every file is a light WebP; art cut from the posters is lossless and opaque (no baked-in fades or padding)", () => {
     for (const art of BADGE_ARTWORK) {
       const b = readFileSync(file(art.image));
-      expect(b.toString("ascii", 12, 16), art.image).toBe("VP8L");
-      expect((b.readUInt32LE(21) >> 28) & 1, art.image).toBe(0);
+      expect(b.length, art.image).toBeLessThanOrEqual(400 * 1024);
+      // Without a decoder here, read the header. Poster crops are lossless (VP8L) with the alpha hint clear; art
+      // exported from masters (scripts/badge-art/export-masters.py) is high-quality lossy WebP and may keep alpha.
+      if (b.toString("ascii", 12, 16) === "VP8L") expect((b.readUInt32LE(21) >> 28) & 1, art.image).toBe(0);
+      else expect(["VP8 ", "VP8X"], art.image).toContain(b.toString("ascii", 12, 16));
     }
   });
 });

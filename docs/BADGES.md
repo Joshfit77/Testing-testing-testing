@@ -179,6 +179,25 @@ files.
 - **Softest, replace first:** the Food set (Torch, Spark, Flame and Ember have the least detail).
 - **Then:** Seed, Sprout, Foundation and Conqueror (Conqueror also to get a hand-painted smaller cross).
 
+### True high-resolution artwork (not done yet)
+
+No genuine 3840 × 1920 artwork exists yet, and none of the current files has been enlarged to pretend otherwise.
+
+- **The brief:** `docs/BADGE_ART_SPEC.md` has the generation spec for all 27 masters: identity, composition, per-badge subjects, a prompt template and an acceptance checklist.
+- **Installing:** masters go in `assets/badge-masters/` (kept out of git by default). Then `python3 scripts/badge-art/export-masters.py` writes the 1200 × 600 app files and updates their sizes, rank by rank.
+
+### Animations
+
+Only the badge in focus animates: the current-rank card, the detail view of an earned rank, and the unlock reveal.
+The list never does.
+
+- **Fitness:** a gold glow, a metallic sheen and gem sparkles.
+- **Food:** flickering firelight and rising embers.
+- **Faith:** soft sun rays and drifting light motes.
+
+The reveal's rings take the category's colour. Rank 9 adds a second ring, and Cedar a burst of sun rays. All of it
+is off under reduced motion (the phone's setting or the app's own).
+
 ### Replacement artwork: per-rank slots and checklist
 
 Each rank has a fixed slot in `public/badges/`. A replacement with the same file name and a 2 : 1 shape drops
