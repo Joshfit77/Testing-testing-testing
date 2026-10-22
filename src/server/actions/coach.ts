@@ -12,6 +12,9 @@ import { checkNutritionTargets, coachProposalSchema } from "@/lib/coach/tools";
 import { addDays, isoDateInTz } from "@/lib/domain/dates";
 import type { Sex } from "@/lib/domain/nutrition";
 import { getActiveProgramRef } from "@/server/coach/snapshot";
+import { approvedChangeMemory, findDuplicateMemory, MEMORY_LIMIT, memoryInputSchema } from "@/lib/coach/memory";
+import type { CoachProposal } from "@/lib/coach/tools";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 type Result = { ok: true; message: string; programSlug?: string } | { ok: false; error: string };
 
@@ -98,13 +101,13 @@ export async function deleteConversationAction(conversationId: string): Promise<
  * from the explicit Confirm button on the suggestion card. Everything is re-validated here against the
  * user's current data; the model never writes anything itself.
  */
-export async function applyCoachProposalAction(messageId: string): Promise<Result> {
+export async function applyCoachProposalAction(messageId: string, edited?: { category: string; content: string }): Promise<Result> {
   const user = await requireUser();
   const id = z.string().uuid().safeParse(messageId);
   if (!id.success) return { ok: false, error: "Invalid suggestion." };
   if ((await getAiAllowance(user.id, await getUserPlan(user.id))).chatLimit <= 0) return { ok: false, error: "Coach suggestions are included with Pro." };
   const supabase = await getServerSupabase();
-  const { data: msg } = await supabase.from("ai_messages").select("id, proposal, proposal_status").eq("id", id.data).eq("user_id", user.id).eq("role", "assistant").maybeSingle();
+  const { data: msg } = await supabase.from("ai_messages").select("id, conversation_id, proposal, proposal_status").eq("id", id.data).eq("user_id", user.id).eq("role", "assistant").maybeSingle();
   if (!msg?.proposal) return { ok: false, error: "Suggestion not found." };
   if (msg.proposal_status !== "proposed") return { ok: false, error: "This suggestion was already handled." };
   const parsed = coachProposalSchema.safeParse(msg.proposal);
@@ -157,6 +160,25 @@ export async function applyCoachProposalAction(messageId: string): Promise<Resul
       });
       if (error) throw error;
       message = `Targets updated: ${p.calories} kcal, ${p.protein_g} g protein.`;
+    } else if (p.kind === "memory") {
+      // The member may edit the note before saving it; whatever is saved is validated again here.
+      const input = memoryInputSchema.safeParse(edited ?? { category: p.category, content: p.content });
+      if (!input.success) return { ok: false, error: input.error.issues[0]?.message ?? "Invalid memory." };
+      const { data: prof } = await supabase.from("profiles").select("coach_memory_enabled").eq("id", user.id).maybeSingle();
+      if (!prof?.coach_memory_enabled) return { ok: false, error: "Memory is switched off. Turn it on in AI Coach → Memory first." };
+      const { data: existing } = await supabase.from("coach_memories").select("content").eq("user_id", user.id);
+      const dup = findDuplicateMemory(input.data.content, existing ?? []);
+      if (dup) return { ok: false, error: `Already remembered: "${dup.content}"` };
+      const { error } = await supabase.from("coach_memories").insert({ user_id: user.id, ...input.data, source: "coach", source_message_id: msg.id });
+      if (error) {
+        if (error.message.includes("coach_memory_limit")) return { ok: false, error: `You can keep up to ${MEMORY_LIMIT} memories. Delete some in AI Coach → Memory first.` };
+        throw error;
+      }
+      message = "Saved to your coaching memory.";
+    } else if (p.kind === "memory_forget") {
+      const { error, count } = await supabase.from("coach_memories").delete({ count: "exact" }).eq("id", p.memoryId).eq("user_id", user.id);
+      if (error) throw error;
+      message = count ? "Forgotten." : "That memory was already deleted.";
     } else {
       const { data: prof } = await supabase.from("profiles").select("timezone").eq("id", user.id).maybeSingle();
       const today = isoDateInTz(new Date(), (prof?.timezone as string) || "UTC");
@@ -166,10 +188,41 @@ export async function applyCoachProposalAction(messageId: string): Promise<Resul
       message = `Logged ${p.display} for ${p.date}.`;
     }
     await supabase.from("ai_messages").update({ proposal_status: "applied" }).eq("id", msg.id).eq("user_id", user.id);
+    if (p.kind === "exercise_swap" || p.kind === "nutrition_targets") await rememberApprovedChange(supabase, user.id, msg.conversation_id as string, p);
     revalidatePath("/", "layout");
     return { ok: true, message };
   } catch (err) {
     logError("coach.apply_suggestion", err);
     return { ok: false, error: "Couldn't apply that change. Please try again." };
+  }
+}
+
+/**
+ * With coaching memory on (and not switched off for that chat), a change the member confirmed is noted, so the coach
+ * knows later what was changed and why. Best effort: the change itself has already been applied.
+ */
+async function rememberApprovedChange(
+  supabase: SupabaseClient,
+  userId: string,
+  conversationId: string,
+  p: Extract<CoachProposal, { kind: "exercise_swap" | "nutrition_targets" }>,
+) {
+  try {
+    const [{ data: prof }, { data: conv }] = await Promise.all([
+      supabase.from("profiles").select("coach_memory_enabled, timezone").eq("id", userId).maybeSingle(),
+      supabase.from("ai_conversations").select("memory_off").eq("id", conversationId).eq("user_id", userId).maybeSingle(),
+    ]);
+    if (!prof?.coach_memory_enabled || conv?.memory_off) return;
+    const date = isoDateInTz(new Date(), (prof.timezone as string) || "UTC");
+    const note = approvedChangeMemory(
+      p.kind === "exercise_swap"
+        ? { kind: "exercise_swap", from: p.from.name, to: p.to.name, scope: p.scope, reason: p.reason }
+        : { kind: "nutrition_targets", calories: p.calories, protein_g: p.protein_g, reason: p.reason },
+      date,
+    );
+    const { error } = await supabase.from("coach_memories").insert({ user_id: userId, ...note, source: "approved_change" });
+    if (error && !error.message.includes("coach_memory_limit")) logError("coach.remember_change", error);
+  } catch (err) {
+    logError("coach.remember_change", err);
   }
 }

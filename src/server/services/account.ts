@@ -31,6 +31,7 @@ export const USER_TABLES: { table: string; column: string }[] = [
   { table: "ai_conversations", column: "user_id" },
   { table: "ai_messages", column: "user_id" },
   { table: "ai_usage_events", column: "user_id" },
+  { table: "coach_memories", column: "user_id" },
   { table: "faith_journal_entries", column: "user_id" },
   { table: "discipline_goals", column: "user_id" },
   { table: "discipline_checkins", column: "user_id" },

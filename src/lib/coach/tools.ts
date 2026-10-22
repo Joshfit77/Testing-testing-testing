@@ -13,6 +13,7 @@ import type { Sex } from "@/lib/domain/nutrition";
 import { estimateOneRepMax } from "@/lib/domain/strength";
 import { EQUIPMENT, type PrimaryGoal } from "@/lib/domain/types";
 import { KG_PER_LB } from "@/lib/domain/units";
+import { MEMORY_CATEGORIES, MEMORY_MAX_CHARS, type MemoryCategory } from "./memory";
 
 const slug = z.string().trim().regex(/^[a-z0-9-]{2,80}$/, "Use an exercise slug like 'bench-press'.");
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD.");
@@ -70,12 +71,19 @@ export const TOOL_INPUT_SCHEMAS = {
     date: isoDate.nullable(),
     reason: z.string().trim().min(3).max(300),
   }),
+  propose_memory: z.strictObject({
+    category: z.enum(MEMORY_CATEGORIES),
+    content: z.string().trim().min(3).max(MEMORY_MAX_CHARS),
+  }),
+  propose_forget_memory: z.strictObject({
+    memory_ref: z.string().trim().regex(/^m-[0-9a-f]{8}$/, "Use the memory's reference, like m-1a2b3c4d."),
+  }),
 } as const;
 
 export type ToolName = keyof typeof TOOL_INPUT_SCHEMAS;
 export type ToolInput<N extends ToolName> = z.infer<(typeof TOOL_INPUT_SCHEMAS)[N]>;
 export const TOOL_NAMES = Object.keys(TOOL_INPUT_SCHEMAS) as ToolName[];
-export const PROPOSAL_TOOLS = ["propose_exercise_swap", "propose_nutrition_targets", "propose_bodyweight_log"] as const satisfies readonly ToolName[];
+export const PROPOSAL_TOOLS = ["propose_exercise_swap", "propose_nutrition_targets", "propose_bodyweight_log", "propose_memory", "propose_forget_memory"] as const satisfies readonly ToolName[];
 export const isToolName = (v: string): v is ToolName => v in TOOL_INPUT_SCHEMAS;
 
 type JsonSchema = Anthropic.Beta.BetaTool.InputSchema;
@@ -191,6 +199,21 @@ const DEFINITIONS: { name: ToolName; description: string; input_schema: JsonSche
       reason: str("One short sentence for the card."),
     }),
   },
+  {
+    name: "propose_memory",
+    description:
+      "Offer to remember something lasting the athlete told you, for future conversations: a secondary goal, an exercise they like or avoid, when or where they train, a food preference, a recovery preference, a milestone, or how they like to be coached. Nothing is saved unless the athlete taps Save (they can edit it first). Only use the athlete's own words and facts they stated; never guess or infer. Don't save what the app already stores (primary goal, experience level, equipment list, days per week, program, logs, targets, bodyweight), health or medical details, or anything from their prayer journal. Don't use it when memory is off. At most one per reply.",
+    input_schema: obj({
+      category: { type: "string", enum: [...MEMORY_CATEGORIES] },
+      content: str(`The note in the third person, one or two short sentences, under ${MEMORY_MAX_CHARS} characters, e.g. "Prefers dumbbell pressing; barbell bench bothers the left shoulder."`),
+    }),
+  },
+  {
+    name: "propose_forget_memory",
+    description:
+      "Offer to delete one saved memory when the athlete asks you to forget it or says it's no longer true. Nothing is deleted unless they tap Forget. Use the reference shown in the Coaching memory list.",
+    input_schema: obj({ memory_ref: str("The memory's reference, like m-1a2b3c4d.") }),
+  },
 ];
 
 /** Tool list for the Messages API (strict schemas, eager input streaming for streamed requests). */
@@ -230,6 +253,10 @@ export function toolActivityLabel(name: string, input: unknown): string {
       return "Preparing suggested nutrition targets…";
     case "propose_bodyweight_log":
       return "Preparing a bodyweight entry for you to confirm…";
+    case "propose_memory":
+      return "Preparing a note to remember, for you to approve…";
+    case "propose_forget_memory":
+      return "Finding that memory…";
     default:
       return "Working…";
   }
@@ -240,7 +267,9 @@ export function toolActivityLabel(name: string, input: unknown): string {
 export type CoachProposal =
   | { kind: "exercise_swap"; from: { slug: string; name: string }; to: { slug: string; name: string }; scope: "next_workout" | "rest_of_program"; reason: string; programName: string; editable: boolean }
   | { kind: "nutrition_targets"; calories: number; protein_g: number; carbs_g: number; fat_g: number; reason: string; previous: { calories: number; protein_g: number; carbs_g: number; fat_g: number } | null }
-  | { kind: "bodyweight_log"; weightKg: number; date: string; display: string; reason: string };
+  | { kind: "bodyweight_log"; weightKg: number; date: string; display: string; reason: string }
+  | { kind: "memory"; category: MemoryCategory; content: string }
+  | { kind: "memory_forget"; memoryId: string; category: MemoryCategory; content: string };
 
 export const coachProposalSchema = z.discriminatedUnion("kind", [
   z.object({
@@ -262,6 +291,8 @@ export const coachProposalSchema = z.discriminatedUnion("kind", [
     previous: z.object({ calories: z.number(), protein_g: z.number(), carbs_g: z.number(), fat_g: z.number() }).nullable(),
   }),
   z.object({ kind: z.literal("bodyweight_log"), weightKg: z.number().min(25).max(400), date: isoDate, display: z.string().max(40), reason: z.string().max(300) }),
+  z.object({ kind: z.literal("memory"), category: z.enum(MEMORY_CATEGORIES), content: z.string().min(3).max(MEMORY_MAX_CHARS) }),
+  z.object({ kind: z.literal("memory_forget"), memoryId: z.string().uuid(), category: z.enum(MEMORY_CATEGORIES), content: z.string().max(MEMORY_MAX_CHARS) }),
 ]);
 
 export function isCoachProposal(v: unknown): v is CoachProposal {

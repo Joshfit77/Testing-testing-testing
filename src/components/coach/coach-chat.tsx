@@ -18,6 +18,7 @@ import { formatDuration } from "@/lib/domain/units";
 import type { AiPlan } from "@/lib/validation/ai";
 import type { CoachProposal } from "@/lib/coach/tools";
 import { applyProposalAction, deleteConversationAction, dismissProposalAction } from "@/server/actions/coach";
+import { setConversationMemoryOffAction } from "@/server/actions/coach-memory";
 import { Markdown } from "./markdown";
 import { SuggestionCard } from "./suggestion-card";
 
@@ -41,6 +42,8 @@ interface Props {
   exerciseNames: Record<string, string>;
   /** Starter questions built from the user's own data. */
   suggestions?: string[];
+  /** Coaching memory (Pro): whether it's on, and whether this chat is "don't remember". Null without the AI coach. */
+  memory?: { enabled: boolean; chatOff: boolean } | null;
 }
 
 const DEFAULT_SUGGESTIONS = [
@@ -185,7 +188,7 @@ type StreamEvent =
   | { type: "done"; result: { conversationId: string; userMessage: ChatMessage; assistantMessage: ChatMessage; usage: { used: number; limit: number } } }
   | { type: "error"; message?: string };
 
-export function CoachChat({ conversationId: initialId, initialMessages, initialQuestion, enabled, disabledReason, canGeneratePlans, usage: initialUsage, exerciseNames, suggestions }: Props) {
+export function CoachChat({ conversationId: initialId, initialMessages, initialQuestion, enabled, disabledReason, canGeneratePlans, usage: initialUsage, exerciseNames, suggestions, memory }: Props) {
   const router = useRouter();
   const [conversationId, setConversationId] = useState(initialId);
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
@@ -201,6 +204,8 @@ export function CoachChat({ conversationId: initialId, initialMessages, initialQ
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [memoryOff, setMemoryOff] = useState(Boolean(memory?.chatOff));
+  const [memoryNote, setMemoryNote] = useState<string | null>(null);
   const [usage, setUsage] = useState(initialUsage);
   const [draft, setDraft] = useState("");
   const [activity, setActivity] = useState<Activity[]>([]);
@@ -266,7 +271,7 @@ export function CoachChat({ conversationId: initialId, initialMessages, initialQ
       const res = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/x-ndjson" },
-        body: JSON.stringify({ conversationId, message, mode }),
+        body: JSON.stringify({ conversationId, message, mode, ...(conversationId ? {} : { memoryOff }) }),
       });
       if (!res.ok || !res.body) {
         const json = await res.json().catch(() => ({}));
@@ -509,6 +514,33 @@ export function CoachChat({ conversationId: initialId, initialMessages, initialQ
             {sending ? <Loader2 className="animate-spin" aria-hidden /> : <Send aria-hidden />}
           </Button>
         </form>
+        {memory?.enabled && (
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <label className="inline-flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="size-4 accent-[#C9A54C]"
+                checked={!memoryOff}
+                onChange={async (e) => {
+                  const off = !e.target.checked;
+                  setMemoryOff(off);
+                  setMemoryNote(null);
+                  if (!conversationId) return;
+                  const r = await setConversationMemoryOffAction(conversationId, off);
+                  if (!r.ok) {
+                    setMemoryOff(!off);
+                    setMemoryNote(r.error);
+                  }
+                }}
+              />
+              Coach may suggest things to remember from this chat
+            </label>
+            <Link href="/coach/memory" className="underline">
+              Memory
+            </Link>
+            {memoryNote && <span role="alert" className="text-[#f08a8a]">{memoryNote}</span>}
+          </div>
+        )}
         <p className="mt-2 text-[0.6875rem] text-muted-foreground">
           AI responses can be wrong and are not medical advice. Suggested changes only apply when you tap Confirm. Don&apos;t share sensitive health details you don&apos;t want stored. Stop any exercise that causes pain.
         </p>

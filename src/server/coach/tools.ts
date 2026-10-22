@@ -16,6 +16,7 @@ import {
   type ToolInput,
   type ToolName,
 } from "@/lib/coach/tools";
+import { checkProposedMemory, memoryInputSchema, memoryRef } from "@/lib/coach/memory";
 import { getActiveProgramRef, loadProgramWeek, mapWorkouts, WORKOUT_SELECT } from "./snapshot";
 
 /**
@@ -31,6 +32,8 @@ export interface ToolContext {
   snapshot: AthleteSnapshot;
   /** Set once a proposal has been made this turn (one proposal per reply). */
   proposal: CoachProposal | null;
+  /** The athlete asked not to remember anything from this conversation. */
+  chatMemoryOff?: boolean;
 }
 
 export interface ToolOutcome {
@@ -399,6 +402,30 @@ function proposeBodyweightLog(ctx: ToolContext, input: ToolInput<"propose_bodywe
   return { content: JSON.stringify({ status: "shown_to_athlete_for_confirmation", applied: false, weight: display, date }), isError: false, proposal };
 }
 
+function proposeMemory(ctx: ToolContext, input: ToolInput<"propose_memory">): ToolOutcome {
+  const memory = ctx.snapshot.memory ?? { enabled: false, wellnessConsent: false, items: [] };
+  const parsed = memoryInputSchema.safeParse(input);
+  if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Invalid memory.");
+  const problem = checkProposedMemory(parsed.data, {
+    enabled: memory.enabled,
+    chatMemoryOff: Boolean(ctx.chatMemoryOff),
+    existing: memory.items,
+    journalExcerpts: (ctx.snapshot.sharedJournal ?? []).map((j) => [j.title, j.excerpt].filter(Boolean).join(" ")),
+  });
+  if (problem) return fail(problem);
+  const proposal: CoachProposal = { kind: "memory", category: parsed.data.category, content: parsed.data.content };
+  return { content: JSON.stringify({ status: "shown_to_athlete_for_approval", saved: false, note: "A card lets the athlete save, edit or decline this. Say so briefly; don't claim it's saved." }), isError: false, proposal };
+}
+
+function proposeForgetMemory(ctx: ToolContext, input: ToolInput<"propose_forget_memory">): ToolOutcome {
+  const memory = ctx.snapshot.memory;
+  if (!memory?.enabled) return fail("Memory is switched off; there is nothing to forget here. The athlete can review saved memories in AI Coach → Memory.");
+  const target = memory.items.find((m) => memoryRef(m.id) === input.memory_ref);
+  if (!target) return fail(`No memory has the reference ${input.memory_ref}. Use a reference from the Coaching memory list.`);
+  const proposal: CoachProposal = { kind: "memory_forget", memoryId: target.id, category: target.category, content: target.content };
+  return { content: JSON.stringify({ status: "shown_to_athlete_for_confirmation", deleted: false }), isError: false, proposal };
+}
+
 /** Validate and run one tool call. Never throws for bad input: errors go back to the model. */
 export async function executeCoachTool(ctx: ToolContext, name: string, rawInput: unknown): Promise<ToolOutcome> {
   if (!isToolName(name)) return fail(`Unknown tool "${name}".`);
@@ -428,6 +455,10 @@ export async function executeCoachTool(ctx: ToolContext, name: string, rawInput:
         return proposeNutritionTargets(ctx, input as ToolInput<"propose_nutrition_targets">);
       case "propose_bodyweight_log":
         return proposeBodyweightLog(ctx, input as ToolInput<"propose_bodyweight_log">);
+      case "propose_memory":
+        return proposeMemory(ctx, input as ToolInput<"propose_memory">);
+      case "propose_forget_memory":
+        return proposeForgetMemory(ctx, input as ToolInput<"propose_forget_memory">);
     }
   } catch (err) {
     if (err instanceof Error && / is required for /.test(err.message)) return fail(err.message);

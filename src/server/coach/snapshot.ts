@@ -8,6 +8,7 @@ import type { UnitSystem } from "@/lib/domain/types";
 import type { AthleteSnapshot, SnapshotProgram, SnapshotProgramDay, SnapshotWorkout } from "@/lib/coach/context";
 import { journalEntriesForCoach, COACH_JOURNAL_LIMIT } from "@/lib/domain/journal";
 import { loadBudgetContext } from "@/server/services/nutrition-targets";
+import { MEMORY_LIMIT, type CoachMemory } from "@/lib/coach/memory";
 
 /**
  * Load the athlete snapshot for the AI coach. Every query uses the caller's own Supabase session (RLS)
@@ -132,7 +133,7 @@ export async function loadProgramWeek(supabase: SupabaseClient, programId: strin
 export async function loadAthleteSnapshot(supabase: SupabaseClient, userId: string): Promise<AthleteSnapshot> {
   const { data: profile } = await supabase
     .from("profiles")
-    .select("unit_system, birth_year, height_cm, sex, faith_enabled, wellness_consent_at, timezone, step_goal")
+    .select("unit_system, birth_year, height_cm, sex, faith_enabled, wellness_consent_at, timezone, step_goal, coach_memory_enabled")
     .eq("id", userId)
     .maybeSingle();
   const tz = (profile?.timezone as string) || "UTC";
@@ -140,7 +141,7 @@ export async function loadAthleteSnapshot(supabase: SupabaseClient, userId: stri
   const since120 = addDays(today, -120);
   const since7 = addDays(today, -6);
 
-  const [answersRes, workoutsRes, datesRes, prsRes, weightsRes, goalsRes, foodRes, stepsRes, suppRes, readinessRes, challengeRes, programRef, budgetCtx, journalRes] = await Promise.all([
+  const [answersRes, workoutsRes, datesRes, prsRes, weightsRes, goalsRes, foodRes, stepsRes, suppRes, readinessRes, challengeRes, programRef, budgetCtx, journalRes, memoryRes] = await Promise.all([
     supabase
       .from("onboarding_answers")
       .select("primary_goal, experience, days_per_week, session_minutes, equipment, preferred_types, limitations, diet_type, goal_weight_kg, weekly_change_kg, activity_level")
@@ -185,6 +186,10 @@ export async function loadAthleteSnapshot(supabase: SupabaseClient, userId: stri
       .eq("share_with_coach", true)
       .order("entry_date", { ascending: false })
       .limit(COACH_JOURNAL_LIMIT),
+    // Coaching memory: read only while the athlete has it switched on.
+    profile?.coach_memory_enabled
+      ? supabase.from("coach_memories").select("id, category, content, source, created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(MEMORY_LIMIT)
+      : Promise.resolve({ data: [] as CoachMemory[] }),
   ]);
 
   const a = answersRes.data;
@@ -272,5 +277,10 @@ export async function loadAthleteSnapshot(supabase: SupabaseClient, userId: stri
     faithEnabled: Boolean(profile?.faith_enabled),
     // Filtered again here so nothing unshared can reach the coach even if the query changes.
     sharedJournal: journalEntriesForCoach(journalRes.data as Parameters<typeof journalEntriesForCoach>[0]),
+    memory: {
+      enabled: Boolean(profile?.coach_memory_enabled),
+      wellnessConsent: Boolean(profile?.wellness_consent_at),
+      items: profile?.coach_memory_enabled ? ((memoryRes.data ?? []) as CoachMemory[]) : [],
+    },
   };
 }

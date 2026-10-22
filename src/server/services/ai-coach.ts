@@ -10,6 +10,7 @@ import { formatAthleteContext, type AthleteSnapshot } from "@/lib/coach/context"
 import { buildSystemBlocks, CHAT_MAX_TOKENS, fallbackParams, MAX_TOOL_ROUNDS, sanitizeAssistantContent } from "@/lib/coach/prompt";
 import { coachModelIds, routeCoachRequest, type ModelTier } from "@/lib/coach/routing";
 import { coachToolDefinitions, toolActivityLabel, type CoachProposal } from "@/lib/coach/tools";
+import { formatMemoriesForContext } from "@/lib/coach/memory";
 import { loadAthleteSnapshot } from "@/server/coach/snapshot";
 import { executeCoachTool, type ToolContext } from "@/server/coach/tools";
 import { isAiConfigured, isServiceRoleConfigured, serverEnv } from "@/server/env";
@@ -322,6 +323,8 @@ export async function coachTurn(params: {
   conversationId: string | null;
   message: string;
   mode: "chat" | "plan";
+  /** For a new conversation: don't remember anything from it (Pro coaching memory). */
+  memoryOff?: boolean;
   onEvent?: (e: CoachEvent) => void;
   signal?: AbortSignal;
 }): Promise<CoachTurnResult> {
@@ -333,13 +336,15 @@ export async function coachTurn(params: {
   if (!consent?.ai_data_consent_at) throw new AiError("consent_required", "Allow the AI Coach to use your data first (on the AI Coach screen).");
 
   let conversationId = params.conversationId;
+  let chatMemoryOff = Boolean(params.memoryOff);
   if (conversationId) {
-    const { data } = await supabase.from("ai_conversations").select("id").eq("id", conversationId).eq("user_id", userId).maybeSingle();
+    const { data } = await supabase.from("ai_conversations").select("id, memory_off").eq("id", conversationId).eq("user_id", userId).maybeSingle();
     if (!data) throw new AiError("not_found", "Conversation not found.");
+    chatMemoryOff = Boolean(data.memory_off);
   } else {
     const { data, error } = await supabase
       .from("ai_conversations")
-      .insert({ user_id: userId, title: message.replace(/\s+/g, " ").slice(0, 60) || "New conversation" })
+      .insert({ user_id: userId, title: message.replace(/\s+/g, " ").slice(0, 60) || "New conversation", memory_off: chatMemoryOff })
       .select("id")
       .single();
     if (error || !data) throw error ?? new Error("Conversation insert failed");
@@ -381,7 +386,14 @@ export async function coachTurn(params: {
     throw err;
   }
   const model = reservation.tier === route.tier ? route.model : coachModelIds(process.env)[reservation.tier];
-  const system = buildSystemBlocks({ faithEnabled: context.snapshot.faithEnabled, contextText: context.text });
+  const memory = context.snapshot.memory;
+  const system = buildSystemBlocks({
+    faithEnabled: context.snapshot.faithEnabled,
+    contextText: context.text,
+    memoryText: memory?.enabled
+      ? formatMemoriesForContext(memory.items, { wellnessConsent: memory.wellnessConsent, chatMemoryOff })
+      : "Coaching memory: switched off by the athlete. Don't offer to remember anything; they can turn it on in AI Coach → Memory.",
+  });
 
   let reply = "";
   let proposal: AiPlan | CoachProposal | null = null;
@@ -389,7 +401,7 @@ export async function coachTurn(params: {
   let outputTokens = 0;
   try {
     if (mode === "chat") {
-      const toolCtx: ToolContext = { supabase, userId, timeZone: (tzRow?.timezone as string) || "UTC", snapshot: context.snapshot, proposal: null };
+      const toolCtx: ToolContext = { supabase, userId, timeZone: (tzRow?.timezone as string) || "UTC", snapshot: context.snapshot, proposal: null, chatMemoryOff };
       onEvent({ type: "status", text: "Thinking…" });
       const r = await runChatLoop({ model, system, messages, toolCtx, onEvent, signal: params.signal });
       reply = r.reply;

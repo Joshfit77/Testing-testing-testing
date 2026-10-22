@@ -20,12 +20,14 @@ export const CHAT_MAX_TOKENS = 32_000;
 /** Upper bound on model round-trips per user message (each tool batch is one round-trip). */
 export const MAX_TOOL_ROUNDS = 6;
 
-export function buildSystemBlocks(opts: { faithEnabled: boolean; contextText: string }): Anthropic.Beta.BetaTextBlockParam[] {
+export function buildSystemBlocks(opts: { faithEnabled: boolean; contextText: string; memoryText?: string | null }): Anthropic.Beta.BetaTextBlockParam[] {
   const blocks: Anthropic.Beta.BetaTextBlockParam[] = [{ type: "text", text: COACH_STATIC_PROMPT, cache_control: { type: "ephemeral" } }];
   if (opts.faithEnabled) blocks.push({ type: "text", text: FAITH_ENABLED_INSTRUCTIONS, cache_control: { type: "ephemeral" } });
   blocks.push({
     type: "text",
-    text: [opts.faithEnabled ? null : FAITH_DISABLED_INSTRUCTIONS, PRO_PLAN_NOTE, `Athlete context (this user's own logged data, loaded just now):\n${opts.contextText}`].filter(Boolean).join("\n\n"),
+    text: [opts.faithEnabled ? null : FAITH_DISABLED_INSTRUCTIONS, PRO_PLAN_NOTE, `Athlete context (this user's own logged data, loaded just now):\n${opts.contextText}`, opts.memoryText ?? null]
+      .filter(Boolean)
+      .join("\n\n"),
   });
   return blocks;
 }

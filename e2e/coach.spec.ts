@@ -76,6 +76,17 @@ function reply(req: MockRequest): { blocks: Block[]; stop: string; delayMs: numb
   }
   const text = String(typeof last.content === "string" ? last.content : "").toLowerCase();
   const system = req.system.map((b) => b.text).join("\n");
+  if (text.includes("remember")) {
+    return {
+      delayMs: 0,
+      stop: "tool_use",
+      blocks: [{ type: "tool_use", id: `toolu_e2e_${++seq}`, name: "propose_memory", input: { category: "schedule", content: text.includes("rowing") ? "Likes rowing for cardio." : "Trains at 6 am before work." } }],
+    };
+  }
+  if (text.includes("forget")) {
+    const ref = system.match(/\[(m-[0-9a-f]{8})\] Schedule:/)?.[1] ?? "m-00000000";
+    return { delayMs: 0, stop: "tool_use", blocks: [{ type: "tool_use", id: `toolu_e2e_${++seq}`, name: "propose_forget_memory", input: { memory_ref: ref } }] };
+  }
   if (text.includes("swap")) {
     const from = system.match(/← next: [^[]*\[([a-z0-9-]+)\]/)?.[1] ?? "back-squat";
     return {
@@ -263,6 +274,8 @@ test.describe("AI coach", () => {
       "propose_exercise_swap",
       "propose_nutrition_targets",
       "propose_bodyweight_log",
+      "propose_memory",
+      "propose_forget_memory",
     ]);
     expect(first.tools.every((t) => t.strict === true)).toBe(true);
     expect(first.system[0]!.cache_control).toEqual({ type: "ephemeral" });
@@ -314,5 +327,110 @@ test.describe("AI coach", () => {
     await page.reload();
     await expect(box).toHaveValue("");
     await expect(page.locator("p", { hasText: question })).toHaveCount(1);
+  });
+
+  test("coaching memory: off until turned on, saved only when approved, used in later chats, and forgettable", async ({ page }) => {
+    test.skip(!MOCK_PORT, "set E2E_ANTHROPIC_MOCK_PORT and start the app with ANTHROPIC_BASE_URL pointing at it");
+    const email = uniqueEmail("coach-memory");
+    await signUpAndConfirm(page, email);
+    await completeOnboarding(page);
+    await grantPlan(email, "pro");
+    await page.goto("/coach");
+    await page.getByRole("button", { name: "Allow and continue" }).click();
+    const box = page.getByLabel("Message the AI coach");
+    const systemOf = (needle: string) => requests.filter((r) => JSON.stringify(r.messages).includes(needle)).at(-1)!.system.map((b) => b.text).join("\n");
+    // The box restores drafts as the page hydrates, which can clear text typed a moment too early: retype until it sticks.
+    const sendMessage = async (text: string) => {
+      await expect(async () => {
+        await box.fill(text);
+        await page.waitForTimeout(250);
+        await expect(box).toHaveValue(text, { timeout: 500 });
+      }).toPass({ timeout: 15_000 });
+      await page.getByRole("button", { name: "Send message" }).click();
+    };
+
+    // Memory is off by default: the coach is told not to offer, and there's no per-chat switch.
+    await sendMessage("Hello coach, memory check one");
+    await expect(page.getByTestId("coach-reply").last()).toContainText("Happy to help", { timeout: 30_000 });
+    expect(systemOf("memory check one")).toContain("Coaching memory: switched off by the athlete");
+    await expect(page.getByLabel("Coach may suggest things to remember from this chat")).toHaveCount(0);
+
+    // Turn it on and add a note by hand.
+    await page.getByRole("link", { name: "Memory" }).first().click();
+    await expect(page.getByRole("heading", { name: "Memory is off" })).toBeVisible();
+    await page.getByRole("button", { name: "Turn memory on" }).click();
+    await expect(page.getByRole("heading", { name: "Memory is on" })).toBeVisible();
+    await page.getByLabel("Type").selectOption("coaching_style");
+    await page.getByLabel("What should the coach remember?").fill("Wants short, direct answers.");
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(page.getByTestId("coach-memory").filter({ hasText: "Wants short, direct answers." })).toBeVisible();
+
+    // The coach suggests a memory; the member edits it before saving.
+    await page.goto("/coach");
+    await expect(page.getByLabel("Coach may suggest things to remember from this chat")).toBeChecked();
+    await sendMessage("Please remember I train at 6 am");
+    const card = page.getByTestId("coach-suggestion").last();
+    await expect(card.getByText("Remember this?")).toBeVisible({ timeout: 30_000 });
+    await expect(card.getByText("Trains at 6 am before work.")).toBeVisible();
+    await card.getByRole("button", { name: "Edit" }).click();
+    await card.getByLabel("Note").fill("Trains at 6:30 am before work.");
+    await card.getByRole("button", { name: "Save to memory" }).click();
+    await expect(card.getByRole("status")).toHaveText("Saved to your coaching memory.");
+    await expect(card.getByText("saved", { exact: true })).toBeVisible();
+
+    // Both notes reach the coach in a new conversation (another device would see the same).
+    await page.goto("/coach");
+    await sendMessage("Hello again, memory check two");
+    await expect(page.getByTestId("coach-reply").last()).toContainText("Happy to help", { timeout: 30_000 });
+    const sys = systemOf("memory check two");
+    expect(sys).toContain("Trains at 6:30 am before work.");
+    expect(sys).toContain("Wants short, direct answers.");
+    expect(sys).not.toContain("Trains at 6 am before work.");
+
+    // Asking the coach to forget something.
+    await sendMessage("Please forget my training time");
+    const forget = page.getByTestId("coach-suggestion").last();
+    await expect(forget.getByText("Forget this memory?")).toBeVisible({ timeout: 30_000 });
+    await forget.getByRole("button", { name: "Forget" }).click();
+    await expect(forget.getByRole("status")).toHaveText("Forgotten.");
+    await page.goto("/coach/memory");
+    await expect(page.getByTestId("coach-memory")).toHaveCount(1);
+    await expect(page.getByText("Trains at 6:30 am before work.")).toHaveCount(0);
+
+    // A change the member confirms is noted (with memory on), so the coach knows later what changed and why.
+    await page.goto("/coach");
+    await sendMessage("Please swap my first exercise today");
+    const swap = page.getByTestId("coach-suggestion").last();
+    await expect(swap.getByText("Suggested exercise swap")).toBeVisible({ timeout: 30_000 });
+    await swap.getByRole("button", { name: "Confirm" }).click();
+    await expect(swap.getByRole("status")).toContainText("Swapped");
+    await page.goto("/coach/memory");
+    await expect(page.getByTestId("coach-memory").filter({ hasText: /approved swapping .+ for .+ \(next session\)/ })).toContainText("a change you confirmed");
+
+    // "Don't remember anything from this chat": the coach's suggestion is refused on the server, so no card.
+    await page.goto("/coach");
+    const chatMemory = page.getByLabel("Coach may suggest things to remember from this chat");
+    await expect(async () => {
+      await chatMemory.uncheck();
+      await page.waitForTimeout(250);
+      await expect(chatMemory).not.toBeChecked({ timeout: 500 });
+    }).toPass({ timeout: 15_000 });
+    await sendMessage("Please remember I like rowing");
+    await expect(page.getByTestId("coach-reply").last()).toContainText("suggested change", { timeout: 30_000 });
+    await expect(page.getByText("Remember this?")).toHaveCount(0);
+    expect(systemOf("Please remember I like rowing")).toContain("not to remember anything from THIS chat");
+    await page.waitForURL(/\/coach\?c=/);
+    await page.reload();
+    await expect(page.getByLabel("Coach may suggest things to remember from this chat")).not.toBeChecked();
+
+    // Delete one, then the rest, and switch memory off.
+    await page.goto("/coach/memory");
+    await page.getByRole("button", { name: /^Delete memory: Wants short/ }).click();
+    await expect(page.getByTestId("coach-memory")).toHaveCount(1);
+    await page.getByRole("button", { name: "Delete all" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Delete all" }).click();
+    await expect(page.getByText("Nothing saved yet.")).toBeVisible();
+    await page.getByRole("button", { name: "Turn memory off" }).click();
+    await expect(page.getByRole("heading", { name: "Memory is off" })).toBeVisible();
   });
 });

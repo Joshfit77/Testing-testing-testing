@@ -11,6 +11,7 @@ import { estimateOneRepMax } from "@/lib/domain/strength";
 import { displayWeight, weightUnit } from "@/lib/domain/units";
 import type { UnitSystem } from "@/lib/domain/types";
 import { JOURNAL_KIND_LABELS, type SharedJournalEntry } from "@/lib/domain/journal";
+import type { CoachMemory } from "./memory";
 
 export interface SnapshotSet {
   reps: number | null;
@@ -108,6 +109,8 @@ export interface AthleteSnapshot {
    * off by default). Journals are otherwise never part of the context.
    */
   sharedJournal?: SharedJournalEntry[];
+  /** Long-term coaching memory (Pro): only loaded while the athlete has memory switched on. */
+  memory?: { enabled: boolean; wellnessConsent: boolean; items: CoachMemory[] };
 }
 
 const round = (n: number, d = 0) => {

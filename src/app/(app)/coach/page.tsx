@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { MessageSquarePlus } from "lucide-react";
+import { Brain, MessageSquarePlus } from "lucide-react";
 import { AiConsentCard } from "@/components/coach/ai-consent-card";
 import { CoachChat, type ChatMessage } from "@/components/coach/coach-chat";
 import { PageHeader } from "@/components/common/page-header";
@@ -28,7 +28,7 @@ export default async function CoachPage({
   const [convRes, exRes, flag, usage] = await Promise.all([
     supabase
       .from("ai_conversations")
-      .select("id, title, updated_at")
+      .select("id, title, updated_at, memory_off")
       .eq("user_id", user.id)
       .order("updated_at", { ascending: false })
       .limit(30),
@@ -37,6 +37,7 @@ export default async function CoachPage({
     getAiUsage(user.id, plan),
   ]);
   const conversations = convRes.data ?? [];
+  const { data: memoryProfile } = await supabase.from("profiles").select("coach_memory_enabled").eq("id", user.id).maybeSingle();
   const selected =
     sp.c && conversations.find((c) => c.id === sp.c) ? sp.c : null;
   const { data: msgs } = selected
@@ -91,6 +92,11 @@ export default async function CoachPage({
                 <Link href="/profile/billing">Upgrade</Link>
               </Button>
             )}
+            <Button asChild variant="secondary">
+              <Link href="/coach/memory">
+                <Brain aria-hidden /> Memory
+              </Link>
+            </Button>
             <Button asChild variant="secondary">
               <Link href="/coach">
                 <MessageSquarePlus aria-hidden /> New chat
@@ -167,6 +173,14 @@ export default async function CoachPage({
             canGeneratePlans={usage.planLimit > 0}
             usage={{ used: usage.chatUsed, limit: usage.chatLimit }}
             suggestions={suggestions}
+            memory={
+              entitled
+                ? {
+                    enabled: Boolean(memoryProfile?.coach_memory_enabled),
+                    chatOff: Boolean(conversations.find((c) => c.id === selected)?.memory_off),
+                  }
+                : null
+            }
             exerciseNames={Object.fromEntries(
               (exRes.data ?? []).map((e) => [
                 e.slug as string,

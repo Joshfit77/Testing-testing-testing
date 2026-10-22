@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { ArrowRight, Check, Dumbbell, Loader2, Scale, Utensils, X } from "lucide-react";
+import { ArrowRight, Brain, Check, Dumbbell, Loader2, Pencil, Scale, Utensils, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { CoachProposal } from "@/lib/coach/tools";
+import { MEMORY_CATEGORIES, MEMORY_CATEGORY_LABELS, MEMORY_MAX_CHARS, type MemoryCategory } from "@/lib/coach/memory";
+import { Textarea } from "@/components/ui/input";
 import { applyCoachProposalAction, dismissProposalAction } from "@/server/actions/coach";
 
 type Status = "proposed" | "applied" | "dismissed" | null;
@@ -28,9 +30,24 @@ export function SuggestionCard({ messageId, proposal, status, onChange }: { mess
       } else setResult({ ok: false, text: r.error });
     });
 
+  const [editing, setEditing] = useState(false);
+  const [memCategory, setMemCategory] = useState<MemoryCategory>(proposal.kind === "memory" ? proposal.category : "other");
+  const [memText, setMemText] = useState(proposal.kind === "memory" ? proposal.content : "");
+
   const canApply = proposal.kind !== "exercise_swap" || proposal.editable;
-  const Icon = proposal.kind === "exercise_swap" ? Dumbbell : proposal.kind === "nutrition_targets" ? Utensils : Scale;
-  const title = proposal.kind === "exercise_swap" ? "Suggested exercise swap" : proposal.kind === "nutrition_targets" ? "Suggested nutrition targets" : "Log bodyweight";
+  const Icon = proposal.kind === "exercise_swap" ? Dumbbell : proposal.kind === "nutrition_targets" ? Utensils : proposal.kind === "bodyweight_log" ? Scale : Brain;
+  const title = {
+    exercise_swap: "Suggested exercise swap",
+    nutrition_targets: "Suggested nutrition targets",
+    bodyweight_log: "Log bodyweight",
+    memory: "Remember this?",
+    memory_forget: "Forget this memory?",
+  }[proposal.kind];
+  const isMemory = proposal.kind === "memory" || proposal.kind === "memory_forget";
+  const confirmLabel = proposal.kind === "memory" ? "Save to memory" : proposal.kind === "memory_forget" ? "Forget" : "Confirm";
+  const declineLabel = proposal.kind === "memory" ? "Don't save" : proposal.kind === "memory_forget" ? "Keep it" : "Not now";
+  const appliedLabel = proposal.kind === "memory" ? "saved" : proposal.kind === "memory_forget" ? "forgotten" : "applied";
+  const declinedLabel = proposal.kind === "memory" ? "not saved" : proposal.kind === "memory_forget" ? "kept" : "dismissed";
 
   return (
     <div className="mt-3 rounded-2xl border border-gold-muted/60 bg-[#141210] p-4" data-testid="coach-suggestion">
@@ -38,7 +55,7 @@ export function SuggestionCard({ messageId, proposal, status, onChange }: { mess
         <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-gold">
           <Icon className="size-4" aria-hidden /> {title}
         </p>
-        {status && status !== "proposed" && <Badge variant={status === "applied" ? "success" : "secondary"}>{status === "applied" ? "applied" : "dismissed"}</Badge>}
+        {status && status !== "proposed" && <Badge variant={status === "applied" ? "success" : "secondary"}>{status === "applied" ? appliedLabel : declinedLabel}</Badge>}
       </div>
 
       {proposal.kind === "exercise_swap" && (
@@ -90,17 +107,75 @@ export function SuggestionCard({ messageId, proposal, status, onChange }: { mess
         </p>
       )}
 
-      <p className="mt-2 text-xs text-muted-foreground">{proposal.reason}</p>
+      {proposal.kind === "memory" &&
+        (editing && status === "proposed" ? (
+          <div className="mt-2 space-y-2">
+            <label className="block text-xs text-muted-foreground">
+              Type
+              <select
+                value={memCategory}
+                onChange={(e) => setMemCategory(e.target.value as MemoryCategory)}
+                className="mt-1 block h-9 w-full rounded-lg border border-border bg-background px-2 text-sm text-foreground"
+              >
+                {MEMORY_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {MEMORY_CATEGORY_LABELS[c]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-xs text-muted-foreground">
+              Note
+              <Textarea value={memText} onChange={(e) => setMemText(e.target.value)} maxLength={MEMORY_MAX_CHARS} rows={3} className="mt-1 text-sm" />
+            </label>
+          </div>
+        ) : (
+          <div className="mt-2 text-sm">
+            <p className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">{MEMORY_CATEGORY_LABELS[memCategory]}</p>
+            <p className="mt-0.5">{memText}</p>
+          </div>
+        ))}
+
+      {proposal.kind === "memory_forget" && (
+        <div className="mt-2 text-sm">
+          <p className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">{MEMORY_CATEGORY_LABELS[proposal.category]}</p>
+          <p className="mt-0.5">{proposal.content}</p>
+        </div>
+      )}
+
+      {"reason" in proposal && <p className="mt-2 text-xs text-muted-foreground">{proposal.reason}</p>}
+      {isMemory && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          {proposal.kind === "memory" ? "Nothing is saved unless you tap Save. " : ""}
+          <Link href="/coach/memory" className="underline">
+            Manage memory
+          </Link>
+        </p>
+      )}
 
       {status === "proposed" && (
         <div className="mt-3 flex flex-wrap gap-2">
           {canApply ? (
             <>
-              <Button size="sm" disabled={pending} onClick={() => act(() => applyCoachProposalAction(messageId), "applied")}>
-                {pending ? <Loader2 className="animate-spin" aria-hidden /> : <Check aria-hidden />} Confirm
+              <Button
+                size="sm"
+                disabled={pending}
+                onClick={() =>
+                  act(
+                    () => applyCoachProposalAction(messageId, proposal.kind === "memory" && editing ? { category: memCategory, content: memText } : undefined),
+                    "applied",
+                  )
+                }
+              >
+                {pending ? <Loader2 className="animate-spin" aria-hidden /> : <Check aria-hidden />} {confirmLabel}
               </Button>
+              {proposal.kind === "memory" && !editing && (
+                <Button size="sm" variant="secondary" disabled={pending} onClick={() => setEditing(true)}>
+                  <Pencil aria-hidden /> Edit
+                </Button>
+              )}
               <Button size="sm" variant="ghost" disabled={pending} onClick={() => act(() => dismissProposalAction(messageId), "dismissed")}>
-                <X aria-hidden /> Not now
+                <X aria-hidden /> {declineLabel}
               </Button>
             </>
           ) : (

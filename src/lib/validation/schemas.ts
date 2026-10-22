@@ -338,6 +338,8 @@ export const aiChatRequestSchema = z.object({
   conversationId: z.string().uuid().nullable(),
   message: z.string().trim().min(1, "Type a message").max(4000),
   mode: z.enum(["chat", "plan"]).default("chat"),
+  /** New conversations only: don't remember anything from this chat. */
+  memoryOff: z.boolean().optional(),
 });
 
 // --------------------------------------------------------------------------- Admin
