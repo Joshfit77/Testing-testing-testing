@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getServiceSupabase } from "@/lib/supabase/server";
-import { getPlans, hasFeature } from "@/lib/domain/plans";
+import { aiAllowance } from "@/lib/domain/plans";
 import type { Plan } from "@/lib/domain/types";
 import { aiPlanOutputSchema, validateAiPlan, type AiPlan } from "@/lib/validation/ai";
 import { formatAthleteContext, type AthleteSnapshot } from "@/lib/coach/context";
@@ -13,6 +13,7 @@ import { coachToolDefinitions, toolActivityLabel, type CoachProposal } from "@/l
 import { loadAthleteSnapshot } from "@/server/coach/snapshot";
 import { executeCoachTool, type ToolContext } from "@/server/coach/tools";
 import { isAiConfigured, isServiceRoleConfigured, serverEnv } from "@/server/env";
+import { getLegacyAiTerms } from "@/server/services/billing";
 import { isFlagEnabled } from "@/server/flags";
 import { rateLimit } from "@/server/rate-limit";
 import { logError } from "@/server/log";
@@ -76,13 +77,18 @@ function monthStartIso(): string {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)).toISOString();
 }
 
+/** The user's monthly AI allowance: their plan's, raised by any legacy terms their subscription kept. */
+export async function getAiAllowance(userId: string, plan: Plan) {
+  return aiAllowance(plan, await getLegacyAiTerms(userId));
+}
+
 /**
- * This month's AI usage against the plan's allowance. `chatUsed` counts every request (chat and plan),
+ * This month's AI usage against the user's allowance. `chatUsed` counts every request (chat and plan),
  * `planUsed` plan generations and `smartUsed` requests served by the larger model.
  */
 export async function getAiUsage(userId: string, plan: Plan) {
-  const config = getPlans()[plan];
-  const limits = { chatLimit: config.aiMonthlyLimit, planLimit: config.aiPlanMonthlyLimit, smartLimit: config.aiSmartMonthlyLimit };
+  const allowance = await getAiAllowance(userId, plan);
+  const limits = { chatLimit: allowance.chatLimit, planLimit: allowance.planLimit, smartLimit: allowance.smartLimit, legacy: allowance.legacy };
   if (!isServiceRoleConfigured()) return { chatUsed: 0, planUsed: 0, smartUsed: 0, ...limits };
   const admin = getServiceSupabase();
   const since = monthStartIso();
@@ -99,9 +105,10 @@ export async function getAiUsage(userId: string, plan: Plan) {
 export async function assertAiAllowed(userId: string, plan: Plan, mode: "chat" | "plan") {
   if (!isAiConfigured()) throw new AiError("not_configured", "The AI coach isn't configured on this server.");
   if (!(await isFlagEnabled("ai_coach"))) throw new AiError("disabled", "The AI coach is temporarily unavailable.");
-  if (!hasFeature(plan, "ai_coach")) throw new AiError("not_entitled", "AI coaching is included with Pro.");
+  const allowance = await getAiAllowance(userId, plan);
+  if (allowance.chatLimit <= 0) throw new AiError("not_entitled", "AI coaching is included with Pro.");
   if (mode === "plan") {
-    if (!hasFeature(plan, "ai_plan_generation")) throw new AiError("plan_not_entitled", "Personalized plan generation is included with Pro.");
+    if (allowance.planLimit <= 0) throw new AiError("plan_not_entitled", "Personalized plan generation is included with Pro.");
     if (!(await isFlagEnabled("ai_plan_generation"))) throw new AiError("disabled", "Plan generation is temporarily unavailable.");
   }
   // Durable metering requires the service role (users cannot write their own usage rows).

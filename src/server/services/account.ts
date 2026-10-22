@@ -56,6 +56,7 @@ export const USER_TABLES: { table: string; column: string }[] = [
   { table: "workout_template_exercises", column: "user_id" },
   { table: "subscriptions", column: "user_id" },
   { table: "user_entitlements", column: "user_id" },
+  { table: "legacy_plan_terms", column: "user_id" },
   { table: "billing_customers", column: "user_id" },
 ];
 

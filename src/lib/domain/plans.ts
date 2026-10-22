@@ -4,10 +4,11 @@ import type { Plan } from "./types";
  * What each plan unlocks. The Faith section is free for everyone and is never gated, so it has no feature here.
  *
  *   Free  — food & calorie logging (search, barcode scanning, macros, saved meals, weekly insights), basic workout
- *           logging, starter programs, basic progress and run tracking, and the first three Fitness and Food ranks.
+ *           logging, up to five saved workouts, starter programs, basic progress and run tracking, viewing the
+ *           training calendar, and every Fitness, Food and Faith rank badge.
  *   Plus  — everything in Free, plus the full program library, the custom program builder, unlimited workout
  *           templates, recipes / meal planner / grocery list, advanced progress and strength trends, progress-photo
- *           comparisons, all Fitness and Food ranks and rescheduling on the training calendar. No AI.
+ *           comparisons and scheduling/rescheduling on the training calendar. No AI.
  *   Pro   — everything in Plus, plus the AI coach (a monthly message allowance) and AI plan generation.
  */
 export const FEATURES = [
@@ -23,7 +24,6 @@ export const FEATURES = [
   "meal_planning",
   "advanced_analytics",
   "advanced_calendar",
-  "full_rank_badges",
   // Pro
   "ai_coach",
   "ai_plan_generation",
@@ -40,7 +40,6 @@ const PLUS_FEATURES: Feature[] = [
   "meal_planning",
   "advanced_analytics",
   "advanced_calendar",
-  "full_rank_badges",
 ];
 
 export interface PlanConfig {
@@ -48,7 +47,10 @@ export interface PlanConfig {
   name: string;
   /** Display price in US cents per month. Billing uses the configured Stripe price. */
   priceCents: number;
-  /** Optional yearly option (US cents per year) that grants this plan. Offered only when set. */
+  /**
+   * Yearly option (US cents per year) that grants this plan. Set only while yearly billing is switched on
+   * (`BILLING_YEARLY_ENABLED=true`); web checkout additionally needs the plan's yearly Stripe price.
+   */
   yearlyPriceCents?: number;
   tagline: string;
   features: Feature[];
@@ -63,8 +65,6 @@ export interface PlanConfig {
   aiSmartMonthlyLimit: number;
   /** Saved workout templates allowed, or null for unlimited. */
   templateLimit: number | null;
-  /** Highest Fitness and Food rank level shown as earnable (Faith ranks are always all free). */
-  rankLevelLimit: number;
   highlights: string[];
 }
 
@@ -74,13 +74,22 @@ function envInt(name: string, fallback: number): number {
   return Number.isFinite(n) && n >= 0 ? n : fallback;
 }
 
+/** Approved yearly prices (US cents). Hidden until yearly billing is switched on; env vars can override them. */
+export const APPROVED_YEARLY_PRICE_CENTS = { plus: 9999, pro: 24999 } as const;
+
+function yearlyPrice(plan: "plus" | "pro"): { yearlyPriceCents: number } | Record<string, never> {
+  const enabled = typeof process !== "undefined" && process.env.BILLING_YEARLY_ENABLED === "true";
+  if (!enabled) return {};
+  const cents = envInt(`PLAN_${plan.toUpperCase()}_YEARLY_PRICE_CENTS`, APPROVED_YEARLY_PRICE_CENTS[plan]);
+  return cents > 0 ? { yearlyPriceCents: cents } : {};
+}
+
 /**
  * Plan definitions. Prices and limits are defaults that can be overridden with environment variables without a
  * code change. Display prices must match the Stripe (and, later, App Store / Play) prices actually charged.
  */
 export function getPlans(): Record<Plan, PlanConfig> {
   const proAi = envInt("PLAN_PRO_AI_MONTHLY_LIMIT", 150);
-  const proYearly = envInt("PLAN_PRO_YEARLY_PRICE_CENTS", 0);
   return {
     free: {
       id: "free",
@@ -91,13 +100,13 @@ export function getPlans(): Record<Plan, PlanConfig> {
       aiMonthlyLimit: 0,
       aiPlanMonthlyLimit: 0,
       aiSmartMonthlyLimit: 0,
-      templateLimit: envInt("PLAN_FREE_TEMPLATE_LIMIT", 3),
-      rankLevelLimit: 3,
+      templateLimit: envInt("PLAN_FREE_TEMPLATE_LIMIT", 5),
       highlights: [
         "Food & calorie logging with barcode scanning",
         "Macro tracking",
-        "Workout logging & starter programs",
-        "Basic progress & run tracking",
+        "Workout logging, starter programs & 5 saved workouts",
+        "Basic progress, run tracking & your training calendar",
+        "Every Fitness, Food & Faith badge",
         "The complete Faith section, always free",
       ],
     },
@@ -105,13 +114,13 @@ export function getPlans(): Record<Plan, PlanConfig> {
       id: "plus",
       name: "Plus",
       priceCents: envInt("PLAN_PLUS_PRICE_CENTS", 1199),
+      ...yearlyPrice("plus"),
       tagline: "The complete fitness and nutrition toolkit.",
       features: PLUS_FEATURES,
       aiMonthlyLimit: 0,
       aiPlanMonthlyLimit: 0,
       aiSmartMonthlyLimit: 0,
       templateLimit: null,
-      rankLevelLimit: 9,
       highlights: [
         "Everything in Free",
         "Full program library & custom program builder",
@@ -119,22 +128,20 @@ export function getPlans(): Record<Plan, PlanConfig> {
         "Meal planner, recipes & grocery lists",
         "Advanced progress & strength trends",
         "Progress-photo comparisons",
-        "All Fitness & Food badges",
-        "Reschedule sessions on your training calendar",
+        "Schedule & reschedule sessions on your training calendar",
       ],
     },
     pro: {
       id: "pro",
       name: "Pro",
       priceCents: envInt("PLAN_PRO_PRICE_CENTS", 2499),
-      ...(proYearly > 0 ? { yearlyPriceCents: proYearly } : {}),
+      ...yearlyPrice("pro"),
       tagline: "Personal coaching, powered by AI.",
       features: [...FEATURES],
       aiMonthlyLimit: proAi,
       aiPlanMonthlyLimit: envInt("PLAN_PRO_AI_PLAN_MONTHLY_LIMIT", 15),
       aiSmartMonthlyLimit: Math.min(proAi, envInt("PLAN_PRO_AI_SMART_MONTHLY_LIMIT", Math.round(proAi * 0.1))),
       templateLimit: null,
-      rankLevelLimit: 9,
       highlights: [
         "Everything in Plus",
         `AI coach: ${proAi} messages a month`,
@@ -220,4 +227,53 @@ export function entitlementFromSubscriptions(
     }
   }
   return { plan: best, validUntil };
+}
+
+/**
+ * AI allowance a subscription kept from before the October 2026 plan change (`legacy_plan_terms`). Existing Plus
+ * subscribers had an AI coach allowance, so it stays with that subscription while it remains active on the same
+ * plan; new Plus subscriptions have no AI.
+ */
+export interface LegacyAiTerms {
+  plan: Exclude<Plan, "free">;
+  aiMonthlyLimit: number;
+  aiPlanMonthlyLimit: number;
+  aiSmartMonthlyLimit: number;
+}
+
+export interface AiAllowance {
+  chatLimit: number;
+  planLimit: number;
+  smartLimit: number;
+  /** True when kept legacy terms raise the allowance above the current plan's. */
+  legacy: boolean;
+}
+
+/** The monthly AI allowance for a plan, raised by any legacy terms still in force (the caller checks they apply). */
+export function aiAllowance(plan: Plan, legacy: LegacyAiTerms[] = []): AiAllowance {
+  const c = getPlans()[plan];
+  const entitled = hasFeature(plan, "ai_coach");
+  const base = {
+    chatLimit: entitled ? c.aiMonthlyLimit : 0,
+    planLimit: hasFeature(plan, "ai_plan_generation") ? c.aiPlanMonthlyLimit : 0,
+    smartLimit: entitled ? c.aiSmartMonthlyLimit : 0,
+  };
+  const out = { ...base, legacy: false };
+  for (const t of legacy) {
+    out.chatLimit = Math.max(out.chatLimit, t.aiMonthlyLimit);
+    out.planLimit = Math.max(out.planLimit, t.aiPlanMonthlyLimit);
+    out.smartLimit = Math.max(out.smartLimit, t.aiSmartMonthlyLimit);
+  }
+  out.legacy = out.chatLimit > base.chatLimit || out.planLimit > base.planLimit || out.smartLimit > base.smartLimit;
+  return out;
+}
+
+/** Legacy terms apply while their subscription still gives access on the same plan and they haven't been ended. */
+export function legacyTermsApply(
+  terms: { plan: Exclude<Plan, "free">; ends_at: string | null },
+  sub: { plan: Exclude<Plan, "free">; status: SubscriptionStatus; current_period_end: string | null },
+  now: Date = new Date(),
+): boolean {
+  if (terms.ends_at && new Date(terms.ends_at).getTime() <= now.getTime()) return false;
+  return sub.plan === terms.plan && effectivePlanFromSubscription(sub, now) === terms.plan;
 }

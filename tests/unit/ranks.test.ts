@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BSB_PASSAGES } from "@/data/scripture";
-import { RANKS, RANK_CATEGORIES, allRankProgress, applyRankPlanLimit, categoryProgress, ranksEarnedOn } from "@/lib/domain/ranks";
+import { RANKS, RANK_CATEGORIES, allRankProgress, categoryProgress, ranksEarnedOn } from "@/lib/domain/ranks";
 import { BADGE_CATALOG } from "@/lib/domain/achievements";
 
 const days = (n: number, start = "2026-01-01") => Array.from({ length: n }, (_, i) => new Date(Date.parse(`${start}T00:00:00Z`) + i * 86_400_000).toISOString().slice(0, 10));
@@ -62,37 +62,5 @@ describe("27 rank badges", () => {
     expect(all.current?.name).toBe("Conqueror");
     expect(all.next).toBeNull();
     expect(all.percentToNext).toBe(100);
-  });
-});
-
-describe("plan rank limit", () => {
-  const progress = allRankProgress({
-    workoutDates: Array.from({ length: 60 }, (_, i) => `2026-0${1 + Math.floor(i / 28)}-${String((i % 28) + 1).padStart(2, "0")}`),
-    foodDays: ["2026-01-01"],
-    faithDays: Array.from({ length: 40 }, (_, i) => `2026-0${1 + Math.floor(i / 28)}-${String((i % 28) + 1).padStart(2, "0")}`),
-  });
-
-  it("Free sees Fitness and Food ranks 4–9 as plan-locked (reached ones flagged), Faith all free", () => {
-    const view = applyRankPlanLimit(progress, 3);
-    const fitness = view.find((p) => p.category === "fitness")!;
-    expect(fitness.limited).toBe(true);
-    expect(fitness.count).toBe(60);
-    expect(fitness.ranks.filter((r) => r.earned).map((r) => r.level)).toEqual([1, 2, 3]);
-    expect(fitness.current?.level).toBe(3);
-    expect(fitness.next).toBeNull();
-    expect(fitness.ranks.find((r) => r.level === 4)).toMatchObject({ planLocked: true, reached: true, earned: false, earnedAt: null });
-    expect(fitness.ranks.find((r) => r.level === 5)).toMatchObject({ planLocked: true, reached: false });
-    const food = view.find((p) => p.category === "food")!;
-    expect(food.next?.level).toBe(2);
-    const faith = view.find((p) => p.category === "faith")!;
-    expect(faith.limited).toBe(false);
-    expect(faith.ranks.some((r) => r.planLocked)).toBe(false);
-    expect(faith.current?.level).toBe(4);
-  });
-
-  it("Plus and Pro see everything unchanged", () => {
-    const view = applyRankPlanLimit(progress, 9);
-    expect(view.map((p) => p.current?.level)).toEqual(progress.map((p) => p.current?.level));
-    expect(view.every((p) => !p.limited)).toBe(true);
   });
 });

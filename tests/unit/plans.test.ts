@@ -1,10 +1,10 @@
-import { canAccessTier, effectivePlanFromSubscription, formatPrice, getPlans, hasFeature, yearlySavingsPercent } from "@/lib/domain/plans";
+import { aiAllowance, APPROVED_YEARLY_PRICE_CENTS, canAccessTier, effectivePlanFromSubscription, formatPrice, getPlans, hasFeature, legacyTermsApply, yearlySavingsPercent } from "@/lib/domain/plans";
 
 describe("plans & entitlements", () => {
   it("gates features by plan: food logging free, Plus a complete non-AI toolkit, AI only on Pro", () => {
     // Free: food & calorie logging with barcode scanning and macros (all `nutrition_tracking`), basic training.
     for (const f of ["workout_logging", "starter_programs", "basic_progress", "nutrition_tracking"] as const) expect(hasFeature("free", f), f).toBe(true);
-    for (const f of ["full_program_library", "custom_program_builder", "unlimited_templates", "meal_planning", "advanced_analytics", "advanced_calendar", "full_rank_badges"] as const) {
+    for (const f of ["full_program_library", "custom_program_builder", "unlimited_templates", "meal_planning", "advanced_analytics", "advanced_calendar"] as const) {
       expect(hasFeature("free", f), f).toBe(false);
       expect(hasFeature("plus", f), f).toBe(true);
       expect(hasFeature("pro", f), f).toBe(true);
@@ -24,16 +24,50 @@ describe("plans & entitlements", () => {
     expect(plans.free.priceCents).toBe(0);
     expect(plans.plus.priceCents).toBe(1199);
     expect(plans.pro.priceCents).toBe(2499);
+    // Yearly plans stay hidden until yearly billing is switched on.
+    expect(plans.plus.yearlyPriceCents).toBeUndefined();
     expect(plans.pro.yearlyPriceCents).toBeUndefined();
     expect(plans.free.aiMonthlyLimit).toBe(0);
     expect(plans.plus.aiMonthlyLimit).toBe(0);
     expect(plans.pro.aiMonthlyLimit).toBe(150);
     expect(plans.pro.aiSmartMonthlyLimit).toBe(15);
     expect(plans.pro.aiPlanMonthlyLimit).toBeLessThanOrEqual(plans.pro.aiSmartMonthlyLimit);
-    expect(plans.free.templateLimit).toBe(3);
+    expect(plans.free.templateLimit).toBe(5);
     expect(plans.plus.templateLimit).toBeNull();
-    expect(plans.free.rankLevelLimit).toBe(3);
-    expect(plans.plus.rankLevelLimit).toBe(9);
+    expect(plans.pro.templateLimit).toBeNull();
+  });
+  it("offers the approved yearly prices only once yearly billing is switched on", () => {
+    process.env.BILLING_YEARLY_ENABLED = "true";
+    try {
+      const plans = getPlans();
+      expect(plans.plus.yearlyPriceCents).toBe(9999);
+      expect(plans.pro.yearlyPriceCents).toBe(24999);
+      expect(plans.free.yearlyPriceCents).toBeUndefined();
+      expect(APPROVED_YEARLY_PRICE_CENTS).toEqual({ plus: 9999, pro: 24999 });
+      expect(yearlySavingsPercent(plans.plus.priceCents, 9999)).toBe(30);
+      expect(yearlySavingsPercent(plans.pro.priceCents, 24999)).toBe(16);
+    } finally {
+      delete process.env.BILLING_YEARLY_ENABLED;
+    }
+  });
+  it("keeps legacy AI terms only while their subscription stays on the same plan", () => {
+    const now = new Date("2026-10-22T00:00:00Z");
+    const future = "2026-11-22T00:00:00Z";
+    const terms = { plan: "plus" as const, ends_at: null };
+    expect(legacyTermsApply(terms, { plan: "plus", status: "active", current_period_end: future }, now)).toBe(true);
+    expect(legacyTermsApply(terms, { plan: "plus", status: "canceled", current_period_end: future }, now)).toBe(true);
+    expect(legacyTermsApply(terms, { plan: "plus", status: "canceled", current_period_end: "2026-10-01T00:00:00Z" }, now)).toBe(false);
+    expect(legacyTermsApply(terms, { plan: "pro", status: "active", current_period_end: future }, now)).toBe(false);
+    expect(legacyTermsApply({ plan: "plus", ends_at: "2026-10-21T00:00:00Z" }, { plan: "plus", status: "active", current_period_end: future }, now)).toBe(false);
+  });
+  it("computes the AI allowance: none on Plus, 150 on Pro, legacy terms raise it", () => {
+    expect(aiAllowance("free")).toEqual({ chatLimit: 0, planLimit: 0, smartLimit: 0, legacy: false });
+    expect(aiAllowance("plus")).toEqual({ chatLimit: 0, planLimit: 0, smartLimit: 0, legacy: false });
+    expect(aiAllowance("pro")).toEqual({ chatLimit: 150, planLimit: 15, smartLimit: 15, legacy: false });
+    const legacyPlus = { plan: "plus" as const, aiMonthlyLimit: 60, aiPlanMonthlyLimit: 0, aiSmartMonthlyLimit: 6 };
+    expect(aiAllowance("plus", [legacyPlus])).toEqual({ chatLimit: 60, planLimit: 0, smartLimit: 6, legacy: true });
+    const legacyPro = { plan: "pro" as const, aiMonthlyLimit: 400, aiPlanMonthlyLimit: 20, aiSmartMonthlyLimit: 40 };
+    expect(aiAllowance("pro", [legacyPro])).toEqual({ chatLimit: 400, planLimit: 20, smartLimit: 40, legacy: true });
   });
   it("formats prices and yearly savings", () => {
     expect(formatPrice(0)).toBe("Free");
@@ -49,15 +83,17 @@ describe("plans & entitlements", () => {
   it("respects env overrides", () => {
     process.env.PLAN_PRO_AI_MONTHLY_LIMIT = "200";
     process.env.PLAN_PRO_YEARLY_PRICE_CENTS = "19999";
-    process.env.PLAN_FREE_TEMPLATE_LIMIT = "5";
+    process.env.BILLING_YEARLY_ENABLED = "true";
+    process.env.PLAN_FREE_TEMPLATE_LIMIT = "8";
     try {
       expect(getPlans().pro.aiMonthlyLimit).toBe(200);
       expect(getPlans().pro.aiSmartMonthlyLimit).toBe(20);
       expect(getPlans().pro.yearlyPriceCents).toBe(19999);
-      expect(getPlans().free.templateLimit).toBe(5);
+      expect(getPlans().free.templateLimit).toBe(8);
     } finally {
       delete process.env.PLAN_PRO_AI_MONTHLY_LIMIT;
       delete process.env.PLAN_PRO_YEARLY_PRICE_CENTS;
+      delete process.env.BILLING_YEARLY_ENABLED;
       delete process.env.PLAN_FREE_TEMPLATE_LIMIT;
     }
   });

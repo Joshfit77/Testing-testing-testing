@@ -7,17 +7,16 @@ import { Button } from "@/components/ui/button";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { BADGE_CATEGORIES, badgePercent, computeAchievements, type BadgeState } from "@/lib/domain/achievements";
 import { isoDateInTz } from "@/lib/domain/dates";
-import { getPlans, hasFeature } from "@/lib/domain/plans";
 import type { UnitSystem } from "@/lib/domain/types";
 import { displayWeight, weightUnit } from "@/lib/domain/units";
 import { cn } from "@/lib/utils";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { getUserPlan, requireOnboardedUser } from "@/server/auth";
+import { requireOnboardedUser } from "@/server/auth";
 import { logError } from "@/server/log";
 import { getAchievementStats } from "@/server/services/achievements";
 import { RankBoard } from "@/components/badges/rank-board";
 import { ACTIVE_TRANSLATION, BSB_PASSAGES } from "@/data/scripture";
-import { RANKS, allRankProgress, applyRankPlanLimit, type PlanCategoryProgress, type RankCategory } from "@/lib/domain/ranks";
+import { RANKS, allRankProgress, type CategoryProgress, type RankCategory } from "@/lib/domain/ranks";
 
 export const metadata = { title: "Badges" };
 
@@ -68,19 +67,17 @@ export default async function BadgesPage({ searchParams }: { searchParams: Promi
   const initialTab: RankCategory = sp.tab === "food" || sp.tab === "faith" ? sp.tab : "fitness";
   const { user, profile } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
-  const plan = await getUserPlan(user.id);
   const tz = profile.timezone;
   const units = profile.unit_system;
 
   let badges: BadgeState[] | null = null;
-  let ranks: PlanCategoryProgress[] = [];
+  let ranks: CategoryProgress[] = [];
   const today = isoDateInTz(new Date(), tz);
   try {
     const stats = await getAchievementStats(supabase, user.id, tz);
     badges = computeAchievements(stats, today);
-    // Free shows the first Fitness and Food ranks; Plus and Pro show all nine. Faith ranks are always free.
-    const rankLimit = hasFeature(plan, "full_rank_badges") ? 9 : getPlans()[plan].rankLevelLimit;
-    ranks = applyRankPlanLimit(allRankProgress({ workoutDates: stats.workouts.map((w) => w.date), foodDays: stats.foodDays, faithDays: stats.faithDays }), rankLimit);
+    // Every Fitness, Food and Faith rank is earnable on every plan.
+    ranks = allRankProgress({ workoutDates: stats.workouts.map((w) => w.date), foodDays: stats.foodDays, faithDays: stats.faithDays });
   } catch (err) {
     logError("badges.load", err);
   }

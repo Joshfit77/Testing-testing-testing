@@ -19,4 +19,7 @@ process.env.STRIPE_WEBHOOK_SECRET = "whsec_integration_dummy";
 process.env.STRIPE_PRICE_PLUS = "price_test_plus";
 process.env.STRIPE_PRICE_PRO = "price_test_pro";
 process.env.STRIPE_PRICE_PRO_YEARLY = "price_test_pro_yearly";
+process.env.STRIPE_PRICE_PLUS_YEARLY = "price_test_plus_yearly";
+process.env.STRIPE_PRICE_PLUS_LEGACY = "price_old_plus_a, price_old_plus_b";
+process.env.STRIPE_PRICE_PRO_LEGACY = "price_old_pro";
 process.env.ANTHROPIC_API_KEY = "sk-ant-integration-dummy";

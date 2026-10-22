@@ -5,7 +5,6 @@ import { CoachChat, type ChatMessage } from "@/components/coach/coach-chat";
 import { PageHeader } from "@/components/common/page-header";
 import { BackButton } from "@/components/common/back-button";
 import { Button } from "@/components/ui/button";
-import { hasFeature } from "@/lib/domain/plans";
 import { cn } from "@/lib/utils";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
@@ -48,7 +47,8 @@ export default async function CoachPage({
         .order("created_at")
     : { data: [] };
 
-  const entitled = hasFeature(plan, "ai_coach");
+  // Pro, or a subscription that kept its AI allowance from before the plan change.
+  const entitled = usage.chatLimit > 0;
   let disabledReason: string | null = null;
   if (!isAiConfigured())
     disabledReason =
@@ -164,7 +164,7 @@ export default async function CoachPage({
             initialQuestion={selected ? "" : (sp.q ?? "").slice(0, 500)}
             enabled={!disabledReason}
             disabledReason={disabledReason}
-            canGeneratePlans={hasFeature(plan, "ai_plan_generation")}
+            canGeneratePlans={usage.planLimit > 0}
             usage={{ used: usage.chatUsed, limit: usage.chatLimit }}
             suggestions={suggestions}
             exerciseNames={Object.fromEntries(

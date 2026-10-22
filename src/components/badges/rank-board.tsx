@@ -6,8 +6,7 @@ import { BadgeArt } from "@/components/badges/badge-art";
 import { RankLadder } from "@/components/badges/rank-ladder";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { ProgressBar } from "@/components/ui/progress-bar";
-import Link from "next/link";
-import { RANK_CATEGORIES, type PlanCategoryProgress, type PlanRankState, type RankCategory, type RankState } from "@/lib/domain/ranks";
+import { RANK_CATEGORIES, type CategoryProgress, type RankCategory, type RankState } from "@/lib/domain/ranks";
 import { cn } from "@/lib/utils";
 
 /** Verse text (BSB) and translation code for each reference used by the ranks, read on the server. */
@@ -45,9 +44,9 @@ function requirement(r: RankState): string {
   return r.threshold === 1 ? "Take part in Faith for the first time." : `Take part in Faith on ${r.threshold.toLocaleString("en-US")} ${noun}.`;
 }
 
-export function RankBoard({ progress, verses, translation, initial = "fitness", today }: { progress: PlanCategoryProgress[]; verses: RankVerses; translation: string; initial?: RankCategory; today: string }) {
+export function RankBoard({ progress, verses, translation, initial = "fitness", today }: { progress: CategoryProgress[]; verses: RankVerses; translation: string; initial?: RankCategory; today: string }) {
   const [tab, setTab] = useState<RankCategory>(initial);
-  const [open, setOpen] = useState<PlanRankState | null>(null);
+  const [open, setOpen] = useState<RankState | null>(null);
   const [reveal, setReveal] = useState<RankState | null>(null);
   const byCat = useMemo(() => new Map(progress.map((p) => [p.category, p])), [progress]);
   const current = byCat.get(tab)!;
@@ -125,8 +124,6 @@ export function RankBoard({ progress, verses, translation, initial = "fitness", 
                   {(current.next.threshold - current.count).toLocaleString("en-US")} more to <span className="font-semibold text-foreground">{current.next.name}</span>
                 </p>
               </div>
-            ) : current.ranks.some((r) => r.planLocked) ? (
-              <p className="mt-2 text-xs font-semibold text-gold-highlight">Every Free rank earned. Plus unlocks the rest.</p>
             ) : (
               <p className="mt-2 text-xs font-semibold text-gold-highlight">Every rank earned.</p>
             )}
@@ -167,7 +164,7 @@ function VerseBlock({ reference, verse, translation }: { reference: string; vers
   );
 }
 
-function RankDetail({ rank, progress, verse, translation }: { rank: PlanRankState; progress: PlanCategoryProgress; verse: string | undefined; translation: string }) {
+function RankDetail({ rank, progress, verse, translation }: { rank: RankState; progress: CategoryProgress; verse: string | undefined; translation: string }) {
   const info = RANK_CATEGORIES.find((c) => c.id === rank.category)!;
   const pct = rank.earned ? 100 : Math.min(100, Math.round((progress.count / rank.threshold) * 100));
   return (
@@ -202,15 +199,6 @@ function RankDetail({ rank, progress, verse, translation }: { rank: PlanRankStat
           </>
         )}
       </div>
-      {rank.planLocked ? (
-        <p className="rounded-xl border border-gold-muted/50 bg-gold/5 p-3 text-sm">
-          Ranks 4–9 are included with Plus and Pro.{" "}
-          {rank.reached ? "You've already reached this one — it appears as soon as you upgrade." : "Your progress keeps counting on Free."}{" "}
-          <Link href="/profile/billing" className="font-semibold text-gold-highlight underline-offset-4 hover:underline">
-            See plans
-          </Link>
-        </p>
-      ) : null}
       {rank.category === "faith" ? (
         <p className="text-xs text-muted-foreground">Faith ranks celebrate showing up. They don&apos;t measure your faith or your worth to God.</p>
       ) : null}

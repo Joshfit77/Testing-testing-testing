@@ -3,7 +3,7 @@
 import { Check, Dumbbell, Flame, Lock, Sprout } from "lucide-react";
 import { BADGE_IMAGE_OVERRIDES } from "@/components/badges/badge-art";
 import { getBadgeArtwork } from "@/components/badges/badge-artwork";
-import { RANK_CATEGORIES, type PlanCategoryProgress, type PlanRankState, type RankCategory } from "@/lib/domain/ranks";
+import { RANK_CATEGORIES, type CategoryProgress, type RankCategory, type RankState } from "@/lib/domain/ranks";
 import { cn } from "@/lib/utils";
 
 /**
@@ -26,8 +26,8 @@ export function RankLadder({
   verses,
   translation,
 }: {
-  progress: PlanCategoryProgress;
-  onOpen: (r: PlanRankState) => void;
+  progress: CategoryProgress;
+  onOpen: (r: RankState) => void;
   /** BSB text by reference; an earned rank shows its verse in full. */
   verses: Record<string, string>;
   translation: string;
@@ -58,7 +58,7 @@ export function RankLadder({
                 type="button"
                 onClick={() => onOpen(r)}
                 className={cn("rank-row", r.earned ? "is-earned" : "is-locked", current && "is-current")}
-                aria-label={`${r.name}, rank ${r.level} of 9, ${r.planLocked ? "included with Plus" : r.earned ? "earned" : "locked"}`}
+                aria-label={`${r.name}, rank ${r.level} of 9, ${r.earned ? "earned" : "locked"}`}
               >
                 <span className="rank-num" aria-hidden>
                   <span>{r.level}</span>
@@ -85,11 +85,7 @@ export function RankLadder({
                   <span className="rank-name">{r.name}</span>
                   <span className="rank-ref">{r.reference}</span>
                   <span className="rank-theme">{r.theme}</span>
-                  {r.planLocked ? (
-                    <span className="rank-state is-plan">
-                      <Lock aria-hidden /> {r.reached ? "Reached · included with Plus" : "Included with Plus"}
-                    </span>
-                  ) : r.earned ? (
+                  {r.earned ? (
                     <>
                       <span className="rank-state is-done">
                         <Check aria-hidden /> Earned

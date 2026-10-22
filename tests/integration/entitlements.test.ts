@@ -118,4 +118,61 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
       delete process.env.PLAN_PRO_AI_MONTHLY_LIMIT;
     }
   });
+
+  it("maps earlier Stripe prices to their plan, and never downgrades a known subscription over an unknown price", async () => {
+    const u = await createTestUser("legacy-price");
+    const ent = async () => (await serviceClient().from("user_entitlements").select("plan").eq("user_id", u.id).single()).data?.plan;
+    try {
+      await syncSubscription(fakeSubscription({ metadata: { user_id: u.id }, items: { object: "list", data: [{ id: "si", price: { id: "price_test_plus_yearly" }, current_period_end: Math.floor(Date.now() / 1000) + 86400 }] } }));
+      expect(await ent()).toBe("plus");
+      const old = fakeSubscription({ metadata: { user_id: u.id }, items: { object: "list", data: [{ id: "si", price: { id: "price_old_pro" }, current_period_end: Math.floor(Date.now() / 1000) + 86400 }] } });
+      await syncSubscription(old);
+      expect(await ent()).toBe("pro");
+      // A renewal arrives on a price this server no longer lists: the stored plan is kept and the period extended.
+      const renewedEnd = Math.floor(Date.now() / 1000) + 40 * 86400;
+      await syncSubscription({ ...old, items: { ...old.items, data: [{ ...old.items.data[0]!, price: { id: "price_removed_from_config" }, current_period_end: renewedEnd }] } } as unknown as Stripe.Subscription);
+      const { data: row } = await serviceClient().from("subscriptions").select("plan, stripe_price_id, current_period_end").eq("stripe_subscription_id", old.id).single();
+      expect(row).toMatchObject({ plan: "pro", stripe_price_id: "price_removed_from_config" });
+      expect(new Date(row!.current_period_end as string).getTime()).toBe(renewedEnd * 1000);
+      expect(await ent()).toBe("pro");
+    } finally {
+      await deleteTestUser(u);
+    }
+  });
+
+  it("keeps an existing Plus subscriber's AI allowance while that subscription stays on Plus", async () => {
+    const u = await createTestUser("legacy-ai");
+    try {
+      const sub = fakeSubscription({ metadata: { user_id: u.id }, items: { object: "list", data: [{ id: "si", price: { id: "price_old_plus_b" }, current_period_end: Math.floor(Date.now() / 1000) + 86400 }] } });
+      await syncSubscription(sub);
+      await expect(assertAiAllowed(u.id, "plus", "chat")).rejects.toMatchObject({ code: "not_entitled" });
+
+      // What the migration records for subscriptions that existed before the plan change.
+      const { error } = await serviceClient()
+        .from("legacy_plan_terms")
+        .insert({ stripe_subscription_id: sub.id, user_id: u.id, plan: "plus", ai_monthly_limit: 60, ai_plan_monthly_limit: 0, ai_smart_monthly_limit: 6 });
+      expect(error).toBeNull();
+      await expect(assertAiAllowed(u.id, "plus", "chat")).resolves.toMatchObject({ chatLimit: 60, planLimit: 0, smartLimit: 6, legacy: true });
+      // Old Plus never included plan generation.
+      await expect(assertAiAllowed(u.id, "plus", "plan")).rejects.toMatchObject({ code: "plan_not_entitled" });
+
+      // Members can read their own terms, not anyone else's, and can't write them.
+      const own = await u.client.from("legacy_plan_terms").select("plan");
+      expect(own.data).toEqual([{ plan: "plus" }]);
+      const write = await u.client.from("legacy_plan_terms").update({ ai_monthly_limit: 9999 }).eq("user_id", u.id).select();
+      expect(write.data ?? []).toEqual([]);
+
+      // Upgrading the same subscription to Pro uses Pro's allowance.
+      await syncSubscription({ ...sub, items: { ...sub.items, data: [{ ...sub.items.data[0]!, price: { id: "price_test_pro" } }] } } as unknown as Stripe.Subscription);
+      await expect(assertAiAllowed(u.id, "pro", "chat")).resolves.toMatchObject({ chatLimit: 150, legacy: false });
+
+      // Back on Plus, then the subscription ends: the terms end with it.
+      await syncSubscription(sub);
+      await expect(assertAiAllowed(u.id, "plus", "chat")).resolves.toMatchObject({ chatLimit: 60 });
+      await syncSubscription({ ...sub, status: "canceled", items: { ...sub.items, data: [{ ...sub.items.data[0]!, current_period_end: Math.floor(Date.now() / 1000) - 60 }] } } as unknown as Stripe.Subscription);
+      await expect(assertAiAllowed(u.id, "free", "chat")).rejects.toMatchObject({ code: "not_entitled" });
+    } finally {
+      await deleteTestUser(u);
+    }
+  });
 });

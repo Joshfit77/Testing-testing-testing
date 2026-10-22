@@ -2,7 +2,7 @@ import "server-only";
 import Stripe from "stripe";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { publicEnv } from "@/lib/env";
-import { entitlementFromSubscriptions, type BillingInterval, type SubscriptionStatus } from "@/lib/domain/plans";
+import { entitlementFromSubscriptions, legacyTermsApply, type BillingInterval, type LegacyAiTerms, type SubscriptionStatus } from "@/lib/domain/plans";
 import type { Plan } from "@/lib/domain/types";
 import { isServiceRoleConfigured, serverEnv } from "@/server/env";
 import { logError } from "@/server/log";
@@ -17,17 +17,19 @@ export function getStripe(): Stripe {
 
 export type PaidPlan = Exclude<Plan, "free">;
 
-/** Stripe price for a plan and interval. Only Pro has a yearly option ("everything, billed yearly"). */
+/** Stripe price for a plan and interval. */
 export function priceIdForPlan(plan: PaidPlan, interval: BillingInterval = "month"): string {
-  if (interval === "year") return plan === "pro" ? serverEnv.stripePriceProYearly : "";
+  if (interval === "year") return plan === "pro" ? serverEnv.stripePriceProYearly : serverEnv.stripePricePlusYearly;
   return plan === "pro" ? serverEnv.stripePricePro : serverEnv.stripePricePlus;
 }
 
+/** The plan a Stripe price grants: current monthly and yearly prices, plus earlier prices kept for existing subscribers. */
 export function planForPriceId(priceId: string | null | undefined): PaidPlan | null {
   if (!priceId) return null;
-  if (priceId === serverEnv.stripePricePro) return "pro";
-  if (serverEnv.stripePriceProYearly && priceId === serverEnv.stripePriceProYearly) return "pro";
-  if (priceId === serverEnv.stripePricePlus) return "plus";
+  const pro = [serverEnv.stripePricePro, serverEnv.stripePriceProYearly, ...serverEnv.stripeLegacyPricesPro];
+  const plus = [serverEnv.stripePricePlus, serverEnv.stripePricePlusYearly, ...serverEnv.stripeLegacyPricesPlus];
+  if (pro.some((p) => p && p === priceId)) return "pro";
+  if (plus.some((p) => p && p === priceId)) return "plus";
   return null;
 }
 
@@ -114,13 +116,19 @@ export async function syncSubscription(sub: Stripe.Subscription): Promise<void> 
     return;
   }
   const priceId = sub.items?.data?.[0]?.price?.id ?? null;
-  const plan = planForPriceId(priceId);
+  const admin = getServiceSupabase();
+  let plan = planForPriceId(priceId);
   if (!plan) {
-    logError("billing.sync", new Error("Unknown price"), { subscription: sub.id });
-    return;
+    // A price this server doesn't know (e.g. the old price after new prices were configured without listing it in
+    // STRIPE_PRICE_*_LEGACY). Keep the plan already stored for this subscription so a paying subscriber is never
+    // downgraded by a configuration change; only a brand-new unknown subscription is skipped.
+    const { data: existing } = await admin.from("subscriptions").select("plan").eq("stripe_subscription_id", sub.id).maybeSingle();
+    logError("billing.sync", new Error("Unknown price"), { subscription: sub.id, keptStoredPlan: Boolean(existing) });
+    if (!existing) return;
+    plan = existing.plan as PaidPlan;
   }
   const status = (KNOWN_STATUSES as string[]).includes(sub.status) ? (sub.status as SubscriptionStatus) : "incomplete";
-  const { error } = await getServiceSupabase()
+  const { error } = await admin
     .from("subscriptions")
     .upsert(
       {
@@ -217,6 +225,33 @@ export async function deleteStripeCustomer(customerId: string): Promise<void> {
     if (isStripeMissing(err)) return;
     throw err;
   }
+}
+
+/**
+ * Legacy AI terms (see `legacy_plan_terms`) that apply to the user right now: the subscription they belong to still
+ * gives access, is still on the same plan, and the terms haven't been ended.
+ */
+export async function getLegacyAiTerms(userId: string, now: Date = new Date()): Promise<LegacyAiTerms[]> {
+  if (!isServiceRoleConfigured()) return [];
+  const { data, error } = await getServiceSupabase()
+    .from("legacy_plan_terms")
+    .select("plan, ai_monthly_limit, ai_plan_monthly_limit, ai_smart_monthly_limit, ends_at, subscriptions(plan, status, current_period_end)")
+    .eq("user_id", userId);
+  if (error) {
+    logError("billing.legacy_terms", error);
+    return [];
+  }
+  type Row = {
+    plan: PaidPlan;
+    ai_monthly_limit: number;
+    ai_plan_monthly_limit: number;
+    ai_smart_monthly_limit: number;
+    ends_at: string | null;
+    subscriptions: { plan: PaidPlan; status: SubscriptionStatus; current_period_end: string | null } | null;
+  };
+  return ((data ?? []) as unknown as Row[])
+    .filter((r) => r.subscriptions && legacyTermsApply(r, r.subscriptions, now))
+    .map((r) => ({ plan: r.plan, aiMonthlyLimit: r.ai_monthly_limit, aiPlanMonthlyLimit: r.ai_plan_monthly_limit, aiSmartMonthlyLimit: r.ai_smart_monthly_limit }));
 }
 
 export function isStripeConfigured(): boolean {

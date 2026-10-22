@@ -5,8 +5,8 @@ import { z } from "zod";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { aiPlanStrictSchema, aiPlanToProgramSeed, validateAiPlan } from "@/lib/validation/ai";
 import { getUserPlan, requireUser } from "@/server/auth";
-import { hasFeature } from "@/lib/domain/plans";
 import { activateProgram, createPrivateProgram } from "@/server/services/programs";
+import { getAiAllowance } from "@/server/services/ai-coach";
 import { logError } from "@/server/log";
 import { checkNutritionTargets, coachProposalSchema } from "@/lib/coach/tools";
 import { addDays, isoDateInTz } from "@/lib/domain/dates";
@@ -20,7 +20,7 @@ export async function applyProposalAction(messageId: string, activate: boolean):
   const user = await requireUser();
   const id = z.string().uuid().safeParse(messageId);
   if (!id.success) return { ok: false, error: "Invalid proposal." };
-  if (!hasFeature(await getUserPlan(user.id), "ai_plan_generation")) return { ok: false, error: "Saving AI plans requires Pro." };
+  if ((await getAiAllowance(user.id, await getUserPlan(user.id))).planLimit <= 0) return { ok: false, error: "Saving AI plans requires Pro." };
   const supabase = await getServerSupabase();
   const { data: msg } = await supabase.from("ai_messages").select("id, proposal, proposal_status").eq("id", id.data).eq("user_id", user.id).maybeSingle();
   if (!msg?.proposal) return { ok: false, error: "Proposal not found." };
@@ -75,7 +75,7 @@ export async function applyCoachProposalAction(messageId: string): Promise<Resul
   const user = await requireUser();
   const id = z.string().uuid().safeParse(messageId);
   if (!id.success) return { ok: false, error: "Invalid suggestion." };
-  if (!hasFeature(await getUserPlan(user.id), "ai_coach")) return { ok: false, error: "Coach suggestions are included with Pro." };
+  if ((await getAiAllowance(user.id, await getUserPlan(user.id))).chatLimit <= 0) return { ok: false, error: "Coach suggestions are included with Pro." };
   const supabase = await getServerSupabase();
   const { data: msg } = await supabase.from("ai_messages").select("id, proposal, proposal_status").eq("id", id.data).eq("user_id", user.id).eq("role", "assistant").maybeSingle();
   if (!msg?.proposal) return { ok: false, error: "Suggestion not found." };

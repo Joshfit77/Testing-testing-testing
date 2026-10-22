@@ -10,6 +10,7 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { isStripeConfigured, isYearlyBillingConfigured } from "@/server/env";
 import { getNativePlatform } from "@/server/native";
+import { getAiAllowance } from "@/server/services/ai-coach";
 
 export const metadata = { title: "Plans & billing" };
 
@@ -25,8 +26,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   const plans = getPlans();
   const sub = subsRes.data;
   const stripeReady = isStripeConfigured();
-  const yearlyReady = isYearlyBillingConfigured();
-  const yearlyCents = plans.pro.yearlyPriceCents ?? 0;
+  const ai = await getAiAllowance(user.id, plan);
   const periodEnd = sub?.current_period_end ? new Date(sub.current_period_end as string).toLocaleDateString("en-US", { dateStyle: "long" }) : null;
 
   return (
@@ -53,6 +53,12 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
       {native && (
         <Notice tone="info">
           In-app purchases aren&apos;t available in the {native === "ios" ? "iOS" : "Android"} app yet. Your current plan works everywhere you sign in.
+        </Notice>
+      )}
+      {ai.legacy && (
+        <Notice tone="info">
+          You subscribed before our plans changed, so your subscription keeps its AI coach allowance ({ai.chatLimit} messages a month) for as long as
+          it stays on {plans[plan].name}. Switching plans uses the new plan&apos;s allowance.
         </Notice>
       )}
       {!stripeReady && !native && <Notice tone="warning">Payments aren&apos;t configured on this server (Stripe keys missing). Checkout is disabled.</Notice>}
@@ -102,9 +108,16 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
                   </li>
                 )}
               </ul>
+              {id !== "free" && p.yearlyPriceCents ? (
+                <p className="mt-3 text-sm" data-testid={`yearly-${id}`}>
+                  or <span className="font-semibold">{formatPrice(p.yearlyPriceCents)} / year</span>{" "}
+                  <span className="text-muted-foreground">(save {yearlySavingsPercent(p.priceCents, p.yearlyPriceCents)}%)</span>
+                </p>
+              ) : null}
               {id !== "free" && plan === "free" && stripeReady && !native && (
-                <div className="mt-5">
+                <div className="mt-5 space-y-2">
                   <CheckoutButton plan={id} label={`Choose ${p.name}`} featured={id === "plus"} />
+                  {p.yearlyPriceCents && isYearlyBillingConfigured(id) ? <CheckoutButton plan={id} interval="year" label={`${p.name} yearly`} /> : null}
                 </div>
               )}
               {id !== "free" && plan !== "free" && !isCurrent && stripeReady && !native && (
@@ -113,36 +126,9 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
             </li>
           );
         })}
-        {yearlyCents > 0 && (
-          <li className="rounded-2xl border border-gold-muted bg-card-gradient p-5">
-            <div className="flex items-center justify-between">
-              <p className="font-display text-xl font-semibold uppercase tracking-wider">All Access Yearly</p>
-              <Badge>Save {yearlySavingsPercent(plans.pro.priceCents, yearlyCents)}%</Badge>
-            </div>
-            <p className="mt-2 text-3xl font-bold">
-              {formatPrice(yearlyCents)}
-              <span className="text-sm font-normal text-muted-foreground"> / year</span>
-            </p>
-            <p className="text-sm text-muted-foreground">Everything in every plan, billed once a year.</p>
-            <ul className="mt-4 space-y-2 text-sm">
-              {["Everything in Pro", "All programs, food tracking & analytics", "Full AI coaching & plan generation", `About ${formatPrice(Math.round(yearlyCents / 12))} a month`].map((h) => (
-                <li key={h} className="flex gap-2">
-                  <Check className="mt-0.5 size-4 shrink-0 text-gold" aria-hidden /> {h}
-                </li>
-              ))}
-            </ul>
-            {plan === "free" && stripeReady && yearlyReady && !native && (
-              <div className="mt-5">
-                <CheckoutButton plan="pro" interval="year" label="Choose yearly" featured />
-              </div>
-            )}
-            {plan === "free" && stripeReady && !yearlyReady && !native && <p className="mt-5 text-xs text-muted-foreground">Yearly billing isn&apos;t configured on this server yet.</p>}
-            {plan !== "free" && stripeReady && !native && <p className="mt-5 text-xs text-muted-foreground">Switch via Manage billing.</p>}
-          </li>
-        )}
       </ul>
       <p className="text-xs text-muted-foreground">
-        Monthly plans renew monthly and the yearly plan renews yearly, until canceled. Cancel any time in Manage billing; you keep access until the end of the paid period. Prices are configurable
+        Monthly plans renew monthly and yearly plans renew yearly, until canceled. Cancel any time in Manage billing; you keep access until the end of the paid period. Prices are configurable
         defaults and may change with notice.
       </p>
     </div>

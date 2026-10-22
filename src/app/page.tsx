@@ -125,6 +125,11 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
                     {formatPrice(p.priceCents)}
                     {p.priceCents > 0 && <span className="text-sm font-normal text-muted-foreground"> / month</span>}
                   </p>
+                  {p.yearlyPriceCents ? (
+                    <p className="text-sm">
+                      or {formatPrice(p.yearlyPriceCents)} / year <span className="text-muted-foreground">(save {yearlySavingsPercent(p.priceCents, p.yearlyPriceCents)}%)</span>
+                    </p>
+                  ) : null}
                   <p className="mt-1 text-sm text-muted-foreground">{p.tagline}</p>
                   <ul className="mt-5 space-y-2 text-sm">
                     {p.highlights.map((h) => (
@@ -136,23 +141,6 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
                 </div>
               );
             })}
-            {plans.pro.yearlyPriceCents ? (
-              <div className="rounded-2xl border border-gold-muted bg-card-gradient p-6">
-                <p className="font-display text-xl font-semibold uppercase tracking-wider text-gold-highlight">All Access Yearly</p>
-                <p className="mt-2 text-3xl font-bold">
-                  {formatPrice(plans.pro.yearlyPriceCents)}
-                  <span className="text-sm font-normal text-muted-foreground"> / year</span>
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">Everything, billed once a year. Save {yearlySavingsPercent(plans.pro.priceCents, plans.pro.yearlyPriceCents)}%.</p>
-                <ul className="mt-5 space-y-2 text-sm">
-                  {["Everything in Pro", "All programs, food tracking & analytics", "Full AI coaching & plan generation"].map((h) => (
-                    <li key={h} className="flex gap-2">
-                      <Check className="mt-0.5 size-4 shrink-0 text-gold" aria-hidden /> {h}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
           </div>
         </section>
       </main>

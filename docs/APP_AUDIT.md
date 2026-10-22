@@ -265,13 +265,22 @@ Everything below reuses existing pieces:
 | 7 | Run badges, body map and strength ranks, optional groups and challenges | L | `ranks.ts`, new groups tables |
 | 8 | Body-scan vendor evaluation (no purchase without approval) | M | — |
 
-## 12. Owner decisions needed
+## 12. Owner decisions
 
-1. **Grandfathering:** whether existing Plus subscribers keep AI.
-2. **Yearly pricing:** whether to offer yearly plans, and at what prices.
-3. **Stripe:** create the new $11.99 / $24.99 prices.
-4. **Apple/Google accounts and RevenueCat:** set them up, and approve building IAP.
-5. **Legal:** counsel to finish the privacy policy and terms.
-6. **Rank limit:** confirm "Free shows ranks 1–3" (`rankLevelLimit`).
-7. **Template limit:** confirm "Free keeps 3 templates" (`PLAN_FREE_TEMPLATE_LIMIT`).
-8. **Calendar:** confirm "rescheduling is Plus; viewing is free".
+Decided by the owner on 2026-10-22:
+
+1. **Prices:** Free $0, Plus $11.99/month, Pro $24.99/month. Live Stripe prices are not created or changed until the owner approves.
+2. **Existing subscribers:** nobody already paying loses AI access. Existing subscriptions keep their earlier AI allowance (see `docs/MEMBERSHIPS.md`). New Plus has no AI; Pro has 150 messages a month.
+3. **Yearly:** Plus $99.99/year and Pro $249.99/year, built but hidden until prices and billing are ready.
+4. **RevenueCat and Apple in-app purchases:** approved to build and test in sandbox. No real charges and no deployment without approval.
+5. **Legal:** list what the final privacy policy and terms need (`docs/LEGAL_REQUIREMENTS.md`). Publish no placeholder documents.
+6. **Free:**
+   - every rank badge (Fitness, Food and Faith);
+   - 5 saved workouts;
+   - viewing the calendar;
+   - unlimited barcode scanning, calorie and macro tracking;
+   - the complete Faith section.
+
+   Calendar scheduling and rescheduling are Plus and Pro.
+
+Still open: creating the Stripe prices, Apple/Google/RevenueCat accounts, legal counsel, and real-device testing.
