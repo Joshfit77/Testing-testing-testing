@@ -11,6 +11,10 @@ import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { isStripeConfigured, isYearlyBillingConfigured } from "@/server/env";
 import { getNativePlatform } from "@/server/native";
 import { getAiAllowance } from "@/server/services/ai-coach";
+import { legalLinks, storeProductIds, storePublicKey } from "@/server/services/store-billing";
+import { StorePaywall } from "@/components/profile/store-paywall";
+import { storeRowAsSubscription } from "@/lib/billing/revenuecat";
+import type { BillingSource } from "@/lib/billing/paywall";
 
 export const metadata = { title: "Plans & billing" };
 
@@ -18,15 +22,31 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   const { checkout } = await searchParams;
   const { user } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
-  const [plan, subsRes, native] = await Promise.all([
+  const [plan, subsRes, storeRes, entRes, native] = await Promise.all([
     getUserPlan(user.id),
     supabase.from("subscriptions").select("plan, status, current_period_end, cancel_at_period_end").eq("user_id", user.id).order("updated_at", { ascending: false }).limit(1).maybeSingle(),
+    supabase
+      .from("store_subscriptions")
+      .select("store, product_id, plan, purchased_at, expires_at, grace_period_expires_at, unsubscribe_detected_at, billing_issue_detected_at, refunded_at")
+      .eq("user_id", user.id),
+    supabase.from("user_entitlements").select("source").eq("user_id", user.id).maybeSingle(),
     getNativePlatform(),
   ]);
   const plans = getPlans();
   const sub = subsRes.data;
   const stripeReady = isStripeConfigured();
   const ai = await getAiAllowance(user.id, plan);
+  const source = (entRes.data?.source as BillingSource | undefined) ?? "default";
+  // The App Store / Google Play subscription that grants the current plan, if that's how the member pays.
+  const storeSub =
+    (storeRes.data ?? [])
+      .map((row) => ({ row, sub: storeRowAsSubscription(row as Parameters<typeof storeRowAsSubscription>[0]) }))
+      .filter((x) => x.sub && x.sub.plan === plan && x.sub.status !== "canceled")
+      .map((x) => ({ store: x.row.store as string, productId: x.row.product_id as string, ...x.sub! }))[0] ?? null;
+  const storeLabel = storeSub?.store === "play_store" ? "Google Play" : "App Store";
+  const storeEnd = storeSub?.current_period_end ? new Date(storeSub.current_period_end).toLocaleDateString("en-US", { dateStyle: "long" }) : null;
+  const storeKey = native ? storePublicKey(native) : "";
+  const showPaywall = Boolean(native && storeKey);
   const periodEnd = sub?.current_period_end ? new Date(sub.current_period_end as string).toLocaleDateString("en-US", { dateStyle: "long" }) : null;
 
   return (
@@ -50,7 +70,20 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
       )}
       {sub?.status === "unpaid" && <Notice tone="error">Your subscription is unpaid and premium features are paused. Update your payment method to restore access.</Notice>}
       {sub?.cancel_at_period_end && periodEnd && <Notice tone="warning">Your subscription is set to cancel. You keep {titleCase(sub.plan as string)} access until {periodEnd}.</Notice>}
-      {native && (
+      {storeSub?.status === "past_due" && (
+        <Notice tone="error">
+          The {storeLabel} couldn&apos;t renew your subscription. Update your payment method in your {storeLabel} account to keep {plans[plan].name}.
+        </Notice>
+      )}
+      {storeSub?.cancel_at_period_end && storeEnd && (
+        <Notice tone="warning">
+          Your {storeLabel} subscription is set to cancel. You keep {plans[plan].name} access until {storeEnd}.
+        </Notice>
+      )}
+      {storeSub && !native && (
+        <Notice tone="info">Your subscription is billed through the {storeLabel}. Manage or cancel it in your {storeLabel} account settings on your phone.</Notice>
+      )}
+      {native && !storeKey && (
         <Notice tone="info">
           In-app purchases aren&apos;t available in the {native === "ios" ? "iOS" : "Android"} app yet. Your current plan works everywhere you sign in.
         </Notice>
@@ -70,18 +103,40 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
         <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="font-display text-3xl font-bold uppercase text-gold-highlight">{plans[plan].name}</p>
-            {sub && (
+            {storeSub ? (
+              <p className="text-sm text-muted-foreground">
+                Billed through the {storeLabel}
+                {storeEnd && !storeSub.cancel_at_period_end && ` · renews ${storeEnd}`}
+              </p>
+            ) : sub ? (
               <p className="text-sm text-muted-foreground">
                 Status: {titleCase(sub.status as string)}
                 {periodEnd && !sub.cancel_at_period_end && ` · renews ${periodEnd}`}
               </p>
-            )}
+            ) : null}
           </div>
           {sub && stripeReady && !native && <PortalButton />}
         </div>
       </section>
 
-      <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      {showPaywall && native ? (
+        <StorePaywall
+          userId={user.id}
+          platform={native}
+          apiKey={storeKey}
+          currentPlan={plan}
+          source={source}
+          currentProductId={storeSub && storeSub.store === (native === "ios" ? "app_store" : "play_store") ? storeSub.productId : null}
+          productIds={storeProductIds()}
+          yearly={{ plus: Boolean(plans.plus.yearlyPriceCents), pro: Boolean(plans.pro.yearlyPriceCents) }}
+          plans={{
+            plus: { name: plans.plus.name, tagline: plans.plus.tagline, highlights: plans.plus.highlights },
+            pro: { name: plans.pro.name, tagline: plans.pro.tagline, highlights: plans.pro.highlights },
+          }}
+          legal={legalLinks()}
+        />
+      ) : null}
+      <ul className={showPaywall ? "hidden" : "grid gap-4 md:grid-cols-2 xl:grid-cols-4"}>
         {PLAN_ORDER.map((id) => {
           const p = plans[id];
           const isCurrent = id === plan;
@@ -127,7 +182,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
           );
         })}
       </ul>
-      <p className="text-xs text-muted-foreground">
+      <p className={showPaywall ? "hidden" : "text-xs text-muted-foreground"}>
         Monthly plans renew monthly and yearly plans renew yearly, until canceled. Cancel any time in Manage billing; you keep access until the end of the paid period. Prices are configurable
         defaults and may change with notice.
       </p>

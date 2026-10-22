@@ -6,12 +6,13 @@ import { getServerSupabase, getServiceSupabase } from "@/lib/supabase/server";
 import { actionError, actionInvalid, actionOk, type ActionState } from "@/lib/action-state";
 import { profileUpdateSchema } from "@/lib/validation/schemas";
 import { requireUser } from "@/server/auth";
-import { isServiceRoleConfigured } from "@/server/env";
+import { isRevenueCatConfigured, isServiceRoleConfigured } from "@/server/env";
 import { createClient } from "@supabase/supabase-js";
 import { publicEnv } from "@/lib/env";
 import { rateLimit } from "@/server/rate-limit";
 import { deleteUserAccount, deletionFailureMessage } from "@/server/services/account-deletion";
 import { cancelStripeSubscriptionsForUser, deleteStripeCustomer, isStripeConfigured } from "@/server/services/billing";
+import { deleteRevenueCatCustomer } from "@/server/services/store-billing";
 import { logError } from "@/server/log";
 
 function isValidTimeZone(tz: string): boolean {
@@ -105,6 +106,7 @@ export async function deleteAccountAction(_prev: ActionState, formData: FormData
     admin: getServiceSupabase(),
     cancelSubscriptions: cancelStripeSubscriptionsForUser,
     deleteStripeCustomer: isStripeConfigured() ? deleteStripeCustomer : null,
+    deleteStoreCustomer: isRevenueCatConfigured() ? deleteRevenueCatCustomer : null,
     log: logError,
   });
   if (!result.ok) return actionError(deletionFailureMessage(result));

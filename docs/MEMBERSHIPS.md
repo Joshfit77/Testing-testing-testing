@@ -81,4 +81,4 @@ Approved prices: **Plus $99.99/year** (saves 30%) and **Pro $249.99/year** (save
 
 - **Stripe:** display prices come from `plans.ts`, but **Stripe charges whatever price `STRIPE_PRICE_PLUS` and `STRIPE_PRICE_PRO` point at.** Create new $11.99 and $24.99 recurring prices in Stripe and update those env vars before deploying. Changing code doesn't change what Stripe charges.
 - **Existing subscribers:** see *Existing subscribers (grandfathering)* above.
-- **App stores:** see `docs/MOBILE_BILLING.md`. The iOS app can't unlock paid plans without Apple in-app purchase.
+- **App stores:** App Store / Google Play subscriptions through RevenueCat are built on `claude/stage2-store-billing` and off until configured; see `docs/MOBILE_BILLING.md`.

@@ -4,6 +4,7 @@ import { getServiceSupabase } from "@/lib/supabase/server";
 import { publicEnv } from "@/lib/env";
 import { entitlementFromSubscriptions, legacyTermsApply, type BillingInterval, type LegacyAiTerms, type SubscriptionStatus } from "@/lib/domain/plans";
 import type { Plan } from "@/lib/domain/types";
+import { storeRowAsSubscription } from "@/lib/billing/revenuecat";
 import { isServiceRoleConfigured, serverEnv } from "@/server/env";
 import { logError } from "@/server/log";
 
@@ -90,20 +91,37 @@ async function userIdForSubscription(sub: Stripe.Subscription): Promise<string |
   return (data?.user_id as string) ?? null;
 }
 
-/** Recompute the user's entitlement from all of their stored subscriptions. */
+type EntitlementSource = "stripe" | "app_store" | "play_store";
+
+/**
+ * Recompute the user's entitlement from all of their stored subscriptions: Stripe (`subscriptions`) and the app
+ * stores (`store_subscriptions`, kept in sync from RevenueCat). The highest plan wins.
+ */
 export async function recomputeEntitlement(userId: string): Promise<Plan> {
   const admin = getServiceSupabase();
-  const { data, error } = await admin.from("subscriptions").select("plan, status, current_period_end").eq("user_id", userId);
-  if (error) throw error;
-  const { plan, validUntil } = entitlementFromSubscriptions(
-    (data ?? []) as { plan: PaidPlan; status: SubscriptionStatus; current_period_end: string | null }[],
-  );
+  const [stripeRes, storeRes] = await Promise.all([
+    admin.from("subscriptions").select("plan, status, current_period_end").eq("user_id", userId),
+    admin
+      .from("store_subscriptions")
+      .select("store, plan, purchased_at, expires_at, grace_period_expires_at, unsubscribe_detected_at, billing_issue_detected_at, refunded_at")
+      .eq("user_id", userId),
+  ]);
+  if (stripeRes.error) throw stripeRes.error;
+  if (storeRes.error) throw storeRes.error;
+  const candidates: { plan: PaidPlan; status: SubscriptionStatus; current_period_end: string | null; source: EntitlementSource }[] = [
+    ...((stripeRes.data ?? []) as { plan: PaidPlan; status: SubscriptionStatus; current_period_end: string | null }[]).map((s) => ({ ...s, source: "stripe" as const })),
+  ];
+  for (const row of (storeRes.data ?? []) as (Parameters<typeof storeRowAsSubscription>[0] & { store: string })[]) {
+    const sub = storeRowAsSubscription(row);
+    if (sub) candidates.push({ ...sub, source: row.store === "play_store" ? "play_store" : "app_store" });
+  }
+  const { plan, validUntil, from } = entitlementFromSubscriptions(candidates);
   const { data: current } = await admin.from("user_entitlements").select("source").eq("user_id", userId).maybeSingle();
-  // Manual admin grants are left alone unless Stripe now provides a paid plan.
+  // Manual admin grants are left alone unless a subscription now provides a paid plan.
   if (current?.source === "admin" && plan === "free") return plan;
   const { error: upErr } = await admin
     .from("user_entitlements")
-    .upsert({ user_id: userId, plan, source: plan === "free" ? "default" : "stripe", valid_until: plan === "free" ? null : validUntil }, { onConflict: "user_id" });
+    .upsert({ user_id: userId, plan, source: plan === "free" || !from ? "default" : from.source, valid_until: plan === "free" ? null : validUntil }, { onConflict: "user_id" });
   if (upErr) throw upErr;
   return plan;
 }

@@ -10,8 +10,10 @@ import { removeUserStorage } from "@/server/services/account";
  *   3. Delete the Supabase auth user. Every personal table references auth.users with `on delete cascade`
  *      (enforced by tests/unit/account-coverage.test.ts), so workouts, nutrition, journals, AI conversations
  *      and everything else go with it.
- *   4. Delete the Stripe customer record (name, email, payment methods). Best effort: the account is
- *      already gone, so a failure here is logged for follow-up instead of shown as a failed deletion.
+ *   4. Delete the Stripe customer record (name, email, payment methods) and the RevenueCat customer (App Store /
+ *      Google Play purchase history). Best effort: the account is already gone, so a failure here is logged for
+ *      follow-up instead of shown as a failed deletion. Store subscriptions can only be cancelled by the person
+ *      in their App Store / Google Play settings; the deletion screen tells them so.
  *
  * Each step's failure is reported separately so the person is told exactly what did and didn't happen.
  */
@@ -27,6 +29,8 @@ export interface DeletionDeps {
   cancelSubscriptions: (userId: string) => Promise<void>;
   /** Deletes the Stripe customer; null when Stripe isn't configured. */
   deleteStripeCustomer: ((customerId: string) => Promise<void>) | null;
+  /** Deletes the RevenueCat customer; null/absent when RevenueCat isn't configured. */
+  deleteStoreCustomer?: ((userId: string) => Promise<void>) | null;
   removeStorage?: (admin: SupabaseClient, userId: string) => Promise<void>;
   log: (scope: string, err: unknown) => void;
 }
@@ -67,6 +71,13 @@ export async function deleteUserAccount(userId: string, deps: DeletionDeps): Pro
       // Logged with the customer id so support can remove it by hand.
       deps.log("account.delete.stripe_customer", { customerId, err });
       stripeCustomerDeleted = false;
+    }
+  }
+  if (deps.deleteStoreCustomer) {
+    try {
+      await deps.deleteStoreCustomer(userId);
+    } catch (err) {
+      deps.log("account.delete.revenuecat_customer", { userId, err });
     }
   }
   return { ok: true, stripeCustomerDeleted };

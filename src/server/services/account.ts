@@ -57,6 +57,7 @@ export const USER_TABLES: { table: string; column: string }[] = [
   { table: "subscriptions", column: "user_id" },
   { table: "user_entitlements", column: "user_id" },
   { table: "legacy_plan_terms", column: "user_id" },
+  { table: "store_subscriptions", column: "user_id" },
   { table: "billing_customers", column: "user_id" },
 ];
 

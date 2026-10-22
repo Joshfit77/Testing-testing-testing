@@ -23,3 +23,7 @@ process.env.STRIPE_PRICE_PLUS_YEARLY = "price_test_plus_yearly";
 process.env.STRIPE_PRICE_PLUS_LEGACY = "price_old_plus_a, price_old_plus_b";
 process.env.STRIPE_PRICE_PRO_LEGACY = "price_old_pro";
 process.env.ANTHROPIC_API_KEY = "sk-ant-integration-dummy";
+// RevenueCat: a local stand-in for its REST API (started by store-billing.test.ts); nothing reaches RevenueCat.
+process.env.REVENUECAT_SECRET_API_KEY = "sk_rc_integration_dummy";
+process.env.REVENUECAT_WEBHOOK_AUTH = "Bearer rc-webhook-integration";
+process.env.REVENUECAT_API_BASE_URL = "http://127.0.0.1:4611";

@@ -115,7 +115,7 @@ const LOCAL_SERVICE_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU";
 
 /** Test-only: grant a plan directly in the local database (stands in for a completed Stripe checkout). */
-export async function grantPlan(email: string, plan: "plus" | "pro") {
+export async function grantPlan(email: string, plan: "plus" | "pro", source: "admin" | "stripe" | "app_store" | "play_store" = "admin") {
   const headers = { apikey: LOCAL_SERVICE_KEY, Authorization: `Bearer ${LOCAL_SERVICE_KEY}`, "Content-Type": "application/json" };
   const users = (await (await fetch(`${SUPABASE_URL}/auth/v1/admin/users?per_page=1000`, { headers })).json()) as { users: { id: string; email: string }[] };
   const user = users.users.find((u) => u.email === email);
@@ -123,7 +123,7 @@ export async function grantPlan(email: string, plan: "plus" | "pro") {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/user_entitlements`, {
     method: "POST",
     headers: { ...headers, Prefer: "resolution=merge-duplicates" },
-    body: JSON.stringify({ user_id: user.id, plan, source: "admin" }),
+    body: JSON.stringify({ user_id: user.id, plan, source }),
   });
   if (!res.ok) throw new Error(`grantPlan failed: ${res.status} ${await res.text()}`);
 }

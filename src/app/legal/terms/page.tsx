@@ -16,7 +16,7 @@ export default function TermsPage() {
         diagnosis or treatment.
       </p>
       <h2>Subscriptions</h2>
-      <p>Paid plans renew monthly until cancelled. You can cancel at any time from the billing portal; access continues until the end of the paid period. [Counsel to complete refund and consumer-law terms.]</p>
+      <p>Paid plans renew monthly (or yearly, where offered) until cancelled. Plans bought on the website are cancelled from the billing portal; plans bought in the app are managed and cancelled in your Apple or Google account. Access continues until the end of the paid period. [Counsel to complete refund and consumer-law terms, including App Store and Google Play purchases.]</p>
       <h2>Acceptable use</h2>
       <p>[To be completed.]</p>
       <h2>Limitation of liability</h2>

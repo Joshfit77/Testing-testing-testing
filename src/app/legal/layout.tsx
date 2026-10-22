@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { Logo } from "@/components/common/logo";
 
+// Drafts awaiting legal review: keep them out of search engines until final documents replace them.
+export const metadata = { robots: { index: false, follow: false } };
+
 export default function LegalLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 md:px-8">

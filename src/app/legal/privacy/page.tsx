@@ -16,12 +16,12 @@ export default function PrivacyPage() {
         </li>
         <li>Optional faith journal entries — private to you and never visible to administrators.</li>
         <li>AI coach conversations, which are sent to our AI provider to generate responses.</li>
-        <li>Billing status from our payment processor (Stripe). We do not store card numbers.</li>
+        <li>Billing status from our payment processors: Stripe for purchases on the website, and Apple or Google (through RevenueCat) for purchases in the app. We do not store card numbers.</li>
       </ul>
       <h2>How we use it</h2>
       <p>To provide and personalize the service, process payments, keep the service secure and comply with law. [Counsel to complete.]</p>
       <h2>Processors</h2>
-      <p>Supabase (database, authentication, storage), Stripe (payments), Anthropic (AI responses), USDA FoodData Central (food search queries), Vercel (hosting). [Counsel to verify and list data processing agreements.]</p>
+      <p>Supabase (database, authentication, storage), Stripe (web payments), RevenueCat with Apple and Google (in-app purchases), Anthropic (AI responses), USDA FoodData Central (food search queries), Vercel (hosting). [Counsel to verify and list data processing agreements.]</p>
       <h2>Your rights</h2>
       <p>You can export all of your data and permanently delete your account from Profile → Privacy &amp; data.</p>
       <h2>Not medical advice</h2>
