@@ -17,3 +17,6 @@ screenshots/
 # Local agent worktrees
 .claude/worktrees/
 downloads/
+
+# Python bytecode (scripts/badge-art)
+__pycache__/
