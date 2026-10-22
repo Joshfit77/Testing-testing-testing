@@ -82,6 +82,8 @@ export interface AchievementStats {
   programsCompleted: string[];
   /** Upload dates of progress photos. */
   photoDates: string[];
+  /** Days with faith participation (devotional read, practice checked off or journal written). Dates only. */
+  faithDays: string[];
 }
 
 export const emptyStats = (): AchievementStats => ({
@@ -91,6 +93,7 @@ export const emptyStats = (): AchievementStats => ({
   weightDates: [],
   programsCompleted: [],
   photoDates: [],
+  faithDays: [],
 });
 
 export interface BadgeDefinition {

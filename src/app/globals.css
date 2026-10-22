@@ -350,3 +350,106 @@ html[data-motion="reduce"] *::after {
   transition-duration: 0.01ms !important;
   scroll-behavior: auto !important;
 }
+
+/* ---------------------------------------------------------------- Rank badge animations (badge-art.tsx)
+   Only a badge with .badge-animate moves (the one in focus); reduced motion stops all of it (rule above). */
+/* fill-box only on the animated parts: on everything it would shift shapes drawn with a rotate(…) attribute. */
+.badge-art :is(.ba-shimmer, .ba-flicker, .ba-ember, .ba-glow, .ba-twinkle, .ba-sway, .ba-wings, .ba-leaf) {
+  transform-box: fill-box;
+}
+.badge-animate .ba-shimmer {
+  animation: ba-shimmer 5.5s ease-in-out infinite;
+}
+.badge-animate .ba-flicker {
+  transform-origin: 50% 100%;
+  animation: ba-flicker 1.6s ease-in-out infinite alternate;
+}
+.badge-animate .ba-ember {
+  animation: ba-ember 3.2s linear infinite;
+}
+.badge-animate .ba-glow {
+  animation: ba-glow 3.6s ease-in-out infinite alternate;
+}
+.badge-animate .ba-twinkle {
+  transform-origin: 50% 50%;
+  animation: ba-twinkle 2.8s ease-in-out infinite;
+}
+.badge-animate .ba-sway {
+  transform-origin: 50% 100%;
+  animation: ba-sway 5s ease-in-out infinite alternate;
+}
+.badge-animate .ba-wings {
+  transform-origin: 50% 80%;
+  animation: ba-wings 2.4s ease-in-out infinite alternate;
+}
+.badge-animate .ba-leaf {
+  animation: ba-leaf 7s ease-in infinite;
+}
+.ba-leaf {
+  opacity: 0;
+}
+@keyframes ba-shimmer {
+  0%, 55% { transform: skewX(-18deg) translateX(0); }
+  100% { transform: skewX(-18deg) translateX(190px); }
+}
+@keyframes ba-flicker {
+  0% { transform: scale(1, 1) skewX(0deg); }
+  35% { transform: scale(0.96, 1.05) skewX(1.5deg); }
+  70% { transform: scale(1.03, 0.97) skewX(-1.5deg); }
+  100% { transform: scale(0.98, 1.03) skewX(0.8deg); }
+}
+@keyframes ba-ember {
+  0% { transform: translateY(0); opacity: 0; }
+  15% { opacity: 1; }
+  100% { transform: translateY(-26px); opacity: 0; }
+}
+@keyframes ba-glow {
+  from { opacity: 0.7; }
+  to { opacity: 1; }
+}
+@keyframes ba-twinkle {
+  0%, 70%, 100% { transform: scale(0.6); opacity: 0.5; }
+  80% { transform: scale(1.15); opacity: 1; }
+}
+@keyframes ba-sway {
+  from { transform: rotate(-1.2deg); }
+  to { transform: rotate(1.2deg); }
+}
+@keyframes ba-wings {
+  from { transform: scaleY(1); }
+  to { transform: scaleY(0.92); }
+}
+@keyframes ba-leaf {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+  10% { opacity: 1; }
+  100% { transform: translate(-14px, 34px) rotate(160deg); opacity: 0; }
+}
+/* Unlock reveal: a gold flash and a settle, once. */
+.badge-reveal {
+  animation: badge-reveal 1.1s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+.badge-reveal-ring {
+  animation: badge-reveal-ring 1.4s ease-out both;
+}
+@keyframes badge-reveal {
+  0% { transform: scale(0.6) rotate(-8deg); opacity: 0; filter: brightness(2.2); }
+  60% { transform: scale(1.06) rotate(1deg); opacity: 1; filter: brightness(1.3); }
+  100% { transform: scale(1) rotate(0); filter: brightness(1); }
+}
+@keyframes badge-reveal-ring {
+  0% { transform: scale(0.4); opacity: 0.9; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+/* With reduced motion, badges show their still artwork (not the last animation frame). */
+html[data-motion="reduce"] .badge-art *,
+html[data-motion="reduce"] .badge-reveal,
+html[data-motion="reduce"] .badge-reveal-ring {
+  animation: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .badge-art *,
+  .badge-reveal,
+  .badge-reveal-ring {
+    animation: none !important;
+  }
+}

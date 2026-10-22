@@ -15,6 +15,9 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { logError } from "@/server/log";
 import { getAchievementStats } from "@/server/services/achievements";
+import { RankBoard } from "@/components/badges/rank-board";
+import { ACTIVE_TRANSLATION, BSB_PASSAGES } from "@/data/scripture";
+import { RANKS, allRankProgress, type CategoryProgress, type RankCategory } from "@/lib/domain/ranks";
 
 export const metadata = { title: "Badges" };
 
@@ -60,7 +63,9 @@ function BadgeCard({ badge, units }: { badge: BadgeState; units: UnitSystem }) {
   );
 }
 
-export default async function BadgesPage() {
+export default async function BadgesPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+  const sp = await searchParams;
+  const initialTab: RankCategory = sp.tab === "food" || sp.tab === "faith" ? sp.tab : "fitness";
   const { user, profile } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
   const plan = await getUserPlan(user.id);
@@ -68,8 +73,12 @@ export default async function BadgesPage() {
   const units = profile.unit_system;
 
   let badges: BadgeState[] | null = null;
+  let ranks: CategoryProgress[] = [];
+  const today = isoDateInTz(new Date(), tz);
   try {
-    badges = computeAchievements(await getAchievementStats(supabase, user.id, tz), isoDateInTz(new Date(), tz));
+    const stats = await getAchievementStats(supabase, user.id, tz);
+    badges = computeAchievements(stats, today);
+    ranks = allRankProgress({ workoutDates: stats.workouts.map((w) => w.date), foodDays: stats.foodDays, faithDays: stats.faithDays });
   } catch (err) {
     logError("badges.load", err);
   }
@@ -104,7 +113,17 @@ export default async function BadgesPage() {
         actions={back}
       />
 
-      <section className="flex items-center gap-4 rounded-2xl border border-border bg-card p-5" aria-label="Badge summary">
+      <RankBoard
+        progress={ranks}
+        verses={Object.fromEntries(RANKS.map((r) => [r.reference, BSB_PASSAGES[r.reference] ?? ""]))}
+        translation={ACTIVE_TRANSLATION.code}
+        initial={initialTab}
+        today={today}
+      />
+
+      <h2 className="pt-2 font-display text-xl font-bold">More achievements</h2>
+
+      <section className="flex items-center gap-4 rounded-2xl border border-border bg-card p-5" aria-label="Achievement summary">
         <div className="flex-1">
           <p className="text-xs uppercase tracking-wider text-muted-foreground">Earned</p>
           <p className="font-display text-3xl font-bold">
@@ -121,9 +140,9 @@ export default async function BadgesPage() {
         if (!list.length) return null;
         return (
           <section key={cat.id} aria-labelledby={`cat-${cat.id}`}>
-            <h2 id={`cat-${cat.id}`} className="mb-3 font-display text-xl font-bold uppercase">
+            <h3 id={`cat-${cat.id}`} className="mb-3 font-display text-lg font-bold">
               {cat.label}
-            </h2>
+            </h3>
             {cat.id === "nutrition" && !hasFeature(plan, "nutrition_tracking") && (
               <p className="mb-3 text-xs text-muted-foreground">
                 Food logging is included with Plus and Pro.{" "}
