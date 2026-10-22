@@ -1,5 +1,6 @@
 import { Dumbbell, HandHeart, MessageCircleQuestion } from "lucide-react";
 import type { Devotional } from "@/data/devotionals";
+import { TRANSLATION } from "@/data/content";
 
 /** Full devotional body: scripture, reading, prayer, training prompt and reflection question. */
 export function DevotionalContent({ devotional }: { devotional: Devotional }) {
@@ -7,7 +8,7 @@ export function DevotionalContent({ devotional }: { devotional: Devotional }) {
     <div className="space-y-4">
       <figure className="rounded-xl border border-gold-muted/40 bg-gold/5 p-4">
         <blockquote className="text-sm italic leading-relaxed text-foreground/90">&ldquo;{devotional.scripture}&rdquo;</blockquote>
-        <figcaption className="mt-2 text-xs font-semibold text-gold">{devotional.reference} (KJV)</figcaption>
+        <figcaption className="mt-2 text-xs font-semibold text-gold">{devotional.reference} ({TRANSLATION.code})</figcaption>
       </figure>
       <p className="text-sm leading-relaxed text-foreground/90">{devotional.devotional}</p>
       <dl className="space-y-3 text-sm">

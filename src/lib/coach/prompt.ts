@@ -3,7 +3,7 @@
  *
  * Cache layout (render order is tools → system → messages): the tool list and `COACH_STATIC_PROMPT`
  * are identical for every user on a model, so the first breakpoint caches them for everyone. Faith
- * users get a second cached block (the KJV verse list). The per-user athlete context comes last and
+ * users get a second cached block (the verse list in the active translation). The per-user athlete context comes last and
  * is never cached across users.
  */
 import type Anthropic from "@anthropic-ai/sdk";

@@ -17,6 +17,7 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
 import { getChallengeState } from "@/server/services/challenge";
 import { JOURNAL_SELECT, loadFaithReminders, loadPractices, type JournalRow } from "@/server/services/faith";
+import { ScriptureNotice } from "@/components/faith/scripture-notice";
 
 export const metadata = { title: "Faith" };
 
@@ -198,6 +199,7 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
         </Link>
         .
       </p>
+      <ScriptureNotice />
     </div>
   );
 }

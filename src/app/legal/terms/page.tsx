@@ -1,3 +1,4 @@
+import { ScriptureNotice } from "@/components/faith/scripture-notice";
 export const metadata = { title: "Terms of Service (Draft)" };
 
 export default function TermsPage() {
@@ -20,6 +21,8 @@ export default function TermsPage() {
       <p>[To be completed.]</p>
       <h2>Limitation of liability</h2>
       <p>[To be completed by counsel.]</p>
+      <h2>Scripture</h2>
+      <ScriptureNotice className="" />
     </>
   );
 }

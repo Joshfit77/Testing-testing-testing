@@ -16,6 +16,7 @@ import { initialActionState, type ActionState } from "@/lib/action-state";
 import { challengeDays, completedDayCount, type ChallengeCheckin, type ChallengeDay } from "@/lib/domain/challenge";
 import { cn } from "@/lib/utils";
 import { leaveChallengeAction, restartChallengeAction, saveChallengeCheckinAction, startChallengeAction } from "@/server/actions/challenge";
+import { TRANSLATION } from "@/data/content";
 
 export interface FaithChallengeProps {
   today: string;
@@ -84,7 +85,7 @@ export function FaithChallenge({ today, rotatingDay, enrollment, currentDay, che
         <h2 id="devotional-title" className="mt-2 font-display text-2xl font-bold uppercase leading-tight">
           {todaysDevotional.title}
         </h2>
-        <p className="mt-1 text-xs font-semibold text-gold">{todaysDevotional.reference} (KJV)</p>
+        <p className="mt-1 text-xs font-semibold text-gold">{todaysDevotional.reference} ({TRANSLATION.code})</p>
         <p className="mt-3 line-clamp-3 text-sm italic text-foreground/85">&ldquo;{todaysDevotional.scripture}&rdquo;</p>
         <div className="mt-4">
           <Button onClick={() => setDialog(enrolled ? { kind: "day", day: currentDay! } : { kind: "read" })}>
@@ -226,7 +227,7 @@ export function FaithChallenge({ today, rotatingDay, enrollment, currentDay, che
             <DialogDescription>A daily faith &amp; fitness rhythm, inspired by Matthew 7:13–14.</DialogDescription>
           </DialogHeader>
           <ul className="list-disc space-y-2 pl-5 text-sm text-foreground/90">
-            <li>Each day brings a King James scripture, a short devotional, a one-line prayer, a training prompt and a reflection question.</li>
+            <li>Each day brings a Bible verse (Berean Standard Bible), a short devotional, a one-line prayer, a training prompt and a reflection question.</li>
             <li>Check off two things: reading the devotional, and training — your scheduled workout, or a walk and mobility on rest days.</li>
             <li>Day 1 is today. Missed a day? Catch up whenever you can — the challenge is finished when all 40 days are checked off.</li>
             <li>

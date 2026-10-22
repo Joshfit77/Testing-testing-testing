@@ -31,7 +31,7 @@ describe("faith reminders", () => {
   it("describes the schedule and names the translation of any verse it quotes", () => {
     expect(describeFaithReminder({ time: "20:00", weekdays: [0, 1, 2, 3, 4, 5, 6] })).toBe("Every day at 8:00 PM");
     expect(describeFaithReminder({ time: "07:05", weekdays: [1, 3] })).toBe("Mon and Wed at 7:05 AM");
-    expect(FAITH_REMINDER_INFO.prayer.body).toMatch(/1 Thessalonians 5:17 \(KJV\)/);
+    expect(FAITH_REMINDER_INFO.prayer.body).toMatch(/1 Thessalonians 5:17 \(BSB\)/);
     for (const i of Object.values(FAITH_REMINDER_INFO)) expect(i.body).not.toMatch(/streak|missed/i);
   });
 });

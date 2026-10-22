@@ -7,7 +7,7 @@ import {
   COMPACT_COACHING_RULES,
   FAITH_DISABLED_INSTRUCTIONS,
   FAITH_ENABLED_INSTRUCTIONS,
-  KJV_VERSES,
+  COACH_VERSES,
   SAFETY_RULES,
   SUPPLEMENT_KNOWLEDGE,
 } from "@/lib/coach/knowledge";
@@ -71,8 +71,8 @@ describe("knowledge base", () => {
     expect(typeof COMPACT_COACHING_RULES).toBe("string");
   });
 
-  it("only offers KJV verses that match the app's devotional text word for word", () => {
-    expect(KJV_VERSES).toHaveLength(DEVOTIONALS.length);
+  it("only offers BSB verses that match the app's devotional text word for word", () => {
+    expect(COACH_VERSES).toHaveLength(DEVOTIONALS.length);
     for (const d of DEVOTIONALS) expect(FAITH_ENABLED_INSTRUCTIONS).toContain(`${d.reference} [${d.theme}]: ${d.scripture}`);
   });
 });

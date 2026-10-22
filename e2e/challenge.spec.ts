@@ -23,7 +23,7 @@ test.describe("40 Days Through the Narrow Gate", () => {
     await page.getByRole("button", { name: "Read today's devotional" }).click();
     const day = page.getByRole("dialog");
     await expect(day.getByRole("heading", { name: "The Narrow Gate" })).toBeVisible();
-    await expect(day.getByText("Matthew 7:13–14 (KJV)")).toBeVisible();
+    await expect(day.getByText("Matthew 7:13–14 (BSB)")).toBeVisible();
     await day.getByLabel("Read today's devotional").check();
     await day.getByLabel("Trained today").check();
     await day.getByLabel("Note (optional)").fill("Choosing the narrow way today.");

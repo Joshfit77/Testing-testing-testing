@@ -6,6 +6,7 @@
  * browser can't deliver them while the site is closed, and the UI says so. Pure helpers only.
  */
 import { WEEKDAY_LABELS, parseTime, toCapacitorWeekday, type JsWeekday } from "@/lib/reminders";
+import { ACTIVE_TRANSLATION, scriptureText } from "@/data/scripture";
 
 export const FAITH_REMINDER_KINDS = ["devotional", "prayer", "practices"] as const;
 export type FaithReminderKind = (typeof FAITH_REMINDER_KINDS)[number];
@@ -32,7 +33,7 @@ export const FAITH_REMINDER_INFO: Record<FaithReminderKind, { label: string; des
     description: "A moment to stop and pray.",
     defaultTime: "12:00",
     title: "A moment for prayer",
-    body: "“Pray without ceasing.” 1 Thessalonians 5:17 (KJV)",
+    body: `“${scriptureText("1 Thessalonians 5:17", "Pray without ceasing.")}” 1 Thessalonians 5:17 (${ACTIVE_TRANSLATION.code})`,
   },
   practices: {
     label: "Daily practices",

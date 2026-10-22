@@ -1,13 +1,14 @@
 /**
  * Static content.
  *
- * Scripture text is from the King James Version (KJV, 1769 standard text), which is in the
- * public domain in most countries. (In the United Kingdom the KJV is administered under Crown
- * letters patent — review before distributing there.) Text should be verified against an
- * authoritative KJV source before publication; see IMPLEMENTATION_STATUS.md.
+ * Scripture text is from the Berean Standard Bible (BSB, public domain), copied from the official
+ * BSB text via src/data/bsb-passages.json (see src/data/scripture.ts).
  */
 
-export const TRANSLATION = { code: "KJV", name: "King James Version", license: "Public domain (outside the UK)" } as const;
+import { ACTIVE_TRANSLATION, scriptureText } from "@/data/scripture";
+
+/** The translation in use (see src/data/scripture.ts). */
+export const TRANSLATION = ACTIVE_TRANSLATION;
 
 export type FaithTheme = "perseverance" | "humility" | "discipline" | "self_control" | "stewardship" | "gratitude";
 
@@ -28,11 +29,11 @@ export interface Scripture {
   reflection: string;
 }
 
-export const SCRIPTURES: Scripture[] = [
+const SCRIPTURE_ENTRIES: Scripture[] = [
   {
     reference: "Matthew 7:13–14",
     text:
-      "Enter ye in at the strait gate: for wide is the gate, and broad is the way, that leadeth to destruction, and many there be which go in thereat: Because strait is the gate, and narrow is the way, which leadeth unto life, and few there be that find it.",
+      "Enter through the narrow gate. For wide is the gate and broad is the way that leads to destruction, and many enter through it. But small is the gate and narrow the way that leads to life, and only a few find it.",
     themes: ["discipline", "perseverance"],
     reflection:
       "The narrow way is rarely the easy one. Where in your training or life are you tempted to take the broad, comfortable path today?",
@@ -40,115 +41,117 @@ export const SCRIPTURES: Scripture[] = [
   {
     reference: "1 Corinthians 9:24–25",
     text:
-      "Know ye not that they which run in a race run all, but one receiveth the prize? So run, that ye may obtain. And every man that striveth for the mastery is temperate in all things. Now they do it to obtain a corruptible crown; but we an incorruptible.",
+      "Do you not know that in a race all the runners run, but only one receives the prize? Run in such a way as to take the prize. Everyone who competes in the games trains with strict discipline. They do it for a crown that is perishable, but we do it for a crown that is imperishable.",
     themes: ["discipline", "self_control"],
     reflection: "Athletes practise temperance for a fading prize. What lasting prize shapes how you train and live?",
   },
   {
     reference: "1 Timothy 4:8",
     text:
-      "For bodily exercise profiteth little: but godliness is profitable unto all things, having promise of the life that now is, and of that which is to come.",
+      "For physical exercise is of limited value, but godliness is valuable in every way, holding promise for the present life and for the one to come.",
     themes: ["stewardship", "humility"],
     reflection: "Training has real value, yet it is not the highest value. How can your training serve something greater?",
   },
   {
     reference: "Hebrews 12:1",
     text:
-      "Wherefore seeing we also are compassed about with so great a cloud of witnesses, let us lay aside every weight, and the sin which doth so easily beset us, and let us run with patience the race that is set before us,",
+      "Therefore, since we are surrounded by such a great cloud of witnesses, let us throw off every encumbrance and the sin that so easily entangles, and let us run with endurance the race set out for us.",
     themes: ["perseverance"],
     reflection: "What weight could you lay aside this week to run your race with more patience?",
   },
   {
     reference: "Galatians 6:9",
-    text: "And let us not be weary in well doing: for in due season we shall reap, if we faint not.",
+    text: "Let us not grow weary in well-doing, for in due time we will reap a harvest if we do not give up.",
     themes: ["perseverance"],
     reflection: "Progress often feels invisible. Which small, faithful habit will you keep even when results feel slow?",
   },
   {
     reference: "Isaiah 40:31",
     text:
-      "But they that wait upon the LORD shall renew their strength; they shall mount up with wings as eagles; they shall run, and not be weary; and they shall walk, and not faint.",
+      "But those who wait upon the LORD will renew their strength; they will mount up with wings like eagles; they will run and not grow weary, they will walk and not faint.",
     themes: ["perseverance", "humility"],
     reflection: "Strength is renewed, not only built. How are you making space for rest and renewal?",
   },
   {
     reference: "Proverbs 16:32",
-    text: "He that is slow to anger is better than the mighty; and he that ruleth his spirit than he that taketh a city.",
+    text: "He who is slow to anger is better than a warrior, and he who controls his temper is greater than one who captures a city.",
     themes: ["self_control"],
     reflection: "Ruling your own spirit is a greater feat than any lift. Where can you practise self-control today?",
   },
   {
     reference: "Proverbs 25:28",
-    text: "He that hath no rule over his own spirit is like a city that is broken down, and without walls.",
+    text: "Like a city whose walls are broken down is a man who does not control his temper.",
     themes: ["self_control", "discipline"],
     reflection: "Discipline builds walls that protect what matters. Which boundary would serve you well this week?",
   },
   {
     reference: "1 Corinthians 6:19–20",
     text:
-      "What? know ye not that your body is the temple of the Holy Ghost which is in you, which ye have of God, and ye are not your own? For ye are bought with a price: therefore glorify God in your body, and in your spirit, which are God's.",
+      "Do you not know that your body is a temple of the Holy Spirit who is in you, whom you have received from God? You are not your own; you were bought at a price. Therefore glorify God with your body.",
     themes: ["stewardship"],
     reflection: "Caring for your body can be an act of stewardship, not vanity. What does faithful care look like for you right now?",
   },
   {
     reference: "James 4:10",
-    text: "Humble yourselves in the sight of the Lord, and he shall lift you up.",
+    text: "Humble yourselves before the Lord, and He will exalt you.",
     themes: ["humility"],
     reflection: "Humility in training means honest loads, honest effort and honest rest. Where does ego need to step aside?",
   },
   {
     reference: "Micah 6:8",
     text:
-      "He hath shewed thee, O man, what is good; and what doth the LORD require of thee, but to do justly, and to love mercy, and to walk humbly with thy God?",
+      "He has shown you, O man, what is good. And what does the LORD require of you but to act justly, to love mercy, and to walk humbly with your God?",
     themes: ["humility"],
     reflection: "How can the strength you build be used to serve others with justice and mercy?",
   },
   {
     reference: "1 Peter 4:10",
     text:
-      "As every man hath received the gift, even so minister the same one to another, as good stewards of the manifold grace of God.",
+      "As good stewards of the manifold grace of God, each of you should use whatever gift he has received to serve one another.",
     themes: ["stewardship", "gratitude"],
     reflection: "What gift — health, time, encouragement — can you steward for someone else this week?",
   },
   {
     reference: "Galatians 5:22–23",
     text:
-      "But the fruit of the Spirit is love, joy, peace, longsuffering, gentleness, goodness, faith, Meekness, temperance: against such there is no law.",
+      "But the fruit of the Spirit is love, joy, peace, patience, kindness, goodness, faithfulness, gentleness, and self-control. Against such things there is no law.",
     themes: ["self_control", "humility"],
     reflection: "Temperance appears alongside love and joy. Which of these fruits do you most want to grow?",
   },
   {
     reference: "2 Timothy 1:7",
-    text: "For God hath not given us the spirit of fear; but of power, and of love, and of a sound mind.",
+    text: "For God has not given us a spirit of fear, but of power, love, and self-control.",
     themes: ["discipline", "perseverance"],
-    reflection: "A sound mind is a disciplined mind. What fear is holding back your next step?",
+    reflection: "Self-control is a gift, not a grind. What fear is holding back your next step?",
   },
   {
     reference: "Colossians 3:23",
-    text: "And whatsoever ye do, do it heartily, as to the Lord, and not unto men;",
+    text: "Whatever you do, work at it with your whole being, as for the Lord and not for men,",
     themes: ["discipline", "stewardship"],
     reflection: "Train and work wholeheartedly — not for applause. What would 'heartily' look like in today's session?",
   },
   {
     reference: "Philippians 3:13–14",
     text:
-      "Brethren, I count not myself to have apprehended: but this one thing I do, forgetting those things which are behind, and reaching forth unto those things which are before, I press toward the mark for the prize of the high calling of God in Christ Jesus.",
+      "Brothers, I do not consider myself yet to have taken hold of it. But one thing I do: Forgetting what is behind and straining toward what is ahead, I press on toward the goal to win the prize of God’s heavenly calling in Christ Jesus.",
     themes: ["perseverance", "humility"],
     reflection: "Yesterday's missed workout doesn't define today. What will you press toward next?",
   },
   {
     reference: "Romans 5:3–4",
-    text: "And not only so, but we glory in tribulations also: knowing that tribulation worketh patience; And patience, experience; and experience, hope:",
+    text: "Not only that, but we also rejoice in our sufferings, because we know that suffering produces perseverance; perseverance, character; and character, hope.",
     themes: ["perseverance"],
     reflection: "Difficulty can produce patience and hope. What hard thing is shaping you right now?",
   },
   {
     reference: "Psalm 118:24",
-    text: "This is the day which the LORD hath made; we will rejoice and be glad in it.",
+    text: "This is the day that the LORD has made; we will rejoice and be glad in it.",
     themes: ["gratitude"],
     reflection: "Name three things your body allowed you to do today that you're grateful for.",
   },
 ];
+
+export const SCRIPTURES: Scripture[] = SCRIPTURE_ENTRIES.map((s) => ({ ...s, text: scriptureText(s.reference, s.text) }));
 
 /** Deterministic "verse of the day" so every user sees the same verse on a given date. */
 export function scriptureForDate(isoDate: string): Scripture {
