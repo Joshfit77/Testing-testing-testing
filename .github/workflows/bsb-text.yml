@@ -6,7 +6,7 @@ name: BSB Scripture text
 on:
   workflow_dispatch:
   push:
-    branches: [main, claude/sharp-cray-8y0uuv, claude/security-nasb-deletion]
+    branches: [main, claude/sharp-cray-8y0uuv, claude/security-nasb-deletion, claude/badges-27]
     paths:
       - "scripts/extract-bsb.mjs"
       - "scripts/bsb-references.json"
