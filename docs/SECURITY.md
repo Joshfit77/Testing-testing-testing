@@ -39,6 +39,26 @@
   auth user, every personal row and the stored files are gone, that an old access token no longer resolves, and that
   other users' data is untouched.
 
+## Database audit (live catalog, local stack)
+
+- **Row level security:** on for every table in `public`. No security-definer function is missing a pinned
+  `search_path`.
+- **Anonymous access:** only the public catalog can be read without signing in: exercises, exercise media and
+  alternatives, training programs and their weeks, days and exercises, program categories, published content and
+  feature flags.
+- **Personal tables:** every policy is limited to `auth.uid()` or to admins. The one exception, a policy on
+  `user_programs` that checks the program is visible, is RESTRICTIVE, so it adds to the ownership rule instead of
+  replacing it.
+- **Storage:** `avatars` and `progress-photos` are private with one folder per user. `exercise-media` is public to
+  read and only admins can write to it. Each bucket has a size limit and accepts only image or video types.
+- **Profiles:** users can update only their own non-sensitive columns. Role, plan and billing can't be changed from
+  the client.
+- **Table grants:** `anon` and `authenticated` hold Supabase's default grants, and row level security is what
+  protects the rows. The API never exposes TRUNCATE.
+- **Regression test:** `tests/unit/rls-coverage.test.ts` fails if a future migration adds a table without row level
+  security, gives anonymous users a policy on a personal table, or adds a security-definer function without a
+  pinned `search_path`.
+
 ## Needs setting outside the code
 
 - **Supabase dashboard (production project) → Authentication.**
