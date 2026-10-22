@@ -8,7 +8,7 @@ import type { Plan } from "@/lib/domain/types";
 import { aiPlanOutputSchema, validateAiPlan, type AiPlan } from "@/lib/validation/ai";
 import { formatAthleteContext, type AthleteSnapshot } from "@/lib/coach/context";
 import { buildSystemBlocks, CHAT_MAX_TOKENS, fallbackParams, MAX_TOOL_ROUNDS, sanitizeAssistantContent } from "@/lib/coach/prompt";
-import { routeCoachRequest, type ModelTier } from "@/lib/coach/routing";
+import { coachModelIds, routeCoachRequest, type ModelTier } from "@/lib/coach/routing";
 import { coachToolDefinitions, toolActivityLabel, type CoachProposal } from "@/lib/coach/tools";
 import { loadAthleteSnapshot } from "@/server/coach/snapshot";
 import { executeCoachTool, type ToolContext } from "@/server/coach/tools";
@@ -65,6 +65,9 @@ Rules:
 - Respect stated limitations and logged pain skips by avoiding aggravating movements, without diagnosing anything.
 - In "reply", briefly explain the plan's logic in 3–6 sentences. Remind the athlete they can skip anything that causes pain.`;
 
+/** Longest earlier message sent back to the model as history (new messages are limited to 4,000 characters). */
+const HISTORY_MESSAGE_CHARS = 8_000;
+
 let client: Anthropic | null = null;
 function getClient(): Anthropic {
   // baseURL comes from the SDK's standard ANTHROPIC_BASE_URL env var when set (e2e tests point it at a local mock).
@@ -98,6 +101,12 @@ export async function getAiUsage(userId: string, plan: Plan) {
     count(admin.from("ai_usage_events")).eq("kind", "plan"),
     count(admin.from("ai_usage_events")).eq("model_tier", "smart"),
   ]);
+  // Not knowing the usage must never read as "nothing used".
+  const failed = chat.error ?? gen.error ?? smart.error;
+  if (failed) {
+    logError("ai.usage_count", failed);
+    throw new AiError("metering_unavailable", "AI usage can't be checked right now. Please try again shortly.");
+  }
   return { chatUsed: chat.count ?? 0, planUsed: gen.count ?? 0, smartUsed: smart.count ?? 0, ...limits };
 }
 
@@ -113,11 +122,9 @@ export async function assertAiAllowed(userId: string, plan: Plan, mode: "chat" |
   }
   // Durable metering requires the service role (users cannot write their own usage rows).
   if (!isServiceRoleConfigured()) throw new AiError("metering_unavailable", "AI usage metering isn't configured on this server.");
-  const perMinute = Number.parseInt(process.env.AI_RATE_LIMIT_PER_MINUTE ?? "6", 10) || 6;
-  const burst = rateLimit(`ai:${userId}`, perMinute, 60_000);
+  const burst = rateLimit(`ai:${userId}`, aiPerMinute(), 60_000);
   if (!burst.ok) throw new AiError("rate_limited", "You're sending messages quickly — please wait a moment.", burst.retryAfterSeconds);
-  // The in-memory limiter is per server instance; the usage table enforces the same limit across instances.
-  if ((await recentAiRequests(userId, 60_000)) >= perMinute) throw new AiError("rate_limited", "You're sending messages quickly — please wait a moment.", 60);
+  // The in-memory limiter is per server instance; reserveUsage enforces the same limit across instances.
   const usage = await getAiUsage(userId, plan);
   if (usage.chatUsed >= usage.chatLimit) throw new AiError("quota", `You've used all ${usage.chatLimit} AI messages for this month.`);
   if (mode === "plan" && (usage.planUsed >= usage.planLimit || usage.smartUsed >= usage.smartLimit)) {
@@ -126,22 +133,53 @@ export async function assertAiAllowed(userId: string, plan: Plan, mode: "chat" |
   return usage;
 }
 
-/** AI requests this user made in the last `windowMs`, from the durable usage table. */
-async function recentAiRequests(userId: string, windowMs: number): Promise<number> {
-  const since = new Date(Date.now() - windowMs).toISOString();
-  const { count, error } = await getServiceSupabase().from("ai_usage_events").select("id", { count: "exact", head: true }).eq("user_id", userId).gte("created_at", since);
-  if (error) {
-    logError("ai.rate_window", error);
-    return 0;
-  }
-  return count ?? 0;
+function aiPerMinute(): number {
+  return Number.parseInt(process.env.AI_RATE_LIMIT_PER_MINUTE ?? "6", 10) || 6;
 }
 
-async function recordUsage(userId: string, kind: "chat" | "plan", model: string, tier: ModelTier, inputTokens: number, outputTokens: number) {
-  const { error } = await getServiceSupabase()
-    .from("ai_usage_events")
-    .insert({ user_id: userId, kind, model, model_tier: tier, input_tokens: inputTokens, output_tokens: outputTokens });
+/**
+ * Reserve one request against the member's limits before the provider is called. The database re-checks every
+ * limit under a per-member lock, so requests sent at the same moment can't overshoot, and a request is counted
+ * even if saving its reply later fails. Returns the usage row and the tier allowed (a chat that wanted the larger
+ * model falls back to the fast one once that share is used up).
+ */
+async function reserveUsage(
+  userId: string,
+  kind: "chat" | "plan",
+  tier: ModelTier,
+  usage: { chatLimit: number; planLimit: number; smartLimit: number },
+): Promise<{ usageId: string; tier: ModelTier }> {
+  const { data, error } = await getServiceSupabase().rpc("reserve_ai_usage", {
+    p_user_id: userId,
+    p_kind: kind,
+    p_tier: tier,
+    p_chat_limit: usage.chatLimit,
+    p_plan_limit: usage.planLimit,
+    p_smart_limit: usage.smartLimit,
+    p_per_minute: aiPerMinute(),
+  });
+  const row = (data as { usage_id: string; model_tier: ModelTier }[] | null)?.[0];
+  if (error || !row) {
+    const msg = error?.message ?? "";
+    if (msg.includes("ai_rate_limited")) throw new AiError("rate_limited", "You're sending messages quickly — please wait a moment.", 60);
+    if (msg.includes("ai_quota_plan")) throw new AiError("quota", "You've used this month's plan generations. They reset on the 1st.");
+    if (msg.includes("ai_quota")) throw new AiError("quota", `You've used all ${usage.chatLimit} AI messages for this month.`);
+    logError("ai.usage_reserve", error ?? new Error("No reservation returned"));
+    throw new AiError("metering_unavailable", "AI usage can't be checked right now. Please try again shortly.");
+  }
+  return { usageId: row.usage_id, tier: row.model_tier };
+}
+
+/** Fill in what a reserved request actually used. */
+async function finalizeUsage(usageId: string, model: string, inputTokens: number, outputTokens: number) {
+  const { error } = await getServiceSupabase().from("ai_usage_events").update({ model, input_tokens: inputTokens, output_tokens: outputTokens }).eq("id", usageId);
   if (error) logError("ai.usage_record", error);
+}
+
+/** Give back a reservation when the provider call itself failed, so members aren't charged for errors. */
+async function releaseUsage(usageId: string) {
+  const { error } = await getServiceSupabase().from("ai_usage_events").delete().eq("id", usageId);
+  if (error) logError("ai.usage_release", error);
 }
 
 /** Summarize the user's authorized data for the model (used by plan mode and the chat). */
@@ -327,14 +365,22 @@ export async function coachTurn(params: {
   const { data: tzRow } = await supabase.from("profiles").select("timezone").eq("id", userId).maybeSingle();
   const context = await buildAthleteContext(supabase, userId);
   const messages: Anthropic.Beta.BetaMessageParam[] = [
-    ...((history ?? []).reverse().map((m) => ({ role: m.role as "user" | "assistant", content: m.content as string })) as Anthropic.Beta.BetaMessageParam[]),
+    // Earlier turns, each capped, so stored history can never make one request much larger than intended.
+    ...((history ?? []).reverse().map((m) => ({ role: m.role as "user" | "assistant", content: (m.content as string).slice(0, HISTORY_MESSAGE_CHARS) })) as Anthropic.Beta.BetaMessageParam[]),
     { role: "user", content: message },
   ];
   // The API requires a user turn first; drop a leading assistant message if present.
   while (messages.length && messages[0]!.role !== "user") messages.shift();
 
   const route = routeCoachRequest({ mode, message, smartUsed: usage.smartUsed, smartLimit: usage.smartLimit, env: process.env });
-  const model = route.model;
+  let reservation: { usageId: string; tier: ModelTier };
+  try {
+    reservation = await reserveUsage(userId, mode, route.tier, usage);
+  } catch (err) {
+    await supabase.from("ai_messages").delete().eq("id", userRow.id);
+    throw err;
+  }
+  const model = reservation.tier === route.tier ? route.model : coachModelIds(process.env)[reservation.tier];
   const system = buildSystemBlocks({ faithEnabled: context.snapshot.faithEnabled, contextText: context.text });
 
   let reply = "";
@@ -384,7 +430,9 @@ export async function coachTurn(params: {
       }
     }
   } catch (err) {
-    // Remove the orphaned user message so retries don't duplicate it.
+    // The provider call failed: give the request back and remove the orphaned user message, so retries don't
+    // duplicate it.
+    await releaseUsage(reservation.usageId);
     await supabase.from("ai_messages").delete().eq("id", userRow.id);
     if (err instanceof Anthropic.APIUserAbortError) throw new AiError("provider", "The request was cancelled.");
     if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
@@ -400,7 +448,10 @@ export async function coachTurn(params: {
     throw err;
   }
 
-  const { data: assistantRow, error: amErr } = await supabase
+  // Counted before anything else can fail.
+  await finalizeUsage(reservation.usageId, model, inputTokens, outputTokens);
+  // Replies are written by the server (members can only insert their own questions).
+  const { data: assistantRow, error: amErr } = await getServiceSupabase()
     .from("ai_messages")
     .insert({
       conversation_id: conversationId,
@@ -414,7 +465,6 @@ export async function coachTurn(params: {
     .single();
   if (amErr || !assistantRow) throw amErr ?? new Error("Assistant message insert failed");
   await supabase.from("ai_conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
-  await recordUsage(userId, mode, model, route.tier, inputTokens, outputTokens);
 
   return {
     conversationId,
