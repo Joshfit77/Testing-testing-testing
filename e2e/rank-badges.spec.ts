@@ -66,7 +66,7 @@ test.describe("rank badges (Fitness, Food, Faith)", () => {
   test("all 27 badge images load whole and line up at iPhone widths", async ({ page }) => {
     await signUpAndConfirm(page, uniqueEmail("rankart"));
     await answerOnboarding(page);
-    for (const width of [320, 375, 390, 430]) {
+    for (const width of [320, 360, 375, 390, 430]) {
       await page.setViewportSize({ width, height: 844 });
       for (const tab of ["fitness", "food", "faith"]) {
         await page.goto(`/progress/badges?tab=${tab}`);
