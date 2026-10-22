@@ -46,17 +46,19 @@ export function BadgeArt({
   const style = locked ? { filter: "brightness(0.55) saturate(0.75)" } : undefined;
   if (override) {
     const art = getBadgeArtwork(category, level);
+    const live = animate && !locked;
     return (
       // The painted art is a 2 : 1 scene: `size` sets the frame's height and its width is twice that, but never
       // wider than the space available or than the art can fill sharply (BADGE_MAX_SHARP_WIDTH). The whole image
-      // is shown, centred, never cropped or stretched. No CSS mask or filter touches it: the edges fade inside the
-      // file, and a locked badge is dimmed with opacity.
+      // is shown, centred, never cropped or stretched, and no CSS mask or filter touches it; a locked badge is
+      // dimmed with opacity. The badge in focus gets its category's light effects as separate layers over it.
       <span
-        className={["badge-img", locked ? "is-locked" : "", animate && !locked ? "badge-img-live" : "", className].filter(Boolean).join(" ")}
+        className={["badge-img", locked ? "is-locked" : "", live ? `badge-img-live badge-live-${category}` : "", className].filter(Boolean).join(" ")}
         style={{ width: Math.min(size * 2, BADGE_MAX_SHARP_WIDTH), maxWidth: "100%" }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={override} alt={title ?? ""} width={art?.width || undefined} height={art?.height || undefined} draggable={false} decoding="async" />
+        {live ? <BadgeLiveEffects category={category} /> : null}
       </span>
     );
   }
@@ -804,5 +806,21 @@ function FaithBadge({ level, uid }: { level: number; uid: string }) {
         <FaithScene level={level} uid={uid} />
       </Medallion>
     </>
+  );
+}
+
+/**
+ * Light effects for the painted badge in focus, by category: gem sparkles on Fitness, rising embers on Food, drifting
+ * light motes under sun rays on Faith (the rays, glow and flicker are the frame's own ::before/::after layers in
+ * globals.css). Only opacity and transform animate, and everything is hidden under reduced motion.
+ */
+function BadgeLiveEffects({ category }: { category: RankCategory }) {
+  const count = category === "fitness" ? 3 : category === "food" ? 5 : 4;
+  return (
+    <span className="badge-fx" aria-hidden>
+      {Array.from({ length: count }, (_, i) => (
+        <span key={i} className={`badge-fx-${category === "fitness" ? "spark" : category === "food" ? "ember" : "mote"} badge-fx-${i + 1}`} />
+      ))}
+    </span>
   );
 }

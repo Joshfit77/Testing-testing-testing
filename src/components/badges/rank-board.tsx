@@ -212,10 +212,13 @@ function RankReveal({ rank, verse, translation, onClose }: { rank: RankState; ve
   return (
     <div className="space-y-4 text-center">
       {/* Rings and glow stack in one grid cell, centred on the art. */}
-      <div className="mx-auto grid place-items-center [&>*]:[grid-area:1/1]">
-        <span className="badge-reveal-ring size-44 rounded-full border-2 border-gold/70" aria-hidden />
-        {top ? <span className="badge-reveal-ring size-52 rounded-full border border-gold/50 [animation-delay:0.35s]" aria-hidden /> : null}
-        <span className={cn("h-28 w-56 rounded-full blur-2xl", top ? "bg-gold/35" : "bg-gold/20")} aria-hidden />
+      {/* Ring colour and glow follow the category: gold for Fitness, fire for Food, sunlit green-gold for Faith.
+          Rank 9 adds a second ring, and Cedar a burst of sun rays. */}
+      <div className={cn("mx-auto grid place-items-center [&>*]:[grid-area:1/1]", `reveal-${rank.category}`)}>
+        {top && rank.category === "faith" ? <span className="badge-reveal-rays size-64 rounded-full" aria-hidden /> : null}
+        <span className="badge-reveal-ring size-44 rounded-full border-2" aria-hidden />
+        {top ? <span className="badge-reveal-ring is-second size-52 rounded-full border [animation-delay:0.35s]" aria-hidden /> : null}
+        <span className={cn("reveal-glow h-28 w-56 rounded-full blur-2xl", top && "is-top")} aria-hidden />
         <div className="badge-reveal relative">
           <BadgeArt category={rank.category} level={rank.level} size={140} animate />
         </div>
