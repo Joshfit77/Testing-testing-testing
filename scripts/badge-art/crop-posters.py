@@ -71,13 +71,13 @@ def subject_y(rgb: np.ndarray) -> float:
     return float((rows * np.arange(len(rows))).sum() / rows.sum())
 
 
-def main():
-    OUT.mkdir(parents=True, exist_ok=True)
-    sizes = {}
+def poster_crops(smaller_cross: bool = True):
+    """Yield (slot, tile) for all 27 badges, cut from the posters as described above (smaller_cross=False: the
+    Conqueror badge as originally painted)."""
     for cat, names in NAMES.items():
         poster = Image.open(SRC / f"{cat}.webp").convert("RGB")
         assert poster.size == (1290, 2796), poster.size
-        if cat == "fitness":
+        if cat == "fitness" and smaller_cross:
             poster = shrink_cross(poster)
         x0, x1 = ART_X[cat]
         for i, name in enumerate(names):
@@ -88,11 +88,17 @@ def main():
             # Centred on the subject, then kept inside the row and the artwork column.
             left = min(max(round(x0 + subject_x(band) - h), x0), x1 - w)
             upper = min(max(round(top + subject_y(band) - h / 2), top), bottom - h)
-            tile = poster.crop((left, upper, left + w, upper + h)).filter(SHARPEN)
-            path = OUT / f"{cat}-{i + 1:02d}-{name}.webp"
-            tile.save(path, "WEBP", lossless=True, quality=100, method=6)
-            sizes[f"/badges/{path.name}"] = {"width": w, "height": h}
-            print(f"{path.name:28} {w}x{h}  from x={left} y={upper}")
+            yield f"{cat}-{i + 1:02d}-{name}", poster.crop((left, upper, left + w, upper + h)).filter(SHARPEN)
+
+
+def main():
+    OUT.mkdir(parents=True, exist_ok=True)
+    sizes = {}
+    for slot, tile in poster_crops():
+        path = OUT / f"{slot}.webp"
+        tile.save(path, "WEBP", lossless=True, quality=100, method=6)
+        sizes[f"/badges/{path.name}"] = {"width": tile.width, "height": tile.height}
+        print(f"{path.name:28} {tile.width}x{tile.height}")
 
     (ROOT / "src/components/badges/badge-artwork-sizes.json").write_text(json.dumps(sizes, indent=2) + "\n")
 

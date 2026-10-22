@@ -11,6 +11,9 @@ WebP, alpha kept if the master has it) and updates src/components/badges/badge-a
 the <img> sizes and the detail view's sharp-size limit. Ranks without a master keep their current file, so masters
 can be added one at a time. Nothing is ever enlarged: a master smaller than MOBILE_WIDTH is refused.
 
+Every master is first checked by check_masters.py. A master it refuses (wrong shape, too small, or a
+poster crop enlarged) is not exported; its warnings (soft detail, off-centre, margins) are printed for review.
+
 Run: python3 scripts/badge-art/export-masters.py [--masters DIR] [--out DIR] [--sizes FILE]
 """
 import argparse
@@ -19,28 +22,11 @@ from pathlib import Path
 
 from PIL import Image
 
+from check_masters import check, find_master, poster_crops, slot_names, status
+
 ROOT = Path(__file__).resolve().parents[2]
 MOBILE_WIDTH = 1200  # 600 CSS px of art at 2x, 400 at 3x: more than the badge detail view ever shows
-MIN_MASTER = (1600, 800)
 QUALITY = 90  # visually lossless for painted art at this size; ~150-300 KB per badge
-SLOTS = {
-    "fitness": ["foundation", "faithful", "endurance", "disciplined", "refined", "steadfast", "overcomer", "mighty", "conqueror"],
-    "food": ["spark", "ember", "flame", "torch", "blaze", "furnace", "forge", "inferno", "phoenix"],
-    "faith": ["seed", "sprout", "sapling", "root", "branch", "vine", "fruit", "olive", "cedar"],
-}
-EXTENSIONS = (".png", ".webp", ".tif", ".tiff")
-
-
-def slot_names() -> list[str]:
-    return [f"{cat}-{i + 1:02d}-{name}" for cat, names in SLOTS.items() for i, name in enumerate(names)]
-
-
-def find_master(masters: Path, slot: str) -> Path | None:
-    for ext in EXTENSIONS:
-        p = masters / f"{slot}{ext}"
-        if p.exists():
-            return p
-    return None
 
 
 def export(masters: Path, out: Path, sizes_file: Path) -> list[str]:
@@ -51,14 +37,14 @@ def export(masters: Path, out: Path, sizes_file: Path) -> list[str]:
         src = find_master(masters, slot)
         if not src:
             continue
+        result = check(src, poster_crops()[slot])
+        for warning in result["warnings"]:
+            print(f"  warning, {src.name}: {warning}")
+        if status(result) == "FAIL":
+            problems += [f"{src.name}: {e}" for e in result["errors"]]
+            continue
         img = Image.open(src)
         w, h = img.size
-        if abs(w - 2 * h) > 1:
-            problems.append(f"{src.name}: {w}x{h} is not 2:1")
-            continue
-        if w < MIN_MASTER[0] or h < MIN_MASTER[1]:
-            problems.append(f"{src.name}: {w}x{h} is below the {MIN_MASTER[0]}x{MIN_MASTER[1]} minimum")
-            continue
         has_alpha = img.mode in ("RGBA", "LA") or "transparency" in img.info
         img = img.convert("RGBA" if has_alpha else "RGB")
         mobile = img.resize((MOBILE_WIDTH, MOBILE_WIDTH // 2), Image.LANCZOS)

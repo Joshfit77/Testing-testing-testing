@@ -8,8 +8,36 @@
   would only make bigger blurry files.
 - **Why it hasn't been made here:** no image-generation tool was available in the development environment.
 - **What's still needed:** an artist or an image-generation service must produce the 27 masters described below.
-- **Already ready for them:** the folder (`assets/badge-masters/`), the export to mobile files
-  (`scripts/badge-art/export-masters.py`) and the app all are. Drop the files in and run the script.
+- **Already ready for them:**
+  - the hand-off pack for the artist or service (below);
+  - the folder (`assets/badge-masters/`) and the export to mobile files (`scripts/badge-art/export-masters.py`);
+  - an automatic check (`scripts/badge-art/check_masters.py`) that refuses an enlarged poster crop;
+  - the app. Drop the files in and run the export.
+
+## Hand-off pack
+
+`python3 scripts/badge-art/make-handoff-pack.py --out badge-art-handoff.zip` builds a zip (about 10 MB) to send to
+the artist or image service:
+
+- `README.txt`: what to deliver;
+- this brief;
+- `prompts.csv`: one ready-to-use prompt per badge, with a negative prompt, built from the tables below;
+- `references/<slot>.png`: each badge as cut from the posters (the design to match, not a base to enlarge);
+- `references/fitness-09-conqueror-original-cross.png`: Conqueror before its cross was made smaller;
+- `references/posters/`: the three original posters.
+
+## Automatic checks on delivery
+
+`python3 scripts/badge-art/check_masters.py` (also run by the export) gives each master PASS, WARN or FAIL.
+
+| Result | Meaning |
+|---|---|
+| **FAIL** (not exported) | Not 2 : 1, smaller than 1600 × 800, or an enlargement of that badge's poster crop. Each master is shrunk back and correlated with its crop, allowing for scale, position, mirroring and colour changes. Enlargements of the current crops score 0.99–1.00, even when sharpened, grained or colour-graded; different paintings of similar subjects score 0.2–0.65. Above 0.90 is refused. |
+| **WARN** (exported; look at it at 100 % zoom) | Little real detail at full size (it behaves like an image enlarged 2× or more); soft edges; subject more than 2 % off-centre, outside 80–88 % of the height, or in the margins; a colour profile other than sRGB. Glow and sparks can make the centring readings slightly larger than the silhouette. |
+
+No automatic check can judge whether a painting is good, so the checklist below still applies.
+`python3 scripts/badge-art/test_badge_pipeline.py` proves the checks and the export on made-up test images
+(about 2 minutes).
 
 ## Deliverables
 
@@ -60,7 +88,7 @@
 | fitness-06-steadfast | Steadfast | Brilliant faceted sapphire-blue diamond on a blue-violet shield; blue and purple crystal laurels; radiant light. |
 | fitness-07-overcomer | Overcomer | Jewelled golden crown on a purple shield; violet light; purple laurels. |
 | fitness-08-mighty | Mighty | Red-and-silver warrior helmet with a crest, on a crimson shield; red flame-like laurels. |
-| fitness-09-conqueror | Conqueror | Silver-white shield with a white-silver cross; large silver-white feathered wings spreading to both sides; silver laurels; fine gold rim accents; soft white glow. **The cross is about 25–30 % smaller than in the current art:** its height about 55–60 % of the shield's inner height, centred, with clear space between it and the rim. Keep the wings fully visible. |
+| fitness-09-conqueror | Conqueror | Silver-white shield with a white-silver cross; large silver-white feathered wings spreading to both sides; silver laurels; fine gold rim accents; soft white glow. **The cross is about 25–30 % smaller than in the original poster** (the app's current art already shows this size): its height about 55–60 % of the shield's inner height, centred, with clear space between it and the rim. Keep the wings fully visible. |
 
 ### Food: fuel and nourishment (fire that grows from a spark to a phoenix)
 
@@ -110,6 +138,7 @@
 - [ ] Same subject, colours and identity as the poster version; Conqueror's cross is about 25–30 % smaller.
 - [ ] No text, numbers, frames or watermarks.
 - [ ] Commercial rights confirmed.
+- [ ] `check_masters.py` reports PASS, or WARN with each warning reviewed at 100 % zoom.
 - [ ] After `export-masters.py`:
   - [ ] `npx vitest run tests/unit/badge-artwork.test.ts` passes (2 : 1, sizes match, file size);
   - [ ] `e2e/rank-badges.spec.ts` passes at 320, 360, 375, 390 and 430 px;

@@ -184,7 +184,9 @@ files.
 No genuine 3840 × 1920 artwork exists yet, and none of the current files has been enlarged to pretend otherwise.
 
 - **The brief:** `docs/BADGE_ART_SPEC.md` has the generation spec for all 27 masters: identity, composition, per-badge subjects, a prompt template and an acceptance checklist.
-- **Installing:** masters go in `assets/badge-masters/` (kept out of git by default). Then `python3 scripts/badge-art/export-masters.py` writes the 1200 × 600 app files and updates their sizes, rank by rank.
+- **Hand-off pack:** `scripts/badge-art/make-handoff-pack.py` zips the brief, one prompt per badge and the poster references for the artist or image service.
+- **Checking:** `scripts/badge-art/check_masters.py` refuses any master that is an enlarged poster crop (even sharpened, grained, re-coloured, moved or mirrored) and warns about soft detail and centring.
+- **Installing:** masters go in `assets/badge-masters/` (kept out of git by default). Then `python3 scripts/badge-art/export-masters.py` checks them, writes the 1200 × 600 app files and updates their sizes, rank by rank.
 
 ### Animations
 
