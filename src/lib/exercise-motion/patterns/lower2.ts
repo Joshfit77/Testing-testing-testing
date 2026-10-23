@@ -151,8 +151,10 @@ export function stepUp(id: string, label: string, opts: { boxH?: number; load?: 
 /** Box / chair squat: sit back to touch the seat, stand. */
 export function seatSquat(id: string, label: string, opts: { seat?: number; chair?: boolean; barbell?: boolean } = {}): MotionDef {
   const seatH = opts.seat ?? 46;
+  if (opts.chair) return chairSitToStand(id, label, seatH);
   const at = (s: number): Pose => {
-    const knee = 3 + 95 * s;
+    // Enough knee range for the hips to reach the box; the depth is then solved so the butt just touches it.
+    const knee = 3 + 112 * s;
     const shin = 2 + 8 * s;
     let p = pose({ ...stanceLegs(shin, knee, 4 + 36 * s) });
     const hold = (q: Pose) => (opts.barbell ? armsLocal(q, [-10, -17], [-6.5, 1]) : armsLocal(q, [16, -6 + 10 * s], [44, -6 + 16 * s]));
@@ -191,6 +193,59 @@ export function seatSquat(id: string, label: string, opts: { seat?: number; chai
 }
 
 /** Hip thrust (upper back on a bench) or glute bridge (on the floor). */
+/**
+ * Sit-to-stand: sits all the way down onto the chair (the chair takes the weight, so the body need not stay balanced
+ * over the feet at the bottom), then leans forward until the chest is over the toes and stands up.
+ */
+function chairSitToStand(id: string, label: string, seatH: number): MotionDef {
+  const arms = (q: Pose, s: number) => armsLocal(q, [16, -6 + 10 * s], [44, -6 + 16 * s]);
+  const legs = (shin: number, knee: number, trunk: number) => pose({ ...stanceLegs(shin, knee, trunk) });
+  // Standing and part-way down: balanced over the feet, as in an unsupported squat.
+  const balanced = (s: number): Pose => {
+    let p = arms(legs(2 + 26 * s, 3 + 95 * s, 4 + 36 * s), s);
+    const base = p;
+    const T = solve1D((t) => {
+      const q = arms({ ...base, trunk: t, hipL: base.hipL + (t - base.trunk), hipR: base.hipR + (t - base.trunk) }, s);
+      // Weight a little behind mid-foot (still well in front of the heel) as the hips reach back for the seat.
+      return centerOfMass(q)[0] - lm(q, "soleR")[0] + 3;
+    }, -5, 70);
+    p = arms({ ...base, trunk: T, hipL: base.hipL + (T - base.trunk), hipR: base.hipR + (T - base.trunk) }, s);
+    return p;
+  };
+  // Seated: feet slightly behind the knees, torso leaning forward a little, knees bent just enough for the butt to rest
+  // on the seat.
+  const shin = 12;
+  const seatedAt = (trunk: number) => {
+    const knee = solve1D((k) => worldPts(arms(legs(shin, k, trunk), 1), FEET).butt[1] - seatH, 60, 130);
+    return arms(legs(shin, knee, trunk), 1);
+  };
+  const seated = seatedAt(24);
+  // Before rising: same legs, chest brought forward ("nose over toes", about 40° from upright — typical trunk flexion at
+  // seat-off) so the weight moves toward the feet; the forward momentum carries it the rest of the way.
+  const leanBase = seated;
+  const leanT = 42;
+  const lean = arms({ ...leanBase, trunk: leanT, hipL: leanBase.hipL + (leanT - leanBase.trunk), hipR: leanBase.hipR + (leanT - leanBase.trunk) }, 1);
+  const Ws = worldPts(seated, FEET);
+  const specs: KeySpec[] = [
+    { pose: balanced(0), dur: 1, hold: 0.4, ease: "spline" },
+    { pose: balanced(0.5), dur: 1.1, ease: "spline" },
+    { pose: seated, dur: 0.5, hold: 0.5, ease: "inOut" },
+    { pose: lean, dur: 0.5, ease: "inOut" },
+    { pose: balanced(0.5), dur: 0.5, ease: "spline" },
+  ];
+  return {
+    id,
+    view: "side",
+    label,
+    keyframes: keys(FEET, specs),
+    // Front edge of the seat ahead of the buttocks: sits toward the front of the chair, thighs supported.
+    props: [{ id: "chair", kind: "chair", at: [Ws.butt[0] + 22, seatH], layer: "back" }],
+    planted: ["L", "R"],
+    footGrounded: true,
+    stillPhase: 0.45,
+  };
+}
+
 export function bridge(id: string, label: string, opts: { bench?: boolean; barbell?: boolean; singleLeg?: boolean } = {}): MotionDef {
   const benchH = 42;
   // Floor bridge pivots on the shoulder blades (shoulders stay down, the neck flexes as the hips rise).
@@ -200,7 +255,8 @@ export function bridge(id: string, label: string, opts: { bench?: boolean; barbe
   const footX = worldPts(flat, root).pelvis[0] + (opts.bench ? 46 : 56);
   const ankle = ankleForSole(footX, 0);
   const at = (T: number) => {
-    let p = pose({ trunk: T, neck: opts.bench ? 22 : 8 + Math.max(0, -90 - T) });
+    // On the bench the chin stays tucked with the eyes forward, so the neck flexes further as the torso levels out.
+    let p = pose({ trunk: T, neck: opts.bench ? Math.min(46, 22 + Math.max(0, -60 - T) * 0.8) : 8 + Math.max(0, -90 - T) });
     p = legsTo(p, root, ankle);
     if (opts.barbell) {
       const W = worldPts(p, root);
@@ -312,7 +368,8 @@ export function legPress(id: string, label: string): MotionDef {
       { pose: top.p, dur: 2, hold: 0.3, ease: "inOut", ik: { footL: top.a, footR: top.a } },
       { pose: bot.p, dur: 1.2, hold: 0.2, ease: "inOut", ik: { footL: bot.a, footR: bot.a } },
     ]),
-    props: [{ id: "m", kind: "legPress", at: [W.butt[0] + 4, 40], to: { lm: "ballR" }, layer: "mid" }],
+    // Back pad along the line from the buttocks to the upper back, so the lifter visibly lies on it.
+    props: [{ id: "m", kind: "legPress", at: W.butt, angle: (Math.atan2(W.upperBack[0] - W.butt[0], W.upperBack[1] - W.butt[1]) * 180) / Math.PI, to: { lm: "ballR" }, layer: "mid" }],
     stillPhase: 0.4,
   };
 }

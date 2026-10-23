@@ -54,6 +54,7 @@ export const ZERO_POSE: Pose = {
   legDR: 0,
   shinDL: 0,
   shinDR: 0,
+  trunkD: 0,
 };
 
 /** Anatomical (projected) limits used by the definition tests. */
@@ -79,6 +80,7 @@ export const LIMITS: Record<keyof Pose, [number, number]> = {
   legDR: [-90, 90],
   shinDL: [-90, 90],
   shinDR: [-90, 90],
+  trunkD: [-20, 75],
 };
 
 export const FRONT_LIMITS: Partial<Record<keyof Pose, [number, number]>> = {
@@ -249,8 +251,10 @@ function sideFK(p: Pose, pelvis: Vec): Skeleton {
 function frontFK(p: Pose, pelvis: Vec): Skeleton {
   const T1 = p.trunk;
   const T2 = p.trunk + p.spine;
-  const mid = add(pelvis, up(T1), BODY.lumbar);
-  const neckBase = add(mid, up(T2), BODY.thorax);
+  // Leaning toward the viewer shortens the torso on screen.
+  const fs = cos(p.trunkD);
+  const mid = add(pelvis, up(T1), BODY.lumbar * fs);
+  const neckBase = add(mid, up(T2), BODY.thorax * fs);
   const headA = T2 + p.neck;
   const neckTop = add(neckBase, up(headA), BODY.neck);
   const head = add(neckTop, up(headA), BODY.headR - 1);
@@ -272,7 +276,7 @@ function frontFK(p: Pose, pelvis: Vec): Skeleton {
     const out: Vec = [k * cos(-T1), k * sin(-T1)];
     return { hipP, thighA, shinA, kneeP, ankleP, sole, heel: add(sole, out, -3), ball: add(sole, out, 4), toe: add(sole, out, 5) };
   };
-  const shoulderOf = (s: Side) => add(add(neckBase, up(T2), -5), right2, sg(s) * BODY.shoulderHalf);
+  const shoulderOf = (s: Side) => add(add(neckBase, up(T2), -5 * fs), right2, sg(s) * BODY.shoulderHalf);
   const arm = (s: Side) => {
     const k = sg(s);
     const sh = shoulderOf(s);
@@ -319,10 +323,10 @@ function frontFK(p: Pose, pelvis: Vec): Skeleton {
     hands: lerpV(aL.hand, aR.hand, 0.5),
     trap: add(neckBase, up(T2), -2),
     rack: add(neckBase, up(T2), -6),
-    chest: add(mid, up(T2), BODY.thorax * 0.55),
+    chest: add(mid, up(T2), BODY.thorax * 0.55 * fs),
     belly: add(mid, up(T1), -2),
     hipCrease: add(pelvis, up(T1), 2),
-    upperBack: add(mid, up(T2), BODY.thorax * 0.6),
+    upperBack: add(mid, up(T2), BODY.thorax * 0.6 * fs),
     lowBack: mid,
     butt: pelvis,
     waist: add(mid, up(T1), -4),

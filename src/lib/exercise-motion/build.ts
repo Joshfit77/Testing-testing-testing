@@ -198,6 +198,7 @@ export interface KeySpec {
   root?: RootRule;
   ik?: Keyframe["ik"];
   props?: Record<string, Anchor>;
+  layers?: Keyframe["layers"];
   alpha?: number;
 }
 
@@ -211,6 +212,7 @@ export function keys(defaultRoot: RootRule, specs: KeySpec[]): Keyframe[] {
     ease: s.ease,
     ik: s.ik,
     props: s.props,
+    layers: s.layers,
     alpha: s.alpha,
   }));
 }

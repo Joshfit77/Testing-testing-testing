@@ -46,6 +46,7 @@ const POSE_KEYS = [
   "legDR",
   "shinDL",
   "shinDR",
+  "trunkD",
 ] as const satisfies readonly PoseKey[];
 
 function lerpPose(a: Pose, b: Pose, w: number): Pose {
@@ -253,7 +254,9 @@ export function evaluate(c: CompiledMotion, time: number, opts: EvalOptions = {}
     const pa = resolveAnchor(a1, sk);
     const pb = resolveAnchor(b1, sk, wrap && Array.isArray(b1) && b1 !== pd.at ? travel : 0);
     const at = a1 === b1 ? pa : lerpV(pa, pb, w);
-    return { def: pd, at, to: pd.to ? resolveAnchor(pd.to, sk) : undefined };
+    // A layer change takes effect half-way between the keyframes.
+    const layer = (w < 0.5 ? A : B).layers?.[pd.id];
+    return { def: pd, at, to: pd.to ? resolveAnchor(pd.to, sk) : undefined, layer };
   });
 
   return {
@@ -322,6 +325,7 @@ function propExtent(p: ResolvedProp): [number, number, number, number] | null {
     case "log":
     case "stone": {
       const r = s || 22.5;
+      if (def.kind === "barbell" && def.variant === "front") return [at[0] - 110, at[1] - r, at[0] + 110, at[1] + r];
       return [at[0] - r, at[1] - r, at[0] + r, at[1] + r];
     }
     default: {

@@ -8,7 +8,7 @@
  *
  * These are stylised illustrations of correct technique, not filmed video.
  */
-import { goodMorning, kettlebellSwing, pull, squat } from "../lib/exercise-motion/patterns/lower";
+import { goodMorning, kettlebellSwing, pull, squat, sumoPull } from "../lib/exercise-motion/patterns/lower";
 import {
   armIsolation,
   benchPress,
@@ -70,7 +70,8 @@ export const EXERCISE_MOTIONS: Record<string, Builder> = {
 
   // ------------------------------------------------------------------ Hinge
   "conventional-deadlift": (id) => pull({ id, label: `${S}Pulls the bar from the floor in a straight line over mid-foot, hips and shoulders rising together, locks out tall, then lowers under control.` }),
-  "sumo-deadlift": (id) => pull({ id, shin0: 4, barX: 2, label: `${S}Wide sumo stance (seen from the side): a more upright torso pulls the bar from the floor to lockout and back down.` }),
+  "sumo-deadlift": (id) =>
+    sumoPull(id, `${F}Feet wide with toes turned out and hands inside the knees: pushes the knees out, keeps the chest up, and stands the bar up to lockout with hips and shoulders rising together, then lowers it.`),
   "trap-bar-deadlift": (id) => pull({ id, implement: "trapBar", shin0: 20, barStart: 24, label: `${S}Standing inside a trap bar: bends the knees more, pulls to a tall lockout, lowers.` }),
   "romanian-deadlift": (id) => pull({ id, fromTop: true, barStart: 46, down: 2, up: 1.2, label: `${S}From standing, pushes the hips back with soft knees, sliding the bar down the thighs to just below the knees, then drives the hips forward.` }),
   "single-leg-rdl": (id) => singleLegRdl(id, `${S}Balancing on one leg, hinges forward while the free leg reaches back in line with the torso, dumbbell hanging under the shoulder, then returns.`),

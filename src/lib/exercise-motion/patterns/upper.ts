@@ -479,9 +479,10 @@ export function pullUp(o: HangOpts): MotionDef {
   const under = o.grip === "underhand";
   const hangLegs = { hipL: -4, hipR: 6, kneeL: 25, kneeR: 15, ankleL: -25, ankleR: -25 };
   const bottom = pose({ trunk: -4, neck: -6, ...hangLegs, ...both({ sh: 176, el: 4, armD: under ? 10 : 24 }) });
-  // Top: chin over the bar. Hand relative to the shoulder (forward, up).
-  let top = pose({ trunk: under ? -10 : -14, spine: -4, neck: -10, ...hangLegs, hipL: 8, hipR: 14 });
-  top = armsLocal(top, under ? [6, -10] : [-2, -5], under ? [9, 20] : [7, 23]);
+  // Top: chin clearly over the bar (bar at the collarbones, hands just above the shoulders), slight lean back, legs only a little
+  // forward. Hand relative to the shoulder (forward, up); the elbows point out to the sides, so the upper arm is
+  // foreshortened in this view.
+  const top = pose({ trunk: under ? -8 : -10, spine: -4, neck: -8, ...hangLegs, hipL: 2, hipR: 8 });
   if (o.mode === "hang") {
     const b2 = { ...bottom, trunk: -1, hipL: 0, hipR: 4 };
     return {
@@ -512,11 +513,24 @@ export function pullUp(o: HangOpts): MotionDef {
       stillPhase: 0.5,
     };
   }
-  const mid = (() => {
-    let m = mix(bottom, top, 0.5);
-    m = armsLocal(m, under ? [8, -18] : [-4, -18], under ? [7, 34] : [6, 36]);
-    return m;
-  })();
+  // Keyframes sampled along the real elbow path: with an overhand grip the elbows sweep down and out to the sides
+  // (seen end-on from here), with an underhand grip down and in front. θ = elbow angle from straight overhead.
+  const gripOut = under ? 3 : 15; // hand's sideways offset from the shoulder
+  const fwd = under ? 0.45 : 0.08; // share of the elbow's travel that shows as forward in this view
+  const along = (theta: number): Pose => {
+    const u = (theta - 20) / 115;
+    const t = (theta * Math.PI) / 180;
+    const ex = BODY.upperArm * Math.sin(t) * fwd;
+    const lat = BODY.upperArm * Math.sin(t) * Math.sqrt(1 - fwd * fwd) - gripOut;
+    const hx = ex + 2 + 4 * u;
+    const ey = BODY.upperArm * Math.cos(t);
+    const hy = ey + Math.sqrt(Math.max(0, BODY.forearm ** 2 - lat * lat - (hx - ex) ** 2));
+    const q = armsLocal(mix(bottom, top, u), [ex, ey], [hx, hy]);
+    // Straight arms at the bottom, never locked past straight.
+    return { ...q, elL: Math.max(3, q.elL), elR: Math.max(3, q.elR) };
+  };
+  const thetas = [20, 58, 96, 135];
+  const [b0, s1, s2, t3] = thetas.map(along) as [Pose, Pose, Pose, Pose];
   const props: PropDef[] = [{ id: "bar", kind: "pullupBar", at: bar, layer: "back" }];
   if (o.band) props.push({ id: "band", kind: "band", at: bar, to: { lm: "kneeR", dy: -4 }, layer: "near" });
   return {
@@ -524,10 +538,12 @@ export function pullUp(o: HangOpts): MotionDef {
     view: "side",
     label: o.label,
     keyframes: keys(root, [
-      { pose: bottom, dur: 0.6, hold: 0.4, ease: "spline" },
-      { pose: mid, dur: 0.6, ease: "spline" },
-      { pose: top, dur: 1, hold: 0.3, ease: "spline" },
-      { pose: mid, dur: 1, ease: "spline" },
+      { pose: b0, dur: 0.35, hold: 0.4, ease: "spline" },
+      { pose: s1, dur: 0.35, ease: "spline" },
+      { pose: s2, dur: 0.4, ease: "spline" },
+      { pose: t3, dur: 0.6, hold: 0.3, ease: "spline" },
+      { pose: s2, dur: 0.6, ease: "spline" },
+      { pose: s1, dur: 0.6, ease: "spline" },
     ]),
     props,
     stillPhase: 0.55,

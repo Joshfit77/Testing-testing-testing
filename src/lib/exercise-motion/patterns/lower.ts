@@ -262,6 +262,72 @@ export function pull(o: PullOpts): MotionDef {
 }
 
 /** Good morning: bar on the back, hinge with soft knees. */
+/**
+ * Sumo deadlift, seen from the front so the stance is visible: feet about twice shoulder width with the toes turned out,
+ * knees pushed out over the toes, hands gripping the bar at shoulder width inside the knees, plates outside the feet.
+ * The hips start lower and the torso more upright than in a conventional pull (here about 54° from upright at the
+ * floor, against about 68° for this figure's conventional deadlift), and hips and shoulders rise together.
+ */
+export function sumoPull(id: string, label: string): MotionDef {
+  const footX = 42; // sole centre from the body's midline
+  const grip = 21; // hand from the midline (shoulder-width grip)
+  const ARM_REACH = Math.sqrt(ARM * ARM - (grip - BODY.shoulderHalf) ** 2);
+  const torso = BODY.lumbar + BODY.thorax - 5; // pelvis → shoulder line, upright
+  const hipY0 = 7.5 + Math.sqrt((BODY.thigh + BODY.shin) ** 2 - (footX - BODY.hipHalf) ** 2);
+  const barTop = hipY0 + torso - ARM_REACH;
+  const barBottom = 22.5;
+  const hipYBottom = 56;
+  const kneeBottom: Vec = [46, 48.5];
+  const smooth = (t: number) => t * t * (3 - 2 * t);
+  const at = (s: number): Pose => {
+    const barY = barTop + (barBottom - barTop) * s;
+    const ph = hipY0 + (hipYBottom - hipY0) * s;
+    const fs = Math.min(1, (barY + ARM_REACH - ph) / torso);
+    let p = pose({ trunkD: (Math.acos(fs) * 180) / Math.PI });
+    // Legs, in pelvis-origin coordinates (pelvis at height ph above the floor).
+    const hip: Vec = [BODY.hipHalf, 0];
+    const ankle: Vec = [footX, 7.5 - ph];
+    const onLine: Vec = [hip[0] + (ankle[0] - hip[0]) * (BODY.thigh / (BODY.thigh + BODY.shin)), hip[1] + (ankle[1] - hip[1]) * (BODY.thigh / (BODY.thigh + BODY.shin))];
+    const w = smooth(s);
+    const knee: Vec = [onLine[0] + (kneeBottom[0] - onLine[0]) * w, onLine[1] + (kneeBottom[1] - ph - onLine[1]) * w];
+    const th: Vec = [knee[0] - hip[0], knee[1] - hip[1]];
+    const sh: Vec = [ankle[0] - knee[0], ankle[1] - knee[1]];
+    const deg = (r: number) => (r * 180) / Math.PI;
+    const hipAbd = deg(Math.atan2(th[0], -th[1]));
+    const shinTilt = deg(Math.atan2(sh[0], -sh[1]));
+    const legD = deg(Math.acos(Math.min(1, Math.hypot(th[0], th[1]) / BODY.thigh)));
+    const shinD = deg(Math.acos(Math.min(1, Math.hypot(sh[0], sh[1]) / BODY.shin)));
+    p = { ...p, hipL: hipAbd, hipR: hipAbd, ankleL: shinTilt, ankleR: shinTilt, legDL: legD, legDR: legD, shinDL: shinD, shinDR: shinD };
+    // Arms hang straight to the bar.
+    const sk = forwardKinematics(p, "front");
+    for (const side of ["L", "R"] as const) {
+      const k = side === "L" ? 1 : -1;
+      const shoulder = sk.pts[`shoulder${side}`];
+      const hand: Vec = [k * grip, barY - ph];
+      const elbow: Vec = [shoulder[0] + (hand[0] - shoulder[0]) * (BODY.upperArm / ARM), shoulder[1] + (hand[1] - shoulder[1]) * (BODY.upperArm / ARM)];
+      p = armThrough(p, side, elbow, hand, "front");
+    }
+    return p;
+  };
+  // Several in-between keys so the interpolated legs keep the feet planted.
+  const upS = [1, 0.75, 0.5, 0.25];
+  const downS = [0, 0.25, 0.5, 0.75];
+  const specs: KeySpec[] = [
+    ...upS.map((v, i): KeySpec => ({ pose: at(v), dur: 0.3, hold: i === 0 ? 0.5 : 0, ease: "spline" })),
+    ...downS.map((v, i): KeySpec => ({ pose: at(v), dur: 0.4, hold: i === 0 ? 0.5 : 0, ease: "spline" })),
+  ];
+  return {
+    id,
+    view: "front",
+    label,
+    keyframes: keys(FEET, specs),
+    props: [{ id: "bar", kind: "barbell", variant: "front", at: { lm: "hands" }, layer: "front" }],
+    planted: ["L", "R"],
+    footGrounded: true,
+    stillPhase: 0.05,
+  };
+}
+
 export function goodMorning(id: string, label: string): MotionDef {
   const at = (s: number) => {
     const T = 6 + 72 * s;

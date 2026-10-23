@@ -1,6 +1,8 @@
 import { BODY, ankleForSole } from "../skeleton";
 import {
   FEET,
+  armThrough,
+  armTo,
   armsLocal,
   both,
   keys,
@@ -203,11 +205,24 @@ export function coreMove(id: string, label: string, kind: CoreKind): MotionDef {
       ], { props: [mat] });
     }
     case "childs-pose": {
-      // Sitting back on the heels (shins flat), chest folded onto the thighs, arms long on the floor.
-      const T = 104;
+      // Sitting back on the heels (shins flat on the floor), chest folded onto the thighs, forehead resting on the floor
+      // and arms reaching forward with the hands flat on the floor.
       const thighA = 72;
-      const p = pose({ trunk: T, spine: 6, neck: 18, ...both({ hip: thighA + T, knee: thighA + 90, ankle: -65, sh: 182, el: 2 }) });
-      return M({ ground: 0 }, hold2(p, breathe(p, 4), 2.4), { props: [mat], stillPhase: 0, allowLimits: ["hipL", "hipR", "kneeL", "kneeR"] });
+      const root: RootRule = { pin: "kneeCapR", at: [0, 0] };
+      const fold = (T: number, spine = 10) => pose({ trunk: T, spine, neck: 22, ...both({ hip: thighA + T, knee: thighA + 90, ankle: -65 }) });
+      const reach = (p: Pose): Pose => {
+        const W = worldPts(p, root);
+        const h = W.shoulder[1] - BODY.r.hand;
+        const hand: Vec = [W.shoulder[0] + Math.sqrt(Math.max(0, (ARM - 1) ** 2 - h * h)), BODY.r.hand];
+        let out = p;
+        for (const s of ["L", "R"] as const) out = armTo(out, s, [hand[0] - W.pelvis[0], hand[1] - W.pelvis[1]]);
+        return out;
+      };
+      // Trunk angle that rests the forehead on the floor.
+      const T = solve1D((t) => worldPts(fold(t), root).foreheadFront[1] - 3, 40, 110);
+      const p = reach(fold(T));
+      const exhale = reach(fold(T, 14));
+      return M(root, hold2(p, exhale, 2.4), { props: [mat], stillPhase: 0, allowLimits: ["hipL", "hipR", "kneeL", "kneeR"] });
     }
     case "couch-stretch": {
       const root: RootRule = { pin: "kneeCapL", at: [0, 0] };
@@ -269,19 +284,29 @@ export function coreMove(id: string, label: string, kind: CoreKind): MotionDef {
       };
     }
     case "worlds-greatest": {
+      // Deep lunge with the torso low over the front thigh so the far hand rests flat on the floor inside the front
+      // foot; the near elbow drops toward the instep, then the torso rotates open and that arm points at the ceiling.
       const root: RootRule = { pin: "soleR", at: [0, 0] };
-      let lunge = pose({ ...stanceLegs(18, 100, 60, ["R"]), neck: -20 });
+      let lunge = pose({ ...stanceLegs(24, 108, 66, ["R"]), spine: 19, neck: -26 });
       const Wl = worldPts(lunge, root);
-      const rear = ankleForSole(Wl.pelvis[0] - 70, 0, -40);
+      const rear = ankleForSole(Wl.pelvis[0] - 74, 0, -40);
       lunge = legsTo(lunge, root, rear, ["L"], -40);
-      lunge = handsTo(lunge, root, [Wl.soleR[0] - 6, BODY.r.hand], ["L"]);
-      const elbowIn = armsLocal(lunge, [18, -24], [6, -6], ["R"]);
-      const reach = { ...lunge, shR: 186, elR: 0, armDR: 50, neck: -40 };
-      const handL: Vec = [Wl.soleR[0] - 6, BODY.r.hand];
+      const handL: Vec = [Wl.soleR[0] - 4, BODY.r.hand];
+      lunge = handsTo(lunge, root, handL, ["L"]);
+      // Near elbow dropped down inside the front shin toward the instep, forearm hanging toward the floor.
+      const Wn = worldPts(lunge, root);
+      const elbowW: Vec = [Wn.shoulder[0] - 8, Wn.shoulder[1] - 30];
+      const handW: Vec = [elbowW[0] + 8, elbowW[1] - 29];
+      const local = (v: Vec): Vec => [v[0] - Wn.pelvis[0], v[1] - Wn.pelvis[1]];
+      const elbowIn = armThrough(lunge, "R", local(elbowW), local(handW));
+      // Seen from the side, the rotated-open arm is simply vertical: its projected shoulder angle exceeds the sagittal
+      // range, hence allowLimits below.
+      const T2 = lunge.trunk + lunge.spine;
+      const reach = { ...lunge, shR: 180 + T2, elR: 0, armDR: 0, foreDR: 0, neck: -45 };
       return M(root, [
         { pose: elbowIn, dur: 1.5, hold: 0.6, ease: "inOut", ik: { handL, footL: rear } },
         { pose: reach, dur: 1.5, hold: 1, ease: "inOut", ik: { handL, footL: rear } },
-      ], { stillPhase: 0.6 });
+      ], { stillPhase: 0.6, allowLimits: ["shR"] });
     }
     case "knee-to-wall": {
       const root: RootRule = { pin: "soleR", at: [0, 0] };

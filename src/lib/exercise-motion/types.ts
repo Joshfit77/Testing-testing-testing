@@ -20,7 +20,8 @@
  *  - sh: shoulder abduction (0 = at the side, 90 = out to the side, 180 = overhead).  el: elbow bend in that plane.
  *  - hip: hip abduction.  knee: knee bend (drawn by foreshortening the thigh / shin).  ankle: shin tilt from the knee.
  *
- * Depth fields foreshorten a segment that points toward / away from the viewer (0 = in the picture plane).
+ * Depth fields foreshorten a segment that points toward / away from the viewer (0 = in the picture plane); `trunkD` does
+ * the same for the whole torso in the front view (a lifter bending forward toward the camera).
  */
 export interface Pose {
   trunk: number;
@@ -48,6 +49,8 @@ export interface Pose {
   /** Shin foreshortening (front view). */
   shinDL: number;
   shinDR: number;
+  /** Forward lean of the trunk toward the viewer (front view only): foreshortens the torso. 0 = upright. */
+  trunkD: number;
 }
 
 export type PoseKey = keyof Pose;
@@ -128,6 +131,8 @@ export interface Keyframe {
   ik?: Partial<Record<"handL" | "handR" | "footL" | "footR", Anchor>>;
   /** Per-keyframe positions for movable equipment (e.g. a thrown ball), by prop id. */
   props?: Record<string, Anchor>;
+  /** Per-keyframe drawing layer for movable equipment, by prop id (e.g. a sandbag that ends up behind the head). */
+  layers?: Record<string, NonNullable<PropDef["layer"]>>;
   /** Seconds to travel from this keyframe to the next. */
   dur: number;
   /** Seconds to hold this keyframe before moving on. */
@@ -266,6 +271,8 @@ export interface ResolvedProp {
   def: PropDef;
   at: Vec;
   to?: Vec;
+  /** Layer for this frame when a keyframe overrides the definition's. */
+  layer?: PropDef["layer"];
 }
 
 /** Minimal exercise info used to choose a pattern-based fallback for slugs without a hand-made motion. */

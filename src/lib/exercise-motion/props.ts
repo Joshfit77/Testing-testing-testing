@@ -45,6 +45,24 @@ function steelGrad(ctx: Ctx, a: Vec, b: Vec) {
   return g;
 }
 
+/** Barbell seen from the front: shaft, sleeves and three plates per side seen edge-on. */
+function barbellFront(ctx: Ctx, c: Vec, r: number) {
+  line(ctx, [c[0] - 64, c[1]], [c[0] + 64, c[1]], 2.8, STEEL);
+  for (const k of [-1, 1]) {
+    line(ctx, [c[0] + k * 62, c[1]], [c[0] + k * 108, c[1]], 5, STEEL_LO);
+    line(ctx, [c[0] + k * 62, c[1]], [c[0] + k * 108, c[1]], 3, STEEL_HI);
+    for (let i = 0; i < 3; i++) {
+      const x = c[0] + k * (67 + i * 5);
+      rrect(ctx, x - 2.2, c[1] - r, 4.4, 2 * r, 1.2);
+      ctx.fillStyle = IRON;
+      ctx.fill();
+      ctx.strokeStyle = IRON_RIM;
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+    }
+  }
+}
+
 /** Plate seen face-on (side view of a barbell). */
 export function plate(ctx: Ctx, c: Vec, r: number, hub = 3.2) {
   const g = ctx.createRadialGradient(c[0] - r * 0.3, c[1] + r * 0.35, r * 0.1, c[0], c[1], r);
@@ -196,6 +214,12 @@ export function drawProp(ctx: Ctx, p: ResolvedProp, f: Frame, t: number) {
   const size = def.size;
   switch (def.kind) {
     case "barbell": {
+      if (def.variant === "front") {
+        // Seen from the front: the 220 cm bar runs across the picture with the plates edge-on outside the hands
+        // (and outside a sumo stance).
+        barbellFront(ctx, at, size ?? 22.5);
+        return;
+      }
       if (def.variant === "empty") {
         // Bar seen end-on with collars, no plates.
         ctx.fillStyle = steelGrad(ctx, [at[0] - 3, at[1] + 3], [at[0] + 3, at[1] - 3]);
@@ -674,19 +698,33 @@ export function drawProp(ctx: Ctx, p: ResolvedProp, f: Frame, t: number) {
       return;
     }
     case "legPress": {
-      // `at` = seat hinge; `to` = feet (platform follows the feet along a 45° rail).
+      // `at` = where the seat meets the back pad (under the buttocks); `angle` = back-pad lean from vertical (negative =
+      // reclined), so the pad lies along the lifter's back; `to` = feet (the foot plate rides a 45° rail).
       const s = at;
-      pad(ctx, [s[0] - 2, s[1] - 4], [s[0] + 28, s[1] - 4], 7);
-      pad(ctx, [s[0] - 2, s[1] - 4], [s[0] - 38, s[1] + 34], 7);
-      machineFrame(ctx, [[s[0] - 40, 3], [s[0] + 150, 3]], 4);
-      machineFrame(ctx, [[s[0] + 5, s[1] - 8], [s[0] + 5, 3]], 4);
-      machineFrame(ctx, [[s[0] + 40, 20], [s[0] + 150, 130]], 3.2);
-      machineFrame(ctx, [[s[0] + 150, 3], [s[0] + 150, 130]], 3.2);
+      const lean = ((def.angle ?? -45) * Math.PI) / 180;
+      const backDir: Vec = [Math.sin(lean), Math.cos(lean)];
+      const behind: Vec = [-Math.cos(lean), Math.sin(lean)];
+      const b0 = add(s, behind, 3.5);
+      pad(ctx, [s[0] - 2, s[1] - 3.5], [s[0] + 28, s[1] - 3.5], 7);
+      pad(ctx, b0, add(b0, backDir, 78), 7);
+      machineFrame(ctx, [[s[0] - 50, 3], [s[0] + 160, 3]], 4);
+      machineFrame(ctx, [[s[0] + 5, s[1] - 7], [s[0] + 5, 3]], 4);
+      machineFrame(ctx, [add(b0, backDir, 40), [add(b0, backDir, 40)[0], 3]], 3);
       if (p.to) {
         const ft = p.to;
         const n: Vec = [Math.SQRT1_2, -Math.SQRT1_2];
+        const dir: Vec = [Math.SQRT1_2, Math.SQRT1_2];
         const a = add(ft, n, 3);
         const plateDir: Vec = [-Math.SQRT1_2, -Math.SQRT1_2];
+        // The rail sits under the sled, parallel to the feet's path: the same line in every frame.
+        const q = add(ft, n, 26);
+        // Starts in front of the seat, not under the lifter.
+        const r0 = add(q, dir, Math.max((12 - q[1]) / dir[1], (s[0] + 40 - q[0]) / dir[0]));
+        const r1 = add(q, dir, (150 - q[1]) / dir[1]);
+        machineFrame(ctx, [r0, r1], 3.2);
+        machineFrame(ctx, [r0, [r0[0], 3]], 3.2);
+        machineFrame(ctx, [r1, [r1[0], 3]], 3.2);
+        machineFrame(ctx, [a, add(a, n, 22)], 3);
         pad(ctx, add(a, plateDir, -24), add(a, plateDir, 18), 4);
         plate(ctx, add(a, n, 16), 20);
       }

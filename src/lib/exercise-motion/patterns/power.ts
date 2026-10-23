@@ -198,7 +198,9 @@ export function loadObject(id: string, label: string, kind: "stone" | "sandbag-p
   const root: RootRule = { pin: "soleR", at: [0, 0] };
   const stone = kind === "stone";
   const r = stone ? 23 : 15;
-  const floorObj: Vec = [stone ? 26 : 22, r];
+  const toPlatform = kind !== "sandbag-shoulder";
+  // For a platform load the object starts between the feet (straddled), behind the platform's front edge.
+  const floorObj: Vec = [toPlatform ? 4 : 22, r];
   const hinge = (() => {
     let p = pose({ ...stanceLegs(16, 80, 62), spine: 18, neck: -16 });
     p = handsTo({ ...p, ...both({ armD: 40 }) }, root, [floorObj[0] + 4, floorObj[1] - 8]);
@@ -211,33 +213,46 @@ export function loadObject(id: string, label: string, kind: "stone" | "sandbag-p
     return p;
   })();
   const lapObj: Anchor = { lm: "thighR", dx: 4, dy: r + 4 };
+  // Standing tall with the object hugged high against the chest (pressed into it, not held out at arm's length).
   const extend = armsLocal(pose({ ...stanceLegs(4, 10, -8) }), [14, -24], [22, -6]);
   const chestObj: Anchor = { lm: "chest", dx: r * 0.7, dy: 0 };
-  const shoulderObj: Anchor = { lm: "shoulder", dx: -9, dy: 11 };
-  const platH = stone ? 110 : 100;
-  const platX = 72;
-  const topObj: Vec = [platX - 6, platH + r];
-  const specs: KeySpec[] = [
-    k(hinge, 0.7, { hold: 0.5, props: { obj: floorObj } }),
-    k(lap, 0.8, { hold: 0.3, props: { obj: lapObj } }),
-    k(extend, 0.6, { props: { obj: kind === "sandbag-shoulder" ? shoulderObj : chestObj } }),
-  ];
-  if (kind === "sandbag-shoulder") {
-    const top = armsLocal(pose({ ...stanceLegs(1, 3, 0) }), [-4, -16], [4, 14]);
-    specs.push(k(top, 0.8, { hold: 0.6, props: { obj: shoulderObj } }), k(standP(), 0.6, { props: { obj: [26, r] } }), k(hinge, 0.5, { props: { obj: floorObj }, alpha: 1 }));
-  } else {
-    const reach = armsLocal(pose({ ...stanceLegs(2, 6, 8) }), [24, -6], [46, 0]);
-    specs.push(
-      k(reach, 0.6, { hold: 0.3, props: { obj: topObj } }),
-      k(standP(), 0.4, { hold: 0.4, props: { obj: topObj } }),
-      k(standP(), 0.3, { props: { obj: topObj }, alpha: 0 }),
-      k(hinge, 0.3, { props: { obj: floorObj }, alpha: 0 }),
-    );
-  }
+  // Straddled on the floor, the near leg is in front of it.
+  const floorLayer = toPlatform ? { obj: "mid" as const } : undefined;
+  const specs: KeySpec[] = [k(hinge, 0.7, { hold: 0.5, props: { obj: floorObj }, layers: floorLayer }), k(lap, 0.8, { hold: 0.3, props: { obj: lapObj } })];
   const props: PropDef[] = [
     stone ? { id: "obj", kind: "stone", at: floorObj, size: r, layer: "front" } : { id: "obj", kind: "sandbag", at: floorObj, w: 44, h: 28, layer: "front" },
   ];
-  if (kind !== "sandbag-shoulder") props.unshift({ id: "plat", kind: "platform", at: [platX + 14, 0], w: 44, h: platH, layer: "back" });
+  if (kind === "sandbag-shoulder") {
+    // Pop: the bag rises past the chest, then lands on the far shoulder (drawn behind the head) with both hands steadying it.
+    const popObj: Anchor = { lm: "chest", dx: 10, dy: 12 };
+    const shoulderObj: Anchor = { lm: "shoulder", dx: -2, dy: 9 };
+    const top = armsLocal(pose({ ...stanceLegs(1, 3, 0) }), [-4, -16], [4, 14]);
+    specs.push(
+      k(extend, 0.35, { props: { obj: popObj } }),
+      k(top, 0.8, { hold: 0.6, props: { obj: shoulderObj }, layers: { obj: "mid" } }),
+      k(standP(), 0.6, { props: { obj: [26, r] } }),
+      k(hinge, 0.5, { props: { obj: floorObj }, alpha: 1 }),
+    );
+  } else {
+    // The platform stands just in front of the toes at about chest height, so the object rolls from the chest onto it.
+    const We = worldPts(extend, root);
+    const held: Vec = [We.chest[0] + r * 0.7, We.chest[1]];
+    // Top just below the hugged object; front edge a few centimetres past the toes.
+    const platH = Math.round(held[1] - r - 3);
+    const edge = Math.max(We.toeR[0] + 6, floorObj[0] + r + 3);
+    const topObj: Vec = [Math.max(held[0] + 8, edge + r * 0.5), platH + r];
+    const platW = 44;
+    // Hips driven through with a slight lean back, hands pushing on the back of the object as it lands.
+    const load = handsTo({ ...pose({ ...stanceLegs(2, 6, -6) }), ...both({ armD: 30 }) }, root, [topObj[0] - r * 0.8, topObj[1] + r * 0.35]);
+    specs.push(
+      k(extend, 0.6, { hold: 0.2, props: { obj: chestObj } }),
+      k(load, 0.5, { hold: 0.3, props: { obj: topObj } }),
+      k(standP(), 0.4, { hold: 0.4, props: { obj: topObj } }),
+      k(standP(), 0.3, { props: { obj: topObj }, alpha: 0 }),
+      k(hinge, 0.3, { props: { obj: floorObj }, layers: floorLayer, alpha: 0 }),
+    );
+    props.unshift({ id: "plat", kind: "platform", at: [edge + platW / 2, 0], w: platW, h: platH, layer: "back" });
+  }
   return { id, view: "side", label, keyframes: keys(root, specs), props, planted: ["L", "R"], footGrounded: true, stillPhase: 0.3 };
 }
 

@@ -73,7 +73,7 @@ export function renderFrame(ctx: CanvasRenderingContext2D, frame: Frame, cam: Ca
   ctx.globalAlpha = frame.alpha;
   const t = opts.time ?? 0;
   const layer = (name: string) => {
-    for (const p of frame.props) if ((p.def.layer ?? "near") === name) drawProp(ctx, p, frame, t);
+    for (const p of frame.props) if ((p.layer ?? p.def.layer ?? "near") === name) drawProp(ctx, p, frame, t);
   };
   layer("back");
   if (frame.view === "side") drawSideFigure(ctx, frame, layer);
