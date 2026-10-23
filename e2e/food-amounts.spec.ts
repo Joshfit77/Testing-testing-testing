@@ -1,51 +1,16 @@
-import { createServer, type Server } from "node:http";
 import { expect, test, type Page } from "@playwright/test";
 import { completeOnboarding, signUpAndConfirm, uniqueEmail } from "./helpers";
+import { BAR_CODE } from "./off-mock";
 
 /**
  * MyFitnessPal-style food log: USDA search with exact amounts in oz / g / household measures, editing an
  * entry, browsing by food type, and a barcode (typed code) with the package's label serving.
  *
  * The barcode part needs the app server started with OFF_API_BASE_URL=http://127.0.0.1:<E2E_OFF_MOCK_PORT>
- * so Open Food Facts is answered by the local mock below (the real API isn't reachable from tests).
+ * so Open Food Facts is answered by the shared local mock (e2e/off-mock.ts; the real API isn't reachable from tests).
  */
+// Open Food Facts is answered by the shared mock in off-mock.ts, started by global-setup.ts.
 const OFF_PORT = Number(process.env.E2E_OFF_MOCK_PORT ?? 0);
-const BAR_CODE = "0012345678905";
-
-let mock: Server | null = null;
-
-test.beforeAll(async () => {
-  if (!OFF_PORT) return;
-  mock = createServer((req, res) => {
-    const code = req.url?.match(/\/api\/v2\/product\/(\d+)\.json/)?.[1];
-    res.setHeader("Content-Type", "application/json");
-    if (code !== BAR_CODE) {
-      res.statusCode = 404;
-      res.end(JSON.stringify({ status: 0, status_verbose: "product not found" }));
-      return;
-    }
-    res.end(
-      JSON.stringify({
-        code: BAR_CODE,
-        status: 1,
-        product: {
-          code: BAR_CODE,
-          product_name: "Peanut Protein Bar",
-          brands: "Test Foods",
-          quantity: "4 x 60 g",
-          serving_size: "1 bar (60 g)",
-          serving_quantity: 60,
-          nutriments: { "energy-kcal_100g": 350, proteins_100g: 33.3, carbohydrates_100g: 40, fat_100g: 11.7, fiber_100g: 10, sugars_100g: 5, sodium_100g: 0.4 },
-        },
-      }),
-    );
-  });
-  await new Promise<void>((resolve) => mock!.listen(OFF_PORT, "127.0.0.1", resolve));
-});
-
-test.afterAll(async () => {
-  await new Promise<void>((resolve) => (mock ? mock.close(() => resolve()) : resolve()));
-});
 
 async function openAddFood(page: Page) {
   await page.getByRole("button", { name: "Add food" }).click();

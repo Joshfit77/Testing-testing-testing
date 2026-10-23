@@ -8,7 +8,8 @@ import type { Plan } from "./types";
  *           training calendar, and every Fitness, Food and Faith rank badge.
  *   Plus  — everything in Free, plus the full program library, the custom program builder, unlimited workout
  *           templates, recipes / meal planner / grocery list, advanced progress and strength trends, progress-photo
- *           comparisons and scheduling/rescheduling on the training calendar. No AI.
+ *           comparisons, scheduling/rescheduling on the training calendar, and product comparisons and personal
+ *           filters in the Food Quality Scanner. No AI.
  *   Pro   — everything in Plus, plus the AI coach (a monthly message allowance) and AI plan generation.
  */
 export const FEATURES = [
@@ -24,6 +25,7 @@ export const FEATURES = [
   "meal_planning",
   "advanced_analytics",
   "advanced_calendar",
+  "food_comparisons",
   // Pro
   "ai_coach",
   "ai_plan_generation",
@@ -40,6 +42,7 @@ const PLUS_FEATURES: Feature[] = [
   "meal_planning",
   "advanced_analytics",
   "advanced_calendar",
+  "food_comparisons",
 ];
 
 export interface PlanConfig {

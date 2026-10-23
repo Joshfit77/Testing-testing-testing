@@ -136,6 +136,14 @@ function reply(req: MockRequest): { blocks: Block[]; stop: string; delayMs: numb
 function structuredReply(req: MockRequest): Record<string, unknown> | null {
   const system = req.system.map((b) => b.text).join("\n");
   const user = String(typeof req.messages[0]?.content === "string" ? req.messages[0].content : "");
+  if (system.includes("You explain a packaged food")) {
+    return {
+      summary: "At 160 kcal and 3 g protein per 40 g serving, this fits as a small pre-workout carb snack rather than a protein source.",
+      fits: ["Quick carbohydrates (31 g per serving) before training"],
+      watch_outs: ["12 g sugars per serving, a large share of the sugars in your day"],
+      uncertainties: ["Added sugars aren't listed separately (not available)"],
+    };
+  }
   if (system.includes("You estimate the nutrition of a meal from one photo")) {
     const it = (name: string, portion: string, grams: number | null, calories: number, p: number, c: number, f: number, confidence: string, search_term: string) => ({
       name,
@@ -691,5 +699,31 @@ test.describe("AI coach", () => {
     await expect(page.getByRole("button", { name: "Edit Olive oil" })).toContainText("13.5 g · 119 kcal");
     await expect(page.getByRole("button", { name: /^Edit White rice/ })).toContainText("USDA");
     await expect(page.getByText("Includes estimated entries")).toBeVisible();
+  });
+  test("food quality: Pro gets an AI explanation for their goals from the product's known data only", async ({ page }) => {
+    test.skip(!MOCK_PORT || !process.env.E2E_OFF_MOCK_PORT, "needs the mock Anthropic and Open Food Facts servers");
+    const email = uniqueEmail("quality-pro");
+    await signUpAndConfirm(page, email);
+    await completeOnboarding(page);
+    await grantPlan(email, "pro");
+    await page.goto("/coach");
+    await page.getByRole("button", { name: "Allow and continue" }).click();
+    await expect(page.getByLabel("Message the AI coach")).toBeVisible();
+
+    await page.goto("/nutrition/product/5000000000012");
+    const explain = page.getByTestId("product-explain");
+    await explain.getByRole("button", { name: "Explain for my goals" }).click();
+    const out = page.getByTestId("product-explanation");
+    await expect(out).toContainText("based only on the data shown", { timeout: 30_000 });
+    await expect(out).toContainText("fits as a small pre-workout carb snack");
+    await expect(out).toContainText("Added sugars aren't listed separately");
+
+    const sent = requests.filter((r) => r.system.some((b) => b.text.includes("You explain a packaged food"))).at(-1)!;
+    expect(sent.model).toBe("claude-haiku-5-5");
+    const text = String(sent.messages[0]!.content);
+    expect(text).toContain("Product: Honey Crunch (Morning Co)");
+    expect(text).toContain("Nutri-Score: D");
+    expect(text).toContain("added sugars (g): not available");
+    expect(text).toContain("Daily targets:");
   });
 });

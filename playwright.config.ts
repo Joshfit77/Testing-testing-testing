@@ -5,6 +5,8 @@ const chromium = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 
 export default defineConfig({
   testDir: "./e2e",
+  // The shared Open Food Facts mock (when E2E_OFF_MOCK_PORT is set).
+  globalSetup: "./e2e/global-setup.ts",
   timeout: 90_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,

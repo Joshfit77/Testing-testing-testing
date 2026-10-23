@@ -4,7 +4,7 @@ describe("plans & entitlements", () => {
   it("gates features by plan: food logging free, Plus a complete non-AI toolkit, AI only on Pro", () => {
     // Free: food & calorie logging with barcode scanning and macros (all `nutrition_tracking`), basic training.
     for (const f of ["workout_logging", "starter_programs", "basic_progress", "nutrition_tracking"] as const) expect(hasFeature("free", f), f).toBe(true);
-    for (const f of ["full_program_library", "custom_program_builder", "unlimited_templates", "meal_planning", "advanced_analytics", "advanced_calendar"] as const) {
+    for (const f of ["full_program_library", "custom_program_builder", "unlimited_templates", "meal_planning", "advanced_analytics", "advanced_calendar", "food_comparisons"] as const) {
       expect(hasFeature("free", f), f).toBe(false);
       expect(hasFeature("plus", f), f).toBe(true);
       expect(hasFeature("pro", f), f).toBe(true);

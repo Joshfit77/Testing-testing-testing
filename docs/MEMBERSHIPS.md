@@ -20,6 +20,11 @@ enforces each gate as well as the screen showing it. The Faith section is never 
 | Recipes, meal planner, grocery list | — | ✓ | ✓ | `meal_planning`: pages and `src/server/actions/{recipes,meal-plan,grocery}.ts` |
 | Advanced progress & strength trends, progress-photo comparisons | — | ✓ | ✓ | `advanced_analytics` |
 | Scheduling and rescheduling sessions on the training calendar | — | ✓ | ✓ | `advanced_calendar`: `movePlannedSessionAction` (viewing is free; "move back" works on every plan) |
+| Interactive muscle body map and strength ranks (`/progress/body-map`) | — | ✓ | ✓ | `advanced_analytics`: page and `setStrengthStandardsAction` |
+| Food Quality Scanner: product facts, indicators, ingredients, allergens, alternatives, Add to Food Diary | ✓ | ✓ | ✓ | `nutrition_tracking` |
+| Food Quality Scanner: personal filters and side-by-side comparisons | — | ✓ | ✓ | `food_comparisons`: compare page and `setFoodFiltersAction` |
+| Guided Body Scan (`/progress/body-scan`) | — | — | ✓ | `canUseBodyScan` + database `has_plan('pro')` and consent |
+| Meal photo analysis, AI meal plans, food-quality AI explanations | — | — | ✓ | AI allowance (`withAiRequest`), AI consent, and the separate photo consent |
 | AI coach (150 requests/month) and AI plan generation (15/month) | — | — | ✓ | `ai_coach`, `ai_plan_generation`: `assertAiAllowed` |
 
 **Downgrades never delete anything.**

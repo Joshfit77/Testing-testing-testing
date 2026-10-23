@@ -61,11 +61,14 @@ export function offChoice(product: BarcodeProduct, format?: RetailBarcodeFormat)
 export function BarcodeScanner({
   onFound,
   onEnterManually,
+  onCode,
 }: {
   /** A product with nutrition was found: open the amount step for it. */
   onFound: (choice: FoodChoice) => void;
   /** Switch to manual entry, optionally prefilling the food name. */
   onEnterManually: (name?: string) => void;
+  /** When set, every scanned or typed code goes here instead of the nutrition lookup (the Food Quality Scanner). */
+  onCode?: (code: string, format?: RetailBarcodeFormat) => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsRef = useRef<ScanControls | null>(null);
@@ -99,6 +102,11 @@ export function BarcodeScanner({
   useEffect(() => stopCamera, [stopCamera]);
 
   const runLookup = useCallback(async (code: string, format?: RetailBarcodeFormat) => {
+    if (onCode) {
+      setLookup({ kind: "loading", code });
+      onCode(code, format);
+      return;
+    }
     setLookup({ kind: "loading", code });
     try {
       const params = new URLSearchParams({ code });
@@ -129,7 +137,7 @@ export function BarcodeScanner({
         message: typeof navigator !== "undefined" && navigator.onLine === false ? "You're offline. Connect to the internet to look up products." : "Lookup failed. Check your connection and try again.",
       });
     }
-  }, [onFound]);
+  }, [onFound, onCode]);
 
   const startNative = async () => {
     setNativeMessage(null);

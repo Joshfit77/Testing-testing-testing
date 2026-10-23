@@ -43,7 +43,7 @@ export function AmountPicker({
   headerAction,
   children,
 }: {
-  food: Pick<FoodChoice, "name" | "detail" | "basis" | "note" | "isEstimate">;
+  food: Pick<FoodChoice, "name" | "detail" | "basis" | "note" | "isEstimate"> & Partial<Pick<FoodChoice, "kind" | "ref">>;
   initialQuantity: number;
   initialUnitId: string;
   /** Omit both to hide the Meal picker (e.g. recipe ingredients). */
@@ -184,6 +184,11 @@ export function AmountPicker({
         )}
       </section>
       {food.note && <p className="text-[0.6875rem] text-gold">{food.note}</p>}
+      {food.kind === "off" && food.ref && (
+        <a href={`/nutrition/product/${encodeURIComponent(food.ref)}`} className="block text-sm font-semibold text-gold-highlight underline">
+          Food quality details: ingredients, additives, allergens and Nutri-Score
+        </a>
+      )}
 
       <Button type="submit" className="w-full" disabled={pending || !result}>
         {pending && <Loader2 className="animate-spin" aria-hidden />} {submitLabel}

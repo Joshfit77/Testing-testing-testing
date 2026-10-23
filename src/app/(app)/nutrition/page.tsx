@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BarChart3, BookMarked, Camera, CalendarClock, CalendarDays, ChevronLeft, ChevronRight, CookingPot, Pill, Salad, Scale, ShoppingCart, Trash2, TrendingUp } from "lucide-react";
+import { BarChart3, BookMarked, Camera, ScanBarcode, CalendarClock, CalendarDays, ChevronLeft, ChevronRight, CookingPot, Pill, Salad, Scale, ShoppingCart, Trash2, TrendingUp } from "lucide-react";
 import { BarSeriesChart } from "@/components/charts/charts";
 import { MainHeader } from "@/components/shell/main-header";
 import { BudgetForm, CopyMealButton, QuickAddDialog } from "@/components/nutrition/diary-client";
@@ -307,6 +307,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
         <nav aria-label="Food tools" className="grid grid-cols-2 gap-2">
           {(
             [
+              ["/nutrition/scanner", "Food quality", ScanBarcode],
               [`/nutrition/photo?date=${date}`, "Meal photo", Camera],
               ["/nutrition/recipes", "Recipes", CookingPot],
               ["/nutrition/saved-meals", "Saved meals", BookMarked],
