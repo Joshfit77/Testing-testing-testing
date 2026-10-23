@@ -26,9 +26,10 @@ function setCustomer(id: string, subs: Record<string, Record<string, unknown>>, 
   customers.set(id, { entitlements: ents, subscriptions: subs });
 }
 
+// A production purchase. Sandbox purchases (TestFlight / internal testing) are covered by their own case below.
 const sub = (over: Record<string, unknown> = {}) => ({
   store: "app_store",
-  is_sandbox: true,
+  is_sandbox: false,
   period_type: "normal",
   purchase_date: iso(-day),
   original_purchase_date: iso(-day),
@@ -106,6 +107,14 @@ describe.skipIf(!available)("App Store / Google Play subscriptions via RevenueCa
     expect(requests.length).toBe(before);
   });
 
+  it("a sandbox purchase grants nothing unless REVENUECAT_ALLOW_SANDBOX is set (it isn't here)", async () => {
+    setCustomer(user.id, { ngf_pro_monthly: sub({ is_sandbox: true }) }, { pro: "ngf_pro_monthly" });
+    const res = await send({ id: `rc-${crypto.randomUUID()}`, type: "INITIAL_PURCHASE", app_user_id: user.id });
+    expect(res.status).toBe(200);
+    expect(await ent()).toMatchObject({ plan: "free" });
+    expect((await serviceClient().from("store_subscriptions").select("product_id").eq("user_id", user.id)).data).toEqual([]);
+  });
+
   it("purchase → Plus from the App Store; the same event twice is processed once", async () => {
     setCustomer(user.id, { ngf_plus_monthly: sub() }, { plus: "ngf_plus_monthly" });
     const event = { id: `rc-${crypto.randomUUID()}`, type: "INITIAL_PURCHASE", app_user_id: user.id };
@@ -118,7 +127,7 @@ describe.skipIf(!available)("App Store / Google Play subscriptions via RevenueCa
     expect(await again.json()).toMatchObject({ duplicate: true });
 
     const { data: rows } = await serviceClient().from("store_subscriptions").select("store, product_id, plan, is_sandbox").eq("user_id", user.id);
-    expect(rows).toEqual([{ store: "app_store", product_id: "ngf_plus_monthly", plan: "plus", is_sandbox: true }]);
+    expect(rows).toEqual([{ store: "app_store", product_id: "ngf_plus_monthly", plan: "plus", is_sandbox: false }]);
     // Members can read their own store subscription; nobody else can.
     expect((await user.client.from("store_subscriptions").select("product_id")).data).toEqual([{ product_id: "ngf_plus_monthly" }]);
     expect((await other.client.from("store_subscriptions").select("product_id")).data).toEqual([]);
