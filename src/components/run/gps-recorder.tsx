@@ -112,7 +112,11 @@ export function GpsRecorder({ userId, units, initialKind, guided }: { userId: st
     setError(null);
     stopWatching();
     stopRef.current = await watchLocation(
-      (fix) => setTrack((t) => (t ? addFix(t, fix).state : t)),
+      (fix) => {
+        // A fix means the signal is back: drop a warning left by a brief loss (tunnels, tall buildings).
+        setError(null);
+        setTrack((t) => (t ? addFix(t, fix).state : t));
+      },
       (e) => setError(e),
     );
     if (!hasNativeBackgroundLocation()) wakeRef.current = await keepScreenOn();

@@ -140,4 +140,28 @@ test.describe("live GPS runs and walks", () => {
     await page.getByTestId("gps-start").click();
     await expect(page.getByText(/Location permission is off for this app/)).toBeVisible({ timeout: 30_000 });
   });
+
+  test("a brief loss of signal shows a warning that clears when fixes come back", async ({ page, context }) => {
+    test.setTimeout(120_000);
+    const email = uniqueEmail("gps-blip");
+    await signUpAndConfirm(page, email);
+    await completeOnboarding(page);
+    await context.grantPermissions(["geolocation"]);
+    await context.setGeolocation({ latitude: LAT0, longitude: LNG0, accuracy: 5 });
+    // The phone reports "position unavailable" once (e.g. in a tunnel), then real fixes continue.
+    await page.addInitScript(() => {
+      const watch = navigator.geolocation.watchPosition.bind(navigator.geolocation);
+      navigator.geolocation.watchPosition = (ok, fail, opts) => {
+        setTimeout(() => fail?.({ code: 2, message: "Position unavailable", PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 } as GeolocationPositionError), 50);
+        return watch(ok, fail, opts);
+      };
+    });
+    await page.goto("/run/record?kind=run");
+    await page.getByTestId("gps-start").click();
+    const warning = page.getByText(/Your location isn't available right now/);
+    await expect(warning).toBeVisible();
+    await moveNorth(context, page, 0, 4, 3);
+    await expect(page.getByTestId("gps-recording")).toBeVisible();
+    await expect(warning).toHaveCount(0);
+  });
 });

@@ -317,7 +317,7 @@ export function CompareTable({ a, b }: { a: QualityProduct; b: QualityProduct })
   const ingredientsCount = (p: QualityProduct) => (p.ingredientsText ? p.ingredientsText.split(/,(?![^()]*\))/).filter((s) => s.trim()).length : null);
   return (
     <div className="overflow-x-auto" data-testid="compare-table">
-      <table className="w-full min-w-[22rem] text-sm">
+      <table className="w-full min-w-[22rem] text-sm [&_td]:pr-3 [&_td]:align-top [&_th]:pr-3 [&_th]:align-top">
         <thead>
           <tr className="border-b border-border text-left">
             <th scope="col" className="py-2 font-medium text-muted-foreground">

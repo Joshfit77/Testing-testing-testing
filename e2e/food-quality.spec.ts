@@ -117,6 +117,16 @@ test.describe("Food Quality Scanner", () => {
     await expect(table).toContainText("Honey Crunch");
     await expect(table).toContainText("Rice Flakes");
     await expect(table.getByRole("row", { name: /Sugars/ })).toContainText("5 g (better)");
+    // A long row label never runs into its value on a phone-width screen.
+    const gap = await table.getByRole("row", { name: /Carbohydrates/ }).evaluate((tr: HTMLTableRowElement) => {
+      const text = (el: Element) => {
+        const r = document.createRange();
+        r.selectNodeContents(el);
+        return r.getBoundingClientRect();
+      };
+      return text(tr.cells[1]!).left - text(tr.cells[0]!).right;
+    });
+    expect(gap).toBeGreaterThanOrEqual(8);
 
     // A drink isn't a fair comparison with a cereal: the page says so.
     await page.goto(`/nutrition/compare?a=${Q.honey}`);
