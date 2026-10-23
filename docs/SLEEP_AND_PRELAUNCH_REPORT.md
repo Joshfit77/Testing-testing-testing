@@ -71,7 +71,7 @@ and labelled; nothing here proves HealthKit, Health Connect or alarm delivery on
 - **A6 security**: two independent static reviews; all isolation/authorization/consent/webhook/storage claims held;
   fixes and open items in `docs/SECURITY.md`.
 
-## 3. Test results (Stage E1, commit `b26d9fb`)
+## 3. Test results (Stage E1, commits `b26d9fb`–`1aa71b3`)
 
 | Suite | Result |
 | --- | --- |
@@ -79,7 +79,7 @@ and labelled; nothing here proves HealthKit, Health Connect or alarm delivery on
 | ESLint | clean |
 | Unit (Vitest) | 95 files, 2,528 tests passed |
 | Integration (Vitest, local Supabase) | 32 files, 176 tests: 175 passed, 1 skipped by design (live Open Food Facts, needs `OFF_LIVE=1`) |
-| Browser (Playwright, production build) | (recorded below once the run on the final build finishes) |
+| Browser (Playwright, production build of `1aa71b3`, mobile profile) | 65 tests: 64 passed, 1 skipped by design (the no-AI-provider case, since the app under test runs with the stand-in AI server) |
 
 Mocked: the AI provider (a stand-in server), Open Food Facts (local mock), HealthKit / Health Connect, local
 notifications, RevenueCat (mock), Stripe (not exercised). None of those are claimed as live-verified.

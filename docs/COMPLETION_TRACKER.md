@@ -49,7 +49,7 @@ proposal; prices are untouched (Free $0 / Plus $11.99 / Pro $24.99). The owner d
 
 | Stage | Label | Evidence |
 | --- | --- | --- |
-| E1 Full regression | Complete and tested | On `b26d9fb`: unit 95 files / 2,528 tests passed; integration 32 files / 176 tests (175 passed, 1 skipped by design); typecheck and lint clean; browser suite: see the report (run on the final build). |
+| E1 Full regression | Complete and tested | On `b26d9fb`: unit 95 files / 2,528 tests passed; integration 32 files / 176 tests (175 passed, 1 skipped by design); typecheck and lint clean; browser suite on the final production build: 65 tests, 64 passed, 1 skipped by design. Three browser expectations were updated for the new sleep tool, the Plus-gated night comparison and the hidden day checkboxes (`1aa71b3`). |
 | E2 Accessibility and UI review | Complete and tested | Independent review of every sleep page and component (22 findings, all medium/low ones fixed in `5e38b67`; one inherited heading-level nit in the shared EmptyState left as a note). Design tokens kept (black/charcoal/champagne/gold). |
 | E3 Performance and battery | Partially complete | Queries bounded and indexed, nothing runs in the background on the phone (`docs/SLEEP_PLAN.md` §8); battery not measured because no device. |
 | E4 Security and privacy | Complete and tested | See A6 and `docs/SECURITY.md` "Launch-readiness review". |
