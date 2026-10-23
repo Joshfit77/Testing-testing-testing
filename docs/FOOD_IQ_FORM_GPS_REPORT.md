@@ -189,8 +189,9 @@ These are simulated traces, not phone recordings.
   as before). It is a viewer of real full-page screenshots of the app at iPhone size, with the app's own links mapped
   as tap areas.
 - It was previously captured from `claude/nine-features` @ `1bfb578`.
-- **Being re-captured from `claude/sharp-cray-8y0uuv` @ `e810c7e`**, with Food IQ, the corrected exercise figures
-  and the new GPS screens. This report is updated when the new version is published to the same link.
+- **Now re-captured from `claude/sharp-cray-8y0uuv` @ `e810c7e`** and published to the same link as version 5:
+  **403 screens**, including Food IQ, the corrected exercise figures and the new GPS screens. A sample image was
+  checked to match the local capture byte for byte.
 - Capture setup: a local production build (`next build` / `next start`) on a local Supabase with all migrations
   applied, and a demo account with seeded workouts and runs.
 - Mocks: a stand-in AI server (replies are sample text) and a local Open Food Facts mock. GPS is simulated through the
