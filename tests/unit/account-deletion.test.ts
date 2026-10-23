@@ -66,7 +66,7 @@ describe("account deletion order and failures", () => {
     const log = vi.fn();
     const r = await deleteUserAccount("u1", deps({ admin, calls, log, deleteStripeCustomer: async () => Promise.reject(new Error("x")) }));
     expect(r).toEqual({ ok: true, stripeCustomerDeleted: false });
-    expect(log).toHaveBeenCalledWith("account.delete.stripe_customer", expect.objectContaining({ customerId: "cus_9" }));
+    expect(log).toHaveBeenCalledWith("account.delete.stripe_customer", expect.anything(), expect.objectContaining({ customerId: "cus_9" }));
   });
 
   it("skips the Stripe customer step when there is no customer or Stripe isn't configured", async () => {

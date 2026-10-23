@@ -111,7 +111,7 @@ export function storeRowsFromSubscriber(
   data: RevenueCatSubscriber,
   ids: EntitlementIds,
   previousPlans: Map<string, PaidPlan> = new Map(),
-  options: { allowTestStore?: boolean } = {},
+  options: { allowTestStore?: boolean; allowSandbox?: boolean } = {},
 ): StoreSubscriptionRow[] {
   const { entitlements, subscriptions } = data.subscriber;
   const planFor = (productId: string): PaidPlan | null => {
@@ -124,6 +124,8 @@ export function storeRowsFromSubscriber(
     const store = normalizeStore(s.store);
     // Purchases made with RevenueCat's Test Store (development builds) only count where explicitly allowed.
     if (store === "test_store" && !options.allowTestStore) continue;
+    // Apple/Google sandbox purchases (TestFlight, internal testing) cost nothing and only count where explicitly allowed.
+    if (s.is_sandbox && !options.allowSandbox) continue;
     // Stripe or other web purchases synced into RevenueCat are already handled by the Stripe integration.
     if (store === "other") continue;
     rows.push({

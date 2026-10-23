@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useRef, useState, useTransition } from "react";
 import { Copy, Loader2, Zap } from "lucide-react";
 import { FieldError, FormMessage, SubmitButton } from "@/components/common/form-status";
 import { Button } from "@/components/ui/button";
@@ -38,9 +38,13 @@ export function QuickAddDialog({ date, mealType: initialMeal = "breakfast", labe
   const [pending, start] = useTransition();
   const mealName = MEAL_TYPES.find(([v]) => v === mealType)?.[1] ?? "meal";
 
+  // One id per attempt: a retry after a timeout reuses it, so the item can't be logged twice.
+  const attempt = useRef<string | null>(null);
   const submit = () =>
     start(async () => {
+      attempt.current ??= crypto.randomUUID();
       const res = await logFoodAction({
+        clientId: attempt.current,
         date,
         mealType,
         status: "logged",
@@ -55,7 +59,10 @@ export function QuickAddDialog({ date, mealType: initialMeal = "breakfast", labe
         },
       });
       setResult(res.ok ? { ...res, message: `Added ${Math.round(Number(values.calories))} kcal to ${mealName}.` } : res);
-      if (res.ok) draft.clear();
+      if (res.ok) {
+        attempt.current = null;
+        draft.clear();
+      }
     });
 
   return (

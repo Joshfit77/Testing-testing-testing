@@ -7,7 +7,7 @@ import { getPlans } from "@/lib/domain/plans";
 import { getUserPlan, requireUser } from "@/server/auth";
 import { isServiceRoleConfigured, isStripeConfigured, isYearlyBillingConfigured } from "@/server/env";
 import { getNativePlatform } from "@/server/native";
-import { createCheckoutSession, createPortalSession } from "@/server/services/billing";
+import { createCheckoutSession, createPortalSession, AlreadySubscribedError } from "@/server/services/billing";
 import { logError } from "@/server/log";
 
 export async function startCheckoutAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -25,6 +25,7 @@ export async function startCheckoutAction(_prev: ActionState, formData: FormData
   try {
     url = await createCheckoutSession(user.id, user.email, plan.data, interval.data);
   } catch (err) {
+    if (err instanceof AlreadySubscribedError) return actionError("You already have a subscription. Use “Manage billing” to change plans.");
     logError("billing.checkout", err);
     return actionError("We couldn't start checkout. Please try again in a moment.");
   }

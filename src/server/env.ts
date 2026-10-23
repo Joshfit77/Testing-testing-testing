@@ -30,6 +30,8 @@ export const serverEnv = {
   revenueCatEntitlementPro: process.env.REVENUECAT_ENTITLEMENT_PRO || "pro",
   /** Count purchases made with RevenueCat's Test Store (development builds only). Never enable in production. */
   revenueCatAllowTestStore: process.env.REVENUECAT_ALLOW_TEST_STORE === "true",
+  /** Count App Store / Play sandbox purchases (TestFlight and internal-testing builds). Never enable in production. */
+  revenueCatAllowSandbox: process.env.REVENUECAT_ALLOW_SANDBOX === "true",
   /** Public SDK keys for the native apps (safe to expose; they can't read or change other customers). */
   revenueCatPublicKeyIos: process.env.REVENUECAT_PUBLIC_KEY_IOS ?? "",
   revenueCatPublicKeyAndroid: process.env.REVENUECAT_PUBLIC_KEY_ANDROID ?? "",

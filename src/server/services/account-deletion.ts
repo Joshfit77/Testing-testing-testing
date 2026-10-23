@@ -32,7 +32,7 @@ export interface DeletionDeps {
   /** Deletes the RevenueCat customer; null/absent when RevenueCat isn't configured. */
   deleteStoreCustomer?: ((userId: string) => Promise<void>) | null;
   removeStorage?: (admin: SupabaseClient, userId: string) => Promise<void>;
-  log: (scope: string, err: unknown) => void;
+  log: (scope: string, err: unknown, context?: Record<string, string | number | boolean | null>) => void;
 }
 
 export async function deleteUserAccount(userId: string, deps: DeletionDeps): Promise<DeletionResult> {
@@ -69,7 +69,7 @@ export async function deleteUserAccount(userId: string, deps: DeletionDeps): Pro
       stripeCustomerDeleted = true;
     } catch (err) {
       // Logged with the customer id so support can remove it by hand.
-      deps.log("account.delete.stripe_customer", { customerId, err });
+      deps.log("account.delete.stripe_customer", err, { customerId });
       stripeCustomerDeleted = false;
     }
   }
@@ -77,7 +77,7 @@ export async function deleteUserAccount(userId: string, deps: DeletionDeps): Pro
     try {
       await deps.deleteStoreCustomer(userId);
     } catch (err) {
-      deps.log("account.delete.revenuecat_customer", { userId, err });
+      deps.log("account.delete.revenuecat_customer", err, { userId });
     }
   }
   return { ok: true, stripeCustomerDeleted };

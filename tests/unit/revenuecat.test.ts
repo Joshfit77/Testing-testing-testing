@@ -52,6 +52,7 @@ describe("RevenueCat customer → stored subscriptions", () => {
       ),
       ids,
       new Map([["ngf_plus_monthly", "plus"]]),
+      { allowSandbox: true },
     );
     expect(rows.find((r) => r.product_id === "ngf_pro_monthly")).toMatchObject({ plan: "pro", store: "app_store", is_sandbox: true, expires_at: future, store_transaction_id: "2000001" });
     // Not attached to an entitlement any more (expired): keeps the plan stored for it before.
@@ -66,6 +67,15 @@ describe("RevenueCat customer → stored subscriptions", () => {
     });
     expect(storeRowsFromSubscriber(c, ids).map((r) => r.product_id)).toEqual(["play"]);
     expect(storeRowsFromSubscriber(c, ids, new Map(), { allowTestStore: true }).map((r) => r.product_id)).toEqual(["test_plus", "play"]);
+  });
+
+  it("skips App Store / Play sandbox purchases unless allowed, so testers never get production entitlements", () => {
+    const c = customer({
+      sandbox: { store: "app_store", expires_date: future, is_sandbox: true },
+      real: { store: "app_store", expires_date: future, is_sandbox: false },
+    });
+    expect(storeRowsFromSubscriber(c, ids).map((r) => r.product_id)).toEqual(["real"]);
+    expect(storeRowsFromSubscriber(c, ids, new Map(), { allowSandbox: true }).map((r) => r.product_id)).toEqual(["sandbox", "real"]);
   });
 
   const row = (over: Partial<Parameters<typeof storeRowAsSubscription>[0]>) => ({

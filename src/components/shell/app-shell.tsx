@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { clearAllDrafts } from "@/lib/drafts";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronsLeft, ChevronsRight, LogOut } from "lucide-react";
@@ -130,7 +131,7 @@ export function AppShell({ children, userId, displayName, isAdmin, plan, textSiz
                 <p className="text-xs text-gold">{plan} plan</p>
               </div>
             )}
-            <form action={signOutAction}>
+            <form action={signOutAction} onSubmit={() => clearAllDrafts(userId)}>
               <button type="submit" className={cn("flex h-11 w-full items-center gap-3 rounded-xl px-3 text-sm text-muted-foreground hover:bg-elevated hover:text-foreground", collapsed && "justify-center px-0")}>
                 <LogOut className="size-4" aria-hidden />
                 {collapsed ? <span className="sr-only">Sign out</span> : "Sign out"}

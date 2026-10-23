@@ -93,7 +93,8 @@ export async function updatePasswordAction(_prev: ActionState, formData: FormDat
     if (error.code === "reauthentication_needed" || /reauthenticat/i.test(error.message)) {
       return actionError("For your security, sign out and sign in again, then change your password.");
     }
-    return actionError(error.message || "We couldn't update your password.");
+    logError("auth.update_password", error);
+    return actionError("We couldn't update your password. Please try again.");
   }
   redirect("/home?password=updated");
 }

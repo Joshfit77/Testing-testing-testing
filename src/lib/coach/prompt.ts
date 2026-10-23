@@ -15,8 +15,10 @@ export function fallbackParams(model: string): { betas?: Anthropic.Beta.Anthropi
   return FALLBACK_MODELS.has(model) ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" } : {};
 }
 
-/** Output budget per request (includes adaptive thinking). Streaming, so a generous cap is safe. */
-export const CHAT_MAX_TOKENS = 32_000;
+/** Output budget per chat request (includes adaptive thinking): enough for a long answer, small enough to bound cost. */
+export const CHAT_MAX_TOKENS = 12_000;
+/** Output budget for plan generation, whose structured output (a whole program) is much longer than a chat reply. */
+export const PLAN_MAX_TOKENS = 16_000;
 /** Upper bound on model round-trips per user message (each tool batch is one round-trip). */
 export const MAX_TOOL_ROUNDS = 6;
 

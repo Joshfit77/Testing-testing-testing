@@ -51,6 +51,8 @@ const logFoodSchema = z.object({
   date: isoDate,
   mealType: mealTypeSchema,
   status: z.enum(["logged", "planned"]),
+  /** Generated on the device per attempt, so a retried or double-sent request can't log the item twice. */
+  clientId: z.string().uuid().optional(),
   item: logFoodInput,
 });
 
@@ -59,7 +61,7 @@ export async function logFoodAction(input: unknown): Promise<ActionState> {
     const { user, supabase } = await nutritionCtx();
     const parsed = logFoodSchema.safeParse(input);
     if (!parsed.success) return actionInvalid(parsed.error);
-    const { date, mealType, status, item } = parsed.data;
+    const { date, mealType, status, item, clientId } = parsed.data;
 
     let row: MealItemRow;
     if (item.source === "manual") {
@@ -94,11 +96,13 @@ export async function logFoodAction(input: unknown): Promise<ActionState> {
       row = { ...meta, name: meta.name.slice(0, 160), ...cols };
     }
     const mealId = await findOrCreateMeal(supabase, user.id, date, mealType, status);
-    const { error } = await supabase.from("meal_items").insert({ meal_id: mealId, user_id: user.id, ...row });
+    const { error } = await supabase.from("meal_items").insert({ meal_id: mealId, user_id: user.id, client_id: clientId ?? null, ...row });
+    const amountText = row.amount_label ? ` (${row.amount_label})` : "";
+    // The same attempt arriving twice: the first insert won, so this one is already done.
+    if (error?.code === "23505" && clientId) return actionOk(`${status === "planned" ? "Planned" : "Logged"} ${row.name}${amountText}.`);
     if (error) throw error;
     revalidatePath("/nutrition");
     revalidatePath("/home");
-    const amountText = row.amount_label ? ` (${row.amount_label})` : "";
     return actionOk(`${status === "planned" ? "Planned" : "Logged"} ${row.name}${amountText}.`);
   } catch (err) {
     return guard(err, "nutrition.log");

@@ -1,10 +1,11 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useMemo, useRef, useState } from "react";
 import { FieldError, FormMessage, SubmitButton } from "@/components/common/form-status";
 import { Input, NativeSelect } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { confirmDialog } from "@/components/ui/confirm";
 import { initialActionState } from "@/lib/action-state";
 import { cmToFeetInches, feetInchesToCm } from "@/lib/domain/units";
 import type { UnitSystem } from "@/lib/domain/types";
@@ -96,8 +97,25 @@ export function ProfileForm({
 
 export function WithdrawConsentForm() {
   const [state, action] = useActionState(withdrawWellnessConsentAction, initialActionState);
+  const confirmed = useRef(false);
   return (
-    <form action={action} className="space-y-2">
+    <form
+      action={action}
+      className="space-y-2"
+      onSubmit={(e) => {
+        if (confirmed.current) {
+          confirmed.current = false;
+          return;
+        }
+        e.preventDefault();
+        const form = e.currentTarget;
+        void confirmDialog({ title: "Withdraw consent and delete wellness data?", message: "Limitation notes and recovery check-ins are removed for good. Sleep entries stay until you delete them under Sleep & Recovery.", confirmLabel: "Withdraw", destructive: true }).then((ok) => {
+          if (!ok) return;
+          confirmed.current = true;
+          form.requestSubmit();
+        });
+      }}
+    >
       <SubmitButton variant="secondary" pendingLabel="Removing…">
         Withdraw consent &amp; delete wellness data
       </SubmitButton>

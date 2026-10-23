@@ -51,10 +51,28 @@ async function getOrCreateCustomer(userId: string, email: string | undefined): P
   return customer.id;
 }
 
+/** Thrown when a checkout would create a second subscription for the same customer. */
+export class AlreadySubscribedError extends Error {
+  constructor() {
+    super("already_subscribed");
+    this.name = "AlreadySubscribedError";
+  }
+}
+
+const OPEN_STATUSES = new Set(["active", "trialing", "past_due", "unpaid", "paused", "incomplete"]);
+
+/** Subscriptions Stripe still considers open for a customer (the local table can lag behind the webhook). */
+async function openStripeSubscriptions(customer: string): Promise<string[]> {
+  const list = await getStripe().subscriptions.list({ customer, status: "all", limit: 20 });
+  return list.data.filter((s) => OPEN_STATUSES.has(s.status)).map((s) => s.id);
+}
+
 export async function createCheckoutSession(userId: string, email: string | undefined, plan: PaidPlan, interval: BillingInterval = "month"): Promise<string> {
   const price = priceIdForPlan(plan, interval);
   if (!price) throw new Error(`No Stripe price configured for ${plan}/${interval}`);
   const customer = await getOrCreateCustomer(userId, email);
+  // Two tabs, or a retry before the webhook lands, must not create a second subscription.
+  if ((await openStripeSubscriptions(customer)).length) throw new AlreadySubscribedError();
   const session = await getStripe().checkout.sessions.create({
     mode: "subscription",
     customer,
@@ -123,9 +141,10 @@ export async function recomputeEntitlement(userId: string): Promise<Plan> {
     if (sub) candidates.push({ ...sub, source: row.store === "play_store" ? "play_store" : "app_store" });
   }
   const { plan, validUntil, from } = entitlementFromSubscriptions(candidates);
-  const { data: current } = await admin.from("user_entitlements").select("plan, source").eq("user_id", userId).maybeSingle();
-  // A manual admin grant stays unless a subscription now provides a higher plan.
-  if (current?.source === "admin" && planRank(current.plan as Plan) >= planRank(plan)) return current.plan as Plan;
+  const { data: current } = await admin.from("user_entitlements").select("plan, source, valid_until").eq("user_id", userId).maybeSingle();
+  // A manual admin grant stays while it is in date, unless a subscription now provides a higher plan.
+  const adminGrantLive = current?.source === "admin" && (!current.valid_until || Date.parse(current.valid_until as string) > Date.now());
+  if (adminGrantLive && planRank(current!.plan as Plan) >= planRank(plan)) return current!.plan as Plan;
   const { error: upErr } = await admin
     .from("user_entitlements")
     .upsert({ user_id: userId, plan, source: plan === "free" || !from ? "default" : from.source, valid_until: plan === "free" ? null : validUntil }, { onConflict: "user_id" });
@@ -247,9 +266,13 @@ export async function cancelStripeSubscriptionsForUser(userId: string): Promise<
     .in("status", ["active", "trialing", "past_due", "unpaid", "paused", "incomplete"]);
   // Not knowing which subscriptions exist must stop the deletion, or the person could keep being billed.
   if (error) throw error;
-  for (const s of data ?? []) {
+  const ids = new Set((data ?? []).map((s) => s.stripe_subscription_id as string));
+  // Stripe's own list too, in case a subscription never reached the local table.
+  const { data: customerRow } = await getServiceSupabase().from("billing_customers").select("stripe_customer_id").eq("user_id", userId).maybeSingle();
+  if (customerRow?.stripe_customer_id) for (const id of await openStripeSubscriptions(customerRow.stripe_customer_id as string)) ids.add(id);
+  for (const id of ids) {
     try {
-      await getStripe().subscriptions.cancel(s.stripe_subscription_id as string);
+      await getStripe().subscriptions.cancel(id);
     } catch (err) {
       // Already cancelled or removed in Stripe: nothing left to bill.
       if (isStripeMissing(err)) continue;

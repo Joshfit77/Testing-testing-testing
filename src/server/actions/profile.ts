@@ -58,13 +58,14 @@ export async function updateProfileAction(_prev: ActionState, formData: FormData
 export async function withdrawWellnessConsentAction(_prev: ActionState): Promise<ActionState> {
   const user = await requireUser();
   const supabase = await getServerSupabase();
+  // The flag first: if the deletes fail, consent still reads as withdrawn and the member can retry the deletion.
+  const { error } = await supabase.from("profiles").update({ wellness_consent_at: null }).eq("id", user.id);
+  if (error) return actionError("Couldn't update your consent. Please try again.");
   const steps = await Promise.all([
     supabase.from("onboarding_answers").update({ limitations: null }).eq("user_id", user.id),
     supabase.from("recovery_checkins").delete().eq("user_id", user.id),
   ]);
-  if (steps.some((s) => s.error)) return actionError("Couldn't remove your wellness data. Please try again.");
-  const { error } = await supabase.from("profiles").update({ wellness_consent_at: null }).eq("id", user.id);
-  if (error) return actionError("Couldn't update your consent. Please try again.");
+  if (steps.some((s) => s.error)) return actionError("Consent withdrawn, but some wellness data couldn't be removed. Please try again.");
   revalidatePath("/", "layout");
   return actionOk("Consent withdrawn. Limitation notes and recovery check-ins were deleted; sleep entries stay until you delete them under Sleep & Recovery > Goal & privacy.");
 }

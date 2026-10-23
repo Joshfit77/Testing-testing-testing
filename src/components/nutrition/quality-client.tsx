@@ -67,7 +67,7 @@ export function AddProductToDiary({ choice, date, defaultMeal }: { choice: FoodC
         onPick={(food, quantity, unitId) => {
           setOpen(false);
           start(async () => {
-            const r = await logFoodAction({ date, mealType: meal, status: "logged", item: logItemFor(food, quantity, unitId) });
+            const r = await logFoodAction({ clientId: crypto.randomUUID(), date, mealType: meal, status: "logged", item: logItemFor(food, quantity, unitId) });
             setMessage(r.ok ? { ok: true, text: r.message ?? "Added." } : { ok: false, text: r.message ?? "Couldn't add it. Try again." });
           });
         }}

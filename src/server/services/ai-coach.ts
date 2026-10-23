@@ -7,7 +7,7 @@ import { aiAllowance } from "@/lib/domain/plans";
 import type { Plan } from "@/lib/domain/types";
 import { aiPlanOutputSchema, validateAiPlan, type AiPlan } from "@/lib/validation/ai";
 import { formatAthleteContext, type AthleteSnapshot } from "@/lib/coach/context";
-import { buildSystemBlocks, CHAT_MAX_TOKENS, fallbackParams, MAX_TOOL_ROUNDS, sanitizeAssistantContent } from "@/lib/coach/prompt";
+import { buildSystemBlocks, CHAT_MAX_TOKENS, fallbackParams, MAX_TOOL_ROUNDS, PLAN_MAX_TOKENS, sanitizeAssistantContent } from "@/lib/coach/prompt";
 import { coachModelIds, routeCoachRequest, type ModelTier } from "@/lib/coach/routing";
 import { coachToolDefinitions, toolActivityLabel, type CoachProposal } from "@/lib/coach/tools";
 import { formatMemoriesForContext } from "@/lib/coach/memory";
@@ -68,6 +68,8 @@ Rules:
 
 /** Longest earlier message sent back to the model as history (new messages are limited to 4,000 characters). */
 const HISTORY_MESSAGE_CHARS = 8_000;
+/** Total characters of earlier turns sent back per request, newest first; older turns beyond this are dropped. */
+const HISTORY_TOTAL_CHARS = 24_000;
 
 let client: Anthropic | null = null;
 function getClient(): Anthropic {
@@ -372,11 +374,18 @@ export async function coachTurn(params: {
   onEvent({ type: "status", text: "Reading your training log…" });
   const { data: tzRow } = await supabase.from("profiles").select("timezone").eq("id", userId).maybeSingle();
   const context = await buildAthleteContext(supabase, userId);
-  const messages: Anthropic.Beta.BetaMessageParam[] = [
-    // Earlier turns, each capped, so stored history can never make one request much larger than intended.
-    ...((history ?? []).reverse().map((m) => ({ role: m.role as "user" | "assistant", content: (m.content as string).slice(0, HISTORY_MESSAGE_CHARS) })) as Anthropic.Beta.BetaMessageParam[]),
-    { role: "user", content: message },
-  ];
+  // Earlier turns, each capped and the whole set budgeted, so stored history can never make one request much
+  // larger than intended. `history` is newest first.
+  const earlier: Anthropic.Beta.BetaMessageParam[] = [];
+  let budget = HISTORY_TOTAL_CHARS;
+  for (const m of history ?? []) {
+    const content = (m.content as string).slice(0, HISTORY_MESSAGE_CHARS);
+    if (content.length > budget) break;
+    budget -= content.length;
+    earlier.push({ role: m.role as "user" | "assistant", content });
+  }
+  earlier.reverse();
+  const messages: Anthropic.Beta.BetaMessageParam[] = [...earlier, { role: "user", content: message }];
   // The API requires a user turn first; drop a leading assistant message if present.
   while (messages.length && messages[0]!.role !== "user") messages.shift();
 
@@ -419,7 +428,7 @@ export async function coachTurn(params: {
       const res = await getClient().beta.messages.parse(
         {
           model,
-          max_tokens: 16_000,
+          max_tokens: PLAN_MAX_TOKENS,
           system: [...system, { type: "text", text: `${PLAN_INSTRUCTIONS}\n\nExercise catalog (slug | name | equipment | difficulty):\n${catalog.join("\n")}` }],
           messages,
           output_config: { effort: "medium", format: betaZodOutputFormat(aiPlanOutputSchema) },

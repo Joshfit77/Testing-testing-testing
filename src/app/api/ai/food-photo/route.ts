@@ -17,7 +17,9 @@ export const maxDuration = 60;
 export async function POST(request: NextRequest) {
   const auth = await authenticateRequest(request);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.error === "unauthorized" ? 401 : 403 });
-  const declared = Number(request.headers.get("content-length") ?? 0);
+  const lengthHeader = request.headers.get("content-length");
+  if (!lengthHeader || !/^\d+$/.test(lengthHeader)) return NextResponse.json({ error: "invalid_request", message: "Send the photo as a form upload." }, { status: 411 });
+  const declared = Number(lengthHeader);
   if (declared > FOOD_PHOTO_MAX_BYTES + 64 * 1024) return NextResponse.json({ error: "too_large", message: "That photo is too large. Try a smaller one." }, { status: 413 });
 
   let form: FormData;

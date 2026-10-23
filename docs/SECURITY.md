@@ -80,3 +80,48 @@
   phone's settings, for when they're added.
 - A deleted user's access token is a signed JWT that stays valid until it expires (up to 1 hour). The server always
   re-checks the user with Supabase Auth, and their rows are gone, so it can't read anything.
+
+## Launch-readiness review (23 October 2026, branch `claude/sharp-cray-8y0uuv`)
+
+Two independent, read-only reviews of the code (one for the new Sleep & Recovery feature, one for the rest of the
+app) checked every claim above against the migrations and server code. The isolation, authorization, consent,
+webhook, private-storage and export/deletion claims all held. Nothing was exercised dynamically and no penetration
+test was done; the Supabase, Stripe and RevenueCat dashboards, production environment values, host request-body
+limits and the native iOS/Android projects were not inspected.
+
+Fixed on this branch as a result:
+
+- RevenueCat: App Store / Play **sandbox purchases no longer grant entitlements** unless `REVENUECAT_ALLOW_SANDBOX=true`
+  (keep it unset in production; TestFlight testers otherwise got Pro for $0).
+- Stripe: a checkout is refused when Stripe already has an open subscription for the customer (two tabs or a retry
+  before the webhook could create two subscriptions); account deletion cancels the subscriptions Stripe lists, not
+  only the ones in the local table; an **expired admin grant no longer blocks** a paid subscription from being written.
+- AI spend: chat replies are capped at 12k output tokens (plan generation keeps 16k) and the history sent back per
+  request is budgeted at 24k characters on top of the per-message cap; the monthly request quota is unchanged.
+- Account deletion follow-up logs now carry the Stripe customer id / user id they exist for.
+- Withdrawing wellness consent asks for confirmation, flips the flag before deleting, and says that sleep entries
+  stay until deleted under Sleep & Recovery.
+- Food logging has an idempotency key (`meal_items.client_id`, unique per member) so a retried request can't log an
+  item twice; the meal-photo upload requires a numeric `Content-Length`; the password-change error no longer echoes
+  the auth provider's text; signing out forgets the device's drafts.
+- Bounds: `training_adjustments.changes` and `profiles.avatar_path` are size-checked; `profiles.sleep_alarm` and
+  `sleep_tips_dismissed` too; `user_id` indexes added on `workout_sets`, `meal_items`, `ai_messages`,
+  `recipe_ingredients` and `workout_template_exercises`.
+- Sleep: the coach only sees sleep through `get_sleep_summary` (no sleep line in every prompt), the training review
+  stops using sleep once wellness consent is withdrawn, imports validate record by record, stage rows are capped per
+  session, and the session cap never touches another member's advisory lock.
+
+Still open (decisions or work for the owner, none blocking data isolation):
+
+- Content-Security-Policy still allows `'unsafe-inline'` scripts and `img-src https:`; a nonce-based policy is the
+  defence-in-depth step. HSTS depends on an https `NEXT_PUBLIC_SITE_URL` in production.
+- The in-memory rate limiter (deletion password check, store sync, food search, barcode) is per server instance; the
+  AI path is database-backed and unaffected. A database-backed counter is the fix on serverless hosts.
+- No per-member cap on objects in the private storage buckets (orphans are purged only at account deletion).
+- No monthly **token** ceiling for AI use (requests are capped, tokens are recorded but not enforced).
+- Stripe refunds and disputes do not end access automatically (RevenueCat refunds do): decide and document.
+- The displayed price (`PLAN_*_PRICE_CENTS`) is not checked against the Stripe price actually charged at startup.
+- A brand-new subscription on an unknown Stripe price is skipped with only a log line.
+- Live dashboard settings to confirm before launch: leaked-password protection, captcha, redirect allow-list, email
+  templates, webhook event subscriptions and restricted API keys.
+

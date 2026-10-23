@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState, useTransition } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Droplets, Loader2, Plus, Search, Undo2, X } from "lucide-react";
 import { FieldError, FormMessage, SubmitButton } from "@/components/common/form-status";
 import { Button } from "@/components/ui/button";
@@ -246,11 +246,15 @@ export function AddFoodDialog({
     }
   };
 
+  // One id per attempt: a retry after a timeout reuses it, so the item can't be logged twice.
+  const attempt = useRef<string | null>(null);
   const submit = (item: unknown, onOk?: () => void) =>
     startTransition(async () => {
-      const res = await logFoodAction({ date, mealType, status, item });
+      attempt.current ??= crypto.randomUUID();
+      const res = await logFoodAction({ clientId: attempt.current, date, mealType, status, item });
       setResult(res);
       if (res.ok) {
+        attempt.current = null;
         setPicked(null);
         onOk?.();
       }

@@ -82,7 +82,7 @@ export async function syncStoreSubscriber(userId: string): Promise<Plan | null> 
     subscriber,
     { plus: serverEnv.revenueCatEntitlementPlus, pro: serverEnv.revenueCatEntitlementPro },
     previousPlans,
-    { allowTestStore: serverEnv.revenueCatAllowTestStore },
+    { allowTestStore: serverEnv.revenueCatAllowTestStore, allowSandbox: serverEnv.revenueCatAllowSandbox },
   );
   if (rows.length) {
     const { error } = await admin.from("store_subscriptions").upsert(
