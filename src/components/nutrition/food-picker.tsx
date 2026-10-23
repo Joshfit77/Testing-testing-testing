@@ -23,6 +23,7 @@ export function FoodPickerDialog({
   initial,
   title = "Add ingredient",
   submitLabel = "Add ingredient",
+  initialQuery,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -32,6 +33,8 @@ export function FoodPickerDialog({
   initial?: { food: FoodChoice; quantity: number; unitId: string } | null;
   title?: string;
   submitLabel?: string;
+  /** Start the search with this term (e.g. a food name suggested from a photo). */
+  initialQuery?: string;
 }) {
   const [tab, setTab] = useState("search");
   const [q, setQ] = useState("");
@@ -44,6 +47,9 @@ export function FoodPickerDialog({
   useEffect(() => {
     if (open) setPicked(initial ?? null);
   }, [open, initial]);
+  useEffect(() => {
+    if (open && initialQuery) setQ(initialQuery);
+  }, [open, initialQuery]);
 
   const term = q.trim();
   useEffect(() => {

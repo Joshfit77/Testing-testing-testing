@@ -136,6 +136,31 @@ function reply(req: MockRequest): { blocks: Block[]; stop: string; delayMs: numb
 function structuredReply(req: MockRequest): Record<string, unknown> | null {
   const system = req.system.map((b) => b.text).join("\n");
   const user = String(typeof req.messages[0]?.content === "string" ? req.messages[0].content : "");
+  if (system.includes("You estimate the nutrition of a meal from one photo")) {
+    const it = (name: string, portion: string, grams: number | null, calories: number, p: number, c: number, f: number, confidence: string, search_term: string) => ({
+      name,
+      visible_ingredients: [name.toLowerCase()],
+      portion,
+      grams,
+      calories,
+      protein_g: p,
+      carbs_g: c,
+      fat_g: f,
+      confidence,
+      search_term,
+    });
+    return {
+      is_food: true,
+      summary: "Grilled chicken with white rice and broccoli.",
+      items: [
+        it("Grilled chicken breast", "a palm-sized fillet", 150, 248, 46, 0, 5.4, "medium", "chicken breast"),
+        it("White rice", "about 1 cup", 160, 208, 4.3, 45, 0.4, "medium", "rice"),
+        // Calories that don't match the macros: the app must flag them for the member to check.
+        it("Broccoli", "a handful", null, 600, 2.5, 6, 0.4, "low", "broccoli"),
+      ],
+      questions: [{ topic: "sauce", question: "Was there any sauce on the chicken?" }],
+    };
+  }
   if (!system.includes("You arrange meal plans")) return null;
   const days = Number(user.match(/Plan (\d+) day/)?.[1] ?? 1);
   const slots = [...user.matchAll(/(\d+): [^(;]+\((breakfast|lunch|dinner|snack),/g)].map((m) => ({ index: Number(m[1]), slot: m[2]! }));
@@ -591,5 +616,80 @@ test.describe("AI coach", () => {
     await expect(meal.getByRole("status")).toContainText(/Replaced .+ with .+\. Saved as your recipe/, { timeout: 30_000 });
     await expect(page.getByTestId("plan-meal").first().getByTestId("plan-meal-name")).not.toHaveText(before);
     await expect(page.getByTestId("plan-meal").first()).toContainText("Your recipe");
+  });
+  test("meal photos: Pro only, separate consent, an estimate to correct and confirm, then the diary", async ({ page }) => {
+    test.skip(!MOCK_PORT, "set E2E_ANTHROPIC_MOCK_PORT and start the app with ANTHROPIC_BASE_URL pointing at it");
+    test.setTimeout(150_000);
+    const email = uniqueEmail("meal-photo");
+    await signUpAndConfirm(page, email);
+    await completeOnboarding(page);
+    await grantPlan(email, "plus");
+    await page.goto("/nutrition");
+    await page.getByRole("navigation", { name: "Food tools" }).getByRole("link", { name: "Meal photo" }).click();
+    await expect(page.getByText("Included with Pro")).toBeVisible();
+
+    await grantPlan(email, "pro");
+    await page.reload();
+    // The general AI consent first, then a separate one for photos.
+    await page.getByRole("button", { name: "Allow and continue" }).click();
+    const consent = page.getByTestId("food-photo-consent");
+    await expect(consent).toContainText("doesn't store the photo");
+    await expect(consent.getByRole("button", { name: "Agree and continue" })).toBeDisabled();
+    await consent.getByRole("checkbox").check();
+    await consent.getByRole("button", { name: "Agree and continue" }).click();
+
+    await page.getByLabel("Choose a meal photo").setInputFiles("public/icons/icon-512.png");
+    await expect(page.getByTestId("food-photo-preview")).toBeVisible();
+    await page.getByLabel("Meal", { exact: true }).selectOption("lunch");
+    await page.getByLabel(/Anything the photo can't show/).fill("no dressing");
+    await page.getByTestId("food-photo-analyze").click();
+    await expect(page.getByTestId("food-photo-estimate-note")).toContainText("Estimated from a photo, not measured", { timeout: 30_000 });
+
+    // What went to the (mock) AI: one image, on the fast model, with the member's note.
+    const sent = requests.filter((r) => r.system.some((b) => b.text.includes("You estimate the nutrition of a meal from one photo"))).at(-1)!;
+    expect(sent.model).toBe("claude-haiku-5-5");
+    const content = sent.messages[0]!.content as { type: string; source?: { type: string; media_type: string; data: string }; text?: string }[];
+    expect(content[0]!).toMatchObject({ type: "image", source: { type: "base64", media_type: "image/jpeg" } });
+    expect(content[0]!.source!.data.length).toBeGreaterThan(1000);
+    expect(content[1]!.text).toContain("no dressing");
+
+    // Questions about what a photo can't show, including oil and portions the app always adds.
+    const questions = page.getByTestId("food-photo-questions");
+    await expect(questions).toContainText("Was there any sauce on the chicken?");
+    await expect(questions).toContainText("cooked in oil or butter");
+    await expect(questions).toContainText("hard to judge");
+
+    const items = page.getByTestId("food-photo-item");
+    await expect(items).toHaveCount(3);
+    const broccoli = items.nth(2);
+    await expect(broccoli).toContainText("Low confidence");
+    await expect(broccoli.getByRole("note")).toContainText("don't match the macros");
+    await broccoli.getByLabel("kcal").fill("35");
+    await expect(broccoli.getByRole("note")).toHaveCount(0);
+
+    // Add the oil it was cooked in, from the food database.
+    await questions.getByRole("button", { name: "Olive oil, 1 tbsp" }).click();
+    await expect(items).toHaveCount(4);
+    await expect(items.nth(3)).toContainText("Database values");
+    await expect(items.nth(3)).toContainText("119 kcal");
+
+    // Swap the rice estimate for a database food.
+    await items.nth(1).getByRole("button", { name: "Use a database food instead" }).click();
+    const picker = page.getByRole("dialog");
+    await expect(picker.getByPlaceholder("e.g. chicken, rice, olive oil")).toHaveValue("rice");
+    await picker.getByRole("region", { name: "Food database results" }).getByRole("button").first().click();
+    await picker.getByRole("button", { name: "Use this food" }).click();
+    await expect(items.nth(1)).toContainText("Database values");
+    await expect(items.nth(1).getByRole("button", { name: "Back to the photo estimate for White rice" })).toBeVisible();
+
+    await page.getByTestId("food-photo-confirm").click();
+    await expect(page.getByTestId("food-photo-done")).toContainText("Added 4 items to lunch.");
+    await page.getByRole("link", { name: "Go to my diary" }).click();
+    // Photo estimates are marked as estimates; the matched foods keep their database values.
+    await expect(page.getByRole("button", { name: "Edit Grilled chicken breast" })).toContainText("a palm-sized fillet (estimated from a photo) · 248 kcal");
+    await expect(page.getByRole("button", { name: "Edit Broccoli" })).toContainText("35 kcal");
+    await expect(page.getByRole("button", { name: "Edit Olive oil" })).toContainText("13.5 g · 119 kcal");
+    await expect(page.getByRole("button", { name: /^Edit White rice/ })).toContainText("USDA");
+    await expect(page.getByText("Includes estimated entries")).toBeVisible();
   });
 });

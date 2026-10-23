@@ -9,7 +9,7 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSCameraUsageDescription</key>
-	<string>Narrow Gate Fitness uses the camera to scan food barcodes for nutrition logging and to take progress photos and Body Scan photos. Photos are stored privately for you only.</string>
+	<string>Narrow Gate Fitness uses the camera to scan food barcodes, photograph meals for nutrition estimates you confirm, and take progress and Body Scan photos, which are stored privately for you only.</string>
 	<key>CFBundleDisplayName</key>
         <string>Narrow Gate Fitness</string>
 	<key>CFBundleExecutable</key>

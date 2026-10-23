@@ -166,6 +166,7 @@ async function reserveUsage(
     const msg = error?.message ?? "";
     if (msg.includes("ai_rate_limited")) throw new AiError("rate_limited", "You're sending messages quickly — please wait a moment.", 60);
     if (msg.includes("ai_quota_plan")) throw new AiError("quota", "You've used this month's plan generations. They reset on the 1st.");
+    if (msg.includes("ai_quota_photo")) throw new AiError("quota", "You've analysed 20 meal photos in the last 24 hours. Try again later, or log this meal by search.");
     if (msg.includes("ai_quota")) throw new AiError("quota", `You've used all ${usage.chatLimit} AI messages for this month.`);
     logError("ai.usage_reserve", error ?? new Error("No reservation returned"));
     throw new AiError("metering_unavailable", "AI usage can't be checked right now. Please try again shortly.");
