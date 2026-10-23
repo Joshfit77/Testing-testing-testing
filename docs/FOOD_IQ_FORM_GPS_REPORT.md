@@ -192,6 +192,18 @@ These are simulated traces, not phone recordings.
 - **Now re-captured from `claude/sharp-cray-8y0uuv` @ `e810c7e`** and published to the same link as version 5:
   **403 screens**, including Food IQ, the corrected exercise figures and the new GPS screens. A sample image was
   checked to match the local capture byte for byte.
+- **Expanded to 602 screens and published as version 10**: the remaining detail pages (exercise history, past
+  workouts, saved runs and run edit) were captured so that every link in the demo opens its page. The one exception
+  is "Export my data", which downloads a file in the app; in the demo it shows a note explaining that instead.
+- **Exercise figures play live in the demo** (160 figures: the 157 exercise pages and the workout logger). They are
+  drawn by the app's own animation code (`src/lib/exercise-motion`, bundled into the page), not a recording, and
+  pause/play and ½× speed work as in the app. The screenshots are packed into 169 image sheets to fit the
+  preview host's file limits.
+- Checked on the published page itself: three sample sheets match the local files byte for byte, the published
+  page is the local page unchanged inside the host's standard wrapper, and the demo click-through checks pass on it
+  (links, back, tab bar, figure animating, pause, ½× speed, the workout logger figure, wide-screen layout, Food IQ
+  and run paths), with no script errors.
+- Still not possible in a recorded demo: typing, saving new entries, real AI replies, live GPS or the camera.
 - Capture setup: a local production build (`next build` / `next start`) on a local Supabase with all migrations
   applied, and a demo account with seeded workouts and runs.
 - Mocks: a stand-in AI server (replies are sample text) and a local Open Food Facts mock. GPS is simulated through the
