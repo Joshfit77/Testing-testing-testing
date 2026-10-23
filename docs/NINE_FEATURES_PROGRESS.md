@@ -15,10 +15,10 @@ Branch `claude/nine-features` (from `claude/app-cleanup` at `5bf988f`). Not merg
 | 5 | Interactive muscle body map | Plus / Pro | Complete and tested | Rank thresholds are provisional and still need review by a qualified coach. |
 | 6 | Guided AI body scanner | Pro | Implemented, physical-device testing needed | Browser capture tested with a fake camera and uploads. No body-fat estimate (no validated provider approved). Native camera behaviour on a phone not tested. |
 | 7 | AI food-photo recognition | Pro | Implemented, physical-device testing needed | Tested end to end with a mock AI; real-model estimate quality and phone camera capture not yet checked. |
-| 8 | Food Quality Scanner | Free / Plus / Pro | Not started | |
+| 8 | Food Quality Scanner | Free / Plus / Pro | Implemented, physical-device testing needed | Tested against a local Open Food Facts mock: this environment's network policy blocks the live API and its docs, so field names and limits still need checking against the live service. Phone camera scanning untested. |
 | 9 | Genuine 4K badge artwork | — | Blocked by external dependency | The import, checking and export pipeline is ready (`docs/BADGE_ART_SPEC.md`). The 27 new 3840 × 1920 masters must be created by an image tool or an artist, which needs your approval. Not complete until they exist. |
 
-Test totals after Stage 7: Vitest 105 files, 2,192 tests passed. Playwright 56 passed, 1 skipped (the skip predates this branch).
+Test totals after Stage 8: Vitest 107 files, 2,206 tests passed. Playwright 59 passed, 1 skipped (the skip predates this branch).
 
 ## Stage 1: long-term AI coaching memory (Pro) — commit `affbbca`
 
@@ -164,3 +164,40 @@ Test totals after Stage 7: Vitest 105 files, 2,192 tests passed. Playwright 56 p
    - A physical phone for camera testing.
 9. **Commit.** `9d0bb50`.
 10. **Next.** Stage 8: Food Quality Scanner.
+
+## Stage 8: Food Quality Scanner (Free / Plus / Pro) — commit `fd2826f`
+
+1. **Implemented.** Food → Food quality, an original feature (Yuka was a functional reference only); details in `docs/FOOD_QUALITY.md`.
+   - **Scanning:** the existing barcode scanner (camera, native or typed) opens a product page.
+   - **Product page:**
+     - name, brand, image and a prominent Add to Food Diary, which uses the normal barcode logging, so no duplicate foods;
+     - full nutrition per serving and per 100 g/ml, with missing values shown as "Not available", and % of EU reference intakes;
+     - Nutri-Score and NOVA as computed by Open Food Facts, each with its meaning and limits; UK front-of-pack levels; EU claim thresholds met. No invented score;
+     - ingredients with forms of sugar; additives in neutral plain language (regulatory notes only);
+     - declared allergens and traces, vegan, vegetarian and palm-oil status, labels, and an explicit "can't guarantee allergen safety" note;
+     - real alternatives from the same category, offered only when clearly better, with the reasons.
+   - **Plus:** personal filters (EU allergens, vegan or vegetarian, nutrition preferences) checked on every product, with missing data shown as unknown, never safe; alternatives filtered by them; side-by-side comparisons that warn when products aren't comparable.
+   - **Pro:** an AI explanation for the member's goals from the known facts only.
+   - **Gates:** checked on the server, using a new Plus feature `food_comparisons`. Prices and plan highlights are unchanged.
+2. **Files.** New: `src/lib/food-quality.ts`, `src/lib/food-quality-ai.ts`, `src/server/services/food-quality.ts`, `src/server/actions/food-quality.ts`, `src/app/(app)/nutrition/{scanner,product/[code],compare}/page.tsx`, `src/components/nutrition/{quality-sections,quality-client}.tsx`, `supabase/migrations/20261024000033_food_quality.sql`, `docs/FOOD_QUALITY.md`, `e2e/{off-mock,global-setup,food-quality.spec}.ts`, `tests/unit/food-quality.test.ts`, `tests/integration/food-quality.test.ts`. Changed: `src/components/nutrition/{barcode-scanner,food-amount}.tsx` (code hook, details link), `src/app/(app)/nutrition/page.tsx` (Food tools link), `src/lib/domain/plans.ts`, `tests/unit/plans.test.ts`, `docs/MEMBERSHIPS.md`, `playwright.config.ts`, `e2e/food-amounts.spec.ts` (now uses the shared mock), `e2e/coach.spec.ts`, `supabase/setup-all.sql`.
+3. **Migration.** `20261024000033_food_quality.sql`: `profiles.food_filters` (an owner-editable object of at most 2 KB). No product data is stored.
+4. **Tests.**
+   - **Unit (11):** normalisation, indicators, sugars, additive wording, filters, comparability, alternatives, AI facts.
+   - **Integration (3):** the service against the mock, including the cache and the search throttle; filter storage.
+   - **Browser (4):** Free flow (scan, facts, unavailable values, indicators, ingredients, allergens, alternatives, add to diary, no-data and unknown products); Plus filters, filtered alternatives and comparisons, including the drink-versus-food warning; the Pro AI explanation and exactly what was sent; the existing barcode journey on the shared mock.
+5. **Results.** Vitest: 107 files, 2,206 tests passed. Playwright: 59 passed, 1 skipped. `tsc`, ESLint and the build are clean.
+6. **Bugs fixed.**
+   - `capitalize` turned "30 g" into "30 G".
+   - Broken product images now hide themselves, including failures before hydration.
+   - The nutrition table's columns were cramped.
+   - A nitrite note was reworded so no additive text reads as a harm claim.
+7. **Limitations.**
+   - Not verified against the live Open Food Facts API or its current documentation: this environment's network policy blocks `world.openfoodfacts.org` and `openfoodfacts.github.io`.
+   - Additive descriptions cover about 75 common additives; others show their code.
+   - Ingredient checks look for English words.
+   - The phone camera hasn't been tested.
+8. **External.**
+   - Network access to `world.openfoodfacts.org` (and `openfoodfacts.github.io` for the docs) in this environment's settings, for live verification. No account or payment is needed.
+   - A physical phone.
+9. **Commit.** `fd2826f`.
+10. **Next.** Stage 9: genuine 4K badge artwork.
