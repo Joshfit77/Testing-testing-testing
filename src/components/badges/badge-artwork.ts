@@ -14,6 +14,8 @@ export interface BadgeArtwork {
   /** The file's own pixel size. */
   width: number;
   height: number;
+  /** A half-width copy for small tiles, when one was exported from a master (export-masters.py). */
+  small: string | null;
 }
 
 /**
@@ -25,8 +27,10 @@ const DEVICE_PIXEL_RATIO = 3;
 
 export const BADGE_ARTWORK: BadgeArtwork[] = RANKS.map((r) => {
   const image = `/badges/${r.category}-${String(r.level).padStart(2, "0")}-${r.name.toLowerCase()}.webp`;
-  const size = (SIZES as Record<string, { width: number; height: number }>)[image];
-  return { category: r.category, rank: r.level, name: r.name, image, width: size?.width ?? 0, height: size?.height ?? 0 };
+  const sizes = SIZES as Record<string, { width: number; height: number }>;
+  const size = sizes[image];
+  const small = image.replace(/\.webp$/, "-sm.webp");
+  return { category: r.category, rank: r.level, name: r.name, image, width: size?.width ?? 0, height: size?.height ?? 0, small: sizes[small] ? small : null };
 });
 
 export function getBadgeArtwork(category: RankCategory, rank: number): BadgeArtwork | undefined {
@@ -40,3 +44,9 @@ export function getBadgeArtwork(category: RankCategory, rank: number): BadgeArtw
 export const BADGE_MAX_SHARP_WIDTH = Math.floor(
   Math.min(...BADGE_ARTWORK.map((b) => b.width || Infinity)) * (MAX_DEVICE_UPSCALE / DEVICE_PIXEL_RATIO),
 );
+
+/** `srcSet` for an <img>: the small copy for small tiles when it exists, otherwise just the full file. */
+export function badgeSrcSet(art: BadgeArtwork | undefined): string | undefined {
+  if (!art?.small || !art.width) return undefined;
+  return `${art.small} ${art.width / 2}w, ${art.image} ${art.width}w`;
+}

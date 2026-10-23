@@ -6,7 +6,8 @@ its rank slot and be exactly 2 : 1, at least 1600 x 800 (target 3840 x 1920):
 
     assets/badge-masters/fitness-01-foundation.png  ...  faith-09-cedar.png   (PNG, WebP or TIFF)
 
-For every master found, this writes public/badges/<slot>.webp at MOBILE_WIDTH x MOBILE_WIDTH/2 (high-quality
+For every master found, this writes public/badges/<slot>.webp at MOBILE_WIDTH x MOBILE_WIDTH/2, plus a
+SMALL_WIDTH copy <slot>-sm.webp for small tiles (both high-quality
 WebP, alpha kept if the master has it) and updates src/components/badges/badge-artwork-sizes.json, which drives
 the <img> sizes and the detail view's sharp-size limit. Ranks without a master keep their current file, so masters
 can be added one at a time. Nothing is ever enlarged: a master smaller than MOBILE_WIDTH is refused.
@@ -26,6 +27,7 @@ from check_masters import check, find_master, poster_crops, slot_names, status
 
 ROOT = Path(__file__).resolve().parents[2]
 MOBILE_WIDTH = 1200  # 600 CSS px of art at 2x, 400 at 3x: more than the badge detail view ever shows
+SMALL_WIDTH = 600  # for small tiles (the rank list), so a phone doesn't download 27 full-size images
 QUALITY = 90  # visually lossless for painted art at this size; ~150-300 KB per badge
 
 
@@ -52,6 +54,9 @@ def export(masters: Path, out: Path, sizes_file: Path) -> list[str]:
         dest = out / f"{slot}.webp"
         mobile.save(dest, "WEBP", quality=QUALITY, method=6, alpha_quality=100)
         sizes[f"/badges/{slot}.webp"] = {"width": mobile.width, "height": mobile.height}
+        small = img.resize((SMALL_WIDTH, SMALL_WIDTH // 2), Image.LANCZOS)
+        small.save(out / f"{slot}-sm.webp", "WEBP", quality=QUALITY, method=6, alpha_quality=100)
+        sizes[f"/badges/{slot}-sm.webp"] = {"width": small.width, "height": small.height}
         done += 1
         print(f"{slot:28} {w}x{h} -> {mobile.width}x{mobile.height}  {dest.stat().st_size // 1024} KB")
     sizes_file.write_text(json.dumps(sizes, indent=2) + "\n")

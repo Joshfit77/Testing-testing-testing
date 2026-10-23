@@ -1,6 +1,6 @@
 # Badge artwork brief: 27 high-resolution masters
 
-**Status (2026-10-22): no genuine high-resolution artwork exists yet.**
+**Status (2026-10-23, Stage 9): no genuine high-resolution artwork exists yet, so Stage 9 is not complete.**
 
 - **In use now:** the art the app uses is cut from the owner's three poster screenshots. Each badge is 352–526 px
   wide (`docs/BADGES.md` has the per-image table).
@@ -43,15 +43,22 @@ No automatic check can judge whether a painting is good, so the checklist below 
 
 | | Master | App file (made by the export script) |
 |---|---|---|
-| Size | **3840 × 1920 px** (minimum 1600 × 800), exactly 2 : 1 | 1200 × 600 px |
-| Format | PNG (lossless), sRGB | WebP, quality 90, about 150–300 KB |
+| Size | **3840 × 1920 px** (minimum 1600 × 800), exactly 2 : 1 | 1200 × 600 px, plus a 600 × 300 copy for small tiles |
+| Format | PNG (lossless), sRGB | WebP, quality 90, about 150–300 KB (the small copy about a quarter of that) |
 | Background | Opaque near-black (#0B0A07) to match the app, or transparent | Kept as delivered |
-| Where | `assets/badge-masters/<slot>.png` (Git LFS or shared drive) | `public/badges/<slot>.webp` |
+| Where | `assets/badge-masters/<slot>.png` (Git LFS or shared drive), never in `public/` | `public/badges/<slot>.webp` and `public/badges/<slot>-sm.webp` |
 | Names | `fitness-01-foundation` … `faith-09-cedar` (table below) | same |
 
 - **Rights:** confirm commercial rights to every image (your own work, a commissioned artist with a licence, or an
   AI service whose terms allow commercial use).
-- **Keep the masters:** the mobile files are made from them and can be re-exported at any size later.
+- **Keep the masters:** the mobile files are made from them and can be re-exported at any size later. Masters stay
+  out of the app bundle; only the exported WebP files ship.
+- **Small copies:** the rank list and other small tiles use the 600 × 300 copy through `srcset`, so a phone doesn't
+  download 27 full-size images; the badge detail view uses the 1200 × 600 file. Both are shrunk from the master,
+  never enlarged.
+- **Animations are not part of the art:** the Fitness shine, Food flames and embers, Faith leaf sway and sunlight,
+  and the unlock celebrations are layers the app draws over the image, and they all stop under reduced motion.
+  Deliver still images with nothing baked in (no motion blur, no lens flares meant to animate).
 
 ## One look for all 27 (so the set is cohesive)
 
@@ -134,6 +141,11 @@ No automatic check can judge whether a painting is good, so the checklist below 
 
 - [ ] 2 : 1, at least 1600 × 800 (target 3840 × 1920), sRGB.
 - [ ] Sharp at 100 % zoom; no smeared or "plastic" areas. Edges stay crisp at 50 %.
+- [ ] No blurry halos around the subject and no over-sharpening (bright or dark ringing along edges, crunchy
+      noise in flat areas).
+- [ ] Not stretched or squashed: shields, medallions and trunks keep their natural proportions.
+- [ ] Nothing clipped: wings, flames, leaves and glow stay inside the frame with margin to spare.
+- [ ] Lighting matches the set: soft key light from the upper left, same background darkness.
 - [ ] Subject centred (within 2 %), 80–88 % of the height, side margins respected; matches its neighbours' scale.
 - [ ] Same subject, colours and identity as the poster version; Conqueror's cross is about 25–30 % smaller.
 - [ ] No text, numbers, frames or watermarks.

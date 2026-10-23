@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { BADGE_ARTWORK, BADGE_MAX_SHARP_WIDTH, MAX_DEVICE_UPSCALE, getBadgeArtwork } from "@/components/badges/badge-artwork";
+import { BADGE_ARTWORK, BADGE_MAX_SHARP_WIDTH, MAX_DEVICE_UPSCALE, badgeSrcSet, getBadgeArtwork } from "@/components/badges/badge-artwork";
 import { BADGE_IMAGE_OVERRIDES } from "@/components/badges/badge-art";
 import { RANKS } from "@/lib/domain/ranks";
 
@@ -48,6 +48,19 @@ describe("badge artwork", () => {
 
   it("knows each file's real pixel size (used for <img> width/height and the sharp-size limit)", () => {
     for (const art of BADGE_ARTWORK) expect({ width: art.width, height: art.height }, art.image).toEqual(webpSize(file(art.image)));
+  });
+
+  it("offers a half-size copy to small tiles only when one was exported from a master", () => {
+    for (const art of BADGE_ARTWORK) {
+      if (art.small) {
+        expect(existsSync(file(art.small)), art.small).toBe(true);
+        expect(webpSize(file(art.small))).toEqual({ width: art.width / 2, height: art.height / 2 });
+        expect(badgeSrcSet(art)).toBe(`${art.small} ${art.width / 2}w, ${art.image} ${art.width}w`);
+      } else {
+        // The current poster crops have no small copy; they're shown as they are.
+        expect(badgeSrcSet(art)).toBeUndefined();
+      }
+    }
   });
 
   it("large views never enlarge any badge more than 1.5x on a 3x iPhone", () => {

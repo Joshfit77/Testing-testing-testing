@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, type ReactNode } from "react";
-import { BADGE_ARTWORK, BADGE_MAX_SHARP_WIDTH, getBadgeArtwork } from "@/components/badges/badge-artwork";
+import { BADGE_ARTWORK, BADGE_MAX_SHARP_WIDTH, badgeSrcSet, getBadgeArtwork } from "@/components/badges/badge-artwork";
 import type { RankCategory } from "@/lib/domain/ranks";
 
 /**
@@ -46,6 +46,7 @@ export function BadgeArt({
   const style = locked ? { filter: "brightness(0.55) saturate(0.75)" } : undefined;
   if (override) {
     const art = getBadgeArtwork(category, level);
+    const srcSet = badgeSrcSet(art);
     const live = animate && !locked;
     return (
       // The painted art is a 2 : 1 scene: `size` sets the frame's height and its width is twice that, but never
@@ -57,7 +58,16 @@ export function BadgeArt({
         style={{ width: Math.min(size * 2, BADGE_MAX_SHARP_WIDTH), maxWidth: "100%" }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={override} alt={title ?? ""} width={art?.width || undefined} height={art?.height || undefined} draggable={false} decoding="async" />
+        <img
+          src={override}
+          srcSet={srcSet}
+          sizes={srcSet ? `${Math.min(size * 2, BADGE_MAX_SHARP_WIDTH)}px` : undefined}
+          alt={title ?? ""}
+          width={art?.width || undefined}
+          height={art?.height || undefined}
+          draggable={false}
+          decoding="async"
+        />
         {live ? <BadgeLiveEffects category={category} /> : null}
       </span>
     );

@@ -81,7 +81,10 @@ def main():
         # the files the first run wrote).
         for run in (1, 2):
             problems = export_masters.export(masters, out, sizes)
-            exported = sorted(p.stem for p in out.glob("*.webp"))
+            exported = sorted(p.stem for p in out.glob("*.webp") if not p.stem.endswith("-sm"))
+            small = sorted(p.stem for p in out.glob("*-sm.webp"))
+            if small != ["faith-01-seed-sm", "food-09-phoenix-sm"]:
+                failures.append(f"export run {run} wrote small copies {small}")
             if exported != ["faith-01-seed", "food-09-phoenix"]:
                 failures.append(f"export run {run} wrote {exported}")
             if len(problems) != 5:
@@ -90,6 +93,8 @@ def main():
             failures.append("exported size is not 1200x600")
         if json.loads(sizes.read_text()).get("/badges/food-09-phoenix.webp") != {"width": 1200, "height": 600}:
             failures.append("sizes file not updated")
+        if json.loads(sizes.read_text()).get("/badges/food-09-phoenix-sm.webp") != {"width": 600, "height": 300}:
+            failures.append("small copy missing from the sizes file")
 
     if failures:
         print("FAILED:\n  " + "\n  ".join(failures))

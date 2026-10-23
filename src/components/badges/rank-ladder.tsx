@@ -2,7 +2,7 @@
 
 import { Check, Dumbbell, Flame, Lock, Sprout } from "lucide-react";
 import { BADGE_IMAGE_OVERRIDES } from "@/components/badges/badge-art";
-import { getBadgeArtwork } from "@/components/badges/badge-artwork";
+import { badgeSrcSet, getBadgeArtwork } from "@/components/badges/badge-artwork";
 import { RANK_CATEGORIES, type CategoryProgress, type RankCategory, type RankState } from "@/lib/domain/ranks";
 import { cn } from "@/lib/utils";
 
@@ -68,6 +68,8 @@ export function RankLadder({
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={art}
+                      srcSet={badgeSrcSet(getBadgeArtwork(r.category, r.level))}
+                      sizes="160px"
                       alt=""
                       width={getBadgeArtwork(r.category, r.level)?.width}
                       height={getBadgeArtwork(r.category, r.level)?.height}
