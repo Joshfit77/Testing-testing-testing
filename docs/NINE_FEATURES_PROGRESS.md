@@ -13,12 +13,12 @@ Branch `claude/nine-features` (from `claude/app-cleanup` at `5bf988f`). Not merg
 | 3 | Personalized AI meal plans | Pro | Complete and tested | Mock AI model only. Allergy filtering is not certified. |
 | 4 | Live GPS running and walking | Free (basic) | Implemented, physical-device testing needed | Browser recording tested with simulated GPS. Background recording on a locked phone is prepared, not synced into a native build, not verified. |
 | 5 | Interactive muscle body map | Plus / Pro | Complete and tested | Rank thresholds are provisional and still need review by a qualified coach. |
-| 6 | Guided AI body scanner | Pro | Not started | |
+| 6 | Guided AI body scanner | Pro | Implemented, physical-device testing needed | Browser capture tested with a fake camera and uploads. No body-fat estimate (no validated provider approved). Native camera behaviour on a phone not tested. |
 | 7 | AI food-photo recognition | Pro | Not started | |
 | 8 | Food Quality Scanner | Free / Plus / Pro | Not started | |
 | 9 | Genuine 4K badge artwork | — | Blocked by external dependency | The import, checking and export pipeline is ready (`docs/BADGE_ART_SPEC.md`). The 27 new 3840 × 1920 masters must be created by an image tool or an artist, which needs your approval. Not complete until they exist. |
 
-Test totals after Stage 5: Vitest 101 files, 2,173 tests passed. Playwright 53 passed, 1 skipped (the skip predates this branch).
+Test totals after Stage 6: Vitest 103 files, 2,183 tests passed. Playwright 54 passed, 1 skipped (the skip predates this branch) and 1 failed: a recipes test whose text locator also matched a status message. That locator was made exact and the spec then passed.
 
 ## Stage 1: long-term AI coaching memory (Pro) — commit `affbbca`
 
@@ -88,3 +88,40 @@ Test totals after Stage 5: Vitest 101 files, 2,173 tests passed. Playwright 53 p
 8. **External.** None. (A coach review of the thresholds is a people task, not an account.)
 9. **Commit.** `d24e32b`.
 10. **Next.** Stage 6: guided AI body scanner.
+
+## Stage 6: guided body scanner (Pro) — commit `3b1029e`
+
+1. **Implemented.** Body Scan under My Progress (`/progress/body-scan`), separate from progress photos and the muscle map, with full details in `docs/BODY_SCAN.md`.
+   - **Consent:** explicit consent comes first and is recorded with its time.
+   - **Guided capture:** a preparation screen (lighting, distance and framing, pose, consistency), then front and side photos (required) and a rear photo (optional). Each comes from the live camera, with a framing outline, a 10-second timer, a camera switch, a faint overlay of the previous scan and a level indicator where the phone reports it, or from an upload. Every photo can be retaken.
+   - **Measurements (optional):** weight and waist, chest, hips, arm and thigh. They also go into the existing weight and measurement history.
+   - **Dashboard:** history with thumbnails, a side-by-side comparison of any two scans (front, side or rear) with the time between and the changes, and 12-month weight and measurement charts.
+   - **Body fat:** no estimate. The page says plainly that a phone camera can't measure body fat or visceral fat. Nothing was purchased; the earlier vendor evaluation is referenced in the doc.
+   - **Privacy:** a private `body-scans` bucket with owner-only policies and no admin access, signed links that expire in 10 minutes, and Pro plus consent enforced by the database. Members can delete one scan, or withdraw consent and delete everything (still possible after a downgrade). Scans are in the export and removed with the account. Photos are never sent to the AI coach or any other service.
+2. **Files.** New: `src/lib/domain/body-scan.ts`, `src/server/services/body-scan.ts`, `src/server/actions/body-scan.ts`, `src/app/(app)/progress/body-scan/page.tsx`, `src/app/(app)/progress/body-scan/new/page.tsx`, `src/components/body-scan/{consent-card,pose-outline,scan-capture,scan-dashboard}.tsx`, `supabase/migrations/20261024000031_body_scans.sql`, `docs/BODY_SCAN.md`, `tests/unit/body-scan.test.ts`, `tests/integration/body-scans.test.ts`, `e2e/body-scan.spec.ts`. Changed: `src/app/(app)/progress/page.tsx`, `src/server/services/account.ts` (export and deletion), `src/lib/security-headers.ts`, `ios/App/App/Info.plist` (camera usage text), `supabase/setup-all.sql`, `docs/PRO_ROADMAP.md`, `tests/unit/security-headers.test.ts`, `e2e/recipes-planner.spec.ts`.
+3. **Migration.** `20261024000031_body_scans.sql`:
+   - `profiles.body_scan_consent_at` and `can_add_body_scan()`;
+   - `body_scans` and `body_scan_photos` with row-level security, path checks and one photo per view;
+   - a limit of 200 scans;
+   - the private `body-scans` bucket and its policies.
+4. **Tests.**
+   - **Unit (5):** plan rule, path ownership, comparison, tilt, guidance wording.
+   - **Database and storage (4):** consent and Pro required to add; Plus refused; owner-only rows and files, with another member and an admin both blocked; one photo per view; paths must match the scan; deletion after a downgrade or withdrawn consent; account deletion.
+   - **Browser (2):** Plus locked; Pro consent, upload with retake, skipped rear photo, measurements, a second scan with Chromium's fake camera, images and the previous-scan overlay actually load, comparison changes, delete one, then withdraw and delete all.
+5. **Results.**
+   - Vitest: 103 files, 2,183 tests passed.
+   - Playwright: 54 passed, 1 skipped and 1 failed (an older recipes test whose text locator was ambiguous). After the locator fix that spec passed.
+   - `tsc` and ESLint clean; the build succeeds.
+6. **Bugs fixed.**
+   - **Photos didn't load locally.** The Content-Security-Policy `img-src` allowed only `https:`, so private photos never loaded against the local http Supabase. It now also lists the configured Supabase origin; https deployments were already fine. The new browser test checks that images really load.
+   - **Previews revoked too early.** A cleanup effect would have revoked preview images still on screen.
+   - **Ambiguous recipes locator.**
+7. **Limitations.**
+   - The camera inside the native iPhone and Android apps and the level indicator haven't been tested on a physical phone.
+   - No automatic retention period; scans stay until deleted.
+   - No body-fat estimate.
+8. **External.**
+   - A physical iPhone and Android phone for camera testing.
+   - Any body-composition vendor would need your approval, a contract and a data-processing agreement.
+9. **Commit.** `3b1029e`.
+10. **Next.** Stage 7: AI food-photo recognition.
