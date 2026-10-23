@@ -105,3 +105,19 @@ product decision to confirm.
 | D3 Sound analysis | Not started (design only) | Design: microphone levels sampled on the device while the timer runs, reduced on the phone to events (snoring-like, talking-like, loud noise; start, length, peak level) with **no audio stored or uploaded**; a separate opt-in consent; events shown on the nightly report; deleted with the night. | A native background audio plugin, a classifier whose accuracy has been measured on real recordings, iOS background-audio entitlement review, and battery measurement. Until a classifier has measured accuracy the feature would be guesswork, so no table, code or UI exists for it. |
 | D4 Device verification | Blocked by external dependency | `docs/SLEEP_DEVICE_CHECKLIST.md`: step-by-step checks for a physical iPhone and Android phone, with the expected result of each. | A physical device with the Capacitor build installed. Nothing in this environment can run HealthKit, Health Connect or local notifications. |
 
+## 8. Performance and battery (Stage E3)
+
+- Every sleep query is bounded by the member and a night range with a matching index (`sleep_sessions (user_id,
+  night_of)`, `(user_id, started_at)`; `sleep_checkins (user_id, day)`; `sleep_stages (session_id, started_at)`;
+  `sleep_import_runs (user_id, created_at)`). The dashboard reads 14 nights, the nightly report one night plus 14
+  for comparison, history at most a year plus 14 nights, and a member can hold at most 4,000 sessions (trigger with
+  an advisory lock), so no page can read an unbounded set.
+- All calculations run on the server from those rows; pages are server components with small client islands
+  (timer, forms, quick check-in, import and alarm buttons). No polling, no timers in the browser beyond the
+  one-second sleep-timer display while the page is open.
+- On the phone nothing runs in the background: the timer is a stored start time, the alarm is a notification
+  scheduled with the operating system, and health-platform import happens only when the member taps the button.
+  Battery use is therefore that of the OS scheduler; it still needs measuring on a device (D4 checklist row B10).
+- The AI coach's `get_sleep_summary` is computed from the same bounded queries and returns a few hundred bytes;
+  it counts against the existing AI usage quota.
+
