@@ -125,7 +125,7 @@ test.describe("Recipes, meal planner and grocery list", () => {
     // Add an item of your own.
     await page.getByLabel("Item", { exact: true }).fill("Coffee beans");
     await page.getByRole("button", { name: "Add item" }).click();
-    await expect(page.getByText("Coffee beans")).toBeVisible();
+    await expect(page.getByText("Coffee beans", { exact: true })).toBeVisible();
     await expect(page.getByTestId("grocery-item")).toHaveCount(total + 1);
   });
 });

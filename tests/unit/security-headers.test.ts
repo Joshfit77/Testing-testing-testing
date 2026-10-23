@@ -15,6 +15,12 @@ describe("security headers", () => {
     expect(csp).toContain("connect-src 'self' https://abc.supabase.co wss://abc.supabase.co");
     expect(csp).toContain("form-action 'self' https://checkout.stripe.com https://billing.stripe.com");
     expect(csp).toContain("upgrade-insecure-requests");
+    expect(csp).toContain("img-src 'self' data: blob: https: https://abc.supabase.co");
+  });
+
+  it("lets a local http Supabase serve private photos", () => {
+    const dev = contentSecurityPolicy({ supabaseUrl: "http://127.0.0.1:54321", production: false, https: false });
+    expect(dev).toContain("img-src 'self' data: blob: https: http://127.0.0.1:54321");
   });
 
   it("only allows eval in development and only pins HTTPS in production", () => {

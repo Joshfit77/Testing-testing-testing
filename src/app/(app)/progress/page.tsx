@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { Award, ChevronRight, History, LineChart, PersonStanding } from "lucide-react";
+import { Award, ChevronRight, History, LineChart, PersonStanding, ScanLine } from "lucide-react";
 import { MainHeader } from "@/components/shell/main-header";
 import { StepsCard } from "@/components/steps/steps-card";
 import { addDays, isoDateInTz } from "@/lib/domain/dates";
+import { canUseBodyScan } from "@/lib/domain/body-scan";
 import { hasFeature } from "@/lib/domain/plans";
 import { DEFAULT_STEP_GOAL } from "@/lib/domain/steps";
 import { getServerSupabase } from "@/lib/supabase/server";
@@ -37,6 +38,12 @@ export default async function ProgressHubPage() {
       body: hasFeature(plan, "advanced_analytics")
         ? "Muscle map, Bronze-to-Disciple strength ranks and trends for each muscle group"
         : "Plus: a muscle map with strength ranks and trends for each muscle group",
+    },
+    {
+      href: "/progress/body-scan",
+      icon: ScanLine,
+      title: "Body Scan",
+      body: canUseBodyScan(plan) ? "Guided front, side and rear photos with measurements, compared over time" : "Pro: guided body photos and measurements, compared over time",
     },
     {
       href: "/progress/badges",

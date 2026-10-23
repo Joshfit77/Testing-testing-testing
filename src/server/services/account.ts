@@ -1,5 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { BODY_SCAN_BUCKET } from "@/lib/domain/body-scan";
 import { PROGRESS_PHOTO_BUCKET } from "@/lib/domain/progress-photos";
 
 /** How long the photo download links in an export stay valid. */
@@ -41,6 +42,8 @@ export const USER_TABLES: { table: string; column: string }[] = [
   { table: "discipline_goals", column: "user_id" },
   { table: "discipline_checkins", column: "user_id" },
   { table: "progress_photos", column: "user_id" },
+  { table: "body_scans", column: "user_id" },
+  { table: "body_scan_photos", column: "user_id" },
   { table: "challenge_enrollments", column: "user_id" },
   { table: "challenge_checkins", column: "user_id" },
   { table: "activities", column: "user_id" },
@@ -112,6 +115,11 @@ export async function exportUserData(supabase: SupabaseClient, userId: string, e
   } catch {
     out.progress_photo_files = { note: "Download links for your progress photo images couldn't be created. Try the export again.", files: [] };
   }
+  try {
+    out.body_scan_photo_files = await progressPhotoLinks(supabase, (out.body_scan_photos as { storage_path: string }[]) ?? [], BODY_SCAN_BUCKET);
+  } catch {
+    out.body_scan_photo_files = { note: "Download links for your body scan photos couldn't be created. Try the export again.", files: [] };
+  }
   return out;
 }
 
@@ -119,14 +127,14 @@ export async function exportUserData(supabase: SupabaseClient, userId: string, e
  * Image files aren't embedded in the JSON export; instead each photo gets a private,
  * time-limited download link (created with the user's own session, so storage policies apply).
  */
-async function progressPhotoLinks(supabase: SupabaseClient, rows: { storage_path: string }[]) {
+async function progressPhotoLinks(supabase: SupabaseClient, rows: { storage_path: string }[], bucket: string = PROGRESS_PHOTO_BUCKET) {
   const expiresAt = new Date(Date.now() + EXPORT_PHOTO_URL_TTL_SECONDS * 1000).toISOString();
   const note = `Image files are not included in this file. Each link below downloads one of your photos and expires at ${expiresAt}. Export again for fresh links.`;
   if (!rows.length) return { note, files: [] };
   const files: { storage_path: string; download_url: string | null }[] = [];
   for (let i = 0; i < rows.length; i += 100) {
     const paths = rows.slice(i, i + 100).map((r) => r.storage_path);
-    const { data, error } = await supabase.storage.from(PROGRESS_PHOTO_BUCKET).createSignedUrls(paths, EXPORT_PHOTO_URL_TTL_SECONDS, { download: true });
+    const { data, error } = await supabase.storage.from(bucket).createSignedUrls(paths, EXPORT_PHOTO_URL_TTL_SECONDS, { download: true });
     if (error) throw error;
     const byPath = new Map((data ?? []).map((d) => [d.path, d.error ? null : d.signedUrl]));
     for (const p of paths) files.push({ storage_path: p, download_url: byPath.get(p) ?? null });
@@ -135,7 +143,7 @@ async function progressPhotoLinks(supabase: SupabaseClient, rows: { storage_path
 }
 
 /** Buckets holding per-user objects under "<uid>/...". Storage objects don't cascade with the user. */
-export const USER_STORAGE_BUCKETS = ["avatars", PROGRESS_PHOTO_BUCKET] as const;
+export const USER_STORAGE_BUCKETS = ["avatars", PROGRESS_PHOTO_BUCKET, BODY_SCAN_BUCKET] as const;
 
 /**
  * Remove every object under "<userId>/" in a bucket (recursing into sub-folders).
@@ -171,7 +179,7 @@ export async function removeUserFolder(admin: SupabaseClient, bucket: string, us
   return removed;
 }
 
-/** Delete all of a user's storage objects (avatars, progress photos). Service-role client only. */
+/** Delete all of a user's storage objects (avatars, progress photos, body scans). Service-role client only. */
 export async function removeUserStorage(admin: SupabaseClient, userId: string): Promise<void> {
   for (const bucket of USER_STORAGE_BUCKETS) await removeUserFolder(admin, bucket, userId);
 }

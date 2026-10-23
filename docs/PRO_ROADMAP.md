@@ -63,7 +63,9 @@ local mock). The first live call should be checked in staging.
     rules for interference (e.g. running before or after lifting).
   - It should only propose program changes through the existing builder, not free-form.
 
-## 3. Pro Body Scan (not built; nothing purchased)
+## 3. Pro Body Scan (guided capture built in Stage 6; no body-fat estimate; nothing purchased)
+
+Built on `claude/nine-features` without any body-fat estimate; see `docs/BODY_SCAN.md`. The proposal below is kept for reference; item 6 (an estimate from a validated vendor) is still not built and needs approval.
 
 **Current state:** no body-scan code exists anywhere in the repository. Related but different:
 

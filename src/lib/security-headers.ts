@@ -34,7 +34,8 @@ export function contentSecurityPolicy({ supabaseUrl, production, https }: Securi
     "script-src": list("'self'", "'unsafe-inline'", !production && "'unsafe-eval'"),
     "style-src": "'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src": "'self' data: https://fonts.gstatic.com",
-    "img-src": "'self' data: blob: https:",
+    // The Supabase origin is listed too, so private photos (signed storage links) also load from a local http stack.
+    "img-src": list("'self'", "data:", "blob:", "https:", supabase),
     "media-src": list("'self'", "blob:", supabase),
     "connect-src": list("'self'", supabase, supabaseWs, "https://*.supabase.co", "wss://*.supabase.co"),
     "frame-src": "https://www.youtube-nocookie.com https://player.vimeo.com",
