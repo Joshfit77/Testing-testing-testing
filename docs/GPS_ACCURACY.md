@@ -129,6 +129,12 @@ the previous `gps-track.ts` checked out.
 
 ## What the browser can and can't do
 
+A desktop or laptop browser usually has no GPS at all: it answers `getCurrentPosition` from Wi-Fi access points or the
+IP address, with an accuracy of tens to thousands of metres that never improves while you walk. That is what the first
+demo recordings were made with, and it explains "inaccurate GPS" there better than any filtering bug. The app treats
+such fixes like any other poor fix (they fail the accuracy gate and show the approximate-location help), so a desktop
+recording shows a waiting state rather than an invented route; real accuracy figures need a phone outdoors.
+
 | | Browser / installed web app | Native app (Capacitor + background-geolocation) |
 |---|---|---|
 | Fixes while the screen is on and the page is open | Yes (`watchPosition`, high accuracy) | Yes |

@@ -69,6 +69,22 @@ export async function rejectRecommendationAction(key: string): Promise<Result> {
   return { ok: true, message: "Okay, it won't be suggested again." };
 }
 
+/** Bring back a suggestion that was turned down: the decision row goes, so it shows again while it still applies. */
+export async function restoreRecommendationAction(key: string): Promise<Result> {
+  const user = await requireUser();
+  const k = keySchema.safeParse(key);
+  if (!k.success) return { ok: false, error: "Recommendation not found." };
+  if (!(await requireAdaptive(user.id))) return { ok: false, error: "Adaptive training is included with Pro." };
+  const supabase = await getServerSupabase();
+  const { error } = await supabase.from("training_recommendation_decisions").delete().eq("user_id", user.id).eq("recommendation_key", k.data).eq("decision", "rejected");
+  if (error) {
+    logError("adaptive.restore", error);
+    return { ok: false, error: "Couldn't bring that back. Please try again." };
+  }
+  revalidatePath("/train/review");
+  return { ok: true, message: "Shown again." };
+}
+
 export async function undoAdjustmentAction(adjustmentId: string): Promise<Result> {
   const user = await requireUser();
   const id = z.string().uuid().safeParse(adjustmentId);

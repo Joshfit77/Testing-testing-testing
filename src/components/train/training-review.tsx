@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import type { Recommendation, TrainingReview } from "@/lib/domain/adaptive-training";
 import { displayWeight, weightUnit } from "@/lib/domain/units";
 import type { UnitSystem } from "@/lib/domain/types";
-import { acceptRecommendationAction, rejectRecommendationAction, undoAdjustmentAction } from "@/server/actions/adaptive-training";
+import { acceptRecommendationAction, rejectRecommendationAction, restoreRecommendationAction, undoAdjustmentAction } from "@/server/actions/adaptive-training";
 
 type Result = { ok: true; message: string } | { ok: false; error: string };
 
@@ -177,6 +177,25 @@ export function TrainingReviewView({
           </p>
         )}
       </section>
+
+      {review.turnedDown.length > 0 && (
+        <section aria-labelledby="turned-down" className="rounded-2xl border border-dashed border-border p-4">
+          <h2 id="turned-down" className="text-sm font-semibold">
+            Turned down
+          </h2>
+          <p className="mt-1 text-xs text-muted-foreground">Suggestions you said no to that still apply. Bring one back and it returns to the list above.</p>
+          <ul className="mt-2 space-y-2">
+            {review.turnedDown.map((r) => (
+              <li key={r.key} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                <span>{r.title}</span>
+                <Button size="sm" variant="ghost" disabled={pending} onClick={() => start(async () => done(await restoreRecommendationAction(r.key)))}>
+                  Show again
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section aria-labelledby="consistency" className="rounded-2xl border border-border bg-card p-4">
         <h2 id="consistency" className="flex items-center gap-2 font-semibold">

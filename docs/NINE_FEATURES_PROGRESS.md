@@ -172,7 +172,7 @@ Test totals after Stage 9: Vitest 107 files, 2,207 tests passed. Playwright 59 p
    - **Product page:**
      - name, brand, image and a prominent Add to Food Diary, which uses the normal barcode logging, so no duplicate foods;
      - full nutrition per serving and per 100 g/ml, with missing values shown as "Not available", and % of EU reference intakes;
-     - Nutri-Score and NOVA as computed by Open Food Facts, each with its meaning and limits; UK front-of-pack levels; EU claim thresholds met. No invented score;
+     - Nutri-Score and NOVA as computed by Open Food Facts, each with its meaning and limits; UK front-of-pack levels; EU claim thresholds met. The original 0–100 Food IQ rating (FIQ-0.1, `docs/FOOD_IQ_METHOD.md`) exists behind the `FOOD_IQ_SCORE` flag, off by default and labelled experimental until a dietitian review;
      - ingredients with forms of sugar; additives in neutral plain language (regulatory notes only);
      - declared allergens and traces, vegan, vegetarian and palm-oil status, labels, and an explicit "can't guarantee allergen safety" note;
      - real alternatives from the same category, offered only when clearly better, with the reasons.

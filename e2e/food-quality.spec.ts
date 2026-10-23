@@ -169,6 +169,16 @@ test.describe("Narrow Gate Food IQ", () => {
     await expect(page.getByText(/One is a drink and the other a food/)).toBeVisible();
   });
 
+  test("Pro: Fits your goals and the AI box are shown", async ({ page }) => {
+    const email = uniqueEmail("quality-pro");
+    await signUpAndConfirm(page, email);
+    await completeOnboarding(page);
+    await grantPlan(email, "pro");
+    await typeBarcode(page, Q.honey);
+    await expect(page.getByTestId("fits-your-goals")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Ask AI about this food" })).toBeVisible();
+  });
+
   test("search by name, and Food IQ across kinds of product: water, a sweetened drink, cured meat and protein bars", async ({ page }) => {
     await signUpAndConfirm(page, uniqueEmail("food-iq"));
     await completeOnboarding(page);

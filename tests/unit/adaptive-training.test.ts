@@ -154,6 +154,10 @@ describe("training review", () => {
     const r = analyzeTraining(input({ program: recent, goal: "build_muscle", goalChangedAfterProgramStart: true, checkins: [{ date: TODAY, readiness: 30 }] }));
     expect(r.recommendations.map((x) => x.kind)).toEqual(["low_readiness", "goal_change"]);
     const decided = analyzeTraining(input({ program: recent, goal: "build_muscle", goalChangedAfterProgramStart: true, checkins: [{ date: TODAY, readiness: 30 }], decided: new Set([`readiness:${TODAY}`]) }));
+    expect(decided.turnedDown).toEqual([]);
+    const rejected = analyzeTraining(input({ program: recent, goal: "build_muscle", goalChangedAfterProgramStart: true, checkins: [{ date: TODAY, readiness: 30 }], decided: new Set([`readiness:${TODAY}`]), rejected: new Set([`readiness:${TODAY}`]) }));
+    expect(rejected.recommendations.map((r) => r.key)).not.toContain(`readiness:${TODAY}`);
+    expect(rejected.turnedDown.map((r) => r.key)).toEqual([`readiness:${TODAY}`]);
     expect(decided.recommendations.map((x) => x.kind)).toEqual(["goal_change"]);
   });
 

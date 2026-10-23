@@ -298,42 +298,42 @@ export function nutrientClasses(p: QualityProduct): NutrientClass[] {
     else if (share >= 12)
       out.push({ id: "protein_source", label: "Source of protein", tone: "positive", kind: "legal", detail: `${share}% of its calories come from protein (EU "source of protein" is 12% or more). ${v.protein_g} g ${per}.${servingNote(p, "protein_g", "g")}` });
     else
-      out.push({ id: "protein_low", label: "Lower in protein", tone: "neutral", kind: "informal", detail: `Only ${share}% of its calories come from protein, below the EU "source of protein" level of 12%. ${v.protein_g} g ${per}.` });
+      out.push({ id: "protein_low", label: "Lower in protein", tone: "neutral", kind: "informal", detail: `Only ${share}% of its calories come from protein, below the EU "source of protein" level of 12%. ${v.protein_g} g ${per}.${servingNote(p, "protein_g", "g")}` });
   }
   if (v.carbs_g != null && kcal != null && kcal >= 20) {
     const share = Math.round(((v.carbs_g * 4) / kcal) * 100);
     if (share > 65)
       out.push({ id: "carbs_high", label: "High in carbohydrates", tone: "neutral", kind: "informal", detail: `${share}% of its calories come from carbohydrates, above the 45–65% range recommended for a whole diet (US Acceptable Macronutrient Distribution Range). ${v.carbs_g} g ${per}.${servingNote(p, "carbs_g", "g")} Useful fuel around training; worth counting on a low-carb plan.` });
     else if (share < 45)
-      out.push({ id: "carbs_low", label: "Lower in carbohydrates", tone: "neutral", kind: "informal", detail: `${share}% of its calories come from carbohydrates, below the 45–65% range recommended for a whole diet. ${v.carbs_g} g ${per}.` });
+      out.push({ id: "carbs_low", label: "Lower in carbohydrates", tone: "neutral", kind: "informal", detail: `${share}% of its calories come from carbohydrates, below the 45–65% range recommended for a whole diet. ${v.carbs_g} g ${per}.${servingNote(p, "carbs_g", "g")}` });
   }
   if (v.fat_g != null) {
     if (v.fat_g > (liquid ? 8.75 : 17.5)) out.push({ id: "fat_high", label: "High in fat", tone: "attention", kind: "guidance", detail: `${v.fat_g} g ${per}, above the UK "high" level of ${liquid ? "8.75" : "17.5"} g. Fat is energy-dense (9 kcal per gram); the type of fat matters too (see saturated fat).${servingNote(p, "fat_g", "g")}` });
-    else if (v.fat_g <= (liquid ? 1.5 : 3)) out.push({ id: "fat_low", label: "Low in fat", tone: "positive", kind: "legal", detail: `${v.fat_g} g ${per} (EU "low fat" is at most ${liquid ? "1.5 g per 100 ml" : "3 g per 100 g"}).` });
+    else if (v.fat_g <= (liquid ? 1.5 : 3)) out.push({ id: "fat_low", label: "Low in fat", tone: "positive", kind: "legal", detail: `${v.fat_g} g ${per} (EU "low fat" is at most ${liquid ? "1.5 g per 100 ml" : "3 g per 100 g"}).${servingNote(p, "fat_g", "g")}` });
   }
   if (v.sat_fat_g != null) {
     if (v.sat_fat_g > (liquid ? 2.5 : 5)) out.push({ id: "sat_high", label: "High in saturated fat", tone: "attention", kind: "guidance", detail: `${v.sat_fat_g} g ${per}, above the UK "high" level of ${liquid ? "2.5" : "5"} g.${servingNote(p, "sat_fat_g", "g")}` });
-    else if (v.sat_fat_g <= (liquid ? 0.75 : 1.5) && kcal != null && (kcal === 0 || (v.sat_fat_g * 9) / kcal <= 0.1)) out.push({ id: "sat_low", label: "Low in saturated fat", tone: "positive", kind: "legal", detail: `${v.sat_fat_g} g ${per} (EU "low saturated fat" level).` });
+    else if (v.sat_fat_g <= (liquid ? 0.75 : 1.5) && kcal != null && (kcal === 0 || (v.sat_fat_g * 9) / kcal <= 0.1)) out.push({ id: "sat_low", label: "Low in saturated fat", tone: "positive", kind: "legal", detail: `${v.sat_fat_g} g ${per} (EU "low saturated fat" level).${servingNote(p, "sat_fat_g", "g")}` });
   }
   if (v.sugars_g != null) {
     if (v.sugars_g > (liquid ? 11.25 : 22.5)) out.push({ id: "sugar_high", label: "High in sugars", tone: "attention", kind: "guidance", detail: `${v.sugars_g} g ${per}, above the UK "high" level of ${liquid ? "11.25" : "22.5"} g. This counts all sugars, including those naturally in fruit or milk.${servingNote(p, "sugars_g", "g")}` });
-    else if (v.sugars_g <= 0.5) out.push({ id: "sugar_free", label: "Sugar-free level", tone: "positive", kind: "legal", detail: `${v.sugars_g} g ${per} (EU "sugar-free" is at most 0.5 g).` });
-    else if (v.sugars_g <= (liquid ? 2.5 : 5)) out.push({ id: "sugar_low", label: "Low in sugars", tone: "positive", kind: "legal", detail: `${v.sugars_g} g ${per} (EU "low sugars" is at most ${liquid ? "2.5 g per 100 ml" : "5 g per 100 g"}).` });
+    else if (v.sugars_g <= 0.5) out.push({ id: "sugar_free", label: "Sugar-free level", tone: "positive", kind: "legal", detail: `${v.sugars_g} g ${per} (EU "sugar-free" is at most 0.5 g).${servingNote(p, "sugars_g", "g")}` });
+    else if (v.sugars_g <= (liquid ? 2.5 : 5)) out.push({ id: "sugar_low", label: "Low in sugars", tone: "positive", kind: "legal", detail: `${v.sugars_g} g ${per} (EU "low sugars" is at most ${liquid ? "2.5 g per 100 ml" : "5 g per 100 g"}).${servingNote(p, "sugars_g", "g")}` });
   }
   if (v.fiber_g != null) {
     const per100kcal = kcal && kcal > 0 ? (v.fiber_g / kcal) * 100 : 0;
     if (v.fiber_g >= 6 || per100kcal >= 3) out.push({ id: "fibre_high", label: "High in fibre", tone: "positive", kind: "legal", detail: `${v.fiber_g} g ${per} (EU "high fibre" is at least 6 g per 100 g or 3 g per 100 kcal).${servingNote(p, "fiber_g", "g")}` });
-    else if (v.fiber_g >= 3 || per100kcal >= 1.5) out.push({ id: "fibre_source", label: "Source of fibre", tone: "positive", kind: "legal", detail: `${v.fiber_g} g ${per} (EU "source of fibre" is at least 3 g per 100 g or 1.5 g per 100 kcal).` });
+    else if (v.fiber_g >= 3 || per100kcal >= 1.5) out.push({ id: "fibre_source", label: "Source of fibre", tone: "positive", kind: "legal", detail: `${v.fiber_g} g ${per} (EU "source of fibre" is at least 3 g per 100 g or 1.5 g per 100 kcal).${servingNote(p, "fiber_g", "g")}` });
   }
   if (v.salt_g != null || v.sodium_mg != null) {
     const sodium = v.sodium_mg ?? Math.round((v.salt_g ?? 0) * 400);
     const salt = v.salt_g ?? sodium / 400;
     if (salt > (liquid ? 0.75 : 1.5)) out.push({ id: "salt_high", label: "High in salt", tone: "attention", kind: "guidance", detail: `${r1(salt)} g salt (${sodium} mg sodium) ${per}, above the UK "high" level of ${liquid ? "0.75" : "1.5"} g salt.${servingNote(p, "sodium_mg", "mg sodium")}` });
-    else if (sodium <= 40) out.push({ id: "sodium_very_low", label: "Very low in sodium", tone: "positive", kind: "legal", detail: `${sodium} mg sodium ${per} (EU "very low sodium" is at most 40 mg).` });
-    else if (sodium <= 120) out.push({ id: "sodium_low", label: "Lower in sodium", tone: "positive", kind: "legal", detail: `${sodium} mg sodium ${per} (EU "low sodium" is at most 120 mg).` });
+    else if (sodium <= 40) out.push({ id: "sodium_very_low", label: "Very low in sodium", tone: "positive", kind: "legal", detail: `${sodium} mg sodium ${per} (EU "very low sodium" is at most 40 mg).${servingNote(p, "sodium_mg", "mg sodium")}` });
+    else if (sodium <= 120) out.push({ id: "sodium_low", label: "Lower in sodium", tone: "positive", kind: "legal", detail: `${sodium} mg sodium ${per} (EU "low sodium" is at most 120 mg).${servingNote(p, "sodium_mg", "mg sodium")}` });
   }
   if (kcal != null) {
-    if (kcal <= (liquid ? 20 : 40)) out.push({ id: "kcal_low", label: "Lower in calories", tone: "positive", kind: "legal", detail: `${kcal} kcal ${per} (EU "low energy" is at most ${liquid ? "20 kcal per 100 ml" : "40 kcal per 100 g"}).` });
+    if (kcal <= (liquid ? 20 : 40)) out.push({ id: "kcal_low", label: "Lower in calories", tone: "positive", kind: "legal", detail: `${kcal} kcal ${per} (EU "low energy" is at most ${liquid ? "20 kcal per 100 ml" : "40 kcal per 100 g"}).${servingNote(p, "calories", "kcal")}` });
     else if (!liquid && kcal >= 400) out.push({ id: "kcal_high", label: "High in calories", tone: "neutral", kind: "informal", detail: `${kcal} kcal ${per}: every 100 g gives 20% or more of a 2,000 kcal reference intake.${servingNote(p, "calories", "kcal")} Calorie-dense foods aren't unhealthy in themselves; the portion decides how they fit.` });
   }
   return out;

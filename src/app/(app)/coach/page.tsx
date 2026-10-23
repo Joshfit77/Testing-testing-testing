@@ -10,7 +10,7 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { isAiConfigured, isServiceRoleConfigured } from "@/server/env";
 import { isFlagEnabled } from "@/server/flags";
-import { getAiUsage } from "@/server/services/ai-coach";
+import { AiError, getAiUsage } from "@/server/services/ai-coach";
 import { suggestedQuestions } from "@/lib/coach/context";
 import { loadAthleteSnapshot } from "@/server/coach/snapshot";
 
@@ -25,7 +25,7 @@ export default async function CoachPage({
   const { user, profile } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
   const plan = await getUserPlan(user.id);
-  const [convRes, exRes, flag, usage] = await Promise.all([
+  const [convRes, exRes, flag, usageOrError] = await Promise.all([
     supabase
       .from("ai_conversations")
       .select("id, title, updated_at, memory_off")
@@ -34,8 +34,23 @@ export default async function CoachPage({
       .limit(30),
     supabase.from("exercises").select("slug, name"),
     isFlagEnabled("ai_coach"),
-    getAiUsage(user.id, plan),
+    // Not knowing the usage must read as "can't check right now", not as an error page.
+    getAiUsage(user.id, plan).catch((e: unknown) => {
+      if (e instanceof AiError) return e;
+      throw e;
+    }),
   ]);
+  if (usageOrError instanceof AiError) {
+    return (
+      <div className="space-y-5">
+        <PageHeader eyebrow="AI Coach" title="AI Coach" />
+        <p role="status" className="rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground">
+          {usageOrError.message}
+        </p>
+      </div>
+    );
+  }
+  const usage = usageOrError;
   const conversations = convRes.data ?? [];
   const { data: memoryProfile } = await supabase.from("profiles").select("coach_memory_enabled").eq("id", user.id).maybeSingle();
   const selected =

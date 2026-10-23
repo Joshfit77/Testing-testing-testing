@@ -10,7 +10,10 @@ import { HIDDEN_EXTRAS } from "@/lib/domain/food-photo";
 import { mealForTime } from "@/lib/domain/meal-time";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
-import { getAiUsage } from "@/server/services/ai-coach";
+import { Notice } from "@/components/common/states";
+import { isAiConfigured } from "@/server/env";
+import { isFlagEnabled } from "@/server/flags";
+import { AiError, getAiUsage } from "@/server/services/ai-coach";
 import { getLocalFood } from "@/server/services/usda-local";
 
 export const metadata = { title: "Meal photo" };
@@ -18,14 +21,35 @@ export const metadata = { title: "Meal photo" };
 export default async function FoodPhotoPage({ searchParams }: { searchParams: Promise<{ date?: string }> }) {
   const { user, profile } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
-  const [plan, sp] = await Promise.all([getUserPlan(user.id), searchParams]);
-  const usage = await getAiUsage(user.id, plan);
+  const [plan, sp, flag] = await Promise.all([getUserPlan(user.id), searchParams, isFlagEnabled("ai_coach")]);
   const header = (
     <>
       <BackLink href="/nutrition">Food</BackLink>
       <PageHeader eyebrow="Food" title="Meal photo" description="Photograph a meal for an AI estimate of what's on the plate. You check and correct every item before it's added to your diary." />
     </>
   );
+  // Say so before asking for any consent when the feature can't run on this server right now.
+  const unavailable = !isAiConfigured() ? "Meal photo analysis isn't configured on this server yet (no AI provider key). Everything else in the app works normally." : !flag ? "Meal photo analysis is temporarily unavailable." : null;
+  if (unavailable) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-5">
+        {header}
+        <Notice tone="warning">{unavailable}</Notice>
+      </div>
+    );
+  }
+  let usage;
+  try {
+    usage = await getAiUsage(user.id, plan);
+  } catch (e) {
+    if (!(e instanceof AiError)) throw e;
+    return (
+      <div className="mx-auto max-w-2xl space-y-5">
+        {header}
+        <Notice tone="warning">{e.message}</Notice>
+      </div>
+    );
+  }
   if (usage.chatLimit <= 0) {
     return (
       <PlanLocked

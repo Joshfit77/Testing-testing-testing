@@ -53,7 +53,7 @@ export async function loadReviewInput(supabase: SupabaseClient, userId: string):
       .limit(200),
     supabase.from("recovery_checkins").select("checked_on, readiness_score").eq("user_id", userId).gte("checked_on", addDays(today, -13)).order("checked_on"),
     supabase.from("exercise_targets").select("weight_kg, reps, exercise:exercises(slug)").eq("user_id", userId),
-    supabase.from("training_recommendation_decisions").select("recommendation_key").eq("user_id", userId),
+    supabase.from("training_recommendation_decisions").select("recommendation_key, decision").eq("user_id", userId),
     supabase.from("onboarding_answers").select("primary_goal, updated_at").eq("user_id", userId).maybeSingle(),
     getActiveProgramRef(supabase, userId),
     supabase.from("sleep_sessions").select(SLEEP_SESSION_COLUMNS).eq("user_id", userId).eq("kind", "night").not("ended_at", "is", null).gte("night_of", addDays(today, -13)).order("started_at"),
@@ -142,6 +142,7 @@ export async function loadReviewInput(supabase: SupabaseClient, userId: string):
       checkins: (checkinsRes.data ?? []).map((c) => ({ date: c.checked_on as string, readiness: c.readiness_score as number })),
       targets,
       decided: new Set((decisionsRes.data ?? []).map((d) => d.recommendation_key as string)),
+      rejected: new Set((decisionsRes.data ?? []).filter((d) => d.decision === "rejected").map((d) => d.recommendation_key as string)),
       // Sleep is wellness data: once consent is withdrawn the rows stay for the member but are not used here.
       sleep: profile?.wellness_consent_at
         ? {

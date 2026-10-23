@@ -40,7 +40,7 @@ export function hasNativeBackgroundLocation(): boolean {
 }
 
 export function locationSourceLabel(): string {
-  return hasNativeBackgroundLocation() ? "Native GPS (keeps recording with the screen locked)" : "Browser location (keep this screen open)";
+  return hasNativeBackgroundLocation() ? "Native GPS (background recording; not yet verified on a phone)" : "Browser location (keep this screen open)";
 }
 
 /** Current permission state in the browser, when the browser can tell without asking. */

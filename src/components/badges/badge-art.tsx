@@ -5,7 +5,8 @@ import { BADGE_ARTWORK, BADGE_MAX_SHARP_WIDTH, badgeSrcSet, getBadgeArtwork } fr
 import type { RankCategory } from "@/lib/domain/ranks";
 
 /**
- * Original vector artwork for the 27 rank badges, drawn in code so it stays sharp at any size.
+ * Artwork for the 27 rank badges: raster crops served at their native size (upscaling is capped in badge-artwork.ts),
+ * with the frame and labels drawn in code.
  *
  *   Fitness: warrior shields in materials that rise from carved wood to silver-white with a gold aura.
  *   Food:    a fire that grows from a single spark to a phoenix, inside a gold-rimmed medallion.

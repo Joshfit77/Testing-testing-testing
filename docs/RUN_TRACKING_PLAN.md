@@ -23,7 +23,7 @@ _First written 2026-10-20 (Stage 1B) as a plan. Live GPS recording was built on 
 **Prepared, not verified on a device:**
 - `@capacitor-community/background-geolocation` 1.2.26 is in `package.json`, `android.useLegacyBridge` is set, and the iOS `NSLocation*` strings, `UIBackgroundModes: location` and the Android location and foreground-service permissions are in place. `src/lib/native/location.ts` uses the native watcher when it is present in the app build and the browser's `watchPosition` otherwise. `npx cap sync` and a native build have **not** been run here (no Xcode or Android SDK), so the installed apps don't contain the plugin yet.
 
-**Not built yet:** auto-pause; a "Return to Run" bar on other pages while recording; best efforts inside longer runs (records still use whole activities); map tiles (would need an approved map provider); `@capacitor/geolocation` (not needed: the browser API and the background plugin cover both cases).
+**Not built yet:** auto-pause; a "Return to Run" bar on other pages while recording; best efforts inside longer runs (records still use whole activities); map tiles (would need an approved map provider; options, all needing the owner's approval before activation: OpenStreetMap's public tile servers, which forbid heavy app use under their usage policy; MapTiler or Mapbox, each with a free monthly tier and paid use beyond it; or Apple MapKit JS / Google Maps with their own keys and billing); `@capacitor/geolocation` (not needed: the browser API and the background plugin cover both cases).
 
 ## What exists after Stage 1B
 

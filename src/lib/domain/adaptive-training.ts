@@ -88,6 +88,8 @@ export interface ReviewInput {
   targets: Record<string, { weightKg: number | null; reps: number | null }>;
   /** Recommendation keys the member already accepted or turned down (they aren't shown again). */
   decided: Set<string>;
+  /** The subset of `decided` that was turned down, listed separately so the member can bring one back. */
+  rejected?: Set<string>;
   sleep?: ReviewSleep | null;
 }
 
@@ -130,6 +132,8 @@ export interface TrainingReview {
   };
   weeksSinceDeload: number | null;
   recommendations: Recommendation[];
+  /** Still-applicable suggestions the member turned down, oldest first; "Show again" removes the decision. */
+  turnedDown: Recommendation[];
   dataGaps: string[];
 }
 
@@ -179,8 +183,10 @@ export function analyzeTraining(input: ReviewInput): TrainingReview {
   const workouts = input.workouts.filter((x) => x.date >= since56 && x.date <= today).sort((a, b) => a.date.localeCompare(b.date));
   const dataGaps: string[] = [];
   const recs: Recommendation[] = [];
+  const turnedDown: Recommendation[] = [];
   const add = (r: Recommendation) => {
     if (!input.decided.has(r.key)) recs.push(r);
+    else if (input.rejected?.has(r.key)) turnedDown.push(r);
   };
 
   // Consistency ------------------------------------------------------------------------------------------------
@@ -483,6 +489,7 @@ export function analyzeTraining(input: ReviewInput): TrainingReview {
     recovery: { checkins: input.checkins.length, avgReadiness7, latest, rpeDrift, rpePoints: drift.length, sleep: sleepSummary },
     weeksSinceDeload,
     recommendations: recs,
+    turnedDown,
     dataGaps,
   };
 }

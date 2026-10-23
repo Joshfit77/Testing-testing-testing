@@ -10,6 +10,7 @@ import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { hasFeature } from "@/lib/domain/plans";
 import { pauseActiveProgramAction } from "@/server/actions/programs";
 import { getActiveProgram } from "@/server/services/training";
+import { getAiAllowance } from "@/server/services/ai-coach";
 import { loadProgramSchedule } from "@/server/services/schedule";
 import { isoDateInTz } from "@/lib/domain/dates";
 
@@ -28,6 +29,8 @@ export default async function TrainPage() {
     getUserPlan(user.id),
   ]);
   const canBuild = hasFeature(plan, "custom_program_builder");
+  // Same gate as /train/review: Pro, or a subscription that kept its AI allowance.
+  const canReview = (await getAiAllowance(user.id, plan)).chatLimit > 0;
   const today = active?.today ?? null;
   const todayIso = isoDateInTz(new Date(), tz);
   // The calendar may have the next session planned (or moved) to a later day.
@@ -48,7 +51,7 @@ export default async function TrainPage() {
     { href: "/train/templates", icon: BookmarkCheck, label: "My workouts" },
     { href: "/train/workout?blank=1", icon: Plus, label: "Empty workout" },
     { href: "/train/recovery", icon: HeartPulse, label: "Recovery" },
-    { href: "/train/review", icon: Activity, label: hasFeature(plan, "advanced_recommendations") ? "Training review" : "Training review (Pro)" },
+    { href: "/train/review", icon: Activity, label: canReview ? "Training review" : "Training review (Pro)" },
     { href: "/calendar", icon: CalendarDays, label: "Training calendar" },
   ];
 

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { EXERCISE_REVIEW_NOTES } from "@/data/exercise-review-notes";
 import { notFound } from "next/navigation";
 import { AlertTriangle, BarChart3, CheckCircle2, ChevronRight, ExternalLink, Lightbulb, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -103,7 +104,10 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
           {!hasVideo && (
             <figure className={media.length ? "px-3 pb-3" : undefined}>
               <ExerciseDemo slug={ex.slug} name={ex.name} meta={demoMeta} className={media.length ? "aspect-video w-full rounded-xl" : "aspect-video w-full"} />
-              <figcaption className="px-3 pt-2 text-[0.6875rem] text-muted-foreground">Animated illustration of correct technique — not filmed video. Use 0.5× to study each phase.</figcaption>
+              <figcaption className="px-3 pt-2 text-[0.6875rem] text-muted-foreground">
+                Animated illustration of the movement — not filmed video, and not a substitute for coaching. Use 0.5× to study each phase.
+                {EXERCISE_REVIEW_NOTES[ex.slug] && <span className="mt-1 block text-gold-highlight">{EXERCISE_REVIEW_NOTES[ex.slug]}</span>}
+              </figcaption>
             </figure>
           )}
           <div className="border-t border-border px-3 py-2">

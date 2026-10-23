@@ -257,7 +257,7 @@ async function Overview({ userId, tz, unit, thisWeek, today, supabase }: { userI
             <Link href="/train/build?type=cardio" className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-4 hover:border-gold-muted">
               <div className="min-w-0">
                 <p className="font-semibold">Build a cardio plan around your goal</p>
-                <p className="text-xs text-muted-foreground">Pick a goal such as your first 5K and your schedule. There&apos;s no dedicated 10K plan in the library yet.</p>
+                <p className="text-xs text-muted-foreground">Pick a goal such as your first 5K or 10K and your schedule.</p>
               </div>
               <ChevronRight className="size-4 shrink-0 text-gold" aria-hidden />
             </Link>

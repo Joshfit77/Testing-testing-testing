@@ -199,6 +199,7 @@ export function IngredientAlertsSection({ alerts, hasIngredients }: { alerts: In
                   ))}
                 </div>
               </div>
+              <p className="mt-1 text-xs text-muted-foreground">{a.classes.map((c) => EVIDENCE_HELP[c]).join(" ")}</p>
               <p className="mt-1 text-sm text-muted-foreground">{a.code ? `What it's for: ${a.purpose}.` : a.purpose}</p>
               {(a.regulatory || a.concern || a.affected || a.dose || a.sources.length > 0) && (
                 <details className="mt-1 text-sm">
