@@ -100,6 +100,15 @@ by up to 20% for a short last night (relative to the goal) and up to 20% for an 
 below 60%. Peaks are hours within 6 points of the day's maximum; dips are local lows at least 15 below it, excluding
 the final wind-down. The four assumptions are printed on the page, and reported energy is shown beside the estimate.
 
+## Comparisons over longer ranges (`sleep-analytics.ts`, analytics version 1)
+
+Sleep history shows time asleep night by night over 7 days, as weekly averages over 30 and 90 days, and as monthly
+averages over a year; a week or month with nothing logged is an empty slot, never zero. Weekday and weekend nights
+(Plus) are compared on nights logged, average time asleep, nights at goal and typical bedtime and wake time: a night
+counts as a weekend night when it ends on a Saturday or Sunday, typical times need three nights on each side, and
+shifts are clock differences in the −12 h to +12 h range so a bedtime that crosses midnight reads as "later", not
+as 23 hours earlier. Differences under 10 minutes read as "about the same".
+
 ## Habit tips (`sleep-habits.ts`, habits version 1)
 
 Ten plain rules over the last 14 nights and check-ins (wake time moving more than ±45 min; usual bedtime far later

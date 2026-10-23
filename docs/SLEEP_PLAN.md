@@ -74,7 +74,7 @@ with the data. Sound events (Stage D3) get their own table when that stage is bu
 | C3 Habit coaching | B5, B6 | Rule-based recommendations with reasons, dismissible |
 | C4 AI sleep coach | B3–B6 | Read-only `get_sleep_summary` tool for the existing coach; same consent and quotas |
 | C5 Sleep × training | B6, adaptive training | Combined dashboard; suggestions go through the existing approval cards |
-| C6 Advanced analytics | C1–C5 | Weekday/weekend, longer ranges, dashboard polish |
+| C6 Advanced analytics | C1–C5 | Night/week/month charts on Sleep history for every range; weekday vs weekend comparison (Plus) with typical times and shifts (`sleep-analytics.ts`) |
 | D1 Automatic detection | B4 | Health-platform sleep records are the automatic source; motion/microphone detection only if it can be made honest |
 | D2 Wake-up alarm | B1 | Settings on the profile (`sleep_alarm`), `/progress/sleep/alarm`, weekly local notifications with Snooze and I'm up on the phone (`src/lib/native-alarm.ts`); the smart window is stored but not active until background detection exists |
 | D3 Sound analysis | consent model | On-device only, events not audio; blocker documented if classification can't be made reliable |

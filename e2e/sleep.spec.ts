@@ -100,7 +100,16 @@ test.describe("Sleep & Recovery", () => {
     await expect(page.getByText("Sleep goal set to 7h.")).toBeVisible();
     await page.goto("/progress/sleep/history?range=7d");
     await expect(page.getByText("Nights logged").locator("..")).toContainText("1");
+    await expect(page.getByRole("list", { name: "Time asleep by night" })).toContainText("7h 40m asleep");
     await expect(page.getByRole("list", { name: "Nights" })).toContainText("asleep");
+    // Longer ranges switch to weekly and monthly averages; the weekday/weekend comparison is Plus.
+    await page.goto("/progress/sleep/history?range=90d");
+    await expect(page.getByRole("list", { name: "Average time asleep by week" }).getByRole("listitem")).toHaveCount(13);
+    await page.goto("/progress/sleep/history?range=1y");
+    // Twelve or thirteen calendar months, depending on today's date.
+    expect(await page.getByRole("list", { name: "Average time asleep by month" }).getByRole("listitem").count()).toBeGreaterThanOrEqual(12);
+    await expect(page.getByRole("heading", { name: "Weekdays and weekends" }).locator("..")).toContainText("Included with Plus and Pro");
+    await page.goto("/progress/sleep/history?range=7d");
     await page.getByRole("list", { name: "Nights" }).getByRole("link").first().click();
     await page.waitForURL(/\/progress\/sleep\/night\//);
     await expect(page.getByRole("heading", { name: "Sleep score" })).toBeVisible();

@@ -1,15 +1,19 @@
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Lock } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
+import { NightBars } from "@/components/sleep/night-bars";
+import { TrendBars } from "@/components/sleep/trend-bars";
 import { BackLink } from "@/components/platform/back-link";
 import { formatNightDate } from "@/components/sleep/session-list";
 import { addDays, isoDateInTz, parseRange, RANGES, rangeStart, type RangeKey } from "@/lib/domain/dates";
 import { clockMinutesInTz, DEFAULT_SLEEP_GOAL_MINUTES, formatClock, formatDuration, summarizeNights } from "@/lib/domain/sleep";
 import { nightlyScore } from "@/lib/domain/sleep-score";
-import { averageAsleepMinutes, goalPct, scheduleStats } from "@/lib/domain/sleep-stats";
+import { describeShift, SLEEP_ANALYTICS_VERSION, trend, weekdayWeekend } from "@/lib/domain/sleep-analytics";
+import { hasFeature } from "@/lib/domain/plans";
+import { averageAsleepMinutes, goalPct, nightSlots, scheduleStats } from "@/lib/domain/sleep-stats";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
-import { requireOnboardedUser } from "@/server/auth";
+import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { listSleepCheckins, listSleepSessions } from "@/server/services/sleep";
 import { associations, describeAssociation } from "@/lib/domain/sleep-checkins";
 
@@ -17,6 +21,8 @@ export const metadata = { title: "Sleep history" };
 
 export default async function SleepHistoryPage({ searchParams }: { searchParams: Promise<{ range?: string }> }) {
   const { user, profile } = await requireOnboardedUser();
+  const plan = await getUserPlan(user.id);
+  const compare = hasFeature(plan, "sleep_analytics");
   const { range: rawRange } = await searchParams;
   const range = parseRange(rawRange);
   const tz = profile.timezone ?? "UTC";
@@ -38,7 +44,11 @@ export default async function SleepHistoryPage({ searchParams }: { searchParams:
   const longest = nights.length ? Math.max(...nights.map((n) => n.asleepMinutes)) : null;
   const shortest = nights.length ? Math.min(...nights.map((n) => n.asleepMinutes)) : null;
   const avgScore = scored.length ? Math.round(scored.reduce((acc, s) => acc + s.score.score, 0) / scored.length) : null;
+  const bucket = range === "1y" ? "month" : "week";
+  const points = range === "7d" ? null : trend(nights, start, today, bucket, goal);
+  const split = compare ? weekdayWeekend(nights, goal) : null;
   const card = "rounded-2xl border border-border bg-card p-5";
+  const clock = (m: number | null) => (m === null ? "—" : formatClock(m));
 
   return (
     <div className="space-y-6">
@@ -77,6 +87,69 @@ export default async function SleepHistoryPage({ searchParams }: { searchParams:
           <p className="mt-2 text-sm text-muted-foreground">No nights logged in this range. Nights you log appear here; days without an entry stay empty rather than counting as no sleep.</p>
         )}
         <p className="mt-3 text-xs text-muted-foreground">Averages cover logged nights only. Nights without detail count time in bed as time asleep.</p>
+      </section>
+
+      <section className={card} aria-labelledby="chart-title">
+        <h2 id="chart-title" className="font-display text-xl font-bold uppercase">
+          {range === "7d" ? "Night by night" : bucket === "week" ? "Week by week" : "Month by month"}
+        </h2>
+        <p className="mt-1 mb-3 text-sm text-muted-foreground">{range === "7d" ? "Time asleep each night against your goal." : `Average time asleep per ${bucket}, from the nights you logged in it.`}</p>
+        {points ? <TrendBars points={points} goalMinutes={goal} unit={bucket} /> : <NightBars slots={nightSlots(nights, today, 7)} goalMinutes={goal} />}
+      </section>
+
+      <section className={card} aria-labelledby="compare-title">
+        <h2 id="compare-title" className="font-display text-xl font-bold uppercase">
+          Weekdays and weekends
+        </h2>
+        {!split ? (
+          <div className="mt-2 flex gap-3 text-sm">
+            <Lock className="mt-0.5 size-5 shrink-0 text-gold" aria-hidden />
+            <p className="text-muted-foreground">
+              Included with Plus and Pro: your typical bedtime, wake time and time asleep on weekday nights next to weekend nights, and how far they shift.{" "}
+              <Link href="/profile/billing" className="font-semibold text-gold-highlight underline">
+                See plans
+              </Link>
+            </p>
+          </div>
+        ) : split.weekday.nights === 0 && split.weekend.nights === 0 ? (
+          <p className="mt-2 text-sm text-muted-foreground">Nothing logged in this range yet.</p>
+        ) : (
+          <>
+            <table className="mt-3 w-full text-sm">
+              <caption className="sr-only">Weekday nights compared with weekend nights (nights ending on a Saturday or Sunday)</caption>
+              <thead>
+                <tr className="text-left text-xs text-muted-foreground">
+                  <th scope="col" className="py-1 font-normal"></th>
+                  <th scope="col" className="py-1 font-normal">Weekdays</th>
+                  <th scope="col" className="py-1 font-normal">Weekends</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ["Nights", String(split.weekday.nights), String(split.weekend.nights)],
+                  ["Average asleep", formatDuration(split.weekday.avgAsleep), formatDuration(split.weekend.avgAsleep)],
+                  ["At goal", `${split.weekday.atGoal} of ${split.weekday.nights}`, `${split.weekend.atGoal} of ${split.weekend.nights}`],
+                  ["Typical bedtime", clock(split.weekday.typicalBed), clock(split.weekend.typicalBed)],
+                  ["Typical wake time", clock(split.weekday.typicalWake), clock(split.weekend.typicalWake)],
+                ].map(([k, a, b]) => (
+                  <tr key={k} className="border-t border-border">
+                    <th scope="row" className="py-2 pr-2 text-left font-normal text-muted-foreground">
+                      {k}
+                    </th>
+                    <td className="py-2 font-semibold">{a}</td>
+                    <td className="py-2 font-semibold">{b}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="mt-3 text-sm">
+              At the weekend you go to bed <strong>{describeShift(split.bedShift)}</strong>, wake <strong>{describeShift(split.wakeShift)}</strong> and sleep <strong>{describeShift(split.asleepDiff, "more", "less")}</strong>.
+            </p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Weekend nights end on a Saturday or Sunday. Typical times need three nights on each side. A wake time that shifts by more than an hour at the weekend is the pattern the schedule page calls weekend drift. Comparisons version {SLEEP_ANALYTICS_VERSION}.
+            </p>
+          </>
+        )}
       </section>
 
       <section className={card} aria-labelledby="patterns-title">
