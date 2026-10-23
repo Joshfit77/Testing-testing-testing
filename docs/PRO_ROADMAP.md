@@ -94,7 +94,9 @@ local mock). The first live call should be checked in staging.
 **Native-only:** level-guided capture, the timer and camera control need the native app (Capacitor camera plus
 motion sensors) and must be tested on real phones.
 
-## 4. Interactive body map (not built)
+## 4. Interactive body map (built in Stage 5 of the nine-feature build)
+
+Built on `claude/nine-features` as `/progress/body-map` for Plus and Pro, with 12 regions and Bronze-to-Disciple strength ranks; see `docs/NINE_FEATURES_PROGRESS.md`. The plan below is kept for reference. Differences: 12 regions (the list the owner specified) rather than about 16, and the whole map is Plus and Pro, as specified.
 
 1. **Data:** map each exercise's primary and secondary muscles to body regions. The catalogue already has `primary_muscles` and
    `secondary_muscles`; they need normalising to about 16 regions, front and back.

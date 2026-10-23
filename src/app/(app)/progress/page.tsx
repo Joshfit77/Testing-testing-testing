@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { Award, ChevronRight, History, LineChart } from "lucide-react";
+import { Award, ChevronRight, History, LineChart, PersonStanding } from "lucide-react";
 import { MainHeader } from "@/components/shell/main-header";
 import { StepsCard } from "@/components/steps/steps-card";
 import { addDays, isoDateInTz } from "@/lib/domain/dates";
+import { hasFeature } from "@/lib/domain/plans";
 import { DEFAULT_STEP_GOAL } from "@/lib/domain/steps";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { requireOnboardedUser } from "@/server/auth";
+import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { logError } from "@/server/log";
 import { getDashboardData } from "@/server/services/dashboard";
 import { getStepsDaily, type StepsSummary } from "@/server/services/steps";
@@ -20,7 +21,7 @@ export default async function ProgressHubPage() {
     logError("progress.hub.steps", err);
     return null;
   });
-  const [data, steps] = await Promise.all([getDashboardData(supabase, user.id, profile.timezone), stepsPromise]);
+  const [data, steps, plan] = await Promise.all([getDashboardData(supabase, user.id, profile.timezone), stepsPromise, getUserPlan(user.id)]);
 
   const sections = [
     {
@@ -28,6 +29,14 @@ export default async function ProgressHubPage() {
       icon: LineChart,
       title: "Overview",
       body: `${data.workoutsTotal} workout${data.workoutsTotal === 1 ? "" : "s"} completed · weight, records, photos and trends`,
+    },
+    {
+      href: "/progress/body-map",
+      icon: PersonStanding,
+      title: "Strength & Body Map",
+      body: hasFeature(plan, "advanced_analytics")
+        ? "Muscle map, Bronze-to-Disciple strength ranks and trends for each muscle group"
+        : "Plus: a muscle map with strength ranks and trends for each muscle group",
     },
     {
       href: "/progress/badges",

@@ -55,7 +55,7 @@ Offline: still the old nav (`NAV` = Home, Programs, Exercises, Food, Coach, Prog
 | 2.8 | Profile icon opens Profile and Settings | Working | Profile icon → `/profile` (Profile & Settings); `e2e/navigation.spec.ts` | 1 |
 | 2.9 | Home → My Progress grouping | Working | Home → My Progress button → `/progress` hub (Overview, Badges, History, Body Map & Ranks placeholder); the Home tab stays active under `/progress` and `/calendar` | 1 |
 | 2.10 | My Progress → Overview | Working | `src/app/(app)/progress/page.tsx` | 1 |
-| 2.11 | My Progress → Body Map & Ranks | Missing | No route (see §10) | 3 |
+| 2.11 | My Progress → Body Map & Ranks | Working | `/progress/body-map` ("Strength & Body Map" on the My Progress hub), Plus and Pro | 3 |
 | 2.12 | My Progress → Badges | Working | `src/app/(app)/progress/badges/page.tsx` | 1 |
 | 2.13 | My Progress → History | Partial | Hub links History to `/train/history` (workouts). Runs/walks history arrives with Stage 1B. | 1 |
 | 2.14 | Train → Current Workout | Working | `/train/workout` and `ActiveWorkoutPill` | 1 |
@@ -297,7 +297,7 @@ Offline: has a Progress tab with weight, PRs and badges.
 |---|---|---|---|---|
 | 9.1 | Prominent Home → My Progress entry | Working | See 3.7 | 1 |
 | 9.2 | Overview | Working | `/progress` | 3 |
-| 9.3 | Strength & Body Map | Missing | See §10 | 3 |
+| 9.3 | Strength & Body Map | Working | See §10 | 3 |
 | 9.4 | Badges | Working | `/progress/badges` | 3 |
 | 9.5 | History | Partial | Workouts only (`/train/history`) | 3 |
 | 9.6 | Weight trends | Working | Weight log and chart (`src/components/progress/progress-forms.tsx`, `e2e/features.spec.ts`) | 3 |
@@ -308,43 +308,43 @@ Offline: has a Progress tab with weight, PRs and badges.
 | 9.11 | Personal records | Working | `#records` section | 3 |
 | 9.12 | Weekly consistency | Working | Weekly/monthly activity chart, week streak (`src/lib/domain/streak.ts`) | 3 |
 | 9.13 | Recent badges | Partial | Only a link to `/progress/badges`. No recent-badge list on the overview. | 3 |
-| 9.14 | Current assessed strength rank | Missing | No rank system | 3 |
+| 9.14 | Current assessed strength rank | Partial | Overall rank on `/progress/body-map`; not yet repeated on the Overview page | 3 |
 | 9.15 | Useful empty states | Working | `EmptyState` on goals, records and similar sections | 3 |
 
 ## 10. Interactive body map and strength ranks
 
-Offline: none of this section exists.
+Built on `claude/nine-features` (Stage 5): `/progress/body-map`, Plus and Pro (`advanced_analytics`). Rank thresholds are provisional until reviewed (10.28).
 
 | ID | Requirement | Status | Evidence | Stage |
 |---|---|---|---|---|
-| 10.1 | Original front and back muscle diagrams | Missing | No body map anywhere in `src/` | 3 |
-| 10.2 | Tappable region: chest | Missing | — | 3 |
-| 10.3 | Tappable region: back | Missing | — | 3 |
-| 10.4 | Tappable region: shoulders | Missing | — | 3 |
-| 10.5 | Tappable region: arms | Missing | — | 3 |
-| 10.6 | Tappable region: core | Missing | — | 3 |
-| 10.7 | Tappable region: legs, with useful subdivisions | Missing | — | 3 |
-| 10.8 | Color muscle groups by rank | Missing | — | 3 |
-| 10.9 | Written legend and labels, so the map doesn't rely on color alone | Missing | — | 3 |
-| 10.10 | Region shows its current rank | Missing | — | 3 |
-| 10.11 | Region shows relevant exercises | Missing | Muscle data exists (`exercises.primary_muscles`) but nothing uses it for this | 3 |
-| 10.12 | Region shows personal records | Missing | `personal_records` exists | 3 |
-| 10.13 | Region shows performance history | Missing | — | 3 |
-| 10.14 | Region shows progress toward the next rank | Missing | — | 3 |
-| 10.15 | Region explains how its score is calculated | Missing | — | 3 |
-| 10.16 | Exact rank order: Bronze → Silver → Gold → Platinum → Diamond → Disciple | Missing | The only "bronze/silver/gold" in the code are badge tiers (`src/lib/domain/achievements.ts`) | 3 |
-| 10.17 | Disciple replaces Titan as the top rank | Missing | No "Titan" exists to replace. Disciple has to be built. | 3 |
-| 10.18 | Transparent, configurable, exercise-specific scoring | Missing | — | 3 |
-| 10.19 | Account for bodyweight where appropriate | Missing | Bodyweight is logged (`weight_entries`) | 3 |
-| 10.20 | Machines and movements not treated as interchangeable | Missing | — | 3 |
-| 10.21 | No strength inferred from photos | Missing | Nothing to violate yet; build it as a rule | 3 |
-| 10.22 | Thresholds not presented as validated standards | Missing | — | 3 |
-| 10.23 | Estimated 1RMs labeled | Partial | PR lists label "Est. 1RM" (`RECORD_LABEL` in Home). Epley is limited to ≤12 reps (`src/lib/domain/strength.ts`). | 3 |
-| 10.24 | Provisional scoring rules labeled | Missing | — | 3 |
-| 10.25 | "Not assessed" shown when data is insufficient | Missing | — | 3 |
-| 10.26 | Overall rank calculation explained, with missing assessments disclosed | Missing | — | 3 |
-| 10.27 | Representative scoring, so repeated similar logs don't inflate a rank | Missing | — | 3 |
-| 10.28 | Rank thresholds reviewed by a qualified coach | Requires Content Review | Needed once thresholds exist | 3 |
+| 10.1 | Original front and back muscle diagrams | Working | Original SVG front and back figures, `src/components/progress/body-figure.tsx` | 3 |
+| 10.2 | Tappable region: chest | Working | Chest region | 3 |
+| 10.3 | Tappable region: back | Working | Upper back and lower back regions | 3 |
+| 10.4 | Tappable region: shoulders | Working | Shoulders region | 3 |
+| 10.5 | Tappable region: arms | Working | Biceps, triceps and forearms regions | 3 |
+| 10.6 | Tappable region: core | Working | Abdominals region | 3 |
+| 10.7 | Tappable region: legs, with useful subdivisions | Working | Glutes, quadriceps, hamstrings and calves regions | 3 |
+| 10.8 | Color muscle groups by rank | Working | Rank metals per region, or this week's sets against the usual range (`src/components/progress/muscle-map.tsx`) | 3 |
+| 10.9 | Written legend and labels, so the map doesn't rely on color alone | Working | Legend, a text list of all 12 regions with their ranks, accessible names on every region, hatching for Not assessed | 3 |
+| 10.10 | Region shows its current rank | Working | Region detail panel (`e2e/body-map.spec.ts`) | 3 |
+| 10.11 | Region shows relevant exercises | Working | Exercises from the last 12 months, main muscle or assisting, with sets and last date | 3 |
+| 10.12 | Region shows personal records | Working | Best record per exercise and type from `personal_records`; estimated 1RMs marked | 3 |
+| 10.13 | Region shows performance history | Working | Sets per week (12 weeks), estimated 1RM by month, 28-day comparison with the 28 days before | 3 |
+| 10.14 | Region shows progress toward the next rank | Working | Progress bar toward the next rank | 3 |
+| 10.15 | Region explains how its score is calculated | Working | "How this rank is scored": each benchmark lift, its measure, your best and the thresholds for your table | 3 |
+| 10.16 | Exact rank order: Bronze → Silver → Gold → Platinum → Diamond → Disciple | Working | `STRENGTH_RANKS` in `src/lib/domain/strength-ranks.ts` | 3 |
+| 10.17 | Disciple replaces Titan as the top rank | Working | Disciple is the top rank, with an ornate narrow-gate emblem (`strength-rank-emblem.tsx`) | 3 |
+| 10.18 | Transparent, configurable, exercise-specific scoring | Working | Per-lift tables in `src/lib/domain/strength-ranks.ts` (`REGION_BENCHMARKS`, `RULES_VERSION`) | 3 |
+| 10.19 | Account for bodyweight where appropriate | Working | Barbell lifts ÷ body weight; pull-ups, chin-ups and dips count body weight + added load; latest weight from the last 12 months | 3 |
+| 10.20 | Machines and movements not treated as interchangeable | Working | Each lift has its own table; leg press, hack squat, machines, dumbbell and band-assisted lifts are never ranked (`tests/unit/strength-ranks.test.ts`) | 3 |
+| 10.21 | No strength inferred from photos | Working | Ranks use workout logs only; stated on the page | 3 |
+| 10.22 | Thresholds not presented as validated standards | Working | "Provisional rules … not validated standards" note on the page | 3 |
+| 10.23 | Estimated 1RMs labeled | Working | Estimated 1RMs labelled in the rank text, charts and records | 3 |
+| 10.24 | Provisional scoring rules labeled | Working | `RULES_VERSION` shown with the scoring note | 3 |
+| 10.25 | "Not assessed" shown when data is insufficient | Working | Per region and per lift, with the reason (no table chosen, no body weight, no benchmark logged, no rule for calves) | 3 |
+| 10.26 | Overall rank calculation explained, with missing assessments disclosed | Working | Overall = middle rank of assessed regions (at least 4); unassessed regions listed, not counted as zero | 3 |
+| 10.27 | Representative scoring, so repeated similar logs don't inflate a rank | Working | A region takes its best single benchmark; repeated sets, sessions or similar exercises can't raise it (unit-tested) | 3 |
+| 10.28 | Rank thresholds reviewed by a qualified coach | Requires Content Review | The provisional thresholds in `src/lib/domain/strength-ranks.ts` were set by hand and still need this review | 3 |
 
 ## 11. Badges and achievements
 
@@ -516,7 +516,7 @@ Offline: all data in localStorage on one device. No sync, accounts or export.
 | 16.8 | Journey: record, pause, resume, finish and reopen a run | Missing | No running | 3 |
 | 16.9 | Journey: update a record and award the correct badge only once | Partial | Unit and integration coverage of PRs and badges; no end-to-end journey | 3 |
 | 16.10 | Journey: edit or delete an activity and recalculate | Partial | `tests/integration/workouts.test.ts` (PR recalculation). Runs: `e2e/run.spec.ts` edits a run, deletes a walk and checks the weekly totals recalculate. Badge recalculation for runs comes with run badges. | 3 |
-| 16.11 | Journey: open a muscle region and inspect its rank explanation | Missing | No body map | 3 |
+| 16.11 | Journey: open a muscle region and inspect its rank explanation | Working | `e2e/body-map.spec.ts` | 3 |
 | 16.12 | Journey: save and recover a journal draft | Working | `e2e/journeys.spec.ts` (tab switch + reload restore, cleared on save) | 2 |
 | 16.13 | Journey: use the AI Coach and handle a service failure gracefully | Working | `e2e/coach.spec.ts`: mocked success, mocked 429 and 500 (message kept, survives reload, Try again sends it once). No live API run. | 4 |
 | 16.14 | Journey: reopen the app and confirm saved data remains | Partial | Browser reload is e2e-tested. Native app relaunch is untested. | 1 |
