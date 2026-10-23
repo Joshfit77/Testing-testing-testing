@@ -215,7 +215,7 @@ These are simulated traces, not phone recordings.
     attached).
   - With the score off: 11 passed, the same 1 skipped.
   - GPS and exercise-demo specs on the Stage 3 build: 6 passed.
-  - The full run on the final build is pending.
+  - **Full run on the final build (`e810c7e`, score on): 62 passed, 1 skipped (the same by-design skip), 0 failed.**
 
 ## What needs you or a professional
 
