@@ -174,6 +174,7 @@ test.describe("Narrow Gate Food IQ", () => {
     await signUpAndConfirm(page, email);
     await completeOnboarding(page);
     await grantPlan(email, "pro");
+    await page.goto("/nutrition/scanner");
     await typeBarcode(page, Q.honey);
     await expect(page.getByTestId("fits-your-goals")).toBeVisible();
     await expect(page.getByRole("button", { name: "Ask AI about this food" })).toBeVisible();

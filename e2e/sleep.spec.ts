@@ -52,7 +52,8 @@ test.describe("Sleep & Recovery", () => {
     await expect(page.getByText("taken as time in bed")).toBeVisible();
     await expect(page.getByText("Time to fall asleep").locator("..")).toContainText("Not recorded");
     await expect(page.getByText("No stage information.")).toBeVisible();
-    await expect(page.getByText("Nothing logged in the previous 14 nights")).toBeVisible();
+    // The comparison with the member's own fortnight is Plus; Free sees the honest note instead.
+    await expect(page.getByText(/Plus compares each night with your own last two weeks/)).toBeVisible();
     await page.getByRole("link", { name: "Previous night" }).click();
     await expect(page.getByText(/Nothing logged for the night of/)).toBeVisible();
 
@@ -106,8 +107,10 @@ test.describe("Sleep & Recovery", () => {
     await page.goto("/progress/sleep/history?range=90d");
     await expect(page.getByRole("list", { name: "Average time asleep by week" }).getByRole("listitem")).toHaveCount(13);
     await page.goto("/progress/sleep/history?range=1y");
-    // Twelve or thirteen calendar months, depending on today's date.
-    expect(await page.getByRole("list", { name: "Average time asleep by month" }).getByRole("listitem").count()).toBeGreaterThanOrEqual(12);
+    // Twelve or thirteen calendar months, depending on today's date (the list streams in after the skeleton).
+    const months = page.getByRole("list", { name: "Average time asleep by month" }).getByRole("listitem");
+    await expect(months.first()).toBeVisible();
+    expect(await months.count()).toBeGreaterThanOrEqual(12);
     await expect(page.getByRole("heading", { name: "Weekdays and weekends" }).locator("..")).toContainText("Included with Plus and Pro");
     await page.goto("/progress/sleep/history?range=7d");
     await page.getByRole("list", { name: "Nights" }).getByRole("link").first().click();
@@ -130,10 +133,12 @@ test.describe("Sleep & Recovery", () => {
     // The wake-up alarm: saved to the account, honest about where it sounds, and the next alarms follow the settings.
     await page.goto("/progress/sleep/alarm");
     await expect(page.getByText("The alarm is off.")).toBeVisible();
-    await expect(page.getByText(/a web browser can.t wake you/)).toBeVisible();
+    await expect(page.getByText(/web browser can.t wake you/i)).toBeVisible();
     await page.getByRole("switch", { name: "Wake me up" }).click();
     await page.getByLabel("Wake time").fill("06:45");
-    await page.getByLabel("Saturday").check();
+    // The day checkboxes are visually hidden behind their styled labels; tap the label.
+    await page.getByText("Sat", { exact: true }).click();
+    await expect(page.getByLabel("Saturday")).toBeChecked();
     await page.getByRole("button", { name: "Save alarm" }).click();
     await expect(page.getByText("Alarm set for 6:45 AM on Mon, Tue, Wed, Thu, Fri and Sat.")).toBeVisible();
     await expect(page.getByRole("list", { name: "Next alarms" }).getByRole("listitem")).toHaveCount(3);

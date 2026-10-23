@@ -373,6 +373,7 @@ test.describe("AI coach", () => {
       "propose_nutrition_targets",
       "propose_bodyweight_log",
       "get_training_review",
+      "get_sleep_summary",
       "propose_target_load",
       "propose_deload_week",
       "propose_volume_change",
