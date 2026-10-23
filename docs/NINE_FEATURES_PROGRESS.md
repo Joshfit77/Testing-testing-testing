@@ -12,13 +12,13 @@ Branch `claude/nine-features` (from `claude/app-cleanup` at `5bf988f`). Not merg
 | 2 | Adaptive AI training and recovery | Pro | Complete and tested | Mock AI model only. |
 | 3 | Personalized AI meal plans | Pro | Complete and tested | Mock AI model only. Allergy filtering is not certified. |
 | 4 | Live GPS running and walking | Free (basic) | Implemented, physical-device testing needed | Browser recording tested with simulated GPS. Background recording on a locked phone is prepared, not synced into a native build, not verified. |
-| 5 | Interactive muscle body map | Plus / Pro | Not started | |
+| 5 | Interactive muscle body map | Plus / Pro | Complete and tested | Rank thresholds are provisional and still need review by a qualified coach. |
 | 6 | Guided AI body scanner | Pro | Not started | |
 | 7 | AI food-photo recognition | Pro | Not started | |
 | 8 | Food Quality Scanner | Free / Plus / Pro | Not started | |
 | 9 | Genuine 4K badge artwork | — | Blocked by external dependency | The import, checking and export pipeline is ready (`docs/BADGE_ART_SPEC.md`). The 27 new 3840 × 1920 masters must be created by an image tool or an artist, which needs your approval. Not complete until they exist. |
 
-Test totals after Stage 4: Vitest 99 files, 2,158 tests passed. Playwright 51 passed, 1 skipped (the skip predates this branch).
+Test totals after Stage 5: Vitest 101 files, 2,173 tests passed. Playwright 53 passed, 1 skipped (the skip predates this branch).
 
 ## Stage 1: long-term AI coaching memory (Pro) — commit `affbbca`
 
@@ -75,3 +75,16 @@ Test totals after Stage 4: Vitest 99 files, 2,158 tests passed. Playwright 51 pa
 8. **External.** A Mac with Xcode and an Android SDK for native builds; a real iPhone and Android phone for the device checks in `docs/RUN_TRACKING_PLAN.md`; optionally a map-tile provider (paid or with usage terms: needs your approval).
 9. **Commit.** `0f3fc9e`.
 10. **Next.** Stage 5: interactive muscle body map.
+
+## Stage 5: interactive muscle body map (Plus / Pro) — commit `d24e32b`
+
+1. **Implemented.** "Strength & Body Map" under My Progress (`/progress/body-map`), checked on the server for Plus and Pro (`advanced_analytics`); Free members see what it offers and a link to plans. Original front and back figures with the 12 regions (chest, upper back, lower back, shoulders, biceps, triceps, forearms, abdominals, glutes, quadriceps, hamstrings, calves), tappable and keyboard-accessible, coloured by strength rank or by this week's sets, with a legend, hatching for "Not assessed" and a text list of every region. A region shows its rank and progress to the next one, how it's scored, exercises, workouts, weighted sets, volume, weekly frequency, personal records, a 12-week sets chart, a monthly estimated-1RM trend and a comparison with the previous 28 days. Ranks run Bronze → Silver → Gold → Platinum → Diamond → Disciple, with emblems that gain detail up to an ornate narrow-gate Disciple emblem. Scoring: each benchmark lift has its own table (barbell lifts by estimated 1RM ÷ body weight; pull-ups, chin-ups and dips by body weight plus added load; push-ups, rollouts, knee raises, Nordic curls and hangs by reps or seconds). A region takes its single best benchmark, so repeated logs can't raise it; leg press, hack squat, machine, dumbbell and assisted variants are never ranked; calves stay "Not assessed" because calf-raise loads aren't comparable. The member picks the men's or women's table on the page (the onboarding sex answer stays limited to calorie estimates). The overall rank is the middle rank of at least 4 assessed regions, with the unassessed ones listed. Only the last 12 months of completed working sets count; likely typos are ignored and reported. Ranks are computed from logs each time and never stored, never come from photos, and are separate from the 27 badges. All rules are labelled "Provisional rules v1".
+2. **Files.** New: `src/lib/domain/strength-ranks.ts`, `src/lib/domain/body-map.ts`, `src/server/services/body-map.ts`, `src/server/actions/body-map.ts`, `src/app/(app)/progress/body-map/page.tsx`, `src/components/progress/{muscle-map,body-figure,strength-rank-emblem}.tsx`, `supabase/migrations/20261024000030_strength_ranks.sql`, `tests/unit/strength-ranks.test.ts`, `tests/integration/body-map.test.ts`, `e2e/body-map.spec.ts`. Changed: `src/app/(app)/progress/page.tsx`, `supabase/setup-all.sql`, `docs/PROJECT_CHECKLIST.md`, `docs/PRO_ROADMAP.md`.
+3. **Migration.** `20261024000030_strength_ranks.sql`: `profiles.strength_standards` ('men' or 'women', member-editable). Nothing else is stored.
+4. **Tests.** Unit (12): every benchmark exists and trains its region, thresholds rise, rank placement and progress, body-weight lifts, machines never counted, repeated logs don't inflate, Not assessed reasons, typo filter, best-benchmark and overall rules, set counting, monthly trend, record de-duplication, volume bands. Database (3): unfinished workouts and warm-ups excluded, the table setting's constraint and owner-only update, ranks from real rows, no access to another member's data. Browser (2): Free sees the locked page; Plus chooses a table, sees the overall rank, taps regions on both views (including by keyboard), reads the scoring and stats, switches colouring, and opens a shared link to a region.
+5. **Results.** All passed: Vitest 101 files / 2,173 tests; Playwright 53 passed / 1 skipped; `tsc` and ESLint clean. Screens were also checked visually at phone size.
+6. **Bugs fixed.** "Men's table" matched inside "Women's table" in tests (exact matching); a gap between the two chest and glute shapes made a tap on the centre line miss; a duplicated confirmation line; "1 sets"; a 28-day set total shown against a weekly range (now a weekly average).
+7. **Limitations.** Thresholds were set by hand and need review by a qualified coach (checklist 10.28). Dumbbell lifts can't be ranked until the app records whether a dumbbell load is per hand or in total. The overall rank isn't yet repeated on the Overview page. The figure is a stylised outline, not a detailed anatomical drawing.
+8. **External.** None. (A coach review of the thresholds is a people task, not an account.)
+9. **Commit.** `d24e32b`.
+10. **Next.** Stage 6: guided AI body scanner.
