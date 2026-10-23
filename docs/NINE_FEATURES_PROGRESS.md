@@ -16,9 +16,9 @@ Branch `claude/nine-features` (from `claude/app-cleanup` at `5bf988f`). Not merg
 | 6 | Guided AI body scanner | Pro | Implemented, physical-device testing needed | Browser capture tested with a fake camera and uploads. No body-fat estimate (no validated provider approved). Native camera behaviour on a phone not tested. |
 | 7 | AI food-photo recognition | Pro | Implemented, physical-device testing needed | Tested end to end with a mock AI; real-model estimate quality and phone camera capture not yet checked. |
 | 8 | Food Quality Scanner | Free / Plus / Pro | Implemented, physical-device testing needed | Tested against a local Open Food Facts mock: this environment's network policy blocks the live API and its docs, so field names and limits still need checking against the live service. Phone camera scanning untested. |
-| 9 | Genuine 4K badge artwork | — | Blocked by external dependency | The import, checking and export pipeline is ready (`docs/BADGE_ART_SPEC.md`). The 27 new 3840 × 1920 masters must be created by an image tool or an artist, which needs your approval. Not complete until they exist. |
+| 9 | Genuine 4K badge artwork | — | Blocked by external dependency | No genuine masters exist yet. The brief, hand-off pack, checks, export (with small copies for phones) and app wiring are ready (`docs/BADGE_ART_SPEC.md`). The 27 new 3840 × 1920 masters must be made by an artist or image service, which needs your approval. Not complete until they exist and are integrated. |
 
-Test totals after Stage 8: Vitest 107 files, 2,206 tests passed. Playwright 59 passed, 1 skipped (the skip predates this branch).
+Test totals after Stage 9: Vitest 107 files, 2,207 tests passed. Playwright 59 passed, 1 skipped (the skip predates this branch).
 
 ## Stage 1: long-term AI coaching memory (Pro) — commit `affbbca`
 
@@ -201,3 +201,64 @@ Test totals after Stage 8: Vitest 107 files, 2,206 tests passed. Playwright 59 p
    - A physical phone.
 9. **Commit.** `fd2826f`.
 10. **Next.** Stage 9: genuine 4K badge artwork.
+
+## Stage 9: genuine 4K badge artwork — commit `d193790` (not complete)
+
+1. **Implemented.** No new artwork. This environment has no image-generation tool and no approved image service, so
+   none of the 27 masters could be made, and the current poster crops were not enlarged to pass as 4K. The app still
+   shows the poster crops (352–526 px wide). What was done:
+   - **Small copies for phones:** the export now also writes a 600 × 300 `<slot>-sm.webp` from each master (shrunk,
+     never enlarged), and the badge and the rank list choose it through `srcset` for small tiles. A phone then
+     doesn't download 27 full-size images for the rank list. This only takes effect once masters are exported.
+   - **Spec additions** (`docs/BADGE_ART_SPEC.md`): acceptance items for blurry halos, over-sharpening, stretching,
+     clipping and matched lighting. Masters stay out of the app bundle. The animations are app layers over still art,
+     so nothing should be baked in.
+   - **Already in place from earlier work and re-checked:**
+     - the per-badge brief, with the Conqueror cross about 25–30 % smaller and the wings kept large;
+     - the hand-off pack (27 prompts, reference crops and the original posters; it builds correctly, about 10 MB);
+     - the automatic checks, which refuse enlargements of the current crops;
+     - the export, and the app wiring.
+   - **Animations:** the Fitness shine, Food flames and embers, Faith leaves and sunlight, unlock celebrations and
+     reduced motion are unchanged. They are drawn over the image, so new masters keep them.
+2. **Files.** `scripts/badge-art/export-masters.py`, `scripts/badge-art/test_badge_pipeline.py`,
+   `src/components/badges/{badge-artwork.ts,badge-art.tsx,rank-ladder.tsx}`, `tests/unit/badge-artwork.test.ts`,
+   `docs/BADGE_ART_SPEC.md`.
+3. **Migration.** None.
+4. **Tests.**
+   - Unit: `srcset` offers a small copy only when one was exported.
+   - Pipeline self-test: the small copies and their size entries. Fake masters are refused or accepted as expected.
+   - Existing rank-badge browser tests: all widths, 320–430 px.
+5. **Results.** Vitest 107 files, 2,207 tests passed. Playwright 59 passed, 1 skipped. Pipeline self-test passed.
+   `tsc`, ESLint and the build are clean.
+6. **Bugs fixed.** None found.
+7. **Limitations.** The feature is not complete: the 27 genuine 3840 × 1920 masters don't exist.
+8. **External.**
+   - Your approval of an artist or image-generation service (and its cost), with commercial rights to the images.
+   - To send them the pack: `python3 scripts/badge-art/make-handoff-pack.py --out badge-art-handoff.zip`.
+   - On delivery:
+     1. put the files in `assets/badge-masters/`;
+     2. run `python3 scripts/badge-art/export-masters.py`;
+     3. review the WARN results at 100 % zoom;
+     4. run the tests;
+     5. check them on a real iPhone.
+9. **Commit.** `d193790`.
+10. **Next.** None in this plan: Stages 1–8 are built and Stage 9 waits on the artwork. The open items are below.
+
+## Open items across all stages
+
+- **Physical phones (iPhone and Android):**
+  - GPS recording, including on a locked screen;
+  - camera use for the body scan, food photos and barcode scanning;
+  - how the badges look.
+- **A live Anthropic API key** to check the quality of real answers for:
+  - coaching memory;
+  - the training review;
+  - meal plans;
+  - food photos;
+  - product explanations.
+- **Network access to Open Food Facts** (`world.openfoodfacts.org`, `openfoodfacts.github.io`) to verify the
+  scanner against the live service.
+- **Approval for the badge artwork** (Stage 9).
+- **A qualified coach** to review the strength-rank thresholds (Stage 5).
+- **Native builds** (Xcode for iOS, the Android SDK) to sync the Capacitor plugins. Nothing has been submitted to
+  TestFlight or the App Store.
