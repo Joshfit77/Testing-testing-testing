@@ -14,8 +14,8 @@ regression run recorded at the end of this file.
 | A2 Exercise form and animation corrections | Partially complete | Whole catalog rendered to contact sheets at six phases; 13 demonstrations corrected with form regression tests (limb lengths, joint limits, equipment contact, feet, floor, smoothness). Not reviewed by a qualified coach, which the report says plainly. | Commits `4f83cd3`, `f332817`, `25d5dc3`; `docs/exercise-review/`; report §2 |
 | A3 Food IQ scoring and ingredient analysis | Partially complete | Scanner renamed Narrow Gate Food IQ; 0–100 score behind the `FOOD_IQ_SCORE` flag with a documented method and version; ingredient evidence entries with the eight fields; nutrient classes per serving and per 100 g; Fits Your Goals separate from quality. Live Open Food Facts lookups are mocked in tests. Flag stays off until the method is evaluated. | Commits `72676ad`, `b7b01c4`; `docs/FOOD_IQ_METHOD.md`; report §1 |
 | A4 GPS corrections and diagnostics | Implemented, physical-device testing needed | Outlier rejection, standing-still rejection, gap handling without invented distance, Kalman-smoothed distance, diagnostics panel, controlled-trace error tests, browser-vs-native distinction, free map tiles. Locked-screen and native GPS unverified. | Commits `20cc8b9`, `e810c7e`; `docs/GPS_ACCURACY.md`; report §3 |
-| A5 Verification of the nine major features | (filled from the E-phase review below) | | |
-| A6 Security, subscription and data integrity | (filled from the E-phase review below) | | |
+| A5 Verification of the nine major features | Complete and tested | Independent read-only pass over all nine (workflow, gating, persistence, deletion, states, tests, honesty); seven defects found and fixed (restorable "turned down" suggestions, hub gate label, AI pages' unavailable/metering states, stale 10K copy, stale doc line, comment). Per-feature labels: AI memory, adaptive training, meal plans, body map "Complete and tested"; GPS, body scan, meal photo, Food IQ "Implemented, physical-device testing needed"; 4K badges "Blocked by external dependency" (no master artwork). | Commit `0526514`; report §A5 in `docs/SLEEP_AND_PRELAUNCH_REPORT.md` |
+| A6 Security, subscription and data integrity | Complete and tested | Two independent static reviews (sleep; whole app). Isolation, authorization, consent, webhook, storage, export/deletion claims held. Fixed: sandbox entitlements, Stripe double checkout, expired admin grant, AI budgets, deletion logs, consent withdrawal order, food-log idempotency, body-size/error-text leaks, column bounds, indexes. Open items listed in `docs/SECURITY.md`. | Commits `5e38b67`, `f76bc43`, `b26d9fb`; migrations 039, 040 |
 
 ## Phase B–D: Sleep, circadian rhythm and recovery
 
@@ -47,4 +47,13 @@ proposal; prices are untouched (Free $0 / Plus $11.99 / Pro $24.99). The owner d
 
 ## Phase E: final quality assurance
 
-(filled in as each stage completes)
+| Stage | Label | Evidence |
+| --- | --- | --- |
+| E1 Full regression | Complete and tested | On `b26d9fb`: unit 95 files / 2,528 tests passed; integration 32 files / 176 tests (175 passed, 1 skipped by design); typecheck and lint clean; browser suite: see the report (run on the final build). |
+| E2 Accessibility and UI review | Complete and tested | Independent review of every sleep page and component (22 findings, all medium/low ones fixed in `5e38b67`; one inherited heading-level nit in the shared EmptyState left as a note). Design tokens kept (black/charcoal/champagne/gold). |
+| E3 Performance and battery | Partially complete | Queries bounded and indexed, nothing runs in the background on the phone (`docs/SLEEP_PLAN.md` §8); battery not measured because no device. |
+| E4 Security and privacy | Complete and tested | See A6 and `docs/SECURITY.md` "Launch-readiness review". |
+| E5 Completion report | Complete and tested | This file and `docs/SLEEP_AND_PRELAUNCH_REPORT.md`. |
+| E6 Demo status and handoff | Partially complete | See the report §Demo: the private artifact exists and the click-everything capture is being republished; the Sleep & Recovery screens are added from the new build. Nothing is deployed. |
+
+Open items that need the owner (none of them code): approve the Plus/Pro split for sleep features; physical-device runs of `docs/SLEEP_DEVICE_CHECKLIST.md` and `docs/GPS_ACCURACY.md`; a dietitian's review before `FOOD_IQ_SCORE=on`; a coach's review of the six flagged exercise figures; 3840×1920 badge masters; a live AI model run; a map-tile provider decision; the open security items.
