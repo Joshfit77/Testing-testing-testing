@@ -39,6 +39,60 @@ export interface ActiveProgram {
   today: ProgramDayDetail | null;
 }
 
+export interface ProgramDayRef {
+  id: string;
+  dayNumber: number;
+  weekId: string;
+  weekNumber: number;
+  isDeload: boolean;
+}
+
+/**
+ * A program's days (optionally only some weeks), looked up week → day through their indexes. Fetch the exercises of
+ * those days with `programExercisesOnDays`. Filtering program_exercises through an embedded `program_days!inner` /
+ * `program_weeks!inner` join instead makes Postgres check the row policy on every exercise of every program, which
+ * takes seconds once members have their own custom programs.
+ */
+export async function programDays(
+  supabase: SupabaseClient,
+  programId: string,
+  weeks: { week?: number; fromWeek?: number; excludeDeload?: boolean } = {},
+): Promise<ProgramDayRef[]> {
+  let q = supabase.from("program_weeks").select("id, week_number, is_deload").eq("program_id", programId);
+  if (weeks.week != null) q = q.eq("week_number", weeks.week);
+  if (weeks.fromWeek != null) q = q.gte("week_number", weeks.fromWeek);
+  if (weeks.excludeDeload) q = q.eq("is_deload", false);
+  const { data: ws, error } = await q;
+  if (error) throw error;
+  if (!ws?.length) return [];
+  const byId = new Map(ws.map((w) => [w.id as string, { weekNumber: w.week_number as number, isDeload: Boolean(w.is_deload) }]));
+  const { data: ds, error: dErr } = await supabase.from("program_days").select("id, day_number, week_id").in("week_id", [...byId.keys()]);
+  if (dErr) throw dErr;
+  return (ds ?? [])
+    .map((d) => ({ id: d.id as string, dayNumber: d.day_number as number, weekId: d.week_id as string, ...byId.get(d.week_id as string)! }))
+    .sort((a, b) => a.weekNumber - b.weekNumber || a.dayNumber - b.dayNumber);
+}
+
+/** Rows of program_exercises on these days (in batches, to keep each request URL short), each with its day. */
+export async function programExercisesOnDays<T extends Record<string, unknown>>(
+  supabase: SupabaseClient,
+  days: ProgramDayRef[],
+  columns: string,
+  opts: { exerciseId?: string } = {},
+): Promise<(T & { day: ProgramDayRef })[]> {
+  const byId = new Map(days.map((d) => [d.id, d]));
+  const ids = [...byId.keys()];
+  const out: (T & { day: ProgramDayRef })[] = [];
+  for (let i = 0; i < ids.length; i += 100) {
+    let q = supabase.from("program_exercises").select(`${columns}, day_id`).in("day_id", ids.slice(i, i + 100));
+    if (opts.exerciseId) q = q.eq("exercise_id", opts.exerciseId);
+    const { data, error } = await q;
+    if (error) throw error;
+    for (const r of (data ?? []) as unknown as (T & { day_id: string })[]) out.push({ ...r, day: byId.get(r.day_id)! });
+  }
+  return out;
+}
+
 export async function getProgramDay(supabase: SupabaseClient, dayId: string): Promise<ProgramDayDetail | null> {
   const { data: day } = await supabase
     .from("program_days")

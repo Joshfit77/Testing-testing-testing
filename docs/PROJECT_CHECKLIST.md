@@ -63,7 +63,7 @@ Offline: still the old nav (`NAV` = Home, Programs, Exercises, Food, Coach, Prog
 | 2.16 | Train → Exercises | Working | `/train/exercises`, currently also its own bottom tab | 1 |
 | 2.17 | Train → Custom Workouts | Working | Stage 2B: Train hub tile "My workouts" → `/train/templates` (build, start, edit, delete saved workouts; empty workout → save as template from the summary). The "not built yet" note is gone. `e2e/training-stage2.spec.ts`. | 2 |
 | 2.18 | Train → Workout History | Working | `/train/history`, `/train/history/[id]` | 1 |
-| 2.19 | Run → Run/Walk Tracker | Partial | Manual and treadmill entry work (`src/components/run/activity-form.tsx`). Outdoor Run shows an honest "GPS tracking is coming next" card with no Start button. Live tracking is Stage 3 (`docs/RUN_TRACKING_PLAN.md`). | 3 |
+| 2.19 | Run → Run/Walk Tracker | Partial | Manual and treadmill entry, plus live GPS recording in the browser (`/run/record`: start, pause, resume, finish, splits, route, guided program runs, goals), tested with simulated GPS. Background recording on a locked phone is prepared but not verified on a device (`docs/RUN_TRACKING_PLAN.md`). | 3 |
 | 2.20 | Run → Plans | Partial | `/run` links to the library's First 5K run/walk (couch-to-5K) and Half Marathon 80/20 programs, plus the cardio builder (`/train/build?type=cardio`). There's no 10K program in the library. | 3 |
 | 2.21 | Run → Goals | Partial | "Goals & records" on `/run` shows the best 1 mi/5K/10K times (`personalBests` in `src/lib/domain/activities.ts`), with self-reported times flagged. No user-set distance or time goals yet. | 3 |
 | 2.22 | Run → History | Working | `/run?tab=history`: grouped by week with run and walk totals, 12-week pages, plus detail, edit and delete. `e2e/run.spec.ts` | 3 |

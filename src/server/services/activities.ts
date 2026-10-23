@@ -55,3 +55,17 @@ export async function listRunsForRecords(supabase: SupabaseClient, userId: strin
   if (error) throw error;
   return ((data ?? []) as Raw[]).map(normalise);
 }
+
+export interface ActivityGpsDetail {
+  route: { type: "MultiLineString"; coordinates: [number, number][][] } | null;
+  splits: { index: number; unit: "mi" | "km"; distance_m: number; moving_s: number; elapsed_s: number; split_s?: number }[] | null;
+  gps_quality: { gaps: number; rejected: number; lastAccuracy: number | null } | null;
+  workout_session_id: string | null;
+}
+
+/** Route, splits and signal notes of one GPS activity (only for its detail page: routes can be large). */
+export async function getActivityGpsDetail(supabase: SupabaseClient, userId: string, id: string): Promise<ActivityGpsDetail | null> {
+  const { data, error } = await supabase.from("activities").select("route, splits, gps_quality, workout_session_id").eq("id", id).eq("user_id", userId).is("deleted_at", null).maybeSingle();
+  if (error) throw error;
+  return (data as ActivityGpsDetail | null) ?? null;
+}

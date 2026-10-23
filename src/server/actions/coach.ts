@@ -16,6 +16,7 @@ import { approvedChangeMemory, findDuplicateMemory, MEMORY_LIMIT, memoryInputSch
 import { applyModification, trainingModifySchema } from "@/lib/domain/adaptive-training";
 import type { UnitSystem } from "@/lib/domain/types";
 import { applyTrainingChange, TrainingChangeError } from "@/server/services/adaptive-training";
+import { programDays, programExercisesOnDays } from "@/server/services/training";
 import type { CoachProposal } from "@/lib/coach/tools";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -141,14 +142,9 @@ export async function applyCoachProposalAction(messageId: string, edited?: Recor
         const fromId = exRows?.find((e) => e.slug === p.from.slug)?.id as string | undefined;
         const toId = exRows?.find((e) => e.slug === p.to.slug)?.id as string | undefined;
         if (!fromId || !toId) return { ok: false, error: "One of those exercises is no longer available." };
-        const { data: rows } = await supabase
-          .from("program_exercises")
-          .select("id, day:program_days!inner(day_number, week:program_weeks!inner(program_id, week_number))")
-          .eq("exercise_id", fromId)
-          .eq("day.week.program_id", ref.programId)
-          .gte("day.week.week_number", ref.currentWeek);
-        const candidates = ((rows ?? []) as unknown as { id: string; day: { day_number: number; week: { week_number: number } } }[])
-          .map((r) => ({ id: r.id, week: r.day.week.week_number, day: r.day.day_number }))
+        const rows = await programExercisesOnDays<{ id: string }>(supabase, await programDays(supabase, ref.programId, { fromWeek: ref.currentWeek }), "id", { exerciseId: fromId });
+        const candidates = rows
+          .map((r) => ({ id: r.id, week: r.day.weekNumber, day: r.day.dayNumber }))
           .filter((r) => r.week > ref.currentWeek || r.day >= ref.currentDay || p.scope === "rest_of_program")
           .sort((a, b) => a.week - b.week || a.day - b.day);
         if (!candidates.length) return { ok: false, error: `${p.from.name} isn't in the rest of your program.` };

@@ -43,6 +43,9 @@ const config: CapacitorConfig = {
   },
   android: {
     allowMixedContent: cleartext,
+    // Needed by @capacitor-community/background-geolocation: without the legacy bridge, location updates stop after
+    // about five minutes in the background (GPS runs and walks).
+    useLegacyBridge: true,
   },
   plugins: {
     SplashScreen: {

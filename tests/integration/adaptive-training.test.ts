@@ -34,12 +34,15 @@ describe.skipIf(!available)("adaptive training changes", async () => {
     await Promise.all([deleteTestUser(pro), deleteTestUser(plus)]);
   });
 
+  // Week → days → exercises by id (an embedded-join filter would scan every program's exercises; see programDays).
   const weekRows = async (week: number) => {
+    const { data: w } = await pro.client.from("program_weeks").select("id").eq("program_id", programId).eq("week_number", week).single();
+    const { data: days } = await pro.client.from("program_days").select("id").eq("week_id", w!.id);
     const { data } = await pro.client
       .from("program_exercises")
-      .select("id, sets, rpe, exercise:exercises(slug), day:program_days!inner(week:program_weeks!inner(program_id, week_number))")
-      .eq("day.week.program_id", programId)
-      .eq("day.week.week_number", week);
+      .select("id, sets, rpe, exercise:exercises(slug)")
+      .in("day_id", (days ?? []).map((d) => d.id))
+      .order("id");
     return (data ?? []) as unknown as { id: string; sets: number; rpe: number | null; exercise: { slug: string } }[];
   };
 

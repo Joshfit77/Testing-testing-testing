@@ -9,17 +9,21 @@ import { ACTIVITY_KIND_LABELS, distanceUnitFor, formatDistance, formatMovingPace
 import { formatDuration } from "@/lib/domain/units";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
-import { getActivity } from "@/server/services/activities";
+import { getActivity, getActivityGpsDetail } from "@/server/services/activities";
+import { RouteMap } from "@/components/run/route-map";
+import { Notice } from "@/components/common/states";
 
 export const metadata = { title: "Activity" };
 
-export default async function ActivityDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ActivityDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ saved?: string }> }) {
   const { id } = await params;
+  const { saved } = await searchParams;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const { user, profile } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
   const a = await getActivity(supabase, user.id, id);
   if (!a) notFound();
+  const gps = a.source === "gps" ? await getActivityGpsDetail(supabase, user.id, id) : null;
   const unit = distanceUnitFor(profile.unit_system);
   // Shown in the time zone where it was logged.
   const when = new Date(a.started_at).toLocaleString("en-US", {
@@ -72,6 +76,52 @@ export default async function ActivityDetailPage({ params }: { params: Promise<{
           </div>
         </CardContent>
       </Card>
+
+      {saved && (
+        <Notice tone="success">
+          {label} saved{gps?.workout_session_id ? " and marked done in your program" : ""}.
+        </Notice>
+      )}
+
+      {gps?.route && (
+        <Card>
+          <CardContent className="space-y-2 pt-5">
+            <h2 className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">Route</h2>
+            <RouteMap coordinates={gps.route.coordinates} className="w-full" label={`Route of this ${label.toLowerCase()}`} />
+            <p className="text-xs text-muted-foreground">
+              Private to you. Drawn from your own GPS points{gps.route.coordinates.length > 1 ? "; breaks are pauses or stretches without a usable signal" : ""}.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {gps?.splits && gps.splits.length > 0 && (
+        <Card>
+          <CardContent className="pt-5">
+            <h2 className="mb-1 text-xs font-semibold uppercase tracking-[0.25em] text-gold">Splits</h2>
+            <ol className="divide-y divide-border text-sm" data-testid="activity-splits">
+              {gps.splits.map((sp, i) => {
+                const prev = gps.splits![i - 1]?.moving_s ?? 0;
+                return (
+                  <li key={sp.index} className="flex justify-between py-1.5 tabular-nums">
+                    <span>
+                      {sp.index} {sp.unit}
+                    </span>
+                    <span>{formatDuration(sp.split_s ?? sp.moving_s - prev)}</span>
+                  </li>
+                );
+              })}
+            </ol>
+          </CardContent>
+        </Card>
+      )}
+
+      {gps?.gps_quality && (gps.gps_quality.gaps > 0 || gps.gps_quality.rejected > 0) && (
+        <p className="text-sm text-muted-foreground" data-testid="gps-quality">
+          GPS: {gps.gps_quality.gaps > 0 ? `the signal dropped ${gps.gps_quality.gaps} time${gps.gps_quality.gaps === 1 ? "" : "s"} (no distance added for those stretches)` : "no signal drops"}
+          {gps.gps_quality.rejected > 0 ? `; ${gps.gps_quality.rejected} imprecise or impossible readings were ignored` : ""}.
+        </p>
+      )}
 
       {a.notes && (
         <Card>

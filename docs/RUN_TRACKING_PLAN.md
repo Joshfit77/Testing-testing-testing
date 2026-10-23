@@ -1,6 +1,24 @@
-# Run tracking plan (Stage 3)
+# Run tracking plan
 
-_Written 2026-10-20 during Stage 1B. Nothing here is implemented yet; this records what was inspected and what Stage 3 has to build. Live GPS tracking must ship with a "not verified on a device" note until it has been tested on real phones._
+_First written 2026-10-20 (Stage 1B) as a plan. Live GPS recording was built on 2026-10-22 as Stage 4 of the nine-feature build (branch `claude/nine-features`); the status below is current. **Background / locked-screen recording has not been tested on a real iPhone or Android phone.** Until the device checks at the end of this file pass, treat it as "implemented, physical-device testing needed"._
+
+## Status (Stage 4)
+
+**Built and tested in the browser (Playwright with simulated GPS, plus unit and database tests):**
+- `/run/record?kind=run|walk`: Start (location is requested only then), "waiting for a GPS fix", live distance, elapsed and moving time, current and average pace, splits per mile or km, Pause / Resume / Finish / Discard, a review screen with the route, effort and notes, then one idempotent save.
+- Filtering in `src/lib/domain/gps-track.ts` as described under "Tracking algorithm": accuracy limits, out-of-order fixes, speed caps (run 10 m/s, walk 4 m/s), jitter, a new line after a pause or a 15 s signal gap (time counts, no distance is invented), interpolated splits, Douglas–Peucker simplification to at most 2,000 stored points.
+- Crash and tab-close recovery: the recording is kept in local storage on this device and offered back ("Continue" or "Discard") when the page reopens.
+- Guided runs: a running day of the member's program (`walk-to-run-beginner` (Free), `5k-training` and `10k-training` (Plus), and the existing run/walk plans) opens as `/run/record?day=…` with timed warm-up, run, walk and cool-down cues (vibration, optional voice). Saving counts the completed intervals in the program and finishes that day.
+- Running goals: weekly or monthly distance and target times for 1 mile, 5K, 10K and half marathon (`running_goals`, owner-only, up to 10). The Run overview shows weekly distance and pace charts.
+- Activity detail: SVG route map (no map tiles, so no third-party map service), splits and a GPS-quality note. Routes are private (`is_private` defaults to true) and are removed with the account.
+- Database (`supabase/migrations/20261024000029_gps_running.sql`): `gps_quality`, `workout_session_id`, size limits on `route` (150 kB) and `splits` (600), and `running_goals` with its limit trigger.
+
+**Fixed along the way:** the site's `Permissions-Policy` header was `geolocation=()`, which made every browser refuse location before asking. It is now `geolocation=(self)` (`src/lib/security-headers.ts`, with a unit test).
+
+**Prepared, not verified on a device:**
+- `@capacitor-community/background-geolocation` 1.2.26 is in `package.json`, `android.useLegacyBridge` is set, and the iOS `NSLocation*` strings, `UIBackgroundModes: location` and the Android location and foreground-service permissions are in place. `src/lib/native/location.ts` uses the native watcher when it is present in the app build and the browser's `watchPosition` otherwise. `npx cap sync` and a native build have **not** been run here (no Xcode or Android SDK), so the installed apps don't contain the plugin yet.
+
+**Not built yet:** auto-pause; a "Return to Run" bar on other pages while recording; best efforts inside longer runs (records still use whole activities); map tiles (would need an approved map provider); `@capacitor/geolocation` (not needed: the browser API and the background plugin cover both cases).
 
 ## What exists after Stage 1B
 
@@ -8,9 +26,9 @@ _Written 2026-10-20 during Stage 1B. Nothing here is implemented yet; this recor
 - The row `id` is generated on the client before the first save. That makes it the stable activity id: retries and double submits save once, and badges or records can key on it.
 - Duplicate guards: a unique `(user_id, source, external_id)` for imports, and a unique `(user_id, source, started_at)` for live GPS rows.
 - Pure helpers in `src/lib/domain/activities.ts`, unit-tested: unit conversion, pace formatting, `movingSecondsFromSegments` (moving time from un-paused segments), weekly totals in the user's time zone, and personal bests. A self-reported (manual or treadmill) record is flagged separately from a GPS one.
-- `/run` hub: Outdoor Run shows an honest "coming next" card (no map, no Start button). Treadmill/Manual entry, History grouped by week, plus activity detail, edit and delete.
+- `/run` hub (Stage 1B): Treadmill/Manual entry, History grouped by week, plus activity detail, edit and delete. Stage 4 replaced the "coming next" card on the Outdoor tab with Outdoor run / Outdoor walk recording.
 
-## Platform inspection (2026-10-20)
+## Platform inspection (2026-10-20, before Stage 4)
 
 | Item | Finding |
 | --- | --- |
@@ -33,7 +51,7 @@ _Written 2026-10-20 during Stage 1B. Nothing here is implemented yet; this recor
 
 **Recommendation.** Start with `@capacitor/geolocation` for permission handling and the foreground watch, and the community background plugin for the native background watcher. If device testing shows dropped points on a locked iPhone or on Android after Doze, switch the background watcher to Transistorsoft and budget for its Android license.
 
-## Native configuration Stage 3 must add
+## Native configuration (added in Stage 4)
 
 **iOS (`ios/App/App/Info.plist`):**
 - `NSLocationWhenInUseUsageDescription`, e.g. "Narrow Gate Fitness uses your location during a run or walk you start, to measure distance, pace and your route."
@@ -76,3 +94,4 @@ _Written 2026-10-20 during Stage 1B. Nothing here is implemented yet; this recor
   - Android 14+ (e.g. Pixel): same, plus the notification, Doze after 30+ minutes, denying `POST_NOTIFICATIONS`, and "approximate location only".
   - Compare against a reference watch on a measured 400 m track and a 5K route. Report the error percentage.
 - Until those pass, checklist rows 7.15–7.26 stay Partial with "not verified on a device".
+- Browser e2e for this plan: `e2e/gps-run.spec.ts` (record with pause, review, save once, route and history, goals; guided program run; permission denied). Unit: `tests/unit/gps-track.test.ts`, `tests/unit/run-session.test.ts`. Database: `tests/integration/gps-running.test.ts`.

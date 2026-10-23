@@ -8,8 +8,9 @@ test.describe("Run tab: manual runs and walks", () => {
 
     await page.goto("/run");
     await expect(page.getByRole("heading", { name: "Run", level: 1 })).toBeVisible();
-    // Outdoor tab: an honest notice, no fake map and no Start button.
-    await expect(page.getByTestId("outdoor-gps-notice")).toContainText("GPS tracking is coming next");
+    // Outdoor tab: live GPS recording opens on its own page (covered in gps-run.spec.ts); nothing starts here.
+    await expect(page.getByRole("link", { name: /Outdoor run/ })).toHaveAttribute("href", "/run/record?kind=run");
+    await expect(page.getByRole("link", { name: /Outdoor walk/ })).toHaveAttribute("href", "/run/record?kind=walk");
     await expect(page.getByRole("button", { name: /^Start/ })).toHaveCount(0);
     await expect(page.getByTestId("run-this-week-run")).toHaveText("No runs");
     await expect(page.getByTestId("run-records")).toContainText("5K");

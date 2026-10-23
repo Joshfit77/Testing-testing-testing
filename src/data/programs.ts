@@ -884,6 +884,95 @@ function halfMarathonWeeks(): ProgramWeekSeed[] {
   });
 }
 
+/** Walk to Run: six gentle weeks from brisk walking to 20 minutes of easy jogging (before the First 5K plan). */
+function walkToRunWeeks(): ProgramWeekSeed[] {
+  // [jog seconds, walk seconds, rounds] per week; the last day of week 6 is continuous.
+  const plan = [
+    [30, 120, 8],
+    [45, 105, 8],
+    [60, 90, 8],
+    [90, 90, 7],
+    [120, 60, 7],
+    [180, 60, 5],
+  ] as const;
+  const warm = ["5 minutes brisk walking", "Ankle circles × 10 each direction"];
+  return weeksOf(6, (w) => {
+    const [jog, walk, rounds] = plan[w - 1]!;
+    const intervals = (n: number) => T("run-walk-intervals", n, jog, walk, { notes: `Jog ${secondsLabel(jog)} very easily, then walk ${secondsLabel(walk)}. ${n} rounds. Walking is part of the plan.` });
+    return {
+      focus: w === 6 ? "Finish strong: 20 minutes of easy jogging on the last day" : `Week ${w}: a little more jogging, a little less walking — repeat any week that felt hard`,
+      days: [
+        day("Walk/Jog A", "Easy jogging intervals", [intervals(rounds)], { warmup: warm }),
+        day("Brisk Walk", "Continuous brisk walking (active recovery and aerobic base)", [T("brisk-walk", 1, (25 + 5 * Math.min(w, 3)) * 60, 0, { notes: "A brisk, purposeful walk: breathing a little harder, still able to talk." })], { warmup: warm }),
+        w === 6
+          ? day("First 20-Minute Jog", "20 minutes of continuous, easy jogging", [T("zone-2-run", 1, 1200, 0, { notes: "Slow enough to talk the whole way. Walk briefly if you must, then carry on." })], { warmup: warm })
+          : day("Walk/Jog B", "Easy jogging intervals", [intervals(rounds)], { warmup: warm }),
+      ],
+    };
+  });
+}
+
+/** 5K: eight weeks of mostly easy running, one quality session a week, a cutback week and a race-week taper. */
+function fiveKWeeks(): ProgramWeekSeed[] {
+  const easy = [25, 28, 30, 25, 32, 35, 35, 20];
+  const long = [35, 40, 45, 35, 50, 55, 55, 0];
+  return weeksOf(8, (w) => {
+    const cutback = w === 4;
+    const quality: BuildEx =
+      w <= 3
+        ? T("running-intervals", 6 + (w - 1), 60, 90, { notes: "1 minute at a hard but controlled effort (about 5K race effort), 90 s easy jog or walk." })
+        : w <= 7
+          ? T("running-intervals", w === 7 ? 4 : 5, 180, 120, { notes: "3 minutes at 5K race effort, 2 min easy. Even pacing: the last rep no faster than the first." })
+          : T("running-intervals", 3, 60, 120, { notes: "Race week: 3 × 1 min at race effort to stay sharp." });
+    const days = [
+      day("Easy Run", "Conversational pace (zone 2)", [T("zone-2-run", 1, easy[w - 1]! * 60, 0, { notes: "Easy — you can speak in full sentences." })], { warmup: RUN_WARMUP }),
+      day("Quality Session", w <= 3 ? "Short repeats" : w <= 7 ? "5K-effort repeats" : "Sharpening", [
+        T("zone-2-run", 1, 600, 0, { notes: "10 minutes of easy running before the first repeat." }),
+        cutback ? T("running-intervals", 4, 30, 90, { notes: "Cutback week: 4 relaxed 30 s strides." }) : quality,
+        T("brisk-walk", 1, 300, 0, { notes: "Cool down: 5 minutes of easy walking." }),
+      ], { warmup: RUN_WARMUP }),
+      w === 8
+        ? day("Race Day — 5K", "5 km / 3.1 miles: start steady, finish strong", [T("zone-2-run", 1, 1800, 0, { reps: "5 km", notes: "Run the first kilometre a little slower than goal pace, settle in, and push over the last kilometre." })], { warmup: RUN_WARMUP })
+        : day("Long Easy Run", "The longest run of the week — easy all the way", [T("zone-2-run", 1, long[w - 1]! * 60, 0, { notes: "Easy and conversational from start to finish." })], { warmup: RUN_WARMUP }),
+    ];
+    if (cutback) return { focus: "Cutback week: less running and no hard session — absorb the training", isDeload: true, days };
+    if (w === 8) return { focus: "Race week: short, easy runs and a few sharp minutes, then race", isDeload: true, days };
+    return { focus: w <= 3 ? "Base: easy running plus short repeats" : "Build: 5K-effort repeats and a longer long run", days };
+  });
+}
+
+/** 10K: ten weeks, four runs a week, with threshold work, cutback weeks and a taper. */
+function tenKWeeks(): ProgramWeekSeed[] {
+  const easy = [30, 32, 35, 28, 38, 40, 30, 42, 40, 25];
+  const long = [45, 50, 55, 45, 60, 65, 50, 70, 70, 0];
+  return weeksOf(10, (w) => {
+    const cutback = w === 4 || w === 7;
+    const quality: BuildEx =
+      w <= 3
+        ? T("running-intervals", 6, 60, 90, { notes: "Hill or flat repeats: 60 s hard but controlled, jog back easy." })
+        : w <= 6
+          ? T("running-intervals", 3, 480, 120, { notes: "Threshold: 8 minutes 'comfortably hard', 2 min easy jog." })
+          : w <= 9
+            ? T("running-intervals", 4, 600, 120, { notes: "10K pace: 10 minutes at goal race pace, 2 min easy." })
+            : T("running-intervals", 4, 60, 120, { notes: "Race week: 4 × 1 min at race pace." });
+    const days = [
+      day("Easy Run", "Conversational pace (zone 2)", [T("zone-2-run", 1, easy[w - 1]! * 60, 0, { notes: "Easy — you can speak in full sentences." })], { warmup: RUN_WARMUP }),
+      day("Quality Session", w <= 3 ? "Hills or short repeats" : w <= 6 ? "Threshold" : "Race-pace work", [
+        T("zone-2-run", 1, 600, 0, { notes: "10 minutes easy before the first interval." }),
+        cutback ? T("running-intervals", 4, 30, 90, { notes: "Cutback week: 4 relaxed 30 s strides." }) : quality,
+        T("brisk-walk", 1, 300, 0, { notes: "Cool down: 5 minutes of easy walking." }),
+      ], { warmup: RUN_WARMUP }),
+      day("Easy Run + Strides", "Easy running with a few short, relaxed strides", [T("zone-2-run", 1, Math.max(25, easy[w - 1]! - 5) * 60, 0, { notes: "Easy. Finish with 4–6 × 20 s strides." })], { warmup: RUN_WARMUP }),
+      w === 10
+        ? day("Race Day — 10K", "10 km / 6.2 miles: patient first half, strong second half", [T("zone-2-run", 1, 3600, 0, { reps: "10 km", notes: "Start conservatively, settle at goal pace by 2 km, and save your effort for the last 3 km." })], { warmup: RUN_WARMUP })
+        : day("Long Run", "Easy all the way", [T("zone-2-run", 1, long[w - 1]! * 60, 0, { notes: "Easy and conversational from start to finish." })], { warmup: RUN_WARMUP }),
+    ];
+    if (cutback) return { focus: "Cutback week: about 25% less running and no hard session", isDeload: true, days };
+    if (w === 10) return { focus: "Race week: short, easy runs and a few race-pace minutes, then race", isDeload: true, days };
+    return { focus: w <= 3 ? "Base: easy volume plus short repeats" : w <= 6 ? "Build: threshold intervals" : "Specific: 10K-pace work and your longest runs", days };
+  });
+}
+
 /** Lean & Conditioned: steady cardio grows every other week, intervals add rounds, strength uses double progression. */
 function leanWeeks(): ProgramWeekSeed[] {
   return weeksOf(6, (w) => {
@@ -2916,6 +3005,76 @@ export const PROGRAMS: ProgramSeed[] = [
     cooldown: ["5 minutes easy walking", "Calf stretch — 30 seconds per side", "Standing quad stretch — 30 seconds per side"],
     days: halfMarathonWeeks()[0]!.days,
     weekTemplates: halfMarathonWeeks(),
+  },
+  {
+    slug: "walk-to-run-beginner",
+    name: "Walk to Run: 6 Weeks to Your First 20-Minute Jog",
+    summary: "Three gentle sessions a week take you from brisk walking with short jogs to 20 minutes of continuous easy jogging.",
+    description:
+      "For complete beginners or anyone returning after a long break, before the First 5K plan. Two walk/jog interval sessions and one brisk walk " +
+      "each week; the jogging bits grow from 30 seconds to 3 minutes, and the last session is 20 minutes of easy, continuous jogging. Everything is " +
+      "conversational. Repeat any week that leaves you sore or out of breath, and stop if anything hurts.",
+    category: "cardiovascular",
+    types: ["cardio"],
+    difficulty: "beginner",
+    weeks: 6,
+    sessionMinutes: 30,
+    goals: ["improve_conditioning", "general_health", "lose_fat"],
+    equipment: ["bodyweight"],
+    tier: "free",
+    lowImpact: true,
+    progression: "Jog intervals lengthen each week (30 s → 3 min) while walk breaks shorten; the brisk walk grows to 40 minutes. Week 6 ends with a 20-minute jog.",
+    progressionModel: "steady",
+    noDeloadReason: "Load rises very gently and you repeat any week that feels too hard, so no separate deload week is needed.",
+    warmup: ["5 minutes brisk walking", "Ankle circles × 10 each direction"],
+    cooldown: ["5 minutes easy walking", "Calf stretch — 30 seconds per side"],
+    days: walkToRunWeeks()[0]!.days,
+    weekTemplates: walkToRunWeeks(),
+  },
+  {
+    slug: "5k-training",
+    name: "5K Training: Run Your Best 5K",
+    summary: "Eight weeks, three runs a week: easy running, one quality session, a long run, a cutback week and a race-week taper.",
+    description:
+      "For runners who can already run 25–30 minutes without stopping. Most running is easy and conversational; one session a week sharpens your " +
+      "5K pace with short repeats, then longer 5K-effort repeats. The long run builds to about 55 minutes. Week 4 cuts back, and week 8 tapers into a " +
+      "5K time trial or race.",
+    category: "cardiovascular",
+    types: ["cardio"],
+    difficulty: "intermediate",
+    weeks: 8,
+    sessionMinutes: 40,
+    goals: ["improve_conditioning", "general_health"],
+    equipment: ["bodyweight"],
+    tier: "plus",
+    progression: "Repeats move from 6–8 × 1 min (weeks 1–3) to 4–5 × 3 min at 5K effort (5–7); easy and long runs grow most weeks. Week 4 cuts back; week 8 tapers.",
+    progressionModel: "steady",
+    warmup: RUN_WARMUP,
+    cooldown: ["5 minutes easy walking", "Calf stretch — 30 seconds per side", "Standing quad stretch — 30 seconds per side"],
+    days: fiveKWeeks()[0]!.days,
+    weekTemplates: fiveKWeeks(),
+  },
+  {
+    slug: "10k-training",
+    name: "10K Training: Build to 10 Kilometres",
+    summary: "Ten weeks, four runs a week: mostly easy running, one quality session, a long run to 70 minutes, two cutback weeks and a taper.",
+    description:
+      "For runners comfortable with 30–40 minutes of easy running. One weekly quality session moves from short repeats to threshold intervals to " +
+      "10K-pace work; everything else is easy. Weeks 4 and 7 cut back, and week 10 tapers into a 10K race or time trial.",
+    category: "cardiovascular",
+    types: ["cardio"],
+    difficulty: "intermediate",
+    weeks: 10,
+    sessionMinutes: 50,
+    goals: ["improve_conditioning", "general_health"],
+    equipment: ["bodyweight"],
+    tier: "plus",
+    progression: "Quality moves from 6 × 60 s repeats to 3 × 8 min threshold to 4 × 10 min at 10K pace; the long run grows from 45 to 70 minutes. Weeks 4 and 7 cut back; week 10 tapers.",
+    progressionModel: "steady",
+    warmup: RUN_WARMUP,
+    cooldown: ["5 minutes easy walking", "Calf stretch — 30 seconds per side", "Standing quad stretch — 30 seconds per side"],
+    days: tenKWeeks()[0]!.days,
+    weekTemplates: tenKWeeks(),
   },
   // =========================================================== Speed & agility
   {

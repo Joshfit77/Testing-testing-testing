@@ -55,7 +55,8 @@ export function securityHeaders(opts: SecurityHeaderOptions): { key: string; val
     { key: "X-Content-Type-Options", value: "nosniff" },
     { key: "X-Frame-Options", value: "DENY" },
     { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-    { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=()" },
+    // Location is for this app's own GPS recorder only (requested on Start); never for embedded frames.
+    { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=(self)" },
     { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
   ];
   // HSTS only over real HTTPS deployments; on localhost it would pin the dev host to HTTPS.

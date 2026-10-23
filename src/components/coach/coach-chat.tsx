@@ -19,6 +19,7 @@ import type { AiPlan } from "@/lib/validation/ai";
 import type { CoachProposal } from "@/lib/coach/tools";
 import { applyProposalAction, deleteConversationAction, dismissProposalAction } from "@/server/actions/coach";
 import { setConversationMemoryOffAction } from "@/server/actions/coach-memory";
+import { chatCreated, initialChatKey, nextChatKey } from "@/lib/coach/chat-key";
 import { Markdown } from "./markdown";
 import { SuggestionCard } from "./suggestion-card";
 
@@ -44,6 +45,14 @@ interface Props {
   suggestions?: string[];
   /** Coaching memory (Pro): whether it's on, and whether this chat is "don't remember". Null without the AI coach. */
   memory?: { enabled: boolean; chatOff: boolean } | null;
+}
+
+/** Keeps a new chat on screen while it moves to its own URL; another chat, or "New chat", starts fresh (see chat-key). */
+export function CoachChat(props: Props) {
+  const [chat, setChat] = useState(() => initialChatKey(props.conversationId));
+  const next = nextChatKey(chat, props.conversationId);
+  if (next !== chat) setChat(next);
+  return <CoachChatView key={next.key} {...props} onCreated={(id) => setChat((c) => chatCreated(c, id))} />;
 }
 
 const DEFAULT_SUGGESTIONS = [
@@ -188,13 +197,13 @@ type StreamEvent =
   | { type: "done"; result: { conversationId: string; userMessage: ChatMessage; assistantMessage: ChatMessage; usage: { used: number; limit: number } } }
   | { type: "error"; message?: string };
 
-export function CoachChat({ conversationId: initialId, initialMessages, initialQuestion, enabled, disabledReason, canGeneratePlans, usage: initialUsage, exerciseNames, suggestions, memory }: Props) {
+function CoachChatView({ conversationId: initialId, initialMessages, initialQuestion, enabled, disabledReason, canGeneratePlans, usage: initialUsage, exerciseNames, suggestions, memory, onCreated }: Props & { onCreated: (id: string) => void }) {
   const router = useRouter();
   const [conversationId, setConversationId] = useState(initialId);
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   // The unsent message is a draft on this device (per user and conversation): it survives tab switches,
   // reloads and failed sends (429/500/offline) until the coach has replied.
-  const draftKey = `coach.input.${initialId ?? "new"}`;
+  const draftKey = `coach.input.${conversationId ?? "new"}`;
   const userId = useDraftUserId();
   const inputDraft = useDraft(draftKey, "");
   const input = inputDraft.value;
@@ -241,6 +250,7 @@ export function CoachChat({ conversationId: initialId, initialMessages, initialQ
     setUsage(json.usage);
     if (!conversationId) {
       setConversationId(json.conversationId);
+      onCreated(json.conversationId);
       router.replace(`/coach?c=${json.conversationId}`, { scroll: false });
       router.refresh();
     }

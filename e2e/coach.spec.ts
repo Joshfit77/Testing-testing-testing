@@ -61,7 +61,8 @@ function reply(req: MockRequest): { blocks: Block[]; stop: string; delayMs: numb
     const call = (prev.content as { type: string; id?: string; name?: string }[]).find((c) => c.type === "tool_use" && c.id === toolResult.tool_use_id);
     if (call?.name === "get_training_review") {
       const data = JSON.parse(String(toolResult.content)) as { consistency?: { sessionsLast28: number }; data_gaps?: string[] };
-      return { delayMs: 0, stop: "end_turn", blocks: [{ type: "text", text: `Review: ${data.consistency?.sessionsLast28 ?? "?"} sessions in 4 weeks. Gaps: ${data.data_gaps?.length ?? 0}.` }] };
+      // Held back like a real model's thinking time, so the "Reviewing…" activity line can be seen.
+      return { delayMs: 1500, stop: "end_turn", blocks: [{ type: "text", text: `Review: ${data.consistency?.sessionsLast28 ?? "?"} sessions in 4 weeks. Gaps: ${data.data_gaps?.length ?? 0}.` }] };
     }
     if (call?.name === "get_exercise_history") {
       const data = JSON.parse(String(toolResult.content)) as { sessions_found?: number; error?: string };

@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { addDays, isoDateInTz } from "@/lib/domain/dates";
+import { programDays, programExercisesOnDays } from "@/server/services/training";
 import { analyzeTraining, type ReviewInput, type ReviewProgram, type ReviewWorkout, type TrainingChange, type TrainingReview } from "@/lib/domain/adaptive-training";
 import type { UnitSystem } from "@/lib/domain/types";
 import { displayWeight, weightUnit } from "@/lib/domain/units";
@@ -87,15 +88,17 @@ export async function loadReviewInput(supabase: SupabaseClient, userId: string):
   let goalChanged = false;
   if (ref) {
     const week = upcomingWeek(ref);
-    const [{ data: up }, { data: prog }, { data: weeks }, { data: rows }] = await Promise.all([
+    const [{ data: up }, { data: prog }, { data: weeks }, rows] = await Promise.all([
       supabase.from("user_programs").select("started_at").eq("id", ref.userProgramId).maybeSingle(),
       supabase.from("training_programs").select("goals").eq("id", ref.programId).maybeSingle(),
       supabase.from("program_weeks").select("week_number, is_deload").eq("program_id", ref.programId),
-      supabase
-        .from("program_exercises")
-        .select("id, sets, reps, rpe, exercise:exercises(slug, name, primary_muscles), day:program_days!inner(day_number, week:program_weeks!inner(program_id, week_number))")
-        .eq("day.week.program_id", ref.programId)
-        .eq("day.week.week_number", week),
+      programDays(supabase, ref.programId, { week }).then((days) =>
+        programExercisesOnDays<{ id: string; sets: number; reps: string | null; rpe: number | string | null; exercise: { slug: string; name: string; primary_muscles: string[] } | null }>(
+          supabase,
+          days,
+          "id, sets, reps, rpe, exercise:exercises(slug, name, primary_muscles)",
+        ),
+      ),
     ]);
     const startedOn = up?.started_at ? isoDateInTz(new Date(up.started_at as string), timeZone) : null;
     program = {
@@ -111,7 +114,7 @@ export async function loadReviewInput(supabase: SupabaseClient, userId: string):
       weeks: (weeks ?? []).map((x) => ({ weekNumber: x.week_number as number, isDeload: Boolean(x.is_deload) })),
       upcoming: {
         weekNumber: week,
-        exercises: ((rows ?? []) as unknown as { id: string; sets: number; reps: string | null; rpe: number | string | null; exercise: { slug: string; name: string; primary_muscles: string[] } | null }[])
+        exercises: rows
           .filter((r) => r.exercise)
           .map((r) => ({ id: r.id, slug: r.exercise!.slug, name: r.exercise!.name, sets: r.sets, reps: r.reps, rpe: r.rpe == null ? null : Number(r.rpe), primaryMuscles: r.exercise!.primary_muscles ?? [] })),
       },
@@ -209,12 +212,12 @@ export async function applyTrainingChange(
       const { data: week } = await supabase.from("program_weeks").select("id, focus, is_deload").eq("program_id", change.programId).eq("week_number", change.weekNumber).maybeSingle();
       if (!week) throw new TrainingChangeError(`Week ${change.weekNumber} isn't in this program.`);
       if (week.is_deload) throw new TrainingChangeError(`Week ${change.weekNumber} is already a recovery week.`);
-      const { data: rows, error: rErr } = await supabase
-        .from("program_exercises")
-        .select("id, sets, rpe, day:program_days!inner(week_id)")
-        .eq("day.week_id", week.id);
-      if (rErr) throw rErr;
-      for (const r of (rows ?? []) as unknown as { id: string; sets: number; rpe: number | string | null }[]) {
+      const rows = await programExercisesOnDays<{ id: string; sets: number; rpe: number | string | null }>(
+        supabase,
+        await programDays(supabase, change.programId, { week: change.weekNumber }),
+        "id, sets, rpe",
+      );
+      for (const r of rows) {
         const before = { sets: r.sets, rpe: r.rpe == null ? null : Number(r.rpe) };
         const after = { sets: Math.max(1, Math.round(r.sets * change.setsFactor)), rpe: before.rpe == null ? change.rpeCap : Math.min(before.rpe, change.rpeCap) };
         const { error } = await supabase.from("program_exercises").update(after).eq("id", r.id);
@@ -232,15 +235,12 @@ export async function applyTrainingChange(
       if (!Number.isInteger(change.deltaSets) || change.deltaSets === 0 || Math.abs(change.deltaSets) > 2) throw new TrainingChangeError("Change by one or two sets.");
       const { data: ex } = await supabase.from("exercises").select("id").eq("slug", change.exerciseSlug).maybeSingle();
       if (!ex) throw new TrainingChangeError("That exercise is no longer in the catalog.");
-      const { data: rows, error: rErr } = await supabase
-        .from("program_exercises")
-        .select("id, sets, day:program_days!inner(week:program_weeks!inner(program_id, week_number, is_deload))")
-        .eq("exercise_id", ex.id)
-        .eq("day.week.program_id", change.programId)
-        .gte("day.week.week_number", change.fromWeek)
-        .eq("day.week.is_deload", false);
-      if (rErr) throw rErr;
-      const list = (rows ?? []) as unknown as { id: string; sets: number }[];
+      const list = await programExercisesOnDays<{ id: string; sets: number }>(
+        supabase,
+        await programDays(supabase, change.programId, { fromWeek: change.fromWeek, excludeDeload: true }),
+        "id, sets",
+        { exerciseId: ex.id as string },
+      );
       if (!list.length) throw new TrainingChangeError(`${change.exerciseName} isn't in the rest of your program.`);
       for (const r of list) {
         const after = { sets: Math.min(10, Math.max(1, r.sets + change.deltaSets)) };

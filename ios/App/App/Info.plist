@@ -74,5 +74,13 @@
 	<string>Narrow Gate Fitness reads your step count from Apple Health to show your daily steps next to your training.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Narrow Gate Fitness only reads from Apple Health and does not write any health data.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Narrow Gate Fitness uses your location only during a run or walk you start, to measure distance, pace and your route.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Lets a run or walk you started keep recording while your phone is locked. Location is never used when you're not recording.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 </dict>
 </plist>

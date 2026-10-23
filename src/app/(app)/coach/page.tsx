@@ -164,7 +164,6 @@ export default async function CoachPage({
           <AiConsentCard />
         ) : (
           <CoachChat
-            key={selected ?? "new"}
             conversationId={selected}
             initialMessages={(msgs ?? []) as ChatMessage[]}
             initialQuestion={selected ? "" : (sp.q ?? "").slice(0, 500)}

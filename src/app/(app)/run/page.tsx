@@ -1,7 +1,11 @@
 import Link from "next/link";
-import { CalendarRange, ChevronRight, Footprints, LocateFixed, Medal, PencilLine, Route } from "lucide-react";
+import { CalendarRange, ChevronRight, Footprints, LocateFixed, Medal, Route } from "lucide-react";
 import { EmptyState } from "@/components/common/states";
 import { ActivityForm } from "@/components/run/activity-form";
+import { BarSeriesChart, LineSeriesChart } from "@/components/charts/charts";
+import { RunningGoals, type GoalView } from "@/components/run/running-goals";
+import { distanceGoalProgress, isRunDay, raceGoalProgress, weeklyDistanceSeries, type RunGoalKind } from "@/lib/domain/run-session";
+import { getActiveProgramRef } from "@/server/coach/snapshot";
 import { ActivityListItem, WeekTotalsLine } from "@/components/run/activity-summary-ui";
 import { parseRunTab, RunTabs } from "@/components/run/run-tabs";
 import { MainHeader } from "@/components/shell/main-header";
@@ -10,7 +14,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   distanceUnitFor,
+  formatDistance,
+  formatPace,
+  fromMeters,
+  isEligibleForDistance,
   localToUtcIso,
+  paceSecondsPer,
   personalBests,
   totalsForWeek,
   utcToLocalParts,
@@ -22,12 +31,16 @@ import { formatDuration } from "@/lib/domain/units";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
 import { listActivities, listRunsForRecords } from "@/server/services/activities";
+import { programDays } from "@/server/services/training";
 
 export const metadata = { title: "Run" };
 
-/** Running programs already in the library (linked, never duplicated). */
+/** Running programs in the library (linked, never duplicated). Start one, then record its runs with GPS from here. */
 const RUN_PROGRAMS = [
+  { slug: "walk-to-run-beginner", blurb: "Brisk walking with short jogs, to a 20-minute jog in 6 weeks." },
   { slug: "aerobic-base-run-walk", blurb: "Run/walk intervals for beginners, couch to 5K in 8 weeks." },
+  { slug: "5k-training", blurb: "8 weeks to your best 5K: easy runs, one quality session, a taper." },
+  { slug: "10k-training", blurb: "10 weeks, four runs a week, threshold work and a taper." },
   { slug: "half-marathon-base-80-20", blurb: "12 weeks of mostly easy running with one quality session." },
 ];
 
@@ -48,35 +61,67 @@ export default async function RunPage({ searchParams }: { searchParams: Promise<
     <div className="mx-auto max-w-3xl space-y-5">
       <MainHeader title="Run" subtitle="Runs and walks, outdoors or on the treadmill." />
       <RunTabs active={tab} />
-      {tab === "outdoor" && <OutdoorTab />}
+      {tab === "outdoor" && <OutdoorTab userId={user.id} supabase={supabase} />}
       {tab === "log" && <LogTab today={today} unit={unit} tz={tz} />}
       {tab === "history" && <HistoryTab userId={user.id} tz={tz} unit={unit} thisWeek={thisWeek} before={before} supabase={supabase} />}
-      {tab !== "history" && <Overview userId={user.id} tz={tz} unit={unit} thisWeek={thisWeek} supabase={supabase} />}
+      {tab !== "history" && <Overview userId={user.id} tz={tz} unit={unit} thisWeek={thisWeek} today={today} supabase={supabase} />}
     </div>
   );
 }
 
-function OutdoorTab() {
+/** Today's day of the member's active program, when it's a running day they can record as a guided run. */
+async function todaysGuidedRun(supabase: Supa, userId: string): Promise<{ href: string; dayName: string; programName: string } | null> {
+  const ref = await getActiveProgramRef(supabase, userId);
+  if (!ref) return null;
+  const today = (await programDays(supabase, ref.programId, { week: ref.currentWeek })).find((d) => d.dayNumber === ref.currentDay);
+  if (!today) return null;
+  const { data: day } = await supabase.from("program_days").select("id, name, program_exercises(sets, duration_seconds, exercise:exercises(slug))").eq("id", today.id).maybeSingle();
+  if (!day) return null;
+  const ex = ((day.program_exercises ?? []) as unknown as { duration_seconds: number | null; exercise: { slug: string } | null }[]).map((e) => ({ slug: e.exercise?.slug ?? "", seconds: e.duration_seconds }));
+  if (!isRunDay(ex)) return null;
+  return { href: `/run/record?day=${day.id as string}&up=${ref.userProgramId}`, dayName: day.name as string, programName: ref.name };
+}
+
+async function OutdoorTab({ userId, supabase }: { userId: string; supabase: Supa }) {
+  const guided = await todaysGuidedRun(supabase, userId).catch(() => null);
   return (
-    <Card data-testid="outdoor-gps-notice">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <LocateFixed className="size-4 text-gold" aria-hidden /> GPS tracking is coming next
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3 text-sm text-muted-foreground">
-        <p>
-          Live outdoor runs and walks (distance, pace, splits and your route on a map) are being added in the next stage. When it arrives, the app will
-          ask for permission to use your location when you start a session, and stop using it when you finish.
-        </p>
-        <p>Until then, you can log a run or walk by hand with your distance and time. It counts toward your weekly mileage and records.</p>
-        <Button asChild className="w-full sm:w-auto">
-          <Link href="/run?tab=log">
-            <PencilLine aria-hidden /> Log a run or walk manually
+    <div className="space-y-3">
+      {guided && (
+        <Link href={guided.href} className="flex items-center gap-3 rounded-2xl border border-gold-muted/60 bg-card-gradient p-4 hover:border-gold" data-testid="guided-run-card">
+          <LocateFixed className="size-6 shrink-0 text-gold" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Today: {guided.dayName}</span>
+            <span className="block text-sm text-muted-foreground">{guided.programName} · guided with GPS, run/walk cues and splits</span>
+          </span>
+          <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
+        </Link>
+      )}
+      <div className="grid grid-cols-2 gap-2">
+        <Button asChild size="lg" className="h-auto flex-col items-start gap-0.5 py-4 text-left">
+          <Link href="/run/record?kind=run">
+            <span className="flex items-center gap-2 font-display text-lg uppercase">
+              <LocateFixed aria-hidden /> Outdoor run
+            </span>
+            <span className="text-xs font-normal opacity-80">GPS distance, pace, splits</span>
           </Link>
         </Button>
-      </CardContent>
-    </Card>
+        <Button asChild size="lg" variant="secondary" className="h-auto flex-col items-start gap-0.5 py-4 text-left">
+          <Link href="/run/record?kind=walk">
+            <span className="flex items-center gap-2 font-display text-lg uppercase">
+              <Footprints aria-hidden /> Outdoor walk
+            </span>
+            <span className="text-xs font-normal opacity-80">GPS distance and route</span>
+          </Link>
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Location is used only while you record. Routes are private. In a browser, keep the screen open while recording; the phone app is being prepared to keep recording with the screen locked.{" "}
+        <Link href="/run?tab=log" className="underline">
+          Log a run or walk manually
+        </Link>
+        .
+      </p>
+    </div>
   );
 }
 
@@ -114,15 +159,61 @@ function LogTab({ today, unit, tz }: { today: string; unit: DistanceUnit; tz: st
 
 type Supa = Awaited<ReturnType<typeof getServerSupabase>>;
 
-async function Overview({ userId, tz, unit, thisWeek, supabase }: { userId: string; tz: string; unit: DistanceUnit; thisWeek: string; supabase: Supa }) {
+async function Overview({ userId, tz, unit, thisWeek, today, supabase }: { userId: string; tz: string; unit: DistanceUnit; thisWeek: string; today: string; supabase: Supa }) {
   const since = localToUtcIso(addDays(thisWeek, -1), "00:00", tz) ?? `${addDays(thisWeek, -1)}T00:00:00Z`;
-  const [recent, runs, { data: programs }] = await Promise.all([
+  const chartStart = addDays(thisWeek, -7 * 11);
+  const chartSince = localToUtcIso(chartStart, "00:00", tz) ?? `${chartStart}T00:00:00Z`;
+  const [recent, runs, { data: programs }, twelveWeeks, { data: goalRows }] = await Promise.all([
     listActivities(supabase, userId, { since }),
     listRunsForRecords(supabase, userId),
     supabase.from("training_programs").select("slug, name, tier").eq("is_published", true).in("slug", RUN_PROGRAMS.map((p) => p.slug)),
+    listActivities(supabase, userId, { since: chartSince, limit: 1000 }),
+    supabase.from("running_goals").select("id, kind, distance_m, target_s, created_at").eq("user_id", userId).is("archived_at", null).order("created_at"),
   ]);
   const week = totalsForWeek(recent, tz, thisWeek);
   const bests = personalBests(runs);
+  // Weekly distance and average run pace over the last 12 weeks (empty weeks included).
+  const weekStarts = Array.from({ length: 12 }, (_, i) => addDays(chartStart, i * 7));
+  const totals = weeklyTotals(twelveWeeks, tz);
+  const distanceSeries = weeklyDistanceSeries(
+    totals.map((w) => ({ weekStart: w.weekStart, distanceM: w.run.distanceM + w.walk.distanceM })),
+    weekStarts,
+  ).map((w) => ({ date: w.weekStart, distance: Math.round(fromMeters(w.distanceM, unit) * 10) / 10 }));
+  const paceSeries = weekStarts.map((w) => {
+    const t = totals.find((x) => x.weekStart === w)?.run;
+    const pace = t && t.distanceM > 0 ? paceSecondsPer(t.distanceM, t.movingS, unit) : null;
+    return { date: w, pace: pace ? Math.round((pace / 60) * 100) / 100 : null };
+  });
+  // Goals: this week's / month's distance, or the best qualifying time for a target-time goal.
+  const monthStart = `${today.slice(0, 8)}01`;
+  const monthSince = localToUtcIso(monthStart, "00:00", tz) ?? `${monthStart}T00:00:00Z`;
+  const monthDistance = twelveWeeks.filter((a) => a.started_at >= monthSince).reduce((m, a) => m + (a.distance_m ?? 0), 0);
+  const weekDistance = week.run.distanceM + week.walk.distanceM;
+  const goals: GoalView[] = ((goalRows ?? []) as { id: string; kind: RunGoalKind; distance_m: number | string; target_s: number | null }[]).map((g) => {
+    const meters = Number(g.distance_m);
+    if (g.kind === "race_time") {
+      const eligible = runs.filter((r) => isEligibleForDistance(r, meters));
+      const best = eligible.length ? Math.min(...eligible.map((r) => r.moving_s)) : null;
+      const prog = raceGoalProgress({ target_s: g.target_s, distance_m: meters }, best, unit);
+      const label = meters === 5000 ? "5K" : meters === 10000 ? "10K" : meters > 21000 && meters < 21200 ? "Half marathon" : formatDistance(meters, unit);
+      return {
+        id: g.id,
+        title: `${label} in ${formatDuration(g.target_s ?? 0)}`,
+        detail: best == null ? `No ${label} run yet. Target pace ${formatPace(prog.targetPace, unit)}.` : prog.met ? `Done: your best is ${formatDuration(best)}.` : `Best ${formatDuration(best)} · ${formatDuration(prog.gapS ?? 0)} to go · target pace ${formatPace(prog.targetPace, unit)}`,
+        pct: null,
+        met: prog.met,
+      };
+    }
+    const covered = g.kind === "weekly_distance" ? weekDistance : monthDistance;
+    const prog = distanceGoalProgress({ distance_m: meters }, covered);
+    return {
+      id: g.id,
+      title: `${formatDistance(meters, unit)} ${g.kind === "weekly_distance" ? "a week" : "a month"}`,
+      detail: `${formatDistance(covered, unit)} so far this ${g.kind === "weekly_distance" ? "week" : "month"}${prog.met ? " — goal met" : ` · ${formatDistance(prog.remainingM, unit)} to go`}`,
+      pct: prog.pct,
+      met: prog.met,
+    };
+  });
   const programBySlug = new Map((programs ?? []).map((p) => [p.slug as string, p as { slug: string; name: string; tier: string }]));
 
   return (
@@ -174,9 +265,49 @@ async function Overview({ userId, tz, unit, thisWeek, supabase }: { userId: stri
         </ul>
       </section>
 
+      <section aria-labelledby="run-progress" className="space-y-2">
+        <h2 id="run-progress" className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">
+          Progress
+        </h2>
+        <BarSeriesChart
+          title="Weekly distance"
+          description={`Runs and walks, last 12 weeks (${unit})`}
+          data={distanceSeries}
+          xKey="date"
+          xFormat="date"
+          decimals={1}
+          valueSuffix={` ${unit}`}
+          series={[{ key: "distance", label: "Distance" }]}
+          emptyMessage="Record or log a run or walk to start the chart."
+        />
+        <LineSeriesChart
+          title="Average run pace"
+          description={`Minutes per ${unit}, by week (lower is faster)`}
+          data={paceSeries}
+          xKey="date"
+          xFormat="date"
+          decimals={2}
+          valueSuffix={` min/${unit}`}
+          series={[{ key: "pace", label: "Pace" }]}
+          connectNulls={false}
+          emptyMessage="Pace shows once you have runs with a distance."
+        />
+      </section>
+
+      <section aria-labelledby="run-goal-list" className="space-y-2">
+        <h2 id="run-goal-list" className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">
+          Goals
+        </h2>
+        <Card>
+          <CardContent className="pt-5">
+            <RunningGoals goals={goals} unit={unit} />
+          </CardContent>
+        </Card>
+      </section>
+
       <section aria-labelledby="run-goals" className="space-y-2">
         <h2 id="run-goals" className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">
-          Goals &amp; records
+          Records
         </h2>
         <Card>
           <CardContent className="space-y-3 pt-5">

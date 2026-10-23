@@ -28,6 +28,12 @@ describe("security headers", () => {
     expect(header(prod, "X-Content-Type-Options")).toBe("nosniff");
   });
 
+  it("lets only the app itself use the camera and location, and nothing use the microphone", () => {
+    const policy = header(securityHeaders({ supabaseUrl: "https://abc.supabase.co", production: true, https: true }), "Permissions-Policy");
+    // geolocation=() would silently break the GPS recorder (the browser refuses before asking the member).
+    expect(policy).toBe("camera=(self), microphone=(), geolocation=(self)");
+  });
+
   it("drops eval in a production build served over plain http (local), without pinning HTTPS", () => {
     const local = securityHeaders({ supabaseUrl: "http://127.0.0.1:54321", production: true, https: false });
     expect(header(local, "Content-Security-Policy")).not.toContain("unsafe-eval");
