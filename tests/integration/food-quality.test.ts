@@ -5,7 +5,7 @@ import { Q, startOffMock } from "../../e2e/off-mock";
 
 const available = await stackAvailable();
 
-/** The Food Quality Scanner's Open Food Facts reads (against the local mock) and the member's saved filters. */
+/** Food IQ's Open Food Facts reads (against the local mock) and the member's saved filters. */
 describe("food quality service (Open Food Facts mock)", async () => {
   let server: Server;
   let svc: typeof import("@/server/services/food-quality");
@@ -29,6 +29,18 @@ describe("food quality service (Open Food Facts mock)", async () => {
     expect(mystery?.diary).toBeNull(); // nothing to log with exact numbers
     expect(await svc.getQualityProduct("0000000000017")).toBeNull();
     expect(await svc.getQualityProduct("not a code")).toBeNull();
+  });
+
+  it("searches products by name or brand (every word must match), and rejects too-short queries", async () => {
+    const r = await svc.searchProducts("protein bar");
+    expect(r.status).toBe("ok");
+    expect(r.status === "ok" && r.products.map((p) => p.name).sort()).toEqual(["Lean Protein Bar Vanilla", "Peak Protein Bar Chocolate", "Peanut Protein Bar"]);
+    const none = await svc.searchProducts("zzzz nothing");
+    expect(none).toEqual({ status: "ok", products: [] });
+    expect(await svc.searchProducts("a")).toEqual({ status: "invalid" });
+    // Odd characters are stripped, not sent.
+    const cleaned = await svc.searchProducts("  Peak!!! <bar> ");
+    expect(cleaned.status === "ok" && cleaned.products.length).toBe(2); // Peak Protein Bar Chocolate and Lean Protein Bar Vanilla (brand Peak)
   });
 
   it("finds products in the same category, caches them, and throttles searches", async () => {

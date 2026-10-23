@@ -4,12 +4,14 @@ import { revalidatePath } from "next/cache";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import { hasFeature } from "@/lib/domain/plans";
-import { sanitizeFilters, type FoodFilters } from "@/lib/food-quality";
-import { PRODUCT_EXPLAIN_INSTRUCTIONS, productExplanationSchema, productFactsForAi, type ProductExplanation } from "@/lib/food-quality-ai";
+import { ingredientAlerts } from "@/lib/additive-evidence";
+import { foodIqScoreEnabled, scoreFoodIq } from "@/lib/food-iq";
+import { pickAlternatives, sanitizeFilters, type FoodFilters, type QualityProduct } from "@/lib/food-quality";
+import { EXPLAIN_FOCUS, FOCUS_INSTRUCTION, PRODUCT_EXPLAIN_INSTRUCTIONS, productExplanationSchema, productFactsForAi, type ProductExplanation } from "@/lib/food-quality-ai";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireUser } from "@/server/auth";
 import { AiError, withAiRequest } from "@/server/services/ai-coach";
-import { getQualityProduct } from "@/server/services/food-quality";
+import { getQualityProduct, searchCategory } from "@/server/services/food-quality";
 import { OffUnavailableError } from "@/server/services/open-food-facts";
 import { logError } from "@/server/log";
 
@@ -30,13 +32,14 @@ export async function setFoodFiltersAction(input: unknown): Promise<{ ok: true; 
 }
 
 /**
- * Pro: explain a product for the member's goals. Uses only the product's known data and the member's targets;
- * counts as one AI message (and needs the AI data consent).
+ * Pro: "Ask AI about this food". Uses only the product's known data, the app's reviewed ingredient evidence and the
+ * member's targets; counts as one AI message (and needs the AI data consent).
  */
-export async function explainProductAction(code: unknown): Promise<{ ok: true; explanation: ProductExplanation } | { ok: false; error: string }> {
+export async function explainProductAction(code: unknown, focusInput: unknown = "goals"): Promise<{ ok: true; explanation: ProductExplanation } | { ok: false; error: string }> {
   const user = await requireUser();
   const parsed = z.string().regex(/^\d{8,14}$/).safeParse(code);
   if (!parsed.success) return { ok: false, error: "Invalid barcode." };
+  const focus = z.enum(EXPLAIN_FOCUS).catch("goals").parse(focusInput);
   const plan = await getUserPlan(user.id);
   const supabase = await getServerSupabase();
   try {
@@ -48,6 +51,12 @@ export async function explainProductAction(code: unknown): Promise<{ ok: true; e
       supabase.from("profiles").select("food_filters").eq("id", user.id).maybeSingle(),
     ]);
     const filters = sanitizeFilters(profile?.food_filters);
+    let alternatives: QualityProduct[] | undefined;
+    if (focus === "compare") {
+      const search = await searchCategory(found.quality.category);
+      alternatives = search.status === "ok" ? pickAlternatives(found.quality, search.candidates, filters, 3).map((a) => a.product) : [];
+    }
+    const facts = productFactsForAi(found.quality, { score: foodIqScoreEnabled() ? scoreFoodIq(found.quality) : null, alerts: ingredientAlerts(found.quality), alternatives });
     const member = [
       `Main goal: ${answers?.primary_goal ?? "not set"}. Diet style: ${answers?.diet_type ?? "not set"}.`,
       goals ? `Daily targets: ${goals.calories} kcal, protein ${goals.protein_g} g, carbs ${goals.carbs_g} g, fat ${goals.fat_g} g.` : "Daily targets: not set.",
@@ -62,7 +71,7 @@ export async function explainProductAction(code: unknown): Promise<{ ok: true; e
         model,
         max_tokens: 1_200,
         system: [{ type: "text", text: PRODUCT_EXPLAIN_INSTRUCTIONS }],
-        messages: [{ role: "user", content: `${productFactsForAi(found.quality)}\n\nMember:\n${member}` }],
+        messages: [{ role: "user", content: `${facts}\n\nMember:\n${member}\n\n${FOCUS_INSTRUCTION[focus]}` }],
         output_config: { format: betaZodOutputFormat(productExplanationSchema) },
       });
       const inputTokens = res.usage.input_tokens + (res.usage.cache_read_input_tokens ?? 0) + (res.usage.cache_creation_input_tokens ?? 0);

@@ -97,6 +97,8 @@ export interface QualityProduct {
   palmOil: Tri;
   /** What OFF itself marks as still to be completed. */
   incomplete: ("ingredients" | "nutrition" | "categories")[];
+  /** Fruit, vegetables, legumes and nuts as % of the product (OFF's estimate from the ingredient list), when known. */
+  fvlPercent: number | null;
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
@@ -236,12 +238,22 @@ export function normalizeQualityProduct(json: OffQualityResponse | null | undefi
     vegan: analysisTri(analysis, "vegan"),
     vegetarian: analysisTri(analysis, "vegetarian"),
     palmOil: analysis.includes("en:palm-oil-free") ? "no" : analysis.includes("en:palm-oil") ? "yes" : analysis.includes("en:may-contain-palm-oil") ? "maybe" : "unknown",
+    fvlPercent: fvlPercent(nutriments),
     incomplete: [
       ...(states.includes("en:ingredients-to-be-completed") || !(textEn ?? textAny) ? (["ingredients"] as const) : []),
       ...(states.includes("en:nutrition-facts-to-be-completed") || !hasAny(per100) ? (["nutrition"] as const) : []),
       ...(states.includes("en:categories-to-be-completed") || categories.length === 0 ? (["categories"] as const) : []),
     ],
   };
+}
+
+/** OFF's fruit/vegetable/legume (or nut) share: the declared value when present, otherwise its estimate from the ingredients. */
+function fvlPercent(n: Record<string, unknown>): number | null {
+  for (const key of ["fruits-vegetables-legumes_100g", "fruits-vegetables-nuts_100g", "fruits-vegetables-legumes-estimate-from-ingredients_100g", "fruits-vegetables-nuts-estimate-from-ingredients_100g"]) {
+    const v = num(n[key], 100);
+    if (v != null) return Math.round(v);
+  }
+  return null;
 }
 
 /** "en:breakfast-cereals" → "Breakfast cereals". */
@@ -388,6 +400,7 @@ export const ADDITIVES: Record<string, AdditiveInfo> = {
   e110: { name: "Sunset yellow FCF", role: "Colour (orange)", note: COLOUR_WARNING },
   e120: { name: "Carmine (cochineal)", role: "Colour (red)", note: "Made from insects, so not vegetarian or vegan." },
   e122: { name: "Azorubine (carmoisine)", role: "Colour (red)", note: COLOUR_WARNING },
+  e127: { name: "Erythrosine", role: "Colour (red)" },
   e124: { name: "Ponceau 4R", role: "Colour (red)", note: COLOUR_WARNING },
   e129: { name: "Allura red AC", role: "Colour (red)", note: COLOUR_WARNING },
   e133: { name: "Brilliant blue FCF", role: "Colour (blue)" },
@@ -404,7 +417,13 @@ export const ADDITIVES: Record<string, AdditiveInfo> = {
   e202: { name: "Potassium sorbate", role: "Preservative" },
   e211: { name: "Sodium benzoate", role: "Preservative" },
   e220: { name: "Sulphur dioxide", role: "Preservative", note: "Sulphites are a declared allergen when above 10 mg per kg or litre." },
+  e221: { name: "Sodium sulphite", role: "Preservative", note: "Sulphites are a declared allergen when above 10 mg per kg or litre." },
+  e222: { name: "Sodium bisulphite", role: "Preservative", note: "Sulphites are a declared allergen when above 10 mg per kg or litre." },
   e223: { name: "Sodium metabisulphite", role: "Preservative", note: "Sulphites are a declared allergen when above 10 mg per kg or litre." },
+  e224: { name: "Potassium metabisulphite", role: "Preservative", note: "Sulphites are a declared allergen when above 10 mg per kg or litre." },
+  e226: { name: "Calcium sulphite", role: "Preservative", note: "Sulphites are a declared allergen when above 10 mg per kg or litre." },
+  e228: { name: "Potassium bisulphite", role: "Preservative", note: "Sulphites are a declared allergen when above 10 mg per kg or litre." },
+  e249: { name: "Potassium nitrite", role: "Preservative (cured meats)", note: "Authorities limit how much may be added." },
   e250: { name: "Sodium nitrite", role: "Preservative (cured meats)", note: "Keeps cured meats safe from bacterial growth. Authorities limit how much may be added." },
   e251: { name: "Sodium nitrate", role: "Preservative (cured meats)", note: "Authorities limit how much may be added." },
   e252: { name: "Potassium nitrate", role: "Preservative (cured meats)", note: "Authorities limit how much may be added." },
@@ -415,6 +434,7 @@ export const ADDITIVES: Record<string, AdditiveInfo> = {
   e300: { name: "Ascorbic acid (vitamin C)", role: "Antioxidant" },
   e301: { name: "Sodium ascorbate", role: "Antioxidant" },
   e306: { name: "Tocopherol-rich extract (vitamin E)", role: "Antioxidant" },
+  e320: { name: "Butylated hydroxyanisole (BHA)", role: "Antioxidant" },
   e322: { name: "Lecithins", role: "Emulsifier", note: "Often made from soy or sunflower; soy lecithin is declared as soy." },
   e330: { name: "Citric acid", role: "Acid / acidity regulator" },
   e331: { name: "Sodium citrates", role: "Acidity regulator" },
@@ -424,17 +444,23 @@ export const ADDITIVES: Record<string, AdditiveInfo> = {
   e339: { name: "Sodium phosphates", role: "Acidity regulator / emulsifying salt" },
   e340: { name: "Potassium phosphates", role: "Acidity regulator" },
   e341: { name: "Calcium phosphates", role: "Acidity regulator / anti-caking agent" },
+  e343: { name: "Magnesium phosphates", role: "Acidity regulator / anti-caking agent" },
   e401: { name: "Sodium alginate", role: "Thickener" },
   e407: { name: "Carrageenan", role: "Thickener / gelling agent" },
+  e407a: { name: "Processed Eucheuma seaweed", role: "Thickener / gelling agent" },
   e410: { name: "Locust bean gum", role: "Thickener" },
   e412: { name: "Guar gum", role: "Thickener" },
   e414: { name: "Gum arabic", role: "Thickener / stabiliser" },
   e415: { name: "Xanthan gum", role: "Thickener" },
   e420: { name: "Sorbitol", role: "Sweetener / humectant (polyol)", note: POLYOL_NOTE },
+  e421: { name: "Mannitol", role: "Sweetener / bulking agent (polyol)", note: POLYOL_NOTE },
   e422: { name: "Glycerol", role: "Humectant" },
+  e433: { name: "Polysorbate 80", role: "Emulsifier" },
+  e443: { name: "Brominated vegetable oil", role: "Emulsifier / stabiliser (drinks)" },
   e440: { name: "Pectins", role: "Gelling agent" },
   e450: { name: "Diphosphates", role: "Raising agent / acidity regulator" },
   e451: { name: "Triphosphates", role: "Stabiliser" },
+  e452: { name: "Polyphosphates", role: "Stabiliser / emulsifying salt" },
   e460: { name: "Cellulose", role: "Bulking / anti-caking agent" },
   e466: { name: "Carboxymethyl cellulose", role: "Thickener" },
   e471: { name: "Mono- and diglycerides of fatty acids", role: "Emulsifier" },
@@ -450,12 +476,18 @@ export const ADDITIVES: Record<string, AdditiveInfo> = {
   e635: { name: "Disodium 5'-ribonucleotides", role: "Flavour enhancer" },
   e901: { name: "Beeswax", role: "Glazing agent", note: "Made by bees, so not vegan." },
   e903: { name: "Carnauba wax", role: "Glazing agent" },
+  e924: { name: "Potassium bromate", role: "Flour treatment agent" },
   e950: { name: "Acesulfame K", role: "Sweetener" },
   e951: { name: "Aspartame", role: "Sweetener", note: "Contains a source of phenylalanine, which matters for people with phenylketonuria (PKU)." },
+  e952: { name: "Cyclamates", role: "Sweetener" },
+  e953: { name: "Isomalt", role: "Sweetener (polyol)", note: POLYOL_NOTE },
+  e954: { name: "Saccharin", role: "Sweetener" },
   e955: { name: "Sucralose", role: "Sweetener" },
   e960: { name: "Steviol glycosides (stevia)", role: "Sweetener" },
   e965: { name: "Maltitol", role: "Sweetener (polyol)", note: POLYOL_NOTE },
+  e966: { name: "Lactitol", role: "Sweetener (polyol)", note: POLYOL_NOTE },
   e967: { name: "Xylitol", role: "Sweetener (polyol)", note: POLYOL_NOTE },
+  e968: { name: "Erythritol", role: "Sweetener (polyol)", note: POLYOL_NOTE },
 };
 
 export const ADDITIVES_NOTE =

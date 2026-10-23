@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { EVIDENCE_LABEL, type IngredientAlert } from "./additive-evidence";
+import type { FoodIqScore } from "./food-iq";
 import { addedSugarIngredients, allergenLabel, describeAdditive, NOVA_INFO, NUTRIENT_KEYS, tagLabel, type Nutrients, type QualityProduct } from "./food-quality";
 
 /** Pro: an AI explanation of a scanned product for the member's goals, from the known data only. */
@@ -17,7 +19,23 @@ Rules:
 - Tie every point to the numbers given (per serving or per 100 g/ml).
 - Don't call a food healthy or unhealthy in general, and don't say an additive is harmful. Describe additives neutrally if at all.
 - Don't give medical, allergy or weight-loss guarantees. Allergen data may be incomplete: tell them to check the label if allergens matter.
+- Ingredients and additives: repeat only what the "Ingredient evidence" lines say. Never add your own safety claims about an ingredient; if an additive is marked "Insufficient information", say no assessment is available.
+- If a Food IQ rating is given, it is experimental: call it a nutritional-quality rating per 100 g, never a probability of being healthy.
+- Only mention alternatives that are listed in the data. Never invent products, prices or availability.
 - Keep it short and practical (portion, timing around training, how it fits the day's targets).`;
+
+export const EXPLAIN_FOCUS = ["goals", "compare", "meal_plan"] as const;
+export type ExplainFocus = (typeof EXPLAIN_FOCUS)[number];
+export const FOCUS_LABEL: Record<ExplainFocus, string> = {
+  goals: "How it fits my goals",
+  compare: "Compare with alternatives",
+  meal_plan: "Fit it into a meal plan",
+};
+export const FOCUS_INSTRUCTION: Record<ExplainFocus, string> = {
+  goals: "Focus: whether this product fits the member's goals and today's targets, and its macro contribution per serving.",
+  compare: "Focus: how this product compares with the listed alternatives for the member's goals (per 100 g and per serving). If no alternatives are listed, say so.",
+  meal_plan: "Focus: how a serving could fit into a day of meals for the member's targets (which meal, what to pair it with to round out protein, fibre or carbs).",
+};
 
 const NUTRIENT_LABEL: Record<keyof Nutrients, string> = {
   calories: "energy (kcal)",
@@ -37,8 +55,9 @@ function nutrientLine(v: Nutrients): string {
 }
 
 /** The product as plain facts for the model (no free text from the record beyond name, brand and ingredients). */
-export function productFactsForAi(p: QualityProduct): string {
+export function productFactsForAi(p: QualityProduct, extra: { score?: FoodIqScore | null; alerts?: IngredientAlert[]; alternatives?: QualityProduct[] } = {}): string {
   const sugars = addedSugarIngredients(p.ingredientsText);
+  const score = extra.score;
   return [
     `Product: ${p.name}${p.brand ? ` (${p.brand})` : ""}${p.quantity ? `, ${p.quantity}` : ""}. Category: ${p.category ? tagLabel(p.category) : "not available"}.`,
     `Per 100 ${p.unit}: ${nutrientLine(p.per100)}.`,
@@ -50,6 +69,17 @@ export function productFactsForAi(p: QualityProduct): string {
     `Declared allergens: ${p.allergens.length ? p.allergens.map(allergenLabel).join(", ") : "none listed"}. May contain: ${p.traces.length ? p.traces.map(allergenLabel).join(", ") : "none listed"}.`,
     `Vegan: ${p.vegan}. Vegetarian: ${p.vegetarian}.`,
     p.incomplete.length ? `Open Food Facts marks these parts as incomplete: ${p.incomplete.join(", ")}.` : "",
+    score?.status === "scored" ? `Food IQ (experimental nutritional-quality rating per 100 ${p.unit}): ${score.score}/100, ${score.band.label}. ${score.summary}` : "",
+    extra.alerts?.length
+      ? `Ingredient evidence (from the app's reviewed list; repeat only this):\n${extra.alerts
+          .map((a) => `- ${a.title}: ${a.classes.map((c) => EVIDENCE_LABEL[c]).join("; ")}.${a.regulatory ? ` ${a.regulatory}` : ""}${a.affected ? ` Who may be affected: ${a.affected}` : ""}`)
+          .join("\n")}`
+      : "",
+    extra.alternatives
+      ? extra.alternatives.length
+        ? `Alternatives in the same category (real products from Open Food Facts):\n${extra.alternatives.map((a) => `- ${a.name}${a.brand ? ` (${a.brand})` : ""}: per 100 ${a.unit}: ${nutrientLine(a.per100)}`).join("\n")}`
+        : "Alternatives: none found in the same category."
+      : "",
   ]
     .filter(Boolean)
     .join("\n");

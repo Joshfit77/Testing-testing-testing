@@ -21,8 +21,10 @@ enforces each gate as well as the screen showing it. The Faith section is never 
 | Advanced progress & strength trends, progress-photo comparisons | — | ✓ | ✓ | `advanced_analytics` |
 | Scheduling and rescheduling sessions on the training calendar | — | ✓ | ✓ | `advanced_calendar`: `movePlannedSessionAction` (viewing is free; "move back" works on every plan) |
 | Interactive muscle body map and strength ranks (`/progress/body-map`) | — | ✓ | ✓ | `advanced_analytics`: page and `setStrengthStandardsAction` |
-| Food Quality Scanner: product facts, indicators, ingredients, allergens, alternatives, Add to Food Diary | ✓ | ✓ | ✓ | `nutrition_tracking` |
-| Food Quality Scanner: personal filters and side-by-side comparisons | — | ✓ | ✓ | `food_comparisons`: compare page and `setFoodFiltersAction` |
+| Food IQ: barcode scan and name search, product facts, ingredient evidence, nutrient analysis, indicators, allergens, alternatives, Add to Food Diary; the experimental 0–100 rating when `FOOD_IQ_SCORE=on` | ✓ | ✓ | ✓ | `nutrition_tracking` |
+| Food IQ: personal filters and side-by-side comparisons | — | ✓ | ✓ | `food_comparisons`: compare page and `setFoodFiltersAction` |
+| Food IQ: "Fits your goals" (a product against the member's own targets) | — | — | ✓ | `food_goal_analysis` (Pro only): product page |
+| Food IQ: "Ask AI about this food" | — | — | ✓ | AI allowance (counts as one AI message) |
 | Guided Body Scan (`/progress/body-scan`) | — | — | ✓ | `canUseBodyScan` + database `has_plan('pro')` and consent |
 | Meal photo analysis, AI meal plans, food-quality AI explanations | — | — | ✓ | AI allowance (`withAiRequest`), AI consent, and the separate photo consent |
 | AI coach (150 requests/month) and AI plan generation (15/month) | — | — | ✓ | `ai_coach`, `ai_plan_generation`: `assertAiAllowed` |

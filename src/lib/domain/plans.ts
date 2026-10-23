@@ -9,8 +9,9 @@ import type { Plan } from "./types";
  *   Plus  — everything in Free, plus the full program library, the custom program builder, unlimited workout
  *           templates, recipes / meal planner / grocery list, advanced progress and strength trends, progress-photo
  *           comparisons, scheduling/rescheduling on the training calendar, and product comparisons and personal
- *           filters in the Food Quality Scanner. No AI.
- *   Pro   — everything in Plus, plus the AI coach (a monthly message allowance) and AI plan generation.
+ *           filters in Narrow Gate Food IQ. No AI.
+ *   Pro   — everything in Plus, plus the AI coach (a monthly message allowance), AI plan generation and Food IQ's
+ *           "Fits your goals" analysis of each product against the member's own targets.
  */
 export const FEATURES = [
   // Free
@@ -30,6 +31,7 @@ export const FEATURES = [
   "ai_coach",
   "ai_plan_generation",
   "advanced_recommendations",
+  "food_goal_analysis",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 
