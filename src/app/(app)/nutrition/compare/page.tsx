@@ -6,6 +6,7 @@ import { BackLink } from "@/components/platform/back-link";
 import { CompareWith } from "@/components/nutrition/quality-client";
 import { CompareTable } from "@/components/nutrition/quality-sections";
 import { hasFeature } from "@/lib/domain/plans";
+import { foodIqScoreEnabled, scoreFoodIq } from "@/lib/food-iq";
 import { comparable, OFF_DATA_NOTICE } from "@/lib/food-quality";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { getQualityProduct } from "@/server/services/food-quality";
@@ -24,7 +25,7 @@ export default async function CompareProductsPage({ searchParams }: { searchPara
     return (
       <PlanLocked
         back={{ href: a ? `/nutrition/product/${a}` : "/nutrition/scanner", label: "Back" }}
-        eyebrow="Food Quality Scanner"
+        eyebrow="Narrow Gate Food IQ"
         title="Compare products"
         plan="Plus"
         description="Compare two products side by side: calories, protein, sugar, fibre, sodium, saturated fat, ingredients, additives and quality indicators."
@@ -65,12 +66,12 @@ export default async function CompareProductsPage({ searchParams }: { searchPara
   return (
     <div className="mx-auto max-w-3xl space-y-5">
       {back}
-      <PageHeader eyebrow="Food Quality Scanner" title="Compare products" description={pb ? `${pa.quality.name} and ${pb.quality.name}, per 100 ${pa.quality.unit}.` : `Choose a product to compare with ${pa.quality.name}.`} />
+      <PageHeader eyebrow="Narrow Gate Food IQ" title="Compare products" description={pb ? `${pa.quality.name} and ${pb.quality.name}, per 100 ${pa.quality.unit}.` : `Choose a product to compare with ${pa.quality.name}.`} />
       {b && !pb && <Notice>Barcode {b} isn&apos;t in Open Food Facts. Try another product.</Notice>}
       {pb && cmp ? (
         <>
           <Notice tone={cmp.ok ? "info" : "warning"}>{cmp.reason}</Notice>
-          <CompareTable a={pa.quality} b={pb.quality} />
+          <CompareTable a={pa.quality} b={pb.quality} scores={foodIqScoreEnabled() ? [scoreFoodIq(pa.quality), scoreFoodIq(pb.quality)] : undefined} />
           <p className="text-sm">
             <Link href={`/nutrition/product/${pb.quality.code}`} className="text-gold-highlight underline">
               Open {pb.quality.name}

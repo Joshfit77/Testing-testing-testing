@@ -700,7 +700,7 @@ test.describe("AI coach", () => {
     await expect(page.getByRole("button", { name: /^Edit White rice/ })).toContainText("USDA");
     await expect(page.getByText("Includes estimated entries")).toBeVisible();
   });
-  test("food quality: Pro gets an AI explanation for their goals from the product's known data only", async ({ page }) => {
+  test("Food IQ: Pro sees how a product fits their own targets and can ask the AI about it, from known data only", async ({ page }) => {
     test.skip(!MOCK_PORT || !process.env.E2E_OFF_MOCK_PORT, "needs the mock Anthropic and Open Food Facts servers");
     const email = uniqueEmail("quality-pro");
     await signUpAndConfirm(page, email);
@@ -711,8 +711,16 @@ test.describe("AI coach", () => {
     await expect(page.getByLabel("Message the AI coach")).toBeVisible();
 
     await page.goto("/nutrition/product/5000000000012");
+    // Fits your goals: a 40 g serving against this member's own targets (set during onboarding).
+    const fit = page.getByTestId("fits-your-goals");
+    await expect(fit).toContainText("For one serving (40 g)");
+    await expect(fit.getByTestId("goal-calories")).toContainText(/152 kcal · \d+% of your daily calories/);
+    await expect(fit.getByTestId("goal-protein")).toContainText(/3.2 g · \d+% of your protein target/);
+    await expect(fit.getByTestId("goal-sodium")).toContainText("112 mg · 5% of the 2,300 mg daily limit");
+
     const explain = page.getByTestId("product-explain");
-    await explain.getByRole("button", { name: "Explain for my goals" }).click();
+    await explain.getByRole("radio", { name: "Compare with alternatives" }).click();
+    await explain.getByRole("button", { name: "Ask AI about this food" }).click();
     const out = page.getByTestId("product-explanation");
     await expect(out).toContainText("based only on the data shown", { timeout: 30_000 });
     await expect(out).toContainText("fits as a small pre-workout carb snack");
@@ -720,10 +728,16 @@ test.describe("AI coach", () => {
 
     const sent = requests.filter((r) => r.system.some((b) => b.text.includes("You explain a packaged food"))).at(-1)!;
     expect(sent.model).toBe("claude-haiku-5-5");
+    expect(sent.system.map((b) => b.text).join("\n")).toContain("repeat only what the \"Ingredient evidence\" lines say");
     const text = String(sent.messages[0]!.content);
     expect(text).toContain("Product: Honey Crunch (Morning Co)");
     expect(text).toContain("Nutri-Score: D");
     expect(text).toContain("added sugars (g): not available");
     expect(text).toContain("Daily targets:");
+    // Only the app's reviewed evidence, real alternatives from the same category, and the chosen focus.
+    expect(text).toContain("- E951 Aspartame: Established concern under specified conditions; Evidence mixed or limited.");
+    expect(text).toContain("Alternatives in the same category (real products from Open Food Facts):\n- Oat Hoops (Morning Co)");
+    expect(text).toContain("\n- Rice Flakes (Morning Co)");
+    expect(text).toContain("Focus: how this product compares with the listed alternatives");
   });
 });

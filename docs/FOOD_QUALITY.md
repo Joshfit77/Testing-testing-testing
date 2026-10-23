@@ -1,4 +1,19 @@
-# Food Quality Scanner
+# Narrow Gate Food IQ (formerly the Food Quality Scanner)
+
+Food IQ was added on `claude/sharp-cray-8y0uuv`; this file describes the scanner it builds on, which was Stage 8 on `claude/nine-features`. The method, weights, reference foods and known biases of the experimental 0–100 rating, and the ingredient-evidence rules, are in [`FOOD_IQ_METHOD.md`](FOOD_IQ_METHOD.md).
+
+## What Food IQ added
+
+- **Name and placement:** the scanner is called Narrow Gate Food IQ. It's a highlighted card on the Food tab and in the Food tools; there's no new tab.
+- **Search by name:** Open Food Facts full-text search (`/cgi/search.pl`), which shares the search throttle and is cached for an hour.
+- **Summary first:** strengths and what to watch, from published thresholds. The experimental 0–100 rating appears only with `FOOD_IQ_SCORE=on`, labelled as not yet reviewed, with a full breakdown.
+- **Ingredients worth knowing about:** every additive with an evidence class and sources, plus added sugars and sodium sources. Unreviewed additives say "Insufficient information".
+- **Macro analysis:** high or low protein, carbs, fat, saturated fat, sugar, fibre, sodium and calories. Each is labelled as an EU claim threshold, a UK front-of-pack level or an informal comparison.
+- **Fits your goals (Pro):** a serving against the member's own targets, kept separate from the rating.
+- **Ask AI about this food (Pro):** three focuses (goals, compare, meal plan). The AI gets only reviewed evidence and real alternatives.
+- **Alternatives:** with the rating on, products it rates lower are never suggested, and "Food IQ X instead of Y" is shown when one is clearly higher.
+
+The original Food Quality Scanner, which Food IQ builds on:
 
 Built on `claude/nine-features` as Stage 8. Route: Food → Food quality (`/nutrition/scanner`), product pages at `/nutrition/product/<barcode>`, and comparisons at `/nutrition/compare?a=&b=` (Plus). It's an original feature; Yuka was used only as a functional reference. No code, branding, scoring, images or distinctive UI were copied.
 
@@ -12,7 +27,7 @@ Built on `claude/nine-features` as Stage 8. Route: Food → Food quality (`/nutr
   - **NOVA:** the processing group;
   - **Levels per 100 g/ml:** low, medium or high against the UK front-of-pack thresholds;
   - **EU nutrition-claim thresholds** the data meets (e.g. "high fibre"), labelled as thresholds, not the maker's claims.
-  - **No proprietary 0–100 score.**
+  - **No proprietary 0–100 score in the original scanner** (Food IQ later added an experimental, documented one behind a flag).
 - **Ingredients:** the list as printed; forms of sugar named in it (with "no added sugar" wording ignored); additives with plain-language names and roles. Notes are regulatory facts only, such as the PKU note for aspartame, the EU colour warning and the polyol laxative statement; additives are never called harmful.
 - **Allergens and diet:** declared allergens and "may contain" traces, vegan, vegetarian and palm-oil status from the ingredient analysis, and labels. Missing data is shown as "no information", with a clear note that the app can't guarantee allergen safety.
 - **Alternatives (all plans):** real products from the same most-specific Open Food Facts category, both foods or both drinks. They're suggested only when better on Nutri-Score or NOVA, or on two or more nutrients, and never when worse overall. The reasons are listed. Prices aren't compared.

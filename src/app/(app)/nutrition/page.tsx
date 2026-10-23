@@ -300,6 +300,23 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
         {!goals && <p className="mt-3 text-sm text-muted-foreground">Set targets below to see progress.</p>}
       </section>
 
+      <section aria-labelledby="food-iq-cta" className="rounded-2xl border border-gold-muted/60 bg-card-gradient p-4" data-testid="food-iq-cta">
+        <p id="food-iq-cta" className="font-display text-xs font-bold uppercase tracking-[0.16em] text-gold">
+          Narrow Gate Food IQ
+        </p>
+        <p className="mt-1 text-[0.9375rem]">Scan a packaged food to see its nutritional quality, the ingredients worth knowing about, and how it fits your goals.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button asChild size="lg">
+            <Link href="/nutrition/scanner">
+              <ScanBarcode aria-hidden /> Scan a product
+            </Link>
+          </Button>
+          <Button asChild size="lg" variant="secondary">
+            <Link href="/nutrition/scanner#search">Search by name</Link>
+          </Button>
+        </div>
+      </section>
+
       <div className="space-y-2">
         <div className="[&>button]:w-full">
           <AddFoodDialog date={date} myFoods={myFoods} commonFoods={commonFoods} remoteSearch={remoteSearch} categories={categories} dietName={diet.name} recent={recent} frequent={frequent} favorites={favorites} />
@@ -307,7 +324,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
         <nav aria-label="Food tools" className="grid grid-cols-2 gap-2">
           {(
             [
-              ["/nutrition/scanner", "Food quality", ScanBarcode],
+              ["/nutrition/scanner", "Food IQ", ScanBarcode],
               [`/nutrition/photo?date=${date}`, "Meal photo", Camera],
               ["/nutrition/recipes", "Recipes", CookingPot],
               ["/nutrition/saved-meals", "Saved meals", BookMarked],

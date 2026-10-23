@@ -3,10 +3,13 @@ import { completeOnboarding, grantPlan, signUpAndConfirm, uniqueEmail } from "./
 import { Q } from "./off-mock";
 
 /**
- * Food Quality Scanner against the shared Open Food Facts mock (e2e/off-mock.ts). Needs the app started with
- * OFF_API_BASE_URL pointing at E2E_OFF_MOCK_PORT. Real products, images and the live API aren't reachable here.
+ * Narrow Gate Food IQ against the shared Open Food Facts mock (e2e/off-mock.ts). Needs the app started with
+ * OFF_API_BASE_URL pointing at E2E_OFF_MOCK_PORT. Real products, images and the live API aren't reachable here, so
+ * every product below is a fictional fixture with typical values (mock data, not live Open Food Facts).
+ * The experimental 0–100 rating is checked when the app runs with FOOD_IQ_SCORE=on (E2E_FOOD_IQ_SCORE=on here).
  */
 const OFF_PORT = Number(process.env.E2E_OFF_MOCK_PORT ?? 0);
+const SCORE_ON = process.env.E2E_FOOD_IQ_SCORE === "on";
 
 async function typeBarcode(page: Page, code: string) {
   await page.getByRole("button", { name: "Type the barcode instead" }).click();
@@ -15,15 +18,18 @@ async function typeBarcode(page: Page, code: string) {
   await page.waitForURL(new RegExp(`/nutrition/product/${code}`));
 }
 
-test.describe("Food Quality Scanner", () => {
+test.describe("Narrow Gate Food IQ", () => {
   test.skip(!OFF_PORT, "Set E2E_OFF_MOCK_PORT and start the app with OFF_API_BASE_URL pointing at it.");
 
   test("Free: scan, full facts with unavailable values, indicators explained, ingredients, allergens, alternatives, add to diary", async ({ page }) => {
     await signUpAndConfirm(page, uniqueEmail("quality-free"));
     await completeOnboarding(page);
     await page.goto("/nutrition");
-    await page.getByRole("navigation", { name: "Food tools" }).getByRole("link", { name: "Food quality" }).click();
-    await expect(page.getByRole("heading", { name: "Food Quality Scanner", level: 1 })).toBeVisible();
+    // Prominent in Food, and in the Food tools.
+    await expect(page.getByTestId("food-iq-cta")).toContainText("Narrow Gate Food IQ");
+    await expect(page.getByTestId("food-iq-cta").getByRole("link", { name: "Scan a product" })).toBeVisible();
+    await page.getByRole("navigation", { name: "Food tools" }).getByRole("link", { name: "Food IQ" }).click();
+    await expect(page.getByRole("heading", { name: "Narrow Gate Food IQ", level: 1 })).toBeVisible();
     await expect(page.getByTestId("my-filters")).toContainText("included with Plus and Pro");
     await typeBarcode(page, Q.honey);
 
@@ -44,10 +50,36 @@ test.describe("Food Quality Scanner", () => {
     await expect(page.getByTestId("row-added_sugars_g")).toContainText("Not available");
     await expect(page.getByTestId("row-sodium_mg")).toContainText("280 mg");
     await expect(page.getByTestId("added-sugars")).toContainText("glucose syrup, honey, sugar");
+    // Ingredients worth knowing about: each additive with its evidence class; the label and the evidence kept apart.
     const additives = page.getByTestId("additives");
-    await expect(additives).toContainText("E322 Lecithins");
-    await expect(additives).toContainText("E951 Aspartame");
-    await expect(additives).toContainText("phenylketonuria");
+    await expect(additives.getByTestId("alert-e951")).toContainText("E951 Aspartame");
+    await expect(additives.getByTestId("alert-e951")).toContainText("Established concern under specified conditions");
+    await expect(additives.getByTestId("alert-e951")).toContainText("phenylketonuria");
+    await expect(additives.getByTestId("alert-e322")).toContainText("No established concern at typical permitted uses");
+    await expect(additives.getByTestId("alert-added_sugars")).toContainText("glucose syrup, honey, sugar");
+    await expect(additives.getByTestId("alert-sodium_sources")).toContainText("salt");
+    await expect(page.getByTestId("ingredient-alerts")).toContainText("A listed additive isn't a sign of harm");
+    // Macro analysis: legal thresholds, UK guidance and informal comparisons are labelled differently.
+    await expect(page.getByTestId("class-sugar_high")).toContainText("High in sugars");
+    await expect(page.getByTestId("class-sugar_high")).toContainText("UK front-of-pack level");
+    await expect(page.getByTestId("class-fibre_source")).toContainText("EU claim threshold");
+    await expect(page.getByTestId("class-carbs_high")).toContainText("Comparison, not a legal term");
+    // Summary at the top: strengths and what to watch (always), the experimental rating when switched on.
+    const summary = page.getByTestId("food-iq-summary");
+    await expect(summary.getByTestId("food-iq-points")).toContainText("High in sugars");
+    if (SCORE_ON) {
+      await expect(summary.getByTestId("food-iq-score")).toContainText("Poor");
+      await expect(summary.getByTestId("food-iq-score")).toContainText("Rated Poor, mainly because of its sugars and calories. Its fibre helps a little.");
+      await expect(summary.getByTestId("food-iq-experimental")).toContainText("Experimental · not yet reviewed");
+      await expect(summary).toContainText("doesn't mean a 75% chance a food is healthy or safe");
+      await page.getByTestId("food-iq-breakdown").getByText("How this rating was worked out").click();
+      await expect(page.getByTestId("food-iq-breakdown")).toContainText("50 + 2.5 × positive points − 1.5 × points of concern");
+      await expect(page.getByTestId("food-iq-breakdown")).toContainText("The fruit, vegetable and legume share isn't known");
+    } else {
+      await expect(summary.getByTestId("food-iq-pending")).toContainText("being validated");
+    }
+    // Fits your goals is Pro.
+    await expect(page.getByTestId("fits-your-goals")).toContainText("Included with Pro");
     const allergens = page.getByTestId("quality-allergens");
     await expect(allergens).toContainText("Contains: Gluten (wheat, rye, barley, oats), Soy");
     await expect(allergens).toContainText("May contain: Tree nuts");
@@ -64,7 +96,7 @@ test.describe("Food Quality Scanner", () => {
     await expect(alts).not.toContainText("Choco Puffs");
     await expect(alts.getByRole("link", { name: "Compare side by side" })).toHaveCount(0);
     await expect(product).toContainText("Side-by-side product comparisons and personal filters are included with Plus and Pro.");
-    await expect(product).toContainText("An AI explanation of this product for your goals and targets is included with Pro.");
+    await expect(product).toContainText("Asking the AI about a product (how it fits your goals, how it compares, how to fit it into a meal plan) is included with Pro.");
     await expect(product).toContainText("Open Database License");
 
     // Add to Food Diary: straight to the amount step with the label serving.
@@ -80,6 +112,8 @@ test.describe("Food Quality Scanner", () => {
     // A product with no data says so, and a code Open Food Facts doesn't know isn't guessed.
     await page.goto(`/nutrition/product/${Q.mystery}`);
     await expect(page.getByTestId("row-calories")).toContainText("Not available");
+    if (SCORE_ON) await expect(page.getByTestId("food-iq-no-score")).toContainText("Not enough data for a Food IQ rating: energy, sugars, saturated fat, salt, protein are missing. Nothing is guessed.");
+    await expect(page.getByTestId("ingredient-alerts")).toContainText("Unknown: there's no ingredient list");
     await expect(page.getByTestId("quality-allergens")).toContainText("Contains: no information");
     await expect(page.getByTestId("nutri-score")).toContainText("Not available");
     await expect(page.getByText(/lists this product's ingredients, nutrition, categories as incomplete/)).toBeVisible();
@@ -133,5 +167,49 @@ test.describe("Food Quality Scanner", () => {
     await page.getByLabel("Second product's barcode").fill(Q.cola);
     await page.getByRole("button", { name: "Compare", exact: true }).click();
     await expect(page.getByText(/One is a drink and the other a food/)).toBeVisible();
+  });
+
+  test("search by name, and Food IQ across kinds of product: water, a sweetened drink, cured meat and protein bars", async ({ page }) => {
+    await signUpAndConfirm(page, uniqueEmail("food-iq"));
+    await completeOnboarding(page);
+    await page.goto("/nutrition/scanner");
+    const search = page.getByTestId("food-iq-search");
+    await search.getByLabel("Product name or brand").fill("protein bar");
+    await search.getByRole("button", { name: "Search" }).click();
+    await page.waitForURL(/q=protein\+bar/);
+    const results = page.getByTestId("search-results");
+    await expect(results.getByRole("link")).toHaveCount(3);
+    await expect(results).toContainText("Peak Protein Bar Chocolate");
+    await expect(results).toContainText("Lean Protein Bar Vanilla");
+    await search.getByLabel("Product name or brand").fill("zzzz nothing");
+    await search.getByRole("button", { name: "Search" }).click();
+    await expect(page.getByTestId("search-empty")).toContainText('No products found for "zzzz nothing"');
+
+    await page.goto("/nutrition/scanner?q=peak+chocolate");
+    await page.getByTestId("search-results").getByRole("link", { name: /Peak Protein Bar Chocolate/ }).click();
+    await page.waitForURL(new RegExp(`/nutrition/product/${Q.bar}`));
+    await expect(page.getByTestId("class-protein_high")).toContainText("This food provides a substantial amount of protein relative to its energy content");
+    await expect(page.getByTestId("additives").getByTestId("alert-e965")).toContainText("Regulatory warning");
+    await expect(page.getByTestId("additives").getByTestId("alert-e955")).toContainText("No established concern at typical permitted uses");
+    if (SCORE_ON) {
+      // Plenty of protein and fibre, but saturated fat holds it back: protein alone doesn't make it Good.
+      await expect(page.getByTestId("food-iq-score")).toContainText("Moderate");
+      await expect(page.getByTestId("alternatives")).toContainText("Lean Protein Bar Vanilla");
+      await expect(page.getByTestId("alternatives")).toContainText(/Food IQ \d+ instead of \d+/);
+    }
+
+    await page.goto(`/nutrition/product/${Q.water}`);
+    if (SCORE_ON) await expect(page.getByTestId("food-iq-score")).toContainText("Plain water: the reference drink, rated 100.");
+    await page.goto(`/nutrition/product/${Q.zero}`);
+    await expect(page.getByTestId("additives").getByTestId("alert-e150d")).toContainText("Evidence mixed or limited");
+    await expect(page.getByTestId("additives").getByTestId("alert-e338")).toContainText("kidney");
+    if (SCORE_ON) {
+      await page.getByTestId("food-iq-breakdown").getByText("How this rating was worked out").click();
+      await expect(page.getByTestId("food-iq-breakdown")).toContainText("Non-sugar sweeteners");
+      await expect(page.getByTestId("food-iq-breakdown")).toContainText("80 + 2.5 × positive points − 2 × points of concern");
+    }
+    await page.goto(`/nutrition/product/${Q.ham}`);
+    await expect(page.getByTestId("additives").getByTestId("alert-e250")).toContainText("Group 1");
+    await expect(page.getByTestId("class-salt_high")).toContainText("High in salt");
   });
 });

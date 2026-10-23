@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { defaultUnit, type FoodChoice } from "@/lib/domain/food-basis";
 import { logItemFor } from "@/lib/domain/food-favorites";
 import { ALLERGENS, NUTRITION_FILTER_LABELS, NUTRITION_FILTERS, type FoodFilters, type NutritionFilter } from "@/lib/food-quality";
-import type { ProductExplanation } from "@/lib/food-quality-ai";
+import { EXPLAIN_FOCUS, FOCUS_LABEL, type ExplainFocus, type ProductExplanation } from "@/lib/food-quality-ai";
 import { cn } from "@/lib/utils";
 import { logFoodAction } from "@/server/actions/nutrition";
 import { explainProductAction, setFoodFiltersAction } from "@/server/actions/food-quality";
@@ -80,23 +80,38 @@ export function ExplainProduct({ code }: { code: string }) {
   const [pending, start] = useTransition();
   const [result, setResult] = useState<ProductExplanation | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [focus, setFocus] = useState<ExplainFocus>("goals");
   return (
     <div className="space-y-3" data-testid="product-explain">
+      <div role="radiogroup" aria-label="What to ask about" className="flex flex-wrap gap-1.5">
+        {EXPLAIN_FOCUS.map((f) => (
+          <button
+            key={f}
+            type="button"
+            role="radio"
+            aria-checked={focus === f}
+            onClick={() => setFocus(f)}
+            className={cn("min-h-9 rounded-full border px-3 text-sm", focus === f ? "border-gold bg-gold/15 text-champagne" : "border-border text-muted-foreground hover:text-foreground")}
+          >
+            {FOCUS_LABEL[f]}
+          </button>
+        ))}
+      </div>
       <Button
         variant="secondary"
         disabled={pending}
         onClick={() =>
           start(async () => {
             setError(null);
-            const r = await explainProductAction(code);
+            const r = await explainProductAction(code, focus);
             if (r.ok) setResult(r.explanation);
             else setError(r.error);
           })
         }
       >
-        {pending ? <Loader2 className="animate-spin" aria-hidden /> : <Sparkles aria-hidden />} {result ? "Explain again" : "Explain for my goals"}
+        {pending ? <Loader2 className="animate-spin" aria-hidden /> : <Sparkles aria-hidden />} {result ? "Ask again" : "Ask AI about this food"}
       </Button>
-      <p className="text-xs text-muted-foreground">Uses 1 AI message. Only the product data shown here and your goals and targets are sent.</p>
+      <p className="text-xs text-muted-foreground">Uses 1 AI message. Only the product data shown here, the app&apos;s reviewed ingredient notes and your goals and targets are sent. The AI can&apos;t add its own claims about ingredients.</p>
       {error && (
         <p role="alert" className="text-sm text-[#f08a8a]">
           {error}
@@ -235,7 +250,7 @@ export function CompareWith({ base }: { base: string }) {
 }
 
 /** The Open Food Facts package photo; hidden if it can't load (offline, or the product has none). */
-export function ProductImage({ src, alt }: { src: string; alt: string }) {
+export function ProductImage({ src, alt, small = false }: { src: string; alt: string; small?: boolean }) {
   const [failed, setFailed] = useState(false);
   const ref = useRef<HTMLImageElement>(null);
   // An error can happen before hydration, when onError isn't attached yet.
@@ -245,5 +260,5 @@ export function ProductImage({ src, alt }: { src: string; alt: string }) {
   }, []);
   if (failed) return null;
   // eslint-disable-next-line @next/next/no-img-element -- Open Food Facts image (CC BY-SA), shown as published
-  return <img ref={ref} src={src} alt={alt} onError={() => setFailed(true)} className="size-24 shrink-0 rounded-xl bg-white object-contain" />;
+  return <img ref={ref} src={src} alt={alt} onError={() => setFailed(true)} className={cn("shrink-0 rounded-xl bg-white object-contain", small ? "size-12" : "size-24")} />;
 }

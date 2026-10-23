@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, CircleHelp, Info, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { SmallScore } from "@/components/nutrition/food-iq-sections";
+import type { FoodIqScore } from "@/lib/food-iq";
 import {
-  ADDITIVES_NOTE,
   addedSugarIngredients,
   allergenLabel,
   COMPARE_ROWS,
@@ -195,28 +196,13 @@ export function IngredientsSection({ p }: { p: QualityProduct }) {
       ) : (
         <p className="text-sm text-muted-foreground">The ingredient list isn&apos;t in the product data yet. Check the package.</p>
       )}
-      <div data-testid="additives">
-        <h3 className="text-sm font-semibold">Additives {p.additives.length > 0 && `(${p.additives.length})`}</h3>
-        {p.additives.length ? (
-          <ul className="mt-1 space-y-1.5 text-sm">
-            {p.additives.map((code) => {
-              const a = describeAdditive(code);
-              return (
-                <li key={code}>
-                  <span className="font-medium">
-                    {a.code} {a.name}
-                  </span>{" "}
-                  <span className="text-muted-foreground">· {a.role}</span>
-                  {a.note && <span className="block text-xs text-muted-foreground">{a.note}</span>}
-                </li>
-              );
-            })}
-          </ul>
-        ) : (
-          <p className="mt-1 text-sm text-muted-foreground">{p.ingredientsText ? "None listed in the product data." : "Unknown without an ingredient list."}</p>
-        )}
-        <p className="mt-2 text-xs text-muted-foreground">{ADDITIVES_NOTE}</p>
-      </div>
+      {p.additives.length > 0 && (
+        <p className="text-sm">
+          <span className="font-semibold">Additives: </span>
+          {p.additives.map((code) => describeAdditive(code)).map((a) => `${a.code} ${a.name}`).join(", ")}
+          <span className="text-muted-foreground"> · what each is for and what the evidence says is under &quot;Ingredients worth knowing about&quot;.</span>
+        </p>
+      )}
     </section>
   );
 }
@@ -282,7 +268,18 @@ export function FilterResults({ results }: { results: FilterResult[] }) {
   );
 }
 
-export function AlternativesList({ base, items, canCompare }: { base: QualityProduct; items: { product: QualityProduct; reasons: string[]; sameCategory: string }[]; canCompare: boolean }) {
+export function AlternativesList({
+  base,
+  items,
+  canCompare,
+  scores,
+}: {
+  base: QualityProduct;
+  items: { product: QualityProduct; reasons: string[]; sameCategory: string }[];
+  canCompare: boolean;
+  /** Food IQ ratings by barcode, when the rating is enabled. */
+  scores?: Record<string, FoodIqScore>;
+}) {
   return (
     <ul className="space-y-2" data-testid="alternatives">
       {items.map(({ product: a, reasons, sameCategory }) => (
@@ -294,7 +291,10 @@ export function AlternativesList({ base, items, canCompare }: { base: QualityPro
               </Link>
               <p className="text-xs text-muted-foreground">{[a.brand, a.quantity].filter(Boolean).join(" · ")}</p>
             </div>
-            {a.nutriScore.grade && <span className={cn("inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sm font-bold", GRADE_STYLE[a.nutriScore.grade])}>{a.nutriScore.grade.toUpperCase()}</span>}
+            <div className="flex shrink-0 items-center gap-1.5">
+              {scores?.[a.code] && <SmallScore score={scores[a.code]!} />}
+              {a.nutriScore.grade && <span className={cn("inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sm font-bold", GRADE_STYLE[a.nutriScore.grade])}>{a.nutriScore.grade.toUpperCase()}</span>}
+            </div>
           </div>
           <p className="mt-1 text-sm">
             <span className="text-muted-foreground">Why: </span>
@@ -311,7 +311,7 @@ export function AlternativesList({ base, items, canCompare }: { base: QualityPro
   );
 }
 
-export function CompareTable({ a, b }: { a: QualityProduct; b: QualityProduct }) {
+export function CompareTable({ a, b, scores }: { a: QualityProduct; b: QualityProduct; scores?: [FoodIqScore, FoodIqScore] }) {
   const fmt = (v: number | null, unit: string) => (v == null ? "Not available" : `${v} ${unit}`);
   const better = (x: number | null, y: number | null, dir: "lower" | "higher" | null) => (x == null || y == null || dir == null || x === y ? null : (dir === "lower" ? x < y : x > y) ? "a" : "b");
   const ingredientsCount = (p: QualityProduct) => (p.ingredientsText ? p.ingredientsText.split(/,(?![^()]*\))/).filter((s) => s.trim()).length : null);
@@ -348,6 +348,18 @@ export function CompareTable({ a, b }: { a: QualityProduct; b: QualityProduct })
               </tr>
             );
           })}
+          {scores && (
+            <tr className="border-b border-border/60" data-testid="compare-food-iq">
+              <th scope="row" className="py-1.5 text-left font-normal">
+                Food IQ (experimental)
+              </th>
+              {scores.map((sc, i) => (
+                <td key={i} className="py-1.5 tabular-nums">
+                  {sc.status === "scored" ? `${sc.score}/100 · ${sc.band.label}` : sc.status === "insufficient" ? "Not enough data" : "Not rated"}
+                </td>
+              ))}
+            </tr>
+          )}
           <tr className="border-b border-border/60">
             <th scope="row" className="py-1.5 text-left font-normal">
               Nutri-Score

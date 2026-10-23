@@ -5,6 +5,10 @@ import { Notice } from "@/components/common/states";
 import { BackLink } from "@/components/platform/back-link";
 import { AddProductToDiary, CompareWith, ExplainProduct, ProductImage } from "@/components/nutrition/quality-client";
 import { AllergensSection, AlternativesList, FilterResults, Indicators, IngredientsSection, NutritionTable } from "@/components/nutrition/quality-sections";
+import { FitsYourGoals, FoodIqBreakdown, FoodIqSummary, IngredientAlertsSection, MacroAnalysis } from "@/components/nutrition/food-iq-sections";
+import { ingredientAlerts } from "@/lib/additive-evidence";
+import { DIET_TYPES, type DietType } from "@/lib/domain/diets";
+import { fitsYourGoals, foodIqScoreEnabled, keyPoints, nutrientClasses, scoreFoodIq, type FoodIqScore } from "@/lib/food-iq";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { isoDateInTz } from "@/lib/domain/dates";
 import type { FoodChoice } from "@/lib/domain/food-basis";
@@ -25,7 +29,7 @@ export default async function ProductQualityPage({ params }: { params: Promise<{
   const { user, profile } = await requireOnboardedUser();
   const { code: raw } = await params;
   const code = decodeURIComponent(raw).replace(/\D/g, "").slice(0, 14);
-  const back = <BackLink href="/nutrition/scanner">Food Quality Scanner</BackLink>;
+  const back = <BackLink href="/nutrition/scanner">Food IQ</BackLink>;
 
   if (!rateLimit(`quality:${user.id}`, 40, 60_000).ok) {
     return (
@@ -47,7 +51,7 @@ export default async function ProductQualityPage({ params }: { params: Promise<{
     return (
       <div className="mx-auto max-w-2xl space-y-5">
         {back}
-        <PageHeader eyebrow="Food Quality Scanner" title={failed ? "Couldn't look that up" : "Product not found"} />
+        <PageHeader eyebrow="Narrow Gate Food IQ" title={failed ? "Couldn't look that up" : "Product not found"} />
         {failed ? (
           <Notice tone="error">Open Food Facts isn&apos;t responding right now. Try again in a moment.</Notice>
         ) : (
@@ -65,12 +69,51 @@ export default async function ProductQualityPage({ params }: { params: Promise<{
   const p = found.quality;
   const plan = await getUserPlan(user.id);
   const plus = hasFeature(plan, "food_comparisons");
+  const goalAnalysis = hasFeature(plan, "food_goal_analysis");
   const ai = (await getAiAllowance(user.id, plan)).chatLimit > 0;
   const supabase = await getServerSupabase();
-  const filters = plus ? sanitizeFilters((await supabase.from("profiles").select("food_filters").eq("id", user.id).maybeSingle()).data?.food_filters) : null;
+  const [{ data: prof }, goalRes, answersRes] = await Promise.all([
+    supabase.from("profiles").select("food_filters").eq("id", user.id).maybeSingle(),
+    goalAnalysis ? supabase.from("nutrition_goals").select("calories, protein_g, carbs_g, fat_g").eq("user_id", user.id).maybeSingle() : Promise.resolve({ data: null }),
+    goalAnalysis ? supabase.from("onboarding_answers").select("primary_goal, diet_type").eq("user_id", user.id).maybeSingle() : Promise.resolve({ data: null }),
+  ]);
+  const filters = plus ? sanitizeFilters(prof?.food_filters) : null;
   const filterResults = filters ? checkFilters(p, filters) : [];
+
+  // Food IQ: the experimental rating (behind the FOOD_IQ_SCORE flag), plain-language classes, ingredient evidence.
+  const scoreOn = foodIqScoreEnabled();
+  const score = scoreFoodIq(p);
+  const classes = nutrientClasses(p);
+  const { positives, concerns } = keyPoints(classes);
+  const alerts = ingredientAlerts(p);
+  const answers = answersRes.data as { primary_goal: string | null; diet_type: string | null } | null;
+  const fit = goalAnalysis
+    ? fitsYourGoals(p, {
+        targets: (goalRes.data as { calories: number; protein_g: number; carbs_g: number; fat_g: number } | null) ?? null,
+        goal: answers?.primary_goal ?? null,
+        diet: answers?.diet_type && (DIET_TYPES as readonly string[]).includes(answers.diet_type) ? (answers.diet_type as DietType) : null,
+        filters,
+      })
+    : null;
+
   const search = await searchCategory(p.category);
-  const alternatives = search.status === "ok" ? pickAlternatives(p, search.candidates, filters) : [];
+  let alternatives = search.status === "ok" ? pickAlternatives(p, search.candidates, filters, 8) : [];
+  let altScores: Record<string, FoodIqScore> | undefined;
+  if (scoreOn) {
+    // With the rating on, never suggest something it rates lower, and say when it rates clearly higher.
+    altScores = Object.fromEntries(alternatives.map((a) => [a.product.code, scoreFoodIq(a.product)]));
+    const base = score.status === "scored" ? score.score : null;
+    alternatives = alternatives
+      .filter((a) => {
+        const s = altScores![a.product.code]!;
+        return base == null || s.status !== "scored" || s.score >= base;
+      })
+      .map((a) => {
+        const s = altScores![a.product.code]!;
+        return base != null && s.status === "scored" && s.score >= base + 5 ? { ...a, reasons: [`Food IQ ${s.score} instead of ${base}`, ...a.reasons] } : a;
+      });
+  }
+  alternatives = alternatives.slice(0, 5);
 
   const today = isoDateInTz(new Date(), profile.timezone);
   const hour = Number(new Intl.DateTimeFormat("en-US", { hour: "numeric", hourCycle: "h23", timeZone: profile.timezone || "UTC" }).format(new Date()));
@@ -94,6 +137,9 @@ export default async function ProductQualityPage({ params }: { params: Promise<{
         <PageHeader eyebrow={[p.brand, p.quantity].filter(Boolean).join(" · ") || "Product"} title={p.name} description={`Barcode ${p.code}${p.category ? ` · ${tagLabel(p.category)}` : ""}`} />
       </div>
 
+      <FoodIqSummary score={score} enabled={scoreOn} positives={positives} concerns={concerns} />
+      {scoreOn && <FoodIqBreakdown score={score} />}
+
       {choice ? (
         <AddProductToDiary choice={choice} date={today} defaultMeal={mealForTime(new Date(2000, 0, 1, hour))} />
       ) : (
@@ -102,6 +148,30 @@ export default async function ProductQualityPage({ params }: { params: Promise<{
       {p.incomplete.length > 0 && (
         <Notice tone="warning">Open Food Facts lists this product&apos;s {p.incomplete.join(", ")} as incomplete. What&apos;s shown may be missing details: check the package.</Notice>
       )}
+
+      <FitsYourGoals fit={fit} allowed={goalAnalysis} hasAi={ai} />
+      <IngredientAlertsSection alerts={alerts} hasIngredients={Boolean(p.ingredientsText)} />
+      <MacroAnalysis p={p} classes={classes} />
+
+      <section aria-labelledby="alternatives-title" className="space-y-2">
+        <h2 id="alternatives-title" className="font-display text-lg">
+          Comparable alternatives
+        </h2>
+        {alternatives.length ? (
+          <AlternativesList base={p} items={alternatives} canCompare={plus} scores={altScores} />
+        ) : (
+          <p className="text-sm text-muted-foreground" data-testid="no-alternatives">
+            {search.status === "busy" || search.status === "unavailable"
+              ? "Alternatives can't be loaded right now. Try again in a minute."
+              : search.status === "no_category"
+                ? "This product has no category in Open Food Facts, so comparable products can't be found."
+                : "No clearly better product in the same category was found in Open Food Facts."}
+          </p>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Alternatives are real products from the same Open Food Facts category, compared per 100 {p.unit}, suggested only when they do better on Nutri-Score or processing, or on several nutrients{scoreOn ? ", and never when Food IQ rates them lower" : ""}. Prices and availability aren&apos;t compared.
+        </p>
+      </section>
 
       {plus ? (
         <Card data-testid="your-filters">
@@ -122,23 +192,6 @@ export default async function ProductQualityPage({ params }: { params: Promise<{
       <IngredientsSection p={p} />
       <AllergensSection p={p} />
 
-      <section aria-labelledby="alternatives-title" className="space-y-2">
-        <h2 id="alternatives-title" className="font-display text-lg">
-          Comparable alternatives
-        </h2>
-        {alternatives.length ? (
-          <AlternativesList base={p} items={alternatives} canCompare={plus} />
-        ) : (
-          <p className="text-sm text-muted-foreground" data-testid="no-alternatives">
-            {search.status === "busy" || search.status === "unavailable"
-              ? "Alternatives can't be loaded right now. Try again in a minute."
-              : search.status === "no_category"
-                ? "This product has no category in Open Food Facts, so comparable products can't be found."
-                : "No clearly better product in the same category was found in Open Food Facts."}
-          </p>
-        )}
-        <p className="text-xs text-muted-foreground">Alternatives are real products from the same Open Food Facts category, suggested only when they score better on Nutri-Score or processing, or on several nutrients. Prices aren&apos;t compared.</p>
-      </section>
 
       <Card>
         <CardHeader>
@@ -149,9 +202,9 @@ export default async function ProductQualityPage({ params }: { params: Promise<{
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">For your goals</CardTitle>
+          <CardTitle className="text-base">Ask AI about this food</CardTitle>
         </CardHeader>
-        <CardContent>{ai ? <ExplainProduct code={p.code} /> : <p className="text-sm text-muted-foreground">An AI explanation of this product for your goals and targets is included with Pro.</p>}</CardContent>
+        <CardContent>{ai ? <ExplainProduct code={p.code} /> : <p className="text-sm text-muted-foreground">Asking the AI about a product (how it fits your goals, how it compares, how to fit it into a meal plan) is included with Pro.</p>}</CardContent>
       </Card>
 
       <p className="text-xs text-muted-foreground">
