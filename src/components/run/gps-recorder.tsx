@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Flag, Loader2, LocateFixed, Pause, Play, Save, SignalZero, Trash2, Volume2, VolumeX } from "lucide-react";
+import type { GpsDiagnostics, GpsHint } from "@/lib/domain/gps-track";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { NativeSelect, Textarea } from "@/components/ui/input";
@@ -14,7 +15,10 @@ import { formatDistance, formatHms, formatPace, paceSecondsPer, type ActivityKin
 import {
   addFix,
   currentPace,
+  currentPosition,
   finishTrack,
+  gpsDiagnostics,
+  ignoredReadings,
   isResumable,
   pauseTrack,
   recoverTrack,
@@ -40,6 +44,53 @@ export interface GuidedSession {
 interface Saved {
   track: TrackState;
   guidedDayId: string | null;
+}
+
+const HINT_TEXT: Record<GpsHint, string> = {
+  precise_off:
+    "Your device is only sharing an approximate location (hundreds of metres), which can't measure a run or walk. Turn on Precise Location for this browser or app — iPhone: Settings › Privacy & Security › Location Services › your browser › Precise Location. Android: long-press the app › App info › Permissions › Location › Use precise location.",
+  weak_signal: "The GPS signal is weak here, so some readings are being ignored. Open sky away from tall buildings helps.",
+  slow_updates: "Location updates are arriving slowly (more than 5 seconds apart). Keep this screen open and turn off battery or low-power saving for the browser.",
+  many_outliers: "Several readings jumped away from your route and were ignored (tall buildings or trees reflect GPS signals).",
+};
+
+const fmtM = (m: number, unit: DistanceUnit) => (unit === "mi" ? `${Math.round(m * 3.28084)} ft` : `${Math.round(m)} m`);
+
+/**
+ * "GPS details": what the GPS is doing right now, for the member (or support) to see why distance looks the way it
+ * does. Accuracies, timings and counts only: positions are never shown here and nothing is logged.
+ */
+function GpsDetails({ d, unit, source }: { d: GpsDiagnostics; unit: DistanceUnit; source: string }) {
+  const rows: [string, string][] = [
+    ["Source", source],
+    ["Last reading", d.lastFixAgeS == null ? "None yet" : d.lastFixAgeS <= 1 ? "Just now" : `${d.lastFixAgeS} s ago`],
+    ["Accuracy now", d.lastAccuracy == null ? "—" : `±${fmtM(d.lastAccuracy, unit)}`],
+    ["Best / worst", d.bestAccuracy == null ? "—" : `±${fmtM(d.bestAccuracy, unit)} / ±${fmtM(d.worstAccuracy ?? d.bestAccuracy, unit)}`],
+    ["Update interval", d.meanIntervalS == null ? "—" : `${d.meanIntervalS} s average, ${d.maxIntervalS} s longest`],
+    ["Readings used", `${d.accepted} of ${d.received}${d.ignored.standingStill ? ` (${d.ignored.standingStill} while standing still, no distance)` : ""}`],
+    ["Ignored", `${d.ignored.inaccurate + d.ignored.waiting} imprecise, ${d.ignored.outliers} off-route, ${d.ignored.outOfOrder} late or repeated`],
+    ["Signal gaps", d.gaps ? `${d.gaps}${d.uncountedGapM ? ` (≈${fmtM(d.uncountedGapM, unit)} straight-line not counted)` : ""}` : "None"],
+    ["Speed now", d.speedMs == null ? "—" : unit === "mi" ? `${(d.speedMs * 2.23694).toFixed(1)} mph` : `${(d.speedMs * 3.6).toFixed(1)} km/h`],
+  ];
+  if (d.restarts) rows.push(["Track restarts", `${d.restarts} (a run of off-route readings turned out to be right)`]);
+  return (
+    <details className="rounded-xl border border-border bg-card px-3 py-2 text-sm" data-testid="gps-details">
+      <summary className="cursor-pointer select-none font-semibold">GPS details</summary>
+      <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+        {rows.map(([k, v]) => (
+          <div key={k} className="contents">
+            <dt className="text-muted-foreground">{k}</dt>
+            <dd className="tabular-nums" data-testid={`gps-detail-${k.toLowerCase().replace(/[^a-z]+/g, "-")}`}>
+              {v}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Distance is measured along a smoothed track: each reading is weighted by its accuracy, readings far off your route are ignored, and standing still adds nothing. Nothing is counted across a pause or a gap.
+      </p>
+    </details>
+  );
 }
 
 const ERROR_TEXT: Record<LocationError, string> = {
@@ -213,7 +264,7 @@ export function GpsRecorder({ userId, units, initialKind, guided }: { userId: st
         movingS: totals.moving_s,
         splits: track.splits,
         route: routeForSave(track),
-        gpsQuality: { gaps: track.gaps, rejected: Object.values(track.rejected).reduce((a, b) => a + b, 0), lastAccuracy: track.lastAccuracy },
+        gpsQuality: { gaps: track.gaps, rejected: ignoredReadings(track), lastAccuracy: track.lastAccuracy, uncountedGapM: Math.round(track.stats?.uncountedGapM ?? 0) },
         effort: effort ? Number(effort) : null,
         notes: notes.trim() || null,
         program: guided && script ? { userProgramId: guided.userProgramId, programDayId: guided.programDayId, completedSets: completedSets(script, guided.prescriptions.length, totals.moving_s) } : null,
@@ -237,6 +288,8 @@ export function GpsRecorder({ userId, units, initialKind, guided }: { userId: st
   const pace = track ? currentPace(track, now) : null;
   const avgPace = paceSecondsPer(distance, Math.max(1, moving), unit);
   const route = track ? routeForSave(track, 600) : null;
+  const diag = track ? gpsDiagnostics(track, now) : null;
+  const source = locationSourceLabel();
 
   // ------------------------------------------------------------------ Not started
   if (!track) {
@@ -337,12 +390,14 @@ export function GpsRecorder({ userId, units, initialKind, guided }: { userId: st
             </div>
           ))}
         </dl>
-        {route && <RouteMap coordinates={route.coordinates} className="w-full" />}
+        {route && <RouteMap coordinates={route.coordinates} className="w-full" unit={unit} />}
         {track.gaps > 0 && (
-          <p className="text-sm text-muted-foreground">
-            The signal dropped {track.gaps} time{track.gaps === 1 ? "" : "s"}; no distance was added for those stretches.
+          <p className="text-sm text-muted-foreground" data-testid="gps-gap-note">
+            The signal dropped {track.gaps} time{track.gaps === 1 ? "" : "s"}; no distance was added for those stretches
+            {diag && diag.uncountedGapM > 0 ? ` (about ${fmtM(diag.uncountedGapM, unit)} in a straight line)` : ""}.
           </p>
         )}
+        {diag && <GpsDetails d={diag} unit={unit} source={source} />}
         <label className="block text-sm">
           How hard was it? (optional)
           <NativeSelect value={effort} onChange={(e) => setEffort(e.target.value)} className="mt-1">
@@ -380,7 +435,23 @@ export function GpsRecorder({ userId, units, initialKind, guided }: { userId: st
           {track.lastAccuracy != null ? `GPS ±${track.lastAccuracy} m` : "No fix yet"}
         </span>
       </div>
-      {track.status === "acquiring" && <Notice tone="info">Waiting for a good GPS fix (within 20 m). Time is running; distance starts with the first good fix.</Notice>}
+      {track.status === "acquiring" && !diag?.hints.includes("precise_off") && (
+        <Notice tone="info">Waiting for a good GPS fix (within 20 m). Time is running; distance starts with the first good fix.</Notice>
+      )}
+      {diag?.hints.includes("precise_off") && (
+        <Notice tone="warning">
+          <span data-testid="gps-hint-precise">{HINT_TEXT.precise_off}</span>
+        </Notice>
+      )}
+      {track.status === "recording" &&
+        diag?.hints
+          .filter((h) => h !== "precise_off")
+          .slice(0, 1)
+          .map((h) => (
+            <p key={h} className="text-sm text-muted-foreground" data-testid={`gps-hint-${h}`}>
+              {HINT_TEXT[h]}
+            </p>
+          ))}
       {track.signalLost && track.status === "recording" && (
         <Notice tone="warning">
           <span className="flex items-center gap-2">
@@ -431,7 +502,9 @@ export function GpsRecorder({ userId, units, initialKind, guided }: { userId: st
         ))}
       </dl>
 
-      {route && <RouteMap coordinates={route.coordinates} className="w-full" />}
+      {route && <RouteMap coordinates={route.coordinates} className="w-full" unit={unit} current={currentPosition(track)} />}
+
+      {diag && <GpsDetails d={diag} unit={unit} source={source} />}
 
       {track.splits.length > 0 && (
         <section aria-labelledby="splits-title">

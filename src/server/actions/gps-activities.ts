@@ -24,7 +24,13 @@ const gpsActivitySchema = z.object({
     .array(z.object({ index: z.number().int().min(1).max(600), unit: z.enum(["mi", "km"]), distance_m: z.number().min(0), moving_s: z.number().int().min(0), elapsed_s: z.number().int().min(0), split_s: z.number().int().min(0) }))
     .max(600),
   route: z.object({ type: z.literal("MultiLineString"), coordinates: z.array(z.array(coord).min(2).max(2000)).min(1).max(200) }).nullable(),
-  gpsQuality: z.object({ gaps: z.number().int().min(0).max(10_000), rejected: z.number().int().min(0).max(1_000_000), lastAccuracy: z.number().min(0).max(10_000).nullable() }),
+  gpsQuality: z.object({
+    gaps: z.number().int().min(0).max(10_000),
+    rejected: z.number().int().min(0).max(1_000_000),
+    lastAccuracy: z.number().min(0).max(10_000).nullable(),
+    /** Straight-line distance across signal gaps that was not counted (m), shown with the activity. */
+    uncountedGapM: z.number().int().min(0).max(1_000_000).optional(),
+  }),
   effort: z.number().int().min(1).max(10).nullable(),
   notes: z.string().trim().max(MAX_NOTES).nullable(),
   /** A guided run from the member's program: the work sets completed per prescribed exercise. */

@@ -87,7 +87,7 @@ export default async function ActivityDetailPage({ params, searchParams }: { par
         <Card>
           <CardContent className="space-y-2 pt-5">
             <h2 className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">Route</h2>
-            <RouteMap coordinates={gps.route.coordinates} className="w-full" label={`Route of this ${label.toLowerCase()}`} />
+            <RouteMap coordinates={gps.route.coordinates} className="w-full" unit={unit} label={`Route of this ${label.toLowerCase()}`} />
             <p className="text-xs text-muted-foreground">
               Private to you. Drawn from your own GPS points{gps.route.coordinates.length > 1 ? "; breaks are pauses or stretches without a usable signal" : ""}.
             </p>
@@ -118,7 +118,10 @@ export default async function ActivityDetailPage({ params, searchParams }: { par
 
       {gps?.gps_quality && (gps.gps_quality.gaps > 0 || gps.gps_quality.rejected > 0) && (
         <p className="text-sm text-muted-foreground" data-testid="gps-quality">
-          GPS: {gps.gps_quality.gaps > 0 ? `the signal dropped ${gps.gps_quality.gaps} time${gps.gps_quality.gaps === 1 ? "" : "s"} (no distance added for those stretches)` : "no signal drops"}
+          GPS:{" "}
+          {gps.gps_quality.gaps > 0
+            ? `the signal dropped ${gps.gps_quality.gaps} time${gps.gps_quality.gaps === 1 ? "" : "s"} (no distance added for those stretches${gps.gps_quality.uncountedGapM ? `: about ${formatDistance(gps.gps_quality.uncountedGapM, unit)} in a straight line` : ""})`
+            : "no signal drops"}
           {gps.gps_quality.rejected > 0 ? `; ${gps.gps_quality.rejected} imprecise or impossible readings were ignored` : ""}.
         </p>
       )}

@@ -59,7 +59,7 @@ export async function listRunsForRecords(supabase: SupabaseClient, userId: strin
 export interface ActivityGpsDetail {
   route: { type: "MultiLineString"; coordinates: [number, number][][] } | null;
   splits: { index: number; unit: "mi" | "km"; distance_m: number; moving_s: number; elapsed_s: number; split_s?: number }[] | null;
-  gps_quality: { gaps: number; rejected: number; lastAccuracy: number | null } | null;
+  gps_quality: { gaps: number; rejected: number; lastAccuracy: number | null; uncountedGapM?: number } | null;
   workout_session_id: string | null;
 }
 

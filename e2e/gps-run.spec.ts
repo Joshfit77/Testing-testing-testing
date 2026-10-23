@@ -42,6 +42,13 @@ test.describe("live GPS runs and walks", () => {
     await expect(page.getByTestId("gps-accuracy")).toHaveText("GPS ±5 m");
     const firstDistance = await page.getByTestId("gps-distance").innerText();
     expect(firstDistance).not.toMatch(/^0(\.00)? /);
+    // GPS details: source, accuracy and counts (never a position); the live map shows where you are now.
+    await page.getByText("GPS details").click();
+    await expect(page.getByTestId("gps-detail-source")).toContainText("Browser location");
+    await expect(page.getByTestId("gps-detail-accuracy-now")).toHaveText(/±(5 m|16 ft)/);
+    await expect(page.getByTestId("gps-detail-readings-used")).toHaveText(/^\d+ of \d+/);
+    await expect(page.getByTestId("gps-details")).not.toContainText("40.0");
+    await expect(page.getByTestId("route-current")).toBeVisible();
 
     // Pause: moving 200 m while paused (e.g. a car ride) adds nothing.
     await page.getByRole("button", { name: "Pause" }).click();
@@ -163,5 +170,22 @@ test.describe("live GPS runs and walks", () => {
     await moveNorth(context, page, 0, 4, 3);
     await expect(page.getByTestId("gps-recording")).toBeVisible();
     await expect(warning).toHaveCount(0);
+  });
+
+  test("explains when the device only shares an approximate location", async ({ page, context }) => {
+    await signUpAndConfirm(page, uniqueEmail("gps-approx"));
+    await completeOnboarding(page);
+    await context.grantPermissions(["geolocation"]);
+    // iPhone "Precise Location" off: fixes arrive, but only to within a couple of kilometres.
+    await context.setGeolocation({ latitude: LAT0, longitude: LNG0, accuracy: 2500 });
+    await page.goto("/run/record?kind=walk");
+    await page.getByTestId("gps-start").click();
+    for (let i = 1; i <= 4; i++) {
+      await context.setGeolocation({ latitude: LAT0 + (i * 2) / M_PER_DEG, longitude: LNG0, accuracy: 2500 });
+      await page.waitForTimeout(800);
+    }
+    await expect(page.getByTestId("gps-hint-precise")).toContainText("Precise Location");
+    await expect(page.getByText("Waiting for GPS")).toBeVisible();
+    await expect(page.getByTestId("gps-distance")).toHaveText(/^0(\.00)? /);
   });
 });
