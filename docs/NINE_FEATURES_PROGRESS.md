@@ -14,11 +14,11 @@ Branch `claude/nine-features` (from `claude/app-cleanup` at `5bf988f`). Not merg
 | 4 | Live GPS running and walking | Free (basic) | Implemented, physical-device testing needed | Browser recording tested with simulated GPS. Background recording on a locked phone is prepared, not synced into a native build, not verified. |
 | 5 | Interactive muscle body map | Plus / Pro | Complete and tested | Rank thresholds are provisional and still need review by a qualified coach. |
 | 6 | Guided AI body scanner | Pro | Implemented, physical-device testing needed | Browser capture tested with a fake camera and uploads. No body-fat estimate (no validated provider approved). Native camera behaviour on a phone not tested. |
-| 7 | AI food-photo recognition | Pro | Not started | |
+| 7 | AI food-photo recognition | Pro | Implemented, physical-device testing needed | Tested end to end with a mock AI; real-model estimate quality and phone camera capture not yet checked. |
 | 8 | Food Quality Scanner | Free / Plus / Pro | Not started | |
 | 9 | Genuine 4K badge artwork | — | Blocked by external dependency | The import, checking and export pipeline is ready (`docs/BADGE_ART_SPEC.md`). The 27 new 3840 × 1920 masters must be created by an image tool or an artist, which needs your approval. Not complete until they exist. |
 
-Test totals after Stage 6: Vitest 103 files, 2,183 tests passed. Playwright 54 passed, 1 skipped (the skip predates this branch) and 1 failed: a recipes test whose text locator also matched a status message. That locator was made exact and the spec then passed.
+Test totals after Stage 7: Vitest 105 files, 2,192 tests passed. Playwright 56 passed, 1 skipped (the skip predates this branch).
 
 ## Stage 1: long-term AI coaching memory (Pro) — commit `affbbca`
 
@@ -125,3 +125,42 @@ Test totals after Stage 6: Vitest 103 files, 2,183 tests passed. Playwright 54 p
    - Any body-composition vendor would need your approval, a contract and a data-processing agreement.
 9. **Commit.** `3b1029e`.
 10. **Next.** Stage 7: AI food-photo recognition.
+
+## Stage 7: AI food-photo recognition (Pro) — commit `9d0bb50`
+
+1. **Implemented.** Food → Meal photo (`/nutrition/photo`); details in `docs/FOOD_PHOTO.md`.
+   - **Entitlement and consent:** Pro (or a grandfathered AI allowance), checked on the server. The general AI consent plus a separate meal-photo consent that names the provider.
+   - **Capture:** take a photo or choose one from the library, with a preview and retake/replace. Choose the meal and add an optional note.
+   - **Estimate:** foods, visible ingredients, portion in words, grams when judgeable, calories, protein, carbs and fat, with a confidence level.
+   - **Honesty rules:**
+     - the app always asks about oil or butter and sauces or dressings, and about portions when unsure;
+     - calories that disagree with the macros are flagged;
+     - a "not measured" banner is shown.
+   - **Correcting:**
+     - every field is editable; items can be removed or added;
+     - any item can be swapped for a database food (search pre-filled, with undo);
+     - one-tap oil, butter and dressing extras use the app's USDA records.
+   - **Saving:** nothing is saved until "Confirm and add to diary". Estimates are stored marked as estimates from a photo; database foods are recomputed on the server.
+   - **Privacy:** the photo is resized on the device (location data removed), checked by its bytes, sent once to the fast model, and never stored.
+   - **Limits:** each analysis counts toward the 150 monthly messages, plus a daily cap of 20 photos inside the locked reservation function.
+2. **Files.** New: `src/lib/domain/food-photo.ts`, `src/server/services/food-photo.ts`, `src/server/actions/food-photo.ts`, `src/app/api/ai/food-photo/route.ts`, `src/app/(app)/nutrition/photo/page.tsx`, `src/components/nutrition/{food-photo-consent,food-photo-flow}.tsx`, `supabase/migrations/20261024000032_food_photos.sql`, `docs/FOOD_PHOTO.md`, `tests/unit/food-photo.test.ts`, `tests/integration/food-photo.test.ts`. Changed: `src/app/(app)/nutrition/page.tsx` (Food tools link), `src/components/nutrition/food-picker.tsx` (optional starting search), `src/components/coach/ai-consent-card.tsx`, `src/server/services/ai-coach.ts` (photo-limit message), `ios/App/App/Info.plist`, `supabase/setup-all.sql`, `e2e/coach.spec.ts`.
+3. **Migration.** `20261024000032_food_photos.sql`:
+   - `profiles.food_photo_consent_at`;
+   - `meal_items` source `photo`;
+   - `reserve_ai_usage` recreated with the 20-a-day photo cap; all other limits are unchanged.
+4. **Tests.**
+   - **Unit (5):** normalisation and clamping, mandatory questions, non-food photos, file-type sniffing, quick-add weights match the USDA measures.
+   - **Database (4):** no analysis or reservation without consent; consent is owner-only; 23 simultaneous photo reservations give exactly 20 successes while chat stays allowed; photo diary entries are owner-only.
+   - **Browser (1):** the whole flow, including what is sent to the AI.
+   - **Regression:** the existing AI-limit tests passed against the recreated function.
+5. **Results.** Vitest: 105 files, 2,192 tests passed. Playwright: 56 passed, 1 skipped. `tsc`, ESLint and the build are clean.
+6. **Bugs fixed.** Test locators made exact: "Meal" also matched "meal photo", and the bundled USDA name for olive oil is "Olive oil".
+7. **Limitations.**
+   - The real model's estimate quality is unverified (mock AI only).
+   - Camera capture hasn't been tried on a physical phone.
+   - Hidden ingredients can only be added by the member.
+8. **External.**
+   - The existing Anthropic API key; no new service.
+   - A physical phone for camera testing.
+9. **Commit.** `9d0bb50`.
+10. **Next.** Stage 8: Food Quality Scanner.
