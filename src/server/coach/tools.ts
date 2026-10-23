@@ -19,6 +19,7 @@ import {
 import { checkProposedMemory, memoryInputSchema, memoryRef } from "@/lib/coach/memory";
 import { analyzeTraining, describeReviewForCoach, type TrainingChange } from "@/lib/domain/adaptive-training";
 import { loadReviewInput, upcomingWeek } from "@/server/services/adaptive-training";
+import { buildSleepSummary } from "./sleep-summary";
 import { getActiveProgramRef, loadProgramWeek, mapWorkouts, WORKOUT_SELECT } from "./snapshot";
 
 /**
@@ -512,6 +513,8 @@ export async function executeCoachTool(ctx: ToolContext, name: string, rawInput:
         return proposeBodyweightLog(ctx, input as ToolInput<"propose_bodyweight_log">);
       case "get_training_review":
         return await getTrainingReviewTool(ctx);
+      case "get_sleep_summary":
+        return ok(await buildSleepSummary(ctx.supabase, ctx.userId, ctx.timeZone, (input as ToolInput<"get_sleep_summary">).days));
       case "propose_target_load":
         return await proposeTargetLoad(ctx, input as ToolInput<"propose_target_load">);
       case "propose_deload_week":

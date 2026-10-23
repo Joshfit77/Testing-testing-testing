@@ -102,6 +102,8 @@ export interface AthleteSnapshot {
   stepGoal: number | null;
   supplements: string[];
   readiness: { score: number; date: string } | null;
+  /** Logged sleep (Sleep & Recovery), when the athlete allowed it and logged any. */
+  sleep?: { lastNight: { date: string; asleepMinutes: number; inBedOnly: boolean } | null; avg14: number | null; nights14: number; goalMinutes: number } | null;
   challenge: { name: string; day: number; completedDays: number; totalDays: number } | null;
   faithEnabled: boolean;
   /**
@@ -339,6 +341,11 @@ export function formatAthleteContext(s: AthleteSnapshot, opts: { maxWorkouts?: n
     lines.push(`Steps: avg ${avg.toLocaleString("en-US")}/day over ${s.steps.length} logged days${s.stepGoal ? ` (goal ${s.stepGoal.toLocaleString("en-US")})` : ""}.`);
   }
   if (s.readiness) lines.push(`Latest readiness check-in: ${s.readiness.score}/100 on ${s.readiness.date}.`);
+  if (s.sleep && s.sleep.nights14 > 0) {
+    const h = (m: number) => `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ""}`;
+    const last = s.sleep.lastNight ? `last night ${h(s.sleep.lastNight.asleepMinutes)}${s.sleep.lastNight.inBedOnly ? " (time in bed; no detail entered)" : ""} on ${s.sleep.lastNight.date}` : "no night logged in the last day";
+    lines.push(`Sleep (logged, not measured): ${last}; ${h(s.sleep.avg14 ?? 0)} average over ${s.sleep.nights14} of the last 14 nights; goal ${h(s.sleep.goalMinutes)}. Use get_sleep_summary for anything beyond this.`);
+  }
   lines.push(`Supplement stack: ${s.supplements.length ? s.supplements.join(", ") : "none"}.`);
   if (s.challenge) lines.push(`Challenge: ${s.challenge.name}, day ${s.challenge.day}/${s.challenge.totalDays}, ${s.challenge.completedDays} days completed.`);
   const shared = (s.sharedJournal ?? []).filter((j) => j.excerpt);

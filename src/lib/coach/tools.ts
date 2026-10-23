@@ -73,6 +73,9 @@ export const TOOL_INPUT_SCHEMAS = {
     reason: z.string().trim().min(3).max(300),
   }),
   get_training_review: z.strictObject({}),
+  get_sleep_summary: z.strictObject({
+    days: z.number().int().min(7).max(90),
+  }),
   propose_target_load: z.strictObject({
     exercise_slug: slug,
     weight: z.number().positive().max(2000),
@@ -234,6 +237,12 @@ const DEFINITIONS: { name: ToolName; description: string; input_schema: JsonSche
     input_schema: obj({}),
   },
   {
+    name: "get_sleep_summary",
+    description:
+      "Get the athlete's sleep as the app worked it out from what they logged or imported: nights and average time asleep over the last N nights, their goal and how often they met it, typical bedtime and wake time and how steady they are, average nightly score, the estimated sleep debt (a rolling shortfall from their entries, not a measurement), suggested bedtime and wake windows, patterns from their check-ins (associations in their own entries, never causes), and what is missing. Call this before answering anything about sleep, bedtimes, energy, consistency, or recovery versus sleep. Never guess sleep figures, never infer sleep stages, never diagnose a sleep disorder; for persistent trouble sleeping, suggest a qualified professional.",
+    input_schema: obj({ days: int("Nights to cover, 7–90 (14 is typical).") }),
+  },
+  {
     name: "propose_target_load",
     description:
       "Suggest a target load (and reps) for the athlete's next session of one exercise, e.g. after they hit all their reps, or a reset after a stall. Shown beside the exercise in the workout logger once they accept. Nothing changes until they tap Accept (they can adjust it). Base it on their logged sets; don't jump more than one sensible step.",
@@ -321,6 +330,8 @@ export function toolActivityLabel(name: string, input: unknown): string {
       return "Preparing a bodyweight entry for you to confirm…";
     case "get_training_review":
       return "Reviewing your recent training…";
+    case "get_sleep_summary":
+      return `Checking your sleep from the last ${Number(i.days) || 14} nights…`;
     case "propose_target_load":
       return "Preparing a target load for you to review…";
     case "propose_deload_week":

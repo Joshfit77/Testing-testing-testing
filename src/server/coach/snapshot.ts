@@ -9,6 +9,7 @@ import type { AthleteSnapshot, SnapshotProgram, SnapshotProgramDay, SnapshotWork
 import { journalEntriesForCoach, COACH_JOURNAL_LIMIT } from "@/lib/domain/journal";
 import { loadBudgetContext } from "@/server/services/nutrition-targets";
 import { MEMORY_LIMIT, type CoachMemory } from "@/lib/coach/memory";
+import { loadSleepSnapshot } from "./sleep-summary";
 
 /**
  * Load the athlete snapshot for the AI coach. Every query uses the caller's own Supabase session (RLS)
@@ -133,7 +134,7 @@ export async function loadProgramWeek(supabase: SupabaseClient, programId: strin
 export async function loadAthleteSnapshot(supabase: SupabaseClient, userId: string): Promise<AthleteSnapshot> {
   const { data: profile } = await supabase
     .from("profiles")
-    .select("unit_system, birth_year, height_cm, sex, faith_enabled, wellness_consent_at, timezone, step_goal, coach_memory_enabled")
+    .select("unit_system, birth_year, height_cm, sex, faith_enabled, wellness_consent_at, timezone, step_goal, coach_memory_enabled, sleep_goal_minutes")
     .eq("id", userId)
     .maybeSingle();
   const tz = (profile?.timezone as string) || "UTC";
@@ -273,6 +274,7 @@ export async function loadAthleteSnapshot(supabase: SupabaseClient, userId: stri
     stepGoal: (profile?.step_goal as number) ?? null,
     supplements: (suppRes.data ?? []).map((s) => getSupplement(s.supplement_id as string)?.name ?? (s.supplement_id as string)),
     readiness: readinessRes.data ? { score: readinessRes.data.readiness_score as number, date: readinessRes.data.checked_on as string } : null,
+    sleep: profile?.wellness_consent_at ? await loadSleepSnapshot(supabase, userId, (profile?.timezone as string) || "UTC", (profile?.sleep_goal_minutes as number | null) ?? null) : null,
     challenge,
     faithEnabled: Boolean(profile?.faith_enabled),
     // Filtered again here so nothing unshared can reach the coach even if the query changes.

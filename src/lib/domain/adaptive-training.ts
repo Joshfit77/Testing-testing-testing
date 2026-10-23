@@ -70,6 +70,12 @@ export interface ReviewCheckin {
   readiness: number;
 }
 
+/** Logged sleep for the last two weeks (Sleep & Recovery). Absent when the member hasn't logged any. */
+export interface ReviewSleep {
+  goalMinutes: number;
+  nights: { date: string; asleepMinutes: number }[];
+}
+
 export interface ReviewInput {
   today: string;
   units: UnitSystem;
@@ -82,6 +88,7 @@ export interface ReviewInput {
   targets: Record<string, { weightKg: number | null; reps: number | null }>;
   /** Recommendation keys the member already accepted or turned down (they aren't shown again). */
   decided: Set<string>;
+  sleep?: ReviewSleep | null;
 }
 
 export type TrainingChange =
@@ -89,7 +96,7 @@ export type TrainingChange =
   | { kind: "deload_week"; programId: string; weekNumber: number; setsFactor: number; rpeCap: number }
   | { kind: "volume_change"; programId: string; exerciseSlug: string; exerciseName: string; fromWeek: number; deltaSets: number };
 
-export type RecommendationKind = "progress_load" | "plateau" | "deload" | "volume" | "frequency" | "goal_change" | "low_readiness";
+export type RecommendationKind = "progress_load" | "plateau" | "deload" | "volume" | "frequency" | "goal_change" | "low_readiness" | "short_sleep";
 
 export interface Recommendation {
   key: string;
@@ -112,7 +119,15 @@ export interface TrainingReview {
   consistency: { sessionsLast28: number; plannedLast28: number | null; pct: number | null; lastSession: string | null; missedThisWeek: number | null };
   volume: { region: BodyRegion; label: string; setsPerWeek: number; range: [number, number] | null; status: "below" | "within" | "above" | "untracked" }[];
   lifts: { slug: string; name: string; sessions: number; firstE1rmKg: number; lastE1rmKg: number; bestE1rmKg: number; changePct: number; sessionsSinceBest: number; plateau: boolean }[];
-  recovery: { checkins: number; avgReadiness7: number | null; latest: ReviewCheckin | null; rpeDrift: number | null; rpePoints: number };
+  recovery: {
+    checkins: number;
+    avgReadiness7: number | null;
+    latest: ReviewCheckin | null;
+    rpeDrift: number | null;
+    rpePoints: number;
+    /** Logged sleep over the last 7 nights, when any was logged. Never inferred. */
+    sleep: { nights7: number; avgAsleep7: number | null; goalMinutes: number } | null;
+  };
   weeksSinceDeload: number | null;
   recommendations: Recommendation[];
   dataGaps: string[];
@@ -263,6 +278,12 @@ export function analyzeTraining(input: ReviewInput): TrainingReview {
   const rpeDrift = drift.length >= 4 ? round(drift.reduce((a, b) => a + b, 0) / drift.length, 1) : null;
   if (!input.checkins.length) dataGaps.push("No recovery check-ins in the last two weeks, so recovery-based advice uses logged effort only.");
   if (rpeDrift == null) dataGaps.push("Not enough sets with a logged RPE against a prescribed RPE to judge whether sessions feel harder than planned.");
+
+  // Logged sleep (Sleep & Recovery): the last 7 nights against the member's goal. Advice only, never a program change.
+  const sleep7 = (input.sleep?.nights ?? []).filter((n) => n.date >= addDays(today, -6) && n.date <= today);
+  const avgAsleep7 = sleep7.length ? Math.round(sleep7.reduce((a, n) => a + n.asleepMinutes, 0) / sleep7.length) : null;
+  const sleepSummary = input.sleep && input.sleep.nights.length ? { nights7: sleep7.length, avgAsleep7, goalMinutes: input.sleep.goalMinutes } : null;
+  if (!sleepSummary) dataGaps.push("No sleep logged in the last two weeks, so sleep isn't part of this review.");
 
   // Weeks since the last deload in this program ------------------------------------------------------------------
   let weeksSinceDeload: number | null = null;
@@ -436,14 +457,30 @@ export function analyzeTraining(input: ReviewInput): TrainingReview {
     });
   }
 
-  const order: Record<RecommendationKind, number> = { low_readiness: 0, deload: 1, plateau: 2, progress_load: 3, volume: 4, frequency: 5, goal_change: 6 };
+  // 8. Short on sleep this week: advice only (nothing changes unless the member chooses to).
+  if (sleepSummary && avgAsleep7 !== null && sleep7.length >= 3 && avgAsleep7 < sleepSummary.goalMinutes - 60) {
+    const weekStart = addDays(today, -((new Date(`${today}T00:00:00Z`).getUTCDay() + 6) % 7));
+    const fmt = (m: number) => `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ""}`;
+    add({
+      key: `sleep:${weekStart}`,
+      kind: "short_sleep",
+      title: "Short on sleep this week",
+      summary: "Keep the plan, but don't chase new loads until you've had a few nights near your goal, and protect the night before your hardest session.",
+      why: [`Average ${fmt(avgAsleep7)} asleep over ${sleep7.length} logged nights against a ${fmt(sleepSummary.goalMinutes)} goal.`, "From what you logged, not a measurement. Short sleep on its own doesn't predict injury."],
+      confidence: "moderate",
+      change: null,
+      link: { href: "/progress/sleep", label: "Sleep & Recovery" },
+    });
+  }
+
+  const order: Record<RecommendationKind, number> = { low_readiness: 0, short_sleep: 1, deload: 2, plateau: 3, progress_load: 4, volume: 5, frequency: 6, goal_change: 7 };
   recs.sort((a, b) => order[a.kind] - order[b.kind]);
   return {
     windowDays: 56,
     consistency,
     volume,
     lifts,
-    recovery: { checkins: input.checkins.length, avgReadiness7, latest, rpeDrift, rpePoints: drift.length },
+    recovery: { checkins: input.checkins.length, avgReadiness7, latest, rpeDrift, rpePoints: drift.length, sleep: sleepSummary },
     weeksSinceDeload,
     recommendations: recs,
     dataGaps,

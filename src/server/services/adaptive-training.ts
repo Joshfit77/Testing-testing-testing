@@ -1,6 +1,8 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { addDays, isoDateInTz } from "@/lib/domain/dates";
+import { DEFAULT_SLEEP_GOAL_MINUTES, summarizeNights } from "@/lib/domain/sleep";
+import { rowToSession, SLEEP_SESSION_COLUMNS, type SleepSessionRow } from "@/server/services/sleep";
 import { programDays, programExercisesOnDays } from "@/server/services/training";
 import { analyzeTraining, type ReviewInput, type ReviewProgram, type ReviewWorkout, type TrainingChange, type TrainingReview } from "@/lib/domain/adaptive-training";
 import type { UnitSystem } from "@/lib/domain/types";
@@ -33,12 +35,12 @@ export function upcomingWeek(ref: { currentWeek: number; currentDay: number; dur
 }
 
 export async function loadReviewInput(supabase: SupabaseClient, userId: string): Promise<{ input: ReviewInput; timeZone: string }> {
-  const { data: profile } = await supabase.from("profiles").select("unit_system, timezone").eq("id", userId).maybeSingle();
+  const { data: profile } = await supabase.from("profiles").select("unit_system, timezone, sleep_goal_minutes").eq("id", userId).maybeSingle();
   const timeZone = (profile?.timezone as string) || "UTC";
   const today = isoDateInTz(new Date(), timeZone);
   const since = addDays(today, -56);
 
-  const [sessionsRes, checkinsRes, targetsRes, decisionsRes, answersRes, ref] = await Promise.all([
+  const [sessionsRes, checkinsRes, targetsRes, decisionsRes, answersRes, ref, sleepRes] = await Promise.all([
     supabase
       .from("workout_sessions")
       .select(
@@ -54,6 +56,7 @@ export async function loadReviewInput(supabase: SupabaseClient, userId: string):
     supabase.from("training_recommendation_decisions").select("recommendation_key").eq("user_id", userId),
     supabase.from("onboarding_answers").select("primary_goal, updated_at").eq("user_id", userId).maybeSingle(),
     getActiveProgramRef(supabase, userId),
+    supabase.from("sleep_sessions").select(SLEEP_SESSION_COLUMNS).eq("user_id", userId).eq("kind", "night").not("ended_at", "is", null).gte("night_of", addDays(today, -13)).order("started_at"),
   ]);
   if (sessionsRes.error) throw sessionsRes.error;
   const sessions = (sessionsRes.data ?? []) as unknown as RawSession[];
@@ -139,6 +142,10 @@ export async function loadReviewInput(supabase: SupabaseClient, userId: string):
       checkins: (checkinsRes.data ?? []).map((c) => ({ date: c.checked_on as string, readiness: c.readiness_score as number })),
       targets,
       decided: new Set((decisionsRes.data ?? []).map((d) => d.recommendation_key as string)),
+      sleep: {
+        goalMinutes: (profile?.sleep_goal_minutes as number | null) ?? DEFAULT_SLEEP_GOAL_MINUTES,
+        nights: summarizeNights(((sleepRes.data ?? []) as unknown as SleepSessionRow[]).map(rowToSession)).map((n) => ({ date: n.nightOf, asleepMinutes: n.asleepMinutes })),
+      },
     },
   };
 }

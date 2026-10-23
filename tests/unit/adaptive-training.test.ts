@@ -168,3 +168,25 @@ describe("training review", () => {
     expect(trainingModifySchema.safeParse({ hack: true }).success).toBe(false);
   });
 });
+
+describe("logged sleep in the review", () => {
+  it("adds an advice-only suggestion after a short week of sleep, and a data gap when none is logged", () => {
+    const nights = [0, 1, 2, 3].map((d) => ({ date: addDays(TODAY, -d), asleepMinutes: 390 }));
+    const r = analyzeTraining(input({ sleep: { goalMinutes: 480, nights } }));
+    const rec = r.recommendations.find((x) => x.kind === "short_sleep")!;
+    expect(rec.change).toBeNull();
+    expect(rec.why[0]).toBe("Average 6h 30m asleep over 4 logged nights against a 8h goal.");
+    expect(rec.link?.href).toBe("/progress/sleep");
+    expect(r.recovery.sleep).toEqual({ nights7: 4, avgAsleep7: 390, goalMinutes: 480 });
+    expect(r.dataGaps.join(" ")).not.toMatch(/No sleep logged/);
+
+    const none = analyzeTraining(input());
+    expect(none.recommendations.some((x) => x.kind === "short_sleep")).toBe(false);
+    expect(none.recovery.sleep).toBeNull();
+    expect(none.dataGaps.join(" ")).toMatch(/No sleep logged/);
+
+    // Enough sleep: nothing to say.
+    const fine = analyzeTraining(input({ sleep: { goalMinutes: 480, nights: nights.map((n) => ({ ...n, asleepMinutes: 470 })) } }));
+    expect(fine.recommendations.some((x) => x.kind === "short_sleep")).toBe(false);
+  });
+});
