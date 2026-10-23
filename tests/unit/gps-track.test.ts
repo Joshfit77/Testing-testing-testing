@@ -80,20 +80,25 @@ describe("distance", () => {
     expect(r.reason).toBe("jump");
     s = r.state;
     expect(s.distanceM).toBe(before);
-    // Walks cap lower: 5 m/s is plausible for a run but a jump for a walk.
+    // Walks cap lower: a sustained 8 m/s (a bike or a car) is fine for a sprint but never counted as walking.
     let w = feed(fresh("walk"), trace({ from: T0, seconds: 30, speed: 1.4 }));
-    const lastWalk = w.lines.at(-1)!.at(-1)!;
-    const fiveMs = { lat: LAT0 + (lastWalk.d + 5 * ((T0 + 31_000 - lastWalk.t) / 1000)) / M_PER_DEG_LAT, lng: LNG0, accuracy: 5, t: T0 + 31_000 };
-    w = addFix(w, fiveMs).state;
-    expect(w.rejected.jump).toBe(1);
-    // A slow walk still adds up (small steps are held until they clear the wobble threshold).
-    expect(w.distanceM).toBeGreaterThan(38);
+    const walked = w.distanceM;
+    // A slow walk still adds up.
+    expect(walked).toBeGreaterThan(36);
+    w = feed(w, trace({ from: T0 + 31_000, seconds: 20, speed: 8, startM: 50 }));
+    expect(w.rejected.jump).toBeGreaterThan(0);
+    expect(w.distanceM - walked).toBeLessThan(10);
+    const sprint = feed(fresh("run"), trace({ from: T0, seconds: 20, speed: 8 }));
+    expect(sprint.rejected.jump).toBe(0);
+    expect(sprint.distanceM).toBeGreaterThan(150);
   });
 
   it("doesn't turn GPS wobble while standing still into distance", () => {
     const s = feed(fresh(), trace({ from: T0, seconds: 120, speed: 0, noiseM: 2 }));
     expect(s.distanceM).toBeLessThan(5);
-    expect(s.rejected.jitter).toBeGreaterThan(100);
+    // The fixes still keep the signal alive: standing still is not a gap.
+    expect(s.signalLost).toBe(false);
+    expect(s.rejected.jitter).toBeGreaterThan(30);
   });
 });
 

@@ -4,6 +4,11 @@ _First written 2026-10-20 (Stage 1B) as a plan. Live GPS recording was built on 
 
 ## Status (Stage 4)
 
+> **Update 2026-10-23:** distance is now measured along a Kalman-smoothed track. It uses outlier rejection, a
+> standing-still rule, a restart after a bad first fix, a "GPS details" diagnostics panel and a richer route map.
+> Measured on controlled traces in `docs/GPS_ACCURACY.md`, which also lists what still needs a real phone. The rules
+> below still hold: nothing is counted before a good fix, across a pause or across a signal gap.
+
 **Built and tested in the browser (Playwright with simulated GPS, plus unit and database tests):**
 - `/run/record?kind=run|walk`: Start (location is requested only then), "waiting for a GPS fix", live distance, elapsed and moving time, current and average pace, splits per mile or km, Pause / Resume / Finish / Discard, a review screen with the route, effort and notes, then one idempotent save.
 - Filtering in `src/lib/domain/gps-track.ts` as described under "Tracking algorithm": accuracy limits, out-of-order fixes, speed caps (run 10 m/s, walk 4 m/s), jitter, a new line after a pause or a 15 s signal gap (time counts, no distance is invented), interpolated splits, Douglas–Peucker simplification to at most 2,000 stored points.
