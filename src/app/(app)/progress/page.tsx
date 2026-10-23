@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Award, ChevronRight, History, LineChart, PersonStanding, ScanLine } from "lucide-react";
+import { Award, ChevronRight, History, LineChart, Moon, PersonStanding, ScanLine } from "lucide-react";
 import { MainHeader } from "@/components/shell/main-header";
 import { StepsCard } from "@/components/steps/steps-card";
 import { addDays, isoDateInTz } from "@/lib/domain/dates";
@@ -44,6 +44,12 @@ export default async function ProgressHubPage() {
       icon: ScanLine,
       title: "Body Scan",
       body: canUseBodyScan(plan) ? "Guided front, side and rear photos with measurements, compared over time" : "Pro: guided body photos and measurements, compared over time",
+    },
+    {
+      href: "/progress/sleep",
+      icon: Moon,
+      title: "Sleep & Recovery",
+      body: "Log nights and naps by timer or by hand, and see last night and your recent sleep",
     },
     {
       href: "/progress/badges",

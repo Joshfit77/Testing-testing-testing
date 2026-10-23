@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BarChart3, CalendarDays, ChevronRight, Dumbbell, Footprints, HeartPulse, Pill, TrendingUp, Utensils, Wand2 } from "lucide-react";
+import { BarChart3, CalendarDays, ChevronRight, Dumbbell, Footprints, HeartPulse, Moon, Pill, TrendingUp, Utensils, Wand2 } from "lucide-react";
 import { Notice } from "@/components/common/states";
 import { TodayWorkoutAction } from "@/components/home/today-workout-action";
 import { WeekBars } from "@/components/home/week-bars";
@@ -225,8 +225,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         <ChevronRight className="size-5 text-gold" aria-hidden />
       </Link>
 
-      <nav aria-label="More for today" className="grid grid-cols-3 gap-2">
+      <nav aria-label="More for today" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {[
+          { href: "/progress/sleep", icon: Moon, label: "Sleep" },
           { href: "/progress#steps", icon: Footprints, label: "Steps" },
           { href: "/nutrition/supplements", icon: Pill, label: "Supplements" },
           { href: "/train/recovery", icon: HeartPulse, label: "Recovery" },

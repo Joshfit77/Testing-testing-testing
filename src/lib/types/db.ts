@@ -22,6 +22,15 @@ export interface ProfileRow {
   home_scripture?: boolean;
   rest_timer_sound?: boolean;
   rest_timer_vibrate?: boolean;
+  /** Added in 20261024000034_sleep (4–12 hours, default 8). */
+  sleep_goal_minutes?: number;
+  /** Added in 20261024000036_sleep_imports: whether health-platform sleep import is switched on. */
+  sleep_import_enabled?: boolean;
+  /** Added in 20261024000037_sleep_schedule: "HH:MM:SS" wake time to keep, or null for the typical one; dismissed tip keys. */
+  sleep_target_wake?: string | null;
+  sleep_tips_dismissed?: string[];
+  /** Added in 20261024000038_sleep_alarm: validated by `alarmConfigSchema`, or null. */
+  sleep_alarm?: unknown;
   created_at: string;
 }
 

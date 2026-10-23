@@ -27,11 +27,16 @@ export const FEATURES = [
   "advanced_analytics",
   "advanced_calendar",
   "food_comparisons",
+  // Sleep & Recovery analytics (nightly score breakdown, comparisons, sleep debt, windows, energy estimate).
+  // Proposed split, pending the owner's approval (docs/SLEEP_PLAN.md §5); the key makes it a one-line change.
+  "sleep_analytics",
   // Pro
   "ai_coach",
   "ai_plan_generation",
   "advanced_recommendations",
   "food_goal_analysis",
+  // AI sleep coaching and sleep-and-training insights (proposed, see above).
+  "sleep_ai_coaching",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 
@@ -45,6 +50,7 @@ const PLUS_FEATURES: Feature[] = [
   "advanced_analytics",
   "advanced_calendar",
   "food_comparisons",
+  "sleep_analytics",
 ];
 
 export interface PlanConfig {
