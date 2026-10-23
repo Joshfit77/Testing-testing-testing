@@ -179,10 +179,15 @@ export function findOverlap<T extends Interval & { id: string }>(sessions: T[], 
   return sessions.find((s) => s.id !== excludeId && overlaps(s, candidate)) ?? null;
 }
 
+/** A zone Intl accepts, or UTC: a stored zone can only be wrong through a direct database write, and a page must not crash on it. */
+function safeZone(timeZone: string): string {
+  return isValidTimeZone(timeZone) ? timeZone : "UTC";
+}
+
 /** Minutes since local midnight (0–1439) of an instant in a time zone. */
 export function clockMinutesInTz(iso: string, timeZone: string): number {
   const d = new Date(iso);
-  const parts = new Intl.DateTimeFormat("en-US", { timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(d);
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: safeZone(timeZone), hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(d);
   const h = Number(parts.find((p) => p.type === "hour")?.value ?? 0) % 24;
   const m = Number(parts.find((p) => p.type === "minute")?.value ?? 0);
   return h * 60 + m;
@@ -190,7 +195,7 @@ export function clockMinutesInTz(iso: string, timeZone: string): number {
 
 /** Minutes east of UTC that `timeZone` was at instant `t`. */
 export function tzOffsetMinutes(t: number, timeZone: string): number {
-  const parts = new Intl.DateTimeFormat("en-US", { timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).formatToParts(new Date(t));
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: safeZone(timeZone), year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).formatToParts(new Date(t));
   const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
   const asUtc = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour") % 24, get("minute"), get("second"));
   return Math.round((asUtc - Math.floor(t / 1000) * 1000) / MINUTE_MS);

@@ -69,7 +69,7 @@ export default async function SleepTrainingPage() {
           ) : (
             <p className="mt-2 text-sm text-muted-foreground">Nothing sleep-related to suggest right now.</p>
           )}
-          <Link href="/train/review" className="mt-3 inline-block text-sm font-semibold text-gold-highlight underline">
+          <Link href="/train/review" className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-gold-highlight underline">
             Open the training review
           </Link>
           <p className="mt-1 text-xs text-muted-foreground">Suggestions with a change attached wait for your Accept there; the rest are advice only.</p>

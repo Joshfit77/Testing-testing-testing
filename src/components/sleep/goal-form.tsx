@@ -17,14 +17,14 @@ export function SleepGoalForm({ goalMinutes }: { goalMinutes: number }) {
       <label htmlFor="sleep-goal" className="block text-sm font-semibold">
         Time asleep each night
       </label>
-      <NativeSelect id="sleep-goal" name="goalMinutes" defaultValue={String(goalMinutes)} aria-invalid={Boolean(state.fieldErrors?.goalMinutes)}>
+      <NativeSelect id="sleep-goal" name="goalMinutes" defaultValue={String(goalMinutes)} aria-invalid={Boolean(state.fieldErrors?.goalMinutes)} aria-describedby={state.fieldErrors?.goalMinutes ? "sleep-goal-error" : undefined}>
         {OPTIONS.map((m) => (
           <option key={m} value={m}>
             {formatDuration(m)}
           </option>
         ))}
       </NativeSelect>
-      <FieldError message={state.fieldErrors?.goalMinutes} />
+      <FieldError id="sleep-goal-error" message={state.fieldErrors?.goalMinutes} />
       <FormMessage state={state} />
       <SubmitButton pendingLabel="Saving…">Save goal</SubmitButton>
     </form>

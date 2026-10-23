@@ -24,6 +24,7 @@ export function QuickCheckin({ day, restedness }: { day: string; restedness: num
               name="restedness"
               value={n}
               aria-pressed={restedness === n}
+              aria-label={n === 1 ? `1 (${r.low})` : n === 5 ? `5 (${r.high})` : String(n)}
               className="flex h-11 items-center justify-center rounded-xl border border-border bg-elevated text-sm font-semibold hover:border-gold-muted aria-pressed:border-gold aria-pressed:bg-gold/15 aria-pressed:text-gold-highlight"
             >
               {n}
@@ -36,7 +37,7 @@ export function QuickCheckin({ day, restedness }: { day: string; restedness: num
         </div>
       </fieldset>
       <FormMessage state={state} />
-      <Link href={`/progress/sleep/checkin?day=${day}`} className="inline-block text-sm font-semibold text-gold-highlight underline">
+      <Link href={`/progress/sleep/checkin?day=${day}`} className="inline-flex min-h-11 items-center text-sm font-semibold text-gold-highlight underline">
         {restedness === null ? "Full check-in (optional)" : "Add more to today's check-in"}
       </Link>
     </form>

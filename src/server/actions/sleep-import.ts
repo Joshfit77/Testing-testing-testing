@@ -17,7 +17,14 @@ const refresh = () => {
 };
 
 const iso = z.string().datetime({ offset: true });
-const stage = z.object({ stage: z.enum(["awake", "light", "deep", "rem", "asleep"]), startedAt: iso, endedAt: iso });
+const stage = z.object({ stage: z.enum(["awake", "light", "deep", "rem", "asleep"]), startedAt: iso, endedAt: iso }).refine((st) => Date.parse(st.endedAt) > Date.parse(st.startedAt), "A stage must end after it starts");
+/** Printable text only: a device name is shown back to the member, never interpreted. */
+const deviceName = z
+  .string()
+  .max(120)
+  .nullable()
+  .transform((v) => v?.replace(/\p{C}/gu, "").trim() || null);
+// Stages are validated one by one so a single odd interval drops that interval, not the night.
 const session = z.object({
   sourceId: z.string().min(1).max(200),
   startedAt: iso,
@@ -26,16 +33,32 @@ const session = z.object({
   finalWakeAt: iso.nullable(),
   awakeMinutes: z.number().int().min(0).max(1440).nullable(),
   awakenings: z.number().int().min(0).max(50).nullable(),
-  stages: z.array(stage).max(500),
-  deviceName: z.string().max(120).nullable(),
+  stages: z.array(z.unknown()).max(2000),
+  deviceName,
 });
+/** Each record is checked on its own below, so one unusable record can't block the rest of the import. */
 const importSchema = z.object({
   source: z.enum(["apple_health", "health_connect"]),
   timezone: z.string().refine(isValidTimeZone, "Unknown time zone"),
   rangeStart: iso,
   rangeEnd: iso,
-  sessions: z.array(session).max(200),
+  sessions: z.array(z.unknown()).max(200),
 });
+const MAX_STAGES_PER_SESSION = 500;
+/** How many import records to keep per member; older ones are pruned after each run. */
+const KEEP_IMPORT_RUNS = 50;
+
+/** The stages of a record that are well formed and inside the record's own window, oldest first, capped. */
+function usableStages(raw: unknown[], startedAt: string, endedAt: string) {
+  const start = Date.parse(startedAt);
+  const end = Date.parse(endedAt);
+  return raw
+    .map((st) => stage.safeParse(st))
+    .flatMap((r) => (r.success ? [r.data] : []))
+    .filter((st) => Date.parse(st.startedAt) >= start && Date.parse(st.endedAt) <= end)
+    .sort((a, b) => Date.parse(a.startedAt) - Date.parse(b.startedAt))
+    .slice(0, MAX_STAGES_PER_SESSION);
+}
 
 export interface ImportSummary extends ActionState {
   added?: number;
@@ -70,7 +93,15 @@ export async function importSleepAction(input: unknown): Promise<ImportSummary> 
   const now = Date.now();
   const stored: (SleepSessionTimes & { id: string })[] = existing.map((s) => ({ ...s }));
 
-  for (const s of v.sessions) {
+  let deviceSeen: string | null = null;
+  for (const raw of v.sessions) {
+    const one = session.safeParse(raw);
+    if (!one.success) {
+      rejected++;
+      continue;
+    }
+    const s = one.data;
+    deviceSeen ??= s.deviceName;
     if (known.has(s.sourceId)) {
       duplicates++;
       continue;
@@ -111,8 +142,9 @@ export async function importSleepAction(input: unknown): Promise<ImportSummary> 
       }
       continue;
     }
-    if (s.stages.length) {
-      const { error: stageErr } = await supabase.from("sleep_stages").insert(s.stages.map((st) => ({ session_id: id, user_id: user.id, stage: st.stage, started_at: st.startedAt, ended_at: st.endedAt })));
+    const stages = usableStages(s.stages, s.startedAt, s.endedAt);
+    if (stages.length) {
+      const { error: stageErr } = await supabase.from("sleep_stages").insert(stages.map((st) => ({ session_id: id, user_id: user.id, stage: st.stage, started_at: st.startedAt, ended_at: st.endedAt })));
       if (stageErr) logError("sleep.import.stages", stageErr);
     }
     stored.push({ id, ...times });
@@ -120,9 +152,12 @@ export async function importSleepAction(input: unknown): Promise<ImportSummary> 
     added++;
   }
 
-  const device = v.sessions.map((s) => s.deviceName).find((d): d is string => Boolean(d)) ?? null;
-  const { error: runErr } = await supabase.from("sleep_import_runs").insert({ user_id: user.id, source: v.source, range_start: v.rangeStart, range_end: v.rangeEnd, added, duplicates, conflicts, device });
+  const { error: runErr } = await supabase.from("sleep_import_runs").insert({ user_id: user.id, source: v.source, range_start: v.rangeStart, range_end: v.rangeEnd, added, duplicates, conflicts, device: deviceSeen });
   if (runErr) logError("sleep.import.run", runErr);
+  else {
+    const { data: old } = await supabase.from("sleep_import_runs").select("id").eq("user_id", user.id).order("created_at", { ascending: false }).range(KEEP_IMPORT_RUNS, KEEP_IMPORT_RUNS + 200);
+    if (old?.length) await supabase.from("sleep_import_runs").delete().eq("user_id", user.id).in("id", old.map((r) => r.id as string));
+  }
   refresh();
   const parts = [`${added} added`];
   if (duplicates) parts.push(`${duplicates} already imported`);

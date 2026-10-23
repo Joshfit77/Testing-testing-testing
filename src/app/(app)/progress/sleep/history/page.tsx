@@ -55,7 +55,7 @@ export default async function SleepHistoryPage({ searchParams }: { searchParams:
       <BackLink href="/progress/sleep">Sleep & Recovery</BackLink>
       <PageHeader eyebrow="Sleep & Recovery" title="Sleep history" description="Every night you logged, with how it compared with your goal." />
 
-      <nav aria-label="Range" className="flex gap-2">
+      <nav aria-label="Range" className="flex flex-wrap gap-2">
         {(Object.keys(RANGES) as RangeKey[]).map((k) => (
           <Link key={k} href={`/progress/sleep/history?range=${k}`} aria-current={k === range ? "page" : undefined} className={cn("min-h-11 rounded-xl border px-4 py-2 text-sm font-semibold", k === range ? "border-gold bg-gold/15 text-gold-highlight" : "border-border bg-card hover:border-gold-muted")}>
             {RANGES[k].label}
@@ -86,7 +86,7 @@ export default async function SleepHistoryPage({ searchParams }: { searchParams:
         ) : (
           <p className="mt-2 text-sm text-muted-foreground">No nights logged in this range. Nights you log appear here; days without an entry stay empty rather than counting as no sleep.</p>
         )}
-        <p className="mt-3 text-xs text-muted-foreground">Averages cover logged nights only. Nights without detail count time in bed as time asleep.</p>
+        <p className="mt-3 text-xs text-muted-foreground">Averages cover logged nights only. Nights without detail count time in bed as time asleep, and each score is based only on what that night had entered.</p>
       </section>
 
       <section className={card} aria-labelledby="chart-title">

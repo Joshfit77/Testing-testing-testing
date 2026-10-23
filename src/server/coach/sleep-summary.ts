@@ -1,28 +1,13 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { addDays, isoDateInTz } from "@/lib/domain/dates";
-import { DEFAULT_SLEEP_GOAL_MINUTES, formatClock, formatDuration, summarizeNights } from "@/lib/domain/sleep";
+import { clockMinutesInTz, DEFAULT_SLEEP_GOAL_MINUTES, formatClock, formatDuration, summarizeNights } from "@/lib/domain/sleep";
 import { associations, clockToMinutes, describeAssociation } from "@/lib/domain/sleep-checkins";
 import { sleepDebt } from "@/lib/domain/sleep-debt";
 import { nightlyScore } from "@/lib/domain/sleep-score";
 import { sleepWindows } from "@/lib/domain/sleep-schedule";
 import { averageAsleepMinutes, scheduleStats } from "@/lib/domain/sleep-stats";
 import { listSleepCheckins, listSleepSessions } from "@/server/services/sleep";
-
-/** The one-line sleep context in the athlete snapshot: last night and the 14-night average, as logged. */
-export async function loadSleepSnapshot(supabase: SupabaseClient, userId: string, timeZone: string, goalMinutes: number | null) {
-  const today = isoDateInTz(new Date(), timeZone);
-  const sessions = await listSleepSessions(supabase, userId, { fromNight: addDays(today, -13), toNight: today }).catch(() => []);
-  const nights = summarizeNights(sessions);
-  if (!nights.length) return null;
-  const last = nights.find((n) => n.nightOf === today) ?? null;
-  return {
-    lastNight: last ? { date: last.nightOf, asleepMinutes: last.asleepMinutes, inBedOnly: last.asleepEstimated } : null,
-    avg14: averageAsleepMinutes(nights),
-    nights14: nights.length,
-    goalMinutes: goalMinutes ?? DEFAULT_SLEEP_GOAL_MINUTES,
-  };
-}
 
 /**
  * The deterministic sleep summary the AI coach reads (Stage C4). Every number comes from the same domain code the
@@ -64,7 +49,7 @@ export async function buildSleepSummary(supabase: SupabaseClient, userId: string
     nights_at_goal: nights.filter((n) => n.asleepMinutes >= goal).length,
     shortest: formatDuration(Math.min(...nights.map((n) => n.asleepMinutes))),
     longest: formatDuration(Math.max(...nights.map((n) => n.asleepMinutes))),
-    last_night: { date: last.nightOf, asleep: formatDuration(last.asleepMinutes), in_bed_only: last.asleepEstimated, bed: formatClock(Math.round((Date.parse(last.bedAt) / 60_000) % 1440)), source: last.sources.join(", ") },
+    last_night: { date: last.nightOf, asleep: formatDuration(last.asleepMinutes), in_bed_only: last.asleepEstimated, bed: formatClock(clockMinutesInTz(last.bedAt, last.timezone)), source: last.sources.join(", ") },
     typical_times: pattern.typicalBed === null ? null : { bedtime: formatClock(pattern.typicalBed), wake: formatClock(pattern.typicalWake!), bedtime_moves_minutes: pattern.bedSpread, wake_moves_minutes: pattern.wakeSpread, steadiness: pattern.steadiness },
     average_nightly_score: scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null,
     estimated_sleep_debt: debt.nightsWithData ? { minutes_behind: debt.debtMinutes, band: debt.band, trend: debt.trend, how: "Rolling 14 nights: a short night adds its whole shortfall; a long night repays half of the extra, only against what's owed; unlogged nights change nothing. An estimate from entries, not a measurement." } : null,

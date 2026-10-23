@@ -16,6 +16,7 @@ function Rating({ name, value }: { name: RatingField; value: number | null }) {
         {[1, 2, 3, 4, 5].map((n) => (
           <label key={n} className="cursor-pointer">
             <input type="radio" name={name} value={n} defaultChecked={value === n} className="peer sr-only" />
+            {n === 1 ? <span className="sr-only">({r.low}) </span> : n === 5 ? <span className="sr-only">({r.high}) </span> : null}
             <span className="flex h-11 items-center justify-center rounded-xl border border-border bg-elevated text-sm font-semibold peer-checked:border-gold peer-checked:bg-gold/15 peer-checked:text-gold-highlight peer-focus-visible:ring-2 peer-focus-visible:ring-gold-highlight">
               {n}
             </span>
@@ -88,12 +89,12 @@ export function SleepCheckinForm({ day, checkin, returnTo }: { day: string; chec
             Last caffeine (time)
           </label>
           <div className="flex flex-wrap items-center gap-3">
-            <Input id="ci-caffeine" name="caffeine_last" type="time" defaultValue={checkin?.caffeine_last ?? ""} className="max-w-40" aria-invalid={Boolean(err("caffeine_last"))} />
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" name="caffeine_none" className="size-4 accent-gold" /> None that day
+            <Input id="ci-caffeine" name="caffeine_last" type="time" defaultValue={checkin?.caffeine_last ?? ""} className="max-w-40" aria-invalid={Boolean(err("caffeine_last"))} aria-describedby={err("caffeine_last") ? "ci-caffeine-error" : undefined} />
+            <label className="flex items-center gap-2 text-sm min-h-11 items-center">
+              <input type="checkbox" name="caffeine_none" className="size-5 accent-gold" /> None that day
             </label>
           </div>
-          <FieldError message={err("caffeine_last")} />
+          <FieldError id="ci-caffeine-error" message={err("caffeine_last")} />
         </div>
         <YesNo name="alcohol" label="Alcohol" value={checkin?.alcohol ?? null} />
         <YesNo name="late_meal" label="A large meal within 2 hours of bed" value={checkin?.late_meal ?? null} />
@@ -133,8 +134,8 @@ export function SleepCheckinForm({ day, checkin, returnTo }: { day: string; chec
           <label htmlFor="ci-aid" className="block text-sm font-semibold">
             Sleep aid, if you used one (optional)
           </label>
-          <Input id="ci-aid" name="sleep_aid" maxLength={120} defaultValue={checkin?.sleep_aid ?? ""} placeholder="e.g. magnesium, as prescribed" aria-invalid={Boolean(err("sleep_aid"))} />
-          <FieldError message={err("sleep_aid")} />
+          <Input id="ci-aid" name="sleep_aid" maxLength={120} defaultValue={checkin?.sleep_aid ?? ""} placeholder="What you took, in your own words" aria-invalid={Boolean(err("sleep_aid"))} aria-describedby={err("sleep_aid") ? "ci-aid-error" : undefined} />
+          <FieldError id="ci-aid-error" message={err("sleep_aid")} />
           <p className="text-xs text-muted-foreground">For your own record only. The app never suggests or adjusts medication.</p>
         </div>
         <div className="space-y-1.5">
@@ -142,7 +143,7 @@ export function SleepCheckinForm({ day, checkin, returnTo }: { day: string; chec
             Notes
           </label>
           <Textarea id="ci-notes" name="notes" rows={2} maxLength={280} defaultValue={checkin?.notes ?? ""} />
-          <FieldError message={err("notes")} />
+          <FieldError id="ci-notes-error" message={err("notes")} />
         </div>
       </section>
 

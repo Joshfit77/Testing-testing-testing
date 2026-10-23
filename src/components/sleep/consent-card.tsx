@@ -18,8 +18,8 @@ export function SleepConsentCard() {
         Sleep times, naps and check-ins are optional wellness information. They are stored in your account, shown only to you, never shared with the AI coach unless you ask it about your sleep, and deleted with your account. You can delete any entry at any time.
       </p>
       <form action={action} className="mt-4 space-y-3">
-        <label className="flex items-start gap-3 text-sm">
-          <input type="checkbox" name="consent" className="mt-0.5 size-5 accent-gold" aria-describedby={state.fieldErrors?.consent ? "sleep-consent-error" : undefined} />
+        <label className="flex min-h-11 items-center gap-3 text-sm">
+          <input type="checkbox" name="consent" className="size-5 accent-gold" aria-describedby={state.fieldErrors?.consent ? "sleep-consent-error" : undefined} />
           <span>I agree to store my sleep and wellness information in my account.</span>
         </label>
         <FieldError id="sleep-consent-error" message={state.fieldErrors?.consent} />

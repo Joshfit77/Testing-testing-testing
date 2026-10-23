@@ -62,7 +62,7 @@ export default async function SleepDebtPage() {
         <p className="mt-2 text-sm text-muted-foreground">
           A night under your goal adds the whole shortfall. A night over it pays back half of the extra, and only what is still owed: sleeping in doesn&apos;t cancel lost sleep hour for hour. Nights you didn&apos;t log change nothing. Shortfall added: {formatDuration(debt.totalShortfall)}; paid back: {formatDuration(debt.totalRepaid)}. This is an estimate from your entries and your goal, not a measurement, and it is separate from the nightly score.{" "}
           <Link href="/progress/sleep/method" className="underline">
-            More
+            How it&apos;s worked out
           </Link>
         </p>
       </section>
@@ -101,7 +101,7 @@ export default async function SleepDebtPage() {
                   )}
                 </td>
                 <td className="py-1.5 text-right">{d.asleep === null ? <span className="text-muted-foreground">not logged</span> : formatDuration(d.asleep)}</td>
-                <td className={cn("py-1.5 text-right", d.shortfall ? "text-[#f08a8a]" : d.repaid ? "text-[#8fd3a8]" : "text-muted-foreground")}>{d.shortfall ? `+${formatDuration(d.shortfall)}` : d.repaid ? `−${formatDuration(d.repaid)}` : "—"}</td>
+                <td className={cn("py-1.5 text-right", d.shortfall ? "text-destructive-foreground" : d.repaid ? "text-success" : "text-muted-foreground")}>{d.shortfall ? `+${formatDuration(d.shortfall)}` : d.repaid ? `−${formatDuration(d.repaid)}` : "—"}</td>
                 <td className="py-1.5 text-right font-semibold">{formatDuration(d.debt)}</td>
               </tr>
             ))}

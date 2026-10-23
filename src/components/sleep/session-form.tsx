@@ -67,15 +67,15 @@ export function SleepSessionForm({ session, timezone, defaults, returnTo }: { se
           <label htmlFor="sleep-started" className={label}>
             Got into bed
           </label>
-          <Input id="sleep-started" name="startedAt" type="datetime-local" required defaultValue={session ? local(session.startedAt) : defaults.startedAt} aria-invalid={Boolean(err("startedAt"))} />
-          <FieldError message={err("startedAt")} />
+          <Input id="sleep-started" name="startedAt" type="datetime-local" required defaultValue={session ? local(session.startedAt) : defaults.startedAt} aria-invalid={Boolean(err("startedAt"))} aria-describedby={err("startedAt") ? "sleep-started-error" : undefined} />
+          <FieldError id="sleep-started-error" message={err("startedAt")} />
         </div>
         <div className={field}>
           <label htmlFor="sleep-ended" className={label}>
             Got up
           </label>
-          <Input id="sleep-ended" name="endedAt" type="datetime-local" required defaultValue={session ? local(session.endedAt) : defaults.endedAt} aria-invalid={Boolean(err("endedAt"))} />
-          <FieldError message={err("endedAt")} />
+          <Input id="sleep-ended" name="endedAt" type="datetime-local" required defaultValue={session ? local(session.endedAt) : defaults.endedAt} aria-invalid={Boolean(err("endedAt"))} aria-describedby={err("endedAt") ? "sleep-ended-error" : undefined} />
+          <FieldError id="sleep-ended-error" message={err("endedAt")} />
         </div>
       </div>
 
@@ -100,29 +100,29 @@ export function SleepSessionForm({ session, timezone, defaults, returnTo }: { se
             <label htmlFor="sleep-onset" className={label}>
               Fell asleep (about)
             </label>
-            <Input id="sleep-onset" name="onsetAt" type="datetime-local" defaultValue={local(session?.onsetAt)} aria-invalid={Boolean(err("onsetAt"))} />
-            <FieldError message={err("onsetAt")} />
+            <Input id="sleep-onset" name="onsetAt" type="datetime-local" defaultValue={local(session?.onsetAt)} aria-invalid={Boolean(err("onsetAt"))} aria-describedby={err("onsetAt") ? "sleep-onset-error" : undefined} />
+            <FieldError id="sleep-onset-error" message={err("onsetAt")} />
           </div>
           <div className={field}>
             <label htmlFor="sleep-final-wake" className={label}>
               Final wake-up
             </label>
-            <Input id="sleep-final-wake" name="finalWakeAt" type="datetime-local" defaultValue={local(session?.finalWakeAt)} aria-invalid={Boolean(err("finalWakeAt"))} />
-            <FieldError message={err("finalWakeAt")} />
+            <Input id="sleep-final-wake" name="finalWakeAt" type="datetime-local" defaultValue={local(session?.finalWakeAt)} aria-invalid={Boolean(err("finalWakeAt"))} aria-describedby={err("finalWakeAt") ? "sleep-final-wake-error" : undefined} />
+            <FieldError id="sleep-final-wake-error" message={err("finalWakeAt")} />
           </div>
           <div className={field}>
             <label htmlFor="sleep-awakenings" className={label}>
               Times you woke up
             </label>
-            <Input id="sleep-awakenings" name="awakenings" type="number" inputMode="numeric" min={0} max={50} defaultValue={session?.awakenings ?? ""} aria-invalid={Boolean(err("awakenings"))} />
-            <FieldError message={err("awakenings")} />
+            <Input id="sleep-awakenings" name="awakenings" type="number" inputMode="numeric" min={0} max={50} defaultValue={session?.awakenings ?? ""} aria-invalid={Boolean(err("awakenings"))} aria-describedby={err("awakenings") ? "sleep-awakenings-error" : undefined} />
+            <FieldError id="sleep-awakenings-error" message={err("awakenings")} />
           </div>
           <div className={field}>
             <label htmlFor="sleep-awake-minutes" className={label}>
               Minutes awake in the night
             </label>
-            <Input id="sleep-awake-minutes" name="awakeMinutes" type="number" inputMode="numeric" min={0} max={1440} defaultValue={session?.awakeMinutes ?? ""} aria-invalid={Boolean(err("awakeMinutes"))} />
-            <FieldError message={err("awakeMinutes")} />
+            <Input id="sleep-awake-minutes" name="awakeMinutes" type="number" inputMode="numeric" min={0} max={1440} defaultValue={session?.awakeMinutes ?? ""} aria-invalid={Boolean(err("awakeMinutes"))} aria-describedby={err("awakeMinutes") ? "sleep-awake-minutes-error" : undefined} />
+            <FieldError id="sleep-awake-minutes-error" message={err("awakeMinutes")} />
           </div>
         </div>
         <p className="mt-3 text-xs text-muted-foreground">These are your own estimates. Without them, time asleep is taken as time in bed and labelled as such.</p>
@@ -133,7 +133,7 @@ export function SleepSessionForm({ session, timezone, defaults, returnTo }: { se
           Notes
         </label>
         <Textarea id="sleep-notes" name="notes" rows={2} maxLength={280} defaultValue={session?.notes ?? ""} placeholder="Late coffee, noisy street, travel day…" />
-        <FieldError message={err("notes")} />
+        <FieldError id="sleep-notes-error" message={err("notes")} />
       </div>
 
       <FormMessage state={state} />

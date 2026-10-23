@@ -53,7 +53,7 @@ export default async function SleepEnergyPage() {
           Estimated alertness today
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          From a {formatClock(wakeMinutes)} wake time{lastNight ? `, last night's ${Math.round(lastNight.asleepMinutes / 6) / 10} h` : ", no night logged"}
+          From {lastNight || w.anchorWake !== null ? `a ${formatClock(wakeMinutes)} wake time` : `an assumed ${formatClock(wakeMinutes)} wake time (nothing logged and no wake time set)`}{lastNight ? `, last night's ${Math.round(lastNight.asleepMinutes / 6) / 10} h` : ", no night logged"}
           {debt.nightsWithData ? ` and an estimated ${Math.round(debt.debtMinutes / 6) / 10} h of sleep debt` : ""}
           {r.scale < 1 ? ` (curve lowered to ${Math.round(r.scale * 100)}%)` : ""}.
         </p>
@@ -72,6 +72,7 @@ export default async function SleepEnergyPage() {
             </li>
           ))}
         </ol>
+        <p className="mt-1 text-xs text-muted-foreground">Bar height is the estimate out of 100; gold 80 and above, champagne 65–79, bronze below. Flat bars are hours you are expected to be asleep.</p>
         <dl className="mt-4 grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
           <div className="rounded-xl bg-elevated p-3">
             <dt className="text-xs text-muted-foreground">Likely sharpest</dt>
@@ -100,7 +101,7 @@ export default async function SleepEnergyPage() {
             </div>
           ))}
         </dl>
-        <Link href={`/progress/sleep/checkin?day=${today}`} className="mt-3 inline-block text-sm font-semibold text-gold-highlight underline">
+        <Link href={`/progress/sleep/checkin?day=${today}`} className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-gold-highlight underline">
           Update today&apos;s check-in
         </Link>
       </section>

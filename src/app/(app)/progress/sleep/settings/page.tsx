@@ -18,7 +18,7 @@ export const metadata = { title: "Sleep settings" };
 export default async function SleepSettingsPage() {
   const { user, profile } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
-  const [{ count }, { count: importedCount }, runs] = await Promise.all([
+  const [{ count, error: countError }, { count: importedCount, error: importedError }, runs] = await Promise.all([
     supabase.from("sleep_sessions").select("id", { count: "exact", head: true }).eq("user_id", user.id),
     supabase.from("sleep_sessions").select("id", { count: "exact", head: true }).eq("user_id", user.id).in("source", ["apple_health", "health_connect", "wearable"]),
     listSleepImportRuns(supabase, user.id, 5).catch(() => []),
@@ -39,7 +39,7 @@ export default async function SleepSettingsPage() {
           Sleep goal
         </h2>
         <p className="mt-1 mb-4 text-sm text-muted-foreground">
-          Currently {formatDuration(goal)}. Most adults are advised 7 hours or more; this is a target you choose, not a measurement of what your body needs. Nightly scores and goal completion use it.
+          Currently {formatDuration(goal)}. Public-health guidance for most adults is 7 hours or more; this is a target you choose, not a measurement of what your body needs. Nightly scores and goal completion use it.
         </p>
         <SleepGoalForm goalMinutes={goal} />
       </section>
@@ -90,21 +90,29 @@ export default async function SleepSettingsPage() {
           <li>{consentedOn ? `You allowed wellness information on ${consentedOn}.` : "Wellness information isn't allowed yet."} The same permission covers recovery check-ins.</li>
           <li>Deleted with your account, and exported with your data.</li>
         </ul>
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <ActionButton
-            action={deleteAllSleepDataAction}
-            fields={{}}
-            variant="destructive"
-            confirmMessage="Delete all sleep entries?"
-            confirmLabel="Delete all"
-            confirmDetail={`${count ?? 0} ${count === 1 ? "entry" : "entries"} will be removed for good.`}
-            disabled={!count}
-          >
-            <Trash2 className="size-4" aria-hidden /> Delete all sleep entries
-          </ActionButton>
-          <span className="text-sm text-muted-foreground">{count ?? 0} stored</span>
-        </div>
-        {!count && <Notice className="mt-3">Nothing stored yet.</Notice>}
+        {countError || importedError ? (
+          <Notice tone="error" className="mt-4">
+            Couldn&apos;t count your sleep entries just now. Try again in a moment.
+          </Notice>
+        ) : (
+          <>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <ActionButton
+                action={deleteAllSleepDataAction}
+                fields={{}}
+                variant="destructive"
+                confirmMessage="Delete all sleep data?"
+                confirmLabel="Delete all"
+                confirmDetail={`${count ?? 0} ${count === 1 ? "entry" : "entries"}, every check-in and the import history will be removed for good.`}
+                disabled={!count}
+              >
+                <Trash2 className="size-4" aria-hidden /> Delete all sleep data
+              </ActionButton>
+              <span className="text-sm text-muted-foreground">{count ?? 0} stored</span>
+            </div>
+            {!count && <Notice className="mt-3">Nothing stored yet.</Notice>}
+          </>
+        )}
       </section>
     </div>
   );

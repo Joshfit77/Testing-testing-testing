@@ -66,7 +66,7 @@ export async function withdrawWellnessConsentAction(_prev: ActionState): Promise
   const { error } = await supabase.from("profiles").update({ wellness_consent_at: null }).eq("id", user.id);
   if (error) return actionError("Couldn't update your consent. Please try again.");
   revalidatePath("/", "layout");
-  return actionOk("Consent withdrawn. Limitation notes and recovery check-ins were deleted.");
+  return actionOk("Consent withdrawn. Limitation notes and recovery check-ins were deleted; sleep entries stay until you delete them under Sleep & Recovery > Goal & privacy.");
 }
 
 /**

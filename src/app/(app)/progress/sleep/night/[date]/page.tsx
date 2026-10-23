@@ -140,7 +140,7 @@ export default async function NightReportPage({ params }: { params: Promise<{ da
               <Row label="Time in bed" value={formatDuration(night.inBedMinutes)} />
               <Row label="Time to fall asleep" value={night.latencyMinutes === null ? "Not recorded" : formatDuration(night.latencyMinutes)} />
               <Row label="Wake-ups" value={night.awakenings === null ? "Not recorded" : String(night.awakenings)} />
-              <Row label="Sleep efficiency" value={night.efficiencyPct === null ? "Not recorded" : `${night.efficiencyPct}%`} note={night.efficiencyPct === null ? "Needs when you fell asleep or time awake" : "Time asleep ÷ time in bed"} />
+              <Row label="Sleep efficiency" value={night.efficiencyPct === null ? "Not recorded" : `${night.efficiencyPct}%`} note={night.efficiencyPct === null ? "Needs when you fell asleep, your final wake-up or minutes awake" : "Time asleep ÷ time in bed"} />
             </dl>
           </section>
 
@@ -211,7 +211,7 @@ export default async function NightReportPage({ params }: { params: Promise<{ da
             ) : (
               <p className="mt-2 text-sm text-muted-foreground">No check-in for this day.</p>
             )}
-            <Link href={`/progress/sleep/checkin?day=${date}`} className="mt-3 inline-block text-sm font-semibold text-gold-highlight underline">
+            <Link href={`/progress/sleep/checkin?day=${date}`} className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-gold-highlight underline">
               {checkinRows.length ? "Edit check-in" : "Add a check-in"}
             </Link>
           </section>

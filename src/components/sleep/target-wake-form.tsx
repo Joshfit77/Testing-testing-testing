@@ -14,8 +14,8 @@ export function TargetWakeForm({ value }: { value: string | null }) {
         <label htmlFor="target-wake" className="block text-sm font-semibold">
           Wake time to keep (optional)
         </label>
-        <Input id="target-wake" name="targetWake" type="time" defaultValue={value ?? ""} className="max-w-40" aria-invalid={Boolean(state.fieldErrors?.targetWake)} />
-        <FieldError message={state.fieldErrors?.targetWake} />
+        <Input id="target-wake" name="targetWake" type="time" defaultValue={value ?? ""} className="max-w-40" aria-invalid={Boolean(state.fieldErrors?.targetWake)} aria-describedby={state.fieldErrors?.targetWake ? "target-wake-error" : undefined} />
+        <FieldError id="target-wake-error" message={state.fieldErrors?.targetWake} />
       </div>
       <SubmitButton pendingLabel="Saving…" variant="secondary">
         Save

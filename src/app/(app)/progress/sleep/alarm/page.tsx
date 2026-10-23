@@ -32,6 +32,7 @@ export default async function SleepAlarmPage() {
         <h2 id="next-title" className="font-display text-xl font-bold uppercase">
           Next alarms
         </h2>
+        <p className="mt-1 text-sm text-muted-foreground">When these settings sound, once the phone app has scheduled them.</p>
         {next.length ? (
           <ul className="mt-2 divide-y divide-border text-sm" aria-label="Next alarms">
             {next.map((iso) => (

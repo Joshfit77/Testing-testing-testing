@@ -2,7 +2,7 @@
 
 _All calculations are deterministic code in `src/lib/domain/sleep*.ts`, unit-tested, and versioned. Nothing on these
 pages is a physiological measurement: the app knows what the member logged (or imported from a health platform) and
-nothing more. Sleep quality (the nightly score), sleep shortfall (sleep debt) and predicted daytime energy are three
+nothing more. the nightly score (one night as logged), sleep shortfall (sleep debt) and predicted daytime energy are three
 separate ideas and are shown separately._
 
 ## Sessions and nights (`sleep.ts`, calc version 1)

@@ -48,7 +48,7 @@ export function SleepImportCard({ enabled }: { enabled: boolean }) {
       </Button>
       {!enabled && <p className="text-xs text-muted-foreground">Import is switched off. Turn it on below to read from {appName} again.</p>}
       {message && (
-        <p role="status" className={message.ok ? "text-sm text-[#8fd3a8]" : "text-sm text-[#f08a8a]"}>
+        <p role={message.ok ? "status" : "alert"} className={message.ok ? "text-sm text-success" : "text-sm text-destructive-foreground"}>
           {message.text}
         </p>
       )}

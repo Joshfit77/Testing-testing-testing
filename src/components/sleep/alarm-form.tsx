@@ -66,11 +66,11 @@ export function SleepAlarmForm({ config }: { config: AlarmConfig }) {
       <fieldset disabled={!enabled} className="space-y-5 disabled:opacity-50">
         <div className="max-w-40 space-y-1.5">
           <Label htmlFor="alarm-time">Wake time</Label>
-          <Input id="alarm-time" name="wakeTime" type="time" defaultValue={config.wakeTime} required aria-invalid={Boolean(state.fieldErrors?.wakeTime)} />
-          <FieldError message={state.fieldErrors?.wakeTime} />
+          <Input id="alarm-time" name="wakeTime" type="time" defaultValue={config.wakeTime} required aria-invalid={Boolean(state.fieldErrors?.wakeTime)} aria-describedby={state.fieldErrors?.wakeTime ? "alarm-time-error" : undefined} />
+          <FieldError id="alarm-time-error" message={state.fieldErrors?.wakeTime} />
         </div>
 
-        <fieldset>
+        <fieldset aria-describedby={state.fieldErrors?.days ? "alarm-days-error" : undefined}>
           <legend className="mb-2 text-sm font-semibold">Days</legend>
           <div className="grid grid-cols-7 gap-1.5">
             {WEEKDAYS.map((d) => (
@@ -89,7 +89,7 @@ export function SleepAlarmForm({ config }: { config: AlarmConfig }) {
               </label>
             ))}
           </div>
-          <FieldError message={state.fieldErrors?.days} />
+          <FieldError id="alarm-days-error" message={state.fieldErrors?.days} />
         </fieldset>
 
         <div className="max-w-48 space-y-1.5">
@@ -110,13 +110,13 @@ export function SleepAlarmForm({ config }: { config: AlarmConfig }) {
       {device === "web" && (
         <div className="flex gap-3 rounded-xl border border-gold-muted/50 bg-gold/5 p-4 text-sm">
           <Smartphone className="mt-0.5 size-5 shrink-0 text-gold" aria-hidden />
-          <p>These settings are saved to your account. The alarm itself sounds from the Narrow Gate phone app, which schedules it on your phone; a web browser can&apos;t wake you.</p>
+          <p>Saved to your account only. A web browser can&apos;t wake you: the alarm sounds from the Narrow Gate phone app, which picks these settings up the next time you open it with notifications allowed, or when you save them there.</p>
         </div>
       )}
       {device === "phone" && (
         <div className="space-y-2 text-sm">
           {deviceStatus && (
-            <p role={deviceStatus.tone === "error" ? "alert" : "status"} className={deviceStatus.tone === "ok" ? "text-[#5fc49a]" : deviceStatus.tone === "warn" ? "text-gold-highlight" : "text-[#f08a8a]"}>
+            <p role={deviceStatus.tone === "error" ? "alert" : "status"} className={deviceStatus.tone === "ok" ? "text-success" : deviceStatus.tone === "warn" ? "text-gold-highlight" : "text-destructive-foreground"}>
               {deviceStatus.text}
             </p>
           )}
@@ -124,7 +124,7 @@ export function SleepAlarmForm({ config }: { config: AlarmConfig }) {
             <p className="text-muted-foreground">{pendingCount === 0 ? "No alarm is scheduled on this phone yet. Save to schedule it." : `${pendingCount} alarm notification${pendingCount === 1 ? "" : "s"} pending on this phone.`}</p>
           )}
           {deviceStatus?.tone === "warn" && (
-            <button type="button" className="text-sm font-semibold text-gold-highlight underline" onClick={() => void requestExactAlarms().then((ok) => ok && setDeviceStatus({ tone: "ok", text: "Exact alarms allowed. Save again to reschedule at the exact minute." }))}>
+            <button type="button" className="inline-flex min-h-11 items-center text-sm font-semibold text-gold-highlight underline" onClick={() => void requestExactAlarms().then((ok) => ok && setDeviceStatus({ tone: "ok", text: "Exact alarms allowed. Save again to reschedule at the exact minute." }))}>
               Allow exact alarms
             </button>
           )}

@@ -15,7 +15,7 @@ export default async function SleepMethodPage() {
   return (
     <div className="space-y-6">
       <BackLink href="/progress/sleep">Sleep & Recovery</BackLink>
-      <PageHeader eyebrow="Sleep & Recovery" title="How the figures are worked out" description="Everything here is calculated from what you logged. Nothing is measured by your phone, and nothing is guessed." />
+      <PageHeader eyebrow="Sleep & Recovery" title="How the figures are worked out" description="Everything here is calculated from what you logged or imported from a health platform. The app itself measures nothing, and anything assumed is labelled." />
 
       <section className={card} aria-labelledby="m-nights">
         <h2 id="m-nights" className="font-display text-lg font-bold uppercase text-foreground">
@@ -87,6 +87,27 @@ export default async function SleepMethodPage() {
           Habit tips
         </h2>
         <p>Ten plain rules over your last two weeks of nights and check-ins, each shown with the entries it came from and one thing to try. At most three appear at a time; dismiss any and it stays hidden until you restore it. The tips are general sleep-habit guidance, never advice about medication.</p>
+      </section>
+
+      <section className={card} aria-labelledby="m-compare">
+        <h2 id="m-compare" className="font-display text-lg font-bold uppercase text-foreground">
+          Comparisons over longer ranges
+        </h2>
+        <p>Sleep history shows time asleep night by night over 7 days, weekly averages over 30 and 90 days and monthly averages over a year; a week or month with nothing logged is an empty slot, never zero. Weekday and weekend nights (Plus) are compared on nights logged, average time asleep, nights at goal and typical bedtime and wake time. A night counts as a weekend night when it ends on a Saturday or Sunday; typical times need three nights on each side; differences under 10 minutes read as &ldquo;about the same&rdquo;.</p>
+      </section>
+
+      <section className={card} aria-labelledby="m-training">
+        <h2 id="m-training" className="font-display text-lg font-bold uppercase text-foreground">
+          Sleep and training (Pro)
+        </h2>
+        <p>Three plain comparisons over your last 28 days, each needing at least three nights on both sides: time asleep before training days against rest days, logged effort (RPE) after short nights against the rest (a difference of 0.4 or more is reported), and restedness on training days against the rest (0.5 points or more). They describe your own entries side by side and are not proof that one causes the other. The easier-day suggestion goes through the same accept-or-decline cards as every other training suggestion and never changes your plan on its own.</p>
+      </section>
+
+      <section className={card} aria-labelledby="m-alarm">
+        <h2 id="m-alarm" className="font-display text-lg font-bold uppercase text-foreground">
+          Wake-up alarm
+        </h2>
+        <p>A fixed time on the days you choose, saved to your account. The phone app schedules it as one repeating notification per day with Snooze and I&apos;m up; a web browser can&apos;t sound it. The &ldquo;next alarms&rdquo; list is worked out in your profile time zone from the saved settings. No alarm ever sounds before the time you set: a smart window would need the phone to watch your sleep in the background, which isn&apos;t built. The alarm hasn&apos;t been tested on a physical phone yet.</p>
       </section>
 
       <section className={card} aria-labelledby="m-goal">

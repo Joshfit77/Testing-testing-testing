@@ -35,7 +35,7 @@ export function upcomingWeek(ref: { currentWeek: number; currentDay: number; dur
 }
 
 export async function loadReviewInput(supabase: SupabaseClient, userId: string): Promise<{ input: ReviewInput; timeZone: string }> {
-  const { data: profile } = await supabase.from("profiles").select("unit_system, timezone, sleep_goal_minutes").eq("id", userId).maybeSingle();
+  const { data: profile } = await supabase.from("profiles").select("unit_system, timezone, sleep_goal_minutes, wellness_consent_at").eq("id", userId).maybeSingle();
   const timeZone = (profile?.timezone as string) || "UTC";
   const today = isoDateInTz(new Date(), timeZone);
   const since = addDays(today, -56);
@@ -142,10 +142,13 @@ export async function loadReviewInput(supabase: SupabaseClient, userId: string):
       checkins: (checkinsRes.data ?? []).map((c) => ({ date: c.checked_on as string, readiness: c.readiness_score as number })),
       targets,
       decided: new Set((decisionsRes.data ?? []).map((d) => d.recommendation_key as string)),
-      sleep: {
-        goalMinutes: (profile?.sleep_goal_minutes as number | null) ?? DEFAULT_SLEEP_GOAL_MINUTES,
-        nights: summarizeNights(((sleepRes.data ?? []) as unknown as SleepSessionRow[]).map(rowToSession)).map((n) => ({ date: n.nightOf, asleepMinutes: n.asleepMinutes })),
-      },
+      // Sleep is wellness data: once consent is withdrawn the rows stay for the member but are not used here.
+      sleep: profile?.wellness_consent_at
+        ? {
+            goalMinutes: (profile?.sleep_goal_minutes as number | null) ?? DEFAULT_SLEEP_GOAL_MINUTES,
+            nights: summarizeNights(((sleepRes.data ?? []) as unknown as SleepSessionRow[]).map(rowToSession)).map((n) => ({ date: n.nightOf, asleepMinutes: n.asleepMinutes })),
+          }
+        : null,
     },
   };
 }

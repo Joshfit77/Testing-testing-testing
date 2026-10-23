@@ -21,7 +21,7 @@ import {
   zonedTimeToIso,
   type SleepSessionTimes,
 } from "@/lib/domain/sleep";
-import { alarmConfigFromForm, alarmConfigSchema, describeAlarm, parseAlarmConfig } from "@/lib/domain/sleep-alarm";
+import { alarmConfigFromForm, alarmConfigSchema, describeAlarm, parseAlarmConfig, type AlarmConfig } from "@/lib/domain/sleep-alarm";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getProfile, requireUser } from "@/server/auth";
 import { logError } from "@/server/log";
@@ -221,7 +221,7 @@ export async function setSleepGoalAction(_prev: ActionState, formData: FormData)
   return actionOk(`Sleep goal set to ${formatDuration(parsed.data.goalMinutes)}.`);
 }
 
-const targetWakeSchema = z.object({ targetWake: z.preprocess(blankToUndefined, z.string().regex(/^\d{2}:\d{2}$/, "Enter a time like 06:30").optional()) });
+const targetWakeSchema = z.object({ targetWake: z.preprocess(blankToUndefined, z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Enter a time like 06:30").optional()) });
 
 /** The wake time the member wants to keep; blank means "use my typical wake time". */
 export async function setSleepTargetWakeAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -256,6 +256,16 @@ export async function setSleepAlarmAction(_prev: ActionState, formData: FormData
   return actionOk(config.enabled ? `Alarm set for ${describeAlarm(config)}.` : "Alarm switched off.");
 }
 
+/** The saved alarm settings, for the phone app to schedule on launch; null when signed out or never set. */
+export async function getSleepAlarmConfigAction(): Promise<AlarmConfig | null> {
+  try {
+    const { profile } = await sleepCtx();
+    return profile?.sleep_alarm == null ? null : parseAlarmConfig(profile.sleep_alarm);
+  } catch {
+    return null;
+  }
+}
+
 /** Hide one habit tip. Used by one-click buttons. */
 export async function dismissSleepTipAction(formData: FormData): Promise<void> {
   const user = await requireUser();
@@ -278,12 +288,16 @@ export async function restoreSleepTipsAction(): Promise<void> {
   refresh();
 }
 
-/** Remove every sleep session (stages go with them). Consent itself is kept; it is shared with recovery check-ins. */
+/** Remove every sleep session (stages go with them), check-in and import record. Consent itself is kept; it is shared with recovery check-ins. */
 export async function deleteAllSleepDataAction(): Promise<void> {
   const user = await requireUser();
   const supabase = await getServerSupabase();
-  const { error } = await supabase.from("sleep_sessions").delete().eq("user_id", user.id);
-  if (error) logError("sleep.delete_all", error);
+  const steps = await Promise.all([
+    supabase.from("sleep_sessions").delete().eq("user_id", user.id),
+    supabase.from("sleep_checkins").delete().eq("user_id", user.id),
+    supabase.from("sleep_import_runs").delete().eq("user_id", user.id),
+  ]);
+  for (const { error } of steps) if (error) logError("sleep.delete_all", error);
   refresh();
   revalidatePath("/progress/sleep/settings");
 }

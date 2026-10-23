@@ -102,7 +102,7 @@ export default async function ProfilePage() {
           <p className="font-semibold">Optional wellness information</p>
           <p className="mb-2 text-sm text-muted-foreground">
             {profile.wellness_consent_at
-              ? `You gave consent on ${new Date(profile.wellness_consent_at).toLocaleDateString()}. Withdrawing deletes limitation notes and recovery check-ins.`
+              ? `You gave consent on ${new Date(profile.wellness_consent_at).toLocaleDateString()}. Withdrawing deletes limitation notes and recovery check-ins; sleep entries stay until you delete them under Sleep & Recovery > Goal & privacy.`
               : "You haven't consented to storing optional wellness information."}
           </p>
           {profile.wellness_consent_at && <WithdrawConsentForm />}

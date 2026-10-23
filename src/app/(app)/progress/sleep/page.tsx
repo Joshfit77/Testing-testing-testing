@@ -116,7 +116,7 @@ export default async function SleepPage({ searchParams }: { searchParams: Promis
       <PageHeader
         eyebrow="My Progress"
         title="Sleep & Recovery"
-        description="Your nights and naps, by timer or by hand. Everything here is what you recorded; nothing is measured from your phone."
+        description="Your nights and naps, by timer, by hand or imported from a health platform. The app itself measures nothing, and anything assumed is labelled."
         actions={
           consented ? (
             <Button asChild variant="secondary">
@@ -162,7 +162,7 @@ export default async function SleepPage({ searchParams }: { searchParams: Promis
                       <SleepScoreCard score={lastScore} breakdown={false} compact />
                     </div>
                   )}
-                  <Link href={`/progress/sleep/night/${lastNight.nightOf}`} className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-gold-highlight underline">
+                  <Link href={`/progress/sleep/night/${lastNight.nightOf}`} className="mt-3 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-gold-highlight underline">
                     Nightly report <ChevronRight className="size-4" aria-hidden />
                   </Link>
                 </>

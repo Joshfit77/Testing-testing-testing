@@ -5,12 +5,14 @@ import { cn } from "@/lib/utils";
 /** Average time asleep per week or month as bars against the goal. A bucket with no nights is an empty slot, never a zero. */
 export function TrendBars({ points, goalMinutes, unit, className }: { points: TrendPoint[]; goalMinutes: number; unit: "week" | "month"; className?: string }) {
   const top = Math.max(goalMinutes * 1.25, ...points.map((p) => p.avgAsleep ?? 0));
-  const goalPct = (goalMinutes / top) * 100;
+  // Bars are 56px tall above a 4px gap and a 16px label, so the goal line sits 1.25rem + its share of 56px up.
+  const goalPx = (goalMinutes / top) * 56;
   const many = points.length > 8;
   return (
-    <div className={cn("relative", className)}>
-      <span aria-hidden className="pointer-events-none absolute inset-x-0 border-t border-dashed border-gold/60" style={{ bottom: `calc(1.25rem + ${goalPct}% * 0.56)` }} />
-      <ol className="flex items-end justify-between gap-1" aria-label={`Average time asleep by ${unit}`}>
+    <div className={className}>
+      <div className="relative">
+        <span aria-hidden className="pointer-events-none absolute inset-x-0 border-t border-dashed border-gold/60" style={{ bottom: `calc(1.25rem + ${goalPx}px)` }} />
+        <ol className="flex items-end justify-between gap-1" aria-label={`Average time asleep by ${unit}`}>
         {points.map((p, i) => (
           <li key={p.start} className="flex min-w-0 flex-1 flex-col items-center gap-1">
             <span className="sr-only">
@@ -24,7 +26,8 @@ export function TrendBars({ points, goalMinutes, unit, className }: { points: Tr
             </span>
           </li>
         ))}
-      </ol>
+        </ol>
+      </div>
       <p className="mt-1 text-xs text-muted-foreground">Dashed line: your goal of {formatDuration(goalMinutes)}. Empty slot: nothing logged that {unit}.</p>
     </div>
   );

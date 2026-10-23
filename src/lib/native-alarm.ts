@@ -89,6 +89,28 @@ export async function scheduleSleepAlarm(config: AlarmConfig): Promise<AlarmSche
   }
 }
 
+/**
+ * On launch, bring this phone in line with the alarm saved to the account: settings saved on the web are scheduled
+ * here, and an alarm switched off elsewhere is cancelled. Never prompts: it only schedules when notifications are
+ * already allowed, so the first scheduling always happens from the alarm page where the prompt makes sense.
+ */
+export async function syncSleepAlarmFromAccount(load: () => Promise<AlarmConfig | null>): Promise<void> {
+  if (!isNativeApp()) return;
+  try {
+    const config = await load();
+    if (!config) return;
+    if (!config.enabled) {
+      await cancelSleepAlarm();
+      return;
+    }
+    const LocalNotifications = await plugin();
+    if ((await LocalNotifications.checkPermissions()).display !== "granted") return;
+    await scheduleSleepAlarm(config);
+  } catch {
+    /* the alarm page reports the device state when the member opens it */
+  }
+}
+
 /** Number of alarm notifications pending on this device (weekly entries plus a snooze), or null if unknown. */
 export async function pendingSleepAlarmCount(): Promise<number | null> {
   if (!isNativeApp()) return null;
@@ -115,7 +137,7 @@ export async function installSleepAlarmActions(): Promise<() => void> {
       const n = event.notification;
       if (!ALL_ALARM_IDS.includes(n.id)) return;
       if (event.actionId === "snooze") {
-        const minutes = Number((n.extra as { snoozeMinutes?: unknown } | undefined)?.snoozeMinutes) || 9;
+        const minutes = Math.min(30, Math.max(1, Math.round(Number((n.extra as { snoozeMinutes?: unknown } | undefined)?.snoozeMinutes) || 9)));
         void LocalNotifications.schedule({
           notifications: [{ id: SNOOZE_NOTIFICATION_ID, title: TITLE, body: BODY, actionTypeId: ALARM_ACTION_TYPE, extra: n.extra, schedule: { at: new Date(Date.now() + minutes * 60_000), allowWhileIdle: true } }],
         }).catch(() => undefined);
