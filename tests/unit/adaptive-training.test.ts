@@ -193,4 +193,17 @@ describe("logged sleep in the review", () => {
     const fine = analyzeTraining(input({ sleep: { goalMinutes: 480, nights: nights.map((n) => ({ ...n, asleepMinutes: 470 })) } }));
     expect(fine.recommendations.some((x) => x.kind === "short_sleep")).toBe(false);
   });
+
+  it("carries what the wearable recorded as context, averaged, and never as a change", () => {
+    const nights = [0, 1, 2, 3, 8, 9].map((d) => ({ date: addDays(TODAY, -d), asleepMinutes: 390, recorded: d !== 3, hrAvg: d === 3 ? null : 50 + d, hrvAvgMs: d === 3 ? null : 40 + d / 2 }));
+    const r = analyzeTraining(input({ sleep: { goalMinutes: 480, nights } }));
+    expect(r.recovery.recorded).toEqual({ nights7: 3, nights14: 5, hrAvg7: 51, hrAvg14: 54, hrvAvg7: 40.5, hrvAvg14: 42 });
+    const rec = r.recommendations.find((x) => x.kind === "short_sleep")!;
+    expect(rec.why[1]).toBe("3 of those nights were recorded by your watch, overnight heart rate 51 bpm on average (54 over the fortnight).");
+    expect(rec.change).toBeNull();
+    expect(r.dataGaps.join(" ")).not.toMatch(/recorded by a wearable/);
+    const manual = analyzeTraining(input({ sleep: { goalMinutes: 480, nights: nights.map((n) => ({ date: n.date, asleepMinutes: n.asleepMinutes })) } }));
+    expect(manual.recovery.recorded).toBeNull();
+    expect(manual.dataGaps.join(" ")).toMatch(/recorded by a wearable/);
+  });
 });

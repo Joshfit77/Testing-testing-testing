@@ -31,7 +31,7 @@ export default async function SleepTrainingPage() {
     const rpes = w.exercises.flatMap((e) => e.sets.map((s) => s.rpe).filter((r): r is number => r != null));
     return { date: w.date, avgRpe: rpes.length ? Math.round((rpes.reduce((a, b) => a + b, 0) / rpes.length) * 10) / 10 : null, sets: w.exercises.reduce((a, e) => a + e.sets.length, 0) };
   });
-  const links = sleepTrainingLinks(nights, training, checkins, goal);
+  const links = sleepTrainingLinks(nights, training, checkins, goal, input.checkins);
   const review = analyzeTraining(input);
   const sleepRecs = review.recommendations.filter((r) => r.kind === "short_sleep" || r.kind === "low_readiness" || r.kind === "deload");
   const week = nights.filter((n) => n.nightOf >= addDays(today, -6));
@@ -53,6 +53,14 @@ export default async function SleepTrainingPage() {
           <p className="mt-1 text-sm text-muted-foreground">
             {trainedThisWeek} workout{trainedThisWeek === 1 ? "" : "s"} in the last 7 days · goal {formatDuration(goal)}
           </p>
+          {review.recovery.recorded && (
+            <p className="mt-1 text-sm text-muted-foreground" data-testid="training-recorded">
+              {review.recovery.recorded.nights7} of {week.length} nights recorded by your watch
+              {review.recovery.recorded.hrAvg7 !== null ? ` · overnight heart rate ${review.recovery.recorded.hrAvg7} bpm` : ""}
+              {review.recovery.recorded.hrvAvg7 !== null ? ` · HRV ${review.recovery.recorded.hrvAvg7} ms` : ""}
+              {review.recovery.recorded.hrAvg14 !== null && review.recovery.recorded.nights14 > review.recovery.recorded.nights7 ? ` (fortnight ${review.recovery.recorded.hrAvg14} bpm)` : ""}
+            </p>
+          )}
         </section>
         <section className={card}>
           <h2 className="font-display text-xl font-bold uppercase">Suggestions</h2>
@@ -89,7 +97,7 @@ export default async function SleepTrainingPage() {
             ))}
           </ul>
         ) : (
-          <p className="mt-2 text-sm text-muted-foreground">Comparisons appear once there are at least three nights on each side (nights before a workout and other nights; short nights and nights near your goal, with logged RPE or a morning check-in) and a real difference between them. Keep logging both and they fill in.</p>
+          <p className="mt-2 text-sm text-muted-foreground">Comparisons appear once there are at least three nights on each side (nights before a workout and other nights; short nights and nights near your goal; steady and off-schedule bedtimes; nights your watch recorded a higher-than-usual overnight heart rate, each against your check-ins or logged RPE) and a real difference between them. Keep logging both and they fill in.</p>
         )}
         <p className="mt-3 text-xs text-muted-foreground">A sleep score is not a recovery measure, and short sleep alone does not predict injury. If you feel unwell or have pain, rest and talk to a qualified professional.</p>
       </section>

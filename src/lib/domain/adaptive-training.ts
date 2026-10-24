@@ -73,7 +73,8 @@ export interface ReviewCheckin {
 /** Logged sleep for the last two weeks (Sleep & Recovery). Absent when the member hasn't logged any. */
 export interface ReviewSleep {
   goalMinutes: number;
-  nights: { date: string; asleepMinutes: number }[];
+  /** `recorded` nights came from a wearable through the health platform; `hrAvg`/`hrvAvgMs` are its overnight readings when it took any. */
+  nights: { date: string; asleepMinutes: number; recorded?: boolean; hrAvg?: number | null; hrvAvgMs?: number | null }[];
 }
 
 export interface ReviewInput {
@@ -129,6 +130,12 @@ export interface TrainingReview {
     rpePoints: number;
     /** Logged sleep over the last 7 nights, when any was logged. Never inferred. */
     sleep: { nights7: number; avgAsleep7: number | null; goalMinutes: number } | null;
+    /**
+     * What the member's wearable recorded through the health platform, when it did: nights recorded in the last 7
+     * and 14, and the average overnight heart rate and HRV over each window. The device's readings, averaged, never
+     * the app's own; absent when no night was recorded.
+     */
+    recorded: { nights7: number; nights14: number; hrAvg7: number | null; hrAvg14: number | null; hrvAvg7: number | null; hrvAvg14: number | null } | null;
   };
   weeksSinceDeload: number | null;
   recommendations: Recommendation[];
@@ -290,6 +297,17 @@ export function analyzeTraining(input: ReviewInput): TrainingReview {
   const avgAsleep7 = sleep7.length ? Math.round(sleep7.reduce((a, n) => a + n.asleepMinutes, 0) / sleep7.length) : null;
   const sleepSummary = input.sleep && input.sleep.nights.length ? { nights7: sleep7.length, avgAsleep7, goalMinutes: input.sleep.goalMinutes } : null;
   if (!sleepSummary) dataGaps.push("No sleep logged in the last two weeks, so sleep isn't part of this review.");
+  // Wearable nights: what the device recorded, averaged over each window. Context for the member and the coach only.
+  const recorded14 = (input.sleep?.nights ?? []).filter((n) => n.recorded && n.date >= addDays(today, -13) && n.date <= today);
+  const recorded7 = recorded14.filter((n) => n.date >= addDays(today, -6));
+  const avgOf = (xs: (number | null | undefined)[], decimals: number) => {
+    const v = xs.filter((x): x is number => typeof x === "number");
+    return v.length ? round(v.reduce((a, b) => a + b, 0) / v.length, decimals) : null;
+  };
+  const recordedSummary = recorded14.length
+    ? { nights7: recorded7.length, nights14: recorded14.length, hrAvg7: avgOf(recorded7.map((n) => n.hrAvg), 0), hrAvg14: avgOf(recorded14.map((n) => n.hrAvg), 0), hrvAvg7: avgOf(recorded7.map((n) => n.hrvAvgMs), 1), hrvAvg14: avgOf(recorded14.map((n) => n.hrvAvgMs), 1) }
+    : null;
+  if (sleepSummary && !recordedSummary) dataGaps.push("No night in the last two weeks was recorded by a wearable, so overnight heart rate and HRV aren't part of this review.");
 
   // Weeks since the last deload in this program ------------------------------------------------------------------
   let weeksSinceDeload: number | null = null;
@@ -472,7 +490,11 @@ export function analyzeTraining(input: ReviewInput): TrainingReview {
       kind: "short_sleep",
       title: "Short on sleep this week",
       summary: "Keep the plan, but don't chase new loads until you've had a few nights near your goal, and protect the night before your hardest session.",
-      why: [`Average ${fmt(avgAsleep7)} asleep over ${sleep7.length} logged nights against a ${fmt(sleepSummary.goalMinutes)} goal.`, "From what you logged, not a measurement. Short sleep on its own doesn't predict injury."],
+      why: [
+        `Average ${fmt(avgAsleep7)} asleep over ${sleep7.length} logged nights against a ${fmt(sleepSummary.goalMinutes)} goal.`,
+        ...(recordedSummary && recordedSummary.nights7 ? [`${recordedSummary.nights7} of those nights were recorded by your watch${recordedSummary.hrAvg7 !== null ? `, overnight heart rate ${recordedSummary.hrAvg7} bpm on average${recordedSummary.hrAvg14 !== null && recordedSummary.nights14 > recordedSummary.nights7 ? ` (${recordedSummary.hrAvg14} over the fortnight)` : ""}` : ""}.`] : []),
+        recordedSummary && recordedSummary.nights7 ? "Time asleep is the device's record and the rest what you logged; neither is a measurement of recovery. Short sleep on its own doesn't predict injury." : "From what you logged, not a measurement. Short sleep on its own doesn't predict injury.",
+      ],
       confidence: "moderate",
       change: null,
       link: { href: "/progress/sleep", label: "Sleep & Recovery" },
@@ -486,7 +508,7 @@ export function analyzeTraining(input: ReviewInput): TrainingReview {
     consistency,
     volume,
     lifts,
-    recovery: { checkins: input.checkins.length, avgReadiness7, latest, rpeDrift, rpePoints: drift.length, sleep: sleepSummary },
+    recovery: { checkins: input.checkins.length, avgReadiness7, latest, rpeDrift, rpePoints: drift.length, sleep: sleepSummary, recorded: recordedSummary },
     weeksSinceDeload,
     recommendations: recs,
     turnedDown,

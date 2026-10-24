@@ -147,7 +147,7 @@ export async function loadReviewInput(supabase: SupabaseClient, userId: string):
       sleep: profile?.wellness_consent_at
         ? {
             goalMinutes: (profile?.sleep_goal_minutes as number | null) ?? DEFAULT_SLEEP_GOAL_MINUTES,
-            nights: summarizeNights(((sleepRes.data ?? []) as unknown as SleepSessionRow[]).map(rowToSession)).map((n) => ({ date: n.nightOf, asleepMinutes: n.asleepMinutes })),
+            nights: summarizeNights(((sleepRes.data ?? []) as unknown as SleepSessionRow[]).map(rowToSession)).map((n) => ({ date: n.nightOf, asleepMinutes: n.asleepMinutes, recorded: n.recorded, hrAvg: n.vitals?.heartRate?.avg ?? null, hrvAvgMs: n.vitals?.hrv?.avgMs ?? null })),
           }
         : null,
     },
