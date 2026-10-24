@@ -52,6 +52,9 @@ export default async function SleepHistoryPage({ searchParams }: { searchParams:
   const recordedNights = nights.filter((n) => n.recorded).slice(0, 30);
   const recordedStages = recordedNights.length ? await listSleepStages(supabase, user.id, recordedNights.flatMap((n) => n.sessions.map((s) => s.id))) : [];
   const mix = recordedStages.length ? stageTotals(recordedStages) : null;
+  // Only nights with stage intervals count toward the mix (a phone's bare record is recorded, but has no stages).
+  const stagedIds = new Set(recordedStages.map((s) => s.session_id));
+  const stagedNights = recordedNights.filter((n) => n.sessions.some((s) => stagedIds.has(s.id)));
   const vitalNights = [...nights].reverse().map((n) => ({ nightOf: n.nightOf, vitals: n.vitals }));
   const split = compare ? weekdayWeekend(nights, goal) : null;
   const card = "rounded-2xl border border-border bg-card p-5";
@@ -111,7 +114,7 @@ export default async function SleepHistoryPage({ searchParams }: { searchParams:
         {mix ? (
           <>
             <p className="mt-1 text-sm text-muted-foreground">
-              Stage mix over {recordedNights.length} recorded night{recordedNights.length === 1 ? "" : "s"}{recordedNights.length < nights.filter((n) => n.recorded).length ? " (the most recent 30)" : ""}: {formatDuration(Math.round(mix.asleepMinutes / recordedNights.length))} asleep by stage on average.
+              Stage mix over {stagedNights.length} recorded night{stagedNights.length === 1 ? "" : "s"}{recordedNights.length < nights.filter((n) => n.recorded).length ? " (the most recent 30)" : ""}: {formatDuration(Math.round(mix.asleepMinutes / Math.max(1, stagedNights.length)))} asleep by stage on average.
             </p>
             <StageBar totals={mix} className="mt-3" />
           </>

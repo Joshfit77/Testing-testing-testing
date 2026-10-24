@@ -45,7 +45,6 @@ describe("sleep and training links", () => {
       id: d,
       kind: "night",
       source: "apple_health",
-      sourceId: `hk-${d}`,
       startedAt: `${addDaysIso(d, -1)}T23:00:00Z`,
       endedAt: `${d}T07:00:00Z`,
       timezone: "UTC",

@@ -141,7 +141,7 @@ export function SleepSourceCard({ status }: { status: SleepSourceStatus }) {
         </Button>
         {!platform && !connected && (
           <Button asChild size="sm" variant="ghost">
-            <Link href="/progress/sleep/log">Enter sleep by hand</Link>
+            <Link href="/progress/sleep/log">Or enter a night by hand</Link>
           </Button>
         )}
       </div>

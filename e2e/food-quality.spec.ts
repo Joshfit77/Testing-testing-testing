@@ -25,9 +25,14 @@ test.describe("Narrow Gate Food IQ", () => {
     await signUpAndConfirm(page, uniqueEmail("quality-free"));
     await completeOnboarding(page);
     await page.goto("/nutrition");
-    // Prominent in Food, and in the Food tools.
+    // Prominent in Food (above the day's totals), honest about what it reads, and in the Food tools.
     await expect(page.getByTestId("food-iq-cta")).toContainText("Narrow Gate Food IQ");
+    await expect(page.getByTestId("food-iq-cta")).toContainText("Scan a packaged food's barcode to review its nutrition and ingredients.");
+    await expect(page.getByTestId("food-iq-cta")).toContainText("doesn't test the food itself");
     await expect(page.getByTestId("food-iq-cta").getByRole("link", { name: "Scan a product" })).toBeVisible();
+    const ctaBox = (await page.getByTestId("food-iq-cta").boundingBox())!;
+    const totalsBox = (await page.getByTestId("budget-equation").boundingBox())!;
+    expect(ctaBox.y).toBeLessThan(totalsBox.y);
     await page.getByRole("navigation", { name: "Food tools" }).getByRole("link", { name: "Food IQ" }).click();
     await expect(page.getByRole("heading", { name: "Narrow Gate Food IQ", level: 1 })).toBeVisible();
     await expect(page.getByTestId("my-filters")).toContainText("included with Plus and Pro");
@@ -59,6 +64,13 @@ test.describe("Narrow Gate Food IQ", () => {
     await expect(additives.getByTestId("alert-added_sugars")).toContainText("glucose syrup, honey, sugar");
     await expect(additives.getByTestId("alert-sodium_sources")).toContainText("salt");
     await expect(page.getByTestId("ingredient-alerts")).toContainText("A listed additive isn't a sign of harm");
+    // The section sits right under the Food IQ summary, says what it reads, and opens its evidence by default.
+    await expect(page.getByTestId("ingredient-alerts")).toContainText("not a test of the food");
+    const alertsBox = (await page.getByTestId("ingredient-alerts").boundingBox())!;
+    const summaryBox = (await page.getByTestId("food-iq-summary").boundingBox())!;
+    const factsBox = (await page.getByTestId("row-sugars_g").boundingBox())!;
+    expect(alertsBox.y).toBeGreaterThan(summaryBox.y);
+    expect(alertsBox.y).toBeLessThan(factsBox.y);
     // Macro analysis: legal thresholds, UK guidance and informal comparisons are labelled differently.
     await expect(page.getByTestId("class-sugar_high")).toContainText("High in sugars");
     await expect(page.getByTestId("class-sugar_high")).toContainText("UK front-of-pack level");
