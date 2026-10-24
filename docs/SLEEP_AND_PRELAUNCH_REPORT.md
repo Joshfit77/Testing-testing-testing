@@ -89,9 +89,11 @@ notifications, RevenueCat (mock), Stripe (not exercised). None of those are clai
 1. A preview exists: a private claude.ai artifact (the link is in the conversation; not public, not deployed).
 2. Created in this session from the real app running locally at iPhone size (390×844), screenshots stitched into a
    clickable viewer with the real controls' positions.
-3. Previous version: commit `e810c7e` (602 screens). The click-everything capture (2,694 screens, 7,245 recorded
-   taps, 602 pop-ups/overlays) was recorded from the same build; the Sleep & Recovery screens and the pages whose
-   copy changed since are captured from the final build of this branch and merged in.
+3. Version 11 of the preview (published 24 Oct 2026, 00:00 UTC): 2,956 screens, 8,399 recorded taps, 786 pop-ups
+   and overlays, 770 pages plus 2,233 reached by tapping. The bulk was recorded from the build at `e810c7e`; the 18
+   Sleep & Recovery pages and the hub pages (Home, My Progress, Run, Train, Profile) were re-captured from the final
+   build of this branch (`1aa71b3`) and merged. Pictures are packed at 0.6× the retina capture (WebP) to fit the
+   hosting limit, so text is readable but less crisp than the earlier versions.
 4. Only accessible to whoever holds the private artifact link; nothing is deployed.
 5. Food IQ: included. 6. GPS: included (the recorded route is a scripted one; the browser has no GPS).
 7. Exercise animations: current (live figures). 8. Newer AI features: included, against the stand-in AI server.

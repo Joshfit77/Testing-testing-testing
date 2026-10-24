@@ -54,6 +54,6 @@ proposal; prices are untouched (Free $0 / Plus $11.99 / Pro $24.99). The owner d
 | E3 Performance and battery | Partially complete | Queries bounded and indexed, nothing runs in the background on the phone (`docs/SLEEP_PLAN.md` §8); battery not measured because no device. |
 | E4 Security and privacy | Complete and tested | See A6 and `docs/SECURITY.md` "Launch-readiness review". |
 | E5 Completion report | Complete and tested | This file and `docs/SLEEP_AND_PRELAUNCH_REPORT.md`. |
-| E6 Demo status and handoff | Partially complete | See the report §Demo: the private artifact exists and the click-everything capture is being republished; the Sleep & Recovery screens are added from the new build. Nothing is deployed. |
+| E6 Demo status and handoff | Complete and tested | Private preview version 11 published (2,956 screens, every control tappable, Sleep & Recovery included); automated tap checks passed (1,440 sampled screens, no broken pictures; four cosmetic slice overlaps). Handoff in the report §6. Nothing is deployed. |
 
 Open items that need the owner (none of them code): approve the Plus/Pro split for sleep features; physical-device runs of `docs/SLEEP_DEVICE_CHECKLIST.md` and `docs/GPS_ACCURACY.md`; a dietitian's review before `FOOD_IQ_SCORE=on`; a coach's review of the six flagged exercise figures; 3840×1920 badge masters; a live AI model run; a map-tile provider decision; the open security items.
