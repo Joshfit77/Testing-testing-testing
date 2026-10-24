@@ -937,6 +937,8 @@ html[data-intro="leaving"] .ngo { animation: ngo-leave 0.35s ease-in forwards; }
 .ngs-light { background-image: url(/opening/gate-light.webp); }
 /* What the open door lets out, added to the shut scene: light on the floor and the reveal, lit haze, bloom. */
 .ngs-light { mix-blend-mode: plus-lighter; opacity: 0; animation: ngo-fade 1.65s cubic-bezier(0.4, 0, 0.2, 1) 1.35s both; }
+/* Older WebKit has no plus-lighter: screen looks almost the same over this dark scene. */
+@supports not (mix-blend-mode: plus-lighter) { .ngs-light { mix-blend-mode: screen; } }
 .ngs-door {
   position: absolute;
   left: var(--door-l);

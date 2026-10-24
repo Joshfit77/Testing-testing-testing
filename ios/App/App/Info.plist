@@ -71,7 +71,7 @@
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Narrow Gate Fitness reads your step count from Apple Health to show your daily steps next to your training.</string>
+	<string>Narrow Gate Fitness reads your steps, sleep (time asleep and sleep stages) and overnight heart rate, heart-rate variability and respiratory rate from Apple Health, only when you choose to connect it, to show your daily steps and your sleep and recovery next to your training.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Narrow Gate Fitness only reads from Apple Health and does not write any health data.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
