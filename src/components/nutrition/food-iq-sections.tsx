@@ -179,10 +179,13 @@ export function EvidenceBadge({ cls }: { cls: EvidenceClass }) {
 /** Ingredients that deserve attention, with what the evidence says (kept separate from what the label says). */
 export function IngredientAlertsSection({ alerts, hasIngredients }: { alerts: IngredientAlert[]; hasIngredients: boolean }) {
   return (
-    <section aria-labelledby="alerts-title" className="space-y-3 rounded-2xl border border-border bg-card p-4" data-testid="ingredient-alerts">
+    <section aria-labelledby="alerts-title" className="space-y-3 rounded-2xl border border-gold-muted/60 bg-card p-4" data-testid="ingredient-alerts">
       <h2 id="alerts-title" className="font-display text-lg">
         Ingredients worth knowing about
       </h2>
+      <p className="text-sm text-muted-foreground">
+        Additives, sweeteners, preservatives and added sugars found in the declared ingredient list, with what each is for, what regulators say, how strong the evidence is and where it comes from. This is a reading of the label and product data, not a test of the food.
+      </p>
       {alerts.length === 0 ? (
         <p className="text-sm text-muted-foreground">{hasIngredients ? "No additives, added sugars or sodium sources named in the product data." : "Unknown: there's no ingredient list in the product data yet. Check the package."}</p>
       ) : (
@@ -202,7 +205,7 @@ export function IngredientAlertsSection({ alerts, hasIngredients }: { alerts: In
               <p className="mt-1 text-xs text-muted-foreground">{a.classes.map((c) => EVIDENCE_HELP[c]).join(" ")}</p>
               <p className="mt-1 text-sm text-muted-foreground">{a.code ? `What it's for: ${a.purpose}.` : a.purpose}</p>
               {(a.regulatory || a.concern || a.affected || a.dose || a.sources.length > 0) && (
-                <details className="mt-1 text-sm">
+                <details className="mt-1 text-sm" open>
                   <summary className="cursor-pointer text-gold-highlight">What regulators and the evidence say</summary>
                   <dl className="mt-1 space-y-1">
                     {a.regulatory && (

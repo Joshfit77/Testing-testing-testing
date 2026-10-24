@@ -32,6 +32,12 @@ export default async function ProgressHubPage() {
       body: `${data.workoutsTotal} workout${data.workoutsTotal === 1 ? "" : "s"} completed · weight, records, photos and trends`,
     },
     {
+      href: "/progress/sleep",
+      icon: Moon,
+      title: "Sleep & Recovery",
+      body: "Sleep from Apple Health, Health Connect or by hand: nightly reports and scores, history, estimated sleep debt, your schedule and energy patterns",
+    },
+    {
       href: "/progress/body-map",
       icon: PersonStanding,
       title: "Strength & Body Map",
@@ -44,12 +50,6 @@ export default async function ProgressHubPage() {
       icon: ScanLine,
       title: "Body Scan",
       body: canUseBodyScan(plan) ? "Guided front, side and rear photos with measurements, compared over time" : "Pro: guided body photos and measurements, compared over time",
-    },
-    {
-      href: "/progress/sleep",
-      icon: Moon,
-      title: "Sleep & Recovery",
-      body: "Log nights and naps by timer or by hand, and see last night and your recent sleep",
     },
     {
       href: "/progress/badges",

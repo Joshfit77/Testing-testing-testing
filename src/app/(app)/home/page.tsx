@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BarChart3, CalendarDays, ChevronRight, Dumbbell, Footprints, HeartPulse, Moon, Pill, TrendingUp, Utensils, Wand2 } from "lucide-react";
+import { Award, BarChart3, CalendarDays, ChevronRight, Dumbbell, Footprints, HeartPulse, Moon, Pill, TrendingUp, Utensils, Wand2 } from "lucide-react";
 import { Notice } from "@/components/common/states";
 import { TodayWorkoutAction } from "@/components/home/today-workout-action";
 import { WeekBars } from "@/components/home/week-bars";
@@ -14,6 +14,9 @@ import { logError } from "@/server/log";
 import { getWeeklyActivity, type WeeklyActivity } from "@/server/services/activity-summary";
 import { getDashboardData } from "@/server/services/dashboard";
 import { getActiveProgram } from "@/server/services/training";
+import { listSleepSessions } from "@/server/services/sleep";
+import { formatDuration, SLEEP_SOURCE_LABELS, summarizeNights } from "@/lib/domain/sleep";
+import { addDays, isoDateInTz } from "@/lib/domain/dates";
 import { loadProgramSchedule } from "@/server/services/schedule";
 import { buildWeeklyActivity } from "@/lib/domain/activity-week";
 import { verseExcerpt } from "@/lib/domain/scripture";
@@ -42,6 +45,16 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       return null;
     }),
   ]);
+  // Last night's sleep for the Sleep & Recovery card: only after wellness consent, and never blocking the page.
+  const sleepToday = isoDateInTz(new Date(), profile.timezone);
+  const lastNight = profile.wellness_consent_at
+    ? await listSleepSessions(supabase, user.id, { fromNight: addDays(sleepToday, -1), toNight: sleepToday })
+        .then((rows) => summarizeNights(rows)[0] ?? null)
+        .catch((err: unknown) => {
+          logError("home.sleep", err);
+          return null;
+        })
+    : null;
   const name = profile.display_name ?? "Athlete";
   const firstName = name.trim().split(/\s+/)[0] || name;
   const showScripture = profile.home_scripture ?? true;
@@ -216,6 +229,21 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         <ChevronRight className="size-5 text-gold" aria-hidden />
       </Link>
 
+      <Link href="/progress/sleep" className={`${card} flex min-h-14 items-center gap-3 px-4 py-3 hover:border-gold-muted`} data-testid="home-sleep-card">
+        <Moon className="size-5 text-gold" aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="block text-base font-semibold">Sleep &amp; Recovery</span>
+          <span className="block truncate text-sm text-muted-foreground">
+            {lastNight
+              ? `Last night ${formatDuration(lastNight.asleepMinutes)}${lastNight.asleepEstimated ? " in bed" : " asleep"} · ${lastNight.sources.map((s) => SLEEP_SOURCE_LABELS[s]).join(", ")}`
+              : profile.wellness_consent_at
+                ? "Nothing for last night yet · sync your watch or log it by hand"
+                : "Sleep from your watch or by hand: scores, debt, schedule and energy"}
+          </span>
+        </span>
+        <ChevronRight className="size-5 text-gold" aria-hidden />
+      </Link>
+
       <Link href="/calendar" className={`${card} flex min-h-14 items-center gap-3 px-4 py-3 hover:border-gold-muted`}>
         <CalendarDays className="size-5 text-gold" aria-hidden />
         <span className="min-w-0 flex-1">
@@ -227,7 +255,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
       <nav aria-label="More for today" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {[
-          { href: "/progress/sleep", icon: Moon, label: "Sleep" },
+          { href: "/progress/badges", icon: Award, label: "Badges" },
           { href: "/progress#steps", icon: Footprints, label: "Steps" },
           { href: "/nutrition/supplements", icon: Pill, label: "Supplements" },
           { href: "/train/recovery", icon: HeartPulse, label: "Recovery" },

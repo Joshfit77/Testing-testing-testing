@@ -139,6 +139,7 @@ export default async function ProductQualityPage({ params }: { params: Promise<{
 
       <FoodIqSummary score={score} enabled={scoreOn} positives={positives} concerns={concerns} />
       {scoreOn && <FoodIqBreakdown score={score} />}
+      <IngredientAlertsSection alerts={alerts} hasIngredients={Boolean(p.ingredientsText)} />
 
       {choice ? (
         <AddProductToDiary choice={choice} date={today} defaultMeal={mealForTime(new Date(2000, 0, 1, hour))} />
@@ -150,7 +151,6 @@ export default async function ProductQualityPage({ params }: { params: Promise<{
       )}
 
       <FitsYourGoals fit={fit} allowed={goalAnalysis} hasAi={ai} />
-      <IngredientAlertsSection alerts={alerts} hasIngredients={Boolean(p.ingredientsText)} />
       <MacroAnalysis p={p} classes={classes} />
 
       <section aria-labelledby="alternatives-title" className="space-y-2">

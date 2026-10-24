@@ -257,6 +257,31 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
         </Button>
       </nav>
 
+      <section aria-labelledby="food-iq-cta" className="rounded-2xl border border-gold/70 bg-gradient-to-br from-gold/12 via-card to-card p-4 shadow-bronze md:p-5" data-testid="food-iq-cta">
+        <div className="flex items-start gap-3">
+          <span className="grid size-11 shrink-0 place-items-center rounded-xl border border-gold-muted/60 bg-elevated">
+            <ScanBarcode className="size-6 text-gold" aria-hidden />
+          </span>
+          <div className="min-w-0">
+            <p id="food-iq-cta" className="font-display text-xs font-bold uppercase tracking-[0.16em] text-gold">
+              Narrow Gate Food IQ
+            </p>
+            <p className="mt-1 text-[1.0625rem] font-semibold leading-snug">Scan a packaged food&apos;s barcode to review its nutrition and ingredients.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Additives, sweeteners, preservatives and added sugars from the declared ingredient list, each with what regulators say, how strong the evidence is and where it comes from. It reads the label and product data; it doesn&apos;t test the food itself.</p>
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button asChild size="lg">
+            <Link href="/nutrition/scanner">
+              <ScanBarcode aria-hidden /> Scan a product
+            </Link>
+          </Button>
+          <Button asChild size="lg" variant="secondary">
+            <Link href="/nutrition/scanner#search">Search by name</Link>
+          </Button>
+        </div>
+      </section>
+
       <section className="rounded-2xl border border-border bg-card p-4 md:p-5" aria-labelledby="totals-title">
         <h2 id="totals-title" className="sr-only">
           Daily totals
@@ -298,23 +323,6 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
         </div>
         {anyEstimate && <p className="mt-3 text-sm text-gold">Includes estimated entries (marked “estimate”).</p>}
         {!goals && <p className="mt-3 text-sm text-muted-foreground">Set targets below to see progress.</p>}
-      </section>
-
-      <section aria-labelledby="food-iq-cta" className="rounded-2xl border border-gold-muted/60 bg-card-gradient p-4" data-testid="food-iq-cta">
-        <p id="food-iq-cta" className="font-display text-xs font-bold uppercase tracking-[0.16em] text-gold">
-          Narrow Gate Food IQ
-        </p>
-        <p className="mt-1 text-[0.9375rem]">Scan a packaged food to see its nutritional quality, the ingredients worth knowing about, and how it fits your goals.</p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Button asChild size="lg">
-            <Link href="/nutrition/scanner">
-              <ScanBarcode aria-hidden /> Scan a product
-            </Link>
-          </Button>
-          <Button asChild size="lg" variant="secondary">
-            <Link href="/nutrition/scanner#search">Search by name</Link>
-          </Button>
-        </div>
       </section>
 
       <div className="space-y-2">
