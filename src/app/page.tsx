@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Bot, Check, Dumbbell, HeartPulse, LineChart, Salad, ShieldCheck } from "lucide-react";
 import { Logo } from "@/components/common/logo";
+import { NarrowGateArt } from "@/components/common/narrow-gate-art";
 import { Button } from "@/components/ui/button";
 import { isSupabaseConfigured } from "@/lib/env";
 import { formatPrice, getPlans, PLAN_ORDER, yearlySavingsPercent } from "@/lib/domain/plans";
@@ -36,59 +37,42 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
     <div className="min-h-dvh">
       {/* After account deletion, also forget the drafts and workout copy kept on this device. */}
       {deleted === "1" && <ForgetDeviceData />}
-      <header className="safe-top mx-auto flex h-20 max-w-6xl items-center justify-between px-4 md:px-8">
-        <Logo />
-        <nav className="flex items-center gap-2">
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/login">Sign in</Link>
-          </Button>
-          <Button asChild size="sm">
-            <Link href="/signup">Start free</Link>
-          </Button>
-        </nav>
+      <header className="safe-top mx-auto flex h-16 max-w-6xl items-center justify-between px-4 md:h-20 md:px-8">
+        <Link href="/" aria-label="Narrow Gate Fitness">
+          <Logo compact className="md:hidden" />
+          <Logo className="hidden md:inline-flex" />
+        </Link>
+        <Button asChild variant="ghost" size="sm">
+          <Link href="/login">Sign in</Link>
+        </Button>
       </header>
 
       <main>
-        <section className="hero-glow relative overflow-hidden">
-          <div className="mx-auto max-w-6xl px-4 pb-20 pt-14 md:px-8 md:pb-28 md:pt-24">
-            <figure className="animate-fade-up mb-10 max-w-2xl rounded-2xl border border-gold-muted/60 bg-card-gradient p-5 shadow-[0_20px_60px_-30px_rgba(201,165,76,0.6)] md:p-6">
-              <blockquote className="font-serif text-lg leading-relaxed text-[#f1ead6] md:text-xl">
-                &ldquo;{GATE_VERSE}&rdquo;
-              </blockquote>
-              <figcaption className="mt-3 text-sm font-semibold text-gold">Matthew 7:13–14 ({TRANSLATION.code})</figcaption>
-            </figure>
-            <p className="animate-fade-up text-xs font-semibold uppercase tracking-[0.4em] text-gold">Welcome · Rooted in faith. Built for strength.</p>
-            <h1 className="animate-fade-up mt-4 max-w-3xl font-display text-5xl font-bold uppercase leading-[0.95] tracking-tight md:text-7xl">
-              Choose the <span className="text-gold-gradient">narrow way</span>. Train with purpose.
+        {/* The welcome screen is the opening's last frame held still: brand, the open gate, the verse beneath it. */}
+        <section className="hero-glow relative overflow-hidden" aria-labelledby="welcome-title">
+          <div className="mx-auto flex max-w-2xl flex-col items-center px-4 pb-16 pt-1 text-center md:pb-24 md:pt-4">
+            <h1 id="welcome-title" className="animate-fade-up flex flex-col items-center gap-2 leading-none">
+              <span className="whitespace-nowrap pl-[0.2em] font-serif text-[1.55rem] font-semibold uppercase tracking-[0.2em] text-gold-gradient md:text-[2rem]">Narrow Gate</span>{" "}
+              <span className="pl-[0.55em] text-[0.68rem] font-semibold uppercase tracking-[0.55em] text-muted-foreground md:text-xs">Fitness</span>
             </h1>
-            <p className="animate-fade-up mt-6 max-w-xl text-base text-muted-foreground md:text-lg">
-              Premium training programs, precise workout tracking, nutrition and an AI coach — for every athlete, whatever you
+            <p className="animate-fade-up mt-3 text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-gold md:text-xs">Rooted in faith. Built for strength.</p>
+            <NarrowGateArt still className="mt-5 h-[clamp(170px,29svh,360px)] md:mt-8 md:h-[clamp(240px,38svh,400px)] [@media(max-height:700px)]:mt-3" />
+            <figure className="animate-fade-up mt-7 max-w-[34rem] [animation-delay:80ms] [@media(max-height:700px)]:mt-5">
+              <blockquote className="font-serif text-[1.03rem] leading-[1.62] text-[#f1ead6] md:text-xl">&ldquo;{GATE_VERSE}&rdquo;</blockquote>
+              <figcaption className="mt-3 text-[0.72rem] font-bold uppercase tracking-[0.22em] text-gold">Matthew 7:13–14 ({TRANSLATION.code})</figcaption>
+            </figure>
+            <div className="animate-fade-up mt-8 grid w-full max-w-sm grid-cols-2 gap-3 [animation-delay:140ms] [@media(max-height:700px)]:mt-5">
+              <Button asChild size="lg">
+                <Link href="/signup">Start free</Link>
+              </Button>
+              <Button asChild size="lg" variant="outline">
+                <Link href="/login">Sign in</Link>
+              </Button>
+            </div>
+            <p className="mt-6 max-w-md text-sm text-muted-foreground">
+              Premium training programs, precise workout tracking, nutrition and an AI coach, for every athlete, whatever you
               believe. An optional faith and discipline section is there if you want it.
             </p>
-            <form action="/signup" method="get" className="animate-fade-up mt-8 max-w-xl rounded-2xl border border-gold-muted/50 bg-card/80 p-3 backdrop-blur [animation-delay:120ms] sm:flex sm:items-center sm:gap-2">
-              <label htmlFor="welcome-email" className="sr-only">
-                Email
-              </label>
-              <input
-                id="welcome-email"
-                name="email"
-                type="email"
-                required
-                autoComplete="email"
-                placeholder="Enter your email"
-                className="h-13 w-full rounded-xl border border-border bg-background px-4 text-base outline-none focus-visible:border-gold sm:flex-1"
-              />
-              <Button type="submit" size="lg" className="mt-2 w-full sm:mt-0 sm:w-auto">
-                Sign up free
-              </Button>
-            </form>
-            <p className="mt-4 text-sm text-muted-foreground">
-              Already have an account?{" "}
-              <Link href="/login" className="font-semibold text-gold-highlight hover:underline">
-                Sign in
-              </Link>
-            </p>
-
           </div>
         </section>
 

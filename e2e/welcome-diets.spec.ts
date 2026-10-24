@@ -2,14 +2,13 @@ import { expect, test } from "@playwright/test";
 import { completeOnboarding, getEmailLink, grantPlan, PASSWORD, signUpAndConfirm, uniqueEmail } from "./helpers";
 
 test.describe("welcome, sign-up and diets", () => {
-  test("the welcome page email carries into sign-up, and setup asks weight, age, sex and height", async ({ page }) => {
+  test("Start free on the welcome page leads to sign-up, and setup asks weight, age, sex and height", async ({ page }) => {
     const email = uniqueEmail("welcome");
     await page.goto("/");
-    await expect(page.getByText(/Welcome · Rooted in faith/)).toBeVisible();
+    await expect(page.getByText("Rooted in faith. Built for strength.")).toBeVisible();
+    await page.getByRole("link", { name: "Start free" }).click();
+    await page.waitForURL(/\/signup/);
     await page.getByLabel("Email").fill(email);
-    await page.getByRole("button", { name: "Sign up free" }).click();
-    await page.waitForURL(/\/signup\?email=/);
-    await expect(page.getByLabel("Email")).toHaveValue(email);
 
     await page.getByLabel("Name").fill("Welcome Tester");
     await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
