@@ -51,7 +51,11 @@ test.describe("opening gate", () => {
     await expect(o).toBeVisible();
     await expect(o.getByText("Matthew 7:13–14 (BSB)")).toBeVisible();
     await expect(o.getByTestId("animated-narrow-door")).toBeVisible();
-    await o.getByRole("button", { name: "Enter Narrow Gate" }).click();
+    // Pressed as soon as it shows: the button rises in for 0.6 s and the overlay moves on at 3.85 s, which a slow
+    // renderer (WebKit on a CI machine without a GPU) can reach before Playwright sees it "stable".
+    const enter = o.getByRole("button", { name: "Enter Narrow Gate" });
+    await expect(enter).toBeVisible();
+    await enter.click({ force: true });
     expect(await introState(page)).toBe("entering");
     // A move, not a cut: right after the press the light has not yet filled the screen.
     const first = await page.evaluate(() => Number(getComputedStyle(document.querySelector(".ngo-white")!).opacity));
