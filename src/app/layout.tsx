@@ -1,9 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import { Cinzel, Inter, Lora, Plus_Jakarta_Sans } from "next/font/google";
+import { AppOpeningOverlay } from "@/components/common/app-opening-overlay";
 import { NativeInit } from "@/components/shell/native-init";
 import { ServiceWorkerRegistration } from "@/components/shell/sw-register";
 import { ConfirmHost } from "@/components/ui/confirm";
 import { Toaster } from "@/components/ui/toaster";
+import { ACTIVE_TRANSLATION, scriptureText } from "@/data/scripture";
+import { OPENING_SCRIPT } from "@/lib/opening";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
@@ -44,8 +47,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${inter.variable} ${heading.variable} ${serif.variable} ${engraved.variable} dark`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: PREFS_SCRIPT }} />
+        {/* Decides before the first paint whether this load plays the opening (src/lib/opening.ts). */}
+        <script dangerouslySetInnerHTML={{ __html: OPENING_SCRIPT }} />
       </head>
       <body className="font-sans">
+        {/* First in the body so it is in the first streamed chunk; hidden unless the script above chose to play it. */}
+        <AppOpeningOverlay verse={scriptureText("Matthew 7:13–14", "")} translation={ACTIVE_TRANSLATION.code} />
         {children}
         <Toaster />
         <ConfirmHost />

@@ -3,6 +3,8 @@ import { existsSync } from "node:fs";
 
 const chromium = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 
+const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
+
 export default defineConfig({
   testDir: "./e2e",
   // The shared Open Food Facts mock (when E2E_OFF_MOCK_PORT is set).
@@ -13,7 +15,10 @@ export default defineConfig({
   retries: 0,
   reporter: [["list"]],
   use: {
-    baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000",
+    baseURL,
+    // The opening plays on every full page load; every spec except e2e/opening-gate.spec.ts starts with it switched
+    // off (OPENING_TEST_FLAG in src/lib/opening.ts) so pages are usable straight away.
+    storageState: { cookies: [], origins: [{ origin: new URL(baseURL).origin, localStorage: [{ name: "ngf.e2e.noIntro", value: "1" }] }] },
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     launchOptions: existsSync(chromium) ? { executablePath: chromium } : {},

@@ -1,77 +1,39 @@
-"use client";
-
-import Link from "next/link";
+import { LogoMark } from "@/components/common/logo";
+import { NarrowGateArt } from "@/components/common/narrow-gate-art";
 
 /**
- * Animated opening for the public landing page and the independent /intro demo route.
- * CSS-only, so a real browser plays it; a screenshot viewer must explicitly keep this
- * animation live rather than substituting a still capture.
+ * The opening sequence's content: the logo, the gate that opens onto soft white light, Matthew 7:13–14, Skip intro
+ * and Enter Narrow Gate. Timing, the move into the light and the reduced-motion version are in globals.css (.ngo-*,
+ * .ngs-*); the overlay around it is AppOpeningOverlay. The buttons carry data-intro-enter / data-intro-dismiss: the
+ * inline head script (src/lib/opening.ts) handles them, even before hydration.
  */
-export function NarrowGateOpening({
-  verse,
-  translation,
-  continueHref = "#welcome",
-  continueLabel = "Enter Narrow Gate Fitness",
-  onEnter,
-}: {
-  verse: string;
-  translation: string;
-  continueHref?: string;
-  continueLabel?: string;
-  onEnter?: () => void;
-}) {
+export function NarrowGateOpening({ verse, translation }: { verse: string; translation: string }) {
   return (
-    <section
-      aria-label="Narrow Gate Fitness opening"
-      data-testid="narrow-gate-opening"
-      className="ng-intro relative isolate mx-auto flex min-h-[min(760px,calc(100svh-5rem))] w-full flex-col items-center justify-center overflow-hidden px-4 py-10 text-center sm:py-14"
-    >
-      <div className="ng-intro-aura" aria-hidden="true" />
-      <div className="ng-intro-art relative mb-5" data-testid="animated-narrow-door" aria-hidden="true">
-        <div className="ng-intro-ground" />
-        <div className="ng-intro-arch">
-          <div className="ng-intro-light" />
-          <div className="ng-intro-door">
-            <span className="ng-intro-panel-edge" />
-            <span className="ng-intro-handle" />
-          </div>
+    <>
+      <NarrowGateArt />
+      <div className="ngo-scrim" aria-hidden="true" />
+      <div className="ngo-ui" data-testid="narrow-gate-opening">
+        <button type="button" className="ngo-skip" data-intro-dismiss="">
+          Skip intro
+        </button>
+        <div className="ngo-brand">
+          <LogoMark />
+          <h2 className="ngo-word">
+            <b>Narrow Gate</b> <small>Fitness</small>
+          </h2>
+        </div>
+        <div className="ngo-bottom">
+          <figure className="ngo-verse">
+            <blockquote id="ngo-verse">&ldquo;{verse}&rdquo;</blockquote>
+            <figcaption>Matthew 7:13–14 ({translation})</figcaption>
+          </figure>
+          <button type="button" className="ngo-enter" data-intro-enter="">
+            Enter Narrow Gate
+          </button>
         </div>
       </div>
-
-      <p className="ng-intro-copy mb-2 text-[0.65rem] font-semibold uppercase tracking-[0.34em] text-gold sm:text-xs">
-        Rooted in faith. Built for strength.
-      </p>
-      <h2 className="ng-intro-copy max-w-2xl font-display text-3xl font-extrabold uppercase leading-[1.04] tracking-[0.04em] text-white sm:text-5xl">
-        Enter through the <span className="text-gold-gradient">narrow gate</span>
-      </h2>
-      <figure className="ng-intro-copy mt-5 max-w-[35rem]">
-        <blockquote className="font-serif text-[0.98rem] leading-relaxed text-[#f1ead6] sm:text-lg">
-          &ldquo;{verse}&rdquo;
-        </blockquote>
-        <figcaption className="mt-2 text-xs font-semibold tracking-wide text-gold">
-          Matthew 7:13–14 ({translation})
-        </figcaption>
-      </figure>
-
-      {onEnter ? (
-      <button
-        type="button"
-        onClick={onEnter}
-        className="ng-intro-copy mt-6 inline-flex min-h-12 items-center justify-center rounded-xl border border-gold bg-gold-gradient px-7 text-sm font-extrabold uppercase tracking-[0.12em] text-[#100d07] shadow-[0_10px_30px_-15px_rgba(241,223,168,0.8)] transition-[filter,transform] hover:brightness-110 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-gold-highlight"
-      >
-        {continueLabel}
-      </button>
-      ) : (
-      <Link
-        href={continueHref}
-        className="ng-intro-copy mt-6 inline-flex min-h-12 items-center justify-center rounded-xl border border-gold bg-gold-gradient px-7 text-sm font-extrabold uppercase tracking-[0.12em] text-[#100d07] shadow-[0_10px_30px_-15px_rgba(241,223,168,0.8)] transition-[filter,transform] hover:brightness-110 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-gold-highlight"
-      >
-        {continueLabel}
-      </Link>
-      )}
-      <p className="ng-intro-copy mt-3 text-xs text-muted-foreground">
-        The opening can be skipped at any time. No account is required to view it.
-      </p>
-    </section>
+      {/* The light that fills the screen as the camera moves through the doorway. */}
+      <div className="ngo-white" aria-hidden="true" />
+    </>
   );
 }
