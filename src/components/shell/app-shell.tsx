@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { AppOpeningOverlay } from "@/components/common/app-opening-overlay";
 import { clearAllDrafts } from "@/lib/drafts";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -85,6 +86,7 @@ export function AppShell({ children, userId, displayName, isAdmin, plan, textSiz
   return (
     <ShellUserProvider value={shellUser}>
       <div className="min-h-dvh bg-background">
+        <AppOpeningOverlay />
         <NavigationProgress />
         <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-gold focus:px-4 focus:py-2 focus:text-black">
           Skip to content
