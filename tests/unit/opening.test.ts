@@ -1,4 +1,5 @@
-import { decideOpening, OPENING_FALLBACK_MS, OPENING_IMAGES, OPENING_SCRIPT, OPENING_TEST_FLAG, type OpeningEnv } from "@/lib/opening";
+import { readFileSync } from "node:fs";
+import { decideOpening, NATIVE_APP_UA_TOKEN, OPENING_FALLBACK_MS, OPENING_IMAGES, OPENING_SCRIPT, OPENING_TEST_FLAG, type OpeningEnv } from "@/lib/opening";
 
 type Listener = (e: { key?: string; animationName?: string; target?: unknown }) => void;
 
@@ -22,7 +23,8 @@ function runScript(env: OpeningEnv) {
   const realNow = Date.now;
   Date.now = () => env.now;
   try {
-    new Function("location", "document", "window", "setTimeout", OPENING_SCRIPT)({ pathname: env.path }, document, window, (fn: () => void, ms: number) => timers.push({ fn, ms }));
+    const navigator = { userAgent: env.native ? `Mozilla/5.0 (iPhone) AppleWebKit/605.1.15 ${NATIVE_APP_UA_TOKEN}` : "Mozilla/5.0 (iPhone) AppleWebKit/605.1.15 Safari/604.1" };
+    new Function("location", "document", "window", "setTimeout", "navigator", OPENING_SCRIPT)({ pathname: env.path }, document, window, (fn: () => void, ms: number) => timers.push({ fn, ms }), navigator);
   } finally {
     Date.now = realNow;
   }
@@ -31,7 +33,7 @@ function runScript(env: OpeningEnv) {
 }
 
 const NOW = Date.UTC(2026, 9, 24, 12);
-const env = (path: string, storage: Record<string, string> = {}, hidden = false): OpeningEnv => ({ path, storage, hidden, now: NOW });
+const env = (path: string, storage: Record<string, string> = {}, hidden = false, native = false): OpeningEnv => ({ path, storage, hidden, native, now: NOW });
 const recording = (status: string, ageMs: number) => JSON.stringify({ track: { version: 2, status, startedAt: NOW - ageMs }, guidedDayId: null });
 
 describe("opening: when it plays", () => {
@@ -54,6 +56,10 @@ describe("opening: when it plays", () => {
     ["the barcode scanner", env("/nutrition/scanner"), "off"],
     ["the smart alarm", env("/progress/sleep/alarm"), "off"],
     ["a background tab", env("/home", {}, true), "off"],
+    ["the iPhone app starting up (the web view still reports hidden)", env("/", {}, true, true), "play"],
+    ["the iPhone app, in front", env("/home", {}, false, true), "play"],
+    ["the iPhone app on the sign-in page", env("/login", {}, true, true), "off"],
+    ["the iPhone app with a workout in progress", env("/home", { "ngf.workout.draft.user-1": "{\"name\":\"Day A\"}" }, true, true), "off"],
     ["the browser-test flag", env("/home", { [OPENING_TEST_FLAG]: "1" }), "off"],
     ["a workout in progress (any page)", env("/home", { "ngf.workout.draft.user-1": "{\"name\":\"Day A\"}" }), "off"],
     ["a GPS recording in progress", env("/faith", { "run.recording.user-1": recording("recording", 20 * 60_000) }), "off"],
@@ -79,10 +85,14 @@ describe("opening: when it plays", () => {
         throw new Error("blocked");
       },
     };
-    new Function("location", "document", "window", "setTimeout", OPENING_SCRIPT)({ pathname: "/home" }, document, window, () => 0);
+    new Function("location", "document", "window", "setTimeout", "navigator", OPENING_SCRIPT)({ pathname: "/home" }, document, window, () => 0, { userAgent: "" });
     expect(documentElement.dataset.intro).toBe("off");
     expect(listeners).toEqual([]);
   });
+});
+
+it("recognises the app by the same user-agent token the native shells add", () => {
+  expect(readFileSync("capacitor.config.ts", "utf8")).toContain(`appendUserAgent: "${NATIVE_APP_UA_TOKEN}"`);
 });
 
 describe("opening: how it ends", () => {

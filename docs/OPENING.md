@@ -31,7 +31,9 @@ ever flashes:
   around, so switching between Home, Train, Run, Food and Faith (or any in-app link) never replays it.
 - **Does not play** on sign-in, sign-up, password, legal, onboarding and admin pages; when reloading straight into a
   live activity (the workout logger, the GPS recorder, the body-scan camera, the barcode scanner, the smart alarm);
-  whenever a workout or a GPS recording is in progress on the device, whatever the page; or in a background tab.
+  whenever a workout or a GPS recording is in progress on the device, whatever the page; or in a background
+  browser tab. (Inside the iPhone/Android app a page load always means the app was opened, relaunched or reloaded,
+  so it plays even if the web view still reports "hidden" while the app starts up.)
 - Browser tests and demo captures set `ngf.e2e.noIntro` in local storage to keep it out of the way.
 
 The script also handles Skip, Enter and Escape and the automatic finish, so the intro works and ends even before the
