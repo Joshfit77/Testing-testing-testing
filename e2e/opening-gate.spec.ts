@@ -227,11 +227,13 @@ test.describe("opening gate", () => {
       await page.goto("/");
       const o = opening(page);
       await expect(o).toBeVisible();
-      // Only fades: no animation in the overlay changes position, size or rotation.
+      // Only fades: no animation in the overlay changes position, size or rotation. The global reduced-motion rule
+      // turns every transition into a 0.01 ms one (WebKit lists the focus ring's), which can't be seen: skip those.
       const props = await page.evaluate(() =>
         document
           .querySelector("[data-testid=opening-overlay]")!
           .getAnimations({ subtree: true })
+          .filter((a) => Number(a.effect!.getTiming().duration) > 1)
           .flatMap((a) => (a.effect as KeyframeEffect).getKeyframes().flatMap((k) => Object.keys(k).filter((p) => !["offset", "easing", "composite", "computedOffset"].includes(p)))),
       );
       expect(props).toContain("opacity");
