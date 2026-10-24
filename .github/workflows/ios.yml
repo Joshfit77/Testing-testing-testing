@@ -115,9 +115,13 @@ jobs:
           for marker in 'data-intro-enter' 'Enter Narrow Gate' '/opening/gate-base.webp' 'small is the gate and narrow the way'; do
             grep -q -- "$marker" "$RUNNER_TEMP/home.html" || { echo "::error::The served page has no '$marker'"; exit 1; }
           done
+      # The app loads the site through a small proxy that can hold page loads (scripts/ios-verify/slow-start-proxy.mjs):
+      # no delay while filming the opening, a few seconds for XCUITest (its launch() waits for the app to settle).
       - name: Point the iPhone app at it and build for the Simulator
         run: |
-          CAP_SERVER_URL=http://127.0.0.1:3000 CAP_ALLOW_CLEARTEXT=true npx cap sync ios
+          echo 0 > "$RUNNER_TEMP/delay-ms"
+          nohup node scripts/ios-verify/slow-start-proxy.mjs 3001 3000 "$RUNNER_TEMP/delay-ms" > "$RUNNER_TEMP/proxy.log" 2>&1 &
+          CAP_SERVER_URL=http://127.0.0.1:3001 CAP_ALLOW_CLEARTEXT=true npx cap sync ios
           xcodebuild -version
           xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug \
             -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
@@ -146,8 +150,11 @@ jobs:
           xcrun simctl bootstatus "$UDID" -b
           xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 || true
           xcrun simctl install "$UDID" build/Build/Products/Debug-iphonesimulator/App.app
-      - name: Drive the opening (XCUITest)
+      - name: Film a fresh launch and a relaunch, left alone
+        run: python3 scripts/ios-verify/film.py "$UDID" sim-shots
+      - name: Tap Enter Narrow Gate, relaunch, return from the background (XCUITest)
         run: |
+          echo 3000 > "$RUNNER_TEMP/delay-ms"
           brew install xcodegen
           cd scripts/ios-verify
           xcodegen generate
@@ -155,16 +162,19 @@ jobs:
           TEST_RUNNER_SHOTS_DIR="$GITHUB_WORKSPACE/sim-shots" xcodebuild test -project GateCheck.xcodeproj -scheme GateCheck \
             -destination "id=$UDID" -resultBundlePath "$RUNNER_TEMP/GateCheck.xcresult" > "$RUNNER_TEMP/xcodebuild-test.log" 2>&1
           status=$?
-          grep -E "Test Case|error:|XCTAssert|Enter Narrow Gate tapped|TEST (SUCCEEDED|FAILED)|Executed" "$RUNNER_TEMP/xcodebuild-test.log" || true
           [ $status -eq 0 ] || tail -80 "$RUNNER_TEMP/xcodebuild-test.log"
           exit $status
-      - name: Screenshots (contact sheets, also printed into this log)
+      # Last, so the end of the log has everything: the test results, then what each frame showed.
+      - name: Results and screenshots (contact sheets in the artifact)
         if: always()
         run: |
           mkdir -p sim-shots
-          cp "$RUNNER_TEMP/next.log" "$RUNNER_TEMP/xcodebuild-test.log" sim-shots/ 2>/dev/null || true
+          cp "$RUNNER_TEMP/next.log" "$RUNNER_TEMP/proxy.log" "$RUNNER_TEMP/xcodebuild-test.log" sim-shots/ 2>/dev/null || true
           python3 -m venv "$RUNNER_TEMP/venv" && "$RUNNER_TEMP/venv/bin/pip" install --quiet pillow
           "$RUNNER_TEMP/venv/bin/python" scripts/ios-verify/contact-sheet.py sim-shots
+          echo
+          grep -E "GATECHECK|Test Case .*(passed|failed)|error:|TEST (SUCCEEDED|FAILED)|Executed" "$RUNNER_TEMP/xcodebuild-test.log" | cut -c1-400 || true
+          grep -A60 "accessibility tree:" "$RUNNER_TEMP/xcodebuild-test.log" | cut -c1-200 | head -130 || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -94,11 +94,11 @@ CAP_ALLOW_CLEARTEXT=true` (local testing only).
 `.github/workflows/ios.yml`, no Apple account needed:
 
 - **compile**: the offline edition compiles for the Simulator.
-- **app-in-simulator**: builds and serves the full web app on the build Mac, points the iPhone app at it, runs it in
-  an iPhone simulator and drives it with XCUITest (`scripts/ios-verify`): the opening plays on launch and ends by
-  itself, Enter Narrow Gate moves into the light and opens the app, a relaunch replays it, returning from the
-  background does not. Screenshots (with each frame's brightness) are in the job log and the
-  `opening-in-simulator` artifact.
+- **app-in-simulator**: builds and serves the full web app on the build Mac, points the iPhone app at it and runs it
+  in an iPhone simulator (`scripts/ios-verify`). It films a fresh launch and a relaunch left alone (`simctl`), then
+  XCUITest taps Enter Narrow Gate, relaunches, taps Skip intro and returns from the background (which must not
+  replay). The log ends with the test results, each frame's brightness and a coarse text picture of key frames;
+  the screenshots and contact sheets are in the `opening-in-simulator` artifact.
 - **webkit**: the opening and navigation browser tests in WebKit (Safari's engine) at iPhone 15 size, signed in
   against a throwaway local Supabase.
 
