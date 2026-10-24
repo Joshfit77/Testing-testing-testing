@@ -16,7 +16,7 @@ version and build number.
 
 | # | Step | Expected |
 | --- | --- | --- |
-| A1 | Sleep settings > Connected devices > "Import from Apple Health / Health Connect" with permission not yet granted | The system permission sheet appears asking only for Sleep (read). |
+| A1 | Sleep hub > "Connect Apple Health / Health Connect" with permission not yet granted | The system permission sheet asks for Sleep, Heart Rate, Heart Rate Variability and Respiratory Rate (read only). |
 | A2 | Deny, then tap import again | A plain message naming where to allow it (Health > Sharing > Apps / Health Connect > App permissions); nothing imported. |
 | A3 | Allow and import | "N added, M already there, K overlapped" matches the health app's own list for the last 14 days; nights appear with "Apple Health" / "Health Connect" as the source and stages where the watch recorded them. |
 | A4 | Import a second time | 0 added, everything "already there"; no duplicates in history. |
@@ -24,6 +24,13 @@ version and build number.
 | A6 | Switch import off, then tap import | Button disabled; nothing read. Switch on: works again. |
 | A7 | "Delete imported entries" | Imported nights gone, hand entries kept, the health app's own records untouched. |
 | A8 | Revoke the permission in the health app, then import | Clear "access wasn't allowed" message, nothing crashes, earlier imports stay. |
+| A9 | Wear the watch for one night, open the app in the morning | The hub's source card syncs by itself (last sync older than 30 min), "Last synced just now", last night shows "Recorded by {watch}", the stage bar and the three measurement tiles. Compare the stage totals with the health app's own: they must not exceed it (in-bed envelope not double-counted). |
+| A10 | Pull the hub down, and tap Sync now | Each triggers one sync; a second within 30 min adds 0 and no duplicate night appears. |
+| A11 | A night where only the phone recorded (no watch) | Night appears without stages ("stage not given"), measurement tiles say "Not recorded"; nothing is invented. |
+| A12 | Deny only Heart Rate (Android) | Sleep imports; the card names the series not allowed; HR tile says "Not recorded". iOS: the tile says "Not recorded" (iOS doesn't report read denials). |
+| A13 | Settings > Connected devices > Disconnect | Status shows "Not connected", auto-sync stops; nights stay. "Disconnect and remove imported" removes imported nights, hand entries and the health app's records stay. |
+| A14 | Nightly report of a recorded night | Hypnogram, stage shares and "Every interval" match the watch app's own; overnight heart rate min/avg/max within the health app's night range; HRV labelled SDNN (iOS) / RMSSD (Android). |
+| A15 | AI coach: "how did I sleep last night?" (with AI data consent on) | Reply quotes the recorded figures, names the device, compares only with the member's own nights, suggests no diagnosis and changes nothing. |
 
 ## B. Wake-up alarm (D2)
 

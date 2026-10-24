@@ -66,7 +66,7 @@ with the data. Sound events (Stage D3) get their own table when that stage is bu
 | B1 Database + manual tracking | — | Migration, domain functions, timer and manual entry, edit/delete, history list, export/deletion coverage, unit + integration tests |
 | B2 Dashboard + nightly report | B1 | `/progress/sleep`, `/progress/sleep/night/[date]`, Home shortcut |
 | B3 Goals, score, history views | B1, B2 | Goal setting, score v1 with `docs/SLEEP_METHOD.md`, 7/30/90-day charts, empty states |
-| B4 Import architecture | B1 | Native read of sleep sessions and stages (same plugin as steps), server-side dedupe/conflicts, `sleep_import_runs`, revocation and disconnect handling; device testing needed |
+| B4 Import architecture | B1 | Native read of sleep sessions, stages and overnight heart rate / HRV / breathing (same plugin as steps), one stage writer per night with overlap clipping, server-side dedupe/conflicts, `sleep_import_runs`, connected-platform status, auto-sync on open, Sync now, pull-to-refresh, revocation and disconnect handling; device testing needed (`docs/WEARABLES.md`) |
 | B5 Check-ins | B1 | Morning + daily check-in form and history; associations shown as "on nights when…" |
 | B6 Sleep debt + trends | B3 | Debt v1 page and card, trend views |
 | C1 Schedule / circadian guidance | B3, B6 | Windows, consistency score, gradual adjustment plan |
@@ -116,7 +116,9 @@ product decision to confirm.
   (timer, forms, quick check-in, import and alarm buttons). No polling, no timers in the browser beyond the
   one-second sleep-timer display while the page is open.
 - On the phone nothing runs in the background: the timer is a stored start time, the alarm is a notification
-  scheduled with the operating system, and health-platform import happens only when the member taps the button.
+  scheduled with the operating system, and health-platform import happens when the sleep hub opens with a sync older
+  than 30 minutes, on pull-to-refresh, or when the member taps Sync now (never while the app is closed: the plugin
+  has no background delivery; see `docs/WEARABLES.md` §3).
   Battery use is therefore that of the OS scheduler; it still needs measuring on a device (D4 checklist row B10).
 - The AI coach's `get_sleep_summary` is computed from the same bounded queries and returns a few hundred bytes;
   it counts against the existing AI usage quota.

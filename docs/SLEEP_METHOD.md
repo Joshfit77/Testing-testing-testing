@@ -21,6 +21,25 @@ separate ideas and are shown separately._
   counted in nightly figures. A night logged as two sessions (woke, got up, went back) is added up.
 - Overlapping sessions are refused by the database, whatever their source. Imported records are unique per source.
 
+## Recorded nights: stages and overnight measurements (`sleep-import.ts`, migration `20261024000041_sleep_vitals.sql`)
+
+- A night is **recorded** when every session in it came from Apple Health or Health Connect; the report, hub and
+  history then show "Recorded by {device}" and otherwise "Entered by hand". The device is the health platform's
+  source name for the stage samples.
+- **Stages** are the device's intervals, untouched. HealthKit's in-bed envelope overlaps the stage samples and is
+  never counted as one; one stage writer is kept per night (the source with light/deep/REM detail, then the one with
+  the most minutes) and any same-source overlap is clipped to the earlier interval, so the stage total can never
+  exceed the night. **Time asleep by stage** = every non-awake interval added up; stage **percentages** are of that
+  figure. Gaps between intervals are unknown time and count toward nothing. The nightly score does not use stages.
+- **Overnight heart rate, HRV and breathing** are averages (with min and max, and the number of readings) of the
+  platform's samples whose midpoint falls inside the session. Heart rate is whole bpm; HRV one decimal in ms with the
+  platform's method (SDNN on iOS, RMSSD on Android), and the two are never compared with each other; breathing one
+  decimal per minute. Readings outside plausible ranges (HR 20–250, HRV 1–500, breathing 4–60) are dropped. A
+  series the device didn't record is null and shows as "Not recorded". The database allows these columns only on
+  imported rows; a hand entry or timer night can never carry a measurement.
+- These are the device's readings shared through the health platform, not the app's own, and not medical
+  measurements. Trends compare a member only with their own earlier nights.
+
 ## Nightly sleep score (`sleep-score.ts`, score version 1)
 
 A 0–100 description of **one night as logged**. Four parts; each is scored only when its inputs exist, the parts that
@@ -129,5 +148,7 @@ ever sounds before the set time. Nothing here has been tested on a physical phon
 
 ## Not in this version
 
-Stage intervals are only ever imported; the app never infers them. Automatic detection from motion or sound, the
-smart-alarm window and nighttime sound analysis (Phase D) will be documented here if and when they ship.
+Stage intervals and overnight measurements are only ever imported; the app never infers them, and it never turns
+them into a recovery score. Automatic detection from motion or sound, the smart-alarm window, background sync and
+nighttime sound analysis (Phase D) will be documented here if and when they ship. Device compatibility and the
+sync design are in `docs/WEARABLES.md`.
