@@ -4,11 +4,21 @@ function listEnv(raw: string | undefined): string[] {
   return (raw ?? "").split(",").map((v) => v.trim()).filter(Boolean);
 }
 
+/**
+ * Live Stripe keys stay switched off until the owner approves real charges with STRIPE_LIVE_APPROVED=true; until
+ * then checkout and the webhook behave as unconfigured, so a test or TestFlight deployment can't take real money.
+ * Test keys (sk_test_) always work.
+ */
+function stripeSecretKey(raw: string | undefined): string {
+  const key = raw ?? "";
+  return /^(sk|rk)_live_/.test(key) && process.env.STRIPE_LIVE_APPROVED !== "true" ? "" : key;
+}
+
 /** Server-only secrets. Never import this module from client components. */
 export const serverEnv = {
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
   anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? "",
-  stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? "",
+  stripeSecretKey: stripeSecretKey(process.env.STRIPE_SECRET_KEY),
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
   stripePricePlus: process.env.STRIPE_PRICE_PLUS ?? "",
   stripePricePro: process.env.STRIPE_PRICE_PRO ?? "",
