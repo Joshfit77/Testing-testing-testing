@@ -528,7 +528,7 @@ Offline: all data in localStorage on one device. No sync, accounts or export.
 | ID | Requirement | Status | Evidence | Stage |
 |---|---|---|---|---|
 | X.1 | Supabase project, migrations applied, auth email/SMTP | Requires External Setup | 12 migrations in `supabase/migrations`, `supabase/setup-all.sql` | 1 |
-| X.2 | Vercel (or other) deploy and `CAP_SERVER_URL` | Requires External Setup | `capacitor.config.ts` defaults to `app.narrowgatefitness.example` | 1 |
+| X.2 | Vercel (or other) deploy and `CAP_SERVER_URL` | Requires External Setup | No deployment exists. `capacitor.config.ts` has no default address: syncing the online app stops without a real `https://` one (docs/TESTFLIGHT.md) | 1 |
 | X.3 | Stripe products and prices, webhook secret | Requires External Setup | `src/app/api/stripe/webhook/route.ts`; `STRIPE_PRICE_*` | 1 |
 | X.4 | Store billing (Apple IAP / Google Play Billing) | Requires External Setup | Not built. The native shells hide Stripe checkout. | 4 |
 | X.5 | Anthropic API key | Requires External Setup | See 13.26 | 4 |

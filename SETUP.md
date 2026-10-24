@@ -159,6 +159,8 @@ npm run cap:sync
 
 To test on a device against your dev machine, use `CAP_SERVER_URL=http://<LAN-IP>:3000 CAP_ALLOW_CLEARTEXT=true npm run cap:sync`. Never ship cleartext.
 
+`CAP_SERVER_URL` has no default: syncing stops with an error if it is missing, a placeholder (`.example`, `.invalid`, `.test`) or plain `http://` without `CAP_ALLOW_CLEARTEXT=true`. The step-by-step TestFlight guide is [docs/TESTFLIGHT.md](docs/TESTFLIGHT.md).
+
 ### iOS (App Store)
 
 1. `npm run cap:ios` opens Xcode.
