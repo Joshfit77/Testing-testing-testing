@@ -43,7 +43,57 @@ Bytes per pixel measured on two real 3× captures (a plan page with dense text, 
 
 ## 3. Results
 
-_Filled in once the capture and the verification runs finish (see the end of this file)._
+### 3.1 Displayed size versus source size (measured with `compare3.mjs` on the packaged preview)
+
+| Display | Picture column in the source | Shown at | Enlargement |
+| --- | --- | --- | --- |
+| iPhone, 390 CSS px wide, 3× (iPhone 12 mini … 16 Pro) | 1170 px | 1170 device px | **1.00** |
+| iPhone, 430 CSS px wide, 3× (Plus / Pro Max) | 1170 px | 1170 device px (stage kept at 390 CSS px, centred) | **1.00** |
+| iPhone, 390 CSS px wide, 2× (SE, 11, XR) | 1170 px | 780 device px | 0.67 (downsampled) |
+| Desktop, 1440 px wide, 2× (Retina) | 1170 px | 741 device px | 0.63 (downsampled) |
+| Desktop, 1440 px wide, 1× | 1170 px | 370 device px | 0.32 (downsampled) |
+
+For comparison, version 11 showed its 468 px columns at 1.67× on a 2× iPhone and 2.50× on a 3× iPhone.
+
+The viewer change that makes the second row true: on phones wider than 390 CSS px the stage no longer stretches to
+the screen; it stays 390 CSS px and is centred, because a stretched stage would have enlarged the picture by up to
+1.13×.
+
+### 3.2 Side-by-side crops
+
+Each image shows the packed preview as displayed (left) next to the same region of the lossless capture resampled to
+the same displayed size (right): `docs/launch-preview/home-phone3.png` (3× iPhone, 1:1) and the sleep and Food IQ
+crops listed in §3.3. `docs/launch-preview/v11-vs-new.png` shows the version-11 recipe (left) against the new one
+(right) on the same text at 3×.
+
+### 3.3 The focused preview
+
+Published privately as **Narrow Gate Crisp Preview**, https://claude.ai/artifact/AMRTW6eHCCVMqptgEaCWt9 (two
+uploads, version 2 holds everything). The full 2,956-screen demo stays at
+https://claude.ai/artifact/NP9mW7vehDxeuzgKdQQp54 (version 11) for navigation testing.
+
+| | Crisp preview | Full demo (version 11) |
+| --- | --- | --- |
+| Screens | 303 (158 pages, 145 recorded states) | 2,956 |
+| Areas | Home 2 · Train and exercise demonstrations 33 · AI Coach 9 (+5 consent and memory states) · Progress 18 (badges, body map and scan with their states) · Run 9 (+ live, finish and review states) · Food IQ 21 (every one of the 14 product pages, scanner, search, a comparison, meal photo) · Sleep & Recovery 36 (hub, 14 nightly reports, history ranges, check-ins, debt, schedule, energy, training, alarm, settings, method) · Faith 6 · Billing 4 | everything |
+| Source pixels | 1170 px wide, lossless PNG | 780 px wide, JPEG q80 |
+| Packed | 1.0×, WebP q90, 252 sheets, 1,118 strips (58 tall ones split, none scaled) | 0.6×, WebP q68 |
+| Size | 107.5 MB of pictures + 0.96 MB page | ≈ 150 MB |
+| Tappable | 3,633 screen links, 123 dropdown pickers, 431 overlays (toggles, chosen options), 333 explanatory notes, 101 resets | 8,399 taps |
+| Automated checks | all 303 screens' pictures load without gaps; a toggle, a dropdown, a pop-up, an in-place change and a text field each behave; no page errors (`tap-controls.mjs --all`) | 1,440 sampled screens |
+| Shown at | 1:1 on 3× iPhones, downsampled elsewhere (§3.1) | enlarged 1.67–2.5× |
+
+Links that leave the focused areas (for example Profile, the other 300 exercise pages, supplements) and taps past
+the two-recorded-states-per-page cap show "isn't included in this preview" rather than a wrong screen: 1,400 such
+taps on 268 targets, 736 of them the state cap. Every Food IQ product page and every Sleep & Recovery page in the
+seeded fortnight is included and reachable from the app's own links.
+
+Two scripted pages (`/coach`, `/train/review`) kept their flow pictures because the live page had moved on since the
+flow was recorded; their links work, their extra controls were not added.
+
+Capture time on this branch's production build against the local database: base passes about 35 minutes, focused
+exploration about 65 minutes (four workers, then one for taps that save data, with the demo account restored between
+them), packing about 4 minutes.
 
 ## 4. Remaining limitations
 

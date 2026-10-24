@@ -102,6 +102,12 @@ notifications, RevenueCat (mock), Stripe (not exercised). None of those are clai
 
 Typing can't work in a recorded demo; destructive account/storage actions show a note instead of running.
 
+Update 2026-10-24: a separate **crisp preview** of the focused areas (Home, Train, exercise demonstrations, AI
+Coach, Progress, Run, Food IQ, Sleep & Recovery, Faith, Billing) is published at
+https://claude.ai/artifact/AMRTW6eHCCVMqptgEaCWt9: 303 screens captured at 3× as lossless PNG and packed without
+downscaling, so it is shown 1:1 on 3× iPhones. Version 11 above stays as the complete navigation demo. The
+measurements and settings are in `docs/LAUNCH_PREVIEW_REPORT.md`.
+
 ## 5. What needs you (not code)
 
 1. Approve the Plus/Pro split for sleep features (§1).
