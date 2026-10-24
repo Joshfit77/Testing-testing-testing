@@ -5,10 +5,12 @@ import { PageHeader } from "@/components/common/page-header";
 import { BackLink } from "@/components/platform/back-link";
 import { SleepScoreCard } from "@/components/sleep/score-card";
 import { formatNightDate, SleepSessionList } from "@/components/sleep/session-list";
+import { StageBar, StageTimeline, stageTotals as totalsOf } from "@/components/sleep/stage-timeline";
+import { RecordedBadge, VitalsCards } from "@/components/sleep/vitals-cards";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { addDays, isoDateInTz } from "@/lib/domain/dates";
 import { hasFeature } from "@/lib/domain/plans";
-import { circularDistance, clockMinutesInTz, DEFAULT_SLEEP_GOAL_MINUTES, formatClock, formatDuration, minutesBetween, napsOn, SLEEP_SOURCE_LABELS, summarizeNights } from "@/lib/domain/sleep";
+import { circularDistance, clockMinutesInTz, DEFAULT_SLEEP_GOAL_MINUTES, formatClock, formatDuration, napsOn, SLEEP_SOURCE_LABELS, summarizeNights } from "@/lib/domain/sleep";
 import { nightlyScore } from "@/lib/domain/sleep-score";
 import { averageAsleepMinutes, goalPct, scheduleStats } from "@/lib/domain/sleep-stats";
 import { getServerSupabase } from "@/lib/supabase/server";
@@ -71,10 +73,8 @@ export default async function NightReportPage({ params }: { params: Promise<{ da
   const pattern = scheduleStats(previous);
   const score = night ? nightlyScore(night, goal, pattern) : null;
   const pct = goalPct(night?.asleepMinutes ?? null, goal);
-  const stageTotals = stages.reduce<Record<string, number>>((acc, s) => {
-    acc[s.stage] = (acc[s.stage] ?? 0) + minutesBetween(s.started_at, s.ended_at);
-    return acc;
-  }, {});
+  const totals = stages.length ? totalsOf(stages) : null;
+  const stageTotals = totals?.minutes ?? {};
   const bedDelta = night && pattern.typicalBed !== null ? clockMinutesInTz(night.bedAt, night.timezone) - pattern.typicalBed : null;
   const wakeDelta = night && pattern.typicalWake !== null ? clockMinutesInTz(night.wakeAt, night.timezone) - pattern.typicalWake : null;
   const signed = (d: number) => `${d >= 0 ? "+" : "−"}${Math.abs(d)} min`;
@@ -104,9 +104,12 @@ export default async function NightReportPage({ params }: { params: Promise<{ da
       {night ? (
         <>
           <section className="bg-card-gradient rounded-2xl border border-border p-5" aria-labelledby="night-total-title">
-            <h2 id="night-total-title" className="font-display text-xl font-bold uppercase">
-              Time asleep
-            </h2>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 id="night-total-title" className="font-display text-xl font-bold uppercase">
+                Time asleep
+              </h2>
+              <RecordedBadge recorded={night.recorded} deviceName={night.deviceName} />
+            </div>
             <p className="mt-2 flex items-baseline gap-2">
               <span className="font-display text-5xl font-bold text-gold-highlight">{formatDuration(night.asleepMinutes)}</span>
               <span className="text-sm text-muted-foreground">{night.asleepEstimated ? "taken as time in bed" : "your estimate"}</span>
@@ -170,32 +173,52 @@ export default async function NightReportPage({ params }: { params: Promise<{ da
             <h2 id="night-stages-title" className="font-display text-xl font-bold uppercase">
               Sleep stages
             </h2>
-            {stages.length ? (
+            {stages.length && totals ? (
               <>
-                <dl className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {(["deep", "rem", "light", "awake"] as const).filter((k) => stageTotals[k]).map((k) => (
+                <p className="mt-1 text-sm text-muted-foreground">As {night.deviceName ?? "your device"} recorded them. Time in bed {formatDuration(night.inBedMinutes)}; asleep by stage {formatDuration(totals.asleepMinutes)}.</p>
+                <StageTimeline stages={stages} bedAt={night.bedAt} wakeAt={night.wakeAt} timeZone={night.timezone} className="mt-3" />
+                <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {(["deep", "rem", "light", "asleep", "awake"] as const).filter((k) => stageTotals[k]).map((k) => (
                     <div key={k} className="rounded-xl bg-elevated p-3">
                       <dt className="text-xs text-muted-foreground">{STAGE_LABEL[k]}</dt>
-                      <dd className="font-semibold">{formatDuration(stageTotals[k] ?? 0)}</dd>
+                      <dd className="font-semibold">
+                        {formatDuration(stageTotals[k] ?? 0)}
+                        {k !== "awake" && totals.pct[k] !== undefined && <span className="ml-1 text-xs font-normal text-muted-foreground">{totals.pct[k]}% of sleep</span>}
+                      </dd>
                     </div>
                   ))}
                 </dl>
-                <ol className="mt-3 space-y-1 text-sm" aria-label="Stage timeline">
-                  {stages.map((s, i) => (
-                    <li key={`${s.session_id}-${i}`} className="flex justify-between gap-3">
-                      <span className="text-muted-foreground">
-                        {formatClock(clockMinutesInTz(s.started_at, night.timezone))} – {formatClock(clockMinutesInTz(s.ended_at, night.timezone))}
-                      </span>
-                      <span>{STAGE_LABEL[s.stage]}</span>
-                    </li>
-                  ))}
-                </ol>
-                <p className="mt-2 text-xs text-muted-foreground">Stages come from the device that recorded them; gaps between intervals are unknown time, not awake time.</p>
+                <StageBar totals={totals} className="mt-3" />
+                <details className="mt-3 text-sm">
+                  <summary className="cursor-pointer font-semibold text-gold-highlight">Every interval</summary>
+                  <ol className="mt-2 space-y-1" aria-label="Stage intervals">
+                    {stages.map((s, i) => (
+                      <li key={`${s.session_id}-${i}`} className="flex justify-between gap-3">
+                        <span className="text-muted-foreground">
+                          {formatClock(clockMinutesInTz(s.started_at, night.timezone))} – {formatClock(clockMinutesInTz(s.ended_at, night.timezone))}
+                        </span>
+                        <span>{STAGE_LABEL[s.stage]}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </details>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Stages come from the device that recorded them; gaps between intervals are unknown time, not awake time. Percentages are of time asleep by stage. The nightly score grades time asleep against your goal and schedule only: no validated way exists to turn stage shares or overnight measurements into one number, so it leaves them out.
+                </p>
               </>
             ) : (
               <p className="mt-2 text-sm text-muted-foreground">No stage information. Stages only come from a health platform or wearable that records them; the app never guesses them from bed and wake times.</p>
             )}
           </section>
+
+          {night.recorded && (
+            <section className={card} aria-labelledby="night-vitals-title">
+              <h2 id="night-vitals-title" className="font-display text-xl font-bold uppercase">
+                Overnight measurements
+              </h2>
+              <VitalsCards vitals={night.vitals} deviceName={night.deviceName} className="mt-3" />
+            </section>
+          )}
 
           <section className={card} aria-labelledby="night-checkin-title">
             <h2 id="night-checkin-title" className="font-display text-xl font-bold uppercase">

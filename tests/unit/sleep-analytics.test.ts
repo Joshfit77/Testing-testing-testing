@@ -4,7 +4,7 @@ import { clockShift, describeShift, isWeekendNight, trend, weekdayWeekend } from
 /** A night ending on `nightOf` in UTC with the given bed/wake clock times (bed the evening before) and time asleep. */
 function night(nightOf: string, bed: string, wake: string, asleep: number): NightSummary {
   const prev = new Date(Date.parse(`${nightOf}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
-  return { nightOf, sessions: [], bedAt: `${prev}T${bed}:00Z`, wakeAt: `${nightOf}T${wake}:00Z`, timezone: "UTC", inBedMinutes: asleep, asleepMinutes: asleep, asleepEstimated: true, latencyMinutes: null, efficiencyPct: null, awakenings: null, sources: ["manual"] };
+  return { nightOf, sessions: [], bedAt: `${prev}T${bed}:00Z`, wakeAt: `${nightOf}T${wake}:00Z`, timezone: "UTC", inBedMinutes: asleep, asleepMinutes: asleep, asleepEstimated: true, latencyMinutes: null, efficiencyPct: null, awakenings: null, sources: ["manual"], recorded: false, deviceName: null, vitals: null };
 }
 
 describe("weekday and weekend nights", () => {

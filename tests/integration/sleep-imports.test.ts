@@ -26,6 +26,19 @@ describe.skipIf(!available)("sleep import runs", () => {
     expect(data).toEqual([{ added: 3, device: "Apple Watch" }]);
   });
 
+  it("records the connected platform on the profile, which the member alone can set and clear", async () => {
+    const at = "2026-10-20T07:00:00.000Z";
+    expect((await owner.client.from("profiles").update({ sleep_import_source: "apple_health", sleep_import_connected_at: at }).eq("id", owner.id)).error).toBeNull();
+    expect((await owner.client.from("profiles").update({ sleep_import_source: "fitbit" }).eq("id", owner.id)).error).not.toBeNull();
+    const stored = (await owner.client.from("profiles").select("sleep_import_source, sleep_import_connected_at").eq("id", owner.id).single()).data!;
+    expect(stored.sleep_import_source).toBe("apple_health");
+    expect(Date.parse(stored.sleep_import_connected_at as string)).toBe(Date.parse(at));
+    expect((await other.client.from("profiles").select("sleep_import_source").eq("id", owner.id)).data).toEqual([]);
+    // Disconnecting clears both.
+    expect((await owner.client.from("profiles").update({ sleep_import_source: null, sleep_import_connected_at: null }).eq("id", owner.id)).error).toBeNull();
+    expect((await owner.client.from("profiles").select("sleep_import_source").eq("id", owner.id).single()).data).toEqual({ sleep_import_source: null });
+  });
+
   it("lets the member switch import off on their own profile", async () => {
     expect((await owner.client.from("profiles").update({ sleep_import_enabled: false }).eq("id", owner.id)).error).toBeNull();
     const { data } = await owner.client.from("profiles").select("sleep_import_enabled").eq("id", owner.id).single();

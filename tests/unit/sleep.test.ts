@@ -170,6 +170,18 @@ describe("clock times", () => {
 });
 
 describe("nights", () => {
+  it("marks a night recorded only when every session was imported, and carries the device's measurements", () => {
+    const base = { kind: "night" as const, timezone: "UTC", nightOf: "2026-10-23", onsetAt: null, finalWakeAt: null, awakenings: null, awakeMinutes: null };
+    const vitals = { heartRate: { avg: 56, min: 48, max: 72, samples: 400 }, hrv: { avgMs: 41.5, samples: 6, method: "sdnn" as const }, respiratoryRate: null };
+    const watch = { ...base, id: "w", source: "apple_health" as const, startedAt: "2026-10-22T22:30:00Z", endedAt: "2026-10-23T06:30:00Z", deviceName: "Apple Watch", vitals };
+    const [recorded] = summarizeNights([watch]);
+    expect(recorded).toMatchObject({ recorded: true, deviceName: "Apple Watch", vitals });
+    const [mixed] = summarizeNights([{ ...watch, endedAt: "2026-10-23T02:00:00Z" }, { ...base, id: "m", source: "manual" as const, startedAt: "2026-10-23T02:10:00Z", endedAt: "2026-10-23T06:30:00Z" }]);
+    expect(mixed).toMatchObject({ recorded: false, deviceName: "Apple Watch", vitals });
+    const [manual] = summarizeNights([{ ...base, id: "m", source: "manual" as const, startedAt: "2026-10-22T22:30:00Z", endedAt: "2026-10-23T06:30:00Z" }]);
+    expect(manual).toMatchObject({ recorded: false, deviceName: null, vitals: null });
+  });
+
   it("adds up a night logged as two sessions and skips naps and running timers", () => {
     const list = [
       night({ id: "a", startedAt: "2026-10-22T22:00:00Z", endedAt: "2026-10-23T02:00:00Z", awakenings: 1 }),

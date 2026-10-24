@@ -5,6 +5,8 @@ import { NightBars } from "@/components/sleep/night-bars";
 import { TrendBars } from "@/components/sleep/trend-bars";
 import { BackLink } from "@/components/platform/back-link";
 import { formatNightDate } from "@/components/sleep/session-list";
+import { StageBar, stageTotals } from "@/components/sleep/stage-timeline";
+import { VitalsTrend } from "@/components/sleep/vitals-cards";
 import { addDays, isoDateInTz, parseRange, RANGES, rangeStart, type RangeKey } from "@/lib/domain/dates";
 import { clockMinutesInTz, DEFAULT_SLEEP_GOAL_MINUTES, formatClock, formatDuration, summarizeNights } from "@/lib/domain/sleep";
 import { nightlyScore } from "@/lib/domain/sleep-score";
@@ -14,7 +16,7 @@ import { averageAsleepMinutes, goalPct, nightSlots, scheduleStats } from "@/lib/
 import { getServerSupabase } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
-import { listSleepCheckins, listSleepSessions } from "@/server/services/sleep";
+import { listSleepCheckins, listSleepSessions, listSleepStages } from "@/server/services/sleep";
 import { associations, describeAssociation } from "@/lib/domain/sleep-checkins";
 
 export const metadata = { title: "Sleep history" };
@@ -46,6 +48,11 @@ export default async function SleepHistoryPage({ searchParams }: { searchParams:
   const avgScore = scored.length ? Math.round(scored.reduce((acc, s) => acc + s.score.score, 0) / scored.length) : null;
   const bucket = range === "1y" ? "month" : "week";
   const points = range === "7d" ? null : trend(nights, start, today, bucket, goal);
+  // Stage mix over the most recent recorded nights in the range (30 at most keeps the query small).
+  const recordedNights = nights.filter((n) => n.recorded).slice(0, 30);
+  const recordedStages = recordedNights.length ? await listSleepStages(supabase, user.id, recordedNights.flatMap((n) => n.sessions.map((s) => s.id))) : [];
+  const mix = recordedStages.length ? stageTotals(recordedStages) : null;
+  const vitalNights = [...nights].reverse().map((n) => ({ nightOf: n.nightOf, vitals: n.vitals }));
   const split = compare ? weekdayWeekend(nights, goal) : null;
   const card = "rounded-2xl border border-border bg-card p-5";
   const clock = (m: number | null) => (m === null ? "—" : formatClock(m));
@@ -95,6 +102,24 @@ export default async function SleepHistoryPage({ searchParams }: { searchParams:
         </h2>
         <p className="mt-1 mb-3 text-sm text-muted-foreground">{range === "7d" ? "Time asleep each night against your goal." : `Average time asleep per ${bucket}, from the nights you logged in it.`}</p>
         {points ? <TrendBars points={points} goalMinutes={goal} unit={bucket} /> : <NightBars slots={nightSlots(nights, today, 7)} goalMinutes={goal} />}
+      </section>
+
+      <section className={card} aria-labelledby="recorded-title">
+        <h2 id="recorded-title" className="font-display text-xl font-bold uppercase">
+          Recorded by your watch
+        </h2>
+        {mix ? (
+          <>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Stage mix over {recordedNights.length} recorded night{recordedNights.length === 1 ? "" : "s"}{recordedNights.length < nights.filter((n) => n.recorded).length ? " (the most recent 30)" : ""}: {formatDuration(Math.round(mix.asleepMinutes / recordedNights.length))} asleep by stage on average.
+            </p>
+            <StageBar totals={mix} className="mt-3" />
+          </>
+        ) : (
+          <p className="mt-1 text-sm text-muted-foreground">No nights recorded by a wearable in this range. Stages and overnight measurements come from the device, through Apple Health or Health Connect; the app never estimates them.</p>
+        )}
+        <h3 className="mt-5 font-display text-base font-bold uppercase">Overnight measurements</h3>
+        <VitalsTrend nights={vitalNights} className="mt-2" />
       </section>
 
       <section className={card} aria-labelledby="compare-title">

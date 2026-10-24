@@ -6,7 +6,7 @@
  * HealthKit returns a list of samples per sleep category (an "in bed" envelope and asleep/awake/stage segments) that
  * may overlap; Health Connect returns a session with stage segments. Both arrive as HealthSample-like objects here.
  */
-import type { SleepSource } from "@/lib/domain/sleep";
+import type { SleepSource, SleepVitals, VitalStat } from "@/lib/domain/sleep";
 
 export type PlatformSleepState = "inBed" | "asleep" | "awake" | "rem" | "deep" | "light";
 
@@ -32,7 +32,20 @@ export interface ImportedSession {
   awakenings: number | null;
   stages: { stage: ImportedStage; startedAt: string; endedAt: string }[];
   deviceName: string | null;
+  /** Filled in by the native layer when the platform shared overnight measurements. */
+  vitals?: SleepVitals | null;
 }
+
+/** A measurement sample from the health platform (heart rate in bpm, HRV in ms, respiratory rate in breaths/min). */
+export interface PlatformVitalSample {
+  startDate: string;
+  endDate?: string;
+  value: number;
+  sourceName?: string;
+}
+
+/** Plausible ranges; anything outside is a unit mix-up or a sensor glitch and is left out rather than averaged in. */
+export const VITAL_RANGES = { heartRate: [20, 250], hrv: [1, 500], respiratoryRate: [4, 60] } as const;
 
 /** Samples closer together than this are one night. */
 export const MERGE_GAP_MINUTES = 30;
@@ -47,16 +60,47 @@ interface Segment {
   start: number;
   end: number;
   stage: ImportedStage | null;
+  source: string;
 }
 
 function segmentsOf(sample: PlatformSleepSample): Segment[] {
+  const source = sample.sourceName ?? "";
   if (sample.stages?.length) {
-    return sample.stages.map((s) => ({ start: ms(s.startDate), end: ms(s.endDate), stage: STAGE_MAP[s.stage] ?? null })).filter((s) => Number.isFinite(s.start) && Number.isFinite(s.end) && s.end > s.start);
+    return sample.stages.map((s) => ({ start: ms(s.startDate), end: ms(s.endDate), stage: STAGE_MAP[s.stage] ?? null, source })).filter((s) => Number.isFinite(s.start) && Number.isFinite(s.end) && s.end > s.start);
   }
   const start = ms(sample.startDate);
   const end = ms(sample.endDate);
   if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return [];
-  return [{ start, end, stage: sample.sleepState ? STAGE_MAP[sample.sleepState] : null }];
+  return [{ start, end, stage: sample.sleepState ? STAGE_MAP[sample.sleepState] : null, source }];
+}
+
+/**
+ * Stage intervals must not overlap, or stage totals double-count. HealthKit's "in bed" envelope is already set
+ * aside (it isn't a stage); this keeps one writer per night (the source with the most stage time, so a watch wins
+ * over a phone's bare "asleep" record) and clips any remaining same-source overlap to the earlier interval.
+ */
+function oneSourceNoOverlap(segs: (Segment & { stage: ImportedStage })[]): { segs: (Segment & { stage: ImportedStage })[]; source: string | null } {
+  if (!segs.length) return { segs, source: null };
+  // Rank the named sources: real stage detail (light/deep/REM) beats a bare asleep/awake record, then more minutes wins.
+  const bySource = new Map<string, { minutes: number; detail: boolean }>();
+  for (const s of segs) {
+    if (!s.source) continue;
+    const cur = bySource.get(s.source) ?? { minutes: 0, detail: false };
+    bySource.set(s.source, { minutes: cur.minutes + (s.end - s.start), detail: cur.detail || s.stage === "light" || s.stage === "deep" || s.stage === "rem" });
+  }
+  const ranked = [...bySource.entries()].sort((a, b) => Number(b[1].detail) - Number(a[1].detail) || b[1].minutes - a[1].minutes);
+  const source = ranked[0]?.[0] ?? null;
+  // Segments without a source name can't be told apart, so they stay with the winner.
+  const kept = segs.filter((x) => !x.source || x.source === source);
+  const out: (Segment & { stage: ImportedStage })[] = [];
+  let cursor = -Infinity;
+  for (const s of kept.sort((a, b) => a.start - b.start || a.end - b.end)) {
+    const start = Math.max(s.start, cursor);
+    if (s.end <= start) continue;
+    out.push({ ...s, start });
+    cursor = s.end;
+  }
+  return { segs: out, source };
 }
 
 function fingerprint(start: number, end: number): string {
@@ -86,10 +130,8 @@ export function samplesToSessions(samples: PlatformSleepSample[]): ImportedSessi
     const end = Math.max(...g.map((x) => x.end));
     const minutes = (end - start) / 60_000;
     if (minutes < MIN_IMPORT_MINUTES || minutes > MAX_IMPORT_HOURS * 60) continue;
-    const segs = g
-      .flatMap((x) => x.segments)
-      .filter((s) => s.stage !== null)
-      .sort((a, b) => a.start - b.start) as (Segment & { stage: ImportedStage })[];
+    const picked = oneSourceNoOverlap(g.flatMap((x) => x.segments).filter((s): s is Segment & { stage: ImportedStage } => s.stage !== null));
+    const segs = picked.segs;
     const sleeping = segs.filter((s) => s.stage !== "awake");
     const onset = sleeping.length ? Math.min(...sleeping.map((s) => s.start)) : null;
     const finalWake = sleeping.length ? Math.max(...sleeping.map((s) => s.end)) : null;
@@ -105,10 +147,48 @@ export function samplesToSessions(samples: PlatformSleepSample[]): ImportedSessi
       awakeMinutes,
       awakenings: sleeping.length ? awakeInside.length : null,
       stages: segs.map((s) => ({ stage: s.stage, startedAt: new Date(s.start).toISOString(), endedAt: new Date(s.end).toISOString() })),
-      deviceName: g.map((x) => x.sample.sourceName).find((n): n is string => Boolean(n)) ?? null,
+      // The device that recorded the stages names the night; otherwise whichever record named one.
+      deviceName: picked.source ?? g.map((x) => x.sample.sourceName).find((n): n is string => Boolean(n)) ?? null,
     });
   }
   return out;
+}
+
+function stat(samples: PlatformVitalSample[], start: number, end: number, [lo, hi]: readonly [number, number], decimals: number): VitalStat | null {
+  const values = samples
+    .filter((s) => {
+      const a = ms(s.startDate);
+      const b = s.endDate ? ms(s.endDate) : a;
+      if (!Number.isFinite(a)) return false;
+      const mid = Number.isFinite(b) ? (a + b) / 2 : a;
+      return mid >= start && mid <= end && Number.isFinite(s.value) && s.value >= lo && s.value <= hi;
+    })
+    .map((s) => s.value);
+  if (!values.length) return null;
+  const f = 10 ** decimals;
+  const r = (n: number) => Math.round(n * f) / f;
+  return { avg: r(values.reduce((acc, v) => acc + v, 0) / values.length), min: r(Math.min(...values)), max: r(Math.max(...values)), samples: values.length };
+}
+
+/**
+ * Overnight measurements inside one session, from the platform's samples: heart rate (bpm, whole numbers), HRV (ms,
+ * one decimal, with the platform's method) and respiratory rate (breaths per minute, one decimal). A sample counts
+ * when its midpoint falls inside the session. Nothing is estimated: a series with no samples is null.
+ */
+export function summarizeVitals(
+  startedAt: string,
+  endedAt: string,
+  samples: { heartRate?: PlatformVitalSample[]; hrv?: PlatformVitalSample[]; respiratoryRate?: PlatformVitalSample[] },
+  hrvMethod: "sdnn" | "rmssd",
+): SleepVitals | null {
+  const start = ms(startedAt);
+  const end = ms(endedAt);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null;
+  const heartRate = stat(samples.heartRate ?? [], start, end, VITAL_RANGES.heartRate, 0);
+  const hrvStat = stat(samples.hrv ?? [], start, end, VITAL_RANGES.hrv, 1);
+  const respiratoryRate = stat(samples.respiratoryRate ?? [], start, end, VITAL_RANGES.respiratoryRate, 1);
+  if (!heartRate && !hrvStat && !respiratoryRate) return null;
+  return { heartRate, hrv: hrvStat ? { avgMs: hrvStat.avg, samples: hrvStat.samples, method: hrvMethod } : null, respiratoryRate };
 }
 
 export const IMPORT_SOURCE_LABEL: Record<Extract<SleepSource, "apple_health" | "health_connect">, string> = { apple_health: "Apple Health", health_connect: "Health Connect" };

@@ -1,6 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { SleepKind, SleepSession, SleepSource } from "@/lib/domain/sleep";
+import type { SleepKind, SleepSession, SleepSource, SleepVitals } from "@/lib/domain/sleep";
 import type { SleepCheckin } from "@/lib/domain/sleep-checkins";
 
 export const SLEEP_CHECKIN_COLUMNS = "day, restedness, energy_morning, energy_afternoon, energy_evening, mood, stress, sleep_quality, caffeine_last, alcohol, late_meal, exercise_timing, evening_screens, disturbances, travel, sleep_aid, notes";
@@ -38,11 +38,36 @@ export interface SleepSessionRow {
   source: SleepSource;
   source_id: string | null;
   notes: string | null;
+  device_name?: string | null;
+  hr_avg?: number | null;
+  hr_min?: number | null;
+  hr_max?: number | null;
+  hr_samples?: number | null;
+  hrv_avg_ms?: number | string | null;
+  hrv_method?: "sdnn" | "rmssd" | null;
+  hrv_samples?: number | null;
+  rr_avg?: number | string | null;
+  rr_min?: number | string | null;
+  rr_max?: number | string | null;
+  rr_samples?: number | null;
   created_at: string;
   updated_at: string;
 }
 
-export const SLEEP_SESSION_COLUMNS = "id, user_id, kind, started_at, ended_at, onset_at, final_wake_at, awakenings, awake_minutes, timezone, night_of, source, source_id, notes, created_at, updated_at";
+export const SLEEP_SESSION_COLUMNS =
+  "id, user_id, kind, started_at, ended_at, onset_at, final_wake_at, awakenings, awake_minutes, timezone, night_of, source, source_id, notes, device_name, hr_avg, hr_min, hr_max, hr_samples, hrv_avg_ms, hrv_method, hrv_samples, rr_avg, rr_min, rr_max, rr_samples, created_at, updated_at";
+
+const num = (v: number | string | null | undefined): number | null => (v == null ? null : Number(v));
+
+/** The overnight measurements a row carries, or null when the device recorded none. Numerics arrive as strings. */
+export function rowToVitals(r: SleepSessionRow): SleepVitals | null {
+  const heartRate = r.hr_avg != null && r.hr_samples != null ? { avg: r.hr_avg, min: r.hr_min ?? r.hr_avg, max: r.hr_max ?? r.hr_avg, samples: r.hr_samples } : null;
+  const hrvAvg = num(r.hrv_avg_ms);
+  const hrv = hrvAvg != null && r.hrv_method && r.hrv_samples != null ? { avgMs: hrvAvg, samples: r.hrv_samples, method: r.hrv_method } : null;
+  const rrAvg = num(r.rr_avg);
+  const respiratoryRate = rrAvg != null && r.rr_samples != null ? { avg: rrAvg, min: num(r.rr_min) ?? rrAvg, max: num(r.rr_max) ?? rrAvg, samples: r.rr_samples } : null;
+  return heartRate || hrv || respiratoryRate ? { heartRate, hrv, respiratoryRate } : null;
+}
 
 export function rowToSession(r: SleepSessionRow): SleepSession {
   return {
@@ -58,6 +83,8 @@ export function rowToSession(r: SleepSessionRow): SleepSession {
     nightOf: r.night_of,
     source: r.source,
     notes: r.notes,
+    deviceName: r.device_name ?? null,
+    vitals: rowToVitals(r),
   };
 }
 
@@ -102,12 +129,14 @@ export interface SleepImportRun {
   added: number;
   duplicates: number;
   conflicts: number;
+  updated: number;
+  with_vitals: number;
   device: string | null;
   created_at: string;
 }
 
 export async function listSleepImportRuns(supabase: SupabaseClient, userId: string, limit = 10): Promise<SleepImportRun[]> {
-  const { data, error } = await supabase.from("sleep_import_runs").select("id, source, range_start, range_end, added, duplicates, conflicts, device, created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(limit);
+  const { data, error } = await supabase.from("sleep_import_runs").select("id, source, range_start, range_end, added, duplicates, conflicts, updated, with_vitals, device, created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(limit);
   if (error) throw error;
   return (data ?? []) as unknown as SleepImportRun[];
 }

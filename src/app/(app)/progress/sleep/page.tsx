@@ -16,6 +16,11 @@ import { QuickCheckin } from "@/components/sleep/quick-checkin";
 import { SleepScoreCard } from "@/components/sleep/score-card";
 import { formatNightDate, SleepSessionList } from "@/components/sleep/session-list";
 import { SleepTimerCard } from "@/components/sleep/timer-card";
+import { SleepSourceCard, type SleepSourceStatus } from "@/components/sleep/source-card";
+import { StageBar, stageTotals } from "@/components/sleep/stage-timeline";
+import { RecordedBadge, VitalsCards } from "@/components/sleep/vitals-cards";
+import { PullToRefresh } from "@/components/platform/pull-to-refresh";
+import { listSleepImportRuns, listSleepStages, type SleepStageRow } from "@/server/services/sleep";
 import { Button } from "@/components/ui/button";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { addDays, isoDateInTz } from "@/lib/domain/dates";
@@ -49,14 +54,16 @@ export default async function SleepPage({ searchParams }: { searchParams: Promis
   let running: SleepSession | null = null;
   let checkin: SleepCheckin | null = null;
   let checkins: SleepCheckin[] = [];
+  let runs: Awaited<ReturnType<typeof listSleepImportRuns>> = [];
   let loadFailed = false;
   if (consented) {
     try {
-      [sessions, running, checkin, checkins] = await Promise.all([
+      [sessions, running, checkin, checkins, runs] = await Promise.all([
         listSleepSessions(supabase, user.id, { fromNight: addDays(today, -29) }),
         getRunningSleepSession(supabase, user.id),
         getSleepCheckin(supabase, user.id, today),
         listSleepCheckins(supabase, user.id, addDays(today, -13), today),
+        listSleepImportRuns(supabase, user.id, 1).catch(() => []),
       ]);
     } catch (err) {
       logError("sleep.page", err);
@@ -65,6 +72,24 @@ export default async function SleepPage({ searchParams }: { searchParams: Promis
   }
   const nights = summarizeNights(sessions);
   const lastNight = nights.find((n) => n.nightOf === today) ?? nights[0] ?? null;
+  let lastStages: SleepStageRow[] = [];
+  if (lastNight?.recorded) {
+    try {
+      lastStages = await listSleepStages(supabase, user.id, lastNight.sessions.map((s) => s.id));
+    } catch (err) {
+      logError("sleep.page.stages", err);
+    }
+  }
+  const lastTotals = lastStages.length ? stageTotals(lastStages) : null;
+  const lastRun = runs[0] ?? null;
+  const sourceStatus: SleepSourceStatus = {
+    source: profile.sleep_import_source ?? null,
+    connectedAt: profile.sleep_import_connected_at ?? null,
+    importEnabled: profile.sleep_import_enabled ?? true,
+    lastSync: lastRun ? { at: lastRun.created_at, device: lastRun.device, added: lastRun.added, updated: lastRun.updated, withVitals: lastRun.with_vitals } : null,
+    deviceName: nights.find((n) => n.deviceName)?.deviceName ?? null,
+    timeZone: tz,
+  };
   const fortnight = nights.filter((n) => n.nightOf >= addDays(today, -13));
   const week = nightSlots(fortnight, today, 7);
   const weekAvg = averageAsleepMinutes(week.flatMap((s) => (s.night ? [s.night] : [])));
@@ -116,7 +141,7 @@ export default async function SleepPage({ searchParams }: { searchParams: Promis
       <PageHeader
         eyebrow="My Progress"
         title="Sleep & Recovery"
-        description="Your nights and naps, by timer, by hand or imported from a health platform. The app itself measures nothing, and anything assumed is labelled."
+        description="Your nights as your watch recorded them through Apple Health or Health Connect, or by timer and by hand. The app itself measures nothing, and anything assumed is labelled."
         actions={
           consented ? (
             <Button asChild variant="secondary">
@@ -134,18 +159,25 @@ export default async function SleepPage({ searchParams }: { searchParams: Promis
       {!consented ? (
         <SleepConsentCard />
       ) : (
-        <>
+        <PullToRefresh>
+          <div className="space-y-6">
+          <SleepSourceCard status={sourceStatus} />
           <div className="grid gap-4 lg:grid-cols-2">
             <section className="bg-card-gradient rounded-2xl border border-border p-5" aria-labelledby="last-night-title">
-              <h2 id="last-night-title" className="font-display text-xl font-bold uppercase">
-                Last night
-              </h2>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 id="last-night-title" className="font-display text-xl font-bold uppercase">
+                  Last night
+                </h2>
+                {lastNight && <RecordedBadge recorded={lastNight.recorded} deviceName={lastNight.deviceName} />}
+              </div>
               {lastNight ? (
                 <>
                   <p className="mt-2 flex items-baseline gap-2">
-                    <span className="font-display text-5xl font-bold text-gold-highlight">{formatDuration(lastNight.asleepMinutes)}</span>
-                    <span className="text-sm text-muted-foreground">{lastNight.asleepEstimated ? "in bed" : "asleep (your estimate)"}</span>
+                    <span className="font-display text-5xl font-bold text-gold-highlight">{formatDuration(lastTotals ? lastTotals.asleepMinutes : lastNight.asleepMinutes)}</span>
+                    <span className="text-sm text-muted-foreground">{lastTotals ? "asleep (recorded)" : lastNight.asleepEstimated ? "in bed" : "asleep (your estimate)"}</span>
                   </p>
+                  {lastTotals && <StageBar totals={lastTotals} className="mt-3" />}
+                  {lastNight.recorded && <VitalsCards vitals={lastNight.vitals} deviceName={lastNight.deviceName} compact className="mt-3" />}
                   <p className="mt-1 text-sm text-muted-foreground">
                     {lastNight.nightOf === today ? "The night just gone" : formatNightDate(lastNight.nightOf)} · {formatClock(clockMinutesInTz(lastNight.bedAt, lastNight.timezone))} – {formatClock(clockMinutesInTz(lastNight.wakeAt, lastNight.timezone))}
                   </p>
@@ -274,7 +306,8 @@ export default async function SleepPage({ searchParams }: { searchParams: Promis
             </h2>
             <SleepSessionList sessions={recent} emptyText="Nothing logged yet. Entries you add appear here with their source, and you can edit or delete any of them." />
           </section>
-        </>
+          </div>
+        </PullToRefresh>
       )}
     </div>
   );

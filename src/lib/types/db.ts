@@ -31,6 +31,9 @@ export interface ProfileRow {
   sleep_tips_dismissed?: string[];
   /** Added in 20261024000038_sleep_alarm: validated by `alarmConfigSchema`, or null. */
   sleep_alarm?: unknown;
+  /** Added in 20261024000041_sleep_vitals: the health platform the member connected for sleep, and when. */
+  sleep_import_source?: "apple_health" | "health_connect" | null;
+  sleep_import_connected_at?: string | null;
   created_at: string;
 }
 

@@ -90,6 +90,28 @@ describe.skipIf(!available)("sleep sessions: consent, isolation, overlap and imp
     expect((await other.client.from("sleep_stages").select("id").eq("session_id", imported.id)).data).toEqual([]);
   });
 
+  it("keeps overnight measurements and the device name on imported rows only, inside plausible ranges", async () => {
+    const base = { started_at: "2026-08-01T22:00:00Z", ended_at: "2026-08-02T06:00:00Z", night_of: "2026-08-02" };
+    const vitals = { device_name: "Apple Watch", hr_avg: 54, hr_min: 47, hr_max: 71, hr_samples: 410, hrv_avg_ms: 38.5, hrv_method: "sdnn", hrv_samples: 6, rr_avg: 14.2, rr_min: 12.5, rr_max: 16.0, rr_samples: 95 };
+    // A hand-entered night can't carry measurements: the app measures nothing itself.
+    expect((await owner.client.from("sleep_sessions").insert(night(owner, { ...base, ...vitals }))).error).not.toBeNull();
+    expect((await owner.client.from("sleep_sessions").insert(night(owner, { ...base, device_name: "Apple Watch" }))).error).not.toBeNull();
+    // Imported rows keep them, with the shape checks: min ≤ avg ≤ max, a method with every HRV figure, nothing absurd.
+    const row = night(owner, { ...base, source: "apple_health", source_id: "hk-vitals", ...vitals });
+    expect((await owner.client.from("sleep_sessions").insert(row)).error).toBeNull();
+    const stored = (await owner.client.from("sleep_sessions").select("hr_avg, hrv_avg_ms, hrv_method, rr_avg, device_name").eq("id", row.id).single()).data;
+    expect(stored).toEqual({ hr_avg: 54, hrv_avg_ms: 38.5, hrv_method: "sdnn", rr_avg: 14.2, device_name: "Apple Watch" });
+    const bad = (over: Record<string, unknown>) => night(owner, { ...base, started_at: "2026-08-03T22:00:00Z", ended_at: "2026-08-04T06:00:00Z", night_of: "2026-08-04", source: "apple_health", source_id: `hk-bad-${JSON.stringify(over)}`, ...vitals, ...over });
+    expect((await owner.client.from("sleep_sessions").insert(bad({ hr_min: 80 }))).error).not.toBeNull();
+    expect((await owner.client.from("sleep_sessions").insert(bad({ hr_avg: 300 }))).error).not.toBeNull();
+    expect((await owner.client.from("sleep_sessions").insert(bad({ hrv_method: null }))).error).not.toBeNull();
+    expect((await owner.client.from("sleep_sessions").insert(bad({ hrv_method: "pnn50" }))).error).not.toBeNull();
+    expect((await owner.client.from("sleep_sessions").insert(bad({ rr_avg: 70 }))).error).not.toBeNull();
+    expect((await owner.client.from("sleep_sessions").insert(bad({ hr_samples: 0 }))).error).not.toBeNull();
+    // A series the device didn't record is simply absent.
+    expect((await owner.client.from("sleep_sessions").insert(bad({ rr_avg: null, rr_min: null, rr_max: null, rr_samples: null }))).error).toBeNull();
+  });
+
   it("keeps viewing and deleting after consent is withdrawn, but not adding or editing", async () => {
     expect((await consent(owner, false)).error).toBeNull();
     const { data } = await owner.client.from("sleep_sessions").select("id").eq("user_id", owner.id);

@@ -10,7 +10,7 @@ import { IMPORT_SOURCE_LABEL } from "@/lib/domain/sleep-import";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
 import { deleteAllSleepDataAction } from "@/server/actions/sleep";
-import { deleteImportedSleepAction, setSleepImportEnabledAction } from "@/server/actions/sleep-import";
+import { deleteImportedSleepAction, disconnectSleepSourceAction, setSleepImportEnabledAction } from "@/server/actions/sleep-import";
 import { listSleepImportRuns } from "@/server/services/sleep";
 
 export const metadata = { title: "Sleep settings" };
@@ -44,10 +44,15 @@ export default async function SleepSettingsPage() {
         <SleepGoalForm goalMinutes={goal} />
       </section>
 
-      <section className={card} aria-labelledby="devices-title">
+      <section id="devices" className={card} aria-labelledby="devices-title">
         <h2 id="devices-title" className="font-display text-xl font-bold uppercase">
           Connected devices
         </h2>
+        <p className="mt-1 text-sm text-muted-foreground" data-testid="sleep-connection">
+          {profile.sleep_import_source
+            ? `Connected to ${IMPORT_SOURCE_LABEL[profile.sleep_import_source]}${profile.sleep_import_connected_at ? ` since ${when(profile.sleep_import_connected_at)}` : ""}${runs[0]?.device ? ` · ${runs[0].device}` : ""}.`
+            : "Not connected. Any watch or ring that writes sleep to Apple Health or Health Connect (Apple Watch, Oura, Garmin, WHOOP, Samsung and more) can share its nights, stages and overnight heart rate, HRV and breathing with the app."}
+        </p>
         <div className="mt-2">
           <SleepImportCard enabled={importEnabled && Boolean(profile.wellness_consent_at)} />
         </div>
@@ -78,6 +83,16 @@ export default async function SleepSettingsPage() {
           </ActionButton>
           <span className="text-sm text-muted-foreground">{importedCount ?? 0} imported</span>
         </div>
+        {profile.sleep_import_source && (
+          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-4">
+            <ActionButton action={disconnectSleepSourceAction} fields={{}} variant="secondary" confirmMessage={`Disconnect ${IMPORT_SOURCE_LABEL[profile.sleep_import_source]}?`} confirmLabel="Disconnect" confirmDetail="Imports stop and the connection is forgotten. Nights already imported stay unless you remove them below.">
+              Disconnect
+            </ActionButton>
+            <ActionButton action={disconnectSleepSourceAction} fields={{ remove: "on" }} variant="destructive" confirmMessage={`Disconnect and remove imported nights?`} confirmLabel="Disconnect and remove" confirmDetail="Imports stop, the connection is forgotten and every imported night goes. Entries you made yourself stay; your phone's own health records are not touched.">
+              <Trash2 className="size-4" aria-hidden /> Disconnect and remove imported
+            </ActionButton>
+          </div>
+        )}
       </section>
 
       <section className={card} aria-labelledby="privacy-title">

@@ -5,7 +5,8 @@ import { z } from "zod";
 import { actionError, actionOk, type ActionState } from "@/lib/action-state";
 import { isoDateInTz } from "@/lib/domain/dates";
 import { findOverlap, isValidTimeZone, nightOf, validateSleepSession, type SleepSessionTimes } from "@/lib/domain/sleep";
-import { IMPORT_SOURCE_LABEL, MAX_IMPORT_HOURS } from "@/lib/domain/sleep-import";
+import { IMPORT_SOURCE_LABEL, MAX_IMPORT_HOURS, VITAL_RANGES } from "@/lib/domain/sleep-import";
+import { hasVitals, type SleepVitals } from "@/lib/domain/sleep";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getProfile, requireUser } from "@/server/auth";
 import { logError } from "@/server/log";
@@ -24,6 +25,18 @@ const deviceName = z
   .max(120)
   .nullable()
   .transform((v) => v?.replace(/\p{C}/gu, "").trim() || null);
+const bounded = (range: readonly [number, number]) => z.number().min(range[0]).max(range[1]);
+const samples = z.number().int().min(1).max(100000);
+const statOf = (range: readonly [number, number]) => z.object({ avg: bounded(range), min: bounded(range), max: bounded(range), samples }).refine((s) => s.min <= s.avg && s.avg <= s.max, "Low, average and high must be in order").nullable();
+/** Overnight measurements the device recorded, as the native layer summarised them; each series may be null. */
+const vitals = z
+  .object({
+    heartRate: statOf(VITAL_RANGES.heartRate),
+    hrv: z.object({ avgMs: bounded(VITAL_RANGES.hrv), samples, method: z.enum(["sdnn", "rmssd"]) }).nullable(),
+    respiratoryRate: statOf(VITAL_RANGES.respiratoryRate),
+  })
+  .nullable()
+  .optional();
 // Stages are validated one by one so a single odd interval drops that interval, not the night.
 const session = z.object({
   sourceId: z.string().min(1).max(200),
@@ -35,7 +48,26 @@ const session = z.object({
   awakenings: z.number().int().min(0).max(50).nullable(),
   stages: z.array(z.unknown()).max(2000),
   deviceName,
+  vitals,
 });
+
+/** The vitals columns for a session row (all null when the device recorded nothing). */
+function vitalColumns(v: SleepVitals | null | undefined) {
+  const r1 = (n: number) => Math.round(n * 10) / 10;
+  return {
+    hr_avg: v?.heartRate ? Math.round(v.heartRate.avg) : null,
+    hr_min: v?.heartRate ? Math.round(v.heartRate.min) : null,
+    hr_max: v?.heartRate ? Math.round(v.heartRate.max) : null,
+    hr_samples: v?.heartRate?.samples ?? null,
+    hrv_avg_ms: v?.hrv ? r1(v.hrv.avgMs) : null,
+    hrv_method: v?.hrv?.method ?? null,
+    hrv_samples: v?.hrv?.samples ?? null,
+    rr_avg: v?.respiratoryRate ? r1(v.respiratoryRate.avg) : null,
+    rr_min: v?.respiratoryRate ? r1(v.respiratoryRate.min) : null,
+    rr_max: v?.respiratoryRate ? r1(v.respiratoryRate.max) : null,
+    rr_samples: v?.respiratoryRate?.samples ?? null,
+  };
+}
 /** Each record is checked on its own below, so one unusable record can't block the rest of the import. */
 const importSchema = z.object({
   source: z.enum(["apple_health", "health_connect"]),
@@ -65,6 +97,9 @@ export interface ImportSummary extends ActionState {
   duplicates?: number;
   conflicts?: number;
   rejected?: number;
+  /** Earlier imports that gained overnight measurements this time. */
+  updated?: number;
+  withVitals?: number;
 }
 
 /**
@@ -90,6 +125,8 @@ export async function importSleepAction(input: unknown): Promise<ImportSummary> 
   let duplicates = 0;
   let conflicts = 0;
   let rejected = 0;
+  let updated = 0;
+  let withVitals = 0;
   const now = Date.now();
   const stored: (SleepSessionTimes & { id: string })[] = existing.map((s) => ({ ...s }));
 
@@ -104,6 +141,23 @@ export async function importSleepAction(input: unknown): Promise<ImportSummary> 
     deviceSeen ??= s.deviceName;
     if (known.has(s.sourceId)) {
       duplicates++;
+      // A record imported before the device's measurements were read can still gain them; nothing else changes.
+      if (hasVitals(s.vitals)) {
+        const { data: filled } = await supabase
+          .from("sleep_sessions")
+          .update({ ...vitalColumns(s.vitals), device_name: s.deviceName })
+          .eq("user_id", user.id)
+          .eq("source", v.source)
+          .eq("source_id", s.sourceId)
+          .is("hr_avg", null)
+          .is("hrv_avg_ms", null)
+          .is("rr_avg", null)
+          .select("id");
+        if (filled?.length) {
+          updated++;
+          withVitals++;
+        }
+      }
       continue;
     }
     const times: SleepSessionTimes = { kind: "night", timezone: v.timezone, startedAt: s.startedAt, endedAt: s.endedAt, onsetAt: s.onsetAt, finalWakeAt: s.finalWakeAt, awakeMinutes: s.awakeMinutes, awakenings: s.awakenings };
@@ -131,7 +185,8 @@ export async function importSleepAction(input: unknown): Promise<ImportSummary> 
       night_of: nightOf(times),
       source: v.source,
       source_id: s.sourceId,
-      notes: s.deviceName ? `From ${s.deviceName}` : null,
+      device_name: s.deviceName,
+      ...vitalColumns(s.vitals),
     });
     if (error) {
       if (error.code === "23505") duplicates++;
@@ -150,20 +205,30 @@ export async function importSleepAction(input: unknown): Promise<ImportSummary> 
     stored.push({ id, ...times });
     known.add(s.sourceId);
     added++;
+    if (hasVitals(s.vitals)) withVitals++;
   }
 
-  const { error: runErr } = await supabase.from("sleep_import_runs").insert({ user_id: user.id, source: v.source, range_start: v.rangeStart, range_end: v.rangeEnd, added, duplicates, conflicts, device: deviceSeen });
+  const { error: runErr } = await supabase.from("sleep_import_runs").insert({ user_id: user.id, source: v.source, range_start: v.rangeStart, range_end: v.rangeEnd, added, duplicates, conflicts, updated, with_vitals: withVitals, device: deviceSeen });
   if (runErr) logError("sleep.import.run", runErr);
   else {
+    // The platform answered with records, so it counts as connected from the first time it did.
+    if (added || duplicates) {
+      const { error: connErr } = await supabase
+        .from("profiles")
+        .update({ sleep_import_source: v.source, sleep_import_connected_at: profile.sleep_import_connected_at ?? new Date().toISOString() })
+        .eq("id", user.id);
+      if (connErr) logError("sleep.import.connect", connErr);
+    }
     const { data: old } = await supabase.from("sleep_import_runs").select("id").eq("user_id", user.id).order("created_at", { ascending: false }).range(KEEP_IMPORT_RUNS, KEEP_IMPORT_RUNS + 200);
     if (old?.length) await supabase.from("sleep_import_runs").delete().eq("user_id", user.id).in("id", old.map((r) => r.id as string));
   }
   refresh();
   const parts = [`${added} added`];
-  if (duplicates) parts.push(`${duplicates} already imported`);
+  if (updated) parts.push(`${updated} gained overnight measurements`);
+  if (duplicates - updated > 0) parts.push(`${duplicates - updated} already imported`);
   if (conflicts) parts.push(`${conflicts} skipped (overlap an entry you made)`);
   if (rejected) parts.push(`${rejected} couldn't be used`);
-  return { ...actionOk(`${label}: ${parts.join(", ")}.`), added, duplicates, conflicts, rejected };
+  return { ...actionOk(`${label}: ${parts.join(", ")}.`), added, duplicates, conflicts, rejected, updated, withVitals };
 }
 
 /** Switch automatic import on or off. Records already imported stay until deleted. */
@@ -173,6 +238,22 @@ export async function setSleepImportEnabledAction(formData: FormData): Promise<v
   const supabase = await getServerSupabase();
   const { error } = await supabase.from("profiles").update({ sleep_import_enabled: enabled }).eq("id", user.id);
   if (error) logError("sleep.import.toggle", error);
+  refresh();
+}
+
+/**
+ * Disconnect the health source: imports stop and the connection status clears. With `remove` on, every imported
+ * session goes too (hand-entered and timer entries always stay). The phone's own health records are never touched.
+ */
+export async function disconnectSleepSourceAction(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const supabase = await getServerSupabase();
+  const { error } = await supabase.from("profiles").update({ sleep_import_enabled: false, sleep_import_source: null, sleep_import_connected_at: null }).eq("id", user.id);
+  if (error) logError("sleep.import.disconnect", error);
+  if (formData.get("remove") === "on") {
+    const { error: delErr } = await supabase.from("sleep_sessions").delete().eq("user_id", user.id).in("source", ["apple_health", "health_connect", "wearable"]);
+    if (delErr) logError("sleep.import.disconnect_delete", delErr);
+  }
   refresh();
 }
 

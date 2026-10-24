@@ -55,11 +55,39 @@ export interface SleepSessionTimes {
   kind: SleepKind;
 }
 
+/** One overnight measurement series summarised: average, lowest, highest and how many samples the device recorded. */
+export interface VitalStat {
+  avg: number;
+  min: number;
+  max: number;
+  samples: number;
+}
+
+/**
+ * Overnight measurements a wearable recorded and the health platform shared, summarised over the session. Never
+ * computed by the app itself: null means the device didn't record it or the member didn't allow it.
+ */
+export interface SleepVitals {
+  heartRate: VitalStat | null;
+  /** HealthKit gives SDNN, Health Connect RMSSD; the two aren't comparable, so the method travels with the number. */
+  hrv: { avgMs: number; samples: number; method: "sdnn" | "rmssd" } | null;
+  respiratoryRate: VitalStat | null;
+}
+
+export const HRV_METHOD_LABEL: Record<"sdnn" | "rmssd", string> = { sdnn: "SDNN", rmssd: "RMSSD" };
+
+export function hasVitals(v: SleepVitals | null | undefined): v is SleepVitals {
+  return Boolean(v && (v.heartRate || v.hrv || v.respiratoryRate));
+}
+
 export interface SleepSession extends SleepSessionTimes {
   id: string;
   source: SleepSource;
   nightOf: string;
   notes?: string | null;
+  /** The watch, ring or app the platform attributed an imported record to. */
+  deviceName?: string | null;
+  vitals?: SleepVitals | null;
 }
 
 const MINUTE_MS = 60_000;
@@ -294,6 +322,11 @@ export interface NightSummary {
   awakenings: number | null;
   /** The sources the night's sessions came from, for the data-source label. */
   sources: SleepSource[];
+  /** True when every session of the night came from a health platform or wearable (nothing entered by hand). */
+  recorded: boolean;
+  deviceName: string | null;
+  /** Overnight measurements from the recording device, from the session that carried the most heart-rate samples. */
+  vitals: SleepVitals | null;
 }
 
 /** Finished nights (not naps) grouped by the date they belong to, newest first. A night split into two logged sessions is added up. */
@@ -330,6 +363,9 @@ export function summarizeNights(sessions: SleepSession[]): NightSummary[] {
       efficiencyPct: estimated || inBed <= 0 ? null : Math.round((asleep / inBed) * 100),
       awakenings,
       sources: [...new Set(list.map((s) => s.source))],
+      recorded: list.every((s) => IMPORTED_SOURCES.includes(s.source)),
+      deviceName: list.map((s) => s.deviceName).find((d): d is string => Boolean(d)) ?? null,
+      vitals: list.filter((s) => hasVitals(s.vitals)).sort((a, b) => (b.vitals?.heartRate?.samples ?? 0) - (a.vitals?.heartRate?.samples ?? 0))[0]?.vitals ?? null,
     });
   }
   return out.sort((a, b) => (a.nightOf < b.nightOf ? 1 : -1));
