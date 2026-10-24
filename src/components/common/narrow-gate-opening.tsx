@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 
 /**
@@ -10,11 +12,13 @@ export function NarrowGateOpening({
   translation,
   continueHref = "#welcome",
   continueLabel = "Enter Narrow Gate Fitness",
+  onEnter,
 }: {
   verse: string;
   translation: string;
   continueHref?: string;
   continueLabel?: string;
+  onEnter?: () => void;
 }) {
   return (
     <section
@@ -49,12 +53,22 @@ export function NarrowGateOpening({
         </figcaption>
       </figure>
 
+      {onEnter ? (
+      <button
+        type="button"
+        onClick={onEnter}
+        className="ng-intro-copy mt-6 inline-flex min-h-12 items-center justify-center rounded-xl border border-gold bg-gold-gradient px-7 text-sm font-extrabold uppercase tracking-[0.12em] text-[#100d07] shadow-[0_10px_30px_-15px_rgba(241,223,168,0.8)] transition-[filter,transform] hover:brightness-110 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-gold-highlight"
+      >
+        {continueLabel}
+      </button>
+      ) : (
       <Link
         href={continueHref}
         className="ng-intro-copy mt-6 inline-flex min-h-12 items-center justify-center rounded-xl border border-gold bg-gold-gradient px-7 text-sm font-extrabold uppercase tracking-[0.12em] text-[#100d07] shadow-[0_10px_30px_-15px_rgba(241,223,168,0.8)] transition-[filter,transform] hover:brightness-110 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-gold-highlight"
       >
         {continueLabel}
       </Link>
+      )}
       <p className="ng-intro-copy mt-3 text-xs text-muted-foreground">
         The opening can be skipped at any time. No account is required to view it.
       </p>
