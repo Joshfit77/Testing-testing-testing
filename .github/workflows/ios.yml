@@ -116,7 +116,7 @@ jobs:
             grep -q -- "$marker" "$RUNNER_TEMP/home.html" || { echo "::error::The served page has no '$marker'"; exit 1; }
           done
       # The app loads the site through a small proxy that can hold page loads (scripts/ios-verify/slow-start-proxy.mjs):
-      # no delay while filming the opening, a few seconds for XCUITest (its launch() waits for the app to settle).
+      # no delay while filming the opening, 8 s for XCUITest (its launch() waits for the app to settle).
       - name: Point the iPhone app at it and build for the Simulator
         run: |
           echo 0 > "$RUNNER_TEMP/delay-ms"
@@ -154,7 +154,7 @@ jobs:
         run: python3 scripts/ios-verify/film.py "$UDID" sim-shots
       - name: Tap Enter Narrow Gate, relaunch, return from the background (XCUITest)
         run: |
-          echo 3000 > "$RUNNER_TEMP/delay-ms"
+          echo 8000 > "$RUNNER_TEMP/delay-ms"
           brew install xcodegen
           cd scripts/ios-verify
           xcodegen generate
@@ -171,10 +171,10 @@ jobs:
           mkdir -p sim-shots
           cp "$RUNNER_TEMP/next.log" "$RUNNER_TEMP/proxy.log" "$RUNNER_TEMP/xcodebuild-test.log" sim-shots/ 2>/dev/null || true
           python3 -m venv "$RUNNER_TEMP/venv" && "$RUNNER_TEMP/venv/bin/pip" install --quiet pillow
-          "$RUNNER_TEMP/venv/bin/python" scripts/ios-verify/contact-sheet.py sim-shots
-          echo
-          grep -E "GATECHECK|Test Case .*(passed|failed)|error:|TEST (SUCCEEDED|FAILED)|Executed" "$RUNNER_TEMP/xcodebuild-test.log" | cut -c1-400 || true
           grep -A60 "accessibility tree:" "$RUNNER_TEMP/xcodebuild-test.log" | cut -c1-200 | head -130 || true
+          grep -E "GATECHECK|Test Case .*(passed|failed)|error:|TEST (SUCCEEDED|FAILED)|Executed" "$RUNNER_TEMP/xcodebuild-test.log" | cut -c1-400 || true
+          # Ends with one CHECK line per filmed step; fails the job if the opening didn't play as it should.
+          "$RUNNER_TEMP/venv/bin/python" scripts/ios-verify/contact-sheet.py sim-shots
       - uses: actions/upload-artifact@v4
         if: always()
         with:

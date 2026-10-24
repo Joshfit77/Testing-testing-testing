@@ -2,8 +2,8 @@ import XCTest
 
 /// Drives the real Narrow Gate Fitness app in the iOS Simulator (WKWebView, loading the full web app) and saves
 /// screenshots to $SHOTS_DIR (passed as TEST_RUNNER_SHOTS_DIR), named "<step>-<milliseconds>.png" for
-/// scripts/ios-verify/contact-sheet.py. The workflow holds each page load for a few seconds (slow-start-proxy.mjs) so
-/// the opening starts after launch() returns. The opening left alone is filmed without XCUITest (film.py).
+/// scripts/ios-verify/contact-sheet.py. The workflow holds each page load for 8 s (slow-start-proxy.mjs) so the
+/// opening starts after launch() returns. The opening left alone is filmed without XCUITest or delay (film.py).
 /// Tests run in name order.
 final class OpeningOnSimulatorTests: XCTestCase {
     private let app = XCUIApplication(bundleIdentifier: "com.narrowgatefitness.app")
@@ -52,11 +52,20 @@ final class OpeningOnSimulatorTests: XCTestCase {
     func test1_enterNarrowGateMovesIntoTheLightAndOpensTheApp() throws {
         continueAfterFailure = true
         launch()
+        // The opening shows Skip intro at once and Enter Narrow Gate from 2.15 s: wait for the first, then the second.
+        guard app.buttons["Skip intro"].waitForExistence(timeout: 20) else {
+            dumpTree("no opening (no Skip intro button)")
+            shot("1-no-opening")
+            XCTFail("the opening did not appear within 20 s of launch")
+            return
+        }
         let enter = app.buttons["Enter Narrow Gate"]
-        guard enter.waitForExistence(timeout: 15) else {
+        let shown = Date()
+        while !enter.exists && Date().timeIntervalSince(shown) < 5 {}
+        guard enter.exists else {
             dumpTree("no Enter Narrow Gate button")
             shot("1-no-enter")
-            XCTFail("no Enter Narrow Gate button within 15 s")
+            XCTFail("no Enter Narrow Gate button within 5 s of the opening")
             return
         }
         let frame = enter.frame
@@ -74,7 +83,7 @@ final class OpeningOnSimulatorTests: XCTestCase {
         continueAfterFailure = true
         launch()
         let skip = app.buttons["Skip intro"]
-        guard skip.waitForExistence(timeout: 15) else {
+        guard skip.waitForExistence(timeout: 20) else {
             dumpTree("no Skip intro button")
             shot("2-no-skip")
             XCTFail("the opening did not replay on a fresh launch")

@@ -34,10 +34,28 @@ def ascii_art(im: Image.Image, cols: int = 22) -> list[str]:
     return ["".join(RAMP[min(9, px[x, y] * 10 // 256)] for x in range(cols)) for y in range(rows)]
 
 
+# Frame types, from the brightness of the whole screen and of the doorway (calibrated on the opening in Chromium and
+# in the Simulator): the gate open with its light, the light filling the screen, the welcome page.
+def kind(screen: float, door: float) -> str:
+    if screen > 200:
+        return "light"
+    if door > 140 and screen < 100:
+        return "gate-open"
+    if screen < 40 and door < 120:
+        return "welcome"
+    return "other"
+
+
+CHECKS = {
+    "0": "fresh launch, left alone",
+    "5": "relaunch, left alone",
+    "1": "after Enter Narrow Gate",
+}
+verdicts: list[str] = []
 W = 180
 for step, files in groups.items():
     print(f"\n== step {step}: {len(files)} frames   (brightness: screen / doorway / lower third)")
-    tiles, grey = [], {}
+    tiles, grey, kinds = [], {}, []
     for f in files:
         im = Image.open(os.path.join(shots, f)).convert("RGB")
         g = im.convert("L")
@@ -45,7 +63,8 @@ for step, files in groups.items():
         w, h = g.size
         centre = g.crop((int(w * 0.38), int(h * 0.22), int(w * 0.62), int(h * 0.55)))
         lower = g.crop((0, int(h * 0.66), w, h))
-        print(f"  {label(f):>14}  {mean(g):6.1f} {mean(centre):6.1f} {mean(lower):6.1f}")
+        kinds.append(kind(mean(g), mean(centre)))
+        print(f"  {label(f):>14}  {mean(g):6.1f} {mean(centre):6.1f} {mean(lower):6.1f}  {kinds[-1]}")
         tiles.append((im.resize((W, round(im.height * W / im.width)), Image.LANCZOS), label(f)))
     cols = min(10, len(tiles))
     rows = (len(tiles) + cols - 1) // cols
@@ -57,9 +76,30 @@ for step, files in groups.items():
         d.text((x + 3, y + 3), text, fill=(230, 200, 120))
         sheet.paste(t, (x, y + 18))
     sheet.save(os.path.join(shots, f"sheet-{step}.jpg"), quality=85)
+    if step in CHECKS:
+        frames = [k for f, k in zip(files, kinds) if re.search(r"-\d{5}\.png$", f)] or kinds
+        seq = [k for k in frames if k != "other"]
+        def after(a: str, b: str) -> bool:
+            return a in seq and b in seq[seq.index(a) + 1 :]
+        if step == "1":
+            ok = "light" in seq and after("light", "welcome") and frames[-1] == "welcome"
+            want = "the light fills the screen, then the welcome page"
+        else:
+            ok = after("gate-open", "light") and after("light", "welcome") and frames[-1] == "welcome"
+            want = "the gate opens with its light, the light fills the screen, then the welcome page"
+        verdicts.append(f"CHECK {CHECKS[step]}: {'ok' if ok else 'FAILED'} ({want}; seen: {' > '.join(k for i, k in enumerate(seq) if i == 0 or seq[i - 1] != k) or 'nothing'})")
     picks = sorted({round(i * (len(files) - 1) / 5) for i in range(6)}) if len(files) > 6 else range(len(files))
     chosen = [files[i] for i in picks]
     arts = [ascii_art(grey[f]) for f in chosen]
     print("  " + "  ".join(f"{label(f):<22}" for f in chosen))
     for r in range(max(len(a) for a in arts)):
         print("  " + "  ".join((a[r] if r < len(a) else "").ljust(22) for a in arts))
+
+print()
+for v in verdicts:
+    print(v)
+for step, what in CHECKS.items():
+    if step not in groups:
+        print(f"CHECK {what}: FAILED (no frames)")
+        verdicts.append("FAILED")
+sys.exit(1 if any("FAILED" in v for v in verdicts) else 0)
