@@ -25,7 +25,7 @@ import {
   row,
   straightArmPulldown,
 } from "../lib/exercise-motion/patterns/upper";
-import { carry, gait, jumpRope, lateralShuffle, standHold } from "../lib/exercise-motion/patterns/locomotion";
+import { aSkip, carry, gait, jumpRope, lateralShuffle, standHold } from "../lib/exercise-motion/patterns/locomotion";
 import { backExtension, bridge, calfRaise, hipAbduction, hackSquat, legMachine, legPress, nordic, seatSquat, singleLegRdl, splitSquat, stepUp } from "../lib/exercise-motion/patterns/lower2";
 import { coreMove } from "../lib/exercise-motion/patterns/core";
 import {
@@ -196,7 +196,8 @@ export const EXERCISE_MOTIONS: Record<string, Builder> = {
   "lateral-bound": (id) => lateralBound(id, `${F}Bounds sideways from one leg to the other, sticking each single-leg landing.`),
   "medicine-ball-slam": (id) => medBall(id, `${S}Lifts the ball overhead on the toes and slams it into the floor, then squats to pick it up.`, "slam"),
   "sandbag-to-shoulder": (id) => loadObject(id, `${S}Lifts the sandbag to the lap, then explodes the hips to pop it onto one shoulder.`, "sandbag-shoulder"),
-  "a-skip": (id) => gait({ id, kind: "askip", label: `${S}Skipping rhythm with a high knee drive and the foot striking down under the hips.` }),
+  "a-skip": (id) =>
+    aSkip(id, `${S}Skips forward tall on the balls of the feet: one knee drives up until the thigh is about level with the hip, toes pulled up, while the other foot hops; the raised foot then strikes down under the hips as the other knee drives up, each arm swinging opposite its leg.`),
   "wall-drill": (id) => wallDrill(id, `${S}Leaning into a wall at about 45°: drives one knee up, then switches legs sharply.`),
   "acceleration-sprint": (id) => gait({ id, kind: "accel", label: `${S}Sprint start with a strong forward lean, powerful pushes and big arm drive.` }),
   "flying-sprint": (id) => gait({ id, kind: "sprint", label: `${S}Upright top-speed sprinting: high knees, feet striking under the hips, fast arms.` }),

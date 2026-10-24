@@ -178,6 +178,27 @@ export function legTo(p: Pose, s: Side, ankle: Vec, rot = 0): Pose {
   return { ...p, [`hip${s}`]: a1 + p.trunk, [`knee${s}`]: normFlex(a1 - a2), [`ankle${s}`]: ank };
 }
 
+/**
+ * Build-time IK for a planted foot: the leg angles that put the ball of the foot at `ball` (world) with the sole
+ * rotated by `rot` (degrees, + = toes up) while the pelvis is at `pelvis` (world). The rest of `base` (trunk, arms,
+ * the other leg) is kept. Used to author a stride as a pelvis path plus fixed foot contacts, so a stance foot cannot
+ * slide and the body's height and speed are exactly what the author specified.
+ */
+export function plantLeg(base: Pose, s: Side, pelvis: Vec, ball: Vec, rot: number): Pose {
+  const f: Vec = [cos(rot), Math.sin((rot * Math.PI) / 180)];
+  const u: Vec = [-f[1], f[0]];
+  const ankle: Vec = [ball[0] - f[0] * BODY.footFront + u[0] * BODY.ankleH, ball[1] - f[1] * BODY.footFront + u[1] * BODY.ankleH];
+  return legTo(base, s, [ankle[0] - pelvis[0], ankle[1] - pelvis[1]], rot);
+}
+
+/** Distance from the hip to the ankle that `plantLeg` asks the leg to reach; the leg is `BODY.thigh + BODY.shin` long. */
+export function plantReach(pelvis: Vec, ball: Vec, rot: number): number {
+  const f: Vec = [cos(rot), Math.sin((rot * Math.PI) / 180)];
+  const u: Vec = [-f[1], f[0]];
+  const ankle: Vec = [ball[0] - f[0] * BODY.footFront + u[0] * BODY.ankleH, ball[1] - f[1] * BODY.footFront + u[1] * BODY.ankleH];
+  return len(sub(ankle, pelvis));
+}
+
 /** World positions of every landmark for a pose placed by a root rule (build-time helper). */
 export function worldPts(p: Pose, rule: RootRule, view: View = "side"): Record<Landmark, Vec> {
   const sk0 = forwardKinematics(p, view);

@@ -4,6 +4,7 @@ import {
   both,
   gaitAt,
   keys,
+  plantLeg,
   pose,
   trackSteps,
   worldPts,
@@ -155,6 +156,148 @@ export function gait(o: GaitOpts): MotionDef {
     footGrounded: o.kind === "walk" || march,
     stillPhase: 0.3,
   };
+}
+
+/** Cubic Hermite interpolation between (t0, y0, slope m0) and (t1, y1, slope m1) at t. */
+function hermite(t: number, t0: number, t1: number, y0: number, y1: number, m0: number, m1: number): number {
+  const h = t1 - t0;
+  const u = (t - t0) / h;
+  const u2 = u * u;
+  const u3 = u2 * u;
+  return (2 * u3 - 3 * u2 + 1) * y0 + (u3 - 2 * u2 + u) * h * m0 + (-2 * u3 + 3 * u2) * y1 + (u3 - u2) * h * m1;
+}
+
+/** Piecewise-linear interpolation through `[time, value]` points (clamped at the ends). */
+function through(t: number, pts: [number, number][]): number {
+  if (t <= pts[0]![0]) return pts[0]![1];
+  for (let i = 1; i < pts.length; i++) {
+    const [t1, v1] = pts[i]!;
+    const [t0, v0] = pts[i - 1]!;
+    if (t <= t1) return v0 + ((v1 - v0) * (t - t0)) / (t1 - t0);
+  }
+  return pts[pts.length - 1]![1];
+}
+
+const smooth = (u: number) => u * u * (3 - 2 * u);
+
+/**
+ * A-skip: the sprint drill (as coached: knee up and toe up, the foot driven down under the hips, opposite arm and leg,
+ * tall posture, a rhythmic skip). Authored as a body path plus fixed foot contacts instead of the generic gait tables,
+ * which give a march with no flight phase.
+ *
+ * One half-cycle (0.46 s) starts as the support leg lands, with the other leg already at the top of its knee drive:
+ *   stance, 0.30 s   The ball of the foot touches down just ahead of the hip with the shank near vertical (heel about
+ *                    14° up), then the foot is held still on the floor while the body travels over it at a constant
+ *                    1.2 m/s: the knee gives to about 40° and the ankle dorsiflexes at the lowest point of the body,
+ *                    then the hip, knee and ankle extend (a small hop) until toe-off. The foot is placed by inverse
+ *                    kinematics, so it cannot slide; the pelvis height follows a smooth dip-and-push curve.
+ *   flight, 0.16 s   The pelvis follows a real ballistic path (gravity). The support leg swings through with the heel
+ *                    tucked and its knee rising to the top; the leg that was up reaches down and slightly back for the
+ *                    ground, accelerating, and lands as the roles swap. The second half mirrors the first.
+ * Top of the drive: thigh about 4° below horizontal, knee about 96°, ankle dorsiflexed, foot under the knee. The arms
+ * swing from the shoulder with the elbows near 90°, each opposite its own leg, passing each other mid-way.
+ */
+export const A_SKIP = {
+  /** Seconds per half-cycle (one support foot + flight); a full right-left cycle is twice this. */
+  half: 0.46,
+  stance: 0.3,
+  /** Forward speed of the body, cm/s. */
+  speed: 120,
+  /** Ball of the foot ahead of the pelvis at touchdown, cm. */
+  ballAhead: 16,
+  trunk: 5,
+  spine: 2,
+  /** Time step between authored keyframes (dense, so the curves below are reproduced faithfully). */
+  dt: 0.02,
+} as const;
+
+export function aSkip(id: string, label: string): MotionDef {
+  const { half: T_HALF, stance: T_ST, speed: V, ballAhead, trunk: TRUNK, spine: SPINE, dt: DT } = A_SKIP;
+  const G = 980; // cm/s²
+  const T_FL = T_HALF - T_ST;
+  // Foot angle (+ = toes up) while the support foot is on the floor: ball strike with the heel up, the heel settles in
+  // mid-stance, then rises into toe-off.
+  const FOOT_ROT: [number, number][] = [
+    [0, -14],
+    [0.08, -10],
+    [0.15, -7],
+    [0.22, -18],
+    [0.27, -38],
+    [T_ST, -52],
+  ];
+  // Pelvis height: lands at yTd, dips to yMin in mid-stance, pushes up to yTo at toe-off, then flies ballistically.
+  const Y_TD = 100;
+  const Y_MIN = 92.5;
+  const Y_TO = 103.2;
+  const VY_TO = (Y_TD - Y_TO) / T_FL + 0.5 * G * T_FL;
+  const VY_LAND = VY_TO - G * T_FL;
+  const T_MIN = 0.14;
+  const pelvisY = (tau: number) =>
+    tau <= T_MIN ? hermite(tau, 0, T_MIN, Y_TD, Y_MIN, VY_LAND, 0) : tau <= T_ST ? hermite(tau, T_MIN, T_ST, Y_MIN, Y_TO, 0, VY_TO) : Y_TO + VY_TO * (tau - T_ST) - 0.5 * G * (tau - T_ST) ** 2;
+  /** The leg that is up (D) through the stance, then reaches down in flight (angles: thigh from vertical, knee, ankle). */
+  const D_STANCE: [number, [number, number, number]][] = [
+    [0, [86, 96, 14]],
+    [0.1, [82, 94, 14]],
+    [0.2, [70, 86, 12]],
+    [T_ST, [52, 72, 6]],
+  ];
+  const D_TOP: [number, number, number] = [86, 96, 14];
+  const base = (support: "R" | "L"): Pose =>
+    pose({ trunk: TRUNK, spine: SPINE, neck: -(TRUNK + SPINE) + 1, [`sh${support}`]: 0 } as Partial<Pose>);
+  const leg3 = (p: Pose, s: "R" | "L"): [number, number, number] => [p[`hip${s}`] - TRUNK, p[`knee${s}`], p[`ankle${s}`]];
+  const lerp3 = (a: [number, number, number], b: [number, number, number], u: number): [number, number, number] => [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u];
+
+  const keyframes: ReturnType<typeof trackSteps>["keyframes"] = [];
+  const N = Math.round(T_HALF / DT);
+  let touchdown: [number, number, number] | null = null;
+  for (let h = 0; h < 2; h++) {
+    const support: "R" | "L" = h === 0 ? "R" : "L";
+    const drive: "R" | "L" = h === 0 ? "L" : "R";
+    const x0 = V * T_HALF * h;
+    const ballX = x0 + ballAhead;
+    // Support-leg angles at touchdown (IK), the end point of the other leg's reach.
+    if (!touchdown) {
+      const p0 = plantLeg(base(support), support, [x0, pelvisY(0)], [ballX, 0], through(0, FOOT_ROT));
+      touchdown = leg3(p0, support);
+    }
+    let toeOff: [number, number, number] | null = null;
+    for (let i = 0; i < N; i++) {
+      const tau = i * DT;
+      const px = x0 + V * tau;
+      const py = pelvisY(tau);
+      let p = base(support);
+      // Arms: swing from the shoulder, each opposite its leg; the support-side arm is forward at touchdown.
+      const c = Math.cos((Math.PI * tau) / T_HALF);
+      p = { ...p, [`sh${support}`]: 10 + 58 * c, [`sh${drive}`]: 10 - 58 * c, [`el${support}`]: 96 - 6 * c, [`el${drive}`]: 96 + 6 * c };
+      const set = (s: "R" | "L", v: [number, number, number]) => ({ ...p, [`hip${s}`]: v[0] + TRUNK, [`knee${s}`]: v[1], [`ankle${s}`]: v[2] }) as Pose;
+      if (tau <= T_ST + 1e-9) {
+        // Stance: the support foot is planted by IK; the other leg holds its knee up, then starts to come down.
+        const dv = [0, 1, 2].map((k) => through(tau, D_STANCE.map(([t, v]) => [t, v[k]!] as [number, number]))) as [number, number, number];
+        p = set(drive, dv);
+        p = plantLeg(p, support, [px, py], [ballX, 0], through(tau, FOOT_ROT));
+        if (Math.abs(tau - T_ST) < 1e-9) toeOff = leg3(p, support);
+      } else {
+        const u = (tau - T_ST) / T_FL;
+        const sv = toeOff!;
+        // Support leg swings through: the knee folds early (heel recovery), the thigh follows, the ankle dorsiflexes.
+        const sw: [number, number, number] = [
+          sv[0] + (D_TOP[0] - sv[0]) * smooth(Math.min(1, u * 1.15)),
+          sv[1] + (D_TOP[1] - sv[1]) * smooth(Math.min(1, u * 1.8)),
+          sv[2] + (D_TOP[2] - sv[2]) * smooth(u),
+        ];
+        // The other leg reaches down for the ground, accelerating towards the strike.
+        const dStart = D_STANCE[D_STANCE.length - 1]![1];
+        const dv = lerp3(dStart, touchdown, u * u * (1.6 - 0.6 * u));
+        p = set(support, sw);
+        p = set(drive, dv);
+      }
+      // Re-apply the arms (set() spread the old pose).
+      p = { ...p, [`sh${support}`]: 10 + 58 * c, [`sh${drive}`]: 10 - 58 * c, [`el${support}`]: 96 - 6 * c, [`el${drive}`]: 96 + 6 * c };
+      keyframes.push({ pose: p, root: { pin: "pelvis", at: [px, py] }, dur: DT, ease: "spline" });
+    }
+  }
+  // Still image: the left foot has just landed and the near (right) knee is at the top of its drive.
+  return { id, view: "side", label, keyframes, props: [], travel: V * T_HALF * 2, footGrounded: false, stillPhase: 0.52 };
 }
 
 /** Carries: walking with the implement held. */
