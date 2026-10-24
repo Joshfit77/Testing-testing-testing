@@ -25,6 +25,8 @@ export default defineConfig({
   },
   projects: [
     { name: "mobile", use: { ...devices["Pixel 7"], browserName: "chromium" } },
+    // WebKit (Safari's engine) at iPhone size, used by the iOS workflow; needs `npx playwright install webkit`.
+    ...(process.env.E2E_WEBKIT ? [{ name: "iphone-webkit", use: { ...devices["iPhone 15"], browserName: "webkit" as const, launchOptions: {} } }] : []),
   ],
   webServer: process.env.E2E_BASE_URL
     ? undefined

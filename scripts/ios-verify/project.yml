@@ -1,0 +1,40 @@
+# XcodeGen spec for a small UI-test project that drives the real Narrow Gate Fitness app in the iOS Simulator
+# (installed separately; see the "app-in-simulator" job in .github/workflows/ios.yml). Generate with `xcodegen`.
+# GateHost is only the empty app XCTest needs to host the UI tests; the tests launch the real app by bundle id.
+name: GateCheck
+options:
+  bundleIdPrefix: com.narrowgatefitness.check
+  deploymentTarget:
+    iOS: "16.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    GENERATE_INFOPLIST_FILE: YES
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "-"
+    DEVELOPMENT_TEAM: ""
+targets:
+  GateHost:
+    type: application
+    platform: iOS
+    sources: [Host]
+    settings:
+      base:
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+  GateCheckUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    dependencies:
+      - target: GateHost
+    settings:
+      base:
+        TEST_TARGET_NAME: GateHost
+schemes:
+  GateCheck:
+    build:
+      targets:
+        GateHost: all
+        GateCheckUITests: [test]
+    test:
+      targets: [GateCheckUITests]

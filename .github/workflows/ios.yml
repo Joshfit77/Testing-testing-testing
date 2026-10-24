@@ -1,46 +1,69 @@
 name: iOS
 
-# 1) "simulator" (runs on every push to the paths below): proves the iPhone app compiles, using the
-#    offline edition. No Apple account needed. Produces an .app for the iOS Simulator on a Mac.
-# 2) "testflight" (manual only): signs and uploads a build to App Store Connect / TestFlight.
-#    Needs an Apple Developer account and these repository secrets:
+# Two kinds of run (step-by-step guide: docs/TESTFLIGHT.md):
+#
+# 1) checks — every push to the branches below, or "Run workflow" with job = checks. No Apple account needed.
+#    - compile: the iPhone project compiles (offline edition, unsigned).
+#    - app-in-simulator: the FULL online app is built and served on the build Mac, the iPhone app is pointed at it
+#      and run in the iOS Simulator, and an XCUITest (scripts/ios-verify) films the opening, taps Enter Narrow Gate,
+#      relaunches the app, and checks the opening doesn't replay when the app returns from the background.
+#      Screenshots: the "opening-in-simulator" artifact (and printed into the log).
+#    - webkit: the opening and navigation browser tests in WebKit (Safari's engine) at iPhone size, signed in
+#      against a local Supabase.
+#
+# 2) testflight — manual only. Builds the ONLINE app (it loads server_url; never the offline edition), signs it
+#    with your App Store Connect API key, and uploads it to App Store Connect only when upload = true.
+#    Repository secrets (Settings > Secrets and variables > Actions; never paste them anywhere else):
 #      APPLE_TEAM_ID       10-character Team ID (developer.apple.com > Membership)
-#      ASC_KEY_ID          App Store Connect API key ID
-#      ASC_ISSUER_ID       App Store Connect API issuer ID
-#      ASC_KEY_P8_BASE64   the .p8 key file, base64-encoded
-#    Also create the app record in App Store Connect with bundle ID com.narrowgatefitness.app
-#    (or change CAP_APP_ID / the Xcode bundle ID to one you own first).
+#      ASC_KEY_ID          App Store Connect API key ID (Users and Access > Integrations > App Store Connect API)
+#      ASC_ISSUER_ID       issuer ID shown on the same page
+#      ASC_KEY_P8_BASE64   the downloaded AuthKey_XXXX.p8 file, base64-encoded
 on:
   workflow_dispatch:
     inputs:
       job:
-        description: "simulator = compile check only; testflight = sign and upload (needs secrets)"
+        description: "checks = compile + full app in the Simulator + WebKit tests; testflight = signed build"
         type: choice
-        options: [simulator, testflight]
-        default: simulator
-      edition:
-        description: "offline = everything on the phone; online = loads your deployed site"
-        type: choice
-        options: [offline, online]
-        default: offline
+        options: [checks, testflight]
+        default: checks
       server_url:
-        description: "Deployed site URL (only for the online edition), e.g. https://app.yourdomain.com"
+        description: "testflight: https:// address of the deployed app (the iPhone app loads it)"
         required: false
+      upload:
+        description: "testflight: upload to App Store Connect (unticked = archive and sign only, nothing leaves GitHub)"
+        type: boolean
+        default: false
+      bundle_id:
+        description: "testflight: bundle ID registered in your Apple Developer account"
+        required: false
+        default: com.narrowgatefitness.app
+      marketing_version:
+        description: "testflight: version shown in TestFlight"
+        required: false
+        default: "1.0.0"
   push:
-    branches: [main, claude/sharp-cray-8y0uuv]
+    branches: [main, claude/sharp-cray-8y0uuv, claude/testflight-prep]
     paths:
       - "standalone/**"
       - "ios/**"
+      - "src/**"
+      - "public/**"
+      - "e2e/opening-gate.spec.ts"
+      - "e2e/navigation.spec.ts"
+      - "scripts/ios-verify/**"
       - "capacitor.config.ts"
+      - "package-lock.json"
       - ".github/workflows/ios.yml"
 
 concurrency:
-  group: ios-${{ github.ref }}
-  cancel-in-progress: true
+  # A push never cancels a TestFlight build.
+  group: ios-${{ github.ref }}-${{ inputs.job || 'checks' }}
+  cancel-in-progress: ${{ inputs.job != 'testflight' }}
 
 jobs:
-  simulator:
-    if: github.event_name == 'push' || inputs.job == 'simulator'
+  compile:
+    name: Compile check (offline edition, unsigned)
+    if: github.event_name == 'push' || inputs.job == 'checks'
     runs-on: macos-latest
     timeout-minutes: 45
     steps:
@@ -67,7 +90,126 @@ jobs:
           name: NarrowGateFitness-iOS-Simulator
           path: NarrowGateFitness-iOS-Simulator.zip
 
+  app-in-simulator:
+    name: Full app in the iOS Simulator (opening)
+    if: github.event_name == 'push' || inputs.job == 'checks'
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # No Supabase in this job: the signed-out pages (the opening and the welcome page) work without it. The
+      # signed-in screens are covered by the webkit job.
+      - name: Build the web app
+        run: npm run build
+      - name: Serve it on this Mac and check the page carries the opening
+        run: |
+          nohup npx next start -H 127.0.0.1 -p 3000 > "$RUNNER_TEMP/next.log" 2>&1 &
+          for i in $(seq 1 60); do curl -fsS -o /dev/null http://127.0.0.1:3000/api/health && break; sleep 2; done
+          curl -fsS http://127.0.0.1:3000/api/health; echo
+          curl -fsS http://127.0.0.1:3000/ -o "$RUNNER_TEMP/home.html"
+          for marker in 'data-intro-enter' 'Enter Narrow Gate' '/opening/gate-base.webp' 'small is the gate and narrow the way'; do
+            grep -q -- "$marker" "$RUNNER_TEMP/home.html" || { echo "::error::The served page has no '$marker'"; exit 1; }
+          done
+      - name: Point the iPhone app at it and build for the Simulator
+        run: |
+          CAP_SERVER_URL=http://127.0.0.1:3000 CAP_ALLOW_CLEARTEXT=true npx cap sync ios
+          xcodebuild -version
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO build -quiet
+      - name: Boot an iPhone simulator and install the app
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          best = None
+          for runtime, devices in json.load(sys.stdin)["devices"].items():
+              if ".iOS-" not in runtime:
+                  continue
+              version = tuple(int(x) for x in runtime.rsplit("iOS-", 1)[1].split("-"))
+              for d in devices:
+                  name = d["name"]
+                  if not name.startswith("iPhone") or " SE" in name:
+                      continue
+                  score = (version, "Pro" in name and "Max" not in name, name)
+                  if best is None or score > best[0]:
+                      best = (score, d["udid"])
+          print(best[1])
+          print("Simulator:", best[0][2], "iOS", ".".join(map(str, best[0][0])), file=sys.stderr)
+          ')
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 || true
+          xcrun simctl install "$UDID" build/Build/Products/Debug-iphonesimulator/App.app
+      - name: Drive the opening (XCUITest)
+        run: |
+          brew install xcodegen
+          cd scripts/ios-verify
+          xcodegen generate
+          set +e
+          TEST_RUNNER_SHOTS_DIR="$GITHUB_WORKSPACE/sim-shots" xcodebuild test -project GateCheck.xcodeproj -scheme GateCheck \
+            -destination "id=$UDID" -resultBundlePath "$RUNNER_TEMP/GateCheck.xcresult" > "$RUNNER_TEMP/xcodebuild-test.log" 2>&1
+          status=$?
+          grep -E "Test Case|error:|XCTAssert|Enter Narrow Gate tapped|TEST (SUCCEEDED|FAILED)|Executed" "$RUNNER_TEMP/xcodebuild-test.log" || true
+          [ $status -eq 0 ] || tail -80 "$RUNNER_TEMP/xcodebuild-test.log"
+          exit $status
+      - name: Screenshots (contact sheets, also printed into this log)
+        if: always()
+        run: |
+          mkdir -p sim-shots
+          cp "$RUNNER_TEMP/next.log" "$RUNNER_TEMP/xcodebuild-test.log" sim-shots/ 2>/dev/null || true
+          python3 -m venv "$RUNNER_TEMP/venv" && "$RUNNER_TEMP/venv/bin/pip" install --quiet pillow
+          "$RUNNER_TEMP/venv/bin/python" scripts/ios-verify/contact-sheet.py sim-shots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: opening-in-simulator
+          path: sim-shots
+          if-no-files-found: warn
+
+  webkit:
+    name: Opening and navigation tests in WebKit (iPhone size)
+    if: github.event_name == 'push' || inputs.job == 'checks'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Start Supabase (local, throwaway)
+        run: npx supabase start
+      - name: Point the app at it
+        run: |
+          eval "$(npx supabase status -o env | grep -E '^(API_URL|ANON_KEY|SERVICE_ROLE_KEY)=')"
+          echo "::add-mask::$ANON_KEY"
+          echo "::add-mask::$SERVICE_ROLE_KEY"
+          {
+            echo "NEXT_PUBLIC_SITE_URL=http://localhost:3000"
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+          } > .env.local
+      - run: npm run build
+      - run: npx playwright install --with-deps webkit
+      - name: Opening and navigation tests (WebKit, iPhone 15)
+        run: E2E_WEBKIT=1 npx playwright test e2e/opening-gate.spec.ts e2e/navigation.spec.ts --project=iphone-webkit
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: webkit-test-results
+          path: test-results
+          if-no-files-found: ignore
+
   testflight:
+    name: TestFlight build (online app, signed; uploaded only if asked)
     if: github.event_name == 'workflow_dispatch' && inputs.job == 'testflight'
     runs-on: macos-latest
     timeout-minutes: 60
@@ -76,30 +218,56 @@ jobs:
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
       ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+      SERVER_URL: ${{ inputs.server_url }}
+      BUNDLE_ID: ${{ inputs.bundle_id || 'com.narrowgatefitness.app' }}
+      MARKETING_VERSION: ${{ inputs.marketing_version || '1.0.0' }}
     steps:
       - name: Check secrets
         run: |
           for v in APPLE_TEAM_ID ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8_BASE64; do
-            if [ -z "${!v}" ]; then echo "::error::Missing repository secret $v (see the comment at the top of ios.yml)"; exit 1; fi
+            if [ -z "${!v}" ]; then echo "::error::Missing repository secret $v (see docs/TESTFLIGHT.md)"; exit 1; fi
           done
+      - name: Check the deployed app the iPhone app will load
+        run: |
+          case "$SERVER_URL" in
+            https://*) ;;
+            *) echo "::error::server_url must be the https:// address of the deployed app (got '$SERVER_URL')"; exit 1 ;;
+          esac
+          base="${SERVER_URL%/}"
+          host=$(python3 -c 'import sys, urllib.parse; print(urllib.parse.urlparse(sys.argv[1]).hostname or "")' "$base")
+          case "$host" in
+            ""|localhost|127.*|*.example|*.invalid|*.test|*.localhost) echo "::error::server_url ($host) is a placeholder or local address"; exit 1 ;;
+          esac
+          health=$(curl -fsS --max-time 20 "$base/api/health") || { echo "::error::$base/api/health did not answer: deploy the app there first"; exit 1; }
+          echo "Deployed app: $health"
+          curl -fsS --max-time 20 "$base/" -o "$RUNNER_TEMP/home.html"
+          for marker in 'data-intro-enter' 'Enter Narrow Gate' 'small is the gate and narrow the way'; do
+            grep -q -- "$marker" "$RUNNER_TEMP/home.html" || { echo "::error::$base doesn't serve the current opening ('$marker' missing): deploy claude/testflight-prep (or later) there first"; exit 1; }
+          done
+          commit=$(printf '%s' "$health" | python3 -c 'import json, sys; print(json.load(sys.stdin)["data"].get("commit") or "")')
+          if [ -n "$commit" ] && [ "$commit" != "$GITHUB_SHA" ]; then
+            echo "::warning::The site serves commit $commit; this build is from $GITHUB_SHA. The app shows whatever the site serves."
+          fi
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Sync the chosen edition
-        env:
-          SERVER_URL: ${{ inputs.server_url }}
+      - name: Point the iPhone app at the deployed app
         run: |
-          if [ "${{ inputs.edition }}" = "online" ]; then
-            if [ -z "$SERVER_URL" ]; then echo "::error::server_url is required for the online edition"; exit 1; fi
-            CAP_SERVER_URL="$SERVER_URL" npx cap sync ios
-          else
-            CAP_MODE=standalone npx cap sync ios
-          fi
+          CAP_SERVER_URL="$SERVER_URL" npx cap sync ios
+          python3 - <<'PY'
+          import json, os
+          c = json.load(open("ios/App/App/capacitor.config.json"))
+          url = c.get("server", {}).get("url", "")
+          assert url == os.environ["SERVER_URL"].rstrip("/"), f"the app would load {url!r}"
+          assert c.get("webDir") != "standalone", "the offline edition is configured"
+          print("The app will load", url)
+          PY
       - name: Write the App Store Connect key
         run: |
+          umask 077
           mkdir -p "$RUNNER_TEMP/asc"
           echo "$ASC_KEY_P8_BASE64" | base64 --decode > "$RUNNER_TEMP/asc/AuthKey_${ASC_KEY_ID}.p8"
       - name: Archive (automatic signing with the API key)
@@ -107,21 +275,25 @@ jobs:
           xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
             -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/App.xcarchive" \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic \
-            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" \
+            MARKETING_VERSION="$MARKETING_VERSION" CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
             -allowProvisioningUpdates \
             -authenticationKeyPath "$RUNNER_TEMP/asc/AuthKey_${ASC_KEY_ID}.p8" \
             -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             archive
-      - name: Upload to App Store Connect (TestFlight)
+      - name: ${{ inputs.upload && 'Sign and upload to App Store Connect (TestFlight)' || 'Sign only (no upload)' }}
+        env:
+          DESTINATION: ${{ inputs.upload && 'upload' || 'export' }}
         run: |
           cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0"><dict>
             <key>method</key><string>app-store-connect</string>
-            <key>destination</key><string>upload</string>
+            <key>destination</key><string>${DESTINATION}</string>
             <key>teamID</key><string>${APPLE_TEAM_ID}</string>
             <key>signingStyle</key><string>automatic</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
           </dict></plist>
           PLIST
           xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/App.xcarchive" \
@@ -129,3 +301,12 @@ jobs:
             -allowProvisioningUpdates \
             -authenticationKeyPath "$RUNNER_TEMP/asc/AuthKey_${ASC_KEY_ID}.p8" \
             -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+          if [ "$DESTINATION" = upload ]; then
+            echo "Uploaded build ${{ github.run_number }} (version $MARKETING_VERSION). It appears in App Store Connect > TestFlight after Apple finishes processing."
+          else
+            ls -la "$RUNNER_TEMP/export"
+            echo "Signed for App Store Connect, not uploaded. The .ipa is not kept (it is not published as an artifact)."
+          fi
+      - name: Remove the key
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/asc" "$RUNNER_TEMP/export"
