@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Cinzel, Inter, Lora, Plus_Jakarta_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import { AppOpeningOverlay } from "@/components/common/app-opening-overlay";
 import { NativeInit } from "@/components/shell/native-init";
 import { ServiceWorkerRegistration } from "@/components/shell/sw-register";
@@ -9,11 +9,20 @@ import { ACTIVE_TRANSLATION, scriptureText } from "@/data/scripture";
 import { OPENING_SCRIPT } from "@/lib/opening";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
-const heading = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-heading", weight: ["500", "600", "700", "800"], display: "swap" });
+// The fonts ship with the app (./fonts, the Google Fonts files, SIL Open Font License) so builds never depend on
+// reaching Google Fonts.
+const inter = localFont({ src: "./fonts/inter-latin-wght-normal.woff2", weight: "100 900", variable: "--font-inter", display: "swap" });
+const heading = localFont({ src: "./fonts/plus-jakarta-sans-latin-wght-normal.woff2", weight: "200 800", variable: "--font-heading", display: "swap" });
 // Engraved capitals for the rank badge ladders (matches the owner's badge artwork).
-const engraved = Cinzel({ subsets: ["latin"], variable: "--font-engraved", weight: ["600", "700", "800"], display: "swap" });
-const serif = Lora({ subsets: ["latin"], variable: "--font-serif-face", weight: ["500", "600"], style: ["normal", "italic"], display: "swap" });
+const engraved = localFont({ src: "./fonts/cinzel-latin-wght-normal.woff2", weight: "400 900", variable: "--font-engraved", display: "swap" });
+const serif = localFont({
+  src: [
+    { path: "./fonts/lora-latin-wght-normal.woff2", weight: "400 700", style: "normal" },
+    { path: "./fonts/lora-latin-wght-italic.woff2", weight: "400 700", style: "italic" },
+  ],
+  variable: "--font-serif-face",
+  display: "swap",
+});
 
 /**
  * Applies the saved text-size and reduce-motion preferences before first paint (no layout jump).
