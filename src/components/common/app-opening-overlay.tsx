@@ -27,6 +27,7 @@ export function AppOpeningOverlay() {
         translation="BSB"
         continueHref="#"
         continueLabel="Enter the app"
+        onEnter={() => setOpen(false)}
       />
       <button
         type="button"
@@ -35,7 +36,6 @@ export function AppOpeningOverlay() {
       >
         Skip intro
       </button>
-      <button type="button" aria-label="Continue to the app" className="absolute inset-0 -z-10" onClick={() => setOpen(false)} />
     </div>
   );
 }
