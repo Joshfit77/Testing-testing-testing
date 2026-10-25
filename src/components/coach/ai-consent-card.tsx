@@ -38,6 +38,10 @@ export function AiConsentCard() {
         <li>Your current program, recent workouts and personal records</li>
         <li>Your food log, nutrition targets and supplement stack</li>
         <li>Bodyweight, steps and recovery check-ins</li>
+        <li>
+          When you ask about sleep or recovery: a summary of your sleep, including nights your watch or ring recorded through Apple Health or Health
+          Connect (time asleep, stages, overnight heart rate, heart-rate variability and breathing rate)
+        </li>
         <li>Limitation notes, only if you agreed to store wellness information</li>
         <li>Prayer-journal entries, only the ones you mark &ldquo;Share with AI Coach&rdquo;</li>
         <li>Coaching memories you chose to keep, only if you turn memory on</li>

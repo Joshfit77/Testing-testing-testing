@@ -15,9 +15,10 @@ import { allergenLabel, type FoodFilters, type Nutrients, type QualityProduct } 
 export const FOOD_IQ_VERSION = "FIQ-0.1";
 
 /**
- * What members see this called. "Food IQ" is a registered trademark of another company (docs/launch-audit), so the
- * public name is "Nutrition Score" until a replacement name is cleared; the code, the FOOD_IQ_SCORE flag, the method
- * version and the test ids keep their names so nothing stored or integrated changes.
+ * What members see this called. "Food IQ" is registered as a US trademark by another company (Reg. 4337059) and used
+ * by several nutrition apps (docs/launch-audit/TRADEMARKS.md), so the public name is "Nutrition Score" until a
+ * replacement name is cleared; the code, the FOOD_IQ_SCORE flag, the method version and the test ids keep their names
+ * so nothing stored or integrated changes.
  */
 export const NUTRITION_SCORE_LABEL = "Nutrition Score";
 export const NUTRITION_FEATURE_TITLE = "Narrow Gate Nutrition Score";

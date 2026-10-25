@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 import { FOOD_IQ_VERSION, NUTRITION_FEATURE_TITLE, NUTRITION_SCORE_LABEL } from "@/lib/food-iq";
 
 /**
- * "Food IQ" is a registered trademark of another company (docs/launch-audit/TRADEMARKS.md): nothing a member can read
- * may use it. The internal names (files, the FOOD_IQ_SCORE flag, the FIQ-0.1 method version, test ids) stay as they
+ * "Food IQ" is registered as a US trademark by another company and used by other nutrition apps
+ * (docs/launch-audit/TRADEMARKS.md): nothing a member can read may use it. The internal names (files, the FOOD_IQ_SCORE flag, the FIQ-0.1 method version, test ids) stay as they
  * are, so this looks only at the text people see: everything under src/app and src/components, plus the prompts and
  * facts sent to the AI (whose replies are shown to members), with code comments stripped first.
  */
