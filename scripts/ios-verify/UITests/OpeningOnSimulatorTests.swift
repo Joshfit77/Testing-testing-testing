@@ -12,6 +12,23 @@ import XCTest
 final class OpeningOnSimulatorTests: XCTestCase {
     private let app = XCUIApplication(bundleIdentifier: "com.narrowgatefitness.app")
 
+    /// XCUITest waits for the app to be idle (no animations) before and after each tap; the opening animates
+    /// throughout, so on a slow CI simulator that wait put the tap seconds after Enter Narrow Gate was found, after
+    /// the opening had moved on by itself. Taps go through straight away instead (XCUITest's own method, emptied).
+    override class func setUp() {
+        super.setUp()
+        guard let process = NSClassFromString("XCUIApplicationProcess") else { return }
+        let twoFlags: @convention(block) (AnyObject, Bool, Bool) -> Void = { _, _, _ in }
+        let oneFlag: @convention(block) (AnyObject, Bool) -> Void = { _, _ in }
+        for (name, block) in [("waitForQuiescenceIncludingAnimationsIdle:isPreEvent:", unsafeBitCast(twoFlags, to: AnyObject.self)),
+                              ("waitForQuiescenceIncludingAnimationsIdle:", unsafeBitCast(oneFlag, to: AnyObject.self))] {
+            if let method = class_getInstanceMethod(process, NSSelectorFromString(name)) {
+                method_setImplementation(method, imp_implementationWithBlock(block))
+                print("GATECHECK taps no longer wait for the app to be idle (\(name))")
+            }
+        }
+    }
+
     private lazy var shotsDir: URL = {
         let base = ProcessInfo.processInfo.environment["SHOTS_DIR"] ?? NSTemporaryDirectory()
         let dir = URL(fileURLWithPath: base)
