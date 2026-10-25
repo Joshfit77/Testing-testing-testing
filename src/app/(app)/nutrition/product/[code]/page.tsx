@@ -8,7 +8,7 @@ import { AllergensSection, AlternativesList, FilterResults, Indicators, Ingredie
 import { FitsYourGoals, FoodIqBreakdown, FoodIqSummary, IngredientAlertsSection, MacroAnalysis } from "@/components/nutrition/food-iq-sections";
 import { ingredientAlerts } from "@/lib/additive-evidence";
 import { DIET_TYPES, type DietType } from "@/lib/domain/diets";
-import { fitsYourGoals, foodIqScoreEnabled, keyPoints, nutrientClasses, scoreFoodIq, type FoodIqScore } from "@/lib/food-iq";
+import { fitsYourGoals, foodIqScoreEnabled, keyPoints, nutrientClasses, NUTRITION_FEATURE_TITLE, NUTRITION_SCORE_LABEL, scoreFoodIq, type FoodIqScore } from "@/lib/food-iq";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { isoDateInTz } from "@/lib/domain/dates";
 import type { FoodChoice } from "@/lib/domain/food-basis";
@@ -29,7 +29,7 @@ export default async function ProductQualityPage({ params }: { params: Promise<{
   const { user, profile } = await requireOnboardedUser();
   const { code: raw } = await params;
   const code = decodeURIComponent(raw).replace(/\D/g, "").slice(0, 14);
-  const back = <BackLink href="/nutrition/scanner">Food IQ</BackLink>;
+  const back = <BackLink href="/nutrition/scanner">{NUTRITION_SCORE_LABEL}</BackLink>;
 
   if (!rateLimit(`quality:${user.id}`, 40, 60_000).ok) {
     return (
@@ -51,7 +51,7 @@ export default async function ProductQualityPage({ params }: { params: Promise<{
     return (
       <div className="mx-auto max-w-2xl space-y-5">
         {back}
-        <PageHeader eyebrow="Narrow Gate Food IQ" title={failed ? "Couldn't look that up" : "Product not found"} />
+        <PageHeader eyebrow={NUTRITION_FEATURE_TITLE} title={failed ? "Couldn't look that up" : "Product not found"} />
         {failed ? (
           <Notice tone="error">Open Food Facts isn&apos;t responding right now. Try again in a moment.</Notice>
         ) : (
@@ -80,7 +80,7 @@ export default async function ProductQualityPage({ params }: { params: Promise<{
   const filters = plus ? sanitizeFilters(prof?.food_filters) : null;
   const filterResults = filters ? checkFilters(p, filters) : [];
 
-  // Food IQ: the experimental rating (behind the FOOD_IQ_SCORE flag), plain-language classes, ingredient evidence.
+  // Nutrition Score: the experimental rating (behind the FOOD_IQ_SCORE flag), plain-language classes, ingredient evidence.
   const scoreOn = foodIqScoreEnabled();
   const score = scoreFoodIq(p);
   const classes = nutrientClasses(p);
@@ -110,7 +110,7 @@ export default async function ProductQualityPage({ params }: { params: Promise<{
       })
       .map((a) => {
         const s = altScores![a.product.code]!;
-        return base != null && s.status === "scored" && s.score >= base + 5 ? { ...a, reasons: [`Food IQ ${s.score} instead of ${base}`, ...a.reasons] } : a;
+        return base != null && s.status === "scored" && s.score >= base + 5 ? { ...a, reasons: [`${NUTRITION_SCORE_LABEL} ${s.score} instead of ${base}`, ...a.reasons] } : a;
       });
   }
   alternatives = alternatives.slice(0, 5);
@@ -169,7 +169,7 @@ export default async function ProductQualityPage({ params }: { params: Promise<{
           </p>
         )}
         <p className="text-xs text-muted-foreground">
-          Alternatives are real products from the same Open Food Facts category, compared per 100 {p.unit}, suggested only when they do better on Nutri-Score or processing, or on several nutrients{scoreOn ? ", and never when Food IQ rates them lower" : ""}. Prices and availability aren&apos;t compared.
+          Alternatives are real products from the same Open Food Facts category, compared per 100 {p.unit}, suggested only when they do better on Nutri-Score or processing, or on several nutrients{scoreOn ? `, and never when their ${NUTRITION_SCORE_LABEL} is lower` : ""}. Prices and availability aren&apos;t compared.
         </p>
       </section>
 

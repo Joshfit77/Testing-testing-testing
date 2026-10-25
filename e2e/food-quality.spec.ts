@@ -26,15 +26,15 @@ test.describe("Narrow Gate Food IQ", () => {
     await completeOnboarding(page);
     await page.goto("/nutrition");
     // Prominent in Food (above the day's totals), honest about what it reads, and in the Food tools.
-    await expect(page.getByTestId("food-iq-cta")).toContainText("Narrow Gate Food IQ");
+    await expect(page.getByTestId("food-iq-cta")).toContainText("Narrow Gate Nutrition Score");
     await expect(page.getByTestId("food-iq-cta")).toContainText("Scan a packaged food's barcode to review its nutrition and ingredients.");
     await expect(page.getByTestId("food-iq-cta")).toContainText("doesn't test the food itself");
     await expect(page.getByTestId("food-iq-cta").getByRole("link", { name: "Scan a product" })).toBeVisible();
     const ctaBox = (await page.getByTestId("food-iq-cta").boundingBox())!;
     const totalsBox = (await page.getByTestId("budget-equation").boundingBox())!;
     expect(ctaBox.y).toBeLessThan(totalsBox.y);
-    await page.getByRole("navigation", { name: "Food tools" }).getByRole("link", { name: "Food IQ" }).click();
-    await expect(page.getByRole("heading", { name: "Narrow Gate Food IQ", level: 1 })).toBeVisible();
+    await page.getByRole("navigation", { name: "Food tools" }).getByRole("link", { name: "Nutrition Score" }).click();
+    await expect(page.getByRole("heading", { name: "Narrow Gate Nutrition Score", level: 1 })).toBeVisible();
     await expect(page.getByTestId("my-filters")).toContainText("included with Plus and Pro");
     await typeBarcode(page, Q.honey);
 
@@ -124,7 +124,7 @@ test.describe("Narrow Gate Food IQ", () => {
     // A product with no data says so, and a code Open Food Facts doesn't know isn't guessed.
     await page.goto(`/nutrition/product/${Q.mystery}`);
     await expect(page.getByTestId("row-calories")).toContainText("Not available");
-    if (SCORE_ON) await expect(page.getByTestId("food-iq-no-score")).toContainText("Not enough data for a Food IQ rating: energy, sugars, saturated fat, salt, protein are missing. Nothing is guessed.");
+    if (SCORE_ON) await expect(page.getByTestId("food-iq-no-score")).toContainText("Not enough data for a Nutrition Score: energy, sugars, saturated fat, salt, protein are missing. Nothing is guessed.");
     await expect(page.getByTestId("ingredient-alerts")).toContainText("Unknown: there's no ingredient list");
     await expect(page.getByTestId("quality-allergens")).toContainText("Contains: no information");
     await expect(page.getByTestId("nutri-score")).toContainText("Not available");
@@ -218,7 +218,7 @@ test.describe("Narrow Gate Food IQ", () => {
       // Plenty of protein and fibre, but saturated fat holds it back: protein alone doesn't make it Good.
       await expect(page.getByTestId("food-iq-score")).toContainText("Moderate");
       await expect(page.getByTestId("alternatives")).toContainText("Lean Protein Bar Vanilla");
-      await expect(page.getByTestId("alternatives")).toContainText(/Food IQ \d+ instead of \d+/);
+      await expect(page.getByTestId("alternatives")).toContainText(/Nutrition Score \d+ instead of \d+/);
     }
 
     await page.goto(`/nutrition/product/${Q.water}`);

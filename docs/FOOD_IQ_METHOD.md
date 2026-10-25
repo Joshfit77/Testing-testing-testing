@@ -1,5 +1,10 @@
 # Narrow Gate Food IQ: method (FIQ-0.1, experimental)
 
+> **Public name: "Nutrition Score".** "Food IQ" is a registered US trademark of another company (see
+> `docs/launch-audit/TRADEMARKS.md`), so members never see that name: every screen, link, prompt and spoken label says
+> "Nutrition Score" (`NUTRITION_SCORE_LABEL` in `src/lib/food-iq.ts`) until a replacement name is cleared. The method,
+> file names, the `FOOD_IQ_SCORE` flag, the `FIQ-0.1` version and the test ids keep their internal names.
+
 **Status: experimental, not yet reviewed. The 0–100 rating is off in production by default** (`FOOD_IQ_SCORE` must be
 `on`). When it's on, it's labelled "Experimental · not yet reviewed". Until a qualified reviewer (a registered
 dietitian or nutrition scientist) has checked this method, Food IQ shows the established indicators and the

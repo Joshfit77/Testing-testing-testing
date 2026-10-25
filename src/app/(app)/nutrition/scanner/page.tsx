@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { hasFeature } from "@/lib/domain/plans";
-import { foodIqScoreEnabled, scoreFoodIq } from "@/lib/food-iq";
+import { foodIqScoreEnabled, NUTRITION_FEATURE_TITLE, NUTRITION_SCORE_LABEL, scoreFoodIq } from "@/lib/food-iq";
 import { OFF_DATA_NOTICE, sanitizeFilters } from "@/lib/food-quality";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
@@ -17,7 +17,7 @@ import { rateLimit } from "@/server/rate-limit";
 import { searchProducts, type ProductSearchResult } from "@/server/services/food-quality";
 import { logError } from "@/server/log";
 
-export const metadata = { title: "Narrow Gate Food IQ" };
+export const metadata = { title: NUTRITION_FEATURE_TITLE };
 
 export default async function FoodIqPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const { user } = await requireOnboardedUser();
@@ -44,7 +44,7 @@ export default async function FoodIqPage({ searchParams }: { searchParams: Promi
       <BackLink href="/nutrition">Food</BackLink>
       <PageHeader
         eyebrow="Food"
-        title="Narrow Gate Food IQ"
+        title={NUTRITION_FEATURE_TITLE}
         description="Scan or search a packaged food to see its nutritional quality, the ingredients worth knowing about, a protein, carb and fat breakdown, better alternatives, and how it fits your goals."
       />
 
@@ -105,7 +105,7 @@ export default async function FoodIqPage({ searchParams }: { searchParams: Promi
           What you&apos;ll see
         </h2>
         <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
-          <li>{scoreOn ? "A Food IQ rating from 0 to 100 (experimental), with exactly how it was worked out." : "Its strengths and what to watch, from published nutrition thresholds. (A Food IQ 0–100 rating is being validated.)"}</li>
+          <li>{scoreOn ? `A ${NUTRITION_SCORE_LABEL} from 0 to 100 (experimental), with exactly how it was worked out.` : `Its strengths and what to watch, from published nutrition thresholds. (A ${NUTRITION_SCORE_LABEL} from 0 to 100 is being validated.)`}</li>
           <li>Ingredients worth knowing about, with what regulators and the evidence actually say.</li>
           <li>Protein, carbs, fat, sugar, fibre, salt and calories in plain words, per serving and per 100 g.</li>
           <li>Better products from the same category, Nutri-Score and NOVA, allergens, and Add to Food Diary.</li>

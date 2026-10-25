@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { EVIDENCE_LABEL, type IngredientAlert } from "./additive-evidence";
-import type { FoodIqScore } from "./food-iq";
+import { NUTRITION_SCORE_LABEL, type FoodIqScore } from "./food-iq";
 import { addedSugarIngredients, allergenLabel, describeAdditive, NOVA_INFO, NUTRIENT_KEYS, tagLabel, type Nutrients, type QualityProduct } from "./food-quality";
 
 /** Pro: an AI explanation of a scanned product for the member's goals, from the known data only. */
@@ -20,7 +20,7 @@ Rules:
 - Don't call a food healthy or unhealthy in general, and don't say an additive is harmful. Describe additives neutrally if at all.
 - Don't give medical, allergy or weight-loss guarantees. Allergen data may be incomplete: tell them to check the label if allergens matter.
 - Ingredients and additives: repeat only what the "Ingredient evidence" lines say. Never add your own safety claims about an ingredient; if an additive is marked "Insufficient information", say no assessment is available.
-- If a Food IQ rating is given, it is experimental: call it a nutritional-quality rating per 100 g, never a probability of being healthy.
+- If a Nutrition Score is given, it is experimental: call it a nutritional-quality rating per 100 g, never a probability of being healthy.
 - Only mention alternatives that are listed in the data. Never invent products, prices or availability.
 - Keep it short and practical (portion, timing around training, how it fits the day's targets).`;
 
@@ -69,7 +69,7 @@ export function productFactsForAi(p: QualityProduct, extra: { score?: FoodIqScor
     `Declared allergens: ${p.allergens.length ? p.allergens.map(allergenLabel).join(", ") : "none listed"}. May contain: ${p.traces.length ? p.traces.map(allergenLabel).join(", ") : "none listed"}.`,
     `Vegan: ${p.vegan}. Vegetarian: ${p.vegetarian}.`,
     p.incomplete.length ? `Open Food Facts marks these parts as incomplete: ${p.incomplete.join(", ")}.` : "",
-    score?.status === "scored" ? `Food IQ (experimental nutritional-quality rating per 100 ${p.unit}): ${score.score}/100, ${score.band.label}. ${score.summary}` : "",
+    score?.status === "scored" ? `${NUTRITION_SCORE_LABEL} (experimental nutritional-quality rating per 100 ${p.unit}): ${score.score}/100, ${score.band.label}. ${score.summary}` : "",
     extra.alerts?.length
       ? `Ingredient evidence (from the app's reviewed list; repeat only this):\n${extra.alerts
           .map((a) => `- ${a.title}: ${a.classes.map((c) => EVIDENCE_LABEL[c]).join("; ")}.${a.regulatory ? ` ${a.regulatory}` : ""}${a.affected ? ` Who may be affected: ${a.affected}` : ""}`)

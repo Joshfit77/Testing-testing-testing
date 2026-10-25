@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, CircleHelp, FlaskConical, Info, ShieldAlert, ShieldCheck, Target } from "lucide-react";
 import { EVIDENCE_HELP, EVIDENCE_LABEL, type EvidenceClass, type IngredientAlert } from "@/lib/additive-evidence";
-import { CLASS_KIND_LABEL, KIND_LABEL, SCORE_MEANING, type Band, type FoodIqScore, type GoalFit, type NutrientClass } from "@/lib/food-iq";
+import { CLASS_KIND_LABEL, KIND_LABEL, NUTRITION_FEATURE_TITLE, NUTRITION_SCORE_LABEL, SCORE_MEANING, type Band, type FoodIqScore, type GoalFit, type NutrientClass } from "@/lib/food-iq";
 import type { QualityProduct } from "@/lib/food-quality";
 import { cn } from "@/lib/utils";
 
@@ -18,7 +18,7 @@ export function ScoreRing({ score, band, size = 112 }: { score: number; band: Ba
   const r = 44;
   const c = 2 * Math.PI * r;
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100" role="img" aria-label={`Food IQ ${score} out of 100`} className="shrink-0">
+    <svg width={size} height={size} viewBox="0 0 100 100" role="img" aria-label={`${NUTRITION_SCORE_LABEL} ${score} out of 100`} className="shrink-0">
       <defs>
         <linearGradient id="fiq-ring" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stopColor="#f1dfa8" />
@@ -40,9 +40,9 @@ export function ScoreRing({ score, band, size = 112 }: { score: number; band: Ba
 export function SmallScore({ score }: { score: FoodIqScore }) {
   if (score.status !== "scored") return null;
   return (
-    <span className={cn("inline-flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs font-bold tabular-nums", BAND_STYLE[score.band.id])} title={`Food IQ ${score.score}/100 · ${score.band.label} (experimental)`}>
+    <span className={cn("inline-flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs font-bold tabular-nums", BAND_STYLE[score.band.id])} title={`${NUTRITION_SCORE_LABEL} ${score.score}/100 · ${score.band.label} (experimental)`}>
       {score.score}
-      <span className="sr-only"> out of 100, Food IQ</span>
+      <span className="sr-only"> out of 100, {NUTRITION_SCORE_LABEL}</span>
     </span>
   );
 }
@@ -61,13 +61,13 @@ function PointList({ items, tone }: { items: NutrientClass[]; tone: "positive" |
   );
 }
 
-/** The top of the product page: the Food IQ rating (when enabled) and the key points, readable in seconds. */
+/** The top of the product page: the Nutrition Score (when enabled) and the key points, readable in seconds. */
 export function FoodIqSummary({ score, enabled, positives, concerns }: { score: FoodIqScore; enabled: boolean; positives: NutrientClass[]; concerns: NutrientClass[] }) {
   return (
     <section aria-labelledby="fiq-title" className="space-y-3 rounded-2xl border border-gold-muted/60 bg-card-gradient p-4" data-testid="food-iq-summary">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id="fiq-title" className="whitespace-nowrap font-display text-sm font-bold uppercase tracking-[0.14em] text-gold">
-          Narrow Gate Food IQ
+          {NUTRITION_FEATURE_TITLE}
         </h2>
         {enabled && score.status === "scored" && (
           <span className="inline-flex items-center gap-1 rounded-full border border-gold-muted/60 px-2 py-0.5 text-[0.7rem] font-semibold text-champagne" data-testid="food-iq-experimental">
@@ -87,7 +87,7 @@ export function FoodIqSummary({ score, enabled, positives, concerns }: { score: 
       ) : enabled && score.status === "insufficient" ? (
         <p className="text-sm" data-testid="food-iq-no-score">
           <CircleHelp className="mr-1 inline size-4 text-muted-foreground" aria-hidden />
-          Not enough data for a Food IQ rating: {score.missing.join(", ")} {score.missing.length === 1 ? "is" : "are"} missing. Nothing is guessed.
+          Not enough data for a {NUTRITION_SCORE_LABEL}: {score.missing.join(", ")} {score.missing.length === 1 ? "is" : "are"} missing. Nothing is guessed.
         </p>
       ) : enabled && score.status === "not_applicable" ? (
         <p className="text-sm" data-testid="food-iq-no-score">
@@ -96,7 +96,7 @@ export function FoodIqSummary({ score, enabled, positives, concerns }: { score: 
         </p>
       ) : (
         <p className="text-sm text-muted-foreground" data-testid="food-iq-pending">
-          The Food IQ 0–100 rating is being validated and will appear here once it has been reviewed. Until then, use the recognised indicators and the points below.
+          The {NUTRITION_SCORE_LABEL} (0–100) is being validated and will appear here once it has been reviewed. Until then, use the recognised indicators and the points below.
         </p>
       )}
       {(positives.length > 0 || concerns.length > 0) && (
@@ -329,7 +329,7 @@ export function FitsYourGoals({ fit, allowed, hasAi }: { fit: GoalFit | null; al
         </p>
       ) : (
         <>
-          <p className="text-sm text-muted-foreground">For {fit.basis}. Separate from the Food IQ rating: a food can fit your plan well and still have a modest general rating, or the reverse.</p>
+          <p className="text-sm text-muted-foreground">For {fit.basis}. Separate from the {NUTRITION_SCORE_LABEL}: a food can fit your plan well and still have a modest general rating, or the reverse.</p>
           <ul className="space-y-2" data-testid="goal-rows">
             {fit.rows.map((r) => (
               <li key={r.key} className="grid grid-cols-[6.5rem_1fr] items-center gap-2 text-sm" data-testid={`goal-${r.key}`}>

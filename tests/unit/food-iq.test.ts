@@ -278,7 +278,8 @@ describe("ingredient evidence", () => {
     const facts = productFactsForAi(p, { score: scoreFoodIq(p), alerts: ingredientAlerts(p), alternatives: [] });
     expect(facts).toMatch(/Ingredient evidence \(from the app's reviewed list; repeat only this\)/);
     expect(facts).toMatch(/E999 No description in the app yet: Insufficient information/);
-    expect(facts).toMatch(/Food IQ \(experimental nutritional-quality rating per 100 g\)/);
+    expect(facts).toMatch(/Nutrition Score \(experimental nutritional-quality rating per 100 g\)/);
+    expect(facts).not.toMatch(/Food IQ/);
     expect(facts).toMatch(/Alternatives: none found in the same category./);
   });
 });
