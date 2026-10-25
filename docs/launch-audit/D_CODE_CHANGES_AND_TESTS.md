@@ -83,7 +83,7 @@ Skipped tests: `coach.spec.ts` "says honestly when the coach isn't configured" (
 | `FOOD_IQ_SCORE` method review by a dietitian | Open — owner |
 | Rest timer has no native notification while the screen is locked | Open — product decision (`IOS_DEVICE_TEST_PLAN.md` 5.3) |
 | Soft-deleted activities are kept (without routes) indefinitely | Optional — purge after 30 days |
-| WebKit CI opening test is timing-sensitive on GPU-less runners | Open — consider sampling the animation's own timeline instead of a wall-clock scale threshold |
+| The two CI opening tests are timing-sensitive on shared runners: the WebKit push-into-the-light scale threshold, and the Simulator's Enter Narrow Gate tap. The button is on screen for under 3 s (rises in at 2.15 s, the opening finishes by itself at `OPENING_MS` 5050 ms) and the test's detect-and-tap pipeline (screenshot, pixel check, synthesized tap) takes 1.7 s on a normal runner and up to 2.7 s on a slow one, where the tap lands after the opening has moved on (run 40228918619, first attempt: the warm-up launch took 10 min to return). Not an app defect: a person taps well inside the window, and the opening ends on its own by design | Open — WebKit: sample the animation's own timeline instead of a wall-clock threshold; Simulator: tap the Enter button by its accessibility element as soon as it is hittable, and drop the on-disk screenshot between detection and tap |
 
 ## D.7 How to review PR #3 quickly
 
