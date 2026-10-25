@@ -148,6 +148,17 @@ jobs:
           xcrun simctl bootstatus "$UDID" -b
           xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 || true
           xcrun simctl install "$UDID" build/Build/Products/Debug-iphonesimulator/App.app
+      - name: Wait for the Mac and the simulator to settle
+        run: |
+          # A freshly booted simulator indexes and migrates for a while, and a shared runner can be busy: the opening's
+          # few seconds need a quiet machine. Wait until the CPU has been mostly idle for three readings (at most 4 min).
+          quiet=0
+          for i in $(seq 1 60); do
+            idle=$(top -l 2 -s 2 -n 0 | awk '/CPU usage/ { v = $7 } END { gsub("%", "", v); print int(v) }')
+            echo "$(date +%T) CPU idle ${idle:-?}%"
+            if [ "${idle:-0}" -ge 60 ]; then quiet=$((quiet + 1)); else quiet=0; fi
+            [ "$quiet" -ge 3 ] && break
+          done
       - name: Open the app once, so the tests start on a warm simulator
         run: |
           # The first launch after installing takes 30–60+ s to show the page on a CI simulator (a phone that has run
@@ -164,6 +175,17 @@ jobs:
           echo "First launch: the page showed ${shown:-not within 120 s}"
           sleep 8
           xcrun simctl terminate "$UDID" com.narrowgatefitness.app || true
+      - name: Let it settle again after the first launch
+        run: |
+          # A freshly booted simulator indexes and migrates for a while, and a shared runner can be busy: the opening's
+          # few seconds need a quiet machine. Wait until the CPU has been mostly idle for three readings (at most 4 min).
+          quiet=0
+          for i in $(seq 1 60); do
+            idle=$(top -l 2 -s 2 -n 0 | awk '/CPU usage/ { v = $7 } END { gsub("%", "", v); print int(v) }')
+            echo "$(date +%T) CPU idle ${idle:-?}%"
+            if [ "${idle:-0}" -ge 60 ]; then quiet=$((quiet + 1)); else quiet=0; fi
+            [ "$quiet" -ge 3 ] && break
+          done
       - name: Launch, Enter Narrow Gate, relaunch, return from the background (XCUITest)
         run: |
           brew install xcodegen

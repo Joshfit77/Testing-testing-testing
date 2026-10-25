@@ -95,14 +95,33 @@ CAP_ALLOW_CLEARTEXT=true` (local testing only).
 
 - **compile**: the offline edition compiles for the Simulator.
 - **app-in-simulator**: builds and serves the full web app on the build Mac, points the iPhone app at it, opens it
-  once in an iPhone simulator (the first launch after installing is slow on CI), then runs XCUITest
-  (`scripts/ios-verify`): a fresh launch left alone is filmed, Enter Narrow Gate
-  is tapped (found in the screenshot), the app is relaunched (the opening must replay, with Matthew 7:13–14), Skip
-  intro is tapped, and the app returns from the background (it must not replay). The log ends with the test results,
-  each frame's brightness, a coarse text picture of key frames and one CHECK line per filmed step; screenshots and
-  contact sheets are in the `opening-in-simulator` artifact.
+  once in an iPhone simulator (the first launch after installing is slow on CI), waits for the machine to settle,
+  then runs XCUITest (`scripts/ios-verify`): a fresh launch left alone is filmed, Enter Narrow Gate is pressed
+  (timed from the opening's first frame: see below), the app is relaunched (the opening must replay, with
+  Matthew 7:13–14), Skip intro is tapped, and the app returns from the background (it must not replay). The log
+  ends with the test results, each frame's brightness, a coarse text picture of key frames and one CHECK line per
+  filmed step; screenshots and contact sheets are in the `opening-in-simulator` artifact.
 - **webkit**: the opening and navigation browser tests in WebKit (Safari's engine) at iPhone 15 size, signed in
   against a throwaway local Supabase.
+
+### Why the opening checks are timed the way they are
+
+Shared CI machines have no GPU, so the opening is drawn in software and everything that touches the app while it
+animates is slow: a Simulator screenshot takes 0.3–2.5 s, a synthesized tap lands 0.3–1.8 s after it is sent, and
+WebKit can go over a second without drawing a frame. The opening itself is untouched; the checks are built around
+those delays:
+
+- Enter Narrow Gate rises in 2.15 s into the opening, the opening moves on by itself at 3.85 s and is gone at
+  5.05 s. The Simulator test does not wait to see the risen button in a screenshot (that put the tap after the
+  window on a slow machine); it films until the opening's first frame, then sends the tap 2.0 s after that frame
+  was taken, at the button's place from any frame that showed it (the fresh launch's film, usually). The first
+  frame after the press must show the door open with its light, then the light must fill the screen, then the
+  welcome page: a tap that lands after the opening moved on by itself fails the test, and XCTest retries it.
+- The WebKit test films the move into the light from inside the page, frame by frame from the press itself, so
+  slow round trips between Playwright and the browser cannot miss the 0.9 s push; it still requires the scene to
+  grow past 2.5x and the light to fill the screen. When the machine draws no frame before the opening's own 1.5 s
+  safety timer closes the overlay, the test fails and Playwright retries it on a fresh page, reporting it as flaky.
+- The job waits for the Mac's CPU to be mostly idle before the warm-up launch and again before the tests.
 
 Signed-in screens (tabs, workouts, Food IQ, AI coach, GPS) are covered by the full browser suite
 (`npx playwright test`) against a local Supabase; Apple Health, background GPS and the camera scanner need a

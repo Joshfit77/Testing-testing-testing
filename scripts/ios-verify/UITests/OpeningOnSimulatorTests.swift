@@ -7,10 +7,14 @@ import XCTest
 ///
 /// Most of launch()'s time is closing the previous run; the app has only just started when it returns, so filming
 /// from there sees the whole opening. Accessibility queries into the web view take about a second each, too slow for
-/// the two seconds Enter Narrow Gate is on screen, so the button is found in the screenshot itself.
+/// the two seconds Enter Narrow Gate is on screen, so the button is found in the screenshots (test0's film, or
+/// test1's own) and pressed on a clock that starts with the opening's first frame.
 /// Tests run in name order.
 final class OpeningOnSimulatorTests: XCTestCase {
     private let app = XCUIApplication(bundleIdentifier: "com.narrowgatefitness.app")
+
+    /// Where a screenshot last showed Enter Narrow Gate, in points (test0's film runs before test1).
+    nonisolated(unsafe) private static var enterPoint: CGPoint?
 
     /// XCUITest waits for the app to be idle (no animations) before and after each tap; the opening animates
     /// throughout, so on a slow CI simulator that wait put the tap seconds after Enter Narrow Gate was found, after
@@ -38,9 +42,10 @@ final class OpeningOnSimulatorTests: XCTestCase {
 
     private func ms(since start: Date) -> Int { Int(Date().timeIntervalSince(start) * 1000) }
 
-    /// Saves a screenshot 402 px wide (JPEG), and attaches the full one to the test result.
+    /// Saves a screenshot 402 px wide (JPEG) for the contact sheet; `attach` also keeps the full one in the test
+    /// result (slow on a busy simulator, so the timed frames of a film are not attached).
     @discardableResult
-    private func shot(_ name: String) -> XCUIScreenshot {
+    private func shot(_ name: String, attach: Bool = false) -> XCUIScreenshot {
         let screenshot = XCUIScreen.main.screenshot()
         let image = screenshot.image
         let size = CGSize(width: 402, height: (402 * image.size.height / image.size.width).rounded())
@@ -48,10 +53,12 @@ final class OpeningOnSimulatorTests: XCTestCase {
         format.scale = 1
         let small = UIGraphicsImageRenderer(size: size, format: format).image { _ in image.draw(in: CGRect(origin: .zero, size: size)) }
         try? small.jpegData(compressionQuality: 0.85)?.write(to: shotsDir.appendingPathComponent("\(name).jpg"))
-        let attachment = XCTAttachment(screenshot: screenshot)
-        attachment.name = name
-        attachment.lifetime = .keepAlways
-        add(attachment)
+        if attach {
+            let attachment = XCTAttachment(screenshot: screenshot)
+            attachment.name = name
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
         return screenshot
     }
 
@@ -145,21 +152,34 @@ final class OpeningOnSimulatorTests: XCTestCase {
         return brightness(p) < 15 && brightness(p, x: 0.38...0.62, y: 0.22...0.55) < 40
     }
 
+    /// The launch screen or the empty web view, before the page has painted: near-black (about 9–12) with at most
+    /// the small launch logo in the centre. The opening's first frame is pure black (about 5), and its logo, verse
+    /// and door are brighter, so the first frame that is not blank is the opening's first frame.
+    private func blank(_ screenshot: XCUIScreenshot) -> Bool {
+        guard let p = pixels(screenshot) else { return true }
+        let screen = brightness(p)
+        return screen >= 8 && screen <= 13.5 && brightness(p, x: 0.38...0.62, y: 0.22...0.55) < 40
+    }
+
     func test0_freshLaunchPlaysTheOpeningAndEndsByItself() throws {
         clear("0")
         let start = launch()
-        // The page can take a few seconds to show on a CI simulator: film until 8 s after the screen first stops
-        // being dark (the opening runs 5 s), at most 60 s.
+        // The page can take a few seconds to show on a CI simulator (over a minute on a slow one): film until 8 s
+        // after the screen first stops being dark (the opening runs 5 s), at most 90 s.
         var changed: Date?
         var sawGate = false
-        while Date().timeIntervalSince(start) < 60 {
+        while Date().timeIntervalSince(start) < 90 {
             let s = shot(stamp("0-launch", start))
             if changed == nil, !dark(s) { changed = Date() }
-            if gateOpen(s) { sawGate = true }
+            if gateOpen(s) {
+                sawGate = true
+                if let p = enterButton(in: s) { Self.enterPoint = p }
+            }
             if let c = changed, Date().timeIntervalSince(c) > 8 { break }
         }
         print("GATECHECK fresh launch: page showed \(changed.map { "\(Int($0.timeIntervalSince(start) * 1000)) ms" } ?? "never") after launch")
-        XCTAssertNotNil(changed, "the page never showed within 60 s of launch")
+        if let p = Self.enterPoint { print(String(format: "GATECHECK Enter Narrow Gate is at (%.0f, %.0f) pt", p.x, p.y)) }
+        XCTAssertNotNil(changed, "the page never showed within 90 s of launch")
         XCTAssertTrue(sawGate, "the opening (the door open with its light) was not seen on a fresh launch")
         XCTAssertFalse(app.buttons["Skip intro"].exists, "the opening is still showing 8 s after the page showed")
         XCTAssertTrue(labelled("Start free").waitForExistence(timeout: 5), "the welcome page did not appear after the opening")
@@ -169,25 +189,54 @@ final class OpeningOnSimulatorTests: XCTestCase {
         continueAfterFailure = true
         clear("1", "1w")
         let start = launch()
-        var target: CGPoint?
-        // The page can take up to about 10 s to show on a CI simulator.
-        while target == nil && Date().timeIntervalSince(start) < 20 {
-            target = enterButton(in: shot(stamp("1w-before-enter", start)))
+        // Enter Narrow Gate rises in 2.15 s into the opening and the opening moves on by itself at 3.85 s (gone at
+        // 5.05 s); on a shared CI simulator a screenshot takes 0.3–2.5 s and a synthesized tap lands 0.3–1.8 s after
+        // it is sent. Waiting to see the risen button in a screenshot before pressing put the tap after the window on
+        // a slow simulator, so instead the press is timed from the opening's first frame: film until the screen is no
+        // longer the launch screen or the blank web view, keep filming while there is time, and send the tap 2.0 s
+        // after that first frame was taken (it lands while the button is rising or has risen). The button's place
+        // comes from any frame that shows it, else from the fresh launch's film (test0), else from the layout.
+        var openingAt: Date?
+        var point: CGPoint?
+        var lastShot: TimeInterval = 0.5
+        while Date().timeIntervalSince(start) < 90 {
+            if let at = openingAt, Date().timeIntervalSince(at) + lastShot > 2.0 { break }
+            let before = Date()
+            let s = shot(stamp("1w-before-enter", start))
+            lastShot = Date().timeIntervalSince(before)
+            if openingAt == nil, !blank(s) { openingAt = before }
+            if openingAt != nil, let p = enterButton(in: s) {
+                point = p
+                Self.enterPoint = p
+                break
+            }
         }
-        guard let point = target else {
-            XCTFail("Enter Narrow Gate never showed (no open door with the gold button) within 20 s of launch")
+        guard let openingAt else {
+            XCTFail("the opening never started: the launch screen or a blank page for 90 s after launch")
             return
         }
-        print(String(format: "GATECHECK Enter Narrow Gate seen at (%.0f, %.0f) pt, %d ms after launch", point.x, point.y, ms(since: start)))
-        app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: point.x, dy: point.y)).tap()
+        if point == nil {
+            let wait = 2.0 - Date().timeIntervalSince(openingAt)
+            if wait > 0 { Thread.sleep(forTimeInterval: wait) }
+        }
+        let screen = UIScreen.main.bounds.size
+        let target = point ?? Self.enterPoint ?? CGPoint(x: screen.width / 2, y: screen.height * 0.912)
+        let source = point != nil ? "seen in this film" : Self.enterPoint != nil ? "where the fresh launch showed it" : "the layout's usual place"
+        print(String(format: "GATECHECK pressing Enter Narrow Gate at (%.0f, %.0f) pt (%@), %d ms after launch, %.1f s after the opening's first frame",
+                     target.x, target.y, source, ms(since: start), Date().timeIntervalSince(openingAt)))
+        app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: target.x, dy: target.y)).tap()
         let tap = Date()
-        print("GATECHECK tapped it \(ms(since: start)) ms after launch")
-        var light = false
+        print("GATECHECK tapped it \(ms(since: start)) ms after launch, \(String(format: "%.1f", tap.timeIntervalSince(openingAt))) s after the opening's first frame")
+        // Right after the press the door is open with its light (and the move has just begun): the tap landed while
+        // the button was there, not before the door opened and not after the opening moved on by itself.
+        let first = shot(stamp("1-enter", tap))
+        XCTAssertTrue(gateOpen(first), "the door was not open with its light when Enter was pressed (the tap landed before the door opened, or after the opening moved on)")
+        var light = inTheLight(first)
         while Date().timeIntervalSince(tap) < 2.4 { if inTheLight(shot(stamp("1-enter", tap))) { light = true } }
-        XCTAssertTrue(light, "no move into the light after the tap (on a slow machine the tap can land after the opening moved on)")
+        XCTAssertTrue(light, "no move into the light after the tap")
         XCTAssertFalse(app.buttons["Skip intro"].exists, "the opening is still showing 2.4 s after Enter")
         XCTAssertTrue(labelled("Start free").waitForExistence(timeout: 5), "the welcome page did not appear after Enter")
-        shot("1-enter-final")
+        shot("1-enter-final", attach: true)
     }
 
     func test2_relaunchReplaysTheOpeningButReturningFromTheBackgroundDoesNot() throws {
@@ -196,25 +245,25 @@ final class OpeningOnSimulatorTests: XCTestCase {
         _ = launch()
         let skip = app.buttons["Skip intro"]
         guard skip.waitForExistence(timeout: 20) else {
-            shot("2-no-skip")
+            shot("2-no-skip", attach: true)
             XCTFail("the opening did not replay on a fresh launch")
             return
         }
         // Wait for the verse (it fades in at 1.7 s).
         let verse = labelled("small is the gate and narrow the way")
         XCTAssertTrue(verse.waitForExistence(timeout: 4), "Matthew 7:13–14 is not on screen")
-        shot("2-relaunch")
+        shot("2-relaunch", attach: true)
         skip.tap()
         sleep(1)
         XCTAssertFalse(app.buttons["Skip intro"].exists, "Skip intro did not close the opening")
         XCTAssertTrue(labelled("Start free").waitForExistence(timeout: 5), "the welcome page did not appear after Skip intro")
-        shot("2-after-skip")
+        shot("2-after-skip", attach: true)
         // Home screen and back: the app resumes where it was, without the opening.
         XCUIDevice.shared.press(.home)
         sleep(2)
         app.activate()
         sleep(2)
         XCTAssertFalse(app.buttons["Skip intro"].exists, "the opening replayed when the app came back from the background")
-        shot("2-resumed")
+        shot("2-resumed", attach: true)
     }
 }

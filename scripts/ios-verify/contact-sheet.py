@@ -35,13 +35,16 @@ def ascii_art(im: Image.Image, cols: int = 22) -> list[str]:
 
 
 # Frame types, from the brightness of the whole screen and of the doorway (calibrated on the opening in Chromium and
-# in the Simulator): dark (the blank web view or the opening's first moments), the gate open with its light, the
-# camera moving into the light / the light filling the screen, the welcome page (dark, with a small lit doorway).
+# in the Simulator): dark (the launch screen or the blank web view), black (the opening's own first frame, before
+# its logo), the gate open with its light, the camera moving into the light / the light filling the screen, the
+# welcome page (dark, with a small lit doorway).
 def kind(screen: float, door: float) -> str:
     if screen > 120:
         return "light"
     if door > 140 and screen < 100:
         return "gate-open"
+    if screen < 8 and door < 40:
+        return "black"
     if screen < 15 and door < 40:
         return "dark"
     if screen < 40 and 60 < door < 120:
@@ -85,11 +88,14 @@ for step, files in groups.items():
         def after(a: str, b: str) -> bool:
             return a in seq and b in seq[seq.index(a) + 1 :]
         if step == "1w":
-            ok = "gate-open" in seq
-            want = "the door opened with its light and the button showed"
+            # Filmed until 2 s into the opening, when Enter Narrow Gate is pressed (OpeningOnSimulatorTests.test1).
+            ok = any(k != "dark" for k in frames)
+            want = "the opening began (its first black frame, the logo or the door) before Enter was pressed"
         elif step == "1":
-            ok = "light" in seq and after("light", "welcome") and frames[-1] == "welcome"
-            want = "the light fills the screen, then the welcome page"
+            # The first frame is taken right after the press: the door open with its light, so the tap landed while
+            # the button was there; then the move into the light, then the welcome page.
+            ok = bool(frames) and frames[0] == "gate-open" and after("gate-open", "light") and after("light", "welcome") and frames[-1] == "welcome"
+            want = "the door open with its light at the press, then the light fills the screen, then the welcome page"
         else:
             # The automatic move into the light lasts under a second, which a slow simulator's screenshots can miss;
             # the move itself is checked after Enter Narrow Gate.
