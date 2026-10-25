@@ -53,6 +53,7 @@ on:
       - "e2e/navigation.spec.ts"
       - "scripts/ios-verify/**"
       - "capacitor.config.ts"
+      - "playwright.config.ts"
       - "package-lock.json"
       - ".github/workflows/ios.yml"
 

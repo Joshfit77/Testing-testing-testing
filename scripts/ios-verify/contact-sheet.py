@@ -35,13 +35,16 @@ def ascii_art(im: Image.Image, cols: int = 22) -> list[str]:
 
 
 # Frame types, from the brightness of the whole screen and of the doorway (calibrated on the opening in Chromium and
-# in the Simulator): the gate open with its light, the light filling the screen, the welcome page.
+# in the Simulator): dark (the blank web view or the opening's first moments), the gate open with its light, the
+# light filling the screen, the welcome page (dark, with a small lit doorway).
 def kind(screen: float, door: float) -> str:
     if screen > 200:
         return "light"
     if door > 140 and screen < 100:
         return "gate-open"
-    if screen < 40 and door < 120:
+    if screen < 15 and door < 40:
+        return "dark"
+    if screen < 40 and 60 < door < 120:
         return "welcome"
     return "other"
 

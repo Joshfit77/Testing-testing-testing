@@ -56,6 +56,19 @@ final class OpeningOnSimulatorTests: XCTestCase {
         return Date()
     }
 
+    /// Average brightness (0–255) of a screenshot.
+    private func luma(_ screenshot: XCUIScreenshot) -> Double {
+        guard let cg = screenshot.image.cgImage else { return 0 }
+        var px = [UInt8](repeating: 0, count: 32 * 64)
+        let ok: Bool = px.withUnsafeMutableBytes { buffer in
+            guard let ctx = CGContext(data: buffer.baseAddress, width: 32, height: 64, bitsPerComponent: 8, bytesPerRow: 32,
+                                      space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue) else { return false }
+            ctx.draw(cg, in: CGRect(x: 0, y: 0, width: 32, height: 64))
+            return true
+        }
+        return ok ? Double(px.reduce(0) { $0 + Int($1) }) / Double(px.count) : 0
+    }
+
     /// Where Enter Narrow Gate is, in points, if the screenshot shows the opening with the door open and the button
     /// shown: the doorway is bright, and a wide, solid gold shape sits in the lower part of the screen.
     private func enterButton(in screenshot: XCUIScreenshot) -> CGPoint? {
@@ -97,8 +110,18 @@ final class OpeningOnSimulatorTests: XCTestCase {
 
     func test0_freshLaunchPlaysTheOpeningAndEndsByItself() throws {
         let start = launch()
-        film("0-launch", from: start, for: 12)
-        XCTAssertFalse(app.buttons["Skip intro"].exists, "the opening is still showing 12 s after launch")
+        // The first launch after installing can take a while to load the page (a cold simulator): film until 8 s
+        // after the screen first changes from the blank web view, at most 40 s.
+        let blank = luma(shot(stamp("0-launch", start)))
+        var changed: Date?
+        while Date().timeIntervalSince(start) < 40 {
+            let now = luma(shot(stamp("0-launch", start)))
+            if changed == nil, abs(now - blank) > 2 { changed = Date() }
+            if let c = changed, Date().timeIntervalSince(c) > 8 { break }
+        }
+        print("GATECHECK fresh launch: page showed \(changed.map { "\(Int($0.timeIntervalSince(start) * 1000)) ms" } ?? "never") after launch")
+        XCTAssertNotNil(changed, "the page never showed within 40 s of launch")
+        XCTAssertFalse(app.buttons["Skip intro"].exists, "the opening is still showing 8 s after the page showed")
         XCTAssertTrue(labelled("Start free").waitForExistence(timeout: 5), "the welcome page did not appear after the opening")
     }
 
