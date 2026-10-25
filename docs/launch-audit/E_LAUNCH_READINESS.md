@@ -77,7 +77,8 @@ Status words: **COMPLETE** implemented and verified by tests/CI · **NEEDS OWNER
 
 | Item | Status |
 |---|---|
-| Web app code: typecheck, lint, build, unit, integration, e2e green; iOS Simulator CI green | COMPLETE |
+| Web app code: typecheck, lint, build, unit, integration, e2e green; `ci.yml` green on the PR head | COMPLETE |
+| iOS CI (`ios.yml` checks): compile and WebKit green on the final code commit; the Simulator job passed on the PR's previous commit and three times on the base, but on the final code commit its Enter Narrow Gate tap missed the button's sub-3 s window on two slow runners (harness timing margin, not an app defect; `D_CODE_CHANGES_AND_TESTS.md` §D.6) | NEEDS OWNER ACTION — accept as documented, or approve a harness change (on the base branch or in this PR) validated by one CI cycle |
 | Privacy fixes (deleted routes, sign-out clean-up, consent texts, export limit, `plan_of`) | COMPLETE (PR #3, awaiting your review) |
 | Deployed HTTPS site + Supabase project with migrations | NEEDS OWNER ACTION (and your approval if I deploy) |
 | Apple Developer membership, App ID with HealthKit, App Store Connect record, API key secrets | NEEDS OWNER ACTION |
