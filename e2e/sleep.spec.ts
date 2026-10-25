@@ -1,5 +1,15 @@
 import { expect, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { completeOnboarding, seedRows, serviceRest, signUpAndConfirm, uniqueEmail, userIdFor } from "./helpers";
+
+/** Fills the sleep form with eight hours ending two minutes ago (the test account's time zone is UTC). */
+async function fillLastEightHours(page: Page) {
+  const up = new Date(Math.floor((Date.now() - 2 * 60_000) / 60_000) * 60_000);
+  const bed = new Date(up.getTime() - 8 * 3600_000);
+  await expect(page.getByLabel("Time zone")).toHaveValue("UTC");
+  await page.getByLabel("Got into bed").fill(bed.toISOString().slice(0, 16));
+  await page.getByLabel("Got up").fill(up.toISOString().slice(0, 16));
+}
 
 test.describe("Sleep & Recovery", () => {
   test("a night recorded by a watch: stages, overnight measurements and the connection status, nothing invented", async ({ page }) => {
@@ -146,9 +156,11 @@ test.describe("Sleep & Recovery", () => {
     await expect(page.getByRole("button", { name: "Going to bed" })).toBeVisible();
     await expect(page.getByText("Nothing logged yet.")).toBeVisible();
 
-    // Enter last night by hand with the defaults (10:30 PM to 6:30 AM).
+    // Enter last night by hand: eight hours ending just now, so the night is today's whatever the time of day (the
+    // form's default times are covered by defaultManualNight's unit tests).
     await page.getByRole("link", { name: /Enter sleep by hand/ }).click();
     await page.waitForURL(/\/progress\/sleep\/log$/);
+    await fillLastEightHours(page);
     await page.getByRole("button", { name: "Save sleep" }).click();
     await page.waitForURL(/\/progress\/sleep\?saved=1$/);
     await expect(page.getByText("Sleep saved.")).toBeVisible();
@@ -271,6 +283,7 @@ test.describe("Sleep & Recovery", () => {
 
     // The same night again overlaps the saved one and is refused with a clear message.
     await page.goto("/progress/sleep/log");
+    await fillLastEightHours(page);
     await page.getByRole("button", { name: "Save sleep" }).click();
     await expect(page.getByText(/overlaps the sleep you logged/)).toBeVisible();
     await expect(page).toHaveURL(/\/progress\/sleep\/log$/);
