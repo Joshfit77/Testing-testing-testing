@@ -19,7 +19,7 @@ As of 2026-10-25, branch `claude/launch-audit` (on top of `claude/testflight-pre
 2. **Confirm FOOD IQ Reg. 4,337,059 status on TSDR** and search/clear a distinctive replacement for the placeholder "Nutrition Score" (also check NUTRI-SCORE Reg. 6,160,878).
 3. **Dietitian / nutrition-scientist review of the FIQ-0.1 method** before `FOOD_IQ_SCORE` is switched on (it stays off).
 4. **App Store Connect privacy answers** matching `PrivacyInfo.xcprivacy`; review notes explaining background location, HealthKit use, optional faith content; demo account.
-5. **Android before any Play build:** `allowBackup="false"` or extraction rules; remove unused Health Connect permissions; add the missing background-geolocation and RevenueCat plugin wiring (`SECURITY_PRIVACY.md` S-8, S-9, O3).
+5. **Android before any Play build:** backup rules, unused Health Connect permissions and the missing plugin wiring are done in PR #4 (`claude/android-hardening`, compiled on CI, not run on a device); still needed: Play Console setup, upload key, Data safety form (`ANDROID_READINESS.md` on that branch).
 6. **Incident procedure** for the FTC Health Breach Notification Rule (notice templates, who decides, timelines), decided with counsel.
 7. **Prompt-injection hardening** of coach tool results (delimit third-party strings) — defence in depth; the current design already limits impact to a proposal card the member must confirm.
 8. **Open Food Facts attribution wording** (ODbL) confirmed by counsel; USDA is public domain.
@@ -68,3 +68,57 @@ As of 2026-10-25, branch `claude/launch-audit` (on top of `claude/testflight-pre
 | Health data | Read-only; not sold or used for ads; shared with the AI provider only as a sleep summary after consent, now disclosed |
 
 **Overall:** the product is technically ready for an internal TestFlight build as soon as a site is deployed and the Apple account exists; it is **not** ready for commercial release until E.1 items 3–6 are done and the legal reviews in E.4 have been carried out.
+
+## E.7 Final launch checklist by stage (2026-10-25, after PR #3 and PR #4)
+
+Status words: **COMPLETE** implemented and verified by tests/CI · **NEEDS OWNER ACTION** account, credential, payment, approval or configuration · **NEEDS DEVICE TEST** physical hardware · **NEEDS LEGAL REVIEW** qualified counsel · **BLOCKED** waits on a prerequisite.
+
+### 1. Internal TestFlight (your own iPhone)
+
+| Item | Status |
+|---|---|
+| Web app code: typecheck, lint, build, unit, integration, e2e green; iOS Simulator CI green | COMPLETE |
+| Privacy fixes (deleted routes, sign-out clean-up, consent texts, export limit, `plan_of`) | COMPLETE (PR #3, awaiting your review) |
+| Deployed HTTPS site + Supabase project with migrations | NEEDS OWNER ACTION (and your approval if I deploy) |
+| Apple Developer membership, App ID with HealthKit, App Store Connect record, API key secrets | NEEDS OWNER ACTION |
+| Sign-only run of the `testflight` job, then upload with your approval | BLOCKED on the two rows above |
+| Install on an iPhone and run `IOS_DEVICE_TEST_PLAN.md` | NEEDS DEVICE TEST |
+| RevenueCat project, App Store subscription products, sandbox testers | NEEDS OWNER ACTION (purchases can be tested after this) |
+| Privacy policy / terms final text | Not required for internal testers (unverified against the live guidelines); drafts are factually correct |
+
+### 2. External TestFlight (Beta App Review)
+
+| Item | Status |
+|---|---|
+| Everything in stage 1 | as above |
+| Privacy policy URL, App Privacy answers in App Store Connect | NEEDS LEGAL REVIEW (text) + NEEDS OWNER ACTION (entry) |
+| Beta review notes, demo account, description of health-data use and optional faith content | NEEDS OWNER ACTION (I can draft) |
+| Device test results recorded (Health, GPS, camera, notifications, purchases) | NEEDS DEVICE TEST |
+
+### 3. Public App Store release
+
+| Item | Status |
+|---|---|
+| Everything in stages 1–2 | as above |
+| Final terms, EULA choice, refund policy for web purchases | NEEDS LEGAL REVIEW |
+| Trademark clearance: NARROW GATE FITNESS; replacement for "Nutrition Score"; FOOD IQ status | NEEDS LEGAL REVIEW |
+| Patent counsel reads the actual claims (`B_PATENT_CLAIM_CHARTS.md`) | NEEDS LEGAL REVIEW |
+| FTC Health Breach Notification Rule procedure | NEEDS LEGAL REVIEW |
+| Dietitian review before `FOOD_IQ_SCORE` is switched on (optional for launch; stays off) | NEEDS OWNER ACTION |
+| Subscriptions approved with the app in App Store Connect; live Stripe keys only with `STRIPE_LIVE_APPROVED=true` | NEEDS OWNER ACTION (approval) |
+| Metadata, screenshots, age rating, review notes | NEEDS OWNER ACTION |
+
+### 4. Google Play release (later)
+
+| Item | Status |
+|---|---|
+| Android hardening (backups, Health Connect permissions, plugin wiring) | COMPLETE in PR #4 (compiled on CI) |
+| Online Android build on a phone: Health Connect, GPS foreground service, camera, notifications | NEEDS DEVICE TEST |
+| Play Console: app, Health apps declaration, Data safety form, privacy policy URL, upload key / Play App Signing | NEEDS OWNER ACTION |
+| Play subscriptions `ngf_plus` / `ngf_pro` and RevenueCat Play configuration; licence testers | NEEDS OWNER ACTION |
+| Play Billing sandbox: purchase, restore, upgrade, cancel, expiry, refund | NEEDS DEVICE TEST |
+| Legal items as in stage 3 | NEEDS LEGAL REVIEW |
+
+### Recommended next step after the PRs are reviewed
+
+Approve or amend PR #3 (and PR #4 when Android matters), then: create the Supabase project and the hosting project, give me the go-ahead to deploy `claude/testflight-prep` + PR #3 to a test URL, and in parallel enrol in the Apple Developer Program and add the four signing secrets. With those two in place I run the `testflight` job sign-only, you approve the upload, and you work through `IOS_DEVICE_TEST_PLAN.md` on your iPhone.

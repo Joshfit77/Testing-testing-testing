@@ -11,6 +11,8 @@ Technical, patent-research, trademark-research, security/privacy and Apple-readi
 | `E_LAUNCH_READINESS.md` | Critical blockers, high-priority improvements, optional work, outstanding legal reviews, device testing, subscription and privacy readiness. |
 | `SECURITY_PRIVACY.md` | Findings (with fixes), RLS table, storage, API/auth, deletion and export, AI data flows, secrets, data-flow inventory, legal-page gap list. |
 | `APPLE_COMPLIANCE.md` | App Store / TestFlight requirement-by-requirement status with evidence (Part 12). |
+| `IOS_DEVICE_TEST_PLAN.md` | What to try on a physical iPhone (Health, GPS, camera, notifications, purchases, account), with the code each step exercises. |
+| `ANDROID_READINESS.md` (on `claude/android-hardening`, PR #4) | Android backup rules, Health Connect permissions, plugin wiring, Play Billing readiness, device test list. |
 
 Related, already in the repository: `docs/TESTFLIGHT.md` (upload steps), `docs/MOBILE_BILLING.md` (in-app purchases), `docs/LEGAL_REQUIREMENTS.md` (inventory for counsel, corrected), `docs/FOOD_IQ_METHOD.md` (the nutrition formula; public name now "Nutrition Score"), `docs/SCRIPTURE.md`, `docs/SECURITY.md`.
 
