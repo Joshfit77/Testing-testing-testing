@@ -154,8 +154,10 @@ jobs:
           cd scripts/ios-verify
           xcodegen generate
           set +e
+          # A shared CI simulator can be slow enough to miss the opening's few seconds: retry a failed test up to twice.
           TEST_RUNNER_SHOTS_DIR="$GITHUB_WORKSPACE/sim-shots" xcodebuild test -project GateCheck.xcodeproj -scheme GateCheck \
-            -destination "id=$UDID" -resultBundlePath "$RUNNER_TEMP/GateCheck.xcresult" > "$RUNNER_TEMP/xcodebuild-test.log" 2>&1
+            -destination "id=$UDID" -resultBundlePath "$RUNNER_TEMP/GateCheck.xcresult" \
+            -retry-tests-on-failure -test-iterations 3 > "$RUNNER_TEMP/xcodebuild-test.log" 2>&1
           status=$?
           [ $status -eq 0 ] || tail -80 "$RUNNER_TEMP/xcodebuild-test.log"
           exit $status

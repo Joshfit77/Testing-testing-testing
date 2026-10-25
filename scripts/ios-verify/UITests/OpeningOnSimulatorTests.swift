@@ -40,11 +40,6 @@ final class OpeningOnSimulatorTests: XCTestCase {
 
     private func stamp(_ step: String, _ start: Date) -> String { String(format: "%@-%05d", step, ms(since: start)) }
 
-    /// Screenshots as fast as the simulator gives them until `seconds` after `start`.
-    private func film(_ step: String, from start: Date, for seconds: TimeInterval) {
-        while Date().timeIntervalSince(start) < seconds { shot(stamp(step, start)) }
-    }
-
     private func labelled(_ text: String) -> XCUIElement {
         app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
     }
@@ -56,22 +51,8 @@ final class OpeningOnSimulatorTests: XCTestCase {
         return Date()
     }
 
-    /// Average brightness (0–255) of a screenshot.
-    private func luma(_ screenshot: XCUIScreenshot) -> Double {
-        guard let cg = screenshot.image.cgImage else { return 0 }
-        var px = [UInt8](repeating: 0, count: 32 * 64)
-        let ok: Bool = px.withUnsafeMutableBytes { buffer in
-            guard let ctx = CGContext(data: buffer.baseAddress, width: 32, height: 64, bitsPerComponent: 8, bytesPerRow: 32,
-                                      space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue) else { return false }
-            ctx.draw(cg, in: CGRect(x: 0, y: 0, width: 32, height: 64))
-            return true
-        }
-        return ok ? Double(px.reduce(0) { $0 + Int($1) }) / Double(px.count) : 0
-    }
-
-    /// Where Enter Narrow Gate is, in points, if the screenshot shows the opening with the door open and the button
-    /// shown: the doorway is bright, and a wide, solid gold shape sits in the lower part of the screen.
-    private func enterButton(in screenshot: XCUIScreenshot) -> CGPoint? {
+    /// A 134-pixel-wide RGBA copy of a screenshot, for quick measurements.
+    private func pixels(_ screenshot: XCUIScreenshot) -> (px: [UInt8], w: Int, h: Int)? {
         guard let cg = screenshot.image.cgImage else { return nil }
         let w = 134
         let h = Int((CGFloat(w) * CGFloat(cg.height) / CGFloat(cg.width)).rounded())
@@ -82,19 +63,52 @@ final class OpeningOnSimulatorTests: XCTestCase {
             ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
             return true
         }
-        guard drawn else { return nil }
-        func rgb(_ x: Int, _ y: Int) -> (Int, Int, Int) { let i = (y * w + x) * 4; return (Int(px[i]), Int(px[i + 1]), Int(px[i + 2])) }
-        // Doorway (same box as contact-sheet.py): bright once the door is open.
+        return drawn ? (px, w, h) : nil
+    }
+
+    /// Average brightness (0–255) of a box given as fractions of the screen.
+    private func brightness(_ p: (px: [UInt8], w: Int, h: Int), x: ClosedRange<Double> = 0...1, y: ClosedRange<Double> = 0...1) -> Double {
         var sum = 0, n = 0
-        for y in Int(Double(h) * 0.22)..<Int(Double(h) * 0.55) {
-            for x in Int(Double(w) * 0.38)..<Int(Double(w) * 0.62) { let (r, g, b) = rgb(x, y); sum += (r * 299 + g * 587 + b * 114) / 1000; n += 1 }
+        for row in Int(Double(p.h) * y.lowerBound)..<max(Int(Double(p.h) * y.upperBound), 1) {
+            for col in Int(Double(p.w) * x.lowerBound)..<max(Int(Double(p.w) * x.upperBound), 1) {
+                let i = (row * p.w + col) * 4
+                sum += (Int(p.px[i]) * 299 + Int(p.px[i + 1]) * 587 + Int(p.px[i + 2]) * 114) / 1000
+                n += 1
+            }
         }
-        guard n > 0, sum / n > 140 else { return nil }
+        return n > 0 ? Double(sum) / Double(n) : 0
+    }
+
+    /// The door is open with its light: the doorway (same box as contact-sheet.py) is bright, the screen isn't white.
+    private func gateOpen(_ screenshot: XCUIScreenshot) -> Bool {
+        guard let p = pixels(screenshot) else { return false }
+        return brightness(p, x: 0.38...0.62, y: 0.22...0.55) > 140 && brightness(p) < 100
+    }
+
+    /// The camera is moving into the light, or the light fills the screen.
+    private func inTheLight(_ screenshot: XCUIScreenshot) -> Bool {
+        guard let p = pixels(screenshot) else { return false }
+        return brightness(p) > 120
+    }
+
+    /// Removes this step's screenshots from an earlier attempt (Xcode retries a failed test).
+    private func clear(_ prefixes: String...) {
+        let files = (try? FileManager.default.contentsOfDirectory(atPath: shotsDir.path)) ?? []
+        for f in files where prefixes.contains(where: { f.hasPrefix($0 + "-") }) {
+            try? FileManager.default.removeItem(at: shotsDir.appendingPathComponent(f))
+        }
+    }
+
+    /// Where Enter Narrow Gate is, in points, if the screenshot shows the opening with the door open and the button
+    /// shown: the doorway is bright, and a wide, solid gold shape sits in the lower part of the screen.
+    private func enterButton(in screenshot: XCUIScreenshot) -> CGPoint? {
+        guard gateOpen(screenshot), let p = pixels(screenshot) else { return nil }
         var rows: [(y: Int, centre: Double)] = []
-        for y in Int(Double(h) * 0.55)..<Int(Double(h) * 0.98) {
+        for y in Int(Double(p.h) * 0.55)..<Int(Double(p.h) * 0.98) {
             var best = (start: 0, length: 0), run = 0
-            for x in 0..<w {
-                let (r, g, b) = rgb(x, y)
+            for x in 0..<p.w {
+                let i = (y * p.w + x) * 4
+                let (r, g, b) = (Int(p.px[i]), Int(p.px[i + 1]), Int(p.px[i + 2]))
                 let gold = r > 140 && g > 100 && b * 4 < g * 3 && r > b + 60
                 run = gold ? run + 1 : 0
                 if run > best.length { best = (x - run + 1, run) }
@@ -103,30 +117,36 @@ final class OpeningOnSimulatorTests: XCTestCase {
         }
         guard rows.count >= 3 else { return nil }
         let size = screenshot.image.size  // points
-        let x = rows.map(\.centre).reduce(0, +) / Double(rows.count) * size.width / Double(w)
-        let y = Double(rows.map(\.y).reduce(0, +)) / Double(rows.count) * size.height / Double(h)
+        let x = rows.map(\.centre).reduce(0, +) / Double(rows.count) * size.width / Double(p.w)
+        let y = Double(rows.map(\.y).reduce(0, +)) / Double(rows.count) * size.height / Double(p.h)
         return CGPoint(x: x, y: y)
     }
 
     func test0_freshLaunchPlaysTheOpeningAndEndsByItself() throws {
+        clear("0")
         let start = launch()
         // The first launch after installing can take a while to load the page (a cold simulator): film until 8 s
-        // after the screen first changes from the blank web view, at most 40 s.
-        let blank = luma(shot(stamp("0-launch", start)))
+        // after the screen first changes from the blank web view, at most 60 s.
+        guard let first = pixels(shot(stamp("0-launch", start))) else { return XCTFail("no screenshot") }
+        let blank = brightness(first)
         var changed: Date?
-        while Date().timeIntervalSince(start) < 40 {
-            let now = luma(shot(stamp("0-launch", start)))
-            if changed == nil, abs(now - blank) > 2 { changed = Date() }
+        var sawGate = false
+        while Date().timeIntervalSince(start) < 60 {
+            let s = shot(stamp("0-launch", start))
+            if changed == nil, let p = pixels(s), abs(brightness(p) - blank) > 2 { changed = Date() }
+            if gateOpen(s) { sawGate = true }
             if let c = changed, Date().timeIntervalSince(c) > 8 { break }
         }
         print("GATECHECK fresh launch: page showed \(changed.map { "\(Int($0.timeIntervalSince(start) * 1000)) ms" } ?? "never") after launch")
-        XCTAssertNotNil(changed, "the page never showed within 40 s of launch")
+        XCTAssertNotNil(changed, "the page never showed within 60 s of launch")
+        XCTAssertTrue(sawGate, "the opening (the door open with its light) was not seen on a fresh launch")
         XCTAssertFalse(app.buttons["Skip intro"].exists, "the opening is still showing 8 s after the page showed")
         XCTAssertTrue(labelled("Start free").waitForExistence(timeout: 5), "the welcome page did not appear after the opening")
     }
 
     func test1_enterNarrowGateMovesIntoTheLightAndOpensTheApp() throws {
         continueAfterFailure = true
+        clear("1", "1w")
         let start = launch()
         var target: CGPoint?
         while target == nil && Date().timeIntervalSince(start) < 10 {
@@ -140,7 +160,9 @@ final class OpeningOnSimulatorTests: XCTestCase {
         app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: point.x, dy: point.y)).tap()
         let tap = Date()
         print("GATECHECK tapped it \(ms(since: start)) ms after launch")
-        film("1-enter", from: tap, for: 2.4)
+        var light = false
+        while Date().timeIntervalSince(tap) < 2.4 { if inTheLight(shot(stamp("1-enter", tap))) { light = true } }
+        XCTAssertTrue(light, "no move into the light after the tap (on a slow machine the tap can land after the opening moved on)")
         XCTAssertFalse(app.buttons["Skip intro"].exists, "the opening is still showing 2.4 s after Enter")
         XCTAssertTrue(labelled("Start free").waitForExistence(timeout: 5), "the welcome page did not appear after Enter")
         shot("1-enter-final")
@@ -148,6 +170,7 @@ final class OpeningOnSimulatorTests: XCTestCase {
 
     func test2_relaunchReplaysTheOpeningButReturningFromTheBackgroundDoesNot() throws {
         continueAfterFailure = true
+        clear("2")
         _ = launch()
         let skip = app.buttons["Skip intro"]
         guard skip.waitForExistence(timeout: 20) else {
