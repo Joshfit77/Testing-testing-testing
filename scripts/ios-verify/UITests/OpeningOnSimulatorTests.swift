@@ -122,18 +122,22 @@ final class OpeningOnSimulatorTests: XCTestCase {
         return CGPoint(x: x, y: y)
     }
 
+    /// The launch screen, the blank web view or the opening's first dark moments (same test as contact-sheet.py).
+    private func dark(_ screenshot: XCUIScreenshot) -> Bool {
+        guard let p = pixels(screenshot) else { return true }
+        return brightness(p) < 15 && brightness(p, x: 0.38...0.62, y: 0.22...0.55) < 40
+    }
+
     func test0_freshLaunchPlaysTheOpeningAndEndsByItself() throws {
         clear("0")
         let start = launch()
-        // The first launch after installing can take a while to load the page (a cold simulator): film until 8 s
-        // after the screen first changes from the blank web view, at most 60 s.
-        guard let first = pixels(shot(stamp("0-launch", start))) else { return XCTFail("no screenshot") }
-        let blank = brightness(first)
+        // The page can take a few seconds to show on a CI simulator: film until 8 s after the screen first stops
+        // being dark (the opening runs 5 s), at most 60 s.
         var changed: Date?
         var sawGate = false
         while Date().timeIntervalSince(start) < 60 {
             let s = shot(stamp("0-launch", start))
-            if changed == nil, let p = pixels(s), abs(brightness(p) - blank) > 2 { changed = Date() }
+            if changed == nil, !dark(s) { changed = Date() }
             if gateOpen(s) { sawGate = true }
             if let c = changed, Date().timeIntervalSince(c) > 8 { break }
         }

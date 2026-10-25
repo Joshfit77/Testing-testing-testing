@@ -148,6 +148,22 @@ jobs:
           xcrun simctl bootstatus "$UDID" -b
           xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 || true
           xcrun simctl install "$UDID" build/Build/Products/Debug-iphonesimulator/App.app
+      - name: Open the app once, so the tests start on a warm simulator
+        run: |
+          # The first launch after installing takes 30–60+ s to show the page on a CI simulator (a phone that has run
+          # the app before starts in a few seconds). Wait here until the screen stops being dark, then close the app.
+          python3 -m venv "$RUNNER_TEMP/venv" && "$RUNNER_TEMP/venv/bin/pip" install --quiet pillow
+          xcrun simctl launch "$UDID" com.narrowgatefitness.app
+          shown=""
+          for i in $(seq 1 60); do
+            sleep 2
+            xcrun simctl io "$UDID" screenshot "$RUNNER_TEMP/warm.png" > /dev/null 2>&1 || continue
+            mean=$("$RUNNER_TEMP/venv/bin/python" -c 'import sys; from PIL import Image, ImageStat; print(int(ImageStat.Stat(Image.open(sys.argv[1]).convert("L")).mean[0]))' "$RUNNER_TEMP/warm.png")
+            if [ "$mean" -ge 15 ]; then shown="after about $((i * 2)) s (brightness $mean)"; break; fi
+          done
+          echo "First launch: the page showed ${shown:-not within 120 s}"
+          sleep 8
+          xcrun simctl terminate "$UDID" com.narrowgatefitness.app || true
       - name: Launch, Enter Narrow Gate, relaunch, return from the background (XCUITest)
         run: |
           brew install xcodegen
@@ -167,7 +183,7 @@ jobs:
         run: |
           mkdir -p sim-shots
           cp "$RUNNER_TEMP/next.log" "$RUNNER_TEMP/xcodebuild-test.log" sim-shots/ 2>/dev/null || true
-          python3 -m venv "$RUNNER_TEMP/venv" && "$RUNNER_TEMP/venv/bin/pip" install --quiet pillow
+          [ -x "$RUNNER_TEMP/venv/bin/python" ] || { python3 -m venv "$RUNNER_TEMP/venv" && "$RUNNER_TEMP/venv/bin/pip" install --quiet pillow; }
           grep -A60 "accessibility tree:" "$RUNNER_TEMP/xcodebuild-test.log" | cut -c1-200 | head -130 || true
           grep -E "GATECHECK|Test Case .*(passed|failed)|error:|TEST (SUCCEEDED|FAILED)|Executed" "$RUNNER_TEMP/xcodebuild-test.log" | cut -c1-400 || true
           # Ends with one CHECK line per filmed step; fails the job if the opening didn't play as it should.
