@@ -94,8 +94,9 @@ CAP_ALLOW_CLEARTEXT=true` (local testing only).
 `.github/workflows/ios.yml`, no Apple account needed:
 
 - **compile**: the offline edition compiles for the Simulator.
-- **app-in-simulator**: builds and serves the full web app on the build Mac, points the iPhone app at it and runs it
-  in an iPhone simulator with XCUITest (`scripts/ios-verify`): a fresh launch left alone is filmed, Enter Narrow Gate
+- **app-in-simulator**: builds and serves the full web app on the build Mac, points the iPhone app at it, opens it
+  once in an iPhone simulator (the first launch after installing is slow on CI), then runs XCUITest
+  (`scripts/ios-verify`): a fresh launch left alone is filmed, Enter Narrow Gate
   is tapped (found in the screenshot), the app is relaunched (the opening must replay, with Matthew 7:13–14), Skip
   intro is tapped, and the app returns from the background (it must not replay). The log ends with the test results,
   each frame's brightness, a coarse text picture of key frames and one CHECK line per filmed step; screenshots and
