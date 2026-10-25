@@ -28,6 +28,15 @@ describe.skipIf(!available)("plan enforcement in the database (not just the serv
   });
   afterAll(async () => deleteTestUser(free));
 
+  it("members can't look up anyone's plan through plan_of() (it is for the database's own checks)", async () => {
+    // plan_of(uuid) runs as its definer and takes any id; PostgREST exposed it to every signed-in member.
+    const own = await free.client.rpc("plan_of", { p_user_id: free.id });
+    expect(own.error).not.toBeNull();
+    const other = await free.client.rpc("plan_of", { p_user_id: "00000000-0000-0000-0000-000000000001" });
+    expect(other.error).not.toBeNull();
+    // The policies that rely on it still work: has_plan() is what gates paid inserts below.
+  });
+
   it("Free: can't create recipes, meal plans, grocery lists or custom/AI programs", async () => {
     const c = free.client;
     expect((await c.from("recipes").insert({ user_id: free.id, name: "Direct insert" }).select()).error).not.toBeNull();

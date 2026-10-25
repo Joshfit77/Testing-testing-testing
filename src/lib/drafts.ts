@@ -8,6 +8,8 @@
  * rendering the functions quietly do nothing and the form simply starts empty.
  */
 
+import { GPS_RECORDING_PREFIX } from "@/lib/opening";
+
 export const DRAFT_PREFIX = "ngf.draft.";
 /** Drafts older than this are ignored and removed (30 days). */
 export const DRAFT_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
@@ -77,16 +79,20 @@ export function clearDraft(userId: string, key: string): void {
   }
 }
 
-/** Removes every draft on this device (all users when `userId` is omitted). Used after account deletion. */
+/**
+ * Removes every draft on this device (all users when `userId` is omitted), and any run or walk still being recorded
+ * (its raw GPS fixes live under the same user's key): used on sign-out and after account deletion, so the next
+ * person on a shared device finds nothing of the last one.
+ */
 export function clearAllDrafts(userId?: string): number {
   const s = storage();
   if (!s) return 0;
-  const prefix = userId ? `${DRAFT_PREFIX}${userId}.` : DRAFT_PREFIX;
+  const prefixes = userId ? [`${DRAFT_PREFIX}${userId}.`, `${GPS_RECORDING_PREFIX}${userId}`] : [DRAFT_PREFIX, GPS_RECORDING_PREFIX];
   const doomed: string[] = [];
   try {
     for (let i = 0; i < s.length; i++) {
       const k = s.key(i);
-      if (k?.startsWith(prefix)) doomed.push(k);
+      if (k && prefixes.some((p) => k.startsWith(p))) doomed.push(k);
     }
     for (const k of doomed) s.removeItem(k);
   } catch {
