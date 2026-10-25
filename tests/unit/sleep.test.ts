@@ -1,5 +1,6 @@
 import {
   circularMedianMinutes,
+  defaultManualNight,
   circularSpreadMinutes,
   clockMinutesInTz,
   findOverlap,
@@ -202,5 +203,24 @@ describe("nights", () => {
     expect(n.awakenings).toBe(2);
     expect(n.efficiencyPct).toBeNull();
     expect(nights[1]!.sources).toEqual(["apple_health"]);
+  });
+});
+
+describe("defaultManualNight", () => {
+  it("is last night once the morning has passed", () => {
+    expect(defaultManualNight(new Date("2026-10-25T09:00:00Z"), "UTC")).toEqual({ startedAt: "2026-10-24T22:30", endedAt: "2026-10-25T06:30" });
+  });
+
+  it("is the night before when it isn't 6:30 AM yet, so it's never in the future", () => {
+    expect(defaultManualNight(new Date("2026-10-25T00:20:00Z"), "UTC")).toEqual({ startedAt: "2026-10-23T22:30", endedAt: "2026-10-24T06:30" });
+    expect(defaultManualNight(new Date("2026-10-25T06:29:00Z"), "UTC").endedAt).toBe("2026-10-24T06:30");
+    expect(defaultManualNight(new Date("2026-10-25T06:30:00Z"), "UTC").endedAt).toBe("2026-10-25T06:30");
+  });
+
+  it("uses the member's time zone", () => {
+    // 05:00 UTC is 1:00 AM in New York: the night before.
+    expect(defaultManualNight(new Date("2026-10-25T05:00:00Z"), "America/New_York")).toEqual({ startedAt: "2026-10-23T22:30", endedAt: "2026-10-24T06:30" });
+    // 05:00 UTC is 2:00 PM in Tokyo: last night.
+    expect(defaultManualNight(new Date("2026-10-25T05:00:00Z"), "Asia/Tokyo")).toEqual({ startedAt: "2026-10-24T22:30", endedAt: "2026-10-25T06:30" });
   });
 });

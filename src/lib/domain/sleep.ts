@@ -5,7 +5,7 @@
  * The app's own entries only know when the member was in bed and, if they said so, when they think they fell asleep
  * and woke: nothing here estimates sleep stages or physiology. Method and versions: docs/SLEEP_METHOD.md.
  */
-import { isoDateInTz } from "@/lib/domain/dates";
+import { addDays, isoDateInTz } from "@/lib/domain/dates";
 
 export const SLEEP_CALC_VERSION = 1;
 
@@ -249,6 +249,17 @@ export function zonedTimeToIso(local: string, timeZone: string): string | null {
   // A skipped time: take the offset in force just before it, which lands on the next valid clock time.
   const before = wall - tzOffsetMinutes(wall - HOUR_MS - tzOffsetMinutes(wall, timeZone) * MINUTE_MS, timeZone) * MINUTE_MS;
   return new Date(before).toISOString();
+}
+
+/**
+ * Defaults for entering a night by hand: 10:30 PM to 6:30 AM of the most recent night that has ended in the time zone.
+ * Before 6:30 AM that is the night before, so the defaults are never in the future (the form refuses those).
+ */
+export function defaultManualNight(now: Date, timeZone: string): { startedAt: string; endedAt: string } {
+  const zone = safeZone(timeZone);
+  const today = isoDateInTz(now, zone);
+  const wakeDay = clockMinutesInTz(now.toISOString(), zone) < 6 * 60 + 30 ? addDays(today, -1) : today;
+  return { startedAt: `${addDays(wakeDay, -1)}T22:30`, endedAt: `${wakeDay}T06:30` };
 }
 
 /** An instant as a datetime-local field value ("2026-10-22T22:30") in a time zone. */

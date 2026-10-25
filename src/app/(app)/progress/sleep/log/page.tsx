@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/common/page-header";
 import { Notice } from "@/components/common/states";
 import { BackLink } from "@/components/platform/back-link";
 import { SleepSessionForm } from "@/components/sleep/session-form";
-import { addDays, isoDateInTz } from "@/lib/domain/dates";
+import { defaultManualNight } from "@/lib/domain/sleep";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
 import { getSleepSession } from "@/server/services/sleep";
@@ -14,7 +14,6 @@ export default async function SleepLogPage({ searchParams }: { searchParams: Pro
   const { user, profile } = await requireOnboardedUser();
   const { id } = await searchParams;
   const tz = profile.timezone ?? "UTC";
-  const today = isoDateInTz(new Date(), tz);
   const supabase = await getServerSupabase();
   const session = id && /^[0-9a-f-]{36}$/i.test(id) ? await getSleepSession(supabase, user.id, id) : null;
   if (id && !session) notFound();
@@ -27,7 +26,7 @@ export default async function SleepLogPage({ searchParams }: { searchParams: Pro
         <Notice tone="warning">Allow sleep logging on the Sleep & Recovery page first.</Notice>
       ) : (
         <section className="rounded-2xl border border-border bg-card p-5">
-          <SleepSessionForm session={session ?? undefined} timezone={tz} defaults={{ startedAt: `${addDays(today, -1)}T22:30`, endedAt: `${today}T06:30` }} />
+          <SleepSessionForm session={session ?? undefined} timezone={tz} defaults={defaultManualNight(new Date(), tz)} />
         </section>
       )}
     </div>
