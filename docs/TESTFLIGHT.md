@@ -95,10 +95,11 @@ CAP_ALLOW_CLEARTEXT=true` (local testing only).
 
 - **compile**: the offline edition compiles for the Simulator.
 - **app-in-simulator**: builds and serves the full web app on the build Mac, points the iPhone app at it and runs it
-  in an iPhone simulator (`scripts/ios-verify`). It films a fresh launch and a relaunch left alone (`simctl`), then
-  XCUITest taps Enter Narrow Gate, relaunches, taps Skip intro and returns from the background (which must not
-  replay). The log ends with the test results, each frame's brightness and a coarse text picture of key frames;
-  the screenshots and contact sheets are in the `opening-in-simulator` artifact.
+  in an iPhone simulator with XCUITest (`scripts/ios-verify`): a fresh launch left alone is filmed, Enter Narrow Gate
+  is tapped (found in the screenshot), the app is relaunched (the opening must replay, with Matthew 7:13–14), Skip
+  intro is tapped, and the app returns from the background (it must not replay). The log ends with the test results,
+  each frame's brightness, a coarse text picture of key frames and one CHECK line per filmed step; screenshots and
+  contact sheets are in the `opening-in-simulator` artifact.
 - **webkit**: the opening and navigation browser tests in WebKit (Safari's engine) at iPhone 15 size, signed in
   against a throwaway local Supabase.
 

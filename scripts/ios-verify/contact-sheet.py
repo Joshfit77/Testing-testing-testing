@@ -10,7 +10,7 @@ import sys
 from PIL import Image, ImageDraw, ImageStat
 
 shots = sys.argv[1]
-names = sorted(f for f in os.listdir(shots) if f.endswith(".png"))
+names = sorted(f for f in os.listdir(shots) if f.endswith((".png", ".jpg")) and not f.startswith("sheet-"))
 groups: dict[str, list[str]] = {}
 for f in names:
     groups.setdefault(f.split("-")[0], []).append(f)
@@ -23,8 +23,8 @@ def mean(im: Image.Image) -> float:
 
 
 def label(f: str) -> str:
-    stamp = re.search(r"-(\d{5})\.png$", f)
-    return f"{int(stamp.group(1)) / 1000:.2f}s" if stamp else f.removesuffix(".png").split("-", 1)[1]
+    stamp = re.search(r"-(\d{5})\.(png|jpg)$", f)
+    return f"{int(stamp.group(1)) / 1000:.2f}s" if stamp else os.path.splitext(f)[0].split("-", 1)[1]
 
 
 def ascii_art(im: Image.Image, cols: int = 22) -> list[str]:
@@ -48,7 +48,7 @@ def kind(screen: float, door: float) -> str:
 
 CHECKS = {
     "0": "fresh launch, left alone",
-    "5": "relaunch, left alone",
+    "1w": "before Enter Narrow Gate",
     "1": "after Enter Narrow Gate",
 }
 verdicts: list[str] = []
@@ -77,11 +77,14 @@ for step, files in groups.items():
         sheet.paste(t, (x, y + 18))
     sheet.save(os.path.join(shots, f"sheet-{step}.jpg"), quality=85)
     if step in CHECKS:
-        frames = [k for f, k in zip(files, kinds) if re.search(r"-\d{5}\.png$", f)] or kinds
+        frames = [k for f, k in zip(files, kinds) if re.search(r"-\d{5}\.(png|jpg)$", f)] or kinds
         seq = [k for k in frames if k != "other"]
         def after(a: str, b: str) -> bool:
             return a in seq and b in seq[seq.index(a) + 1 :]
-        if step == "1":
+        if step == "1w":
+            ok = "gate-open" in seq
+            want = "the door opened with its light and the button showed"
+        elif step == "1":
             ok = "light" in seq and after("light", "welcome") and frames[-1] == "welcome"
             want = "the light fills the screen, then the welcome page"
         else:

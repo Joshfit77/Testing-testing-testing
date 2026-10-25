@@ -5,9 +5,10 @@ name: iOS
 # 1) checks — every push to the branches below, or "Run workflow" with job = checks. No Apple account needed.
 #    - compile: the iPhone project compiles (offline edition, unsigned).
 #    - app-in-simulator: the FULL online app is built and served on the build Mac, the iPhone app is pointed at it
-#      and run in the iOS Simulator, and an XCUITest (scripts/ios-verify) films the opening, taps Enter Narrow Gate,
-#      relaunches the app, and checks the opening doesn't replay when the app returns from the background.
-#      Screenshots: the "opening-in-simulator" artifact (and printed into the log).
+#      and run in the iOS Simulator, and an XCUITest (scripts/ios-verify) films a fresh launch left alone, taps Enter
+#      Narrow Gate, relaunches the app, and checks the opening doesn't replay when the app returns from the
+#      background. The log ends with a CHECK line per filmed step; screenshots are in the "opening-in-simulator"
+#      artifact.
 #    - webkit: the opening and navigation browser tests in WebKit (Safari's engine) at iPhone size, signed in
 #      against a local Supabase.
 #
@@ -115,13 +116,9 @@ jobs:
           for marker in 'data-intro-enter' 'Enter Narrow Gate' '/opening/gate-base.webp' 'small is the gate and narrow the way'; do
             grep -q -- "$marker" "$RUNNER_TEMP/home.html" || { echo "::error::The served page has no '$marker'"; exit 1; }
           done
-      # The app loads the site through a small proxy that can hold page loads (scripts/ios-verify/slow-start-proxy.mjs):
-      # no delay while filming the opening, 8 s for XCUITest (its launch() waits for the app to settle).
       - name: Point the iPhone app at it and build for the Simulator
         run: |
-          echo 0 > "$RUNNER_TEMP/delay-ms"
-          nohup node scripts/ios-verify/slow-start-proxy.mjs 3001 3000 "$RUNNER_TEMP/delay-ms" > "$RUNNER_TEMP/proxy.log" 2>&1 &
-          CAP_SERVER_URL=http://127.0.0.1:3001 CAP_ALLOW_CLEARTEXT=true npx cap sync ios
+          CAP_SERVER_URL=http://127.0.0.1:3000 CAP_ALLOW_CLEARTEXT=true npx cap sync ios
           xcodebuild -version
           xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug \
             -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
@@ -150,11 +147,8 @@ jobs:
           xcrun simctl bootstatus "$UDID" -b
           xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 || true
           xcrun simctl install "$UDID" build/Build/Products/Debug-iphonesimulator/App.app
-      - name: Film a fresh launch and a relaunch, left alone
-        run: python3 scripts/ios-verify/film.py "$UDID" sim-shots
-      - name: Tap Enter Narrow Gate, relaunch, return from the background (XCUITest)
+      - name: Launch, Enter Narrow Gate, relaunch, return from the background (XCUITest)
         run: |
-          echo 8000 > "$RUNNER_TEMP/delay-ms"
           brew install xcodegen
           cd scripts/ios-verify
           xcodegen generate
@@ -169,7 +163,7 @@ jobs:
         if: always()
         run: |
           mkdir -p sim-shots
-          cp "$RUNNER_TEMP/next.log" "$RUNNER_TEMP/proxy.log" "$RUNNER_TEMP/xcodebuild-test.log" sim-shots/ 2>/dev/null || true
+          cp "$RUNNER_TEMP/next.log" "$RUNNER_TEMP/xcodebuild-test.log" sim-shots/ 2>/dev/null || true
           python3 -m venv "$RUNNER_TEMP/venv" && "$RUNNER_TEMP/venv/bin/pip" install --quiet pillow
           grep -A60 "accessibility tree:" "$RUNNER_TEMP/xcodebuild-test.log" | cut -c1-200 | head -130 || true
           grep -E "GATECHECK|Test Case .*(passed|failed)|error:|TEST (SUCCEEDED|FAILED)|Executed" "$RUNNER_TEMP/xcodebuild-test.log" | cut -c1-400 || true
