@@ -165,14 +165,18 @@ export async function updateActivityAction(_prev: ActionState, formData: FormDat
   return actionOk(summary(row, data.unit).replace("saved", "updated"));
 }
 
-/** Soft-delete an activity. Weekly totals and records are derived from live rows, so they recalculate. */
+/**
+ * Soft-delete an activity. Weekly totals and records are derived from live rows, so they recalculate. The GPS route,
+ * splits and signal summary are removed at the same time: a deleted run's track (where the member was) must not stay
+ * on the server or turn up in a later export.
+ */
 export async function deleteActivityAction(id: string): Promise<ActionState> {
   const user = await requireUser();
   if (!z.string().uuid().safeParse(id).success) return actionError("Invalid activity.");
   const supabase = await getServerSupabase();
   const { data, error } = await supabase
     .from("activities")
-    .update({ deleted_at: new Date().toISOString() })
+    .update({ deleted_at: new Date().toISOString(), route: null, splits: null, gps_quality: null })
     .eq("id", id)
     .eq("user_id", user.id)
     .is("deleted_at", null)

@@ -113,3 +113,32 @@ physical iPhone.
 Internal testers (people on your App Store Connect team) need no review. External testing needs Beta App Review:
 a privacy policy URL (`LEGAL_PRIVACY_URL`), the App Privacy answers in App Store Connect matching
 `ios/App/App/PrivacyInfo.xcprivacy`, a test account for the reviewer, and contact details.
+
+## Who does what
+
+| Step | Claude can do it from the repository | Needs you (account, money, approval or a device) |
+|---|---|---|
+| Deploy the web app | Prepare config, environment variable list, health check, CI; run the deploy **only after you approve and give access** | Create the Supabase project and host account; approve the deploy; enter secrets in the host (never in chat) |
+| Supabase | Migrations are in the repo (`supabase/migrations`); `supabase db push` once linked | Create the project; link it; apply migrations to the live project (a destructive step needs your go-ahead) |
+| Apple Developer | Nothing: Apple requires the account holder | Enrol; note the Team ID; register the App ID with HealthKit; create the App Store Connect app; create the internal-testing group |
+| Signing | The workflow is written; it signs when the four secrets exist | Create the App Store Connect API key (Admin role); add `APPLE_TEAM_ID`, `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8_BASE64` as repository secrets |
+| RevenueCat sandbox | Product ids, entitlements and webhook are coded (`docs/MOBILE_BILLING.md`) | Create the RevenueCat project and the four App Store subscriptions; add the keys to the deployment; create sandbox testers |
+| Build and archive | The `testflight` job builds and signs on GitHub's Mac; or you archive in Xcode | Run the job (upload unticked first) |
+| Upload to TestFlight | The job can upload when `upload` is ticked | **Your explicit approval**, then tick `upload` |
+| Install and test on an iPhone | The device plan is written (`docs/launch-audit/IOS_DEVICE_TEST_PLAN.md`) | Install TestFlight, run the plan, send results |
+
+## Requirements by stage
+
+Marked **unverified** where the current App Review Guidelines could not be opened from the audit sandbox; confirm against developer.apple.com before each stage.
+
+| Requirement | Internal TestFlight (your own testers, no review) | External TestFlight (Beta App Review) | App Store release |
+|---|---|---|---|
+| Deployed HTTPS site, Apple account, signed build | Required | Required | Required |
+| Privacy policy URL in App Store Connect | Not enforced for internal builds (unverified) | Required | Required (5.1.1(i)) |
+| Final terms, EULA choice | Not needed | Recommended | Required |
+| App Privacy ("nutrition label") answers | Not needed | Required before the first external build (unverified) | Required |
+| In-app purchases live in App Store Connect | Sandbox only | Sandbox / review | Products approved with the app (3.1.1) |
+| Review notes, demo account, screenshots, age rating | Not needed | Beta review notes and a test account | Full metadata (2.3) |
+| Export compliance | Answered in `Info.plist` | Same | Same |
+| Device testing of Health, GPS, camera, purchases | This is what internal testing is for | Done | Done |
+| Legal clearance (trademark, patents) | Not an Apple requirement | Not an Apple requirement | Business decision before commercial release (`docs/launch-audit/E_LAUNCH_READINESS.md`) |

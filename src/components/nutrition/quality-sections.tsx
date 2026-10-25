@@ -2,7 +2,7 @@ import Link from "next/link";
 import { AlertTriangle, CheckCircle2, CircleHelp, Info, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { SmallScore } from "@/components/nutrition/food-iq-sections";
-import type { FoodIqScore } from "@/lib/food-iq";
+import { NUTRITION_SCORE_LABEL, type FoodIqScore } from "@/lib/food-iq";
 import {
   addedSugarIngredients,
   allergenLabel,
@@ -277,7 +277,7 @@ export function AlternativesList({
   base: QualityProduct;
   items: { product: QualityProduct; reasons: string[]; sameCategory: string }[];
   canCompare: boolean;
-  /** Food IQ ratings by barcode, when the rating is enabled. */
+  /** Nutrition Scores by barcode, when the rating is enabled. */
   scores?: Record<string, FoodIqScore>;
 }) {
   return (
@@ -351,7 +351,7 @@ export function CompareTable({ a, b, scores }: { a: QualityProduct; b: QualityPr
           {scores && (
             <tr className="border-b border-border/60" data-testid="compare-food-iq">
               <th scope="row" className="py-1.5 text-left font-normal">
-                Food IQ (experimental)
+                {NUTRITION_SCORE_LABEL} (experimental)
               </th>
               {scores.map((sc, i) => (
                 <td key={i} className="py-1.5 tabular-nums">

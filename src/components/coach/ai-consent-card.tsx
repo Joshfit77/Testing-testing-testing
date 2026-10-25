@@ -38,11 +38,16 @@ export function AiConsentCard() {
         <li>Your current program, recent workouts and personal records</li>
         <li>Your food log, nutrition targets and supplement stack</li>
         <li>Bodyweight, steps and recovery check-ins</li>
+        <li>
+          When you ask about sleep or recovery: a summary of your sleep, including nights your watch or ring recorded through Apple Health or Health
+          Connect (time asleep, stages, overnight heart rate, heart-rate variability and breathing rate)
+        </li>
         <li>Limitation notes, only if you agreed to store wellness information</li>
         <li>Prayer-journal entries, only the ones you mark &ldquo;Share with AI Coach&rdquo;</li>
         <li>Coaching memories you chose to keep, only if you turn memory on</li>
         <li>For an AI meal plan: your targets, planner settings (diet, budget, allergies, dislikes), your notes and the dish list</li>
         <li>Meal photos you choose to analyse, only after you agree to that separately (they aren&apos;t stored)</li>
+        <li>For &ldquo;Ask AI about this food&rdquo;: the product&apos;s Open Food Facts data with your goal, diet style, daily targets and food filters</li>
       </ul>
       <p className="text-sm text-muted-foreground">
         Progress photos, Body Scan photos and unshared journal entries are never sent. Nothing is sent until you allow it, and you can turn this off any time in
