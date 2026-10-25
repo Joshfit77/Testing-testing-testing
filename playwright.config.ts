@@ -25,8 +25,10 @@ export default defineConfig({
   },
   projects: [
     { name: "mobile", use: { ...devices["Pixel 7"], browserName: "chromium" } },
-    // WebKit (Safari's engine) at iPhone size, used by the iOS workflow; needs `npx playwright install webkit`.
-    ...(process.env.E2E_WEBKIT ? [{ name: "iphone-webkit", use: { ...devices["iPhone 15"], browserName: "webkit" as const, launchOptions: {} } }] : []),
+    // WebKit (Safari's engine) at iPhone size, used by the iOS workflow; needs `npx playwright install webkit`. Drawn at
+    // 1x: on a CI machine without a GPU, WebKit at the iPhone's 3x can't keep up with the opening's animations (they
+    // stay pending). The checks measure CSS pixels, so the pixel density doesn't change what they test.
+    ...(process.env.E2E_WEBKIT ? [{ name: "iphone-webkit", use: { ...devices["iPhone 15"], deviceScaleFactor: 1, browserName: "webkit" as const, launchOptions: {} } }] : []),
   ],
   webServer: process.env.E2E_BASE_URL
     ? undefined
