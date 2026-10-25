@@ -188,4 +188,55 @@ test.describe("live GPS runs and walks", () => {
     await expect(page.getByText("Waiting for GPS")).toBeVisible();
     await expect(page.getByTestId("gps-distance")).toHaveText(/^0(\.00)? /);
   });
+
+  test("signing out during a walk leaves no recording on the device, and the next member sees nothing to continue", async ({ page, context }) => {
+    test.setTimeout(180_000);
+    const first = uniqueEmail("gps-signout");
+    await signUpAndConfirm(page, first);
+    await completeOnboarding(page);
+    await context.grantPermissions(["geolocation"]);
+    await context.setGeolocation({ latitude: LAT0, longitude: LNG0, accuracy: 5 });
+    await page.goto("/run/record?kind=walk");
+    await page.getByTestId("gps-start").click();
+    await expect(page.getByTestId("gps-recording")).toBeVisible();
+    await moveNorth(context, page, 0, 8, 3);
+    // The recording is kept on the device while it runs (so a crash or reload can continue it).
+    const keysWhileRecording = await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("run.recording.")));
+    expect(keysWhileRecording).toHaveLength(1);
+
+    // Sign out from the profile page while the walk is still recording.
+    await page.goto("/profile");
+    await page.locator("main").getByRole("button", { name: "Sign out" }).click();
+    await page.waitForURL(/\/login/);
+    await expect(page.getByRole("heading", { name: /Sign in|Welcome back/ })).toBeVisible();
+    expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("run.recording.") || k.startsWith("ngf.draft.")))).toEqual([]);
+
+    // Another member on the same device: nothing of the first member's walk is offered or readable.
+    const second = uniqueEmail("gps-next");
+    await signUpAndConfirm(page, second);
+    await completeOnboarding(page);
+    await page.goto("/run/record?kind=walk");
+    await expect(page.getByTestId("gps-start")).toBeVisible();
+    await expect(page.getByText(/You have an unfinished/)).toHaveCount(0);
+    expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("run.recording.")))).toEqual([]);
+  });
+
+  test("a reload while signed in offers to continue the same member's walk", async ({ page, context }) => {
+    test.setTimeout(120_000);
+    await signUpAndConfirm(page, uniqueEmail("gps-reload"));
+    await completeOnboarding(page);
+    await context.grantPermissions(["geolocation"]);
+    await context.setGeolocation({ latitude: LAT0, longitude: LNG0, accuracy: 5 });
+    await page.goto("/run/record?kind=walk");
+    await page.getByTestId("gps-start").click();
+    await expect(page.getByTestId("gps-recording")).toBeVisible();
+    await moveNorth(context, page, 0, 8, 3);
+    await page.reload();
+    await expect(page.getByText(/You have an unfinished walk/)).toBeVisible();
+    await page.getByRole("button", { name: "Continue recording" }).click();
+    await expect(page.getByTestId("gps-recording")).toBeVisible();
+    await page.getByRole("button", { name: "Discard recording" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Discard" }).click();
+    expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("run.recording.")))).toEqual([]);
+  });
 });

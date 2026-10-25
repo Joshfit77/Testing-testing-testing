@@ -134,6 +134,25 @@ describe.skipIf(!available)("activities: RLS, constraints and duplicate guards",
     expect(hard).toHaveLength(1);
   });
 
+  it("a deleted GPS run can't keep its route: the delete must strip route, splits and signal data", async () => {
+    const id = randomUUID();
+    const route = { type: "MultiLineString", coordinates: [[[-75.0, 40.0], [-75.0, 40.001]]] };
+    const { error: ins } = await alice.client
+      .from("activities")
+      .insert({ id, ...base(alice.id), source: "gps", started_at: "2026-10-07T07:00:00Z", distance_m: 111, elapsed_s: 60, moving_s: 55, route, splits: [], gps_quality: { gaps: 0, rejected: 0, lastAccuracy: 5 } });
+    expect(ins).toBeNull();
+    // Only marking it deleted (what the app did before 2026-10-25) is now refused by the constraint.
+    const kept = await alice.client.from("activities").update({ deleted_at: new Date().toISOString() }).eq("id", id).select("id");
+    expect(kept.error?.message ?? "").toMatch(/activities_deleted_no_route/);
+    // Stripping the location data in the same update (what deleteActivityAction does) is accepted, and the row
+    // then holds no route anywhere a later export could return it.
+    const stripped = await alice.client.from("activities").update({ deleted_at: new Date().toISOString(), route: null, splits: null, gps_quality: null }).eq("id", id).select("id");
+    expect(stripped.error).toBeNull();
+    const { data: row } = await serviceClient().from("activities").select("route, splits, gps_quality, deleted_at").eq("id", id).single();
+    expect(row).toMatchObject({ route: null, splits: null, gps_quality: null });
+    expect(row!.deleted_at).not.toBeNull();
+  });
+
   it("anonymous clients see nothing", async () => {
     const { createClient } = await import("@supabase/supabase-js");
     const anon = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { auth: { persistSession: false } });

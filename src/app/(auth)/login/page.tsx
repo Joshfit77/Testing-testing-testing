@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SignInForm } from "@/components/auth/auth-forms";
+import { DeviceCleanup } from "@/components/platform/device-cleanup";
 import { Notice } from "@/components/common/states";
 import { safeNextPath } from "@/lib/safe-redirect";
 
@@ -22,6 +23,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         </Notice>
       )}
       <div className="mt-6 rounded-2xl border border-border bg-card p-5">
+        <DeviceCleanup />
         <SignInForm next={safeNextPath(sp.next)} />
       </div>
       <p className="mt-6 text-center text-sm text-muted-foreground">

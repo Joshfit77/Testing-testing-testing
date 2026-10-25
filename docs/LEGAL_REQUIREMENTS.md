@@ -27,7 +27,7 @@
   - goals, experience, equipment, schedule, diet style and preferences, units, timezone.
 - **Activity logs:**
   - workouts, sets, personal records;
-  - runs and walks: entered by hand, from a treadmill, or **recorded live with GPS** (`activities.route`: a simplified route of up to 2,000 points, distance, pace, splits and a GPS-quality summary, stored in the member's account and visible only to them). Location is read only during a recording the member started, including while the phone is locked (`UIBackgroundModes: location`); it is never read otherwise and never shared;
+  - runs and walks: entered by hand, from a treadmill, or **recorded live with GPS** (`activities.route`: a simplified route of up to 2,000 points, distance, pace, splits and a GPS-quality summary, stored in the member's account and visible only to them). Location is read only during a recording the member started, including while the phone is locked (`UIBackgroundModes: location`); it is not read otherwise, is stored only at Supabase, and is not passed to any other provider. Deleting a run strips its route (the row keeps distance and time for totals; a migration also strips routes from runs deleted earlier);
   - bodyweight, body measurements;
   - food diary, water, saved meals, recipes, meal plans, grocery lists, supplements.
 - **Progress photos and Body Scan photos (Pro):** optional; stored in private storage visible only to the member (`progress-photos` and `body-scans` buckets, signed URLs). Body Scan also stores optional tape measurements. No photo is analysed by AI and no body-fat estimate is made.

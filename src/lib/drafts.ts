@@ -101,6 +101,31 @@ export function clearAllDrafts(userId?: string): number {
   return doomed.length;
 }
 
+const CLEANUP_KEY = "ngf.cleanup.user";
+
+/**
+ * Remembers (for this tab only) that `userId` is signing out, so the next page can clear anything written to this
+ * device after the sign-out began. See src/components/platform/device-cleanup.tsx.
+ */
+export function markDeviceCleanup(userId: string): void {
+  try {
+    sessionStorage.setItem(CLEANUP_KEY, userId);
+  } catch {
+    /* storage unavailable: the immediate clean-up on sign-out still ran */
+  }
+}
+
+/** The user id left by markDeviceCleanup, removed as it is read; null when there is none. */
+export function takeDeviceCleanup(): string | null {
+  try {
+    const id = sessionStorage.getItem(CLEANUP_KEY);
+    if (id) sessionStorage.removeItem(CLEANUP_KEY);
+    return id || null;
+  } catch {
+    return null;
+  }
+}
+
 /** True when a value holds nothing worth keeping (empty strings, empty arrays, or equal to the blank form). */
 export function isBlankDraft(value: unknown, blank?: unknown): boolean {
   if (blank !== undefined && JSON.stringify(value) === JSON.stringify(blank)) return true;
