@@ -209,7 +209,8 @@ test.describe("live GPS runs and walks", () => {
     await page.locator("main").getByRole("button", { name: "Sign out" }).click();
     await page.waitForURL(/\/login/);
     await expect(page.getByRole("heading", { name: /Sign in|Welcome back/ })).toBeVisible();
-    expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("run.recording.") || k.startsWith("ngf.draft.")))).toEqual([]);
+    // The login page finishes the clean-up once it has mounted (the recorder may have written once more on the way out).
+    await expect.poll(() => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("run.recording.") || k.startsWith("ngf.draft.")))).toEqual([]);
 
     // Another member on the same device: nothing of the first member's walk is offered or readable.
     const second = uniqueEmail("gps-next");
@@ -235,6 +236,8 @@ test.describe("live GPS runs and walks", () => {
     await expect(page.getByText(/You have an unfinished walk/)).toBeVisible();
     await page.getByRole("button", { name: "Continue recording" }).click();
     await expect(page.getByTestId("gps-recording")).toBeVisible();
+    // Discard is offered while paused.
+    await page.getByRole("button", { name: "Pause" }).click();
     await page.getByRole("button", { name: "Discard recording" }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Discard" }).click();
     expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("run.recording.")))).toEqual([]);

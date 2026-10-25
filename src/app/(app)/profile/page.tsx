@@ -9,6 +9,7 @@ import { getPlans } from "@/lib/domain/plans";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { signOutAction } from "@/server/actions/auth";
+import { SignOutForm } from "@/components/shell/sign-out-form";
 
 export const metadata = { title: "Profile & Settings" };
 
@@ -137,11 +138,11 @@ export default async function ProfilePage() {
         </div>
       </section>
 
-      <form action={signOutAction}>
+      <SignOutForm action={signOutAction} userId={user.id}>
         <Button type="submit" variant="secondary" className="w-full">
           <LogOut aria-hidden /> Sign out
         </Button>
-      </form>
+      </SignOutForm>
     </div>
   );
 }
