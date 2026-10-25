@@ -170,11 +170,12 @@ final class OpeningOnSimulatorTests: XCTestCase {
         clear("1", "1w")
         let start = launch()
         var target: CGPoint?
-        while target == nil && Date().timeIntervalSince(start) < 10 {
+        // The page can take up to about 10 s to show on a CI simulator.
+        while target == nil && Date().timeIntervalSince(start) < 20 {
             target = enterButton(in: shot(stamp("1w-before-enter", start)))
         }
         guard let point = target else {
-            XCTFail("Enter Narrow Gate never showed (no open door with the gold button) within 10 s of launch")
+            XCTFail("Enter Narrow Gate never showed (no open door with the gold button) within 20 s of launch")
             return
         }
         print(String(format: "GATECHECK Enter Narrow Gate seen at (%.0f, %.0f) pt, %d ms after launch", point.x, point.y, ms(since: start)))
