@@ -112,11 +112,15 @@ WebKit can go over a second without drawing a frame. The opening itself is untou
 those delays:
 
 - Enter Narrow Gate rises in 2.15 s into the opening, the opening moves on by itself at 3.85 s and is gone at
-  5.05 s. The Simulator test does not wait to see the risen button in a screenshot (that put the tap after the
-  window on a slow machine); it films until the opening's first frame, then sends the tap 2.0 s after that frame
-  was taken, at the button's place from any frame that showed it (the fresh launch's film, usually). The first
-  frame after the press must show the door open with its light, then the light must fill the screen, then the
-  welcome page: a tap that lands after the opening moved on by itself fails the test, and XCTest retries it.
+  5.05 s. The Simulator test does not wait for a screenshot to show the risen button (that put the tap after the
+  window on a slow machine): it films the launch until the opening is on screen, then polls the accessibility tree
+  for the button (a fraction of a second per query, even there) and presses the moment it appears, at the place the
+  fresh launch's film showed it. The frame right after the press must show the door open with its light, so a tap
+  that lands after the opening moved on by itself fails and XCTest retries it; then the opening must end and the
+  welcome page appear. The light itself fills the screen for about half a second after the press: when a
+  screenshot takes under a second the test requires a frame of it, and when the machine is slower than that it
+  cannot film it and says so in the log (a `::warning::` line and the CHECK verdict), rather than guess either
+  way; the move is checked frame by frame in WebKit.
 - The WebKit test films the move into the light from inside the page, frame by frame from the press itself, so
   slow round trips between Playwright and the browser cannot miss the 0.9 s push; it still requires the scene to
   grow past 2.5x and the light to fill the screen. When the machine draws no frame before the opening's own 1.5 s

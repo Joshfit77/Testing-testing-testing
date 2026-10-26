@@ -144,6 +144,7 @@ jobs:
           print("Simulator:", best[0][2], "iOS", ".".join(map(str, best[0][0])), file=sys.stderr)
           ')
           echo "UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl list devices available | grep -E "^[[:space:]]+iPhone" | sed 's/^ *//' | cut -d'(' -f1 | sort -u | tr '\n' ',' | sed 's/,$/\n/' | sed 's/^/iPhones available here: /' | tee -a "$RUNNER_TEMP/machine.log"
           xcrun simctl boot "$UDID" || true
           xcrun simctl bootstatus "$UDID" -b
           xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 || true
@@ -161,7 +162,8 @@ jobs:
             if [ "${idle:-0}" -ge 50 ]; then quiet=$((quiet + 1)); else quiet=0; fi
             if [ "$quiet" -ge 3 ]; then break; fi
           done
-          if [ "$quiet" -ge 3 ]; then echo "Settled."; else echo "Still busy after about $((i * 2)) s; carrying on."; fi
+          if [ "$quiet" -ge 3 ]; then msg="settled after about $((i * 2)) s (CPU idle ${idle}%)"; else msg="still busy after about $((i * 2)) s (CPU idle ${idle}%); carrying on"; fi
+          echo "$msg"; echo "$(date +%T) Before the warm-up launch: $msg" >> "$RUNNER_TEMP/machine.log"
       - name: Open the app once, so the tests start on a warm simulator
         run: |
           # The first launch after installing takes 30–60+ s to show the page on a CI simulator (a phone that has run
@@ -176,6 +178,7 @@ jobs:
             if [ "$mean" -ge 15 ]; then shown="after about $((i * 2)) s (brightness $mean)"; break; fi
           done
           echo "First launch: the page showed ${shown:-not within 120 s}"
+          echo "$(date +%T) First launch: the page showed ${shown:-not within 120 s}" >> "$RUNNER_TEMP/machine.log"
           sleep 8
           xcrun simctl terminate "$UDID" com.narrowgatefitness.app || true
       - name: Let it settle again after the first launch
@@ -191,7 +194,8 @@ jobs:
             if [ "${idle:-0}" -ge 50 ]; then quiet=$((quiet + 1)); else quiet=0; fi
             if [ "$quiet" -ge 3 ]; then break; fi
           done
-          if [ "$quiet" -ge 3 ]; then echo "Settled."; else echo "Still busy after about $((i * 2)) s; carrying on."; fi
+          if [ "$quiet" -ge 3 ]; then msg="settled after about $((i * 2)) s (CPU idle ${idle}%)"; else msg="still busy after about $((i * 2)) s (CPU idle ${idle}%); carrying on"; fi
+          echo "$msg"; echo "$(date +%T) After the warm-up launch: $msg" >> "$RUNNER_TEMP/machine.log"
       - name: Launch, Enter Narrow Gate, relaunch, return from the background (XCUITest)
         run: |
           brew install xcodegen
@@ -213,6 +217,8 @@ jobs:
           cp "$RUNNER_TEMP/next.log" "$RUNNER_TEMP/xcodebuild-test.log" sim-shots/ 2>/dev/null || true
           [ -x "$RUNNER_TEMP/venv/bin/python" ] || { python3 -m venv "$RUNNER_TEMP/venv" && "$RUNNER_TEMP/venv/bin/pip" install --quiet pillow; }
           grep -A60 "accessibility tree:" "$RUNNER_TEMP/xcodebuild-test.log" | cut -c1-200 | head -130 || true
+          echo "== This machine"; cat "$RUNNER_TEMP/machine.log" 2>/dev/null || true
+          echo "== Tests"
           grep -E "GATECHECK|Test Case .*(passed|failed)|error:|TEST (SUCCEEDED|FAILED)|Executed" "$RUNNER_TEMP/xcodebuild-test.log" | cut -c1-400 || true
           # Ends with one CHECK line per filmed step; fails the job if the opening didn't play as it should.
           "$RUNNER_TEMP/venv/bin/python" scripts/ios-verify/contact-sheet.py sim-shots

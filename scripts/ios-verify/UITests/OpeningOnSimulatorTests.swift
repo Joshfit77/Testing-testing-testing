@@ -6,9 +6,9 @@ import XCTest
 /// scripts/ios-verify/contact-sheet.py, which checks what each filmed step showed.
 ///
 /// Most of launch()'s time is closing the previous run; the app has only just started when it returns, so filming
-/// from there sees the whole opening. Accessibility queries into the web view take about a second each, too slow for
-/// the two seconds Enter Narrow Gate is on screen, so the button is found in the screenshots (test0's film, or
-/// test1's own) and pressed on a clock that starts with the opening's first frame.
+/// from there sees the whole opening. On a shared CI simulator a screenshot of the animated opening takes 0.3–3 s and
+/// a synthesized tap lands 0.3–1.8 s after it is sent, while an accessibility query takes a fraction of a second: the
+/// moment to press Enter Narrow Gate comes from the accessibility tree, and the place from the screenshots.
 /// Tests run in name order.
 final class OpeningOnSimulatorTests: XCTestCase {
     private let app = XCUIApplication(bundleIdentifier: "com.narrowgatefitness.app")
@@ -168,9 +168,12 @@ final class OpeningOnSimulatorTests: XCTestCase {
         // after the screen first stops being dark (the opening runs 5 s), at most 90 s.
         var changed: Date?
         var sawGate = false
+        var captures: [TimeInterval] = []
         while Date().timeIntervalSince(start) < 90 {
+            let before = Date()
             let s = shot(stamp("0-launch", start))
             if changed == nil, !dark(s) { changed = Date() }
+            if changed != nil { captures.append(Date().timeIntervalSince(before)) }
             if gateOpen(s) {
                 sawGate = true
                 if let p = enterButton(in: s) { Self.enterPoint = p }
@@ -178,6 +181,10 @@ final class OpeningOnSimulatorTests: XCTestCase {
             if let c = changed, Date().timeIntervalSince(c) > 8 { break }
         }
         print("GATECHECK fresh launch: page showed \(changed.map { "\(Int($0.timeIntervalSince(start) * 1000)) ms" } ?? "never") after launch")
+        if !captures.isEmpty {
+            let sorted = captures.sorted()
+            print(String(format: "GATECHECK a screenshot of the opening takes %.1f s here (median of %d; longest %.1f s)", sorted[sorted.count / 2], sorted.count, sorted.last!))
+        }
         if let p = Self.enterPoint { print(String(format: "GATECHECK Enter Narrow Gate is at (%.0f, %.0f) pt", p.x, p.y)) }
         XCTAssertNotNil(changed, "the page never showed within 90 s of launch")
         XCTAssertTrue(sawGate, "the opening (the door open with its light) was not seen on a fresh launch")
@@ -189,51 +196,68 @@ final class OpeningOnSimulatorTests: XCTestCase {
         continueAfterFailure = true
         clear("1", "1w")
         let start = launch()
-        // Enter Narrow Gate rises in 2.15 s into the opening and the opening moves on by itself at 3.85 s (gone at
-        // 5.05 s); on a shared CI simulator a screenshot takes 0.3–2.5 s and a synthesized tap lands 0.3–1.8 s after
-        // it is sent. Waiting to see the risen button in a screenshot before pressing put the tap after the window on
-        // a slow simulator, so instead the press is timed from the opening's first frame: film until the screen is no
-        // longer the launch screen or the blank web view, keep filming while there is time, and send the tap 2.0 s
-        // after that first frame was taken (it lands while the button is rising or has risen). The button's place
-        // comes from any frame that shows it, else from the fresh launch's film (test0), else from the layout.
-        var openingAt: Date?
-        var point: CGPoint?
-        var lastShot: TimeInterval = 0.5
+        let skip = app.buttons["Skip intro"]
+        let enter = app.buttons["Enter Narrow Gate"]
+        // Film the launch (the launch screen and the blank web view: cheap frames) until the opening is on screen:
+        // Skip intro is in the accessibility tree from the opening's first frame. The check comes before each frame
+        // so that no slow screenshot of the animated opening delays what follows.
+        var opened = false
         while Date().timeIntervalSince(start) < 90 {
-            if let at = openingAt, Date().timeIntervalSince(at) + lastShot > 2.0 { break }
-            let before = Date()
+            if skip.exists { opened = true; break }
             let s = shot(stamp("1w-before-enter", start))
-            lastShot = Date().timeIntervalSince(before)
-            if openingAt == nil, !blank(s) { openingAt = before }
-            if openingAt != nil, let p = enterButton(in: s) {
-                point = p
-                Self.enterPoint = p
-                break
-            }
+            if !blank(s) { opened = true; break }
         }
-        guard let openingAt else {
+        guard opened else {
+            shot("1-no-opening", attach: true)
             XCTFail("the opening never started: the launch screen or a blank page for 90 s after launch")
             return
         }
-        if point == nil {
-            let wait = 2.0 - Date().timeIntervalSince(openingAt)
-            if wait > 0 { Thread.sleep(forTimeInterval: wait) }
+        let openingSeen = Date()
+        // Enter Narrow Gate is hidden until it rises in at 2.15 s, then joins the accessibility tree: poll for it
+        // closely and press at once (the opening moves on by itself at 3.85 s and is gone at 5.05 s), where the
+        // fresh launch's film showed the button, else where the accessibility tree puts it, else the layout's place.
+        var found = false
+        while Date().timeIntervalSince(openingSeen) < 15 {
+            if enter.exists { found = true; break }
+            Thread.sleep(forTimeInterval: 0.1)
+        }
+        guard found else {
+            shot("1-no-enter", attach: true)
+            XCTFail("Enter Narrow Gate never appeared within 15 s of the opening")
+            return
+        }
+        let appeared = Date()
+        var source = "where the fresh launch showed it"
+        var target = Self.enterPoint
+        if target == nil {
+            let f = enter.frame
+            if f.width > 0 { target = CGPoint(x: f.midX, y: f.midY); source = "where the accessibility tree puts it" }
         }
         let screen = UIScreen.main.bounds.size
-        let target = point ?? Self.enterPoint ?? CGPoint(x: screen.width / 2, y: screen.height * 0.912)
-        let source = point != nil ? "seen in this film" : Self.enterPoint != nil ? "where the fresh launch showed it" : "the layout's usual place"
-        print(String(format: "GATECHECK pressing Enter Narrow Gate at (%.0f, %.0f) pt (%@), %d ms after launch, %.1f s after the opening's first frame",
-                     target.x, target.y, source, ms(since: start), Date().timeIntervalSince(openingAt)))
-        app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: target.x, dy: target.y)).tap()
+        let point = target ?? CGPoint(x: screen.width / 2, y: screen.height * 0.912)
+        if target == nil { source = "the layout's usual place" }
+        print(String(format: "GATECHECK pressing Enter Narrow Gate at (%.0f, %.0f) pt (%@), %d ms after launch, %.1f s after the opening was first seen",
+                     point.x, point.y, source, ms(since: start), appeared.timeIntervalSince(openingSeen)))
+        app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: point.x, dy: point.y)).tap()
         let tap = Date()
-        print("GATECHECK tapped it \(ms(since: start)) ms after launch, \(String(format: "%.1f", tap.timeIntervalSince(openingAt))) s after the opening's first frame")
-        // Right after the press the door is open with its light (and the move has just begun): the tap landed while
-        // the button was there, not before the door opened and not after the opening moved on by itself.
+        print(String(format: "GATECHECK tapped it %d ms after launch; the tap took %.1f s to land", ms(since: start), tap.timeIntervalSince(appeared)))
+        // The frame right after the press: the door open with its light (the move has just begun), so the tap landed
+        // while the button was there, not before the door opened and not after the opening moved on by itself.
         let first = shot(stamp("1-enter", tap))
+        let capture = Date().timeIntervalSince(tap)
         XCTAssertTrue(gateOpen(first), "the door was not open with its light when Enter was pressed (the tap landed before the door opened, or after the opening moved on)")
         var light = inTheLight(first)
         while Date().timeIntervalSince(tap) < 2.4 { if inTheLight(shot(stamp("1-enter", tap))) { light = true } }
-        XCTAssertTrue(light, "no move into the light after the tap")
+        // The light fills the screen for about half a second (from 0.55 s to 1.05 s after the press): a machine whose
+        // screenshots take longer than that cannot film it, and says so instead of guessing either way. The press
+        // itself, the door open at the press, the opening ending and the welcome page are still checked.
+        if capture <= 1.0 {
+            XCTAssertTrue(light, String(format: "no move into the light after the tap (a screenshot takes %.1f s here, quick enough to film it)", capture))
+        } else {
+            let note = String(format: "the move into the light could not be filmed here: a screenshot of the opening takes %.1f s (it needs under 1.0 s to catch the half second of light); it is checked frame by frame in WebKit", capture)
+            print("GATECHECK \(note)")
+            try? note.write(to: shotsDir.appendingPathComponent("1-nolight.txt"), atomically: true, encoding: .utf8)
+        }
         XCTAssertFalse(app.buttons["Skip intro"].exists, "the opening is still showing 2.4 s after Enter")
         XCTAssertTrue(labelled("Start free").waitForExistence(timeout: 5), "the welcome page did not appear after Enter")
         shot("1-enter-final", attach: true)
