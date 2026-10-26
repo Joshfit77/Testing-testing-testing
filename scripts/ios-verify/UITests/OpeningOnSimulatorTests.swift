@@ -270,6 +270,11 @@ final class OpeningOnSimulatorTests: XCTestCase {
         let changed = all.first(where: { !dark($0) })
         var sawGate = false
         var opening: [Frame] = []
+        // The last frame before the opening counts too: the capture that straddles the opening's first paint is
+        // the one that stalls, and the gap into the first frame of the opening measures it.
+        if let last = all.last(where: { blank($0) || (dark($0) && doorway($0) > 6) }), let i = all.firstIndex(where: { $0.at == last.at }), i + 1 < all.count {
+            opening.append(last)
+        }
         for f in all.drop(while: { blank($0) || (dark($0) && doorway($0) > 6) }) {
             opening.append(f)
             if gateOpen(f) {
@@ -294,11 +299,12 @@ final class OpeningOnSimulatorTests: XCTestCase {
         let shown = changed.map { "\(Int($0.at.timeIntervalSince(start) * 1000)) ms" } ?? "never"
         let dom = domReady.map { "\(Int($0.timeIntervalSince(start) * 1000)) ms" } ?? "never"
         print("GATECHECK fresh launch: page showed \(shown) after launch; Skip intro was in the accessibility tree \(dom) after launch")
-        if !opening.isEmpty {
-            let capture = median(opening.map(\.capture))
+        let shownFrames = opening.filter { !blank($0) && !(dark($0) && doorway($0) > 6) }
+        if !shownFrames.isEmpty {
+            let capture = median(shownFrames.map(\.capture))
             Self.openingCapture = capture
             print(String(format: "GATECHECK filming the opening here: a screenshot call takes %.1f s (median of %d, longest %.1f s), a frame decoded and saved %.1f s",
-                         capture, opening.count, opening.map(\.capture).max()!, median(opening.map(\.total))))
+                         capture, shownFrames.count, shownFrames.map(\.capture).max()!, median(shownFrames.map(\.total))))
         }
         if let p = Self.enterPoint { print(String(format: "GATECHECK Enter Narrow Gate is at (%.0f, %.0f) pt", p.x, p.y)) }
         XCTAssertNotNil(changed, "the page never showed within 90 s of launch")
