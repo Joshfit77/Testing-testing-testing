@@ -10,16 +10,17 @@ import XCTest
 /// first rendering update), which the film catches to within one cheap frame of the blank page. The accessibility
 /// tree is no use for Enter Narrow Gate (WebKit does not update it for the button's animated visibility), so the
 /// press is timed from that clock and placed where the fresh launch's film showed the button. On a shared CI
-/// simulator a tap lands 0.3–1.8 s after it is sent and a screenshot of the animated opening takes 0.3–3 s, so
-/// each frame is decoded once and the fresh launch measures the machine.
+/// simulator a tap lands 0.3–1.8 s after it is sent, a screenshot call takes 0.2–3 s and decoding one takes up to a
+/// second more, so a film captures at the pace of the call alone and decodes in the background, and the fresh
+/// launch measures the machine.
 /// Tests run in name order.
 final class OpeningOnSimulatorTests: XCTestCase {
     private let app = XCUIApplication(bundleIdentifier: "com.narrowgatefitness.app")
 
     /// Where a screenshot last showed Enter Narrow Gate, in points (test0's film runs before test1).
     nonisolated(unsafe) private static var enterPoint: CGPoint?
-    /// How long one frame of the animated opening takes to film here (capture, decode, measure, save), from test0.
-    nonisolated(unsafe) private static var openingFrame: TimeInterval?
+    /// How long a screenshot call takes while the opening animates here (median), from test0's film.
+    nonisolated(unsafe) private static var openingCapture: TimeInterval?
 
     /// XCUITest waits for the app to be idle (no animations) before and after each tap; the opening animates
     /// throughout, so on a slow CI simulator that wait put the tap seconds after Enter Narrow Gate was found, after
@@ -45,41 +46,96 @@ final class OpeningOnSimulatorTests: XCTestCase {
         return dir
     }()
 
+    override func setUp() {
+        super.setUp()
+        _ = shotsDir
+    }
+
     private func ms(since start: Date) -> Int { Int(Date().timeIntervalSince(start) * 1000) }
 
     /// One filmed frame: a 134-pixel-wide RGBA copy for measurements (made from the 402 px JPEG saved for the
-    /// contact sheet, so the screenshot is decoded once), the screen size in points, and what the frame cost.
+    /// contact sheet, so the screenshot is decoded once), the screen size in points, when the capture began and
+    /// what it cost (the call, and the whole frame).
     private struct Frame {
         let px: [UInt8]
         let w: Int
         let h: Int
         let size: CGSize
+        let at: Date
         let capture: TimeInterval
         let total: TimeInterval
     }
 
-    /// Takes a screenshot, saves it 402 px wide (JPEG) and measures it; `attach` also keeps the full one in the test
-    /// result (slow on a busy simulator, so the timed frames of a film are not attached).
-    @discardableResult
-    private func shot(_ name: String, attach: Bool = false) -> Frame {
-        let began = Date()
-        let screenshot = XCUIScreen.main.screenshot()
-        let capture = Date().timeIntervalSince(began)
+    // A film: captures on the test's thread at the pace of the screenshot call, decoded and saved on this queue.
+    private let filmQueue = DispatchQueue(label: "gatecheck.film", qos: .userInitiated)
+    private let filmGroup = DispatchGroup()
+    private let filmLock = NSLock()
+    private var filmed: [Frame] = []
+
+    /// Decodes a screenshot once: saves it 402 px wide (JPEG) and measures it.
+    private func process(_ screenshot: XCUIScreenshot, name: String, began: Date, capture: TimeInterval) -> Frame {
         let image = screenshot.image
         let points = image.size
         let size = CGSize(width: 402, height: (402 * points.height / points.width).rounded())
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
-        let small = UIGraphicsImageRenderer(size: size, format: format).image { _ in image.draw(in: CGRect(origin: .zero, size: size)) }
+        let small = UIGraphicsImageRenderer(size: size, format: format).image { ctx in
+            ctx.cgContext.interpolationQuality = .low
+            image.draw(in: CGRect(origin: .zero, size: size))
+        }
         try? small.jpegData(compressionQuality: 0.85)?.write(to: shotsDir.appendingPathComponent("\(name).jpg"))
+        let (px, w, h) = pixels(small)
+        return Frame(px: px, w: w, h: h, size: points, at: began, capture: capture, total: Date().timeIntervalSince(began))
+    }
+
+    /// Takes a screenshot and processes it here and now; `attach` also keeps the full one in the test result.
+    @discardableResult
+    private func shot(_ name: String, attach: Bool = false) -> Frame {
+        let began = Date()
+        let screenshot = XCUIScreen.main.screenshot()
+        let capture = Date().timeIntervalSince(began)
         if attach {
             let attachment = XCTAttachment(screenshot: screenshot)
             attachment.name = name
             attachment.lifetime = .keepAlways
             add(attachment)
         }
-        let (px, w, h) = pixels(small)
-        return Frame(px: px, w: w, h: h, size: points, capture: capture, total: Date().timeIntervalSince(began))
+        return process(screenshot, name: name, began: began, capture: capture)
+    }
+
+    /// Takes a screenshot now and processes it in the background; `frames()` collects the film in capture order.
+    @discardableResult
+    private func film(_ name: String) -> (at: Date, capture: TimeInterval) {
+        let began = Date()
+        let screenshot = XCUIScreen.main.screenshot()
+        let capture = Date().timeIntervalSince(began)
+        filmQueue.async(group: filmGroup) { [self] in
+            let frame = process(screenshot, name: name, began: began, capture: capture)
+            filmLock.lock()
+            filmed.append(frame)
+            filmLock.unlock()
+        }
+        return (began, capture)
+    }
+
+    /// The frames processed so far, without waiting.
+    private func peek() -> [Frame] {
+        filmLock.lock()
+        defer { filmLock.unlock() }
+        return filmed
+    }
+
+    /// Waits for the film to be processed and returns it, in capture order.
+    private func frames() -> [Frame] {
+        filmGroup.wait()
+        return peek()
+    }
+
+    private func resetFilm() {
+        filmGroup.wait()
+        filmLock.lock()
+        filmed = []
+        filmLock.unlock()
     }
 
     private func stamp(_ step: String, _ start: Date) -> String { String(format: "%@-%05d", step, ms(since: start)) }
@@ -104,6 +160,7 @@ final class OpeningOnSimulatorTests: XCTestCase {
         px.withUnsafeMutableBytes { buffer in
             guard let ctx = CGContext(data: buffer.baseAddress, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
                                       space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return }
+            ctx.interpolationQuality = .low
             ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
         }
         return (px, w, h)
@@ -149,11 +206,15 @@ final class OpeningOnSimulatorTests: XCTestCase {
         return brightness(f) < 40 && d > 60 && d < 120
     }
 
-    /// Removes this step's screenshots and notes from an earlier attempt (Xcode retries a failed test).
+    /// Moves this step's screenshots and notes from an earlier attempt (Xcode retries a failed test) into
+    /// earlier-attempts/, where the contact sheet ignores them but the artifact keeps them.
     private func clear(_ prefixes: String...) {
         let files = (try? FileManager.default.contentsOfDirectory(atPath: shotsDir.path)) ?? []
+        let keep = shotsDir.appendingPathComponent("earlier-attempts", isDirectory: true)
+        let tag = Int(Date().timeIntervalSince1970) % 100_000
         for f in files where prefixes.contains(where: { f.hasPrefix($0 + "-") }) {
-            try? FileManager.default.removeItem(at: shotsDir.appendingPathComponent(f))
+            try? FileManager.default.createDirectory(at: keep, withIntermediateDirectories: true)
+            try? FileManager.default.moveItem(at: shotsDir.appendingPathComponent(f), to: keep.appendingPathComponent("\(tag)-\(f)"))
         }
     }
 
@@ -179,39 +240,48 @@ final class OpeningOnSimulatorTests: XCTestCase {
         return CGPoint(x: x, y: y)
     }
 
+    private func median(_ values: [TimeInterval]) -> TimeInterval {
+        let sorted = values.sorted()
+        return sorted.isEmpty ? 0 : sorted[sorted.count / 2]
+    }
+
     func test0_freshLaunchPlaysTheOpeningAndEndsByItself() throws {
         clear("0")
+        resetFilm()
         let start = launch()
         let skip = app.buttons["Skip intro"]
         // The page can take a few seconds to show on a CI simulator (over a minute on a slow one): film until 8 s
-        // after the screen first stops being dark (the opening runs 5 s), at most 90 s. The frames of the opening
-        // itself (from the first that is not dark to the welcome page) time how fast this machine can film it.
+        // after the screen first stops being dark (the opening runs 5 s), at most 90 s. Frames are decoded in the
+        // background, so the film runs at the pace of the screenshot call; the frames of the opening itself (from
+        // the first that is not dark to the welcome page) time how fast this machine can film it.
         var domReady: Date?
-        var changed: Date?
-        var sawGate = false
-        var ended = false
-        var opening: [Frame] = []
+        var firstShown: Date?
         while Date().timeIntervalSince(start) < 90 {
             if domReady == nil, skip.exists { domReady = Date() }
-            let f = shot(stamp("0-launch", start))
-            if changed == nil, !dark(f) { changed = Date() }
-            if changed != nil, !ended { opening.append(f) }
+            film(stamp("0-launch", start))
+            if firstShown == nil, let f = peek().first(where: { !dark($0) }) { firstShown = f.at }
+            if let shown = firstShown, Date().timeIntervalSince(shown) > 8 { break }
+        }
+        let all = frames()
+        let changed = all.first(where: { !dark($0) })
+        var sawGate = false
+        var opening: [Frame] = []
+        for f in all.drop(while: { dark($0) }) {
+            opening.append(f)
             if gateOpen(f) {
                 sawGate = true
                 if let p = enterButton(in: f) { Self.enterPoint = p }
             }
-            if sawGate, welcome(f) { ended = true }
-            if let c = changed, Date().timeIntervalSince(c) > 8 { break }
+            if sawGate, welcome(f) { break }
         }
-        let shown = changed.map { "\(Int($0.timeIntervalSince(start) * 1000)) ms" } ?? "never"
+        let shown = changed.map { "\(Int($0.at.timeIntervalSince(start) * 1000)) ms" } ?? "never"
         let dom = domReady.map { "\(Int($0.timeIntervalSince(start) * 1000)) ms" } ?? "never"
         print("GATECHECK fresh launch: page showed \(shown) after launch; Skip intro was in the accessibility tree \(dom) after launch")
         if !opening.isEmpty {
-            let totals = opening.map(\.total).sorted()
-            let captures = opening.map(\.capture).sorted()
-            Self.openingFrame = totals[totals.count / 2]
-            print(String(format: "GATECHECK a frame of the opening takes %.1f s to film here (median of %d; the screenshot itself %.1f s; longest frame %.1f s)",
-                         totals[totals.count / 2], totals.count, captures[captures.count / 2], totals.last!))
+            let capture = median(opening.map(\.capture))
+            Self.openingCapture = capture
+            print(String(format: "GATECHECK filming the opening here: a screenshot call takes %.1f s (median of %d, longest %.1f s), a frame decoded and saved %.1f s",
+                         capture, opening.count, opening.map(\.capture).max()!, median(opening.map(\.total))))
         }
         if let p = Self.enterPoint { print(String(format: "GATECHECK Enter Narrow Gate is at (%.0f, %.0f) pt", p.x, p.y)) }
         XCTAssertNotNil(changed, "the page never showed within 90 s of launch")
@@ -223,12 +293,13 @@ final class OpeningOnSimulatorTests: XCTestCase {
     func test1_enterNarrowGateMovesIntoTheLightAndOpensTheApp() throws {
         continueAfterFailure = true
         clear("1", "1w")
-        // The light fills the screen for about half a second after the press (from 0.4 s to 1.05 s): a machine that
-        // needs longer than that for one frame cannot film it, so the check is skipped there and says so, rather
+        resetFilm()
+        // The light fills the screen for about half a second after the press (from 0.4 s to 1.05 s): a machine whose
+        // screenshot calls take longer than that cannot film it, so the check is skipped there and says so, rather
         // than failing on the machine or passing on nothing. The fresh launch has still filmed the opening, and the
         // move into the light is checked frame by frame in WebKit.
-        if let t = Self.openingFrame, t > 0.9 {
-            let reason = String(format: "Enter Narrow Gate not checked here: a frame of the opening takes %.1f s to film on this simulator (over 0.9 s), too slow to catch the half second of light after the press; the fresh launch filmed the opening, and the move into the light is checked frame by frame in WebKit", t)
+        if let t = Self.openingCapture, t > 0.9 {
+            let reason = String(format: "Enter Narrow Gate not checked here: a screenshot call takes %.1f s while the opening animates on this simulator (over 0.9 s), too slow to catch the half second of light after the press; the fresh launch filmed the opening, and the move into the light is checked frame by frame in WebKit", t)
             try? reason.write(to: shotsDir.appendingPathComponent("1-skipped.txt"), atomically: true, encoding: .utf8)
             print("GATECHECK \(reason)")
             throw XCTSkip(reason)
@@ -237,20 +308,29 @@ final class OpeningOnSimulatorTests: XCTestCase {
         let skip = app.buttons["Skip intro"]
         // Enter Narrow Gate rises in at 2.15 s of the opening, the opening moves on by itself at 3.85 s and is gone
         // at 5.05 s. Film the launch (cheap frames of the launch screen and the blank web view) until the opening's
-        // first painted frame, keep filming while there is time, and send the tap 2.3 s after that frame was taken:
-        // it lands 0.3–1.8 s later, while the button is there. Should a frame show the risen button first, press at
-        // once. The place comes from that frame, else from the fresh launch's film, else from the layout.
+        // first painted frame, keep filming while there is time, and send the tap 2.3 s after that frame: it lands
+        // 0.3–1.8 s later, while the button is there. The first paint is the first frame that is not blank, or a
+        // blank capture that stalled (over a second, once the page is in the accessibility tree): the simulator is
+        // busy painting the opening's first frames just then, and the capture returns what it grabbed before them.
+        // Should a frame show the risen button first, press at once. The place comes from that frame, else from the
+        // fresh launch's film, else from the layout.
         var domReady: Date?
         var paintedAt: Date?
         var point: CGPoint?
         var lastFrame: TimeInterval = 0.3
         while Date().timeIntervalSince(start) < 90 {
-            if let at = paintedAt, Date().timeIntervalSince(at) + max(lastFrame, Self.openingFrame ?? 0) > 2.3 { break }
+            if let at = paintedAt, Date().timeIntervalSince(at) + lastFrame > 2.3 { break }
             if domReady == nil, skip.exists { domReady = Date() }
-            let began = Date()
             let f = shot(stamp("1w-before-enter", start))
             lastFrame = f.total
-            if paintedAt == nil, !blank(f) { paintedAt = began }
+            if paintedAt == nil {
+                if !blank(f) {
+                    paintedAt = f.at
+                } else if domReady != nil, f.capture > 1.0 {
+                    paintedAt = f.at.addingTimeInterval(0.2)
+                    print(String(format: "GATECHECK a blank capture stalled for %.1f s once the page was there: taking the opening's first paint as its start", f.capture))
+                }
+            }
             if paintedAt != nil, let p = enterButton(in: f) {
                 point = p
                 Self.enterPoint = p
@@ -275,21 +355,20 @@ final class OpeningOnSimulatorTests: XCTestCase {
         app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: target.x, dy: target.y)).tap()
         let tap = Date()
         print(String(format: "GATECHECK tapped it %d ms after launch, %.1f s after the opening's first frame", ms(since: start), tap.timeIntervalSince(paintedAt)))
+        // Film the 2.4 s after the press at the pace of the screenshot call (frames are decoded in the background).
+        resetFilm()
+        var captures: [TimeInterval] = []
+        while Date().timeIntervalSince(tap) < 2.4 { captures.append(film(stamp("1-enter", tap)).capture) }
+        let after = frames()
         // The frame right after the press: the door open with its light (the move has just begun), so the tap landed
         // while the button was there, not before the door opened and not after the opening moved on by itself.
-        let first = shot(stamp("1-enter", tap))
-        XCTAssertTrue(gateOpen(first), "the door was not open with its light when Enter was pressed (the tap landed before the door opened, or after the opening moved on)")
-        var light = inTheLight(first)
-        var slowest = first.total
-        while Date().timeIntervalSince(tap) < 2.4 {
-            let f = shot(stamp("1-enter", tap))
-            slowest = max(slowest, f.total)
-            if inTheLight(f) { light = true }
-        }
+        XCTAssertTrue(after.first.map { gateOpen($0) } ?? false, "the door was not open with its light when Enter was pressed (the tap landed before the door opened, or after the opening moved on)")
+        let light = after.contains { inTheLight($0) }
+        let slowest = captures.max() ?? 0
         if slowest <= 1.0 {
-            XCTAssertTrue(light, String(format: "no move into the light after the tap (a frame took at most %.1f s here, quick enough to film it)", slowest))
+            XCTAssertTrue(light, String(format: "no move into the light after the tap (a screenshot call took at most %.1f s here, quick enough to film it)", slowest))
         } else {
-            let note = String(format: "the move into the light could not be filmed after this press: a frame took %.1f s (it needs under 1.0 s to catch the half second of light); it is checked frame by frame in WebKit", slowest)
+            let note = String(format: "the move into the light could not be filmed after this press: a screenshot call took %.1f s (it needs under 1.0 s to catch the half second of light); it is checked frame by frame in WebKit", slowest)
             print("GATECHECK \(note)")
             try? note.write(to: shotsDir.appendingPathComponent("1-nolight.txt"), atomically: true, encoding: .utf8)
         }
