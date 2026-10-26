@@ -13,6 +13,7 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { isServiceRoleConfigured, isStripeConfigured } from "@/server/env";
 import { getNativePlatform } from "@/server/native";
+import { isDemoMode } from "@/server/demo";
 import { getAiAllowance } from "@/server/services/ai-coach";
 import { intervalForPriceId, stripePriceProblems, stripeProPrices } from "@/server/services/billing";
 import { legalLinks, storeProductIds, storePublicKey } from "@/server/services/store-billing";
@@ -67,7 +68,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   const periodEnd = storeSub?.current_period_end ?? (stripeActive ? (sub?.current_period_end as string | null) : null) ?? (source === "admin" ? (entRes.data?.valid_until as string | null) : null);
   const cancelling = storeSub ? storeSub.cancel_at_period_end : stripeActive ? Boolean(sub?.cancel_at_period_end) : false;
   const storeName = storeSub?.store === "play_store" ? "Google Play" : "the App Store";
-  const channel = storeSub ? `Billed through ${storeName}` : stripeActive ? "Billed through Stripe on our website" : source === "admin" ? "Granted by Narrow Gate Fitness" : null;
+  const channel = storeSub ? `Billed through ${storeName}` : stripeActive ? "Billed through Stripe on our website" : source === "admin" ? (isDemoMode() ? "Demo test membership, no payment" : "Granted by Narrow Gate Fitness") : null;
 
   // Web prices: the amounts Stripe will actually charge. Checkout is offered only for a price that matches the
   // approved price shown on this page.
@@ -89,6 +90,14 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
       </Link>
       <PageHeader eyebrow="Membership" title="Plans & billing" description="Free, or Pro All Access monthly or yearly. Change or cancel any time." />
 
+      {isDemoMode() && (
+        <Notice tone="warning">
+          <span data-testid="demo-purchases-off">
+            <strong>Demo:</strong> purchases are turned off and nothing is charged. The prices below are the real Free and Pro All Access prices; to see
+            Pro features, use the Free / Pro switch at the top of the screen.
+          </span>
+        </Notice>
+      )}
       {checkout === "success" && (
         <Notice tone="success">
           Thank you! Stripe has your payment details. Pro All Access unlocks as soon as Stripe confirms the subscription, usually within seconds. Refresh

@@ -10,6 +10,8 @@ import { getCurrentUser } from "@/server/auth";
 import { ForgetDeviceData } from "@/components/platform/forget-device-data";
 import { TRANSLATION } from "@/data/content";
 import { scriptureText } from "@/data/scripture";
+import { DemoEntry } from "@/components/demo/demo-entry";
+import { isDemoMode } from "@/server/demo";
 
 const GATE_VERSE = scriptureText(
   "Matthew 7:13–14",
@@ -69,6 +71,7 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
                 <Link href="/login">Sign in</Link>
               </Button>
             </div>
+            {isDemoMode() && <DemoEntry className="animate-fade-up mt-6 w-full max-w-sm [animation-delay:160ms]" />}
             <p className="mt-6 max-w-md text-sm text-muted-foreground">
               Premium training programs, precise workout tracking, nutrition and an AI coach, for every athlete, whatever you
               believe. An optional faith and discipline section is there if you want it.

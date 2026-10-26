@@ -10,6 +10,8 @@ import { signOutAction } from "@/server/actions/auth";
 import { getPlans } from "@/lib/domain/plans";
 import { FaithReminderSync } from "@/components/faith/faith-reminders-settings";
 import { getFaithRemindersAction } from "@/server/actions/faith";
+import { DemoBar } from "@/components/demo/demo-bar";
+import { demoAiSimulated, isDemoMode, isDemoUser } from "@/server/demo";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   if (!isSupabaseConfigured()) return <SetupRequired />;
@@ -32,6 +34,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <KeyboardAvoidance />
       {/* Stage 2C: in the iPhone/Android app, apply the account's faith reminders on this device. */}
       <FaithReminderSync load={getFaithRemindersAction} />
+      {isDemoMode() && <DemoBar plan={plan} canSwitch={isDemoUser(user)} aiSimulated={demoAiSimulated()} />}
       <DraftUserProvider userId={user.id}>{children}</DraftUserProvider>
     </AppShell>
   );

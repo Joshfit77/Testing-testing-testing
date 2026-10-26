@@ -34,6 +34,7 @@ import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { logError } from "@/server/log";
 import { getRunningSleepSession, getSleepCheckin, listSleepSessions } from "@/server/services/sleep";
 import type { SleepCheckin } from "@/lib/domain/sleep-checkins";
+import { DemoNote } from "@/components/demo/demo-note";
 
 const SAVED_TEXT: Record<string, string> = { "1": "Sleep saved.", checkin: "Check-in saved.", cleared: "Check-in cleared." };
 
@@ -138,6 +139,7 @@ export default async function SleepPage({ searchParams }: { searchParams: Promis
   return (
     <div className="space-y-6">
       <BackLink href="/progress">My Progress</BackLink>
+      <DemoNote topic="sleep" />
       <PageHeader
         eyebrow="My Progress"
         title="Sleep & Recovery"

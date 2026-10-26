@@ -8,6 +8,7 @@ import { addDays, isoDateInTz } from "@/lib/domain/dates";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { listBodyScans, loadBodyTrends } from "@/server/services/body-scan";
+import { DemoNote } from "@/components/demo/demo-note";
 
 export const metadata = { title: "Body Scan" };
 
@@ -33,6 +34,7 @@ export default async function BodyScanPage({ searchParams }: { searchParams: Pro
     return (
       <div className="mx-auto max-w-3xl space-y-5">
         <BackLink href="/progress">My Progress</BackLink>
+        <DemoNote topic="bodyScan" />
         <PageHeader eyebrow="My Progress" title="Body Scan" description="New scans are included with Pro. Your saved scans stay here for you to view, export or delete." />
         <BodyScanDashboard scans={scans} trends={trends} units={units} savedId={null} canScan={false} />
       </div>
@@ -43,6 +45,7 @@ export default async function BodyScanPage({ searchParams }: { searchParams: Pro
     return (
       <div className="mx-auto max-w-3xl space-y-5">
         <BackLink href="/progress">My Progress</BackLink>
+        <DemoNote topic="bodyScan" />
         <PageHeader eyebrow="My Progress" title="Body Scan" description={DESCRIPTION} />
         <BodyScanConsentCard />
       </div>
@@ -53,6 +56,7 @@ export default async function BodyScanPage({ searchParams }: { searchParams: Pro
   return (
     <div className="mx-auto max-w-3xl space-y-5">
       <BackLink href="/progress">My Progress</BackLink>
+      <DemoNote topic="bodyScan" />
       <PageHeader eyebrow="My Progress" title="Body Scan" description={DESCRIPTION} />
       <BodyScanDashboard scans={scans} trends={trends} units={units} savedId={saved ?? null} canScan />
     </div>

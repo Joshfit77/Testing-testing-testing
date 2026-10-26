@@ -297,7 +297,7 @@ export default async function ProgramsPage({ searchParams }: { searchParams: Pro
                             <p className="text-xs font-semibold text-gold">{p.categoryName ?? "Program"}</p>
                             {locked ? (
                               <Badge>
-                                <Lock className="size-3" aria-hidden /> {titleCase(p.tier)}
+                                <Lock className="size-3" aria-hidden /> Pro
                               </Badge>
                             ) : (
                               p.tier === "free" && <Badge variant="success">Free</Badge>

@@ -3,6 +3,8 @@ import { SignInForm } from "@/components/auth/auth-forms";
 import { DeviceCleanup } from "@/components/platform/device-cleanup";
 import { Notice } from "@/components/common/states";
 import { safeNextPath } from "@/lib/safe-redirect";
+import { DemoEntry } from "@/components/demo/demo-entry";
+import { isDemoMode } from "@/server/demo";
 
 export const metadata = { title: "Sign in" };
 
@@ -22,6 +24,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           {sp.notice.slice(0, 200)}
         </Notice>
       )}
+      {isDemoMode() && <DemoEntry className="mt-6" />}
       <div className="mt-6 rounded-2xl border border-border bg-card p-5">
         <DeviceCleanup />
         <SignInForm next={safeNextPath(sp.next)} />

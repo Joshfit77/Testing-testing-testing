@@ -22,6 +22,8 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     launchOptions: existsSync(chromium) ? { executablePath: chromium } : {},
+    // A protected Vercel preview (the demo-preview workflow) is reached with its automation bypass secret.
+    ...(process.env.E2E_VERCEL_BYPASS ? { extraHTTPHeaders: { "x-vercel-protection-bypass": process.env.E2E_VERCEL_BYPASS, "x-vercel-set-bypass-cookie": "true" } } : {}),
   },
   projects: [
     { name: "mobile", use: { ...devices["Pixel 7"], browserName: "chromium" } },

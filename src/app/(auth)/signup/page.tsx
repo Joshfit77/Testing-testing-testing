@@ -2,6 +2,8 @@ import Link from "next/link";
 import { SignUpForm } from "@/components/auth/auth-forms";
 import { TRANSLATION } from "@/data/content";
 import { scriptureText } from "@/data/scripture";
+import { Notice } from "@/components/common/states";
+import { isDemoMode } from "@/server/demo";
 
 const SIGNUP_VERSE = scriptureText("Philippians 4:13", "I can do all things through Christ who gives me strength.");
 
@@ -19,6 +21,15 @@ export default async function SignUpPage({ searchParams }: { searchParams: Promi
         <figcaption className="mt-1 text-xs font-semibold text-gold">Philippians 4:13 ({TRANSLATION.code})</figcaption>
       </figure>
       <p className="mt-2 text-sm text-muted-foreground">Free forever plan. No card required. Next, we&apos;ll ask your weight, age, sex and height to set up your plan.</p>
+      {isDemoMode() && (
+        <Notice tone="info" className="mt-4">
+          This is a demo server, so confirmation emails aren&apos;t delivered. To walk through sign-up and onboarding, use{" "}
+          <Link href="/login" className="font-semibold text-gold-highlight hover:underline">
+            Start as a new member
+          </Link>{" "}
+          on the sign-in screen. The form below still shows exactly what members agree to.
+        </Notice>
+      )}
       <div className="mt-6 rounded-2xl border border-border bg-card p-5">
         <SignUpForm defaultEmail={defaultEmail} />
       </div>
