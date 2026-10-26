@@ -47,7 +47,7 @@ Limitation of the backup change: a member who moves to a new phone signs in agai
 3. Health Connect: connect, allow only the five read types, import steps and sleep with a watch writing to Health Connect, deny vitals and confirm nothing is estimated, delete imports, disconnect.
 4. GPS: permission flow (precise location, notifications), record with the screen off for 20 minutes, pause/resume, signal loss, delete the run, sign out during a run (nothing left for the next member).
 5. Camera: barcode scan, progress photo, Body Scan capture.
-6. Notifications: reminder and sleep alarm with the app in the background.
+6. Notifications: reminder and sleep alarm with the app in the background, with "Alarms & reminders" both allowed and not allowed (Android 14+).
 7. Play Billing sandbox (once products exist).
 8. Backup check: Settings → Google → Backup shows no app data for Narrow Gate Fitness after a backup; a device-to-device transfer does not carry the session.
 
@@ -60,9 +60,11 @@ Limitation of the backup change: a member who moves to a new phone signs in agai
 | New apps and updates target Android 16 (API 36) from 2026-08-31 | `targetSdkVersion = 36`, `compileSdkVersion = 36`, `minSdkVersion = 26` | ✓ |
 | Android App Bundle, signed with an upload key (Play App Signing) | `android-play.yml` builds `bundleRelease`; signs with `ANDROID_UPLOAD_*` secrets when you add them | ✓ workflow; ✗ upload key (yours) |
 | Increasing `versionCode` per upload | Set from the workflow run number | ✓ |
-| 16 KB memory-page support for native libraries | Checked on every bundle build (zip alignment and ELF LOAD alignment of 64-bit `.so` files) | ✓ checked in CI (see `FINAL_TEST_RESULTS.md`) |
+| 16 KB memory-page support for native libraries | Checked on every bundle build: all 16 native libraries zip-aligned, and every 64-bit library's LOAD segments ≥16 KB (ML Kit barcode, CameraX, AndroidX graphics) | ✓ CI run 40326693973 |
 | Health Connect: only the data types used, declared in Play Console's Health apps form | 5 read types (steps, sleep, heart rate, HRV, respiratory rate); 43 others removed | ✓ code; ✗ declaration (yours) |
 | Location: no background location; foreground service for recording | No `ACCESS_BACKGROUND_LOCATION` (the workflow fails if one is merged in); `FOREGROUND_SERVICE_LOCATION` with an ongoing notification | ✓ code; ✗ foreground-service declaration with a short video (yours) |
+| Final merged permissions (CI run 40326693973) | INTERNET, CAMERA, fine/coarse location, FOREGROUND_SERVICE(_LOCATION), POST_NOTIFICATIONS, VIBRATE, RECEIVE_BOOT_COMPLETED, WAKE_LOCK, SCHEDULE_EXACT_ALARM, ACCESS_NETWORK_STATE, BILLING, and the 5 Health Connect reads | ✓ as intended |
+| Exact alarms (sleep smart alarm) | `SCHEDULE_EXACT_ALARM` comes from the notifications plugin; on Android 14+ it's off until the member allows it, so the alarm must fall back gracefully (device test) | ✓ code; ✗ device test |
 | Backups exclude private data | `allowBackup=false` and exclusion rules | ✓ |
 | Account deletion inside the app and from a web link | In-app (Profile › Delete account) and on the website after sign-in | ✓ in app; ✗ give Play the web URL |
 | New personal developer accounts: closed test with ≥12 testers opted in for 14 days before production | — | ✗ yours (organization accounts are reported to be exempt) |
