@@ -152,11 +152,9 @@ test.describe("demo flows", () => {
     await expect(page).toHaveURL(/\/onboarding/);
   });
 
-  test("demo accounts can't reach admin pages or the AI stand-in directly", async ({ page, request }) => {
+  test("demo accounts can't reach admin pages", async ({ page }) => {
     await enterDemo(page);
     await page.goto("/admin");
     await expect(page).not.toHaveURL(/\/admin/);
-    const res = await request.post("/api/demo-ai/v1/messages", { data: { model: "x", messages: [{ role: "user", content: "hi" }] } });
-    expect(res.status()).toBe(401);
   });
 });

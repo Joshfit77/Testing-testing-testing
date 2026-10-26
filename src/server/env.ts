@@ -24,7 +24,8 @@ function storeSecret(raw: string | undefined): string {
 /** Server-only secrets. Never import this module from client components. */
 export const serverEnv = {
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
-  anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? "",
+  // A demo deployment never calls the AI provider, so its key is ignored there (see src/server/demo.ts).
+  anthropicApiKey: process.env.DEMO_MODE === "true" ? "" : (process.env.ANTHROPIC_API_KEY ?? ""),
   stripeSecretKey: stripeSecretKey(process.env.STRIPE_SECRET_KEY),
   stripeWebhookSecret: storeSecret(process.env.STRIPE_WEBHOOK_SECRET),
   /** Pro All Access: $19.99 a month and $149.99 a year (the only prices sold to new customers). */
@@ -56,7 +57,8 @@ export const serverEnv = {
   revenueCatPublicKeyAndroid: process.env.REVENUECAT_PUBLIC_KEY_ANDROID ?? "",
 };
 
-export const isAiConfigured = () => Boolean(serverEnv.anthropicApiKey);
+/** In demo mode AI features run against the scripted stand-in, so they count as configured. */
+export const isAiConfigured = () => Boolean(serverEnv.anthropicApiKey) || process.env.DEMO_MODE === "true";
 /** Web checkout needs the secret key and the Pro All Access monthly price (Plus is no longer sold). */
 export const isStripeConfigured = () => Boolean(serverEnv.stripeSecretKey && serverEnv.stripePricePro);
 /** The Pro All Access yearly Stripe price is configured. */

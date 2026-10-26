@@ -29,7 +29,7 @@ Wi-Fi, open `http://<your computer's IP address>:3000`.
 | Demo bar | On every screen: sample data, purchases off, AI simulated, and a **Free / Pro** switch |
 | Free / Pro switch | Writes a test entitlement on the server (`user_entitlements`, source `admin`). It works only for accounts the server marked as demo accounts (`app_metadata.demo`, which members can't set), and only in demo mode. There is no client-side bypass |
 | Purchases | Stripe and RevenueCat keys are ignored in demo mode, so checkout and store purchases can't start. The membership screen says so |
-| AI | The app's AI calls go to `/api/demo-ai`, a scripted stand-in. Every reply says "Simulated demo reply — written by a script, not an AI model". No AI provider is called and nothing is paid for. The route answers 404 outside demo mode |
+| AI | Answered inside the server by a scripted stand-in (`src/lib/demo/simulated-ai.ts`). Every reply says "Simulated demo reply — written by a script, not an AI model". Any AI key is ignored in demo mode, so no AI provider is called and nothing is paid for |
 
 ## Live, simulated, or needs a phone
 
@@ -47,19 +47,51 @@ Wi-Fi, open `http://<your computer's IP address>:3000`.
 | Apple Health / Health Connect imports | **Needs the phone app** on a phone |
 | Barcode camera scanning, notifications, alarms, in-app purchases | **Needs the phone app** |
 
-## Private hosted preview (needs your approval and accounts)
+## Private hosted preview (Vercel, protected)
 
-This repository's cloud environment can't open a public tunnel or reach hosting APIs, so there is no hosted link yet.
-To host the demo privately:
+`.github/workflows/demo-preview.yml` puts the demo online as a **Vercel preview deployment** (never production)
+that only people signed in to your Vercel account can open, backed by a **separate Supabase project used only for the
+demo**. It runs only when a `demo-preview-*` tag is pushed, after the owner approves.
 
-1. Create a **new, separate** Supabase project just for the demo (never the production project). Apply the migrations
-   (`supabase db push`) and `supabase/seed.sql`.
-2. Seed it from your computer:
-   `DEMO_SEED_ALLOW_REMOTE=true NEXT_PUBLIC_SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… npx tsx scripts/demo/seed-demo.ts`
-3. Deploy a **preview** (not production) on a host with access protection, for example a Vercel preview deployment
-   with Deployment Protection (Vercel Authentication or a password) switched on. Set these environment variables on
-   that preview only: `DEMO_MODE=true`, the demo project's `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
-   `SUPABASE_SERVICE_ROLE_KEY`, `DEMO_ACCOUNT_EMAIL` and `DEMO_ACCOUNT_PASSWORD` from `.demo-credentials.local`,
-   `ANTHROPIC_API_KEY` set to any random value, `ANTHROPIC_BASE_URL=https://<preview address>/api/demo-ai`, and
-   `NEXT_PUBLIC_SITE_URL=https://<preview address>`. Don't set any Stripe or RevenueCat keys.
-4. Share the protected preview link only with the people you choose.
+### One-time setup (owner)
+
+1. **Demo database.** At supabase.com create a new project, for example `narrow-gate-demo` (the free plan is
+   enough). Never use the production project: the workflow refuses a database with any account the demo didn't
+   create. From the new project copy:
+   - Project Settings > API: the Project URL, the `anon` key and the `service_role` key;
+   - Connect > Connection string > **Session pooler** (not "Direct connection", which GitHub can't reach), with the
+     database password filled in.
+2. **Vercel.** Sign in at vercel.com and create an access token (Account Settings > Tokens) with a short expiry.
+   You don't need to create a project or connect the repository; the workflow creates a project named
+   `narrow-gate-fitness-demo` with Vercel Authentication switched on.
+3. **GitHub secrets.** In this repository: Settings > Secrets and variables > Actions > New repository secret.
+   Add `DEMO_SUPABASE_URL`, `DEMO_SUPABASE_ANON_KEY`, `DEMO_SUPABASE_SERVICE_ROLE_KEY`, `DEMO_SUPABASE_DB_URL`
+   (the session pooler string) and `VERCEL_TOKEN`, plus `VERCEL_SCOPE` (your team slug) only if the project should
+   live in a Vercel team.
+
+No Stripe, RevenueCat or AI keys are needed or used.
+
+### Deploying (after approval)
+
+Pushing a tag such as `demo-preview-1` on the `claude/interactive-demo` branch runs the workflow. It:
+
+1. stops if the secrets are missing, point at two different projects, or the database has real accounts;
+2. applies the app's migrations and reference data (exercises, programs, foods) to the demo database;
+3. loads the sample member (the password stays inside the run and the deployment; it's never printed);
+4. creates the Vercel project, switches on Vercel Authentication, and stops if it can't;
+5. deploys a preview with `DEMO_MODE=true`;
+6. checks that the link refuses visitors who aren't signed in to Vercel, and removes the deployment if it doesn't;
+7. runs the demo walkthrough against the preview at iPhone and desktop sizes, through a temporary bypass that is
+   revoked afterwards.
+
+The link appears in the run's summary. Open it on your Mac or iPhone, sign in to Vercel when asked, then tap
+**Explore with sample data**. To share it with someone else, invite them to the Vercel project or create a
+shareable link in Vercel (Deployment Protection settings) and send it privately.
+
+### Notes
+
+- Vercel's free Hobby plan is for non-commercial use; for a business, Vercel's terms call for the Pro plan.
+- A free Supabase project pauses after a week without use; restore it from the Supabase dashboard.
+- Running the workflow again resets the sample data and gives a new preview link.
+- To take the demo down: delete the `narrow-gate-fitness-demo` project in Vercel and the demo project in Supabase,
+  then delete the repository secrets.

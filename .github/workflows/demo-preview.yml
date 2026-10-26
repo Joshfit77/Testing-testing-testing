@@ -1,0 +1,161 @@
+name: Demo preview (private)
+
+# Puts the interactive demo online as a PRIVATE Vercel preview deployment (never production), backed by a separate
+# Supabase project used only for the demo. Runs only when a tag named demo-preview-* is pushed, which happens only
+# after the owner approves a deployment. See docs/DEMO.md.
+#
+# Repository secrets (Settings > Secrets and variables > Actions); never paste them in chat or commit them:
+#   DEMO_SUPABASE_URL               https://<demo-ref>.supabase.co of the DEMO project (never production)
+#   DEMO_SUPABASE_ANON_KEY          that project's anon (public) key
+#   DEMO_SUPABASE_SERVICE_ROLE_KEY  that project's service_role key
+#   DEMO_SUPABASE_DB_URL            that project's Session pooler connection string, with its database password
+#   VERCEL_TOKEN                    a Vercel access token (scope: your account or team)
+#   VERCEL_SCOPE                    optional: your Vercel team slug, if the project should live in a team
+#
+# Safety: it stops before changing anything if the demo database has any account the demo didn't create, if the
+# database URL and API URL point at different projects, or if Vercel Authentication can't be switched on. It deploys
+# with `vercel deploy` (a preview, no --prod), payments and AI keys are never given to it, and if the deployment
+# answers without asking for a Vercel sign-in it is removed again.
+on:
+  push:
+    tags: ["demo-preview-*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: demo-preview
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      DEMO_SUPABASE_URL: ${{ secrets.DEMO_SUPABASE_URL }}
+      DEMO_SUPABASE_ANON_KEY: ${{ secrets.DEMO_SUPABASE_ANON_KEY }}
+      DEMO_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.DEMO_SUPABASE_SERVICE_ROLE_KEY }}
+      DEMO_SUPABASE_DB_URL: ${{ secrets.DEMO_SUPABASE_DB_URL }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_SCOPE: ${{ secrets.VERCEL_SCOPE }}
+      VERCEL_PROJECT: narrow-gate-fitness-demo
+      VERCEL_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check the secrets and that they name one demo project
+        run: |
+          missing=0
+          for v in DEMO_SUPABASE_URL DEMO_SUPABASE_ANON_KEY DEMO_SUPABASE_SERVICE_ROLE_KEY DEMO_SUPABASE_DB_URL VERCEL_TOKEN; do
+            if [ -z "${!v}" ]; then echo "::error::Missing repository secret $v (see docs/DEMO.md)"; missing=1; fi
+          done
+          [ "$missing" = 0 ]
+          ref=$(echo "$DEMO_SUPABASE_URL" | sed -nE 's#^https://([a-z0-9]+)\.supabase\.co/?$#\1#p')
+          [ -n "$ref" ] || { echo "::error::DEMO_SUPABASE_URL must look like https://<ref>.supabase.co"; exit 1; }
+          case "$DEMO_SUPABASE_DB_URL" in
+            *"$ref"*) ;;
+            *) echo "::error::DEMO_SUPABASE_DB_URL is not for the same project as DEMO_SUPABASE_URL"; exit 1 ;;
+          esac
+          echo "Demo Supabase project: $ref"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Refuse a database with real accounts
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.DEMO_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.DEMO_SUPABASE_SERVICE_ROLE_KEY }}
+          DEMO_SEED_ALLOW_REMOTE: "true"
+        run: npx tsx scripts/demo/seed-demo.ts --check-only
+
+      - name: Apply the app's migrations and reference data to the demo database
+        run: npx supabase db push --db-url "$DEMO_SUPABASE_DB_URL" --include-seed --yes
+
+      - name: Load the sample data
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.DEMO_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.DEMO_SUPABASE_SERVICE_ROLE_KEY }}
+          DEMO_SEED_ALLOW_REMOTE: "true"
+          DEMO_CREDENTIALS_FILE: ${{ runner.temp }}/demo-credentials
+        run: |
+          npx tsx scripts/demo/seed-demo.ts
+          email=$(sed -n 's/^DEMO_ACCOUNT_EMAIL=//p' "$DEMO_CREDENTIALS_FILE")
+          password=$(sed -n 's/^DEMO_ACCOUNT_PASSWORD=//p' "$DEMO_CREDENTIALS_FILE")
+          echo "::add-mask::$password"
+          { echo "DEMO_ACCOUNT_EMAIL=$email"; echo "DEMO_ACCOUNT_PASSWORD=$password"; } >> "$GITHUB_ENV"
+          rm -f "$DEMO_CREDENTIALS_FILE"
+
+      - name: Create the Vercel project and switch on Vercel Authentication
+        run: |
+          npm install -g vercel@62.7.0 >/dev/null
+          scope=(); q=""
+          if [ -n "$VERCEL_SCOPE" ]; then scope=(--scope "$VERCEL_SCOPE"); q="?slug=$VERCEL_SCOPE"; fi
+          # Create the project if it doesn't exist yet (409 = it already exists), then link this checkout to it.
+          code=$(curl -s -o "$RUNNER_TEMP/p.json" -w "%{http_code}" -X POST "https://api.vercel.com/v11/projects$q" -H "Authorization: Bearer $VERCEL_TOKEN" \
+            -H "Content-Type: application/json" -d "{\"name\":\"$VERCEL_PROJECT\",\"framework\":\"nextjs\"}")
+          case "$code" in 200|201|409) ;; *) echo "::error::Creating the Vercel project failed (HTTP $code)"; exit 1 ;; esac
+          vercel link --yes --project "$VERCEL_PROJECT" --token "$VERCEL_TOKEN" "${scope[@]}" >/dev/null
+          # Standard Protection: every deployment except a custom production domain needs a Vercel sign-in with access
+          # to this project. This project never gets a production deployment or a custom domain.
+          curl -fsS -X PATCH "https://api.vercel.com/v9/projects/$VERCEL_PROJECT$q" -H "Authorization: Bearer $VERCEL_TOKEN" \
+            -H "Content-Type: application/json" -d '{"ssoProtection":{"deploymentType":"all_except_custom_domains"}}' >/dev/null
+          prot=$(curl -fsS "https://api.vercel.com/v9/projects/$VERCEL_PROJECT$q" -H "Authorization: Bearer $VERCEL_TOKEN" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s);process.stdout.write(p.ssoProtection?.deploymentType??"")})')
+          [ -n "$prot" ] || { echo "::error::Vercel Authentication could not be switched on; nothing was deployed."; exit 1; }
+          echo "Vercel Authentication: $prot"
+
+      - name: Deploy a preview (not production)
+        run: |
+          scope=(); [ -n "$VERCEL_SCOPE" ] && scope=(--scope "$VERCEL_SCOPE")
+          url=$(vercel deploy --target preview --yes --token "$VERCEL_TOKEN" "${scope[@]}" \
+            --build-env DEMO_MODE=true \
+            --build-env NEXT_PUBLIC_SUPABASE_URL="$DEMO_SUPABASE_URL" \
+            --build-env NEXT_PUBLIC_SUPABASE_ANON_KEY="$DEMO_SUPABASE_ANON_KEY" \
+            --env DEMO_MODE=true \
+            --env NEXT_PUBLIC_SUPABASE_URL="$DEMO_SUPABASE_URL" \
+            --env NEXT_PUBLIC_SUPABASE_ANON_KEY="$DEMO_SUPABASE_ANON_KEY" \
+            --env SUPABASE_SERVICE_ROLE_KEY="$DEMO_SUPABASE_SERVICE_ROLE_KEY" \
+            --env DEMO_ACCOUNT_EMAIL="$DEMO_ACCOUNT_EMAIL" \
+            --env DEMO_ACCOUNT_PASSWORD="$DEMO_ACCOUNT_PASSWORD")
+          echo "DEMO_URL=$url" >> "$GITHUB_ENV"
+          echo "Deployed preview: $url"
+
+      - name: Check the preview is private
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" "$DEMO_URL/")
+          echo "Without a Vercel sign-in the preview answers HTTP $code"
+          if [ "$code" = "200" ]; then
+            scope=(); [ -n "$VERCEL_SCOPE" ] && scope=(--scope "$VERCEL_SCOPE")
+            vercel remove "$DEMO_URL" --yes --token "$VERCEL_TOKEN" "${scope[@]}" || true
+            echo "::error::The preview was publicly reachable, so it was removed."
+            exit 1
+          fi
+
+      - name: Walk through the demo on the preview (iPhone and desktop sizes)
+        run: |
+          q=""; [ -n "$VERCEL_SCOPE" ] && q="?slug=$VERCEL_SCOPE"
+          # A temporary automation bypass, used only by this test run and revoked straight after.
+          secret=$(curl -fsS -X PATCH "https://api.vercel.com/v1/projects/$VERCEL_PROJECT/protection-bypass$q" -H "Authorization: Bearer $VERCEL_TOKEN" \
+            -H "Content-Type: application/json" -d '{}' | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const b=JSON.parse(s).protectionBypass??{};process.stdout.write(Object.keys(b).find(k=>b[k].scope==="automation-bypass")??"")})') || secret=""
+          if [ -z "$secret" ]; then echo "::warning::Couldn't create a bypass for automated checks; open the preview to check it by hand."; exit 0; fi
+          echo "::add-mask::$secret"
+          npx playwright install --with-deps chromium >/dev/null
+          status=0
+          E2E_DEMO=1 E2E_BASE_URL="$DEMO_URL" E2E_VERCEL_BYPASS="$secret" npx playwright test e2e/demo.spec.ts --project mobile || status=$?
+          curl -fsS -X PATCH "https://api.vercel.com/v1/projects/$VERCEL_PROJECT/protection-bypass$q" -H "Authorization: Bearer $VERCEL_TOKEN" \
+            -H "Content-Type: application/json" -d "{\"revoke\":{\"secret\":\"$secret\",\"regenerate\":false}}" >/dev/null || echo "::warning::Revoke the automation bypass in Vercel > Settings > Deployment Protection."
+          exit $status
+
+      - name: Summary
+        if: always() && env.DEMO_URL != ''
+        run: |
+          {
+            echo "## Narrow Gate Fitness demo (private preview)"
+            echo
+            echo "**$DEMO_URL**"
+            echo
+            echo "Sign in to Vercel with the account that owns the project when asked, then tap **Explore with sample data**."
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,5 +1,7 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
+import { simulatedFetch } from "@/lib/demo/simulated-ai";
+import { isDemoMode } from "@/server/demo";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getServiceSupabase } from "@/lib/supabase/server";
@@ -73,8 +75,13 @@ const HISTORY_TOTAL_CHARS = 24_000;
 
 let client: Anthropic | null = null;
 function getClient(): Anthropic {
-  // baseURL comes from the SDK's standard ANTHROPIC_BASE_URL env var when set (e2e tests point it at a local mock).
-  if (!client) client = new Anthropic({ apiKey: serverEnv.anthropicApiKey, maxRetries: 2, timeout: 120_000 });
+  if (!client) {
+    client = isDemoMode()
+      ? // Demo mode: answered in-process by a script whose replies say they're simulated; nothing leaves the server.
+        new Anthropic({ apiKey: "demo-simulated", baseURL: "https://demo.invalid", fetch: simulatedFetch, maxRetries: 0 })
+      : // baseURL comes from the SDK's standard ANTHROPIC_BASE_URL env var when set (e2e tests point it at a local mock).
+        new Anthropic({ apiKey: serverEnv.anthropicApiKey, maxRetries: 2, timeout: 120_000 });
+  }
   return client;
 }
 

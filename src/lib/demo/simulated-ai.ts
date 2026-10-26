@@ -2,6 +2,8 @@
  * The demo's stand-in for the AI provider. It speaks the Messages API format so the real app code runs end to end
  * (allowance, consent, tools, approval cards), but every word comes from this script, never from a model, and every
  * reply says so. Read-only tools still run against the demo account's sample data; the script only summarizes them.
+ * In demo mode the AI client is given `simulatedFetch` (src/server/services/ai-coach.ts), so no request leaves the
+ * server and no AI provider is ever called.
  */
 
 export const SIMULATED_LABEL = "Simulated demo reply — written by a script, not an AI model.";
@@ -198,4 +200,42 @@ export function sseEvents(model: string, blocks: SimBlock[], stopReason: string)
   events.push({ type: "message_delta", delta: { stop_reason: stopReason, stop_sequence: null }, usage: { output_tokens: 0 } });
   events.push({ type: "message_stop" });
   return events;
+}
+
+const errorResponse = (status: number, type: string, message: string) =>
+  new Response(JSON.stringify({ type: "error", error: { type, message } }), { status, headers: { "Content-Type": "application/json" } });
+
+/** A Messages API response for one request body: JSON for structured output, server-sent events for streams. */
+export function simulatedResponse(body: SimRequest): Response {
+  if (!Array.isArray(body?.messages) || body.messages.length === 0) return errorResponse(400, "invalid_request_error", "messages required");
+  const model = String(body.model ?? "demo");
+  if (!body.stream) {
+    const structured = simulatedStructured(body);
+    const content = structured ? [{ type: "text", text: JSON.stringify(structured) }] : simulatedChat(body).blocks;
+    return new Response(
+      JSON.stringify({ id: id("msg"), type: "message", role: "assistant", model, content, stop_reason: "end_turn", stop_sequence: null, usage: { input_tokens: 0, output_tokens: 0 } }),
+      { headers: { "Content-Type": "application/json" } },
+    );
+  }
+  const reply = simulatedChat(body);
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    start(controller) {
+      for (const e of sseEvents(model, reply.blocks, reply.stop)) controller.enqueue(encoder.encode(`event: ${e.type as string}\ndata: ${JSON.stringify(e)}\n\n`));
+      controller.close();
+    },
+  });
+  return new Response(stream, { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });
+}
+
+/** A `fetch` for the AI SDK that answers Messages API calls in-process, so nothing leaves the server. */
+export async function simulatedFetch(input: string | URL | Request, init?: RequestInit): Promise<Response> {
+  const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  if (!/\/v1\/messages(\?|$)/.test(new URL(url).pathname + new URL(url).search)) return errorResponse(404, "not_found_error", "Not found");
+  const raw = init?.body ?? (input instanceof Request ? await input.text() : null);
+  try {
+    return simulatedResponse(JSON.parse(typeof raw === "string" ? raw : new TextDecoder().decode(raw as ArrayBuffer)) as SimRequest);
+  } catch {
+    return errorResponse(400, "invalid_request_error", "Invalid JSON");
+  }
 }

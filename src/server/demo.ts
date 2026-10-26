@@ -9,7 +9,7 @@ import type { User } from "@supabase/supabase-js";
  *   - payments are off: Stripe and RevenueCat keys are ignored (src/server/env.ts), so nothing can be charged;
  *   - demo accounts are marked in `app_metadata.demo`, which only the service role can set (members can't edit it);
  *   - a demo account can switch itself between Free and Pro through a server-held entitlement (source `admin`);
- *   - AI replies come from the simulated provider at /api/demo-ai unless a real key and base URL are configured.
+ *   - AI replies always come from the scripted stand-in (src/lib/demo/simulated-ai.ts), in-process; any AI key is ignored.
  * Nothing here exists in a deployment without DEMO_MODE=true: every demo action and route checks it first.
  */
 export function isDemoMode(): boolean {
@@ -28,7 +28,7 @@ export function demoAccount(): { email: string; password: string } | null {
   return isDemoMode() && email && password ? { email, password } : null;
 }
 
-/** Is the AI in this demo simulated (the built-in demo provider) rather than a real model? */
+/** In demo mode every AI reply is simulated by a script; no AI provider is called. */
 export function demoAiSimulated(): boolean {
-  return isDemoMode() && (process.env.ANTHROPIC_BASE_URL ?? "").replace(/\/$/, "").endsWith("/api/demo-ai");
+  return isDemoMode();
 }

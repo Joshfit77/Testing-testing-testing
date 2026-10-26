@@ -4,6 +4,7 @@
  * that is never committed (.demo-credentials.local).
  *
  *   npx tsx scripts/demo/seed-demo.ts            (normally run by scripts/demo/run-demo.sh)
+ *   npx tsx scripts/demo/seed-demo.ts --check-only   (only the safety checks below; changes nothing)
  *
  * Safety:
  * - It only writes to the Supabase project in NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY.
@@ -655,6 +656,10 @@ async function seedFaith(userId: string) {
 async function main() {
   db = createClient(URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
   await checkTarget();
+  if (process.argv.includes("--check-only")) {
+    console.log("seed-demo: the target holds no accounts except demo accounts.");
+    return;
+  }
   await removeDemoAccounts();
   // Re-seeding under a running demo server keeps its password (DEMO_ACCOUNT_PASSWORD); otherwise a new random one.
   const password = process.env.DEMO_ACCOUNT_PASSWORD || randomBytes(18).toString("base64url");

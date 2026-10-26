@@ -26,10 +26,8 @@ export DEMO_CREDENTIALS_FILE=".demo-credentials.local"
 npx tsx scripts/demo/seed-demo.ts
 set -a; . "./$DEMO_CREDENTIALS_FILE"; set +a
 
-# Demo mode: payment keys are ignored, and the AI SDK talks to the app's own scripted stand-in.
+# Demo mode: payment and AI keys are ignored; AI replies come from the app's scripted stand-in, in-process.
 export DEMO_MODE=true
-export ANTHROPIC_API_KEY="demo-$(node -e 'process.stdout.write(require("crypto").randomBytes(12).toString("hex"))')"
-export ANTHROPIC_BASE_URL="http://127.0.0.1:${PORT}/api/demo-ai"
 export NEXT_PUBLIC_SITE_URL="${NEXT_PUBLIC_SITE_URL:-http://localhost:${PORT}}"
 # Set to empty (not unset) so values in .env.local are not loaded either.
 export STRIPE_SECRET_KEY="" STRIPE_WEBHOOK_SECRET="" REVENUECAT_SECRET_API_KEY="" REVENUECAT_WEBHOOK_AUTH="" REVENUECAT_PUBLIC_KEY_IOS="" REVENUECAT_PUBLIC_KEY_ANDROID=""

@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -61,7 +62,6 @@ describe("demo helpers", () => {
   it("offers the sample account and simulated AI only in demo mode", async () => {
     vi.stubEnv("DEMO_ACCOUNT_EMAIL", "sample@demo.invalid");
     vi.stubEnv("DEMO_ACCOUNT_PASSWORD", "pw");
-    vi.stubEnv("ANTHROPIC_BASE_URL", "http://127.0.0.1:3000/api/demo-ai");
     vi.stubEnv("DEMO_MODE", "");
     let demo = await import("@/server/demo");
     expect(demo.demoAccount()).toBeNull();
@@ -71,8 +71,6 @@ describe("demo helpers", () => {
     demo = await import("@/server/demo");
     expect(demo.demoAccount()).toEqual({ email: "sample@demo.invalid", password: "pw" });
     expect(demo.demoAiSimulated()).toBe(true);
-    vi.stubEnv("ANTHROPIC_BASE_URL", "https://api.anthropic.com");
-    expect(demo.demoAiSimulated()).toBe(false);
   });
 });
 
@@ -163,42 +161,58 @@ describe("demo sign-in actions", () => {
   });
 });
 
-describe("POST /api/demo-ai/v1/messages", () => {
-  const call = async (body: unknown, key = "demo-key") => {
-    const { POST } = await import("@/app/api/demo-ai/v1/messages/route");
-    return POST(new Request("http://localhost/api/demo-ai/v1/messages", { method: "POST", headers: { "x-api-key": key, "content-type": "application/json" }, body: JSON.stringify(body) }));
-  };
-  const chat = { model: "m", stream: true, messages: [{ role: "user", content: "hello" }] };
+describe("AI in demo mode", () => {
+  it("is always simulated, ignores a real AI key and still counts as configured", async () => {
+    vi.stubEnv("DEMO_MODE", "true");
+    vi.stubEnv("ANTHROPIC_API_KEY", "sk-ant-real-key");
+    const env = await import("@/server/env");
+    const demo = await import("@/server/demo");
+    expect(env.serverEnv.anthropicApiKey).toBe("");
+    expect(env.isAiConfigured()).toBe(true);
+    expect(demo.demoAiSimulated()).toBe(true);
+  });
 
-  it("doesn't exist outside demo mode", async () => {
+  it("is untouched outside demo mode", async () => {
     vi.stubEnv("DEMO_MODE", "");
-    vi.stubEnv("ANTHROPIC_API_KEY", "demo-key");
-    vi.stubEnv("ANTHROPIC_BASE_URL", "http://127.0.0.1:3000/api/demo-ai");
-    expect((await call(chat)).status).toBe(404);
+    vi.stubEnv("ANTHROPIC_API_KEY", "");
+    const env = await import("@/server/env");
+    const demo = await import("@/server/demo");
+    expect(env.isAiConfigured()).toBe(false);
+    expect(demo.demoAiSimulated()).toBe(false);
   });
 
-  it("doesn't exist when the app talks to a real AI provider", async () => {
-    vi.stubEnv("DEMO_MODE", "true");
-    vi.stubEnv("ANTHROPIC_API_KEY", "demo-key");
-    vi.stubEnv("ANTHROPIC_BASE_URL", "");
-    expect((await call(chat)).status).toBe(404);
-  });
-
-  it("answers only the app's own server (its key)", async () => {
-    vi.stubEnv("DEMO_MODE", "true");
-    vi.stubEnv("ANTHROPIC_API_KEY", "demo-key");
-    vi.stubEnv("ANTHROPIC_BASE_URL", "http://127.0.0.1:3000/api/demo-ai");
-    expect((await call(chat, "wrong-key")).status).toBe(401);
-    const res = await call(chat);
+  it("answers the SDK in-process with a labelled stream", async () => {
+    const { simulatedFetch } = await import("@/lib/demo/simulated-ai");
+    const res = await simulatedFetch("https://demo.invalid/v1/messages?beta=true", {
+      method: "POST",
+      body: JSON.stringify({ model: "m", stream: true, messages: [{ role: "user", content: "hello" }] }),
+    });
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("text/event-stream");
     const text = await res.text();
     expect(text).toContain("event: message_stop");
     const reply = text
       .split("\n")
-      .filter((l) => l.startsWith("data: "))
-      .map((l) => (JSON.parse(l.slice(6)) as { delta?: { text?: string } }).delta?.text ?? "")
+      .filter((l: string) => l.startsWith("data: "))
+      .map((l: string) => (JSON.parse(l.slice(6)) as { delta?: { text?: string } }).delta?.text ?? "")
       .join("");
     expect(reply).toContain("Simulated demo reply — written by a script, not an AI model.");
+    expect((await simulatedFetch("https://demo.invalid/v1/models", { method: "GET" })).status).toBe(404);
+  });
+
+  it("drives the real Anthropic SDK without any network request", async () => {
+    const realFetch = globalThis.fetch;
+    const spy = vi.fn(() => Promise.reject(new Error("network used")));
+    globalThis.fetch = spy as unknown as typeof fetch;
+    try {
+      const { default: Anthropic } = await import("@anthropic-ai/sdk");
+      const { simulatedFetch } = await import("@/lib/demo/simulated-ai");
+      const client = new Anthropic({ apiKey: "demo-simulated", baseURL: "https://demo.invalid", fetch: simulatedFetch, maxRetries: 0 });
+      const msg = await client.messages.create({ model: "m", max_tokens: 100, messages: [{ role: "user", content: "hello" }] });
+      expect(JSON.stringify(msg.content)).toContain("Simulated demo reply");
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      globalThis.fetch = realFetch;
+    }
   });
 });
