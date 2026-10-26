@@ -13,4 +13,8 @@ The derived mesh (simplified, rigged, re-shaped, with added shorts and labels) i
 **CC BY-SA 2.1 JP**: anyone receiving it may reuse and adapt it with attribution, and adaptations of the mesh must use
 the same licence. This applies to the mesh data, not to the app's source code.
 
+The head, face, ears, neck and eyes come from the **MakeHuman** base mesh and targets
+(https://github.com/makehumancommunity/makehuman, `makehuman/data`), released as **CC0 1.0** (public domain) in
+September 2020.
+
 This is a summary for the project, not legal advice; please have the licence terms reviewed before release.

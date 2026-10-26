@@ -108,7 +108,7 @@ export function makeAthleteMaterial(): AthleteMaterial {
         if (vTissue > 1.5 && vTissue < 2.5) diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.80, 0.66, 0.42), 0.45); // bone
         if (vTissue > 2.5 && vTissue < 3.5) diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.92, 0.80, 0.55), 0.5); // tendon
         // Hair: a short buzz cut, darker gold with a fine grain.
-        float isHair = (1.0 - step(0.5, vTissue)) * step(0.5, vExtra);
+        float isHair = (1.0 - step(0.5, vTissue)) * smoothstep(0.2, 0.8, vExtra);
         float grain = hash3(floor(vRest * 9.0));
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.2, 0.135, 0.055) * (0.8 + 0.4 * grain), isHair);
         // Eyes: ivory-gold whites, a dark amber iris, a black pupil.

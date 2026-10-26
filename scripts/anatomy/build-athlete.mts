@@ -24,6 +24,7 @@ import * as THREE from "three";
 import { MeshBVH } from "three-mesh-bvh";
 import { BONES, muscleId, NO_MUSCLE, TISSUE, type BoneName, type Region } from "../../src/lib/anatomy3d/muscle-ids";
 import { kindOf, regionOf, sideOf, type PartKind } from "./bp3d-regions";
+import { buildMakeHumanHead } from "./makehuman-head";
 import { computeWeights, NO_BONE } from "./weights";
 
 type V3 = [number, number, number];
@@ -357,14 +358,7 @@ for (const [id, name] of names) {
   if (eyeId && existsSync(stlPath(eyeId))) {
     const m = simplify(load(eyeId), 3000, 0.005);
     orientOutward(m);
-    const ps = verts(m);
-    const centres = [ps.filter((p) => p[2] > 0), ps.filter((p) => p[2] <= 0)].map(centroid);
-    const extra = new Float32Array(ps.map((p) => {
-      const c = p[2] > 0 ? centres[0]! : centres[1]!;
-      const facing = dot(norm(sub(p, c)), norm([1, 0, 0.08 * Math.sign(p[2])]));
-      return smoothstep(0.8, 0.86, facing) * 0.6 + smoothstep(0.955, 0.97, facing) * 0.4;
-    }));
-    parts.push({ name: "eyes", kind: "eye", mesh: m, label: NO_MUSCLE, fiber: [0, 1, 0], rigid: "head", extra });
+    parts.push({ name: "eyes", kind: "eye", mesh: m, label: NO_MUSCLE, fiber: [0, 1, 0], rigid: "head", extra: eyeIris(m) });
   }
 }
 console.log(`parts: ${parts.length} (${muscleTris} muscle triangles)`);
@@ -381,10 +375,22 @@ const handOf = (p: V3) => {
   return false;
 };
 const isFoot = (p: V3) => p[1] < R.ankle[1] + 0.8;
+/** Iris (0.6) and pupil (1) on each eyeball, looking straight ahead. */
+function eyeIris(m: Mesh): Float32Array {
+  const ps = verts(m);
+  const centres = [ps.filter((p) => p[2] > 0), ps.filter((p) => p[2] <= 0)].map(centroid);
+  return new Float32Array(
+    ps.map((p) => {
+      const c = p[2] > 0 ? centres[0]! : centres[1]!;
+      const facing = dot(norm(sub(p, c)), norm([1, 0, 0.08 * Math.sign(p[2])]));
+      return smoothstep(0.8, 0.86, facing) * 0.6 + smoothstep(0.955, 0.97, facing) * 0.4;
+    }),
+  );
+}
 /** A short buzz cut: 1 on the scalp above a natural hairline (higher at the forehead, down to the nape behind). */
-function hairMask(m: Mesh): Float32Array {
+function hairMask(m: Mesh, eyeCentre?: V3): Float32Array {
   const eyeId = idOf("eyeball");
-  const eyes = eyeId && existsSync(stlPath(eyeId)) ? verts(load(eyeId)) : [];
+  const eyes = eyeCentre ? [eyeCentre] : eyeId && existsSync(stlPath(eyeId)) ? verts(load(eyeId)) : [];
   const eyeY = eyes.length ? centroid(eyes)[1] : 168;
   const front = Math.max(...verts(m).map((p) => p[0]));
   return new Float32Array(
@@ -392,9 +398,9 @@ function hairMask(m: Mesh): Float32Array {
       const h = p[1] - eyeY;
       const fromFront = front - p[0];
       // Hairline height above the eyes: about 7.5 cm at the forehead, 3 cm at the temples, dropping behind the ears.
-      const line = 7.5 - 4.5 * smoothstep(2, 6, fromFront) - 9 * smoothstep(10, 16, fromFront);
-      const ears = Math.abs(p[2]) > 6.2 && fromFront > 7 && fromFront < 13 && h < 2.5;
-      return !ears && h > line ? 1 : 0;
+      const line = 6.2 - 3.6 * smoothstep(2, 6, fromFront) - 9 * smoothstep(10, 16, fromFront);
+      const ears = smoothstep(5.8, 6.6, Math.abs(p[2])) * smoothstep(6.5, 7.5, fromFront) * (1 - smoothstep(12.5, 13.5, fromFront)) * (1 - smoothstep(2, 3, h));
+      return smoothstep(line - 0.5, line + 0.5, h) * (1 - ears);
     }),
   );
 }
@@ -414,6 +420,27 @@ for (const [name, test, tris] of [
 ] as const) {
   const m = cropAndSimplify(skin, test, tris);
   parts.push({ name, kind: "skin", mesh: m, label: NO_MUSCLE, fiber: [0, 1, 0], rigid: name === "face" ? "head" : null, extra: name === "face" ? hairMask(m) : undefined });
+}
+// A new face: the MakeHuman head (CC0), shaped for a stronger adult male face, fitted where the scanned head was.
+const MAKEHUMAN = process.argv[3];
+if (MAKEHUMAN) {
+  const eyesPart = parts.find((pt) => pt.kind === "eye")!;
+  const eyeMid = centroid(verts(eyesPart.mesh));
+  const sk = verts(skin);
+  const crownY = sk.reduce((m, p) => Math.max(m, p[1]), -Infinity);
+  const chinY = sk
+    .filter((p) => Math.abs(p[2]) < 1.5 && p[1] > eyeMid[1] - 16 && p[1] < eyeMid[1] - 5 && p[0] > eyeMid[0] - 3)
+    .reduce((m, p) => Math.min(m, p[1]), Infinity);
+  const { head: mhHead, eyes: mhEyes } = buildMakeHumanHead(MAKEHUMAN, { eyeMid, chinY, crownY, cutY: (x) => 147.5 - 0.35 * x });
+  // The new neck is skin: the deep neck muscles that would poke through it behind the ears are left out.
+  for (let i = parts.length - 1; i >= 0; i--)
+    if (/splenius|semispinalis capitis|levator scapulae/.test(parts[i]!.name)) parts.splice(i, 1);
+  const face = parts.findIndex((pt) => pt.name === "face");
+  const headMesh: Mesh = { pos: mhHead.pos, idx: mhHead.idx };
+  parts[face] = { name: "face", kind: "skin", mesh: headMesh, label: NO_MUSCLE, fiber: [0, 1, 0], rigid: null, extra: hairMask(headMesh, centroid(Array.from({ length: mhEyes.pos.length / 3 }, (_, i) => [mhEyes.pos[i * 3]!, mhEyes.pos[i * 3 + 1]!, mhEyes.pos[i * 3 + 2]!] as V3))) };
+  const eyeMesh: Mesh = { pos: mhEyes.pos, idx: mhEyes.idx };
+  parts[parts.indexOf(eyesPart)] = { ...eyesPart, mesh: eyeMesh, extra: eyeIris(eyeMesh) };
+  console.log(`MakeHuman head: ${headMesh.idx.length / 3} triangles (chin ${chinY.toFixed(1)}, crown ${crownY.toFixed(1)})`);
 }
 
 // ---------------------------------------------------------------- fascia layer and pelvic cover
