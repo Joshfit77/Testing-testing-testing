@@ -13,8 +13,8 @@ export interface AthleteMaterial {
   setGlowEnabled(on: boolean): void;
 }
 
-export const GOLD_BASE = new THREE.Color("#a5782f");
-export const GLOW_COLOR = new THREE.Color("#ffc94a");
+export const GOLD_BASE = new THREE.Color("#c8903a");
+export const GLOW_COLOR = new THREE.Color("#ffb72e");
 
 export function makeAthleteMaterial(): AthleteMaterial {
   const glow = new Float32Array(MUSCLE_ID_COUNT + 1);
@@ -27,11 +27,11 @@ export function makeAthleteMaterial(): AthleteMaterial {
   // gold rather than a polished statue.
   const material = new THREE.MeshPhysicalMaterial({
     color: GOLD_BASE,
-    metalness: 0.3,
-    roughness: 0.44,
-    clearcoat: 0.5,
-    clearcoatRoughness: 0.3,
-    sheen: 0.75,
+    metalness: 0.5,
+    roughness: 0.34,
+    clearcoat: 0.85,
+    clearcoatRoughness: 0.14,
+    sheen: 0.5,
     sheenColor: new THREE.Color("#ffd98a"),
     sheenRoughness: 0.55,
     // The shorts are an open sheet (their hems show the inside), so both faces are drawn.
@@ -110,15 +110,19 @@ export function makeAthleteMaterial(): AthleteMaterial {
         // Hair: a short buzz cut, darker gold with a fine grain.
         float isHair = (1.0 - step(0.5, vTissue)) * smoothstep(0.2, 0.8, vExtra);
         float grain = hash3(floor(vRest * 9.0));
-        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.2, 0.135, 0.055) * (0.8 + 0.4 * grain), isHair);
+        // Shaved head: only a faint darker tone on the scalp.
+        diffuseColor.rgb *= 1.0 - 0.16 * isHair * (0.8 + 0.4 * grain);
         // Eyes: ivory-gold whites, a dark amber iris, a black pupil.
         vec3 eye = mix(vec3(0.86, 0.74, 0.5), vec3(0.22, 0.13, 0.04), smoothstep(0.2, 0.5, vExtra));
         eye = mix(eye, vec3(0.015, 0.012, 0.01), smoothstep(0.75, 0.9, vExtra));
         diffuseColor.rgb = mix(diffuseColor.rgb, eye, isEye);
         if (vTissue > 4.5 && vTissue < 5.5) diffuseColor.rgb *= 0.42; // fascia between the muscles
-        // Shorts: matte black fabric with a thin gold trim at the waistband and hems.
+        // Shorts: matte black fabric, cut at a clean hem and waistband with a thin gold trim.
         float isShorts = step(5.5, vTissue);
-        float trim = isShorts * step(0.5, vExtra);
+        float hemY = 68.5 + 3.5 * smoothstep(6.0, 16.0, abs(vRest.z));
+        float waistY = 95.5 + 3.0 * smoothstep(2.0, -8.0, vRest.x);
+        if (isShorts > 0.5 && (vRest.y < hemY || vRest.y > waistY)) discard;
+        float trim = isShorts * (1.0 - step(0.8, min(vRest.y - hemY, waistY - vRest.y)));
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.018, 0.016, 0.014), isShorts * (1.0 - trim));
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.85, 0.66, 0.3), trim);`,
       )
@@ -126,7 +130,7 @@ export function makeAthleteMaterial(): AthleteMaterial {
         "#include <normal_fragment_maps>",
         `#include <normal_fragment_maps>
         // The fibres catch the light: real relief across each muscle, not just a colour change.
-        float fh = sin(vStripe * 7.5) * stripeAA * isMuscle * (1.0 - tendon) * 0.5 + (grain - 0.5) * isHair * 0.35;
+        float fh = sin(vStripe * 7.5) * stripeAA * isMuscle * (1.0 - tendon) * 0.5 + (grain - 0.5) * isHair * 0.06;
         normal = perturbFibre(-vViewPosition, normal, vec2(dFdx(fh), dFdy(fh)), faceDirection);`,
       )
       .replace(
@@ -136,11 +140,23 @@ export function makeAthleteMaterial(): AthleteMaterial {
         // The glow lives in the muscle: shaped by its fibres and its own shading, never a flat coat of paint.
         float fibreGlow = 0.78 + 0.22 * fibre;
         float body = 0.45 + 0.55 * vAo;
-        totalEmissiveRadiance += uGlowColor * g * fibreGlow * body * 0.62;
-        diffuseColor.rgb = mix(diffuseColor.rgb, uGlowColor * 0.9, clamp(g, 0.0, 1.0) * 0.35);
+        totalEmissiveRadiance += uGlowColor * g * fibreGlow * body * 0.75;
+        diffuseColor.rgb = mix(diffuseColor.rgb, uGlowColor, clamp(g, 0.0, 1.0) * 0.45);
         // Warm edge light, like light passing through the edges of the tissue.
         float facing = clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0);
         totalEmissiveRadiance += vec3(1.0, 0.72, 0.32) * pow(1.0 - facing, 4.0) * 0.12 * (1.0 - step(5.5, vTissue));`,
+      )
+      .replace(
+        "#include <lights_physical_fragment>",
+        `#include <lights_physical_fragment>
+        // Shorts are matte fabric: no clearcoat or sheen (the gold trim keeps a little shine).
+        #ifdef USE_CLEARCOAT
+        if (vTissue > 5.5) material.clearcoat = 0.0;
+        if (vTissue < 0.5) material.clearcoat *= 0.35; // face, hands, feet: less wet shine
+        #endif
+        #ifdef USE_SHEEN
+        if (vTissue > 5.5) material.sheenColor *= 0.0;
+        #endif`,
       )
       .replace(
         "#include <aomap_fragment>",
@@ -155,9 +171,10 @@ export function makeAthleteMaterial(): AthleteMaterial {
       .replace(
         "#include <metalnessmap_fragment>",
         `#include <metalnessmap_fragment>
-        if (vTissue < 0.5) metalnessFactor = vExtra > 0.5 ? 0.15 : 0.4; // face, hands and feet: satin; hair: matte
+        if (vTissue < 0.5) metalnessFactor = 0.42; // face, hands and feet: satin, so the features read cleanly
+        if (vTissue < 0.5) diffuseColor.rgb *= 0.72;
         if (vTissue > 3.5 && vTissue < 4.5) metalnessFactor = 0.1;
-        if (vTissue > 5.5) metalnessFactor = vExtra > 0.5 ? 0.85 : 0.0;`,
+        if (vTissue > 5.5) metalnessFactor = trim > 0.5 ? 0.85 : 0.0;`,
       )
       .replace(
         "#include <roughnessmap_fragment>",
@@ -166,12 +183,13 @@ export function makeAthleteMaterial(): AthleteMaterial {
         roughnessFactor += vTissue > 4.5 && vTissue < 5.5 ? 0.35 : 0.0;
         roughnessFactor -= (vTissue > 2.5 && vTissue < 3.5 ? 0.12 : 0.0) + tendonR * 0.14;
         if (vTissue > 3.5 && vTissue < 4.5) roughnessFactor = 0.12;
-        if (vTissue > 5.5) roughnessFactor = vExtra > 0.5 ? 0.3 : 0.72;
-        if (vTissue < 0.5 && vExtra > 0.5) roughnessFactor = 0.8;
+        if (vTissue > 5.5) roughnessFactor = trim > 0.5 ? 0.3 : 0.75;
+        if (vTissue < 0.5) roughnessFactor = max(roughnessFactor, 0.5);
+        if (vTissue < 0.5 && vExtra > 0.5) roughnessFactor = 0.45;
         roughnessFactor = clamp(roughnessFactor, 0.05, 1.0);`,
       );
   };
-  material.customProgramCacheKey = () => "ngf-athlete-v9";
+  material.customProgramCacheKey = () => "ngf-athlete-v12";
   return {
     material,
     glow,

@@ -559,7 +559,8 @@ function nearestSurface(p: V3, radius: number): { q: V3; n: V3; d: number } | nu
     (tri.some((v) => coverMark[v]) ? coverIdx : deepIdx).push(...tri);
   }
   parts.push({ name: "fascia", kind: "deep", mesh: compact(body.pos, new Uint32Array(deepIdx)), label: NO_MUSCLE, fiber: [0, 1, 0], rigid: null });
-  parts.push({ name: "pelvic cover", kind: "cover", mesh: compact(body.pos, new Uint32Array(coverIdx)), label: NO_MUSCLE, fiber: [0, 1, 0], rigid: null });
+  // The groin itself is left open here: the shorts cover it.
+  void coverIdx;
 }
 
 // ---------------------------------------------------------------- shorts
@@ -582,7 +583,8 @@ const shortsHem = (p: V3) => 68.5 + 3.5 * smoothstep(6, 16, Math.abs(p[2]));
   geo.setIndex(new THREE.BufferAttribute(new Uint32Array(underIdx), 1));
   const bvh = new MeshBVH(geo);
   const side = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
-  const inShorts = (p: V3) => !handOf(p) && Math.abs(p[2]) < 23 && p[1] > shortsHem(p) && p[1] < shortsWaist(p);
+  // Cropped a little wide; the shader cuts the exact hem and waistband lines (clean curves, not triangle edges).
+  const inShorts = (p: V3) => !handOf(p) && Math.abs(p[2]) < 23 && p[1] > shortsHem(p) - 1.8 && p[1] < shortsWaist(p) + 1.4;
   const m = cropAndSimplify(skin, inShorts, 26000);
   const nv = m.pos.length / 3;
   const nrm = vertexNormals(m);
@@ -596,13 +598,14 @@ const shortsHem = (p: V3) => 68.5 + 3.5 * smoothstep(6, 16, Math.abs(p[2]));
     ray.origin.set(p[0] + nn[0] * 0.3, p[1] + nn[1] * 0.3, p[2] + nn[2] * 0.3);
     ray.direction.set(-nn[0], -nn[1], -nn[2]);
     const hit = bvh.raycastFirst(ray, side, 0, 8);
-    const depth = hit ? Math.max(0, hit.distance - 0.3 - 0.55) * 0.9 : 0.8;
+    const depth = hit ? Math.max(0, hit.distance - 0.3 - 1.1) * 0.85 : 0.6;
     let target = sub(p, mul(nn, depth));
     // Over the groin the fabric lies flat.
-    const g = (1 - smoothstep(6.5, 9.5, Math.abs(p[2]))) * smoothstep(58, 63, p[1]) * smoothstep(0, 3, p[0]);
+    // Over the groin the fabric is a smooth, flat panel: every point there is pressed onto one curved surface.
+    const g = (1 - smoothstep(8, 11, Math.abs(p[2]))) * smoothstep(58, 63, p[1]) * smoothstep(-1, 2, p[0]);
     if (g > 0) {
-      const cap = 2.6 + 5.0 * smoothstep(62, 88, p[1]);
-      target = [target[0] + (Math.min(target[0], cap) - target[0]) * g, target[1], target[2]];
+      const cap = 2.8 + 5.0 * smoothstep(62, 88, p[1]) - 0.012 * p[2] * p[2];
+      target = [target[0] + (cap - target[0]) * g, target[1], target[2]];
     }
     disp.set(sub(target, p), n * 3);
   }
@@ -673,7 +676,7 @@ const { skinIndex, skinWeight } = computeWeights(position, index, label, BINDM, 
   const torsoF = (y: number) => smoothstep(106, 126, y) * (1 - smoothstep(154, 163, y));
   const torso = (p: V3): V3 => {
     const f = torsoF(p[1]);
-    return [(p[0] - neckBase[0]) * (1 + 0.09 * f) + neckBase[0], p[1], p[2] * (1 + 0.12 * f)];
+    return [(p[0] - neckBase[0]) * (1 + 0.13 * f) + neckBase[0], p[1], p[2] * (1 + 0.2 * f)];
   };
   const closestOnSeg = (p: V3, a: V3, b: V3) => {
     const ab = sub(b, a);
@@ -691,8 +694,22 @@ const { skinIndex, skinWeight } = computeWeights(position, index, label, BINDM, 
     const along = dot(sub(p, J.shoulder), norm(sub(J.elbow, J.shoulder)));
     const w = smoothstep(-3, 7, along) * (1 - smoothstep(13, 19, dist));
     const beyondWrist = dot(sub(p, J.wrist), norm(sub(J.wrist, J.elbow)));
-    const k = (useUp ? 1.13 : 1.13 - 0.06 * smoothstep(0.0, 0.25, c.t)) * (1 - smoothstep(-1, 1.5, beyondWrist)) + smoothstep(-1, 1.5, beyondWrist);
+    const k = (useUp ? 1.24 : 1.24 - 0.09 * smoothstep(0.0, 0.25, c.t)) * (1 - smoothstep(-1, 1.5, beyondWrist)) + smoothstep(-1, 1.5, beyondWrist);
     return { w, out: add(add(c.q, mul(sub(p, c.q), k)), shift) };
+  };
+  // Legs: fuller quads, hamstrings and calves, swelling about the thigh and shin bones.
+  const leg = (p: V3, J: SideJ): { w: number; out: V3 } => {
+    const sideW = smoothstep(0.5, 4.5, Math.sign(J.hip[2]) * p[2]);
+    if (sideW <= 0 || p[1] < J.ankle[1] + 2) return { w: 0, out: p };
+    const up = closestOnSeg(p, J.hip, J.knee);
+    const lo = closestOnSeg(p, J.knee, J.ankle);
+    const useUp = len(sub(p, up.q)) <= len(sub(p, lo.q));
+    const c = useUp ? up : lo;
+    const dist = len(sub(p, c.q));
+    const below = J.hip[1] - p[1];
+    const w = sideW * smoothstep(2, 10, below) * (1 - smoothstep(15, 21, dist));
+    const k = useUp ? 1.15 : 1.1 - 0.08 * smoothstep(0.55, 0.95, c.t);
+    return { w, out: add(c.q, mul(sub(p, c.q), k)) };
   };
   const eyesPart = parts.find((pt) => pt.kind === "eye");
   const browY = eyesPart ? centroid(verts(eyesPart.mesh))[1] + 2 : headTop[1] - 9;
@@ -701,12 +718,14 @@ const { skinIndex, skinWeight } = computeWeights(position, index, label, BINDM, 
     for (const J of [R, L]) {
       const a = arm(p, J);
       if (a.w > 0) q = lerp(q, a.out, a.w);
+      const l = leg(p, J);
+      if (l.w > 0) q = lerp(q, l.out, l.w);
     }
     // Neck: a little fuller.
     const nw = smoothstep(148, 154, p[1]) * (1 - smoothstep(160, 165, p[1])) * (1 - smoothstep(8, 11, Math.hypot(p[0] - neckBase[0], p[2])));
     if (nw > 0) {
       const c: V3 = [neckBase[0], p[1], 0];
-      q = lerp(q, add(c, mul(sub(p, c), 1.08)), nw);
+      q = lerp(q, add(c, mul(sub(p, c), 1.12)), nw);
     }
     // Crown: slightly lower, for a natural head shape.
     if (p[1] > browY) q[1] = browY + (q[1] - browY) * (1 - 0.06 * smoothstep(browY, browY + 4, p[1]));
@@ -714,6 +733,7 @@ const { skinIndex, skinWeight } = computeWeights(position, index, label, BINDM, 
   };
   for (let n = 0; n < NV; n++) position.set(morph([position[n * 3]!, position[n * 3 + 1]!, position[n * 3 + 2]!]), n * 3);
   for (const J of [R, L]) for (const k of ["shoulder", "elbow", "wrist", "hand"] as const) J[k] = morph(J[k]);
+  // (Leg joints sit on the bone axes, which the leg swelling leaves in place.)
   for (const v of [head, headTop]) v.splice(0, 3, ...morph(v));
   writeBind();
 }

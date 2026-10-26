@@ -24,7 +24,7 @@ export function makeStage(canvas: HTMLCanvasElement, opts: { pixelRatio?: number
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: "high-performance", preserveDrawingBuffer: false });
   renderer.setPixelRatio(Math.min(opts.pixelRatio ?? (typeof devicePixelRatio === "number" ? devicePixelRatio : 1), 2));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.92;
+  renderer.toneMappingExposure = 0.9;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
   const scene = new THREE.Scene();
@@ -33,16 +33,16 @@ export function makeStage(canvas: HTMLCanvasElement, opts: { pixelRatio?: number
   const pmrem = new THREE.PMREMGenerator(renderer);
   const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
   scene.environment = env;
-  scene.environmentIntensity = 0.55;
+  scene.environmentIntensity = 0.75;
 
   const camera = new THREE.PerspectiveCamera(30, 1, 10, 3000);
 
   // Lights: warm key from the front-left, gold rims behind both shoulders, soft fill from below the camera.
-  const key = new THREE.DirectionalLight("#fff1d6", 2.0);
+  const key = new THREE.DirectionalLight("#fff1d6", 2.6);
   key.position.set(260, 320, -160);
-  const rimA = new THREE.DirectionalLight("#ffcf7a", 2.4);
+  const rimA = new THREE.DirectionalLight("#ffc65a", 3.4);
   rimA.position.set(-260, 220, 220);
-  const rimB = new THREE.DirectionalLight("#ffd98f", 1.8);
+  const rimB = new THREE.DirectionalLight("#ffd27a", 2.6);
   rimB.position.set(-200, 160, -260);
   const fill = new THREE.HemisphereLight("#3a2c14", "#050403", 0.9);
   // Soft front light so surfaces facing the viewer read clearly.
@@ -62,7 +62,7 @@ export function makeStage(canvas: HTMLCanvasElement, opts: { pixelRatio?: number
 
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.55, 0.42, 0.9);
+  const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.38, 0.35, 0.95);
   if (opts.bloom !== false) composer.addPass(bloom);
   composer.addPass(new OutputPass());
 

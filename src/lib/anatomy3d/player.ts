@@ -76,6 +76,8 @@ export async function mountAthlete(
   const first = evaluate(motion, 0);
   const centerX = first.pts.pelvis[0];
   const barbell = first.props.some((p) => p.def.kind === "barbell");
+  // Squats use a shoulder-width-plus stance with the toes turned out, knees tracking over the toes.
+  const stance = ex.pattern === "squat" && first.view === "side" ? { halfWidth: 17, toeOut: 22 } : null;
   const GRIPPED = new Set(["barbell", "dumbbell", "kettlebell", "pullupBar", "trapBar", "farmerHandle", "landmine", "cable", "battleRope", "jumpRope", "yoke", "dipBars"]);
   const grip = first.props.some((p) => GRIPPED.has(p.def.kind)) ? 1 : 0;
   mesh.morphTargetInfluences![0] = grip;
@@ -126,7 +128,7 @@ export async function mountAthlete(
   let pelvisY = 92;
   const poseAt = (time: number) => {
     const f = evaluate(motion, time);
-    const j = jointsFromFrame(f, { centerX, barGrip: barbell ? 26 : null });
+    const j = jointsFromFrame(f, { centerX, barGrip: barbell ? 26 : null, stance });
     pelvisY = j.pelvis.y;
     poseBones(j, bones);
     equipment.update(f, j);

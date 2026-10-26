@@ -49,14 +49,16 @@ bash scripts/anatomy/preview/build.sh          # .anatomy-preview/index.html
 
 ## Known problems (honest list)
 
-- **Face**: replaced with a MakeHuman head shaped by targets (stronger jaw, chin and cheekbones, heavier brow, real
-  ears, thicker neck) plus a procedural buzz cut. It is a generic, untextured face: no skin pores, eyelashes or
-  eyebrows, and the eyes are simple shaded spheres. The neck is smooth skin from the jaw to the collarbones (the
-  sternocleidomastoids still show through at the front).
-- **Muscle definition**: the muscles come from an average (non-athletic) subject; the "athletic" shape is a smooth
-  upper-body morph plus small per-muscle thickening. Pectorals/abs/obliques are less defined than in the reference.
-- **Thin strands** appear between the hands and the hips/thighs in some poses (forearm-tendon/skin weighting).
-- **Shorts** are fitted from the skin surface; their hems are single-sided, and the groin area still needs polish.
-- **Rendering**: single-sided faces are required (double-sided let the fascia layer show over the muscles).
-- **Size/performance**: 11.6 MB, ~440k triangles: too heavy for phones as-is (needs quantisation, LOD, compression).
+Compared with the owner's reference image (`docs/anatomy3d` target: the gold anatomical barbell-squat illustration):
+
+- **Face**: MakeHuman head (Caucasian young male, stronger jaw/chin/cheekbones, heavier brow, bald). It is smooth,
+  untextured gold: no fine facial anatomy, eyebrows or eyelashes, and the eyes are simple shaded spheres.
+- **Physique**: bodybuilder proportions come from a smooth morph of an average subject (chest, back, arms, quads,
+  calves). The pectorals and abs are less deeply cut than in the reference.
+- **Shorts**: matte black with a gold-trimmed waistband and hems, cut cleanly in the shader. Thigh muscles still show
+  through near the lower front edge in the standing pose, and a thin sheet artefact appears beside the hip in the deep
+  squat.
+- **Look**: real-time WebGL with bloom; the reference is a painted render with softer translucency and richer
+  lighting. It will not be pixel-identical.
+- **Size/performance**: 11.3 MB, ~434k triangles: too heavy for phones as-is (needs quantisation, LOD, compression).
 - Only the squat has been checked visually; the other exercises and the 143 planned new exercises are not done.

@@ -1,63 +1,63 @@
 {
  "version": 3,
  "source": "BodyParts3D 3.0 (CC BY-SA 2.1 JP)",
- "vertices": 218135,
- "triangles": 433423,
- "bytes": 11526999,
+ "vertices": 217606,
+ "triangles": 432583,
+ "bytes": 11501582,
  "layout": {
   "position": {
    "offset": 0,
-   "length": 654405,
+   "length": 652818,
    "type": "Float32Array"
   },
   "index": {
-   "offset": 2617620,
-   "length": 1300269,
+   "offset": 2611272,
+   "length": 1297749,
    "type": "Uint32Array"
   },
   "forcedBone": {
-   "offset": 7818696,
-   "length": 218135,
+   "offset": 7802268,
+   "length": 217606,
    "type": "Uint8Array"
   },
   "skinIndex": {
-   "offset": 8036832,
-   "length": 872540,
+   "offset": 8019876,
+   "length": 870424,
    "type": "Uint8Array"
   },
   "skinWeight": {
-   "offset": 8909372,
-   "length": 872540,
+   "offset": 8890300,
+   "length": 870424,
    "type": "Uint8Array"
   },
   "muscleA": {
-   "offset": 9781912,
-   "length": 218135,
+   "offset": 9760724,
+   "length": 217606,
    "type": "Uint8Array"
   },
   "muscleB": {
-   "offset": 10000048,
-   "length": 218135,
+   "offset": 9978332,
+   "length": 217606,
    "type": "Uint8Array"
   },
   "muscleMix": {
-   "offset": 10218184,
-   "length": 218135,
+   "offset": 10195940,
+   "length": 217606,
    "type": "Uint8Array"
   },
   "tissue": {
-   "offset": 10436320,
-   "length": 218135,
+   "offset": 10413548,
+   "length": 217606,
    "type": "Uint8Array"
   },
   "fiber": {
-   "offset": 10654456,
-   "length": 654405,
+   "offset": 10631156,
+   "length": 652818,
    "type": "Int8Array"
   },
   "ao": {
-   "offset": 11308864,
-   "length": 218135,
+   "offset": 11283976,
+   "length": 217606,
    "type": "Uint8Array"
   }
  },

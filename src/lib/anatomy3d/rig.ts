@@ -46,6 +46,8 @@ function outOfPlane(len: number, dx: number, dy: number): number {
 export interface RigOptions {
   centerX?: number;
   barGrip?: number | null;
+  /** Feet this far from the midline (cm) with the toes turned out this many degrees, e.g. a squat stance. */
+  stance?: { halfWidth: number; toeOut: number } | null;
 }
 
 /** Two-bone IK: the middle joint for a chain root→end with lengths a, b, bending towards `pole`. */
@@ -90,11 +92,18 @@ export function jointsFromFrame(f: Frame, opts: RigOptions | number = {}): Joint
       const k2 = p[`knee${s}`];
       const dirL = Math.sign(pose[`legD${s}`]) || 1;
       const kz = hip.z + side * dirL * outOfPlane(LIMB.thigh, k2[0] - p.pelvis[0], k2[1] - p.pelvis[1]);
-      const az = side * Math.max(side * kz * 0.85 + 0.15 * HALF.hip, HALF.hip - 1);
+      const az = o.stance ? side * o.stance.halfWidth : side * Math.max(side * kz * 0.85 + 0.15 * HALF.hip, HALF.hip - 1);
       const ankle = P(p[`ankle${s}`], az);
       const kPole = P(k2, 0).sub(V((p.pelvis[0] + p[`ankle${s}`][0]) / 2 - centerX, (p.pelvis[1] + p[`ankle${s}`][1]) / 2, 0));
-      kPole.z = side * 3 + (kz - az) * 0.5;
+      // Knees track out over the toes.
+      kPole.z = o.stance ? side * (6 + o.stance.halfWidth * 0.35) : side * 3 + (kz - az) * 0.5;
       const knee = solveTwoBone(hip, ankle, LIMB.thigh, LIMB.shin, kPole);
+      // Feet: turned out about the ankle.
+      const turn = ((o.stance?.toeOut ?? 0) * Math.PI) / 180;
+      const foot = (v: Vec, extra: number) => {
+        const q = P(v, az + side * extra).sub(ankle);
+        return ankle.clone().add(V(q.x * Math.cos(turn), q.y, q.z + side * q.x * Math.sin(turn)));
+      };
       return {
         shoulder: sh,
         elbow,
@@ -102,9 +111,9 @@ export function jointsFromFrame(f: Frame, opts: RigOptions | number = {}): Joint
         hip,
         knee,
         ankle,
-        heel: P(p[`heel${s}`], az),
-        ball: P(p[`ball${s}`], az + side * 1.2),
-        toe: P(p[`toe${s}`], az + side * 1.6),
+        heel: foot(p[`heel${s}`], 0),
+        ball: foot(p[`ball${s}`], 1.2),
+        toe: foot(p[`toe${s}`], 1.6),
       };
     };
     return {

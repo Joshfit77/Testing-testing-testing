@@ -111,7 +111,7 @@ export function computeWeights(
       const fd = norm(sub(J.wrist, J.elbow));
       const along = dot(sub(p, J.wrist), fd);
       const off = len(sub(sub(p, J.wrist), mul(fd, along)));
-      if (along > -1 && along < 22 && off < 7 && (sd === "R") === p[2] > 0) primary = `hand${sd}`;
+      if (along > -1 && along < 24 && off < 13 && (sd === "R") === p[2] > 0) primary = `hand${sd}`;
     }
     // The face and jaw hang in front of and below the top of the neck: they move with the head.
     if ((p[1] > B.neckTop[1] - 8 && p[0] > B.neckTop[0] + 3.5 && Math.abs(p[2]) < 9) || p[1] > B.neckTop[1] + 1.5) {
