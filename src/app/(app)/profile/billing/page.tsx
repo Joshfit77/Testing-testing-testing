@@ -13,6 +13,7 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { isServiceRoleConfigured, isStripeConfigured } from "@/server/env";
 import { getNativePlatform } from "@/server/native";
+import { isDemoMode } from "@/server/demo";
 import { getAiAllowance } from "@/server/services/ai-coach";
 import { intervalForPriceId, stripePriceProblems, stripeProPrices } from "@/server/services/billing";
 import { legalLinks, storeProductIds, storePublicKey } from "@/server/services/store-billing";
@@ -89,6 +90,14 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
       </Link>
       <PageHeader eyebrow="Membership" title="Plans & billing" description="Free, or Pro All Access monthly or yearly. Change or cancel any time." />
 
+      {isDemoMode() && (
+        <Notice tone="warning">
+          <span data-testid="demo-purchases-off">
+            <strong>Demo:</strong> purchases are turned off and nothing is charged. The prices below are the real Free and Pro All Access prices; to see
+            Pro features, use the Free / Pro switch at the top of the screen.
+          </span>
+        </Notice>
+      )}
       {checkout === "success" && (
         <Notice tone="success">
           Thank you! Stripe has your payment details. Pro All Access unlocks as soon as Stripe confirms the subscription, usually within seconds. Refresh

@@ -10,8 +10,15 @@ function listEnv(raw: string | undefined): string[] {
  * Test keys (sk_test_) always work.
  */
 function stripeSecretKey(raw: string | undefined): string {
+  // A demo deployment (DEMO_MODE=true) never takes payments, whatever keys it was given.
+  if (process.env.DEMO_MODE === "true") return "";
   const key = raw ?? "";
   return /^(sk|rk)_live_/.test(key) && process.env.STRIPE_LIVE_APPROVED !== "true" ? "" : key;
+}
+
+/** Store-billing secrets are ignored in a demo deployment, so in-app purchases can't run there either. */
+function storeSecret(raw: string | undefined): string {
+  return process.env.DEMO_MODE === "true" ? "" : (raw ?? "");
 }
 
 /** Server-only secrets. Never import this module from client components. */
@@ -19,7 +26,7 @@ export const serverEnv = {
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
   anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? "",
   stripeSecretKey: stripeSecretKey(process.env.STRIPE_SECRET_KEY),
-  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
+  stripeWebhookSecret: storeSecret(process.env.STRIPE_WEBHOOK_SECRET),
   /** Pro All Access: $19.99 a month and $149.99 a year (the only prices sold to new customers). */
   stripePricePro: process.env.STRIPE_PRICE_PRO ?? "",
   stripePriceProYearly: process.env.STRIPE_PRICE_PRO_YEARLY ?? "",
@@ -34,9 +41,9 @@ export const serverEnv = {
   stripeLegacyPricesPro: listEnv(process.env.STRIPE_PRICE_PRO_LEGACY),
   usdaApiKey: process.env.USDA_FDC_API_KEY ?? "",
   /** RevenueCat (App Store / Google Play). The secret key reads customers server-side; never send it to the app. */
-  revenueCatSecretKey: process.env.REVENUECAT_SECRET_API_KEY ?? "",
+  revenueCatSecretKey: storeSecret(process.env.REVENUECAT_SECRET_API_KEY),
   /** The exact Authorization header value set for the webhook in the RevenueCat dashboard. */
-  revenueCatWebhookAuth: process.env.REVENUECAT_WEBHOOK_AUTH ?? "",
+  revenueCatWebhookAuth: storeSecret(process.env.REVENUECAT_WEBHOOK_AUTH),
   revenueCatApiBaseUrl: (process.env.REVENUECAT_API_BASE_URL ?? "https://api.revenuecat.com").replace(/\/$/, ""),
   revenueCatEntitlementPlus: process.env.REVENUECAT_ENTITLEMENT_PLUS || "plus",
   revenueCatEntitlementPro: process.env.REVENUECAT_ENTITLEMENT_PRO || "pro",

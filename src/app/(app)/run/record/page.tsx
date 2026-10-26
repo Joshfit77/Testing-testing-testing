@@ -5,6 +5,7 @@ import { isRunDay, type RunPrescription } from "@/lib/domain/run-session";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { hasFeature } from "@/lib/domain/plans";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
+import { DemoNote } from "@/components/demo/demo-note";
 
 export const metadata = { title: "Record" };
 
@@ -43,6 +44,7 @@ export default async function RecordPage({ searchParams }: { searchParams: Promi
     <div className="mx-auto max-w-xl space-y-5">
       <BackLink href="/run">Run</BackLink>
       <PageHeader eyebrow="Run" title={guided ? "Guided run" : "Record outdoors"} description="Distance, pace, splits and your route from your phone's GPS." />
+      <DemoNote topic="gps" />
       <GpsRecorder userId={user.id} units={profile.unit_system} initialKind={sp.kind === "walk" ? "walk" : "run"} guided={guided} canRecord={hasFeature(plan, "live_gps")} />
     </div>
   );

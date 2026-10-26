@@ -13,6 +13,8 @@ import { isFlagEnabled } from "@/server/flags";
 import { AiError, getAiUsage } from "@/server/services/ai-coach";
 import { suggestedQuestions } from "@/lib/coach/context";
 import { loadAthleteSnapshot } from "@/server/coach/snapshot";
+import { demoAiSimulated } from "@/server/demo";
+import { Notice } from "@/components/common/states";
 
 export const metadata = { title: "AI Coach" };
 
@@ -120,6 +122,14 @@ export default async function CoachPage({
           </>
         }
       />
+      {demoAiSimulated() && (
+        <Notice tone="warning">
+          <span data-testid="demo-ai-simulated">
+            <strong>Demo:</strong> no AI model is connected. Replies here are written by a script and labelled as simulated. The app&apos;s real tools
+            still run on the sample data, and suggested changes still wait for your approval.
+          </span>
+        </Notice>
+      )}
       {conversations.length > 0 && (
         <details className="rounded-2xl border border-border bg-card p-3 lg:hidden">
           <summary className="cursor-pointer text-sm font-semibold">
