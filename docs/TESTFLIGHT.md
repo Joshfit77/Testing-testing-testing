@@ -113,14 +113,15 @@ those delays:
 
 - Enter Narrow Gate rises in 2.15 s into the opening, the opening moves on by itself at 3.85 s and is gone at
   5.05 s. The Simulator test does not wait for a screenshot to show the risen button (that put the tap after the
-  window on a slow machine): it films the launch until the opening is on screen, then polls the accessibility tree
-  for the button (a fraction of a second per query, even there) and presses the moment it appears, at the place the
-  fresh launch's film showed it. The frame right after the press must show the door open with its light, so a tap
-  that lands after the opening moved on by itself fails and XCTest retries it; then the opening must end and the
-  welcome page appear. The light itself fills the screen for about half a second after the press: when a
-  screenshot takes under a second the test requires a frame of it, and when the machine is slower than that it
-  cannot film it and says so in the log (a `::warning::` line and the CHECK verdict), rather than guess either
-  way; the move is checked frame by frame in WebKit.
+  window on a slow machine): it films the launch with cheap frames of the blank page, takes the opening's first
+  painted frame as its clock, and sends the tap 2.3 s after it, at the place the fresh launch's film showed the
+  button. The frame right after the press must show the door open with its light, so a tap that lands after the
+  opening moved on by itself fails and XCTest retries it; then the light must fill the screen, the opening end and
+  the welcome page appear. The fresh launch measures how long a screenshot of the opening takes on the machine:
+  over 0.9 s, the half second of light after the press cannot be filmed at all, and the Enter check is skipped
+  with that reason (an XCTest skip, a `::warning::` line and a SKIPPED verdict) rather than failed or passed
+  blindly; the fresh launch, relaunch and background checks still run, and the move is checked frame by frame in
+  WebKit.
 - The WebKit test films the move into the light from inside the page, frame by frame from the press itself, so
   slow round trips between Playwright and the browser cannot miss the 0.9 s push; it still requires the scene to
   grow past 2.5x and the light to fill the screen. When the machine draws no frame before the opening's own 1.5 s

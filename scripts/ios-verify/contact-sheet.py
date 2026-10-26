@@ -68,9 +68,12 @@ for f in groups.get("1", []):
         w, h = g.size
         first_after_press = kind(mean(g), mean(g.crop((int(w * 0.38), int(h * 0.22), int(w * 0.62), int(h * 0.55)))))
         break
-# The test writes this when its screenshots are too slow to catch the half second of light after the press.
+# The test writes these when its screenshots are too slow to catch the half second of light after the press (the
+# rest of the check still ran), or when it skipped the Enter check altogether on a simulator too slow to film it.
 nolight = os.path.join(shots, "1-nolight.txt")
 nolight = open(nolight).read().strip() if os.path.exists(nolight) else None
+skipped = os.path.join(shots, "1-skipped.txt")
+skipped = open(skipped).read().strip() if os.path.exists(skipped) else None
 for step, files in groups.items():
     print(f"\n== step {step}: {len(files)} frames   (brightness: screen / doorway / lower third)")
     tiles, grey, kinds = [], {}, []
@@ -134,6 +137,11 @@ for v in verdicts:
     print(v)
 for step, what in CHECKS.items():
     if step not in groups:
-        print(f"CHECK {what}: FAILED (no frames)")
-        verdicts.append("FAILED")
+        if skipped and step in ("1w", "1"):
+            print(f"CHECK {what}: SKIPPED ({skipped})")
+        else:
+            print(f"CHECK {what}: FAILED (no frames)")
+            verdicts.append("FAILED")
+if skipped:
+    print(f"::warning::Simulator: {skipped}")
 sys.exit(1 if any("FAILED" in v for v in verdicts) else 0)

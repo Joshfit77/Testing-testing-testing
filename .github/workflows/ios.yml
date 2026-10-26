@@ -157,7 +157,9 @@ jobs:
           quiet=0
           for i in $(seq 1 60); do
             # iostat's second report is the last 2 s; its "id" column sits before the three load averages.
-            idle=$(iostat -c 2 -w 2 | tail -1 | awk '{ print int($(NF-3)) }')
+            raw=$(iostat -c 2 -w 2 2>&1 || true)
+            idle=$(printf '%s\n' "$raw" | awk 'NF >= 6 && $(NF-3) ~ /^[0-9]+$/ { v = $(NF-3) } END { print v + 0 }')
+            [ "$i" -eq 1 ] && printf '%s\n' "$raw" | tail -3
             echo "$(date +%T) CPU idle ${idle:-?}%"
             if [ "${idle:-0}" -ge 50 ]; then quiet=$((quiet + 1)); else quiet=0; fi
             if [ "$quiet" -ge 3 ]; then break; fi
@@ -189,7 +191,9 @@ jobs:
           quiet=0
           for i in $(seq 1 60); do
             # iostat's second report is the last 2 s; its "id" column sits before the three load averages.
-            idle=$(iostat -c 2 -w 2 | tail -1 | awk '{ print int($(NF-3)) }')
+            raw=$(iostat -c 2 -w 2 2>&1 || true)
+            idle=$(printf '%s\n' "$raw" | awk 'NF >= 6 && $(NF-3) ~ /^[0-9]+$/ { v = $(NF-3) } END { print v + 0 }')
+            [ "$i" -eq 1 ] && printf '%s\n' "$raw" | tail -3
             echo "$(date +%T) CPU idle ${idle:-?}%"
             if [ "${idle:-0}" -ge 50 ]; then quiet=$((quiet + 1)); else quiet=0; fi
             if [ "$quiet" -ge 3 ]; then break; fi
