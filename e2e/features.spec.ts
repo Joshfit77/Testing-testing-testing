@@ -37,7 +37,7 @@ test.describe("feature access, subscriptions and core sections", () => {
     await page.goto("/nutrition");
     await expect(page.getByRole("button", { name: "Add food" })).toBeVisible();
     await page.goto("/nutrition/planner");
-    await expect(page.getByText("Included with Plus and Pro")).toBeVisible();
+    await expect(page.getByText("Included with Pro All Access")).toBeVisible();
 
     await page.goto("/coach");
     await expect(page.getByText(/isn't configured on this server|included with Pro/).first()).toBeVisible();
@@ -45,7 +45,8 @@ test.describe("feature access, subscriptions and core sections", () => {
 
     await page.goto("/profile/billing");
     await expect(page.getByRole("heading", { name: "Plans & billing" })).toBeVisible();
-    await expect(page.getByText("Current plan")).toBeVisible();
+    await expect(page.getByText("Current membership")).toBeVisible();
+    await expect(page.getByTestId("current-plan")).toHaveText("Free");
   });
 
   test("progress: log bodyweight and create a goal; recovery check-in requires consent", async ({ page }) => {
@@ -96,10 +97,17 @@ test.describe("feature access, subscriptions and core sections", () => {
     await expect(page.getByText("210").first()).toBeVisible();
 
     await page.goto("/profile/billing");
-    await expect(page.getByText(/^\$11\.99\s*\/ month$/)).toBeVisible();
-    await expect(page.getByText(/^\$24\.99\s*\/ month$/)).toBeVisible();
-    await expect(page.getByText("AI coach: 150 messages a month")).toBeVisible();
-    // No yearly option unless the owner configures a yearly price.
-    await expect(page.getByText("All Access Yearly")).toHaveCount(0);
+    // Only Free and Pro All Access are offered, at the approved prices; Plus is never offered.
+    await expect(page.getByTestId("plan-free")).toContainText("$0");
+    await expect(page.getByTestId("pro-price")).toHaveText("$19.99 / month");
+    await page.getByRole("radio", { name: /Yearly/ }).click();
+    await expect(page.getByTestId("pro-price")).toHaveText("$149.99 / year");
+    await expect(page.getByText("About $12.49 a month, billed yearly.")).toBeVisible();
+    await expect(page.getByRole("radio", { name: /Save 37%/ })).toBeVisible();
+    await expect(page.getByText("150 requests / month")).toBeVisible();
+    await expect(page.getByText(/\$11\.99|\$24\.99|\$249\.99/)).toHaveCount(0);
+    // No Stripe keys in this test environment: no checkout is offered, and nothing pretends to be one.
+    await expect(page.getByText("Online checkout isn't available right now. You haven't been charged.")).toBeVisible();
+    await expect(page.getByRole("button", { name: /Start Pro All Access/ })).toHaveCount(0);
   });
 });

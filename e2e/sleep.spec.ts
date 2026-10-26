@@ -246,21 +246,21 @@ test.describe("Sleep & Recovery", () => {
     const months = page.getByRole("list", { name: "Average time asleep by month" }).getByRole("listitem");
     await expect(months.first()).toBeVisible();
     expect(await months.count()).toBeGreaterThanOrEqual(12);
-    await expect(page.getByRole("heading", { name: "Weekdays and weekends" }).locator("..")).toContainText("Included with Plus and Pro");
+    await expect(page.getByRole("heading", { name: "Weekdays and weekends" }).locator("..")).toContainText("Included with Pro All Access");
     await page.goto("/progress/sleep/history?range=7d");
     await page.getByRole("list", { name: "Nights" }).getByRole("link").first().click();
     await page.waitForURL(/\/progress\/sleep\/night\//);
     await expect(page.getByRole("heading", { name: "Sleep score" })).toBeVisible();
     // Free sees the score and its basis, not the breakdown.
     await expect(page.getByText(/Based on duration/)).toBeVisible();
-    await expect(page.getByText("Plus shows how this score was built")).toBeVisible();
+    await expect(page.getByText("Pro All Access shows how this score was built")).toBeVisible();
     await page.getByRole("link", { name: "How it's worked out" }).first().click();
     await page.waitForURL(/\/progress\/sleep\/method$/);
     await expect(page.getByRole("heading", { name: /Nightly score \(version/ })).toBeVisible();
-    // Sleep debt, schedule and energy are Plus: the honest locked state, with no numbers invented.
+    // Sleep debt, schedule and energy are Pro: the honest locked state, with no numbers invented.
     for (const path of ["/progress/sleep/debt", "/progress/sleep/schedule", "/progress/sleep/energy"]) {
       await page.goto(path);
-      await expect(page.getByText("Included with Plus and Pro")).toBeVisible();
+      await expect(page.getByText("Included with Pro All Access")).toBeVisible();
     }
     await page.goto("/progress/sleep/training");
     await expect(page.getByText("Included with Pro")).toBeVisible();

@@ -32,7 +32,7 @@ export default async function TemplatesPage() {
         {atLimit ? (
           <Button asChild variant="secondary">
             <Link href="/profile/billing">
-              <Plus aria-hidden /> Unlimited with Plus
+              <Plus aria-hidden /> Unlimited with Pro
             </Link>
           </Button>
         ) : (

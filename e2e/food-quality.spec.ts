@@ -35,7 +35,7 @@ test.describe("Narrow Gate Food IQ", () => {
     expect(ctaBox.y).toBeLessThan(totalsBox.y);
     await page.getByRole("navigation", { name: "Food tools" }).getByRole("link", { name: "Nutrition Score" }).click();
     await expect(page.getByRole("heading", { name: "Narrow Gate Nutrition Score", level: 1 })).toBeVisible();
-    await expect(page.getByTestId("my-filters")).toContainText("included with Plus and Pro");
+    await expect(page.getByTestId("my-filters")).toContainText("included with Pro All Access");
     await typeBarcode(page, Q.honey);
 
     const product = page.getByTestId("quality-product");
@@ -107,7 +107,7 @@ test.describe("Narrow Gate Food IQ", () => {
     await expect(alts).toContainText("Less sugar: 12 g vs 30 g per 100 g");
     await expect(alts).not.toContainText("Choco Puffs");
     await expect(alts.getByRole("link", { name: "Compare side by side" })).toHaveCount(0);
-    await expect(product).toContainText("Side-by-side product comparisons and personal filters are included with Plus and Pro.");
+    await expect(product).toContainText("Side-by-side product comparisons and personal filters are included with Pro All Access.");
     await expect(product).toContainText("Asking the AI about a product (how it fits your goals, how it compares, how to fit it into a meal plan) is included with Pro.");
     await expect(product).toContainText("Open Database License");
 
