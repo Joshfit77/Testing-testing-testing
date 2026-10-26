@@ -21,8 +21,8 @@ final class OpeningOnSimulatorTests: XCTestCase {
     nonisolated(unsafe) private static var enterPoint: CGPoint?
     /// How long a screenshot call takes while the opening animates here (median), from test0's film.
     nonisolated(unsafe) private static var openingCapture: TimeInterval?
-    /// Whether test0's film kept up with the opening (the door seen, frames never more than 1.5 s apart): only then
-    /// can a film time the press; set to the longest gap otherwise.
+    /// Set when test0's film could not catch the door open (the screenshot service stalled across it), to the longest
+    /// gap between its frames: a film cannot then time the press either.
     nonisolated(unsafe) private static var openingGap: TimeInterval?
 
     /// XCUITest waits for the app to be idle (no animations) before and after each tap; the opening animates
@@ -290,7 +290,7 @@ final class OpeningOnSimulatorTests: XCTestCase {
         let gaps = zip(opening, opening.dropFirst()).map { $1.at.timeIntervalSince($0.at) }
         let longestGap = gaps.max() ?? 0
         var stalled: String?
-        Self.openingGap = (sawGate && longestGap < 1.5) ? nil : longestGap
+        Self.openingGap = sawGate ? nil : longestGap
         if !sawGate, longestGap >= 1.5 {
             stalled = String(format: "the door could not be filmed on this fresh launch: the screenshot service stalled for %.1f s while the opening rendered, and the next frame was already the welcome page", longestGap)
             try? stalled!.write(to: shotsDir.appendingPathComponent("0-stall.txt"), atomically: true, encoding: .utf8)
