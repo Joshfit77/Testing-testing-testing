@@ -20,7 +20,8 @@ export interface Stage {
   dispose(): void;
 }
 
-export function makeStage(canvas: HTMLCanvasElement, opts: { pixelRatio?: number; bloom?: boolean } = {}): Stage {
+export function makeStage(canvas: HTMLCanvasElement, opts: { pixelRatio?: number; bloom?: boolean; look?: "gold" | "medical" } = {}): Stage {
+  const medical = opts.look === "medical";
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: "high-performance", preserveDrawingBuffer: false });
   renderer.setPixelRatio(Math.min(opts.pixelRatio ?? (typeof devicePixelRatio === "number" ? devicePixelRatio : 1), 2));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -28,30 +29,31 @@ export function makeStage(canvas: HTMLCanvasElement, opts: { pixelRatio?: number
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
   const scene = new THREE.Scene();
-  const backdrop = backdropTexture();
+  const backdrop = medical ? smokeBackdrop() : backdropTexture();
   scene.background = backdrop ?? new THREE.Color("#060504");
   const pmrem = new THREE.PMREMGenerator(renderer);
   const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
   scene.environment = env;
-  scene.environmentIntensity = 0.75;
+  scene.environmentIntensity = medical ? 0.55 : 0.75;
 
   const camera = new THREE.PerspectiveCamera(30, 1, 10, 3000);
 
   // Lights: warm key from the front-left, gold rims behind both shoulders, soft fill from below the camera.
-  const key = new THREE.DirectionalLight("#fff1d6", 2.6);
+  // Medical look: a neutral studio, white key from above-front, soft cool rims.
+  const key = new THREE.DirectionalLight(medical ? "#fff6ee" : "#fff1d6", medical ? 3.0 : 2.6);
   key.position.set(260, 320, -160);
-  const rimA = new THREE.DirectionalLight("#ffc65a", 3.4);
+  const rimA = new THREE.DirectionalLight(medical ? "#e8eeff" : "#ffc65a", medical ? 1.6 : 3.4);
   rimA.position.set(-260, 220, 220);
-  const rimB = new THREE.DirectionalLight("#ffd27a", 2.6);
+  const rimB = new THREE.DirectionalLight(medical ? "#dfe6f5" : "#ffd27a", medical ? 1.3 : 2.6);
   rimB.position.set(-200, 160, -260);
-  const fill = new THREE.HemisphereLight("#3a2c14", "#050403", 0.9);
+  const fill = new THREE.HemisphereLight(medical ? "#3a3634" : "#3a2c14", "#050403", medical ? 1.2 : 0.9);
   // Soft front light so surfaces facing the viewer read clearly.
-  const front = new THREE.DirectionalLight("#ffe8c2", 0.9);
+  const front = new THREE.DirectionalLight(medical ? "#fff4ec" : "#ffe8c2", medical ? 1.3 : 0.9);
   front.position.set(420, 160, 60);
   scene.add(key, rimA, rimB, fill, front);
 
   // Floor: unlit, warm black under the athlete fading to the background, so it never competes with the gold.
-  const tex = floorTexture();
+  const tex = floorTexture(medical);
   const floor = new THREE.Mesh(new THREE.CircleGeometry(380, 64), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
   floor.rotation.x = -Math.PI / 2;
   floor.position.y = -0.2;
@@ -62,7 +64,7 @@ export function makeStage(canvas: HTMLCanvasElement, opts: { pixelRatio?: number
 
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.38, 0.35, 0.95);
+  const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), medical ? 0.3 : 0.38, 0.35, medical ? 0.97 : 0.95);
   if (opts.bloom !== false) composer.addPass(bloom);
   composer.addPass(new OutputPass());
 
@@ -93,12 +95,37 @@ export function makeStage(canvas: HTMLCanvasElement, opts: { pixelRatio?: number
   };
 }
 
-function floorTexture(): THREE.Texture {
-  const size = 256;
+function floorTexture(medical = false): THREE.Texture {
+  const size = medical ? 1024 : 256;
   const c = typeof document !== "undefined" ? document.createElement("canvas") : null;
   if (!c) return new THREE.Texture();
   c.width = c.height = size;
   const g = c.getContext("2d")!;
+  if (medical) {
+    // Dark concrete: a pool of light under the athlete, mottled grain, fading out to black.
+    const grain = g.createImageData(size, size);
+    for (let i = 0; i < size * size; i++) {
+      const v = 70 + Math.random() * 60;
+      grain.data.set([v, v, v, Math.random() < 0.5 ? 40 + Math.random() * 50 : 0], i * 4);
+    }
+    g.putImageData(grain, 0, 0);
+    const lit = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    lit.addColorStop(0, "rgba(120,120,120,0.55)");
+    lit.addColorStop(0.45, "rgba(60,60,60,0.35)");
+    lit.addColorStop(1, "rgba(0,0,0,0)");
+    g.fillStyle = lit;
+    g.fillRect(0, 0, size, size);
+    g.globalCompositeOperation = "destination-in";
+    const fade = g.createRadialGradient(size / 2, size / 2, size * 0.2, size / 2, size / 2, size / 2);
+    fade.addColorStop(0, "rgba(0,0,0,1)");
+    fade.addColorStop(1, "rgba(0,0,0,0)");
+    g.fillStyle = fade;
+    g.fillRect(0, 0, size, size);
+    g.globalCompositeOperation = "source-over";
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }
   const grad = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
   grad.addColorStop(0, "rgba(58,42,16,0.85)");
   grad.addColorStop(0.35, "rgba(24,18,8,0.75)");
@@ -148,6 +175,34 @@ function backdropTexture(): THREE.Texture | null {
   floor.addColorStop(1, "rgba(3,2,2,1)");
   g.fillStyle = floor;
   g.fillRect(0, 360, 512, 152);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/** Medical look: a near-black studio with low drifting haze over the floor. */
+function smokeBackdrop(): THREE.Texture | null {
+  const c = typeof document !== "undefined" ? document.createElement("canvas") : null;
+  if (!c) return null;
+  c.width = 512;
+  c.height = 512;
+  const g = c.getContext("2d")!;
+  g.fillStyle = "#050505";
+  g.fillRect(0, 0, 512, 512);
+  const glow = g.createRadialGradient(256, 250, 20, 256, 250, 300);
+  glow.addColorStop(0, "rgba(40,40,40,0.9)");
+  glow.addColorStop(1, "rgba(0,0,0,0)");
+  g.fillStyle = glow;
+  g.fillRect(0, 0, 512, 512);
+  g.filter = "blur(18px)";
+  for (let i = 0; i < 40; i++) {
+    const x = Math.random() * 512, y = 300 + Math.random() * 110, r = 20 + Math.random() * 60;
+    g.fillStyle = `rgba(150,150,150,${0.03 + Math.random() * 0.05})`;
+    g.beginPath();
+    g.ellipse(x, y, r * 1.8, r * 0.6, 0, 0, Math.PI * 2);
+    g.fill();
+  }
+  g.filter = "none";
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   return t;

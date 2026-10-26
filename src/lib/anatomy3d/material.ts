@@ -16,23 +16,49 @@ export interface AthleteMaterial {
 export const GOLD_BASE = new THREE.Color("#c8903a");
 export const GLOW_COLOR = new THREE.Color("#ffb72e");
 
-export function makeAthleteMaterial(): AthleteMaterial {
+/**
+ * The two looks: "gold" (the app's anatomical gold) and "medical" (a classic anatomy plate: red muscle with fine fibres,
+ * pearly white tendons and aponeuroses, ivory bone). Colours in the shader are linear.
+ */
+export type AthleteLook = "gold" | "medical";
+const f1 = (x: number) => x.toFixed(3); // GLSL floats always need a decimal point
+const g3 = (v: readonly number[]) => `vec3(${v.map(f1).join(", ")})`;
+const LOOKS = {
+  gold: {
+    base: "#c8903a", metalness: 0.5, roughness: 0.34, clearcoat: 0.85, clearcoatRoughness: 0.14, sheen: 0.5, sheenColor: "#ffd98a",
+    fibre: [0.88, 0.2], tendonEnd: [[0.93, 0.79, 0.52], 0.55], bone: [[0.8, 0.66, 0.42], 0.45], tendon: [[0.92, 0.8, 0.55], 0.5],
+    hairDark: 0.16, scalp: [[0.93, 0.79, 0.52], 0], fascia: 0.42, skinMetal: 0.42, skinTint: [1, 1, 1], skinMul: 0.72, rim: [[1, 0.72, 0.32], 0.12],
+    glow: "#ffb72e", glowTint: 0.45,
+  },
+  medical: {
+    base: "#b0463a", metalness: 0, roughness: 0.5, clearcoat: 0.28, clearcoatRoughness: 0.35, sheen: 0.25, sheenColor: "#ff9f8c",
+    fibre: [0.74, 0.42], tendonEnd: [[0.86, 0.8, 0.7], 0.9], bone: [[0.82, 0.75, 0.6], 0.92], tendon: [[0.88, 0.83, 0.74], 0.92],
+    hairDark: 0, scalp: [[0.62, 0.52, 0.46], 0.6], fascia: 0.3, skinMetal: 0, skinTint: [1.0, 0.92, 0.9], skinMul: 0.95, rim: [[1, 0.55, 0.45], 0.05],
+    // Worked muscles: a hot, bright orange-red that reads clearly against the plain muscle red.
+    glow: "#ff7a2e", glowTint: 0.35,
+  },
+} as const;
+
+export function makeAthleteMaterial(look: AthleteLook = "gold", opts: { shorts?: boolean } = {}): AthleteMaterial {
+  const L = LOOKS[look];
+  // Without shorts (as in an anatomy plate) only the smooth panel over the groin is kept, shaded as muscle.
+  const SHORTS = f1(opts.shorts === false ? 0 : 1);
   const glow = new Float32Array(MUSCLE_ID_COUNT + 1);
   const uniforms = {
     uGlow: { value: glow },
-    uGlowColor: { value: GLOW_COLOR.clone() },
+    uGlowColor: { value: new THREE.Color(L.glow) },
     uGlowOn: { value: 1 },
   };
-  // Satin gold tissue: part metal, part soft sheen, with a thin wet clearcoat, so it reads as living tissue cast in
-  // gold rather than a polished statue.
+  // Gold: satin tissue, part metal, part soft sheen, with a thin wet clearcoat, so it reads as living tissue cast in
+  // gold rather than a polished statue. Medical: moist, non-metallic muscle.
   const material = new THREE.MeshPhysicalMaterial({
-    color: GOLD_BASE,
-    metalness: 0.5,
-    roughness: 0.34,
-    clearcoat: 0.85,
-    clearcoatRoughness: 0.14,
-    sheen: 0.5,
-    sheenColor: new THREE.Color("#ffd98a"),
+    color: new THREE.Color(L.base),
+    metalness: L.metalness,
+    roughness: L.roughness,
+    clearcoat: L.clearcoat,
+    clearcoatRoughness: L.clearcoatRoughness,
+    sheen: L.sheen,
+    sheenColor: new THREE.Color(L.sheenColor),
     sheenRoughness: 0.55,
     // The shorts are an open sheet (their hems show the inside), so both faces are drawn.
     side: THREE.FrontSide,
@@ -66,6 +92,8 @@ export function makeAthleteMaterial(): AthleteMaterial {
         vTissue = tissue;
         // Distance across the fibres (rest pose), for the striations.
         vec3 across = normalize(cross(fiber, objectNormal) + vec3(1e-4));
+        // Without shorts, the groin panel sits a little lower, tucked between the thigh muscles.
+        if (tissue > 5.5 && ${SHORTS} < 0.5) transformed -= objectNormal * 0.1;
         vStripe = dot(position, across);
         vRest = position;`,
       );
@@ -102,26 +130,31 @@ export function makeAthleteMaterial(): AthleteMaterial {
         float stripeAA = 1.0 - smoothstep(0.35, 0.9, fwidth(vStripe * 7.5));
         float fibre = 0.5 + 0.5 * sin(vStripe * 7.5) * stripeAA;
         float tendon = vExtra * isMuscle;
-        diffuseColor.rgb *= mix(1.0, 0.88 + 0.2 * fibre, isMuscle * (1.0 - tendon));
+        diffuseColor.rgb *= mix(1.0, ${f1(L.fibre[0])} + ${f1(L.fibre[1])} * fibre, isMuscle * (1.0 - tendon));
         // Tendinous ends: paler, smoother gold.
-        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.79, 0.52), tendon * 0.55);
-        if (vTissue > 1.5 && vTissue < 2.5) diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.80, 0.66, 0.42), 0.45); // bone
-        if (vTissue > 2.5 && vTissue < 3.5) diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.92, 0.80, 0.55), 0.5); // tendon
+        diffuseColor.rgb = mix(diffuseColor.rgb, ${g3(L.tendonEnd[0])}, tendon * ${f1(L.tendonEnd[1])});
+        if (vTissue > 1.5 && vTissue < 2.5) diffuseColor.rgb = mix(diffuseColor.rgb, ${g3(L.bone[0])}, ${f1(L.bone[1])}); // bone
+        if (vTissue > 2.5 && vTissue < 3.5) diffuseColor.rgb = mix(diffuseColor.rgb, ${g3(L.tendon[0])}, ${f1(L.tendon[1])}); // tendon
         // Hair: a short buzz cut, darker gold with a fine grain.
         float isHair = (1.0 - step(0.5, vTissue)) * smoothstep(0.2, 0.8, vExtra);
         float grain = hash3(floor(vRest * 9.0));
         // Shaved head: only a faint darker tone on the scalp.
-        diffuseColor.rgb *= 1.0 - 0.16 * isHair * (0.8 + 0.4 * grain);
+        diffuseColor.rgb *= 1.0 - ${f1(L.hairDark)} * isHair * (0.8 + 0.4 * grain);
+        // (Medical look: the pale aponeurosis over the crown of the head.)
+        diffuseColor.rgb = mix(diffuseColor.rgb, ${g3(L.scalp[0])}, ${f1(L.scalp[1])} * isHair);
         // Eyes: ivory-gold whites, a dark amber iris, a black pupil.
         vec3 eye = mix(vec3(0.86, 0.74, 0.5), vec3(0.22, 0.13, 0.04), smoothstep(0.2, 0.5, vExtra));
         eye = mix(eye, vec3(0.015, 0.012, 0.01), smoothstep(0.75, 0.9, vExtra));
         diffuseColor.rgb = mix(diffuseColor.rgb, eye, isEye);
-        if (vTissue > 4.5 && vTissue < 5.5) diffuseColor.rgb *= 0.42; // fascia between the muscles
+        if (vTissue > 4.5 && vTissue < 5.5) diffuseColor.rgb *= ${f1(L.fascia)}; // fascia between the muscles
         // Shorts: matte black fabric, cut at a clean hem and waistband with a thin gold trim.
-        float isShorts = step(5.5, vTissue);
+        float isShorts = step(5.5, vTissue) * ${SHORTS};
         float hemY = 68.5 + 3.5 * smoothstep(6.0, 16.0, abs(vRest.z));
         float waistY = 95.5 + 3.0 * smoothstep(2.0, -8.0, vRest.x);
         if (isShorts > 0.5 && (vRest.y < hemY || vRest.y > waistY)) discard;
+        // Without shorts: a smooth V over the groin (narrower lower down), like the pubic region of an anatomy figure.
+        if (vTissue > 5.5 && isShorts < 0.5 && (abs(vRest.z) > 2.5 + 6.0 * smoothstep(66.0, 86.0, vRest.y) || vRest.y > 88.0 || vRest.y < 66.0 || vRest.x < -2.0)) discard;
+        if (vTissue > 5.5 && isShorts < 0.5) diffuseColor.rgb *= 0.8;
         float trim = isShorts * (1.0 - step(0.8, min(vRest.y - hemY, waistY - vRest.y)));
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.018, 0.016, 0.014), isShorts * (1.0 - trim));
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.85, 0.66, 0.3), trim);`,
@@ -141,21 +174,21 @@ export function makeAthleteMaterial(): AthleteMaterial {
         float fibreGlow = 0.78 + 0.22 * fibre;
         float body = 0.45 + 0.55 * vAo;
         totalEmissiveRadiance += uGlowColor * g * fibreGlow * body * 0.75;
-        diffuseColor.rgb = mix(diffuseColor.rgb, uGlowColor, clamp(g, 0.0, 1.0) * 0.45);
+        diffuseColor.rgb = mix(diffuseColor.rgb, uGlowColor, clamp(g, 0.0, 1.0) * ${f1(L.glowTint)});
         // Warm edge light, like light passing through the edges of the tissue.
         float facing = clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0);
-        totalEmissiveRadiance += vec3(1.0, 0.72, 0.32) * pow(1.0 - facing, 4.0) * 0.12 * (1.0 - step(5.5, vTissue));`,
+        totalEmissiveRadiance += ${g3(L.rim[0])} * pow(1.0 - facing, 4.0) * ${f1(L.rim[1])} * (1.0 - isShorts);`,
       )
       .replace(
         "#include <lights_physical_fragment>",
         `#include <lights_physical_fragment>
         // Shorts are matte fabric: no clearcoat or sheen (the gold trim keeps a little shine).
         #ifdef USE_CLEARCOAT
-        if (vTissue > 5.5) material.clearcoat = 0.0;
+        if (isShorts > 0.5) material.clearcoat = 0.0;
         if (vTissue < 0.5) material.clearcoat *= 0.35; // face, hands, feet: less wet shine
         #endif
         #ifdef USE_SHEEN
-        if (vTissue > 5.5) material.sheenColor *= 0.0;
+        if (isShorts > 0.5) material.sheenColor *= 0.0;
         #endif`,
       )
       .replace(
@@ -171,10 +204,10 @@ export function makeAthleteMaterial(): AthleteMaterial {
       .replace(
         "#include <metalnessmap_fragment>",
         `#include <metalnessmap_fragment>
-        if (vTissue < 0.5) metalnessFactor = 0.42; // face, hands and feet: satin, so the features read cleanly
-        if (vTissue < 0.5) diffuseColor.rgb *= 0.72;
+        if (vTissue < 0.5) metalnessFactor = ${f1(L.skinMetal)}; // face, hands and feet: satin, so the features read cleanly
+        if (vTissue < 0.5) diffuseColor.rgb *= ${g3(L.skinTint)} * ${f1(L.skinMul)};
         if (vTissue > 3.5 && vTissue < 4.5) metalnessFactor = 0.1;
-        if (vTissue > 5.5) metalnessFactor = trim > 0.5 ? 0.85 : 0.0;`,
+        if (isShorts > 0.5) metalnessFactor = trim > 0.5 ? 0.85 : 0.0;`,
       )
       .replace(
         "#include <roughnessmap_fragment>",
@@ -183,13 +216,13 @@ export function makeAthleteMaterial(): AthleteMaterial {
         roughnessFactor += vTissue > 4.5 && vTissue < 5.5 ? 0.35 : 0.0;
         roughnessFactor -= (vTissue > 2.5 && vTissue < 3.5 ? 0.12 : 0.0) + tendonR * 0.14;
         if (vTissue > 3.5 && vTissue < 4.5) roughnessFactor = 0.12;
-        if (vTissue > 5.5) roughnessFactor = trim > 0.5 ? 0.3 : 0.75;
+        if (isShorts > 0.5) roughnessFactor = trim > 0.5 ? 0.3 : 0.75;
         if (vTissue < 0.5) roughnessFactor = max(roughnessFactor, 0.5);
         if (vTissue < 0.5 && vExtra > 0.5) roughnessFactor = 0.45;
         roughnessFactor = clamp(roughnessFactor, 0.05, 1.0);`,
       );
   };
-  material.customProgramCacheKey = () => "ngf-athlete-v12";
+  material.customProgramCacheKey = () => `ngf-athlete-v13-${look}-${SHORTS}`;
   return {
     material,
     glow,

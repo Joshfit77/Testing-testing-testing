@@ -162,8 +162,8 @@ export interface HeadFit {
   /** Height of the bottom of the chin and of the crown. */
   chinY: number;
   crownY: number;
-  /** Keep the head and neck above this height (a function of the forward position). */
-  cutY: (x: number) => number;
+  /** Keep the head and neck above this height (a function of the forward and sideways position). */
+  cutY: (x: number, z: number) => number;
 }
 
 export function buildMakeHumanHead(mhData: string, fit: HeadFit): { head: HeadMesh; eyes: HeadMesh } {
@@ -189,7 +189,7 @@ export function buildMakeHumanHead(mhData: string, fit: HeadFit): { head: HeadMe
   ];
   const mirrored = leftSign < 0; // the mapping flips handedness: reverse the winding
   const ath = obj.pos.map(toAthlete);
-  const keepFace = (f: number[]) => f.every((i) => ath[i]![1] > fit.cutY(ath[i]![0]));
+  const keepFace = (f: number[]) => f.every((i) => ath[i]![1] > fit.cutY(ath[i]![0], ath[i]![2]));
   let head = { pos: ath, faces: body.filter(keepFace) };
   head = catmullClark(head.pos, head.faces);
   let eyes = { pos: ath, faces: [...obj.groups.get("helper-l-eye")!, ...obj.groups.get("helper-r-eye")!] };

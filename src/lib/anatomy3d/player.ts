@@ -4,7 +4,7 @@ import type { ExerciseMeta } from "../exercise-motion/types";
 import { effortCurve, type EffortCurve } from "./effort";
 import { makeEquipment, type EquipmentSet } from "./equipment";
 import { addGripMorph } from "./grip";
-import { makeAthleteMaterial } from "./material";
+import { makeAthleteMaterial, type AthleteLook } from "./material";
 import { loadAthlete, makeSkeleton } from "./mesh";
 import { muscleId, type Region } from "./muscle-ids";
 import { muscleTargets, type MuscleTargets } from "./muscle-map";
@@ -43,7 +43,7 @@ export interface AthletePlayer {
   setGlow(on: boolean): void;
   resize(width: number, height: number): void;
   /** Renders one still (for step thumbnails and the angle buttons) and returns it as a data URL. */
-  snapshot(t: number, view: CameraView, width: number, height: number): string;
+  snapshot(t: number, view: CameraView, width: number, height: number, camera?: ShotCamera): string;
   /** A still of the athlete standing in the rest pose (no equipment), from any angle, for reviews and diagrams. */
   restStill(o: { yaw: number; distance: number; targetY: number; width: number; height: number; effort?: number; fov?: number }): string;
   /** The athlete standing in the anatomical pose, front or back, with the worked muscles lit (the muscle diagram). */
@@ -52,16 +52,33 @@ export interface AthletePlayer {
   dispose(): void;
 }
 
+/** Optional framing for a still: distance, look-at height, extra yaw (radians). */
+export interface ShotCamera {
+  distance?: number;
+  targetY?: number;
+  yaw?: number;
+}
+
 const VIEW_YAW: Record<CameraView, number> = { front: -0.42, side: -Math.PI / 2 + 0.62, rear: Math.PI + 0.38 };
 
 export async function mountAthlete(
   canvas: HTMLCanvasElement,
   ex: PlayerExercise,
-  opts: { assetBase?: string; reducedMotion?: boolean; pixelRatio?: number; hideProps?: string[]; framing?: { distance?: number; targetY?: number } } = {},
+  opts: {
+    assetBase?: string;
+    reducedMotion?: boolean;
+    pixelRatio?: number;
+    hideProps?: string[];
+    framing?: { distance?: number; targetY?: number };
+    /** "gold" (default) or "medical" (red muscle, white tendons, like an anatomy plate). */
+    look?: AthleteLook;
+    /** Black shorts over the hips (default: on for gold, off for medical, like an anatomy plate). */
+    shorts?: boolean;
+  } = {},
 ): Promise<AthletePlayer> {
-  const stage: Stage = makeStage(canvas, { pixelRatio: opts.pixelRatio });
+  const stage: Stage = makeStage(canvas, { pixelRatio: opts.pixelRatio, look: opts.look });
   const { geometry } = await loadAthlete(opts.assetBase);
-  const mat = makeAthleteMaterial();
+  const mat = makeAthleteMaterial(opts.look, { shorts: opts.shorts ?? opts.look !== "medical" });
   const { bones, skeleton } = makeSkeleton();
   if (!geometry.morphAttributes.position) addGripMorph(geometry);
   const mesh = new THREE.SkinnedMesh(geometry, mat.material);
@@ -115,13 +132,13 @@ export async function mountAthlete(
       mat.glow[muscleId(r, 1)] = g;
     }
   };
-  const placeCamera = (cam: THREE.PerspectiveCamera, v: CameraView, aspect: number) => {
-    const yaw = VIEW_YAW[v] + (cam === stage.camera ? yawExtra : 0);
+  const placeCamera = (cam: THREE.PerspectiveCamera, v: CameraView, aspect: number, shot?: ShotCamera) => {
+    const yaw = VIEW_YAW[v] + (cam === stage.camera ? yawExtra : 0) + (shot?.yaw ?? 0);
     const p = cam === stage.camera ? pitch : 0.08;
-    const base = opts.framing?.distance ?? 340;
-    const dist = aspect < 0.8 ? base * 1.3 : base;
+    const base = shot?.distance ?? opts.framing?.distance ?? 340;
+    const dist = aspect < 0.8 && !shot?.distance ? base * 1.3 : base;
     // Follow the hips a little so the whole athlete stays in frame as they squat or lie down.
-    const target = new THREE.Vector3(0, opts.framing?.targetY ?? 34 + 0.55 * pelvisY, 0);
+    const target = new THREE.Vector3(0, shot?.targetY ?? opts.framing?.targetY ?? 34 + 0.55 * pelvisY, 0);
     cam.position.set(Math.cos(yaw) * Math.cos(p) * dist, target.y + Math.sin(p) * dist + 6, Math.sin(yaw) * Math.cos(p) * dist);
     cam.lookAt(target);
   };
@@ -199,14 +216,14 @@ export async function mountAthlete(
     resize(w, h) {
       stage.resize(w, h);
     },
-    snapshot(time, v, w, h) {
+    snapshot(time, v, w, h, shot) {
       const size = new THREE.Vector2();
       stage.renderer.getSize(size);
       const aspect = stage.camera.aspect;
       stage.resize(w, h);
       poseAt(time);
       applyGlow(effort.at(time));
-      placeCamera(stage.camera, v, w / h);
+      placeCamera(stage.camera, v, w / h, shot);
       const saveYaw = yawExtra;
       stage.render();
       const url = canvas.toDataURL("image/jpeg", 0.85);

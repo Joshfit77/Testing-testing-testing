@@ -25,6 +25,7 @@ import { MeshBVH } from "three-mesh-bvh";
 import { BONES, muscleId, NO_MUSCLE, TISSUE, type BoneName, type Region } from "../../src/lib/anatomy3d/muscle-ids";
 import { kindOf, regionOf, sideOf, type PartKind } from "./bp3d-regions";
 import { buildMakeHumanHead } from "./makehuman-head";
+import { fitShorts } from "./shorts-fit";
 import { computeWeights, NO_BONE } from "./weights";
 
 type V3 = [number, number, number];
@@ -352,6 +353,63 @@ for (const [id, name] of names) {
     extra,
   });
 }
+// Chest and abdomen, as on a bodybuilder: a full, rounded pectoral mass with a clear lower shelf, and a cut six-pack
+// (each segment of the rectus abdominis rounded between its tendinous lines). Only the front faces are pushed out, along
+// their normals, so the muscles thicken over the fascia and never open a gap.
+{
+  for (const side of [0, 1] as const) {
+    const pec = parts.filter((p) => /pectoralis major/.test(p.name) && sideOf(p.name) === side);
+    const front: V3[] = [];
+    for (const p of pec) {
+      const nrm = vertexNormals(p.mesh);
+      verts(p.mesh).forEach((v, n) => nrm[n * 3]! > 0.3 && front.push(v));
+    }
+    if (!front.length) continue;
+    const c = centroid(front);
+    const centre: V3 = [c[0], c[1] - 2.5, c[2] * 1.06];
+    for (const p of pec) {
+      const nrm = vertexNormals(p.mesh);
+      const ps = verts(p.mesh);
+      ps.forEach((v, n) => {
+        const dy = (v[1] - centre[1]) / (v[1] < centre[1] ? 6.5 : 11);
+        const dz = (v[2] - centre[2]) / 10.5;
+        const r2 = dy * dy + dz * dz;
+        if (r2 >= 1) return;
+        const d = 1.5 * (1 - r2) ** 2 * smoothstep(-0.15, 0.45, nrm[n * 3]!);
+        for (let k = 0; k < 3; k++) p.mesh.pos[n * 3 + k]! += nrm[n * 3 + k]! * d;
+      });
+    }
+  }
+  for (const p of parts.filter((q) => /rectus abdominis/.test(q.name))) {
+    const ps = verts(p.mesh);
+    const nrm = vertexNormals(p.mesh);
+    const y0 = ps.reduce((m, v) => Math.min(m, v[1]), Infinity), y1 = ps.reduce((m, v) => Math.max(m, v[1]), -Infinity);
+    // The muscle's inner and outer edge at each height (1 cm slabs of the front surface).
+    const slab = new Map<number, [number, number]>();
+    ps.forEach((v, n) => {
+      if (nrm[n * 3]! < 0.25) return;
+      const k = Math.round(v[1]);
+      const r = slab.get(k) ?? [Infinity, -Infinity];
+      slab.set(k, [Math.min(r[0], Math.abs(v[2])), Math.max(r[1], Math.abs(v[2]))]);
+    });
+    const SEG = [0.1, 0.47, 0.66, 0.84, 0.985];
+    ps.forEach((v, n) => {
+      const nx = nrm[n * 3]!;
+      if (nx < 0.05) return;
+      const f = (v[1] - y0) / (y1 - y0);
+      const i = SEG.findIndex((b, j) => j > 0 && f < b);
+      if (i <= 0) return;
+      const a = SEG[i - 1]!, b = SEG[i]!;
+      const along = Math.sin(Math.PI * Math.max(0, Math.min(1, (f - a) / (b - a)))) ** 0.6;
+      const r = slab.get(Math.round(v[1]));
+      if (!r || r[1] - r[0] < 1) return;
+      const t = Math.max(0, Math.min(1, (Math.abs(v[2]) - r[0]) / (r[1] - r[0])));
+      const across = Math.sin(Math.PI * t) ** 0.6;
+      const d = 0.75 * along * across * smoothstep(0.05, 0.45, nx);
+      for (let k = 0; k < 3; k++) p.mesh.pos[n * 3 + k]! += nrm[n * 3 + k]! * d;
+    });
+  }
+}
 // Eyes: real eyeballs in the sockets, with the iris and pupil marked for the shader.
 {
   const eyeId = idOf("eyeball");
@@ -431,7 +489,8 @@ if (MAKEHUMAN) {
   const chinY = sk
     .filter((p) => Math.abs(p[2]) < 1.5 && p[1] > eyeMid[1] - 16 && p[1] < eyeMid[1] - 5 && p[0] > eyeMid[0] - 3)
     .reduce((m, p) => Math.min(m, p[1]), Infinity);
-  const { head: mhHead, eyes: mhEyes } = buildMakeHumanHead(MAKEHUMAN, { eyeMid, chinY, crownY, cutY: (x) => 147.5 - 0.35 * x });
+  const { head: mhHead, eyes: mhEyes } = buildMakeHumanHead(MAKEHUMAN, { eyeMid, chinY, crownY, // The neck column only: the slopes of the trapezius and the tops of the shoulders stay real muscle.
+  cutY: (x, z) => 147.5 - 0.35 * x + 9 * smoothstep(7, 11, Math.abs(z)) });
   // The new neck is skin: the deep neck muscles that would poke through it behind the ears are left out.
   for (let i = parts.length - 1; i >= 0; i--)
     if (/splenius|semispinalis capitis|levator scapulae/.test(parts[i]!.name)) parts.splice(i, 1);
@@ -737,6 +796,7 @@ const { skinIndex, skinWeight } = computeWeights(position, index, label, BINDM, 
   for (const v of [head, headTop]) v.splice(0, 3, ...morph(v));
   writeBind();
 }
+console.log(`shorts: ${fitShorts(position, index, tissue)} vertices lifted clear of the muscles`);
 // ---------------------------------------------------------------- write
 const blocks: { name: string; data: ArrayBufferView }[] = [
   { name: "position", data: position },
