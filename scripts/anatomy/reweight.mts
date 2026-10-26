@@ -3,7 +3,8 @@
  *  - skin weights (scripts/anatomy/weights.ts); the fascia takes its weights from the muscles over it
  *  - baked ambient occlusion per vertex, so the grooves between muscles read as deep cuts in any light
  *
- *   npx tsx scripts/anatomy/reweight.mts
+ *   npx tsx scripts/anatomy/reweight.mts                                   (public/anatomy/athlete)
+ *   ATHLETE=public/anatomy/athlete-eco npx tsx scripts/anatomy/reweight.mts  (the Écorché-based build)
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import * as THREE from "three";
@@ -14,8 +15,9 @@ import { BONES, TISSUE } from "../../src/lib/anatomy3d/muscle-ids";
 import { computeWeights } from "./weights";
 
 type Layout = Record<string, { offset: number; length: number; type: string }>;
-const meta = JSON.parse(readFileSync("public/anatomy/athlete.json", "utf8")) as { layout: Layout; bytes: number } & Record<string, unknown>;
-let buf: Buffer = readFileSync("public/anatomy/athlete.bin");
+const ATHLETE = process.env.ATHLETE ?? "public/anatomy/athlete";
+const meta = JSON.parse(readFileSync(`${ATHLETE}.json`, "utf8")) as { layout: Layout; bytes: number } & Record<string, unknown>;
+let buf: Buffer = readFileSync(`${ATHLETE}.bin`);
 const view = <T,>(name: string, T: new (b: ArrayBuffer, o: number, l: number) => T) => {
   const l = meta.layout[name]!;
   return new T(buf.buffer as ArrayBuffer, buf.byteOffset + l.offset, l.length);
@@ -133,6 +135,6 @@ putBlock("ao", ao);
   putBlock("indexLod1", lod);
   console.log(`mobile detail: ${lod.length / 3} of ${src.length / 3} triangles`);
 }
-writeFileSync("public/anatomy/athlete.bin", buf);
-writeFileSync("public/anatomy/athlete.json", JSON.stringify(meta, null, 1));
+writeFileSync(`${ATHLETE}.bin`, buf);
+writeFileSync(`${ATHLETE}.json`, JSON.stringify(meta, null, 1));
 console.log(`finished ${NV} vertices: weights + ambient occlusion`);

@@ -16,6 +16,11 @@
  *
  * Joint centres are measured from the bones (femoral and humeral heads by sphere fit, knee, ankle, elbow and wrist
  * from the joint surfaces) and written to src/lib/anatomy3d/athlete-bind.generated.ts.
+ *
+ * Alternative muscle and bone source (evaluation): ECORCHE=<path to ecorche.glb> takes every muscle, tendon and bone
+ * from Écorché (github.com/Charleeh/ecorche, CC BY-SA 4.0: BodyParts3D cleaned up, with Z-Anatomy abdominal wall,
+ * lats and back), aligned to the BodyParts3D skeleton, which still gives the joints, skin, hands and feet. Output then
+ * goes to ATHLETE_OUT (default public/anatomy/athlete-eco), so the current athlete is not replaced.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -35,6 +40,8 @@ if (!DATA || !existsSync(join(DATA, "parts_list_e.txt"))) {
   process.exit(1);
 }
 const HEIGHT = 183; // cm, matching the 2D motion figure
+const ECORCHE = process.env.ECORCHE;
+const OUT = process.env.ATHLETE_OUT ?? (ECORCHE ? "public/anatomy/athlete-eco" : "public/anatomy/athlete");
 await MeshoptSimplifier.ready;
 
 const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -236,7 +243,7 @@ function writeBind() {
       `};\n`,
   );
 }
-writeBind();
+if (!ECORCHE) writeBind();
 console.log("joints", JSON.stringify({ pelvis: r1(pelvis), neckBase: r1(neckBase), R: Object.fromEntries(Object.entries(R).map(([k, v]) => [k, r1(v)])) }));
 
 // ---------------------------------------------------------------- parts
@@ -314,27 +321,134 @@ function longAxis(m: Mesh): V3 {
   for (let it = 0; it < 40; it++) f = norm([0, 1, 2].map((a) => C[a * 3]! * f[0] + C[a * 3 + 1]! * f[1] + C[a * 3 + 2]! * f[2]) as V3);
   return f;
 }
+/**
+ * Écorché's muscles, tendons and bones in the athlete's frame. Its axes are converted (metres, Y up, facing +Z) and
+ * then fitted to this build's BodyParts3D bones by scale and offset (both come from the same BodyParts3D subject), so
+ * they sit on the skeleton that gives the joints, the skin, the hands and the feet. The white aponeurosis that
+ * Écorché lays over the six-pack (the sheath of the external oblique) is left out in front of the rectus abdominis:
+ * the abs are what an exercise model has to show.
+ */
+async function ecorcheSources(path: string): Promise<Source[]> {
+  const { GLTFLoader } = await import("three/examples/jsm/loaders/GLTFLoader.js");
+  const buf = readFileSync(path);
+  const gltf = await new GLTFLoader().parseAsync(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer, "");
+  gltf.scene.updateMatrixWorld(true);
+  const raw: { name: string; layer: string; pos: V3[]; idx: Uint32Array; tint: Float32Array }[] = [];
+  gltf.scene.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const g = mesh.geometry;
+    const pa = g.getAttribute("position"), ca = g.getAttribute("color");
+    const v = new THREE.Vector3();
+    const pos: V3[] = [];
+    const tint = new Float32Array(pa.count);
+    for (let i = 0; i < pa.count; i++) {
+      v.fromBufferAttribute(pa, i).applyMatrix4(mesh.matrixWorld);
+      pos.push([v.z * 100, v.y * 100, -v.x * 100]); // +X forward, +Y up, +Z the figure's right
+      if (ca) tint[i] = smoothstep(0.45, 0.85, ca.getY(i) / Math.max(1e-3, ca.getX(i)));
+    }
+    const idx = g.index ? Uint32Array.from(g.index.array) : Uint32Array.from({ length: pa.count }, (_, i) => i);
+    raw.push({ name: String(mesh.userData.name ?? mesh.name).toLowerCase().replace(/ \(2\)$/, ""), layer: String(mesh.userData.layer), pos, idx, tint });
+  });
+  // Fit scale and offset on the bones both have.
+  const pairs: [V3, V3][] = [];
+  for (const r of raw) {
+    if (r.layer !== "skeleton" || kindOf(r.name) !== "bone") continue;
+    const id = idOf(r.name);
+    if (!id || !existsSync(stlPath(id))) continue;
+    pairs.push([centroid(r.pos), centroid(verts(load(id)))]);
+  }
+  const ca = centroid(pairs.map((p) => p[0])), cb = centroid(pairs.map((p) => p[1]));
+  let num = 0, den = 0;
+  for (const [a, b] of pairs) {
+    num += dot(sub(a, ca), sub(b, cb));
+    den += dot(sub(a, ca), sub(a, ca));
+  }
+  const k = num / den;
+  const fit = (p: V3): V3 => add(cb, mul(sub(p, ca), k));
+  const rms = Math.sqrt(pairs.reduce((s2, [a, b]) => s2 + len(sub(fit(a), b)) ** 2, 0) / pairs.length);
+  console.log(`Écorché: ${raw.length} meshes; fitted on ${pairs.length} bones, scale ${k.toFixed(3)}, residual ${rms.toFixed(2)} cm`);
+  const rectusZ = raw.filter((r) => /rectus abdominis/.test(r.name)).flatMap((r) => r.pos.map((p) => Math.abs(fit(p)[2]))).reduce((a, b) => Math.max(a, b), 0);
+  const out: Source[] = [];
+  for (const r of raw) {
+    const kind = kindOf(r.name);
+    if (!kind || (r.layer === "skeleton") !== (kind === "bone")) continue;
+    const pos = new Float32Array(r.pos.flatMap(fit));
+    let idx = r.idx;
+    if (/external oblique/.test(r.name)) {
+      const keep: number[] = [];
+      for (let t = 0; t < idx.length; t += 3) {
+        const tri = [idx[t]!, idx[t + 1]!, idx[t + 2]!];
+        const sheath = tri.every((v) => r.tint[v]! > 0.5 && Math.abs(pos[v * 3 + 2]!) < rectusZ + 0.8 && pos[v * 3]! > 0);
+        if (!sheath) keep.push(...tri);
+      }
+      idx = new Uint32Array(keep);
+    }
+    // Compact (keeping each vertex's tint), and cap the heaviest sheets.
+    const used = new Int32Array(pos.length / 3).fill(-1);
+    let nu = 0;
+    for (const v of idx) if (used[v]! < 0) used[v] = nu++;
+    const np = new Float32Array(nu * 3), nt = new Float32Array(nu);
+    used.forEach((u, v) => {
+      if (u < 0) return;
+      np.set(pos.subarray(v * 3, v * 3 + 3), u * 3);
+      nt[u] = r.tint[v]!;
+    });
+    let mesh: Mesh = { pos: np, idx: Uint32Array.from(idx, (v) => used[v]!) };
+    let tint: Float32Array | undefined = kind === "muscle" ? nt : undefined;
+    if (mesh.idx.length / 3 > 12000) {
+      const [si] = MeshoptSimplifier.simplify(mesh.idx, mesh.pos, 3, 12000 * 3, 0.01, []);
+      const keepV = new Int32Array(nu).fill(-1);
+      let n2 = 0;
+      for (const v of si) if (keepV[v]! < 0) keepV[v] = n2++;
+      const p2 = new Float32Array(n2 * 3), t2 = new Float32Array(n2);
+      keepV.forEach((u, v) => {
+        if (u < 0) return;
+        p2.set(mesh.pos.subarray(v * 3, v * 3 + 3), u * 3);
+        t2[u] = nt[v]!;
+      });
+      mesh = { pos: p2, idx: Uint32Array.from(si, (v) => keepV[v]!) };
+      if (tint) tint = t2;
+    }
+    out.push({ name: r.name, kind, mesh, tint });
+  }
+  return out;
+}
 let muscleTris = 0;
-for (const [id, name] of names) {
-  const kind = kindOf(name);
-  if (!kind || !existsSync(stlPath(id))) continue;
-  const raw = load(id);
-  const tris = raw.idx.length / 3;
-  const target = kind === "muscle" ? Math.min(7000, Math.max(450, Math.round(tris / 36))) : kind === "bone" ? Math.min(2200, Math.max(120, Math.round(tris / 70))) : Math.min(1500, Math.max(150, Math.round(tris / 30)));
-  const m = simplify(raw, target, 0.01);
+/** A source mesh: name (lower case, BodyParts3D style), its kind, and (Écorché) a per-vertex tendon tint. */
+interface Source {
+  name: string;
+  kind: PartKind;
+  mesh: Mesh;
+  tint?: Float32Array;
+}
+const sources: Source[] = ECORCHE ? await ecorcheSources(ECORCHE) : [];
+if (!ECORCHE)
+  for (const [id, name] of names) {
+    const kind = kindOf(name);
+    if (!kind || !existsSync(stlPath(id))) continue;
+    const raw = load(id);
+    const tris = raw.idx.length / 3;
+    const target = kind === "muscle" ? Math.min(7000, Math.max(450, Math.round(tris / 36))) : kind === "bone" ? Math.min(2200, Math.max(120, Math.round(tris / 70))) : Math.min(1500, Math.max(150, Math.round(tris / 30)));
+    sources.push({ name, kind, mesh: simplify(raw, target, 0.01) });
+  }
+for (const { name, kind, mesh: m, tint } of sources) {
   orientOutward(m);
   const region = kind === "muscle" ? regionOf(name) : null;
   const axis = longAxis(m);
   let extra: Float32Array | undefined;
   if (kind === "muscle") {
-    // Tendinous ends: the last stretch of the muscle along its length shades paler and glossier, like the tendons
-    // and aponeuroses of an anatomy plate.
-    const ps = verts(m);
-    const c = centroid(ps);
-    const along = ps.map((p) => dot(sub(p, c), axis));
-    const reach = Math.max(...along.map(Math.abs)) || 1;
-    extra = new Float32Array(along.map((a) => smoothstep(0.7, 0.97, Math.abs(a) / reach)));
-    if (/rectus abdominis/.test(name)) carveAbs(m);
+    // Tendinous ends: paler and glossier, like the tendons and aponeuroses of an anatomy plate. Écorché marks them
+    // itself (its tendon tint); for the raw BodyParts3D meshes, the last stretch of the muscle along its length.
+    if (tint) extra = tint;
+    else {
+      const ps = verts(m);
+      const c = centroid(ps);
+      const along = ps.map((p) => dot(sub(p, c), axis));
+      const reach = along.reduce((a, v) => Math.max(a, Math.abs(v)), 0) || 1;
+      extra = new Float32Array(along.map((a) => smoothstep(0.7, 0.97, Math.abs(a) / reach)));
+      if (/rectus abdominis/.test(name)) carveAbs(m);
+    }
   }
   if (kind === "muscle") {
     // Athletic bulk: push the muscle out along its normals.
@@ -865,7 +979,7 @@ const { skinIndex, skinWeight } = computeWeights(position, index, label, BINDM, 
   for (const J of [R, L]) for (const k of ["shoulder", "elbow", "wrist", "hand"] as const) J[k] = morph(J[k]);
   // (Leg joints sit on the bone axes, which the leg swelling leaves in place.)
   for (const v of [head, headTop]) v.splice(0, 3, ...morph(v));
-  writeBind();
+  if (!ECORCHE) writeBind();
 }
 console.log(`shorts: ${fitShorts(position, index, tissue, (v) => muscleMix[v]! > 250)} vertices lifted clear of the muscles`);
 // ---------------------------------------------------------------- write
@@ -895,9 +1009,9 @@ for (const p of blocks) {
   offset += buf.byteLength;
 }
 mkdirSync("public/anatomy", { recursive: true });
-writeFileSync("public/anatomy/athlete.bin", Buffer.concat(chunks));
-writeFileSync(
-  "public/anatomy/athlete.json",
-  JSON.stringify({ version: 3, source: "BodyParts3D 3.0 (CC BY-SA 2.1 JP)", vertices: NV, triangles: NI / 3, bytes: offset, layout, bones: BONES }, null, 1),
-);
-console.log(`wrote public/anatomy/athlete.bin (${(offset / 1e6).toFixed(2)} MB)`);
+writeFileSync(`${OUT}.bin`, Buffer.concat(chunks));
+const source = ECORCHE
+  ? "Écorché (github.com/Charleeh/ecorche, CC BY-SA 4.0; BodyParts3D CC BY 4.0, Z-Anatomy CC BY-SA 4.0) + BodyParts3D skin"
+  : "BodyParts3D 3.0 (CC BY-SA 2.1 JP)";
+writeFileSync(`${OUT}.json`, JSON.stringify({ version: 3, source, vertices: NV, triangles: NI / 3, bytes: offset, layout, bones: BONES }, null, 1));
+console.log(`wrote ${OUT}.bin (${(offset / 1e6).toFixed(2)} MB)`);

@@ -29,7 +29,9 @@ const STEPS = [
   try {
     // Gold by default; ?look=medical shows the anatomy-plate look (red muscle, white tendons) for comparison.
     const look = new URLSearchParams(location.search).get("look") === "medical" ? "medical" : "gold";
-    player = await mountAthlete(canvas, ex, { hideProps: ["rack"], assetBase: "anatomy/athlete", reducedMotion: reduced, pixelRatio: Math.min(devicePixelRatio || 1, 2), look });
+    // ?asset=athlete-eco previews the Écorché-based build (evaluation) instead of the current athlete.
+    const asset = new URLSearchParams(location.search).get("asset") === "athlete-eco" ? "athlete-eco" : "athlete";
+    player = await mountAthlete(canvas, ex, { hideProps: ["rack"], assetBase: `anatomy/${asset}`, reducedMotion: reduced, pixelRatio: Math.min(devicePixelRatio || 1, 2), look });
   } catch (e) {
     $<HTMLElement>(".loading").textContent = "3D isn't available on this device.";
     console.error(e);

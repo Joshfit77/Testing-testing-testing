@@ -26,3 +26,5 @@ __pycache__/
 assets/badge-masters/*
 !assets/badge-masters/README.md
 .anatomy-preview/
+# Écorché-based evaluation build (not approved; rebuild with ECORCHE=... scripts/anatomy/build-athlete.mts)
+public/anatomy/athlete-eco.*
