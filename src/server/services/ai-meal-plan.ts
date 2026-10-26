@@ -10,6 +10,8 @@ import {
   MEAL_PLAN_INSTRUCTIONS,
   type DraftDay,
   type MealPlanFocus,
+  mealPlanNotesForAi,
+  MEDICAL_NOTES_ASSUMPTION,
 } from "@/lib/domain/ai-meal-plan";
 import { eligibleCandidates, plannedMeal, slotsForMeals, type PlannerSettings, type PlanNutrition } from "@/lib/domain/meal-planner";
 import type { Sex } from "@/lib/domain/nutrition";
@@ -69,13 +71,14 @@ export async function draftAiMealPlan(
     memoryNotes = (data ?? []).map((m) => m.content as string);
   }
 
+  const notes = mealPlanNotesForAi(input.notes);
   const userText = [
     `Plan ${input.days} day${input.days === 1 ? "" : "s"} starting ${input.startDate} (day_index 0 = ${input.startDate}).`,
     `Focus: ${FOCUS_LABELS[input.focus]}.`,
     `Daily targets: ${settings.calories} kcal, protein ${settings.protein_g} g, carbs ${settings.carbs_g} g, fat ${settings.fat_g} g.`,
     `Meal slots each day (slot_index: meal, share of calories): ${specs.map((s, i) => `${i}: ${s.label} (${s.slot}, ${Math.round(s.share * 100)}%)`).join("; ")}.`,
     `Diet style: ${settings.diet}. Budget: ${settings.budget}.`,
-    input.notes ? `Member's notes: ${input.notes}` : null,
+    notes.notes ? `Member's notes: ${notes.notes}` : null,
     memoryNotes.length ? `Food preferences the member saved:\n${memoryNotes.map((m) => `- ${m}`).join("\n")}` : null,
     `Dishes (key | name | meals | per serving):\n${dishCatalogForAi(eligible)}`,
   ]
@@ -105,7 +108,7 @@ export async function draftAiMealPlan(
     targets: { calories: settings.calories, protein_g: settings.protein_g, carbs_g: settings.carbs_g, fat_g: settings.fat_g, explanation: focus.explanation },
     settings: { mealsPerDay: settings.mealsPerDay, diet: settings.diet, budget: settings.budget, allergies: settings.allergies, dislikes: settings.dislikes },
     days_plan: draft.days.map((d) => ({ date: d.date, meals: d.meals.map((m) => (m ? { slotIndex: m.slotIndex, key: m.key, portion: m.portion, by: m.by } : null)) })),
-    summary: [result.output.summary.trim(), ...result.output.assumptions.map((a) => `Assumed: ${a}`)].join("\n").slice(0, 1500),
+    summary: [result.output.summary.trim(), ...(notes.medical ? [MEDICAL_NOTES_ASSUMPTION] : []), ...result.output.assumptions.map((a) => `Assumed: ${a}`)].join("\n").slice(0, 1500),
     model: result.model,
   };
   // Drafts are written by the server only.

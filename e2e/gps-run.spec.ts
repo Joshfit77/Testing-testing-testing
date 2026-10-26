@@ -1,5 +1,5 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
-import { completeOnboarding, signUpAndConfirm, uniqueEmail } from "./helpers";
+import { completeOnboarding, grantPlan, signUpAndConfirm, uniqueEmail } from "./helpers";
 
 /**
  * Live GPS recording in the browser, with a scripted route fed through Chromium's location override (simulated GPS).
@@ -22,11 +22,17 @@ async function moveNorth(context: BrowserContext, page: Page, fromM: number, sec
   return m;
 }
 
+/** Live GPS recording is part of Pro All Access (Free is covered in memberships.spec.ts). */
+async function signUpPro(page: Page, email: string) {
+  await signUpAndConfirm(page, email);
+  await grantPlan(email, "pro");
+}
+
 test.describe("live GPS runs and walks", () => {
   test("records a walk with a pause, saves it once with its route, and shows it in history", async ({ page, context }) => {
     test.setTimeout(180_000);
     const email = uniqueEmail("gps-walk");
-    await signUpAndConfirm(page, email);
+    await signUpPro(page, email);
     await completeOnboarding(page);
     await context.grantPermissions(["geolocation"]);
     await context.setGeolocation({ latitude: LAT0, longitude: LNG0, accuracy: 5 });
@@ -110,7 +116,7 @@ test.describe("live GPS runs and walks", () => {
 
   test("a running day of the member's program is recorded as a guided run", async ({ page, context }) => {
     const email = uniqueEmail("gps-guided");
-    await signUpAndConfirm(page, email);
+    await signUpPro(page, email);
     await completeOnboarding(page);
     await page.goto("/train/programs/walk-to-run-beginner");
     await page.getByRole("button", { name: "Start program" }).click();
@@ -133,7 +139,7 @@ test.describe("live GPS runs and walks", () => {
 
   test("says clearly when location permission is off", async ({ page }) => {
     const email = uniqueEmail("gps-denied");
-    await signUpAndConfirm(page, email);
+    await signUpPro(page, email);
     await completeOnboarding(page);
     // Headless Chromium leaves an unanswered permission prompt pending forever, so answer "Don't allow" the way the
     // browser reports it: the watcher's error callback with PERMISSION_DENIED.
@@ -151,7 +157,7 @@ test.describe("live GPS runs and walks", () => {
   test("a brief loss of signal shows a warning that clears when fixes come back", async ({ page, context }) => {
     test.setTimeout(120_000);
     const email = uniqueEmail("gps-blip");
-    await signUpAndConfirm(page, email);
+    await signUpPro(page, email);
     await completeOnboarding(page);
     await context.grantPermissions(["geolocation"]);
     await context.setGeolocation({ latitude: LAT0, longitude: LNG0, accuracy: 5 });
@@ -173,7 +179,7 @@ test.describe("live GPS runs and walks", () => {
   });
 
   test("explains when the device only shares an approximate location", async ({ page, context }) => {
-    await signUpAndConfirm(page, uniqueEmail("gps-approx"));
+    await signUpPro(page, uniqueEmail("gps-approx"));
     await completeOnboarding(page);
     await context.grantPermissions(["geolocation"]);
     // iPhone "Precise Location" off: fixes arrive, but only to within a couple of kilometres.
@@ -187,5 +193,59 @@ test.describe("live GPS runs and walks", () => {
     await expect(page.getByTestId("gps-hint-precise")).toContainText("Precise Location");
     await expect(page.getByText("Waiting for GPS")).toBeVisible();
     await expect(page.getByTestId("gps-distance")).toHaveText(/^0(\.00)? /);
+  });
+
+  test("signing out during a walk leaves no recording on the device, and the next member sees nothing to continue", async ({ page, context }) => {
+    test.setTimeout(180_000);
+    const first = uniqueEmail("gps-signout");
+    await signUpPro(page, first);
+    await completeOnboarding(page);
+    await context.grantPermissions(["geolocation"]);
+    await context.setGeolocation({ latitude: LAT0, longitude: LNG0, accuracy: 5 });
+    await page.goto("/run/record?kind=walk");
+    await page.getByTestId("gps-start").click();
+    await expect(page.getByTestId("gps-recording")).toBeVisible();
+    await moveNorth(context, page, 0, 8, 3);
+    // The recording is kept on the device while it runs (so a crash or reload can continue it).
+    const keysWhileRecording = await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("run.recording.")));
+    expect(keysWhileRecording).toHaveLength(1);
+
+    // Sign out from the profile page while the walk is still recording.
+    await page.goto("/profile");
+    await page.locator("main").getByRole("button", { name: "Sign out" }).click();
+    await page.waitForURL(/\/login/);
+    await expect(page.getByRole("heading", { name: /Sign in|Welcome back/ })).toBeVisible();
+    // The login page finishes the clean-up once it has mounted (the recorder may have written once more on the way out).
+    await expect.poll(() => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("run.recording.") || k.startsWith("ngf.draft.")))).toEqual([]);
+
+    // Another member on the same device: nothing of the first member's walk is offered or readable.
+    const second = uniqueEmail("gps-next");
+    await signUpPro(page, second);
+    await completeOnboarding(page);
+    await page.goto("/run/record?kind=walk");
+    await expect(page.getByTestId("gps-start")).toBeVisible();
+    await expect(page.getByText(/You have an unfinished/)).toHaveCount(0);
+    expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("run.recording.")))).toEqual([]);
+  });
+
+  test("a reload while signed in offers to continue the same member's walk", async ({ page, context }) => {
+    test.setTimeout(120_000);
+    await signUpPro(page, uniqueEmail("gps-reload"));
+    await completeOnboarding(page);
+    await context.grantPermissions(["geolocation"]);
+    await context.setGeolocation({ latitude: LAT0, longitude: LNG0, accuracy: 5 });
+    await page.goto("/run/record?kind=walk");
+    await page.getByTestId("gps-start").click();
+    await expect(page.getByTestId("gps-recording")).toBeVisible();
+    await moveNorth(context, page, 0, 8, 3);
+    await page.reload();
+    await expect(page.getByText(/You have an unfinished walk/)).toBeVisible();
+    await page.getByRole("button", { name: "Continue recording" }).click();
+    await expect(page.getByTestId("gps-recording")).toBeVisible();
+    // Discard is offered while paused.
+    await page.getByRole("button", { name: "Pause" }).click();
+    await page.getByRole("button", { name: "Discard recording" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Discard" }).click();
+    expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("run.recording.")))).toEqual([]);
   });
 });

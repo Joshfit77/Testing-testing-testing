@@ -29,7 +29,8 @@ import {
 import { addDays, isoDateInTz, startOfWeek } from "@/lib/domain/dates";
 import { formatDuration } from "@/lib/domain/units";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { requireOnboardedUser } from "@/server/auth";
+import { hasFeature } from "@/lib/domain/plans";
+import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { listActivities, listRunsForRecords } from "@/server/services/activities";
 import { programDays } from "@/server/services/training";
 
@@ -83,7 +84,10 @@ async function todaysGuidedRun(supabase: Supa, userId: string): Promise<{ href: 
 }
 
 async function OutdoorTab({ userId, supabase }: { userId: string; supabase: Supa }) {
-  const guided = await todaysGuidedRun(supabase, userId).catch(() => null);
+  const [guided, plan] = await Promise.all([todaysGuidedRun(supabase, userId).catch(() => null), getUserPlan(userId)]);
+  // Live GPS recording is Pro All Access; manual logging stays free.
+  const gps = hasFeature(plan, "live_gps");
+  const proTag = gps ? null : <span className="ml-auto rounded-full bg-black/25 px-2 py-0.5 text-[0.65rem] font-bold tracking-wider">PRO</span>;
   return (
     <div className="space-y-3">
       {guided && (
@@ -100,7 +104,7 @@ async function OutdoorTab({ userId, supabase }: { userId: string; supabase: Supa
         <Button asChild size="lg" className="h-auto flex-col items-start gap-0.5 py-4 text-left">
           <Link href="/run/record?kind=run">
             <span className="flex items-center gap-2 font-display text-lg uppercase">
-              <LocateFixed aria-hidden /> Outdoor run
+              <LocateFixed aria-hidden /> Outdoor run {proTag}
             </span>
             <span className="text-xs font-normal opacity-80">GPS distance, pace, splits</span>
           </Link>
@@ -108,13 +112,14 @@ async function OutdoorTab({ userId, supabase }: { userId: string; supabase: Supa
         <Button asChild size="lg" variant="secondary" className="h-auto flex-col items-start gap-0.5 py-4 text-left">
           <Link href="/run/record?kind=walk">
             <span className="flex items-center gap-2 font-display text-lg uppercase">
-              <Footprints aria-hidden /> Outdoor walk
+              <Footprints aria-hidden /> Outdoor walk {proTag}
             </span>
             <span className="text-xs font-normal opacity-80">GPS distance and route</span>
           </Link>
         </Button>
       </div>
       <p className="text-xs text-muted-foreground">
+        {gps ? null : "Live GPS recording is included with Pro All Access. Logging a run or walk by hand is free. "}
         Location is used only while you record. Routes are private. In a browser, keep the screen open while recording; the phone app is being prepared to keep recording with the screen locked.{" "}
         <Link href="/run?tab=log" className="underline">
           Log a run or walk manually
@@ -244,7 +249,7 @@ async function Overview({ userId, tz, unit, thisWeek, today, supabase }: { userI
                 <Link href={`/train/programs/${p.slug}`} className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-4 hover:border-gold-muted">
                   <div className="min-w-0">
                     <p className="flex flex-wrap items-center gap-2 font-semibold">
-                      {prog.name} {prog.tier !== "free" && <Badge variant="secondary">{prog.tier === "pro" ? "Pro" : "Plus"}</Badge>}
+                      {prog.name} {prog.tier !== "free" && <Badge variant="secondary">Pro</Badge>}
                     </p>
                     <p className="text-xs text-muted-foreground">{p.blurb}</p>
                   </div>

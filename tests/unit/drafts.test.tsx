@@ -40,6 +40,17 @@ describe("draft storage", () => {
     expect(localStorage.getItem("ngf.textSize")).toBe("large");
   });
 
+  it("also removes a run or walk still being recorded (its GPS fixes), for that user only", () => {
+    writeDraft("u1", "a", "x");
+    localStorage.setItem("run.recording.u1", JSON.stringify({ track: { status: "recording" } }));
+    localStorage.setItem("run.recording.u2", JSON.stringify({ track: { status: "recording" } }));
+    expect(clearAllDrafts("u1")).toBe(2);
+    expect(localStorage.getItem("run.recording.u1")).toBeNull();
+    expect(localStorage.getItem("run.recording.u2")).not.toBeNull();
+    expect(clearAllDrafts()).toBe(1);
+    expect(localStorage.getItem("run.recording.u2")).toBeNull();
+  });
+
   it("treats empty forms as blank", () => {
     expect(isBlankDraft("  ")).toBe(true);
     expect(isBlankDraft({ name: "", calories: "", isEstimate: true })).toBe(true);

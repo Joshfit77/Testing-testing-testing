@@ -2637,6 +2637,511 @@ alter table public.profiles
   add column if not exists food_filters jsonb check (food_filters is null or (jsonb_typeof(food_filters) = 'object' and octet_length(food_filters::text) <= 2000));
 grant update (food_filters) on public.profiles to authenticated;
 
+-- ===== supabase/migrations/20261024000034_sleep.sql =====
+-- Sleep & Recovery, Stage B1: nights and naps a member logs by hand or with the in-app timer, and (Stage B4) records
+-- imported from Apple Health / Health Connect or a wearable. Times are timestamptz; the IANA zone a session was logged
+-- in is kept so clock times display as the member saw them, and `night_of` is the local date they got up (computed
+-- on the server). Nothing here measures sleep stages or physiology: the app's own entries only know when the member
+-- was in bed and, if they said so, when they think they fell asleep and woke. Stage intervals exist only for imported
+-- records. Logging needs the same "optional wellness information" consent as recovery check-ins
+-- (profiles.wellness_consent_at); viewing and deleting never do, so withdrawing consent never traps data.
+
+create extension if not exists btree_gist;
+
+-- The member's sleep goal (4–12 hours), editable like the other self-service profile fields.
+alter table public.profiles
+  add column if not exists sleep_goal_minutes smallint not null default 480 check (sleep_goal_minutes between 240 and 720);
+grant update (sleep_goal_minutes) on public.profiles to authenticated;
+
+create or replace function public.can_log_sleep()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (select 1 from public.profiles p where p.id = auth.uid() and p.wellness_consent_at is not null);
+$$;
+revoke all on function public.can_log_sleep() from public, anon;
+grant execute on function public.can_log_sleep() to authenticated, service_role;
+
+create table public.sleep_sessions (
+  -- Generated on the device before saving, so a retried save can't create a second session.
+  id uuid primary key,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  kind text not null default 'night' check (kind in ('night', 'nap')),
+  -- Got into bed / got out of bed (null while the timer runs).
+  started_at timestamptz not null,
+  ended_at timestamptz,
+  -- Optional detail the member gave: when they think they fell asleep and finally woke, and time awake in between.
+  onset_at timestamptz,
+  final_wake_at timestamptz,
+  awakenings smallint check (awakenings between 0 and 50),
+  awake_minutes smallint check (awake_minutes between 0 and 1440),
+  timezone text not null check (char_length(timezone) between 1 and 64),
+  night_of date not null,
+  source text not null default 'manual' check (source in ('manual', 'timer', 'apple_health', 'health_connect', 'wearable')),
+  -- The record's id in its source, so one import can't be added twice. The app's own entries have none.
+  source_id text check (char_length(source_id) between 1 and 200),
+  notes text check (char_length(notes) <= 280),
+  -- Where the session ends for overlap checks: ended_at, or 20 hours after bedtime while a timer runs. Kept by the
+  -- trigger below (an index expression can't compute it: timestamptz + interval isn't immutable).
+  overlap_until timestamptz not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check (ended_at is null or ended_at > started_at),
+  check (ended_at is null or ended_at - started_at <= interval '24 hours'),
+  check (onset_at is null or (onset_at >= started_at and (ended_at is null or onset_at <= ended_at))),
+  check (final_wake_at is null or (final_wake_at >= coalesce(onset_at, started_at) and (ended_at is null or final_wake_at <= ended_at))),
+  check ((source in ('manual', 'timer')) = (source_id is null)),
+  check (overlap_until > started_at),
+  unique (user_id, source, source_id),
+  -- A member's sessions never overlap, whatever their source.
+  exclude using gist (user_id with =, tstzrange(started_at, overlap_until, '[)') with &&)
+);
+create index sleep_sessions_user_night_idx on public.sleep_sessions (user_id, night_of desc);
+create index sleep_sessions_user_started_idx on public.sleep_sessions (user_id, started_at desc);
+
+create or replace function public.sleep_session_prepare()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  new.overlap_until := coalesce(new.ended_at, new.started_at + interval '20 hours');
+  return new;
+end;
+$$;
+create trigger sleep_sessions_prepare before insert or update on public.sleep_sessions
+  for each row execute function public.sleep_session_prepare();
+create trigger sleep_sessions_updated_at before update on public.sleep_sessions
+  for each row execute function public.set_updated_at();
+
+-- Stage intervals supplied by a health platform or wearable for one imported session. The app never writes its own.
+create table public.sleep_stages (
+  id uuid primary key default gen_random_uuid(),
+  session_id uuid not null references public.sleep_sessions (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  stage text not null check (stage in ('awake', 'light', 'deep', 'rem', 'asleep', 'unknown')),
+  started_at timestamptz not null,
+  ended_at timestamptz not null,
+  check (ended_at > started_at),
+  check (ended_at - started_at <= interval '24 hours')
+);
+create index sleep_stages_session_idx on public.sleep_stages (session_id, started_at);
+create index sleep_stages_user_idx on public.sleep_stages (user_id);
+
+alter table public.sleep_sessions enable row level security;
+alter table public.sleep_stages enable row level security;
+
+create policy sleep_sessions_select_own on public.sleep_sessions
+  for select to authenticated using (user_id = (select auth.uid()));
+create policy sleep_sessions_insert_own on public.sleep_sessions
+  for insert to authenticated with check (user_id = (select auth.uid()) and public.can_log_sleep());
+create policy sleep_sessions_update_own on public.sleep_sessions
+  for update to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()) and public.can_log_sleep());
+create policy sleep_sessions_delete_own on public.sleep_sessions
+  for delete to authenticated using (user_id = (select auth.uid()));
+
+create policy sleep_stages_select_own on public.sleep_stages
+  for select to authenticated using (user_id = (select auth.uid()));
+create policy sleep_stages_delete_own on public.sleep_stages
+  for delete to authenticated using (user_id = (select auth.uid()));
+-- Stages belong to the member's own imported session only.
+create policy sleep_stages_insert_own on public.sleep_stages
+  for insert to authenticated with check (
+    user_id = (select auth.uid())
+    and public.can_log_sleep()
+    and exists (
+      select 1 from public.sleep_sessions s
+      where s.id = session_id and s.user_id = (select auth.uid()) and s.source not in ('manual', 'timer')
+    )
+  );
+
+-- At most 4,000 sessions per member (about ten years of nights and naps), checked under a per-member lock.
+create or replace function public.sleep_session_limit()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform pg_advisory_xact_lock(hashtext('sleep_sessions:' || new.user_id::text));
+  if (select count(*) from public.sleep_sessions where user_id = new.user_id) >= 4000 then
+    raise exception 'sleep_session_limit' using errcode = 'P0001';
+  end if;
+  return new;
+end;
+$$;
+create trigger sleep_sessions_limit before insert on public.sleep_sessions for each row execute function public.sleep_session_limit();
+
+-- ===== supabase/migrations/20261024000035_sleep_checkins.sql =====
+-- Sleep & Recovery, Stage B5: brief, optional morning and daily check-ins. One row per member and day; every field
+-- is optional so a check-in can be a single tap. A row's `day` is the day the member woke up, so it lines up with
+-- the night listed under that date (sleep_sessions.night_of). Evening habits (caffeine, alcohol, late meal, screens)
+-- describe the evening before that night. Same wellness consent as sleep sessions; viewing and deleting never need it.
+
+create table public.sleep_checkins (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  day date not null,
+  -- 1 (low) – 5 (high) ratings.
+  restedness smallint check (restedness between 1 and 5),
+  energy_morning smallint check (energy_morning between 1 and 5),
+  energy_afternoon smallint check (energy_afternoon between 1 and 5),
+  energy_evening smallint check (energy_evening between 1 and 5),
+  mood smallint check (mood between 1 and 5),
+  stress smallint check (stress between 1 and 5),
+  sleep_quality smallint check (sleep_quality between 1 and 5),
+  -- Last caffeine the day before, as a clock time (null = not answered or none).
+  caffeine_last time,
+  alcohol boolean,
+  late_meal boolean,
+  exercise_timing text check (exercise_timing in ('none', 'morning', 'afternoon', 'evening')),
+  evening_screens boolean,
+  disturbances text[] not null default '{}'
+    check (cardinality(disturbances) <= 12 and disturbances <@ array['noise', 'light', 'heat', 'cold', 'partner', 'pet', 'child', 'pain', 'bathroom', 'worry', 'other']::text[]),
+  travel boolean,
+  -- Free text the member chose to record (never a recommendation).
+  sleep_aid text check (char_length(sleep_aid) <= 120),
+  notes text check (char_length(notes) <= 280),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (user_id, day)
+);
+create trigger sleep_checkins_updated_at before update on public.sleep_checkins
+  for each row execute function public.set_updated_at();
+
+alter table public.sleep_checkins enable row level security;
+
+create policy sleep_checkins_select_own on public.sleep_checkins
+  for select to authenticated using (user_id = (select auth.uid()));
+create policy sleep_checkins_insert_own on public.sleep_checkins
+  for insert to authenticated with check (user_id = (select auth.uid()) and public.can_log_sleep());
+create policy sleep_checkins_update_own on public.sleep_checkins
+  for update to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()) and public.can_log_sleep());
+create policy sleep_checkins_delete_own on public.sleep_checkins
+  for delete to authenticated using (user_id = (select auth.uid()));
+
+-- ===== supabase/migrations/20261024000036_sleep_imports.sql =====
+-- Sleep & Recovery, Stage B4: a record of each health-platform import (Apple Health / Health Connect), so a member
+-- can see what was brought in and a failed or repeated import never adds a record twice. The sessions themselves go
+-- into sleep_sessions with their source and the platform's record id (unique per member and source), and overlaps
+-- with anything already stored are refused by that table; the counts here say how many were added, skipped as
+-- already imported, or skipped because they clashed with an existing entry.
+
+create table public.sleep_import_runs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  source text not null check (source in ('apple_health', 'health_connect')),
+  range_start timestamptz not null,
+  range_end timestamptz not null,
+  added integer not null default 0 check (added between 0 and 10000),
+  duplicates integer not null default 0 check (duplicates between 0 and 10000),
+  conflicts integer not null default 0 check (conflicts between 0 and 10000),
+  -- The name of the device or app the platform attributed the records to, when it said.
+  device text check (char_length(device) <= 120),
+  created_at timestamptz not null default now(),
+  check (range_end > range_start)
+);
+create index sleep_import_runs_user_idx on public.sleep_import_runs (user_id, created_at desc);
+
+alter table public.sleep_import_runs enable row level security;
+create policy sleep_import_runs_select_own on public.sleep_import_runs
+  for select to authenticated using (user_id = (select auth.uid()));
+create policy sleep_import_runs_insert_own on public.sleep_import_runs
+  for insert to authenticated with check (user_id = (select auth.uid()) and public.can_log_sleep());
+create policy sleep_import_runs_delete_own on public.sleep_import_runs
+  for delete to authenticated using (user_id = (select auth.uid()));
+
+-- Whether the member has switched automatic import off (records they already imported stay until deleted).
+alter table public.profiles add column if not exists sleep_import_enabled boolean not null default true;
+grant update (sleep_import_enabled) on public.profiles to authenticated;
+
+-- ===== supabase/migrations/20261024000037_sleep_schedule.sql =====
+-- Sleep & Recovery, Stages C1–C3: the wake time a member chooses to keep (the windows hang off it; null means use
+-- their typical wake time), and which habit tips they have dismissed.
+
+alter table public.profiles
+  add column if not exists sleep_target_wake time,
+  add column if not exists sleep_tips_dismissed text[] not null default '{}' check (cardinality(sleep_tips_dismissed) <= 50);
+grant update (sleep_target_wake, sleep_tips_dismissed) on public.profiles to authenticated;
+
+-- ===== supabase/migrations/20261024000038_sleep_alarm.sql =====
+-- Sleep & Recovery, Stage D2: the member's alarm settings (wake time, window, fixed or smart, sound, days, snooze)
+-- as validated JSON on the profile. The phone app schedules them as local notifications; the web app only stores
+-- and shows them. Null means never configured.
+
+alter table public.profiles add column if not exists sleep_alarm jsonb;
+grant update (sleep_alarm) on public.profiles to authenticated;
+
+-- ===== supabase/migrations/20261024000039_sleep_hardening.sql =====
+-- Sleep & Recovery hardening after review: bounds on the profile's sleep JSON and tip list, a per-session cap on
+-- imported stage rows, and the session cap trigger no longer touching another member's lock before RLS rejects
+-- the row. Nothing here changes behaviour for well-formed data.
+
+alter table public.profiles
+  add constraint profiles_sleep_alarm_check
+    check (sleep_alarm is null or (jsonb_typeof(sleep_alarm) = 'object' and octet_length(sleep_alarm::text) <= 1000));
+
+alter table public.profiles drop constraint if exists profiles_sleep_tips_dismissed_check;
+alter table public.profiles
+  add constraint profiles_sleep_tips_dismissed_check
+    check (cardinality(sleep_tips_dismissed) <= 50 and octet_length(array_to_string(sleep_tips_dismissed, ',')) <= 2500);
+
+-- The cap only concerns the member's own rows; a row for someone else is RLS's to reject, without taking their lock.
+create or replace function public.sleep_session_limit()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.user_id is distinct from (select auth.uid()) then
+    return new;
+  end if;
+  perform pg_advisory_xact_lock(hashtext('sleep_sessions:' || new.user_id::text));
+  if (select count(*) from public.sleep_sessions where user_id = new.user_id) >= 4000 then
+    raise exception 'sleep_session_limit' using errcode = 'P0001';
+  end if;
+  return new;
+end;
+$$;
+
+-- At most 1,000 stage rows per session (a night at one-minute resolution is under 1,500 but imports are capped at 500).
+create or replace function public.sleep_stage_limit()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.user_id is distinct from (select auth.uid()) then
+    return new;
+  end if;
+  perform pg_advisory_xact_lock(hashtext('sleep_stages:' || new.session_id::text));
+  if (select count(*) from public.sleep_stages where session_id = new.session_id) >= 1000 then
+    raise exception 'sleep_stage_limit' using errcode = 'P0001';
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.sleep_stage_limit() from public, anon;
+create trigger sleep_stages_limit before insert on public.sleep_stages for each row execute function public.sleep_stage_limit();
+
+-- ===== supabase/migrations/20261024000040_review_hardening.sql =====
+-- Hardening after the launch-readiness review: an idempotency key for food logging, bounds on two unbounded
+-- columns, and user_id indexes on child tables that the export and record rebuilds scan by member.
+
+-- Food logging: the device sends a per-attempt id so a retried request can't log an item twice.
+alter table public.meal_items add column if not exists client_id uuid;
+create unique index if not exists meal_items_user_client_uidx on public.meal_items (user_id, client_id) where client_id is not null;
+
+alter table public.training_adjustments
+  add constraint training_adjustments_changes_size_check check (octet_length(changes::text) <= 20000);
+alter table public.profiles
+  add constraint profiles_avatar_path_check check (avatar_path is null or char_length(avatar_path) <= 300);
+
+create index if not exists workout_sets_user_idx on public.workout_sets (user_id);
+create index if not exists meal_items_user_idx on public.meal_items (user_id);
+create index if not exists ai_messages_user_idx on public.ai_messages (user_id);
+create index if not exists recipe_ingredients_user_idx on public.recipe_ingredients (user_id);
+create index if not exists workout_template_exercises_user_idx on public.workout_template_exercises (user_id);
+
+-- ===== supabase/migrations/20261024000041_sleep_vitals.sql =====
+-- Sleep & Recovery: wearable-recorded detail on imported sessions. The recording device's name, and the overnight
+-- heart rate, heart-rate variability and respiratory rate summarised from the health platform's samples inside the
+-- session (averages, lows and highs, how many samples). Only imported sessions may carry them: the app never
+-- measures anything itself, so a hand-logged or timer session has nothing to put here.
+
+alter table public.sleep_sessions
+  add column if not exists device_name text check (char_length(device_name) <= 120),
+  add column if not exists hr_avg smallint check (hr_avg between 20 and 250),
+  add column if not exists hr_min smallint check (hr_min between 20 and 250),
+  add column if not exists hr_max smallint check (hr_max between 20 and 250),
+  add column if not exists hr_samples integer check (hr_samples between 1 and 100000),
+  -- HealthKit reports SDNN, Health Connect RMSSD: different statistics, so the method is kept with the number.
+  add column if not exists hrv_avg_ms numeric(6, 1) check (hrv_avg_ms between 1 and 500),
+  add column if not exists hrv_method text check (hrv_method in ('sdnn', 'rmssd')),
+  add column if not exists hrv_samples integer check (hrv_samples between 1 and 100000),
+  add column if not exists rr_avg numeric(4, 1) check (rr_avg between 4 and 60),
+  add column if not exists rr_min numeric(4, 1) check (rr_min between 4 and 60),
+  add column if not exists rr_max numeric(4, 1) check (rr_max between 4 and 60),
+  add column if not exists rr_samples integer check (rr_samples between 1 and 100000);
+
+alter table public.sleep_sessions
+  add constraint sleep_sessions_vitals_imported_check
+    check (source not in ('manual', 'timer') or (hr_avg is null and hrv_avg_ms is null and rr_avg is null and device_name is null)),
+  add constraint sleep_sessions_hr_shape_check
+    check ((hr_avg is null) = (hr_samples is null) and (hr_min is null or hr_max is null or hr_avg is null or (hr_min <= hr_avg and hr_avg <= hr_max))),
+  add constraint sleep_sessions_hrv_shape_check
+    check ((hrv_avg_ms is null) = (hrv_method is null) and (hrv_avg_ms is null) = (hrv_samples is null)),
+  add constraint sleep_sessions_rr_shape_check
+    check ((rr_avg is null) = (rr_samples is null) and (rr_min is null or rr_max is null or rr_avg is null or (rr_min <= rr_avg and rr_avg <= rr_max)));
+
+-- Which platform the member connected and when; shown as the connection status and cleared on disconnect.
+alter table public.profiles
+  add column if not exists sleep_import_source text check (sleep_import_source in ('apple_health', 'health_connect')),
+  add column if not exists sleep_import_connected_at timestamptz;
+grant update (sleep_import_source, sleep_import_connected_at) on public.profiles to authenticated;
+
+-- A sync can also complete earlier imports with vitals that weren't read before.
+alter table public.sleep_import_runs
+  add column if not exists updated integer not null default 0 check (updated between 0 and 10000),
+  add column if not exists with_vitals integer not null default 0 check (with_vitals between 0 and 10000);
+
+-- ===== supabase/migrations/20261025000042_plan_of_private.sql =====
+-- plan_of(uuid) takes any user id and runs as its definer, and it was callable by every signed-in member through
+-- PostgREST (POST /rest/v1/rpc/plan_of), so one member could read another's plan by id. Only the database needs it:
+-- has_plan() and can_use_program() (both security definer) call it with the caller's own id. Members keep reading
+-- their own plan through the user_entitlements policy.
+revoke execute on function public.plan_of(uuid) from authenticated;
+
+-- ===== supabase/migrations/20261025000043_deleted_activities_no_route.sql =====
+-- Runs and walks deleted before 2026-10-25 kept their GPS route, splits and signal summary in the soft-deleted row
+-- (the app only set deleted_at), and the data export returns soft-deleted rows. This removes the location data from
+-- every row the member has already deleted, and makes the rule structural: a deleted activity can't carry a route.
+--
+-- Irreversible for those rows (the route can't be recovered), and intended to be: the member deleted them. Only rows
+-- with deleted_at set are touched; live runs and walks, workouts and accounts are untouched. On a live database this
+-- is to be applied only with the owner's approval (docs/launch-audit/D_CODE_CHANGES_AND_TESTS.md).
+update public.activities
+   set route = null, splits = null, gps_quality = null
+ where deleted_at is not null
+   and (route is not null or splits is not null or gps_quality is not null);
+
+alter table public.activities
+  add constraint activities_deleted_no_route
+  check (deleted_at is null or (route is null and splits is null and gps_quality is null));
+
+-- ===== supabase/migrations/20261026000044_free_pro_memberships.sql =====
+-- Narrow Gate Fitness — Free and Pro All Access (owner decision of 2026-10-26).
+--
+-- New customers can choose only Free or Pro All Access ($19.99 a month or $149.99 a year, the same features).
+-- Plus is no longer sold; the 'plus' plan value stays valid so existing Plus subscriptions keep their access until
+-- they end. Nothing existing is changed or removed by this migration: no subscription, entitlement, activity or
+-- route is rewritten. It only adds columns and governs new writes.
+
+-- 1. Refunds and disputes (Stripe). A full refund or a dispute of the payment for a subscription's current period
+--    ends the access that payment bought; the subscription row keeps its Stripe status. A later paid period, or a
+--    dispute closed in the merchant's favour, restores access (src/server/services/billing.ts).
+alter table public.subscriptions
+  add column access_revoked_at timestamptz,
+  add column access_revoked_reason text check (access_revoked_reason in ('refund', 'dispute')),
+  add column revoked_invoice_id text check (revoked_invoice_id is null or char_length(revoked_invoice_id) <= 200),
+  add constraint subscriptions_revocation_complete check (
+    (access_revoked_at is null and access_revoked_reason is null)
+    or (access_revoked_at is not null and access_revoked_reason is not null)
+  );
+
+-- 2. Live GPS recording is part of Pro (and of legacy Plus subscriptions, which included it). Manual and treadmill
+--    run and walk logging stays free. A trigger rather than a policy, because an update has to compare the old row
+--    with the new one: a member on Free can still edit the notes or effort of a run they recorded earlier, delete it,
+--    or remove its route, but can't create a GPS recording or attach a route. Server-side writes (the service role,
+--    with no signed-in member) aren't affected, so imports, exports and account deletion behave as before.
+create or replace function public.enforce_live_gps_plan()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  adds_gps boolean;
+begin
+  if auth.uid() is null then
+    return new;
+  end if;
+  if tg_op = 'INSERT' then
+    adds_gps := new.source = 'gps' or new.route is not null;
+  else
+    adds_gps := (new.source = 'gps' and old.source is distinct from 'gps')
+      or (new.route is not null and new.route is distinct from old.route);
+  end if;
+  if adds_gps and public.plan_rank(public.plan_of(new.user_id)) < public.plan_rank('plus') then
+    raise exception 'Live GPS recording is included with Pro' using errcode = 'P0001';
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.enforce_live_gps_plan() from public, anon, authenticated;
+
+create trigger activities_live_gps_plan before insert or update on public.activities
+  for each row execute function public.enforce_live_gps_plan();
+
+-- ===== supabase/migrations/20261026000045_legal_acceptances.sql =====
+-- Narrow Gate Fitness — evidence of what each member agreed to, and when.
+--
+-- Sign-up already required unticked "I agree" and "18 or older" boxes, but nothing recorded which version of the
+-- Terms and Privacy Policy was shown or when it was accepted. Each row records one acceptance: the document, its
+-- version, a SHA-256 fingerprint of the exact text shown (src/lib/legal/versions.ts; the text itself is kept in the
+-- repository's history), when, and where (sign-up, re-acceptance after a change, or web checkout's auto-renewal
+-- consent). Rows are append-only for members: they can read their own and add their own, never edit or delete.
+-- They are removed with the account. Nothing existing is changed.
+
+create table public.legal_acceptances (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  document text not null check (document in ('terms', 'privacy', 'risk_acknowledgment', 'auto_renewal')),
+  version text not null check (char_length(version) between 1 and 64),
+  document_sha256 text not null check (document_sha256 ~ '^[0-9a-f]{64}$'),
+  source text not null check (source in ('signup', 'reaccept', 'checkout')),
+  -- For auto-renewal consent: what was agreed to (e.g. "Pro All Access, $19.99 per month").
+  details text check (details is null or char_length(details) <= 300),
+  accepted_at timestamptz not null default now()
+);
+create index legal_acceptances_user_idx on public.legal_acceptances (user_id, document, accepted_at desc);
+
+alter table public.legal_acceptances enable row level security;
+create policy legal_acceptances_select_own on public.legal_acceptances
+  for select to authenticated using (user_id = (select auth.uid()));
+create policy legal_acceptances_insert_own on public.legal_acceptances
+  for insert to authenticated with check (user_id = (select auth.uid()) and source in ('reaccept', 'checkout'));
+
+-- The time is always the database's, so a record can't be back- or post-dated.
+create or replace function public.legal_acceptance_stamp()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.accepted_at := now();
+  return new;
+end;
+$$;
+create trigger legal_acceptances_stamp before insert on public.legal_acceptances
+  for each row execute function public.legal_acceptance_stamp();
+
+-- Sign-up: the sign-up form sends the documents accepted with the new account (user metadata), and they're recorded
+-- in the same transaction that creates the account, so an account can't exist without the record of how it was
+-- created. Malformed entries are ignored rather than blocking the sign-up; the app treats a member without a current
+-- record as not having accepted (src/server/legal.ts).
+create or replace function public.record_signup_acceptances()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  item jsonb;
+begin
+  if jsonb_typeof(new.raw_user_meta_data -> 'legal_acceptances') <> 'array' then
+    return new;
+  end if;
+  for item in select * from jsonb_array_elements(new.raw_user_meta_data -> 'legal_acceptances') limit 10 loop
+    if item ->> 'document' in ('terms', 'privacy', 'risk_acknowledgment')
+       and char_length(coalesce(item ->> 'version', '')) between 1 and 64
+       and coalesce(item ->> 'sha256', '') ~ '^[0-9a-f]{64}$' then
+      insert into public.legal_acceptances (user_id, document, version, document_sha256, source)
+      values (new.id, item ->> 'document', item ->> 'version', item ->> 'sha256', 'signup');
+    end if;
+  end loop;
+  return new;
+end;
+$$;
+revoke all on function public.record_signup_acceptances() from public, anon, authenticated;
+
+create trigger on_auth_user_created_legal
+  after insert on auth.users
+  for each row execute function public.record_signup_acceptances();
+
 -- ===== supabase/seed.sql =====
 -- AUTO-GENERATED by scripts/generate-seed.ts — do not edit by hand.
 -- Exercise descriptions are general fitness education, not medical advice.

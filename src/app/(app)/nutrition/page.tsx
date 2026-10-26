@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { ProgressRing } from "@/components/ui/progress-ring";
 import { addDays, isoDateInTz } from "@/lib/domain/dates";
+import { NUTRITION_FEATURE_TITLE, NUTRITION_SCORE_LABEL } from "@/lib/food-iq";
 import { progressPct, sumMacros } from "@/lib/domain/nutrition";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
@@ -264,7 +265,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
           </span>
           <div className="min-w-0">
             <p id="food-iq-cta" className="font-display text-xs font-bold uppercase tracking-[0.16em] text-gold">
-              Narrow Gate Food IQ
+              {NUTRITION_FEATURE_TITLE}
             </p>
             <p className="mt-1 text-[1.0625rem] font-semibold leading-snug">Scan a packaged food&apos;s barcode to review its nutrition and ingredients.</p>
             <p className="mt-1 text-sm text-muted-foreground">Additives, sweeteners, preservatives and added sugars from the declared ingredient list, each with what regulators say, how strong the evidence is and where it comes from. It reads the label and product data; it doesn&apos;t test the food itself.</p>
@@ -332,7 +333,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
         <nav aria-label="Food tools" className="grid grid-cols-2 gap-2">
           {(
             [
-              ["/nutrition/scanner", "Food IQ", ScanBarcode],
+              ["/nutrition/scanner", NUTRITION_SCORE_LABEL, ScanBarcode],
               [`/nutrition/photo?date=${date}`, "Meal photo", Camera],
               ["/nutrition/recipes", "Recipes", CookingPot],
               ["/nutrition/saved-meals", "Saved meals", BookMarked],

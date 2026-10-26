@@ -19,3 +19,8 @@ export function logError(scope: string, error: unknown, context: Record<string, 
     }),
   );
 }
+
+/** A notable event that isn't an error (same privacy rules as logError: ids and codes only). */
+export function logInfo(scope: string, context: Record<string, string | number | boolean | null> = {}) {
+  console.info(JSON.stringify({ level: "info", scope, ...context, at: new Date().toISOString() }));
+}

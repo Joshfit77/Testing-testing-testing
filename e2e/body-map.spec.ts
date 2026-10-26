@@ -26,10 +26,10 @@ test.describe("Strength & Body Map", () => {
     await signUpAndConfirm(page, uniqueEmail("bodymap-free"));
     await completeOnboarding(page);
     await page.goto("/progress");
-    await expect(page.getByRole("link", { name: /Strength & Body Map/ })).toContainText("Plus:");
+    await expect(page.getByRole("link", { name: /Strength & Body Map/ })).toContainText("Pro:");
     await page.getByRole("link", { name: /Strength & Body Map/ }).click();
     await page.waitForURL(/\/progress\/body-map/);
-    await expect(page.getByText(/included with Plus|Upgrade to Plus|Available with Plus/i).first()).toBeVisible();
+    await expect(page.getByText(/included with Pro|Upgrade to Pro|Available with Pro/i).first()).toBeVisible();
     await expect(page.getByTestId("region-list")).toHaveCount(0);
   });
 

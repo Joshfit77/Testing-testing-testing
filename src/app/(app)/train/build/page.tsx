@@ -21,7 +21,7 @@ export default async function BuildProgramPage({ searchParams }: { searchParams:
         back={{ href: "/train", label: "Train" }}
         eyebrow="Build my program"
         title="Your custom program"
-        plan="Plus"
+        plan="Pro"
         description="Build a periodized program around your goal, numbers, schedule and equipment — strength, bodybuilding, running and more. Your starter program and the free programs stay available on every plan."
       />
     );

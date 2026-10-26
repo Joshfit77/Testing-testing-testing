@@ -104,7 +104,7 @@ export default async function ExerciseHistoryPage({ params }: { params: Promise<
                 <h2 className="font-semibold">Estimated 1RM trend</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
                   <Lock className="mr-1 inline size-3.5 text-gold" aria-hidden />
-                  Trend charts are part of Plus. Your best estimated 1RM for each session is listed below.
+                  Trend charts are part of Pro All Access. Your best estimated 1RM for each session is listed below.
                 </p>
                 <Button asChild size="sm" variant="secondary" className="mt-2">
                   <Link href="/profile/billing">See plans</Link>

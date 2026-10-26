@@ -56,7 +56,7 @@ export default async function SleepMethodPage() {
 
       <section className={card} aria-labelledby="m-debt">
         <h2 id="m-debt" className="font-display text-lg font-bold uppercase text-foreground">
-          Estimated sleep debt (version {SLEEP_DEBT_VERSION}, Plus)
+          Estimated sleep debt (version {SLEEP_DEBT_VERSION}, Pro)
         </h2>
         <p>A rolling estimate over your last 14 nights. A night under your goal adds the whole shortfall. A night over it pays back half of the extra, and only what is still owed, so sleeping in doesn&apos;t cancel lost sleep hour for hour. Nights you didn&apos;t log change nothing. Up to an hour behind is on track, up to three hours a little behind, more than that a deficit. It is an estimate from your entries, not a measurement, and it is separate from the nightly score.</p>
       </section>
@@ -70,14 +70,14 @@ export default async function SleepMethodPage() {
 
       <section className={card} aria-labelledby="m-windows">
         <h2 id="m-windows" className="font-display text-lg font-bold uppercase text-foreground">
-          Suggested windows (version {SLEEP_SCHEDULE_VERSION}, Plus)
+          Suggested windows (version {SLEEP_SCHEDULE_VERSION}, Pro)
         </h2>
         <p>The wake-up window is 15 minutes either side of the wake time you chose, or your typical one. The bedtime window counts back from it: your goal, plus how long you typically take to fall asleep (15 minutes if you never entered it), plus ten minutes to settle, then 30 minutes either side. When your usual bedtime is more than half an hour from the window, the plan moves it 15 minutes a night with the wake time held fixed. None of this measures your body clock.</p>
       </section>
 
       <section className={card} aria-labelledby="m-energy">
         <h2 id="m-energy" className="font-display text-lg font-bold uppercase text-foreground">
-          Estimated daily energy (version {SLEEP_ENERGY_VERSION}, Plus)
+          Estimated daily energy (version {SLEEP_ENERGY_VERSION}, Pro)
         </h2>
         <p>An hour-by-hour sketch from stated assumptions: alertness is highest a few hours after waking and falls as the day goes on; there&apos;s a dip six to eight hours after waking; and the last two hours before bed wind down. A short night and an estimated sleep debt lower the whole curve, by at most 40% together. It ignores caffeine, light, meals and training, which is why what you actually report is shown next to it.</p>
       </section>
@@ -93,7 +93,7 @@ export default async function SleepMethodPage() {
         <h2 id="m-compare" className="font-display text-lg font-bold uppercase text-foreground">
           Comparisons over longer ranges
         </h2>
-        <p>Sleep history shows time asleep night by night over 7 days, weekly averages over 30 and 90 days and monthly averages over a year; a week or month with nothing logged is an empty slot, never zero. Weekday and weekend nights (Plus) are compared on nights logged, average time asleep, nights at goal and typical bedtime and wake time. A night counts as a weekend night when it ends on a Saturday or Sunday; typical times need three nights on each side; differences under 10 minutes read as &ldquo;about the same&rdquo;.</p>
+        <p>Sleep history shows time asleep night by night over 7 days, weekly averages over 30 and 90 days and monthly averages over a year; a week or month with nothing logged is an empty slot, never zero. Weekday and weekend nights (Pro) are compared on nights logged, average time asleep, nights at goal and typical bedtime and wake time. A night counts as a weekend night when it ends on a Saturday or Sunday; typical times need three nights on each side; differences under 10 minutes read as &ldquo;about the same&rdquo;.</p>
       </section>
 
       <section className={card} aria-labelledby="m-training">

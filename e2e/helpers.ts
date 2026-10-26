@@ -33,6 +33,7 @@ export async function signUpAndConfirm(page: Page, email: string, name = "Test A
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await page.getByLabel("I confirm I am 18 years of age or older.").check();
   await page.getByRole("checkbox", { name: /I agree to the/ }).check();
+  await page.getByRole("checkbox", { name: /I understand that exercise and outdoor activity carry a risk of injury/ }).check();
   await page.getByRole("button", { name: "Create account" }).click();
   await page.getByText("Check your inbox").waitFor();
   const link = await getEmailLink(email, /http:\/\/127\.0\.0\.1:54321\/auth\/v1\/verify[^"'\s<]+/);

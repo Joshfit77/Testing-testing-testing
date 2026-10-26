@@ -43,7 +43,7 @@ export default async function ProgressHubPage() {
       title: "Strength & Body Map",
       body: hasFeature(plan, "advanced_analytics")
         ? "Muscle map, Bronze-to-Disciple strength ranks and trends for each muscle group"
-        : "Plus: a muscle map with strength ranks and trends for each muscle group",
+        : "Pro: a muscle map with strength ranks and trends for each muscle group",
     },
     {
       href: "/progress/body-scan",

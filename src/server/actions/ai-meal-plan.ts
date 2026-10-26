@@ -16,7 +16,7 @@ const draftSchema = z.object({
   notes: z.string().trim().max(300, "Keep notes under 300 characters.").optional(),
 });
 
-/** AI meal plans need the meal planner (Plus) and the AI allowance (Pro, or kept legacy AI terms). */
+/** AI meal plans need the meal planner (Pro) and the AI allowance (Pro, or kept legacy AI terms). */
 async function ctx() {
   const user = await requireUser();
   await assertFeature(user.id, "meal_planning");

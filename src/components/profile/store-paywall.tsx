@@ -2,23 +2,22 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check } from "lucide-react";
 import { Notice } from "@/components/common/states";
-import { Badge } from "@/components/ui/badge";
+import { MembershipPlans, type BillingInterval } from "@/components/profile/membership-plans";
 import { Button } from "@/components/ui/button";
 import {
   paywallAction,
   paywallOptions,
   purchaseErrorMessage,
   renewalTerms,
+  storePrices,
   type BillingSource,
   type Interval,
-  type PaidPlan,
   type PaywallOptions,
-  type PaywallPackage,
   type StoreProductIds,
 } from "@/lib/billing/paywall";
 import { connectStore, type StoreClient } from "@/lib/billing/store-purchases";
+import type { ComparisonSection } from "@/lib/domain/membership";
 import type { Plan } from "@/lib/domain/types";
 import { syncStorePurchasesAction } from "@/server/actions/store-billing";
 
@@ -28,11 +27,12 @@ export interface StorePaywallProps {
   apiKey: string;
   currentPlan: Plan;
   source: BillingSource;
-  /** The store product the member currently subscribes to here, if any (Google Play upgrades must name it). */
+  /** The store product the member currently subscribes to here, if any (Google Play changes must name it). */
   currentProductId: string | null;
+  /** Monthly or yearly, for the member's current subscription here. */
+  currentInterval: Interval | null;
   productIds: StoreProductIds;
-  yearly: Record<PaidPlan, boolean>;
-  plans: Record<PaidPlan, { name: string; tagline: string; highlights: string[] }>;
+  comparison: ComparisonSection[];
   legal: { termsUrl: string; privacyUrl: string; final: boolean };
 }
 
@@ -42,25 +42,26 @@ const MANAGE_FALLBACK = {
 };
 
 /**
- * In-app subscription screen for the iOS and Android apps (App Store / Google Play through RevenueCat). Shows
- * each plan with the store's localized renewal price, the renewal terms, Terms and Privacy links, and Restore
- * purchases (App Store guidelines 3.1.1 and 3.1.2). After a purchase or restore the server re-reads the member's
- * purchases from RevenueCat; the plan never changes on the app's word alone.
+ * In-app membership screen for the iOS and Android apps (App Store / Google Play through RevenueCat). Shows Free
+ * and Pro All Access with the store's localized monthly and yearly prices, the renewal terms, Terms and Privacy
+ * links, Restore purchases and Manage subscription (App Store guidelines 3.1.1 and 3.1.2). After a purchase or
+ * restore the server re-reads the member's purchases from RevenueCat; the plan never changes on the app's word.
  */
 export function StorePaywall(props: StorePaywallProps) {
-  const { userId, platform, apiKey, currentPlan, source, currentProductId, productIds, yearly, plans, legal } = props;
+  const { userId, platform, apiKey, currentPlan, source, currentProductId, currentInterval, productIds, comparison, legal } = props;
   const router = useRouter();
   const client = useRef<StoreClient | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "unavailable">("loading");
-  const [options, setOptions] = useState<PaywallOptions>({ plus: {}, pro: {} });
+  const [options, setOptions] = useState<PaywallOptions>({});
+  const [interval, setInterval] = useState<BillingInterval>(currentInterval ?? "month");
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<{ tone: "info" | "success" | "error"; text: string } | null>(null);
   const storeName = platform === "ios" ? "App Store" : "Google Play";
   // Compared by value: the page passes new objects on every refresh, which mustn't reload the store.
-  const configKey = JSON.stringify({ productIds, yearly });
+  const configKey = JSON.stringify(productIds);
 
   useEffect(() => {
-    const config = JSON.parse(configKey) as Pick<StorePaywallProps, "productIds" | "yearly">;
+    const ids = JSON.parse(configKey) as StoreProductIds;
     let cancelled = false;
     (async () => {
       const c = await connectStore(apiKey, userId);
@@ -70,7 +71,7 @@ export function StorePaywall(props: StorePaywallProps) {
       try {
         const packages = await c.packages();
         if (cancelled) return;
-        setOptions(paywallOptions(packages, config.productIds, config.yearly));
+        setOptions(paywallOptions(packages, ids));
         setState("ready");
       } catch {
         if (!cancelled) setState("unavailable");
@@ -81,24 +82,18 @@ export function StorePaywall(props: StorePaywallProps) {
     };
   }, [apiKey, userId, configKey]);
 
-  async function refreshFromServer(successText: (plan: Plan) => string | null) {
-    const res = await syncStorePurchasesAction();
-    if (!res.ok) {
-      setMessage({ tone: "error", text: res.error });
-      return;
-    }
-    const text = successText(res.plan);
-    setMessage(text ? { tone: "success", text } : { tone: "info", text: "Purchase received. Your plan will update in a moment — pull down to refresh if it hasn't." });
-    router.refresh();
-  }
-
-  async function buy(plan: PaidPlan, pkg: PaywallPackage) {
-    if (!client.current) return;
+  async function buy(chosen: Interval) {
+    const pkg = options[chosen];
+    if (!client.current || !pkg) return;
     setBusy(pkg.product.identifier);
     setMessage(null);
     try {
       await client.current.purchase(pkg, { oldProductId: currentProductId ?? undefined });
-      await refreshFromServer((p) => (p === plan || (plan === "plus" && p === "pro") ? `You're on ${plans[plan].name}. Thank you!` : null));
+      const res = await syncStorePurchasesAction();
+      if (!res.ok) setMessage({ tone: "error", text: res.error });
+      else if (res.plan === "pro") setMessage({ tone: "success", text: "Welcome to Pro All Access. Thank you!" });
+      else setMessage({ tone: "info", text: "Purchase received. Your membership will update in a moment. Pull down to refresh if it hasn't." });
+      router.refresh();
     } catch (err) {
       const text = purchaseErrorMessage(err);
       setMessage(text ? { tone: "error", text } : { tone: "info", text: "Purchase cancelled. You haven't been charged." });
@@ -115,8 +110,8 @@ export function StorePaywall(props: StorePaywallProps) {
       await client.current.restore();
       const res = await syncStorePurchasesAction();
       if (!res.ok) setMessage({ tone: "error", text: res.error });
-      else if (res.plan === "free") setMessage({ tone: "info", text: `No active subscriptions were found for your ${storeName} account.` });
-      else setMessage({ tone: "success", text: `Purchases restored. You're on ${res.plan === "pro" ? plans.pro.name : plans.plus.name}.` });
+      else if (res.plan === "free") setMessage({ tone: "info", text: `No active memberships were found for your ${storeName} account.` });
+      else setMessage({ tone: "success", text: `Purchases restored. You're on ${res.plan === "pro" ? "Pro All Access" : "your Plus membership"}.` });
       router.refresh();
     } catch (err) {
       setMessage({ tone: "error", text: purchaseErrorMessage(err) ?? "Restore was cancelled." });
@@ -133,94 +128,77 @@ export function StorePaywall(props: StorePaywallProps) {
   if (state === "unavailable") {
     return (
       <Notice tone="info">
-        In-app purchases aren&apos;t available right now. Please update the app or try again later. Your current plan works everywhere you sign in.
+        In-app purchases aren&apos;t available right now. Please update the app or try again later. Your current membership works everywhere you sign in.
       </Notice>
     );
   }
 
-  const elsewhere = paywallAction(currentPlan, source, platform, "pro") === "elsewhere";
+  const prices = storePrices(options);
+  const shown: Interval = interval === "year" && options.year ? "year" : "month";
+  const action = paywallAction(currentPlan, source, platform, shown, currentInterval);
+  const pkg = options[shown];
   const managedHere = currentPlan !== "free" && source === (platform === "ios" ? "app_store" : "play_store");
 
-  return (
-    <section className="space-y-4" aria-labelledby="store-plans-title" aria-busy={state === "loading"}>
-      <h2 id="store-plans-title" className="sr-only">
-        Subscribe in the app
-      </h2>
-      {elsewhere && (
-        <Notice tone="info">Your subscription was purchased outside the {storeName}. Manage it where you subscribed; it works here too.</Notice>
-      )}
-      {message && <Notice tone={message.tone}>{message.text}</Notice>}
-      {state === "loading" && <p className="text-sm text-muted-foreground">Loading {storeName} prices…</p>}
-      {state === "ready" && !elsewhere && (
-        <ul className="grid gap-4 md:grid-cols-2">
-          {(["plus", "pro"] as const).map((plan) => {
-            const action = paywallAction(currentPlan, source, platform, plan);
-            const intervals = (["month", "year"] as Interval[]).filter((i) => options[plan][i]);
-            return (
-              <li key={plan} className={action === "current" ? "rounded-2xl border border-gold bg-card-gradient p-5" : "rounded-2xl border border-border bg-card p-5"}>
-                <div className="flex items-center justify-between">
-                  <p className="font-display text-xl font-semibold uppercase tracking-wider">{plans[plan].name}</p>
-                  {action === "current" && <Badge>Current</Badge>}
-                </div>
-                <p className="text-sm text-muted-foreground">{plans[plan].tagline}</p>
-                <ul className="mt-3 space-y-2 text-sm">
-                  {plans[plan].highlights.map((h) => (
-                    <li key={h} className="flex gap-2">
-                      <Check className="mt-0.5 size-4 shrink-0 text-gold" aria-hidden /> {h}
-                    </li>
-                  ))}
-                </ul>
-                {intervals.length === 0 && <p className="mt-4 text-sm text-muted-foreground">Not available in the {storeName} yet.</p>}
-                {(action === "buy" || action === "upgrade") && (
-                  <div className="mt-4 space-y-3">
-                    {intervals.map((interval) => {
-                      const pkg = options[plan][interval]!;
-                      return (
-                        <div key={interval}>
-                          <p className="text-2xl font-bold">
-                            {pkg.product.priceString}
-                            <span className="text-sm font-normal text-muted-foreground"> / {interval}</span>
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {plans[plan].name}, billed {interval === "month" ? "monthly" : "yearly"}. Renews automatically until cancelled.
-                          </p>
-                          <Button className="mt-2 w-full" variant={plan === "plus" ? "default" : "secondary"} disabled={busy !== null} onClick={() => buy(plan, pkg)}>
-                            {busy === pkg.product.identifier
-                              ? "Opening the " + storeName + "…"
-                              : `${action === "upgrade" ? "Upgrade to" : "Subscribe to"} ${plans[plan].name} ${interval === "month" ? "monthly" : "yearly"}`}
-                          </Button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-                {action === "included" && <p className="mt-4 text-xs text-muted-foreground">Included in your current plan.</p>}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-      <div className="flex flex-wrap gap-3">
-        <Button variant="secondary" disabled={busy !== null || state !== "ready"} onClick={restore}>
-          {busy === "restore" ? "Restoring…" : "Restore purchases"}
+  let proAction: React.ReactNode;
+  if (state === "loading") proAction = <p className="text-sm text-muted-foreground">Loading {storeName} prices…</p>;
+  else if (action === "elsewhere")
+    proAction = <p className="text-sm text-muted-foreground">Your membership was purchased outside the {storeName}. Manage it where you subscribed; it works here too.</p>;
+  else if (action === "current") proAction = <p className="text-sm text-muted-foreground">This is your current membership.</p>;
+  else if (!pkg) proAction = <p className="text-sm text-muted-foreground">Not available in the {storeName} yet.</p>;
+  else
+    proAction = (
+      <div className="space-y-2">
+        <Button className="w-full" size="lg" disabled={busy !== null} onClick={() => buy(shown)} data-testid="store-buy">
+          {busy === pkg.product.identifier
+            ? `Opening the ${storeName}…`
+            : action === "switch"
+              ? `Switch to ${shown === "year" ? "yearly" : "monthly"} · ${pkg.product.priceString}`
+              : `${action === "upgrade" ? "Upgrade to" : "Start"} Pro All Access · ${pkg.product.priceString} / ${shown}`}
         </Button>
-        {managedHere && (
-          <Button variant="secondary" onClick={manage}>
-            Manage subscription
-          </Button>
-        )}
+        <p className="text-xs text-muted-foreground">
+          {action === "switch"
+            ? `The ${storeName} moves your membership to ${shown === "year" ? "yearly" : "monthly"} billing; it confirms when the change takes effect.`
+            : `Pro All Access, billed ${shown === "month" ? "monthly" : "yearly"}. Renews automatically until cancelled.`}
+        </p>
       </div>
-      <p className="text-xs text-muted-foreground">
-        {renewalTerms(platform)}{" "}
-        <a href={legal.termsUrl} className="text-gold-highlight underline" target="_blank" rel="noopener">
-          Terms of Use
-        </a>{" "}
-        ·{" "}
-        <a href={legal.privacyUrl} className="text-gold-highlight underline" target="_blank" rel="noopener">
-          Privacy Policy
-        </a>
-        {!legal.final && " (drafts awaiting legal review)"}
-      </p>
-    </section>
+    );
+
+  return (
+    <div className="space-y-4" aria-busy={state === "loading"}>
+      {message && <Notice tone={message.tone}>{message.text}</Notice>}
+      <MembershipPlans
+        currentPlan={currentPlan}
+        interval={interval}
+        onIntervalChange={setInterval}
+        prices={prices}
+        comparison={comparison}
+        proAction={proAction}
+        footer={
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-3">
+              <Button variant="secondary" disabled={busy !== null || state !== "ready"} onClick={restore}>
+                {busy === "restore" ? "Restoring…" : "Restore purchases"}
+              </Button>
+              {managedHere && (
+                <Button variant="secondary" onClick={manage}>
+                  Manage subscription
+                </Button>
+              )}
+            </div>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {renewalTerms(platform)}{" "}
+              <a href={legal.termsUrl} className="text-gold-highlight underline" target="_blank" rel="noopener">
+                Terms of Service
+              </a>{" "}
+              ·{" "}
+              <a href={legal.privacyUrl} className="text-gold-highlight underline" target="_blank" rel="noopener">
+                Privacy Policy
+              </a>
+              {!legal.final && " (drafts awaiting legal review)"}
+            </p>
+          </div>
+        }
+      />
+    </div>
   );
 }

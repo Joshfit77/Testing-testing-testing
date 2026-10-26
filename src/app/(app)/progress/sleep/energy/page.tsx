@@ -20,7 +20,7 @@ export default async function SleepEnergyPage() {
   const { user, profile } = await requireOnboardedUser();
   const plan = await getUserPlan(user.id);
   if (!hasFeature(plan, "sleep_analytics")) {
-    return <PlanLocked back={{ href: "/progress/sleep", label: "Sleep & Recovery" }} eyebrow="Sleep & Recovery" title="Daily energy" plan="Plus" description="An hour-by-hour estimate of when you're likely to feel sharp or flat today, from your wake time, last night and sleep debt, shown next to the energy you actually report." />;
+    return <PlanLocked back={{ href: "/progress/sleep", label: "Sleep & Recovery" }} eyebrow="Sleep & Recovery" title="Daily energy" plan="Pro" description="An hour-by-hour estimate of when you're likely to feel sharp or flat today, from your wake time, last night and sleep debt, shown next to the energy you actually report." />;
   }
   const tz = profile.timezone ?? "UTC";
   const today = isoDateInTz(new Date(), tz);

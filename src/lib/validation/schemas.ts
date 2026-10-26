@@ -34,6 +34,7 @@ export const signUpSchema = z.object({
   displayName: z.string().trim().min(1, "Tell us what to call you").max(60),
   ageConfirmed: z.literal("on", { message: "You must be 18 or older to create an account" }),
   termsAccepted: z.literal("on", { message: "Please accept the terms and privacy policy" }),
+  riskAcknowledged: z.literal("on", { message: "Please read and acknowledge the health and AI notice" }),
 });
 
 export const signInSchema = z.object({ email: emailSchema, password: z.string().min(1, "Enter your password").max(128) });

@@ -15,10 +15,10 @@ import { getQualityProduct, searchCategory } from "@/server/services/food-qualit
 import { OffUnavailableError } from "@/server/services/open-food-facts";
 import { logError } from "@/server/log";
 
-/** Save the member's product filters (Plus and Pro). */
+/** Save the member's product filters (Pro, and legacy Plus). */
 export async function setFoodFiltersAction(input: unknown): Promise<{ ok: true; message: string; filters: FoodFilters } | { ok: false; error: string }> {
   const user = await requireUser();
-  if (!hasFeature(await getUserPlan(user.id), "food_comparisons")) return { ok: false, error: "Personal product filters are included with Plus and Pro." };
+  if (!hasFeature(await getUserPlan(user.id), "food_comparisons")) return { ok: false, error: "Personal product filters are included with Pro All Access." };
   const filters = sanitizeFilters(input);
   const supabase = await getServerSupabase();
   const { error } = await supabase.from("profiles").update({ food_filters: filters }).eq("id", user.id);

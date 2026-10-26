@@ -5,6 +5,11 @@ name: Android APK
 # Not for the Play Store: store builds need your own signing key and the online app URL.
 on:
   workflow_dispatch:
+    inputs:
+      publish:
+        description: "Replace the android-latest release with this APK (a manual run only compiles and keeps the APK as a run artifact unless ticked)"
+        type: boolean
+        default: false
   push:
     branches: [main, claude/sharp-cray-8y0uuv]
     paths:
@@ -51,6 +56,8 @@ jobs:
           name: NarrowGateFitness-offline-apk
           path: NarrowGateFitness-offline.apk
       - name: Publish as the android-latest release
+        # Pushes to the listed branches publish as before; a manual run publishes only when asked.
+        if: github.event_name == 'push' || inputs.publish == true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

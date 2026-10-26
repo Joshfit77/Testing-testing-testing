@@ -20,7 +20,7 @@ export default async function SleepDebtPage() {
   const { user, profile } = await requireOnboardedUser();
   const plan = await getUserPlan(user.id);
   if (!hasFeature(plan, "sleep_analytics")) {
-    return <PlanLocked back={{ href: "/progress/sleep", label: "Sleep & Recovery" }} eyebrow="Sleep & Recovery" title="Sleep debt" plan="Plus" description="An estimate of how far behind your sleep goal you are over the last two weeks, night by night, with the maths shown." />;
+    return <PlanLocked back={{ href: "/progress/sleep", label: "Sleep & Recovery" }} eyebrow="Sleep & Recovery" title="Sleep debt" plan="Pro" description="An estimate of how far behind your sleep goal you are over the last two weeks, night by night, with the maths shown." />;
   }
   const tz = profile.timezone ?? "UTC";
   const today = isoDateInTz(new Date(), tz);

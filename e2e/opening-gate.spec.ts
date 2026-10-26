@@ -33,6 +33,8 @@ async function waitForAnimations(page: Page, selector: string) {
 }
 
 type Box = { x: number; y: number; width: number; height: number };
+/** What the page filmed of the move into the light after Enter Narrow Gate (see the first test). */
+type Film = { frames: number; first: number; maxScale: number; maxWhite: number; animations: string[] };
 const overlaps = (a: Box, b: Box) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 
 test.describe("opening gate", () => {
@@ -52,30 +54,45 @@ test.describe("opening gate", () => {
     await expect(o.getByText("Matthew 7:13–14 (BSB)")).toBeVisible();
     await expect(o.getByTestId("animated-narrow-door")).toBeVisible();
     // Pressed as soon as it shows: the button rises in for 0.6 s and the overlay moves on at 3.85 s, which a slow
-    // renderer (WebKit on a CI machine without a GPU) can reach before Playwright sees it "stable".
+    // renderer (WebKit on a CI machine without a GPU) can reach before Playwright sees it "stable". The move is
+    // filmed from inside the page, frame by frame from the press itself: a loop on the test side can miss the whole
+    // 0.9 s push when each round trip to a busy browser takes hundreds of milliseconds.
     const enter = o.getByRole("button", { name: "Enter Narrow Gate" });
     await expect(enter).toBeVisible();
-    await enter.click({ force: true });
-    expect(await introState(page)).toBe("entering");
-    // A move, not a cut: right after the press the light has not yet filled the screen.
-    const first = await page.evaluate(() => Number(getComputedStyle(document.querySelector(".ngo-white")!).opacity));
-    expect(first).toBeLessThan(0.3);
-    let maxScale = 1;
-    let maxWhite = 0;
-    for (let i = 0; i < 30 && (await introState(page)) === "entering"; i++) {
-      const m = await page.evaluate(() => {
-        const push = document.querySelector(".ngs-push");
-        const white = document.querySelector(".ngo-white");
-        return push && white ? { scale: new DOMMatrix(getComputedStyle(push).transform).a, white: Number(getComputedStyle(white).opacity) } : null;
+    await page.evaluate(() => {
+      const d = document.documentElement;
+      const push = document.querySelector(".ngo .ngs-push")!;
+      const white = document.querySelector(".ngo-white")!;
+      const sample = () => ({ scale: new DOMMatrix(getComputedStyle(push).transform).a, white: Number(getComputedStyle(white).opacity) });
+      (window as unknown as { __ngFilm: Promise<Film> }).__ngFilm = new Promise<Film>((resolve) => {
+        const film: Film = { frames: 0, first: NaN, maxScale: 1, maxWhite: 0, animations: [] };
+        const frame = () => {
+          const m = sample();
+          film.frames += 1;
+          if (Number.isNaN(film.first)) film.first = m.white;
+          film.maxScale = Math.max(film.maxScale, m.scale);
+          film.maxWhite = Math.max(film.maxWhite, m.white);
+          if (d.dataset.intro === "entering" && film.frames < 600) requestAnimationFrame(frame);
+          else resolve(film);
+        };
+        const observer = new MutationObserver(() => {
+          if (d.dataset.intro !== "entering") return;
+          observer.disconnect();
+          film.animations = [...push.getAnimations(), ...white.getAnimations()].map((a) => (a as CSSAnimation).animationName);
+          requestAnimationFrame(frame);
+        });
+        observer.observe(d, { attributes: true, attributeFilter: ["data-intro"] });
       });
-      if (m) {
-        maxScale = Math.max(maxScale, m.scale);
-        maxWhite = Math.max(maxWhite, m.white);
-      }
-      await page.waitForTimeout(40);
-    }
-    expect(maxScale).toBeGreaterThan(2.5);
-    expect(maxWhite).toBeGreaterThan(0.9);
+    });
+    await enter.click({ force: true });
+    const film = await page.evaluate(() => (window as unknown as { __ngFilm: Promise<Film> }).__ngFilm);
+    // The press starts the camera push and the light together, as a move and not a cut: on the first frame the
+    // light has not yet filled the screen; by the end the scene has grown past 2.5x and the light is full.
+    expect(film.animations).toEqual(expect.arrayContaining(["ngs-push-now", "ngo-flood"]));
+    expect(film.frames).toBeGreaterThan(0);
+    expect(film.first).toBeLessThan(0.3);
+    expect(film.maxScale).toBeGreaterThan(2.5);
+    expect(film.maxWhite).toBeGreaterThan(0.9);
     await expect(o).toHaveCount(0);
     expect(await introState(page)).toBe("done");
 

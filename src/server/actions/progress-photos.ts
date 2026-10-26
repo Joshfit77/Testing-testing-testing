@@ -82,16 +82,24 @@ export async function deleteProgressPhotoAction(id: string): Promise<Result> {
   const parsedId = z.string().uuid().safeParse(id);
   if (!parsedId.success) return { ok: false, error: "Invalid photo." };
   const supabase = await getServerSupabase();
-  const { data, error } = await supabase.from("progress_photos").delete().eq("id", parsedId.data).eq("user_id", user.id).select("storage_path");
+  // The image goes first: if removing it fails, the row stays so the member can simply try again, and no private
+  // image is ever left behind without a row pointing at it.
+  const { data: row, error: readErr } = await supabase.from("progress_photos").select("storage_path").eq("id", parsedId.data).eq("user_id", user.id).maybeSingle();
+  if (readErr) {
+    logError("progress_photos.delete", readErr);
+    return { ok: false, error: "Couldn't delete the photo. Please try again." };
+  }
+  if (!row) return { ok: false, error: "Photo not found." };
+  const { error: rmErr } = await supabase.storage.from(PROGRESS_PHOTO_BUCKET).remove([row.storage_path as string]);
+  if (rmErr) {
+    logError("progress_photos.delete_object", rmErr);
+    return { ok: false, error: "Couldn't delete the photo. Please try again." };
+  }
+  const { error } = await supabase.from("progress_photos").delete().eq("id", parsedId.data).eq("user_id", user.id);
   if (error) {
     logError("progress_photos.delete", error);
     return { ok: false, error: "Couldn't delete the photo. Please try again." };
   }
-  const row = data?.[0];
-  if (!row) return { ok: false, error: "Photo not found." };
-  const { error: rmErr } = await supabase.storage.from(PROGRESS_PHOTO_BUCKET).remove([row.storage_path as string]);
-  // The row is gone; a leftover object stays private and is purged with the account.
-  if (rmErr) logError("progress_photos.delete_object", rmErr);
   revalidatePath("/progress", "layout");
   return { ok: true };
 }

@@ -552,7 +552,8 @@ function CoachChatView({ conversationId: initialId, initialMessages, initialQues
           </div>
         )}
         <p className="mt-2 text-[0.6875rem] text-muted-foreground">
-          AI responses can be wrong and are not medical advice. Suggested changes only apply when you tap Confirm. Don&apos;t share sensitive health details you don&apos;t want stored. Stop any exercise that causes pain.
+          You&apos;re chatting with an AI. Its answers can be wrong, incomplete or out of date, and it isn&apos;t a doctor, dietitian or physical therapist; this
+          is not medical advice. Suggested changes only apply when you tap Confirm. Don&apos;t share sensitive health details you don&apos;t want stored. Stop any exercise that causes pain.
         </p>
       </div>
     </div>

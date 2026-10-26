@@ -32,7 +32,7 @@ export default async function TemplatesPage() {
         {atLimit ? (
           <Button asChild variant="secondary">
             <Link href="/profile/billing">
-              <Plus aria-hidden /> Unlimited with Plus
+              <Plus aria-hidden /> Unlimited with Pro
             </Link>
           </Button>
         ) : (
@@ -54,7 +54,7 @@ export default async function TemplatesPage() {
           {templates.length} of {limit} saved workouts on Free.{" "}
           {atLimit ? "Delete one to save another, or " : ""}
           <Link href="/profile/billing" className="text-gold underline-offset-4 hover:underline">
-            {atLimit ? "upgrade to Plus" : "Plus"}
+            {atLimit ? "upgrade to Pro All Access" : "Pro All Access"}
           </Link>{" "}
           {atLimit ? "for unlimited workouts." : "keeps unlimited workouts."}
         </p>

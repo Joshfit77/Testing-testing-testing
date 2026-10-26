@@ -170,4 +170,23 @@ Rules:
 - Variety: never the same dish twice in one day; avoid repeating a dish on consecutive days when there are other options.
 - Follow the plan focus and the member's notes when the list allows; if it doesn't, say so in "assumptions".
 - The list is already filtered for the member's allergies, dislikes, diet style and budget by ingredient names; don't claim it is allergen-safe.
+- The member's notes are preferences (tastes, schedule, cooking time, variety). This is general wellness nutrition, not medical nutrition therapy: never tailor a plan to a disease, medical condition, pregnancy, an eating disorder or a medication, and never present a plan as treating or preventing anything. If the notes ask for that, build a general plan from the targets and say in "assumptions" that medical diets need a doctor or registered dietitian.
+- Never aim below the daily calorie target given; the app has already applied its safety floors.
 - "summary": 2–4 plain sentences on how the plan fits. No medical claims.`;
+
+/** Words in a member's meal-plan notes that mean a medical or therapeutic diet, which the AI must not attempt. */
+const MEDICAL_DIET =
+  /\b(diagnos\w*|medication\w*|medicine|prescri\w*|disease|disorder|diabet\w*|insulin|kidney|renal|dialysis|liver|cirrhosis|celiac|coeliac|crohn\w*|colitis|ibs|fodmap|gout|pku|phenylketon\w*|epilep\w*|seizure\w*|cancer|chemo\w*|heart (?:disease|failure|condition|attack)|cardiac|blood pressure|hypertension|cholesterol|thyroid|pcos|pregnan\w*|breastfeed\w*|lactating|postpartum|eating disorder|anorexi\w*|bulimi\w*|binge eat\w*|purg\w*|arfid|surgery|bariatric|warfarin|my doctor|dietitian (?:said|says|told))\b/i;
+
+export const MEDICAL_NOTES_ASSUMPTION =
+  "Your notes mention a health condition or a medical diet, so they weren't used for this plan. It's general wellness nutrition, not a medical diet: for that, talk to your doctor or a registered dietitian.";
+
+/**
+ * The notes to send to the AI. Notes that describe a medical condition or therapeutic diet aren't sent at all
+ * (the plan stays general, and the member is told why), which also keeps health details away from the provider.
+ */
+export function mealPlanNotesForAi(notes: string | null): { notes: string | null; medical: boolean } {
+  const trimmed = notes?.trim() || null;
+  if (!trimmed) return { notes: null, medical: false };
+  return MEDICAL_DIET.test(trimmed) ? { notes: null, medical: true } : { notes: trimmed, medical: false };
+}

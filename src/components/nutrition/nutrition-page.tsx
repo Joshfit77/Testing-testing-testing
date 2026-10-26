@@ -6,7 +6,7 @@ import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 /**
  * Signed-in user for a Food sub-screen, and whether their plan includes it. The food diary, search, barcode
  * scanning, macros, saved meals and insights are free (`nutrition_tracking`); recipes, the meal planner and the
- * grocery list are Plus (`meal_planning`).
+ * grocery list are Pro (`meal_planning`).
  */
 export async function nutritionPageUser(feature: Feature = "nutrition_tracking") {
   const { user, profile } = await requireOnboardedUser();
@@ -14,9 +14,9 @@ export async function nutritionPageUser(feature: Feature = "nutrition_tracking")
   return { user, profile, allowed: hasFeature(plan, feature) };
 }
 
-/** The honest locked state for a Plus food tool. */
+/** The honest locked state for a Pro food tool. */
 export function NutritionLocked({ title, description }: { title: string; description: string }) {
-  return <PlanLocked back={{ href: "/nutrition", label: "Food" }} eyebrow="Food" title={title} plan="Plus" description={description} />;
+  return <PlanLocked back={{ href: "/nutrition", label: "Food" }} eyebrow="Food" title={title} plan="Pro" description={description} />;
 }
 
 /** Links between the Food tools, shown on each tool screen. */

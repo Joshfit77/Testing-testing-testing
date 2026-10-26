@@ -73,7 +73,7 @@ export default async function CoachPage({
   else if (!isServiceRoleConfigured())
     disabledReason =
       "AI usage metering isn't configured on this server, so the coach is disabled.";
-  else if (!entitled) disabledReason = "AI coaching is included with Pro.";
+  else if (!entitled) disabledReason = "AI coaching is included with Pro All Access.";
   else if (usage.chatUsed >= usage.chatLimit)
     disabledReason = `You've used all ${usage.chatLimit} AI messages for this month. Your allowance resets on the 1st.`;
 

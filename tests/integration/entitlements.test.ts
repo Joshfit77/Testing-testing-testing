@@ -7,6 +7,21 @@ const available = await stackAvailable();
 
 /** What Stripe currently holds for each subscription (a local stand-in for GET /v1/subscriptions/:id). */
 const stripeSubs = new Map<string, Stripe.Subscription>();
+const stripeCharges = new Map<string, unknown>();
+const stripeInvoices = new Map<string, unknown>();
+const stripeDisputes = new Map<string, unknown>();
+const stripeInvoiceByIntent = new Map<string, string>();
+
+/** A paid invoice for a subscription, its PaymentIntent and charge, as Stripe would hold them. */
+function fakePayment(subscriptionId: string, over: { refunded?: boolean; amount_refunded?: number } = {}) {
+  const key = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
+  const invoice = { id: `in_${key}`, object: "invoice", status: "paid", parent: { type: "subscription_details", subscription_details: { subscription: subscriptionId } } };
+  const charge = { id: `ch_${key}`, object: "charge", amount: 1999, amount_refunded: over.amount_refunded ?? 0, refunded: over.refunded ?? false, payment_intent: `pi_${key}` };
+  stripeInvoices.set(invoice.id, invoice);
+  stripeCharges.set(charge.id, charge);
+  stripeInvoiceByIntent.set(charge.payment_intent, invoice.id);
+  return { invoice, charge };
+}
 let stripeServer: Server;
 
 function fakeSubscription(overrides: Record<string, unknown>): Stripe.Subscription {
@@ -34,10 +49,19 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
 
   beforeAll(async () => {
     stripeServer = createServer((req, res) => {
-      const id = req.url?.match(/^\/v1\/subscriptions\/([^/?]+)/)?.[1];
-      const sub = id ? stripeSubs.get(decodeURIComponent(id)) : undefined;
-      if (!sub) return void res.writeHead(404, { "content-type": "application/json" }).end(JSON.stringify({ error: { type: "invalid_request_error", code: "resource_missing", message: "No such subscription" } }));
-      res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(sub));
+      const url = new URL(req.url ?? "/", "http://stripe.local");
+      const json = (status: number, body: unknown) => void res.writeHead(status, { "content-type": "application/json" }).end(JSON.stringify(body));
+      const missing = () => json(404, { error: { type: "invalid_request_error", code: "resource_missing", message: "No such object" } });
+      // Invoice payments of a PaymentIntent (how Stripe links a charge to its invoice since API 2025-03-31).
+      if (url.pathname === "/v1/invoice_payments") {
+        const pi = url.searchParams.get("payment[payment_intent]");
+        const invoice = pi ? stripeInvoiceByIntent.get(pi) : undefined;
+        return json(200, { object: "list", has_more: false, data: invoice ? [{ id: `inpay_${pi}`, object: "invoice_payment", invoice }] : [] });
+      }
+      const m = url.pathname.match(/^\/v1\/(subscriptions|charges|invoices|disputes)\/([^/?]+)/);
+      const store = m ? { subscriptions: stripeSubs, charges: stripeCharges, invoices: stripeInvoices, disputes: stripeDisputes }[m[1] as "subscriptions"] : undefined;
+      const obj = m && store ? (store as Map<string, unknown>).get(decodeURIComponent(m[2]!)) : undefined;
+      return obj ? json(200, obj) : missing();
     });
     await new Promise<void>((resolve) => stripeServer.listen(4613, "127.0.0.1", resolve));
     user = await createTestUser("subscriber");
@@ -206,6 +230,80 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
       await serviceClient().from("user_entitlements").upsert({ user_id: u.id, plan: "pro", source: "admin" }, { onConflict: "user_id" });
       await syncSubscription({ ...sub, id: `${sub.id}b` } as Stripe.Subscription);
       expect(await ent()).toMatchObject({ plan: "pro", source: "admin" });
+    } finally {
+      await deleteTestUser(u);
+    }
+  });
+
+  it("a full refund of the current period ends its access; a partial refund doesn't; the next paid period restores it", async () => {
+    const u = await createTestUser("refund");
+    const ent = async () => (await serviceClient().from("user_entitlements").select("plan").eq("user_id", u.id).single()).data?.plan;
+    const send = (type: string, object: unknown) => handleStripeEvent({ id: `evt_${crypto.randomUUID()}`, object: "event", type, data: { object } } as unknown as Stripe.Event);
+    try {
+      const sub = fakeSubscription({ metadata: { user_id: u.id }, items: { object: "list", data: [{ id: "si_1", price: { id: "price_test_pro" }, current_period_end: Math.floor(Date.now() / 1000) + 30 * 86400 }] } });
+      const first = fakePayment(sub.id);
+      stripeSubs.set(sub.id, { ...sub, latest_invoice: first.invoice.id } as Stripe.Subscription);
+      await syncSubscription(stripeSubs.get(sub.id)!);
+      expect(await ent()).toBe("pro");
+
+      // A partial (goodwill) refund leaves the paid period alone.
+      stripeCharges.set(first.charge.id, { ...first.charge, amount_refunded: 500, refunded: false });
+      await send("charge.refunded", stripeCharges.get(first.charge.id));
+      expect(await ent()).toBe("pro");
+
+      // A full refund of the current period's payment ends that period's access, whatever Stripe's status says.
+      stripeCharges.set(first.charge.id, { ...first.charge, amount_refunded: 1999, refunded: true });
+      await send("charge.refunded", stripeCharges.get(first.charge.id));
+      expect(await ent()).toBe("free");
+      const row = (await serviceClient().from("subscriptions").select("status, access_revoked_reason, revoked_invoice_id").eq("stripe_subscription_id", sub.id).single()).data;
+      expect(row).toMatchObject({ status: "active", access_revoked_reason: "refund", revoked_invoice_id: first.invoice.id });
+
+      // A later event about the same subscription can't quietly restore the refunded period.
+      await syncSubscription(stripeSubs.get(sub.id)!);
+      expect(await ent()).toBe("free");
+
+      // The next period is paid: access returns.
+      const second = fakePayment(sub.id);
+      stripeSubs.set(sub.id, { ...sub, latest_invoice: second.invoice.id } as Stripe.Subscription);
+      await send("invoice.paid", second.invoice);
+      expect(await ent()).toBe("pro");
+    } finally {
+      await deleteTestUser(u);
+    }
+  });
+
+  it("a dispute pauses access until it's won; a refund of an earlier period leaves the current one", async () => {
+    const u = await createTestUser("dispute");
+    const ent = async () => (await serviceClient().from("user_entitlements").select("plan").eq("user_id", u.id).single()).data?.plan;
+    const send = (type: string, object: unknown) => handleStripeEvent({ id: `evt_${crypto.randomUUID()}`, object: "event", type, data: { object } } as unknown as Stripe.Event);
+    try {
+      const sub = fakeSubscription({ metadata: { user_id: u.id }, items: { object: "list", data: [{ id: "si_1", price: { id: "price_test_pro_yearly" }, current_period_end: Math.floor(Date.now() / 1000) + 300 * 86400 }] } });
+      const old = fakePayment(sub.id);
+      const current = fakePayment(sub.id);
+      stripeSubs.set(sub.id, { ...sub, latest_invoice: current.invoice.id } as Stripe.Subscription);
+      await syncSubscription(stripeSubs.get(sub.id)!);
+      expect(await ent()).toBe("pro");
+
+      // Refunding last year's payment doesn't touch the year the member has paid for now.
+      stripeCharges.set(old.charge.id, { ...old.charge, amount_refunded: 1999, refunded: true });
+      await send("charge.refunded", stripeCharges.get(old.charge.id));
+      expect(await ent()).toBe("pro");
+
+      const dispute = { id: `dp_${crypto.randomUUID().slice(0, 8)}`, object: "dispute", charge: current.charge.id, status: "needs_response" };
+      stripeDisputes.set(dispute.id, dispute);
+      await send("charge.dispute.created", dispute);
+      expect(await ent()).toBe("free");
+
+      stripeDisputes.set(dispute.id, { ...dispute, status: "won" });
+      await send("charge.dispute.closed", stripeDisputes.get(dispute.id));
+      expect(await ent()).toBe("pro");
+
+      // A lost dispute keeps the access ended.
+      stripeDisputes.set(dispute.id, { ...dispute, status: "needs_response" });
+      await send("charge.dispute.created", dispute);
+      stripeDisputes.set(dispute.id, { ...dispute, status: "lost" });
+      await send("charge.dispute.closed", stripeDisputes.get(dispute.id));
+      expect(await ent()).toBe("free");
     } finally {
       await deleteTestUser(u);
     }

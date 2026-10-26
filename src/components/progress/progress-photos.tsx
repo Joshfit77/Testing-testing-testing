@@ -363,7 +363,7 @@ export function ProgressPhotos({
   userId: string;
   units: UnitSystem;
   today: string;
-  /** Side-by-side comparisons are a Plus feature; adding and viewing photos is free. */
+  /** Side-by-side comparisons are a Pro feature; adding and viewing photos is free. */
   canCompare: boolean;
 }) {
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -405,7 +405,7 @@ export function ProgressPhotos({
           {photos.length >= 2 && !canCompare && (
             <Button asChild variant="secondary">
               <Link href="/profile/billing">
-                <Columns2 aria-hidden /> Compare with Plus
+                <Columns2 aria-hidden /> Compare with Pro
               </Link>
             </Button>
           )}

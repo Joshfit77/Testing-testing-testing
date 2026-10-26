@@ -29,7 +29,7 @@ function Locked({ title }: { title: string }) {
     <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-gold-muted/50 bg-card/60 p-6 text-center">
       <Lock className="size-5 text-gold" aria-hidden />
       <p className="font-semibold">{title}</p>
-      <p className="text-xs text-muted-foreground">Advanced analytics are included with Plus and Pro.</p>
+      <p className="text-xs text-muted-foreground">Advanced analytics are included with Pro All Access.</p>
       <Button asChild size="sm" variant="outline">
         <Link href="/profile/billing">See plans</Link>
       </Button>
@@ -433,7 +433,7 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
         <h2 id="measure-title" className="mb-3 font-display text-2xl font-bold uppercase">
           Body measurements <span className="text-sm font-normal normal-case text-muted-foreground">(optional)</span>
         </h2>
-        {/* Logging measurements is basic progress (every plan); the trend chart is advanced analytics (Plus). */}
+        {/* Logging measurements is basic progress (every plan); the trend chart is advanced analytics (Pro). */}
         <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
           {advanced ? (
             <LineSeriesChart

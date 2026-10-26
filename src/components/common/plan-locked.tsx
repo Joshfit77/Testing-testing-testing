@@ -16,7 +16,8 @@ export function PlanLocked({
   back: { href: string; label: string };
   eyebrow?: string;
   title: string;
-  plan: "Plus" | "Pro";
+  /** Kept for callers; every paid feature is now part of Pro All Access. */
+  plan?: "Plus" | "Pro";
   description: string;
 }) {
   return (
@@ -25,7 +26,7 @@ export function PlanLocked({
       <PageHeader eyebrow={eyebrow} title={title} />
       <EmptyState
         icon={Lock}
-        title={plan === "Plus" ? "Included with Plus and Pro" : "Included with Pro"}
+        title="Included with Pro All Access"
         description={description}
         action={
           <Button asChild>

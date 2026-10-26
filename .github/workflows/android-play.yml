@@ -1,0 +1,133 @@
+name: Android Play bundle
+
+# Builds the Android App Bundle (.aab) for Google Play and checks it against Play's technical requirements:
+# target API, 16 KB native-library alignment and the final merged permissions. Manual only. It never uploads to
+# Google Play: download the bundle from the run's artifacts and upload it in Play Console yourself.
+#
+# Signing: add these repository secrets (Settings > Secrets and variables > Actions); never paste them in chat:
+#   ANDROID_UPLOAD_KEYSTORE_BASE64  base64 of your upload keystore (.jks)
+#   ANDROID_UPLOAD_KEYSTORE_PASSWORD, ANDROID_UPLOAD_KEY_ALIAS, ANDROID_UPLOAD_KEY_PASSWORD
+# Without them the bundle is built unsigned: fine for checking, not for uploading.
+on:
+  workflow_dispatch:
+    inputs:
+      edition:
+        description: "online = the full app loading server_url (for Play); offline = the offline edition (build checks only)"
+        type: choice
+        options: [online, offline]
+        default: online
+      server_url:
+        description: "online: HTTPS address of the deployed app (must answer /api/health)"
+        type: string
+        default: ""
+      version_name:
+        description: "Version shown in the store"
+        type: string
+        default: "1.0.0"
+  # A push that changes the Android project checks the offline edition only (no site, no signing, nothing uploaded).
+  push:
+    branches: [claude/free-pro-membership, claude/testflight-prep]
+    paths:
+      - "android/**"
+      - "capacitor.config.ts"
+      - "package-lock.json"
+      - ".github/workflows/android-play.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-play-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      EDITION: ${{ inputs.edition || 'offline' }}
+      ANDROID_VERSION_CODE: ${{ github.run_number }}
+      ANDROID_VERSION_NAME: ${{ inputs.version_name || '1.0.0' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Install dependencies
+        run: npm ci
+      - name: Accept Android SDK licenses
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+
+      - name: Check the deployed site
+        if: env.EDITION == 'online'
+        env:
+          SERVER_URL: ${{ inputs.server_url }}
+        run: |
+          if [ -z "$SERVER_URL" ]; then echo "::error::server_url is required for the online edition"; exit 1; fi
+          health=$(curl -fsS --max-time 20 "${SERVER_URL%/}/api/health") || { echo "::error::$SERVER_URL/api/health did not answer"; exit 1; }
+          echo "$health"
+          echo "$health" | grep -q '"narrow-gate-fitness"' || { echo "::error::$SERVER_URL is not this app"; exit 1; }
+      - name: Sync the web app into the Android project
+        env:
+          CAP_SERVER_URL: ${{ inputs.server_url }}
+          CAP_MODE: ${{ env.EDITION == 'offline' && 'standalone' || '' }}
+        run: npx cap sync android
+
+      - name: Upload key (from secrets, if set)
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+            echo "ANDROID_UPLOAD_KEYSTORE=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
+            echo "Signing with the upload key from secrets."
+          else
+            echo "::warning::No upload key in secrets: the bundle is built unsigned and can't be uploaded to Google Play."
+          fi
+      - name: Build the release bundle and APK
+        working-directory: android
+        env:
+          ANDROID_UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+        run: ./gradlew bundleRelease assembleRelease --no-daemon
+      - name: Check Play requirements
+        run: |
+          set -e
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          APK=$(ls android/app/build/outputs/apk/release/*.apk | head -1)
+          AAB=android/app/build/outputs/bundle/release/app-release.aab
+          echo "== Target and minimum SDK"
+          "$BT/aapt2" dump badging "$APK" | grep -E "^(package|sdkVersion|targetSdkVersion)" || true
+          target=$("$BT/aapt2" dump badging "$APK" | sed -n "s/^targetSdkVersion:'\([0-9]*\)'.*/\1/p")
+          if [ "${target:-0}" -lt 36 ]; then echo "::error::targetSdkVersion $target is below 36 (Google Play requires 36 for new apps and updates from 2026-08-31)"; exit 1; fi
+          echo "== Permissions in the final merged manifest"
+          "$BT/aapt2" dump permissions "$APK"
+          if "$BT/aapt2" dump permissions "$APK" | grep -q "ACCESS_BACKGROUND_LOCATION"; then echo "::error::ACCESS_BACKGROUND_LOCATION is declared; the app records through a foreground service and must not request it"; exit 1; fi
+          echo "== 16 KB page size: zip alignment of native libraries"
+          "$BT/zipalign" -c -P 16 -v 4 "$APK" | grep -E "lib/.*\.so|Verification" || true
+          "$BT/zipalign" -c -P 16 4 "$APK" || { echo "::error::native libraries are not 16 KB zip-aligned"; exit 1; }
+          echo "== 16 KB page size: ELF LOAD segment alignment (64-bit libraries)"
+          mkdir -p "$RUNNER_TEMP/so" && unzip -o -q "$APK" 'lib/arm64-v8a/*' 'lib/x86_64/*' -d "$RUNNER_TEMP/so" || true
+          bad=0
+          for so in $(find "$RUNNER_TEMP/so" -name '*.so'); do
+            low=""
+            for a in $(readelf -lW "$so" | awk '$1=="LOAD"{print $NF}'); do
+              if [ $((a)) -lt 16384 ]; then low="$a"; fi
+            done
+            if [ -n "$low" ]; then echo "::error::${so#$RUNNER_TEMP/so/} has a LOAD segment aligned to $low (< 16 KB)"; bad=1; else echo "ok ${so#$RUNNER_TEMP/so/}"; fi
+          done
+          [ "$bad" = 0 ]
+          echo "== Bundle"
+          ls -l "$AAB"
+          if [ -n "$ANDROID_UPLOAD_KEYSTORE" ]; then jarsigner -verify "$AAB" >/dev/null && echo "Bundle signed with the upload key."; else echo "Bundle unsigned."; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NarrowGateFitness-${{ env.EDITION }}-${{ env.ANDROID_VERSION_NAME }}-${{ github.run_number }}-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 30

@@ -522,7 +522,7 @@ export function allergenLabel(tag: string): string {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// Member filters (Plus)
+// Member filters (Pro)
 // ---------------------------------------------------------------------------------------------------------------
 
 export const NUTRITION_FILTERS = ["low_sugar", "low_salt", "low_sat_fat", "high_protein", "high_fibre"] as const;

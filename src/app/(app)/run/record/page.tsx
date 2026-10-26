@@ -3,7 +3,8 @@ import { PageHeader } from "@/components/common/page-header";
 import { GpsRecorder, type GuidedSession } from "@/components/run/gps-recorder";
 import { isRunDay, type RunPrescription } from "@/lib/domain/run-session";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { requireOnboardedUser } from "@/server/auth";
+import { hasFeature } from "@/lib/domain/plans";
+import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 
 export const metadata = { title: "Record" };
 
@@ -37,12 +38,12 @@ export default async function RecordPage({ searchParams }: { searchParams: Promi
   const sp = await searchParams;
   const { user, profile } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
-  const guided = sp.day && sp.up ? await loadGuided(supabase, user.id, sp.up, sp.day) : null;
+  const [guided, plan] = await Promise.all([sp.day && sp.up ? loadGuided(supabase, user.id, sp.up, sp.day) : null, getUserPlan(user.id)]);
   return (
     <div className="mx-auto max-w-xl space-y-5">
       <BackLink href="/run">Run</BackLink>
       <PageHeader eyebrow="Run" title={guided ? "Guided run" : "Record outdoors"} description="Distance, pace, splits and your route from your phone's GPS." />
-      <GpsRecorder userId={user.id} units={profile.unit_system} initialKind={sp.kind === "walk" ? "walk" : "run"} guided={guided} />
+      <GpsRecorder userId={user.id} units={profile.unit_system} initialKind={sp.kind === "walk" ? "walk" : "run"} guided={guided} canRecord={hasFeature(plan, "live_gps")} />
     </div>
   );
 }

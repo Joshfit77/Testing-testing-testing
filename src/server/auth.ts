@@ -6,6 +6,7 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { hasFeature, planFromEntitlement, type Feature } from "@/lib/domain/plans";
 import type { Plan } from "@/lib/domain/types";
 import type { ProfileRow } from "@/lib/types/db";
+import { hasCurrentAcceptance, reacceptRequired } from "@/server/legal";
 
 export const getCurrentUser = cache(async (): Promise<User | null> => {
   const supabase = await getServerSupabase();
@@ -31,6 +32,8 @@ export async function requireOnboardedUser(): Promise<{ user: User; profile: Pro
   const user = await requireUser();
   const profile = await getProfile(user.id);
   if (!profile?.onboarding_completed_at) redirect("/onboarding");
+  // After a material change to the Terms (switched on by the owner), accept the current versions first.
+  if (reacceptRequired() && !(await hasCurrentAcceptance(user.id))) redirect("/legal/accept");
   return { user, profile };
 }
 

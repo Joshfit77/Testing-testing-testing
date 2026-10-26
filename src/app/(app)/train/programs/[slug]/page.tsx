@@ -190,7 +190,7 @@ export default async function ProgramDetailPage({
 
       {locked && (
         <Notice tone="info">
-          <Lock className="mr-1 inline size-4 text-gold" aria-hidden /> You&apos;re viewing the program outline. Upgrade to Plus to see every
+          <Lock className="mr-1 inline size-4 text-gold" aria-hidden /> You&apos;re viewing the program outline. Upgrade to Pro All Access to see every
           exercise, set, rep and intensity target — and to start the program.
         </Notice>
       )}

@@ -19,7 +19,7 @@ export default async function BodyMapPage({ searchParams }: { searchParams: Prom
         back={{ href: "/progress", label: "My Progress" }}
         eyebrow="My Progress"
         title="Strength & Body Map"
-        plan="Plus"
+        plan="Pro"
         description="A front-and-back muscle map built from your own workouts: sets, volume, frequency, records and strength trends for each muscle group, with Bronze-to-Disciple strength ranks and exactly how each one is scored."
       />
     );

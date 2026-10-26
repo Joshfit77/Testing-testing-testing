@@ -135,7 +135,8 @@ function ids(name: string, fallback: string): string[] {
 export function storeProductIds(): StoreProductIds {
   return {
     plus: { month: ids("REVENUECAT_PRODUCTS_PLUS_MONTHLY", "ngf_plus_monthly"), year: ids("REVENUECAT_PRODUCTS_PLUS_YEARLY", "ngf_plus_yearly") },
-    pro: { month: ids("REVENUECAT_PRODUCTS_PRO_MONTHLY", "ngf_pro_monthly"), year: ids("REVENUECAT_PRODUCTS_PRO_YEARLY", "ngf_pro_yearly") },
+    // App Store product ids, and Google Play's subscription:base-plan ids for the subscription `ngf_pro`.
+    pro: { month: ids("REVENUECAT_PRODUCTS_PRO_MONTHLY", "ngf_pro_monthly,ngf_pro:monthly"), year: ids("REVENUECAT_PRODUCTS_PRO_YEARLY", "ngf_pro_yearly,ngf_pro:yearly") },
   };
 }
 

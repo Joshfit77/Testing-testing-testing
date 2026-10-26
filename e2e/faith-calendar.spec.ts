@@ -104,7 +104,7 @@ test.describe("Stage 2C: faith flows, onboarding additions and the training cale
 
     // Free accounts see the calendar but rescheduling is Plus.
     await page.goto("/calendar");
-    await expect(page.getByRole("region", { name: "Up next" }).getByRole("link", { name: "Move to another day with Plus" }).first()).toBeVisible();
+    await expect(page.getByRole("region", { name: "Up next" }).getByRole("link", { name: "Move to another day with Pro" }).first()).toBeVisible();
     await grantPlan(email, "plus");
 
     await page.goto("/home");

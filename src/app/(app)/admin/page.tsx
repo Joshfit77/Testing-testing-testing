@@ -26,7 +26,7 @@ export default async function AdminPage() {
         ["Workouts (7d)", m.workouts_last_7d],
         ["Workouts (30d)", m.workouts_last_30d],
         ["AI requests (30d)", m.ai_requests_30d],
-        ["Plus subscribers", m.plus_subscribers],
+        ["Legacy Plus subscribers", m.plus_subscribers],
         ["Pro subscribers", m.pro_subscribers],
         ["Exercises", counts[0].count ?? 0],
         ["Library programs", counts[1].count ?? 0],
