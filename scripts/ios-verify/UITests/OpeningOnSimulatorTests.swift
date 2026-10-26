@@ -21,6 +21,9 @@ final class OpeningOnSimulatorTests: XCTestCase {
     nonisolated(unsafe) private static var enterPoint: CGPoint?
     /// How long a screenshot call takes while the opening animates here (median), from test0's film.
     nonisolated(unsafe) private static var openingCapture: TimeInterval?
+    /// Whether test0's film kept up with the opening (the door seen, frames never more than 1.5 s apart): only then
+    /// can a film time the press; set to the longest gap otherwise.
+    nonisolated(unsafe) private static var openingGap: TimeInterval?
 
     /// XCUITest waits for the app to be idle (no animations) before and after each tap; the opening animates
     /// throughout, so on a slow CI simulator that wait put the tap seconds after Enter Narrow Gate was found, after
@@ -282,6 +285,7 @@ final class OpeningOnSimulatorTests: XCTestCase {
         let gaps = zip(opening, opening.dropFirst()).map { $1.at.timeIntervalSince($0.at) }
         let longestGap = gaps.max() ?? 0
         var stalled: String?
+        Self.openingGap = (sawGate && longestGap < 1.5) ? nil : longestGap
         if !sawGate, longestGap >= 1.5 {
             stalled = String(format: "the door could not be filmed on this fresh launch: the screenshot service stalled for %.1f s while the opening rendered, and the next frame was already the welcome page", longestGap)
             try? stalled!.write(to: shotsDir.appendingPathComponent("0-stall.txt"), atomically: true, encoding: .utf8)
@@ -311,8 +315,16 @@ final class OpeningOnSimulatorTests: XCTestCase {
         // screenshot calls take longer than that cannot film it, so the check is skipped there and says so, rather
         // than failing on the machine or passing on nothing. The fresh launch has still filmed the opening, and the
         // move into the light is checked frame by frame in WebKit.
+        // Likewise when the fresh launch's film could not keep up with the opening (the screenshot service stalled
+        // while it rendered): a film cannot then time the press to the second either.
+        var unfilmable: String?
         if let t = Self.openingCapture, t > 0.9 {
-            let reason = String(format: "Enter Narrow Gate not checked here: a screenshot call takes %.1f s while the opening animates on this simulator (over 0.9 s), too slow to catch the half second of light after the press; the fresh launch filmed the opening, and the move into the light is checked frame by frame in WebKit", t)
+            unfilmable = String(format: "a screenshot call takes %.1f s while the opening animates on this simulator (over 0.9 s), too slow to catch the half second of light after the press", t)
+        } else if let gap = Self.openingGap {
+            unfilmable = String(format: "the screenshot service stalled for %.1f s while the opening rendered on the fresh launch, so a film cannot time the press here", gap)
+        }
+        if let why = unfilmable {
+            let reason = "Enter Narrow Gate not checked here: \(why); the fresh launch filmed what it could, and the move into the light is checked frame by frame in WebKit"
             try? reason.write(to: shotsDir.appendingPathComponent("1-skipped.txt"), atomically: true, encoding: .utf8)
             print("GATECHECK \(reason)")
             throw XCTSkip(reason)

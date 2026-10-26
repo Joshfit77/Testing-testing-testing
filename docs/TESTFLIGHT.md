@@ -122,14 +122,15 @@ those delays:
   as proof of the move only when it comes within 3.9 s of the opening's first frame, before the opening's own
   move could have brightened the screen; a later light, or screenshots too slow to catch it, is said so in the
   log (a `1-nolight.txt` note and the CHECK verdict) rather than passed or failed blindly.
-- The fresh launch measures how long a screenshot call takes while the opening animates: over 0.9 s, the half
-  second of light after the press cannot be filmed at all, and the Enter check is skipped with that reason (an
-  XCTest skip, a `::warning::` line and a SKIPPED verdict); the fresh launch, relaunch and background checks
-  still run, and the move is checked frame by frame in WebKit. The simulator's screenshot service can also stall
-  for seconds while the opening's heavy first frames render: when no frame could be taken while the door stood
-  open, the fresh launch says so (a `0-stall.txt` note and a warning) instead of failing, since Skip intro's
-  presence and the opening's end are still checked through the accessibility tree. Frames of retried attempts
-  are kept under `earlier-attempts/` in the artifact.
+- The fresh launch measures the machine. The simulator's screenshot service can stall for seconds while the
+  opening's heavy first frames render, and the opening goes on meanwhile: when no frame could be taken while the
+  door stood open, the fresh launch says so (a `0-stall.txt` note and a warning) instead of failing, since Skip
+  intro's presence and the opening's end are still checked through the accessibility tree. The Enter check then
+  runs only when that film kept up with the opening (the door seen, frames never more than 1.5 s apart) and a
+  screenshot call takes under 0.9 s; otherwise a film cannot time the press or catch the half second of light,
+  and the check is skipped with the measured reason (an XCTest skip, a `::warning::` line and a SKIPPED
+  verdict). The relaunch and background checks always run, and the move into the light is checked frame by
+  frame in WebKit. Frames of retried attempts are kept under `earlier-attempts/` in the artifact.
 - The WebKit test films the move into the light from inside the page, frame by frame from the press itself, so
   slow round trips between Playwright and the browser cannot miss the 0.9 s push; it still requires the scene to
   grow past 2.5x and the light to fill the screen. When the machine draws no frame before the opening's own 1.5 s
