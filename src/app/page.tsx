@@ -5,7 +5,7 @@ import { Logo } from "@/components/common/logo";
 import { NarrowGateArt } from "@/components/common/narrow-gate-art";
 import { Button } from "@/components/ui/button";
 import { isSupabaseConfigured } from "@/lib/env";
-import { formatPrice, getPlans, PLAN_ORDER, yearlySavingsPercent } from "@/lib/domain/plans";
+import { formatPrice, getPlans, PUBLIC_PLAN_ORDER, yearlySavingsPercent } from "@/lib/domain/plans";
 import { getCurrentUser } from "@/server/auth";
 import { ForgetDeviceData } from "@/components/platform/forget-device-data";
 import { TRANSLATION } from "@/data/content";
@@ -95,10 +95,11 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
           <h2 id="pricing-title" className="font-display text-3xl font-bold uppercase tracking-wide">
             Simple plans
           </h2>
-          <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {PLAN_ORDER.map((id) => {
+          <p className="mt-2 text-sm text-muted-foreground">Free to build your foundation. One membership for every premium feature.</p>
+          <div className="mt-8 grid max-w-4xl gap-4 md:grid-cols-2">
+            {PUBLIC_PLAN_ORDER.map((id) => {
               const p = plans[id];
-              const featured = id === "plus";
+              const featured = id === "pro";
               return (
                 <div
                   key={id}
@@ -114,6 +115,7 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
                       or {formatPrice(p.yearlyPriceCents)} / year <span className="text-muted-foreground">(save {yearlySavingsPercent(p.priceCents, p.yearlyPriceCents)}%)</span>
                     </p>
                   ) : null}
+                  {featured && <p className="mt-1 text-xs text-muted-foreground">Renews automatically until cancelled. Monthly and yearly include the same features.</p>}
                   <p className="mt-1 text-sm text-muted-foreground">{p.tagline}</p>
                   <ul className="mt-5 space-y-2 text-sm">
                     {p.highlights.map((h) => (
@@ -138,6 +140,9 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
             </Link>
             <Link href="/legal/terms" className="hover:text-foreground">
               Terms
+            </Link>
+            <Link href="/legal/notices" className="hover:text-foreground">
+              Notices
             </Link>
           </nav>
         </div>

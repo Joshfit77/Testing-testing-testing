@@ -100,7 +100,20 @@ const ERROR_TEXT: Record<LocationError, string> = {
   timeout: "Still waiting for a GPS fix. Move to an open area away from tall buildings.",
 };
 
-export function GpsRecorder({ userId, units, initialKind, guided }: { userId: string; units: "metric" | "imperial"; initialKind: ActivityKind; guided: GuidedSession | null }) {
+export function GpsRecorder({
+  userId,
+  units,
+  initialKind,
+  guided,
+  canRecord = true,
+}: {
+  userId: string;
+  units: "metric" | "imperial";
+  initialKind: ActivityKind;
+  guided: GuidedSession | null;
+  /** Live GPS recording is part of Pro All Access. Without it, an unsaved recording on this device can still be discarded. */
+  canRecord?: boolean;
+}) {
   const router = useRouter();
   const unit: DistanceUnit = units === "imperial" ? "mi" : "km";
   const storageKey = `run.recording.${userId}`;
@@ -298,11 +311,17 @@ export function GpsRecorder({ userId, units, initialKind, guided }: { userId: st
         {recoverable && (
           <Notice tone="warning">
             <p className="font-semibold">You have an unfinished {recoverable.track.kind} from {new Date(recoverable.track.startedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.</p>
-            <p className="mt-1 text-sm">Continue it, or discard it. Any time the app was closed is kept as a gap: no distance is guessed for it.</p>
+            <p className="mt-1 text-sm">
+              {canRecord
+                ? "Continue it, or discard it. Any time the app was closed is kept as a gap: no distance is guessed for it."
+                : "Saving live GPS recordings is included with Pro All Access. It stays on this phone until you discard it or renew Pro to finish and save it."}
+            </p>
             <div className="mt-2 flex gap-2">
-              <Button size="sm" onClick={continueRecording}>
-                Continue recording
-              </Button>
+              {canRecord && (
+                <Button size="sm" onClick={continueRecording}>
+                  Continue recording
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="ghost"
@@ -357,9 +376,19 @@ export function GpsRecorder({ userId, units, initialKind, guided }: { userId: st
           <li>Location is used only while you record, and your route is private to you.</li>
         </ul>
         {error && <Notice tone="error">{ERROR_TEXT[error]}</Notice>}
-        <Button className="w-full" size="lg" onClick={start} data-testid="gps-start">
-          <Play aria-hidden /> Start {guided ? "guided run" : kind}
-        </Button>
+        {canRecord ? (
+          <Button className="w-full" size="lg" onClick={start} data-testid="gps-start">
+            <Play aria-hidden /> Start {guided ? "guided run" : kind}
+          </Button>
+        ) : (
+          <div className="space-y-2 rounded-2xl border border-gold-muted/60 bg-card p-4 text-center" data-testid="gps-locked">
+            <p className="font-semibold">Live GPS recording is included with Pro All Access</p>
+            <p className="text-sm text-muted-foreground">Route maps, distance, pace and splits from your phone&apos;s GPS. Runs and walks you recorded before stay yours to view, edit and delete.</p>
+            <Button asChild className="w-full">
+              <Link href="/profile/billing">See Pro All Access</Link>
+            </Button>
+          </div>
+        )}
         <p className="text-center text-xs text-muted-foreground">
           No GPS? <Link href="/run?tab=log" className="underline">Log a run or walk by hand</Link>.
         </p>

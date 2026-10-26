@@ -30,7 +30,7 @@ async function ctx() {
 }
 
 function guard(err: unknown, scope: string): ActionState {
-  if (err instanceof EntitlementError) return actionError("The meal planner is included with Plus and Pro.");
+  if (err instanceof EntitlementError) return actionError("The meal planner is included with Pro All Access.");
   logError(scope, err);
   return actionError("Something went wrong. Please try again.");
 }
@@ -162,7 +162,7 @@ export async function planAlternativesAction(input: unknown): Promise<{ ok: bool
     };
   } catch (err) {
     logError("planner.alternatives", err);
-    return { ok: false, message: err instanceof EntitlementError ? "The meal planner is included with Plus and Pro." : "Couldn't load other options. Try again." };
+    return { ok: false, message: err instanceof EntitlementError ? "The meal planner is included with Pro All Access." : "Couldn't load other options. Try again." };
   }
 }
 

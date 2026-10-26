@@ -33,7 +33,7 @@ export async function createTemplateAction(input: unknown): Promise<Result<{ id:
     const limit = getPlans()[plan].templateLimit;
     if (!hasFeature(plan, "unlimited_templates") && limit !== null && (count ?? 0) >= limit) {
       // Templates saved earlier (e.g. before a downgrade) are kept; only new ones are limited.
-      return { ok: false, error: `Free accounts can keep ${limit} workout templates. Delete one to save another, or upgrade to Plus for unlimited templates.` };
+      return { ok: false, error: `Free accounts can keep ${limit} workout templates. Delete one to save another, or upgrade to Pro All Access for unlimited templates.` };
     }
     if ((count ?? 0) >= MAX_TEMPLATES) return { ok: false, error: `You can keep up to ${MAX_TEMPLATES} workout templates. Delete one to save another.` };
     const id = await createTemplate(supabase, user.id, parsed.data);

@@ -6,6 +6,7 @@ import { publicEnv } from "@/lib/env";
 import { actionError, actionInvalid, actionOk, type ActionState } from "@/lib/action-state";
 import { safeNextPath } from "@/lib/safe-redirect";
 import { emailSchema, newPasswordSchema, resetRequestSchema, signInSchema, signUpSchema } from "@/lib/validation/schemas";
+import { signupAcceptances } from "@/lib/legal/versions";
 import { isFlagEnabled } from "@/server/flags";
 import { logError } from "@/server/log";
 
@@ -20,7 +21,8 @@ export async function signUpAction(_prev: ActionState, formData: FormData): Prom
     password: parsed.data.password,
     options: {
       emailRedirectTo: `${publicEnv.siteUrl}/auth/callback?next=/onboarding`,
-      data: { display_name: parsed.data.displayName },
+      // Recorded with the account by a database trigger (legal_acceptances): what was accepted, which version, when.
+      data: { display_name: parsed.data.displayName, legal_acceptances: signupAcceptances() },
     },
   });
   if (error) {

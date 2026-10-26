@@ -21,7 +21,7 @@ async function ctx() {
 }
 
 function guard(err: unknown, scope: string): ActionState {
-  if (err instanceof EntitlementError) return actionError("The grocery list is included with Plus and Pro.");
+  if (err instanceof EntitlementError) return actionError("The grocery list is included with Pro All Access.");
   logError(scope, err);
   return actionError("Something went wrong. Please try again.");
 }

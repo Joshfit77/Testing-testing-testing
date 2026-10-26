@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { SCORE_BAND_TEXT, SLEEP_SCORE_VERSION, type SleepScore } from "@/lib/domain/sleep-score";
 
-/** The nightly score with its basis; the breakdown of how it was built is part of Plus sleep analytics. */
+/** The nightly score with its basis; the breakdown of how it was built is part of Pro sleep analytics. */
 export function SleepScoreCard({ score, breakdown, compact }: { score: SleepScore; breakdown: boolean; compact?: boolean }) {
   return (
     <div>
@@ -39,7 +39,7 @@ export function SleepScoreCard({ score, breakdown, compact }: { score: SleepScor
           </div>
         ) : (
           <p className="mt-3 rounded-xl border border-border bg-elevated p-3 text-sm text-muted-foreground">
-            Plus shows how this score was built, part by part, and compares the night with your own history.{" "}
+            Pro All Access shows how this score was built, part by part, and compares the night with your own history.{" "}
             <Link href="/profile/billing" className="font-semibold text-gold-highlight underline">
               See plans
             </Link>

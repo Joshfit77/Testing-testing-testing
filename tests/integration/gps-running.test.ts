@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createTestUser, deleteTestUser, serviceClient, stackAvailable, type TestUser } from "./helpers";
+import { createTestUser, deleteTestUser, grantPlan, serviceClient, stackAvailable, type TestUser } from "./helpers";
 
 const available = await stackAvailable();
 
@@ -25,12 +25,14 @@ describe.skipIf(!available)("GPS runs and running goals", () => {
 
   beforeAll(async () => {
     [runner, other] = await Promise.all([createTestUser("gps-runner"), createTestUser("gps-other")]);
+    // Live GPS recording is part of Pro All Access; `other` stays on Free.
+    await grantPlan(runner, "pro");
   });
   afterAll(async () => {
     await Promise.all([deleteTestUser(runner), deleteTestUser(other)]);
   });
 
-  it("saves a GPS run once (same id or same start), privately, on the Free plan", async () => {
+  it("saves a GPS run once (same id or same start), privately, on Pro", async () => {
     const row = base();
     expect((await runner.client.from("activities").insert(row)).error).toBeNull();
     const again = await runner.client.from("activities").insert(row);
@@ -40,6 +42,27 @@ describe.skipIf(!available)("GPS runs and running goals", () => {
     const { data } = await runner.client.from("activities").select("is_private, route, gps_quality").eq("id", row.id).single();
     expect(data).toMatchObject({ is_private: true, gps_quality: { gaps: 1 } });
     expect((await other.client.from("activities").select("id").eq("id", row.id)).data).toEqual([]);
+  });
+
+  it("live GPS is Pro: Free can't record or attach a route, but keeps managing runs recorded earlier", async () => {
+    const freeRow = { ...base(), user_id: other.id, started_at: new Date(Date.now() - 9000_000).toISOString() };
+    const refused = await other.client.from("activities").insert(freeRow);
+    expect(refused.error?.message).toContain("Live GPS recording is included with Pro");
+    // A manual entry is free, but it can't be turned into a GPS recording afterwards.
+    const manualId = crypto.randomUUID();
+    const manual = { id: manualId, user_id: other.id, kind: "walk", source: "manual", started_at: new Date(Date.now() - 9100_000).toISOString(), timezone: "UTC", distance_m: 2000, elapsed_s: 1500, moving_s: 1500 };
+    expect((await other.client.from("activities").insert(manual)).error).toBeNull();
+    const upgraded = await other.client.from("activities").update({ source: "gps", route: freeRow.route }).eq("id", manualId).select("id");
+    expect(upgraded.error?.message).toContain("Live GPS recording is included with Pro");
+    // A run recorded while they had Pro (written here by the service role) stays theirs to edit and delete.
+    const earlier = { ...freeRow, id: crypto.randomUUID(), started_at: new Date(Date.now() - 9200_000).toISOString() };
+    expect((await serviceClient().from("activities").insert(earlier)).error).toBeNull();
+    const edited = await other.client.from("activities").update({ notes: "Hilly", perceived_effort: 6 }).eq("id", earlier.id).select("notes");
+    expect(edited.error).toBeNull();
+    expect(edited.data).toEqual([{ notes: "Hilly" }]);
+    const removed = await other.client.from("activities").update({ deleted_at: new Date().toISOString(), route: null, splits: null, gps_quality: null }).eq("id", earlier.id).select("id");
+    expect(removed.error).toBeNull();
+    expect(removed.data).toHaveLength(1);
   });
 
   it("refuses oversized routes and splits, and routes on manual entries", async () => {
@@ -67,6 +90,7 @@ describe.skipIf(!available)("GPS runs and running goals", () => {
 
   it("removes goals and runs with the account", async () => {
     const victim = await createTestUser("gps-delete");
+    await grantPlan(victim, "pro");
     await victim.client.from("running_goals").insert({ user_id: victim.id, kind: "weekly_distance", distance_m: 1000 });
     await deleteTestUser(victim);
     expect((await serviceClient().from("running_goals").select("id", { count: "exact", head: true }).eq("user_id", victim.id)).count).toBe(0);

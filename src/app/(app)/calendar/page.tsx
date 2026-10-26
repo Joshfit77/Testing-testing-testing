@@ -30,7 +30,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const sp = await searchParams;
   const { user, profile } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
-  // Viewing the calendar is free; moving planned sessions to other days is a Plus feature.
+  // Viewing the calendar is free; moving planned sessions to other days is a Pro feature.
   const canReschedule = hasFeature(await getUserPlan(user.id), "advanced_calendar");
   const tz = profile.timezone;
   const today = isoDateInTz(new Date(), tz);
@@ -277,7 +277,7 @@ function EntryRow({ entry: e, minDate, canReschedule }: { entry: CalendarEntry; 
             <MoveSession dayId={e.planned.dayId} name={e.title} date={e.date} minDate={minDate} />
           ) : (
             <Link href="/profile/billing" className="inline-flex min-h-11 items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-              <Lock className="size-4 text-gold" aria-hidden /> Move to another day with Plus
+              <Lock className="size-4 text-gold" aria-hidden /> Move to another day with Pro
             </Link>
           )}
           {e.planned.moved && (

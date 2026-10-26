@@ -46,7 +46,7 @@ export default async function TrainPage() {
   const tools = [
     { href: "/train/programs", icon: BarChart3, label: "Programs" },
     { href: "/train/exercises", icon: Dumbbell, label: "Exercises" },
-    { href: "/train/build", icon: Wand2, label: canBuild ? "Program builder" : "Program builder (Plus)" },
+    { href: "/train/build", icon: Wand2, label: canBuild ? "Program builder" : "Program builder (Pro)" },
     { href: "/train/history", icon: History, label: "Workout history" },
     { href: "/train/templates", icon: BookmarkCheck, label: "My workouts" },
     { href: "/train/workout?blank=1", icon: Plus, label: "Empty workout" },
@@ -86,10 +86,10 @@ export default async function TrainPage() {
           <div className={`${card} p-4`}>
             <p className="font-semibold">No active program</p>
             <p className="mt-1 text-sm text-muted-foreground">Build one around your goals, start one from the library, or log a free workout.</p>
-            {/* The builder is Plus; Free members get the program library first (it has free programs). */}
+            {/* The builder is Pro; Free members get the program library first (it has free programs). */}
             <div className="mt-3 grid grid-cols-2 gap-2">
               <Button asChild variant={canBuild ? "default" : "secondary"}>
-                <Link href="/train/build">{canBuild ? "Build my program" : "Build (Plus)"}</Link>
+                <Link href="/train/build">{canBuild ? "Build my program" : "Build (Pro)"}</Link>
               </Button>
               <Button asChild variant={canBuild ? "secondary" : "default"}>
                 <Link href="/train/programs">Browse programs</Link>

@@ -18,11 +18,11 @@ const moveSchema = z.object({
  * Move a planned (not yet completed) session of the active program to another date. Completed
  * workouts are never touched: only sessions from the program pointer onwards can be moved, and the
  * override is keyed by the enrolment + program day. Moving it back to its usual date removes the
- * override. The client refreshes the route afterwards. Rescheduling is a Plus feature.
+ * override. The client refreshes the route afterwards. Rescheduling is a Pro feature.
  */
 export async function movePlannedSessionAction(input: { dayId: string; date: string }): Promise<ActionState> {
   const user = await requireUser();
-  if (!hasFeature(await getUserPlan(user.id), "advanced_calendar")) return actionError("Moving sessions to other days is included with Plus and Pro.");
+  if (!hasFeature(await getUserPlan(user.id), "advanced_calendar")) return actionError("Moving sessions to other days is included with Pro All Access.");
   const parsed = moveSchema.safeParse(input);
   if (!parsed.success) return actionError(parsed.error.issues[0]?.message ?? "Choose a date.");
   const profile = await getProfile(user.id);

@@ -197,7 +197,7 @@ export default async function ProductQualityPage({ params }: { params: Promise<{
         <CardHeader>
           <CardTitle className="text-base">Compare with another product</CardTitle>
         </CardHeader>
-        <CardContent>{plus ? <CompareWith base={p.code} /> : <p className="text-sm text-muted-foreground">Side-by-side product comparisons and personal filters are included with Plus and Pro.</p>}</CardContent>
+        <CardContent>{plus ? <CompareWith base={p.code} /> : <p className="text-sm text-muted-foreground">Side-by-side product comparisons and personal filters are included with Pro All Access.</p>}</CardContent>
       </Card>
 
       <Card>

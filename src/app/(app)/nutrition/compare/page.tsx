@@ -27,7 +27,7 @@ export default async function CompareProductsPage({ searchParams }: { searchPara
         back={{ href: a ? `/nutrition/product/${a}` : "/nutrition/scanner", label: "Back" }}
         eyebrow={NUTRITION_FEATURE_TITLE}
         title="Compare products"
-        plan="Plus"
+        plan="Pro"
         description="Compare two products side by side: calories, protein, sugar, fibre, sodium, saturated fat, ingredients, additives and quality indicators."
       />
     );

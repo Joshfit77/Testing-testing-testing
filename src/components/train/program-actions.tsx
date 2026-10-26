@@ -32,7 +32,7 @@ export function ProgramActions({
             <Lock aria-hidden /> Upgrade to unlock
           </Link>
         </Button>
-        <p className="text-xs text-muted-foreground">This program is part of the Plus library.</p>
+        <p className="text-xs text-muted-foreground">This program is part of the Pro All Access library.</p>
       </div>
     );
   }

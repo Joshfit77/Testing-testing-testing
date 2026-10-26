@@ -1,17 +1,22 @@
 import type { Plan } from "./types";
 
 /**
- * What each plan unlocks. The Faith section is free for everyone and is never gated, so it has no feature here.
+ * What each plan unlocks. The Faith & Discipline section is free for everyone and is never gated, so it has no
+ * feature here. Owner decision of 2026-10-26: new customers choose between two memberships only.
  *
- *   Free  — food & calorie logging (search, barcode scanning, macros, saved meals, weekly insights), basic workout
- *           logging, up to five saved workouts, starter programs, basic progress and run tracking, viewing the
- *           training calendar, and every Fitness, Food and Faith rank badge.
- *   Plus  — everything in Free, plus the full program library, the custom program builder, unlimited workout
- *           templates, recipes / meal planner / grocery list, advanced progress and strength trends, progress-photo
- *           comparisons, scheduling/rescheduling on the training calendar, and product comparisons and personal
- *           filters in Narrow Gate Food IQ. No AI.
- *   Pro   — everything in Plus, plus the AI coach (a monthly message allowance), AI plan generation and Food IQ's
- *           "Fits your goals" analysis of each product against the member's own targets.
+ *   Free            — workout logging, starter programs, all exercise demonstrations, up to five saved workouts,
+ *                     basic history and calendar viewing; food diary, calories and macros, barcode scanning, food
+ *                     search, manual entry, saved meals and basic insights; manual run and walk logging; basic sleep
+ *                     logging and goals; weight and basic progress; every Fitness, Food and Faith badge.
+ *   Pro All Access  — everything in Free plus every premium feature: the full program library and custom builder,
+ *                     unlimited templates, scheduling, live GPS run and walk recording with route maps and splits,
+ *                     recipes, meal planning and grocery lists, food comparisons and filters, advanced sleep and
+ *                     recovery analytics, Body Scan, progress-photo comparisons, advanced analytics and the AI coach
+ *                     (a monthly allowance). Monthly ($19.99) and yearly ($149.99) unlock exactly the same features.
+ *
+ *   Plus (legacy)   — no longer sold. Kept only so that members who subscribed to Plus before the change keep exactly
+ *                     the access they paid for (including live GPS, which every plan had then) until their
+ *                     subscription ends or the owner changes its terms with notice. See docs/MEMBERSHIPS.md.
  */
 export const FEATURES = [
   // Free
@@ -19,7 +24,7 @@ export const FEATURES = [
   "starter_programs",
   "basic_progress",
   "nutrition_tracking",
-  // Plus
+  // Pro (and legacy Plus subscriptions)
   "full_program_library",
   "custom_program_builder",
   "unlimited_templates",
@@ -28,20 +33,22 @@ export const FEATURES = [
   "advanced_calendar",
   "food_comparisons",
   // Sleep & Recovery analytics (nightly score breakdown, comparisons, sleep debt, windows, energy estimate).
-  // Proposed split, pending the owner's approval (docs/SLEEP_PLAN.md §5); the key makes it a one-line change.
   "sleep_analytics",
-  // Pro
+  // Live GPS run and walk recording, route maps and splits. Manual run and walk logging stays free.
+  "live_gps",
+  // Pro only
   "ai_coach",
   "ai_plan_generation",
   "advanced_recommendations",
   "food_goal_analysis",
-  // AI sleep coaching and sleep-and-training insights (proposed, see above).
+  // AI sleep coaching and sleep-and-training insights.
   "sleep_ai_coaching",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 
 const FREE_FEATURES: Feature[] = ["workout_logging", "starter_programs", "basic_progress", "nutrition_tracking"];
-const PLUS_FEATURES: Feature[] = [
+/** What a legacy Plus subscription keeps: the paid toolkit it had, without AI (its AI allowance comes from legacy terms). */
+const LEGACY_PLUS_FEATURES: Feature[] = [
   ...FREE_FEATURES,
   "full_program_library",
   "custom_program_builder",
@@ -51,6 +58,7 @@ const PLUS_FEATURES: Feature[] = [
   "advanced_calendar",
   "food_comparisons",
   "sleep_analytics",
+  "live_gps",
 ];
 
 export interface PlanConfig {
@@ -58,12 +66,11 @@ export interface PlanConfig {
   name: string;
   /** Display price in US cents per month. Billing uses the configured Stripe price. */
   priceCents: number;
-  /**
-   * Yearly option (US cents per year) that grants this plan. Set only while yearly billing is switched on
-   * (`BILLING_YEARLY_ENABLED=true`); web checkout additionally needs the plan's yearly Stripe price.
-   */
+  /** Yearly option (US cents per year) granting the same plan. Web checkout also needs the plan's yearly Stripe price. */
   yearlyPriceCents?: number;
   tagline: string;
+  /** Offered to new customers. Legacy plans are kept only for existing subscriptions. */
+  purchasable: boolean;
   features: Feature[];
   /** AI coach requests per calendar month (chat messages and plan generations together). */
   aiMonthlyLimit: number;
@@ -85,15 +92,17 @@ function envInt(name: string, fallback: number): number {
   return Number.isFinite(n) && n >= 0 ? n : fallback;
 }
 
-/** Approved yearly prices (US cents). Hidden until yearly billing is switched on; env vars can override them. */
-export const APPROVED_YEARLY_PRICE_CENTS = { plus: 9999, pro: 24999 } as const;
+/**
+ * Approved Pro All Access prices (US cents), owner decision of 2026-10-26. These are the prices shown when the
+ * store or Stripe price can't be read; the in-app paywall always shows the store's own localized price, and web
+ * checkout shows the amount of the configured Stripe price (see src/server/services/billing.ts).
+ */
+export const APPROVED_PRO_PRICE_CENTS = { month: 1999, year: 14999 } as const;
 
-function yearlyPrice(plan: "plus" | "pro"): { yearlyPriceCents: number } | Record<string, never> {
-  const enabled = typeof process !== "undefined" && process.env.BILLING_YEARLY_ENABLED === "true";
-  if (!enabled) return {};
-  const cents = envInt(`PLAN_${plan.toUpperCase()}_YEARLY_PRICE_CENTS`, APPROVED_YEARLY_PRICE_CENTS[plan]);
-  return cents > 0 ? { yearlyPriceCents: cents } : {};
-}
+/** Paid plans offered to new customers. */
+export const PURCHASABLE_PLANS = ["pro"] as const;
+/** Plans shown to new customers, in order. */
+export const PUBLIC_PLAN_ORDER: Plan[] = ["free", "pro"];
 
 /**
  * Plan definitions. Prices and limits are defaults that can be overridden with environment variables without a
@@ -101,33 +110,38 @@ function yearlyPrice(plan: "plus" | "pro"): { yearlyPriceCents: number } | Recor
  */
 export function getPlans(): Record<Plan, PlanConfig> {
   const proAi = envInt("PLAN_PRO_AI_MONTHLY_LIMIT", 150);
+  const proPlans = envInt("PLAN_PRO_AI_PLAN_MONTHLY_LIMIT", 15);
+  const proYearly = envInt("PLAN_PRO_YEARLY_PRICE_CENTS", APPROVED_PRO_PRICE_CENTS.year);
   return {
     free: {
       id: "free",
       name: "Free",
       priceCents: 0,
-      tagline: "Train, eat well and grow in faith.",
+      tagline: "Build your foundation.",
+      purchasable: true,
       features: FREE_FEATURES,
       aiMonthlyLimit: 0,
       aiPlanMonthlyLimit: 0,
       aiSmartMonthlyLimit: 0,
       templateLimit: envInt("PLAN_FREE_TEMPLATE_LIMIT", 5),
       highlights: [
-        "Food & calorie logging with barcode scanning",
-        "Macro tracking",
         "Workout logging, starter programs & 5 saved workouts",
-        "Basic progress, run tracking & your training calendar",
+        "All 157 exercise demonstrations",
+        "Food diary, calories & macros, barcode scanning and food search",
+        "Manual run & walk logging",
+        "Basic sleep logging, weight and progress history",
         "Every Fitness, Food & Faith badge",
-        "The complete Faith section, always free",
+        "The complete Faith & Discipline section, always free",
       ],
     },
     plus: {
       id: "plus",
       name: "Plus",
+      // What legacy Plus subscribers were charged; shown only to them. Billing uses their existing Stripe or store price.
       priceCents: envInt("PLAN_PLUS_PRICE_CENTS", 1199),
-      ...yearlyPrice("plus"),
-      tagline: "The complete fitness and nutrition toolkit.",
-      features: PLUS_FEATURES,
+      tagline: "Your earlier membership, kept as you subscribed to it.",
+      purchasable: false,
+      features: LEGACY_PLUS_FEATURES,
       aiMonthlyLimit: 0,
       aiPlanMonthlyLimit: 0,
       aiSmartMonthlyLimit: 0,
@@ -135,29 +149,31 @@ export function getPlans(): Record<Plan, PlanConfig> {
       highlights: [
         "Everything in Free",
         "Full program library & custom program builder",
-        "Unlimited workout templates",
-        "Meal planner, recipes & grocery lists",
-        "Advanced progress & strength trends",
-        "Progress-photo comparisons",
-        "Schedule & reschedule sessions on your training calendar",
+        "Unlimited workout templates and calendar scheduling",
+        "Live GPS runs & walks, meal planning, food comparisons",
+        "Advanced progress, strength and sleep analytics",
       ],
     },
     pro: {
       id: "pro",
-      name: "Pro",
-      priceCents: envInt("PLAN_PRO_PRICE_CENTS", 2499),
-      ...yearlyPrice("pro"),
-      tagline: "Personal coaching, powered by AI.",
+      name: "Pro All Access",
+      priceCents: envInt("PLAN_PRO_PRICE_CENTS", APPROVED_PRO_PRICE_CENTS.month),
+      ...(proYearly > 0 ? { yearlyPriceCents: proYearly } : {}),
+      tagline: "One membership. Every premium feature.",
+      purchasable: true,
       features: [...FEATURES],
       aiMonthlyLimit: proAi,
-      aiPlanMonthlyLimit: envInt("PLAN_PRO_AI_PLAN_MONTHLY_LIMIT", 15),
+      aiPlanMonthlyLimit: Math.min(proAi, proPlans),
       aiSmartMonthlyLimit: Math.min(proAi, envInt("PLAN_PRO_AI_SMART_MONTHLY_LIMIT", Math.round(proAi * 0.1))),
       templateLimit: null,
       highlights: [
-        "Everything in Plus",
-        `AI coach: ${proAi} messages a month`,
-        "Personalized AI workout plans, saved only when you approve",
-        "Exercise swaps and nutrition-target suggestions you approve",
+        "Everything in Free",
+        `AI personal coaching: ${proAi} AI requests a month`,
+        "The complete workout library & custom program builder",
+        "Live GPS runs & walks with route maps and splits",
+        "Recipes, meal planning, grocery lists & food comparisons",
+        "Advanced sleep & recovery insights",
+        "Body Scan, progress-photo comparisons & advanced analytics",
       ],
     },
   };
@@ -195,10 +211,12 @@ export type SubscriptionStatus =
  * the period end has already moved on although nothing was paid.
  */
 export function effectivePlanFromSubscription(
-  sub: { plan: Exclude<Plan, "free">; status: SubscriptionStatus; current_period_end: string | null } | null,
+  sub: { plan: Exclude<Plan, "free">; status: SubscriptionStatus; current_period_end: string | null; access_revoked_at?: string | null } | null,
   now: Date = new Date(),
 ): Plan {
   if (!sub) return "free";
+  // The payment for the current period was fully refunded or disputed: that period's access ends (see billing.ts).
+  if (sub.access_revoked_at) return "free";
   const periodActive = !sub.current_period_end || new Date(sub.current_period_end).getTime() > now.getTime();
   switch (sub.status) {
     case "active":
@@ -227,7 +245,9 @@ export type BillingInterval = "month" | "year";
  * Best effective plan across all of a user's subscriptions (e.g. an old canceled one plus a new active one, or a
  * web subscription plus an App Store one). `from` is the subscription that grants it.
  */
-export function entitlementFromSubscriptions<T extends { plan: Exclude<Plan, "free">; status: SubscriptionStatus; current_period_end: string | null }>(
+export function entitlementFromSubscriptions<
+  T extends { plan: Exclude<Plan, "free">; status: SubscriptionStatus; current_period_end: string | null; access_revoked_at?: string | null },
+>(
   subs: T[],
   now: Date = new Date(),
 ): { plan: Plan; validUntil: string | null; from: T | null } {
@@ -287,7 +307,7 @@ export function aiAllowance(plan: Plan, legacy: LegacyAiTerms[] = []): AiAllowan
 /** Legacy terms apply while their subscription still gives access on the same plan and they haven't been ended. */
 export function legacyTermsApply(
   terms: { plan: Exclude<Plan, "free">; ends_at: string | null },
-  sub: { plan: Exclude<Plan, "free">; status: SubscriptionStatus; current_period_end: string | null },
+  sub: { plan: Exclude<Plan, "free">; status: SubscriptionStatus; current_period_end: string | null; access_revoked_at?: string | null },
   now: Date = new Date(),
 ): boolean {
   if (terms.ends_at && new Date(terms.ends_at).getTime() <= now.getTime()) return false;

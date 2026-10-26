@@ -29,7 +29,7 @@ async function ctx() {
 }
 
 function guard(err: unknown, scope: string): ActionState {
-  if (err instanceof EntitlementError) return actionError("Recipes are included with Plus and Pro.");
+  if (err instanceof EntitlementError) return actionError("Recipes are included with Pro All Access.");
   if (err instanceof OffUnavailableError) return actionError("Open Food Facts isn't responding right now. Try again in a moment.");
   logError(scope, err);
   return actionError("Something went wrong. Please try again.");

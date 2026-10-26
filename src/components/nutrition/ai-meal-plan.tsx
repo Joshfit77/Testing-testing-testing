@@ -118,6 +118,8 @@ export function AiMealPlanPanel({ entitled, defaultStart, draft }: { entitled: b
       <Message state={state} />
       <p className="text-xs text-muted-foreground">
         Allergies and dislikes from your planner settings are filtered by ingredient names. That is not a guarantee a dish is free of an allergen: always check labels and recipes.
+        AI-arranged plans are general wellness nutrition, not a medical diet, and can contain mistakes. Notes about a health condition aren&apos;t used: for a
+        medical diet, pregnancy or a history of disordered eating, talk to your doctor or a registered dietitian.
       </p>
 
       {draft && (

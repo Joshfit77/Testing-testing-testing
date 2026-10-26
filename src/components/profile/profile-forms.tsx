@@ -154,7 +154,7 @@ export function DeleteAccountForm() {
           This removes your workouts, runs, nutrition logs, recipes and meal plans, progress photos, AI coach conversations, prayer journal and
           everything else in your account. It can&apos;t be undone. Export your data first if you want a copy.
         </p>
-        <p>A Plus or Pro subscription bought on this website is cancelled for you, with no further charges.</p>
+        <p>A membership bought on this website is cancelled for you, with no further charges.</p>
         <p>
           If you subscribed through the App Store or Google Play, deleting your account doesn&apos;t stop those charges: cancel in your iPhone&apos;s
           Settings → your name → Subscriptions, or in Google Play → Payments &amp; subscriptions.

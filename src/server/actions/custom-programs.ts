@@ -17,12 +17,12 @@ const BUILDS_PER_HOUR = 10;
 
 /**
  * Build a personalized program from the /train/build answers, save it as a private program and
- * make it the active program. The builder is a Plus feature; a program already built stays its owner's on
+ * make it the active program. The builder is a Pro feature; a program already built stays its owner's on
  * every plan (the onboarding starter program and schedule changes use the service directly and stay free).
  */
 export async function buildCustomProgramAction(input: CustomProgramFormInput): Promise<ActionState> {
   const { user, profile } = await requireOnboardedUser();
-  if (!hasFeature(await getUserPlan(user.id), "custom_program_builder")) return actionError("The program builder is included with Plus and Pro.");
+  if (!hasFeature(await getUserPlan(user.id), "custom_program_builder")) return actionError("The program builder is included with Pro All Access.");
   const parsed = customProgramSchema.safeParse(input);
   if (!parsed.success) return actionInvalid(parsed.error);
   const v = parsed.data;

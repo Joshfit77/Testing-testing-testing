@@ -18,7 +18,7 @@ export default async function SleepSchedulePage() {
   const { user, profile } = await requireOnboardedUser();
   const plan = await getUserPlan(user.id);
   if (!hasFeature(plan, "sleep_analytics")) {
-    return <PlanLocked back={{ href: "/progress/sleep", label: "Sleep & Recovery" }} eyebrow="Sleep & Recovery" title="Sleep schedule" plan="Plus" description="A suggested bedtime and wake-up window from your own nights and goal, how steady your rhythm is, and a gradual plan when your bedtime needs to move." />;
+    return <PlanLocked back={{ href: "/progress/sleep", label: "Sleep & Recovery" }} eyebrow="Sleep & Recovery" title="Sleep schedule" plan="Pro" description="A suggested bedtime and wake-up window from your own nights and goal, how steady your rhythm is, and a gradual plan when your bedtime needs to move." />;
   }
   const tz = profile.timezone ?? "UTC";
   const today = isoDateInTz(new Date(), tz);

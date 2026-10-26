@@ -4,7 +4,8 @@ import { z } from "zod";
 import { MAX_DISTANCE_M, MAX_ELAPSED_S, MAX_NOTES } from "@/lib/domain/activities";
 import { haversine, MAX_SPEED_MS } from "@/lib/domain/gps-track";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { getProfile, requireUser } from "@/server/auth";
+import { hasFeature } from "@/lib/domain/plans";
+import { getProfile, getUserPlan, requireUser } from "@/server/auth";
 import { logError } from "@/server/log";
 import { finishWorkout } from "@/server/services/workouts";
 
@@ -50,6 +51,9 @@ function routeLength(route: { coordinates: [number, number][][] }): number {
  */
 export async function saveGpsActivityAction(input: unknown): Promise<Result> {
   const user = await requireUser();
+  // Live GPS recording is part of Pro All Access (the database enforces it too). The recording stays on the device.
+  if (!hasFeature(await getUserPlan(user.id), "live_gps"))
+    return { ok: false, error: "Saving live GPS recordings is included with Pro All Access. Your recording is still on this phone." };
   const parsed = gpsActivitySchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "This recording couldn't be read. Please try saving again." };
   const v = parsed.data;

@@ -126,7 +126,7 @@ export default async function ProgramsPage({ searchParams }: { searchParams: Pro
           <span className="block font-semibold">Build my program</span>
           <span className="block text-sm text-muted-foreground">
             Built around your numbers, goals, schedule and equipment — including combined goals like strength + a 5K.{" "}
-            {canBuild ? "" : "Included with Plus and Pro."}
+            {canBuild ? "" : "Included with Pro All Access."}
           </span>
         </span>
         <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />

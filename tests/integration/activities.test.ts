@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createTestUser, deleteTestUser, serviceClient, stackAvailable, type TestUser } from "./helpers";
+import { createTestUser, deleteTestUser, grantPlan, serviceClient, stackAvailable, type TestUser } from "./helpers";
 
 const available = await stackAvailable();
 
@@ -24,6 +24,8 @@ describe.skipIf(!available)("activities: RLS, constraints and duplicate guards",
   beforeAll(async () => {
     [alice, bob, admin] = await Promise.all([createTestUser("act-alice"), createTestUser("act-bob"), createTestUser("act-admin")]);
     await serviceClient().from("profiles").update({ role: "admin" }).eq("id", admin.id);
+    // These tests record live GPS activities, which are part of Pro All Access (see gps-running.test.ts for Free).
+    await Promise.all([grantPlan(alice, "pro"), grantPlan(bob, "pro")]);
     const { error } = await alice.client.from("activities").insert({ id: aliceRun, ...base(alice.id), notes: "Easy loop" });
     if (error) throw error;
   });

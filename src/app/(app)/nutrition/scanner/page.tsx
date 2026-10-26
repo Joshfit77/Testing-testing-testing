@@ -123,7 +123,7 @@ export default async function FoodIqPage({ searchParams }: { searchParams: Promi
             <FiltersEditor initial={filters} />
           ) : (
             <p className="text-sm text-muted-foreground">
-              Personal filters and side-by-side comparisons are included with Plus and Pro. Every product&apos;s declared allergens are shown on all plans.
+              Personal filters and side-by-side comparisons are included with Pro All Access. Every product&apos;s declared allergens are shown on all plans.
             </p>
           )}
         </CardContent>

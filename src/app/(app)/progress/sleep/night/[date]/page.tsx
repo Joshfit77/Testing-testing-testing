@@ -153,7 +153,7 @@ export default async function NightReportPage({ params }: { params: Promise<{ da
             </h2>
             {!analytics ? (
               <p className="mt-2 text-sm text-muted-foreground">
-                Plus compares each night with your own last two weeks: average time asleep and how far the night was from your usual bedtime and wake time.{" "}
+                Pro All Access compares each night with your own last two weeks: average time asleep and how far the night was from your usual bedtime and wake time.{" "}
                 <Link href="/profile/billing" className="font-semibold text-gold-highlight underline">
                   See plans
                 </Link>

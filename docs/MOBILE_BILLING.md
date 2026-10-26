@@ -23,7 +23,8 @@
 |---|---|
 | Purchase | Plan unlocks as soon as the server confirms with RevenueCat (usually before the purchase sheet closes). |
 | Renewal | Period extended. |
-| Upgrade Plus → Pro | iOS: same subscription group, immediate. Android: the app names the old product so Google replaces it. Pro applies at once. |
+| Upgrade legacy Plus → Pro All Access | iOS: same subscription group, immediate. Android: the app names the old product so Google replaces it. Pro applies at once. |
+| Monthly ↔ yearly | Offered as "Switch to yearly/monthly" for a Pro member on the same store; the store moves the same subscription and confirms when it takes effect (Apple: same-level duration changes apply at renewal). |
 | Downgrade / crossgrade | Takes effect when the store applies it (usually at renewal). |
 | Cancellation (auto-renew off) | Access continues to the end of the paid period; Plans & billing says when it ends. |
 | Billing problem | Access continues through the store's grace period; Plans & billing asks the member to fix payment. |
@@ -38,18 +39,16 @@
 ## Owner setup (sandbox first)
 
 1. **App Store Connect:** use the app's real bundle id (`CAP_APP_ID`).
-   - Create one *subscription group* with four auto-renewable subscriptions:
-     - `ngf_plus_monthly` $11.99
-     - `ngf_pro_monthly` $24.99
-     - `ngf_plus_yearly` $99.99
-     - `ngf_pro_yearly` $249.99
-   - Order them in the group so Pro is the higher level (upgrades are then immediate).
+   - Create one *subscription group* with two auto-renewable subscriptions, both "Pro All Access" at the same level:
+     - `ngf_pro_monthly` $19.99 (US price; Apple sets other storefronts' prices from it unless you change them)
+     - `ngf_pro_yearly` $149.99
+   - Plus is no longer sold: create no Plus products. If Plus products already exist with subscribers, leave them in the group below Pro (so an upgrade is immediate) and remove them from sale.
    - Add review screenshots and descriptions.
    - Create **Sandbox tester** accounts.
-2. **Google Play Console** (when Android is ready): create subscriptions `ngf_plus` and `ngf_pro`, each with `monthly` and `yearly` base plans. Set the product ids in `.env` if they differ.
+2. **Google Play Console** (when Android is ready): create the subscription `ngf_pro` with `monthly` ($19.99) and `yearly` ($149.99) base plans, and set `REVENUECAT_PRODUCTS_PRO_MONTHLY=ngf_pro` / `REVENUECAT_PRODUCTS_PRO_YEARLY=ngf_pro` (the app matches `ngf_pro:monthly` and `ngf_pro:yearly` by base plan; set the exact ids if they differ).
 3. **RevenueCat:**
    - Create a project and add the iOS app (App Store Connect API key / in-app purchase key) and the Android app.
-   - Create entitlements `plus` and `pro`. Attach the Plus products to `plus`, and the Pro products to `pro` (optionally also to `plus`).
+   - Create the entitlement `pro` and attach both Pro All Access products. Keep an entitlement `plus` only for existing Plus store products, if any.
    - Create an offering containing the packages.
    - Add the webhook: URL `https://<your domain>/api/revenuecat/webhook`, with an Authorization header value you generate (long and random).
    - **Pricing:** free up to $2,500 a month in tracked revenue, then 1% (per RevenueCat's published pricing; check before launch).
@@ -59,15 +58,15 @@
    - `REVENUECAT_PUBLIC_KEY_IOS` / `REVENUECAT_PUBLIC_KEY_ANDROID`
    - optionally the product ids and entitlement ids
 5. **Native build:** run `npm install` and `npx cap sync`. In Xcode, add the **In-App Purchase** capability to the app target. Then build in Xcode / Android Studio. The plugin is native code: an app binary built before this change can't make purchases; it shows "In-app purchases aren't available right now".
-6. **Yearly plans** stay hidden until `BILLING_YEARLY_ENABLED=true` (the same switch as the website).
+6. **Yearly** is shown whenever the store offers `ngf_pro_yearly`; the paywall never shows a price the store doesn't return.
 
 ## Sandbox test plan (on a real iPhone)
 
 Use a development build signed with your team, signed in with a **Sandbox** Apple Account (Settings → App Store → Sandbox Account).
 
 1. **New member:** open Plans & billing. Check that the prices show, along with the renewal terms, Terms and Privacy links, and Restore purchases.
-2. **Subscribe to Plus monthly.** The plan shows Plus, the AI Coach says it's included with Pro, and Plus tools open.
-3. **Upgrade to Pro.** Pro applies at once, and the AI Coach asks for data-sharing consent, then works.
+2. **Start Pro All Access monthly.** Pro applies at once: live GPS, the full program library, meal planning and Body Scan open, and the AI Coach asks for data-sharing consent, then works.
+3. **Switch to yearly.** The store confirms the change; Plans & billing shows Yearly once it applies.
 4. **Cancel** in Settings → Apple Account → Subscriptions. Plans & billing shows "set to cancel… until <date>". Sandbox renewals are accelerated (a month lasts minutes), so expiry returns you to Free shortly after.
 5. **Restore:** delete and reinstall the app, sign in, tap Restore purchases.
 6. **Refund:** request one through Apple's sandbox tools (or StoreKit testing in Xcode). Access ends.

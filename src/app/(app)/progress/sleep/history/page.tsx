@@ -133,7 +133,7 @@ export default async function SleepHistoryPage({ searchParams }: { searchParams:
           <div className="mt-2 flex gap-3 text-sm">
             <Lock className="mt-0.5 size-5 shrink-0 text-gold" aria-hidden />
             <p className="text-muted-foreground">
-              Included with Plus and Pro: your typical bedtime, wake time and time asleep on weekday nights next to weekend nights, and how far they shift.{" "}
+              Included with Pro All Access: your typical bedtime, wake time and time asleep on weekday nights next to weekend nights, and how far they shift.{" "}
               <Link href="/profile/billing" className="font-semibold text-gold-highlight underline">
                 See plans
               </Link>

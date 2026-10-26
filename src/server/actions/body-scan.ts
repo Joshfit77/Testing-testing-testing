@@ -130,17 +130,24 @@ export async function deleteBodyScanAction(id: unknown): Promise<Result> {
   const parsed = z.string().uuid().safeParse(id);
   if (!parsed.success) return { ok: false, error: "Invalid scan." };
   const supabase = await getServerSupabase();
-  const { data, error } = await supabase.from("body_scans").delete().eq("id", parsed.data).eq("user_id", user.id).select("id");
-  if (error) {
-    logError("body_scan.delete", error);
+  const { data: scan, error: readErr } = await supabase.from("body_scans").select("id").eq("id", parsed.data).eq("user_id", user.id).maybeSingle();
+  if (readErr) {
+    logError("body_scan.delete", readErr);
     return { ok: false, error: "Couldn't delete the scan. Try again." };
   }
-  if (!data?.length) return { ok: false, error: "Scan not found." };
+  if (!scan) return { ok: false, error: "Scan not found." };
+  // Photo files first: if removing them fails, the scan stays listed so it can be deleted again, and no private
+  // image is ever left behind without a row pointing at it.
   try {
     await removeOwnScanFiles(supabase, user.id, parsed.data);
   } catch (err) {
-    // The rows are gone; any leftover file stays private and is removed with "delete all" or the account.
     logError("body_scan.delete_files", err);
+    return { ok: false, error: "Couldn't delete the scan photos. Try again." };
+  }
+  const { error } = await supabase.from("body_scans").delete().eq("id", parsed.data).eq("user_id", user.id);
+  if (error) {
+    logError("body_scan.delete", error);
+    return { ok: false, error: "Couldn't delete the scan. Try again." };
   }
   revalidatePath("/progress", "layout");
   return { ok: true, message: "Scan deleted." };
@@ -150,16 +157,17 @@ export async function deleteBodyScanAction(id: unknown): Promise<Result> {
 export async function withdrawBodyScanConsentAction(): Promise<Result> {
   const user = await requireUser();
   const supabase = await getServerSupabase();
-  const { error } = await supabase.from("body_scans").delete().eq("user_id", user.id);
-  if (error) {
-    logError("body_scan.delete_all", error);
-    return { ok: false, error: "Couldn't delete your scans. Try again." };
-  }
+  // Files first, then rows (see deleteBodyScanAction).
   try {
     await removeOwnScanFiles(supabase, user.id);
   } catch (err) {
     logError("body_scan.delete_all_files", err);
-    return { ok: false, error: "Your scans were deleted, but some photo files couldn't be removed yet. Try again." };
+    return { ok: false, error: "Some scan photos couldn't be removed yet, so nothing was deleted. Try again." };
+  }
+  const { error } = await supabase.from("body_scans").delete().eq("user_id", user.id);
+  if (error) {
+    logError("body_scan.delete_all", error);
+    return { ok: false, error: "Your scan photos were removed, but the scan records couldn't be deleted yet. Try again." };
   }
   await supabase.from("profiles").update({ body_scan_consent_at: null }).eq("id", user.id);
   revalidatePath("/progress", "layout");
