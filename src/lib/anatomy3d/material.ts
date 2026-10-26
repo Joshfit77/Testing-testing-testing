@@ -25,9 +25,10 @@ const f1 = (x: number) => x.toFixed(3); // GLSL floats always need a decimal poi
 const g3 = (v: readonly number[]) => `vec3(${v.map(f1).join(", ")})`;
 const LOOKS = {
   gold: {
-    base: "#c8903a", metalness: 0.5, roughness: 0.34, clearcoat: 0.85, clearcoatRoughness: 0.14, sheen: 0.5, sheenColor: "#ffd98a",
+    // A darker, satin gold: rich in shadow, bright only where the light catches it, never a polished statue.
+    base: "#ad7a30", metalness: 0.62, roughness: 0.4, clearcoat: 0.32, clearcoatRoughness: 0.28, sheen: 0.3, sheenColor: "#ffd98a",
     fibre: [0.88, 0.2], tendonEnd: [[0.93, 0.79, 0.52], 0.55], bone: [[0.8, 0.66, 0.42], 0.45], tendon: [[0.92, 0.8, 0.55], 0.5],
-    hairDark: 0.16, scalp: [[0.93, 0.79, 0.52], 0], fascia: 0.42, skinMetal: 0.42, skinTint: [1, 1, 1], skinMul: 0.72, rim: [[1, 0.72, 0.32], 0.12],
+    hairDark: 0.16, scalp: [[0.93, 0.79, 0.52], 0], fascia: 0.42, skinMetal: 0.5, skinTint: [1, 1, 1], skinMul: 0.8, rim: [[1, 0.72, 0.32], 0.06],
     glow: "#ffb72e", glowTint: 0.45,
   },
   medical: {
@@ -39,10 +40,8 @@ const LOOKS = {
   },
 } as const;
 
-export function makeAthleteMaterial(look: AthleteLook = "gold", opts: { shorts?: boolean } = {}): AthleteMaterial {
+export function makeAthleteMaterial(look: AthleteLook = "gold"): AthleteMaterial {
   const L = LOOKS[look];
-  // Without shorts (as in an anatomy plate) only the smooth panel over the groin is kept, shaded as muscle.
-  const SHORTS = f1(opts.shorts === false ? 0 : 1);
   const glow = new Float32Array(MUSCLE_ID_COUNT + 1);
   const uniforms = {
     uGlow: { value: glow },
@@ -92,8 +91,6 @@ export function makeAthleteMaterial(look: AthleteLook = "gold", opts: { shorts?:
         vTissue = tissue;
         // Distance across the fibres (rest pose), for the striations.
         vec3 across = normalize(cross(fiber, objectNormal) + vec3(1e-4));
-        // Without shorts, the groin panel sits a little lower, tucked between the thigh muscles.
-        if (tissue > 5.5 && ${SHORTS} < 0.5) transformed -= objectNormal * 0.1;
         vStripe = dot(position, across);
         vRest = position;`,
       );
@@ -147,15 +144,15 @@ export function makeAthleteMaterial(look: AthleteLook = "gold", opts: { shorts?:
         eye = mix(eye, vec3(0.015, 0.012, 0.01), smoothstep(0.75, 0.9, vExtra));
         diffuseColor.rgb = mix(diffuseColor.rgb, eye, isEye);
         if (vTissue > 4.5 && vTissue < 5.5) diffuseColor.rgb *= ${f1(L.fascia)}; // fascia between the muscles
-        // Shorts: matte black fabric, cut at a clean hem and waistband with a thin gold trim.
-        float isShorts = step(5.5, vTissue) * ${SHORTS};
+        // Shorts (a fitted mesh of their own): matte black fabric with a thin gold trim drawn along the waistband and
+        // hem lines (the same curves the mesh is cut on, so the line is crisp at any distance); the folded edge
+        // (muscleMix 1) stays black.
+        float isShorts = step(5.5, vTissue);
         float hemY = 68.5 + 3.5 * smoothstep(6.0, 16.0, abs(vRest.z));
         float waistY = 95.5 + 3.0 * smoothstep(2.0, -8.0, vRest.x);
-        if (isShorts > 0.5 && (vRest.y < hemY || vRest.y > waistY)) discard;
-        // Without shorts: a smooth V over the groin (narrower lower down), like the pubic region of an anatomy figure.
-        if (vTissue > 5.5 && isShorts < 0.5 && (abs(vRest.z) > 2.5 + 6.0 * smoothstep(66.0, 86.0, vRest.y) || vRest.y > 88.0 || vRest.y < 66.0 || vRest.x < -2.0)) discard;
-        if (vTissue > 5.5 && isShorts < 0.5) diffuseColor.rgb *= 0.8;
-        float trim = isShorts * (1.0 - step(0.8, min(vRest.y - hemY, waistY - vRest.y)));
+        float toEdge = min(vRest.y - hemY, waistY - vRest.y);
+        float trimW = fwidth(toEdge);
+        float trim = isShorts * (1.0 - smoothstep(0.55 - trimW, 0.55 + trimW, toEdge)) * (1.0 - step(0.9, vExtra));
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.018, 0.016, 0.014), isShorts * (1.0 - trim));
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.85, 0.66, 0.3), trim);`,
       )
@@ -173,7 +170,7 @@ export function makeAthleteMaterial(look: AthleteLook = "gold", opts: { shorts?:
         // The glow lives in the muscle: shaped by its fibres and its own shading, never a flat coat of paint.
         float fibreGlow = 0.78 + 0.22 * fibre;
         float body = 0.45 + 0.55 * vAo;
-        totalEmissiveRadiance += uGlowColor * g * fibreGlow * body * 0.75;
+        totalEmissiveRadiance += uGlowColor * g * fibreGlow * body * 1.35;
         diffuseColor.rgb = mix(diffuseColor.rgb, uGlowColor, clamp(g, 0.0, 1.0) * ${f1(L.glowTint)});
         // Warm edge light, like light passing through the edges of the tissue.
         float facing = clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0);
@@ -222,7 +219,7 @@ export function makeAthleteMaterial(look: AthleteLook = "gold", opts: { shorts?:
         roughnessFactor = clamp(roughnessFactor, 0.05, 1.0);`,
       );
   };
-  material.customProgramCacheKey = () => `ngf-athlete-v13-${look}-${SHORTS}`;
+  material.customProgramCacheKey = () => `ngf-athlete-v14-${look}`;
   return {
     material,
     glow,

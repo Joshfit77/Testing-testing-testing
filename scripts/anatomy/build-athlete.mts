@@ -481,193 +481,63 @@ for (const [name, test, tris] of [
 }
 // A new face: the MakeHuman head (CC0), shaped for a stronger adult male face, fitted where the scanned head was.
 const MAKEHUMAN = process.argv[3];
+const neckCut = (p: V3) => 147.5 - 0.35 * p[0] + 9 * smoothstep(7, 11, Math.abs(p[2]));
 if (MAKEHUMAN) {
   const eyesPart = parts.find((pt) => pt.kind === "eye")!;
   const eyeMid = centroid(verts(eyesPart.mesh));
   const sk = verts(skin);
-  const crownY = sk.reduce((m, p) => Math.max(m, p[1]), -Infinity);
-  const chinY = sk
-    .filter((p) => Math.abs(p[2]) < 1.5 && p[1] > eyeMid[1] - 16 && p[1] < eyeMid[1] - 5 && p[0] > eyeMid[0] - 3)
-    .reduce((m, p) => Math.min(m, p[1]), Infinity);
-  const { head: mhHead, eyes: mhEyes } = buildMakeHumanHead(MAKEHUMAN, { eyeMid, chinY, crownY, // The neck column only: the slopes of the trapezius and the tops of the shoulders stay real muscle.
-  cutY: (x, z) => 147.5 - 0.35 * x + 9 * smoothstep(7, 11, Math.abs(z)) });
+  const bodyHeight = sk.reduce((m, p) => Math.max(m, p[1]), -Infinity);
+  const { head: mhHead, eyes: mhEyes } = buildMakeHumanHead(MAKEHUMAN, {
+    eyeMid,
+    bodyHeight,
+    // (Kept a little long here; cut exactly below.)
+    cutY: (x, z) => neckCut([x, 0, z]) - 2.5,
+  });
   // The new neck is skin: the deep neck muscles that would poke through it behind the ears are left out.
   for (let i = parts.length - 1; i >= 0; i--)
     if (/splenius|semispinalis capitis|levator scapulae/.test(parts[i]!.name)) parts.splice(i, 1);
   const face = parts.findIndex((pt) => pt.name === "face");
-  const headMesh: Mesh = { pos: mhHead.pos, idx: mhHead.idx };
+  // The neck column only (the slopes of the trapezius and the tops of the shoulders stay real muscle), cut along one
+  // smooth curve and folded in at the edge so it meets the muscles cleanly.
+  const headMesh: Mesh = foldEdges(clipMesh({ pos: mhHead.pos, idx: mhHead.idx }, (p) => p[1] - neckCut(p)), 0.6);
   parts[face] = { name: "face", kind: "skin", mesh: headMesh, label: NO_MUSCLE, fiber: [0, 1, 0], rigid: null, extra: hairMask(headMesh, centroid(Array.from({ length: mhEyes.pos.length / 3 }, (_, i) => [mhEyes.pos[i * 3]!, mhEyes.pos[i * 3 + 1]!, mhEyes.pos[i * 3 + 2]!] as V3))) };
   const eyeMesh: Mesh = { pos: mhEyes.pos, idx: mhEyes.idx };
   parts[parts.indexOf(eyesPart)] = { ...eyesPart, mesh: eyeMesh, extra: eyeIris(eyeMesh) };
-  console.log(`MakeHuman head: ${headMesh.idx.length / 3} triangles (chin ${chinY.toFixed(1)}, crown ${crownY.toFixed(1)})`);
+  const hy = verts(headMesh).map((p) => p[1]);
+  console.log(`MakeHuman head: ${headMesh.idx.length / 3} triangles, crown ${hy.reduce((a, b) => Math.max(a, b)).toFixed(1)} (body height ${bodyHeight.toFixed(1)})`);
 }
 
-// ---------------------------------------------------------------- fascia layer and pelvic cover
+// ---------------------------------------------------------------- fascia layer
 // The fascia is the body surface shrink-wrapped to just under the muscles: hidden beneath each muscle, it fills the
 // grooves and gaps between them with dark tissue, so no hole ever shows through the écorché.
-const CELL = 1.5;
-const grid = new Map<number, number[]>();
-const triPos: number[] = [];
-const ck = (i: number, j: number, k: number) => (i + 512) * 1048576 + (j + 512) * 1024 + (k + 512);
-for (const part of parts) {
-  if (part.kind !== "muscle" && part.kind !== "bone" && part.kind !== "tendon") continue;
-  const m = part.mesh;
-  for (let t = 0; t < m.idx.length; t += 3) {
-    const id = triPos.length / 9;
-    for (let k = 0; k < 3; k++) triPos.push(...vert(m, m.idx[t + k]!));
-    const o = id * 9;
-    const mn = [0, 1, 2].map((k) => Math.floor(Math.min(triPos[o + k]!, triPos[o + 3 + k]!, triPos[o + 6 + k]!) / CELL));
-    const mx = [0, 1, 2].map((k) => Math.floor(Math.max(triPos[o + k]!, triPos[o + 3 + k]!, triPos[o + 6 + k]!) / CELL));
-    for (let i = mn[0]!; i <= mx[0]!; i++)
-      for (let j = mn[1]!; j <= mx[1]!; j++)
-        for (let k = mn[2]!; k <= mx[2]!; k++) {
-          const key = ck(i, j, k);
-          const a = grid.get(key);
-          if (a) a.push(id);
-          else grid.set(key, [id]);
-        }
-  }
-}
-const triV = (t: number, k: number): V3 => [triPos[t * 9 + k * 3]!, triPos[t * 9 + k * 3 + 1]!, triPos[t * 9 + k * 3 + 2]!];
-/** Closest point on a triangle (Ericson, Real-Time Collision Detection 5.1.5). */
-function closestOnTri(p: V3, a: V3, b: V3, c: V3): V3 {
-  const ab = sub(b, a), ac = sub(c, a), ap = sub(p, a);
-  const d1 = dot(ab, ap), d2 = dot(ac, ap);
-  if (d1 <= 0 && d2 <= 0) return a;
-  const bp = sub(p, b), d3 = dot(ab, bp), d4 = dot(ac, bp);
-  if (d3 >= 0 && d4 <= d3) return b;
-  const vc = d1 * d4 - d3 * d2;
-  if (vc <= 0 && d1 >= 0 && d3 <= 0) return add(a, mul(ab, d1 / (d1 - d3)));
-  const cp = sub(p, c), d5 = dot(ab, cp), d6 = dot(ac, cp);
-  if (d6 >= 0 && d5 <= d6) return c;
-  const vb = d5 * d2 - d1 * d6;
-  if (vb <= 0 && d2 >= 0 && d6 <= 0) return add(a, mul(ac, d2 / (d2 - d6)));
-  const va = d3 * d6 - d5 * d4;
-  if (va <= 0 && d4 - d3 >= 0 && d5 - d6 >= 0) return add(b, mul(sub(c, b), (d4 - d3) / (d4 - d3 + (d5 - d6))));
-  const denom = 1 / (va + vb + vc);
-  return add(a, add(mul(ab, vb * denom), mul(ac, vc * denom)));
-}
-function nearestSurface(p: V3, radius: number): { q: V3; n: V3; d: number } | null {
-  const r = Math.ceil(radius / CELL);
-  const ci = Math.floor(p[0] / CELL), cj = Math.floor(p[1] / CELL), ckk = Math.floor(p[2] / CELL);
-  let best: { q: V3; n: V3; d: number } | null = null;
-  const seen = new Set<number>();
-  for (let i = -r; i <= r; i++)
-    for (let j = -r; j <= r; j++)
-      for (let k = -r; k <= r; k++) {
-        const list = grid.get(ck(ci + i, cj + j, ckk + k));
-        if (!list) continue;
-        for (const t of list) {
-          if (seen.has(t)) continue;
-          seen.add(t);
-          const q = closestOnTri(p, triV(t, 0), triV(t, 1), triV(t, 2));
-          const d = len(sub(p, q));
-          if (d < radius && (!best || d < best.d)) best = { q, n: norm(cross(sub(triV(t, 1), triV(t, 0)), sub(triV(t, 2), triV(t, 0)))), d };
-        }
-      }
-  return best;
-}
 {
+  // Each point of the body surface moves straight in along its own normal, to just under the first muscle, bone or
+  // tendon it meets (or 3 cm where there is none). Moving only along the normal keeps the sheet smooth and unfolded;
+  // snapping each point to its nearest muscle instead scrambled neighbouring points and crumpled the sheet into dark
+  // torn-looking slivers between the muscles.
   const body = cropAndSimplify(skin, (p) => !isHead(p) && !handOf(p) && !isFoot(p), 50000);
   const nb = body.pos.length / 3;
   const nrm = vertexNormals(body);
-  const groin = (p: V3) => (1 - smoothstep(6.5, 9.5, Math.abs(p[2]))) * smoothstep(58, 63, p[1]) * (1 - smoothstep(86, 91, p[1])) * smoothstep(0, 3, p[0]);
-  const coverMark = new Uint8Array(nb);
-  const disp = new Float32Array(nb * 3);
+  const under = bvhOf(parts.filter((pt) => pt.kind === "muscle" || pt.kind === "bone" || pt.kind === "tendon").map((pt) => pt.mesh));
+  const ray = new THREE.Ray();
+  const both = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+  const depth = new Float32Array(nb * 3);
   for (let n = 0; n < nb; n++) {
     const p = vert(body, n);
-    const g = groin(p);
-    coverMark[n] = g > 0.5 ? 1 : 0;
-    if (g > 0.5) {
-      // The cover is pressed smooth and close to the body: no anatomical detail of the genitals.
-      // A flat, discreet panel: everything in front of a smooth curve is pressed onto it.
-      const cap = 1.6 + 5.2 * smoothstep(62, 88, p[1]);
-      const target: V3 = [p[0] > cap - 2 ? cap - 0.2 : p[0] - 0.2, p[1], p[2] * 0.97];
-      disp.set(sub(target, p), n * 3);
-      continue;
-    }
-    // Under the nearest muscle, bone or tendon; where there's nothing close, sink well below the surface.
-    const hit = nearestSurface(p, 6);
-    const target = hit ? sub(hit.q, mul(dot(sub(p, hit.q), hit.n) >= 0 ? hit.n : mul(hit.n, -1), 0.6)) : sub(p, mul([nrm[n * 3]!, nrm[n * 3 + 1]!, nrm[n * 3 + 2]!], 3));
-    disp.set(sub(target, p), n * 3);
+    // Start a little outside the skin: the athletic bulk can push a muscle just past it.
+    ray.origin.set(p[0] + nrm[n * 3]! * 1.5, p[1] + nrm[n * 3 + 1]! * 1.5, p[2] + nrm[n * 3 + 2]! * 1.5);
+    ray.direction.set(-nrm[n * 3]!, -nrm[n * 3 + 1]!, -nrm[n * 3 + 2]!);
+    const hit = under.raycastFirst(ray, both, 0, 7.5);
+    depth[n * 3] = hit ? Math.max(0, hit.distance - 1.5 + 0.6) : 3;
   }
-  // Smooth the pull so the fascia stays a clean surface.
-  const nbrs: Set<number>[] = Array.from({ length: nb }, () => new Set());
-  for (let t = 0; t < body.idx.length; t += 3) {
-    const a = body.idx[t]!, b2 = body.idx[t + 1]!, c = body.idx[t + 2]!;
-    nbrs[a]!.add(b2).add(c);
-    nbrs[b2]!.add(a).add(c);
-    nbrs[c]!.add(a).add(b2);
-  }
-  for (let it = 0; it < 7; it++) {
-    const next = new Float32Array(disp.length);
-    for (let n = 0; n < nb; n++) {
-      const ns = [...nbrs[n]!];
-      for (let k = 0; k < 3; k++) {
-        let s2 = disp[n * 3 + k]! * 2;
-        for (const m of ns) s2 += disp[m * 3 + k]! / ns.length;
-        next[n * 3 + k] = s2 / 3;
-      }
-    }
-    disp.set(next);
-  }
-  for (let i = 0; i < body.pos.length; i++) body.pos[i]! += disp[i]!;
-  const deepIdx: number[] = [], coverIdx: number[] = [];
-  for (let t = 0; t < body.idx.length; t += 3) {
-    const tri = [body.idx[t]!, body.idx[t + 1]!, body.idx[t + 2]!];
-    (tri.some((v) => coverMark[v]) ? coverIdx : deepIdx).push(...tri);
-  }
-  parts.push({ name: "fascia", kind: "deep", mesh: compact(body.pos, new Uint32Array(deepIdx)), label: NO_MUSCLE, fiber: [0, 1, 0], rigid: null });
-  // The groin itself is left open here: the shorts cover it.
-  void coverIdx;
+  smoothField(body, depth, 3);
+  for (let n = 0; n < nb; n++) for (let k = 0; k < 3; k++) body.pos[n * 3 + k]! -= nrm[n * 3 + k]! * depth[n * 3]!;
+  parts.push({ name: "fascia", kind: "deep", mesh: body, label: NO_MUSCLE, fiber: [0, 1, 0], rigid: null });
 }
 
-// ---------------------------------------------------------------- shorts
-// Clean black compression shorts with a short inseam: the body surface in the shorts area, pulled straight in until
-// it sits just above the muscles underneath (so the fabric is smooth and snug, never patchy), with a thin gold trim at
-// the waistband and the hems.
-const shortsWaist = (p: V3) => 95.5 + 3 * smoothstep(2, -8, p[0]);
-const shortsHem = (p: V3) => 68.5 + 3.5 * smoothstep(6, 16, Math.abs(p[2]));
-{
-  const under: number[] = [];
-  const underIdx: number[] = [];
-  for (const part of parts) {
-    if (part.kind === "skin" || part.kind === "deep" || part.kind === "eye") continue;
-    const base = under.length / 3;
-    for (const v of part.mesh.pos) under.push(v);
-    for (const i of part.mesh.idx) underIdx.push(i + base);
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(under), 3));
-  geo.setIndex(new THREE.BufferAttribute(new Uint32Array(underIdx), 1));
-  const bvh = new MeshBVH(geo);
-  const side = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
-  // Cropped a little wide; the shader cuts the exact hem and waistband lines (clean curves, not triangle edges).
-  const inShorts = (p: V3) => !handOf(p) && Math.abs(p[2]) < 23 && p[1] > shortsHem(p) - 1.8 && p[1] < shortsWaist(p) + 1.4;
-  const m = cropAndSimplify(skin, inShorts, 26000);
+/** Laplacian smoothing of a per-vertex vector field over a mesh's surface. */
+function smoothField(m: Mesh, f: Float32Array, iterations: number) {
   const nv = m.pos.length / 3;
-  const nrm = vertexNormals(m);
-  const disp = new Float32Array(nv * 3);
-  const trim = new Float32Array(nv);
-  const ray = new THREE.Ray();
-  for (let n = 0; n < nv; n++) {
-    const p = vert(m, n);
-    trim[n] = Math.min(Math.abs(p[1] - shortsWaist(p)), Math.abs(p[1] - shortsHem(p))) < 1.1 ? 1 : 0;
-    const nn: V3 = [nrm[n * 3]!, nrm[n * 3 + 1]!, nrm[n * 3 + 2]!];
-    ray.origin.set(p[0] + nn[0] * 0.3, p[1] + nn[1] * 0.3, p[2] + nn[2] * 0.3);
-    ray.direction.set(-nn[0], -nn[1], -nn[2]);
-    const hit = bvh.raycastFirst(ray, side, 0, 8);
-    const depth = hit ? Math.max(0, hit.distance - 0.3 - 1.1) * 0.85 : 0.6;
-    let target = sub(p, mul(nn, depth));
-    // Over the groin the fabric lies flat.
-    // Over the groin the fabric is a smooth, flat panel: every point there is pressed onto one curved surface.
-    const g = (1 - smoothstep(8, 11, Math.abs(p[2]))) * smoothstep(58, 63, p[1]) * smoothstep(-1, 2, p[0]);
-    if (g > 0) {
-      const cap = 2.8 + 5.0 * smoothstep(62, 88, p[1]) - 0.012 * p[2] * p[2];
-      target = [target[0] + (cap - target[0]) * g, target[1], target[2]];
-    }
-    disp.set(sub(target, p), n * 3);
-  }
   const nbrs: Set<number>[] = Array.from({ length: nv }, () => new Set());
   for (let t = 0; t < m.idx.length; t += 3) {
     const a = m.idx[t]!, b2 = m.idx[t + 1]!, c = m.idx[t + 2]!;
@@ -675,20 +545,227 @@ const shortsHem = (p: V3) => 68.5 + 3.5 * smoothstep(6, 16, Math.abs(p[2]));
     nbrs[b2]!.add(a).add(c);
     nbrs[c]!.add(a).add(b2);
   }
-  for (let it = 0; it < 8; it++) {
-    const next = new Float32Array(disp.length);
+  for (let it = 0; it < iterations; it++) {
+    const next = new Float32Array(f.length);
     for (let n = 0; n < nv; n++) {
       const ns = [...nbrs[n]!];
       for (let k = 0; k < 3; k++) {
-        let s2 = disp[n * 3 + k]! * 2;
-        for (const o of ns) s2 += disp[o * 3 + k]! / ns.length;
+        let s2 = f[n * 3 + k]! * 2;
+        for (const o of ns) s2 += f[o * 3 + k]! / (ns.length || 1);
         next[n * 3 + k] = s2 / 3;
       }
     }
-    disp.set(next);
+    f.set(next);
   }
-  for (let i = 0; i < m.pos.length; i++) m.pos[i]! += disp[i]!;
-  parts.push({ name: "shorts", kind: "cover", mesh: m, label: NO_MUSCLE, fiber: [0, 1, 0], rigid: null, extra: trim });
+}
+/** Cuts a mesh exactly along the zero line of a scalar field, keeping the part where it is positive (watertight). */
+function clipMesh(m: Mesh, field: (p: V3) => number): Mesh {
+  const nv = m.pos.length / 3;
+  const f = Array.from({ length: nv }, (_, n) => field(vert(m, n)));
+  const pos = Array.from(m.pos);
+  const idx: number[] = [];
+  const onEdge = new Map<string, number>();
+  const mid = (a: number, b: number) => {
+    const key = a < b ? `${a}_${b}` : `${b}_${a}`;
+    let r = onEdge.get(key);
+    if (r === undefined) {
+      const t = f[a]! / (f[a]! - f[b]!);
+      r = pos.length / 3;
+      pos.push(...lerp(vert(m, a), vert(m, b), t));
+      onEdge.set(key, r);
+    }
+    return r;
+  };
+  for (let t = 0; t < m.idx.length; t += 3) {
+    const tri = [m.idx[t]!, m.idx[t + 1]!, m.idx[t + 2]!];
+    const ins = tri.map((v) => f[v]! >= 0);
+    const n = ins.filter(Boolean).length;
+    if (n === 3) idx.push(...tri);
+    if (n === 0 || n === 3) continue;
+    // Rotate so the odd one out comes first.
+    const k = n === 1 ? ins.indexOf(true) : ins.indexOf(false);
+    const a = tri[k]!, b2 = tri[(k + 1) % 3]!, c = tri[(k + 2) % 3]!;
+    const ab = mid(a, b2), ac = mid(a, c);
+    if (n === 1) idx.push(a, ab, ac);
+    else idx.push(ab, b2, c, ab, c, ac);
+  }
+  return compact(new Float32Array(pos), new Uint32Array(idx));
+}
+/** Folds every open edge of a mesh straight inwards (against its normals) by `depth`: a finished edge. */
+function foldEdges(m: Mesh, depth: number): Mesh {
+  const nrm = vertexNormals(m);
+  const edgeUse = new Map<string, [number, number]>();
+  for (let t = 0; t < m.idx.length; t += 3)
+    for (let k = 0; k < 3; k++) {
+      const a = m.idx[t + k]!, b = m.idx[t + ((k + 1) % 3)]!;
+      const key = a < b ? `${a}_${b}` : `${b}_${a}`;
+      edgeUse.set(key, edgeUse.has(key) ? [-1, -1] : [a, b]);
+    }
+  const pos = Array.from(m.pos);
+  const idx = Array.from(m.idx);
+  const fold = new Map<number, number>();
+  const inner = (v: number) => {
+    let r = fold.get(v);
+    if (r === undefined) {
+      r = pos.length / 3;
+      pos.push(...sub(vert(m, v), mul([nrm[v * 3]!, nrm[v * 3 + 1]!, nrm[v * 3 + 2]!], depth)));
+      fold.set(v, r);
+    }
+    return r;
+  };
+  for (const [a, b] of edgeUse.values()) {
+    if (a < 0) continue;
+    // (a, b) runs along the edge with the surface on its left: the folded strip continues the same surface.
+    const ai = inner(a), bi = inner(b);
+    idx.push(b, a, ai, b, ai, bi);
+  }
+  return { pos: new Float32Array(pos), idx: new Uint32Array(idx) };
+}
+/** A BVH over several meshes, for ray casts. */
+function bvhOf(meshes: Mesh[]): MeshBVH {
+  const pos: number[] = [], idx: number[] = [];
+  for (const m of meshes) {
+    const base = pos.length / 3;
+    for (const v of m.pos) pos.push(v);
+    for (const i of m.idx) idx.push(i + base);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(pos), 3));
+  g.setIndex(new THREE.BufferAttribute(new Uint32Array(idx), 1));
+  return new MeshBVH(g);
+}
+
+// ---------------------------------------------------------------- shorts
+// Fitted black compression shorts, built as real geometry: the body's own skin surface over the hips (so the fabric
+// follows the body exactly, like compression wear), smoothed flat over the groin, cut exactly along the hem and
+// waistband curves (new vertices on the cut, not a shader mask), with a finished edge that folds in to meet the body.
+// Everything the shorts cover is then removed from the anatomy underneath: the pelvic internals, the fascia, and the
+// covered parts of the hip, glute and thigh muscles. Nothing can show through or poke out, and the pelvis reads as
+// one clean surface.
+const shortsWaist = (p: V3) => 95.5 + 3 * smoothstep(2, -8, p[0]);
+const shortsHem = (p: V3) => 68.5 + 3.5 * smoothstep(6, 16, Math.abs(p[2]));
+/** Signed distance (cm, vertical) inside the shorts band: positive between hem and waistband. */
+const shortsF = (p: V3) => Math.min(p[1] - shortsHem(p), shortsWaist(p) - p[1]);
+{
+  const m0 = cropAndSimplify(skin, (p) => !handOf(p) && Math.abs(p[2]) < 24 && shortsF(p) > -4, 30000);
+  // Groin: a smooth front panel lying 1 cm over the muscles beneath (found by casting rays at them from the front),
+  // never following the shape of the genitals. Pressed, smoothed and pressed again so it stays smooth and snug.
+  const under = bvhOf(parts.filter((pt) => pt.kind === "muscle" || pt.kind === "bone" || pt.kind === "tendon").map((pt) => pt.mesh));
+  const ray = new THREE.Ray();
+  const both = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+  {
+    const nv = m0.pos.length / 3;
+    const zone = new Float32Array(nv);
+    const front = new Float32Array(nv).fill(NaN);
+    for (let n = 0; n < nv; n++) {
+      const p = vert(m0, n);
+      zone[n] = (1 - smoothstep(8, 12, Math.abs(p[2]))) * smoothstep(57, 62, p[1]) * (1 - smoothstep(90, 95, p[1])) * smoothstep(-2, 1, p[0]);
+      if (zone[n]! <= 0) continue;
+      ray.origin.set(40, p[1], p[2]);
+      ray.direction.set(-1, 0, 0);
+      const hit = under.raycastFirst(ray, both, 0, 60);
+      if (hit) front[n] = hit.point.x + 1.0;
+    }
+    // Smooth the fabric itself (front-to-back only) and hold it under the 1 cm limit: the bulge flattens out
+    // completely instead of being averaged away.
+    const nbrs: Set<number>[] = Array.from({ length: nv }, () => new Set());
+    for (let t = 0; t < m0.idx.length; t += 3)
+      for (let k = 0; k < 3; k++) for (let j = 1; j < 3; j++) nbrs[m0.idx[t + k]!]!.add(m0.idx[t + ((k + j) % 3)]!);
+    let bump = 0;
+    for (let n = 0; n < nv; n++) if (zone[n]! > 0.5 && !Number.isNaN(front[n]!)) bump = Math.max(bump, m0.pos[n * 3]! - front[n]!);
+    for (let it = 0; it < 30; it++) {
+      const x = m0.pos.filter((_, i) => i % 3 === 0);
+      for (let n = 0; n < nv; n++) {
+        if (zone[n]! <= 0) continue;
+        let a = 0;
+        for (const o of nbrs[n]!) a += x[o]!;
+        let nx = x[n]! + (a / (nbrs[n]!.size || 1) - x[n]!) * 0.6 * zone[n]!;
+        // Never more than 1 cm over the muscle (fully held in the middle of the panel, eased out at its edges).
+        const lim = front[n]!;
+        if (!Number.isNaN(lim) && nx > lim) nx = lim + (1 - zone[n]!) * (nx - lim);
+        m0.pos[n * 3] = nx;
+      }
+    }
+    let after = 0;
+    for (let n = 0; n < nv; n++) if (zone[n]! > 0.5 && !Number.isNaN(front[n]!)) after = Math.max(after, m0.pos[n * 3]! - front[n]!);
+    console.log(`groin panel: fabric stands ${bump.toFixed(1)} cm proud of the 1 cm line before, ${after.toFixed(1)} cm after`);
+  }
+  // Fabric thickness: a hair above the skin.
+  {
+    const nrm = vertexNormals(m0);
+    for (let i = 0; i < m0.pos.length; i++) m0.pos[i]! += nrm[i]! * 0.12;
+  }
+  const cut = clipMesh(m0, shortsF);
+  // Finished edge: every cut edge folds straight in towards the body by 8 mm, an even band that reads as the hem's
+  // thickness and closes the view under the fabric.
+  const nrm = vertexNormals(cut);
+  const m = foldEdges(cut, 0.8);
+  // Trim: a thin gold line along the waistband and hems (0.8), the folded edge itself (1).
+  const extra = new Float32Array(m.pos.length / 3);
+  for (let n = 0; n < extra.length; n++) extra[n] = n >= cut.pos.length / 3 ? 1 : shortsF(vert(m, n)) < 0.8 ? 0.8 : 0;
+  // Remove the anatomy the shorts cover: every triangle more than 2.5 cm inside the hem and waistband, and on the
+  // inner side of the fabric.
+  const sGrid = new Map<string, number[]>();
+  const SC = 3;
+  const skey = (p: V3) => `${Math.floor(p[0] / SC)},${Math.floor(p[1] / SC)},${Math.floor(p[2] / SC)}`;
+  for (let n = 0; n < cut.pos.length / 3; n++) {
+    const k2 = skey(vert(cut, n));
+    (sGrid.get(k2) ?? sGrid.set(k2, []).get(k2)!).push(n);
+  }
+  const covered = (p: V3) => {
+    if (shortsF(p) < 2.5 || handOf(p)) return false;
+    // Nearest fabric point (searching further out for the deep pelvic structures, up to 21 cm away).
+    let best = -1, bd = Infinity;
+    const [ci, cj, ck2] = [0, 1, 2].map((k) => Math.floor(p[k]! / SC));
+    for (const R of [2, 7]) {
+      for (let i = -R; i <= R; i++)
+        for (let j = -R; j <= R; j++)
+          for (let k = -R; k <= R; k++)
+            for (const q of sGrid.get(`${ci! + i},${cj! + j},${ck2! + k}`) ?? []) {
+              const d = len(sub(p, vert(cut, q)));
+              if (d < bd) {
+                bd = d;
+                best = q;
+              }
+            }
+      if (best >= 0) break;
+    }
+    if (best < 0) return false;
+    return dot(sub(p, vert(cut, best)), [nrm[best * 3]!, nrm[best * 3 + 1]!, nrm[best * 3 + 2]!]) < 0;
+  };
+  let removed = 0, dropped = 0;
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const pt = parts[i]!;
+    if (pt.kind === "skin" || pt.kind === "eye") continue;
+    const inside = verts(pt.mesh).map(covered);
+    const keep: number[] = [];
+    for (let t = 0; t < pt.mesh.idx.length; t += 3) {
+      const tri = [pt.mesh.idx[t]!, pt.mesh.idx[t + 1]!, pt.mesh.idx[t + 2]!];
+      if (tri.every((v) => inside[v])) removed++;
+      else keep.push(...tri);
+    }
+    if (keep.length === pt.mesh.idx.length) continue;
+    if (!keep.length) {
+      parts.splice(i, 1);
+      dropped++;
+      continue;
+    }
+    // Keep each vertex's extra data with it through the compaction.
+    const used = new Int32Array(pt.mesh.pos.length / 3).fill(-1);
+    let nu = 0;
+    for (const v of keep) if (used[v]! < 0) used[v] = nu++;
+    const np = new Float32Array(nu * 3);
+    const ne = pt.extra ? new Float32Array(nu) : undefined;
+    used.forEach((u, v) => {
+      if (u < 0) return;
+      np.set(pt.mesh.pos.subarray(v * 3, v * 3 + 3), u * 3);
+      if (ne) ne[u] = pt.extra![v]!;
+    });
+    pt.mesh = { pos: np, idx: new Uint32Array(keep.map((v) => used[v]!)) };
+    if (ne) pt.extra = ne;
+  }
+  console.log(`shorts: ${m.idx.length / 3} triangles; removed ${removed} covered anatomy triangles (${dropped} parts entirely)`);
+  parts.push({ name: "shorts", kind: "cover", mesh: m, label: NO_MUSCLE, fiber: [0, 1, 0], rigid: null, extra });
 }
 
 // ---------------------------------------------------------------- assemble
@@ -698,7 +775,6 @@ const NI = parts.reduce((s, p) => s + p.mesh.idx.length, 0);
 const position = new Float32Array(NV * 3);
 const index = new Uint32Array(NI);
 const label = new Uint8Array(NV).fill(NO_MUSCLE);
-const labelB = new Uint8Array(NV).fill(NO_MUSCLE);
 const muscleMix = new Uint8Array(NV);
 const tissue = new Uint8Array(NV);
 const fiber = new Int8Array(NV * 3);
@@ -711,7 +787,6 @@ const forced = new Uint8Array(NV).fill(NO_BONE);
     for (let i = 0; i < p.mesh.idx.length; i++) index[io + i] = p.mesh.idx[i]! + vo;
     for (let n = 0; n < nv; n++) {
       label[vo + n] = p.label;
-      labelB[vo + n] = p.label;
       tissue[vo + n] = TISSUE_OF[p.kind];
       if (p.extra) muscleMix[vo + n] = Math.round(p.extra[n]! * 255);
       for (let k = 0; k < 3; k++) fiber[(vo + n) * 3 + k] = Math.round(p.fiber[k]! * 127);
@@ -724,7 +799,7 @@ const forced = new Uint8Array(NV).fill(NO_BONE);
 console.log(`athlete: ${NV} vertices, ${NI / 3} triangles`);
 
 // ---------------------------------------------------------------- skin weights (refined by scripts/anatomy/reweight.mts)
-const { skinIndex, skinWeight } = computeWeights(position, index, label, BINDM, forced);
+const { skinIndex, skinWeight } = computeWeights(position, index, label, BINDM, forced, tissue.map((t) => (t === TISSUE.cover ? 1 : 0)));
 
 // ---------------------------------------------------------------- athletic proportions
 // The database's subject is an average build. A broader, deeper chest and upper back, shoulders set wider to match,
@@ -770,8 +845,6 @@ const { skinIndex, skinWeight } = computeWeights(position, index, label, BINDM, 
     const k = useUp ? 1.15 : 1.1 - 0.08 * smoothstep(0.55, 0.95, c.t);
     return { w, out: add(c.q, mul(sub(p, c.q), k)) };
   };
-  const eyesPart = parts.find((pt) => pt.kind === "eye");
-  const browY = eyesPart ? centroid(verts(eyesPart.mesh))[1] + 2 : headTop[1] - 9;
   const morph = (p: V3): V3 => {
     let q = torso(p);
     for (const J of [R, L]) {
@@ -786,8 +859,6 @@ const { skinIndex, skinWeight } = computeWeights(position, index, label, BINDM, 
       const c: V3 = [neckBase[0], p[1], 0];
       q = lerp(q, add(c, mul(sub(p, c), 1.12)), nw);
     }
-    // Crown: slightly lower, for a natural head shape.
-    if (p[1] > browY) q[1] = browY + (q[1] - browY) * (1 - 0.06 * smoothstep(browY, browY + 4, p[1]));
     return q;
   };
   for (let n = 0; n < NV; n++) position.set(morph([position[n * 3]!, position[n * 3 + 1]!, position[n * 3 + 2]!]), n * 3);
@@ -796,7 +867,7 @@ const { skinIndex, skinWeight } = computeWeights(position, index, label, BINDM, 
   for (const v of [head, headTop]) v.splice(0, 3, ...morph(v));
   writeBind();
 }
-console.log(`shorts: ${fitShorts(position, index, tissue)} vertices lifted clear of the muscles`);
+console.log(`shorts: ${fitShorts(position, index, tissue, (v) => muscleMix[v]! > 250)} vertices lifted clear of the muscles`);
 // ---------------------------------------------------------------- write
 const blocks: { name: string; data: ArrayBufferView }[] = [
   { name: "position", data: position },
@@ -805,7 +876,6 @@ const blocks: { name: string; data: ArrayBufferView }[] = [
   { name: "skinIndex", data: skinIndex },
   { name: "skinWeight", data: skinWeight },
   { name: "muscleA", data: label },
-  { name: "muscleB", data: labelB },
   { name: "muscleMix", data: muscleMix },
   { name: "tissue", data: tissue },
   { name: "fiber", data: fiber },

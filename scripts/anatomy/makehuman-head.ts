@@ -159,9 +159,8 @@ function toMesh(pos: V3[], faces: number[][]): HeadMesh {
 export interface HeadFit {
   /** Midpoint between the athlete's eyeball centres. */
   eyeMid: V3;
-  /** Height of the bottom of the chin and of the crown. */
-  chinY: number;
-  crownY: number;
+  /** The athlete's standing height: the head keeps MakeHuman's natural adult proportions at this height. */
+  bodyHeight: number;
   /** Keep the head and neck above this height (a function of the forward and sideways position). */
   cutY: (x: number, z: number) => number;
 }
@@ -177,10 +176,12 @@ export function buildMakeHumanHead(mhData: string, fit: HeadFit): { head: HeadMe
   const body = obj.groups.get("body")!;
   const bodyVerts = [...new Set(body.flat())].map((i) => obj.pos[i]!);
   const crown = bodyVerts.reduce((m, p) => Math.max(m, p[1]), -Infinity);
-  const chin = bodyVerts
-    .filter((p) => Math.abs(p[0] - eyeMid[0]) < 0.25 && p[2] > eyeMid[2] - 0.5 && p[1] > eyeMid[1] - 2.2)
-    .reduce((m, p) => Math.min(m, p[1]), Infinity);
-  const s = (fit.crownY - fit.chinY) / (crown - chin);
+  const feet = bodyVerts.reduce((m, p) => Math.min(m, p[1]), Infinity);
+  // Scale: the MakeHuman man at the athlete's height, so the head has a real adult size (about 1/7.8 of the height)
+  // and a natural skull: eye to crown about as far as eye to chin. (Fitting it to the scan's chin-to-crown span made
+  // the head too small and the skull too short.)
+  // (0.96: a slightly smaller head than the average man's, about 7.7 head-heights tall, as on an athletic build.)
+  const s = (0.96 * fit.bodyHeight) / (crown - feet);
   // To the athlete's frame: +X forward, +Y up, +Z the athlete's right (= away from the left eye).
   const toAthlete = (p: V3): V3 => [
     fit.eyeMid[0] + (p[2] - eyeMid[2]) * s,

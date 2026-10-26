@@ -38,6 +38,9 @@ export function computeWeights(
   B: BindPose,
   /** Optional bone index per vertex that overrides the computed weights (e.g. rigid bones). */
   forced?: Uint8Array,
+  /** Optional per-vertex flag (1) for clothing on the hips: bound to the pelvis and thighs only, never to the arms
+   *  or hands that hang beside it in the rest pose. */
+  hipsOnly?: Uint8Array,
 ): { skinIndex: Uint8Array; skinWeight: Uint8Array } {
   const NV = pos.length / 3;
   const NB = BONES.length;
@@ -95,7 +98,9 @@ export function computeWeights(
       continue;
     }
     let best: Seg | null = null, bestD = Infinity;
+    const hips = hipsOnly?.[n] === 1;
     for (const s of segs) {
+      if (hips && s.bone !== "pelvis" && !s.bone.startsWith("thigh")) continue;
       if (s.side !== -1 && vs !== -1 && s.side !== vs) continue;
       if (s.side !== -1 && vs === -1 && (s.side === 0) !== p[2] > 0) continue;
       const d = segDist(p, s) / s.r;
@@ -106,7 +111,7 @@ export function computeWeights(
     }
     let primary = best!.bone;
     // Hands and fingers belong to the hand, however close they hang to the thigh.
-    for (const sd of ["R", "L"] as const) {
+    for (const sd of hips ? [] : (["R", "L"] as const)) {
       const J = B[sd];
       const fd = norm(sub(J.wrist, J.elbow));
       const along = dot(sub(p, J.wrist), fd);
@@ -114,7 +119,7 @@ export function computeWeights(
       if (along > -1 && along < 24 && off < 13 && (sd === "R") === p[2] > 0) primary = `hand${sd}`;
     }
     // The face and jaw hang in front of and below the top of the neck: they move with the head.
-    if ((p[1] > B.neckTop[1] - 8 && p[0] > B.neckTop[0] + 3.5 && Math.abs(p[2]) < 9) || p[1] > B.neckTop[1] + 1.5) {
+    if (!hips && ((p[1] > B.neckTop[1] - 8 && p[0] > B.neckTop[0] + 3.5 && Math.abs(p[2]) < 9) || p[1] > B.neckTop[1] + 1.5)) {
       W[n * NB + bi("head")] = 1;
       continue;
     }

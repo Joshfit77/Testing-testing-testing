@@ -72,18 +72,21 @@ export async function mountAthlete(
     framing?: { distance?: number; targetY?: number };
     /** "gold" (default) or "medical" (red muscle, white tendons, like an anatomy plate). */
     look?: AthleteLook;
-    /** Black shorts over the hips (default: on for gold, off for medical, like an anatomy plate). */
-    shorts?: boolean;
+    /** "mobile" draws the lighter mesh; "auto" (default) picks it on touch devices. */
+    detail?: "full" | "mobile" | "auto";
   } = {},
 ): Promise<AthletePlayer> {
   const stage: Stage = makeStage(canvas, { pixelRatio: opts.pixelRatio, look: opts.look });
-  const { geometry } = await loadAthlete(opts.assetBase);
-  const mat = makeAthleteMaterial(opts.look, { shorts: opts.shorts ?? opts.look !== "medical" });
+  const coarse = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+  const detail = opts.detail === "full" || opts.detail === "mobile" ? opts.detail : coarse ? "mobile" : "full";
+  const { geometry } = await loadAthlete(opts.assetBase, detail);
+  const mat = makeAthleteMaterial(opts.look);
   const { bones, skeleton } = makeSkeleton();
   if (!geometry.morphAttributes.position) addGripMorph(geometry);
   const mesh = new THREE.SkinnedMesh(geometry, mat.material);
   mesh.updateMorphTargets();
   mesh.frustumCulled = false;
+  mesh.castShadow = mesh.receiveShadow = true;
   for (const b of bones) mesh.add(b);
   mesh.bind(skeleton, new THREE.Matrix4());
   stage.root.add(mesh);

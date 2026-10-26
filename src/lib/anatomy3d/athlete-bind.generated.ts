@@ -8,7 +8,7 @@ export const MEASURED_BIND = {
   neckBase: v([-0.6,154.7,0]),
   neckTop: v([-0.3,165.1,0]),
   head: v([1.2,172,0]),
-  headTop: v([0.7,182.4,0]),
+  headTop: v([0.7,183,0]),
   R: {
     shoulder: v([-2.5,148.1,21.5]),
     elbow: v([-3.2,117.8,27.6]),

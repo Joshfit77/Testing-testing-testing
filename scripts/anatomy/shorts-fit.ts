@@ -8,7 +8,15 @@ import { TISSUE } from "../../src/lib/anatomy3d/muscle-ids";
  * hanging beside the hip, and is ignored), the fabric is lifted to sit `clear` above it, and the lift is feathered
  * out over the neighbouring fabric so it rises in a smooth swell, not a spike. Moves the shorts vertices in place.
  */
-export function fitShorts(pos: Float32Array, idx: ArrayLike<number>, tissue: Uint8Array, clear = 0.45, maxPoke = 1.6): number {
+export function fitShorts(
+  pos: Float32Array,
+  idx: ArrayLike<number>,
+  tissue: Uint8Array,
+  /** Vertices to leave in place (the folded edge, which meets the body on purpose). */
+  fixed?: (v: number) => boolean,
+  clear = 0.45,
+  maxPoke = 1.6,
+): number {
   const isUnder = (v: number) => tissue[v] === TISSUE.muscle || tissue[v] === TISSUE.bone || tissue[v] === TISSUE.tendon;
   const tri: number[] = [];
   const shortsTri: number[] = [];
@@ -21,10 +29,10 @@ export function fitShorts(pos: Float32Array, idx: ArrayLike<number>, tissue: Uin
   g.setIndex(new THREE.BufferAttribute(new Uint32Array(tri), 1));
   const under = new MeshBVH(g);
   const both = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
-  const verts = [...new Set(shortsTri)];
+  const verts = [...new Set(shortsTri)].filter((v) => !fixed?.(v));
   const nbrs = new Map<number, Set<number>>(verts.map((v) => [v, new Set<number>()]));
   for (let i = 0; i < shortsTri.length; i += 3)
-    for (let k = 0; k < 3; k++) for (let j = 1; j < 3; j++) nbrs.get(shortsTri[i + k]!)!.add(shortsTri[i + ((k + j) % 3)]!);
+    for (let k = 0; k < 3; k++) for (let j = 1; j < 3; j++) nbrs.get(shortsTri[i + k]!)?.add(shortsTri[i + ((k + j) % 3)]!);
   const sg = new THREE.BufferGeometry();
   sg.setAttribute("position", new THREE.BufferAttribute(pos, 3));
   sg.setIndex(new THREE.BufferAttribute(new Uint32Array(shortsTri), 1));
@@ -49,7 +57,7 @@ export function fitShorts(pos: Float32Array, idx: ArrayLike<number>, tissue: Uin
       for (const v of verts) {
         const m = lift.get(v)!;
         let s = 0;
-        for (const o of nbrs.get(v)!) s += lift.get(o)!;
+        for (const o of nbrs.get(v)!) s += lift.get(o) ?? 0;
         next.set(v, Math.max(m, 0.5 * m + 0.5 * (s / (nbrs.get(v)!.size || 1))));
       }
       lift = next;

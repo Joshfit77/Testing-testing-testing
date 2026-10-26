@@ -20,7 +20,10 @@ export interface Stage {
   dispose(): void;
 }
 
-export function makeStage(canvas: HTMLCanvasElement, opts: { pixelRatio?: number; bloom?: boolean; look?: "gold" | "medical" } = {}): Stage {
+export function makeStage(
+  canvas: HTMLCanvasElement,
+  opts: { pixelRatio?: number; bloom?: boolean; look?: "gold" | "medical"; /** Key-light self-shadowing (default on). */ shadows?: boolean } = {},
+): Stage {
   const medical = opts.look === "medical";
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: "high-performance", preserveDrawingBuffer: false });
   renderer.setPixelRatio(Math.min(opts.pixelRatio ?? (typeof devicePixelRatio === "number" ? devicePixelRatio : 1), 2));
@@ -34,23 +37,40 @@ export function makeStage(canvas: HTMLCanvasElement, opts: { pixelRatio?: number
   const pmrem = new THREE.PMREMGenerator(renderer);
   const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
   scene.environment = env;
-  scene.environmentIntensity = medical ? 0.55 : 0.75;
+  scene.environmentIntensity = medical ? 0.55 : 0.55;
 
   const camera = new THREE.PerspectiveCamera(30, 1, 10, 3000);
 
   // Lights: warm key from the front-left, gold rims behind both shoulders, soft fill from below the camera.
   // Medical look: a neutral studio, white key from above-front, soft cool rims.
-  const key = new THREE.DirectionalLight(medical ? "#fff6ee" : "#fff1d6", medical ? 3.0 : 2.6);
+  const key = new THREE.DirectionalLight(medical ? "#fff6ee" : "#fff1d6", medical ? 3.0 : 3.2);
   key.position.set(260, 320, -160);
-  const rimA = new THREE.DirectionalLight(medical ? "#e8eeff" : "#ffc65a", medical ? 1.6 : 3.4);
+  // The key light casts soft shadows across the body: the deltoid onto the arm, the pecs onto the abs, each muscle
+  // onto its neighbour, so the anatomy reads by its form and not only by its colour.
+  if (opts.shadows !== false) {
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    key.castShadow = true;
+    key.shadow.mapSize.set(2048, 2048);
+    // Aimed at the athlete's middle; the box covers him standing, squatting or lying on a bench.
+    key.position.add(new THREE.Vector3(0, 90, 0));
+    key.target.position.set(0, 90, 0);
+    Object.assign(key.shadow.camera, { left: -140, right: 140, top: 140, bottom: -140, near: 50, far: 1000 });
+    // The muscles lie in layers a few millimetres apart: a generous normal bias keeps each layer from shadowing the
+    // one right under it (which showed as dark blotches), while still letting real forms cast their shadows.
+    key.shadow.bias = -0.0006;
+    key.shadow.normalBias = 1.1;
+    key.shadow.radius = 3;
+  }
+  const rimA = new THREE.DirectionalLight(medical ? "#e8eeff" : "#ffc65a", medical ? 1.6 : 2.4);
   rimA.position.set(-260, 220, 220);
-  const rimB = new THREE.DirectionalLight(medical ? "#dfe6f5" : "#ffd27a", medical ? 1.3 : 2.6);
+  const rimB = new THREE.DirectionalLight(medical ? "#dfe6f5" : "#ffd27a", medical ? 1.3 : 1.8);
   rimB.position.set(-200, 160, -260);
   const fill = new THREE.HemisphereLight(medical ? "#3a3634" : "#3a2c14", "#050403", medical ? 1.2 : 0.9);
   // Soft front light so surfaces facing the viewer read clearly.
-  const front = new THREE.DirectionalLight(medical ? "#fff4ec" : "#ffe8c2", medical ? 1.3 : 0.9);
+  const front = new THREE.DirectionalLight(medical ? "#fff4ec" : "#ffe8c2", medical ? 1.3 : 0.7);
   front.position.set(420, 160, 60);
-  scene.add(key, rimA, rimB, fill, front);
+  scene.add(key, key.target, rimA, rimB, fill, front);
 
   // Floor: unlit, warm black under the athlete fading to the background, so it never competes with the gold.
   const tex = floorTexture(medical);
@@ -64,7 +84,8 @@ export function makeStage(canvas: HTMLCanvasElement, opts: { pixelRatio?: number
 
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), medical ? 0.3 : 0.38, 0.35, medical ? 0.97 : 0.95);
+  // Bloom only lifts what is genuinely bright (the glowing muscles), it never softens the anatomy.
+  const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), medical ? 0.3 : 0.28, 0.3, medical ? 0.97 : 0.97);
   if (opts.bloom !== false) composer.addPass(bloom);
   composer.addPass(new OutputPass());
 

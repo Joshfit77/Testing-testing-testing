@@ -1,12 +1,13 @@
 /**
  * Finishing pass on public/anatomy/athlete.bin, without rebuilding the mesh (seconds instead of minutes):
- *  - skin weights (scripts/anatomy/weights.ts); the shorts and fascia take theirs from the muscles beneath
+ *  - skin weights (scripts/anatomy/weights.ts); the fascia takes its weights from the muscles over it
  *  - baked ambient occlusion per vertex, so the grooves between muscles read as deep cuts in any light
  *
  *   npx tsx scripts/anatomy/reweight.mts
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import * as THREE from "three";
+import { MeshoptSimplifier } from "meshoptimizer";
 import { MeshBVH } from "three-mesh-bvh";
 import { MEASURED_BIND } from "../../src/lib/anatomy3d/athlete-bind.generated";
 import { BONES, TISSUE } from "../../src/lib/anatomy3d/muscle-ids";
@@ -26,9 +27,9 @@ const forced = meta.layout.forcedBone ? view("forcedBone", Uint8Array) : undefin
 const tissue = view("tissue", Uint8Array);
 const NV0 = pos.length / 3;
 
-const { skinIndex, skinWeight } = computeWeights(pos, idx, label, MEASURED_BIND, forced);
+const { skinIndex, skinWeight } = computeWeights(pos, idx, label, MEASURED_BIND, forced, tissue.map((t) => (t === TISSUE.cover ? 1 : 0)));
 
-// The shorts and the fascia follow the muscles under them: each takes the skin weights of the nearest muscle and
+// The fascia follows the muscles over it: each takes the skin weights of the nearest muscle and
 // tendon vertices (inverse-distance blend), so in a deep squat the layers bend together instead of crossing.
 {
   const NB = BONES.length;
@@ -44,7 +45,7 @@ const { skinIndex, skinWeight } = computeWeights(pos, idx, label, MEASURED_BIND,
   const w = new Float32Array(NB);
   let moved = 0;
   for (let v = 0; v < NV0; v++) {
-    if (tissue[v] !== TISSUE.cover && tissue[v] !== TISSUE.deep) continue;
+    if (tissue[v] !== TISSUE.deep) continue;
     if (forced && forced[v] !== 255) continue;
     const x = pos[v * 3]!, y = pos[v * 3 + 1]!, z = pos[v * 3 + 2]!;
     const near: [number, number][] = [];
@@ -74,7 +75,7 @@ const { skinIndex, skinWeight } = computeWeights(pos, idx, label, MEASURED_BIND,
     });
     moved++;
   }
-  console.log(`shorts/fascia: ${moved} vertices take their weights from the muscles beneath`);
+  console.log(`fascia: ${moved} vertices take their weights from the muscles over them`);
 }
 view("skinIndex", Uint8Array).set(skinIndex);
 view("skinWeight", Uint8Array).set(skinWeight);
@@ -109,13 +110,28 @@ for (let v = 0; v < NV; v++) {
   }
   ao[v] = Math.round(Math.max(0, 1 - (occ / RAYS) * 1.6) * 255);
 }
-// Write (replace or append the "ao" block).
-if (meta.layout.ao) view("ao", Uint8Array).set(ao);
-else {
+// Write (replace or append a block).
+const putBlock = (name: string, data: Uint8Array | Uint32Array) => {
+  const old = meta.layout[name];
+  if (old && old.length === data.length) {
+    Buffer.from(data.buffer, data.byteOffset, data.byteLength).copy(buf, old.offset);
+    return;
+  }
   const offset = Math.ceil(buf.length / 4) * 4;
-  buf = Buffer.concat([buf, Buffer.alloc(offset - buf.length), Buffer.from(ao.buffer)]);
-  meta.layout.ao = { offset, length: NV, type: "Uint8Array" };
+  buf = Buffer.concat([buf, Buffer.alloc(offset - buf.length), Buffer.from(data.buffer, data.byteOffset, data.byteLength)]);
+  meta.layout[name] = { offset, length: data.length, type: data.constructor.name };
   meta.bytes = buf.length;
+};
+putBlock("ao", ao);
+
+// Mobile level of detail: a second, lighter index buffer over the same vertices (each part simplified on its own, its
+// outline locked so neighbouring parts still meet). Vertices are untouched, so weights, glow and shading still apply.
+{
+  await MeshoptSimplifier.ready;
+  const src = new Uint32Array(idx);
+  const lod = MeshoptSimplifier.simplify(src, new Float32Array(pos), 3, Math.round(src.length * 0.45 / 3) * 3, 0.004, ["LockBorder"])[0];
+  putBlock("indexLod1", lod);
+  console.log(`mobile detail: ${lod.length / 3} of ${src.length / 3} triangles`);
 }
 writeFileSync("public/anatomy/athlete.bin", buf);
 writeFileSync("public/anatomy/athlete.json", JSON.stringify(meta, null, 1));

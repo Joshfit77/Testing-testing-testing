@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { BIND, type V3 } from "./bind";
 import { BONES, type BoneName } from "./muscle-ids";
 
-/** Layout of public/anatomy/athlete.json (written by scripts/anatomy/build-body.mts). */
+/** Layout of public/anatomy/athlete.json (written by scripts/anatomy/build-athlete.mts and reweight.mts). */
 interface AthleteMeta {
   version: number;
   vertices: number;
@@ -25,8 +25,11 @@ export interface AthleteGeometry {
 
 let cached: Promise<AthleteGeometry> | null = null;
 
-/** Loads the athlete mesh once per page (about 1 MB, cached by the browser). */
-export function loadAthlete(base = "/anatomy/athlete"): Promise<AthleteGeometry> {
+/**
+ * Loads the athlete mesh once per page. `detail: "mobile"` draws the lighter index buffer (about 45% of the
+ * triangles, same vertices, so skinning, glow and shading data are unchanged) where the asset has one.
+ */
+export function loadAthlete(base = "/anatomy/athlete", detail: "full" | "mobile" = "full"): Promise<AthleteGeometry> {
   cached ??= (async () => {
     const [metaRes, binRes] = await Promise.all([fetch(`${base}.json`), fetch(`${base}.bin`)]);
     if (!metaRes.ok || !binRes.ok) throw new Error("The 3D athlete couldn't be loaded.");
@@ -38,11 +41,11 @@ export function loadAthlete(base = "/anatomy/athlete"): Promise<AthleteGeometry>
     };
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.BufferAttribute(part("position") as Float32Array, 3));
-    g.setIndex(new THREE.BufferAttribute(part("index") as Uint16Array | Uint32Array, 1));
+    const indexName = detail === "mobile" && meta.layout.indexLod1 ? "indexLod1" : "index";
+    g.setIndex(new THREE.BufferAttribute(part(indexName) as Uint16Array | Uint32Array, 1));
     g.setAttribute("skinIndex", new THREE.BufferAttribute(part("skinIndex") as Uint8Array, 4));
     g.setAttribute("skinWeight", new THREE.BufferAttribute(part("skinWeight") as Uint8Array, 4, true));
     g.setAttribute("muscleA", new THREE.BufferAttribute(part("muscleA") as Uint8Array, 1));
-    g.setAttribute("muscleB", new THREE.BufferAttribute(part("muscleB") as Uint8Array, 1));
     g.setAttribute("muscleMix", new THREE.BufferAttribute(part("muscleMix") as Uint8Array, 1, true));
     g.setAttribute("tissue", new THREE.BufferAttribute(part("tissue") as Uint8Array, 1));
     g.setAttribute("fiber", new THREE.BufferAttribute(part("fiber") as Int8Array, 3, true));

@@ -9,7 +9,8 @@ declare global {
   }
 }
 
-const ex = EXERCISES.find((e) => e.slug === "back-squat")!;
+// ?ex=<slug> previews another exercise (for deformation checks); the page layout is written for the back squat.
+const ex = EXERCISES.find((e) => e.slug === new URLSearchParams(location.search).get("ex")) ?? EXERCISES.find((e) => e.slug === "back-squat")!;
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
 const fmt = (s: number) => `0:${String(Math.floor(s)).padStart(2, "0")}`;
 
