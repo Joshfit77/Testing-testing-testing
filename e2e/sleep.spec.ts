@@ -179,8 +179,8 @@ test.describe("Sleep & Recovery", () => {
     await expect(page.getByText("taken as time in bed")).toBeVisible();
     await expect(page.getByText("Time to fall asleep").locator("..")).toContainText("Not recorded");
     await expect(page.getByText("No stage information.")).toBeVisible();
-    // The comparison with the member's own fortnight is Plus; Free sees the honest note instead.
-    await expect(page.getByText(/Plus compares each night with your own last two weeks/)).toBeVisible();
+    // The comparison with the member's own fortnight is Pro; Free sees the honest note instead.
+    await expect(page.getByText(/Pro All Access compares each night with your own last two weeks/)).toBeVisible();
     await page.getByRole("link", { name: "Previous night" }).click();
     await expect(page.getByText(/Nothing logged for the night of/)).toBeVisible();
 

@@ -30,7 +30,7 @@ export function WebMembership({
   checkout: Record<BillingInterval, boolean>;
   /** The member has a Stripe subscription to manage. */
   stripeManaged: boolean;
-  /** "App Store" / "Google Play" when the membership is billed through a store. */
+  /** "the App Store" / "Google Play" when the membership is billed through a store. */
   storeManaged: string | null;
   legal: { termsUrl: string; privacyUrl: string; final: boolean };
 }) {
@@ -42,7 +42,8 @@ export function WebMembership({
   if (storeManaged) {
     proAction = (
       <p className="text-sm text-muted-foreground">
-        Your membership is billed through {storeManaged}. Manage or cancel it in your {storeManaged} account on your phone; it works here too.
+        Your membership is billed through {storeManaged}. Manage or cancel it on your phone in your {storeManaged === "Google Play" ? "Google Play" : "Apple Account"}{" "}
+        subscription settings; it works here too.
       </p>
     );
   } else if (currentPlan === "pro" && stripeManaged) {

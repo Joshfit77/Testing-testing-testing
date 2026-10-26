@@ -66,7 +66,8 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   const interval: BillingInterval | null = storeSub ? intervalForProduct(storeSub.productId, ids) : stripeActive ? intervalForPriceId(sub?.stripe_price_id as string | null) : null;
   const periodEnd = storeSub?.current_period_end ?? (stripeActive ? (sub?.current_period_end as string | null) : null) ?? (source === "admin" ? (entRes.data?.valid_until as string | null) : null);
   const cancelling = storeSub ? storeSub.cancel_at_period_end : stripeActive ? Boolean(sub?.cancel_at_period_end) : false;
-  const channel = storeSub ? `Billed through ${storeLabel}` : stripeActive ? "Billed through Stripe on our website" : source === "admin" ? "Granted by Narrow Gate Fitness" : null;
+  const storeName = storeSub?.store === "play_store" ? "Google Play" : "the App Store";
+  const channel = storeSub ? `Billed through ${storeName}` : stripeActive ? "Billed through Stripe on our website" : source === "admin" ? "Granted by Narrow Gate Fitness" : null;
 
   // Web prices: the amounts Stripe will actually charge. Checkout is offered only for a price that matches the
   // approved price shown on this page.
@@ -177,7 +178,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
           prices={webPrices}
           checkout={checkoutOk}
           stripeManaged={stripeActive}
-          storeManaged={storeSub ? storeLabel : null}
+          storeManaged={storeSub ? storeName : null}
           legal={legalLinks()}
         />
       )}
