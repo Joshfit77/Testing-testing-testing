@@ -115,15 +115,21 @@ those delays:
   5.05 s. The Simulator test does not wait for a screenshot to show the risen button (that put the tap after the
   window on a slow machine): it films the launch with cheap frames of the blank page, takes the opening's first
   painted frame as its clock (or the moment a blank capture stalls because the simulator is painting those first
-  frames), and sends the tap 2.3 s after it, at the place the fresh launch's film showed the button. Frames are
+  frames), and sends the tap 2.0 s after it, at the place the fresh launch's film showed the button. Frames are
   decoded in the background, so a film runs at the pace of the screenshot call alone. The frame right after the
   press must show the door open with its light, so a tap that lands after the opening moved on by itself fails
-  and XCTest retries it; then the light must fill the screen, the opening end and the welcome page appear. The
-  fresh launch measures how long a screenshot call takes while the opening animates: over 0.9 s, the half second
-  of light after the press cannot be filmed at all, and the Enter check is skipped with that reason (an XCTest
-  skip, a `::warning::` line and a SKIPPED verdict) rather than failed or passed blindly; the fresh launch,
-  relaunch and background checks still run, and the move is checked frame by frame in WebKit. Frames of retried
-  attempts are kept under `earlier-attempts/` in the artifact.
+  and XCTest retries it; then the opening must end and the welcome page appear. The light after the press counts
+  as proof of the move only when it comes within 3.9 s of the opening's first frame, before the opening's own
+  move could have brightened the screen; a later light, or screenshots too slow to catch it, is said so in the
+  log (a `1-nolight.txt` note and the CHECK verdict) rather than passed or failed blindly.
+- The fresh launch measures how long a screenshot call takes while the opening animates: over 0.9 s, the half
+  second of light after the press cannot be filmed at all, and the Enter check is skipped with that reason (an
+  XCTest skip, a `::warning::` line and a SKIPPED verdict); the fresh launch, relaunch and background checks
+  still run, and the move is checked frame by frame in WebKit. The simulator's screenshot service can also stall
+  for seconds while the opening's heavy first frames render: when no frame could be taken while the door stood
+  open, the fresh launch says so (a `0-stall.txt` note and a warning) instead of failing, since Skip intro's
+  presence and the opening's end are still checked through the accessibility tree. Frames of retried attempts
+  are kept under `earlier-attempts/` in the artifact.
 - The WebKit test films the move into the light from inside the page, frame by frame from the press itself, so
   slow round trips between Playwright and the browser cannot miss the 0.9 s push; it still requires the scene to
   grow past 2.5x and the light to fill the screen. When the machine draws no frame before the opening's own 1.5 s
