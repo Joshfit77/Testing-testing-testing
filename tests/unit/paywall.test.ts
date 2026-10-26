@@ -82,3 +82,17 @@ describe("in-app paywall: Free and Pro All Access only", () => {
     expect(renewalTerms("web")).toMatch(/Manage billing.*won't be charged again/);
   });
 });
+
+describe("default store product ids", () => {
+  it("match the App Store products and Google Play's ngf_pro base plans, each to its own interval", async () => {
+    const { storeProductIds } = await import("@/server/services/store-billing");
+    const defaults = storeProductIds();
+    const store = [pkg("ngf_pro:monthly", "$19.99"), pkg("ngf_pro:yearly", "$149.99")];
+    expect(paywallOptions(store, defaults)).toMatchObject({ month: { product: { identifier: "ngf_pro:monthly" } }, year: { product: { identifier: "ngf_pro:yearly" } } });
+    const apple = [pkg("ngf_pro_monthly", "$19.99"), pkg("ngf_pro_yearly", "$149.99")];
+    expect(paywallOptions(apple, defaults)).toMatchObject({ month: { product: { identifier: "ngf_pro_monthly" } }, year: { product: { identifier: "ngf_pro_yearly" } } });
+    for (const id of ["ngf_pro:monthly", "ngf_pro_monthly"]) expect(intervalForProduct(id, defaults)).toBe("month");
+    for (const id of ["ngf_pro:yearly", "ngf_pro_yearly"]) expect(intervalForProduct(id, defaults)).toBe("year");
+    expect(planForProduct("ngf_pro:yearly", defaults)).toBe("pro");
+  });
+});

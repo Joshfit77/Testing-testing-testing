@@ -45,7 +45,7 @@
    - Plus is no longer sold: create no Plus products. If Plus products already exist with subscribers, leave them in the group below Pro (so an upgrade is immediate) and remove them from sale.
    - Add review screenshots and descriptions.
    - Create **Sandbox tester** accounts.
-2. **Google Play Console** (when Android is ready): create the subscription `ngf_pro` with `monthly` ($19.99) and `yearly` ($149.99) base plans, and set `REVENUECAT_PRODUCTS_PRO_MONTHLY=ngf_pro` / `REVENUECAT_PRODUCTS_PRO_YEARLY=ngf_pro` (the app matches `ngf_pro:monthly` and `ngf_pro:yearly` by base plan; set the exact ids if they differ).
+2. **Google Play Console**: create the subscription `ngf_pro` with two auto-renewing base plans, `monthly` ($19.99, billing period 1 month) and `yearly` ($149.99, 1 year). RevenueCat reports them as `ngf_pro:monthly` and `ngf_pro:yearly`, which the app's defaults already match; set `REVENUECAT_PRODUCTS_PRO_*` only if you use different ids.
 3. **RevenueCat:**
    - Create a project and add the iOS app (App Store Connect API key / in-app purchase key) and the Android app.
    - Create the entitlement `pro` and attach both Pro All Access products. Keep an entitlement `plus` only for existing Plus store products, if any.
