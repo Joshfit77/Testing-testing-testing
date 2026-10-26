@@ -12,6 +12,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "seed:generate": "tsx scripts/generate-seed.ts",
+    "demo": "bash scripts/demo/run-demo.sh",
+    "demo:seed": "tsx scripts/demo/seed-demo.ts",
     "test:unit": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
     "icons": "node scripts/render-icons.mjs && capacitor-assets generate --ios --android --iconBackgroundColor '#090909' --splashBackgroundColor '#090909'",
