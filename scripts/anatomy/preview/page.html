@@ -1,0 +1,131 @@
+<title>Gold Athlete Squat</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #050403; --panel: #0d0b08; --line: rgba(214, 170, 82, 0.28); --line-strong: rgba(232, 190, 100, 0.65);
+    --gold: #e6bd62; --gold-hi: #ffd98a; --gold-lo: #a07a32; --text: #efe6d2; --muted: #a99c82;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: Montserrat, "Helvetica Neue", Arial, sans-serif; }
+  .page { max-width: 1480px; margin: 0 auto; padding-block: 18px 28px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 14px;
+    grid-template-columns: 250px minmax(0, 1fr) 300px; grid-template-areas: "head head head" "left stage right" "bar bar bar"; }
+  header { grid-area: head; display: flex; gap: 16px; align-items: center; }
+  .back { width: 44px; height: 44px; border: 1px solid var(--line-strong); border-radius: 10px; display: grid; place-items: center; color: var(--gold); flex: none; }
+  h1 { margin: 0; font-size: clamp(28px, 4vw, 44px); font-weight: 700; letter-spacing: 0.01em; background: linear-gradient(180deg, var(--gold-hi), var(--gold) 55%, var(--gold-lo)); -webkit-background-clip: text; background-clip: text; color: transparent; text-wrap: balance; }
+  .chips { color: var(--text); font-size: 15px; margin-top: 2px; }
+  .chips span + span::before { content: "•"; margin: 0 10px; color: var(--muted); }
+  .note { margin-left: auto; font-size: 11px; color: var(--muted); max-width: 260px; text-align: right; line-height: 1.4; }
+  .panel { background: linear-gradient(180deg, rgba(30, 24, 14, 0.75), rgba(10, 8, 6, 0.9)); border: 1px solid var(--line); border-radius: 14px; }
+  .left { grid-area: left; display: grid; gap: 14px; align-content: start; }
+  .muscles { padding: 16px 18px; }
+  .muscles h2 { margin: 0 0 10px; font-size: 16px; font-weight: 600; color: var(--gold); display: flex; align-items: center; gap: 8px; }
+  .muscles h2.sec { margin-top: 18px; color: var(--text); }
+  .muscles ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; font-size: 14px; }
+  .muscles li { display: flex; align-items: center; gap: 10px; }
+  .muscles li::before { content: ""; width: 11px; height: 11px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, var(--gold-hi), var(--gold) 60%, var(--gold-lo)); box-shadow: 0 0 8px rgba(255, 200, 90, 0.7); }
+  #secondary li::before { opacity: 0.55; box-shadow: none; }
+  .diagram { padding: 10px 10px 12px; text-align: center; }
+  .diagram .figs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+  .diagram img { width: 100%; aspect-ratio: 26 / 42; object-fit: cover; border-radius: 8px; background: #000; }
+  .diagram .cap { display: inline-block; margin-top: 8px; padding: 5px 16px; border: 1px solid var(--line); border-radius: 999px; font-size: 13px; }
+  .stage-box { grid-area: stage; position: relative; min-height: 560px; border-radius: 16px; overflow: hidden; border: 1px solid rgba(214, 170, 82, 0.12); }
+  #stage { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+  .loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; }
+  .glowtag { position: absolute; left: 14px; top: 12px; display: flex; gap: 10px; align-items: center; font-size: 12px; color: var(--muted); }
+  #meter { width: 90px; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+  #meter::after { content: ""; display: block; height: 100%; width: calc(var(--e, 0) * 100%); background: linear-gradient(90deg, var(--gold-lo), var(--gold-hi)); }
+  .toggle { position: absolute; right: 14px; top: 10px; display: flex; gap: 8px; align-items: center; font-size: 13px; }
+  .toggle input { accent-color: #e6bd62; width: 18px; height: 18px; }
+  .right { grid-area: right; display: grid; gap: 10px; align-content: start; }
+  .step { all: unset; cursor: pointer; display: grid; grid-template-columns: 110px auto 1fr; gap: 12px; align-items: center; padding: 8px; border: 1px solid var(--line); border-radius: 14px; background: linear-gradient(180deg, rgba(30, 24, 14, 0.7), rgba(10, 8, 6, 0.9)); }
+  .step.on { border-color: var(--line-strong); box-shadow: 0 0 18px rgba(230, 189, 98, 0.18); }
+  .step:focus-visible { outline: 2px solid var(--gold); }
+  .step img { width: 110px; height: 130px; object-fit: cover; border-radius: 10px; border: 1px solid var(--line); background: #000; }
+  .step .num { width: 34px; height: 34px; border: 1.5px solid var(--gold); border-radius: 50%; display: grid; place-items: center; color: var(--gold); font-weight: 600; }
+  .step .txt { display: grid; gap: 5px; font-size: 13px; line-height: 1.4; color: var(--text); }
+  .step b { color: var(--gold); font-size: 16px; font-weight: 600; }
+  .bar { grid-area: bar; padding: 14px 18px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 8px 18px; align-items: center; }
+  #play { all: unset; cursor: pointer; width: 50px; height: 50px; border-radius: 50%; border: 1.5px solid var(--gold-hi); display: grid; place-items: center; }
+  #play::before { content: ""; width: 14px; height: 16px; border-left: 5px solid var(--text); border-right: 5px solid var(--text); box-sizing: border-box; }
+  #play.paused::before { width: 0; height: 0; border-left: 15px solid var(--text); border-right: 0; border-top: 9px solid transparent; border-bottom: 9px solid transparent; margin-left: 4px; }
+  #scrub { width: 100%; accent-color: #e6bd62; }
+  #time { font-variant-numeric: tabular-nums; font-size: 14px; color: var(--text); }
+  .modes { grid-column: 2; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .modes button { all: unset; cursor: pointer; padding: 11px 26px; border: 1px solid var(--line); border-radius: 10px; font-size: 15px; display: flex; gap: 10px; align-items: center; }
+  .modes button.on { border-color: var(--line-strong); color: var(--gold-hi); background: rgba(214, 170, 82, 0.1); }
+  .angles { grid-column: 4; grid-row: 1 / span 2; display: flex; gap: 10px; align-items: center; }
+  .angles .lbl { font-size: 14px; line-height: 1.3; margin-right: 6px; }
+  .angles button { all: unset; cursor: pointer; display: grid; gap: 6px; justify-items: center; font-size: 13px; }
+  .angles img { width: 66px; height: 82px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); background: #000; }
+  .angles button.on img { border-color: var(--gold-hi); box-shadow: 0 0 10px rgba(255, 210, 120, 0.35); }
+  button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .facts { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+  .facts section { padding: 14px 18px; }
+  .facts h3 { margin: 0 0 8px; font-size: 14px; color: var(--gold); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+  .facts ul { margin: 0; padding-left: 18px; font-size: 13.5px; line-height: 1.55; color: var(--text); }
+  @media (max-width: 1100px) {
+    .page { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "stage" "bar" "right" "left"; }
+    .stage-box { min-height: 0; aspect-ratio: 4 / 5; max-height: 78vh; }
+    .left { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+    .right { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+    .bar { grid-template-columns: auto minmax(0, 1fr) auto; }
+    .modes { grid-column: 1 / -1; }
+    .angles { grid-column: 1 / -1; grid-row: auto; justify-content: center; }
+    .note { display: none; }
+  }
+  @media (max-width: 520px) { .modes button { padding: 9px 14px; font-size: 13px; } .step { grid-template-columns: 84px auto 1fr; } .step img { width: 84px; height: 100px; } }
+</style>
+<div class="page">
+  <header>
+    <span class="back" aria-hidden="true">‹</span>
+    <div>
+      <h1>Barbell Squat</h1>
+      <div class="chips"><span>Lower Body</span><span>Strength</span><span>Compound</span></div>
+    </div>
+    <p class="note">Technical checkpoint. The athlete is generated in code from open anatomy data. The glow is an instructional visualization, not measured muscle activation.</p>
+  </header>
+  <aside class="left">
+    <div class="panel muscles">
+      <h2>◎ Primary Muscles</h2>
+      <ul id="primary"></ul>
+      <h2 class="sec">◌ Secondary Muscles</h2>
+      <ul id="secondary"></ul>
+    </div>
+    <div class="panel diagram">
+      <div class="figs"><img id="diag-front" alt="Front of the body with the worked muscles highlighted"><img id="diag-back" alt="Back of the body with the worked muscles highlighted"></div>
+      <span class="cap">Muscles Worked</span>
+    </div>
+  </aside>
+  <div class="stage-box">
+    <canvas id="stage" aria-label="3D gold anatomical athlete performing a barbell back squat. Drag to rotate."></canvas>
+    <div class="loading">Loading athlete…</div>
+    <div class="glowtag">Effort <span id="meter"></span></div>
+    <label class="toggle"><input id="glow" type="checkbox" checked> Muscle Glow</label>
+  </div>
+  <aside class="right" id="steps" aria-label="Steps"></aside>
+  <div class="panel bar">
+    <button id="play" aria-label="Pause"></button>
+    <input id="scrub" type="range" min="0" step="0.01" value="0" aria-label="Position in the rep">
+    <span id="time">0:00 / 0:00</span>
+    <div class="modes">
+      <button data-speed="0.75">⟲ Rep View</button>
+      <button data-speed="1" class="on">▶ Full Motion</button>
+      <button data-speed="0.35">◎ Slow Motion</button>
+    </div>
+    <div class="angles">
+      <span class="lbl">Angle<br>View</span>
+      <button data-view="front" class="on"><img alt="">Front</button>
+      <button data-view="side"><img alt="">Side</button>
+      <button data-view="rear"><img alt="">Rear</button>
+    </div>
+  </div>
+  <div class="facts">
+    <section class="panel"><h3>Breathing &amp; bracing</h3><ul><li>Big breath into the belly at the top, brace as if about to be pushed.</li><li>Hold the brace through the descent and the bottom.</li><li>Breathe out as you pass the hardest part of the drive or at the top.</li></ul></section>
+    <section class="panel"><h3>Common mistakes</h3><ul id="mistakes"></ul></section>
+    <section class="panel"><h3>Safety</h3><ul><li>Squat inside a rack with the safety pins set just below your bottom position.</li><li>Use a depth you can control without the lower back rounding.</li><li>Stop if you feel sharp pain in the knees, hips or back.</li></ul></section>
+  </div>
+</div>
+<script>/*APP*/</script>

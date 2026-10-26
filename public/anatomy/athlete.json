@@ -1,0 +1,84 @@
+{
+ "version": 3,
+ "source": "BodyParts3D 3.0 (CC BY-SA 2.1 JP)",
+ "vertices": 223538,
+ "triangles": 443890,
+ "bytes": 11809294,
+ "layout": {
+  "position": {
+   "offset": 0,
+   "length": 670614,
+   "type": "Float32Array"
+  },
+  "index": {
+   "offset": 2682456,
+   "length": 1331670,
+   "type": "Uint32Array"
+  },
+  "forcedBone": {
+   "offset": 8009136,
+   "length": 223538,
+   "type": "Uint8Array"
+  },
+  "skinIndex": {
+   "offset": 8232676,
+   "length": 894152,
+   "type": "Uint8Array"
+  },
+  "skinWeight": {
+   "offset": 9126828,
+   "length": 894152,
+   "type": "Uint8Array"
+  },
+  "muscleA": {
+   "offset": 10020980,
+   "length": 223538,
+   "type": "Uint8Array"
+  },
+  "muscleB": {
+   "offset": 10244520,
+   "length": 223538,
+   "type": "Uint8Array"
+  },
+  "muscleMix": {
+   "offset": 10468060,
+   "length": 223538,
+   "type": "Uint8Array"
+  },
+  "tissue": {
+   "offset": 10691600,
+   "length": 223538,
+   "type": "Uint8Array"
+  },
+  "fiber": {
+   "offset": 10915140,
+   "length": 670614,
+   "type": "Int8Array"
+  },
+  "ao": {
+   "offset": 11585756,
+   "length": 223538,
+   "type": "Uint8Array"
+  }
+ },
+ "bones": [
+  "pelvis",
+  "chest",
+  "neck",
+  "head",
+  "clavR",
+  "upperArmR",
+  "foreArmR",
+  "handR",
+  "clavL",
+  "upperArmL",
+  "foreArmL",
+  "handL",
+  "thighR",
+  "shinR",
+  "footR",
+  "thighL",
+  "shinL",
+  "footL"
+ ]
+}
