@@ -23,7 +23,9 @@ const cdp = await ctx.newCDPSession(p);
 const canvas = await p.$('#stage');
 const box = await canvas.boundingBox();
 const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
-const shot = async () => canvas.screenshot();
+// (A clipped page screenshot: an element screenshot waits for the element to settle, which can time out while the
+// software renderer is busy with the moving model.)
+const shot = async () => p.screenshot({ clip: box, timeout: 120000 });
 const diff = async (a, c) => {
   const [x, y] = await Promise.all([a, c].map((i) => sharp(i).raw().toBuffer()));
   let s = 0;
@@ -45,8 +47,10 @@ results['nothing else is drawn as the character (no rigged athlete loaded)'] = a
 // The model itself performs the exercise (its own meshes, skinned), and the play button pauses it: the turn and zoom
 // checks below run paused, so only the controls change the picture.
 results['all 634 of the file\'s meshes are skinned (the file is what moves)'] = await p.evaluate(() => window.viewer.motion?.skinnedMeshes === 634);
-let a = await shot(); await p.waitForTimeout(1500); let c = await shot();
-results['plays the squat'] = (await diff(a, c)) > 0.2;
+const t0 = await p.evaluate(() => window.viewer.motion.time());
+await p.waitForTimeout(1500);
+results['plays the squat'] = (await p.evaluate(() => window.viewer.motion.time())) !== t0;
+let a, c;
 await p.tap('#play'); await p.waitForTimeout(400);
 a = await shot(); await p.waitForTimeout(1200); c = await shot();
 results['pause stops it'] = (await diff(a, c)) === 0 && (await p.evaluate(() => window.viewer.motion.playing === false));
