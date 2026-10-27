@@ -1,4 +1,4 @@
-<title>Gold Athlete Squat</title>
+<title>Écorché Exercise Player</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap">
@@ -76,6 +76,20 @@
     .angles { grid-column: 1 / -1; grid-row: auto; justify-content: center; }
     .note { display: none; }
   }
+  /* Model view (first milestone): the stage, the angle buttons and the credit only. */
+  .credit { display: none; }
+  .model-mode .page { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "stage" "bar" "credit"; max-width: 980px; }
+  .model-mode .left, .model-mode #steps, .model-mode .glowtag, .model-mode .toggle, .model-mode #play, .model-mode #scrub,
+  .model-mode #time, .model-mode .modes, .model-mode .facts, .model-mode .note { display: none; }
+  .model-mode .stage-box { min-height: 0; height: min(78vh, 900px); aspect-ratio: auto; max-height: none; }
+  .model-mode .bar { display: flex; justify-content: center; }
+  .model-mode .angles { grid-column: auto; grid-row: auto; }
+  .model-mode .credit { display: block; grid-area: credit; margin: 0; font-size: 12px; line-height: 1.5; color: var(--muted); text-align: center; }
+  .model-mode .credit a { color: var(--muted); }
+  .verify { display: block; margin-top: 4px; }
+  .model-mode .hint { display: block; }
+  .hint { display: none; position: absolute; left: 12px; right: 12px; top: 10px; text-align: center; font-size: 12px; color: var(--muted); pointer-events: none; transition: opacity 0.6s; }
+  .hint.gone { opacity: 0; }
   @media (max-width: 520px) { .modes button { padding: 9px 14px; font-size: 13px; } .step { grid-template-columns: 84px auto 1fr; } .step img { width: 84px; height: 100px; } }
 </style>
 <div class="page">
@@ -100,10 +114,11 @@
     </div>
   </aside>
   <div class="stage-box">
-    <canvas id="stage" aria-label="3D gold anatomical athlete performing a barbell back squat. Drag to rotate."></canvas>
+    <canvas id="stage" aria-label="3D anatomical athlete performing a barbell back squat. Drag to rotate."></canvas>
     <div class="loading">Loading athlete…</div>
     <div class="glowtag">Effort <span id="meter"></span></div>
     <label class="toggle"><input id="glow" type="checkbox" checked> Muscle Glow</label>
+    <div class="hint">One finger turns · Pinch to zoom · Two fingers up or down to move along the body</div>
   </div>
   <aside class="right" id="steps" aria-label="Steps"></aside>
   <div class="panel bar">
@@ -127,5 +142,6 @@
     <section class="panel"><h3>Common mistakes</h3><ul id="mistakes"></ul></section>
     <section class="panel"><h3>Safety</h3><ul><li>Squat inside a rack with the safety pins set just below your bottom position.</li><li>Use a depth you can control without the lower back rounding.</li><li>Stop if you feel sharp pain in the knees, hips or back.</li></ul></section>
   </div>
+<p class="credit">Écorché (<a href="https://github.com/Charleeh/ecorche">github.com/Charleeh/ecorche</a>), CC BY-SA 4.0, shown as published. Based on BodyParts3D, © The Database Center for Life Science, CC BY 4.0, and Z-Anatomy by Gauthier Kervyn, CC BY-SA 4.0. <a href="https://creativecommons.org/licenses/by-sa/4.0/">Licence</a>. Provided as is, without warranties.<span class="verify"></span></p>
 </div>
 <script>/*APP*/</script>

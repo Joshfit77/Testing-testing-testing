@@ -4,10 +4,26 @@ Status: **not approved, not final.** A 3D anatomical athlete for the exercise de
 far (the barbell back squat). The existing 2D demonstrations are unchanged and remain what the app uses; nothing here is
 wired into the app's pages yet.
 
-**The character is the raw Écorché model** (github.com/Charleeh/ecorche), unaltered: red muscle, white tendons, ivory
-bone, its own head, nothing covered. It is rigged for the exercises: `public/anatomy/athlete-raw.*`. See
-[ECORCHE_RAW.md](ECORCHE_RAW.md) for what is kept, what is added, the renders, the known limits and the CC BY-SA 4.0
-obligations.
+## Milestone 1 (current): the original model in the player
+
+The exercise player opens on the **original Écorché model file**, `public/anatomy/ecorche.glb`, byte-identical to the
+published `model/ecorche.glb` (sha256 `9744d3df…326c`, checked by the page before it shows the model). It is loaded as
+it is, with its own meshes, vertex colours and materials: nothing is rebuilt, rigged, recoloured or covered. The model
+stands still; one finger turns it a full 360°, a pinch zooms, two fingers move along the body, and front, side and rear
+buttons reset the view. No exercise animation, glow or equipment yet: those come after the appearance is approved.
+
+- Viewer: `src/lib/anatomy3d/model-viewer.ts` (`mountModel`). Lighting: the studio of the reference renders (ACES tone
+  mapping, room environment at 0.6, warm key light, white rim light).
+- Page: `scripts/anatomy/preview/` (`bash scripts/anatomy/preview/build.sh`, open `.anatomy-preview/index.html`).
+  The exercise player with the rigged athlete is still there for later milestones (`?ex=back-squat`).
+- Test: `scripts/anatomy/preview/model-controls-test.mjs` (phone-sized touch screen, real touch input).
+
+## Later milestones
+
+Rigging, exercise movement, muscle highlighting, equipment and any coverage come only after the owner approves the
+model's appearance in milestone 1. An experimental rigged copy of the same model already exists for that work
+(`public/anatomy/athlete-raw.*`, shown only with `?ex=…`); [ECORCHE_RAW.md](ECORCHE_RAW.md) describes it and the
+CC BY-SA 4.0 obligations.
 
 The earlier gold athlete (BodyParts3D, Écorché torso, MakeHuman head, gold material) was dropped at the owner's
 request: its asset and renders are removed. The builder still has its code paths (`ECORCHE_USE=torso|all`), and the
