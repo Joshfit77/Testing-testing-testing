@@ -7,11 +7,7 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
       <Link href="/" aria-label="Narrow Gate Fitness home">
         <Logo />
       </Link>
-      <div className="mt-6 rounded-xl border border-[#a8802f]/60 bg-[#a8802f]/10 px-4 py-3 text-sm" role="note">
-        <strong className="text-gold-highlight">Placeholder — requires legal review.</strong> This document is a draft outline and is not
-        legally binding. Have qualified counsel review and complete it before launch.
-      </div>
-      <article className="prose-ngf mt-8 space-y-4 text-sm leading-relaxed text-muted-foreground [&_h1]:font-display [&_h1]:text-3xl [&_h1]:font-bold [&_h1]:uppercase [&_h1]:text-foreground [&_h2]:mt-8 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:text-foreground [&_ul]:list-disc [&_ul]:pl-6">
+      <article className="prose-ngf mt-6 space-y-4 break-words text-sm leading-relaxed text-muted-foreground [&_h1]:font-display [&_h1]:text-3xl [&_h1]:font-bold [&_h1]:uppercase [&_h1]:text-foreground [&_h2]:mt-8 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:text-foreground [&_h3]:mt-5 [&_h3]:font-semibold [&_h3]:text-foreground [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-6 [&_strong]:text-foreground">
         {children}
       </article>
     </div>

@@ -75,6 +75,17 @@ export default async function ProfilePage() {
         <h2 id="privacy-title" className="font-display text-xl font-bold uppercase">
           Privacy &amp; data
         </h2>
+        <p className="text-xs text-muted-foreground">
+          Read how we collect, use, share and delete your information in our{" "}
+          <Link href="/legal/privacy" className="text-gold-highlight underline">
+            Privacy Policy
+          </Link>{" "}
+          and{" "}
+          <Link href="/legal/terms" className="text-gold-highlight underline">
+            Terms of Service
+          </Link>
+          .
+        </p>
         <div>
           <p className="text-sm font-semibold">Export your data</p>
           <p className="mb-2 text-xs text-muted-foreground">Download everything stored for your account as a JSON file.</p>

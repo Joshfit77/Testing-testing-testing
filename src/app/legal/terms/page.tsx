@@ -1,8 +1,11 @@
+import { LegalReviewNotice } from "@/components/legal/review-notice";
+
 export const metadata = { title: "Terms of Service (Draft)" };
 
 export default function TermsPage() {
   return (
     <>
+      <LegalReviewNotice />
       <h1>Terms of Service</h1>
       <p>Draft last updated: [DATE — to be completed by counsel]</p>
       <h2>Eligibility</h2>
