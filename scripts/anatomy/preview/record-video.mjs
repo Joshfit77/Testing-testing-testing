@@ -59,9 +59,12 @@ await frame(30); // standing, front
 for (let i = 0; i < 4; i++) await gesture([[cx - 98, cy + 40]], [[cx + 98, cy + 40]], 22);
 await frame(15);
 // Two fingers: move up the body to the head, then pinch out to zoom in on the face.
-await gesture([[cx - 45, cy - 40], [cx + 45, cy - 40]], [[cx - 45, cy + 150], [cx + 45, cy + 150]], 26);
-await gesture([[cx - 30, cy - 120], [cx + 30, cy - 120]], [[cx - 150, cy - 120], [cx + 150, cy - 120]], 30);
-await gesture([[cx - 30, cy - 120], [cx + 30, cy - 120]], [[cx - 120, cy - 120], [cx + 120, cy - 120]], 26);
+// (Two fingers moving down the screen bring the view up the body: 0.43 of the stage's height takes it from the hips
+// to the eyes.)
+const up = Math.round(box.height * 0.43) / 2;
+await gesture([[cx - 45, cy - up], [cx + 45, cy - up]], [[cx - 45, cy + up], [cx + 45, cy + up]], 30);
+await gesture([[cx - 30, cy], [cx + 30, cy]], [[cx - 150, cy], [cx + 150, cy]], 30);
+await gesture([[cx - 30, cy], [cx + 30, cy]], [[cx - 120, cy], [cx + 120, cy]], 26);
 await frame(20);
 // A slow look round the head with one finger, and back.
 await gesture([[cx - 60, cy + 60]], [[cx + 60, cy + 60]], 30);
