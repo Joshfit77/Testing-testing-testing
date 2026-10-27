@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { LegalReviewNotice } from "@/components/legal/review-notice";
+import { ContactDetails, EffectiveDate, ExternalLink, legalLinkClass as linkClass, UnpublishedNotice } from "@/components/legal/legal-parts";
 import { isPrivacyPolicyReady, missingPrivacyPolicyDetails, privacyPolicyConfig as config } from "./policy-config";
 
 const ready = isPrivacyPolicyReady();
@@ -11,8 +11,6 @@ export const metadata: Metadata = {
   // Keep unfinished drafts out of search results.
   robots: ready ? undefined : { index: false, follow: false },
 };
-
-const linkClass = "text-gold-highlight underline";
 
 const SECTIONS = [
   { id: "collect", title: "Information we collect" },
@@ -52,46 +50,14 @@ function SectionLink({ id }: { id: SectionId }) {
   );
 }
 
-function ExternalLink({ href, children }: { href: string; children: React.ReactNode }) {
-  return (
-    <a href={href} className={linkClass} target="_blank" rel="noopener noreferrer">
-      {children}
-    </a>
-  );
-}
-
-function formatDate(iso: string): string {
-  const d = new Date(`${iso}T00:00:00Z`);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" });
-}
-
 export default function PrivacyPage() {
-  const missing = missingPrivacyPolicyDetails();
-  const hasContact = Boolean(config.operatorLegalName || config.contactEmail || config.postalAddress);
   return (
     <>
-      {!ready && (
-        <LegalReviewNotice>
-          This privacy policy has not been published. Before publication, the following must be supplied:
-          <ul className="mt-2">
-            {missing.map((m) => (
-              <li key={m}>{m}</li>
-            ))}
-          </ul>
-        </LegalReviewNotice>
-      )}
+      {!ready && <UnpublishedNotice missing={missingPrivacyPolicyDetails()} />}
 
       <header className="space-y-2">
         <h1>Privacy Policy</h1>
-        <p>
-          {config.effectiveDate ? (
-            <>
-              Effective date: <time dateTime={config.effectiveDate}>{formatDate(config.effectiveDate)}</time>
-            </>
-          ) : (
-            "Effective date: not yet set — this policy has not been published."
-          )}
-        </p>
+        <EffectiveDate date={config.effectiveDate} />
       </header>
 
       <p>
@@ -522,22 +488,8 @@ export default function PrivacyPage() {
       </Section>
 
       <Section id="contact">
-        {hasContact ? (
-          <>
-            <p>For privacy questions or requests, contact:</p>
-            <address className="not-italic">
-              {config.operatorLegalName && <span className="block text-foreground">{config.operatorLegalName}</span>}
-              {config.postalAddress && <span className="block whitespace-pre-line">{config.postalAddress}</span>}
-              {config.contactEmail && (
-                <a href={`mailto:${config.contactEmail}`} className={linkClass}>
-                  {config.contactEmail}
-                </a>
-              )}
-            </address>
-          </>
-        ) : (
-          <p>Contact details will be listed here when this policy is published.</p>
-        )}
+        <p>For privacy questions or requests, contact:</p>
+        <ContactDetails name={config.operatorLegalName} email={config.contactEmail} address={config.postalAddress} />
         <p>
           You can also review our{" "}
           <Link href="/legal/terms" className={linkClass}>

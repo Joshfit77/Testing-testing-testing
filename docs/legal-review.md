@@ -1,22 +1,29 @@
-# Privacy policy review notes
+# Legal documents review notes
 
-Companion to `src/app/legal/privacy/page.tsx`. This file records what the policy is based on, what still has to be supplied before
-publication, and a checklist for Apple's App Privacy questionnaire. It reflects the code as audited; re-check it whenever data
+Companion to `src/app/legal/privacy/page.tsx` and `src/app/legal/terms/page.tsx`. This file records what the documents are based on, what
+still has to be supplied before publication, and a checklist for Apple's App Privacy questionnaire. It reflects the code as audited; re-check it whenever data
 collection, providers or SDKs change.
 
 ## Before publishing
 
-1. Fill in every field in `src/app/legal/privacy/policy-config.ts`:
-   - `effectiveDate`: the date the policy takes effect.
+1. Fill in the shared business details in `src/app/legal/legal-details.ts` (used by both documents):
    - `operatorLegalName`: the legal entity that operates Narrow Gate Fitness.
-   - `contactEmail`: privacy contact email address.
-   - `postalAddress`: postal address for privacy correspondence.
+   - `contactEmail`: contact email address for privacy, legal and support questions.
+   - `postalAddress`: postal address for legal correspondence.
+   - `governingLaw`: the jurisdiction whose law governs the Terms.
+
+   Then fill in `src/app/legal/privacy/policy-config.ts`:
+   - `effectiveDate`: the date the policy takes effect.
    - `providerProtectionConfirmed`: set to `true` only after confirming data processing agreements, or equivalent terms, with each
      provider named in the policy. Apple Guideline 5.1.1(i) requires the policy to confirm that providers protect data to the same
      standard.
    - `legalReviewComplete`: set to `true` after counsel has reviewed the final text.
 
-   When every field is set, the page drops "(Draft)" from its title, removes the review banner and `noindex`, and shows the contact details.
+   And `src/app/legal/terms/terms-config.ts`:
+   - `effectiveDate`: the date the terms take effect.
+   - `legalReviewComplete`: set to `true` after counsel has reviewed the final text.
+
+   When every field for a document is set, that page drops "(Draft)" from its title, removes the review banner and `noindex`, and shows the contact details.
 2. Confirm that production is hosted on Vercel. This comes from `SETUP.md`; the code itself doesn't name a host.
 3. Resolve or accept the open findings below, especially the AI coach consent requirement.
 4. Publish at `https://<production domain>/legal/privacy` and enter that URL in App Store Connect and Google Play. The repo has no production
@@ -116,3 +123,35 @@ Related guidelines (checked October 2026 at https://developer.apple.com/app-stor
 - Whether the material-changes notice commitment ("in the app or by email before they take effect") is the right promise.
 - Wording for the 18+ requirement and what to do on discovering an underage user.
 - Whether the offline test edition needs its own notice if it is distributed publicly.
+
+## Terms of Service: what is based on code vs. drafted for review
+
+Based on the code:
+
+- 18+ eligibility: sign-up checkbox and onboarding age check.
+- Plans: Free, Plus and Pro monthly, plus Pro yearly when `STRIPE_PRICE_PRO_YEARLY` is set. Prices are configurable by environment
+  variables, so the Terms point to the Plans & billing page rather than stating amounts.
+- Purchases happen on the web through Stripe Checkout and are blocked in the native apps. Promotion codes are enabled.
+- Cancelling through the Stripe portal keeps access until the period ends, and access continues while a payment is `past_due`
+  (`src/lib/domain/plans.ts`).
+- Account deletion cancels subscriptions immediately (`cancelStripeSubscriptionsForUser`). The previous draft's subscription wording didn't
+  cover this.
+- AI allowances reset on the first of each calendar month in UTC (`monthStartIso`). Plans proposed by the AI only apply after the user
+  approves them.
+- Food data sources: USDA, Open Food Facts (crowd-sourced) and curated foods. Scripture is from the KJV (`src/data/devotionals.ts`).
+
+Drafted as standard language that counsel must confirm or replace (none of it is a fact from the code):
+
+- **Refunds:** "non-refundable except where required by law", including unused time after account deletion. This is a business decision.
+  The code has no refund logic; refunds are handled manually in the Stripe dashboard.
+- **Price-change notice:** "we will tell you before the change applies to your next renewal". This is a commitment you must be able to
+  keep, since there is no notification tooling in the code.
+- **Limitation of liability:** cap equal to the amount paid in the prior 12 months. Also the disclaimers, the indemnity and the general
+  clauses.
+- **Suspension:** we may suspend or end access. There is no admin tooling to suspend a user today; it would be done directly in Supabase.
+- **Acceptable-use rules:** for example, progress photos must be of you, with no explicit content.
+- **Material-change notice:** given in the app or by email before changes take effect.
+- **No arbitration clause or class-action waiver was added.** Ask counsel whether you want one.
+- **Auto-renewal disclosure:** the automatic-renewal wording is in bold. Some US states (for example California) have specific
+  auto-renewal disclosure and cancellation rules for checkout; counsel should confirm the Stripe Checkout flow complies.
+- **KJV:** it is public domain except in the UK, where Crown rights apply. Check this if you distribute there.
