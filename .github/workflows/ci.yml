@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Run the full checks (including the Supabase integration tests) on any branch from the Actions tab.
+  workflow_dispatch:
 
 jobs:
   checks:
