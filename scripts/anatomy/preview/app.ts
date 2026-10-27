@@ -102,11 +102,20 @@ function attachControls(canvas: HTMLCanvasElement, c: { orbit(dYaw: number, dPit
 /** First milestone: the original Écorché model standing in the player, unmodified, with rotation and zoom only. */
 async function runModel() {
   document.body.classList.add("model-mode");
-  document.title = "Écorché Model Viewer";
-  $<HTMLElement>("h1").textContent = "Écorché Anatomical Model";
-  $<HTMLElement>(".chips").innerHTML = "<span>Original model</span><span>Eyes added</span><span>Standing</span><span>360° view</span>";
+  // The header is the exercise itself, as everywhere else in the app.
+  document.title = ex.name;
+  $<HTMLElement>("h1").textContent = ex.name;
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  const chips = $<HTMLElement>(".chips");
+  chips.replaceChildren(
+    ...[ex.category, ex.mechanics].filter((x): x is NonNullable<typeof x> => !!x).map((x) => {
+      const s = document.createElement("span");
+      s.textContent = cap(String(x));
+      return s;
+    }),
+  );
   const canvas = $<HTMLCanvasElement>("#stage");
-  canvas.setAttribute("aria-label", "The original Écorché anatomical model, standing. Drag to turn it, pinch or scroll to zoom.");
+  canvas.setAttribute("aria-label", `3D anatomical figure for ${ex.name}, standing. Drag to turn it, pinch or scroll to zoom.`);
   const box = $<HTMLElement>(".stage-box");
   const loading = $<HTMLElement>(".loading");
   loading.textContent = "Loading model…";
