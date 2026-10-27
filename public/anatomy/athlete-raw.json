@@ -1,73 +1,73 @@
 {
  "version": 3,
- "source": "Écorché (github.com/Charleeh/ecorche, CC BY-SA 4.0; BodyParts3D CC BY 4.0, Z-Anatomy CC BY-SA 4.0), unaltered geometry and colours; rig, shorts and muscle labels added",
- "vertices": 485234,
- "triangles": 977853,
- "bytes": 32538656,
+ "source": "Écorché (github.com/Charleeh/ecorche, CC BY-SA 4.0; BodyParts3D CC BY 4.0, Z-Anatomy CC BY-SA 4.0), unaltered geometry and colours; rig and muscle labels added",
+ "vertices": 485878,
+ "triangles": 984466,
+ "bytes": 32675232,
  "layout": {
   "position": {
    "offset": 0,
-   "length": 1455702,
+   "length": 1457634,
    "type": "Float32Array"
   },
   "index": {
-   "offset": 5822808,
-   "length": 2933559,
+   "offset": 5830536,
+   "length": 2953398,
    "type": "Uint32Array"
   },
   "forcedBone": {
-   "offset": 17557044,
-   "length": 485234,
+   "offset": 17644128,
+   "length": 485878,
    "type": "Uint8Array"
   },
   "skinIndex": {
-   "offset": 18042280,
-   "length": 1940936,
+   "offset": 18130008,
+   "length": 1943512,
    "type": "Uint8Array"
   },
   "skinWeight": {
-   "offset": 19983216,
-   "length": 1940936,
+   "offset": 20073520,
+   "length": 1943512,
    "type": "Uint8Array"
   },
   "muscleA": {
-   "offset": 21924152,
-   "length": 485234,
+   "offset": 22017032,
+   "length": 485878,
    "type": "Uint8Array"
   },
   "muscleMix": {
-   "offset": 22409388,
-   "length": 485234,
+   "offset": 22502912,
+   "length": 485878,
    "type": "Uint8Array"
   },
   "tissue": {
-   "offset": 22894624,
-   "length": 485234,
+   "offset": 22988792,
+   "length": 485878,
    "type": "Uint8Array"
   },
   "fiber": {
-   "offset": 23379860,
-   "length": 1455702,
+   "offset": 23474672,
+   "length": 1457634,
    "type": "Int8Array"
   },
   "limb": {
-   "offset": 24835564,
-   "length": 485234,
+   "offset": 24932308,
+   "length": 485878,
    "type": "Uint8Array"
   },
   "color": {
-   "offset": 25320800,
-   "length": 1455702,
+   "offset": 25418188,
+   "length": 1457634,
    "type": "Uint8Array"
   },
   "ao": {
-   "offset": 26776504,
-   "length": 485234,
+   "offset": 26875824,
+   "length": 485878,
    "type": "Uint8Array"
   },
   "indexLod1": {
-   "offset": 27261740,
-   "length": 1319229,
+   "offset": 27361704,
+   "length": 1328382,
    "type": "Uint32Array"
   }
  },

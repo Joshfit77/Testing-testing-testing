@@ -51,6 +51,9 @@ const ECORCHE = process.env.ECORCHE;
 const ECORCHE_USE = process.env.ECORCHE_USE === "torso" || process.env.ECORCHE_USE === "raw" ? process.env.ECORCHE_USE : "all";
 /** The raw Écorché athlete (ECORCHE_USE=raw). */
 const RAW = !!ECORCHE && ECORCHE_USE === "raw";
+/** Shorts: always on the gold athlete; on the raw Écorché athlete only with ECORCHE_SHORTS=1 (by default it is shown
+ *  exactly as published, with nothing covered or cut away). */
+const SHORTS = !RAW || process.env.ECORCHE_SHORTS === "1";
 const OUT =
   process.env.ATHLETE_OUT ?? (RAW ? "public/anatomy/athlete-raw" : ECORCHE && ECORCHE_USE === "all" ? "public/anatomy/athlete-eco" : "public/anatomy/athlete");
 /** The shipped joint file is written only by the build that ships (the skeleton, and so the joints, is the same). */
@@ -902,7 +905,7 @@ const HEM = RAW ? 78.5 : 68.5;
 const shortsHem = (p: V3) => HEM + 3.5 * smoothstep(6, 16, Math.abs(p[2]));
 /** Signed distance (cm, vertical) inside the shorts band: positive between hem and waistband. */
 const shortsF = (p: V3) => Math.min(p[1] - shortsHem(p), shortsWaist(p) - p[1]);
-{
+if (SHORTS) {
   // The fabric: a smooth envelope 5 mm over the muscles and bones of the hips and thighs, bridging every crease and
   // hollow narrower than about 6 cm (3 cm near the hems, so it does not web between the thighs). Built from the anatomy,
   // not the scanned skin, so nothing of the genitals' shape or the skin's creases is left in it.
@@ -1188,7 +1191,7 @@ for (const p of blocks) {
 mkdirSync("public/anatomy", { recursive: true });
 writeFileSync(`${OUT}.bin`, Buffer.concat(chunks));
 const source = RAW
-  ? "Écorché (github.com/Charleeh/ecorche, CC BY-SA 4.0; BodyParts3D CC BY 4.0, Z-Anatomy CC BY-SA 4.0), unaltered geometry and colours; rig, shorts and muscle labels added"
+  ? `Écorché (github.com/Charleeh/ecorche, CC BY-SA 4.0; BodyParts3D CC BY 4.0, Z-Anatomy CC BY-SA 4.0), unaltered geometry and colours; rig${SHORTS ? ", shorts" : ""} and muscle labels added`
   : !ECORCHE
   ? "BodyParts3D 3.0 (CC BY-SA 2.1 JP)"
   : ECORCHE_USE === "torso"

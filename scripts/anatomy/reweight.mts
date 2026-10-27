@@ -127,6 +127,102 @@ const { skinIndex, skinWeight } = computeWeights(pos, idx, label, meta.bind ?? M
   }
   console.log(`latissimus: weights spread over ${W.size} vertices`);
 }
+// Raw Écorché athlete (no shorts): the hip bones buried under the glutes and the hip muscles follow the muscles over
+// them instead of moving rigidly. Rigid, the femur heads, greater trochanters and sitting bones came through the glutes
+// in a deep squat, where the blended muscle surface slides in towards them. How buried a bone vertex is: the share of 16
+// rays over its outward hemisphere that meet muscle or tendon within 8 cm. Buried vertices take the weights of the
+// nearest muscle point, blended with their rigid bone by that share, smoothed over the bone's surface (an abrupt
+// switch tore the surface into shards). Bone seen at rest (the sacrum, the crest of the pelvis) has no muscle over it
+// and stays rigid.
+if (meta.bind && forced) {
+  const NB = BONES.length;
+  const HIP = new Set(["pelvis", "thighR", "thighL"].map((b) => BONES.indexOf(b as (typeof BONES)[number])));
+  const keep: number[] = [];
+  for (let t = 0; t < idx.length; t += 3) if (tissue[idx[t]!] === TISSUE.muscle || tissue[idx[t]!] === TISSUE.tendon) keep.push(idx[t]!, idx[t + 1]!, idx[t + 2]!);
+  const mg = new THREE.BufferGeometry();
+  mg.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  mg.setIndex(keep);
+  const mbvh = new MeshBVH(mg);
+  const bg = new THREE.BufferGeometry();
+  bg.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  bg.setIndex(new THREE.BufferAttribute(idx, 1));
+  bg.computeVertexNormals();
+  const bn = bg.getAttribute("normal") as THREE.BufferAttribute;
+  const ray = new THREE.Ray();
+  const side = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+  const smooth = (e0: number, e1: number, x: number) => {
+    const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0)));
+    return t * t * (3 - 2 * t);
+  };
+  const n = new THREE.Vector3(), t1 = new THREE.Vector3(), t2 = new THREE.Vector3(), p = new THREE.Vector3();
+  const share = new Map<number, number>();
+  for (let v = 0; v < NV0; v++) {
+    if (tissue[v] !== TISSUE.bone || !HIP.has(forced[v]!)) continue;
+    const y = pos[v * 3 + 1]!;
+    const zone = smooth(66, 72, y) * smooth(108, 102, y);
+    if (!zone) continue;
+    n.fromBufferAttribute(bn, v).normalize();
+    t1.set(Math.abs(n.x) < 0.9 ? 1 : 0, Math.abs(n.x) < 0.9 ? 0 : 1, 0).cross(n).normalize();
+    t2.crossVectors(n, t1);
+    let hits = 0;
+    const RAYS = 16;
+    for (let r = 0; r < RAYS; r++) {
+      const u = (r + 0.5) / RAYS, phi = r * 2.399963;
+      const sr = Math.sqrt(u), z = Math.sqrt(1 - u);
+      ray.origin.set(pos[v * 3]!, y, pos[v * 3 + 2]!);
+      ray.direction.copy(t1).multiplyScalar(Math.cos(phi) * sr).addScaledVector(t2, Math.sin(phi) * sr).addScaledVector(n, z);
+      if (mbvh.raycastFirst(ray, side, 0, 8)) hits++;
+    }
+    share.set(v, smooth(0.45, 0.9, hits / RAYS) * zone);
+  }
+  // Smooth the share over the bone surface (vertices outside the zone hold 0).
+  const nb = new Map<number, number[]>();
+  for (let t = 0; t < idx.length; t += 3)
+    for (let k = 0; k < 3; k++) {
+      const a = idx[t + k]!;
+      if (!share.has(a)) continue;
+      const list = nb.get(a) ?? nb.set(a, []).get(a)!;
+      for (let j = 1; j < 3; j++) list.push(idx[t + ((k + j) % 3)]!);
+    }
+  let s = share;
+  for (let it = 0; it < 12; it++) {
+    const next = new Map<number, number>();
+    for (const [v, x] of s) {
+      const list = nb.get(v) ?? [];
+      const avg = list.length ? list.reduce((acc, o) => acc + (s.get(o) ?? 0), 0) / list.length : x;
+      next.set(v, 0.5 * x + 0.5 * avg);
+    }
+    s = next;
+  }
+  let soft = 0;
+  const w = new Float32Array(NB);
+  const target = { point: new THREE.Vector3(), faceIndex: 0, distance: 0 } as { point: THREE.Vector3; faceIndex: number; distance: number };
+  for (const [v, f] of s) {
+    if (f < 0.02) continue;
+    p.set(pos[v * 3]!, pos[v * 3 + 1]!, pos[v * 3 + 2]!);
+    if (!mbvh.closestPointToPoint(p, target)) continue;
+    const tri = [0, 1, 2].map((k) => mg.index!.getX(target.faceIndex * 3 + k)); // (the BVH reorders the index)
+    const [A, B, C] = tri.map((u) => new THREE.Vector3(pos[u * 3]!, pos[u * 3 + 1]!, pos[u * 3 + 2]!));
+    const bary = new THREE.Triangle(A, B, C).getBarycoord(target.point, new THREE.Vector3());
+    if (!bary) continue;
+    w.fill(0);
+    w[forced[v]!] = 1 - f;
+    tri.forEach((u, k) => {
+      for (let j = 0; j < 4; j++) w[skinIndex[u * 4 + j]!]! += (f * bary.getComponent(k) * skinWeight[u * 4 + j]!) / 255;
+    });
+    const top = Array.from(w, (x, b) => [x, b] as [number, number]).sort((a, b) => b[0] - a[0]).slice(0, 4);
+    const sum = top.reduce((acc, [x]) => acc + x, 0) || 1;
+    let acc = 0;
+    top.forEach(([x, b], i) => {
+      skinIndex[v * 4 + i] = b;
+      skinWeight[v * 4 + i] = Math.round((x / sum) * 255);
+      acc += skinWeight[v * 4 + i]!;
+    });
+    skinWeight[v * 4] = skinWeight[v * 4]! + 255 - acc;
+    soft++;
+  }
+  console.log(`hip bones: ${soft} buried vertices follow the muscles over them`);
+}
 view("skinIndex", Uint8Array).set(skinIndex);
 view("skinWeight", Uint8Array).set(skinWeight);
 

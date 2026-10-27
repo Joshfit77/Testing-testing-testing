@@ -19,6 +19,8 @@ perform exercises.
   and eyes), under the same studio lighting as the reference renders (ACES tone mapping, room environment at 0.6, one
   warm key light, one white rim light).
 - **Head**: Écorché's own skull, facial muscles, eyes and teeth. No MakeHuman head, no scanned skin, no fascia.
+- **Nothing covered**: no shorts and nothing cut away. The pelvis, lower abdomen, glutes and hips look exactly like the
+  published model (the owner's reference images), and every glute and hip muscle can glow.
 
 ## What is added
 
@@ -28,12 +30,14 @@ perform exercises.
   can never follow the hand hanging beside it). The limb comes from the muscle's region, or for unlabelled parts from
   where the whole mesh lies, and is stored with the asset (`limb` block). The motion comes from the app's existing
   exercise engine.
+- **Hip bones under the glutes** follow the muscles over them instead of moving rigidly (only bone that is buried under
+  muscle at rest, blended smoothly into the rigid bone around it). Rigid, the femur heads, greater trochanters and
+  sitting bones came through the stretched glutes at the bottom of a squat as grey patches. The sacrum and the crest of
+  the pelvis, which are seen at rest, stay rigid.
 - **Muscle labels** for the glow, from the muscle names. Worked muscles brighten towards a warm orange (primary
   muscles fully, secondary ones softer). All other muscles keep their own red.
-- **Black shorts**: short compression trunks, a smooth surface 5 mm over the hip anatomy. The hem sits about 7 cm
-  below the crotch on the inside and higher on the outside, so the quadriceps, hamstrings and adductors stay in view.
-  The anatomy hidden under the fabric is cut away exactly along a line 2.5 cm inside the edge, so nothing comes through
-  in a deep squat. The fabric follows the pelvis and thighs only.
+- **Shorts (off)**: fitted black trunks can still be built for this figure (`ECORCHE_SHORTS=1`), but by default it is
+  shown as published, with nothing covered.
 
 ## Build
 
@@ -46,7 +50,7 @@ ATHLETE=public/anatomy/athlete-raw npx tsx scripts/anatomy/reweight.mts
 The preview shows it with `?asset=athlete-raw` (`scripts/anatomy/preview/build.sh`, then open
 `.anatomy-preview/index.html?asset=athlete-raw`).
 
-Size: 975k triangles, 32 MB with the mobile index buffer (438k triangles). That is twice the gold athlete;
+Size: 984k triangles, 33 MB with the mobile index buffer (443k triangles). That is twice the gold athlete;
 compressing it (Draco or meshopt) or dropping fully hidden deep structures would be the next step before shipping it to
 phones. Not tested on a phone.
 
@@ -55,14 +59,15 @@ phones. Not tested on a phone.
 Renders are in `renders/raw-ecorche/`, all from the actual model:
 
 - **Same character** (`compare-*.jpg`): the original file and the new athlete, side by side at the same size and
-  camera. Views: front, side, rear, face from two angles, torso, abdomen and back.
+  camera. Views: front, side, rear, face from two angles, torso, back, and the hips from the front, rear and side.
 - **Moving squat** (`squat-rep.gif`): one full repetition.
 - **Poses**:
   - `squat-views.jpg`: the squat top, plus the bottom from the side, front and rear;
   - `other-poses.jpg`: walking lunge, Romanian deadlift and run.
 - **Close-ups**:
-  - `squat-bottom-closeups.jpg`: knee, hip crease, back and the shorts from behind, at the bottom of the squat;
-  - `shorts-and-legs.jpg`: the pelvis from the front, side and rear, and the legs.
+  - `squat-bottom-closeups.jpg`: the glutes from behind and from the side, the front of the hips, and the knee, at
+    the bottom of the squat;
+  - `hips-and-legs.jpg`: the pelvis from the front, side and rear, and the legs.
 - **Glow** (`glow-off-on.jpg`, `glow-standing-off-on.jpg`): off and on, at the bottom of the squat and standing.
 
 ![Original and new, front](renders/raw-ecorche/compare-01-front.jpg)
@@ -78,6 +83,8 @@ Problems found and fixed on the way:
 | Black spikes above the waistband | The fabric's clearance pass lifted the edge along upward normals | The edge band is held where the cut puts it |
 | Strands from the hands to the hips (again, after the first fix) | Small unlabelled thigh muscles beside the resting hand | Every part gets a limb from where the whole mesh lies |
 | Halo around the white skull | Bloom caught the bright bone | Bloom only above the glow's brightness |
+| Grey bone patches through the glutes at the bottom of the squat (once the shorts were gone) | The hip bones moved rigidly while the muscle over them blended | Buried hip bone follows the muscle over it |
+| White bone shards under the glutes (first version of that fix) | Buried and rigid bone vertices side by side | The switch is blended smoothly over the bone surface |
 
 Player controls (360° drag rotation while it moves, pinch and wheel zoom, front, side and rear presets, slow motion,
 play and pause) are checked by `scripts/anatomy/preview/controls-test.mjs` against this asset.
@@ -86,10 +93,8 @@ play and pause) are checked by `scripts/anatomy/preview/controls-test.mjs` again
 
 - **Deformation** is linear blend skinning, as for the gold athlete. Deep hip and knee flexion compresses the muscles
   around the joint instead of bulging them, and there are no corrective shapes.
-- **Shorts in front views**: in the bottom of a squat seen from the front, the thighs point at the camera and hide most
-  of the shorts. That is perspective, not missing geometry.
-- **Glutes**: the shorts cover most of the gluteus maximus, so its glow is mostly hidden. Briefs with a higher leg line
-  would show more of it but cover less.
+- **Knee at full depth**: the patella and tendons crowd together at the front of the knee, the same skinning limit.
+- **Between the glutes**: the sacrum, coccyx and the white tissue of the pelvic floor show, as on the published model.
 
 ## Licence: CC BY-SA 4.0 (summary for the project, not legal advice)
 
@@ -110,8 +115,7 @@ files themselves), keep:
   (https://creativecommons.org/licenses/by-sa/4.0/);
 - the disclaimer of warranties notice;
 - a link to the source, where reasonably practicable;
-- a statement that it was modified and how ("rigged for animation, scaled, muscle labels and fitted shorts added,
-  anatomy under the shorts removed").
+- a statement that it was modified and how ("rigged for animation, scaled, muscle labels added").
 
 This may be done in any reasonable manner for the medium (Section 3(a)(2)), for example a Licences screen in the app.
 
