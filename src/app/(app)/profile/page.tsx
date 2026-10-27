@@ -89,7 +89,7 @@ export default async function ProfilePage() {
         </p>
         <div>
           <p className="text-sm font-semibold">Export your data</p>
-          <p className="mb-2 text-xs text-muted-foreground">Download everything stored for your account as a JSON file.</p>
+          <p className="mb-2 text-xs text-muted-foreground">Download your account data as a JSON file. Photos are included as private download links.</p>
           <Button asChild variant="secondary">
             <a href="/api/account/export" download>
               <Download aria-hidden /> Download my data

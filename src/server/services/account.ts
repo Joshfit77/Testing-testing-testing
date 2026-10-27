@@ -34,6 +34,7 @@ const USER_TABLES: { table: string; column: string }[] = [
   { table: "challenge_enrollments", column: "user_id" },
   { table: "challenge_checkins", column: "user_id" },
   { table: "subscriptions", column: "user_id" },
+  { table: "billing_customers", column: "user_id" },
   { table: "user_entitlements", column: "user_id" },
 ];
 
@@ -54,12 +55,32 @@ export async function exportUserData(supabase: SupabaseClient, userId: string, e
     }
     out[table] = rows;
   }
+  out.program_structure = await ownProgramStructure(supabase, ((out.training_programs as { id: string }[]) ?? []).map((p) => p.id));
   try {
     out.progress_photo_files = await progressPhotoLinks(supabase, (out.progress_photos as { storage_path: string }[]) ?? []);
   } catch {
     out.progress_photo_files = { note: "Download links for your progress photo images couldn't be created. Try the export again.", files: [] };
   }
   return out;
+}
+
+/** Rows of `table` whose `column` is in `ids`, fetched in chunks (keeps request URLs short). */
+async function rowsIn(supabase: SupabaseClient, table: string, column: string, ids: string[]): Promise<Record<string, unknown>[]> {
+  const rows: Record<string, unknown>[] = [];
+  for (let i = 0; i < ids.length; i += 100) {
+    const { data, error } = await supabase.from(table).select("*").in(column, ids.slice(i, i + 100));
+    if (error) throw error;
+    rows.push(...((data ?? []) as Record<string, unknown>[]));
+  }
+  return rows;
+}
+
+/** Weeks, days and exercises of the programs the user created (the program rows themselves are in training_programs). */
+async function ownProgramStructure(supabase: SupabaseClient, programIds: string[]) {
+  const program_weeks = await rowsIn(supabase, "program_weeks", "program_id", programIds);
+  const program_days = await rowsIn(supabase, "program_days", "week_id", program_weeks.map((w) => w.id as string));
+  const program_exercises = await rowsIn(supabase, "program_exercises", "day_id", program_days.map((d) => d.id as string));
+  return { program_weeks, program_days, program_exercises };
 }
 
 /**

@@ -23,9 +23,15 @@ export async function saveOnboardingAction(input: OnboardingInput & { rebuildPro
   const { data: existing } = await supabase.from("profiles").select("onboarding_completed_at, timezone, wellness_consent_at").eq("id", user.id).single();
   const firstTime = !existing?.onboarding_completed_at;
   const today = isoDateInTz(new Date(), existing?.timezone ?? "UTC");
+  const withdrawingConsent = Boolean(existing?.wellness_consent_at) && !v.wellnessConsent;
 
   try {
     const consentAt = v.wellnessConsent ? (existing?.wellness_consent_at ?? new Date().toISOString()) : null;
+    // Unticking consent withdraws it, exactly like Profile → Withdraw consent: delete what was stored under it.
+    if (withdrawingConsent) {
+      const { error: rErr } = await supabase.from("recovery_checkins").delete().eq("user_id", user.id);
+      if (rErr) throw rErr;
+    }
     const { error: pErr } = await supabase
       .from("profiles")
       .update({
@@ -105,5 +111,7 @@ export async function saveOnboardingAction(input: OnboardingInput & { rebuildPro
 
   revalidatePath("/", "layout");
   if (firstTime) redirect("/home?welcome=1");
-  return { ok: true, message: input.rebuildProgram ? "Saved. Your starter program has been rebuilt and activated." : "Your training preferences were saved.", at: Date.now() };
+  const saved = input.rebuildProgram ? "Saved. Your starter program has been rebuilt and activated." : "Your training preferences were saved.";
+  const message = withdrawingConsent ? `${saved} Wellness consent withdrawn; limitation notes and recovery check-ins were deleted.` : saved;
+  return { ok: true, message, at: Date.now() };
 }

@@ -405,13 +405,12 @@ export default function PrivacyPage() {
           Profile → Privacy &amp; data → <strong>Download my data</strong> gives you a JSON file containing your account ID and email, your
           profile and onboarding answers, goals, programs you saved or created, workouts, sets and personal records, bodyweight and
           measurements, recovery check-ins, custom foods, meals and nutrition targets, water entries, AI conversations, messages and usage
-          records, faith journal entries, discipline goals and check-ins, challenge progress, progress photo details, and your subscription
-          and plan records.
+          records, faith journal entries, discipline goals and check-ins, challenge progress, progress photo details, the week-by-week
+          structure of programs you created, and your subscription, plan and Stripe customer records.
         </p>
         <p>
           Progress photo image files are not embedded in the file. Instead, the export includes a private download link for each photo that
-          expires after one hour; export again for fresh links. For programs you created, the export currently includes the program&apos;s
-          main details but not its week-by-week exercise layout.
+          expires after one hour; export again for fresh links.
         </p>
       </Section>
 

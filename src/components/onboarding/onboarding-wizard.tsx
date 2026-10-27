@@ -392,7 +392,7 @@ export function OnboardingWizard({ initial, mode = "create" }: { initial: Onboar
               <legend className="px-1 text-sm font-semibold">Physical limitations (optional)</legend>
               <p className="text-xs text-muted-foreground">
                 Note anything you want your training to work around (e.g. &ldquo;prefer to avoid overhead pressing&rdquo;). This is
-                sensitive wellness information — we only store it with your consent, and it&apos;s never visible to administrators. This
+                sensitive wellness information — we only store it with your consent, and it isn&apos;t shown in our admin tools. This
                 app doesn&apos;t diagnose or treat injuries.
               </p>
               <Textarea value={limitations} onChange={(e) => setLimitations(e.target.value)} maxLength={1000} aria-label="Physical limitations" aria-invalid={Boolean(fieldErrors.limitations)} />
@@ -400,6 +400,11 @@ export function OnboardingWizard({ initial, mode = "create" }: { initial: Onboar
                 <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 size-5 accent-[#C9A54C]" />
                 <span>I consent to Narrow Gate Fitness storing this optional wellness information to personalize my training.</span>
               </label>
+              {initial.wellnessConsent && !consent && (
+                <p role="status" className="text-xs text-[#f08a8a]">
+                  Saving without this ticked withdraws your consent and deletes your limitation notes and recovery check-ins.
+                </p>
+              )}
             </fieldset>
             <div className="flex items-start justify-between gap-4 rounded-xl border border-border bg-elevated/40 p-4">
               <div>
