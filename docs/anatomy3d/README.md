@@ -8,7 +8,9 @@ wired into the app's pages yet.
 
 The exercise player opens on the **original Écorché model file**, `public/anatomy/ecorche.glb`, byte-identical to the
 published `model/ecorche.glb` (sha256 `9744d3df…326c`, checked by the page before it shows the model). It is loaded as
-it is, with its own meshes, vertex colours and materials: nothing is rebuilt, rigged, recoloured or covered. The model
+it is, with its own meshes, vertex colours and materials: nothing is rebuilt, rigged, recoloured or covered. The one
+addition, at the owner's request: the published eyes are blank white, so the viewer paints a brown iris and a pupil onto
+each cornea in the shader (`paintEyes`); the file and its geometry are unchanged. The model
 stands still; one finger turns it a full 360°, a pinch zooms, two fingers move along the body, and front, side and rear
 buttons reset the view. No exercise animation, glow or equipment yet: those come after the appearance is approved.
 

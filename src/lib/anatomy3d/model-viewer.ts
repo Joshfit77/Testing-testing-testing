@@ -34,7 +34,7 @@ const FOV = 30;
 export async function mountModel(
   canvas: HTMLCanvasElement,
   /** The GLB file's bytes, as fetched (nothing is changed before it is parsed). */
-  opts: { glb: ArrayBuffer; pixelRatio?: number },
+  opts: { glb: ArrayBuffer; pixelRatio?: number; /** Iris and pupil on the corneas (default on; see paintEyes). */ eyes?: boolean },
 ): Promise<ModelViewer> {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: "high-performance" });
   renderer.setPixelRatio(Math.min(opts.pixelRatio ?? (typeof devicePixelRatio === "number" ? devicePixelRatio : 1), 2));
@@ -56,6 +56,8 @@ export async function mountModel(
   const gltf = await new GLTFLoader().parseAsync(opts.glb, "");
   const model = gltf.scene;
   scene.add(model);
+  model.updateMatrixWorld(true);
+  if (opts.eyes !== false) paintEyes(model);
   const box = new THREE.Box3().setFromObject(model);
   const H = box.max.y - box.min.y;
   const center = box.getCenter(new THREE.Vector3());
@@ -141,4 +143,74 @@ export async function mountModel(
     },
   };
   return viewer;
+}
+
+/**
+ * The one addition to the model's look, asked for by the owner: the published eyes are blank white (a sclera and a
+ * cornea, no iris), so an iris and a pupil are painted onto each cornea in the shader. The geometry and the file are
+ * untouched; only the two corneas get their own copy of the material, which colours the disc around the eye's axis
+ * (the line from the eyeball's centre through the cornea) and makes it a little glossier, like a wet eye.
+ */
+function paintEyes(model: THREE.Object3D) {
+  const meshes = new Map<string, THREE.Mesh>();
+  model.traverse((o) => {
+    if (o instanceof THREE.Mesh && /^(Left|Right)[ _](cornea|sclera)$/.test(o.name)) meshes.set(o.name.replace("_", " "), o);
+  });
+  for (const side of ["Left", "Right"]) {
+    const cornea = meshes.get(`${side} cornea`), sclera = meshes.get(`${side} sclera`);
+    if (!cornea || !sclera) continue;
+    // Eye centre and axis in world space, then in the cornea's own (vertex) space.
+    const eyeCenter = new THREE.Box3().setFromObject(sclera).getCenter(new THREE.Vector3());
+    const corneaCenter = new THREE.Box3().setFromObject(cornea).getCenter(new THREE.Vector3());
+    const toLocal = cornea.matrixWorld.clone().invert();
+    const c = eyeCenter.clone().applyMatrix4(toLocal);
+    const a = corneaCenter.clone().applyMatrix4(toLocal).sub(c).normalize();
+    // The cornea's radius around that axis (its rim), so the iris is sized from the eye itself.
+    const pos = cornea.geometry.getAttribute("position");
+    const v = new THREE.Vector3();
+    let rim = 0;
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i).sub(c);
+      rim = Math.max(rim, v.clone().addScaledVector(a, -v.dot(a)).length());
+    }
+    // Two directions across the iris, for the radial fibres.
+    const u = new THREE.Vector3(0, 1, 0).cross(a).normalize();
+    const w = a.clone().cross(u);
+    const mat = (cornea.material as THREE.MeshStandardMaterial).clone();
+    mat.onBeforeCompile = (shader) => {
+      Object.assign(shader.uniforms, {
+        eyeC: { value: c },
+        eyeA: { value: a },
+        eyeU: { value: u },
+        eyeW: { value: w },
+        eyeR: { value: rim },
+      });
+      shader.vertexShader = shader.vertexShader
+        .replace("#include <common>", "#include <common>\nvarying vec3 vEyeP;")
+        .replace("#include <begin_vertex>", "#include <begin_vertex>\nvEyeP = position;");
+      shader.fragmentShader = shader.fragmentShader
+        .replace("#include <common>", "#include <common>\nvarying vec3 vEyeP;\nuniform vec3 eyeC, eyeA, eyeU, eyeW;\nuniform float eyeR;\nfloat eyeIris = 0.0;")
+        .replace(
+          "#include <color_fragment>",
+          `#include <color_fragment>
+          {
+            vec3 d = vEyeP - eyeC;
+            vec3 across = d - dot(d, eyeA) * eyeA;
+            float r = length(across) / eyeR;
+            float ang = atan(dot(across, eyeW), dot(across, eyeU));
+            // Iris: warm brown, lighter round the pupil, fine radial fibres, a dark ring at its edge.
+            float fib = 0.5 + 0.5 * sin(ang * 47.0 + 3.0 * sin(ang * 13.0)) * sin(ang * 29.0 + 1.7);
+            vec3 inner = vec3(0.20, 0.115, 0.055), outer = vec3(0.085, 0.05, 0.025);
+            vec3 iris = mix(inner, outer, smoothstep(0.30, 0.74, r)) * (0.78 + 0.34 * fib);
+            iris *= 1.0 - 0.65 * smoothstep(0.66, 0.78, r);
+            vec3 col = mix(iris, vec3(0.012), 1.0 - smoothstep(0.26, 0.29, r));
+            eyeIris = 1.0 - smoothstep(0.78, 0.82, r);
+            diffuseColor.rgb = mix(diffuseColor.rgb, col, eyeIris);
+          }`,
+        )
+        .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.12, eyeIris);");
+    };
+    mat.customProgramCacheKey = () => "ngf-ecorche-eye";
+    cornea.material = mat;
+  }
 }

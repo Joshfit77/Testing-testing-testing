@@ -104,7 +104,7 @@ async function runModel() {
   document.body.classList.add("model-mode");
   document.title = "Écorché Model Viewer";
   $<HTMLElement>("h1").textContent = "Écorché Anatomical Model";
-  $<HTMLElement>(".chips").innerHTML = "<span>Original model, unmodified</span><span>Standing</span><span>360° view</span>";
+  $<HTMLElement>(".chips").innerHTML = "<span>Original model</span><span>Eyes added</span><span>Standing</span><span>360° view</span>";
   const canvas = $<HTMLCanvasElement>("#stage");
   canvas.setAttribute("aria-label", "The original Écorché anatomical model, standing. Drag to turn it, pinch or scroll to zoom.");
   const box = $<HTMLElement>(".stage-box");
