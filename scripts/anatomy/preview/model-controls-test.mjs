@@ -53,7 +53,8 @@ const moved = await p.waitForFunction((t0) => window.viewer.motion.time() !== t0
 const t1 = await p.evaluate(() => window.viewer.motion.time());
 results['plays the squat (the clock runs forward, within the rep)'] = moved && t0 >= 0 && t1 >= 0 && t1 <= (await p.evaluate(() => window.viewer.motion.duration));
 let a, c;
-await p.tap('#play'); await p.waitForTimeout(400);
+// (While the model plays, a software-rendered frame can take seconds, so the tap is given time to land.)
+await p.tap('#play', { timeout: 120000 }); await p.waitForTimeout(400);
 a = await shot(); await p.waitForTimeout(1200); c = await shot();
 results['pause stops it'] = (await diff(a, c)) === 0 && (await p.evaluate(() => window.viewer.motion.playing === false));
 a = await shot();
@@ -81,7 +82,7 @@ await p.mouse.move(cx, cy); await p.mouse.wheel(0, 400); await p.waitForTimeout(
 c = await shot();
 results['mouse wheel zooms'] = (await diff(a, c)) > 0.5;
 for (const v of ['side', 'rear', 'front']) {
-  a = await shot(); await p.tap(`[data-view="${v}"]`); await p.waitForTimeout(300); c = await shot();
+  a = await shot(); await p.tap(`[data-view="${v}"]`, { timeout: 120000 }); await p.waitForTimeout(300); c = await shot();
   results[`${v} button`] = (await diff(a, c)) > 0.5;
   fs.writeFileSync(`${process.env.SHOTS ?? '/tmp'}/model-${v}.png`, c);
 }
