@@ -4,7 +4,7 @@ Status: **not approved, not final.** A 3D anatomical athlete for the exercise de
 far (the barbell back squat). The existing 2D demonstrations are unchanged and remain what the app uses; nothing here is
 wired into the app's pages yet.
 
-## Milestone 1 (approved look): the original model in the player
+## Milestone 1: the original model in the player
 
 The exercise player opens on the **original Écorché model file**, `public/anatomy/ecorche.glb`, byte-identical to the
 published `model/ecorche.glb` (sha256 `9744d3df…326c`, checked by the page before it shows the model). It is loaded as
