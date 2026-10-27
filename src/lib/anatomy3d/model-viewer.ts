@@ -122,11 +122,17 @@ export async function mountModel(
     cam.lookAt(center.x, ty, center.z);
   };
   // While an exercise plays, the camera follows the hips down and up (as the exercise player does), on top of the
-  // viewer's own up-and-down offset.
+  // viewer's own up-and-down offset. Zoomed in, it follows the part of the body it is looking at instead, so a
+  // close-up of the face stays on the face as he squats.
   const followY = () => (moving ? moving.followY() - center.y : 0);
+  const lookY = () => {
+    if (!moving) return targetY;
+    const close = THREE.MathUtils.clamp((0.85 - zoomK) / 0.45, 0, 1);
+    return THREE.MathUtils.lerp(targetY + followY(), moving.bodyY(targetY), close);
+  };
   const draw = () => {
     raf = 0;
-    place(camera, yaw, pitch, fitDistance(camera.aspect) * zoomK, targetY + followY());
+    place(camera, yaw, pitch, fitDistance(camera.aspect) * zoomK, lookY());
     renderer.render(scene, camera);
   };
   // While the exercise plays, a frame loop; when it is paused (or there is none), frames only on request.
@@ -383,11 +389,16 @@ function moveModel(
   let speed = 1;
   let playing = !o.reducedMotion;
   let pelvisY = 92;
+  // Heights up the body (rig frame, cm) at rest and in the current pose: ankles, knees, pelvis, chest, neck, head.
+  const B = meta.bind;
+  const restUp = [(B.R.ankle[1] + B.L.ankle[1]) / 2, (B.R.knee[1] + B.L.knee[1]) / 2, B.pelvis[1], B.mid[1], B.neckBase[1], B.head[1], B.headTop[1]];
+  const nowUp = [...restUp];
   const listeners: ((t: number, e: number) => void)[] = [];
   const pose = () => {
     const f = evaluate(motion, t);
     const j = jointsFromFrame(f, { centerX, barGrip: barbell ? 26 : null, stance });
     pelvisY = j.pelvis.y;
+    nowUp.splice(0, 7, (j.R.ankle.y + j.L.ankle.y) / 2, (j.R.knee.y + j.L.knee.y) / 2, j.pelvis.y, j.mid.y, j.neck.y, j.head.y, j.headTop.y);
     poseBones(j, bones);
     equipment.update(f, j);
     for (const l of listeners) l(t, effort.at(t));
@@ -401,6 +412,14 @@ function moveModel(
     },
     /** The camera's look-at height (file frame) for the current pose: low on the body, following the hips. */
     followY: () => v.set(0, 34 + 0.55 * pelvisY, 0).applyMatrix4(fromRig).y,
+    /** Where the part of the body at height `y` at rest (file frame) is now (file frame), so a close-up stays on it. */
+    bodyY(y: number) {
+      const r = v.set(0, y, 0).applyMatrix4(toRig);
+      let k = 0;
+      while (k < restUp.length - 2 && r.y > restUp[k + 1]!) k++;
+      const s = (r.y - restUp[k]!) / (restUp[k + 1]! - restUp[k]!);
+      return r.setY(nowUp[k]! + s * (nowUp[k + 1]! - nowUp[k]!)).applyMatrix4(fromRig).y;
+    },
     motion: {
       skinnedMeshes: skinned.length,
       duration: T,
