@@ -347,10 +347,31 @@ async function ecorcheSources(path: string): Promise<Source[]> {
       pos.push([v.z * 100, v.y * 100, -v.x * 100]); // +X forward, +Y up, +Z the figure's right
       if (ca) tint[i] = smoothstep(0.45, 0.85, ca.getY(i) / Math.max(1e-3, ca.getX(i)));
     }
-    const idx = g.index ? Uint32Array.from(g.index.array) : Uint32Array.from({ length: pa.count }, (_, i) => i);
-    raw.push({ name: String(mesh.userData.name ?? mesh.name).toLowerCase().replace(/ \(2\)$/, ""), layer: String(mesh.userData.layer), pos, idx, tint });
+    const idx0 = g.index ? Uint32Array.from(g.index.array) : Uint32Array.from({ length: pa.count }, (_, i) => i);
+    // Weld: glTF splits vertices along colour and normal seams. Left split, each copy would be pushed out along its own
+    // normal (athletic bulk, sculpting) and the surface would crack open along the seams.
+    const weld = new Map<string, number>();
+    const remap = new Uint32Array(pos.length);
+    const wpos: V3[] = [], wtint: number[] = [];
+    pos.forEach((p, i) => {
+      const key = p.map((c) => Math.round(c * 1000)).join(",");
+      let w = weld.get(key);
+      if (w === undefined) {
+        w = wpos.length;
+        weld.set(key, w);
+        wpos.push(p);
+        wtint.push(tint[i]!);
+      }
+      remap[i] = w;
+    });
+    const idx: number[] = [];
+    for (let t = 0; t < idx0.length; t += 3) {
+      const a = remap[idx0[t]!]!, b = remap[idx0[t + 1]!]!, c = remap[idx0[t + 2]!]!;
+      if (a !== b && b !== c && a !== c) idx.push(a, b, c);
+    }
+    raw.push({ name: String(mesh.userData.name ?? mesh.name).toLowerCase().replace(/ \(2\)$/, ""), layer: String(mesh.userData.layer), pos: wpos, idx: new Uint32Array(idx), tint: new Float32Array(wtint) });
   });
-  // Fit scale and offset on the bones both have.
+  // Fit rotation, scale and offset on the bones both have (Horn's closed-form absolute orientation).
   const pairs: [V3, V3][] = [];
   for (const r of raw) {
     if (r.layer !== "skeleton" || kindOf(r.name) !== "bone") continue;
@@ -359,15 +380,41 @@ async function ecorcheSources(path: string): Promise<Source[]> {
     pairs.push([centroid(r.pos), centroid(verts(load(id)))]);
   }
   const ca = centroid(pairs.map((p) => p[0])), cb = centroid(pairs.map((p) => p[1]));
-  let num = 0, den = 0;
+  const S = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+  let den = 0;
   for (const [a, b] of pairs) {
-    num += dot(sub(a, ca), sub(b, cb));
-    den += dot(sub(a, ca), sub(a, ca));
+    const A = sub(a, ca), B = sub(b, cb);
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) S[i * 3 + j]! += A[i]! * B[j]!;
+    den += dot(A, A);
   }
-  const k = num / den;
-  const fit = (p: V3): V3 => add(cb, mul(sub(p, ca), k));
+  const [Sxx, Sxy, Sxz, Syx, Syy, Syz, Szx, Szy, Szz] = S as [number, number, number, number, number, number, number, number, number];
+  const N = [
+    [Sxx + Syy + Szz, Syz - Szy, Szx - Sxz, Sxy - Syx],
+    [Syz - Szy, Sxx - Syy - Szz, Sxy + Syx, Szx + Sxz],
+    [Szx - Sxz, Sxy + Syx, -Sxx + Syy - Szz, Syz + Szy],
+    [Sxy - Syx, Szx + Sxz, Syz + Szy, -Sxx - Syy + Szz],
+  ];
+  // Largest eigenvector of N (power iteration on N + cI, which shifts every eigenvalue positive).
+  const shiftC = N.flat().reduce((a, v) => a + Math.abs(v), 0);
+  let q = [1, 0, 0, 0];
+  for (let it = 0; it < 500; it++) {
+    const nq = N.map((row, i) => row.reduce((a, v, j) => a + v * q[j]!, 0) + shiftC * q[i]!);
+    const l = Math.hypot(...nq);
+    q = nq.map((v) => v / l);
+  }
+  const [qw, qx, qy, qz] = q as [number, number, number, number];
+  const rot = new THREE.Matrix3().set(
+    1 - 2 * (qy * qy + qz * qz), 2 * (qx * qy - qw * qz), 2 * (qx * qz + qw * qy),
+    2 * (qx * qy + qw * qz), 1 - 2 * (qx * qx + qz * qz), 2 * (qy * qz - qw * qx),
+    2 * (qx * qz - qw * qy), 2 * (qy * qz + qw * qx), 1 - 2 * (qx * qx + qy * qy),
+  );
+  const rv = new THREE.Vector3();
+  const rotate = (p: V3): V3 => rv.set(...p).applyMatrix3(rot).toArray() as V3;
+  const k = pairs.reduce((a, [p, b]) => a + dot(rotate(sub(p, ca)), sub(b, cb)), 0) / den;
+  const fit = (p: V3): V3 => add(cb, mul(rotate(sub(p, ca)), k));
+  const angle = (2 * Math.acos(Math.min(1, Math.abs(qw))) * 180) / Math.PI;
   const rms = Math.sqrt(pairs.reduce((s2, [a, b]) => s2 + len(sub(fit(a), b)) ** 2, 0) / pairs.length);
-  console.log(`Écorché: ${raw.length} meshes; fitted on ${pairs.length} bones, scale ${k.toFixed(3)}, residual ${rms.toFixed(2)} cm`);
+  console.log(`Écorché: ${raw.length} meshes; fitted on ${pairs.length} bones, scale ${k.toFixed(3)}, rotation ${angle.toFixed(2)}°, residual ${rms.toFixed(2)} cm`);
   const rectusZ = raw.filter((r) => /rectus abdominis/.test(r.name)).flatMap((r) => r.pos.map((p) => Math.abs(fit(p)[2]))).reduce((a, b) => Math.max(a, b), 0);
   const out: Source[] = [];
   for (const r of raw) {
@@ -794,15 +841,22 @@ const shortsF = (p: V3) => Math.min(p[1] - shortsHem(p), shortsWaist(p) - p[1]);
         let a = 0;
         for (const o of nbrs[n]!) a += x[o]!;
         let nx = x[n]! + (a / (nbrs[n]!.size || 1) - x[n]!) * 0.6 * zone[n]!;
-        // Never more than 1 cm over the muscle (fully held in the middle of the panel, eased out at its edges).
-        const lim = front[n]!;
+        // Between 0.4 and 1 cm over the muscle (fully held in the middle of the panel, eased out at its edges). The
+        // floor matters as much as the ceiling: smoothing shrinks a curved surface inward, and without it the panel
+        // sank behind the lower abdominal muscles, which then showed through the fabric.
+        const lim = front[n]!, floor = lim - 0.6;
         if (!Number.isNaN(lim) && nx > lim) nx = lim + (1 - zone[n]!) * (nx - lim);
+        if (!Number.isNaN(lim) && nx < floor) nx = floor + (1 - zone[n]!) * (nx - floor);
         m0.pos[n * 3] = nx;
       }
     }
-    let after = 0;
-    for (let n = 0; n < nv; n++) if (zone[n]! > 0.5 && !Number.isNaN(front[n]!)) after = Math.max(after, m0.pos[n * 3]! - front[n]!);
-    console.log(`groin panel: fabric stands ${bump.toFixed(1)} cm proud of the 1 cm line before, ${after.toFixed(1)} cm after`);
+    let after = 0, sunk = 0;
+    for (let n = 0; n < nv; n++)
+      if (zone[n]! > 0.5 && !Number.isNaN(front[n]!)) {
+        after = Math.max(after, m0.pos[n * 3]! - front[n]!);
+        sunk = Math.max(sunk, front[n]! - 0.6 - m0.pos[n * 3]!);
+      }
+    console.log(`groin panel: fabric ${bump.toFixed(1)} cm proud of the 1 cm line before, ${after.toFixed(1)} cm after; at most ${sunk.toFixed(1)} cm below the 0.4 cm floor`);
   }
   // Fabric thickness: a hair above the skin.
   {
@@ -818,7 +872,7 @@ const shortsF = (p: V3) => Math.min(p[1] - shortsHem(p), shortsWaist(p) - p[1]);
   const extra = new Float32Array(m.pos.length / 3);
   for (let n = 0; n < extra.length; n++) extra[n] = n >= cut.pos.length / 3 ? 1 : shortsF(vert(m, n)) < 0.8 ? 0.8 : 0;
   // Remove the anatomy the shorts cover: every triangle more than 2.5 cm inside the hem and waistband, and on the
-  // inner side of the fabric.
+  // inner side of the fabric (or less than 1.5 cm outside it).
   const sGrid = new Map<string, number[]>();
   const SC = 3;
   const skey = (p: V3) => `${Math.floor(p[0] / SC)},${Math.floor(p[1] / SC)},${Math.floor(p[2] / SC)}`;
@@ -828,6 +882,12 @@ const shortsF = (p: V3) => Math.min(p[1] - shortsHem(p), shortsWaist(p) - p[1]);
   }
   const covered = (p: V3) => {
     if (shortsF(p) < 2.5 || handOf(p)) return false;
+    // The forearms hang beside the hips: never part of what the shorts cover.
+    for (const J of [R, L]) {
+      const ab = sub(J.wrist, J.elbow);
+      const t = Math.max(0, Math.min(1, dot(sub(p, J.elbow), ab) / dot(ab, ab)));
+      if (len(sub(p, add(J.elbow, mul(ab, t)))) < 6) return false;
+    }
     // Nearest fabric point (searching further out for the deep pelvic structures, up to 21 cm away).
     let best = -1, bd = Infinity;
     const [ci, cj, ck2] = [0, 1, 2].map((k) => Math.floor(p[k]! / SC));
@@ -845,13 +905,16 @@ const shortsF = (p: V3) => Math.min(p[1] - shortsHem(p), shortsWaist(p) - p[1]);
       if (best >= 0) break;
     }
     if (best < 0) return false;
-    return dot(sub(p, vert(cut, best)), [nrm[best * 3]!, nrm[best * 3 + 1]!, nrm[best * 3 + 2]!]) < 0;
+    // Inside the fabric, or poking less than 1.5 cm out of it (a misfit, not a body part that belongs outside).
+    return dot(sub(p, vert(cut, best)), [nrm[best * 3]!, nrm[best * 3 + 1]!, nrm[best * 3 + 2]!]) < 1.5;
   };
   let removed = 0, dropped = 0;
   for (let i = parts.length - 1; i >= 0; i--) {
     const pt = parts[i]!;
     if (pt.kind === "skin" || pt.kind === "eye") continue;
-    const inside = verts(pt.mesh).map(covered);
+    // The fascia only fills gaps between visible muscles; under the shorts it has no job, and over the groin (where no
+    // muscle stops it) it kept the scanned skin's shape in front of the fabric. All of it inside the band goes.
+    const inside = verts(pt.mesh).map((p) => (pt.kind === "deep" ? shortsF(p) > 0 && !handOf(p) && Math.abs(p[2]) < 24 : covered(p)));
     const keep: number[] = [];
     for (let t = 0; t < pt.mesh.idx.length; t += 3) {
       const tri = [pt.mesh.idx[t]!, pt.mesh.idx[t + 1]!, pt.mesh.idx[t + 2]!];

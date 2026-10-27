@@ -38,8 +38,10 @@ export interface AthletePlayer {
   seek(t: number): void;
   time(): number;
   setView(view: CameraView): void;
-  /** Extra orbit around the athlete (radians), e.g. from dragging. */
+  /** Extra orbit around the athlete (radians), e.g. from dragging; a full 360° turn is allowed. */
   orbit(dYaw: number, dPitch: number): void;
+  /** Zoom by a factor (below 1 moves closer), e.g. from a pinch or the mouse wheel; kept between 0.35× and 1.6×. */
+  zoom(factor: number): void;
   setGlow(on: boolean): void;
   resize(width: number, height: number): void;
   /** Renders one still (for step thumbnails and the angle buttons) and returns it as a data URL. */
@@ -121,6 +123,7 @@ export async function mountAthlete(
   let view: CameraView = "front";
   let yawExtra = 0;
   let pitch = 0.08;
+  let zoomK = 1;
   let last = performance.now();
   let raf = 0;
   const listeners: ((t: number, e: number) => void)[] = [];
@@ -139,7 +142,7 @@ export async function mountAthlete(
     const yaw = VIEW_YAW[v] + (cam === stage.camera ? yawExtra : 0) + (shot?.yaw ?? 0);
     const p = cam === stage.camera ? pitch : 0.08;
     const base = shot?.distance ?? opts.framing?.distance ?? 340;
-    const dist = aspect < 0.8 && !shot?.distance ? base * 1.3 : base;
+    const dist = (aspect < 0.8 && !shot?.distance ? base * 1.3 : base) * (cam === stage.camera && !shot ? zoomK : 1);
     // Follow the hips a little so the whole athlete stays in frame as they squat or lie down.
     const target = new THREE.Vector3(0, shot?.targetY ?? opts.framing?.targetY ?? 34 + 0.55 * pelvisY, 0);
     cam.position.set(Math.cos(yaw) * Math.cos(p) * dist, target.y + Math.sin(p) * dist + 6, Math.sin(yaw) * Math.cos(p) * dist);
@@ -212,6 +215,9 @@ export async function mountAthlete(
     orbit(dy, dp) {
       yawExtra += dy;
       pitch = Math.max(-0.15, Math.min(0.7, pitch + dp));
+    },
+    zoom(f) {
+      zoomK = Math.max(0.35, Math.min(1.6, zoomK * f));
     },
     setGlow(on) {
       glowOn = on;

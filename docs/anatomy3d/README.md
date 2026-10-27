@@ -49,16 +49,18 @@ bash scripts/anatomy/preview/build.sh          # .anatomy-preview/index.html
 
 ## Known problems (honest list)
 
-Compared with the owner's reference image (`docs/anatomy3d` target: the gold anatomical barbell-squat illustration):
+Compared with the owner's reference image (the gold anatomical barbell-squat illustration):
 
-- **Face**: MakeHuman head (Caucasian young male, stronger jaw/chin/cheekbones, heavier brow, bald). It is smooth,
-  untextured gold: no fine facial anatomy, eyebrows or eyelashes, and the eyes are simple shaded spheres.
-- **Physique**: bodybuilder proportions come from a smooth morph of an average subject (chest, back, arms, quads,
-  calves). The pectorals and abs are less deeply cut than in the reference.
-- **Shorts**: matte black with a gold-trimmed waistband and hems, cut cleanly in the shader. Thigh muscles still show
-  through near the lower front edge in the standing pose, and a thin sheet artefact appears beside the hip in the deep
-  squat.
-- **Look**: real-time WebGL with bloom; the reference is a painted render with softer translucency and richer
-  lighting. It will not be pixel-identical.
-- **Size/performance**: 11.3 MB, ~434k triangles: too heavy for phones as-is (needs quantisation, LOD, compression).
-- Only the squat has been checked visually; the other exercises and the 143 planned new exercises are not done.
+- **Face**: MakeHuman head (CC0), now at true scale for the body height. It still reads as a smooth mannequin: no fine
+  facial anatomy, eyebrows or eyelashes, and the eyes are simple shaded spheres.
+- **Shorts**: a real fitted mesh, opaque over the groin, skinned to the pelvis and thighs and checked in squat, lunge,
+  hinge and run poses. The edge where the waistband and hems meet the muscles is still jagged in close-ups.
+- **Neck base**: the cut where the MakeHuman neck meets the trapezius is visible in close-ups.
+- **Deformation**: linear blend skinning without corrective shapes, so deep hip and shoulder flexion still pinches.
+- **Look**: real-time WebGL; the reference is a painted render. It will not be pixel-identical.
+- **Size**: ~410k triangles, 10.5 MB; a 45% mobile index buffer exists, but nothing has been measured on a phone.
+- **Écorché** (CC BY-SA 4.0) was evaluated as an alternative muscle source: see `ECORCHE_EVALUATION.md`.
+- Only the squat has been checked visually in depth; the other exercises and the 143 planned new exercises are not done.
+
+Player controls (play/pause, 360° drag, wheel and pinch zoom, camera presets, slow motion) are checked by
+`scripts/anatomy/preview/controls-test.mjs`.

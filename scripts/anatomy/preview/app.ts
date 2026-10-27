@@ -115,18 +115,37 @@ const STEPS = [
   const glow = $<HTMLInputElement>("#glow");
   glow.addEventListener("change", () => player.setGlow(glow.checked));
 
-  // Drag to orbit.
-  let drag: { x: number; y: number } | null = null;
+  // One finger (or the mouse) turns the athlete all the way round; two fingers pinch to zoom; the wheel zooms too.
+  canvas.style.touchAction = "none";
+  const touches = new Map<number, { x: number; y: number }>();
+  const spread = () => {
+    const [a, b] = [...touches.values()];
+    return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
+  };
   canvas.addEventListener("pointerdown", (e) => {
-    drag = { x: e.clientX, y: e.clientY };
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
     canvas.setPointerCapture(e.pointerId);
   });
   canvas.addEventListener("pointermove", (e) => {
-    if (!drag) return;
-    player.orbit((e.clientX - drag.x) * 0.008, (e.clientY - drag.y) * 0.004);
-    drag = { x: e.clientX, y: e.clientY };
+    const prev = touches.get(e.pointerId);
+    if (!prev) return;
+    if (touches.size >= 2) {
+      const before = spread();
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      const after = spread();
+      if (before > 0 && after > 0) player.zoom(before / after);
+      return;
+    }
+    player.orbit((e.clientX - prev.x) * 0.008, (e.clientY - prev.y) * 0.004);
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
   });
-  canvas.addEventListener("pointerup", () => (drag = null));
+  const lift = (e: PointerEvent) => touches.delete(e.pointerId);
+  canvas.addEventListener("pointerup", lift);
+  canvas.addEventListener("pointercancel", lift);
+  canvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    player.zoom(Math.exp(e.deltaY * 0.0012));
+  }, { passive: false });
 
   const meter = $<HTMLElement>("#meter");
   const time = $<HTMLElement>("#time");

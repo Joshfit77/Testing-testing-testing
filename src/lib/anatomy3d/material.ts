@@ -59,8 +59,10 @@ export function makeAthleteMaterial(look: AthleteLook = "gold"): AthleteMaterial
     sheen: L.sheen,
     sheenColor: new THREE.Color(L.sheenColor),
     sheenRoughness: 0.55,
-    // The shorts are an open sheet (their hems show the inside), so both faces are drawn.
-    side: THREE.FrontSide,
+    // Both faces are rasterised, but only the shorts keep their back faces (see the colour stage): the fabric over the
+    // groin is pressed flat from the scanned skin and has folded patches, which would otherwise show as see-through
+    // holes. Every other tissue is effectively single-sided.
+    side: THREE.DoubleSide,
   });
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
@@ -121,6 +123,7 @@ export function makeAthleteMaterial(look: AthleteLook = "gold"): AthleteMaterial
       .replace(
         "#include <color_fragment>",
         `#include <color_fragment>
+        if (!gl_FrontFacing && vTissue < 5.5) discard;
         float isMuscle = step(0.5, vTissue) * (1.0 - step(1.5, vTissue));
         float isEye = step(3.5, vTissue) * (1.0 - step(4.5, vTissue));
         // Muscle fibres about 8 mm apart, faded out wherever they'd be finer than a pixel (no shimmer or moiré).

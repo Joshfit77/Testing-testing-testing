@@ -1,88 +1,101 @@
-# Evaluation: Écorché and Innerscene as sources for the anatomical athlete
+# Evaluation: Écorché as the anatomy source for the athlete
 
 Status: **evaluation only.** Nothing in the app or in `public/anatomy/athlete.*` was replaced. The Écorché-based build is
-a separate file (`public/anatomy/athlete-eco.*`, not committed) made with the same pipeline.
+a separate file (`public/anatomy/athlete-eco.*`, not committed) made with the same pipeline, and both builds were
+rendered with the same renderer, lights and cameras.
 
-## 1. What the assets are
+## 1. What the asset is
 
-| | Écorché (github.com/Charleeh/ecorche, commit 320805e) | Innerscene "Male Base Mesh, rigged, A-pose" |
-|---|---|---|
-| Downloaded | Yes, cloned into a separate workspace | **No.** The environment's network policy blocks `innerscene.com` (HTTP 403 at the proxy). Not inspected; nothing stands in for it. |
-| Content | 634 named meshes: 198 bones, 159 deep and 203 superficial muscles, cartilage, teeth, eyes. 985k triangles. No skin, no rig, no poses. | (per the listing) a rigged base human mesh |
-| Source data | **The same BodyParts3D subject we already use** (v4.0 OBJ), plus Z-Anatomy for latissimus dorsi, rectus abdominis, internal oblique, transversus abdominis, back muscles and face muscles | n/a |
-| Licence (as published) | Model: **CC BY-SA 4.0**. Code: MIT. | CC0 according to you; not verified |
+Écorché (github.com/Charleeh/ecorche, commit 320805e), cloned into a separate workspace:
 
-## 2. Is Écorché better than our geometry? Partly.
+- 634 named meshes: 198 bones, 159 deep and 203 superficial muscles, cartilage, teeth and eyes; 985k triangles.
+- **No skin, no rig, no poses.** The head is facial muscles (lidless eyes, teeth), not a face.
+- Source data: **the same BodyParts3D subject we already use** (version 4.0), plus Z-Anatomy for the latissimus dorsi,
+  rectus abdominis, internal oblique, transversus abdominis, back muscles and the face muscles.
 
-It is **not** higher-detail overall. Per muscle it is often lighter than ours (gluteus maximus 1,094 triangles, deltoid
-parts 584-984); most of its triangle count is the skeleton (255k), the rebuilt external obliques (47.6k each) and the
-Z-Anatomy rectus abdominis (16k each).
+(The Innerscene rigged base mesh could not be inspected: the environment's network policy blocks `innerscene.com`.)
 
-What it does better, and why it matters for us:
+## 2. Is it a genuine improvement? Partly.
 
-- **Clean layering.** Where the two source datasets cross, it fixes the order (trapezius over lats, lats over erector
-  spinae, oblique sheath over rectus), and resolves hairline overlaps. Our raw BodyParts3D meshes cross in places,
-  which shows as torn or flickering patches.
-- **The external oblique and serratus anterior are rebuilt as single smooth surfaces.** In raw BodyParts3D they are
-  overlapping fibre bundles; that is a direct cause of the "feathered", blotchy flanks on our athlete.
-- **A better six-pack** (Z-Anatomy rectus abdominis) and cleaner lats and lower back.
-- **Exact left/right symmetry**, outward-facing surfaces, and a tendon/aponeurosis tint per vertex.
+**Muscle detail.** Not higher overall: many muscles have fewer triangles than ours (gluteus maximus 1,094; deltoid parts
+584-984). Most of its triangles are the skeleton (255k), the rebuilt external obliques (47.6k each) and the Z-Anatomy
+rectus abdominis (16k each).
 
-What it does not solve: it is the same average-build subject, has no skin, no face (the head is facial muscles with
-lidless eyes and teeth), and no rig.
+**Mesh quality.** Yes, in specific places:
+
+- the external oblique and serratus anterior are single smooth surfaces (in raw BodyParts3D they are overlapping fibre
+  bundles, a direct cause of the blotchy, "feathered" flanks on our athlete);
+- the Z-Anatomy rectus abdominis gives a crisper six-pack, and the lats and lower back read more clearly;
+- crossings between the two datasets are fixed, and left and right are exact mirrors.
+
+**Body proportions.** No change: it is the same average-build subject. The athletic proportions come from our own
+morph in both builds.
 
 ## 3. Integration test
 
 `ECORCHE=<path to ecorche.glb> npx tsx scripts/anatomy/build-athlete.mts …` takes every muscle, tendon and bone from
-Écorché instead of BodyParts3D 3.0, and keeps everything else of the pipeline: the BodyParts3D skeleton for the joints
-(so the rig is identical), the skin for hands, feet, fascia and shorts, the MakeHuman face, the athletic proportions,
-the fitted shorts, the skin weights and the gold material with per-muscle glow. Écorché's own tendon tint replaces our
-heuristic, and its white aponeurosis over the six-pack is left out so the abs can show and glow.
+Écorché, welded and fitted onto our BodyParts3D skeleton by rotation, scale and offset (Horn's method: 87 matching bones,
+**1.16 cm average residual**, 0.48° rotation; the remaining misfit is genuine shape difference between BodyParts3D
+4.0 and 3.0). Everything else is the same pipeline: the skeleton gives the joints (identical rig), the skin gives the
+hands, feet, fascia and shorts, the MakeHuman face, athletic proportions, fitted shorts, skin weights, gold material and
+per-muscle glow (the muscle names match, so the glow works unchanged). Écorché's own tendon tint replaces our heuristic,
+and its white aponeurosis over the six-pack is left out so the abs can show and glow.
 
-- Fit: scale 1.074 and offset onto 87 matching bones, **average residual 1.2 cm** (BodyParts3D 4.0 vs 3.0 differ
-  slightly; no rotation is fitted yet).
-- Size: 678k triangles, 17.3 MB (current: 427k, 11.2 MB). Mobile index buffer: 305k triangles.
-- Glow labels: the muscle names match ours, so the per-muscle glow works unchanged.
+Problems found and fixed during the test (the fixes apply to both builds):
 
-### Results (same renderer, same cameras: current | Écorché-based | raw Écorché)
+| Problem | Cause | Fix |
+|---|---|---|
+| Long sliver from armpit to hip in the squat | Z-Anatomy latissimus runs into the armpit; its arm-to-torso weight change was a narrow band | Weights spread over the whole latissimus so it stretches evenly |
+| Fragments on the front of the shorts | Fascia over the groin kept the scanned skin's shape in front of the fabric; folded fabric showed as see-through holes | All fascia inside the shorts band removed; the fabric is drawn two-sided |
+| Pieces of abdominal muscle poking through | The 1.2 cm misfit put them just outside the fabric | Anatomy less than 1.5 cm outside the fabric inside the band counts as covered (never the forearms) |
+
+Verified by casting rays from the front over the groin: in the current build the only non-fabric first hits are now the
+legitimate dark gap between the thighs below the hem and the inner-thigh muscles.
+
+### Results (same renderer and cameras: current | Écorché-based | raw Écorché)
 
 | | |
 |---|---|
-| ![](renders/ecorche-eval/05-torso.jpg) | ![](renders/ecorche-eval/02-rear.jpg) |
+| ![](renders/ecorche-eval/01-front.jpg) | ![](renders/ecorche-eval/02-rear.jpg) |
+| ![](renders/ecorche-eval/03-side.jpg) | ![](renders/ecorche-eval/05-torso.jpg) |
 | ![](renders/ecorche-eval/06-pelvis-front.jpg) | ![](renders/ecorche-eval/09-squat-bottom.jpg) |
 
-Also in `renders/ecorche-eval/`: front, side, face, squat bottom from the front and rear.
+Animated squat rep, both builds side by side: `renders/ecorche-eval/squat-rep.gif`. Also: face, squat bottom from the
+front and rear, glow off and on.
 
-**Better** in the Écorché-based build: abdominal definition, cleaner obliques and flanks, a more legible back (lats,
-thoracolumbar region), hamstrings and calves.
-
-**Worse / new defects** (integration problems, not the asset's):
-
-- thin spikes from the shoulders and flanks in the squat (some Écorché vertices get the wrong skin weights);
-- loose shards over the front of the shorts and at the waist (pieces of the lower abdominal wall that the "covered by
-  the shorts" test misses because of the 1.2 cm misfit);
-- 60% heavier.
-
-**Unchanged** (neither source fixes it): the face (MakeHuman in both), overall polish and the painted look of your
-reference, and deformation quality in deep flexion (linear blend skinning without corrective shapes).
+**Better** in the Écorché-based build: abs, flanks, lats and lower back; hamstrings and calves.
+**Worse:** a few more remnants at the waistband edge than the current build; 60% heavier (~654k triangles, 16.7 MB vs
+~410k, 10.5 MB).
+**Unchanged** (neither source fixes it): the face (MakeHuman in both), the jagged edge where the waistband and hems meet
+the muscles, deformation in deep flexion (linear blend skinning without corrective shapes), and the overall gap to
+the painted look of the reference.
 
 ## 4. Verdict
 
-Écorché is a **real but targeted** improvement in torso and back muscle quality, and it is the better source for the
-muscles we highlight most (abs, obliques, lats). It is not a different class of model: it will not by itself make the
-athlete look like your reference. Worth adopting **if** the spikes and shards are fixed (rotation fit, weight fix for the
-Z-Anatomy pieces, removal test against the shorts). Not ready to replace the current asset today.
+Écorché is a **real but targeted** improvement in the muscles the app highlights most (abs, obliques, lats), and its
+integration now animates as cleanly as the current build. It is not a different class of model and will not by itself
+reach the reference. Recommendation: adopt it for the torso and back once the waistband edge is cleaned up, and budget for
+the extra weight on phones (the mobile index buffer brings it to ~294k triangles).
 
-## 5. Licensing notes (not legal advice; please have counsel confirm before release)
+## 5. Player controls (both builds)
 
-- **Écorché, CC BY-SA 4.0.** Commercial use is allowed. Required: attribution (their suggested credit line, e.g. in the
-  app's credits/licences screen and in `public/anatomy/LICENSE.md`), a link to the licence, and an indication of
-  changes. **Share-alike:** our athlete mesh built from it is an adaptation and must itself be offered under
-  CC BY-SA 4.0. That covers the mesh data, not the app's source code. The licence also forbids applying
-  "effective technological measures" that restrict the licensed rights; whether App Store/Play distribution (FairPlay
-  and similar) counts as that is a known open question to put to counsel.
-- **Current asset**: BodyParts3D 3.0 data is under CC BY-SA 2.1 JP, so the mesh in PR #8 already carries a share-alike
-  obligation of the same kind. (Écorché notes that BodyParts3D is now published under CC BY 4.0; a rebuild from the
-  current BodyParts3D release *without* the Z-Anatomy pieces would need attribution only, no share-alike.)
-- **MakeHuman** head: CC0. **Innerscene**: CC0 per you, but not verified, because the site is not reachable from here.
-  CC0 and CC BY-SA content can be combined; the combined mesh would then be offered under CC BY-SA 4.0.
+Checked in Chromium by `scripts/anatomy/preview/controls-test.mjs`: play/pause, 360° drag rotation, mouse-wheel zoom,
+**two-finger pinch zoom (new)**, front/side/rear presets, slow motion (0.35×) and full speed. All pass. Not tested on a
+physical phone.
+
+## 6. Licensing (CC BY-SA 4.0, checked against the licence text in the repository; not legal advice)
+
+- **Commercial use is allowed.**
+- **Attribution (Section 3(a)):** keep the creator credit and notices, say that the material was modified, and include the
+  licence or its URL. Écorché's suggested credit: "Écorché (github.com/Charleeh/ecorche), CC BY-SA 4.0. Based on
+  BodyParts3D, © The Database Center for Life Science, CC BY 4.0, and Z-Anatomy by Gauthier Kervyn, CC BY-SA 4.0." This
+  belongs in the app's credits/licences screen and in `public/anatomy/LICENSE.md`.
+- **ShareAlike (Section 3(b)):** our athlete mesh built from it is Adapted Material and must be licensed CC BY-SA 4.0
+  (or a compatible licence). This covers the mesh data, not the app's code.
+- **No downstream restrictions (Sections 2(a)(5)(C) and 3(b)(3)):** we may not apply "Effective Technological
+  Measures" that restrict recipients' rights to the mesh. Whether App Store / Play distribution counts as such a
+  measure is an open question for counsel before release.
+- The current asset already carries a similar share-alike obligation (BodyParts3D 3.0 data, CC BY-SA 2.1 JP). Écorché
+  notes BodyParts3D is now published under CC BY 4.0: a rebuild from the current BodyParts3D release *without* the
+  Z-Anatomy pieces would need attribution only.
+- MakeHuman (head): CC0. CC0 content combines freely with CC BY-SA.

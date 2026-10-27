@@ -11,7 +11,7 @@ import * as THREE from "three";
 import { MeshoptSimplifier } from "meshoptimizer";
 import { MeshBVH } from "three-mesh-bvh";
 import { MEASURED_BIND } from "../../src/lib/anatomy3d/athlete-bind.generated";
-import { BONES, TISSUE } from "../../src/lib/anatomy3d/muscle-ids";
+import { BONES, muscleId, TISSUE } from "../../src/lib/anatomy3d/muscle-ids";
 import { computeWeights } from "./weights";
 
 type Layout = Record<string, { offset: number; length: number; type: string }>;
@@ -79,13 +79,86 @@ const { skinIndex, skinWeight } = computeWeights(pos, idx, label, MEASURED_BIND,
   }
   console.log(`fascia: ${moved} vertices take their weights from the muscles over them`);
 }
+// The latissimus dorsi runs from the pelvis and spine into the armpit, onto the humerus: when the arms rise (a bar on
+// the back, a pull-up) it has to stretch evenly along its whole length. Its arm-to-torso weight change is spread over
+// the entire muscle instead of a narrow band at the armpit, which tore into a long sliver.
+{
+  const NB = BONES.length;
+  const lat = new Set([muscleId("lat", 0), muscleId("lat", 1)]);
+  const nbrs = new Map<number, Set<number>>();
+  for (let t = 0; t < idx.length; t += 3)
+    for (let k = 0; k < 3; k++) {
+      const a = idx[t + k]!;
+      if (!lat.has(label[a]!) || (forced && forced[a] !== 255)) continue;
+      const set = nbrs.get(a) ?? nbrs.set(a, new Set()).get(a)!;
+      for (let j = 1; j < 3; j++) set.add(idx[t + ((k + j) % 3)]!);
+    }
+  const W = new Map<number, Float32Array>();
+  for (const v of nbrs.keys()) {
+    const w = new Float32Array(NB);
+    for (let j = 0; j < 4; j++) w[skinIndex[v * 4 + j]!]! += skinWeight[v * 4 + j]! / 255;
+    W.set(v, w);
+  }
+  for (let it = 0; it < 30; it++) {
+    const next = new Map<number, Float32Array>();
+    for (const [v, ns] of nbrs) {
+      const w = Float32Array.from(W.get(v)!, (x) => x * 2);
+      for (const o of ns) {
+        const wo = W.get(o);
+        if (wo) for (let b = 0; b < NB; b++) w[b]! += wo[b]! / ns.size;
+        else for (let j = 0; j < 4; j++) w[skinIndex[o * 4 + j]!]! += skinWeight[o * 4 + j]! / 255 / ns.size;
+      }
+      next.set(v, w.map((x) => x / 3));
+    }
+    for (const [v, w] of next) W.set(v, w);
+  }
+  for (const [v, w] of W) {
+    const top = Array.from(w, (x, b) => [x, b] as [number, number]).sort((a, b) => b[0] - a[0]).slice(0, 4);
+    const sum = top.reduce((a, [x]) => a + x, 0) || 1;
+    let acc = 0;
+    top.forEach(([x, b], i) => {
+      skinIndex[v * 4 + i] = b;
+      const q = i === 3 ? 255 - acc : Math.round((x / sum) * 255);
+      skinWeight[v * 4 + i] = Math.max(0, q);
+      acc += q;
+    });
+  }
+  console.log(`latissimus: weights spread over ${W.size} vertices`);
+}
 view("skinIndex", Uint8Array).set(skinIndex);
 view("skinWeight", Uint8Array).set(skinWeight);
+
+// Fascia triangles that bridge the arm and the torso (across the armpit) would stretch into long slivers when the arms
+// rise: they fill no visible gap, so they go. (Written back into the index block, which only gets shorter.)
+let tris: Uint32Array = new Uint32Array(idx);
+{
+  const ARM = new Set(BONES.flatMap((b, i) => (/upperArm|foreArm|hand/.test(b) ? [i] : [])));
+  const keep: number[] = [];
+  let dropped = 0;
+  for (let t = 0; t < tris.length; t += 3) {
+    const tri = [tris[t]!, tris[t + 1]!, tris[t + 2]!];
+    if (tissue[tri[0]!] === TISSUE.deep) {
+      const arm = tri.map((v) => ARM.has(skinIndex[v * 4]!));
+      if (arm.some(Boolean) && !arm.every(Boolean)) {
+        dropped++;
+        continue;
+      }
+    }
+    keep.push(...tri);
+  }
+  if (dropped) {
+    tris = new Uint32Array(keep);
+    const l = meta.layout.index!;
+    (l.type === "Uint32Array" ? view("index", Uint32Array) : view("index", Uint16Array)).set(tris);
+    l.length = tris.length;
+  }
+  console.log(`fascia: ${dropped} triangles bridging arm and torso removed`);
+}
 
 // Ambient occlusion: 32 cosine-weighted rays per vertex, nearer hits darker.
 const geo = new THREE.BufferGeometry();
 geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(pos), 3));
-geo.setIndex(new THREE.BufferAttribute(new Uint32Array(idx), 1));
+geo.setIndex(new THREE.BufferAttribute(tris, 1));
 geo.computeVertexNormals();
 const bvh = new MeshBVH(geo);
 const nrm = geo.getAttribute("normal") as THREE.BufferAttribute;
@@ -130,7 +203,7 @@ putBlock("ao", ao);
 // outline locked so neighbouring parts still meet). Vertices are untouched, so weights, glow and shading still apply.
 {
   await MeshoptSimplifier.ready;
-  const src = new Uint32Array(idx);
+  const src = tris;
   const lod = MeshoptSimplifier.simplify(src, new Float32Array(pos), 3, Math.round(src.length * 0.45 / 3) * 3, 0.004, ["LockBorder"])[0];
   putBlock("indexLod1", lod);
   console.log(`mobile detail: ${lod.length / 3} of ${src.length / 3} triangles`);
