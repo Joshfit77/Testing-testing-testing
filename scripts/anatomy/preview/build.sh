@@ -7,11 +7,8 @@ OUT="$ROOT/.anatomy-preview"
 mkdir -p "$OUT/anatomy"
 "$ROOT/node_modules/.bin/esbuild" "$ROOT/scripts/anatomy/preview/app.ts" --bundle --format=iife --minify \
   --alias:@="$ROOT/src" --outfile="$OUT/app.js" --log-level=warning
-cp "$ROOT/public/anatomy/athlete.bin" "$ROOT/public/anatomy/athlete.json" "$OUT/anatomy/"
-# The Écorché-based evaluation build, when present (?asset=athlete-eco).
-if [ -f "$ROOT/public/anatomy/athlete-eco.bin" ]; then cp "$ROOT/public/anatomy/athlete-eco.bin" "$ROOT/public/anatomy/athlete-eco.json" "$OUT/anatomy/"; fi
-# The raw Écorché athlete (?asset=athlete-raw).
-if [ -f "$ROOT/public/anatomy/athlete-raw.bin" ]; then cp "$ROOT/public/anatomy/athlete-raw.bin" "$ROOT/public/anatomy/athlete-raw.json" "$OUT/anatomy/"; fi
+# The raw Écorché athlete (the only character).
+cp "$ROOT/public/anatomy/athlete-raw.bin" "$ROOT/public/anatomy/athlete-raw.json" "$OUT/anatomy/"
 python3 - "$OUT" "$ROOT/scripts/anatomy/preview/page.html" <<'PY'
 import sys
 out, page = sys.argv[1], sys.argv[2]

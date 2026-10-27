@@ -41,7 +41,7 @@ const LOOKS = {
   },
 } as const;
 
-export function makeAthleteMaterial(look: AthleteLook = "gold"): AthleteMaterial {
+export function makeAthleteMaterial(look: AthleteLook = "ecorche"): AthleteMaterial {
   if (look === "ecorche") return makeEcorcheMaterial();
   const L = LOOKS[look];
   const glow = new Float32Array(MUSCLE_ID_COUNT + 1);

@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { BIND, type BindJoints, type V3 } from "./bind";
 import { BONES, type BoneName } from "./muscle-ids";
 
-/** Layout of public/anatomy/athlete.json (written by scripts/anatomy/build-athlete.mts and reweight.mts). */
+/** Layout of public/anatomy/athlete-raw.json (written by scripts/anatomy/build-athlete.mts and reweight.mts). */
 interface AthleteMeta {
   version: number;
   vertices: number;
@@ -32,7 +32,7 @@ let cached: Promise<AthleteGeometry> | null = null;
  * Loads the athlete mesh once per page. `detail: "mobile"` draws the lighter index buffer (about 45% of the
  * triangles, same vertices, so skinning, glow and shading data are unchanged) where the asset has one.
  */
-export function loadAthlete(base = "/anatomy/athlete", detail: "full" | "mobile" = "full"): Promise<AthleteGeometry> {
+export function loadAthlete(base = "/anatomy/athlete-raw", detail: "full" | "mobile" = "full"): Promise<AthleteGeometry> {
   cached ??= (async () => {
     const [metaRes, binRes] = await Promise.all([fetch(`${base}.json`), fetch(`${base}.bin`)]);
     if (!metaRes.ok || !binRes.ok) throw new Error("The 3D athlete couldn't be loaded.");

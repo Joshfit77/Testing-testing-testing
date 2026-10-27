@@ -73,18 +73,19 @@ export async function mountAthlete(
     pixelRatio?: number;
     hideProps?: string[];
     framing?: { distance?: number; targetY?: number };
-    /** "gold" (default) or "medical" (red muscle, white tendons, like an anatomy plate). */
+    /** "ecorche" (default: the raw Écorché model's own red-and-white look), or "gold" / "medical". */
     look?: AthleteLook;
     /** "mobile" draws the lighter mesh; "auto" (default) picks it on touch devices. */
     detail?: "full" | "mobile" | "auto";
   } = {},
 ): Promise<AthletePlayer> {
-  const stage: Stage = makeStage(canvas, { pixelRatio: opts.pixelRatio, look: opts.look });
+  const look = opts.look ?? "ecorche";
+  const stage: Stage = makeStage(canvas, { pixelRatio: opts.pixelRatio, look });
   const coarse = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
   const detail = opts.detail === "full" || opts.detail === "mobile" ? opts.detail : coarse ? "mobile" : "full";
   const { geometry, bind } = await loadAthlete(opts.assetBase, detail);
   if (bind) setRestJoints(bind);
-  const mat = makeAthleteMaterial(opts.look);
+  const mat = makeAthleteMaterial(look);
   const { bones, skeleton } = makeSkeleton();
   if (!geometry.morphAttributes.position) addGripMorph(geometry);
   const mesh = new THREE.SkinnedMesh(geometry, mat.material);

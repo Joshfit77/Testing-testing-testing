@@ -47,10 +47,9 @@ ECORCHE=/path/to/ecorche/model/ecorche.glb ECORCHE_USE=raw \
 ATHLETE=public/anatomy/athlete-raw npx tsx scripts/anatomy/reweight.mts
 ```
 
-The preview shows it with `?asset=athlete-raw` (`scripts/anatomy/preview/build.sh`, then open
-`.anatomy-preview/index.html?asset=athlete-raw`).
+The preview shows it (`bash scripts/anatomy/preview/build.sh`, then open `.anatomy-preview/index.html`).
 
-Size: 984k triangles, 33 MB with the mobile index buffer (443k triangles). That is twice the gold athlete;
+Size: 984k triangles, 33 MB with the mobile index buffer (443k triangles). That is large for a phone;
 compressing it (Draco or meshopt) or dropping fully hidden deep structures would be the next step before shipping it to
 phones. Not tested on a phone.
 
@@ -91,7 +90,7 @@ play and pause) are checked by `scripts/anatomy/preview/controls-test.mjs` again
 
 ## Known limits
 
-- **Deformation** is linear blend skinning, as for the gold athlete. Deep hip and knee flexion compresses the muscles
+- **Deformation** is linear blend skinning. Deep hip and knee flexion compresses the muscles
   around the joint instead of bulging them, and there are no corrective shapes.
 - **Knee at full depth**: the patella and tendons crowd together at the front of the knee, the same skinning limit.
 - **Between the glutes**: the sacrum, coccyx and the white tissue of the pelvic floor show, as on the published model.
