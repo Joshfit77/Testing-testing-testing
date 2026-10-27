@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Award, ChevronRight, CreditCard, Download, LogOut, SlidersHorizontal } from "lucide-react";
+import { WithdrawAiConsentForm } from "@/components/coach/ai-consent";
 import { PageHeader } from "@/components/common/page-header";
 import { DeleteAccountForm, ProfileForm, WithdrawConsentForm } from "@/components/profile/profile-forms";
 import { Button } from "@/components/ui/button";
@@ -103,6 +104,15 @@ export default async function ProfilePage() {
               : "You haven't consented to storing optional wellness information."}
           </p>
           {profile.wellness_consent_at && <WithdrawConsentForm />}
+        </div>
+        <div>
+          <p className="text-sm font-semibold">AI coach data sharing</p>
+          <p className="mb-2 text-xs text-muted-foreground">
+            {profile.ai_consent_at
+              ? `You agreed on ${new Date(profile.ai_consent_at).toLocaleDateString()} to share coach messages and a training summary with our AI provider, Anthropic. Turning this off stops all sharing; your saved conversations stay until you delete them.`
+              : "You haven't agreed to share data with the AI coach provider. The coach asks before you send your first message."}
+          </p>
+          {profile.ai_consent_at && <WithdrawAiConsentForm />}
         </div>
         <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4">
           <p className="text-sm font-semibold text-[#f08a8a]">Delete account</p>

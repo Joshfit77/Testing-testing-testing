@@ -13,6 +13,7 @@ import { rateLimit } from "@/server/rate-limit";
 import { logError } from "@/server/log";
 
 export type AiErrorCode =
+  | "consent_required"
   | "not_configured"
   | "disabled"
   | "not_entitled"
@@ -35,6 +36,7 @@ export class AiError extends Error {
 }
 
 export const AI_ERROR_STATUS: Record<AiErrorCode, number> = {
+  consent_required: 403,
   not_configured: 503,
   disabled: 503,
   not_entitled: 403,
@@ -109,6 +111,9 @@ export async function assertAiAllowed(userId: string, plan: Plan, mode: "chat" |
   }
   // Durable metering requires the service role (users cannot write their own usage rows).
   if (!isServiceRoleConfigured()) throw new AiError("metering_unavailable", "AI usage metering isn't configured on this server.");
+  // Nothing goes to the AI provider until the member has explicitly agreed (Apple 5.1.2(i)).
+  const { data: consent } = await getServiceSupabase().from("profiles").select("ai_consent_at").eq("id", userId).maybeSingle();
+  if (!consent?.ai_consent_at) throw new AiError("consent_required", "Please review and agree to how the AI coach uses your data before sending a message.");
   const perMinute = Number.parseInt(process.env.AI_RATE_LIMIT_PER_MINUTE ?? "6", 10) || 6;
   const burst = await rateLimit(`ai:${userId}`, perMinute, 60_000);
   if (!burst.ok) throw new AiError("rate_limited", "You're sending messages quickly — please wait a moment.", burst.retryAfterSeconds);

@@ -95,6 +95,10 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
   it("enforces AI entitlements and monthly quotas server-side", async () => {
     await expect(assertAiAllowed(user.id, "free", "chat")).rejects.toMatchObject({ code: "not_entitled" });
     await expect(assertAiAllowed(user.id, "plus", "plan")).rejects.toMatchObject({ code: "plan_not_entitled" });
+    // Nothing is sent to the AI provider until the member explicitly agrees.
+    await expect(assertAiAllowed(user.id, "plus", "chat")).rejects.toMatchObject({ code: "consent_required" });
+    const { error: consentErr } = await user.client.from("profiles").update({ ai_consent_at: new Date().toISOString() }).eq("id", user.id);
+    expect(consentErr).toBeNull();
     await expect(assertAiAllowed(user.id, "plus", "chat")).resolves.toMatchObject({ chatUsed: 0 });
 
     process.env.PLAN_PLUS_AI_MONTHLY_LIMIT = "2";

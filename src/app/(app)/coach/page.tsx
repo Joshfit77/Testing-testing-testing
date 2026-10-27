@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { MessageSquarePlus } from "lucide-react";
+import { AiConsentCard } from "@/components/coach/ai-consent";
 import { CoachChat, type ChatMessage } from "@/components/coach/coach-chat";
 import { PageHeader } from "@/components/common/page-header";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,7 @@ export const metadata = { title: "AI Coach" };
 
 export default async function CoachPage({ searchParams }: { searchParams: Promise<{ c?: string; q?: string }> }) {
   const sp = await searchParams;
-  const { user } = await requireOnboardedUser();
+  const { user, profile } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
   const plan = await getUserPlan(user.id);
   const [convRes, exRes, flag, usage] = await Promise.all([
@@ -80,17 +81,21 @@ export default async function CoachPage({ searchParams }: { searchParams: Promis
             </ul>
           )}
         </nav>
-        <CoachChat
-          key={selected ?? "new"}
-          conversationId={selected}
-          initialMessages={(msgs ?? []) as ChatMessage[]}
-          initialQuestion={selected ? "" : (sp.q ?? "").slice(0, 500)}
-          enabled={!disabledReason}
-          disabledReason={disabledReason}
-          canGeneratePlans={hasFeature(plan, "ai_plan_generation")}
-          usage={{ used: usage.chatUsed, limit: usage.chatLimit }}
-          exerciseNames={Object.fromEntries((exRes.data ?? []).map((e) => [e.slug as string, e.name as string]))}
-        />
+        {!disabledReason && !profile.ai_consent_at ? (
+          <AiConsentCard />
+        ) : (
+          <CoachChat
+            key={selected ?? "new"}
+            conversationId={selected}
+            initialMessages={(msgs ?? []) as ChatMessage[]}
+            initialQuestion={selected ? "" : (sp.q ?? "").slice(0, 500)}
+            enabled={!disabledReason}
+            disabledReason={disabledReason}
+            canGeneratePlans={hasFeature(plan, "ai_plan_generation")}
+            usage={{ used: usage.chatUsed, limit: usage.chatLimit }}
+            exerciseNames={Object.fromEntries((exRes.data ?? []).map((e) => [e.slug as string, e.name as string]))}
+          />
+        )}
       </div>
     </div>
   );

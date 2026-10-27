@@ -234,7 +234,9 @@ export default function PrivacyPage() {
 
       <Section id="ai-coach">
         <p>
-          The AI coach is provided using Anthropic&apos;s Claude models. Each time you send the coach a message, our servers send Anthropic:
+          The AI coach is provided using Anthropic&apos;s Claude models. Before you can send your first message, the coach explains what
+          is shared and asks for your explicit agreement; nothing is sent to Anthropic until you agree. After that, each time you send the
+          coach a message, our servers send Anthropic:
         </p>
         <ul>
           <li>Your new message and up to 20 earlier messages from the same conversation.</li>
@@ -379,7 +381,9 @@ export default function PrivacyPage() {
             delete existing journal entries; delete entries individually or delete your account to remove them.
           </li>
           <li>
-            <strong>AI coach.</strong> The AI coach is used only when you send it a message. You can delete conversations at any time.
+            <strong>AI coach.</strong> Nothing is shared with our AI provider until you agree on the coach screen, and the coach is used only
+            when you send it a message. You can turn off AI coach data sharing at any time in Profile → Privacy &amp; data, which stops all
+            further sharing, and you can delete conversations at any time.
           </li>
           <li>
             <strong>Reminders.</strong> Workout reminders are scheduled on your device and can be turned off in the app or in your device

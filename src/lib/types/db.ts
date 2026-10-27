@@ -10,6 +10,7 @@ export interface ProfileRow {
   sex: "male" | "female" | "unspecified" | null;
   faith_enabled: boolean;
   wellness_consent_at: string | null;
+  ai_consent_at: string | null;
   onboarding_completed_at: string | null;
   timezone: string;
   avatar_path: string | null;

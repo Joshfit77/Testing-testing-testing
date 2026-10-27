@@ -7,6 +7,7 @@ import { aiPlanStrictSchema, aiPlanToProgramSeed, validateAiPlan } from "@/lib/v
 import { getUserPlan, requireUser } from "@/server/auth";
 import { hasFeature } from "@/lib/domain/plans";
 import { activateProgram, createPrivateProgram } from "@/server/services/programs";
+import { actionError, actionOk, type ActionState } from "@/lib/action-state";
 import { logError } from "@/server/log";
 
 type Result = { ok: true; message: string; programSlug?: string } | { ok: false; error: string };
@@ -60,4 +61,33 @@ export async function deleteConversationAction(conversationId: string): Promise<
   await supabase.from("ai_conversations").delete().eq("id", id.data).eq("user_id", user.id);
   revalidatePath("/coach");
   return { ok: true, message: "Conversation deleted." };
+}
+
+/** Record the member's explicit agreement to send coach requests to the AI provider. */
+export async function giveAiConsentAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const user = await requireUser();
+  if (formData.get("agree") !== "on") return actionError("Tick the box to confirm you agree.", { agree: "Required" });
+  const supabase = await getServerSupabase();
+  const { error } = await supabase.from("profiles").update({ ai_consent_at: new Date().toISOString() }).eq("id", user.id);
+  if (error) {
+    logError("coach.consent", error);
+    return actionError("Couldn't save your choice. Please try again.");
+  }
+  revalidatePath("/coach");
+  revalidatePath("/profile");
+  return actionOk("Thanks — you can now use the AI coach.");
+}
+
+/** Stop sending anything to the AI provider. Existing conversations stay until the member deletes them. */
+export async function withdrawAiConsentAction(_prev: ActionState): Promise<ActionState> {
+  const user = await requireUser();
+  const supabase = await getServerSupabase();
+  const { error } = await supabase.from("profiles").update({ ai_consent_at: null }).eq("id", user.id);
+  if (error) {
+    logError("coach.consent_withdraw", error);
+    return actionError("Couldn't update your choice. Please try again.");
+  }
+  revalidatePath("/coach");
+  revalidatePath("/profile");
+  return actionOk("AI coach turned off. Nothing more will be sent to the AI provider.");
 }
