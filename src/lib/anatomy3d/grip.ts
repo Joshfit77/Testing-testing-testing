@@ -11,38 +11,60 @@ export function addGripMorph(geometry: THREE.BufferGeometry, curl = 2.6): void {
   const pos = geometry.getAttribute("position") as THREE.BufferAttribute;
   const si = geometry.getAttribute("skinIndex") as THREE.BufferAttribute;
   const sw = geometry.getAttribute("skinWeight") as THREE.BufferAttribute;
-  const delta = new Float32Array(pos.count * 3);
-  const hands = (["R", "L"] as const).map((s) => {
+  const reach = gripReach([{ pos, si, sw }]);
+  geometry.morphAttributes.position = [new THREE.BufferAttribute(gripDelta(pos, si, sw, reach, curl), 3)];
+  geometry.morphTargetsRelative = true;
+}
+
+type Attr = Pick<THREE.BufferAttribute, "count" | "getX" | "getY" | "getZ" | "getComponent">;
+const handFrames = () =>
+  (["R", "L"] as const).map((s) => {
     const J = BIND[s];
     const wrist = v(J.wrist);
     const dir = wrist.clone().sub(v(J.elbow)).normalize();
     const palm = new THREE.Vector3(1, 0, 0).addScaledVector(dir, -dir.x).normalize(); // palms face forward at rest
-    return { bone: BONES.indexOf(`hand${s}`), wrist, dir, palm, axis: new THREE.Vector3().crossVectors(dir, palm).normalize(), reach: 0 };
+    return { bone: BONES.indexOf(`hand${s}`), wrist, dir, palm, axis: new THREE.Vector3().crossVectors(dir, palm).normalize() };
   });
-  const p = new THREE.Vector3();
-  const owner = new Int8Array(pos.count).fill(-1);
-  const handW = new Float32Array(pos.count);
-  for (let i = 0; i < pos.count; i++) {
-    for (let k = 0; k < 4; k++) {
-      const h = hands.findIndex((x) => x.bone === si.getComponent(i, k));
-      const w = sw.getComponent(i, k);
-      if (h >= 0 && w > handW[i]!) {
-        owner[i] = h;
-        handW[i] = w;
-      }
-    }
-    if (owner[i]! >= 0) {
-      const hd = hands[owner[i]!]!;
-      hd.reach = Math.max(hd.reach, p.fromBufferAttribute(pos, i).sub(hd.wrist).dot(hd.dir));
+/** The hand (0 right, 1 left, -1 none) that carries a vertex most, and how much. */
+const handOf = (hands: ReturnType<typeof handFrames>, si: Attr, sw: Attr, i: number): [number, number] => {
+  let owner = -1, best = 0;
+  for (let k = 0; k < 4; k++) {
+    const h = hands.findIndex((x) => x.bone === si.getComponent(i, k));
+    const w = sw.getComponent(i, k);
+    if (h >= 0 && w > best) {
+      owner = h;
+      best = w;
     }
   }
+  return [owner, best];
+};
+
+/** How far each hand reaches past the wrist (rest pose, rig frame), over one or more meshes. */
+export function gripReach(meshes: { pos: Attr; si: Attr; sw: Attr }[]): [number, number] {
+  const hands = handFrames();
+  const reach: [number, number] = [0, 0];
+  const p = new THREE.Vector3();
+  for (const { pos, si, sw } of meshes)
+    for (let i = 0; i < pos.count; i++) {
+      const [h] = handOf(hands, si, sw, i);
+      if (h >= 0) reach[h] = Math.max(reach[h]!, p.set(pos.getX(i), pos.getY(i), pos.getZ(i)).sub(hands[h]!.wrist).dot(hands[h]!.dir));
+    }
+  return reach;
+}
+
+/** The grip's displacement of each vertex (rig frame, rest-pose positions in the rig frame). */
+export function gripDelta(pos: Attr, si: Attr, sw: Attr, reach: [number, number], curl = 2.6): Float32Array {
+  const hands = handFrames();
+  const delta = new Float32Array(pos.count * 3);
+  const p = new THREE.Vector3();
   const q = new THREE.Quaternion();
   const o = new THREE.Vector3();
   for (let i = 0; i < pos.count; i++) {
-    if (owner[i]! < 0) continue;
-    const hd = hands[owner[i]!]!;
-    const knuckle = hd.reach * 0.52;
-    p.fromBufferAttribute(pos, i).sub(hd.wrist);
+    const [h, handW] = handOf(hands, si, sw, i);
+    if (h < 0) continue;
+    const hd = hands[h]!;
+    const knuckle = reach[h]! * 0.52;
+    p.set(pos.getX(i), pos.getY(i), pos.getZ(i)).sub(hd.wrist);
     const along = p.dot(hd.dir);
     const s = along - knuckle;
     if (s <= 0) continue;
@@ -51,13 +73,12 @@ export function addGripMorph(geometry: THREE.BufferGeometry, curl = 2.6): void {
     q.setFromAxisAngle(hd.axis, phi);
     o.applyQuaternion(q);
     const target = hd.dir.clone().multiplyScalar(knuckle + curl * Math.sin(phi)).addScaledVector(hd.palm, curl * (1 - Math.cos(phi))).add(o);
-    const w = Math.min(1, handW[i]! * 1.3);
+    const w = Math.min(1, handW * 1.3);
     delta[i * 3] = (target.x - p.x) * w;
     delta[i * 3 + 1] = (target.y - p.y) * w;
     delta[i * 3 + 2] = (target.z - p.z) * w;
   }
-  geometry.morphAttributes.position = [new THREE.BufferAttribute(delta, 3)];
-  geometry.morphTargetsRelative = true;
+  return delta;
 }
 
 const v = (a: V3) => new THREE.Vector3(a[0], a[1], a[2]);

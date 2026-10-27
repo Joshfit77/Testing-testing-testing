@@ -1,6 +1,6 @@
 // Usage: CHROMIUM_PATH=... node scripts/anatomy/preview/model-controls-test.mjs .anatomy-preview [index.html|artifact.html]
 // The model view (the original Écorché model standing in the player): checks, on a phone-sized touch screen with real
-// touch input (Chrome DevTools touch events, as a finger produces), that the model is the published file, stands still,
+// touch input (Chrome DevTools touch events, as a finger produces), that the model is the published file, performs the squat (and stops on pause),
 // turns a full 360° under one finger, zooms with a pinch, moves along the body with two fingers, zooms with the wheel,
 // and that the front, side and rear buttons work.
 import { chromium } from 'playwright';
@@ -42,8 +42,14 @@ const results = {};
 if (page === 'index.html') results['loads the original GLB, byte for byte'] = served.length === 1 && served[0] === ORIGINAL_SHA256;
 results['the page itself confirms the file is unmodified (sha256)'] = await p.evaluate(() => window.modelVerified === true);
 results['nothing else is drawn as the character (no rigged athlete loaded)'] = await p.evaluate(() => !window.player && !!window.viewer);
-let a = await shot(); await p.waitForTimeout(1200); let c = await shot();
-results['stands still (no animation)'] = (await diff(a, c)) === 0;
+// The model itself performs the exercise (its own meshes, skinned), and the play button pauses it: the turn and zoom
+// checks below run paused, so only the controls change the picture.
+results['all 634 of the file\'s meshes are skinned (the file is what moves)'] = await p.evaluate(() => window.viewer.motion?.skinnedMeshes === 634);
+let a = await shot(); await p.waitForTimeout(1500); let c = await shot();
+results['plays the squat'] = (await diff(a, c)) > 0.2;
+await p.tap('#play'); await p.waitForTimeout(400);
+a = await shot(); await p.waitForTimeout(1200); c = await shot();
+results['pause stops it'] = (await diff(a, c)) === 0 && (await p.evaluate(() => window.viewer.motion.playing === false));
 a = await shot();
 await drag([[cx - 60, cy]], [[cx + 60, cy]]);
 c = await shot();

@@ -8,7 +8,8 @@ mkdir -p "$OUT/anatomy"
 "$ROOT/node_modules/.bin/esbuild" "$ROOT/scripts/anatomy/preview/app.ts" --bundle --format=iife --minify \
   --alias:@="$ROOT/src" --outfile="$OUT/app.js" --log-level=warning
 # The original Écorché model (the default view) and the rigged athlete built from it (?ex=…, later milestones).
-cp "$ROOT/public/anatomy/ecorche.glb" "$ROOT/public/anatomy/athlete-raw.bin" "$ROOT/public/anatomy/athlete-raw.json" "$OUT/anatomy/"
+cp "$ROOT/public/anatomy/ecorche.glb" "$ROOT/public/anatomy/ecorche-skin.bin" "$ROOT/public/anatomy/ecorche-skin.json" \
+  "$ROOT/public/anatomy/athlete-raw.bin" "$ROOT/public/anatomy/athlete-raw.json" "$OUT/anatomy/"
 python3 - "$OUT" "$ROOT/scripts/anatomy/preview/page.html" <<'PY'
 import sys
 out, page = sys.argv[1], sys.argv[2]
@@ -25,7 +26,9 @@ half = len(glb) // 2
 names = ["anatomy/ecorche-1.txt", "anatomy/ecorche-2.txt"]
 for name, part in zip(names, [glb[:half], glb[half:]]):
     open(f"{out}/{name}", "w").write(part)
-parts = "<script>window.ECORCHE_PARTS = " + str(names).replace("'", '"') + ";</script>\n"
+skin = base64.b64encode(open(f"{out}/anatomy/ecorche-skin.bin", "rb").read()).decode()
+open(f"{out}/anatomy/ecorche-skin.txt", "w").write(skin)
+parts = "<script>window.ECORCHE_PARTS = " + str(names).replace("'", '"') + '; window.SKIN_PARTS = ["anatomy/ecorche-skin.txt"];</script>\n'
 open(f"{out}/artifact.html", "w").write(body.replace("<script>", parts + "<script>", 1))
 PY
 echo "built $OUT/index.html"

@@ -27,10 +27,20 @@ await p.evaluate(() => {
 const frames = fs.mkdtempSync(path.join(path.dirname(path.resolve(out)), 'frames-'));
 let n = 0;
 const settle = () => p.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+// When the model performs an exercise, the recording drives its clock: the motion is paused and stepped by 1/30 s per
+// frame, so the video plays at true speed however slowly each frame renders here.
+const moving = await p.evaluate(() => {
+  const m = window.viewer?.motion;
+  if (m) m.pause();
+  return !!m;
+});
+let clock = 0;
 const frame = async (count = 1) => {
-  await settle();
-  const png = await p.screenshot();
-  for (let i = 0; i < count; i++) fs.writeFileSync(path.join(frames, `f${String(n++).padStart(5, '0')}.png`), png);
+  for (let i = 0; i < count; i++) {
+    if (moving) await p.evaluate((t) => window.viewer.motion.seek(t), (clock += 1 / 30));
+    await settle();
+    fs.writeFileSync(path.join(frames, `f${String(n++).padStart(5, '0')}.png`), await p.screenshot());
+  }
 };
 const dots = (pts) => p.evaluate((pts) => {
   ['f0', 'f1'].forEach((id, i) => {
@@ -54,7 +64,8 @@ const gesture = async (from, to, steps) => {
 };
 const box = await (await p.$('#stage')).boundingBox();
 const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
-await frame(30); // standing, front
+// One rep from the front (when moving), or a moment standing.
+await frame(moving ? Math.round(await p.evaluate(() => window.viewer.motion.duration) * 30) : 30);
 // One finger: four swipes of 196 px = one full turn (2π / 0.008 per px).
 for (let i = 0; i < 4; i++) await gesture([[cx - 98, cy + 40]], [[cx + 98, cy + 40]], 22);
 await frame(15);

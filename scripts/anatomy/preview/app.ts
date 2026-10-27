@@ -1,5 +1,5 @@
 import { mountAthlete, type CameraView } from "../../../src/lib/anatomy3d/player";
-import { mountModel } from "../../../src/lib/anatomy3d/model-viewer";
+import { mountModel, type ModelSkin } from "../../../src/lib/anatomy3d/model-viewer";
 import { REGION_LABELS, type Region } from "../../../src/lib/anatomy3d/muscle-ids";
 import { EXERCISES } from "../../../src/data/exercises";
 
@@ -10,6 +10,8 @@ declare global {
     viewer?: unknown;
     /** Set by the artifact build: the GLB as base64 text parts (artifacts do not serve .glb files). */
     ECORCHE_PARTS?: string[];
+    /** The same for the model's skin weights (anatomy/ecorche-skin.bin). */
+    SKIN_PARTS?: string[];
     modelVerified?: boolean;
   }
 }
@@ -19,6 +21,11 @@ const ECORCHE_SHA256 = "9744d3dffced835961104447d23a781ad469588289ce322d84d000e0
 
 /** The model file's bytes, from the .glb itself or from its base64 parts, with download progress. */
 async function fetchModel(onProgress: (f: number) => void): Promise<ArrayBuffer> {
+  return fetchBinary("anatomy/ecorche.glb", window.ECORCHE_PARTS, onProgress);
+}
+
+/** A binary file, fetched as it is or (artifact builds, which serve no binary types) as base64 text parts. */
+async function fetchBinary(url: string, parts: string[] | undefined, onProgress: (f: number) => void): Promise<ArrayBuffer> {
   const read = async (url: string, done: number, share: number) => {
     const res = await fetch(url);
     if (!res.ok || !res.body) throw new Error(`${url}: ${res.status}`);
@@ -41,8 +48,7 @@ async function fetchModel(onProgress: (f: number) => void): Promise<ArrayBuffer>
     }
     return out;
   };
-  const parts = window.ECORCHE_PARTS;
-  if (!parts) return (await read("anatomy/ecorche.glb", 0, 1)).buffer as ArrayBuffer;
+  if (!parts) return (await read(url, 0, 1)).buffer as ArrayBuffer;
   let text = "";
   for (let i = 0; i < parts.length; i++) text += new TextDecoder().decode(await read(parts[i]!, i / parts.length, 1 / parts.length));
   const bin = atob(text.trim());
@@ -99,9 +105,9 @@ function attachControls(canvas: HTMLCanvasElement, c: { orbit(dYaw: number, dPit
   }, { passive: false });
 }
 
-/** First milestone: the original Écorché model standing in the player, unmodified, with rotation and zoom only. */
+/** The original Écorché model in the player: the model itself performing the exercise, with rotation and zoom. */
 async function runModel() {
-  document.body.classList.add("model-mode");
+  document.body.classList.add("model-mode", "model-moving");
   // The header is the exercise itself, as everywhere else in the app.
   document.title = ex.name;
   $<HTMLElement>("h1").textContent = ex.name;
@@ -115,7 +121,7 @@ async function runModel() {
     }),
   );
   const canvas = $<HTMLCanvasElement>("#stage");
-  canvas.setAttribute("aria-label", `3D anatomical figure for ${ex.name}, standing. Drag to turn it, pinch or scroll to zoom.`);
+  canvas.setAttribute("aria-label", `3D anatomical figure performing the ${ex.name}. Drag to turn it, pinch or scroll to zoom.`);
   const box = $<HTMLElement>(".stage-box");
   const loading = $<HTMLElement>(".loading");
   loading.textContent = "Loading model…";
@@ -127,7 +133,13 @@ async function runModel() {
     $<HTMLElement>(".verify").textContent = window.modelVerified
       ? `File check: identical to the published Écorché file (SHA-256 ${hash.slice(0, 12)}…).`
       : `File check failed: this file differs from the published Écorché file (SHA-256 ${hash.slice(0, 12)}…).`;
-    viewer = await mountModel(canvas, { glb, pixelRatio: Math.min(devicePixelRatio || 1, 2) });
+    loading.textContent = "Loading movement…";
+    const skin: ModelSkin = {
+      meta: await (await fetch("anatomy/ecorche-skin.json")).json(),
+      data: await fetchBinary("anatomy/ecorche-skin.bin", window.SKIN_PARTS, () => {}),
+    };
+    const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    viewer = await mountModel(canvas, { glb, pixelRatio: Math.min(devicePixelRatio || 1, 2), exercise: { ex, skin, hideProps: ["rack"], reducedMotion } });
   } catch (e) {
     loading.textContent = "3D isn't available on this device.";
     console.error(e);
@@ -147,6 +159,37 @@ async function runModel() {
       document.querySelectorAll("[data-view]").forEach((x) => x.classList.toggle("on", x === b));
     });
   }
+  // Transport: play and pause, the position in the rep, and the speed.
+  const motion = viewer.motion!;
+  const T = motion.duration;
+  const playBtn = $<HTMLButtonElement>("#play");
+  const setPlaying = (on: boolean) => {
+    if (on) motion.play();
+    else motion.pause();
+    playBtn.classList.toggle("paused", !on);
+    playBtn.setAttribute("aria-label", on ? "Pause" : "Play");
+  };
+  setPlaying(motion.playing);
+  playBtn.addEventListener("click", () => setPlaying(!motion.playing));
+  const scrub = $<HTMLInputElement>("#scrub");
+  scrub.max = String(T);
+  scrub.addEventListener("input", () => {
+    setPlaying(false);
+    motion.seek(Number(scrub.value));
+  });
+  const modes = document.querySelectorAll<HTMLButtonElement>("[data-speed]");
+  modes.forEach((b) =>
+    b.addEventListener("click", () => {
+      motion.setSpeed(Number(b.dataset.speed));
+      modes.forEach((x) => x.classList.toggle("on", x === b));
+      setPlaying(true);
+    }),
+  );
+  const time = $<HTMLElement>("#time");
+  motion.onTick((t) => {
+    scrub.value = String(t);
+    time.textContent = `${fmt(t)} / ${fmt(T)}`;
+  });
   loading.remove();
   window.ready = true;
 }

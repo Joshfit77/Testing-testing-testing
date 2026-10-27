@@ -1,7 +1,14 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
-import type { CameraView } from "./player";
+import { compileMotion, evaluate, getMotion } from "../exercise-motion";
+import { setRestJoints, type BindJoints } from "./bind";
+import { effortCurve, type EffortCurve } from "./effort";
+import { makeEquipment } from "./equipment";
+import { gripDelta, gripReach } from "./grip";
+import { makeSkeleton } from "./mesh";
+import type { CameraView, PlayerExercise } from "./player";
+import { jointsFromFrame, poseBones } from "./rig";
 
 /**
  * The raw Écorché model in the exercise player, exactly as published: the GLB file (github.com/Charleeh/ecorche,
@@ -25,16 +32,48 @@ export interface ModelViewer {
   still(o: { yaw: number; distance?: number; targetY?: number; width: number; height: number }): string;
   /** The model's height in its own units (metres). */
   readonly height: number;
+  /** Present when an exercise was given: the model itself performing it (see moveModel). */
+  readonly motion?: ModelMotion;
   dispose(): void;
 }
 
-const VIEW_YAW: Record<CameraView, number> = { front: 0, side: Math.PI / 2, rear: Math.PI };
+export interface ModelMotion {
+  /** How many of the file's meshes were bound to the rig (all of them). */
+  readonly skinnedMeshes: number;
+  readonly duration: number;
+  readonly effort: EffortCurve;
+  play(): void;
+  pause(): void;
+  readonly playing: boolean;
+  setSpeed(speed: number): void;
+  /** Seconds into the loop. */
+  seek(t: number): void;
+  time(): number;
+  onTick(cb: (t: number, effort: number) => void): void;
+}
+
+/** Skin weights for the original file (scripts/anatomy/build-ecorche-skin.mts). */
+export interface ModelSkin {
+  meta: { toRig: number[][]; bind: BindJoints; vertices: number; meshes: { name: string; offset: number; count: number }[] };
+  /** Per vertex: four bone indices, then four weights (bytes). */
+  data: ArrayBuffer;
+}
+
+// (The side view is turned a little towards the front, as in the exercise player, so a barbell's plates do not hide the body.)
+const VIEW_YAW: Record<CameraView, number> = { front: 0, side: Math.PI / 2 - 0.55, rear: Math.PI };
 const FOV = 30;
 
 export async function mountModel(
   canvas: HTMLCanvasElement,
   /** The GLB file's bytes, as fetched (nothing is changed before it is parsed). */
-  opts: { glb: ArrayBuffer; pixelRatio?: number; /** Iris and pupil on the corneas (default on; see paintEyes). */ eyes?: boolean },
+  opts: {
+    glb: ArrayBuffer;
+    pixelRatio?: number;
+    /** Iris and pupil on the corneas (default on; see paintEyes). */
+    eyes?: boolean;
+    /** The model performing an exercise: the exercise, the file's skin weights, equipment to leave out. */
+    exercise?: { ex: PlayerExercise; skin: ModelSkin; hideProps?: string[]; reducedMotion?: boolean };
+  },
 ): Promise<ModelViewer> {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: "high-performance" });
   renderer.setPixelRatio(Math.min(opts.pixelRatio ?? (typeof devicePixelRatio === "number" ? devicePixelRatio : 1), 2));
@@ -67,6 +106,7 @@ export async function mountModel(
   let zoomK = 1;
   let targetY = center.y;
   let raf = 0;
+  const moving = opts.exercise ? moveModel(scene, model, opts.exercise) : null;
 
   // Distance that fits the whole figure (with a margin) in the frame, for the current aspect ratio.
   const fitDistance = (aspect: number) => {
@@ -79,14 +119,25 @@ export async function mountModel(
     cam.position.set(center.x + Math.sin(y) * Math.cos(p) * dist, ty + Math.sin(p) * dist, center.z + Math.cos(y) * Math.cos(p) * dist);
     cam.lookAt(center.x, ty, center.z);
   };
+  // While an exercise plays, the camera follows the hips down and up (as the exercise player does), on top of the
+  // viewer's own up-and-down offset.
+  const followY = () => (moving ? moving.followY() - center.y : 0);
   const draw = () => {
     raf = 0;
-    place(camera, yaw, pitch, fitDistance(camera.aspect) * zoomK, targetY);
+    place(camera, yaw, pitch, fitDistance(camera.aspect) * zoomK, targetY + followY());
     renderer.render(scene, camera);
   };
-  const request = () => {
-    if (!raf) raf = requestAnimationFrame(draw);
+  let last = performance.now();
+  const loop = (now: number) => {
+    moving!.advance(Math.min(0.1, (now - last) / 1000));
+    last = now;
+    draw();
+    raf = requestAnimationFrame(loop);
   };
+  const request = () => {
+    if (!raf) raf = requestAnimationFrame(moving ? loop : draw);
+  };
+  if (moving) request();
 
   const viewer: ModelViewer = {
     height: H,
@@ -121,15 +172,16 @@ export async function mountModel(
       const aspect = camera.aspect;
       const shot = new THREE.PerspectiveCamera(FOV, o.width / o.height, 0.02, 50);
       renderer.setSize(o.width, o.height, false);
-      place(shot, o.yaw, 0.05, o.distance !== undefined ? o.distance * H : fitDistance(shot.aspect), o.targetY !== undefined ? box.min.y + o.targetY * H : center.y);
+      place(shot, o.yaw, 0.05, o.distance !== undefined ? o.distance * H : fitDistance(shot.aspect), (o.targetY !== undefined ? box.min.y + o.targetY * H : center.y) + followY());
       renderer.render(scene, shot);
       const url = canvas.toDataURL("image/png");
       renderer.setSize(size.x, size.y, false);
       camera.aspect = aspect;
       camera.updateProjectionMatrix();
-      draw();
+      if (!moving) draw();
       return url;
     },
+    motion: moving?.motion,
     dispose() {
       cancelAnimationFrame(raf);
       model.traverse((o) => {
@@ -213,4 +265,148 @@ function paintEyes(model: THREE.Object3D) {
     mat.customProgramCacheKey = () => "ngf-ecorche-eye";
     cornea.material = mat;
   }
+}
+
+/**
+ * The original model performing an exercise. Each of the file's meshes becomes a skinned mesh with the same geometry
+ * and material, bound to the exercise rig with the file's own skin weights (detached bind: the rig lives in its own
+ * frame, centimetres facing +X, and the bind matrix carries each mesh from the file's frame into it). The motion comes
+ * from the app's exercise engine, as in the exercise player; equipment is placed in the rig's frame.
+ */
+function moveModel(scene: THREE.Scene, model: THREE.Object3D, o: { ex: PlayerExercise; skin: ModelSkin; hideProps?: string[]; reducedMotion?: boolean }) {
+  const { meta, data } = o.skin;
+  const r = meta.toRig;
+  const [a, b, c] = [r[0]!, r[1]!, r[2]!];
+  const toRig = new THREE.Matrix4().set(a[0]!, a[1]!, a[2]!, a[3]!, b[0]!, b[1]!, b[2]!, b[3]!, c[0]!, c[1]!, c[2]!, c[3]!, 0, 0, 0, 1);
+  const fromRig = toRig.clone().invert();
+  setRestJoints(meta.bind);
+  const { bones, skeleton } = makeSkeleton();
+  for (const b of bones) b.matrixWorld.copy(b.matrix);
+
+  // Swap each mesh for a skinned one, in place (same parent, transform, geometry and material).
+  const meshes: THREE.Mesh[] = [];
+  model.traverse((m) => {
+    if (m instanceof THREE.Mesh) meshes.push(m);
+  });
+  if (meshes.length !== meta.meshes.length) throw new Error(`skin weights are for ${meta.meshes.length} meshes, the file has ${meshes.length}`);
+  const bytes = new Uint8Array(data);
+  meshes.forEach((m, i) => {
+    const entry = meta.meshes[i]!;
+    const g = m.geometry;
+    if (g.getAttribute("position").count !== entry.count) throw new Error(`skin weights do not match ${m.name}`);
+    const ib = new THREE.InterleavedBuffer(bytes.subarray(entry.offset * 8, (entry.offset + entry.count) * 8), 8);
+    g.setAttribute("skinIndex", new THREE.InterleavedBufferAttribute(ib, 4, 0));
+    g.setAttribute("skinWeight", new THREE.InterleavedBufferAttribute(ib, 4, 4, true));
+    const sm = new THREE.SkinnedMesh(g, m.material);
+    sm.name = m.name;
+    sm.position.copy(m.position);
+    sm.quaternion.copy(m.quaternion);
+    sm.scale.copy(m.scale);
+    sm.frustumCulled = false;
+    sm.bindMode = THREE.DetachedBindMode;
+    m.parent!.add(sm);
+    m.parent!.remove(m);
+  });
+  model.updateMatrixWorld(true);
+  const skinned: { m: THREE.SkinnedMesh; toRigM: THREE.Matrix4; rigPos: THREE.BufferAttribute }[] = [];
+  model.traverse((m) => {
+    if (!(m instanceof THREE.SkinnedMesh)) return;
+    const toRigM = toRig.clone().multiply(m.matrixWorld);
+    m.bind(skeleton, toRigM);
+    const p = m.geometry.getAttribute("position");
+    const rigPos = new THREE.BufferAttribute(new Float32Array(p.count * 3), 3);
+    const v = new THREE.Vector3();
+    for (let i = 0; i < p.count; i++) {
+      v.fromBufferAttribute(p, i).applyMatrix4(toRigM);
+      rigPos.setXYZ(i, v.x, v.y, v.z);
+    }
+    skinned.push({ m, toRigM, rigPos });
+  });
+  // The grip (fingers rolled round the bar), as a morph target on every mesh the hands carry: worked out in the rig's
+  // frame over the whole hand, then carried back into each mesh's own frame.
+  const attrs = (m: THREE.SkinnedMesh) => ({ si: m.geometry.getAttribute("skinIndex") as THREE.InterleavedBufferAttribute, sw: m.geometry.getAttribute("skinWeight") as THREE.InterleavedBufferAttribute });
+  const reach = gripReach(skinned.map(({ m, rigPos }) => ({ pos: rigPos, ...attrs(m) })));
+  const gripMeshes: THREE.SkinnedMesh[] = [];
+  for (const { m, toRigM, rigPos } of skinned) {
+    const { si, sw } = attrs(m);
+    const d = gripDelta(rigPos, si, sw, reach);
+    if (!d.some((x) => x !== 0)) continue;
+    const back = new THREE.Matrix3().setFromMatrix4(toRigM.clone().invert());
+    const v = new THREE.Vector3();
+    for (let i = 0; i < d.length; i += 3) {
+      v.set(d[i]!, d[i + 1]!, d[i + 2]!).applyMatrix3(back);
+      d.set([v.x, v.y, v.z], i);
+    }
+    m.geometry.morphAttributes.position = [new THREE.BufferAttribute(d, 3)];
+    m.geometry.morphTargetsRelative = true;
+    m.updateMorphTargets();
+    gripMeshes.push(m);
+  }
+
+  // The motion and the equipment, as in the exercise player.
+  const def = getMotion(o.ex.slug, o.ex.meta);
+  const motion = compileMotion(def);
+  const first = evaluate(motion, 0);
+  const centerX = first.pts.pelvis[0];
+  const barbell = first.props.some((p) => p.def.kind === "barbell");
+  const stance = o.ex.pattern === "squat" && first.view === "side" ? { halfWidth: 17, toeOut: 22 } : null;
+  const GRIPPED = new Set(["barbell", "dumbbell", "kettlebell", "pullupBar", "trapBar", "farmerHandle", "landmine", "cable", "battleRope", "jumpRope", "yoke", "dipBars"]);
+  const grip = first.props.some((p) => GRIPPED.has(p.def.kind)) ? 1 : 0;
+  for (const m of gripMeshes) m.morphTargetInfluences![0] = grip;
+  const rigSpace = new THREE.Group();
+  rigSpace.matrixAutoUpdate = false;
+  rigSpace.matrix.copy(fromRig);
+  const equipment = makeEquipment(first.props.map((p) => p.def).filter((d) => !o.hideProps?.includes(d.kind)), first.view, centerX);
+  rigSpace.add(equipment.group);
+  scene.add(rigSpace);
+  const effort = effortCurve(def);
+  const T = motion.duration;
+  let t = def.stillPhase !== undefined && o.reducedMotion ? def.stillPhase * T : 0;
+  let speed = 1;
+  let playing = !o.reducedMotion;
+  let pelvisY = 92;
+  const listeners: ((t: number, e: number) => void)[] = [];
+  const pose = () => {
+    const f = evaluate(motion, t);
+    const j = jointsFromFrame(f, { centerX, barGrip: barbell ? 26 : null, stance });
+    pelvisY = j.pelvis.y;
+    poseBones(j, bones);
+    equipment.update(f, j);
+    for (const l of listeners) l(t, effort.at(t));
+  };
+  pose();
+  const v = new THREE.Vector3();
+  return {
+    advance(dt: number) {
+      if (playing) t = (t + dt * speed) % T;
+      pose();
+    },
+    /** The camera's look-at height (file frame) for the current pose: low on the body, following the hips. */
+    followY: () => v.set(0, 34 + 0.55 * pelvisY, 0).applyMatrix4(fromRig).y,
+    motion: {
+      skinnedMeshes: skinned.length,
+      duration: T,
+      effort,
+      play() {
+        playing = true;
+      },
+      pause() {
+        playing = false;
+      },
+      get playing() {
+        return playing;
+      },
+      setSpeed(s: number) {
+        speed = s;
+      },
+      seek(time: number) {
+        t = ((time % T) + T) % T;
+        pose();
+      },
+      time: () => t,
+      onTick(cb: (t: number, e: number) => void) {
+        listeners.push(cb);
+      },
+    } satisfies ModelMotion,
+  };
 }
