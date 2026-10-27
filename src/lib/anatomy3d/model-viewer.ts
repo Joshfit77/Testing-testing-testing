@@ -106,7 +106,9 @@ export async function mountModel(
   let zoomK = 1;
   let targetY = center.y;
   let raf = 0;
-  const moving = opts.exercise ? moveModel(scene, model, opts.exercise) : null;
+  // (Redraw requests from the motion: play, seek. Set once `request` exists.)
+  let changed = () => {};
+  const moving = opts.exercise ? moveModel(scene, model, opts.exercise, () => changed()) : null;
 
   // Distance that fits the whole figure (with a margin) in the frame, for the current aspect ratio.
   const fitDistance = (aspect: number) => {
@@ -127,15 +129,24 @@ export async function mountModel(
     place(camera, yaw, pitch, fitDistance(camera.aspect) * zoomK, targetY + followY());
     renderer.render(scene, camera);
   };
+  // While the exercise plays, a frame loop; when it is paused (or there is none), frames only on request.
   let last = performance.now();
   const loop = (now: number) => {
     moving!.advance(Math.min(0.1, (now - last) / 1000));
     last = now;
     draw();
-    raf = requestAnimationFrame(loop);
+    if (moving!.motion.playing) raf = requestAnimationFrame(loop);
   };
   const request = () => {
-    if (!raf) raf = requestAnimationFrame(moving ? loop : draw);
+    if (raf) return;
+    last = performance.now();
+    raf = requestAnimationFrame(moving?.motion.playing ? loop : draw);
+  };
+  changed = () => {
+    if (raf && moving?.motion.playing) return;
+    cancelAnimationFrame(raf);
+    raf = 0;
+    request();
   };
   if (moving) request();
 
@@ -273,7 +284,12 @@ function paintEyes(model: THREE.Object3D) {
  * frame, centimetres facing +X, and the bind matrix carries each mesh from the file's frame into it). The motion comes
  * from the app's exercise engine, as in the exercise player; equipment is placed in the rig's frame.
  */
-function moveModel(scene: THREE.Scene, model: THREE.Object3D, o: { ex: PlayerExercise; skin: ModelSkin; hideProps?: string[]; reducedMotion?: boolean }) {
+function moveModel(
+  scene: THREE.Scene,
+  model: THREE.Object3D,
+  o: { ex: PlayerExercise; skin: ModelSkin; hideProps?: string[]; reducedMotion?: boolean },
+  changed: () => void,
+) {
   const { meta, data } = o.skin;
   const r = meta.toRig;
   const [a, b, c] = [r[0]!, r[1]!, r[2]!];
@@ -389,6 +405,7 @@ function moveModel(scene: THREE.Scene, model: THREE.Object3D, o: { ex: PlayerExe
       effort,
       play() {
         playing = true;
+        changed();
       },
       pause() {
         playing = false;
@@ -402,6 +419,7 @@ function moveModel(scene: THREE.Scene, model: THREE.Object3D, o: { ex: PlayerExe
       seek(time: number) {
         t = ((time % T) + T) % T;
         pose();
+        changed();
       },
       time: () => t,
       onTick(cb: (t: number, e: number) => void) {
