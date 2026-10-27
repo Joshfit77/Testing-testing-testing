@@ -17,19 +17,20 @@
  * Joint centres are measured from the bones (femoral and humeral heads by sphere fit, knee, ankle, elbow and wrist
  * from the joint surfaces) and written to src/lib/anatomy3d/athlete-bind.generated.ts.
  *
- * Alternative muscle and bone source (evaluation): ECORCHE=<path to ecorche.glb> takes every muscle, tendon and bone
- * from Écorché (github.com/Charleeh/ecorche, CC BY-SA 4.0: BodyParts3D cleaned up, with Z-Anatomy abdominal wall,
- * lats and back), aligned to the BodyParts3D skeleton, which still gives the joints, skin, hands and feet. Output then
- * goes to ATHLETE_OUT (default public/anatomy/athlete-eco), so the current athlete is not replaced.
+ * Écorché (github.com/Charleeh/ecorche, CC BY-SA 4.0: BodyParts3D cleaned up, with the Z-Anatomy abdominal wall,
+ * lats and back), aligned to the BodyParts3D skeleton, which still gives the joints, skin, hands and feet:
+ *   ECORCHE=<path to ecorche.glb> ECORCHE_USE=torso   the torso and back muscles from Écorché (the athlete as built)
+ *   ECORCHE=<path to ecorche.glb>                     every muscle, tendon and bone from Écorché (evaluation build,
+ *                                                     written to public/anatomy/athlete-eco unless ATHLETE_OUT is set)
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { MeshoptSimplifier } from "meshoptimizer";
 import * as THREE from "three";
-import { MeshBVH } from "three-mesh-bvh";
 import { BONES, muscleId, NO_MUSCLE, TISSUE, type BoneName, type Region } from "../../src/lib/anatomy3d/muscle-ids";
 import { kindOf, regionOf, sideOf, type PartKind } from "./bp3d-regions";
 import { buildMakeHumanHead } from "./makehuman-head";
+import { closedEnvelope } from "./shorts-envelope";
 import { fitShorts } from "./shorts-fit";
 import { computeWeights, NO_BONE } from "./weights";
 
@@ -41,7 +42,11 @@ if (!DATA || !existsSync(join(DATA, "parts_list_e.txt"))) {
 }
 const HEIGHT = 183; // cm, matching the 2D motion figure
 const ECORCHE = process.env.ECORCHE;
-const OUT = process.env.ATHLETE_OUT ?? (ECORCHE ? "public/anatomy/athlete-eco" : "public/anatomy/athlete");
+/** Which muscles come from Écorché: "torso" (chest, abdomen and back) or "all" (every muscle, tendon and bone). */
+const ECORCHE_USE = process.env.ECORCHE_USE === "torso" ? "torso" : "all";
+const OUT = process.env.ATHLETE_OUT ?? (ECORCHE && ECORCHE_USE === "all" ? "public/anatomy/athlete-eco" : "public/anatomy/athlete");
+/** The shipped joint file is written only by the build that ships (the skeleton, and so the joints, is the same). */
+const WRITE_BIND = OUT === "public/anatomy/athlete";
 await MeshoptSimplifier.ready;
 
 const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -243,7 +248,7 @@ function writeBind() {
       `};\n`,
   );
 }
-if (!ECORCHE) writeBind();
+if (WRITE_BIND) writeBind();
 console.log("joints", JSON.stringify({ pelvis: r1(pelvis), neckBase: r1(neckBase), R: Object.fromEntries(Object.entries(R).map(([k, v]) => [k, r1(v)])) }));
 
 // ---------------------------------------------------------------- parts
@@ -469,11 +474,23 @@ interface Source {
   mesh: Mesh;
   tint?: Float32Array;
 }
-const sources: Source[] = ECORCHE ? await ecorcheSources(ECORCHE) : [];
-if (!ECORCHE)
+/** The chest, abdomen and back: the muscles taken from Écorché with ECORCHE_USE=torso. */
+const TORSO: ReadonlySet<Region> = new Set(["pecUpper", "pecLower", "abs", "obliques", "serratus", "lat", "trapUpper", "trapMid", "rhomboid", "erector"]);
+const inTorso = (name: string) => {
+  const r = regionOf(name);
+  return !!r && r !== "drop" && TORSO.has(r);
+};
+const sources: Source[] = !ECORCHE
+  ? []
+  : ECORCHE_USE === "all"
+    ? await ecorcheSources(ECORCHE)
+    : (await ecorcheSources(ECORCHE)).filter((s) => s.kind === "muscle" && inTorso(s.name));
+if (ECORCHE_USE === "torso" && ECORCHE) console.log(`Écorché torso muscles: ${sources.length} (${[...new Set(sources.map((s) => regionOf(s.name)))].join(", ")})`);
+if (!ECORCHE || ECORCHE_USE === "torso")
   for (const [id, name] of names) {
     const kind = kindOf(name);
     if (!kind || !existsSync(stlPath(id))) continue;
+    if (ECORCHE && kind === "muscle" && inTorso(name)) continue;
     const raw = load(id);
     const tris = raw.idx.length / 3;
     const target = kind === "muscle" ? Math.min(7000, Math.max(450, Math.round(tris / 36))) : kind === "bone" ? Math.min(2200, Math.max(120, Math.round(tris / 70))) : Math.min(1500, Math.max(150, Math.round(tris / 30)));
@@ -669,56 +686,44 @@ if (MAKEHUMAN) {
 }
 
 // ---------------------------------------------------------------- fascia layer
-// The fascia is the body surface shrink-wrapped to just under the muscles: hidden beneath each muscle, it fills the
-// grooves and gaps between them with dark tissue, so no hole ever shows through the écorché.
+// The fascia is a smooth sheet about 1 cm under the surface of the muscles, bones and tendons, bridging every gap between
+// them narrower than about 2.5 cm: hidden beneath each muscle, it fills the grooves and gaps between them with dark tissue, so
+// no hole ever shows through the écorché. It is extracted from a voxel field (see closedEnvelope), so it cannot fold or
+// crumple; built from the scanned skin instead, it folded over itself where neighbouring points sank to different
+// depths, and the folds showed between the muscles as bright shards.
 {
-  // Each point of the body surface moves straight in along its own normal, to just under the first muscle, bone or
-  // tendon it meets (or 3 cm where there is none). Moving only along the normal keeps the sheet smooth and unfolded;
-  // snapping each point to its nearest muscle instead scrambled neighbouring points and crumpled the sheet into dark
-  // torn-looking slivers between the muscles.
-  const body = cropAndSimplify(skin, (p) => !isHead(p) && !handOf(p) && !isFoot(p), 50000);
-  const nb = body.pos.length / 3;
-  const nrm = vertexNormals(body);
-  const under = bvhOf(parts.filter((pt) => pt.kind === "muscle" || pt.kind === "bone" || pt.kind === "tendon").map((pt) => pt.mesh));
-  const ray = new THREE.Ray();
-  const both = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
-  const depth = new Float32Array(nb * 3);
-  for (let n = 0; n < nb; n++) {
-    const p = vert(body, n);
-    // Start a little outside the skin: the athletic bulk can push a muscle just past it.
-    ray.origin.set(p[0] + nrm[n * 3]! * 1.5, p[1] + nrm[n * 3 + 1]! * 1.5, p[2] + nrm[n * 3 + 2]! * 1.5);
-    ray.direction.set(-nrm[n * 3]!, -nrm[n * 3 + 1]!, -nrm[n * 3 + 2]!);
-    const hit = under.raycastFirst(ray, both, 0, 7.5);
-    depth[n * 3] = hit ? Math.max(0, hit.distance - 1.5 + 0.6) : 3;
+  const all: number[] = [];
+  const lo: V3 = [Infinity, Infinity, Infinity], hi: V3 = [-Infinity, -Infinity, -Infinity];
+  for (const pt of parts) {
+    if (pt.kind !== "muscle" && pt.kind !== "bone" && pt.kind !== "tendon") continue;
+    for (const i of pt.mesh.idx) {
+      const v = vert(pt.mesh, i);
+      all.push(...v);
+      for (let k = 0; k < 3; k++) {
+        lo[k] = Math.min(lo[k]!, v[k]!);
+        hi[k] = Math.max(hi[k]!, v[k]!);
+      }
+    }
   }
-  smoothField(body, depth, 3);
-  for (let n = 0; n < nb; n++) for (let k = 0; k < 3; k++) body.pos[n * 3 + k]! -= nrm[n * 3 + k]! * depth[n * 3]!;
+  // No organs are modelled, so the trunk is hollow, and open at the bottom of the pelvis: through there the sheet
+  // followed the outside into the empty trunk, and then out through every gap between the abdominal muscles (the spine
+  // showed between them). A disc across the pelvis closes it (inside the shorts, where the fascia is removed anyway).
+  {
+    const c = lerp(R.hip, L.hip, 0.5);
+    const y = c[1] - 6;
+    const ring = Array.from({ length: 48 }, (_, i) => [c[0] + 13 * Math.cos((i / 48) * 2 * Math.PI), y, c[2] + 13 * Math.sin((i / 48) * 2 * Math.PI)] as V3);
+    ring.forEach((p, i) => all.push(c[0], y, c[2], ...p, ...ring[(i + 1) % 48]!));
+  }
+  for (let k = 0; k < 3; k++) {
+    lo[k] -= 3.5;
+    hi[k] += 3.5;
+  }
+  const env = closedEnvelope(new Float32Array(all), new Uint32Array(all.length / 3).map((_, i) => i), lo, hi, 0.5, () => 1.2, -1.0, true, [[4, 108, 0], [2, 125, 0]]);
+  const body = cropAndSimplify(env, (p) => !isHead(p) && !handOf(p) && !isFoot(p), 60000);
+  console.log(`fascia: ${env.idx.length / 3} triangles, ${body.idx.length / 3} kept`);
   parts.push({ name: "fascia", kind: "deep", mesh: body, label: NO_MUSCLE, fiber: [0, 1, 0], rigid: null });
 }
 
-/** Laplacian smoothing of a per-vertex vector field over a mesh's surface. */
-function smoothField(m: Mesh, f: Float32Array, iterations: number) {
-  const nv = m.pos.length / 3;
-  const nbrs: Set<number>[] = Array.from({ length: nv }, () => new Set());
-  for (let t = 0; t < m.idx.length; t += 3) {
-    const a = m.idx[t]!, b2 = m.idx[t + 1]!, c = m.idx[t + 2]!;
-    nbrs[a]!.add(b2).add(c);
-    nbrs[b2]!.add(a).add(c);
-    nbrs[c]!.add(a).add(b2);
-  }
-  for (let it = 0; it < iterations; it++) {
-    const next = new Float32Array(f.length);
-    for (let n = 0; n < nv; n++) {
-      const ns = [...nbrs[n]!];
-      for (let k = 0; k < 3; k++) {
-        let s2 = f[n * 3 + k]! * 2;
-        for (const o of ns) s2 += f[o * 3 + k]! / (ns.length || 1);
-        next[n * 3 + k] = s2 / 3;
-      }
-    }
-    f.set(next);
-  }
-}
 /** Cuts a mesh exactly along the zero line of a scalar field, keeping the part where it is positive (watertight). */
 function clipMesh(m: Mesh, field: (p: V3) => number): Mesh {
   const nv = m.pos.length / 3;
@@ -752,8 +757,11 @@ function clipMesh(m: Mesh, field: (p: V3) => number): Mesh {
   }
   return compact(new Float32Array(pos), new Uint32Array(idx));
 }
-/** Folds every open edge of a mesh straight inwards (against its normals) by `depth`: a finished edge. */
-function foldEdges(m: Mesh, depth: number): Mesh {
+/**
+ * Folds every open edge of a mesh inwards by `depth`: a finished edge. By default the fold follows the surface normal;
+ * `inward` gives the direction instead (normals right at a freshly cut edge are unreliable and made the strip spike).
+ */
+function foldEdges(m: Mesh, depth: number, inward?: (p: V3) => V3): Mesh {
   const nrm = vertexNormals(m);
   const edgeUse = new Map<string, [number, number]>();
   for (let t = 0; t < m.idx.length; t += 3)
@@ -769,7 +777,8 @@ function foldEdges(m: Mesh, depth: number): Mesh {
     let r = fold.get(v);
     if (r === undefined) {
       r = pos.length / 3;
-      pos.push(...sub(vert(m, v), mul([nrm[v * 3]!, nrm[v * 3 + 1]!, nrm[v * 3 + 2]!], depth)));
+      const p = vert(m, v);
+      pos.push(...(inward ? add(p, mul(inward(p), depth)) : sub(p, mul([nrm[v * 3]!, nrm[v * 3 + 1]!, nrm[v * 3 + 2]!], depth))));
       fold.set(v, r);
     }
     return r;
@@ -781,19 +790,6 @@ function foldEdges(m: Mesh, depth: number): Mesh {
     idx.push(b, a, ai, b, ai, bi);
   }
   return { pos: new Float32Array(pos), idx: new Uint32Array(idx) };
-}
-/** A BVH over several meshes, for ray casts. */
-function bvhOf(meshes: Mesh[]): MeshBVH {
-  const pos: number[] = [], idx: number[] = [];
-  for (const m of meshes) {
-    const base = pos.length / 3;
-    for (const v of m.pos) pos.push(v);
-    for (const i of m.idx) idx.push(i + base);
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(pos), 3));
-  g.setIndex(new THREE.BufferAttribute(new Uint32Array(idx), 1));
-  return new MeshBVH(g);
 }
 
 // ---------------------------------------------------------------- shorts
@@ -808,69 +804,66 @@ const shortsHem = (p: V3) => 68.5 + 3.5 * smoothstep(6, 16, Math.abs(p[2]));
 /** Signed distance (cm, vertical) inside the shorts band: positive between hem and waistband. */
 const shortsF = (p: V3) => Math.min(p[1] - shortsHem(p), shortsWaist(p) - p[1]);
 {
-  const m0 = cropAndSimplify(skin, (p) => !handOf(p) && Math.abs(p[2]) < 24 && shortsF(p) > -4, 30000);
-  // Groin: a smooth front panel lying 1 cm over the muscles beneath (found by casting rays at them from the front),
-  // never following the shape of the genitals. Pressed, smoothed and pressed again so it stays smooth and snug.
-  const under = bvhOf(parts.filter((pt) => pt.kind === "muscle" || pt.kind === "bone" || pt.kind === "tendon").map((pt) => pt.mesh));
-  const ray = new THREE.Ray();
-  const both = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
-  {
-    const nv = m0.pos.length / 3;
-    const zone = new Float32Array(nv);
-    const front = new Float32Array(nv).fill(NaN);
-    for (let n = 0; n < nv; n++) {
-      const p = vert(m0, n);
-      zone[n] = (1 - smoothstep(8, 12, Math.abs(p[2]))) * smoothstep(57, 62, p[1]) * (1 - smoothstep(90, 95, p[1])) * smoothstep(-2, 1, p[0]);
-      if (zone[n]! <= 0) continue;
-      ray.origin.set(40, p[1], p[2]);
-      ray.direction.set(-1, 0, 0);
-      const hit = under.raycastFirst(ray, both, 0, 60);
-      if (hit) front[n] = hit.point.x + 1.0;
-    }
-    // Smooth the fabric itself (front-to-back only) and hold it under the 1 cm limit: the bulge flattens out
-    // completely instead of being averaged away.
-    const nbrs: Set<number>[] = Array.from({ length: nv }, () => new Set());
-    for (let t = 0; t < m0.idx.length; t += 3)
-      for (let k = 0; k < 3; k++) for (let j = 1; j < 3; j++) nbrs[m0.idx[t + k]!]!.add(m0.idx[t + ((k + j) % 3)]!);
-    let bump = 0;
-    for (let n = 0; n < nv; n++) if (zone[n]! > 0.5 && !Number.isNaN(front[n]!)) bump = Math.max(bump, m0.pos[n * 3]! - front[n]!);
-    for (let it = 0; it < 30; it++) {
-      const x = m0.pos.filter((_, i) => i % 3 === 0);
-      for (let n = 0; n < nv; n++) {
-        if (zone[n]! <= 0) continue;
-        let a = 0;
-        for (const o of nbrs[n]!) a += x[o]!;
-        let nx = x[n]! + (a / (nbrs[n]!.size || 1) - x[n]!) * 0.6 * zone[n]!;
-        // Between 0.4 and 1 cm over the muscle (fully held in the middle of the panel, eased out at its edges). The
-        // floor matters as much as the ceiling: smoothing shrinks a curved surface inward, and without it the panel
-        // sank behind the lower abdominal muscles, which then showed through the fabric.
-        const lim = front[n]!, floor = lim - 0.6;
-        if (!Number.isNaN(lim) && nx > lim) nx = lim + (1 - zone[n]!) * (nx - lim);
-        if (!Number.isNaN(lim) && nx < floor) nx = floor + (1 - zone[n]!) * (nx - floor);
-        m0.pos[n * 3] = nx;
+  // The fabric: a smooth envelope 5 mm over the muscles and bones of the hips and thighs, bridging every crease and
+  // hollow narrower than about 6 cm (3 cm near the hems, so it does not web between the thighs). Built from the anatomy,
+  // not the scanned skin, so nothing of the genitals' shape or the skin's creases is left in it.
+  const forearm = (p: V3) =>
+    [R, L].some((J) => {
+      const ab = sub(J.wrist, J.elbow);
+      const t = Math.max(0, Math.min(1, dot(sub(p, J.elbow), ab) / dot(ab, ab)));
+      return len(sub(p, add(J.elbow, mul(ab, t)))) < 7;
+    });
+  const hullPos: number[] = [];
+  const lo: V3 = [Infinity, 60, Infinity], hi: V3 = [-Infinity, 106, -Infinity];
+  for (const pt of parts) {
+    if (pt.kind !== "muscle" && pt.kind !== "bone" && pt.kind !== "tendon") continue;
+    for (let t = 0; t < pt.mesh.idx.length; t += 3) {
+      const tri = [0, 1, 2].map((k) => vert(pt.mesh, pt.mesh.idx[t + k]!));
+      const c = centroid(tri);
+      if (c[1] < lo[1] || c[1] > hi[1] || Math.abs(c[2]) > 24 || handOf(c) || forearm(c)) continue;
+      for (const v of tri) {
+        hullPos.push(...v);
+        for (const k of [0, 2]) {
+          lo[k] = Math.min(lo[k]!, v[k]!);
+          hi[k] = Math.max(hi[k]!, v[k]!);
+        }
       }
     }
-    let after = 0, sunk = 0;
-    for (let n = 0; n < nv; n++)
-      if (zone[n]! > 0.5 && !Number.isNaN(front[n]!)) {
-        after = Math.max(after, m0.pos[n * 3]! - front[n]!);
-        sunk = Math.max(sunk, front[n]! - 0.6 - m0.pos[n * 3]!);
-      }
-    console.log(`groin panel: fabric ${bump.toFixed(1)} cm proud of the 1 cm line before, ${after.toFixed(1)} cm after; at most ${sunk.toFixed(1)} cm below the 0.4 cm floor`);
   }
-  // Fabric thickness: a hair above the skin.
-  {
-    const nrm = vertexNormals(m0);
-    for (let i = 0; i < m0.pos.length; i++) m0.pos[i]! += nrm[i]! * 0.12;
+  const radius = (y: number) => 1.5 + 1.5 * smoothstep(71, 79, y);
+  // The crotch: just under the lowest bone on the midline (the pubic symphysis). From a 5 cm gusset below it, the legs
+  // get separate tubes, cut apart along the midline (the inner thighs nearly touch, and bridged they made a skirt-like panel that the knees
+  // stretched apart).
+  let crotch = Infinity;
+  for (const pt of parts)
+    if (pt.kind === "bone") for (const v of verts(pt.mesh)) if (Math.abs(v[2]) < 1.5 && v[1] > 60 && v[1] < 100) crotch = Math.min(crotch, v[1] - 2);
+  console.log(`shorts: crotch at ${crotch.toFixed(1)} cm`);
+  const midZ = lerp(R.hip, L.hip, 0.5)[2];
+  for (const k of [0, 2]) {
+    lo[k] -= 4.5;
+    hi[k] += 4.5;
   }
+  const m0 = cropAndSimplify(closedEnvelope(new Float32Array(hullPos), new Uint32Array(hullPos.length / 3).map((_, i) => i), lo, hi, 0.5, radius, 0.5, false, [], (p) => p[1] < crotch - 5 && Math.abs(p[2] - midZ) < 0.3), () => true, 24000);
   const cut = clipMesh(m0, shortsF);
   // Finished edge: every cut edge folds straight in towards the body by 8 mm, an even band that reads as the hem's
   // thickness and closes the view under the fabric.
   const nrm = vertexNormals(cut);
-  const m = foldEdges(cut, 0.8);
-  // Trim: a thin gold line along the waistband and hems (0.8), the folded edge itself (1).
+  // The hems fold in towards the thigh's axis and the waistband towards the trunk's, level with the cut: a clean band.
+  const thighAxis = (p: V3, J: SideJ): V3 => {
+    const ab = sub(J.knee, J.hip);
+    const t = (p[1] - J.hip[1]) / ab[1];
+    return add(J.hip, mul(ab, Math.max(0, Math.min(1, t))));
+  };
+  const trunk: V3 = [lerp(R.hip, L.hip, 0.5)[0] - 2, 0, 0];
+  const m = foldEdges(cut, 0.8, (p) => {
+    const atHem = p[1] - shortsHem(p) < shortsWaist(p) - p[1];
+    const c = atHem ? thighAxis(p, p[2] > 0 ? R : L) : trunk;
+    return norm([c[0] - p[0], 0, c[2] - p[2]]);
+  });
+  // Trim: a thin gold line along the waistband and hems (0.8), and the folded edge itself (0.85).
   const extra = new Float32Array(m.pos.length / 3);
-  for (let n = 0; n < extra.length; n++) extra[n] = n >= cut.pos.length / 3 ? 1 : shortsF(vert(m, n)) < 0.8 ? 0.8 : 0;
+  // (0.85 marks the folded strip, so the clearance fit leaves it alone; it is drawn as part of the gold trim.)
+  for (let n = 0; n < extra.length; n++) extra[n] = n >= cut.pos.length / 3 ? 0.85 : shortsF(vert(m, n)) < 0.8 ? 0.8 : 0;
   // Remove the anatomy the shorts cover: every triangle more than 2.5 cm inside the hem and waistband, and on the
   // inner side of the fabric (or less than 1.5 cm outside it).
   const sGrid = new Map<string, number[]>();
@@ -1042,9 +1035,9 @@ const { skinIndex, skinWeight } = computeWeights(position, index, label, BINDM, 
   for (const J of [R, L]) for (const k of ["shoulder", "elbow", "wrist", "hand"] as const) J[k] = morph(J[k]);
   // (Leg joints sit on the bone axes, which the leg swelling leaves in place.)
   for (const v of [head, headTop]) v.splice(0, 3, ...morph(v));
-  if (!ECORCHE) writeBind();
+  if (WRITE_BIND) writeBind();
 }
-console.log(`shorts: ${fitShorts(position, index, tissue, (v) => muscleMix[v]! > 250)} vertices lifted clear of the muscles`);
+console.log(`shorts: ${fitShorts(position, index, tissue, (v) => tissue[v] === TISSUE.cover && muscleMix[v]! > 210)} vertices lifted clear of the muscles`);
 // ---------------------------------------------------------------- write
 const blocks: { name: string; data: ArrayBufferView }[] = [
   { name: "position", data: position },
@@ -1073,8 +1066,10 @@ for (const p of blocks) {
 }
 mkdirSync("public/anatomy", { recursive: true });
 writeFileSync(`${OUT}.bin`, Buffer.concat(chunks));
-const source = ECORCHE
-  ? "Écorché (github.com/Charleeh/ecorche, CC BY-SA 4.0; BodyParts3D CC BY 4.0, Z-Anatomy CC BY-SA 4.0) + BodyParts3D skin"
-  : "BodyParts3D 3.0 (CC BY-SA 2.1 JP)";
+const source = !ECORCHE
+  ? "BodyParts3D 3.0 (CC BY-SA 2.1 JP)"
+  : ECORCHE_USE === "torso"
+    ? "BodyParts3D 3.0 (CC BY-SA 2.1 JP) with torso and back muscles from Écorché (github.com/Charleeh/ecorche, CC BY-SA 4.0; BodyParts3D CC BY 4.0, Z-Anatomy CC BY-SA 4.0); head MakeHuman (CC0)"
+    : "Écorché (github.com/Charleeh/ecorche, CC BY-SA 4.0; BodyParts3D CC BY 4.0, Z-Anatomy CC BY-SA 4.0) + BodyParts3D skin";
 writeFileSync(`${OUT}.json`, JSON.stringify({ version: 3, source, vertices: NV, triangles: NI / 3, bytes: offset, layout, bones: BONES }, null, 1));
 console.log(`wrote ${OUT}.bin (${(offset / 1e6).toFixed(2)} MB)`);

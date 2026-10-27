@@ -1,8 +1,9 @@
 # Evaluation: Écorché as the anatomy source for the athlete
 
-Status: **evaluation only.** Nothing in the app or in `public/anatomy/athlete.*` was replaced. The Écorché-based build is
-a separate file (`public/anatomy/athlete-eco.*`, not committed) made with the same pipeline, and both builds were
-rendered with the same renderer, lights and cameras.
+Status: **adopted for the torso and back** (approved by the owner after the comparison below). The shipped athlete
+(`public/anatomy/athlete.*`) now takes the chest, abdomen and back muscles from Écorché and everything else from
+BodyParts3D (see section 7). The full Écorché build used for the evaluation can still be made as a separate file
+(`public/anatomy/athlete-eco.*`, not committed).
 
 ## 1. What the asset is
 
@@ -74,8 +75,8 @@ the painted look of the reference.
 
 Écorché is a **real but targeted** improvement in the muscles the app highlights most (abs, obliques, lats), and its
 integration now animates as cleanly as the current build. It is not a different class of model and will not by itself
-reach the reference. Recommendation: adopt it for the torso and back once the waistband edge is cleaned up, and budget for
-the extra weight on phones (the mobile index buffer brings it to ~294k triangles).
+reach the reference. Recommendation (adopted): use it for the torso and back once the waistband edge is cleaned up, and
+budget for the extra weight on phones.
 
 ## 5. Player controls (both builds)
 
@@ -99,3 +100,32 @@ physical phone.
   notes BodyParts3D is now published under CC BY 4.0: a rebuild from the current BodyParts3D release *without* the
   Z-Anatomy pieces would need attribution only.
 - MakeHuman (head): CC0. CC0 content combines freely with CC BY-SA.
+
+## 7. Adoption: Écorché torso and back (hybrid build)
+
+`ECORCHE=<path to ecorche.glb> ECORCHE_USE=torso npx tsx scripts/anatomy/build-athlete.mts …` builds the shipped
+athlete: 42 Écorché muscles (pectorals, rectus abdominis, external obliques, serratus anterior, latissimus dorsi,
+trapezius, rhomboids, erector spinae) replace their BodyParts3D counterparts; limbs, neck, skeleton (and so the rig),
+hands, feet and the MakeHuman head are unchanged.
+
+Close-up review of that build found three defects, two of them present in the earlier build as well, now fixed:
+
+| Problem | Cause | Fix |
+|---|---|---|
+| Crumpled fabric over the groin (both builds) | The shorts were cut from the scanned skin, which includes the genitals; flattening it front-to-back left folded-over fabric | The shorts are now a smooth closed envelope 5 mm over the hip and thigh muscles and bones (voxel field, morphological closing, surface nets), bridging creases; nothing of the skin is used |
+| Bright shards between the abdominal muscles and at the waistband (both builds; worse with Écorché) | The fascia sheet was the scanned skin pushed in along its normals; neighbouring points sank to different depths and the sheet folded over itself between the muscles. The skin mesh also has internal layers in the abdomen | The fascia is now the same kind of envelope, 1 cm under the muscle surface, bridging gaps under 2.5 cm; a disc closes the bottom of the (organ-less) pelvis so it cannot leak into the trunk |
+| Knee-to-knee sheet in the squat descent (both builds) | The inner thighs nearly touch, so the shorts bridged them down to the hem; the knees stretched that panel apart | Separate leg tubes below a 5 cm crotch gusset |
+
+The darker gold (`#8c6124`, was `#ad7a30`) keeps the approved brightness: the old folded fascia had darkened the
+muscles' baked occlusion (mean 0.09, now 0.17), so the same base colour now rendered about 20% lighter.
+
+Verified: front rays over the groin hit only the shorts and the inner-thigh muscles below the hem; front rays over the
+abdomen hit muscle 92% of the time, the rest being the dark groove of the linea alba and tendons; controls test passes.
+
+Size: ~493k triangles, 15.4 MB (was ~410k, 10.5 MB); the mobile index buffer is ~221k triangles. Not measured on a
+phone.
+
+Still visible: a narrow dark gap between the shorts' legs in front views (the legs are separate below the gusset);
+the aponeurotic parts of Écorché's obliques and the thoracolumbar fascia read as pale gold (anatomically right, but
+lighter than the painted reference); a small flap at the knees in deep flexion (from the BodyParts3D leg muscles, not
+fixed); the face, neck base and deep-flexion pinching listed in the README.

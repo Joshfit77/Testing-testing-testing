@@ -128,18 +128,24 @@ const { skinIndex, skinWeight } = computeWeights(pos, idx, label, MEASURED_BIND,
 view("skinIndex", Uint8Array).set(skinIndex);
 view("skinWeight", Uint8Array).set(skinWeight);
 
-// Fascia triangles that bridge the arm and the torso (across the armpit) would stretch into long slivers when the arms
-// rise: they fill no visible gap, so they go. (Written back into the index block, which only gets shorter.)
+// Fascia triangles that bridge the arm and the torso (across the armpit), or the two legs (between the inner thighs,
+// which nearly touch below the shorts), would stretch into long sheets when the arms rise or the knees spread: they fill
+// no visible gap, so they go. (Written back into the index block, which only gets shorter.)
 let tris: Uint32Array = new Uint32Array(idx);
 {
   const ARM = new Set(BONES.flatMap((b, i) => (/upperArm|foreArm|hand/.test(b) ? [i] : [])));
+  const legSide = (v: number) => {
+    const b = BONES[skinIndex[v * 4]!]!;
+    return /^(thigh|shin|foot)/.test(b) ? b.slice(-1) : "";
+  };
   const keep: number[] = [];
   let dropped = 0;
   for (let t = 0; t < tris.length; t += 3) {
     const tri = [tris[t]!, tris[t + 1]!, tris[t + 2]!];
     if (tissue[tri[0]!] === TISSUE.deep) {
       const arm = tri.map((v) => ARM.has(skinIndex[v * 4]!));
-      if (arm.some(Boolean) && !arm.every(Boolean)) {
+      const legs = new Set(tri.map(legSide).filter(Boolean));
+      if ((arm.some(Boolean) && !arm.every(Boolean)) || legs.size > 1) {
         dropped++;
         continue;
       }
@@ -152,7 +158,7 @@ let tris: Uint32Array = new Uint32Array(idx);
     (l.type === "Uint32Array" ? view("index", Uint32Array) : view("index", Uint16Array)).set(tris);
     l.length = tris.length;
   }
-  console.log(`fascia: ${dropped} triangles bridging arm and torso removed`);
+  console.log(`fascia: ${dropped} triangles bridging arm and torso or the two legs removed`);
 }
 
 // Ambient occlusion: 32 cosine-weighted rays per vertex, nearer hits darker.

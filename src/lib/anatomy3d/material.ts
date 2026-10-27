@@ -26,7 +26,7 @@ const g3 = (v: readonly number[]) => `vec3(${v.map(f1).join(", ")})`;
 const LOOKS = {
   gold: {
     // A darker, satin gold: rich in shadow, bright only where the light catches it, never a polished statue.
-    base: "#ad7a30", metalness: 0.62, roughness: 0.4, clearcoat: 0.32, clearcoatRoughness: 0.28, sheen: 0.3, sheenColor: "#ffd98a",
+    base: "#8c6124", metalness: 0.62, roughness: 0.4, clearcoat: 0.32, clearcoatRoughness: 0.28, sheen: 0.3, sheenColor: "#ffd98a",
     fibre: [0.88, 0.2], tendonEnd: [[0.93, 0.79, 0.52], 0.55], bone: [[0.8, 0.66, 0.42], 0.45], tendon: [[0.92, 0.8, 0.55], 0.5],
     hairDark: 0.16, scalp: [[0.93, 0.79, 0.52], 0], fascia: 0.42, skinMetal: 0.5, skinTint: [1, 1, 1], skinMul: 0.8, rim: [[1, 0.72, 0.32], 0.06],
     glow: "#ffb72e", glowTint: 0.45,
@@ -148,14 +148,14 @@ export function makeAthleteMaterial(look: AthleteLook = "gold"): AthleteMaterial
         diffuseColor.rgb = mix(diffuseColor.rgb, eye, isEye);
         if (vTissue > 4.5 && vTissue < 5.5) diffuseColor.rgb *= ${f1(L.fascia)}; // fascia between the muscles
         // Shorts (a fitted mesh of their own): matte black fabric with a thin gold trim drawn along the waistband and
-        // hem lines (the same curves the mesh is cut on, so the line is crisp at any distance); the folded edge
-        // (muscleMix 1) stays black.
+        // hem lines (the same curves the mesh is cut on, so the line is crisp at any distance), continuing over the
+        // folded edge.
         float isShorts = step(5.5, vTissue);
         float hemY = 68.5 + 3.5 * smoothstep(6.0, 16.0, abs(vRest.z));
         float waistY = 95.5 + 3.0 * smoothstep(2.0, -8.0, vRest.x);
         float toEdge = min(vRest.y - hemY, waistY - vRest.y);
         float trimW = fwidth(toEdge);
-        float trim = isShorts * (1.0 - smoothstep(0.55 - trimW, 0.55 + trimW, toEdge)) * (1.0 - step(0.9, vExtra));
+        float trim = isShorts * (1.0 - smoothstep(0.55 - trimW, 0.55 + trimW, toEdge));
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.018, 0.016, 0.014), isShorts * (1.0 - trim));
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.85, 0.66, 0.3), trim);`,
       )
