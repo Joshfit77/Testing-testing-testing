@@ -75,7 +75,6 @@ await frame(15);
 const up = Math.round(box.height * 0.43) / 2;
 await gesture([[cx - 45, cy - up], [cx + 45, cy - up]], [[cx - 45, cy + up], [cx + 45, cy + up]], 30);
 await gesture([[cx - 30, cy], [cx + 30, cy]], [[cx - 150, cy], [cx + 150, cy]], 30);
-await gesture([[cx - 30, cy], [cx + 30, cy]], [[cx - 120, cy], [cx + 120, cy]], 26);
 await frame(20);
 // A slow look round the head with one finger, and back.
 await gesture([[cx - 60, cy + 60]], [[cx + 60, cy + 60]], 30);
