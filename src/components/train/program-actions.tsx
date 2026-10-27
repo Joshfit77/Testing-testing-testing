@@ -19,7 +19,7 @@ export function ProgramActions({ programId, locked, isActive, isSaved }: { progr
             <Lock aria-hidden /> Upgrade to unlock
           </Link>
         </Button>
-        <p className="text-xs text-muted-foreground">This program is part of the Plus library.</p>
+        <p className="text-xs text-muted-foreground">This program is included with Pro.</p>
       </div>
     );
   }

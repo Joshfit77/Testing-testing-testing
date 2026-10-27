@@ -27,7 +27,7 @@ function Locked({ title }: { title: string }) {
     <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-gold-muted/50 bg-card/60 p-6 text-center">
       <Lock className="size-5 text-gold" aria-hidden />
       <p className="font-semibold">{title}</p>
-      <p className="text-xs text-muted-foreground">Advanced analytics are included with Plus and Pro.</p>
+      <p className="text-xs text-muted-foreground">Advanced analytics are included with Pro.</p>
       <Button asChild size="sm" variant="outline">
         <Link href="/profile/billing">See plans</Link>
       </Button>

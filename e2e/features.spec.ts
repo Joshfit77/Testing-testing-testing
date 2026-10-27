@@ -31,10 +31,10 @@ test.describe("feature access, subscriptions and core sections", () => {
     await expect(page.getByRole("button", { name: /Start program/ })).toBeVisible();
 
     await page.goto("/nutrition");
-    await expect(page.getByText("Included with Plus and Pro")).toBeVisible();
+    await expect(page.getByText("Included with Pro")).toBeVisible();
 
     await page.goto("/coach");
-    await expect(page.getByText(/isn't configured on this server|included with Plus and Pro/).first()).toBeVisible();
+    await expect(page.getByText(/isn't configured on this server|included with Pro/).first()).toBeVisible();
     await expect(page.getByRole("button", { name: "Send message" })).toBeDisabled();
 
     await page.goto("/profile/billing");
@@ -88,8 +88,10 @@ test.describe("feature access, subscriptions and core sections", () => {
     await expect(page.getByText("210").first()).toBeVisible();
 
     await page.goto("/profile/billing");
-    await expect(page.getByText("All Access Yearly")).toBeVisible();
-    await expect(page.getByText("$200")).toBeVisible();
-    await expect(page.getByText(/^\$30\s*\/ month$/)).toBeVisible();
+    // Plus is legacy: a Plus member still sees their plan, marked as no longer offered, next to Pro.
+    await expect(page.getByText("Pro yearly")).toBeVisible();
+    await expect(page.getByText(/^\$149\.99\s*\/ year$/)).toBeVisible();
+    await expect(page.getByText(/^\$19\.99\s*\/ month$/)).toBeVisible();
+    await expect(page.getByText("Legacy")).toBeVisible();
   });
 });

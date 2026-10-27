@@ -20,6 +20,8 @@ export interface PlanConfig {
   priceCents: number;
   /** Optional yearly option (US cents per year) that grants this plan. */
   yearlyPriceCents?: number;
+  /** Whether new members can choose this plan. Plus is legacy: existing subscriptions keep it, nobody new can buy it. */
+  sellable: boolean;
   tagline: string;
   features: Feature[];
   /** AI coach messages per calendar month. */
@@ -45,6 +47,7 @@ export function getPlans(): Record<Plan, PlanConfig> {
       id: "free",
       name: "Free",
       priceCents: 0,
+      sellable: true,
       tagline: "Start training today.",
       features: ["workout_logging", "starter_programs", "basic_progress"],
       aiMonthlyLimit: envInt("PLAN_FREE_AI_MONTHLY_LIMIT", 0),
@@ -55,6 +58,7 @@ export function getPlans(): Record<Plan, PlanConfig> {
       id: "plus",
       name: "Plus",
       priceCents: envInt("PLAN_PLUS_PRICE_CENTS", 999),
+      sellable: false,
       tagline: "The complete training toolkit.",
       features: [
         "workout_logging",
@@ -72,16 +76,16 @@ export function getPlans(): Record<Plan, PlanConfig> {
     pro: {
       id: "pro",
       name: "Pro",
-      priceCents: envInt("PLAN_PRO_PRICE_CENTS", 3000),
-      yearlyPriceCents: envInt("PLAN_PRO_YEARLY_PRICE_CENTS", 20000),
-      tagline: "Personal coaching, powered by AI.",
+      priceCents: envInt("PLAN_PRO_PRICE_CENTS", 1999),
+      yearlyPriceCents: envInt("PLAN_PRO_YEARLY_PRICE_CENTS", 14999),
+      sellable: true,
+      tagline: "Everything in Narrow Gate Fitness, including the AI coach.",
       features: [...FEATURES],
       aiMonthlyLimit: envInt("PLAN_PRO_AI_MONTHLY_LIMIT", 400),
       aiPlanMonthlyLimit: envInt("PLAN_PRO_AI_PLAN_MONTHLY_LIMIT", 20),
       highlights: [
-        "Everything in Plus",
-        "Expanded AI coaching",
-        "Personalized workout generation",
+        "Full program library, food tracking & advanced analytics",
+        "AI coach and personalized plan generation",
         "Advanced training recommendations",
       ],
     },
@@ -89,6 +93,12 @@ export function getPlans(): Record<Plan, PlanConfig> {
 }
 
 export const PLAN_ORDER: Plan[] = ["free", "plus", "pro"];
+
+/** Plans offered to new members, in display order (Free and Pro; Plus is legacy). */
+export function sellablePlans(): Plan[] {
+  const plans = getPlans();
+  return PLAN_ORDER.filter((p) => plans[p].sellable);
+}
 
 export function planRank(plan: Plan): number {
   return PLAN_ORDER.indexOf(plan);

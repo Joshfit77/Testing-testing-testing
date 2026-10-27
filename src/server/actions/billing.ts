@@ -6,15 +6,15 @@ import { actionError, type ActionState } from "@/lib/action-state";
 import { getUserPlan, requireUser } from "@/server/auth";
 import { isServiceRoleConfigured, isStripeConfigured, isYearlyBillingConfigured } from "@/server/env";
 import { getNativePlatform } from "@/server/native";
-import { createCheckoutSession, createPortalSession } from "@/server/services/billing";
+import { createCheckoutSession, createPortalSession, PriceMismatchError } from "@/server/services/billing";
 import { logError } from "@/server/log";
 
 export async function startCheckoutAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireUser();
-  const plan = z.enum(["plus", "pro"]).safeParse(formData.get("plan"));
+  // Only Pro is sold to new members; Plus is legacy (existing subscriptions keep working).
+  const plan = z.enum(["pro"]).safeParse(formData.get("plan"));
   const interval = z.enum(["month", "year"]).safeParse(formData.get("interval") ?? "month");
   if (!plan.success || !interval.success) return actionError("Choose a plan.");
-  if (interval.data === "year" && plan.data !== "pro") return actionError("Yearly billing is available for the all-access plan only.");
   if (await getNativePlatform()) return actionError("Subscriptions can't be purchased inside the mobile app yet.");
   if (!isStripeConfigured() || !isServiceRoleConfigured()) return actionError("Payments aren't configured on this server yet.");
   if (interval.data === "year" && !isYearlyBillingConfigured()) return actionError("Yearly billing isn't configured on this server yet.");
@@ -25,6 +25,7 @@ export async function startCheckoutAction(_prev: ActionState, formData: FormData
     url = await createCheckoutSession(user.id, user.email, plan.data, interval.data);
   } catch (err) {
     logError("billing.checkout", err);
+    if (err instanceof PriceMismatchError) return actionError("Checkout is temporarily unavailable while we update our prices. You haven't been charged.");
     return actionError("We couldn't start checkout. Please try again in a moment.");
   }
   redirect(url);

@@ -5,7 +5,7 @@ import { FormMessage, SubmitButton } from "@/components/common/form-status";
 import { initialActionState } from "@/lib/action-state";
 import { openBillingPortalAction, startCheckoutAction } from "@/server/actions/billing";
 
-export function CheckoutButton({ plan, label, featured, interval = "month" }: { plan: "plus" | "pro"; label: string; featured?: boolean; interval?: "month" | "year" }) {
+export function CheckoutButton({ plan, label, featured, interval = "month" }: { plan: "pro"; label: string; featured?: boolean; interval?: "month" | "year" }) {
   const [state, action] = useActionState(startCheckoutAction, initialActionState);
   return (
     <form action={action} className="space-y-2">

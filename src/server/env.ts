@@ -14,7 +14,8 @@ export const serverEnv = {
 };
 
 export const isAiConfigured = () => Boolean(serverEnv.anthropicApiKey);
-export const isStripeConfigured = () => Boolean(serverEnv.stripeSecretKey && serverEnv.stripePricePlus && serverEnv.stripePricePro);
+/** Checkout needs the secret key and the Pro monthly price. STRIPE_PRICE_PLUS is only needed to recognise legacy Plus subscriptions. */
+export const isStripeConfigured = () => Boolean(serverEnv.stripeSecretKey && serverEnv.stripePricePro);
 export const isYearlyBillingConfigured = () => Boolean(isStripeConfigured() && serverEnv.stripePriceProYearly);
 export const isStripeWebhookConfigured = () => Boolean(serverEnv.stripeSecretKey && serverEnv.stripeWebhookSecret);
 export const isServiceRoleConfigured = () => Boolean(serverEnv.supabaseServiceRoleKey);

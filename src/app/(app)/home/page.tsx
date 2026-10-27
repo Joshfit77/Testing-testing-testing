@@ -234,7 +234,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             ) : (
               <div className="flex flex-col items-center gap-3 py-4 text-center">
                 <Lock className="size-6 text-gold" aria-hidden />
-                <p className="text-sm text-muted-foreground">Calorie and protein tracking is included with Plus and Pro.</p>
+                <p className="text-sm text-muted-foreground">Calorie and protein tracking is included with Pro.</p>
                 <Button asChild size="sm" variant="outline">
                   <Link href="/profile/billing">See plans</Link>
                 </Button>
@@ -348,7 +348,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                 </li>
               ))}
             </ul>
-            {!hasFeature(plan, "ai_coach") && <p className="text-xs text-muted-foreground">AI coaching is included with Plus and Pro.</p>}
+            {!hasFeature(plan, "ai_coach") && <p className="text-xs text-muted-foreground">AI coaching is included with Pro.</p>}
           </CardContent>
         </Card>
 

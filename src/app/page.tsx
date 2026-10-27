@@ -4,7 +4,7 @@ import { Bot, Check, Dumbbell, HeartPulse, LineChart, Salad, ShieldCheck } from 
 import { Logo } from "@/components/common/logo";
 import { Button } from "@/components/ui/button";
 import { isSupabaseConfigured } from "@/lib/env";
-import { formatPrice, getPlans, PLAN_ORDER, yearlySavingsPercent } from "@/lib/domain/plans";
+import { formatPrice, getPlans, sellablePlans, yearlySavingsPercent } from "@/lib/domain/plans";
 import { getCurrentUser } from "@/server/auth";
 
 const FEATURES = [
@@ -101,10 +101,10 @@ export default async function LandingPage() {
           <h2 id="pricing-title" className="font-display text-3xl font-bold uppercase tracking-wide">
             Simple plans
           </h2>
-          <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {PLAN_ORDER.map((id) => {
+          <div className="mt-8 grid gap-4 md:grid-cols-3">
+            {sellablePlans().map((id) => {
               const p = plans[id];
-              const featured = id === "plus";
+              const featured = id === "pro";
               return (
                 <div
                   key={id}
@@ -128,14 +128,14 @@ export default async function LandingPage() {
             })}
             {plans.pro.yearlyPriceCents ? (
               <div className="rounded-2xl border border-gold-muted bg-card-gradient p-6">
-                <p className="font-display text-xl font-semibold uppercase tracking-wider text-gold-highlight">All Access Yearly</p>
+                <p className="font-display text-xl font-semibold uppercase tracking-wider text-gold-highlight">Pro yearly</p>
                 <p className="mt-2 text-3xl font-bold">
                   {formatPrice(plans.pro.yearlyPriceCents)}
                   <span className="text-sm font-normal text-muted-foreground"> / year</span>
                 </p>
-                <p className="mt-1 text-sm text-muted-foreground">Everything, billed once a year. Save {yearlySavingsPercent(plans.pro.priceCents, plans.pro.yearlyPriceCents)}%.</p>
+                <p className="mt-1 text-sm text-muted-foreground">Everything in Pro, billed once a year. Save {yearlySavingsPercent(plans.pro.priceCents, plans.pro.yearlyPriceCents)}%.</p>
                 <ul className="mt-5 space-y-2 text-sm">
-                  {["Everything in Pro", "All programs, food tracking & analytics", "Full AI coaching & plan generation"].map((h) => (
+                  {["Everything in Pro", `About ${formatPrice(Math.round(plans.pro.yearlyPriceCents / 12))} a month`].map((h) => (
                     <li key={h} className="flex gap-2">
                       <Check className="mt-0.5 size-4 shrink-0 text-gold" aria-hidden /> {h}
                     </li>

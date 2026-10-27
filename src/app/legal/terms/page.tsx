@@ -198,8 +198,9 @@ export default function TermsPage() {
       <Section id="subscriptions">
         <h3>Plans and prices</h3>
         <p>
-          Narrow Gate Fitness offers a free plan and paid plans (currently Plus and Pro, billed monthly, and Pro billed yearly). Current
-          prices and what each plan includes are shown on the Plans &amp; billing page and at checkout. Prices are in US dollars.
+          Narrow Gate Fitness offers a free plan and a paid Pro plan, billed monthly or yearly. Current prices and what each plan includes
+          are shown on the Plans &amp; billing page and at checkout. Prices are in US dollars. The earlier Plus plan is no longer offered to
+          new members; existing Plus subscriptions continue on their current terms until cancelled.
         </p>
         <h3>Payment</h3>
         <ul>

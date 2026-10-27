@@ -126,7 +126,7 @@ export default async function BadgesPage() {
             </h2>
             {cat.id === "nutrition" && !hasFeature(plan, "nutrition_tracking") && (
               <p className="mb-3 text-xs text-muted-foreground">
-                Food logging is included with Plus and Pro.{" "}
+                Food logging is included with Pro.{" "}
                 <Link href="/profile/billing" className="text-gold-highlight underline">
                   See plans
                 </Link>

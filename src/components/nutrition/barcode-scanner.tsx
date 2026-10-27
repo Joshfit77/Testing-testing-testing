@@ -108,7 +108,7 @@ export function BarcodeScanner({
             : json.error === "invalid_code"
               ? "That isn't a valid product barcode."
               : json.error === "upgrade_required"
-                ? "Barcode scanning is part of nutrition tracking on Plus and Pro."
+                ? "Barcode scanning is part of nutrition tracking on Pro."
                 : json.error === "unauthorized"
                   ? "Your session expired — sign in again."
                   : "Open Food Facts isn't responding right now. Try again in a moment.";

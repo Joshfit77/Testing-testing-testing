@@ -2,7 +2,7 @@ import "server-only";
 import Stripe from "stripe";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { publicEnv } from "@/lib/env";
-import { entitlementFromSubscriptions, type BillingInterval, type SubscriptionStatus } from "@/lib/domain/plans";
+import { entitlementFromSubscriptions, getPlans, type BillingInterval, type SubscriptionStatus } from "@/lib/domain/plans";
 import type { Plan } from "@/lib/domain/types";
 import { isServiceRoleConfigured, serverEnv } from "@/server/env";
 import { logError } from "@/server/log";
@@ -41,9 +41,33 @@ async function getOrCreateCustomer(userId: string, email: string | undefined): P
   return customer.id;
 }
 
+/** Thrown when the configured Stripe price doesn't match the price the app shows, so nobody is charged a different amount. */
+export class PriceMismatchError extends Error {}
+
+/** Amount (US cents) the app displays for a plan and interval. */
+export function displayedPriceCents(plan: PaidPlan, interval: BillingInterval): number | null {
+  const p = getPlans()[plan];
+  return interval === "year" ? (p.yearlyPriceCents ?? null) : p.priceCents;
+}
+
+/** Confirms the Stripe price is an active USD recurring price for the right interval and the amount the app shows. */
+export function checkStripePrice(
+  price: Pick<Stripe.Price, "active" | "currency" | "unit_amount" | "recurring">,
+  expectedCents: number | null,
+  interval: BillingInterval,
+): string | null {
+  if (!price.active) return "price is not active";
+  if (price.currency !== "usd") return `currency is ${price.currency}, expected usd`;
+  if (price.recurring?.interval !== interval || (price.recurring?.interval_count ?? 1) !== 1) return `billing interval doesn't match ${interval}`;
+  if (expectedCents == null || price.unit_amount !== expectedCents) return `amount ${price.unit_amount} doesn't match displayed ${expectedCents}`;
+  return null;
+}
+
 export async function createCheckoutSession(userId: string, email: string | undefined, plan: PaidPlan, interval: BillingInterval = "month"): Promise<string> {
   const price = priceIdForPlan(plan, interval);
   if (!price) throw new Error(`No Stripe price configured for ${plan}/${interval}`);
+  const problem = checkStripePrice(await getStripe().prices.retrieve(price), displayedPriceCents(plan, interval), interval);
+  if (problem) throw new PriceMismatchError(`Stripe price ${price} for ${plan}/${interval}: ${problem}`);
   const customer = await getOrCreateCustomer(userId, email);
   const session = await getStripe().checkout.sessions.create({
     mode: "subscription",

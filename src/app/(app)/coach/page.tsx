@@ -36,7 +36,7 @@ export default async function CoachPage({ searchParams }: { searchParams: Promis
   if (!isAiConfigured()) disabledReason = "The AI coach isn't configured on this server yet (no AI provider key). Everything else in the app works normally.";
   else if (!flag) disabledReason = "The AI coach is temporarily unavailable.";
   else if (!isServiceRoleConfigured()) disabledReason = "AI usage metering isn't configured on this server, so the coach is disabled.";
-  else if (!entitled) disabledReason = "AI coaching is included with Plus and Pro.";
+  else if (!entitled) disabledReason = "AI coaching is included with Pro.";
   else if (usage.chatUsed >= usage.chatLimit) disabledReason = `You've used all ${usage.chatLimit} AI messages for this month. Your allowance resets on the 1st.`;
 
   return (

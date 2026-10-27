@@ -51,7 +51,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
         <PageHeader eyebrow="Food log" title="Food" description="Track calories, macros and water, save meals and plan ahead." />
         <EmptyState
           icon={Lock}
-          title="Included with Plus and Pro"
+          title="Included with Pro"
           description="Track calories, protein, carbs, fat and water, search a reliable food database, save meals and recipes, and plan ahead."
           action={
             <Button asChild>

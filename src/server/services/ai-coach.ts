@@ -104,7 +104,7 @@ export async function getAiUsage(userId: string, plan: Plan) {
 export async function assertAiAllowed(userId: string, plan: Plan, mode: "chat" | "plan") {
   if (!isAiConfigured()) throw new AiError("not_configured", "The AI coach isn't configured on this server.");
   if (!(await isFlagEnabled("ai_coach"))) throw new AiError("disabled", "The AI coach is temporarily unavailable.");
-  if (!hasFeature(plan, "ai_coach")) throw new AiError("not_entitled", "AI coaching is included with Plus and Pro.");
+  if (!hasFeature(plan, "ai_coach")) throw new AiError("not_entitled", "AI coaching is included with Pro.");
   if (mode === "plan") {
     if (!hasFeature(plan, "ai_plan_generation")) throw new AiError("plan_not_entitled", "Personalized plan generation is included with Pro.");
     if (!(await isFlagEnabled("ai_plan_generation"))) throw new AiError("disabled", "Plan generation is temporarily unavailable.");
