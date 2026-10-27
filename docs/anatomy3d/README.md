@@ -4,7 +4,7 @@ Status: **not approved, not final.** A 3D anatomical athlete for the exercise de
 far (the barbell back squat). The existing 2D demonstrations are unchanged and remain what the app uses; nothing here is
 wired into the app's pages yet.
 
-## Milestone 1 (current): the original model in the player
+## Milestone 1 (approved look): the original model in the player
 
 The exercise player opens on the **original Écorché model file**, `public/anatomy/ecorche.glb`, byte-identical to the
 published `model/ecorche.glb` (sha256 `9744d3df…326c`, checked by the page before it shows the model). It is loaded as
@@ -12,7 +12,19 @@ it is, with its own meshes, vertex colours and materials: nothing is rebuilt, ri
 addition, at the owner's request: the published eyes are blank white, so the viewer paints a brown iris and a pupil onto
 each cornea in the shader (`paintEyes`); the file and its geometry are unchanged. The model
 stands still; one finger turns it a full 360°, a pinch zooms, two fingers move along the body, and front, side and rear
-buttons reset the view. No exercise animation, glow or equipment yet: those come after the appearance is approved.
+buttons reset the view.
+
+## Milestone 2 (current, awaiting approval): the original model performs the barbell back squat
+
+The same file now moves. Each of its 634 meshes becomes a skinned mesh with its own geometry and material, bound to the
+exercise rig with skin weights transferred from the rigged copy of the same model (`public/anatomy/ecorche-skin.*`, built
+by `scripts/anatomy/build-ecorche-skin.mts`: an affine fit of the file onto the copy, median match 1 µm, 34 of 486,005
+vertices more than 3 mm away). The motion and the barbell come from the app's exercise engine; the fingers close round
+the bar. The page has play/pause, a scrubber and speeds. The camera follows the hips at full view and, zoomed in, the
+part of the body in view, so a close-up of the face stays on the face through the rep. No muscle glow yet.
+
+- Video (simulated phone, headless Chromium with software WebGL; not a physical device):
+  `renders/raw-ecorche/squat-phone.mp4`.
 
 - Viewer: `src/lib/anatomy3d/model-viewer.ts` (`mountModel`). Lighting: the studio of the reference renders (ACES tone
   mapping, room environment at 0.6, warm key light, white rim light).
@@ -22,8 +34,7 @@ buttons reset the view. No exercise animation, glow or equipment yet: those come
 
 ## Later milestones
 
-Rigging, exercise movement, muscle highlighting, equipment and any coverage come only after the owner approves the
-model's appearance in milestone 1. An experimental rigged copy of the same model already exists for that work
+Muscle highlighting, the other exercises and any coverage come only after the owner approves the squat. An experimental rigged copy of the same model already exists for that work
 (`public/anatomy/athlete-raw.*`, shown only with `?ex=…`); [ECORCHE_RAW.md](ECORCHE_RAW.md) describes it and the
 CC BY-SA 4.0 obligations.
 
