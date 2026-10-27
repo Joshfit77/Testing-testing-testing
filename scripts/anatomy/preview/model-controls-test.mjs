@@ -47,9 +47,11 @@ results['nothing else is drawn as the character (no rigged athlete loaded)'] = a
 // The model itself performs the exercise (its own meshes, skinned), and the play button pauses it: the turn and zoom
 // checks below run paused, so only the controls change the picture.
 results['all 634 of the file\'s meshes are skinned (the file is what moves)'] = await p.evaluate(() => window.viewer.motion?.skinnedMeshes === 634);
+// (Software rendering here can take seconds per frame: wait up to 30 s for the clock to move, forwards.)
 const t0 = await p.evaluate(() => window.viewer.motion.time());
-await p.waitForTimeout(1500);
-results['plays the squat'] = (await p.evaluate(() => window.viewer.motion.time())) !== t0;
+const moved = await p.waitForFunction((t0) => window.viewer.motion.time() !== t0, t0, { timeout: 30000 }).then(() => true, () => false);
+const t1 = await p.evaluate(() => window.viewer.motion.time());
+results['plays the squat (the clock runs forward, within the rep)'] = moved && t0 >= 0 && t1 >= 0 && t1 <= (await p.evaluate(() => window.viewer.motion.duration));
 let a, c;
 await p.tap('#play'); await p.waitForTimeout(400);
 a = await shot(); await p.waitForTimeout(1200); c = await shot();

@@ -130,16 +130,18 @@ export async function mountModel(
     renderer.render(scene, camera);
   };
   // While the exercise plays, a frame loop; when it is paused (or there is none), frames only on request.
-  let last = performance.now();
+  // (The first frame after a start only sets the clock: a frame's timestamp can be a little earlier than the moment the
+  // loop was asked for, which made a negative step.)
+  let last = -1;
   const loop = (now: number) => {
-    moving!.advance(Math.min(0.1, (now - last) / 1000));
+    moving!.advance(last < 0 ? 0 : Math.max(0, Math.min(0.1, (now - last) / 1000)));
     last = now;
     draw();
     if (moving!.motion.playing) raf = requestAnimationFrame(loop);
   };
   const request = () => {
     if (raf) return;
-    last = performance.now();
+    last = -1;
     raf = requestAnimationFrame(moving?.motion.playing ? loop : draw);
   };
   changed = () => {
@@ -394,7 +396,7 @@ function moveModel(
   const v = new THREE.Vector3();
   return {
     advance(dt: number) {
-      if (playing) t = (t + dt * speed) % T;
+      if (playing) t = (((t + dt * speed) % T) + T) % T;
       pose();
     },
     /** The camera's look-at height (file frame) for the current pose: low on the body, following the hips. */
