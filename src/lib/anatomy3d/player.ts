@@ -4,6 +4,7 @@ import type { ExerciseMeta } from "../exercise-motion/types";
 import { effortCurve, type EffortCurve } from "./effort";
 import { makeEquipment, type EquipmentSet } from "./equipment";
 import { addGripMorph } from "./grip";
+import { setRestJoints } from "./bind";
 import { makeAthleteMaterial, type AthleteLook } from "./material";
 import { loadAthlete, makeSkeleton } from "./mesh";
 import { muscleId, type Region } from "./muscle-ids";
@@ -81,7 +82,8 @@ export async function mountAthlete(
   const stage: Stage = makeStage(canvas, { pixelRatio: opts.pixelRatio, look: opts.look });
   const coarse = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
   const detail = opts.detail === "full" || opts.detail === "mobile" ? opts.detail : coarse ? "mobile" : "full";
-  const { geometry } = await loadAthlete(opts.assetBase, detail);
+  const { geometry, bind } = await loadAthlete(opts.assetBase, detail);
+  if (bind) setRestJoints(bind);
   const mat = makeAthleteMaterial(opts.look);
   const { bones, skeleton } = makeSkeleton();
   if (!geometry.morphAttributes.position) addGripMorph(geometry);

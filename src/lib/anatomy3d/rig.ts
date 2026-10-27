@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { Frame, Vec } from "../exercise-motion/types";
-import { HALF, LIMB } from "./bind";
+import { bindVersion, HALF, LIMB } from "./bind";
 import { bindFrames, frameMatrix, type BoneFrame } from "./mesh";
 import { BONES, type BoneName } from "./muscle-ids";
 
@@ -176,12 +176,20 @@ function headJoints(head: THREE.Vector3, headTop: THREE.Vector3, forehead: THREE
 
 // ---------------------------------------------------------------- bone frames
 
-const BIND_FRAMES = bindFrames();
-const BIND_ROT: Record<BoneName, THREE.Quaternion> = Object.fromEntries(
-  BONES.map((b) => [b, new THREE.Quaternion().setFromRotationMatrix(frameMatrix(BIND_FRAMES[b]))]),
-) as Record<BoneName, THREE.Quaternion>;
-/** Rest length of each bone; limbs stretch along their axis to the motion's segment lengths. */
-const BIND_LEN: Record<BoneName, number> = Object.fromEntries(BONES.map((b) => [b, Math.hypot(...BIND_FRAMES[b].y)])) as Record<BoneName, number>;
+/** Rest rotation and length of each bone (limbs stretch along their axis to the motion's segment lengths), rebuilt
+ *  when the asset in use brings its own joints. */
+let restCache: { version: number; rot: Record<BoneName, THREE.Quaternion>; len: Record<BoneName, number> } | null = null;
+function rest() {
+  if (restCache?.version !== bindVersion) {
+    const frames = bindFrames();
+    restCache = {
+      version: bindVersion,
+      rot: Object.fromEntries(BONES.map((b) => [b, new THREE.Quaternion().setFromRotationMatrix(frameMatrix(frames[b]))])) as Record<BoneName, THREE.Quaternion>,
+      len: Object.fromEntries(BONES.map((b) => [b, Math.hypot(...frames[b].y)])) as Record<BoneName, number>,
+    };
+  }
+  return restCache;
+}
 const STRETCH = new Set<BoneName>(["pelvis", "chest", "upperArmR", "foreArmR", "upperArmL", "foreArmL", "thighR", "shinR", "thighL", "shinL"]);
 const PARENT: Partial<Record<BoneName, BoneName>> = {
   upperArmR: "chest",
@@ -230,7 +238,7 @@ export function poseBones(j: Joints3, bones: THREE.Bone[]): void {
   // Limbs: swing each bone from its rest direction (carried by the parent) to the new direction.
   const limb = (name: BoneName, origin: THREE.Vector3, to: THREE.Vector3) => {
     const parent = PARENT[name]!;
-    const restInParent = BIND_ROT[parent].clone().invert().multiply(BIND_ROT[name]);
+    const restInParent = rest().rot[parent].clone().invert().multiply(rest().rot[name]);
     const carried = rot[parent]!.clone().multiply(restInParent);
     const restDir = new THREE.Vector3(0, 1, 0).applyQuaternion(carried);
     const newDir = to.clone().sub(origin).normalize();
@@ -251,7 +259,7 @@ export function poseBones(j: Joints3, bones: THREE.Bone[]): void {
   }
   BONES.forEach((name, i) => {
     const b = bones[i]!;
-    const stretch = STRETCH.has(name) && len[name] ? len[name]! / BIND_LEN[name] : 1;
+    const stretch = STRETCH.has(name) && len[name] ? len[name]! / rest().len[name] : 1;
     b.matrix.compose(pos[name]!, rot[name]!, tmpS.set(1, stretch, 1));
     b.matrixWorld.copy(b.matrix);
   });

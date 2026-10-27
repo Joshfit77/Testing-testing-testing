@@ -10,6 +10,8 @@ mkdir -p "$OUT/anatomy"
 cp "$ROOT/public/anatomy/athlete.bin" "$ROOT/public/anatomy/athlete.json" "$OUT/anatomy/"
 # The Écorché-based evaluation build, when present (?asset=athlete-eco).
 if [ -f "$ROOT/public/anatomy/athlete-eco.bin" ]; then cp "$ROOT/public/anatomy/athlete-eco.bin" "$ROOT/public/anatomy/athlete-eco.json" "$OUT/anatomy/"; fi
+# The raw Écorché athlete (?asset=athlete-raw).
+if [ -f "$ROOT/public/anatomy/athlete-raw.bin" ]; then cp "$ROOT/public/anatomy/athlete-raw.bin" "$ROOT/public/anatomy/athlete-raw.json" "$OUT/anatomy/"; fi
 python3 - "$OUT" "$ROOT/scripts/anatomy/preview/page.html" <<'PY'
 import sys
 out, page = sys.argv[1], sys.argv[2]

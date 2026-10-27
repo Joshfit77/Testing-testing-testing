@@ -22,8 +22,9 @@ export interface Stage {
 
 export function makeStage(
   canvas: HTMLCanvasElement,
-  opts: { pixelRatio?: number; bloom?: boolean; look?: "gold" | "medical"; /** Key-light self-shadowing (default on). */ shadows?: boolean } = {},
+  opts: { pixelRatio?: number; bloom?: boolean; look?: "gold" | "medical" | "ecorche"; /** Key-light self-shadowing (default on). */ shadows?: boolean } = {},
 ): Stage {
+  if (opts.look === "ecorche") return ecorcheStage(canvas, opts);
   const medical = opts.look === "medical";
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: "high-performance", preserveDrawingBuffer: false });
   renderer.setPixelRatio(Math.min(opts.pixelRatio ?? (typeof devicePixelRatio === "number" ? devicePixelRatio : 1), 2));
@@ -116,7 +117,69 @@ export function makeStage(
   };
 }
 
-function floorTexture(medical = false): THREE.Texture {
+/**
+ * The raw Écorché look: the same studio the published model is shown in (ACES tone mapping, a soft room environment, one
+ * warm key light from the front-left and a white rim from behind), so the athlete reads exactly as the source model. The
+ * source faces +Z and the athlete +X: the lights and the environment are turned with it. Bloom only for the glow.
+ */
+function ecorcheStage(canvas: HTMLCanvasElement, opts: { pixelRatio?: number; bloom?: boolean }): Stage {
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: "high-performance" });
+  renderer.setPixelRatio(Math.min(opts.pixelRatio ?? (typeof devicePixelRatio === "number" ? devicePixelRatio : 1), 2));
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color("#060504");
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  scene.environment = env;
+  scene.environmentIntensity = 0.6;
+  scene.environmentRotation.set(0, Math.PI / 2, 0);
+  const camera = new THREE.PerspectiveCamera(30, 1, 10, 3000);
+  // (Source (x, y, z) is the athlete's (z, y, -x).)
+  const key = new THREE.DirectionalLight("#fff4e8", 2.6);
+  key.position.set(260, 300, 200);
+  const rim = new THREE.DirectionalLight("#ffffff", 1.4);
+  rim.position.set(-250, 200, -200);
+  scene.add(key, rim);
+  const tex = floorTexture(false, [36, 32, 30]);
+  const floor = new THREE.Mesh(new THREE.CircleGeometry(380, 64), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = -0.2;
+  scene.add(floor);
+  const root = new THREE.Group();
+  scene.add(root);
+  const composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene, camera));
+  const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.32, 0.35, 1.5);
+  if (opts.bloom !== false) composer.addPass(bloom);
+  composer.addPass(new OutputPass());
+  return {
+    renderer,
+    scene,
+    camera,
+    root,
+    floor,
+    render() {
+      composer.render();
+    },
+    resize(width, height) {
+      renderer.setSize(width, height, false);
+      composer.setSize(width, height);
+      bloom.resolution.set(width / 2, height / 2);
+      camera.aspect = width / Math.max(1, height);
+      camera.updateProjectionMatrix();
+    },
+    dispose() {
+      composer.dispose();
+      pmrem.dispose();
+      tex.dispose();
+      env.dispose();
+      renderer.dispose();
+    },
+  };
+}
+
+function floorTexture(medical = false, tone: [number, number, number] = [58, 42, 16]): THREE.Texture {
   const size = medical ? 1024 : 256;
   const c = typeof document !== "undefined" ? document.createElement("canvas") : null;
   if (!c) return new THREE.Texture();
@@ -148,8 +211,8 @@ function floorTexture(medical = false): THREE.Texture {
     return t;
   }
   const grad = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-  grad.addColorStop(0, "rgba(58,42,16,0.85)");
-  grad.addColorStop(0.35, "rgba(24,18,8,0.75)");
+  grad.addColorStop(0, `rgba(${tone.join(",")},0.85)`);
+  grad.addColorStop(0.35, `rgba(${tone.map((c) => Math.round(c * 0.42)).join(",")},0.75)`);
   grad.addColorStop(1, "rgba(6,5,4,0)");
   g.fillStyle = grad;
   g.fillRect(0, 0, size, size);

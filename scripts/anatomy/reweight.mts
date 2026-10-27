@@ -5,6 +5,7 @@
  *
  *   npx tsx scripts/anatomy/reweight.mts                                   (public/anatomy/athlete)
  *   ATHLETE=public/anatomy/athlete-eco npx tsx scripts/anatomy/reweight.mts  (the Écorché-based build)
+ *   ATHLETE=public/anatomy/athlete-raw npx tsx scripts/anatomy/reweight.mts  (the raw Écorché athlete, own joints)
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import * as THREE from "three";
@@ -16,7 +17,7 @@ import { computeWeights } from "./weights";
 
 type Layout = Record<string, { offset: number; length: number; type: string }>;
 const ATHLETE = process.env.ATHLETE ?? "public/anatomy/athlete";
-const meta = JSON.parse(readFileSync(`${ATHLETE}.json`, "utf8")) as { layout: Layout; bytes: number } & Record<string, unknown>;
+const meta = JSON.parse(readFileSync(`${ATHLETE}.json`, "utf8")) as { layout: Layout; bytes: number; bind?: typeof MEASURED_BIND } & Record<string, unknown>;
 let buf: Buffer = readFileSync(`${ATHLETE}.bin`);
 const view = <T,>(name: string, T: new (b: ArrayBuffer, o: number, l: number) => T) => {
   const l = meta.layout[name]!;
@@ -29,7 +30,8 @@ const forced = meta.layout.forcedBone ? view("forcedBone", Uint8Array) : undefin
 const tissue = view("tissue", Uint8Array);
 const NV0 = pos.length / 3;
 
-const { skinIndex, skinWeight } = computeWeights(pos, idx, label, MEASURED_BIND, forced, tissue.map((t) => (t === TISSUE.cover ? 1 : 0)));
+const limbs = meta.layout.limb ? view("limb", Uint8Array) : undefined;
+const { skinIndex, skinWeight } = computeWeights(pos, idx, label, meta.bind ?? MEASURED_BIND, forced, tissue.map((t) => (t === TISSUE.cover ? 1 : 0)), limbs);
 
 // The fascia follows the muscles over it: each takes the skin weights of the nearest muscle and
 // tendon vertices (inverse-distance blend), so in a deep squat the layers bend together instead of crossing.

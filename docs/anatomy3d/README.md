@@ -4,6 +4,11 @@ Status: **not approved, not final.** A code-generated 3D anatomical athlete for 
 technical checkpoint (one exercise, the barbell back squat). The existing 2D demonstrations are unchanged and remain
 what the app uses; nothing here is wired into the app's pages yet.
 
+**Owner's chosen direction (experimental, awaiting approval of the squat):** the raw Écorché model, unaltered (red
+muscle, white tendons, its own head), rigged for the exercises: `public/anatomy/athlete-raw.*`, preview
+`?asset=athlete-raw`. See [ECORCHE_RAW.md](ECORCHE_RAW.md) for what is kept, what is added, the renders and the
+CC BY-SA 4.0 obligations. The gold athlete described below stays as it was until that is approved.
+
 Renders below are from the actual model (headless Chromium, WebGL via SwiftShader), not concept art.
 
 | | |

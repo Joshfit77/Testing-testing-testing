@@ -22,17 +22,22 @@
  *   ECORCHE=<path to ecorche.glb> ECORCHE_USE=torso   the torso and back muscles from Écorché (the athlete as built)
  *   ECORCHE=<path to ecorche.glb>                     every muscle, tendon and bone from Écorché (evaluation build,
  *                                                     written to public/anatomy/athlete-eco unless ATHLETE_OUT is set)
+ *   ECORCHE=<path to ecorche.glb> ECORCHE_USE=raw     the Écorché model itself, unaltered (public/anatomy/athlete-raw):
+ *                                                     every mesh with its own geometry, proportions and colours, its
+ *                                                     own head, eyes and teeth; only the rig, the shorts and the muscle
+ *                                                     labels for the glow are added. No skin, fascia, sculpting or
+ *                                                     athletic proportions, and its own (unwidened) joints.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { MeshoptSimplifier } from "meshoptimizer";
 import * as THREE from "three";
-import { BONES, muscleId, NO_MUSCLE, TISSUE, type BoneName, type Region } from "../../src/lib/anatomy3d/muscle-ids";
+import { BONES, muscleId, NO_MUSCLE, REGION_COUNT, REGIONS, TISSUE, type BoneName, type Region } from "../../src/lib/anatomy3d/muscle-ids";
 import { kindOf, regionOf, sideOf, type PartKind } from "./bp3d-regions";
 import { buildMakeHumanHead } from "./makehuman-head";
 import { closedEnvelope } from "./shorts-envelope";
 import { fitShorts } from "./shorts-fit";
-import { computeWeights, NO_BONE } from "./weights";
+import { computeWeights, LIMB, LIMB_CODE, NO_BONE } from "./weights";
 
 type V3 = [number, number, number];
 const DATA = process.argv[2];
@@ -43,8 +48,11 @@ if (!DATA || !existsSync(join(DATA, "parts_list_e.txt"))) {
 const HEIGHT = 183; // cm, matching the 2D motion figure
 const ECORCHE = process.env.ECORCHE;
 /** Which muscles come from Écorché: "torso" (chest, abdomen and back) or "all" (every muscle, tendon and bone). */
-const ECORCHE_USE = process.env.ECORCHE_USE === "torso" ? "torso" : "all";
-const OUT = process.env.ATHLETE_OUT ?? (ECORCHE && ECORCHE_USE === "all" ? "public/anatomy/athlete-eco" : "public/anatomy/athlete");
+const ECORCHE_USE = process.env.ECORCHE_USE === "torso" || process.env.ECORCHE_USE === "raw" ? process.env.ECORCHE_USE : "all";
+/** The raw Écorché athlete (ECORCHE_USE=raw). */
+const RAW = !!ECORCHE && ECORCHE_USE === "raw";
+const OUT =
+  process.env.ATHLETE_OUT ?? (RAW ? "public/anatomy/athlete-raw" : ECORCHE && ECORCHE_USE === "all" ? "public/anatomy/athlete-eco" : "public/anatomy/athlete");
 /** The shipped joint file is written only by the build that ships (the skeleton, and so the joints, is the same). */
 const WRITE_BIND = OUT === "public/anatomy/athlete";
 await MeshoptSimplifier.ready;
@@ -279,6 +287,8 @@ interface Part {
   rigid: BoneName | null;
   /** Per-vertex 0..1 extra: how tendinous (muscle ends), or the iris (eyes). */
   extra?: Float32Array;
+  /** The source's own vertex colours (raw Écorché), RGB bytes. */
+  rgb?: Uint8Array;
 }
 const parts: Part[] = [];
 function vertexNormals(m: Mesh): Float32Array {
@@ -333,12 +343,12 @@ function longAxis(m: Mesh): V3 {
  * Écorché lays over the six-pack (the sheath of the external oblique) is left out in front of the rectus abdominis:
  * the abs are what an exercise model has to show.
  */
-async function ecorcheSources(path: string): Promise<Source[]> {
+async function ecorcheSources(path: string, raw = false): Promise<Source[]> {
   const { GLTFLoader } = await import("three/examples/jsm/loaders/GLTFLoader.js");
   const buf = readFileSync(path);
   const gltf = await new GLTFLoader().parseAsync(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer, "");
   gltf.scene.updateMatrixWorld(true);
-  const raw: { name: string; layer: string; pos: V3[]; idx: Uint32Array; tint: Float32Array }[] = [];
+  const meshes: { name: string; layer: string; tissue: string; pos: V3[]; idx: Uint32Array; tint: Float32Array; rgb: number[] }[] = [];
   gltf.scene.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh) return;
@@ -347,17 +357,20 @@ async function ecorcheSources(path: string): Promise<Source[]> {
     const v = new THREE.Vector3();
     const pos: V3[] = [];
     const tint = new Float32Array(pa.count);
+    const rgb: number[] = [];
     for (let i = 0; i < pa.count; i++) {
       v.fromBufferAttribute(pa, i).applyMatrix4(mesh.matrixWorld);
       pos.push([v.z * 100, v.y * 100, -v.x * 100]); // +X forward, +Y up, +Z the figure's right
       if (ca) tint[i] = smoothstep(0.45, 0.85, ca.getY(i) / Math.max(1e-3, ca.getX(i)));
+      // (The source's colour bytes, exactly: glTF vertex colours, linear.)
+      rgb.push(...(ca ? [ca.getX(i), ca.getY(i), ca.getZ(i)].map((c) => Math.round(c * 255)) : [255, 255, 255]));
     }
     const idx0 = g.index ? Uint32Array.from(g.index.array) : Uint32Array.from({ length: pa.count }, (_, i) => i);
     // Weld: glTF splits vertices along colour and normal seams. Left split, each copy would be pushed out along its own
     // normal (athletic bulk, sculpting) and the surface would crack open along the seams.
     const weld = new Map<string, number>();
     const remap = new Uint32Array(pos.length);
-    const wpos: V3[] = [], wtint: number[] = [];
+    const wpos: V3[] = [], wtint: number[] = [], wrgb: number[] = [];
     pos.forEach((p, i) => {
       const key = p.map((c) => Math.round(c * 1000)).join(",");
       let w = weld.get(key);
@@ -366,6 +379,7 @@ async function ecorcheSources(path: string): Promise<Source[]> {
         weld.set(key, w);
         wpos.push(p);
         wtint.push(tint[i]!);
+        wrgb.push(rgb[i * 3]!, rgb[i * 3 + 1]!, rgb[i * 3 + 2]!);
       }
       remap[i] = w;
     });
@@ -374,11 +388,19 @@ async function ecorcheSources(path: string): Promise<Source[]> {
       const a = remap[idx0[t]!]!, b = remap[idx0[t + 1]!]!, c = remap[idx0[t + 2]!]!;
       if (a !== b && b !== c && a !== c) idx.push(a, b, c);
     }
-    raw.push({ name: String(mesh.userData.name ?? mesh.name).toLowerCase().replace(/ \(2\)$/, ""), layer: String(mesh.userData.layer), pos: wpos, idx: new Uint32Array(idx), tint: new Float32Array(wtint) });
+    meshes.push({
+      name: String(mesh.userData.name ?? mesh.name).toLowerCase().replace(/ \(2\)$/, ""),
+      layer: String(mesh.userData.layer),
+      tissue: String(mesh.userData.tissue ?? ""),
+      pos: wpos,
+      idx: new Uint32Array(idx),
+      tint: new Float32Array(wtint),
+      rgb: wrgb,
+    });
   });
   // Fit rotation, scale and offset on the bones both have (Horn's closed-form absolute orientation).
   const pairs: [V3, V3][] = [];
-  for (const r of raw) {
+  for (const r of meshes) {
     if (r.layer !== "skeleton" || kindOf(r.name) !== "bone") continue;
     const id = idOf(r.name);
     if (!id || !existsSync(stlPath(id))) continue;
@@ -419,13 +441,18 @@ async function ecorcheSources(path: string): Promise<Source[]> {
   const fit = (p: V3): V3 => add(cb, mul(rotate(sub(p, ca)), k));
   const angle = (2 * Math.acos(Math.min(1, Math.abs(qw))) * 180) / Math.PI;
   const rms = Math.sqrt(pairs.reduce((s2, [a, b]) => s2 + len(sub(fit(a), b)) ** 2, 0) / pairs.length);
-  console.log(`Écorché: ${raw.length} meshes; fitted on ${pairs.length} bones, scale ${k.toFixed(3)}, rotation ${angle.toFixed(2)}°, residual ${rms.toFixed(2)} cm`);
-  const rectusZ = raw.filter((r) => /rectus abdominis/.test(r.name)).flatMap((r) => r.pos.map((p) => Math.abs(fit(p)[2]))).reduce((a, b) => Math.max(a, b), 0);
+  console.log(`Écorché: ${meshes.length} meshes; fitted on ${pairs.length} bones, scale ${k.toFixed(3)}, rotation ${angle.toFixed(2)}°, residual ${rms.toFixed(2)} cm`);
+  const rectusZ = meshes.filter((r) => /rectus abdominis/.test(r.name)).flatMap((r) => r.pos.map((p) => Math.abs(fit(p)[2]))).reduce((a, b) => Math.max(a, b), 0);
   const out: Source[] = [];
-  for (const r of raw) {
-    const kind = kindOf(r.name);
-    if (!kind || (r.layer === "skeleton") !== (kind === "bone")) continue;
+  for (const r of meshes) {
+    // Raw: every mesh, as it is (eyes, teeth, cartilage and all; the skeleton layer moves with the bones).
+    const kind: Source["kind"] | null = raw ? (r.tissue === "eye" ? "eye" : r.layer === "skeleton" ? "bone" : "muscle") : kindOf(r.name);
+    if (!kind || (!raw && (r.layer === "skeleton") !== (kind === "bone"))) continue;
     const pos = new Float32Array(r.pos.flatMap(fit));
+    if (raw) {
+      out.push({ name: r.name, kind, mesh: { pos, idx: r.idx }, tint: kind === "muscle" ? r.tint : undefined, rgb: Uint8Array.from(r.rgb) });
+      continue;
+    }
     let idx = r.idx;
     if (/external oblique/.test(r.name)) {
       const keep: number[] = [];
@@ -467,12 +494,13 @@ async function ecorcheSources(path: string): Promise<Source[]> {
   return out;
 }
 let muscleTris = 0;
-/** A source mesh: name (lower case, BodyParts3D style), its kind, and (Écorché) a per-vertex tendon tint. */
+/** A source mesh: name (lower case, BodyParts3D style), its kind, and (Écorché) a per-vertex tendon tint and colours. */
 interface Source {
   name: string;
-  kind: PartKind;
+  kind: PartKind | "eye";
   mesh: Mesh;
   tint?: Float32Array;
+  rgb?: Uint8Array;
 }
 /** The chest, abdomen and back: the muscles taken from Écorché with ECORCHE_USE=torso. */
 const TORSO: ReadonlySet<Region> = new Set(["pecUpper", "pecLower", "abs", "obliques", "serratus", "lat", "trapUpper", "trapMid", "rhomboid", "erector"]);
@@ -482,7 +510,9 @@ const inTorso = (name: string) => {
 };
 const sources: Source[] = !ECORCHE
   ? []
-  : ECORCHE_USE === "all"
+  : RAW
+    ? await ecorcheSources(ECORCHE, true)
+    : ECORCHE_USE === "all"
     ? await ecorcheSources(ECORCHE)
     : (await ecorcheSources(ECORCHE)).filter((s) => s.kind === "muscle" && inTorso(s.name));
 if (ECORCHE_USE === "torso" && ECORCHE) console.log(`Écorché torso muscles: ${sources.length} (${[...new Set(sources.map((s) => regionOf(s.name)))].join(", ")})`);
@@ -496,7 +526,24 @@ if (!ECORCHE || ECORCHE_USE === "torso")
     const target = kind === "muscle" ? Math.min(7000, Math.max(450, Math.round(tris / 36))) : kind === "bone" ? Math.min(2200, Math.max(120, Math.round(tris / 70))) : Math.min(1500, Math.max(150, Math.round(tris / 30)));
     sources.push({ name, kind, mesh: simplify(raw, target, 0.01) });
   }
-for (const { name, kind, mesh: m, tint } of sources) {
+for (const { name, kind, mesh: m, tint, rgb } of sources) {
+  if (RAW) {
+    // As published: no re-winding, sculpting or bulk.
+    const region = kind === "muscle" ? regionOf(name) : null;
+    parts.push({
+      name,
+      kind,
+      mesh: m,
+      label: region && region !== "drop" ? muscleId(region, sideOf(name)) : NO_MUSCLE,
+      fiber: longAxis(m),
+      rigid: kind === "bone" ? rigidBone(name) : kind === "eye" ? "head" : null,
+      extra: tint,
+      rgb,
+    });
+    if (kind === "muscle") muscleTris += m.idx.length / 3;
+    continue;
+  }
+  if (kind === "eye") continue;
   orientOutward(m);
   const region = kind === "muscle" ? regionOf(name) : null;
   const axis = longAxis(m);
@@ -534,7 +581,7 @@ for (const { name, kind, mesh: m, tint } of sources) {
 // Chest and abdomen, as on a bodybuilder: a full, rounded pectoral mass with a clear lower shelf, and a cut six-pack
 // (each segment of the rectus abdominis rounded between its tendinous lines). Only the front faces are pushed out, along
 // their normals, so the muscles thicken over the fascia and never open a gap.
-{
+if (!RAW) {
   for (const side of [0, 1] as const) {
     const pec = parts.filter((p) => /pectoralis major/.test(p.name) && sideOf(p.name) === side);
     const front: V3[] = [];
@@ -589,7 +636,7 @@ for (const { name, kind, mesh: m, tint } of sources) {
   }
 }
 // Eyes: real eyeballs in the sockets, with the iris and pupil marked for the shader.
-{
+if (!RAW) {
   const eyeId = idOf("eyeball");
   if (eyeId && existsSync(stlPath(eyeId))) {
     const m = simplify(load(eyeId), 3000, 0.005);
@@ -649,18 +696,20 @@ function cropAndSimplify(m: Mesh, test: (p: V3) => boolean, tris: number): Mesh 
   const [si] = MeshoptSimplifier.simplify(part.idx, part.pos, 3, Math.min(part.idx.length, tris * 3), 0.002, ["LockBorder"]);
   return compact(part.pos, si);
 }
-for (const [name, test, tris] of [
-  ["face", isHead, 40000],
-  ["hands", handOf, 16000],
-  ["feet", isFoot, 9000],
-] as const) {
+for (const [name, test, tris] of RAW
+  ? []
+  : ([
+      ["face", isHead, 40000],
+      ["hands", handOf, 16000],
+      ["feet", isFoot, 9000],
+    ] as const)) {
   const m = cropAndSimplify(skin, test, tris);
   parts.push({ name, kind: "skin", mesh: m, label: NO_MUSCLE, fiber: [0, 1, 0], rigid: name === "face" ? "head" : null, extra: name === "face" ? hairMask(m) : undefined });
 }
 // A new face: the MakeHuman head (CC0), shaped for a stronger adult male face, fitted where the scanned head was.
 const MAKEHUMAN = process.argv[3];
 const neckCut = (p: V3) => 147.5 - 0.35 * p[0] + 9 * smoothstep(7, 11, Math.abs(p[2]));
-if (MAKEHUMAN) {
+if (MAKEHUMAN && !RAW) {
   const eyesPart = parts.find((pt) => pt.kind === "eye")!;
   const eyeMid = centroid(verts(eyesPart.mesh));
   const sk = verts(skin);
@@ -691,7 +740,7 @@ if (MAKEHUMAN) {
 // no hole ever shows through the écorché. It is extracted from a voxel field (see closedEnvelope), so it cannot fold or
 // crumple; built from the scanned skin instead, it folded over itself where neighbouring points sank to different
 // depths, and the folds showed between the muscles as bright shards.
-{
+if (!RAW) {
   const all: number[] = [];
   const lo: V3 = [Infinity, Infinity, Infinity], hi: V3 = [-Infinity, -Infinity, -Infinity];
   for (const pt of parts) {
@@ -715,8 +764,8 @@ if (MAKEHUMAN) {
     ring.forEach((p, i) => all.push(c[0], y, c[2], ...p, ...ring[(i + 1) % 48]!));
   }
   for (let k = 0; k < 3; k++) {
-    lo[k] -= 3.5;
-    hi[k] += 3.5;
+    lo[k]! -= 3.5;
+    hi[k]! += 3.5;
   }
   const env = closedEnvelope(new Float32Array(all), new Uint32Array(all.length / 3).map((_, i) => i), lo, hi, 0.5, () => 1.2, -1.0, true, [[4, 108, 0], [2, 125, 0]]);
   const body = cropAndSimplify(env, (p) => !isHead(p) && !handOf(p) && !isFoot(p), 60000);
@@ -756,6 +805,53 @@ function clipMesh(m: Mesh, field: (p: V3) => number): Mesh {
     else idx.push(ab, b2, c, ab, c, ac);
   }
   return compact(new Float32Array(pos), new Uint32Array(idx));
+}
+/** clipMesh for a part with per-vertex data: keeps where `f` >= 0 and carries colours and extras onto the cut. */
+function clipWithData(m: Mesh, f: number[], rgb?: Uint8Array, extra?: Float32Array): { mesh: Mesh; rgb?: Uint8Array; extra?: Float32Array } {
+  const pos = Array.from(m.pos);
+  const col = rgb ? Array.from(rgb) : null;
+  const ex = extra ? Array.from(extra) : null;
+  const fv = [...f];
+  const idx: number[] = [];
+  const onEdge = new Map<string, number>();
+  const mid = (a: number, b: number) => {
+    const key = a < b ? `${a}_${b}` : `${b}_${a}`;
+    let r = onEdge.get(key);
+    if (r === undefined) {
+      const t = fv[a]! / (fv[a]! - fv[b]!);
+      r = pos.length / 3;
+      pos.push(...lerp(vert(m, a), vert(m, b), t));
+      if (col) for (let k = 0; k < 3; k++) col.push(Math.round(col[a * 3 + k]! + (col[b * 3 + k]! - col[a * 3 + k]!) * t));
+      if (ex) ex.push(ex[a]! + (ex[b]! - ex[a]!) * t);
+      fv.push(0);
+      onEdge.set(key, r);
+    }
+    return r;
+  };
+  for (let t = 0; t < m.idx.length; t += 3) {
+    const tri = [m.idx[t]!, m.idx[t + 1]!, m.idx[t + 2]!];
+    const ins = tri.map((v) => fv[v]! >= 0);
+    const n = ins.filter(Boolean).length;
+    if (n === 3) idx.push(...tri);
+    if (n === 0 || n === 3) continue;
+    const k = n === 1 ? ins.indexOf(true) : ins.indexOf(false);
+    const a = tri[k]!, b2 = tri[(k + 1) % 3]!, c = tri[(k + 2) % 3]!;
+    const ab = mid(a, b2), ac = mid(a, c);
+    if (n === 1) idx.push(a, ab, ac);
+    else idx.push(ab, b2, c, ab, c, ac);
+  }
+  // Compact, keeping each vertex's data with it.
+  const used = new Int32Array(pos.length / 3).fill(-1);
+  let nu = 0;
+  for (const v of idx) if (used[v]! < 0) used[v] = nu++;
+  const np = new Float32Array(nu * 3), nc = col ? new Uint8Array(nu * 3) : undefined, ne = ex ? new Float32Array(nu) : undefined;
+  used.forEach((u, v) => {
+    if (u < 0) return;
+    for (let k = 0; k < 3; k++) np[u * 3 + k] = pos[v * 3 + k]!;
+    if (nc) for (let k = 0; k < 3; k++) nc[u * 3 + k] = col![v * 3 + k]!;
+    if (ne) ne[u] = ex![v]!;
+  });
+  return { mesh: { pos: np, idx: Uint32Array.from(idx, (v) => used[v]!) }, rgb: nc, extra: ne };
 }
 /**
  * Folds every open edge of a mesh inwards by `depth`: a finished edge. By default the fold follows the surface normal;
@@ -800,7 +896,10 @@ function foldEdges(m: Mesh, depth: number, inward?: (p: V3) => V3): Mesh {
 // covered parts of the hip, glute and thigh muscles. Nothing can show through or poke out, and the pelvis reads as
 // one clean surface.
 const shortsWaist = (p: V3) => 95.5 + 3 * smoothstep(2, -8, p[0]);
-const shortsHem = (p: V3) => 68.5 + 3.5 * smoothstep(6, 16, Math.abs(p[2]));
+/** Hem height on the inside of the thigh: mid-thigh shorts, or short trunks on the raw Écorché athlete, which leave the
+ *  quads, hamstrings and adductors in view. */
+const HEM = RAW ? 78.5 : 68.5;
+const shortsHem = (p: V3) => HEM + 3.5 * smoothstep(6, 16, Math.abs(p[2]));
 /** Signed distance (cm, vertical) inside the shorts band: positive between hem and waistband. */
 const shortsF = (p: V3) => Math.min(p[1] - shortsHem(p), shortsWaist(p) - p[1]);
 {
@@ -830,7 +929,7 @@ const shortsF = (p: V3) => Math.min(p[1] - shortsHem(p), shortsWaist(p) - p[1]);
       }
     }
   }
-  const radius = (y: number) => 1.5 + 1.5 * smoothstep(71, 79, y);
+  const radius = (y: number) => 1.5 + 1.5 * smoothstep(HEM + 2.5, HEM + 10.5, y);
   // The crotch: just under the lowest bone on the midline (the pubic symphysis). From a 5 cm gusset below it, the legs
   // get separate tubes, cut apart along the midline (the inner thighs nearly touch, and bridged they made a skirt-like panel that the knees
   // stretched apart).
@@ -840,10 +939,10 @@ const shortsF = (p: V3) => Math.min(p[1] - shortsHem(p), shortsWaist(p) - p[1]);
   console.log(`shorts: crotch at ${crotch.toFixed(1)} cm`);
   const midZ = lerp(R.hip, L.hip, 0.5)[2];
   for (const k of [0, 2]) {
-    lo[k] -= 4.5;
-    hi[k] += 4.5;
+    lo[k]! -= 4.5;
+    hi[k]! += 4.5;
   }
-  const m0 = cropAndSimplify(closedEnvelope(new Float32Array(hullPos), new Uint32Array(hullPos.length / 3).map((_, i) => i), lo, hi, 0.5, radius, 0.5, false, [], (p) => p[1] < crotch - 5 && Math.abs(p[2] - midZ) < 0.3), () => true, 24000);
+  const m0 = cropAndSimplify(closedEnvelope(new Float32Array(hullPos), new Uint32Array(hullPos.length / 3).map((_, i) => i), lo, hi, 0.5, radius, 0.5, false, [], (p) => p[1] < crotch - 5 && Math.abs(p[2] - midZ) < 0.3, 30), () => true, 24000);
   const cut = clipMesh(m0, shortsF);
   // Finished edge: every cut edge folds straight in towards the body by 8 mm, an even band that reads as the hem's
   // thickness and closes the view under the fabric.
@@ -862,7 +961,8 @@ const shortsF = (p: V3) => Math.min(p[1] - shortsHem(p), shortsWaist(p) - p[1]);
   });
   // Trim: a thin gold line along the waistband and hems (0.8), and the folded edge itself (0.85).
   const extra = new Float32Array(m.pos.length / 3);
-  // (0.85 marks the folded strip, so the clearance fit leaves it alone; it is drawn as part of the gold trim.)
+  // (0.85 marks the folded strip and 0.8 the band along the edge: the clearance fit leaves both where the cut put them;
+  // they are drawn as the gold trim.)
   for (let n = 0; n < extra.length; n++) extra[n] = n >= cut.pos.length / 3 ? 0.85 : shortsF(vert(m, n)) < 0.8 ? 0.8 : 0;
   // Remove the anatomy the shorts cover: every triangle more than 2.5 cm inside the hem and waistband, and on the
   // inner side of the fabric (or less than 1.5 cm outside it).
@@ -901,38 +1001,33 @@ const shortsF = (p: V3) => Math.min(p[1] - shortsHem(p), shortsWaist(p) - p[1]);
     // Inside the fabric, or poking less than 1.5 cm out of it (a misfit, not a body part that belongs outside).
     return dot(sub(p, vert(cut, best)), [nrm[best * 3]!, nrm[best * 3 + 1]!, nrm[best * 3 + 2]!]) < 1.5;
   };
+  // The anatomy is cut exactly along the line (2.5 cm inside the band; the band's edge for the fascia), not trimmed by
+  // whole triangles: the large triangles that straddled the line reached deep under the fabric and came through it in
+  // a squat. New vertices on the cut take the colour and tint of the edge they split.
   let removed = 0, dropped = 0;
   for (let i = parts.length - 1; i >= 0; i--) {
     const pt = parts[i]!;
     if (pt.kind === "skin" || pt.kind === "eye") continue;
     // The fascia only fills gaps between visible muscles; under the shorts it has no job, and over the groin (where no
     // muscle stops it) it kept the scanned skin's shape in front of the fabric. All of it inside the band goes.
-    const inside = verts(pt.mesh).map((p) => (pt.kind === "deep" ? shortsF(p) > 0 && !handOf(p) && Math.abs(p[2]) < 24 : covered(p)));
-    const keep: number[] = [];
-    for (let t = 0; t < pt.mesh.idx.length; t += 3) {
-      const tri = [pt.mesh.idx[t]!, pt.mesh.idx[t + 1]!, pt.mesh.idx[t + 2]!];
-      if (tri.every((v) => inside[v])) removed++;
-      else keep.push(...tri);
-    }
-    if (keep.length === pt.mesh.idx.length) continue;
-    if (!keep.length) {
+    const f = verts(pt.mesh).map((p) => {
+      const depth = pt.kind === "deep" ? shortsF(p) : shortsF(p) - 2.5;
+      const gone = pt.kind === "deep" ? shortsF(p) > 0 && !handOf(p) && Math.abs(p[2]) < 24 : covered(p);
+      return gone ? -depth : Math.max(-depth, 0.05);
+    });
+    if (f.every((x) => x >= 0)) continue;
+    if (f.every((x) => x < 0)) {
+      removed += pt.mesh.idx.length / 3;
       parts.splice(i, 1);
       dropped++;
       continue;
     }
-    // Keep each vertex's extra data with it through the compaction.
-    const used = new Int32Array(pt.mesh.pos.length / 3).fill(-1);
-    let nu = 0;
-    for (const v of keep) if (used[v]! < 0) used[v] = nu++;
-    const np = new Float32Array(nu * 3);
-    const ne = pt.extra ? new Float32Array(nu) : undefined;
-    used.forEach((u, v) => {
-      if (u < 0) return;
-      np.set(pt.mesh.pos.subarray(v * 3, v * 3 + 3), u * 3);
-      if (ne) ne[u] = pt.extra![v]!;
-    });
-    pt.mesh = { pos: np, idx: new Uint32Array(keep.map((v) => used[v]!)) };
-    if (ne) pt.extra = ne;
+    const before = pt.mesh.idx.length / 3;
+    const cut = clipWithData(pt.mesh, f, pt.rgb, pt.extra);
+    pt.mesh = cut.mesh;
+    pt.rgb = cut.rgb;
+    pt.extra = cut.extra;
+    removed += Math.max(0, before - pt.mesh.idx.length / 3);
   }
   console.log(`shorts: ${m.idx.length / 3} triangles; removed ${removed} covered anatomy triangles (${dropped} parts entirely)`);
   parts.push({ name: "shorts", kind: "cover", mesh: m, label: NO_MUSCLE, fiber: [0, 1, 0], rigid: null, extra });
@@ -949,6 +1044,28 @@ const muscleMix = new Uint8Array(NV);
 const tissue = new Uint8Array(NV);
 const fiber = new Int8Array(NV * 3);
 const forced = new Uint8Array(NV).fill(NO_BONE);
+const color = new Uint8Array(NV * 3).fill(255);
+const limbs = new Uint8Array(NV);
+/**
+ * Which limb a part belongs to (see computeWeights): its muscle region, or for unlabelled parts where it lies (a whole
+ * mesh at the hand is the hand's, one below the hips the leg's; a vertex-by-vertex test could not tell the small
+ * muscles of the thigh beside the resting hand from those of the hand itself).
+ */
+function limbCode(pt: Part): number {
+  if (pt.kind === "skin") return pt.name === "hands" ? LIMB_CODE.arm : pt.name === "feet" ? LIMB_CODE.leg : 0;
+  if (pt.kind !== "muscle" && pt.kind !== "tendon") return 0;
+  if (pt.label !== NO_MUSCLE) return LIMB_CODE[LIMB[REGIONS[pt.label % REGION_COUNT]!]];
+  const c = centroid(verts(pt.mesh));
+  const nearArm = [R, L].some((J) =>
+    [[J.shoulder, J.elbow], [J.elbow, J.wrist]].some(([a, b]) => {
+      const ab = sub(b!, a!);
+      const t = Math.max(0, Math.min(1, dot(sub(c, a!), ab) / dot(ab, ab)));
+      return len(sub(c, add(a!, mul(ab, t)))) < 4.5;
+    }),
+  );
+  if (handOf(c) || nearArm) return LIMB_CODE.arm;
+  return c[1] < pelvis[1] - 4 ? LIMB_CODE.leg : 0;
+}
 {
   let vo = 0, io = 0;
   for (const p of parts) {
@@ -962,6 +1079,8 @@ const forced = new Uint8Array(NV).fill(NO_BONE);
       for (let k = 0; k < 3; k++) fiber[(vo + n) * 3 + k] = Math.round(p.fiber[k]! * 127);
       if (p.rigid) forced[vo + n] = BONES.indexOf(p.rigid);
     }
+    if (p.rgb) color.set(p.rgb, vo * 3);
+    limbs.fill(limbCode(p), vo, vo + nv);
     vo += nv;
     io += p.mesh.idx.length;
   }
@@ -969,14 +1088,14 @@ const forced = new Uint8Array(NV).fill(NO_BONE);
 console.log(`athlete: ${NV} vertices, ${NI / 3} triangles`);
 
 // ---------------------------------------------------------------- skin weights (refined by scripts/anatomy/reweight.mts)
-const { skinIndex, skinWeight } = computeWeights(position, index, label, BINDM, forced, tissue.map((t) => (t === TISSUE.cover ? 1 : 0)));
+const { skinIndex, skinWeight } = computeWeights(position, index, label, BINDM, forced, tissue.map((t) => (t === TISSUE.cover ? 1 : 0)), limbs);
 
 // ---------------------------------------------------------------- athletic proportions
 // The database's subject is an average build. A broader, deeper chest and upper back, shoulders set wider to match,
 // fuller arms and neck, and a slightly lower crown give an athletic frame. The change is one smooth deformation of
 // space (it depends only on where a point is), so muscles, bones, fascia and joints all move together and every layer
 // keeps its place.
-{
+if (!RAW) {
   const torsoF = (y: number) => smoothstep(106, 126, y) * (1 - smoothstep(154, 163, y));
   const torso = (p: V3): V3 => {
     const f = torsoF(p[1]);
@@ -1037,7 +1156,7 @@ const { skinIndex, skinWeight } = computeWeights(position, index, label, BINDM, 
   for (const v of [head, headTop]) v.splice(0, 3, ...morph(v));
   if (WRITE_BIND) writeBind();
 }
-console.log(`shorts: ${fitShorts(position, index, tissue, (v) => tissue[v] === TISSUE.cover && muscleMix[v]! > 210)} vertices lifted clear of the muscles`);
+console.log(`shorts: ${fitShorts(position, index, tissue, (v) => tissue[v] === TISSUE.cover && muscleMix[v]! >= 200)} vertices lifted clear of the muscles`);
 // ---------------------------------------------------------------- write
 const blocks: { name: string; data: ArrayBufferView }[] = [
   { name: "position", data: position },
@@ -1049,6 +1168,8 @@ const blocks: { name: string; data: ArrayBufferView }[] = [
   { name: "muscleMix", data: muscleMix },
   { name: "tissue", data: tissue },
   { name: "fiber", data: fiber },
+  { name: "limb", data: limbs },
+  ...(RAW ? [{ name: "color", data: color }] : []),
 ];
 let offset = 0;
 const layout: Record<string, { offset: number; length: number; type: string }> = {};
@@ -1066,10 +1187,14 @@ for (const p of blocks) {
 }
 mkdirSync("public/anatomy", { recursive: true });
 writeFileSync(`${OUT}.bin`, Buffer.concat(chunks));
-const source = !ECORCHE
+const source = RAW
+  ? "Écorché (github.com/Charleeh/ecorche, CC BY-SA 4.0; BodyParts3D CC BY 4.0, Z-Anatomy CC BY-SA 4.0), unaltered geometry and colours; rig, shorts and muscle labels added"
+  : !ECORCHE
   ? "BodyParts3D 3.0 (CC BY-SA 2.1 JP)"
   : ECORCHE_USE === "torso"
     ? "BodyParts3D 3.0 (CC BY-SA 2.1 JP) with torso and back muscles from Écorché (github.com/Charleeh/ecorche, CC BY-SA 4.0; BodyParts3D CC BY 4.0, Z-Anatomy CC BY-SA 4.0); head MakeHuman (CC0)"
     : "Écorché (github.com/Charleeh/ecorche, CC BY-SA 4.0; BodyParts3D CC BY 4.0, Z-Anatomy CC BY-SA 4.0) + BodyParts3D skin";
-writeFileSync(`${OUT}.json`, JSON.stringify({ version: 3, source, vertices: NV, triangles: NI / 3, bytes: offset, layout, bones: BONES }, null, 1));
+// The raw athlete keeps its own proportions, so it carries its own (measured, unwidened) joints.
+const bind = RAW ? JSON.parse(JSON.stringify(BINDM, (_, v) => (Array.isArray(v) && typeof v[0] === "number" ? r1(v as V3) : v))) : undefined;
+writeFileSync(`${OUT}.json`, JSON.stringify({ version: 3, source, vertices: NV, triangles: NI / 3, bytes: offset, layout, bones: BONES, bind }, null, 1));
 console.log(`wrote ${OUT}.bin (${(offset / 1e6).toFixed(2)} MB)`);

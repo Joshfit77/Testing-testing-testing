@@ -1,63 +1,68 @@
 {
  "version": 3,
  "source": "BodyParts3D 3.0 (CC BY-SA 2.1 JP) with torso and back muscles from Écorché (github.com/Charleeh/ecorche, CC BY-SA 4.0; BodyParts3D CC BY 4.0, Z-Anatomy CC BY-SA 4.0); head MakeHuman (CC0)",
- "vertices": 245522,
- "triangles": 492842,
- "bytes": 15445208,
+ "vertices": 247786,
+ "triangles": 495143,
+ "bytes": 15795796,
  "layout": {
   "position": {
    "offset": 0,
-   "length": 736566,
+   "length": 743358,
    "type": "Float32Array"
   },
   "index": {
-   "offset": 2946264,
-   "length": 1476591,
+   "offset": 2973432,
+   "length": 1483494,
    "type": "Uint32Array"
   },
   "forcedBone": {
-   "offset": 8860368,
-   "length": 245522,
+   "offset": 8915148,
+   "length": 247786,
    "type": "Uint8Array"
   },
   "skinIndex": {
-   "offset": 9105892,
-   "length": 982088,
+   "offset": 9162936,
+   "length": 991144,
    "type": "Uint8Array"
   },
   "skinWeight": {
-   "offset": 10087980,
-   "length": 982088,
+   "offset": 10154080,
+   "length": 991144,
    "type": "Uint8Array"
   },
   "muscleA": {
-   "offset": 11070068,
-   "length": 245522,
+   "offset": 11145224,
+   "length": 247786,
    "type": "Uint8Array"
   },
   "muscleMix": {
-   "offset": 11315592,
-   "length": 245522,
+   "offset": 11393012,
+   "length": 247786,
    "type": "Uint8Array"
   },
   "tissue": {
-   "offset": 11561116,
-   "length": 245522,
+   "offset": 11640800,
+   "length": 247786,
    "type": "Uint8Array"
   },
   "fiber": {
-   "offset": 11806640,
-   "length": 736566,
+   "offset": 11888588,
+   "length": 743358,
    "type": "Int8Array"
   },
+  "limb": {
+   "offset": 12631948,
+   "length": 247786,
+   "type": "Uint8Array"
+  },
   "ao": {
-   "offset": 12543208,
-   "length": 245522,
+   "offset": 12879736,
+   "length": 247786,
    "type": "Uint8Array"
   },
   "indexLod1": {
-   "offset": 12788732,
-   "length": 664119,
+   "offset": 13127524,
+   "length": 667068,
    "type": "Uint32Array"
   }
  },

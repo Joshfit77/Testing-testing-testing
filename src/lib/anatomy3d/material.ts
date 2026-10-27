@@ -7,7 +7,7 @@ import { MUSCLE_ID_COUNT } from "./muscle-ids";
  * each muscle mesh carries its own id, so the light follows that muscle's shape exactly.
  */
 export interface AthleteMaterial {
-  material: THREE.MeshPhysicalMaterial;
+  material: THREE.MeshStandardMaterial;
   glow: Float32Array;
   /** Overall glow switch (0 = off) for the Muscle Glow toggle. */
   setGlowEnabled(on: boolean): void;
@@ -17,10 +17,11 @@ export const GOLD_BASE = new THREE.Color("#c8903a");
 export const GLOW_COLOR = new THREE.Color("#ffb72e");
 
 /**
- * The two looks: "gold" (the app's anatomical gold) and "medical" (a classic anatomy plate: red muscle with fine fibres,
- * pearly white tendons and aponeuroses, ivory bone). Colours in the shader are linear.
+ * The looks: "gold" (the app's anatomical gold), "medical" (a classic anatomy plate: red muscle with fine fibres,
+ * pearly white tendons and aponeuroses, ivory bone) and "ecorche" (the Écorché model exactly as published: its own
+ * colours and materials, see makeEcorcheMaterial). Colours in the shader are linear.
  */
-export type AthleteLook = "gold" | "medical";
+export type AthleteLook = "gold" | "medical" | "ecorche";
 const f1 = (x: number) => x.toFixed(3); // GLSL floats always need a decimal point
 const g3 = (v: readonly number[]) => `vec3(${v.map(f1).join(", ")})`;
 const LOOKS = {
@@ -41,6 +42,7 @@ const LOOKS = {
 } as const;
 
 export function makeAthleteMaterial(look: AthleteLook = "gold"): AthleteMaterial {
+  if (look === "ecorche") return makeEcorcheMaterial();
   const L = LOOKS[look];
   const glow = new Float32Array(MUSCLE_ID_COUNT + 1);
   const uniforms = {
@@ -223,6 +225,85 @@ export function makeAthleteMaterial(look: AthleteLook = "gold"): AthleteMaterial
       );
   };
   material.customProgramCacheKey = () => `ngf-athlete-v14-${look}`;
+  return {
+    material,
+    glow,
+    setGlowEnabled(on) {
+      uniforms.uGlowOn.value = on ? 1 : 0;
+    },
+  };
+}
+
+/**
+ * The raw Écorché look: the model's own vertex colours (red muscle, white tendons, ivory bone) under its own two
+ * materials (non-metallic, roughness 0.48 for muscle and 0.62 for bone, cartilage, teeth and eyes), nothing painted
+ * over them. Added on top: the per-muscle glow, and the black shorts (matte fabric). The asset keeps the source's own
+ * colour bytes (linear, as glTF stores vertex colours).
+ */
+export function makeEcorcheMaterial(): AthleteMaterial {
+  const glow = new Float32Array(MUSCLE_ID_COUNT + 1);
+  const uniforms = {
+    uGlow: { value: glow },
+    uGlowColor: { value: new THREE.Color("#ff6a1c") },
+    uGlowOn: { value: 1 },
+  };
+  const material = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0, roughness: 0.48, side: THREE.DoubleSide });
+  material.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, uniforms);
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        "#include <common>",
+        `#include <common>
+        attribute vec3 rgb;
+        attribute float muscleA;
+        attribute float tissue;
+        uniform float uGlow[${MUSCLE_ID_COUNT + 1}];
+        varying vec3 vRgb;
+        varying float vGlow;
+        varying float vTissue;`,
+      )
+      .replace(
+        "#include <begin_vertex>",
+        `#include <begin_vertex>
+        vRgb = rgb;
+        vTissue = tissue;
+        vGlow = tissue > 0.5 && tissue < 1.5 && muscleA < 254.5 ? uGlow[int(muscleA + 0.5)] : 0.0;`,
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        "#include <common>",
+        `#include <common>
+        uniform vec3 uGlowColor;
+        uniform float uGlowOn;
+        varying vec3 vRgb;
+        varying float vGlow;
+        varying float vTissue;`,
+      )
+      .replace(
+        "#include <color_fragment>",
+        `#include <color_fragment>
+        // Single-sided like the source, except the shorts (their folded edge is seen from both sides).
+        float isShorts = step(5.5, vTissue);
+        if (!gl_FrontFacing && isShorts < 0.5) discard;
+        diffuseColor.rgb *= mix(vRgb, vec3(0.016, 0.016, 0.017), isShorts);
+        float g = clamp(vGlow, 0.0, 1.6) * uGlowOn;
+        // Worked muscles: the muscle itself brightens towards a warm orange, keeping its own shading and form.
+        diffuseColor.rgb = mix(diffuseColor.rgb, uGlowColor, clamp(g, 0.0, 1.0) * 0.25);`,
+      )
+      .replace(
+        "#include <roughnessmap_fragment>",
+        `#include <roughnessmap_fragment>
+        // Muscle 0.48 (the source's "Muscle" material); bone, cartilage, teeth and eyes 0.62 ("Bone"); fabric matte.
+        if (vTissue > 1.5 && vTissue < 2.5 || vTissue > 3.5 && vTissue < 4.5) roughnessFactor = 0.62;
+        if (isShorts > 0.5) roughnessFactor = 0.8;`,
+      )
+      .replace(
+        "#include <emissivemap_fragment>",
+        `#include <emissivemap_fragment>
+        totalEmissiveRadiance += uGlowColor * g * 1.2;`,
+      );
+  };
+  material.customProgramCacheKey = () => "ngf-athlete-ecorche-v1";
   return {
     material,
     glow,

@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { BIND, type V3 } from "./bind";
+import { BIND, type BindJoints, type V3 } from "./bind";
 import { BONES, type BoneName } from "./muscle-ids";
 
 /** Layout of public/anatomy/athlete.json (written by scripts/anatomy/build-athlete.mts and reweight.mts). */
@@ -8,6 +8,8 @@ interface AthleteMeta {
   vertices: number;
   triangles: number;
   layout: Record<string, { offset: number; length: number; type: string }>;
+  /** The asset's own rest-pose joints, when they differ from the shared ones (BIND). */
+  bind?: BindJoints;
 }
 
 const TYPES: Record<string, new (buf: ArrayBuffer, offset: number, length: number) => ArrayBufferView> = {
@@ -21,6 +23,7 @@ const TYPES: Record<string, new (buf: ArrayBuffer, offset: number, length: numbe
 export interface AthleteGeometry {
   geometry: THREE.BufferGeometry;
   vertices: number;
+  bind?: BindJoints;
 }
 
 let cached: Promise<AthleteGeometry> | null = null;
@@ -49,11 +52,13 @@ export function loadAthlete(base = "/anatomy/athlete", detail: "full" | "mobile"
     g.setAttribute("muscleMix", new THREE.BufferAttribute(part("muscleMix") as Uint8Array, 1, true));
     g.setAttribute("tissue", new THREE.BufferAttribute(part("tissue") as Uint8Array, 1));
     g.setAttribute("fiber", new THREE.BufferAttribute(part("fiber") as Int8Array, 3, true));
+    // The source's own vertex colours (linear), when the asset keeps them (the raw Écorché athlete).
+    if (meta.layout.color) g.setAttribute("rgb", new THREE.BufferAttribute(part("color") as Uint8Array, 3, true));
     const ao = meta.layout.ao ? (part("ao") as Uint8Array) : new Uint8Array(meta.vertices).fill(255);
     g.setAttribute("ao", new THREE.BufferAttribute(ao, 1, true));
     g.computeVertexNormals();
     g.computeBoundingSphere();
-    return { geometry: g, vertices: meta.vertices };
+    return { geometry: g, vertices: meta.vertices, bind: meta.bind };
   })();
   return cached;
 }

@@ -28,9 +28,13 @@ const STEPS = [
   let player;
   try {
     // Gold by default; ?look=medical shows the anatomy-plate look (red muscle, white tendons) for comparison.
-    const look = new URLSearchParams(location.search).get("look") === "medical" ? "medical" : "gold";
-    // ?asset=athlete-eco previews the Écorché-based build (evaluation) instead of the current athlete.
-    const asset = new URLSearchParams(location.search).get("asset") === "athlete-eco" ? "athlete-eco" : "athlete";
+    const lookQ = new URLSearchParams(location.search).get("look");
+    const rawAsset = new URLSearchParams(location.search).get("asset") === "athlete-raw";
+    const look = lookQ === "medical" || lookQ === "gold" || lookQ === "ecorche" ? lookQ : rawAsset ? "ecorche" : "gold";
+    // ?asset=athlete-eco previews the Écorché-based build (evaluation); ?asset=athlete-raw the raw Écorché athlete (shown
+    // in its own look unless ?look= says otherwise).
+    const asked = new URLSearchParams(location.search).get("asset");
+    const asset = asked === "athlete-eco" || asked === "athlete-raw" ? asked : "athlete";
     player = await mountAthlete(canvas, ex, { hideProps: ["rack"], assetBase: `anatomy/${asset}`, reducedMotion: reduced, pixelRatio: Math.min(devicePixelRatio || 1, 2), look });
   } catch (e) {
     $<HTMLElement>(".loading").textContent = "3D isn't available on this device.";

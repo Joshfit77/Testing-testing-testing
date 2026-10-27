@@ -32,6 +32,8 @@ export function closedEnvelope(
   probes: V3[] = [],
   /** Space that is always outside, however narrow (e.g. the slot between the thighs below the crotch). */
   carve?: (p: V3) => boolean,
+  /** Shrink-free smoothing passes over the extracted surface (more for fabric, which should read perfectly smooth). */
+  smoothing = 12,
 ): EnvelopeMesh {
   const n = [0, 1, 2].map((k) => Math.ceil((max[k]! - min[k]!) / voxel) + 1) as V3;
   const [nx, ny, nz] = n;
@@ -112,7 +114,7 @@ export function closedEnvelope(
         const c = at(i, j, k);
         field[c] = Math.sqrt(d2[c]!) * voxel - (ry[j]! - offset);
       }
-  return taubin(surfaceNets(field, nx, ny, nz, min, voxel), 12);
+  return taubin(surfaceNets(field, nx, ny, nz, min, voxel), smoothing);
 }
 
 /** Squared Euclidean distance (in voxels) from every voxel to the nearest set voxel (Felzenszwalb & Huttenlocher). */

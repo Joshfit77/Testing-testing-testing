@@ -1,4 +1,4 @@
-import { BONES, NO_MUSCLE, REGION_COUNT, type BoneName } from "../../src/lib/anatomy3d/muscle-ids";
+import { BONES, NO_MUSCLE, REGION_COUNT, REGIONS, type BoneName, type Region } from "../../src/lib/anatomy3d/muscle-ids";
 
 /**
  * Skin weights for the athlete. Each vertex first belongs to its nearest bone (distance scaled by the bone's flesh
@@ -31,6 +31,30 @@ const smoothstep = (e0: number, e1: number, x: number) => {
 /** Marks a vertex as free (no forced bone) in `forced`. */
 export const NO_BONE = 255;
 
+/**
+ * Which bones a labelled muscle may follow: a leg muscle never binds to the hand hanging beside it, an arm muscle never
+ * to the thigh, the trunk muscles never to the forearms. (Without this, the outer thigh next to the resting hand went
+ * with the hand and stretched into long strands as soon as the arms rose.)
+ */
+export type Limb = "leg" | "arm" | "girdle" | "core";
+/** Per-vertex limb codes, as stored in an asset's `limb` block (0: any bone). */
+export const LIMB_CODE: Record<Limb, number> = { leg: 1, arm: 2, girdle: 3, core: 4 };
+const LIMB_OF_CODE: (Limb | null)[] = [null, "leg", "arm", "girdle", "core"];
+export const LIMB: Record<Region, Limb> = {
+  pecUpper: "girdle", pecLower: "girdle", deltAnt: "girdle", deltLat: "girdle", deltPost: "girdle", lat: "girdle",
+  trapUpper: "girdle", trapMid: "girdle", rhomboid: "girdle", rotatorCuff: "girdle", serratus: "girdle", neck: "girdle",
+  biceps: "arm", brachialis: "arm", triceps: "arm", forearmFlex: "arm", forearmExt: "arm",
+  obliques: "core", abs: "core", erector: "core",
+  gluteMax: "leg", gluteMed: "leg", hipFlexor: "leg", adductors: "leg", rectusFemoris: "leg", vastusLat: "leg", vastusMed: "leg",
+  bicepsFemoris: "leg", semitendinosus: "leg", gastroc: "leg", soleus: "leg", tibialis: "leg", peroneus: "leg",
+};
+const ALLOWED = {
+  leg: (b: string) => b === "pelvis" || /^(thigh|shin|foot)/.test(b),
+  arm: (b: string) => b === "chest" || /^(upperArm|foreArm|hand)/.test(b),
+  girdle: (b: string) => /^(chest|neck|head|pelvis|clav|upperArm)/.test(b),
+  core: (b: string) => b === "pelvis" || b === "chest",
+};
+
 export function computeWeights(
   pos: Float32Array,
   idx: ArrayLike<number>,
@@ -41,6 +65,9 @@ export function computeWeights(
   /** Optional per-vertex flag (1) for clothing on the hips: bound to the pelvis and thighs only, never to the arms
    *  or hands that hang beside it in the rest pose. */
   hipsOnly?: Uint8Array,
+  /** Optional per-vertex limb code (LIMB_CODE; 0 = from the muscle label, if any): set per part, so unlabelled parts
+   *  are kept to their limb too (a small muscle of the hand to the arm, one of the thigh to the leg). */
+  limbs?: Uint8Array,
 ): { skinIndex: Uint8Array; skinWeight: Uint8Array } {
   const NV = pos.length / 3;
   const NB = BONES.length;
@@ -99,8 +126,10 @@ export function computeWeights(
     }
     let best: Seg | null = null, bestD = Infinity;
     const hips = hipsOnly?.[n] === 1;
+    const limb = (limbs?.[n] ? LIMB_OF_CODE[limbs[n]!] : null) ?? (l !== NO_MUSCLE ? LIMB[REGIONS[l % REGION_COUNT]!] : null);
     for (const s of segs) {
       if (hips && s.bone !== "pelvis" && !s.bone.startsWith("thigh")) continue;
+      if (limb && !ALLOWED[limb](s.bone)) continue;
       if (s.side !== -1 && vs !== -1 && s.side !== vs) continue;
       if (s.side !== -1 && vs === -1 && (s.side === 0) !== p[2] > 0) continue;
       const d = segDist(p, s) / s.r;
@@ -110,8 +139,9 @@ export function computeWeights(
       }
     }
     let primary = best!.bone;
-    // Hands and fingers belong to the hand, however close they hang to the thigh.
-    for (const sd of hips ? [] : (["R", "L"] as const)) {
+    // Hands and fingers belong to the hand, however close they hang to the thigh (only arm muscles and unlabelled
+    // parts: hand bones, skin and small hand muscles).
+    for (const sd of hips || (limb && limb !== "arm") ? [] : (["R", "L"] as const)) {
       const J = B[sd];
       const fd = norm(sub(J.wrist, J.elbow));
       const along = dot(sub(p, J.wrist), fd);

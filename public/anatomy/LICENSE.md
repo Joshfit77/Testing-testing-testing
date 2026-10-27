@@ -29,3 +29,14 @@ The head, face, ears, neck and eyes come from the **MakeHuman** base mesh and ta
 September 2020.
 
 This is a summary for the project, not legal advice; please have the licence terms reviewed before release.
+
+## athlete-raw.bin / athlete-raw.json (the raw Écorché athlete)
+
+> Écorché (github.com/Charleeh/ecorche), CC BY-SA 4.0. Based on BodyParts3D, © The Database Center for Life Science,
+> CC BY 4.0, and Z-Anatomy by Gauthier Kervyn, CC BY-SA 4.0.
+> https://creativecommons.org/licenses/by-sa/4.0/
+
+Modified: scaled and placed in the app's frame, rigged (skin weights and joints), muscle labels added, fitted shorts
+added, and the anatomy under the shorts removed. The geometry, proportions and colours of every other part are as
+published. This adapted mesh is shared under **CC BY-SA 4.0**. It is provided as is, without warranties. See
+`docs/anatomy3d/ECORCHE_RAW.md` for the obligations this places on distribution.
