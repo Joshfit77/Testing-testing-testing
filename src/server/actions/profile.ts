@@ -10,6 +10,7 @@ import { isServiceRoleConfigured } from "@/server/env";
 import { removeUserStorage } from "@/server/services/account";
 import { cancelStripeSubscriptionsForUser } from "@/server/services/billing";
 import { logError } from "@/server/log";
+import { rateLimit } from "@/server/rate-limit";
 
 function isValidTimeZone(tz: string): boolean {
   try {
@@ -69,6 +70,8 @@ export async function deleteAccountAction(_prev: ActionState, formData: FormData
   const user = await requireUser();
   if (formData.get("confirm") !== "DELETE") return actionError('Type DELETE to confirm.', { confirm: "Type DELETE" });
   if (!isServiceRoleConfigured()) return actionError("Account deletion isn't configured on this server. Please contact support.");
+  const limit = await rateLimit(`delete:${user.id}`, 5, 60 * 60_000);
+  if (!limit.ok) return actionError("Too many attempts. Please wait a while and try again.");
   try {
     await cancelStripeSubscriptionsForUser(user.id);
     const admin = getServiceSupabase();

@@ -8,11 +8,18 @@ import { safeNextPath } from "@/lib/safe-redirect";
 import { emailSchema, newPasswordSchema, resetRequestSchema, signInSchema, signUpSchema } from "@/lib/validation/schemas";
 import { isFlagEnabled } from "@/server/flags";
 import { logError } from "@/server/log";
+import { clientIp, hashKey, rateLimitAll } from "@/server/rate-limit";
+
+const MINUTE = 60_000;
+const TOO_MANY = "Too many attempts. Please wait a few minutes and try again.";
 
 export async function signUpAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = signUpSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return actionInvalid(parsed.error);
   if (!(await isFlagEnabled("signups"))) return actionError("New registrations are temporarily paused. Please try again later.");
+  const ip = await clientIp();
+  const limited = await rateLimitAll([{ key: `signup:ip:${ip}`, limit: 5, windowMs: 10 * MINUTE }]);
+  if (!limited.ok) return actionError(TOO_MANY);
 
   const supabase = await getServerSupabase();
   const { data, error } = await supabase.auth.signUp({
@@ -36,6 +43,12 @@ export async function signUpAction(_prev: ActionState, formData: FormData): Prom
 export async function signInAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = signInSchema.safeParse({ email: formData.get("email"), password: formData.get("password") });
   if (!parsed.success) return actionInvalid(parsed.error);
+  const ip = await clientIp();
+  const limited = await rateLimitAll([
+    { key: `signin:ip:${ip}`, limit: 20, windowMs: 5 * MINUTE },
+    { key: `signin:email:${hashKey(parsed.data.email)}`, limit: 10, windowMs: 15 * MINUTE },
+  ]);
+  if (!limited.ok) return actionError(TOO_MANY);
   const supabase = await getServerSupabase();
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
   if (error) {
@@ -51,6 +64,12 @@ export async function signInAction(_prev: ActionState, formData: FormData): Prom
 export async function resendConfirmationAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const email = emailSchema.safeParse(formData.get("email"));
   if (!email.success) return actionError("Enter the email address you signed up with.");
+  const ip = await clientIp();
+  const limited = await rateLimitAll([
+    { key: `email:ip:${ip}`, limit: 5, windowMs: 15 * MINUTE },
+    { key: `email:addr:${hashKey(email.data)}`, limit: 3, windowMs: 15 * MINUTE },
+  ]);
+  if (!limited.ok) return actionError("Please wait a few minutes before requesting another email.");
   const supabase = await getServerSupabase();
   const { error } = await supabase.auth.resend({
     type: "signup",
@@ -71,6 +90,12 @@ export async function signOutAction(): Promise<void> {
 export async function requestPasswordResetAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = resetRequestSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return actionInvalid(parsed.error);
+  const ip = await clientIp();
+  const limited = await rateLimitAll([
+    { key: `email:ip:${ip}`, limit: 5, windowMs: 15 * MINUTE },
+    { key: `email:addr:${hashKey(parsed.data.email)}`, limit: 3, windowMs: 15 * MINUTE },
+  ]);
+  if (!limited.ok) return actionError("Please wait a few minutes before requesting another email.");
   const supabase = await getServerSupabase();
   const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
     redirectTo: `${publicEnv.siteUrl}/auth/callback?next=/reset-password`,

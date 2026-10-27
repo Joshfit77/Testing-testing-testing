@@ -3,6 +3,7 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/server/auth";
 import { exportUserData } from "@/server/services/account";
 import { logError } from "@/server/log";
+import { rateLimit } from "@/server/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,9 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  // Exports read every table for the user, so keep them occasional.
+  const limit = await rateLimit(`export:${user.id}`, 5, 60 * 60_000);
+  if (!limit.ok) return NextResponse.json({ error: "rate_limited" }, { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } });
   try {
     const supabase = await getServerSupabase();
     const data = await exportUserData(supabase, user.id, user.email);

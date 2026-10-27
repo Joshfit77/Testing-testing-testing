@@ -110,7 +110,7 @@ export async function assertAiAllowed(userId: string, plan: Plan, mode: "chat" |
   // Durable metering requires the service role (users cannot write their own usage rows).
   if (!isServiceRoleConfigured()) throw new AiError("metering_unavailable", "AI usage metering isn't configured on this server.");
   const perMinute = Number.parseInt(process.env.AI_RATE_LIMIT_PER_MINUTE ?? "6", 10) || 6;
-  const burst = rateLimit(`ai:${userId}`, perMinute, 60_000);
+  const burst = await rateLimit(`ai:${userId}`, perMinute, 60_000);
   if (!burst.ok) throw new AiError("rate_limited", "You're sending messages quickly — please wait a moment.", burst.retryAfterSeconds);
   const usage = await getAiUsage(userId, plan);
   if (usage.chatUsed >= usage.chatLimit) throw new AiError("quota", `You've used all ${usage.chatLimit} AI messages for this month.`);

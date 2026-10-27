@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
   if (!isFoodSearchConfigured() || !(await isFlagEnabled("food_search"))) return NextResponse.json({ error: "not_configured" }, { status: 503 });
   const q = (request.nextUrl.searchParams.get("q") ?? "").trim().slice(0, 80);
   if (q.length < 2) return NextResponse.json({ foods: [] });
-  const limit = rateLimit(`food:${user.id}`, 30, 60_000);
+  const limit = await rateLimit(`food:${user.id}`, 30, 60_000);
   if (!limit.ok) return NextResponse.json({ error: "rate_limited" }, { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } });
   try {
     return NextResponse.json({ foods: await searchFoods(q), source: "USDA FoodData Central" });

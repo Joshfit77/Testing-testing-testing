@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
   const format = FORMATS.find((f) => f === rawFormat);
   const candidates = barcodeLookupCandidates((request.nextUrl.searchParams.get("code") ?? "").slice(0, 20), format);
   if (!candidates) return NextResponse.json({ error: "invalid_code" }, { status: 400 });
-  const limit = rateLimit(`barcode:${user.id}`, 30, 60_000);
+  const limit = await rateLimit(`barcode:${user.id}`, 30, 60_000);
   if (!limit.ok) return NextResponse.json({ error: "rate_limited" }, { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } });
   try {
     const result = await lookupBarcode(candidates);
