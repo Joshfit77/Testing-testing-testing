@@ -117,6 +117,7 @@ describe("week planning", () => {
 });
 
 describe("custom program builder", () => {
+  // Exhaustive sweep: ~1.5 s locally, but well over the 5 s default on a busy 2-core CI runner.
   it("builds a valid program for every type × experience × goal", () => {
     for (const type of CUSTOM_PROGRAM_TYPES) {
       const cfg = CUSTOM_TYPES[type];
@@ -168,7 +169,7 @@ describe("custom program builder", () => {
         }
       }
     }
-  });
+  }, 30_000);
 
   it("is deterministic", () => {
     const a = buildCustomProgram(input("powerlifting", { maxesKg: { squat: 150, bench: 100, deadlift: 190 } }), catalog);
