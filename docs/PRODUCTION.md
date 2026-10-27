@@ -19,7 +19,7 @@ Readiness categories used below:
 | --- | --- | --- |
 | Web build, typecheck, lint, unit tests | Verified | Local runs on this branch; see §9 |
 | Database migrations apply in order | Verified | All migrations applied to PostgreSQL 16 with Supabase stubs; new triggers and functions tested in SQL |
-| Integration tests (RLS, billing, consent) | Implemented, not verified locally | Local Supabase images couldn't be pulled here; CI (`ci.yml`) runs them on GitHub; see §9 |
+| Integration tests (RLS, billing, consent) | Verified in CI | 57 passed, 0 skipped on a real Supabase stack (GitHub Actions); see §9 |
 | Browser end-to-end tests | Not run | Need the local Supabase stack (same blocker) |
 | Shared rate limiting | Verified (SQL + unit) | `rate_limit_hit` in Postgres; falls back to per-instance memory |
 | AI coach consent (Apple 5.1.2(i)) | Verified (SQL + unit), UI not seen in a browser | Needs a signed-in Pro session with a database to view |
@@ -28,7 +28,7 @@ Readiness categories used below:
 | Data export | Implemented, not verified end to end | Includes program structure, billing and store records |
 | Web subscriptions (Stripe) | Implemented, not verified against Stripe | Webhook logic integration-tested with signed synthetic events (CI); checkout/portal need test-mode keys |
 | App Store subscriptions (RevenueCat) | Implemented, not verified | Needs App Store Connect products, RevenueCat project, sandbox testers |
-| iOS project compiles | See §9 (CI run) | Unsigned Simulator build of the offline edition |
+| iOS project compiles | Verified in CI | Unsigned Simulator build with Xcode 26.6, RevenueCat linked; not a signed device build |
 | Signed iOS build / TestFlight | Blocked | Apple Developer account, signing secrets, deployed site |
 | Production deployment | Blocked | Supabase project, Vercel project, domain, approval to deploy |
 | Privacy policy and terms | Decision / review | Written from the code; business details and counsel review required |
@@ -211,10 +211,10 @@ App Store Connect's review notes, not in the repository.
 | `npm run build` | Passed |
 | `npm audit --omit=dev` | 0 vulnerabilities |
 | Migrations on PostgreSQL 16 with Supabase stubs | All 12 applied; rate limiter, AI-consent and recovery-consent triggers checked with SQL |
-| `npm run test:integration` (local) | Not run: Supabase Docker images couldn't be pulled (registry rate limits / blocked) |
+| `npm run test:integration` (local) | Not run locally: Supabase Docker images couldn't be pulled here (registry rate limits / blocked) |
 | `npm run test:e2e` | Not run: same blocker |
-| CI (`ci.yml`, includes integration tests) | See the run linked in the hand-off report |
-| iOS Simulator compile (`ios.yml`, offline edition, unsigned) | See the run linked in the hand-off report |
+| CI (`ci.yml`: typecheck, lint, unit, build, integration) on the branch head | Passed; integration 57 tests in 9 files, 0 skipped ([run 40431375340](https://github.com/Joshfit77/Testing-testing-testing/actions/runs/40431375340)) |
+| iOS Simulator compile (`ios.yml`, offline edition, unsigned) | Passed: `BUILD SUCCEEDED`, Xcode 26.6, RevenueCat linked ([run 40430900952](https://github.com/Joshfit77/Testing-testing-testing/actions/runs/40430900952)) |
 | Physical device, TestFlight, sandbox or live purchases | Not done |
 
 ## 10. Remaining blockers (priority order)
@@ -230,7 +230,7 @@ App Store Connect's review notes, not in the repository.
 | 7 | Device testing (§6 checklist) | Camera, notifications, offline and layout never tested on hardware | iPhone (and iPad) | Run the checklist on TestFlight | Submission |
 | 8 | Stripe test-mode run, then live-mode approval | Web payments untested against Stripe | Stripe account + approval | Create test prices, run checkout/portal/cancel/refund (§5) | Web paid launch |
 | 9 | Review account with Pro | Reviewers must reach paid features | Human | Create it and grant Pro (§7) | Submission |
-| 10 | Integration and browser tests on a full stack | Database rules and flows verified only partly here | CI or a machine with Docker access | Check the CI run; run `npm run test:e2e` locally with Supabase | Confidence for launch |
+| 10 | Browser end-to-end tests | The Playwright suite hasn't run on this branch | A machine with Docker access | `npx supabase start && npm run build && npm run test:e2e` | Confidence for launch |
 | 11 | iPad decision | iPad support means iPad screenshots and review on iPad | Owner decision | Keep (and test) or set the device family to iPhone only | Submission |
 | 12 | Minimum-functionality risk (4.2) | Possible rejection of a web-based app | Owner decision | Decide whether to add HealthKit or push before submitting | Possibly submission |
 | 13 | Custom SMTP, backup retention, error reporting | Production email delivery, recovery, visibility | Accounts | Configure SMTP; record backup retention; optionally add Sentry | Launch |
