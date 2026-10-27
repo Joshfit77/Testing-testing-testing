@@ -10,7 +10,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Skip static assets, the service worker, manifest/icons and the Stripe webhook (which needs the raw body).
-    "/((?!_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest|icons/|api/stripe/webhook|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    // Skip static assets, the service worker, manifest/icons and the payment webhooks (which need the raw body).
+    "/((?!_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest|icons/|api/stripe/webhook|api/revenuecat/webhook|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

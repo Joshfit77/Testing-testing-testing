@@ -205,11 +205,15 @@ export default function TermsPage() {
         <h3>Payment</h3>
         <ul>
           <li>
-            Paid plans are purchased on our website and processed by Stripe. By subscribing, you authorize recurring charges to your payment
-            method and agree to Stripe&apos;s terms for the payment (
+            On our website, paid plans are processed by Stripe. By subscribing, you authorize recurring charges to your payment method and
+            agree to Stripe&apos;s terms for the payment (
             <ExternalLink href="https://stripe.com/legal/consumer">stripe.com/legal/consumer</ExternalLink>).
           </li>
-          <li>Subscriptions cannot currently be purchased inside the iOS or Android apps.</li>
+          <li>
+            In our iOS app, subscriptions are purchased through Apple&apos;s App Store, charged to your Apple Account and subject to
+            Apple&apos;s terms. The price shown in the app is the App Store price for your country.
+          </li>
+          <li>Subscriptions cannot currently be purchased inside the Android app.</li>
           <li>Promotion codes, when offered, are subject to any conditions stated with them and have no cash value.</li>
         </ul>
         <h3>Automatic renewal</h3>
@@ -218,29 +222,31 @@ export default function TermsPage() {
             Your subscription renews automatically at the end of each billing period (monthly or yearly) and you will be charged the
             then-current price until you cancel.
           </strong>{" "}
-          If we change the price of your plan, we will tell you before the change applies to your next renewal, and you can cancel before
-          then.
+          App Store subscriptions renew unless cancelled at least 24 hours before the end of the current period. If we change the price of
+          your plan, we will tell you before the change applies to your next renewal, and you can cancel before then.
         </p>
         <h3>Cancelling</h3>
         <ul>
           <li>
-            You can cancel at any time from Profile → Plans &amp; billing → Manage billing. Cancellation takes effect at the end of the current
-            billing period, and you keep paid access until then.
+            You can cancel a website subscription at any time from Profile → Plans &amp; billing → Manage billing, and an App Store
+            subscription in your Apple Account subscription settings. Cancellation takes effect at the end of the current billing period, and
+            you keep paid access until then.
           </li>
           <li>
             If a payment fails, we may keep your paid access for a short time while Stripe retries the payment. If payment is not completed,
             your account moves to the free plan. Your data is kept.
           </li>
           <li>
-            Deleting your account cancels any subscription immediately and ends paid access at once, without waiting for the end of the
-            billing period.
+            Deleting your account cancels any website subscription immediately and ends paid access at once, without waiting for the end of
+            the billing period. It does not cancel an App Store subscription; cancel that in your Apple Account settings first.
           </li>
         </ul>
         <h3>Refunds</h3>
         <p>
           Cancelling stops future charges but does not refund past ones. Except where required by law, payments are non-refundable,
           including for unused time after cancellation or account deletion. If you believe you were charged in error, or you are entitled to
-          a refund under the law where you live, contact us using the details in <SectionLink id="contact" />. Nothing in these terms
+          a refund under the law where you live, contact us using the details in <SectionLink id="contact" />. Refunds for App Store
+          purchases are handled by Apple (reportaproblem.apple.com). Nothing in these terms
           limits any rights you have under applicable consumer law.
         </p>
       </Section>

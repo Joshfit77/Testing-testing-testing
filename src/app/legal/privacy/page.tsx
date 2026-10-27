@@ -181,10 +181,16 @@ export default function PrivacyPage() {
 
         <h3>Subscription and payment information</h3>
         <p>
-          Paid plans are purchased on our website through Stripe Checkout. Stripe collects your payment details directly; we never receive
+          On our website, paid plans are purchased through Stripe Checkout. Stripe collects your payment details directly; we never receive
           or store your full card number. When you subscribe we send Stripe your email address and account ID, and we store the Stripe
           customer and subscription identifiers, your plan, the subscription status, the renewal or end date, and whether it is set to
           cancel. Billing changes are made through Stripe&apos;s billing portal.
+        </p>
+        <p>
+          In our iOS app, subscriptions are purchased through Apple&apos;s App Store, which handles payment under Apple&apos;s terms; we
+          never receive your payment details. We use RevenueCat to confirm App Store purchases: the app identifies you to RevenueCat by your
+          account ID, and we store the product you bought, whether it is a sandbox (test) purchase, the purchase, renewal and expiry dates,
+          and any cancellation, billing-problem or refund dates, so we can give you the right plan.
         </p>
 
         <h3>Food search and barcode scanning</h3>
@@ -284,6 +290,13 @@ export default function PrivacyPage() {
           <li>
             <strong>Stripe</strong> — subscription payments. Receives your email address and account ID from us, and the payment details you
             enter in Stripe Checkout. (<ExternalLink href="https://stripe.com/privacy">privacy policy</ExternalLink>)
+          </li>
+          <li>
+            <strong>Apple</strong> — App Store purchases in our iOS app, processed under Apple&apos;s own terms and privacy policy.
+          </li>
+          <li>
+            <strong>RevenueCat</strong> — confirms App Store purchases. Receives your account ID and your purchase and subscription records
+            from the app and the App Store. (<ExternalLink href="https://www.revenuecat.com/privacy">privacy policy</ExternalLink>)
           </li>
           <li>
             <strong>USDA FoodData Central</strong> — food search. Receives the text of your food searches from our servers, without your
@@ -417,7 +430,7 @@ export default function PrivacyPage() {
       <Section id="deletion">
         <p>You can delete your account in the app from Profile → Privacy &amp; data by typing DELETE to confirm. When you do:</p>
         <ol className="list-decimal space-y-1 pl-6">
-          <li>Any active subscription is cancelled with Stripe immediately.</li>
+          <li>Any active subscription bought on our website is cancelled with Stripe immediately.</li>
           <li>Your progress photos and any other files stored under your account are deleted from storage.</li>
           <li>
             Your account is deleted from our authentication system, and all database records linked to it — including your profile,
@@ -431,6 +444,11 @@ export default function PrivacyPage() {
           <li>
             Stripe keeps its own customer and payment records (including your email address) under its policies; deleting your account does
             not delete them.
+          </li>
+          <li>
+            A subscription bought through the App Store is not cancelled by deleting your account; only you can cancel it, in your Apple
+            Account subscription settings. The app warns you about this before you delete. We also ask RevenueCat to delete its record of
+            your purchases; Apple keeps its own purchase records under its policies.
           </li>
           <li>Information previously sent to Anthropic is not recalled.</li>
           <li>Information stored locally on your device remains until you clear the app&apos;s data or uninstall it.</li>

@@ -158,19 +158,24 @@ export function yearlySavingsPercent(monthlyCents: number, yearlyCents: number):
 
 export type BillingInterval = "month" | "year";
 
-/** Best effective plan across all of a user's subscriptions (e.g. an old canceled one plus a new active one). */
-export function entitlementFromSubscriptions(
-  subs: { plan: Exclude<Plan, "free">; status: SubscriptionStatus; current_period_end: string | null }[],
+/**
+ * Best effective plan across all of a user's subscriptions (e.g. an old canceled one plus a new active one, or a
+ * web subscription plus an App Store one). `from` is the subscription that grants it.
+ */
+export function entitlementFromSubscriptions<T extends { plan: Exclude<Plan, "free">; status: SubscriptionStatus; current_period_end: string | null }>(
+  subs: T[],
   now: Date = new Date(),
-): { plan: Plan; validUntil: string | null } {
+): { plan: Plan; validUntil: string | null; from: T | null } {
   let best: Plan = "free";
   let validUntil: string | null = null;
+  let from: T | null = null;
   for (const s of subs) {
     const p = effectivePlanFromSubscription(s, now);
     if (planRank(p) > planRank(best)) {
       best = p;
       validUntil = s.current_period_end;
+      from = s;
     }
   }
-  return { plan: best, validUntil };
+  return { plan: best, validUntil, from };
 }

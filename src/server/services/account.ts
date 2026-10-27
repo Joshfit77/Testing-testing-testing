@@ -35,6 +35,7 @@ const USER_TABLES: { table: string; column: string }[] = [
   { table: "challenge_checkins", column: "user_id" },
   { table: "subscriptions", column: "user_id" },
   { table: "billing_customers", column: "user_id" },
+  { table: "store_subscriptions", column: "user_id" },
   { table: "user_entitlements", column: "user_id" },
 ];
 

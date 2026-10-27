@@ -6,9 +6,10 @@ import { getServerSupabase, getServiceSupabase } from "@/lib/supabase/server";
 import { actionError, actionInvalid, actionOk, type ActionState } from "@/lib/action-state";
 import { profileUpdateSchema } from "@/lib/validation/schemas";
 import { requireUser } from "@/server/auth";
-import { isServiceRoleConfigured } from "@/server/env";
+import { isRevenueCatConfigured, isServiceRoleConfigured } from "@/server/env";
 import { removeUserStorage } from "@/server/services/account";
 import { cancelStripeSubscriptionsForUser } from "@/server/services/billing";
+import { deleteRevenueCatCustomer } from "@/server/services/store-billing";
 import { logError } from "@/server/log";
 import { rateLimit } from "@/server/rate-limit";
 
@@ -82,6 +83,11 @@ export async function deleteAccountAction(_prev: ActionState, formData: FormData
   } catch (err) {
     logError("account.delete", err);
     return actionError("We couldn't delete your account. Please try again or contact support.");
+  }
+  // The account is gone; removing RevenueCat's record of App Store / Google Play purchases is best effort.
+  // (Store subscriptions themselves can only be cancelled by the member in their store settings.)
+  if (isRevenueCatConfigured()) {
+    await deleteRevenueCatCustomer(user.id).catch((err) => logError("account.delete.revenuecat_customer", err));
   }
   const supabase = await getServerSupabase();
   await supabase.auth.signOut().catch(() => null);

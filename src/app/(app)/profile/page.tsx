@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/common/page-header";
 import { DeleteAccountForm, ProfileForm, WithdrawConsentForm } from "@/components/profile/profile-forms";
 import { Button } from "@/components/ui/button";
 import { getPlans } from "@/lib/domain/plans";
+import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { signOutAction } from "@/server/actions/auth";
 
@@ -13,6 +14,10 @@ export const metadata = { title: "Profile" };
 export default async function ProfilePage() {
   const { user, profile } = await requireOnboardedUser();
   const plan = await getUserPlan(user.id);
+  const supabase = await getServerSupabase();
+  const { data: ent } = await supabase.from("user_entitlements").select("source").eq("user_id", user.id).maybeSingle();
+  // Account deletion can't cancel an App Store or Google Play subscription (App Store guideline 5.1.1(v)).
+  const storeBilled = plan !== "free" && (ent?.source === "app_store" || ent?.source === "play_store") ? (ent.source === "app_store" ? "App Store" : "Google Play") : null;
   return (
     <div className="space-y-6">
       <PageHeader eyebrow="Profile" title={profile.display_name ?? "Profile"} description={user.email} />
@@ -116,7 +121,15 @@ export default async function ProfilePage() {
         </div>
         <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4">
           <p className="text-sm font-semibold text-[#f08a8a]">Delete account</p>
-          <p className="mb-3 text-xs text-muted-foreground">This cancels any active subscription and permanently deletes your account and data. It can&apos;t be undone.</p>
+          <p className="mb-3 text-xs text-muted-foreground">
+            This cancels any subscription bought on our website and permanently deletes your account and data. It can&apos;t be undone.
+          </p>
+          {storeBilled ? (
+            <p role="alert" className="mb-3 rounded-lg border border-[#a8802f]/60 bg-[#a8802f]/10 p-3 text-xs">
+              Your {getPlans()[plan].name} subscription is billed by the {storeBilled}. Deleting your account won&apos;t cancel it — cancel it first in your{" "}
+              {storeBilled} subscription settings ({storeBilled === "App Store" ? "Settings → your name → Subscriptions" : "Google Play → Payments & subscriptions"}).
+            </p>
+          ) : null}
           <DeleteAccountForm />
         </div>
       </section>
