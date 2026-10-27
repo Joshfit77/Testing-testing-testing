@@ -58,8 +58,8 @@ each item yourself; the ones marked **Decide** depend on how you read Apple's de
 | Health & Fitness → Health | Yes | Recovery check-ins, limitation notes (consented), bodyweight, measurements, body-fat %; **Decide** whether height, weight and calorie estimates belong here | Yes | No | App Functionality, Product Personalization |
 | User Content → Photos or Videos | Yes | Progress photos | Yes | No | App Functionality |
 | User Content → Other User Content | Yes | AI coach messages, faith journal, workout and meal notes, challenge notes | Yes | No | App Functionality, Product Personalization |
-| Purchases → Purchase History | Yes | Subscription plan and status (purchases happen on the web; native checkout is blocked) | Yes | No | App Functionality |
-| Identifiers → User ID | Yes | Supabase account ID (also sent to Stripe) | Yes | No | App Functionality |
+| Purchases → Purchase History | Yes | Subscription plan and status; App Store purchase records via RevenueCat (product, dates, refunds) | Yes | No | App Functionality |
+| Identifiers → User ID | Yes | Supabase account ID (also sent to Stripe and RevenueCat) | Yes | No | App Functionality |
 | Sensitive Info | **Decide** | Faith features may reveal religious beliefs; limitation notes may reveal disability | Yes | No | App Functionality |
 | Other Data | **Decide** | Age (birth year), sex, diet style and preferences, time zone | Yes | No | App Functionality, Product Personalization |
 | Usage Data → Product Interaction | **Decide** | `ai_usage_events` (per-request token counts used for quotas) | Yes | No | App Functionality |
@@ -71,28 +71,24 @@ each item yourself; the ones marked **Decide** depend on how you read Apple's de
 
 Tracking: none found, so App Tracking Transparency isn't needed. Re-check if analytics or ads are ever added.
 
-Privacy manifest gap: `PrivacyInfo.xcprivacy` doesn't declare Photos or Videos, User ID, or any items you mark as Sensitive Info or Other
-Data above. Update it to match your final answers.
+Privacy manifest: `PrivacyInfo.xcprivacy` now declares Photos or Videos and User ID as well. It doesn't yet declare items you mark
+as Sensitive Info or Other Data above; update it to match your final answers.
 
 Related guidelines (checked October 2026 at https://developer.apple.com/app-store/review/guidelines/):
 
 - 5.1.1(i): privacy policy link required in App Store Connect and inside the app.
 - 5.1.1(v): in-app account deletion. Implemented.
-- 5.1.2(i): you must clearly disclose sharing with third-party AI and get explicit permission first. **Not implemented** (see finding 1).
+- 5.1.2(i): you must clearly disclose sharing with third-party AI and get explicit permission first. Implemented on `claude/production-readiness` (finding 1).
 - 5.1.3: health and fitness data may not be used for advertising or data mining. No such use was found.
 
 ## Findings: implementation vs. policy
 
-1. **No explicit consent before AI coach data goes to Anthropic.** The coach page has no disclosure or opt-in, and the wellness-consent
-   checkbox wording doesn't mention the AI provider. Apple 5.1.2(i) requires explicit permission. The policy discloses the sharing, but
-   disclosure alone doesn't meet the guideline. Needs a product decision and an in-app consent step.
-2. **Onboarding copy overstates admin access.** The limitations field says it is "never visible to administrators" (`src/components/onboarding/onboarding-wizard.tsx`).
-   That holds for the in-app admin tools, but anyone with the service-role key or Supabase console access can read it. The policy is worded
-   accurately; the onboarding copy should be aligned with it.
-3. **Recovery check-in consent is enforced only in application code.** Limitation notes are also protected by a database trigger
-   (`enforce_wellness_consent`); `recovery_checkins` has no equivalent.
-4. **Unticking consent in preferences differs from "Withdraw consent".** Re-saving onboarding without consent clears the consent timestamp
-   and limitation notes but leaves existing recovery check-ins. The Profile → Withdraw action deletes both.
+1. ~~No explicit consent before AI coach data goes to Anthropic.~~ **Fixed:** the coach asks for explicit agreement first, enforced on
+   the server and in the database; members can turn it off in Profile → Privacy & data.
+2. ~~Onboarding copy overstates admin access.~~ **Fixed:** it now says limitation notes aren't shown in our admin tools.
+3. ~~Recovery check-in consent is enforced only in application code.~~ **Fixed:** database trigger `enforce_recovery_consent`.
+4. ~~Unticking consent in preferences differs from "Withdraw consent".~~ **Fixed:** unticking now deletes recovery check-ins too, with a
+   warning before saving.
 5. **Withdrawal scope.** Workout skip reasons such as "pain" and free-text notes aren't covered by wellness consent, and skip reasons are
    sent to the AI coach. The policy says so; decide whether that's acceptable.
 6. **Account deletion isn't atomic.** Stripe subscriptions are cancelled immediately and storage is wiped before the auth user is deleted.
@@ -100,9 +96,8 @@ Related guidelines (checked October 2026 at https://developer.apple.com/app-stor
    say access continues to the end of the paid period on cancellation.
 7. **Stripe customer records aren't deleted** on account deletion. The email and the `user_id` metadata remain at Stripe. The policy
    discloses this.
-8. **Export gaps.** The week/day/exercise structure of custom programs isn't exported (only `training_programs` rows), and neither is
-   `billing_customers` (the Stripe customer ID). The policy discloses the program gap. The Profile copy "Download everything stored for your
-   account" overstates the export.
+8. ~~Export gaps.~~ **Fixed:** the export includes custom program structure, the Stripe customer record and store subscriptions; the
+   profile copy no longer says "everything".
 9. **No individual delete** for body measurements, recovery check-ins or goals (goals can only be archived). The policy doesn't claim
    these can be deleted individually.
 10. **No consent-version record.** Only `wellness_consent_at` is stored. Acceptance of the Terms and this policy, and the age confirmation,

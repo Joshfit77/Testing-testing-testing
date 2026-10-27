@@ -164,7 +164,7 @@ To test on a device against your dev machine, use `CAP_SERVER_URL=http://<LAN-IP
 2. Select your Team (Signing & Capabilities) and set the bundle ID and version/build number.
 3. Product → Archive, then distribute to App Store Connect.
 4. The app ships an App privacy manifest (`ios/App/App/PrivacyInfo.xcprivacy`): no tracking; email, name, fitness, optional health/wellness notes, user content and purchase history collected for app functionality only. `Info.plist` declares `ITSAppUsesNonExemptEncryption = false` (standard HTTPS only), so uploads skip the export-compliance question. Version is 1.0.0 (build 1); bump `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in Xcode for each release.
-5. In App Store Connect, provide the privacy "nutrition labels" matching that manifest: account email, fitness data, health-related wellness notes (optional, consent-based), and purchase history if you add IAP. Add the privacy policy URL and a demo account for review.
+5. In App Store Connect, provide the privacy "nutrition labels" matching that manifest (see `docs/legal-review.md`). Add the privacy policy URL and a review account with Pro (`docs/PRODUCTION.md` §7).
 
 ### Android (Google Play)
 
@@ -175,7 +175,7 @@ To test on a device against your dev machine, use `CAP_SERVER_URL=http://<LAN-IP
 
 ### App-store requirements to plan for (important)
 
-- **In-app purchases.** Apple (App Store Review Guideline 3.1.1) and Google Play generally require their own billing systems for digital subscriptions bought in the app. The native shells therefore hide Stripe checkout: the server detects the `NarrowGateApp` user-agent token and shows a notice instead. Users with a web subscription keep their plan in the app. To sell in-app, integrate StoreKit and Google Play Billing (RevenueCat is a common choice), then map store purchases to `user_entitlements` from a server webhook. See IMPLEMENTATION_STATUS.md.
+- **In-app purchases.** Apple (App Store Review Guideline 3.1.1) requires in-app purchase for digital subscriptions bought in the app. The iOS app sells Pro through the App Store using RevenueCat (`src/server/services/store-billing.ts`, `/api/revenuecat/webhook`); the native shells never show website prices or Stripe checkout (detected by the `NarrowGateApp` user-agent token). Members with a web subscription keep their plan in the app. Setup steps are in `docs/PRODUCTION.md` §5. Android in-app purchases aren't set up yet.
 - **Account deletion.** Required by Apple. It is available in Profile → Privacy & data.
 - **Minimum functionality (Guideline 4.2).** The native features above help, but reviewers may still scrutinize web-based apps. Consider adding push notifications or HealthKit / Health Connect integration before submission.
 - **Universal Links / App Links.** Confirmation and reset links open in the browser by default. Add `apple-app-site-association` and `assetlinks.json` if you want them to open in the app.

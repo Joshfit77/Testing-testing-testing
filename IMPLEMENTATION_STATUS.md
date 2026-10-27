@@ -1,5 +1,10 @@
 # Implementation status
 
+> **Current production-readiness status, blockers and setup steps are in [`docs/PRODUCTION.md`](docs/PRODUCTION.md).**
+> This file is the original 2026-10-16 build report. Since then: pricing is Free + Pro ($19.99/month, $149.99/year; Plus is
+> legacy), App Store subscriptions use RevenueCat, the AI coach asks for explicit consent, rate limits are shared in Postgres,
+> and the legal pages are complete drafts awaiting business details and counsel review.
+
 _Last updated: 2026-10-16._
 
 This file separates what was **verified in this environment** from what **needs external credentials or accounts** and what is **not done yet**.
