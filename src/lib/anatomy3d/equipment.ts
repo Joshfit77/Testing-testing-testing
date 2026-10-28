@@ -51,7 +51,7 @@ function placeRod(mesh: THREE.Object3D, a: THREE.Vector3, b: THREE.Vector3) {
 }
 const V = (x: number, y: number, z = 0) => new THREE.Vector3(x, y, z);
 
-/** The plate face: matte black with the NGF mark and gold rings (drawn once, shared by every plate). */
+/** The plate face: matte black with gold rings, no lettering (drawn once, shared by every plate). */
 let plateFace: THREE.MeshStandardMaterial | null = null;
 function plateFaceMaterial(): THREE.MeshStandardMaterial | null {
   if (plateFace) return plateFace;
@@ -67,17 +67,6 @@ function plateFaceMaterial(): THREE.MeshStandardMaterial | null {
     g.beginPath();
     g.arc(256, 256, r, 0, Math.PI * 2);
     g.stroke();
-  }
-  g.fillStyle = "#d8b45a";
-  g.font = "bold 64px Montserrat, Arial, sans-serif";
-  g.textAlign = "center";
-  g.textBaseline = "middle";
-  for (const a of [0, Math.PI]) {
-    g.save();
-    g.translate(256, 256);
-    g.rotate(a - Math.PI / 2);
-    g.fillText("NGF", 0, -192);
-    g.restore();
   }
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
