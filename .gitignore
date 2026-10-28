@@ -28,3 +28,4 @@ assets/badge-masters/*
 .anatomy-preview/
 # Écorché-based evaluation build (not approved; rebuild with ECORCHE=... scripts/anatomy/build-athlete.mts)
 public/anatomy/athlete-eco.*
+.anatomy-lab/

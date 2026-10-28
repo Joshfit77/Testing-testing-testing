@@ -7,7 +7,7 @@ import type { Joints3 } from "./rig";
  * chrome bars. Each prop is built once in "plane space" (x = the motion's horizontal axis, y up, z across the picture)
  * and moved every frame from the motion's resolved positions, so it lines up with the reviewed 2D technique.
  */
-const M = {
+export const M = {
   steel: new THREE.MeshStandardMaterial({ color: "#c9ced4", metalness: 1, roughness: 0.22 }),
   knurl: new THREE.MeshStandardMaterial({ color: "#8d9298", metalness: 1, roughness: 0.45 }),
   black: new THREE.MeshStandardMaterial({ color: "#16171a", metalness: 0.65, roughness: 0.42 }),
@@ -35,14 +35,14 @@ interface Built {
 }
 
 // ---------------------------------------------------------------- shape helpers (plane space)
-const box = (w: number, h: number, d: number, m: THREE.Material) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
-function rod(a: THREE.Vector3, b: THREE.Vector3, r: number, m: THREE.Material, seg = 12): THREE.Mesh {
+export const box = (w: number, h: number, d: number, m: THREE.Material) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
+export function rod(a: THREE.Vector3, b: THREE.Vector3, r: number, m: THREE.Material, seg = 12): THREE.Mesh {
   const len = a.distanceTo(b);
   const mesh = new THREE.Mesh(new THREE.CylinderGeometry(r, r, Math.max(0.01, len), seg), m);
   placeRod(mesh, a, b);
   return mesh;
 }
-function placeRod(mesh: THREE.Object3D, a: THREE.Vector3, b: THREE.Vector3) {
+export function placeRod(mesh: THREE.Object3D, a: THREE.Vector3, b: THREE.Vector3) {
   mesh.position.copy(a).add(b).multiplyScalar(0.5);
   const dir = b.clone().sub(a);
   const len = dir.length();
@@ -76,7 +76,7 @@ function plateFaceMaterial(): THREE.MeshStandardMaterial | null {
 }
 
 /** A weight plate: black disc, gold rim and hub, axis along z. */
-function plate(r: number, t = 4.5): THREE.Group {
+export function plate(r: number, t = 4.5): THREE.Group {
   const g = new THREE.Group();
   const face = plateFaceMaterial();
   if (face)
@@ -101,7 +101,7 @@ function plate(r: number, t = 4.5): THREE.Group {
 }
 
 /** A barbell along local z (length 220 cm), plates outside the sleeves. */
-function barbell(r: number, opts: { plates?: boolean; thick?: number } = {}): THREE.Group {
+export function barbell(r: number, opts: { plates?: boolean; thick?: number } = {}): THREE.Group {
   const g = new THREE.Group();
   const shaft = new THREE.Mesh(new THREE.CylinderGeometry(opts.thick ?? 1.4, opts.thick ?? 1.4, 131, 16), M.knurl);
   shaft.rotation.x = Math.PI / 2;
@@ -124,7 +124,7 @@ function barbell(r: number, opts: { plates?: boolean; thick?: number } = {}): TH
   return g;
 }
 
-function dumbbell(scale: number): THREE.Group {
+export function dumbbell(scale: number): THREE.Group {
   const g = new THREE.Group();
   const handle = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 13, 12), M.knurl);
   handle.rotation.x = Math.PI / 2;
@@ -141,7 +141,7 @@ function dumbbell(scale: number): THREE.Group {
   return g;
 }
 
-function kettlebell(scale: number): THREE.Group {
+export function kettlebell(scale: number): THREE.Group {
   const g = new THREE.Group();
   const bell = new THREE.Mesh(new THREE.SphereGeometry(9 * scale, 24, 18), M.black);
   bell.position.y = -11 * scale;
@@ -153,7 +153,7 @@ function kettlebell(scale: number): THREE.Group {
   return g;
 }
 
-function bench(len: number, h: number): THREE.Group {
+export function bench(len: number, h: number): THREE.Group {
   const g = new THREE.Group();
   const top = box(len, 7, 28, M.pad);
   top.position.y = h - 3.5;
@@ -170,11 +170,11 @@ function bench(len: number, h: number): THREE.Group {
   return g;
 }
 
-function curveTube(points: THREE.Vector3[], r: number, m: THREE.Material): THREE.Mesh {
+export function curveTube(points: THREE.Vector3[], r: number, m: THREE.Material): THREE.Mesh {
   const curve = new THREE.CatmullRomCurve3(points);
   return new THREE.Mesh(new THREE.TubeGeometry(curve, Math.max(8, points.length * 6), r, 8, false), m);
 }
-function replaceTube(holder: THREE.Group, points: THREE.Vector3[], r: number, m: THREE.Material) {
+export function replaceTube(holder: THREE.Group, points: THREE.Vector3[], r: number, m: THREE.Material) {
   for (const c of holder.children) (c as THREE.Mesh).geometry?.dispose();
   holder.clear();
   if (points.length >= 2) holder.add(curveTube(points, r, m));

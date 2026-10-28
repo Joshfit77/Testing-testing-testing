@@ -15,6 +15,8 @@ declare global {
     SKIN_PARTS?: string[];
     /** The same for the filled-in face (anatomy/ecorche-face.bin). */
     FACE_PARTS?: string[];
+    /** The same for the anatomical rig's weights (anatomy/ecorche-rig.bin). */
+    RIG_PARTS?: string[];
     modelVerified?: boolean;
     exerciseView?: string;
     exerciseSlugs?: string[];
@@ -148,9 +150,13 @@ async function runModel() {
       data: await fetchBinary("anatomy/ecorche-face.bin", window.FACE_PARTS, () => {}),
     };
     const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    // All gold, in the app's gold (owner's request); ?look=original shows the file's own red and white.
-    const look = new URLSearchParams(location.search).get("look") === "original" ? "original" : "gold";
-    viewer = await mountModel(canvas, { glb, face, look, pixelRatio: Math.min(devicePixelRatio || 1, 2), exercise: { ex, skin, hideProps: ["rack"], reducedMotion } });
+    const q = new URLSearchParams(location.search);
+    // All gold, in the app's dark gold (owner's request, "keep him gold"); ?look=original shows the file's own red and
+    // white.
+    const look = q.get("look") === "original" ? "original" : "gold";
+    // The anatomical rig (its own equipment, hands on the handles); ?rig=old shows the first rig for comparison.
+    const rig = q.get("rig") === "old" ? undefined : { meta: await (await fetch("anatomy/ecorche-rig.json")).json(), data: await fetchBinary("anatomy/ecorche-rig.bin", window.RIG_PARTS, () => {}) };
+    viewer = await mountModel(canvas, { glb, face, look, rig, pixelRatio: Math.min(devicePixelRatio || 1, 2), exercise: { ex, skin, hideProps: ["rack"], reducedMotion } });
   } catch (e) {
     loading.textContent = "3D isn't available on this device.";
     console.error(e);

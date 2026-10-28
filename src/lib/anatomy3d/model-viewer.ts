@@ -9,6 +9,10 @@ import { gripDelta, gripReach } from "./grip";
 import { makeSkeleton } from "./mesh";
 import type { CameraView, PlayerExercise } from "./player";
 import { jointsFromFrame, poseBones } from "./rig";
+import { bindModel, type BoundBody } from "./body/bind-model";
+import type { RigMeta } from "./body/skeleton";
+import { solvePose, type PoseGoals, type SolveReport } from "./body/solve";
+import { moveModel3, type Mover3 } from "./motion3d/mover";
 
 /**
  * The raw Écorché model in the exercise player: the GLB file (github.com/Charleeh/ecorche, CC BY-SA 4.0) is loaded as
@@ -42,6 +46,10 @@ export interface ModelViewer {
   readonly height: number;
   /** Present when an exercise was given: the model itself performing it (see moveModel). */
   readonly motion?: ModelMotion;
+  /** Present with `rig` and an exercise: the anatomical rig's mover (solve reports, contacts, equipment). */
+  readonly rig3?: Mover3;
+  /** Present with `rig` and no exercise: the anatomical skeleton, posed directly from goals (for checks). */
+  readonly body?: { bound: BoundBody; pose(goals: PoseGoals): SolveReport };
   dispose(): void;
 }
 
@@ -101,7 +109,10 @@ export async function mountModel(
     /** The face: a smooth red surface over the head, red ears, teeth hidden (see fillFace). */
     face?: ModelFace;
     /** The model performing an exercise: the exercise, the file's skin weights, equipment to leave out. */
-    exercise?: { ex: PlayerExercise; skin: ModelSkin; hideProps?: string[]; reducedMotion?: boolean };
+    exercise?: { ex: PlayerExercise; skin?: ModelSkin; hideProps?: string[]; reducedMotion?: boolean };
+    /** The anatomical rig (public/anatomy/ecorche-rig.*): with an exercise, the model performs it on this rig (its
+     *  own equipment, hands on the handles); without one, it can be posed from goals. */
+    rig?: { meta: RigMeta; data: ArrayBuffer };
   },
 ): Promise<ModelViewer> {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: "high-performance" });
@@ -141,7 +152,11 @@ export async function mountModel(
   let raf = 0;
   // (Redraw requests from the motion: play, seek. Set once `request` exists.)
   let changed = () => {};
-  const moving = opts.exercise ? moveModel(scene, model, opts.exercise, () => changed()) : null;
+  const ex = opts.exercise;
+  const moving3 = ex && opts.rig ? moveModel3(scene, model, { ex: ex.ex, rig: opts.rig, reducedMotion: ex.reducedMotion }, () => changed()) : null;
+  const moving = moving3 ?? (ex ? moveModel(scene, model, { ...ex, skin: ex.skin! }, () => changed()) : null);
+  const bound = !opts.exercise && opts.rig ? bindModel(model, opts.rig) : null;
+  if (bound) bound.update();
 
   // Distance that fits the whole figure (with a margin) in the frame, for the current aspect ratio.
   const half = THREE.MathUtils.degToRad(FOV / 2);
@@ -260,6 +275,19 @@ export async function mountModel(
       return url;
     },
     motion: moving?.motion,
+    rig3: moving3 ?? undefined,
+    body: bound
+      ? {
+          bound,
+          pose(goals) {
+            const report: SolveReport = { reach: { wristR: 0, wristL: 0, ankleR: 0, ankleL: 0 }, handTurn: { R: 0, L: 0 }, limits: {} };
+            solvePose(bound.sk, goals, report);
+            bound.update();
+            request();
+            return report;
+          },
+        }
+      : undefined,
     dispose() {
       cancelAnimationFrame(raf);
       model.traverse((o) => {
@@ -329,6 +357,7 @@ function fillFace(model: THREE.Object3D, face: ModelFace) {
     const m = new THREE.Mesh(g, mat);
     m.name = "Face";
     m.userData.skin = new Uint8Array(face.data, sh.offset + n * 15, n * 8);
+    m.userData.faceShell = true;
     model.add(m);
   }
   model.updateMatrixWorld(true);

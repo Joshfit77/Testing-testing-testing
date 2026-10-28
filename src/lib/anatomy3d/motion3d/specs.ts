@@ -1,0 +1,429 @@
+import * as THREE from "three";
+import { SIDE_SIGN, type Side, type Skeleton3 } from "../body/skeleton";
+import { restGoals } from "../body/solve";
+import {
+  Cable,
+  makeAirBike,
+  makeBarbell,
+  makeCableTower,
+  makeDHandle,
+  makeDumbbell,
+  makeKettlebell,
+  makeMedball,
+  makeRower,
+  makeSled,
+  makeFlexRope,
+
+  makeWall,
+  Piece,
+} from "./apparatus";
+import { K } from "./lift";
+import { gripPoint, handNow, placeInHand, type Ctx, type Spec } from "./perform";
+
+/**
+ * Exercise specs for the anatomical rig: the equipment each exercise uses, how the hands hold it, and, where the
+ * reviewed 2D motion cannot carry the movement (a trunk that rotates, a ball thrown and caught), the exercise's own
+ * 3D keyframes. Specs exist so far for the exercises demonstrated first; others fall back to the lifted motion with
+ * free hands (`hasSpec` tells them apart).
+ */
+const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
+const D2R = Math.PI / 180;
+const rotY = (deg: number) => new THREE.Quaternion().setFromAxisAngle(V3(0, 1, 0), deg * D2R);
+const rotZ = (deg: number) => new THREE.Quaternion().setFromAxisAngle(V3(0, 0, 1), deg * D2R);
+const rotX = (deg: number) => new THREE.Quaternion().setFromAxisAngle(V3(1, 0, 0), deg * D2R);
+const SIDES = ["R", "L"] as const;
+/** Towards the midline along a bar across the body (an overhand grip's thumb side). */
+const medial = (s: Side) => V3(0, 0, -SIDE_SIGN[s]);
+const lateral = (s: Side) => V3(0, 0, SIDE_SIGN[s]);
+
+// ---------------------------------------------------------------- 3D keyframes
+
+/** Body parameters for 3D-authored exercises (degrees; "turn" is towards the figure's right, about the vertical). */
+export interface BodyKey {
+  at: number;
+  pelvis: [number, number, number];
+  turn: number;
+  tilt: number;
+  chestTurn: number;
+  chestFlex: number;
+  chestSide?: number;
+  headTurn?: number;
+  /** Feet: ball of the foot on the floor at (x, z), the foot turned right by `turn`, heel lifted by `heel` degrees. */
+  feet: Record<Side, [number, number, number, number]>;
+}
+
+const smooth = (u: number) => u * u * (3 - 2 * u);
+/** Interpolates numeric fields (and arrays of numbers) between keys by phase, eased, looping. */
+export function keyed<T extends { at: number }>(keys: T[], phase: number): T {
+  let i = keys.length - 1;
+  while (i > 0 && keys[i]!.at > phase) i--;
+  const a = keys[i]!;
+  const b = keys[(i + 1) % keys.length]!;
+  const span = (b.at <= a.at ? b.at + 1 : b.at) - a.at;
+  const u = smooth(Math.min(1, Math.max(0, (phase - a.at + (phase < a.at ? 1 : 0)) / (span || 1))));
+  const mix = (x: unknown, y: unknown): unknown =>
+    typeof x === "number" ? x + ((y as number) - x) * u : Array.isArray(x) ? x.map((v, k) => mix(v, (y as unknown[])[k])) : x && typeof x === "object" ? Object.fromEntries(Object.entries(x).map(([k, v]) => [k, mix(v, (y as Record<string, unknown>)[k])])) : x;
+  return mix(a, b) as T;
+}
+
+/** Goals from body parameters. */
+export function bodyGoals(c: Ctx, k: BodyKey): void {
+  const sk = c.sk;
+  const g = restGoals(sk);
+  const pel = sk.restRot[sk.i("pelvis")]!;
+  g.pelvis = { pos: V3(...k.pelvis), rot: rotY(-k.turn).multiply(rotZ(-k.tilt)).multiply(pel) };
+  g.chest = rotY(-k.chestTurn).multiply(rotZ(-k.chestFlex)).multiply(rotX(k.chestSide ?? 0)).multiply(sk.restRot[sk.i("thorax2")]!);
+  g.head = rotY(-(k.headTurn ?? k.chestTurn)).multiply(sk.restRot[sk.i("head")]!);
+  for (const s of SIDES) {
+    const [x, z, turn, heel] = k.feet[s];
+    const J = sk.meta.joints[s];
+    const restFoot = sk.restRot[sk.i(`foot${s}`)]!;
+    const ballRest = V3(...J.ball), ankleRest = V3(...J.ankle);
+    const yaw = rotY(-turn);
+    const latAxis = V3(0, 0, 1).applyQuaternion(yaw);
+    // (Heel up: the foot pitches toes-down about the ball, a negative turn about its lateral axis.)
+    const q = new THREE.Quaternion().setFromAxisAngle(latAxis, -heel * D2R).multiply(yaw);
+    const ball = V3(x, ballRest.y, z);
+    const ankle = ankleRest.clone().sub(ballRest).applyQuaternion(q).add(ball);
+    const toesFwd = V3(1, 0, 0).applyQuaternion(yaw);
+    g.legs[s] = { ankle, foot: q.clone().multiply(restFoot), pole: toesFwd.addScaledVector(V3(0, 0, SIDE_SIGN[s]), 0.25), toes: heel * 0.9 };
+  }
+  c.goals = g;
+}
+
+// ---------------------------------------------------------------- helpers
+
+/** Middle of the two hands' grip points as the motion moves them (rig). */
+/** A piece holding just a cable (a tube between two points). */
+const cablePiece = () => {
+  const p = new Piece("cable") as Piece & { cable: Cable };
+  p.cable = new Cable();
+  p.obj.add(p.cable.obj);
+  return p;
+};
+const cableOf = (p: Piece | undefined) => (p as Piece & { cable: Cable }).cable;
+
+const handsMid = (c: Ctx) => c.freeArm("R").grip.add(c.freeArm("L").grip).multiplyScalar(0.5);
+
+// ---------------------------------------------------------------- specs
+
+const pushPress: Spec = {
+  build: () => [makeBarbell({ grip: 27 })],
+  frame(c, [bar]) {
+    // The bar travels where the motion's hands go (on the model's arms, each keeping its reach at the grip's width),
+    // level, across the body.
+    const mid = c.freeAt("R", 27).add(c.freeAt("L", -27)).multiplyScalar(0.5).setZ(0);
+    const at = c.reachable(mid, ["R", "L"], 0.5, { offsets: { R: V3(0, 0, 27), L: V3(0, 0, -27) }, minBend: 140 });
+    bar!.place(at, new THREE.Quaternion());
+    for (const s of SIDES) c.hold(s, bar!.handle(s), medial(s));
+  },
+};
+
+const kettlebellSwing: Spec = {
+  build: () => [makeKettlebell(1.15)],
+  // Feet a little wider than the hips, toes out: the bell passes between the thighs, not the shins.
+  stance: { halfWidth: 19, toeOut: 14 },
+  frame(c, [kb]) {
+    // Both hands on the handle, palms towards the body; the bell hangs on the line of the arms.
+    const sh = c.gh("R").add(c.gh("L")).multiplyScalar(0.5);
+    // (Arms long but not locked: the bell stays a little inside full reach.)
+    const at = c.reachable(handsMid(c).setZ(0), ["R", "L"], 2.2, { offsets: { R: V3(0, 0, 2.6), L: V3(0, 0, -2.6) } });
+    const along = at.clone().sub(sh).normalize();
+    const q = new THREE.Quaternion().setFromUnitVectors(V3(0, -1, 0), along);
+    // Keep the handle across the body (local Z on the figure's Z).
+    const zNow = V3(0, 0, 1).applyQuaternion(q);
+    const fix = new THREE.Quaternion().setFromUnitVectors(zNow.clone().projectOnPlane(along).normalize(), V3(0, 0, 1).projectOnPlane(along).normalize());
+    kb!.place(at, fix.multiply(q));
+    for (const s of SIDES) c.hold(s, kb!.handle(s), medial(s), { kind: "wrap", radius: 1.2 });
+  },
+};
+
+const lateralRaise: Spec = {
+  build: () => [makeDumbbell(0.8), makeDumbbell(0.8)],
+  frame(c) {
+    // Neutral grip (thumbs forward at the bottom, the palms face down at the top), elbows slightly bent.
+    for (const s of SIDES) c.free(s, 92, { kind: "wrap", radius: 1.6 });
+  },
+  after(c, [r, l]) {
+    placeInHand(c.sk, "R", r!, 1.6);
+    placeInHand(c.sk, "L", l!, 1.6);
+  },
+};
+
+const farmersCarry: Spec = {
+  build: () => [makeDumbbell(1.25), makeDumbbell(1.25)],
+  travel: 111.85 * K,
+  frame(c) {
+    // Arms long at the sides, a little away from the thighs so the dumbbells clear them; neutral grip.
+    for (const s of SIDES) {
+      c.free(s, 88, { kind: "wrap", radius: 1.6 });
+      const g = c.goals.arms[s];
+      const gh = c.gh(s);
+      g.wrist.z = gh.z + SIDE_SIGN[s] * 12;
+      g.wrist.y = Math.max(g.wrist.y, gh.y - 56);
+    }
+  },
+  after(c, [r, l]) {
+    placeInHand(c.sk, "R", r!, 1.6);
+    placeInHand(c.sk, "L", l!, 1.6);
+  },
+};
+
+const runningIntervals: Spec = {
+  travel: 263.58 * K,
+  frame(c) {
+    // Running arms: elbows about 90° (as the motion swings them), loose fists with the thumbs up, hands in close.
+    for (const s of SIDES) {
+      c.free(s, 80, { kind: "fist" }, 5);
+      const g = c.goals.arms[s];
+      g.wrist.z = c.gh(s).z * 0.75 + SIDE_SIGN[s] * 4;
+    }
+  },
+};
+
+const sledPush: Spec = {
+  build: () => [makeSled({ gripY: 100 })],
+  travel: 246.96 * K,
+  frame(c, [sled]) {
+    // The sled sits where the motion's hands reach the uprights; both hands on the grips, thumbs up the uprights.
+    const hands = handsMid(c);
+    const grip = sled!.local.R!.at;
+    sled!.place(V3(hands.x - grip.x, 0, 0));
+    for (const s of SIDES) {
+      const h = sled!.handle(s);
+      c.hold(s, h, h.axis.clone(), { kind: "wrap", radius: 2.0 });
+    }
+  },
+};
+
+/**
+ * Rowing machine, authored in 3D (the 2D motion's finish keeps the elbows under the shoulders, which no overhand grip
+ * can follow): catch with the shins upright and the arms long; the drive in order, legs, then the trunk swinging back,
+ * then the arms drawing the handle to the lower ribs with the elbows past the body; the recovery in the reverse order.
+ * The machine stands with its seat rail along X; the feet stay strapped to the footplates.
+ */
+/** Rowing keys: seat position, pelvis and chest lean (degrees forward), and the hands as an angle below the horizontal
+ *  from the shoulders and a fraction of the arms' full reach. */
+type RowKey = { at: number; seat: number; tilt: number; chest: number; hands: [number, number] };
+const rowKeys: RowKey[] = [
+  { at: 0, seat: 8, tilt: 24, chest: 32, hands: [34, 0.98] },
+  { at: 0.2, seat: -38, tilt: 22, chest: 30, hands: [30, 0.98] },
+  { at: 0.3, seat: -44, tilt: -10, chest: -14, hands: [26, 0.9] },
+  { at: 0.42, seat: -44, tilt: -14, chest: -20, hands: [55, 0.4] },
+  { at: 0.5, seat: -44, tilt: -14, chest: -20, hands: [55, 0.4] },
+  { at: 0.62, seat: -44, tilt: -10, chest: -14, hands: [24, 0.95] },
+  { at: 0.72, seat: -40, tilt: 20, chest: 28, hands: [30, 0.98] },
+];
+const rowingIntervals: Spec = {
+  build: () => [makeRower()],
+  body: {
+    duration: 2.1,
+    goals(c) {
+      const k = keyed(rowKeys, c.phase);
+      const sk = c.sk;
+      const g = restGoals(sk);
+      const seatTop = 38.5;
+      g.pelvis = { pos: V3(k.seat, seatTop + 12, 0), rot: rotZ(-k.tilt).multiply(sk.restRot[sk.i("pelvis")]!) };
+      g.chest = rotZ(-k.chest).multiply(sk.restRot[sk.i("thorax2")]!);
+      g.head = rotZ(-k.chest * 0.4).multiply(sk.restRot[sk.i("head")]!);
+      for (const s of SIDES) {
+        // Feet strapped to the plates (tilted 43°, toes up), knees pointing up and a little out.
+        const pitch = 43;
+        g.legs[s] = { ankle: V3(47, 40, SIDE_SIGN[s] * 9.5), pole: V3(0.3, 1, SIDE_SIGN[s] * 0.25), foot: rotZ(pitch).multiply(sk.restRot[sk.i(`foot${s}`)]!) };
+      }
+      c.goals = g;
+    },
+  },
+  frame(c, [rower]) {
+    const r = rower as ReturnType<typeof makeRower>;
+    rower!.place(V3(0, 0, 0));
+    const k = keyed(rowKeys, c.phase);
+    const sh = c.gh("R").add(c.gh("L")).multiplyScalar(0.5).setZ(0);
+    const a = (k.hands[0] * Math.PI) / 180;
+    const full = 63.8;
+    const hands = c.reachable(sh.clone().add(V3(Math.cos(a), -Math.sin(a), 0).multiplyScalar(full * k.hands[1])), ["R", "L"], 0.3);
+    r.set(k.seat, hands);
+    // Overhand, the elbows going back past the body and a little out; the forearms come level as the arms draw in.
+    const bend = Math.min(1, Math.max(0, (1 - k.hands[1]) / 0.55));
+    for (const s of SIDES) {
+      const h = rower!.handle(s);
+      const along = h.at.clone().sub(c.gh(s)).normalize().lerp(V3(1, 0, 0), bend).normalize();
+      c.hold(s, h, medial(s), { kind: "wrap", radius: 1.6 }, V3(-1, -0.2, SIDE_SIGN[s] * 0.45), h.at.clone().addScaledVector(along, -30));
+    }
+  },
+};
+
+const pallofPress: Spec = {
+  build: () => [makeCableTower(), makeDHandle(20), cablePiece()],
+  frame(c, [tower, handle, holder]) {
+    // Standing side-on to the cable (the tower on the figure's right), the handle pressed straight out from the chest
+    // and back, both hands round it, thumbs up; the trunk stays square against the cable's pull.
+    const t = tower as ReturnType<typeof makeCableTower>;
+    t.place(V3(0, 0, 118), rotY(90));
+    t.setPulley(128);
+    const at = c.reachable(handsMid(c).setZ(0), ["R", "L"], 3, { offsets: { R: V3(0, -5, 0), L: V3(0, 5, 0) } });
+    const pulley = t.pulleyAt();
+    const pull = pulley.clone().sub(at).normalize();
+    // Handle: grip upright, its D towards the cable.
+    const x = pull.clone().negate();
+    const y = V3(0, 1, 0);
+    const z = V3().crossVectors(x, y).normalize();
+    const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z));
+    handle!.place(at, q);
+    cableOf(holder).set(pulley, (handle as ReturnType<typeof makeDHandle>).ring());
+    c.hold("R", handle!.handle("lower"), V3(0, 1, 0), { kind: "wrap", radius: 1.7 }, V3(0, -1, 0.5));
+    c.hold("L", handle!.handle("upper"), V3(0, 1, 0), { kind: "wrap", radius: 1.7 }, V3(0, -1, -0.5));
+  },
+};
+
+/**
+ * High-to-low cable wood chop with a rope, the tower on the figure's right, authored in 3D: the trunk turns through the
+ * chop while the arms stay long, the hands sweeping an arc from high on the right to low beside the left hip; the
+ * back foot pivots. Both hands hold the rope's two ends, thumbs towards the cable.
+ */
+const woodchopKeys: (BodyKey & { dir: [number, number, number]; reach: number })[] = [
+  { at: 0, pelvis: [-2, 92, 2], turn: 22, tilt: 4, chestTurn: 50, chestFlex: -4, chestSide: 6, headTurn: 40, feet: { R: [10, 26, 30, 0], L: [8, -24, 8, 0] }, dir: [0.35, 0.62, 0.7], reach: 0.9 },
+  { at: 0.45, pelvis: [0, 86, -3], turn: -28, tilt: 10, chestTurn: -48, chestFlex: 14, chestSide: -4, headTurn: -38, feet: { R: [10, 26, -10, 32], L: [8, -24, -6, 0] }, dir: [0.45, -0.75, -0.48], reach: 0.88 },
+  { at: 0.55, pelvis: [0, 86, -3], turn: -28, tilt: 10, chestTurn: -50, chestFlex: 14, chestSide: -4, headTurn: -40, feet: { R: [10, 26, -10, 32], L: [8, -24, -6, 0] }, dir: [0.45, -0.75, -0.48], reach: 0.88 },
+];
+const woodchop: Spec = {
+  body: {
+    duration: 2.8,
+    goals(c) {
+      bodyGoals(c, keyed(woodchopKeys, c.phase));
+    },
+  },
+  build: () => [makeCableTower(225), makeFlexRope(), cablePiece()],
+  frame(c, [tower]) {
+    const t = tower as ReturnType<typeof makeCableTower>;
+    t.place(V3(30, 0, 105), rotY(70));
+    t.setPulley(205);
+    const k = keyed(woodchopKeys, c.phase);
+    // The hands sweep an arc round the shoulders at near full reach.
+    const sh = c.gh("R").add(c.gh("L")).multiplyScalar(0.5);
+    const a = V3(...woodchopKeys[0]!.dir).normalize(), b = V3(...woodchopKeys[1]!.dir).normalize();
+    const u = Math.min(1, Math.max(0, V3(...k.dir).normalize().sub(a).length() / b.clone().sub(a).length()));
+    const dir = a.clone().applyQuaternion(new THREE.Quaternion().slerp(new THREE.Quaternion().setFromUnitVectors(a, b), u));
+    const right = c.chestAxes().right;
+    const hands = c.reachable(sh.addScaledVector(dir, 63.8 * k.reach), ["R", "L"], 5, { offsets: { R: right.clone().multiplyScalar(4.5), L: right.clone().multiplyScalar(-4.5) } });
+    const pulley = t.pulleyAt();
+    // Each fist round its rope end: the rope square to the forearm, thumbs towards the cable.
+    for (const s of SIDES) {
+      const at = hands.clone().addScaledVector(right, SIDE_SIGN[s] * 4.5);
+      const arm = at.clone().sub(c.gh(s)).normalize();
+      const cable = pulley.clone().sub(at).normalize();
+      let axis = cable.clone().addScaledVector(arm, -cable.dot(arm));
+      if (axis.lengthSq() < 0.05) axis = V3(0, 1, 0).addScaledVector(arm, -arm.y);
+      c.hold(s, { at, axis: axis.normalize(), radius: 1.3 }, axis.clone());
+    }
+  },
+  after(c, [tower, rope, holder]) {
+    const t = tower as ReturnType<typeof makeCableTower>;
+    const r = rope as ReturnType<typeof makeFlexRope>;
+    const ends: Partial<Record<Side, { at: THREE.Vector3; axis: THREE.Vector3 }>> = {};
+    for (const s of SIDES) ends[s] = { at: gripPoint(c.sk, s, 1.3), axis: handNow(c.sk, s).across };
+    const pulley = t.pulleyAt();
+    const mid = ends.R!.at.clone().add(ends.L!.at).multiplyScalar(0.5);
+    const clip = mid.clone().addScaledVector(pulley.clone().sub(mid).normalize(), 18);
+    r.set(clip, ends);
+    cableOf(holder).set(pulley, clip);
+  },
+};
+
+/** Rotational medicine-ball throw against a wall on the figure's left: load at the right hip, throw, catch. */
+const throwKeys: (BodyKey & { ball: [number, number, number]; held: number })[] = [
+  { at: 0, pelvis: [-3, 88, 4], turn: 30, tilt: 10, chestTurn: 62, chestFlex: 10, headTurn: -10, feet: { R: [10, 26, 10, 0], L: [8, -26, 4, 0] }, ball: [16, -44, 30], held: 1 },
+  { at: 0.3, pelvis: [0, 90, -2], turn: -30, tilt: 6, chestTurn: -52, chestFlex: 4, headTurn: -60, feet: { R: [10, 26, -40, 34], L: [8, -26, -10, 0] }, ball: [30, -18, -38], held: 1 },
+  { at: 0.36, pelvis: [0, 90, -2], turn: -32, tilt: 6, chestTurn: -55, chestFlex: 4, headTurn: -60, feet: { R: [10, 26, -40, 34], L: [8, -26, -10, 0] }, ball: [30, -16, -60], held: 0 },
+  { at: 0.52, pelvis: [0, 90, -2], turn: -25, tilt: 6, chestTurn: -42, chestFlex: 4, headTurn: -60, feet: { R: [10, 26, -30, 20], L: [8, -26, -10, 0] }, ball: [30, -16, -60], held: 0 },
+  { at: 0.66, pelvis: [-1, 89, 0], turn: -20, tilt: 8, chestTurn: -40, chestFlex: 6, headTurn: -50, feet: { R: [10, 26, -10, 6], L: [8, -26, -6, 0] }, ball: [28, -16, -36], held: 1 },
+];
+const rotationalThrow: Spec = {
+  body: {
+    duration: 2.6,
+    goals(c) {
+      bodyGoals(c, keyed(throwKeys, c.phase));
+    },
+  },
+  build: () => {
+    const wall = makeWall(320, 280);
+    return [wall, makeMedball(12)];
+  },
+  frame(c, [wall, ball]) {
+    wall!.place(V3(10, 0, -140), rotY(90));
+    const k = keyed(throwKeys, c.phase);
+    // Held: at the hands (set from the shoulders, so the arms reach it). In flight from the release to the wall and
+    // back to the catch: a straight path with a little arc, bouncing off the wall.
+    let at = c.reachable(c.fromShoulders(k.ball), ["R", "L"], 6);
+    const release = c.fromShoulders(throwKeys[1]!.ball);
+    const catchAt = c.fromShoulders(throwKeys[4]!.ball);
+    const wallHit = V3(release.x + 6, release.y + 8, -140 + 12);
+    if (c.phase > 0.3 && c.phase < 0.66) {
+      const p = c.phase;
+      const fly = (a: THREE.Vector3, b: THREE.Vector3, u: number) => a.clone().lerp(b, Math.min(1, Math.max(0, u))).add(V3(0, Math.sin(Math.min(1, Math.max(0, u)) * Math.PI) * 6, 0));
+      at = p < 0.46 ? fly(release, wallHit, (p - 0.3) / 0.16) : fly(wallHit, catchAt, (p - 0.46) / 0.2);
+    }
+    ball!.place(at);
+    // The hands keep the ball's shape all through: on the ball while it is held; after the release they follow through
+    // towards the wall, then come back in front of the chest ready for the catch (a ball they hold in the air), so the
+    // hands never jump from one pose to another.
+    let hands = at.clone();
+    if (c.phase > 0.3 && c.phase < 0.66) {
+      const follow = release.clone().add(V3(4, -4, -14));
+      const ready = catchAt.clone().add(V3(4, 0, 6));
+      const u = (c.phase - 0.3) / 0.36;
+      hands = u < 0.3 ? release.clone().lerp(follow, smooth(u / 0.3)) : follow.clone().lerp(ready, smooth((u - 0.3) / 0.7)).lerp(catchAt, smooth(Math.max(0, (u - 0.85) / 0.15)));
+    }
+    {
+      // Hands on either side of the ball, fingers spread over it.
+      const fwd = c.chestAxes().fwd;
+      const side = V3().crossVectors(V3(0, 1, 0), fwd).normalize(); // the figure's left
+      const held = c.phase <= 0.3 || c.phase >= 0.66;
+      for (const s of SIDES) {
+        const n = side.clone().multiplyScalar(s === "R" ? -1 : 1).addScaledVector(V3(0, -1, 0), 0.3).addScaledVector(fwd, -0.2).normalize();
+        c.palm(s, hands, n, held ? 12 : 13, fwd.clone().addScaledVector(V3(0, 1, 0), 0.4), { kind: held ? "cup" : "open" });
+      }
+    }
+    void wall;
+  },
+};
+
+/** Air bike: seated, pedalling, both hands on the moving levers (not in the demonstrated set, kept for the audit). */
+const airBike: Spec = {
+  build: () => [makeAirBike()],
+  frame(c, [bike]) {
+    const b = bike as ReturnType<typeof makeAirBike>;
+    bike!.place(V3(c.goals.pelvis.pos.x + 8, 0, 0));
+    b.set(c.phase * 2);
+    for (const s of SIDES) {
+      const h = bike!.handle(s);
+      c.hold(s, h, h.axis.clone(), { kind: "wrap", radius: 1.8 });
+    }
+  },
+};
+
+export const SPECS: Record<string, Spec> = {
+  "push-press": pushPress,
+  "kettlebell-swing": kettlebellSwing,
+  "lateral-raise": lateralRaise,
+  "farmers-carry": farmersCarry,
+  "running-intervals": runningIntervals,
+  "sled-push": sledPush,
+  "rowing-intervals": rowingIntervals,
+  "pallof-press": pallofPress,
+  "cable-woodchop": woodchop,
+  "medicine-ball-rotational-throw": rotationalThrow,
+  "air-bike-sprint": airBike,
+};
+
+/** Hands free, following the motion, no equipment: the fallback while an exercise has no spec of its own. */
+export const FALLBACK: Spec = {
+  frame(c) {
+    for (const s of SIDES) c.free(s, 90);
+  },
+};
+
+export const hasSpec = (slug: string) => slug in SPECS;
+export const specFor = (slug: string): Spec => SPECS[slug] ?? FALLBACK;
+void lateral;
+export type { Skeleton3 };
