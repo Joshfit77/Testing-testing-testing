@@ -11,6 +11,7 @@ import {
   makeDumbbell,
   makeKettlebell,
   makeMedball,
+  makeRack,
   makeRower,
   makeSled,
   makeFlexRope,
@@ -391,6 +392,74 @@ const overheadTricepsExtension: Spec = {
 };
 
 /**
+ * Inverted row: a bar resting on a rack's J-hooks at about hip height, the body straight beneath it from the heels to
+ * the shoulders, hands overhand a little wider than the shoulders, pulling the chest up to the bar. The bar stays put;
+ * the body moves (where the motion puts the bar and the hands).
+ */
+const invertedRow: Spec = {
+  build: () => [makeRack(), makeBarbell({ plates: false, grip: 27 })],
+  frame(c, [rack, bar]) {
+    const r = rack as ReturnType<typeof makeRack>;
+    const def = c.f?.props.find((p) => p.def.kind === "barbell")?.def as { at?: [number, number] } | undefined;
+    const at2 = def?.at ?? [0, 90];
+    const seat = c.lifted!.to3(at2 as [number, number]);
+    r.place(V3(seat.x, 0, 0));
+    r.setHooks(seat.y - 1.4);
+    const barAt = r.barAt();
+    bar!.place(barAt, new THREE.Quaternion());
+    // The body is a plank pivoting on the heels: the arms' bend (the motion's elbows, on the model's arms, which are a
+    // little longer than the drawing's) sets how far the shoulders are from the bar, and the whole body turns about
+    // the ankles until they are that far (straight arms hanging at the bottom, the chest to the bar at the top).
+    if (c.f) {
+      const sk = c.sk;
+      const el = (softMinDeg((c.f.pose.elR + c.f.pose.elL) / 2, 140) * Math.PI) / 180;
+      const J = sk.meta.joints.R;
+      const L1 = V3(...J.shoulder).distanceTo(V3(...J.elbow)), fore = V3(...J.elbow).distanceTo(V3(...J.wrist)) + 7;
+      const want = Math.sqrt(L1 * L1 + fore * fore + 2 * L1 * fore * Math.cos(el)) - 1.5;
+      const ankle = sk.pos[sk.i("footR")]!.clone().add(sk.pos[sk.i("footL")]!).multiplyScalar(0.5);
+      for (let it = 0; it < 3; it++) {
+        const sh = c.gh("R").add(c.gh("L")).multiplyScalar(0.5);
+        const dist = (a: number) => {
+          const p = sh.clone().sub(ankle).applyAxisAngle(V3(0, 0, 1), a).add(ankle);
+          return Math.hypot(p.x - barAt.x, p.y - barAt.y);
+        };
+        // Out from the pose as it stands, the way that brings the distance towards the one wanted, until it is passed;
+        // then halved down to it. (Over a wide range the shoulders swing past the bar and the distance turns back, so a
+        // search across the whole range can land on the wrong side.)
+        const f = (a: number) => dist(a) - want;
+        const grows = dist(0.01) > dist(-0.01) ? 1 : -1;
+        const dir = f(0) > 0 ? -grows : grows;
+        let lo = 0, hi = 0;
+        for (let k = 1; k <= 35; k++) {
+          hi = dir * k * 0.02;
+          if (Math.sign(f(hi)) !== Math.sign(f(0))) break;
+          lo = hi;
+        }
+        for (let k = 0; k < 30; k++) {
+          const mid = (lo + hi) / 2;
+          if (Math.sign(f(mid)) === Math.sign(f(0))) lo = mid;
+          else hi = mid;
+        }
+        const a = (lo + hi) / 2;
+        if (Math.abs(a) < 1e-4) break;
+        const q = new THREE.Quaternion().setFromAxisAngle(V3(0, 0, 1), a);
+        const g = c.goals;
+        g.pelvis.pos.sub(ankle).applyQuaternion(q).add(ankle);
+        g.pelvis.rot.premultiply(q);
+        g.chest.premultiply(q);
+        g.head.premultiply(q);
+        // (The feet turn with the body on their heels.)
+        for (const s of SIDES) g.legs[s].foot?.premultiply(q);
+        c.presolve();
+      }
+    }
+    for (const s of SIDES) c.hold(s, bar!.handle(s), medial(s));
+  },
+};
+/** A smooth minimum of an angle and a limit (degrees). */
+const softMinDeg = (x: number, m: number, w = 6) => m - w * Math.log1p(Math.exp((m - x) / w));
+
+/**
  * Rowing machine, authored in 3D (the 2D motion's finish keeps the elbows under the shoulders, which no overhand grip
  * can follow): catch with the shins upright and the arms long; the drive in order, legs, then the trunk swinging back,
  * then the arms drawing the handle to the lower ribs with the elbows past the body; the recovery in the reverse order.
@@ -664,6 +733,7 @@ export const SPECS: Record<string, Spec> = {
   "cable-chest-fly": cableChestFly,
   "sumo-deadlift": sumoDeadlift,
   "overhead-triceps-extension": overheadTricepsExtension,
+  "inverted-row": invertedRow,
 };
 
 /** Hands free, following the motion, no equipment: the fallback while an exercise has no spec of its own. */

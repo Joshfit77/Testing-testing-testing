@@ -429,6 +429,47 @@ export function makeSled(o: { posts?: boolean; gripY?: number } = {}): Piece & {
   return p;
 }
 
+/**
+ * A squat rack: two uprights either side (local z ±62), a crossbar on top, feet on the floor, and a J-hook on each
+ * upright at `hookY` (the bar rests on the hooks, its axis at local x = 0 and height hookY + the bar's radius).
+ */
+export function makeRack(hookY = 90): Piece & { setHooks(y: number): void; barAt(): THREE.Vector3 } {
+  const p = new Piece("rack") as Piece & { setHooks(y: number): void; barAt(): THREE.Vector3 };
+  const H = 215, Z = 62;
+  for (const k of [-1, 1]) {
+    const up = box(7, H, 7, M.frame);
+    up.position.set(-8, H / 2, k * Z);
+    const stripe = box(0.6, H - 15, 7.2, M.gold);
+    stripe.position.set(-4.2, H / 2, k * Z);
+    const foot = box(70, 4, 8, M.frame);
+    foot.position.set(-8, 2, k * Z);
+    p.obj.add(up, stripe, foot);
+    p.solids.push({ a: V3(-8, 0, k * Z), b: V3(-8, H, k * Z), r: 4.5, flat: true });
+  }
+  const top = box(7, 6, 2 * Z + 7, M.frame);
+  top.position.set(-8, H - 3, 0);
+  p.obj.add(top);
+  const hooks = new THREE.Group();
+  for (const k of [-1, 1]) {
+    // A J: a plate out from the upright, the bar's seat, and a lip in front.
+    const arm = box(12, 3, 6, M.gold);
+    arm.position.set(-1, -1.5, k * Z);
+    const lip = box(2, 6, 6, M.gold);
+    lip.position.set(4, 1.5, k * Z);
+    hooks.add(arm, lip);
+  }
+  p.obj.add(hooks);
+  let y = hookY;
+  p.setHooks = (h: number) => {
+    y = h;
+    hooks.position.y = h;
+    p.obj.updateMatrixWorld(true);
+  };
+  p.barAt = () => V3(0, y + 1.4, 0).applyQuaternion(p.obj.quaternion).add(p.obj.position);
+  p.setHooks(hookY);
+  return p;
+}
+
 /** A wall (a slab facing -X at local x = 0), for throws and wall drills. */
 export function makeWall(w = 260, h = 260): Piece {
   const p = new Piece("wall");
