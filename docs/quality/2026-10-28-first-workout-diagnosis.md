@@ -59,6 +59,7 @@ on screen or reproduced by running the code; "suggestion" items were not. Line n
 ## Tests
 
 - Unit: `tests/unit/workout-draft-session.test.ts` (new, 10), `tests/unit/training-schedule.test.ts` (rest-day cases) — full unit suite 2,665 passing.
+- Integration (local Supabase): 185 passing, 1 skipped (`tests/integration/workouts.test.ts` covers finish idempotency, records, program advance).
 - Type check and lint: clean.
 - E2E: `e2e/workout-reliability.spec.ts` (new) and `e2e/core-flow.spec.ts` (updated expectations) — results recorded below once run against the rebuilt demo.
 

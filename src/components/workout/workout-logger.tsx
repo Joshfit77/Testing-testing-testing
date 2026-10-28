@@ -314,12 +314,17 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
     setDraft((d) => (d ? workoutReducer(d, action) : d));
   }, []);
 
-  // Native: schedule a local notification for the end of rest so it fires while the app is backgrounded.
+  // Native: schedule a local notification for the end of rest so it fires while the app is backgrounded (only when
+  // the member wants rest alerts at all), naming the exercise the next set is on.
   const restEndsAt = draft?.rest.endsAt ?? null;
+  const nextName = draft ? (draft.exercises.find((e) => e.id === nextUp(draft)?.exerciseKey)?.name ?? null) : null;
+  const wantsAlert = alerts.sound || alerts.vibrate;
   useEffect(() => {
-    if (restEndsAt) void scheduleRestNotification(restEndsAt);
+    if (restEndsAt && wantsAlert) void scheduleRestNotification(restEndsAt, nextName ?? undefined);
     else void cancelRestNotification();
-  }, [restEndsAt]);
+    // (The exercise name only matters at scheduling time.)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restEndsAt, wantsAlert]);
 
   // Rest timer completion feedback.
   const rest = draft ? restRemaining(draft, now) : 0;
