@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { Maximize2 } from "lucide-react";
 import {
   Dialog,
@@ -10,6 +11,10 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { ExerciseMeta } from "@/lib/exercise-motion/types";
+import { has3dDemo } from "@/lib/anatomy3d/in-app";
+
+// The 3D anatomical figure, for the exercises in src/lib/anatomy3d/in-app.ts; loaded only when one is opened.
+const ExerciseDemo3D = dynamic(() => import("./exercise-demo-3d").then((m) => m.ExerciseDemo3D), { ssr: false });
 
 type MotionModule = typeof import("@/lib/exercise-motion");
 
@@ -126,16 +131,20 @@ export function ExerciseDemoMini({
           <DialogDescription className="sr-only">
             Animated demonstration of {name}
           </DialogDescription>
-          {open && (
+          {open && has3dDemo(slug) ? (
+            <ExerciseDemo3D slug={slug} name={name} meta={meta} className="mt-3 aspect-[4/3] w-full rounded-xl" />
+          ) : open ? (
             <ExerciseDemo
               slug={slug}
               name={name}
               meta={meta}
               className="mt-3 aspect-video w-full rounded-xl"
             />
-          )}
+          ) : null}
           <p className="mt-2 text-[0.6875rem] text-muted-foreground">
-            Animated illustration of the movement — not filmed video.
+            {has3dDemo(slug)
+              ? "3D anatomical figure performing the movement — a computer model, not filmed video. Drag to turn it, pinch to zoom."
+              : "Animated illustration of the movement — not filmed video."}
           </p>
         </DialogContent>
       </Dialog>
