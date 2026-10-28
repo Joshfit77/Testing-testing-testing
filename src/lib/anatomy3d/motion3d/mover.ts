@@ -1,7 +1,6 @@
 import * as THREE from "three";
 import { getMotion } from "../../exercise-motion";
-import { bindModel, type BoundBody } from "../body/bind-model";
-import type { RigMeta } from "../body/skeleton";
+import { bindModel, type BoundBody, type RigFiles } from "../body/bind-model";
 import type { SolveReport } from "../body/solve";
 import { effortCurve, type EffortCurve } from "../effort";
 import type { PlayerExercise } from "../player";
@@ -50,7 +49,7 @@ export interface Mover3 {
 export function moveModel3(
   scene: THREE.Scene,
   model: THREE.Object3D,
-  o: { ex: PlayerExercise; rig: { meta: RigMeta; data: ArrayBuffer; baked?: ArrayBuffer | Baked }; reducedMotion?: boolean },
+  o: { ex: PlayerExercise; rig: RigFiles & { baked?: ArrayBuffer | Baked }; reducedMotion?: boolean },
   changed: () => void,
 ): Mover3 {
   const bound = bindModel(model, o.rig);

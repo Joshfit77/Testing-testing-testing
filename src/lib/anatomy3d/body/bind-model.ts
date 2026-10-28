@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { applyDualQuaternionSkinning } from "./dqs";
+import { attachCorrectives, Correctives, type CorrectiveMeta } from "./correctives";
 import { Skeleton3, type RigMeta } from "./skeleton";
 
 /**
@@ -18,9 +19,18 @@ export interface BoundBody {
   parts: Map<string, THREE.SkinnedMesh>;
   /** The rig frame from the file frame. */
   fileToRig: THREE.Matrix4;
+  /** The pose-space corrective shapes, when given (public/anatomy/ecorche-correctives.*). */
+  correctives: Correctives | null;
 }
 
-export function bindModel(model: THREE.Object3D, rig: { meta: RigMeta; data: ArrayBuffer }): BoundBody {
+export interface RigFiles {
+  meta: RigMeta;
+  data: ArrayBuffer;
+  /** Corrective shapes for the shoulders and hips (body/correctives.ts); without them the skinning alone. */
+  correctives?: { meta: CorrectiveMeta; data: ArrayBuffer };
+}
+
+export function bindModel(model: THREE.Object3D, rig: RigFiles): BoundBody {
   const sk = new Skeleton3(rig.meta);
   const { bones, skeleton } = sk.makeThree();
   const fileToRig = sk.fileToRig();
@@ -33,6 +43,10 @@ export function bindModel(model: THREE.Object3D, rig: { meta: RigMeta; data: Arr
   });
   if (meshes.length !== rig.meta.meshes.length) throw new Error(`rig weights are for ${rig.meta.meshes.length} parts, the file has ${meshes.length}`);
   const entryOf = new Map(meshes.map((m, i) => [m as THREE.Object3D, rig.meta.meshes[i]!]));
+  const indexOf = new Map(meshes.map((m, i) => [m as THREE.Object3D, i]));
+  /** The rig's parts as skinned meshes, in the rig's order (the correctives name them by index). */
+  const rigMeshes: (THREE.SkinnedMesh | null)[] = meshes.map(() => null);
+  const skinned: THREE.SkinnedMesh[] = [];
   const parts = new Map<string, THREE.SkinnedMesh>();
   const materials = new Set<THREE.Material>();
   for (const m of [...meshes, ...extra]) {
@@ -65,21 +79,32 @@ export function bindModel(model: THREE.Object3D, rig: { meta: RigMeta; data: Arr
     m.parent!.add(sm);
     m.parent!.remove(m);
     for (const mat of [sm.material].flat()) materials.add(mat);
-    if (!m.userData.faceFor && !m.userData.faceShell) parts.set(m.name, sm);
+    skinned.push(sm);
+    if (!m.userData.faceFor && !m.userData.faceShell) {
+      parts.set(m.name, sm);
+      rigMeshes[indexOf.get(m)!] = sm;
+    }
   }
   model.updateMatrixWorld(true);
   model.traverse((m) => {
     if (m instanceof THREE.SkinnedMesh) m.bind(skeleton, fileToRig.clone().multiply(m.matrixWorld));
   });
   for (const mat of materials) applyDualQuaternionSkinning(mat);
+  let correctives: Correctives | null = null;
+  if (rig.correctives) {
+    correctives = new Correctives(rig.correctives.meta, rig.correctives.data);
+    attachCorrectives(correctives, skinned, rigMeshes, materials);
+  }
   return {
     sk,
     bones,
     skeleton,
     parts,
     fileToRig,
+    correctives,
     update() {
       sk.write(bones);
+      correctives?.update(sk);
     },
   };
 }

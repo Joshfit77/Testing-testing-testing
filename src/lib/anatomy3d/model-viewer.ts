@@ -11,8 +11,7 @@ import { muscleId, MUSCLE_ID_COUNT, NO_MUSCLE, regionOf, sideOf, type Region } f
 import { muscleTargets } from "./muscle-map";
 import type { CameraView, PlayerExercise } from "./player";
 import { jointsFromFrame, poseBones } from "./rig";
-import { bindModel, type BoundBody } from "./body/bind-model";
-import type { RigMeta } from "./body/skeleton";
+import { bindModel, type BoundBody, type RigFiles } from "./body/bind-model";
 import { solvePose, type PoseGoals, type SolveReport } from "./body/solve";
 import { moveModel3, type Mover3 } from "./motion3d/mover";
 
@@ -117,7 +116,7 @@ export async function mountModel(
     /** The anatomical rig (public/anatomy/ecorche-rig.*): with an exercise, the model performs it on this rig (its
      *  own equipment, hands on the handles); without one, it can be posed from goals. */
     /** The anatomical rig, and the exercise's baked motion if there is one (played instead of solving each frame). */
-    rig?: { meta: RigMeta; data: ArrayBuffer; baked?: ArrayBuffer };
+    rig?: RigFiles & { baked?: ArrayBuffer };
   },
 ): Promise<ModelViewer> {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: "high-performance" });

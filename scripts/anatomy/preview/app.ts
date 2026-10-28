@@ -1,9 +1,11 @@
 import { mountAthlete, type CameraView } from "../../../src/lib/anatomy3d/player";
 import { mountModel, type ModelFace, type ModelSkin } from "../../../src/lib/anatomy3d/model-viewer";
-import type { RigMeta } from "../../../src/lib/anatomy3d/body/skeleton";
+import { attachControls } from "../../../src/lib/anatomy3d/controls";
+import type { RigFiles } from "../../../src/lib/anatomy3d/body/bind-model";
 import { REGION_LABELS, type Region } from "../../../src/lib/anatomy3d/muscle-ids";
 import { EXERCISES } from "../../../src/data/exercises";
 import { getMotion } from "../../../src/lib/exercise-motion";
+import { hasSpec } from "../../../src/lib/anatomy3d/motion3d/specs";
 
 declare global {
   interface Window {
@@ -18,6 +20,8 @@ declare global {
     FACE_PARTS?: string[];
     /** The same for the anatomical rig's weights (anatomy/ecorche-rig.bin). */
     RIG_PARTS?: string[];
+    /** The same for the shoulder and hip corrective shapes (anatomy/ecorche-correctives.bin), when built. */
+    CORR_PARTS?: string[];
     BAKE_PARTS?: Record<string, string[]>;
     modelVerified?: boolean;
     exerciseView?: string;
@@ -66,8 +70,27 @@ async function fetchBinary(url: string, parts: string[] | undefined, onProgress:
   return bytes.buffer;
 }
 
-// ?ex=<slug> previews another exercise (for deformation checks); the page layout is written for the back squat.
-const ex = EXERCISES.find((e) => e.slug === new URLSearchParams(location.search).get("ex")) ?? EXERCISES.find((e) => e.slug === "back-squat")!;
+// ?ex=<slug> previews another exercise (for deformation checks), or #<slug> where the page cannot take a query (the
+// artifact); without either, the kettlebell swing (the first exercise with a 3D motion of its own in the app).
+const wantedSlug = new URLSearchParams(location.search).get("ex") ?? (location.hash.length > 1 ? decodeURIComponent(location.hash.slice(1)) : null);
+const ex = EXERCISES.find((e) => e.slug === wantedSlug) ?? EXERCISES.find((e) => e.slug === "kettlebell-swing")!;
+// The picker: the exercises with a 3D motion of their own; choosing one reloads the page on it.
+{
+  const pick = document.querySelector<HTMLSelectElement>("#pick");
+  if (pick) {
+    for (const e of EXERCISES.filter((e) => hasSpec(e.slug))) {
+      const o = document.createElement("option");
+      o.value = e.slug;
+      o.textContent = e.name;
+      o.selected = e.slug === ex.slug;
+      pick.append(o);
+    }
+    pick.addEventListener("change", () => {
+      location.hash = pick.value;
+      location.reload();
+    });
+  }
+}
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
 const fmt = (s: number) => `0:${String(Math.floor(s)).padStart(2, "0")}`;
 
@@ -77,42 +100,6 @@ const STEPS = [
   { key: "bottom", title: "Bottom", text: "Thighs at or just below parallel, heels down, core tight." },
   { key: "lifting", title: "Ascent", text: "Drive through the whole foot, stand tall, squeeze the glutes. Breathe out at the top." },
 ] as const;
-
-/** One finger (or the mouse) turns the figure all the way round; two fingers pinch to zoom (and, in the model view,
- *  drag up or down to move along the body); the wheel zooms too. */
-function attachControls(canvas: HTMLCanvasElement, c: { orbit(dYaw: number, dPitch: number): void; zoom(f: number): void; pan?(dh: number): void }) {
-  canvas.style.touchAction = "none";
-  const touches = new Map<number, { x: number; y: number }>();
-  const pair = () => {
-    const [a, b] = [...touches.values()];
-    return a && b ? { spread: Math.hypot(a.x - b.x, a.y - b.y), midY: (a.y + b.y) / 2 } : null;
-  };
-  canvas.addEventListener("pointerdown", (e) => {
-    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    canvas.setPointerCapture(e.pointerId);
-  });
-  canvas.addEventListener("pointermove", (e) => {
-    const prev = touches.get(e.pointerId);
-    if (!prev) return;
-    if (touches.size >= 2) {
-      const before = pair();
-      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      const after = pair();
-      if (before && after && before.spread > 0 && after.spread > 0) c.zoom(before.spread / after.spread);
-      if (before && after && c.pan) c.pan((after.midY - before.midY) / Math.max(1, canvas.clientHeight));
-      return;
-    }
-    c.orbit((e.clientX - prev.x) * 0.008, (e.clientY - prev.y) * 0.004);
-    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
-  });
-  const lift = (e: PointerEvent) => touches.delete(e.pointerId);
-  canvas.addEventListener("pointerup", lift);
-  canvas.addEventListener("pointercancel", lift);
-  canvas.addEventListener("wheel", (e) => {
-    e.preventDefault();
-    c.zoom(Math.exp(e.deltaY * 0.0012));
-  }, { passive: false });
-}
 
 /** The original Écorché model in the player: the model itself performing the exercise, with rotation and zoom. */
 async function runModel() {
@@ -157,8 +144,14 @@ async function runModel() {
     // white.
     const look = q.get("look") === "original" ? "original" : "gold";
     // The anatomical rig (its own equipment, hands on the handles); ?rig=old shows the first rig for comparison.
-    const rig: { meta: RigMeta; data: ArrayBuffer; baked?: ArrayBuffer } | undefined =
+    const rig: RigFiles & { baked?: ArrayBuffer } | undefined =
       q.get("rig") === "old" ? undefined : { meta: await (await fetch("anatomy/ecorche-rig.json")).json(), data: await fetchBinary("anatomy/ecorche-rig.bin", window.RIG_PARTS, () => {}) };
+    // The shoulder and hip corrective shapes (scripts/anatomy/build-ecorche-correctives.mts), when built; ?correctives=0
+    // shows the skinning alone (the "before" of a comparison).
+    if (rig && q.get("correctives") !== "0")
+      rig.correctives = await Promise.all([fetch("anatomy/ecorche-correctives.json").then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status))))), fetchBinary("anatomy/ecorche-correctives.bin", window.CORR_PARTS, () => {})])
+        .then(([meta, data]) => ({ meta, data }))
+        .catch(() => undefined);
     // The exercise's baked motion when there is one (?live=1 solves every frame instead, as the checks do).
     // (In the artifact the bakes are text parts, listed by exercise; an exercise not listed has none.)
     if (rig && q.get("live") !== "1" && (!window.BAKE_PARTS || window.BAKE_PARTS[ex.slug]))

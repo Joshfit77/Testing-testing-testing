@@ -17,10 +17,11 @@
  * Writes <out>/<slug>.json and <out>/summary.json, and prints a table. What these checks cannot see (whether a grip
  * looks right, whether a movement reads as the exercise) is left to the visual review.
  */
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import * as THREE from "three";
 import { EXERCISES } from "../../../src/data/exercises";
 import { getMotion } from "../../../src/lib/exercise-motion";
+import { Correctives, type CorrectiveMeta } from "../../../src/lib/anatomy3d/body/correctives";
 import { dqOf, dqSkin, lbsSkin } from "../../../src/lib/anatomy3d/body/dqs";
 import { Skeleton3, type RigMeta } from "../../../src/lib/anatomy3d/body/skeleton";
 import { bake, playBaked, settle } from "../../../src/lib/anatomy3d/motion3d/bake";
@@ -40,6 +41,9 @@ const OUT = opt("out", "docs/anatomy3d/qa");
 // --baked: also bake each motion (as the app plays it) and run the body checks on the baked, interpolated poses, with
 // how far they stray from the live solve between frames.
 const BAKED = args.includes("--baked") ? (args.splice(args.indexOf("--baked"), 1), true) : false;
+// --no-correctives: the skinning alone, without the shoulder and hip corrective shapes (the viewer applies them when
+// public/anatomy/ecorche-correctives.* exist).
+const NO_CORR = args.includes("--no-correctives") ? (args.splice(args.indexOf("--no-correctives"), 1), true) : false;
 const slugs = args.length ? args : EXERCISES.map((e) => e.slug);
 mkdirSync(OUT, { recursive: true });
 
@@ -52,6 +56,11 @@ const meta = JSON.parse(readFileSync("public/anatomy/ecorche-rig.json", "utf8"))
 const bin = new Uint8Array(readFileSync("public/anatomy/ecorche-rig.bin"));
 const probe = new Skeleton3(meta);
 const fileToRig = probe.fileToRig();
+const correctives: Correctives | null =
+  !NO_CORR && existsSync("public/anatomy/ecorche-correctives.json")
+    ? new Correctives(JSON.parse(readFileSync("public/anatomy/ecorche-correctives.json", "utf8")) as CorrectiveMeta, new Uint8Array(readFileSync("public/anatomy/ecorche-correctives.bin")).buffer as ArrayBuffer)
+    : null;
+if (correctives) console.log(`with the corrective shapes (${correctives.meta.rows} rows, ${correctives.meta.regions.map((r) => r.name).join(", ")})`);
 
 /** Rest positions (rig frame), weights and triangles of every part, decimated for speed (every vertex kept; edges of
  *  all triangles). */
@@ -65,6 +74,8 @@ interface Part {
   main: Uint8Array;
   /** Skinned linearly (as the viewer does for the rig's band muscles). */
   linear: boolean;
+  /** Per vertex, its corrective row, or -1. */
+  row: Int32Array;
 }
 const parts: Part[] = [];
 {
@@ -91,8 +102,11 @@ const parts: Part[] = [];
       main[i] = idx[i * 4 + best]!;
     }
     const tris = o.geometry.index ? Uint32Array.from(o.geometry.index.array) : Uint32Array.from({ length: p.count }, (_, i) => i);
+    const row = new Int32Array(p.count).fill(-1);
+    const rows = correctives?.rowsOf(k - 1);
+    if (correctives && rows) for (let r = rows.offset; r < rows.offset + rows.count; r++) row[correctives.vertex[r]!] = r;
     // Hidden parts (the face covers them) are not checked.
-    if (o.visible) parts.push({ name: o.name, pos, idx, wt, tris, main, linear: !!e.linear });
+    if (o.visible) parts.push({ name: o.name, pos, idx, wt, tris, main, linear: !!e.linear, row });
   });
 }
 const handBones = (s: "R" | "L") => new Set(probe.names.map((n, i) => [n, i] as const).filter(([n]) => n.endsWith(s) && /^(hand|thumb|index|middle|ring|little|radius)/.test(n)).map(([, i]) => i));
@@ -218,7 +232,9 @@ for (const slug of slugs) {
     // Skin the body for this sample.
     const mats = sk.names.map((_, b) => new THREE.Matrix4().compose(sk.pos[b]!, sk.rot[b]!, new THREE.Vector3(1, 1, 1)).multiply(new THREE.Matrix4().compose(sk.restPos[b]!, sk.restRot[b]!, new THREE.Vector3(1, 1, 1)).invert()).elements);
     const dqs = mats.map((e) => dqOf(e));
+    correctives?.update(sk);
     const out: [number, number, number] = [0, 0, 0];
+    const p: [number, number, number] = [0, 0, 0];
     const solids = perf.pieces.flatMap((p) => p.solidsWorld().map((s) => ({ ...s, piece: p.kind })));
     const held = new Set<number>();
     for (const c of perf.contacts()) for (const b of HANDS[c.side]) held.add(b);
@@ -230,7 +246,11 @@ for (const slug of slugs) {
       const now = new Float32Array(N * 3);
       skinnedParts.push(now);
       for (let v = 0; v < N; v++) {
-        (part.linear ? lbsSkin : dqSkin)((part.linear ? mats : dqs) as never, part.idx.subarray(v * 4, v * 4 + 4), part.wt.subarray(v * 4, v * 4 + 4), [part.pos[v * 3]!, part.pos[v * 3 + 1]!, part.pos[v * 3 + 2]!], out);
+        p[0] = part.pos[v * 3]!;
+        p[1] = part.pos[v * 3 + 1]!;
+        p[2] = part.pos[v * 3 + 2]!;
+        if (correctives && part.row[v]! >= 0) correctives.add(part.row[v]!, p);
+        (part.linear ? lbsSkin : dqSkin)((part.linear ? mats : dqs) as never, part.idx.subarray(v * 4, v * 4 + 4), part.wt.subarray(v * 4, v * 4 + 4), p, out);
         now.set(out, v * 3);
         if (out[1] < lowest) lowest = out[1];
         const mb = part.main[v]!;

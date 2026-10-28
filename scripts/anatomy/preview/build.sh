@@ -12,6 +12,8 @@ cp "$ROOT/public/anatomy/ecorche.glb" "$ROOT/public/anatomy/ecorche-skin.bin" "$
   "$ROOT/public/anatomy/ecorche-face.bin" "$ROOT/public/anatomy/ecorche-face.json" \
   "$ROOT/public/anatomy/ecorche-rig.bin" "$ROOT/public/anatomy/ecorche-rig.json" \
   "$ROOT/public/anatomy/athlete-raw.bin" "$ROOT/public/anatomy/athlete-raw.json" "$OUT/anatomy/"
+# The shoulder and hip corrective shapes (scripts/anatomy/build-ecorche-correctives.mts), when built.
+cp "$ROOT"/public/anatomy/ecorche-correctives.* "$OUT/anatomy/" 2>/dev/null || true
 # Baked motions (scripts/anatomy/bake-motions.mts), when there are any.
 mkdir -p "$OUT/anatomy/bake"
 cp "$ROOT"/public/anatomy/bake/*.ngb "$OUT/anatomy/bake/" 2>/dev/null || true
@@ -37,13 +39,16 @@ face = base64.b64encode(open(f"{out}/anatomy/ecorche-face.bin", "rb").read()).de
 open(f"{out}/anatomy/ecorche-face.txt", "w").write(face)
 rig = base64.b64encode(open(f"{out}/anatomy/ecorche-rig.bin", "rb").read()).decode()
 open(f"{out}/anatomy/ecorche-rig.txt", "w").write(rig)
+corr = os.path.exists(f"{out}/anatomy/ecorche-correctives.bin")
+if corr:
+    open(f"{out}/anatomy/ecorche-correctives.txt", "w").write(base64.b64encode(open(f"{out}/anatomy/ecorche-correctives.bin", "rb").read()).decode())
 import glob, json
 bakes = {}
 for f in sorted(glob.glob(f"{out}/anatomy/bake/*.ngb")):
     slug = os.path.basename(f)[:-4]
     open(f"{out}/anatomy/bake/{slug}.txt", "w").write(base64.b64encode(open(f, "rb").read()).decode())
     bakes[slug] = [f"anatomy/bake/{slug}.txt"]
-parts = "<script>window.ECORCHE_PARTS = " + str(names).replace("'", '"') + '; window.SKIN_PARTS = ["anatomy/ecorche-skin.txt"]; window.FACE_PARTS = ["anatomy/ecorche-face.txt"]; window.RIG_PARTS = ["anatomy/ecorche-rig.txt"]; window.BAKE_PARTS = ' + json.dumps(bakes) + ';</script>\n'
+parts = "<script>window.ECORCHE_PARTS = " + str(names).replace("'", '"') + '; window.SKIN_PARTS = ["anatomy/ecorche-skin.txt"]; window.FACE_PARTS = ["anatomy/ecorche-face.txt"]; window.RIG_PARTS = ["anatomy/ecorche-rig.txt"]; ' + ('window.CORR_PARTS = ["anatomy/ecorche-correctives.txt"]; ' if corr else '') + 'window.BAKE_PARTS = ' + json.dumps(bakes) + ';</script>\n'
 open(f"{out}/artifact.html", "w").write(body.replace("<script>", parts + "<script>", 1))
 PY
 echo "built $OUT/index.html"
