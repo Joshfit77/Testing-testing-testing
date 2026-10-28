@@ -1,4 +1,5 @@
-import { NextResponse, type NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
+import { redirectToPath } from "@/lib/relative-redirect";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { safeNextPath } from "@/lib/safe-redirect";
 
@@ -10,15 +11,13 @@ export async function GET(request: NextRequest) {
   const errorDescription = url.searchParams.get("error_description");
 
   if (errorDescription) {
-    return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(errorDescription)}`, url.origin));
+    return redirectToPath(`/login?error=${encodeURIComponent(errorDescription)}`);
   }
   if (code) {
     const supabase = await getServerSupabase();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) return NextResponse.redirect(new URL(next, url.origin));
+    if (!error) return redirectToPath(next);
   }
   // Exchange can fail when the link is opened in a different browser. The email is still confirmed.
-  return NextResponse.redirect(
-    new URL(`/login?notice=${encodeURIComponent("Your link was processed. Please sign in to continue.")}`, url.origin),
-  );
+  return redirectToPath(`/login?notice=${encodeURIComponent("Your link was processed. Please sign in to continue.")}`);
 }

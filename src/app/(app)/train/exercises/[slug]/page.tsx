@@ -17,8 +17,10 @@ import { BackLink } from "@/components/platform/back-link";
 
 export const metadata = { title: "Exercise" };
 
-export default async function ExerciseDetailPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function ExerciseDetailPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ from?: string }> }) {
   const { slug } = await params;
+  // Opened from the workout logger: Back returns to the workout (its draft is kept), not to the library.
+  const fromWorkout = (await searchParams).from === "workout";
   await requireOnboardedUser();
   const supabase = await getServerSupabase();
   const { data } = await supabase.from("exercises").select("*").eq("slug", slug).maybeSingle();
@@ -37,7 +39,7 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
 
   return (
     <div className="space-y-6">
-      <BackLink href="/train/exercises">Exercise library</BackLink>
+      <BackLink href={fromWorkout ? "/train/workout" : "/train/exercises"}>{fromWorkout ? "Back to workout" : "Exercise library"}</BackLink>
 
       <header>
         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gold">{titleCase(ex.category)}</p>

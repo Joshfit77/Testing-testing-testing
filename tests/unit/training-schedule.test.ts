@@ -8,7 +8,7 @@ const pending: PendingSession[] = [
   { dayId: "d3", week: 1, day: 3, name: "Full Body C", minutes: 45 },
   { dayId: "d4", week: 2, day: 1, name: "Full Body A", minutes: 45 },
 ];
-const plan = (overrides: Record<string, string> = {}, completedToday = false) => planSchedule({ pending, overrides, today: TODAY, daysPerWeek: 3, completedToday });
+const plan = (overrides: Record<string, string> = {}, lastCompleted: string | null = null) => planSchedule({ pending, overrides, today: TODAY, daysPerWeek: 3, lastCompleted });
 
 describe("planned session dates", () => {
   it("puts the next session today and the rest on the usual training days", () => {
@@ -17,7 +17,16 @@ describe("planned session dates", () => {
   });
 
   it("plans the next session for the next training day once a workout was done today", () => {
-    expect(plan({}, true)[0]!.date).toBe("2026-10-23");
+    expect(plan({}, TODAY)[0]!.date).toBe("2026-10-23");
+  });
+
+  it("the day after a workout is a rest day: the next session waits for the next training day", () => {
+    // Trained Monday the 19th; Wednesday is the next training day, so Tuesday would have been a rest day.
+    expect(plan({}, "2026-10-19").map((s) => s.date)).toEqual(["2026-10-21", "2026-10-23", "2026-10-26", "2026-10-28"]);
+    // Trained Tuesday the 20th (off the usual days): Wednesday is still the next training day.
+    expect(plan({}, "2026-10-20")[0]!.date).toBe("2026-10-21");
+    // Trained Wednesday the 14th and missed Friday and Monday: the overdue session rolls forward to today.
+    expect(plan({}, "2026-10-14")[0]!.date).toBe(TODAY);
   });
 
   it("an override moves a planned session, and later ones flow after it", () => {

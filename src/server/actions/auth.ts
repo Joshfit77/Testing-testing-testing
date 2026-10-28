@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { publicEnv } from "@/lib/env";
 import { actionError, actionInvalid, actionOk, type ActionState } from "@/lib/action-state";
+import { isValidTimeZone } from "@/lib/domain/dates";
 import { safeNextPath } from "@/lib/safe-redirect";
 import { emailSchema, newPasswordSchema, resetRequestSchema, signInSchema, signUpSchema } from "@/lib/validation/schemas";
 import { signupAcceptances } from "@/lib/legal/versions";
@@ -46,6 +47,14 @@ export async function signInAction(_prev: ActionState, formData: FormData): Prom
     }
     if (error.status === 429) return actionError("Too many attempts. Please wait a minute and try again.");
     return actionError("Incorrect email or password.");
+  }
+  // A profile that never learned its time zone (accounts from before it was captured) takes the device's now.
+  const tz = formData.get("timezone");
+  if (isValidTimeZone(tz)) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) await supabase.from("profiles").update({ timezone: tz }).eq("id", user.id).eq("timezone", "UTC");
   }
   redirect(safeNextPath(formData.get("next")));
 }

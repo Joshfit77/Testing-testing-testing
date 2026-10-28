@@ -15,11 +15,13 @@ import type { UnitSystem } from "@/lib/domain/types";
 import { formatDuration, formatWeight } from "@/lib/domain/units";
 import {
   createDraft,
+  draftAgeHours,
   draftSummary,
   elapsedSeconds,
   migrateDraft,
   newerDraft,
   nextUp,
+  STALE_DRAFT_HOURS,
   supersetMembers,
   restRemaining,
   workoutReducer,
@@ -30,8 +32,8 @@ import {
   type WorkoutDraft,
 } from "@/lib/domain/workout-draft";
 import { cancelRestNotification, hapticSuccess, scheduleRestNotification } from "@/lib/native";
-import { clearLocalDraft, loadLocalDraft, saveLocalDraft } from "@/lib/workout-storage";
-import { discardWorkoutAction, finishWorkoutAction, previousPerformanceAction, syncWorkoutDraftAction, type UnlockedBadge } from "@/server/actions/workouts";
+import { clearLocalDraft, clearPendingDiscard, loadLocalDraft, loadPendingDiscard, saveLocalDraft, savePendingDiscard } from "@/lib/workout-storage";
+import { discardWorkoutAction, finishWorkoutAction, previousPerformanceAction, syncWorkoutDraftAction, type NextSession, type UnlockedBadge } from "@/server/actions/workouts";
 import { updateRestAlertsAction } from "@/server/actions/rest-alerts";
 import { createTemplateAction } from "@/server/actions/templates";
 import { lastTimeText, targetText, type PreviousPerformance } from "@/lib/domain/previous-performance";
@@ -73,9 +75,20 @@ type SyncState = "idle" | "saving" | "synced" | "local";
 
 interface FinishResult {
   volumeKg: number;
-  records: { exerciseId: string; recordType: string; value: number }[];
+  records: { exerciseId: string; recordType: string; value: number; first?: boolean }[];
   badges: UnlockedBadge[];
   durationSeconds: number;
+  /** What the program has next, so the member leaves knowing what to do. */
+  next: NextSession | null;
+}
+
+/** A second tap on Done within this time is the same tap (a bounce, a shaky hand), not an undo. */
+const DOUBLE_TAP_MS = 700;
+
+function ageText(hours: number): string {
+  if (hours < 24) return `${Math.round(hours)} hour${Math.round(hours) === 1 ? "" : "s"} ago`;
+  const days = Math.round(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
 }
 
 const RECORD_LABEL: Record<string, string> = {
@@ -138,6 +151,14 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
   const [templateState, setTemplateState] = useState<{ saving: boolean; error: string | null; savedId: string | null }>({ saving: false, error: null, savedId: null });
   const restWasRunning = useRef(false);
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Nothing is saved (here or on the server) until the member has done something: opening the logger to look at
+  // the session and leaving again must not leave a "Resume workout" behind.
+  const touched = useRef(false);
+  const latest = useRef<WorkoutDraft | null>(null);
+  const retryDelay = useRef(0);
+  const lastToggle = useRef(new Map<string, number>());
+  const prefilled = useRef(new Set<string>());
+  const [staleHours, setStaleHours] = useState<number | null>(null);
 
   const catalogById = useMemo(() => new Map(catalog.map((c) => [c.id, c])), [catalog]);
 
@@ -151,17 +172,33 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
 
   // Restore on mount: prefer the most recently updated of local and server drafts.
   useEffect(() => {
-    const local = loadLocalDraft(userId);
+    // A discard the server never heard about (offline at the time): finish it now, and don't bring that draft back.
+    const pendingDiscard = loadPendingDiscard(userId);
+    let local = loadLocalDraft(userId);
     // Drafts saved by an older version of the app (v1) are migrated to the current format.
-    const server = migrateDraft(serverDraft);
+    let server = migrateDraft(serverDraft);
+    if (pendingDiscard) {
+      if (local?.clientId === pendingDiscard) {
+        clearLocalDraft(userId);
+        local = null;
+      }
+      if (server?.clientId === pendingDiscard) server = null;
+      void discardWorkoutAction(pendingDiscard)
+        .then((r) => r.ok && clearPendingDiscard(userId))
+        .catch(() => null);
+    }
     const existing = newerDraft(local, server);
     if (existing) {
       const wantsDifferentSession = template && (template.programDayId !== existing.programDayId || (template.templateId ?? null) !== (existing.templateId ?? null));
-      if (wantsDifferentSession) {
+      // A draft from hours or days ago is not resumed silently: the member says whether it is still this workout.
+      const age = draftAgeHours(existing, new Date().toISOString());
+      if (wantsDifferentSession || age >= STALE_DRAFT_HOURS) {
         setPendingExisting(existing);
+        setStaleHours(age >= STALE_DRAFT_HOURS ? age : null);
         setPhase("conflict");
         return;
       }
+      touched.current = true;
       setDraft(existing);
     } else {
       setDraft(freshFromTemplate());
@@ -196,18 +233,31 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
     setSync("saving");
     const res = await syncWorkoutDraftAction({
       clientId: d.clientId,
-      name: d.name || "Workout",
+      name: d.name.trim() || "Workout",
       startedAt: d.startedAt,
       userProgramId: d.userProgramId,
       programDayId: d.programDayId,
       draft: d as unknown as Record<string, unknown>,
     }).catch(() => ({ ok: false as const, error: "offline" }));
-    setSync(res.ok ? "synced" : "local");
+    if (res.ok) {
+      retryDelay.current = 0;
+      setSync("synced");
+      return;
+    }
+    setSync("local");
+    // Try again later, waiting longer each time (gym Wi-Fi with no internet behind it, a server hiccup) rather than
+    // hammering the connection; the next edit tries again sooner.
+    retryDelay.current = Math.min(120_000, retryDelay.current ? retryDelay.current * 3 : 5_000);
+    if (syncTimer.current) clearTimeout(syncTimer.current);
+    syncTimer.current = setTimeout(() => {
+      if (latest.current) void pushToServer(latest.current);
+    }, retryDelay.current);
   }, []);
 
-  // Persist every change locally immediately, and to the server (debounced).
+  // Persist every change locally immediately, and to the server (debounced), once the member has done something.
   useEffect(() => {
-    if (!draft || phase !== "active") return;
+    latest.current = draft;
+    if (!draft || phase !== "active" || !touched.current) return;
     const ok = saveLocalDraft(userId, draft);
     if (!ok) setError("This device couldn't store your workout locally. Keep this tab open until you finish.");
     if (syncTimer.current) clearTimeout(syncTimer.current);
@@ -216,6 +266,19 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
       if (syncTimer.current) clearTimeout(syncTimer.current);
     };
   }, [draft, phase, userId, pushToServer]);
+
+  // Empty fields take last time's numbers (the target's reps stay): the member corrects a value instead of typing
+  // every one. Only sets not yet done, and never a value already typed.
+  useEffect(() => {
+    if (!draft || phase !== "active") return;
+    for (const e of draft.exercises) {
+      const p = prev[e.exerciseId];
+      if (!p || prefilled.current.has(e.id)) continue;
+      prefilled.current.add(e.id);
+      const working = p.sets.filter((x) => x.completed && !x.isWarmup).map((x) => ({ reps: x.reps, weightKg: x.weightKg, durationSeconds: x.durationSeconds, distanceM: x.distanceM }));
+      if (working.length) setDraft((d) => (d ? workoutReducer(d, { type: "prefillFromPrevious", exerciseKey: e.id, sets: working }) : d));
+    }
+  }, [draft, prev, phase]);
 
   // "Last time" for exercises added during the workout (the page preloads the starting ones).
   const exerciseIds = draft ? draft.exercises.map((e) => e.exerciseId).join(",") : "";
@@ -234,13 +297,20 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
       .catch(() => missing.forEach((id) => asked.current.delete(id)));
   }, [exerciseIds]);
 
-  // Re-sync when coming back online.
+  // Re-sync when coming back online (on that change only: a failed attempt schedules its own retry).
   useEffect(() => {
-    if (online && draft && phase === "active" && sync === "local") void pushToServer(draft);
-  }, [online, draft, phase, sync, pushToServer]);
+    if (online && phase === "active" && touched.current && latest.current) void pushToServer(latest.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [online]);
 
   const dispatch = useCallback((action: DraftAction) => {
-    if (action.type === "toggleSetComplete") void hapticSuccess();
+    if (action.type === "toggleSetComplete") {
+      const t = Date.now();
+      if (t - (lastToggle.current.get(action.setId) ?? 0) < DOUBLE_TAP_MS) return;
+      lastToggle.current.set(action.setId, t);
+      void hapticSuccess();
+    }
+    touched.current = true;
     setDraft((d) => (d ? workoutReducer(d, action) : d));
   }, []);
 
@@ -286,17 +356,22 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
   }
 
   if (phase === "conflict" && pendingExisting) {
+    const done = draftSummary(pendingExisting).completedSets;
     return (
       <div className="mx-auto max-w-lg space-y-4 rounded-2xl border border-gold-muted/60 bg-card p-6">
-        <h1 className="font-display text-2xl font-bold uppercase">Workout in progress</h1>
+        <h1 className="font-display text-2xl font-bold uppercase">{staleHours !== null ? "Unfinished workout" : "Workout in progress"}</h1>
         <p className="text-sm text-muted-foreground">
-          You have an unfinished workout, <strong className="text-foreground">{pendingExisting.name}</strong>, started{" "}
-          {new Date(pendingExisting.startedAt).toLocaleString()}. Resume it, or discard it and start {template?.name ?? "a new workout"}?
+          You have an unfinished workout, <strong className="text-foreground">{pendingExisting.name}</strong>
+          {staleHours !== null ? ` (last used ${ageText(staleHours)}, ${done} ${done === 1 ? "set" : "sets"} logged)` : `, started ${new Date(pendingExisting.startedAt).toLocaleString()}`}.{" "}
+          {staleHours !== null && !template ? "Carry on with it, or discard it and start fresh?" : `Resume it, or discard it and start ${template?.name ?? "a new workout"}?`}
         </p>
         <div className="flex flex-wrap gap-2">
           <Button
             onClick={() => {
-              setDraft(pendingExisting);
+              // Time away is not training time; a rest that ended long ago is gone.
+              const resumed = workoutReducer(pendingExisting, { type: "continueAfterGap", now: new Date().toISOString() });
+              touched.current = true;
+              setDraft(resumed);
               setPendingExisting(null);
               setPhase("active");
             }}
@@ -317,8 +392,11 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
               if (!ok) return;
               setDiscarding(true);
               try {
-                await discardWorkoutAction(pendingExisting.clientId).catch(() => null);
+                const res = await discardWorkoutAction(pendingExisting.clientId).catch(() => ({ ok: false as const }));
+                // (Offline, or the server said no: the discard is finished on the next visit; the draft stays gone here.)
+                if (!res.ok) savePendingDiscard(userId, pendingExisting.clientId);
                 clearLocalDraft(userId);
+                void cancelRestNotification();
                 setPendingExisting(null);
                 setDraft(freshFromTemplate());
                 setPhase("active");
@@ -355,18 +433,59 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
             <dd className="font-display text-2xl font-semibold">{formatWeight(result.volumeKg, units)}</dd>
           </div>
         </dl>
-        {result.records.length > 0 && (
+        {result.next && (
+          <section className="rounded-2xl border border-border bg-card p-4 text-left" aria-labelledby="next-title">
+            <h2 id="next-title" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {result.next.programDone ? "Program complete" : "Up next"}
+            </h2>
+            {result.next.programDone ? (
+              <p className="mt-1 text-sm">
+                That was the last session of <strong>{result.next.programName}</strong>. Choose your next program in Train.
+              </p>
+            ) : (
+              <>
+                <p className="mt-1 text-lg font-semibold">{result.next.name}</p>
+                <p className="text-sm text-muted-foreground">
+                  Week {result.next.week} of {result.next.durationWeeks} · Day {result.next.day} of {result.next.daysPerWeek}
+                  {result.next.date ? ` · ${new Date(`${result.next.date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" })}` : ""}
+                  {result.next.minutes ? ` · ~${result.next.minutes} min` : ""}
+                </p>
+              </>
+            )}
+          </section>
+        )}
+        {result.records.some((r) => !r.first) && (
           <section className="animate-bounce-in rounded-2xl border border-gold-muted bg-gold/5 p-4 text-left [animation-delay:250ms]" aria-labelledby="prs-title">
             <h2 id="prs-title" className="mb-2 font-display text-lg font-semibold uppercase text-gold-highlight">
               New personal records
             </h2>
             <ul className="space-y-1 text-sm">
-              {result.records.map((r, i) => (
+              {result.records.filter((r) => !r.first).map((r, i) => (
                 <li key={i}>
                   <strong>{catalogById.get(r.exerciseId)?.name ?? "Exercise"}</strong> — {RECORD_LABEL[r.recordType] ?? r.recordType}:{" "}
                   {r.recordType === "max_duration" ? formatDuration(r.value) : r.recordType === "max_reps" ? `${r.value} reps` : formatWeight(r.value, units)}
                 </li>
               ))}
+            </ul>
+          </section>
+        )}
+        {result.records.some((r) => r.first) && (
+          <section className="rounded-2xl border border-border bg-card p-4 text-left" aria-labelledby="baselines-title">
+            <h2 id="baselines-title" className="mb-1 font-display text-lg font-semibold uppercase">
+              Baselines set
+            </h2>
+            <p className="mb-2 text-xs text-muted-foreground">First time logged: your next sessions are measured against these.</p>
+            <ul className="space-y-1 text-sm">
+              {[...new Set(result.records.filter((r) => r.first).map((r) => r.exerciseId))].map((id) => {
+                const best = result.records.find((r) => r.exerciseId === id && r.first && r.recordType === "max_weight") ?? result.records.find((r) => r.exerciseId === id && r.first);
+                if (!best) return null;
+                return (
+                  <li key={id}>
+                    <strong>{catalogById.get(id)?.name ?? "Exercise"}</strong> — {RECORD_LABEL[best.recordType] ?? best.recordType}:{" "}
+                    {best.recordType === "max_duration" ? formatDuration(best.value) : best.recordType === "max_reps" ? `${best.value} reps` : formatWeight(best.value, units)}
+                  </li>
+                );
+              })}
             </ul>
           </section>
         )}
@@ -464,8 +583,11 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
   const finish = async () => {
     setSaving(true);
     setError(null);
-    const endedAt = new Date().toISOString();
-    const finalDraft = draft.pausedAt ? workoutReducer(draft, { type: "resume", now: endedAt }) : draft;
+    // The end time is when Finish was first tapped: a retry after the network came back doesn't stretch the workout.
+    const asked = workoutReducer(draft, { type: "requestFinish", now: new Date().toISOString() });
+    if (asked !== draft) setDraft(asked);
+    const endedAt = asked.finishRequestedAt!;
+    const finalDraft = asked.pausedAt ? workoutReducer(asked, { type: "resume", now: endedAt }) : asked;
     const payload = {
       clientId: finalDraft.clientId,
       name: finalDraft.name.trim() || "Workout",
@@ -503,7 +625,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
     void cancelRestNotification();
     setFinishedDraft(finalDraft);
     setTemplateName(finalDraft.name);
-    setResult({ volumeKg: res.data.volumeKg, records: res.data.records, badges: res.data.badges ?? [], durationSeconds: elapsedSeconds(finalDraft, endedAt) });
+    setResult({ volumeKg: res.data.volumeKg, records: res.data.records, badges: res.data.badges ?? [], durationSeconds: elapsedSeconds(finalDraft, endedAt), next: res.data.next ?? null });
     setPhase("finished");
     window.scrollTo({ top: 0 });
   };
@@ -681,7 +803,16 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
         open={Boolean(substituteTarget)}
         onOpenChange={(o) => !o && setSubstituteKey(null)}
         title="Substitute exercise"
-        description={substituteTarget ? `Replace ${substituteTarget.name}. Your sets and reps carry over; weights reset.` : undefined}
+        description={
+          substituteTarget
+            ? (() => {
+                const done = substituteTarget.sets.filter((x) => x.completed).length;
+                return done
+                  ? `The ${done} ${done === 1 ? "set" : "sets"} you've done stay logged under ${substituteTarget.name}; the rest move to the new exercise (reps carry over, weight resets).`
+                  : `Replace ${substituteTarget.name}. Reps carry over; the weight resets for the new exercise.`;
+              })()
+            : undefined
+        }
         catalog={catalog}
         suggestedIds={substituteTarget ? (alternatives[substituteTarget.exerciseId] ?? []) : []}
         excludeId={substituteTarget?.exerciseId}
@@ -760,12 +891,10 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
               variant="destructive"
               onClick={async () => {
                 const res = await discardWorkoutAction(draft.clientId).catch(() => ({ ok: false as const, error: "offline" }));
-                if (!res.ok && navigator.onLine) {
-                  setError("Couldn't discard on the server. Please try again.");
-                  setDiscardOpen(false);
-                  return;
-                }
+                // The server's copy goes on the next visit if it couldn't go now; it is never brought back meanwhile.
+                if (!res.ok) savePendingDiscard(userId, draft.clientId);
                 clearLocalDraft(userId);
+                void cancelRestNotification();
                 router.push("/train");
               }}
             >

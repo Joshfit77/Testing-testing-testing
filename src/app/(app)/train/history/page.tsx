@@ -3,7 +3,7 @@ import { ArrowLeft, ChevronRight, Dumbbell } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/states";
 import { Button } from "@/components/ui/button";
-import { addDays, isoDateInTz } from "@/lib/domain/dates";
+import { addDays, daysBetween, isoDateInTz } from "@/lib/domain/dates";
 import { formatDuration, formatWeight } from "@/lib/domain/units";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
@@ -23,11 +23,16 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
   const since = addDays(today, -29);
   const { data: last30 } = await supabase
     .from("workout_sessions")
-    .select("total_volume_kg")
+    .select("total_volume_kg, started_at")
     .eq("user_id", user.id)
     .eq("status", "completed")
     .gte("started_at", `${since}T00:00:00Z`);
   const volume30 = (last30 ?? []).reduce((s, r) => s + Number(r.total_volume_kg), 0);
+  // Per week over the days since the first of these workouts (at least a week), so a member in their first days is
+  // not told they train 0.2 times a week.
+  const first = (last30 ?? []).map((r) => isoDateInTz(new Date(r.started_at as string), profile.timezone)).sort()[0];
+  const spanDays = first ? Math.max(7, daysBetween(first, today) + 1) : 30;
+  const perWeek = ((last30 ?? []).length / spanDays) * 7;
 
   const groups = new Map<string, typeof items>();
   for (const it of items) {
@@ -46,11 +51,11 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
         <div className="rounded-2xl border border-border bg-card p-4">
           <p className="text-xs uppercase tracking-wider text-muted-foreground">Workouts · 30 days</p>
           <p className="mt-1 font-display text-3xl font-bold">{(last30 ?? []).length}</p>
-          <p className="text-xs text-muted-foreground">≈ {((last30 ?? []).length / 30 * 7).toFixed(1)} per week</p>
+          <p className="text-xs text-muted-foreground">≈ {perWeek.toFixed(1)} per week</p>
         </div>
         <div className="rounded-2xl border border-border bg-card p-4">
           <p className="text-xs uppercase tracking-wider text-muted-foreground">Volume · 30 days</p>
-          <p className="mt-1 font-display text-3xl font-bold">{formatWeight(Math.round(volume30), units)}</p>
+          <p className="mt-1 font-display text-3xl font-bold">{formatWeight(volume30, units)}</p>
           <p className="text-xs text-muted-foreground">weight × reps, completed sets</p>
         </div>
       </section>

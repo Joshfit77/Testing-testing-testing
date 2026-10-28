@@ -34,3 +34,31 @@ export function clearLocalDraft(userId: string): void {
     /* ignore */
   }
 }
+
+/** A discard the server has not confirmed yet (it was offline): finished on the next visit, and the draft it names is
+ *  never restored from the server in the meantime. */
+const discardKey = (userId: string) => `ngf.workout.discard.${userId}`;
+
+export function loadPendingDiscard(userId: string): string | null {
+  try {
+    return localStorage.getItem(discardKey(userId));
+  } catch {
+    return null;
+  }
+}
+
+export function savePendingDiscard(userId: string, clientId: string): void {
+  try {
+    localStorage.setItem(discardKey(userId), clientId);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function clearPendingDiscard(userId: string): void {
+  try {
+    localStorage.removeItem(discardKey(userId));
+  } catch {
+    /* ignore */
+  }
+}

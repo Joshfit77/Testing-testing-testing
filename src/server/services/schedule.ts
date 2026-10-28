@@ -1,6 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { addDays, isoDateInTz } from "@/lib/domain/dates";
+import { isoDateInTz } from "@/lib/domain/dates";
 import { planSchedule, type PendingSession, type PlannedSession } from "@/lib/domain/training-schedule";
 
 /** How many pending sessions get dates (enough for ~2 months of a 7-day program). */
@@ -15,6 +15,39 @@ export interface ProgramSchedule {
   planned: PlannedSession[];
   /** program_day_id → date, as stored (including stale entries for completed days, which planSchedule ignores). */
   overrides: Record<string, string>;
+}
+
+/** What the member's program has next: the finish screen's "Up next". */
+export interface NextSession {
+  programName: string;
+  /** The session just finished was the program's last. */
+  programDone: boolean;
+  name: string | null;
+  week: number | null;
+  day: number | null;
+  durationWeeks: number;
+  daysPerWeek: number;
+  /** Planned date (user's time zone), from the training calendar. */
+  date: string | null;
+  minutes: number | null;
+}
+
+export async function nextSessionSummary(supabase: SupabaseClient, userId: string, userProgramId: string, timezone: string): Promise<NextSession | null> {
+  const { data: up } = await supabase
+    .from("user_programs")
+    .select("id, status, program:training_programs(name, duration_weeks, days_per_week)")
+    .eq("id", userProgramId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  const program = up?.program as unknown as { name: string; duration_weeks: number; days_per_week: number } | null;
+  if (!up || !program) return null;
+  const base = { programName: program.name, durationWeeks: program.duration_weeks, daysPerWeek: program.days_per_week };
+  if (up.status === "completed") return { ...base, programDone: true, name: null, week: null, day: null, date: null, minutes: null };
+  if (up.status !== "active") return null;
+  const schedule = await loadProgramSchedule(supabase, userId, timezone);
+  const next = schedule?.userProgramId === userProgramId ? schedule.planned[0] : undefined;
+  if (!next) return null;
+  return { ...base, programDone: false, name: next.name, week: next.week, day: next.day, date: next.date, minutes: next.minutes };
 }
 
 /**
@@ -48,7 +81,9 @@ export async function loadProgramSchedule(supabase: SupabaseClient, userId: stri
       .eq("user_id", userId)
       .eq("user_program_id", up.id)
       .eq("status", "completed")
-      .gte("started_at", `${addDays(today, -1)}T00:00:00Z`),
+      .order("started_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   const pending: PendingSession[] = ((weeksRes.data ?? []) as unknown as { week_number: number; program_days: { id: string; day_number: number; name: string; estimated_minutes: number | null }[] }[])
@@ -61,7 +96,8 @@ export async function loadProgramSchedule(supabase: SupabaseClient, userId: stri
     .slice(0, SCHEDULE_HORIZON_SESSIONS);
   const overrides: Record<string, string> = {};
   for (const o of overridesRes.data ?? []) overrides[o.program_day_id as string] = o.planned_date as string;
-  const completedToday = (doneRes.data ?? []).some((s) => isoDateInTz(new Date(s.started_at as string), timezone) === today);
+  // The last completed session of this program: the next one is due on the training day after it.
+  const lastCompleted = doneRes.data ? isoDateInTz(new Date(doneRes.data.started_at as string), timezone) : null;
 
   return {
     userProgramId: up.id as string,
@@ -69,7 +105,7 @@ export async function loadProgramSchedule(supabase: SupabaseClient, userId: stri
     programName: program.name,
     daysPerWeek: program.days_per_week,
     today,
-    planned: planSchedule({ pending, overrides, today, daysPerWeek: program.days_per_week, completedToday }),
+    planned: planSchedule({ pending, overrides, today, daysPerWeek: program.days_per_week, lastCompleted }),
     overrides,
   };
 }
