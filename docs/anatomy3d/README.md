@@ -25,8 +25,8 @@ part of the body in view, so a close-up of the face stays on the face through th
 
 - Look (owner's requests since): dark gold all over (the viewer's `goldAndBlack`; `?look=original` shows the file's red
   and white), plain plates, a little bigger in the frame, and an actual face: the head's skin surface from BodyParts3D
-  (FMA7163), fitted onto this skull (mean 1.1 mm), smoothed and cut at the neck; the parts under it are hidden, his own
-  ears stay. Rebuild with `npx tsx scripts/anatomy/build-ecorche-face.mts <BodyParts3D_data>` (the BodyParts3D clone
+  (FMA7163), fitted onto this skull (mean 1.1 mm), smoothed, 8% smaller and cut along the jaw line so his own neck
+  muscles carry on up to the head; the parts under it are hidden, his own ears stay (scaled with the head). Rebuild with `npx tsx scripts/anatomy/build-ecorche-face.mts <BodyParts3D_data>` (the BodyParts3D clone
   below).
 - Video (simulated phone, headless Chromium with software WebGL; not a physical device):
   `renders/raw-ecorche/squat-phone.mp4`.

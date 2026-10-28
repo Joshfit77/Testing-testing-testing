@@ -23,7 +23,7 @@ This adapted mesh is shared under **CC BY-SA 4.0**. It is provided as is, withou
 
 `ecorche-skin.bin` / `ecorche-skin.json` (skin weights and joints that rig `ecorche.glb`, per vertex of the file) and
 `ecorche-face.bin` / `ecorche-face.json` (the face: the head's skin surface from **BodyParts3D**, © The Database Center
-for Life Science, CC BY 4.0, file FMA7163, fitted onto this model's skull, smoothed and cut at the neck; and the list of
+for Life Science, CC BY 4.0, file FMA7163, fitted onto this model's skull, smoothed, scaled to 92% and cut along the jaw line; a scaled copy of the ears; and the list of
 the model's parts it covers, which the viewer hides) are adapted from BodyParts3D and
 **Écorché** (credit as above). Built by `scripts/anatomy/build-ecorche-skin.mts` and
 `scripts/anatomy/build-ecorche-face.mts`. They are shared under **CC BY-SA 4.0**, as is, without warranties.

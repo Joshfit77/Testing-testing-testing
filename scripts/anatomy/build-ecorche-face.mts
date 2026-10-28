@@ -33,7 +33,15 @@ const ALL = [
   "Frontal_bone", "Occipital_bone", "Sphenoid_bone", "Mandible", "Septal_nasal_cartilage", "External_ear",
   ...["parietal_bone", "temporal_bone", "zygomatic_bone", "maxilla", "nasal_bone", "lacrimal_bone", "lateral_nasal_cartilage", "major_alar_cartilage"].flatMap((n) => [`Left_${n}`, `Right_${n}`]),
 ];
-const FILL = process.env.FACE_LAYERS === "all" ? ALL : [];
+// (By default only the ears: the face's skin surface has none, so the model's own ears are shown, scaled with the head.)
+const FILL = process.env.FACE_LAYERS === "all" ? ALL : ["External_ear"];
+/** The head a little smaller than the scan (owner: "heads a little big"), about a point at the top of the neck. */
+const HEAD_SCALE = 0.92;
+const PIVOT = new THREE.Vector3(0, 1.525, 0.005);
+const scaleHead = (v: THREE.Vector3) => v.sub(PIVOT).multiplyScalar(HEAD_SCALE).add(PIVOT);
+/** Where the face's skin ends: along the jaw line, under the chin in front (y 1.50) up to the base of the skull behind
+ * (1.555), so the model's own neck carries on up to the head (owner: "his neck looks off, fix it to match the body"). */
+const cutY = (z: number) => 1.5 - 0.423 * (z - 0.07);
 /** Thin parts (ears, nose cartilage): only coloured, with a fixed small lift, so their shape stays as it is. */
 const THIN = /ear$|cartilage$/i;
 const mm = 0.001;
@@ -216,7 +224,7 @@ for (const { name, mesh, first, count: n } of parts) {
     eyeBvh.closestPointToPoint(p, { point: target } as never);
     const face = smooth(EYE_CLEAR, EYE_CLEAR + 2.5 * mm, p.distanceTo(target));
     const l = thin(r) ? 0.35 * mm : THREE.MathUtils.clamp(lift[r]!, fixed[r] ? 0 : 0.6 * mm, 12 * mm);
-    const w = p.clone().addScaledVector(N[first + i]!, THREE.MathUtils.lerp(-1.5 * mm, l, face)).applyMatrix4(inv);
+    const w = scaleHead(p.clone().addScaledVector(N[first + i]!, THREE.MathUtils.lerp(-1.5 * mm, l, face))).applyMatrix4(inv);
     out.writeFloatLE(w.x, i * 12);
     out.writeFloatLE(w.y, i * 12 + 4);
     out.writeFloatLE(w.z, i * 12 + 8);
@@ -330,7 +338,7 @@ fileCloud.dispose();
 const skinTris = stl("FMA7163");
 let topZ = -Infinity;
 for (let i = 2; i < skinTris.length; i += 3) topZ = Math.max(topZ, skinTris[i]!);
-const CUT = 1.465, TUCK = 0.006;
+const TUCK = 0.006;
 const vmap = new Map<string, number>();
 const verts: THREE.Vector3[] = [];
 const faces: number[] = [];
@@ -367,11 +375,12 @@ for (let it = 0; it < 20; it++)
     next.forEach((v, i) => verts[i]!.copy(v));
   }
 // Normals (for the small outward lift and the tuck), then the cut.
+verts.forEach(scaleHead);
 const sg = new THREE.BufferGeometry().setFromPoints(verts);
 sg.setIndex(faces);
 sg.computeVertexNormals();
 const sn = sg.getAttribute("normal");
-const keepV = verts.map((v) => v.y >= CUT);
+const keepV = verts.map((v) => v.y >= cutY(v.z));
 const newId = new Int32Array(verts.length).fill(-1);
 const vPos: number[] = [], vCol: number[] = [], vSkin: number[] = [];
 // Skin weights: those of the nearest vertex of the file (so the neck end bends with the neck).
@@ -393,7 +402,7 @@ const vidAttr = vidAll.getAttribute("vid");
 verts.forEach((v, i) => {
   if (!keepV[i]) return;
   // 0.8 mm out, so nothing of the model under the skin shows through; near the cut it tucks in under itself.
-  const lift = 0.8 * mm - 2.5 * mm * (1 - smooth(CUT, CUT + TUCK, v.y));
+  const lift = 0.8 * mm - 2.5 * mm * (1 - smooth(cutY(v.z), cutY(v.z) + TUCK, v.y));
   const w = v.clone().addScaledVector(new THREE.Vector3().fromBufferAttribute(sn, i), lift);
   newId[i] = vPos.length / 3;
   vPos.push(w.x, w.y, w.z);
@@ -408,8 +417,15 @@ for (let i = 0; i < faces.length; i += 3) {
   if (a! >= 0 && b! >= 0 && c! >= 0) tri.push(a!, b!, c!);
 }
 // The file's parts the skin covers entirely (all of the part above the neck cut, a little above it): hidden.
-// (Not the ears: the skin surface has none, so the model's own ears stay.)
-const covered = meshes.filter((m) => !/External_ear/.test(m.name) && new THREE.Box3().setFromObject(m).min.y > CUT + 0.012).map((m) => m.name);
+// (A part counts as covered when every point of it is above the cut, by 6 mm; the ears are shown as their scaled layer.)
+const covered = meshes
+  .filter((m) => {
+    if (/External_ear/.test(m.name)) return true;
+    const pa = worldGeometry(m).getAttribute("position");
+    for (let i = 0; i < pa.count; i++) if (pa.getY(i) < cutY(pa.getZ(i)) + 0.006) return false;
+    return true;
+  })
+  .map((m) => m.name);
 const nv = vPos.length / 3;
 const shellBuf = Buffer.alloc(nv * 12 + nv * 3 + nv * 8 + tri.length * 4);
 new Float32Array(shellBuf.buffer, shellBuf.byteOffset, nv * 3).set(vPos);
