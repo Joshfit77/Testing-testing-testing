@@ -34,7 +34,8 @@ export interface ModelViewer {
   /**
    * A still picture at the given size and angle, as a data URL (PNG, or JPEG when `jpeg` is set). With `t`, the
    * exercise is posed at that time first, without drawing the page's own view (for rendering videos frame by frame).
-   * With `fit`, a still camera framing the whole space the exercise takes over a rep (videos).
+   * With `fit`, a still camera framing the whole space the exercise takes over a rep, or, for an exercise that
+   * travels, a camera moving with him (videos).
    */
   still(o: { yaw: number; distance?: number; targetY?: number; width: number; height: number; t?: number; jpeg?: boolean; fit?: boolean }): string;
   /** The model's height in its own units (metres). */
@@ -49,6 +50,10 @@ export interface ModelMotion {
   readonly skinnedMeshes: number;
   /** The space the exercise takes over a rep (the model's frame, metres): body and the height of the equipment. */
   readonly bounds: THREE.Box3;
+  /** True when the exercise travels (a sprint, a walk, a carry): it is followed rather than framed whole. */
+  readonly travels: boolean;
+  /** The space the body takes over a rep round the pelvis, without the travel. */
+  readonly reach: THREE.Box3;
   readonly duration: number;
   readonly effort: EffortCurve;
   play(): void;
@@ -240,7 +245,11 @@ export async function mountModel(
       const aspect = camera.aspect;
       const shot = new THREE.PerspectiveCamera(FOV, o.width / o.height, 0.02, 50);
       renderer.setSize(o.width, o.height, false);
-      if (o.fit && moving) place(shot, o.yaw, 0.05, fitBox(moving.bounds, shot.aspect, o.yaw), moving.bounds.getCenter(new THREE.Vector3()));
+      if (o.fit && moving) {
+        // (A travelling exercise: a camera moving with him, framing the space his body takes; otherwise the whole rep.)
+        const b = moving.travels ? moving.following() : moving.bounds;
+        place(shot, o.yaw, 0.05, fitBox(b, shot.aspect, o.yaw), b.getCenter(new THREE.Vector3()));
+      }
       else place(shot, o.yaw, 0.05, o.distance !== undefined ? o.distance * H : fitDistance(shot.aspect), new THREE.Vector3(center.x, (o.targetY !== undefined ? box.min.y + o.targetY * H : center.y) + followY(), center.z));
       renderer.render(scene, shot);
       const url = o.jpeg ? canvas.toDataURL("image/jpeg", 0.92) : canvas.toDataURL("image/png");
@@ -570,6 +579,7 @@ function moveModel(
     const f = evaluate(motion, t);
     const j = jointsFromFrame(f, { centerX, barGrip: barbell ? 26 : null, stance });
     pelvisY = j.pelvis.y;
+    pelvisNow.copy(j.pelvis).applyMatrix4(fromRig);
     nowUp[0]!.addVectors(j.R.ankle, j.L.ankle).multiplyScalar(0.5);
     nowUp[1]!.addVectors(j.R.knee, j.L.knee).multiplyScalar(0.5);
     [j.pelvis, j.mid, j.neck, j.head, j.headTop].forEach((p, k) => nowUp[k + 2]!.copy(p));
@@ -581,26 +591,40 @@ function moveModel(
   // and the height of the equipment (a bench under a lying exercise, a bar overhead); not its width, so a long bar
   // does not shrink the figure.
   const bounds = new THREE.Box3();
+  // (Also the body's own reach round the pelvis, at every moment: an exercise that travels, a sprint or a carry, takes
+  // far more room across than the body does, and is better followed than framed whole.)
+  const bodyReach = new THREE.Box3();
+  const pelvisNow = new THREE.Vector3();
   {
     const q = new THREE.Vector3();
+    const pv = new THREE.Vector3();
     const eb = new THREE.Box3();
     for (let i = 0; i < 24; i++) {
       t = (i / 24) * T;
       pose();
       const j = jointsFromFrame(evaluate(motion, t), { centerX, barGrip: barbell ? 26 : null, stance });
-      for (const p of [j.pelvis, j.mid, j.neck, j.head, j.headTop, ...(["R", "L"] as const).flatMap((sd) => [j[sd].shoulder, j[sd].elbow, j[sd].hand, j[sd].hip, j[sd].knee, j[sd].ankle, j[sd].heel, j[sd].toe])])
+      pv.copy(j.pelvis).applyMatrix4(fromRig);
+      for (const p of [j.pelvis, j.mid, j.neck, j.head, j.headTop, ...(["R", "L"] as const).flatMap((sd) => [j[sd].shoulder, j[sd].elbow, j[sd].hand, j[sd].hip, j[sd].knee, j[sd].ankle, j[sd].heel, j[sd].toe])]) {
         bounds.expandByPoint(q.copy(p).applyMatrix4(fromRig));
+        bodyReach.expandByPoint(q.sub(pv));
+      }
       rigSpace.updateMatrixWorld(true);
       eb.setFromObject(equipment.group);
       if (!eb.isEmpty()) bounds.expandByPoint(q.set(bounds.min.x, eb.min.y, bounds.min.z)).expandByPoint(q.set(bounds.max.x, eb.max.y, bounds.max.z));
     }
     bounds.expandByScalar(0.1);
+    bodyReach.expandByScalar(0.1);
     t = def.stillPhase !== undefined && o.reducedMotion ? def.stillPhase * T : 0;
   }
+  const across = (b: THREE.Box3) => Math.max(b.max.x - b.min.x, b.max.z - b.min.z);
+  const travels = across(bounds) > across(bodyReach) + 0.6;
   pose();
   const v = new THREE.Vector3();
   return {
     bounds,
+    travels,
+    /** The space the body takes round the pelvis now, for a camera that follows a travelling exercise. */
+    following: () => bodyReach.clone().translate(pelvisNow),
     advance(dt: number) {
       if (playing) t = (((t + dt * speed) % T) + T) % T;
       pose();
@@ -624,6 +648,8 @@ function moveModel(
     },
     motion: {
       bounds,
+      travels,
+      reach: bodyReach,
       skinnedMeshes: skinned.filter(({ m }) => !m.userData.faceFor && !m.userData.skin).length,
       duration: T,
       effort,

@@ -43,7 +43,8 @@ for (const slug of slugs) {
     const info = await p.evaluate(() => {
       const m = window.viewer.motion;
       m.pause();
-      const b = m.bounds;
+      // (An exercise that travels is followed, so its shape is the body's, not the distance covered.)
+      const b = m.travels ? m.reach : m.bounds;
       return { T: m.duration, view: window.exerciseView, across: Math.max(b.max.x - b.min.x, b.max.z - b.min.z), up: b.max.y - b.min.y };
     });
     // Tall for a standing exercise, wide for one that takes more room across than up (lying, crawling, stepping).
