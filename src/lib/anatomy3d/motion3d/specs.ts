@@ -656,8 +656,12 @@ const rotationalThrow: Spec = {
       // ball from the shoulders, so the wrists stay straight whether the ball is low at the hip or out in front).
       const fwd = c.chestAxes().fwd;
       const side = V3().crossVectors(V3(0, 1, 0), fwd).normalize(); // the figure's left
+      // The leading (left) hand turns from the ball's side to under it as the throw comes round, so the ball leaves
+      // towards the wall over it instead of through it, and comes back to the side for the catch.
+      const under = clamp01((c.phase - 0.1) / 0.16) * clamp01((0.64 - c.phase) / 0.08);
       for (const s of SIDES) {
         const n = side.clone().multiplyScalar(s === "R" ? -1 : 1).addScaledVector(V3(0, -1, 0), 0.3).addScaledVector(fwd, -0.2).normalize();
+        if (s === "L") n.lerp(V3(0, -1, 0).addScaledVector(side, 0.35).addScaledVector(fwd, -0.15).normalize(), under).normalize();
         const along = hands.clone().sub(c.gh(s));
         const fingers = along.addScaledVector(n, -along.dot(n)).normalize().addScaledVector(fwd, 0.25).normalize();
         // (The fingers open over the release and close again over the catch, rather than in one frame.)

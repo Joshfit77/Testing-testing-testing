@@ -14,7 +14,9 @@ import { FINGERS, SIDE_SIGN, type Side, type Skeleton3 } from "./skeleton";
  * - the wrist and ankle bend within their ranges; the shoulder blade and collarbone follow the arm (the scapula rotates
  *   upwards as the arm rises, the shoulders lift and reach forward) so the arm never pivots alone against the ribs;
  * - the trunk's bend, side bend and turn are shared over four spine joints (turning mostly in the thoracic spine,
- *   bending mostly in the lumbar spine), the head's over the neck and head.
+ *   bending mostly in the lumbar spine), the head's over the neck and head;
+ * - a thigh drawn up past the hip's range takes the pelvis with it: the pelvis tilts back about the hips and the lower
+ *   back rounds (the lumbopelvic rhythm of a deep squat or a rowing catch), so the hip itself never flexes past it.
  *
  * Results that could not be met (a wrist out of reach, a hand turned beyond the forearm's range) are reported per
  * frame in `SolveReport`, so the checks can tell a contact that holds from one that does not.
@@ -362,10 +364,11 @@ export function solvePose(
     if (Math.abs(over) > 0.5)
       rep.limits[name] = Math.max(rep.limits[name] ?? 0, Math.abs(over));
   };
-  // Pelvis.
+  // Pelvis (tilted back if the thighs are drawn up past the hips' range).
   const pel = sk.i("pelvis");
+  const pelvisRot = pelvisForHips(sk, g, lim);
   sk.pos[pel]!.copy(g.pelvis.pos);
-  sk.rot[pel]!.copy(g.pelvis.rot);
+  sk.rot[pel]!.copy(pelvisRot);
   // Spine: the chest's turn relative to the pelvis, split into bend (about the pelvis's side axis), side bend (about its
   // forward axis) and turn (about its up axis), shared over the four joints.
   {
@@ -373,13 +376,13 @@ export function solvePose(
       sk.i(n)
     );
     // Where the chest would be with the spine at rest.
-    const restChest = g.pelvis.rot
+    const restChest = pelvisRot
       .clone()
       .multiply(sk.restRot[pel]!.clone().invert())
       .multiply(sk.restRot[spine[3]!]!);
     const rel = restChest.clone().invert().premultiply(g.chest).normalize(); // world delta: chest = rel · restChest
     // Decompose rel in the pelvis frame as turn (Y) · side bend (X: forward) · bend (Z: side).
-    const pf = g.pelvis.rot.clone().multiply(sk.restRot[pel]!.clone().invert());
+    const pf = pelvisRot.clone().multiply(sk.restRot[pel]!.clone().invert());
     const local = pf.clone().invert().multiply(rel).multiply(pf);
     const e = new THREE.Euler().setFromQuaternion(local, "YXZ");
     const share = {
@@ -1243,6 +1246,44 @@ function solveLeg(
       )
   );
   void tmpQ;
+}
+
+/** Hip flexion (degrees, the thigh against the pelvis, in the pelvis's side view) the hip allows: with the knee bent,
+ *  about 120° (the femur's neck nears the rim of the socket); with the knee straight, about 95°, since the hamstrings
+ *  and gracilis cross the knee too and are then at their full length. A thigh drawn further up is eased into the limit
+ *  over its last HIP_EASE degrees by tilting the pelvis back. */
+const HIP_MAX_BENT = 122;
+const HIP_MAX_STRAIGHT = 95;
+const HIP_EASE = 22;
+
+/** The pelvis's rotation for the goals: as asked, or tilted back about the hips (whose joints lie on its side axis) by
+ *  as much as either thigh would pass its hip's range. Where the thighs go does not depend on that tilt, so they are
+ *  placed once to measure it (the knees' frame-to-frame memory is left as it was). */
+function pelvisForHips(sk: Skeleton3, g: PoseGoals, lim: Record<Side, Limb>): THREE.Quaternion {
+  const pel = sk.i("pelvis");
+  sk.pos[pel]!.copy(g.pelvis.pos);
+  sk.rot[pel]!.copy(g.pelvis.rot);
+  const turn = g.pelvis.rot.clone().multiply(sk.restRot[pel]!.clone().invert());
+  const fwd = V3(1, 0, 0).applyQuaternion(turn);
+  const down = V3(0, -1, 0).applyQuaternion(turn);
+  const memo = lastKnee.get(sk);
+  const kept = memo ? { ...memo } : null;
+  const scratch: SolveReport = { reach: { wristR: 0, wristL: 0, ankleR: 0, ankleL: 0 }, handTurn: { R: 0, L: 0 }, limits: {} };
+  let back = 0;
+  for (const s of ["R", "L"] as const) {
+    const L = lim[s];
+    solveLeg(sk, s, g.legs[s], L, scratch, () => {});
+    const thigh = sk.pos[L.shin]!.clone().sub(sk.pos[L.thigh]!);
+    const shin = sk.pos[L.foot]!.clone().sub(sk.pos[L.shin]!);
+    const flex = Math.atan2(thigh.dot(fwd), thigh.dot(down)) / D2R;
+    const knee = thigh.angleTo(shin) / D2R;
+    const max = HIP_MAX_STRAIGHT + (HIP_MAX_BENT - HIP_MAX_STRAIGHT) * clamp(knee / 90, 0, 1);
+    const soft = max - HIP_EASE;
+    if (flex > soft) back = Math.max(back, flex - (soft + HIP_EASE * Math.tanh((flex - soft) / HIP_EASE)));
+  }
+  if (kept) lastKnee.set(sk, kept);
+  else lastKnee.delete(sk);
+  return back > 0 ? axisAngle(V3(0, 0, 1).applyQuaternion(turn), back).multiply(g.pelvis.rot) : g.pelvis.rot;
 }
 
 /** A neutral standing pose's goals (rest pelvis, upright trunk and head, arms hanging, feet under the hips). */

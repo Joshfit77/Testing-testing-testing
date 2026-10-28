@@ -53,5 +53,40 @@
   "frames": 43,
   "bytes": 49226,
   "duration": 1.4
+ },
+ "dumbbell-curl": {
+  "frames": 109,
+  "bytes": 126822,
+  "duration": 3.6
+ },
+ "hammer-curl": {
+  "frames": 109,
+  "bytes": 126822,
+  "duration": 3.6
+ },
+ "triceps-pushdown": {
+  "frames": 103,
+  "bytes": 126046,
+  "duration": 3.4
+ },
+ "cable-chest-fly": {
+  "frames": 112,
+  "bytes": 150124,
+  "duration": 3.7
+ },
+ "sumo-deadlift": {
+  "frames": 115,
+  "bytes": 130530,
+  "duration": 3.8
+ },
+ "overhead-triceps-extension": {
+  "frames": 112,
+  "bytes": 127156,
+  "duration": 3.7
+ },
+ "inverted-row": {
+  "frames": 99,
+  "bytes": 115182,
+  "duration": 3.25
  }
 }

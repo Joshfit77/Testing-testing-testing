@@ -708,8 +708,11 @@ const meshes: { name: string; offset: number; count: number; bones: string[]; li
 const CHORD = /latissimus|teres_major|teres_minor|infraspinatus|supraspinatus|subscapularis|long_head_of_.*triceps|pectoralis_major|deltoid|quadratus_femoris|gemellus|obturator|piriformis|gluteus|biceps_femoris|semitendinosus|semimembranosus|adductor|gracilis|pectineus|iliotibial|tensor_fasciae/;
 // (The shoulder's band muscles and the deep hip rotators and adductors hold to their bones loosely, so their stretch
 // spreads along them; the glutes and hamstrings keep the usual hold, so a thigh's turn does not reach up them to the
-// iliac crest.)
-const LOOSE = /latissimus|teres_major|teres_minor|infraspinatus|supraspinatus|subscapularis|long_head_of_.*triceps|pectoralis_major|deltoid|quadratus_femoris|gemellus|obturator|piriformis|adductor_(brevis|longus|minimus)|gracilis|pectineus/;
+// iliac crest. The coracobrachialis too: its origin on the coracoid lies beside the head of the humerus, and held
+// tightly it passed from the shoulder blade to the arm within 5 cm there, which folded as the arm reached across the
+// body.)
+const LOOSE = /latissimus|teres_major|teres_minor|infraspinatus|supraspinatus|subscapularis|coracobrachialis|long_head_of_.*triceps|pectoralis_major|deltoid|quadratus_femoris|gemellus|obturator|piriformis|adductor_(brevis|longus|minimus)|gracilis|pectineus/;
+const HELPED = /tensor_fasciae/;
 const write = (n: number, w: Map<number, number>) => {
   const top = [...w.entries()].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 4);
   const sum = top.reduce((s, [, v]) => s + v, 0) || 1;
@@ -783,7 +786,7 @@ for (const p of parts) {
         const v = W[i * cand.length + m]!;
         if (v > 0.01) w.set(ks[c]!, (w.get(ks[c]!) ?? 0) + v);
       });
-      write(offset + i, chord ? w : throughJoints(w));
+      write(offset + i, chord && !HELPED.test(lower) ? w : throughJoints(w));
     }
     for (const c of cand) used.add(bones[ks[c]!]!.name);
     for (let i = 0; i < count; i++) for (let k = 0; k < 4; k++) if (out[(offset + i) * 8 + 4 + k]) used.add(bones[out[(offset + i) * 8 + k]!]!.name);
