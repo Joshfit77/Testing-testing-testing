@@ -76,7 +76,11 @@ for (const slug of slugs) {
     const frames = fs.mkdtempSync(path.join(out, `.${slug}-`));
     // SECOND_VIEW=1: two more reps from a second angle (a side-view exercise from the front three-quarters, a front-view
     // one from behind), so the hands, the equipment and the far side can be seen too.
-    const yaws = process.env.SECOND_VIEW ? [yaw, info.view === 'side' ? Math.sign(yaw || 1) * 0.35 : Math.PI - 0.4] : [yaw];
+    // (A front-view exercise first seen from behind, a cable tower or a wall in the way at the front, is seen from the
+    // better front side second, so the hands and the handle are seen at all.)
+    const front = info.view === 'side' ? 0 : seen[1] > seen[0] * 1.15 ? sides[1] : sides[0];
+    const second = info.view === 'side' ? Math.sign(yaw || 1) * 0.35 : Math.abs(yaw) > Math.PI / 2 ? front : Math.PI - 0.4;
+    const yaws = process.env.SECOND_VIEW ? [yaw, second] : [yaw];
     for (const [v, y] of yaws.entries())
       for (let i = 0; i < n; i++) {
         const url = await p.evaluate(([t, yaw, w, h]) => window.viewer.still({ yaw, width: w, height: h, t, jpeg: true, fit: true }), [(i / n) * info.T, y, W, H]);
