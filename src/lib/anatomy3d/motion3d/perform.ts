@@ -42,7 +42,7 @@ export interface Ctx {
    *  counted as touching anything. */
   palm(s: Side, center: THREE.Vector3, normal: THREE.Vector3, radius: number, fingers: THREE.Vector3, grip?: Grip, o?: { contact?: boolean }): void;
   /** Brings a point within reach of the given hands' shoulders (cm short of a straight arm), moving it towards the
-   *  shoulders. */
+   *  shoulders; with `minBend`, also no nearer than the elbow flexed that many degrees (5: arms kept straight). */
   reachable(p: THREE.Vector3, sides: Side[], margin?: number, o?: { offsets?: Partial<Record<Side, THREE.Vector3>>; minBend?: number }): THREE.Vector3;
   /** A point given as an offset from the middle of the shoulders, in the world's axes. */
   fromShoulders(off: readonly [number, number, number]): THREE.Vector3;

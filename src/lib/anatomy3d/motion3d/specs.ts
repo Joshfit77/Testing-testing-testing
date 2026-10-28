@@ -5,6 +5,7 @@ import {
   Cable,
   makeAirBike,
   makeBarbell,
+  makeCableBar,
   makeCableTower,
   makeDHandle,
   makeDumbbell,
@@ -107,6 +108,23 @@ const cableOf = (p: Piece | undefined) => (p as Piece & { cable: Cable }).cable;
 
 const handsMid = (c: Ctx) => c.freeArm("R").grip.add(c.freeArm("L").grip).multiplyScalar(0.5);
 
+/** How far forward (rig X) the legs reach at height `y`, as they are solved: the front of each thigh and shin there
+ *  (the bone's line plus the leg's thickness in front of it, from about 9 cm at the top of the thigh to 4.5 cm at the
+ *  ankle); -Infinity above the hips. */
+const legsFrontAt = (c: Ctx, y: number) => {
+  const sk = c.sk;
+  let front = -Infinity;
+  for (const s of SIDES) {
+    const hip = sk.pos[sk.i(`thigh${s}`)]!, knee = sk.pos[sk.i(`shin${s}`)]!, ankle = sk.pos[sk.i(`foot${s}`)]!;
+    for (const [a, b, ra, rb] of [[hip, knee, 9, 6.5], [knee, ankle, 6.5, 4.5]] as const) {
+      if (y > Math.max(a.y, b.y) + 4 || y < Math.min(a.y, b.y) - 4) continue;
+      const u = Math.min(1, Math.max(0, (y - a.y) / (b.y - a.y || 1)));
+      front = Math.max(front, a.x + (b.x - a.x) * u + ra + (rb - ra) * u);
+    }
+  }
+  return front;
+};
+
 // ---------------------------------------------------------------- specs
 
 const pushPress: Spec = {
@@ -118,6 +136,47 @@ const pushPress: Spec = {
     const at = c.reachable(mid, ["R", "L"], 0.5, { offsets: { R: V3(0, 0, 27), L: V3(0, 0, -27) }, minBend: 140 });
     bar!.place(at, new THREE.Quaternion());
     for (const s of SIDES) c.hold(s, bar!.handle(s), medial(s));
+  },
+};
+
+/**
+ * Sumo deadlift: feet wide and turned out, hands inside the knees, arms long, a mixed grip (right hand over, left hand
+ * under). The bar hangs below the shoulders unless the legs are in its way; then it rides just in front of the shins
+ * and thighs, as a deadlift's bar does, and never passes into them (it once followed the hands alone and went through
+ * the thighs at the top). The plates rest on the floor at the bottom.
+ */
+const SUMO_GRIP = 21 * K;
+const sumoDeadlift: Spec = {
+  build: () => [makeBarbell({ grip: SUMO_GRIP })],
+  stance: { halfWidth: 42, toeOut: 30 },
+  frame(c, [bar]) {
+    const offsets = { R: V3(0, 0, SUMO_GRIP), L: V3(0, 0, -SUMO_GRIP) };
+    const hanging = () => c.freeAt("R", SUMO_GRIP).add(c.freeAt("L", -SUMO_GRIP)).multiplyScalar(0.5).setZ(0);
+    // Balanced over the feet: the hips go back until the bar, hanging from the shoulders, is over the middle of the
+    // feet (the front view says how far the trunk leans, not where the hips are).
+    const sk = c.sk;
+    const midFoot = SIDES.reduce((a, s) => {
+      const J = sk.meta.joints[s];
+      const f = sk.i(`foot${s}`);
+      return a + sk.point(f, V3(...J.ankle)).lerp(sk.point(f, V3(...J.ball)), 0.6).x / 2;
+    }, 0);
+    for (let i = 0; i < 3; i++) {
+      const shift = midFoot - hanging().x;
+      if (Math.abs(shift) < 0.2) break;
+      c.goals.pelvis.pos.x += shift;
+      c.presolve();
+    }
+    let at = hanging();
+    for (let i = 0; i < 4; i++) {
+      at.x = Math.max(at.x, legsFrontAt(c, at.y) + 1.4 + 0.8);
+      at.y = Math.max(at.y, 22.5);
+      // (Arms straight: pinned to their full reach, so a bar moved forward off the thighs slides down the arms' arc
+      // rather than bending the elbows.)
+      at = c.reachable(at, ["R", "L"], 4, { offsets, minBend: 16 });
+    }
+    bar!.place(at, new THREE.Quaternion());
+    c.hold("R", bar!.handle("R"), medial("R"));
+    c.hold("L", bar!.handle("L"), lateral("L"));
   },
 };
 
@@ -198,6 +257,99 @@ const sledPush: Spec = {
     for (const s of SIDES) {
       const h = sled!.handle(s);
       c.hold(s, h, h.axis.clone(), { kind: "wrap", radius: 2.0 });
+    }
+  },
+};
+
+/** Dumbbells in both hands, following the motion's arms with the given grip: `pronation` 0 is palms forward (up at
+ *  the top of a curl), 90 thumbs forward. `out` angles the hanging arms away from the thighs so the inner heads clear
+ *  them (fraction of the arm's direction, sideways). */
+const dumbbellsInHands = (pronation: number, out = 0): Spec => ({
+  build: () => [makeDumbbell(0.8), makeDumbbell(0.8)],
+  frame(c) {
+    for (const s of SIDES) {
+      c.free(s, pronation, { kind: "wrap", radius: 1.6 });
+      if (!out) continue;
+      const g = c.goals.arms[s];
+      const gh = c.gh(s);
+      const d = g.wrist.clone().sub(gh);
+      const len = d.length();
+      // (Most where the arm hangs, none once the forearm comes up past level.)
+      const hang = Math.max(0, -d.y / len);
+      d.z += SIDE_SIGN[s] * out * len * hang;
+      g.wrist = gh.clone().addScaledVector(d.normalize(), len);
+    }
+  },
+  after(c, [r, l]) {
+    placeInHand(c.sk, "R", r!, 1.6);
+    placeInHand(c.sk, "L", l!, 1.6);
+  },
+});
+
+/** Dumbbell curl: underhand, the palms facing forward at the bottom and up at the top. */
+const dumbbellCurl = dumbbellsInHands(4, 0.22);
+/** Hammer curl: neutral grip, thumbs up all the way. */
+const hammerCurl = dumbbellsInHands(90, 0.14);
+
+/**
+ * Triceps pushdown on a straight bar: the tower in front, its pulley high, the bar held overhand a little narrower than
+ * the shoulders; it hangs square to the cable from its swivel, and the elbows stay at the sides as the motion moves
+ * the forearms.
+ */
+const tricepsPushdown: Spec = {
+  build: () => [makeCableTower(225), makeCableBar(48, 14), cablePiece()],
+  frame(c, [tower, bar, holder]) {
+    const t = tower as ReturnType<typeof makeCableTower>;
+    const sh = c.gh("R").add(c.gh("L")).multiplyScalar(0.5);
+    // (Facing the figure: the tower's front, its pulley side, towards -X.)
+    t.place(V3(sh.x + 52 * K, 0, 0), rotY(180));
+    t.setPulley(207 * K);
+    const at = c.freeAt("R", 14).add(c.freeAt("L", -14)).multiplyScalar(0.5).setZ(0);
+    const pulley = t.pulleyAt();
+    // Bar level across the body, turned about its length so the swivel points up the cable.
+    const up = pulley.clone().sub(at).setZ(0).normalize();
+    bar!.place(at, new THREE.Quaternion().setFromUnitVectors(V3(0, 1, 0), up));
+    cableOf(holder).set(pulley, (bar as ReturnType<typeof makeCableBar>).ring());
+    for (const s of SIDES) c.hold(s, bar!.handle(s), medial(s));
+  },
+};
+
+/**
+ * Cable chest fly between two towers, pulleys high: a D-handle in each hand, hanging square to its cable, thumbs up;
+ * the hands sweep from out at the sides to together in front of the lower chest as the motion's arms move them.
+ */
+const cableChestFly: Spec = {
+  build: () => [makeCableTower(225), makeCableTower(225), makeDHandle(13), makeDHandle(13), cablePiece(), cablePiece()],
+  frame(c, [towerR, towerL, hR, hL, cR, cL]) {
+    const sh = c.gh("R").add(c.gh("L")).multiplyScalar(0.5);
+    const towers = { R: towerR as ReturnType<typeof makeCableTower>, L: towerL as ReturnType<typeof makeCableTower> };
+    const handles = { R: hR as ReturnType<typeof makeDHandle>, L: hL as ReturnType<typeof makeDHandle> };
+    const cables = { R: cableOf(cR), L: cableOf(cL) };
+    for (const s of SIDES) {
+      // (A tower either side, a little behind the figure, its pulley side facing in.)
+      towers[s].place(V3(sh.x - 22, 0, SIDE_SIGN[s] * 112 * K), rotY(SIDE_SIGN[s] * 90));
+      towers[s].setPulley(196 * K);
+      const arm = c.freeArm(s);
+      const at = c.reachable(arm.grip, [s], 2);
+      const pulley = towers[s].pulleyAt();
+      // Handle: its D towards the cable, swivelled to the hand, which faces where the hands meet in front of the chest
+      // (the grip runs across the palm, little finger to index). (Not "as upright as it hangs": with the arms open the
+      // cable runs nearly straight up, and the grip's lie would turn over from one frame to the next.)
+      const x = at.clone().sub(pulley).normalize();
+      const long = arm.grip.clone().sub(arm.elbow).normalize();
+      const meet = sh.clone().add(V3(45, at.y - sh.y, 0));
+      const palm = meet.sub(at);
+      palm.addScaledVector(long, -palm.dot(long)).normalize();
+      const across = V3().crossVectors(long, palm).multiplyScalar(SIDE_SIGN[s]);
+      const y = across.addScaledVector(x, -across.dot(x)).normalize();
+      const z = V3().crossVectors(x, y).normalize();
+      handles[s].place(at, new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z)));
+      cables[s].set(pulley, handles[s].ring());
+      // Elbows soft and pointing back and a little down, as in a fly. (The front-view motion bends the forearms up in
+      // the plane of the body, an elbow pointing at the floor, which no palm-forward grip can follow.)
+      const pole = V3(-1, -0.45, SIDE_SIGN[s] * 0.15).normalize();
+      const elbow = c.gh(s).lerp(at, 0.5).addScaledVector(pole, 14);
+      c.hold(s, handles[s].handle("grip"), y.clone(), { kind: "wrap", radius: 1.7 }, pole, elbow);
     }
   },
 };
@@ -470,6 +622,11 @@ export const SPECS: Record<string, Spec> = {
   "cable-woodchop": woodchop,
   "medicine-ball-rotational-throw": rotationalThrow,
   "air-bike-sprint": airBike,
+  "dumbbell-curl": dumbbellCurl,
+  "hammer-curl": hammerCurl,
+  "triceps-pushdown": tricepsPushdown,
+  "cable-chest-fly": cableChestFly,
+  "sumo-deadlift": sumoDeadlift,
 };
 
 /** Hands free, following the motion, no equipment: the fallback while an exercise has no spec of its own. */
@@ -481,5 +638,4 @@ export const FALLBACK: Spec = {
 
 export const hasSpec = (slug: string) => slug in SPECS;
 export const specFor = (slug: string): Spec => SPECS[slug] ?? FALLBACK;
-void lateral;
 export type { Skeleton3 };

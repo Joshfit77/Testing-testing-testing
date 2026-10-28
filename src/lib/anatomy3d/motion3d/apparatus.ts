@@ -184,17 +184,21 @@ export function makeDHandle(len = 13): Piece & { ring: () => THREE.Vector3 } {
   return p;
 }
 
-/** A straight cable bar (pushdowns) along local Z, the ring at its middle above (+Y). */
-export function makeCableBar(len = 50): Piece & { ring: () => THREE.Vector3 } {
+/** A straight cable bar (pushdowns) along local Z, the swivel and ring at its middle above (+Y); handles "R"/"L" at
+ *  `grip` either side of the middle. */
+export function makeCableBar(len = 50, grip = 9): Piece & { ring: () => THREE.Vector3 } {
   const p = new Piece("cableBar") as Piece & { ring: () => THREE.Vector3 };
   const bar = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, len, 14), M.knurl);
   bar.rotation.x = Math.PI / 2;
   const swivel = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 5, 12), M.steel);
   swivel.position.y = 3;
-  p.obj.add(bar, swivel);
-  p.local.R = { at: V3(0, 0, 9), axis: V3(0, 0, 1), radius: 1.4 };
-  p.local.L = { at: V3(0, 0, -9), axis: V3(0, 0, 1), radius: 1.4 };
-  p.ring = () => V3(0, 6, 0).applyQuaternion(p.obj.quaternion).add(p.obj.position);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.4, 0.4, 6, 16), M.steel);
+  ring.position.y = 6.6;
+  p.obj.add(bar, swivel, ring);
+  p.local.R = { at: V3(0, 0, grip), axis: V3(0, 0, 1), radius: 1.4 };
+  p.local.L = { at: V3(0, 0, -grip), axis: V3(0, 0, 1), radius: 1.4 };
+  p.ring = () => V3(0, 8, 0).applyQuaternion(p.obj.quaternion).add(p.obj.position);
+  p.solids.push({ a: V3(0, 0, -len / 2), b: V3(0, 0, len / 2), r: 1.4 });
   return p;
 }
 

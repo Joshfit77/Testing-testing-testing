@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { depthMix } from "../../exercise-motion/skeleton";
 import type { Frame, Vec } from "../../exercise-motion/types";
 import { SIDE_SIGN, type Side, type Skeleton3 } from "../body/skeleton";
 import { restGoals, type PoseGoals } from "../body/solve";
@@ -34,7 +35,8 @@ const lean = (a: Vec, b: Vec) => Math.atan2(b[0] - a[0], b[1] - a[1]) / D2R;
 export interface LiftOptions {
   /** Plane-space x of the motion's centre (taken off so the figure stands near the origin). */
   centerX: number;
-  /** Feet this far from the midline (cm) with the toes turned out this many degrees. */
+  /** Feet this far from the midline (cm) with the toes turned out this many degrees. (Front view: the motion places the
+   *  feet itself; only the toe-out is taken.) */
   stance?: { halfWidth: number; toeOut: number } | null;
 }
 
@@ -105,22 +107,35 @@ export function lift(sk: Skeleton3, f: Frame, o: LiftOptions): Lifted {
   const sideChest = lean(p.mid, p.neckBase);
   const sideHead = lean(p.head, p.headTop);
   const fwd = pose.trunkD;
-  g.pelvis = { pos: to3(p.pelvis), rot: rotZ(-fwd * 0.6).multiply(rotX(-side * 0.8)).multiply(restPel) };
+  // Depth the front view cannot show, from the motion's own depth angles (as the 2D skeleton draws them): each thigh
+  // reaches forward from the hip to the knee, each shin back from the knee to the ankle. The ankles stand at depth 0,
+  // so the hips sit back from them by the thigh's reach less the shin's: in a squat or a pull the hips go back and the
+  // shins keep their lean. (Before, the hips stood straight over the ankles and the knees took all the bend forward,
+  // which leaned the shins far past what the ankle can follow.)
+  const len = (a: readonly number[], b: readonly number[]) => Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!, a[2]! - b[2]!);
+  const THIGH = len(J.R.hip, J.R.knee), SHIN = len(J.R.knee, J.R.ankle);
+  const depthOf = (s: Side) => {
+    const knee = pose[`knee${s}`];
+    const thighD = depthMix(pose[`legD${s}`], Math.min(80, knee * 0.62)) * (Math.sign(pose[`legD${s}`]) || 1);
+    const shinD = depthMix(pose[`shinD${s}`], Math.min(60, knee * 0.22)) * (Math.sign(pose[`shinD${s}`]) || 1);
+    return { thigh: THIGH * Math.sin(thighD * D2R), shin: SHIN * Math.sin(shinD * D2R) };
+  };
+  const hipBack = (["R", "L"] as const).reduce((a, s) => a + depthOf(s).shin - depthOf(s).thigh, 0) / 2;
+  g.pelvis = { pos: to3(p.pelvis, hipBack), rot: rotZ(-fwd * 0.6).multiply(rotX(-side * 0.8)).multiply(restPel) };
   g.chest = rotZ(-fwd).multiply(rotX(-sideChest)).multiply(restChest);
   g.head = rotZ(-fwd * 0.5).multiply(rotX(-sideHead)).multiply(restHead);
   for (const s of ["R", "L"] as const) {
     const sign = SIDE_SIGN[s];
     const ankle = to3(p[`ankle${s}`]);
     ankle.y -= ANKLE_DROP;
-    // The knee comes forward by what the thigh's foreshortening hides.
-    const hip = to3(p[`hip${s}`]);
-    const knee2 = to3(p[`knee${s}`]);
-    const thigh2 = knee2.distanceTo(hip);
-    const L = 45.4;
-    const forward = Math.sqrt(Math.max(0, L * L - thigh2 * thigh2)) * (Math.sign(pose[`legD${s}`]) || 1);
+    // The knee towards where it is: the thigh's reach forward from the hip (and out, as the motion spreads the knees).
+    const hip = to3(p[`hip${s}`], hipBack);
+    const knee = to3(p[`knee${s}`], hipBack + depthOf(s).thigh);
     const mid = hip.clone().add(ankle).multiplyScalar(0.5);
-    const pole = V3(Math.max(0.2, forward / L), 0, knee2.z - mid.z).normalize();
-    const footYaw = sign * 4;
+    const pole = knee.sub(mid);
+    pole.x = Math.max(pole.x, 0.2 * (pole.length() || 1));
+    pole.normalize();
+    const footYaw = sign * (o.stance?.toeOut ?? 4);
     g.legs[s] = { ankle, pole, foot: rotY(-footYaw).multiply(sk.restRot[sk.i(`foot${s}`)]!) };
     const dir = (a: Vec, b: Vec, depthDeg: number) => {
       const d = V3(0, b[1] - a[1], -(b[0] - a[0]));
