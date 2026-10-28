@@ -355,6 +355,42 @@ const cableChestFly: Spec = {
 };
 
 /**
+ * Overhead triceps extension with one dumbbell: both palms up under its top head, the thumbs round the handle, the bell
+ * hanging below the hands (tipped a little forward, so the wrists are not asked to bend back past their range). The
+ * hands go where the motion's forearms take them: overhead, then down behind the head.
+ */
+/** The bell's tip (towards the front, per unit of down) at the top and at the bottom of the rep. */
+const OTE_TOP = -0.9;
+const OTE_BOTTOM = 0;
+const overheadTricepsExtension: Spec = {
+  build: () => [makeDumbbell(0.9)],
+  frame(c, [db]) {
+    const fwd = c.chestAxes().fwd.setY(0).normalize();
+    // How far the elbows are bent (0 locked out, 1 at the bottom), from the motion.
+    const flex = Math.min(1, Math.max(0, (c.f ? (c.f.pose.elR + c.f.pose.elL) / 2 : 0) / 120));
+    // (The palms meet the plate nearer the wrists than a fist meets a handle: near the top the plate sits a little
+    // further along the forearms, so the arms straighten as the motion's do.)
+    const fore = SIDES.reduce((a, s) => a.add(c.freeArm(s).grip.sub(c.freeArm(s).elbow).normalize()), V3()).normalize();
+    const plate = c.reachable(handsMid(c).setZ(0).addScaledVector(fore, 6 * (1 - smooth(flex))), ["R", "L"], 1);
+    // Down the handle, from the top head to the bottom one: tipped back at the top (the palms face up and back, the
+    // wrists bent back within their range), hanging nearly straight down behind the head at the bottom.
+    const u = V3(0, -1, 0).addScaledVector(fwd, OTE_TOP + (OTE_BOTTOM - OTE_TOP) * smooth(flex)).normalize();
+    const zAxis = u.clone();
+    const xAxis = fwd.clone().addScaledVector(u, -fwd.dot(u)).normalize();
+    const yAxis = V3().crossVectors(zAxis, xAxis);
+    db!.place(plate.clone().addScaledVector(u, 7), new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis)));
+    // Palms on the underside of the top head, one either side of the handle, fingers back and a little out.
+    const R = 40;
+    for (const s of SIDES) {
+      const side = V3(0, 0, SIDE_SIGN[s]).addScaledVector(u, -u.z).normalize();
+      const at = plate.clone().addScaledVector(side, 2.6);
+      const fingers = xAxis.clone().negate().addScaledVector(side, 0.45).normalize();
+      c.palm(s, at.clone().addScaledVector(u, -R), u, R, fingers, { kind: "cup" });
+    }
+  },
+};
+
+/**
  * Rowing machine, authored in 3D (the 2D motion's finish keeps the elbows under the shoulders, which no overhand grip
  * can follow): catch with the shins upright and the arms long; the drive in order, legs, then the trunk swinging back,
  * then the arms drawing the handle to the lower ribs with the elbows past the body; the recovery in the reverse order.
@@ -627,6 +663,7 @@ export const SPECS: Record<string, Spec> = {
   "triceps-pushdown": tricepsPushdown,
   "cable-chest-fly": cableChestFly,
   "sumo-deadlift": sumoDeadlift,
+  "overhead-triceps-extension": overheadTricepsExtension,
 };
 
 /** Hands free, following the motion, no equipment: the fallback while an exercise has no spec of its own. */
