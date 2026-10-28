@@ -1,0 +1,73 @@
+{
+  "reviewer": "Claude (the coding session), from the rendered videos and stills, two angles each; not the owner",
+  "date": "2026-10-28",
+  "eye": {
+    "push-press": {
+      "verdict": "fail",
+      "note": "armpits fold where the arms lock out overhead (teres major, lats stretched); the drive and press themselves read right"
+    },
+    "kettlebell-swing": {
+      "verdict": "minor",
+      "note": "a crease at the right shoulder at the top of the swing; hinge, bell path and hands on the handle read right"
+    },
+    "lateral-raise": {
+      "verdict": "pass",
+      "note": "raise to shoulder height, slight forward lean, dumbbells in the hands; front and rear renders"
+    },
+    "farmers-carry": {
+      "verdict": "pass",
+      "note": "walking stride with the dumbbells at the sides, arms straight"
+    },
+    "running-intervals": {
+      "verdict": "pass",
+      "note": "sprint stride, knee drive and arm swing read right"
+    },
+    "sled-push": {
+      "verdict": "pass",
+      "note": "hands on the posts, body angled into the sled, sled on the floor and moving"
+    },
+    "rowing-intervals": {
+      "verdict": "fail",
+      "note": "inner thighs (adductors, gracilis) stretch and pull apart at the catch; seat, handle and chain move with the body"
+    },
+    "pallof-press": {
+      "verdict": "pass"
+    },
+    "cable-woodchop": {
+      "verdict": "not checked",
+      "note": "to be re-checked on the new render (the left coracobrachialis spike was the failure)"
+    },
+    "medicine-ball-rotational-throw": {
+      "verdict": "minor",
+      "note": "ball held, trunk turns, ball leaves the hands at release; it reappears in the hands when the loop restarts (inherent to a looping throw)"
+    },
+    "air-bike-sprint": {
+      "verdict": "pass",
+      "note": "seated on the bike, hands on the levers, feet on the pedals; levers and cranks move with the body"
+    },
+    "dumbbell-curl": {
+      "verdict": "pass",
+      "note": "supinated curl, dumbbells in the hands to the shoulders, elbows at the sides; side and front renders"
+    },
+    "hammer-curl": {
+      "verdict": "pass",
+      "note": "neutral grip held through the curl"
+    },
+    "triceps-pushdown": {
+      "verdict": "not checked"
+    },
+    "cable-chest-fly": {
+      "verdict": "not checked"
+    },
+    "inverted-row": {
+      "verdict": "not checked"
+    },
+    "sumo-deadlift": {
+      "verdict": "not checked"
+    },
+    "overhead-triceps-extension": {
+      "verdict": "not checked"
+    }
+  },
+  "owner_approval": {}
+}

@@ -1,83 +1,94 @@
-# 3D anatomical athlete (work in progress)
+# 3D anatomical exercise demonstrations
 
-Status: **not approved, not final.** A 3D anatomical athlete for the exercise demonstrations, checked on one exercise so
-far (the barbell back squat). The existing 2D demonstrations are unchanged and remain what the app uses; nothing here is
-wired into the app's pages yet.
+Status (2026-10-28): **experimental; not approved by the owner.** The app's exercise demonstrations are the animated
+illustrations (`src/lib/exercise-motion`). The 3D figure performs **18 of the 157 exercises** with a motion of its own;
+**one** of them (the kettlebell swing) is wired into the app on the branch `claude/3d-in-workout`, behind the
+allowlist in `src/lib/anatomy3d/in-app.ts`, with the illustration kept as the fallback. The other 139 exercises have no
+3D motion. The 143 proposed additional exercises in [EXERCISES_300.md](EXERCISES_300.md) do not exist in the app at
+all. [LIBRARY_STATUS.md](LIBRARY_STATUS.md), generated from the code, says where every exercise stands (motion, bake,
+automated QA, visual review, owner approval, PASS / FAIL / NOT TESTED); [QUALITY_CHECKLIST.md](QUALITY_CHECKLIST.md)
+says what a pass means.
 
-## Milestone 1: the original model in the player
+## The model
 
-The exercise player opens on the **original Écorché model file**, `public/anatomy/ecorche.glb`, byte-identical to the
-published `model/ecorche.glb` (sha256 `9744d3df…326c`, checked by the page before it shows the model). It is loaded as
-it is, with its own meshes, vertex colours and materials: nothing is rebuilt, rigged, recoloured or covered. The one
-addition, at the owner's request: the published eyes are blank white, so the viewer paints a brown iris and a pupil onto
-each cornea in the shader (`paintEyes`); the file and its geometry are unchanged. The model
-stands still; one finger turns it a full 360°, a pinch zooms, two fingers move along the body, and front, side and rear
-buttons reset the view.
+`public/anatomy/ecorche.glb` is the original Écorché file (github.com/Charleeh/ecorche, CC BY-SA 4.0; sha256
+`9744d3df…326c`, checked by the preview page), loaded as it is: 634 parts, each bone, muscle and tendon its own mesh
+with its own vertex colours. Additions, all at run time and all in the viewer (`src/lib/anatomy3d/model-viewer.ts`):
 
-## Milestone 2 (current, awaiting approval): the original model performs the barbell back squat
+- an iris and a pupil painted on the blank corneas (`paintEyes`);
+- a face: the head's skin surface from BodyParts3D, fitted to this skull, cut along the jaw (`public/anatomy/ecorche-face.*`,
+  built by `scripts/anatomy/build-ecorche-face.mts`; the parts under it are hidden);
+- the look: all dark gold in the app's gold (`goldAndBlack`; the owner's "keep him gold"); `?look=original` in the preview
+  shows the file's own red and white.
 
-The same file now moves. Each of its 634 meshes becomes a skinned mesh with its own geometry and material, bound to the
-exercise rig with skin weights transferred from the rigged copy of the same model (`public/anatomy/ecorche-skin.*`, built
-by `scripts/anatomy/build-ecorche-skin.mts`: an affine fit of the file onto the copy, median match 1 µm, 34 of 486,005
-vertices more than 3 mm away). The motion and the barbell come from the app's exercise engine; the fingers close round
-the bar. The page has play/pause, a scrubber and speeds. The camera follows the hips at full view and, zoomed in, the
-part of the body in view, so a close-up of the face stays on the face through the rep. No muscle glow yet.
+[LICENSING_CHECK.md](LICENSING_CHECK.md) records the licence obligations (CC BY-SA 4.0 for the modified model, the
+credit shown in the player). [ECORCHE_RAW.md](ECORCHE_RAW.md) describes the earlier rigged copy of the model
+(`public/anatomy/athlete-raw.*`), kept for comparison only (`?mode=exercise` in the preview).
 
-- Look (owner's requests since): dark gold all over (the viewer's `goldAndBlack`; `?look=original` shows the file's red
-  and white), plain plates, a little bigger in the frame, and an actual face: the head's skin surface from BodyParts3D
-  (FMA7163), fitted onto this skull (mean 1.1 mm), smoothed, 8% smaller and cut along the jaw line so his own neck
-  muscles carry on up to the head; the parts under it are hidden, his own ears stay (scaled with the head). Rebuild with `npx tsx scripts/anatomy/build-ecorche-face.mts <BodyParts3D_data>` (the BodyParts3D clone
-  below).
-- Video (simulated phone, headless Chromium with software WebGL; not a physical device):
-  `renders/raw-ecorche/squat-phone.mp4`.
+## How it moves
 
-- Viewer: `src/lib/anatomy3d/model-viewer.ts` (`mountModel`). Lighting: the studio of the reference renders (ACES tone
-  mapping, room environment at 0.6, warm key light, white rim light).
-- Page: `scripts/anatomy/preview/` (`bash scripts/anatomy/preview/build.sh`, open `.anatomy-preview/index.html`).
-  The exercise player with the rigged athlete is still there for later milestones (`?ex=back-squat`).
-- Test: `scripts/anatomy/preview/model-controls-test.mjs` (phone-sized touch screen, real touch input).
+| Step | Where | What |
+| --- | --- | --- |
+| **Rig** | `scripts/anatomy/build-ecorche-rig.mts` → `public/anatomy/ecorche-rig.json`, `.bin` | 79 bones measured from the model's own skeleton (spine in four, clavicle and scapula per side, humerus, ulna and radius for pronation, fingers, feet) plus blend helpers at the shoulders, hips, knees and elbows. Skin weights per vertex of every part: bones rigid to one rig bone; muscles by distance to the bones they lie on, spread by bone heat (Baran & Popović 2007); muscles that span a joint far from its centre (lats, pectorals, teres, deltoid, infraspinatus, coracobrachialis, the deep hip rotators, the adductors) in a `LOOSE` set that is skinned linearly. |
+| **Skinning** | `src/lib/anatomy3d/body/bind-model.ts`, `body/dqs.ts` | Dual-quaternion skinning in the shader for every part, linear for the `LOOSE` set; the same skinning on the CPU in the QA. |
+| **Solver** | `src/lib/anatomy3d/body/solve.ts`, `body/skeleton.ts` | Poses the skeleton from goals (pelvis, trunk, head, each wrist and ankle with its orientation, elbow and knee poles, finger closure): analytic IK on the real bone geometry, hinges about measured axes, pronation by the radius within range, wrist and ankle limits, the scapula and clavicle following the arm, the trunk's bend shared over the spine, and a hip flexed past its range tilting the pelvis back instead (`pelvisForHips`). Reports what it could not meet. |
+| **Motions** | `src/lib/anatomy3d/motion3d/specs.ts` (18 specs), `perform.ts`, `lift.ts`, `apparatus.ts` | A spec says what equipment the exercise uses and how (which handle each hand holds, with which grip, where the equipment is each frame) and anything the 2D motion cannot say (a turning trunk, a ball that leaves the hands). The body's goals come from the reviewed 2D motion lifted into 3D, or from the spec's own 3D keyframes. An exercise without a spec gets `FALLBACK` (hands free, no equipment): a placeholder, not a demonstration. |
+| **Equipment** | `src/lib/anatomy3d/motion3d/apparatus.ts`, `equipment.ts` | Barbell, dumbbells, kettlebell, cable towers with handles and cables, rower (seat on its rail, handle on its chain), air bike (levers and cranks), sled, medicine ball, bench, rack (hidden in the app). |
+| **Bakes** | `scripts/anatomy/bake-motions.mts` → `public/anatomy/bake/<slug>.ngb`, `index.json`; `motion3d/bake.ts` | Every spec'd exercise solved offline, frame by frame, and stored (NGB1: bones as Int16, equipment as Float32), so a phone interpolates between poses instead of solving (18–21 ms a frame on a desktop live). `bake-motions.mts [slug …]` re-bakes; a solver or spec change invalidates the bakes. |
+| **Playback** | `src/lib/anatomy3d/motion3d/mover.ts`, `model-viewer.ts` (`mountModel`) | Plays the bake when there is one, solves live otherwise; the camera frames the whole rep or follows an exercise that travels. |
+| **Muscle Glow** | `model-viewer.ts` (`muscleGlow`, `setGlow`), `muscle-ids.ts`, `muscle-map.ts`, `effort.ts` | Every part is labelled with its muscle region from its name (`regionOf`, `muscleId`, left and right apart). Each tick the exercise's primary and secondary muscles (`muscleTargets`, the same map as the app's muscle lists) are lit with the rep's effort curve (`effortCurve`: primary muscles brighter, secondary softer). A shader patch lights the parts whose id is glowing, on top of the gold look and the skinning; only a part's red muscle belly glows, its white tendon stays unlit. `setGlow(on)` switches it; `?glow=0` in the preview renders the movement without it; the in-app player has a Muscle Glow button. |
 
-## Later milestones
+## In the app (branch `claude/3d-in-workout`)
 
-Muscle highlighting, the other exercises and any coverage come only after the owner approves the squat. An experimental rigged copy of the same model already exists for that work
-(`public/anatomy/athlete-raw.*`, shown only with `?ex=…`); [ECORCHE_RAW.md](ECORCHE_RAW.md) describes it and the
-CC BY-SA 4.0 obligations.
+| Piece | Where |
+| --- | --- |
+| Which exercises show the figure (one, the kettlebell swing, pending the owner's approval) | `src/lib/anatomy3d/in-app.ts` (`IN_APP_3D`, `has3dDemo`) |
+| Loading the model, face, rig and bake from `/anatomy` and mounting the viewer; files kept once fetched | `src/lib/anatomy3d/app-player.ts` (`mountAppModel`) |
+| Touch and mouse controls (one finger turns, pinch zooms, two fingers move along the body, wheel zooms) | `src/lib/anatomy3d/controls.ts` (`attachControls`; the preview uses the same) |
+| The player: progress while loading, play/pause, 0.5× and 1×, front/side/rear, Muscle Glow, "Show the illustration"; the illustration while loading and when WebGL or the files are missing | `src/components/train/exercise-demo-3d.tsx` (`ExerciseDemo3D`) |
+| Where it appears: the demonstration dialog on the workout screen's exercise card, and the exercise page | `src/components/train/exercise-demo.tsx` (`ExerciseDemoMini`), `src/app/(app)/train/exercises/[slug]/page.tsx` |
+| Checks | `tests/unit/anatomy-in-app.test.ts`; `e2e/exercise-demo-3d.spec.ts` (software WebGL, `playwright.config.ts`) |
 
-The earlier gold athlete (BodyParts3D, Écorché torso, MakeHuman head, gold material) was dropped at the owner's
-request: its asset and renders are removed. The builder still has its code paths (`ECORCHE_USE=torso|all`), and the
-files are in the git history if they are ever wanted.
+First load downloads about 21 MB (model 14.3 MB, rig 4.4 MB, face 2.7 MB, the bake under 0.2 MB); the browser's
+HTTP cache and the page keep them afterwards. three.js and the viewer are in a chunk loaded only when a 3D
+demonstration opens. Nothing has been measured on a physical phone yet.
 
-## Where things are
-
-| Concern | Where |
-|---|---|
-| Which anatomy parts are used, and each part's glow region and kind (muscle / bone / tendon) | `scripts/anatomy/bp3d-regions.ts` |
-| Building the athlete from the Écorché file (`ECORCHE_USE=raw`): fit to the app frame, joints, muscle labels, limbs | `scripts/anatomy/build-athlete.mts` |
-| **Skin weights** (rigging, hip bones following the glutes) and baked ambient occlusion | `scripts/anatomy/weights.ts`, `scripts/anatomy/reweight.mts` |
-| Joint centres measured from the skeleton (generated) | `src/lib/anatomy3d/athlete-bind.generated.ts`, `bind.ts` |
-| Loading the mesh, the skeleton | `src/lib/anatomy3d/mesh.ts` |
-| **Rig**: 2D motion frame → 3D joints (IK for elbows/knees), bone posing and stretching | `src/lib/anatomy3d/rig.ts` |
-| Hand grip (finger curl morph) | `src/lib/anatomy3d/grip.ts` |
-| **Material / glow**: the Écorché look (its own vertex colours, red muscle, white tendons, ivory bone), per-muscle orange glow | `src/lib/anatomy3d/material.ts` (`makeEcorcheMaterial`) |
-| Which muscles glow per exercise (all catalogue exercises) | `src/lib/anatomy3d/muscle-map.ts` (+ `tests/unit/anatomy-muscle-map.test.ts`) |
-| Glow timing through each rep (effort curve) | `src/lib/anatomy3d/effort.ts` |
-| Scene, lights, bloom, backdrop | `src/lib/anatomy3d/scene.ts` (`ecorcheStage`) |
-| Equipment (barbell with NGF plates, rack, benches, machines, cables…) | `src/lib/anatomy3d/equipment.ts` |
-| Player: playback, speed, cameras, glow toggle, stills | `src/lib/anatomy3d/player.ts` |
-| Stand-alone squat preview page (reference layout) and review renders | `scripts/anatomy/preview/` |
-
-## Rebuild
-
-Needs the Écorché file and the BodyParts3D STL folder (~0.5 GB, used for the joint measurement); neither is checked in.
+## Checking a motion
 
 ```bash
-git clone https://github.com/Charleeh/ecorche /tmp/ecorche                                        # model/ecorche.glb
-git clone --filter=blob:none https://github.com/Kevin-Mattheus-Moerman/BodyParts3D /tmp/bp3d    # then check out the STLs used
-ECORCHE=/tmp/ecorche/model/ecorche.glb ECORCHE_USE=raw \
-  npx tsx scripts/anatomy/build-athlete.mts /tmp/bp3d/assets/BodyParts3D_data
-ATHLETE=public/anatomy/athlete-raw npx tsx scripts/anatomy/reweight.mts   # skin weights + ambient occlusion
-bash scripts/anatomy/preview/build.sh                                      # .anatomy-preview/index.html
+npx tsx scripts/anatomy/bake-motions.mts [slug …]                                  # bake (all specs when none given)
+npx tsx scripts/anatomy/qa/check-motion.mts --samples 24 --baked --out <dir> <slug> …   # automated checks (table + json)
+OUT=<dir> bash scripts/anatomy/preview/build.sh                                     # the preview page (index.html, artifact.html)
+CHROMIUM_PATH=… SECOND_VIEW=1 node scripts/anatomy/preview/render-videos.mjs <dir> <videos> [slug …]   # two reps, two angles
+node scripts/anatomy/preview/review-stills.mjs <dir> <out> <slug> …; python3 scripts/anatomy/preview/sheet.py <out> <slug>
+npx tsx scripts/anatomy/library-status.mts --qa <qa logs dir>                        # regenerates LIBRARY_STATUS.md
 ```
 
-Player controls (play/pause, 360° drag, wheel and pinch zoom, camera presets, slow motion) are checked by
-`scripts/anatomy/preview/controls-test.mjs`.
+The preview page shows one exercise at a time (`?ex=<slug>`, or `#<slug>` where a query cannot be given; a picker lists
+the exercises with a 3D motion); `?live=1` solves every frame instead of playing the bake; `?rig=old` shows the first
+rig. The automated checks (`check-motion.mts`: contacts, joint limits, pops and the loop seam, stretch and collapse
+per part, collisions, missing equipment) are necessary, not sufficient: the visual review in the checklist decides, and
+the owner's approval is recorded in `docs/anatomy3d/review.json`, which `library-status.mts` reads.
+
+## Known failures (see LIBRARY_STATUS.md for the current list)
+
+- **Overhead shoulder**: the push press and the overhead triceps extension fold at the armpit at lockout (teres major,
+  lats and teres minor stretched or collapsed past 2%). The rig's weights alone cannot fix this; corrective shapes
+  (a Delta-Mush-style correction baked per pose) are the proposed fix and are not built.
+- **Deep hip flexion**: the rowing catch and the sumo deadlift stretch the adductors and gracilis past 2% (the hip limit
+  and the pelvis tilt reduced it; not enough).
+- Everything else that fails or is unchecked is listed per exercise in LIBRARY_STATUS.md with the measured reason.
+
+## Rebuilding the files
+
+Needs the Écorché file (checked in as `public/anatomy/ecorche.glb`) and, for the face, the BodyParts3D STL folder
+(not checked in; `git clone --filter=blob:none https://github.com/Kevin-Mattheus-Moerman/BodyParts3D`).
+
+```bash
+npx tsx scripts/anatomy/build-ecorche-rig.mts                                      # ecorche-rig.json / .bin
+npx tsx scripts/anatomy/build-ecorche-face.mts <BodyParts3D_data>                  # ecorche-face.json / .bin
+npx tsx scripts/anatomy/bake-motions.mts                                           # every bake
+```
+
+`public/anatomy/ecorche-skin.*` (the first rig's weights, `build-ecorche-skin.mts`) and `athlete-raw.*` are kept for
+the preview's comparison modes only; the app does not load them.
