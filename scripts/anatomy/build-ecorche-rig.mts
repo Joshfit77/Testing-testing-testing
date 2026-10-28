@@ -356,6 +356,23 @@ const bi = (n: string) => {
   return i;
 };
 
+// ---------------------------------------------------------------- sides
+// A part's side as its name gives it, unless the part itself lies clearly on the other side of the body: the file
+// names a few parts for the wrong side (its "Right_flexor_pollicis_brevis" is in the left hand), and a part bound to
+// the other side's bones floats off as the hands move apart. (Parts across the midline keep their names.)
+const sidedName = (p: { name: string; pos: Float32Array }): string => {
+  let z = 0;
+  for (let i = 2; i < p.pos.length; i += 3) z += p.pos[i]!;
+  z /= p.pos.length / 3;
+  const named = /(^|_)left(_|$)/i.test(p.name) ? -1 : /(^|_)right(_|$)/i.test(p.name) ? 1 : 0;
+  if (!named || Math.abs(z) < 4 || Math.sign(z) === named) return p.name;
+  return named > 0 ? p.name.replace(/(^|_)Right(_|$)/, "$1Left$2") : p.name.replace(/(^|_)Left(_|$)/, "$1Right$2");
+};
+for (const p of parts) {
+  const n = sidedName(p);
+  if (n !== p.name) console.log(`side from position: ${p.name} lies on the other side; bound as ${n}`);
+}
+
 // ---------------------------------------------------------------- which rig bone each bone part follows
 const ORD = ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth", "eleventh", "twelfth"];
 const rigidBone = (name: string): string | null => {
@@ -448,7 +465,7 @@ const CELL = 2;
 const rigidOf = new Map<string, string>();
 const boneSets: Map<string, [number, number, number]>[] = bones.map(() => new Map());
 for (const p of parts) {
-  const b = rigidBone(p.name);
+  const b = rigidBone(sidedName(p));
   if (!b || (!p.bone && !/sclera|cornea|ear|cartilage|disk/.test(p.name.toLowerCase()))) continue;
   // (Intervertebral disks and costal cartilages are soft: they blend between the bones either side.)
   if (/disk|costal_cartilage/.test(p.name.toLowerCase())) continue;
@@ -688,7 +705,10 @@ const meshes: { name: string; offset: number; count: number; bones: string[]; li
 // femur) are skinned linearly: blended positions run along the straight line between where the two bones carry them,
 // so when the arm goes overhead the lats, teres and pectorals stretch as straight bands from the ribs to the arm, as they
 // do. Dual-quaternion blending (everything else) swings them round the joint instead, out into wings at the armpit.
-const CHORD = /latissimus|teres_major|teres_minor|infraspinatus|pectoralis_major|deltoid|quadratus_femoris|gemellus|obturator_internus|piriformis/;
+const CHORD = /latissimus|teres_major|teres_minor|infraspinatus|supraspinatus|subscapularis|long_head_of_.*triceps|pectoralis_major|deltoid|quadratus_femoris|gemellus|obturator_internus|piriformis|gluteus|biceps_femoris|semitendinosus|semimembranosus|adductor_magnus|iliotibial|tensor_fasciae/;
+// (The shoulder's band muscles hold to their bones loosely, so their stretch spreads along them; the hip's keep the usual
+// hold, so a thigh's turn does not reach up the glutes to the iliac crest.)
+const LOOSE = /latissimus|teres_major|teres_minor|infraspinatus|supraspinatus|subscapularis|long_head_of_.*triceps|pectoralis_major|deltoid/;
 const write = (n: number, w: Map<number, number>) => {
   const top = [...w.entries()].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 4);
   const sum = top.reduce((s, [, v]) => s + v, 0) || 1;
@@ -710,7 +730,7 @@ for (const p of parts) {
   } else {
     // Soft part: candidates are the allowed bones it comes close to.
     const lower = p.name.toLowerCase();
-    let allowed = allowedFor(p.name);
+    let allowed = allowedFor(sidedName(p));
     if (/disk_of/.test(lower) || /costal_cartilage/.test(lower)) allowed = [...TRUNK, "neck", "head"];
     // Bones the part attaches to or lies on: within 2.5 cm somewhere (at least the nearest one).
     const all = allowed.map(sourceOf).filter((src) => src.pts.length);
@@ -755,7 +775,7 @@ for (const p of parts) {
     const chord = CHORD.test(lower);
     // (Band muscles hold to their bones more loosely, so the change from one bone to the other spreads along their whole
     // length and the stretch with it, rather than gathering where the belly leaves the bone.)
-    if (cand.length > 1 && !/disk|cartilage/.test(lower)) heatWeights(p, count, cand.length, W, near0, chord ? CHORD_HEAT : HEAT);
+    if (cand.length > 1 && !/disk|cartilage/.test(lower)) heatWeights(p, count, cand.length, W, near0, LOOSE.test(lower) ? CHORD_HEAT : HEAT);
     for (let i = 0; i < count; i++) {
       const w = new Map<number, number>();
       cand.forEach((c, m) => {
@@ -766,7 +786,7 @@ for (const p of parts) {
     }
     for (const c of cand) used.add(bones[ks[c]!]!.name);
     for (let i = 0; i < count; i++) for (let k = 0; k < 4; k++) if (out[(offset + i) * 8 + 4 + k]) used.add(bones[out[(offset + i) * 8 + k]!]!.name);
-    if (!rigidBone(p.name) && cand.length === 0) report.push(`${p.name}: no bone`);
+    if (!rigidBone(sidedName(p)) && cand.length === 0) report.push(`${p.name}: no bone`);
   }
   meshes.push({ name: p.name, offset, count, bones: [...used], ...(!rigid && CHORD.test(p.name.toLowerCase()) ? { linear: true } : {}) });
   offset += count;

@@ -23,6 +23,7 @@ import { EXERCISES } from "../../../src/data/exercises";
 import { getMotion } from "../../../src/lib/exercise-motion";
 import { dqOf, dqSkin, lbsSkin } from "../../../src/lib/anatomy3d/body/dqs";
 import { Skeleton3, type RigMeta } from "../../../src/lib/anatomy3d/body/skeleton";
+import { bake, playBaked, settle } from "../../../src/lib/anatomy3d/motion3d/bake";
 import { makePerformer } from "../../../src/lib/anatomy3d/motion3d/perform";
 import { hasSpec, specFor } from "../../../src/lib/anatomy3d/motion3d/specs";
 
@@ -36,6 +37,9 @@ const opt = (name: string, d: string) => {
 };
 const SAMPLES = Number(opt("samples", "48"));
 const OUT = opt("out", "docs/anatomy3d/qa");
+// --baked: also bake each motion (as the app plays it) and run the body checks on the baked, interpolated poses, with
+// how far they stray from the live solve between frames.
+const BAKED = args.includes("--baked") ? (args.splice(args.indexOf("--baked"), 1), true) : false;
 const slugs = args.length ? args : EXERCISES.map((e) => e.slug);
 mkdirSync(OUT, { recursive: true });
 
@@ -126,6 +130,8 @@ interface Result {
   collisions: { piece: string; depth: number; at: number; bone: string }[];
   floor: { below: number; floating: number };
   missing: string[];
+  /** Baked playback against the live solve between frames (cm): the worst bone, the worst hand, the worst piece. */
+  baked?: { frames: number; bytes: number; bone: number; hand: number; piece: number; worst: string };
   fails: string[];
 }
 
@@ -170,11 +176,36 @@ for (const slug of slugs) {
   const collapseMin = new Map<string, { ratio: number; at: number }>();
   const skinEvery = Math.max(1, Math.round(n / 16));
   const planted = def.planted ?? [];
-  // (One loop first, as the player does when it loads: each arm's solution continues from the frame before.)
-  for (let i = 0; i < n; i++) perf.pose((i / n) * T);
+  const baked = BAKED ? bake(slug, perf, sk) : null;
+  if (baked) {
+    // Between frames: the live solve half a frame on from each frame (solved in the bake's own order, so it carries
+    // the same history) against the baked playback at that moment.
+    res.baked = { frames: baked.frames, bytes: baked.frames * baked.bones * 14 + baked.gear.length * 4, bone: 0, hand: 0, piece: 0, worst: "" };
+    const handIdx = [...HANDS.R, ...HANDS.L].filter((b) => /^hand/.test(sk.names[b]!));
+    const F = baked.frames;
+    settle(perf, sk, F);
+    for (let f = 0; f < F; f++) {
+      perf.pose((f / F) * T);
+      const t = ((f + 0.5) / F) * T;
+      perf.pose(t);
+      const live = sk.pos.map((p) => p.clone());
+      const liveGear = perf.pieces.map((p) => p.obj.position.clone());
+      playBaked(baked, t, sk, perf.pieces);
+      sk.pos.forEach((p, b) => {
+        const d = p.distanceTo(live[b]!);
+        if (d > res.baked!.bone) [res.baked!.bone, res.baked!.worst] = [d, sk.names[b]!];
+      });
+      res.baked.hand = Math.max(res.baked.hand, ...handIdx.map((b) => sk.pos[b]!.distanceTo(live[b]!)));
+      res.baked.piece = Math.max(res.baked.piece, ...perf.pieces.map((p, k) => p.obj.position.distanceTo(liveGear[k]!)));
+    }
+  }
+  // (Loops first until they repeat, as the bake does: each arm's solution continues from the frame before.)
+  settle(perf, sk, n);
   for (let i = 0; i < n; i++) {
     const t = (i / n) * T;
     const rep = perf.pose(t);
+    // (Baked: the body checks below run on the baked playback, as the app shows it.)
+    if (baked) playBaked(baked, t, sk, perf.pieces);
     rots.push(sk.rot.map((q) => q.clone()));
     for (const [k, v] of Object.entries(rep.limits)) res.limits[k] = Math.max(res.limits[k] ?? 0, v);
     for (const c of perf.contacts()) {
@@ -193,9 +224,11 @@ for (const slug of slugs) {
     for (const c of perf.contacts()) for (const b of HANDS[c.side]) held.add(b);
     let lowest = Infinity;
     const footLow: Record<string, number> = { R: Infinity, L: Infinity };
+    const skinnedParts: Float32Array[] = [];
     for (const part of parts) {
       const N = part.pos.length / 3;
       const now = new Float32Array(N * 3);
+      skinnedParts.push(now);
       for (let v = 0; v < N; v++) {
         (part.linear ? lbsSkin : dqSkin)((part.linear ? mats : dqs) as never, part.idx.subarray(v * 4, v * 4 + 4), part.wt.subarray(v * 4, v * 4 + 4), [part.pos[v * 3]!, part.pos[v * 3 + 1]!, part.pos[v * 3 + 2]!], out);
         now.set(out, v * 3);
@@ -246,6 +279,33 @@ for (const slug of slugs) {
             }
           }
         }
+    }
+    // Floating parts: a part most of whose points have no other part within a few centimetres (a sliver come adrift,
+    // as the thumb muscle the file names for the wrong hand once did).
+    {
+      const key = (x: number, y: number, z: number) => `${Math.floor(x / 3)},${Math.floor(y / 3)},${Math.floor(z / 3)}`;
+      const grid = new Map<string, number[]>();
+      skinnedParts.forEach((q, pi) => {
+        for (let v = 0; v < q.length / 3; v += 2) {
+          const k = key(q[v * 3]!, q[v * 3 + 1]!, q[v * 3 + 2]!);
+          const l = grid.get(k) ?? [];
+          if (!l.includes(pi)) l.push(pi);
+          grid.set(k, l);
+        }
+      });
+      skinnedParts.forEach((q, pi) => {
+        let alone = 0, tot = 0;
+        for (let v = 0; v < q.length / 3; v += 3) {
+          tot++;
+          const cx = Math.floor(q[v * 3]! / 3), cy = Math.floor(q[v * 3 + 1]! / 3), cz = Math.floor(q[v * 3 + 2]! / 3);
+          let other = false;
+          for (let a = -1; a <= 1 && !other; a++)
+            for (let b = -1; b <= 1 && !other; b++)
+              for (let c = -1; c <= 1 && !other; c++) other = (grid.get(`${cx + a},${cy + b},${cz + c}`) ?? []).some((o) => o !== pi);
+          if (!other) alone++;
+        }
+        if (tot && alone / tot > 0.5) detached.set(parts[pi]!.name, Math.max(detached.get(parts[pi]!.name) ?? 0, 100 * (alone / tot)));
+      });
     }
     res.floor.below = Math.max(res.floor.below, -lowest);
     for (const s of planted) res.floor.floating = Math.max(res.floor.floating, footLow[s]! - 0.5);
@@ -301,11 +361,13 @@ for (const slug of slugs) {
   for (const s of res.stretch.filter((s) => s.ratio > 2)) res.fails.push(`stretched: ${s.part} (${s.ratio.toFixed(1)}% of its surface)`);
   for (const s of res.collapse.filter((s) => s.ratio > 2)) res.fails.push(`collapsed: ${s.part} (${s.ratio.toFixed(1)}% of its surface)`);
   for (const c of res.collisions.filter((c) => c.depth > 1.5)) res.fails.push(`${c.piece} ${c.depth.toFixed(1)} cm into the ${c.bone}`);
-  for (const [part, d] of detached) res.fails.push(`detached: ${part} drifts ${d.toFixed(0)} cm from its bones`);
+  for (const [part, d] of detached) res.fails.push(`detached: ${part} (${d.toFixed(0)})`);
   if (res.floor.below > 1.5) res.fails.push(`${res.floor.below.toFixed(1)} cm below the floor`);
   if (res.floor.floating > 2) res.fails.push(`planted foot ${res.floor.floating.toFixed(1)} cm off the floor`);
+  if (res.baked && Math.max(res.baked.hand, res.baked.piece) > 1) res.fails.push(`baked playback strays ${Math.max(res.baked.hand, res.baked.piece).toFixed(1)} cm from the solve between frames`);
   results.push(res);
   writeFileSync(`${OUT}/${slug}.json`, JSON.stringify(res, null, 1));
-  console.log(`${slug.padEnd(34)} ${res.fails.length ? "FAIL" : "pass"}  contact ${res.contact.worst.toFixed(1)}cm/${res.contact.turn.toFixed(0)}°  ${res.fails.join("; ")}`);
+  const bk = res.baked ? `  baked ${res.baked.frames}f ${(res.baked.bytes / 1024).toFixed(0)}KB err bone ${res.baked.bone.toFixed(2)} (${res.baked.worst}) hand ${res.baked.hand.toFixed(2)} piece ${res.baked.piece.toFixed(2)}cm` : "";
+  console.log(`${slug.padEnd(34)} ${res.fails.length ? "FAIL" : "pass"}  contact ${res.contact.worst.toFixed(1)}cm/${res.contact.turn.toFixed(0)}°${bk}  ${res.fails.join("; ")}`);
 }
 writeFileSync(`${OUT}/summary.json`, JSON.stringify(results.map((r) => ({ slug: r.slug, pass: !r.fails.length, fails: r.fails })), null, 1));

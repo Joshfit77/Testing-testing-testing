@@ -74,15 +74,19 @@ for (const slug of slugs) {
     const yaw = sides[best];
     const n = Math.max(24, Math.round(info.T * FPS));
     const frames = fs.mkdtempSync(path.join(out, `.${slug}-`));
-    for (let i = 0; i < n; i++) {
-      const url = await p.evaluate(([t, yaw, w, h]) => window.viewer.still({ yaw, width: w, height: h, t, jpeg: true, fit: true }), [(i / n) * info.T, yaw, W, H]);
-      const jpg = Buffer.from(url.slice(url.indexOf(',') + 1), 'base64');
-      fs.writeFileSync(path.join(frames, `f${String(i).padStart(4, '0')}.jpg`), jpg);
-      if (i === Math.round(n / 2)) fs.writeFileSync(path.join(out, `${slug}.jpg`), jpg);
-    }
-    // Two reps: the frames twice over.
+    // SECOND_VIEW=1: two more reps from a second angle (a side-view exercise from the front three-quarters, a front-view
+    // one from behind), so the hands, the equipment and the far side can be seen too.
+    const yaws = process.env.SECOND_VIEW ? [yaw, info.view === 'side' ? Math.sign(yaw || 1) * 0.35 : Math.PI - 0.4] : [yaw];
+    for (const [v, y] of yaws.entries())
+      for (let i = 0; i < n; i++) {
+        const url = await p.evaluate(([t, yaw, w, h]) => window.viewer.still({ yaw, width: w, height: h, t, jpeg: true, fit: true }), [(i / n) * info.T, y, W, H]);
+        const jpg = Buffer.from(url.slice(url.indexOf(',') + 1), 'base64');
+        fs.writeFileSync(path.join(frames, `v${v}f${String(i).padStart(4, '0')}.jpg`), jpg);
+        if (v === 0 && i === Math.round(n / 2)) fs.writeFileSync(path.join(out, `${slug}.jpg`), jpg);
+      }
+    // Two reps from each view: its frames twice over.
     const list = path.join(frames, 'list.txt');
-    fs.writeFileSync(list, [0, 1].flatMap(() => Array.from({ length: n }, (_, i) => `file 'f${String(i).padStart(4, '0')}.jpg'\nduration ${1 / FPS}`)).join('\n'));
+    fs.writeFileSync(list, yaws.flatMap((_, v) => [0, 1].flatMap(() => Array.from({ length: n }, (_, i) => `file 'v${v}f${String(i).padStart(4, '0')}.jpg'\nduration ${1 / FPS}`))).join('\n'));
     execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', list, '-r', String(FPS), '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '26', '-preset', 'slow', '-movflags', '+faststart', mp4]);
     fs.rmSync(frames, { recursive: true });
     console.log(`${slug}: ${n} frames, ${((Date.now() - t0) / 1000).toFixed(0)} s, ${(fs.statSync(mp4).size / 1e3).toFixed(0)} kB`);

@@ -81,6 +81,9 @@ export interface Performer {
 }
 
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
+/** Smooth minimum and maximum of x and a limit m, eased over a width w (never past the limit). */
+const softMin = (x: number, m: number, w: number) => m - w * Math.log1p(Math.exp((m - x) / w));
+const softMax = (x: number, m: number, w: number) => m + w * Math.log1p(Math.exp((x - m) / w));
 
 export function makePerformer(sk: Skeleton3, ex: ExerciseMeta, spec: Spec): Performer {
   const def = getMotion(ex.slug, ex);
@@ -137,7 +140,7 @@ export function makePerformer(sk: Skeleton3, ex: ExerciseMeta, spec: Spec): Perf
         const g = c.freeArm(s).grip;
         // The reach the motion's own elbow angle gives on the model's arm (a straight arm stays straight).
         // (No more than the model's elbow can fold.)
-        const el = f ? (Math.min(140, f.pose[`el${s}`]) * Math.PI) / 180 : 0;
+        const el = f ? (softMin(f.pose[`el${s}`], 140, 6) * Math.PI) / 180 : 0;
         const fore = L2[s] + 7;
         const d = f ? Math.sqrt(L1[s] * L1[s] + fore * fore + 2 * L1[s] * fore * Math.cos(el)) : g.distanceTo(gh);
         const dx = g.x - gh.x, dz = z - gh.z;
@@ -166,8 +169,10 @@ export function makePerformer(sk: Skeleton3, ex: ExerciseMeta, spec: Spec): Perf
             const min = Math.sqrt(L1[s] * L1[s] + fore * fore + 2 * L1[s] * fore * Math.cos(bend));
             const hand = out.clone().add(off);
             const d = hand.distanceTo(gh);
-            if (d > max) out.add(gh.clone().sub(hand).multiplyScalar(1 - max / d));
-            else if (d < min && d > 1e-3) out.add(hand.clone().sub(gh).multiplyScalar(min / d - 1));
+            // (Eased into the limits over a centimetre or two, so a point that comes up to a limit slows into it rather
+            // than stopping dead: the motion stays smooth.)
+            const want = softMax(softMin(d, max, 1.5), min, 1.5);
+            if (d > 1e-3 && Math.abs(want - d) > 1e-6) out.add(hand.clone().sub(gh).multiplyScalar(want / d - 1));
           }
         return out;
       },

@@ -34,6 +34,21 @@ describe("anatomical rig asset", () => {
     const fpb = meta.meshes.find((m) => m.name === "Right_flexor_pollicis_brevis")!;
     expect(fpb.bones.every((b) => /^(hand|thumb)/.test(b))).toBe(true);
   });
+
+  it("binds a part the file names for the wrong side to the hand it is in", () => {
+    // (The file's "Right_flexor_pollicis_brevis" lies in the left hand, and its "Left_..." in the right.)
+    const r = meta.meshes.find((m) => m.name === "Right_flexor_pollicis_brevis")!;
+    const l = meta.meshes.find((m) => m.name === "Left_flexor_pollicis_brevis")!;
+    expect(r.bones.every((b) => b.endsWith("L"))).toBe(true);
+    expect(l.bones.every((b) => b.endsWith("R"))).toBe(true);
+  });
+
+  it("skins the muscles that span a joint far from its centre linearly, and passes the rest through the joint helpers", () => {
+    const linear = meta.meshes.filter((m) => m.linear).map((m) => m.name);
+    for (const n of ["Right_latissimus_dorsi", "Right_teres_major", "Right_gluteus_maximus", "Right_iliotibial_tract"]) expect(linear).toContain(n);
+    expect(linear).not.toContain("Long_head_of_right_biceps_brachii");
+    expect(meta.bones.filter((b) => b.blend).length).toBe(20);
+  });
 });
 
 describe("pose solver", () => {

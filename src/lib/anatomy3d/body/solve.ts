@@ -34,7 +34,9 @@ export type Grip =
   | { kind: "flat" }
   | { kind: "fist" }
   | { kind: "relaxed" }
-  | { kind: "cup" };
+  | { kind: "cup" }
+  /** Part way from one hand shape to another (`t` 0..1): fingers open or close over a few frames, never in one. */
+  | { kind: "blend"; from: Grip; to: Grip; t: number };
 
 export interface ArmGoal {
   /** Where the wrist joint must be (rig frame). */
@@ -823,6 +825,19 @@ function curls(g: Grip): {
   thumb: [number, number, number];
 } {
   switch (g.kind) {
+    case "blend": {
+      const a = curls(g.from),
+        b = curls(g.to),
+        t = clamp(g.t, 0, 1);
+      const mix = (x: number, y: number) => x + (y - x) * t;
+      return {
+        mcp: mix(a.mcp, b.mcp),
+        pip: mix(a.pip, b.pip),
+        dip: mix(a.dip, b.dip),
+        spread: mix(a.spread, b.spread),
+        thumb: [0, 1, 2].map((k) => mix(a.thumb[k]!, b.thumb[k]!)) as [number, number, number],
+      };
+    }
     case "wrap":
     case "hook": {
       // Smaller handles close the fingers further (a bar ~1.4 cm, a thick handle ~2.5 cm, a log handle ~2 cm).

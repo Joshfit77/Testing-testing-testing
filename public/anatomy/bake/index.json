@@ -1,0 +1,57 @@
+{
+ "push-press": {
+  "frames": 96,
+  "bytes": 108980,
+  "duration": 3.2
+ },
+ "kettlebell-swing": {
+  "frames": 52,
+  "bytes": 59108,
+  "duration": 1.73
+ },
+ "lateral-raise": {
+  "frames": 108,
+  "bytes": 125660,
+  "duration": 3.6
+ },
+ "farmers-carry": {
+  "frames": 35,
+  "bytes": 40818,
+  "duration": 1.15
+ },
+ "running-intervals": {
+  "frames": 20,
+  "bytes": 22228,
+  "duration": 0.68
+ },
+ "sled-push": {
+  "frames": 33,
+  "bytes": 37534,
+  "duration": 1.1
+ },
+ "rowing-intervals": {
+  "frames": 63,
+  "bytes": 72570,
+  "duration": 2.1
+ },
+ "pallof-press": {
+  "frames": 117,
+  "bytes": 143166,
+  "duration": 3.9
+ },
+ "cable-woodchop": {
+  "frames": 84,
+  "bytes": 108536,
+  "duration": 2.8
+ },
+ "medicine-ball-rotational-throw": {
+  "frames": 78,
+  "bytes": 90796,
+  "duration": 2.6
+ },
+ "air-bike-sprint": {
+  "frames": 42,
+  "bytes": 48084,
+  "duration": 1.4
+ }
+}

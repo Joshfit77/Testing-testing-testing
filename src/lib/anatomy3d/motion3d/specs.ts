@@ -53,6 +53,7 @@ export interface BodyKey {
 }
 
 const smooth = (u: number) => u * u * (3 - 2 * u);
+const clamp01 = (u: number) => smooth(Math.min(1, Math.max(0, u)));
 /** Interpolates numeric fields (and arrays of numbers) between keys by phase, eased, looping. */
 export function keyed<T extends { at: number }>(keys: T[], phase: number): T {
   let i = keys.length - 1;
@@ -99,6 +100,7 @@ const cablePiece = () => {
   const p = new Piece("cable") as Piece & { cable: Cable };
   p.cable = new Cable();
   p.obj.add(p.cable.obj);
+  p.inner = { get: () => p.cable.args, set: (v) => p.cable.set(V3(v[0], v[1], v[2]), V3(v[3], v[4], v[5]), v[6]) };
   return p;
 };
 const cableOf = (p: Piece | undefined) => (p as Piece & { cable: Cable }).cable;
@@ -308,7 +310,8 @@ const woodchop: Spec = {
     const u = Math.min(1, Math.max(0, V3(...k.dir).normalize().sub(a).length() / b.clone().sub(a).length()));
     const dir = a.clone().applyQuaternion(new THREE.Quaternion().slerp(new THREE.Quaternion().setFromUnitVectors(a, b), u));
     const right = c.chestAxes().right;
-    const hands = c.reachable(sh.addScaledVector(dir, 63.8 * k.reach), ["R", "L"], 5, { offsets: { R: right.clone().multiplyScalar(4.5), L: right.clone().multiplyScalar(-4.5) } });
+    // (Arms long with a little bend kept: within reach whichever way the hands roll round the rope.)
+    const hands = c.reachable(sh.addScaledVector(dir, 63.8 * k.reach), ["R", "L"], 9, { offsets: { R: right.clone().multiplyScalar(4.5), L: right.clone().multiplyScalar(-4.5) } });
     const pulley = t.pulleyAt();
     // Each fist round its rope end: the rope square to the forearm, thumbs towards the cable.
     for (const s of SIDES) {
@@ -389,7 +392,9 @@ const rotationalThrow: Spec = {
         const n = side.clone().multiplyScalar(s === "R" ? -1 : 1).addScaledVector(V3(0, -1, 0), 0.3).addScaledVector(fwd, -0.2).normalize();
         const along = hands.clone().sub(c.gh(s));
         const fingers = along.addScaledVector(n, -along.dot(n)).normalize().addScaledVector(fwd, 0.25).normalize();
-        c.palm(s, hands, n, held ? 12 : 13, fingers, { kind: held ? "cup" : "open" }, { contact: held });
+        // (The fingers open over the release and close again over the catch, rather than in one frame.)
+        const open = clamp01((c.phase - 0.28) / 0.08) * clamp01((0.68 - c.phase) / 0.08);
+        c.palm(s, hands, n, held ? 12 : 13, fingers, { kind: "blend", from: { kind: "cup" }, to: { kind: "open" }, t: open }, { contact: held });
       }
     }
     void wall;

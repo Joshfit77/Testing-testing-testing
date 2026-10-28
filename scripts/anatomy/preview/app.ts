@@ -1,5 +1,6 @@
 import { mountAthlete, type CameraView } from "../../../src/lib/anatomy3d/player";
 import { mountModel, type ModelFace, type ModelSkin } from "../../../src/lib/anatomy3d/model-viewer";
+import type { RigMeta } from "../../../src/lib/anatomy3d/body/skeleton";
 import { REGION_LABELS, type Region } from "../../../src/lib/anatomy3d/muscle-ids";
 import { EXERCISES } from "../../../src/data/exercises";
 import { getMotion } from "../../../src/lib/exercise-motion";
@@ -17,6 +18,7 @@ declare global {
     FACE_PARTS?: string[];
     /** The same for the anatomical rig's weights (anatomy/ecorche-rig.bin). */
     RIG_PARTS?: string[];
+    BAKE_PARTS?: Record<string, string[]>;
     modelVerified?: boolean;
     exerciseView?: string;
     exerciseSlugs?: string[];
@@ -155,7 +157,12 @@ async function runModel() {
     // white.
     const look = q.get("look") === "original" ? "original" : "gold";
     // The anatomical rig (its own equipment, hands on the handles); ?rig=old shows the first rig for comparison.
-    const rig = q.get("rig") === "old" ? undefined : { meta: await (await fetch("anatomy/ecorche-rig.json")).json(), data: await fetchBinary("anatomy/ecorche-rig.bin", window.RIG_PARTS, () => {}) };
+    const rig: { meta: RigMeta; data: ArrayBuffer; baked?: ArrayBuffer } | undefined =
+      q.get("rig") === "old" ? undefined : { meta: await (await fetch("anatomy/ecorche-rig.json")).json(), data: await fetchBinary("anatomy/ecorche-rig.bin", window.RIG_PARTS, () => {}) };
+    // The exercise's baked motion when there is one (?live=1 solves every frame instead, as the checks do).
+    // (In the artifact the bakes are text parts, listed by exercise; an exercise not listed has none.)
+    if (rig && q.get("live") !== "1" && (!window.BAKE_PARTS || window.BAKE_PARTS[ex.slug]))
+      rig.baked = await fetchBinary(`anatomy/bake/${ex.slug}.ngb`, window.BAKE_PARTS?.[ex.slug], () => {}).catch(() => undefined);
     viewer = await mountModel(canvas, { glb, face, look, rig, pixelRatio: Math.min(devicePixelRatio || 1, 2), exercise: { ex, skin, hideProps: ["rack"], reducedMotion } });
   } catch (e) {
     loading.textContent = "3D isn't available on this device.";

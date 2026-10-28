@@ -5,6 +5,7 @@ import type { RigMeta } from "../body/skeleton";
 import type { SolveReport } from "../body/solve";
 import { effortCurve, type EffortCurve } from "../effort";
 import type { PlayerExercise } from "../player";
+import { decodeBaked, playBaked, type Baked } from "./bake";
 import { makePerformer, type Performer } from "./perform";
 import { hasSpec, specFor } from "./specs";
 
@@ -18,6 +19,8 @@ export interface Mover3 {
   performer: Performer;
   /** True when the exercise has its own spec (equipment and grips); false: lifted motion, free hands, no equipment. */
   converted: boolean;
+  /** True when it plays a baked motion (solved offline), false when it solves every frame. */
+  baked: boolean;
   bounds: THREE.Box3;
   travels: boolean;
   following(): THREE.Box3;
@@ -47,7 +50,7 @@ export interface Mover3 {
 export function moveModel3(
   scene: THREE.Scene,
   model: THREE.Object3D,
-  o: { ex: PlayerExercise; rig: { meta: RigMeta; data: ArrayBuffer }; reducedMotion?: boolean },
+  o: { ex: PlayerExercise; rig: { meta: RigMeta; data: ArrayBuffer; baked?: ArrayBuffer | Baked }; reducedMotion?: boolean },
   changed: () => void,
 ): Mover3 {
   const bound = bindModel(model, o.rig);
@@ -63,10 +66,21 @@ export function moveModel3(
   const def = getMotion(o.ex.slug, o.ex.meta);
   const effort = effortCurve(def);
   const T = performer.duration;
+  // A baked motion (scripts/anatomy/bake-motions.mts) is played by interpolating its frames; without one, the
+  // performer solves each frame (fine on a desktop, too slow on a phone for exercises that hold equipment).
+  const bakedRaw = o.rig.baked;
+  const baked = bakedRaw ? (bakedRaw instanceof ArrayBuffer ? decodeBaked(bakedRaw) : bakedRaw) : null;
+  if (baked && (baked.bones !== sk.names.length || baked.pieces.length !== performer.pieces.length)) throw new Error(`baked motion for ${o.ex.slug} does not match the rig`);
+  const NONE: SolveReport = { reach: { wristR: 0, wristL: 0, ankleR: 0, ankleL: 0 }, handTurn: { R: 0, L: 0 }, limits: {} };
+  const poseAt = (time: number): SolveReport => {
+    if (!baked) return performer.pose(time);
+    playBaked(baked, time, sk, performer.pieces);
+    return NONE;
+  };
   let t = def.stillPhase !== undefined && o.reducedMotion ? def.stillPhase * T : 0;
   let speed = 1;
   let playing = !o.reducedMotion;
-  let last: SolveReport = performer.pose(t);
+  let last: SolveReport = poseAt(t);
   const listeners: ((t: number, e: number) => void)[] = [];
   const at = (name: string) => sk.pos[sk.i(name)]!;
   // Points up the body for the close-up camera: ankles, knees, pelvis, mid-back, neck, head, top of the head.
@@ -78,10 +92,10 @@ export function moveModel3(
   };
   sk.reset();
   const restUp = upPoints();
-  last = performer.pose(t);
+  last = poseAt(t);
   let nowUp = upPoints();
   const pose = () => {
-    last = performer.pose(t);
+    last = poseAt(t);
     bound.update();
     nowUp = upPoints();
     for (const l of listeners) l(t, effort.at(t));
@@ -147,6 +161,7 @@ export function moveModel3(
     bound,
     performer,
     converted: hasSpec(o.ex.slug),
+    baked: !!baked,
     bounds,
     travels,
     following: () => {

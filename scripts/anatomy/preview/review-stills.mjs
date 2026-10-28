@@ -26,7 +26,24 @@ for (const slug of slugs) {
   await p.goto(`http://localhost:${srv.address().port}/index.html?ex=${slug}${process.env.Q ?? ""}`);
   await p.waitForFunction(() => window.ready === true, null, { timeout: 240000 });
   const view = await p.evaluate(() => window.exerciseView);
-  const yaws = view === "side" ? [Math.PI / 2 - 0.55, 0.15, Math.PI - 0.3] : [0.3, Math.PI / 2 - 0.4, Math.PI - 0.3];
+  let yaws = view === "side" ? [Math.PI / 2 - 0.55, 0.15, Math.PI - 0.3] : [0.3, Math.PI / 2 - 0.4, Math.PI - 0.3];
+  // Each view from whichever side shows the figure (a wall or a cable stack must not stand between the camera and him):
+  // the yaw or its mirror, by how much of the gold figure a small still at mid-rep shows.
+  const gold = (yaw) =>
+    p.evaluate(async (yaw) => {
+      const img = new Image();
+      img.src = window.viewer.still({ yaw, width: 120, height: 120, t: window.viewer.motion.duration / 2, jpeg: true, fit: true });
+      await img.decode();
+      const c = document.createElement("canvas");
+      c.width = c.height = 120;
+      const g = c.getContext("2d");
+      g.drawImage(img, 0, 0);
+      const d = g.getImageData(0, 0, 120, 120).data;
+      let n = 0;
+      for (let i = 0; i < d.length; i += 4) if (d[i] > 60 && d[i] - d[i + 2] > 35 && d[i + 1] > d[i + 2]) n++;
+      return n;
+    }, yaw);
+  yaws = await Promise.all(yaws.map(async (y) => ((await gold(-y)) > (await gold(y)) * 1.5 ? -y : y)));
   const lines = [];
   for (const [i, ph] of phases.entries()) {
     for (const [j, yaw] of yaws.entries()) {

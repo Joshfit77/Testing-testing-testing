@@ -30,6 +30,9 @@ export class Piece {
   /** Solid parts in the piece's own frame, for the collision checks: segments with a radius, round-ended (a capsule)
    *  or, `flat`, a cylinder cut square at both ends (plates, wheels, posts). */
   readonly solids: Solid[] = [];
+  /** Moving parts inside the piece (a cable's ends, a seat on its rail, cranks), as numbers that can be stored with a
+   *  baked motion, interpolated, and set again. Pieces without them are rigid: their place is all there is. */
+  inner?: { get(): number[]; set(v: number[]): void };
   constructor(readonly kind: string) {
     this.obj.name = kind;
   }
@@ -135,6 +138,7 @@ export function makeCableTower(h = 215): Piece & { pulley: THREE.Group; setPulle
     p.obj.updateMatrixWorld(true);
   };
   p.pulleyAt = () => V3(4, p.pulley.position.y, 0).applyQuaternion(p.obj.quaternion).add(p.obj.position);
+  p.inner = { get: () => [p.pulley.position.y], set: (v) => p.setPulley(v[0]!) };
   p.solids.push({ a: V3(-14, 0, 0), b: V3(-14, h, 0), r: 9, flat: true }, { a: V3(-30, 5, 0), b: V3(-30, 75, 0), r: 12, flat: true });
   return p;
 }
@@ -144,7 +148,10 @@ export class Cable {
   readonly obj = new THREE.Group();
   private last = "";
   constructor(private radius = 0.4, private material: THREE.Material = M.cable) {}
+  /** The ends and sag it was last set to (for baking). */
+  args: number[] = [0, 0, 0, 0, 0, 0, 0];
   set(a: THREE.Vector3, b: THREE.Vector3, sag = 0): void {
+    this.args = [a.x, a.y, a.z, b.x, b.y, b.z, sag];
     const key = `${a.toArray().map((x) => x.toFixed(2))}|${b.toArray().map((x) => x.toFixed(2))}|${sag.toFixed(2)}`;
     if (key === this.last) return;
     this.last = key;
@@ -264,6 +271,7 @@ export function makeRower(): Piece & { set(seatX: number, handle: THREE.Vector3)
   p.local.R = { at: V3(0, 0, 10), axis: V3(0, 0, 1), radius: 1.6 };
   p.local.L = { at: V3(0, 0, -10), axis: V3(0, 0, 1), radius: 1.6 };
   const handleLocal = V3();
+  p.inner = { get: () => [seatG.position.x, handleLocal.x, handleLocal.y, handleLocal.z], set: (v) => p.set(v[0]!, V3(v[1], v[2], v[3])) };
   p.set = (seatX: number, h: THREE.Vector3) => {
     seatG.position.set(seatX, railY + 2 + 2.5 + 2, 0);
     handle.position.copy(h);
@@ -294,7 +302,7 @@ export function makeAirBike(): Piece & {
     pedalAt(side: "R" | "L", phase: number): THREE.Vector3;
   };
   // (Saddle 70 cm above the crank and 20 cm behind it, as a rider of this size sets it; the grips at about 125 cm.)
-  const seatTop = V3(-12, 102, 0);
+  const seatTop = V3(-6, 101, 0);
   const crank = V3(8, 32, 0);
   const pivot = V3(48, 54, 0);
   const GRIP = 70;
@@ -303,10 +311,11 @@ export function makeAirBike(): Piece & {
   fan.position.set(66, 42, 0);
   const fanRing = new THREE.Mesh(new THREE.TorusGeometry(30, 0.8, 8, 48), M.gold);
   fanRing.position.set(66, 42, 8.2);
-  const seat = box(26, 6, 20, M.pad);
+  // (A saddle as long and wide as an air bike's: the rider sits on its wide back, its nose under the pelvis.)
+  const seat = box(30, 6, 24, M.pad);
   seat.position.copy(seatTop).add(V3(0, -3, 0));
   const frame = new THREE.Group().add(
-    rod(V3(-12, 96, 0), crank, 2.6, M.frame),
+    rod(V3(-6, 95, 0), crank, 2.6, M.frame),
     rod(crank, V3(66, 42, 0), 2.6, M.frame),
     rod(V3(-30, 2, 0), V3(90, 2, 0), 2.4, M.frame),
     rod(V3(-30, 2, -24), V3(-30, 2, 24), 2.2, M.frame),
@@ -371,6 +380,11 @@ export function makeAirBike(): Piece & {
     p.obj.updateMatrixWorld(true);
   };
   p.set(0);
+  // (Stored as the crank's angle's cosine and sine, so it interpolates round the turn, never back through it.)
+  p.inner = {
+    get: () => [Math.cos(phase * Math.PI * 2), Math.sin(phase * Math.PI * 2)],
+    set: (v) => p.set(Math.atan2(v[1]!, v[0]!) / (Math.PI * 2)),
+  };
   p.solids.push({ a: V3(66, 42, -8), b: V3(66, 42, 8), r: 30, flat: true });
   return p;
 }
@@ -433,7 +447,17 @@ export function makeFlexRope(): Piece & { set(clip: THREE.Vector3, ends: Partial
   const clipMesh = new THREE.Mesh(new THREE.TorusGeometry(1.6, 0.45, 8, 16), M.steel);
   p.obj.add(tubes, clipMesh);
   let last = "";
+  let args: number[] = new Array(17).fill(0);
+  p.inner = {
+    get: () => args,
+    set: (v) => {
+      const end = (o: number) => (v[o] ? { at: V3(v[o + 1], v[o + 2], v[o + 3]), axis: V3(v[o + 4], v[o + 5], v[o + 6]) } : undefined);
+      p.set(V3(v[0], v[1], v[2]), { R: end(3), L: end(10) });
+    },
+  };
   p.set = (clip, ends) => {
+    const e = (x?: { at: THREE.Vector3; axis: THREE.Vector3 }) => (x ? [1, ...x.at.toArray(), ...x.axis.toArray()] : [0, 0, 0, 0, 0, 0, 0]);
+    args = [...clip.toArray(), ...e(ends.R), ...e(ends.L)];
     const key = JSON.stringify([clip, ends]);
     if (key === last) return;
     last = key;
