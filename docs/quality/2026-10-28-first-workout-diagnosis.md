@@ -61,7 +61,8 @@ on screen or reproduced by running the code; "suggestion" items were not. Line n
 - Unit: `tests/unit/workout-draft-session.test.ts` (new, 10), `tests/unit/training-schedule.test.ts` (rest-day cases) — full unit suite 2,665 passing.
 - Integration (local Supabase): 185 passing, 1 skipped (`tests/integration/workouts.test.ts` covers finish idempotency, records, program advance).
 - Type check and lint: clean.
-- E2E: `e2e/workout-reliability.spec.ts` (new) and `e2e/core-flow.spec.ts` (updated expectations) — results recorded below once run against the rebuilt demo.
+- E2E (Playwright, mobile Chromium, against the rebuilt demo): `e2e/workout-reliability.spec.ts` (new), `e2e/core-flow.spec.ts` (3) and `e2e/onboarding-plan.spec.ts` — 5 of 5 pass on the final build; `e2e/journeys.spec.ts` (5) passed on the build before the last two cosmetic fixes. `onboarding-plan.spec.ts` had asserted the phantom-draft behaviour ("Resume workout" after only opening the logger) and was corrected.
+- Walkthrough on the final build (`walk/journey2.mjs`, iPhone 15 size, New York time zone): confirmation link → onboarding ✓; "Why this program" ✓; Today card "Week 1 of 8 · Day 1 of 3" ✓; open-and-leave leaves no Resume ✓; double tap counts once and 135 lb carries down ✓; substitution keeps 2 done sets ✓; blank set's Done disabled ✓; reload restores ✓; finish shows Up next + Baselines, no "records" ✓; Home "Rest day today · Day 2 of 3 · planned for Friday, Oct 30" ✓; history 2109.9 lb in both places, "≈ 1.0 per week" ✓; ten-hour-old draft → "Unfinished workout", resumed with elapsed 0:00 ✓.
 
 ## Not tested here
 
