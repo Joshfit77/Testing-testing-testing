@@ -23,6 +23,11 @@ vertices more than 3 mm away). The motion and the barbell come from the app's ex
 the bar. The page has play/pause, a scrubber and speeds. The camera follows the hips at full view and, zoomed in, the
 part of the body in view, so a close-up of the face stays on the face through the rep. No muscle glow yet.
 
+- Look (owner's requests since): dark gold all over (the viewer's `goldAndBlack`; `?look=original` shows the file's red
+  and white), plain plates, a little bigger in the frame, and an actual face: the head's skin surface from BodyParts3D
+  (FMA7163), fitted onto this skull (mean 1.1 mm), smoothed and cut at the neck; the parts under it are hidden, his own
+  ears stay. Rebuild with `npx tsx scripts/anatomy/build-ecorche-face.mts <BodyParts3D_data>` (the BodyParts3D clone
+  below).
 - Video (simulated phone, headless Chromium with software WebGL; not a physical device):
   `renders/raw-ecorche/squat-phone.mp4`.
 

@@ -16,6 +16,7 @@
  * bytes, in blocks per part).
  */
 import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import * as THREE from "three";
 import { MeshBVH } from "three-mesh-bvh";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
@@ -32,7 +33,7 @@ const ALL = [
   "Frontal_bone", "Occipital_bone", "Sphenoid_bone", "Mandible", "Septal_nasal_cartilage", "External_ear",
   ...["parietal_bone", "temporal_bone", "zygomatic_bone", "maxilla", "nasal_bone", "lacrimal_bone", "lateral_nasal_cartilage", "major_alar_cartilage"].flatMap((n) => [`Left_${n}`, `Right_${n}`]),
 ];
-const FILL = process.env.FACE_LAYERS === "all" ? ALL : ["External_ear"];
+const FILL = process.env.FACE_LAYERS === "all" ? ALL : [];
 /** Thin parts (ears, nose cartilage): only coloured, with a fixed small lift, so their shape stays as it is. */
 const THIN = /ear$|cartilage$/i;
 const mm = 0.001;
@@ -70,6 +71,32 @@ const mIdx = surface.index!;
 const eyes = mergeGeometries(meshes.filter((m) => /(sclera|cornea)$/.test(m.name)).map(worldGeometry), false)!;
 const eyeBvh = new MeshBVH(eyes);
 
+/** Least-squares affine map from pairs (p → q), as rows [a b c t]. */
+const fitAffine = (P: number[][], Q: number[][]) => {
+  const N = Array.from({ length: 4 }, () => new Array(4).fill(0));
+  const B = Array.from({ length: 4 }, () => new Array(3).fill(0));
+  for (let n = 0; n < P.length; n++) {
+    const h = [...P[n]!, 1];
+    for (let i = 0; i < 4; i++) {
+      for (let j = 0; j < 4; j++) N[i]![j]! += h[i]! * h[j]!;
+      for (let c = 0; c < 3; c++) B[i]![c]! += h[i]! * Q[n]![c]!;
+    }
+  }
+  const aug = N.map((r, i) => [...r, ...B[i]!]);
+  for (let c = 0; c < 4; c++) {
+    let p = c;
+    for (let r = c + 1; r < 4; r++) if (Math.abs(aug[r]![c]!) > Math.abs(aug[p]![c]!)) p = r;
+    [aug[c], aug[p]] = [aug[p]!, aug[c]!];
+    const d = aug[c]![c]!;
+    for (let j = 0; j < 7; j++) aug[c]![j]! /= d;
+    for (let r = 0; r < 4; r++)
+      if (r !== c) {
+        const f = aug[r]![c]!;
+        for (let j = 0; j < 7; j++) aug[r]![j]! -= f * aug[c]![j]!;
+      }
+  }
+  return [0, 1, 2].map((c) => [aug[0]![4 + c]!, aug[1]![4 + c]!, aug[2]![4 + c]!, aug[3]![4 + c]!]);
+};
 const smooth = (a: number, b: number, x: number) => {
   const t = THREE.MathUtils.clamp((x - a) / (b - a), 0, 1);
   return t * t * (3 - 2 * t);
@@ -207,164 +234,182 @@ for (const { name, mesh, first, count: n } of parts) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// The face itself (owner's request: "give him a face"): one smooth red surface over the whole head, shrink-wrapped
-// round it, so the face reads as a face (forehead, brows, nose, cheeks, lips, chin) instead of separate muscles. The
-// eyes show through openings; the ears stay outside it.
-//
-// It is built on a sphere of directions round the centre of the head: along each direction, the outermost surface of
-// the head (muscles, bones, cartilage; not the ears or teeth). The grooves between the muscles are closed (a
-// morphological closing over 7 mm, then a blur, never less than 1 mm above the surface underneath), and it ends at the neck,
-// tucked in under itself.
-const C = new THREE.Vector3(0, 1.605, 0.01);
-const STEP = 0.0105; // radians: about 1 mm at the head's radius
-const headParts = meshes.filter((m) => head(m) && m.visible && !/_tooth$|External_ear/.test(m.name) && new THREE.Box3().setFromObject(m).min.y > 1.40);
-const isEye = (m: THREE.Mesh) => /(sclera|cornea)$/.test(m.name);
-const headGeoms = headParts.map((m) => {
-  const g = worldGeometry(m);
-  g.setAttribute("eye", new THREE.BufferAttribute(new Float32Array(g.getAttribute("position").count).fill(isEye(m) ? 1 : 0), 1));
-  return g;
-});
-const headAll = mergeGeometries(headGeoms, false)!;
-const headBvh = new MeshBVH(headAll);
-const eyeAttr = headAll.getAttribute("eye");
-const NT = Math.round((2 * Math.PI) / STEP), NP = Math.round(2.45 / STEP);
-const dir = (t: number, p: number) => new THREE.Vector3(Math.sin(p) * Math.sin((t * 2 * Math.PI) / NT), Math.cos(p), Math.sin(p) * Math.cos((t * 2 * Math.PI) / NT));
-// (Eye openings only where the eyes are: a ray that reaches an eye from elsewhere, through a gap, is not one.)
-const eyeBox = new THREE.Box3().setFromBufferAttribute(eyes.getAttribute("position") as THREE.BufferAttribute).expandByScalar(2 * mm);
-const outer = new Float64Array(NT * NP).fill(NaN);
-const eyeCell = new Uint8Array(NT * NP);
-const R = 0.3;
-for (let p = 0; p < NP; p++)
-  for (let t = 0; t < NT; t++) {
-    const d = dir(t, (p + 0.5) * STEP);
-    ray.origin.copy(C).addScaledVector(d, R);
-    ray.direction.copy(d).negate();
-    const hit = headBvh.raycastFirst(ray, bothSides, 0, R);
-    if (!hit) continue;
-    outer[p * NT + t] = R - hit.distance;
-    if (eyeAttr.getX(headAll.index!.getX(hit.faceIndex! * 3)) > 0.5 && eyeBox.containsPoint(hit.point) && hit.point.z > 0.07) eyeCell[p * NT + t] = 1;
-  }
-// A ray that slips through a hairline gap between two skull bones finds nothing behind it: such a spot takes the
-// height of the surface round it.
-for (let pass = 0; pass < 3; pass++)
-  for (let p = 1; p < NP - 1; p++)
-    for (let t = 0; t < NT; t++) {
-      if (!Number.isNaN(outer[p * NT + t]!)) continue;
-      let s = 0, k = 0;
-      for (let dp = -1; dp <= 1; dp++)
-        for (let dt = -1; dt <= 1; dt++) {
-          const v = outer[(p + dp) * NT + (((t + dt) % NT) + NT) % NT]!;
-          if (!Number.isNaN(v)) {
-            s += v;
-            k++;
+// The face (owner's requests: "give him a face", "give a actual face like appearance", "his eyes look weird"): the
+// head's skin surface from BodyParts3D, the anatomy the model's bones come from (CC BY 4.0, credited with the model).
+// It is a real person's face, shaped over this skull: eyes, lids, nose, lips, chin and ears as they are, so it reads as
+// an actual face (in gold, a bust). It is fitted onto the model's skull (BodyParts3D's skull bones onto the file's,
+// by an affine fit on nearest points), lightly smoothed (the scan is faceted), and cut at the middle of the neck,
+// tucked in under itself. The parts of the file it covers entirely (skull, face muscles, eyes, teeth) are hidden; the
+// ears stay (the skin surface has none).
+const BP3D = process.argv[2] ?? process.env.BP3D;
+if (!BP3D) throw new Error("usage: build-ecorche-face.mts <BodyParts3D_data folder> (git clone https://github.com/Kevin-Mattheus-Moerman/BodyParts3D; assets/BodyParts3D_data)");
+/** An STL's triangles (millimetres, z up). */
+const stl = (id: string) => {
+  const b = readFileSync(join(BP3D, "stl", `${id}.stl`));
+  const n = b.readUInt32LE(80);
+  const f = new Float32Array(n * 9);
+  for (let i = 0; i < n; i++) for (let k = 0; k < 9; k++) f[i * 9 + k] = b.readFloatLE(84 + i * 50 + 12 + k * 4);
+  return f;
+};
+// The skull, in both: BodyParts3D's bones and the file's.
+const SKULL_BP3D = ["FMA52734", "FMA52735", "FMA52748", "FMA52738", "FMA52739", "FMA52788", "FMA52789", "FMA52892", "FMA52893", "FMA53649", "FMA53650"];
+const SKULL_FILE = /^(Frontal_bone|Occipital_bone|Mandible|(Left|Right)_(temporal_bone|parietal_bone|zygomatic_bone|maxilla))$/;
+const bpSkull: THREE.Vector3[] = [];
+for (const id of SKULL_BP3D) {
+  const f = stl(id);
+  for (let i = 0; i < f.length; i += 9) bpSkull.push(new THREE.Vector3(f[i], f[i + 1], f[i + 2]));
+}
+const fileSkull: THREE.Vector3[] = [];
+for (const m of meshes.filter((x) => SKULL_FILE.test(x.name))) {
+  const pa = worldGeometry(m).getAttribute("position");
+  for (let i = 0; i < pa.count; i++) fileSkull.push(new THREE.Vector3().fromBufferAttribute(pa, i));
+}
+// Start: BodyParts3D is in mm with z up and the face towards -y; the file is in metres with y up and the face towards
+// +z (checked below from where the face is), centres and heights matched.
+const box = (pts: THREE.Vector3[]) => new THREE.Box3().setFromPoints(pts);
+const bb = box(bpSkull), fb = box(fileSkull);
+const bc = bb.getCenter(new THREE.Vector3()), fc = fb.getCenter(new THREE.Vector3());
+const faceSign = (() => {
+  const maxilla = stl("FMA53649");
+  let y = 0;
+  for (let i = 1; i < maxilla.length; i += 3) y += maxilla[i]!;
+  return y / (maxilla.length / 3) < bc.y ? -1 : 1; // the face is on this side of y
+})();
+const k0 = (fb.max.y - fb.min.y) / (bb.max.z - bb.min.z);
+// file = A · bp + t; rows of A: x' = k·x·sx, y' = k·z, z' = k·y·faceSign (sx keeps the handedness: a mirror if needed).
+const handed = -faceSign; // x' × y' = z' must hold with the face on +z
+let A = [
+  [k0 * handed, 0, 0, 0],
+  [0, 0, k0, 0],
+  [0, k0 * faceSign, 0, 0],
+];
+const applyA = (a: number[][], v: THREE.Vector3) => new THREE.Vector3(...(a.map((r) => r[0]! * v.x + r[1]! * v.y + r[2]! * v.z + r[3]!) as [number, number, number]));
+{
+  const c = applyA(A, bc);
+  for (let r = 0; r < 3; r++) A[r]![3] = [fc.x, fc.y, fc.z][r]! - [c.x, c.y, c.z][r]!;
+}
+// Fit: affine least squares on nearest points, 20 rounds.
+const fileCloud = new THREE.BufferGeometry().setFromPoints(fileSkull);
+const cloudIndex = new Map<string, number[]>();
+const CELL = 0.004;
+const ck = (v: THREE.Vector3, dx = 0, dy = 0, dz = 0) => `${Math.floor(v.x / CELL) + dx},${Math.floor(v.y / CELL) + dy},${Math.floor(v.z / CELL) + dz}`;
+fileSkull.forEach((v, i) => (cloudIndex.get(ck(v)) ?? cloudIndex.set(ck(v), []).get(ck(v))!).push(i));
+const nearestFile = (q: THREE.Vector3) => {
+  let best = -1, bd = Infinity;
+  for (let dx = -2; dx <= 2; dx++)
+    for (let dy = -2; dy <= 2; dy++)
+      for (let dz = -2; dz <= 2; dz++)
+        for (const i of cloudIndex.get(ck(q, dx, dy, dz)) ?? []) {
+          const d = fileSkull[i]!.distanceToSquared(q);
+          if (d < bd) {
+            bd = d;
+            best = i;
           }
         }
-      if (k >= 5) outer[p * NT + t] = s / k;
-    }
-const at = (a: Float64Array, p: number, t: number) => a[THREE.MathUtils.clamp(p, 0, NP - 1) * NT + ((t % NT) + NT) % NT]!;
-// Closing (dilate, then erode) over a disc of about 4 mm, measured on the sphere.
-const disc = (p: number, fn: (q: number, u: number) => void) => {
-  const rad = 7;
-  for (let dp = -rad; dp <= rad; dp++) {
-    const q = p + dp;
-    if (q < 0 || q >= NP) continue;
-    const span = Math.min(NT / 2, Math.ceil(rad / Math.max(0.15, Math.sin((q + 0.5) * STEP))));
-    for (let dt = -span; dt <= span; dt++) {
-      const s = Math.sin((q + 0.5) * STEP) * dt;
-      if (dp * dp + s * s <= rad * rad) fn(q, dt);
-    }
-  }
+  return best < 0 ? null : { p: fileSkull[best]!, d: Math.sqrt(bd) };
 };
-const filled = Float64Array.from(outer, (v) => (Number.isNaN(v) ? 0 : v));
-const dil = new Float64Array(NT * NP), clo = new Float64Array(NT * NP);
-for (let p = 0; p < NP; p++)
-  for (let t = 0; t < NT; t++) {
-    let m = 0;
-    disc(p, (q, dt) => (m = Math.max(m, at(filled, q, t + dt))));
-    dil[p * NT + t] = m;
+const sample = bpSkull.filter((_, i) => i % Math.max(1, Math.floor(bpSkull.length / 20000)) === 0);
+for (let it = 0; it < 20; it++) {
+  const P: number[][] = [], Q: number[][] = [];
+  let sum = 0;
+  for (const v of sample) {
+    const q = applyA(A, v);
+    const n = nearestFile(q);
+    if (!n || n.d > 0.01) continue;
+    sum += n.d;
+    P.push([v.x, v.y, v.z]);
+    Q.push([n.p.x, n.p.y, n.p.z]);
   }
-for (let p = 0; p < NP; p++)
-  for (let t = 0; t < NT; t++) {
-    let m = Infinity;
-    disc(p, (q, dt) => (m = Math.min(m, at(dil, q, t + dt))));
-    clo[p * NT + t] = m;
-  }
-// Round off steps (the top edge of the forehead muscle, the edges of the cheek muscles): blur that only ever raises.
-let rr = clo;
-for (let it = 0; it < 10; it++) {
-  const next = new Float64Array(NT * NP);
-  for (let p = 0; p < NP; p++)
-    for (let t = 0; t < NT; t++) {
-      const v = (at(rr, p - 1, t) + at(rr, p + 1, t) + at(rr, p, t - 1) + at(rr, p, t + 1)) / 4;
-      next[p * NT + t] = Math.max(at(rr, p, t), v);
-    }
-  rr = next;
+  A = fitAffine(P, Q);
+  if (it % 5 === 4 || it === 19) console.log(`skull fit ${it + 1}: mean distance ${((sum / P.length) * 1000).toFixed(2)} mm over ${P.length} points`);
 }
-// Blur, never below the surface underneath (+1 mm).
-for (let it = 0; it < 10; it++) {
-  const next = new Float64Array(NT * NP);
-  for (let p = 0; p < NP; p++)
-    for (let t = 0; t < NT; t++) {
-      const v = (2 * at(rr, p, t) + at(rr, p - 1, t) + at(rr, p + 1, t) + at(rr, p, t - 1) + at(rr, p, t + 1)) / 6;
-      const o = outer[p * NT + t]!;
-      next[p * NT + t] = Number.isNaN(o) ? v : Math.max(v, o + 1 * mm);
+fileCloud.dispose();
+
+// The skin of the head and neck, in the file's frame: welded, lightly smoothed (Taubin, keeps the shape), cut at the
+// middle of the neck.
+const skinTris = stl("FMA7163");
+let topZ = -Infinity;
+for (let i = 2; i < skinTris.length; i += 3) topZ = Math.max(topZ, skinTris[i]!);
+const CUT = 1.465, TUCK = 0.006;
+const vmap = new Map<string, number>();
+const verts: THREE.Vector3[] = [];
+const faces: number[] = [];
+for (let i = 0; i < skinTris.length; i += 9) {
+  if (skinTris[i + 2]! < topZ - 330 || skinTris[i + 5]! < topZ - 330 || skinTris[i + 8]! < topZ - 330) continue;
+  const ids = [0, 1, 2].map((k) => {
+    const x = skinTris[i + k * 3]!, y = skinTris[i + k * 3 + 1]!, z = skinTris[i + k * 3 + 2]!;
+    const key = `${Math.round(x * 1e3)},${Math.round(y * 1e3)},${Math.round(z * 1e3)}`;
+    let id = vmap.get(key);
+    if (id === undefined) {
+      id = verts.length;
+      vmap.set(key, id);
+      verts.push(applyA(A, new THREE.Vector3(x, y, z)));
     }
-  rr = next;
+    return id;
+  });
+  if (ids[0] !== ids[1] && ids[1] !== ids[2] && ids[0] !== ids[2]) faces.push(...ids);
 }
-// Where it ends: the neck (below y = 1.495) and directions that miss the head. Cells next to the edge tuck in by 2 mm.
-const keep = new Uint8Array(NT * NP);
-const pos = (p: number, t: number, r: number) => dir(t, (p + 0.5) * STEP).multiplyScalar(r).add(C);
-for (let p = 0; p < NP; p++)
-  for (let t = 0; t < NT; t++) {
-    const o = outer[p * NT + t]!;
-    if (!Number.isNaN(o) && pos(p, t, rr[p * NT + t]!).y >= 1.495) keep[p * NT + t] = 1;
+const adj = verts.map(() => new Set<number>());
+for (let i = 0; i < faces.length; i += 3)
+  for (let k = 0; k < 3; k++) {
+    adj[faces[i + k]!]!.add(faces[i + ((k + 1) % 3)]!);
+    adj[faces[i + k]!]!.add(faces[i + ((k + 2) % 3)]!);
   }
-const edgeDist = new Float64Array(NT * NP).fill(99);
-for (let p = 0; p < NP; p++)
-  for (let t = 0; t < NT; t++)
-    if (keep[p * NT + t])
-      for (let dp = -3; dp <= 3; dp++)
-        for (let dt = -3; dt <= 3; dt++) {
-          const q = p + dp;
-          if (q >= 0 && q < NP && !keep[q * NT + (((t + dt) % NT) + NT) % NT]) edgeDist[p * NT + t] = Math.min(edgeDist[p * NT + t]!, Math.hypot(dp, dt));
-        }
+for (let it = 0; it < 20; it++)
+  for (const f of [0.5, -0.53]) {
+    const next = verts.map((v, i) => {
+      if (!adj[i]!.size) return v.clone();
+      const avg = new THREE.Vector3();
+      for (const j of adj[i]!) avg.add(verts[j]!);
+      avg.multiplyScalar(1 / adj[i]!.size);
+      return v.clone().lerp(avg, f);
+    });
+    next.forEach((v, i) => verts[i]!.copy(v));
+  }
+// Normals (for the small outward lift and the tuck), then the cut.
+const sg = new THREE.BufferGeometry().setFromPoints(verts);
+sg.setIndex(faces);
+sg.computeVertexNormals();
+const sn = sg.getAttribute("normal");
+const keepV = verts.map((v) => v.y >= CUT);
+const newId = new Int32Array(verts.length).fill(-1);
+const vPos: number[] = [], vCol: number[] = [], vSkin: number[] = [];
 // Skin weights: those of the nearest vertex of the file (so the neck end bends with the neck).
 const skinMeta = JSON.parse(readFileSync("public/anatomy/ecorche-skin.json", "utf8"));
 const skinBin = readFileSync("public/anatomy/ecorche-skin.bin");
 const offsetOf = new Map<string, number>(skinMeta.meshes.map((e: { name: string; offset: number }) => [e.name, e.offset]));
-const vidGeoms = headParts.map((m) => {
-  const g = worldGeometry(m);
-  const base = offsetOf.get(m.name.replace(/_/g, " ")) ?? offsetOf.get(m.name)!;
-  g.setAttribute("vid", new THREE.BufferAttribute(Float32Array.from({ length: g.getAttribute("position").count }, (_, i) => base + i), 1));
-  return g;
-});
-const vidAll = mergeGeometries(vidGeoms, false)!;
+const near = meshes.filter((m) => new THREE.Box3().setFromObject(m).max.y > 1.4);
+const vidAll = mergeGeometries(
+  near.map((m) => {
+    const g = worldGeometry(m);
+    const base = offsetOf.get(m.name) ?? offsetOf.get(m.name.replace(/_/g, " "))!;
+    g.setAttribute("vid", new THREE.BufferAttribute(Float32Array.from({ length: g.getAttribute("position").count }, (_, i) => base + i), 1));
+    return g;
+  }),
+  false,
+)!;
 const vidBvh = new MeshBVH(vidAll);
 const vidAttr = vidAll.getAttribute("vid");
-const vIndex = new Int32Array(NT * NP).fill(-1);
-const vPos: number[] = [], vCol: number[] = [], vSkin: number[] = [];
-for (let p = 0; p < NP; p++)
-  for (let t = 0; t < NT; t++) {
-    const c = p * NT + t;
-    if (!keep[c] || eyeCell[c]) continue;
-    const tuck = smooth(0, 3, edgeDist[c]!);
-    const w = pos(p, t, rr[c]! - (1 - tuck) * 2 * mm);
-    vIndex[c] = vPos.length / 3;
-    vPos.push(w.x, w.y, w.z);
-    const col = BASE.clone();
-    vCol.push(...[col.x, col.y, col.z].map((x) => Math.round(Math.sqrt(x) * 255)));
-    const near = vidBvh.closestPointToPoint(w)!;
-    const vid = Math.round(vidAttr.getX(vidAll.index!.getX(near.faceIndex! * 3)));
-    for (let k = 0; k < 8; k++) vSkin.push(skinBin[vid * 8 + k]!);
-  }
+verts.forEach((v, i) => {
+  if (!keepV[i]) return;
+  // 0.8 mm out, so nothing of the model under the skin shows through; near the cut it tucks in under itself.
+  const lift = 0.8 * mm - 2.5 * mm * (1 - smooth(CUT, CUT + TUCK, v.y));
+  const w = v.clone().addScaledVector(new THREE.Vector3().fromBufferAttribute(sn, i), lift);
+  newId[i] = vPos.length / 3;
+  vPos.push(w.x, w.y, w.z);
+  vCol.push(...[BASE.x, BASE.y, BASE.z].map((x) => Math.round(Math.sqrt(x) * 255)));
+  const hit = vidBvh.closestPointToPoint(w)!;
+  const vid = Math.round(vidAttr.getX(vidAll.index!.getX(hit.faceIndex! * 3)));
+  for (let k = 0; k < 8; k++) vSkin.push(skinBin[vid * 8 + k]!);
+});
 const tri: number[] = [];
-for (let p = 0; p < NP - 1; p++)
-  for (let t = 0; t < NT; t++) {
-    const a = vIndex[p * NT + t]!, b = vIndex[p * NT + ((t + 1) % NT)]!, c = vIndex[(p + 1) * NT + t]!, d = vIndex[(p + 1) * NT + ((t + 1) % NT)]!;
-    // (Outward-facing winding.)
-    if (a >= 0 && c >= 0 && b >= 0) tri.push(a, c, b);
-    if (b >= 0 && c >= 0 && d >= 0) tri.push(b, c, d);
-  }
+for (let i = 0; i < faces.length; i += 3) {
+  const [a, b, c] = [faces[i]!, faces[i + 1]!, faces[i + 2]!].map((x) => newId[x]!);
+  if (a! >= 0 && b! >= 0 && c! >= 0) tri.push(a!, b!, c!);
+}
+// The file's parts the skin covers entirely (all of the part above the neck cut, a little above it): hidden.
+// (Not the ears: the skin surface has none, so the model's own ears stay.)
+const covered = meshes.filter((m) => !/External_ear/.test(m.name) && new THREE.Box3().setFromObject(m).min.y > CUT + 0.012).map((m) => m.name);
 const nv = vPos.length / 3;
 const shellBuf = Buffer.alloc(nv * 12 + nv * 3 + nv * 8 + tri.length * 4);
 new Float32Array(shellBuf.buffer, shellBuf.byteOffset, nv * 3).set(vPos);
@@ -374,14 +419,14 @@ for (let i = 0; i < tri.length; i++) shellBuf.writeUInt32LE(tri[i]!, nv * 23 + i
 const shell = { vertices: nv, triangles: tri.length / 3, offset: byteOffset };
 blocks.push(shellBuf);
 byteOffset += shellBuf.length;
-console.log(`face surface: ${nv} vertices, ${tri.length / 3} triangles`);
+console.log(`face (skin of the head): ${nv} vertices, ${tri.length / 3} triangles; ${covered.length} parts of the file covered`);
 
 writeFileSync("public/anatomy/ecorche-face.bin", Buffer.concat(blocks));
 writeFileSync(
   "public/anatomy/ecorche-face.json",
   JSON.stringify({
     source: "Filled-in face for public/anatomy/ecorche.glb (scripts/anatomy/build-ecorche-face.mts)",
-    hide: meshes.filter((m) => /_tooth$/.test(m.name)).map((m) => m.name),
+    hide: [...new Set([...meshes.filter((m) => /_tooth$/.test(m.name)).map((m) => m.name), ...covered])],
     layers: entries,
     // The face surface: positions (float32 ×3, file frame), colours (3 bytes, square-root coded), skin weights (4 bone
     // indices, 4 weights), then triangles (uint32 ×3), from `offset`.

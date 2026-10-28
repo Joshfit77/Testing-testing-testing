@@ -84,7 +84,7 @@ export async function mountModel(
     pixelRatio?: number;
     /** Iris and pupil on the corneas (default on; see paintEyes). */
     eyes?: boolean;
-    /** Colours: the file's own red and white, or gold and black (owner's request: red becomes gold, white black). */
+    /** Colours: the file's own red and white, or all gold in the app's gold (see goldAndBlack). */
     look?: "original" | "gold";
     /** The face: a smooth red surface over the head, red ears, teeth hidden (see fillFace). */
     face?: ModelFace;
@@ -123,7 +123,9 @@ export async function mountModel(
   let yaw = 0;
   let pitch = 0.05;
   let zoomK = 1;
-  let targetY = center.y;
+  // (A little above the middle, so the head clears the top of the frame with the figure this size.)
+  const homeY = center.y + 0.025 * H;
+  let targetY = homeY;
   let raf = 0;
   // (Redraw requests from the motion: play, seek. Set once `request` exists.)
   let changed = () => {};
@@ -132,8 +134,8 @@ export async function mountModel(
   // Distance that fits the whole figure (with a margin) in the frame, for the current aspect ratio.
   const fitDistance = (aspect: number) => {
     const half = THREE.MathUtils.degToRad(FOV / 2);
-    const byHeight = (H * 0.56) / Math.tan(half);
-    const byWidth = ((box.max.x - box.min.x) * 0.62) / (Math.tan(half) * aspect);
+    const byHeight = (H * 0.53) / Math.tan(half);
+    const byWidth = ((box.max.x - box.min.x) * 0.58) / (Math.tan(half) * aspect);
     return Math.max(byHeight, byWidth);
   };
   const place = (cam: THREE.PerspectiveCamera, y: number, p: number, dist: number, at: THREE.Vector3) => {
@@ -200,7 +202,7 @@ export async function mountModel(
       yaw = VIEW_YAW[v];
       pitch = 0.05;
       zoomK = 1;
-      targetY = center.y;
+      targetY = homeY;
       request();
     },
     resize(w, h) {
@@ -305,10 +307,11 @@ function fillFace(model: THREE.Object3D, face: ModelFace) {
  * (the line from the eyeball's centre through the cornea) and makes it a little glossier, like a wet eye.
  */
 /**
- * Gold and black (owner's request: "all red make gold and the white black"). Each fragment's colour in the file says
- * what it is: red is muscle, white is bone, tendon and cartilage. Red becomes polished gold, keeping the file's own
- * light and dark (the muscle fibres); white becomes glossy black. The whites of the eyes are left as they are. Only the
- * materials change; the file's geometry and colours are untouched.
+ * All gold, in the app's darker gold (owner's requests: first "all red make gold and the white black", then "make him
+ * fully gold but darker gold like the app"). Each fragment's colour in the file says what it is: red is muscle, white
+ * is bone, tendon and cartilage. Red becomes the app's gold (#C9A54C), keeping the file's own light and dark (the
+ * muscle fibres); white becomes a deeper, satin gold, so the tendons still read. The whites of the eyes are left as
+ * they are. Only the materials change; the file's geometry and colours are untouched.
  */
 function goldAndBlack(model: THREE.Object3D) {
   const materials = new Set<THREE.MeshStandardMaterial>();
@@ -332,20 +335,20 @@ function goldAndBlack(model: THREE.Object3D) {
           `#include <color_fragment>
           // How white this point is in the file (red muscle: green/red about 0.1; white: about 0.9).
           float white = smoothstep(0.35, 0.7, vColor.g / max(vColor.r, 1e-3));
-          float shade = clamp(vColor.r / 0.21, 0.45, 1.3);
-          vec3 gold = vec3(0.96, 0.64, 0.22) * shade;
-          vec3 black = vec3(0.018) * clamp(vColor.r / 0.35, 0.6, 1.4);
-          diffuseColor.rgb = mix(gold, black, white);`,
+          // A dark gold (the app's #C9A54C, darker), keeping the file's light and dark; the white parts deeper still.
+          float shade = clamp(vColor.r / 0.21, 0.5, 1.15);
+          vec3 gold = vec3(0.4, 0.262, 0.06);
+          diffuseColor.rgb = mix(gold * shade, gold * 0.62, white);`,
         )
         .replace(
           "#include <metalnessmap_fragment>",
           `#include <metalnessmap_fragment>
-          metalnessFactor = mix(0.95, 0.15, white);`,
+          metalnessFactor = mix(0.95, 0.9, white);`,
         )
         .replace(
           "#include <roughnessmap_fragment>",
           `#include <roughnessmap_fragment>
-          roughnessFactor = mix(0.3, 0.38, white);`,
+          roughnessFactor = mix(0.34, 0.5, white);`,
         );
     };
     m.customProgramCacheKey = () => "gold-and-black";
