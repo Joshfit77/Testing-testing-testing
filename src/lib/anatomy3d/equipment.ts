@@ -124,18 +124,19 @@ export function barbell(r: number, opts: { plates?: boolean; thick?: number } = 
   return g;
 }
 
-export function dumbbell(scale: number): THREE.Group {
+export function dumbbell(scale: number, handleLength = 13): THREE.Group {
   const g = new THREE.Group();
-  const handle = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 13, 12), M.knurl);
+  const half = handleLength / 2;
+  const handle = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, handleLength, 12), M.knurl);
   handle.rotation.x = Math.PI / 2;
   g.add(handle);
   for (const k of [-1, 1]) {
     const head = new THREE.Mesh(new THREE.CylinderGeometry(5.6 * scale, 5.6 * scale, 7 * scale, 6), M.black);
     head.rotation.x = Math.PI / 2;
-    head.position.z = k * (6.5 + 3.5 * scale);
+    head.position.z = k * (half + 3.5 * scale);
     const band = new THREE.Mesh(new THREE.CylinderGeometry(5.7 * scale, 5.7 * scale, 1.2, 6), M.gold);
     band.rotation.x = Math.PI / 2;
-    band.position.z = k * 6.8;
+    band.position.z = k * (half + 0.3);
     g.add(head, band);
   }
   return g;

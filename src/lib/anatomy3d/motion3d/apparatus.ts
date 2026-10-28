@@ -15,13 +15,21 @@ export interface Handle {
 
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 
+export interface Solid {
+  a: THREE.Vector3;
+  b: THREE.Vector3;
+  r: number;
+  flat?: boolean;
+}
+
 /** A piece whose object is posed by a matrix (position + rotation) and whose handles are fixed in its own frame. */
 export class Piece {
   readonly obj = new THREE.Group();
   /** Handles in the piece's own frame. */
   readonly local: Record<string, Handle> = {};
-  /** Solid parts in the piece's own frame, for the collision checks: segments with a radius. */
-  readonly solids: { a: THREE.Vector3; b: THREE.Vector3; r: number }[] = [];
+  /** Solid parts in the piece's own frame, for the collision checks: segments with a radius, round-ended (a capsule)
+   *  or, `flat`, a cylinder cut square at both ends (plates, wheels, posts). */
+  readonly solids: Solid[] = [];
   constructor(readonly kind: string) {
     this.obj.name = kind;
   }
@@ -39,9 +47,9 @@ export class Piece {
     const q = this.obj.quaternion;
     return { at: h.at.clone().applyQuaternion(q).add(this.obj.position), axis: h.axis.clone().applyQuaternion(q).normalize(), radius: h.radius };
   }
-  solidsWorld(): { a: THREE.Vector3; b: THREE.Vector3; r: number }[] {
+  solidsWorld(): Solid[] {
     const m = this.obj.matrix;
-    return this.solids.map((s) => ({ a: s.a.clone().applyMatrix4(m), b: s.b.clone().applyMatrix4(m), r: s.r }));
+    return this.solids.map((s) => ({ ...s, a: s.a.clone().applyMatrix4(m), b: s.b.clone().applyMatrix4(m) }));
   }
 }
 
@@ -56,17 +64,19 @@ export function makeBarbell(o: { plateR?: number; plates?: boolean; thick?: numb
   p.local.R = { at: V3(0, 0, g), axis: V3(0, 0, 1), radius: r };
   p.local.L = { at: V3(0, 0, -g), axis: V3(0, 0, 1), radius: r };
   p.solids.push({ a: V3(0, 0, -65), b: V3(0, 0, 65), r });
-  if (o.plates !== false) for (const k of [-1, 1]) p.solids.push({ a: V3(0, 0, k * 68), b: V3(0, 0, k * 82), r: o.plateR ?? 22.5 });
+  if (o.plates !== false) for (const k of [-1, 1]) p.solids.push({ a: V3(0, 0, k * 68), b: V3(0, 0, k * 82), r: o.plateR ?? 22.5, flat: true });
   return p;
 }
 
 /** Dumbbell with the handle along local Z (centre = the middle of the handle). */
 export function makeDumbbell(scale = 1): Piece {
   const p = new Piece("dumbbell");
-  p.obj.add(dumbbell(scale));
+  // (A 14 cm handle between the heads, as on most fixed dumbbells: room for the whole fist.)
+  const half = 7;
+  p.obj.add(dumbbell(scale, half * 2));
   p.local.grip = { at: V3(), axis: V3(0, 0, 1), radius: 1.6 };
-  p.solids.push({ a: V3(0, 0, -6.5), b: V3(0, 0, 6.5), r: 1.6 });
-  for (const k of [-1, 1]) p.solids.push({ a: V3(0, 0, k * 6.5), b: V3(0, 0, k * (6.5 + 7 * scale)), r: 5.6 * scale });
+  p.solids.push({ a: V3(0, 0, -half), b: V3(0, 0, half), r: 1.6 });
+  for (const k of [-1, 1]) p.solids.push({ a: V3(0, 0, k * half), b: V3(0, 0, k * (half + 7 * scale)), r: 5.6 * scale, flat: true });
   return p;
 }
 
@@ -125,7 +135,7 @@ export function makeCableTower(h = 215): Piece & { pulley: THREE.Group; setPulle
     p.obj.updateMatrixWorld(true);
   };
   p.pulleyAt = () => V3(4, p.pulley.position.y, 0).applyQuaternion(p.obj.quaternion).add(p.obj.position);
-  p.solids.push({ a: V3(-14, 0, 0), b: V3(-14, h, 0), r: 9 }, { a: V3(-30, 5, 0), b: V3(-30, 75, 0), r: 12 });
+  p.solids.push({ a: V3(-14, 0, 0), b: V3(-14, h, 0), r: 9, flat: true }, { a: V3(-30, 5, 0), b: V3(-30, 75, 0), r: 12, flat: true });
   return p;
 }
 
@@ -262,7 +272,7 @@ export function makeRower(): Piece & { set(seatX: number, handle: THREE.Vector3)
     p.local.R!.at.set(h.x, h.y, 10);
     p.local.L!.at.set(h.x, h.y, -10);
   };
-  p.solids.push({ a: V3(-90, railY, 0), b: V3(60, railY, 0), r: 4 }, { a: V3(88, 40, -8), b: V3(88, 40, 8), r: 26 });
+  p.solids.push({ a: V3(-90, railY, 0), b: V3(60, railY, 0), r: 4 }, { a: V3(88, 40, -8), b: V3(88, 40, 8), r: 26, flat: true });
   return p;
 }
 
@@ -271,11 +281,23 @@ export function makeRower(): Piece & { set(seatX: number, handle: THREE.Vector3)
  * swing forward and back opposite each other, linked to the pedals. `set(phase)` turns the cranks (one turn per
  * phase 0→1); handles "R"/"L" are the tops of the levers (vertical grips).
  */
-export function makeAirBike(): Piece & { set(phase: number): void; seat: THREE.Vector3; pedal(side: "R" | "L"): THREE.Vector3 } {
-  const p = new Piece("airBike") as Piece & { set(phase: number): void; seat: THREE.Vector3; pedal(side: "R" | "L"): THREE.Vector3 };
-  const seatTop = V3(-8, 92, 0);
+export function makeAirBike(): Piece & {
+  set(phase: number): void;
+  seat: THREE.Vector3;
+  pedal(side: "R" | "L"): THREE.Vector3;
+  pedalAt(side: "R" | "L", phase: number): THREE.Vector3;
+} {
+  const p = new Piece("airBike") as Piece & {
+    set(phase: number): void;
+    seat: THREE.Vector3;
+    pedal(side: "R" | "L"): THREE.Vector3;
+    pedalAt(side: "R" | "L", phase: number): THREE.Vector3;
+  };
+  // (Saddle 70 cm above the crank and 20 cm behind it, as a rider of this size sets it; the grips at about 125 cm.)
+  const seatTop = V3(-12, 102, 0);
   const crank = V3(8, 32, 0);
-  const pivot = V3(48, 50, 0);
+  const pivot = V3(48, 54, 0);
+  const GRIP = 70;
   const fan = new THREE.Mesh(new THREE.CylinderGeometry(30, 30, 16, 40), M.black);
   fan.rotation.x = Math.PI / 2;
   fan.position.set(66, 42, 0);
@@ -284,7 +306,7 @@ export function makeAirBike(): Piece & { set(phase: number): void; seat: THREE.V
   const seat = box(26, 6, 20, M.pad);
   seat.position.copy(seatTop).add(V3(0, -3, 0));
   const frame = new THREE.Group().add(
-    rod(V3(-8, 86, 0), crank, 2.6, M.frame),
+    rod(V3(-12, 96, 0), crank, 2.6, M.frame),
     rod(crank, V3(66, 42, 0), 2.6, M.frame),
     rod(V3(-30, 2, 0), V3(90, 2, 0), 2.4, M.frame),
     rod(V3(-30, 2, -24), V3(-30, 2, 24), 2.2, M.frame),
@@ -299,10 +321,10 @@ export function makeAirBike(): Piece & { set(phase: number): void; seat: THREE.V
     const k = s === "R" ? 1 : -1;
     // Lever: from the pivot up to the grip (local, the lever's frame at the pivot, pointing up).
     const L = new THREE.Group();
-    L.add(rod(V3(0, 0, k * 22), V3(0, 72, k * 22), 1.8, M.frame));
+    L.add(rod(V3(0, 0, k * 22), V3(0, GRIP + 6, k * 22), 1.8, M.frame));
     L.add(rod(V3(0, 0, k * 8), V3(0, 0, k * 22), 1.8, M.frame));
     const grip = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 1.8, 16, 14), M.pad);
-    grip.position.set(0, 66, k * 22);
+    grip.position.set(0, GRIP, k * 22);
     L.add(grip);
     L.position.copy(pivot);
     levers[s] = L;
@@ -314,11 +336,15 @@ export function makeAirBike(): Piece & { set(phase: number): void; seat: THREE.V
   p.obj.add(fan, fanRing, seat, frame, cranks);
   p.seat = seatTop.clone();
   let phase = 0;
-  const pedalAt = (s: "R" | "L") => {
-    const a = phase * Math.PI * 2 + (s === "R" ? 0 : Math.PI);
+  // (Pedalling forward: seen from the rider's right the cranks turn clockwise, over the top towards the front.)
+  const crankAngle = (s: "R" | "L", ph: number) => -ph * Math.PI * 2 + (s === "R" ? 0 : Math.PI);
+  const pedalAt = (s: "R" | "L", ph = phase) => {
+    const a = crankAngle(s, ph);
     return V3(crank.x + Math.cos(a) * 17, crank.y + Math.sin(a) * 17, (s === "R" ? 1 : -1) * 13);
   };
   p.pedal = (s) => pedalAt(s).applyQuaternion(p.obj.quaternion).add(p.obj.position);
+  /** Where a pedal is at a phase of the cranks (in the bike's parent frame, as it stands). */
+  p.pedalAt = (s, ph) => pedalAt(s, ph).applyQuaternion(p.obj.quaternion).add(p.obj.position);
   p.set = (ph: number) => {
     phase = ph;
     for (const c of cranks.children) (c as THREE.Mesh).geometry?.dispose();
@@ -329,12 +355,14 @@ export function makeAirBike(): Piece & { set(phase: number): void; seat: THREE.V
       const pedal = box(10, 2, 9, M.black);
       pedal.position.set(ped.x, ped.y, ped.z);
       cranks.add(pedal);
-      // The lever swings with the opposite pedal: forward (+angle) as the opposite pedal goes back.
-      const a = phase * Math.PI * 2 + (s === "R" ? Math.PI : 0);
-      const swing = Math.cos(a) * 0.38 - 0.18;
+      // Each lever is linked to its own crank: its grip comes forward as that pedal goes back, so each arm pushes while
+      // the opposite leg drives down (+swing tips the grip back).
+      const a = crankAngle(s, phase);
+      // (About ±12 cm at the grips round a point an arm's comfortable reach in front of the seated shoulders.)
+      const swing = Math.cos(a) * 0.16 - 0.02;
       levers[s].rotation.set(0, 0, swing);
       const k = s === "R" ? 1 : -1;
-      p.local[s] = { at: V3(0, 66, k * 22).applyEuler(levers[s].rotation).add(pivot), axis: V3(0, 1, 0).applyEuler(levers[s].rotation), radius: 1.8 };
+      p.local[s] = { at: V3(0, GRIP, k * 22).applyEuler(levers[s].rotation).add(pivot), axis: V3(0, 1, 0).applyEuler(levers[s].rotation), radius: 1.8 };
       // Link rod from the lever's foot to the crank.
       for (const c of arms[s].children) (c as THREE.Mesh).geometry?.dispose();
       arms[s].clear();
@@ -343,7 +371,7 @@ export function makeAirBike(): Piece & { set(phase: number): void; seat: THREE.V
     p.obj.updateMatrixWorld(true);
   };
   p.set(0);
-  p.solids.push({ a: V3(66, 42, -8), b: V3(66, 42, 8), r: 30 });
+  p.solids.push({ a: V3(66, 42, -8), b: V3(66, 42, 8), r: 30, flat: true });
   return p;
 }
 
@@ -379,7 +407,7 @@ export function makeSled(o: { posts?: boolean; gripY?: number } = {}): Piece & {
       p.local[k > 0 ? "R" : "L"] = { at, axis: dir.clone(), radius: 2.0 };
     }
   p.hook = () => V3(-36, 10, 0).applyQuaternion(p.obj.quaternion).add(p.obj.position);
-  p.solids.push({ a: V3(-35, 8, 0), b: V3(40, 8, 0), r: 6 }, { a: V3(0, 10, 0), b: V3(0, 26, 0), r: 22 });
+  p.solids.push({ a: V3(-35, 8, 0), b: V3(40, 8, 0), r: 6 }, { a: V3(0, 10, 0), b: V3(0, 26, 0), r: 22, flat: true });
   return p;
 }
 

@@ -38,8 +38,9 @@ export interface Ctx {
   /** Puts a hand on a handle: power grip with the thumb side towards `thumb`. */
   hold(s: Side, h: Handle, thumb: THREE.Vector3, grip?: Grip, pole?: THREE.Vector3, elbow?: THREE.Vector3): void;
   /** Puts a palm flat on a round surface (a ball, a stone): the contact point is `center + normal·radius`, the fingers
-   *  pointing along `fingers`. */
-  palm(s: Side, center: THREE.Vector3, normal: THREE.Vector3, radius: number, fingers: THREE.Vector3, grip?: Grip): void;
+   *  pointing along `fingers`. With `contact: false` the hand only takes that shape (a ball already thrown): it is not
+   *  counted as touching anything. */
+  palm(s: Side, center: THREE.Vector3, normal: THREE.Vector3, radius: number, fingers: THREE.Vector3, grip?: Grip, o?: { contact?: boolean }): void;
   /** Brings a point within reach of the given hands' shoulders (cm short of a straight arm), moving it towards the
    *  shoulders. */
   reachable(p: THREE.Vector3, sides: Side[], margin?: number, o?: { offsets?: Partial<Record<Side, THREE.Vector3>>; minBend?: number }): THREE.Vector3;
@@ -47,6 +48,10 @@ export interface Ctx {
   fromShoulders(off: readonly [number, number, number]): THREE.Vector3;
   /** A free hand with this pronation (degrees; 90 thumb forward) and grip, following the motion. */
   free(s: Side, pronation: number, grip?: Grip, wristFlex?: number): void;
+  /** The arm's full reach from the shoulder joint to the wrist (cm). */
+  armReach(s: Side): number;
+  /** The exercise's equipment (as the spec built it). */
+  pieces: Piece[];
 }
 
 export interface Spec {
@@ -93,7 +98,7 @@ export function makePerformer(sk: Skeleton3, ex: ExerciseMeta, spec: Spec): Perf
   let report: SolveReport = { reach: { wristR: 0, wristL: 0, ankleR: 0, ankleL: 0 }, handTurn: { R: 0, L: 0 }, limits: {} };
   type Hold =
     | { kind: "grip"; h: Handle; thumb: THREE.Vector3; grip: Grip; pole?: THREE.Vector3; from?: THREE.Vector3 }
-    | { kind: "palm"; center: THREE.Vector3; normal: THREE.Vector3; radius: number; fingers: THREE.Vector3; grip: Grip; from?: THREE.Vector3 };
+    | { kind: "palm"; center: THREE.Vector3; normal: THREE.Vector3; radius: number; fingers: THREE.Vector3; grip: Grip; from?: THREE.Vector3; contact: boolean };
   const holds: Partial<Record<Side, Hold>> = {};
   const defaultPole = (s: Side, c: { fwd: THREE.Vector3; up: THREE.Vector3; right: THREE.Vector3 }) =>
     c.fwd.clone().multiplyScalar(-0.5).addScaledVector(c.up, -0.6).addScaledVector(c.right, SIDE_SIGN[s] * 0.6).normalize();
@@ -144,8 +149,8 @@ export function makePerformer(sk: Skeleton3, ex: ExerciseMeta, spec: Spec): Perf
       hold(s, h, thumb, grip, pole, elbow) {
         holds[s] = { kind: "grip", h, thumb, grip: grip ?? { kind: "wrap", radius: h.radius }, pole, from: elbow };
       },
-      palm(s, center, normal, radius, fingers, grip) {
-        holds[s] = { kind: "palm", center, normal: normal.clone().normalize(), radius, fingers, grip: grip ?? { kind: "cup" } };
+      palm(s, center, normal, radius, fingers, grip, o) {
+        holds[s] = { kind: "palm", center, normal: normal.clone().normalize(), radius, fingers, grip: grip ?? { kind: "cup" }, contact: o?.contact ?? true };
       },
       reachable(p, sides, margin = 4, o = {}) {
         // Each hand's point (the object's point plus that hand's offset on it) is kept within the arm's reach, and
@@ -178,10 +183,26 @@ export function makePerformer(sk: Skeleton3, ex: ExerciseMeta, spec: Spec): Perf
         pole.normalize().multiplyScalar(Math.min(1, pole.length() / 3)).add(defaultPole(s, ax).multiplyScalar(0.35));
         c.goals.arms[s] = { wrist: a.wrist, pole, pronation, grip: grip ?? { kind: "relaxed" }, wristFlex };
       },
+      armReach: (s) => L1[s] + L2[s],
+      pieces,
     };
     if (spec.body) {
       spec.body.goals(c);
     }
+    // The shoulders' girdle follows the arms, so before the shoulders are read the arms must already be where the body
+    // is: the arms' resting goals carried with the pelvis (they are given in the rest frame), then, once the shoulders
+    // are found, the motion's own free arms, and the shoulders found again from those.
+    {
+      const pel = sk.i("pelvis");
+      const turn = c.goals.pelvis.rot.clone().multiply(sk.restRot[pel]!.clone().invert());
+      for (const s of ["R", "L"] as const) {
+        const a = c.goals.arms[s];
+        a.wrist = a.wrist.clone().sub(sk.restPos[pel]!).applyQuaternion(turn).add(c.goals.pelvis.pos);
+        a.pole = a.pole.clone().applyQuaternion(turn);
+      }
+    }
+    c.presolve();
+    for (const s of ["R", "L"] as const) c.free(s, 90);
     c.presolve();
     // Hands on handles: the hand's roll round its handle is aimed along the forearm, from where the motion puts the
     // elbow (smooth from frame to frame), or for 3D-authored motions from the spec's elbow hint.
@@ -189,7 +210,9 @@ export function makePerformer(sk: Skeleton3, ex: ExerciseMeta, spec: Spec): Perf
       const hd = holds[s]!;
       if (hd.kind === "palm") {
         const g = palmOn(sk, s, hd.center, hd.normal, hd.radius, hd.fingers);
-        return { wrist: g.wrist, hand: g.hand, pole: c.goals.arms[s].pole ?? defaultPole(s, ax), grip: hd.grip };
+        // (A palm on a ball may turn about the point it touches, to suit the wrist.)
+        const at = hd.center.clone().addScaledVector(hd.normal, hd.radius);
+        return { wrist: g.wrist, hand: g.hand, pole: c.goals.arms[s].pole ?? defaultPole(s, ax), grip: hd.grip, roll: { center: at, axis: hd.normal, range: 70, oblique: 0 } };
       }
       const g = gripOn(sk, s, hd.h, hd.thumb, from, hd.h.radius);
       // (Round handles: the hand may roll round the handle to suit the arm.)
@@ -235,7 +258,7 @@ export function makePerformer(sk: Skeleton3, ex: ExerciseMeta, spec: Spec): Perf
     pose,
     contacts() {
       return (["R", "L"] as const)
-        .filter((s) => lastHolds[s])
+        .filter((s) => lastHolds[s] && !(lastHolds[s]!.kind === "palm" && !(lastHolds[s] as { contact: boolean }).contact))
         .map((s) => {
           const hd = lastHolds[s]!;
           if (hd.kind === "palm") return { side: s, gap: Math.abs(palmPoint(sk, s).distanceTo(hd.center) - hd.radius), turn: report.handTurn[s] };

@@ -10,10 +10,21 @@ import * as THREE from "three";
  */
 export interface RigMeta {
   frame: { scale: number; offset: [number, number, number] };
-  bones: { name: string; parent: string | null; origin: [number, number, number]; y: [number, number, number]; x: [number, number, number]; hinge?: [number, number, number] }[];
+  bones: {
+    name: string;
+    parent: string | null;
+    origin: [number, number, number];
+    y: [number, number, number];
+    x: [number, number, number];
+    hinge?: [number, number, number];
+    /** A blend helper: turns `t` of the way from `from`'s turn to `to`'s, about `to`'s joint (skinning only). */
+    blend?: { from: string; to: string; t: number };
+  }[];
   joints: Record<"R" | "L", RigSideJoints> & { spine: Record<string, [number, number, number]> };
   vertices: number;
-  meshes: { name: string; offset: number; count: number; bones: string[] }[];
+  /** Per part of the file: its block of weights, the bones it follows, and whether it is skinned linearly (muscles that
+   *  stretch as straight bands across a joint) rather than with dual quaternions. */
+  meshes: { name: string; offset: number; count: number; bones: string[]; linear?: boolean }[];
   face: { offset: number; count: number } | null;
 }
 type P3 = [number, number, number];
@@ -49,6 +60,8 @@ export class Skeleton3 {
   readonly pos: THREE.Vector3[];
   readonly rot: THREE.Quaternion[];
   readonly meta: RigMeta;
+  /** Blend helpers (skinning only; posed from the bones either side of their joint by `updateBlends`). */
+  readonly blends: { k: number; from: number; to: number; t: number }[];
 
   constructor(meta: RigMeta) {
     this.meta = meta;
@@ -78,6 +91,35 @@ export class Skeleton3 {
     });
     this.pos = this.restPos.map((p) => p.clone());
     this.rot = this.restRot.map((q) => q.clone());
+    this.blends = meta.bones.flatMap((b, k) => (b.blend ? [{ k, from: this.index.get(b.blend.from)!, to: this.index.get(b.blend.to)!, t: b.blend.t }] : []));
+  }
+
+  /** Poses the blend helpers: each turns its share of the way between the bones either side of its joint, about that
+   *  joint. The turn between them is split into the swing of the lower bone's axis and its twist about that axis, each
+   *  shared out separately, so an arm overhead and turned out (a turn of near 180° all told) never flips a helper the
+   *  other way round. */
+  updateBlends(): void {
+    const a = new THREE.Quaternion(), b = new THREE.Quaternion(), inv = new THREE.Quaternion();
+    const swing = new THREE.Quaternion(), twist = new THREE.Quaternion(), id = new THREE.Quaternion();
+    const axis = new THREE.Vector3(), v = new THREE.Vector3();
+    for (const h of this.blends) {
+      a.copy(this.rot[h.from]!).multiply(inv.copy(this.restRot[h.from]!).invert());
+      b.copy(this.rot[h.to]!).multiply(inv.copy(this.restRot[h.to]!).invert());
+      // r = a⁻¹ b (the lower bone's turn relative to the upper's), as swing · twist about the lower bone's rest axis.
+      const r = inv.copy(a).invert().multiply(b);
+      axis.set(0, 1, 0).applyQuaternion(this.restRot[h.to]!);
+      v.set(r.x, r.y, r.z);
+      const p = axis.dot(v);
+      twist.set(axis.x * p, axis.y * p, axis.z * p, r.w);
+      if (twist.lengthSq() < 1e-12) twist.identity();
+      else twist.normalize();
+      if (twist.w < 0) twist.set(-twist.x, -twist.y, -twist.z, -twist.w);
+      swing.copy(r).multiply(id.copy(twist).invert());
+      if (swing.w < 0) swing.set(-swing.x, -swing.y, -swing.z, -swing.w);
+      const part = id.identity().slerp(swing, h.t).multiply(new THREE.Quaternion().slerp(twist, h.t));
+      this.rot[h.k]!.copy(a).multiply(part).multiply(this.restRot[h.k]!);
+      this.pos[h.k]!.copy(this.pos[h.to]!);
+    }
   }
 
   i(name: string): number {

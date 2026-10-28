@@ -50,10 +50,11 @@ describe("pose solver", () => {
     g.arms.L = { wrist: V(60, 120, -10), pole: V(0, -1, 0), pronation: 10 };
     g.legs.R = { ankle: V(20, 40, 20), pole: V(1, 0, 0.3) };
     solvePose(sk, g);
-    // (The armpit helpers are not bones: they ride on the humerus by design.)
+    // (The armpit and blend helpers are not bones: they ride on the humerus or sit at a joint by design.)
     const stretched = lengths()
-      .map((l, k) => ({ bone: sk.names[k]!, d: Math.abs(l - restLengths[k]!) }))
-      .filter((x) => !x.bone.startsWith("axilla") && x.d > 1e-4);
+      .map((l, k) => ({ bone: sk.names[k]!, d: Math.abs(l - restLengths[k]!), helper: !!meta.bones[k]!.blend }))
+      .filter((x) => !x.bone.startsWith("axilla") && !x.helper && x.d > 1e-4)
+      .map(({ bone, d }) => ({ bone, d }));
     expect(stretched).toEqual([]);
   });
 

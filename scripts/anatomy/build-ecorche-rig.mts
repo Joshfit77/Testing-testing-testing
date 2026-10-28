@@ -15,8 +15,14 @@
  *   arm rises, as it does in the body, instead of the arm swinging alone against the ribs.
  * - The forearm has the ulna (the elbow hinge) and the radius, which turns about the ulna for pronation and supination,
  *   carrying the hand: the palm can face up, down or in.
- * - Each muscle follows the bones it lies on and attaches to: per vertex, by its distance to those bones' surfaces,
- *   smoothed over the muscle, so a muscle that crosses a joint stretches evenly along its length.
+ * - Each muscle follows the bones it lies on and attaches to: per vertex, a target from its distance to those bones'
+ *   surfaces, spread over the muscle and through its thickness by bone heat (Baran & Popović 2007), so a muscle that
+ *   crosses a joint stretches evenly along its length.
+ * - Across the joints that turn furthest (shoulder, hip, knee, elbow) the weights pass through blend helpers at the
+ *   joint that turn a third and two thirds of the way, so no vertex blends two bones much more than 60° apart.
+ * - Muscles that span a joint far from its centre (lats, pectorals, teres, deltoid, infraspinatus, the deep hip
+ *   rotators) are marked to be skinned linearly: they stretch as straight bands across the joint instead of swinging
+ *   round it.
  *
  * Joint centres: hips and shoulders by sphere fits to the femoral and humeral heads; elbows, knees and ankles on the line
  * between the epicondyles or malleoli; the spine at the intervertebral disks; fingers between the phalanges.
@@ -276,6 +282,8 @@ type BoneDef = {
   x: V;
   /** Hinge axis (world, rest) for hinge joints. */
   hinge?: V;
+  /** Blend helper: turns a fraction `t` of the way from bone `from`'s turn to bone `to`'s, about `to`'s joint. */
+  blend?: { from: string; to: string; t: number };
 };
 const bones: BoneDef[] = [];
 const add = (name: string, parent: string | null, origin: V, to: V, x: V = V3(1, 0, 0), hinge?: V) =>
@@ -318,13 +326,28 @@ for (const { s, sign } of SIDES) {
   add(`toes${s}`, `foot${s}`, j.ball, j.toeTip, V3(0, -1, 0));
   void out;
 }
-// Armpit helpers: a bone that moves with the point of the humerus where the lats, teres major and pectoralis major
-// insert, without turning (it keeps the chest's orientation). The parts of those muscles away from the bone follow it,
-// so when the arm rises they stretch towards the arm along the ribcage instead of swinging out round the shoulder joint.
+// Blend helpers across the joints that turn furthest (shoulder, hip, knee, elbow): bones at the joint that turn a third
+// and two thirds of the way from the bone above to the bone below. Flesh that crosses the joint passes from one bone to
+// the next through them, so no vertex is ever blended between two bones more than about 60° apart. Blending two bones
+// that have turned 150-170° from each other (an arm overhead against the chest, a hip folded for the catch of a row)
+// is what tears muscles into flaps and spikes: the blend of two rotations that far apart is unstable, and it cuts the
+// corner of the joint instead of going round it.
+const CHAINS: { key: string; from: string; to: string }[] = [];
 for (const { s } of SIDES) {
-  const j = J[s];
-  const ins = j.shoulder.clone().lerp(j.elbow, 0.2);
-  add(`axilla${s}`, "thorax2", ins, ins.clone().add(spine.neck.clone().sub(spine.thorax2)));
+  CHAINS.push(
+    { key: `shT${s}`, from: "thorax2", to: `humerus${s}` },
+    { key: `shS${s}`, from: `scap${s}`, to: `humerus${s}` },
+    { key: `hip${s}`, from: "pelvis", to: `thigh${s}` },
+    { key: `knee${s}`, from: `thigh${s}`, to: `shin${s}` },
+    { key: `elb${s}`, from: `humerus${s}`, to: `ulna${s}` },
+  );
+}
+for (const c of CHAINS) {
+  const to = bones.find((b) => b.name === c.to)!;
+  for (const t of [1, 2]) {
+    add(`${c.key.slice(0, -1)}${t}${c.key.slice(-1)}`, c.from, to.origin, to.origin.clone().add(to.y), to.x);
+    bones[bones.length - 1]!.blend = { from: c.from, to: c.to, t: t / 3 };
+  }
 }
 const boneIndex = new Map(bones.map((b, i) => [b.name, i]));
 const bi = (n: string) => {
@@ -503,17 +526,169 @@ const distTo = (src: Source, x: number, y: number, z: number): number => {
   return Math.sqrt(best);
 };
 
+// ---------------------------------------------------------------- bone heat
+const HEAT = Number(process.env.RIG_HEAT ?? 1);
+const CHORD_HEAT = Number(process.env.RIG_CHORD_HEAT ?? 0.08);
+/** Solves (L + H) w = H p per channel in place (W holds p on entry, w on return), by Jacobi-preconditioned conjugate
+ *  gradients. L: edges of the part's triangles and links through its thickness, each weighted 1/length²; H: HEAT/d². */
+function heatWeights(p: { pos: Float32Array; index: Uint32Array }, count: number, C: number, W: Float32Array, near0: Float32Array, heatScale = HEAT): void {
+  const pos = p.pos;
+  const R = 1.2;
+  const lists: Map<number, number>[] = Array.from({ length: count }, () => new Map());
+  const link = (a: number, b: number) => {
+    if (a === b) return;
+    const e = Math.hypot(pos[a * 3]! - pos[b * 3]!, pos[a * 3 + 1]! - pos[b * 3 + 1]!, pos[a * 3 + 2]! - pos[b * 3 + 2]!);
+    const w = 1 / Math.max(0.15, e) ** 2;
+    lists[a]!.set(b, Math.max(lists[a]!.get(b) ?? 0, w));
+    lists[b]!.set(a, Math.max(lists[b]!.get(a) ?? 0, w));
+  };
+  for (let t = 0; t < p.index.length; t += 3) {
+    const a = p.index[t]!, b = p.index[t + 1]!, c = p.index[t + 2]!;
+    link(a, b);
+    link(b, c);
+    link(c, a);
+  }
+  {
+    const grid = new Map<string, number[]>();
+    for (let i = 0; i < count; i++) {
+      const k = gkey(pos[i * 3]!, pos[i * 3 + 1]!, pos[i * 3 + 2]!, R);
+      (grid.get(k) ?? grid.set(k, []).get(k)!).push(i);
+    }
+    for (let i = 0; i < count; i++) {
+      const x = pos[i * 3]!, y = pos[i * 3 + 1]!, z = pos[i * 3 + 2]!;
+      const ci = Math.floor(x / R), cj = Math.floor(y / R), ck = Math.floor(z / R);
+      const found: [number, number][] = [];
+      for (let a = -1; a <= 1; a++)
+        for (let b = -1; b <= 1; b++)
+          for (let c = -1; c <= 1; c++)
+            for (const j of grid.get(`${ci + a},${cj + b},${ck + c}`) ?? []) {
+              const d2 = (pos[j * 3]! - x) ** 2 + (pos[j * 3 + 1]! - y) ** 2 + (pos[j * 3 + 2]! - z) ** 2;
+              if (j !== i && d2 <= R * R) found.push([j, d2]);
+            }
+      // (The nearest dozen: enough to tie the faces together without making the system dense.)
+      found.sort((u, v) => u[1] - v[1]);
+      for (const [j] of found.slice(0, 12)) link(i, j);
+    }
+  }
+  const start = new Uint32Array(count + 1);
+  for (let i = 0; i < count; i++) start[i + 1] = start[i]! + lists[i]!.size;
+  const col = new Uint32Array(start[count]!), val = new Float32Array(start[count]!);
+  const diag = new Float64Array(count), heat = new Float64Array(count);
+  for (let i = 0; i < count; i++) {
+    let k = start[i]!;
+    let s = 0;
+    for (const [j, w] of lists[i]!) {
+      col[k] = j;
+      val[k++] = w;
+      s += w;
+    }
+    heat[i] = heatScale / near0[i]! ** 2;
+    diag[i] = s + heat[i]!;
+  }
+  const mul = (x: Float64Array, out: Float64Array) => {
+    for (let i = 0; i < count; i++) {
+      let s = diag[i]! * x[i]!;
+      for (let k = start[i]!; k < start[i + 1]!; k++) s -= val[k]! * x[col[k]!]!;
+      out[i] = s;
+    }
+  };
+  const x = new Float64Array(count), r = new Float64Array(count), z = new Float64Array(count), d = new Float64Array(count), q = new Float64Array(count);
+  for (let m = 0; m < C; m++) {
+    // Start from the target; b = H p.
+    for (let i = 0; i < count; i++) x[i] = W[i * C + m]!;
+    mul(x, q);
+    let bn = 0;
+    for (let i = 0; i < count; i++) {
+      const b = heat[i]! * W[i * C + m]!;
+      bn += b * b;
+      r[i] = b - q[i]!;
+      z[i] = r[i]! / diag[i]!;
+      d[i] = z[i]!;
+    }
+    let rz = 0;
+    for (let i = 0; i < count; i++) rz += r[i]! * z[i]!;
+    const tol = 1e-10 * Math.max(bn, 1e-30);
+    for (let it = 0; it < 600; it++) {
+      let rr = 0;
+      for (let i = 0; i < count; i++) rr += r[i]! * r[i]!;
+      if (rr < tol) break;
+      mul(d, q);
+      let dq = 0;
+      for (let i = 0; i < count; i++) dq += d[i]! * q[i]!;
+      const alpha = rz / dq;
+      for (let i = 0; i < count; i++) {
+        x[i]! += alpha * d[i]!;
+        r[i]! -= alpha * q[i]!;
+        z[i] = r[i]! / diag[i]!;
+      }
+      let rz2 = 0;
+      for (let i = 0; i < count; i++) rz2 += r[i]! * z[i]!;
+      const beta = rz2 / rz;
+      rz = rz2;
+      for (let i = 0; i < count; i++) d[i] = z[i]! + beta * d[i]!;
+    }
+    for (let i = 0; i < count; i++) W[i * C + m] = Math.min(1, Math.max(0, x[i]!));
+  }
+  // (Each vertex's weights still add up to one: L keeps constants and H p sums to H; renormalised for rounding.)
+  for (let i = 0; i < count; i++) {
+    let s = 0;
+    for (let m = 0; m < C; m++) s += W[i * C + m]!;
+    if (s > 0) for (let m = 0; m < C; m++) W[i * C + m]! /= s;
+  }
+}
+
+// ---------------------------------------------------------------- blending across the big joints
+/** Per joint (in the order applied: the elbows and knees before the shoulders and hips): the bones below it, and the
+ *  groups of bones above it, each with the helpers it passes through. */
+const JOINT_CHAINS = (["R", "L"] as const).flatMap((s) => [
+  { below: [`ulna${s}`, `radius${s}`], above: [{ bones: [`humerus${s}`], via: `elb${s}` }] },
+  { below: [`shin${s}`], above: [{ bones: [`thigh${s}`], via: `knee${s}` }] },
+  { below: [`humerus${s}`], above: [{ bones: ["thorax2", "thorax1", "lumbar2", "lumbar1", "pelvis", "neck"], via: `shT${s}` }, { bones: [`scap${s}`, `clav${s}`], via: `shS${s}` }] },
+  { below: [`thigh${s}`], above: [{ bones: ["pelvis", "lumbar1", "lumbar2"], via: `hip${s}` }] },
+]).map((c) => ({
+  below: c.below.map(bi),
+  above: c.above.map((a) => ({ bones: a.bones.map(bi), h1: bi(`${a.via.slice(0, -1)}1${a.via.slice(-1)}`), h2: bi(`${a.via.slice(0, -1)}2${a.via.slice(-1)}`) })),
+}));
+/** Re-expresses a vertex's weights so that its share between the bones above and below a joint passes through the
+ *  joint's helpers (piecewise linear: at most two neighbours of the chain at once). The turn the vertex follows is about
+ *  the same; the blend is between bones a third of the joint's turn apart. */
+function throughJoints(w: Map<number, number>): Map<number, number> {
+  for (const c of JOINT_CHAINS) {
+    const dW = c.below.reduce((s, b) => s + (w.get(b) ?? 0), 0);
+    if (dW <= 0) continue;
+    let best: (typeof c.above)[number] | null = null, gW = 0;
+    for (const a of c.above) {
+      const g = a.bones.reduce((s, b) => s + (w.get(b) ?? 0), 0);
+      if (g > gW) [best, gW] = [a, g];
+    }
+    if (!best) continue;
+    const total = dW + gW, f = dW / total;
+    // Shares of the chain: [above, h1, h2, below].
+    const k = f * 3;
+    const share = k <= 1 ? [1 - k, k, 0, 0] : k <= 2 ? [0, 2 - k, k - 1, 0] : [0, 0, 3 - k, k - 2];
+    for (const b of best.bones) if (w.has(b)) w.set(b, (w.get(b)! / gW) * total * share[0]!);
+    for (const b of c.below) if (w.has(b)) w.set(b, (w.get(b)! / dW) * total * share[3]!);
+    w.set(best.h1, (w.get(best.h1) ?? 0) + total * share[1]!);
+    w.set(best.h2, (w.get(best.h2) ?? 0) + total * share[2]!);
+  }
+  return w;
+}
+
 // ---------------------------------------------------------------- weights
-// How sharply a muscle's weight passes from one bone to the next (the falloff of the distance weighting, and how many
-// passes of smoothing over the muscle's surface). Softer transitions spread a joint's turn along the muscle.
+// The falloff of each vertex's target weights with its distance from the candidate bones (bone heat then spreads them
+// over the part).
 const POW = Number(process.env.RIG_POW ?? 2);
-const ITERS = Number(process.env.RIG_ITERS ?? 30);
 const NB = bones.length;
 const total = parts.reduce((s, p) => s + p.pos.length / 3, 0);
 const out = new Uint8Array(total * 8);
 const report: string[] = [];
 let offset = 0;
-const meshes: { name: string; offset: number; count: number; bones: string[] }[] = [];
+const meshes: { name: string; offset: number; count: number; bones: string[]; linear?: boolean }[] = [];
+// Muscles that span a joint far from its centre (from the trunk or the shoulder blade to the arm, from the pelvis to the
+// femur) are skinned linearly: blended positions run along the straight line between where the two bones carry them,
+// so when the arm goes overhead the lats, teres and pectorals stretch as straight bands from the ribs to the arm, as they
+// do. Dual-quaternion blending (everything else) swings them round the joint instead, out into wings at the armpit.
+const CHORD = /latissimus|teres_major|teres_minor|infraspinatus|pectoralis_major|deltoid|quadratus_femoris|gemellus|obturator_internus|piriformis/;
 const write = (n: number, w: Map<number, number>) => {
   const top = [...w.entries()].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 4);
   const sum = top.reduce((s, [, v]) => s + v, 0) || 1;
@@ -556,113 +731,44 @@ for (const p of parts) {
     const D = new Float32Array(count * ks.length);
     for (let i = 0; i < count; i++)
       srcs.forEach((src, c) => (D[i * ks.length + c] = distTo(src, p.pos[i * 3]!, p.pos[i * 3 + 1]!, p.pos[i * 3 + 2]!)));
-    // Per vertex: inverse-square distance to each candidate's surface.
+    // Per vertex, the target: inverse-square distance to each candidate's surface.
     const W = new Float32Array(count * cand.length);
+    const near0 = new Float32Array(count);
     for (let i = 0; i < count; i++) {
       let s = 0;
+      near0[i] = Infinity;
       cand.forEach((c, m) => {
         const d = Math.max(0.6, D[i * ks.length + c]!);
+        near0[i] = Math.min(near0[i]!, d);
         const w = 1 / Math.pow(d, POW);
         W[i * cand.length + m] = w;
         s += w;
       });
       for (let m = 0; m < cand.length; m++) W[i * cand.length + m]! /= s;
     }
-    // Smooth through the part's thickness (all of its points within 1.6 cm, whatever surface they are on), so a thin
-    // sheet like the latissimus moves as one sheet instead of its two faces parting when the arm turns far.
-    {
-      const R = 1.6;
-      const grid = new Map<string, number[]>();
-      for (let i = 0; i < count; i++) {
-        const k = gkey(p.pos[i * 3]!, p.pos[i * 3 + 1]!, p.pos[i * 3 + 2]!, R);
-        (grid.get(k) ?? grid.set(k, []).get(k)!).push(i);
-      }
-      const near: number[][] = [];
-      for (let i = 0; i < count; i++) {
-        const x = p.pos[i * 3]!, y = p.pos[i * 3 + 1]!, z = p.pos[i * 3 + 2]!;
-        const ci = Math.floor(x / R), cj = Math.floor(y / R), ck = Math.floor(z / R);
-        const list: number[] = [];
-        for (let a = -1; a <= 1; a++)
-          for (let b = -1; b <= 1; b++)
-            for (let c = -1; c <= 1; c++)
-              for (const j of grid.get(`${ci + a},${cj + b},${ck + c}`) ?? [])
-                if ((p.pos[j * 3]! - x) ** 2 + (p.pos[j * 3 + 1]! - y) ** 2 + (p.pos[j * 3 + 2]! - z) ** 2 <= R * R) list.push(j);
-        near.push(list.length > 40 ? list.filter((_, n) => n % Math.ceil(list.length / 40) === 0) : list);
-      }
-      for (let it = 0; it < 3; it++) {
-        const next = new Float32Array(W.length);
-        for (let i = 0; i < count; i++) {
-          const ns = near[i]!;
-          for (let m = 0; m < cand.length; m++) {
-            let sum = 0;
-            for (const j of ns) sum += W[j * cand.length + m]!;
-            next[i * cand.length + m] = sum / ns.length;
-          }
-        }
-        W.set(next);
-      }
-    }
-    // Smooth over the part's own surface, so the change from one bone to the next spreads along the muscle.
-    const nb: number[][] = Array.from({ length: count }, () => []);
-    for (let t = 0; t < p.index.length; t += 3) {
-      const a = p.index[t]!, b = p.index[t + 1]!, c = p.index[t + 2]!;
-      nb[a]!.push(b, c);
-      nb[b]!.push(a, c);
-      nb[c]!.push(a, b);
-    }
-    const iters = /disk|cartilage/.test(lower) ? 4 : ITERS;
-    for (let it = 0; it < iters; it++) {
-      const next = new Float32Array(W.length);
-      for (let i = 0; i < count; i++) {
-        const ns = nb[i]!;
-        for (let m = 0; m < cand.length; m++) {
-          let s = W[i * cand.length + m]!;
-          for (const j of ns) s += W[j * cand.length + m]! / Math.max(1, ns.length);
-          next[i * cand.length + m] = s / 2;
-        }
-      }
-      W.set(next);
-    }
-    // Armpit muscles: the humerus keeps only what lies on it; the rest of its share goes to the armpit helper.
-    const pull = /latissimus|teres_major|pectoralis_major/.test(lower) ? srcs.findIndex((src) => bones[src.bone]!.name.startsWith("humerus")) : -1;
-    const helper = pull >= 0 ? bi(`axilla${bones[srcs[pull]!.bone]!.name.slice(-1)}`) : -1;
-    // (Only near the insertion: farther down the muscle the arm's share fades out, so the lower lats and the chest stay
-    // on the ribs and only the band running into the armpit stretches.)
-    const insertion = helper >= 0 ? bones[helper]!.origin : null;
+    // Bone heat (Baran & Popović 2007): each vertex keeps its target with a strength that falls off with its distance
+    // from the nearest bone, and the weights diffuse over the part, (L + H) w = H p. Near a bone a muscle moves with it;
+    // where it spans free between two bones the change from one to the other spreads evenly along the whole span, so a
+    // joint's turn stretches the muscle a little everywhere instead of tearing one band of it. L joins each vertex to its
+    // neighbours on the surface and through the part's thickness (points within 1.2 cm), so a sheet's two faces move as
+    // one.
+    const chord = CHORD.test(lower);
+    // (Band muscles hold to their bones more loosely, so the change from one bone to the other spreads along their whole
+    // length and the stretch with it, rather than gathering where the belly leaves the bone.)
+    if (cand.length > 1 && !/disk|cartilage/.test(lower)) heatWeights(p, count, cand.length, W, near0, chord ? CHORD_HEAT : HEAT);
     for (let i = 0; i < count; i++) {
       const w = new Map<number, number>();
-      if (insertion && pull >= 0) {
-        const d = V3(p.pos[i * 3], p.pos[i * 3 + 1], p.pos[i * 3 + 2]).distanceTo(insertion);
-        const fade = Math.min(1, Math.max(0, (22 - d) / 12));
-        const k = pull * 1;
-        const lost = W[i * cand.length + k]! * (1 - fade);
-        W[i * cand.length + k]! -= lost;
-        // The lost share goes to the trunk bones in proportion to theirs.
-        let trunk = 0;
-        cand.forEach((c, m) => {
-          if (c !== pull && /thorax|lumbar|pelvis|scap/.test(bones[ks[c]!]!.name)) trunk += W[i * cand.length + m]!;
-        });
-        cand.forEach((c, m) => {
-          if (c !== pull && /thorax|lumbar|pelvis|scap/.test(bones[ks[c]!]!.name)) W[i * cand.length + m]! += trunk > 0 ? (lost * W[i * cand.length + m]!) / trunk : 0;
-        });
-      }
       cand.forEach((c, m) => {
-        let v = W[i * cand.length + m]!;
-        if (c === pull) {
-          const d = D[i * ks.length + c]!;
-          const keep = Math.min(1, Math.max(0, (3.5 - d) / 2.5));
-          w.set(helper, (w.get(helper) ?? 0) + v * (1 - keep));
-          v *= keep;
-        }
+        const v = W[i * cand.length + m]!;
         if (v > 0.01) w.set(ks[c]!, (w.get(ks[c]!) ?? 0) + v);
       });
-      write(offset + i, w);
+      write(offset + i, chord ? w : throughJoints(w));
     }
-    if (helper >= 0) used.add(bones[helper]!.name);
     for (const c of cand) used.add(bones[ks[c]!]!.name);
+    for (let i = 0; i < count; i++) for (let k = 0; k < 4; k++) if (out[(offset + i) * 8 + 4 + k]) used.add(bones[out[(offset + i) * 8 + k]!]!.name);
     if (!rigidBone(p.name) && cand.length === 0) report.push(`${p.name}: no bone`);
   }
-  meshes.push({ name: p.name, offset, count, bones: [...used] });
+  meshes.push({ name: p.name, offset, count, bones: [...used], ...(!rigid && CHORD.test(p.name.toLowerCase()) ? { linear: true } : {}) });
   offset += count;
 }
 
@@ -728,7 +834,7 @@ writeFileSync(
   JSON.stringify({
     source: "Anatomical rig for public/anatomy/ecorche.glb (scripts/anatomy/build-ecorche-rig.mts)",
     frame,
-    bones: bones.map((b) => ({ name: b.name, parent: b.parent, origin: r(b.origin), y: r(b.y), x: r(b.x), ...(b.hinge ? { hinge: r(b.hinge) } : {}) })),
+    bones: bones.map((b) => ({ name: b.name, parent: b.parent, origin: r(b.origin), y: r(b.y), x: r(b.x), ...(b.hinge ? { hinge: r(b.hinge) } : {}), ...(b.blend ? { blend: b.blend } : {}) })),
     joints: { ...joints, spine: Object.fromEntries(Object.entries(spine).map(([k, v]) => [k, r(v)])) },
     vertices: total,
     meshes,

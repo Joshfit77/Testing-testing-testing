@@ -154,13 +154,15 @@ const farmersCarry: Spec = {
   build: () => [makeDumbbell(1.25), makeDumbbell(1.25)],
   travel: 111.85 * K,
   frame(c) {
-    // Arms long at the sides, a little away from the thighs so the dumbbells clear them; neutral grip.
+    // Arms long at the sides (a few per cent short of locked, so the elbow keeps a direction and the arm never twists
+    // from one way to the other), angled out from the thighs so the dumbbells clear them; neutral grip.
     for (const s of SIDES) {
       c.free(s, 88, { kind: "wrap", radius: 1.6 });
       const g = c.goals.arms[s];
       const gh = c.gh(s);
-      g.wrist.z = gh.z + SIDE_SIGN[s] * 12;
-      g.wrist.y = Math.max(g.wrist.y, gh.y - 56);
+      const dir = g.wrist.clone().sub(gh).normalize();
+      dir.z = SIDE_SIGN[s] * 0.2;
+      g.wrist = gh.clone().addScaledVector(dir.normalize(), c.armReach(s) * 0.97);
     }
   },
   after(c, [r, l]) {
@@ -209,8 +211,8 @@ const rowKeys: RowKey[] = [
   { at: 0, seat: 8, tilt: 24, chest: 32, hands: [34, 0.98] },
   { at: 0.2, seat: -38, tilt: 22, chest: 30, hands: [30, 0.98] },
   { at: 0.3, seat: -44, tilt: -10, chest: -14, hands: [26, 0.9] },
-  { at: 0.42, seat: -44, tilt: -14, chest: -20, hands: [55, 0.4] },
-  { at: 0.5, seat: -44, tilt: -14, chest: -20, hands: [55, 0.4] },
+  { at: 0.42, seat: -44, tilt: -14, chest: -20, hands: [45, 0.55] },
+  { at: 0.5, seat: -44, tilt: -14, chest: -20, hands: [45, 0.55] },
   { at: 0.62, seat: -44, tilt: -10, chest: -14, hands: [24, 0.95] },
   { at: 0.72, seat: -40, tilt: 20, chest: 28, hands: [30, 0.98] },
 ];
@@ -243,12 +245,13 @@ const rowingIntervals: Spec = {
     const full = 63.8;
     const hands = c.reachable(sh.clone().add(V3(Math.cos(a), -Math.sin(a), 0).multiplyScalar(full * k.hands[1])), ["R", "L"], 0.3);
     r.set(k.seat, hands);
-    // Overhand, the elbows going back past the body and a little out; the forearms come level as the arms draw in.
+    // Overhand, the elbows going back past the body and out (the handle lies a little across each palm, as it does at
+    // the finish); the forearms come level as the arms draw in to the lower ribs.
     const bend = Math.min(1, Math.max(0, (1 - k.hands[1]) / 0.55));
     for (const s of SIDES) {
       const h = rower!.handle(s);
       const along = h.at.clone().sub(c.gh(s)).normalize().lerp(V3(1, 0, 0), bend).normalize();
-      c.hold(s, h, medial(s), { kind: "wrap", radius: 1.6 }, V3(-1, -0.2, SIDE_SIGN[s] * 0.45), h.at.clone().addScaledVector(along, -30));
+      c.hold(s, h, medial(s), { kind: "wrap", radius: 1.6 }, V3(-0.6, -0.3, SIDE_SIGN[s] * 0.8), h.at.clone().addScaledVector(along, -30));
     }
   },
 };
@@ -368,36 +371,73 @@ const rotationalThrow: Spec = {
     // towards the wall, then come back in front of the chest ready for the catch (a ball they hold in the air), so the
     // hands never jump from one pose to another.
     let hands = at.clone();
-    if (c.phase > 0.3 && c.phase < 0.66) {
+    const held = c.phase <= 0.3 || c.phase >= 0.66;
+    if (!held) {
       const follow = release.clone().add(V3(4, -4, -14));
       const ready = catchAt.clone().add(V3(4, 0, 6));
       const u = (c.phase - 0.3) / 0.36;
       hands = u < 0.3 ? release.clone().lerp(follow, smooth(u / 0.3)) : follow.clone().lerp(ready, smooth((u - 0.3) / 0.7)).lerp(catchAt, smooth(Math.max(0, (u - 0.85) / 0.15)));
+      // (The follow-through stays within the arms' reach.)
+      hands = c.reachable(hands, ["R", "L"], 6);
     }
     {
-      // Hands on either side of the ball, fingers spread over it.
+      // Hands on either side of the ball, fingers spread over it and running on from the forearms (the arms reach the
+      // ball from the shoulders, so the wrists stay straight whether the ball is low at the hip or out in front).
       const fwd = c.chestAxes().fwd;
       const side = V3().crossVectors(V3(0, 1, 0), fwd).normalize(); // the figure's left
-      const held = c.phase <= 0.3 || c.phase >= 0.66;
       for (const s of SIDES) {
         const n = side.clone().multiplyScalar(s === "R" ? -1 : 1).addScaledVector(V3(0, -1, 0), 0.3).addScaledVector(fwd, -0.2).normalize();
-        c.palm(s, hands, n, held ? 12 : 13, fwd.clone().addScaledVector(V3(0, 1, 0), 0.4), { kind: held ? "cup" : "open" });
+        const along = hands.clone().sub(c.gh(s));
+        const fingers = along.addScaledVector(n, -along.dot(n)).normalize().addScaledVector(fwd, 0.25).normalize();
+        c.palm(s, hands, n, held ? 12 : 13, fingers, { kind: held ? "cup" : "open" }, { contact: held });
       }
     }
     void wall;
   },
 };
 
-/** Air bike: seated, pedalling, both hands on the moving levers (not in the demonstrated set, kept for the audit). */
+/**
+ * Air bike, authored in 3D: seated on the saddle, leaning forward a little, the balls of the feet on the pedals as the
+ * cranks turn (two turns a loop, about 85 rpm), the hands on the levers, which swing opposite the pedals: each arm pushes
+ * as the leg on its side pulls back. The chest turns a few degrees with the arms.
+ */
 const airBike: Spec = {
   build: () => [makeAirBike()],
+  body: {
+    duration: 1.4,
+    goals(c) {
+      const sk = c.sk;
+      const g = restGoals(sk);
+      const a = c.phase * Math.PI * 4;
+      g.pelvis = { pos: V3(-10, 110, 0), rot: rotY(2 * Math.sin(a)).multiply(rotZ(-14)).multiply(sk.restRot[sk.i("pelvis")]!) };
+      g.chest = rotY(6 * Math.sin(a)).multiply(rotZ(-24)).multiply(sk.restRot[sk.i("thorax2")]!);
+      g.head = rotZ(-6).multiply(sk.restRot[sk.i("head")]!);
+      // Feet: the ball on the pedal, toes pointing down about 20° (a little more over the top, a little less at the
+      // bottom).
+      const bike = c.pieces[0] as ReturnType<typeof makeAirBike>;
+      for (const s of SIDES) {
+        const J = sk.meta.joints[s];
+        const ballRest = V3(...J.ball), ankleRest = V3(...J.ankle);
+        // (The crank's angle as the bike turns it: forward, clockwise seen from the right.)
+        const crankA = -c.phase * 4 * Math.PI + (s === "R" ? 0 : Math.PI);
+        const pitch = 22 + 6 * Math.sin(crankA);
+        const q = rotZ(-pitch);
+        const pedal = bike.pedalAt(s, c.phase * 2);
+        const ball = V3(pedal.x, pedal.y + 1 + ballRest.y, pedal.z);
+        const ankle = ankleRest.clone().sub(ballRest).applyQuaternion(q).add(ball);
+        g.legs[s] = { ankle, foot: q.clone().multiply(sk.restRot[sk.i(`foot${s}`)]!), pole: V3(1, 0.4, SIDE_SIGN[s] * 0.2), toes: 0 };
+      }
+      c.goals = g;
+    },
+  },
   frame(c, [bike]) {
     const b = bike as ReturnType<typeof makeAirBike>;
-    bike!.place(V3(c.goals.pelvis.pos.x + 8, 0, 0));
+    bike!.place(V3(0, 0, 0));
     b.set(c.phase * 2);
+    // Neutral grip on the levers, thumbs up them; elbows down and a little out.
     for (const s of SIDES) {
       const h = bike!.handle(s);
-      c.hold(s, h, h.axis.clone(), { kind: "wrap", radius: 1.8 });
+      c.hold(s, h, h.axis.clone(), { kind: "wrap", radius: 1.8 }, V3(-0.3, -1, SIDE_SIGN[s] * 0.5));
     }
   },
 };

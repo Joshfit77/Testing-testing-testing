@@ -7,10 +7,13 @@ import type * as THREE from "three";
  * of the flesh between them, so a muscle that crosses a joint bends round it instead. Bones must be rigid (no scale),
  * as they are in this rig.
  *
+ * Muscles that should stretch as straight bands across a joint (an attribute `skinLinear` = 1) blend linearly instead.
+ *
  * The patch replaces three's skinning chunks (positions and normals) and keeps any onBeforeCompile already on the
  * material (the gold look, the painted eyes).
  */
 const PARS = /* glsl */ `
+attribute float skinLinear;
 vec4 dqQuat( mat4 m ) {
   float t = m[0][0] + m[1][1] + m[2][2];
   vec4 q;
@@ -62,14 +65,16 @@ const BASE = /* glsl */ `
   float dqLen = length( dqR );
   dqR /= dqLen;
   dqD /= dqLen;
+  // (Linear blending for the parts marked so: the bones' matrices averaged, as three.js does.)
+  mat4 lbsMatrix = bindMatrixInverse * ( skinWeight.x * boneMatX + skinWeight.y * boneMatY + skinWeight.z * boneMatZ + skinWeight.w * boneMatW ) * bindMatrix;
 #endif
 `;
 
 const NORMAL = /* glsl */ `
 #ifdef USE_SKINNING
-  objectNormal = ( bindMatrixInverse * vec4( dqRotate( dqR, ( bindMatrix * vec4( objectNormal, 0.0 ) ).xyz ), 0.0 ) ).xyz;
+  objectNormal = mix( ( bindMatrixInverse * vec4( dqRotate( dqR, ( bindMatrix * vec4( objectNormal, 0.0 ) ).xyz ), 0.0 ) ).xyz, ( lbsMatrix * vec4( objectNormal, 0.0 ) ).xyz, skinLinear );
   #ifdef USE_TANGENT
-    objectTangent = ( bindMatrixInverse * vec4( dqRotate( dqR, ( bindMatrix * vec4( objectTangent, 0.0 ) ).xyz ), 0.0 ) ).xyz;
+    objectTangent = mix( ( bindMatrixInverse * vec4( dqRotate( dqR, ( bindMatrix * vec4( objectTangent, 0.0 ) ).xyz ), 0.0 ) ).xyz, ( lbsMatrix * vec4( objectTangent, 0.0 ) ).xyz, skinLinear );
   #endif
 #endif
 `;
@@ -77,7 +82,7 @@ const NORMAL = /* glsl */ `
 const POSITION = /* glsl */ `
 #ifdef USE_SKINNING
   vec3 dqP = dqTransform( dqR, dqD, ( bindMatrix * vec4( transformed, 1.0 ) ).xyz );
-  transformed = ( bindMatrixInverse * vec4( dqP, 1.0 ) ).xyz;
+  transformed = mix( ( bindMatrixInverse * vec4( dqP, 1.0 ) ).xyz, ( lbsMatrix * vec4( transformed, 1.0 ) ).xyz, skinLinear );
 #endif
 `;
 
@@ -129,6 +134,19 @@ export function dqOf(e: ArrayLike<number>): { r: [number, number, number, number
     -0.5 * (tx * x + ty * y + tz * z),
   ];
   return { r: [x, y, z, w], d };
+}
+
+/** Skins one point (rig frame) linearly: bones' matrices (column-major), four indices and weights (0..1). */
+export function lbsSkin(mats: ArrayLike<number>[], idx: ArrayLike<number>, wts: ArrayLike<number>, p: [number, number, number], out: [number, number, number]): void {
+  out[0] = out[1] = out[2] = 0;
+  for (let k = 0; k < 4; k++) {
+    const w = wts[k]!;
+    if (!w) continue;
+    const e = mats[idx[k]!]!;
+    out[0] += w * (e[0]! * p[0] + e[4]! * p[1] + e[8]! * p[2] + e[12]!);
+    out[1] += w * (e[1]! * p[0] + e[5]! * p[1] + e[9]! * p[2] + e[13]!);
+    out[2] += w * (e[2]! * p[0] + e[6]! * p[1] + e[10]! * p[2] + e[14]!);
+  }
 }
 
 /** Skins one point (rig frame) with dual quaternions: bones' DQs, four indices and weights (0..1). */

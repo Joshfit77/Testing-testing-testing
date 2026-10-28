@@ -21,7 +21,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import * as THREE from "three";
 import { EXERCISES } from "../../../src/data/exercises";
 import { getMotion } from "../../../src/lib/exercise-motion";
-import { dqOf, dqSkin } from "../../../src/lib/anatomy3d/body/dqs";
+import { dqOf, dqSkin, lbsSkin } from "../../../src/lib/anatomy3d/body/dqs";
 import { Skeleton3, type RigMeta } from "../../../src/lib/anatomy3d/body/skeleton";
 import { makePerformer } from "../../../src/lib/anatomy3d/motion3d/perform";
 import { hasSpec, specFor } from "../../../src/lib/anatomy3d/motion3d/specs";
@@ -59,6 +59,8 @@ interface Part {
   tris: Uint32Array;
   /** Dominant bone per vertex. */
   main: Uint8Array;
+  /** Skinned linearly (as the viewer does for the rig's band muscles). */
+  linear: boolean;
 }
 const parts: Part[] = [];
 {
@@ -86,7 +88,7 @@ const parts: Part[] = [];
     }
     const tris = o.geometry.index ? Uint32Array.from(o.geometry.index.array) : Uint32Array.from({ length: p.count }, (_, i) => i);
     // Hidden parts (the face covers them) are not checked.
-    if (o.visible) parts.push({ name: o.name, pos, idx, wt, tris, main });
+    if (o.visible) parts.push({ name: o.name, pos, idx, wt, tris, main, linear: !!e.linear });
   });
 }
 const handBones = (s: "R" | "L") => new Set(probe.names.map((n, i) => [n, i] as const).filter(([n]) => n.endsWith(s) && /^(hand|thumb|index|middle|ring|little|radius)/.test(n)).map(([, i]) => i));
@@ -98,6 +100,16 @@ const segDist = (p: THREE.Vector3, a: THREE.Vector3, b: THREE.Vector3) => {
   const ab = b.clone().sub(a);
   const t = ab.lengthSq() > 1e-9 ? Math.min(1, Math.max(0, p.clone().sub(a).dot(ab) / ab.lengthSq())) : 0;
   return p.distanceTo(a.clone().addScaledVector(ab, t));
+};
+/** How deep a point is inside a solid (cm; negative outside): a capsule, or a cylinder cut square at its ends. */
+const depthIn = (p: THREE.Vector3, s: { a: THREE.Vector3; b: THREE.Vector3; r: number; flat?: boolean }) => {
+  if (!s.flat) return s.r - segDist(p, s.a, s.b);
+  const ab = s.b.clone().sub(s.a);
+  const len = ab.length();
+  const t = p.clone().sub(s.a).dot(ab) / (len * len);
+  if (t < 0 || t > 1) return -1;
+  const radial = p.distanceTo(s.a.clone().addScaledVector(ab, t));
+  return Math.min(s.r - radial, t * len, (1 - t) * len);
 };
 const angleDeg = (a: THREE.Quaternion, b: THREE.Quaternion) => (2 * Math.acos(Math.min(1, Math.abs(a.dot(b))))) / (Math.PI / 180);
 
@@ -173,10 +185,8 @@ for (const slug of slugs) {
     }
     if (i % skinEvery) continue;
     // Skin the body for this sample.
-    const dqs = sk.names.map((_, b) => {
-      const m = new THREE.Matrix4().compose(sk.pos[b]!, sk.rot[b]!, new THREE.Vector3(1, 1, 1)).multiply(new THREE.Matrix4().compose(sk.restPos[b]!, sk.restRot[b]!, new THREE.Vector3(1, 1, 1)).invert());
-      return dqOf(m.elements);
-    });
+    const mats = sk.names.map((_, b) => new THREE.Matrix4().compose(sk.pos[b]!, sk.rot[b]!, new THREE.Vector3(1, 1, 1)).multiply(new THREE.Matrix4().compose(sk.restPos[b]!, sk.restRot[b]!, new THREE.Vector3(1, 1, 1)).invert()).elements);
+    const dqs = mats.map((e) => dqOf(e));
     const out: [number, number, number] = [0, 0, 0];
     const solids = perf.pieces.flatMap((p) => p.solidsWorld().map((s) => ({ ...s, piece: p.kind })));
     const held = new Set<number>();
@@ -187,7 +197,7 @@ for (const slug of slugs) {
       const N = part.pos.length / 3;
       const now = new Float32Array(N * 3);
       for (let v = 0; v < N; v++) {
-        dqSkin(dqs, part.idx.subarray(v * 4, v * 4 + 4), part.wt.subarray(v * 4, v * 4 + 4), [part.pos[v * 3]!, part.pos[v * 3 + 1]!, part.pos[v * 3 + 2]!], out);
+        (part.linear ? lbsSkin : dqSkin)((part.linear ? mats : dqs) as never, part.idx.subarray(v * 4, v * 4 + 4), part.wt.subarray(v * 4, v * 4 + 4), [part.pos[v * 3]!, part.pos[v * 3 + 1]!, part.pos[v * 3 + 2]!], out);
         now.set(out, v * 3);
         if (out[1] < lowest) lowest = out[1];
         const mb = part.main[v]!;
@@ -228,7 +238,7 @@ for (const slug of slugs) {
           if (held.has(mb)) continue;
           const p = new THREE.Vector3(now[v * 3], now[v * 3 + 1], now[v * 3 + 2]);
           for (const s of solids) {
-            const depth = s.r - segDist(p, s.a, s.b);
+            const depth = depthIn(p, s);
             if (depth > 0.8) {
               const prev = res.collisions.find((c) => c.piece === s.piece);
               if (!prev) res.collisions.push({ piece: s.piece, depth, at: i / n, bone: sk.names[mb]! });

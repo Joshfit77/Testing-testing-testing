@@ -5,7 +5,8 @@ import { Skeleton3, type RigMeta } from "./skeleton";
 /**
  * Binds the loaded Écorché model to the anatomical skeleton: every part of the file becomes a skinned mesh (same
  * geometry, material, place in the scene) with the rig's weights (public/anatomy/ecorche-rig.*), skinned with dual
- * quaternions. Face layers take their source part's weights; the face surface takes its own block.
+ * quaternions, or linearly for the muscles the rig marks so. Face layers take their source part's weights; the face
+ * surface takes its own block.
  */
 export interface BoundBody {
   sk: Skeleton3;
@@ -49,6 +50,9 @@ export function bindModel(model: THREE.Object3D, rig: { meta: RigMeta; data: Arr
     const ib = new THREE.InterleavedBuffer(own, 8);
     g.setAttribute("skinIndex", new THREE.InterleavedBufferAttribute(ib, 4, 0));
     g.setAttribute("skinWeight", new THREE.InterleavedBufferAttribute(ib, 4, 4, true));
+    // Linear (1) or dual-quaternion (0) blending, per vertex (all of a part alike).
+    const linear = !m.userData.faceShell && entryOf.get(m.userData.faceFor ?? m)!.linear ? 255 : 0;
+    g.setAttribute("skinLinear", new THREE.BufferAttribute(new Uint8Array(g.getAttribute("position").count).fill(linear), 1, true));
     const sm = new THREE.SkinnedMesh(g, m.material);
     sm.name = m.name;
     sm.position.copy(m.position);
