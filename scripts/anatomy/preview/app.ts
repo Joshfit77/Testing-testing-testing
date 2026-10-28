@@ -2,6 +2,7 @@ import { mountAthlete, type CameraView } from "../../../src/lib/anatomy3d/player
 import { mountModel, type ModelFace, type ModelSkin } from "../../../src/lib/anatomy3d/model-viewer";
 import { REGION_LABELS, type Region } from "../../../src/lib/anatomy3d/muscle-ids";
 import { EXERCISES } from "../../../src/data/exercises";
+import { getMotion } from "../../../src/lib/exercise-motion";
 
 declare global {
   interface Window {
@@ -15,6 +16,8 @@ declare global {
     /** The same for the filled-in face (anatomy/ecorche-face.bin). */
     FACE_PARTS?: string[];
     modelVerified?: boolean;
+    exerciseView?: string;
+    exerciseSlugs?: string[];
   }
 }
 
@@ -154,6 +157,9 @@ async function runModel() {
     return;
   }
   window.viewer = viewer;
+  // (For the video renderer: the exercise's own camera side.)
+  window.exerciseView = getMotion(ex.slug, ex).view;
+  window.exerciseSlugs = EXERCISES.map((e) => e.slug);
   const fit = () => viewer.resize(box.clientWidth, box.clientHeight);
   fit();
   new ResizeObserver(fit).observe(box);
@@ -203,10 +209,10 @@ async function runModel() {
 }
 
 (async () => {
-  // The exercise player (rigged athlete, animation, glow) only with ?ex= or ?mode=exercise; by default the page shows
-  // the original model standing.
+  // The model performs the exercise in ?ex= (the squat by default); the old rigged-athlete player only with
+  // ?mode=exercise.
   const q = new URLSearchParams(location.search);
-  if (!q.has("ex") && q.get("mode") !== "exercise") return runModel();
+  if (q.get("mode") !== "exercise") return runModel();
   const canvas = $<HTMLCanvasElement>("#stage");
   const box = $<HTMLElement>(".stage-box");
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;

@@ -31,7 +31,12 @@ export interface ModelViewer {
   setView(view: CameraView): void;
   resize(width: number, height: number): void;
   /** One still from any angle, as a PNG data URL (for thumbnails and reviews). Distances are in model heights. */
-  still(o: { yaw: number; distance?: number; targetY?: number; width: number; height: number }): string;
+  /**
+   * A still picture at the given size and angle, as a data URL (PNG, or JPEG when `jpeg` is set). With `t`, the
+   * exercise is posed at that time first, without drawing the page's own view (for rendering videos frame by frame).
+   * With `fit`, a still camera framing the whole space the exercise takes over a rep (videos).
+   */
+  still(o: { yaw: number; distance?: number; targetY?: number; width: number; height: number; t?: number; jpeg?: boolean; fit?: boolean }): string;
   /** The model's height in its own units (metres). */
   readonly height: number;
   /** Present when an exercise was given: the model itself performing it (see moveModel). */
@@ -42,6 +47,8 @@ export interface ModelViewer {
 export interface ModelMotion {
   /** How many of the file's meshes were bound to the rig (all of them). */
   readonly skinnedMeshes: number;
+  /** The space the exercise takes over a rep (the model's frame, metres): body and the height of the equipment. */
+  readonly bounds: THREE.Box3;
   readonly duration: number;
   readonly effort: EffortCurve;
   play(): void;
@@ -132,11 +139,21 @@ export async function mountModel(
   const moving = opts.exercise ? moveModel(scene, model, opts.exercise, () => changed()) : null;
 
   // Distance that fits the whole figure (with a margin) in the frame, for the current aspect ratio.
+  const half = THREE.MathUtils.degToRad(FOV / 2);
+  /** Distance that fits a box (the space an exercise takes) seen from the side `yaw`, or from any side without it. */
+  const fitBox = (b: THREE.Box3, aspect: number, yaw?: number) => {
+    const s = b.getSize(new THREE.Vector3());
+    const across = yaw === undefined ? Math.max(s.x, s.z) : Math.abs(s.x * Math.cos(yaw)) + Math.abs(s.z * Math.sin(yaw));
+    const deep = yaw === undefined ? Math.min(s.x, s.z) : Math.abs(s.x * Math.sin(yaw)) + Math.abs(s.z * Math.cos(yaw));
+    return Math.max((s.y * 0.52) / Math.tan(half), (across * 0.52) / (Math.tan(half) * aspect)) + deep / 3;
+  };
   const fitDistance = (aspect: number) => {
-    const half = THREE.MathUtils.degToRad(FOV / 2);
     const byHeight = (H * 0.53) / Math.tan(half);
     const byWidth = ((box.max.x - box.min.x) * 0.58) / (Math.tan(half) * aspect);
-    return Math.max(byHeight, byWidth);
+    // (An exercise that takes more room across than the standing figure, lying or stepping, is fitted across.)
+    const s = moving?.bounds.getSize(new THREE.Vector3());
+    const byExercise = s ? (Math.max(s.x, s.z) * 0.55) / (Math.tan(half) * aspect) : 0;
+    return Math.max(byHeight, byWidth, byExercise);
   };
   const place = (cam: THREE.PerspectiveCamera, y: number, p: number, dist: number, at: THREE.Vector3) => {
     cam.position.set(at.x + Math.sin(y) * Math.cos(p) * dist, at.y + Math.sin(p) * dist, at.z + Math.cos(y) * Math.cos(p) * dist);
@@ -146,6 +163,12 @@ export async function mountModel(
   // viewer's own up-and-down offset. Zoomed in, it follows the part of the body it is looking at instead, so a
   // close-up of the face stays on the face as he squats and leans.
   const followY = () => (moving ? moving.followY() - center.y : 0);
+  // (Across the floor, the camera centres on the space the exercise takes.)
+  if (moving) {
+    const c = moving.bounds.getCenter(new THREE.Vector3());
+    center.x = c.x;
+    center.z = c.z;
+  }
   const at = new THREE.Vector3();
   const lookAt = () => {
     at.set(center.x, targetY + followY(), center.z);
@@ -212,13 +235,15 @@ export async function mountModel(
       draw();
     },
     still(o) {
+      if (o.t !== undefined) moving?.poseAt(o.t);
       const size = renderer.getSize(new THREE.Vector2());
       const aspect = camera.aspect;
       const shot = new THREE.PerspectiveCamera(FOV, o.width / o.height, 0.02, 50);
       renderer.setSize(o.width, o.height, false);
-      place(shot, o.yaw, 0.05, o.distance !== undefined ? o.distance * H : fitDistance(shot.aspect), new THREE.Vector3(center.x, (o.targetY !== undefined ? box.min.y + o.targetY * H : center.y) + followY(), center.z));
+      if (o.fit && moving) place(shot, o.yaw, 0.05, fitBox(moving.bounds, shot.aspect, o.yaw), moving.bounds.getCenter(new THREE.Vector3()));
+      else place(shot, o.yaw, 0.05, o.distance !== undefined ? o.distance * H : fitDistance(shot.aspect), new THREE.Vector3(center.x, (o.targetY !== undefined ? box.min.y + o.targetY * H : center.y) + followY(), center.z));
       renderer.render(scene, shot);
-      const url = canvas.toDataURL("image/png");
+      const url = o.jpeg ? canvas.toDataURL("image/jpeg", 0.92) : canvas.toDataURL("image/png");
       renderer.setSize(size.x, size.y, false);
       camera.aspect = aspect;
       camera.updateProjectionMatrix();
@@ -552,15 +577,41 @@ function moveModel(
     equipment.update(f, j);
     for (const l of listeners) l(t, effort.at(t));
   };
+  // The space the exercise takes over a rep (file frame): the joints at 24 moments, with room for the body round them,
+  // and the height of the equipment (a bench under a lying exercise, a bar overhead); not its width, so a long bar
+  // does not shrink the figure.
+  const bounds = new THREE.Box3();
+  {
+    const q = new THREE.Vector3();
+    const eb = new THREE.Box3();
+    for (let i = 0; i < 24; i++) {
+      t = (i / 24) * T;
+      pose();
+      const j = jointsFromFrame(evaluate(motion, t), { centerX, barGrip: barbell ? 26 : null, stance });
+      for (const p of [j.pelvis, j.mid, j.neck, j.head, j.headTop, ...(["R", "L"] as const).flatMap((sd) => [j[sd].shoulder, j[sd].elbow, j[sd].hand, j[sd].hip, j[sd].knee, j[sd].ankle, j[sd].heel, j[sd].toe])])
+        bounds.expandByPoint(q.copy(p).applyMatrix4(fromRig));
+      rigSpace.updateMatrixWorld(true);
+      eb.setFromObject(equipment.group);
+      if (!eb.isEmpty()) bounds.expandByPoint(q.set(bounds.min.x, eb.min.y, bounds.min.z)).expandByPoint(q.set(bounds.max.x, eb.max.y, bounds.max.z));
+    }
+    bounds.expandByScalar(0.1);
+    t = def.stillPhase !== undefined && o.reducedMotion ? def.stillPhase * T : 0;
+  }
   pose();
   const v = new THREE.Vector3();
   return {
+    bounds,
     advance(dt: number) {
       if (playing) t = (((t + dt * speed) % T) + T) % T;
       pose();
     },
     /** The camera's look-at height (file frame) for the current pose: low on the body, following the hips. */
     followY: () => v.set(0, 34 + 0.55 * pelvisY, 0).applyMatrix4(fromRig).y,
+    /** Poses the exercise at time `time` without asking for a redraw (stills, video frames). */
+    poseAt(time: number) {
+      t = ((time % T) + T) % T;
+      pose();
+    },
     /** How far the part of the body at height `y` at rest (file frame) has moved in the current pose (file frame), so
      * a close-up stays on it. */
     bodyShift(y: number) {
@@ -572,6 +623,7 @@ function moveModel(
       return d(k).lerp(d(k + 1), s).applyMatrix3(rigToFile);
     },
     motion: {
+      bounds,
       skinnedMeshes: skinned.filter(({ m }) => !m.userData.faceFor && !m.userData.skin).length,
       duration: T,
       effort,
