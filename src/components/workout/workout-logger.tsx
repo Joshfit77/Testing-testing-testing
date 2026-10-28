@@ -159,6 +159,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
   const lastToggle = useRef(new Map<string, number>());
   const prefilled = useRef(new Set<string>());
   const [staleHours, setStaleHours] = useState<number | null>(null);
+  const [sameSession, setSameSession] = useState(false);
 
   const catalogById = useMemo(() => new Map(catalog.map((c) => [c.id, c])), [catalog]);
 
@@ -195,6 +196,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
       if (wantsDifferentSession || age >= STALE_DRAFT_HOURS) {
         setPendingExisting(existing);
         setStaleHours(age >= STALE_DRAFT_HOURS ? age : null);
+        setSameSession(!wantsDifferentSession);
         setPhase("conflict");
         return;
       }
@@ -368,7 +370,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
         <p className="text-sm text-muted-foreground">
           You have an unfinished workout, <strong className="text-foreground">{pendingExisting.name}</strong>
           {staleHours !== null ? ` (last used ${ageText(staleHours)}, ${done} ${done === 1 ? "set" : "sets"} logged)` : `, started ${new Date(pendingExisting.startedAt).toLocaleString()}`}.{" "}
-          {staleHours !== null && !template ? "Carry on with it, or discard it and start fresh?" : `Resume it, or discard it and start ${template?.name ?? "a new workout"}?`}
+          {sameSession || !template ? "Carry on with it, or discard it and start fresh?" : `Resume it, or discard it and start ${template.name}?`}
         </p>
         <div className="flex flex-wrap gap-2">
           <Button
@@ -649,7 +651,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
               id="workout-name"
               value={draft.name}
               onChange={(e) => dispatch({ type: "rename", name: e.target.value })}
-              className="h-9 border-transparent bg-transparent px-0 font-display text-xl font-bold uppercase focus-visible:border-border focus-visible:px-2"
+              className="h-9 overflow-hidden text-ellipsis border-transparent bg-transparent px-0 font-display text-xl font-bold uppercase focus-visible:border-border focus-visible:px-2"
               maxLength={120}
             />
             <p className="flex items-center gap-2 text-xs text-muted-foreground">
