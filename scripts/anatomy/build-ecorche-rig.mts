@@ -705,10 +705,11 @@ const meshes: { name: string; offset: number; count: number; bones: string[]; li
 // femur) are skinned linearly: blended positions run along the straight line between where the two bones carry them,
 // so when the arm goes overhead the lats, teres and pectorals stretch as straight bands from the ribs to the arm, as they
 // do. Dual-quaternion blending (everything else) swings them round the joint instead, out into wings at the armpit.
-const CHORD = /latissimus|teres_major|teres_minor|infraspinatus|supraspinatus|subscapularis|long_head_of_.*triceps|pectoralis_major|deltoid|quadratus_femoris|gemellus|obturator_internus|piriformis|gluteus|biceps_femoris|semitendinosus|semimembranosus|adductor_magnus|iliotibial|tensor_fasciae/;
-// (The shoulder's band muscles hold to their bones loosely, so their stretch spreads along them; the hip's keep the usual
-// hold, so a thigh's turn does not reach up the glutes to the iliac crest.)
-const LOOSE = /latissimus|teres_major|teres_minor|infraspinatus|supraspinatus|subscapularis|long_head_of_.*triceps|pectoralis_major|deltoid/;
+const CHORD = /latissimus|teres_major|teres_minor|infraspinatus|supraspinatus|subscapularis|long_head_of_.*triceps|pectoralis_major|deltoid|quadratus_femoris|gemellus|obturator|piriformis|gluteus|biceps_femoris|semitendinosus|semimembranosus|adductor|gracilis|pectineus|iliotibial|tensor_fasciae/;
+// (The shoulder's band muscles and the deep hip rotators and adductors hold to their bones loosely, so their stretch
+// spreads along them; the glutes and hamstrings keep the usual hold, so a thigh's turn does not reach up them to the
+// iliac crest.)
+const LOOSE = /latissimus|teres_major|teres_minor|infraspinatus|supraspinatus|subscapularis|long_head_of_.*triceps|pectoralis_major|deltoid|quadratus_femoris|gemellus|obturator|piriformis|adductor_(brevis|longus|minimus)|gracilis|pectineus/;
 const write = (n: number, w: Map<number, number>) => {
   const top = [...w.entries()].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 4);
   const sum = top.reduce((s, [, v]) => s + v, 0) || 1;

@@ -175,6 +175,8 @@ const farmersCarry: Spec = {
 
 const runningIntervals: Spec = {
   travel: 263.58 * K,
+  // (The arms swing fast: baked at 60 frames a second.)
+  bakeFps: 60,
   frame(c) {
     // Running arms: elbows about 90° (as the motion swings them), loose fists with the thumbs up, hands in close.
     for (const s of SIDES) {
@@ -313,14 +315,20 @@ const woodchop: Spec = {
     // (Arms long with a little bend kept: within reach whichever way the hands roll round the rope.)
     const hands = c.reachable(sh.addScaledVector(dir, 63.8 * k.reach), ["R", "L"], 9, { offsets: { R: right.clone().multiplyScalar(4.5), L: right.clone().multiplyScalar(-4.5) } });
     const pulley = t.pulleyAt();
-    // Each fist round its rope end: the rope square to the forearm, thumbs towards the cable.
+    // Each fist round its rope end, the rope square to the forearm, thumbs towards the cable. (The rope is flexible: it
+    // bends where it enters the fist. When the arms reach along the cable, at the top of the chop, the cable's part
+    // square to the arm vanishes, so the chest's up and right add a steady lean: the direction through the fist never
+    // falls to nothing, and never switches from one choice to another.)
+    const chest = c.chestAxes();
     for (const s of SIDES) {
       const at = hands.clone().addScaledVector(right, SIDE_SIGN[s] * 4.5);
       const arm = at.clone().sub(c.gh(s)).normalize();
-      const cable = pulley.clone().sub(at).normalize();
-      let axis = cable.clone().addScaledVector(arm, -cable.dot(arm));
-      if (axis.lengthSq() < 0.05) axis = V3(0, 1, 0).addScaledVector(arm, -arm.y);
-      c.hold(s, { at, axis: axis.normalize(), radius: 1.3 }, axis.clone());
+      const square = (v: THREE.Vector3) => v.clone().addScaledVector(arm, -v.dot(arm));
+      const axis = square(pulley.clone().sub(at).normalize())
+        .addScaledVector(square(chest.up), 0.4)
+        .addScaledVector(square(chest.right), -SIDE_SIGN[s] * 0.4)
+        .normalize();
+      c.hold(s, { at, axis, radius: 1.3 }, axis.clone());
     }
   },
   after(c, [tower, rope, holder]) {
@@ -345,6 +353,8 @@ const throwKeys: (BodyKey & { ball: [number, number, number]; held: number })[] 
   { at: 0.66, pelvis: [-1, 89, 0], turn: -20, tilt: 8, chestTurn: -40, chestFlex: 6, headTurn: -50, feet: { R: [10, 26, -10, 6], L: [8, -26, -6, 0] }, ball: [28, -16, -36], held: 1 },
 ];
 const rotationalThrow: Spec = {
+  // (The ball comes off the wall fast: baked at 60 frames a second so the bounce is not cut short.)
+  bakeFps: 60,
   body: {
     duration: 2.6,
     goals(c) {
@@ -380,8 +390,9 @@ const rotationalThrow: Spec = {
       const ready = catchAt.clone().add(V3(4, 0, 6));
       const u = (c.phase - 0.3) / 0.36;
       hands = u < 0.3 ? release.clone().lerp(follow, smooth(u / 0.3)) : follow.clone().lerp(ready, smooth((u - 0.3) / 0.7)).lerp(catchAt, smooth(Math.max(0, (u - 0.85) / 0.15)));
-      // (The follow-through stays within the arms' reach.)
-      hands = c.reachable(hands, ["R", "L"], 6);
+      // (The follow-through stays within the arms' reach; over the last of the catch the hands meet the ball itself, so
+      // the fingers close round the real ball, not ahead of it.)
+      hands = c.reachable(hands, ["R", "L"], 6).lerp(at, clamp01((c.phase - 0.56) / 0.1));
     }
     {
       // Hands on either side of the ball, fingers spread over it and running on from the forearms (the arms reach the

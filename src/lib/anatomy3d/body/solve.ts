@@ -56,6 +56,8 @@ export interface ArmGoal {
   shrug?: number;
   reach?: number;
   grip?: Grip;
+  /** A ball the hand is on: the fingers stop at its surface. */
+  ball?: { center: V; radius: number };
 }
 
 export interface LegGoal {
@@ -424,6 +426,12 @@ export function solvePose(
   sk.updateBlends();
 }
 
+/** Continuity weights (cost per degree squared of change from the last frame): humerus turn, forearm turn, the hand's
+ *  roll and lie on its handle. */
+const K_HUM = Number(process.env.K_HUM ?? 0.04);
+const K_PHI = Number(process.env.K_PHI ?? 0.02);
+const K_ROLL = Number(process.env.K_ROLL ?? 0.04);
+
 /** The swivel each held arm had at the last solve, per skeleton (continuity from frame to frame). */
 const lastSwivel = new WeakMap<Skeleton3, Record<Side, number | null>>();
 /** The humerus's rotation for each held arm at the last solve. */
@@ -670,13 +678,35 @@ function solveArm(
         n.over * 2 +
         wl.over +
         Math.abs(sw) * 0.06 +
-        humStep * 0.25 +
-        (prevPhi === null ? 0 : Math.abs(n.phi - prevPhi) * 0.12),
+        // (Continuity costs the square of the change: small moves are nearly free, so the arm follows its best
+        // solution without sticking where it was, which made the result depend on the frames before; large jumps
+        // stay dear.)
+        cont * (humStep * humStep * K_HUM + (prevPhi === null ? 0 : (n.phi - prevPhi) ** 2 * K_PHI)),
       phi: n.phi,
     };
   };
-  /** Best swivel for the current target: a grid every 10° over ±110°, then refined. */
-  const search = () => {
+  // Continuity only chooses which family of solutions the arm stays in (as the target moves, the one it was in); the
+  // pose itself is then settled on that family's own best, with continuity off, so it does not lag behind by an amount
+  // that depends on the step from the last frame (the same motion solved at 30 or 60 frames a second agrees).
+  let cont = 1;
+  const descend = (x0: number, f: (x: number) => number, lim: number) => {
+    let x = x0,
+      best = f(x0);
+    for (const step of [2, 1, 0.5, 0.25, 0.1])
+      for (let it = 0; it < 20; it++) {
+        let moved = false;
+        for (const c of [x - step, x + step]) {
+          if (Math.abs(c) > lim) continue;
+          const v = f(c);
+          if (v < best - 1e-9) [best, x, moved] = [v, c, true];
+        }
+        if (!moved) break;
+      }
+    return x;
+  };
+  /** Best swivel for the current target: a grid every 10° over ±110°, then refined; `exact`: then settled on its own
+   *  best without continuity (see cont). */
+  const search = (exact = false) => {
     theta = solveTheta();
     if (!handGoal) {
       apply(theta, phi, 0);
@@ -698,6 +728,13 @@ function solveArm(
         const r = costAt(sw);
         if (r.cost < best.cost) best = { cost: r.cost, sw, phi: r.phi };
       }
+    if (exact) {
+      const was = cont;
+      cont = 0;
+      best.sw = descend(best.sw, (sw) => costAt(sw).cost, 115);
+      best.phi = costAt(best.sw).phi;
+      cont = was;
+    }
     // The pronation found changes where the wrist sits a little: settle the elbow angle for it once.
     phi = best.phi;
     theta = solveTheta();
@@ -733,9 +770,9 @@ function solveArm(
       return (
         search() +
         Math.abs(d) * 0.04 +
-        (prevRoll === null ? 0 : Math.abs(d - prevRoll) * 0.25) +
+        cont * (prevRoll === null ? 0 : (d - prevRoll) ** 2 * K_ROLL) +
         Math.abs(y) * 0.06 +
-        (prevYaw === null ? 0 : Math.abs(y - prevYaw) * 0.25)
+        cont * (prevYaw === null ? 0 : (y - prevYaw) ** 2 * K_ROLL)
       );
     };
     const y0 = prevYaw !== null && Math.abs(prevYaw) <= yawRange ? prevYaw : 0;
@@ -766,12 +803,24 @@ function solveArm(
           if (c < best.cost) best = { ...best, cost: c, yaw: y };
         }
     }
+    // Then roll and lie settled on their own best, without continuity (see cont).
+    {
+      cont = 0;
+      const exact = (d: number, y: number) => {
+        const t = rotated(d, y);
+        aim(t.w, t.h);
+        return search(true) + Math.abs(d) * 0.04 + Math.abs(y) * 0.06;
+      };
+      best.roll = descend(best.roll, (d) => exact(d, best.yaw), range);
+      if (yawRange > 0) best.yaw = descend(best.yaw, (y) => exact(best.roll, y), yawRange);
+      cont = 1;
+    }
     const t = rotated(best.roll, best.yaw);
     aim(t.w, t.h);
-    search();
+    search(true);
     rollMemo[s] = best.roll;
     yawMemo[s] = best.yaw;
-  } else search();
+  } else search(true);
   // (Remembered only from solves that hold something: the free-arm solves made to find the shoulders each frame must
   // not reset what the held arm had.)
   if (goal.hand) {
@@ -807,7 +856,7 @@ function solveArm(
   if (theta <= RANGE.elbow[0] + 0.01 && wristIn(0, phi).length() < dist - 0.5)
     held(`elbow${s}`, dist - wristIn(0, phi).length());
   // Fingers.
-  poseFingers(sk, s, goal.grip ?? { kind: "relaxed" }, L, roll);
+  poseFingers(sk, s, goal.grip ?? { kind: "relaxed" }, L, roll, goal.ball);
   // Armpit helper: at its point on the humerus, turned with the chest.
   const ax = sk.index.get(`axilla${s}`);
   if (ax !== undefined) {
@@ -864,7 +913,7 @@ function curls(g: Grip): {
   }
 }
 
-function poseFingers(sk: Skeleton3, s: Side, grip: Grip, L: Limb, handle?: { center: V; axis: V }) {
+function poseFingers(sk: Skeleton3, s: Side, grip: Grip, L: Limb, handle?: { center: V; axis: V }, ball?: { center: V; radius: number }) {
   const c = curls(grip);
   const flexW = V3().crossVectors(L.long, L.palm).normalize(); // rest world: + curls towards the palm
   const spreadW = L.palm.clone();
@@ -940,45 +989,90 @@ function poseFingers(sk: Skeleton3, s: Side, grip: Grip, L: Limb, handle?: { cen
         at(deg);
       }
     });
-  } else
+  } else {
+    // On a ball the fingers take their shape but stop at its surface (a finger curls no further once its next joint
+    // reaches the ball, plus the finger's half thickness).
+    const J = sk.meta.joints[s];
+    const surface = (p: V) => (ball ? p.distanceTo(ball.center) - (ball.radius + 0.8) : Infinity);
     FINGERS.forEach((f, n) => {
       const spread = (n - 1.5) * c.spread * SIDE_SIGN[s];
+      const ends = [J[f].pip, J[f].dip, J[f].tip];
       [c.mcp, c.pip, c.dip].forEach((deg, j) => {
         const k = sk.i(`${f}${j + 1}${s}`);
         sk.place(k);
-        let r = sk
-          .carried(k, Q())
-          .multiply(
-            axisAngle(
-              local(k, flexW),
-              deg + (f === "little" && j === 0 ? 4 : 0)
-            )
-          );
-        if (j === 0 && spread)
-          r = r.multiply(axisAngle(local(k, spreadW), spread));
-        sk.rot[k]!.copy(r);
+        const base = sk.carried(k, Q());
+        if (j === 0 && spread) base.multiply(axisAngle(local(k, spreadW), spread));
+        const set = (d: number) => {
+          sk.rot[k]!.copy(base).multiply(axisAngle(local(k, flexW), d));
+          return surface(sk.point(k, V3(...ends[j]!)));
+        };
+        let want = deg + (f === "little" && j === 0 ? 4 : 0);
+        if (ball && set(want) < 0) {
+          // The largest curl up to the shape's that keeps the joint outside the ball (none if it starts inside).
+          let lo = 0,
+            hi = want;
+          if (set(0) < 0) want = 0;
+          else {
+            for (let it = 0; it < 12; it++) {
+              const mid = (lo + hi) / 2;
+              if (set(mid) < 0) hi = mid;
+              else lo = mid;
+            }
+            want = lo;
+          }
+        }
+        set(want);
       });
     });
+  }
   // Thumb: opposition (towards the palm, across the fingers), then flexion of its two joints.
   const [opp, m, ip] = c.thumb;
   const t1 = sk.i(`thumb1${s}`),
     t2 = sk.i(`thumb2${s}`),
     t3 = sk.i(`thumb3${s}`);
-  sk.place(t1);
-  sk.rot[t1]!.copy(
-    sk
-      .carried(t1, Q())
-      .multiply(axisAngle(local(t1, L.long), -SIDE_SIGN[s] * opp * 0.6))
-      .multiply(axisAngle(local(t1, flexW), opp * 0.5))
-  );
-  for (const [k, deg] of [
-    [t2, m],
-    [t3, ip],
-  ] as const) {
-    sk.place(k);
-    sk.rot[k]!.copy(
-      sk.carried(k, Q()).multiply(axisAngle(local(k, flexW), deg))
+  const thumb = (f: number) => {
+    sk.place(t1);
+    sk.rot[t1]!.copy(
+      sk
+        .carried(t1, Q())
+        .multiply(axisAngle(local(t1, L.long), -SIDE_SIGN[s] * opp * 0.6 * f))
+        .multiply(axisAngle(local(t1, flexW), opp * 0.5 * f))
     );
+    for (const [k, deg] of [
+      [t2, m],
+      [t3, ip],
+    ] as const) {
+      sk.place(k);
+      sk.rot[k]!.copy(
+        sk.carried(k, Q()).multiply(axisAngle(local(k, flexW), deg * f))
+      );
+    }
+  };
+  thumb(1);
+  // On a ball the thumb, like the fingers, closes only as far as the ball's surface.
+  if (ball) {
+    const J = sk.meta.joints[s];
+    const inside = () =>
+      Math.min(
+        ...([
+          [t1, J.thumb.mcp],
+          [t2, J.thumb.ip],
+          [t3, J.thumb.tip],
+        ] as const).map(([k, p]) => sk.point(k, V3(...p)).distanceTo(ball.center) - (ball.radius + 0.8))
+      ) < 0;
+    if (inside()) {
+      let lo = 0,
+        hi = 1;
+      thumb(0);
+      if (!inside())
+        for (let it = 0; it < 12; it++) {
+          const mid = (lo + hi) / 2;
+          thumb(mid);
+          if (inside()) hi = mid;
+          else lo = mid;
+        }
+      thumb(lo);
+    }
   }
 }
 

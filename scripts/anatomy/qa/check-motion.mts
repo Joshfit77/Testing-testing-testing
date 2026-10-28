@@ -182,7 +182,7 @@ for (const slug of slugs) {
     // the same history) against the baked playback at that moment.
     res.baked = { frames: baked.frames, bytes: baked.frames * baked.bones * 14 + baked.gear.length * 4, bone: 0, hand: 0, piece: 0, worst: "" };
     const handIdx = [...HANDS.R, ...HANDS.L].filter((b) => /^hand/.test(sk.names[b]!));
-    const F = baked.frames;
+    const F = baked.frames - 1;
     settle(perf, sk, F);
     for (let f = 0; f < F; f++) {
       perf.pose((f / F) * T);
@@ -264,14 +264,16 @@ for (const slug of slugs) {
       const lo = total ? (100 * folds) / total : 0;
       if (hi > (stretchMax.get(part.name)?.ratio ?? 0)) stretchMax.set(part.name, { ratio: hi, at: i / n });
       if (lo > (collapseMin.get(part.name)?.ratio ?? 0)) collapseMin.set(part.name, { ratio: lo, at: i / n });
-      // Equipment inside the body.
+      // Equipment inside the body. (A holding hand touches its handle's surface, so its parts are allowed a little
+      // further in, the depth of the skin pressing on the handle, but no further: fingers or a thumb inside a ball or a
+      // plate still count.)
       if (solids.length)
         for (let v = 0; v < N; v += 3) {
           const mb = part.main[v]!;
-          if (held.has(mb)) continue;
+          const allow = held.has(mb) ? 1.2 : 0;
           const p = new THREE.Vector3(now[v * 3], now[v * 3 + 1], now[v * 3 + 2]);
           for (const s of solids) {
-            const depth = depthIn(p, s);
+            const depth = depthIn(p, s) - allow;
             if (depth > 0.8) {
               const prev = res.collisions.find((c) => c.piece === s.piece);
               if (!prev) res.collisions.push({ piece: s.piece, depth, at: i / n, bone: sk.names[mb]! });

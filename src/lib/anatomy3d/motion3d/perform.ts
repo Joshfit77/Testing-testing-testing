@@ -67,10 +67,14 @@ export interface Spec {
   after?(c: Ctx, pieces: Piece[]): void;
   /** Distance travelled per loop along +X (carries, sprints), for the camera. */
   travel?: number;
+  /** Frames a second to bake at (default 30; more for something fast, a ball thrown at a wall). */
+  bakeFps?: number;
 }
 
 export interface Performer {
   readonly duration: number;
+  /** Frames a second the exercise is baked at. */
+  readonly bakeFps: number;
   readonly group: THREE.Group;
   readonly pieces: Piece[];
   readonly view: "side" | "front";
@@ -217,7 +221,7 @@ export function makePerformer(sk: Skeleton3, ex: ExerciseMeta, spec: Spec): Perf
         const g = palmOn(sk, s, hd.center, hd.normal, hd.radius, hd.fingers);
         // (A palm on a ball may turn about the point it touches, to suit the wrist.)
         const at = hd.center.clone().addScaledVector(hd.normal, hd.radius);
-        return { wrist: g.wrist, hand: g.hand, pole: c.goals.arms[s].pole ?? defaultPole(s, ax), grip: hd.grip, roll: { center: at, axis: hd.normal, range: 70, oblique: 0 } };
+        return { wrist: g.wrist, hand: g.hand, pole: c.goals.arms[s].pole ?? defaultPole(s, ax), grip: hd.grip, roll: { center: at, axis: hd.normal, range: 70, oblique: 0 }, ball: { center: hd.center, radius: hd.radius } };
       }
       const g = gripOn(sk, s, hd.h, hd.thumb, from, hd.h.radius);
       // (Round handles: the hand may roll round the handle to suit the arm.)
@@ -257,6 +261,7 @@ export function makePerformer(sk: Skeleton3, ex: ExerciseMeta, spec: Spec): Perf
   let lastHolds: typeof holds = {};
   const performer: Performer = {
     duration: T,
+    bakeFps: spec.bakeFps ?? 30,
     group,
     pieces,
     view: def.view,
