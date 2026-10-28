@@ -5,7 +5,7 @@
 // from the exercise's own side (a side-view exercise from the side, turned a little forward as in the player; a
 // front-view one from the front, turned a little), a still camera framing the whole rep. Also writes <slug>.jpg (the frame
 // at mid-rep) for contact sheets, and skips exercises whose video already exists (so a run can be resumed).
-// All slugs when none are given.
+// All slugs when none are given. Q=<query> adds to the page's address (e.g. Q=&glow=0 for the movement without the glow).
 import { chromium } from 'playwright';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs'; import http from 'node:http'; import path from 'node:path';
@@ -38,7 +38,7 @@ for (const slug of slugs) {
   const p = await ctx.newPage();
   p.on('pageerror', (e) => console.error(slug, e.message));
   try {
-    await p.goto(`http://localhost:${port}/index.html?ex=${encodeURIComponent(slug)}`);
+    await p.goto(`http://localhost:${port}/index.html?ex=${encodeURIComponent(slug)}${process.env.Q ?? ""}`);
     await p.waitForFunction(() => window.ready === true, null, { timeout: 240000 });
     const info = await p.evaluate(() => {
       const m = window.viewer.motion;

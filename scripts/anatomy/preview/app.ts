@@ -212,6 +212,11 @@ async function runModel() {
       setPlaying(true);
     }),
   );
+  // Muscle Glow, on unless ?glow=0 (reviews of the movement itself).
+  const glowBox = $<HTMLInputElement>("#glow");
+  glowBox.checked = new URLSearchParams(location.search).get("glow") !== "0";
+  viewer.setGlow(glowBox.checked);
+  glowBox.addEventListener("change", () => viewer.setGlow(glowBox.checked));
   const time = $<HTMLElement>("#time");
   motion.onTick((t) => {
     scrub.value = String(t);

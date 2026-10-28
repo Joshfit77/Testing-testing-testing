@@ -428,9 +428,9 @@ export function solvePose(
 
 /** Continuity weights (cost per degree squared of change from the last frame): humerus turn, forearm turn, the hand's
  *  roll and lie on its handle. */
-const K_HUM = Number(process.env.K_HUM ?? 0.04);
-const K_PHI = Number(process.env.K_PHI ?? 0.02);
-const K_ROLL = Number(process.env.K_ROLL ?? 0.04);
+const K_HUM = 0.04;
+const K_PHI = 0.02;
+const K_ROLL = 0.04;
 
 /** The swivel each held arm had at the last solve, per skeleton (continuity from frame to frame). */
 const lastSwivel = new WeakMap<Skeleton3, Record<Side, number | null>>();

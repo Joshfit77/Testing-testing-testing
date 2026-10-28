@@ -94,6 +94,7 @@
   /* The model performing the exercise: the transport comes back. */
   .model-mode.model-moving #play, .model-mode.model-moving #scrub, .model-mode.model-moving #time { display: revert; }
   .model-mode.model-moving .modes { display: flex; }
+  .model-mode.model-moving .toggle { display: flex; top: auto; bottom: 12px; }
   .model-mode.model-moving .bar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; }
   .model-mode.model-moving .modes, .model-mode.model-moving .angles { grid-column: 1 / -1; justify-content: center; }
   .hint { display: none; position: absolute; left: 12px; right: 12px; top: 10px; text-align: center; font-size: 12px; color: var(--muted); pointer-events: none; transition: opacity 0.6s; }

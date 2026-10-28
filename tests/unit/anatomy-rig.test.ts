@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { Skeleton3, type RigMeta } from "@/lib/anatomy3d/body/skeleton";
 import { RANGE, gripOn, restGoals, solvePose, type SolveReport } from "@/lib/anatomy3d/body/solve";
+import { muscleId, REGIONS, regionOf, sideOf } from "@/lib/anatomy3d/muscle-ids";
 
 /**
  * The anatomical rig (public/anatomy/ecorche-rig.*, src/lib/anatomy3d/body): what the solver guarantees whatever the
@@ -48,6 +49,19 @@ describe("anatomical rig asset", () => {
     for (const n of ["Right_latissimus_dorsi", "Right_teres_major", "Right_gluteus_maximus", "Right_iliotibial_tract"]) expect(linear).toContain(n);
     expect(linear).not.toContain("Long_head_of_right_biceps_brachii");
     expect(meta.bones.filter((b) => b.blend).length).toBe(20);
+  });
+
+  it("labels parts for every Muscle Glow region, on both sides (the viewer's glow, model-viewer muscleGlow)", () => {
+    const lit = new Set<number>();
+    for (const { name } of meta.meshes) {
+      const n = name.replace(/_/g, " ").toLowerCase();
+      const r = regionOf(n);
+      if (r && r !== "drop") lit.add(muscleId(r, sideOf(n)));
+    }
+    const missing = REGIONS.flatMap((r) => ([0, 1] as const).filter((s) => !lit.has(muscleId(r, s))).map((s) => `${r} ${s ? "left" : "right"}`));
+    expect(missing).toEqual([]);
+    expect(regionOf("acromial part of right deltoid")).toBe("deltLat");
+    expect(sideOf("acromial part of left deltoid")).toBe(1);
   });
 });
 

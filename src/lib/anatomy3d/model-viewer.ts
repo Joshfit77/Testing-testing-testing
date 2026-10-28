@@ -7,6 +7,8 @@ import { effortCurve, type EffortCurve } from "./effort";
 import { makeEquipment } from "./equipment";
 import { gripDelta, gripReach } from "./grip";
 import { makeSkeleton } from "./mesh";
+import { muscleId, MUSCLE_ID_COUNT, NO_MUSCLE, regionOf, sideOf, type Region } from "./muscle-ids";
+import { muscleTargets } from "./muscle-map";
 import type { CameraView, PlayerExercise } from "./player";
 import { jointsFromFrame, poseBones } from "./rig";
 import { bindModel, type BoundBody } from "./body/bind-model";
@@ -18,7 +20,7 @@ import { moveModel3, type Mover3 } from "./motion3d/mover";
  * The raw Écorché model in the exercise player: the GLB file (github.com/Charleeh/ecorche, CC BY-SA 4.0) is loaded as
  * published, with its own meshes, vertex colours and materials, and the file itself is not changed. At runtime the
  * viewer adds: an iris and pupil on the eyes (paintEyes), a face (fillFace), and, for an exercise, skin
- * weights that rig and animate it (moveModel). What is shown is therefore a modified version of the model, shared under
+ * weights that rig and animate it (moveModel) and the glow on the muscles it works (muscleGlow). What is shown is therefore a modified version of the model, shared under
  * CC BY-SA 4.0 (public/anatomy/LICENSE.md). The lighting is the studio used for the reference renders (ACES tone
  * mapping, a room environment, one warm key light and one white rim light).
  *
@@ -33,6 +35,8 @@ export interface ModelViewer {
   pan(dHeight: number): void;
   /** Front, side or rear, at the full-body framing. */
   setView(view: CameraView): void;
+  /** Muscle Glow on or off: the muscles the exercise works light up with each rep (on by default). */
+  setGlow(on: boolean): void;
   resize(width: number, height: number): void;
   /** One still from any angle, as a PNG data URL (for thumbnails and reviews). Distances are in model heights. */
   /**
@@ -140,6 +144,7 @@ export async function mountModel(
   if (opts.eyes !== false) paintEyes(model);
   if (opts.face) fillFace(model, opts.face);
   if (opts.look === "gold") goldAndBlack(model);
+  const glow = muscleGlow(model, opts.look ?? "original");
   const box = new THREE.Box3().setFromObject(model);
   const H = box.max.y - box.min.y;
   const center = box.getCenter(new THREE.Vector3());
@@ -225,7 +230,21 @@ export async function mountModel(
     raf = 0;
     request();
   };
-  if (moving) request();
+  if (moving) {
+    // The worked muscles glow with the effort of each rep, as in the exercise player: primary muscles from a soft
+    // ember to full strength, secondary muscles softer.
+    const targets = muscleTargets(ex!.ex);
+    moving.motion.onTick((_t, e) => {
+      glow.levels.fill(0);
+      for (const [r, w] of Object.entries(targets.weights) as [Region, number][]) {
+        const g = w >= 0.99 ? 0.08 + 1.05 * e : w * (0.05 + 0.7 * e);
+        glow.levels[muscleId(r, 0)] = g;
+        glow.levels[muscleId(r, 1)] = g;
+      }
+    });
+    moving.motion.seek(moving.motion.time());
+    request();
+  }
 
   const viewer: ModelViewer = {
     height: H,
@@ -247,6 +266,10 @@ export async function mountModel(
       pitch = 0.05;
       zoomK = 1;
       targetY = homeY;
+      request();
+    },
+    setGlow(on) {
+      glow.setOn(on);
       request();
     },
     resize(w, h) {
@@ -418,6 +441,67 @@ function goldAndBlack(model: THREE.Object3D) {
     m.customProgramCacheKey = () => "gold-and-black";
     m.needsUpdate = true;
   }
+}
+
+/**
+ * Muscle Glow on the model. Every part is labelled with the glow region its name gives (regionOf: the file's
+ * "Acromial_part_of_right_deltoid" is the right side deltoid), as a muscle id on each vertex, and every material gets a
+ * shader patch that lights the parts whose id is glowing, kept on top of any patch already there or added later (the
+ * gold look, the eyes, dual-quaternion skinning). Only the red of a part glows, not its white tendon. `levels` holds
+ * the strength (0 to 1.5) per muscle id.
+ */
+function muscleGlow(model: THREE.Object3D, look: "original" | "gold") {
+  const levels = new Float32Array(MUSCLE_ID_COUNT + 1);
+  const uniforms = {
+    uGlow: { value: levels },
+    // (A hot orange on the red model; on the dark gold, a bright molten gold so the worked muscles stand out of it.)
+    uGlowColor: { value: new THREE.Color(look === "gold" ? "#ffa733" : "#ff6a1c") },
+    uGlowOn: { value: 1 },
+  };
+  const materials = new Set<THREE.Material>();
+  model.traverse((o) => {
+    if (!(o instanceof THREE.Mesh)) return;
+    const name = o.name.replace(/_/g, " ").toLowerCase();
+    const r = o.userData.faceShell ? null : regionOf(name);
+    const id = r && r !== "drop" ? muscleId(r, sideOf(name)) : NO_MUSCLE;
+    const g = o.geometry as THREE.BufferGeometry;
+    g.setAttribute("muscle", new THREE.BufferAttribute(new Uint8Array(g.getAttribute("position").count).fill(id), 1));
+    for (const m of [o.material].flat() as THREE.Material[]) materials.add(m);
+  });
+  for (const m of materials) {
+    const before = m.onBeforeCompile;
+    const key = m.customProgramCacheKey;
+    m.onBeforeCompile = (shader, renderer) => {
+      before.call(m, shader, renderer);
+      Object.assign(shader.uniforms, uniforms);
+      shader.vertexShader = shader.vertexShader
+        .replace("#include <common>", `#include <common>\nattribute float muscle;\nuniform float uGlow[${MUSCLE_ID_COUNT + 1}];\nvarying float vGlow;`)
+        .replace("#include <begin_vertex>", "#include <begin_vertex>\nvGlow = muscle > 254.5 ? 0.0 : uGlow[int(muscle + 0.5)];");
+      shader.fragmentShader = shader.fragmentShader
+        .replace("#include <common>", "#include <common>\nuniform vec3 uGlowColor;\nuniform float uGlowOn;\nvarying float vGlow;")
+        .replace(
+          "#include <emissivemap_fragment>",
+          `#include <emissivemap_fragment>
+          {
+            float g = clamp(vGlow, 0.0, 1.6) * uGlowOn;
+            #ifdef USE_COLOR
+              // (The file's white, tendon and aponeurosis, stays unlit: only the muscle belly glows.)
+              g *= 1.0 - smoothstep(0.35, 0.7, vColor.g / max(vColor.r, 1e-3));
+            #endif
+            diffuseColor.rgb = mix(diffuseColor.rgb, uGlowColor, clamp(g, 0.0, 1.0) * 0.3);
+            totalEmissiveRadiance += uGlowColor * g * 0.9;
+          }`,
+        );
+    };
+    m.customProgramCacheKey = () => `${key.call(m)}|glow`;
+    m.needsUpdate = true;
+  }
+  return {
+    levels,
+    setOn(on: boolean) {
+      uniforms.uGlowOn.value = on ? 1 : 0;
+    },
+  };
 }
 
 function paintEyes(model: THREE.Object3D) {
