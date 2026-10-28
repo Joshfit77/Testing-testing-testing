@@ -35,7 +35,7 @@ The app's own code and content do not have to be opened up.
    include it yet**.
 2. **ShareAlike** (section 3(b)) applies to the *changed* model files, not to the app:
    - `ecorche-skin.*` (rigging);
-   - `ecorche-face.*` (filled-in face);
+   - `ecorche-face.*` (the added face);
    - `athlete-raw.*` (rigged copy).
 
    These are marked CC BY-SA 4.0 in `public/anatomy/LICENSE.md`. Before release they should also be available to

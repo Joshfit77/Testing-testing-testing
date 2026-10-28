@@ -13,7 +13,7 @@ import { jointsFromFrame, poseBones } from "./rig";
 /**
  * The raw Écorché model in the exercise player: the GLB file (github.com/Charleeh/ecorche, CC BY-SA 4.0) is loaded as
  * published, with its own meshes, vertex colours and materials, and the file itself is not changed. At runtime the
- * viewer adds: an iris and pupil on the eyes (paintEyes), the filled-in face (fillFace), and, for an exercise, skin
+ * viewer adds: an iris and pupil on the eyes (paintEyes), a face (fillFace), and, for an exercise, skin
  * weights that rig and animate it (moveModel). What is shown is therefore a modified version of the model, shared under
  * CC BY-SA 4.0 (public/anatomy/LICENSE.md). The lighting is the studio used for the reference renders (ACES tone
  * mapping, a room environment, one warm key light and one white rim light).
@@ -55,9 +55,14 @@ export interface ModelMotion {
 }
 
 /** Skin weights for the original file (scripts/anatomy/build-ecorche-skin.mts). */
-/** The filled-in face (public/anatomy/ecorche-face.*, scripts/anatomy/build-ecorche-face.mts). */
+/** The face (public/anatomy/ecorche-face.*, scripts/anatomy/build-ecorche-face.mts). */
 export interface ModelFace {
-  meta: { hide: string[]; layers: { source: string; count: number; offset: number }[] };
+  meta: {
+    hide: string[];
+    layers: { source: string; count: number; offset: number }[];
+    /** The face surface over the whole head: its own vertices (file frame), colours, skin weights and triangles. */
+    shell?: { vertices: number; triangles: number; offset: number };
+  };
   data: ArrayBuffer;
 }
 
@@ -79,7 +84,7 @@ export async function mountModel(
     pixelRatio?: number;
     /** Iris and pupil on the corneas (default on; see paintEyes). */
     eyes?: boolean;
-    /** The filled-in face: red layers over the face's bare bone and cartilage, teeth hidden (see fillFace). */
+    /** The face: a smooth red surface over the head, red ears, teeth hidden (see fillFace). */
     face?: ModelFace;
     /** The model performing an exercise: the exercise, the file's skin weights, equipment to leave out. */
     exercise?: { ex: PlayerExercise; skin: ModelSkin; hideProps?: string[]; reducedMotion?: boolean };
@@ -232,16 +237,10 @@ export async function mountModel(
 }
 
 /**
- * The one addition to the model's look, asked for by the owner: the published eyes are blank white (a sclera and a
- * cornea, no iris), so an iris and a pupil are painted onto each cornea in the shader. The geometry and the file are
- * untouched; only the two corneas get their own copy of the material, which colours the disc around the eye's axis
- * (the line from the eyeball's centre through the cornea) and makes it a little glossier, like a wet eye.
- */
-/**
- * Fills in the face (owner's request), keeping the model's red: next to each of the face's bones and cartilages goes a
- * red layer of the same shape, lifted to the level of the muscles around it (built by build-ecorche-face.mts), so the
- * bare bone between the muscles no longer shows; the teeth are hidden. The file's own parts are not changed. The
- * layers use the file's muscle material and move with the part they cover.
+ * Gives him a face (owner's requests), in the model's red, from build-ecorche-face.mts: one smooth surface shrink-wrapped
+ * over the head, with openings for the eyes, so the face reads as a face rather than separate muscles; a red layer over
+ * the ears (same shape, moved with them); the teeth hidden. The file's own parts are not changed. Everything uses the
+ * file's muscle material.
  */
 function fillFace(model: THREE.Object3D, face: ModelFace) {
   const parts = new Map<string, THREE.Mesh>();
@@ -273,9 +272,35 @@ function fillFace(model: THREE.Object3D, face: ModelFace) {
     m.scale.copy(src.scale);
     src.parent!.add(m);
   }
+  // The face: one smooth surface over the head (the eyes show through it), in the file's frame.
+  const sh = face.meta.shell;
+  if (sh) {
+    const n = sh.vertices;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(face.data.slice(sh.offset, sh.offset + n * 12)), 3));
+    const bytes = new Uint8Array(face.data, sh.offset + n * 12, n * 3);
+    g.setAttribute("color", new THREE.BufferAttribute(Float32Array.from(bytes, (b) => (b / 255) ** 2), 3));
+    g.setIndex(new THREE.BufferAttribute(new Uint32Array(face.data.slice(sh.offset + n * 23, sh.offset + n * 23 + sh.triangles * 12)), 1));
+    g.computeVertexNormals();
+    // (Drawn in front of the muscles just under it, where the two are within a hair of each other.)
+    const mat = muscle.clone();
+    mat.polygonOffset = true;
+    mat.polygonOffsetFactor = -2;
+    mat.polygonOffsetUnits = -2;
+    const m = new THREE.Mesh(g, mat);
+    m.name = "Face";
+    m.userData.skin = new Uint8Array(face.data, sh.offset + n * 15, n * 8);
+    model.add(m);
+  }
   model.updateMatrixWorld(true);
 }
 
+/**
+ * The one addition to the model's look, asked for by the owner: the published eyes are blank white (a sclera and a
+ * cornea, no iris), so an iris and a pupil are painted onto each cornea in the shader. The geometry and the file are
+ * untouched; only the two corneas get their own copy of the material, which colours the disc around the eye's axis
+ * (the line from the eyeball's centre through the cornea) and makes it a little glossier, like a wet eye.
+ */
 function paintEyes(model: THREE.Object3D) {
   const meshes = new Map<string, THREE.Mesh>();
   model.traverse((o) => {
@@ -366,17 +391,22 @@ function moveModel(
   const meshes: THREE.Mesh[] = [];
   const layers: THREE.Mesh[] = [];
   model.traverse((m) => {
-    if (m instanceof THREE.Mesh) (m.userData.faceFor ? layers : meshes).push(m);
+    if (m instanceof THREE.Mesh) (m.userData.faceFor || m.userData.skin ? layers : meshes).push(m);
   });
   if (meshes.length !== meta.meshes.length) throw new Error(`skin weights are for ${meta.meshes.length} meshes, the file has ${meshes.length}`);
   const bytes = new Uint8Array(data);
   // (A face layer takes the weights of the part it covers: same vertices, same order.)
   const entryOf = new Map(meshes.map((m, i) => [m as THREE.Object3D, meta.meshes[i]!]));
+  // (The face surface brings its own weights.)
   [...meshes, ...layers].forEach((m) => {
-    const entry = entryOf.get(m.userData.faceFor ?? m)!;
     const g = m.geometry;
-    if (g.getAttribute("position").count !== entry.count) throw new Error(`skin weights do not match ${m.name}`);
-    const ib = new THREE.InterleavedBuffer(bytes.subarray(entry.offset * 8, (entry.offset + entry.count) * 8), 8);
+    let own: Uint8Array = m.userData.skin;
+    if (!own) {
+      const entry = entryOf.get(m.userData.faceFor ?? m)!;
+      if (g.getAttribute("position").count !== entry.count) throw new Error(`skin weights do not match ${m.name}`);
+      own = bytes.subarray(entry.offset * 8, (entry.offset + entry.count) * 8);
+    }
+    const ib = new THREE.InterleavedBuffer(own, 8);
     g.setAttribute("skinIndex", new THREE.InterleavedBufferAttribute(ib, 4, 0));
     g.setAttribute("skinWeight", new THREE.InterleavedBufferAttribute(ib, 4, 4, true));
     const sm = new THREE.SkinnedMesh(g, m.material);
@@ -487,7 +517,7 @@ function moveModel(
       return d(k).lerp(d(k + 1), s).applyMatrix3(rigToFile);
     },
     motion: {
-      skinnedMeshes: skinned.filter(({ m }) => !m.userData.faceFor).length,
+      skinnedMeshes: skinned.filter(({ m }) => !m.userData.faceFor && !m.userData.skin).length,
       duration: T,
       effort,
       play() {
