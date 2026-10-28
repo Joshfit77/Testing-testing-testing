@@ -1,5 +1,5 @@
 import { mountAthlete, type CameraView } from "../../../src/lib/anatomy3d/player";
-import { mountModel, type ModelSkin } from "../../../src/lib/anatomy3d/model-viewer";
+import { mountModel, type ModelFace, type ModelSkin } from "../../../src/lib/anatomy3d/model-viewer";
 import { REGION_LABELS, type Region } from "../../../src/lib/anatomy3d/muscle-ids";
 import { EXERCISES } from "../../../src/data/exercises";
 
@@ -12,6 +12,8 @@ declare global {
     ECORCHE_PARTS?: string[];
     /** The same for the model's skin weights (anatomy/ecorche-skin.bin). */
     SKIN_PARTS?: string[];
+    /** The same for the filled-in face (anatomy/ecorche-face.bin). */
+    FACE_PARTS?: string[];
     modelVerified?: boolean;
   }
 }
@@ -138,8 +140,12 @@ async function runModel() {
       meta: await (await fetch("anatomy/ecorche-skin.json")).json(),
       data: await fetchBinary("anatomy/ecorche-skin.bin", window.SKIN_PARTS, () => {}),
     };
+    const face: ModelFace = {
+      meta: await (await fetch("anatomy/ecorche-face.json")).json(),
+      data: await fetchBinary("anatomy/ecorche-face.bin", window.FACE_PARTS, () => {}),
+    };
     const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    viewer = await mountModel(canvas, { glb, pixelRatio: Math.min(devicePixelRatio || 1, 2), exercise: { ex, skin, hideProps: ["rack"], reducedMotion } });
+    viewer = await mountModel(canvas, { glb, face, pixelRatio: Math.min(devicePixelRatio || 1, 2), exercise: { ex, skin, hideProps: ["rack"], reducedMotion } });
   } catch (e) {
     loading.textContent = "3D isn't available on this device.";
     console.error(e);

@@ -11,10 +11,12 @@ import type { CameraView, PlayerExercise } from "./player";
 import { jointsFromFrame, poseBones } from "./rig";
 
 /**
- * The raw Écorché model in the exercise player, exactly as published: the GLB file (github.com/Charleeh/ecorche,
- * CC BY-SA 4.0) is loaded as it is, with its own meshes, vertex colours and materials. Nothing is rebuilt, re-coloured,
- * rigged or re-shaped; the player only adds the lights, the camera and the controls. The lighting is the studio used
- * for the reference renders (ACES tone mapping, a room environment, one warm key light and one white rim light).
+ * The raw Écorché model in the exercise player: the GLB file (github.com/Charleeh/ecorche, CC BY-SA 4.0) is loaded as
+ * published, with its own meshes, vertex colours and materials, and the file itself is not changed. At runtime the
+ * viewer adds: an iris and pupil on the eyes (paintEyes), the filled-in face (fillFace), and, for an exercise, skin
+ * weights that rig and animate it (moveModel). What is shown is therefore a modified version of the model, shared under
+ * CC BY-SA 4.0 (public/anatomy/LICENSE.md). The lighting is the studio used for the reference renders (ACES tone
+ * mapping, a room environment, one warm key light and one white rim light).
  *
  * The model's frame: metres, Y up, soles on y = 0, facing +Z.
  */
@@ -53,6 +55,12 @@ export interface ModelMotion {
 }
 
 /** Skin weights for the original file (scripts/anatomy/build-ecorche-skin.mts). */
+/** The filled-in face (public/anatomy/ecorche-face.*, scripts/anatomy/build-ecorche-face.mts). */
+export interface ModelFace {
+  meta: { hide: string[]; layers: { source: string; count: number; offset: number }[] };
+  data: ArrayBuffer;
+}
+
 export interface ModelSkin {
   meta: { toRig: number[][]; bind: BindJoints; vertices: number; meshes: { name: string; offset: number; count: number }[] };
   /** Per vertex: four bone indices, then four weights (bytes). */
@@ -71,6 +79,8 @@ export async function mountModel(
     pixelRatio?: number;
     /** Iris and pupil on the corneas (default on; see paintEyes). */
     eyes?: boolean;
+    /** The filled-in face: red layers over the face's bare bone and cartilage, teeth hidden (see fillFace). */
+    face?: ModelFace;
     /** The model performing an exercise: the exercise, the file's skin weights, equipment to leave out. */
     exercise?: { ex: PlayerExercise; skin: ModelSkin; hideProps?: string[]; reducedMotion?: boolean };
   },
@@ -97,6 +107,7 @@ export async function mountModel(
   scene.add(model);
   model.updateMatrixWorld(true);
   if (opts.eyes !== false) paintEyes(model);
+  if (opts.face) fillFace(model, opts.face);
   const box = new THREE.Box3().setFromObject(model);
   const H = box.max.y - box.min.y;
   const center = box.getCenter(new THREE.Vector3());
@@ -226,6 +237,45 @@ export async function mountModel(
  * untouched; only the two corneas get their own copy of the material, which colours the disc around the eye's axis
  * (the line from the eyeball's centre through the cornea) and makes it a little glossier, like a wet eye.
  */
+/**
+ * Fills in the face (owner's request), keeping the model's red: next to each of the face's bones and cartilages goes a
+ * red layer of the same shape, lifted to the level of the muscles around it (built by build-ecorche-face.mts), so the
+ * bare bone between the muscles no longer shows; the teeth are hidden. The file's own parts are not changed. The
+ * layers use the file's muscle material and move with the part they cover.
+ */
+function fillFace(model: THREE.Object3D, face: ModelFace) {
+  const parts = new Map<string, THREE.Mesh>();
+  model.traverse((o) => {
+    if (o instanceof THREE.Mesh) parts.set(o.name, o);
+  });
+  const muscle = parts.get("Left_frontalis")?.material as THREE.Material | undefined;
+  if (!muscle) return;
+  for (const name of face.meta.hide) {
+    const m = parts.get(name);
+    if (m) m.visible = false;
+  }
+  for (const layer of face.meta.layers) {
+    const src = parts.get(layer.source);
+    if (!src || src.geometry.getAttribute("position").count !== layer.count) continue;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(face.data.slice(layer.offset, layer.offset + layer.count * 12)), 3));
+    const bytes = new Uint8Array(face.data, layer.offset + layer.count * 12, layer.count * 3);
+    const col = new Float32Array(layer.count * 3);
+    for (let i = 0; i < col.length; i++) col[i] = (bytes[i]! / 255) ** 2;
+    g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    g.setIndex(src.geometry.index);
+    g.computeVertexNormals();
+    const m = new THREE.Mesh(g, muscle);
+    m.name = `${layer.source} (face)`;
+    m.userData.faceFor = src;
+    m.position.copy(src.position);
+    m.quaternion.copy(src.quaternion);
+    m.scale.copy(src.scale);
+    src.parent!.add(m);
+  }
+  model.updateMatrixWorld(true);
+}
+
 function paintEyes(model: THREE.Object3D) {
   const meshes = new Map<string, THREE.Mesh>();
   model.traverse((o) => {
@@ -314,13 +364,16 @@ function moveModel(
 
   // Swap each mesh for a skinned one, in place (same parent, transform, geometry and material).
   const meshes: THREE.Mesh[] = [];
+  const layers: THREE.Mesh[] = [];
   model.traverse((m) => {
-    if (m instanceof THREE.Mesh) meshes.push(m);
+    if (m instanceof THREE.Mesh) (m.userData.faceFor ? layers : meshes).push(m);
   });
   if (meshes.length !== meta.meshes.length) throw new Error(`skin weights are for ${meta.meshes.length} meshes, the file has ${meshes.length}`);
   const bytes = new Uint8Array(data);
-  meshes.forEach((m, i) => {
-    const entry = meta.meshes[i]!;
+  // (A face layer takes the weights of the part it covers: same vertices, same order.)
+  const entryOf = new Map(meshes.map((m, i) => [m as THREE.Object3D, meta.meshes[i]!]));
+  [...meshes, ...layers].forEach((m) => {
+    const entry = entryOf.get(m.userData.faceFor ?? m)!;
     const g = m.geometry;
     if (g.getAttribute("position").count !== entry.count) throw new Error(`skin weights do not match ${m.name}`);
     const ib = new THREE.InterleavedBuffer(bytes.subarray(entry.offset * 8, (entry.offset + entry.count) * 8), 8);
@@ -332,6 +385,8 @@ function moveModel(
     sm.quaternion.copy(m.quaternion);
     sm.scale.copy(m.scale);
     sm.frustumCulled = false;
+    sm.visible = m.visible;
+    sm.userData = m.userData;
     sm.bindMode = THREE.DetachedBindMode;
     m.parent!.add(sm);
     m.parent!.remove(m);
@@ -432,7 +487,7 @@ function moveModel(
       return d(k).lerp(d(k + 1), s).applyMatrix3(rigToFile);
     },
     motion: {
-      skinnedMeshes: skinned.length,
+      skinnedMeshes: skinned.filter(({ m }) => !m.userData.faceFor).length,
       duration: T,
       effort,
       play() {
