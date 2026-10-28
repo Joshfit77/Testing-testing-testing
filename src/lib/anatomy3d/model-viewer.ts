@@ -84,6 +84,8 @@ export async function mountModel(
     pixelRatio?: number;
     /** Iris and pupil on the corneas (default on; see paintEyes). */
     eyes?: boolean;
+    /** Colours: the file's own red and white, or gold and black (owner's request: red becomes gold, white black). */
+    look?: "original" | "gold";
     /** The face: a smooth red surface over the head, red ears, teeth hidden (see fillFace). */
     face?: ModelFace;
     /** The model performing an exercise: the exercise, the file's skin weights, equipment to leave out. */
@@ -113,6 +115,7 @@ export async function mountModel(
   model.updateMatrixWorld(true);
   if (opts.eyes !== false) paintEyes(model);
   if (opts.face) fillFace(model, opts.face);
+  if (opts.look === "gold") goldAndBlack(model);
   const box = new THREE.Box3().setFromObject(model);
   const H = box.max.y - box.min.y;
   const center = box.getCenter(new THREE.Vector3());
@@ -301,6 +304,55 @@ function fillFace(model: THREE.Object3D, face: ModelFace) {
  * untouched; only the two corneas get their own copy of the material, which colours the disc around the eye's axis
  * (the line from the eyeball's centre through the cornea) and makes it a little glossier, like a wet eye.
  */
+/**
+ * Gold and black (owner's request: "all red make gold and the white black"). Each fragment's colour in the file says
+ * what it is: red is muscle, white is bone, tendon and cartilage. Red becomes polished gold, keeping the file's own
+ * light and dark (the muscle fibres); white becomes glossy black. The whites of the eyes are left as they are. Only the
+ * materials change; the file's geometry and colours are untouched.
+ */
+function goldAndBlack(model: THREE.Object3D) {
+  const materials = new Set<THREE.MeshStandardMaterial>();
+  model.traverse((o) => {
+    if (!(o instanceof THREE.Mesh)) return;
+    // (The eyes keep their own look: the sclera gets its own copy of the material, the cornea already has one.)
+    if (/(sclera|cornea)$/i.test(o.name)) {
+      if (/sclera$/i.test(o.name)) o.material = (o.material as THREE.Material).clone();
+      return;
+    }
+    materials.add(o.material as THREE.MeshStandardMaterial);
+  });
+  for (const m of materials) {
+    m.metalness = 1;
+    m.roughness = 0.32;
+    m.color.set("#ffffff");
+    m.onBeforeCompile = (shader) => {
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          "#include <color_fragment>",
+          `#include <color_fragment>
+          // How white this point is in the file (red muscle: green/red about 0.1; white: about 0.9).
+          float white = smoothstep(0.35, 0.7, vColor.g / max(vColor.r, 1e-3));
+          float shade = clamp(vColor.r / 0.21, 0.45, 1.3);
+          vec3 gold = vec3(0.96, 0.64, 0.22) * shade;
+          vec3 black = vec3(0.018) * clamp(vColor.r / 0.35, 0.6, 1.4);
+          diffuseColor.rgb = mix(gold, black, white);`,
+        )
+        .replace(
+          "#include <metalnessmap_fragment>",
+          `#include <metalnessmap_fragment>
+          metalnessFactor = mix(0.95, 0.15, white);`,
+        )
+        .replace(
+          "#include <roughnessmap_fragment>",
+          `#include <roughnessmap_fragment>
+          roughnessFactor = mix(0.3, 0.38, white);`,
+        );
+    };
+    m.customProgramCacheKey = () => "gold-and-black";
+    m.needsUpdate = true;
+  }
+}
+
 function paintEyes(model: THREE.Object3D) {
   const meshes = new Map<string, THREE.Mesh>();
   model.traverse((o) => {

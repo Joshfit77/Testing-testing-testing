@@ -27,7 +27,8 @@ for the eyes, and a red layer over the ears; the viewer also hides the teeth) ar
 **Écorché** (credit as above). Built by `scripts/anatomy/build-ecorche-skin.mts` and
 `scripts/anatomy/build-ecorche-face.mts`. They are shared under **CC BY-SA 4.0**, as is, without warranties.
 
-What the app shows is the model as modified: rigged and animated, iris and pupil painted on the eyes, a face added.
+What the app shows is the model as modified: rigged and animated, iris and pupil painted on the eyes, a face added,
+and recoloured gold and black in the viewer (red parts gold, white parts black).
 The credit on the exercise screen says so and links the licence.
 
 This is a summary for the project, not legal advice; please have the licence terms reviewed before release.

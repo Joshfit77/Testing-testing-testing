@@ -145,7 +145,9 @@ async function runModel() {
       data: await fetchBinary("anatomy/ecorche-face.bin", window.FACE_PARTS, () => {}),
     };
     const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    viewer = await mountModel(canvas, { glb, face, pixelRatio: Math.min(devicePixelRatio || 1, 2), exercise: { ex, skin, hideProps: ["rack"], reducedMotion } });
+    // Gold and black (owner's request); ?look=original shows the file's own red and white.
+    const look = new URLSearchParams(location.search).get("look") === "original" ? "original" : "gold";
+    viewer = await mountModel(canvas, { glb, face, look, pixelRatio: Math.min(devicePixelRatio || 1, 2), exercise: { ex, skin, hideProps: ["rack"], reducedMotion } });
   } catch (e) {
     loading.textContent = "3D isn't available on this device.";
     console.error(e);
