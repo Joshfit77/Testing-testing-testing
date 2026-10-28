@@ -46,9 +46,31 @@ for (const slug of slugs) {
       const b = m.bounds;
       return { T: m.duration, view: window.exerciseView, across: Math.max(b.max.x - b.min.x, b.max.z - b.min.z), up: b.max.y - b.min.y };
     });
-    const yaw = info.view === 'side' ? Math.PI / 2 - 0.55 : 0.3;
     // Tall for a standing exercise, wide for one that takes more room across than up (lying, crawling, stepping).
     const [W, H] = info.across > info.up * 0.9 ? [960, 540] : [540, 960];
+    // From whichever side shows more of him at mid-rep (a wall, a cable stack or a rack can stand between the camera
+    // and the figure on one side): the gold pixels of a small still from each.
+    // (Turned a little forward first, as in the player; then from behind the shoulder, for a wall in front of him.)
+    const sides = info.view === 'side' ? [Math.PI / 2 - 0.55, -(Math.PI / 2 - 0.55), Math.PI / 2 + 0.45, -(Math.PI / 2 + 0.45)] : [0.3, -0.3, Math.PI - 0.3];
+    const seen = [];
+    for (const y of sides)
+      seen.push(await p.evaluate(async ([t, yaw]) => {
+        const img = new Image();
+        img.src = window.viewer.still({ yaw, width: 160, height: 160, t, jpeg: true, fit: true });
+        await img.decode();
+        const c = document.createElement('canvas');
+        c.width = c.height = 160;
+        const g = c.getContext('2d');
+        g.drawImage(img, 0, 0);
+        const d = g.getImageData(0, 0, 160, 160).data;
+        let n = 0;
+        for (let i = 0; i < d.length; i += 4) if (d[i] > 60 && d[i] - d[i + 2] > 35 && d[i + 1] > d[i + 2]) n++;
+        return n;
+      }, [info.T / 2, y]));
+    // (The first side unless another shows clearly more.)
+    let best = 0;
+    seen.forEach((n, i) => { if (n > seen[best] * 1.15) best = i; });
+    const yaw = sides[best];
     const n = Math.max(24, Math.round(info.T * FPS));
     const frames = fs.mkdtempSync(path.join(out, `.${slug}-`));
     for (let i = 0; i < n; i++) {
