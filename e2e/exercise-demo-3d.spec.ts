@@ -31,7 +31,8 @@ test.describe("3D anatomical demonstration", () => {
     await expect(illustration).toHaveAttribute("aria-label", /Animated demonstration of Kettlebell Swing/);
     await demo.getByRole("button", { name: "Show the 3D figure" }).click();
     await expect(demo).toHaveAttribute("data-phase", "ready", { timeout: 60_000 });
-    await demo.getByRole("button", { name: "Pause" }).dispatchEvent("click");
+    // (It comes back paused, as it was left.)
+    await expect(demo.getByRole("button", { name: "Play" })).toBeVisible();
 
     // Every other exercise keeps the illustration only.
     await page.goto("/train/exercises/back-squat");
