@@ -28,7 +28,7 @@
     },
     "rowing-intervals": {
       "verdict": "fail",
-      "note": "inner thighs (adductors, gracilis) stretch and pull apart at the catch; seat, handle and chain move with the body"
+      "note": "catch, drive and layback read as rowing; seat, handle and chain move with the body; the gracilis still stretches and pulls away from the thigh at the catch (the automated check fails it)"
     },
     "pallof-press": {
       "verdict": "pass"
@@ -54,7 +54,8 @@
       "note": "neutral grip held through the curl"
     },
     "triceps-pushdown": {
-      "verdict": "not checked"
+      "verdict": "pass",
+      "note": "straight bar at the cable, elbows at the sides, push to extension; cable runs to the top pulley; side and front renders"
     },
     "cable-chest-fly": {
       "verdict": "not checked"
