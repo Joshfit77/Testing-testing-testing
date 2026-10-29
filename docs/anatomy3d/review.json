@@ -67,7 +67,8 @@
       "note": "body straight under the bar in the rack, heels on the floor, chest pulled to the bar; side and front renders"
     },
     "sumo-deadlift": {
-      "verdict": "not checked"
+      "verdict": "fail",
+      "note": "wide stance, hands inside the knees, the bar pulled from the floor to lockout and back, reads as a sumo pull from both angles; the automated check fails it: the gracilis pulls away from the thigh, the bar sits 1.3 cm off the hands, and the baked playback strays 2.6 cm from the live solve between frames"
     },
     "overhead-triceps-extension": {
       "verdict": "not checked"
