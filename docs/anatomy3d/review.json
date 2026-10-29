@@ -1,30 +1,30 @@
 {
-  "reviewer": "Claude (the coding session), from the rendered videos and stills, two angles each; not the owner",
-  "date": "2026-10-28",
+  "reviewer": "Claude (the coding session), from the rendered videos (30 fps, two angles each) and close-up stills; not the owner",
+  "date": "2026-10-29",
   "eye": {
     "push-press": {
       "verdict": "fail",
-      "note": "with the corrective shapes the automated check passes (lats and teres major under 2%), and the dip, drive and press read right; but at lockout a flat sheet still flares out from each armpit, front and side: the deltoid band, which the shapes do not cover, stretched between the acromion and the raised humerus. Looked at side by side, before and after the shapes, the lockout looks the same. Still wrong by eye."
+      "note": "the rack now sits on the front of the shoulders with the elbows forward and out, the grip overhand throughout, the dip, drive and press read right, the figure fills the frame, and the automated check passes again (a first version pointed the elbows straight forward and the forearm wound round; a palms-up rack flipped the hand); at lockout the deltoid still flares into a flat sheet beside each arm (dual-quaternion skinning for it: no visible change). Still wrong by eye at lockout."
     },
     "kettlebell-swing": {
       "verdict": "minor",
-      "note": "a crease at the right shoulder at the top of the swing; hinge, bell path and hands on the handle read right"
+      "note": "flat back through the hinge now (the chest brought into line with the pelvis; tilting the pelvis the rest of the way stretched the gracilis past 2%), stance a touch wider so the bell clears the thighs, hands on the handle, three-quarter views read as arms; at the top of the swing the pectorals and lats are still drawn into a sheet between the chest and the forward arms (close-up), which a pectoral corrective shape did not change"
     },
     "lateral-raise": {
       "verdict": "pass",
-      "note": "raise to shoulder height, slight forward lean, dumbbells in the hands; front and rear renders"
+      "note": "raise to shoulder height, slight forward lean, dumbbells in the hands; the figure fills the frame now; front three-quarter and rear renders"
     },
     "farmers-carry": {
       "verdict": "pass",
-      "note": "walking stride with the dumbbells at the sides, arms straight"
+      "note": "walking stride with the dumbbells at the sides, arms straight; side and front three-quarter"
     },
     "running-intervals": {
       "verdict": "pass",
-      "note": "sprint stride, knee drive and arm swing read right"
+      "note": "sprint stride, knee drive and arm swing read right at 30 fps"
     },
     "sled-push": {
       "verdict": "pass",
-      "note": "hands on the posts, body angled into the sled, sled on the floor and moving"
+      "note": "hands on the posts, body angled into the sled, legs driving; the sled on the floor and moving"
     },
     "rowing-intervals": {
       "verdict": "fail",
@@ -32,15 +32,15 @@
     },
     "pallof-press": {
       "verdict": "pass",
-      "note": "side-on to the cable, handle held at the chest with both hands and pressed out and back; the trunk holds; the press-out is short in the render; rear and front views"
+      "note": "side-on to the cable, both hands on the handle at the chest, pressed out and back, the trunk holding; seen from behind the shoulder and from the front three-quarter, the arms read as arms"
     },
     "cable-woodchop": {
       "verdict": "minor",
-      "note": "high-to-low chop with the trunk turning and the cable running to the top pulley; the coracobrachialis spike is gone; from behind, the far hand looks off the handle at mid-chop (the automated contact check covers the held hand)"
+      "note": "high-to-low chop with the trunk turning and the cable to the top pulley, the figure filling the frame; the close-up at mid-chop shows both hands on the two rope ends and the automated contact check passes, but in the video from behind the far hand still reads as if it were off the rope (the body hides it); your eye on the player decides"
     },
     "medicine-ball-rotational-throw": {
       "verdict": "minor",
-      "note": "ball held, trunk turns, ball leaves the hands at release; it reappears in the hands when the loop restarts (inherent to a looping throw)"
+      "note": "ball held in both hands at the hip, the trunk turns, the fingers now close round the ball instead of splaying, the ball leaves towards the wall and comes back to the catch; the figure fills the frame; it reappears in the hands when the loop restarts (inherent to a looping throw)"
     },
     "air-bike-sprint": {
       "verdict": "pass",
@@ -48,23 +48,23 @@
     },
     "dumbbell-curl": {
       "verdict": "pass",
-      "note": "supinated curl, dumbbells in the hands to the shoulders, elbows at the sides; side and front renders"
+      "note": "supinated curl, dumbbells in the hands to the shoulders, elbows at the sides; side and front three-quarter renders"
     },
     "hammer-curl": {
       "verdict": "pass",
-      "note": "neutral grip held through the curl"
+      "note": "neutral grip held through the curl, dumbbells in the hands, elbows at the sides; front three-quarter and side"
     },
     "triceps-pushdown": {
       "verdict": "pass",
-      "note": "straight bar at the cable, elbows at the sides, push to extension; cable runs to the top pulley; side and front renders"
+      "note": "straight bar at the cable, elbows at the sides, push to extension; the cable runs to the top pulley; side and front renders"
     },
     "cable-chest-fly": {
       "verdict": "pass",
-      "note": "between two towers, handles from the high pulleys, arms open wide and brought together low in front; cables stay in the hands; front and rear renders"
+      "note": "between two towers, handles from the high pulleys, arms open wide and brought together low in front; cables stay in the hands; front three-quarter and rear renders"
     },
     "inverted-row": {
       "verdict": "pass",
-      "note": "body straight under the bar in the rack, heels on the floor, chest pulled to the bar; side and front renders"
+      "note": "body straight under the bar in the rack, heels on the floor, chest pulled to the bar; wide frame, side and front three-quarter"
     },
     "sumo-deadlift": {
       "verdict": "fail",
@@ -72,7 +72,7 @@
     },
     "overhead-triceps-extension": {
       "verdict": "fail",
-      "note": "dumbbell held overhead in both hands, lowered behind the head and pressed back up; at the bottom the upper arms and armpits flatten into sheets and the elbows flare; the automated check fails it (teres major and lats stretched, teres minor and infraspinatus collapsed, wrists held at their limit, a 120\u00b0 pop in a shoulder helper, the dumbbell 1.6 cm into the thumb)"
+      "note": "dumbbell held overhead in both hands, lowered behind the head and pressed back up; at the bottom the upper arms and armpits flatten into sheets and the elbows flare; the automated check fails it (wrists held at their limit, a pop in the elbow, the shoulder helpers)"
     }
   },
   "owner_approval": {}
