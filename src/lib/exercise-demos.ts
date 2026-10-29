@@ -22,9 +22,38 @@ export interface DemoPhase {
   t?: number;
 }
 
+/** The per-exercise verification the owner asked for; "" = not reviewed / not tested. */
+export interface DemoChecks {
+  character?: "PASS" | "FAIL" | "";
+  form?: "PASS" | "FAIL" | "NOT REVIEWED" | "";
+  equipment?: "PASS" | "FAIL" | "";
+  highlighting?: "PASS" | "FAIL" | "";
+  playback?: "PASS" | "FAIL" | "";
+  mobile?: "PASS" | "FAIL" | "NOT TESTED" | "";
+}
+
+/** A second camera angle, rendered separately where the movement needs it (front and side). */
+export interface DemoAngle {
+  label: string;
+  poster: string;
+  mp4?: string;
+  webm?: string;
+  durationMs?: number;
+}
+
 export interface ExerciseDemoAsset {
   mode: DemoMode;
   status: DemoStatus;
+  /** Asset version, bumped by the source folder's meta.json when a clip is re-rendered. */
+  version?: number;
+  /** Which model or tool rendered the clip, for the record. */
+  source?: string;
+  /** The main clip's camera, named when there are other angles ("Side", "Front"). */
+  mainAngle?: string;
+  /** Extra camera angles beyond the main clip. */
+  angles?: DemoAngle[];
+  /** The owner's and the reviewer's verdicts, copied from meta.json. */
+  review?: DemoChecks;
   poster: string;
   /** Small still for lists (480 px wide). */
   thumb: string;

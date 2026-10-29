@@ -8,6 +8,8 @@
     "dumbbell-curl": {
       "mode": "poster",
       "status": "stand-in",
+      "version": 1,
+      "source": "Owner's dumbbell curl reference image, 2026-10-29",
       "poster": "/exercise-demos/dumbbell-curl/poster.webp",
       "thumb": "/exercise-demos/dumbbell-curl/thumb.webp",
       "width": 1200,

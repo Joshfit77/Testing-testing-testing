@@ -8,8 +8,11 @@
 //   frames/0001.png …          a rendered frame sequence (24–30 fps, one rep)   → mode "sequence"
 //   start.png, finish.png …    rendered phase stills in order (any names, sorted; meta.json names them) → "keyframes"
 //   poster.png                 a still used as the poster (optional; else the first frame)
-//   meta.json                  { "status": "stand-in" | "review" | "approved", "note": "…", "highlighted": ["biceps"],
-//                                "phases": [{ "label": "Start", "t": 0 }, { "label": "Curl", "t": 1.2 }], "source": "…" }
+//   angles/side/loop.mp4       a second camera angle (any name), with an optional poster.*
+//   meta.json                  { "status": "stand-in" | "review" | "approved", "version": 1, "source": "which model",
+//                                "note": "…", "highlighted": ["biceps"], "mainAngle": "Front",
+//                                "phases": [{ "label": "Start", "t": 0 }, { "label": "Curl", "t": 1.2 }],
+//                                "review": { "character": "PASS", "form": "NOT REVIEWED", "equipment": "", "highlighting": "", "playback": "", "mobile": "" } }
 // Output per slug: poster.webp (1200×900), thumb.webp (480×360), loop.mp4 + loop.webm (video and sequence modes),
 // phase-N.webp (keyframes mode), all letterboxed to 4:3 on #0a0a0a. Checks: the loop's seam (first vs last frame),
 // file sizes (mp4 ≤ 2.5 MB), dimensions. Every file is overwritten; nothing outside the slug's folder is touched.
@@ -55,7 +58,7 @@ for (const slug of slugs) {
   const stills = files.filter((f) => /\.(png|jpe?g|webp)$/i.test(f) && !/^poster\./i.test(f)).sort();
   const posterSrc = files.find((f) => /^poster\.(png|jpe?g|webp)$/i.test(f));
   const web = (f) => `/exercise-demos/${slug}/${f}`;
-  const asset = { mode: "poster", status: meta.status ?? "review", poster: web("poster.webp"), thumb: web("thumb.webp"), width: W, height: H, phases: [], highlighted: meta.highlighted ?? [], note: meta.note, checks: {} };
+  const asset = { mode: "poster", status: meta.status ?? "review", version: meta.version ?? 1, source: meta.source, mainAngle: meta.mainAngle, poster: web("poster.webp"), thumb: web("thumb.webp"), width: W, height: H, phases: [], highlighted: meta.highlighted ?? [], note: meta.note, review: meta.review, checks: {} };
   const tmp = fs.mkdtempSync(path.join(outDir, ".tmp-"));
   try {
     let loopSrc = null;
@@ -103,6 +106,22 @@ for (const slug of slugs) {
       still(path.join(dir, posterSrc), path.join(outDir, "poster.webp"), W, H);
     } else {
       throw new Error("nothing to build: add loop.*, frames/, phase stills or poster.*");
+    }
+    // Extra camera angles: <slug>/angles/<name>/loop.* (+ poster.*), each encoded like the main clip.
+    const anglesDir = path.join(dir, "angles");
+    if (fs.existsSync(anglesDir)) {
+      asset.angles = [];
+      for (const name of fs.readdirSync(anglesDir).sort()) {
+        const ad = path.join(anglesDir, name);
+        const al = fs.readdirSync(ad).find((f) => /^loop\.(mp4|mov|webm|gif|m4v)$/i.test(f));
+        if (!al) { report.push(`${slug}: angle ${name} has no loop.*`); continue; }
+        const base = `angle-${name}`;
+        ff(["-i", path.join(ad, al), "-an", "-vf", `${FIT},fps=30`, "-c:v", "libx264", "-profile:v", "high", "-crf", "26", "-preset", "slow", "-pix_fmt", "yuv420p", "-movflags", "+faststart", path.join(outDir, `${base}.mp4`)]);
+        ff(["-i", path.join(ad, al), "-an", "-vf", `${FIT},fps=30`, "-c:v", "libvpx-vp9", "-crf", "34", "-b:v", "0", "-row-mt", "1", "-pix_fmt", "yuv420p", path.join(outDir, `${base}.webm`)]);
+        const ap = fs.readdirSync(ad).find((f) => /^poster\.(png|jpe?g|webp)$/i.test(f));
+        if (ap) still(path.join(ad, ap), path.join(outDir, `${base}.webp`), W, H); else firstFrame(path.join(outDir, `${base}.mp4`), path.join(outDir, `${base}.webp`));
+        asset.angles.push({ label: name.replace(/^\w/, (c) => c.toUpperCase()), poster: web(`${base}.webp`), mp4: web(`${base}.mp4`), webm: web(`${base}.webm`), durationMs: Math.round(Number(probe(path.join(outDir, `${base}.mp4`)).format.duration) * 1000) });
+      }
     }
     still(path.join(outDir, "poster.webp"), path.join(outDir, "thumb.webp"), 480, 360);
     asset.checks.posterBytes = size(path.join(outDir, "poster.webp"));

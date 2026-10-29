@@ -35,6 +35,11 @@ export function ExerciseDemo25D({ slug, name, asset, className, controls = true,
   const [speed, setSpeed] = useState(1);
   const [phase, setPhase] = useState(0);
   const [failed, setFailed] = useState(false);
+  const [angle, setAngle] = useState(-1); // -1 = the main clip, else an index into asset.angles
+  const view = angle >= 0 && asset.angles?.[angle] ? asset.angles[angle] : null;
+  const mp4 = view ? view.mp4 : asset.mp4;
+  const webm = view ? view.webm : asset.webm;
+  const poster = view ? view.poster : asset.poster;
 
   // The loop: muted and inline (iOS keeps it in place), looping, started here because React does not reliably
   // reflect `muted`, which autoplay requires.
@@ -45,7 +50,7 @@ export function ExerciseDemo25D({ slug, name, asset, className, controls = true,
     v.playbackRate = speed;
     if (playing) void v.play().catch(() => setPlaying(false));
     else v.pause();
-  }, [playing, speed, hasLoop]);
+  }, [playing, speed, hasLoop, mp4, webm]);
 
   // Still-only assets with several phases cycle through them slowly (a crossfade, never a warp).
   useEffect(() => {
@@ -74,8 +79,9 @@ export function ExerciseDemo25D({ slug, name, asset, className, controls = true,
       <div className={cn("relative overflow-hidden bg-[#0a0a0a]", className)}>
         {hasLoop && !failed ? (
           <video
+            key={mp4 ?? webm}
             ref={video}
-            poster={asset.poster}
+            poster={poster}
             muted
             loop
             playsInline
@@ -86,8 +92,8 @@ export function ExerciseDemo25D({ slug, name, asset, className, controls = true,
             aria-label={`${name}: pre-rendered demonstration of the movement`}
             onError={() => setFailed(true)}
           >
-            {asset.webm && <source src={asset.webm} type="video/webm" />}
-            {asset.mp4 && <source src={asset.mp4} type="video/mp4" />}
+            {webm && <source src={webm} type="video/webm" />}
+            {mp4 && <source src={mp4} type="video/mp4" />}
           </video>
         ) : (
           asset.phases.map((p, i) => (
@@ -131,6 +137,19 @@ export function ExerciseDemo25D({ slug, name, asset, className, controls = true,
                 {s}×
               </button>
             ))}
+          {asset.angles && asset.angles.length > 0 && (
+            <>
+              <span className="mx-1 h-4 w-px bg-white/20" aria-hidden />
+              <button type="button" onClick={() => setAngle(-1)} className={cn(ctl, angle === -1 && on)} aria-pressed={angle === -1}>
+                {asset.mainAngle ?? "Main"}
+              </button>
+              {asset.angles.map((a, i) => (
+                <button key={a.label} type="button" onClick={() => setAngle(i)} className={cn(ctl, angle === i && on)} aria-pressed={angle === i}>
+                  {a.label}
+                </button>
+              ))}
+            </>
+          )}
           {asset.phases.length > 1 && <span className="mx-1 h-4 w-px bg-white/20" aria-hidden />}
           {asset.phases.length > 1 &&
             asset.phases.map((p, i) => (
