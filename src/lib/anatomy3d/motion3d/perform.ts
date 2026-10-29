@@ -59,6 +59,9 @@ export interface Spec {
   build?(sk: Skeleton3): Piece[];
   /** Feet apart and turned out (lifted motions). */
   stance?: { halfWidth: number; toeOut: number };
+  /** A flat back held through the movement (0..1; lifted motions): the chest kept in line with the lower trunk where
+   *  the 2D figure's drawn spine rounds. */
+  flatBack?: number;
   /** A 3D-authored body (replaces the lifted motion): duration and goals at a phase. */
   body?: { duration: number; goals(c: Ctx): void };
   /** Per frame, before the final solve: equipment and hands. */
@@ -113,7 +116,7 @@ export function makePerformer(sk: Skeleton3, ex: ExerciseMeta, spec: Spec): Perf
   const pose = (t: number): SolveReport => {
     const time = ((t % T) + T) % T;
     const f = spec.body ? null : evaluate(motion, time);
-    const lifted = f ? lift(sk, f, { centerX, stance: spec.stance ?? null }) : null;
+    const lifted = f ? lift(sk, f, { centerX, stance: spec.stance ?? null, flatBack: spec.flatBack }) : null;
     const goals: PoseGoals = lifted ? lifted.goals : (null as unknown as PoseGoals);
     for (const s of ["R", "L"] as const) delete holds[s];
     const c: Ctx = {

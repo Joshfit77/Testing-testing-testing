@@ -1,7 +1,7 @@
 // Usage: CHROMIUM_PATH=... node scripts/anatomy/preview/render-videos.mjs .anatomy-preview <out dir> [slug ...]
 //        (RENDER_SHARD=k/n renders every n-th exercise from the k-th, so n copies can run side by side.)
-// One video per exercise of the model performing it (the page's model view, ?ex=<slug>): two reps, 20 fps, 540×960
-// (or 960×540 for an exercise wider than it is tall),
+// One video per exercise of the model performing it (the page's model view, ?ex=<slug>): two reps, 30 fps, 720×960
+// (or 960×720 for an exercise wider than it is tall), framed on the figure and what he holds (not on a tower or a wall beside him),
 // from the exercise's own side (a side-view exercise from the side, turned a little forward as in the player; a
 // front-view one from the front, turned a little), a still camera framing the whole rep. Also writes <slug>.jpg (the frame
 // at mid-rep) for contact sheets, and skips exercises whose video already exists (so a run can be resumed).
@@ -26,7 +26,7 @@ if (!slugs.length) {
   slugs = await p.evaluate(() => window.exerciseSlugs);
   await p.close();
 }
-const FPS = 20;
+const FPS = Number(process.env.FPS ?? 30);
 if (process.env.RENDER_SHARD) {
   const [k, n] = process.env.RENDER_SHARD.split('/').map(Number);
   slugs = slugs.filter((_, i) => i % n === k);
@@ -47,12 +47,13 @@ for (const slug of slugs) {
       const b = m.travels ? m.reach : m.bounds;
       return { T: m.duration, view: window.exerciseView, across: Math.max(b.max.x - b.min.x, b.max.z - b.min.z), up: b.max.y - b.min.y };
     });
-    // Tall for a standing exercise, wide for one that takes more room across than up (lying, crawling, stepping).
-    const [W, H] = info.across > info.up * 0.9 ? [960, 540] : [540, 960];
+    // Tall for a standing exercise, wide for one that takes more room across than up (lying, rowing, stepping).
+    const [W, H] = info.across > info.up * 1.15 ? [960, 720] : [720, 960];
     // From whichever side shows more of him at mid-rep (a wall, a cable stack or a rack can stand between the camera
     // and the figure on one side): the gold pixels of a small still from each.
     // (Turned a little forward first, as in the player; then from behind the shoulder, for a wall in front of him.)
-    const sides = info.view === 'side' ? [Math.PI / 2 - 0.55, -(Math.PI / 2 - 0.55), Math.PI / 2 + 0.45, -(Math.PI / 2 + 0.45)] : [0.3, -0.3, Math.PI - 0.3];
+    // (A front-view exercise is seen from three-quarters front, so arms reaching towards the camera read as arms.)
+    const sides = info.view === 'side' ? [Math.PI / 2 - 0.55, -(Math.PI / 2 - 0.55), Math.PI / 2 + 0.45, -(Math.PI / 2 + 0.45)] : [0.55, -0.55, Math.PI - 0.55];
     const seen = [];
     for (const y of sides)
       seen.push(await p.evaluate(async ([t, yaw]) => {
@@ -79,7 +80,7 @@ for (const slug of slugs) {
     // (A front-view exercise first seen from behind, a cable tower or a wall in the way at the front, is seen from the
     // better front side second, so the hands and the handle are seen at all.)
     const front = info.view === 'side' ? 0 : seen[1] > seen[0] * 1.15 ? sides[1] : sides[0];
-    const second = info.view === 'side' ? Math.sign(yaw || 1) * 0.35 : Math.abs(yaw) > Math.PI / 2 ? front : Math.PI - 0.4;
+    const second = info.view === 'side' ? Math.sign(yaw || 1) * 0.4 : Math.abs(yaw) > Math.PI / 2 ? front : Math.PI - 0.55;
     const yaws = process.env.SECOND_VIEW ? [yaw, second] : [yaw];
     for (const [v, y] of yaws.entries())
       for (let i = 0; i < n; i++) {

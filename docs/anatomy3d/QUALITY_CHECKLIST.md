@@ -17,7 +17,7 @@ Render the stills and the video for the visual part:
 bash scripts/anatomy/preview/build.sh
 node scripts/anatomy/preview/review-stills.mjs .anatomy-preview <dir> <slug> ...      # 4 moments × front, side, rear
 python3 scripts/anatomy/preview/sheet.py <dir> <slug>                                  # contact sheet
-SECOND_VIEW=1 node scripts/anatomy/preview/render-videos.mjs .anatomy-preview <dir> <slug> ...
+SECOND_VIEW=1 node scripts/anatomy/preview/render-videos.mjs .anatomy-preview <dir> <slug> ...   # 30 fps, two reps from each of two angles
 ```
 
 The four moments are the start, the quarter, the half and the three-quarter points of the rep. For most exercises

@@ -38,6 +38,9 @@ export interface LiftOptions {
   /** Feet this far from the midline (cm) with the toes turned out this many degrees. (Front view: the motion places the
    *  feet itself; only the toe-out is taken.) */
   stance?: { halfWidth: number; toeOut: number } | null;
+  /** How far (0..1) the chest is kept in line with the lower trunk rather than bent as the motion draws it: 1 is a
+   *  flat back held through a hinge (a swing, a deadlift), where the 2D figure's drawn spine rounds. */
+  flatBack?: number;
 }
 
 export interface Lifted {
@@ -63,8 +66,13 @@ export function lift(sk: Skeleton3, f: Frame, o: LiftOptions): Lifted {
     const trunk = lean(p.pelvis, p.mid);
     const chest = lean(p.mid, p.neckBase);
     const head = lean(p.head, p.headTop);
-    g.pelvis = { pos: pel, rot: rotZ(-trunk * 0.7).multiply(restPel) };
-    g.chest = rotZ(-chest).multiply(restChest);
+    // The pelvis tilts with the trunk's lean, most of the way: the rest of the lean is the spine's own bend, so a lean
+    // rounds the back a little, as the drawn figure's does. (A flat back: the pelvis tilts the whole way and the chest
+    // stays in line with the lower trunk, bent beyond it only as far as the option allows, as in a hinge.)
+    const flat = o.flatBack ?? 0;
+    const chestLean = chest > trunk ? trunk + (chest - trunk) * (1 - flat) : chest;
+    g.pelvis = { pos: pel, rot: rotZ(-trunk * (0.7 + 0.3 * flat)).multiply(restPel) };
+    g.chest = rotZ(-chestLean).multiply(restChest);
     g.head = rotZ(-head).multiply(restHead);
     for (const s of ["R", "L"] as const) {
       const sign = SIDE_SIGN[s];

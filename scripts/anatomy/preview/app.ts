@@ -12,63 +12,13 @@ declare global {
     ready?: boolean;
     player?: unknown;
     viewer?: unknown;
-    /** Set by the artifact build: the GLB as base64 text parts (artifacts do not serve .glb files). */
-    ECORCHE_PARTS?: string[];
-    /** The same for the model's skin weights (anatomy/ecorche-skin.bin). */
-    SKIN_PARTS?: string[];
-    /** The same for the filled-in face (anatomy/ecorche-face.bin). */
-    FACE_PARTS?: string[];
-    /** The same for the anatomical rig's weights (anatomy/ecorche-rig.bin). */
-    RIG_PARTS?: string[];
-    /** The same for the shoulder and hip corrective shapes (anatomy/ecorche-correctives.bin), when built. */
-    CORR_PARTS?: string[];
-    BAKE_PARTS?: Record<string, string[]>;
     modelVerified?: boolean;
     exerciseView?: string;
     exerciseSlugs?: string[];
   }
 }
 
-/** sha256 of model/ecorche.glb in github.com/Charleeh/ecorche at commit 320805e: the page checks it before showing. */
-const ECORCHE_SHA256 = "9744d3dffced835961104447d23a781ad469588289ce322d84d000e0d498326c";
-
-/** The model file's bytes, from the .glb itself or from its base64 parts, with download progress. */
-async function fetchModel(onProgress: (f: number) => void): Promise<ArrayBuffer> {
-  return fetchBinary("anatomy/ecorche.glb", window.ECORCHE_PARTS, onProgress);
-}
-
-/** A binary file, fetched as it is or (artifact builds, which serve no binary types) as base64 text parts. */
-async function fetchBinary(url: string, parts: string[] | undefined, onProgress: (f: number) => void): Promise<ArrayBuffer> {
-  const read = async (url: string, done: number, share: number) => {
-    const res = await fetch(url);
-    if (!res.ok || !res.body) throw new Error(`${url}: ${res.status}`);
-    const total = Number(res.headers.get("content-length")) || 0;
-    const reader = res.body.getReader();
-    const parts: Uint8Array[] = [];
-    let got = 0;
-    for (;;) {
-      const { done: end, value } = await reader.read();
-      if (end) break;
-      parts.push(value);
-      got += value.length;
-      if (total) onProgress(done + (share * got) / total);
-    }
-    const out = new Uint8Array(got);
-    let o = 0;
-    for (const p of parts) {
-      out.set(p, o);
-      o += p.length;
-    }
-    return out;
-  };
-  if (!parts) return (await read(url, 0, 1)).buffer as ArrayBuffer;
-  let text = "";
-  for (let i = 0; i < parts.length; i++) text += new TextDecoder().decode(await read(parts[i]!, i / parts.length, 1 / parts.length));
-  const bin = atob(text.trim());
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return bytes.buffer;
-}
+import { ECORCHE_SHA256, fetchBinary, fetchModel } from "./files";
 
 // ?ex=<slug> previews another exercise (for deformation checks), or #<slug> where the page cannot take a query (the
 // artifact); without either, the kettlebell swing (the first exercise with a 3D motion of its own in the app).

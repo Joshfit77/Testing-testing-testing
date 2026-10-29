@@ -908,7 +908,8 @@ function curls(g: Grip): {
     case "open":
       return { mcp: 18, pip: 22, dip: 12, spread: 6, thumb: [20, 10, 10] };
     case "cup":
-      return { mcp: 30, pip: 35, dip: 20, spread: 4, thumb: [35, 15, 15] };
+      // (Fingers curved round a ball held in both hands, close together, not spread open like a claw.)
+      return { mcp: 40, pip: 42, dip: 22, spread: 1.5, thumb: [42, 22, 22] };
     case "flat":
       return { mcp: 2, pip: 4, dip: 2, spread: 4, thumb: [5, 0, 0] };
     default:

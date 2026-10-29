@@ -46,6 +46,9 @@ export interface Mover3 {
   };
 }
 
+/** Equipment that stands on the floor beside the figure (left out of the rep's framing). */
+const STANDS = new Set(["wall", "cableTower", "rack"]);
+
 export function moveModel3(
   scene: THREE.Scene,
   model: THREE.Object3D,
@@ -115,8 +118,13 @@ export function moveModel3(
         bodyReach.expandByPoint(q.sub(pv));
       }
       rigSpace.updateMatrixWorld(true);
-      eb.setFromObject(performer.group);
-      if (!eb.isEmpty()) bounds.expandByPoint(q.set(bounds.min.x, eb.min.y, bounds.min.z)).expandByPoint(q.set(bounds.max.x, eb.max.y, bounds.max.z));
+      // (The height of what he holds or lies on, a bar overhead or a bench; not of what stands beside him, a cable
+      // tower, a wall or a rack, which would frame the room instead of the figure.)
+      for (const piece of performer.pieces) {
+        if (STANDS.has(piece.kind)) continue;
+        eb.setFromObject(piece.obj);
+        if (!eb.isEmpty()) bounds.expandByPoint(q.set(bounds.min.x, eb.min.y, bounds.min.z)).expandByPoint(q.set(bounds.max.x, eb.max.y, bounds.max.z));
+      }
     }
     bounds.expandByScalar(0.12);
     bodyReach.expandByScalar(0.12);

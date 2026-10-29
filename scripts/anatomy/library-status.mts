@@ -13,7 +13,15 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { EXERCISES } from "../../src/data/exercises";
 import { hasSpec } from "../../src/lib/anatomy3d/motion3d/specs";
-import { IN_APP_3D } from "../../src/lib/anatomy3d/in-app";
+import { existsSync } from "node:fs";
+// The allowlist of exercises the app shows as the 3D figure lives on the integration branch (claude/3d-in-workout:
+// src/lib/anatomy3d/in-app.ts). On a branch without it (the 3D branch itself, PR #8) nothing is wired into the app, and
+// the status says so rather than reading a file that is not there.
+const IN_APP_FILE = "src/lib/anatomy3d/in-app.ts";
+const IN_APP_3D: readonly string[] = existsSync(IN_APP_FILE) ? ((await import("../../" + IN_APP_FILE)) as { IN_APP_3D: readonly string[] }).IN_APP_3D : [];
+const IN_APP_NOTE = existsSync(IN_APP_FILE)
+  ? `read from \`${IN_APP_FILE}\` on this branch`
+  : `\`${IN_APP_FILE}\` is not on this branch: nothing is wired into the app here; the integration lives on \`claude/3d-in-workout\``;
 
 const args = process.argv.slice(2);
 const opt = (name: string, d: string) => {
@@ -89,7 +97,7 @@ type Row = {
   owner: Review["owner_approval"][string] | null;
   inApp: "3d" | "illustration";
   /** The one-word result the owner asked for. */
-  result: "PASS" | "FAIL" | "NOT TESTED";
+  result: "PASS" | "POLISH NEEDED" | "FAIL" | "NOT TESTED";
 };
 
 const rows: Row[] = EXERCISES.map((e) => {
@@ -99,8 +107,10 @@ const rows: Row[] = EXERCISES.map((e) => {
   const owner = review.owner_approval[e.slug] ?? null;
   // PASS needs the automated checks and the visual review both passing (a minor visual note still counts as a pass of
   // the automated line, but is named); FAIL when either fails; everything else is NOT TESTED.
+  // (POLISH NEEDED: the automated checks pass and the movement reads right, but the reviewer saw a visible defect; it
+  // is not counted as approved.)
   let result: Row["result"] = "NOT TESTED";
-  if (own && q && eye && eye.verdict !== "not checked") result = q.verdict === "PASS" && eye.verdict !== "fail" ? "PASS" : "FAIL";
+  if (own && q && eye && eye.verdict !== "not checked") result = q.verdict !== "PASS" || eye.verdict === "fail" ? "FAIL" : eye.verdict === "minor" ? "POLISH NEEDED" : "PASS";
   else if (own && q && q.verdict === "FAIL") result = "FAIL";
   else if (own && eye && eye.verdict === "fail") result = "FAIL";
   return {
@@ -133,6 +143,7 @@ const counts = {
   ownerApproved: n((r) => r.owner !== null),
   inApp3d: n((r) => r.inApp === "3d"),
   pass: n((r) => r.result === "PASS"),
+  polish: n((r) => r.result === "POLISH NEEDED"),
   fail: n((r) => r.result === "FAIL"),
   notTested: n((r) => r.result === "NOT TESTED"),
 };
@@ -147,7 +158,7 @@ const qaCell = (r: Row) => {
 const eyeCell = (r: Row) => {
   if (r.motion !== "own") return "—";
   if (!r.eye || r.eye.verdict === "not checked") return "NOT CHECKED";
-  const v = r.eye.verdict === "pass" ? "PASS" : r.eye.verdict === "minor" ? "PASS (minor)" : "FAIL";
+  const v = r.eye.verdict === "pass" ? "PASS" : r.eye.verdict === "minor" ? "VISIBLE DEFECT" : "FAIL";
   return r.eye.note ? `${v}: ${esc(r.eye.note)}` : v;
 };
 const lines: string[] = [];
@@ -170,8 +181,9 @@ lines.push(`| 3D motions with **no automated QA run** recorded here | ${counts.q
 lines.push(`| **Visual review** pass (${esc(review.reviewer)}, ${review.date}; this is a reviewer's eye, not the owner's approval) | ${counts.eyePass} |`);
 lines.push(`| Visual review fail | ${counts.eyeFail} |`);
 lines.push(`| **Owner's visual approval** of the rendered motion | ${counts.ownerApproved} |`);
-lines.push(`| Shown in the app as the 3D figure (with the illustration as fallback) | ${counts.inApp3d} |`);
-lines.push(`| **PASS** (automated QA and visual review both pass) | ${counts.pass} |`);
+lines.push(`| Shown in the app as the 3D figure (with the illustration as fallback): ${IN_APP_NOTE} | ${counts.inApp3d} |`);
+lines.push(`| **PASS** (automated QA and visual review both pass, nothing visibly wrong; still not the owner's approval) | ${counts.pass} |`);
+lines.push(`| **POLISH NEEDED** (automated QA passes and the movement reads right, but a visible defect remains; not counted as approved) | ${counts.polish} |`);
 lines.push(`| **FAIL** (either fails) | ${counts.fail} |`);
 lines.push(`| **NOT TESTED** (no 3D motion, or not checked) | ${counts.notTested} |`);
 lines.push("");
@@ -201,4 +213,4 @@ lines.push(`The list in [EXERCISES_300.md](EXERCISES_300.md) is a proposal for t
 lines.push("");
 writeFileSync(OUT, lines.join("\n"));
 if (JSON_OUT) writeFileSync(JSON_OUT, JSON.stringify({ generated: today, counts, proposed, rows }, null, 1));
-console.log(`${OUT}: ${counts.original} original, ${counts.proposed} proposed; 3D motion ${counts.ownMotion}; baked ${counts.baked}; QA pass ${counts.qaPass}, fail ${counts.qaFail}; owner approvals ${counts.ownerApproved}; PASS ${counts.pass}, FAIL ${counts.fail}, NOT TESTED ${counts.notTested}`);
+console.log(`${OUT}: ${counts.original} original, ${counts.proposed} proposed; 3D motion ${counts.ownMotion}; baked ${counts.baked}; QA pass ${counts.qaPass}, fail ${counts.qaFail}; owner approvals ${counts.ownerApproved}; PASS ${counts.pass}, POLISH NEEDED ${counts.polish}, FAIL ${counts.fail}, NOT TESTED ${counts.notTested}`);

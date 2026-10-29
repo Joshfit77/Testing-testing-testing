@@ -132,11 +132,23 @@ const pushPress: Spec = {
   build: () => [makeBarbell({ grip: 27 })],
   frame(c, [bar]) {
     // The bar travels where the motion's hands go (on the model's arms, each keeping its reach at the grip's width),
-    // level, across the body.
+    // level, across the body. At the rack it sits on the front of the shoulders, as far in as the model's elbows fold,
+    // with the elbows forward and a little under it (the motion's own hands come up to the chin there, which a forearm
+    // held to the bar cannot do); the press takes over as the bar rises from the shoulders.
+    const gh = c.gh("R").add(c.gh("L")).multiplyScalar(0.5);
+    const ax = c.chestAxes();
     const mid = c.freeAt("R", 27).add(c.freeAt("L", -27)).multiplyScalar(0.5).setZ(0);
-    const at = c.reachable(mid, ["R", "L"], 0.5, { offsets: { R: V3(0, 0, 27), L: V3(0, 0, -27) }, minBend: 140 });
+    const rack = gh.clone().addScaledVector(ax.fwd, 17).addScaledVector(ax.up, 5).setZ(0);
+    const up = clamp01((mid.y - gh.y - 9) / 26);
+    const want = rack.lerp(mid, up);
+    const at = c.reachable(want, ["R", "L"], 0.5, { offsets: { R: V3(0, 0, 27), L: V3(0, 0, -27) }, minBend: 146 });
     bar!.place(at, new THREE.Quaternion());
-    for (const s of SIDES) c.hold(s, bar!.handle(s), medial(s));
+    for (const s of SIDES) {
+      const out = SIDE_SIGN[s];
+      const rackPole = ax.fwd.clone().addScaledVector(ax.up, -0.45).addScaledVector(ax.right, out * 0.2).normalize();
+      const pressPole = ax.fwd.clone().multiplyScalar(-0.5).addScaledVector(ax.up, -0.6).addScaledVector(ax.right, out * 0.6).normalize();
+      c.hold(s, bar!.handle(s), medial(s), undefined, rackPole.lerp(pressPole, up).normalize());
+    }
   },
 };
 
@@ -150,6 +162,7 @@ const SUMO_GRIP = 21 * K;
 const sumoDeadlift: Spec = {
   build: () => [makeBarbell({ grip: SUMO_GRIP })],
   stance: { halfWidth: 42, toeOut: 30 },
+  flatBack: 1,
   frame(c, [bar]) {
     const offsets = { R: V3(0, 0, SUMO_GRIP), L: V3(0, 0, -SUMO_GRIP) };
     const hanging = () => c.freeAt("R", SUMO_GRIP).add(c.freeAt("L", -SUMO_GRIP)).multiplyScalar(0.5).setZ(0);
@@ -185,6 +198,8 @@ const kettlebellSwing: Spec = {
   build: () => [makeKettlebell(1.15)],
   // Feet a little wider than the hips, toes out: the bell passes between the thighs, not the shins.
   stance: { halfWidth: 19, toeOut: 14 },
+  // A flat back through the hinge (the 2D figure's drawn spine rounds at the bottom of the swing).
+  flatBack: 1,
   frame(c, [kb]) {
     // Both hands on the handle, palms towards the body; the bell hangs on the line of the arms.
     const sh = c.gh("R").add(c.gh("L")).multiplyScalar(0.5);
