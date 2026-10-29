@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "frame": {
+    "width": 1200,
+    "height": 900
+  },
+  "demos": {
+    "dumbbell-curl": {
+      "mode": "poster",
+      "status": "stand-in",
+      "poster": "/exercise-demos/dumbbell-curl/poster.webp",
+      "thumb": "/exercise-demos/dumbbell-curl/thumb.webp",
+      "width": 1200,
+      "height": 900,
+      "phases": [],
+      "highlighted": [
+        "biceps"
+      ],
+      "note": "Stand-in: the owner's reference render (a still cropped from a screenshot, so soft) placed on the page to judge the UI fit. The animated loop of this athlete has not been produced yet; it needs an image-to-video model (see docs/EXERCISE_DEMOS_25D.md).",
+      "checks": {
+        "posterBytes": 25508
+      }
+    }
+  }
+}

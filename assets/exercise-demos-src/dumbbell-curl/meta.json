@@ -1,0 +1,6 @@
+{
+  "status": "stand-in",
+  "note": "Stand-in: the owner's reference render (a still cropped from a screenshot, so soft) placed on the page to judge the UI fit. The animated loop of this athlete has not been produced yet; it needs an image-to-video model (see docs/EXERCISE_DEMOS_25D.md).",
+  "highlighted": ["biceps"],
+  "source": "Owner's dumbbell curl reference image, 2026-10-29"
+}

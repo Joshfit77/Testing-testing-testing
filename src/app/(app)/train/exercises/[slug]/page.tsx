@@ -5,15 +5,14 @@ import { AlertTriangle, BarChart3, CheckCircle2, ChevronRight, ExternalLink, Lig
 import { Badge } from "@/components/ui/badge";
 import { EQUIPMENT_LABELS, type Equipment } from "@/lib/domain/types";
 import type { ExerciseRow } from "@/lib/types/db";
-import { titleCase } from "@/lib/utils";
+import { cn, titleCase } from "@/lib/utils";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { publicEnv } from "@/lib/env";
 import { formVideoSearchUrl, videoEmbedUrl } from "@/lib/media";
 import { exerciseMediaPublicUrl } from "@/lib/exercise-media";
 import { DemoVideo } from "@/components/train/demo-video";
 import { ExerciseDemo } from "@/components/train/exercise-demo";
-import { ExerciseDemo3D } from "@/components/train/exercise-demo-3d";
-import { has3dDemo } from "@/lib/anatomy3d/in-app";
+import { getDemoAsset } from "@/lib/exercise-demos";
 import { requireOnboardedUser } from "@/server/auth";
 import { BackLink } from "@/components/platform/back-link";
 
@@ -34,6 +33,7 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
   const media = mediaRes.data ?? [];
   const hasVideo = media.some((m) => m.media_type === "video");
   const demoMeta = { name: ex.name, pattern: ex.movement_pattern, category: ex.category, equipment: ex.equipment, timed: ex.is_timed };
+  const demo = getDemoAsset(ex.slug);
   const mediaUrl = (m: (typeof media)[number]) =>
     (m.external_url as string | null) ?? exerciseMediaPublicUrl(publicEnv.supabaseUrl, m.storage_path as string);
 
@@ -97,26 +97,18 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
               ))}
               {hasVideo && (
                 <details className="rounded-xl border border-border">
-                  <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-gold-highlight">{has3dDemo(ex.slug) ? "3D anatomical demo" : "Animated demo"}</summary>
-                  {has3dDemo(ex.slug) ? (
-                    <ExerciseDemo3D slug={ex.slug} name={ex.name} meta={demoMeta} className="aspect-[4/3] w-full rounded-b-xl" />
-                  ) : (
-                    <ExerciseDemo slug={ex.slug} name={ex.name} meta={demoMeta} className="aspect-video w-full rounded-b-xl" />
-                  )}
+                  <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-gold-highlight">{demo ? "Rendered demo" : "Animated demo"}</summary>
+                  <ExerciseDemo slug={ex.slug} name={ex.name} meta={demoMeta} className={demo ? "aspect-[4/3] w-full rounded-b-xl" : "aspect-video w-full rounded-b-xl"} />
                 </details>
               )}
             </div>
           ) : null}
           {!hasVideo && (
             <figure className={media.length ? "px-3 pb-3" : undefined}>
-              {has3dDemo(ex.slug) ? (
-                <ExerciseDemo3D slug={ex.slug} name={ex.name} meta={demoMeta} className={media.length ? "aspect-[4/3] w-full rounded-xl" : "aspect-[4/3] w-full"} />
-              ) : (
-                <ExerciseDemo slug={ex.slug} name={ex.name} meta={demoMeta} className={media.length ? "aspect-video w-full rounded-xl" : "aspect-video w-full"} />
-              )}
+              <ExerciseDemo slug={ex.slug} name={ex.name} meta={demoMeta} className={cn(demo ? "aspect-[4/3]" : "aspect-video", "w-full", media.length && "rounded-xl")} />
               <figcaption className="px-3 pt-2 text-[0.6875rem] text-muted-foreground">
-                {has3dDemo(ex.slug)
-                  ? "3D anatomical figure performing the movement — a computer model, not filmed video, and not a substitute for coaching. Drag to turn it, pinch to zoom; use 0.5× to study each phase."
+                {demo
+                  ? "Rendered demonstration of the movement — a computer render, not filmed video, and not a substitute for coaching. Use 0.5× to study each phase."
                   : "Animated illustration of the movement — not filmed video, and not a substitute for coaching. Use 0.5× to study each phase."}
                 {EXERCISE_REVIEW_NOTES[ex.slug] && <span className="mt-1 block text-gold-highlight">{EXERCISE_REVIEW_NOTES[ex.slug]}</span>}
               </figcaption>

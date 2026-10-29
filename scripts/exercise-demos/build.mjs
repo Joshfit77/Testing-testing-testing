@@ -1,0 +1,120 @@
+// Builds the premium 2.5D exercise demonstrations from the source folder into public/exercise-demos/<slug>/ and
+// writes src/data/exercise-demos.json (the manifest the app reads).
+//
+//   node scripts/exercise-demos/build.mjs [assets/exercise-demos-src] [--only slug,slug]
+//
+// Source layout, one folder per exercise slug (assets/exercise-demos-src/<slug>/):
+//   loop.mp4|mov|webm|gif      a rendered loop (one rep, seamless)            → mode "video"
+//   frames/0001.png …          a rendered frame sequence (24–30 fps, one rep)   → mode "sequence"
+//   start.png, finish.png …    rendered phase stills in order (any names, sorted; meta.json names them) → "keyframes"
+//   poster.png                 a still used as the poster (optional; else the first frame)
+//   meta.json                  { "status": "stand-in" | "review" | "approved", "note": "…", "highlighted": ["biceps"],
+//                                "phases": [{ "label": "Start", "t": 0 }, { "label": "Curl", "t": 1.2 }], "source": "…" }
+// Output per slug: poster.webp (1200×900), thumb.webp (480×360), loop.mp4 + loop.webm (video and sequence modes),
+// phase-N.webp (keyframes mode), all letterboxed to 4:3 on #0a0a0a. Checks: the loop's seam (first vs last frame),
+// file sizes (mp4 ≤ 2.5 MB), dimensions. Every file is overwritten; nothing outside the slug's folder is touched.
+import fs from "node:fs";
+import path from "node:path";
+import { execFileSync } from "node:child_process";
+
+const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
+const args = process.argv.slice(2);
+const only = (args.find((a) => a.startsWith("--only")) ?? "").split("=")[1]?.split(",").filter(Boolean) ?? (args.includes("--only") ? args[args.indexOf("--only") + 1]?.split(",") : null);
+const SRC = path.resolve(ROOT, args.find((a) => !a.startsWith("--") && a !== only?.join(",")) ?? "assets/exercise-demos-src");
+const OUT = path.join(ROOT, "public/exercise-demos");
+const MANIFEST = path.join(ROOT, "src/data/exercise-demos.json");
+const W = 1200, H = 900, BG = "#0a0a0a";
+const MAX_MP4 = 2.5 * 1024 * 1024;
+const FIT = `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2:color=${BG}`;
+
+const ff = (a) => execFileSync("ffmpeg", ["-y", "-loglevel", "error", ...a], { stdio: ["ignore", "pipe", "inherit"] });
+const probe = (f) => JSON.parse(execFileSync("ffprobe", ["-v", "error", "-print_format", "json", "-show_streams", "-show_format", f]).toString());
+const size = (f) => (fs.existsSync(f) ? fs.statSync(f).size : 0);
+const still = (input, out, w, h) => ff(["-i", input, "-vf", `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2:color=${BG}`, "-frames:v", "1", "-q:v", "85", out]);
+const firstFrame = (video, out) => ff(["-i", video, "-vf", FIT, "-frames:v", "1", out]);
+const lastFrame = (video, out) => ff(["-sseof", "-0.05", "-i", video, "-vf", FIT, "-frames:v", "1", "-update", "1", out]);
+/** Mean absolute difference between two same-size images, 0..255 (ffmpeg's psnr is awkward here; PIL is simpler). */
+const seam = (a, b) => Number(execFileSync("python3", ["-I", "-c", `
+from PIL import Image, ImageChops, ImageStat
+a=Image.open('${a}').convert('L'); b=Image.open('${b}').convert('L').resize(a.size)
+print(ImageStat.Stat(ImageChops.difference(a,b)).mean[0])`]).toString().trim());
+
+const manifest = fs.existsSync(MANIFEST) ? JSON.parse(fs.readFileSync(MANIFEST, "utf8")) : { version: 1, frame: { width: W, height: H }, demos: {} };
+manifest.frame = { width: W, height: H };
+const slugs = fs.existsSync(SRC) ? fs.readdirSync(SRC).filter((d) => fs.statSync(path.join(SRC, d)).isDirectory() && (!only || only.includes(d))) : [];
+if (!slugs.length) console.log(`no sources in ${SRC}`);
+const report = [];
+for (const slug of slugs) {
+  const dir = path.join(SRC, slug);
+  const outDir = path.join(OUT, slug);
+  fs.mkdirSync(outDir, { recursive: true });
+  const meta = fs.existsSync(path.join(dir, "meta.json")) ? JSON.parse(fs.readFileSync(path.join(dir, "meta.json"), "utf8")) : {};
+  const files = fs.readdirSync(dir).filter((f) => !f.startsWith("."));
+  const loop = files.find((f) => /^loop\.(mp4|mov|webm|gif|m4v)$/i.test(f));
+  const framesDir = fs.existsSync(path.join(dir, "frames")) ? path.join(dir, "frames") : null;
+  const stills = files.filter((f) => /\.(png|jpe?g|webp)$/i.test(f) && !/^poster\./i.test(f)).sort();
+  const posterSrc = files.find((f) => /^poster\.(png|jpe?g|webp)$/i.test(f));
+  const web = (f) => `/exercise-demos/${slug}/${f}`;
+  const asset = { mode: "poster", status: meta.status ?? "review", poster: web("poster.webp"), thumb: web("thumb.webp"), width: W, height: H, phases: [], highlighted: meta.highlighted ?? [], note: meta.note, checks: {} };
+  const tmp = fs.mkdtempSync(path.join(outDir, ".tmp-"));
+  try {
+    let loopSrc = null;
+    if (loop) {
+      asset.mode = "video";
+      loopSrc = path.join(dir, loop);
+    } else if (framesDir) {
+      asset.mode = "sequence";
+      const seq = fs.readdirSync(framesDir).filter((f) => /\.(png|jpe?g|webp)$/i.test(f)).sort();
+      if (!seq.length) throw new Error("frames/ is empty");
+      const list = path.join(tmp, "frames.txt");
+      const fps = meta.fps ?? 30;
+      fs.writeFileSync(list, seq.map((f) => `file '${path.join(framesDir, f).replace(/'/g, "'\\''")}'\nduration ${(1 / fps).toFixed(5)}`).join("\n") + "\n");
+      loopSrc = path.join(tmp, "seq.mp4");
+      ff(["-f", "concat", "-safe", "0", "-i", list, "-vf", FIT, "-r", String(fps), "-c:v", "libx264", "-crf", "18", "-pix_fmt", "yuv420p", loopSrc]);
+    } else if (stills.length) {
+      asset.mode = "keyframes";
+    }
+    if (loopSrc) {
+      const mp4 = path.join(outDir, "loop.mp4"), webm = path.join(outDir, "loop.webm");
+      ff(["-i", loopSrc, "-an", "-vf", `${FIT},fps=30`, "-c:v", "libx264", "-profile:v", "high", "-crf", "26", "-preset", "slow", "-pix_fmt", "yuv420p", "-movflags", "+faststart", mp4]);
+      ff(["-i", loopSrc, "-an", "-vf", `${FIT},fps=30`, "-c:v", "libvpx-vp9", "-crf", "34", "-b:v", "0", "-row-mt", "1", "-pix_fmt", "yuv420p", webm]);
+      const p = probe(mp4);
+      asset.mp4 = web("loop.mp4"); asset.webm = web("loop.webm");
+      asset.durationMs = Math.round(Number(p.format.duration) * 1000);
+      asset.checks.mp4Bytes = size(mp4); asset.checks.webmBytes = size(webm);
+      firstFrame(mp4, path.join(tmp, "first.png")); lastFrame(mp4, path.join(tmp, "last.png"));
+      asset.checks.seam = Number(seam(path.join(tmp, "first.png"), path.join(tmp, "last.png")).toFixed(2));
+      still(posterSrc ? path.join(dir, posterSrc) : path.join(tmp, "first.png"), path.join(outDir, "poster.webp"), W, H);
+      asset.phases = (meta.phases ?? []).map((ph, i) => {
+        const f = `phase-${i + 1}.webp`;
+        ff(["-ss", String(ph.t ?? 0), "-i", mp4, "-vf", FIT, "-frames:v", "1", "-q:v", "85", path.join(outDir, f)]);
+        return { label: ph.label, src: web(f), t: ph.t ?? 0 };
+      });
+      if (asset.checks.mp4Bytes > MAX_MP4) report.push(`${slug}: loop.mp4 is ${(asset.checks.mp4Bytes / 1e6).toFixed(1)} MB (limit 2.5 MB)`);
+      if (asset.checks.seam > 6) report.push(`${slug}: loop seam ${asset.checks.seam} (first and last frames differ; the loop will visibly jump)`);
+    } else if (asset.mode === "keyframes") {
+      asset.phases = stills.map((f, i) => {
+        const out = `phase-${i + 1}.webp`;
+        still(path.join(dir, f), path.join(outDir, out), W, H);
+        return { label: meta.phases?.[i]?.label ?? f.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ").replace(/^\w/, (c) => c.toUpperCase()), src: web(out) };
+      });
+      still(posterSrc ? path.join(dir, posterSrc) : path.join(dir, stills[0]), path.join(outDir, "poster.webp"), W, H);
+    } else if (posterSrc) {
+      still(path.join(dir, posterSrc), path.join(outDir, "poster.webp"), W, H);
+    } else {
+      throw new Error("nothing to build: add loop.*, frames/, phase stills or poster.*");
+    }
+    still(path.join(outDir, "poster.webp"), path.join(outDir, "thumb.webp"), 480, 360);
+    asset.checks.posterBytes = size(path.join(outDir, "poster.webp"));
+    manifest.demos[slug] = asset;
+    console.log(`${slug}: ${asset.mode} · ${asset.status}${asset.durationMs ? ` · ${asset.durationMs} ms` : ""}${asset.checks.mp4Bytes ? ` · mp4 ${(asset.checks.mp4Bytes / 1e6).toFixed(2)} MB · webm ${(asset.checks.webmBytes / 1e6).toFixed(2)} MB · seam ${asset.checks.seam}` : ""} · ${asset.phases.length} phase stills`);
+  } catch (e) {
+    report.push(`${slug}: FAILED ${e.message}`);
+    delete manifest.demos[slug];
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+}
+fs.writeFileSync(MANIFEST, JSON.stringify(manifest, null, 2) + "\n");
+console.log(`manifest: ${Object.keys(manifest.demos).length} demos → ${path.relative(ROOT, MANIFEST)}`);
+if (report.length) { console.log("ATTENTION:\n  " + report.join("\n  ")); process.exitCode = 1; }

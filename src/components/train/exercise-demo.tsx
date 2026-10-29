@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import dynamic from "next/dynamic";
 import { Maximize2 } from "lucide-react";
 import {
   Dialog,
@@ -11,10 +10,8 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { ExerciseMeta } from "@/lib/exercise-motion/types";
-import { has3dDemo } from "@/lib/anatomy3d/in-app";
-
-// The 3D anatomical figure, for the exercises in src/lib/anatomy3d/in-app.ts; loaded only when one is opened.
-const ExerciseDemo3D = dynamic(() => import("./exercise-demo-3d").then((m) => m.ExerciseDemo3D), { ssr: false });
+import { getDemoAsset } from "@/lib/exercise-demos";
+import { ExerciseDemo25D, ExerciseDemo25DStill } from "./exercise-demo-25d";
 
 type MotionModule = typeof import("@/lib/exercise-motion");
 
@@ -32,8 +29,19 @@ export interface ExerciseDemoProps {
   autoplay?: boolean;
 }
 
+/**
+ * The exercise's demonstration: the premium 2.5D render when the app has one for this exercise
+ * (src/data/exercise-demos.json), otherwise the animated illustration. The 3D anatomical figure is no longer used
+ * here; it stays on its own showcase page (/train/3d).
+ */
+export function ExerciseDemo(props: ExerciseDemoProps) {
+  const asset = getDemoAsset(props.slug);
+  if (asset) return <ExerciseDemo25D slug={props.slug} name={props.name} asset={asset} className={props.className} controls={props.controls} autoplay={props.autoplay} />;
+  return <ExerciseIllustration {...props} />;
+}
+
 /** Looping animated demonstration of an exercise (stylised illustration, not filmed video). */
-export function ExerciseDemo({
+export function ExerciseIllustration({
   slug,
   name,
   meta,
@@ -110,6 +118,8 @@ export function ExerciseDemoMini({
             controls={false}
             className="pointer-events-none h-full w-full"
           />
+        ) : getDemoAsset(slug) ? (
+          <ExerciseDemo25DStill name={name} asset={getDemoAsset(slug)!} className="pointer-events-none" />
         ) : (
           <ExerciseThumb
             slug={slug}
@@ -131,19 +141,17 @@ export function ExerciseDemoMini({
           <DialogDescription className="sr-only">
             Animated demonstration of {name}
           </DialogDescription>
-          {open && has3dDemo(slug) ? (
-            <ExerciseDemo3D slug={slug} name={name} meta={meta} className="mt-3 aspect-[4/3] w-full rounded-xl" />
-          ) : open ? (
+          {open ? (
             <ExerciseDemo
               slug={slug}
               name={name}
               meta={meta}
-              className="mt-3 aspect-video w-full rounded-xl"
+              className={cn("mt-3 w-full rounded-xl", getDemoAsset(slug) ? "aspect-[4/3]" : "aspect-video")}
             />
           ) : null}
           <p className="mt-2 text-[0.6875rem] text-muted-foreground">
-            {has3dDemo(slug)
-              ? "3D anatomical figure performing the movement — a computer model, not filmed video. Drag to turn it, pinch to zoom."
+            {getDemoAsset(slug)
+              ? "Rendered demonstration of the movement — a computer render, not filmed video."
               : "Animated illustration of the movement — not filmed video."}
           </p>
         </DialogContent>
@@ -152,8 +160,14 @@ export function ExerciseDemoMini({
   );
 }
 
-/** Still thumbnail of an exercise, drawn only when scrolled into view (exercise library). */
-export function ExerciseThumb({
+/** Still thumbnail of an exercise: the 2.5D poster when there is one, else the illustration drawn when scrolled into view. */
+export function ExerciseThumb(props: { slug: string; name: string; meta?: Omit<ExerciseMeta, "slug">; className?: string }) {
+  const asset = getDemoAsset(props.slug);
+  if (asset) return <ExerciseDemo25DStill name={props.name} asset={asset} className={props.className} />;
+  return <IllustrationThumb {...props} />;
+}
+
+function IllustrationThumb({
   slug,
   name,
   meta,
