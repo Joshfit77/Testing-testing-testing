@@ -1,0 +1,92 @@
+{
+ "push-press": {
+  "frames": 97,
+  "bytes": 110114,
+  "duration": 3.2
+ },
+ "kettlebell-swing": {
+  "frames": 53,
+  "bytes": 60242,
+  "duration": 1.73
+ },
+ "lateral-raise": {
+  "frames": 109,
+  "bytes": 126822,
+  "duration": 3.6
+ },
+ "farmers-carry": {
+  "frames": 36,
+  "bytes": 41980,
+  "duration": 1.15
+ },
+ "running-intervals": {
+  "frames": 42,
+  "bytes": 46560,
+  "duration": 0.68
+ },
+ "sled-push": {
+  "frames": 34,
+  "bytes": 38668,
+  "duration": 1.1
+ },
+ "rowing-intervals": {
+  "frames": 64,
+  "bytes": 73720,
+  "duration": 2.1
+ },
+ "pallof-press": {
+  "frames": 118,
+  "bytes": 144388,
+  "duration": 3.9
+ },
+ "cable-woodchop": {
+  "frames": 85,
+  "bytes": 109826,
+  "duration": 2.8
+ },
+ "medicine-ball-rotational-throw": {
+  "frames": 157,
+  "bytes": 182594,
+  "duration": 2.6
+ },
+ "air-bike-sprint": {
+  "frames": 43,
+  "bytes": 49226,
+  "duration": 1.4
+ },
+ "dumbbell-curl": {
+  "frames": 109,
+  "bytes": 126822,
+  "duration": 3.6
+ },
+ "hammer-curl": {
+  "frames": 109,
+  "bytes": 126822,
+  "duration": 3.6
+ },
+ "triceps-pushdown": {
+  "frames": 103,
+  "bytes": 126046,
+  "duration": 3.4
+ },
+ "cable-chest-fly": {
+  "frames": 112,
+  "bytes": 150124,
+  "duration": 3.7
+ },
+ "sumo-deadlift": {
+  "frames": 115,
+  "bytes": 130530,
+  "duration": 3.8
+ },
+ "overhead-triceps-extension": {
+  "frames": 112,
+  "bytes": 127156,
+  "duration": 3.7
+ },
+ "inverted-row": {
+  "frames": 99,
+  "bytes": 115182,
+  "duration": 3.25
+ }
+}

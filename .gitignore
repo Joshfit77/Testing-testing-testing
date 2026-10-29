@@ -25,3 +25,7 @@ __pycache__/
 # Badge master artwork (large; keep in Git LFS or a shared drive)
 assets/badge-masters/*
 !assets/badge-masters/README.md
+.anatomy-preview/
+# Écorché-based evaluation build (not approved; rebuild with ECORCHE=... scripts/anatomy/build-athlete.mts)
+public/anatomy/athlete-eco.*
+.anatomy-lab/

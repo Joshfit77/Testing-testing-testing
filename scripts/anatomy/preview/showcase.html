@@ -1,0 +1,111 @@
+<title>3D Exercise Showcase</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #050403; --panel: #0d0b08; --line: rgba(214, 170, 82, 0.28); --line-strong: rgba(232, 190, 100, 0.65);
+    --gold: #e6bd62; --gold-hi: #ffd98a; --gold-lo: #a07a32; --text: #efe6d2; --muted: #a99c82;
+    --pass: #6fcf97; --polish: #f2c94c; --fail: #eb5757; --untested: #a99c82;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: Montserrat, "Helvetica Neue", Arial, sans-serif; }
+  .page { max-width: 1280px; margin: 0 auto; padding-block: 14px 28px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 12px;
+    grid-template-columns: minmax(0, 1fr) 320px; grid-template-areas: "head head" "tabs tabs" "stage side" "bar side" "facts facts" "credit credit"; }
+  header { grid-area: head; display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; }
+  .brand { font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold); }
+  h1 { margin: 0; font-size: clamp(24px, 4vw, 38px); font-weight: 700; background: linear-gradient(180deg, var(--gold-hi), var(--gold) 55%, var(--gold-lo)); -webkit-background-clip: text; background-clip: text; color: transparent; text-wrap: balance; }
+  .sub { width: 100%; margin: 0; font-size: 13px; color: var(--muted); line-height: 1.5; max-width: 70ch; }
+  .tabs { grid-area: tabs; display: flex; gap: 8px; flex-wrap: wrap; }
+  .tabs button, .modes button, .angles button, .looks button { all: unset; cursor: pointer; padding: 10px 16px; border: 1px solid var(--line); border-radius: 10px; font-size: 14px; color: var(--text); min-height: 44px; }
+  .tabs button.on, .modes button.on, .angles button.on, .looks button.on { border-color: var(--line-strong); color: var(--gold-hi); background: rgba(214, 170, 82, 0.12); }
+  button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .stage-box { grid-area: stage; position: relative; border-radius: 16px; overflow: hidden; border: 1px solid rgba(214, 170, 82, 0.2); background: #060504; }
+  .stage { position: relative; width: 100%; aspect-ratio: 4 / 5; max-height: 72vh; }
+  #stage { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+  #loading[hidden] { display: none; }
+  #loading { position: absolute; inset: 0; display: grid; place-items: center; padding: 20px; text-align: center; color: var(--muted); font-size: 14px; letter-spacing: 0.06em; background: rgba(5, 4, 3, 0.75); }
+  .hint { position: absolute; left: 12px; right: 12px; top: 10px; text-align: center; font-size: 12px; color: var(--muted); pointer-events: none; }
+  .toggle { position: absolute; right: 12px; bottom: 10px; display: flex; gap: 8px; align-items: center; font-size: 13px; background: rgba(5, 4, 3, 0.6); padding: 6px 10px; border-radius: 8px; }
+  .toggle input { accent-color: #e6bd62; width: 20px; height: 20px; }
+  .side { grid-area: side; display: grid; gap: 10px; align-content: start; min-width: 0; }
+  .panel { background: linear-gradient(180deg, rgba(30, 24, 14, 0.75), rgba(10, 8, 6, 0.9)); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; min-width: 0; }
+  .panel h2 { margin: 0 0 8px; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold); font-weight: 600; }
+  .panel ul, .panel ol { margin: 0; padding-left: 18px; font-size: 13.5px; line-height: 1.5; }
+  .panel li + li { margin-top: 4px; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+  .chips span { font-size: 12px; padding: 3px 9px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); }
+  #desc { margin: 0; font-size: 13.5px; line-height: 1.5; }
+  .badge { display: inline-block; padding: 5px 10px; border-radius: 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; border: 1px solid currentColor; }
+  .badge.pass { color: var(--pass); } .badge.polish { color: var(--polish); } .badge.fail { color: var(--fail); } .badge.untested { color: var(--untested); } .badge.approved { color: var(--gold-hi); background: rgba(214, 170, 82, 0.15); }
+  #status-detail { margin: 8px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--muted); overflow-wrap: anywhere; }
+  .bar { grid-area: bar; display: grid; gap: 10px 14px; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; padding: 12px 14px; }
+  #play { all: unset; cursor: pointer; width: 48px; height: 48px; border-radius: 50%; border: 1.5px solid var(--gold-hi); display: grid; place-items: center; font-size: 16px; color: var(--text); }
+  #scrub { width: 100%; accent-color: #e6bd62; min-width: 0; }
+  #time { font-variant-numeric: tabular-nums; font-size: 13px; }
+  .modes, .angles, .looks { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .lbl { font-size: 12px; color: var(--muted); margin-right: 4px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .facts { grid-area: facts; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+  .credit { grid-area: credit; font-size: 12px; line-height: 1.5; color: var(--muted); }
+  .credit a { color: var(--muted); }
+  .credit summary { cursor: pointer; }
+  @media (max-width: 860px) {
+    .page { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "tabs" "stage" "bar" "side" "facts" "credit"; }
+    .stage { aspect-ratio: 4 / 5; max-height: 70vh; }
+    .tabs { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 4px; }
+    .tabs button { white-space: nowrap; }
+  }
+</style>
+<div class="page">
+  <header>
+    <span class="brand">Narrow Gate Fitness</span>
+    <h1>3D Exercise Showcase</h1>
+    <p class="sub">Five exercises on the Écorché anatomical figure, in its own red and white, performing the app's baked motions: one finger turns him, pinch to zoom. Each exercise carries its honest status; none has your approval yet.</p>
+  </header>
+  <nav class="tabs" id="tabs" aria-label="Exercises"></nav>
+  <div class="stage-box">
+    <div class="stage">
+      <canvas id="stage" role="img" aria-label="3D anatomical figure"></canvas>
+      <div id="loading">Loading…</div>
+      <div class="hint">One finger turns · Pinch to zoom · Two fingers move along the body</div>
+      <label class="toggle"><input id="glow" type="checkbox" checked> Muscle Glow</label>
+    </div>
+  </div>
+  <aside class="side">
+    <div class="panel">
+      <h2>Status</h2>
+      <span id="status" class="badge untested">NOT TESTED</span>
+      <p id="status-detail"></p>
+    </div>
+    <div class="panel">
+      <h2 id="name">Exercise</h2>
+      <div class="chips" id="chips"></div>
+      <p id="desc"></p>
+    </div>
+    <div class="panel">
+      <h2>Primary muscles</h2>
+      <ul id="primary"></ul>
+      <h2 style="margin-top:12px">Secondary muscles</h2>
+      <ul id="secondary"></ul>
+    </div>
+  </aside>
+  <div class="panel bar">
+    <button id="play" aria-label="Pause">❚❚</button>
+    <input id="scrub" type="range" min="0" step="0.01" value="0" aria-label="Position in the rep">
+    <span id="time">0:00 / 0:00</span>
+    <div class="modes"><span class="lbl">Speed</span><button data-speed="1" class="on">Full motion</button><button data-speed="0.35">Slow motion</button></div>
+    <div class="angles"><span class="lbl">View</span><button data-view="front" class="on" aria-pressed="true">Front</button><button data-view="side" aria-pressed="false">Side</button><button data-view="rear" aria-pressed="false">Rear</button></div>
+    <div class="looks"><span class="lbl">Look</span><button data-look="original" class="on">Red &amp; white (original)</button><button data-look="gold">Gold</button></div>
+  </div>
+  <div class="facts">
+    <section class="panel"><h2>Instructions</h2><ol id="steps"></ol></section>
+    <section class="panel"><h2>What this is</h2><ul>
+      <li>A computer model, not filmed video: the figure is the Écorché anatomical model on the app's rig, playing the exercise's baked motion. Muscle Glow is an instructional highlight, not measured activation.</li>
+      <li>The same player, rig and motions as the app's integration branch; what you see here is what the app would show, with the animated illustration as its fallback when 3D is unavailable.</li>
+      <li>First load downloads about 33 MB (the model as text parts); later switches between exercises reuse it.</li>
+    </ul></section>
+  </div>
+  <details class="credit"><summary>Credits and file check</summary><p>Écorché (<a href="https://github.com/Charleeh/ecorche">github.com/Charleeh/ecorche</a>), CC BY-SA 4.0. Based on BodyParts3D, © The Database Center for Life Science, CC BY 4.0, and Z-Anatomy by Gauthier Kervyn, CC BY-SA 4.0. Modified by Narrow Gate Fitness: rigged with skin weights and animated, an iris and pupil painted on the eyes, a face added (the head's skin surface from BodyParts3D, fitted to this skull; the parts under it hidden), and a gold look as an option. The modified model is licensed under <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>. Provided as is, without warranties. <span id="verify"></span></p></details>
+</div>
+<script>/*APP*/</script>

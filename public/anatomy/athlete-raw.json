@@ -1,0 +1,230 @@
+{
+ "version": 3,
+ "source": "Écorché (github.com/Charleeh/ecorche, CC BY-SA 4.0; BodyParts3D CC BY 4.0, Z-Anatomy CC BY-SA 4.0), unaltered geometry and colours; rig and muscle labels added",
+ "vertices": 485878,
+ "triangles": 984466,
+ "bytes": 32675232,
+ "layout": {
+  "position": {
+   "offset": 0,
+   "length": 1457634,
+   "type": "Float32Array"
+  },
+  "index": {
+   "offset": 5830536,
+   "length": 2953398,
+   "type": "Uint32Array"
+  },
+  "forcedBone": {
+   "offset": 17644128,
+   "length": 485878,
+   "type": "Uint8Array"
+  },
+  "skinIndex": {
+   "offset": 18130008,
+   "length": 1943512,
+   "type": "Uint8Array"
+  },
+  "skinWeight": {
+   "offset": 20073520,
+   "length": 1943512,
+   "type": "Uint8Array"
+  },
+  "muscleA": {
+   "offset": 22017032,
+   "length": 485878,
+   "type": "Uint8Array"
+  },
+  "muscleMix": {
+   "offset": 22502912,
+   "length": 485878,
+   "type": "Uint8Array"
+  },
+  "tissue": {
+   "offset": 22988792,
+   "length": 485878,
+   "type": "Uint8Array"
+  },
+  "fiber": {
+   "offset": 23474672,
+   "length": 1457634,
+   "type": "Int8Array"
+  },
+  "limb": {
+   "offset": 24932308,
+   "length": 485878,
+   "type": "Uint8Array"
+  },
+  "color": {
+   "offset": 25418188,
+   "length": 1457634,
+   "type": "Uint8Array"
+  },
+  "ao": {
+   "offset": 26875824,
+   "length": 485878,
+   "type": "Uint8Array"
+  },
+  "indexLod1": {
+   "offset": 27361704,
+   "length": 1328382,
+   "type": "Uint32Array"
+  }
+ },
+ "bones": [
+  "pelvis",
+  "chest",
+  "neck",
+  "head",
+  "clavR",
+  "upperArmR",
+  "foreArmR",
+  "handR",
+  "clavL",
+  "upperArmL",
+  "foreArmL",
+  "handL",
+  "thighR",
+  "shinR",
+  "footR",
+  "thighL",
+  "shinL",
+  "footL"
+ ],
+ "bind": {
+  "pelvis": [
+   0,
+   92.1,
+   0
+  ],
+  "mid": [
+   -0.3,
+   119.8,
+   0
+  ],
+  "neckBase": [
+   -0.6,
+   154.7,
+   0
+  ],
+  "neckTop": [
+   -0.3,
+   165.1,
+   0
+  ],
+  "head": [
+   1.2,
+   172,
+   0
+  ],
+  "headTop": [
+   0.7,
+   183,
+   0
+  ],
+  "R": {
+   "shoulder": [
+    -2.3,
+    148.1,
+    17.9
+   ],
+   "elbow": [
+    -3,
+    117.8,
+    23.3
+   ],
+   "wrist": [
+    2,
+    92.5,
+    28
+   ],
+   "hand": [
+    3.5,
+    84.8,
+    29.5
+   ],
+   "hip": [
+    0,
+    92.1,
+    9
+   ],
+   "knee": [
+    -2.4,
+    47,
+    8.5
+   ],
+   "ankle": [
+    -2.7,
+    8,
+    8.2
+   ],
+   "heel": [
+    -9.3,
+    0.6,
+    8.2
+   ],
+   "ball": [
+    10.1,
+    0.6,
+    9.1
+   ],
+   "toe": [
+    16.2,
+    1.2,
+    9.5
+   ]
+  },
+  "L": {
+   "shoulder": [
+    -2.3,
+    148.1,
+    -17.9
+   ],
+   "elbow": [
+    -3,
+    117.8,
+    -23.2
+   ],
+   "wrist": [
+    2,
+    92.5,
+    -28
+   ],
+   "hand": [
+    3.5,
+    84.8,
+    -29.5
+   ],
+   "hip": [
+    0,
+    92.1,
+    -9
+   ],
+   "knee": [
+    -2.4,
+    47,
+    -8.4
+   ],
+   "ankle": [
+    -2.8,
+    8,
+    -8.3
+   ],
+   "heel": [
+    -9.3,
+    0.6,
+    -8.3
+   ],
+   "ball": [
+    10.1,
+    0.6,
+    -9.1
+   ],
+   "toe": [
+    16.2,
+    1.2,
+    -9.5
+   ]
+  }
+ }
+}
