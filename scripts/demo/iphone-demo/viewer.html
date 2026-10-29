@@ -1,0 +1,325 @@
+<title>Narrow Gate iPhone Demo</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap">
+<style>
+  /* One dark look by choice: the app's black and gold. */
+  :root {
+    --bg: #070707; --panel: #121109; --card: #151515; --line: #2b2824; --line2: rgba(214, 170, 82, 0.35);
+    --fg: #f1ece1; --muted: #a99c82; --dim: #8f8b84;
+    --gold: #d9b65e; --gold-hi: #ffd98a; --gold-lo: #8c6a2f;
+    --pass: #6fcf97; --polish: #f2c94c; --fail: #eb5757;
+    --body: "Inter", -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+    --display: "Montserrat", "Inter", system-ui, sans-serif;
+    --top-h: 34px; --W: 390px;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 var(--body); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px; }
+  button { font: inherit; color: inherit; }
+  a { color: var(--gold-hi); }
+
+  /* Desktop: a life-size iPhone beside a short note. On a phone: the demo fills the screen. */
+  .wrap { max-width: 1040px; min-height: 100%; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 56px; align-items: center; }
+  .copy { display: grid; gap: 16px; max-width: 46ch; min-width: 0; }
+  .eyebrow { font-size: 12px; letter-spacing: .22em; text-transform: uppercase; color: var(--gold); font-weight: 600; }
+  h1 { font-family: var(--display); font-weight: 700; font-size: clamp(30px, 4.6vw, 48px); line-height: 1.05; margin: 0; text-wrap: balance; }
+  h1 span { color: var(--gold); }
+  .copy p, .copy li { color: var(--muted); margin: 0; }
+  .copy ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+  .copy b { color: var(--fg); font-weight: 600; }
+  .truth { border-left: 2px solid var(--gold); padding-left: 14px; font-size: 14px; }
+  .phone { position: relative; width: var(--W); height: 844px; padding: 14px; border-radius: 62px; background: linear-gradient(145deg, #3a352c, #16140f 40%, #2a261e); box-shadow: 0 0 0 1.5px #4a4336, 0 40px 90px -30px rgba(217, 182, 94, .35), 0 30px 60px -20px #000; box-sizing: content-box; }
+  .phone::after { content: ""; position: absolute; right: -3px; top: 190px; width: 3px; height: 92px; border-radius: 0 3px 3px 0; background: #3a352c; }
+  .screen { position: relative; width: 100%; height: 100%; border-radius: 48px; background: #000; overflow: hidden; display: flex; flex-direction: column; }
+  .scaler { transform-origin: top center; }
+  @media (max-width: 860px) { .wrap { grid-template-columns: minmax(0, 1fr); gap: 28px; justify-items: center; } }
+  @media (max-width: 520px) {
+    body { padding: 0; }
+    .wrap { display: block; min-height: 0; }
+    .copy { display: none; }
+    .scaler { transform: none !important; height: auto !important; }
+    .phone { width: 100%; height: 100dvh; padding: 0; border-radius: 0; box-shadow: none; background: none; }
+    .phone::after { display: none; }
+    .screen { border-radius: 0; height: 100dvh; padding-top: env(safe-area-inset-top, 0px); }
+  }
+
+  /* The phone's screen: a thin demo bar, the captured screen (scrolls), the app's tab bar. */
+  .top { flex: none; height: var(--top-h); display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 6px; padding: 0 6px; background: #100e08; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--gold-hi); }
+  .top button { all: unset; cursor: pointer; min-width: 34px; height: 30px; display: grid; place-items: center; border-radius: 8px; padding: 0 8px; font-weight: 600; color: var(--gold-hi); }
+  .top button:disabled { opacity: .35; cursor: default; }
+  .top button.on { background: rgba(214, 170, 82, 0.18); }
+  .top .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; color: var(--muted); }
+  .top .t b { color: var(--gold-hi); font-weight: 600; }
+  .strip { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; background: #070707; overscroll-behavior: contain; }
+  .col { position: relative; width: 100%; max-width: var(--W); margin: 0 auto; }
+  .shot { display: block; width: 100%; height: auto; }
+  .hs { position: absolute; margin: 0; padding: 0; border: 0; background: transparent; border-radius: 8px; cursor: pointer; -webkit-tap-highlight-color: rgba(217, 182, 94, .25); }
+  .hs.link { outline: 2px solid transparent; outline-offset: -2px; transition: outline-color .3s; }
+  .hs.live { outline: 2px solid rgba(217, 182, 94, .9); outline-offset: -2px; box-shadow: 0 0 0 4px rgba(217, 182, 94, .15) inset; }
+  .hs.live::after { content: "Tap: live 3D"; position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); font: 600 11px var(--body); letter-spacing: .06em; text-transform: uppercase; color: #120e05; background: var(--gold); padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+  .hint .hs.link, .flash .hs.link { outline-color: rgba(217, 182, 94, .75); }
+  .hs:focus-visible { outline: 2px solid var(--gold-hi); }
+  .navbar { flex: none; position: relative; width: 100%; max-width: var(--W); margin: 0 auto; background: #0b0b0b; padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .navbar img { display: block; width: 100%; height: auto; }
+  .navbar[hidden] { display: none; }
+  #toast { position: absolute; left: 12px; right: 12px; bottom: calc(var(--nav-h, 64px) + 14px + env(safe-area-inset-bottom, 0px)); z-index: 30; background: rgba(20, 17, 9, .96); border: 1px solid var(--line2); color: var(--fg); border-radius: 12px; padding: 10px 14px; font-size: 13px; line-height: 1.4; text-align: center; box-shadow: 0 10px 30px -10px #000; }
+  #toast[hidden] { display: none; }
+  #loadbar { position: absolute; left: 0; right: 0; top: var(--top-h); height: 2px; background: var(--gold); transform-origin: left; transform: scaleX(0); transition: transform .4s; z-index: 20; }
+
+  /* The menu sheet: every captured screen, grouped, and what this demo is. */
+  .sheet { position: absolute; inset: 0; z-index: 40; background: rgba(7, 7, 7, .97); display: flex; flex-direction: column; }
+  .sheet[hidden] { display: none; }
+  .sheet header { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  .sheet header h2 { margin: 0; font: 600 15px var(--display); color: var(--gold-hi); }
+  .sheet header button { all: unset; cursor: pointer; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line2); color: var(--gold-hi); font-size: 13px; }
+  .sheet .body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 10px 12px 24px; }
+  .note { background: var(--panel); border: 1px solid var(--line2); border-radius: 12px; padding: 12px 14px; font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .note b { color: var(--fg); }
+  .note ul { margin: 6px 0 0; padding-left: 18px; }
+  .grp { margin-top: 14px; }
+  .grp h3 { margin: 0 0 6px; font: 600 11px var(--body); letter-spacing: .14em; text-transform: uppercase; color: var(--gold); }
+  .grp button { all: unset; cursor: pointer; display: block; width: 100%; padding: 9px 10px; border-radius: 8px; font-size: 14px; border: 1px solid transparent; }
+  .grp button:hover, .grp button:focus-visible { border-color: var(--line2); background: var(--card); }
+  .grp small { color: var(--dim); margin-left: 6px; font-size: 12px; }
+
+  /* The live 3D figure: the real player, in the phone. */
+  #live { position: absolute; inset: 0; z-index: 35; background: #050403; display: flex; flex-direction: column; font-family: var(--display); }
+  #live[hidden] { display: none; }
+  #live .lbody { flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 0 24px; }
+  .tabs { display: flex; gap: 6px; overflow-x: auto; padding: 10px 12px 6px; }
+  .tabs button, .modes button, .angles button, .looks button { all: unset; cursor: pointer; padding: 8px 12px; border: 1px solid var(--line2); border-radius: 10px; font-size: 13px; color: var(--fg); min-height: 40px; white-space: nowrap; }
+  .tabs button.on, .modes button.on, .angles button.on, .looks button.on { border-color: rgba(232, 190, 100, 0.75); color: var(--gold-hi); background: rgba(214, 170, 82, 0.12); }
+  .stage-box { position: relative; margin: 4px 12px 0; border-radius: 14px; overflow: hidden; border: 1px solid rgba(214, 170, 82, 0.2); background: #060504; }
+  .stage { position: relative; width: 100%; aspect-ratio: 4 / 5; }
+  #stage { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+  #loading[hidden] { display: none; }
+  #loading { position: absolute; inset: 0; display: grid; place-items: center; padding: 20px; text-align: center; color: var(--muted); font-size: 13px; letter-spacing: .04em; background: rgba(5, 4, 3, 0.8); }
+  .hint3 { position: absolute; left: 10px; right: 10px; top: 8px; text-align: center; font-size: 11px; color: var(--muted); pointer-events: none; }
+  .toggle { position: absolute; right: 10px; bottom: 8px; display: flex; gap: 6px; align-items: center; font-size: 12px; background: rgba(5, 4, 3, 0.65); padding: 5px 9px; border-radius: 8px; }
+  .toggle input { accent-color: #e6bd62; width: 18px; height: 18px; }
+  .bar { display: grid; gap: 8px 10px; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; padding: 10px 12px 4px; }
+  #play { all: unset; cursor: pointer; width: 44px; height: 44px; border-radius: 50%; border: 1.5px solid var(--gold-hi); display: grid; place-items: center; font-size: 14px; }
+  #scrub { width: 100%; accent-color: #e6bd62; min-width: 0; }
+  #time { font-variant-numeric: tabular-nums; font-size: 12px; }
+  .modes, .angles, .looks { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .lbl { font-size: 11px; color: var(--muted); margin-right: 2px; letter-spacing: .06em; text-transform: uppercase; }
+  .panel { margin: 10px 12px 0; background: linear-gradient(180deg, rgba(30, 24, 14, 0.75), rgba(10, 8, 6, 0.9)); border: 1px solid var(--line2); border-radius: 12px; padding: 12px 14px; font-family: var(--body); }
+  .panel h2 { margin: 0 0 6px; font: 600 12px var(--body); letter-spacing: .06em; text-transform: uppercase; color: var(--gold); }
+  .panel ul, .panel ol { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.5; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+  .chips span { font-size: 11px; padding: 3px 8px; border: 1px solid var(--line2); border-radius: 999px; color: var(--muted); }
+  #desc { margin: 0; font-size: 13px; line-height: 1.5; }
+  .badge { display: inline-block; padding: 4px 9px; border-radius: 8px; font-size: 11px; font-weight: 600; letter-spacing: .04em; border: 1px solid currentColor; }
+  .badge.pass { color: var(--pass); } .badge.polish { color: var(--polish); } .badge.fail { color: var(--fail); } .badge.untested { color: var(--muted); } .badge.approved { color: var(--gold-hi); background: rgba(214, 170, 82, 0.15); }
+  #status-detail { margin: 6px 0 0; font-size: 12px; line-height: 1.5; color: var(--muted); overflow-wrap: anywhere; }
+  .credit { margin: 10px 12px 0; font-size: 11px; line-height: 1.5; color: var(--muted); font-family: var(--body); }
+  .credit a { color: var(--muted); }
+</style>
+
+<main class="wrap">
+  <section class="copy" aria-labelledby="t">
+    <div class="eyebrow">iPhone demo · captured screens + live 3D</div>
+    <h1 id="t">Narrow Gate <span>Fitness</span></h1>
+    <p class="truth">What you are tapping through are <b>pictures of the real app</b>, captured in demo mode with clearly labelled sample data at iPhone size, joined by tap targets. The <b>3D anatomical figure is live</b>: a real model running on your device, not a recording.</p>
+    <ol>
+      <li>Tap <b>Enter</b> on the opening, then <b>Explore with sample data</b>.</li>
+      <li>Use the five tabs <b>Home, Train, Run, Food, Faith</b>; <b>‹</b> goes back; <b>☰</b> lists every captured screen.</li>
+      <li>On <b>Train → 3D exercise showcase</b> (or a 3D exercise page) tap the figure: it loads the real 3D player.</li>
+      <li>Typing, timers, GPS, the camera and purchases are not live in pictures; the workout flow is captured step by step.</li>
+    </ol>
+    <p>Open this page on an iPhone and it fills the screen.</p>
+  </section>
+  <div class="scaler" id="scaler">
+    <div class="phone">
+      <div class="screen" id="screen">
+        <div class="top">
+          <button id="back" aria-label="Back" disabled>‹</button>
+          <div class="t" id="title"><b>Demo</b> · captured screens</div>
+          <button id="hint" aria-pressed="false" aria-label="Show where to tap">◎</button>
+          <button id="menu" aria-label="All screens">☰</button>
+        </div>
+        <div id="loadbar" aria-hidden="true"></div>
+        <div class="strip" id="strip"><div class="col" id="col"></div></div>
+        <div class="navbar" id="navbar" hidden><img id="navimg" alt="" draggable="false"><div id="navhot"></div></div>
+        <div id="toast" role="status" hidden></div>
+
+        <section class="sheet" id="sheet" hidden aria-label="All screens">
+          <header><h2>All captured screens</h2><button id="close-sheet">Close</button></header>
+          <div class="body">
+            <div class="note" id="about"></div>
+            <div id="groups"></div>
+          </div>
+        </section>
+
+        <section id="live" hidden aria-label="3D exercise figure">
+          <div class="top"><button id="live-back" aria-label="Back to the app">‹</button><div class="t"><b>3D figure</b> · live on this device</div><span></span><span></span></div>
+          <div class="lbody">
+            <nav class="tabs" id="tabs" aria-label="Exercises"></nav>
+            <div class="stage-box"><div class="stage">
+              <canvas id="stage" role="img" aria-label="3D anatomical figure"></canvas>
+              <div id="loading">Loading…</div>
+              <div class="hint3">One finger turns · pinch to zoom</div>
+              <label class="toggle"><input id="glow" type="checkbox" checked> Muscle Glow</label>
+            </div></div>
+            <div class="bar">
+              <button id="play" aria-label="Pause">❚❚</button>
+              <input id="scrub" type="range" min="0" step="0.01" value="0" aria-label="Position in the rep">
+              <span id="time">0:00 / 0:00</span>
+              <div class="modes"><span class="lbl">Speed</span><button data-speed="1" class="on">Full</button><button data-speed="0.35">Slow motion</button></div>
+              <div class="angles"><span class="lbl">View</span><button data-view="front" class="on" aria-pressed="true">Front</button><button data-view="side" aria-pressed="false">Side</button><button data-view="rear" aria-pressed="false">Rear</button></div>
+              <div class="looks"><span class="lbl">Look</span><button data-look="original" class="on">Red &amp; white</button><button data-look="gold">Gold</button></div>
+            </div>
+            <div class="panel"><h2>Status</h2><span id="status" class="badge untested">NOT TESTED</span><p id="status-detail"></p></div>
+            <div class="panel"><h2 id="name">Exercise</h2><div class="chips" id="chips"></div><p id="desc"></p></div>
+            <div class="panel"><h2>Instructions</h2><ol id="steps"></ol></div>
+            <div class="panel"><h2>Primary muscles</h2><ul id="primary"></ul><h2 style="margin-top:10px">Secondary muscles</h2><ul id="secondary"></ul></div>
+            <div class="panel"><h2>What this is</h2><ul>
+              <li>A computer model, not filmed video: the Écorché anatomical figure on the app's rig, playing the exercise's baked motion. Muscle Glow is an instructional highlight, not measured activation.</li>
+              <li>The same player and motions as the app's integration branch; in the app the animated illustration is the fallback when 3D is unavailable.</li>
+              <li>First load downloads about 30 MB; switching exercises reuses it.</li>
+            </ul></div>
+            <p class="credit">Écorché (<a href="https://github.com/Charleeh/ecorche">github.com/Charleeh/ecorche</a>), CC BY-SA 4.0. Based on BodyParts3D, © The Database Center for Life Science, CC BY 4.0, and Z-Anatomy by Gauthier Kervyn, CC BY-SA 4.0. Modified by Narrow Gate Fitness (rigged, animated, eyes and face added, a gold look as an option); the modified model is licensed under <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>. <span id="verify"></span></p>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>/*DATA*/</script>
+<script>
+(function () {
+  const D = window.DEMO;
+  const SCREENS = D.screens;
+  const BYKEY = Object.fromEntries(SCREENS.map((s) => [s.key, s]));
+  const BYID = Object.fromEntries(SCREENS.map((s) => [s.id, s]));
+  const ALIAS = D.alias || {};
+  const $ = (id) => document.getElementById(id);
+  const strip = $("strip"), col = $("col"), navbar = $("navbar"), navimg = $("navimg"), navhot = $("navhot"), title = $("title"), toastEl = $("toast");
+  const screen = $("screen");
+  screen.style.setProperty("--nav-h", D.navH + "px");
+  const trail = [];
+  let current = null, hint = false;
+  try { hint = localStorage.getItem("ng-hint") === "1"; } catch {}
+  $("hint").setAttribute("aria-pressed", String(hint));
+  $("hint").classList.toggle("on", hint);
+  screen.classList.toggle("hint", hint);
+
+  function toast(text, ms) {
+    toastEl.textContent = text; toastEl.hidden = false;
+    clearTimeout(toast.t); toast.t = setTimeout(() => (toastEl.hidden = true), ms || 2600);
+  }
+  function resolve(to) {
+    if (!to) return null;
+    let k = to; const seen = new Set();
+    while (ALIAS[k] && !seen.has(k)) { seen.add(k); k = ALIAS[k]; }
+    if (BYKEY[k]) return BYKEY[k];
+    const p = k.split("?")[0];
+    if (BYKEY[p]) return BYKEY[p];
+    return SCREENS.find((s) => s.key.split("?")[0] === p) || null;
+  }
+  const groupOf = (s) => s.group || (s.key === "/" || s.key.startsWith("/login") || s.key.startsWith("/signup") || s.key.startsWith("/legal") || s.key.startsWith("/plan") ? "Welcome and setup" : s.key.startsWith("/coach") ? "AI Coach" : s.key.startsWith("/train") ? "Train" : s.key.startsWith("/run") ? "Run" : s.key.startsWith("/nutrition") ? "Food" : s.key.startsWith("/faith") ? "Faith" : s.key.startsWith("/progress") ? "My Progress" : s.key.startsWith("/profile") ? "Profile and membership" : "Home");
+
+  function show(s, opts) {
+    opts = opts || {};
+    if (current && !opts.back && current !== s) trail.push(current.id);
+    current = s;
+    $("back").disabled = trail.length === 0;
+    title.innerHTML = "<b>" + esc(s.title || s.key) + "</b>";
+    col.innerHTML = "";
+    $("loadbar").style.transform = "scaleX(0.3)";
+    const pics = s.pics || [[s.id + ".webp", s.h]];
+    let loaded = 0;
+    for (const [file, ph] of pics) {
+      const img = document.createElement("img");
+      img.className = "shot"; img.alt = s.title || s.key; img.width = 390; img.height = ph; img.draggable = false;
+      img.onload = () => { if (++loaded === pics.length) { $("loadbar").style.transform = "scaleX(1)"; setTimeout(() => ($("loadbar").style.transform = "scaleX(0)"), 300); } };
+      img.onerror = () => toast("This screen's picture did not load. Check the connection and try again.");
+      img.src = "s/" + file;
+      col.append(img);
+    }
+    for (const h of s.hot || []) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "hs " + (h.kind === "live" ? "live" : h.to && resolve(h.to) ? "link" : "dead");
+      b.style.left = (h.x / 390 * 100) + "%"; b.style.width = (h.w / 390 * 100) + "%";
+      b.style.top = (h.y / s.h * 100) + "%"; b.style.height = (h.h / s.h * 100) + "%";
+      b.setAttribute("aria-label", h.label || "Control");
+      b.addEventListener("click", (e) => { e.stopPropagation(); tap(h); });
+      col.append(b);
+    }
+    strip.scrollTop = 0;
+    const tab = s.tab || "hidden";
+    if (tab === "hidden") navbar.hidden = true; else { navbar.hidden = false; navimg.src = "s/nav-" + (tab === "none" ? "none" : tab.slice(1)) + ".png"; }
+    screen.classList.add("flash"); clearTimeout(show.t); show.t = setTimeout(() => screen.classList.remove("flash"), 1400);
+    // Warm the pictures a tap away.
+    clearTimeout(show.pre); show.pre = setTimeout(() => { let n = 0; for (const h of s.hot || []) { const t = resolve(h.to); if (t && n < 10) { n++; for (const [f] of t.pics || [[t.id + ".webp"]]) new Image().src = "s/" + f; } } }, 1200);
+  }
+  function tap(h) {
+    if (h.kind === "live" || (h.to && h.to.startsWith("live3d:"))) return openLive(h.to.slice(7));
+    if (!h.to) { toast(h.kind === "button" || h.kind === "summary" || h.kind === "label" ? "“" + (h.label || "This control") + "” works in the real app; this demo is pictures of it, so it is not live here." : "Not captured in this demo."); return; }
+    const t = resolve(h.to);
+    if (!t) { toast("“" + (h.label || h.to) + "” leads to a screen that is not among the " + SCREENS.length + " captured here."); return; }
+    show(t);
+  }
+  col.addEventListener("click", () => { if (current && current.closeTo) { const t = resolve(current.closeTo); if (t) show(t, { back: true }); } });
+  $("back").addEventListener("click", () => { const id = trail.pop(); if (id && BYID[id]) show(BYID[id], { back: true }); $("back").disabled = trail.length === 0; });
+  $("hint").addEventListener("click", () => { hint = !hint; screen.classList.toggle("hint", hint); $("hint").classList.toggle("on", hint); $("hint").setAttribute("aria-pressed", String(hint)); try { localStorage.setItem("ng-hint", hint ? "1" : "0"); } catch {} toast(hint ? "Tap targets are outlined in gold." : "Outlines hidden."); });
+
+  // The tab bar.
+  const navH = D.navH;
+  for (const t of D.navHot) {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "hs";
+    b.style.left = (t.x / 390 * 100) + "%"; b.style.width = (t.w / 390 * 100) + "%"; b.style.top = "0"; b.style.height = "100%";
+    b.setAttribute("aria-label", t.label);
+    b.addEventListener("click", () => { const s = resolve(t.to); if (s) show(s); });
+    navhot.append(b);
+  }
+  navhot.style.cssText = "position:absolute;inset:0;";
+
+  // The menu.
+  const groups = {};
+  for (const s of SCREENS) (groups[groupOf(s)] ||= []).push(s);
+  const ORDER = ["Welcome", "Welcome and setup", "Home", "Train", "Workout", "AI Coach", "Run", "Food", "Faith", "My Progress", "Profile and membership"];
+  const gEl = $("groups");
+  for (const g of [...ORDER.filter((g) => groups[g]), ...Object.keys(groups).filter((g) => !ORDER.includes(g))]) {
+    const d = document.createElement("div"); d.className = "grp";
+    d.innerHTML = "<h3>" + esc(g) + "</h3>";
+    for (const s of groups[g]) { const b = document.createElement("button"); b.innerHTML = esc(s.title || s.key) + "<small>" + esc(s.key.startsWith("state:") ? "" : s.key) + "</small>"; b.addEventListener("click", () => { $("sheet").hidden = true; show(s); }); d.append(b); }
+    gEl.append(d);
+  }
+  $("about").innerHTML = "<b>What this demo is.</b> Pictures of the real Narrow Gate Fitness app, captured in demo mode (sample data, purchases off, AI replies simulated) at iPhone size on " + esc(D.date.slice(0, 10)) + ", joined by tap targets: " + SCREENS.length + " screens, " + D.taps + " taps. The <b>3D figure is live</b>: the real player runs on this device.<ul><li>Typing, timers, GPS, the camera, Apple Health and purchases are not live in pictures. The workout flow (start, demonstration, log sets, rest timer, substitute, finish, summary) and the AI coach's reply are captured step by step.</li><li>Nothing here touches a real account or charges anything.</li><li>The real app on a phone needs the private preview deployment, which waits on the owner's approval.</li></ul>";
+  $("menu").addEventListener("click", () => ($("sheet").hidden = false));
+  $("close-sheet").addEventListener("click", () => ($("sheet").hidden = true));
+
+  // The live 3D figure (the showcase player, started on first open).
+  let liveStarted = false;
+  function openLive(slug) {
+    $("live").hidden = true; $("live").hidden = false;
+    if (!window.showcaseShow) { toast("The 3D player did not load on this page."); return; }
+    if (!liveStarted || window.showcaseSlug !== slug) { liveStarted = true; window.showcaseShow(slug); }
+    else if (window.viewer && window.viewer.motion) window.viewer.motion.play();
+    $("live").querySelector(".lbody").scrollTop = 0;
+  }
+  $("live-back").addEventListener("click", () => { $("live").hidden = true; if (window.showcasePause) window.showcasePause(); });
+  window.openLive = openLive;
+
+  function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+  // Fit the life-size phone on shorter laptop screens.
+  const sc = $("scaler");
+  function fit() { if (window.innerWidth <= 520) { sc.style.transform = ""; sc.style.height = ""; return; } const k = Math.min(1, (window.innerHeight - 56) / 872); sc.style.transform = k < 1 ? "scale(" + k.toFixed(3) + ")" : ""; sc.style.height = k < 1 ? Math.round(872 * k) + "px" : ""; }
+  fit(); window.addEventListener("resize", fit);
+
+  const startKey = location.hash.length > 1 ? decodeURIComponent(location.hash.slice(1)) : null;
+  const first = (startKey && resolve(startKey)) || BYKEY["state:opening"] || BYKEY["/"] || SCREENS[0];
+  show(first);
+  setTimeout(() => toast("Tap the screen like the app. ◎ outlines the tap targets, ☰ lists every screen.", 4200), 600);
+  window.demo = { show, resolve, screens: SCREENS, trail };
+})();
+</script>
+<script>/*SHOWCASE*/</script>

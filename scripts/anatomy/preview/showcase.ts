@@ -22,6 +22,10 @@ declare global {
     ready?: boolean;
     viewer?: unknown;
     showcaseSlug?: string;
+    /** Set by a page that embeds the showcase: the figure starts only when showcaseShow is called. */
+    SHOWCASE_LAZY?: boolean;
+    showcaseShow?: (slug: string) => Promise<void>;
+    showcasePause?: () => void;
     /** Set by the build: the exercises shown, in order. */
     SHOWCASE?: string[];
     /** Set by the build from library-status.mts --json: status per exercise. */
@@ -269,5 +273,8 @@ function setPlaying(on: boolean) {
     }),
   );
   const start = location.hash.length > 1 && SLUGS.includes(decodeURIComponent(location.hash.slice(1))) ? decodeURIComponent(location.hash.slice(1)) : SLUGS[0]!;
-  void show(start);
+  // A page that embeds the showcase (the iPhone demo) starts it itself, when the figure is first opened.
+  window.showcaseShow = (slug) => show(SLUGS.includes(slug) ? slug : SLUGS[0]!);
+  window.showcasePause = () => setPlaying(false);
+  if (!window.SHOWCASE_LAZY) void show(start);
 }
