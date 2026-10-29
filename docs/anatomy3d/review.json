@@ -31,7 +31,8 @@
       "note": "catch, drive and layback read as rowing; seat, handle and chain move with the body; the gracilis still stretches and pulls away from the thigh at the catch (the automated check fails it)"
     },
     "pallof-press": {
-      "verdict": "pass"
+      "verdict": "pass",
+      "note": "side-on to the cable, handle held at the chest with both hands and pressed out and back; the trunk holds; the press-out is short in the render; rear and front views"
     },
     "cable-woodchop": {
       "verdict": "not checked",
