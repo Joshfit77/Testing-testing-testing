@@ -67,11 +67,13 @@ export function lift(sk: Skeleton3, f: Frame, o: LiftOptions): Lifted {
     const chest = lean(p.mid, p.neckBase);
     const head = lean(p.head, p.headTop);
     // The pelvis tilts with the trunk's lean, most of the way: the rest of the lean is the spine's own bend, so a lean
-    // rounds the back a little, as the drawn figure's does. (A flat back: the pelvis tilts the whole way and the chest
-    // stays in line with the lower trunk, bent beyond it only as far as the option allows, as in a hinge.)
+    // rounds the back a little, as the drawn figure's does. (A flat back, as in a hinge: the chest is brought into
+    // line with the pelvis instead, as far as the option allows. Tilting the pelvis the rest of the way was tried
+    // first and flexed the hips past what the gracilis follows, 2.2% stretched at the bottom of a swing.)
     const flat = o.flatBack ?? 0;
-    const chestLean = chest > trunk ? trunk + (chest - trunk) * (1 - flat) : chest;
-    g.pelvis = { pos: pel, rot: rotZ(-trunk * (0.7 + 0.3 * flat)).multiply(restPel) };
+    const pelvisLean = trunk * 0.7;
+    const chestLean = chest > pelvisLean ? chest + (pelvisLean - chest) * flat : chest;
+    g.pelvis = { pos: pel, rot: rotZ(-pelvisLean).multiply(restPel) };
     g.chest = rotZ(-chestLean).multiply(restChest);
     g.head = rotZ(-head).multiply(restHead);
     for (const s of ["R", "L"] as const) {

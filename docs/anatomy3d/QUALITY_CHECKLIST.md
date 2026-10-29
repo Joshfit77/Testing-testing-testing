@@ -118,4 +118,7 @@ For each exercise, record the automated output, the contact sheet, the video and
 "pass", "fail" with what fails, or "not checked". Never mark a line passing that was not looked at. The visual verdicts
 go in `docs/anatomy3d/review.json` (`eye`, with who looked and when), the owner's approvals in its `owner_approval`;
 `scripts/anatomy/library-status.mts` turns them, the bakes and the QA logs into `LIBRARY_STATUS.md`: PASS only when the
-automated checks and the visual review both pass, FAIL when either fails, NOT TESTED otherwise.
+automated checks and the visual review both pass with nothing visibly wrong, POLISH NEEDED when the automated checks
+pass and the movement reads right but the reviewer saw a visible defect (recorded as `minor` with its note; not counted
+as approved), FAIL when either fails, NOT TESTED otherwise. None of these is the owner's approval, which is recorded
+separately in `review.json` under `owner_approval`.

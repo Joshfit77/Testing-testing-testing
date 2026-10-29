@@ -143,11 +143,17 @@ const pushPress: Spec = {
     const want = rack.lerp(mid, up);
     const at = c.reachable(want, ["R", "L"], 0.5, { offsets: { R: V3(0, 0, 27), L: V3(0, 0, -27) }, minBend: 146 });
     bar!.place(at, new THREE.Quaternion());
+    // The elbows: forward and under the bar at the rack, turning out and down as the bar rises, over the whole rise
+    // (a turn over the drive alone was too quick: the forearm jumped between frames).
+    const turn = clamp01((at.y - gh.y - 4) / 40);
     for (const s of SIDES) {
       const out = SIDE_SIGN[s];
-      const rackPole = ax.fwd.clone().addScaledVector(ax.up, -0.45).addScaledVector(ax.right, out * 0.2).normalize();
-      const pressPole = ax.fwd.clone().multiplyScalar(-0.5).addScaledVector(ax.up, -0.6).addScaledVector(ax.right, out * 0.6).normalize();
-      c.hold(s, bar!.handle(s), medial(s), undefined, rackPole.lerp(pressPole, up).normalize());
+      // (Elbows forward and out at the rack: pointed straight forward under the bar, the overhand grip wound the
+      // forearm round, supinator and wrist extensors stretched past 4%; a grip turning palms-up at the rack flipped
+      // the hand between frames. Forward-and-out keeps the grip and the forearm within range.)
+      const rackPole = ax.fwd.clone().multiplyScalar(0.45).addScaledVector(ax.up, -0.4).addScaledVector(ax.right, out * 0.7).normalize();
+      const pressPole = ax.fwd.clone().multiplyScalar(0.1).addScaledVector(ax.up, -0.7).addScaledVector(ax.right, out * 0.7).normalize();
+      c.hold(s, bar!.handle(s), medial(s), undefined, rackPole.lerp(pressPole, turn).normalize());
     }
   },
 };
@@ -196,10 +202,12 @@ const sumoDeadlift: Spec = {
 
 const kettlebellSwing: Spec = {
   build: () => [makeKettlebell(1.15)],
-  // Feet a little wider than the hips, toes out: the bell passes between the thighs, not the shins.
-  stance: { halfWidth: 19, toeOut: 14 },
-  // A flat back through the hinge (the 2D figure's drawn spine rounds at the bottom of the swing).
-  flatBack: 1,
+  // Feet a little wider than the hips, toes out: the bell passes between the thighs, not the shins (with the back
+  // flat the shoulders sit a little higher and further back, and the bell swings deeper between the thighs: the
+  // stance is a touch wider so it clears them).
+  stance: { halfWidth: 21, toeOut: 14 },
+  // A flat back through the hinge (the 2D figure's drawn spine rounds at the bottom of the swing), most of the way.
+  flatBack: 0.8,
   frame(c, [kb]) {
     // Both hands on the handle, palms towards the body; the bell hangs on the line of the arms.
     const sh = c.gh("R").add(c.gh("L")).multiplyScalar(0.5);
