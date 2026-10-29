@@ -54,9 +54,12 @@ const MIN_SEP = (10 * Math.PI) / 180;
 
 // Only the band muscles the checks fail: relaxing the compact muscles round the joint (teres minor, infraspinatus,
 // supraspinatus, the deltoid, adductor brevis, pectineus) made them worse, so they keep their skinning.
-const REGIONS: { name: string; base: string; bone: string; side: "R" | "L"; parts: RegExp; exercises: string[] }[] = [
-  { name: "shoulderR", base: "thorax2", bone: "humerusR", side: "R", parts: /latissimus|teres_major/i, exercises: ["push-press", "overhead-triceps-extension", "lateral-raise", "cable-woodchop"] },
-  { name: "shoulderL", base: "thorax2", bone: "humerusL", side: "L", parts: /latissimus|teres_major/i, exercises: ["push-press", "overhead-triceps-extension", "lateral-raise", "cable-woodchop"] },
+// `zero`: exercises whose poses are sampled with no correction (the relaxation made them worse: the arm straight up
+// with the elbow bent behind the head stretches the teres major between its attachments, which no smoothing shortens),
+// so the shapes of nearby poses do not bleed into them.
+const REGIONS: { name: string; base: string; bone: string; side: "R" | "L"; parts: RegExp; exercises: string[]; zero?: string[] }[] = [
+  { name: "shoulderR", base: "thorax2", bone: "humerusR", side: "R", parts: /latissimus|teres_major/i, exercises: ["push-press", "lateral-raise", "cable-woodchop"], zero: ["overhead-triceps-extension"] },
+  { name: "shoulderL", base: "thorax2", bone: "humerusL", side: "L", parts: /latissimus|teres_major/i, exercises: ["push-press", "lateral-raise", "cable-woodchop"], zero: ["overhead-triceps-extension"] },
   { name: "hipR", base: "pelvis", bone: "thighR", side: "R", parts: /adductor_(magnus|longus|minimus)/i, exercises: ["rowing-intervals", "sumo-deadlift", "kettlebell-swing"] },
   { name: "hipL", base: "pelvis", bone: "thighL", side: "L", parts: /adductor_(magnus|longus|minimus)/i, exercises: ["rowing-intervals", "sumo-deadlift", "kettlebell-swing"] },
 ];
@@ -373,7 +376,7 @@ interface Sample {
 }
 function pickSamples(region: (typeof REGIONS)[number]): Sample[] {
   const candidates: Sample[] = [];
-  for (const slug of region.exercises) {
+  for (const slug of [...region.exercises, ...(region.zero ?? [])]) {
     const p = performer(slug);
     for (let i = 0; i < MOMENTS; i++) {
       const t = (i / MOMENTS) * p.duration;
@@ -476,6 +479,10 @@ REGIONS.forEach((region, ri) => {
   const inv = new THREE.Matrix4(), v = new THREE.Vector3();
   samples.forEach((s, si) => {
     if (si === 0) return;
+    if (region.zero?.includes(s.slug!)) {
+      console.log(`  ${s.slug}@${(s.t / performer(s.slug!).duration).toFixed(2)}: pinned to no correction`);
+      return;
+    }
     performer(s.slug!).pose(s.t);
     const xf = poseTransforms();
     let at = 0;

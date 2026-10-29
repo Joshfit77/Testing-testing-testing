@@ -31,6 +31,7 @@ credit shown in the player). [ECORCHE_RAW.md](ECORCHE_RAW.md) describes the earl
 | --- | --- | --- |
 | **Rig** | `scripts/anatomy/build-ecorche-rig.mts` → `public/anatomy/ecorche-rig.json`, `.bin` | 79 bones measured from the model's own skeleton (spine in four, clavicle and scapula per side, humerus, ulna and radius for pronation, fingers, feet) plus blend helpers at the shoulders, hips, knees and elbows. Skin weights per vertex of every part: bones rigid to one rig bone; muscles by distance to the bones they lie on, spread by bone heat (Baran & Popović 2007); muscles that span a joint far from its centre (lats, pectorals, teres, deltoid, infraspinatus, coracobrachialis, the deep hip rotators, the adductors) in a `LOOSE` set that is skinned linearly. |
 | **Skinning** | `src/lib/anatomy3d/body/bind-model.ts`, `body/dqs.ts` | Dual-quaternion skinning in the shader for every part, linear for the `LOOSE` set; the same skinning on the CPU in the QA. |
+| **Corrective shapes** | `body/correctives.ts`; `scripts/anatomy/build-ecorche-correctives.mts` → `public/anatomy/ecorche-correctives.json`, `.bin` | Pose-space corrections for the shoulders (lats, teres major) and hips (adductor magnus, longus, minimus): at sample poses from the exercises themselves the muscle is relaxed by delta mush only where its edges fold, the difference is taken back to the rest pose through the vertex's own skinning, reduced to four shapes per region and blended by the joint's turn (radial basis, exact at the samples, zero far from them). Added before skinning in the vertex shader and on the CPU in the QA; `?correctives=0` in the preview and `--no-correctives` in the QA show the skinning alone. |
 | **Solver** | `src/lib/anatomy3d/body/solve.ts`, `body/skeleton.ts` | Poses the skeleton from goals (pelvis, trunk, head, each wrist and ankle with its orientation, elbow and knee poles, finger closure): analytic IK on the real bone geometry, hinges about measured axes, pronation by the radius within range, wrist and ankle limits, the scapula and clavicle following the arm, the trunk's bend shared over the spine, and a hip flexed past its range tilting the pelvis back instead (`pelvisForHips`). Reports what it could not meet. |
 | **Motions** | `src/lib/anatomy3d/motion3d/specs.ts` (18 specs), `perform.ts`, `lift.ts`, `apparatus.ts` | A spec says what equipment the exercise uses and how (which handle each hand holds, with which grip, where the equipment is each frame) and anything the 2D motion cannot say (a turning trunk, a ball that leaves the hands). The body's goals come from the reviewed 2D motion lifted into 3D, or from the spec's own 3D keyframes. An exercise without a spec gets `FALLBACK` (hands free, no equipment): a placeholder, not a demonstration. |
 | **Equipment** | `src/lib/anatomy3d/motion3d/apparatus.ts`, `equipment.ts` | Barbell, dumbbells, kettlebell, cable towers with handles and cables, rower (seat on its rail, handle on its chain), air bike (levers and cranks), sled, medicine ball, bench, rack (hidden in the app). |
@@ -72,11 +73,16 @@ the owner's approval is recorded in `docs/anatomy3d/review.json`, which `library
 
 ## Known failures (see LIBRARY_STATUS.md for the current list)
 
-- **Overhead shoulder**: the push press and the overhead triceps extension fold at the armpit at lockout (teres major,
-  lats and teres minor stretched or collapsed past 2%). The rig's weights alone cannot fix this; corrective shapes
-  (a Delta-Mush-style correction baked per pose) are the proposed fix and are not built.
-- **Deep hip flexion**: the rowing catch and the sumo deadlift stretch the adductors and gracilis past 2% (the hip limit
-  and the pelvis tilt reduced it; not enough).
+- **Overhead shoulder**: the push press folded at the armpit at lockout (teres major and lats stretched past 2%). The
+  corrective shapes (`body/correctives.ts`, built by `scripts/anatomy/build-ecorche-correctives.mts` from the
+  exercises' own poses: the lats and teres major relaxed where their edges fold, blended by the joint's turn) bring the
+  push press under the limit. The overhead triceps extension (arm straight up, elbow bent behind the head) is beyond
+  them: the teres major is stretched between its attachments and no relaxation shortens it, the teres minor collapses,
+  and the wrists are held at their limit; the correction is pinned to zero at those poses so it does not make them
+  worse. It stays a FAIL.
+- **Deep hip flexion**: the hip limit, the pelvis tilt and the hip corrective shapes (adductor magnus, longus,
+  minimus) brought the adductors under the limit at the rowing catch and the sumo pull; the gracilis still stretches
+  and pulls away from the thigh (relaxing it made it worse, so it keeps its skinning). Rowing stays a FAIL.
 - Everything else that fails or is unchecked is listed per exercise in LIBRARY_STATUS.md with the measured reason.
 
 ## Rebuilding the files
@@ -88,6 +94,7 @@ Needs the Écorché file (checked in as `public/anatomy/ecorche.glb`) and, for t
 npx tsx scripts/anatomy/build-ecorche-rig.mts                                      # ecorche-rig.json / .bin
 npx tsx scripts/anatomy/build-ecorche-face.mts <BodyParts3D_data>                  # ecorche-face.json / .bin
 npx tsx scripts/anatomy/bake-motions.mts                                           # every bake
+npx tsx scripts/anatomy/build-ecorche-correctives.mts                              # ecorche-correctives.json / .bin
 ```
 
 `public/anatomy/ecorche-skin.*` (the first rig's weights, `build-ecorche-skin.mts`) and `athlete-raw.*` are kept for
