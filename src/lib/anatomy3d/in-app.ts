@@ -8,10 +8,12 @@
  * it is shown while the model downloads, it takes over when WebGL or the model's files are not available, and the
  * athlete can switch to it in the player.
  *
- * The kettlebell swing is the first candidate: it passes the automated checks and is in for the owner's visual
- * approval. Nothing else is to be added without that approval.
+ * The five listed are the owner's first milestone ("the first five exercises working properly inside the actual
+ * workout interface"): each passes the automated checks and the coding session's visual review (the kettlebell swing
+ * with a visible defect still noted, POLISH NEEDED), and each is shown with a "preview, awaiting approval" tag until
+ * the owner approves it in docs/anatomy3d/review.json. Nothing else is to be added without that approval.
  */
-export const IN_APP_3D: readonly string[] = ["kettlebell-swing"];
+export const IN_APP_3D: readonly string[] = ["kettlebell-swing", "dumbbell-curl", "inverted-row", "cable-chest-fly", "sled-push"];
 
 /** Whether the app shows the 3D anatomical demonstration for this exercise. */
 export function has3dDemo(slug: string): boolean {

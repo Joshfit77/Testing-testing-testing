@@ -34,6 +34,19 @@ test.describe("3D anatomical demonstration", () => {
     // (It comes back paused, as it was left.)
     await expect(demo.getByRole("button", { name: "Play" })).toBeVisible();
 
+    // The showcase page: the five exercises as tabs, the real player for the chosen one, switched in place.
+    await page.goto("/train/3d");
+    const showcase = page.getByTestId("showcase-3d");
+    await expect(showcase.getByRole("tab")).toHaveCount(5);
+    await expect(showcase.getByTestId("exercise-demo-3d")).toHaveAttribute("data-phase", "ready", { timeout: 180_000 });
+    await showcase.getByTestId("exercise-demo-3d").getByRole("button", { name: "Pause" }).dispatchEvent("click");
+    await showcase.getByRole("tab", { name: "Dumbbell Biceps Curl" }).dispatchEvent("click");
+    await expect(showcase.getByRole("tab", { name: "Dumbbell Biceps Curl" })).toHaveAttribute("aria-selected", "true");
+    await expect(showcase.getByTestId("exercise-demo-3d")).toHaveAttribute("data-phase", "ready", { timeout: 180_000 });
+    await expect(showcase.locator("canvas[role=img]")).toHaveAttribute("aria-label", /performing the Dumbbell Biceps Curl/);
+    await showcase.getByTestId("exercise-demo-3d").getByRole("button", { name: "Pause" }).dispatchEvent("click");
+    await expect(showcase.getByText(/Preview, awaiting the owner/)).toBeVisible();
+
     // Every other exercise keeps the illustration only.
     await page.goto("/train/exercises/back-squat");
     await expect(page.getByTestId("exercise-demo-3d")).toHaveCount(0);
