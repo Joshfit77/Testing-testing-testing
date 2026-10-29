@@ -1,6 +1,6 @@
 # Exercise library: 3D demonstration status
 
-Generated 2026-10-28 by `npx tsx scripts/anatomy/library-status.mts --qa /tmp/claude-0/-home-user-Testing-testing-testing/b5f7be41-8a07-5fa2-949c-491c9ac58107/scratchpad/qa31` from the code and files; do not edit by hand.
+Generated 2026-10-29 by `npx tsx scripts/anatomy/library-status.mts --qa /tmp/claude-0/-home-user-Testing-testing-testing/b5f7be41-8a07-5fa2-949c-491c9ac58107/scratchpad/qa33` from the code and files; do not edit by hand.
 
 ## The counts, kept apart
 
@@ -11,16 +11,16 @@ Generated 2026-10-28 by `npx tsx scripts/anatomy/library-status.mts --qa /tmp/cl
 | Original exercises with an **implemented 3D motion** (their own spec: equipment, grips, 3D keyframes) | 18 |
 | Original exercises with **no 3D motion** (the figure can only follow the 2D motion with no equipment and free hands: a placeholder, not a demonstration, and not shown in the app) | 139 |
 | With a **baked motion** (`public/anatomy/bake`), as a phone plays it | 18 |
-| **Automated QA pass** (`check-motion.mts --baked`, 24 samples) | 14 |
-| Automated QA **fail** | 4 |
+| **Automated QA pass** (`check-motion.mts --baked`, 24 samples) | 15 |
+| Automated QA **fail** | 3 |
 | 3D motions with **no automated QA run** recorded here | 0 |
-| **Visual review** pass (Claude (the coding session), from the rendered videos and stills, two angles each; not the owner, 2026-10-28; this is a reviewer's eye, not the owner's approval) | 10 |
+| **Visual review** pass (Claude (the coding session), from the rendered videos and stills, two angles each; not the owner, 2026-10-28; this is a reviewer's eye, not the owner's approval) | 12 |
 | Visual review fail | 2 |
 | **Owner's visual approval** of the rendered motion | 0 |
 | Shown in the app as the 3D figure (with the illustration as fallback) | 1 |
-| **PASS** (automated QA and visual review both pass) | 10 |
+| **PASS** (automated QA and visual review both pass) | 12 |
 | **FAIL** (either fails) | 4 |
-| **NOT TESTED** (no 3D motion, or not checked) | 143 |
+| **NOT TESTED** (no 3D motion, or not checked) | 141 |
 
 Proposed additions by section: Strength 75, Core 15, Power and plyometric 18, Conditioning 13, Cardio 4, Mobility 18. None of them is built.
 
@@ -28,23 +28,23 @@ Proposed additions by section: Strength 75, Core 15, Power and plyometric 18, Co
 
 | Exercise | Bake | Automated QA | Visual review | Owner approval | In the app | Result |
 | --- | --- | --- | --- | --- | --- | --- |
-| Sumo Deadlift (`sumo-deadlift`) | 115 frames, 3.8 s | FAIL: stretched: Right_adductor_magnus (2.4% of its surface); stretched: Left_adductor_magnus (2.3% of its surface); stretched: Right_adductor_minimus (2.1% of its surface); detached: Left_gracilis (29); detached: Right_gracilis (27); baked playback strays 2.6 cm from the solve between frames | NOT CHECKED | none | illustration | **FAIL** |
+| Sumo Deadlift (`sumo-deadlift`) | 115 frames, 3.8 s | FAIL: detached: Left_gracilis (29); detached: Right_gracilis (27); baked playback strays 2.6 cm from the solve between frames | NOT CHECKED | none | illustration | **FAIL** |
 | Kettlebell Swing (`kettlebell-swing`) | 53 frames, 1.73 s | PASS | PASS (minor): a crease at the right shoulder at the top of the swing; hinge, bell path and hands on the handle read right | none | 3D figure, illustration as fallback | **PASS** |
-| Push Press (`push-press`) | 97 frames, 3.2 s | FAIL: stretched: Right_teres_major (2.8% of its surface); stretched: Left_teres_major (2.7% of its surface); stretched: Right_latissimus_dorsi (2.3% of its surface); stretched: Left_latissimus_dorsi (2.3% of its surface) | FAIL: armpits fold where the arms lock out overhead (teres major, lats stretched); the drive and press themselves read right | none | illustration | **FAIL** |
+| Push Press (`push-press`) | 97 frames, 3.2 s | PASS | FAIL: armpits fold where the arms lock out overhead (teres major, lats stretched); the drive and press themselves read right | none | illustration | **FAIL** |
 | Dumbbell Lateral Raise (`lateral-raise`) | 109 frames, 3.6 s | PASS | PASS: raise to shoulder height, slight forward lean, dumbbells in the hands; front and rear renders | none | illustration | **PASS** |
-| Cable Triceps Pushdown (`triceps-pushdown`) | 103 frames, 3.4 s | PASS | NOT CHECKED | none | illustration | **NOT TESTED** |
+| Cable Triceps Pushdown (`triceps-pushdown`) | 103 frames, 3.4 s | PASS | PASS: straight bar at the cable, elbows at the sides, push to extension; cable runs to the top pulley; side and front renders | none | illustration | **PASS** |
 | Inverted Row (`inverted-row`) | 99 frames, 3.25 s | PASS | NOT CHECKED | none | illustration | **NOT TESTED** |
 | Dumbbell Biceps Curl (`dumbbell-curl`) | 109 frames, 3.6 s | PASS | PASS: supinated curl, dumbbells in the hands to the shoulders, elbows at the sides; side and front renders | none | illustration | **PASS** |
 | Hammer Curl (`hammer-curl`) | 109 frames, 3.6 s | PASS | PASS: neutral grip held through the curl | none | illustration | **PASS** |
-| Pallof Press (`pallof-press`) | 118 frames, 3.9 s | PASS | PASS | none | illustration | **PASS** |
+| Pallof Press (`pallof-press`) | 118 frames, 3.9 s | PASS | PASS: side-on to the cable, handle held at the chest with both hands and pressed out and back; the trunk holds; the press-out is short in the render; rear and front views | none | illustration | **PASS** |
 | Cable Woodchop (`cable-woodchop`) | 85 frames, 2.8 s | PASS | NOT CHECKED | none | illustration | **NOT TESTED** |
 | Medicine Ball Rotational Throw (`medicine-ball-rotational-throw`) | 157 frames, 2.6 s | PASS | PASS (minor): ball held, trunk turns, ball leaves the hands at release; it reappears in the hands when the loop restarts (inherent to a looping throw) | none | illustration | **PASS** |
 | Farmer's Carry (`farmers-carry`) | 36 frames, 1.15 s | PASS | PASS: walking stride with the dumbbells at the sides, arms straight | none | illustration | **PASS** |
 | Sled Push (`sled-push`) | 34 frames, 1.1 s | PASS | PASS: hands on the posts, body angled into the sled, sled on the floor and moving | none | illustration | **PASS** |
-| Rowing Machine (`rowing-intervals`) | 64 frames, 2.1 s | FAIL: stretched: Right_adductor_minimus (2.4% of its surface); stretched: Left_adductor_minimus (2.2% of its surface); stretched: Left_gracilis (2.2% of its surface); stretched: Left_adductor_magnus (2.1% of its surface); stretched: Right_adductor_magnus (2.1% of its surface); stretched: Right_gracilis (2.0% of its surface); collapsed: Right_adductor_longus (2.8% of its surface); collapsed: Left_adductor_longus (2.6% of its surface); detached: Left_gracilis (30); detached: Right_gracilis (28) | FAIL: inner thighs (adductors, gracilis) stretch and pull apart at the catch; seat, handle and chain move with the body | none | illustration | **FAIL** |
+| Rowing Machine (`rowing-intervals`) | 64 frames, 2.1 s | FAIL: stretched: Left_gracilis (2.2% of its surface); stretched: Right_gracilis (2.0% of its surface); detached: Left_gracilis (30); detached: Right_gracilis (28) | FAIL: catch, drive and layback read as rowing; seat, handle and chain move with the body; the gracilis still stretches and pulls away from the thigh at the catch (the automated check fails it) | none | illustration | **FAIL** |
 | Running Intervals (`running-intervals`) | 42 frames, 0.68 s | PASS | PASS: sprint stride, knee drive and arm swing read right | none | illustration | **PASS** |
-| Cable Chest Fly (`cable-chest-fly`) | 112 frames, 3.7 s | PASS | NOT CHECKED | none | illustration | **NOT TESTED** |
-| Overhead Triceps Extension (`overhead-triceps-extension`) | 112 frames, 3.7 s | FAIL: wristR held at its limit by 15; wristL held at its limit by 15; pop: shT2R jumps 120° at 88%; stretched: Right_teres_major (4.4% of its surface); stretched: Left_teres_major (4.3% of its surface); stretched: Left_latissimus_dorsi (2.1% of its surface); stretched: Right_latissimus_dorsi (2.1% of its surface); collapsed: Left_teres_minor (5.6% of its surface); collapsed: Right_teres_minor (5.6% of its surface); collapsed: Left_infraspinatus_muscle (2.1% of its surface); collapsed: Right_infraspinatus_muscle (2.1% of its surface); dumbbell 1.6 cm into the thumb1L; baked playback strays 1.7 cm from the solve between frames | NOT CHECKED | none | illustration | **FAIL** |
+| Cable Chest Fly (`cable-chest-fly`) | 112 frames, 3.7 s | PASS | PASS: between two towers, handles from the high pulleys, arms open wide and brought together low in front; cables stay in the hands; front and rear renders | none | illustration | **PASS** |
+| Overhead Triceps Extension (`overhead-triceps-extension`) | 112 frames, 3.7 s | FAIL: wristR held at its limit by 15; wristL held at its limit by 15; pop: shT2R jumps 120° at 88%; stretched: Right_teres_major (4.4% of its surface); stretched: Left_teres_major (4.3% of its surface); stretched: Right_latissimus_dorsi (2.1% of its surface); stretched: Left_latissimus_dorsi (2.1% of its surface); collapsed: Left_teres_minor (5.6% of its surface); collapsed: Right_teres_minor (5.6% of its surface); collapsed: Left_infraspinatus_muscle (2.1% of its surface); collapsed: Right_infraspinatus_muscle (2.1% of its surface); dumbbell 1.6 cm into the thumb1L; baked playback strays 1.7 cm from the solve between frames | NOT CHECKED | none | illustration | **FAIL** |
 | Air Bike Sprint (`air-bike-sprint`) | 43 frames, 1.4 s | PASS | PASS: seated on the bike, hands on the levers, feet on the pedals; levers and cranks move with the body | none | illustration | **PASS** |
 
 ## Exercises without a 3D motion (139)
