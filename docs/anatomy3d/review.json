@@ -58,7 +58,8 @@
       "note": "straight bar at the cable, elbows at the sides, push to extension; cable runs to the top pulley; side and front renders"
     },
     "cable-chest-fly": {
-      "verdict": "not checked"
+      "verdict": "pass",
+      "note": "between two towers, handles from the high pulleys, arms open wide and brought together low in front; cables stay in the hands; front and rear renders"
     },
     "inverted-row": {
       "verdict": "not checked"
