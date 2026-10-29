@@ -35,8 +35,8 @@
       "note": "side-on to the cable, handle held at the chest with both hands and pressed out and back; the trunk holds; the press-out is short in the render; rear and front views"
     },
     "cable-woodchop": {
-      "verdict": "not checked",
-      "note": "to be re-checked on the new render (the left coracobrachialis spike was the failure)"
+      "verdict": "minor",
+      "note": "high-to-low chop with the trunk turning and the cable running to the top pulley; the coracobrachialis spike is gone; from behind, the far hand looks off the handle at mid-chop (the automated contact check covers the held hand)"
     },
     "medicine-ball-rotational-throw": {
       "verdict": "minor",
@@ -63,7 +63,8 @@
       "note": "between two towers, handles from the high pulleys, arms open wide and brought together low in front; cables stay in the hands; front and rear renders"
     },
     "inverted-row": {
-      "verdict": "not checked"
+      "verdict": "pass",
+      "note": "body straight under the bar in the rack, heels on the floor, chest pulled to the bar; side and front renders"
     },
     "sumo-deadlift": {
       "verdict": "not checked"
