@@ -103,6 +103,20 @@ export const down = (a: number): Vec => [sin(a), -cos(a)];
 export const up = (a: number): Vec => [sin(a), cos(a)];
 /** Unit vector pointing out of the front of a segment whose up-direction has lean `a`. */
 export const frontOf = (a: number): Vec => [cos(a), -sin(a)];
+/**
+ * A barbell across the shoulders, seen from the side, is drawn in a slight oblique view: each cm of the bar toward the
+ * viewer shows this far back and down on screen (the far end forward and up). The bar and both plates then show beside
+ * the lifter, with the hands on the bar, instead of one plate face hiding the head and hands.
+ */
+export const BAR_DEPTH: Vec = [-0.6, -0.12];
+/** Grip: each hand this far (cm, along the bar) from the middle. */
+export const BAR_GRIP = 22;
+/**
+ * The far half of that bar is drawn this much shorter than the near half (perspective, exaggerated): its plate sits
+ * behind the lifter's head instead of out in front of the face.
+ */
+export const BAR_FAR_SCALE = 0.4;
+
 export const add = (p: Vec, v: Vec, k = 1): Vec => [p[0] + v[0] * k, p[1] + v[1] * k];
 export const sub = (a: Vec, b: Vec): Vec => [a[0] - b[0], a[1] - b[1]];
 export const len = (v: Vec) => Math.hypot(v[0], v[1]);

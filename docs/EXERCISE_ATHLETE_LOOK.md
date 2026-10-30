@@ -48,6 +48,15 @@ Darker graphite skin (not silver), a deltoid that is part of the arm's outline i
 "mechanical joint"), soft three-step depth halos instead of hard outlines, muscle bellies and grooves as soft light and
 shade instead of drawn shapes, the gold rim light and amber glow on the trained muscles kept at a fixed strength.
 
+## The bar on the back squat
+
+Seen exactly from the side, a bar across the shoulders is a dot: the first version drew its plate behind the head and
+the bar's end in the hands, which at phone size read as a disc floating behind the lifter, not a bar being held. The
+bar across the shoulders (back squat, pause squat, tempo squat) is now drawn in a slight oblique view (`BAR_DEPTH` in
+`skeleton.ts`): the bar runs from the traps back to the near plates, the near hand grips it, and the far half (drawn
+shorter, smaller and in shadow) puts its plates behind the head. The hands are placed on that drawn bar. A plate in
+front of the lifter, as a true side view would show, was tried and rejected: it hides the whole head.
+
 ## Motion changes (shared by both looks)
 
 - Keyframes are joined by a time-scaled Hermite curve: speed carries smoothly from a slow phase into a fast one, and a

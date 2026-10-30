@@ -1,4 +1,4 @@
-import { BODY, ankleForSole, forwardKinematics, solveTwoBone, angleOf } from "../skeleton";
+import { BAR_DEPTH, BAR_FAR_SCALE, BAR_GRIP, BODY, add, ankleForSole, forwardKinematics, solveTwoBone, angleOf } from "../skeleton";
 import {
   FEET,
   armThrough,
@@ -46,9 +46,17 @@ export interface SquatOpts {
 /** Arm placement for each way of holding the load (shoulder-local elbow / hand points). */
 function holdArms(p: Pose, load: SquatLoad, s: number): Pose {
   switch (load) {
-    case "back":
-      // Elbows down under the bar (slightly behind it), forearms close to vertical, hands on the bar at the traps.
-      return armsLocal(p, [-5, -24], [-6.5, 1]);
+    case "back": {
+      // Hands on the bar either side of the neck, where the bar across the shoulders is drawn (BAR_DEPTH), elbows
+      // down under the hands (forearms about vertical; the arm's sideways reach shows as foreshortening).
+      const trap = lm(p, "trap");
+      let q = p;
+      for (const [side, k] of [["R", 1], ["L", -BAR_FAR_SCALE]] as const) {
+        const hand = add(trap, BAR_DEPTH, k * BAR_GRIP);
+        q = armThrough(q, side, add(hand, [1.5, -25]), hand);
+      }
+      return q;
+    }
     case "front":
       return armsLocal(p, [23, 1], [8.5, 3.5]);
     case "goblet":
@@ -105,7 +113,7 @@ export function squat(o: SquatOpts): MotionDef {
   const props: PropDef[] = [...(o.props ?? [])];
   if (implement === "barbell") {
     const at = o.load === "back" ? { lm: "trap" as const } : o.load === "front" ? { lm: "rack" as const } : o.load === "zercher" ? { lm: "elbowR" as const, dx: 3, dy: 6 } : { lm: "hands" as const };
-    props.push({ id: "bar", kind: "barbell", at, layer: "front" });
+    props.push({ id: "bar", kind: "barbell", at, layer: "front", ...(o.load === "back" ? { orient: "across" as const } : {}) });
   } else if (implement === "dumbbell") props.push({ id: "db", kind: "dumbbell", at: { lm: "hands", dy: -3 }, orient: "profile", angle: 90, layer: "near", size: 1.05 });
   else if (implement === "kettlebell") props.push({ id: "kb", kind: "kettlebell", at: { lm: "hands" }, orient: "vertical", layer: "near" });
   const specs = rep((s) => squatPose(s, o), { down: o.down ?? 2, up: o.up ?? 1, holdBottom: o.holdBottom, holdTop: o.holdTop ?? 0.4 });
@@ -118,6 +126,9 @@ export function squat(o: SquatOpts): MotionDef {
     planted: ["L", "R"],
     footGrounded: true,
     stillPhase: o.stillPhase ?? 0.45,
+    // A bar on the back: the arms reach out to the sides and round to the bar (abducted and turned out), which a side
+    // view shows as an elbow bent a little past straight.
+    allowLimits: o.load === "back" ? ["elL", "elR"] : undefined,
   };
 }
 

@@ -1,9 +1,11 @@
 /**
  * Equipment in the "athlete" look: matte black iron and steel with thin gold edges, matching the athlete. Kinds not
- * redrawn here keep their classic drawing (props.ts). Barbells seen from the side are drawn as a cut-away: the plate
- * behind the athlete and the bar end in the hands, so the plate never hides the lifter's head, arms or hands.
+ * redrawn here keep their classic drawing (props.ts). A barbell across the shoulders is drawn in a slight oblique view
+ * (BAR_DEPTH): the bar runs from behind the lifter across the traps, with the hands on it and plates at both ends. Other
+ * side-view barbells are drawn as a cut-away: the plate behind the athlete and the bar end in the hands, so the plate
+ * never hides the lifter's head, arms or hands.
  */
-import { add, len, sub } from "./skeleton";
+import { BAR_DEPTH, BAR_FAR_SCALE, add, len, sub } from "./skeleton";
 import type { Frame, ResolvedProp, Vec } from "./types";
 
 type Ctx = CanvasRenderingContext2D;
@@ -122,6 +124,75 @@ export function plateFace(ctx: Ctx, c: Vec, r: number, hub = 2.6) {
   ctx.strokeStyle = STEEL_LO;
   ctx.lineWidth = 0.3;
   ctx.stroke();
+}
+
+const COLLAR = 66; // bar centre to the inner collar (cm)
+const PLATE_T = 5; // plate thickness (cm)
+
+/**
+ * One half of a barbell across the shoulders (oblique view, BAR_DEPTH): the bar from the lifter's traps out to the
+ * collar, two plates and the sleeve's end. `side` +1 is the half toward the viewer, -1 the far half (drawn behind the
+ * athlete). Parts are painted far to near so each covers what is behind it.
+ */
+function barAcross(ctx: Ctx, at: Vec, r0: number, side: 1 | -1) {
+  // The far half is drawn shorter (BAR_FAR_SCALE), smaller and in shadow, as perspective and the light would show it.
+  const P = (z: number): Vec => add(at, BAR_DEPTH, z * (side > 0 ? 1 : -BAR_FAR_SCALE));
+  const r = side > 0 ? r0 : r0 * 0.9;
+  const shadow = side > 0 ? 0 : 0.7;
+  const line = (a: Vec, b: Vec, w: number, cap: CanvasLineCap) => {
+    ctx.strokeStyle = steel(ctx, [a[0], a[1] + w / 2], [a[0], a[1] - w / 2]);
+    ctx.lineWidth = w;
+    ctx.lineCap = cap;
+    ctx.beginPath();
+    ctx.moveTo(a[0], a[1]);
+    ctx.lineTo(b[0], b[1]);
+    ctx.stroke();
+    if (shadow) {
+      ctx.strokeStyle = `rgba(0,0,0,${shadow})`;
+      ctx.stroke();
+    }
+  };
+  // A plate between depths z0 and z1 (outward from the centre): its rim band, then the face toward the viewer.
+  const plate = (z0: number, z1: number) => {
+    const a = P(z0);
+    const b = P(z1);
+    const d = sub(b, a);
+    const L = len(d) || 0.001;
+    const n: Vec = [-d[1] / L, d[0] / L];
+    const band = new Path2D();
+    band.moveTo(a[0] + n[0] * r, a[1] + n[1] * r);
+    band.lineTo(b[0] + n[0] * r, b[1] + n[1] * r);
+    band.lineTo(b[0] - n[0] * r, b[1] - n[1] * r);
+    band.lineTo(a[0] - n[0] * r, a[1] - n[1] * r);
+    band.closePath();
+    band.arc(a[0], a[1], r, 0, Math.PI * 2);
+    band.moveTo(b[0] + r, b[1]);
+    band.arc(b[0], b[1], r, 0, Math.PI * 2);
+    ctx.fillStyle = IRON_LO;
+    ctx.fill(band, "nonzero");
+    // The face the viewer sees: the outer one on the near half, the inner one on the far half.
+    const face = side > 0 ? b : a;
+    plateFace(ctx, face, r, 2.6);
+    if (shadow) {
+      ctx.fillStyle = `rgba(0,0,0,${shadow})`;
+      ctx.beginPath();
+      ctx.arc(face[0], face[1], r + 0.3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  };
+  const shaft = () => line(at, P(COLLAR), 2.6, "round");
+  const sleeve = () => line(P(COLLAR + 2 * PLATE_T), P(COLLAR + 2 * PLATE_T + 9), 4.2, "butt");
+  if (side > 0) {
+    shaft();
+    plate(COLLAR, COLLAR + PLATE_T);
+    plate(COLLAR + PLATE_T, COLLAR + 2 * PLATE_T);
+    sleeve();
+  } else {
+    sleeve();
+    plate(COLLAR + PLATE_T, COLLAR + 2 * PLATE_T);
+    plate(COLLAR, COLLAR + PLATE_T);
+    shaft();
+  }
 }
 
 /** The bar's end where it crosses the body (side view), held in the hands. */
@@ -328,16 +399,20 @@ function rowStation(ctx: Ctx, seatAt: Vec, f: Frame, hands: Vec | undefined) {
   if (hands) cableTo(ctx, pul, hands, "v");
 }
 
-/** Where a prop is drawn in the athlete look (a side-view barbell plate goes behind the athlete). */
+/**
+ * Where a prop is drawn in the athlete look. A side-view barbell plate goes behind the athlete; a bar across the
+ * shoulders draws its near half under the near arm (the hand closes over it) and its far half behind the athlete.
+ */
 export function athleteLayer(p: ResolvedProp, f: Frame): string {
   const l = p.layer ?? p.def.layer ?? "near";
-  if (p.def.kind === "barbell" && f.view === "side" && !p.def.variant) return "far";
+  if (p.def.kind === "barbell" && f.view === "side" && !p.def.variant) return p.def.orient === "across" ? "near" : "far";
   return l;
 }
 
 /**
  * Draw a prop in the athlete look. Returns false for kinds it does not redraw (the caller draws the classic one).
- * `pass` "extra" draws the second part of a cut-away barbell: its end in the hands.
+ * `pass` "extra" draws the second part of a side-view barbell: a cut-away bar's end in the hands, or the far half of a
+ * bar across the shoulders.
  */
 export function drawPropAthlete(ctx: Ctx, p: ResolvedProp, f: Frame, pass: "main" | "extra" = "main"): boolean {
   const { def, at } = p;
@@ -345,7 +420,8 @@ export function drawPropAthlete(ctx: Ctx, p: ResolvedProp, f: Frame, pass: "main
   switch (def.kind) {
     case "barbell": {
       if (f.view !== "side" || def.variant) return false;
-      if (pass === "main") plateFace(ctx, at, size ?? 22.5, 2.8);
+      if (def.orient === "across") barAcross(ctx, at, size ?? 22.5, pass === "main" ? 1 : -1);
+      else if (pass === "main") plateFace(ctx, at, size ?? 22.5, 2.8);
       else barEnd(ctx, at);
       return true;
     }
@@ -378,7 +454,8 @@ export function drawPropAthlete(ctx: Ctx, p: ResolvedProp, f: Frame, pass: "main
   }
 }
 
-/** The layer of a prop's second part, if it has one: a cut-away barbell's end, held in the hands. */
+/** The layer of a prop's second part, if it has one: a cut-away barbell's end in the hands, or a bar's far half. */
 export function extraLayer(p: ResolvedProp, f: Frame): string | null {
-  return p.def.kind === "barbell" && f.view === "side" && !p.def.variant ? "near" : null;
+  if (p.def.kind !== "barbell" || f.view !== "side" || p.def.variant) return null;
+  return p.def.orient === "across" ? "far" : "near";
 }
