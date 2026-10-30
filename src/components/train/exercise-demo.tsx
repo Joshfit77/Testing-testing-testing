@@ -146,7 +146,7 @@ export function ExerciseDemoMini({
               slug={slug}
               name={name}
               meta={meta}
-              className={cn("mt-3 w-full rounded-xl", getDemoAsset(slug) ? "aspect-[4/3]" : "aspect-video")}
+              className={cn("mt-3 w-full rounded-xl", getDemoAsset(slug) ? "max-h-[60vh]" : "aspect-video")}
             />
           ) : null}
           <p className="mt-2 text-[0.6875rem] text-muted-foreground">

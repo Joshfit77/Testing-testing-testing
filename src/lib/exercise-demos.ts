@@ -63,12 +63,16 @@ export interface ExerciseDemoAsset {
   width: number;
   height: number;
   phases: DemoPhase[];
+  /** Loop the clip (default true). False when its last frame does not meet its first: it plays once and offers Replay. */
+  loop?: boolean;
+  /** Reviewer notes on the clip (form, artifacts, look), for the owner; not shown in the app. */
+  flags?: string[];
   /** Muscles highlighted in the render (the exercise's primary muscles unless the source says otherwise). */
   highlighted: string[];
   /** A short note shown to reviewers while the status is not "approved". */
   note?: string;
   /** The build's checks: loop seam difference (0 = identical first and last frames) and file sizes. */
-  checks?: { seam?: number; mp4Bytes?: number; webmBytes?: number; posterBytes?: number };
+  checks?: { seam?: number; mp4Bytes?: number; webmBytes?: number; posterBytes?: number; copied?: boolean };
 }
 
 export interface ExerciseDemoManifest {

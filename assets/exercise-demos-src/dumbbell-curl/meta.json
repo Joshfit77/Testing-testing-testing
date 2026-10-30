@@ -1,6 +1,34 @@
 {
-  "status": "stand-in",
-  "note": "Stand-in: the owner's reference render (a still cropped from a screenshot, so soft) placed on the page to judge the UI fit. The animated loop of this athlete has not been produced yet; it needs an image-to-video model (see docs/EXERCISE_DEMOS_25D.md).",
-  "highlighted": ["biceps"],
-  "source": "Owner's dumbbell curl reference image, 2026-10-29"
+  "status": "review",
+  "version": 1,
+  "source": "Owner-supplied clip (Narrow_Gate_Claude_Curl_Package.zip, received 2026-10-30): dumbbell-curl.mp4, 540x788, 30 fps, 7.47 s, H.264 High, no audio, sha256 07e8da80fb965e192f5dc826e2eb722ad06d67062b903196855fc30ea7e3dc33",
+  "fit": "native",
+  "encode": "copy",
+  "loop": false,
+  "thumbCrop": [
+    0,
+    40,
+    540,
+    405
+  ],
+  "highlighted": [
+    "biceps"
+  ],
+  "note": "New demonstration, awaiting the owner's review.",
+  "review": {
+    "character": "",
+    "form": "NOT REVIEWED",
+    "equipment": "",
+    "highlighting": "",
+    "playback": "PASS",
+    "mobile": "NOT TESTED"
+  },
+  "flags": [
+    "Loop seam: first and last frames differ (19.5 vs 2.5 between ordinary frames); the clip plays once and offers Replay instead of looping.",
+    "Frame 118 (3.9 s): a one-frame jump in the arm's position.",
+    "About 0.6-1.1 s: on the athlete's right arm the elbow travels forward and up and the dumbbell rises to face height (shoulder involvement); the grip turns to neutral on that side.",
+    "About 1.1 s, 5.9 s and 6.4 s: the moving dumbbell smears or changes shape for a few frames.",
+    "Look against character-reference.png: lighter silver-grey skin (not dark graphite), olive shorts (not black), a lit blue-grey backdrop (not matte black); face, hair, build and gold outlines are close."
+  ],
+  "verified": "2026-10-30: plays, moves, ends with Replay, 0.5x, pause, Reduced Motion and poster fallback on the exercise page, library/search card and workout screen, in headless Chromium at iPhone 15 size (19/19 checks, scripts/exercise-demos/verify-curl.mjs). Chromium played the WebM; iPhone Safari plays the original MP4 and was not tested on a device."
 }

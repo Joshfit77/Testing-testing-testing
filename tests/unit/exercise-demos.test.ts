@@ -27,3 +27,20 @@ describe("2.5D exercise demonstrations manifest", () => {
     expect(demoMoves({ ...base, mode: "video", mp4: "/x.mp4", phases: [] })).toBe(true);
   });
 });
+
+describe("the dumbbell curl's moving demonstration", () => {
+  const a = getDemoAsset("dumbbell-curl");
+  it("is a real video, in its own portrait shape, playing once (its loop does not close)", () => {
+    expect(a?.mode).toBe("video");
+    expect(a?.mp4).toBe("/exercise-demos/dumbbell-curl/loop.mp4");
+    expect(a?.webm).toBe("/exercise-demos/dumbbell-curl/loop.webm");
+    expect(a?.width).toBe(540);
+    expect(a?.height).toBe(788);
+    expect(a?.loop).toBe(false);
+    expect(a?.durationMs).toBeGreaterThan(7000);
+  });
+  it("keeps the owner's file as delivered and awaits the owner's approval", () => {
+    expect(a?.checks?.copied).toBe(true);
+    expect(a?.status).not.toBe("approved");
+  });
+});

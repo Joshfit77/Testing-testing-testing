@@ -98,14 +98,14 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
               {hasVideo && (
                 <details className="rounded-xl border border-border">
                   <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-gold-highlight">{demo ? "Rendered demo" : "Animated demo"}</summary>
-                  <ExerciseDemo slug={ex.slug} name={ex.name} meta={demoMeta} className={demo ? "aspect-[4/3] w-full rounded-b-xl" : "aspect-video w-full rounded-b-xl"} />
+                  <ExerciseDemo slug={ex.slug} name={ex.name} meta={demoMeta} className={demo ? "w-full" : "aspect-video w-full rounded-b-xl"} />
                 </details>
               )}
             </div>
           ) : null}
           {!hasVideo && (
             <figure className={media.length ? "px-3 pb-3" : undefined}>
-              <ExerciseDemo slug={ex.slug} name={ex.name} meta={demoMeta} className={cn(demo ? "aspect-[4/3]" : "aspect-video", "w-full", media.length && "rounded-xl")} />
+              <ExerciseDemo slug={ex.slug} name={ex.name} meta={demoMeta} className={cn(!demo && "aspect-video", "w-full", media.length && "rounded-xl")} />
               <figcaption className="px-3 pt-2 text-[0.6875rem] text-muted-foreground">
                 {demo
                   ? "Rendered demonstration of the movement — a computer render, not filmed video, and not a substitute for coaching. Use 0.5× to study each phase."

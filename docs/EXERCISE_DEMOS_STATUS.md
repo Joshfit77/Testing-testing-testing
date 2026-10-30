@@ -1,10 +1,10 @@
 # 2.5D exercise demonstrations: library status
 
-Generated 2026-10-29 by `scripts/exercise-demos/status.mjs` from the manifest and each source folder's meta.json. An exercise is complete only with a real moving clip, every check PASS and the owner's approval.
+Generated 2026-10-30 by `scripts/exercise-demos/status.mjs` from the manifest and each source folder's meta.json. An exercise is complete only with a real moving clip, every check PASS and the owner's approval.
 
 | Exercises | Moving clip | Still only | No asset | Owner approved | Complete |
 | --- | --- | --- | --- | --- | --- |
-| 157 | 0 | 1 | 156 | 0 | 0 |
+| 157 | 1 | 0 | 156 | 0 | 0 |
 
 | Exercise | Asset | Status | Character | Form | Equipment | Highlighting | Playback | Mobile | Owner |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -55,7 +55,7 @@ Generated 2026-10-29 by `scripts/exercise-demos/status.mjs` from the manifest an
 | Inverted Row (`inverted-row`) | NO | - | - | - | - | - | - | - | PENDING |
 | Face Pull (`face-pull`) | NO | - | - | - | - | - | - | - | PENDING |
 | Band Pull-Apart (`band-pull-apart`) | NO | - | - | - | - | - | - | - | PENDING |
-| Dumbbell Biceps Curl (`dumbbell-curl`) | STILL ONLY | stand-in | NOT REVIEWED | NOT REVIEWED | NOT REVIEWED | NOT REVIEWED | NO VIDEO | NOT TESTED | PENDING |
+| Dumbbell Biceps Curl (`dumbbell-curl`) | YES | review | NOT REVIEWED | NOT REVIEWED | NOT REVIEWED | NOT REVIEWED | PASS | NOT TESTED | PENDING |
 | Hammer Curl (`hammer-curl`) | NO | - | - | - | - | - | - | - | PENDING |
 | Front Plank (`plank`) | NO | - | - | - | - | - | - | - | PENDING |
 | Side Plank (`side-plank`) | NO | - | - | - | - | - | - | - | PENDING |

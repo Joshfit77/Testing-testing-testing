@@ -9,6 +9,25 @@ lighting, matte charcoal background). No live rotatable model in the library; sm
 Nothing is approved by code. Each asset carries a status the app shows until the owner approves it: `stand-in`,
 `review`, `approved`. The animated illustration stays as the fallback for every exercise without an approved asset.
 
+## 0. Progress
+
+| Exercise | Clip | In the app | Owner |
+| --- | --- | --- | --- |
+| Dumbbell Biceps Curl (`dumbbell-curl`) | Owner-supplied, 2026-10-30: 540×788, 7.47 s, 30 fps, H.264, no audio. Kept byte-for-byte as the app's MP4 (video stream identical, moov moved to the front); a VP9 WebM is added for browsers without H.264. | Exercise page, library and search cards (poster thumbnail), workout card and its enlarged view. Plays once and offers Replay: its last frame does not meet its first (seam 19.5 against about 2.5 between ordinary frames), so it is not looped. | Pending review |
+| The other 156 | none yet | their existing animated illustration, as the fallback | - |
+
+Reviewer flags on the curl clip (by eye, frame by frame; for the owner's decision, not verdicts):
+- 0.6–1.1 s: on the athlete's right arm the elbow travels forward and up and the dumbbell rises to face height; the
+  grip turns neutral on that side.
+- 1.1 s, 5.9 s, 6.4 s: the moving dumbbell smears or changes shape for a few frames.
+- 3.9 s (frame 118): a one-frame jump in the arm's position.
+- Against `assets/exercise-demos-src/_character/character-reference.png`: lighter silver-grey skin (not dark graphite),
+  olive shorts (not black), a lit blue-grey backdrop (not matte black). Face, hair, build and gold outlines are close.
+
+Verification: `scripts/exercise-demos/verify-curl.mjs`, 19 of 19 checks, headless Chromium at iPhone 15 size. That
+browser has no H.264 decoder, so it played the WebM; iPhone Safari plays the MP4, which has not been tested on a
+physical device.
+
 ## 1. Where the old visuals are used (audit, branch `claude/3d-in-workout`)
 
 | Where | What it rendered | Now |

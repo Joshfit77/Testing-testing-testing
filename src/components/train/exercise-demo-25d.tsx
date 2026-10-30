@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Pause, Play } from "lucide-react";
+import { Pause, Play, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { prefersReducedMotion } from "@/lib/keyboard";
 import { demoMoves, type ExerciseDemoAsset } from "@/lib/exercise-demos";
@@ -35,6 +35,8 @@ export function ExerciseDemo25D({ slug, name, asset, className, controls = true,
   const [speed, setSpeed] = useState(1);
   const [phase, setPhase] = useState(0);
   const [failed, setFailed] = useState(false);
+  const [ended, setEnded] = useState(false);
+  const loops = asset.loop !== false;
   const [angle, setAngle] = useState(-1); // -1 = the main clip, else an index into asset.angles
   const view = angle >= 0 && asset.angles?.[angle] ? asset.angles[angle] : null;
   const mp4 = view ? view.mp4 : asset.mp4;
@@ -48,9 +50,35 @@ export function ExerciseDemo25D({ slug, name, asset, className, controls = true,
     if (!v || !hasLoop) return;
     v.muted = true;
     v.playbackRate = speed;
-    if (playing) void v.play().catch(() => setPlaying(false));
+    if (playing) {
+      if (v.ended) v.currentTime = 0;
+      void v.play().catch(() => setPlaying(false));
+    }
     else v.pause();
   }, [playing, speed, hasLoop, mp4, webm]);
+
+  // Load failures can happen before React attaches its handlers (the server-rendered <video> starts loading at once),
+  // so check the element when the player mounts, and listen on the <source> elements themselves.
+  useEffect(() => {
+    const v = video.current;
+    if (!v || !hasLoop) return;
+    const settle = () => {
+      if (v.error || v.networkState === HTMLMediaElement.NETWORK_NO_SOURCE) setFailed(true);
+    };
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const later = () => timers.push(setTimeout(settle, 250));
+    // A new element reports "no source" for a moment while it starts choosing one; a real failure stays that way.
+    if (v.error) setFailed(true);
+    else timers.push(setTimeout(settle, 1500));
+    const sources = Array.from(v.querySelectorAll("source"));
+    sources.forEach((s) => s.addEventListener("error", later));
+    v.addEventListener("error", settle);
+    return () => {
+      timers.forEach(clearTimeout);
+      sources.forEach((s) => s.removeEventListener("error", later));
+      v.removeEventListener("error", settle);
+    };
+  }, [hasLoop, mp4, webm]);
 
   // Still-only assets with several phases cycle through them slowly (a crossfade, never a warp).
   useEffect(() => {
@@ -74,27 +102,49 @@ export function ExerciseDemo25D({ slug, name, asset, className, controls = true,
   const badge = STATUS_LABEL[asset.status];
   const moves = demoMoves(asset);
 
+  const replay = () => {
+    const v = video.current;
+    if (v) v.currentTime = 0;
+    setEnded(false);
+    setPlaying(true);
+    if (v) void v.play().catch(() => setPlaying(false));
+  };
+  // The full player takes the clip's own shape (a portrait clip stays portrait), capped to most of the screen's height;
+  // a small card (no controls) fills its box and shows the upper body.
+  const frameStyle = controls ? { aspectRatio: `${asset.width} / ${asset.height}` } : undefined;
+
   return (
-    <div data-testid="exercise-demo-25d" data-slug={slug} data-mode={asset.mode} data-status={asset.status} data-playing={playing} className="flex flex-col">
-      <div className={cn("relative overflow-hidden bg-[#0a0a0a]", className)}>
+    <div data-testid="exercise-demo-25d" data-slug={slug} data-mode={asset.mode} data-status={asset.status} data-playing={playing} data-ended={ended} className="flex flex-col">
+      <div className={cn("relative overflow-hidden bg-[#0a0a0a]", controls && "mx-auto max-h-[70vh]", className)} style={frameStyle}>
         {hasLoop && !failed ? (
           <video
             key={mp4 ?? webm}
             ref={video}
             poster={poster}
             muted
-            loop
+            loop={loops}
             playsInline
             preload="metadata"
             width={asset.width}
             height={asset.height}
-            className="absolute inset-0 h-full w-full object-contain"
+            className={cn("absolute inset-0 h-full w-full", controls ? "object-contain" : "object-cover object-[50%_15%]")}
             aria-label={`${name}: pre-rendered demonstration of the movement`}
-            onError={() => setFailed(true)}
+            // A browser without H.264 skips the MP4 for the WebM; that is not a failure. Real failures are caught by the
+            // effect above (the element's own error, or no playable source left).
+            onEnded={() => {
+              setPlaying(false);
+              setEnded(true);
+            }}
+            onPlay={() => setEnded(false)}
           >
-            {webm && <source src={webm} type="video/webm" />}
+            {/* The MP4 first: iPhone and desktop browsers play the original file; the WebM serves browsers without H.264. */}
             {mp4 && <source src={mp4} type="video/mp4" />}
+            {webm && <source src={webm} type="video/webm" />}
           </video>
+        ) : asset.phases.length === 0 ? (
+          // No loop (or it failed to play) and no phase stills: the poster, never an empty frame.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={poster} alt={`${name}: demonstration still`} width={asset.width} height={asset.height} className={cn("absolute inset-0 h-full w-full", controls ? "object-contain" : "object-cover object-[50%_15%]")} draggable={false} />
         ) : (
           asset.phases.map((p, i) => (
             // eslint-disable-next-line @next/next/no-img-element
@@ -110,26 +160,34 @@ export function ExerciseDemo25D({ slug, name, asset, className, controls = true,
             />
           ))
         )}
-        {!hasLoop && asset.phases.length === 0 && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={asset.poster} alt={`${name}: demonstration still`} width={asset.width} height={asset.height} className="absolute inset-0 h-full w-full object-contain" draggable={false} />
+        {controls && ended && !loops && (
+          <button
+            type="button"
+            onClick={replay}
+            className="absolute inset-0 flex items-center justify-center bg-black/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+            aria-label="Replay the demonstration"
+          >
+            <span className="inline-flex min-h-11 items-center gap-2 rounded-full border border-gold/70 bg-black/70 px-4 text-sm font-semibold text-gold-highlight">
+              <RotateCcw className="size-4" aria-hidden /> Replay
+            </span>
+          </button>
         )}
         {controls && badge && (
           <span className="pointer-events-none absolute left-2 top-2 rounded bg-black/60 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wider text-gold-highlight">{badge}</span>
         )}
-        {controls && !moves && (
+        {controls && (!moves || (failed && hasLoop)) && (
           <p className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-3 pb-2 pt-6 text-[0.6875rem] text-foreground/90" role="status">
-            Still only: the animated loop for this exercise has not been produced yet.
+            {failed && hasLoop ? "The video could not be played on this device; showing its still." : "Still only: the animated loop for this exercise has not been produced yet."}
           </p>
         )}
         {!hasLoop && asset.phases.length > 1 && (
           <span className="pointer-events-none absolute bottom-2 right-2 rounded bg-black/60 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wider text-foreground/90">{asset.phases[phase]?.label}</span>
         )}
       </div>
-      {controls && moves && (
+      {controls && moves && !(failed && asset.phases.length === 0) && (
         <div className="flex flex-wrap items-center gap-1 bg-[#0d0b08] px-2 py-1.5" role="group" aria-label="Demonstration controls">
-          <button type="button" onClick={() => setPlaying(!playing)} className={cn(ctl, "inline-flex items-center gap-1")} aria-label={playing ? "Pause" : "Play"} aria-pressed={playing}>
-            {playing ? <Pause className="size-4" aria-hidden /> : <Play className="size-4" aria-hidden />}
+          <button type="button" onClick={() => (ended ? replay() : setPlaying(!playing))} className={cn(ctl, "inline-flex items-center gap-1")} aria-label={playing ? "Pause" : ended ? "Replay" : "Play"} aria-pressed={playing}>
+            {playing ? <Pause className="size-4" aria-hidden /> : ended ? <RotateCcw className="size-4" aria-hidden /> : <Play className="size-4" aria-hidden />}
           </button>
           {hasLoop &&
             [0.5, 1].map((s) => (
