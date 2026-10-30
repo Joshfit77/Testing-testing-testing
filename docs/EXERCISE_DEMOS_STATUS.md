@@ -2,7 +2,7 @@
 
 Generated 2026-10-30 by `scripts/exercise-demos/status.mjs` from the manifest and each source folder's meta.json.
 
-**COMPLETED** = a real moving clip in the app whose character, form, equipment, highlighting and playback were checked and passed. **FAILED** = a clip exists but a check failed. **MISSING** = no moving clip yet. Owner approval is separate and never implied. Physical-iPhone testing is listed separately.
+**COMPLETED** = a real moving clip in the app, at normal speed and as a 0.5× file, with frames for finger scrubbing, whose character, form, equipment, highlighting and playback were checked and passed. **FAILED** = a clip exists but a check failed. **MISSING** = no moving clip yet. Owner approval is separate and never implied. Physical-iPhone testing is listed separately.
 
 | Exercises | COMPLETED | FAILED | MISSING | Moving clip in the app | Owner approved |
 | --- | --- | --- | --- | --- | --- |
@@ -10,9 +10,9 @@ Generated 2026-10-30 by `scripts/exercise-demos/status.mjs` from the manifest an
 
 ## Exercises with a clip
 
-| Exercise | Tracker | Character | Form | Equipment | Highlighting | Playback | iPhone | Owner | Reason |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Dumbbell Biceps Curl (`dumbbell-curl`) | **FAILED** | PASS | PASS | FAIL | PASS | PASS | NOT TESTED | PENDING | Dumbbell shows a doubled outline for about 0.27 s at the fastest part of the lift (in the source footage), seen again on the reversed lowering. Needs a regenerated clip; this corrected version is the interim. |
+| Exercise | Tracker | Normal | 0.5× | Finger scrub | Views | Character | Form | Equipment | Highlighting | Playback | iPhone | Owner | Reason |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Dumbbell Biceps Curl (`dumbbell-curl`) | **FAILED** | YES | YES | YES | 1 | PASS | PASS | FAIL | PASS | PASS | NOT TESTED | PENDING | Dumbbell shows a doubled outline for about 0.27 s at the fastest part of the lift (in the source footage), seen again on the reversed lowering. Needs a regenerated clip; this corrected version is the interim. |
 
 ## Missing (blocked)
 

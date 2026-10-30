@@ -28,12 +28,36 @@ The owner's original clip and poster stay in the source folder as `original-owne
 - Kept, and why it is FAILED: a doubled dumbbell outline for about 0.27 s at the fastest part of the lift (in the source),
   seen again on the reversed lowering. The lowering takes as long as the lift (about 0.6 s). Only his left arm curls.
 - Tried and rejected: a crossfade loop (a second faint dumbbell), a motion-interpolated slow-down (warped the dumbbell).
-- Verified: 19/19 playback checks in headless Chromium at iPhone 15 size (`scripts/exercise-demos/verify-curl.mjs`).
+- Both speeds (2026-10-30): `loop.mp4` (3.27 s) and `loop-half.mp4` (6.53 s, 0.61 MB): the same 98 frames, each held
+  twice as long (196 frames; every pair identical, each matching its normal-speed frame). Nothing is interpolated.
+  Plus 49 scrub frames (400 px WebP, 0.44 MB) for moving through the rep with a finger.
+- Verified: 36/36 checks in headless Chromium at iPhone 15 size with touch emulation
+  (`scripts/exercise-demos/verify-curl.mjs`): playback, loop, both speeds, tap, finger scrub, scroll, position bar,
+  arrow keys, replay, enlarge, full screen, workout screen, library, Reduced Motion, blocked-video fallback, slow network.
   Not tested on a physical iPhone.
+
+**Touch interaction (every 2.5D clip, `src/components/train/exercise-demo-25d.tsx`).** The clips are filmed from a fixed
+camera, so they cannot be turned in 3D and the player says so ("One fixed camera view (it does not rotate)"). Instead:
+
+| Gesture or control | What it does |
+| --- | --- |
+| Tap the picture | Play / pause (Space or Enter with a keyboard) |
+| Drag sideways on the picture | Move through the rep frame by frame; the picture's width is one whole rep, wrapping on a loop. Pauses. On release the video rests on that frame. Up-and-down drags still scroll the page. |
+| Position bar under the picture | The same, by dragging the bar (arrow keys step one frame) |
+| Normal / 0.5× | Switches between the normal file and the real half-speed file, keeping the place in the rep |
+| Replay | Back to the start, playing |
+| Phase buttons (Start, Top) | Jump to that position and pause |
+| Enlarge | A full-screen view inside the app with the same gestures; it opens where the small player was and hands its place, speed and pause back when closed. Inside it, Full screen uses the device's own full screen where there is one (on iPhone, the system video player). |
+| View bar (only when an exercise has more than one camera view) | Swipe left or right, or tap Front / Side, to change view at the same point in the rep |
+
+The pipeline (`build.mjs`) makes the 0.5× file and the scrub frames for every clip and every extra view; the tracker
+counts an exercise COMPLETED only when both speeds and the scrub frames exist and every check passes. A second view is
+sent as `<slug>.side.mp4` (or `.front`) beside `<slug>.mp4`.
 
 **The other 156 are MISSING for one reason:** generating a clip needs a video model that keeps the approved athlete, and
 none can run or be reached from this environment (no GPU or ML runtime; model hosts and video generators blocked by its
-network policy; $0 budget). Each has a ready-to-paste prompt in `assets/exercise-demos-src/PROMPTS.md` (built from the
+network policy; $0 budget). Each has a ready-to-paste prompt in `assets/exercise-demos-src/PROMPTS.md` (numbered as in the app and the owner's list
+of 157; built from the
 app's own instructions, cues and mistakes, with the character reference to attach every time). A folder or zip of clips
 named `<slug>.mp4` goes in with `node scripts/exercise-demos/ingest.mjs <folder-or-zip>`: it files each clip, grades it to
 the character, checks jumps and the loop seam, makes a review sheet, and updates the manifest and the tracker. A clip is

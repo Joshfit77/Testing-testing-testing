@@ -32,6 +32,21 @@ export interface DemoChecks {
   mobile?: "PASS" | "FAIL" | "NOT TESTED" | "";
 }
 
+/** The 0.5× version of a clip: the same frames, each held twice as long (built by the pipeline, nothing invented). */
+export interface DemoSlow {
+  mp4?: string;
+  webm?: string;
+  durationMs?: number;
+}
+
+/** Frames for scrubbing with a finger: `count` WebPs evenly spaced through one rep, `<base>001.webp` onwards. */
+export interface DemoScrub {
+  base: string;
+  count: number;
+  width: number;
+  height: number;
+}
+
 /** A second camera angle, rendered separately where the movement needs it (front and side). */
 export interface DemoAngle {
   label: string;
@@ -39,6 +54,8 @@ export interface DemoAngle {
   mp4?: string;
   webm?: string;
   durationMs?: number;
+  slow?: DemoSlow;
+  scrub?: DemoScrub;
 }
 
 export interface ExerciseDemoAsset {
@@ -60,6 +77,9 @@ export interface ExerciseDemoAsset {
   mp4?: string;
   webm?: string;
   durationMs?: number;
+  /** The 0.5× version (absent on older builds: the player then plays the normal clip at half rate). */
+  slow?: DemoSlow;
+  scrub?: DemoScrub;
   width: number;
   height: number;
   phases: DemoPhase[];
@@ -72,7 +92,7 @@ export interface ExerciseDemoAsset {
   /** A short note shown to reviewers while the status is not "approved". */
   note?: string;
   /** The build's checks: loop seam difference (0 = identical first and last frames) and file sizes. */
-  checks?: { seam?: number; mp4Bytes?: number; webmBytes?: number; posterBytes?: number; copied?: boolean };
+  checks?: { seam?: number; mp4Bytes?: number; webmBytes?: number; posterBytes?: number; copied?: boolean; slowMp4Bytes?: number; slowWebmBytes?: number; scrubBytes?: number };
 }
 
 export interface ExerciseDemoManifest {
@@ -95,4 +115,14 @@ export function getDemoAsset(slug: string): ExerciseDemoAsset | null {
 /** Whether the asset has something that moves (a loop or more than one phase still). */
 export function demoMoves(a: ExerciseDemoAsset): boolean {
   return Boolean(a.mp4 || a.webm) || a.phases.length > 1;
+}
+
+/** The URL of scrub frame `i` (0-based). */
+export function scrubFrameSrc(scrub: DemoScrub, i: number): string {
+  return `${scrub.base}${String(i + 1).padStart(3, "0")}.webp`;
+}
+
+/** Both speeds exist as files: the normal clip and its 0.5× version. */
+export function hasBothSpeeds(a: ExerciseDemoAsset): boolean {
+  return Boolean((a.mp4 || a.webm) && (a.slow?.mp4 || a.slow?.webm));
 }

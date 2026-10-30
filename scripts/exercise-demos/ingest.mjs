@@ -3,7 +3,10 @@
 // graded to the approved character (scripts/exercise-demos/correct.py, whole clip, no motion added), analyses it for
 // frame jumps and its loop seam, writes meta.json (status "review", tracker FAILED "not reviewed yet" until a reviewer
 // checks the timeline sheet and records the verdicts), then rebuilds the manifest and the status table.
+// A second camera view of the same exercise: <slug>.<view>.mp4 (e.g. back-squat.side.mp4), filed as angles/<view>/.
+// The build then makes, for every clip and view, the 0.5x version and the frames for finger scrubbing.
 //   node scripts/exercise-demos/ingest.mjs <folder-or-zip> [--no-grade]
+// EXERCISE_DEMOS_SRC (with build.mjs's EXERCISE_DEMOS_OUT and EXERCISE_DEMOS_MANIFEST) points a dry run elsewhere.
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -13,7 +16,7 @@ const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../.
 const input = process.argv[2];
 const noGrade = process.argv.includes("--no-grade");
 if (!input) { console.error("usage: node scripts/exercise-demos/ingest.mjs <folder-or-zip> [--no-grade]"); process.exit(2); }
-const SRC = path.join(ROOT, "assets/exercise-demos-src");
+const SRC = process.env.EXERCISE_DEMOS_SRC ? path.resolve(process.env.EXERCISE_DEMOS_SRC) : path.join(ROOT, "assets/exercise-demos-src");
 const slugs = new Set([...fs.readFileSync(path.join(ROOT, "src/data/exercises.ts"), "utf8").matchAll(/\n\s{4}slug: "([^"]+)"/g)].map((m) => m[1]));
 let dir = input;
 if (input.endsWith(".zip")) {
@@ -25,9 +28,23 @@ const files = [];
 const walk = (d) => { for (const f of fs.readdirSync(d)) { const p = path.join(d, f); if (fs.statSync(p).isDirectory()) walk(p); else if (/\.(mp4|mov|webm|m4v)$/i.test(f) && !f.startsWith(".")) files.push(p); } };
 walk(dir);
 const report = [];
-for (const file of files) {
-  const slug = path.basename(file).replace(/\.[^.]+$/, "").toLowerCase().replace(/[^a-z0-9-]+/g, "-");
+const named = files.map((file) => {
+  const [base, view] = path.basename(file).replace(/\.[^.]+$/, "").toLowerCase().split(".");
+  return { file, slug: base.replace(/[^a-z0-9-]+/g, "-"), view: view?.replace(/[^a-z0-9-]+/g, "-") || null };
+});
+// Main clips first, so a view's meta lands beside them.
+named.sort((a, b) => Number(Boolean(a.view)) - Number(Boolean(b.view)));
+for (const { file, slug, view } of named) {
   if (!slugs.has(slug)) { report.push(`${path.basename(file)}: not an exercise slug in the app; skipped`); continue; }
+  if (view) {
+    const vdir = path.join(SRC, slug, "angles", view);
+    fs.mkdirSync(vdir, { recursive: true });
+    fs.copyFileSync(file, path.join(vdir, `original-owner${path.extname(file).toLowerCase()}`));
+    execFileSync("python3", ["-I", path.join(ROOT, "scripts/exercise-demos/correct.py"), "make", file, path.join(vdir, "loop.mp4"), "--crossfade", "0", ...(noGrade ? ["--no-grade"] : [])]);
+    const hasMain = fs.existsSync(path.join(SRC, slug, "loop.mp4"));
+    report.push(`${slug}: ${view} view ingested${hasMain ? "" : ` (no main clip yet: send ${slug}.mp4 too, the view is not shown without it)`}`);
+    continue;
+  }
   const dest = path.join(SRC, slug);
   fs.mkdirSync(dest, { recursive: true });
   const ext = path.extname(file).toLowerCase();
@@ -54,4 +71,5 @@ for (const file of files) {
 }
 console.log(report.join("\n") || "no video files found");
 execFileSync("node", [path.join(ROOT, "scripts/exercise-demos/build.mjs"), SRC], { stdio: "inherit" });
-execFileSync("node", [path.join(ROOT, "scripts/exercise-demos/status.mjs")], { stdio: "inherit" });
+// The status table describes the app's own manifest; a dry run elsewhere leaves it alone.
+if (!process.env.EXERCISE_DEMOS_MANIFEST) execFileSync("node", [path.join(ROOT, "scripts/exercise-demos/status.mjs")], { stdio: "inherit" });

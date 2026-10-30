@@ -36,13 +36,20 @@ const status = rows.map((r) => {
   const checks = ["character", "form", "equipment", "highlighting", "playback"];
   const failedCheck = checks.find((k) => rv[k] === "FAIL");
   const allPass = checks.every((k) => rv[k] === "PASS");
-  const tracker = !moves ? "MISSING" : mt.tracker === "FAILED" || failedCheck ? "FAILED" : allPass ? "COMPLETED" : "FAILED";
-  const reason = !moves ? BLOCKED : tracker === "FAILED" ? mt.trackerReason ?? (failedCheck ? `${failedCheck} check failed` : "not every check has passed yet") : "";
+  // Both speeds are required: the normal clip and its 0.5x file (the build makes it), plus the frames for scrubbing.
+  const halfSpeed = Boolean(d && (d.slow?.mp4 || d.slow?.webm));
+  const touch = Boolean(d?.scrub?.count);
+  const tracker = !moves ? "MISSING" : mt.tracker === "FAILED" || failedCheck || !halfSpeed || !touch ? "FAILED" : allPass ? "COMPLETED" : "FAILED";
+  const reason = !moves ? BLOCKED : tracker === "FAILED" ? mt.trackerReason ?? (failedCheck ? `${failedCheck} check failed` : !halfSpeed ? "no 0.5x version (rebuild with build.mjs)" : !touch ? "no scrub frames (rebuild with build.mjs)" : "not every check has passed yet") : "";
   return {
     ...r,
     tracker,
     reason,
     asset: d ? (moves ? "YES" : "STILL ONLY") : "NO",
+    normal: moves ? "YES" : "NO",
+    half: halfSpeed ? "YES" : "NO",
+    touch: touch ? "YES" : "NO",
+    views: d ? 1 + (d.angles?.length ?? 0) : 0,
     status: d?.status ?? "",
     version: d?.version ?? "",
     character: d ? V(rv.character, "NOT REVIEWED") : "-",
@@ -58,12 +65,12 @@ const status = rows.map((r) => {
 const n = (f) => status.filter(f).length;
 const counts = { exercises: status.length, completed: n((s) => s.tracker === "COMPLETED"), failed: n((s) => s.tracker === "FAILED"), missing: n((s) => s.tracker === "MISSING"), withVideo: n((s) => s.asset === "YES"), approved: n((s) => s.owner === "APPROVED") };
 const md = [];
-md.push("# 2.5D exercise demonstrations: library status", "", `Generated ${new Date().toISOString().slice(0, 10)} by \`scripts/exercise-demos/status.mjs\` from the manifest and each source folder's meta.json.`, "", "**COMPLETED** = a real moving clip in the app whose character, form, equipment, highlighting and playback were checked and passed. **FAILED** = a clip exists but a check failed. **MISSING** = no moving clip yet. Owner approval is separate and never implied. Physical-iPhone testing is listed separately.", "");
+md.push("# 2.5D exercise demonstrations: library status", "", `Generated ${new Date().toISOString().slice(0, 10)} by \`scripts/exercise-demos/status.mjs\` from the manifest and each source folder's meta.json.`, "", "**COMPLETED** = a real moving clip in the app, at normal speed and as a 0.5× file, with frames for finger scrubbing, whose character, form, equipment, highlighting and playback were checked and passed. **FAILED** = a clip exists but a check failed. **MISSING** = no moving clip yet. Owner approval is separate and never implied. Physical-iPhone testing is listed separately.", "");
 md.push(`| Exercises | COMPLETED | FAILED | MISSING | Moving clip in the app | Owner approved |`, `| --- | --- | --- | --- | --- | --- |`, `| ${counts.exercises} | ${counts.completed} | ${counts.failed} | ${counts.missing} | ${counts.withVideo} | ${counts.approved} |`, "");
 const notMissing = status.filter((s) => s.tracker !== "MISSING");
 if (notMissing.length) {
-  md.push("## Exercises with a clip", "", "| Exercise | Tracker | Character | Form | Equipment | Highlighting | Playback | iPhone | Owner | Reason |", "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |");
-  for (const s of notMissing) md.push(`| ${s.name} (\`${s.slug}\`) | **${s.tracker}** | ${s.character} | ${s.form} | ${s.equipmentCheck} | ${s.highlighting} | ${s.playback} | ${s.mobile} | ${s.owner} | ${s.reason || "-"} |`);
+  md.push("## Exercises with a clip", "", "| Exercise | Tracker | Normal | 0.5× | Finger scrub | Views | Character | Form | Equipment | Highlighting | Playback | iPhone | Owner | Reason |", "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |");
+  for (const s of notMissing) md.push(`| ${s.name} (\`${s.slug}\`) | **${s.tracker}** | ${s.normal} | ${s.half} | ${s.touch} | ${s.views} | ${s.character} | ${s.form} | ${s.equipmentCheck} | ${s.highlighting} | ${s.playback} | ${s.mobile} | ${s.owner} | ${s.reason || "-"} |`);
   md.push("");
 }
 md.push("## Missing (blocked)", "", `Every exercise below is **MISSING** for the same reason: ${BLOCKED} Its ready-to-paste prompt is in \`assets/exercise-demos-src/PROMPTS.md\`; until its clip passes, the app keeps showing its existing animated illustration.`, "", "| # | Exercise | Category | Equipment |", "| --- | --- | --- | --- |");
@@ -87,8 +94,8 @@ fs.writeFileSync(path.join(SRC, "SHEET.md"), sheet.join("\n") + "\n");
 const CHARACTER = "Same athlete as the attached reference image: identical face, short dark hair, muscular build and proportions, dark graphite skin with metallic gold anatomical outlines, black fitted athletic shorts, black training shoes, matte black studio background, dramatic rim lighting.";
 const RULES = "One continuous take: camera locked, no zoom, no pan, no cuts. Equipment is realistic, solid, the same size and shape in every frame, and stays in his hands (no blur trails, no doubled edges). Smooth and controlled: the lowering or return is slower than the effort. The clip starts and ends in the same position so it loops. No text, no logos, no other people.";
 const sentence = (xs) => xs.map((x) => x.replace(/\.$/, "")).join("; ");
-const prompts = ["# Generation prompts: all 157 exercises", "", "Paste one prompt per clip, attach `assets/exercise-demos-src/_character/character-reference.png` every time, and save the result as `<slug>.mp4`. Length in the sheet (`SHEET.md`); 5 s suits most single repetitions. Reject any take where the face, hair, build, shorts or equipment change, the equipment blurs into two, a limb bends the wrong way, or the camera moves.", ""];
-order.forEach((r, i) => {
+const prompts = ["# Generation prompts: all 157 exercises", "", "Numbered as in the app (and the owner's list of 157). Paste one prompt per clip, attach `assets/exercise-demos-src/_character/character-reference.png` every time, and save the result as `<slug>.mp4`. Length in the sheet (`SHEET.md`); 5 s suits most single repetitions. Reject any take where the face, hair, build, shorts or equipment change, the equipment blurs into two, a limb bends the wrong way, or the camera moves.", "", "Make only the normal-speed clip: the pipeline makes the 0.5× version from the same frames and the frames for finger scrubbing. A second camera view is optional: the same prompt with the camera changed (the sheet suggests which), saved as `<slug>.side.mp4` or `<slug>.front.mp4`.", ""];
+rows.forEach((r, i) => {
   const cam = CAMERA[r.pattern] ?? CAMERA[r.category] ?? "three-quarter front";
   // Supporting equipment (a rack, a bench, a box) is part of the scene; the rest are alternatives: show the first.
   const SUPPORT = new Set(["rack", "bench", "box", "plyo box", "pull-up bar", "dip bars", "mat", "wall", "track", "platform"]);

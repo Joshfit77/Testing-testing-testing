@@ -30,7 +30,7 @@
     "Removed by the correction: the elbow drift (0.0-1.2 s, 4.6-5.6 s), the stitch between two takes at 3.9 s, the dumbbell smears at 5.8-6.4 s, and the light skin / olive shorts / lit backdrop (graded).",
     "Tried and rejected: a crossfade loop (left a second faint dumbbell) and a motion-interpolated slow-down to 3.3 s (warped the dumbbell)."
   ],
-  "verified": "2026-10-30 (version 2): plays, loops, Start/Top, 0.5x, pause, Reduced Motion and still fallback on the exercise page, library/search card and workout screen, in headless Chromium at iPhone 15 size (19/19, scripts/exercise-demos/verify-curl.mjs). Chromium played the WebM; iPhone Safari plays the MP4 and was not tested on a device.",
+  "verified": "2026-10-30 (version 2, with the 0.5x file and touch controls): 36/36 checks in headless Chromium at iPhone 15 size with touch emulation (scripts/exercise-demos/verify-curl.mjs): plays, loops, Start/Top, Normal and the real 0.5x file, pause, tap to play/pause, finger scrub, page scroll, position bar, arrow keys, replay, enlarge, full screen, workout screen, library/search card, Reduced Motion, still fallback, slow network. Chromium played the WebM; iPhone Safari plays the MP4 and was not tested on a device.",
   "phases": [
     {
       "label": "Start",

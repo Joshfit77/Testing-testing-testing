@@ -50,12 +50,26 @@
         "copied": true,
         "mp4Bytes": 505637,
         "webmBytes": 416928,
+        "slowMp4Bytes": 608670,
+        "slowWebmBytes": 515065,
+        "scrubBytes": 441450,
         "seam": 2.89,
         "posterBytes": 19384
       },
       "mp4": "/exercise-demos/dumbbell-curl/loop.mp4",
       "webm": "/exercise-demos/dumbbell-curl/loop.webm",
-      "durationMs": 3267
+      "durationMs": 3267,
+      "slow": {
+        "mp4": "/exercise-demos/dumbbell-curl/loop-half.mp4",
+        "webm": "/exercise-demos/dumbbell-curl/loop-half.webm",
+        "durationMs": 6533
+      },
+      "scrub": {
+        "base": "/exercise-demos/dumbbell-curl/scrub/",
+        "count": 49,
+        "width": 400,
+        "height": 584
+      }
     }
   }
 }
