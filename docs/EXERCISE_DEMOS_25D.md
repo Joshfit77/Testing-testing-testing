@@ -9,24 +9,35 @@ lighting, matte charcoal background). No live rotatable model in the library; sm
 Nothing is approved by code. Each asset carries a status the app shows until the owner approves it: `stand-in`,
 `review`, `approved`. The animated illustration stays as the fallback for every exercise without an approved asset.
 
-## 0. Progress
+## 0. Progress (tracker: `docs/EXERCISE_DEMOS_STATUS.md`)
 
-| Exercise | Clip | In the app | Owner |
-| --- | --- | --- | --- |
-| Dumbbell Biceps Curl (`dumbbell-curl`) | Owner-supplied, 2026-10-30: 540×788, 7.47 s, 30 fps, H.264, no audio. Kept byte-for-byte as the app's MP4 (video stream identical, moov moved to the front); a VP9 WebM is added for browsers without H.264. | Exercise page, library and search cards (poster thumbnail), workout card and its enlarged view. Plays once and offers Replay: its last frame does not meet its first (seam 19.5 against about 2.5 between ordinary frames), so it is not looped. | Pending review |
-| The other 156 | none yet | their existing animated illustration, as the fallback | - |
+| | Count |
+| --- | --- |
+| COMPLETED (moving clip, every check passed) | 0 |
+| FAILED (clip exists, a check failed) | 1: Dumbbell Biceps Curl |
+| MISSING (no clip) | 156 |
 
-Reviewer flags on the curl clip (by eye, frame by frame; for the owner's decision, not verdicts):
-- 0.6–1.1 s: on the athlete's right arm the elbow travels forward and up and the dumbbell rises to face height; the
-  grip turns neutral on that side.
-- 1.1 s, 5.9 s, 6.4 s: the moving dumbbell smears or changes shape for a few frames.
-- 3.9 s (frame 118): a one-frame jump in the arm's position.
-- Against `assets/exercise-demos-src/_character/character-reference.png`: lighter silver-grey skin (not dark graphite),
-  olive shorts (not black), a lit blue-grey backdrop (not matte black). Face, hair, build and gold outlines are close.
+**Dumbbell Biceps Curl, version 2 (2026-10-30).** Corrected from the owner's clip with `scripts/exercise-demos/correct.py`,
+using only real frames: his left arm's clean lift and top hold (1.4–3.0 s of the source) played forward, then the same
+frames in reverse for the lowering, so the loop closes exactly; graded toward `_character/character-reference.png`
+(dark graphite body, black shorts, near-black backdrop, gold kept). 3.27 s, 540×788, 0.51 MB MP4 (H.264) + 0.42 MB WebM.
+The owner's original clip and poster stay in the source folder as `original-owner.*`.
 
-Verification: `scripts/exercise-demos/verify-curl.mjs`, 19 of 19 checks, headless Chromium at iPhone 15 size. That
-browser has no H.264 decoder, so it played the WebM; iPhone Safari plays the MP4, which has not been tested on a
-physical device.
+- Removed: the elbow drifting forward on his right arm (both of its reps), the stitch between two takes at 3.9 s, the
+  dumbbell smears at 5.8–6.4 s, the light skin / olive shorts / lit backdrop.
+- Kept, and why it is FAILED: a doubled dumbbell outline for about 0.27 s at the fastest part of the lift (in the source),
+  seen again on the reversed lowering. The lowering takes as long as the lift (about 0.6 s). Only his left arm curls.
+- Tried and rejected: a crossfade loop (a second faint dumbbell), a motion-interpolated slow-down (warped the dumbbell).
+- Verified: 19/19 playback checks in headless Chromium at iPhone 15 size (`scripts/exercise-demos/verify-curl.mjs`).
+  Not tested on a physical iPhone.
+
+**The other 156 are MISSING for one reason:** generating a clip needs a video model that keeps the approved athlete, and
+none can run or be reached from this environment (no GPU or ML runtime; model hosts and video generators blocked by its
+network policy; $0 budget). Each has a ready-to-paste prompt in `assets/exercise-demos-src/PROMPTS.md` (built from the
+app's own instructions, cues and mistakes, with the character reference to attach every time). A folder or zip of clips
+named `<slug>.mp4` goes in with `node scripts/exercise-demos/ingest.mjs <folder-or-zip>`: it files each clip, grades it to
+the character, checks jumps and the loop seam, makes a review sheet, and updates the manifest and the tracker. A clip is
+COMPLETED only after its review sheet has been checked and every check passes; the illustration stays until then.
 
 ## 1. Where the old visuals are used (audit, branch `claude/3d-in-workout`)
 

@@ -1,167 +1,178 @@
 # 2.5D exercise demonstrations: library status
 
-Generated 2026-10-30 by `scripts/exercise-demos/status.mjs` from the manifest and each source folder's meta.json. An exercise is complete only with a real moving clip, every check PASS and the owner's approval.
+Generated 2026-10-30 by `scripts/exercise-demos/status.mjs` from the manifest and each source folder's meta.json.
 
-| Exercises | Moving clip | Still only | No asset | Owner approved | Complete |
+**COMPLETED** = a real moving clip in the app whose character, form, equipment, highlighting and playback were checked and passed. **FAILED** = a clip exists but a check failed. **MISSING** = no moving clip yet. Owner approval is separate and never implied. Physical-iPhone testing is listed separately.
+
+| Exercises | COMPLETED | FAILED | MISSING | Moving clip in the app | Owner approved |
 | --- | --- | --- | --- | --- | --- |
-| 157 | 1 | 0 | 156 | 0 | 0 |
+| 157 | 0 | 1 | 156 | 1 | 0 |
 
-| Exercise | Asset | Status | Character | Form | Equipment | Highlighting | Playback | Mobile | Owner |
+## Exercises with a clip
+
+| Exercise | Tracker | Character | Form | Equipment | Highlighting | Playback | iPhone | Owner | Reason |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Barbell Back Squat (`back-squat`) | NO | - | - | - | - | - | - | - | PENDING |
-| Barbell Front Squat (`front-squat`) | NO | - | - | - | - | - | - | - | PENDING |
-| Goblet Squat (`goblet-squat`) | NO | - | - | - | - | - | - | - | PENDING |
-| Bodyweight Squat (`bodyweight-squat`) | NO | - | - | - | - | - | - | - | PENDING |
-| Sit-to-Stand (Chair Squat) (`box-squat-to-chair`) | NO | - | - | - | - | - | - | - | PENDING |
-| Leg Press (`leg-press`) | NO | - | - | - | - | - | - | - | PENDING |
-| Conventional Deadlift (`conventional-deadlift`) | NO | - | - | - | - | - | - | - | PENDING |
-| Sumo Deadlift (`sumo-deadlift`) | NO | - | - | - | - | - | - | - | PENDING |
-| Trap Bar Deadlift (`trap-bar-deadlift`) | NO | - | - | - | - | - | - | - | PENDING |
-| Romanian Deadlift (`romanian-deadlift`) | NO | - | - | - | - | - | - | - | PENDING |
-| Single-Leg Romanian Deadlift (`single-leg-rdl`) | NO | - | - | - | - | - | - | - | PENDING |
-| Kettlebell Swing (`kettlebell-swing`) | NO | - | - | - | - | - | - | - | PENDING |
-| Barbell Hip Thrust (`hip-thrust`) | NO | - | - | - | - | - | - | - | PENDING |
-| Glute Bridge (`glute-bridge`) | NO | - | - | - | - | - | - | - | PENDING |
-| Machine Leg Curl (`leg-curl`) | NO | - | - | - | - | - | - | - | PENDING |
-| Machine Leg Extension (`leg-extension`) | NO | - | - | - | - | - | - | - | PENDING |
-| Standing Calf Raise (`standing-calf-raise`) | NO | - | - | - | - | - | - | - | PENDING |
-| Dumbbell Walking Lunge (`walking-lunge`) | NO | - | - | - | - | - | - | - | PENDING |
-| Reverse Lunge (`reverse-lunge`) | NO | - | - | - | - | - | - | - | PENDING |
-| Bulgarian Split Squat (`bulgarian-split-squat`) | NO | - | - | - | - | - | - | - | PENDING |
-| Step-Up (`step-up`) | NO | - | - | - | - | - | - | - | PENDING |
-| Barbell Bench Press (`bench-press`) | NO | - | - | - | - | - | - | - | PENDING |
-| Dumbbell Bench Press (`dumbbell-bench-press`) | NO | - | - | - | - | - | - | - | PENDING |
-| Incline Dumbbell Press (`incline-dumbbell-press`) | NO | - | - | - | - | - | - | - | PENDING |
-| Close-Grip Bench Press (`close-grip-bench-press`) | NO | - | - | - | - | - | - | - | PENDING |
-| Push-Up (`push-up`) | NO | - | - | - | - | - | - | - | PENDING |
-| Incline Push-Up (`incline-push-up`) | NO | - | - | - | - | - | - | - | PENDING |
-| Wall Push-Up (`wall-push-up`) | NO | - | - | - | - | - | - | - | PENDING |
-| Parallel Bar Dip (`dips`) | NO | - | - | - | - | - | - | - | PENDING |
-| Standing Overhead Press (`overhead-press`) | NO | - | - | - | - | - | - | - | PENDING |
-| Seated Dumbbell Shoulder Press (`seated-dumbbell-shoulder-press`) | NO | - | - | - | - | - | - | - | PENDING |
-| Pike Push-Up (`pike-push-up`) | NO | - | - | - | - | - | - | - | PENDING |
-| Half-Kneeling Landmine Press (`landmine-press`) | NO | - | - | - | - | - | - | - | PENDING |
-| Push Press (`push-press`) | NO | - | - | - | - | - | - | - | PENDING |
-| Dumbbell Lateral Raise (`lateral-raise`) | NO | - | - | - | - | - | - | - | PENDING |
-| Cable Triceps Pushdown (`triceps-pushdown`) | NO | - | - | - | - | - | - | - | PENDING |
-| Pull-Up (`pull-up`) | NO | - | - | - | - | - | - | - | PENDING |
-| Band-Assisted Pull-Up (`band-assisted-pull-up`) | NO | - | - | - | - | - | - | - | PENDING |
-| Chin-Up (`chin-up`) | NO | - | - | - | - | - | - | - | PENDING |
-| Lat Pulldown (`lat-pulldown`) | NO | - | - | - | - | - | - | - | PENDING |
-| Bent-Over Barbell Row (`barbell-row`) | NO | - | - | - | - | - | - | - | PENDING |
-| One-Arm Dumbbell Row (`one-arm-dumbbell-row`) | NO | - | - | - | - | - | - | - | PENDING |
-| Seated Cable Row (`seated-cable-row`) | NO | - | - | - | - | - | - | - | PENDING |
-| Resistance Band Row (`band-row`) | NO | - | - | - | - | - | - | - | PENDING |
-| Inverted Row (`inverted-row`) | NO | - | - | - | - | - | - | - | PENDING |
-| Face Pull (`face-pull`) | NO | - | - | - | - | - | - | - | PENDING |
-| Band Pull-Apart (`band-pull-apart`) | NO | - | - | - | - | - | - | - | PENDING |
-| Dumbbell Biceps Curl (`dumbbell-curl`) | YES | review | NOT REVIEWED | NOT REVIEWED | NOT REVIEWED | NOT REVIEWED | PASS | NOT TESTED | PENDING |
-| Hammer Curl (`hammer-curl`) | NO | - | - | - | - | - | - | - | PENDING |
-| Front Plank (`plank`) | NO | - | - | - | - | - | - | - | PENDING |
-| Side Plank (`side-plank`) | NO | - | - | - | - | - | - | - | PENDING |
-| Dead Bug (`dead-bug`) | NO | - | - | - | - | - | - | - | PENDING |
-| Bird Dog (`bird-dog`) | NO | - | - | - | - | - | - | - | PENDING |
-| Pallof Press (`pallof-press`) | NO | - | - | - | - | - | - | - | PENDING |
-| Cable Woodchop (`cable-woodchop`) | NO | - | - | - | - | - | - | - | PENDING |
-| Hanging Knee Raise (`hanging-knee-raise`) | NO | - | - | - | - | - | - | - | PENDING |
-| Ab Wheel Rollout (`ab-wheel-rollout`) | NO | - | - | - | - | - | - | - | PENDING |
-| Medicine Ball Rotational Throw (`medicine-ball-rotational-throw`) | NO | - | - | - | - | - | - | - | PENDING |
-| Farmer's Carry (`farmers-carry`) | NO | - | - | - | - | - | - | - | PENDING |
-| Suitcase Carry (`suitcase-carry`) | NO | - | - | - | - | - | - | - | PENDING |
-| Sandbag Bear-Hug Carry (`sandbag-bear-hug-carry`) | NO | - | - | - | - | - | - | - | PENDING |
-| Sandbag to Shoulder (`sandbag-to-shoulder`) | NO | - | - | - | - | - | - | - | PENDING |
-| Sled Push (`sled-push`) | NO | - | - | - | - | - | - | - | PENDING |
-| Dead Hang (`dead-hang`) | NO | - | - | - | - | - | - | - | PENDING |
-| Power Clean (`power-clean`) | NO | - | - | - | - | - | - | - | PENDING |
-| Box Jump (`box-jump`) | NO | - | - | - | - | - | - | - | PENDING |
-| Broad Jump (`broad-jump`) | NO | - | - | - | - | - | - | - | PENDING |
-| Medicine Ball Slam (`medicine-ball-slam`) | NO | - | - | - | - | - | - | - | PENDING |
-| Burpee (`burpee`) | NO | - | - | - | - | - | - | - | PENDING |
-| Step-Back Burpee (No Jump) (`step-back-burpee`) | NO | - | - | - | - | - | - | - | PENDING |
-| Sprawl (`sprawl`) | NO | - | - | - | - | - | - | - | PENDING |
-| Mountain Climber (`mountain-climber`) | NO | - | - | - | - | - | - | - | PENDING |
-| Bear Crawl (`bear-crawl`) | NO | - | - | - | - | - | - | - | PENDING |
-| Jump Rope (`jump-rope`) | NO | - | - | - | - | - | - | - | PENDING |
-| Rowing Machine (`rowing-intervals`) | NO | - | - | - | - | - | - | - | PENDING |
-| Air / Stationary Bike (`bike-intervals`) | NO | - | - | - | - | - | - | - | PENDING |
-| Brisk / Incline Walk (`brisk-walk`) | NO | - | - | - | - | - | - | - | PENDING |
-| Shadowboxing (`shadowboxing`) | NO | - | - | - | - | - | - | - | PENDING |
-| Heavy Bag Rounds (`heavy-bag-rounds`) | NO | - | - | - | - | - | - | - | PENDING |
-| Battle Rope Waves (`battle-rope-waves`) | NO | - | - | - | - | - | - | - | PENDING |
-| Lateral Shuffle (`lateral-shuffle`) | NO | - | - | - | - | - | - | - | PENDING |
-| Hip Escape (Shrimp) (`hip-escape`) | NO | - | - | - | - | - | - | - | PENDING |
-| Cat-Cow (`cat-cow`) | NO | - | - | - | - | - | - | - | PENDING |
-| World's Greatest Stretch (`worlds-greatest-stretch`) | NO | - | - | - | - | - | - | - | PENDING |
-| 90/90 Hip Switch (`90-90-hip-switch`) | NO | - | - | - | - | - | - | - | PENDING |
-| Thoracic Open Book (`thoracic-open-book`) | NO | - | - | - | - | - | - | - | PENDING |
-| Couch Stretch (`couch-stretch`) | NO | - | - | - | - | - | - | - | PENDING |
-| Supine Hamstring Stretch (`supine-hamstring-stretch`) | NO | - | - | - | - | - | - | - | PENDING |
-| Child's Pose (`childs-pose`) | NO | - | - | - | - | - | - | - | PENDING |
-| Knee-to-Wall Ankle Mobility (`ankle-knee-to-wall`) | NO | - | - | - | - | - | - | - | PENDING |
-| Band Shoulder Pass-Through (`band-pass-through`) | NO | - | - | - | - | - | - | - | PENDING |
-| Deep Squat Hold (`deep-squat-hold`) | NO | - | - | - | - | - | - | - | PENDING |
-| Figure-Four Glute Stretch (`figure-four-stretch`) | NO | - | - | - | - | - | - | - | PENDING |
-| Single-Leg Balance (`single-leg-balance`) | NO | - | - | - | - | - | - | - | PENDING |
-| Standing March (`standing-march`) | NO | - | - | - | - | - | - | - | PENDING |
-| Paused Bench Press (`paused-bench-press`) | NO | - | - | - | - | - | - | - | PENDING |
-| Pin Press (Bench) (`pin-press`) | NO | - | - | - | - | - | - | - | PENDING |
-| Pause Squat (`pause-squat`) | NO | - | - | - | - | - | - | - | PENDING |
-| Tempo Squat (`tempo-squat`) | NO | - | - | - | - | - | - | - | PENDING |
-| Barbell Box Squat (`box-squat`) | NO | - | - | - | - | - | - | - | PENDING |
-| Deficit Deadlift (`deficit-deadlift`) | NO | - | - | - | - | - | - | - | PENDING |
-| Block Pull (Rack Pull) (`block-pull`) | NO | - | - | - | - | - | - | - | PENDING |
-| Barbell Good Morning (`good-morning`) | NO | - | - | - | - | - | - | - | PENDING |
-| Log Clean & Press (`log-press`) | NO | - | - | - | - | - | - | - | PENDING |
-| Yoke Carry (`yoke-carry`) | NO | - | - | - | - | - | - | - | PENDING |
-| Atlas Stone Load (`atlas-stone-load`) | NO | - | - | - | - | - | - | - | PENDING |
-| A-Skip (`a-skip`) | NO | - | - | - | - | - | - | - | PENDING |
-| Acceleration Wall Drill (`wall-drill`) | NO | - | - | - | - | - | - | - | PENDING |
-| Acceleration Sprint (`acceleration-sprint`) | NO | - | - | - | - | - | - | - | PENDING |
-| Flying Sprint (`flying-sprint`) | NO | - | - | - | - | - | - | - | PENDING |
-| Bounding (`bounding`) | NO | - | - | - | - | - | - | - | PENDING |
-| Pogo Jumps (`pogo-jumps`) | NO | - | - | - | - | - | - | - | PENDING |
-| 5-10-5 Pro Agility Shuttle (`pro-agility-shuttle`) | NO | - | - | - | - | - | - | - | PENDING |
-| T-Drill (`t-drill`) | NO | - | - | - | - | - | - | - | PENDING |
-| Three-Cone (L) Drill (`three-cone-drill`) | NO | - | - | - | - | - | - | - | PENDING |
-| Agility Ladder Drills (`agility-ladder-drills`) | NO | - | - | - | - | - | - | - | PENDING |
-| Reactive Mirror Drill (`reactive-mirror-drill`) | NO | - | - | - | - | - | - | - | PENDING |
-| Lateral Bound (Skater Jump) (`lateral-bound`) | NO | - | - | - | - | - | - | - | PENDING |
-| Easy Zone 2 Run (`zone-2-run`) | NO | - | - | - | - | - | - | - | PENDING |
-| Run/Walk Intervals (`run-walk-intervals`) | NO | - | - | - | - | - | - | - | PENDING |
-| Running Intervals (`running-intervals`) | NO | - | - | - | - | - | - | - | PENDING |
-| Stair Climber / Stair Climb (`stair-climb`) | NO | - | - | - | - | - | - | - | PENDING |
-| Cable Chest Fly (`cable-chest-fly`) | NO | - | - | - | - | - | - | - | PENDING |
-| Rear Delt Fly (`rear-delt-fly`) | NO | - | - | - | - | - | - | - | PENDING |
-| Overhead Triceps Extension (`overhead-triceps-extension`) | NO | - | - | - | - | - | - | - | PENDING |
-| Axle Clean & Press (`axle-clean-and-press`) | NO | - | - | - | - | - | - | - | PENDING |
-| One-Arm Dumbbell Push Press (`one-arm-dumbbell-push-press`) | NO | - | - | - | - | - | - | - | PENDING |
-| Farmer's Walk (Strongman Handles) (`strongman-farmers-walk`) | NO | - | - | - | - | - | - | - | PENDING |
-| Trap Bar Carry (`trap-bar-carry`) | NO | - | - | - | - | - | - | - | PENDING |
-| Keg Carry (`keg-carry`) | NO | - | - | - | - | - | - | - | PENDING |
-| Zercher Carry (`zercher-carry`) | NO | - | - | - | - | - | - | - | PENDING |
-| Zercher Squat (`zercher-squat`) | NO | - | - | - | - | - | - | - | PENDING |
-| Heavy Sled Drag (`sled-drag`) | NO | - | - | - | - | - | - | - | PENDING |
-| Arm-Over-Arm Sled Pull (`arm-over-arm-sled-pull`) | NO | - | - | - | - | - | - | - | PENDING |
-| Sandbag Load to Platform (`sandbag-load-over-bar`) | NO | - | - | - | - | - | - | - | PENDING |
-| Air Bike Sprint (`air-bike-sprint`) | NO | - | - | - | - | - | - | - | PENDING |
-| Neck Isometrics (4-Way) (`neck-isometrics`) | NO | - | - | - | - | - | - | - | PENDING |
-| Banded Neck Flexion & Extension (`band-neck-training`) | NO | - | - | - | - | - | - | - | PENDING |
-| Medicine Ball Shot Put Throw (`medicine-ball-shot-put`) | NO | - | - | - | - | - | - | - | PENDING |
-| Medicine Ball Scoop Toss (`medicine-ball-scoop-toss`) | NO | - | - | - | - | - | - | - | PENDING |
-| Landmine Rotation (`landmine-rotation`) | NO | - | - | - | - | - | - | - | PENDING |
-| Trap Bar Jump (`trap-bar-jump`) | NO | - | - | - | - | - | - | - | PENDING |
-| Copenhagen Plank (`copenhagen-plank`) | NO | - | - | - | - | - | - | - | PENDING |
-| Nordic Hamstring Curl (`nordic-hamstring-curl`) | NO | - | - | - | - | - | - | - | PENDING |
-| Band External Rotation (`band-external-rotation`) | NO | - | - | - | - | - | - | - | PENDING |
-| Hack Squat (Machine) (`hack-squat`) | NO | - | - | - | - | - | - | - | PENDING |
-| Machine Chest Press (`machine-chest-press`) | NO | - | - | - | - | - | - | - | PENDING |
-| Chest-Supported Row (`chest-supported-row`) | NO | - | - | - | - | - | - | - | PENDING |
-| Straight-Arm Pulldown (`straight-arm-pulldown`) | NO | - | - | - | - | - | - | - | PENDING |
-| Cable Lateral Raise (`cable-lateral-raise`) | NO | - | - | - | - | - | - | - | PENDING |
-| Incline Dumbbell Curl (`incline-dumbbell-curl`) | NO | - | - | - | - | - | - | - | PENDING |
-| Seated Leg Curl (`seated-leg-curl`) | NO | - | - | - | - | - | - | - | PENDING |
-| Seated Calf Raise (`seated-calf-raise`) | NO | - | - | - | - | - | - | - | PENDING |
-| Kneeling Cable Crunch (`cable-crunch`) | NO | - | - | - | - | - | - | - | PENDING |
-| Posing Practice (`posing-practice`) | NO | - | - | - | - | - | - | - | PENDING |
-| Hip Abduction (Machine or Band) (`hip-abduction`) | NO | - | - | - | - | - | - | - | PENDING |
-| Back Extension (45° Hyperextension) (`back-extension`) | NO | - | - | - | - | - | - | - | PENDING |
+| Dumbbell Biceps Curl (`dumbbell-curl`) | **FAILED** | PASS | PASS | FAIL | PASS | PASS | NOT TESTED | PENDING | Dumbbell shows a doubled outline for about 0.27 s at the fastest part of the lift (in the source footage), seen again on the reversed lowering. Needs a regenerated clip; this corrected version is the interim. |
+
+## Missing (blocked)
+
+Every exercise below is **MISSING** for the same reason: No clip yet. Generating one needs a video model that keeps the approved athlete; none can run or be reached from this environment (no GPU or ML runtime; model hosts and video generators blocked by its network policy; $0 budget). Needs a clip generated with the owner's own tools. Its ready-to-paste prompt is in `assets/exercise-demos-src/PROMPTS.md`; until its clip passes, the app keeps showing its existing animated illustration.
+
+| # | Exercise | Category | Equipment |
+| --- | --- | --- | --- |
+| 1 | Barbell Back Squat (`back-squat`) | strength | barbell, rack |
+| 2 | Barbell Front Squat (`front-squat`) | strength | barbell, rack |
+| 3 | Goblet Squat (`goblet-squat`) | strength | dumbbell, kettlebell |
+| 4 | Bodyweight Squat (`bodyweight-squat`) | strength | bodyweight |
+| 5 | Sit-to-Stand (Chair Squat) (`box-squat-to-chair`) | strength | bodyweight |
+| 6 | Leg Press (`leg-press`) | strength | machine |
+| 7 | Conventional Deadlift (`conventional-deadlift`) | strength | barbell |
+| 8 | Sumo Deadlift (`sumo-deadlift`) | strength | barbell |
+| 9 | Trap Bar Deadlift (`trap-bar-deadlift`) | strength | trap_bar |
+| 10 | Romanian Deadlift (`romanian-deadlift`) | strength | barbell, dumbbell |
+| 11 | Single-Leg Romanian Deadlift (`single-leg-rdl`) | strength | dumbbell, kettlebell, bodyweight |
+| 12 | Kettlebell Swing (`kettlebell-swing`) | conditioning | kettlebell |
+| 13 | Barbell Hip Thrust (`hip-thrust`) | strength | barbell, bench |
+| 14 | Glute Bridge (`glute-bridge`) | strength | bodyweight, mat |
+| 15 | Machine Leg Curl (`leg-curl`) | strength | machine |
+| 16 | Machine Leg Extension (`leg-extension`) | strength | machine |
+| 17 | Standing Calf Raise (`standing-calf-raise`) | strength | bodyweight, dumbbell, machine |
+| 18 | Dumbbell Walking Lunge (`walking-lunge`) | strength | dumbbell |
+| 19 | Reverse Lunge (`reverse-lunge`) | strength | bodyweight, dumbbell |
+| 20 | Bulgarian Split Squat (`bulgarian-split-squat`) | strength | bench, dumbbell, bodyweight |
+| 21 | Step-Up (`step-up`) | strength | box, bodyweight, dumbbell |
+| 22 | Barbell Bench Press (`bench-press`) | strength | barbell, bench, rack |
+| 23 | Dumbbell Bench Press (`dumbbell-bench-press`) | strength | dumbbell, bench |
+| 24 | Incline Dumbbell Press (`incline-dumbbell-press`) | strength | dumbbell, bench |
+| 25 | Close-Grip Bench Press (`close-grip-bench-press`) | strength | barbell, bench, rack |
+| 26 | Push-Up (`push-up`) | strength | bodyweight |
+| 27 | Incline Push-Up (`incline-push-up`) | strength | bodyweight, bench, box |
+| 28 | Wall Push-Up (`wall-push-up`) | strength | bodyweight |
+| 29 | Parallel Bar Dip (`dips`) | strength | dip_station |
+| 30 | Standing Overhead Press (`overhead-press`) | strength | barbell, rack |
+| 31 | Seated Dumbbell Shoulder Press (`seated-dumbbell-shoulder-press`) | strength | dumbbell, bench |
+| 32 | Pike Push-Up (`pike-push-up`) | strength | bodyweight |
+| 33 | Half-Kneeling Landmine Press (`landmine-press`) | strength | landmine, barbell |
+| 34 | Push Press (`push-press`) | plyometric | barbell, rack |
+| 35 | Dumbbell Lateral Raise (`lateral-raise`) | strength | dumbbell, cable, band |
+| 36 | Cable Triceps Pushdown (`triceps-pushdown`) | strength | cable, band |
+| 37 | Pull-Up (`pull-up`) | strength | pull_up_bar |
+| 38 | Band-Assisted Pull-Up (`band-assisted-pull-up`) | strength | pull_up_bar, band |
+| 39 | Chin-Up (`chin-up`) | strength | pull_up_bar |
+| 40 | Lat Pulldown (`lat-pulldown`) | strength | cable, machine |
+| 41 | Bent-Over Barbell Row (`barbell-row`) | strength | barbell |
+| 42 | One-Arm Dumbbell Row (`one-arm-dumbbell-row`) | strength | dumbbell, bench |
+| 43 | Seated Cable Row (`seated-cable-row`) | strength | cable, machine |
+| 44 | Resistance Band Row (`band-row`) | strength | band |
+| 45 | Inverted Row (`inverted-row`) | strength | barbell, rack, bodyweight |
+| 46 | Face Pull (`face-pull`) | strength | cable, band |
+| 47 | Band Pull-Apart (`band-pull-apart`) | strength | band |
+| 48 | Hammer Curl (`hammer-curl`) | strength | dumbbell |
+| 49 | Front Plank (`plank`) | core | bodyweight, mat |
+| 50 | Side Plank (`side-plank`) | core | bodyweight, mat |
+| 51 | Dead Bug (`dead-bug`) | core | bodyweight, mat |
+| 52 | Bird Dog (`bird-dog`) | core | bodyweight, mat |
+| 53 | Pallof Press (`pallof-press`) | core | cable, band |
+| 54 | Cable Woodchop (`cable-woodchop`) | core | cable, band |
+| 55 | Hanging Knee Raise (`hanging-knee-raise`) | core | pull_up_bar |
+| 56 | Ab Wheel Rollout (`ab-wheel-rollout`) | core | ab_wheel |
+| 57 | Medicine Ball Rotational Throw (`medicine-ball-rotational-throw`) | plyometric | medicine_ball |
+| 58 | Farmer's Carry (`farmers-carry`) | strength | dumbbell, kettlebell, trap_bar |
+| 59 | Suitcase Carry (`suitcase-carry`) | core | dumbbell, kettlebell |
+| 60 | Sandbag Bear-Hug Carry (`sandbag-bear-hug-carry`) | strength | sandbag |
+| 61 | Sandbag to Shoulder (`sandbag-to-shoulder`) | strength | sandbag |
+| 62 | Sled Push (`sled-push`) | conditioning | sled |
+| 63 | Dead Hang (`dead-hang`) | strength | pull_up_bar |
+| 64 | Power Clean (`power-clean`) | plyometric | barbell |
+| 65 | Box Jump (`box-jump`) | plyometric | box |
+| 66 | Broad Jump (`broad-jump`) | plyometric | bodyweight |
+| 67 | Medicine Ball Slam (`medicine-ball-slam`) | conditioning | medicine_ball |
+| 68 | Burpee (`burpee`) | conditioning | bodyweight |
+| 69 | Step-Back Burpee (No Jump) (`step-back-burpee`) | conditioning | bodyweight |
+| 70 | Sprawl (`sprawl`) | conditioning | bodyweight, mat |
+| 71 | Mountain Climber (`mountain-climber`) | conditioning | bodyweight |
+| 72 | Bear Crawl (`bear-crawl`) | conditioning | bodyweight |
+| 73 | Jump Rope (`jump-rope`) | cardio | jump_rope |
+| 74 | Rowing Machine (`rowing-intervals`) | cardio | rower |
+| 75 | Air / Stationary Bike (`bike-intervals`) | cardio | bike |
+| 76 | Brisk / Incline Walk (`brisk-walk`) | cardio | bodyweight |
+| 77 | Shadowboxing (`shadowboxing`) | conditioning | bodyweight |
+| 78 | Heavy Bag Rounds (`heavy-bag-rounds`) | conditioning | heavy_bag |
+| 79 | Battle Rope Waves (`battle-rope-waves`) | conditioning | battle_rope |
+| 80 | Lateral Shuffle (`lateral-shuffle`) | conditioning | bodyweight |
+| 81 | Hip Escape (Shrimp) (`hip-escape`) | conditioning | mat |
+| 82 | Cat-Cow (`cat-cow`) | mobility | mat |
+| 83 | World's Greatest Stretch (`worlds-greatest-stretch`) | mobility | bodyweight |
+| 84 | 90/90 Hip Switch (`90-90-hip-switch`) | mobility | mat |
+| 85 | Thoracic Open Book (`thoracic-open-book`) | mobility | mat |
+| 86 | Couch Stretch (`couch-stretch`) | mobility | mat |
+| 87 | Supine Hamstring Stretch (`supine-hamstring-stretch`) | mobility | band, mat |
+| 88 | Child's Pose (`childs-pose`) | mobility | mat |
+| 89 | Knee-to-Wall Ankle Mobility (`ankle-knee-to-wall`) | mobility | bodyweight |
+| 90 | Band Shoulder Pass-Through (`band-pass-through`) | mobility | band |
+| 91 | Deep Squat Hold (`deep-squat-hold`) | mobility | bodyweight |
+| 92 | Figure-Four Glute Stretch (`figure-four-stretch`) | mobility | mat |
+| 93 | Single-Leg Balance (`single-leg-balance`) | mobility | bodyweight |
+| 94 | Standing March (`standing-march`) | cardio | bodyweight |
+| 95 | Paused Bench Press (`paused-bench-press`) | strength | barbell, bench, rack |
+| 96 | Pin Press (Bench) (`pin-press`) | strength | barbell, rack, bench |
+| 97 | Pause Squat (`pause-squat`) | strength | barbell, rack |
+| 98 | Tempo Squat (`tempo-squat`) | strength | barbell, rack |
+| 99 | Barbell Box Squat (`box-squat`) | strength | barbell, rack, box |
+| 100 | Deficit Deadlift (`deficit-deadlift`) | strength | barbell |
+| 101 | Block Pull (Rack Pull) (`block-pull`) | strength | barbell, rack |
+| 102 | Barbell Good Morning (`good-morning`) | strength | barbell, rack |
+| 103 | Log Clean & Press (`log-press`) | strength | strongman_implements |
+| 104 | Yoke Carry (`yoke-carry`) | strength | strongman_implements |
+| 105 | Atlas Stone Load (`atlas-stone-load`) | strength | strongman_implements |
+| 106 | A-Skip (`a-skip`) | plyometric | bodyweight |
+| 107 | Acceleration Wall Drill (`wall-drill`) | plyometric | bodyweight |
+| 108 | Acceleration Sprint (`acceleration-sprint`) | conditioning | bodyweight |
+| 109 | Flying Sprint (`flying-sprint`) | conditioning | bodyweight |
+| 110 | Bounding (`bounding`) | plyometric | bodyweight |
+| 111 | Pogo Jumps (`pogo-jumps`) | plyometric | bodyweight |
+| 112 | 5-10-5 Pro Agility Shuttle (`pro-agility-shuttle`) | conditioning | bodyweight |
+| 113 | T-Drill (`t-drill`) | conditioning | bodyweight |
+| 114 | Three-Cone (L) Drill (`three-cone-drill`) | conditioning | bodyweight |
+| 115 | Agility Ladder Drills (`agility-ladder-drills`) | conditioning | bodyweight |
+| 116 | Reactive Mirror Drill (`reactive-mirror-drill`) | conditioning | bodyweight |
+| 117 | Lateral Bound (Skater Jump) (`lateral-bound`) | plyometric | bodyweight |
+| 118 | Easy Zone 2 Run (`zone-2-run`) | cardio | bodyweight |
+| 119 | Run/Walk Intervals (`run-walk-intervals`) | cardio | bodyweight |
+| 120 | Running Intervals (`running-intervals`) | cardio | bodyweight |
+| 121 | Stair Climber / Stair Climb (`stair-climb`) | cardio | bodyweight |
+| 122 | Cable Chest Fly (`cable-chest-fly`) | strength | cable, dumbbell |
+| 123 | Rear Delt Fly (`rear-delt-fly`) | strength | dumbbell, cable, machine |
+| 124 | Overhead Triceps Extension (`overhead-triceps-extension`) | strength | dumbbell, cable |
+| 125 | Axle Clean & Press (`axle-clean-and-press`) | strength | strongman_implements |
+| 126 | One-Arm Dumbbell Push Press (`one-arm-dumbbell-push-press`) | strength | dumbbell, kettlebell |
+| 127 | Farmer's Walk (Strongman Handles) (`strongman-farmers-walk`) | strength | strongman_implements |
+| 128 | Trap Bar Carry (`trap-bar-carry`) | strength | trap_bar |
+| 129 | Keg Carry (`keg-carry`) | strength | strongman_implements |
+| 130 | Zercher Carry (`zercher-carry`) | strength | barbell, rack |
+| 131 | Zercher Squat (`zercher-squat`) | strength | barbell, rack |
+| 132 | Heavy Sled Drag (`sled-drag`) | strength | sled |
+| 133 | Arm-Over-Arm Sled Pull (`arm-over-arm-sled-pull`) | strength | sled |
+| 134 | Sandbag Load to Platform (`sandbag-load-over-bar`) | strength | sandbag |
+| 135 | Air Bike Sprint (`air-bike-sprint`) | cardio | bike |
+| 136 | Neck Isometrics (4-Way) (`neck-isometrics`) | strength | bodyweight |
+| 137 | Banded Neck Flexion & Extension (`band-neck-training`) | strength | band |
+| 138 | Medicine Ball Shot Put Throw (`medicine-ball-shot-put`) | plyometric | medicine_ball |
+| 139 | Medicine Ball Scoop Toss (`medicine-ball-scoop-toss`) | plyometric | medicine_ball |
+| 140 | Landmine Rotation (`landmine-rotation`) | core | landmine, barbell |
+| 141 | Trap Bar Jump (`trap-bar-jump`) | plyometric | trap_bar |
+| 142 | Copenhagen Plank (`copenhagen-plank`) | core | bench, bodyweight |
+| 143 | Nordic Hamstring Curl (`nordic-hamstring-curl`) | strength | bodyweight, mat |
+| 144 | Band External Rotation (`band-external-rotation`) | strength | band, cable |
+| 145 | Hack Squat (Machine) (`hack-squat`) | strength | machine |
+| 146 | Machine Chest Press (`machine-chest-press`) | strength | machine |
+| 147 | Chest-Supported Row (`chest-supported-row`) | strength | dumbbell, bench, machine |
+| 148 | Straight-Arm Pulldown (`straight-arm-pulldown`) | strength | cable, band |
+| 149 | Cable Lateral Raise (`cable-lateral-raise`) | strength | cable |
+| 150 | Incline Dumbbell Curl (`incline-dumbbell-curl`) | strength | dumbbell, bench |
+| 151 | Seated Leg Curl (`seated-leg-curl`) | strength | machine |
+| 152 | Seated Calf Raise (`seated-calf-raise`) | strength | machine, dumbbell |
+| 153 | Kneeling Cable Crunch (`cable-crunch`) | core | cable, band |
+| 154 | Posing Practice (`posing-practice`) | conditioning | bodyweight |
+| 155 | Hip Abduction (Machine or Band) (`hip-abduction`) | strength | machine, band |
+| 156 | Back Extension (45° Hyperextension) (`back-extension`) | strength | bench |

@@ -45,6 +45,9 @@ const manifest = fs.existsSync(MANIFEST) ? JSON.parse(fs.readFileSync(MANIFEST, 
 manifest.frame = { width: W, height: H };
 const slugs = fs.existsSync(SRC) ? fs.readdirSync(SRC).filter((d) => fs.statSync(path.join(SRC, d)).isDirectory() && !d.startsWith("_") && (!only || only.includes(d))) : [];
 if (!slugs.length) console.log(`no sources in ${SRC}`);
+// A full build mirrors the source folders: an exercise whose folder is gone leaves the manifest (its old files stay
+// on disk until removed by hand, so nothing is deleted silently).
+if (!only) for (const slug of Object.keys(manifest.demos)) if (!slugs.includes(slug)) { delete manifest.demos[slug]; console.log(`${slug}: no source folder; removed from the manifest`); }
 const report = [];
 for (const slug of slugs) {
   const dir = path.join(SRC, slug);

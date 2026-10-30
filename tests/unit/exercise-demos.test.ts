@@ -30,17 +30,18 @@ describe("2.5D exercise demonstrations manifest", () => {
 
 describe("the dumbbell curl's moving demonstration", () => {
   const a = getDemoAsset("dumbbell-curl");
-  it("is a real video, in its own portrait shape, playing once (its loop does not close)", () => {
+  it("is a real video, in its own portrait shape, looping (the corrected clip's loop closes)", () => {
     expect(a?.mode).toBe("video");
     expect(a?.mp4).toBe("/exercise-demos/dumbbell-curl/loop.mp4");
     expect(a?.webm).toBe("/exercise-demos/dumbbell-curl/loop.webm");
     expect(a?.width).toBe(540);
     expect(a?.height).toBe(788);
-    expect(a?.loop).toBe(false);
-    expect(a?.durationMs).toBeGreaterThan(7000);
+    expect(a?.loop).toBe(true);
+    expect(a?.durationMs).toBeGreaterThan(3000);
+    expect(a?.phases.map((p) => p.label)).toEqual(["Start", "Top"]);
   });
-  it("keeps the owner's file as delivered and awaits the owner's approval", () => {
-    expect(a?.checks?.copied).toBe(true);
+  it("is the corrected version 2, still awaiting the owner's approval", () => {
+    expect(a?.version).toBe(2);
     expect(a?.status).not.toBe("approved");
   });
 });
