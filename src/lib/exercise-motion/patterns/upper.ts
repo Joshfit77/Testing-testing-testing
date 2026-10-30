@@ -698,11 +698,12 @@ export function row(o: RowOpts): MotionDef {
       const base = pose({ trunk: 0, ...both({ hip: 86, knee: 22, ankle: -10 }) });
       const W = worldPts(base, root);
       const foot = W.ankleR;
-      const reachP = { ...base, trunk: 18, neck: -6, hipL: base.hipL + 18, hipR: base.hipR + 18 };
+      // Sit tall: a small forward lean at the reach and upright at the finish, so the torso does not rock.
+      const reachP = { ...base, trunk: 9, neck: -4, hipL: base.hipL + 9, hipR: base.hipR + 9 };
       const W2 = worldPts(reachP, root);
       const front: Vec = [W2.shoulder[0] + ARM - 3, W2.shoulder[1] - 8];
       const pullTo: Vec = [W.belly[0] + 3, W.belly[1] + 2];
-      const pullP = { ...base, trunk: -4, hipL: base.hipL - 4, hipR: base.hipR - 4 };
+      const pullP = { ...base, trunk: 0 };
       return {
         id: o.id,
         view: "side",
@@ -889,7 +890,8 @@ export function armIsolation(o: CurlOpts): MotionDef {
   }
   const base = pose({ ...stanceLegs(2, 5, 0), ...both({ sh: 4, armD: 6 }) });
   const down0 = { ...base, ...both({ el: 6 }) };
-  const up = { ...base, ...both({ sh: 14, el: 142 }) };
+  // Elbows stay by the sides: the upper arm moves forward only a few degrees at the top of the curl.
+  const up = { ...base, ...both({ sh: 8, el: 140 }) };
   const hammer = o.kind === "hammer";
   const props: PropDef[] =
     o.kind === "band-curl"

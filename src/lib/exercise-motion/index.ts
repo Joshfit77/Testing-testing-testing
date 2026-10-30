@@ -12,7 +12,8 @@
 import { EXERCISE_MOTIONS, fallbackMotion } from "../../data/exercise-motions";
 import { mountMotion, type MotionController, type MountOptions } from "./mount";
 import { compileMotion, evaluate, motionBounds, stillFrame } from "./timeline";
-import { fitCamera, renderFrame } from "./render";
+import { fitCamera, renderFrame, type FigureStyle } from "./render";
+import { highlightFor, type Highlight } from "./athlete";
 import type { ExerciseMeta, MotionDef } from "./types";
 
 const cache = new Map<string, MotionDef>();
@@ -52,7 +53,7 @@ export function mountExerciseMotion(element: HTMLElement, slug: string, options:
 }
 
 /** Draw a single still frame (phase 0..1 of the loop, default the motion's still phase) into a canvas. */
-export function drawExerciseStill(canvas: HTMLCanvasElement, slug: string, opts: { meta?: ExerciseMeta; phase?: number; width?: number; height?: number } = {}): void {
+export function drawExerciseStill(canvas: HTMLCanvasElement, slug: string, opts: { meta?: ExerciseMeta; phase?: number; width?: number; height?: number; style?: FigureStyle; highlight?: Highlight } = {}): void {
   const def = getMotion(slug, opts.meta);
   const c = compileMotion(def);
   const w = opts.width ?? canvas.clientWidth ?? 160;
@@ -63,8 +64,8 @@ export function drawExerciseStill(canvas: HTMLCanvasElement, slug: string, opts:
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
   const frame = opts.phase === undefined ? stillFrame(c) : evaluate(c, opts.phase * c.duration);
-  renderFrame(ctx, frame, fitCamera(motionBounds(c), w, h, dpr, def.mirror), { floor: def.floor });
+  renderFrame(ctx, frame, fitCamera(motionBounds(c), w, h, dpr, def.mirror), { floor: def.floor, style: opts.style, highlight: opts.highlight });
 }
 
-export { EXERCISE_MOTIONS, fallbackMotion, mountMotion, compileMotion, evaluate, motionBounds, renderFrame, fitCamera };
-export type { MotionController, MountOptions, MotionDef, ExerciseMeta };
+export { EXERCISE_MOTIONS, fallbackMotion, mountMotion, compileMotion, evaluate, motionBounds, renderFrame, fitCamera, highlightFor };
+export type { MotionController, MountOptions, MotionDef, ExerciseMeta, FigureStyle, Highlight };

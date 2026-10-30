@@ -1,5 +1,7 @@
 import { BODY, add, down, frontOf, up } from "./skeleton";
 import { drawProp } from "./props";
+import { drawAthlete, type Highlight } from "./athlete";
+import { athleteLayer, drawPropAthlete, extraLayer } from "./props-athlete";
 import type { Frame, Vec } from "./types";
 
 export interface Palette {
@@ -37,11 +39,11 @@ export interface Bounds {
   y1: number;
 }
 
-/** Fit the motion's bounds into a canvas. */
-export function fitCamera(b: Bounds, w: number, h: number, dpr: number, mirror = false): Camera {
+/** Fit the motion's bounds into a canvas; `insetBottom` (CSS px) keeps the figure above controls drawn over the bottom. */
+export function fitCamera(b: Bounds, w: number, h: number, dpr: number, mirror = false, insetBottom = 0): Camera {
   const padX = 0.06 * w;
   const padTop = 0.07 * h;
-  const padBottom = 0.12 * h;
+  const padBottom = 0.12 * h + insetBottom;
   const bw = Math.max(60, b.x1 - b.x0);
   const bh = Math.max(60, b.y1 - Math.min(0, b.y0));
   const scale = Math.min((w - 2 * padX) / bw, (h - padTop - padBottom) / bh);
@@ -51,10 +53,16 @@ export function fitCamera(b: Bounds, w: number, h: number, dpr: number, mirror =
   return { scale, ox, oy, w, h, dpr, mirror };
 }
 
+export type FigureStyle = "classic" | "athlete";
+
 export interface RenderOptions {
   /** Floor style ("none" for top-down views). */
   floor?: "plain" | "mat" | "none";
   time?: number;
+  /** "classic": the gold figure (default); "athlete": the black-and-gold muscular athlete (athlete.ts). */
+  style?: FigureStyle;
+  /** Athlete look: the muscles that glow (see highlightFor). */
+  highlight?: Highlight;
 }
 
 /** Draw one frame. The context is reset and the whole canvas repainted. */
@@ -72,6 +80,19 @@ export function renderFrame(ctx: CanvasRenderingContext2D, frame: Frame, cam: Ca
   if (opts.floor !== "none") drawShadow(ctx, frame);
   ctx.globalAlpha = frame.alpha;
   const t = opts.time ?? 0;
+  if (opts.style === "athlete") {
+    const layerA = (name: string) => {
+      for (const p of frame.props) {
+        if (athleteLayer(p, frame) === name && !drawPropAthlete(ctx, p, frame)) drawProp(ctx, p, frame, t);
+        if (extraLayer(p, frame) === name) drawPropAthlete(ctx, p, frame, "extra");
+      }
+    };
+    layerA("back");
+    drawAthlete(ctx, frame, layerA, opts.highlight);
+    layerA("front");
+    ctx.globalAlpha = 1;
+    return;
+  }
   const layer = (name: string) => {
     for (const p of frame.props) if ((p.layer ?? p.def.layer ?? "near") === name) drawProp(ctx, p, frame, t);
   };

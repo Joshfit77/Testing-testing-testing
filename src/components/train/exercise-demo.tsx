@@ -10,14 +10,24 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { ExerciseMeta } from "@/lib/exercise-motion/types";
-import { getDemoAsset } from "@/lib/exercise-demos";
+import { shownDemoAsset as getDemoAsset } from "@/lib/exercise-demos";
+import { athleteLookInReview, usesAthleteLook } from "@/lib/athlete-look";
 import { ExerciseDemo25D, ExerciseDemo25DStill } from "./exercise-demo-25d";
 
 type MotionModule = typeof import("@/lib/exercise-motion");
+type Highlight = ReturnType<MotionModule["highlightFor"]>;
 
 // The motion library is loaded on demand so pages that never show a demo don't pay for it.
 let modPromise: Promise<MotionModule> | null = null;
 const loadMotion = () => (modPromise ??= import("@/lib/exercise-motion"));
+
+/** The athlete look's settings for an exercise: its trained muscles (loaded with the catalog, on demand). */
+async function athleteLook(slug: string, m: MotionModule): Promise<{ style: "athlete"; highlight: Highlight } | null> {
+  if (!usesAthleteLook(slug)) return null;
+  const { EXERCISES } = await import("@/data/exercises");
+  const e = EXERCISES.find((x) => x.slug === slug);
+  return { style: "athlete", highlight: m.highlightFor(e?.primary ?? [], e?.secondary ?? []) };
+}
 
 export interface ExerciseDemoProps {
   slug: string;
@@ -56,13 +66,18 @@ export function ExerciseIllustration({
     if (!el) return;
     let destroyed = false;
     let ctrl: { destroy(): void } | null = null;
-    void loadMotion().then((m) => {
+    void loadMotion().then(async (m) => {
+      const look = await athleteLook(slug, m);
       if (destroyed || !host.current) return;
       const parsed = JSON.parse(metaKey) as Omit<ExerciseMeta, "slug">;
+      const review = athleteLookInReview(slug);
       ctrl = m.mountExerciseMotion(el, slug, {
         autoplay,
         controls,
-        badge: controls ? "Animated demo" : "",
+        ...(look ?? {}),
+        styleToggle: controls && review,
+        controlsInset: look ? 74 : 0,
+        badge: controls ? (look && review ? "New athlete look · awaiting approval" : "Animated demo") : "",
         meta: { slug, name, ...parsed },
         label: `Animated demonstration of ${name}. ${
           m.getMotion(slug, { slug, name, ...parsed }).label
@@ -146,7 +161,7 @@ export function ExerciseDemoMini({
               slug={slug}
               name={name}
               meta={meta}
-              className={cn("mt-3 w-full rounded-xl", getDemoAsset(slug) ? "max-h-[60vh]" : "aspect-video")}
+              className={cn("mt-3 w-full rounded-xl", getDemoAsset(slug) ? "max-h-[60vh]" : usesAthleteLook(slug) ? "aspect-[4/3]" : "aspect-video")}
             />
           ) : null}
           <p className="mt-2 text-[0.6875rem] text-muted-foreground">
@@ -187,13 +202,15 @@ function IllustrationThumb({
     const draw = () => {
       if (done) return;
       done = true;
-      void loadMotion().then((m) => {
+      void loadMotion().then(async (m) => {
+        const look = await athleteLook(slug, m);
         if (!ref.current) return;
         const r = canvas.getBoundingClientRect();
         m.drawExerciseStill(canvas, slug, {
           meta: { slug, name, ...(JSON.parse(metaKey) as object) },
           width: r.width || 96,
           height: r.height || 72,
+          ...(look ?? {}),
         });
       });
     };

@@ -1,4 +1,6 @@
 // Verifies the dumbbell curl's 2.5D video inside the real app at iPhone 15 size and records it (Chromium; not a phone).
+// While the curl is in the athlete-look preview (src/lib/athlete-look.ts) the app shows the 2D athlete instead, and this
+// script does not apply; scripts/exercise-review/verify-athlete-look.mjs covers the preview.
 //   BASE=http://localhost:3000 CHROMIUM=<path, optional> node scripts/exercise-demos/verify-curl.mjs <outdir>
 // Proves the curl's video plays inside the real app at iPhone 15 size, records it, and checks every surface and every
 // finger control: tap, sideways scrub, scroll, position bar, arrow keys, Normal / 0.5x (the real half-speed file),

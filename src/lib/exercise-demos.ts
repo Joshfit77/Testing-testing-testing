@@ -9,6 +9,7 @@
  * folder's meta.json and the build copies it here.
  */
 import manifest from "@/data/exercise-demos.json";
+import { usesAthleteLook } from "@/lib/athlete-look";
 
 export type DemoMode = "video" | "sequence" | "keyframes" | "poster";
 export type DemoStatus = "stand-in" | "review" | "approved";
@@ -110,6 +111,14 @@ export function has25dDemo(slug: string): boolean {
 
 export function getDemoAsset(slug: string): ExerciseDemoAsset | null {
   return EXERCISE_DEMOS.demos[slug] ?? null;
+}
+
+/**
+ * The 2.5D asset the app shows for an exercise: none while the exercise is drawn with the new athlete look (the 2D
+ * animation then takes its place everywhere; the asset stays in the manifest).
+ */
+export function shownDemoAsset(slug: string): ExerciseDemoAsset | null {
+  return usesAthleteLook(slug) ? null : getDemoAsset(slug);
 }
 
 /** Whether the asset has something that moves (a loop or more than one phase still). */

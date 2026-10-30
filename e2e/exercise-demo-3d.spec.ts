@@ -2,20 +2,21 @@ import { expect, test } from "@playwright/test";
 import { completeOnboarding, signUpAndConfirm, uniqueEmail } from "./helpers";
 
 // The 3D anatomical figure is kept isolated on its own showcase page (/train/3d): the exercise library and the workout
-// show the 2.5D video where one exists and the animated illustration everywhere else. Runs on software WebGL
+// show the 2D animation (the new athlete look on the exercises in review, the classic figure elsewhere). Runs on software WebGL
 // (playwright.config.ts).
 test.describe("3D anatomical demonstration", () => {
-  test("stays on its showcase page; the library and the workout show the 2.5D video or the illustration", async ({ page }) => {
+  test("stays on its showcase page; the library and the workout show the 2D animation", async ({ page }) => {
     test.setTimeout(300_000);
     await signUpAndConfirm(page, uniqueEmail("demo3d"));
     await completeOnboarding(page);
 
-    // Exercise pages: no 3D. The swing has no 2.5D clip yet, so it keeps its illustration; the curl has the 2.5D video.
+    // Exercise pages: no 3D. The swing keeps its classic figure; the curl shows the new athlete look (in review).
     await page.goto("/train/exercises/kettlebell-swing");
     await expect(page.locator("canvas[data-motion-canvas]")).toBeVisible();
+    await expect(page.locator("[data-exercise-motion]")).toHaveAttribute("data-style", "classic");
     await expect(page.getByTestId("exercise-demo-3d")).toHaveCount(0);
     await page.goto("/train/exercises/dumbbell-curl");
-    await expect(page.getByTestId("exercise-demo-25d")).toBeVisible();
+    await expect(page.locator("[data-exercise-motion]")).toHaveAttribute("data-style", "athlete");
     await expect(page.getByTestId("exercise-demo-3d")).toHaveCount(0);
 
     // The showcase page: the five exercises as tabs, the real player for the chosen one, switched in place.

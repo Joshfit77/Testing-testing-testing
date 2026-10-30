@@ -5,6 +5,7 @@
  *
  *   node scripts/exercise-review/render-motion.mjs pro-agility-shuttle,a-skip --out=out/motion [--speed=1,0.5]
  *        [--fps=30] [--w=640] [--h=480] [--root=/path/to/another/checkout] [--strip=12] [--cols=6] [--tag=after]
+ *        [--style=classic|athlete]   (athlete: the black-and-gold figure, its trained muscles glowing)
  *
  * Speed 0.5 is exactly what the player's 0.5× button does: the loop is sampled twice as densely, so the video lasts
  * twice as long. Output per slug and speed: <tag>-<slug>-<speed>x.mp4, plus <tag>-<slug>-strip.png (evenly spaced
@@ -30,10 +31,11 @@ const H = Number(flag("h", 480));
 const root = resolve(flag("root", join(here, "../..")));
 const tag = flag("tag", "after");
 const stripN = Number(flag("strip", 12));
+const style = flag("style", "classic");
 mkdirSync(join(outDir, "frames"), { recursive: true });
 
 const bundle = await build({
-  stdin: { contents: `export { drawExerciseStill, getMotion, compileMotion } from "./src/lib/exercise-motion"; export { EXERCISES } from "./src/data/exercises";`, resolveDir: root, loader: "ts" },
+  stdin: { contents: style === "athlete" ? `export { drawExerciseStill, getMotion, compileMotion, highlightFor } from "./src/lib/exercise-motion"; export { EXERCISES } from "./src/data/exercises";` : `export { drawExerciseStill, getMotion, compileMotion } from "./src/lib/exercise-motion"; export { EXERCISES } from "./src/data/exercises";`, resolveDir: root, loader: "ts" },
   bundle: true,
   format: "iife",
   globalName: "EM",
@@ -55,11 +57,12 @@ for (const slug of slugs) {
     return { name: e.name, view: def.view, duration: EM.compileMotion(def).duration, label: def.label };
   }, slug);
   const draw = async (phase) => {
-    await page.evaluate(({ slug, phase, W, H }) => {
+    await page.evaluate(({ slug, phase, W, H, style }) => {
       const e = EM.EXERCISES.find((x) => x.slug === slug);
       const meta = { slug, name: e.name, pattern: e.pattern, category: e.category, equipment: e.equipment, timed: e.timed };
-      EM.drawExerciseStill(document.getElementById("c"), slug, { meta, phase, width: W, height: H });
-    }, { slug, phase, W, H });
+      const look = style === "athlete" ? { style, highlight: EM.highlightFor(e.primary, e.secondary) } : {};
+      EM.drawExerciseStill(document.getElementById("c"), slug, { meta, phase, width: W, height: H, ...look });
+    }, { slug, phase, W, H, style });
     return page.locator("#c").screenshot({ type: "png" });
   };
   for (const speed of speeds) {

@@ -47,7 +47,8 @@ export interface SquatOpts {
 function holdArms(p: Pose, load: SquatLoad, s: number): Pose {
   switch (load) {
     case "back":
-      return armsLocal(p, [-10, -17], [-6.5, 1]);
+      // Elbows down under the bar (slightly behind it), forearms close to vertical, hands on the bar at the traps.
+      return armsLocal(p, [-5, -24], [-6.5, 1]);
     case "front":
       return armsLocal(p, [23, 1], [8.5, 3.5]);
     case "goblet":
