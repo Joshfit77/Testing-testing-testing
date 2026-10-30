@@ -5,13 +5,13 @@ import { ATHLETE_LOOK_PREVIEW, athleteLookInReview, usesAthleteLook } from "@/li
 import { getDemoAsset, shownDemoAsset } from "@/lib/exercise-demos";
 
 describe("the athlete look", () => {
-  it("is previewed on the squat, the curl and the cable row only, with the classic figure for everything else", () => {
-    expect([...ATHLETE_LOOK_PREVIEW].sort()).toEqual(["back-squat", "dumbbell-curl", "seated-cable-row"]);
+  it("is previewed on the squat, the curl, the cable row and the easy run only, with the classic figure for everything else", () => {
+    expect([...ATHLETE_LOOK_PREVIEW].sort()).toEqual(["back-squat", "dumbbell-curl", "seated-cable-row", "zone-2-run"]);
     for (const slug of ATHLETE_LOOK_PREVIEW) {
       expect(usesAthleteLook(slug)).toBe(true);
       expect(athleteLookInReview(slug)).toBe(true);
     }
-    expect(EXERCISES.filter((e) => usesAthleteLook(e.slug))).toHaveLength(3);
+    expect(EXERCISES.filter((e) => usesAthleteLook(e.slug))).toHaveLength(4);
   });
 
   it("takes the curl's place over its 2.5D clip while previewed (the clip stays in the manifest)", () => {

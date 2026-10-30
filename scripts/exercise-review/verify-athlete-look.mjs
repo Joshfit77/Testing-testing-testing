@@ -1,5 +1,5 @@
 // Checks the new athlete look inside the real app at iPhone 15 size (Chromium with touch emulation; not a phone) and
-// records it: the three exercises in review play, respond to tap / finger scrub / 0.5x / full screen / the classic-look
+// records it: the four exercises in review play, respond to tap / finger scrub / 0.5x / full screen / the classic-look
 // switch, appear on the library card and the workout screen, and every other exercise keeps the classic figure.
 //   BASE=http://localhost:3000 CHROMIUM=<path> node scripts/exercise-review/verify-athlete-look.mjs <outdir>
 import { chromium, devices } from "playwright";
@@ -56,7 +56,7 @@ cdp.on("Page.screencastFrame", async (f) => {
 await cdp.send("Page.startScreencast", { format: "jpeg", quality: 88, maxWidth: 786, maxHeight: 1704, everyNthFrame: 1 });
 const touch = (type, x, y) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y, radiusX: 8, radiusY: 8 }] });
 
-for (const [slug, name] of [["back-squat", "Barbell Back Squat"], ["dumbbell-curl", "Dumbbell Biceps Curl"], ["seated-cable-row", "Seated Cable Row"]]) {
+for (const [slug, name] of [["back-squat", "Barbell Back Squat"], ["dumbbell-curl", "Dumbbell Biceps Curl"], ["seated-cable-row", "Seated Cable Row"], ["zone-2-run", "Easy Zone 2 Run"]]) {
   await page.goto(`${BASE}/train/exercises/${slug}`);
   await skipIntro();
   // When an exercise also has a filmed video, the animation sits in a collapsed "Animated demo" section.

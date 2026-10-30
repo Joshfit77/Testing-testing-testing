@@ -237,6 +237,19 @@ export interface MotionDef {
   floor?: "plain" | "mat" | "none";
   /** Joint-limit checks to skip for deliberately stylised poses (documented in the definition). */
   allowLimits?: PoseKey[];
+  /**
+   * Running: the body travels at an even speed on a smooth up-and-down path (lowest at mid-stance, airborne between
+   * steps) and the support foot is held where it landed. Right foot lands at the start of the loop, left half-way.
+   */
+  run?: RunPath;
+}
+
+export interface RunPath {
+  /** Fraction of each step (half the loop) with the foot on the floor. */
+  stance: number;
+  /** Pelvis height at touchdown and at toe-off (cm). */
+  land: number;
+  push: number;
 }
 
 /** A fully computed frame. */

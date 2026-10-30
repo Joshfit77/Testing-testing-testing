@@ -164,13 +164,24 @@ function drawShadow(ctx: CanvasRenderingContext2D, f: Frame) {
   ctx.restore();
 }
 
+/** Mix two #rrggbb colours (k = 0 → a, 1 → b). */
+function mixHex(a: string, b: string, k: number) {
+  const pa = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16));
+  const pb = [1, 3, 5].map((i) => parseInt(b.slice(i, i + 2), 16));
+  return `rgb(${pa.map((x, i) => Math.round(x + (pb[i]! - x) * k)).join(",")})`;
+}
+
+/**
+ * Shading across a limb: the side facing the light is lighter. How much it faces the light is continuous in the limb's
+ * direction, so the shading changes smoothly as the limb turns (a lit-side switch here flipped whole limbs from light to
+ * dark in one frame: the flicker).
+ */
 function shade(ctx: CanvasRenderingContext2D, a: Vec, n: Vec, r: number, pal: Palette) {
-  // Lit side is the normal facing the light.
-  const s = n[0] * LIGHT[0] + n[1] * LIGHT[1] >= 0 ? 1 : -1;
-  const g = ctx.createLinearGradient(a[0] + n[0] * r * s, a[1] + n[1] * r * s, a[0] - n[0] * r * s, a[1] - n[1] * r * s);
-  g.addColorStop(0, pal.hi);
+  const f = Math.max(-1, Math.min(1, n[0] * LIGHT[0] + n[1] * LIGHT[1]));
+  const g = ctx.createLinearGradient(a[0] + n[0] * r, a[1] + n[1] * r, a[0] - n[0] * r, a[1] - n[1] * r);
+  g.addColorStop(0, mixHex(pal.lo, pal.hi, (1 + f) / 2));
   g.addColorStop(0.42, pal.mid);
-  g.addColorStop(1, pal.lo);
+  g.addColorStop(1, mixHex(pal.lo, pal.hi, (1 - f) / 2));
   return g;
 }
 

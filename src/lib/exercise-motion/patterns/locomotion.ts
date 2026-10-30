@@ -1,4 +1,4 @@
-import { BODY } from "../skeleton";
+import { BODY, forwardKinematics } from "../skeleton";
 import {
   armsLocal,
   both,
@@ -30,14 +30,14 @@ const WALK: Table = [
   [0.92, 28, 16, 2],
 ];
 const JOG: Table = [
-  [0, 28, 14, 2],
-  [0.1, 18, 36, 16],
-  [0.24, -4, 22, 8],
-  [0.34, -16, 14, -22],
+  [0, 22, 20, 4],
+  [0.1, 12, 38, 16],
+  [0.24, -4, 24, 8],
+  [0.34, -16, 16, -22],
   [0.46, -4, 62, -10],
   [0.62, 28, 105, -4],
-  [0.76, 46, 72, 0],
-  [0.9, 38, 26, 4],
+  [0.76, 44, 74, 0],
+  [0.9, 32, 32, 4],
 ];
 const SPRINT: Table = [
   [0, 42, 24, 6],
@@ -82,12 +82,23 @@ export interface GaitOpts {
   props?: PropDef[];
 }
 
+/** Runner's pelvis at touchdown, below the stride table's (cm): the knee is already a little bent as the foot lands. */
+const LAND_DROP = 1;
+/** Most the pelvis may be higher at toe-off than at touchdown (cm). */
+const PUSH_RISE = 3;
+
+/** Elbow bend for a running arm from the same side's hip angle (the arm is forward when that hip is extended). */
+const runElbow = (hip: number) => Math.min(122, Math.max(62, 104 - 0.75 * hip));
+
 function armHold(p: Pose, hold: CarryHold, hipR: number, hipL: number, k: number): Pose {
   const T2 = p.trunk + p.spine;
   switch (hold) {
     case "swing":
       return { ...p, shR: -0.8 * hipR + T2 + 4, shL: -0.8 * hipL + T2 + 4, elR: 22, elL: 22 };
     case "run":
+      // The elbow opens as the arm swings back (hand by the hip) and closes as it drives forward (hand up by the chest),
+      // as runners' arms do; a fixed angle swung the forearm out in front like a punch.
+      return { ...p, shR: -1.0 * hipR * k + T2 + 10, shL: -1.0 * hipL * k + T2 + 10, elR: runElbow(hipR), elL: runElbow(hipL) };
     case "guard":
       return { ...p, shR: -1.0 * hipR * k + T2 + 10, shL: -1.0 * hipL * k + T2 + 10, elR: 88, elL: 88 };
     case "farmer":
@@ -143,6 +154,19 @@ export function gait(o: GaitOpts): MotionDef {
     frames.push({ pose: p, stance, dur: cycle / N, lift: flight ? (o.kind === "bound" ? 16 : o.kind === "sprint" || o.kind === "accel" ? 7 : o.kind === "askip" ? 5 : 4) : 0 });
   }
   const { keyframes, travel } = trackSteps(frames);
+  // Running: the body's up-and-down path. Pelvis height over the support foot at touchdown and at toe-off, from the
+  // table; the push-off is held at most PUSH_RISE above the landing (the leg bends a little more at toe-off), which
+  // gives about 6-7 cm of vertical travel, as measured in easy running, and a short airborne arc.
+  let run: MotionDef["run"];
+  if (hold === "run" && o.kind === "jog") {
+    const height = (ph: number) => {
+      const [h, kn, an] = gaitAt(table, ph);
+      const P = forwardKinematics(pose({ trunk: lean, hipR: h * k + lean, kneeR: kn * Math.min(1.1, k), ankleR: an }), "side").pts;
+      return P.pelvis[1] - Math.min(P.heelR[1], P.ballR[1]);
+    };
+    const land = height(0) - LAND_DROP;
+    run = { stance: stanceEnd * 2, land, push: land + Math.min(PUSH_RISE, Math.max(0, height(stanceEnd - 0.01) - land)) };
+  }
   const march = o.kind === "march";
   if (march) for (const kf of keyframes) kf.root = { ground: 0 };
   const props: PropDef[] = [...(o.props ?? [])];
@@ -151,6 +175,7 @@ export function gait(o: GaitOpts): MotionDef {
     view: "side",
     label: o.label,
     keyframes,
+    run,
     props,
     travel: march ? 0 : travel,
     footGrounded: o.kind === "walk" || march,

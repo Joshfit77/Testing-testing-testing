@@ -1,5 +1,5 @@
 import { BODY, applyLimbIK, forwardKinematics, lerp, lerpV, type Skeleton } from "./skeleton";
-import type { Anchor, Ease, Frame, Keyframe, Landmark, MotionDef, Pose, PoseKey, ResolvedProp, RootRule, Vec, View } from "./types";
+import type { Anchor, Ease, Frame, Keyframe, Landmark, MotionDef, Pose, PoseKey, ResolvedProp, RootRule, RunPath, Vec, View } from "./types";
 
 export interface CompiledMotion {
   def: MotionDef;
@@ -55,17 +55,35 @@ function lerpPose(a: Pose, b: Pose, w: number): Pose {
   return out;
 }
 
-function splinePose(p0: Pose, p1: Pose, p2: Pose, p3: Pose, u: number): Pose {
-  const out = { ...p1 };
+/**
+ * Smooth interpolation through the keyframes (cubic Hermite). Each keyframe's velocity is the slope between its
+ * neighbours measured in seconds, so the motion keeps a continuous speed even when one phase is slower than the next
+ * (a 2 s descent into a 1 s drive); a keyframe with a hold has zero velocity, so the body eases into and out of a pause
+ * instead of snapping into motion. With equal durations and no holds this is the Catmull-Rom spline used before.
+ */
+function tangent(c: CompiledMotion, j: number, key: PoseKey): number {
+  const kfs = c.def.keyframes;
+  const n = kfs.length;
+  const K = kfs[j]!;
+  if ((K.hold ?? 0) > 0) return 0;
+  const prev = kfs[(j - 1 + n) % n]!;
+  const next = kfs[(j + 1) % n]!;
+  return (next.pose[key] - prev.pose[key]) / Math.max(1e-6, prev.dur + K.dur);
+}
+
+function hermitePose(c: CompiledMotion, i: number, u: number): Pose {
+  const kfs = c.def.keyframes;
+  const n = kfs.length;
+  const A = kfs[i]!;
+  const B = kfs[(i + 1) % n]!;
+  const out = { ...A.pose };
   const u2 = u * u;
   const u3 = u2 * u;
-  for (const k of POSE_KEYS) {
-    const a = p0[k];
-    const b = p1[k];
-    const c = p2[k];
-    const d = p3[k];
-    out[k] = 0.5 * (2 * b + (-a + c) * u + (2 * a - 5 * b + 4 * c - d) * u2 + (-a + 3 * b - 3 * c + d) * u3);
-  }
+  const h00 = 2 * u3 - 3 * u2 + 1;
+  const h10 = u3 - 2 * u2 + u;
+  const h01 = -2 * u3 + 3 * u2;
+  const h11 = u3 - u2;
+  for (const k of POSE_KEYS) out[k] = h00 * A.pose[k] + h10 * A.dur * tangent(c, i, k) + h01 * B.pose[k] + h11 * A.dur * tangent(c, (i + 1) % n, k);
   return out;
 }
 
@@ -147,10 +165,9 @@ export interface EvalOptions {
   noClamp?: boolean;
 }
 
-/** Compute the frame at time `t` seconds (wrapped to the loop). */
-export function evaluate(c: CompiledMotion, time: number, opts: EvalOptions = {}): Frame {
-  const { def } = c;
-  const kfs = def.keyframes;
+/** The keyframe segment and the interpolated (raw) pose at time `time`. */
+function interpolate(c: CompiledMotion, time: number) {
+  const kfs = c.def.keyframes;
   const n = kfs.length;
   const T = c.duration;
   const t = ((time % T) + T) % T;
@@ -163,22 +180,109 @@ export function evaluate(c: CompiledMotion, time: number, opts: EvalOptions = {}
     }
   }
   const A = kfs[i]!;
-  const B = kfs[(i + 1) % n]!;
-  const wrap = i === n - 1;
-  const travel = def.travel ?? 0;
   const local = t - c.starts[i]!;
   const hold = A.hold ?? 0;
   const u = local < hold ? 0 : Math.min(1, (local - hold) / Math.max(1e-6, A.dur));
   const ease = A.ease ?? "inOut";
   const w = ease === "spline" ? u : EASE[ease](u);
+  const pose = ease === "spline" ? hermitePose(c, i, u) : lerpPose(A.pose, kfs[(i + 1) % n]!.pose, w);
+  return { t, i, u, w, ease, pose };
+}
 
-  let pose: Pose;
-  if (ease === "spline") {
-    const P0 = kfs[(i - 1 + n) % n]!.pose;
-    const P3 = kfs[(i + 2) % n]!.pose;
-    pose = splinePose(P0, A.pose, B.pose, P3, u);
-  } else {
-    pose = lerpPose(A.pose, B.pose, w);
+/**
+ * Where a travelling body is (pelvis x on the ground, and its lift off the floor) between two keyframes, on the same
+ * smooth curve as the joints. Interpolating it in straight lines changed the body's speed abruptly at every keyframe: a
+ * runner lurched forward and dropped onto each step. Null unless the keyframe and its neighbours all place the body by
+ * ground position (gait), so pinned movements keep their exact contacts.
+ */
+function groundSpline(c: CompiledMotion, i: number, u: number): [number, number] | null {
+  const kfs = c.def.keyframes;
+  const n = kfs.length;
+  const travel = c.def.travel ?? 0;
+  const g = (j: number): [number, number] | null => {
+    const r = kfs[((j % n) + n) % n]!.root;
+    if (!("ground" in r)) return null;
+    const lap = Math.floor(j / n);
+    return [r.ground + lap * travel, r.lift ?? 0];
+  };
+  const dur = (j: number) => kfs[((j % n) + n) % n]!.dur;
+  const p0 = g(i - 1);
+  const p1 = g(i);
+  const p2 = g(i + 1);
+  const p3 = g(i + 2);
+  if (!p0 || !p1 || !p2 || !p3) return null;
+  const m1 = (dur(i - 1) + dur(i)) || 1;
+  const m2 = (dur(i) + dur(i + 1)) || 1;
+  const d = dur(i);
+  const u2 = u * u;
+  const u3 = u2 * u;
+  const out: [number, number] = [0, 0];
+  for (const k of [0, 1] as const) {
+    const t1 = ((p2[k] - p0[k]) / m1) * d;
+    const t2 = ((p3[k] - p1[k]) / m2) * d;
+    out[k] = (2 * u3 - 3 * u2 + 1) * p1[k] + (u3 - 2 * u2 + u) * t1 + (-2 * u3 + 3 * u2) * p2[k] + (u3 - u2) * t2;
+  }
+  out[1] = Math.max(0, out[1]);
+  return out;
+}
+
+const GRAVITY = 981; // cm/s²
+const FOOT = 24; // heel → ball of a flat foot (as in trackSteps)
+
+/**
+ * Pelvis height of a runner at time `t` of the loop. Airborne between steps it follows a ballistic arc (gravity); on the
+ * support foot it dips and rises again on one smooth curve that meets the arc with the same speed at touchdown and at
+ * toe-off, so the runner never drops onto a step or stops dead.
+ */
+function runHeight(r: RunPath, T: number, t: number): number {
+  const Ts = T / 2;
+  const tf = Ts * (1 - r.stance);
+  const ts = Ts * r.stance;
+  const up = (r.land - r.push) / tf + (GRAVITY * tf) / 2; // launch speed at toe-off
+  const down = up - GRAVITY * tf; // speed at touchdown
+  const ph = ((t % Ts) + Ts) % Ts;
+  if (ph >= ts) {
+    const a = ph - ts;
+    return r.push + up * a - (GRAVITY * a * a) / 2;
+  }
+  const u = ph / ts;
+  const u2 = u * u;
+  const u3 = u2 * u;
+  return (2 * u3 - 3 * u2 + 1) * r.land + (u3 - 2 * u2 + u) * down * ts + (-2 * u3 + 3 * u2) * r.push + (u3 - u2) * up * ts;
+}
+
+/** Seconds by which the head trails the torso, and (in travelling movements) the forearms trail the upper arms. */
+const LAG_NECK = 0.07;
+const LAG_ELBOW = 0.05;
+
+/** Compute the frame at time `t` seconds (wrapped to the loop). */
+export function evaluate(c: CompiledMotion, time: number, opts: EvalOptions = {}): Frame {
+  const { def } = c;
+  const kfs = def.keyframes;
+  const n = kfs.length;
+  const T = c.duration;
+  const { t, i, u, w, ease, pose: raw } = interpolate(c, time);
+  const A = kfs[i]!;
+  const B = kfs[(i + 1) % n]!;
+  const wrap = i === n - 1;
+  const travel = def.travel ?? 0;
+
+  let pose: Pose = { ...raw };
+  // Follow-through: the head settles a moment after the torso moves; a runner's forearms swing a moment after the
+  // upper arms. (Hands placed by inverse kinematics are re-solved below, so contacts are kept.)
+  pose.neck = interpolate(c, time - LAG_NECK).pose.neck;
+  if (travel) {
+    const lag = interpolate(c, time - LAG_ELBOW).pose;
+    pose.elL = lag.elL;
+    pose.elR = lag.elR;
+  }
+  // Breathing: the chest rises and falls a little (a whole number of breaths per loop, so the loop stays seamless),
+  // so a held position is never a frozen one.
+  if (def.view === "side") {
+    const breaths = Math.max(1, Math.round(T / 3.4));
+    const b = Math.sin((2 * Math.PI * breaths * t) / T);
+    pose.spine += 0.7 * b;
+    pose.neck -= 0.45 * b;
   }
 
   // Knees never hyperextend (spline overshoot guard).
@@ -190,7 +294,48 @@ export function evaluate(c: CompiledMotion, time: number, opts: EvalOptions = {}
   const oB = rootOffset(B.root, sk0, view);
   if (wrap) oB[0] += travel;
   let offset = lerpV(oA, oB, w);
+  const gs = ease === "spline" && (A.hold ?? 0) === 0 ? groundSpline(c, i, u) : null;
+  if (gs) offset = [gs[0] - sk0.pts.pelvis[0], gs[1] - lowestContact(sk0, view)];
+  const run = def.run && view === "side" ? def.run : null;
+  const x0 = kfs[0] && "ground" in kfs[0].root ? kfs[0].root.ground : 0;
+  // Running: even forward speed and the smooth up-and-down path (see runHeight).
+  const runOffset = (p: Pose, at: number): Vec => {
+    const s0 = forwardKinematics(p, view);
+    return [x0 + (travel * at) / T - s0.pts.pelvis[0], runHeight(run!, T, at) - s0.pts.pelvis[1]];
+  };
+  if (run) offset = runOffset(pose, t);
   let sk = forwardKinematics(pose, view, offset);
+  if (run) {
+    // The support foot stays where it landed: the leg reaches it (inverse kinematics) as the body passes over it.
+    // The hold fades in over the last few hundredths of a second before touchdown and out after toe-off, so the foot
+    // settles onto the floor and peels off it instead of jumping between where the stride table has it and the plant.
+    const Ts = T / 2;
+    const stanceT = Ts * run.stance;
+    const fade = 0.1;
+    const hold = (side: "L" | "R", land: number, k: number, onFloor: boolean) => {
+      if (k <= 0) return;
+      const atLand = interpolate(c, land % T).pose;
+      const heel = forwardKinematics(atLand, view, runOffset(atLand, land)).pts[`heel${side}`][0];
+      const h = sk.pts[`heel${side}`];
+      const b = sk.pts[`ball${side}`];
+      // The foot rolls from heel to ball: whichever is lower is on the floor, at its planted spot.
+      const onHeel = h[1] <= b[1];
+      const contact = onHeel ? h : b;
+      const plant = onHeel ? heel : heel + FOOT;
+      const a = sk.pts[`ankle${side}`];
+      // While fading in or out only the foot's position along the floor is eased; it meets the floor on its own at
+      // touchdown (the body is at landing height then) and leaves it on its own after toe-off.
+      const dy = onFloor ? -contact[1] : Math.max(0, -contact[1]);
+      pose = applyLimbIK(pose, view, sk, `foot${side}`, [a[0] + k * (plant - contact[0]), a[1] + dy]);
+      sk = forwardKinematics(pose, view, offset);
+    };
+    const side = t < Ts ? "R" : "L";
+    const land = side === "R" ? 0 : Ts;
+    const since = t - land;
+    hold(side, land, since < stanceT ? 1 : since < stanceT + fade ? 1 - EASE.inOut((since - stanceT) / fade) : 0, since < stanceT);
+    const until = land + Ts - t;
+    if (until < fade) hold(side === "R" ? "L" : "R", land + Ts, EASE.inOut(1 - until / fade), false);
+  }
 
   // Inverse kinematics for limbs pinned to targets.
   const limbs = new Set([...Object.keys(A.ik ?? {}), ...Object.keys(B.ik ?? {})]) as Set<keyof NonNullable<Keyframe["ik"]>>;
