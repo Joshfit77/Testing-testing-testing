@@ -57,6 +57,13 @@
    - `REVENUECAT_WEBHOOK_AUTH` (the exact header value)
    - `REVENUECAT_PUBLIC_KEY_IOS` / `REVENUECAT_PUBLIC_KEY_ANDROID`
    - optionally the product ids and entitlement ids
+   - `REVENUECAT_ALLOW_SANDBOX=true` while sandbox purchases must unlock Pro. The server ignores App Store / Play
+     **sandbox** purchases unless this is set (`storeRowsFromSubscriber`, `src/lib/billing/revenuecat.ts`), and every
+     purchase made from a development build, a TestFlight build, or by App Review is a sandbox purchase. The phone
+     always talks to the one deployed server (`CAP_SERVER_URL`), so set it on that deployment for the sandbox plan
+     below, for TestFlight and for App Review; without it, step 2 below ends with "Purchase received. Your membership
+     will update in a moment" and the member stays on Free. Sandbox purchases are free and can only be made with a
+     Sandbox Apple Account you created, so leaving it on costs nothing; leave `REVENUECAT_ALLOW_TEST_STORE=false`.
 5. **Native build:** run `npm install` and `npx cap sync`. In Xcode, add the **In-App Purchase** capability to the app target. Then build in Xcode / Android Studio. The plugin is native code: an app binary built before this change can't make purchases; it shows "In-app purchases aren't available right now".
 6. **Yearly** is shown whenever the store offers `ngf_pro_yearly`; the paywall never shows a price the store doesn't return.
 
