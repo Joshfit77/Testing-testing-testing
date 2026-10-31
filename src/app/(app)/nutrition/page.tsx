@@ -32,7 +32,7 @@ import { COMMON_FOODS } from "@/data/foods";
 import { EditableMealItem, type EditableItem } from "@/components/nutrition/food-amount";
 import { FavoriteStar } from "@/components/nutrition/favorite-star";
 import { choiceFromFavorite, isFavoritableKey, type FavoriteRow } from "@/lib/domain/food-favorites";
-import { basisFromLegacyItem, defaultUnit, sanitizeBasis, unitIdForLabel } from "@/lib/domain/food-basis";
+import { basisFromLegacyItem, defaultUnit, incompleteMacros, sanitizeBasis, unitIdForLabel, type MacroKey } from "@/lib/domain/food-basis";
 import { nutrientTotals } from "@/lib/domain/nutrition";
 import { usdaCategories } from "@/server/services/usda-local";
 import { DIETS, fitsDiet, isDietType } from "@/lib/domain/diets";
@@ -89,6 +89,9 @@ function editableItem(i: MealRow["meal_items"][number], mealType: string, favori
     ({ unitId, quantity } = defaultUnit(stored));
   }
   const amount = i.amount_label ?? (Number(i.servings) !== 1 ? `${Number(i.servings)} ×` : null);
+  // A macro the source didn't list is stored as 0 for the sums; show it as unknown rather than as a real zero.
+  const missing = new Set<MacroKey>(stored?.missing ?? []);
+  const macro = (k: MacroKey, v: number) => (missing.has(k) ? "—" : String(fmt(v)));
   return {
     id: i.id,
     name: i.name,
@@ -105,7 +108,7 @@ function editableItem(i: MealRow["meal_items"][number], mealType: string, favori
     sourceKey: isFavoritableKey(i.source) ? i.source : null,
     source: i.source,
     favorite: Boolean(i.source && favoriteKeys.has(i.source)),
-    summary: `${amount ? `${amount} · ` : ""}${Math.round(Number(i.calories))} kcal · P ${fmt(Number(i.protein_g))} · C ${fmt(Number(i.carbs_g))} · F ${fmt(Number(i.fat_g))}`,
+    summary: `${amount ? `${amount} · ` : ""}${Math.round(Number(i.calories))} kcal · P ${macro("protein_g", Number(i.protein_g))} · C ${macro("carbs_g", Number(i.carbs_g))} · F ${macro("fat_g", Number(i.fat_g))}`,
   };
 }
 
@@ -181,6 +184,8 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
   const totals = sumMacros(logged.flatMap((m) => m.meal_items.map((i) => ({ ...i, calories: Number(i.calories), protein_g: Number(i.protein_g), carbs_g: Number(i.carbs_g), fat_g: Number(i.fat_g) }))));
   const anyEstimate = logged.some((m) => m.meal_items.some((i) => i.is_estimate));
   const nutrients = nutrientTotals(logged.flatMap((m) => m.meal_items));
+  // Macros some logged item's source didn't list: their totals are minimums, not complete values.
+  const incomplete = incompleteMacros(logged.flatMap((m) => m.meal_items));
   const goals = goalsRes.data as { calories: number; protein_g: number; carbs_g: number; fat_g: number; water_ml: number; is_estimate: boolean } | null;
   const water = (waterRes.data ?? []).reduce((s, w) => s + (w.amount_ml as number), 0);
   const myFoods = (foodsRes.data ?? []) as MyFood[];
@@ -304,14 +309,15 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
           <dl className="w-full flex-1 space-y-3">
             {(
               [
-                ["Protein", totals.protein_g, goals?.protein_g],
-                ["Carbs", totals.carbs_g, goals?.carbs_g],
-                ["Fat", totals.fat_g, goals?.fat_g],
+                ["Protein", totals.protein_g, goals?.protein_g, "protein_g"],
+                ["Carbs", totals.carbs_g, goals?.carbs_g, "carbs_g"],
+                ["Fat", totals.fat_g, goals?.fat_g, "fat_g"],
               ] as const
-            ).map(([l, v, g]) => (
+            ).map(([l, v, g, key]) => (
               <div key={l} className="grid grid-cols-[4.5rem_6.5rem_1fr] items-center gap-2 text-[0.9375rem]">
                 <dt className="font-semibold">{l}</dt>
-                <dd className="tabular-nums text-muted-foreground">
+                <dd className="tabular-nums text-muted-foreground" data-incomplete={incomplete.includes(key) ? "true" : undefined}>
+                  {incomplete.includes(key) ? <span title="At least: some entries don't list this macro">≥ </span> : null}
                   {Math.round(v)}
                   {g ? ` / ${g}` : ""} g
                 </dd>
@@ -323,6 +329,12 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
           </dl>
         </div>
         {anyEstimate && <p className="mt-3 text-sm text-gold">Includes estimated entries (marked “estimate”).</p>}
+        {incomplete.length > 0 && (
+          <p className="mt-3 text-sm text-gold" data-testid="incomplete-macros">
+            {incomplete.map((k) => ({ protein_g: "Protein", carbs_g: "Carbs", fat_g: "Fat" })[k]).join(", ")} {incomplete.length === 1 ? "is" : "are"} a minimum: some entries don&apos;t list{" "}
+            {incomplete.length === 1 ? "it" : "them"} (shown as “—”).
+          </p>
+        )}
         {!goals && <p className="mt-3 text-sm text-muted-foreground">Set targets below to see progress.</p>}
       </section>
 

@@ -178,6 +178,17 @@ export function sanitizeBasis(raw: unknown): FoodBasis | null {
   };
 }
 
+/**
+ * Macros that at least one logged item's source didn't list (its basis carries them under `missing`), in
+ * canonical order. Those items count 0 toward the day's sums, so a total that includes them is a minimum
+ * ("at least"), never a complete value (SPEC §8) — the diary page uses this to label the day's totals.
+ */
+export function incompleteMacros(items: { basis?: unknown }[]): MacroKey[] {
+  const found = new Set<MacroKey>();
+  for (const i of items) for (const k of sanitizeBasis(i.basis)?.missing ?? []) found.add(k);
+  return MACRO_KEYS.filter((k) => found.has(k));
+}
+
 /** A food the person can pick in the add-food dialog, with everything the amount step needs. */
 export interface FoodChoice {
   /** Unique key, e.g. "usda:171477", "off:3017620422003", "food:<uuid>". */
