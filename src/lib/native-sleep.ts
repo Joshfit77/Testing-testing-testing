@@ -58,7 +58,10 @@ export async function readRecentSleep(days = 14): Promise<SleepReadResult> {
     }
     const end = new Date();
     const start = new Date(end.getTime() - days * 86_400_000);
-    const { samples } = await Health.readSamples({ dataType: "sleep", startDate: start.toISOString(), endDate: end.toISOString(), limit: 2000, ascending: true });
+    // Newest first: the platform applies `limit` after sorting (HKSampleQuery on iOS, the page size on Android), so if
+    // two weeks of a watch's stage samples ever exceed it, the nights cut off are the oldest (already imported last
+    // time), never last night. samplesToSessions sorts the samples itself.
+    const { samples } = await Health.readSamples({ dataType: "sleep", startDate: start.toISOString(), endDate: end.toISOString(), limit: 2000, ascending: false });
     const sessions = samplesToSessions(samples as PlatformSleepSample[]);
     if (!sessions.length) {
       return { ok: false, message: platform === "ios" ? `No sleep found in ${appName} for the last ${days} days. Check Health > Sharing > Apps > Narrow Gate and turn on Sleep.` : `No sleep found in Health Connect for the last ${days} days. Check that your watch or sleep app writes sleep to Health Connect.` };
@@ -77,7 +80,9 @@ export async function readRecentSleep(days = 14): Promise<SleepReadResult> {
         continue;
       }
       try {
-        const res = await Health.readSamples({ dataType: type, startDate: new Date(first).toISOString(), endDate: new Date(last).toISOString(), limit: type === "heartRate" ? 20000 : 5000, ascending: true });
+        // Newest first for the same reason: daytime workouts write heart rate every second, so a fortnight can reach the
+        // limit, and the most recent nights are the ones that must keep their measurements.
+        const res = await Health.readSamples({ dataType: type, startDate: new Date(first).toISOString(), endDate: new Date(last).toISOString(), limit: type === "heartRate" ? 20000 : 5000, ascending: false });
         series[type] = res.samples.map((s) => ({ startDate: s.startDate, endDate: s.endDate, value: s.value, sourceName: s.sourceName }));
         if (res.samples.length) vitalsRead.push(type);
       } catch {
