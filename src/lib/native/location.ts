@@ -54,9 +54,41 @@ export async function browserLocationPermission(): Promise<"granted" | "denied" 
   }
 }
 
+/** True in the phone app, where the system settings page for this app can be opened after a refusal. */
+export function canOpenLocationSettings(): boolean {
+  return hasNativeBackgroundLocation();
+}
+
+/** Open this app's page in the phone's Settings (where location access is switched on). No-op in a browser. */
+export async function openLocationSettings(): Promise<void> {
+  if (!hasNativeBackgroundLocation()) return;
+  try {
+    await BackgroundGeolocation.openSettings();
+  } catch {
+    /* nothing to open */
+  }
+}
+
+/**
+ * Android 13+ shows the "Recording your run" foreground-service notification only once the app holds the
+ * POST_NOTIFICATIONS runtime permission, and the location plugin asks only for location. Ask (once) before the
+ * watcher starts; a refusal only hides the notification, the recording still runs.
+ */
+async function ensureAndroidNotificationPermission(): Promise<void> {
+  if (Capacitor.getPlatform() !== "android") return;
+  try {
+    const { LocalNotifications } = await import("@capacitor/local-notifications");
+    const { display } = await LocalNotifications.checkPermissions();
+    if (display === "prompt" || display === "prompt-with-rationale") await LocalNotifications.requestPermissions();
+  } catch {
+    /* plugin unavailable: the watcher still starts */
+  }
+}
+
 /** Start delivering fixes. Returns a stop function. */
 export async function watchLocation(onFix: (fix: GpsFix) => void, onError: (e: LocationError) => void): Promise<() => void> {
   if (hasNativeBackgroundLocation()) {
+    await ensureAndroidNotificationPermission();
     const id = await BackgroundGeolocation.addWatcher(
       { backgroundTitle: "Recording your run", backgroundMessage: "Narrow Gate Fitness is recording your route. Tap to return.", requestPermissions: true, stale: false, distanceFilter: 0 },
       (location, error) => {

@@ -4,6 +4,7 @@ import {
   currentPace,
   finishTrack,
   haversine,
+  isRecoverable,
   isResumable,
   movingSecondsAt,
   pauseTrack,
@@ -144,6 +145,12 @@ describe("pauses, gaps and recovery", () => {
     expect(isResumable(saved, T0 + 60_000)).toBe(true);
     expect(isResumable({ ...(saved as TrackState), status: "finished" }, T0 + 60_000)).toBe(false);
     expect(isResumable(saved, T0 + 13 * 3600_000)).toBe(false);
+    // A finished recording whose save failed (offline) is still offered back, until it is too old to matter.
+    expect(isRecoverable(saved, T0 + 60_000)).toBe(true);
+    expect(isRecoverable({ ...(saved as TrackState), status: "finished" }, T0 + 60_000)).toBe(true);
+    expect(isRecoverable({ ...(saved as TrackState), status: "finished" }, T0 + 13 * 3600_000)).toBe(false);
+    expect(isRecoverable(null, T0)).toBe(false);
+    expect(isRecoverable({ version: 3, status: "finished", startedAt: T0 }, T0)).toBe(false);
     const r = recoverTrack(saved as TrackState);
     expect(r.signalLost).toBe(true);
     expect(r.gaps).toBe(1);
