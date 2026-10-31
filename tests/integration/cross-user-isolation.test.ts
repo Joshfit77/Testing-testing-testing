@@ -15,7 +15,6 @@ import { removeUserStorage, USER_STORAGE_BUCKETS, USER_TABLES } from "@/server/s
 const available = await stackAvailable();
 
 const jpeg = () => new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0xff, 0xd9])], { type: "image/jpeg" });
-const ZERO_UUID = "00000000-0000-0000-0000-000000000000";
 
 /** Tables where an admin legitimately sees other members' rows: the shared catalog (private programs are not personal data). */
 const ADMIN_MAY_SEE = new Set(["training_programs"]);
