@@ -8,7 +8,7 @@ import { WebMembership } from "@/components/profile/web-membership";
 import { intervalForProduct, type BillingSource } from "@/lib/billing/paywall";
 import { storeRowAsSubscription } from "@/lib/billing/revenuecat";
 import { membershipComparison } from "@/lib/domain/membership";
-import { getPlans, yearlySavingsPercent, type BillingInterval } from "@/lib/domain/plans";
+import { getPlans, subscriptionToShow, yearlySavingsPercent, type BillingInterval } from "@/lib/domain/plans";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { isServiceRoleConfigured, isStripeConfigured } from "@/server/env";
@@ -37,8 +37,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
       .select("plan, status, stripe_price_id, current_period_end, cancel_at_period_end, access_revoked_at, access_revoked_reason")
       .eq("user_id", user.id)
       .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+      .limit(20),
     supabase
       .from("store_subscriptions")
       .select("store, product_id, plan, purchased_at, expires_at, grace_period_expires_at, unsubscribe_detected_at, billing_issue_detected_at, refunded_at")
@@ -47,7 +46,10 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
     getNativePlatform(),
   ]);
   const plans = getPlans();
-  const sub = subsRes.data;
+  // The subscription that grants the plan (a late webhook can make an old, ended one the most recently updated).
+  const sub = subscriptionToShow((subsRes.data ?? []) as Parameters<typeof subscriptionToShow>[0]) as
+    | { plan: string; status: string; stripe_price_id: string | null; current_period_end: string | null; cancel_at_period_end: boolean; access_revoked_at: string | null; access_revoked_reason: string | null }
+    | null;
   const ai = await getAiAllowance(user.id, plan);
   const source = (entRes.data?.source as BillingSource | undefined) ?? "default";
   const ids = storeProductIds();
