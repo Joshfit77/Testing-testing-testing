@@ -29,3 +29,6 @@ assets/badge-masters/*
 # Écorché-based evaluation build (not approved; rebuild with ECORCHE=... scripts/anatomy/build-athlete.mts)
 public/anatomy/athlete-eco.*
 .anatomy-lab/
+
+# Written by capacitor.config.ts at `npx cap sync` (the deployed address for the offline page)
+native-shell/server-url.js

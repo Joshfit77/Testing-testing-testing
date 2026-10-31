@@ -1,5 +1,7 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 import { KeyboardResize, KeyboardStyle } from "@capacitor/keyboard";
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 /**
  * Native iOS/Android shells for Narrow Gate Fitness.
@@ -42,6 +44,17 @@ function onlineServerUrl(value: string | undefined): string {
 
 const serverUrl = standalone ? "" : onlineServerUrl(process.env.CAP_SERVER_URL);
 
+/**
+ * The offline page (native-shell/error.html) is loaded from inside the app bundle (capacitor://localhost on iOS), so
+ * reloading it only shows it again. Its "Try again" goes back to the site instead, and this tells it where the site is.
+ */
+export function serverAddressScript(url: string): string {
+  return `window.NGF_SERVER_URL = ${JSON.stringify(url)};\n`;
+}
+if (!standalone && writesNativeConfig) {
+  writeFileSync(join(process.cwd(), "native-shell", "server-url.js"), serverAddressScript(serverUrl));
+}
+
 const config: CapacitorConfig = {
   appId: process.env.CAP_APP_ID ?? "com.narrowgatefitness.app",
   appName: "Narrow Gate Fitness",
@@ -59,7 +72,8 @@ const config: CapacitorConfig = {
       },
   ios: {
     contentInset: "never",
-    scheme: "Narrow Gate Fitness",
+    // The Xcode scheme `npx cap run ios` / `npx cap build ios` build (the project's only scheme is the App target's).
+    scheme: "App",
     limitsNavigationsToAppBoundDomains: false,
   },
   android: {
