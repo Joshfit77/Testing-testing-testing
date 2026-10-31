@@ -1,7 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { FOOD_PHOTO_MAX_BYTES, sniffImageType } from "@/lib/domain/food-photo";
-import { authenticateRequest } from "@/server/api-auth";
-import { getUserPlan } from "@/server/auth";
+import { authenticateRequest, planForAuth } from "@/server/api-auth";
 import { AI_ERROR_STATUS, AiError } from "@/server/services/ai-coach";
 import { analyzeFoodPhoto } from "@/server/services/food-photo";
 import { logError } from "@/server/log";
@@ -37,7 +36,7 @@ export async function POST(request: NextRequest) {
   const notes = String(form.get("notes") ?? "").trim().slice(0, 300);
 
   try {
-    const plan = await getUserPlan(auth.user.id);
+    const plan = await planForAuth(auth);
     const analysis = await analyzeFoodPhoto(auth.supabase, auth.user.id, plan, { base64: Buffer.from(bytes).toString("base64"), mediaType }, notes);
     return NextResponse.json(analysis, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {
