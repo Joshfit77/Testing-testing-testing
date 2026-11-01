@@ -25,6 +25,12 @@ export function uniqueEmail(prefix = "e2e") {
 
 export const PASSWORD = "Gate-Strong-2026";
 
+/**
+ * The sign-up confirmation link: the app's own /auth/confirm (supabase/templates/confirmation.html, so it works in
+ * any browser), or Supabase's /auth/v1/verify on a stack still using the default template.
+ */
+export const CONFIRMATION_LINK = /http:\/\/(?:localhost:3000\/auth\/confirm|127\.0\.0\.1:54321\/auth\/v1\/verify)[^"'\s<]+/;
+
 /** Sign up, confirm via email, and land on onboarding. */
 export async function signUpAndConfirm(page: Page, email: string, name = "Test Athlete") {
   await page.goto("/signup");
@@ -36,7 +42,7 @@ export async function signUpAndConfirm(page: Page, email: string, name = "Test A
   await page.getByRole("checkbox", { name: /I understand that exercise and outdoor activity carry a risk of injury/ }).check();
   await page.getByRole("button", { name: "Create account" }).click();
   await page.getByText("Check your inbox").waitFor();
-  const link = await getEmailLink(email, /http:\/\/127\.0\.0\.1:54321\/auth\/v1\/verify[^"'\s<]+/);
+  const link = await getEmailLink(email, CONFIRMATION_LINK);
   await page.goto(link);
 }
 

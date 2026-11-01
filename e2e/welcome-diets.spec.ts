@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { completeOnboarding, getEmailLink, grantPlan, PASSWORD, signUpAndConfirm, uniqueEmail } from "./helpers";
+import { completeOnboarding, CONFIRMATION_LINK, getEmailLink, grantPlan, PASSWORD, signUpAndConfirm, uniqueEmail } from "./helpers";
 
 test.describe("welcome, sign-up and diets", () => {
   test("Start free on the welcome page leads to sign-up, and setup asks weight, age, sex and height", async ({ page }) => {
@@ -17,7 +17,7 @@ test.describe("welcome, sign-up and diets", () => {
     await page.getByRole("checkbox", { name: /I understand that exercise and outdoor activity carry a risk of injury/ }).check();
     await page.getByRole("button", { name: "Create account" }).click();
     await page.getByText("Check your inbox").waitFor();
-    await page.goto(await getEmailLink(email, /http:\/\/127\.0\.0\.1:54321\/auth\/v1\/verify[^"'\s<]+/));
+    await page.goto(await getEmailLink(email, CONFIRMATION_LINK));
 
     await page.waitForURL(/\/onboarding/);
     await page.getByRole("button", { name: "Lose body fat", exact: true }).click();
