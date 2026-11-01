@@ -15,11 +15,13 @@ import type { UnitSystem } from "@/lib/domain/types";
 import { formatDuration, formatWeight } from "@/lib/domain/units";
 import {
   createDraft,
+  draftSnapshot,
   draftSummary,
   elapsedSeconds,
+  finishFailureMessage,
   migrateDraft,
-  newerDraft,
   nextUp,
+  restorableDraft,
   supersetMembers,
   restRemaining,
   workoutReducer,
@@ -30,7 +32,7 @@ import {
   type WorkoutDraft,
 } from "@/lib/domain/workout-draft";
 import { cancelRestNotification, hapticSuccess, scheduleRestNotification } from "@/lib/native";
-import { clearLocalDraft, loadLocalDraft, saveLocalDraft } from "@/lib/workout-storage";
+import { clearLocalDraft, discardedWorkoutIds, loadLocalDraft, rememberDiscard, saveLocalDraft } from "@/lib/workout-storage";
 import { discardWorkoutAction, finishWorkoutAction, previousPerformanceAction, syncWorkoutDraftAction, type UnlockedBadge } from "@/server/actions/workouts";
 import { updateRestAlertsAction } from "@/server/actions/rest-alerts";
 import { createTemplateAction } from "@/server/actions/templates";
@@ -154,7 +156,8 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
     const local = loadLocalDraft(userId);
     // Drafts saved by an older version of the app (v1) are migrated to the current format.
     const server = migrateDraft(serverDraft);
-    const existing = newerDraft(local, server);
+    // A workout discarded here while offline stays discarded, although its server copy isn't deleted yet.
+    const existing = restorableDraft(local, server, new Set(discardedWorkoutIds(userId)));
     if (existing) {
       const wantsDifferentSession = template && (template.programDayId !== existing.programDayId || (template.templateId ?? null) !== (existing.templateId ?? null));
       if (wantsDifferentSession) {
@@ -194,14 +197,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
       return;
     }
     setSync("saving");
-    const res = await syncWorkoutDraftAction({
-      clientId: d.clientId,
-      name: d.name || "Workout",
-      startedAt: d.startedAt,
-      userProgramId: d.userProgramId,
-      programDayId: d.programDayId,
-      draft: d as unknown as Record<string, unknown>,
-    }).catch(() => ({ ok: false as const, error: "offline" }));
+    const res = await syncWorkoutDraftAction(draftSnapshot(d)).catch(() => ({ ok: false as const, error: "offline" }));
     setSync(res.ok ? "synced" : "local");
   }, []);
 
@@ -317,7 +313,9 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
               if (!ok) return;
               setDiscarding(true);
               try {
-                await discardWorkoutAction(pendingExisting.clientId).catch(() => null);
+                const res = await discardWorkoutAction(pendingExisting.clientId).catch(() => null);
+                // Never restore it again; offline (or no answer), its server copy is deleted once back online.
+                rememberDiscard(userId, pendingExisting.clientId, Boolean(res?.ok));
                 clearLocalDraft(userId);
                 setPendingExisting(null);
                 setDraft(freshFromTemplate());
@@ -492,7 +490,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
         })),
       })),
     };
-    const res = await finishWorkoutAction(payload).catch(() => ({ ok: false as const, error: "You appear to be offline. Your workout is saved on this device — try again when you're connected." }));
+    const res = await finishWorkoutAction(payload).catch(() => ({ ok: false as const, error: finishFailureMessage(navigator.onLine) }));
     setSaving(false);
     if (!res.ok) {
       setError(res.error);
@@ -765,7 +763,10 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
                   setDiscardOpen(false);
                   return;
                 }
+                // Never restore it again; offline, its server copy is deleted once the device is back online.
+                rememberDiscard(userId, draft.clientId, res.ok);
                 clearLocalDraft(userId);
+                void cancelRestNotification();
                 router.push("/train");
               }}
             >

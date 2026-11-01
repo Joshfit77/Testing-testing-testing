@@ -1,13 +1,15 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Timer } from "lucide-react";
-import { DRAFT_EVENT, loadLocalDraft } from "@/lib/workout-storage";
+import { DRAFT_EVENT, loadLocalDraft, retryPendingDiscards } from "@/lib/workout-storage";
+import { discardWorkoutAction } from "@/server/actions/workouts";
 
 /** Floating shortcut back to an in-progress workout restored from local storage. */
 export function ActiveWorkoutPill({ userId }: { userId: string }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [name, setName] = useState<string | null>(null);
 
   useEffect(() => {
@@ -20,6 +22,20 @@ export function ActiveWorkoutPill({ userId }: { userId: string }) {
       window.removeEventListener("storage", refresh);
     };
   }, [userId]);
+
+  // A workout discarded while offline still has its server copy: delete it once the device is online again, then
+  // refresh so Home and Train stop offering "Resume workout" for it.
+  useEffect(() => {
+    const retry = () => {
+      if (!navigator.onLine) return;
+      void retryPendingDiscards(userId, discardWorkoutAction).then((removed) => {
+        if (removed) router.refresh();
+      });
+    };
+    retry();
+    window.addEventListener("online", retry);
+    return () => window.removeEventListener("online", retry);
+  }, [userId, router]);
 
   if (!name || pathname.startsWith("/train/workout")) return null;
   return (

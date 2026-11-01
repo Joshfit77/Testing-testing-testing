@@ -5,7 +5,7 @@ import { FoodPhotoConsentCard } from "@/components/nutrition/food-photo-consent"
 import { FoodPhotoFlow, type HiddenExtra } from "@/components/nutrition/food-photo-flow";
 import type { MyFood } from "@/components/nutrition/nutrition-client";
 import { BackLink } from "@/components/platform/back-link";
-import { isoDateInTz } from "@/lib/domain/dates";
+import { isoDateInTz, isValidIsoDate } from "@/lib/domain/dates";
 import { HIDDEN_EXTRAS } from "@/lib/domain/food-photo";
 import { mealForTime } from "@/lib/domain/meal-time";
 import { getServerSupabase } from "@/lib/supabase/server";
@@ -80,7 +80,7 @@ export default async function FoodPhotoPage({ searchParams }: { searchParams: Pr
   }
 
   const today = isoDateInTz(new Date(), profile.timezone);
-  const date = sp.date && /^\d{4}-\d{2}-\d{2}$/.test(sp.date) && sp.date <= today ? sp.date : today;
+  const date = isValidIsoDate(sp.date) && sp.date <= today ? sp.date : today;
   const hour = Number(new Intl.DateTimeFormat("en-US", { hour: "numeric", hourCycle: "h23", timeZone: profile.timezone || "UTC" }).format(new Date()));
   const [{ data: foodRows }, extras] = await Promise.all([
     supabase.from("foods").select("id, name, brand, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g, is_estimate, source").eq("owner_id", user.id).order("name"),

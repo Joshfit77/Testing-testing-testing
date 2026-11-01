@@ -489,6 +489,41 @@ export function migrateDraft(value: unknown): WorkoutDraft | null {
   };
 }
 
+/**
+ * The message when the finish request itself didn't complete. Online, the usual cause is an ended session (signed out
+ * on another device: the request is redirected to sign-in), so "you appear to be offline" would have the member retry
+ * forever. The workout stays on the device either way and resumes after signing in.
+ */
+export function finishFailureMessage(online: boolean): string {
+  return online
+    ? "We couldn't reach your account, so the workout isn't saved yet. It's kept on this device. If you were signed out, sign in again and finish it from Resume."
+    : "You appear to be offline. Your workout is saved on this device — try again when you're connected.";
+}
+
+/**
+ * What the logger sends to the server as the in-progress backup. The name is trimmed first: the server trims it and
+ * requires a character, so a name of only spaces used to make every backup be rejected.
+ */
+export function draftSnapshot(d: WorkoutDraft) {
+  return {
+    clientId: d.clientId,
+    name: d.name.trim() || "Workout",
+    startedAt: d.startedAt,
+    userProgramId: d.userProgramId,
+    programDayId: d.programDayId,
+    draft: d as unknown as Record<string, unknown>,
+  };
+}
+
+/**
+ * The draft to restore when the logger opens: the newer of the local and server drafts, leaving out any the
+ * member discarded on this device (an offline discard can't delete the server copy until the device is online).
+ */
+export function restorableDraft(local: WorkoutDraft | null, server: WorkoutDraft | null, discarded: ReadonlySet<string>): WorkoutDraft | null {
+  const keep = (d: WorkoutDraft | null) => (d && !discarded.has(d.clientId) ? d : null);
+  return newerDraft(keep(local), keep(server));
+}
+
 /** Pick whichever draft was modified most recently (local vs server). */
 export function newerDraft(a: WorkoutDraft | null, b: WorkoutDraft | null): WorkoutDraft | null {
   if (!a) return b;
