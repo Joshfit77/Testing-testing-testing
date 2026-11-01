@@ -1,0 +1,20 @@
+# gitleaks configuration (CI job "security-scan" in .github/workflows/ci.yml).
+# The default rules apply. The allowlist below covers only values that are published or test-only, each limited to
+# test files: the Supabase CLI's well-known local-stack demo JWTs (issuer "supabase-demo"; they only work against a
+# local stack) and fixed passwords/secrets used by the automated tests against that local stack.
+title = "Narrow Gate Fitness"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Supabase CLI local-stack demo JWTs (published defaults, issuer supabase-demo) in test helpers"
+condition = "AND"
+paths = ['''^(tests|e2e)/''']
+regexes = ['''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIi''']
+
+[[allowlists]]
+description = "Fixed test-only passwords and secrets for the local test stack"
+condition = "AND"
+paths = ['''^(tests|e2e)/''']
+regexes = ['''^Integration-Test-1$''', '''^Gate-Strong-2026$''', '''^cron-integration-secret-0123456789$''']
