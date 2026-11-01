@@ -252,8 +252,9 @@ Severity: Critical, High, Medium, Low. Status: Fixed, Open, Blocked, Unverified.
 | Browser tests (Playwright, Chromium at phone size): opening, navigation, onboarding, builder, memberships, store billing, core flow | — | 22 / 22, then 22 / 22 again on a stack recreated from the current config | The membership tests need an AI key configured on the server; they pass with a placeholder (no provider is called). The second run used the current confirmation-email template, after the helper fix in `ae1fc43`. |
 | Secret scan, full history | — | 0 confirmed secrets | gitleaks + trufflehog + regex over 392 commits / 60 refs |
 | Production dependency audit | — | 0 vulnerabilities | `npm audit --omit=dev` |
-| iOS compile (GitHub macOS runner) | — | pass | Simulator build, unsigned |
-| iOS Simulator app test and WebKit tests (GitHub) | — | _see below_ | |
+| iOS compile (GitHub macOS runner) | — | pass | Simulator build, unsigned (iOS run 53) |
+| iOS opening and navigation tests in WebKit at iPhone 15 size (GitHub) | **fails** on the unchanged base `claude/exercise-demo-25d` (iOS run 52, `03f815a`) | **pass**, 13 / 13 (iOS run 53, `ae1fc43`) | The base fails because its sign-up helper waits for the wrong confirmation link (an existing break from `e4bf019`). `ae1fc43` fixes the helper. |
+| iOS Simulator app test (XCUITest: launch, Enter Narrow Gate, relaunch, return from the background) | — | **pass** (iOS run 53) | The same job failed in runs 50 (`c9ce6a2`) and 51 (`54880e7`): `test0_freshLaunchPlaysTheOpeningAndEndsByItself` reported "opening not seen" in all 3 tries. Between those runs and run 53, the only iOS change was the workflow file's permissions, pinned actions and WebKit settings. The app, the opening and the XCUITest code were identical. So this test is timing-sensitive on GitHub's Mac runners. Not caused by this branch, but not root-caused either. A Simulator is not a physical iPhone. |
 | Payment sandbox (Stripe test mode, App Store sandbox, RevenueCat) | — | **not run** | No accounts |
 | Physical iPhone | — | **not run** | No device |
 | TestFlight | — | **not run** | Needs the owner's Apple account and approval |
@@ -331,7 +332,9 @@ npm run build && npx playwright test --project=mobile   # set ANTHROPIC_API_KEY 
 **UNVERIFIED — ESSENTIAL TESTING OR ACCESS IS MISSING**
 
 - **The code side.** All known Critical and High issues found here are fixed and covered by tests that failed before
-  the fixes. The remaining findings are Low.
+  the fixes. The remaining app findings are Low (F14–F19). One Medium CI finding stays open (C8: three workflows
+  with write access across the whole workflow and unchecked downloads). It changes how release files are published,
+  so it's left for the owner's decision.
 - **What is still unproven.**
   - Real payments: no sandbox purchase through the App Store or Stripe test mode has been made against a deployed app.
   - A real iPhone: none has run the app.
