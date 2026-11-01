@@ -140,6 +140,12 @@ export interface Keyframe {
   ease?: Ease;
   /** Overall opacity (used to reset travelling movements between loops). */
   alpha?: number;
+  /**
+   * In the air (a jump's peak): nothing supports the body here. From the last supported keyframe before it to the first
+   * one after it the body flies on one smooth path, leaving the floor at the speed of the push and landing at the speed
+   * the landing absorbs (see flightPath in timeline.ts); this keyframe's root sets where the path passes.
+   */
+  air?: boolean;
 }
 
 export type PropKind =
@@ -289,6 +295,12 @@ export interface ResolvedProp {
   to?: Vec;
   /** Layer for this frame when a keyframe overrides the definition's. */
   layer?: PropDef["layer"];
+  /**
+   * While the prop changes layer: a second copy in the nearer of the two layers, at this opacity (0 → 1 as it comes
+   * forward, 1 → 0 as it goes back), over the copy drawn in `layer` (the deeper one). A limb it passes then dissolves
+   * behind it or out from behind it instead of vanishing in one frame.
+   */
+  fade?: { layer: NonNullable<PropDef["layer"]>; alpha: number };
 }
 
 /** Minimal exercise info used to choose a pattern-based fallback for slugs without a hand-made motion. */

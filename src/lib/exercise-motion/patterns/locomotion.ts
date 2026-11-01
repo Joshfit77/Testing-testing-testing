@@ -129,7 +129,7 @@ export function gait(o: GaitOpts): MotionDef {
   const k = o.stride ?? (o.kind === "ladder" ? 0.55 : o.kind === "bound" ? 1.15 : 1);
   const N = o.kind === "march" || o.kind === "askip" ? 8 : 10;
   // Stance windows (fraction of the stride from right-foot contact).
-  const stanceEnd = o.kind === "walk" || o.kind === "march" ? 0.5 : o.kind === "jog" || o.kind === "ladder" ? 0.34 : o.kind === "askip" ? 0.5 : o.kind === "bound" ? 0.26 : 0.32;
+  const stanceEnd = o.kind === "walk" || o.kind === "march" ? 0.5 : o.kind === "jog" || o.kind === "ladder" ? 0.34 : o.kind === "askip" ? 0.5 : 0.32;
   const frames: StepFrame[] = [];
   for (let i = 0; i < N; i++) {
     const ph = i / N;
@@ -158,7 +158,9 @@ export function gait(o: GaitOpts): MotionDef {
   // table; the push-off is held at most PUSH_RISE above the landing (the leg bends a little more at toe-off), which
   // gives about 6-7 cm of vertical travel, as measured in easy running, and a short airborne arc.
   let run: MotionDef["run"];
-  if (hold === "run" && o.kind === "jog") {
+  // Sprints and bounds too: on the old rule (lowest foot on the floor, lifted by a fixed amount in flight) the body
+  // dropped some 20 cm onto each step and bounced off it in a single frame.
+  if (hold === "run" && (o.kind === "jog" || o.kind === "sprint" || o.kind === "accel" || o.kind === "bound")) {
     const height = (ph: number) => {
       const [h, kn, an] = gaitAt(table, ph);
       const P = forwardKinematics(pose({ trunk: lean, hipR: h * k + lean, kneeR: kn * Math.min(1.1, k), ankleR: an }), "side").pts;

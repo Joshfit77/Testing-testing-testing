@@ -221,6 +221,7 @@ export interface KeySpec {
   props?: Record<string, Anchor>;
   layers?: Keyframe["layers"];
   alpha?: number;
+  air?: boolean;
 }
 
 /** Assemble keyframes, filling in a default root rule. */
@@ -235,6 +236,7 @@ export function keys(defaultRoot: RootRule, specs: KeySpec[]): Keyframe[] {
     props: s.props,
     layers: s.layers,
     alpha: s.alpha,
+    air: s.air,
   }));
 }
 

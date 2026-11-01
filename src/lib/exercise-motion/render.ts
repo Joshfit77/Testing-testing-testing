@@ -88,6 +88,7 @@ export function renderFrame(ctx: CanvasRenderingContext2D, frame: Frame, cam: Ca
         const p: ResolvedProp = dx ? { ...p0, at: [p0.at[0] + dx, p0.at[1]], to: p0.to ? [p0.to[0] + dx, p0.to[1]] : undefined } : p0;
         if (athleteLayer(p, frame) === name && !drawPropAthlete(ctx, p, frame)) drawProp(ctx, p, frame, t);
         if (extraLayer(p, frame) === name) drawPropAthlete(ctx, p, frame, "extra");
+        if (p.fade?.layer === name) withAlpha(ctx, p.fade.alpha, () => drawPropAthlete(ctx, p, frame) || drawProp(ctx, p, frame, t));
       }
     };
     layerA("back");
@@ -97,13 +98,24 @@ export function renderFrame(ctx: CanvasRenderingContext2D, frame: Frame, cam: Ca
     return;
   }
   const layer = (name: string) => {
-    for (const p of frame.props) if ((p.layer ?? p.def.layer ?? "near") === name) drawProp(ctx, p, frame, t);
+    for (const p of frame.props) {
+      if ((p.layer ?? p.def.layer ?? "near") === name) drawProp(ctx, p, frame, t);
+      if (p.fade?.layer === name) withAlpha(ctx, p.fade.alpha, () => drawProp(ctx, p, frame, t));
+    }
   };
   layer("back");
   if (frame.view === "side") drawSideFigure(ctx, frame, layer);
   else drawFrontFigure(ctx, frame, layer);
   layer("front");
   ctx.globalAlpha = 1;
+}
+
+/** Draw at a fraction of the current opacity (a prop dissolving between two layers). */
+function withAlpha(ctx: CanvasRenderingContext2D, a: number, draw: () => unknown) {
+  const g = ctx.globalAlpha;
+  ctx.globalAlpha = g * a;
+  draw();
+  ctx.globalAlpha = g;
 }
 
 function drawBackdrop(ctx: CanvasRenderingContext2D, w: number, h: number, cam: Camera, frame: Frame, floor: boolean) {

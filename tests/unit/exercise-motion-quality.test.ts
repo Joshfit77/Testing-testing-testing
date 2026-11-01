@@ -67,6 +67,47 @@ describe("movement quality on the frames the player draws", () => {
     expect(bad).toEqual([]);
   });
 
+  // The body as a whole (the pelvis) never changes speed abruptly: no take-off at full speed in a single frame, no dead
+  // stop on landing, no drop onto a step, no pop when a hand or foot meets the floor. Measured as the change in the
+  // pelvis's velocity between consecutive frames (cm per frame², 60 fps; 1 cm/frame² = 3,600 cm/s², about 3.7 g),
+  // over the frames the player draws (a fade between loops is invisible and is skipped). Before these checks the
+  // worst were a box jump's flight, sprinting (the body dropping some 20 cm onto each step and bouncing off it in one
+  // frame), a trap-bar jump's take-off (12.5) and the medicine-ball slam.
+  function maxPelvisJerk(def: MotionDef, frames: Frame[]): { step: number; at: number } {
+    const n = frames.length;
+    let worst = { step: 0, at: 0 };
+    for (let i = 0; i < n; i++) {
+      const ia = (i - 1 + n) % n;
+      const id = (i + 1) % n;
+      if (Math.min(frames[ia]!.alpha, frames[i]!.alpha, frames[id]!.alpha) < 0.05) continue;
+      for (const k of [0, 1] as const) {
+        let a = frames[ia]!.pts.pelvis[k];
+        let d = frames[id]!.pts.pelvis[k];
+        // A travelling movement's next loop starts one loop's travel further on.
+        if (k === 0 && def.travel) {
+          if (id < i) d += def.travel;
+          if (ia > i) a -= def.travel;
+        }
+        const acc = Math.abs(d - 2 * frames[i]!.pts.pelvis[k] + a);
+        if (acc > worst.step) worst = { step: acc, at: i };
+      }
+    }
+    return worst;
+  }
+
+  it("every exercise: the body never changes speed abruptly (jumps, landings, steps, floor contacts)", () => {
+    const bad: string[] = [];
+    for (const e of EXERCISES) {
+      const { def, frames } = framesOf(e.slug);
+      const w = maxPelvisJerk(def, frames);
+      // Explosive work (a jump's take-off and landing, a sprint's change of direction) reaches a few g; 2.5 cm/frame²
+      // (about 9 g) is a jolt the eye catches. Lifts, carries, mobility and core work stay far below that.
+      const limit = slowCategories.has(e.category) ? 0.75 : 2.5;
+      if (w.step > limit) bad.push(`${e.slug} ${w.step.toFixed(2)} cm/frame² at frame ${w.at} of ${frames.length}`);
+    }
+    expect(bad).toEqual([]);
+  });
+
   it("every exercise: the loop closes without the figure jumping up or down", () => {
     const bad: string[] = [];
     for (const e of EXERCISES) {
@@ -101,7 +142,7 @@ describe("movement quality on the frames the player draws", () => {
   });
 
   it("running: the support foot does not slide, and the body never leaves the floor by more than a real stride's flight", () => {
-    for (const slug of ["zone-2-run", "running-intervals", "run-walk-intervals"]) {
+    for (const slug of ["zone-2-run", "running-intervals", "run-walk-intervals", "flying-sprint", "acceleration-sprint", "bounding"]) {
       const { frames } = framesOf(slug);
       let slide = 0;
       let lowest = Infinity;
@@ -119,6 +160,36 @@ describe("movement quality on the frames the player draws", () => {
       expect(slide, `${slug} support foot slides`).toBeLessThan(0.35);
       expect(lowest, `${slug} a foot below the floor`).toBeGreaterThan(-0.1);
     }
+  });
+
+  it("equipment that changes drawing layer covers or uncovers a limb gradually, never in a single frame", () => {
+    // How much of whatever is drawn at each depth a prop covers: its copies in front of that depth (the deeper layer at
+    // full opacity, the nearer one fading). An atlas stone moving from between the legs to the hug switched in front
+    // of the near thigh in one frame, and the thigh vanished.
+    const DEPTH = { back: 0, far: 1, mid: 2, near: 3, front: 4 } as const;
+    const cover = (f: Frame, id: string) => {
+      const p = f.props.find((x) => x.def.id === id)!;
+      const copies: [number, number][] = [[DEPTH[p.layer ?? p.def.layer ?? "near"], 1]];
+      if (p.fade) copies.push([DEPTH[p.fade.layer], p.fade.alpha]);
+      return [0, 1, 2, 3].map((d) => 1 - copies.filter(([l]) => l > d + 0.5).reduce((m, [, a]) => m * (1 - a), 1));
+    };
+    const bad: string[] = [];
+    for (const e of EXERCISES) {
+      const { def, frames } = framesOf(e.slug);
+      if (!def.keyframes.some((k) => k.layers)) continue;
+      for (const pd of def.props ?? []) {
+        let worst = 0;
+        for (let i = 0; i < frames.length; i++) {
+          const a = cover(frames[i]!, pd.id);
+          const b = cover(frames[(i + 1) % frames.length]!, pd.id);
+          // Not while the whole picture fades between loops.
+          if (Math.min(frames[i]!.alpha, frames[(i + 1) % frames.length]!.alpha) < 0.99) continue;
+          worst = Math.max(worst, ...a.map((v, d) => Math.abs(v - b[d]!)));
+        }
+        if (worst > 0.35) bad.push(`${e.slug} ${pd.id} jumps ${worst.toFixed(2)} in one frame`);
+      }
+    }
+    expect(bad).toEqual([]);
   });
 
   it("a prop held in a hand stays in that hand through the whole movement", () => {

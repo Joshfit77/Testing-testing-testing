@@ -48,12 +48,14 @@ function fingerprint(slug: string): string {
  * Exercises that were not part of this correction, and the fingerprint their animation has. A change to the shared
  * engine or to the shared lateral-shuffle / gait code that alters any of them fails here. Updated once, on purpose,
  * when the engine's "inOut" keyframes moved to the monotone cubic curve (joints keep moving through positions they
- * pass instead of stopping at each one): the keyframe poses are unchanged, the in-betweens are smoother.
+ * pass instead of stopping at each one): the keyframe poses are unchanged, the in-betweens are smoother. Updated again
+ * for the T-drill and the three-cone drill when the body's placement between keyframes moved onto the same curve (it
+ * moved in straight lines, starting and stopping abruptly at each cone); their keyframes are unchanged.
  */
 const UNCHANGED: Record<string, string> = {
   "lateral-shuffle": "ab176e11f016c84e",
-  "t-drill": "fc8bc37e654761e6",
-  "three-cone-drill": "d141b237699eccd1",
+  "t-drill": "ec39ac5022736217",
+  "three-cone-drill": "ccb93ab0424ed48e",
   "reactive-mirror-drill": "63ccd65b0053604f",
 };
 

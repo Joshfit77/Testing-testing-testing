@@ -363,8 +363,11 @@ export function overheadPress(o: PressOpts): MotionDef {
     const rackDip: Vec = [W2.rack[0] + 1, W2.rack[1] + 1];
     specs.push(
       { pose: P(rack), dur: 0.45, hold: 0.4, ease: "inOut", ik: ik(rack) },
-      { pose: P(rackDip, dip), dur: 0.25, hold: 0.05, ease: "out", ik: ik(rackDip) },
-      { pose: P(face, drive), dur: 0.35, ease: "linear", ik: ik(face) },
+      // One smooth drive from the bottom of the dip through the bar passing the face to lockout: it speeds up out of the
+      // dip and slows into lockout. ("out" started the drive at full speed after the pause in the dip, and "linear"
+      // carried the bar into lockout at full speed, stopping it dead in one frame.)
+      { pose: P(rackDip, dip), dur: 0.25, hold: 0.05, ease: "inOut", ik: ik(rackDip) },
+      { pose: P(face, drive), dur: 0.35, ease: "inOut", ik: ik(face) },
       { pose: P(lockout), dur: 1.2, hold: 0.5, ease: "inOut", ik: ik(lockout) },
     );
   } else {

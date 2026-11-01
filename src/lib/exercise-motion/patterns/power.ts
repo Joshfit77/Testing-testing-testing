@@ -42,14 +42,18 @@ export function jump(id: string, label: string, kind: "box" | "broad" | "trap-ba
   if (kind === "pogo") {
     const p = pose({ ...stanceLegs(2, 6, 2), ...both({ sh: 10, el: 30 }) });
     const off = { ...p, ...both({ ankle: -30, knee: 4 }) };
+    const touch = { ...p, ...both({ ankle: -18, knee: 4 }) };
     return {
       id,
       view: "side",
       label,
+      // A short, springy contact: the heels sink a little and the ankles drive the body straight back up (the push
+      // speeds up into take-off), a low flight, and a touchdown that the ankles absorb.
       keyframes: keys(BALL(), [
-        k(p, 0.12, { ease: "out" }),
-        k(off, 0.16, { root: BALL(11, 10), ease: "out" }),
-        k(off, 0.12, { root: BALL(11, 1), ease: "in" }),
+        k(touch, 0.07, { ease: "out" }),
+        k(p, 0.07, { ease: "in" }),
+        k(touch, 0.13, {}),
+        k(off, 0.13, { root: BALL(11, 8), air: true }),
       ]),
       props: [],
       stillPhase: 0.4,
@@ -68,15 +72,19 @@ export function jump(id: string, label: string, kind: "box" | "broad" | "trap-ba
     const d = hold(pullPose(55, { id, label }));
     const st = hold(pose({ ...stanceLegs(1, 3, 2) }));
     const up = hold({ ...st, ...both({ ankle: -32 }) });
+    const touch = hold({ ...st, ...both({ ankle: -14, knee: 8, hip: 10 }) });
     return {
       id,
       view: "side",
       label,
+      // Dip, a push that speeds up into take-off on the toes, one flight, a touchdown on the balls of the feet that the
+      // hips and knees absorb, and a stand.
       keyframes: keys(BALL(), [
         k(st, 0.5, { hold: 0.4 }),
-        k(d, 0.25, { ease: "out" }),
-        k(up, 0.25, { root: BALL(11, 18), ease: "out" }),
-        k(up, 0.25, { root: BALL(11, 1), ease: "in" }),
+        k(d, 0.24, { ease: "in" }),
+        k(up, 0.2),
+        k(up, 0.2, { root: BALL(11, 18), air: true }),
+        k(touch, 0.2, { ease: "out" }),
         k(hold(pullPose(65, { id, label })), 0.5, { hold: 0.2 }),
       ]),
       props: [{ id: "bar", kind: "trapBar", at: { lm: "hands" }, layer: "front" }],
@@ -88,18 +96,22 @@ export function jump(id: string, label: string, kind: "box" | "broad" | "trap-ba
   const peak: RootRule = { pin: "soleR", at: [dist * 0.5, boxH + 26] };
   const landRoot: RootRule = { pin: "soleR", at: [dist, boxH] };
   const start: RootRule = BALL();
+  // The push speeds up into take-off (full extension on the toes), the body flies on one smooth path through the
+  // tuck, touches down with the legs reaching for the landing and absorbs it into the quarter squat.
+  const touch = armsLocal(squatPose(0.12, { id, label, load: "arms-forward" }), [20, -10], [44, 0]);
   const specs: KeySpec[] = [
     k(stand, 0.5, { hold: 0.5, root: start }),
-    k(dip, 0.3, { root: start, ease: "out" }),
-    k(drive, 0.18, { root: start, ease: "linear" }),
-    k(tuck, 0.22, { root: peak, ease: "linear" }),
-    k(land, 0.45, { root: landRoot, ease: "out", hold: 0.25 }),
+    k(dip, 0.3, { root: start, ease: "in" }),
+    k(drive, 0.18, { root: start }),
+    k(tuck, 0.22, { root: peak, air: true }),
+    k(touch, 0.22, { root: landRoot, ease: "out" }),
+    k(land, 0.4, { root: landRoot, hold: 0.25 }),
     k(stand, 0.4, { root: landRoot, hold: 0.4 }),
     k(stand, 0.01, { root: landRoot, alpha: 0 }),
     k(stand, 0.35, { root: start, alpha: 0 }),
   ];
   // Fade back to the start position.
-  specs[5]!.dur = 0.35;
+  specs[6]!.dur = 0.35;
   const props: PropDef[] = kind === "box" ? [{ id: "box", kind: "box", at: [dist + 4, 0], w: 62, h: boxH, layer: "back" }] : [{ id: "line", kind: "hurdleLine", at: [-14, 0], w: 6, layer: "back" }];
   return { id, view: "side", label, keyframes: keys(start, specs), props, stillPhase: 0.32 };
 }
@@ -147,6 +159,11 @@ export function medBall(id: string, label: string, kind: "slam" | "scoop"): Moti
       const T2 = p.trunk;
       return { ...p, shL: T2 + 70, shR: T2 + 70, elL: 6, elR: 6 };
     })();
+    // Follow-through: the hinge deepens and the arms carry on towards the floor after the ball leaves the hands.
+    const follow = (() => {
+      const p = pose({ ...stanceLegs(16, 56, 66), neck: -22 });
+      return { ...p, shL: p.trunk + 46, shR: p.trunk + 46, elL: 8, elR: 8 };
+    })();
     const W = worldPts(slam, { pin: "soleR", at: [0, 0] });
     const floorPt: Vec = [W.handR[0] + 6, 12];
     const pick = (() => {
@@ -159,10 +176,12 @@ export function medBall(id: string, label: string, kind: "slam" | "scoop"): Moti
       view: "side",
       label,
       keyframes: keys(BALL(), [
-        k(top, 0.35, { hold: 0.2, ease: "in", props: { ball: { lm: "hands", dy: 4 } } }),
-        k(slam, 0.18, { ease: "out", props: { ball: { lm: "hands", dy: -6 } } }),
-        k(slam, 0.25, { ease: "out", props: { ball: floorPt } }),
-        k(pick, 0.6, { props: { ball: [floorPt[0], 22] } }),
+        // The slam speeds up to the release and the body follows through after it, slowing as it sinks towards the
+        // pick-up (it used to arrive at the release at full speed and stop dead there).
+        k(top, 0.36, { hold: 0.2, props: { ball: { lm: "hands", dy: 4 } } }),
+        k(slam, 0.22, { props: { ball: { lm: "hands", dy: -6 } } }),
+        k(follow, 0.3, { props: { ball: floorPt } }),
+        k(pick, 0.55, { props: { ball: [floorPt[0], 22] } }),
         k(pick, 0.6, { props: { ball: { lm: "hands", dy: -2 } } }),
       ]),
       props: [{ id: "ball", kind: "medball", at: { lm: "hands" }, layer: "front" }],
@@ -183,9 +202,11 @@ export function medBall(id: string, label: string, kind: "slam" | "scoop"): Moti
     view: "side",
     label,
     keyframes: keys(BALL(), [
-      k(low, 0.35, { hold: 0.3, ease: "in", props: { ball: { lm: "hands", dy: -4 } } }),
-      k(throwP, 0.25, { ease: "out", props: { ball: { lm: "hands", dy: 4 } } }),
-      k(throwP, 0.5, { ease: "out", props: { ball: [150, 215] } }),
+      // The scoop speeds up to the release and the body follows through onto the toes, slowing to a stop (it used to
+      // reach the release at full speed and stop dead there).
+      k(low, 0.3, { hold: 0.3, ease: "in", props: { ball: { lm: "hands", dy: -4 } } }),
+      k(mix(low, throwP, 0.62), 0.22, { ease: "out", props: { ball: { lm: "hands", dy: 4 } } }),
+      k(throwP, 0.5, { props: { ball: [150, 215] } }),
       k(standP(), 0.5, { props: { ball: [70, 225] }, ease: "in" }),
       k(standP(), 0.5, { props: { ball: { lm: "hands", dy: -2 } } }),
     ]),
@@ -220,8 +241,11 @@ export function loadObject(id: string, label: string, kind: "stone" | "sandbag-p
   // Straddled on the floor, the near leg is in front of it.
   const floorLayer = toPlatform ? { obj: "mid" as const } : undefined;
   const specs: KeySpec[] = [k(hinge, 0.7, { hold: 0.5, props: { obj: floorObj }, layers: floorLayer }), k(lap, 0.8, { hold: 0.3, props: { obj: lapObj } })];
+  // Once off the floor the object is hugged: in front of the torso and the near leg, behind the near arm wrapped round
+  // it (drawn in front of everything, it hid the near arm and hand holding it).
+  const held = toPlatform ? "near" : "front";
   const props: PropDef[] = [
-    stone ? { id: "obj", kind: "stone", at: floorObj, size: r, layer: "front" } : { id: "obj", kind: "sandbag", at: floorObj, w: 44, h: 28, layer: "front" },
+    stone ? { id: "obj", kind: "stone", at: floorObj, size: r, layer: held } : { id: "obj", kind: "sandbag", at: floorObj, w: 44, h: 28, layer: held },
   ];
   if (kind === "sandbag-shoulder") {
     // Pop: the bag rises past the chest, then lands on the far shoulder (drawn behind the head) with both hands steadying it.
@@ -327,8 +351,19 @@ export function burpee(id: string, label: string, kind: "jump" | "step" | "spraw
     );
   }
   if (kind === "jump") {
+    // From the squat the push speeds up into take-off on the toes with the arms going up, one flight, and a touchdown
+    // the legs absorb before standing tall.
+    const drive = armsUp(pose({ ...stanceLegs(0, 6, 2), ...both({ ankle: -30 }) }), 150);
     const air = armsUp(pose({ ...stanceLegs(0, 2, 2), ...both({ ankle: -28 }) }));
-    specs.push(k(air, 0.3, { root: { pin: "soleR", at: [0, 24] }, ease: "out" }), k(standP(), 0.3, { root: feet, ease: "in" }));
+    const touch = armsUp(pose({ ...stanceLegs(8, 22, 10), ...both({ ankle: -16 }) }), 120);
+    // (A little longer than the squat-in it replaces: the arms swing from the floor to overhead.)
+    Object.assign(specs[specs.length - 1]!, { ease: "in", dur: 0.28 });
+    specs.push(
+      k(drive, 0.14, { root: { pin: "ballR", at: [worldPts(drive, feet).ballR[0], 0] } }),
+      k(air, 0.18, { root: { pin: "soleR", at: [0, 24] }, air: true }),
+      k(touch, 0.16, { root: feet, ease: "out" }),
+      k(standP(), 0.3, { root: feet }),
+    );
   }
   return { id, view: "side", label, keyframes: keys(feet, specs), props: [], stillPhase: 0.32 };
 }
@@ -580,9 +615,9 @@ export function lateralBound(id: string, label: string): MotionDef {
     label,
     keyframes: keys({ ground: 0 }, [
       k(landL, 0.3, { hold: 0.35, root: { ground: 60 }, ease: "out" }),
-      k(air, 0.3, { root: { ground: 0, lift: 26 }, ease: "linear" }),
+      k(air, 0.3, { root: { ground: 0, lift: 26 }, air: true }),
       k(landR, 0.3, { hold: 0.35, root: { ground: -60 }, ease: "out" }),
-      k(air, 0.3, { root: { ground: 0, lift: 26 }, ease: "linear" }),
+      k(air, 0.3, { root: { ground: 0, lift: 26 }, air: true }),
     ]),
     props: [],
     stillPhase: 0,

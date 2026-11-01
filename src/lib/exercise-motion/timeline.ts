@@ -1,5 +1,5 @@
 import { BODY, applyLimbIK, forwardKinematics, lerp, lerpV, type Skeleton } from "./skeleton";
-import type { Anchor, Ease, Frame, Keyframe, Landmark, MotionDef, Pose, PoseKey, ResolvedProp, RootRule, RunPath, Vec, View } from "./types";
+import type { Anchor, Ease, Frame, Keyframe, Landmark, MotionDef, Pose, PoseKey, PropDef, ResolvedProp, RootRule, RunPath, Vec, View } from "./types";
 
 export interface CompiledMotion {
   def: MotionDef;
@@ -173,6 +173,8 @@ const LIMB_KEYS: Record<"handL" | "handR" | "footL" | "footR", PoseKey[]> = {
 export interface EvalOptions {
   /** Skip the floor-penetration clamp (used by the tests to detect bad poses). */
   noClamp?: boolean;
+  /** Internal: place the body by its keyframes only (flightPath measures the push and the landing this way). */
+  noFlight?: boolean;
 }
 
 /** The keyframe segment and the interpolated (raw) pose at time `time`. */
@@ -263,25 +265,15 @@ function runHeight(r: RunPath, T: number, t: number): number {
 }
 
 /**
- * Where a limb pinned by inverse kinematics reaches between two keyframes, on the same smooth curve as the joints (each
- * coordinate a cubic Hermite with the keyframes' timing). In straight lines the target kept its full speed right up to
- * a keyframe: a pressed bar arrived at lockout at speed and the solver snapped the elbow straight in a frame or two (a
- * straight limb's angle changes fastest just before it locks). On the curve the bar slows into lockout and the joint
- * eases straight, as in a real press, and passes through mid-rep keyframes without stopping. Null when a neighbouring
- * keyframe does not pin this limb (the plain blend applies).
+ * A point that keyframes place (a limb's target, the body's root, a moving piece of equipment) between keyframe `i` and
+ * the next, on the same smooth curve as the joints: each coordinate a cubic Hermite with the keyframes' timing. `at(j)`
+ * gives the point at keyframe j (any integer: neighbours wrap around the loop), or null when that keyframe does not
+ * place it, and then the curve is not used (null). Tangents: Catmull-Rom at "spline" keyframes (dense gait tables),
+ * otherwise monotone (no overshoot, zero at a turning point), zero after a hold.
  */
-function ikSpline(c: CompiledMotion, i: number, u: number, limb: keyof NonNullable<Keyframe["ik"]>, sk: Skeleton): Vec | null {
+function keySpline(c: CompiledMotion, i: number, u: number, at: (j: number) => Vec | null): Vec | null {
   const kfs = c.def.keyframes;
   const n = kfs.length;
-  const travel = c.def.travel ?? 0;
-  const at = (j: number): Vec | null => {
-    const K = kfs[((j % n) + n) % n]!;
-    const a = K.ik?.[limb];
-    if (!a) return null;
-    // A world point repeats one loop's travel further on each lap; a landmark anchor moves with the body already.
-    const lap = Math.floor(j / n);
-    return resolveAnchor(a, sk, Array.isArray(a) ? lap * travel : 0);
-  };
   const p0 = at(i - 1);
   const p1 = at(i);
   const p2 = at(i + 1);
@@ -309,6 +301,110 @@ function ikSpline(c: CompiledMotion, i: number, u: number, limb: keyof NonNullab
   }
   return out;
 }
+
+/**
+ * Where a limb pinned by inverse kinematics reaches between two keyframes. In straight lines the target kept its full
+ * speed right up to a keyframe: a pressed bar arrived at lockout at speed and the solver snapped the elbow straight in a
+ * frame or two (a straight limb's angle changes fastest just before it locks). On the curve the bar slows into lockout
+ * and the joint eases straight, as in a real press, and passes through mid-rep keyframes without stopping. Null when a
+ * neighbouring keyframe does not pin this limb (the plain blend applies).
+ */
+function ikSpline(c: CompiledMotion, i: number, u: number, limb: keyof NonNullable<Keyframe["ik"]>, sk: Skeleton): Vec | null {
+  const kfs = c.def.keyframes;
+  const n = kfs.length;
+  const travel = c.def.travel ?? 0;
+  return keySpline(c, i, u, (j) => {
+    const a = kfs[((j % n) + n) % n]!.ik?.[limb];
+    if (!a) return null;
+    // A world point repeats one loop's travel further on each lap; a landmark anchor moves with the body already.
+    return resolveAnchor(a, sk, Array.isArray(a) ? Math.floor(j / n) * travel : 0);
+  });
+}
+
+/**
+ * Where the body is placed (its root offset) between two keyframes whose placement differs: a jump's take-off, flight
+ * and landing, a burpee's jump back to the feet, a step onto a box. In straight lines the body set off at full speed
+ * and stopped dead at each keyframe (flying up and reversing at the top of a jump in a single frame); on the curve it
+ * speeds up and slows down through them like a body carried by its own momentum. Every keyframe's placement is
+ * measured on the current pose, so a change of pinned landmark between keyframes stays continuous.
+ */
+function rootSpline(c: CompiledMotion, i: number, u: number, sk0: Skeleton, view: View): Vec | null {
+  const kfs = c.def.keyframes;
+  const n = kfs.length;
+  const travel = c.def.travel ?? 0;
+  return keySpline(c, i, u, (j) => {
+    const o = rootOffset(kfs[((j % n) + n) % n]!.root, sk0, view);
+    return [o[0] + Math.floor(j / n) * travel, o[1]];
+  });
+}
+
+/**
+ * Where the pelvis is while the body is in the air. A jump was placed keyframe by keyframe: the body left the floor at
+ * full speed in a single frame (the push before it slowed to a stop at full extension) and hit the landing at a speed
+ * the landing then dropped in one frame. Here the pelvis follows one smooth path (a cubic Hermite per coordinate) from
+ * the last supported keyframe through the airborne ones to the first supported one, leaving with the pelvis's real
+ * speed at the end of the push and arriving with its speed at the start of the landing, so take-off and touchdown are
+ * seamless. Null outside a flight (or when `noFlight`).
+ */
+function flightPath(c: CompiledMotion, i: number, u: number, opts: EvalOptions): Vec | null {
+  const kfs = c.def.keyframes;
+  const n = kfs.length;
+  const K = (j: number) => kfs[((j % n) + n) % n]!;
+  if (opts.noFlight || !(K(i).air || K(i + 1).air)) return null;
+  let a = i;
+  while (K(a).air && a > i - n) a--;
+  let b = i + 1;
+  while (K(b).air && b < i + 1 + n) b++;
+  if (K(a).air || K(b).air) return null;
+  const view = c.def.view;
+  const T = c.duration;
+  const travel = c.def.travel ?? 0;
+  // Pelvis at keyframe j, in its own pose and placement (one loop's travel further on each lap).
+  const knot = (j: number): Vec => {
+    const sk = forwardKinematics(K(j).pose, view);
+    const o = rootOffset(K(j).root, sk, view);
+    return [sk.pts.pelvis[0] + o[0] + Math.floor(j / n) * travel, sk.pts.pelvis[1] + o[1]];
+  };
+  // Pelvis at time t as the keyframes place it, on the same lap as t.
+  const at = (t: number): Vec => {
+    const p = evaluate(c, t, { ...opts, noFlight: true }).pts.pelvis;
+    return [p[0] + Math.floor(t / T) * travel, p[1]];
+  };
+  const startOf = (j: number) => c.starts[((j % n) + n) % n]! + Math.floor(j / n) * T;
+  const h = 1 / 240;
+  const tOff = startOf(a) + (K(a).hold ?? 0); // leaves the take-off keyframe after its hold
+  const tLand = startOf(b);
+  const vOff = ((q0: Vec, q1: Vec): Vec => [(q1[0] - q0[0]) / h, (q1[1] - q0[1]) / h])(at(tOff - h), at(tOff));
+  const vLand = ((q0: Vec, q1: Vec): Vec => [(q1[0] - q0[0]) / h, (q1[1] - q0[1]) / h])(at(tLand), at(tLand + h));
+  const P = (j: number) => knot(j);
+  const p1 = P(i);
+  const p2 = P(i + 1);
+  const d = Math.max(1e-6, K(i).dur);
+  // Tangent (per second) at keyframe j: the measured speeds at take-off and touchdown, monotone between neighbours
+  // inside the flight (level at the top of the jump).
+  const tangent = (j: number, k: 0 | 1): number => {
+    if (j === a) return vOff[k];
+    if (j === b) return vLand[k];
+    const q0 = P(j - 1)[k];
+    const q1 = P(j)[k];
+    const q2 = P(j + 1)[k];
+    const da = Math.max(1e-6, K(j - 1).dur);
+    const db = Math.max(1e-6, K(j).dur);
+    const s0 = (q1 - q0) / da;
+    const s1 = (q2 - q1) / db;
+    if (s0 * s1 <= 0) return 0;
+    return (3 * (da + db)) / ((2 * db + da) / s0 + (db + 2 * da) / s1);
+  };
+  const u2 = u * u;
+  const u3 = u2 * u;
+  const out: Vec = [0, 0];
+  for (const k of [0, 1] as const)
+    out[k] = (2 * u3 - 3 * u2 + 1) * p1[k] + (u3 - 2 * u2 + u) * tangent(i, k) * d + (-2 * u3 + 3 * u2) * p2[k] + (u3 - u2) * tangent(i + 1, k) * d;
+  return out;
+}
+
+/** Drawing order of the prop layers, back to front. */
+const LAYER_DEPTH: Record<NonNullable<PropDef["layer"]>, number> = { back: 0, far: 1, mid: 2, near: 3, front: 4 };
 
 /** Seconds by which the head trails the torso, and (in travelling movements) the forearms trail the upper arms. */
 const LAG_NECK = 0.07;
@@ -353,8 +449,11 @@ export function evaluate(c: CompiledMotion, time: number, opts: EvalOptions = {}
   const oB = rootOffset(B.root, sk0, view);
   if (wrap) oB[0] += travel;
   let offset = lerpV(oA, oB, w);
+  if ((ease === "spline" || ease === "inOut") && (oA[0] !== oB[0] || oA[1] !== oB[1])) offset = rootSpline(c, i, u, sk0, view) ?? offset;
   const gs = (ease === "spline" || ease === "inOut") && (A.hold ?? 0) === 0 ? groundSpline(c, i, u) : null;
   if (gs) offset = [gs[0] - sk0.pts.pelvis[0], gs[1] - lowestContact(sk0, view)];
+  const fl = flightPath(c, i, u, opts);
+  if (fl) offset = [fl[0] - sk0.pts.pelvis[0], fl[1] - sk0.pts.pelvis[1]];
   const run = def.run && view === "side" ? def.run : null;
   const x0 = kfs[0] && "ground" in kfs[0].root ? kfs[0].root.ground : 0;
   // Running: even forward speed and the smooth up-and-down path (see runHeight).
@@ -422,7 +521,9 @@ export function evaluate(c: CompiledMotion, time: number, opts: EvalOptions = {}
 
   let lifted = 0;
   if (!opts.noClamp) {
-    // Feet and hands slide along the floor instead of passing through it (only that limb moves).
+    // Feet and hands slide along the floor instead of passing through it (only that limb moves). From the first
+    // hundredth of a centimetre: with a 0.5 cm dead band, a hand dipping into the floor first lifted the whole body,
+    // then at 0.5 cm the arm took over and the body dropped back by half a centimetre in one frame (a visible pop).
     if (view === "side") {
       const pinned = (rule: RootRule) => ("pin" in rule ? rule.pin : "");
       // A limb counts as pinned only when both keyframes pin it (mid-blend it is free to be corrected).
@@ -431,13 +532,13 @@ export function evaluate(c: CompiledMotion, time: number, opts: EvalOptions = {}
       for (const s of ["L", "R"] as const) {
         const low = Math.min(sk.pts[`heel${s}`][1], sk.pts[`ball${s}`][1], sk.pts[`toe${s}`][1]);
         const isPinned = footPinned(s);
-        if (low < -0.5 && !isPinned) {
+        if (low < -0.01 && !isPinned) {
           const a = sk.pts[`ankle${s}`];
           pose = applyLimbIK(pose, view, sk, `foot${s}`, [a[0], a[1] - low]);
           changed = true;
         }
         const h = sk.pts[`hand${s}`][1] - BODY.r.hand;
-        if (h < -0.5 && !(pinned(A.root) === `hand${s}` && pinned(B.root) === `hand${s}`)) {
+        if (h < -0.01 && !(pinned(A.root) === `hand${s}` && pinned(B.root) === `hand${s}`)) {
           const hp = sk.pts[`hand${s}`];
           pose = applyLimbIK(pose, view, sk, `hand${s}`, [hp[0], hp[1] - h]);
           changed = true;
@@ -458,10 +559,34 @@ export function evaluate(c: CompiledMotion, time: number, opts: EvalOptions = {}
     const b1 = B.props?.[pd.id] ?? pd.at;
     const pa = resolveAnchor(a1, sk);
     const pb = resolveAnchor(b1, sk, wrap && Array.isArray(b1) && b1 !== pd.at ? travel : 0);
-    const at = a1 === b1 ? pa : lerpV(pa, pb, w);
-    // A layer change takes effect half-way between the keyframes.
-    const layer = (w < 0.5 ? A : B).layers?.[pd.id];
-    return { def: pd, at, to: pd.to ? resolveAnchor(pd.to, sk) : undefined, layer };
+    // Equipment moved by the keyframes (a thrown ball, a stone lifted onto a platform) follows the same smooth curve.
+    const curve =
+      a1 !== b1 && (ease === "spline" || ease === "inOut")
+        ? keySpline(c, i, u, (j) => {
+            const a = kfs[((j % n) + n) % n]!.props?.[pd.id] ?? pd.at;
+            return resolveAnchor(a, sk, Array.isArray(a) && a !== pd.at ? Math.floor(j / n) * travel : 0);
+          })
+        : null;
+    const at = a1 === b1 ? pa : (curve ?? lerpV(pa, pb, w));
+    // A layer change: drawn in the deeper layer, with a copy in the nearer one fading in (coming forward) or out
+    // (going back) over the middle 40% of the move.
+    const la = A.layers?.[pd.id] ?? pd.layer ?? "near";
+    const lb = B.layers?.[pd.id] ?? pd.layer ?? "near";
+    let layer = (w < 0.5 ? A : B).layers?.[pd.id];
+    let fade: ResolvedProp["fade"];
+    if (la !== lb) {
+      const k = Math.min(1, Math.max(0, (w - 0.3) / 0.4));
+      const s = k * k * (3 - 2 * k);
+      const forward = LAYER_DEPTH[lb] > LAYER_DEPTH[la];
+      layer = forward ? la : lb;
+      fade = { layer: forward ? lb : la, alpha: forward ? s : 1 - s };
+      if (fade.alpha <= 0) fade = undefined;
+      else if (fade.alpha >= 1) {
+        layer = fade.layer;
+        fade = undefined;
+      }
+    }
+    return { def: pd, at, to: pd.to ? resolveAnchor(pd.to, sk) : undefined, layer, ...(fade ? { fade } : {}) };
   });
 
   return {
