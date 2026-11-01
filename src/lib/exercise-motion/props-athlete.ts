@@ -491,6 +491,36 @@ export function drawPropAthlete(ctx: Ctx, p: ResolvedProp, f: Frame, pass: "main
       dumbbell(ctx, at, def.orient, def.angle ?? fa, size ?? 1);
       return true;
     }
+    case "keg": {
+      // Brushed dark steel with the two rolling hoops edged in gold (matching the athlete, not bright silver).
+      const w = def.w ?? 36;
+      const h = def.h ?? 50;
+      rrect(ctx, at[0] - w / 2, at[1] - h / 2, w, h, 6);
+      const g = ctx.createLinearGradient(at[0] - w / 2, 0, at[0] + w / 2, 0);
+      g.addColorStop(0, "#4a4d52");
+      g.addColorStop(0.4, "#26282b");
+      g.addColorStop(1, "#0d0e10");
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.strokeStyle = `rgba(${GOLD},0.55)`;
+      ctx.lineWidth = 0.45;
+      ctx.stroke();
+      for (const k of [-0.22, 0.22]) {
+        ctx.strokeStyle = "#08090a";
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(at[0] - w / 2, at[1] + h * k);
+        ctx.lineTo(at[0] + w / 2, at[1] + h * k);
+        ctx.stroke();
+        ctx.strokeStyle = `rgba(${GOLD},0.6)`;
+        ctx.lineWidth = 0.35;
+        ctx.beginPath();
+        ctx.moveTo(at[0] - w / 2, at[1] + h * k + 0.9);
+        ctx.lineTo(at[0] + w / 2, at[1] + h * k + 0.9);
+        ctx.stroke();
+      }
+      return true;
+    }
     case "rack":
       rack(ctx, at, def.h);
       return true;
