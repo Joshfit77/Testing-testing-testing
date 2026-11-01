@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { basisFromFoodRow, computeAmount, incompleteMacros, type FoodBasis } from "@/lib/domain/food-basis";
 import { GRAMS_PER_LB, nutritionForGrams, toGrams, unitOptions } from "@/lib/domain/food-units";
 import { basisFromOffProduct, normalizeOffProduct, nutritionForAmount } from "@/lib/open-food-facts";
+import { addDays, isValidIsoDate } from "@/lib/domain/dates";
 
 /** Regression tests from the workouts / nutrition / progress / faith audit (docs/audit/3-workouts-nutrition-progress-faith.md). */
 
@@ -32,6 +33,16 @@ describe("diary totals never present a missing macro as a real zero", () => {
     const basis = basisFromOffProduct(lookup.product);
     expect(basis.missing).toEqual(["protein_g", "fat_g"]);
     expect(incompleteMacros([{ basis }])).toEqual(["protein_g", "fat_g"]);
+  });
+});
+
+describe("the diary's ?date= parameter", () => {
+  it("accepts only real calendar dates, so a malformed link can't crash the page", () => {
+    // The page used to accept anything shaped like a date, and then addDays threw while rendering.
+    expect(() => addDays("2026-13-45", -1)).toThrow(RangeError);
+    for (const bad of ["2026-13-45", "2026-00-10", "2026-02-30", "2026-04-31", "2026-1-05", "", null, undefined, "2026-10-31T00:00"]) expect(isValidIsoDate(bad), String(bad)).toBe(false);
+    for (const good of ["2026-10-31", "2028-02-29", "2026-01-01", "2026-12-31"]) expect(isValidIsoDate(good), good).toBe(true);
+    expect(isValidIsoDate("2027-02-29")).toBe(false);
   });
 });
 

@@ -15,7 +15,7 @@ import { ActionButton } from "@/components/common/action-button";
 import { Button } from "@/components/ui/button";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { ProgressRing } from "@/components/ui/progress-ring";
-import { addDays, isoDateInTz } from "@/lib/domain/dates";
+import { addDays, isoDateInTz, isValidIsoDate } from "@/lib/domain/dates";
 import { NUTRITION_FEATURE_TITLE, NUTRITION_SCORE_LABEL } from "@/lib/food-iq";
 import { progressPct, sumMacros } from "@/lib/domain/nutrition";
 import { getServerSupabase } from "@/lib/supabase/server";
@@ -117,7 +117,8 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
   const { user, profile } = await requireOnboardedUser();
   // The food diary, search, barcode scanning and macros are free on every plan.
   const today = isoDateInTz(new Date(), profile.timezone);
-  const date = sp.date && /^\d{4}-\d{2}-\d{2}$/.test(sp.date) ? sp.date : today;
+  // A malformed ?date= (e.g. 2026-13-45 from an edited link) falls back to today instead of crashing the page.
+  const date = isValidIsoDate(sp.date) ? sp.date : today;
   const supabase = await getServerSupabase();
   const prevDate = addDays(date, -1);
   const [mealsRes, goalsRes, waterRes, foodsRes, templatesRes, plannedRes, history, flag, commonRes, dietRes, prevRes, recentRes, workoutsRes, ctx, categories, favoritesRes, stepsRes, activitiesRes, markRes] = await Promise.all([
