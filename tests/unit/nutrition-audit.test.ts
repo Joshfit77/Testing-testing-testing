@@ -3,6 +3,7 @@ import { basisFromFoodRow, computeAmount, incompleteMacros, type FoodBasis } fro
 import { GRAMS_PER_LB, nutritionForGrams, toGrams, unitOptions } from "@/lib/domain/food-units";
 import { basisFromOffProduct, normalizeOffProduct, nutritionForAmount } from "@/lib/open-food-facts";
 import { addDays, isValidIsoDate } from "@/lib/domain/dates";
+import { amountColumns, scaleItem } from "@/server/services/diary-write";
 
 /** Regression tests from the workouts / nutrition / progress / faith audit (docs/audit/3-workouts-nutrition-progress-faith.md). */
 
@@ -33,6 +34,26 @@ describe("diary totals never present a missing macro as a real zero", () => {
     const basis = basisFromOffProduct(lookup.product);
     expect(basis.missing).toEqual(["protein_g", "fat_g"]);
     expect(incompleteMacros([{ basis }])).toEqual(["protein_g", "fat_g"]);
+  });
+});
+
+describe("saved meals and recipes logged as a different number of servings", () => {
+  it("recomputes an item that has a basis from its amount, so the amount text stays right", () => {
+    const cols = amountColumns(chicken, 6, "oz")!;
+    expect(cols).toMatchObject({ calories: 281, protein_g: 52.7, grams: 170.1, quantity: 6, unit_label: "oz", amount_label: "6 oz (170 g)" });
+    const half = scaleItem({ name: "Chicken", ...cols }, 0.5);
+    expect(half).toMatchObject({ quantity: 3, calories: 140, protein_g: 26.4, amount_label: "3 oz (85 g)" });
+  });
+
+  it("scales an older item without a basis by its numbers and drops the stale amount text", () => {
+    const legacy = { name: "Oats", servings: 1, calories: 150, protein_g: 5, carbs_g: 27, fat_g: 3, fiber_g: 4, sugar_g: null, sodium_mg: 0, grams: 40, quantity: 1, amount_label: "1 cup", unit_label: null, basis: null };
+    expect(scaleItem(legacy, 1.5)).toMatchObject({ servings: 1.5, calories: 225, protein_g: 7.5, carbs_g: 40.5, fat_g: 4.5, fiber_g: 6, sugar_g: null, grams: 60, amount_label: null });
+    expect(scaleItem(legacy, 1)).toBe(legacy);
+  });
+
+  it("refuses units a food doesn't have", () => {
+    expect(amountColumns(chicken, 1, "serving")).toBeNull();
+    expect(amountColumns(chicken, 0, "g")).toBeNull();
   });
 });
 
