@@ -1,5 +1,9 @@
 # Security notes
 
+Pre-launch review (2026-11-01): findings, fixes, test evidence and the launch verdict are in
+[`docs/security/PRELAUNCH_SECURITY_REPORT.md`](security/PRELAUNCH_SECURITY_REPORT.md); the database audit is in
+[`docs/security/DATABASE_AUDIT.md`](security/DATABASE_AUDIT.md).
+
 ## In the code
 
 - **Headers** (`src/lib/security-headers.ts`, wired up in `next.config.ts`).
