@@ -1,4 +1,4 @@
-import { aiAllowance, APPROVED_PRO_PRICE_CENTS, planFromEntitlement, PUBLIC_PLAN_ORDER, PURCHASABLE_PLANS, canAccessTier, effectivePlanFromSubscription, formatPrice, getPlans, hasFeature, legacyTermsApply, yearlySavingsPercent } from "@/lib/domain/plans";
+import { aiAllowance, APPROVED_PRO_PRICE_CENTS, planFromEntitlement, subscriptionToShow, PUBLIC_PLAN_ORDER, PURCHASABLE_PLANS, canAccessTier, effectivePlanFromSubscription, formatPrice, getPlans, hasFeature, legacyTermsApply, yearlySavingsPercent } from "@/lib/domain/plans";
 
 describe("plans & entitlements", () => {
   it("gates features: Free foundation, Pro All Access everything, legacy Plus keeps what it had", () => {
@@ -137,5 +137,23 @@ describe("planFromEntitlement", () => {
     expect(planFromEntitlement({ plan: "plus", valid_until: "2026-11-01T00:00:00Z" }, now)).toBe("plus");
     expect(planFromEntitlement({ plan: "plus", valid_until: "2026-10-01T00:00:00Z" }, now)).toBe("free");
     expect(planFromEntitlement({ plan: "gold", valid_until: null }, now)).toBe("free");
+  });
+});
+
+describe("subscriptionToShow (Plans & billing's current membership)", () => {
+  const now = new Date("2026-10-31T00:00:00Z");
+  // Rows as the page reads them: newest `updated_at` first. Every webhook sync bumps `updated_at`, so a late event
+  // for an old, cancelled subscription can put it first although another subscription grants the plan.
+  const oldCancelled = { id: "old", plan: "pro" as const, status: "canceled" as const, current_period_end: "2026-09-30T00:00:00Z", access_revoked_at: null };
+  const current = { id: "current", plan: "pro" as const, status: "active" as const, current_period_end: "2026-11-30T00:00:00Z", access_revoked_at: null };
+
+  it("describes the subscription that grants the plan, not the one touched last", () => {
+    expect(subscriptionToShow([oldCancelled, current], now)?.id).toBe("current");
+  });
+
+  it("falls back to the newest row when none grants access (ended, refunded), and to nothing without rows", () => {
+    const refunded = { ...current, id: "refunded", access_revoked_at: "2026-10-20T00:00:00Z" };
+    expect(subscriptionToShow([refunded, oldCancelled], now)?.id).toBe("refunded");
+    expect(subscriptionToShow([], now)).toBeNull();
   });
 });

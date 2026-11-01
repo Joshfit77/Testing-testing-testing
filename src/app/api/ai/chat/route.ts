@@ -1,7 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { aiChatRequestSchema } from "@/lib/validation/schemas";
-import { authenticateRequest } from "@/server/api-auth";
-import { getUserPlan } from "@/server/auth";
+import { authenticateRequest, planForAuth } from "@/server/api-auth";
 import { AI_ERROR_STATUS, AiError, coachTurn, type CoachEvent, type CoachTurnResult } from "@/server/services/ai-coach";
 import { logError } from "@/server/log";
 
@@ -34,7 +33,8 @@ export async function POST(request: NextRequest) {
   const parsed = aiChatRequestSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "invalid_request", message: parsed.error.issues[0]?.message }, { status: 400 });
   const wantsStream = (request.headers.get("accept") ?? "").includes("application/x-ndjson");
-  const plan = await getUserPlan(auth.user.id).catch(() => null);
+  // Through the same session that authenticated the request, so bearer-token (native/API) callers get their real plan.
+  const plan = await planForAuth(auth).catch(() => null);
   if (!plan) return NextResponse.json({ error: "server_error", message: "Something went wrong. Please try again." }, { status: 500 });
 
   if (!wantsStream) {

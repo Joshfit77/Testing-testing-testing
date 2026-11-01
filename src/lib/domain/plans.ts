@@ -266,6 +266,17 @@ export function entitlementFromSubscriptions<
 }
 
 /**
+ * The subscription Plans & billing describes, from rows ordered newest `updated_at` first: the one that grants the
+ * member's plan now, else the newest. Every webhook sync touches `updated_at`, so the newest row alone can be an old,
+ * ended subscription that a late Stripe retry just re-synced.
+ */
+export function subscriptionToShow<
+  T extends { plan: Exclude<Plan, "free">; status: SubscriptionStatus; current_period_end: string | null; access_revoked_at?: string | null },
+>(rows: T[], now: Date = new Date()): T | null {
+  return entitlementFromSubscriptions(rows, now).from ?? rows[0] ?? null;
+}
+
+/**
  * AI allowance a subscription kept from before the October 2026 plan change (`legacy_plan_terms`). Existing Plus
  * subscribers had an AI coach allowance, so it stays with that subscription while it remains active on the same
  * plan; new Plus subscriptions have no AI.

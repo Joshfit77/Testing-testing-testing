@@ -3,6 +3,8 @@ import type { NextRequest } from "next/server";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { getServerSupabase, getTokenSupabase } from "@/lib/supabase/server";
 import { publicEnv } from "@/lib/env";
+import { planFromEntitlement } from "@/lib/domain/plans";
+import type { Plan } from "@/lib/domain/types";
 
 export interface ApiAuth {
   user: User;
@@ -29,6 +31,17 @@ export async function authenticateRequest(request: NextRequest): Promise<ApiAuth
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) return { error: "unauthorized" };
   return { user: data.user, supabase, via: "cookie" };
+}
+
+/**
+ * The member's plan, read through the session that authenticated this request (cookie or bearer token).
+ * `getUserPlan` in src/server/auth.ts reads through the cookie session only; on a bearer request that client is an
+ * anonymous visitor, sees no entitlement row under RLS, and would report a paying member as Free.
+ */
+export async function planForAuth(auth: ApiAuth): Promise<Plan> {
+  const { data, error } = await auth.supabase.from("user_entitlements").select("plan, valid_until").eq("user_id", auth.user.id).maybeSingle();
+  if (error) throw error;
+  return planFromEntitlement(data as { plan: string; valid_until: string | null } | null);
 }
 
 export function isSameOrigin(request: NextRequest): boolean {
