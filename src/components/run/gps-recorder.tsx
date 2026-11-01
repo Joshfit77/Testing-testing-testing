@@ -19,7 +19,7 @@ import {
   finishTrack,
   gpsDiagnostics,
   ignoredReadings,
-  isResumable,
+  isRecoverable,
   pauseTrack,
   recoverTrack,
   resumeTrack,
@@ -30,7 +30,7 @@ import {
   type TrackState,
 } from "@/lib/domain/gps-track";
 import { buildScript, completedSets, phaseAt, scriptSeconds, type RunPrescription } from "@/lib/domain/run-session";
-import { hasNativeBackgroundLocation, keepScreenOn, locationSourceLabel, watchLocation, type LocationError } from "@/lib/native/location";
+import { canOpenLocationSettings, hasNativeBackgroundLocation, keepScreenOn, locationSourceLabel, openLocationSettings, watchLocation, type LocationError } from "@/lib/native/location";
 import { saveGpsActivityAction } from "@/server/actions/gps-activities";
 
 export interface GuidedSession {
@@ -135,14 +135,15 @@ export function GpsRecorder({
   const script = useMemo(() => (guided ? buildScript(guided.prescriptions) : null), [guided]);
   const lastPhaseRef = useRef<number>(-1);
 
-  // A recording left unfinished on this device (closed tab, crash, phone restart): offer to continue it.
+  // A recording left on this device (closed tab, crash, phone restart, or finished but not saved because the save
+  // failed offline): offer it back. Only a draft too old to matter is removed; a finished one is never thrown away here.
   useEffect(() => {
     try {
       const raw = localStorage.getItem(storageKey);
       if (!raw) return;
       const saved = JSON.parse(raw) as Saved;
-      if (isResumable(saved.track, Date.now()) && (saved.guidedDayId ?? null) === (guided?.programDayId ?? null)) setRecoverable(saved);
-      else if (!isResumable(saved.track, Date.now())) localStorage.removeItem(storageKey);
+      if (isRecoverable(saved.track, Date.now()) && (saved.guidedDayId ?? null) === (guided?.programDayId ?? null)) setRecoverable(saved);
+      else if (!isRecoverable(saved.track, Date.now())) localStorage.removeItem(storageKey);
     } catch {
       /* storage unavailable: nothing to recover */
     }
@@ -165,7 +166,12 @@ export function GpsRecorder({
     [storageKey, guided?.programDayId],
   );
 
+  // Bumped by every stop: a watcher that finishes starting after a stop (Pause, Discard, Finish or leaving the page
+  // while the native permission prompt was up) is stopped at once instead of being kept and leaking GPS use.
+  const watchGen = useRef(0);
+
   const stopWatching = useCallback(() => {
+    watchGen.current += 1;
     stopRef.current?.();
     stopRef.current = null;
     wakeRef.current?.();
@@ -175,7 +181,8 @@ export function GpsRecorder({
   const beginWatching = useCallback(async () => {
     setError(null);
     stopWatching();
-    stopRef.current = await watchLocation(
+    const gen = watchGen.current;
+    const stop = await watchLocation(
       (fix) => {
         // A fix means the signal is back: drop a warning left by a brief loss (tunnels, tall buildings).
         setError(null);
@@ -183,7 +190,16 @@ export function GpsRecorder({
       },
       (e) => setError(e),
     );
-    if (!hasNativeBackgroundLocation()) wakeRef.current = await keepScreenOn();
+    if (gen !== watchGen.current) {
+      stop();
+      return;
+    }
+    stopRef.current = stop;
+    if (!hasNativeBackgroundLocation()) {
+      const wake = await keepScreenOn();
+      if (gen !== watchGen.current) wake?.();
+      else wakeRef.current = wake;
+    }
   }, [stopWatching]);
 
   useEffect(() => () => stopWatching(), [stopWatching]);
@@ -243,7 +259,8 @@ export function GpsRecorder({
     setKind(t.kind);
     setTrack(t);
     setRecoverable(null);
-    if (t.status !== "paused") await beginWatching();
+    // A finished recording goes straight back to the review screen; location is not needed for that.
+    if (t.status !== "paused" && t.status !== "finished") await beginWatching();
   };
 
   const discard = async () => {
@@ -310,16 +327,21 @@ export function GpsRecorder({
       <div className="space-y-4">
         {recoverable && (
           <Notice tone="warning">
-            <p className="font-semibold">You have an unfinished {recoverable.track.kind} from {new Date(recoverable.track.startedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.</p>
+            <p className="font-semibold" data-testid="gps-recoverable">
+              {recoverable.track.status === "finished" ? "Your" : "You have an unfinished"} {recoverable.track.kind} from {new Date(recoverable.track.startedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+              {recoverable.track.status === "finished" ? " wasn't saved yet." : "."}
+            </p>
             <p className="mt-1 text-sm">
-              {canRecord
-                ? "Continue it, or discard it. Any time the app was closed is kept as a gap: no distance is guessed for it."
-                : "Saving live GPS recordings is included with Pro All Access. It stays on this phone until you discard it or renew Pro to finish and save it."}
+              {!canRecord
+                ? "Saving live GPS recordings is included with Pro All Access. It stays on this phone until you discard it or renew Pro to finish and save it."
+                : recoverable.track.status === "finished"
+                  ? "It is still on this device: review and save it, or discard it."
+                  : "Continue it, or discard it. Any time the app was closed is kept as a gap: no distance is guessed for it."}
             </p>
             <div className="mt-2 flex gap-2">
               {canRecord && (
                 <Button size="sm" onClick={continueRecording}>
-                  Continue recording
+                  {recoverable.track.status === "finished" ? "Review and save" : "Continue recording"}
                 </Button>
               )}
               <Button
@@ -375,7 +397,16 @@ export function GpsRecorder({
           </li>
           <li>Location is used only while you record, and your route is private to you.</li>
         </ul>
-        {error && <Notice tone="error">{ERROR_TEXT[error]}</Notice>}
+        {error && (
+          <Notice tone="error">
+            {ERROR_TEXT[error]}
+            {error === "denied" && canOpenLocationSettings() && (
+              <Button size="sm" variant="secondary" className="mt-2" onClick={() => void openLocationSettings()}>
+                Open Settings
+              </Button>
+            )}
+          </Notice>
+        )}
         {canRecord ? (
           <Button className="w-full" size="lg" onClick={start} data-testid="gps-start">
             <Play aria-hidden /> Start {guided ? "guided run" : kind}

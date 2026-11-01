@@ -549,10 +549,21 @@ export function trackTotals(s: TrackState): { distance_m: number; elapsed_s: num
   return { distance_m: Math.round(s.distanceM * 10) / 10, elapsed_s: elapsed, moving_s: Math.max(1, Math.min(elapsed, movingSecondsAt(s, end))) };
 }
 
+/** How long a draft left on the device is offered back (matches GPS_RESUMABLE_MS in src/lib/opening.ts). */
+export const RECOVERABLE_MS = 12 * 3600_000;
+
+/**
+ * Is a saved draft worth offering back: a recording still in progress, or one that was finished but never saved
+ * (the save failed offline, or the app was closed on the review screen)? Only recent drafts count.
+ */
+export function isRecoverable(s: unknown, now: number): s is TrackState {
+  const t = s as TrackState | null;
+  return Boolean(t && (t.version === 1 || t.version === 2) && typeof t.startedAt === "number" && now - t.startedAt < RECOVERABLE_MS);
+}
+
 /** Is a saved draft still a recording to offer to continue (not finished, and recent)? */
 export function isResumable(s: unknown, now: number): s is TrackState {
-  const t = s as TrackState | null;
-  return Boolean(t && (t.version === 1 || t.version === 2) && t.status !== "finished" && typeof t.startedAt === "number" && now - t.startedAt < 12 * 3600_000);
+  return isRecoverable(s, now) && s.status !== "finished";
 }
 
 /**

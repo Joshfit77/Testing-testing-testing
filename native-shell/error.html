@@ -14,13 +14,23 @@
       p { color: #b7b7b7; line-height: 1.5; }
       a, button { display: inline-block; margin-top: 16px; padding: 12px 22px; border-radius: 12px; border: 0; background: linear-gradient(135deg,#E6C76E,#C9A54C 50%,#8C7139); color: #0b0b0b; font-weight: 700; font-size: 15px; text-decoration: none; cursor: pointer; }
     </style>
+    <!-- Written by capacitor.config.ts at `npx cap sync`: the deployed site's address. -->
+    <script src="server-url.js"></script>
+    <script>
+      // This page is loaded from inside the app (not from the site), so reloading it would only show it again.
+      function retry() {
+        var site = window.NGF_SERVER_URL;
+        if (site) window.location.replace(site);
+        else window.location.reload();
+      }
+    </script>
   </head>
   <body>
     <main>
       
       <h1>You're offline</h1>
       <p>Narrow Gate Fitness needs an internet connection. If you were logging a workout, it's saved on this device — reopen the workout when you're back online and it will sync.</p>
-      <button type="button" onclick="location.reload()">Try again</button>
+      <button type="button" onclick="retry()">Try again</button>
     </main>
   </body>
 </html>

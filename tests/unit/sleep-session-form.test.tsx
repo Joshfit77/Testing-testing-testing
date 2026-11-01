@@ -1,0 +1,62 @@
+import { act } from "@testing-library/react";
+import { renderToString } from "react-dom/server";
+import { hydrateRoot } from "react-dom/client";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+/**
+ * "Enter sleep by hand" is server-rendered on a host whose clock zone is UTC, then hydrated on the member's phone in
+ * their own zone. The zone picker used to read the device's zone during render, so the option list differed between
+ * the two and React threw a hydration error (#418) on every visit outside UTC.
+ */
+vi.mock("@/server/actions/sleep", () => ({ saveSleepSessionAction: vi.fn() }));
+const { SleepSessionForm } = await import("@/components/sleep/session-form");
+
+const ZONES = ["Africa/Abidjan", "America/Chicago", "America/New_York", "Europe/London"];
+
+function onDevice(tz: string) {
+  vi.spyOn(Intl, "supportedValuesOf").mockImplementation(() => [...ZONES]);
+  const real = Intl.DateTimeFormat.prototype.resolvedOptions;
+  vi.spyOn(Intl.DateTimeFormat.prototype, "resolvedOptions").mockImplementation(function (this: Intl.DateTimeFormat) {
+    return { ...real.call(this), timeZone: tz };
+  });
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  document.body.innerHTML = "";
+});
+
+describe("entering sleep by hand", () => {
+  it("hydrates without a mismatch when the server and the phone are in different zones, then uses the phone's zone", async () => {
+    const element = <SleepSessionForm timezone="America/Chicago" defaults={{ startedAt: "2026-10-30T22:30", endedAt: "2026-10-31T06:30" }} />;
+    onDevice("UTC");
+    const html = renderToString(element);
+    vi.restoreAllMocks();
+
+    onDevice("America/New_York");
+    const container = document.createElement("div");
+    container.innerHTML = html;
+    document.body.append(container);
+    const errors: unknown[] = [];
+    await act(async () => {
+      hydrateRoot(container, element, { onRecoverableError: (e) => errors.push(e) });
+    });
+    expect(errors).toEqual([]);
+    const select = container.querySelector<HTMLSelectElement>("#sleep-zone")!;
+    expect(select.value).toBe("America/New_York");
+    expect([...select.options].map((o) => o.value)).toEqual([...ZONES, "UTC"]);
+  });
+
+  it("keeps the zone a night was recorded in when editing it", async () => {
+    onDevice("America/New_York");
+    const container = document.createElement("div");
+    document.body.append(container);
+    const session = { id: "5f1c6a52-1b2c-4d3e-8f90-123456789abc", kind: "night" as const, source: "manual" as const, nightOf: "2026-10-31", timezone: "Europe/London", startedAt: "2026-10-30T22:00:00Z", endedAt: "2026-10-31T06:00:00Z", onsetAt: null, finalWakeAt: null, awakeMinutes: null, awakenings: null };
+    const { createRoot } = await import("react-dom/client");
+    await act(async () => {
+      createRoot(container).render(<SleepSessionForm session={session} timezone="America/Chicago" defaults={{ startedAt: "", endedAt: "" }} />);
+    });
+    expect(container.querySelector<HTMLSelectElement>("#sleep-zone")!.value).toBe("Europe/London");
+    expect(container.querySelector<HTMLInputElement>("#sleep-started")!.value).toBe("2026-10-30T22:00");
+  });
+});
