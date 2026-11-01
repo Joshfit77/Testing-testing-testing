@@ -127,7 +127,8 @@ export function powerClean(id: string, label: string): MotionDef {
       k(floor, 0.5, { hold: 0.5, ease: "in", props: { bar: { lm: "hands" } } }),
       k(knee, 0.22, { ease: "linear", props: { bar: { lm: "hands" } } }),
       k(ext, 0.14, { ease: "linear", props: { bar: { lm: "hands" } } }),
-      k(pull, 0.16, { ease: "out", props: { bar: { lm: "hands" } } }),
+      // The turnover: elbows whip round under the bar, fast but accelerating from the pull (not at full speed at once).
+      k(pull, 0.22, { props: { bar: { lm: "hands" } } }),
       k(catchP, 0.6, { hold: 0.25, props: { bar: { lm: "rack" } } }),
       k(stand, 0.4, { hold: 0.5, props: { bar: { lm: "rack" } } }),
       k(mix(stand, knee, 0.3), 0.8, { props: { bar: { lm: "hands" } } }),
@@ -314,13 +315,15 @@ export function burpee(id: string, label: string, kind: "jump" | "step" | "spraw
       k(squat.p, 0.5, { root: feet, ik: { handL: hand, handR: hand } }),
     );
   } else {
+    // The kick back and the jump in each take about a quarter of a second, passing smoothly through the tuck and
+    // kick positions (no stop at each, no instant start).
     specs.push(
-      k(tuck, 0.1, { root: handsRoot, ease: "linear" }),
-      k(kick, 0.12, { root: handsRoot, ease: "linear" }),
-      k(plank, 0.18, { root: handsRoot, hold: kind === "sprawl" ? 0.3 : 0.15, ease: "out" }),
-      k(kick, 0.12, { root: handsRoot, ease: "linear" }),
-      k(tuck, 0.1, { root: handsRoot, ease: "linear" }),
-      k(squat.p, 0.14, { root: feet, ik: { handL: hand, handR: hand }, ease: "out" }),
+      k(tuck, 0.19, { root: handsRoot }),
+      k(kick, 0.15, { root: handsRoot }),
+      k(plank, 0.2, { root: handsRoot, hold: kind === "sprawl" ? 0.3 : 0.15 }),
+      k(kick, 0.19, { root: handsRoot }),
+      k(tuck, 0.15, { root: handsRoot }),
+      k(squat.p, 0.2, { root: feet, ik: { handL: hand, handR: hand } }),
     );
   }
   if (kind === "jump") {
@@ -397,18 +400,23 @@ export function bearCrawl(id: string, label: string): MotionDef {
 export function rowing(id: string, label: string): MotionDef {
   const seatY = 40;
   const foot = ankleForSole(0, 14, 50);
+  const REACH = ARM - 6;
+  let handleAt: number | null = null;
   const P = (x: number, T: number, hand: Vec | null) => {
     const root: RootRule = { pin: "butt", at: [x, seatY] };
     let p = pose({ trunk: T, neck: -4, ...both({ armD: 10 }) });
     p = legsTo(p, root, foot, ["L", "R"], 50);
     const W = worldPts(p, root);
-    const h: Vec = hand ?? [W.shoulder[0] + ARM - 4, W.shoulder[1] - 22];
+    // Default: the arms out straight (a touch short of locked) to the handle, at the chain's height.
+    const h: Vec = hand ?? [W.shoulder[0] + Math.sqrt(Math.max(1, REACH * REACH - (W.shoulder[1] - (handleAt ?? W.shoulder[1] - 22)) ** 2)), handleAt ?? W.shoulder[1] - 22];
     p = handsTo(p, root, h);
     return { p, root, h };
   };
   const c = P(-68, 26, null);
   const handleY = c.h[1];
-  const d = P(-88, 10, [c.h[0] - 30, handleY]);
+  handleAt = handleY;
+  // The leg drive: the arms stay straight and the handle level; the body carries it back.
+  const d = P(-88, 10, null);
   const f = P(-112, -22, null);
   const Wf = worldPts(f.p, f.root);
   const fin = P(-112, -22, [Wf.belly[0] + 4, Wf.belly[1] + 6]);
@@ -539,15 +547,20 @@ export function wallDrill(id: string, label: string): MotionDef {
   const W = worldPts(a, stanceRoot("R"));
   const handPt: Vec = [W.shoulder[0] + ARM * 0.7, W.shoulder[1] + 20];
   const ik = { handL: handPt, handR: handPt };
+  // The body is placed by its hands on the wall, which never move (each pose's arms were solved to reach them from its
+  // stance), so the support foot stays put while the legs switch. Pinning the support foot instead hands the pin from
+  // one foot to the other mid-switch and dragged the body through the floor (the other knee jerked 45° and back).
+  const wallRoot: RootRule = { pin: "handR", at: handPt };
   return {
     id,
     view: "side",
     label,
     keyframes: [
-      { pose: handsTo(a, stanceRoot("R"), handPt), root: stanceRoot("R"), dur: 0.35, hold: 0.25, ease: "inOut", ik },
-      { pose: handsTo({ ...a, hipL: lean, kneeL: 4, ankleL: -lean - 12 }, stanceRoot("R"), handPt), root: stanceRoot("R"), dur: 0.01, ease: "linear", ik },
-      { pose: handsTo({ ...b, hipL: lean, kneeL: 4, ankleL: -lean - 12 }, stanceRoot("L"), handPt), root: stanceRoot("L"), dur: 0.35, hold: 0.25, ease: "inOut", ik },
-      { pose: handsTo({ ...b, hipR: lean, kneeR: 4, ankleR: -lean - 12 }, stanceRoot("L"), handPt), root: stanceRoot("L"), dur: 0.01, ease: "linear", ik },
+      { pose: handsTo(a, stanceRoot("R"), handPt), root: wallRoot, dur: 0.35, hold: 0.25, ease: "inOut", ik },
+      // The switch is sharp (about a tenth of a second), not instantaneous: the legs pass each other.
+      { pose: handsTo({ ...a, hipL: lean, kneeL: 4, ankleL: -lean - 12 }, stanceRoot("R"), handPt), root: wallRoot, dur: 0.12, ease: "inOut", ik },
+      { pose: handsTo({ ...b, hipL: lean, kneeL: 4, ankleL: -lean - 12 }, stanceRoot("L"), handPt), root: wallRoot, dur: 0.35, hold: 0.25, ease: "inOut", ik },
+      { pose: handsTo({ ...b, hipR: lean, kneeR: 4, ankleR: -lean - 12 }, stanceRoot("L"), handPt), root: wallRoot, dur: 0.12, ease: "inOut", ik },
     ],
     props: [{ id: "wall", kind: "wall", at: [handPt[0] + BODY.r.hand, 0], layer: "back" }],
     footGrounded: true,

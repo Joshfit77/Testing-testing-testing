@@ -1,8 +1,8 @@
 import { BODY, add, down, frontOf, up } from "./skeleton";
 import { drawProp } from "./props";
 import { drawAthlete, type Highlight } from "./athlete";
-import { athleteLayer, drawPropAthlete, extraLayer } from "./props-athlete";
-import type { Frame, Vec } from "./types";
+import { athleteLayer, drawPropAthlete, extraLayer, propShift } from "./props-athlete";
+import type { Frame, ResolvedProp, Vec } from "./types";
 
 export interface Palette {
   hi: string;
@@ -82,7 +82,10 @@ export function renderFrame(ctx: CanvasRenderingContext2D, frame: Frame, cam: Ca
   const t = opts.time ?? 0;
   if (opts.style === "athlete") {
     const layerA = (name: string) => {
-      for (const p of frame.props) {
+      for (const p0 of frame.props) {
+        // The athlete look's camera: a prop in a hand shifts with that hand.
+        const dx = frame.view === "side" ? propShift(p0.def) : 0;
+        const p: ResolvedProp = dx ? { ...p0, at: [p0.at[0] + dx, p0.at[1]], to: p0.to ? [p0.to[0] + dx, p0.to[1]] : undefined } : p0;
         if (athleteLayer(p, frame) === name && !drawPropAthlete(ctx, p, frame)) drawProp(ctx, p, frame, t);
         if (extraLayer(p, frame) === name) drawPropAthlete(ctx, p, frame, "extra");
       }

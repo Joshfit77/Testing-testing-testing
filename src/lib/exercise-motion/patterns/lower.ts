@@ -1,4 +1,4 @@
-import { BAR_DEPTH, BAR_FAR_SCALE, BAR_GRIP, BODY, add, ankleForSole, forwardKinematics, solveTwoBone, angleOf } from "../skeleton";
+import { BODY, add, ankleForSole, forwardKinematics, solveTwoBone, angleOf } from "../skeleton";
 import {
   FEET,
   armThrough,
@@ -47,15 +47,11 @@ export interface SquatOpts {
 function holdArms(p: Pose, load: SquatLoad, s: number): Pose {
   switch (load) {
     case "back": {
-      // Hands on the bar either side of the neck, where the bar across the shoulders is drawn (BAR_DEPTH), elbows
-      // down under the hands (forearms about vertical; the arm's sideways reach shows as foreshortening).
-      const trap = lm(p, "trap");
-      let q = p;
-      for (const [side, k] of [["R", 1], ["L", -BAR_FAR_SCALE]] as const) {
-        const hand = add(trap, BAR_DEPTH, k * BAR_GRIP);
-        q = armThrough(q, side, add(hand, [1.5, -25]), hand);
-      }
-      return q;
+      // Hands on the bar at the traps (seen from the side they are at the bar's end), elbows below and a little behind;
+      // each arm reaches out to the side, which the side view shows as foreshortening (armThrough).
+      const hand = lm(p, "trap");
+      const elbow = add(hand, [-1.5, -27]);
+      return armThrough(armThrough(p, "R", elbow, hand), "L", elbow, hand);
     }
     case "front":
       return armsLocal(p, [23, 1], [8.5, 3.5]);
@@ -126,9 +122,6 @@ export function squat(o: SquatOpts): MotionDef {
     planted: ["L", "R"],
     footGrounded: true,
     stillPhase: o.stillPhase ?? 0.45,
-    // A bar on the back: the arms reach out to the sides and round to the bar (abducted and turned out), which a side
-    // view shows as an elbow bent a little past straight.
-    allowLimits: o.load === "back" ? ["elL", "elR"] : undefined,
   };
 }
 

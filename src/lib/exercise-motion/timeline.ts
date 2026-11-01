@@ -56,10 +56,14 @@ function lerpPose(a: Pose, b: Pose, w: number): Pose {
 }
 
 /**
- * Smooth interpolation through the keyframes (cubic Hermite). Each keyframe's velocity is the slope between its
- * neighbours measured in seconds, so the motion keeps a continuous speed even when one phase is slower than the next
- * (a 2 s descent into a 1 s drive); a keyframe with a hold has zero velocity, so the body eases into and out of a pause
- * instead of snapping into motion. With equal durations and no holds this is the Catmull-Rom spline used before.
+ * Smooth interpolation through the keyframes: a cubic Hermite curve per joint whose velocity at each keyframe comes
+ * from the slopes to its neighbours, measured in seconds, so the motion keeps a continuous speed even when one phase
+ * is slower than the next (a 2 s descent into a 1 s drive). A keyframe with a hold has zero velocity, so the body eases
+ * into and out of the pause instead of snapping into motion.
+ *   "spline" keys (dense, evenly sampled gait and drill tables): the Catmull-Rom slope through the neighbours.
+ *   "inOut" keys (sparse, hand-authored positions): the monotone (Fritsch-Carlson) slope, so a joint keeps moving
+ *   through a position it passes on the way somewhere else instead of stopping dead at every key, comes to rest
+ *   exactly where it reverses (a squat's bottom, a curl's top) and never overshoots a key's value.
  */
 function tangent(c: CompiledMotion, j: number, key: PoseKey): number {
   const kfs = c.def.keyframes;
@@ -68,7 +72,13 @@ function tangent(c: CompiledMotion, j: number, key: PoseKey): number {
   if ((K.hold ?? 0) > 0) return 0;
   const prev = kfs[(j - 1 + n) % n]!;
   const next = kfs[(j + 1) % n]!;
-  return (next.pose[key] - prev.pose[key]) / Math.max(1e-6, prev.dur + K.dur);
+  const d0 = Math.max(1e-6, prev.dur);
+  const d1 = Math.max(1e-6, K.dur);
+  if ((K.ease ?? "inOut") === "spline") return (next.pose[key] - prev.pose[key]) / (d0 + d1);
+  const s0 = (K.pose[key] - prev.pose[key]) / d0;
+  const s1 = (next.pose[key] - K.pose[key]) / d1;
+  if (s0 * s1 <= 0) return 0;
+  return (3 * (d0 + d1)) / ((2 * d1 + d0) / s0 + (d1 + 2 * d0) / s1);
 }
 
 function hermitePose(c: CompiledMotion, i: number, u: number): Pose {
@@ -184,8 +194,9 @@ function interpolate(c: CompiledMotion, time: number) {
   const hold = A.hold ?? 0;
   const u = local < hold ? 0 : Math.min(1, (local - hold) / Math.max(1e-6, A.dur));
   const ease = A.ease ?? "inOut";
-  const w = ease === "spline" ? u : EASE[ease](u);
-  const pose = ease === "spline" ? hermitePose(c, i, u) : lerpPose(A.pose, kfs[(i + 1) % n]!.pose, w);
+  const smooth = ease === "spline" || ease === "inOut";
+  const w = smooth ? u : EASE[ease](u);
+  const pose = smooth ? hermitePose(c, i, u) : lerpPose(A.pose, kfs[(i + 1) % n]!.pose, w);
   return { t, i, u, w, ease, pose };
 }
 
@@ -251,6 +262,54 @@ function runHeight(r: RunPath, T: number, t: number): number {
   return (2 * u3 - 3 * u2 + 1) * r.land + (u3 - 2 * u2 + u) * down * ts + (-2 * u3 + 3 * u2) * r.push + (u3 - u2) * up * ts;
 }
 
+/**
+ * Where a limb pinned by inverse kinematics reaches between two keyframes, on the same smooth curve as the joints (each
+ * coordinate a cubic Hermite with the keyframes' timing). In straight lines the target kept its full speed right up to
+ * a keyframe: a pressed bar arrived at lockout at speed and the solver snapped the elbow straight in a frame or two (a
+ * straight limb's angle changes fastest just before it locks). On the curve the bar slows into lockout and the joint
+ * eases straight, as in a real press, and passes through mid-rep keyframes without stopping. Null when a neighbouring
+ * keyframe does not pin this limb (the plain blend applies).
+ */
+function ikSpline(c: CompiledMotion, i: number, u: number, limb: keyof NonNullable<Keyframe["ik"]>, sk: Skeleton): Vec | null {
+  const kfs = c.def.keyframes;
+  const n = kfs.length;
+  const travel = c.def.travel ?? 0;
+  const at = (j: number): Vec | null => {
+    const K = kfs[((j % n) + n) % n]!;
+    const a = K.ik?.[limb];
+    if (!a) return null;
+    // A world point repeats one loop's travel further on each lap; a landmark anchor moves with the body already.
+    const lap = Math.floor(j / n);
+    return resolveAnchor(a, sk, Array.isArray(a) ? lap * travel : 0);
+  };
+  const p0 = at(i - 1);
+  const p1 = at(i);
+  const p2 = at(i + 1);
+  const p3 = at(i + 2);
+  if (!p0 || !p1 || !p2 || !p3) return null;
+  const K = (j: number) => kfs[((j % n) + n) % n]!;
+  const d0 = Math.max(1e-6, K(i - 1).dur);
+  const d1 = Math.max(1e-6, K(i).dur);
+  const d2 = Math.max(1e-6, K(i + 1).dur);
+  const slope = (a: number, b: number, c2: number, da: number, db: number, held: boolean, spline: boolean) => {
+    if (held) return 0;
+    if (spline) return (c2 - a) / (da + db);
+    const s0 = (b - a) / da;
+    const s1 = (c2 - b) / db;
+    if (s0 * s1 <= 0) return 0;
+    return (3 * (da + db)) / ((2 * db + da) / s0 + (db + 2 * da) / s1);
+  };
+  const u2 = u * u;
+  const u3 = u2 * u;
+  const out: Vec = [0, 0];
+  for (const k of [0, 1] as const) {
+    const t1 = slope(p0[k], p1[k], p2[k], d0, d1, (K(i).hold ?? 0) > 0, (K(i).ease ?? "inOut") === "spline") * d1;
+    const t2 = slope(p1[k], p2[k], p3[k], d1, d2, (K(i + 1).hold ?? 0) > 0, (K(i + 1).ease ?? "inOut") === "spline") * d1;
+    out[k] = (2 * u3 - 3 * u2 + 1) * p1[k] + (u3 - 2 * u2 + u) * t1 + (-2 * u3 + 3 * u2) * p2[k] + (u3 - u2) * t2;
+  }
+  return out;
+}
+
 /** Seconds by which the head trails the torso, and (in travelling movements) the forearms trail the upper arms. */
 const LAG_NECK = 0.07;
 const LAG_ELBOW = 0.05;
@@ -294,7 +353,7 @@ export function evaluate(c: CompiledMotion, time: number, opts: EvalOptions = {}
   const oB = rootOffset(B.root, sk0, view);
   if (wrap) oB[0] += travel;
   let offset = lerpV(oA, oB, w);
-  const gs = ease === "spline" && (A.hold ?? 0) === 0 ? groundSpline(c, i, u) : null;
+  const gs = (ease === "spline" || ease === "inOut") && (A.hold ?? 0) === 0 ? groundSpline(c, i, u) : null;
   if (gs) offset = [gs[0] - sk0.pts.pelvis[0], gs[1] - lowestContact(sk0, view)];
   const run = def.run && view === "side" ? def.run : null;
   const x0 = kfs[0] && "ground" in kfs[0].root ? kfs[0].root.ground : 0;
@@ -345,7 +404,8 @@ export function evaluate(c: CompiledMotion, time: number, opts: EvalOptions = {}
       const ta = A.ik?.[limb];
       const tb = B.ik?.[limb];
       if (ta && tb) {
-        const target = lerpV(resolveAnchor(ta, sk), resolveAnchor(tb, sk, wrap ? travel : 0), w);
+        const smooth = (A.ease ?? "inOut") === "spline" || (A.ease ?? "inOut") === "inOut";
+        const target = (smooth && ikSpline(c, i, u, limb, sk)) || lerpV(resolveAnchor(ta, sk), resolveAnchor(tb, sk, wrap ? travel : 0), w);
         p2 = applyLimbIK(p2, view, sk, limb, target);
       } else {
         const anchor = (ta ?? tb)!;

@@ -15,7 +15,7 @@
  * It draws the same skeleton (frame.pts / frame.seg) as the classic figure, so every exercise keeps its movement. No
  * images: a handful of paths and gradients per body part, light enough to animate at 60 fps on a phone.
  */
-import { BODY, add, frontOf, up } from "./skeleton";
+import { BODY, add, frontOf, up, yawShift } from "./skeleton";
 import type { Frame, Vec } from "./types";
 
 type Ctx = CanvasRenderingContext2D;
@@ -124,8 +124,8 @@ interface Tone {
   /** Strength of the few gold anatomical lines. */
   line: number;
 }
-const SKIN_NEAR: Tone = { base: "#2b2826", hi: 0.2, lo: 0.6, rim: 0.95, line: 0.24 };
-const SKIN_FAR: Tone = { base: "#1d1b1a", hi: 0.08, lo: 0.5, rim: 0.42, line: 0.08 };
+const SKIN_NEAR: Tone = { base: "#2c2927", hi: 0.3, lo: 0.66, rim: 0.95, line: 0.22 };
+const SKIN_FAR: Tone = { base: "#1d1b1a", hi: 0.1, lo: 0.52, rim: 0.42, line: 0.08 };
 const CLOTH_NEAR: Tone = { base: "#121213", hi: 0.09, lo: 0.5, rim: 0.6, line: 0 };
 const CLOTH_FAR: Tone = { base: "#0c0c0d", hi: 0.04, lo: 0.45, rim: 0.28, line: 0 };
 const SHOE: Tone = { base: "#151516", hi: 0.14, lo: 0.5, rim: 0.55, line: 0 };
@@ -352,39 +352,47 @@ function render(ctx: Ctx, items: Item[], layer: LayerFn) {
 // ---------------------------------------------------------------------------------------------------- Limbs
 
 /** Side-view profiles (cm). Front = toward the front of the body for a limb hanging down. */
+// Shoulder to elbow: the deltoid cap (widest just below the joint), the groove at its insertion, then the biceps in
+// front and the triceps behind peaking mid-arm, tapering to the elbow.
 const UPPER_ARM: Profile = [
-  [-0.02, 6.2, 6.4],
-  [0.1, 7.3, 7.0],
-  [0.22, 6.9, 6.8],
-  [0.38, 5.8, 6.3],
-  [0.56, 6.1, 6.5],
-  [0.76, 5.1, 5.3],
-  [0.92, 4.0, 4.2],
-  [1, 3.6, 3.8],
+  [-0.04, 7.6, 8.2],
+  [0.1, 9.3, 9.0],
+  [0.22, 8.6, 8.5],
+  [0.32, 7.0, 7.6],
+  [0.5, 8.1, 7.9],
+  [0.66, 7.5, 7.1],
+  [0.82, 5.7, 5.7],
+  [0.94, 4.6, 4.7],
+  [1, 4.2, 4.3],
 ];
+// Elbow to the hand: thick at the brachioradialis and flexor bellies, tapering hard to the wrist.
 const FOREARM: Profile = [
-  [0, 3.8, 3.9],
-  [0.14, 4.8, 4.3],
-  [0.36, 4.2, 3.6],
-  [0.6, 3.1, 2.8],
-  [0.8, 2.45, 2.35],
+  [0, 4.6, 4.8],
+  [0.14, 6.1, 5.4],
+  [0.32, 5.4, 4.6],
+  [0.52, 4.0, 3.5],
+  [0.7, 3.0, 2.8],
+  [0.82, 2.7, 2.6],
 ];
+// Hip to knee: the quadriceps sweep in front, the hamstring behind, the vastus medialis teardrop above the knee.
 const THIGH: Profile = [
-  [0, 9.6, 10.6],
-  [0.22, 10.4, 10.0],
-  [0.5, 10.0, 8.8],
-  [0.74, 8.6, 6.9],
-  [0.9, 6.3, 5.4],
-  [1, 5.0, 4.8],
+  [0, 11.2, 12.4],
+  [0.2, 12.2, 11.8],
+  [0.42, 12.0, 10.4],
+  [0.62, 10.8, 8.4],
+  [0.8, 8.6, 6.6],
+  [0.92, 6.8, 5.6],
+  [1, 5.7, 5.2],
 ];
+// Knee to ankle: the gastrocnemius bulge behind, the shin nearly straight in front, a slim ankle.
 const SHIN: Profile = [
-  [0, 4.8, 4.9],
-  [0.1, 4.5, 7.2],
-  [0.28, 4.2, 8.1],
-  [0.46, 3.7, 6.2],
-  [0.66, 3.1, 3.8],
-  [0.82, 2.6, 2.8],
-  [0.95, 2.4, 2.5],
+  [0, 5.5, 5.6],
+  [0.08, 5.2, 7.5],
+  [0.24, 4.9, 9.8],
+  [0.4, 4.3, 8.2],
+  [0.58, 3.6, 5.1],
+  [0.76, 2.9, 3.3],
+  [0.95, 2.6, 2.7],
 ];
 
 /** Shoulder to fist as one silhouette: deltoid, upper arm, forearm and the closed hand. */
@@ -395,29 +403,37 @@ function armGroup(ctx: Ctx, sh: Vec, el: Vec, hd: Vec, tone: Tone, hl: Highlight
   const prof = (p: Profile): Profile => (flipFront ? p.map(([t, f, b]) => [t, b, f]) : p);
   // The biceps rounds up as the elbow bends (continuous in the elbow angle).
   const flex = clamp(1 - (dot(upper.d, fore.d) + 1) / 1.6, 0, 1);
-  const ua = prof(UPPER_ARM.map(([t, f, b]) => [t, t > 0.36 && t < 0.86 ? f + flex * 1.2 * Math.sin(((t - 0.36) / 0.5) * Math.PI) : f, b] as [number, number, number]));
+  // The biceps rounds up and the triceps flattens a little as the elbow bends.
+  const ua = prof(UPPER_ARM.map(([t, f, b]) => [t, t > 0.3 && t < 0.86 ? f + flex * 1.8 * Math.sin(((t - 0.3) / 0.56) * Math.PI) : f, t > 0.3 && t < 0.86 ? b - flex * 0.4 * Math.sin(((t - 0.3) / 0.56) * Math.PI) : b] as [number, number, number]));
   // The fist: palm and curled fingers around the grip point, knuckles beyond it.
   const g = fore.b;
   const fn: Vec = [fore.n[0] * sgn, fore.n[1] * sgn];
   const P = (x: number, y: number): Vec => [g[0] + fore.d[0] * x + fn[0] * y, g[1] + fore.d[1] * x + fn[1] * y];
   const fist = [P(-7.4, 2.5), P(-3.4, 3.9), P(0.6, 4.3), P(3.8, 3.5), P(4.9, 1.0), P(4.7, -1.8), P(2.4, -3.5), P(-2.6, -3.3), P(-7.4, -2.4)];
-  const path = union(limbOutline(fore, prof(FOREARM), 3.2, 1.4), fist, limbOutline(upper, ua, 5.4, 3.0));
+  const path = union(limbOutline(fore, prof(FOREARM), 3.4, 1.4), fist, limbOutline(upper, ua, 6.2, 3.2));
   return {
     path,
     tone,
     halo,
     haloSkip: [sh, 9],
     shade: () => {
-      form(ctx, fore, 4.2, tone);
-      form(ctx, upper, 6.4, tone);
-      // Deltoid cap, biceps and triceps bellies, the groove between them; forearm muscles; knuckles.
-      belly(ctx, upper, 0.04, 0, 6.2, 5.6, tone, 1);
-      belly(ctx, upper, 0.58, 3 * sgn, 8, 3.4 + flex, tone, sgn);
-      belly(ctx, upper, 0.46, -3.2 * sgn, 9, 3.6, tone, -sgn);
-      groove(ctx, upper, 0.62, 0.4 * sgn, 10, 1.3, tone.lo * 0.4);
-      groove(ctx, upper, 0.3, 0, 6, 1.6, tone.lo * 0.35);
-      belly(ctx, fore, 0.22, 1.8 * sgn, 7, 2.6, tone, sgn);
-      belly(ctx, fore, 0.3, -1.4 * sgn, 7, 2.3, tone, -sgn);
+      form(ctx, fore, 4.6, tone);
+      form(ctx, upper, 7.2, tone);
+      // Deltoid: a round cap with the shadow of its lower edge where it inserts into the arm.
+      belly(ctx, upper, 0.1, 0.8 * sgn, 7.2, 6.4, tone, 1);
+      blob(ctx, at(upper, 0.12, 1.5 * sgn), upper.d, 4.5, 3.2, WARM, tone.hi * 0.5 * clamp(0.5 + 0.5 * sgn * facing(upper.n), 0, 1));
+      groove(ctx, upper, 0.31, 0, 7.5, 1.7, tone.lo * 0.55);
+      // Biceps (front) and triceps (back) bellies, the groove running between them, the triceps' lateral head.
+      belly(ctx, upper, 0.52, 3.6 * sgn, 8.5, 3.6 + flex * 0.8, tone, sgn);
+      belly(ctx, upper, 0.46, -3.6 * sgn, 9.5, 3.4, tone, -sgn);
+      groove(ctx, upper, 0.58, 0.2 * sgn, 11, 1.2, tone.lo * 0.5);
+      belly(ctx, upper, 0.74, -2.2 * sgn, 4.5, 2.2, tone, -sgn);
+      groove(ctx, upper, 0.9, 0, 4, 1.4, tone.lo * 0.3);
+      // Forearm: brachioradialis along the top, the flexors beneath, a groove between; the wrist bone; knuckles.
+      belly(ctx, fore, 0.2, 2.2 * sgn, 7.5, 2.8, tone, sgn);
+      belly(ctx, fore, 0.3, -1.8 * sgn, 8, 2.4, tone, -sgn);
+      groove(ctx, fore, 0.36, 0.2 * sgn, 9, 0.9, tone.lo * 0.4);
+      blob(ctx, at(fore, 0.8, -1.2 * sgn), fore.d, 1.8, 1.4, WARM, tone.hi * 0.4);
       blob(ctx, P(3.4, -1.6), fore.d, 2.6, 2, WARM, tone.hi * 0.6);
       glow(ctx, at(upper, 0.56, 2.4 * sgn), upper.d, 9.5, 3.8 + flex, k * (hl.biceps ?? 0));
       glow(ctx, at(upper, 0.5, -2.6 * sgn), upper.d, 10.5, 3.9, k * (hl.triceps ?? 0));
@@ -438,20 +454,27 @@ function legParts(ctx: Ctx, hip: Vec, knee: Vec, ankle: Vec, footRot: number, sk
   const sgn = flipFront ? -1 : 1;
   const prof = (p: Profile): Profile => (flipFront ? p.map(([t, f, b]) => [t, b, f]) : p);
   const skin: Group = {
-    path: union(limbOutline(shin, prof(SHIN), 3.6, 2), limbOutline(thigh, prof(THIGH), 8, 3.4)),
+    path: union(limbOutline(shin, prof(SHIN), 3.8, 2), limbOutline(thigh, prof(THIGH), 8, 3.6)),
     tone: skinT,
     halo,
     shade: () => {
-      form(ctx, thigh, 9.6, skinT);
-      form(ctx, shin, 5.6, skinT);
-      // Quads (with the teardrop above the knee), hamstrings and the groove between; calf and shin.
-      belly(ctx, thigh, 0.56, 4.6 * sgn, 15, 4.6, skinT, sgn);
-      belly(ctx, thigh, 0.84, 3.4 * sgn, 5, 3.2, skinT, sgn);
-      belly(ctx, thigh, 0.56, -4.2 * sgn, 14, 4, skinT, -sgn);
-      groove(ctx, thigh, 0.58, 0, 17, 1.4, skinT.lo * 0.35);
-      belly(ctx, shin, 0.27, -4.8 * sgn, 9, 3.6, skinT, -sgn);
-      belly(ctx, shin, 0.42, 2.2 * sgn, 11, 1.8, skinT, sgn);
-      blob(ctx, knee, thigh.d, 4.6, 4.2, WARM, skinT.hi * 0.35);
+      form(ctx, thigh, 10.4, skinT);
+      form(ctx, shin, 6.2, skinT);
+      // Quadriceps: the rectus femoris sweep, the vastus medialis teardrop above the knee, the groove along the
+      // iliotibial band; the hamstring behind with the groove above the knee; the kneecap.
+      belly(ctx, thigh, 0.46, 5.2 * sgn, 15, 4.6, skinT, sgn);
+      belly(ctx, thigh, 0.82, 3.8 * sgn, 5.5, 3.2, skinT, sgn);
+      groove(ctx, thigh, 0.68, 1.8 * sgn, 6, 1.0, skinT.lo * 0.35);
+      belly(ctx, thigh, 0.5, -4.6 * sgn, 14, 4.2, skinT, -sgn);
+      groove(ctx, thigh, 0.55, 0.2 * sgn, 18, 1.5, skinT.lo * 0.5);
+      groove(ctx, thigh, 0.86, -2.6 * sgn, 5, 1.2, skinT.lo * 0.35);
+      blob(ctx, knee, thigh.d, 4.4, 4.0, WARM, skinT.hi * 0.45);
+      // Calf: the gastrocnemius head high behind the shin, the soleus below it, the tibialis along the front.
+      belly(ctx, shin, 0.24, -5.2 * sgn, 9, 4.0, skinT, -sgn);
+      belly(ctx, shin, 0.5, -3.2 * sgn, 7, 2.4, skinT, -sgn);
+      groove(ctx, shin, 0.36, -0.8 * sgn, 12, 0.9, skinT.lo * 0.4);
+      belly(ctx, shin, 0.38, 2.4 * sgn, 11, 1.8, skinT, sgn);
+      groove(ctx, shin, 0.86, -1.4 * sgn, 4, 1.0, skinT.lo * 0.3);
       glow(ctx, at(thigh, 0.6, 3.8 * sgn), thigh.d, 19, 5.8, k * (hl.quads ?? 0));
       glow(ctx, at(thigh, 0.58, -3.6 * sgn), thigh.d, 18, 5.2, k * (hl.hamstrings ?? 0));
       glow(ctx, at(thigh, 0.32, front ? -4 * sgn : 0), thigh.d, 12, 4, k * (hl.adductors ?? 0) * 0.8);
@@ -508,18 +531,28 @@ function shoeSide(ctx: Ctx, ankle: Vec, rot: number): Group {
 }
 
 function shoeFront(ctx: Ctx, ankle: Vec, shin: Seg): Group {
-  const c: Vec = [ankle[0] + shin.d[0] * 3, ankle[1] + shin.d[1] * 3 - 1.5];
-  const path = new Path2D();
-  path.ellipse(c[0], c[1] - 1.5, 5.6, 4.4, 0, 0, Math.PI * 2);
+  // Seen from the front: the toe box toward the viewer, wider than the ankle, flat on the floor, with the sole's edge.
+  const x = ankle[0] + shin.d[0] * 2;
+  const top = ankle[1] + 2.5;
+  const floor = ankle[1] - BODY.ankleH;
+  const pts: Vec[] = [[x - 3.6, top], [x + 3.6, top], [x + 5.6, top - 4], [x + 6.6, floor + 2.2], [x + 6.2, floor - 0.2], [x - 6.2, floor - 0.2], [x - 6.6, floor + 2.2], [x - 5.6, top - 4]];
   return {
-    path,
+    path: smooth(pts),
     tone: SHOE,
     shade: () => {
-      blob(ctx, [c[0] + 1.5, c[1] + 1], [1, 0], 4, 3, WARM, SHOE.hi);
-      ctx.fillStyle = "#0a0a0a";
-      ctx.fillRect(c[0] - 5.8, c[1] - 6.4, 11.6, 1.7);
+      blob(ctx, [x + 1.8, top - 3], [1, 0], 4, 3, WARM, SHOE.hi * 1.2);
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.fillRect(x - 6.6, floor - 0.2, 13.2, 2.2);
       ctx.fillStyle = `rgba(${GOLD},0.75)`;
-      ctx.fillRect(c[0] - 5.6, c[1] - 5, 11.2, 0.4);
+      ctx.fillRect(x - 6.3, floor + 1.9, 12.6, 0.4);
+      ctx.strokeStyle = "rgba(0,0,0,0.5)";
+      ctx.lineWidth = 0.35;
+      ctx.beginPath();
+      for (let i = 0; i < 3; i++) {
+        ctx.moveTo(x - 1.8, top - 1.2 - i * 1.3);
+        ctx.lineTo(x + 1.8, top - 1.2 - i * 1.3);
+      }
+      ctx.stroke();
     },
   };
 }
@@ -670,16 +703,19 @@ function torsoStationsSide(f: Frame): [Vec, number, number, Vec][] {
   const fm = frontOf((T1 + T2) / 2);
   const u1 = up(T1);
   const u2 = up(T2);
+  // Waist narrowest above the hips; the lats flare behind from the lower ribs to the armpit; the pectoral curves
+  // forward to its fullest below the clavicle and turns under into the abdominal wall; the traps rise into the neck.
   return [
-    [add(pelvis, u1, -2), 10.6, 11.8, f1],
-    [add(pelvis, u1, 8), 10.3, 9.4, f1],
-    [add(pelvis, u1, 15), 10.6, 8.4, f1],
-    [m, 11.2, 9.6, fm],
-    [add(m, u2, BODY.thorax * 0.22), 12.6, 12.0, f2],
-    [add(m, u2, BODY.thorax * 0.45), 15.2, 13.4, f2],
-    [add(m, u2, BODY.thorax * 0.66), 15.6, 12.8, f2],
-    [add(m, u2, BODY.thorax * 0.86), 12.8, 11.8, f2],
-    [add(neckBase, u2, 1.5), 7.6, 10.6, f2],
+    [add(pelvis, u1, -2), 11.0, 12.4, f1],
+    [add(pelvis, u1, 7), 10.2, 9.4, f1],
+    [add(pelvis, u1, 14), 10.9, 9.2, f1],
+    [m, 12.0, 10.8, fm],
+    [add(m, u2, BODY.thorax * 0.2), 13.2, 13.8, f2],
+    [add(m, u2, BODY.thorax * 0.36), 14.4, 15.4, f2],
+    [add(m, u2, BODY.thorax * 0.52), 17.4, 15.0, f2],
+    [add(m, u2, BODY.thorax * 0.7), 17.0, 14.0, f2],
+    [add(m, u2, BODY.thorax * 0.88), 13.2, 13.0, f2],
+    [add(neckBase, u2, 1.5), 8.0, 11.8, f2],
   ];
 }
 
@@ -694,7 +730,7 @@ function torsoSideGroup(ctx: Ctx, f: Frame, hl: Highlight): Group {
   const base = add(neckBase, up(a), -2);
   const top = add(head, up(a), -7.6);
   const nm = mid(base, top);
-  const neck = [add(base, fT2, 6.2), add(nm, fa, 5.3), add(top, fa, 5.4), add(top, fa, -3.4), add(nm, fa, -5.8), add(base, fT2, -10)];
+  const neck = [add(base, fT2, 6.6), add(nm, fa, 5.6), add(top, fa, 5.6), add(top, fa, -3.6), add(nm, fa, -6.2), add(base, fT2, -10.6)];
   const f1 = frontOf(f.seg.T1);
   const f2 = fT2;
   const u1 = up(f.seg.T1);
@@ -708,16 +744,28 @@ function torsoSideGroup(ctx: Ctx, f: Frame, hl: Highlight): Group {
     tone,
     shade: () => {
       // Form: the chest and belly face the light, the back turns away.
-      form(ctx, { ...spineLow, n: f1 }, 10.5, tone);
-      form(ctx, { ...spineHigh, n: f2 }, 13.5, tone);
-      form(ctx, seg(base, top), 5.5, tone);
-      // Pec, the abdominal wall, the lat's sweep, the upper back, the erectors.
-      blob(ctx, add(add(m, u2, th * 0.6), f2, 10.5), u2, 7, 4.6, WARM, tone.hi * 0.85 * clamp(0.5 + 0.5 * facing(f2), 0, 1));
-      blob(ctx, add(add(m, u2, th * 0.38), f2, 11), u2, 5.5, 1.6, "0,0,0", 0.3);
-      blob(ctx, add(add(m, u1, -2), f1, 8.4), u1, 10, 2.4, WARM, tone.hi * 0.6 * clamp(0.5 + 0.5 * facing(f1), 0, 1));
-      blob(ctx, add(add(m, u2, th * 0.4), f2, -8), u2, 11, 3.4, WARM, tone.hi * 0.45 * clamp(0.5 - 0.5 * facing(f2), 0, 1));
-      blob(ctx, add(add(m, u2, th * 0.72), f2, -9), u2, 7, 3.6, WARM, tone.hi * 0.5 * clamp(0.5 - 0.5 * facing(f2), 0, 1));
-      blob(ctx, add(add(m, u2, th * 0.28), f2, 2), u2, 9, 2.4, "0,0,0", 0.22);
+      form(ctx, { ...spineLow, n: f1 }, 10.8, tone);
+      form(ctx, { ...spineHigh, n: f2 }, 14.5, tone);
+      form(ctx, seg(base, top), 5.8, tone);
+      const lit2 = clamp(0.5 + 0.5 * facing(f2), 0, 1);
+      const lit1 = clamp(0.5 + 0.5 * facing(f1), 0, 1);
+      const back2 = clamp(0.5 - 0.5 * facing(f2), 0, 1);
+      // Pectoral: a full belly with its lower border in shadow, the upper chest catching the light under the clavicle.
+      blob(ctx, add(add(m, u2, th * 0.58), f2, 11.5), u2, 7.5, 5.2, WARM, tone.hi * 1.0 * lit2);
+      blob(ctx, add(add(m, u2, th * 0.78), f2, 11), u2, 4.5, 3, WARM, tone.hi * 0.55 * lit2);
+      blob(ctx, add(add(m, u2, th * 0.37), f2, 12.6), u2, 6, 1.5, "0,0,0", 0.42);
+      // Abdominal wall: three blocks down the front with the grooves between them; the serratus under the pec.
+      for (const [y, k] of [[th * 0.22, 0.75], [th * 0.06, 0.65], [-7, 0.55]] as const) blob(ctx, add(add(m, u2, y), f2, 9.6), u2, 3.2, 2.6, WARM, tone.hi * k * lit2);
+      for (const y of [th * 0.14, -1, -11]) blob(ctx, add(add(m, u2, y), f2, 10.2), u2, 4.2, 0.7, "0,0,0", 0.3);
+      blob(ctx, add(add(m, u2, th * 0.3), f2, 6), u2, 6, 2, "0,0,0", 0.22);
+      blob(ctx, add(add(m, u1, -2), f1, 8.8), u1, 10, 2.4, WARM, tone.hi * 0.45 * lit1);
+      // Latissimus: the flare behind the ribs; the upper back and rear deltoid mass; the trapezius rising to the neck.
+      blob(ctx, add(add(m, u2, th * 0.4), f2, -9.5), u2, 11, 3.8, WARM, tone.hi * 0.55 * back2);
+      blob(ctx, add(add(m, u2, th * 0.72), f2, -9.5), u2, 7, 3.8, WARM, tone.hi * 0.6 * back2);
+      blob(ctx, add(add(neckBase, u2, -3), f2, -6.5), u2, 6, 3.4, WARM, tone.hi * 0.5 * back2);
+      blob(ctx, add(add(m, u2, th * 0.56), f2, -4), u2, 9, 1.2, "0,0,0", 0.26);
+      // The erector groove down the lower back.
+      blob(ctx, add(add(m, u1, -3), f1, -8.6), u1, 9, 0.9, "0,0,0", 0.3);
       glow(ctx, add(add(m, u2, th * 0.6), f2, 8.5), u2, 7.5, 5.5, hl.chest ?? 0);
       glow(ctx, add(add(m, u1, -2), f1, 7.2), u1, 13, 3.6, hl.abs ?? 0);
       glow(ctx, add(add(m, u1, -1), f1, 1.5), u1, 11, 5.5, hl.obliques ?? 0);
@@ -727,8 +775,8 @@ function torsoSideGroup(ctx: Ctx, f: Frame, hl: Highlight): Group {
       glow(ctx, add(add(m, u1, -6), f1, -6.4), u1, 11, 3.6, hl.lowerBack ?? 0);
       glow(ctx, nm, seg(base, top).d, 7, 4, hl.neck ?? 0);
       const L = tone.line;
-      lineW(ctx, [add(add(m, u2, th * 0.44), f2, 14.8), add(add(m, u2, th * 0.37), f2, 9.6), add(add(m, u2, th * 0.55), f2, 3.4)], L);
-      lineW(ctx, [add(add(m, u2, th * 0.66), f2, -3), add(add(m, u2, th * 0.34), f2, -8.4), add(add(pelvis, u1, 17), f1, -6.6)], L * 0.6);
+      lineW(ctx, [add(add(m, u2, th * 0.42), f2, 15.6), add(add(m, u2, th * 0.36), f2, 10.4), add(add(m, u2, th * 0.5), f2, 4.2)], L);
+      lineW(ctx, [add(add(m, u2, th * 0.7), f2, -3.5), add(add(m, u2, th * 0.34), f2, -9.4), add(add(pelvis, u1, 16), f1, -7)], L * 0.6);
       lineW(ctx, [W2(top, fa, 1.2), add(nm, fa, 2.2), add(base, fT2, 3.6)], L * 0.6);
     },
   };
@@ -743,15 +791,17 @@ function shortsSideGroup(ctx: Ctx, f: Frame, hl: Highlight, sleevePts: Vec[], sl
   const f1 = frontOf(f.seg.T1);
   const u1 = up(f.seg.T1);
   const P = (fw: number, uh: number): Vec => add(add(pelvis, f1, fw), u1, uh);
-  const seat = [P(10.9, 9.6), P(11.6, 3), P(10.8, -4.5), P(3.4, -10.6), P(-4.6, -11.2), P(-12, -6.6), P(-13.4, 1), P(-11, 8.8), P(0, 9.9)];
+  const seat = [P(11.0, 9.6), P(11.8, 3), P(11.0, -4.5), P(3.4, -10.8), P(-5.2, -11.6), P(-12.6, -7.4), P(-14.4, 0.2), P(-12.4, 7.6), P(-10.8, 9.2), P(0, 9.9)];
   const tone = CLOTH_NEAR;
   return {
     path: union(seat, sleevePts),
     tone,
     halo: 0.25,
     shade: () => {
-      form(ctx, { ...seg(P(0, -8), P(0, 9)), n: f1 }, 12, tone);
-      blob(ctx, P(-8, -2), u1, 6, 6, WARM, tone.hi * clamp(0.5 - 0.5 * facing(f1), 0, 1));
+      form(ctx, { ...seg(P(0, -8), P(0, 9)), n: f1 }, 12.5, tone);
+      // The gluteal mass rounds the seat; the fold beneath it.
+      blob(ctx, P(-8.5, -1), u1, 6.5, 6.5, WARM, tone.hi * 1.3 * clamp(0.5 - 0.5 * facing(f1), 0, 1));
+      blob(ctx, P(-6, -9.6), f1, 6, 1.2, "0,0,0", 0.35);
       glow(ctx, P(-6.4, -1), u1, 8.5, 7, (hl.glutes ?? 0) * 0.65);
       glow(ctx, P(6.5, -2), u1, 6, 5, (hl.hipFlexors ?? 0) * 0.45);
       sleeveShade();
@@ -766,15 +816,20 @@ function shortsSideGroup(ctx: Ctx, f: Frame, hl: Highlight, sleevePts: Vec[], sl
 
 function drawSide(ctx: Ctx, f: Frame, layer: LayerFn, hl: Highlight) {
   const p = f.pts;
-  const far = legParts(ctx, p.pelvis, p.kneeL, p.ankleL, f.seg.footL, SKIN_FAR, CLOTH_FAR, hl, 0.5, 0);
-  const near = legParts(ctx, p.pelvis, p.kneeR, p.ankleR, f.seg.footR, SKIN_NEAR, CLOTH_NEAR, hl, 1, 0.32);
+  // The camera (CAMERA_YAW in skeleton.ts): the near limbs shift back a little on screen, the far limbs forward; the
+  // midline (torso, head) stays. Equipment in a hand shifts with that hand (render.ts).
+  const Y = (q: Vec, z: number): Vec => [q[0] + yawShift(z), q[1]];
+  const zA = BODY.shoulderHalf;
+  const zL = BODY.hipHalf;
+  const far = legParts(ctx, Y(p.pelvis, -zL), Y(p.kneeL, -zL), Y(p.ankleL, -zL), f.seg.footL, SKIN_FAR, CLOTH_FAR, hl, 0.5, 0);
+  const near = legParts(ctx, Y(p.pelvis, zL), Y(p.kneeR, zL), Y(p.ankleR, zL), f.seg.footR, SKIN_NEAR, CLOTH_NEAR, hl, 1, 0.32);
   const farSleeve: Group = { path: smooth(far.sleevePts), tone: CLOTH_FAR, shade: far.sleeveShade };
   const items: Item[] = [
     // Far side: darker, its glow softer.
     far.skin,
     far.shoe,
     farSleeve,
-    armGroup(ctx, p.shoulder, p.elbowL, p.handL, SKIN_FAR, hl, 0.5, 0),
+    armGroup(ctx, Y(p.shoulder, -zA), Y(p.elbowL, -zA), Y(p.handL, -zA), SKIN_FAR, hl, 0.5, 0),
     { layer: "far" },
     { layer: "mid" },
     torsoSideGroup(ctx, f, hl),
@@ -783,7 +838,7 @@ function drawSide(ctx: Ctx, f: Frame, layer: LayerFn, hl: Highlight) {
     near.shoe,
     shortsSideGroup(ctx, f, hl, near.sleevePts, near.sleeveShade),
     { layer: "near" },
-    armGroup(ctx, p.shoulder, p.elbowR, p.handR, SKIN_NEAR, hl, 1, 0.38),
+    armGroup(ctx, Y(p.shoulder, zA), Y(p.elbowR, zA), Y(p.handR, zA), SKIN_NEAR, hl, 1, 0.38),
   ];
   render(ctx, items, layer);
 }
@@ -853,21 +908,38 @@ function drawFront(ctx: Ctx, f: Frame, layer: LayerFn, hl: Highlight) {
       ctx.save();
       ctx.translate(p.head[0], p.head[1]);
       ctx.rotate((-ha * Math.PI) / 180);
-      ctx.fillStyle = "#070606";
+      // Eyes (set under the brow's shadow), a straight brow, the nose's shadow side and nostrils, a level mouth, the
+      // jaw's shadow: a calm, focused face rather than a drawn smile.
       for (const k of [1, -1]) {
+        ctx.fillStyle = "rgba(0,0,0,0.35)";
         ctx.beginPath();
-        ctx.ellipse(k * 3.2, 1.6, 1.1, 0.45, 0, 0, Math.PI * 2);
+        ctx.ellipse(k * 3.3, 2.0, 2.4, 1.2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#070606";
+        ctx.beginPath();
+        ctx.ellipse(k * 3.3, 1.7, 1.15, 0.42, k * 0.08, 0, Math.PI * 2);
         ctx.fill();
       }
       ctx.strokeStyle = "rgba(8,7,6,0.9)";
-      ctx.lineWidth = 0.55;
+      ctx.lineWidth = 0.75;
       ctx.beginPath();
-      ctx.moveTo(-5.4, 3.4);
-      ctx.quadraticCurveTo(-3.2, 4.2, -1.2, 3.4);
-      ctx.moveTo(5.4, 3.4);
-      ctx.quadraticCurveTo(3.2, 4.2, 1.2, 3.4);
-      ctx.moveTo(-2.2, -5.4);
-      ctx.quadraticCurveTo(0, -6.0, 2.2, -5.4);
+      ctx.moveTo(-5.6, 3.6);
+      ctx.quadraticCurveTo(-3.4, 4.1, -1.3, 3.5);
+      ctx.moveTo(5.6, 3.6);
+      ctx.quadraticCurveTo(3.4, 4.1, 1.3, 3.5);
+      ctx.stroke();
+      ctx.fillStyle = "rgba(0,0,0,0.3)";
+      ctx.beginPath();
+      ctx.ellipse(-0.9, -1.2, 0.9, 2.6, 0.1, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.lineWidth = 0.35;
+      ctx.beginPath();
+      ctx.moveTo(-1.3, -3.6);
+      ctx.lineTo(-0.5, -3.8);
+      ctx.moveTo(0.5, -3.8);
+      ctx.lineTo(1.3, -3.6);
+      ctx.moveTo(-1.9, -6.0);
+      ctx.lineTo(1.9, -6.0);
       ctx.stroke();
       ctx.restore();
     },

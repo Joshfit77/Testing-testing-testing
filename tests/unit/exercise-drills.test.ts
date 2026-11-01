@@ -45,14 +45,16 @@ function fingerprint(slug: string): string {
 }
 
 /**
- * Exercises that were not part of this correction, and the fingerprint their animation had before it. A change to
- * the shared engine or to the shared lateral-shuffle / gait code that alters any of them fails here.
+ * Exercises that were not part of this correction, and the fingerprint their animation has. A change to the shared
+ * engine or to the shared lateral-shuffle / gait code that alters any of them fails here. Updated once, on purpose,
+ * when the engine's "inOut" keyframes moved to the monotone cubic curve (joints keep moving through positions they
+ * pass instead of stopping at each one): the keyframe poses are unchanged, the in-betweens are smoother.
  */
 const UNCHANGED: Record<string, string> = {
-  "lateral-shuffle": "ee4e0659affb492a",
-  "t-drill": "89dc58eaf87bf36a",
-  "three-cone-drill": "55b2785cf5456cd8",
-  "reactive-mirror-drill": "c068d982b8b5b0d1",
+  "lateral-shuffle": "ab176e11f016c84e",
+  "t-drill": "fc8bc37e654761e6",
+  "three-cone-drill": "d141b237699eccd1",
+  "reactive-mirror-drill": "63ccd65b0053604f",
 };
 
 describe("drill corrections do not disturb other exercises", () => {

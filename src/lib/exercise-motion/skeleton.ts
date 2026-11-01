@@ -104,18 +104,22 @@ export const up = (a: number): Vec => [sin(a), cos(a)];
 /** Unit vector pointing out of the front of a segment whose up-direction has lean `a`. */
 export const frontOf = (a: number): Vec => [cos(a), -sin(a)];
 /**
- * A barbell across the shoulders, seen from the side, is drawn in a slight oblique view: each cm of the bar toward the
- * viewer shows this far back and down on screen (the far end forward and up). The bar and both plates then show beside
- * the lifter, with the hands on the bar, instead of one plate face hiding the head and hands.
+ * The athlete look's camera stands a little behind the lifter's near shoulder (this many degrees off a pure side
+ * view), as a photographer would: the two arms and legs separate instead of lying on top of each other, and a bar
+ * across the shoulders shows a short length of bar and both plates beside the lifter instead of one plate face over
+ * the head. Everything is projected with the same camera: a point `z` cm toward the viewer shifts back on screen by
+ * `z * sin(yaw)`. The motion itself, the classic look and the front view are unaffected.
  */
-export const BAR_DEPTH: Vec = [-0.6, -0.12];
-/** Grip: each hand this far (cm, along the bar) from the middle. */
-export const BAR_GRIP = 22;
-/**
- * The far half of that bar is drawn this much shorter than the near half (perspective, exaggerated): its plate sits
- * behind the lifter's head instead of out in front of the face.
- */
-export const BAR_FAR_SCALE = 0.4;
+export const CAMERA_YAW = 15;
+const YAW_SIN = Math.sin((CAMERA_YAW * Math.PI) / 180);
+/** Screen x shift of a point `z` cm toward the viewer (negative = back, the lifter faces +x). */
+export const yawShift = (z: number) => -z * YAW_SIN;
+/** How far a landmark is toward the viewer (+, the right side) or away (-), for the camera above. */
+export function landmarkDepth(lm: string): number {
+  const side = lm.endsWith("R") ? 1 : lm.endsWith("L") ? -1 : 0;
+  if (!side) return 0;
+  return side * (/^(elbow|hand|wrist|shoulder)/.test(lm) ? BODY.shoulderHalf : BODY.hipHalf);
+}
 
 export const add = (p: Vec, v: Vec, k = 1): Vec => [p[0] + v[0] * k, p[1] + v[1] * k];
 export const sub = (a: Vec, b: Vec): Vec => [a[0] - b[0], a[1] - b[1]];
@@ -366,9 +370,22 @@ function frontFK(p: Pose, pelvis: Vec): Skeleton {
  * starting at `root` ends at `target`. `bend` = +1 picks the solution whose second segment is rotated
  * counter-clockwise from the first (elbow flexion), -1 clockwise (knee flexion).
  */
-export function solveTwoBone(root: Vec, target: Vec, a: number, b: number, bend: 1 | -1): { a1: number; a2: number; reached: boolean } {
+/** Where the soft reach of an animated limb begins, as a fraction of its full length (see solveTwoBone). */
+export const SOFT_REACH = 0.99;
+
+/**
+ * Two-bone inverse kinematics: the angles that put the limb's end at `target`. With `soft`, the limb approaches full
+ * extension gradually: past `soft` of its length the reach is compressed toward (never quite to) straight. A straight
+ * limb's joint angle changes fastest just before it locks, so without this a hand or foot travelling to the edge of
+ * its reach snapped the elbow or knee straight in a frame; with it the joint eases into a soft lockout (a few degrees
+ * short of straight), as a real one does. Build-time solves (exact keyframe poses) use the hard reach.
+ */
+export function solveTwoBone(root: Vec, target: Vec, a: number, b: number, bend: 1 | -1, soft = 0): { a1: number; a2: number; reached: boolean } {
   const d0 = len(sub(target, root));
-  const d = Math.max(Math.abs(a - b) + 1e-3, Math.min(a + b - 1e-3, d0));
+  const L = a + b;
+  const ds = soft * L;
+  const dSoft = soft > 0 && d0 > ds ? ds + (L - ds) * (1 - Math.exp(-(d0 - ds) / (L - ds))) : d0;
+  const d = Math.max(Math.abs(a - b) + 1e-3, Math.min(L - 1e-3, dSoft));
   const base = angleOf(root, target);
   const cosA = (a * a + d * d - b * b) / (2 * a * d);
   const alpha = Math.acos(Math.max(-1, Math.min(1, cosA))) / RAD;
@@ -391,7 +408,7 @@ export function applyLimbIK(pose: Pose, view: View, sk: Skeleton, limb: "handL" 
     const b = BODY.forearm * cos(pose[`foreD${s}`]);
     // Elbow flexion is counter-clockwise in side view; in front view mirrored for the right arm.
     const bend = view === "front" ? (s === "L" ? 1 : -1) : 1;
-    const { a1, a2 } = solveTwoBone(root, target, a, b, bend as 1 | -1);
+    const { a1, a2 } = solveTwoBone(root, target, a, b, bend as 1 | -1, SOFT_REACH);
     const T2 = pose.trunk + pose.spine;
     if (view === "side") {
       out[`sh${s}`] = normShoulder(a1 + T2);
@@ -406,7 +423,7 @@ export function applyLimbIK(pose: Pose, view: View, sk: Skeleton, limb: "handL" 
     const root = sk.pts[`hip${s}`];
     const a = BODY.thigh * cos(pose[`legD${s}`]);
     const b = BODY.shin;
-    const { a1, a2 } = solveTwoBone(root, target, a, b, -1);
+    const { a1, a2 } = solveTwoBone(root, target, a, b, -1, SOFT_REACH);
     const T1 = pose.trunk;
     const rot = (s === "L" ? sk.seg.footL : sk.seg.footR);
     out[`hip${s}`] = a1 + T1;
@@ -420,6 +437,33 @@ export function applyLimbIK(pose: Pose, view: View, sk: Skeleton, limb: "handL" 
 export function depthMix(explicit: number, implicit: number) {
   const e = Math.min(90, Math.abs(explicit));
   return e + (1 - e / 90) * implicit;
+}
+
+/**
+ * The real (three-dimensional) angles of an arm whose side-view pose has it reaching out of the picture plane (armD,
+ * foreD are the out-of-plane angles of the upper arm and forearm). The projected elbow angle of such an arm can read
+ * far outside the anatomical range (an arm reaching sideways and round to a bar on the back projects to an elbow bent
+ * past straight) while the arm itself is fine, so the definition tests check these instead of the projection.
+ *   elbowFlex: the angle between the upper arm and the forearm (0 = straight).
+ *   shoulderElevation: how far the upper arm is raised from hanging down, in any direction (0..180).
+ *   shoulderBack: how far the upper arm points behind the frontal plane (0 when forward or sideways).
+ */
+export function armAngles3D(p: Pose, s: Side): { elbowFlex: number; shoulderElevation: number; shoulderBack: number } {
+  const sh = p[`sh${s}`];
+  const el = p[`el${s}`];
+  const a = p[`armD${s}`];
+  const b = p[`foreD${s}`];
+  const ca = cos(a);
+  const cb = cos(b);
+  const clampCos = (x: number) => Math.max(-1, Math.min(1, x));
+  const elbowFlex = (Math.acos(clampCos(ca * cb * cos(el) + sin(a) * sin(b))) * 180) / Math.PI;
+  // Upper arm in the trunk's frame: forward, up and toward the viewer.
+  const fwd = ca * sin(sh);
+  const upC = -ca * cos(sh);
+  const lat = sin(a);
+  const shoulderElevation = (Math.acos(clampCos(-upC)) * 180) / Math.PI;
+  const shoulderBack = (Math.atan2(-fwd, Math.hypot(upC, lat)) * 180) / Math.PI;
+  return { elbowFlex, shoulderElevation, shoulderBack };
 }
 
 /** Shoulder angles live in [-170, 190). */

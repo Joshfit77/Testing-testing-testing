@@ -1,12 +1,11 @@
 /**
- * Equipment in the "athlete" look: matte black iron and steel with thin gold edges, matching the athlete. Kinds not
- * redrawn here keep their classic drawing (props.ts). A barbell across the shoulders is drawn in a slight oblique view
- * (BAR_DEPTH): the bar runs from behind the lifter across the traps, with the hands on it and plates at both ends. Other
- * side-view barbells are drawn as a cut-away: the plate behind the athlete and the bar end in the hands, so the plate
- * never hides the lifter's head, arms or hands.
+ * Equipment in the "athlete" look: matte black iron and steel with thin gold edges, matching the athlete, seen with
+ * the same camera as the athlete (CAMERA_YAW in skeleton.ts). Kinds not redrawn here keep their classic drawing
+ * (props.ts). A side-view barbell (barAcross) shows a short length of bar with the plates at both ends beside the
+ * lifter and the hands on the bar, instead of one plate face hiding the head and hands.
  */
-import { BAR_DEPTH, BAR_FAR_SCALE, add, len, sub } from "./skeleton";
-import type { Frame, ResolvedProp, Vec } from "./types";
+import { add, landmarkDepth, len, sub, yawShift } from "./skeleton";
+import type { Frame, PropDef, ResolvedProp, Vec } from "./types";
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -92,6 +91,7 @@ function cushion(ctx: Ctx, a: Vec, b: Vec, thick = 8) {
 
 /** A round iron plate face-on: raised rim, recessed face, inner ring, steel hub. */
 export function plateFace(ctx: Ctx, c: Vec, r: number, hub = 2.6) {
+  // hub 0: the face away from the viewer (no sleeve end showing).
   const g = ctx.createRadialGradient(c[0] + r * 0.25, c[1] + r * 0.35, r * 0.1, c[0], c[1], r);
   g.addColorStop(0, IRON_HI);
   g.addColorStop(0.65, IRON);
@@ -117,6 +117,7 @@ export function plateFace(ctx: Ctx, c: Vec, r: number, hub = 2.6) {
   ctx.arc(c[0], c[1], r * 0.58, 0, Math.PI * 2);
   ctx.stroke();
   // Hub: the sleeve's end with a collar.
+  if (hub <= 0) return;
   ctx.fillStyle = steel(ctx, [c[0] + hub, c[1] + hub], [c[0] - hub, c[1] - hub]);
   ctx.beginPath();
   ctx.arc(c[0], c[1], hub, 0, Math.PI * 2);
@@ -128,17 +129,21 @@ export function plateFace(ctx: Ctx, c: Vec, r: number, hub = 2.6) {
 
 const COLLAR = 66; // bar centre to the inner collar (cm)
 const PLATE_T = 5; // plate thickness (cm)
+/** Perspective: the near plates are closer to the camera than the lifter, the far ones farther (camera about 4 m away). */
+const NEAR_SCALE = 1.08;
+const FAR_SCALE = 0.86;
 
 /**
- * One half of a barbell across the shoulders (oblique view, BAR_DEPTH): the bar from the lifter's traps out to the
- * collar, two plates and the sleeve's end. `side` +1 is the half toward the viewer, -1 the far half (drawn behind the
- * athlete). Parts are painted far to near so each covers what is behind it.
+ * One half of a barbell, seen with the athlete look's camera (CAMERA_YAW): the bar from its middle (on the traps, in
+ * the hands, on the chest) out to the collar, two plates and the sleeve's end. The hands, shifted by the same camera
+ * (a shoulder-width grip), land on it. `side` +1 is the half toward the viewer (drawn before the near arm, so the hand
+ * closes over the bar), -1 the far half (drawn behind the athlete). Parts are painted far to near.
  */
 function barAcross(ctx: Ctx, at: Vec, r0: number, side: 1 | -1) {
-  // The far half is drawn shorter (BAR_FAR_SCALE), smaller and in shadow, as perspective and the light would show it.
-  const P = (z: number): Vec => add(at, BAR_DEPTH, z * (side > 0 ? 1 : -BAR_FAR_SCALE));
-  const r = side > 0 ? r0 : r0 * 0.9;
-  const shadow = side > 0 ? 0 : 0.7;
+  const sc = side > 0 ? NEAR_SCALE : FAR_SCALE;
+  const P = (z: number): Vec => [at[0] + yawShift(z * side) * sc, at[1]];
+  const r = r0 * sc;
+  const shadow = side > 0 ? 0 : 0.5;
   const line = (a: Vec, b: Vec, w: number, cap: CanvasLineCap) => {
     ctx.strokeStyle = steel(ctx, [a[0], a[1] + w / 2], [a[0], a[1] - w / 2]);
     ctx.lineWidth = w;
@@ -172,7 +177,7 @@ function barAcross(ctx: Ctx, at: Vec, r0: number, side: 1 | -1) {
     ctx.fill(band, "nonzero");
     // The face the viewer sees: the outer one on the near half, the inner one on the far half.
     const face = side > 0 ? b : a;
-    plateFace(ctx, face, r, 2.6);
+    plateFace(ctx, face, r, side > 0 ? 2.6 * sc : 0);
     if (shadow) {
       ctx.fillStyle = `rgba(0,0,0,${shadow})`;
       ctx.beginPath();
@@ -180,8 +185,8 @@ function barAcross(ctx: Ctx, at: Vec, r0: number, side: 1 | -1) {
       ctx.fill();
     }
   };
-  const shaft = () => line(at, P(COLLAR), 2.6, "round");
-  const sleeve = () => line(P(COLLAR + 2 * PLATE_T), P(COLLAR + 2 * PLATE_T + 9), 4.2, "butt");
+  const shaft = () => line(at, P(COLLAR), 2.6 * sc, "round");
+  const sleeve = () => line(P(COLLAR + 2 * PLATE_T), P(COLLAR + 2 * PLATE_T + 9), 4.2 * sc, "butt");
   if (side > 0) {
     shaft();
     plate(COLLAR, COLLAR + PLATE_T);
@@ -195,15 +200,66 @@ function barAcross(ctx: Ctx, at: Vec, r0: number, side: 1 | -1) {
   }
 }
 
-/** The bar's end where it crosses the body (side view), held in the hands. */
-function barEnd(ctx: Ctx, c: Vec, r = 1.9) {
-  ctx.fillStyle = steel(ctx, [c[0] + r, c[1] + r], [c[0] - r, c[1] - r]);
+/**
+ * A barbell seen from the front (sumo deadlift): the bar runs across the picture with the plates edge-on outside the
+ * hands. Thick iron plates with a gold rim and a lit edge, collars, and the steel bar shaded across its thickness.
+ */
+function barFront(ctx: Ctx, c: Vec, r: number) {
+  const [x, y] = c;
+  // Shaft, knurled in the middle third, and the sleeves.
+  ctx.lineCap = "butt";
+  ctx.strokeStyle = steel(ctx, [x, y + 1.4], [x, y - 1.4]);
+  ctx.lineWidth = 2.8;
   ctx.beginPath();
-  ctx.arc(c[0], c[1], r, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "rgba(0,0,0,0.6)";
-  ctx.lineWidth = 0.3;
+  ctx.moveTo(x - 64, y);
+  ctx.lineTo(x + 64, y);
   ctx.stroke();
+  ctx.strokeStyle = "rgba(0,0,0,0.25)";
+  ctx.lineWidth = 0.35;
+  for (let k = -20; k <= 20; k += 2.2) {
+    ctx.beginPath();
+    ctx.moveTo(x + k, y - 1.2);
+    ctx.lineTo(x + k + 1, y + 1.2);
+    ctx.stroke();
+  }
+  for (const k of [-1, 1]) {
+    ctx.strokeStyle = steel(ctx, [x, y + 2.1], [x, y - 2.1]);
+    ctx.lineWidth = 4.2;
+    ctx.beginPath();
+    ctx.moveTo(x + k * 62, y);
+    ctx.lineTo(x + k * 112, y);
+    ctx.stroke();
+    // Collar.
+    rrect(ctx, x + k * 63 - 1.6, y - 3.4, 3.2, 6.8, 0.8);
+    ctx.fillStyle = STEEL;
+    ctx.fill();
+    // Two plates a side, the inner one first.
+    for (let i = 0; i < 2; i++) {
+      const px = x + k * (67.5 + i * 5.6);
+      rrect(ctx, px - 2.6, y - r, 5.2, 2 * r, 1.6);
+      const g = ctx.createLinearGradient(px - 2.6, y, px + 2.6, y);
+      g.addColorStop(0, IRON_HI);
+      g.addColorStop(0.45, IRON);
+      g.addColorStop(1, IRON_LO);
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.strokeStyle = `rgba(${GOLD},0.75)`;
+      ctx.lineWidth = 0.45;
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(255,255,255,0.08)";
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(px - 1.6, y - r + 2);
+      ctx.lineTo(px - 1.6, y + r - 2);
+      ctx.stroke();
+    }
+  }
+}
+
+/** Screen shift of a prop with the athlete look's camera: it follows the depth of the landmark it is anchored to. */
+export function propShift(def: PropDef): number {
+  const lm = def.follow ?? (typeof def.at === "object" && !Array.isArray(def.at) ? def.at.lm : undefined);
+  return lm ? yawShift(landmarkDepth(lm)) : 0;
 }
 
 /** Round-plate dumbbell. End-on: a plate face (supinated / pronated grip seen from the side). Profile: handle and plates. */
@@ -400,29 +456,30 @@ function rowStation(ctx: Ctx, seatAt: Vec, f: Frame, hands: Vec | undefined) {
 }
 
 /**
- * Where a prop is drawn in the athlete look. A side-view barbell plate goes behind the athlete; a bar across the
- * shoulders draws its near half under the near arm (the hand closes over it) and its far half behind the athlete.
+ * Where a prop is drawn in the athlete look. A side-view barbell draws its near half under the near arm (the hand
+ * closes over it) and its far half behind the athlete.
  */
 export function athleteLayer(p: ResolvedProp, f: Frame): string {
   const l = p.layer ?? p.def.layer ?? "near";
-  if (p.def.kind === "barbell" && f.view === "side" && !p.def.variant) return p.def.orient === "across" ? "near" : "far";
+  if (p.def.kind === "barbell" && f.view === "side" && !p.def.variant) return "near";
   return l;
 }
 
 /**
  * Draw a prop in the athlete look. Returns false for kinds it does not redraw (the caller draws the classic one).
- * `pass` "extra" draws the second part of a side-view barbell: a cut-away bar's end in the hands, or the far half of a
- * bar across the shoulders.
+ * `pass` "extra" draws the second part of a side-view barbell: its far half.
  */
 export function drawPropAthlete(ctx: Ctx, p: ResolvedProp, f: Frame, pass: "main" | "extra" = "main"): boolean {
   const { def, at } = p;
   const size = def.size;
   switch (def.kind) {
     case "barbell": {
+      if (def.variant === "front") {
+        if (pass === "main") barFront(ctx, at, size ?? 22.5);
+        return true;
+      }
       if (f.view !== "side" || def.variant) return false;
-      if (def.orient === "across") barAcross(ctx, at, size ?? 22.5, pass === "main" ? 1 : -1);
-      else if (pass === "main") plateFace(ctx, at, size ?? 22.5, 2.8);
-      else barEnd(ctx, at);
+      barAcross(ctx, at, size ?? 22.5, pass === "main" ? 1 : -1);
       return true;
     }
     case "plate":
@@ -454,8 +511,7 @@ export function drawPropAthlete(ctx: Ctx, p: ResolvedProp, f: Frame, pass: "main
   }
 }
 
-/** The layer of a prop's second part, if it has one: a cut-away barbell's end in the hands, or a bar's far half. */
+/** The layer of a prop's second part, if it has one: a side-view barbell's far half, behind the athlete. */
 export function extraLayer(p: ResolvedProp, f: Frame): string | null {
-  if (p.def.kind !== "barbell" || f.view !== "side" || p.def.variant) return null;
-  return p.def.orient === "across" ? "far" : "near";
+  return p.def.kind === "barbell" && f.view === "side" && !p.def.variant ? "far" : null;
 }

@@ -1,7 +1,7 @@
 import { EXERCISES } from "@/data/exercises";
 import { EXERCISE_MOTIONS, fallbackMotion } from "@/data/exercise-motions";
 import { getMotion, hasMotion } from "@/lib/exercise-motion";
-import { FRONT_LIMITS, LIMITS } from "@/lib/exercise-motion/skeleton";
+import { FRONT_LIMITS, LIMITS, armAngles3D } from "@/lib/exercise-motion/skeleton";
 import { compileMotion, evaluate, lowestContact, sampleFrames } from "@/lib/exercise-motion/timeline";
 import { forwardKinematics } from "@/lib/exercise-motion/skeleton";
 import type { ExerciseMeta, Frame, MotionDef, Pose } from "@/lib/exercise-motion/types";
@@ -11,17 +11,31 @@ const metaOf = (e: (typeof EXERCISES)[number]): ExerciseMeta => ({ slug: e.slug,
 const SAMPLES = 36;
 
 /**
- * Limits are checked on the drawn (projected) 2D angles. A limb that leaves the picture plane (foreshortened by
- * 20° or more, e.g. elbows flared out in a front rack) can show a larger apparent elbow / shoulder angle than the
- * real joint, so those get a wider projected range.
+ * Joint limits. Angles are authored as drawn (projected) 2D angles. An arm that leaves the picture plane (armD / foreD,
+ * e.g. elbows flared in a front rack, hands reaching sideways to a bar on the back) projects to elbow and shoulder
+ * angles that can read far outside the anatomical range while the real joint is fine, so for such arms the elbow and
+ * shoulder are checked on their real three-dimensional angles (armAngles3D) instead of their projections; everything
+ * else is checked on the drawn angle against LIMITS / FRONT_LIMITS.
  */
-function limitFor(def: MotionDef, f: Frame, key: keyof Pose): [number, number] {
-  const base = (def.view === "front" ? FRONT_LIMITS[key] : undefined) ?? LIMITS[key];
+const OUT_OF_PLANE = 20;
+const ELBOW_MAX = LIMITS.elR[1];
+/** How far the upper arm may point behind the body, by how far it is raised: 75° hanging, 10° overhead. */
+const shoulderBackAllowed = (elevation: number) => (elevation <= 75 ? 75 : elevation >= 170 ? 10 : 75 - ((elevation - 75) / 95) * 65);
+
+function jointViolation(def: MotionDef, f: Frame, key: keyof Pose): string | null {
   const side = key.endsWith("L") ? "L" : "R";
-  const outOfPlane = def.view === "side" && (Math.abs(f.pose[`armD${side}`]) >= 20 || Math.abs(f.pose[`foreD${side}`]) >= 20);
-  if (outOfPlane && (key === "elL" || key === "elR")) return [-20, 200];
-  if (outOfPlane && (key === "shL" || key === "shR")) return [-110, 215];
-  return base;
+  const arm = key === "elL" || key === "elR" || key === "shL" || key === "shR";
+  const outOfPlane = def.view === "side" && arm && (Math.abs(f.pose[`armD${side}`]) >= OUT_OF_PLANE || Math.abs(f.pose[`foreD${side}`]) >= OUT_OF_PLANE);
+  if (outOfPlane) {
+    const a = armAngles3D(f.pose, side);
+    if (key.startsWith("el")) return a.elbowFlex > ELBOW_MAX + 1 ? `${key}: real elbow flexion ${a.elbowFlex.toFixed(1)} > ${ELBOW_MAX} (projected ${f.pose[key].toFixed(1)})` : null;
+    const allowed = shoulderBackAllowed(a.shoulderElevation);
+    return a.shoulderBack > allowed + 1 ? `${key}: arm ${a.shoulderBack.toFixed(1)}° behind the body at ${a.shoulderElevation.toFixed(0)}° elevation (allowed ${allowed.toFixed(0)})` : null;
+  }
+  const [lo, hi] = (def.view === "front" ? FRONT_LIMITS[key] : undefined) ?? LIMITS[key];
+  const v = f.pose[key];
+  if (!Number.isFinite(v)) return `${key} not finite`;
+  return v < lo - 1 || v > hi + 1 ? `${key}=${v.toFixed(1)} outside [${lo}, ${hi}]` : null;
 }
 
 function limitViolations(def: MotionDef, frames: Frame[]): string[] {
@@ -30,10 +44,8 @@ function limitViolations(def: MotionDef, frames: Frame[]): string[] {
   for (const f of frames) {
     for (const key of Object.keys(LIMITS) as (keyof Pose)[]) {
       if (allow.has(key)) continue;
-      const [lo, hi] = limitFor(def, f, key);
-      const v = f.pose[key];
-      if (!Number.isFinite(v)) out.push(`${key} not finite`);
-      else if (v < lo - 1 || v > hi + 1) out.push(`${key}=${v.toFixed(1)} outside [${lo}, ${hi}]`);
+      const v = jointViolation(def, f, key);
+      if (v) out.push(v);
     }
   }
   return [...new Set(out)];

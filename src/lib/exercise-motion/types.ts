@@ -210,7 +210,7 @@ export interface PropDef {
   angle?: number;
   /**
    * For dumbbells: "end" = seen end-on (pronated / supinated grip), "profile" = neutral grip seen from the side.
-   * For a barbell: "across" = across the shoulders, drawn in the oblique view of BAR_DEPTH in the athlete look.
+   * For a barbell: "across" = across the shoulders (side view: its end at the traps, near plates drawn as a cut-away).
    */
   orient?: "end" | "profile" | "vertical" | "across";
   /** Rotate with the forearm of this hand (dumbbell profile / kettlebell hang). */
