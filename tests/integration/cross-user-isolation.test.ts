@@ -368,4 +368,65 @@ describe.skipIf(!available)("cross-user isolation sweep: every user-owned table 
     expect((await bob.client.rpc("admin_usage_metrics")).error).not.toBeNull();
     expect((await bob.client.rpc("record_signup_acceptances")).error).not.toBeNull();
   });
+
+  it("private buckets accept only images within their size limit", async () => {
+    const problems: string[] = [];
+    const tryUpload = async (bucket: string, body: Blob, contentType: string, label: string) => {
+      const { error } = await alice.client.storage.from(bucket).upload(`${alice.id}/${crypto.randomUUID()}.bin`, body, { contentType });
+      if (!error) problems.push(`${bucket}: accepted ${label}`);
+    };
+    for (const bucket of USER_STORAGE_BUCKETS) {
+      const folder = bucket === "body-scans" ? `${alice.id}/${parents.body_scans}` : alice.id;
+      const up = (body: Blob, contentType: string, label: string) =>
+        alice.client.storage
+          .from(bucket)
+          .upload(`${folder}/${crypto.randomUUID()}.bin`, body, { contentType })
+          .then(({ error }) => void (!error && problems.push(`${bucket}: accepted ${label}`)));
+      await up(new Blob(["<script>alert(1)</script>"], { type: "text/html" }), "text/html", "an HTML file");
+      await up(new Blob(['<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"/>'], { type: "image/svg+xml" }), "image/svg+xml", "an SVG");
+      await up(new Blob([new Uint8Array(9 * 1024 * 1024)], { type: "image/jpeg" }), "image/jpeg", "a 9 MB image");
+    }
+    // Avatars are smaller still (2 MB).
+    await tryUpload("avatars", new Blob([new Uint8Array(3 * 1024 * 1024)], { type: "image/jpeg" }), "image/jpeg", "a 3 MB avatar");
+    expect(problems).toEqual([]);
+  });
+
+  it("the data export returns the member's rows from every table, and nothing of anyone else's", async () => {
+    const { exportUserData } = await import("@/server/services/account");
+    const out = (await exportUserData(alice.client, alice.id, alice.email)) as Record<string, unknown>;
+    const problems: string[] = [];
+    for (const { table, column } of USER_TABLES) {
+      const rows = out[table] as Record<string, unknown>[];
+      if (!rows?.length) problems.push(`${table}: missing from the export`);
+      else if (rows.some((r) => r[column] !== alice.id)) problems.push(`${table}: holds another member's row`);
+    }
+    expect(problems).toEqual([]);
+    const photoLinks = (out.progress_photo_files as { files: { download_url: string | null }[] }).files;
+    const scanLinks = (out.body_scan_photo_files as { files: { download_url: string | null }[] }).files;
+    expect(photoLinks.length).toBe(1);
+    expect(photoLinks[0]!.download_url).toBeTruthy();
+    expect(scanLinks[0]!.download_url).toBeTruthy();
+    // Pointing the export at someone else's id with your own session yields nothing.
+    const stolen = (await exportUserData(bob.client, alice.id, alice.email)) as Record<string, unknown>;
+    expect(USER_TABLES.filter(({ table }) => (stolen[table] as unknown[]).length > 0).map((t) => t.table)).toEqual([]);
+  });
+
+  it("deleting the account removes every row in every table, every stored file and the sign-in, and nothing of Bob's", async () => {
+    const { deleteUserAccount } = await import("@/server/services/account-deletion");
+    const bobBefore = await Promise.all(USER_TABLES.map(async ({ table, column }) => (await svc.from(table).select(column, { count: "exact", head: true }).eq(column, bob.id)).count ?? 0));
+    const result = await deleteUserAccount(alice.id, { admin: svc, cancelSubscriptions: async () => undefined, deleteStripeCustomer: null, log: () => undefined });
+    expect(result).toEqual({ ok: true, stripeCustomerDeleted: null });
+    const left: string[] = [];
+    for (const { table, column } of USER_TABLES) if ((await count(table, column)) > 0) left.push(table);
+    expect(left).toEqual([]);
+    for (const bucket of USER_STORAGE_BUCKETS) {
+      const folder = objects[bucket]!.split("/").slice(0, -1).join("/");
+      expect((await svc.storage.from(bucket).list(folder)).data, bucket).toEqual([]);
+      expect((await svc.storage.from(bucket).list(alice.id)).data, bucket).toEqual([]);
+    }
+    expect((await svc.auth.admin.getUserById(alice.id)).data.user).toBeNull();
+    expect((await alice.client.auth.getUser()).data.user).toBeNull();
+    const bobAfter = await Promise.all(USER_TABLES.map(async ({ table, column }) => (await svc.from(table).select(column, { count: "exact", head: true }).eq(column, bob.id)).count ?? 0));
+    expect(bobAfter).toEqual(bobBefore);
+  });
 });
