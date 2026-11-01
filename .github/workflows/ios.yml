@@ -257,6 +257,8 @@ jobs:
             echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
             echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
             echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+            # The tests sign up many accounts from this one machine: raise (never lower) the app's auth rate limits.
+            echo "AUTH_RATE_LIMIT_SCALE=50"
           } > .env.local
       - run: npm run build
       - run: npx playwright install --with-deps webkit

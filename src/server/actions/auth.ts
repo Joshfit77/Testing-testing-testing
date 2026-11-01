@@ -18,17 +18,27 @@ const TOO_MANY_EMAILS = "Please wait a few minutes before requesting another ema
 /**
  * App-level limits on the sign-in and email actions. These run on our servers, so Supabase's own per-address auth
  * limits see the server's address; these use the client's (hashed) address and the (hashed) email instead, shared
- * across every server instance.
+ * across every server instance. AUTH_RATE_LIMIT_SCALE can only raise the limits (automated test runs sign up many
+ * accounts from one machine); production leaves it unset.
  */
-async function authLimited(checks: { key: string; limit: number; windowMs: number }[]): Promise<boolean> {
-  return !(await rateLimitAll(checks)).ok;
+type Check = { key: string; limit: number; windowMs: number };
+const SCALE = Math.max(1, Number(process.env.AUTH_RATE_LIMIT_SCALE) || 1);
+
+async function authLimited(checks: Check[]): Promise<boolean> {
+  return !(await rateLimitAll(checks.map((c) => ({ ...c, limit: c.limit * SCALE })))).ok;
+}
+
+/** A per-address check, or none when the platform didn't pass the client's address (so unrelated people never share one counter). */
+async function perAddress(prefix: string, limit: number, windowMs: number): Promise<Check[]> {
+  const ip = await clientIp();
+  return ip === "unknown" ? [] : [{ key: `${prefix}:ip:${hashKey(ip)}`, limit, windowMs }];
 }
 
 export async function signUpAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = signUpSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return actionInvalid(parsed.error);
   if (!(await isFlagEnabled("signups"))) return actionError("New registrations are temporarily paused. Please try again later.");
-  if (await authLimited([{ key: `signup:ip:${hashKey(await clientIp())}`, limit: 5, windowMs: 10 * MINUTE }])) return actionError(TOO_MANY);
+  if (await authLimited(await perAddress("signup", 5, 10 * MINUTE))) return actionError(TOO_MANY);
 
   const supabase = await getServerSupabase();
   const { data, error } = await supabase.auth.signUp({
@@ -55,7 +65,7 @@ export async function signInAction(_prev: ActionState, formData: FormData): Prom
   if (!parsed.success) return actionInvalid(parsed.error);
   if (
     await authLimited([
-      { key: `signin:ip:${hashKey(await clientIp())}`, limit: 20, windowMs: 5 * MINUTE },
+      ...(await perAddress("signin", 20, 5 * MINUTE)),
       { key: `signin:email:${hashKey(parsed.data.email)}`, limit: 10, windowMs: 15 * MINUTE },
     ])
   )
@@ -77,7 +87,7 @@ export async function resendConfirmationAction(_prev: ActionState, formData: For
   if (!email.success) return actionError("Enter the email address you signed up with.");
   if (
     await authLimited([
-      { key: `email:ip:${hashKey(await clientIp())}`, limit: 5, windowMs: 15 * MINUTE },
+      ...(await perAddress("email", 5, 15 * MINUTE)),
       { key: `email:addr:${hashKey(email.data)}`, limit: 3, windowMs: 15 * MINUTE },
     ])
   )
@@ -104,7 +114,7 @@ export async function requestPasswordResetAction(_prev: ActionState, formData: F
   if (!parsed.success) return actionInvalid(parsed.error);
   if (
     await authLimited([
-      { key: `email:ip:${hashKey(await clientIp())}`, limit: 5, windowMs: 15 * MINUTE },
+      ...(await perAddress("email", 5, 15 * MINUTE)),
       { key: `email:addr:${hashKey(parsed.data.email)}`, limit: 3, windowMs: 15 * MINUTE },
     ])
   )

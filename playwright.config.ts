@@ -41,5 +41,12 @@ export default defineConfig({
   ],
   webServer: process.env.E2E_BASE_URL
     ? undefined
-    : { command: "npm run start", url: "http://localhost:3000", reuseExistingServer: true, timeout: 120_000 },
+    : {
+        command: "npm run start",
+        url: "http://localhost:3000",
+        reuseExistingServer: true,
+        timeout: 120_000,
+        // The suite signs up and signs in many accounts from one machine; only raises the app's auth rate limits.
+        env: { AUTH_RATE_LIMIT_SCALE: "50" },
+      },
 });
