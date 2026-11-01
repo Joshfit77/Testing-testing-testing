@@ -45,7 +45,7 @@ describe("the in-progress backup sent to the server", () => {
   });
 });
 
-describe("when finishing can't reach the server (W5)", () => {
+describe("when finishing can't reach the server (W3)", () => {
   it("tells an online member their session may have ended, instead of calling them offline", () => {
     // Online, the request fails because an ended session is redirected to sign-in; "offline" sent members round in circles.
     expect(finishFailureMessage(true)).toMatch(/sign in again/);
