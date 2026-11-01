@@ -132,7 +132,7 @@ export async function assertAiAllowed(userId: string, plan: Plan, mode: "chat" |
   }
   // Durable metering requires the service role (users cannot write their own usage rows).
   if (!isServiceRoleConfigured()) throw new AiError("metering_unavailable", "AI usage metering isn't configured on this server.");
-  const burst = rateLimit(`ai:${userId}`, aiPerMinute(), 60_000);
+  const burst = await rateLimit(`ai:${userId}`, aiPerMinute(), 60_000);
   if (!burst.ok) throw new AiError("rate_limited", "You're sending messages quickly — please wait a moment.", burst.retryAfterSeconds);
   // The in-memory limiter is per server instance; reserveUsage enforces the same limit across instances.
   const usage = await getAiUsage(userId, plan);

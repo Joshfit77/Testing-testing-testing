@@ -97,7 +97,7 @@ export async function deleteAccountAction(_prev: ActionState, formData: FormData
   if (!password) return actionError("Enter your password to confirm.", { password: "Enter your password" });
   if (!isServiceRoleConfigured()) return actionError("Account deletion isn't configured on this server. Please contact support.");
 
-  const attempt = rateLimit(`delete-account:${user.id}`, 5, 15 * 60_000);
+  const attempt = await rateLimit(`delete-account:${user.id}`, 5, 15 * 60_000);
   if (!attempt.ok) return actionError("Too many attempts. Please wait a few minutes and try again.");
   const check = await verifyPassword(user.email ?? "", password);
   if (check === "wrong") return actionError("That password isn't right.", { password: "Incorrect password" });

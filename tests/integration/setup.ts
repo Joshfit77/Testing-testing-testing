@@ -16,6 +16,8 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = process.env.TEST_SUPABASE_SERVICE_ROLE_K
 // Dummy credentials: these tests never call Stripe or Anthropic over the network.
 process.env.STRIPE_SECRET_KEY = "sk_test_integration_dummy";
 process.env.STRIPE_WEBHOOK_SECRET = "whsec_integration_dummy";
+// Scheduled billing reconciliation (tests/integration/billing-integrity.test.ts).
+process.env.CRON_SECRET = "cron-integration-secret-0123456789";
 process.env.STRIPE_PRICE_PLUS = "price_test_plus";
 process.env.STRIPE_PRICE_PRO = "price_test_pro";
 process.env.STRIPE_PRICE_PRO_YEARLY = "price_test_pro_yearly";

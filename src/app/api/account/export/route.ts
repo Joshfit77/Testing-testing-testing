@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  const limit = rateLimit(`export:${user.id}`, 3, 60 * 60_000);
+  const limit = await rateLimit(`export:${user.id}`, 3, 60 * 60_000);
   if (!limit.ok) return NextResponse.json({ error: "Please wait before exporting again." }, { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } });
   try {
     const supabase = await getServerSupabase();

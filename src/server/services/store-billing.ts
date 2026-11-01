@@ -12,8 +12,9 @@ import {
 import type { StoreProductIds } from "@/lib/billing/paywall";
 import type { Plan } from "@/lib/domain/types";
 import { serverEnv } from "@/server/env";
-import { logError } from "@/server/log";
+import { logInfo } from "@/server/log";
 import { recomputeEntitlement } from "@/server/services/billing";
+import { claimWebhookEvent, processClaimedEvent, type WebhookOutcome } from "@/server/services/webhook-events";
 
 /**
  * App Store / Google Play subscriptions through RevenueCat. Purchases happen in the native app; this server never
@@ -66,16 +67,19 @@ export async function deleteRevenueCatCustomer(appUserId: string): Promise<void>
 }
 
 /**
- * Refresh one member's store subscriptions from RevenueCat and recompute their plan. Products no longer on the
- * customer (e.g. moved to another account by a restore) are removed, so they stop granting access here.
- * Returns null when the id isn't one of our members.
+ * Refresh one member's store subscriptions from RevenueCat and recompute their plan. The whole snapshot replaces
+ * the member's store rows in one transaction (`apply_store_snapshot`), ordered by when RevenueCat was read, so
+ * products no longer on the customer (e.g. moved to another account by a restore) stop granting access here and two
+ * overlapping syncs can't leave an older picture behind. Returns null when the id isn't one of our members.
  */
 export async function syncStoreSubscriber(userId: string): Promise<Plan | null> {
   const admin = getServiceSupabase();
-  const { data: profile } = await admin.from("profiles").select("id").eq("id", userId).maybeSingle();
+  const { data: profile, error: profErr } = await admin.from("profiles").select("id").eq("id", userId).maybeSingle();
+  if (profErr) throw profErr;
   if (!profile) return null;
+  const fetchedAt = new Date();
   const subscriber = await fetchRevenueCatSubscriber(userId);
-  const { data: existing, error: readErr } = await admin.from("store_subscriptions").select("id, store, product_id, plan").eq("user_id", userId);
+  const { data: existing, error: readErr } = await admin.from("store_subscriptions").select("product_id, plan").eq("user_id", userId);
   if (readErr) throw readErr;
   const previousPlans = new Map((existing ?? []).filter((r) => r.plan).map((r) => [r.product_id as string, r.plan as PaidPlan]));
   const rows = storeRowsFromSubscriber(
@@ -84,46 +88,27 @@ export async function syncStoreSubscriber(userId: string): Promise<Plan | null> 
     previousPlans,
     { allowTestStore: serverEnv.revenueCatAllowTestStore, allowSandbox: serverEnv.revenueCatAllowSandbox },
   );
-  if (rows.length) {
-    const { error } = await admin.from("store_subscriptions").upsert(
-      rows.map((r) => ({ ...r, user_id: userId })),
-      { onConflict: "user_id,store,product_id" },
-    );
-    if (error) throw error;
-  }
-  const keep = new Set(rows.map((r) => `${r.store}:${r.product_id}`));
-  const stale = (existing ?? []).filter((r) => !keep.has(`${r.store}:${r.product_id}`)).map((r) => r.id as string);
-  if (stale.length) {
-    const { error } = await admin.from("store_subscriptions").delete().in("id", stale);
-    if (error) throw error;
-  }
+  const { data: result, error } = await admin.rpc("apply_store_snapshot", { p_user_id: userId, p_fetched_at: fetchedAt.toISOString(), p_rows: rows });
+  if (error) throw error;
+  if (result === "stale") logInfo("revenuecat.sync_stale", {});
   return recomputeEntitlement(userId);
 }
 
 /**
  * Process a verified RevenueCat webhook once. Every event type (purchase, renewal, product change, cancellation,
  * uncancellation, billing issue, expiration, refund, transfer, …) is handled the same way: re-read the affected
- * members from RevenueCat. Returns false for a duplicate delivery.
+ * members from RevenueCat, never trusting the event body about what anyone owns. "duplicate" for an event already
+ * processed, "busy" while another delivery of it is being processed; a failure is recorded and rethrown.
  */
-export async function handleRevenueCatEvent(body: RevenueCatWebhook): Promise<boolean> {
+export async function handleRevenueCatEvent(body: RevenueCatWebhook): Promise<WebhookOutcome> {
   const { event } = body;
-  const admin = getServiceSupabase();
-  const { error: dupErr } = await admin.from("revenuecat_events").insert({ id: event.id, type: event.type, environment: event.environment ?? null });
-  if (dupErr) {
-    if (dupErr.code === "23505") return false;
-    throw dupErr;
-  }
-  try {
-    if (event.type !== "TEST") {
-      for (const userId of affectedAppUserIds(event)) await syncStoreSubscriber(userId);
-    }
-  } catch (err) {
-    // Let RevenueCat retry: forget that we saw this event.
-    await admin.from("revenuecat_events").delete().eq("id", event.id);
-    logError("revenuecat.event", err, { type: event.type });
-    throw err;
-  }
-  return true;
+  const claim = await claimWebhookEvent("revenuecat", event.id, event.type, event.environment ?? null);
+  if (claim !== "claimed") return claim;
+  await processClaimedEvent("revenuecat", event.id, async () => {
+    if (event.type === "TEST") return;
+    for (const userId of affectedAppUserIds(event)) await syncStoreSubscriber(userId);
+  });
+  return "processed";
 }
 
 function ids(name: string, fallback: string): string[] {

@@ -37,7 +37,7 @@ export async function applyScheduleChangeAction(input: unknown): Promise<ActionS
     const { data: w } = await supabase.from("weight_entries").select("weight_kg").eq("user_id", user.id).order("recorded_on", { ascending: false }).limit(1).maybeSingle();
     if (!profile.birth_year || !profile.height_cm || !w?.weight_kg) return actionError("Add your age, height and weight in Training preferences first.");
     // Each rebuild saves a new private program, so it's limited like the program builder.
-    if (!rateLimit(`schedule-rebuild:${user.id}`, 10, 60 * 60_000).ok) return actionError("You've rebuilt your program several times in the last hour. Please try again later.");
+    if (!(await rateLimit(`schedule-rebuild:${user.id}`, 10, 60 * 60_000)).ok) return actionError("You've rebuilt your program several times in the last hour. Please try again later.");
     const { error: uErr } = await supabase
       .from("onboarding_answers")
       .update({ days_per_week: parsed.data.daysPerWeek, session_minutes: parsed.data.sessionMinutes })

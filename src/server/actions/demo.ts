@@ -10,7 +10,7 @@ import { getServerSupabase, getServiceSupabase } from "@/lib/supabase/server";
 import { requireUser } from "@/server/auth";
 import { demoAccount, isDemoMode, isDemoUser } from "@/server/demo";
 import { logError } from "@/server/log";
-import { rateLimit } from "@/server/rate-limit";
+import { hashKey, rateLimit } from "@/server/rate-limit";
 
 /** Enter the seeded demo account (sample data, Pro switched on). Demo deployments only. */
 export async function enterDemoAction(_prev: ActionState): Promise<ActionState> {
@@ -32,7 +32,7 @@ export async function enterDemoAction(_prev: ActionState): Promise<ActionState> 
 export async function startFreshDemoAction(_prev: ActionState): Promise<ActionState> {
   if (!isDemoMode()) return actionError("The demo isn't set up on this server.");
   const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
-  if (!rateLimit(`demo-fresh:${ip}`, 10, 60 * 60_000).ok) return actionError("Too many new demo accounts from here. Please try again later.");
+  if (!(await rateLimit(`demo-fresh:${hashKey(ip)}`, 10, 60 * 60_000)).ok) return actionError("Too many new demo accounts from here. Please try again later.");
   const email = `new-member-${randomUUID().slice(0, 8)}@demo.narrowgatefitness.invalid`;
   const password = randomBytes(24).toString("base64url");
   const admin = getServiceSupabase();

@@ -55,3 +55,22 @@ export async function connectStore(apiKey: string, appUserID: string): Promise<S
     },
   };
 }
+
+/**
+ * On sign-out, detach this device from the member's RevenueCat identity, so the next person to sign in on a shared
+ * phone starts from their own account (the paywall then logs in with their id). Best effort: an app build without
+ * the plugin, an unconfigured SDK or an anonymous id simply has nothing to detach. What anyone owns is still decided
+ * only by the server.
+ */
+export async function storeLogOut(): Promise<void> {
+  if (!isNativeApp()) return;
+  try {
+    const { Purchases } = await import("@revenuecat/purchases-capacitor");
+    const { isConfigured } = await Purchases.isConfigured();
+    if (!isConfigured) return;
+    const { isAnonymous } = await Purchases.isAnonymous();
+    if (!isAnonymous) await Purchases.logOut();
+  } catch {
+    // Nothing to detach.
+  }
+}

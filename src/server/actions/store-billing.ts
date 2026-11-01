@@ -16,7 +16,7 @@ import { syncStoreSubscriber } from "@/server/services/store-billing";
 export async function syncStorePurchasesAction(): Promise<{ ok: true; plan: Plan } | { ok: false; error: string }> {
   const user = await requireUser();
   if (!isRevenueCatConfigured() || !isServiceRoleConfigured()) return { ok: false, error: "In-app purchases aren't configured on this server yet." };
-  if (!rateLimit(`store-sync:${user.id}`, 10, 60_000).ok) return { ok: false, error: "Please wait a moment and try again." };
+  if (!(await rateLimit(`store-sync:${user.id}`, 10, 60_000)).ok) return { ok: false, error: "Please wait a moment and try again." };
   try {
     const plan = await syncStoreSubscriber(user.id);
     revalidatePath("/profile/billing");

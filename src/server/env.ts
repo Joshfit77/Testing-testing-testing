@@ -24,6 +24,8 @@ function storeSecret(raw: string | undefined): string {
 /** Server-only secrets. Never import this module from client components. */
 export const serverEnv = {
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
+  // Bearer secret for scheduled jobs (billing reconciliation). Unset: those endpoints refuse every call.
+  cronSecret: process.env.CRON_SECRET ?? "",
   // A demo deployment never calls the AI provider, so its key is ignored there (see src/server/demo.ts).
   anthropicApiKey: process.env.DEMO_MODE === "true" ? "" : (process.env.ANTHROPIC_API_KEY ?? ""),
   stripeSecretKey: stripeSecretKey(process.env.STRIPE_SECRET_KEY),

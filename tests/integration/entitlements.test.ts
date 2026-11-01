@@ -26,10 +26,12 @@ let stripeServer: Server;
 
 function fakeSubscription(overrides: Record<string, unknown>): Stripe.Subscription {
   const periodEnd = Math.floor(Date.now() / 1000) + 30 * 86400;
+  // One Stripe customer per member, as checkout creates them (the server refuses a customer shared by two members).
+  const member = (overrides.metadata as { user_id?: string } | undefined)?.user_id;
   return {
     id: `sub_${crypto.randomUUID().replace(/-/g, "").slice(0, 14)}`,
     object: "subscription",
-    customer: "cus_test",
+    customer: member ? `cus_${member.replace(/-/g, "").slice(0, 16)}` : "cus_test",
     status: "active",
     cancel_at_period_end: false,
     metadata: {},
@@ -129,7 +131,7 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
   it("ignores subscriptions with unknown prices or users", async () => {
     await syncSubscription(fakeSubscription({ metadata: { user_id: user.id }, items: { object: "list", data: [{ id: "si", price: { id: "price_unknown" } }] } }));
     expect(await plan()).toMatchObject({ plan: "free" });
-    await expect(handleStripeEvent({ id: `evt_${crypto.randomUUID()}`, type: "ping", data: { object: {} } } as unknown as Stripe.Event)).resolves.toBe(true);
+    await expect(handleStripeEvent({ id: `evt_${crypto.randomUUID()}`, type: "ping", data: { object: {} } } as unknown as Stripe.Event)).resolves.toBe("processed");
   });
 
   it("enforces AI entitlements and monthly quotas server-side: the coach is Pro-only", async () => {

@@ -83,6 +83,8 @@ export const NOT_EXPORTED: Record<string, string> = {
   // (program_weeks / program_days / program_exercises have no user column; owned programs' structure is
   // exported as training_program_structure.)
   admin_audit_logs: "Administrators' own audit trail (actor_id is set to null when that admin is deleted); not personal data of the user.",
+  billing_state_versions: "Internal counter used to order billing updates (a number only); the subscriptions it counts are exported.",
+  store_sync_state: "Internal timestamp of the last App Store / Google Play sync; the store subscriptions themselves are exported.",
 };
 
 export async function exportUserData(supabase: SupabaseClient, userId: string, email: string | undefined) {

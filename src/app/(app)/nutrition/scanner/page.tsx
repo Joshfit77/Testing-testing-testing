@@ -28,7 +28,7 @@ export default async function FoodIqPage({ searchParams }: { searchParams: Promi
 
   let results: ProductSearchResult | null = null;
   if (q) {
-    if (!rateLimit(`food-iq-search:${user.id}`, 20, 60_000).ok) results = { status: "busy" };
+    if (!(await rateLimit(`food-iq-search:${user.id}`, 20, 60_000)).ok) results = { status: "busy" };
     else {
       try {
         results = await searchProducts(q);

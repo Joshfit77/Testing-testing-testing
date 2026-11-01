@@ -2,11 +2,12 @@ import "server-only";
 import Stripe from "stripe";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { publicEnv } from "@/lib/env";
-import { entitlementFromSubscriptions, getPlans, legacyTermsApply, planRank, type BillingInterval, type LegacyAiTerms, type SubscriptionStatus } from "@/lib/domain/plans";
+import { entitlementFromSubscriptions, getPlans, legacyTermsApply, type BillingInterval, type LegacyAiTerms, type SubscriptionStatus } from "@/lib/domain/plans";
 import type { Plan } from "@/lib/domain/types";
 import { storeRowAsSubscription } from "@/lib/billing/revenuecat";
 import { isServiceRoleConfigured, serverEnv } from "@/server/env";
 import { logError, logInfo } from "@/server/log";
+import { claimWebhookEvent, processClaimedEvent, type WebhookOutcome } from "@/server/services/webhook-events";
 
 let stripeClient: Stripe | null = null;
 
@@ -181,58 +182,110 @@ function periodEnd(sub: Stripe.Subscription): string | null {
 
 const KNOWN_STATUSES: SubscriptionStatus[] = ["trialing", "active", "past_due", "canceled", "unpaid", "incomplete", "incomplete_expired", "paused"];
 
-async function userIdForSubscription(sub: Stripe.Subscription): Promise<string | null> {
-  const fromMeta = sub.metadata?.user_id;
-  if (fromMeta) return fromMeta;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** A Stripe object that names a different member than the one its customer belongs to here. Needs a human. */
+export class OwnershipConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "OwnershipConflictError";
+  }
+}
+
+/**
+ * The member a Stripe subscription belongs to. The customer → member link this server recorded when it created
+ * the customer (`billing_customers`) is authoritative; metadata is only a hint. Metadata naming someone else is
+ * refused rather than followed, so a subscription can never be moved to another member by editing metadata. A
+ * customer this server didn't create (e.g. made by hand in the Stripe Dashboard) is accepted for the member its
+ * metadata names only if that member exists and has no other Stripe customer; the link is then recorded.
+ */
+export async function userIdForSubscription(sub: Pick<Stripe.Subscription, "id" | "customer" | "metadata">): Promise<string | null> {
+  const admin = getServiceSupabase();
   const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer.id;
-  const { data } = await getServiceSupabase().from("billing_customers").select("user_id").eq("stripe_customer_id", customerId).maybeSingle();
-  return (data?.user_id as string) ?? null;
+  const { data: mapped, error } = await admin.from("billing_customers").select("user_id").eq("stripe_customer_id", customerId).maybeSingle();
+  if (error) throw error;
+  const meta = sub.metadata?.user_id;
+  const fromMeta = typeof meta === "string" && UUID.test(meta) ? meta.toLowerCase() : null;
+  if (mapped?.user_id) {
+    if (fromMeta && fromMeta !== mapped.user_id) throw new OwnershipConflictError(`Subscription ${sub.id}: metadata names a different member than its customer`);
+    return mapped.user_id as string;
+  }
+  if (!fromMeta) return null;
+  const { data: profile, error: profErr } = await admin.from("profiles").select("id").eq("id", fromMeta).maybeSingle();
+  if (profErr) throw profErr;
+  if (!profile) return null;
+  const { data: other, error: otherErr } = await admin.from("billing_customers").select("stripe_customer_id").eq("user_id", fromMeta).maybeSingle();
+  if (otherErr) throw otherErr;
+  if (other?.stripe_customer_id && other.stripe_customer_id !== customerId)
+    throw new OwnershipConflictError(`Subscription ${sub.id}: the member already has a different Stripe customer`);
+  const { error: linkErr } = await admin.from("billing_customers").insert({ user_id: fromMeta, stripe_customer_id: customerId });
+  if (linkErr && linkErr.code !== "23505") throw linkErr;
+  return fromMeta;
 }
 
 type EntitlementSource = "stripe" | "app_store" | "play_store";
 
 /**
  * Recompute the user's entitlement from all of their stored subscriptions: Stripe (`subscriptions`) and the app
- * stores (`store_subscriptions`, kept in sync from RevenueCat). The highest plan wins.
+ * stores (`store_subscriptions`, kept in sync from RevenueCat). The highest plan wins. The write is a
+ * compare-and-set on the member's billing version (`apply_entitlement`): if another change to their subscription
+ * rows landed while this one was reading, the result is discarded and recomputed, so concurrent webhooks can't
+ * leave an entitlement computed from an older picture. A live admin grant of an equal or higher plan stays.
  */
 export async function recomputeEntitlement(userId: string): Promise<Plan> {
   const admin = getServiceSupabase();
-  const [stripeRes, storeRes] = await Promise.all([
-    admin.from("subscriptions").select("plan, status, current_period_end, access_revoked_at").eq("user_id", userId),
-    admin
-      .from("store_subscriptions")
-      .select("store, plan, purchased_at, expires_at, grace_period_expires_at, unsubscribe_detected_at, billing_issue_detected_at, refunded_at")
-      .eq("user_id", userId),
-  ]);
-  if (stripeRes.error) throw stripeRes.error;
-  if (storeRes.error) throw storeRes.error;
-  const candidates: { plan: PaidPlan; status: SubscriptionStatus; current_period_end: string | null; access_revoked_at?: string | null; source: EntitlementSource }[] = [
-    ...((stripeRes.data ?? []) as { plan: PaidPlan; status: SubscriptionStatus; current_period_end: string | null; access_revoked_at: string | null }[]).map((s) => ({
-      ...s,
-      source: "stripe" as const,
-    })),
-  ];
-  for (const row of (storeRes.data ?? []) as (Parameters<typeof storeRowAsSubscription>[0] & { store: string })[]) {
-    const sub = storeRowAsSubscription(row);
-    if (sub) candidates.push({ ...sub, source: row.store === "play_store" ? "play_store" : "app_store" });
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const { data: ver, error: verErr } = await admin.from("billing_state_versions").select("version").eq("user_id", userId).maybeSingle();
+    if (verErr) throw verErr;
+    const version = Number(ver?.version ?? 0);
+    const [stripeRes, storeRes] = await Promise.all([
+      admin.from("subscriptions").select("plan, status, current_period_end, access_revoked_at").eq("user_id", userId),
+      admin
+        .from("store_subscriptions")
+        .select("store, plan, purchased_at, expires_at, grace_period_expires_at, unsubscribe_detected_at, billing_issue_detected_at, refunded_at")
+        .eq("user_id", userId),
+    ]);
+    if (stripeRes.error) throw stripeRes.error;
+    if (storeRes.error) throw storeRes.error;
+    const candidates: { plan: PaidPlan; status: SubscriptionStatus; current_period_end: string | null; access_revoked_at?: string | null; source: EntitlementSource }[] = [
+      ...((stripeRes.data ?? []) as { plan: PaidPlan; status: SubscriptionStatus; current_period_end: string | null; access_revoked_at: string | null }[]).map((s) => ({
+        ...s,
+        source: "stripe" as const,
+      })),
+    ];
+    for (const row of (storeRes.data ?? []) as (Parameters<typeof storeRowAsSubscription>[0] & { store: string })[]) {
+      const sub = storeRowAsSubscription(row);
+      if (sub) candidates.push({ ...sub, source: row.store === "play_store" ? "play_store" : "app_store" });
+    }
+    const { plan, validUntil, from } = entitlementFromSubscriptions(candidates);
+    const { data: result, error: applyErr } = await admin.rpc("apply_entitlement", {
+      p_user_id: userId,
+      p_version: version,
+      p_plan: plan,
+      p_source: plan === "free" || !from ? "default" : from.source,
+      p_valid_until: plan === "free" ? null : validUntil,
+    });
+    if (applyErr) throw applyErr;
+    if (result === "applied") return plan;
+    if (result === "kept_admin") {
+      const { data: current, error: curErr } = await admin.from("user_entitlements").select("plan").eq("user_id", userId).maybeSingle();
+      if (curErr) throw curErr;
+      return (current?.plan as Plan) ?? plan;
+    }
+    // "stale": the member's subscription rows changed while we were reading; read them again.
   }
-  const { plan, validUntil, from } = entitlementFromSubscriptions(candidates);
-  const { data: current } = await admin.from("user_entitlements").select("plan, source, valid_until").eq("user_id", userId).maybeSingle();
-  // A manual admin grant stays while it is in date, unless a subscription now provides a higher plan.
-  const adminGrantLive = current?.source === "admin" && (!current.valid_until || Date.parse(current.valid_until as string) > Date.now());
-  if (adminGrantLive && planRank(current!.plan as Plan) >= planRank(plan)) return current!.plan as Plan;
-  const { error: upErr } = await admin
-    .from("user_entitlements")
-    .upsert({ user_id: userId, plan, source: plan === "free" || !from ? "default" : from.source, valid_until: plan === "free" ? null : validUntil }, { onConflict: "user_id" });
-  if (upErr) throw upErr;
-  return plan;
+  throw new Error("Entitlement recompute kept racing with concurrent changes");
 }
 
-/** Upsert a Stripe subscription and refresh entitlements. */
-export async function syncSubscription(sub: Stripe.Subscription): Promise<void> {
+/**
+ * Store a Stripe subscription as read from Stripe at `fetchedAt` and refresh the member's entitlement. An older
+ * read never overwrites a newer one, and a subscription is never moved to another member
+ * (`upsert_stripe_subscription`).
+ */
+export async function syncSubscription(sub: Stripe.Subscription, fetchedAt: Date = new Date()): Promise<void> {
   const userId = await userIdForSubscription(sub);
   if (!userId) {
-    logError("billing.sync", new Error("Subscription without a known user"), { subscription: sub.id });
+    logError("billing.sync", new Error("Subscription without a known member"), { subscription: sub.id });
     return;
   }
   const priceId = sub.items?.data?.[0]?.price?.id ?? null;
@@ -242,108 +295,112 @@ export async function syncSubscription(sub: Stripe.Subscription): Promise<void> 
     // A price this server doesn't know (e.g. the old price after new prices were configured without listing it in
     // STRIPE_PRICE_*_LEGACY). Keep the plan already stored for this subscription so a paying subscriber is never
     // downgraded by a configuration change; only a brand-new unknown subscription is skipped.
-    const { data: existing } = await admin.from("subscriptions").select("plan").eq("stripe_subscription_id", sub.id).maybeSingle();
+    const { data: existing } = await admin.from("subscriptions").select("plan").eq("stripe_subscription_id", sub.id).eq("user_id", userId).maybeSingle();
     logError("billing.sync", new Error("Unknown price"), { subscription: sub.id, keptStoredPlan: Boolean(existing) });
     if (!existing) return;
     plan = existing.plan as PaidPlan;
   }
   const status = (KNOWN_STATUSES as string[]).includes(sub.status) ? (sub.status as SubscriptionStatus) : "incomplete";
-  const { error } = await admin
-    .from("subscriptions")
-    .upsert(
-      {
-        user_id: userId,
-        stripe_subscription_id: sub.id,
-        stripe_price_id: priceId,
-        plan,
-        status,
-        current_period_end: periodEnd(sub),
-        cancel_at_period_end: Boolean(sub.cancel_at_period_end),
-      },
-      { onConflict: "stripe_subscription_id" },
-    );
+  const { data: result, error } = await admin.rpc("upsert_stripe_subscription", {
+    p_user_id: userId,
+    p_subscription_id: sub.id,
+    p_price_id: priceId,
+    p_plan: plan,
+    p_status: status,
+    p_current_period_end: periodEnd(sub),
+    p_cancel_at_period_end: Boolean(sub.cancel_at_period_end),
+    p_synced_at: fetchedAt.toISOString(),
+  });
   if (error) throw error;
+  if (result === "owner_conflict") throw new OwnershipConflictError(`Subscription ${sub.id} is stored for a different member`);
+  if (result === "stale") logInfo("billing.sync_stale", { subscription: sub.id });
   await recomputeEntitlement(userId);
 }
 
-/** Process a verified webhook event once. Returns false when the event was already processed. */
-export async function handleStripeEvent(event: Stripe.Event): Promise<boolean> {
-  const admin = getServiceSupabase();
-  const { error: dupErr } = await admin.from("stripe_events").insert({ id: event.id, type: event.type });
-  if (dupErr) {
-    if (dupErr.code === "23505") return false; // already handled
-    throw dupErr;
-  }
-  try {
-    const stripe = getStripe();
-    switch (event.type) {
-      case "checkout.session.completed": {
-        const session = event.data.object as Stripe.Checkout.Session;
-        if (session.mode === "subscription" && session.subscription) {
-          const subId = typeof session.subscription === "string" ? session.subscription : session.subscription.id;
-          const sub = await stripe.subscriptions.retrieve(subId);
-          if (!sub.metadata?.user_id && session.client_reference_id) {
-            sub.metadata = { ...sub.metadata, user_id: session.client_reference_id };
-          }
-          await syncSubscription(sub);
+/** A subscription as Stripe holds it now, with the time it was read (orders concurrent writes). */
+async function fetchSubscription(stripe: Stripe, id: string): Promise<{ sub: Stripe.Subscription; fetchedAt: Date }> {
+  const fetchedAt = new Date();
+  return { sub: await stripe.subscriptions.retrieve(id), fetchedAt };
+}
+
+/**
+ * Process a verified webhook event once (see webhook-events.ts): "duplicate" when it was already processed, "busy"
+ * when another delivery of it is being processed right now (the route asks Stripe to retry later). A failure is
+ * recorded on the event and rethrown, so Stripe retries it; nothing is acknowledged unless its changes were saved.
+ */
+export async function handleStripeEvent(event: Stripe.Event): Promise<WebhookOutcome> {
+  const claim = await claimWebhookEvent("stripe", event.id, event.type);
+  if (claim !== "claimed") return claim;
+  await processClaimedEvent("stripe", event.id, () => applyStripeEvent(event));
+  return "processed";
+}
+
+async function applyStripeEvent(event: Stripe.Event): Promise<void> {
+  const stripe = getStripe();
+  switch (event.type) {
+    case "checkout.session.completed": {
+      const session = event.data.object as Stripe.Checkout.Session;
+      if (session.mode === "subscription" && session.subscription) {
+        const subId = typeof session.subscription === "string" ? session.subscription : session.subscription.id;
+        const { sub, fetchedAt } = await fetchSubscription(stripe, subId);
+        if (!sub.metadata?.user_id && session.client_reference_id) {
+          sub.metadata = { ...sub.metadata, user_id: session.client_reference_id };
         }
-        break;
+        await syncSubscription(sub, fetchedAt);
       }
-      case "customer.subscription.created":
-      case "customer.subscription.updated":
-      case "customer.subscription.deleted":
-      case "customer.subscription.paused":
-      case "customer.subscription.resumed": {
-        // Stripe doesn't deliver events in order and retries failures hours later, so the event's snapshot may be
-        // older than what is already stored. Always sync the subscription's current state.
-        const snapshot = event.data.object as Stripe.Subscription;
-        await syncSubscription(await currentSubscription(stripe, snapshot));
-        break;
-      }
-      case "invoice.payment_failed":
-      case "invoice.paid": {
-        const invoice = event.data.object as Stripe.Invoice;
-        const subId = subscriptionOfInvoice(invoice);
-        if (subId) {
-          // A newer period paid for after a refund or dispute restores access; the revoked period stays revoked.
-          if (event.type === "invoice.paid" && invoice.id) await clearRevocation(subId, (row) => row.revoked_invoice_id !== invoice.id);
-          await syncSubscription(await stripe.subscriptions.retrieve(subId));
-        }
-        break;
-      }
-      case "charge.refunded": {
-        const charge = event.data.object as Stripe.Charge;
-        // Only a full refund ends access. A partial (goodwill) refund leaves the paid period as it is.
-        const current = await stripe.charges.retrieve(charge.id);
-        if (current.refunded) await revokeForCharge(stripe, current, "refund");
-        else logInfo("billing.partial_refund", { charge: charge.id });
-        break;
-      }
-      case "charge.dispute.created": {
-        const dispute = event.data.object as Stripe.Dispute;
-        const chargeId = typeof dispute.charge === "string" ? dispute.charge : dispute.charge.id;
-        await revokeForCharge(stripe, await stripe.charges.retrieve(chargeId), "dispute");
-        break;
-      }
-      case "charge.dispute.closed": {
-        const dispute = await stripe.disputes.retrieve((event.data.object as Stripe.Dispute).id);
-        // Won (or an inquiry closed without a chargeback): the payment stands, so its access returns. Lost: it stays ended.
-        if (dispute.status === "won" || dispute.status === "warning_closed") {
-          const chargeId = typeof dispute.charge === "string" ? dispute.charge : dispute.charge.id;
-          const link = await subscriptionForCharge(stripe, await stripe.charges.retrieve(chargeId));
-          if (link) await clearRevocation(link.subscriptionId, (row) => row.access_revoked_reason === "dispute" && row.revoked_invoice_id === link.invoiceId);
-        }
-        break;
-      }
-      default:
-        break;
+      break;
     }
-  } catch (err) {
-    // Allow Stripe to retry: forget that we saw this event.
-    await admin.from("stripe_events").delete().eq("id", event.id);
-    throw err;
+    case "customer.subscription.created":
+    case "customer.subscription.updated":
+    case "customer.subscription.deleted":
+    case "customer.subscription.paused":
+    case "customer.subscription.resumed": {
+      // Stripe doesn't deliver events in order and retries failures hours later, so the event's snapshot may be
+      // older than what is already stored. Always sync the subscription's current state.
+      const snapshot = event.data.object as Stripe.Subscription;
+      const { sub, fetchedAt } = await currentSubscription(stripe, snapshot, event.created);
+      await syncSubscription(sub, fetchedAt);
+      break;
+    }
+    case "invoice.payment_failed":
+    case "invoice.paid": {
+      const invoice = event.data.object as Stripe.Invoice;
+      const subId = subscriptionOfInvoice(invoice);
+      if (subId) {
+        // A newer period paid for after a refund or dispute restores access; the revoked period stays revoked.
+        if (event.type === "invoice.paid" && invoice.id) await clearRevocation(subId, (row) => row.revoked_invoice_id !== invoice.id);
+        const { sub, fetchedAt } = await fetchSubscription(stripe, subId);
+        await syncSubscription(sub, fetchedAt);
+      }
+      break;
+    }
+    case "charge.refunded": {
+      const charge = event.data.object as Stripe.Charge;
+      // Only a full refund ends access. A partial (goodwill) refund leaves the paid period as it is.
+      const current = await stripe.charges.retrieve(charge.id);
+      if (current.refunded) await revokeForCharge(stripe, current, "refund");
+      else logInfo("billing.partial_refund", { charge: charge.id });
+      break;
+    }
+    case "charge.dispute.created": {
+      const dispute = event.data.object as Stripe.Dispute;
+      const chargeId = typeof dispute.charge === "string" ? dispute.charge : dispute.charge.id;
+      await revokeForCharge(stripe, await stripe.charges.retrieve(chargeId), "dispute");
+      break;
+    }
+    case "charge.dispute.closed": {
+      const dispute = await stripe.disputes.retrieve((event.data.object as Stripe.Dispute).id);
+      // Won (or an inquiry closed without a chargeback): the payment stands, so its access returns. Lost: it stays ended.
+      if (dispute.status === "won" || dispute.status === "warning_closed") {
+        const chargeId = typeof dispute.charge === "string" ? dispute.charge : dispute.charge.id;
+        const link = await subscriptionForCharge(stripe, await stripe.charges.retrieve(chargeId));
+        if (link) await clearRevocation(link.subscriptionId, (row) => row.access_revoked_reason === "dispute" && row.revoked_invoice_id === link.invoiceId);
+      }
+      break;
+    }
+    default:
+      break;
   }
-  return true;
 }
 
 function subscriptionOfInvoice(invoice: Stripe.Invoice): string | null {
@@ -377,8 +434,8 @@ async function subscriptionForCharge(stripe: Stripe, charge: Stripe.Charge): Pro
 async function revokeForCharge(stripe: Stripe, charge: Stripe.Charge, reason: "refund" | "dispute"): Promise<void> {
   const link = await subscriptionForCharge(stripe, charge);
   if (!link) return;
-  const sub = await stripe.subscriptions.retrieve(link.subscriptionId);
-  await syncSubscription(sub);
+  const { sub, fetchedAt } = await fetchSubscription(stripe, link.subscriptionId);
+  await syncSubscription(sub, fetchedAt);
   const latest = typeof sub.latest_invoice === "string" ? sub.latest_invoice : sub.latest_invoice?.id;
   if (latest && latest !== link.invoiceId) {
     logInfo("billing.revoke_skipped_earlier_period", { subscription: sub.id, reason });
@@ -413,14 +470,17 @@ async function clearRevocation(subscriptionId: string, when: (row: { revoked_inv
   await recomputeEntitlement(data.user_id as string);
 }
 
-/** The subscription as Stripe holds it now, or the event's snapshot if Stripe no longer has it. */
-async function currentSubscription(stripe: Stripe, snapshot: Stripe.Subscription): Promise<Stripe.Subscription> {
+/**
+ * The subscription as Stripe holds it now, or the event's snapshot if Stripe no longer has it. A snapshot counts as
+ * read when the event was created, so it can't overwrite anything read from Stripe later.
+ */
+async function currentSubscription(stripe: Stripe, snapshot: Stripe.Subscription, eventCreated: number): Promise<{ sub: Stripe.Subscription; fetchedAt: Date }> {
   try {
-    const current = await stripe.subscriptions.retrieve(snapshot.id);
+    const { sub: current, fetchedAt } = await fetchSubscription(stripe, snapshot.id);
     if (!current.metadata?.user_id && snapshot.metadata?.user_id) current.metadata = { ...current.metadata, user_id: snapshot.metadata.user_id };
-    return current;
+    return { sub: current, fetchedAt };
   } catch (err) {
-    if (isStripeMissing(err)) return snapshot;
+    if (isStripeMissing(err)) return { sub: snapshot, fetchedAt: new Date(eventCreated * 1000) };
     throw err;
   }
 }

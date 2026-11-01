@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
   if (!hasFeature(await getUserPlan(user.id), "nutrition_tracking")) return NextResponse.json({ error: "upgrade_required" }, { status: 403 });
   const sp = request.nextUrl.searchParams;
   const q = (sp.get("q") ?? "").trim().slice(0, 80);
-  const limit = rateLimit(`food:${user.id}`, 90, 60_000);
+  const limit = await rateLimit(`food:${user.id}`, 90, 60_000);
   if (!limit.ok) return NextResponse.json({ error: "rate_limited" }, { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } });
 
   try {

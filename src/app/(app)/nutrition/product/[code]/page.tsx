@@ -31,7 +31,7 @@ export default async function ProductQualityPage({ params }: { params: Promise<{
   const code = decodeURIComponent(raw).replace(/\D/g, "").slice(0, 14);
   const back = <BackLink href="/nutrition/scanner">{NUTRITION_SCORE_LABEL}</BackLink>;
 
-  if (!rateLimit(`quality:${user.id}`, 40, 60_000).ok) {
+  if (!(await rateLimit(`quality:${user.id}`, 40, 60_000)).ok) {
     return (
       <div className="mx-auto max-w-2xl space-y-5">
         {back}
