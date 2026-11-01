@@ -18,6 +18,7 @@ import {
   draftSnapshot,
   draftSummary,
   elapsedSeconds,
+  finishFailureMessage,
   migrateDraft,
   nextUp,
   restorableDraft,
@@ -489,7 +490,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
         })),
       })),
     };
-    const res = await finishWorkoutAction(payload).catch(() => ({ ok: false as const, error: "You appear to be offline. Your workout is saved on this device — try again when you're connected." }));
+    const res = await finishWorkoutAction(payload).catch(() => ({ ok: false as const, error: finishFailureMessage(navigator.onLine) }));
     setSaving(false);
     if (!res.ok) {
       setError(res.error);

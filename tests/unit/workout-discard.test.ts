@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createDraft, draftSnapshot, restorableDraft, workoutReducer, type WorkoutDraft } from "@/lib/domain/workout-draft";
+import { createDraft, draftSnapshot, finishFailureMessage, restorableDraft, workoutReducer, type WorkoutDraft } from "@/lib/domain/workout-draft";
 import { draftSnapshotSchema } from "@/lib/validation/schemas";
 import { discardedWorkoutIds, pendingDiscards, rememberDiscard, retryPendingDiscards } from "@/lib/workout-storage";
 
@@ -42,6 +42,17 @@ describe("the in-progress backup sent to the server", () => {
     expect(snap.name).toBe("Workout");
     expect(draftSnapshotSchema.safeParse(snap).success).toBe(true);
     expect(draftSnapshot({ ...d, name: "  Leg day " }).name).toBe("Leg day");
+  });
+});
+
+describe("when finishing can't reach the server (W5)", () => {
+  it("tells an online member their session may have ended, instead of calling them offline", () => {
+    // Online, the request fails because an ended session is redirected to sign-in; "offline" sent members round in circles.
+    expect(finishFailureMessage(true)).toMatch(/sign in again/);
+    expect(finishFailureMessage(true)).not.toMatch(/offline/i);
+    expect(finishFailureMessage(true)).toMatch(/kept on this device/);
+    expect(finishFailureMessage(false)).toMatch(/offline/);
+    expect(finishFailureMessage(false)).toMatch(/saved on this device/);
   });
 });
 

@@ -490,6 +490,17 @@ export function migrateDraft(value: unknown): WorkoutDraft | null {
 }
 
 /**
+ * The message when the finish request itself didn't complete. Online, the usual cause is an ended session (signed out
+ * on another device: the request is redirected to sign-in), so "you appear to be offline" would have the member retry
+ * forever. The workout stays on the device either way and resumes after signing in.
+ */
+export function finishFailureMessage(online: boolean): string {
+  return online
+    ? "We couldn't reach your account, so the workout isn't saved yet. It's kept on this device. If you were signed out, sign in again and finish it from Resume."
+    : "You appear to be offline. Your workout is saved on this device — try again when you're connected.";
+}
+
+/**
  * What the logger sends to the server as the in-progress backup. The name is trimmed first: the server trims it and
  * requires a character, so a name of only spaces used to make every backup be rejected.
  */
