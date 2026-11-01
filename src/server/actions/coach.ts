@@ -29,7 +29,8 @@ export async function applyProposalAction(messageId: string, activate: boolean):
   if (!id.success) return { ok: false, error: "Invalid proposal." };
   if ((await getAiAllowance(user.id, await getUserPlan(user.id))).planLimit <= 0) return { ok: false, error: "Saving AI plans requires Pro." };
   const supabase = await getServerSupabase();
-  const { data: msg } = await supabase.from("ai_messages").select("id, proposal, proposal_status").eq("id", id.data).eq("user_id", user.id).maybeSingle();
+  // Only the coach's own replies carry plans a member can apply.
+  const { data: msg } = await supabase.from("ai_messages").select("id, proposal, proposal_status").eq("id", id.data).eq("user_id", user.id).eq("role", "assistant").maybeSingle();
   if (!msg?.proposal) return { ok: false, error: "Proposal not found." };
   if (msg.proposal_status !== "proposed") return { ok: false, error: "This proposal was already handled." };
 

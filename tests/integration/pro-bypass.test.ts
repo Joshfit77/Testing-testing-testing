@@ -96,6 +96,44 @@ describe.skipIf(!available)("Pro access can't be obtained without a valid server
     expect((await free.client.rpc("plan_of", { p_user_id: pro.id })).error).not.toBeNull();
   });
 
+  it("a Free member can't build a program through the database API: no starter inserts, no relabelling, no editing a starter's contents", async () => {
+    const program = (owner: TestUser) => ({
+      owner_id: owner.id,
+      slug: `starter-${crypto.randomUUID().slice(0, 8)}`,
+      name: "Starter",
+      difficulty: "beginner",
+      duration_weeks: 4,
+      days_per_week: 3,
+      session_minutes: 45,
+      tier: "free",
+      is_published: false,
+    });
+    // Creating a "starter" program (any content, no plan check before) is now the server's job only.
+    expect((await free.client.from("training_programs").insert({ ...program(free), source: "starter" })).error).not.toBeNull();
+    // The server-made starter program: its source can't be changed and its contents can't be edited on Free.
+    const { data: made } = await svc.from("training_programs").insert({ ...program(free), source: "starter" }).select("id").single();
+    const { data: week } = await svc.from("program_weeks").insert({ program_id: made!.id, week_number: 1 }).select("id").single();
+    expect((await free.client.from("training_programs").update({ source: "custom" }).eq("id", made!.id)).error?.code).toBe("42501");
+    expect((await free.client.from("program_weeks").insert({ program_id: made!.id, week_number: 2 })).error).not.toBeNull();
+    await free.client.from("program_weeks").update({ week_number: 9 }).eq("id", week!.id);
+    expect((await svc.from("program_weeks").select("week_number").eq("id", week!.id).single()).data?.week_number).toBe(1);
+    expect((await svc.from("training_programs").select("source").eq("id", made!.id).single()).data?.source).toBe("starter");
+    // With Pro (adaptive training edits the active program), the same edit is allowed.
+    const { data: proProgram } = await svc.from("training_programs").insert({ ...program(pro), source: "starter" }).select("id").single();
+    const { data: proWeek } = await svc.from("program_weeks").insert({ program_id: proProgram!.id, week_number: 1 }).select("id").single();
+    const edited = await pro.client.from("program_weeks").update({ week_number: 2 }).eq("id", proWeek!.id).select("week_number");
+    expect(edited.error).toBeNull();
+    expect(edited.data).toEqual([{ week_number: 2 }]);
+  });
+
+  it("a member can't plant an AI plan proposal of their own and apply it as the coach's", async () => {
+    const { data: conv } = await pro.client.from("ai_conversations").insert({ user_id: pro.id, title: "Mine" }).select("id").single();
+    const forged = await pro.client.from("ai_messages").insert({ conversation_id: conv!.id, user_id: pro.id, role: "user", content: "plan", proposal: { name: "Forged" }, proposal_status: "proposed" });
+    expect(forged.error).not.toBeNull();
+    // A plain question is still fine.
+    expect((await pro.client.from("ai_messages").insert({ conversation_id: conv!.id, user_id: pro.id, role: "user", content: "Hi" })).error).toBeNull();
+  });
+
   it("the API reports each member's own plan from the server, whatever the request says", async () => {
     const { GET } = await import("@/app/api/v1/me/route");
     const res = await GET(new NextRequest(`http://localhost:3000/api/v1/me?plan=pro&user_id=${pro.id}`, { headers: { authorization: `Bearer ${await token(free)}`, "x-plan": "pro" } }));

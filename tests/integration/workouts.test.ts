@@ -129,7 +129,7 @@ describe.skipIf(!available)("workout logging service", async () => {
 
   it("advances the active program pointer after completing the scheduled day", async () => {
     const seed = getProgramSeed("foundations-full-body")!;
-    const programId = await createPrivateProgram(user.client, user.id, { ...seed, slug: "x", name: "My starter" }, "starter");
+    const programId = await createPrivateProgram(serviceClient(), user.id, { ...seed, slug: "x", name: "My starter" }, "starter"); // starter programs are written by the server
     const upId = await activateProgram(user.client, user.id, programId);
     const before = await getActiveProgram(user.client, user.id);
     expect(before).toMatchObject({ currentWeek: 1, currentDay: 1 });
@@ -151,7 +151,7 @@ describe.skipIf(!available)("workout logging service", async () => {
     try {
       const { data: theirs } = await other.client.from("user_programs").select("id").limit(1);
       const seed = getProgramSeed("home-bodyweight-strength")!;
-      const pid = await createPrivateProgram(other.client, other.id, { ...seed, slug: "y" }, "starter");
+      const pid = await createPrivateProgram(serviceClient(), other.id, { ...seed, slug: "y" }, "starter");
       const theirUp = await activateProgram(other.client, other.id, pid);
       expect(theirs).toBeDefined();
       const res = await finishWorkout(user.client, user.id, {
