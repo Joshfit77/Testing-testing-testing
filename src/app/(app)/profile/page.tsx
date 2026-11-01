@@ -10,6 +10,8 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { signOutAction } from "@/server/actions/auth";
 import { SignOutForm } from "@/components/shell/sign-out-form";
+import { LegalLinks } from "@/components/profile/legal-links";
+import { legalLinks } from "@/server/services/store-billing";
 
 export const metadata = { title: "Profile & Settings" };
 
@@ -123,6 +125,7 @@ export default async function ProfilePage() {
             </Link>
           )}
         </div>
+        <LegalLinks legal={legalLinks()} />
         <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4">
           <p className="font-semibold text-destructive-foreground">Delete account</p>
           <p className="mb-3 text-sm text-muted-foreground">

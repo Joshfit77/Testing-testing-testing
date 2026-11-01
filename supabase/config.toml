@@ -244,6 +244,19 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
+# Sign-up confirmation and password reset link to /auth/confirm with the token hash, which works in any browser.
+# Supabase's default links need the PKCE code verifier kept by the browser that asked for the email, so a reset
+# requested in the iPhone app failed once the link opened in Safari (tests/integration/auth-email-links.test.ts).
+# These files apply to the local stack after a restart; the hosted project needs the same templates (Supabase
+# dashboard > Authentication > Email Templates, or `supabase config push`).
+[auth.email.template.confirmation]
+subject = "Confirm your email address"
+content_path = "./supabase/templates/confirmation.html"
+
+[auth.email.template.recovery]
+subject = "Reset your password"
+content_path = "./supabase/templates/recovery.html"
+
 # Uncomment to customize email template
 # [auth.email.template.invite]
 # subject = "You have been invited"
