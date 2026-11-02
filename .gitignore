@@ -48,3 +48,6 @@ native-shell/server-url.js
 *.jks
 keystore.properties
 service-account*.json
+
+# AI coach evaluation runs (scripts/ai-eval): transcripts and model output, kept local
+ai-eval-results/
