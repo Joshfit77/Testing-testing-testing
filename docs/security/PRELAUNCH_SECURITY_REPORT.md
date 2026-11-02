@@ -283,6 +283,7 @@ touched, no release was replaced, and nothing was merged.
 | Production dependency audit | **0 vulnerabilities** | `npm audit --omit=dev` |
 | iOS on GitHub, run 54 (`ad54e04`: Simulator test fix, before the CSP) | compile pass; WebKit pass; Simulator **pass** | The runner was saturated (CPU idle 0 % throughout) and the screenshot service stalled 2.1 s, so the fresh-launch test passed by its stall path, now also requiring Skip intro in the accessibility tree (seen at 10.5 s); Enter Narrow Gate was skipped with its reason recorded. The quiet-runner path that used to fail was not exercised. |
 | iOS on GitHub, run 55 (`4d637f0`: everything, CSP included) | **success**: compile pass; WebKit opening and navigation tests pass with the nonce CSP; Simulator pass, all three CHECKs ok | The fresh-launch test passed on its first try **through the fixed path** (the door filmed open at 10.8 s and 12.3 s; no stall exemption), on a runner with the CPU idle 0 %. Enter Narrow Gate failed its first try and passed on the workflow's retry: Skip intro had been in the accessibility tree 1.5 s before the first painted frame, so the press, timed from that frame, landed 3.8 s into the opening as it moved on by itself. `test1` now times the press from whichever came first (commit below); see run 56. |
+| iOS on GitHub, run 56 (`c99c98a`: the press timed from the opening's real start) | **success**: compile pass; WebKit pass; Simulator pass after a retry; fresh-launch CHECK ok, the two Enter CHECKs skipped | CPU idle 0 % throughout. The fresh-launch test **failed its first try** on the check added in this round: the screenshot service stalled 5.0 s, as long as the opening, and Skip intro was never seen, because the accessibility tree is only read between screenshots. The retry (a 2.9 s stall, Skip intro seen at 10.7 s) passed. Enter Narrow Gate was skipped (stall), so its new timing **was not exercised**. Fix: a stall of 4 s or more with Skip intro never seen is now a skip with its reason, not a failure (`b8c0ce5`); see run 57. |
 | Payment sandbox, physical iPhone, TestFlight, hosted Supabase | **not run** | unchanged: needs the owner's accounts and a device |
 
 **Simulator test root cause (from the logs of runs 46–53, replayed in a script):** `test0` scanned its film of the
@@ -315,6 +316,8 @@ Fixed in `74724d9`, plus a saturation guard for `test1` (run 52 failed it with 2
 | `f7d5f9a` | F14–F17: migration `20261102000048_low_findings_hardening.sql`, server-written legal records, tests |
 | `d1c3f4a` | F18: AI request ids (saved reply on retry, 409 while in progress) |
 | `4ea36cc` | Tests: auth email links read the link the current templates send (an existing break from `e4bf019`) |
+| `c99c98a` | iOS Simulator test: Enter Narrow Gate timed from the opening's real start (Skip intro or the first painted frame, whichever came first) |
+| `b8c0ce5` | iOS Simulator test: a screenshot stall as long as the opening, with Skip intro never seen, is a skip with its reason, not a failure |
 
 **New files:**
 - Migrations: `supabase/migrations/20261101000046_billing_integrity.sql` and
