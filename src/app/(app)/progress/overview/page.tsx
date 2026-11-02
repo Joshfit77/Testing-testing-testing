@@ -144,7 +144,7 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
         }
       />
 
-      <nav aria-label="Time range" className="flex gap-2">
+      <nav aria-label="Time range" className="flex flex-wrap gap-2">
         {(Object.keys(RANGES) as RangeKey[]).map((r) => (
           <Link
             key={r}
@@ -174,7 +174,7 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
         ))}
       </section>
 
-      <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr]">
         <LineSeriesChart
           title="Bodyweight"
           description={RANGES[range].label}
@@ -231,7 +231,7 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
         <Notice tone="error">We couldn&apos;t load your progress photos right now. Please refresh to try again.</Notice>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <BarSeriesChart
           title={byMonth ? "Monthly activity" : "Weekly activity"}
           description="Completed workouts"
@@ -258,7 +258,7 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
       </div>
 
       {advanced ? (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <LineSeriesChart
             title="Squat · Bench · Deadlift"
             description="Best estimated 1RM per session (Epley)"
@@ -275,7 +275,7 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
               <label htmlFor="ex-select" className="sr-only">
                 Exercise
               </label>
-              <select id="ex-select" name="ex" defaultValue={sp.ex ?? ""} className="h-11 flex-1 rounded-xl border border-border bg-elevated px-3 text-sm">
+              <select id="ex-select" name="ex" defaultValue={sp.ex ?? ""} className="h-11 min-w-0 flex-1 rounded-xl border border-border bg-elevated px-3 text-sm">
                 <option value="">Choose an exercise…</option>
                 {exercises.map((e) => (
                   <option key={e.slug as string} value={e.slug as string}>
@@ -304,7 +304,7 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
       )}
 
       {advanced && nutrition && (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <BarSeriesChart
             title="Calories"
             description="Logged per day"
@@ -339,7 +339,7 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
         <h2 id="goals-title" className="mb-3 flex items-center gap-2 font-display text-2xl font-bold uppercase">
           <Target className="size-5 text-gold" aria-hidden /> Goals
         </h2>
-        <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr]">
           {goals.length ? (
             <ul className="space-y-3">
               {goals.map((g) => {
@@ -434,7 +434,7 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
           Body measurements <span className="text-sm font-normal normal-case text-muted-foreground">(optional)</span>
         </h2>
         {/* Logging measurements is basic progress (every plan); the trend chart is advanced analytics (Pro). */}
-        <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr]">
           {advanced ? (
             <LineSeriesChart
               title="Measurements"
