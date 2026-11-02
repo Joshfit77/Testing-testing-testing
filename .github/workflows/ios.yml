@@ -97,6 +97,53 @@ jobs:
           name: NarrowGateFitness-iOS-Simulator
           path: NarrowGateFitness-iOS-Simulator.zip
 
+  archive-check:
+    # The TestFlight build without the Apple account: the online app, Release, for a real iPhone (arm64, iPhoneOS SDK),
+    # archived unsigned and checked against what App Store Connect requires (scripts/ios-verify/check-archive.py).
+    # Nothing is signed, kept or uploaded. The address is a reserved documentation domain: this build is never installed.
+    name: Device archive check (online app, Release, unsigned)
+    if: github.event_name == 'push' || inputs.job == 'checks'
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      # App Store Connect's minimum since April 28, 2026: Xcode 26 with the iOS 26 SDK (iOS 27 SDK from April 2027).
+      MIN_IOS_SDK: "26"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Xcode and the iOS SDK meet App Store Connect's minimum
+        run: |
+          xcodebuild -version
+          echo "Selected: $(xcode-select -p)"
+          sdk=$(xcrun --sdk iphoneos --show-sdk-version)
+          echo "iPhoneOS SDK: $sdk"
+          case "$(xcode-select -p)" in *beta*|*Beta*) echo "::error::The selected Xcode is a beta: App Store Connect only takes builds from released Xcode versions"; exit 1 ;; esac
+          [ "${sdk%%.*}" -ge "$MIN_IOS_SDK" ] || { echo "::error::iOS SDK $sdk is older than App Store Connect's minimum ($MIN_IOS_SDK)"; exit 1; }
+      - name: Configure the online app (as the TestFlight job does)
+        run: |
+          CAP_SERVER_URL=https://example.com npx cap sync ios
+          python3 - <<'PY'
+          import json
+          c = json.load(open("ios/App/App/capacitor.config.json"))
+          assert c.get("server", {}).get("url") == "https://example.com", c.get("server")
+          assert c.get("webDir") != "standalone", "the offline edition is configured"
+          print("Online app configured")
+          PY
+      - name: Archive for iPhone (Release, unsigned)
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" archive -quiet
+      - name: Check the archive against App Store Connect's requirements
+        run: python3 scripts/ios-verify/check-archive.py "$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app" "$MIN_IOS_SDK"
+
   app-in-simulator:
     name: Full app in the iOS Simulator (opening)
     if: github.event_name == 'push' || inputs.job == 'checks'
@@ -344,6 +391,14 @@ jobs:
           assert c.get("webDir") != "standalone", "the offline edition is configured"
           print("The app will load", url)
           PY
+      - name: Xcode and the iOS SDK meet App Store Connect's minimum
+        run: |
+          xcodebuild -version
+          sdk=$(xcrun --sdk iphoneos --show-sdk-version)
+          echo "iPhoneOS SDK: $sdk ($(xcode-select -p))"
+          case "$(xcode-select -p)" in *beta*|*Beta*) echo "::error::The selected Xcode is a beta: App Store Connect only takes builds from released Xcode versions"; exit 1 ;; esac
+          # Xcode 26 with the iOS 26 SDK since April 28, 2026; the iOS 27 SDK from April 2027.
+          [ "${sdk%%.*}" -ge 26 ] || { echo "::error::iOS SDK $sdk is older than App Store Connect's minimum (26)"; exit 1; }
       - name: Write the App Store Connect key
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
