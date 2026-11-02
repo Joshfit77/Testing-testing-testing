@@ -42,10 +42,15 @@ jobs:
       VERCEL_TELEMETRY_DISABLED: "1"
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
-          cache: npm
+          # No shared npm cache in the job that holds the Vercel and Supabase secrets (zizmor: cache-poisoning).
+          # v4 only caches when asked; v5 and later cache by default unless this is false.
+          # npm ci still checks every package against package-lock.json.
+          package-manager-cache: false
 
       - name: Check the secrets and that they name one demo project
         run: |
