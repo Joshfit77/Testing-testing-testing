@@ -371,7 +371,9 @@ final class OpeningOnSimulatorTests: XCTestCase {
         var lastFrame: TimeInterval = 0.3
         var screen = CGSize(width: 402, height: 874)
         while Date().timeIntervalSince(start) < 90 {
-            if let at = paintedAt, Date().timeIntervalSince(at) + lastFrame > 2.0 { break }
+            // Timed from the opening's start: the first painted frame, or Skip intro reaching the accessibility tree if
+            // that came first (see openingStart below).
+            if let at = paintedAt.map({ p in domReady.map { min($0, p) } ?? p }), Date().timeIntervalSince(at) + lastFrame > 2.0 { break }
             if domReady == nil, skip.exists { domReady = Date() }
             let f = shot(stamp("1w-before-enter", start))
             lastFrame = f.total
@@ -396,8 +398,14 @@ final class OpeningOnSimulatorTests: XCTestCase {
             XCTFail("the opening never started: the launch screen or a blank page for 90 s after launch")
             return
         }
+        // The opening starts when its overlay is laid out, which is when Skip intro reaches the accessibility tree. On a
+        // busy simulator the screenshot service can return the first painted frame well after that: in run 55 Skip intro
+        // was there 1.5 s before the first painted frame, so a press timed from that frame landed 3.8 s into the opening,
+        // as it moved on by itself (3.85 s), and the try failed; the retry, with no gap, passed. Time everything from
+        // whichever came first.
+        let openingStart = min(paintedAt, domReady ?? paintedAt)
         if point == nil {
-            let wait = 2.0 - Date().timeIntervalSince(paintedAt)
+            let wait = 2.0 - Date().timeIntervalSince(openingStart)
             if wait > 0 { Thread.sleep(forTimeInterval: wait) }
         }
         let target = point ?? Self.enterPoint ?? CGPoint(x: screen.width / 2, y: screen.height * 0.912)
@@ -407,7 +415,7 @@ final class OpeningOnSimulatorTests: XCTestCase {
                      Int(paintedAt.timeIntervalSince(start) * 1000), dom, target.x, target.y, source, Date().timeIntervalSince(paintedAt)))
         app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: target.x, dy: target.y)).tap()
         let tap = Date()
-        print(String(format: "GATECHECK tapped it %d ms after launch, %.1f s after the opening's first frame", ms(since: start), tap.timeIntervalSince(paintedAt)))
+        print(String(format: "GATECHECK tapped it %d ms after launch, %.1f s after the opening's first frame, %.1f s after the opening started", ms(since: start), tap.timeIntervalSince(paintedAt), tap.timeIntervalSince(openingStart)))
         // Film the 2.4 s after the press at the pace of the screenshot call (frames are decoded in the background).
         resetFilm()
         var captures: [TimeInterval] = []
@@ -419,18 +427,18 @@ final class OpeningOnSimulatorTests: XCTestCase {
         if let first = after.first { print("GATECHECK right after the press: \(enterButton(in: first) != nil ? "the door open with the button still showing" : gateOpen(first) ? "the door open" : "not the open door")") }
         // The light after the press proves the move only when it comes before the opening's own move could have
         // brightened the screen (its push starts at 3.85 s and its light at 4.1 s): a light frame within 3.9 s of
-        // the opening's first frame. Later than that, or with screenshots too slow to catch the half second of
+        // the opening's start. Later than that, or with screenshots too slow to catch the half second of
         // light, the press and the welcome page are still checked, and the log says what could not be told apart.
-        let firstLight = after.first { inTheLight($0) }.map { $0.at.timeIntervalSince(paintedAt) }
+        let firstLight = after.first { inTheLight($0) }.map { $0.at.timeIntervalSince(openingStart) }
         let slowest = captures.max() ?? 0
-        let landed = tap.timeIntervalSince(paintedAt)
+        let landed = tap.timeIntervalSince(openingStart)
         if slowest <= 1.0, landed <= 3.4 {
             XCTAssertTrue(firstLight != nil, String(format: "no move into the light after the tap (a screenshot call took at most %.1f s here, quick enough to film it)", slowest))
-            if let t = firstLight { XCTAssertLessThanOrEqual(t, 3.9, String(format: "the light came %.1f s after the opening's first frame, late enough to be the opening's own move rather than the press", t)) }
+            if let t = firstLight { XCTAssertLessThanOrEqual(t, 3.9, String(format: "the light came %.1f s after the opening started, late enough to be the opening's own move rather than the press", t)) }
         } else {
             let note = slowest > 1.0
                 ? String(format: "the move into the light could not be filmed after this press: a screenshot call took %.1f s (it needs under 1.0 s to catch the half second of light); it is checked frame by frame in WebKit", slowest)
-                : String(format: "the light after this press (%@) cannot be told from the opening's own move: the tap landed %.1f s after the opening's first frame, and the opening moves on by itself from 3.85 s; the move is checked frame by frame in WebKit", firstLight.map { String(format: "seen %.1f s after the first frame", $0) } ?? "not seen", landed)
+                : String(format: "the light after this press (%@) cannot be told from the opening's own move: the tap landed %.1f s after the opening started, and the opening moves on by itself from 3.85 s; the move is checked frame by frame in WebKit", firstLight.map { String(format: "seen %.1f s after the opening started", $0) } ?? "not seen", landed)
             print("GATECHECK \(note)")
             try? note.write(to: shotsDir.appendingPathComponent("1-nolight.txt"), atomically: true, encoding: .utf8)
         }
