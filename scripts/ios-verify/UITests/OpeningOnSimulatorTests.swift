@@ -320,13 +320,28 @@ final class OpeningOnSimulatorTests: XCTestCase {
         XCTAssertNotNil(changed, "the page never showed within 90 s of launch")
         XCTAssertTrue(sawGate || stalled != nil, String(format: "the opening (the door open with its light) was not seen on a fresh launch, with frames at most %.1f s apart", longestGap))
         // Without the door on film, the accessibility tree has to show the opening was there: Skip intro is in it only
-        // while the opening is on screen (the overlay is display: none whenever the opening is not playing).
-        if stalled != nil {
-            XCTAssertNotNil(domReady, "the door could not be filmed (the screenshot service stalled) and Skip intro was never in the accessibility tree either: nothing shows the opening played")
+        // while the opening is on screen (the overlay is display: none whenever the opening is not playing). The tree
+        // is read between screenshots, so a stall as long as the opening itself (gone at 5.05 s) can hide it from
+        // both: run 56 stalled 5.0 s, the next frame was the welcome page, and Skip intro was never seen, though the
+        // retry (a 2.9 s stall) saw it. Then nothing on this machine could see the opening, and the test says so as
+        // a skip, after checking the opening's end, instead of failing on the machine or passing on nothing.
+        var unobservable: String?
+        if stalled != nil, domReady == nil {
+            if longestGap >= Self.stallHidesOpening {
+                unobservable = String(format: "the screenshot service stalled for %.1f s, about as long as the opening itself, and the accessibility tree is read between screenshots, so neither could see the opening on this machine; its end is checked here, and the opening frame by frame in WebKit", longestGap)
+                print("GATECHECK \(unobservable!)")
+            } else {
+                XCTFail(String(format: "the door could not be filmed (the screenshot service stalled for %.1f s) and Skip intro was never in the accessibility tree either, although the tree was read during the opening: nothing shows the opening played", longestGap))
+            }
         }
         XCTAssertFalse(app.buttons["Skip intro"].exists, "the opening is still showing 8 s after the page showed")
         XCTAssertTrue(labelled("Start free").waitForExistence(timeout: 5), "the welcome page did not appear after the opening")
+        if let reason = unobservable { throw XCTSkip(reason) }
     }
+
+    /// A gap between screenshots at least this long can span the whole time Skip intro is in the accessibility tree
+    /// (the opening is gone at 5.05 s; less the overlay's fade-in and the time each read of the tree takes).
+    private static let stallHidesOpening: TimeInterval = 4.0
 
     func test1_enterNarrowGateMovesIntoTheLightAndOpensTheApp() throws {
         continueAfterFailure = true
