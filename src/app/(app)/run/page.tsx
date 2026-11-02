@@ -100,18 +100,19 @@ async function OutdoorTab({ userId, supabase }: { userId: string; supabase: Supa
           <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
         </Link>
       )}
+      {/* The labels wrap (buttons default to one line): "Outdoor walk" with the PRO tag is wider than half a phone. */}
       <div className="grid grid-cols-2 gap-2">
-        <Button asChild size="lg" className="h-auto flex-col items-start gap-0.5 py-4 text-left">
+        <Button asChild size="lg" className="h-auto min-w-0 flex-col items-start gap-0.5 whitespace-normal py-4 text-left">
           <Link href="/run/record?kind=run">
-            <span className="flex items-center gap-2 font-display text-lg uppercase">
+            <span className="flex flex-wrap items-center gap-x-2 gap-y-1 font-display text-lg uppercase">
               <LocateFixed aria-hidden /> Outdoor run {proTag}
             </span>
             <span className="text-xs font-normal opacity-80">GPS distance, pace, splits</span>
           </Link>
         </Button>
-        <Button asChild size="lg" variant="secondary" className="h-auto flex-col items-start gap-0.5 py-4 text-left">
+        <Button asChild size="lg" variant="secondary" className="h-auto min-w-0 flex-col items-start gap-0.5 whitespace-normal py-4 text-left">
           <Link href="/run/record?kind=walk">
-            <span className="flex items-center gap-2 font-display text-lg uppercase">
+            <span className="flex flex-wrap items-center gap-x-2 gap-y-1 font-display text-lg uppercase">
               <Footprints aria-hidden /> Outdoor walk {proTag}
             </span>
             <span className="text-xs font-normal opacity-80">GPS distance and route</span>

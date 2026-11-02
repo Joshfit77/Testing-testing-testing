@@ -245,7 +245,8 @@ export default async function ProgramDetailPage({
                 aria-current={w.week_number === weekNumber ? "page" : undefined}
                 scroll={false}
                 className={cn(
-                  "flex size-11 shrink-0 items-center justify-center rounded-xl border text-sm font-semibold",
+                  // relative: keeps the sr-only "Week" inside the scrolling bar (an absolute box placed by the page widened it).
+                  "relative flex size-11 shrink-0 items-center justify-center rounded-xl border text-sm font-semibold",
                   w.week_number === weekNumber ? "border-gold bg-gold/10 text-gold-highlight" : "border-border text-muted-foreground hover:text-foreground",
                 )}
               >
