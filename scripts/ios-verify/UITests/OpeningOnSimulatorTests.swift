@@ -21,6 +21,9 @@ final class OpeningOnSimulatorTests: XCTestCase {
     nonisolated(unsafe) private static var enterPoint: CGPoint?
     /// How long a screenshot call takes while the opening animates here (median), from test0's film.
     nonisolated(unsafe) private static var openingCapture: TimeInterval?
+    /// How long a frame of that film took to decode and save (median): over about a second means the simulator's
+    /// machine is saturated (CPU idle 0 %), and the page itself lags behind the clock there.
+    nonisolated(unsafe) private static var openingTotal: TimeInterval?
     /// Set when test0's film could not catch the door open (the screenshot service stalled across it), to the longest
     /// gap between its frames: a film cannot then time the press either.
     nonisolated(unsafe) private static var openingGap: TimeInterval?
@@ -275,22 +278,28 @@ final class OpeningOnSimulatorTests: XCTestCase {
         if let last = all.last(where: { blank($0) || (dark($0) && doorway($0) > 6) }), let i = all.firstIndex(where: { $0.at == last.at }), i + 1 < all.count {
             opening.append(last)
         }
-        for f in all.drop(while: { blank($0) || (dark($0) && doorway($0) > 6) }) {
+        // The opening ends where the film settles on the welcome page: the first frame of the run of welcome frames
+        // the film ends on. The opening passes through the welcome page's brightness on its way (the doorway
+        // brightens from about 30 to 170 as the door opens, about a third of a second of it in the welcome band), so
+        // a film quick enough to catch that moment must not stop there, before the door is open.
+        let settled = (all.lastIndex(where: { !welcome($0) }) ?? -1) + 1
+        for f in all.prefix(settled + 1).drop(while: { blank($0) || (dark($0) && doorway($0) > 6) }) {
             opening.append(f)
             if gateOpen(f) {
                 sawGate = true
                 if let p = enterButton(in: f) { Self.enterPoint = p }
             }
-            if welcome(f) { break }
         }
         // The simulator's screenshot service can stall for seconds while the opening's heavy first frames render,
         // and the opening goes on meanwhile: when no frame could be taken while the door stood open (a gap of
         // 1.5 s or more between frames, and no door seen), that is the machine, not the opening, and is reported
-        // as such; the opening's presence and end are still checked below through the accessibility tree.
+        // as such; the opening's presence (Skip intro in the accessibility tree) and end are still checked below.
         let gaps = zip(opening, opening.dropFirst()).map { $1.at.timeIntervalSince($0.at) }
         let longestGap = gaps.max() ?? 0
         var stalled: String?
-        Self.openingGap = sawGate ? nil : longestGap
+        // Only a real stall counts as one: a film that kept up and still never saw the door is a failure below, not a
+        // reason for test1 to skip.
+        Self.openingGap = !sawGate && longestGap >= 1.5 ? longestGap : nil
         if !sawGate, longestGap >= 1.5 {
             stalled = String(format: "the door could not be filmed on this fresh launch: the screenshot service stalled for %.1f s while the opening rendered, and the next frame was already the welcome page", longestGap)
             try? stalled!.write(to: shotsDir.appendingPathComponent("0-stall.txt"), atomically: true, encoding: .utf8)
@@ -303,12 +312,18 @@ final class OpeningOnSimulatorTests: XCTestCase {
         if !shownFrames.isEmpty {
             let capture = median(shownFrames.map(\.capture))
             Self.openingCapture = capture
+            Self.openingTotal = median(shownFrames.map(\.total))
             print(String(format: "GATECHECK filming the opening here: a screenshot call takes %.1f s (median of %d, longest %.1f s), a frame decoded and saved %.1f s",
                          capture, shownFrames.count, shownFrames.map(\.capture).max()!, median(shownFrames.map(\.total))))
         }
         if let p = Self.enterPoint { print(String(format: "GATECHECK Enter Narrow Gate is at (%.0f, %.0f) pt", p.x, p.y)) }
         XCTAssertNotNil(changed, "the page never showed within 90 s of launch")
         XCTAssertTrue(sawGate || stalled != nil, String(format: "the opening (the door open with its light) was not seen on a fresh launch, with frames at most %.1f s apart", longestGap))
+        // Without the door on film, the accessibility tree has to show the opening was there: Skip intro is in it only
+        // while the opening is on screen (the overlay is display: none whenever the opening is not playing).
+        if stalled != nil {
+            XCTAssertNotNil(domReady, "the door could not be filmed (the screenshot service stalled) and Skip intro was never in the accessibility tree either: nothing shows the opening played")
+        }
         XCTAssertFalse(app.buttons["Skip intro"].exists, "the opening is still showing 8 s after the page showed")
         XCTAssertTrue(labelled("Start free").waitForExistence(timeout: 5), "the welcome page did not appear after the opening")
     }
@@ -328,6 +343,10 @@ final class OpeningOnSimulatorTests: XCTestCase {
             unfilmable = String(format: "a screenshot call takes %.1f s while the opening animates on this simulator (over 0.9 s), too slow to catch the half second of light after the press", t)
         } else if let gap = Self.openingGap {
             unfilmable = String(format: "the screenshot service stalled for %.1f s while the opening rendered on the fresh launch, so a film cannot time the press here", gap)
+        } else if let t = Self.openingTotal, t > 0.9 {
+            // Run 52: screenshot calls of 0.5 s, but 2.3 s to decode each frame with the CPU idle 0 %; the first frame
+            // after every press was already the welcome page. The press can't be timed to the button's 1.7 s there.
+            unfilmable = String(format: "a frame of the opening takes %.1f s to decode and save on this simulator (over 0.9 s: the machine is saturated), too slow to time the press to the button's 1.7 s on screen", t)
         }
         if let why = unfilmable {
             let reason = "Enter Narrow Gate not checked here: \(why); the fresh launch filmed what it could, and the move into the light is checked frame by frame in WebKit"
