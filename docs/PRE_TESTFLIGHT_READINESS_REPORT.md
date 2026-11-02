@@ -219,6 +219,7 @@ Record the build number, iPhone model and iOS version for each.
 | — 10 skipped demo-mode tests | `demo.spec.ts` | **not run**. The demo seed only runs on an empty database, and this one holds the test accounts. Demo mode isn't part of the TestFlight build. |
 | Phone layout sweep | `e2e/phone-sweep.spec.ts` | **pass**: 59 screens × 5 configurations (375, 393, 440, 320 pt; 375 pt with the largest text and reduced motion) |
 | iOS on GitHub, run 58 (`ed7d993`) | `ios.yml` checks | **success**: compile, WebKit, device archive, Simulator (no retries) |
+| iOS on GitHub, run 59 (`43a1846`, the final code) | `ios.yml` checks | **success**: compile, WebKit, device archive and Simulator all pass, and all three Simulator CHECKs ok (fresh launch, before and after Enter Narrow Gate). The TestFlight job was skipped, as intended. |
 | Workflow lint and security | actionlint 1.7.12, zizmor 1.31.1 | clean; zizmor shows no findings on `ios.yml` |
 | Secrets | gitleaks 8.30.1, all refs | 0 leaks, 394 commits |
 | Production dependencies | `npm audit --omit=dev` | 0 vulnerabilities |
