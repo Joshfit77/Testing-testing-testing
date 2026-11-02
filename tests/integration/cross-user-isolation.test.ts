@@ -147,6 +147,9 @@ describe.skipIf(!available)("cross-user isolation sweep: every user-owned table 
     const conversation = await seed("ai_conversations", { user_id: u, title: "Private chat" });
     parents.ai_conversations = conversation.id!;
     await seed("ai_messages", { conversation_id: conversation.id, user_id: u, role: "user", content: "My private question" });
+    const reply = await seed("ai_messages", { conversation_id: conversation.id, user_id: u, role: "assistant", content: "My private answer" });
+    parents.ai_replies = reply.id!;
+    await seed("ai_message_feedback", { user_id: u, message_id: reply.id, rating: "partially", comment: "Private feedback" });
     await seed("ai_usage_events", { user_id: u, kind: "chat" });
     await seed("coach_memories", { user_id: u, category: "schedule", content: "Trains at 6am", source: "member" });
 
@@ -265,6 +268,7 @@ describe.skipIf(!available)("cross-user isolation sweep: every user-owned table 
       ai_conversations: { title: "hacked" },
       ai_messages: { content: "hacked" },
       coach_memories: { content: "hacked note" },
+      ai_message_feedback: { comment: "hacked" },
       activities: { notes: "hacked" },
       sleep_sessions: { notes: "hacked" },
       daily_steps: { steps: 1 },
@@ -322,6 +326,7 @@ describe.skipIf(!available)("cross-user isolation sweep: every user-owned table 
       ["workout_template_exercises", { template_id: parents.workout_templates, user_id: bob.id, exercise_id: exerciseId, position: 1, sets: 3 }],
       ["meal_items", { meal_id: parents.meals, user_id: bob.id, name: "planted", servings: 1, calories: 1, source: "custom" }],
       ["ai_messages", { conversation_id: parents.ai_conversations, user_id: bob.id, role: "user", content: "planted" }],
+      ["ai_message_feedback", { message_id: parents.ai_replies, user_id: bob.id, rating: "no" }],
       ["sleep_stages", { session_id: parents.sleep_sessions, user_id: bob.id, stage: "awake", started_at: "2026-10-02T01:00:00Z", ended_at: "2026-10-02T01:30:00Z" }],
       ["body_scan_photos", { scan_id: parents.body_scans, user_id: bob.id, pose: "back", storage_path: `${bob.id}/${parents.body_scans}/back.jpg` }],
       ["discipline_checkins", { goal_id: parents.discipline_goals, user_id: bob.id, checked_on: "2026-10-02" }],

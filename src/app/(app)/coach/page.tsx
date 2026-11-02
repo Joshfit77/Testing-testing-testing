@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { isAiConfigured, isServiceRoleConfigured } from "@/server/env";
-import { isFlagEnabled } from "@/server/flags";
+import { COACH_FEEDBACK_FLAG, isFlagEnabled, isFlagOn } from "@/server/flags";
 import { AiError, getAiUsage } from "@/server/services/ai-coach";
 import { suggestedQuestions } from "@/lib/coach/context";
 import { loadAthleteSnapshot } from "@/server/coach/snapshot";
@@ -195,6 +195,7 @@ export default async function CoachPage({
             enabled={!disabledReason}
             disabledReason={disabledReason}
             canGeneratePlans={usage.planLimit > 0}
+            feedbackEnabled={entitled && (await isFlagOn(COACH_FEEDBACK_FLAG))}
             usage={{ used: usage.chatUsed, limit: usage.chatLimit }}
             suggestions={suggestions}
             memory={

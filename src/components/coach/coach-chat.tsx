@@ -32,6 +32,7 @@ export function newRequestId(): string {
 }
 import { Markdown } from "./markdown";
 import { SuggestionCard } from "./suggestion-card";
+import { CoachFeedback } from "./coach-feedback";
 
 export interface ChatMessage {
   id: string;
@@ -55,6 +56,8 @@ interface Props {
   suggestions?: string[];
   /** Coaching memory (Pro): whether it's on, and whether this chat is "don't remember". Null without the AI coach. */
   memory?: { enabled: boolean; chatOff: boolean } | null;
+  /** TestFlight "Was this coaching advice useful?" under replies: only when the owner has switched it on. */
+  feedbackEnabled?: boolean;
 }
 
 /** Keeps a new chat on screen while it moves to its own URL; another chat, or "New chat", starts fresh (see chat-key). */
@@ -207,7 +210,7 @@ type StreamEvent =
   | { type: "done"; result: { conversationId: string; userMessage: ChatMessage; assistantMessage: ChatMessage; usage: { used: number; limit: number } } }
   | { type: "error"; message?: string };
 
-function CoachChatView({ conversationId: initialId, initialMessages, initialQuestion, enabled, disabledReason, canGeneratePlans, usage: initialUsage, exerciseNames, suggestions, memory, onCreated }: Props & { onCreated: (id: string) => void }) {
+function CoachChatView({ conversationId: initialId, initialMessages, initialQuestion, enabled, disabledReason, canGeneratePlans, usage: initialUsage, exerciseNames, suggestions, memory, feedbackEnabled, onCreated }: Props & { onCreated: (id: string) => void }) {
   const router = useRouter();
   const [conversationId, setConversationId] = useState(initialId);
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
@@ -470,6 +473,7 @@ function CoachChatView({ conversationId: initialId, initialMessages, initialQues
                   <CopyButton text={m.content} />
                 </div>
               )}
+              {feedbackEnabled && m.role === "assistant" && !m.id.startsWith("tmp-") && <CoachFeedback messageId={m.id} />}
             </div>
           </div>
         ))}
