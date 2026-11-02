@@ -63,7 +63,7 @@ jobs:
           if fetch https://berean.bible/downloads.htm downloads.htm; then
             echo "Plain-text links on the downloads page:"
             for link in $(grep -oiE 'href="[^"]+\.txt"' downloads.htm | sed -E 's/href="([^"]+)"/\1/I' | grep -iE 'bsb\.txt$' || true); do
-              case "$link" in https://*) ;; http://*) link="https://${link#http://}" ;; /*) link="https://berean.bible$link" ;; *) link="https://berean.bible/$link" ;; esac
+              case "$link" in https://*) ;; http://*) link="https://${link#http://}" ;; //*) link="https:$link" ;; /*) link="https://berean.bible$link" ;; *) link="https://berean.bible/$link" ;; esac
               echo "  $link"
               candidates="$candidates $link"
             done

@@ -45,7 +45,9 @@ jobs:
       # Any other content is refused. To move to a newer USDA release, review it first, then update both
       # values and regenerate src/data/usda-foods.json.
       SR_LEGACY_URL: https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_sr_legacy_food_csv_2018-04.zip
-      SR_LEGACY_SHA256: ""
+      # Pinned from the first checked download on GitHub's runner (2026-11-02); the file built from it is compared
+      # with the app's copy below.
+      SR_LEGACY_SHA256: b80817294b8850530aaedf2e515c02593b1824f763a0ff356e5c2081643e6fd0
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
