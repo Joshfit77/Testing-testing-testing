@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import localFont from "next/font/local";
 import { AppOpeningOverlay } from "@/components/common/app-opening-overlay";
 import { NativeInit } from "@/components/shell/native-init";
@@ -51,13 +52,16 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // The middleware's per-request nonce (src/middleware.ts): the page's CSP lets only scripts carrying it run. Reading
+  // it renders every page per request, which a nonce needs (a page built ahead of time couldn't carry one).
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     <html lang="en" className={`${inter.variable} ${heading.variable} ${serif.variable} ${engraved.variable} dark`} suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: PREFS_SCRIPT }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: PREFS_SCRIPT }} />
         {/* Decides before the first paint whether this load plays the opening (src/lib/opening.ts). */}
-        <script dangerouslySetInnerHTML={{ __html: OPENING_SCRIPT }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: OPENING_SCRIPT }} />
       </head>
       <body className="font-sans">
         {/* First in the body so it is in the first streamed chunk; hidden unless the script above chose to play it. */}

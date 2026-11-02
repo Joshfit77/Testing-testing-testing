@@ -1,9 +1,11 @@
 /**
- * HTTP security headers for every response (wired up in next.config.ts).
+ * HTTP security headers.
  *
- * The Content-Security-Policy keeps 'unsafe-inline' for scripts because the App Router streams inline
- * hydration scripts and the root layout applies display preferences before first paint; everything
- * else is limited to this origin, Supabase, Stripe's hosted pages and the two video hosts we embed.
+ * The Content-Security-Policy is sent by the middleware (src/middleware.ts) with a new nonce for every request: only
+ * scripts carrying that nonce run (Next.js adds it to its own scripts and inline hydration data, the root layout to
+ * its two inline scripts), plus scripts they load ('strict-dynamic'). No 'unsafe-inline' for scripts, so injected
+ * markup can't run code. Everything else is limited to this origin, Supabase, Stripe's hosted pages and the two video
+ * hosts we embed. The other headers are static and set in next.config.ts.
  */
 export interface SecurityHeaderOptions {
   supabaseUrl?: string;
@@ -22,16 +24,25 @@ function origin(url: string | undefined): string | null {
   }
 }
 
-export function contentSecurityPolicy({ supabaseUrl, production, https }: SecurityHeaderOptions): string {
+/** A fresh nonce for one response: 16 random bytes, base64. */
+export function generateNonce(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
+
+export function contentSecurityPolicy({ supabaseUrl, production, https, nonce }: SecurityHeaderOptions & { nonce?: string }): string {
   const supabase = origin(supabaseUrl);
   const supabaseWs = supabase ? supabase.replace(/^http/, "ws") : null;
-  const list = (...items: (string | null | false)[]) => items.filter(Boolean).join(" ");
+  const list = (...items: (string | null | false | undefined)[]) => items.filter(Boolean).join(" ");
   const directives: Record<string, string> = {
     "default-src": "'self'",
     "base-uri": "'self'",
     "object-src": "'none'",
     "frame-ancestors": "'none'",
-    "script-src": list("'self'", "'unsafe-inline'", !production && "'unsafe-eval'"),
+    // Without a nonce (a response the middleware didn't see), no inline script runs at all.
+    "script-src": list("'self'", nonce && `'nonce-${nonce}'`, nonce && "'strict-dynamic'", !production && "'unsafe-eval'"),
     "style-src": "'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src": "'self' data: https://fonts.gstatic.com",
     // The Supabase origin is listed too, so private photos (signed storage links) also load from a local http stack.
@@ -50,9 +61,9 @@ export function contentSecurityPolicy({ supabaseUrl, production, https }: Securi
     .join("; ");
 }
 
+/** The static headers for every response (next.config.ts). The CSP comes from the middleware, with its nonce. */
 export function securityHeaders(opts: SecurityHeaderOptions): { key: string; value: string }[] {
   const headers = [
-    { key: "Content-Security-Policy", value: contentSecurityPolicy(opts) },
     { key: "X-Content-Type-Options", value: "nosniff" },
     { key: "X-Frame-Options", value: "DENY" },
     { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },

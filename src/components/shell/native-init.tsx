@@ -1,4 +1,5 @@
 "use client";
+import "@/lib/zod-browser";
 import { useEffect } from "react";
 import { initNativeShell } from "@/lib/native";
 import { installSleepAlarmActions, syncSleepAlarmFromAccount } from "@/lib/native-alarm";
