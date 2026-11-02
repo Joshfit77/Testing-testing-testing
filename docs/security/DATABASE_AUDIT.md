@@ -6,7 +6,7 @@ Branch `security/payment-hardening-prelaunch`, 2026-11-01. The audit was read-on
 
 ## Result
 
-**0 Critical, 0 High, 1 Medium, 8 Low, 10 Info.**
+**0 Critical, 0 High, 1 Medium, 8 Low, 10 Info.** All but L6's broader `anon` write revokes are fixed (M1, L3, L4 and part of L6 in migration 047; L1, L2, L5, L7, L8 in migration 048).
 
 - **RLS is on everywhere:** all 76 public tables. Write paths were judged from the exact policy text, grants and function bodies, because the brief allowed no writes.
 - **No cross-account rows visible:** three test users, each probed across 63 owner-column tables, saw 0 rows belonging to anyone else. Anonymous callers saw 0 member rows.
@@ -22,14 +22,14 @@ Branch `security/payment-hardening-prelaunch`, 2026-11-01. The audit was read-on
 | # | Sev | Finding | Evidence | Status |
 |---|---|---|---|---|
 | M1 | Medium | A Free member could insert a `source='starter'` program with their own token. That insert had no plan check. They could fill it with any weeks, days and exercises, then relabel it `custom` or `ai`. That is the paid builder's result without the plan or its rate limit. | `20261023000024_plan_enforcement.sql:76-87`; `20261016000002_rls_policies.sql:257-282` | **Fixed** (migration 047). Starter programs are now created by the server only (`src/server/services/custom-programs.ts`). `source` can't be changed under a member session. Writing to a member starter program's contents needs Plus/Pro. Tested in `tests/integration/pro-bypass.test.ts`. |
-| L1 | Low | A member can repoint `user_programs.program_id` on UPDATE; the paid-program check applies to insert only. Paid prescriptions stay hidden (`can_use_program`). | `…024:70-72`, `…002:141` | Open. Not a data leak; it only creates a bogus enrolment. Suggested trigger in the audit notes. |
-| L2 | Low | Six SECURITY DEFINER BEFORE-INSERT triggers check a row's `user_id` before RLS runs. Given another member's UUID, the different error messages reveal whether that member is on Free, has given consent, or is at a limit. | `enforce_free_template_limit`, `enforce_live_gps_plan`, `enforce_wellness_consent`, `enforce_coach_memory_limit`, `enforce_running_goal_limit`, `body_scan_limit` | Open. The fix is a guard, `if auth.uid() is not null and new.user_id is distinct from auth.uid() then return new; end if;`, as migration 039 did for the sleep triggers. Low impact: it needs the victim's UUID. |
+| L1 | Low | A member can repoint `user_programs.program_id` on UPDATE; the paid-program check applies to insert only. Paid prescriptions stay hidden (`can_use_program`). | `…024:70-72`, `…002:141` | **Fixed** (migration 048, 2026-11-02): changing `program_id` needs `can_use_program`. Tested in `tests/integration/low-findings.test.ts`. |
+| L2 | Low | Six SECURITY DEFINER BEFORE-INSERT triggers check a row's `user_id` before RLS runs. Given another member's UUID, the different error messages reveal whether that member is on Free, has given consent, or is at a limit. | `enforce_free_template_limit`, `enforce_live_gps_plan`, `enforce_wellness_consent`, `enforce_coach_memory_limit`, `enforce_running_goal_limit`, `body_scan_limit` | **Fixed** (migration 048): the guard is in all six triggers. Tested. |
 | L3 | Low | `has_ai_coach()` ignored `access_revoked_at` (a refunded or disputed period). | `…026:12-30` | **Fixed** (migration 047). |
 | L4 | Low | Members could insert their own `proposal` JSON, and `applyProposalAction` didn't filter `role='assistant'`. | `…025:63-69`, `src/server/actions/coach.ts:32` | **Fixed** (migration 047 and `coach.ts`). Tested. |
-| L5 | Low | Members write their own `legal_acceptances` rows with unvalidated version, hash and `details`. That weakens them as dispute evidence. | `…045:26-27`, `src/server/legal.ts:40-42` | Open. Suggested fix: a table of valid document versions, and auto-renewal consent written by the service role. |
+| L5 | Low | Members write their own `legal_acceptances` rows with unvalidated version, hash and `details`. That weakens them as dispute evidence. | `…045:26-27`, `src/server/legal.ts:40-42` | **Fixed** (migration 048): `legal_document_versions`; only listed versions are recorded; members no longer write records (the server does). Tested in `legal-acceptances.test.ts`. |
 | L6 | Low | `anon` and `authenticated` held TRUNCATE, REFERENCES and TRIGGER on every table, plus write grants on billing tables that RLS was denying. | default ACL | **Fixed for TRUNCATE/REFERENCES/TRIGGER and billing writes** (migration 047). Broader `anon` write revokes are left for review. |
-| L7 | Low | Some foreign keys to another member's rows aren't ownership-checked (for example `body_scans.measurement_id`, `workout_sessions.user_program_id`). Nothing leaks, but they work as an existence check and allow integrity pollution. | catalog `14_fk_cross_owner` | Open. |
-| L8 | Low | Definer helpers (`program_of_day`, `program_of_week`, `can_*_program`) can be called over RPC by `anon`. They reveal a day's or week's program id and work as an existence check. | `…002:10-71` | Open. Suggested fix: move them to a non-exposed schema. |
+| L7 | Low | Some foreign keys to another member's rows aren't ownership-checked (for example `body_scans.measurement_id`, `workout_sessions.user_program_id`). Nothing leaks, but they work as an existence check and allow integrity pollution. | catalog `14_fk_cross_owner` | **Fixed** (migration 048): ten links checked by `check_member_reference` (own rows or the catalog; a foreign row gets the missing-row error). Tested. |
+| L8 | Low | Definer helpers (`program_of_day`, `program_of_week`, `can_*_program`) can be called over RPC by `anon`. They reveal a day's or week's program id and work as an existence check. | `…002:10-71` | **Fixed** (migration 048): the lookups answer only for programs the caller can see, so they reveal nothing new. Tested. |
 | I1–I10 | Info | FORCE RLS off (normal on Supabase); a few non-definer functions without a pinned search_path; `btree_gist` in `public`; storage UPDATE policies rely on USING (no explicit WITH CHECK); members can set consent timestamps; `parsed.data` spread order in the AI chat route (safe today); `pg_stat_statements` readable; the Supabase CLI's public local demo JWTs in test files (not secrets); `activities.is_private` unused; `profiles.avatar_path` unused. | | Recorded only. |
 
 ## Private data categories mapped
@@ -58,6 +58,6 @@ Branch `security/payment-hardening-prelaunch`, 2026-11-01. The audit was read-on
 
 A migration file in the repository doesn't prove it was applied to the hosted project. Before launch, on the hosted staging project:
 
-1. Run `supabase migration list` against it. Every version through `20261101000047` must be applied.
+1. Run `supabase migration list` against it. Every version through `20261102000048` must be applied.
 2. Run the integration suite against it with disposable accounts. Set `TEST_SUPABASE_URL`, `TEST_SUPABASE_ANON_KEY` and `TEST_SUPABASE_SERVICE_ROLE_KEY`; the tests create and delete their own users.
 3. Repeat the catalog snapshot. The queries are in the audit's scratch output; the key checks are `relrowsecurity` on every public table and EXECUTE on the service-role-only functions.

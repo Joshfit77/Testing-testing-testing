@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import { expect, test } from "@playwright/test";
-import { completeOnboarding, grantPlan, signUpAndConfirm, uniqueEmail } from "./helpers";
+import { completeOnboarding, grantPlan, serviceRest, signUpAndConfirm, uniqueEmail, userIdFor } from "./helpers";
 
 /**
  * AI coach end to end, without a real API key and without ever calling the real API.
@@ -430,6 +430,46 @@ test.describe("AI coach", () => {
     await page.reload();
     await expect(box).toHaveValue("");
     await expect(page.locator("p", { hasText: question })).toHaveCount(1);
+  });
+
+  test("a reply saved while the connection dropped comes back on Try again: one answer, one charge", async ({ page }) => {
+    test.skip(!MOCK_PORT, "set E2E_ANTHROPIC_MOCK_PORT and start the app with ANTHROPIC_BASE_URL pointing at it");
+    const email = uniqueEmail("coach-lost");
+    await signUpAndConfirm(page, email);
+    await completeOnboarding(page);
+    await grantPlan(email, "pro");
+    const userId = await userIdFor(email);
+    const usage = async () => (await serviceRest<unknown[]>(`ai_usage_events?select=id&user_id=eq.${userId}`)).length;
+    await page.goto("/coach");
+    await page.getByRole("button", { name: "Allow and continue" }).click();
+    const box = page.getByLabel("Message the AI coach");
+    const question = "How long should I rest between heavy sets today?";
+    const asked = () => requests.filter((b) => JSON.stringify(b.messages).includes(question)).length;
+
+    // The server answers and saves the reply, but the connection drops before any of it reaches the phone.
+    let drop = true;
+    await page.route("**/api/ai/chat", async (route) => {
+      if (!drop) return route.continue();
+      drop = false;
+      await (await route.fetch()).text();
+      await route.abort("connectionreset");
+    });
+    await box.fill(question);
+    await page.getByRole("button", { name: "Send message" }).click();
+    await expect(page.getByRole("alert").filter({ hasText: /try again|reach the server/i })).toBeVisible({ timeout: 30_000 });
+    await expect(box).toHaveValue(question);
+    expect(asked()).toBe(1);
+    expect(await usage()).toBe(1);
+
+    // Try again sends the same request: the saved reply comes back, with no second answer and no second charge.
+    await page.getByRole("button", { name: "Try again" }).click();
+    await expect(page.getByTestId("coach-reply").last()).toContainText("Happy to help with your training.", { timeout: 30_000 });
+    expect(asked()).toBe(1);
+    expect(await usage()).toBe(1);
+    await page.waitForURL(/\/coach\?c=/);
+    await page.reload();
+    await expect(page.locator("p", { hasText: question })).toHaveCount(1);
+    await expect(page.getByTestId("coach-reply")).toHaveCount(1);
   });
 
   test("coaching memory: off until turned on, saved only when approved, used in later chats, and forgettable", async ({ page }) => {
