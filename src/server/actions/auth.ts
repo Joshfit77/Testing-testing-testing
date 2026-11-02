@@ -8,6 +8,7 @@ import { safeNextPath } from "@/lib/safe-redirect";
 import { emailSchema, newPasswordSchema, resetRequestSchema, signInSchema, signUpSchema } from "@/lib/validation/schemas";
 import { signupAcceptances } from "@/lib/legal/versions";
 import { isFlagEnabled } from "@/server/flags";
+import { registerLegalVersions } from "@/server/legal";
 import { logError } from "@/server/log";
 import { clientIp, hashKey, rateLimitAll } from "@/server/rate-limit";
 
@@ -40,6 +41,8 @@ export async function signUpAction(_prev: ActionState, formData: FormData): Prom
   if (!(await isFlagEnabled("signups"))) return actionError("New registrations are temporarily paused. Please try again later.");
   if (await authLimited(await perAddress("signup", 5, 10 * MINUTE))) return actionError(TOO_MANY);
 
+  // The database records only listed document versions; make sure this server's are listed (never blocks sign-up).
+  await registerLegalVersions().catch((err) => logError("legal.register", err));
   const supabase = await getServerSupabase();
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,

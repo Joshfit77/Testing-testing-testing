@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { LEGAL_PAGES } from "@/lib/legal/versions";
 import { anonClient, createTestUser, deleteTestUser, exerciseIds, grantPlan, serviceClient, stackAvailable, type TestUser } from "./helpers";
 import { removeUserStorage, USER_STORAGE_BUCKETS, USER_TABLES } from "@/server/services/account";
 
@@ -160,7 +161,8 @@ describe.skipIf(!available)("cross-user isolation sweep: every user-owned table 
     await seed("challenge_checkins", { enrollment_id: enrollment.id, user_id: u, day_number: 1, checked_on: "2026-10-01" });
 
     // Legal and billing (written by the server in real life).
-    await seed("legal_acceptances", { user_id: u, document: "terms", version: "iso-test", document_sha256: "a".repeat(64), source: "signup" });
+    // Only a published version can be recorded (legal_document_versions).
+    await seed("legal_acceptances", { user_id: u, document: "terms", version: LEGAL_PAGES.terms.version, document_sha256: LEGAL_PAGES.terms.sha256, source: "signup" });
     const subId = `sub_iso_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
     await seed("subscriptions", { user_id: u, stripe_subscription_id: subId, plan: "plus", status: "active", current_period_end: new Date(Date.now() + 30 * 86_400_000).toISOString() });
     await seed("legacy_plan_terms", { stripe_subscription_id: subId, user_id: u, plan: "plus", ai_monthly_limit: 60, ai_plan_monthly_limit: 0, ai_smart_monthly_limit: 6 });
