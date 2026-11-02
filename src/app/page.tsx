@@ -2,7 +2,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Bot, Check, Dumbbell, HeartPulse, LineChart, Salad, ShieldCheck } from "lucide-react";
 import { Logo } from "@/components/common/logo";
-import { NarrowGateArt } from "@/components/common/narrow-gate-art";
 import { Button } from "@/components/ui/button";
 import { isSupabaseConfigured } from "@/lib/env";
 import { formatPrice, getPlans, PUBLIC_PLAN_ORDER, yearlySavingsPercent } from "@/lib/domain/plans";
@@ -50,16 +49,17 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
       </header>
 
       <main>
-        {/* The welcome screen is the opening's last frame held still: brand, the open gate, the verse beneath it. */}
-        <section className="hero-glow relative overflow-hidden" aria-labelledby="welcome-title">
-          <div className="mx-auto flex max-w-2xl flex-col items-center px-4 pb-16 pt-1 text-center md:pb-24 md:pt-4">
+        {/* The place beyond the gate. The opening (root layout) is the app's one entrance: it plays over this page on a
+            launch and walks through the doorway into the light, so this page doesn't draw the gate again. It keeps the
+            brand, Matthew 7:13–14 and the two ways in, with the light settling from above. */}
+        <section className="beyond-gate relative overflow-hidden" aria-labelledby="welcome-title">
+          <div className="mx-auto flex max-w-2xl flex-col items-center px-4 pb-16 pt-6 text-center md:pb-24 md:pt-12">
             <h1 id="welcome-title" className="animate-fade-up flex flex-col items-center gap-2 leading-none">
               <span className="whitespace-nowrap pl-[0.2em] font-serif text-[1.55rem] font-semibold uppercase tracking-[0.2em] text-gold-gradient md:text-[2rem]">Narrow Gate</span>{" "}
               <span className="pl-[0.55em] text-[0.68rem] font-semibold uppercase tracking-[0.55em] text-muted-foreground md:text-xs">Fitness</span>
             </h1>
             <p className="animate-fade-up mt-3 text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-gold md:text-xs">Rooted in faith. Built for strength.</p>
-            <NarrowGateArt still className="mt-5 h-[clamp(170px,29svh,360px)] md:mt-8 md:h-[clamp(240px,38svh,400px)] [@media(max-height:700px)]:mt-3" />
-            <figure className="animate-fade-up mt-7 max-w-[34rem] [animation-delay:80ms] [@media(max-height:700px)]:mt-5">
+            <figure className="animate-fade-up mt-10 max-w-[34rem] [animation-delay:80ms] md:mt-14 [@media(max-height:700px)]:mt-7">
               <blockquote className="font-serif text-[1.03rem] leading-[1.62] text-[#f1ead6] md:text-xl">&ldquo;{GATE_VERSE}&rdquo;</blockquote>
               <figcaption className="mt-3 text-[0.72rem] font-bold uppercase tracking-[0.22em] text-gold">Matthew 7:13–14 ({TRANSLATION.code})</figcaption>
             </figure>

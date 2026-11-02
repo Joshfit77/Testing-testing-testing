@@ -1,5 +1,4 @@
 import type { CSSProperties } from "react";
-import { cn } from "@/lib/utils";
 import geo from "./gate-geometry.json";
 
 const pct = (n: number) => `${(n * 100).toFixed(3)}%`;
@@ -21,10 +20,10 @@ const DUST: [number, number, number, number][] = [
  * doorway, a polished threshold and floor, and soft white light beyond. The shut scene (with light leaking round
  * the door) is the base picture; the light the open door lets out is a second picture added on top as the door
  * opens; the door leaf is turned about its hinge in real 3D, with the renderer's camera (gate-geometry.json), so it
- * lines up with the doorway. Mist drifts through the light and a few motes of dust catch it.
- * `still` shows it open and at rest (welcome page); otherwise globals.css plays the opening sequence.
+ * lines up with the doorway. Mist drifts through the light and a few motes of dust catch it. globals.css plays the
+ * opening sequence. It is drawn only by the opening (the app's one entrance), never by a page.
  */
-export function NarrowGateArt({ still = false, className }: { still?: boolean; className?: string }) {
+export function NarrowGateArt() {
   const d = geo.door;
   const [ox = 0.5, oy = 0.5] = geo.origin;
   const [gx = 0.5, gy = 0.44] = geo.doorway;
@@ -40,7 +39,7 @@ export function NarrowGateArt({ still = false, className }: { still?: boolean; c
     "--gate-y": gy.toFixed(4),
   } as CSSProperties;
   return (
-    <div className={cn("ngs", still && "ngs--still", className)} style={style} data-testid="animated-narrow-door" aria-hidden="true">
+    <div className="ngs" style={style} data-testid="animated-narrow-door" aria-hidden="true">
       <div className="ngs-push">
         <div className="ngs-drift">
           <div className="ngs-box">
@@ -51,13 +50,11 @@ export function NarrowGateArt({ still = false, className }: { still?: boolean; c
               <div className="ngs-door" data-testid="gate-door" />
             </div>
             <div className="ngs-haze" />
-            {!still && (
-              <div className="ngs-dust">
-                {DUST.map(([x, y, s, delay]) => (
-                  <i key={`${x}-${y}`} style={{ left: `${x}%`, top: `${y}%`, width: `${s}cqh`, height: `${s}cqh`, animationDelay: `${2.2 + delay}s, ${2.2 + delay}s` }} />
-                ))}
-              </div>
-            )}
+            <div className="ngs-dust">
+              {DUST.map(([x, y, s, delay]) => (
+                <i key={`${x}-${y}`} style={{ left: `${x}%`, top: `${y}%`, width: `${s}cqh`, height: `${s}cqh`, animationDelay: `${2.2 + delay}s, ${2.2 + delay}s` }} />
+              ))}
+            </div>
             <div className="ngs-edge" />
           </div>
         </div>
