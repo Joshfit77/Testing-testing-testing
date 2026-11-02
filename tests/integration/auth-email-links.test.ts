@@ -166,7 +166,7 @@ describe.skipIf(!available)("auth email links", () => {
     const { data } = await serviceClient().auth.admin.generateLink({ type: "recovery", email: member.email });
     safariCookies.clear();
     const res = await GET(new NextRequest(`${SITE}/auth/confirm?token_hash=${data.properties!.hashed_token}&type=recovery&next=/reset-password`));
-    expect(new URL(res.headers.get("location")!).pathname).toBe("/reset-password");
+    expect(new URL(res.headers.get("location")!, SITE).pathname).toBe("/reset-password");
     expect([...safariCookies.keys()].some((k) => /^sb-.+-auth-token/.test(k))).toBe(true);
   });
 
@@ -187,7 +187,7 @@ describe.skipIf(!available)("auth email links", () => {
       expect(tokenHash, "confirmation email in the mail catcher").toBeTruthy();
       safariCookies.clear();
       const res = await GET(new NextRequest(`${SITE}/auth/confirm?token_hash=${tokenHash}&type=email&next=/onboarding`));
-      expect(new URL(res.headers.get("location")!).pathname).toBe("/onboarding");
+      expect(new URL(res.headers.get("location")!, SITE).pathname).toBe("/onboarding");
       const { data: user } = await serviceClient().auth.admin.getUserById(userId);
       expect(user.user?.email_confirmed_at).toBeTruthy();
     } finally {

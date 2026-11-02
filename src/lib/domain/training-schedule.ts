@@ -4,8 +4,10 @@
  * Programs are sequences (week N, day M); they are not pinned to dates. This module gives every pending
  * session a planned date:
  *
- * - The next session is due today (a session you haven't done rolls forward to today), unless a
- *   program workout was already completed today, in which case it is planned for the next training day.
+ * - The next session is due on the first default training weekday after the last completed program
+ *   session, or today if that day has passed (a session you haven't done rolls forward to today). So the
+ *   day after a workout is a rest day, not another "due today": a member who follows Home trains on the
+ *   program's days per week, not every day. With no completed session yet, the first one is due today.
  * - Each later session goes on the next default training weekday after the previous session.
  * - A user can move a pending session to another date (an override). Later sessions without their own
  *   override then flow after it. Overrides never move a completed session: completed workouts are read
@@ -76,12 +78,19 @@ export interface ScheduleInput {
   overrides: ReadonlyMap<string, string> | Record<string, string>;
   today: string;
   daysPerWeek: number;
-  /** A program workout was already completed today. */
-  completedToday?: boolean;
+  /** The date (user's time zone) of the most recent completed program session, if any. */
+  lastCompleted?: string | null;
 }
 
 function overrideMap(o: ScheduleInput["overrides"]): ReadonlyMap<string, string> {
   return o instanceof Map ? o : new Map(Object.entries(o));
+}
+
+/** When the next session is due: the training day after the last completed one, or today if that has passed. */
+function firstDueDate(input: ScheduleInput): string {
+  if (!input.lastCompleted || input.lastCompleted > input.today) return input.today;
+  const next = nextTrainingDay(input.lastCompleted, input.daysPerWeek);
+  return next < input.today ? input.today : next;
 }
 
 /** Give every pending session a date. Dates never go backwards and never fall before today. */
@@ -90,8 +99,7 @@ export function planSchedule(input: ScheduleInput): PlannedSession[] {
   const out: PlannedSession[] = [];
   let prev: string | null = null;
   input.pending.forEach((s, index) => {
-    const defaultDate: string =
-      prev === null ? (input.completedToday ? nextTrainingDay(input.today, input.daysPerWeek) : input.today) : nextTrainingDay(prev, input.daysPerWeek);
+    const defaultDate: string = prev === null ? firstDueDate(input) : nextTrainingDay(prev, input.daysPerWeek);
     const o = overrides.get(s.dayId);
     let date = defaultDate;
     if (o) {

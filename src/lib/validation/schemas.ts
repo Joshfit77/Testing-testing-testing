@@ -106,6 +106,8 @@ export const onboardingPlanSchema = z.object({
   secondaryGoal: z.enum(SECONDARY_GOALS).nullable().optional(),
   textSize: z.enum(["default", "large", "xlarge"]).optional(),
   reduceMotion: z.boolean().optional(),
+  /** The device's time zone (IANA name); "today" is reckoned in it from then on. */
+  timeZone: z.string().max(64).optional(),
 }).refine((v) => !v.secondaryGoal || v.secondaryGoal !== v.primaryGoal, { message: "Pick a second goal that's different from your main goal", path: ["secondaryGoal"] });
 export type OnboardingPlanInput = z.input<typeof onboardingPlanSchema>;
 

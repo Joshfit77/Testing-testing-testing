@@ -101,6 +101,15 @@ function Choice({
   );
 }
 
+/** The device's time zone, so "today" in the app is the member's today. */
+function deviceTimeZone(): string | undefined {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function Question({ title, help, children }: { title: string; help?: React.ReactNode; children: React.ReactNode }) {
   return (
     <fieldset className="space-y-4">
@@ -298,6 +307,7 @@ export function OnboardingQuestionnaire({ initialName }: { initialName: string }
         secondaryGoal: secondGoal,
         textSize,
         reduceMotion,
+        timeZone: deviceTimeZone(),
       });
       // On success the action redirects to the plan summary; we only get here on failure.
       if (res && !res.ok) setError(res.message ?? "Something went wrong. Please try again.");

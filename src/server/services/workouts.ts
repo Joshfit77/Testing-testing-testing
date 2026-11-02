@@ -136,6 +136,8 @@ async function currentBests(supabase: SupabaseClient, userId: string, exerciseId
 
 export interface NewRecord extends PersonalBest {
   exerciseId: string;
+  /** The first value ever logged for this exercise and record type: a baseline, not an improvement. */
+  first: boolean;
 }
 
 /**
@@ -202,7 +204,8 @@ export async function finishWorkout(
   const records: NewRecord[] = [];
   for (const id of exerciseIds) {
     const sets = active.filter((e) => e.exerciseId === id).flatMap((e) => toLogged(e.sets));
-    for (const r of detectNewRecords(prior.get(id) ?? [], bestsFromSets(sets))) records.push({ ...r, exerciseId: id });
+    const before = prior.get(id) ?? [];
+    for (const r of detectNewRecords(before, bestsFromSets(sets))) records.push({ ...r, exerciseId: id, first: !before.some((b) => b.recordType === r.recordType) });
   }
   if (records.length) {
     const { error } = await supabase.from("personal_records").insert(

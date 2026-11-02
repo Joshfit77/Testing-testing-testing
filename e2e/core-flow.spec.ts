@@ -43,7 +43,9 @@ test.describe("authentication, onboarding and workout logging", () => {
     await page.getByRole("button", { name: "Finish" }).click();
     await page.getByRole("button", { name: "Finish & save" }).click();
     await expect(page.getByRole("heading", { name: "Workout complete" })).toBeVisible();
-    await expect(page.getByText("New personal records")).toBeVisible();
+    // A first workout sets baselines (there is nothing to beat yet); the summary says what comes next in the program.
+    await expect(page.getByText("Baselines set")).toBeVisible();
+    await expect(page.getByText("Up next")).toBeVisible();
 
     // History shows the workout.
     await page.getByRole("link", { name: "View history" }).click();

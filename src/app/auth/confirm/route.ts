@@ -1,5 +1,6 @@
-import { NextResponse, type NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
+import { redirectToPath } from "@/lib/relative-redirect";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { safeNextPath } from "@/lib/safe-redirect";
 
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
   if (tokenHash && type && TYPES.includes(type)) {
     const supabase = await getServerSupabase();
     const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
-    if (!error) return NextResponse.redirect(new URL(next, url.origin));
+    if (!error) return redirectToPath(next);
   }
-  return NextResponse.redirect(new URL("/login?error=link_invalid", url.origin));
+  return redirectToPath("/login?error=link_invalid");
 }

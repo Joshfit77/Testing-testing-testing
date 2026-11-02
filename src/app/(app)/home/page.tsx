@@ -61,7 +61,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const verse = scriptureForDate(data.today);
   const startHref = active?.today ? `/train/workout?day=${active.today.id}&up=${active.userProgramId}` : "/train/workout?blank=1";
   const weeklyTarget = active?.daysPerWeek ?? (answersRes.data?.days_per_week as number | undefined) ?? null;
-  const sessionsThisWeek = weekly.workouts.length + weekly.runs.length + weekly.walks.length;
+  // Strength workouts, against the program's days per week (runs and walks have their own places; My Progress counts the same way).
+  const sessionsThisWeek = weekly.workouts.length;
   const todayLong = new Date(`${data.today}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
   const today = active?.today ?? null;
   // The training calendar's date for the next session (it may have been moved to another day).
@@ -142,10 +143,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           <span className="min-w-0 flex-1">
             <span className="block truncate text-lg font-semibold">{today ? today.name : active ? "Program complete" : "No program yet"}</span>
             <span className="block text-sm text-muted-foreground" data-testid="today-detail">
-              {today && plannedLater
-                ? `Next session · planned for ${plannedLabel}${plannedLater.moved ? " (moved)" : ""}`
-                : today
-                ? [today.estimated_minutes ? `${today.estimated_minutes} min` : null, `${today.exercises.length} exercise${today.exercises.length === 1 ? "" : "s"}`]
+              {today && active && plannedLater
+                ? `Week ${active.currentWeek} · Day ${active.currentDay} of ${active.daysPerWeek} · planned for ${plannedLabel}${plannedLater.moved ? " (moved)" : ""}`
+                : today && active
+                ? [`Week ${active.currentWeek} of ${active.durationWeeks}`, `Day ${active.currentDay} of ${active.daysPerWeek}`, today.estimated_minutes ? `${today.estimated_minutes} min` : null, `${today.exercises.length} exercise${today.exercises.length === 1 ? "" : "s"}`]
                     .filter(Boolean)
                     .join(" · ")
                 : active
@@ -212,7 +213,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             {sessionsThisWeek}
             {weeklyTarget ? <span className="text-base font-medium text-muted-foreground"> / {weeklyTarget}</span> : null}
           </span>
-          <span className="text-sm text-muted-foreground">this week</span>
+          <span className="text-sm text-muted-foreground">workouts</span>
           <WeekBars days={weekly.days} className="mt-2" />
         </Link>
       </div>

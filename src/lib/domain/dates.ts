@@ -1,5 +1,16 @@
 /** Date helpers operating on ISO calendar dates (YYYY-MM-DD) in the user's time zone. */
 
+/** An IANA time zone name the runtime knows (what the device reports), e.g. "America/New_York". */
+export function isValidTimeZone(tz: unknown): tz is string {
+  if (typeof tz !== "string" || !tz || tz.length > 64) return false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function isoDateInTz(date: Date, timeZone = "UTC"): string {
   try {
     return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(date);

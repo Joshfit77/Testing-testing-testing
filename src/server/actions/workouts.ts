@@ -10,6 +10,7 @@ import { badgesUnlockedBySession, type BadgeIconName, type BadgeTier } from "@/l
 import { isoDateInTz } from "@/lib/domain/dates";
 import { getAchievementStats } from "@/server/services/achievements";
 import { deleteWorkout, discardDraft, editWorkout, finishWorkout, getExerciseTargets, getPreviousPerformance, saveDraftSnapshot, WorkoutError, type ExerciseTarget, type NewRecord } from "@/server/services/workouts";
+import { nextSessionSummary, type NextSession } from "@/server/services/schedule";
 import type { PreviousPerformance } from "@/lib/domain/previous-performance";
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: string };
@@ -62,9 +63,11 @@ async function unlockedBadges(supabase: Awaited<ReturnType<typeof getServerSupab
   }
 }
 
+export type { NextSession } from "@/server/services/schedule";
+
 export async function finishWorkoutAction(
   input: unknown,
-): Promise<Result<{ sessionId: string; volumeKg: number; records: NewRecord[]; badges: UnlockedBadge[] }>> {
+): Promise<Result<{ sessionId: string; volumeKg: number; records: NewRecord[]; badges: UnlockedBadge[]; next: NextSession | null }>> {
   const user = await requireUser();
   const parsed = finishWorkoutSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Some workout values are invalid. Check weights, reps and RPE." };
@@ -75,8 +78,15 @@ export async function finishWorkoutAction(
     const supabase = await getServerSupabase();
     const res = await finishWorkout(supabase, user.id, parsed.data);
     const badges = res.alreadyCompleted ? [] : await unlockedBadges(supabase, user.id, res.sessionId);
+    // What the program has next (never blocks the save: the summary just goes without it).
+    const next = parsed.data.userProgramId
+      ? await nextSessionSummary(supabase, user.id, parsed.data.userProgramId, (await getProfile(user.id))?.timezone ?? "UTC").catch((err: unknown) => {
+          logError("workouts.finish.next", err);
+          return null;
+        })
+      : null;
     revalidatePath("/", "layout");
-    return { ok: true, data: { sessionId: res.sessionId, volumeKg: res.volumeKg, records: res.records, badges } };
+    return { ok: true, data: { sessionId: res.sessionId, volumeKg: res.volumeKg, records: res.records, badges, next } };
   } catch (err) {
     logError("workouts.finish", err);
     return { ok: false, error: err instanceof WorkoutError && err.code === "invalid" ? "One of the exercises is no longer available." : "We couldn't save your workout. It's still on this device — please try again." };

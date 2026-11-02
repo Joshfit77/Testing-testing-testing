@@ -40,8 +40,10 @@ test.describe("guided onboarding builds a plan", () => {
     await page.getByRole("link", { name: /Start my first workout/ }).click();
     await page.waitForURL(/\/train\/workout\?day=/);
 
-    // The program is the active one on Home; opening the logger left a draft, so Home offers Resume.
+    // The program is the active one on Home. Opening the logger and leaving logged nothing, so nothing was saved:
+    // Home still offers to start the session (no phantom "Resume workout").
     await page.goto("/home");
-    await expect(page.getByRole("link", { name: /^Resume workout/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: /^Start workout/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: /^Resume workout/ })).toHaveCount(0);
   });
 });

@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { actionError, actionInvalid, type ActionState } from "@/lib/action-state";
 import { fieldErrors } from "@/lib/validation/schemas";
-import { isoDateInTz } from "@/lib/domain/dates";
+import { isValidTimeZone, isoDateInTz } from "@/lib/domain/dates";
 import { onboardingPlanSchema, onboardingSchema, type OnboardingInput, type OnboardingPlanInput } from "@/lib/validation/schemas";
 import { requireUser } from "@/server/auth";
 import { logError } from "@/server/log";
@@ -131,6 +131,8 @@ export async function completeOnboardingAction(input: OnboardingPlanInput): Prom
         // Optional accessibility step; skipped = keep the defaults.
         ...(v.textSize ? { text_size: v.textSize } : {}),
         ...(v.reduceMotion !== undefined ? { reduce_motion: v.reduceMotion } : {}),
+        // Dates (today's workout, the food diary, the calendar) follow the member's clock, not the server's.
+        ...(isValidTimeZone(v.timeZone) ? { timezone: v.timeZone } : {}),
       })
       .eq("id", user.id);
     if (pErr) throw pErr;

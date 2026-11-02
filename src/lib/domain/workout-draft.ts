@@ -69,6 +69,8 @@ export interface WorkoutDraft {
   exercises: DraftExercise[];
   rest: { endsAt: string | null; durationSeconds: number; pausedRemaining: number | null };
   updatedAt: string;
+  /** When the member first tapped Finish: a retry (offline, a lost reply) keeps this end time, not the retry's. */
+  finishRequestedAt?: string | null;
 }
 
 export interface ExerciseRef {
@@ -76,6 +78,29 @@ export interface ExerciseRef {
   slug: string;
   name: string;
   isTimed: boolean;
+}
+
+export interface PreviousSetValues {
+  reps: number | null;
+  weightKg: number | null;
+  durationSeconds: number | null;
+  distanceM: number | null;
+}
+
+/** A draft last touched this long ago is shown as "unfinished from earlier" rather than resumed silently. */
+export const STALE_DRAFT_HOURS = 6;
+
+/** Hours since the draft was last touched. */
+export function draftAgeHours(draft: Pick<WorkoutDraft, "updatedAt">, now: string): number {
+  return Math.max(0, (Date.parse(now) - Date.parse(draft.updatedAt)) / 3_600_000);
+}
+
+/** Whether a set has what it needs to count as done: reps for a rep set, time for a timed one, distance for distance
+ *  work (a loaded carry needs its distance; the weight is optional, bodyweight work has none). */
+export function setCanComplete(exercise: Pick<DraftExercise, "isTimed" | "usesDistance">, set: DraftSet): boolean {
+  if (exercise.usesDistance) return (set.distanceM ?? 0) > 0;
+  if (exercise.isTimed) return (set.durationSeconds ?? 0) > 0;
+  return (set.reps ?? 0) > 0;
 }
 
 export type DraftAction =
@@ -94,6 +119,11 @@ export type DraftAction =
   | { type: "removeSet"; exerciseKey: string; setId: string }
   | { type: "updateSet"; exerciseKey: string; setId: string; patch: Partial<Omit<DraftSet, "id">> }
   | { type: "toggleSetComplete"; exerciseKey: string; setId: string; now: string }
+  /** Fills the empty fields of the sets not yet done from the last time this exercise was logged (never overwrites). */
+  | { type: "prefillFromPrevious"; exerciseKey: string; sets: PreviousSetValues[] }
+  /** Coming back to a draft last touched a while ago: the time away counts as paused, not as training. */
+  | { type: "continueAfterGap"; now: string }
+  | { type: "requestFinish"; now: string }
   | { type: "startRest"; seconds: number; now: string }
   | { type: "adjustRest"; deltaSeconds: number; now: string }
   | { type: "clearRest" }
@@ -171,7 +201,14 @@ export function workoutReducer(state: WorkoutDraft, action: DraftAction): Workou
   const next = reduce(state, action);
   if (next === state) return state;
   const structural = ["addExercise", "removeExercise", "moveExercise", "linkSuperset", "unlinkSuperset"].includes(action.type);
-  return { ...next, exercises: structural ? normalizeSupersets(next.exercises) : next.exercises, updatedAt: "now" in action ? action.now : new Date().toISOString() };
+  // More work logged after a Finish that did not go through: the end time is asked for again.
+  const training = ["toggleSetComplete", "addSet", "updateSet", "addExercise"].includes(action.type);
+  return {
+    ...next,
+    exercises: structural ? normalizeSupersets(next.exercises) : next.exercises,
+    updatedAt: "now" in action ? action.now : new Date().toISOString(),
+    ...(training && next.finishRequestedAt ? { finishRequestedAt: null } : {}),
+  };
 }
 
 /**
@@ -301,9 +338,15 @@ function reduce(state: WorkoutDraft, action: DraftAction): WorkoutDraft {
       list.splice(to, 0, item!);
       return { ...state, exercises: list };
     }
-    case "substituteExercise":
-      return mapExercise(state, action.exerciseKey, (e) => ({
+    case "substituteExercise": {
+      // The sets already done stay logged under the exercise they were done on; only the sets still to do move to the
+      // replacement (reps kept, the load cleared: a different exercise takes a different weight).
+      const idx = state.exercises.findIndex((e) => e.id === action.exerciseKey);
+      const e = state.exercises[idx];
+      if (!e) return state;
+      const replace = (sets: DraftSet[]): DraftExercise => ({
         ...e,
+        id: e.sets.some((s) => s.completed) ? newId() : e.id,
         substitutedFromId: e.substitutedFromId ?? e.exerciseId,
         substitutedFromName: e.substitutedFromName ?? e.name,
         exerciseId: action.replacement.id,
@@ -311,14 +354,26 @@ function reduce(state: WorkoutDraft, action: DraftAction): WorkoutDraft {
         name: action.replacement.name,
         isTimed: action.replacement.isTimed,
         usesDistance: usesDistance(action.replacement.slug),
-        sets: e.sets.map((s) => ({
+        notes: "",
+        sets: sets.map((s) => ({
           ...s,
           weightKg: null,
           completed: false,
           reps: action.replacement.isTimed ? null : s.reps,
           durationSeconds: action.replacement.isTimed ? (s.durationSeconds ?? e.target?.seconds ?? 30) : null,
         })),
-      }));
+      });
+      const done = e.sets.filter((s) => s.completed);
+      if (!done.length) return { ...state, exercises: state.exercises.map((x, i) => (i === idx ? replace(e.sets) : x)) };
+      const left = e.sets.filter((s) => !s.completed);
+      const kept: DraftExercise = { ...e, sets: done, target: e.target ? { ...e.target, sets: done.length } : null };
+      // (At least one set to do on the replacement, so the member is not left with an empty card.)
+      const moved = replace(left.length ? left : [emptySet(done[done.length - 1])]);
+      if (moved.target) moved.target = { ...moved.target, sets: moved.sets.length };
+      const list = [...state.exercises];
+      list.splice(idx, 1, kept, moved);
+      return { ...state, exercises: list };
+    }
     case "skipExercise":
       return mapExercise(state, action.exerciseKey, (e) => ({ ...e, skipped: true, skipReason: action.reason ?? "other" }));
     case "unskipExercise":
@@ -340,18 +395,37 @@ function reduce(state: WorkoutDraft, action: DraftAction): WorkoutDraft {
       let completedNow = false;
       let rest = 0;
       let round = -1;
+      let blocked = false;
       const toggled = mapExercise(state, action.exerciseKey, (e) => {
         rest = e.restSeconds;
-        return {
-          ...e,
-          sets: e.sets.map((s, i) => {
-            if (s.id !== action.setId) return s;
-            completedNow = !s.completed;
-            round = i;
-            return { ...s, completed: !s.completed };
-          }),
-        };
+        const sets = e.sets.map((s, i) => {
+          if (s.id !== action.setId) return s;
+          if (!s.completed && !setCanComplete(e, s)) {
+            blocked = true;
+            return s;
+          }
+          completedNow = !s.completed;
+          round = i;
+          return { ...s, completed: !s.completed };
+        });
+        // The numbers just logged become the next set's starting point, where it has none yet.
+        if (completedNow && round >= 0) {
+          const done = sets[round]!;
+          const next = sets.findIndex((s, i) => i > round && !s.completed);
+          if (next >= 0) {
+            const n = sets[next]!;
+            sets[next] = {
+              ...n,
+              weightKg: n.weightKg ?? done.weightKg,
+              reps: n.reps ?? done.reps,
+              durationSeconds: n.durationSeconds ?? done.durationSeconds,
+              distanceM: n.distanceM ?? done.distanceM,
+            };
+          }
+        }
+        return { ...e, sets };
       });
+      if (blocked) return state;
       if (!completedNow || state.pausedAt) return toggled;
       const members = supersetMembers(toggled, action.exerciseKey).filter((m) => !m.skipped);
       if (members.length > 1) {
@@ -383,6 +457,35 @@ function reduce(state: WorkoutDraft, action: DraftAction): WorkoutDraft {
     }
     case "clearRest":
       return { ...state, rest: { endsAt: null, durationSeconds: 0, pausedRemaining: null } };
+    case "prefillFromPrevious": {
+      if (!action.sets.length) return state;
+      let changed = false;
+      const next = mapExercise(state, action.exerciseKey, (e) => ({
+        ...e,
+        sets: e.sets.map((s, i) => {
+          if (s.completed) return s;
+          const p = action.sets[Math.min(i, action.sets.length - 1)]!;
+          const filled = {
+            ...s,
+            weightKg: s.weightKg ?? p.weightKg,
+            reps: s.reps ?? p.reps,
+            durationSeconds: e.isTimed || e.usesDistance ? (s.durationSeconds ?? p.durationSeconds) : s.durationSeconds,
+            distanceM: e.usesDistance ? (s.distanceM ?? p.distanceM) : s.distanceM,
+          };
+          if (filled.weightKg !== s.weightKg || filled.reps !== s.reps || filled.durationSeconds !== s.durationSeconds || filled.distanceM !== s.distanceM) changed = true;
+          return filled;
+        }),
+      }));
+      return changed ? next : state;
+    }
+    case "continueAfterGap": {
+      if (state.pausedAt) return state;
+      const gap = Math.max(0, Math.round((Date.parse(action.now) - Date.parse(state.updatedAt)) / 1000));
+      if (gap < 60) return state;
+      return { ...state, pausedSeconds: state.pausedSeconds + gap, rest: { endsAt: null, durationSeconds: 0, pausedRemaining: null } };
+    }
+    case "requestFinish":
+      return state.finishRequestedAt ? state : { ...state, finishRequestedAt: action.now };
     case "pause": {
       if (state.pausedAt) return state;
       const remaining = state.rest.endsAt ? Math.max(0, Math.round((Date.parse(state.rest.endsAt) - Date.parse(action.now)) / 1000)) : null;

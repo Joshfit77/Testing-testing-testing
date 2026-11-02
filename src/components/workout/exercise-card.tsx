@@ -5,12 +5,13 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Check, ChevronDown, Crosshair, History, Link2, Unlink, MessageSquare, Pause, Play, Plus, Repeat2, SkipForward, Trash2, Undo2, X } from "lucide-react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { confirmDialog } from "@/components/ui/confirm";
 import { Textarea } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { ExerciseDemoMini } from "@/components/train/exercise-demo";
 import { displayWeight, formatDuration, toKg, weightUnit } from "@/lib/domain/units";
 import type { UnitSystem } from "@/lib/domain/types";
-import type { DraftAction, DraftExercise, DraftSet } from "@/lib/domain/workout-draft";
+import { setCanComplete, type DraftAction, type DraftExercise, type DraftSet } from "@/lib/domain/workout-draft";
 import { distanceMode, distanceUnit, formatDistance, fromMetres, toMetres } from "@/lib/domain/exercise-tracking";
 
 function parseNum(v: string): number | null {
@@ -213,10 +214,13 @@ function SetRow({
           type="button"
           onClick={() => dispatch({ type: "toggleSetComplete", exerciseKey: exercise.id, setId: set.id, now: new Date().toISOString() })}
           aria-pressed={set.completed}
-          aria-label={set.completed ? `${label} completed. Mark incomplete` : `Mark ${label} complete`}
+          aria-disabled={!set.completed && !setCanComplete(exercise, set)}
+          aria-label={set.completed ? `${label} completed. Mark incomplete` : setCanComplete(exercise, set) ? `Mark ${label} complete` : `${label}: enter ${exercise.usesDistance ? "the distance" : exercise.isTimed ? "the seconds" : "reps"} to mark it complete`}
+          title={!set.completed && !setCanComplete(exercise, set) ? `Enter ${exercise.usesDistance ? "the distance" : exercise.isTimed ? "the seconds" : "reps"} first` : undefined}
           className={cn(
             "flex size-11 items-center justify-center rounded-lg border transition-colors",
             set.completed ? "border-success bg-success text-white" : "border-border bg-elevated text-muted-foreground hover:border-gold-muted",
+            !set.completed && !setCanComplete(exercise, set) && "opacity-40",
           )}
         >
           <Check className="size-5" aria-hidden />
@@ -314,7 +318,7 @@ export function ExerciseCard({
         <ExerciseDemoMini slug={exercise.slug} name={exercise.name} animate={current} className="h-[60px] w-20" />
         <div className="min-w-0 flex-1">
           <h3 id={`ex-${exercise.id}`} className="font-display text-lg font-semibold uppercase leading-tight">
-            <Link href={`/train/exercises/${exercise.slug}`} target="_blank" className="hover:text-gold-highlight">
+            <Link href={`/train/exercises/${exercise.slug}?from=workout`} className="hover:text-gold-highlight">
               {exercise.name}
             </Link>
           </h3>
@@ -350,7 +354,19 @@ export function ExerciseCard({
                 ...(inSuperset ? [{ label: "Remove from superset", icon: Unlink, onSelect: () => dispatch({ type: "unlinkSuperset", exerciseKey: exercise.id }) }] : []),
                 ...(index > 0 ? [{ label: "Move up", icon: ArrowUp, onSelect: () => dispatch({ type: "moveExercise", exerciseKey: exercise.id, direction: -1 }) }] : []),
                 ...(index < total - 1 ? [{ label: "Move down", icon: ArrowDown, onSelect: () => dispatch({ type: "moveExercise", exerciseKey: exercise.id, direction: 1 }) }] : []),
-                { label: "Remove exercise", icon: Trash2, onSelect: () => dispatch({ type: "removeExercise", exerciseKey: exercise.id }), danger: true },
+                {
+                  label: "Remove exercise",
+                  icon: Trash2,
+                  onSelect: async () => {
+                    // Logged work is never thrown away on one tap.
+                    if (done > 0) {
+                      const ok = await confirmDialog({ title: `Remove ${exercise.name}?`, message: `The ${done} ${done === 1 ? "set" : "sets"} you logged for it will be deleted from this workout.`, confirmLabel: "Remove", destructive: true });
+                      if (!ok) return;
+                    }
+                    dispatch({ type: "removeExercise", exerciseKey: exercise.id });
+                  },
+                  danger: true,
+                },
               ].map((item) => (
                 <DropdownMenu.Item
                   key={item.label}
@@ -392,8 +408,12 @@ export function ExerciseCard({
             type="button"
             size="sm"
             variant="ghost"
-            onClick={() => {
+            onClick={async () => {
               const last = exercise.sets[exercise.sets.length - 1]!;
+              if (last.completed) {
+                const ok = await confirmDialog({ title: `Remove set ${exercise.sets.length}?`, message: "That set is marked done; removing it deletes what you logged.", confirmLabel: "Remove", destructive: true });
+                if (!ok) return;
+              }
               dispatch({ type: "removeSet", exerciseKey: exercise.id, setId: last.id });
             }}
             aria-label={`Remove last set of ${exercise.name}`}

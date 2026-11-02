@@ -10,8 +10,11 @@ const { GET: confirm } = await import("@/app/auth/confirm/route");
 const { authLinkMessage } = await import("@/lib/auth-messages");
 
 const at = (path: string) => new NextRequest(new URL(path, "https://app.narrowgate.test"));
+// The routes redirect to a path (lib/relative-redirect): the browser resolves it against the address it used.
 const location = (res: Response) => {
-  const u = new URL(res.headers.get("location")!);
+  const raw = res.headers.get("location")!;
+  expect(raw.startsWith("/") && !raw.startsWith("//"), `a same-site path, not ${raw}`).toBe(true);
+  const u = new URL(raw, "https://app.narrowgate.test");
   return u.pathname + u.search;
 };
 

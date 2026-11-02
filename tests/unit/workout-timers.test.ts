@@ -103,7 +103,7 @@ describe("what a finished workout saves", () => {
     expect(estimateOneRepMax(100, 13)).toBeNull(); // beyond the formula's useful range
   });
 
-  it("substituting an exercise keeps the reps, clears loads and ticks, and remembers the original", () => {
+  it("substituting an exercise keeps the set already done under the original and moves the rest: reps kept, loads and ticks cleared", () => {
     const { d, key, sets } = start();
     const w = run(
       d,
@@ -111,8 +111,12 @@ describe("what a finished workout saves", () => {
       { type: "toggleSetComplete", exerciseKey: key, setId: sets[0]!, now: at(1) },
       { type: "substituteExercise", exerciseKey: key, replacement: { id: "e3", slug: "dumbbell-bench-press", name: "DB Bench", isTimed: false } },
     );
-    const ex = w.exercises[0]!;
-    expect(ex).toMatchObject({ exerciseId: "e3", substitutedFromId: "e1", substitutedFromName: "Bench" });
-    expect(ex.sets[0]).toMatchObject({ reps: 5, weightKg: null, completed: false });
+    const [kept, moved] = w.exercises;
+    expect(kept).toMatchObject({ exerciseId: "e1", name: "Bench" });
+    expect(kept!.sets).toHaveLength(1);
+    expect(kept!.sets[0]).toMatchObject({ weightKg: 100, reps: 5, completed: true });
+    expect(moved).toMatchObject({ exerciseId: "e3", substitutedFromId: "e1", substitutedFromName: "Bench" });
+    expect(moved!.sets).toHaveLength(2);
+    expect(moved!.sets.every((s) => s.weightKg === null && !s.completed && s.reps === 5)).toBe(true);
   });
 });

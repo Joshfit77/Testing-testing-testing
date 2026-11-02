@@ -7,7 +7,7 @@ import { ACTIVITY_INFO, weeksToGoal } from "@/lib/domain/calorie-budget";
 import { isoDateInTz } from "@/lib/domain/dates";
 import { formatLongDate, goalDate, paceLabel } from "@/lib/domain/diary";
 import { DIETS } from "@/lib/domain/diets";
-import { GOAL_LABELS, SECONDARY_GOAL_LABELS, type SecondaryGoal } from "@/lib/domain/types";
+import { EQUIPMENT_LABELS, GOAL_LABELS, SECONDARY_GOAL_LABELS, type Equipment, type ExperienceLevel, type SecondaryGoal } from "@/lib/domain/types";
 import { formatWeight } from "@/lib/domain/units";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
@@ -15,6 +15,13 @@ import { loadBudgetContext } from "@/server/services/nutrition-targets";
 import { getActiveProgram } from "@/server/services/training";
 
 export const metadata = { title: "Your plan" };
+
+const EXPERIENCE_PHRASE: Record<ExperienceLevel, string> = {
+  new: "you're new to training",
+  beginner: "you've trained for under a year",
+  intermediate: "you've trained for 1–3 years",
+  advanced: "you've trained for 3+ years",
+};
 
 export default async function PlanPage({ searchParams }: { searchParams: Promise<{ new?: string }> }) {
   const sp = await searchParams;
@@ -28,9 +35,24 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
     loadBudgetContext(supabase, user.id),
     supabase.from("nutrition_goals").select("calories, protein_g, carbs_g, fat_g, water_ml, is_estimate").eq("user_id", user.id).maybeSingle(),
     getActiveProgram(supabase, user.id),
-    supabase.from("onboarding_answers").select("secondary_goal").eq("user_id", user.id).maybeSingle(),
+    supabase.from("onboarding_answers").select("secondary_goal, experience, days_per_week, session_minutes, equipment").eq("user_id", user.id).maybeSingle(),
   ]);
   const secondGoal = (secondRes.data?.secondary_goal as SecondaryGoal | null | undefined) ?? null;
+  // Why this program: the answers it was built from, in the member's own terms.
+  const a = secondRes.data as { experience?: ExperienceLevel | null; days_per_week?: number | null; session_minutes?: number | null; equipment?: Equipment[] | null } | null;
+  const gear = a?.equipment ?? [];
+  const gearText = !gear.length || (gear.length === 1 && gear[0] === "bodyweight") ? "no equipment" : gear.filter((g) => g !== "bodyweight").map((g) => EQUIPMENT_LABELS[g].toLowerCase()).join(", ");
+  const why =
+    ctx && a
+      ? [
+          `your main goal is ${GOAL_LABELS[ctx.goal].toLowerCase()}`,
+          a.experience ? EXPERIENCE_PHRASE[a.experience] : null,
+          a.days_per_week ? `you can train ${a.days_per_week} ${a.days_per_week === 1 ? "day" : "days"} a week${a.session_minutes ? ` for about ${a.session_minutes} minutes` : ""}` : null,
+          `you have ${gearText}`,
+        ]
+          .filter(Boolean)
+          .join(", ")
+      : null;
   const goals = goalsRes.data as { calories: number; protein_g: number; carbs_g: number; fat_g: number; water_ml: number; is_estimate: boolean } | null;
 
   let program: { sessionMinutes: number; weekOne: { id: string; day_number: number; name: string; focus: string | null; estimated_minutes: number | null }[] } | null = null;
@@ -139,6 +161,12 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
             <p className="text-sm text-muted-foreground">
               {active.durationWeeks} weeks × {active.daysPerWeek} days/week × {program.sessionMinutes} min
             </p>
+            {why && (
+              <p className="mt-2 rounded-xl border border-gold-muted/50 bg-gold/5 px-3 py-2 text-sm" data-testid="program-why">
+                <span className="font-semibold text-gold-highlight">Why this program: </span>
+                because {why}. Change your goals or equipment any time in Profile &amp; Settings; your workout history stays.
+              </p>
+            )}
             {program.weekOne.length > 0 && (
               <>
                 <h3 className="mt-4 flex items-center gap-2 text-sm font-semibold">
