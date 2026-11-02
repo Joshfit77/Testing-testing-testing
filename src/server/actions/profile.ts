@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getServerSupabase, getServiceSupabase } from "@/lib/supabase/server";
 import { actionError, actionInvalid, actionOk, type ActionState } from "@/lib/action-state";
@@ -14,6 +15,7 @@ import { deleteUserAccount, deletionFailureMessage } from "@/server/services/acc
 import { cancelStripeSubscriptionsForUser, deleteStripeCustomer, isStripeConfigured } from "@/server/services/billing";
 import { deleteRevenueCatCustomer } from "@/server/services/store-billing";
 import { logError } from "@/server/log";
+import { RETURNING_COOKIE } from "@/lib/opening";
 
 function isValidTimeZone(tz: string): boolean {
   try {
@@ -114,6 +116,8 @@ export async function deleteAccountAction(_prev: ActionState, formData: FormData
 
   const supabase = await getServerSupabase();
   await supabase.auth.signOut().catch(() => null);
+  // Nobody has an account on this device any more: the next launch opens the welcome page, not sign-in.
+  (await cookies()).delete(RETURNING_COOKIE);
   redirect("/?deleted=1");
 }
 

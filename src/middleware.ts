@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { isSupabaseConfigured, publicEnv } from "@/lib/env";
 import { contentSecurityPolicy, generateNonce } from "@/lib/security-headers";
-import { updateSession } from "@/lib/supabase/middleware";
+import { isLaunch, markLaunch, updateSession } from "@/lib/supabase/middleware";
 
 const production = process.env.NODE_ENV === "production";
 const https = production && (process.env.NEXT_PUBLIC_SITE_URL ?? "").startsWith("https://");
@@ -14,7 +14,8 @@ export async function middleware(request: NextRequest) {
   const csp = contentSecurityPolicy({ supabaseUrl: publicEnv.supabaseUrl, production, https, nonce });
   request.headers.set("x-nonce", nonce);
   request.headers.set("content-security-policy", csp);
-  const response = isSupabaseConfigured() ? await updateSession(request) : NextResponse.next({ request });
+  // (updateSession marks a launch itself; without a database the welcome page is the only destination.)
+  const response = isSupabaseConfigured() ? await updateSession(request) : isLaunch(request) ? markLaunch(NextResponse.next({ request }), request) : NextResponse.next({ request });
   response.headers.set("Content-Security-Policy", csp);
   return response;
 }
