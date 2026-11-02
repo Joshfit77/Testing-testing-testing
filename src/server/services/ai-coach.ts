@@ -31,6 +31,7 @@ export type AiErrorCode =
   | "rate_limited"
   | "metering_unavailable"
   | "not_found"
+  | "in_progress"
   | "provider";
 
 export class AiError extends Error {
@@ -54,6 +55,7 @@ export const AI_ERROR_STATUS: Record<AiErrorCode, number> = {
   rate_limited: 429,
   metering_unavailable: 503,
   not_found: 404,
+  in_progress: 409,
   provider: 502,
 };
 
@@ -328,6 +330,32 @@ async function runChatLoop(params: {
   return { reply: texts.join("\n\n").trim(), proposal: toolCtx.proposal, inputTokens, outputTokens };
 }
 
+const IN_PROGRESS_MESSAGE = "Your last message is still being answered. Give it a moment, then try again.";
+/** A request still unanswered after this long is taken as abandoned (the route's limit is 180 s). */
+const REQUEST_ABANDONED_MS = 4 * 60_000;
+
+/**
+ * The saved answer to an earlier request with this id, if there is one. Throws `in_progress` while the first request
+ * is still being answered; a question left unanswered for longer than any request can run is removed, so the retry
+ * is answered afresh (and charged once, as the abandoned attempt gave its reservation back or never made one).
+ */
+async function replayRequest(supabase: SupabaseClient, userId: string, plan: Plan, requestId: string): Promise<CoachTurnResult | null> {
+  const columns = "id, role, content, proposal, proposal_status, created_at, conversation_id";
+  const { data: rows, error } = await supabase.from("ai_messages").select(columns).eq("user_id", userId).eq("request_id", requestId);
+  if (error) throw error;
+  const question = rows?.find((r) => r.role === "user");
+  const answer = rows?.find((r) => r.role === "assistant");
+  if (!question) return null;
+  if (!answer) {
+    if (Date.now() - Date.parse(question.created_at as string) < REQUEST_ABANDONED_MS) throw new AiError("in_progress", IN_PROGRESS_MESSAGE, 15);
+    await supabase.from("ai_messages").delete().eq("id", question.id).eq("user_id", userId);
+    return null;
+  }
+  const usage = await getAiUsage(userId, plan);
+  const strip = ({ conversation_id: _c, ...m }: Record<string, unknown>) => m as unknown as CoachMessage;
+  return { conversationId: question.conversation_id as string, userMessage: strip(question), assistantMessage: strip(answer), usage: { used: usage.chatUsed, limit: usage.chatLimit } };
+}
+
 export async function coachTurn(params: {
   supabase: SupabaseClient;
   userId: string;
@@ -337,11 +365,21 @@ export async function coachTurn(params: {
   mode: "chat" | "plan";
   /** For a new conversation: don't remember anything from it (Pro coaching memory). */
   memoryOff?: boolean;
+  /** The client's id for this message: a retry with the same id gets the saved reply instead of a second answer. */
+  requestId?: string;
   onEvent?: (e: CoachEvent) => void;
   signal?: AbortSignal;
 }): Promise<CoachTurnResult> {
   const { supabase, userId, plan, message, mode } = params;
+  const requestId = params.requestId ?? null;
   const onEvent = params.onEvent ?? (() => {});
+  // A retry of a message that was already answered (the reply was saved but never reached the device): the saved
+  // reply, with no second answer and no second charge. Checked before the allowance, which that first answer may
+  // have used up.
+  if (requestId) {
+    const replay = await replayRequest(supabase, userId, plan, requestId);
+    if (replay) return replay;
+  }
   const usage = await assertAiAllowed(userId, plan, mode);
   // Nothing goes to the AI provider until the user has allowed it (and only while they keep it allowed).
   const { data: consent } = await supabase.from("profiles").select("ai_data_consent_at").eq("id", userId).maybeSingle();
@@ -373,9 +411,15 @@ export async function coachTurn(params: {
 
   const { data: userRow, error: umErr } = await supabase
     .from("ai_messages")
-    .insert({ conversation_id: conversationId, user_id: userId, role: "user", content: message })
+    .insert({ conversation_id: conversationId, user_id: userId, role: "user", content: message, request_id: requestId })
     .select("id, role, content, proposal, proposal_status, created_at")
     .single();
+  // The same request id arrived twice at once: the first one is answering it (and this one's new, empty
+  // conversation is removed again).
+  if (umErr?.code === "23505" && requestId) {
+    if (!params.conversationId) await supabase.from("ai_conversations").delete().eq("id", conversationId).eq("user_id", userId);
+    throw new AiError("in_progress", IN_PROGRESS_MESSAGE, 15);
+  }
   if (umErr || !userRow) throw umErr ?? new Error("Message insert failed");
 
   onEvent({ type: "status", text: "Reading your training log…" });
@@ -491,6 +535,7 @@ export async function coachTurn(params: {
       content: (reply || "Sorry — I didn't get a response. Please try again.").slice(0, 20_000),
       proposal,
       proposal_status: proposal ? "proposed" : null,
+      request_id: requestId,
     })
     .select("id, role, content, proposal, proposal_status, created_at")
     .single();

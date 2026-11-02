@@ -341,6 +341,8 @@ export const aiChatRequestSchema = z.object({
   mode: z.enum(["chat", "plan"]).default("chat"),
   /** New conversations only: don't remember anything from this chat. */
   memoryOff: z.boolean().optional(),
+  /** The client's id for this message, reused when it retries the same message. */
+  requestId: z.string().uuid().optional(),
 });
 
 // --------------------------------------------------------------------------- Admin

@@ -20,6 +20,16 @@ import type { CoachProposal } from "@/lib/coach/tools";
 import { applyProposalAction, deleteConversationAction, dismissProposalAction } from "@/server/actions/coach";
 import { setConversationMemoryOffAction } from "@/server/actions/coach-memory";
 import { chatCreated, initialChatKey, nextChatKey } from "@/lib/coach/chat-key";
+
+/** A random id for one message (RFC 4122 v4), also where crypto.randomUUID isn't available. */
+export function newRequestId(): string {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6]! & 0x0f) | 0x40;
+  b[8] = (b[8]! & 0x3f) | 0x80;
+  const h = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
 import { Markdown } from "./markdown";
 import { SuggestionCard } from "./suggestion-card";
 
@@ -222,12 +232,16 @@ function CoachChatView({ conversationId: initialId, initialMessages, initialQues
   const endRef = useRef<HTMLDivElement>(null);
   const starters = suggestions?.length ? suggestions : DEFAULT_SUGGESTIONS;
   const pendingKey = "coach.pending";
+  // The id of the message being sent, kept until it is answered: sending the same text again (after a dropped
+  // connection, or after reopening the page) reuses it, so the server returns the reply it already saved instead
+  // of answering, and charging, twice.
+  const retryRef = useRef<{ message: string; requestId: string } | null>(null);
 
   // A link like /coach?q=… prefills the box (it wins over an older draft).
   useEffect(() => {
     if (initialQuestion) setInput(initialQuestion);
     // A message that was being sent when the page closed: bring it back unless it was saved.
-    const pending = readDraft<{ message: string; conversationId: string | null }>(userId, pendingKey);
+    const pending = readDraft<{ message: string; conversationId: string | null; requestId?: string }>(userId, pendingKey);
     if (!pending) return;
     clearDraft(userId, pendingKey);
     const p = pending.value;
@@ -235,6 +249,7 @@ function CoachChatView({ conversationId: initialId, initialMessages, initialQues
     if (!saved && p.conversationId === initialId) {
       setInput((cur) => (cur.trim() ? cur : p.message));
       setRestoredNotice(true);
+      if (p.requestId) retryRef.current = { message: p.message, requestId: p.requestId };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on mount
   }, []);
@@ -246,6 +261,7 @@ function CoachChatView({ conversationId: initialId, initialMessages, initialQues
 
   const finish = (json: Extract<StreamEvent, { type: "done" }>["result"], optimisticId: string) => {
     clearDraft(userId, pendingKey);
+    retryRef.current = null;
     setMessages((m) => [...m.filter((x) => x.id !== optimisticId), json.userMessage, json.assistantMessage]);
     setUsage(json.usage);
     if (!conversationId) {
@@ -266,8 +282,10 @@ function CoachChatView({ conversationId: initialId, initialMessages, initialQues
     setStatus(mode === "plan" ? "Drafting your plan — this can take a little while…" : "Thinking…");
     const optimistic: ChatMessage = { id: `tmp-${Date.now()}`, role: "user", content: message, proposal: null, proposal_status: null, created_at: new Date().toISOString() };
     setMessages((m) => [...m, optimistic]);
+    const requestId = retryRef.current?.message === message ? retryRef.current.requestId : newRequestId();
+    retryRef.current = { message, requestId };
     // Keep the message on the device until the coach has answered.
-    writeDraft(userId, pendingKey, { message, conversationId });
+    writeDraft(userId, pendingKey, { message, conversationId, requestId });
     setInput("");
     setRestoredNotice(false);
     inputDraft.dismissRestored();
@@ -281,7 +299,7 @@ function CoachChatView({ conversationId: initialId, initialMessages, initialQues
       const res = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/x-ndjson" },
-        body: JSON.stringify({ conversationId, message, mode, ...(conversationId ? {} : { memoryOff }) }),
+        body: JSON.stringify({ conversationId, message, mode, requestId, ...(conversationId ? {} : { memoryOff }) }),
       });
       if (!res.ok || !res.body) {
         const json = await res.json().catch(() => ({}));
