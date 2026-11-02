@@ -2,7 +2,7 @@
 - one contact sheet per step (sheet-<step>.jpg, kept in the artifact);
 - a table of each frame's average brightness (0 black – 255 white) for the whole screen, the doorway (centre) and
   the lower third (verse and button): the door opening lights the centre, the move into the light turns the whole
-  screen near-white, the welcome page is dark with a small bright doorway;
+  screen near-white, the welcome page beyond it is dark with no doorway of its own;
 - a coarse text rendering of a few frames per step, so the log alone shows what was on screen."""
 import os
 import re
@@ -37,7 +37,7 @@ def ascii_art(im: Image.Image, cols: int = 22) -> list[str]:
 # Frame types, from the brightness of the whole screen and of the doorway (calibrated on the opening in Chromium and
 # in the Simulator): dark (the launch screen or the blank web view), black (the opening's own first frame, before
 # its logo), the gate open with its light, the camera moving into the light / the light filling the screen, the
-# welcome page (dark, with a small lit doorway).
+# welcome page beyond the gate (dark, soft light from above, no doorway of its own: the opening is the only gate).
 def kind(screen: float, door: float) -> str:
     if screen > 120:
         return "light"
@@ -47,7 +47,7 @@ def kind(screen: float, door: float) -> str:
         return "black"
     if screen < 15 and door < 40:
         return "dark"
-    if screen < 40 and 60 < door < 120:
+    if 16 <= screen < 42 and 16 <= door < 62:
         return "welcome"
     return "other"
 

@@ -32,6 +32,44 @@ async function waitForAnimations(page: Page, selector: string) {
   }, selector);
 }
 
+/** Everything the page went through from its first moment: the opening's states, the most gates ever on the page. */
+type GateLog = { states: string[]; arts: string[]; maxGates: number };
+async function watchGate(page: Page) {
+  await page.addInitScript(() => {
+    const log = { states: [] as string[], arts: [] as string[], maxGates: 0 };
+    (window as unknown as { __gate: typeof log }).__gate = log;
+    // (This runs as the document is created, before it has a root element: watch the document itself.)
+    const note = () => {
+      const d = document.documentElement;
+      if (!d) return;
+      const s = d.dataset.intro ?? "";
+      if (s && log.states.at(-1) !== s) log.states.push(s);
+      const a = d.dataset.introArt ?? "";
+      if (a && log.arts.at(-1) !== a) log.arts.push(a);
+      log.maxGates = Math.max(log.maxGates, document.querySelectorAll("[data-testid=animated-narrow-door]").length);
+    };
+    new MutationObserver(note).observe(document, { attributes: true, childList: true, subtree: true });
+    const tick = () => {
+      note();
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  return () => page.evaluate(() => (window as unknown as { __gate: GateLog }).__gate);
+}
+/** Enter Narrow Gate, pressed as a person would once it shows. */
+async function enterGate(page: Page) {
+  const enter = opening(page).getByRole("button", { name: "Enter Narrow Gate" });
+  await expect(enter).toBeVisible();
+  await enter.click({ force: true });
+}
+/** After the entrance: no overlay, and no gate anywhere on the page. */
+async function inside(page: Page) {
+  await expect(opening(page)).toHaveCount(0);
+  await expect(page.locator("[data-testid=animated-narrow-door]")).toHaveCount(0);
+  expect(await introState(page)).toBe("done");
+}
+
 type Box = { x: number; y: number; width: number; height: number };
 /** What the page filmed of the move into the light after Enter Narrow Gate (see the first test). */
 type Film = { frames: number; first: number; maxScale: number; maxWhite: number; animations: string[] };
@@ -292,19 +330,20 @@ test.describe("opening gate", () => {
     await ctx.close();
   });
 
-  test("welcome screen: centred gate, brand, the verse beneath, Start free and Sign in, nothing clipped", async ({ browser }) => {
+  test("welcome screen: the place beyond the gate (no gate of its own), brand, the verse, Start free and Sign in, nothing clipped", async ({ browser }) => {
     for (const s of [SIZES[0]!, SIZES[1]!, SIZES[2]!, SIZES[3]!, SIZES[6]!]) {
       const ctx = await quietContext(browser, { viewport: { width: s.width, height: s.height }, deviceScaleFactor: s.dpr });
       const page = await ctx.newPage();
       await page.goto("/");
       await expect(page.getByRole("heading", { level: 1, name: "Narrow Gate Fitness" })).toBeVisible();
-      const gate = page.locator("main [data-testid=animated-narrow-door]");
-      await expect(gate).toBeVisible();
-      const g = (await gate.boundingBox())!;
-      expect(Math.abs(g.x + g.width / 2 - s.width / 2)).toBeLessThan(2);
+      // The opening is the only gate: the page itself draws none (the overlay, off here, is the only one on the page).
+      await expect(page.locator("main [data-testid=animated-narrow-door]")).toHaveCount(0);
+      await expect(page.locator("main .ngs")).toHaveCount(0);
       const quote = page.locator("main blockquote");
       await expect(quote).toHaveText(`“${VERSE}”`);
-      expect((await quote.boundingBox())!.y).toBeGreaterThan(g.y + g.height);
+      const title = (await page.getByRole("heading", { level: 1 }).boundingBox())!;
+      expect(Math.abs(title.x + title.width / 2 - s.width / 2)).toBeLessThan(3);
+      expect((await quote.boundingBox())!.y).toBeGreaterThan(title.y + title.height);
       await expect(page.getByRole("link", { name: "Start free" })).toHaveAttribute("href", "/signup");
       // On every current iPhone (667 pt tall and up) both choices are on the first screen, without scrolling.
       if (s.height >= 667) {
@@ -328,5 +367,204 @@ test.describe("opening gate", () => {
       await page.waitForURL(/\/signup/);
       await ctx.close();
     }
+  });
+});
+
+test.describe("one gate: the opening is the app's only entrance, and opens onto the right place", () => {
+  const PHONE: BrowserContextOptions = { viewport: { width: 393, height: 852 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true };
+
+  test("a new person: the gate opens straight onto the welcome page, which draws no second gate", async ({ browser }) => {
+    const ctx = await freshContext(browser, PHONE);
+    const page = await ctx.newPage();
+    const log = await watchGate(page);
+    await page.goto("/");
+    await expect(opening(page)).toBeVisible();
+    await enterGate(page);
+    await inside(page);
+    expect(new URL(page.url()).pathname).toBe("/");
+    await expect(page.getByRole("heading", { level: 1, name: "Narrow Gate Fitness" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Start free" })).toBeVisible();
+    const g = await log();
+    expect(g.maxGates).toBe(1);
+    expect(g.states).toEqual(["play", "entering", "done"]);
+    // In-app navigation (Sign in, then the logo back to the welcome page) neither replays the opening nor draws a gate.
+    await page.getByRole("main").getByRole("link", { name: "Sign in" }).click();
+    await page.waitForURL(/\/login/);
+    await page.getByRole("link", { name: "Narrow Gate Fitness home" }).click();
+    await page.waitForURL((u) => u.pathname === "/");
+    await expect(page.getByRole("link", { name: "Start free" })).toBeVisible();
+    await inside(page);
+    expect((await log()).maxGates).toBe(1);
+    await ctx.close();
+  });
+
+  test("someone who has signed in on this phone before, signed out now: the gate opens onto sign-in; a reload doesn't replay it", async ({ browser }) => {
+    const ctx = await freshContext(browser, PHONE);
+    const base = test.info().project.use.baseURL ?? "http://localhost:3000";
+    await ctx.addCookies([{ name: "ngf_member", value: "1", url: base }]);
+    const page = await ctx.newPage();
+    const log = await watchGate(page);
+    await page.goto("/");
+    await page.waitForURL(/\/login$/);
+    await expect(opening(page)).toBeVisible();
+    await enterGate(page);
+    await inside(page);
+    await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
+    expect((await log()).maxGates).toBe(1);
+    await page.reload();
+    expect(await introState(page)).toBe("off");
+    await expect(opening(page)).toHaveCount(0);
+    await ctx.close();
+  });
+
+  test("signed in: the gate opens onto Home; with onboarding unfinished, onto onboarding; never twice", async ({ page }) => {
+    test.setTimeout(240_000);
+    // Unfinished onboarding: a confirmed account that hasn't answered the questions yet.
+    await signUpAndConfirm(page, uniqueEmail("gate-onb"));
+    await page.waitForURL(/\/onboarding/);
+    await page.evaluate((f) => localStorage.removeItem(f), FLAG);
+    await page.goto("/");
+    await page.waitForURL(/\/onboarding/);
+    await expect(opening(page)).toBeVisible();
+    await enterGate(page);
+    await inside(page);
+    await expect(page.getByRole("heading", { level: 1, name: "Let's build your plan" })).toBeVisible();
+    // A reload of onboarding (not a launch) doesn't replay it.
+    await page.reload();
+    expect(await introState(page)).toBe("off");
+
+    // Finished onboarding: Home.
+    await page.evaluate((f) => localStorage.setItem(f, "1"), FLAG);
+    await completeOnboarding(page);
+    await page.evaluate((f) => localStorage.removeItem(f), FLAG);
+    const log = await watchGate(page);
+    await page.goto("/");
+    await page.waitForURL(/\/home/);
+    await expect(opening(page)).toBeVisible();
+    await enterGate(page);
+    await inside(page);
+    await expect(page.getByRole("navigation", { name: "Main sections" }).last()).toBeVisible();
+    const g = await log();
+    expect(g.maxGates).toBe(1);
+    expect(g.states).toEqual(["play", "entering", "done"]);
+    // Tab navigation never replays it.
+    await page.getByRole("navigation", { name: "Main sections" }).last().getByRole("link", { name: "Train" }).click();
+    await page.waitForURL(/\/train/);
+    await inside(page);
+  });
+
+  test("tapping Enter Narrow Gate again and again starts one entrance only", async ({ browser }) => {
+    const ctx = await freshContext(browser, PHONE);
+    const page = await ctx.newPage();
+    const log = await watchGate(page);
+    await page.goto("/");
+    const enter = opening(page).getByRole("button", { name: "Enter Narrow Gate" });
+    await expect(enter).toBeVisible();
+    const box = (await enter.boundingBox())!;
+    for (let i = 0; i < 6; i++) await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+    await inside(page);
+    expect((await log()).states).toEqual(["play", "entering", "done"]);
+    // The taps after the overlay went landed on the welcome page, which is where they belong; no second entrance.
+    expect(new URL(page.url()).pathname).toBe("/");
+    await ctx.close();
+  });
+
+  test("Enter pressed while the door is still opening: the door finishes opening before the camera reaches it", async ({ browser }) => {
+    const ctx = await freshContext(browser, PHONE);
+    const page = await ctx.newPage();
+    await page.goto("/");
+    await expect(opening(page)).toBeVisible();
+    const angle = () =>
+      page.evaluate(() => {
+        const m = getComputedStyle(document.querySelector(".ngo .ngs-door")!).transform.match(/matrix3d\(([^)]+)\)/);
+        if (!m) return 0;
+        const c = m[1]!.split(",").map(Number);
+        return (Math.atan2(-c[2]!, c[0]!) * 180) / Math.PI;
+      });
+    // Wait for the door to be part-way open, then press (the button works from the moment it exists).
+    await expect.poll(angle, { timeout: 15_000, intervals: [30] }).toBeGreaterThan(5);
+    const film = await page.evaluate(
+      () =>
+        new Promise<{ angle: number; scale: number }[]>((resolve) => {
+          const door = document.querySelector(".ngo .ngs-door")!;
+          const push = document.querySelector(".ngo .ngs-push")!;
+          const frames: { angle: number; scale: number }[] = [];
+          const read = () => {
+            const m = getComputedStyle(door).transform.match(/matrix3d\(([^)]+)\)/);
+            const c = m ? m[1]!.split(",").map(Number) : [1, 0, 0];
+            frames.push({ angle: (Math.atan2(-c[2]!, c[0]!) * 180) / Math.PI, scale: new DOMMatrix(getComputedStyle(push).transform).a });
+          };
+          read();
+          (document.querySelector("[data-intro-enter]") as HTMLElement).click();
+          const tick = () => {
+            read();
+            if (frames.length < 400 && frames.at(-1)!.scale < 2 && document.documentElement.dataset.intro === "entering") requestAnimationFrame(tick);
+            else resolve(frames);
+          };
+          requestAnimationFrame(tick);
+        }),
+    );
+    expect(film[0]!.angle).toBeLessThan(79);
+    // By the time the camera has moved in noticeably (the scene 1.5x), the door stands fully open; it never swings back.
+    const near = film.find((f) => f.scale >= 1.5);
+    if (near) expect(near.angle).toBeGreaterThan(78.5);
+    for (let i = 1; i < film.length; i++) expect(film[i]!.angle).toBeGreaterThanOrEqual(film[i - 1]!.angle - 0.5);
+    await inside(page);
+    await ctx.close();
+  });
+
+  test("if the gate's pictures fail to load, a drawn gate takes their place and Enter still leads in", async ({ browser }) => {
+    const ctx = await freshContext(browser, PHONE);
+    const page = await ctx.newPage();
+    await page.route("**/opening/gate-*.webp", (route) => route.abort());
+    const log = await watchGate(page);
+    await page.goto("/");
+    await expect(opening(page)).toBeVisible();
+    await expect.poll(() => page.evaluate(() => document.documentElement.dataset.introArt)).toBe("missing");
+    const drawn = await page.evaluate(() => getComputedStyle(document.querySelector(".ngo .ngs-scene")!, "::before").content);
+    expect(drawn).not.toBe("none");
+    await enterGate(page);
+    await inside(page);
+    await expect(page.getByRole("link", { name: "Start free" })).toBeVisible();
+    expect((await log()).maxGates).toBe(1);
+    await ctx.close();
+  });
+
+  test("on a slow connection the sequence waits briefly for the gate's pictures, then plays (no door opening undrawn)", async ({ browser }) => {
+    const ctx = await freshContext(browser, PHONE);
+    const page = await ctx.newPage();
+    await page.route("**/opening/gate-*.webp", async (route) => {
+      await new Promise((r) => setTimeout(r, 4000));
+      await route.continue().catch(() => null);
+    });
+    const log = await watchGate(page);
+    await page.goto("/");
+    await expect(opening(page)).toBeVisible();
+    expect((await log()).arts[0]).toBe("loading");
+    // It doesn't wait for long: the sequence starts within about a second and a quarter, pictures or not.
+    await expect.poll(() => page.evaluate(() => document.documentElement.dataset.introArt), { timeout: 3000 }).toBe("ready");
+    await enterGate(page);
+    await inside(page);
+    await ctx.close();
+  });
+
+  test("leaving the app mid-opening and coming back fades it out instead of replaying or stalling", async ({ browser }) => {
+    const ctx = await freshContext(browser, PHONE);
+    const page = await ctx.newPage();
+    const log = await watchGate(page);
+    await page.goto("/");
+    await expect(opening(page)).toBeVisible();
+    const setVisibility = (v: "hidden" | "visible") =>
+      page.evaluate((state) => {
+        Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state });
+        document.dispatchEvent(new Event("visibilitychange"));
+      }, v);
+    await setVisibility("hidden");
+    await page.waitForTimeout(1300);
+    await setVisibility("visible");
+    await inside(page);
+    expect((await log()).states).toEqual(["play", "leaving", "done"]);
+    await expect(page.getByRole("link", { name: "Start free" })).toBeVisible();
+    await ctx.close();
   });
 });

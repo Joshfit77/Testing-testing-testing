@@ -206,10 +206,14 @@ final class OpeningOnSimulatorTests: XCTestCase {
     /// The camera is moving into the light, or the light fills the screen.
     private func inTheLight(_ f: Frame) -> Bool { brightness(f) > 120 }
 
-    /// The welcome page: dark, with its small lit doorway (same bands as contact-sheet.py).
+    /// The welcome page, beyond the gate: dark with soft light from above, the brand, the verse and the two buttons, and
+    /// no doorway of its own (the opening is the only gate), so its centre is about as dim as the rest (about 23 overall
+    /// and 26–35 in the centre on iPhone sizes, measured; same bands as contact-sheet.py). The opening's first frames
+    /// (logo and verse, the door still shut) fall in the same band, so the checks go by order and by the run of frames
+    /// the film ends on, never by a single frame.
     private func welcome(_ f: Frame) -> Bool {
-        let d = doorway(f)
-        return brightness(f) < 40 && d > 60 && d < 120
+        let screen = brightness(f), d = doorway(f)
+        return screen >= 16 && screen < 42 && d >= 16 && d < 62
     }
 
     /// Moves this step's screenshots and notes from an earlier attempt (Xcode retries a failed test) into
