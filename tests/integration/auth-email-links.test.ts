@@ -57,6 +57,21 @@ async function latestLinkTo(email: string, type: string): Promise<string | null>
   return null;
 }
 
+/**
+ * The token hash in an emailed link: `token_hash` in this repository's templates (/auth/confirm), `token` in GoTrue's
+ * default /verify link. The local stack sends whichever templates it was started with (config.toml), so both count.
+ */
+function emailedTokenHash(link: string | null): string | null {
+  if (!link) return null;
+  const u = new URL(link);
+  return u.searchParams.get("token_hash") ?? u.searchParams.get("token");
+}
+
+/** GoTrue's default link for that token hash (what {{ .ConfirmationURL }} would have been in the email). */
+function defaultVerifyLink(tokenHash: string, type: string, redirectTo: string): string {
+  return `${url()}/auth/v1/verify?token=${encodeURIComponent(tokenHash)}&type=${type}&redirect_to=${encodeURIComponent(redirectTo)}`;
+}
+
 async function mailCatcherAvailable(): Promise<boolean> {
   try {
     return (await fetch(`${MAILPIT}/api/v1/messages?limit=1`, { signal: AbortSignal.timeout(2000) })).ok;
@@ -79,7 +94,8 @@ describe.skipIf(!available)("auth email links", () => {
 
   it.skipIf(!mail)("a default (PKCE) reset link only works in the browser that asked for it", async () => {
     const appWebView = jar();
-    const { error } = await browser(appWebView).auth.resetPasswordForEmail(pkceMember.email, { redirectTo: `${SITE}/auth/callback?next=/reset-password` });
+    const redirectTo = `${SITE}/auth/callback?next=/reset-password`;
+    const { error } = await browser(appWebView).auth.resetPasswordForEmail(pkceMember.email, { redirectTo });
     if (error?.status === 429) {
       // The local stack's hourly email limit is shared with every other test run; this proof needs one email.
       console.warn("Skipped: local GoTrue email rate limit reached");
@@ -90,7 +106,8 @@ describe.skipIf(!available)("auth email links", () => {
 
     const link = await latestLinkTo(pkceMember.email, "recovery");
     expect(link, "recovery email in the mail catcher").toBeTruthy();
-    const verify = await fetch(link!, { redirect: "manual" });
+    // The default template's link, for the token this email carries.
+    const verify = await fetch(defaultVerifyLink(emailedTokenHash(link)!, "recovery", redirectTo), { redirect: "manual" });
     const location = new URL(verify.headers.get("location")!);
     expect(location.pathname).toBe("/auth/callback");
     const code = location.searchParams.get("code");
@@ -115,8 +132,9 @@ describe.skipIf(!available)("auth email links", () => {
     }
     expect(error).toBeNull();
     const link = await latestLinkTo(hashMember.email, "recovery");
-    // GoTrue's default link is /verify?token=<the same token hash the templates link with>&type=recovery…
-    const tokenHash = new URL(link!).searchParams.get("token");
+    // The same token hash whichever template sent it (the repository's links /auth/confirm?token_hash=…, the default
+    // /verify?token=…).
+    const tokenHash = emailedTokenHash(link);
     expect(tokenHash).toMatch(/^pkce_[0-9a-f]+$/);
     const safari = browser(jar());
     const verified = await safari.auth.verifyOtp({ type: "recovery", token_hash: tokenHash! });
@@ -163,8 +181,10 @@ describe.skipIf(!available)("auth email links", () => {
     expect(error).toBeNull();
     const userId = signed.user!.id;
     try {
-      const link = await latestLinkTo(email, "signup");
-      const tokenHash = new URL(link!).searchParams.get("token");
+      // type=email in the repository's confirmation template, type=signup in GoTrue's default one.
+      const link = await latestLinkTo(email, "(?:email|signup)");
+      const tokenHash = emailedTokenHash(link);
+      expect(tokenHash, "confirmation email in the mail catcher").toBeTruthy();
       safariCookies.clear();
       const res = await GET(new NextRequest(`${SITE}/auth/confirm?token_hash=${tokenHash}&type=email&next=/onboarding`));
       expect(new URL(res.headers.get("location")!).pathname).toBe("/onboarding");
