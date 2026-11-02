@@ -255,10 +255,42 @@ Severity: Critical, High, Medium, Low. Status: Fixed, Open, Blocked, Unverified.
 | Production dependency audit | — | 0 vulnerabilities | `npm audit --omit=dev` |
 | iOS compile (GitHub macOS runner) | — | pass | Simulator build, unsigned (iOS run 53) |
 | iOS opening and navigation tests in WebKit at iPhone 15 size (GitHub) | **fails** on the unchanged base `claude/exercise-demo-25d` (iOS run 52, `03f815a`) | **pass**, 13 / 13 (iOS run 53, `ae1fc43`) | The base fails because its sign-up helper waits for the wrong confirmation link (an existing break from `e4bf019`). `ae1fc43` fixes the helper. |
-| iOS Simulator app test (XCUITest: launch, Enter Narrow Gate, relaunch, return from the background) | — | **pass** (iOS run 53) | The same job failed in runs 50 (`c9ce6a2`) and 51 (`54880e7`): `test0_freshLaunchPlaysTheOpeningAndEndsByItself` reported "opening not seen" in all 3 tries. Between those runs and run 53, the only iOS change was the workflow file's permissions, pinned actions and WebKit settings. The app, the opening and the XCUITest code were identical. So this test is timing-sensitive on GitHub's Mac runners. Not caused by this branch, but not root-caused either. A Simulator is not a physical iPhone. |
+| iOS Simulator app test (XCUITest: launch, Enter Narrow Gate, relaunch, return from the background) | — | **pass** (iOS run 53) | The same job failed in runs 50 (`c9ce6a2`) and 51 (`54880e7`): `test0_freshLaunchPlaysTheOpeningAndEndsByItself` reported "opening not seen" in all 3 tries. Between those runs and run 53, the only iOS change was the workflow file's permissions, pinned actions and WebKit settings. The app, the opening and the XCUITest code were identical. So this test is timing-sensitive on GitHub's Mac runners. Not caused by this branch; root cause found and fixed afterwards (a bug in the test's own frame scan, see E2). A Simulator is not a physical iPhone. |
 | Payment sandbox (Stripe test mode, App Store sandbox, RevenueCat) | — | **not run** | No accounts |
 | Physical iPhone | — | **not run** | No device |
 | TestFlight | — | **not run** | Needs the owner's Apple account and approval |
+
+
+### E2. Follow-up round (2026-11-02): C8, F14–F19, the Simulator test and the Run page
+
+How each result was obtained is stated as before. The local stack is the same disposable one; nothing hosted was
+touched, no release was replaced, and nothing was merged.
+
+| Check | Result | Notes |
+|---|---|---|
+| Type check, lint | 0 errors; 0 errors and the same 5 warnings | |
+| Unit tests | **2,790 / 2,790** (131 files) | adds `legal-versions-db.test.ts`; `security-headers.test.ts` rewritten for the nonce |
+| Integration tests (local Supabase) | **248 passed, 1 skipped, 0 failed** | new `low-findings.test.ts` (9); `legal-acceptances.test.ts` rewritten (4). The skipped file calls a live outside food service. |
+| Same database tests with the old rules put back | **8 of 8 fail**; with migration 048 re-applied all pass and the schema dump matches the migrated one exactly | F14, F15, F16, F17. The F18 tests depend on the new server code, not the schema. |
+| Production build | pass; every page is now rendered per request (the nonce needs it) | |
+| Browser tests, full suite (Chromium, phone size) | **71 passed, 22 skipped, 2 failed** | Skips: tests that need the mock AI provider or the demo-mode server. Failures: (1) "coach isn't configured" needs a server without an AI key and passes on one (it was run with a placeholder key for the membership tests); (2) `journeys.spec.ts` "filters and scroll position…" fails **5 of 5 on the build from before this round too** (`4422f28`, run side by side): an existing problem, not from these changes, not fixed here. |
+| Coach browser tests with the mock AI provider | **7 passed, 2 skipped** (the skips are by the tests' own conditions) | includes the new "a reply saved while the connection dropped comes back on Try again: one answer, one charge" (one provider call, one usage row) |
+| CSP and phone-layout browser tests (`e2e/csp-and-layout.spec.ts`) | **4 / 4** | no CSP violation on 5 signed-out and 8 signed-in screens; every script tag carries the nonce; 5 responses, 5 nonces; script injected into a page's HTML doesn't run while the page's own scripts do; no sideways scroll at 320–430 px. The layout test failed on the build before the fix (Run page 378 px wide at 320 px). |
+| Workflow lint (actionlint 1.7.12) | clean, all 7 workflows | |
+| Workflow security (zizmor 1.31.1) | the three C8 workflows: 3 findings before, **0** after; all 7 workflows: **0 high, 0 medium** (1 informational: the demo deploy installs a pinned Vercel CLI outside the lockfile) | |
+| Workflow runs on GitHub (this branch, nothing published) | Android APK: build + **dry run** of the publish job (APK downloaded, SHA-256 OK, release untouched). BSB: build + **dry run** (download matched the pinned SHA-256; extracted passages **identical** to `src/data/bsb-passages.json`; release untouched), and a manual run without "publish" (publish job **skipped**). Food database: the first run stopped at the unset pin as designed and printed the download's SHA-256; after pinning, build + **dry run** (download matched; rebuilt file **byte-identical** to `src/data/usda-foods.json`; release untouched). | Releases `android-latest`, `bsb-text` and `food-db` were not replaced. |
+| Secret scan | git history (386 commits, all refs): **0 leaks**. Working tree: findings only in untracked, git-ignored local files (Playwright traces, `.next` build output, `.env.local`, `.demo-credentials.local`), none committed. | gitleaks 8.30.1 |
+| Production dependency audit | **0 vulnerabilities** | `npm audit --omit=dev` |
+| iOS on GitHub, run 54 (`ad54e04`: Simulator test fix, before the CSP) | compile pass; WebKit pass; Simulator **pass** | The runner was saturated (CPU idle 0 % throughout) and the screenshot service stalled 2.1 s, so the fresh-launch test passed by its stall path, now also requiring Skip intro in the accessibility tree (seen at 10.5 s); Enter Narrow Gate was skipped with its reason recorded. The quiet-runner path that used to fail was not exercised. |
+| iOS on GitHub, run 55 (`4d637f0`: everything, CSP included) | compile **pass**; WebKit opening and navigation tests **pass** with the nonce CSP; Simulator: still running when this was written (updated below if it finishes) | |
+| Payment sandbox, physical iPhone, TestFlight, hosted Supabase | **not run** | unchanged: needs the owner's accounts and a device |
+
+**Simulator test root cause (from the logs of runs 46–53, replayed in a script):** `test0` scanned its film of the
+launch only until the first frame that looked like the welcome page. The opening passes through that brightness band
+for about a third of a second while the door opens, so a quiet runner (0.2–0.3 s per frame) usually caught one frame
+there and stopped before the door was open: "opening not seen" although the opening played (Skip intro was in the
+accessibility tree and the contact sheets show gate-open → light → welcome). Busy runners skipped the band and passed.
+Fixed in `74724d9`, plus a saturation guard for `test1` (run 52 failed it with 2.3 s per frame and the CPU idle 0 %).
 
 ---
 
@@ -275,6 +307,14 @@ Severity: Critical, High, Medium, Low. Status: Fixed, Open, Blocked, Unverified.
 | `54880e7` | Auth rate limits: test runs can raise them; no shared counter without a client address |
 | `07254e5` | CI hardening: secret scanning, least-privilege tokens, pinned actions, scoped signing secrets; `docs/security/DATABASE_AUDIT.md` |
 | `ae1fc43` | e2e: follow the confirmation link the app's email template sends (an existing break from `e4bf019`) |
+| `426b7f4`, `d809738` | C8: read-only build jobs and separate publish jobs in `android-apk`, `bsb-text`, `food-db`; pinned, HTTPS-only downloads; no stored token or shared cache elsewhere (C10) |
+| `74724d9` | iOS Simulator test: the fresh-launch check no longer stops mid-opening; stall path checks the accessibility tree; saturation guard for Enter Narrow Gate |
+| `ad54e04` | `ios.yml`: checkouts don't keep the token; no shared npm cache in the TestFlight job |
+| `a33f2b4` | F19: per-request nonce CSP, no `'unsafe-inline'` for scripts |
+| `22dbcb8` | Run page and program week bars fit the phone; `e2e/csp-and-layout.spec.ts` |
+| `f7d5f9a` | F14–F17: migration `20261102000048_low_findings_hardening.sql`, server-written legal records, tests |
+| `d1c3f4a` | F18: AI request ids (saved reply on retry, 409 while in progress) |
+| `4ea36cc` | Tests: auth email links read the link the current templates send (an existing break from `e4bf019`) |
 
 **New files:**
 - Migrations: `supabase/migrations/20261101000046_billing_integrity.sql` and
@@ -321,10 +361,12 @@ npm run build && npx playwright test --project=mobile   # set ANTHROPIC_API_KEY 
 | **App Store Connect / Apple Developer** | Create the subscription group and the two products (`ngf_pro_monthly`, `ngf_pro_yearly`, or set `REVENUECAT_PRODUCTS_*` to the real ids) at the approved prices; In-App Purchase capability on the App ID; signing; sandbox testers; privacy labels; the TestFlight build (`ios.yml`, job `testflight`, with the four secrets it names) |
 | **RevenueCat dashboard** | Project, iOS app with the App Store shared secret / API key, entitlement `pro`, offering with monthly and yearly; webhook URL `/api/revenuecat/webhook` with a long random `Authorization` value matching `REVENUECAT_WEBHOOK_AUTH`; transfer behaviour "transfer to new App User ID" (what the tests assume) |
 | **Stripe dashboard** | Test-mode prices ($19.99/month, $149.99/year), webhook endpoint and secret, Billing Portal settings; then a test-mode run of checkout, renewal, cancellation, refund and dispute against a deployed staging app |
-| **Supabase (hosted staging and production)** | Apply migrations 046 and 047; confirm `supabase migration list`; run the integration suite against staging with disposable accounts; set auth settings to match `supabase/config.toml` (email confirmation on, secure password change, refresh-token rotation, password length) |
+| **Supabase (hosted staging and production)** | Apply migrations 046, 047 and 048; confirm `supabase migration list`; run the integration suite against staging with disposable accounts; set auth settings to match `supabase/config.toml` (email confirmation on, secure password change, refresh-token rotation, password length) |
 | **Hosting** | Set `CRON_SECRET` and call `/api/billing/reconcile` every 30 minutes; keep `AUTH_RATE_LIMIT_SCALE` unset; keep `DEMO_MODE` unset |
 | **A physical iPhone** (several models if possible) | Everything in section 7.3 of the brief: install, sign-up, onboarding, purchase, restore, account switch, camera, GPS, Health, notifications, background/foreground, offline, deletion |
 | **15+ TestFlight testers** | Recruit, feedback channel, crash reports |
+| **Deployed site (Vercel staging)** | Open the main screens with the browser console open and confirm no Content-Security-Policy errors with the real Supabase URL (the policy is now per request); confirm pages still load quickly now that every page renders per request |
+| **Release workflows** | A manual run of `bsb-text` or `food-db` now publishes only with "publish" ticked (pushes to the listed branches publish as before). If the Berean Bible or USDA republishes their files, review them and update the pinned SHA-256 in the workflow. |
 
 ---
 
@@ -332,10 +374,10 @@ npm run build && npx playwright test --project=mobile   # set ANTHROPIC_API_KEY 
 
 **UNVERIFIED — ESSENTIAL TESTING OR ACCESS IS MISSING**
 
-- **The code side.** All known Critical and High issues found here are fixed and covered by tests that failed before
-  the fixes. The remaining app findings are Low (F14–F19). One Medium CI finding stays open (C8: three workflows
-  with write access across the whole workflow and unchecked downloads). It changes how release files are published,
-  so it's left for the owner's decision.
+- **The code side.** All known Critical, High, Medium and Low issues found here are fixed (F1–F19, C1–C8, C10) and
+  covered by tests; the database ones fail with the old rules put back. Left open: C9 (repository settings only the
+  owner can see), the broader `anon` write revokes in DB audit L6, the development-only dependency advisories, and an
+  existing browser test that fails on the old build as well (`journeys.spec.ts` scroll position).
 - **What is still unproven.**
   - Real payments: no sandbox purchase through the App Store or Stripe test mode has been made against a deployed app.
   - A real iPhone: none has run the app.
