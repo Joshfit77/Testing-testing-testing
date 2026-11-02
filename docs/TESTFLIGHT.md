@@ -1,6 +1,9 @@
 # TestFlight: first internal beta
 
-Branch: `claude/testflight-prep` (the cinematic opening from `claude/animated-opening-demo` merged with the app work
+Current branch: `security/payment-hardening-prelaunch`, which contains all of `claude/testflight-prep` and everything since. The
+owner's step-by-step from the LLC onwards is [TESTFLIGHT_SETUP_GUIDE.md](TESTFLIGHT_SETUP_GUIDE.md).
+
+Originally written on `claude/testflight-prep` (the cinematic opening from `claude/animated-opening-demo` merged with the app work
 on `claude/sharp-cray-8y0uuv`). Nothing here has been deployed or uploaded.
 
 ## How the iPhone app works
@@ -34,7 +37,7 @@ an error, so a build can't point at a placeholder.
 1. Create a Supabase project; apply the migrations (`npx supabase link`, `npx supabase db push`).
 2. In Supabase > Authentication > URL configuration, set the Site URL to your app address and add it to the
    redirect URLs.
-3. Create the hosting project (Vercel: import the repository, framework Next.js, branch `claude/testflight-prep`).
+3. Create the hosting project (Vercel: import the repository, framework Next.js, branch `security/payment-hardening-prelaunch` or whichever branch you approve).
 4. Set the environment variables from `.env.example`, with payments in test mode:
    - `NEXT_PUBLIC_SITE_URL` = your app address; Supabase URL, anon key and service-role key.
    - Stripe **test** keys only (`sk_test_...`); leave `STRIPE_LIVE_APPROVED=false` (live keys are ignored without it).
@@ -63,7 +66,7 @@ an error, so a build can't point at a placeholder.
 2. GitHub > the repository > Settings > Secrets and variables > Actions > New repository secret. Add:
    `APPLE_TEAM_ID`, `ASC_KEY_ID`, `ASC_ISSUER_ID`, and `ASC_KEY_P8_BASE64` (on a Mac: `base64 -i AuthKey_XXXX.p8 | pbcopy`).
    Enter them only there, never in chat, issues or files.
-3. Actions > iOS > Run workflow: branch `claude/testflight-prep`, job `testflight`, `server_url` = your deployed
+3. Actions > iOS > Run workflow: the branch deployed to staging, job `testflight`, `server_url` = your deployed
    address, **upload unticked**. This checks the site (health, the current opening) and signs the build without
    sending anything to Apple.
 4. When that passes, run it again with **upload ticked**.
@@ -74,7 +77,7 @@ an error, so a build can't point at a placeholder.
 
 ### 3b. Upload with Xcode (on a Mac)
 
-1. Install Xcode (latest), Node 22, then: `git clone` the repository, `git checkout claude/testflight-prep`, `npm ci`.
+1. Install Xcode (latest), Node 22, then: `git clone` the repository, `git checkout security/payment-hardening-prelaunch`, `npm ci`.
 2. `CAP_SERVER_URL=https://<your address> npx cap sync ios`, then `npx cap open ios`.
 3. In Xcode: target **App** > Signing & Capabilities: tick *Automatically manage signing*, choose your Team, check the
    bundle ID, and that **HealthKit** is listed.
@@ -89,11 +92,18 @@ Security), choose it in Xcode and press **Run**. With `CAP_SERVER_URL` pointing 
 loads it; for a site running on your Mac use `CAP_SERVER_URL=http://<your Mac's LAN address>:3000
 CAP_ALLOW_CLEARTEXT=true` (local testing only).
 
-## Automated checks (every push to `claude/testflight-prep`)
+## Automated checks (pushes to the listed branches, or Run workflow with job = checks)
 
 `.github/workflows/ios.yml`, no Apple account needed:
 
 - **compile**: the offline edition compiles for the Simulator.
+- **archive-check**: the online app (the TestFlight configuration) is archived unsigned in Release for a real
+  iPhone. `scripts/ios-verify/check-archive.py` then checks:
+  - Xcode 26 and the iOS 26 SDK or later, Apple's minimum since 28 April 2026, from a released (not beta) Xcode;
+  - bundle ID, version and build number;
+  - arm64;
+  - permission texts, privacy manifest and icon;
+  - HTTPS only, and the offline page.
 - **app-in-simulator**: builds and serves the full web app on the build Mac, points the iPhone app at it, opens it
   once in an iPhone simulator (the first launch after installing is slow on CI), waits for the machine to settle,
   then runs XCUITest (`scripts/ios-verify`): a fresh launch left alone is filmed, Enter Narrow Gate is pressed
