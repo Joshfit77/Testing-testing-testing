@@ -9,7 +9,11 @@ export function safeNextPath(value: unknown, fallback = "/home"): string {
   try {
     const url = new URL(value, base);
     if (url.origin !== base) return fallback;
-    return `${url.pathname}${url.search}${url.hash}`;
+    const path = `${url.pathname}${url.search}${url.hash}`;
+    // Resolving dot segments can itself make a protocol-relative address: "/.//evil.com" and "/a/..//evil.com" have the
+    // pathname "//evil.com", which a browser sends to evil.com. The result must still be a single-slash path.
+    if (!path.startsWith("/") || path.startsWith("//") || path.includes("\\")) return fallback;
+    return path;
   } catch {
     return fallback;
   }

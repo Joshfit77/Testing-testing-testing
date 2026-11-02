@@ -35,6 +35,9 @@ describe("auth link routes", () => {
     exchangeCodeForSession.mockResolvedValue({ error: null });
     expect(location(await callback(at("/auth/callback?next=/reset-password&code=abc")))).toBe("/reset-password");
     expect(location(await callback(at("/auth/callback?next=//evil.example&code=abc")))).toBe("/home");
+    expect(location(await callback(at("/auth/callback?next=/.//evil.example&code=abc")))).toBe("/home");
+    verifyOtp.mockResolvedValue({ error: null });
+    expect(location(await confirm(at("/auth/confirm?token_hash=pkce_abc&type=email&next=/a/..//evil.example")))).toBe("/onboarding");
   });
 
   it("never passes the provider's or an attacker's error text on to the sign-in page", async () => {

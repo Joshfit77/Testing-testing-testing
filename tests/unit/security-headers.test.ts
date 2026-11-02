@@ -72,7 +72,13 @@ describe("post-login redirects stay on this site", () => {
   it.each(["https://evil.example", "//evil.example", "/\\evil.example", "javascript:alert(1)", "/home\r\nSet-Cookie: x=1", "/\t/evil.example", "/%09/evil.example".replace("%09", "\t"), "/\u0000/evil.example", "/a\\b", 42, null])("rejects %s", (v) => {
     expect(safeNextPath(v)).toBe("/home");
   });
+  // Dot segments resolve to a protocol-relative address ("//evil.example"), which a browser sends to that host.
+  it.each(["/.//evil.example", "/a/..//evil.example", "/..//evil.example", "/%2e//evil.example", "/%2E%2E//evil.example", "/x/./..//evil.example"])("rejects %s, which resolves to //evil.example", (v) => {
+    expect(safeNextPath(v)).toBe("/home");
+    expect(new URL(safeNextPath(v), "https://app.narrowgate.test").host).toBe("app.narrowgate.test");
+  });
   it("keeps same-site paths with their query", () => {
+    expect(safeNextPath("/x/../home")).toBe("/home");
     expect(safeNextPath("/train/programs?goal=strength")).toBe("/train/programs?goal=strength");
     expect(safeNextPath("/progress/badges?tab=faith#cedar")).toBe("/progress/badges?tab=faith#cedar");
   });
