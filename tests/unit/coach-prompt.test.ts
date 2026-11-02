@@ -11,7 +11,7 @@ import {
   SAFETY_RULES,
   SUPPLEMENT_KNOWLEDGE,
 } from "@/lib/coach/knowledge";
-import { buildSystemBlocks, fallbackParams, sanitizeAssistantContent } from "@/lib/coach/prompt";
+import { buildSystemBlocks, fallbackParams, fitStoredReply, PLAN_REQUEST_OPTIONS, REPLY_MAX_CHARS, sanitizeAssistantContent } from "@/lib/coach/prompt";
 
 const words = (s: string) => s.split(/\s+/).filter(Boolean).length;
 
@@ -126,5 +126,28 @@ describe("prompt assembly", () => {
     expect(sanitizeAssistantContent(content).map((b) => b.type)).toEqual(["text", "fallback", "tool_use"]);
     const plain = [{ type: "text", text: "Hi", citations: null }] as unknown as Anthropic.Beta.BetaContentBlock[];
     expect(sanitizeAssistantContent(plain)).toBe(plain);
+  });
+});
+
+describe("saved replies and plan requests (AI audit D3, D4)", () => {
+  const NOTE = "_(Response shortened — ask me to continue.)_";
+  it("saves a reply whole when it fits, and ends a longer one with the shortened note at a word break", () => {
+    expect(fitStoredReply("Squat 3 × 5 @ RPE 7.")).toBe("Squat 3 × 5 @ RPE 7.");
+    const long = "brace ".repeat(15_000);
+    const saved = fitStoredReply(long);
+    expect(saved.length).toBeLessThanOrEqual(REPLY_MAX_CHARS);
+    expect(saved.endsWith(NOTE)).toBe(true);
+    expect(saved.slice(0, -NOTE.length).trimEnd().endsWith("brace")).toBe(true);
+  });
+  it("keeps a reply that already ends with the note, and never cuts the note itself", () => {
+    const already = `${"x".repeat(REPLY_MAX_CHARS - NOTE.length)}${NOTE}`;
+    expect(fitStoredReply(already)).toBe(already);
+    const noSpaces = "x".repeat(REPLY_MAX_CHARS + 5000);
+    expect(fitStoredReply(noSpaces).endsWith(NOTE)).toBe(true);
+    expect(fitStoredReply(noSpaces).length).toBeLessThanOrEqual(REPLY_MAX_CHARS);
+  });
+  it("sends a plan once, inside the route's 180 s limit", () => {
+    expect(PLAN_REQUEST_OPTIONS.maxRetries).toBe(0);
+    expect(PLAN_REQUEST_OPTIONS.timeout).toBeLessThan(180_000);
   });
 });

@@ -9,7 +9,7 @@ import { aiAllowance } from "@/lib/domain/plans";
 import type { Plan } from "@/lib/domain/types";
 import { aiPlanOutputSchema, validateAiPlan, type AiPlan } from "@/lib/validation/ai";
 import { formatAthleteContext, type AthleteSnapshot } from "@/lib/coach/context";
-import { buildSystemBlocks, CHAT_MAX_TOKENS, fallbackParams, MAX_TOOL_ROUNDS, PLAN_MAX_TOKENS, sanitizeAssistantContent } from "@/lib/coach/prompt";
+import { buildSystemBlocks, CHAT_MAX_TOKENS, fallbackParams, fitStoredReply, MAX_TOOL_ROUNDS, PLAN_MAX_TOKENS, PLAN_REQUEST_OPTIONS, sanitizeAssistantContent } from "@/lib/coach/prompt";
 import { coachModelIds, routeCoachRequest, type ModelTier } from "@/lib/coach/routing";
 import { coachToolDefinitions, toolActivityLabel, type CoachProposal } from "@/lib/coach/tools";
 import { formatMemoriesForContext } from "@/lib/coach/memory";
@@ -226,7 +226,12 @@ export type CoachEvent =
   | { type: "text"; delta: string }
   | { type: "reset" };
 
-const REFUSAL_REPLY = "I can't help with that request. I'm happy to help with training, technique, recovery or general nutrition questions instead.";
+/** Anthropic's "overloaded" answer (HTTP 529): the service is busy, which the member is told as such. */
+function isOverloaded(err: unknown): boolean {
+  return err instanceof Anthropic.APIError && err.status === 529;
+}
+
+const REFUSAL_REPLY ="I can't help with that request. I'm happy to help with training, technique, recovery or general nutrition questions instead.";
 
 interface ChatLoopResult {
   reply: string;
@@ -485,7 +490,7 @@ export async function coachTurn(params: {
           output_config: { effort: "medium", format: betaZodOutputFormat(aiPlanOutputSchema) },
           ...fallbackParams(model),
         },
-        { signal: params.signal },
+        { signal: params.signal, ...PLAN_REQUEST_OPTIONS },
       );
       inputTokens = res.usage.input_tokens + (res.usage.cache_read_input_tokens ?? 0) + (res.usage.cache_creation_input_tokens ?? 0);
       outputTokens = res.usage.output_tokens;
@@ -514,7 +519,7 @@ export async function coachTurn(params: {
       logError("ai.provider_auth", err, { status: err.status ?? null });
       throw new AiError("not_configured", "The AI coach isn't configured correctly on this server (the AI provider rejected its key).");
     }
-    if (err instanceof Anthropic.RateLimitError) throw new AiError("rate_limited", "The AI service is busy. Please try again shortly.", 30);
+    if (err instanceof Anthropic.RateLimitError || isOverloaded(err)) throw new AiError("rate_limited", "The AI service is busy. Please try again shortly.", 30);
     if (err instanceof Anthropic.APIConnectionError) throw new AiError("provider", "Couldn't reach the AI service. Please try again.");
     if (err instanceof Anthropic.APIError) {
       logError("ai.provider", err, { status: err.status ?? null });
@@ -532,7 +537,7 @@ export async function coachTurn(params: {
       conversation_id: conversationId,
       user_id: userId,
       role: "assistant",
-      content: (reply || "Sorry — I didn't get a response. Please try again.").slice(0, 20_000),
+      content: fitStoredReply(reply || "Sorry — I didn't get a response. Please try again."),
       proposal,
       proposal_status: proposal ? "proposed" : null,
       request_id: requestId,
@@ -575,7 +580,7 @@ export async function withAiRequest<T>(
       logError("ai.provider_auth", err, { status: err.status ?? null });
       throw new AiError("not_configured", "The AI service isn't configured correctly on this server.");
     }
-    if (err instanceof Anthropic.RateLimitError) throw new AiError("rate_limited", "The AI service is busy. Please try again shortly.", 30);
+    if (err instanceof Anthropic.RateLimitError || isOverloaded(err)) throw new AiError("rate_limited", "The AI service is busy. Please try again shortly.", 30);
     if (err instanceof Anthropic.APIConnectionError) throw new AiError("provider", "Couldn't reach the AI service. Please try again.");
     if (err instanceof Anthropic.APIError) {
       logError("ai.provider", err, { status: err.status ?? null, kind: params.kind });

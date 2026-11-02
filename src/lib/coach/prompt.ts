@@ -21,6 +21,28 @@ export const CHAT_MAX_TOKENS = 12_000;
 export const PLAN_MAX_TOKENS = 16_000;
 /** Upper bound on model round-trips per user message (each tool batch is one round-trip). */
 export const MAX_TOOL_ROUNDS = 6;
+/**
+ * Plan generation is one request, sent once: the SDK's automatic retries could re-send a slow or failed plan (each
+ * attempt billed) past the route's 180 s limit, which then ended the function mid-retry. A failed plan is reported at
+ * once and the member can try again.
+ */
+export const PLAN_REQUEST_OPTIONS = { timeout: 150_000, maxRetries: 0 } as const;
+
+/** Longest reply saved (matches the `ai_messages.content` check, migration 049). */
+export const REPLY_MAX_CHARS = 60_000;
+const SHORTENED_NOTE = "_(Response shortened — ask me to continue.)_";
+/**
+ * The reply as it is saved: whole when it fits; otherwise cut at a line or word break with the "shortened" note at the
+ * end, so the note itself is never what gets cut.
+ */
+export function fitStoredReply(reply: string, max = REPLY_MAX_CHARS): string {
+  if (reply.length <= max) return reply;
+  if (reply.endsWith(SHORTENED_NOTE) && reply.length - SHORTENED_NOTE.length <= max) return reply;
+  const room = max - SHORTENED_NOTE.length - 2;
+  const head = reply.slice(0, room);
+  const cut = Math.max(head.lastIndexOf("\n"), head.lastIndexOf(" "));
+  return `${(cut > room * 0.8 ? head.slice(0, cut) : head).trimEnd()}\n\n${SHORTENED_NOTE}`;
+}
 
 export function buildSystemBlocks(opts: { faithEnabled: boolean; contextText: string; memoryText?: string | null }): Anthropic.Beta.BetaTextBlockParam[] {
   const blocks: Anthropic.Beta.BetaTextBlockParam[] = [{ type: "text", text: COACH_STATIC_PROMPT, cache_control: { type: "ephemeral" } }];
