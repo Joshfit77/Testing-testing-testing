@@ -3,26 +3,37 @@
  * NOT shared with the AI coach unless the user ticks "Share with AI Coach" on that entry (off by default).
  */
 
-export const JOURNAL_KINDS = ["reflection", "request", "praise"] as const;
+export const JOURNAL_KINDS = ["daily", "request", "intercession", "praise", "confession", "reflection"] as const;
 export type JournalKind = (typeof JOURNAL_KINDS)[number];
 
 export const JOURNAL_KIND_LABELS: Record<JournalKind, string> = {
-  reflection: "Reflection",
+  daily: "Daily prayer",
   request: "Prayer request",
+  intercession: "For others",
   praise: "Praise / thanksgiving",
+  confession: "Confession",
+  reflection: "Reflection",
 };
 
-export const JOURNAL_FILTERS = ["all", "request", "open", "answered", "praise", "reflection", "shared"] as const;
+/** Kinds that can be marked answered. */
+export const ANSWERABLE_KINDS: readonly JournalKind[] = ["request", "intercession"];
+export const isAnswerable = (k: string | null | undefined) => (ANSWERABLE_KINDS as readonly string[]).includes(k ?? "");
+
+export const JOURNAL_FILTERS = ["all", "daily", "request", "intercession", "open", "answered", "praise", "confession", "reflection", "shared", "archived"] as const;
 export type JournalFilter = (typeof JOURNAL_FILTERS)[number];
 
 export const JOURNAL_FILTER_LABELS: Record<JournalFilter, string> = {
   all: "All",
+  daily: "Daily",
   request: "Requests",
+  intercession: "For others",
   open: "Still praying",
   answered: "Answered",
   praise: "Praise",
+  confession: "Confession",
   reflection: "Reflections",
   shared: "Shared with coach",
+  archived: "Archived",
 };
 
 export function parseJournalFilter(v: string | undefined): JournalFilter {

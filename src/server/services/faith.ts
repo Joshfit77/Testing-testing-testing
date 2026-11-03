@@ -34,7 +34,8 @@ export interface JournalRow {
   answered_on: string | null;
   answered_note: string | null;
   share_with_coach: boolean;
+  archived_at: string | null;
   updated_at: string;
 }
 
-export const JOURNAL_SELECT = "id, entry_date, kind, theme, scripture_ref, title, body, answered_on, answered_note, share_with_coach, updated_at";
+export const JOURNAL_SELECT = "id, entry_date, kind, theme, scripture_ref, title, body, answered_on, answered_note, share_with_coach, archived_at, updated_at";

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Bot, CheckCircle2, ChevronRight, HandHeart } from "lucide-react";
-import { JOURNAL_KIND_LABELS } from "@/lib/domain/journal";
+import { isAnswerable, JOURNAL_KIND_LABELS } from "@/lib/domain/journal";
 import type { JournalRow } from "@/server/services/faith";
 
 export function formatJournalDate(iso: string): string {
@@ -9,7 +9,7 @@ export function formatJournalDate(iso: string): string {
 
 /** One journal entry in a list; opens the entry. */
 export function JournalEntryCard({ entry }: { entry: Pick<JournalRow, "id" | "entry_date" | "kind" | "title" | "body" | "scripture_ref" | "answered_on" | "share_with_coach"> }) {
-  const answered = entry.kind === "request" && entry.answered_on;
+  const answered = isAnswerable(entry.kind) && entry.answered_on;
   return (
     <Link href={`/faith/journal/${entry.id}`} className="flex min-h-16 items-start gap-3 rounded-2xl border border-border bg-card p-4 hover:border-gold-muted">
       <span className="min-w-0 flex-1">
@@ -21,7 +21,7 @@ export function JournalEntryCard({ entry }: { entry: Pick<JournalRow, "id" | "en
             <span className="inline-flex items-center gap-1 rounded-full border border-[#5fc49a]/50 px-2 py-0.5 font-semibold text-[#5fc49a]">
               <CheckCircle2 className="size-3" aria-hidden /> Answered
             </span>
-          ) : entry.kind === "request" ? (
+          ) : isAnswerable(entry.kind) ? (
             <span className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5">
               <HandHeart className="size-3" aria-hidden /> Still praying
             </span>

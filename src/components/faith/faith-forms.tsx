@@ -25,10 +25,10 @@ export interface JournalEntryInput {
   share_with_coach: boolean;
 }
 
-const BODY_LABEL: Record<JournalKind, string> = { reflection: "Reflection", request: "Prayer", praise: "Praise" };
+const BODY_LABEL: Record<JournalKind, string> = { daily: "Prayer", request: "Prayer", intercession: "Who and what you're praying for", praise: "Thanks and praise", confession: "Confession", reflection: "Reflection" };
 
 /** New or edit prayer-journal entry. Unsaved text is kept as a device-only draft until it is saved. */
-export function JournalForm({ today, entry, defaultRef, onSaved }: { today: string; entry?: JournalEntryInput; defaultRef?: string; onSaved?: () => void }) {
+export function JournalForm({ today, entry, defaultRef, defaultKind, onSaved }: { today: string; entry?: JournalEntryInput; defaultRef?: string; defaultKind?: JournalKind; onSaved?: () => void }) {
   const router = useRouter();
   const [state, action] = useActionState(saveJournalEntryAction, initialActionState);
   const id = entry?.id ?? "new";
@@ -36,16 +36,16 @@ export function JournalForm({ today, entry, defaultRef, onSaved }: { today: stri
   const blank = useMemo(
     () => ({
       entryDate: entry?.entry_date ?? today,
-      kind: (entry?.kind ?? "reflection") as JournalKind,
+      kind: (entry?.kind ?? defaultKind ?? "reflection") as JournalKind,
       theme: entry?.theme ?? "",
       scriptureRef: entry?.scripture_ref ?? defaultRef ?? "",
       title: entry?.title ?? "",
       body: entry?.body ?? "",
       share: entry?.share_with_coach ?? false,
     }),
-    [entry, today, defaultRef],
+    [entry, today, defaultRef, defaultKind],
   );
-  const draft = useDraft(`faith.journal.${id}`, blank);
+  const draft = useDraft(`faith.journal.${id}${defaultKind && !entry ? `.${defaultKind}` : ""}`, blank);
   const v = draft.value;
   const set = (k: Exclude<keyof typeof blank, "share">) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     draft.setValue((d) => ({ ...d, [k]: e.target.value }));
@@ -82,7 +82,7 @@ export function JournalForm({ today, entry, defaultRef, onSaved }: { today: stri
       </fieldset>
       <div className="space-y-1">
         <Label htmlFor={`j-title-${id}`}>Title (optional)</Label>
-        <Input id={`j-title-${id}`} name="title" maxLength={120} value={v.title} onChange={set("title")} placeholder={kind === "request" ? "e.g. Mum's recovery" : undefined} />
+        <Input id={`j-title-${id}`} name="title" maxLength={120} value={v.title} onChange={set("title")} placeholder={kind === "request" || kind === "intercession" ? "e.g. Mum's recovery" : undefined} />
       </div>
       <div className="space-y-1">
         <Label htmlFor={`j-body-${id}`}>{BODY_LABEL[kind]}</Label>
@@ -184,4 +184,10 @@ export function CustomPracticeForm() {
 export function EditJournalEntry({ entry, today }: { entry: JournalEntryInput; today: string }) {
   const router = useRouter();
   return <JournalForm today={today} entry={entry} onSaved={() => router.replace(`/faith/journal/${entry.id}`)} />;
+}
+
+/** A new entry on its own screen (e.g. from the journey's "Write a prayer"); returns to `returnTo` once saved. */
+export function NewJournalEntry({ today, kind, scriptureRef, returnTo }: { today: string; kind?: JournalKind; scriptureRef?: string; returnTo: string }) {
+  const router = useRouter();
+  return <JournalForm today={today} defaultKind={kind} defaultRef={scriptureRef} onSaved={() => router.replace(returnTo)} />;
 }

@@ -304,7 +304,7 @@ export const FAITH_THEMES = ["perseverance", "humility", "discipline", "self_con
 
 export const journalEntrySchema = z.object({
   entryDate: isoDate,
-  kind: z.enum(["reflection", "request", "praise"]).default("reflection"),
+  kind: z.enum(["daily", "request", "intercession", "praise", "confession", "reflection"]).default("reflection"),
   theme: z.enum(FAITH_THEMES).nullable(),
   scriptureRef: z.string().trim().max(80).optional().default(""),
   title: z.string().trim().max(120).optional().default(""),

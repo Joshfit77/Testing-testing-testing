@@ -3,6 +3,8 @@
 import { z } from "zod";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { isValidChapter } from "@/lib/bible/books";
+import { formatReference, parseReference } from "@/lib/bible/reference";
+import { reviewOutcome, type ReviewResult } from "@/lib/faith/memory";
 import { isoDateInTz } from "@/lib/domain/dates";
 import { getProfile, requireUser } from "@/server/auth";
 import { lastVerse } from "@/server/bible/text";
@@ -203,4 +205,45 @@ export async function addMemoryVerseAction(bookId: string, chapter: number, vers
     return fail("Couldn't save the verse.");
   }
   return { ok: true };
+}
+
+/** Save a passage to memory by typing its reference (one chapter, up to 30 verses). */
+export async function addMemoryByReferenceAction(_prev: { ok: boolean; message?: string }, formData: FormData): Promise<{ ok: boolean; message?: string }> {
+  const raw = String(formData.get("reference") ?? "").slice(0, 60);
+  const ref = parseReference(raw);
+  if (!ref || ref.chapterEnd !== undefined) return { ok: false, message: "Type a reference in one chapter, like Romans 8:28 or Psalm 23:1–3." };
+  const start = ref.verseStart ?? 1;
+  const end = ref.verseEnd ?? ref.verseStart ?? Math.min(lastVerse(ref.bookId, ref.chapter), start + 29);
+  const r = await addMemoryVerseAction(ref.bookId, ref.chapter, start, end);
+  return r.ok ? { ok: true, message: `${formatReference({ ...ref, verseStart: start, verseEnd: end === start ? undefined : end })} saved.` } : { ok: false, message: r.error };
+}
+
+/** Record one practice of a memory verse; the level and next review follow src/lib/faith/memory.ts. */
+export async function reviewMemoryAction(id: string, result: ReviewResult): Promise<BibleActionResult & { level?: number; status?: string; nextReviewOn?: string }> {
+  const user = await requireUser();
+  if (!z.string().uuid().safeParse(id).success || (result !== "remembered" && result !== "struggled")) return fail("Invalid review.");
+  const supabase = await getServerSupabase();
+  const { data: row } = await supabase.from("scripture_memory").select("level, status, review_count").eq("id", id).eq("user_id", user.id).maybeSingle();
+  if (!row) return fail("Verse not found.");
+  const profile = await getProfile(user.id);
+  const today = isoDateInTz(new Date(), profile?.timezone ?? "UTC");
+  const out = reviewOutcome(row.level as number, result, today, row.status as "learning" | "memorized");
+  const { error } = await supabase
+    .from("scripture_memory")
+    .update({ level: out.level, status: out.status, next_review_on: out.nextReviewOn, review_count: (row.review_count as number) + 1, last_reviewed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("user_id", user.id);
+  if (error) {
+    logError("bible.memory.review", error);
+    return fail("Couldn't save your practice.");
+  }
+  return { ok: true, ...out };
+}
+
+export async function deleteMemoryAction(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const id = z.string().uuid().safeParse(formData.get("id"));
+  if (!id.success) return;
+  const supabase = await getServerSupabase();
+  await supabase.from("scripture_memory").delete().eq("id", id.data).eq("user_id", user.id);
 }

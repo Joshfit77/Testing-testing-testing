@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { actionError, actionInvalid, actionOk, type ActionState } from "@/lib/action-state";
 import { isoDateInTz } from "@/lib/domain/dates";
+import { ANSWERABLE_KINDS, isAnswerable } from "@/lib/domain/journal";
 import { canCheckIn, isPresetPractice, PRACTICE_INFO } from "@/lib/domain/practices";
 import { FAITH_REMINDER_KINDS, faithReminderFromRow, normalizeWeekdays, type FaithReminder } from "@/lib/faith-reminders";
 import { customPracticeSchema, faithRemindersSchema, journalEntrySchema, prayerAnsweredSchema } from "@/lib/validation/schemas";
@@ -49,7 +50,7 @@ export async function saveJournalEntryAction(_prev: ActionState, formData: FormD
   };
   if (id.success) {
     // An answered prayer stays answered only while it is a prayer request.
-    const patch = row.kind === "request" ? row : { ...row, answered_on: null, answered_note: null };
+    const patch = isAnswerable(row.kind) ? row : { ...row, answered_on: null, answered_note: null };
     const { data, error } = await supabase.from("faith_journal_entries").update(patch).eq("id", id.data).eq("user_id", user.id).select("id");
     if (error || !data?.length) {
       if (error) logError("faith.journal", error);
@@ -85,7 +86,7 @@ export async function markPrayerAnsweredAction(_prev: ActionState, formData: For
     .update({ answered_on: parsed.data.answeredOn, answered_note: parsed.data.note || null })
     .eq("id", parsed.data.id)
     .eq("user_id", user.id)
-    .eq("kind", "request")
+    .in("kind", [...ANSWERABLE_KINDS])
     .select("id");
   if (error || !data?.length) {
     if (error) logError("faith.answered", error);
@@ -100,6 +101,19 @@ export async function clearPrayerAnsweredAction(formData: FormData): Promise<voi
   if (!id.success) return;
   const supabase = await getServerSupabase();
   await supabase.from("faith_journal_entries").update({ answered_on: null, answered_note: null }).eq("id", id.data).eq("user_id", user.id);
+}
+
+/** Archive (hide from the journal without deleting) or restore an entry. */
+export async function setJournalArchivedAction(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const id = uuid.safeParse(formData.get("id"));
+  if (!id.success) return;
+  const supabase = await getServerSupabase();
+  await supabase
+    .from("faith_journal_entries")
+    .update({ archived_at: formData.get("archived") === "true" ? new Date().toISOString() : null })
+    .eq("id", id.data)
+    .eq("user_id", user.id);
 }
 
 export async function setJournalShareAction(formData: FormData): Promise<void> {
@@ -191,4 +205,25 @@ export async function saveFaithRemindersAction(input: FaithReminder[]): Promise<
     return actionError("Couldn't save your reminders. Please try again.");
   }
   return { ...actionOk("Saved."), reminders: await getFaithRemindersAction() };
+}
+
+// ---------------------------------------------------------------------------- Daily goals (optional)
+
+/**
+ * Tick or untick today's optional Faith challenge or Fitness goal (the member's own local date). These are tracked on
+ * their own and never affect a reading journey.
+ */
+export async function toggleDailyGoalAction(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const kind = formData.get("kind");
+  if (kind !== "faith_challenge" && kind !== "fitness") return;
+  const today = await userToday(user.id);
+  const supabase = await getServerSupabase();
+  const { data } = await supabase.from("faith_daily_goals").select("kind").eq("user_id", user.id).eq("goal_date", today).eq("kind", kind).maybeSingle();
+  if (data) {
+    await supabase.from("faith_daily_goals").delete().eq("user_id", user.id).eq("goal_date", today).eq("kind", kind);
+    return;
+  }
+  const { error } = await supabase.from("faith_daily_goals").insert({ user_id: user.id, goal_date: today, kind });
+  if (error && error.code !== "23505") logError("faith.daily_goal", error);
 }

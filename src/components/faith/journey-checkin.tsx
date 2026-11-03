@@ -1,0 +1,182 @@
+"use client";
+
+import { useCallback, useEffect, useState, useTransition } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { BookOpen, CheckCircle2, Circle, CloudOff, HandHeart, Undo2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/toaster";
+import { DRAFT_PREFIX } from "@/lib/drafts";
+import { cn } from "@/lib/utils";
+import { journeyCheckInAction, journeyUndoAction, type CheckInResult } from "@/server/actions/journeys";
+
+type Activity = "reading" | "prayer";
+interface Pending {
+  journeyId: string;
+  activity: Activity;
+  occurredAt: string;
+}
+
+/** Saved under the member's draft prefix, so signing out clears it (src/lib/drafts.ts). Holds no prayer content. */
+const queueKey = (userId: string) => `${DRAFT_PREFIX}${userId}.faith-checkins`;
+
+function readQueue(userId: string): Pending[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(queueKey(userId)) ?? "[]") as Pending[];
+    return Array.isArray(v) ? v : [];
+  } catch {
+    return [];
+  }
+}
+function writeQueue(userId: string, q: Pending[]) {
+  try {
+    if (q.length) localStorage.setItem(queueKey(userId), JSON.stringify(q));
+    else localStorage.removeItem(queueKey(userId));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+/**
+ * Today's two required activities. Each is marked complete only when the member taps it. Without a connection the
+ * tap is kept on this device with its time and sent when the connection returns; the server counts it only for the
+ * day it happened, and only if it arrives before that day closes (midnight, plus three hours for a phone that was
+ * offline). Otherwise the member is told it didn't count; nothing is moved to another day.
+ */
+export function JourneyCheckIn({
+  userId,
+  journeyId,
+  day,
+  reading,
+  prayer,
+  readingHref,
+  minutes,
+}: {
+  userId: string;
+  journeyId: string;
+  day: number;
+  reading: boolean;
+  prayer: boolean;
+  readingHref: string | null;
+  minutes: number;
+}) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [queued, setQueued] = useState<Activity[]>([]);
+
+  const send = useCallback(async (activity: Activity, occurredAt: string | null): Promise<CheckInResult | "network"> => {
+    try {
+      return await journeyCheckInAction(activity, occurredAt);
+    } catch {
+      return "network";
+    }
+  }, []);
+
+  const flush = useCallback(async () => {
+    const q = readQueue(userId);
+    if (!q.length || !navigator.onLine) return;
+    const keep: Pending[] = [];
+    for (const p of q) {
+      if (p.journeyId !== journeyId) continue; // a journey that has since ended: nothing to count it toward
+      const r = await send(p.activity, p.occurredAt);
+      if (r === "network") keep.push(p);
+      else if (!r.ok && r.code === "too_late") toast.error(`Your ${p.activity === "reading" ? "Bible reading" : "prayer"} check-in from ${new Date(p.occurredAt).toLocaleString()} reached us too late to count. ${r.error}`);
+      else if (r.ok) toast.success(`${p.activity === "reading" ? "Bible reading" : "Prayer"} you marked offline is saved.`);
+    }
+    writeQueue(userId, keep);
+    setQueued(keep.filter((p) => p.journeyId === journeyId).map((p) => p.activity));
+    if (keep.length !== q.length) router.refresh();
+  }, [journeyId, router, send, userId]);
+
+  useEffect(() => {
+    setQueued(
+      readQueue(userId)
+        .filter((p) => p.journeyId === journeyId)
+        .map((p) => p.activity),
+    );
+    void flush();
+    const onOnline = () => void flush();
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, [flush, journeyId, userId]);
+
+  function mark(activity: Activity) {
+    const occurredAt = new Date().toISOString();
+    const queue = () => {
+      const q = readQueue(userId).filter((p) => !(p.journeyId === journeyId && p.activity === activity));
+      writeQueue(userId, [...q, { journeyId, activity, occurredAt }]);
+      setQueued((s) => [...new Set([...s, activity])]);
+      toast.info("You're offline. Saved on this device; it will count when you reconnect, if that's before 3 a.m.");
+    };
+    if (!navigator.onLine) return queue();
+    start(async () => {
+      const r = await send(activity, null);
+      if (r === "network") return queue();
+      if (!r.ok) return toast.error(r.error);
+      toast.success(r.reading && r.prayer ? `Day ${r.day} complete.` : activity === "reading" ? "Bible reading marked complete." : "Prayer marked complete.");
+      router.refresh();
+    });
+  }
+
+  function undo(activity: Activity) {
+    start(async () => {
+      const r = await journeyUndoAction(activity).catch(() => ({ ok: false }));
+      if (!r.ok) return toast.error("Couldn't undo. Check your connection.");
+      router.refresh();
+    });
+  }
+
+  const rows: { id: Activity; done: boolean; title: string; detail: string; icon: typeof BookOpen }[] = [
+    { id: "reading", done: reading, title: "Today's Bible reading", detail: `About ${minutes} min`, icon: BookOpen },
+    { id: "prayer", done: prayer, title: "Prayer", detail: "Time with God in prayer. Writing it down is optional.", icon: HandHeart },
+  ];
+
+  return (
+    <div className="space-y-2">
+      {rows.map((r) => {
+        const isQueued = !r.done && queued.includes(r.id);
+        return (
+          <div key={r.id} className={cn("rounded-2xl border p-3", r.done ? "border-gold-muted bg-gold/8" : "border-border bg-elevated/50")}>
+            <div className="flex items-start gap-3">
+              {r.done ? <CheckCircle2 className="mt-0.5 size-6 shrink-0 text-gold" aria-hidden /> : isQueued ? <CloudOff className="mt-0.5 size-6 shrink-0 text-gold" aria-hidden /> : <Circle className="mt-0.5 size-6 shrink-0 text-muted-foreground" aria-hidden />}
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold">{r.title}</p>
+                <p className="text-sm text-muted-foreground">{r.done ? "Done for today." : isQueued ? "Saved on this device; waiting for a connection." : r.detail}</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {r.id === "reading" && readingHref && (
+                    <Button asChild size="sm" variant="secondary">
+                      <Link href={readingHref}>
+                        <BookOpen aria-hidden /> Read
+                      </Link>
+                    </Button>
+                  )}
+                  {r.id === "prayer" && (
+                    <Button asChild size="sm" variant="secondary">
+                      <Link href="/faith/journal/new?kind=daily&from=journey">
+                        <HandHeart aria-hidden /> Write a prayer
+                      </Link>
+                    </Button>
+                  )}
+                  {r.done ? (
+                    <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={() => undo(r.id)}>
+                      <Undo2 aria-hidden /> Undo
+                    </Button>
+                  ) : (
+                    !isQueued && (
+                      <Button type="button" size="sm" disabled={pending} onClick={() => mark(r.id)}>
+                        <CheckCircle2 aria-hidden /> {r.id === "reading" ? "Mark reading complete" : "Mark prayer complete"}
+                      </Button>
+                    )
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+      <p className="text-sm text-muted-foreground" aria-live="polite">
+        {reading && prayer ? `Day ${day} is complete. Well done.` : "Both are needed before midnight (your time) to keep going."}
+      </p>
+    </div>
+  );
+}

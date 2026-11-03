@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Bot, CheckCircle2, Lock, Pencil, Trash2, Undo2 } from "lucide-react";
+import { Archive, Bot, CheckCircle2, Lock, Pencil, Trash2, Undo2 } from "lucide-react";
 import { ActionButton } from "@/components/common/action-button";
 import { PageHeader } from "@/components/common/page-header";
 import { AnsweredForm, EditJournalEntry } from "@/components/faith/faith-forms";
@@ -9,10 +9,10 @@ import { BackLink } from "@/components/platform/back-link";
 import { Button } from "@/components/ui/button";
 import { THEME_LABELS, type FaithTheme } from "@/data/content";
 import { isoDateInTz } from "@/lib/domain/dates";
-import { JOURNAL_KIND_LABELS } from "@/lib/domain/journal";
+import { isAnswerable, JOURNAL_KIND_LABELS } from "@/lib/domain/journal";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
-import { clearPrayerAnsweredAction, deleteJournalEntryAction, setJournalShareAction } from "@/server/actions/faith";
+import { clearPrayerAnsweredAction, deleteJournalEntryAction, setJournalArchivedAction, setJournalShareAction } from "@/server/actions/faith";
 import { JOURNAL_SELECT, type JournalRow } from "@/server/services/faith";
 
 export const metadata = { title: "Journal entry" };
@@ -33,7 +33,7 @@ export default async function JournalEntryPage({ params, searchParams }: { param
       <BackLink href="/faith/journal">Prayer journal</BackLink>
       <PageHeader
         eyebrow={`${JOURNAL_KIND_LABELS[e.kind] ?? "Reflection"} · ${formatJournalDate(e.entry_date)}`}
-        title={e.title || (e.kind === "request" ? "Prayer request" : e.kind === "praise" ? "Praise" : "Reflection")}
+        title={e.title || (JOURNAL_KIND_LABELS[e.kind] ?? "Reflection")}
         className="mb-2"
       />
 
@@ -58,7 +58,7 @@ export default async function JournalEntryPage({ params, searchParams }: { param
             )}
           </article>
 
-          {e.kind === "request" &&
+          {isAnswerable(e.kind) &&
             (e.answered_on ? (
               <section className="rounded-2xl border border-[#5fc49a]/40 bg-[#5fc49a]/5 p-4" aria-labelledby="answered-title">
                 <h2 id="answered-title" className="flex items-center gap-2 font-semibold text-[#5fc49a]">
@@ -93,7 +93,11 @@ export default async function JournalEntryPage({ params, searchParams }: { param
             </ActionButton>
           </section>
 
-          <div className="grid grid-cols-2 gap-2">
+          {e.archived_at && <p className="rounded-xl border border-border bg-elevated/50 p-3 text-sm text-muted-foreground">Archived. It&rsquo;s hidden from your journal but kept; restore it any time.</p>}
+          <div className="grid grid-cols-3 gap-2">
+            <ActionButton action={setJournalArchivedAction} fields={{ id: e.id, archived: e.archived_at ? "false" : "true" }} variant="ghost">
+              <Archive aria-hidden /> {e.archived_at ? "Restore" : "Archive"}
+            </ActionButton>
             <Button asChild variant="secondary">
               <Link href={`/faith/journal/${e.id}?edit=1`}>
                 <Pencil aria-hidden /> Edit

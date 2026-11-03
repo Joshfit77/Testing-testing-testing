@@ -2,10 +2,10 @@ import Link from "next/link";
 import { Lock, Plus, Search } from "lucide-react";
 import { BackLink } from "@/components/platform/back-link";
 import { PageHeader } from "@/components/common/page-header";
-import { JournalEntryCard } from "@/components/faith/journal-entry-card";
+import { formatJournalDate, JournalEntryCard } from "@/components/faith/journal-entry-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { JOURNAL_FILTER_LABELS, JOURNAL_FILTERS, journalSearchPattern, parseJournalFilter } from "@/lib/domain/journal";
+import { ANSWERABLE_KINDS, JOURNAL_FILTER_LABELS, JOURNAL_FILTERS, journalSearchPattern, parseJournalFilter } from "@/lib/domain/journal";
 import { cn } from "@/lib/utils";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
@@ -24,11 +24,15 @@ export default async function JournalPage({ searchParams }: { searchParams: Prom
   const pattern = journalSearchPattern(q);
 
   let query = supabase.from("faith_journal_entries").select(JOURNAL_SELECT).eq("user_id", user.id);
-  if (filter === "request" || filter === "praise" || filter === "reflection") query = query.eq("kind", filter);
-  if (filter === "open") query = query.eq("kind", "request").is("answered_on", null);
-  if (filter === "answered") query = query.eq("kind", "request").not("answered_on", "is", null);
+  // Archived entries are kept but only shown under Archived.
+  query = filter === "archived" ? query.not("archived_at", "is", null) : query.is("archived_at", null);
+  if (filter === "daily" || filter === "request" || filter === "intercession" || filter === "praise" || filter === "confession" || filter === "reflection") query = query.eq("kind", filter);
+  if (filter === "open") query = query.in("kind", [...ANSWERABLE_KINDS]).is("answered_on", null);
+  if (filter === "answered") query = query.in("kind", [...ANSWERABLE_KINDS]).not("answered_on", "is", null);
   if (filter === "shared") query = query.eq("share_with_coach", true);
   if (pattern) query = query.or(`title.ilike.${pattern},body.ilike.${pattern},scripture_ref.ilike.${pattern},answered_note.ilike.${pattern}`);
+  // Answered prayers read as a timeline, newest answer first.
+  if (filter === "answered") query = query.order("answered_on", { ascending: false });
   const { data, error } = await query.order("entry_date", { ascending: false }).order("created_at", { ascending: false }).limit(PAGE + 1);
   const rows = (data ?? []) as unknown as JournalRow[];
   const entries = rows.slice(0, PAGE);
@@ -54,7 +58,7 @@ export default async function JournalPage({ searchParams }: { searchParams: Prom
         className="mb-2"
         actions={
           <Button asChild size="sm">
-            <Link href="/faith#journal-new">
+            <Link href="/faith/journal/new">
               <Plus aria-hidden /> New entry
             </Link>
           </Button>
@@ -97,13 +101,25 @@ export default async function JournalPage({ searchParams }: { searchParams: Prom
           <p className="text-sm text-muted-foreground" aria-live="polite">
             {q ? `${entries.length}${rows.length > PAGE ? "+" : ""} matching “${q}”` : `${entries.length}${rows.length > PAGE ? "+" : ""} entr${entries.length === 1 ? "y" : "ies"}`}
           </p>
-          <ul className="grid gap-2 md:grid-cols-2">
-            {entries.map((e) => (
-              <li key={e.id}>
-                <JournalEntryCard entry={e} />
-              </li>
-            ))}
-          </ul>
+          {filter === "answered" ? (
+            <ol className="relative space-y-3 border-l border-gold-muted pl-4" aria-label="Answered prayers, newest first">
+              {entries.map((e) => (
+                <li key={e.id} className="relative">
+                  <span aria-hidden className="absolute -left-[1.4rem] top-5 size-3 rounded-full border-2 border-gold bg-background" />
+                  <p className="mb-1 text-xs font-semibold text-gold">Answered {e.answered_on ? formatJournalDate(e.answered_on) : ""}</p>
+                  <JournalEntryCard entry={e} />
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <ul className="grid gap-2 md:grid-cols-2">
+              {entries.map((e) => (
+                <li key={e.id}>
+                  <JournalEntryCard entry={e} />
+                </li>
+              ))}
+            </ul>
+          )}
           {rows.length > PAGE && <p className="text-sm text-muted-foreground">Showing the newest {PAGE}. Search to find older entries.</p>}
         </>
       ) : (

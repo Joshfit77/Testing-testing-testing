@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BellRing, BookOpen, ChevronRight, Flame, NotebookPen, Sparkles } from "lucide-react";
+import { BellRing, BookMarked, BookOpen, Brain, ChevronRight, Flame, GraduationCap, History, MessageCircleQuestion, NotebookPen, Route, Search, Sparkles } from "lucide-react";
 import { MainHeader } from "@/components/shell/main-header";
 import { EmptyState } from "@/components/common/states";
 import { FaithChallenge } from "@/components/faith/faith-challenge";
@@ -18,6 +18,11 @@ import { requireOnboardedUser } from "@/server/auth";
 import { getChallengeState } from "@/server/services/challenge";
 import { JOURNAL_SELECT, loadFaithReminders, loadPractices, type JournalRow } from "@/server/services/faith";
 import { ScriptureNotice } from "@/components/faith/scripture-notice";
+import { TodayCard } from "@/components/faith/today-card";
+import { chapterHref, chapterLabel } from "@/lib/bible/books";
+import { loadDailyGoals } from "@/server/services/daily-goals";
+import { loadActiveJourney } from "@/server/services/journeys";
+import { loadReadingState } from "@/server/services/bible";
 
 export const metadata = { title: "Faith" };
 
@@ -32,14 +37,27 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
   const theme = sp.theme && sp.theme in THEME_LABELS ? (sp.theme as FaithTheme) : null;
   const scriptures = theme ? SCRIPTURES.filter((s) => s.themes.includes(theme)) : SCRIPTURES;
 
-  const [journalRes, journalCountRes, practiceData, devotionalsRes, challenge, reminders] = await Promise.all([
+  const [journalRes, journalCountRes, practiceData, devotionalsRes, challenge, reminders, journey, goals, reading] = await Promise.all([
     supabase.from("faith_journal_entries").select(JOURNAL_SELECT).eq("user_id", user.id).order("entry_date", { ascending: false }).order("created_at", { ascending: false }).limit(3),
     supabase.from("faith_journal_entries").select("id", { count: "exact", head: true }).eq("user_id", user.id),
     loadPractices(supabase, user.id, startOfWeek(addDays(today, -6))),
     supabase.from("content_items").select("id, title, body, scripture_ref").eq("kind", "devotional").eq("is_published", true).order("published_at", { ascending: false }).limit(6),
     getChallengeState(supabase, user.id, profile.timezone),
     loadFaithReminders(supabase, user.id),
+    loadActiveJourney(supabase, user.id, profile.timezone),
+    loadDailyGoals(supabase, user.id, profile.timezone),
+    loadReadingState(supabase, user.id),
   ]);
+  const tools = [
+    { href: "/faith/bible", label: "Bible", icon: BookOpen },
+    { href: "/faith/bible/search", label: "Search", icon: Search },
+    { href: "/faith/bible/saved", label: "Saved", icon: BookMarked },
+    { href: "/faith/bible/history", label: "History", icon: History },
+    { href: "/faith/journey", label: "Journey", icon: Route },
+    { href: "/faith/memory", label: "Memorize", icon: Brain },
+    { href: "/faith/studies", label: "Studies", icon: GraduationCap },
+    { href: "/faith/ask", label: "Ask", icon: MessageCircleQuestion },
+  ];
   const journal = (journalRes.data ?? []) as unknown as JournalRow[];
   const journalCount = journalCountRes.count ?? journal.length;
   const remindersOn = reminders.filter((r) => r.enabled);
@@ -47,6 +65,31 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
   return (
     <div className="space-y-6">
       <MainHeader title="Faith" />
+
+      <TodayCard userId={user.id} journey={journey} goals={goals} />
+
+      <Link
+        href={reading ? chapterHref(reading.book, reading.chapter, reading.verse ?? undefined) : "/faith/bible"}
+        className="flex min-h-16 items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 hover:border-gold-muted"
+      >
+        <BookOpen className="size-6 shrink-0 text-gold" aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="block font-semibold">{reading ? "Continue reading" : "Bible"}</span>
+          <span className="block truncate text-sm text-muted-foreground">
+            {reading ? `${chapterLabel(reading.book, reading.chapter)}${reading.verse ? `:${reading.verse}` : ""} · Berean Standard Bible` : "The complete Berean Standard Bible: read, search, highlight and take notes."}
+          </span>
+        </span>
+        <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
+      </Link>
+
+      <nav aria-label="Bible tools" className="grid grid-cols-4 gap-2">
+        {tools.map(({ href, label, icon: Icon }) => (
+          <Link key={href} href={href} className="flex min-h-16 flex-col items-center justify-center gap-1 rounded-2xl border border-border bg-card text-xs font-semibold hover:border-gold-muted">
+            <Icon className="size-5 text-gold" aria-hidden />
+            {label}
+          </Link>
+        ))}
+      </nav>
 
       <section className="relative overflow-hidden rounded-2xl border border-border bg-card" aria-labelledby="verse-title">
         {/* Decorative original artwork; the verse is the content. */}
@@ -63,14 +106,7 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
           <p className="mt-1.5 text-sm text-white/85">{verse.reference} ({TRANSLATION.code})</p>
         </div>
       </section>
-      <Link href="/faith/bible" className="flex min-h-16 items-center gap-3 rounded-2xl border border-gold-muted bg-card px-4 py-3 hover:border-gold">
-        <BookOpen className="size-6 shrink-0 text-gold" aria-hidden />
-        <span className="min-w-0 flex-1">
-          <span className="block font-semibold">Bible</span>
-          <span className="block truncate text-sm text-muted-foreground">The complete Berean Standard Bible: read, search, highlight and take notes.</span>
-        </span>
-        <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
-      </Link>
+      <h2 className="pt-2 font-display text-xl font-bold uppercase">Spiritual growth</h2>
       <FaithChallenge
         today={challenge.today}
         rotatingDay={devotionalForDate(challenge.today).day}
