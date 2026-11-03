@@ -77,7 +77,12 @@ describe("Scripture is the official Berean Standard Bible text", () => {
       expect(BSB_PASSAGES[ref], ref).toContain(fragment);
       expect(scriptureFragment(ref, "unused")).toBe(`“${fragment}” (${ref}, BSB)`);
     }
-    expect(FAITH_REMINDER_INFO.prayer.body).toBe(`“${BSB_PASSAGES["1 Thessalonians 5:17"]}” 1 Thessalonians 5:17 (BSB)`);
+    // The prayer reminder now uses the owner's own wording (2026-11-03) rather than a verse; any reminder that quotes
+    // Scripture must quote the BSB exactly.
+    expect(FAITH_REMINDER_INFO.prayer.body).toBe("Take a few moments to pray and bring your requests before the Lord.");
+    const passages = Object.values(BSB_PASSAGES);
+    for (const info of Object.values(FAITH_REMINDER_INFO))
+      for (const [, quoted] of info.body.matchAll(/“([^”]+)”/g)) expect(passages.some((p) => p.includes(quoted!)), quoted).toBe(true);
   });
 
   it("lets the AI coach quote only BSB verses from the app's list", () => {

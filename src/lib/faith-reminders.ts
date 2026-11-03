@@ -1,7 +1,7 @@
 /**
  * Faith reminders (SPEC §12): optional reminders, each off by default with its own time and days: devotional, prayer,
- * daily practices, Bible reading, Faith challenge, Fitness goal, memory practice, and two opt-in accountability
- * reminders for a reading journey (an evening check and a final one before midnight).
+ * daily practices, Bible reading, Faith challenge, Fitness goal, memory practice, reading-plan progress, prayer
+ * follow-up, an evening check-in, and a final reminder before midnight for a strict reading journey.
  *
  * Two kinds of delivery:
  * - weekly repeating notifications (devotional, practices, memory practice), which don't depend on what's done;
@@ -15,9 +15,8 @@
  * browser can't deliver them while the site is closed, and the UI says so. Pure helpers only.
  */
 import { WEEKDAY_LABELS, parseTime, toCapacitorWeekday, type JsWeekday } from "@/lib/reminders";
-import { ACTIVE_TRANSLATION, scriptureText } from "@/data/scripture";
 
-export const FAITH_REMINDER_KINDS = ["reading", "prayer", "challenge", "fitness", "accountability", "final", "devotional", "practices", "memorize"] as const;
+export const FAITH_REMINDER_KINDS = ["reading", "prayer", "challenge", "fitness", "accountability", "final", "devotional", "practices", "memorize", "plan_progress", "prayer_followup"] as const;
 export type FaithReminderKind = (typeof FAITH_REMINDER_KINDS)[number];
 
 export interface FaithReminder {
@@ -39,10 +38,10 @@ export const FAITH_REMINDER_INFO: Record<FaithReminderKind, { label: string; des
   },
   prayer: {
     label: "Prayer",
-    description: "A moment to stop and pray.",
+    description: "A moment to stop and pray. Not sent once today's prayer is marked.",
     defaultTime: "12:00",
-    title: "A moment for prayer",
-    body: `“${scriptureText("1 Thessalonians 5:17", "Pray without ceasing.")}” 1 Thessalonians 5:17 (${ACTIVE_TRANSLATION.code})`,
+    title: "Prayer time",
+    body: "Take a few moments to pray and bring your requests before the Lord.",
   },
   practices: {
     label: "Daily practices",
@@ -55,8 +54,8 @@ export const FAITH_REMINDER_INFO: Record<FaithReminderKind, { label: string; des
     label: "Bible reading",
     description: "Today's reading, at a time that suits you. Not sent once it's marked complete.",
     defaultTime: "07:00",
-    title: "Today's Bible reading",
-    body: "Your reading for today is ready on the Faith tab.",
+    title: "Bible reading",
+    body: "Don't forget to spend time with the Lord today. Your Bible reading is ready.",
   },
   challenge: {
     label: "Faith challenge",
@@ -73,18 +72,18 @@ export const FAITH_REMINDER_INFO: Record<FaithReminderKind, { label: string; des
     body: "Today's training (or rest) is on the Faith tab and in Train.",
   },
   accountability: {
-    label: "Evening check",
-    description: "Only if today's journey reading or prayer isn't marked yet. For reading journeys.",
+    label: "Evening check-in",
+    description: "Only if today's Bible reading or prayer isn't marked yet.",
     defaultTime: "20:00",
-    title: "Reading and prayer",
-    body: "Today's Bible reading and prayer aren't marked yet. There's still time today.",
+    title: "Evening reminder",
+    body: "Before the day ends, remember your Bible reading and prayer.",
   },
   final: {
-    label: "Last call before midnight",
-    description: "A final reminder late in the evening, only if today isn't complete. For reading journeys.",
+    label: "Before midnight (strict journey)",
+    description: "One late reminder, only while a strict reading journey is active and today isn't marked yet.",
     defaultTime: "22:30",
     title: "Before the day ends",
-    body: "Your journey's reading and prayer for today aren't marked yet. The day closes at midnight.",
+    body: "Your journey's reading and prayer for today aren't marked yet. There's still time before midnight.",
   },
   memorize: {
     label: "Memory practice",
@@ -93,19 +92,36 @@ export const FAITH_REMINDER_INFO: Record<FaithReminderKind, { label: string; des
     title: "Scripture memory",
     body: "A minute with your memory verses is waiting on the Faith tab.",
   },
+  plan_progress: {
+    label: "Reading plan progress",
+    description: "Once a week, a look at where you are in your reading plan. Only while a plan is active.",
+    defaultTime: "18:00",
+    title: "Your reading plan",
+    body: "See where you are in your reading plan and what's coming up this week.",
+  },
+  prayer_followup: {
+    label: "Prayer follow-up",
+    description: "Once a week, a moment to look back over your open prayer requests. Never shows what you wrote.",
+    defaultTime: "19:30",
+    title: "Prayer follow-up",
+    body: "A quiet moment to look back over your prayer requests and note any answers.",
+  },
 };
+
+/** Kinds that repeat once a week by default (one day chosen) rather than every day. */
+export const WEEKLY_FAITH_KINDS: readonly FaithReminderKind[] = ["plan_progress", "prayer_followup"];
 
 /** Kinds delivered as dated notifications (left out once done). The rest repeat weekly. */
 export const TRACKED_KINDS = ["reading", "prayer", "challenge", "fitness", "accountability", "final"] as const satisfies readonly FaithReminderKind[];
 export type TrackedKind = (typeof TRACKED_KINDS)[number];
 const isTracked = (k: FaithReminderKind): k is TrackedKind => (TRACKED_KINDS as readonly string[]).includes(k);
-/** Reminders about the journey's rule itself: only sent while a journey is active. */
-const JOURNEY_ONLY: readonly TrackedKind[] = ["accountability", "final"];
+/** The reminder about the strict journey's midnight rule: only sent while a journey is active. */
+const JOURNEY_ONLY: readonly TrackedKind[] = ["final"];
 
 const ALL_DAYS: JsWeekday[] = [0, 1, 2, 3, 4, 5, 6];
 
 export function defaultFaithReminder(kind: FaithReminderKind): FaithReminder {
-  return { kind, enabled: false, time: FAITH_REMINDER_INFO[kind].defaultTime, weekdays: [...ALL_DAYS] };
+  return { kind, enabled: false, time: FAITH_REMINDER_INFO[kind].defaultTime, weekdays: WEEKLY_FAITH_KINDS.includes(kind) ? [0] : [...ALL_DAYS] };
 }
 
 /**
@@ -113,7 +129,19 @@ export function defaultFaithReminder(kind: FaithReminderKind): FaithReminder {
  * base + days from today (0–6). 5310–5316 were the weekly prayer reminders before prayer became dated; they stay in
  * the cancel list so an older schedule on a device is cleared.
  */
-const ID_BASE: Record<FaithReminderKind, number> = { devotional: 5300, practices: 5320, reading: 5500, prayer: 5510, challenge: 5520, fitness: 5530, accountability: 5540, final: 5550, memorize: 5560 };
+const ID_BASE: Record<FaithReminderKind, number> = {
+  devotional: 5300,
+  practices: 5320,
+  reading: 5500,
+  prayer: 5510,
+  challenge: 5520,
+  fitness: 5530,
+  accountability: 5540,
+  final: 5550,
+  memorize: 5560,
+  plan_progress: 5570,
+  prayer_followup: 5580,
+};
 const LEGACY_PRAYER_IDS = ALL_DAYS.map((d) => 5310 + d);
 export const ALL_FAITH_REMINDER_IDS: number[] = [...FAITH_REMINDER_KINDS.flatMap((k) => ALL_DAYS.map((d) => ID_BASE[k] + d)), ...LEGACY_PRAYER_IDS];
 /** Today's dated notification id for a kind. */
@@ -138,6 +166,7 @@ export function faithReminderFromRow(kind: FaithReminderKind, row: { enabled?: u
 
 export interface FaithNotification {
   id: number;
+  kind: FaithReminderKind;
   title: string;
   body: string;
   /** Shape of Capacitor's `schedule.on` (weekday 1 = Sunday … 7 = Saturday). */
@@ -164,16 +193,27 @@ export function inQuietHours(time: string, quiet: QuietHours | null | undefined)
   return a < b ? t >= a && t < b : t >= a || t < b;
 }
 
-/** Weekly local notifications for the enabled weekly reminders (devotional, practices, memory practice). */
-export function buildFaithNotifications(reminders: FaithReminder[], quiet?: QuietHours | null): FaithNotification[] {
+/** What the weekly reminders depend on: reading-plan progress needs an active plan, prayer follow-up open requests. */
+export interface WeeklyFaithConditions {
+  journeyActive?: boolean;
+  openPrayerRequests?: number;
+}
+
+/**
+ * Weekly local notifications for the enabled weekly reminders (devotional, practices, memory practice, and, when
+ * there's something to look at, reading-plan progress and prayer follow-up).
+ */
+export function buildFaithNotifications(reminders: FaithReminder[], quiet?: QuietHours | null, when: WeeklyFaithConditions = {}): FaithNotification[] {
   const out: FaithNotification[] = [];
   for (const r of reminders) {
     if (!r.enabled || isTracked(r.kind) || inQuietHours(r.time, quiet)) continue;
+    if (r.kind === "plan_progress" && !when.journeyActive) continue;
+    if (r.kind === "prayer_followup" && !(when.openPrayerRequests && when.openPrayerRequests > 0)) continue;
     const t = parseTime(r.time);
     if (!t) continue;
     const info = FAITH_REMINDER_INFO[r.kind];
     for (const d of normalizeWeekdays(r.weekdays)) {
-      out.push({ id: ID_BASE[r.kind] + d, title: info.title, body: info.body, on: { weekday: toCapacitorWeekday(d), hour: t.hour, minute: t.minute } });
+      out.push({ id: ID_BASE[r.kind] + d, kind: r.kind, title: info.title, body: info.body, on: { weekday: toCapacitorWeekday(d), hour: t.hour, minute: t.minute } });
     }
   }
   return out;
@@ -271,7 +311,7 @@ export function todayIdsToCancel(done: FaithReminderContext["done"]): number[] {
   return TRACKED_KINDS.filter((k) => doneFor(k, done)).map((k) => ID_BASE[k]);
 }
 
-function addDaysIso(iso: string, n: number): string {
+export function addDaysIso(iso: string, n: number): string {
   const d = new Date(`${iso}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);

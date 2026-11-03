@@ -24,16 +24,18 @@ describe("faith reminders", () => {
   });
 
   it("uses ids that don't clash with workout reminders or each other", () => {
-    // 9 kinds × 7, plus the 7 ids of the earlier weekly prayer reminders (cleared on every sync).
-    expect(new Set(ALL_FAITH_REMINDER_IDS).size).toBe(70);
-    expect(ALL_FAITH_REMINDER_IDS.length).toBe(70);
+    // 11 kinds × 7, plus the 7 ids of the earlier weekly prayer reminders (cleared on every sync).
+    expect(new Set(ALL_FAITH_REMINDER_IDS).size).toBe(84);
+    expect(ALL_FAITH_REMINDER_IDS.length).toBe(84);
     for (let d = 0; d < 7; d++) expect(ALL_FAITH_REMINDER_IDS).not.toContain(REMINDER_ID_BASE + d);
   });
 
-  it("describes the schedule and names the translation of any verse it quotes", () => {
+  it("describes the schedule, and uses the owner's wording for reading, prayer and the evening reminder", () => {
     expect(describeFaithReminder({ time: "20:00", weekdays: [0, 1, 2, 3, 4, 5, 6] })).toBe("Every day at 8:00 PM");
     expect(describeFaithReminder({ time: "07:05", weekdays: [1, 3] })).toBe("Mon and Wed at 7:05 AM");
-    expect(FAITH_REMINDER_INFO.prayer.body).toMatch(/1 Thessalonians 5:17 \(BSB\)/);
+    expect(FAITH_REMINDER_INFO.reading.body).toBe("Don't forget to spend time with the Lord today. Your Bible reading is ready.");
+    expect(FAITH_REMINDER_INFO.prayer.body).toBe("Take a few moments to pray and bring your requests before the Lord.");
+    expect(FAITH_REMINDER_INFO.accountability.body).toBe("Before the day ends, remember your Bible reading and prayer.");
     for (const i of Object.values(FAITH_REMINDER_INFO)) expect(i.body).not.toMatch(/streak|missed/i);
   });
 });

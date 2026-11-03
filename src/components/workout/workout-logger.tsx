@@ -35,6 +35,7 @@ import {
   type WorkoutDraft,
 } from "@/lib/domain/workout-draft";
 import { cancelRestNotification, hapticSuccess, scheduleRestNotification } from "@/lib/native";
+import { cancelDoneToday, deviceToday } from "@/lib/native-notifications";
 import { clearLocalDraft, discardedWorkoutIds, loadLocalDraft, rememberDiscard, saveLocalDraft } from "@/lib/workout-storage";
 import { discardWorkoutAction, finishWorkoutAction, previousPerformanceAction, syncWorkoutDraftAction, type NextSession, type UnlockedBadge } from "@/server/actions/workouts";
 import { updateRestAlertsAction } from "@/server/actions/rest-alerts";
@@ -632,6 +633,8 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
     }
     clearLocalDraft(userId);
     void cancelRestNotification();
+    // Today's workout reminder (and the Faith fitness-goal one) aren't needed any more on this phone.
+    void cancelDoneToday(deviceToday(), { workout: true, fitness: true });
     setFinishedDraft(finalDraft);
     setTemplateName(finalDraft.name);
     setResult({ volumeKg: res.data.volumeKg, records: res.data.records, badges: res.data.badges ?? [], durationSeconds: elapsedSeconds(finalDraft, endedAt), next: res.data.next ?? null });

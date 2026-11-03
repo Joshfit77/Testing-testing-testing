@@ -82,7 +82,7 @@ export default async function MemoryPage() {
           )}
         </>
       )}
-      <Link href="/faith/reminders" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-gold-highlight hover:underline">
+      <Link href="/profile/notifications#faith" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-gold-highlight hover:underline">
         Memory practice reminders <ChevronRight className="size-4" aria-hidden />
       </Link>
     </div>

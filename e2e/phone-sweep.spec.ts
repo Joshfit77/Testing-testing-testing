@@ -12,7 +12,7 @@ const STATIC = [
   "/train", "/train/programs", "/train/exercises", "/train/history", "/train/templates", "/train/templates/new", "/train/build", "/train/recovery", "/train/review", "/train/3d",
   "/run", "/run?tab=log", "/run/record",
   "/nutrition", "/nutrition/diets", "/nutrition/recipes", "/nutrition/recipes/new", "/nutrition/planner", "/nutrition/grocery", "/nutrition/insights", "/nutrition/saved-meals", "/nutrition/supplements", "/nutrition/compare", "/nutrition/photo", "/nutrition/scanner",
-  "/faith", "/faith/journal", "/faith/practices", "/faith/reminders",
+  "/faith", "/faith/journal", "/faith/practices", "/profile/notifications",
   "/faith/bible", "/faith/bible/john", "/faith/bible/john/3", "/faith/bible/psalms/119", "/faith/bible/search?q=peace", "/faith/bible/saved", "/faith/bible/history",
   "/faith/journey", "/faith/journey/new", "/faith/journey/new?kind=book", "/faith/journey/new?kind=full_bible", "/faith/journey/new?kind=gospels&days=90",
   "/faith/journal/new?kind=daily", "/faith/memory", "/faith/studies", "/faith/studies/gospel", "/faith/studies/gospel/good-news", "/faith/ask",

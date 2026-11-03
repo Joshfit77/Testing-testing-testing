@@ -1983,9 +1983,9 @@ Kept or not per member, also from the code (record what you see; the owner decid
 
 - The in-progress **workout copy** (`ngf.workout.draft.<id>`) is kept on purpose: it is keyed by member, so another
   member can't load it, and the member gets it back on signing in again (`docs/DATA.md`).
-- **Workout reminders** are a phone setting, not an account setting (`ngf.workoutReminders.v1`).
-- **Faith reminders** already scheduled with iOS are replaced only when the app re-applies the signed-in account's
-  reminders, once per app session.
+- **Reminders** (Faith, workouts, food, recovery) are account settings since 2026-11-03. Signing out removes every
+  notification this app scheduled on the phone (reminders, the sleep alarm, a rest timer); the next member's own
+  reminders are scheduled when they sign in (`docs/NOTIFICATIONS.md`, DT-NOTIF).
 - A **rest notification** already scheduled is not cancelled (DT-REST-11).
 - **Navigation memory** for the app session (`ngf.nav.*`, `ngf.scroll.*`, and dialog state `ngf.ui.*` such as the Add
   food search text) is not cleared on sign-out; it goes when the app is closed.
@@ -2046,15 +2046,15 @@ Kept or not per member, also from the code (record what you see; the owner decid
 
 - **Preparation:** A signed in; notifications allowed.
 - **Steps:**
-  1. As A: Profile → Workout reminders: on, today, 3 minutes ahead. Faith reminders: one reminder 4 minutes ahead.
-  2. Sign out; sign in as B (no relaunch). Open Profile → Workout reminders. Wait for both reminder times.
-  3. As A again set a faith reminder 3 minutes ahead; sign out; sign in as B; force-quit and reopen; wait.
-- **Expected outcome (from the code):** (2) B's Workout reminders show A's schedule, and the workout reminder fires;
-  A's faith reminder also fires (re-applied only once per app session). (3) After relaunching as B, faith reminders
-  follow B's account (none), so A's no longer fires. Record each; the owner decides whether this is acceptable.
-- **Source:** `src/lib/reminders.ts` (`ngf.workoutReminders.v1` in local storage); `src/lib/native-reminders.ts`
-  `syncFaithReminders`; `src/components/faith/faith-reminders-settings.tsx` `FaithReminderSync`
-  (`ngf.faithRemindersSynced`).
+  1. As A: Profile → Notifications: Scheduled workouts on, 3 minutes ahead; Bible reading 4 minutes ahead. Save.
+  2. Sign out; sign in as B (no relaunch). Open Profile → Notifications. Wait past both reminder times.
+  3. As A set a reminder 3 minutes ahead; let the session expire or switch accounts without signing out if possible;
+     open the app as B; wait.
+- **Expected outcome (from the code, updated 2026-11-03):** (2) B's screen shows B's own settings (all off) and
+  neither of A's reminders fires: signing out removed everything this app had scheduled. (3) When the app opens as
+  B it sees a different account than the one the phone's reminders belong to, removes A's and schedules B's.
+- **Source:** `src/lib/native-notifications.ts` (`clearDeviceNotifications`, the owner check in `syncReminders`);
+  `src/components/shell/sign-out-form.tsx`; `src/components/notifications/notification-sync.tsx`.
 - **Pass/Fail:** ☐ Pass ☐ Fail ☐ Blocked
 - **Actual result:**
 - **Evidence** (suggested file name `DT-SWITCH-04-a.png`):

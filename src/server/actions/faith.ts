@@ -6,11 +6,9 @@ import { actionError, actionInvalid, actionOk, type ActionState } from "@/lib/ac
 import { isoDateInTz } from "@/lib/domain/dates";
 import { ANSWERABLE_KINDS, isAnswerable } from "@/lib/domain/journal";
 import { canCheckIn, isPresetPractice, PRACTICE_INFO } from "@/lib/domain/practices";
-import { FAITH_REMINDER_KINDS, faithReminderFromRow, normalizeWeekdays, type FaithReminder, type FaithReminderContext } from "@/lib/faith-reminders";
-import { customPracticeSchema, faithRemindersSchema, journalEntrySchema, prayerAnsweredSchema } from "@/lib/validation/schemas";
+import { customPracticeSchema, journalEntrySchema, prayerAnsweredSchema } from "@/lib/validation/schemas";
 import { getProfile, requireUser } from "@/server/auth";
 import { logError } from "@/server/log";
-import { loadReminderContext } from "@/server/services/faith";
 
 /*
  * Faith actions. Every query is scoped to the signed-in user (RLS plus an explicit user_id filter).
@@ -185,51 +183,7 @@ export async function removePracticeAction(formData: FormData): Promise<void> {
   await supabase.from("discipline_goals").delete().eq("id", id.data).eq("user_id", user.id);
 }
 
-// ---------------------------------------------------------------------------- Faith reminders
-
-export async function getFaithRemindersAction(): Promise<FaithReminder[]> {
-  const user = await requireUser();
-  const supabase = await getServerSupabase();
-  const { data } = await supabase.from("faith_reminders").select("kind, enabled, remind_at, weekdays").eq("user_id", user.id);
-  return FAITH_REMINDER_KINDS.map((k) => faithReminderFromRow(k, (data ?? []).find((r) => r.kind === k)));
-}
-
-/** Everything the app on a phone needs to (re)schedule this member's Faith reminders. */
-export async function getFaithReminderSyncAction(): Promise<{ reminders: FaithReminder[]; context: Omit<FaithReminderContext, "now"> }> {
-  const user = await requireUser();
-  const profile = await getProfile(user.id);
-  const supabase = await getServerSupabase();
-  const [reminders, context] = await Promise.all([getFaithRemindersAction(), loadReminderContext(supabase, user.id, profile?.timezone ?? "UTC")]);
-  return { reminders, context };
-}
-
-/** Quiet hours: no Faith reminder is scheduled inside them. Both null turns them off. */
-export async function saveFaithQuietHoursAction(start: string | null, end: string | null): Promise<ActionState> {
-  const user = await requireUser();
-  const t = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
-  if ((start === null) !== (end === null) || (start !== null && (!t.safeParse(start).success || !t.safeParse(end).success))) return actionError("Choose both a start and an end time.");
-  const supabase = await getServerSupabase();
-  const { error } = await supabase.from("faith_reminder_prefs").upsert({ user_id: user.id, quiet_start: start, quiet_end: end, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
-  if (error) {
-    logError("faith.quiet_hours", error);
-    return actionError("Couldn't save quiet hours.");
-  }
-  return actionOk("Saved.");
-}
-
-export async function saveFaithRemindersAction(input: FaithReminder[]): Promise<ActionState & { reminders?: FaithReminder[] }> {
-  const user = await requireUser();
-  const parsed = faithRemindersSchema.safeParse(input);
-  if (!parsed.success) return actionError(parsed.error.issues[0]?.message ?? "Please check your reminders.");
-  const supabase = await getServerSupabase();
-  const rows = parsed.data.map((r) => ({ user_id: user.id, kind: r.kind, enabled: r.enabled, remind_at: r.time, weekdays: normalizeWeekdays(r.weekdays) }));
-  const { error } = await supabase.from("faith_reminders").upsert(rows, { onConflict: "user_id,kind" });
-  if (error) {
-    logError("faith.reminders", error);
-    return actionError("Couldn't save your reminders. Please try again.");
-  }
-  return { ...actionOk("Saved."), reminders: await getFaithRemindersAction() };
-}
+// Faith reminders are saved with every other reminder in src/server/actions/notifications.ts (Profile → Notifications).
 
 // ---------------------------------------------------------------------------- Daily goals (optional)
 

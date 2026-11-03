@@ -2,7 +2,7 @@ import Link from "next/link";
 import { CheckCircle2, ChevronRight, Circle, Dumbbell, Plus, RotateCcw, Sparkles } from "lucide-react";
 import { ActionButton } from "@/components/common/action-button";
 import { JourneyCheckIn } from "@/components/faith/journey-checkin";
-import { FaithReminderTodaySync } from "@/components/faith/faith-reminders-settings";
+import { NotificationTodaySync } from "@/components/notifications/notification-sync";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { Button } from "@/components/ui/button";
 import { chapterHref } from "@/lib/bible/books";
@@ -24,7 +24,10 @@ export function TodayCard({ userId, journey, goals }: { userId: string; journey:
   const fitDone = fit.workoutDone || fit.marked;
   return (
     <section className="rounded-2xl border border-gold-muted bg-card p-4" aria-labelledby="today-journey-title">
-      <FaithReminderTodaySync done={{ reading: Boolean(journey?.reading), prayer: Boolean(journey?.prayer), challenge: goals.challenge.done, fitness: fitDone }} />
+      <NotificationTodaySync
+        today={goals.today}
+        done={{ reading: Boolean(journey?.reading), prayer: Boolean(journey?.prayer), challenge: goals.challenge.done, fitness: fitDone, workout: fit.workoutDone }}
+      />
       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gold">Today · {formatLongDate(goals.today)}</p>
       {journey ? (
         <>

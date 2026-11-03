@@ -17,7 +17,7 @@ that needs theological review before release, and `PHASE1_INVENTORY.md` records 
 | Scripture memory | `/faith/memory` | Hidden-word practice, reference recall, spaced reviews. |
 | Guided studies | `/faith/studies` | 26 studies (foundations, Christian living, books). |
 | Bible study helper | `/faith/ask` | An AI helper, separate from the fitness coach. |
-| Reminders | `/faith/reminders` | See "Reminders" below. |
+| Reminders | Profile → Notifications (`/profile/notifications#faith`; `/faith/reminders` redirects there) | See "Reminders" below and `docs/NOTIFICATIONS.md`. |
 | 40-day challenge, practices, devotionals, Scripture by theme | Faith tab | Unchanged. |
 
 ## The daily rule
@@ -95,9 +95,11 @@ Daily load (from the plan generator, BSB word counts):
 
 ## Reminders
 
-Each kind has its own on/off, time and days, and all are off by default: Bible reading, prayer, Faith challenge,
-Fitness goal, memory practice, devotional, practices, an opt-in evening check, and an optional last call before
-midnight. The evening and final reminders are only sent while a journey is active.
+Faith reminders now live with every other reminder in Profile → Notifications (`docs/NOTIFICATIONS.md`). Each kind has
+its own on/off, time and days, and all are off by default: Bible reading, prayer, an evening check-in, the strict
+journey's last call before midnight, Faith challenge, Fitness goal, devotional, practices, memory practice,
+reading-plan progress (weekly, while a plan is active) and prayer follow-up (weekly, only with open requests, never
+showing what was written). Only the before-midnight reminder needs an active journey.
 
 - Reading, prayer, challenge, fitness, evening and final reminders are scheduled **per date** for the next seven days
   (`buildDatedFaithNotifications`), in the member's saved time zone, so DST never shifts them; one per kind per day.

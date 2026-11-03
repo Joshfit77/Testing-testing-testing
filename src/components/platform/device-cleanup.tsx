@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { clearAllDrafts, takeDeviceCleanup } from "@/lib/drafts";
+import { clearDeviceNotifications } from "@/lib/native-notifications";
 
 /**
  * Finishes a sign-out's clean-up on the page the member lands on. Signing out clears the member's drafts and any run
@@ -11,7 +12,10 @@ import { clearAllDrafts, takeDeviceCleanup } from "@/lib/drafts";
 export function DeviceCleanup() {
   useEffect(() => {
     const userId = takeDeviceCleanup();
-    if (userId) clearAllDrafts(userId);
+    if (userId) {
+      clearAllDrafts(userId);
+      void clearDeviceNotifications();
+    }
   }, []);
   return null;
 }

@@ -40,7 +40,9 @@ All keys start with `ngf.`. Every read and write is wrapped, so a private window
 | `ngf.workout.draft.<userId>` | The in-progress workout (sets, timers, notes) | When the workout is finished or discarded |
 | `ngf.textSize`, `ngf.reduceMotion` | A mirror of your display settings, so the first paint is already the right size (the real values are on `profiles`) | Overwritten on every page load |
 | `ngf.sidebar.collapsed` | Desktop sidebar state | Never (not personal) |
-| `ngf.workoutReminders.v1` | Workout reminder schedule (iPhone/Android app; the notifications themselves are scheduled natively) | When you change the reminders |
+| `ngf.workoutReminders.v1` | Older versions only: the workout reminder kept on the phone. Moved to the account once (Profile → Notifications) and then removed | On the first app open after updating |
+| `ngf.notifications.device` | A random id for this phone, so the member can tell their phones apart in Profile → Notifications (not a hardware id) | Never (until app data is cleared) |
+| `ngf.notifications.owner`, `ngf.notifications.lastSync` | Which account's reminders this phone holds (an opaque tag) and when they were last rebuilt | On sign-out |
 
 Drafts are namespaced by user id, so on a shared device one account never sees another's draft (unit-tested in `tests/unit/drafts.test.tsx`).
 

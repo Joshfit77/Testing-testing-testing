@@ -8,8 +8,8 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { signOutAction } from "@/server/actions/auth";
 import { getPlans } from "@/lib/domain/plans";
-import { FaithReminderSync } from "@/components/faith/faith-reminders-settings";
-import { getFaithReminderSyncAction } from "@/server/actions/faith";
+import { NotificationSync } from "@/components/notifications/notification-sync";
+import { getNotificationSyncAction, importDeviceWorkoutReminderAction } from "@/server/actions/notifications";
 import { DemoBar } from "@/components/demo/demo-bar";
 import { demoAiSimulated, isDemoMode, isDemoUser } from "@/server/demo";
 
@@ -34,8 +34,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <ScrollMemory />
       </Suspense>
       <KeyboardAvoidance />
-      {/* Stage 2C: in the iPhone/Android app, apply the account's faith reminders on this device. */}
-      <FaithReminderSync load={getFaithReminderSyncAction} />
+      {/* In the iPhone/Android app: keep this phone's reminders (Faith, workouts, food, recovery) in line with the account. */}
+      <NotificationSync load={getNotificationSyncAction} importWorkout={importDeviceWorkoutReminderAction} />
       {isDemoMode() && <DemoBar plan={plan} canSwitch={isDemoUser(user)} aiSimulated={demoAiSimulated()} />}
       <DraftUserProvider userId={user.id}>{children}</DraftUserProvider>
     </AppShell>

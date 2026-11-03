@@ -12,6 +12,8 @@ import { CARDIO_MODALITIES, COMBINABLE_TYPES, CUSTOM_PROGRAM_TYPES, CUSTOM_TYPES
 import { COMBINE_GOALS } from "@/lib/domain/combined-goals";
 import { ACTIVITY_LEVELS, isWeeklyRate } from "@/lib/domain/calorie-budget";
 import { SESSION_MINUTES } from "@/lib/domain/starter-program";
+import { FAITH_REMINDER_KINDS } from "@/lib/faith-reminders";
+import { APP_REMINDER_KINDS, WATER_INTERVALS } from "@/lib/notifications/catalog";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
 const optionalNumber = (min: number, max: number) =>
@@ -324,7 +326,7 @@ export const customPracticeSchema = z.object({
 });
 
 export const faithReminderSchema = z.object({
-  kind: z.enum(["reading", "prayer", "challenge", "fitness", "accountability", "final", "devotional", "practices", "memorize"]),
+  kind: z.enum(FAITH_REMINDER_KINDS),
   enabled: z.boolean(),
   time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Choose a time"),
   weekdays: z.array(z.number().int().min(0).max(6)).max(7),
@@ -332,9 +334,49 @@ export const faithReminderSchema = z.object({
 export const faithRemindersSchema = z
   .array(faithReminderSchema)
   .min(1)
-  .max(9)
+  .max(FAITH_REMINDER_KINDS.length)
   .refine((list) => new Set(list.map((r) => r.kind)).size === list.length, "Each reminder once")
   .refine((list) => list.every((r) => !r.enabled || r.weekdays.length > 0), "Pick at least one day for each reminder that's on.");
+
+// --------------------------------------------------------------------------- Notifications (Profile → Notifications)
+const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Choose a time");
+export const appReminderSchema = z
+  .object({
+    kind: z.enum(APP_REMINDER_KINDS),
+    enabled: z.boolean(),
+    time: hhmm,
+    weekdays: z.array(z.number().int().min(0).max(6)).max(7),
+    intervalMinutes: z
+      .number()
+      .int()
+      .refine((m) => (WATER_INTERVALS as readonly number[]).includes(m), "Choose how often")
+      .nullable(),
+    endTime: hhmm.nullable(),
+    style: z.enum(["friendly", "faith"]),
+  })
+  .refine((r) => !r.enabled || r.weekdays.length > 0, "Pick at least one day for each reminder that's on.")
+  .refine((r) => r.kind !== "water" || !r.endTime || r.endTime > r.time, "Water reminders need to end after they start.");
+export const notificationSettingsSchema = z.object({
+  faith: faithRemindersSchema,
+  app: z
+    .array(appReminderSchema)
+    .min(1)
+    .max(APP_REMINDER_KINDS.length)
+    .refine((list) => new Set(list.map((r) => r.kind)).size === list.length, "Each reminder once"),
+  prefs: z
+    .object({
+      paused: z.boolean(),
+      quiet: z.object({ start: hhmm, end: hhmm }).nullable(),
+      dailyLimit: z.number().int().min(1).max(20),
+    })
+    .refine((p) => !p.quiet || p.quiet.start !== p.quiet.end, "Quiet hours need different start and end times."),
+});
+export const notificationDeviceSchema = z.object({
+  key: z.string().regex(/^[A-Za-z0-9-]{16,64}$/),
+  platform: z.enum(["ios", "android"]),
+  timezone: z.string().max(64).nullable(),
+  permission: z.enum(["granted", "denied", "prompt", "unknown"]),
+});
 
 // --------------------------------------------------------------------------- AI
 export const aiChatRequestSchema = z.object({

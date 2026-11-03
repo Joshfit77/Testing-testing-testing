@@ -176,6 +176,9 @@ describe.skipIf(!available)("cross-user isolation sweep: every user-owned table 
     parents.discipline_goals = goal.id!;
     await seed("discipline_checkins", { goal_id: goal.id, user_id: u, checked_on: "2026-10-01" });
     await seed("faith_reminders", { user_id: u, kind: "prayer" });
+    await seed("notification_reminders", { user_id: u, kind: "water", enabled: true, interval_minutes: 120, end_at: "19:00" });
+    await seed("notification_prefs", { user_id: u, paused: false, quiet_start: "22:00", quiet_end: "06:00" });
+    await seed("notification_devices", { user_id: u, device_key: crypto.randomUUID(), platform: "ios", label: "iPhone or iPad" });
     const enrollment = await seed("challenge_enrollments", { user_id: u, challenge_slug: "iso-challenge", started_on: "2026-10-01" });
     parents.challenge_enrollments = enrollment.id!;
     await seed("challenge_checkins", { enrollment_id: enrollment.id, user_id: u, day_number: 1, checked_on: "2026-10-01" });

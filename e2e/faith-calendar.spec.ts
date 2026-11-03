@@ -82,17 +82,19 @@ test.describe("Stage 2C: faith flows, onboarding additions and the training cale
     // Faith reminders: off by default, honest about the web, saved to the account.
     await page.goto("/faith");
     await expect(page.getByRole("link", { name: /Faith reminders/ })).toContainText("Off.");
+    // Faith reminders now live in Profile → Notifications (Faith group); the Faith tab links straight there.
     await page.getByRole("link", { name: /Faith reminders/ }).click();
-    await expect(page.getByTestId("reminders-web-note")).toContainText("A web browser can't remind you while this site is closed");
-    const prayerSwitch = page.getByRole("switch", { name: "Prayer reminder" });
+    await page.waitForURL(/\/profile\/notifications#faith$/);
+    await expect(page.getByTestId("notif-web-note")).toContainText(/A web browser can.t remind you while this site is closed/);
+    const prayerSwitch = page.locator('fieldset[data-reminder="prayer"]').getByRole("switch", { name: "Prayer" });
     await expect(prayerSwitch).toHaveAttribute("aria-checked", "false");
     await prayerSwitch.click();
-    await page.getByLabel("Time").fill("07:15");
-    await page.getByRole("button", { name: "Save reminders" }).click();
+    await page.locator("#nr-prayer-time").fill("07:15");
+    await page.getByRole("button", { name: /^Save/ }).click();
     await expect(page.getByText(/^Saved to your account/)).toBeVisible();
     await page.reload();
-    await expect(page.getByRole("switch", { name: "Prayer reminder" })).toHaveAttribute("aria-checked", "true");
-    await expect(page.getByText("Every day at 7:15 AM")).toBeVisible();
+    await expect(page.locator('fieldset[data-reminder="prayer"]').getByRole("switch", { name: "Prayer" })).toHaveAttribute("aria-checked", "true");
+    await expect(page.locator('fieldset[data-reminder="prayer"]')).toContainText("Every day at 7:15 AM");
     await page.goto("/faith");
     await expect(page.getByRole("link", { name: /Faith reminders/ })).toContainText("Prayer: Every day at 7:15 AM");
   });

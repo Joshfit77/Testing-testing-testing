@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { NotificationTodaySync } from "@/components/notifications/notification-sync";
 import { BarChart3, BookMarked, Camera, ScanBarcode, CalendarClock, CalendarDays, ChevronLeft, ChevronRight, CookingPot, Pill, Salad, Scale, ShoppingCart, Trash2, TrendingUp } from "lucide-react";
 import { BarSeriesChart } from "@/components/charts/charts";
 import { MainHeader } from "@/components/shell/main-header";
@@ -243,6 +244,18 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
   return (
     <div className="space-y-6">
       <MainHeader title="Food" />
+      {date === today && (
+        <NotificationTodaySync
+          today={today}
+          done={{
+            breakfast: logged.some((m) => m.meal_type === "breakfast"),
+            lunch: logged.some((m) => m.meal_type === "lunch"),
+            dinner: logged.some((m) => m.meal_type === "dinner"),
+            snack: logged.some((m) => m.meal_type === "snack"),
+            water: Boolean(goals?.water_ml) && water >= (goals?.water_ml ?? 0),
+          }}
+        />
+      )}
       <nav className="-mt-4 -mb-1 flex items-center justify-center gap-2" aria-label="Choose day">
         <Button asChild variant="ghost" size="icon" aria-label="Previous day">
           <Link href={`/nutrition?date=${addDays(date, -1)}`}>

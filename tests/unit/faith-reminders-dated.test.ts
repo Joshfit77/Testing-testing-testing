@@ -47,9 +47,11 @@ describe("dated Faith reminders", () => {
     expect(late[0]!.date).toBe("2026-11-04");
   });
 
-  it("sends the journey's evening and final reminders only while a journey is active", () => {
+  it("sends the strict journey's before-midnight reminder only while a journey is active; the evening check-in is for everyone", () => {
     const n = buildDatedFaithNotifications([on("accountability", "20:00"), on("final", "22:30"), on("reading", "19:00")], ctx({ journeyActive: false }));
-    expect(new Set(n.map((x) => x.kind))).toEqual(new Set(["reading"]));
+    expect(new Set(n.map((x) => x.kind))).toEqual(new Set(["reading", "accountability"]));
+    const j = buildDatedFaithNotifications([on("final", "22:30")], ctx({ journeyActive: true }));
+    expect(j.length).toBeGreaterThan(0);
   });
 
   it("respects quiet hours, including ones that cross midnight", () => {

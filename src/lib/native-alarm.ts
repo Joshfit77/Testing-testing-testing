@@ -2,7 +2,7 @@
 
 /**
  * Wake-up alarm on the phone: weekly repeating local notifications with Snooze and I'm up actions
- * (Capacitor LocalNotifications), following the workout-reminder pattern in ./native-reminders.ts.
+ * (Capacitor LocalNotifications), following the reminder pattern in ./native-notifications.ts.
  * Every function is a safe no-op outside the iOS/Android shells. Not yet verified on a physical phone.
  */
 import { isNativeApp } from "@/lib/native";

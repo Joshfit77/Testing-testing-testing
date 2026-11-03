@@ -21,7 +21,6 @@ vi.mock("@/lib/supabase/server", () => ({
 vi.mock("@/server/actions/auth", () => ({ signOutAction: vi.fn() }));
 vi.mock("@/components/shell/main-header", () => ({ MainHeader: () => null }));
 vi.mock("@/components/profile/display-settings", () => ({ DisplaySettings: () => null }));
-vi.mock("@/components/profile/workout-reminders", () => ({ WorkoutReminders: () => null }));
 vi.mock("@/components/shell/sign-out-form", () => ({ SignOutForm: ({ children }: { children: React.ReactNode }) => <form>{children}</form> }));
 vi.mock("@/components/profile/profile-forms", () => ({ ProfileForm: () => null, DeleteAccountForm: () => null, WithdrawConsentForm: () => null, AiConsentOffForm: () => null }));
 

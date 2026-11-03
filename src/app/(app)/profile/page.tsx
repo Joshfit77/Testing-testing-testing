@@ -3,7 +3,6 @@ import { BellRing, ChevronRight, CreditCard, Download, KeyRound, LogOut, Sliders
 import { MainHeader } from "@/components/shell/main-header";
 import { DisplaySettings } from "@/components/profile/display-settings";
 import { DeleteAccountForm, ProfileForm, WithdrawConsentForm, AiConsentOffForm } from "@/components/profile/profile-forms";
-import { WorkoutReminders } from "@/components/profile/workout-reminders";
 import { Button } from "@/components/ui/button";
 import { getPlans } from "@/lib/domain/plans";
 import { getServerSupabase } from "@/lib/supabase/server";
@@ -45,6 +44,7 @@ export default async function ProfilePage() {
 
       <nav aria-label="Profile sections" className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
         <Row href="/profile/preferences" icon={SlidersHorizontal} title="Edit onboarding details" body="Goals (main and second), schedule, equipment, diet, body and display" />
+        <Row href="/profile/notifications" icon={BellRing} title="Notifications" body="Reminders for Faith, workouts, food, water and recovery" />
         <Row href="/profile/billing" icon={CreditCard} title="Plans & billing" body={`Current plan: ${getPlans()[plan].name}`} />
         <Row href="/progress" icon={TrendingUp} title="My Progress" body="Overview, badges and history" />
       </nav>
@@ -75,18 +75,6 @@ export default async function ProfilePage() {
           initial={{ textSize: profile.text_size ?? "default", reduceMotion: profile.reduce_motion ?? false, homeScripture: profile.home_scripture ?? true }}
         />
       </section>
-
-      <div id="reminders" className="space-y-2">
-        <WorkoutReminders faithEnabled={profile.faith_enabled} />
-        <Link href="/faith/reminders" className="flex min-h-14 items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 hover:border-gold-muted">
-          <BellRing className="size-5 shrink-0 text-gold" aria-hidden />
-          <span className="min-w-0 flex-1">
-            <span className="block font-semibold">Faith reminders</span>
-            <span className="block text-sm text-muted-foreground">Devotional, prayer and practice reminders (optional)</span>
-          </span>
-          <ChevronRight className="size-4 shrink-0 text-gold" aria-hidden />
-        </Link>
-      </div>
 
       <section id="privacy" className={`${section} space-y-5`} aria-labelledby="privacy-title">
         <h2 id="privacy-title" className="text-lg font-semibold">

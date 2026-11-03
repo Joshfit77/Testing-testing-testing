@@ -170,7 +170,7 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
         </section>
       )}
 
-      <Link href="/faith/reminders" className="flex min-h-14 items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 hover:border-gold-muted">
+      <Link href="/profile/notifications#faith" className="flex min-h-14 items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 hover:border-gold-muted">
         <BellRing className="size-5 shrink-0 text-gold" aria-hidden />
         <span className="min-w-0 flex-1">
           <span className="block font-semibold">Faith reminders</span>

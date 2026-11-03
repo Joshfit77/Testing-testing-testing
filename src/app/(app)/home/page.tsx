@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Suspense } from "react";
+import { TodaysRemindersSection } from "@/components/notifications/todays-reminders-section";
 import { Award, BarChart3, CalendarDays, ChevronRight, Dumbbell, Footprints, HeartPulse, Moon, Pill, TrendingUp, Utensils, Wand2 } from "lucide-react";
 import { Notice } from "@/components/common/states";
 import { TodayWorkoutAction } from "@/components/home/today-workout-action";
@@ -121,6 +123,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           </div>
         </Link>
       )}
+
+      <Suspense fallback={null}>
+        <TodaysRemindersSection supabase={supabase} userId={user.id} profile={profile} />
+      </Suspense>
 
       {/* Today's workout */}
       <section className={`${card} p-4`} aria-labelledby="today-title">
