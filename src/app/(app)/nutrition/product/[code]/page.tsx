@@ -62,9 +62,14 @@ export default async function ProductQualityPage({ params, searchParams }: { par
             Barcode {code || raw} isn&apos;t in Open Food Facts yet, so there&apos;s nothing to show, and nothing is guessed. You can log it yourself from the food diary using the label.
           </Notice>
         )}
-        <Link href="/nutrition" className="text-sm font-semibold text-gold-highlight underline">
-          Go to the food diary
-        </Link>
+        <div className="flex flex-wrap gap-4">
+          <Link href="/nutrition/label" className="text-sm font-semibold text-gold-highlight underline">
+            Check its ingredient label instead
+          </Link>
+          <Link href="/nutrition" className="text-sm font-semibold text-gold-highlight underline">
+            Go to the food diary
+          </Link>
+        </div>
       </div>
     );
   }
@@ -157,6 +162,15 @@ export default async function ProductQualityPage({ params, searchParams }: { par
       />
       {scoreOn && <FoodIqBreakdown score={score} />}
       <IngredientAlertsSection alerts={alerts} hasIngredients={Boolean(p.ingredientsText)} ingredientsLang={p.ingredientsLang} incomplete={p.incomplete.includes("ingredients")} />
+      {(!p.ingredientsText || p.incomplete.includes("ingredients")) && (
+        <p className="text-sm text-muted-foreground" data-testid="label-check-link">
+          Have the package?{" "}
+          <Link href="/nutrition/label" className="font-semibold text-gold-highlight underline">
+            Check its ingredient label
+          </Link>{" "}
+          for additives, added sugars and allergens.
+        </p>
+      )}
 
       {choice ? (
         <AddProductToDiary choice={choice} date={today} defaultMeal={mealForTime(new Date(2000, 0, 1, hour))} />

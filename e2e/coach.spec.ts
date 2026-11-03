@@ -144,6 +144,17 @@ function structuredReply(req: MockRequest): Record<string, unknown> | null {
       uncertainties: ["Added sugars aren't listed separately (not available)"],
     };
   }
+  if (system.includes("You transcribe the text printed on a food label")) {
+    return {
+      is_label: true,
+      legibility: "partly",
+      product_name: "Cherry Fizz",
+      // One word the "AI" couldn't read, for the member to fix before checking.
+      ingredients_text: "Carbonated water, sugar, acid: citric acid, colour: E129, sweetener: [?], flavourings.",
+      allergen_statement: "May contain milk.",
+      nutrition: { basis: "per_100ml", serving_size_grams: 330, calories: 42, protein_g: 0, carbs_g: 10.6, sugars_g: 10.6, fat_g: 0, sat_fat_g: 0, fiber_g: null, salt_g: 0.02, sodium_mg: null },
+    };
+  }
   if (system.includes("You estimate the nutrition of a meal from one photo")) {
     const it = (name: string, portion: string, grams: number | null, calories: number, p: number, c: number, f: number, confidence: string, search_term: string) => ({
       name,
@@ -753,6 +764,41 @@ test.describe("AI coach", () => {
     await expect(page.getByRole("button", { name: "Edit Olive oil" })).toContainText("13.5 g · 119 kcal");
     await expect(page.getByRole("button", { name: /^Edit White rice/ })).toContainText("160 g (amount estimated from a photo)");
     await expect(page.getByText("Includes estimated entries")).toBeVisible();
+  });
+  test("label photo: Pro reads a label with the AI, the member corrects it, the app's own rules check it", async ({ page }) => {
+    test.skip(!MOCK_PORT, "set E2E_ANTHROPIC_MOCK_PORT and start the app with ANTHROPIC_BASE_URL pointing at it");
+    test.setTimeout(120_000);
+    const email = uniqueEmail("label-photo");
+    await signUpAndConfirm(page, email);
+    await completeOnboarding(page);
+    await grantPlan(email, "pro");
+    await page.goto("/nutrition/label");
+    // Both consents first (typing works without them).
+    await page.getByRole("button", { name: "Allow and continue" }).click();
+    const consent = page.getByTestId("food-photo-consent");
+    await expect(consent).toContainText("label photo");
+    await consent.getByRole("checkbox").check();
+    await consent.getByRole("button", { name: "Agree and continue" }).click();
+    await expect(page.getByRole("button", { name: "Photograph the label" })).toBeVisible();
+
+    await page.getByLabel("Choose a label photo").setInputFiles("public/icons/icon-512.png");
+    await expect(page.getByTestId("label-photo-note")).toContainText("check every word against the label");
+    await expect(page.getByTestId("label-photo-note")).toContainText("[?]");
+    // What went to the (mock) AI: one image, on the fast model, to transcribe only.
+    const sent = requests.filter((r) => r.system.some((b) => b.text.includes("You transcribe the text printed on a food label"))).at(-1)!;
+    expect(sent.model).toBe("claude-haiku-5-5");
+    expect((sent.messages[0]!.content as { type: string; source?: { media_type: string } }[])[0]).toMatchObject({ type: "image", source: { media_type: "image/jpeg" } });
+
+    // The transcription is editable: fix the unreadable word, then check with the app's own rules.
+    const ingredients = page.getByLabel("Ingredients");
+    await expect(ingredients).toHaveValue(/sweetener: \[\?\]/);
+    await ingredients.fill("Carbonated water, sugar, acid: citric acid, colour: E129, sweetener: aspartame, flavourings.");
+    await expect(page.getByLabel("Values are per")).toHaveValue("100ml");
+    await page.getByTestId("label-check").click();
+    const result = page.getByTestId("label-result");
+    await expect(result.getByTestId("alert-e129")).toContainText("Synthetic colour");
+    await expect(result.getByTestId("alert-e951")).toContainText("Aspartame");
+    await expect(result.getByTestId("label-allergens")).toContainText("May contain: Milk");
   });
   test("Food IQ: Pro sees how a product fits their own targets and can ask the AI about it, from known data only", async ({ page }) => {
     test.skip(!MOCK_PORT || !process.env.E2E_OFF_MOCK_PORT, "needs the mock Anthropic and Open Food Facts servers");

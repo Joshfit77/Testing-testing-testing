@@ -97,7 +97,7 @@ proportional in between.
 | Band | Score | Meaning in this formula |
 |---|---|---|
 | Excellent | 85–100 | Strong positives (high fibre and/or protein, fruit/veg) and almost nothing to watch |
-| Good | 70–84 | Clear net positives: at least 8 positive points more than the weighted concerns |
+| Good | 70–84 | Clear net positives. For foods, 2.5 × positive points − 1.5 × concern points is at least 20: for example 8 positive points with no concerns, or 11 with 5 (drinks start from 80, so they need 2.5P − 2N ≥ −10) |
 | Moderate | 50–69 | Roughly balanced, or a few concerns offset by positives |
 | Poor | 30–49 | Net concerns, typically one nutrient at UK "high" level or several at "medium" |
 | Very poor | 0–29 | Several high-level concerns (e.g. high in sugar *and* saturated fat) with little to offset them |

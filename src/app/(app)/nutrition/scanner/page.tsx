@@ -53,8 +53,14 @@ export default async function FoodIqPage({ searchParams }: { searchParams: Promi
           <CardTitle className="text-base">Scan a barcode</CardTitle>
           <p className="text-sm text-muted-foreground">Point your camera at the barcode, or type the number under it.</p>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
           <QualityScanner />
+          <p className="text-sm text-muted-foreground">
+            No barcode, or the product isn&apos;t found?{" "}
+            <Link href="/nutrition/label" className="font-semibold text-gold-highlight underline" data-testid="label-check-link">
+              Check its ingredient label
+            </Link>
+          </p>
         </CardContent>
       </Card>
 

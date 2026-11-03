@@ -341,11 +341,16 @@ export function FoodPhotoFlow({ date: initialDate, defaultMeal, myFoods, extras,
           {analysis.packaged && (
             <div role="note" className="space-y-2 rounded-2xl border border-border bg-card p-3 text-sm" data-testid="food-photo-packaged">
               <p>This looks like a packaged product. Its barcode gives the label&apos;s own nutrition, ingredients, additives and allergens, which a photo of the food can&apos;t.</p>
-              <Button asChild size="sm" variant="secondary">
-                <Link href="/nutrition/scanner">
-                  <Barcode aria-hidden /> Scan the barcode instead
-                </Link>
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button asChild size="sm" variant="secondary">
+                  <Link href="/nutrition/scanner">
+                    <Barcode aria-hidden /> Scan the barcode instead
+                  </Link>
+                </Button>
+                <Button asChild size="sm" variant="ghost">
+                  <Link href="/nutrition/label">Check its ingredient label</Link>
+                </Button>
+              </div>
             </div>
           )}
           {!analysis.isFood && <p className="text-sm">No food was recognised in that photo. Add the items yourself below, or try another photo.</p>}

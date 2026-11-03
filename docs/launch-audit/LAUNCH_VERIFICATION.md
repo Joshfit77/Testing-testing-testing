@@ -65,6 +65,12 @@ version and the build number.
 
 - **LV-SCAN-1:** A UPC-E (short) barcode, a scan held in landscape, and an incoming call during a scan. The scanner
   closes or recovers without freezing.
+- **LV-SCAN-2 (new):** Scan an 8-digit UPC-E product from **Nutrition Score**, then the same product from the diary
+  scanner. Both open the same product.
+  - This checks that the iOS scanner reports the barcode type. If it doesn't, the app falls back to trying both
+    readings.
+- **LV-SCAN-3 (new):** With Airplane mode on, scan from Nutrition Score. The message is "You're offline", not an
+  endless "Looking up…".
 
 **F. Progress photos:** DT-PHOTO-01…08, plus:
 
@@ -72,6 +78,41 @@ version and the build number.
   tap Save again: there is **one** entry, with its image (new in this build).
 - **LV-PHOTO-2:** A 48 MP photo, a ProRAW photo, a Live Photo and a photo stored only in iCloud. Each saves or gives
   a clear error, with no crash.
+
+**F2. Meal photo and label check (new in this build):**
+
+- **LV-FOOD-1:** On Pro, take a meal photo with the camera. Check four things:
+  - The photo preview appears.
+  - The estimate arrives in under about 20 seconds on 4G.
+  - Chicken or rice appear as "Database values · Amount estimated from the photo".
+  - Changing an estimate's grams changes its kcal.
+- **LV-FOOD-2:** Photograph a plate in very low light, and a blurry one. The "looks dark" or "blurry" note appears with
+  "Use another photo".
+- **LV-FOOD-3:** Photograph a packaged snack. "This looks like a packaged product" appears, with links to the barcode
+  scanner and the label check. No additive or preservative is listed for the meal.
+- **LV-FOOD-4:** Turn Airplane mode on and tap "Confirm and add to diary". An error appears. Reconnect and confirm again:
+  each item is in the diary **once**.
+- **LV-FOOD-5:** Under Settings → Privacy → Camera, turn camera access off for the app, then tap "Take a photo".
+  "Choose from library" still works, and nothing crashes.
+- **LV-FOOD-6:** Use **Check a label** with the camera on a real ingredient list in small print. Check four things:
+  - The text appears in the fields, with unreadable words marked [?].
+  - The text can be corrected.
+  - "Check these ingredients" lists the label's E-numbers.
+  - The allergen box shows the "not proof" note.
+- **LV-FOOD-7:** Check a label and add 30 g to the diary. The entry reads "30 g (from a label you checked)" with the
+  right kcal.
+- **LV-FOOD-8 (cost):** After LV-FOOD-1 to LV-FOOD-6, run this read-only query as the service role in the Supabase SQL
+  editor:
+
+  ```sql
+  select kind, model, input_tokens, output_tokens, created_at
+  from ai_usage_events
+  where kind = 'food_photo'
+  order by created_at desc
+  limit 20;
+  ```
+
+  Each photo is one row. Record the tokens: this is the first **measured** cost per photo.
 
 **G. Completion screen:** after any program workout, the summary shows:
 

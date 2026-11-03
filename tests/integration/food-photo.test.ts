@@ -46,4 +46,20 @@ describe.skipIf(!available)("AI food photos", async () => {
     expect((await pro.client.from("meal_items").insert({ ...row, source: "photo2" })).error).not.toBeNull();
     expect((await other.client.from("meal_items").select("id").eq("meal_id", meal!.id)).data).toEqual([]);
   });
+
+  it("saves a reviewed photo once, however often the save is sent (all rows or none)", async () => {
+    const { rowClientId } = await import("@/server/services/diary-write");
+    const { data: meal } = await pro.client.from("meals").insert({ user_id: pro.id, eaten_on: "2026-10-23", meal_type: "dinner" }).select("id").single();
+    const saveId = crypto.randomUUID();
+    const rows = ["Rice", "Broccoli"].map((name, i) => ({ meal_id: meal!.id, user_id: pro.id, client_id: rowClientId(saveId, i), name, servings: 1, calories: 100, protein_g: 2, carbs_g: 20, fat_g: 1, is_estimate: true, source: "photo" }));
+    expect((await pro.client.from("meal_items").insert(rows)).error).toBeNull();
+    // The retry (same review, same ids) is refused as a whole with a unique violation, which the action reports as saved.
+    const retry = await pro.client.from("meal_items").insert(rows);
+    expect(retry.error?.code).toBe("23505");
+    const { count } = await pro.client.from("meal_items").select("id", { count: "exact", head: true }).eq("meal_id", meal!.id);
+    expect(count).toBe(2);
+    // Another member reusing the same ids is a different save, not a conflict with this one.
+    const { data: theirMeal } = await other.client.from("meals").insert({ user_id: other.id, eaten_on: "2026-10-23", meal_type: "dinner" }).select("id").single();
+    expect((await other.client.from("meal_items").insert(rows.map((r) => ({ ...r, meal_id: theirMeal!.id, user_id: other.id })))).error).toBeNull();
+  });
 });

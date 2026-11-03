@@ -103,29 +103,41 @@ describe("AI routes read the plan through the authenticated session", () => {
     expect(coachTurn.mock.calls[0]![0]).toMatchObject({ userId: "u-lapsed", plan: "free" });
   });
 
+  /** A hand-built multipart body (the jsdom FormData isn't the one the request parser expects). */
+  const photoRequest = (bytes: Uint8Array) => {
+    const boundary = "----ngf-test-boundary";
+    const head = new TextEncoder().encode(`--${boundary}\r\nContent-Disposition: form-data; name="photo"; filename="meal.png"\r\nContent-Type: image/png\r\n\r\n`);
+    const tail = new TextEncoder().encode(`\r\n--${boundary}--\r\n`);
+    const body = new Uint8Array([...head, ...bytes, ...tail]);
+    return new NextRequest("http://localhost/api/ai/food-photo", {
+      method: "POST",
+      headers: { authorization: "Bearer token", "content-type": `multipart/form-data; boundary=${boundary}`, "content-length": String(body.length) },
+      body,
+    });
+  };
+  // A real 1 × 1 PNG: the server decodes and re-encodes every photo before it goes to the AI.
+  const PNG_1X1 = new Uint8Array(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64"));
+
   it("the food-photo route uses the same session for the plan", async () => {
     const session = stubClient({ user_entitlements: { plan: "pro", valid_until: null } });
     authenticateRequest.mockResolvedValue({ user: { id: "u-photo" }, supabase: session, via: "bearer" });
     analyzeFoodPhoto.mockResolvedValue({ is_food: true, items: [], summary: "ok", questions: [] });
-    // A hand-built multipart body (the jsdom FormData isn't the one the request parser expects). A PNG header is
-    // enough for the image sniff; the analysis itself is mocked.
-    const boundary = "----ngf-test-boundary";
-    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
-    const head = new TextEncoder().encode(`--${boundary}\r\nContent-Disposition: form-data; name="photo"; filename="meal.png"\r\nContent-Type: image/png\r\n\r\n`);
-    const tail = new TextEncoder().encode(`\r\n--${boundary}--\r\n`);
-    const body = new Uint8Array([...head, ...png, ...tail]);
-    const res = await foodPhoto(
-      new NextRequest("http://localhost/api/ai/food-photo", {
-        method: "POST",
-        headers: { authorization: "Bearer token", "content-type": `multipart/form-data; boundary=${boundary}`, "content-length": String(body.length) },
-        body,
-      }),
-    );
+    const res = await foodPhoto(photoRequest(PNG_1X1));
     expect(res.status).toBe(200);
     expect(analyzeFoodPhoto).toHaveBeenCalledTimes(1);
-    // (supabase, userId, plan, photo, notes)
+    // (supabase, userId, plan, photo, notes): the photo arrives re-encoded as JPEG.
     expect(analyzeFoodPhoto.mock.calls[0]![0]).toBe(session);
     expect(analyzeFoodPhoto.mock.calls[0]![1]).toBe("u-photo");
     expect(analyzeFoodPhoto.mock.calls[0]![2]).toBe("pro");
+    expect(analyzeFoodPhoto.mock.calls[0]![3]).toMatchObject({ mediaType: "image/jpeg" });
+  });
+
+  it("refuses a file that only looks like an image, without calling the AI", async () => {
+    const session = stubClient({ user_entitlements: { plan: "pro", valid_until: null } });
+    authenticateRequest.mockResolvedValue({ user: { id: "u-photo" }, supabase: session, via: "bearer" });
+    // A PNG signature with nothing decodable after it passes the byte sniff but not the server's decode.
+    const res = await foodPhoto(photoRequest(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0])));
+    expect(res.status).toBe(415);
+    expect(analyzeFoodPhoto).not.toHaveBeenCalled();
   });
 });
