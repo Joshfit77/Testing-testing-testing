@@ -8,6 +8,8 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { RANK_CATEGORIES, type CategoryProgress, type RankCategory, type RankState } from "@/lib/domain/ranks";
 import { cn } from "@/lib/utils";
+import { ScriptureText } from "@/components/bible/scripture-text";
+import type { TextPart } from "@/lib/bible/red-letter";
 
 /** Verse text (BSB) and translation code for each reference used by the ranks, read on the server. */
 export type RankVerses = Record<string, string>;
@@ -44,7 +46,22 @@ function requirement(r: RankState): string {
   return r.threshold === 1 ? "Take part in Faith for the first time." : `Take part in Faith on ${r.threshold.toLocaleString("en-US")} ${noun}.`;
 }
 
-export function RankBoard({ progress, verses, translation, initial = "fitness", today }: { progress: CategoryProgress[]; verses: RankVerses; translation: string; initial?: RankCategory; today: string }) {
+export function RankBoard({
+  progress,
+  verses,
+  verseParts,
+  translation,
+  initial = "fitness",
+  today,
+}: {
+  progress: CategoryProgress[];
+  verses: RankVerses;
+  /** Red-letter parts of the rank verses that contain words of Jesus, by reference. */
+  verseParts?: Record<string, TextPart[]>;
+  translation: string;
+  initial?: RankCategory;
+  today: string;
+}) {
   const [tab, setTab] = useState<RankCategory>(initial);
   const [open, setOpen] = useState<RankState | null>(null);
   const [reveal, setReveal] = useState<RankState | null>(null);
@@ -131,13 +148,13 @@ export function RankBoard({ progress, verses, translation, initial = "fitness", 
         </button>
         <p className="text-xs text-muted-foreground">{info.counts}</p>
 
-        <RankLadder progress={current} onOpen={setOpen} verses={verses} translation={translation} />
+        <RankLadder progress={current} onOpen={setOpen} verses={verses} verseParts={verseParts} translation={translation} />
       </div>
 
       <Dialog open={open !== null} onOpenChange={(o) => !o && setOpen(null)}>
         {open ? (
           <DialogContent className="max-h-[90dvh] overflow-y-auto">
-            <RankDetail rank={open} progress={byCat.get(open.category)!} verse={verses[open.reference]} translation={translation} />
+            <RankDetail rank={open} progress={byCat.get(open.category)!} verse={verses[open.reference]} parts={verseParts?.[open.reference]} translation={translation} />
           </DialogContent>
         ) : null}
       </Dialog>
@@ -145,7 +162,7 @@ export function RankBoard({ progress, verses, translation, initial = "fitness", 
       <Dialog open={reveal !== null} onOpenChange={(o) => !o && setReveal(null)}>
         {reveal ? (
           <DialogContent className="max-h-[90dvh] overflow-y-auto">
-            <RankReveal rank={reveal} verse={verses[reveal.reference]} translation={translation} onClose={() => setReveal(null)} />
+            <RankReveal rank={reveal} verse={verses[reveal.reference]} parts={verseParts?.[reveal.reference]} translation={translation} onClose={() => setReveal(null)} />
           </DialogContent>
         ) : null}
       </Dialog>
@@ -153,10 +170,12 @@ export function RankBoard({ progress, verses, translation, initial = "fitness", 
   );
 }
 
-function VerseBlock({ reference, verse, translation }: { reference: string; verse: string | undefined; translation: string }) {
+function VerseBlock({ reference, verse, parts, translation }: { reference: string; verse: string | undefined; parts?: TextPart[]; translation: string }) {
   return (
     <figure className="rounded-xl border border-gold-muted/40 bg-[#14110a] px-4 py-3">
-      {verse ? <blockquote className="font-serif text-[0.95rem] leading-relaxed text-[#f1ead6]">{verse}</blockquote> : null}
+      {verse ? <blockquote className="font-serif text-[0.95rem] leading-relaxed text-[#f1ead6]">
+          <ScriptureText text={verse} parts={parts} />
+        </blockquote> : null}
       <figcaption className="mt-1.5 text-xs font-semibold text-gold">
         {reference} ({translation})
       </figcaption>
@@ -164,7 +183,7 @@ function VerseBlock({ reference, verse, translation }: { reference: string; vers
   );
 }
 
-function RankDetail({ rank, progress, verse, translation }: { rank: RankState; progress: CategoryProgress; verse: string | undefined; translation: string }) {
+function RankDetail({ rank, progress, verse, parts, translation }: { rank: RankState; progress: CategoryProgress; verse: string | undefined; parts?: TextPart[]; translation: string }) {
   const info = RANK_CATEGORIES.find((c) => c.id === rank.category)!;
   const pct = rank.earned ? 100 : Math.min(100, Math.round((progress.count / rank.threshold) * 100));
   return (
@@ -184,7 +203,7 @@ function RankDetail({ rank, progress, verse, translation }: { rank: RankState; p
         <DialogTitle className="font-display text-2xl font-bold">{rank.name}</DialogTitle>
         <DialogDescription className="text-sm text-muted-foreground">{rank.theme}</DialogDescription>
       </div>
-      <VerseBlock reference={rank.reference} verse={verse} translation={translation} />
+      <VerseBlock reference={rank.reference} verse={verse} parts={parts} translation={translation} />
       <div className="space-y-2 rounded-xl border border-border bg-card p-3">
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">To unlock</p>
         <p className="text-sm">{requirement(rank)}</p>
@@ -206,7 +225,7 @@ function RankDetail({ rank, progress, verse, translation }: { rank: RankState; p
   );
 }
 
-function RankReveal({ rank, verse, translation, onClose }: { rank: RankState; verse: string | undefined; translation: string; onClose: () => void }) {
+function RankReveal({ rank, verse, parts, translation, onClose }: { rank: RankState; verse: string | undefined; parts?: TextPart[]; translation: string; onClose: () => void }) {
   const info = RANK_CATEGORIES.find((c) => c.id === rank.category)!;
   const top = rank.level === 9;
   return (
@@ -230,7 +249,7 @@ function RankReveal({ rank, verse, translation, onClose }: { rank: RankState; ve
           Rank {rank.level} of 9 · {rank.theme}
         </DialogDescription>
       </div>
-      <VerseBlock reference={rank.reference} verse={verse} translation={translation} />
+      <VerseBlock reference={rank.reference} verse={verse} parts={parts} translation={translation} />
       <button type="button" onClick={onClose} className="min-h-11 w-full rounded-xl bg-gold-gradient px-4 font-semibold text-black">
         Continue
       </button>

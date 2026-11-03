@@ -30,6 +30,10 @@ test.describe("Bible reader", () => {
     await expect(page.getByRole("heading", { name: "John 3" })).toBeVisible();
     const verse16 = page.locator("#v16").getByRole("button");
     await expect(verse16).toContainText(JOHN_3_16);
+    // The words of Jesus are in red (the publisher's red-letter marking): all of 3:16 is His; 3:1 is narration.
+    await expect(page.locator("#v16 [data-words-of-jesus]")).toHaveText(JOHN_3_16);
+    await expect(page.locator("#v16 [data-words-of-jesus]")).toHaveCSS("color", "rgb(240, 115, 106)");
+    await expect(page.locator("#v1 [data-words-of-jesus]")).toHaveCount(0);
 
     // Highlight in gold, bookmark, and a note: each survives a reload.
     await verse16.click();
@@ -82,6 +86,12 @@ test.describe("Bible reader", () => {
     await page.goto("/faith/bible/john/5");
     await expect(page.locator("#v4")).toContainText("Verse 4 is not in the Berean Standard Bible’s main text");
 
+    // Only His words are red, never the narration around them.
+    await page.goto("/faith/bible/john/11");
+    await expect(page.locator("#v25 [data-words-of-jesus]")).toHaveText("“I am the resurrection and the life. Whoever believes in Me will live, even though he dies.");
+    await expect(page.locator("#v25").getByRole("button")).toContainText("Jesus said to her, “I am the resurrection");
+    await expect(page.locator("#v35 [data-words-of-jesus]")).toHaveCount(0);
+
     // Reference search shows the passage; keyword and phrase search find whole words.
     await page.goto("/faith/bible/search?q=John+3%3A16");
     await expect(page.getByRole("region", { name: "John 3:16" })).toContainText(JOHN_3_16);
@@ -120,6 +130,9 @@ test.describe("Bible reader", () => {
     await expect(page.getByText(/You're offline\. This is the Bible saved on this device/)).toBeVisible();
     await expect(page.getByRole("heading", { name: "John 3" })).toBeVisible();
     await expect(page.locator("#v16")).toContainText(JOHN_3_16);
+    await expect(page.locator("#v16 .wj")).toHaveText(JOHN_3_16);
+    await expect(page.locator("#v16 .wj")).toHaveCSS("color", "rgb(240, 115, 106)");
+    await expect(page.locator("#v1 .wj")).toHaveCount(0);
     await page.getByRole("link", { name: /Next\s*John 4/ }).click();
     await expect(page.getByRole("heading", { name: "John 4" })).toBeVisible();
     await page.getByRole("link", { name: "← John" }).click();

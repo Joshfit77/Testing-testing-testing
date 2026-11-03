@@ -13,7 +13,8 @@ import { LEVEL_LABELS, memoryRef, type MemoryRow } from "@/lib/faith/memory";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
 import { deleteMemoryAction } from "@/server/actions/bible";
-import { passageText } from "@/server/bible/text";
+import { passageParts } from "@/server/bible/text";
+import { ScriptureText } from "@/components/bible/scripture-text";
 
 export const metadata = { title: "Scripture memory" };
 
@@ -36,7 +37,9 @@ export default async function MemoryPage() {
             <span className="font-semibold text-gold-highlight">{formatReference(ref)}</span>
             <span className="text-xs text-muted-foreground">{r.status === "memorized" ? "Memorized" : LEVEL_LABELS[r.level]}</span>
           </span>
-          <span className="mt-0.5 line-clamp-2 block font-serif text-[0.9375rem] text-muted-foreground">{passageText(ref)}</span>
+          <span className="mt-0.5 line-clamp-2 block font-serif text-[0.9375rem] text-muted-foreground">
+            <ScriptureText parts={passageParts(ref)} />
+          </span>
           {r.next_review_on && r.next_review_on > today && <span className="mt-1 block text-xs text-muted-foreground">Next practice {formatShortDate(r.next_review_on)}</span>}
         </Link>
         <ActionButton action={deleteMemoryAction} fields={{ id: r.id }} variant="ghost" size="icon" aria-label={`Remove ${formatReference(ref)}`} confirmMessage="Remove this passage from memory practice?" confirmLabel="Remove">

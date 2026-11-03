@@ -20,6 +20,8 @@ import { addDays, isoDateInTz } from "@/lib/domain/dates";
 import { loadProgramSchedule } from "@/server/services/schedule";
 import { buildWeeklyActivity } from "@/lib/domain/activity-week";
 import { verseExcerpt } from "@/lib/domain/scripture";
+import { scriptureParts } from "@/server/bible/text";
+import { ScriptureText } from "@/components/bible/scripture-text";
 
 export const metadata = { title: "Home" };
 
@@ -111,7 +113,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           <div className="relative flex min-h-40 flex-col justify-end p-4">
             <p className="text-xs font-semibold text-champagne">Verse of the day</p>
             <blockquote className="mt-1 max-w-[18rem] font-serif text-[1.375rem] leading-snug text-white [text-shadow:0_1px_8px_rgba(0,0,0,0.6)]">
-              {verseExcerpt(verse.text)}
+              <ScriptureText parts={scriptureParts(verse.reference, verseExcerpt(verse.text))} />
             </blockquote>
             <p className="mt-1.5 flex items-center gap-1 text-sm text-white/80">
               {verse.reference} ({TRANSLATION.code}) <ChevronRight className="size-4 text-gold transition-transform group-hover:translate-x-0.5" aria-hidden />

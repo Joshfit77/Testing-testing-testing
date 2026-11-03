@@ -2,7 +2,8 @@ import "server-only";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { BIBLE_BOOKS, bookById, type BibleBook } from "@/lib/bible/books";
-import { formatReference, type ScriptureRef } from "@/lib/bible/reference";
+import { formatReference, parseReference, type ScriptureRef } from "@/lib/bible/reference";
+import { hasRedLetter, joinVerseParts, sliceParts, type RedLetterSpan, type TextPart } from "@/lib/bible/red-letter";
 
 /**
  * The verified Berean Standard Bible (public/bible/bsb, see tests/unit/bible-dataset.test.ts), read from disk once per
@@ -43,6 +44,41 @@ function loadBook(id: string): BookFile {
   return b;
 }
 
+interface RedLetterFile {
+  source: string;
+  sourceSha256: string;
+  bibleContentSha256: string;
+  books: Record<string, Record<string, Record<string, [number, number][]>>>;
+}
+let redLetter: RedLetterFile | null | undefined;
+
+/**
+ * The words-of-Jesus offsets (public/bible/bsb/wj.json, built by scripts/build-bsb-red-letter.mjs from the publisher's
+ * USFM edition). Used only if they were built for exactly this Bible text; otherwise nothing is shown in red, because
+ * offsets into different text could colour the wrong words.
+ */
+export function redLetterData(): RedLetterFile | null {
+  if (redLetter === undefined) {
+    try {
+      const data = JSON.parse(readFileSync(path.join(DIR, "wj.json"), "utf8")) as RedLetterFile;
+      redLetter = data.bibleContentSha256 === bibleMeta().contentSha256 ? data : null;
+    } catch {
+      redLetter = null;
+    }
+  }
+  return redLetter;
+}
+
+/** The words of Jesus in one chapter: verse number → [start, end) offsets into that verse's text. */
+export function chapterWordsOfJesus(bookId: string, chapter: number): Record<number, RedLetterSpan[]> {
+  return redLetterData()?.books[bookId]?.[chapter] ?? {};
+}
+
+/** The words of Jesus in one verse, if it has any. */
+export function wordsOfJesus(bookId: string, chapter: number, verse: number): RedLetterSpan[] | undefined {
+  return redLetterData()?.books[bookId]?.[chapter]?.[verse];
+}
+
 /** Verses of one chapter, or null for a book or chapter that doesn't exist. */
 export function getChapter(bookId: string, chapter: number): Verse[] | null {
   const book = bookById(bookId);
@@ -61,6 +97,8 @@ export interface PassageVerse {
   chapter: number;
   verse: number;
   text: string;
+  /** The words of Jesus in this verse, if any. */
+  jesus?: RedLetterSpan[];
 }
 
 /** The verses a reference covers (whole chapters when it names no verses). Empty when nothing matches. */
@@ -78,7 +116,8 @@ export function getPassage(ref: ScriptureRef): PassageVerse[] {
         const end = ref.verseEnd ?? (ref.chapterEnd === undefined ? ref.verseStart : undefined);
         if (end !== undefined && v > end) continue;
       }
-      out.push({ bookId: book.id, chapter: c, verse: v, text });
+      const jesus = wordsOfJesus(book.id, c, v);
+      out.push(jesus ? { bookId: book.id, chapter: c, verse: v, text, jesus } : { bookId: book.id, chapter: c, verse: v, text });
     }
   }
   return out;
@@ -88,6 +127,37 @@ export function getPassage(ref: ScriptureRef): PassageVerse[] {
 export function passageText(ref: ScriptureRef): string | null {
   const verses = getPassage(ref);
   return verses.length ? verses.map((v) => v.text).join(" ") : null;
+}
+
+/** The passage as text parts with the words of Jesus marked (joined like passageText), or null if it matches nothing. */
+export function passageParts(ref: ScriptureRef): TextPart[] | null {
+  const verses = getPassage(ref);
+  return verses.length ? joinVerseParts(verses) : null;
+}
+
+/**
+ * Red-letter parts for a quotation of a passage given by its reference ("Matthew 7:13–14"): the whole passage, or a
+ * stretch of it such as an excerpt ending in "…". The quotation must appear word for word in the app's Bible at that
+ * reference; anything else (or a reference without the words of Jesus) comes back as plain text, unchanged.
+ */
+export function scriptureParts(reference: string, text: string): TextPart[] {
+  const plain = text ? [{ text, jesus: false }] : [];
+  const ref = parseReference(reference);
+  let parts: TextPart[] | null = null;
+  try {
+    parts = ref ? passageParts(ref) : null;
+  } catch (e) {
+    // Colour is a nicety here: if the Bible files can't be read, show the verse plain rather than fail the page.
+    console.error("[bible] red letter unavailable", e);
+  }
+  if (!parts || !hasRedLetter(parts)) return plain;
+  const ellipsis = text.endsWith("…") ? "…" : "";
+  const core = ellipsis ? text.slice(0, -1) : text;
+  const at = core ? parts.map((p) => p.text).join("").indexOf(core) : -1;
+  if (at < 0) return plain;
+  const out = sliceParts(parts, at, at + core.length);
+  if (ellipsis) out.push({ text: ellipsis, jesus: false });
+  return out;
 }
 
 /** The last verse number of a chapter (counting verses the BSB keeps without text), or 0 if the chapter doesn't exist. */
@@ -141,6 +211,8 @@ export interface SearchHit {
   verse: number;
   reference: string;
   text: string;
+  /** The words of Jesus in this verse, if any. */
+  jesus?: RedLetterSpan[];
 }
 
 export interface SearchOptions {
@@ -175,7 +247,7 @@ export function searchBible(query: string, opts: SearchOptions = {}): { total: n
     if (!needles.every((n) => iv.norm.includes(n))) continue;
     total++;
     if (total > offset && hits.length < limit) {
-      hits.push({ bookId: book.id, bookName: book.name, chapter: iv.c, verse: iv.v, reference: formatReference({ bookId: book.id, chapter: iv.c, verseStart: iv.v }), text: iv.text });
+      hits.push({ bookId: book.id, bookName: book.name, chapter: iv.c, verse: iv.v, reference: formatReference({ bookId: book.id, chapter: iv.c, verseStart: iv.v }), text: iv.text, jesus: wordsOfJesus(book.id, iv.c, iv.v) });
     }
   }
   return { total, hits, terms };

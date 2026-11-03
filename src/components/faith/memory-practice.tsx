@@ -6,6 +6,8 @@ import { Eye, RefreshCw, ThumbsUp, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toaster";
 import { LEVEL_LABELS, maskWords } from "@/lib/faith/memory";
+import { redLetterWordFlags, type TextPart } from "@/lib/bible/red-letter";
+import { ScriptureText } from "@/components/bible/scripture-text";
 import { cn } from "@/lib/utils";
 import { reviewMemoryAction } from "@/server/actions/bible";
 
@@ -13,7 +15,7 @@ import { reviewMemoryAction } from "@/server/actions/bible";
  * Practise one memory passage: words hidden for the current level (tap one to see it), or recall the reference from
  * the words. The member says how it went; the level and next review follow from that.
  */
-export function MemoryPractice({ id, text, reference, level }: { id: string; text: string; reference: string; level: number }) {
+export function MemoryPractice({ id, text, parts, reference, level }: { id: string; text: string; parts?: TextPart[]; reference: string; level: number }) {
   const router = useRouter();
   const [mode, setMode] = useState<"words" | "reference">("words");
   const [seed, setSeed] = useState(0);
@@ -21,6 +23,8 @@ export function MemoryPractice({ id, text, reference, level }: { id: string; tex
   const [refShown, setRefShown] = useState(false);
   const [pending, start] = useTransition();
   const words = useMemo(() => maskWords(text, level, seed), [text, level, seed]);
+  // Words of Jesus stay red when shown (same word split as maskWords).
+  const red = useMemo(() => (parts ? redLetterWordFlags(parts) : []), [parts]);
 
   function finish(result: "remembered" | "struggled") {
     start(async () => {
@@ -62,7 +66,9 @@ export function MemoryPractice({ id, text, reference, level }: { id: string; tex
                   {w.hint}
                 </button>
               ) : (
-                <span key={i}>{w.word} </span>
+                <span key={i}>
+                  <span className={red[i] ? "text-red-letter" : undefined}>{w.word}</span>{" "}
+                </span>
               ),
             )}
           </p>
@@ -89,7 +95,9 @@ export function MemoryPractice({ id, text, reference, level }: { id: string; tex
         </div>
       ) : (
         <div className="rounded-2xl border border-border bg-card p-4">
-          <p className="font-serif text-xl leading-relaxed">{text}</p>
+          <p className="font-serif text-xl leading-relaxed">
+            <ScriptureText text={text} parts={parts} />
+          </p>
           <p className="mt-3 text-sm text-muted-foreground">Where is this from?</p>
           {refShown ? (
             <p className="mt-1 font-display text-xl font-bold text-gold-highlight">{reference}</p>

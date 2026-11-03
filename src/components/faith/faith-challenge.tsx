@@ -6,6 +6,8 @@ import { BookOpenText, Check, Flag, Loader2, Lock, PartyPopper, RotateCcw } from
 import { FieldError, FormMessage, SubmitButton } from "@/components/common/form-status";
 import { Notice } from "@/components/common/states";
 import { DevotionalContent } from "@/components/faith/devotional-content";
+import { ScriptureText } from "@/components/bible/scripture-text";
+import type { TextPart } from "@/lib/bible/red-letter";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/input";
@@ -28,6 +30,8 @@ export interface FaithChallengeProps {
   /** Dates (user's time zone) with a completed workout since the challenge started. */
   workoutDates: string[];
   lastCompletedAt: string | null;
+  /** Red-letter parts of the devotional verses that contain words of Jesus, by day. */
+  devotionalParts?: Record<number, TextPart[]>;
 }
 
 type DialogState = { kind: "start" } | { kind: "read" } | { kind: "day"; day: number } | { kind: "leave" } | { kind: "restart" } | null;
@@ -43,7 +47,7 @@ const STATUS_LABEL: Record<ChallengeDay["status"], string> = {
   upcoming: "upcoming",
 };
 
-export function FaithChallenge({ today, rotatingDay, enrollment, currentDay, checkins, workoutDates, lastCompletedAt }: FaithChallengeProps) {
+export function FaithChallenge({ today, rotatingDay, enrollment, currentDay, checkins, workoutDates, lastCompletedAt, devotionalParts }: FaithChallengeProps) {
   const router = useRouter();
   const [dialog, setDialog] = useState<DialogState>(null);
   const [pending, startTransition] = useTransition();
@@ -86,7 +90,9 @@ export function FaithChallenge({ today, rotatingDay, enrollment, currentDay, che
           {todaysDevotional.title}
         </h2>
         <p className="mt-1 text-xs font-semibold text-gold">{todaysDevotional.reference} ({TRANSLATION.code})</p>
-        <p className="mt-3 line-clamp-3 text-sm italic text-foreground/85">&ldquo;{todaysDevotional.scripture}&rdquo;</p>
+        <p className="mt-3 line-clamp-3 text-sm italic text-foreground/85">&ldquo;
+          <ScriptureText text={todaysDevotional.scripture} parts={devotionalParts?.[todaysDevotional.day]} />
+          &rdquo;</p>
         <div className="mt-4">
           <Button onClick={() => setDialog(enrolled ? { kind: "day", day: currentDay! } : { kind: "read" })}>
             <BookOpenText aria-hidden /> Read today&apos;s devotional
@@ -209,7 +215,7 @@ export function FaithChallenge({ today, rotatingDay, enrollment, currentDay, che
             <DialogTitle>{todaysDevotional.title}</DialogTitle>
             <DialogDescription>{todaysDevotional.reference}</DialogDescription>
           </DialogHeader>
-          <DevotionalContent devotional={todaysDevotional} />
+          <DevotionalContent devotional={todaysDevotional} parts={devotionalParts?.[todaysDevotional.day]} />
           <div className="mt-5 rounded-xl border border-border bg-elevated/50 p-4">
             <p className="text-sm text-muted-foreground">Want a daily rhythm? Walk through all 40 devotionals with the challenge.</p>
             <Button className="mt-3" variant="outline" onClick={() => setDialog({ kind: "start" })}>
@@ -287,6 +293,7 @@ export function FaithChallenge({ today, rotatingDay, enrollment, currentDay, che
               isToday={dayDialog.day === currentDay && dayDialog.date === today}
               checkin={byDay.get(dayDialog.day)}
               workoutFound={workoutSet.has(dayDialog.date)}
+              parts={devotionalParts?.[dayDialog.day]}
             />
           )}
         </DialogContent>
@@ -301,12 +308,14 @@ function DayView({
   isToday,
   checkin,
   workoutFound,
+  parts,
 }: {
   enrollmentId: string;
   day: ChallengeDay;
   isToday: boolean;
   checkin: ChallengeCheckin | undefined;
   workoutFound: boolean;
+  parts?: TextPart[];
 }) {
   const [state, action] = useActionState(saveChallengeCheckinAction, initialActionState);
   const devotional = devotionalForDay(day.day);
@@ -321,7 +330,7 @@ function DayView({
         <DialogTitle>{devotional.title}</DialogTitle>
         <DialogDescription>{devotional.reference}</DialogDescription>
       </DialogHeader>
-      <DevotionalContent devotional={devotional} />
+      <DevotionalContent devotional={devotional} parts={parts} />
 
       <form action={action} className="mt-5 space-y-3 border-t border-border pt-4">
         <input type="hidden" name="enrollmentId" value={enrollmentId} />

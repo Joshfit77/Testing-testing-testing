@@ -180,6 +180,35 @@ describe("offline reader page", () => {
     expect(next.getAttribute("href")).toBe("#john/4");
     vi.unstubAllGlobals();
   });
+
+  it("shows the words of Jesus in red when the red-letter file matches the saved text, and plain when it doesn't", async () => {
+    const meta = { contentSha256: "abc", books: BIBLE_BOOKS.map((b) => ({ id: b.id, name: b.name, chapters: b.chapters, withoutText: [] })) };
+    const chapters = Array.from({ length: 21 }, (_, i) => [[1, `Chapter ${i + 1} verse one.`]]);
+    chapters[10] = [
+      [25, "Jesus said to her, “I am the resurrection and the life.”"],
+      [35, "Jesus wept."],
+    ];
+    const open = async (wjChecksum: string) => {
+      const wj = { bibleContentSha256: wjChecksum, books: { JHN: { 11: { 25: [[19, 56]] } } } };
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (u: string) => new Response(JSON.stringify(u.endsWith("meta.json") ? meta : u.endsWith("wj.json") ? wj : { id: "JHN", name: "John", chapters }))),
+      );
+      document.body.innerHTML = '<main id="app"></main>';
+      window.history.replaceState(null, "", "/faith/bible/john/11");
+      new Function(read("public/bible-offline.js"))();
+      await vi.waitFor(() => expect(document.querySelector("#v25")?.textContent).toContain("resurrection"));
+    };
+    await open("abc");
+    expect([...document.querySelectorAll("#v25 .wj")].map((e) => e.textContent)).toEqual(["“I am the resurrection and the life.”"]);
+    expect(document.querySelector("#v25")?.textContent).toBe("25Jesus said to her, “I am the resurrection and the life.”");
+    expect(document.querySelector("#v35 .wj")).toBeNull();
+    // Built for different text: offsets could colour the wrong words, so nothing is red.
+    await open("something-else");
+    expect(document.querySelector(".wj")).toBeNull();
+    expect(document.querySelector("#v25")?.textContent).toBe("25Jesus said to her, “I am the resurrection and the life.”");
+    vi.unstubAllGlobals();
+  });
 });
 
 describe("native app", () => {

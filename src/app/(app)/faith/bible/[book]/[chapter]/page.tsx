@@ -6,7 +6,7 @@ import { ChapterReader } from "@/components/bible/chapter-reader";
 import { bookBySlug, chapterHref, chapterLabel, nextChapter, previousChapter } from "@/lib/bible/books";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
-import { bibleMeta, getChapter, lastVerse, versesWithoutText } from "@/server/bible/text";
+import { bibleMeta, chapterWordsOfJesus, getChapter, lastVerse, versesWithoutText } from "@/server/bible/text";
 import { loadChapterAnnotations, loadReadingState } from "@/server/services/bible";
 
 export async function generateMetadata({ params }: { params: Promise<{ book: string; chapter: string }> }) {
@@ -53,6 +53,7 @@ export default async function ChapterPage({ params, searchParams }: { params: Pr
         bookId={book.id}
         chapter={chapter}
         verses={verses}
+        jesus={chapterWordsOfJesus(book.id, chapter)}
         withoutText={versesWithoutText(book.id, chapter)}
         highlights={notes.highlights}
         bookmarks={notes.bookmarks}

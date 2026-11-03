@@ -10,7 +10,8 @@ import { cn } from "@/lib/utils";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
 import { deleteBibleNoteFormAction, removeBookmarkAction, removeHighlightAction } from "@/server/actions/bible";
-import { getChapter } from "@/server/bible/text";
+import { getChapter, wordsOfJesus } from "@/server/bible/text";
+import { ScriptureText } from "@/components/bible/scripture-text";
 
 export const metadata = { title: "My Bible" };
 
@@ -40,7 +41,11 @@ export default async function SavedPage({ searchParams }: { searchParams: Promis
             <li key={r.id as string} className="flex items-start gap-1 rounded-2xl border border-border bg-card">
               <Link href={chapterHref(book, r.chapter as number, verse ?? undefined)} className="min-w-0 flex-1 p-3">
                 <span className="block text-sm font-semibold text-gold-highlight">{verse ? selectionReference(book.id, r.chapter as number, [verse]) : chapterLabel(book, r.chapter as number)}</span>
-                {verse && <span className="mt-0.5 line-clamp-2 block font-serif text-[0.9375rem] text-muted-foreground">{verseText(book.id, r.chapter as number, verse)}</span>}
+                {verse && (
+                  <span className="mt-0.5 line-clamp-2 block font-serif text-[0.9375rem] text-muted-foreground">
+                    <ScriptureText text={verseText(book.id, r.chapter as number, verse)} jesus={wordsOfJesus(book.id, r.chapter as number, verse)} />
+                  </span>
+                )}
               </Link>
               <ActionButton action={removeBookmarkAction} fields={{ id: r.id as string }} variant="ghost" size="icon" aria-label="Remove bookmark">
                 <Trash2 aria-hidden />
@@ -66,7 +71,9 @@ export default async function SavedPage({ searchParams }: { searchParams: Promis
                   <span className={cn("size-3 rounded-full", COLOR_DOT[r.color as string])} aria-hidden />
                   {selectionReference(book.id, r.chapter as number, [r.verse as number])}
                 </span>
-                <span className="mt-0.5 line-clamp-3 block font-serif text-[0.9375rem]">{verseText(book.id, r.chapter as number, r.verse as number)}</span>
+                <span className="mt-0.5 line-clamp-3 block font-serif text-[0.9375rem]">
+                  <ScriptureText text={verseText(book.id, r.chapter as number, r.verse as number)} jesus={wordsOfJesus(book.id, r.chapter as number, r.verse as number)} />
+                </span>
               </Link>
               <ActionButton action={removeHighlightAction} fields={{ bookId: book.id, chapter: String(r.chapter), verse: String(r.verse) }} variant="ghost" size="icon" aria-label="Remove highlight">
                 <Trash2 aria-hidden />

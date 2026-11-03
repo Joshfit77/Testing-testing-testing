@@ -5,6 +5,8 @@ import { BADGE_IMAGE_OVERRIDES } from "@/components/badges/badge-art";
 import { badgeSrcSet, getBadgeArtwork } from "@/components/badges/badge-artwork";
 import { RANK_CATEGORIES, type CategoryProgress, type RankCategory, type RankState } from "@/lib/domain/ranks";
 import { cn } from "@/lib/utils";
+import { ScriptureText } from "@/components/bible/scripture-text";
+import type { TextPart } from "@/lib/bible/red-letter";
 
 /**
  * The nine ranks of one category laid out like the owner's badge design: an ornate gold frame, the category
@@ -24,12 +26,15 @@ export function RankLadder({
   progress,
   onOpen,
   verses,
+  verseParts,
   translation,
 }: {
   progress: CategoryProgress;
   onOpen: (r: RankState) => void;
   /** BSB text by reference; an earned rank shows its verse in full. */
   verses: Record<string, string>;
+  /** Red-letter parts of verses containing words of Jesus, by reference. */
+  verseParts?: Record<string, TextPart[]>;
   translation: string;
 }) {
   const info = RANK_CATEGORIES.find((c) => c.id === progress.category)!;
@@ -110,7 +115,9 @@ export function RankLadder({
               </button>
               {r.earned && verses[r.reference] ? (
                 <figure className={cn("rank-verse", current && "is-current")}>
-                  <blockquote className="rank-verse-text">{verses[r.reference]}</blockquote>
+                  <blockquote className="rank-verse-text">
+                    <ScriptureText text={verses[r.reference]} parts={verseParts?.[r.reference]} />
+                  </blockquote>
                   <figcaption className="rank-verse-ref">
                     {r.reference} ({translation})
                   </figcaption>

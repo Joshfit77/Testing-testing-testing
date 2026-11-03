@@ -2,7 +2,8 @@
  * Offline Bible reader (public/bible-offline.html). Reads the Berean Standard Bible saved on this device: in a browser,
  * from the cache the "Save for offline" button fills (the service worker answers /bible/bsb/* from it); in the native
  * app, from the copy bundled with the app. It shows Scripture only: it never reads cookies, account data, highlights,
- * notes or journeys. Text is inserted with textContent, never as HTML.
+ * notes or journeys. Text is inserted with textContent, never as HTML. The words of Jesus are shown in red from
+ * /bible/bsb/wj.json when it is saved too (and was built for this exact text); without it the text is shown plain.
  */
 (function () {
   "use strict";
@@ -10,6 +11,7 @@
   var FONT_KEY = "ngf.bible.fontScale";
   var meta = null;
   var books = {};
+  var redLetter; // undefined: not loaded yet; null: not available
   var native = location.protocol === "capacitor:" || (location.hostname === "localhost" && !location.port && /\.html$/.test(location.pathname));
 
   function slug(name) {
@@ -36,6 +38,20 @@
       if (!r.ok) throw new Error(String(r.status));
       return r.json();
     });
+  }
+  /** Verse text split at the red-letter offsets; out-of-range or overlapping spans are ignored, never guessed at. */
+  function verseParts(t, spans) {
+    if (!spans) return [t];
+    var out = [];
+    var at = 0;
+    spans.forEach(function (s) {
+      if (s[0] < at || s[1] <= s[0] || s[1] > t.length) return;
+      if (s[0] > at) out.push(t.slice(at, s[0]));
+      out.push(el("span", { class: "wj", text: t.slice(s[0], s[1]) }));
+      at = s[1];
+    });
+    if (at < t.length) out.push(t.slice(at));
+    return out;
   }
   function scale() {
     try {
@@ -101,8 +117,10 @@
       app.appendChild(notice());
       var text = el("div", { class: "text", style: "--scale:" + scale() }, [el("p", { class: "notice", text: "Loading…" })]);
       app.appendChild(text);
-      loadBook(r.book.id).then(
-        function (data) {
+      Promise.all([loadBook(r.book.id), loadRedLetter()]).then(
+        function (loaded) {
+          var data = loaded[0];
+          var wj = (loaded[1] && loaded[1][r.book.id] && loaded[1][r.book.id][r.chapter]) || {};
           text.textContent = "";
           var verses = data.chapters[r.chapter - 1] || [];
           var gaps = (r.book.withoutText || []).filter(function (s) { return s.indexOf(r.chapter + ":") === 0; }).map(function (s) { return Number(s.split(":")[1]); });
@@ -110,7 +128,7 @@
           rows.sort(function (a, b) { return a.v - b.v; });
           rows.forEach(function (row) {
             if (row.gap) text.appendChild(el("p", { class: "gap" }, [el("sup", { text: String(row.v) }), "Verse " + row.v + " is not in the Berean Standard Bible’s main text; the translation gives it in a footnote, which this app does not show."]));
-            else text.appendChild(el("p", { id: "v" + row.v }, [el("sup", { text: String(row.v) }), row.t]));
+            else text.appendChild(el("p", { id: "v" + row.v }, [el("sup", { text: String(row.v) })].concat(verseParts(row.t, wj[row.v]))));
           });
           var idx = meta.books.indexOf(r.book);
           var prev = r.chapter > 1 ? [r.book, r.chapter - 1] : idx > 0 ? [meta.books[idx - 1], meta.books[idx - 1].chapters] : null;
@@ -138,6 +156,21 @@
       books[id] = b;
       return b;
     });
+  }
+
+  /** The words-of-Jesus offsets, only if built for this exact Bible text. Never fails: without them, no red. */
+  function loadRedLetter() {
+    if (redLetter !== undefined) return Promise.resolve(redLetter);
+    return getJSON("/bible/bsb/wj.json").then(
+      function (d) {
+        redLetter = d && d.books && meta && d.bibleContentSha256 && d.bibleContentSha256 === meta.contentSha256 ? d.books : null;
+        return redLetter;
+      },
+      function () {
+        redLetter = null;
+        return null;
+      },
+    );
   }
 
   window.addEventListener("hashchange", render);

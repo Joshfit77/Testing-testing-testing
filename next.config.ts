@@ -21,6 +21,9 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/faith/**": ["./public/bible/bsb/**/*"],
     "/api/**": ["./public/bible/bsb/**/*"],
+    // The verse of the day (Home) and rank verses (badges) show the words of Jesus in red from the same files.
+    "/home": ["./public/bible/bsb/**/*"],
+    "/progress/**": ["./public/bible/bsb/**/*"],
   },
 };
 

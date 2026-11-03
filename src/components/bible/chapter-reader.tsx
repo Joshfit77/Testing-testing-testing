@@ -6,8 +6,10 @@ import { useRouter } from "next/navigation";
 import { Bookmark, BookmarkCheck, Brain, Copy, Minus, NotebookPen, Plus, Share2, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScriptureText } from "@/components/bible/scripture-text";
 import { toast } from "@/components/ui/toaster";
 import { selectionReference, shareableText, verseRange, verseRuns } from "@/lib/bible/format";
+import type { RedLetterSpan } from "@/lib/bible/red-letter";
 import { cn } from "@/lib/utils";
 import {
   addMemoryVerseAction,
@@ -41,12 +43,15 @@ const FONT_KEY = "ngf.bible.fontScale";
 
 /**
  * One chapter of the BSB, verse by verse. Tap verses to select them, then highlight, bookmark, add a note, copy,
- * share or save them to memory. Text is shown exactly as stored; nothing here changes a word.
+ * share or save them to memory. Text is shown exactly as stored; nothing here changes a word. The words of Jesus are
+ * shown in red, at the offsets the publisher's red-letter edition gives (see src/lib/bible/red-letter.ts).
  */
 export function ChapterReader(props: {
   bookId: string;
   chapter: number;
   verses: [number, string][];
+  /** The words of Jesus: verse number → [start, end) offsets into its text. */
+  jesus?: Record<number, readonly RedLetterSpan[]>;
   withoutText: number[];
   highlights: Record<number, HighlightColor>;
   bookmarks: number[];
@@ -267,7 +272,7 @@ export function ChapterReader(props: {
                 <sup className="mr-1 select-none font-sans text-[0.65em] font-semibold text-gold" aria-label={`Verse ${r.v}`}>
                   {r.v}
                 </sup>
-                {r.t}
+                <ScriptureText text={r.t} jesus={props.jesus?.[r.v]} />
                 {bookmarks.has(r.v) && <Bookmark className="ml-1 inline size-[0.8em] fill-gold text-gold" aria-label="Bookmarked" />}
               </button>
               {notesByVerse.has(r.v) && (

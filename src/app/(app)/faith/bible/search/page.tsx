@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { BackLink } from "@/components/platform/back-link";
@@ -8,26 +9,40 @@ import { formatReference, parseReference } from "@/lib/bible/reference";
 import { cn } from "@/lib/utils";
 import { requireOnboardedUser } from "@/server/auth";
 import { getPassage, searchBible } from "@/server/bible/text";
+import { ScriptureText } from "@/components/bible/scripture-text";
+import { redLetterParts, type RedLetterSpan } from "@/lib/bible/red-letter";
 
 export const metadata = { title: "Search the Bible" };
 
 const PAGE = 50;
 const PASSAGE_LIMIT = 40;
 
-/** The verse's own words with the searched terms marked. */
-function Marked({ text, terms }: { text: string; terms: string[] }) {
-  if (!terms.length) return <>{text}</>;
-  const pattern = new RegExp(`\\b(${terms.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/'/g, "['’]").replace(/ /g, "[\\s\\W]+")).join("|")})\\b`, "gi");
-  const parts = text.split(pattern);
+/** The verse's own words with the searched terms marked, and the words of Jesus in red. */
+function Marked({ text, terms, jesus }: { text: string; terms: string[]; jesus?: readonly RedLetterSpan[] }) {
+  const pattern = terms.length
+    ? new RegExp(`\\b(${terms.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/'/g, "['’]").replace(/ /g, "[\\s\\W]+")).join("|")})\\b`, "gi")
+    : null;
+  const mark = (chunk: string, key: string) =>
+    pattern
+      ? chunk.split(pattern).map((p, i) =>
+          i % 2 === 1 ? (
+            <mark key={`${key}.${i}`} className="rounded bg-gold/25 px-0.5 text-inherit">
+              {p}
+            </mark>
+          ) : (
+            <Fragment key={`${key}.${i}`}>{p}</Fragment>
+          ),
+        )
+      : chunk;
   return (
     <>
-      {parts.map((p, i) =>
-        i % 2 === 1 ? (
-          <mark key={i} className="rounded bg-gold/25 px-0.5 text-foreground">
-            {p}
-          </mark>
+      {redLetterParts(text, jesus).map((part, i) =>
+        part.jesus ? (
+          <span key={i} className="text-red-letter" data-words-of-jesus="">
+            {mark(part.text, String(i))}
+          </span>
         ) : (
-          p
+          <Fragment key={i}>{mark(part.text, String(i))}</Fragment>
         ),
       )}
     </>
@@ -73,7 +88,7 @@ export default async function BibleSearchPage({ searchParams }: { searchParams: 
             {passage.slice(0, PASSAGE_LIMIT).map((v) => (
               <p key={`${v.chapter}:${v.verse}`}>
                 <sup className="mr-1 font-sans text-xs font-semibold text-gold">{ref.chapterEnd ? `${v.chapter}:${v.verse}` : v.verse}</sup>
-                {v.text}
+                <ScriptureText text={v.text} jesus={v.jesus} />
               </p>
             ))}
           </div>
@@ -124,7 +139,7 @@ export default async function BibleSearchPage({ searchParams }: { searchParams: 
                 <Link href={chapterHref(h.bookId, h.chapter, h.verse)} className="block rounded-2xl border border-border bg-card p-3 hover:border-gold-muted">
                   <span className="block text-xs font-semibold text-gold">{h.reference}</span>
                   <span className="mt-0.5 block font-serif text-[1.0625rem] leading-relaxed">
-                    <Marked text={h.text} terms={results.terms} />
+                    <Marked text={h.text} terms={results.terms} jesus={h.jesus} />
                   </span>
                 </Link>
               </li>

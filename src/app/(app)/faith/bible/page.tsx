@@ -7,7 +7,8 @@ import { OfflineBible } from "@/components/bible/offline-bible";
 import { chapterHref, chapterLabel, NEW_TESTAMENT, OLD_TESTAMENT, type BibleBook } from "@/lib/bible/books";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
-import { bibleMeta, getChapter } from "@/server/bible/text";
+import { bibleMeta, getChapter, wordsOfJesus } from "@/server/bible/text";
+import { ScriptureText } from "@/components/bible/scripture-text";
 import { loadReadingState } from "@/server/services/bible";
 
 export const metadata = { title: "Bible" };
@@ -61,7 +62,11 @@ export default async function BiblePage() {
             {chapterLabel(state.book, state.chapter)}
             {state.verse ? `:${state.verse}` : ""}
           </span>
-          {preview && <span className="mt-1 line-clamp-2 block font-serif text-[0.9375rem] text-muted-foreground">{preview[1]}</span>}
+          {preview && state && (
+            <span className="mt-1 line-clamp-2 block font-serif text-[0.9375rem] text-muted-foreground">
+              <ScriptureText text={preview[1]} jesus={wordsOfJesus(state.book.id, state.chapter, preview[0])} />
+            </span>
+          )}
         </Link>
       ) : (
         <div className="rounded-2xl border border-border bg-card p-4">

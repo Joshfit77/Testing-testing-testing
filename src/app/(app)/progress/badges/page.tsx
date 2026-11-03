@@ -16,6 +16,8 @@ import { logError } from "@/server/log";
 import { getAchievementStats } from "@/server/services/achievements";
 import { RankBoard } from "@/components/badges/rank-board";
 import { ACTIVE_TRANSLATION, BSB_PASSAGES } from "@/data/scripture";
+import { scriptureParts } from "@/server/bible/text";
+import { hasRedLetter } from "@/lib/bible/red-letter";
 import { RANKS, allRankProgress, type CategoryProgress, type RankCategory } from "@/lib/domain/ranks";
 
 export const metadata = { title: "Badges" };
@@ -115,6 +117,9 @@ export default async function BadgesPage({ searchParams }: { searchParams: Promi
       <RankBoard
         progress={ranks}
         verses={Object.fromEntries(RANKS.map((r) => [r.reference, BSB_PASSAGES[r.reference] ?? ""]))}
+        verseParts={Object.fromEntries(
+          RANKS.map((r) => [r.reference, scriptureParts(r.reference, BSB_PASSAGES[r.reference] ?? "")] as const).filter(([, parts]) => hasRedLetter(parts)),
+        )}
         translation={ACTIVE_TRANSLATION.code}
         initial={initialTab}
         today={today}

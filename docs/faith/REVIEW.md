@@ -58,3 +58,15 @@ labelled "Bible study helper (AI)", with "This is an AI, not a pastor, and it ca
 Where the BSB keeps a verse number without text (16 verses, such as Matthew 17:21 and John 5:4), the reader shows:
 "Verse N is not in the Berean Standard Bible's main text; the translation gives it in a footnote, which this app does
 not show." Please confirm this description.
+
+## Words of Jesus in red
+
+The red-letter marking follows the publisher's USFM edition exactly; the app makes no choices of its own. Most of it is
+Jesus speaking in the Gospels, Acts 1 and 9, 1 Corinthians 11:24–25, 2 Corinthians 12:9 and Revelation 1–3 and 22.
+For review, the publisher also marks: the voice in Peter's vision (Acts 10:13, 15; 11:7, 9), Hebrews 10:5–9 (Christ
+speaking in the words of Psalm 40), Revelation 4:1 and 16:15. It does not mark Revelation 1:8 ("says the Lord God").
+If the reviewer would mark these differently, the change belongs in the source data, not in the app.
+
+Not red by design (owner to decide): Matthew 7:13–14 in the opening gate animation and on the welcome page, where it is
+set in the gold brand style.
+

@@ -23,6 +23,20 @@ import { chapterHref, chapterLabel } from "@/lib/bible/books";
 import { loadDailyGoals } from "@/server/services/daily-goals";
 import { loadActiveJourney } from "@/server/services/journeys";
 import { loadReadingState } from "@/server/services/bible";
+import { scriptureParts } from "@/server/bible/text";
+import { ScriptureText } from "@/components/bible/scripture-text";
+import { DEVOTIONALS } from "@/data/devotionals";
+import { hasRedLetter, type TextPart } from "@/lib/bible/red-letter";
+
+/** Red-letter parts of the 40 devotional verses that contain words of Jesus (the rest are shown plain). */
+function devotionalRedLetter(): Record<number, TextPart[]> {
+  const out: Record<number, TextPart[]> = {};
+  for (const d of DEVOTIONALS) {
+    const parts = scriptureParts(d.reference, d.scripture);
+    if (hasRedLetter(parts)) out[d.day] = parts;
+  }
+  return out;
+}
 
 export const metadata = { title: "Faith" };
 
@@ -101,7 +115,7 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
             Verse of the day
           </h2>
           <p className="mt-1 max-w-[20rem] font-serif text-2xl leading-snug text-white [text-shadow:0_1px_8px_rgba(0,0,0,0.6)]" aria-hidden>
-            {verseExcerpt(verse.text)}
+            <ScriptureText parts={scriptureParts(verse.reference, verseExcerpt(verse.text))} />
           </p>
           <p className="mt-1.5 text-sm text-white/85">{verse.reference} ({TRANSLATION.code})</p>
         </div>
@@ -115,6 +129,7 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
         checkins={challenge.checkins}
         workoutDates={challenge.workoutDates}
         lastCompletedAt={challenge.lastCompleted?.completedAt ?? null}
+        devotionalParts={devotionalRedLetter()}
       />
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -167,7 +182,11 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
       </Link>
 
       <section className="rounded-2xl border border-border bg-card p-4 text-[0.9375rem]" aria-label="Today's verse in full">
-        <blockquote className="font-serif text-lg leading-relaxed">&ldquo;{verse.text}&rdquo;</blockquote>
+        <blockquote className="font-serif text-lg leading-relaxed">
+          &ldquo;
+          <ScriptureText parts={scriptureParts(verse.reference, verse.text)} />
+          &rdquo;
+        </blockquote>
         <p className="mt-1 text-sm text-muted-foreground">
           {verse.reference} · {TRANSLATION.name} ({TRANSLATION.license})
         </p>
@@ -203,7 +222,11 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
         <ul className="grid gap-3 md:grid-cols-2">
           {scriptures.map((s) => (
             <li key={s.reference} className="rounded-2xl border border-border bg-card p-4">
-              <p className="text-sm italic">&ldquo;{s.text}&rdquo;</p>
+              <p className="text-sm italic">
+                &ldquo;
+                <ScriptureText parts={scriptureParts(s.reference, s.text)} />
+                &rdquo;
+              </p>
               <p className="mt-2 text-xs font-semibold text-gold">{s.reference} ({TRANSLATION.code})</p>
               <div className="mt-2 flex flex-wrap gap-1">
                 {s.themes.map((t) => (

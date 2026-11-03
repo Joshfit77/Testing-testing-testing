@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { toggleDailyGoalAction } from "@/server/actions/faith";
 import type { DailyGoals } from "@/server/services/daily-goals";
 import type { JourneyView } from "@/server/services/journeys";
+import { ScriptureText } from "@/components/bible/scripture-text";
 
 /**
  * The Faith tab's first card: today's four activities. Bible reading and prayer belong to the journey (both required);
@@ -92,7 +93,9 @@ export function TodayCard({ userId, journey, goals }: { userId: string; journey:
               <p className="text-[0.9375rem]">{goals.challenge.text}</p>
               {goals.challenge.verseText && (
                 <p className="mt-1 font-serif text-sm text-muted-foreground">
-                  &ldquo;{goals.challenge.verseText}&rdquo; <span className="font-sans font-semibold text-gold">{goals.challenge.reference} (BSB)</span>
+                  &ldquo;
+                  <ScriptureText text={goals.challenge.verseText} parts={goals.challenge.verseParts} />
+                  &rdquo; <span className="font-sans font-semibold text-gold">{goals.challenge.reference} (BSB)</span>
                 </p>
               )}
               <ActionButton action={toggleDailyGoalAction} fields={{ kind: "faith_challenge" }} size="sm" variant={goals.challenge.done ? "ghost" : "secondary"} className="mt-2" aria-pressed={goals.challenge.done}>

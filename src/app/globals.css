@@ -24,6 +24,8 @@
   --success: #3fa077;
   --destructive: #d45c5c;
   --destructive-foreground: #f08a8a;
+  /* Words of Jesus in Scripture ("red letter"). At least 4.5:1 on the page, cards and every highlight colour. */
+  --red-letter: #f0736a;
   /* Radii: 12px cards, 10px inputs, full pills. */
   --radius: 0.75rem;
 }
@@ -52,6 +54,7 @@
   --color-accent-foreground: var(--foreground);
   --color-destructive: var(--destructive);
   --color-success: var(--success);
+  --color-red-letter: var(--red-letter);
   --color-border: var(--border);
   --color-input: var(--border);
   --color-ring: var(--gold);

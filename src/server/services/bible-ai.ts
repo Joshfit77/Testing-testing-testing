@@ -15,7 +15,8 @@ import {
 } from "@/lib/bible/ai";
 import { formatReference } from "@/lib/bible/reference";
 import type { Plan } from "@/lib/domain/types";
-import { getPassage, passageText, searchBible } from "@/server/bible/text";
+import { getPassage, passageParts, passageText, searchBible } from "@/server/bible/text";
+import type { TextPart } from "@/lib/bible/red-letter";
 import { isDemoMode } from "@/server/demo";
 import { isAiConfigured, serverEnv } from "@/server/env";
 import { logError } from "@/server/log";
@@ -63,7 +64,7 @@ export interface BibleAnswer {
   ok: true;
   threadId: string;
   answer: string;
-  citations: { reference: string; text: string }[];
+  citations: { reference: string; text: string; parts?: TextPart[] }[];
   unverified: string[];
 }
 export type BibleAskResult = BibleAnswer | { ok: false; code: "unavailable" | "rate_limited" | "quota" | "invalid" | "error"; error: string };
@@ -102,7 +103,7 @@ export async function askBible(userId: string, plan: Plan, questionRaw: string, 
       .trim();
     const check = checkCitations(raw, (r) => getPassage(r).length > 0);
     const answer = markUnverified(raw || "I couldn't answer that. Try asking it another way.", check.unverified);
-    const citations = check.verified.slice(0, 12).map((r) => ({ reference: formatReference(r), text: passageText(r) ?? "" }));
+    const citations = check.verified.slice(0, 12).map((r) => ({ reference: formatReference(r), text: passageText(r) ?? "", parts: passageParts(r) ?? undefined }));
     // (Every row names every column: in a multi-row insert a column one row leaves out is sent as null, not its default.)
     const [saved, metered] = await Promise.all([
       service.from("bible_ai_messages").insert([

@@ -5,13 +5,14 @@ import { ActionButton } from "@/components/common/action-button";
 import { PageHeader } from "@/components/common/page-header";
 import { BackLink } from "@/components/platform/back-link";
 import { StudyNotesForm } from "@/components/faith/study-notes-form";
+import { ScriptureText } from "@/components/bible/scripture-text";
 import { findLesson, findStudy, notesVisible } from "@/data/studies";
 import { chapterHref } from "@/lib/bible/books";
 import { parseReference } from "@/lib/bible/reference";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
 import { toggleStudyLessonAction } from "@/server/actions/studies";
-import { getPassage, passageText } from "@/server/bible/text";
+import { getPassage, passageParts } from "@/server/bible/text";
 
 export async function generateMetadata({ params }: { params: Promise<{ study: string; lesson: string }> }) {
   const p = await params;
@@ -55,7 +56,7 @@ export default async function LessonPage({ params }: { params: Promise<{ study: 
           {verses.map((v) => (
             <p key={`${v.chapter}:${v.verse}`}>
               <sup className="mr-1 font-sans text-xs font-semibold text-gold">{ref.chapterEnd ? `${v.chapter}:${v.verse}` : v.verse}</sup>
-              {v.text}
+              <ScriptureText text={v.text} jesus={v.jesus} />
             </p>
           ))}
         </div>
@@ -72,13 +73,15 @@ export default async function LessonPage({ params }: { params: Promise<{ study: 
           <ul className="space-y-2">
             {lesson.crossReferences.map((x) => {
               const r = parseReference(x);
-              const text = r ? passageText(r) : null;
-              return r && text ? (
+              const parts = r ? passageParts(r) : null;
+              return r && parts ? (
                 <li key={x} className="rounded-xl border border-border bg-card p-3">
                   <Link href={chapterHref(r.bookId, r.chapter, r.verseStart)} className="text-sm font-semibold text-gold-highlight hover:underline">
                     {x}
                   </Link>
-                  <p className="mt-0.5 line-clamp-4 font-serif text-[0.9375rem] text-muted-foreground">{text}</p>
+                  <p className="mt-0.5 line-clamp-4 font-serif text-[0.9375rem] text-muted-foreground">
+                    <ScriptureText parts={parts} />
+                  </p>
                 </li>
               ) : null;
             })}

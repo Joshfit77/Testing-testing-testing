@@ -5,7 +5,7 @@ import { BackLink } from "@/components/platform/back-link";
 import { BibleAsk, type AskMessage } from "@/components/faith/bible-ask";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
-import { passageText } from "@/server/bible/text";
+import { passageParts, passageText } from "@/server/bible/text";
 import { parseReference } from "@/lib/bible/reference";
 import { bibleAiRemainingToday } from "@/server/services/bible-ai";
 
@@ -23,7 +23,7 @@ export default async function AskPage() {
     content: r.content as string,
     citations: ((r.citations as string[] | null) ?? []).map((reference) => {
       const ref = parseReference(reference);
-      return { reference, text: (ref && passageText(ref)) ?? "" };
+      return { reference, text: (ref && passageText(ref)) ?? "", parts: (ref && passageParts(ref)) ?? undefined };
     }),
   }));
   const remaining = await bibleAiRemainingToday(user.id, await getUserPlan(user.id));

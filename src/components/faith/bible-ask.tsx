@@ -12,11 +12,13 @@ import { chapterHref } from "@/lib/bible/books";
 import { BIBLE_AI_MAX_QUESTION } from "@/lib/bible/ai";
 import { parseReference } from "@/lib/bible/reference";
 import { askBibleAction, clearBibleAiHistoryAction } from "@/server/actions/bible-ai";
+import { ScriptureText } from "@/components/bible/scripture-text";
+import type { TextPart } from "@/lib/bible/red-letter";
 
 export interface AskMessage {
   role: "user" | "assistant";
   content: string;
-  citations?: { reference: string; text: string }[];
+  citations?: { reference: string; text: string; parts?: TextPart[] }[];
 }
 
 /** A conversation with the Bible study helper. Cited passages are shown from the verified BSB, not from the AI. */
@@ -67,7 +69,9 @@ export function BibleAsk({ initialThread, initialMessages, remaining }: { initia
                         ) : (
                           <span className="text-sm font-semibold">{c.reference}</span>
                         )}
-                        <p className="line-clamp-4 font-serif text-sm text-muted-foreground">{c.text}</p>
+                        <p className="line-clamp-4 font-serif text-sm text-muted-foreground">
+                          <ScriptureText text={c.text} parts={c.parts} />
+                        </p>
                       </div>
                     );
                   })}

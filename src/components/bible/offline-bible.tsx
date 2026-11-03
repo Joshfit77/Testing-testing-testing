@@ -8,7 +8,7 @@ import { isNativeApp } from "@/lib/native";
 
 /** Must match BIBLE_CACHE in public/sw.js. */
 export const BIBLE_CACHE = "ngf-bible-v1";
-const SHELL = ["/bible-offline.html", "/bible-offline.js", "/bible/bsb/meta.json"];
+const SHELL = ["/bible-offline.html", "/bible-offline.js", "/bible/bsb/meta.json", "/bible/bsb/wj.json"];
 
 type Status = { kind: "checking" } | { kind: "unsupported" } | { kind: "native" } | { kind: "none" } | { kind: "partial"; have: number } | { kind: "saved" } | { kind: "saving"; done: number } | { kind: "error"; message: string };
 

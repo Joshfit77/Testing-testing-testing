@@ -3,7 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { faithChallengeFor, type FaithChallenge } from "@/data/faith-challenges";
 import { parseReference } from "@/lib/bible/reference";
 import { addDays, isoDateInTz } from "@/lib/domain/dates";
-import { passageText } from "@/server/bible/text";
+import { passageParts, passageText } from "@/server/bible/text";
+import type { TextPart } from "@/lib/bible/red-letter";
 import { loadProgramSchedule } from "@/server/services/schedule";
 
 /*
@@ -26,7 +27,7 @@ export interface FitnessToday {
 
 export interface DailyGoals {
   today: string;
-  challenge: FaithChallenge & { verseText: string | null; done: boolean };
+  challenge: FaithChallenge & { verseText: string | null; verseParts: TextPart[] | null; done: boolean };
   fitness: FitnessToday;
 }
 
@@ -45,7 +46,7 @@ export async function loadDailyGoals(supabase: SupabaseClient, userId: string, t
   const session = schedule?.planned.find((p) => p.date === today) ?? null;
   return {
     today,
-    challenge: { ...challenge, verseText: ref ? passageText(ref) : null, done: kinds.has("faith_challenge") },
+    challenge: { ...challenge, verseText: ref ? passageText(ref) : null, verseParts: ref ? passageParts(ref) : null, done: kinds.has("faith_challenge") },
     fitness: {
       kind: !schedule ? "none" : session ? "workout" : "rest",
       programName: schedule?.programName ?? null,

@@ -131,6 +131,14 @@ Found afterwards while capturing the iPhone-size demo, and fixed:
 - The phone sweep (`phone-sweep.spec.ts`: every signed-in screen from the iPhone SE to the Pro Max, largest text,
   reduced motion) now includes the new Faith screens; 1 of 1 passed after these fixes.
 
+Added afterwards, at the owner's request: **the words of Jesus in red**, everywhere Bible text is shown (see
+`docs/SCRIPTURE.md`, "Words of Jesus in red"). Which words are His comes from the publisher's own USFM edition of the
+BSB (`\wj` markers), downloaded and checked by the `bsb-text` workflow (GitHub run 41640228934) and pinned by checksum;
+the verse text is unchanged. Checked: typecheck, lint, production build; unit 145 files, 3,002 tests passed;
+integration 302 passed, 1 skipped (same as before); end to end `bible-reader`, `challenge`, `faith-calendar`,
+`faith-journey`, `rank-badges` 11 of 11 passed, including red text in the reader and the offline reader. Not checked on
+a physical iPhone.
+
 ## 14. Physical iPhone tests needed
 
 - Notifications: each reminder kind fires at its time; none after the activity is done; quiet hours; a DST change;
