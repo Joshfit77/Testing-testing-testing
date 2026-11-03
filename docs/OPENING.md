@@ -33,6 +33,21 @@ door appeared behind it. The welcome page now draws no gate. It is the place bey
 settling from above (`.beyond-gate`), the brand, Matthew 7:13–14 and Start free / Sign in. `NarrowGateArt` has no
 "still" form any more, and only the opening renders it.
 
+**The native launch screen (2026-11-03).** On a phone there was still a gate before the opening. The iOS and
+Android launch screens showed a gold arch (a doorway), and Capacitor's splash held it for 1.5 s
+(`SplashScreen.launchShowDuration: 1500`) before the web view, and the opening's own gate, appeared. Browser tests
+can't see this; only a native launch shows it. The arch also appeared at different sizes in the 1x and 3x iOS images,
+and three unused stock Capacitor splash images sat in the iOS image set. Now:
+- every launch image (6 iOS, 26 Android) is plain `#090909`, the app's black;
+- the unused images are removed;
+- the splash hands over at once (`launchShowDuration: 0`), on the same black as the web view (`backgroundColor`) and
+  the opening's first frame.
+
+A launch therefore reads as black, then the one cinematic gate. `scripts/native/blank-splash.mjs` rewrites the images
+if anything regenerates the native assets. `tests/unit/native-splash.test.ts` fails if any splash image is not plain,
+if the iOS image set and its files disagree, or if the hold comes back. Run `npx cap sync` before a native build so the
+native projects pick up the new `launchShowDuration`.
+
 ## Where a launch goes
 
 A launch is the full page load of `/` (the iPhone app's start address, a typed address or a bookmark).
@@ -123,6 +138,8 @@ play (the three that matter for the first frames; the haze follows as a CSS back
   none is left once the opening has ended: a new person (welcome page), a returning person (sign-in), a signed-in
   person (onboarding, then Home), six rapid taps, Enter on a half-open door, failed pictures, slow pictures, and
   leaving the app mid-opening.
+- `tests/unit/native-splash.test.ts`: the native launch screens are plain `#090909` (no arch), the iOS image set lists
+  exactly its files, and the splash hands over at once.
 - `scripts/ios-verify/` (iOS Simulator, in the iOS workflow) films a fresh launch and Enter Narrow Gate and checks
   the order: the door open with its light, the light filling the screen, then the welcome page (dark, with no
   doorway of its own).

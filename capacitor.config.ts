@@ -84,7 +84,9 @@ const config: CapacitorConfig = {
   },
   plugins: {
     SplashScreen: {
-      launchShowDuration: 1500,
+      // Plain #090909 (no gate: the web opening is the only gate) and handed over at once, so there is no pause and no
+      // second door before the opening (docs/OPENING.md, scripts/native/blank-splash.mjs).
+      launchShowDuration: 0,
       launchAutoHide: true,
       backgroundColor: "#090909",
       showSpinner: false,
