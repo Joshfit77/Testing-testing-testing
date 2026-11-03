@@ -155,6 +155,18 @@ export function simulatedStructured(req: SimRequest): Record<string, unknown> | 
       questions: [{ topic: "sauce", question: "Was there any sauce or oil on the chicken?" }],
     };
   }
+  if (system.includes("You transcribe the text printed on a food label")) {
+    // A made-up label (no real product), consistent with itself: sugars below carbohydrate, saturates below fat, and
+    // energy matching the macronutrients. The product name says it wasn't read from the photo.
+    return {
+      is_label: true,
+      legibility: "clear",
+      product_name: "Simulated demo reading (not from your photo)",
+      ingredients_text: "Whole grain oats, sugar, sunflower oil, honey, salt, emulsifier (soy lecithin), natural flavouring.",
+      allergen_statement: "Contains: oats (gluten), soy.",
+      nutrition: { basis: "per_100g", serving_size_grams: null, calories: 452, protein_g: 8.4, carbs_g: 64, sugars_g: 18, fat_g: 17, sat_fat_g: 2.1, fiber_g: 6.5, salt_g: 0.6, sodium_mg: null },
+    };
+  }
   if (system.includes("You arrange meal plans")) {
     const days = Number(user.match(/Plan (\d+) day/)?.[1] ?? 1);
     const slots = [...user.matchAll(/(\d+): [^(;]+\((breakfast|lunch|dinner|snack),/g)].map((m) => ({ index: Number(m[1]), slot: m[2]! }));

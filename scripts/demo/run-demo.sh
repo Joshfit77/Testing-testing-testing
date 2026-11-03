@@ -4,6 +4,8 @@
 #
 #   npm run demo                         then open http://localhost:3000 (or this computer's address on your Wi-Fi)
 #   DEMO_RESET_LOCAL_DB=true npm run demo   wipes the LOCAL database first (needed if you've used it for development)
+#   npm run demo:reset                   puts the sample account back to its starting state while the demo runs
+#   DEMO_SHOW_SCORE=on npm run demo      also shows the experimental Nutrition Score (off by default, unreviewed)
 #
 # It never talks to a hosted Supabase project, Stripe, RevenueCat or the AI provider.
 set -euo pipefail
@@ -23,11 +25,14 @@ fi
 
 export NEXT_PUBLIC_SUPABASE_URL="$API_URL" NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY" SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
 export DEMO_CREDENTIALS_FILE=".demo-credentials.local"
-npx tsx scripts/demo/seed-demo.ts
+# react-server: the seed builds the reading journey with the app's own server-side plan code.
+npx tsx --conditions=react-server scripts/demo/seed-demo.ts
 set -a; . "./$DEMO_CREDENTIALS_FILE"; set +a
 
 # Demo mode: payment and AI keys are ignored; AI replies come from the app's scripted stand-in, in-process.
 export DEMO_MODE=true
+# The Nutrition Score stays off unless the presenter asks for it (it has not had its dietitian review yet).
+if [ "${DEMO_SHOW_SCORE:-}" = "on" ]; then export FOOD_IQ_SCORE=on; fi
 export NEXT_PUBLIC_SITE_URL="${NEXT_PUBLIC_SITE_URL:-http://localhost:${PORT}}"
 # Set to empty (not unset) so values in .env.local are not loaded either.
 export STRIPE_SECRET_KEY="" STRIPE_WEBHOOK_SECRET="" REVENUECAT_SECRET_API_KEY="" REVENUECAT_WEBHOOK_AUTH="" REVENUECAT_PUBLIC_KEY_IOS="" REVENUECAT_PUBLIC_KEY_ANDROID=""

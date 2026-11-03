@@ -8,6 +8,8 @@ import { ConfirmHost } from "@/components/ui/confirm";
 import { Toaster } from "@/components/ui/toaster";
 import { ACTIVE_TRANSLATION, scriptureText } from "@/data/scripture";
 import { OPENING_SCRIPT } from "@/lib/opening";
+import { DEMO_INTRO_ONCE_SCRIPT } from "@/lib/demo/presenter";
+import { isDemoMode } from "@/server/demo";
 import "./globals.css";
 
 // The fonts ship with the app (./fonts, the Google Fonts files, SIL Open Font License) so builds never depend on
@@ -62,6 +64,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: PREFS_SCRIPT }} />
         {/* Decides before the first paint whether this load plays the opening (src/lib/opening.ts). */}
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: OPENING_SCRIPT }} />
+        {/* Demo deployments only: the opening plays once per browser tab, at the start of a presentation. */}
+        {isDemoMode() && <script nonce={nonce} dangerouslySetInnerHTML={{ __html: DEMO_INTRO_ONCE_SCRIPT }} />}
       </head>
       <body className="font-sans">
         {/* First in the body so it is in the first streamed chunk; hidden unless the script above chose to play it. */}

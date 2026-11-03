@@ -90,7 +90,10 @@ describe.skipIf(!available)("AI routes: plan and monthly limits are enforced ser
   it("the meal-photo endpoint applies the same allowance", async () => {
     const { POST } = await import("@/app/api/ai/food-photo/route");
     const form = new FormData();
-    form.append("photo", new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46, 0x49, 0x46, 0, 1, 0xff, 0xd9])], { type: "image/jpeg" }), "meal.jpg");
+    // A real (1×1) image: the server decodes and re-encodes the photo before anything else, so a header-only file would
+    // be refused as an invalid image before the allowance is checked.
+    const png = new Uint8Array(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64"));
+    form.append("photo", new Blob([png], { type: "image/png" }), "meal.png");
     const req = new Request("http://localhost:3000/api/ai/food-photo", { method: "POST", headers: { authorization: `Bearer ${await token(pro)}` }, body: form });
     const bytes = await req.clone().arrayBuffer();
     const res = await POST(new NextRequest(req.url, { method: "POST", headers: { authorization: `Bearer ${await token(pro)}`, "content-type": req.headers.get("content-type")!, "content-length": String(bytes.byteLength) }, body: bytes }));

@@ -1,8 +1,12 @@
 import { FlaskConical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { setDemoPlanAction } from "@/server/actions/demo";
+import { PresenterPanel } from "@/components/demo/presenter-panel";
 
-/** Shown on every screen of a demo deployment: what's sample data, and the server-held Free/Pro switch. */
+/**
+ * Shown on every screen of a demo deployment: what's sample data, the server-held Free/Pro switch, and the presenter's
+ * guided path (20 stops, skip and return).
+ */
 export function DemoBar({ plan, canSwitch, aiSimulated }: { plan: "free" | "pro" | "plus"; canSwitch: boolean; aiSimulated: boolean }) {
   return (
     <div
@@ -37,6 +41,7 @@ export function DemoBar({ plan, canSwitch, aiSimulated }: { plan: "free" | "pro"
           ))}
         </form>
       )}
+      <PresenterPanel />
     </div>
   );
 }

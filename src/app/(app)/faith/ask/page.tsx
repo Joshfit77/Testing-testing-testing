@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Info } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
+import { DemoNote } from "@/components/demo/demo-note";
 import { BackLink } from "@/components/platform/back-link";
 import { BibleAsk, type AskMessage } from "@/components/faith/bible-ask";
 import { getServerSupabase } from "@/lib/supabase/server";
@@ -32,6 +33,7 @@ export default async function AskPage() {
     <div className="mx-auto max-w-2xl space-y-4">
       <BackLink href="/faith">Faith</BackLink>
       <PageHeader title="Ask about the Bible" description="An AI study helper that answers from the Berean Standard Bible and shows every passage it cites." className="mb-2" />
+      <DemoNote topic="bibleAsk" />
       <p className="flex items-start gap-2 rounded-xl border border-border bg-elevated/50 p-3 text-sm text-muted-foreground">
         <Info className="mt-0.5 size-4 shrink-0 text-gold" aria-hidden />
         <span>

@@ -7,6 +7,11 @@ const NOTES = {
     "Demo: these nights are sample data. Nights labelled as from Apple Watch are pretend imports. Real Apple Health and Health Connect imports only work in the iPhone and Android apps on a phone.",
   bodyScan:
     "Demo: you can walk through the guided steps without uploading anything. Don't upload real body photos to a demo server; photos are only needed to save a scan.",
+  mealPhoto:
+    "Demo: no AI model is connected. Any photo returns the same fixed sample items, labelled as simulated, for you to review and edit. The photo isn't analysed or stored.",
+  labelPhoto:
+    "Demo: a label photo returns a fixed sample reading, labelled as simulated; it isn't read from your photo. Typed ingredients are checked for real by the app's own rules.",
+  bibleAsk: "Demo: no AI model is connected. Answers here are written by a script and labelled as simulated.",
 } as const;
 
 /** Demo deployments only: what on this screen is sample data, and what needs a real phone. */

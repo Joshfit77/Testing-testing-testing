@@ -93,7 +93,8 @@ jobs:
           DEMO_SEED_ALLOW_REMOTE: "true"
           DEMO_CREDENTIALS_FILE: ${{ runner.temp }}/demo-credentials
         run: |
-          npx tsx scripts/demo/seed-demo.ts
+          # react-server: the seed builds the sample reading journey with the app's server-side plan code.
+          npx tsx --conditions=react-server scripts/demo/seed-demo.ts
           email=$(sed -n 's/^DEMO_ACCOUNT_EMAIL=//p' "$DEMO_CREDENTIALS_FILE")
           password=$(sed -n 's/^DEMO_ACCOUNT_PASSWORD=//p' "$DEMO_CREDENTIALS_FILE")
           echo "::add-mask::$password"

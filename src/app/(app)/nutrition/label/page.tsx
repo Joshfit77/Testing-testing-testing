@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/common/page-header";
+import { DemoNote } from "@/components/demo/demo-note";
 import { AiConsentCard } from "@/components/coach/ai-consent-card";
 import { FoodPhotoConsentCard } from "@/components/nutrition/food-photo-consent";
 import { LabelCheck } from "@/components/nutrition/label-check";
@@ -55,6 +56,7 @@ export default async function LabelCheckPage({ searchParams }: { searchParams: P
         title="Check a label"
         description="For a product without a barcode, or one the database doesn't know: check its ingredient list for additives, added sugars, sodium sources and allergens, and log its nutrition."
       />
+      <DemoNote topic="labelPhoto" />
       <LabelCheck photo={photo} date={date} defaultMeal={mealForTime(new Date(2000, 0, 1, hour))} />
       {consentCard === "ai" && <AiConsentCard />}
       {consentCard === "photo" && <FoodPhotoConsentCard />}

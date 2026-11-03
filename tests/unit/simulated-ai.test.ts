@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { aiMealPlanOutputSchema } from "@/lib/domain/ai-meal-plan";
 import { foodPhotoOutputSchema } from "@/lib/domain/food-photo";
+import { LABEL_PHOTO_INSTRUCTIONS, labelPhotoOutputSchema, normalizeLabelPhoto } from "@/lib/domain/label-photo";
 import { productExplanationSchema } from "@/lib/food-quality-ai";
 import { isToolName, validateToolInput } from "@/lib/coach/tools";
 import { SIMULATED_LABEL, simulatedChat, simulatedStructured, sseEvents, type SimRequest } from "@/lib/demo/simulated-ai";
@@ -49,6 +50,20 @@ describe("simulated coach chat", () => {
     const events = sseEvents("m", simulatedChat(ask("hi")).blocks, "end_turn");
     expect(events[0]!.type).toBe("message_start");
     expect(events.at(-1)!.type).toBe("message_stop");
+  });
+});
+
+describe("simulated label photo (demo)", () => {
+  it("answers the real label prompt with a valid, self-consistent reading that says it is simulated", () => {
+    const out = simulatedStructured({ model: "m", system: [{ type: "text", text: LABEL_PHOTO_INSTRUCTIONS }], messages: [{ role: "user", content: "Transcribe this food label." }] });
+    const parsed = labelPhotoOutputSchema.parse(out);
+    expect(parsed.product_name).toMatch(/Simulated demo reading/);
+    const reading = normalizeLabelPhoto(parsed);
+    const t = reading.nutrition!;
+    expect(t.sugars_g!).toBeLessThan(t.carbs_g!);
+    expect(t.sat_fat_g!).toBeLessThan(t.fat_g!);
+    const energy = 4 * t.protein_g! + 4 * t.carbs_g! + 9 * t.fat_g! + 2 * t.fiber_g!;
+    expect(Math.abs(energy - t.calories!) / t.calories!).toBeLessThan(0.05);
   });
 });
 

@@ -110,7 +110,7 @@ async function createMember(password: string): Promise<string> {
     password,
     email_confirm: true,
     app_metadata: { demo: true },
-    user_metadata: { display_name: "Jordan", legal_acceptances: signupAcceptances() },
+    user_metadata: { display_name: "Demo Athlete", legal_acceptances: signupAcceptances() },
   });
   if (error || !data.user) fail(`creating the demo account: ${error?.message}`);
   const id = data.user.id;
@@ -118,10 +118,11 @@ async function createMember(password: string): Promise<string> {
   const { error: pErr } = await db
     .from("profiles")
     .update({
-      display_name: "Jordan",
+      display_name: "Demo Athlete",
       unit_system: "imperial",
       sex: "male",
-      birth_year: 1991,
+      // 28 years old (fictional sample member).
+      birth_year: Number(TODAY.slice(0, 4)) - 28,
       height_cm: 180,
       faith_enabled: true,
       timezone: TZ,
@@ -130,6 +131,8 @@ async function createMember(password: string): Promise<string> {
       wellness_consent_at: consented,
       coach_memory_enabled: true,
       coach_memory_consent_at: consented,
+      // Agreed to meal and label photos, so the photo screens open straight away in the demo.
+      food_photo_consent_at: consented,
       step_goal: 9000,
       sleep_goal_minutes: 450,
       sleep_target_wake: "06:30:00",
@@ -383,9 +386,9 @@ async function seedFood(userId: string) {
   const byName = new Map((foods ?? []).map((f) => [f.name as string, f]));
   const missing = FOODS.filter((n) => !byName.has(n));
   if (missing.length) fail(`foods not found: ${missing.join(", ")}`);
-  for (let d = -13; d <= 0; d++) {
+  for (let d = -29; d <= 0; d++) {
     const date = dayOffset(d);
-    const menu = MENUS[(d + 14) % MENUS.length]!.filter(([meal]) => d < 0 || meal !== "dinner"); // today: dinner not eaten yet
+    const menu = MENUS[(((d + 30) % MENUS.length) + MENUS.length) % MENUS.length]!.filter(([meal]) => d < 0 || meal !== "dinner"); // today: dinner not eaten yet
     const mealIds = new Map<string, string>();
     for (const [meal, name, servings] of menu) {
       if (!mealIds.has(meal)) {
@@ -653,6 +656,121 @@ async function seedFaith(userId: string) {
   await insert("discipline_checkins", checkins, "goal_id");
 }
 
+// ---------- Bible, reading journey, prayer, memory verses and studies (all free)
+
+/** Local time on a given date in the demo time zone, as an ISO string. */
+const localIso = (date: string, hour: number, minute = 0) => at(date, hour, minute).toISOString();
+
+async function seedDiscipleship(userId: string): Promise<string> {
+  // A 90-day Gospels journey started 20 days ago, kept every day so far: reading in the morning, prayer in the
+  // evening. Recorded through the database's own rule (faith_journey_check_in_at / faith_journey_settle_at), so the
+  // journey's day, attempts and history are exactly what the app itself would have produced. Today is left open, so
+  // the presenter can mark today's reading and prayer live.
+  const startOn = dayOffset(-20);
+  const [journey] = await insert("faith_journeys", { user_id: userId, plan_kind: "gospels", duration_days: 90, start_on: startOn });
+  await insert("faith_journey_attempts", { journey_id: journey!.id, user_id: userId, attempt_number: 1, started_on: startOn });
+  const { journeyPlan, validPlanSpec } = await import("@/server/bible/plans");
+  const plan = journeyPlan(validPlanSpec("gospels", null)!, 90);
+  if (!plan) fail("the Gospels plan couldn't be built");
+  const history: Record<string, unknown>[] = [];
+  for (let d = -20; d <= -1; d++) {
+    const date = dayOffset(d);
+    for (const [activity, hour] of [["reading", 6], ["prayer", 21]] as const) {
+      const { error } = await db.rpc("faith_journey_check_in_at", { p_user: userId, p_activity: activity, p_now: localIso(date, hour, 40) });
+      if (error) fail(`journey check-in ${date} ${activity}: ${error.message}`);
+    }
+    // The chapters that day's reading covered, in the reading history.
+    const day = plan.schedule[d + 20]!;
+    const chapters = new Set<string>();
+    for (const r of day.refs) for (let c = r.chapter; c <= (r.chapterEnd ?? r.chapter); c++) chapters.add(`${r.bookId}|${c}`);
+    for (const key of chapters) {
+      const [book_id, chapter] = key.split("|");
+      history.push({ user_id: userId, book_id, chapter: Number(chapter), read_on: date, read_at: localIso(date, 6, 30) });
+    }
+  }
+  const { error: settleErr } = await db.rpc("faith_journey_settle_at", { p_journey_id: journey!.id, p_now: new Date().toISOString() });
+  if (settleErr) fail(`journey settle: ${settleErr.message}`);
+  await insert("bible_reading_history", history, "id");
+  const next = plan.schedule[20]!.refs[0]!;
+  await insert("bible_reading_state", { user_id: userId, book_id: next.bookId, chapter: next.chapter, verse: next.verseStart ?? null }, "user_id");
+
+  // Highlights, bookmarks and notes the member made while reading.
+  await insert(
+    "bible_highlights",
+    [
+      ["MAT", 7, 13, "gold"],
+      ["MAT", 7, 14, "gold"],
+      ["JHN", 3, 16, "gold"],
+      ["PHP", 4, 13, "sage"],
+      ["ISA", 40, 31, "sky"],
+      ["1CO", 9, 27, "rose"],
+      ["PSA", 23, 1, "sage"],
+    ].map(([book_id, chapter, verse, color]) => ({ user_id: userId, book_id, chapter, verse, color })),
+    "user_id",
+  );
+  await insert("bible_bookmarks", [
+    { user_id: userId, book_id: "MAT", chapter: 7, verse: 13, label: "The narrow gate" },
+    { user_id: userId, book_id: "PSA", chapter: 23, verse: null, label: "Psalm 23" },
+  ]);
+  await insert("bible_notes", [
+    { user_id: userId, book_id: "MAT", chapter: 7, verse_start: 13, verse_end: 14, body: "The narrow way is a daily choice, in small things: getting up to train, opening the Bible before the phone." },
+    { user_id: userId, book_id: "1CO", chapter: 9, verse_start: 24, verse_end: 27, body: "Paul uses the athlete's discipline as a picture of the Christian life. Train with purpose, not aimlessly." },
+  ]);
+
+  // Memory verses: one learnt, one in progress (due for review today).
+  await insert("scripture_memory", [
+    { user_id: userId, book_id: "JOS", chapter: 1, verse_start: 9, verse_end: 9, status: "memorized", level: 4, review_count: 9, next_review_on: dayOffset(12), last_reviewed_at: localIso(dayOffset(-2), 7) },
+    { user_id: userId, book_id: "PHP", chapter: 4, verse_start: 13, verse_end: 13, status: "learning", level: 2, review_count: 4, next_review_on: TODAY, last_reviewed_at: localIso(dayOffset(-3), 7) },
+  ]);
+
+  // Prayer journal: an answered request, an open one for a friend, and recent daily prayers.
+  await insert("faith_journal_entries", [
+    { user_id: userId, entry_date: dayOffset(-26), kind: "request", theme: "perseverance", title: "A new job", body: "Pray for wisdom and peace about the job interview next week.", answered_on: dayOffset(-17), answered_note: "Got the offer, and the hours leave room to train in the mornings." },
+    { user_id: userId, entry_date: dayOffset(-6), kind: "intercession", theme: "other", title: "My brother's recovery", body: "Pray for healing after his knee surgery, and patience through the rehab." },
+    ...[-3, -2, -1].map((d) => ({ user_id: userId, entry_date: dayOffset(d), kind: "daily", theme: "gratitude", title: "Morning prayer", body: "Thank You for strength for today. Help me to be faithful in small things." })),
+  ]);
+
+  // Daily Faith & Fitness goals over the last ten days.
+  const goals: Record<string, unknown>[] = [];
+  for (let d = -10; d <= -1; d++) {
+    const date = dayOffset(d);
+    goals.push({ user_id: userId, goal_date: date, kind: "faith_challenge", completed_at: localIso(date, 20) });
+    if (d % 4 !== 0) goals.push({ user_id: userId, goal_date: date, kind: "fitness", completed_at: localIso(date, 19) });
+  }
+  await insert("faith_daily_goals", goals, "user_id");
+
+  // A guided study under way: the member's own notes (the study's commentary stays unpublished until reviewed).
+  await insert("bible_study_progress", { user_id: userId, study_slug: "gospel", lesson_slug: "good-news", completed_at: localIso(dayOffset(-5), 7), notes: "Jesus' first message: repent and believe. Both, every day." }, "user_id");
+  return `Gospels journey on day 21 of 90 (20 days kept), ${history.length} chapters read, highlights, notes, memory verses, prayer journal`;
+}
+
+/** Reminders the member turned on (shown on Profile → Notifications and its 24-hour preview; delivery needs the phone app). */
+async function seedReminders(userId: string) {
+  const weekdays = [1, 2, 4, 6]; // training days (JavaScript weekdays: 0 = Sunday)
+  const everyDay = [0, 1, 2, 3, 4, 5, 6];
+  const { error: fErr } = await db.from("faith_reminders").upsert(
+    [
+      { user_id: userId, kind: "reading", enabled: true, remind_at: "06:15", weekdays: everyDay },
+      { user_id: userId, kind: "prayer", enabled: true, remind_at: "21:00", weekdays: everyDay },
+      { user_id: userId, kind: "final", enabled: true, remind_at: "22:30", weekdays: everyDay },
+    ],
+    { onConflict: "user_id,kind", defaultToNull: false },
+  );
+  if (fErr) fail(`faith reminders: ${fErr.message}`);
+  const { error: nErr } = await db.from("notification_reminders").upsert(
+    [
+      { user_id: userId, kind: "workout", enabled: true, remind_at: "05:45", weekdays, style: "faith" },
+      { user_id: userId, kind: "lunch", enabled: true, remind_at: "12:30", weekdays: everyDay },
+      { user_id: userId, kind: "water", enabled: true, remind_at: "08:00", weekdays: everyDay, interval_minutes: 120, end_at: "20:00" },
+      { user_id: userId, kind: "winddown", enabled: true, remind_at: "21:45", weekdays: everyDay },
+    ],
+    { onConflict: "user_id,kind", defaultToNull: false },
+  );
+  if (nErr) fail(`reminders: ${nErr.message}`);
+  const { error: pErr } = await db.from("notification_prefs").upsert({ user_id: userId, quiet_start: "22:45", quiet_end: "05:30", daily_limit: 8 }, { onConflict: "user_id" });
+  if (pErr) fail(`notification settings: ${pErr.message}`);
+}
+
 async function main() {
   db = createClient(URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
   await checkTarget();
@@ -669,12 +787,15 @@ async function main() {
   await seedRuns(userId);
   await seedSleep(userId);
   await seedFaith(userId);
+  const discipleship = await seedDiscipleship(userId);
+  await seedReminders(userId);
   writeFileSync(
     CREDENTIALS_FILE,
     `# Demo sign-in for the sample account (local file, never commit it). Created ${new Date().toISOString()}\nDEMO_ACCOUNT_EMAIL=${EMAIL}\nDEMO_ACCOUNT_PASSWORD=${password}\n`,
     { mode: 0o600 },
   );
-  console.log(`seed-demo: sample account ready (${sessions} workouts, 14 days of food, 8 runs, 28 nights of sleep, faith history).`);
+  console.log(`seed-demo: sample account ready (${sessions} workouts, 30 days of food, 8 runs, 28 nights of sleep, faith history).`);
+  console.log(`seed-demo: ${discipleship}.`);
   console.log(`seed-demo: sign-in written to ${CREDENTIALS_FILE}`);
 }
 

@@ -21,6 +21,65 @@ Wi-Fi, open `http://<your computer's IP address>:3000`.
   accounts). `DEMO_RESET_LOCAL_DB=true npm run demo` wipes the **local** database first.
 - Each run re-creates the sample data, so anything you log during a session is reset next time.
 
+### On a MacBook, step by step
+
+1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and open it (wait for "Engine running").
+2. Install Node 22 (for example from nodejs.org).
+3. In Terminal: `cd` into this repository, then `npm run demo`. The first run downloads the database images and
+   builds the app: allow about 5–10 minutes. Later runs take 2–3 minutes.
+4. When Terminal prints `Narrow Gate Fitness demo: http://localhost:3000`, open that address in Safari or Chrome.
+5. To show it at phone size on the Mac: Safari › Develop › Enter Responsive Design Mode (turn on the Develop menu in
+   Safari › Settings › Advanced), or Chrome › View › Developer › Developer Tools › the phone icon. Or open it on an iPhone
+   on the same Wi-Fi (macOS may ask to allow incoming connections for `node`: allow it).
+6. To stop: press Control-C in Terminal. Docker keeps the database for next time.
+
+| Command | What it does |
+|---|---|
+| `npm run demo` | Starts the database, loads the sample account, builds and serves the demo on port 3000 |
+| `npm run demo:reset` | Puts the sample account back to its starting state in about 10 seconds while the demo keeps running (the password stays the same; sign in again with **Explore with sample data**) |
+| `DEMO_RESET_LOCAL_DB=true npm run demo` | Wipes the **local** database first (only needed if you used it for development) |
+| `DEMO_SHOW_SCORE=on npm run demo` | Also shows the experimental Nutrition Score number on product pages. Off by default: the formula hasn't had its dietitian review (`docs/FOOD_IQ_METHOD.md`) |
+| `PORT=3001 npm run demo` | Another port |
+
+### The sample member
+
+"Demo Athlete", 28, intermediate, training for strength with gradual fat loss, a 5K and better nutrition, with an
+active Faith life. All of it is made up by `scripts/demo/seed-demo.ts`, dated relative to today so it always looks
+current:
+
+- **Training:** Powerbuilding 4-Day in week 3, about 8 weeks of logged workouts, personal records, bodyweight and
+  measurements, goals.
+- **Food:** 30 days of meals, water and steps against 2,600 kcal / 185 g protein targets; today's dinner not yet
+  logged.
+- **Cardio and recovery:** 8 runs on sample routes; 28 nights of sleep with stages (pretend Apple Watch imports).
+- **Faith (all free):** a 90-day Gospels reading journey on day 21, kept every day so far and recorded through the
+  database's own daily rule (today's reading and prayer are left open so you can mark them live); the reading history
+  for those days; highlights, bookmarks and notes (Matthew 7:13–14 is bookmarked); two memory verses; a guided study
+  lesson done with the member's own notes; a prayer journal with an answered request and an open one for a family
+  member; the 40-day challenge on day 13; daily disciplines.
+- **Notifications:** reading, prayer, before-midnight, workout, lunch, water and wind-down reminders switched on, with
+  quiet hours, so the settings screen and its **Next 24 hours** preview have something to show.
+- **Consents:** the member has agreed to meal and label photos and to coach memory, so those screens open straight away.
+  Prayer entries are **not** shared with the AI coach (each entry is private unless ticked).
+
+### Presenter panel (in the demo bar)
+
+Every screen of a demo deployment shows the demo bar; under it is the presenter's **guided path**: 20 stops from the
+opening to the closing Home screen (`src/lib/demo/presenter.ts`). It shows where you are ("4/20 Live workout"), a
+**Live / Sample data / Simulated AI / Preview** tag for that stop, one line on what to show, **Next** and **Back**, a
+list of all stops to skip ahead or go back to, and **Hide** (a small "Presenter" button brings it back, for clean
+screen recordings).
+
+- **Skip and return:** open the list and tap any stop. If you wander off the path (a screen that isn't a stop), the
+  panel says so and offers "Back to *n*. *stop*".
+- **The opening plays once per browser tab**, at the start, not again on every reload. Stop 1 (**Play the opening**)
+  plays it again on purpose.
+- **Recovering from a mistake:** a wrong tap is undone with Back or the list. If sample data got changed (a workout
+  saved, a reading marked), run `npm run demo:reset` in Terminal and tap **Explore with sample data** again.
+- The panel is only links: it unlocks nothing. It is remembered only in this browser tab.
+
+The full talk track, tap by tap, is in `docs/PRESENTATION_GUIDE.md`.
+
 ## What demo mode does (`DEMO_MODE=true`)
 
 | Area | Behaviour |
@@ -35,17 +94,31 @@ Wi-Fi, open `http://<your computer's IP address>:3000`.
 
 | Feature | In the demo |
 |---|---|
-| Opening, onboarding, Home, programs, all 157 demonstrations, workout logging, history, calendar | **Live** (real app, sample data) |
+| Opening, onboarding, Home, programs, all 157 demonstrations, workout logging (rest timer with −15 s and Skip), history, calendar | **Live** (real app, sample data) |
+| 3D exercise viewer (Train › 3D) | **Live, experimental**: five exercises; not the standard demonstration |
 | Food diary, meal planner, recipes, grocery list, water, steps | **Live** (food search uses the built-in food database) |
+| Check a label (typed ingredients): additives, sugars, sodium, allergens, evidence notes | **Live**, rule tables in the app |
+| Barcode lookup | **Live, needs internet** (Open Food Facts). Type a real barcode from a product you have with you, or use the camera in the phone app. No products are made up |
+| Nutrition Score number | **Off** by default (experimental, unreviewed); `DEMO_SHOW_SCORE=on` shows it, labelled experimental |
 | Progress, records, badges, body measurements, Body Scan screens | **Live**. Saving a new Body Scan needs photos; don't upload real body photos to a demo server |
 | Sleep & Recovery dashboards, check-ins, scoring | **Live** on sample nights. Nights labelled "Apple Watch (sample data)" are pretend imports |
-| Faith & Discipline (journal, 40-day challenge, practices) | **Live**, Free |
+| Faith: Bible (BSB, words of Jesus in red), highlights, notes, reading journeys, prayer journal, memory verses, studies, 40-day challenge, practices | **Live**, Free. Study commentary that hasn't been reviewed stays hidden, as in the real app |
+| Bible study assistant (Faith › Ask) | **Simulated** (labelled) |
+| Notification settings and the Next 24 hours preview | **Live** settings; **delivery needs the phone app** |
 | Free / Pro comparison, $19.99 / $149.99 prices | **Live**; purchases turned off |
-| AI Coach, AI meal plans, food-photo estimates, product explanations | **Simulated** (labelled). The coach's real tools still run on the sample data, and suggestions still wait for approval |
+| AI Coach, AI meal plans, food-photo estimates, label-photo reading, product explanations | **Simulated** (labelled). The coach's real tools still run on the sample data, and suggestions still wait for approval |
 | Runs with routes | **Sample routes** (labelled), not real recordings |
 | Live GPS recording | **Needs the phone app** outdoors |
 | Apple Health / Health Connect imports | **Needs the phone app** on a phone |
 | Barcode camera scanning, notifications, alarms, in-app purchases | **Needs the phone app** |
+
+### What the demo never does
+
+It never charges a card or starts a subscription (payment keys are ignored), never touches real members' records (the
+seed refuses any database with accounts it didn't create), never sends push notifications (the web app can't, and the
+demo has no push keys), never calls an AI model (replies are scripted and say so), never reads Apple Health (that
+needs the phone app) and never records GPS without the phone's own permission prompt. The Free/Pro switch works only
+for accounts the server created as demo accounts, only when the server runs in demo mode.
 
 ## The clickable iPhone demo (captured screens + the live 3D figure)
 

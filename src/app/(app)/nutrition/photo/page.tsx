@@ -5,6 +5,7 @@ import { FoodPhotoConsentCard } from "@/components/nutrition/food-photo-consent"
 import { FoodPhotoFlow, type HiddenExtra } from "@/components/nutrition/food-photo-flow";
 import type { MyFood } from "@/components/nutrition/nutrition-client";
 import { BackLink } from "@/components/platform/back-link";
+import { DemoNote } from "@/components/demo/demo-note";
 import { isoDateInTz, isValidIsoDate } from "@/lib/domain/dates";
 import { HIDDEN_EXTRAS } from "@/lib/domain/food-photo";
 import { mealForTime } from "@/lib/domain/meal-time";
@@ -101,6 +102,7 @@ export default async function FoodPhotoPage({ searchParams }: { searchParams: Pr
   return (
     <div className="mx-auto max-w-2xl space-y-5">
       {header}
+      <DemoNote topic="mealPhoto" />
       <FoodPhotoFlow
         date={date}
         defaultMeal={mealForTime(new Date(2000, 0, 1, hour))}
