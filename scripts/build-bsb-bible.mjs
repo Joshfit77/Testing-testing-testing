@@ -9,8 +9,9 @@
  * Writes <out-dir>/meta.json and <out-dir>/books/<ID>.json (chapters as arrays of [verse, text]), then validates the
  * result against src/data/bible/books.json, an independently written list of the 66 books and their chapter counts.
  * Fails on any unknown book name, a book or chapter count that differs, a missing or repeated chapter, a verse out of
- * order, or an empty verse. Verse numbers absent from the file (a few verses the BSB places in footnotes) are listed
- * in meta.json as "absent", never filled in.
+ * order. A verse number the file lists with no text (the BSB keeps the numbers of a few verses it places in its
+ * footnotes, e.g. Matthew 17:21) is recorded in meta.json as "withoutText" and left out of the chapter, never filled
+ * in; a verse number missing from the file altogether is recorded as "absent".
  */
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -63,9 +64,7 @@ for (const line of raw.toString("utf8").split(/\r?\n/)) {
   if (!chapters.has(c)) chapters.set(c, new Map());
   const verses = chapters.get(c);
   if (verses.has(v)) errors.push(`${book.id} ${c}:${v} appears twice`);
-  const t = text.trim();
-  if (!t) errors.push(`${book.id} ${c}:${v} has no text`);
-  verses.set(v, t);
+  verses.set(v, text.trim());
 }
 
 if (unknownBooks.size) errors.push(`Unknown book names in the file: ${[...unknownBooks].join(", ")}`);
@@ -82,7 +81,7 @@ const meta = {
   downloadedAt: new Date().toISOString(),
   fileSha256: createHash("sha256").update(raw).digest("hex"),
   books: [],
-  totals: { books: 0, chapters: 0, verses: 0, words: 0, absentVerses: 0 },
+  totals: { books: 0, chapters: 0, verseNumbers: 0, verses: 0, versesWithoutText: 0, words: 0, absentVerses: 0 },
   contentSha256: "",
 };
 const content = createHash("sha256");
@@ -99,25 +98,30 @@ for (const b of books) {
   const verseCounts = [];
   const words = [];
   const absent = [];
+  const withoutText = [];
   for (const c of chapterNumbers) {
     const verses = chapters.get(c);
     const numbers = [...verses.keys()].sort((x, y) => x - y);
     if (numbers[0] !== 1) errors.push(`${b.name} ${c} starts at verse ${numbers[0]}`);
+    if (!numbers.some((v) => verses.get(v))) errors.push(`${b.name} ${c} has no text at all`);
     const last = numbers.at(-1);
     for (let v = 1; v <= last; v++) if (!verses.has(v)) absent.push(`${c}:${v}`);
-    const rows = numbers.map((v) => [v, verses.get(v)]);
+    for (const v of numbers) if (!verses.get(v)) withoutText.push(`${c}:${v}`);
+    meta.totals.verseNumbers += numbers.length;
+    const rows = numbers.filter((v) => verses.get(v)).map((v) => [v, verses.get(v)]);
     out.push(rows);
     verseCounts.push(rows.length);
     words.push(rows.reduce((n, [, t]) => n + (t.match(/\S+/g)?.length ?? 0), 0));
     for (const [v, t] of rows) content.update(`${b.id} ${c}:${v}\t${t}\n`);
   }
   writeFileSync(path.join(outDir, "books", `${b.id}.json`), JSON.stringify({ id: b.id, name: b.name, chapters: out }));
-  meta.books.push({ id: b.id, name: b.name, fileName: fileNames.get(b.id) ?? null, chapters: out.length, verses: verseCounts, lastVerse: out.map((r) => r.at(-1)?.[0] ?? 0), words, absent });
+  meta.books.push({ id: b.id, name: b.name, fileName: fileNames.get(b.id) ?? null, chapters: out.length, verses: verseCounts, lastVerse: out.map((r) => r.at(-1)?.[0] ?? 0), words, absent, withoutText });
   meta.totals.books += 1;
   meta.totals.chapters += out.length;
   meta.totals.verses += verseCounts.reduce((a, n) => a + n, 0);
   meta.totals.words += words.reduce((a, n) => a + n, 0);
   meta.totals.absentVerses += absent.length;
+  meta.totals.versesWithoutText += withoutText.length;
 }
 meta.contentSha256 = content.digest("hex");
 
@@ -125,7 +129,8 @@ if (meta.totals.books !== 66) errors.push(`${meta.totals.books} books`);
 if (meta.totals.chapters !== 1189) errors.push(`${meta.totals.chapters} chapters, 1189 expected`);
 if (meta.totals.verses < 31000) errors.push(`Only ${meta.totals.verses} verses`);
 
-console.log(`Books ${meta.totals.books}, chapters ${meta.totals.chapters}, verses ${meta.totals.verses}, words ${meta.totals.words}`);
+console.log(`Books ${meta.totals.books}, chapters ${meta.totals.chapters}, verse numbers ${meta.totals.verseNumbers}, verses with text ${meta.totals.verses}, words ${meta.totals.words}`);
+console.log(`Verse numbers with no text in the file (${meta.totals.versesWithoutText}): ${meta.books.flatMap((b) => b.withoutText.map((a) => `${b.name} ${a}`)).join(", ") || "none"}`);
 console.log(`Verse numbers absent from the file (${meta.totals.absentVerses}): ${meta.books.flatMap((b) => b.absent.map((a) => `${b.name} ${a}`)).join(", ") || "none"}`);
 console.log(`Book names as written in the file that differ from the canonical names: ${meta.books.filter((b) => b.fileName && b.fileName !== b.name).map((b) => `${b.fileName} → ${b.name}`).join(", ") || "none"}`);
 console.log(`Non-verse lines skipped (${unparsed.length}): ${unparsed.slice(0, 6).join(" | ")}`);
