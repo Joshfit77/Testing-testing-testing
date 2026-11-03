@@ -67,6 +67,22 @@ For review, the publisher also marks: the voice in Peter's vision (Acts 10:13, 1
 speaking in the words of Psalm 40), Revelation 4:1 and 16:15. It does not mark Revelation 1:8 ("says the Lord God").
 If the reviewer would mark these differently, the change belongs in the source data, not in the app.
 
+Cross-check (2026-11-03, `bsb-text` workflow run 41644412507): the World English Bible's red-letter edition (eBible.org)
+marks 2,036 of the same 2,047 verses. Where they differ:
+
+- Verses the BSB keeps only in footnotes, so there is no text to colour: Matthew 17:21, 18:11, 23:14; Mark 7:16, 9:44,
+  9:46, 11:26; and the longer reading of Luke 9:55–56.
+- Wording differences: Luke 20:23 (the BSB starts His words in 20:24); Mark 8:23 (the BSB gives His question directly).
+- Others repeating His words: the BSB colours exact quotations (Matthew 27:43, 27:63; Mark 5:31; Luke 24:7) but not
+  indirect ones (John 5:12, 8:33, 8:52, 9:11, 12:34), which the WEB colours.
+- Interpretive calls the reviewer may want to decide: Revelation 1:8 and 21:5–8 (the Lord God / the One on the throne:
+  red in the WEB, plain in the BSB); Revelation 22:14–15 (the BSB closes His quotation at 22:13); 1 Timothy 5:18 ("The
+  worker is worthy of his wages", Jesus' saying quoted as Scripture: red in the WEB); Hebrews 10:5–9 and Revelation 4:1
+  (red in the BSB only).
+
+A local scan of the BSB text (every "Jesus said", "He answered" and similar, and every verse inside an open quotation of
+His) found no verse where He speaks without being marked.
+
 Not red by design (owner to decide): Matthew 7:13–14 in the opening gate animation and on the welcome page, where it is
 set in the gold brand style.
 
