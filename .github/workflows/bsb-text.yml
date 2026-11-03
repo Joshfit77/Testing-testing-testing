@@ -23,6 +23,7 @@ on:
     branches: [main, claude/sharp-cray-8y0uuv, claude/security-nasb-deletion, claude/badges-27]
     paths:
       - "scripts/extract-bsb.mjs"
+      - "scripts/build-bsb-bible.mjs"
       - "scripts/bsb-references.json"
       - ".github/workflows/bsb-text.yml"
 
@@ -89,6 +90,13 @@ jobs:
           wc -l bsb.txt
       - name: Extract the app's passages
         run: node scripts/extract-bsb.mjs bsb.txt scripts/bsb-references.json bsb-passages.json "$BSB_SOURCE"
+      - name: Build and validate the complete Bible for the reader (66 books, 1,189 chapters)
+        run: node scripts/build-bsb-bible.mjs bsb.txt src/data/bible/books.json bsb-bible "$BSB_SOURCE"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: bsb-bible
+          path: bsb-bible
+          if-no-files-found: error
       - name: Compare with the copy the app ships (information only)
         run: |
           node -e '
