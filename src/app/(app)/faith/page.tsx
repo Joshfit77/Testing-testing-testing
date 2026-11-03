@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BellRing, BookMarked, BookOpen, Brain, ChevronRight, Flame, GraduationCap, History, MessageCircleQuestion, NotebookPen, Route, Search, Sparkles } from "lucide-react";
+import { BellRing, BookMarked, BookOpen, Brain, ChevronRight, Flame, GraduationCap, MessageCircleQuestion, NotebookPen, Route, Search, Sparkles } from "lucide-react";
 import { MainHeader } from "@/components/shell/main-header";
 import { EmptyState } from "@/components/common/states";
 import { FaithChallenge } from "@/components/faith/faith-challenge";
@@ -52,7 +52,7 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
     { href: "/faith/bible", label: "Bible", icon: BookOpen },
     { href: "/faith/bible/search", label: "Search", icon: Search },
     { href: "/faith/bible/saved", label: "Saved", icon: BookMarked },
-    { href: "/faith/bible/history", label: "History", icon: History },
+    { href: "/faith/journal", label: "Journal", icon: NotebookPen },
     { href: "/faith/journey", label: "Journey", icon: Route },
     { href: "/faith/memory", label: "Memorize", icon: Brain },
     { href: "/faith/studies", label: "Studies", icon: GraduationCap },
