@@ -3,13 +3,16 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { Bookmark, BookmarkCheck, Brain, Copy, Minus, NotebookPen, Plus, Share2, Trash2, X } from "lucide-react";
+import { Bookmark, BookmarkCheck, Brain, Copy, Minus, NotebookPen, Plus, Settings2, Share2, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScriptureText } from "@/components/bible/scripture-text";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/toaster";
 import { selectionReference, shareableText, verseRange, verseRuns } from "@/lib/bible/format";
 import type { RedLetterSpan } from "@/lib/bible/red-letter";
+import { applyBibleDisplay, readingVars, type BiblePageTheme } from "@/lib/bible/reading-display";
+import { updateUiPrefsAction } from "@/server/actions/ui-prefs";
 import { cn } from "@/lib/utils";
 import {
   addMemoryVerseAction,
@@ -52,6 +55,9 @@ export function ChapterReader(props: {
   verses: [number, string][];
   /** The words of Jesus: verse number → [start, end) offsets into its text. */
   jesus?: Record<number, readonly RedLetterSpan[]>;
+  /** The member's Red Letters setting (default on) and reading page. */
+  redLetters?: boolean;
+  pageTheme?: BiblePageTheme;
   withoutText: number[];
   highlights: Record<number, HighlightColor>;
   bookmarks: number[];
@@ -70,6 +76,9 @@ export function ChapterReader(props: {
   const [noteOpen, setNoteOpen] = useState<{ id: string | null; start: number; end: number; body: string } | null>(null);
   const [viewNotes, setViewNotes] = useState<number | null>(null);
   const [pending, start] = useTransition();
+  const [redLetters, setRedLetters] = useState(props.redLetters ?? true);
+  const [pageTheme, setPageTheme] = useState<BiblePageTheme>(props.pageTheme ?? "dark");
+  const [displayOpen, setDisplayOpen] = useState(false);
   const fontTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const text = useMemo(() => new Map(verses), [verses]);
   const ref = selectionReference(bookId, chapter, selected);
@@ -113,6 +122,18 @@ export function ChapterReader(props: {
     }
     if (fontTimer.current) clearTimeout(fontTimer.current);
     fontTimer.current = setTimeout(() => void setFontScaleAction(next, bookId, chapter), 800);
+  }
+
+  // Red Letters and the reading page: shown at once, saved to the account (and this device, for the offline reader).
+  function saveDisplay(next: { redLetters?: boolean; biblePageTheme?: BiblePageTheme }) {
+    const on = next.redLetters ?? redLetters;
+    const theme = next.biblePageTheme ?? pageTheme;
+    setRedLetters(on);
+    setPageTheme(theme);
+    applyBibleDisplay(on, theme);
+    void updateUiPrefsAction(next).then((r) => {
+      if (!r.ok) toast.error("Couldn't save that setting. Please try again.");
+    });
   }
 
   const toggle = (v: number) => setSelected((s) => (s.includes(v) ? s.filter((x) => x !== v) : [...s, v].sort((a, b) => a - b)));
@@ -219,15 +240,20 @@ export function ChapterReader(props: {
 
   return (
     <div>
-      <div className="mb-3 flex items-center justify-end gap-1" role="group" aria-label="Text size">
-        <Button type="button" variant="ghost" size="icon" onClick={() => changeFont(-1)} disabled={scale <= FONT_STEPS[0]!} aria-label="Smaller text">
-          <Minus aria-hidden />
-        </Button>
-        <span className="w-12 text-center text-sm tabular-nums text-muted-foreground" aria-live="polite">
-          {Math.round(scale * 100)}%
-        </span>
-        <Button type="button" variant="ghost" size="icon" onClick={() => changeFont(1)} disabled={scale >= FONT_STEPS.at(-1)!} aria-label="Larger text">
-          <Plus aria-hidden />
+      <div className="mb-3 flex items-center justify-end gap-1">
+        <div className="flex items-center gap-1" role="group" aria-label="Text size">
+          <Button type="button" variant="ghost" size="icon" onClick={() => changeFont(-1)} disabled={scale <= FONT_STEPS[0]!} aria-label="Smaller text">
+            <Minus aria-hidden />
+          </Button>
+          <span className="w-12 text-center text-sm tabular-nums text-muted-foreground" aria-live="polite">
+            {Math.round(scale * 100)}%
+          </span>
+          <Button type="button" variant="ghost" size="icon" onClick={() => changeFont(1)} disabled={scale >= FONT_STEPS.at(-1)!} aria-label="Larger text">
+            <Plus aria-hidden />
+          </Button>
+        </div>
+        <Button type="button" variant="ghost" size="icon" aria-label="Reading display" aria-expanded={displayOpen} aria-controls="reading-display" onClick={() => setDisplayOpen((o) => !o)}>
+          <Settings2 aria-hidden />
         </Button>
         <Button
           type="button"
@@ -249,11 +275,47 @@ export function ChapterReader(props: {
         </Button>
       </div>
 
-      <div className="mx-auto max-w-[38rem] font-serif leading-[1.8]" style={{ fontSize: `calc(1.125rem * ${scale})` }} data-testid="bible-text">
+      {displayOpen && (
+        <section id="reading-display" aria-label="Reading display" className="mx-auto mb-4 max-w-[38rem] space-y-4 rounded-2xl border border-border bg-card p-4">
+          <div className="flex items-center justify-between gap-4">
+            <label htmlFor="red-letters" className="min-w-0">
+              <span className="block font-semibold">Red letters</span>
+              <span className="block text-sm text-muted-foreground">The words of Jesus in red. The text itself never changes.</span>
+            </label>
+            <Switch id="red-letters" checked={redLetters} onCheckedChange={(on) => saveDisplay({ redLetters: on })} />
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span id="reading-page-label" className="font-semibold">
+              Page
+            </span>
+            <div role="group" aria-labelledby="reading-page-label" className="flex gap-1 rounded-full border border-border p-1">
+              {(["dark", "light"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  aria-pressed={pageTheme === t}
+                  onClick={() => saveDisplay({ biblePageTheme: t })}
+                  className={cn("min-h-10 rounded-full px-4 text-sm font-semibold", pageTheme === t ? "bg-gold/15 text-gold-highlight" : "text-muted-foreground")}
+                >
+                  {t === "dark" ? "Dark" : "Light"}
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      <div
+        className={cn("mx-auto max-w-[38rem] font-serif leading-[1.8]", pageTheme === "light" && "rounded-2xl bg-[var(--reader-page)] px-4 py-3 text-[var(--reader-text)]")}
+        style={{ fontSize: `calc(1.125rem * ${scale})`, ...readingVars(pageTheme, redLetters) }}
+        data-testid="bible-text"
+        data-page-theme={pageTheme}
+        data-red-letters={redLetters ? "on" : "off"}
+      >
         {rows.map((r) =>
           r.kind === "gap" ? (
-            <p key={`g${r.v}`} id={`v${r.v}`} className="my-1 rounded-lg border border-dashed border-border px-3 py-1.5 font-sans text-sm text-muted-foreground">
-              <sup className="mr-1 font-semibold text-gold">{r.v}</sup>
+            <p key={`g${r.v}`} id={`v${r.v}`} className="my-1 rounded-lg border border-dashed border-[var(--reader-border)] px-3 py-1.5 font-sans text-sm text-[var(--reader-muted)]">
+              <sup className="mr-1 font-semibold text-[var(--reader-verse)]">{r.v}</sup>
               Verse {r.v} is not in the Berean Standard Bible&rsquo;s main text; the translation gives it in a footnote, which this app does not show.
             </p>
           ) : (
@@ -269,21 +331,21 @@ export function ChapterReader(props: {
                   props.focusVerse === r.v && !selected.length && "animate-[verse-focus_2.4s_ease-out]",
                 )}
               >
-                <sup className="mr-1 select-none font-sans text-[0.65em] font-semibold text-gold" aria-label={`Verse ${r.v}`}>
+                <sup className="mr-1 select-none font-sans text-[0.65em] font-semibold text-[var(--reader-verse)]" aria-label={`Verse ${r.v}`}>
                   {r.v}
                 </sup>
                 <ScriptureText text={r.t} jesus={props.jesus?.[r.v]} />
-                {bookmarks.has(r.v) && <Bookmark className="ml-1 inline size-[0.8em] fill-gold text-gold" aria-label="Bookmarked" />}
+                {bookmarks.has(r.v) && <Bookmark className="ml-1 inline size-[0.8em] fill-[var(--reader-verse)] text-[var(--reader-verse)]" aria-label="Bookmarked" />}
               </button>
               {notesByVerse.has(r.v) && (
-                <button type="button" onClick={() => setViewNotes(r.v)} className="ml-1 inline-flex min-h-8 items-center gap-1 rounded-full border border-gold-muted px-2 align-middle font-sans text-xs font-semibold text-gold-highlight">
+                <button type="button" onClick={() => setViewNotes(r.v)} className={cn("ml-1 inline-flex min-h-8 items-center gap-1 rounded-full border px-2 align-middle font-sans text-xs font-semibold text-[var(--reader-accent)]", pageTheme === "light" ? "border-[var(--reader-accent)]" : "border-gold-muted")}>
                   <NotebookPen className="size-3.5" aria-hidden /> Note{notesByVerse.get(r.v)!.length > 1 ? `s (${notesByVerse.get(r.v)!.length})` : ""}
                 </button>
               )}
             </p>
           ),
         )}
-        {verses.length === 0 && <p className="text-muted-foreground">This chapter could not be loaded.</p>}
+        {verses.length === 0 && <p className="text-[var(--reader-muted)]">This chapter could not be loaded.</p>}
       </div>
 
       {/* Rendered into <body>: page containers keep an entrance-animation transform, which would otherwise pin this

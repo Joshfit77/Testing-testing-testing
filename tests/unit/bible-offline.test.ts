@@ -209,6 +209,33 @@ describe("offline reader page", () => {
     expect(document.querySelector("#v25")?.textContent).toBe("25Jesus said to her, “I am the resurrection and the life.”");
     vi.unstubAllGlobals();
   });
+
+  it("follows the member's Red Letters setting and reading page saved on this device; the text is the same either way", async () => {
+    const meta = { contentSha256: "abc", books: BIBLE_BOOKS.map((b) => ({ id: b.id, name: b.name, chapters: b.chapters, withoutText: [] })) };
+    const chapters = Array.from({ length: 21 }, () => [[25, "Jesus said to her, “I am the resurrection and the life.”"]]);
+    const wj = { bibleContentSha256: "abc", books: { JHN: { 11: { 25: [[19, 56]] } } } };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (u: string) => new Response(JSON.stringify(u.endsWith("meta.json") ? meta : u.endsWith("wj.json") ? wj : { id: "JHN", name: "John", chapters }))),
+    );
+    const run = async (prefs: Record<string, string>) => {
+      localStorage.clear();
+      for (const [k, v] of Object.entries(prefs)) localStorage.setItem(k, v);
+      document.body.className = "";
+      document.body.innerHTML = '<main id="app"></main>';
+      window.history.replaceState(null, "", "/faith/bible/john/11");
+      new Function(read("public/bible-offline.js"))();
+      await vi.waitFor(() => expect(document.querySelector("#v25 .wj")).not.toBeNull());
+      return { classes: [...document.body.classList].sort(), text: document.querySelector("#v25")!.textContent };
+    };
+    const on = await run({});
+    expect(on.classes).toEqual([]);
+    const off = await run({ "ngf.bible.redLetters": "0", "ngf.bible.pageTheme": "light" });
+    expect(off.classes).toEqual(["light", "no-wj"]);
+    expect(off.text).toBe(on.text);
+    localStorage.clear();
+    vi.unstubAllGlobals();
+  });
 });
 
 describe("native app", () => {

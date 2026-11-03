@@ -1,4 +1,5 @@
-import { expect, test } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import { expect, test, type Page } from "@playwright/test";
 import { completeOnboarding, signUpAndConfirm, uniqueEmail } from "./helpers";
 
 /**
@@ -7,6 +8,17 @@ import { completeOnboarding, signUpAndConfirm, uniqueEmail } from "./helpers";
  * checked against public/bible/bsb, which tests/unit/bible-dataset.test.ts verifies against the official file.
  */
 const JOHN_3_16 = "For God so loved the world that He gave His one and only Son, that everyone who believes in Him shall not perish but have eternal life.";
+const wj = JSON.parse(readFileSync("public/bible/bsb/wj.json", "utf8")) as { books: Record<string, Record<string, Record<string, [number, number][]>>> };
+const redCount = (book: string, chapter: number) => Object.values(wj.books[book]?.[chapter] ?? {}).reduce((n, s) => n + s.length, 0);
+const colorOf = (page: Page, selector: string) => page.locator(selector).first().evaluate((e) => getComputedStyle(e).color);
+/** Opens the reader's display options and returns the Red Letters switch. */
+async function displayOptions(page: Page) {
+  const button = page.getByRole("button", { name: "Reading display" });
+  if ((await button.getAttribute("aria-expanded")) !== "true") await button.click();
+  return page.getByRole("switch", { name: /Red letters/ });
+}
+/** The display setting's save (not the reading-history POST to the same page). */
+const whenSaved = (page: Page) => page.waitForResponse((r) => r.request().method() === "POST" && /redLetters|biblePageTheme/.test(r.request().postData() ?? ""));
 
 test.describe("Bible reader", () => {
   test("read, highlight, bookmark, note, search, history and text size; all free", async ({ page }) => {
@@ -69,6 +81,40 @@ test.describe("Bible reader", () => {
     await page.getByRole("toolbar").getByRole("button", { name: "Copy" }).click();
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(`${JOHN_3_16}\n— John 3:16 (BSB)`);
 
+    // Red Letters (on by default, free): off shows His words in the normal colour with the text unchanged, and the
+    // choice is kept after a reload. The light page has its own deep red.
+    const textBefore = await page.getByTestId("bible-text").innerText();
+    const redLetters = await displayOptions(page);
+    await expect(redLetters).toBeChecked();
+    let save = whenSaved(page);
+    await redLetters.click();
+    await save;
+    const plain = await colorOf(page, "#v1 button");
+    await expect.poll(() => colorOf(page, "#v16 [data-words-of-jesus]")).toBe(plain);
+    expect(await page.getByTestId("bible-text").innerText()).toBe(textBefore);
+    await page.reload();
+    await expect.poll(() => colorOf(page, "#v16 [data-words-of-jesus]")).toBe(plain);
+    expect(await page.getByTestId("bible-text").innerText()).toBe(textBefore);
+    await expect(await displayOptions(page)).not.toBeChecked();
+    save = whenSaved(page);
+    await page.getByRole("button", { name: "Light", exact: true }).click();
+    await save;
+    save = whenSaved(page);
+    await (await displayOptions(page)).click();
+    await save;
+    await expect(page.getByTestId("bible-text")).toHaveCSS("background-color", "rgb(248, 244, 234)");
+    await expect(page.locator("#v16 [data-words-of-jesus]")).toHaveCSS("color", "rgb(155, 28, 36)");
+    await page.reload();
+    await expect(page.getByTestId("bible-text")).toHaveAttribute("data-page-theme", "light");
+    await expect(page.locator("#v16 [data-words-of-jesus]")).toHaveCSS("color", "rgb(155, 28, 36)");
+    // The highlight made earlier still shows on the light page.
+    await expect(page.locator("#v16").getByRole("button")).toHaveClass(/bg-\[#C9A54C\]/);
+    await displayOptions(page);
+    save = whenSaved(page);
+    await page.getByRole("button", { name: "Dark", exact: true }).click();
+    await save;
+    await expect(page.locator("#v16 [data-words-of-jesus]")).toHaveCSS("color", "rgb(240, 115, 106)");
+
     // Text size, remembered after a reload.
     await page.getByRole("button", { name: "Larger text" }).click();
     await expect(page.getByRole("group", { name: "Text size" })).toContainText("110%");
@@ -111,6 +157,15 @@ test.describe("Bible reader", () => {
     await page.goto("/faith/bible/history");
     await expect(page.getByRole("link", { name: "John 3", exact: true })).toBeVisible();
 
+    // Long chapters: one red element per marked stretch (no per-word markup), quick to open.
+    for (const [path, book, chapter, last] of [["/faith/bible/luke/12", "LUK", 12, 59], ["/faith/bible/psalms/119", "PSA", 119, 176]] as const) {
+      const t0 = Date.now();
+      await page.goto(path);
+      await expect(page.locator(`#v${last}`)).toBeVisible();
+      expect(Date.now() - t0).toBeLessThan(8000);
+      await expect(page.locator("[data-words-of-jesus]")).toHaveCount(redCount(book, chapter));
+    }
+
     // Continue Reading picks up where the member was.
     await page.goto("/faith/bible");
     await expect(page.getByRole("link", { name: /^Continue reading/ })).toBeVisible();
@@ -140,6 +195,18 @@ test.describe("Bible reader", () => {
     await expect(page.getByRole("heading", { name: "John 21" })).toBeVisible();
     // Only Scripture: no account details on the offline page.
     expect(await page.locator("body").innerText()).not.toMatch(/@|Test Athlete/);
+
+    // Turning Red Letters off in the app reaches the offline reader on this device; the text is unchanged.
+    await context.setOffline(false);
+    await page.goto("/faith/bible/john/3");
+    const save = whenSaved(page);
+    await (await displayOptions(page)).click();
+    await save;
+    await expect.poll(() => page.evaluate(() => localStorage.getItem("ngf.bible.redLetters"))).toBe("0");
+    await context.setOffline(true);
+    await page.goto("/faith/bible/john/3").catch(() => undefined);
+    await expect(page.locator("#v16 .wj")).toHaveText(JOHN_3_16);
+    expect(await colorOf(page, "#v16 .wj")).toBe(await colorOf(page, "#v16"));
     await context.setOffline(false);
   });
 });

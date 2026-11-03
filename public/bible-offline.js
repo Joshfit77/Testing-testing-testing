@@ -12,6 +12,14 @@
   var meta = null;
   var books = {};
   var redLetter; // undefined: not loaded yet; null: not available
+
+  // The member's Red Letters setting and reading page, as the app last saved them on this device.
+  try {
+    if (localStorage.getItem("ngf.bible.redLetters") === "0") document.body.classList.add("no-wj");
+    if (localStorage.getItem("ngf.bible.pageTheme") === "light") document.body.classList.add("light");
+  } catch {
+    /* storage unavailable: defaults (red letters on, dark page) */
+  }
   var native = location.protocol === "capacitor:" || (location.hostname === "localhost" && !location.port && /\.html$/.test(location.pathname));
 
   function slug(name) {

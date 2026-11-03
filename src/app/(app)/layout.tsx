@@ -23,6 +23,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       displayName={profile.display_name ?? "Athlete"}
       textSize={profile.text_size ?? "default"}
       reduceMotion={profile.reduce_motion ?? false}
+      redLetters={profile.bible_red_letters ?? true}
+      biblePageTheme={profile.bible_page_theme ?? "dark"}
       isAdmin={profile.role === "admin"}
       plan={getPlans()[plan].name}
       signOutAction={signOutAction}

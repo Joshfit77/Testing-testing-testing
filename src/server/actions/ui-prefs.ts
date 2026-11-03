@@ -12,8 +12,12 @@ const prefsSchema = z
     textSize: z.enum(["default", "large", "xlarge"]).optional(),
     reduceMotion: z.boolean().optional(),
     homeScripture: z.boolean().optional(),
+    /** Bible reader: words of Jesus in red. */
+    redLetters: z.boolean().optional(),
+    /** Bible reader: dark or light reading page. */
+    biblePageTheme: z.enum(["dark", "light"]).optional(),
   })
-  .refine((v) => v.textSize !== undefined || v.reduceMotion !== undefined || v.homeScripture !== undefined, "Nothing to save");
+  .refine((v) => Object.values(v).some((x) => x !== undefined), "Nothing to save");
 
 export type UiPrefsInput = z.infer<typeof prefsSchema>;
 
@@ -26,6 +30,8 @@ export async function updateUiPrefsAction(input: UiPrefsInput): Promise<ActionSt
   if (parsed.data.textSize !== undefined) row.text_size = parsed.data.textSize;
   if (parsed.data.reduceMotion !== undefined) row.reduce_motion = parsed.data.reduceMotion;
   if (parsed.data.homeScripture !== undefined) row.home_scripture = parsed.data.homeScripture;
+  if (parsed.data.redLetters !== undefined) row.bible_red_letters = parsed.data.redLetters;
+  if (parsed.data.biblePageTheme !== undefined) row.bible_page_theme = parsed.data.biblePageTheme;
   const supabase = await getServerSupabase();
   const { error } = await supabase.from("profiles").update(row).eq("id", user.id);
   if (error) {

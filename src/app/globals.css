@@ -30,6 +30,14 @@
   --radius: 0.75rem;
 }
 
+/*
+ * Red Letters off (Bible reader setting, account-wide): the words of Jesus take the normal text colour. A custom
+ * property, so the nearest ancestor that sets it wins (the reader overrides it on its page for an instant switch).
+ */
+.red-letters-off {
+  --red-letter: currentColor;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

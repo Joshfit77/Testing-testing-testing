@@ -75,25 +75,7 @@ See `docs/faith/README.md` for the features and `docs/faith/REVIEW.md` for conte
 
 ## Words of Jesus in red
 
-Wherever the app shows Bible text, the words of Jesus are in red (`--red-letter`, #F0736A: at least 4.5:1 contrast on
-the page, cards and every highlight colour). Which words are His is never decided by hand:
-
-1. `.github/workflows/bsb-text.yml` downloads the publisher's own USFM edition of the BSB
-   (`https://bereanbible.com/bsb_usfm.zip`, pinned SHA-256 `f0c56438eb89c98e8f62c5c00461e25cc35b098ad5b179bc350cede759ee5f87`),
-   whose `\wj` markers mark the words of Jesus, and runs `scripts/build-bsb-red-letter.mjs`.
-2. The script records, for each marked verse, where His words begin and end inside the app's own verse text
-   (character offsets), so the text itself is never changed. Every marked stretch must be found word for word in the
-   app's text; only typesetting may differ (spaces around dashes and inside quotation marks, and bracketed closing
-   quotes such as "[’’]" that the plain text leaves out). Any other difference fails the run.
-3. The result is `public/bible/bsb/wj.json` (2,047 verses: Matthew, Mark, Luke, John, Acts, 1 and 2 Corinthians,
-   Hebrews, Revelation). It records the content checksum of the Bible text it was built for; the app and the offline
-   reader use it only when that matches, so offsets can never colour the wrong words. Without it the text shows plain.
-4. `tests/unit/red-letter.test.ts` checks the source and checksum pin, that every span lies inside its verse, and known
-   verses (His words red, narration such as "He said" or "Jesus wept" plain).
-
-Shown in red: the Bible reader and the offline reader, search results and reference search, My Bible, Continue
-reading, study passages and cross-references, memory practice, the Bible study helper's cited passages, the daily
-Faith challenge verse, the verse of the day (Home and Faith), Scripture by theme, the 40-day devotional, and badge verses.
-Not changed: the opening gate animation and the welcome page, where Matthew 7:13–14 is part of the gold brand design,
-and notification text, which can't be coloured.
-
+Wherever the app shows Bible text, the words of Jesus are in red, from the BSB publisher's own red-letter marking,
+verified against the BSB text and its quotation marks. Members can turn it off (Bible reader → Reading display); the
+text never changes. Policy, sources, verification, the register of disputed passages and the records:
+`docs/faith/RED_LETTER.md`.

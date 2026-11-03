@@ -21,7 +21,7 @@ export default async function ChapterPage({ params, searchParams }: { params: Pr
   const chapter = /^\d{1,3}$/.test(ch) ? Number(ch) : NaN;
   const verses = book ? getChapter(book.id, chapter) : null;
   if (!book || !verses) notFound();
-  const { user } = await requireOnboardedUser();
+  const { user, profile } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
   const [notes, state] = await Promise.all([loadChapterAnnotations(supabase, user.id, book.id, chapter), loadReadingState(supabase, user.id)]);
   const v = Number(sp.v);
@@ -54,6 +54,8 @@ export default async function ChapterPage({ params, searchParams }: { params: Pr
         chapter={chapter}
         verses={verses}
         jesus={chapterWordsOfJesus(book.id, chapter)}
+        redLetters={profile.bible_red_letters ?? true}
+        pageTheme={profile.bible_page_theme ?? "dark"}
         withoutText={versesWithoutText(book.id, chapter)}
         highlights={notes.highlights}
         bookmarks={notes.bookmarks}

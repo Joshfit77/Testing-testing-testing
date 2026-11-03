@@ -139,6 +139,10 @@ integration 302 passed, 1 skipped (same as before); end to end `bible-reader`, `
 `faith-journey`, `rank-badges` 11 of 11 passed, including red text in the reader and the offline reader. Not checked on
 a physical iPhone.
 
+**Red Letter Bible (complete).** Publisher-sourced, verified against the BSB text and its quotation marks (2,172
+stretches, 2,047 verses, all verified), whole-Bible scan, register of disputed passages, Red Letters setting (on by
+default, per account, offline too) and a light reading page. Details and test results: `docs/faith/RED_LETTER.md`.
+
 ## 14. Physical iPhone tests needed
 
 - Notifications: each reminder kind fires at its time; none after the activity is done; quiet hours; a DST change;

@@ -31,7 +31,13 @@
       .text { font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif; line-height: 1.8; font-size: calc(1.125rem * var(--scale, 1)); }
       .text p { margin: 0 0 4px; }
       .text sup { color: var(--gold); font-family: system-ui, sans-serif; font-size: .65em; font-weight: 600; margin-right: 4px; }
-      .text .wj { color: #f0736a; } /* words of Jesus, as in the app */
+      /* Words of Jesus and the reading page: the same colours as the app (src/lib/bible/reading-display.ts, checked by a test). */
+      .text { --wj: #f0736a; }
+      .text .wj { color: var(--wj); }
+      body.light .text { --wj: #9b1c24; background: #f8f4ea; color: #1c1915; border-radius: 16px; padding: 12px 16px; }
+      body.light .text sup { color: #6f4f12; }
+      body.light .text .gap { color: #57524a; border-color: #d9cfbb; }
+      body.no-wj .text .wj { color: inherit; }
       .gap { font-family: system-ui, sans-serif; font-size: 14px; color: var(--muted); border: 1px dashed var(--line); border-radius: 8px; padding: 6px 10px; margin: 4px 0; }
       nav.pn { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 24px; }
       nav.pn a { display: block; min-height: 56px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 16px; background: var(--card); color: #f4f1ea; text-decoration: none; }

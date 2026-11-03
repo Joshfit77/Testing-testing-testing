@@ -14,6 +14,7 @@ import { OfflineBanner } from "./offline-banner";
 import { ShellUserProvider } from "./shell-context";
 import { RESTORE_SCROLL_ATTR } from "./scroll-memory";
 import { useTabHrefs } from "@/lib/nav-memory";
+import { applyBibleDisplay, RED_LETTERS_OFF_CLASS, type BiblePageTheme } from "@/lib/bible/reading-display";
 
 export type TextSize = "default" | "large" | "xlarge";
 
@@ -25,6 +26,9 @@ interface AppShellProps {
   plan: string;
   textSize: TextSize;
   reduceMotion: boolean;
+  /** Bible: words of Jesus in red (account setting, default on). */
+  redLetters?: boolean;
+  biblePageTheme?: BiblePageTheme;
   signOutAction: () => Promise<void>;
 }
 
@@ -45,7 +49,7 @@ export function applyDisplayPrefs(textSize: TextSize, reduceMotion: boolean) {
   }
 }
 
-export function AppShell({ children, userId, displayName, isAdmin, plan, textSize, reduceMotion, signOutAction }: AppShellProps) {
+export function AppShell({ children, userId, displayName, isAdmin, plan, textSize, reduceMotion, redLetters = true, biblePageTheme = "dark", signOutAction }: AppShellProps) {
   const pathname = usePathname();
   const secondary = visibleSecondary({ isAdmin });
   const [collapsed, setCollapsed] = useState(false);
@@ -63,6 +67,7 @@ export function AppShell({ children, userId, displayName, isAdmin, plan, textSiz
   }, []);
 
   useEffect(() => applyDisplayPrefs(textSize, reduceMotion), [textSize, reduceMotion]);
+  useEffect(() => applyBibleDisplay(redLetters, biblePageTheme), [redLetters, biblePageTheme]);
 
   const toggle = () => {
     setCollapsed((c) => {
@@ -84,7 +89,7 @@ export function AppShell({ children, userId, displayName, isAdmin, plan, textSiz
 
   return (
     <ShellUserProvider value={shellUser}>
-      <div className="min-h-dvh bg-background">
+      <div className={cn("min-h-dvh bg-background", !redLetters && RED_LETTERS_OFF_CLASS)}>
         <NavigationProgress />
         <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-gold focus:px-4 focus:py-2 focus:text-black">
           Skip to content

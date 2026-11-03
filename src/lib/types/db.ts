@@ -20,6 +20,8 @@ export interface ProfileRow {
   text_size?: "default" | "large" | "xlarge";
   reduce_motion?: boolean;
   home_scripture?: boolean;
+  bible_red_letters?: boolean;
+  bible_page_theme?: "dark" | "light";
   rest_timer_sound?: boolean;
   rest_timer_vibrate?: boolean;
   /** Added in 20261024000034_sleep (4–12 hours, default 8). */
