@@ -24,9 +24,9 @@ export default async function StudiesPage() {
           <h2 id={`cat-${cat}`} className="mb-2 text-sm font-semibold uppercase tracking-[0.14em] text-gold">
             {STUDY_CATEGORIES[cat]}
           </h2>
-          <ul className="grid gap-2 md:grid-cols-2">
+          <ul className="grid grid-cols-1 gap-2 md:grid-cols-2">
             {STUDIES.filter((s) => s.category === cat).map((s) => (
-              <li key={s.slug}>
+              <li key={s.slug} className="min-w-0">
                 <Link href={`/faith/studies/${s.slug}`} className="flex min-h-16 items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 hover:border-gold-muted">
                   <GraduationCap className="size-5 shrink-0 text-gold" aria-hidden />
                   <span className="min-w-0 flex-1">

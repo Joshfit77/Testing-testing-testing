@@ -35,6 +35,8 @@ test.describe("Bible reader", () => {
     await verse16.click();
     const bar = page.getByRole("toolbar", { name: "Actions for John 3:16" });
     await expect(bar).toBeVisible();
+    // On the screen, above the tab bar, even this far down a long chapter.
+    await expect(bar).toBeInViewport({ ratio: 1 });
     await bar.getByRole("button", { name: "Highlight gold" }).click();
     await expect(bar).toBeHidden();
     await verse16.click();

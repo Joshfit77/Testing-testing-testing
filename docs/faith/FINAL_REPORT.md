@@ -118,6 +118,19 @@ commit `cb831d2` before any of this work. It was not changed. The 17 skips are e
 demo-mode server, the Open Food Facts mock, and an unconfigured-AI case. The Bible helper was tested only against a
 local stand-in for the AI API; it has not been run against the real API.
 
+Found afterwards while capturing the iPhone-size demo, and fixed:
+
+- In a long chapter the verse action bar (highlight, note, copy, share, memorize) was drawn at the bottom of the
+  chapter instead of the screen, so it couldn't be seen after tapping a verse. Cause: the page entrance animation
+  leaves a `transform` on the page container, which turns `position: fixed` into "fixed to the page". The bar is now
+  rendered into `<body>`; `bible-reader.spec.ts` checks it is fully on screen (2 of 2 passed). The existing
+  celebration effect (`components/common/celebration.tsx`) uses the same pattern and was not changed.
+- The Guided studies page was wider than the phone (one long description stretched the grid): fixed.
+- At the largest text size on a 375-point screen, the My Bible tabs and the memory practice toggle were wider than
+  the screen: they now wrap.
+- The phone sweep (`phone-sweep.spec.ts`: every signed-in screen from the iPhone SE to the Pro Max, largest text,
+  reduced motion) now includes the new Faith screens; 1 of 1 passed after these fixes.
+
 ## 14. Physical iPhone tests needed
 
 - Notifications: each reminder kind fires at its time; none after the activity is done; quiet hours; a DST change;

@@ -33,7 +33,7 @@ export function MemoryPractice({ id, text, reference, level }: { id: string; tex
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2" role="group" aria-label="Practice">
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Practice">
         {(["words", "reference"] as const).map((m) => (
           <button
             key={m}

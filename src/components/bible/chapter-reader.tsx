@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Bookmark, BookmarkCheck, Brain, Copy, Minus, NotebookPen, Plus, Share2, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -280,8 +281,11 @@ export function ChapterReader(props: {
         {verses.length === 0 && <p className="text-muted-foreground">This chapter could not be loaded.</p>}
       </div>
 
-      {selected.length > 0 && (
-        <div
+      {/* Rendered into <body>: page containers keep an entrance-animation transform, which would otherwise pin this
+          "fixed" bar to the bottom of the chapter instead of the screen. */}
+      {selected.length > 0 &&
+        createPortal(
+          <div
           role="toolbar"
           aria-label={`Actions for ${ref}`}
           className="fixed inset-x-2 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 mx-auto max-w-xl rounded-2xl border border-gold-muted bg-card p-3 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.8)] md:bottom-6"
@@ -316,8 +320,9 @@ export function ChapterReader(props: {
             <ToolButton onClick={() => void share()} label="Share" icon={<Share2 aria-hidden />} />
             <ToolButton onClick={memorize} disabled={pending} label="Memorize" icon={<Brain aria-hidden />} />
           </div>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
 
       <Dialog open={noteOpen !== null} onOpenChange={(o) => !o && setNoteOpen(null)}>
         <DialogContent side="bottom">

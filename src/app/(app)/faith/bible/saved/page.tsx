@@ -108,7 +108,7 @@ export default async function SavedPage({ searchParams }: { searchParams: Promis
     <div className="space-y-4">
       <BackLink href="/faith/bible">Bible</BackLink>
       <PageHeader title="My Bible" description="Your bookmarks, highlights and notes. Private to you." className="mb-2" />
-      <nav aria-label="Saved" className="flex gap-2">
+      <nav aria-label="Saved" className="flex flex-wrap gap-2">
         {(Object.keys(TABS) as Tab[]).map((t) => (
           <Link
             key={t}
