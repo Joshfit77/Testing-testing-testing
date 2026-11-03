@@ -96,6 +96,44 @@ jobs:
         run: node scripts/extract-bsb.mjs bsb.txt scripts/bsb-references.json bsb-passages.json "$BSB_SOURCE"
       - name: Build and validate the complete Bible for the reader (66 books, 1,189 chapters)
         run: node scripts/build-bsb-bible.mjs bsb.txt src/data/bible/books.json bsb-bible "$BSB_SOURCE"
+      - name: Mark the words of Jesus (red letter) from an official USFM edition of the BSB
+        env:
+          # SHA-256 of the USFM edition the red-letter data comes from. Empty until the first run has been reviewed;
+          # once set, any other content is refused.
+          BSB_USFM_SHA256: ""
+        run: |
+          set -euo pipefail
+          fetch() { curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --max-filesize 104857600 -o "$2" "$1"; }
+          candidates=""
+          if [ -s downloads.htm ]; then
+            echo "Links on the downloads page:"
+            grep -oiE 'href="[^"]+"' downloads.htm | sed -E 's/href="([^"]+)"/\1/I' | sort -u | sed 's/^/  /' || true
+            for link in $(grep -oiE 'href="[^"]+\.zip"' downloads.htm | sed -E 's/href="([^"]+)"/\1/I' | grep -iE 'usfm|sfm' || true); do
+              case "$link" in https://*) ;; http://*) link="https://${link#http://}" ;; //*) link="https:$link" ;; /*) link="https://berean.bible$link" ;; *) link="https://berean.bible/$link" ;; esac
+              candidates="$candidates $link"
+            done
+          fi
+          src=""
+          for url in $candidates https://bereanbible.com/bsb_usfm.zip https://ebible.org/Scriptures/engbsb_usfm.zip; do
+            rm -rf usfm usfm.zip
+            mkdir usfm
+            if fetch "$url" usfm.zip && unzip -q -o usfm.zip -d usfm; then
+              sha=$(sha256sum usfm.zip | cut -d' ' -f1)
+              n=$(grep -rlE '\\\+?wj ' usfm | wc -l || true)
+              echo "$url: $(find usfm -type f | wc -l) files, $n with words of Jesus marked (\\wj), SHA-256 $sha"
+              if [ -n "$BSB_USFM_SHA256" ] && [ "$sha" != "$BSB_USFM_SHA256" ]; then echo "  skipped: not the pinned file"; continue; fi
+              if [ "$n" -gt 0 ]; then src="$url"; break; fi
+            else
+              echo "$url: not available"
+            fi
+          done
+          if [ -z "$src" ]; then
+            echo "::error::No official USFM edition of the BSB with the words of Jesus marked was found."
+            exit 1
+          fi
+          mkdir usfm-flat
+          find usfm -type f \( -iname '*.usfm' -o -iname '*.sfm' -o -iname '*.ptx' \) -exec cp {} usfm-flat/ \;
+          node scripts/build-bsb-red-letter.mjs usfm-flat bsb-bible bsb-bible/wj.json "$src" "$(sha256sum usfm.zip | cut -d' ' -f1)"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: bsb-bible
@@ -185,6 +223,7 @@ jobs:
           gh run download "$RUN_ID" --name bsb-bible --dir bible
           test "$(ls bible/books | wc -l)" = 66
           jq -e '.totals.books == 66 and .totals.chapters == 1189' bible/meta.json
+          jq -e '.totals.verses > 1000 and .bibleContentSha256 != ""' bible/wj.json
       - name: Commit it as the only content of the bsb-bible-data branch
         run: |
           set -euo pipefail
