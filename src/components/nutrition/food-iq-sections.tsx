@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, CircleHelp, FlaskConical, Info, ShieldAlert, ShieldCheck, Target } from "lucide-react";
-import { EVIDENCE_HELP, EVIDENCE_LABEL, type EvidenceClass, type IngredientAlert } from "@/lib/additive-evidence";
+import { EVIDENCE_HELP, EVIDENCE_LABEL, HAZARD_VS_RISK, STRENGTH_LABEL, type EvidenceClass, type IngredientAlert } from "@/lib/additive-evidence";
+import { ORIGIN_LABEL, ORIGIN_NOTE } from "@/lib/additive-origins";
 import { CLASS_KIND_LABEL, KIND_LABEL, NUTRITION_FEATURE_TITLE, NUTRITION_SCORE_LABEL, SCORE_MEANING, type Band, type FoodIqScore, type GoalFit, type NutrientClass } from "@/lib/food-iq";
 import type { QualityProduct } from "@/lib/food-quality";
 import { cn } from "@/lib/utils";
@@ -221,6 +222,9 @@ export function IngredientAlertsSection({
       <p className="text-sm text-muted-foreground">
         Additives, sweeteners, preservatives and added sugars found in the declared ingredient list, with what each is for, what regulators say, how strong the evidence is and where it comes from. This is a reading of the label and product data, not a test of the food.
       </p>
+      <p className="text-xs text-muted-foreground" data-testid="hazard-vs-risk">
+        {HAZARD_VS_RISK} {ORIGIN_NOTE}
+      </p>
       {(ingredientsLang || incomplete) && hasIngredients && (
         <p className="text-xs text-muted-foreground" data-testid="alerts-caveat">
           {ingredientsLang ? "The ingredient list isn't in English, so added sugars and sodium sources in it may not be recognised. " : ""}
@@ -251,7 +255,17 @@ export function IngredientAlertsSection({
                 </div>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">{a.classes.map((c) => EVIDENCE_HELP[c]).join(" ")}</p>
+              {a.origin && (
+                <p className="mt-1 text-sm text-muted-foreground" data-testid="additive-origin">
+                  <span className="font-semibold text-foreground">What it is: </span>
+                  {a.origin.text} <span className="whitespace-nowrap text-xs">({ORIGIN_LABEL[a.origin.kind]})</span>
+                </p>
+              )}
               <p className="mt-1 text-sm text-muted-foreground">{a.code ? `What it's for: ${a.purpose}.` : a.purpose}</p>
+              <p className="mt-1 text-sm" data-testid="evidence-strength">
+                <span className="font-semibold">Strength of evidence: </span>
+                {STRENGTH_LABEL[a.strength]}
+              </p>
               {(a.regulatory || a.concern || a.affected || a.dose || a.sources.length > 0) && (
                 <details className="mt-1 text-sm" open>
                   <summary className="cursor-pointer text-gold-highlight">What regulators and the evidence say</summary>

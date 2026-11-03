@@ -25,6 +25,8 @@ export const Q = {
   bar: "5000000000111",
   leanBar: "5000000000128",
   ham: "5000000000135",
+  // A record with values that can't all be right, last edited years ago (data-quality notices).
+  stale: "5000000000142",
 } as const;
 
 const img = (code: string) => `https://images.openfoodfacts.org/images/products/${code}/front_en.200.jpg`;
@@ -44,6 +46,21 @@ const cereal = (code: string, name: string, grade: string, nova: number, n: Reco
 });
 
 export const PRODUCTS: Record<string, Record<string, unknown>> = {
+  [Q.stale]: {
+    code: Q.stale,
+    product_name: "Old Recipe Crackers",
+    brands: "Harbour",
+    quantity: "200 g",
+    serving_size: "30 g",
+    serving_quantity: 30,
+    // Sugars listed above total carbohydrates: a data-entry error.
+    nutriments: { "energy-kcal_100g": 440, proteins_100g: 9, carbohydrates_100g: 6, sugars_100g: 12, fat_100g: 16, "saturated-fat_100g": 2, fiber_100g: 3, salt_100g: 1.2 },
+    nova_group: 3,
+    categories_tags: ["en:snacks", "en:salty-snacks", "en:crackers"],
+    ingredients_text: "Wheat flour, sunflower oil, salt, raising agent: sodium bicarbonate",
+    allergens_tags: ["en:gluten"],
+    last_modified_t: 1559347200, // 2019-06-01
+  },
   [BAR_CODE]: {
     code: BAR_CODE,
     product_name: "Peanut Protein Bar",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { additivesInText, allergensInLabel, analyzeLabel, looksEnglish, per100FromLabel } from "@/lib/label-analysis";
+import { additivesInText, allergensInLabel, analyzeLabel, looksEnglish, per100FromLabel, unreadableParts } from "@/lib/label-analysis";
 
 describe("ingredient label check (deterministic, no AI)", () => {
   it("finds additives by E-number, INS number after a function word, and name", () => {
@@ -53,6 +53,12 @@ describe("ingredient label check (deterministic, no AI)", () => {
   it("works out per-100 values from a per-serving label only when the serving weight is known", () => {
     expect(per100FromLabel({ basis: "serving", servingGrams: 40, calories: 160, protein_g: 4, carbs_g: 28, sugars_g: 10, fat_g: 3, sat_fat_g: 1, fiber_g: 2, salt_g: 0.2 })).toMatchObject({ calories: 400, protein_g: 10, sugars_g: 25, salt_g: 0.5, sodium_mg: 200 });
     expect(per100FromLabel({ basis: "serving", servingGrams: null, calories: 160, protein_g: 4, carbs_g: 28, sugars_g: 10, fat_g: 3, sat_fat_g: 1, fiber_g: 2, salt_g: 0.2 }).calories).toBeNull();
+  });
+
+  it("counts parts marked unreadable, so a result never looks complete when it isn't", () => {
+    expect(unreadableParts("Wheat flour, sugar, [?], emulsifier: E[?]22, salt [...]")).toBe(3);
+    expect(analyzeLabel({ ingredients: "Sugar, [?] oil", allergenStatement: "May contain [...]" }).unreadable).toBe(2);
+    expect(analyzeLabel({ ingredients: "Sugar, palm oil" }).unreadable).toBe(0);
   });
 
   it("flags text that doesn't look English, which the word matching needs", () => {

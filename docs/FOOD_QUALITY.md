@@ -22,6 +22,12 @@ Built on `claude/nine-features` as Stage 8. Route: Food → Food quality (`/nutr
 - **Scanning:** the existing barcode scanner (camera, the native scanner in the app, or a typed code), unlimited and free. An optional `onCode` hook opens the product page. The diary's amount step for a scanned product links to the same page.
 - **Product:** name, brand, quantity, barcode, category and the Open Food Facts package photo (only `https` images from `openfoodfacts.org`; hidden if it can't load). "Add to Food Diary" opens the usual amount step with the label serving and logs through the normal barcode path, so no duplicate food records are created.
 - **Nutrition:** calories, protein, carbohydrates, sugars, added sugars, total and saturated fat, fibre, sodium and salt, per serving and per 100 g (or ml), with % of the EU reference intake per serving. On the product page, missing values say **"Not available"**, never 0. In the **diary**, a missing protein, carb or fat value is counted as 0 so the day still adds up, and the totals say "at least" (`basis.missing`); the scanner's own note says "(counted as 0)".
+- **Data that can't all be right, or is old** (`dataIssues`):
+  - **Conflicting values:** sugars above total carbohydrates, or saturated fat above total fat (allowing 0.5 g for
+    rounding), can't both be right. The page says which values conflict, and the Nutrition Score isn't calculated.
+  - **Calories that don't match the macros:** if they differ from 4/4/9 kcal per gram (plus 2 for fibre) by more than
+    25% and 40 kcal, the page flags it. Alcohol and polyols are named as possible reasons.
+  - **The record's last-update date** is shown. A record older than 3 years is flagged, because recipes change.
 - **Drink or food:** a product is measured per 100 ml only when Open Food Facts puts it in a drink category (`en:beverages`). Ice cream sold as "500 ml", soy sauce or syrup are foods, with food thresholds. Only a product with no category at all falls back to how its pack size is written (`quantityUnit` in `src/lib/food-quality.ts`).
 - **Quality indicators,** each with a "what this means and its limits" note:
   - **Nutri-Score:** the grade Open Food Facts computed, "not applicable" or "not available";
@@ -67,7 +73,7 @@ For a product without a barcode, one Open Food Facts doesn't know, or one with n
 
 ## Sources for the thresholds
 
-- **UK front-of-pack traffic lights** (Department of Health and FSA guidance, 2016), per 100 g. Low is at most fat 3, saturates 1.5, sugars 5 and salt 0.3. High is above fat 17.5, saturates 5, sugars 22.5 and salt 1.5. Drinks use half of those (salt high above 0.75).
+- **UK front-of-pack traffic lights** (Department of Health and FSA guidance, 2016), per 100 g. Low is at most fat 3, saturates 1.5, sugars 5 and salt 0.3. High is above fat 17.5, saturates 5, sugars 22.5 and salt 1.5. For drinks (per 100 ml) the fat, saturates and sugars limits are halved (fat 1.5/8.75, saturates 0.75/2.5, sugars 2.5/11.25); salt stays "low" at 0.3 g and is "high" above 0.75 g.
 - **EU reference intakes,** Regulation (EU) No 1169/2011, Annex XIII.
 - **EU nutrition claims,** Regulation (EC) No 1924/2006, Annex.
 

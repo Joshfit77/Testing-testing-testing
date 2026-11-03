@@ -10,7 +10,7 @@
  * 75% chance that a food is healthy or safe, and it says nothing about allergens, additives or a person's needs.
  */
 import { type DietType } from "@/lib/domain/diets";
-import { allergenLabel, allergenStatus, type FoodFilters, type Nutrients, type QualityProduct } from "./food-quality";
+import { allergenLabel, allergenStatus, dataIssues, type FoodFilters, type Nutrients, type QualityProduct } from "./food-quality";
 
 export const FOOD_IQ_VERSION = "FIQ-0.1";
 
@@ -146,6 +146,9 @@ export function positiveFactor(negative: number): number {
  */
 export function scoreFoodIq(p: QualityProduct): FoodIqScore {
   for (const [tag, reason] of NOT_RATED) if (p.categories.includes(tag)) return { status: "not_applicable", reason };
+  // Values that can't all be right (a part larger than its whole): nothing is calculated from them.
+  const conflict = dataIssues(p).find((i) => i.blocking);
+  if (conflict) return { status: "not_applicable", reason: `Not rated: ${conflict.text}` };
   const kind = foodIqKind(p);
   const v = p.per100;
   const sweet = hasNonSugarSweeteners(p);

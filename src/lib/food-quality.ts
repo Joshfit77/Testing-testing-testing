@@ -45,6 +45,7 @@ export const OFF_QUALITY_FIELDS = [
   "labels_tags",
   "ingredients_analysis_tags",
   "states_tags",
+  "last_modified_t",
 ] as const;
 
 export const OFF_DATA_NOTICE =
@@ -99,6 +100,8 @@ export interface QualityProduct {
   incomplete: ("ingredients" | "nutrition" | "categories")[];
   /** Fruit, vegetables, legumes and nuts as % of the product (OFF's estimate from the ingredient list), when known. */
   fvlPercent: number | null;
+  /** When the record was last edited in Open Food Facts (ISO date), when known. */
+  updatedAt?: string | null;
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
@@ -249,12 +252,56 @@ export function normalizeQualityProduct(json: OffQualityResponse | null | undefi
     vegetarian: analysisTri(analysis, "vegetarian"),
     palmOil: analysis.includes("en:palm-oil-free") ? "no" : analysis.includes("en:palm-oil") ? "yes" : analysis.includes("en:may-contain-palm-oil") ? "maybe" : "unknown",
     fvlPercent: fvlPercent(nutriments),
+    updatedAt: typeof p.last_modified_t === "number" && p.last_modified_t > 946_684_800 && p.last_modified_t < 4_102_444_800 ? new Date(p.last_modified_t * 1000).toISOString().slice(0, 10) : null,
     incomplete: [
       ...(states.includes("en:ingredients-to-be-completed") || !(textEn ?? textAny) ? (["ingredients"] as const) : []),
       ...(states.includes("en:nutrition-facts-to-be-completed") || !hasAny(per100) ? (["nutrition"] as const) : []),
       ...(states.includes("en:categories-to-be-completed") || categories.length === 0 ? (["categories"] as const) : []),
     ],
   };
+}
+
+export interface DataIssue {
+  key: "sugars_over_carbs" | "sat_over_fat" | "energy_mismatch" | "outdated";
+  text: string;
+  /** The values can't all be right, so nothing is calculated from them (the rating is withheld). */
+  blocking: boolean;
+}
+
+/** Records older than this are flagged: recipes and labels change. */
+export const OUTDATED_AFTER_YEARS = 3;
+
+/**
+ * Values in a product record that can't all be right, and records too old to rely on. Each is said on the product
+ * page; impossible values (part larger than the whole) also stop the rating, so nothing is calculated from them.
+ */
+export function dataIssues(p: Pick<QualityProduct, "per100" | "unit" | "updatedAt">, now = new Date()): DataIssue[] {
+  const v = p.per100;
+  const u = `per 100 ${p.unit}`;
+  const out: DataIssue[] = [];
+  // 0.5 g of slack for rounding on the label.
+  if (v.sugars_g != null && v.carbs_g != null && v.sugars_g > v.carbs_g + 0.5)
+    out.push({ key: "sugars_over_carbs", blocking: true, text: `Sugars (${v.sugars_g} g) are listed as more than total carbohydrates (${v.carbs_g} g) ${u}, which isn't possible. One of these values is wrong.` });
+  if (v.sat_fat_g != null && v.fat_g != null && v.sat_fat_g > v.fat_g + 0.5)
+    out.push({ key: "sat_over_fat", blocking: true, text: `Saturated fat (${v.sat_fat_g} g) is listed as more than total fat (${v.fat_g} g) ${u}, which isn't possible. One of these values is wrong.` });
+  if (v.calories != null && v.protein_g != null && v.carbs_g != null && v.fat_g != null) {
+    // Labels use 4 kcal/g for protein and carbohydrate, 9 for fat and 2 for fibre (EU Regulation 1169/2011, Annex XIV).
+    const implied = v.protein_g * 4 + v.carbs_g * 4 + v.fat_g * 9 + (v.fiber_g ?? 0) * 2;
+    if (Math.abs(v.calories - implied) > Math.max(40, 0.25 * Math.max(v.calories, implied)))
+      out.push({
+        key: "energy_mismatch",
+        blocking: false,
+        text: `The calories (${v.calories} kcal) don't match the protein, carbohydrate and fat listed (about ${Math.round(implied)} kcal) ${u}. A value may be wrong, unless the product contains alcohol or polyols (sugar alcohols), which have different energy values.`,
+      });
+  }
+  if (p.updatedAt) {
+    const years = (now.getTime() - Date.parse(`${p.updatedAt}T00:00:00Z`)) / (365.25 * 24 * 3600_000);
+    if (years > OUTDATED_AFTER_YEARS) {
+      const when = new Date(`${p.updatedAt}T00:00:00Z`).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
+      out.push({ key: "outdated", blocking: false, text: `This record was last updated in ${when}. Recipes and labels change, so check the package.` });
+    }
+  }
+  return out;
 }
 
 /** OFF's fruit/vegetable/legume (or nut) share: the declared value when present, otherwise its estimate from the ingredients. */

@@ -133,6 +133,20 @@ test.describe("Narrow Gate Food IQ", () => {
     await expect(page.getByRole("heading", { name: "Product not found" })).toBeVisible();
   });
 
+  test("conflicting or outdated product data is called out, and nothing is calculated from impossible values", async ({ page }) => {
+    await signUpAndConfirm(page, uniqueEmail("quality-stale"));
+    await completeOnboarding(page);
+    await page.goto(`/nutrition/product/${Q.stale}`);
+    const issues = page.getByTestId("data-issues");
+    await expect(issues).toContainText("Sugars (12 g) are listed as more than total carbohydrates (6 g) per 100 g");
+    await expect(issues).toContainText("last updated in June 2019");
+    await expect(page.getByTestId("data-updated")).toContainText("1 June 2019");
+    // Additive explanations say what each one is, where it comes from, and how strong the evidence is.
+    const soda = page.getByTestId("ingredient-alerts");
+    await expect(soda.getByTestId("hazard-vs-risk")).toContainText("describe hazard, not risk");
+    if (SCORE_ON) await expect(page.getByTestId("food-iq-no-score")).toContainText("Not rated: Sugars (12 g)");
+  });
+
   test("Plus: personal filters, filtered alternatives and side-by-side comparisons", async ({ page }) => {
     const email = uniqueEmail("quality-plus");
     await signUpAndConfirm(page, email);

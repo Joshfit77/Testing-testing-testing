@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { ADDITIVE_EVIDENCE, EVIDENCE_LABEL, hasEvidence, ingredientAlerts, sodiumSources } from "@/lib/additive-evidence";
+import { readFileSync } from "node:fs";
+import { ADDITIVE_EVIDENCE, EVIDENCE_LABEL, EVIDENCE_SOURCES, HAZARD_VS_RISK, hasEvidence, ingredientAlerts, sodiumSources } from "@/lib/additive-evidence";
+import { ADDITIVE_ORIGINS, ORIGIN_NOTE } from "@/lib/additive-origins";
+import { ADDITIVES } from "@/lib/food-quality";
 import { bandFor, fitsYourGoals, foodIqKind, foodIqScoreEnabled, hasNonSugarSweeteners, keyPoints, lin, nutrientClasses, positiveFactor, scoreFoodIq, type FoodIqScore } from "@/lib/food-iq";
-import { normalizeQualityProduct, quantityUnit, type QualityProduct } from "@/lib/food-quality";
+import { dataIssues, normalizeQualityProduct, quantityUnit, type QualityProduct } from "@/lib/food-quality";
 import { PRODUCT_EXPLAIN_INSTRUCTIONS, productFactsForAi } from "@/lib/food-quality-ai";
 import { REFERENCE_FOODS, type ReferenceFood } from "../fixtures/food-iq-reference-foods";
 
@@ -149,7 +152,9 @@ describe("Food IQ rating (FIQ-0.1)", () => {
     let seed = 7;
     const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
     for (let i = 0; i < 300; i++) {
-      const base = { "energy-kcal_100g": 50 + rand() * 450, proteins_100g: rand() * 30, sugars_100g: rand() * 40, "saturated-fat_100g": rand() * 15, salt_100g: rand() * 3, fiber_100g: rand() * 12, fat_100g: 15 };
+      // Physically possible products: total fat (20 g) covers the saturated fat (at most 17 g after the +2 step) and
+      // total carbohydrates (60 g) cover the sugars (at most 45 g).
+      const base = { "energy-kcal_100g": 50 + rand() * 450, proteins_100g: rand() * 30, sugars_100g: rand() * 40, "saturated-fat_100g": rand() * 15, salt_100g: rand() * 3, fiber_100g: rand() * 12, fat_100g: 20, carbohydrates_100g: 60 };
       const s0 = scored(scoreFoodIq(product({}, base))).score;
       for (const [k, d] of [["sugars_100g", 5], ["salt_100g", 0.5], ["saturated-fat_100g", 2]] as const) expect(scored(scoreFoodIq(product({}, { ...base, [k]: base[k] + d }))).score).toBeLessThanOrEqual(s0);
       expect(scored(scoreFoodIq(product({}, { ...base, fiber_100g: base.fiber_100g + 2 }))).score).toBeGreaterThanOrEqual(s0);
@@ -165,6 +170,75 @@ describe("Food IQ rating (FIQ-0.1)", () => {
     expect(s.components.every((c) => c.basis.length > 20 && c.points >= 0 && c.points <= c.max)).toBe(true);
     expect(s.summary).toMatch(/^Rated Moderate/);
     expect(s.summary).toMatch(/salt/);
+  });
+});
+
+describe("what each additive is, and how strong the evidence is", () => {
+  it("lists every cited source in the verification register, and cites only sources that are in it", () => {
+    const register = readFileSync("docs/ADDITIVE_EVIDENCE_SOURCES.md", "utf8");
+    const listed = [...register.matchAll(/^\| `(\w+)` \|/gm)].map((m) => m[1]);
+    expect(listed.sort()).toEqual(Object.keys(EVIDENCE_SOURCES).sort());
+    const cited = new Set(Object.values(ADDITIVE_EVIDENCE).flatMap((e) => e.sources.map((s) => s.label)));
+    const known = new Set(Object.values(EVIDENCE_SOURCES).map((s) => s.label));
+    for (const label of cited) expect(known.has(label), label).toBe(true);
+    // Every link points at a primary or official host.
+    for (const s of Object.values(EVIDENCE_SOURCES)) if (s.url) expect(new URL(s.url).hostname, s.label).toMatch(/(^|\.)(europa\.eu|who\.int|paho\.org|fda\.gov|nih\.gov|iarc\.who\.int)$/);
+  });
+
+  it("says where every additive in the app's list comes from, and that origin isn't safety", () => {
+    expect(Object.keys(ADDITIVE_ORIGINS).sort()).toEqual(Object.keys(ADDITIVES).sort());
+    for (const [code, o] of Object.entries(ADDITIVE_ORIGINS)) expect(o.text.length, code).toBeGreaterThan(15);
+    expect(ADDITIVE_ORIGINS.e129!.kind).toBe("manufactured");
+    expect(ADDITIVE_ORIGINS.e100!.kind).toBe("natural");
+    expect(ADDITIVE_ORIGINS.e330!.kind).toBe("both");
+    expect(ORIGIN_NOTE).toMatch(/says nothing about whether it's safe/);
+  });
+
+  it("states the strength of the evidence separately from regulatory action", () => {
+    const p = product({ additives_tags: ["en:e129", "en:e965", "en:e171", "en:e330", "en:e999", "en:e952"], ingredients_text: "Sugar, salt" });
+    const strength = Object.fromEntries(ingredientAlerts(p).map((a) => [a.key, a.strength]));
+    expect(strength).toMatchObject({
+      e129: "limited", // an EU warning resting on limited evidence
+      e965: "strong", // the laxative effect of polyols is well established, and dose-dependent
+      e171: "uncertain", // EFSA couldn't rule out a genotoxicity concern
+      e330: "assessed",
+      e999: "not_reviewed",
+      e952: "assessed", // banned in the US, assessed with an ADI in the EU
+      added_sugars: "strong",
+      sodium_sources: "strong",
+    });
+    const e129 = ingredientAlerts(p).find((a) => a.key === "e129")!;
+    expect(e129.origin).toMatchObject({ kind: "manufactured" });
+    expect(HAZARD_VS_RISK).toMatch(/describe hazard, not risk/);
+  });
+});
+
+describe("conflicting and outdated product data", () => {
+  it("withholds the rating when a part is larger than its whole, and says why", () => {
+    const bad = product({}, { "energy-kcal_100g": 400, proteins_100g: 5, carbohydrates_100g: 20, sugars_100g: 35, fat_100g: 10, "saturated-fat_100g": 4, salt_100g: 0.5 });
+    expect(scoreFoodIq(bad)).toMatchObject({ status: "not_applicable", reason: expect.stringMatching(/^Not rated: Sugars \(35 g\) are listed as more than total carbohydrates \(20 g\)/) });
+    expect(dataIssues(product({}, { fat_100g: 3, "saturated-fat_100g": 6 })).map((i) => i.key)).toEqual(["sat_over_fat"]);
+    // Rounding on a label (half a gram) isn't a conflict.
+    expect(dataIssues(product({}, { "energy-kcal_100g": 110, carbohydrates_100g: 10, sugars_100g: 10.4 }))).toEqual([]);
+  });
+
+  it("flags calories that don't match the macros, without withholding the rating", () => {
+    const off = product({}, { "energy-kcal_100g": 120, proteins_100g: 10, carbohydrates_100g: 60, sugars_100g: 5, fat_100g: 20, "saturated-fat_100g": 3, salt_100g: 0.5 });
+    const issues = dataIssues(off);
+    expect(issues).toEqual([expect.objectContaining({ key: "energy_mismatch", blocking: false })]);
+    expect(issues[0]!.text).toMatch(/about 466 kcal/); // 10×4 + 60×4 + 20×9 + 3 g fibre × 2
+    expect(scoreFoodIq(off).status).toBe("scored");
+    // A label that adds up (with fibre at 2 kcal/g) isn't flagged.
+    expect(dataIssues(product({}, { "energy-kcal_100g": 370, proteins_100g: 13, carbohydrates_100g: 60, fat_100g: 7, fiber_100g: 10 }))).toEqual([]);
+  });
+
+  it("dates the record and flags one older than three years", () => {
+    const now = new Date("2026-11-03T00:00:00Z");
+    const old = product({ last_modified_t: Date.UTC(2021, 4, 1) / 1000 });
+    expect(old.updatedAt).toBe("2021-05-01");
+    expect(dataIssues(old, now)).toEqual([expect.objectContaining({ key: "outdated", text: expect.stringMatching(/last updated in May 2021/) })]);
+    expect(dataIssues(product({ last_modified_t: Date.UTC(2025, 0, 1) / 1000 }), now)).toEqual([]);
+    expect(product({ last_modified_t: "yesterday" }).updatedAt).toBeNull();
   });
 });
 

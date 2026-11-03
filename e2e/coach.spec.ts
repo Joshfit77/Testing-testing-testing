@@ -790,13 +790,17 @@ test.describe("AI coach", () => {
     expect((sent.messages[0]!.content as { type: string; source?: { media_type: string } }[])[0]).toMatchObject({ type: "image", source: { media_type: "image/jpeg" } });
 
     // The transcription is editable: fix the unreadable word, then check with the app's own rules.
-    const ingredients = page.getByLabel("Ingredients");
+    const ingredients = page.getByRole("textbox", { name: "Ingredients" });
     await expect(ingredients).toHaveValue(/sweetener: \[\?\]/);
+    await expect(page.getByTestId("label-unreadable")).toBeVisible();
     await ingredients.fill("Carbonated water, sugar, acid: citric acid, colour: E129, sweetener: aspartame, flavourings.");
+    await expect(page.getByTestId("label-unreadable")).toHaveCount(0);
     await expect(page.getByLabel("Values are per")).toHaveValue("100ml");
     await page.getByTestId("label-check").click();
     const result = page.getByTestId("label-result");
     await expect(result.getByTestId("alert-e129")).toContainText("Synthetic colour");
+    await expect(result.getByTestId("alert-e129").getByTestId("additive-origin")).toContainText("A synthetic azo dye");
+    await expect(result.getByTestId("alert-e129").getByTestId("evidence-strength")).toContainText("Limited or conflicting");
     await expect(result.getByTestId("alert-e951")).toContainText("Aspartame");
     await expect(result.getByTestId("label-allergens")).toContainText("May contain: Milk");
   });

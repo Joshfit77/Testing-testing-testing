@@ -151,6 +151,9 @@ export function allergensInLabel(ingredients: string, statement = ""): { contain
   return { contains: sort(contains), mayContain: sort(may).filter((a) => !contains.has(a)) };
 }
 
+/** How many parts of the text are marked unreadable ([?] for a word, [...] for a cut-off end), as the photo reader marks them. */
+export const unreadableParts = (text: string) => (text.match(/\[\?\]|\[(?:\.\.\.|…)\]/g) ?? []).length;
+
 const ENGLISH_HINTS = /\b(water|sugar|salt|flour|oil|milk|and|wheat|starch|syrup|acid|extract|natural|flavourings?|vegetable|powder|contains?|ingredients)\b/;
 /** A rough check that the text is English, which the word matching needs. */
 export const looksEnglish = (text: string) => text.trim().length < 20 || ENGLISH_HINTS.test(normalise(text));
@@ -171,6 +174,8 @@ export interface LabelNutrition {
 }
 
 export interface LabelAnalysis {
+  /** Parts of the checked text marked unreadable: nothing in them was checked. */
+  unreadable: number;
   additives: string[];
   alerts: IngredientAlert[];
   allergens: { contains: string[]; mayContain: string[] };
@@ -224,6 +229,7 @@ export function analyzeLabel(input: { ingredients: string; allergenStatement?: s
     fvlPercent: null,
   };
   return {
+    unreadable: unreadableParts(`${ingredients} ${input.allergenStatement ?? ""}`),
     additives,
     alerts: ingredientAlerts(product),
     allergens: allergensInLabel(ingredients, input.allergenStatement ?? ""),

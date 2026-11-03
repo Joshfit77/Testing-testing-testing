@@ -10,7 +10,7 @@ import { Input, NativeSelect, Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { allergenLabel } from "@/lib/food-quality";
 import { LABEL_PHOTO_MAX_DIMENSION, type LabelReading, type Legibility } from "@/lib/domain/label-photo";
-import { analyzeLabel, LABEL_TEXT_MAX, type LabelAnalysis, type LabelNutrition } from "@/lib/label-analysis";
+import { analyzeLabel, LABEL_TEXT_MAX, unreadableParts, type LabelAnalysis, type LabelNutrition } from "@/lib/label-analysis";
 import { compressImage } from "@/lib/image-compress";
 import { logLabelFoodAction } from "@/server/actions/label";
 
@@ -213,6 +213,11 @@ export function LabelCheck({ photo, date: initialDate, defaultMeal }: { photo: {
               {error}
             </p>
           )}
+          {unreadableParts(`${ingredients} ${statement}`) > 0 && (
+            <p role="note" className="text-sm text-gold" data-testid="label-unreadable">
+              The text still has parts that couldn&apos;t be read ([?] or [...]). Fix them from the package: anything unreadable can&apos;t be checked.
+            </p>
+          )}
           <Button onClick={check} disabled={!ingredients.trim() && !statement.trim()} data-testid="label-check">
             {stale ? <RefreshCw aria-hidden /> : <ListChecks aria-hidden />} {stale ? "Check again" : "Check these ingredients"}
           </Button>
@@ -224,6 +229,11 @@ export function LabelCheck({ photo, date: initialDate, defaultMeal }: { photo: {
           {stale && (
             <p role="status" className="rounded-xl border border-border bg-card p-3 text-sm">
               You&apos;ve changed the text since this check. Check again to update the results.
+            </p>
+          )}
+          {result.unreadable > 0 && (
+            <p role="note" className="rounded-xl border border-[#a8802f]/60 bg-[#a8802f]/10 p-3 text-sm" data-testid="label-result-unreadable">
+              This check includes {result.unreadable === 1 ? "a part" : `${result.unreadable} parts`} marked unreadable. Nothing there was checked, so an additive or allergen could be missing from the results.
             </p>
           )}
           {!result.likelyEnglish && (

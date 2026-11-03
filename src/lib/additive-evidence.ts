@@ -9,6 +9,7 @@
  *     this list shows "Insufficient information" instead of an AI-written or guessed assessment.
  *   - What the label says (the product data) and what the evidence says (this table) are shown as separate things.
  */
+import { ADDITIVE_ORIGINS, type OriginKind } from "./additive-origins";
 import { addedSugarIngredients, describeAdditive, type QualityProduct } from "./food-quality";
 
 export type EvidenceClass = "established" | "regulatory" | "mixed" | "no_concern" | "insufficient";
@@ -19,6 +20,30 @@ export const EVIDENCE_LABEL: Record<EvidenceClass, string> = {
   no_concern: "No established concern at typical permitted uses",
   insufficient: "Insufficient information",
 };
+/**
+ * How strong the evidence behind an entry is, said in words, separately from what regulators did. A regulatory warning
+ * or ban can rest on limited evidence (precaution), and a well-established effect can carry no regulatory action.
+ */
+export type EvidenceStrength = "strong" | "limited" | "uncertain" | "assessed" | "not_reviewed";
+export const STRENGTH_LABEL: Record<EvidenceStrength, string> = {
+  strong: "Strong, for the people and amounts named",
+  limited: "Limited or conflicting",
+  uncertain: "Uncertain: a concern couldn't be ruled out",
+  assessed: "Assessed by regulators: no concern found at permitted levels",
+  not_reviewed: "Not reviewed by this app",
+};
+export function evidenceStrength(classes: EvidenceClass[], override?: EvidenceStrength): EvidenceStrength {
+  if (override) return override;
+  if (classes.includes("established")) return "strong";
+  if (classes.includes("mixed") || classes.includes("regulatory")) return "limited";
+  if (classes.includes("no_concern")) return "assessed";
+  return "not_reviewed";
+}
+
+/** Shown once above the list: hazard (what a substance can do at some dose) is not risk (harm at real intakes). */
+export const HAZARD_VS_RISK =
+  "A hazard is what a substance can do at some dose; risk is the chance of harm at the amounts people actually eat. Classifications such as IARC's describe hazard, not risk. Each entry says whether the amount matters.";
+
 export const EVIDENCE_HELP: Record<EvidenceClass, string> = {
   established: "A recognised risk, but only for particular people or at particular intakes, which are named.",
   regulatory: "A regulator requires a warning, restricts or has banned it somewhere.",
@@ -33,6 +58,8 @@ export interface Source {
 }
 interface Evidence {
   classes: EvidenceClass[];
+  /** When the strength of the evidence isn't what the classes imply (e.g. a warning required for a well-established effect). */
+  strength?: EvidenceStrength;
   regulatory?: string;
   concern?: string;
   affected?: string;
@@ -48,7 +75,7 @@ const S = {
   whoAspartame: { label: "WHO, IARC and JECFA (2023): Aspartame hazard and risk assessment results released", url: "https://www.who.int/news/item/14-07-2023-aspartame-hazard-and-risk-assessment-results-released" },
   whoNss: { label: "WHO (2023) guideline on non-sugar sweeteners (summary)", url: "https://www.paho.org/en/news/15-5-2023-who-advises-not-use-non-sugar-sweeteners-weight-control-newly-released-guideline" },
   efsaErythritol: { label: "EFSA (2023): Re-evaluation of erythritol (E 968) as a food additive", url: "https://www.efsa.europa.eu/en/efsajournal/pub/8430" },
-  witkowski: { label: "Witkowski et al. (2023), Nature Medicine: erythritol and cardiovascular event risk (observational study)" },
+  witkowski: { label: "Witkowski et al. (2023), Nature Medicine 29:710–718: erythritol and cardiovascular event risk (cohort study with laboratory experiments)" },
   efsaAceK: { label: "EFSA (2025): Re-evaluation of acesulfame K (E 950) as food additive", url: "https://www.efsa.europa.eu/en/node/19722" },
   efsaNitrite: { label: "EFSA (2017): EFSA confirms safe levels for nitrites and nitrates added to food", url: "https://www.efsa.europa.eu/en/press/news/170615" },
   iarcMeat: { label: "IARC (2015): Q&A on the carcinogenicity of red and processed meat", url: "https://www.iarc.who.int/wp-content/uploads/2018/11/Monographs-QA_Vol114.pdf" },
@@ -61,7 +88,12 @@ const S = {
   whoSugars: { label: "WHO (2015) Guideline: sugars intake for adults and children" },
   whoSodium: { label: "WHO (2012) Guideline: sodium intake for adults and children" },
   // Primary documents cited by name. Their links couldn't be checked from the build environment, so none is given.
-  iarcVol40: { label: "IARC Monographs volume 40 (1986): butylated hydroxyanisole (BHA), Group 2B" },
+  iarcVol40: { label: "IARC Monographs volume 40 (1986) and Supplement 7 (1987, Group 2B): butylated hydroxyanisole (BHA)" },
+  efsaMcCann: { label: "EFSA (2008): opinion on the McCann et al. (2007) study of food additives and children's behaviour" },
+  fdaBenzene: { label: "US FDA: Questions and answers on the occurrence of benzene in soft drinks and other beverages", url: "https://www.fda.gov/food/process-contaminants-food/questions-and-answers-occurrence-benzene-soft-drinks-and-other-beverages" },
+  jecfaBromate: { label: "JECFA (1992): potassium bromate, acceptable level for flour treatment withdrawn" },
+  fdaCyclamate: { label: "US FDA (1969–1970): removal of cyclamate from food use" },
+  efsaSteviol: { label: "EFSA (2010): safety of steviol glycosides (ADI 4 mg/kg bw as steviol); JECFA (2008)" },
   iarcVol73: { label: "IARC Monographs volume 73 (1999): potassium bromate (Group 2B); saccharin and its salts (Group 3)" },
   efsaBha: { label: "EFSA (2011): re-evaluation of butylated hydroxyanisole (BHA, E 320) as a food additive, EFSA Journal 9(10):2392" },
   efsaGlutamate: { label: "EFSA (2017): re-evaluation of glutamic acid and glutamates (E 620–625) as food additives, EFSA Journal 15(7):4910" },
@@ -69,18 +101,21 @@ const S = {
   cfrBromatedFlour: { label: "US Code of Federal Regulations, 21 CFR 137.155: bromated flour" },
   cfrCarmine: { label: "US Code of Federal Regulations, 21 CFR 73.100: cochineal extract and carmine (must be declared by name on food labels)" },
 } satisfies Record<string, Source>;
+/** Every source the evidence cites; each is listed with its verification status in docs/ADDITIVE_EVIDENCE_SOURCES.md. */
+export const EVIDENCE_SOURCES: Record<string, Source> = S;
 
 const AZO: Evidence = {
   classes: ["regulatory"],
   regulatory: "In the EU, foods containing this colour must carry the warning \"may have an adverse effect on activity and attention in children\".",
   concern:
-    "A 2007 UK study linked mixtures of six colours (with the preservative sodium benzoate) to increased hyperactivity in some children. EFSA judged that evidence limited, but the EU kept the warning and lowered the acceptable daily intake of some of these colours.",
+    "A 2007 UK study linked mixtures of six colours (given with the preservative sodium benzoate) to increased hyperactivity in some children. EFSA (2008) judged the evidence limited and said it couldn't be used to change acceptable daily intakes. EU law nevertheless requires the warning on foods containing these colours.",
   affected: "Children (activity and attention).",
   dose: "The study tested mixtures at amounts children could eat; how much is eaten matters.",
-  sources: [S.reg1333, S.mccann],
+  sources: [S.reg1333, S.mccann, S.efsaMcCann],
 };
 const POLYOL: Evidence = {
   classes: ["regulatory"],
+  strength: "strong",
   regulatory: "In the EU, foods with more than 10% added polyols must state \"excessive consumption may produce laxative effects\".",
   concern: "Polyols are only partly absorbed, so larger amounts can cause bloating and diarrhoea.",
   affected: "Anyone eating large amounts; people with sensitive digestion (such as IBS) may react to less.",
@@ -98,7 +133,7 @@ const SULPHITE: Evidence = {
 const PHOSPHATE: Evidence = {
   classes: ["established"],
   concern:
-    "EFSA (2019) set a group acceptable daily intake of 40 mg phosphorus per kg of body weight and noted it doesn't protect people with moderate to severe kidney disease. Some children's intakes from all sources can exceed it.",
+    "EFSA (2019) set a group acceptable daily intake of 40 mg phosphorus per kg of body weight, which doesn't apply to people with moderate to severe kidney disease. It found that infants, toddlers and children with average intakes, and adolescents with high intakes, may exceed it from all sources.",
   affected: "People with chronic kidney disease; children with high intakes.",
   dose: "Yes: total phosphorus intake from all foods is what matters.",
   sources: [S.efsaPhosphates],
@@ -116,8 +151,8 @@ const NITRITE: Evidence = {
 const NITRITE_OTHER: Evidence = {
   classes: ["mixed"],
   concern:
-    "Used as a preservative (in cheese, for example, against the bacteria that cause late blowing). Nitrites can form nitrosamines. EFSA (2017) found the permitted additive levels within safe intakes for most people, with a slight exceedance for children with high intakes from all sources.",
-  affected: "Children with high intakes from all foods.",
+    "Used as preservatives; nitrates (E251, E252) are permitted in some cheeses against the bacteria that cause late blowing. Nitrites can form nitrosamines. EFSA (2017) found intake of nitrites from these additives within safe levels for most people, with a slight exceedance for children with high intakes; counting all foods (vegetables are the main source of nitrate), nitrate intake may exceed the acceptable daily intake at medium and high exposure.",
+  affected: "Children with high intakes; people with high intakes from all foods.",
   dose: "Yes: total intake from all foods is what matters.",
   sources: [S.efsaNitrite],
 };
@@ -130,7 +165,7 @@ const EMULSIFIER_MIXED: Evidence = {
   classes: ["mixed"],
   concern: "Mouse studies found that this emulsifier changed gut bacteria and promoted inflammation. Evidence in people is limited, and regulators still permit it at set levels.",
   affected: "Unclear; most research is in animals.",
-  dose: "Animal studies used amounts set relative to diet; effects in people at typical intakes aren't established.",
+  dose: "The mice were given the emulsifier in their drinking water; how that compares with what people eat, and whether the effects occur in people, isn't established.",
   sources: [S.chassaing],
 };
 const NO_CONCERN = (note: string, sources: Source[] = [S.reg1333]): Evidence => ({ classes: ["no_concern"], concern: note, sources });
@@ -150,11 +185,12 @@ export const ADDITIVE_EVIDENCE: Record<string, Evidence> = {
     concern: "The FDA acted under a law that bans additives found to cause cancer in animals (thyroid tumours in male rats at high doses); it states those findings don't apply to people.",
     affected: "No established effect in people at typical intakes.",
     dose: "The rat findings were at high doses.",
-    sources: [S.fdaRed3],
+    sources: [S.fdaRed3, S.reg1333],
   },
   e171: {
     classes: ["regulatory"],
-    regulatory: "Banned as a food additive in the EU since 2022. Still permitted in the US and some other countries.",
+    strength: "uncertain",
+    regulatory: "No longer authorised as a food additive in the EU since 2022. Its status differs in other countries.",
     concern: "EFSA (2021) couldn't rule out damage to genetic material (genotoxicity) from titanium dioxide particles, so it couldn't set a safe daily intake.",
     affected: "Everyone (no safe intake could be set).",
     dose: "Absorption is low, but particles can build up in the body; no safe threshold could be established.",
@@ -167,8 +203,8 @@ export const ADDITIVE_EVIDENCE: Record<string, Evidence> = {
     dose: "Allergic people can react to small amounts.",
     sources: [S.cfrCarmine],
   },
-  e150c: { classes: ["mixed"], concern: "Can contain 4-methylimidazole (4-MEI), which IARC classifies as possibly carcinogenic (Group 2B, from animal studies). Authorities limit 4-MEI in these colours.", affected: "Unclear at typical intakes.", dose: "Yes: assessments depend on the amount consumed.", sources: [S.iarc4mei] },
-  e150d: { classes: ["mixed"], concern: "Can contain 4-methylimidazole (4-MEI), which IARC classifies as possibly carcinogenic (Group 2B, from animal studies). Authorities limit 4-MEI in these colours.", affected: "Unclear at typical intakes.", dose: "Yes: assessments depend on the amount consumed.", sources: [S.iarc4mei] },
+  e150c: { classes: ["mixed"], concern: "Can contain 4-methylimidazole (4-MEI), which IARC classifies as possibly carcinogenic (Group 2B, from animal studies).", affected: "Unclear at typical intakes.", dose: "Yes: assessments depend on the amount consumed.", sources: [S.iarc4mei] },
+  e150d: { classes: ["mixed"], concern: "Can contain 4-methylimidazole (4-MEI), which IARC classifies as possibly carcinogenic (Group 2B, from animal studies).", affected: "Unclear at typical intakes.", dose: "Yes: assessments depend on the amount consumed.", sources: [S.iarc4mei] },
   e100: NO_CONCERN("A natural yellow colour from turmeric, assessed by EFSA with an acceptable daily intake."),
   e101: NO_CONCERN("Vitamin B2, used as a colour."),
   e133: NO_CONCERN("Assessed by EFSA with an acceptable daily intake; no specific concern at permitted levels."),
@@ -183,7 +219,7 @@ export const ADDITIVE_EVIDENCE: Record<string, Evidence> = {
     concern: "In drinks that also contain vitamin C, small amounts of benzene can form with heat and light; manufacturers have reformulated to limit this. It was also part of the additive mixtures in the 2007 Southampton study.",
     affected: "Unclear at typical intakes.",
     dose: "Yes: benzene formation depends on storage conditions and amounts.",
-    sources: [S.mccann],
+    sources: [S.fdaBenzene, S.mccann],
   },
   e220: SULPHITE,
   e221: SULPHITE,
@@ -250,7 +286,7 @@ export const ADDITIVE_EVIDENCE: Record<string, Evidence> = {
     classes: ["regulatory", "mixed"],
     regulatory: POLYOL.regulatory,
     concern:
-      "EFSA (2023) set an acceptable daily intake of 0.5 g per kg of body weight (based on laxative effects) and found that high consumers may exceed it. A 2023 observational study linked higher blood erythritol to cardiovascular events; it couldn't show cause and effect.",
+      "EFSA (2023) set an acceptable daily intake of 0.5 g per kg of body weight (based on laxative effects). Its estimates of intake exceeded that, even on average for children, though EFSA considered them overestimates. A 2023 study (a cohort plus laboratory experiments) linked higher blood erythritol to cardiovascular events; the cohort part couldn't show cause and effect.",
     affected: "High consumers; people with sensitive digestion.",
     dose: "Yes: effects depend on the amount eaten.",
     sources: [S.efsaErythritol, S.witkowski, S.reg1169],
@@ -258,14 +294,14 @@ export const ADDITIVE_EVIDENCE: Record<string, Evidence> = {
   e500: NO_CONCERN("Sodium carbonates (baking soda); they add sodium."),
   e551: NO_CONCERN("Silicon dioxide, an anti-caking agent."),
   e621: {
-    classes: ["no_concern"],
+    classes: ["mixed"],
     concern:
-      "EFSA (2017) set a group acceptable daily intake of 30 mg per kg of body weight for glutamates and noted some high consumers may exceed it. Reported reactions such as headache haven't been consistently confirmed in controlled studies. It adds sodium.",
+      "EFSA (2017) set a group acceptable daily intake of 30 mg per kg of body weight for glutamates. It found intake may exceed it for high consumers in every age group, and may exceed doses linked in human studies to effects such as headache (from about 85 mg per kg of body weight) in some groups. It adds sodium.",
     affected: "High consumers.",
-    dose: "Yes: assessments depend on total intake.",
+    dose: "Yes: the effects in studies came at high doses; what matters is total intake.",
     sources: [S.efsaGlutamate],
   },
-  e924: { classes: ["regulatory"], regulatory: "Not authorised as a food additive in the EU; still permitted in bread-making in the US (bromated flour).", concern: "IARC classifies potassium bromate as possibly carcinogenic (Group 2B), from animal studies.", affected: "Unclear at typical intakes.", dose: "Most should break down during baking; residues depend on use.", sources: [S.reg1333, S.cfrBromatedFlour, S.iarcVol73] },
+  e924: { classes: ["regulatory"], regulatory: "Not authorised as a food additive in the EU; still permitted in bread-making in the US (bromated flour).", concern: "IARC classifies potassium bromate as possibly carcinogenic (Group 2B), from animal studies.", affected: "Unclear at typical intakes.", dose: "It's meant to convert during baking, but residues can remain in bread; JECFA withdrew its acceptable level for flour treatment in 1992 for this reason.", sources: [S.reg1333, S.cfrBromatedFlour, S.iarcVol73, S.jecfaBromate] },
   e443: { classes: ["regulatory"], regulatory: "The US FDA revoked its authorization in 2024; it isn't authorised as a food additive in the EU.", concern: "The FDA's decision cited animal studies showing effects on the thyroid.", affected: "Unclear at typical intakes.", dose: "Effects in studies depended on dose.", sources: [S.fdaBvo, S.reg1333] },
   e950: { classes: ["no_concern"], concern: `EFSA's 2025 re-evaluation found no genotoxicity concern and set an acceptable daily intake of 15 mg per kg of body weight. ${NSS_NOTE}`, affected: "None identified at permitted levels.", dose: "Safety assessments assume intake below the acceptable daily intake.", sources: [S.efsaAceK, S.whoNss] },
   e951: {
@@ -276,10 +312,10 @@ export const ADDITIVE_EVIDENCE: Record<string, Evidence> = {
     dose: "Yes: WHO estimates a 70 kg adult would need more than about 9–14 cans of diet soft drink a day to exceed the acceptable daily intake.",
     sources: [S.whoAspartame, S.reg1169, S.whoNss],
   },
-  e952: { classes: ["regulatory"], regulatory: "Not permitted in the US; permitted in the EU with an acceptable daily intake.", concern: NSS_NOTE, affected: "None identified at permitted EU levels.", dose: "Safety assessments assume intake below the acceptable daily intake.", sources: [S.reg1333, S.whoNss] },
+  e952: { classes: ["regulatory"], strength: "assessed", regulatory: "Not permitted in the US; permitted in the EU with an acceptable daily intake.", concern: NSS_NOTE, affected: "None identified at permitted EU levels.", dose: "Safety assessments assume intake below the acceptable daily intake.", sources: [S.reg1333, S.fdaCyclamate, S.whoNss] },
   e954: { classes: ["no_concern"], concern: `Once suspected from bladder tumours in rats; IARC moved it to Group 3 ("not classifiable") in 1999 because that mechanism doesn't apply to people. ${NSS_NOTE}`, affected: "None identified at permitted levels.", dose: "Safety assessments assume intake below the acceptable daily intake.", sources: [S.iarcVol73, S.whoNss] },
   e955: { classes: ["no_concern"], concern: `Permitted in the EU and US with an acceptable daily intake. ${NSS_NOTE}`, affected: "None identified at permitted levels.", dose: "Safety assessments assume intake below the acceptable daily intake.", sources: [S.reg1333, S.whoNss] },
-  e960: { classes: ["no_concern"], concern: `EFSA and JECFA set an acceptable daily intake of 4 mg per kg of body weight (as steviol). ${NSS_NOTE}`, affected: "None identified at permitted levels.", dose: "Safety assessments assume intake below the acceptable daily intake.", sources: [S.reg1333, S.whoNss] },
+  e960: { classes: ["no_concern"], concern: `EFSA and JECFA set an acceptable daily intake of 4 mg per kg of body weight (as steviol). ${NSS_NOTE}`, affected: "None identified at permitted levels.", dose: "Safety assessments assume intake below the acceptable daily intake.", sources: [S.efsaSteviol, S.whoNss] },
   e901: NO_CONCERN("Beeswax, a glazing agent; not vegan."),
   e903: NO_CONCERN("Carnauba wax, a glazing agent from palm leaves."),
 };
@@ -306,6 +342,10 @@ export interface IngredientAlert {
   purpose: string;
   /** The first class is the headline one. */
   classes: EvidenceClass[];
+  /** How strong the evidence is, in words. */
+  strength: EvidenceStrength;
+  /** What the additive is and where it comes from (null for added sugars and sodium sources). */
+  origin: { kind: OriginKind; text: string } | null;
   regulatory: string | null;
   concern: string | null;
   affected: string | null;
@@ -358,6 +398,8 @@ export function ingredientAlerts(p: QualityProduct): IngredientAlert[] {
       group: groupFor(info.role, base),
       purpose: info.role,
       classes: ev?.classes ?? ["insufficient"],
+      strength: evidenceStrength(ev?.classes ?? ["insufficient"], ev?.strength),
+      origin: ADDITIVE_ORIGINS[base] ?? ADDITIVE_ORIGINS[key] ?? null,
       regulatory: ev?.regulatory ?? null,
       concern: ev?.concern ?? (ev ? null : "This additive hasn't been reviewed for this app yet, so no assessment is given. Check the regulator in your country for its status."),
       affected: ev?.affected ?? null,
@@ -377,6 +419,8 @@ export function ingredientAlerts(p: QualityProduct): IngredientAlert[] {
       group: "Added sugars",
       purpose: `Named in the ingredients: ${sugars.join(", ")}. ${amount[0]!.toUpperCase() + amount.slice(1)}.`,
       classes: ["established"],
+      strength: "strong",
+      origin: null,
       regulatory: null,
       concern: "The WHO strongly recommends keeping free sugars below 10% of daily energy, and suggests below 5%, mainly for weight and dental health.",
       affected: "Everyone, depending on total intake across the day.",
@@ -391,6 +435,8 @@ export function ingredientAlerts(p: QualityProduct): IngredientAlert[] {
       title: "Sodium sources",
       code: null,
       group: "Sodium sources",
+      strength: "strong",
+      origin: null,
       purpose: `Named in the ingredients: ${sodiumTerms.join(", ")}.${p.per100.salt_g != null ? ` ${p.per100.salt_g} g of salt per 100 ${p.unit}.` : ""}`,
       classes: ["established"],
       regulatory: null,

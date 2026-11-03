@@ -90,7 +90,39 @@ proportional in between.
 - **Foods and fats:** `score = 50 + 2.5 × P − 1.5 × N`. A product with nothing notable either way scores 50.
 - **Drinks:** `score = 80 + 2.5 × P − 2 × N`. An unsweetened, energy-free drink scores 80. Plain water (no energy, no
   sugar, no sweeteners) is the reference drink at 100.
-- **Rounding:** the result is rounded and clamped to 0–100.
+- **Rounding:** each component's points are rounded to 0.1 before they are added up. The result is rounded to a
+  whole number and clamped to 0–100.
+
+### Details that decide edge cases (exactly as the code does it)
+
+- **Which formula a product gets:**
+  - A water category (`en:waters`, spring or mineral waters) makes it **water**.
+  - A fats, oils, nuts or seeds category makes it **fats**.
+  - **Milks and milk or yoghurt drinks are rated as foods.** They're eaten for protein and other nutrients, not just as
+    fluid.
+  - Anything else in `en:beverages`, or measured per 100 ml, is a **drink**.
+  - Everything else is a **food**.
+- **Plain water:** a water with at most 1 kcal, at most 0.5 g sugars and no non-sugar sweeteners scores 100. Any other
+  water is rated as a drink.
+- **Protein** only counts when the product has at least 4 kcal per 100 g/ml, so a near-zero-energy drink can't score
+  for a trace of protein.
+- **Fibre:** fibre that isn't listed adds nothing (stated on the page). For drinks it isn't mentioned.
+- **The fruit, vegetable and legume share** counts for foods and drinks, not for fats.
+- **Mostly unsaturated fat:**
+  - For fats, it is `lin(unsaturated %, 50, 85)`, where unsaturated % = (fat − saturated) ÷ fat.
+  - For foods, it is half that, and only at 10 g of fat or more.
+  - The saturated share of a fat with 0 g fat counts as 0 %.
+- **Data that can't be right:** if sugars are listed as more than total carbohydrates, or saturated fat as more than
+  total fat (by more than 0.5 g of rounding), the product is **not rated** and the page says which values conflict
+  (`dataIssues` in `src/lib/food-quality.ts`).
+  - Calories that don't match the macros, and records over 3 years old, are flagged on the page but don't stop the
+    rating.
+- **Non-sugar sweeteners:** they are detected from E950–E969 (non-sugar sweeteners only; polyols are excluded) or
+  their names in the ingredient list. Wording that says they're absent ("aspartame-free", "no sweeteners") doesn't
+  count.
+
+**Verified:** `tests/unit/nutrition-score-formula.test.ts` re-implements this section from the text alone and checks
+it gives the same score as the app for 3,000 random valid products of every kind.
 
 ### Bands (and why)
 
@@ -196,12 +228,23 @@ each band is about a fixed number of net points away. They are UI bands, not sci
 `src/lib/additive-evidence.ts` lists additives that have been reviewed.
 
 **For each:**
-- its purpose;
+- what it is and where it comes from: from a natural source, manufactured, or both (`src/lib/additive-origins.ts`;
+  the page adds that origin says nothing about safety);
+- its purpose (why manufacturers use it);
 - its regulatory status;
 - what the evidence says;
+- **the strength of the evidence**, in words: strong (for the people and amounts named), limited or conflicting,
+  uncertain, assessed by regulators with no concern at permitted levels, or not reviewed. This is stated separately
+  from regulatory action, because a warning or a ban can rest on limited evidence;
 - who may be affected;
 - whether the amount matters;
 - its sources.
+
+**Hazard vs risk** is explained once above the list: a hazard (e.g. an IARC classification) is what a substance can do
+at some dose; risk is the chance of harm at the amounts people actually eat.
+
+**The Nutrition Score stays separate:** no additive changes the score. The one exception is non-sugar sweeteners in
+drinks, a diet-pattern component following the WHO 2023 guideline, not a safety finding.
 
 **Classes:**
 - Established concern under specified conditions;
@@ -215,7 +258,8 @@ each band is about a fixed number of net points away. They are UI bands, not sci
 - Unreviewed additives show "Insufficient information" and no assessment.
 - The AI is given only these notes and may not add claims of its own.
 
-**Sources used:**
+**Sources used** (each checked on 2026-11-03; status and the corrections made are in
+`docs/ADDITIVE_EVIDENCE_SOURCES.md`, kept in step with the code by a unit test):
 - Regulation (EC) 1333/2008;
 - Regulation (EU) 1169/2011;
 - Regulation (EU) 2022/63;
@@ -233,7 +277,13 @@ each band is about a fixed number of net points away. They are UI bands, not sci
 - McCann et al. 2007 (Lancet);
 - Chassaing et al. 2015 (Nature);
 - Witkowski et al. 2023 (Nature Medicine);
-- WHO sugars (2015) and sodium (2012) guidelines.
+- WHO sugars (2015) and sodium (2012) guidelines;
+- EFSA re-evaluations of BHA (2011), glutamates (2017) and steviol glycosides (2010), and the EFSA opinion on the
+  McCann study (2008);
+- IARC Monographs volumes 40 / Supplement 7 (BHA) and 73 (potassium bromate, saccharin);
+- JECFA on potassium bromate (1992);
+- US FDA on brominated vegetable oil (2024), benzene in soft drinks, cyclamate (1969–70), and 21 CFR 137.155 and
+  73.100.
 
 ## Nutrient classifications
 

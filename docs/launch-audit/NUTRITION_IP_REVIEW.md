@@ -129,6 +129,20 @@ It builds on, and doesn't repeat, three earlier reviews:
     Counsel should confirm that meets section D.3.
   - Retention (30 days by default, or 7 by another source; zero retention by approval) is **unverified**.
 
+## 7a. Ingredient analysis and Nutrition Score: originality
+
+- **Ingredient evidence:** the explanations (`src/lib/additive-evidence.ts`, `src/lib/additive-origins.ts`) are
+  written by the app from public regulatory and scientific sources (EU regulations, EFSA, WHO/IARC/JECFA, US FDA and
+  CFR, peer-reviewed papers). They're listed with their verification status in `docs/ADDITIVE_EVIDENCE_SOURCES.md`.
+  - No text, ratings, colours or classifications come from Yuka, Cal AI, MyFitnessPal or any other app.
+  - There's no numerical "toxicity" or hazard score for ingredients.
+- **Nutrition Score:** an original formula (FIQ-0.1, `docs/FOOD_IQ_METHOD.md`) with anchors from public regulations
+  and guidance. It doesn't reproduce Nutri-Score's point tables.
+  - The Nutri-Score grade shown on product pages is the one Open Food Facts computed. Earlier trademark review covers
+    the NUTRI-SCORE mark.
+- **Label check:** the photo reader transcribes text; the analysis uses the app's own rule tables. The allergen word
+  lists are generic food vocabulary for the 14 EU-regulated allergens.
+
 ## 8. Marketing claims
 
 - No "accurate to X%" claim is made anywhere. Estimate quality hasn't been measured (`docs/FOOD_PHOTO.md`), and

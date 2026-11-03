@@ -14,7 +14,7 @@ import { isoDateInTz } from "@/lib/domain/dates";
 import type { FoodChoice } from "@/lib/domain/food-basis";
 import { mealForTime } from "@/lib/domain/meal-time";
 import { hasFeature } from "@/lib/domain/plans";
-import { checkFilters, OFF_DATA_NOTICE, pickAlternatives, sanitizeFilters, tagLabel } from "@/lib/food-quality";
+import { checkFilters, dataIssues, OFF_DATA_NOTICE, pickAlternatives, sanitizeFilters, tagLabel } from "@/lib/food-quality";
 import { basisFromOffProduct, OFF_ATTRIBUTION } from "@/lib/open-food-facts";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
@@ -75,6 +75,7 @@ export default async function ProductQualityPage({ params, searchParams }: { par
   }
 
   const p = found.quality;
+  const issues = dataIssues(p);
   const plan = await getUserPlan(user.id);
   const plus = hasFeature(plan, "food_comparisons");
   const goalAnalysis = hasFeature(plan, "food_goal_analysis");
@@ -179,6 +180,23 @@ export default async function ProductQualityPage({ params, searchParams }: { par
       )}
       {p.incomplete.length > 0 && (
         <Notice tone="warning">Open Food Facts lists this product&apos;s {p.incomplete.join(", ")} as incomplete. What&apos;s shown may be missing details: check the package.</Notice>
+      )}
+      {issues.length > 0 && (
+        <div data-testid="data-issues">
+          <Notice tone="warning">
+            <span className="font-semibold">Check this product&apos;s data against the package:</span>
+            <ul className="mt-1 list-disc space-y-1 pl-5">
+              {issues.map((i) => (
+                <li key={i.key}>{i.text}</li>
+              ))}
+            </ul>
+          </Notice>
+        </div>
+      )}
+      {p.updatedAt && (
+        <p className="text-xs text-muted-foreground" data-testid="data-updated">
+          Open Food Facts record last updated {new Date(`${p.updatedAt}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })}.
+        </p>
       )}
 
       <FitsYourGoals fit={fit} allowed={goalAnalysis} hasAi={ai} />
