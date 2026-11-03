@@ -135,6 +135,16 @@ jobs:
           mkdir usfm-flat
           find usfm -type f \( -iname '*.usfm' -o -iname '*.sfm' -o -iname '*.ptx' \) -exec cp {} usfm-flat/ \;
           node scripts/build-bsb-red-letter.mjs usfm-flat bsb-bible bsb-bible/wj.json "$src" "$(sha256sum usfm.zip | cut -d' ' -f1)"
+      - name: Compare the red letters with an independent red-letter Bible (information only)
+        # A cross-check for a person to review: lists every verse where the BSB publisher's marking and the World
+        # English Bible's (eBible.org) disagree. It changes nothing and never fails the run.
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --max-filesize 104857600 -o web.zip https://ebible.org/Scriptures/engwebp_usfm.zip
+          rm -rf web && mkdir web && unzip -q -o web.zip -d web
+          echo "World English Bible USFM SHA-256: $(sha256sum web.zip | cut -d' ' -f1)"
+          node scripts/compare-red-letter.mjs bsb-bible/wj.json web "World English Bible (eBible.org)"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: bsb-bible
