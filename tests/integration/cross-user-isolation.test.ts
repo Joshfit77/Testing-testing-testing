@@ -155,6 +155,23 @@ describe.skipIf(!available)("cross-user isolation sweep: every user-owned table 
 
     // Faith.
     await seed("faith_journal_entries", { user_id: u, body: "Private prayer" });
+    // Bible reader, journeys, memorization, studies, AI Bible study (migration 053).
+    const todayUtc = new Date().toISOString().slice(0, 10);
+    await seed("bible_reading_state", { user_id: u, book_id: "JHN", chapter: 3 });
+    await seed("bible_reading_history", { user_id: u, book_id: "JHN", chapter: 3, read_on: "2026-10-01" });
+    await seed("bible_highlights", { user_id: u, book_id: "JHN", chapter: 3, verse: 16, color: "gold" });
+    await seed("bible_bookmarks", { user_id: u, book_id: "PSA", chapter: 23 });
+    await seed("bible_notes", { user_id: u, book_id: "JHN", chapter: 3, verse_start: 16, verse_end: 17, body: "Private Bible note" });
+    await seed("scripture_memory", { user_id: u, book_id: "JHN", chapter: 3, verse_start: 16, verse_end: 16 });
+    await seed("bible_study_progress", { user_id: u, study_slug: "the-gospel", lesson_slug: "1", notes: "Private study note" });
+    await seed("bible_ai_messages", { user_id: u, thread_id: crypto.randomUUID(), role: "user", content: "Private Bible question" });
+    await seed("bible_ai_usage", { user_id: u });
+    await seed("faith_daily_goals", { user_id: u, goal_date: todayUtc, kind: "fitness" });
+    const journey = await seed("faith_journeys", { user_id: u, plan_kind: "gospels", duration_days: 30, start_on: "2026-10-01" });
+    parents.faith_journeys = journey.id!;
+    await seed("faith_journey_attempts", { journey_id: journey.id, user_id: u, attempt_number: 1, started_on: "2026-10-01" });
+    await seed("faith_journey_checkins", { journey_id: journey.id, user_id: u, check_date: "2026-10-01", prayer_completed_at: "2026-10-01T12:00:00Z", prayer_source: "online" });
+    await seed("faith_reminder_prefs", { user_id: u, quiet_start: "22:00", quiet_end: "06:00" });
     const goal = await seed("discipline_goals", { user_id: u, title: "Daily prayer" });
     parents.discipline_goals = goal.id!;
     await seed("discipline_checkins", { goal_id: goal.id, user_id: u, checked_on: "2026-10-01" });
@@ -269,6 +286,12 @@ describe.skipIf(!available)("cross-user isolation sweep: every user-owned table 
       ai_messages: { content: "hacked" },
       coach_memories: { content: "hacked note" },
       ai_message_feedback: { comment: "hacked" },
+      bible_notes: { body: "hacked" },
+      bible_highlights: { color: "rose" },
+      faith_journeys: { status: "ended" },
+      faith_journey_attempts: { status: "interrupted" },
+      faith_journey_checkins: { reading_day: 1 },
+      scripture_memory: { status: "memorized" },
       activation_events: { source: "backfill" },
       activities: { notes: "hacked" },
       sleep_sessions: { notes: "hacked" },
@@ -308,6 +331,10 @@ describe.skipIf(!available)("cross-user isolation sweep: every user-owned table 
       ["sleep_sessions", { id: crypto.randomUUID(), user_id: alice.id, started_at: "2026-10-09T22:00:00Z", ended_at: "2026-10-10T06:00:00Z", timezone: "UTC", night_of: "2026-10-10", source: "manual" }],
       ["legal_acceptances", { user_id: alice.id, document: "terms", version: "x", document_sha256: "b".repeat(64), source: "reaccept" }],
       ["ai_conversations", { user_id: alice.id, title: "planted" }],
+      ["bible_notes", { user_id: alice.id, book_id: "JHN", chapter: 1, verse_start: 1, verse_end: 1, body: "planted" }],
+      ["bible_bookmarks", { user_id: alice.id, book_id: "JHN", chapter: 1 }],
+      ["scripture_memory", { user_id: alice.id, book_id: "JHN", chapter: 1, verse_start: 1, verse_end: 1 }],
+      ["faith_journeys", { user_id: alice.id, plan_kind: "gospels", duration_days: 30, start_on: "2026-10-01" }],
       ["progress_photos", { user_id: alice.id, storage_path: `${alice.id}/${crypto.randomUUID()}.jpg`, taken_on: "2026-10-09", pose: "front" }],
     ];
     const problems: string[] = [];
@@ -328,6 +355,8 @@ describe.skipIf(!available)("cross-user isolation sweep: every user-owned table 
       ["meal_items", { meal_id: parents.meals, user_id: bob.id, name: "planted", servings: 1, calories: 1, source: "custom" }],
       ["ai_messages", { conversation_id: parents.ai_conversations, user_id: bob.id, role: "user", content: "planted" }],
       ["ai_message_feedback", { message_id: parents.ai_replies, user_id: bob.id, rating: "no" }],
+      ["faith_journey_checkins", { journey_id: parents.faith_journeys, user_id: bob.id, check_date: "2026-10-02", prayer_completed_at: "2026-10-02T12:00:00Z" }],
+      ["faith_journey_attempts", { journey_id: parents.faith_journeys, user_id: bob.id, attempt_number: 9, started_on: "2026-10-02" }],
       ["sleep_stages", { session_id: parents.sleep_sessions, user_id: bob.id, stage: "awake", started_at: "2026-10-02T01:00:00Z", ended_at: "2026-10-02T01:30:00Z" }],
       ["body_scan_photos", { scan_id: parents.body_scans, user_id: bob.id, pose: "back", storage_path: `${bob.id}/${parents.body_scans}/back.jpg` }],
       ["discipline_checkins", { goal_id: parents.discipline_goals, user_id: bob.id, checked_on: "2026-10-02" }],
