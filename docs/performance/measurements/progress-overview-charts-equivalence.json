@@ -1,0 +1,98 @@
+{
+  "chartsIdentical": true,
+  "charts": [
+    {
+      "title": "Bodyweight",
+      "drawn": true,
+      "bars": 0,
+      "dots": 21,
+      "linePaths": 1
+    },
+    {
+      "title": "Steps",
+      "drawn": true,
+      "bars": 21,
+      "dots": 0,
+      "linePaths": 0
+    },
+    {
+      "title": "Weekly activity",
+      "drawn": true,
+      "bars": 4,
+      "dots": 0,
+      "linePaths": 0
+    },
+    {
+      "title": "Training volume",
+      "drawn": true,
+      "bars": 4,
+      "dots": 0,
+      "linePaths": 0
+    },
+    {
+      "title": "Squat \u00b7 Bench \u00b7 Deadlift",
+      "drawn": true,
+      "bars": 0,
+      "dots": 6,
+      "linePaths": 3
+    },
+    {
+      "title": "Strength improvements",
+      "drawn": false,
+      "bars": 0,
+      "dots": 0,
+      "linePaths": 0
+    },
+    {
+      "title": "Calories",
+      "drawn": false,
+      "bars": 0,
+      "dots": 0,
+      "linePaths": 0
+    },
+    {
+      "title": "Macros",
+      "drawn": false,
+      "bars": 0,
+      "dots": 0,
+      "linePaths": 0
+    },
+    {
+      "title": "Measurements",
+      "drawn": false,
+      "bars": 0,
+      "dots": 0,
+      "linePaths": 0
+    }
+  ],
+  "toggleMs": {
+    "old": [
+      31,
+      32,
+      32,
+      36,
+      37,
+      78,
+      108,
+      118,
+      129,
+      157,
+      188,
+      277
+    ],
+    "new": [
+      22,
+      28,
+      33,
+      44,
+      46,
+      49,
+      135,
+      137,
+      137,
+      148,
+      165,
+      186
+    ]
+  }
+}
