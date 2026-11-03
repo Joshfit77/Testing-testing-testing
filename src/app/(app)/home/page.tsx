@@ -161,7 +161,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             userId={user.id}
             startHref={startHref}
             serverInProgress={(inProgressRes.data?.name as string | undefined) ?? null}
-            startLabel={plannedLater ? "Start workout early" : "Start workout"}
+            startLabel={plannedLater ? "Start workout early" : today ? "Start Today's Workout" : "Start workout"}
           />
         </div>
         {next && (

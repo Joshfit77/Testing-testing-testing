@@ -23,19 +23,16 @@ test.describe("welcome, sign-up and diets", () => {
     await page.getByRole("button", { name: "Lose body fat", exact: true }).click();
     await page.getByRole("button", { name: /^Continue/ }).click();
     await page.getByRole("button", { name: /^Continue/ }).click(); // optional second goal: Continue skips it too
-    // Sex is required (only used for calorie math).
-    await expect(page.getByText(/only used to estimate your daily calories/i)).toBeVisible();
+    // About you (one screen): sex is required (only used for calorie math).
+    await expect(page.getByText(/only for the calorie estimate/i)).toBeVisible();
     await page.getByRole("button", { name: /^Continue/ }).click();
     await expect(page.getByText("Please choose male, female or prefer not to say.")).toBeVisible();
     await page.getByRole("button", { name: /^Back/ }).click();
     await page.getByRole("button", { name: /^Continue/ }).click();
     await page.getByRole("button", { name: "Female", exact: true }).click();
-    await page.getByRole("button", { name: /^Continue/ }).click();
     await page.getByLabel("Age").fill("29");
-    await page.getByRole("button", { name: /^Continue/ }).click();
     await page.getByLabel("Height (ft)").fill("5");
     await page.getByLabel("Height (in)").fill("5");
-    await page.getByRole("button", { name: /^Continue/ }).click();
     await page.getByLabel(/Current weight/).fill("150");
     await page.getByRole("button", { name: /^Continue/ }).click();
     await page.getByRole("button", { name: /^Continue/ }).click(); // weight goal is optional

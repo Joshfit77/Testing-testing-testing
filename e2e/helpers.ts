@@ -77,13 +77,11 @@ export async function answerOnboarding(page: Page, a: OnboardingAnswers = {}) {
     await page.getByRole("group", { name: "Second goal" }).getByRole("button", { name: a.secondGoal, exact: true }).click();
     await next();
   } else await page.getByRole("button", { name: "Skip", exact: true }).click();
+  // About you: sex, age, height and weight on one screen.
   await page.getByRole("button", { name: a.sex ?? "Male", exact: true }).click();
-  await next();
   await page.getByLabel("Age").fill(a.age ?? "34");
-  await next();
   await page.getByLabel("Height (ft)").fill(a.feet ?? "5");
   await page.getByLabel("Height (in)").fill(a.inches ?? "10");
-  await next();
   await page.getByLabel(/Current weight/).fill(a.weightLb ?? "185");
   await next();
   if (a.goalWeightLb) await page.getByLabel(/Goal weight/).fill(a.goalWeightLb);

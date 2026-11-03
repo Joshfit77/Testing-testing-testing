@@ -10,6 +10,7 @@ import { confirmDialog } from "@/components/ui/confirm";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input, Textarea } from "@/components/ui/input";
 import { Notice } from "@/components/common/states";
+import { ProgressBar } from "@/components/ui/progress-bar";
 import { cn } from "@/lib/utils";
 import type { UnitSystem } from "@/lib/domain/types";
 import { formatDuration, formatWeight } from "@/lib/domain/units";
@@ -82,6 +83,22 @@ interface FinishResult {
   durationSeconds: number;
   /** What the program has next, so the member leaves knowing what to do. */
   next: NextSession | null;
+}
+
+/** Sessions done in the program so far (the next one is Week w, Day d), as a bar under "Up next". */
+function ProgramProgress({ next }: { next: NextSession }) {
+  if (next.programDone || !next.week || !next.day || !next.daysPerWeek || !next.durationWeeks) return null;
+  const total = next.durationWeeks * next.daysPerWeek;
+  const done = Math.min(total, (next.week - 1) * next.daysPerWeek + (next.day - 1));
+  if (done <= 0) return null;
+  return (
+    <div className="mt-3 space-y-1" data-testid="program-progress">
+      <p className="text-xs text-muted-foreground">
+        Program progress: <strong className="text-foreground">{done} of {total}</strong> session{total === 1 ? "" : "s"} done
+      </p>
+      <ProgressBar value={(done / total) * 100} label={`Program progress: ${done} of ${total} sessions done`} />
+    </div>
+  );
 }
 
 /** A second tap on Done within this time is the same tap (a bounce, a shaky hand), not an undo. */
@@ -441,6 +458,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
                   {result.next.date ? ` · ${new Date(`${result.next.date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" })}` : ""}
                   {result.next.minutes ? ` · ~${result.next.minutes} min` : ""}
                 </p>
+                <ProgramProgress next={result.next} />
               </>
             )}
           </section>
@@ -738,6 +756,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
             onSkip={() => setSkipKey(e.id)}
             lastTime={lastTimeText(prev[e.exerciseId], units, e.isTimed)}
             coachTarget={targetText(targets[e.exerciseId], units)}
+            firstTime={!prev[e.exerciseId] && !targets[e.exerciseId]}
             nextSetId={up?.exerciseKey === e.id ? up.setId : null}
             superset={{
               letter: e.supersetId ? (letters.get(e.supersetId) ?? null) : null,

@@ -110,6 +110,17 @@ function gridFor(exercise: DraftExercise): string {
   return exercise.isTimed && !exercise.usesDistance ? "grid-cols-[2rem_1fr_3.2rem_3.4rem_2.75rem]" : "grid-cols-[2rem_1fr_1fr_3.4rem_2.75rem]";
 }
 
+/**
+ * What to do the first time, when there is no history to suggest a number from. No working weight is invented for a
+ * beginner: they choose a light one (or an easier version) that leaves a few reps in reserve, and what they log
+ * becomes the starting point the app progresses from.
+ */
+export function firstTimeTip(exercise: Pick<DraftExercise, "isTimed" | "usesDistance">): string {
+  if (exercise.usesDistance) return "First time: go at an easy, steady pace you could keep up. Log what you did.";
+  if (exercise.isTimed) return "First time: an easy, steady effort. Stop early if your form slips, and log the time you did.";
+  return "First time: start light. Use a weight, or an easier version, that leaves at least 3 reps in reserve. Your next session builds from what you log.";
+}
+
 function columnLabels(exercise: DraftExercise, units: UnitSystem): [string, string] {
   const mode = exercise.usesDistance ? distanceMode(exercise.slug) : null;
   if (mode === "loaded") return [weightUnit(units), distanceUnit(mode, units)];
@@ -251,6 +262,7 @@ export function ExerciseCard({
   current = false,
   lastTime = null,
   coachTarget = null,
+  firstTime = false,
   nextSetId = null,
   superset = null,
 }: {
@@ -268,6 +280,8 @@ export function ExerciseCard({
   lastTime?: string | null;
   /** "Your target: 102.5 kg × 5 reps" (accepted from the training review or the AI coach). */
   coachTarget?: string | null;
+  /** Never logged before and no coach target: a starting tip instead of a number the app can't know yet. */
+  firstTime?: boolean;
   /** The set to do next (highlighted). */
   nextSetId?: string | null;
   /** Superset placement: its letter, this exercise's place in it, and whether the next exercise can be joined. */
@@ -337,6 +351,7 @@ export function ExerciseCard({
               <Crosshair className="size-3.5 shrink-0 text-gold" aria-hidden /> {coachTarget}
             </p>
           )}
+          {firstTime && !coachTarget && !lastTime && <p className="mt-0.5 text-xs text-foreground/85" data-testid="first-time-tip">{firstTimeTip(exercise)}</p>}
         </div>
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>

@@ -7,7 +7,7 @@ test.describe("guided onboarding builds a plan", () => {
     await page.waitForURL(/\/onboarding/);
 
     // Progress bar + validation on a screen.
-    await expect(page.getByText("Question 1 of 14")).toBeVisible();
+    await expect(page.getByText("Question 1 of 11")).toBeVisible();
     await page.getByRole("button", { name: /^Continue/ }).click();
     await expect(page.getByText("Choose your main goal.")).toBeVisible();
 
@@ -37,13 +37,17 @@ test.describe("guided onboarding builds a plan", () => {
     await expect(page.getByRole("heading", { name: "Week 1" })).toBeVisible();
     await expect(page.getByText(/^Day 1:/)).toBeVisible();
 
-    await page.getByRole("link", { name: /Start my first workout/ }).click();
+    // One prominent next step, above the fold: today's session.
+    const start = page.getByTestId("plan-start-today").getByRole("link", { name: "Start Today's Workout" });
+    await expect(start).toBeInViewport();
+    await expect(page.getByRole("link", { name: /^Start/ })).toHaveCount(1);
+    await start.click();
     await page.waitForURL(/\/train\/workout\?day=/);
 
     // The program is the active one on Home. Opening the logger and leaving logged nothing, so nothing was saved:
     // Home still offers to start the session (no phantom "Resume workout").
     await page.goto("/home");
-    await expect(page.getByRole("link", { name: /^Start workout/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Start Today's Workout" })).toBeVisible();
     await expect(page.getByRole("link", { name: /^Resume workout/ })).toHaveCount(0);
   });
 });

@@ -69,7 +69,7 @@ test.describe("training review (Pro)", () => {
 
     // The workout logger shows it beside the exercise.
     await page.goto("/home");
-    await page.getByRole("link", { name: /Start workout/ }).click();
+    await page.getByRole("link", { name: /^Start (Today's Workout|workout)/ }).click();
     await page.waitForURL(/\/train\/workout/);
     await expect(page.getByTestId("coach-target").first()).toContainText(`Your target: 100`);
 

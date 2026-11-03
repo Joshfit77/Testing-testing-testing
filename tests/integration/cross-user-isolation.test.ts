@@ -269,6 +269,7 @@ describe.skipIf(!available)("cross-user isolation sweep: every user-owned table 
       ai_messages: { content: "hacked" },
       coach_memories: { content: "hacked note" },
       ai_message_feedback: { comment: "hacked" },
+      activation_events: { source: "backfill" },
       activities: { notes: "hacked" },
       sleep_sessions: { notes: "hacked" },
       daily_steps: { steps: 1 },

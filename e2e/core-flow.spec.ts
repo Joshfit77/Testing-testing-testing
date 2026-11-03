@@ -9,10 +9,10 @@ test.describe("authentication, onboarding and workout logging", () => {
 
     // Dashboard shows today's starter-program session.
     await expect(page.getByText(/Your starter program is ready/)).toBeVisible();
-    await expect(page.getByRole("link", { name: /Start workout/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: /^Start (Today's Workout|workout)/ })).toBeVisible();
 
     // Start the program session.
-    await page.getByRole("link", { name: /Start workout/ }).click();
+    await page.getByRole("link", { name: /^Start (Today's Workout|workout)/ }).click();
     await page.waitForURL(/\/train\/workout/);
     const firstWeight = page.getByLabel(/set 1 weight in lb/).first();
     await firstWeight.fill("135");

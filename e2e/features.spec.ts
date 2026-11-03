@@ -14,11 +14,10 @@ test.describe("feature access, subscriptions and core sections", () => {
     await page.getByRole("button", { name: /^Continue/ }).click();
     await page.getByRole("button", { name: "Skip", exact: true }).click(); // optional second goal
     await page.getByRole("button", { name: "Female", exact: true }).click();
-    await page.getByRole("button", { name: /^Continue/ }).click();
     await page.getByLabel("Age").fill("16");
     await page.getByRole("button", { name: /^Continue/ }).click();
     await expect(page.getByText(/available to adults \(18\+\)/)).toBeVisible();
-    // Still on the age question.
+    // Still on the About you question.
     await expect(page.getByLabel("Age")).toBeVisible();
   });
 

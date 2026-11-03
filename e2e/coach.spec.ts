@@ -323,7 +323,7 @@ test.describe("AI coach", () => {
     await expect(card2.getByText("applied", { exact: true })).toBeVisible();
     // Home no longer lists exercises (Stage 1 redesign): the swap shows when the next session starts.
     await page.goto("/home");
-    await page.getByRole("link", { name: /Start workout/ }).click();
+    await page.getByRole("link", { name: /^Start (Today's Workout|workout)/ }).click();
     await page.waitForURL(/\/train\/workout/);
     await expect(page.getByText("Push-Up", { exact: true }).first()).toBeVisible();
 

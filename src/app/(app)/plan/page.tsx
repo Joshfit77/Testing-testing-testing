@@ -85,6 +85,31 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
         }
       />
 
+      {/* The one thing to do next, above the fold: today's session, ready to start. */}
+      {active?.today && (
+        <section aria-labelledby="start-title" className="rounded-2xl border border-gold-muted bg-card p-5" data-testid="plan-start-today">
+          <h2 id="start-title" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Today&apos;s workout
+          </h2>
+          <p className="mt-1 text-lg font-semibold">{active.today.name}</p>
+          <p className="text-sm text-muted-foreground">
+            {[
+              `Week ${active.currentWeek} · Day ${active.currentDay} of ${active.daysPerWeek}`,
+              active.today.estimated_minutes ? `~${active.today.estimated_minutes} min` : null,
+              `${active.today.exercises.length} exercise${active.today.exercises.length === 1 ? "" : "s"}`,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+          {active.today.exercises[0] && <p className="mt-1 text-sm">First up: <strong>{active.today.exercises[0].exercise.name}</strong></p>}
+          <Button asChild size="lg" className="mt-4 w-full">
+            <Link href={startHref}>
+              <Play aria-hidden /> Start Today&apos;s Workout
+            </Link>
+          </Button>
+        </section>
+      )}
+
       <section aria-labelledby="budget-title" className="bg-card-gradient rounded-2xl border border-gold-muted/60 p-5 md:p-6">
         <h2 id="budget-title" className="flex items-center gap-2 font-display text-xl font-bold uppercase">
           <Flame className="size-5 text-gold" aria-hidden /> Daily calorie budget
@@ -194,20 +219,14 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
       </section>
 
       <div className="flex flex-col gap-3 sm:flex-row">
-        {active?.today ? (
-          <Button asChild size="lg" className="flex-1">
-            <Link href={startHref}>
-              <Play aria-hidden /> Start my first workout
-            </Link>
-          </Button>
-        ) : (
+        {!active?.today && (
           <Button asChild size="lg" className="flex-1">
             <Link href="/train/build">
               <Dumbbell aria-hidden /> Build a program
             </Link>
           </Button>
         )}
-        <Button asChild size="lg" variant="outline" className="flex-1">
+        <Button asChild size="lg" variant={active?.today ? "secondary" : "outline"} className="flex-1">
           <Link href={isNew ? "/home?welcome=1" : "/home"}>
             <Home aria-hidden /> Go to Home
           </Link>

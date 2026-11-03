@@ -18,7 +18,7 @@ test.describe("Stage 1 journeys", () => {
   test("an active workout survives switching tabs and reloading the app", async ({ page }) => {
     await signUpAndConfirm(page, uniqueEmail("tabs"));
     await completeOnboarding(page);
-    await page.getByRole("link", { name: /Start workout/ }).click();
+    await page.getByRole("link", { name: /^Start (Today's Workout|workout)/ }).click();
     await page.waitForURL(/\/train\/workout/);
 
     await page.getByLabel(/set 1 weight in lb/).first().fill("135");

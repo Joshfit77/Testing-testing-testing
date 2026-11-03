@@ -45,10 +45,8 @@ const WEIGHT_GOALS: PrimaryGoal[] = ["lose_fat", "build_muscle", "general_health
 const STEPS = [
   { id: "goal", title: "Main goal" },
   { id: "second", title: "Second goal (optional)" },
-  { id: "sex", title: "Sex" },
-  { id: "age", title: "Age" },
-  { id: "height", title: "Height" },
-  { id: "weight", title: "Current weight" },
+  // Sex, age, height and weight on one screen: the same four answers, three fewer screens to tap through.
+  { id: "body", title: "About you" },
   { id: "target", title: "Weight goal" },
   { id: "activity", title: "Daily activity" },
   { id: "experience", title: "Experience" },
@@ -198,6 +196,19 @@ export function OnboardingQuestionnaire({ initialName }: { initialName: string }
     setShowGoalWeight(WEIGHT_GOALS.includes(g));
   };
 
+  const validateBody = (): string | null => {
+    if (!sex) return "Please choose male, female or prefer not to say.";
+    const a = Number(age);
+    if (!age || !Number.isInteger(a)) return "Please enter your age in whole years.";
+    if (a < 18) return "Narrow Gate Fitness is available to adults (18+) at launch.";
+    if (a > 100) return "Please check your age.";
+    if (units === "imperial" && inches && (Number(inches) < 0 || Number(inches) > 11)) return "Inches should be between 0 and 11.";
+    const h = heightCm();
+    if (!h || h < 90 || h > 260) return "Please enter a valid height.";
+    const w = weightKg();
+    return !w || w < 25 || w > 400 ? "Please enter a valid weight." : null;
+  };
+
   const validate = (id: StepId): string | null => {
     switch (id) {
       case "goal":
@@ -206,24 +217,8 @@ export function OnboardingQuestionnaire({ initialName }: { initialName: string }
         return secondGoal && secondGoal === goal ? "Pick a different second goal, or skip." : null;
       case "comfort":
         return null;
-      case "sex":
-        return sex ? null : "Please choose male, female or prefer not to say.";
-      case "age": {
-        const a = Number(age);
-        if (!age || !Number.isInteger(a)) return "Please enter your age in whole years.";
-        if (a < 18) return "Narrow Gate Fitness is available to adults (18+) at launch.";
-        if (a > 100) return "Please check your age.";
-        return null;
-      }
-      case "height": {
-        if (units === "imperial" && inches && (Number(inches) < 0 || Number(inches) > 11)) return "Inches should be between 0 and 11.";
-        const h = heightCm();
-        return !h || h < 90 || h > 260 ? "Please enter a valid height." : null;
-      }
-      case "weight": {
-        const w = weightKg();
-        return !w || w < 25 || w > 400 ? "Please enter a valid weight." : null;
-      }
+      case "body":
+        return validateBody();
       case "target": {
         if (!showGoalWeight || !goalWeight) return null;
         const g = goalWeightKg();
@@ -404,28 +399,28 @@ export function OnboardingQuestionnaire({ initialName }: { initialName: string }
           </Question>
         )}
 
-        {current === "sex" && (
-          <Question title="What's your sex?" help="Only used to estimate your daily calories (men and women burn different amounts at rest). Never shared.">
-            <div className="grid gap-2 sm:grid-cols-3" role="group" aria-label="Sex">
-              <Choice selected={sex === "male"} onClick={() => setSex("male")} title="Male" />
-              <Choice selected={sex === "female"} onClick={() => setSex("female")} title="Female" />
-              <Choice selected={sex === "unspecified"} onClick={() => setSex("unspecified")} title="Prefer not to say" />
+        {current === "body" && (
+          <Question title="About you" help="Used to confirm you're an adult and to estimate your daily calories. Never shared.">
+            <div className="space-y-2">
+              <p id="ob-sex-label" className="text-sm font-medium">
+                Sex
+              </p>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" role="group" aria-label="Sex">
+                <Choice selected={sex === "male"} onClick={() => setSex("male")} title="Male" />
+                <Choice selected={sex === "female"} onClick={() => setSex("female")} title="Female" />
+                <Choice selected={sex === "unspecified"} onClick={() => setSex("unspecified")} title="Prefer not to say" />
+              </div>
+              <p className="text-xs text-muted-foreground">Only for the calorie estimate (men and women burn different amounts at rest).</p>
             </div>
-          </Question>
-        )}
-
-        {current === "age" && (
-          <Question title="How old are you?" help="Used to confirm you're an adult and to estimate your calorie needs.">
             <div className="max-w-40 space-y-2">
               <Label htmlFor="ob-age">Age</Label>
               <Input id="ob-age" type="number" inputMode="numeric" min={18} max={100} value={age} onChange={(e) => setAge(e.target.value)} />
             </div>
-          </Question>
-        )}
-
-        {current === "height" && (
-          <Question title="How tall are you?" help="Pick your units. This also sets how weights show across the app (you can change it later).">
-            {unitsToggle}
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Units</p>
+              {unitsToggle}
+              <p className="text-xs text-muted-foreground">Also how weights show across the app (you can change it later).</p>
+            </div>
             {units === "imperial" ? (
               <div className="grid max-w-72 grid-cols-2 gap-3">
                 <div className="space-y-2">
@@ -443,15 +438,10 @@ export function OnboardingQuestionnaire({ initialName }: { initialName: string }
                 <Input id="ob-cm" type="number" inputMode="decimal" min={90} max={260} value={cm} onChange={(e) => setCm(e.target.value)} />
               </div>
             )}
-          </Question>
-        )}
-
-        {current === "weight" && (
-          <Question title="What do you weigh today?" help="Saved as your first bodyweight entry so you can track progress.">
-            {unitsToggle}
             <div className="max-w-48 space-y-2">
               <Label htmlFor="ob-weight">Current weight ({unit})</Label>
               <Input id="ob-weight" type="number" inputMode="decimal" step="0.1" value={weight} onChange={(e) => setWeight(e.target.value)} />
+              <p className="text-xs text-muted-foreground">Saved as your first bodyweight entry so you can track progress.</p>
             </div>
           </Question>
         )}
