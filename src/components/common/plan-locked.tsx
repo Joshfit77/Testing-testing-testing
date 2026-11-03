@@ -10,14 +10,11 @@ export function PlanLocked({
   back,
   eyebrow,
   title,
-  plan,
   description,
 }: {
   back: { href: string; label: string };
   eyebrow?: string;
   title: string;
-  /** Kept for callers; every paid feature is now part of Pro All Access. */
-  plan?: "Plus" | "Pro";
   description: string;
 }) {
   return (

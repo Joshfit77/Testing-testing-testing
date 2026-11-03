@@ -204,7 +204,7 @@ export default async function ProductQualityPage({ params }: { params: Promise<{
         <CardHeader>
           <CardTitle className="text-base">Ask AI about this food</CardTitle>
         </CardHeader>
-        <CardContent>{ai ? <ExplainProduct code={p.code} /> : <p className="text-sm text-muted-foreground">Asking the AI about a product (how it fits your goals, how it compares, how to fit it into a meal plan) is included with Pro.</p>}</CardContent>
+        <CardContent>{ai ? <ExplainProduct code={p.code} /> : <p className="text-sm text-muted-foreground">Asking the AI about a product (how it fits your goals, how it compares, how to fit it into a meal plan) is included with Pro All Access.</p>}</CardContent>
       </Card>
 
       <p className="text-xs text-muted-foreground">

@@ -72,6 +72,7 @@ export default async function AdminPage() {
 }
 
 interface Activation {
+  excluded_test_accounts?: number;
   new_members: { accounts: number; onboarded: number; started_first_workout: number; completed_first_set: number; completed_first_workout: number };
   median_minutes: Record<"signup_to_onboarded" | "onboarded_to_first_workout_start" | "first_workout_start_to_first_set" | "signup_to_first_set" | "signup_to_first_workout_completed", number | null>;
   return_activity: Record<"day1" | "day7" | "day14" | "days1to7", { eligible: number; returned: number }>;
@@ -90,7 +91,9 @@ function ActivationSummary({ data }: { data: Activation | null }) {
         First-workout activation (new accounts, last 30 days)
       </h2>
       <p className="mt-1 text-xs text-muted-foreground">
-        From workouts the server stored (start, first completed set, finish, discard), once per workout. Medians. With only a few new accounts these numbers describe individuals, so treat them as private.
+        From workouts the server stored (start, first completed set, finish, discard), once per workout. Medians. Sandbox testers, admins, demo
+        accounts and test addresses (such as @example.com) are left out. Deleted accounts drop out of the counts. With only a few new accounts these
+        numbers describe individuals, so treat them as private.
       </p>
       {!data ? (
         <Notice tone="error" className="mt-3">Couldn&apos;t load activation metrics.</Notice>
@@ -98,7 +101,9 @@ function ActivationSummary({ data }: { data: Activation | null }) {
         <dl className="mt-3 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
           {[
             ["New accounts", String(data.new_members.accounts)],
+            ["Test, tester and admin accounts left out", String(data.excluded_test_accounts ?? 0)],
             ["Finished onboarding", share(data.new_members.onboarded, data.new_members.accounts)],
+            ["Started a first workout", share(data.new_members.started_first_workout, data.new_members.accounts)],
             ["Completed a first set", share(data.new_members.completed_first_set, data.new_members.accounts)],
             ["Completed a first workout", share(data.new_members.completed_first_workout, data.new_members.accounts)],
             ["Sign-up → onboarding done", minutes(data.median_minutes.signup_to_onboarded)],

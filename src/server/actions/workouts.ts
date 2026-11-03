@@ -9,7 +9,23 @@ import { logError } from "@/server/log";
 import { badgesUnlockedBySession, type BadgeIconName, type BadgeTier } from "@/lib/domain/achievements";
 import { isoDateInTz } from "@/lib/domain/dates";
 import { getAchievementStats } from "@/server/services/achievements";
-import { deleteWorkout, discardDraft, editWorkout, finishWorkout, getExerciseTargets, getPreviousPerformance, saveDraftSnapshot, WorkoutError, type ExerciseTarget, type NewRecord } from "@/server/services/workouts";
+import {
+  deleteWorkout,
+  discardDraft,
+  editWorkout,
+  finishWorkout,
+  getExerciseTargets,
+  getPreviousPerformance,
+  previousComparableSession,
+  saveDraftSnapshot,
+  WorkoutError,
+  type ExerciseTarget,
+  type NewRecord,
+  type PreviousSession,
+} from "@/server/services/workouts";
+import { scriptureForDate } from "@/data/content";
+import type { TextPart } from "@/lib/bible/red-letter";
+import { scriptureParts } from "@/server/bible/text";
 import { nextSessionSummary, type NextSession } from "@/server/services/schedule";
 import type { PreviousPerformance } from "@/lib/domain/previous-performance";
 
@@ -64,10 +80,26 @@ async function unlockedBadges(supabase: Awaited<ReturnType<typeof getServerSupab
 }
 
 export type { NextSession } from "@/server/services/schedule";
+export type { PreviousSession } from "@/server/services/workouts";
 
-export async function finishWorkoutAction(
-  input: unknown,
-): Promise<Result<{ sessionId: string; volumeKg: number; records: NewRecord[]; badges: UnlockedBadge[]; next: NextSession | null }>> {
+/** An optional verse to close the session with (only for members who let workouts draw on Scripture). */
+export interface Reflection {
+  reference: string;
+  parts: TextPart[];
+  prompt: string;
+}
+
+export async function finishWorkoutAction(input: unknown): Promise<
+  Result<{
+    sessionId: string;
+    volumeKg: number;
+    records: NewRecord[];
+    badges: UnlockedBadge[];
+    next: NextSession | null;
+    previous: PreviousSession | null;
+    reflection: Reflection | null;
+  }>
+> {
   const user = await requireUser();
   const parsed = finishWorkoutSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Some workout values are invalid. Check weights, reps and RPE." };
@@ -77,16 +109,34 @@ export async function finishWorkoutAction(
   try {
     const supabase = await getServerSupabase();
     const res = await finishWorkout(supabase, user.id, parsed.data);
-    const badges = res.alreadyCompleted ? [] : await unlockedBadges(supabase, user.id, res.sessionId);
-    // What the program has next (never blocks the save: the summary just goes without it).
-    const next = parsed.data.userProgramId
-      ? await nextSessionSummary(supabase, user.id, parsed.data.userProgramId, (await getProfile(user.id))?.timezone ?? "UTC").catch((err: unknown) => {
+    // Badges are worked out from the saved sessions, so a retried finish (first response lost) shows them too.
+    const badges = await unlockedBadges(supabase, user.id, res.sessionId);
+    const profile = await getProfile(user.id);
+    const tz = profile?.timezone ?? "UTC";
+    // What the program has next, also after a workout outside it (never blocks the save: the summary goes without).
+    const programId =
+      parsed.data.userProgramId ??
+      ((await supabase.from("user_programs").select("id").eq("user_id", user.id).eq("status", "active").maybeSingle()).data?.id as string | undefined) ??
+      null;
+    const next = programId
+      ? await nextSessionSummary(supabase, user.id, programId, tz).catch((err: unknown) => {
           logError("workouts.finish.next", err);
           return null;
         })
       : null;
+    const previous = await previousComparableSession(supabase, user.id, {
+      sessionId: res.sessionId,
+      startedAt: parsed.data.startedAt,
+      programDayId: parsed.data.programDayId,
+      name: parsed.data.name,
+    }).catch((err: unknown) => {
+      logError("workouts.finish.previous", err);
+      return null;
+    });
+    const verse = profile?.faith_enabled ? scriptureForDate(isoDateInTz(new Date(), tz)) : null;
+    const reflection = verse ? { reference: verse.reference, parts: scriptureParts(verse.reference, verse.text), prompt: verse.reflection } : null;
     revalidatePath("/", "layout");
-    return { ok: true, data: { sessionId: res.sessionId, volumeKg: res.volumeKg, records: res.records, badges, next } };
+    return { ok: true, data: { sessionId: res.sessionId, volumeKg: res.volumeKg, records: res.records, badges, next, previous, reflection } };
   } catch (err) {
     logError("workouts.finish", err);
     return { ok: false, error: err instanceof WorkoutError && err.code === "invalid" ? "One of the exercises is no longer available." : "We couldn't save your workout. It's still on this device — please try again." };

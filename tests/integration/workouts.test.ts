@@ -9,7 +9,7 @@ function set(reps: number | null, weightKg: number | null, completed = true, ext
 }
 
 describe.skipIf(!available)("workout logging service", async () => {
-  const { finishWorkout, saveDraftSnapshot, getServerDraft, editWorkout, deleteWorkout, discardDraft } = await import("@/server/services/workouts");
+  const { finishWorkout, saveDraftSnapshot, getServerDraft, editWorkout, deleteWorkout, discardDraft, previousComparableSession } = await import("@/server/services/workouts");
   const { createPrivateProgram, activateProgram } = await import("@/server/services/programs");
   const { getActiveProgram } = await import("@/server/services/training");
   const { getProgramSeed } = await import("@/data/programs");
@@ -88,6 +88,9 @@ describe.skipIf(!available)("workout logging service", async () => {
     // Retrying the same finish (e.g. after a network error) does not duplicate anything.
     const retry = await finishWorkout(user.client, user.id, input);
     expect(retry).toMatchObject({ sessionId: first.sessionId, alreadyCompleted: true });
+    // …and still shows the records the first attempt saved (its response may never have reached the phone).
+    const key = (r: { exerciseId: string; recordType: string; value: number; first: boolean }) => `${r.exerciseId}:${r.recordType}:${r.value}:${r.first}`;
+    expect(retry.records.map(key).sort()).toEqual(first.records.map(key).sort());
     const { data: setsAfter } = await user.client.from("workout_sets").select("id").eq("user_id", user.id);
     expect(setsAfter?.length).toBe(sets?.length);
   });
@@ -105,6 +108,20 @@ describe.skipIf(!available)("workout logging service", async () => {
       baseInput(crypto.randomUUID(), "2026-09-07T10:00:00Z", [{ exerciseId: ex["back-squat"]!, substitutedFromId: null, notes: "", skipped: false, skipReason: null, sets: [set(3, 140)] }]),
     );
     expect(better.records.map((r) => r.recordType).sort()).toEqual(["estimated_1rm", "max_weight"]);
+  });
+
+  it("compares with the last time the same session was done, and never with a generically named one", async () => {
+    const squat = (kg: number) => [{ exerciseId: ex["back-squat"]!, substitutedFromId: null, notes: "", skipped: false, skipReason: null, sets: [set(5, kg)] }];
+    const named = (clientId: string, at: string, kg: number) => ({ ...baseInput(clientId, at, squat(kg)), name: "Leg day (compare)" });
+    const a = await finishWorkout(user.client, user.id, named(crypto.randomUUID(), "2026-09-20T10:00:00Z", 100));
+    const bInput = named(crypto.randomUUID(), "2026-09-22T10:00:00Z", 110);
+    const b = await finishWorkout(user.client, user.id, bInput);
+    const prev = await previousComparableSession(user.client, user.id, { sessionId: b.sessionId, startedAt: bInput.startedAt, programDayId: null, name: bInput.name });
+    expect(prev).toMatchObject({ volumeKg: a.volumeKg });
+    expect(Date.parse(prev!.startedAt)).toBe(Date.parse("2026-09-20T10:00:00Z"));
+    // The first time has nothing to compare with; "Workout" is too generic to compare.
+    expect(await previousComparableSession(user.client, user.id, { sessionId: a.sessionId, startedAt: "2026-09-20T10:00:00Z", programDayId: null, name: "Leg day (compare)" })).toBeNull();
+    expect(await previousComparableSession(user.client, user.id, { sessionId: b.sessionId, startedAt: bInput.startedAt, programDayId: null, name: "Workout" })).toBeNull();
   });
 
   it("recalculates records when a past workout is edited or deleted", async () => {

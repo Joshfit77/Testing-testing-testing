@@ -46,6 +46,10 @@ test.describe("authentication, onboarding and workout logging", () => {
     // A first workout sets baselines (there is nothing to beat yet); the summary says what comes next in the program.
     await expect(page.getByText("Baselines set")).toBeVisible();
     await expect(page.getByText("Up next")).toBeVisible();
+    // Sets done this session; a first workout has no "last time" to compare with, and Faith content is off here.
+    await expect(page.locator("dt", { hasText: /^Sets$/ })).toBeVisible();
+    await expect(page.getByTestId("compared-with-last-time")).toHaveCount(0);
+    await expect(page.getByTestId("workout-reflection")).toHaveCount(0);
 
     // History shows the workout.
     await page.getByRole("link", { name: "View history" }).click();

@@ -91,7 +91,7 @@ describe("a recording left on the device", () => {
     stored(recorded(10 * 60_000, true));
     render(<GpsRecorder {...props} canRecord={false} />);
     expect(await screen.findByTestId("gps-recoverable")).toBeInTheDocument();
-    expect(screen.getByText(/renew Pro to finish and save it/)).toBeInTheDocument();
+    expect(screen.getByText(/until you have Pro All Access to finish and save it/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Review and save" })).not.toBeInTheDocument();
     expect(localStorage.getItem(KEY)).not.toBeNull();
   });

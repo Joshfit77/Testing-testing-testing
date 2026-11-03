@@ -88,15 +88,21 @@ export function StorePaywall(props: StorePaywallProps) {
     setBusy(pkg.product.identifier);
     setMessage(null);
     try {
-      await client.current.purchase(pkg, { oldProductId: currentProductId ?? undefined });
-      const res = await syncStorePurchasesAction();
-      if (!res.ok) setMessage({ tone: "error", text: res.error });
+      try {
+        await client.current.purchase(pkg, { oldProductId: currentProductId ?? undefined });
+      } catch (err) {
+        const text = purchaseErrorMessage(err);
+        setMessage(text ? { tone: "error", text } : { tone: "info", text: "Purchase cancelled. You haven't been charged." });
+        return;
+      }
+      // The store has taken the payment from here on: never say "you haven't been charged". If this device can't
+      // reach the server now, the store's notification to the server (and Restore) still brings Pro.
+      const res = await syncStorePurchasesAction().catch(() => null);
+      if (!res || !res.ok)
+        setMessage({ tone: "info", text: `Purchase received. Your membership will update shortly; if it hasn't in a few minutes, tap Restore purchases.` });
       else if (res.plan === "pro") setMessage({ tone: "success", text: "Welcome to Pro All Access. Thank you!" });
       else setMessage({ tone: "info", text: "Purchase received. Your membership will update in a moment. Pull down to refresh if it hasn't." });
       router.refresh();
-    } catch (err) {
-      const text = purchaseErrorMessage(err);
-      setMessage(text ? { tone: "error", text } : { tone: "info", text: "Purchase cancelled. You haven't been charged." });
     } finally {
       setBusy(null);
     }
@@ -108,7 +114,7 @@ export function StorePaywall(props: StorePaywallProps) {
     setMessage(null);
     try {
       await client.current.restore();
-      const res = await syncStorePurchasesAction();
+      const res = await syncStorePurchasesAction().catch(() => ({ ok: false as const, error: "Couldn't reach Narrow Gate to update your membership. Check your connection and tap Restore purchases again." }));
       if (!res.ok) setMessage({ tone: "error", text: res.error });
       else if (res.plan === "free") setMessage({ tone: "info", text: `No active memberships were found for your ${storeName} account.` });
       else setMessage({ tone: "success", text: `Purchases restored. You're on ${res.plan === "pro" ? "Pro All Access" : "your Plus membership"}.` });

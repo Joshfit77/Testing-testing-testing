@@ -181,7 +181,19 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
           comparison={comparison}
           legal={legalLinks()}
         />
-      ) : native ? null : (
+      ) : native ? (
+        // No in-app store on this build: show what Pro includes (no prices or links to buy elsewhere).
+        <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="pro-benefits-title" data-testid="pro-benefits">
+          <h2 id="pro-benefits-title" className="font-display text-lg font-semibold uppercase tracking-wider text-gold-highlight">
+            {plans.pro.name} includes
+          </h2>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
+            {plans.pro.highlights.map((h) => (
+              <li key={h}>{h}</li>
+            ))}
+          </ul>
+        </section>
+      ) : (
         <WebMembership
           currentPlan={plan}
           currentInterval={interval}

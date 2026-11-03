@@ -21,7 +21,7 @@ export async function startCheckoutAction(_prev: ActionState, formData: FormData
   if (!plan.success || !interval.success) return actionError("Choose a plan.");
   // Auto-renewal consent: an unticked box naming the price and period (California and federal ROSCA expectations).
   if (formData.get("renewalConsent") !== "on") return actionError("Please tick the box to agree to automatic renewal before continuing.");
-  if (await getNativePlatform()) return actionError("Subscriptions can't be purchased inside the mobile app yet.");
+  if (await getNativePlatform()) return actionError("In the app, memberships are bought through the App Store or Google Play (Profile → Plans & billing).");
   if (!isStripeConfigured() || !isServiceRoleConfigured()) return actionError("Payments aren't configured on this server yet.");
   if (interval.data === "year" && (!getPlans().pro.yearlyPriceCents || !isYearlyBillingConfigured())) return actionError("Yearly billing isn't offered right now.");
   const current = await getUserPlan(user.id);

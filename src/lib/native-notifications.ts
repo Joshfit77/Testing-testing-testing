@@ -12,7 +12,7 @@
  * - Signing out (or another member signing in) removes everything this app scheduled on the phone.
  * Delivery on real phones still has to be checked by hand (docs/NOTIFICATIONS.md).
  */
-import { isNativeApp } from "@/lib/native";
+import { NOTIFICATION_SOUND, isNativeApp } from "@/lib/native";
 import { ALL_FAITH_REMINDER_IDS } from "@/lib/faith-reminders";
 import { ALL_APP_REMINDER_IDS, NOTIFICATION_CHANNELS, safeNotificationPath } from "@/lib/notifications/catalog";
 import { isDoneToday, planNotifications, type DoneToday, type PlannedNotification } from "@/lib/notifications/planner";
@@ -125,6 +125,8 @@ export function toCapacitor(plan: PlannedNotification[], os: "ios" | "android" |
     // Android: the group's channel. iOS: grouped per group in Notification Centre.
     ...(os === "android" ? { channelId: n.channelId, group: n.group } : { threadIdentifier: `ngf-${n.group}` }),
     extra: { url: n.url, kind: n.kind, date: n.date },
+    // Without a sound iOS shows the reminder silently.
+    sound: NOTIFICATION_SOUND,
     schedule: n.at ? { at: n.at, allowWhileIdle: true } : { on: n.on!, allowWhileIdle: true },
     // Inexact on Android: no "Alarms & reminders" permission needed; may arrive a few minutes late.
     isExactNotification: false,

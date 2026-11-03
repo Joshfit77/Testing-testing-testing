@@ -16,7 +16,7 @@ export async function nutritionPageUser(feature: Feature = "nutrition_tracking")
 
 /** The honest locked state for a Pro food tool. */
 export function NutritionLocked({ title, description }: { title: string; description: string }) {
-  return <PlanLocked back={{ href: "/nutrition", label: "Food" }} eyebrow="Food" title={title} plan="Pro" description={description} />;
+  return <PlanLocked back={{ href: "/nutrition", label: "Food" }} eyebrow="Food" title={title} description={description} />;
 }
 
 /** Links between the Food tools, shown on each tool screen. */

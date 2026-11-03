@@ -34,10 +34,20 @@ import {
   type ExerciseRef,
   type WorkoutDraft,
 } from "@/lib/domain/workout-draft";
-import { cancelRestNotification, hapticSuccess, scheduleRestNotification } from "@/lib/native";
+import { canVibrate, cancelRestNotification, hapticSuccess, scheduleRestNotification, vibrate } from "@/lib/native";
 import { cancelDoneToday, deviceToday } from "@/lib/native-notifications";
 import { clearLocalDraft, discardedWorkoutIds, loadLocalDraft, rememberDiscard, saveLocalDraft } from "@/lib/workout-storage";
-import { discardWorkoutAction, finishWorkoutAction, previousPerformanceAction, syncWorkoutDraftAction, type NextSession, type UnlockedBadge } from "@/server/actions/workouts";
+import {
+  discardWorkoutAction,
+  finishWorkoutAction,
+  previousPerformanceAction,
+  syncWorkoutDraftAction,
+  type NextSession,
+  type PreviousSession,
+  type Reflection,
+  type UnlockedBadge,
+} from "@/server/actions/workouts";
+import { ScriptureText } from "@/components/bible/scripture-text";
 import { updateRestAlertsAction } from "@/server/actions/rest-alerts";
 import { createTemplateAction } from "@/server/actions/templates";
 import { lastTimeText, targetText, type PreviousPerformance } from "@/lib/domain/previous-performance";
@@ -84,6 +94,22 @@ interface FinishResult {
   durationSeconds: number;
   /** What the program has next, so the member leaves knowing what to do. */
   next: NextSession | null;
+  /** Working sets completed in this session. */
+  completedSets: number;
+  /** The last time the member did this session (same program day, or same named workout). */
+  previous: PreviousSession | null;
+  /** An optional verse to close with, only when the member lets workouts draw on Scripture. */
+  reflection: Reflection | null;
+}
+
+/** "Up 6% on last time (Thu, Oct 30)": neutral when lower, never a guilt message. */
+export function comparedWithLastTime(volumeKg: number, previous: PreviousSession | null, formatWeight: (kg: number) => string): string | null {
+  if (!previous || previous.volumeKg <= 0 || volumeKg <= 0) return null;
+  const when = new Date(previous.startedAt).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  const change = Math.round(((volumeKg - previous.volumeKg) / previous.volumeKg) * 100);
+  if (change > 0) return `Up ${change}% on last time (${when}, ${formatWeight(previous.volumeKg)}).`;
+  if (change === 0) return `Matched last time (${when}, ${formatWeight(previous.volumeKg)}).`;
+  return `Last time (${when}): ${formatWeight(previous.volumeKg)}.`;
 }
 
 /** Sessions done in the program so far (the next one is Week w, Day d), as a bar under "Up next". */
@@ -337,7 +363,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
     if (rest > 0) restWasRunning.current = true;
     else if (restWasRunning.current && draft.rest.endsAt) {
       restWasRunning.current = false;
-      if (alerts.vibrate && "vibrate" in navigator) navigator.vibrate?.([200, 100, 200]);
+      if (alerts.vibrate) void vibrate([200, 100, 200]);
       if (alerts.sound) beep();
       dispatch({ type: "clearRest" });
     }
@@ -348,7 +374,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
     setAlerts(next);
     setAlertsError(null);
     if (next.sound && !before.sound) beep(); // a short preview, which also unlocks audio on iOS
-    if (next.vibrate && !before.vibrate && "vibrate" in navigator) navigator.vibrate?.(80);
+    if (next.vibrate && !before.vibrate) void vibrate([80]);
     const res = await updateRestAlertsAction(next).catch(() => ({ ok: false as const, message: "You appear to be offline." }));
     if (!res.ok) {
       setAlerts(before);
@@ -432,16 +458,28 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
           <h1 className="font-display text-4xl font-bold uppercase">Workout complete</h1>
           <p className="mt-2 text-muted-foreground">Faithful in the small things. Well done.</p>
         </div>
-        <dl className="stagger grid grid-cols-2 gap-3">
-          <div className="rounded-2xl border border-border bg-card p-4">
+        <dl className="stagger grid grid-cols-3 gap-2">
+          <div className="rounded-2xl border border-border bg-card p-3">
             <dt className="text-xs uppercase tracking-wider text-muted-foreground">Duration</dt>
-            <dd className="font-display text-2xl font-semibold">{formatDuration(result.durationSeconds)}</dd>
+            <dd className="font-display text-xl font-semibold">{formatDuration(result.durationSeconds)}</dd>
           </div>
-          <div className="rounded-2xl border border-border bg-card p-4">
+          <div className="rounded-2xl border border-border bg-card p-3">
+            <dt className="text-xs uppercase tracking-wider text-muted-foreground">Sets</dt>
+            <dd className="font-display text-xl font-semibold">{result.completedSets}</dd>
+          </div>
+          <div className="rounded-2xl border border-border bg-card p-3">
             <dt className="text-xs uppercase tracking-wider text-muted-foreground">Volume</dt>
-            <dd className="font-display text-2xl font-semibold">{formatWeight(result.volumeKg, units)}</dd>
+            <dd className="font-display text-xl font-semibold">{result.volumeKg > 0 ? formatWeight(result.volumeKg, units) : "—"}</dd>
           </div>
         </dl>
+        {(() => {
+          const line = comparedWithLastTime(result.volumeKg, result.previous, (kg) => formatWeight(kg, units));
+          return line ? (
+            <p className="-mt-3 text-sm text-muted-foreground" data-testid="compared-with-last-time">
+              {line}
+            </p>
+          ) : null;
+        })()}
         {result.next && (
           <section className="rounded-2xl border border-border bg-card p-4 text-left" aria-labelledby="next-title">
             <h2 id="next-title" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -449,7 +487,11 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
             </h2>
             {result.next.programDone ? (
               <p className="mt-1 text-sm">
-                That was the last session of <strong>{result.next.programName}</strong>. Choose your next program in Train.
+                That was the last session of <strong>{result.next.programName}</strong>.{" "}
+                <Link href="/train/programs" className="font-semibold text-gold-highlight underline-offset-4 hover:underline">
+                  Choose your next program
+                </Link>
+                .
               </p>
             ) : (
               <>
@@ -566,6 +608,22 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
             </ul>
           </section>
         )}
+        {result.reflection && (
+          <details className="rounded-2xl border border-border bg-card p-4 text-left" data-testid="workout-reflection">
+            <summary className="min-h-11 cursor-pointer font-display text-lg font-semibold uppercase">A verse to close with</summary>
+            <blockquote className="mt-2 font-serif text-lg leading-relaxed">
+              <ScriptureText parts={result.reflection.parts} />
+            </blockquote>
+            <p className="mt-1 text-sm text-muted-foreground">{result.reflection.reference} (BSB)</p>
+            <p className="mt-2 text-sm">{result.reflection.prompt}</p>
+            <Link
+              href={`/faith/journal/new?kind=reflection&ref=${encodeURIComponent(result.reflection.reference)}`}
+              className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-gold-highlight underline-offset-4 hover:underline"
+            >
+              Write a reflection (optional)
+            </Link>
+          </details>
+        )}
         <div className="flex flex-wrap justify-center gap-2">
           <Button asChild>
             <Link href="/home">Back to home</Link>
@@ -637,7 +695,16 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
     void cancelDoneToday(deviceToday(), { workout: true, fitness: true });
     setFinishedDraft(finalDraft);
     setTemplateName(finalDraft.name);
-    setResult({ volumeKg: res.data.volumeKg, records: res.data.records, badges: res.data.badges ?? [], durationSeconds: elapsedSeconds(finalDraft, endedAt), next: res.data.next ?? null });
+    setResult({
+      volumeKg: res.data.volumeKg,
+      records: res.data.records,
+      badges: res.data.badges ?? [],
+      durationSeconds: elapsedSeconds(finalDraft, endedAt),
+      next: res.data.next ?? null,
+      completedSets: finalDraft.exercises.filter((e) => !e.skipped).reduce((n, e) => n + e.sets.filter((s) => s.completed && !s.isWarmup).length, 0),
+      previous: res.data.previous ?? null,
+      reflection: res.data.reflection ?? null,
+    });
     setPhase("finished");
     window.scrollTo({ top: 0 });
   };
@@ -788,8 +855,8 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
             <Vibrate aria-hidden /> Vibrate {alerts.vibrate ? "on" : "off"}
           </Button>
         </div>
-        {typeof navigator !== "undefined" && !("vibrate" in navigator) && alerts.vibrate && (
-          <p className="mt-1 text-xs text-muted-foreground">This browser can&apos;t vibrate (iPhone Safari doesn&apos;t support it); the installed app uses its own notification.</p>
+        {typeof navigator !== "undefined" && !canVibrate() && alerts.vibrate && (
+          <p className="mt-1 text-xs text-muted-foreground">This browser can&apos;t vibrate (iPhone Safari doesn&apos;t support it); the iPhone app vibrates and sends its own alert.</p>
         )}
         {alertsError && <Notice tone="error" className="mt-2">{alertsError}</Notice>}
       </section>

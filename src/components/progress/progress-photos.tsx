@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useMemo, useState, useTransition } from "react";
+import { useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, Check, Columns2, ImageOff, ImagePlus, Loader2, Lock, Trash2, X } from "lucide-react";
 import { EmptyState } from "@/components/common/states";
@@ -80,9 +80,13 @@ function UploadDialog({ open, onOpenChange, userId, units, today }: { open: bool
     setError(null);
   };
 
+  // An upload whose save we couldn't confirm (connection lost): retries reuse the same file, and the server treats a
+  // second save of the same file as already done, so a retry never makes a second entry or loses the image.
+  const pending = useRef<{ file: File; path: string } | null>(null);
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) return setError("Choose a photo first.");
+    if (pending.current?.file !== file) pending.current = null;
     setError(null);
     setStage("compressing");
     let blob: Blob;
@@ -98,19 +102,29 @@ function UploadDialog({ open, onOpenChange, userId, units, today }: { open: bool
     }
     setStage("uploading");
     const supabase = getBrowserSupabase();
-    const path = photoPathFor(userId, crypto.randomUUID());
-    const { error: upErr } = await supabase.storage.from(PROGRESS_PHOTO_BUCKET).upload(path, blob, { contentType: "image/jpeg", upsert: false, cacheControl: "3600" });
-    if (upErr) {
-      setStage("idle");
-      return setError("Upload failed. Check your connection and try again.");
+    const path = pending.current?.path ?? photoPathFor(userId, crypto.randomUUID());
+    if (!pending.current) {
+      const { error: upErr } = await supabase.storage.from(PROGRESS_PHOTO_BUCKET).upload(path, blob, { contentType: "image/jpeg", upsert: false, cacheControl: "3600" });
+      if (upErr) {
+        setStage("idle");
+        return setError("Upload failed. Check your connection and try again.");
+      }
+      pending.current = { file, path };
     }
     setStage("saving");
-    const res = await saveProgressPhotoAction({ path, takenOn, pose, note, weight }).catch(() => ({ ok: false as const, error: "You appear to be offline. Please try again." }));
+    const res = await saveProgressPhotoAction({ path, takenOn, pose, note, weight }).catch(() => null);
+    if (!res) {
+      // The server may have saved it: keep the file and let a retry confirm (no second entry).
+      setStage("idle");
+      return setError("We couldn't confirm the save. Check your connection and tap Save again.");
+    }
     if (!res.ok) {
       await supabase.storage.from(PROGRESS_PHOTO_BUCKET).remove([path]).catch(() => null);
+      pending.current = null;
       setStage("idle");
       return setError(res.error);
     }
+    pending.current = null;
     setStage("idle");
     reset(true);
     onOpenChange(false);

@@ -56,7 +56,7 @@ export default async function FoodPhotoPage({ searchParams }: { searchParams: Pr
         back={{ href: "/nutrition", label: "Food" }}
         eyebrow="Food"
         title="Meal photo"
-        plan="Pro"
+       
         description="Take a photo of your meal and get estimated foods, portions, calories and macros to check, correct and add to your diary."
       />
     );

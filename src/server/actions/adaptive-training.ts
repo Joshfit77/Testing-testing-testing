@@ -33,7 +33,7 @@ export async function acceptRecommendationAction(key: string, modify?: unknown):
   const m = trainingModifySchema.safeParse(modify ?? {});
   if (!k.success) return { ok: false, error: "Recommendation not found." };
   if (!m.success) return { ok: false, error: m.error.issues[0]?.message ?? "Invalid change." };
-  if (!(await requireAdaptive(user.id))) return { ok: false, error: "Adaptive training is included with Pro." };
+  if (!(await requireAdaptive(user.id))) return { ok: false, error: "Adaptive training is included with Pro All Access." };
   const supabase = await getServerSupabase();
   try {
     const { input } = await loadReviewInput(supabase, user.id);
@@ -56,7 +56,7 @@ export async function rejectRecommendationAction(key: string): Promise<Result> {
   const user = await requireUser();
   const k = keySchema.safeParse(key);
   if (!k.success) return { ok: false, error: "Recommendation not found." };
-  if (!(await requireAdaptive(user.id))) return { ok: false, error: "Adaptive training is included with Pro." };
+  if (!(await requireAdaptive(user.id))) return { ok: false, error: "Adaptive training is included with Pro All Access." };
   const supabase = await getServerSupabase();
   const { error } = await supabase
     .from("training_recommendation_decisions")
@@ -74,7 +74,7 @@ export async function restoreRecommendationAction(key: string): Promise<Result> 
   const user = await requireUser();
   const k = keySchema.safeParse(key);
   if (!k.success) return { ok: false, error: "Recommendation not found." };
-  if (!(await requireAdaptive(user.id))) return { ok: false, error: "Adaptive training is included with Pro." };
+  if (!(await requireAdaptive(user.id))) return { ok: false, error: "Adaptive training is included with Pro All Access." };
   const supabase = await getServerSupabase();
   const { error } = await supabase.from("training_recommendation_decisions").delete().eq("user_id", user.id).eq("recommendation_key", k.data).eq("decision", "rejected");
   if (error) {

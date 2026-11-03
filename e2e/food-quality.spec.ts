@@ -108,7 +108,7 @@ test.describe("Narrow Gate Food IQ", () => {
     await expect(alts).not.toContainText("Choco Puffs");
     await expect(alts.getByRole("link", { name: "Compare side by side" })).toHaveCount(0);
     await expect(product).toContainText("Side-by-side product comparisons and personal filters are included with Pro All Access.");
-    await expect(product).toContainText("Asking the AI about a product (how it fits your goals, how it compares, how to fit it into a meal plan) is included with Pro.");
+    await expect(product).toContainText("Asking the AI about a product (how it fits your goals, how it compares, how to fit it into a meal plan) is included with Pro All Access.");
     await expect(product).toContainText("Open Database License");
 
     // Add to Food Diary: straight to the amount step with the label serving.

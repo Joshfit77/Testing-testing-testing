@@ -105,10 +105,21 @@ export async function askBible(userId: string, plan: Plan, questionRaw: string, 
     const answer = markUnverified(raw || "I couldn't answer that. Try asking it another way.", check.unverified);
     const citations = check.verified.slice(0, 12).map((r) => ({ reference: formatReference(r), text: passageText(r) ?? "", parts: passageParts(r) ?? undefined }));
     // (Every row names every column: in a multi-row insert a column one row leaves out is sent as null, not its default.)
+    // Explicit, distinct times: a default now() is the same for both rows of one insert, so the question and its answer
+    // would tie and could come back in either order as history for the next question.
+    const askedAt = new Date();
+    const answeredAt = new Date(askedAt.getTime() + 1);
     const [saved, metered] = await Promise.all([
       service.from("bible_ai_messages").insert([
-        { user_id: userId, thread_id: threadId, role: "user", content: question, citations: [] },
-        { user_id: userId, thread_id: threadId, role: "assistant", content: answer.slice(0, 20000), citations: citations.map((c) => c.reference) },
+        { user_id: userId, thread_id: threadId, role: "user", content: question, citations: [], created_at: askedAt.toISOString() },
+        {
+          user_id: userId,
+          thread_id: threadId,
+          role: "assistant",
+          content: answer.slice(0, 20000),
+          citations: citations.map((c) => c.reference),
+          created_at: answeredAt.toISOString(),
+        },
       ]),
       service.from("bible_ai_usage").update({ status: "done", model, input_tokens: msg.usage.input_tokens, output_tokens: msg.usage.output_tokens }).eq("id", usageId as number),
     ]);

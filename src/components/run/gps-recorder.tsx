@@ -333,7 +333,7 @@ export function GpsRecorder({
             </p>
             <p className="mt-1 text-sm">
               {!canRecord
-                ? "Saving live GPS recordings is included with Pro All Access. It stays on this phone until you discard it or renew Pro to finish and save it."
+                ? "Saving live GPS recordings is included with Pro All Access. It stays on this phone until you discard it, or until you have Pro All Access to finish and save it."
                 : recoverable.track.status === "finished"
                   ? "It is still on this device: review and save it, or discard it."
                   : "Continue it, or discard it. Any time the app was closed is kept as a gap: no distance is guessed for it."}

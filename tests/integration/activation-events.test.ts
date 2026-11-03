@@ -121,8 +121,15 @@ describe.skipIf(!available)("activation events", () => {
     const denied = await member.client.rpc("admin_activation_metrics", { p_from: since });
     expect(denied.error?.code).toBe("42501");
 
-    const { data, error } = await admin.client.rpc("admin_activation_metrics", { p_from: since });
+    // These accounts use @example.com test addresses: left out by default, counted when asked for.
+    const real = await admin.client.rpc("admin_activation_metrics", { p_from: since });
+    expect(real.error).toBeNull();
+    const r = real.data as { excluded_test_accounts: number; new_members: Record<string, number> };
+    expect(r.excluded_test_accounts).toBeGreaterThanOrEqual(3);
+    const { data, error } = await admin.client.rpc("admin_activation_metrics", { p_from: since, p_include_test: true });
     expect(error).toBeNull();
+    expect((data as { excluded_test_accounts: number }).excluded_test_accounts).toBe(0);
+    expect((data as { new_members: { accounts: number } }).new_members.accounts).toBeGreaterThanOrEqual(r.new_members.accounts! + 3);
     const m = data as { new_members: Record<string, number>; abandonment: Record<string, number>; median_minutes: Record<string, number | null>; return_activity: Record<string, { eligible: number; returned: number }> };
     // Other test files may create accounts at the same time, so these are lower bounds.
     expect(m.new_members.accounts).toBeGreaterThanOrEqual(3);

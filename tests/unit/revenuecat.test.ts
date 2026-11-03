@@ -112,6 +112,20 @@ describe("RevenueCat customer → stored subscriptions", () => {
     expect(older.status).toBe("active");
   });
 
+  it("the same plan from two places lasts until the later one ends (no early loss of Pro)", () => {
+    const soon = new Date(now.getTime() + 7 * 86_400_000).toISOString();
+    const later = new Date(now.getTime() + 28 * 86_400_000).toISOString();
+    // A web Pro subscription set to cancel soon, plus an App Store Pro renewing later (and either order).
+    const web = { plan: "pro" as const, status: "active" as const, current_period_end: soon, source: "stripe" };
+    const store = { plan: "pro" as const, status: "active" as const, current_period_end: later.replace("Z", "+00:00").replace(".000", ""), source: "app_store" };
+    expect(entitlementFromSubscriptions([web, store], now)).toMatchObject({ plan: "pro", from: { source: "app_store" } });
+    expect(Date.parse(entitlementFromSubscriptions([web, store], now).validUntil!)).toBe(Date.parse(later));
+    expect(Date.parse(entitlementFromSubscriptions([store, web], now).validUntil!)).toBe(Date.parse(later));
+    // No end date at all beats any date.
+    const open = { ...web, current_period_end: null };
+    expect(entitlementFromSubscriptions([store, open], now).validUntil).toBeNull();
+  });
+
   it("the higher plan wins across Stripe and the stores, and says where it comes from", () => {
     const store = { ...storeRowAsSubscription(row({ plan: "pro" }), now)!, source: "app_store" };
     const web = { plan: "plus" as const, status: "active" as const, current_period_end: future, source: "stripe" };

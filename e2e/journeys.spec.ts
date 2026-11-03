@@ -185,7 +185,8 @@ test.describe("Stage 1 journeys", () => {
     await page.goto("/train/exercises?category=&equipment=dumbbell&q=");
     const list = page.locator("main ul li a[href^='/train/exercises/']");
     await expect(list.nth(8)).toBeVisible();
-    await page.evaluate(() => window.scrollTo(0, 700));
+    // Instant: the app scrolls smoothly (globals.css), which on a slow machine takes longer than the wait below.
+    await page.evaluate(() => window.scrollTo({ top: 700, behavior: "instant" }));
     await page.waitForTimeout(300);
     const before = await page.evaluate(() => window.scrollY);
     expect(before).toBeGreaterThan(500);

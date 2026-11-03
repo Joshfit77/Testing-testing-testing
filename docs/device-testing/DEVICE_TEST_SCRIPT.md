@@ -387,12 +387,11 @@ otherwise; ringer volume up; Ring/Silent switch on ring; no Focus mode.
   1. Start a rest, tap Finish → **Finish & save**, go to the Home Screen until the original end time.
   2. Start a new workout, start a rest, tap **Discard workout** → Discard, go to the Home Screen until the end time.
   3. Start a new workout, start a rest, go to Profile (initials, top right) → **Sign out**, wait until the end time.
-- **Expected outcome:** (1) and (2): no notification (Finish and Discard cancel it). (3) Sign-out does **not** cancel
-  it in the code (the sign-out form clears drafts but doesn't cancel the rest notification), so expect "Rest complete
-  — Time for your next set of <exercise>." to arrive after signing out. Record it; on a shared phone this shows the
-  previous member's exercise name (owner decision).
+- **Expected outcome (updated 2026-11-03):** no notification in any of the three. Finish and Discard cancel it, and
+  signing out removes every notification the app scheduled (rest timer, reminders, sleep alarm), so the next person
+  never sees the previous member's exercise name.
 - **Source:** `workout-logger.tsx` (`cancelRestNotification` on finish and discard);
-  `src/components/shell/sign-out-form.tsx` (no cancel).
+  `src/components/shell/sign-out-form.tsx` → `clearDeviceNotifications` (`src/lib/native-notifications.ts`).
 - **Pass/Fail:** ☐ Pass ☐ Fail ☐ Blocked
 - **Actual result:**
 - **Evidence** (suggested file name `DT-REST-11-a.png`):
@@ -1986,7 +1985,7 @@ Kept or not per member, also from the code (record what you see; the owner decid
 - **Reminders** (Faith, workouts, food, recovery) are account settings since 2026-11-03. Signing out removes every
   notification this app scheduled on the phone (reminders, the sleep alarm, a rest timer); the next member's own
   reminders are scheduled when they sign in (`docs/NOTIFICATIONS.md`, DT-NOTIF).
-- A **rest notification** already scheduled is not cancelled (DT-REST-11).
+- A **rest notification** already scheduled is cancelled with everything else the app scheduled (DT-REST-11).
 - **Navigation memory** for the app session (`ngf.nav.*`, `ngf.scroll.*`, and dialog state `ngf.ui.*` such as the Add
   food search text) is not cleared on sign-out; it goes when the app is closed.
 

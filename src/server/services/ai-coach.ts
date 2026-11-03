@@ -129,7 +129,7 @@ export async function assertAiAllowed(userId: string, plan: Plan, mode: "chat" |
   const allowance = await getAiAllowance(userId, plan);
   if (allowance.chatLimit <= 0) throw new AiError("not_entitled", "AI coaching is included with Pro All Access.");
   if (mode === "plan") {
-    if (allowance.planLimit <= 0) throw new AiError("plan_not_entitled", "Personalized plan generation is included with Pro.");
+    if (allowance.planLimit <= 0) throw new AiError("plan_not_entitled", "Personalized plan generation is included with Pro All Access.");
     if (!(await isFlagEnabled("ai_plan_generation"))) throw new AiError("disabled", "Plan generation is temporarily unavailable.");
   }
   // Durable metering requires the service role (users cannot write their own usage rows).

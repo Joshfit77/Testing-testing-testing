@@ -377,7 +377,7 @@ function CoachChatView({ conversationId: initialId, initialMessages, initialQues
             aria-selected={mode === "plan"}
             onClick={() => canGeneratePlans && setMode("plan")}
             disabled={!canGeneratePlans}
-            title={canGeneratePlans ? undefined : "Plan generation is included with Pro"}
+            title={canGeneratePlans ? undefined : "Plan generation is included with Pro All Access"}
             className={cn("flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold disabled:opacity-50", mode === "plan" ? "bg-elevated text-gold-highlight" : "text-muted-foreground")}
           >
             <Sparkles className="size-4" aria-hidden /> Plan {!canGeneratePlans && <span className="text-[0.6875rem] uppercase">Pro</span>}

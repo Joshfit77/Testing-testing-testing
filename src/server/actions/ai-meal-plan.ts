@@ -26,7 +26,7 @@ async function ctx() {
 }
 
 function guard(err: unknown, scope: string): ActionState {
-  if (err instanceof EntitlementError) return actionError("AI meal plans are included with Pro.");
+  if (err instanceof EntitlementError) return actionError("AI meal plans are included with Pro All Access.");
   if (err instanceof MealPlanError) return actionError(err.message);
   if (err instanceof AiError) return actionError(err.message);
   logError(scope, err);

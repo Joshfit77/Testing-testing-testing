@@ -16,6 +16,13 @@ function stripeSecretKey(raw: string | undefined): string {
   return /^(sk|rk)_live_/.test(key) && process.env.STRIPE_LIVE_APPROVED !== "true" ? "" : key;
 }
 
+/**
+ * A deployment approved for real charges is production: there, blanket acceptance of free sandbox / Test Store
+ * purchases is ignored (anyone with a TestFlight build could otherwise get Pro). Individual App Review and TestFlight
+ * accounts use the per-account sandbox tester list (migration 052) instead.
+ */
+const realMoneyDeployment = process.env.STRIPE_LIVE_APPROVED === "true";
+
 /** Store-billing secrets are ignored in a demo deployment, so in-app purchases can't run there either. */
 function storeSecret(raw: string | undefined): string {
   return process.env.DEMO_MODE === "true" ? "" : (raw ?? "");
@@ -51,9 +58,9 @@ export const serverEnv = {
   revenueCatEntitlementPlus: process.env.REVENUECAT_ENTITLEMENT_PLUS || "plus",
   revenueCatEntitlementPro: process.env.REVENUECAT_ENTITLEMENT_PRO || "pro",
   /** Count purchases made with RevenueCat's Test Store (development builds only). Never enable in production. */
-  revenueCatAllowTestStore: process.env.REVENUECAT_ALLOW_TEST_STORE === "true",
+  revenueCatAllowTestStore: !realMoneyDeployment && process.env.REVENUECAT_ALLOW_TEST_STORE === "true",
   /** Count App Store / Play sandbox purchases (TestFlight and internal-testing builds). Never enable in production. */
-  revenueCatAllowSandbox: process.env.REVENUECAT_ALLOW_SANDBOX === "true",
+  revenueCatAllowSandbox: !realMoneyDeployment && process.env.REVENUECAT_ALLOW_SANDBOX === "true",
   /** Public SDK keys for the native apps (safe to expose; they can't read or change other customers). */
   revenueCatPublicKeyIos: process.env.REVENUECAT_PUBLIC_KEY_IOS ?? "",
   revenueCatPublicKeyAndroid: process.env.REVENUECAT_PUBLIC_KEY_ANDROID ?? "",

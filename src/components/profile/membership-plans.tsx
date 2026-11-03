@@ -33,12 +33,12 @@ const PRO_HIGHLIGHTS = [
 ];
 
 const FREE_HIGHLIGHTS = [
-  "Workout logging & starter programs",
+  "Workout logging, starter programs & 5 saved workouts",
   "All 157 exercise demonstrations",
   "Calorie & macro tracking with barcode scanning",
   "Manual run & walk logging",
   "Sleep logging, weight & badges",
-  "The complete Faith & Discipline section",
+  "The complete Faith & Discipline section, always free",
 ];
 
 /**

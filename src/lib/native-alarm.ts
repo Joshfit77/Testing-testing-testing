@@ -5,7 +5,7 @@
  * (Capacitor LocalNotifications), following the reminder pattern in ./native-notifications.ts.
  * Every function is a safe no-op outside the iOS/Android shells. Not yet verified on a physical phone.
  */
-import { isNativeApp } from "@/lib/native";
+import { NOTIFICATION_SOUND, isNativeApp } from "@/lib/native";
 import { ALARM_ACTION_TYPE, ALL_ALARM_IDS, alarmNotifications, SNOOZE_NOTIFICATION_ID, type AlarmConfig } from "@/lib/domain/sleep-alarm";
 
 export type AlarmScheduleResult =
@@ -77,6 +77,7 @@ export async function scheduleSleepAlarm(config: AlarmConfig): Promise<AlarmSche
         title: TITLE,
         body: BODY,
         actionTypeId: ALARM_ACTION_TYPE,
+        sound: NOTIFICATION_SOUND,
         extra: { snoozeMinutes: config.snoozeMinutes },
         // `on` repeats every matching weekday/time; exact only where Android allows it, otherwise it may run a few minutes late.
         schedule: { on: { weekday: e.weekday, hour: e.hour, minute: e.minute }, allowWhileIdle: true },
@@ -139,7 +140,8 @@ export async function installSleepAlarmActions(): Promise<() => void> {
       if (event.actionId === "snooze") {
         const minutes = Math.min(30, Math.max(1, Math.round(Number((n.extra as { snoozeMinutes?: unknown } | undefined)?.snoozeMinutes) || 9)));
         void LocalNotifications.schedule({
-          notifications: [{ id: SNOOZE_NOTIFICATION_ID, title: TITLE, body: BODY, actionTypeId: ALARM_ACTION_TYPE, extra: n.extra, schedule: { at: new Date(Date.now() + minutes * 60_000), allowWhileIdle: true } }],
+          notifications: [{ id: SNOOZE_NOTIFICATION_ID, title: TITLE, body: BODY, actionTypeId: ALARM_ACTION_TYPE,
+        sound: NOTIFICATION_SOUND, extra: n.extra, schedule: { at: new Date(Date.now() + minutes * 60_000), allowWhileIdle: true } }],
         }).catch(() => undefined);
       } else {
         window.location.assign("/progress/sleep/checkin");

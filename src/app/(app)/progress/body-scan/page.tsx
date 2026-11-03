@@ -28,14 +28,14 @@ export default async function BodyScanPage({ searchParams }: { searchParams: Pro
     // Scans kept from an earlier Pro membership stay viewable and deletable.
     const scans = await listBodyScans(supabase, user.id);
     if (!scans.length) {
-      return <PlanLocked back={{ href: "/progress", label: "My Progress" }} eyebrow="My Progress" title="Body Scan" plan="Pro" description={DESCRIPTION} />;
+      return <PlanLocked back={{ href: "/progress", label: "My Progress" }} eyebrow="My Progress" title="Body Scan" description={DESCRIPTION} />;
     }
     const trends = await loadBodyTrends(supabase, user.id, addDays(isoDateInTz(new Date(), profile.timezone), -365));
     return (
       <div className="mx-auto max-w-3xl space-y-5">
         <BackLink href="/progress">My Progress</BackLink>
         <DemoNote topic="bodyScan" />
-        <PageHeader eyebrow="My Progress" title="Body Scan" description="New scans are included with Pro. Your saved scans stay here for you to view, export or delete." />
+        <PageHeader eyebrow="My Progress" title="Body Scan" description="New scans are included with Pro All Access. Your saved scans stay here for you to view, export or delete." />
         <BodyScanDashboard scans={scans} trends={trends} units={units} savedId={null} canScan={false} />
       </div>
     );

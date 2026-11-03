@@ -2,7 +2,7 @@
 
 What to try on a physical iPhone once the TestFlight build installs, in the order that finds problems fastest. Nothing below has run on hardware yet; the CI Simulator run covers only launch, the opening, relaunch and background/foreground. Record each line as pass / fail / not tried, with the iPhone model and iOS version.
 
-Before starting: the deployed site must answer at `https://<your address>/api/health`, and the build must have been synced with that address (`docs/TESTFLIGHT.md`). Sign in with a test account on a test deployment (Stripe test keys, `REVENUECAT_ALLOW_SANDBOX=true`).
+Before starting: the deployed site must answer at `https://<your address>/api/health`, and the build must have been synced with that address (`docs/TESTFLIGHT.md`). Sign in with a test account on a test deployment (Stripe test keys, `REVENUECAT_ALLOW_SANDBOX=true`), or, on the production project, with an account on the sandbox tester list (Admin → Sandbox testers; the blanket flag is ignored once real charges are approved). The full launch checklist is `docs/launch-audit/LAUNCH_VERIFICATION.md`.
 
 ## 1. Install, launch, navigation (10 min)
 
@@ -66,9 +66,9 @@ Before starting: the deployed site must answer at `https://<your address>/api/he
 
 | # | Step | Expect | Code |
 |---|---|---|---|
-| 5.1 | Faith → reminders, or a workout reminder → enable | iOS notification permission prompt; a notification arrives at the time with the app in the background and with the phone locked | `@capacitor/local-notifications`, `native-reminders.ts` |
+| 5.1 | Profile → Notifications → turn on a reminder → Save | iOS notification permission prompt; a notification arrives at the time, **with a sound**, with the app in the background and with the phone locked (`docs/NOTIFICATIONS.md`, DT-NOTIF) | `@capacitor/local-notifications`, `native-notifications.ts` |
 | 5.2 | Sleep alarm → set for 2 min ahead | Notification at the deadline (the "smart window" is stored but every alarm sounds at the deadline, as the page says) | `native-alarm.ts`, `sleep-alarm.ts:1-8` |
-| 5.3 | Rest timer during a workout, screen locked | **Known limitation:** the rest timer is in-page only; no native notification fires when the screen is locked. Decide whether to add one later (not in scope) | `src/components/train/*` |
+| 5.3 | Rest timer during a workout, screen locked | A "Rest complete" notification arrives at the end of the rest, with the default sound; with the app open, the beep and (Vibrate on) a vibration (DT-REST) | `src/lib/native.ts` `scheduleRestNotification`, `workout-logger.tsx` |
 | 5.4 | Notifications permission denied | Reminders page explains and offers the Settings path | `checkPermissions` branch |
 
 ## 6. In-app purchases (App Store sandbox, 20 min; needs App Store Connect products and a RevenueCat project)
@@ -76,7 +76,7 @@ Before starting: the deployed site must answer at `https://<your address>/api/he
 | # | Step | Expect | Code |
 |---|---|---|---|
 | 6.1 | Profile → Plans & billing | Store prices for Plus/Pro monthly and yearly (localized), renewal terms, Terms and Privacy links, Restore purchases | `store-paywall.tsx` |
-| 6.2 | Buy Plus monthly with a sandbox tester | Apple sheet; after purchase the plan shows Plus within seconds (server confirms with RevenueCat) | `store-billing.ts` |
+| 6.2 | Buy Pro All Access monthly with a sandbox tester | Apple sheet; after purchase the plan shows Pro All Access within seconds (server confirms with RevenueCat) | `store-billing.ts` |
 | 6.3 | Upgrade to Pro | Immediate (same subscription group) | |
 | 6.4 | Restore purchases on a second device / after reinstall | Plan restored | |
 | 6.5 | Cancel in iOS Settings → Subscriptions | Access continues to period end; page shows the end date | webhook `CANCELLATION` |

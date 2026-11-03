@@ -100,6 +100,29 @@ describe.skipIf(!available)("App Store / Google Play subscriptions via RevenueCa
     expect(await ent()).toMatchObject({ plan: "free" });
   });
 
+  it("an event naming a well-formed id that isn't one of our members looks nothing up and grants nothing", async () => {
+    const stranger = crypto.randomUUID();
+    const before = requests.length;
+    const res = await send({ id: `rc-${crypto.randomUUID()}`, type: "INITIAL_PURCHASE", app_user_id: stranger, aliases: [stranger] });
+    expect(res.status).toBe(200);
+    expect(requests.length).toBe(before); // no RevenueCat lookup for a non-member
+    const { data } = await serviceClient().from("user_entitlements").select("user_id").eq("user_id", stranger);
+    expect(data ?? []).toEqual([]);
+  });
+
+  it("refuses an oversized webhook body before reading anything into the account", async () => {
+    const before = requests.length;
+    const big = JSON.stringify({ api_version: "1.0", event: { id: crypto.randomUUID(), type: "INITIAL_PURCHASE", app_user_id: user.id, padding: "x".repeat(300_000) } });
+    const res = await webhook(new NextRequest("http://localhost/api/revenuecat/webhook", { method: "POST", body: big, headers: { authorization: "Bearer rc-webhook-integration" } }));
+    expect(res.status).toBe(413);
+    expect(requests.length).toBe(before);
+    // A body that lies about its length is measured too.
+    const lying = await webhook(
+      new NextRequest("http://localhost/api/revenuecat/webhook", { method: "POST", body: big, headers: { authorization: "Bearer rc-webhook-integration", "content-length": "10" } }),
+    );
+    expect(lying.status).toBe(413);
+  });
+
   it("accepts RevenueCat's test event without looking anyone up", async () => {
     const before = requests.length;
     const res = await send({ type: "TEST", app_user_id: "$RCAnonymousID:test" });

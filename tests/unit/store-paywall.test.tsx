@@ -93,6 +93,20 @@ describe("in-app membership screen", () => {
     expect(screen.queryByText(/Welcome to Pro/)).not.toBeInTheDocument();
   });
 
+  it("after a real charge never says 'you haven't been charged', even if the server can't be reached", async () => {
+    // The store took the payment; then the server call fails (connection lost) or the server reports an error.
+    sync.mockRejectedValueOnce(new Error("Failed to fetch"));
+    render(<StorePaywall {...props} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Start Pro All Access · $19.99 / month" }));
+    expect(await screen.findByText(/Purchase received. Your membership will update shortly; if it hasn't in a few minutes, tap Restore purchases/)).toBeInTheDocument();
+    expect(screen.queryByText(/haven't been charged/)).not.toBeInTheDocument();
+    expect(refresh).toHaveBeenCalled();
+    sync.mockResolvedValueOnce({ ok: false, error: "Too many requests." });
+    fireEvent.click(screen.getByRole("button", { name: "Start Pro All Access · $19.99 / month" }));
+    expect(await screen.findByText(/Purchase received. Your membership will update shortly/)).toBeInTheDocument();
+    expect(screen.queryByText(/haven't been charged/)).not.toBeInTheDocument();
+  });
+
   it("says plainly when a purchase is cancelled or pending", async () => {
     store.purchase.mockRejectedValueOnce({ code: "1", userCancelled: true });
     render(<StorePaywall {...props} />);

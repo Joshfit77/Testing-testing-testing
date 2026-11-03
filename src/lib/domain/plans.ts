@@ -256,7 +256,13 @@ export function entitlementFromSubscriptions<
   let from: T | null = null;
   for (const s of subs) {
     const p = effectivePlanFromSubscription(s, now);
-    if (planRank(p) > planRank(best)) {
+    // Same plan from two places (web and App Store): keep the one that lasts longer, so access doesn't end when the
+    // earlier one does.
+    const later =
+      planRank(p) === planRank(best) &&
+      p !== "free" &&
+      (s.current_period_end === null || (validUntil !== null && Date.parse(s.current_period_end) > Date.parse(validUntil)));
+    if (planRank(p) > planRank(best) || later) {
       best = p;
       validUntil = s.current_period_end;
       from = s;

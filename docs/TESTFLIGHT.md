@@ -166,7 +166,7 @@ a privacy policy URL (`LEGAL_PRIVACY_URL`), the App Privacy answers in App Store
 | Supabase | Migrations are in the repo (`supabase/migrations`); `supabase db push` once linked | Create the project; link it; apply migrations to the live project (a destructive step needs your go-ahead) |
 | Apple Developer | Nothing: Apple requires the account holder | Enrol; note the Team ID; register the App ID with HealthKit; create the App Store Connect app; create the internal-testing group |
 | Signing | The workflow is written; it signs when the four secrets exist | Create the App Store Connect API key (Admin role); add `APPLE_TEAM_ID`, `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8_BASE64` as repository secrets |
-| RevenueCat sandbox | Product ids, entitlements and webhook are coded (`docs/MOBILE_BILLING.md`) | Create the RevenueCat project and the four App Store subscriptions; add the keys to the deployment; create sandbox testers |
+| RevenueCat sandbox | Product ids, entitlements and webhook are coded (`docs/MOBILE_BILLING.md`) | Create the RevenueCat project and the two App Store subscriptions (`ngf_pro_monthly`, `ngf_pro_yearly`; `docs/MOBILE_BILLING.md`); add the keys to the deployment; create sandbox testers |
 | Build and archive | The `testflight` job builds and signs on GitHub's Mac; or you archive in Xcode | Run the job (upload unticked first) |
 | Upload to TestFlight | The job can upload when `upload` is ticked | **Your explicit approval**, then tick `upload` |
 | Install and test on an iPhone | The device plan is written (`docs/launch-audit/IOS_DEVICE_TEST_PLAN.md`) | Install TestFlight, run the plan, send results |

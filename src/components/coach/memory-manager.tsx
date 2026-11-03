@@ -132,7 +132,7 @@ export function MemoryManager({
         </h2>
         {!entitled ? (
           <>
-            <p className="text-sm text-muted-foreground">Coaching memory is part of the AI Coach, included with Pro. You can still read and delete anything saved earlier.</p>
+            <p className="text-sm text-muted-foreground">Coaching memory is part of the AI Coach, included with Pro All Access. You can still read and delete anything saved earlier.</p>
             <Button asChild size="sm">
               <Link href="/profile/billing">See plans</Link>
             </Button>

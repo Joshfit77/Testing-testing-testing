@@ -141,6 +141,64 @@ export interface NewRecord extends PersonalBest {
 }
 
 /**
+ * The personal records a finished session set, as finishWorkout first reported them (`first`: no earlier record of
+ * that type for the exercise, so it was a baseline rather than an improvement).
+ */
+export async function recordsOfSession(supabase: SupabaseClient, userId: string, sessionId: string): Promise<NewRecord[]> {
+  const { data } = await supabase
+    .from("personal_records")
+    .select("exercise_id, record_type, value, weight_kg, reps, achieved_at")
+    .eq("user_id", userId)
+    .eq("session_id", sessionId);
+  const rows = data ?? [];
+  if (!rows.length) return [];
+  const { data: others } = await supabase
+    .from("personal_records")
+    .select("exercise_id, record_type, achieved_at")
+    .eq("user_id", userId)
+    .in("exercise_id", [...new Set(rows.map((r) => r.exercise_id as string))])
+    .or(`session_id.is.null,session_id.neq.${sessionId}`);
+  return rows.map((r) => ({
+    exerciseId: r.exercise_id as string,
+    recordType: r.record_type as NewRecord["recordType"],
+    value: Number(r.value),
+    weightKg: r.weight_kg == null ? null : Number(r.weight_kg),
+    reps: r.reps == null ? null : Number(r.reps),
+    first: !(others ?? []).some((o) => o.exercise_id === r.exercise_id && o.record_type === r.record_type && String(o.achieved_at) <= String(r.achieved_at)),
+  }));
+}
+
+/** Names a workout gets when the member doesn't name it: too generic to compare "last time" against. */
+const GENERIC_NAME = /^\s*((morning|afternoon|evening|night|quick|empty|new)\s+)?workout\s*$/i;
+
+export interface PreviousSession {
+  startedAt: string;
+  volumeKg: number;
+}
+
+/**
+ * The member's previous completed session of the same kind, for a "compared with last time" line: the same program
+ * day, or (outside a program) a workout with the same, non-generic name. Null when there isn't one.
+ */
+export async function previousComparableSession(
+  supabase: SupabaseClient,
+  userId: string,
+  s: { sessionId: string; startedAt: string; programDayId: string | null; name: string },
+): Promise<PreviousSession | null> {
+  if (!s.programDayId && GENERIC_NAME.test(s.name)) return null;
+  let q = supabase
+    .from("workout_sessions")
+    .select("started_at, total_volume_kg")
+    .eq("user_id", userId)
+    .eq("status", "completed")
+    .neq("id", s.sessionId)
+    .lt("started_at", s.startedAt);
+  q = s.programDayId ? q.eq("program_day_id", s.programDayId) : q.eq("name", s.name.trim());
+  const { data } = await q.order("started_at", { ascending: false }).limit(1).maybeSingle();
+  return data ? { startedAt: data.started_at as string, volumeKg: Number(data.total_volume_kg ?? 0) } : null;
+}
+
+/**
  * Finish (complete) a workout. Idempotent per client id: retries after a network error
  * return the already-completed session instead of duplicating it.
  */
@@ -156,7 +214,9 @@ export async function finishWorkout(
     .eq("client_id", input.clientId)
     .maybeSingle();
   if (existing?.status === "completed") {
-    return { sessionId: existing.id as string, volumeKg: Number(existing.total_volume_kg), records: [], alreadyCompleted: true };
+    // A retry after the first response was lost (gym Wi-Fi): show the same records the first attempt saved.
+    const records = await recordsOfSession(supabase, userId, existing.id as string).catch(() => []);
+    return { sessionId: existing.id as string, volumeKg: Number(existing.total_volume_kg), records, alreadyCompleted: true };
   }
 
   // Only link to a program the user actually owns a record for.
