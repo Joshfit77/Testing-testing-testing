@@ -60,6 +60,14 @@ const S = {
   iarc4mei: { label: "IARC Monographs volume 101: 4-methylimidazole (Group 2B)" },
   whoSugars: { label: "WHO (2015) Guideline: sugars intake for adults and children" },
   whoSodium: { label: "WHO (2012) Guideline: sodium intake for adults and children" },
+  // Primary documents cited by name. Their links couldn't be checked from the build environment, so none is given.
+  iarcVol40: { label: "IARC Monographs volume 40 (1986): butylated hydroxyanisole (BHA), Group 2B" },
+  iarcVol73: { label: "IARC Monographs volume 73 (1999): potassium bromate (Group 2B); saccharin and its salts (Group 3)" },
+  efsaBha: { label: "EFSA (2011): re-evaluation of butylated hydroxyanisole (BHA, E 320) as a food additive, EFSA Journal 9(10):2392" },
+  efsaGlutamate: { label: "EFSA (2017): re-evaluation of glutamic acid and glutamates (E 620–625) as food additives, EFSA Journal 15(7):4910" },
+  fdaBvo: { label: "US FDA (2024): final rule revoking the authorization of brominated vegetable oil in food (Federal Register, July 2024)" },
+  cfrBromatedFlour: { label: "US Code of Federal Regulations, 21 CFR 137.155: bromated flour" },
+  cfrCarmine: { label: "US Code of Federal Regulations, 21 CFR 73.100: cochineal extract and carmine (must be declared by name on food labels)" },
 } satisfies Record<string, Source>;
 
 const AZO: Evidence = {
@@ -95,6 +103,7 @@ const PHOSPHATE: Evidence = {
   dose: "Yes: total phosphorus intake from all foods is what matters.",
   sources: [S.efsaPhosphates],
 };
+/** Nitrites and nitrates in a processed meat: the context IARC's classification is about. */
 const NITRITE: Evidence = {
   classes: ["established", "mixed"],
   concern:
@@ -103,6 +112,20 @@ const NITRITE: Evidence = {
   dose: "Yes: IARC estimates bowel-cancer risk rises by about 18% for every 50 g of processed meat eaten daily.",
   sources: [S.iarcMeat, S.efsaNitrite],
 };
+/** The same additives in any other food (cheese, for example): IARC's processed-meat finding doesn't apply to it. */
+const NITRITE_OTHER: Evidence = {
+  classes: ["mixed"],
+  concern:
+    "Used as a preservative (in cheese, for example, against the bacteria that cause late blowing). Nitrites can form nitrosamines. EFSA (2017) found the permitted additive levels within safe intakes for most people, with a slight exceedance for children with high intakes from all sources.",
+  affected: "Children with high intakes from all foods.",
+  dose: "Yes: total intake from all foods is what matters.",
+  sources: [S.efsaNitrite],
+};
+const NITRITE_CODES = new Set(["e249", "e250", "e251", "e252"]);
+/** Open Food Facts categories of processed (cured, smoked or salted) meat. */
+export const isProcessedMeat = (p: Pick<QualityProduct, "categories">) =>
+  p.categories.some((c) => /^en:(processed-meats?|prepared-meats|cured-meats|hams?|bacons?|sausages?|salamis?|chorizos?|hot-dogs?|frankfurters?|pates?|charcuteries?|meat-preparations|smoked-meats|cold-cuts|deli-meats)$/.test(c));
+
 const EMULSIFIER_MIXED: Evidence = {
   classes: ["mixed"],
   concern: "Mouse studies found that this emulsifier changed gut bacteria and promoted inflammation. Evidence in people is limited, and regulators still permit it at set levels.",
@@ -142,7 +165,7 @@ export const ADDITIVE_EVIDENCE: Record<string, Evidence> = {
     concern: "Rare allergic reactions, including severe ones, have been reported; the US requires it to be named on labels. Made from insects, so not vegetarian or vegan.",
     affected: "People allergic to carmine.",
     dose: "Allergic people can react to small amounts.",
-    sources: [S.reg1333],
+    sources: [S.cfrCarmine],
   },
   e150c: { classes: ["mixed"], concern: "Can contain 4-methylimidazole (4-MEI), which IARC classifies as possibly carcinogenic (Group 2B, from animal studies). Authorities limit 4-MEI in these colours.", affected: "Unclear at typical intakes.", dose: "Yes: assessments depend on the amount consumed.", sources: [S.iarc4mei] },
   e150d: { classes: ["mixed"], concern: "Can contain 4-methylimidazole (4-MEI), which IARC classifies as possibly carcinogenic (Group 2B, from animal studies). Authorities limit 4-MEI in these colours.", affected: "Unclear at typical intakes.", dose: "Yes: assessments depend on the amount consumed.", sources: [S.iarc4mei] },
@@ -180,7 +203,7 @@ export const ADDITIVE_EVIDENCE: Record<string, Evidence> = {
   e300: NO_CONCERN("Vitamin C."),
   e301: NO_CONCERN("A form of vitamin C."),
   e306: NO_CONCERN("Vitamin E."),
-  e320: { classes: ["mixed"], concern: "IARC classifies BHA as possibly carcinogenic (Group 2B), based on animal studies at high doses. EFSA set an acceptable daily intake and permits it at low levels.", affected: "Unclear at typical intakes.", dose: "The animal findings were at high doses.", sources: [S.reg1333] },
+  e320: { classes: ["mixed"], concern: "IARC classifies BHA as possibly carcinogenic (Group 2B), based on animal studies at high doses. EFSA (2011) set an acceptable daily intake and permits it at low levels.", affected: "Unclear at typical intakes.", dose: "The animal findings were at high doses.", sources: [S.iarcVol40, S.efsaBha] },
   e322: NO_CONCERN("Lecithins: re-evaluated by EFSA, which found no need for a numerical acceptable daily intake. Often made from soy (declared as soy) or sunflower."),
   e330: NO_CONCERN("Citric acid, naturally found in citrus fruit."),
   e331: NO_CONCERN("Sodium citrates; they add a little sodium."),
@@ -240,10 +263,10 @@ export const ADDITIVE_EVIDENCE: Record<string, Evidence> = {
       "EFSA (2017) set a group acceptable daily intake of 30 mg per kg of body weight for glutamates and noted some high consumers may exceed it. Reported reactions such as headache haven't been consistently confirmed in controlled studies. It adds sodium.",
     affected: "High consumers.",
     dose: "Yes: assessments depend on total intake.",
-    sources: [S.reg1333],
+    sources: [S.efsaGlutamate],
   },
-  e924: { classes: ["regulatory"], regulatory: "Not permitted in the EU, UK or Canada; still permitted in bread-making in the US.", concern: "IARC classifies potassium bromate as possibly carcinogenic (Group 2B), from animal studies.", affected: "Unclear at typical intakes.", dose: "Most should break down during baking; residues depend on use.", sources: [S.reg1333] },
-  e443: { classes: ["regulatory"], regulatory: "The US FDA revoked its authorization in 2024; it isn't permitted in the EU.", concern: "Animal studies raised concerns about effects on the thyroid and other organs.", affected: "Unclear at typical intakes.", dose: "Effects in studies depended on dose.", sources: [S.reg1333] },
+  e924: { classes: ["regulatory"], regulatory: "Not authorised as a food additive in the EU; still permitted in bread-making in the US (bromated flour).", concern: "IARC classifies potassium bromate as possibly carcinogenic (Group 2B), from animal studies.", affected: "Unclear at typical intakes.", dose: "Most should break down during baking; residues depend on use.", sources: [S.reg1333, S.cfrBromatedFlour, S.iarcVol73] },
+  e443: { classes: ["regulatory"], regulatory: "The US FDA revoked its authorization in 2024; it isn't authorised as a food additive in the EU.", concern: "The FDA's decision cited animal studies showing effects on the thyroid.", affected: "Unclear at typical intakes.", dose: "Effects in studies depended on dose.", sources: [S.fdaBvo, S.reg1333] },
   e950: { classes: ["no_concern"], concern: `EFSA's 2025 re-evaluation found no genotoxicity concern and set an acceptable daily intake of 15 mg per kg of body weight. ${NSS_NOTE}`, affected: "None identified at permitted levels.", dose: "Safety assessments assume intake below the acceptable daily intake.", sources: [S.efsaAceK, S.whoNss] },
   e951: {
     classes: ["established", "mixed"],
@@ -254,7 +277,7 @@ export const ADDITIVE_EVIDENCE: Record<string, Evidence> = {
     sources: [S.whoAspartame, S.reg1169, S.whoNss],
   },
   e952: { classes: ["regulatory"], regulatory: "Not permitted in the US; permitted in the EU with an acceptable daily intake.", concern: NSS_NOTE, affected: "None identified at permitted EU levels.", dose: "Safety assessments assume intake below the acceptable daily intake.", sources: [S.reg1333, S.whoNss] },
-  e954: { classes: ["no_concern"], concern: `Once suspected from bladder tumours in rats; IARC moved it to Group 3 ("not classifiable") in 1999 because that mechanism doesn't apply to people. ${NSS_NOTE}`, affected: "None identified at permitted levels.", dose: "Safety assessments assume intake below the acceptable daily intake.", sources: [S.whoNss] },
+  e954: { classes: ["no_concern"], concern: `Once suspected from bladder tumours in rats; IARC moved it to Group 3 ("not classifiable") in 1999 because that mechanism doesn't apply to people. ${NSS_NOTE}`, affected: "None identified at permitted levels.", dose: "Safety assessments assume intake below the acceptable daily intake.", sources: [S.iarcVol73, S.whoNss] },
   e955: { classes: ["no_concern"], concern: `Permitted in the EU and US with an acceptable daily intake. ${NSS_NOTE}`, affected: "None identified at permitted levels.", dose: "Safety assessments assume intake below the acceptable daily intake.", sources: [S.reg1333, S.whoNss] },
   e960: { classes: ["no_concern"], concern: `EFSA and JECFA set an acceptable daily intake of 4 mg per kg of body weight (as steviol). ${NSS_NOTE}`, affected: "None identified at permitted levels.", dose: "Safety assessments assume intake below the acceptable daily intake.", sources: [S.reg1333, S.whoNss] },
   e901: NO_CONCERN("Beeswax, a glazing agent; not vegan."),
@@ -263,6 +286,7 @@ export const ADDITIVE_EVIDENCE: Record<string, Evidence> = {
 
 export type AlertGroup =
   | "Sweetener"
+  | "Synthetic colour"
   | "Colour"
   | "Preservative"
   | "Antioxidant"
@@ -289,9 +313,15 @@ export interface IngredientAlert {
   sources: Source[];
 }
 
-function groupFor(role: string): AlertGroup {
+/** Synthetic (azo and other artificial) colours, as opposed to colours from natural sources such as curcumin. */
+const SYNTHETIC_COLOURS = new Set(["e102", "e104", "e110", "e122", "e123", "e124", "e127", "e128", "e129", "e131", "e132", "e133", "e142", "e143", "e151", "e154", "e155", "e180"]);
+
+function groupFor(role: string, code: string): AlertGroup {
   if (/sweetener|polyol/i.test(role)) return "Sweetener";
+  if (SYNTHETIC_COLOURS.has(code)) return "Synthetic colour";
   if (/colour/i.test(role)) return "Colour";
+  // "Emulsifying salts" (melting salts in processed cheese) regulate acidity; they aren't emulsifiers.
+  if (/emulsifying salt/i.test(role)) return "Acidity regulator";
   if (/preservative/i.test(role)) return "Preservative";
   if (/emulsif/i.test(role)) return "Emulsifier";
   if (/thicken|stabilis|gelling/i.test(role)) return "Thickener or stabiliser";
@@ -303,6 +333,14 @@ function groupFor(role: string): AlertGroup {
 const PRIORITY: Record<EvidenceClass, number> = { regulatory: 0, established: 1, mixed: 2, insufficient: 3, no_concern: 4 };
 
 const SODIUM_TERMS = /\b(sea salt|salt|sodium [a-z]+|monosodium glutamate|baking soda|bicarbonate of soda|soy sauce|soya sauce|fish sauce|stock cube|bouillon|brine)\b/gi;
+/** Wording that says salt is absent ("no added salt", "salt-free"), removed before looking for sodium sources. */
+const NO_SALT = /\b(no added salt|no salt added|without added salt|salt[- ]free|unsalted|sodium[- ]free)\b/gi;
+
+/** The named sodium sources in an ingredient list (wording that says salt is absent doesn't count). */
+export function sodiumSources(ingredients: string | null): string[] {
+  if (!ingredients) return [];
+  return [...new Set((ingredients.replace(NO_SALT, " ").match(SODIUM_TERMS) ?? []).map((t) => t.toLowerCase()))].slice(0, 6);
+}
 
 /** Ingredients that deserve attention, most important first. Every additive in the data appears, with its evidence class. */
 export function ingredientAlerts(p: QualityProduct): IngredientAlert[] {
@@ -310,12 +348,14 @@ export function ingredientAlerts(p: QualityProduct): IngredientAlert[] {
   for (const code of p.additives) {
     const info = describeAdditive(code);
     const key = code.toLowerCase();
-    const ev = ADDITIVE_EVIDENCE[key] ?? ADDITIVE_EVIDENCE[key.replace(/(i{1,3}|iv|v)$/, "")];
+    const base = key.replace(/(i{1,3}|iv|v)$/, "");
+    let ev = ADDITIVE_EVIDENCE[key] ?? ADDITIVE_EVIDENCE[base];
+    if (NITRITE_CODES.has(base) && !isProcessedMeat(p)) ev = NITRITE_OTHER;
     out.push({
       key,
       title: `${info.code} ${info.name}`,
       code: info.code,
-      group: groupFor(info.role),
+      group: groupFor(info.role, base),
       purpose: info.role,
       classes: ev?.classes ?? ["insufficient"],
       regulatory: ev?.regulatory ?? null,
@@ -340,11 +380,11 @@ export function ingredientAlerts(p: QualityProduct): IngredientAlert[] {
       regulatory: null,
       concern: "The WHO strongly recommends keeping free sugars below 10% of daily energy, and suggests below 5%, mainly for weight and dental health.",
       affected: "Everyone, depending on total intake across the day.",
-      dose: "Yes: what matters is how much free sugar you eat in total.",
+      dose: `Yes: what matters is how much free sugar you eat in total.${levelNote(p, "sugars")}`,
       sources: [S.whoSugars],
     });
   }
-  const sodiumTerms = [...new Set((p.ingredientsText?.match(SODIUM_TERMS) ?? []).map((t) => t.toLowerCase()))].slice(0, 6);
+  const sodiumTerms = sodiumSources(p.ingredientsText);
   if (sodiumTerms.length) {
     out.push({
       key: "sodium_sources",
@@ -356,11 +396,24 @@ export function ingredientAlerts(p: QualityProduct): IngredientAlert[] {
       regulatory: null,
       concern: "High sodium intake raises blood pressure. The WHO recommends adults eat less than 2 g of sodium (5 g of salt) a day.",
       affected: "Everyone, especially people with high blood pressure.",
-      dose: "Yes: what matters is total salt across the day.",
+      dose: `Yes: what matters is total salt across the day.${levelNote(p, "salt")}`,
       sources: [S.whoSodium],
     });
   }
   return out;
+}
+
+/**
+ * The product's own level, so a sugar or salt named in the ingredients isn't read as a problem by itself
+ * (UK front-of-pack thresholds per 100 g; half for drinks, salt high above 0.75 g).
+ */
+function levelNote(p: QualityProduct, what: "sugars" | "salt"): string {
+  const v = what === "sugars" ? p.per100.sugars_g : p.per100.salt_g;
+  if (v == null) return ` This product's ${what === "sugars" ? "sugar" : "salt"} content isn't available.`;
+  const drink = p.unit === "ml";
+  const [low, high] = what === "sugars" ? (drink ? [2.5, 11.25] : [5, 22.5]) : drink ? [0.3, 0.75] : [0.3, 1.5];
+  const level = v <= low ? "low" : v > high ? "high" : "medium";
+  return ` This product is ${level} in ${what} (${v} g per 100 ${p.unit}, UK front-of-pack levels).`;
 }
 
 /** True when an additive has been reviewed for this list. */

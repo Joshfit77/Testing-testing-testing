@@ -159,6 +159,8 @@ function structuredReply(req: MockRequest): Record<string, unknown> | null {
     });
     return {
       is_food: true,
+      photo_quality: "dark",
+      packaged: false,
       summary: "Grilled chicken with white rice and broccoli.",
       items: [
         it("Grilled chicken breast", "a palm-sized fillet", 150, 248, 46, 0, 5.4, "medium", "chicken breast"),
@@ -702,6 +704,9 @@ test.describe("AI coach", () => {
     expect(content[0]!.source!.data.length).toBeGreaterThan(1000);
     expect(content[1]!.text).toContain("no dressing");
 
+    // A dark photo is called out, with a way to try another.
+    await expect(page.getByTestId("food-photo-quality")).toContainText("looks dark");
+
     // Questions about what a photo can't show, including oil and portions the app always adds.
     const questions = page.getByTestId("food-photo-questions");
     await expect(questions).toContainText("Was there any sauce on the chicken?");
@@ -710,8 +715,23 @@ test.describe("AI coach", () => {
 
     const items = page.getByTestId("food-photo-item");
     await expect(items).toHaveCount(3);
+    // Matched on the server to the app's USDA foods at the photo's estimated weight (database values, estimated amount).
+    const chicken = items.nth(0);
+    await expect(chicken).toContainText("Chicken breast, cooked (roasted)");
+    await expect(chicken).toContainText("150 g");
+    await expect(chicken).toContainText("Amount estimated from the photo");
+    await expect(items.nth(1)).toContainText("White rice, cooked");
+    // Back to the photo estimate, then halve the weight: calories and macros follow.
+    await chicken.getByRole("button", { name: "Back to the photo estimate for Grilled chicken breast" }).click();
+    await expect(chicken.getByLabel("kcal")).toHaveValue("248");
+    await chicken.getByLabel("Grams").fill("75");
+    await expect(chicken.getByLabel("kcal")).toHaveValue("124");
+    await expect(chicken.getByLabel("Protein g")).toHaveValue("23");
+
+    // No weight for the broccoli: it stays an estimate, with the database food offered.
     const broccoli = items.nth(2);
     await expect(broccoli).toContainText("Low confidence");
+    await expect(broccoli.getByTestId("food-photo-suggestion")).toContainText("Broccoli, cooked");
     await expect(broccoli.getByRole("note")).toContainText("don't match the macros");
     await broccoli.getByLabel("kcal").fill("35");
     await expect(broccoli.getByRole("note")).toHaveCount(0);
@@ -722,23 +742,16 @@ test.describe("AI coach", () => {
     await expect(items.nth(3)).toContainText("Database values");
     await expect(items.nth(3)).toContainText("119 kcal");
 
-    // Swap the rice estimate for a database food.
-    await items.nth(1).getByRole("button", { name: "Use a database food instead" }).click();
-    const picker = page.getByRole("dialog");
-    await expect(picker.getByPlaceholder("e.g. chicken, rice, olive oil")).toHaveValue("rice");
-    await picker.getByRole("region", { name: "Food database results" }).getByRole("button").first().click();
-    await picker.getByRole("button", { name: "Use this food" }).click();
-    await expect(items.nth(1)).toContainText("Database values");
-    await expect(items.nth(1).getByRole("button", { name: "Back to the photo estimate for White rice" })).toBeVisible();
-
+    // The meal can still be changed on the review screen.
+    await page.getByLabel("Add to").selectOption("dinner");
     await page.getByTestId("food-photo-confirm").click();
-    await expect(page.getByTestId("food-photo-done")).toContainText("Added 4 items to lunch.");
+    await expect(page.getByTestId("food-photo-done")).toContainText("Added 4 items to dinner.");
     await page.getByRole("link", { name: "Go to my diary" }).click();
-    // Photo estimates are marked as estimates; the matched foods keep their database values.
-    await expect(page.getByRole("button", { name: "Edit Grilled chicken breast" })).toContainText("a palm-sized fillet (estimated from a photo) · 248 kcal");
+    // Photo estimates are marked as estimates; matched foods keep their database values but say the amount was estimated.
+    await expect(page.getByRole("button", { name: "Edit Grilled chicken breast" })).toContainText("a palm-sized fillet (estimated from a photo) · 124 kcal");
     await expect(page.getByRole("button", { name: "Edit Broccoli" })).toContainText("35 kcal");
     await expect(page.getByRole("button", { name: "Edit Olive oil" })).toContainText("13.5 g · 119 kcal");
-    await expect(page.getByRole("button", { name: /^Edit White rice/ })).toContainText("USDA");
+    await expect(page.getByRole("button", { name: /^Edit White rice/ })).toContainText("160 g (amount estimated from a photo)");
     await expect(page.getByText("Includes estimated entries")).toBeVisible();
   });
   test("Food IQ: Pro sees how a product fits their own targets and can ask the AI about it, from known data only", async ({ page }) => {

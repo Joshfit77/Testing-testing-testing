@@ -108,7 +108,11 @@ describe("food quality: filters, comparisons, alternatives", () => {
     const f = sanitizeFilters({ allergens: ["en:gluten", "en:nuts", "en:milk", "bogus"], diet: "vegan", nutrition: ["low_sugar", "high_protein", "nope"] });
     expect(f).toEqual({ allergens: ["en:gluten", "en:nuts", "en:milk"], diet: "vegan", nutrition: ["low_sugar", "high_protein"] });
     const r = checkFilters(cereal(), f).map((x) => x.status);
-    expect(r).toEqual(["conflict", "caution", "ok", "conflict", "conflict", "conflict"]);
+    // Not declared is never "ok": the data can be wrong, so it isn't proof the product is free of milk.
+    expect(r).toEqual(["conflict", "caution", "not_declared", "conflict", "conflict", "conflict"]);
+    // An ingredient list marked incomplete can't clear an allergen either.
+    const partial = cereal();
+    expect(checkFilters({ ...partial, incomplete: ["ingredients"] }, { allergens: ["en:milk"], diet: "none", nutrition: [] })[0]!.status).toBe("unknown");
     const unknown = checkFilters(off({ product_name: "Mystery" }), f).map((x) => x.status);
     expect(unknown).toEqual(["unknown", "unknown", "unknown", "unknown", "unknown", "unknown"]);
   });
@@ -134,6 +138,11 @@ describe("food quality: filters, comparisons, alternatives", () => {
     expect(picked.map((x) => x.product.name)).toEqual(["Oat Hoops"]);
     // A member avoiding gluten isn't offered another gluten product.
     expect(pickAlternatives(base, [better], { allergens: ["en:gluten"], diet: "none", nutrition: [] })).toEqual([]);
+    // Nor one that may contain it (traces), nor one with no allergen data at all: only one whose data covers it.
+    const traces = cereal({ code: "0000000000048", product_name: "Oat Rings", nutriscore_grade: "b", nova_group: 3, allergens_tags: [], traces_tags: ["en:gluten"] }, { sugars_100g: 12, fiber_100g: 8 });
+    const noData = cereal({ code: "0000000000055", product_name: "Mystery Oats", nutriscore_grade: "b", nova_group: 3, allergens_tags: [], traces_tags: [], ingredients_text: "" }, { sugars_100g: 12, fiber_100g: 8 });
+    const declaredFree = cereal({ code: "0000000000062", product_name: "Rice Pops", nutriscore_grade: "b", nova_group: 3, allergens_tags: [], traces_tags: [] }, { sugars_100g: 12, fiber_100g: 8 });
+    expect(pickAlternatives(base, [traces, noData, declaredFree], { allergens: ["en:gluten"], diet: "none", nutrition: [] }).map((x) => x.product.name)).toEqual(["Rice Pops"]);
   });
 
   it("gives the AI only known facts and marks the rest as not available", () => {

@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { AlertTriangle, Camera, Check, ImageUp, Loader2, Plus, RotateCcw, Search, Sparkles, Trash2, Undo2 } from "lucide-react";
-import { FoodPickerDialog } from "@/components/nutrition/food-picker";
+import { AlertTriangle, Barcode, Camera, Check, ImageUp, Loader2, Pencil, Plus, RotateCcw, Search, Sparkles, Trash2, Undo2 } from "lucide-react";
+import { FoodPickerDialog, gramsAmount } from "@/components/nutrition/food-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +12,18 @@ import { Input, NativeSelect } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { computeAmount, type FoodChoice } from "@/lib/domain/food-basis";
 import { logItemFor } from "@/lib/domain/food-favorites";
-import { CONFIDENCE_LABELS, FOOD_PHOTO_MAX_DIMENSION, macroCalories, type PhotoAnalysis, type QuestionTopic } from "@/lib/domain/food-photo";
+import {
+  CONFIDENCE_LABELS,
+  FOOD_PHOTO_MAX_DIMENSION,
+  macroCalories,
+  perGram,
+  PHOTO_QUALITY_NOTES,
+  scaleToGrams,
+  type MatchedAnalysis,
+  type MatchedEstimate,
+  type PerGram,
+  type QuestionTopic,
+} from "@/lib/domain/food-photo";
 import { compressImage } from "@/lib/image-compress";
 import { cn } from "@/lib/utils";
 import { logFoodPhotoItemsAction, setFoodPhotoConsentAction } from "@/server/actions/food-photo";
@@ -26,22 +37,41 @@ const MEALS: [Meal, string][] = [
   ["snack", "Snack"],
 ];
 
-type Item =
-  | {
-      id: string;
-      kind: "estimate";
-      name: string;
-      portion: string;
-      grams: string;
-      calories: string;
-      protein_g: string;
-      carbs_g: string;
-      fat_g: string;
-      confidence: "low" | "medium" | "high" | null;
-      ingredients: string[];
-      searchTerm: string;
-    }
-  | { id: string; kind: "database"; food: FoodChoice; quantity: number; unitId: string; replaced: Extract<Item, { kind: "estimate" }> | null };
+interface Estimate {
+  id: string;
+  kind: "estimate";
+  name: string;
+  portion: string;
+  grams: string;
+  calories: string;
+  protein_g: string;
+  carbs_g: string;
+  fat_g: string;
+  confidence: "low" | "medium" | "high" | null;
+  ingredients: string[];
+  searchTerm: string;
+  /** Nutrition per gram, so changing the grams rescales the numbers (reset when the member edits them by hand). */
+  base: PerGram | null;
+  /** The closest database food found on the server, offered but not used. */
+  suggestion: FoodChoice | null;
+}
+interface DatabaseItem {
+  id: string;
+  kind: "database";
+  food: FoodChoice;
+  quantity: number;
+  unitId: string;
+  /** The photo estimate it replaced (for undo). */
+  replaced: Estimate | null;
+  /** The amount is still the one estimated from the photo. */
+  estimatedAmount: boolean;
+}
+type Item = Estimate | DatabaseItem;
+
+type PickerState =
+  | { mode: "add"; query: string }
+  | { mode: "swap"; itemId: string; query: string; grams: number | null }
+  | { mode: "amount"; itemId: string; initial: { food: FoodChoice; quantity: number; unitId: string } };
 
 export interface HiddenExtra {
   key: string;
@@ -53,6 +83,40 @@ export interface HiddenExtra {
 
 const n = (s: string) => (s.trim() === "" ? NaN : Number(s));
 const r1 = (x: number) => Math.round(x * 10) / 10;
+const deviceToday = () => new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+
+function estimateFrom(i: MatchedEstimate): Estimate {
+  return {
+    id: crypto.randomUUID(),
+    kind: "estimate",
+    name: i.name,
+    portion: i.portion,
+    grams: i.grams == null ? "" : String(i.grams),
+    calories: String(i.calories),
+    protein_g: String(i.protein_g),
+    carbs_g: String(i.carbs_g),
+    fat_g: String(i.fat_g),
+    confidence: i.confidence,
+    ingredients: i.ingredients,
+    searchTerm: i.searchTerm,
+    base: perGram(i),
+    suggestion: i.match?.choice ?? null,
+  };
+}
+
+/**
+ * The starting point for review. When the server found a strong database match and the AI judged the weight, the
+ * database food is used at that weight (its values are measured, the amount is the estimate); the photo estimate stays
+ * one tap away. Everything else starts as the photo estimate, with any weaker match offered.
+ */
+export function initialItems(items: MatchedEstimate[]): Item[] {
+  return items.map((i) => {
+    const estimate = estimateFrom(i);
+    const amount = i.match?.strong ? gramsAmount(i.match.choice.basis, i.grams) : null;
+    if (i.match && amount) return { id: crypto.randomUUID(), kind: "database", food: i.match.choice, ...amount, replaced: estimate, estimatedAmount: true };
+    return estimate;
+  });
+}
 
 function itemTotals(i: Item) {
   if (i.kind === "database") {
@@ -63,7 +127,7 @@ function itemTotals(i: Item) {
   return Object.values(v).every((x) => Number.isFinite(x) && x >= 0) ? v : null;
 }
 
-export function FoodPhotoFlow({ date, defaultMeal, myFoods, extras, usage }: { date: string; defaultMeal: Meal; myFoods: MyFood[]; extras: HiddenExtra[]; usage: { used: number; limit: number } }) {
+export function FoodPhotoFlow({ date: initialDate, defaultMeal, myFoods, extras, usage }: { date: string; defaultMeal: Meal; myFoods: MyFood[]; extras: HiddenExtra[]; usage: { used: number; limit: number } }) {
   const router = useRouter();
   const cameraRef = useRef<HTMLInputElement>(null);
   const libraryRef = useRef<HTMLInputElement>(null);
@@ -71,13 +135,17 @@ export function FoodPhotoFlow({ date, defaultMeal, myFoods, extras, usage }: { d
   const [notes, setNotes] = useState("");
   const [meal, setMeal] = useState<Meal>(defaultMeal);
   const [phase, setPhase] = useState<"capture" | "analyzing" | "review">("capture");
-  const [analysis, setAnalysis] = useState<PhotoAnalysis | null>(null);
+  const [analysis, setAnalysis] = useState<MatchedAnalysis | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [picker, setPicker] = useState<{ itemId: string | null; query: string } | null>(null);
+  const [picker, setPicker] = useState<PickerState | null>(null);
   const [saving, start] = useTransition();
   const savingRef = useRef(false);
   const [result, setResult] = useState<string | null>(null);
+  const [date, setDate] = useState(initialDate);
+  const [used, setUsed] = useState(usage.used);
+  // One id per reviewed analysis: a retried or double-sent save can't add the same items twice.
+  const [saveId, setSaveId] = useState("");
 
   useEffect(() => () => {
     if (photo) URL.revokeObjectURL(photo.url);
@@ -104,28 +172,15 @@ export function FoodPhotoFlow({ date, defaultMeal, myFoods, extras, usage }: { d
       form.append("photo", photo.blob, "meal.jpg");
       form.append("notes", notes);
       const res = await fetch("/api/ai/food-photo", { method: "POST", body: form });
-      const json = (await res.json().catch(() => null)) as (PhotoAnalysis & { message?: string }) | null;
+      const json = (await res.json().catch(() => null)) as (MatchedAnalysis & { message?: string }) | null;
       if (!res.ok || !json) {
         setPhase("capture");
-        return setError(json?.message ?? "The photo couldn't be analysed. Try again.");
+        return setError(json?.message ?? (res.status === 504 || res.status === 502 ? "The analysis took too long. Try again." : "The photo couldn't be analysed. Try again."));
       }
       setAnalysis(json);
-      setItems(
-        json.items.map((i) => ({
-          id: crypto.randomUUID(),
-          kind: "estimate",
-          name: i.name,
-          portion: i.portion,
-          grams: i.grams == null ? "" : String(i.grams),
-          calories: String(i.calories),
-          protein_g: String(i.protein_g),
-          carbs_g: String(i.carbs_g),
-          fat_g: String(i.fat_g),
-          confidence: i.confidence,
-          ingredients: i.ingredients,
-          searchTerm: i.searchTerm,
-        })),
-      );
+      setItems(initialItems(json.items));
+      setSaveId(crypto.randomUUID());
+      setUsed((u) => u + 1);
       setPhase("review");
     } catch {
       setPhase("capture");
@@ -133,8 +188,29 @@ export function FoodPhotoFlow({ date, defaultMeal, myFoods, extras, usage }: { d
     }
   };
 
-  const update = (id: string, patch: Partial<Extract<Item, { kind: "estimate" }>>) => setItems((list) => list.map((i) => (i.id === id && i.kind === "estimate" ? { ...i, ...patch } : i)));
-  const blankItem = (): Item => ({ id: crypto.randomUUID(), kind: "estimate", name: "", portion: "", grams: "", calories: "", protein_g: "", carbs_g: "", fat_g: "", confidence: null, ingredients: [], searchTerm: "" });
+  const update = (id: string, patch: Partial<Estimate>) => setItems((list) => list.map((i) => (i.id === id && i.kind === "estimate" ? { ...i, ...patch } : i)));
+  /** Grams change: rescale calories and macros from the per-gram values. Numbers change: those become the new basis. */
+  const setNumber = (i: Estimate, field: "grams" | "calories" | "protein_g" | "carbs_g" | "fat_g", value: string) => {
+    if (field === "grams") {
+      const g = n(value);
+      if (i.base && Number.isFinite(g) && g > 0) {
+        const v = scaleToGrams(i.base, g);
+        return update(i.id, { grams: value, calories: String(v.calories), protein_g: String(v.protein_g), carbs_g: String(v.carbs_g), fat_g: String(v.fat_g) });
+      }
+      const next = { ...i, grams: value };
+      return update(i.id, { grams: value, base: i.base ?? perGram({ grams: g, calories: n(next.calories), protein_g: n(next.protein_g), carbs_g: n(next.carbs_g), fat_g: n(next.fat_g) }) });
+    }
+    const next = { ...i, [field]: value };
+    const vals = { grams: n(next.grams), calories: n(next.calories), protein_g: n(next.protein_g), carbs_g: n(next.carbs_g), fat_g: n(next.fat_g) };
+    update(i.id, { [field]: value, base: Object.values(vals).every(Number.isFinite) ? perGram(vals) : null });
+  };
+  /** Use a database food in place of a photo estimate, at the estimated weight when it has one. */
+  const applyDatabase = (i: Estimate, food: FoodChoice) => {
+    const amount = gramsAmount(food.basis, n(i.grams));
+    if (!amount) return setPicker({ mode: "swap", itemId: i.id, query: food.name, grams: null });
+    setItems((list) => list.map((x) => (x.id === i.id ? { id: crypto.randomUUID(), kind: "database", food, ...amount, replaced: i, estimatedAmount: true } : x)));
+  };
+  const blankItem = (): Item => ({ id: crypto.randomUUID(), kind: "estimate", name: "", portion: "", grams: "", calories: "", protein_g: "", carbs_g: "", fat_g: "", confidence: null, ingredients: [], searchTerm: "", base: null, suggestion: null });
 
   const totals = items.map(itemTotals);
   const invalid = items.length === 0 || totals.some((t) => t == null) || items.some((i) => i.kind === "estimate" && !i.name.trim());
@@ -147,7 +223,7 @@ export function FoodPhotoFlow({ date, defaultMeal, myFoods, extras, usage }: { d
     start(async () => {
       const payload = items.map((i) =>
         i.kind === "database"
-          ? { kind: "database" as const, picked: logItemFor(i.food, i.quantity, i.unitId) }
+          ? { kind: "database" as const, picked: logItemFor(i.food, i.quantity, i.unitId), estimatedAmount: i.estimatedAmount }
           : {
               kind: "estimate" as const,
               name: i.name.trim(),
@@ -159,7 +235,7 @@ export function FoodPhotoFlow({ date, defaultMeal, myFoods, extras, usage }: { d
               fat_g: n(i.fat_g),
             },
       );
-      const r = await logFoodPhotoItemsAction({ date, mealType: meal, items: payload });
+      const r = await logFoodPhotoItemsAction({ date, mealType: meal, clientId: saveId, items: payload });
       savingRef.current = false;
       if (!r.ok) return setError(r.error);
       setResult(r.message);
@@ -174,7 +250,7 @@ export function FoodPhotoFlow({ date, defaultMeal, myFoods, extras, usage }: { d
           <p role="status" className="font-semibold text-[#5fc49a]">
             {result}
           </p>
-          <p className="text-sm text-muted-foreground">They&apos;re marked as estimates in your diary. The photo wasn&apos;t kept.</p>
+          <p className="text-sm text-muted-foreground">Photo estimates, and amounts judged from the photo, are marked as estimates in your diary. The photo wasn&apos;t kept.</p>
           <div className="flex flex-wrap gap-2">
             <Button asChild>
               <Link href={`/nutrition?date=${date}`}>Go to my diary</Link>
@@ -238,7 +314,7 @@ export function FoodPhotoFlow({ date, defaultMeal, myFoods, extras, usage }: { d
               {phase === "analyzing" ? <Loader2 className="animate-spin" aria-hidden /> : <Sparkles aria-hidden />} {phase === "analyzing" ? "Estimating…" : "Estimate nutrition"}
             </Button>
             <p className="text-xs text-muted-foreground">
-              Uses 1 AI message ({Math.max(0, usage.limit - usage.used)} of {usage.limit} left this month). The photo is sent once and not stored.
+              Uses 1 AI message ({Math.max(0, usage.limit - used)} of {usage.limit} left this month). The photo is sent once and not stored.
             </p>
           </CardContent>
         </Card>
@@ -250,8 +326,28 @@ export function FoodPhotoFlow({ date, defaultMeal, myFoods, extras, usage }: { d
             <p className="flex items-start gap-2 font-semibold">
               <AlertTriangle className="mt-0.5 size-4 shrink-0 text-gold" aria-hidden /> Estimated from a photo, not measured
             </p>
-            <p className="mt-1 text-muted-foreground">Check and correct every item. Swap an item for a database food when you can; database values are more reliable.</p>
+            <p className="mt-1 text-muted-foreground">
+              Check and correct every item. Foods matched to the USDA database use its measured values; the amounts are still estimated from the photo. Ingredients, additives and allergens can&apos;t be seen in a photo, so none are listed.
+            </p>
           </div>
+          {PHOTO_QUALITY_NOTES[analysis.photoQuality] && (
+            <div role="note" className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border bg-card p-3 text-sm" data-testid="food-photo-quality">
+              <p>{PHOTO_QUALITY_NOTES[analysis.photoQuality]}</p>
+              <Button size="sm" variant="secondary" onClick={() => setPhase("capture")}>
+                <RotateCcw aria-hidden /> Use another photo
+              </Button>
+            </div>
+          )}
+          {analysis.packaged && (
+            <div role="note" className="space-y-2 rounded-2xl border border-border bg-card p-3 text-sm" data-testid="food-photo-packaged">
+              <p>This looks like a packaged product. Its barcode gives the label&apos;s own nutrition, ingredients, additives and allergens, which a photo of the food can&apos;t.</p>
+              <Button asChild size="sm" variant="secondary">
+                <Link href="/nutrition/scanner">
+                  <Barcode aria-hidden /> Scan the barcode instead
+                </Link>
+              </Button>
+            </div>
+          )}
           {!analysis.isFood && <p className="text-sm">No food was recognised in that photo. Add the items yourself below, or try another photo.</p>}
           {analysis.summary && <p className="text-sm text-muted-foreground">{analysis.summary}</p>}
 
@@ -273,7 +369,7 @@ export function FoodPhotoFlow({ date, defaultMeal, myFoods, extras, usage }: { d
                               key={x.key}
                               size="sm"
                               variant="secondary"
-                              onClick={() => setItems((list) => [...list, { id: crypto.randomUUID(), kind: "database", food: x.food, quantity: x.grams, unitId: "g", replaced: null }])}
+                              onClick={() => setItems((list) => [...list, { id: crypto.randomUUID(), kind: "database", food: x.food, quantity: x.grams, unitId: "g", replaced: null, estimatedAmount: false }])}
                             >
                               <Plus aria-hidden /> {x.label}
                             </Button>
@@ -300,13 +396,17 @@ export function FoodPhotoFlow({ date, defaultMeal, myFoods, extras, usage }: { d
                         <p className="text-sm text-muted-foreground">
                           {a?.amountLabel} · {i.food.detail ?? "Food database"}
                         </p>
-                        <Badge variant="success" className="mt-1">
-                          Database values
-                        </Badge>
+                        <div className="mt-1 flex flex-wrap gap-1.5">
+                          <Badge variant="success">Database values</Badge>
+                          {i.estimatedAmount && <Badge variant="secondary">Amount estimated from the photo</Badge>}
+                        </div>
                       </div>
                       <div className="flex gap-1">
+                        <Button size="icon-sm" variant="ghost" aria-label={`Change the amount of ${i.food.name}`} onClick={() => setPicker({ mode: "amount", itemId: i.id, initial: { food: i.food, quantity: i.quantity, unitId: i.unitId } })}>
+                          <Pencil aria-hidden />
+                        </Button>
                         {i.replaced && (
-                          <Button size="icon-sm" variant="ghost" aria-label={`Back to the photo estimate for ${i.replaced.name}`} onClick={() => setItems((list) => list.map((x) => (x.id === i.id && x.kind === "database" ? x.replaced! : x)))}>
+                          <Button size="icon-sm" variant="ghost" aria-label={`Back to the photo estimate for ${i.replaced.name}`} onClick={() => setItems((list) => list.map((x) => (x.id === i.id && x.kind === "database" && x.replaced ? x.replaced : x)))}>
                             <Undo2 aria-hidden />
                           </Button>
                         )}
@@ -362,7 +462,7 @@ export function FoodPhotoFlow({ date, defaultMeal, myFoods, extras, usage }: { d
                         <Label htmlFor={id(f)} className="text-xs">
                           {l}
                         </Label>
-                        <Input id={id(f)} type="number" inputMode="decimal" min="0" step="1" value={i[f]} onChange={(e) => update(i.id, { [f]: e.target.value })} className="px-2" />
+                        <Input id={id(f)} type="number" inputMode="decimal" min="0" step="any" value={i[f]} onChange={(e) => setNumber(i, f, e.target.value)} className="px-2" />
                       </div>
                     ))}
                   </div>
@@ -371,7 +471,18 @@ export function FoodPhotoFlow({ date, defaultMeal, myFoods, extras, usage }: { d
                       The calories don&apos;t match the macros (about {Math.round(macroCalories(v.protein_g, v.carbs_g, v.fat_g))} kcal from protein, carbs and fat). Check them.
                     </p>
                   )}
-                  <Button size="sm" variant="secondary" onClick={() => setPicker({ itemId: i.id, query: i.searchTerm || i.name })}>
+                  {i.base && <p className="text-xs text-muted-foreground">Changing the grams rescales the calories and macros.</p>}
+                  {i.suggestion && (
+                    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border p-2 text-sm" data-testid="food-photo-suggestion">
+                      <span className="min-w-0 flex-1">
+                        Closest database food: <span className="font-medium">{i.suggestion.name}</span>
+                      </span>
+                      <Button size="sm" variant="secondary" onClick={() => applyDatabase(i, i.suggestion!)}>
+                        Use its values
+                      </Button>
+                    </div>
+                  )}
+                  <Button size="sm" variant="secondary" onClick={() => setPicker({ mode: "swap", itemId: i.id, query: i.searchTerm || i.name, grams: Number.isFinite(n(i.grams)) && n(i.grams) > 0 ? n(i.grams) : null })}>
                     <Search aria-hidden /> Use a database food instead
                   </Button>
                 </li>
@@ -383,13 +494,29 @@ export function FoodPhotoFlow({ date, defaultMeal, myFoods, extras, usage }: { d
             <Button variant="secondary" size="sm" onClick={() => setItems((list) => [...list, blankItem()])}>
               <Plus aria-hidden /> Add something missing
             </Button>
-            <Button variant="secondary" size="sm" onClick={() => setPicker({ itemId: null, query: "" })}>
+            <Button variant="secondary" size="sm" onClick={() => setPicker({ mode: "add", query: "" })}>
               <Search aria-hidden /> Add from the food database
             </Button>
           </div>
 
           <Card>
             <CardContent className="space-y-3 pt-5">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label htmlFor="photo-review-meal">Add to</Label>
+                  <NativeSelect id="photo-review-meal" value={meal} onChange={(e) => setMeal(e.target.value as Meal)}>
+                    {MEALS.map(([v, l]) => (
+                      <option key={v} value={v}>
+                        {l}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="photo-review-date">Date</Label>
+                  <Input id="photo-review-date" type="date" value={date} max={deviceToday()} onChange={(e) => e.target.value && setDate(e.target.value)} />
+                </div>
+              </div>
               <p className="text-sm" data-testid="food-photo-total">
                 Total: <span className="font-semibold tabular-nums">{Math.round(sum.calories)} kcal</span> · P {r1(sum.protein_g)} g · C {r1(sum.carbs_g)} g · F {r1(sum.fat_g)} g, added to {MEALS.find(([v]) => v === meal)![1].toLowerCase()} on {date}
               </p>
@@ -423,15 +550,22 @@ export function FoodPhotoFlow({ date, defaultMeal, myFoods, extras, usage }: { d
         open={picker != null}
         onOpenChange={(o) => !o && setPicker(null)}
         myFoods={myFoods}
-        initialQuery={picker?.query}
+        initialQuery={picker && picker.mode !== "amount" ? picker.query : undefined}
+        initial={picker?.mode === "amount" ? picker.initial : null}
+        preferGrams={picker?.mode === "swap" ? picker.grams : null}
         title="Find the food"
         submitLabel="Use this food"
+        amountHint={picker?.mode === "swap" && picker.grams ? `Starts at the ${picker.grams} g estimated from the photo. Change it if you know better.` : "Pick the amount you ate."}
         onPick={(food, quantity, unitId) => {
-          const target = picker?.itemId ?? null;
+          const p = picker;
           setItems((list) => {
-            const replaced = target ? (list.find((x) => x.id === target && x.kind === "estimate") as Extract<Item, { kind: "estimate" }> | undefined) : undefined;
-            const next: Item = { id: crypto.randomUUID(), kind: "database", food, quantity, unitId, replaced: replaced ?? null };
-            return target ? list.map((x) => (x.id === target ? next : x)) : [...list, next];
+            if (p?.mode === "amount") return list.map((x) => (x.id === p.itemId && x.kind === "database" ? { ...x, quantity, unitId, estimatedAmount: false } : x));
+            if (p?.mode === "swap") {
+              const replaced = list.find((x): x is Estimate => x.id === p.itemId && x.kind === "estimate") ?? null;
+              const estimatedAmount = p.grams != null && unitId === "g" && quantity === Math.round(p.grams);
+              return list.map((x) => (x.id === p.itemId ? { id: crypto.randomUUID(), kind: "database", food, quantity, unitId, replaced, estimatedAmount } : x));
+            }
+            return [...list, { id: crypto.randomUUID(), kind: "database", food, quantity, unitId, replaced: null, estimatedAmount: false }];
           });
           setPicker(null);
         }}

@@ -47,6 +47,8 @@ export function SmallScore({ score }: { score: FoodIqScore }) {
   );
 }
 
+const joinWords = (w: string[]) => (w.length <= 1 ? (w[0] ?? "") : `${w.slice(0, -1).join(", ")} and ${w[w.length - 1]}`);
+
 function PointList({ items, tone }: { items: NutrientClass[]; tone: "positive" | "attention" }) {
   const Icon = tone === "positive" ? CheckCircle2 : AlertTriangle;
   return (
@@ -62,7 +64,20 @@ function PointList({ items, tone }: { items: NutrientClass[]; tone: "positive" |
 }
 
 /** The top of the product page: the Nutrition Score (when enabled) and the key points, readable in seconds. */
-export function FoodIqSummary({ score, enabled, positives, concerns }: { score: FoodIqScore; enabled: boolean; positives: NutrientClass[]; concerns: NutrientClass[] }) {
+export function FoodIqSummary({
+  score,
+  enabled,
+  positives,
+  concerns,
+  unknown = [],
+}: {
+  score: FoodIqScore;
+  enabled: boolean;
+  positives: NutrientClass[];
+  concerns: NutrientClass[];
+  /** Which of sugars, salt and saturated fat have no value: never reported as "not high". */
+  unknown?: string[];
+}) {
   return (
     <section aria-labelledby="fiq-title" className="space-y-3 rounded-2xl border border-gold-muted/60 bg-card-gradient p-4" data-testid="food-iq-summary">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -107,7 +122,12 @@ export function FoodIqSummary({ score, enabled, positives, concerns }: { score: 
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">To watch</p>
-            {concerns.length ? <PointList items={concerns} tone="attention" /> : <p className="text-sm text-muted-foreground">Nothing high in sugars, salt or saturated fat.</p>}
+            {concerns.length ? <PointList items={concerns} tone="attention" /> : unknown.length ? null : <p className="text-sm text-muted-foreground">Nothing high in sugars, salt or saturated fat.</p>}
+            {unknown.length > 0 && (
+              <p className="text-sm text-muted-foreground" data-testid="food-iq-unknown">
+                No value for {joinWords(unknown)}, so {unknown.length === 1 ? "it" : "they"} can&apos;t be checked.
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -177,7 +197,22 @@ export function EvidenceBadge({ cls }: { cls: EvidenceClass }) {
 }
 
 /** Ingredients that deserve attention, with what the evidence says (kept separate from what the label says). */
-export function IngredientAlertsSection({ alerts, hasIngredients }: { alerts: IngredientAlert[]; hasIngredients: boolean }) {
+export function IngredientAlertsSection({
+  alerts,
+  hasIngredients,
+  ingredientsLang = null,
+  incomplete = false,
+  source = "product",
+}: {
+  alerts: IngredientAlert[];
+  hasIngredients: boolean;
+  /** The ingredient list's language when it isn't English: the app's own word matching only reads English. */
+  ingredientsLang?: string | null;
+  /** The ingredient list is marked incomplete. */
+  incomplete?: boolean;
+  /** "label": read from a label the member photographed or typed, not from a product database. */
+  source?: "product" | "label";
+}) {
   return (
     <section aria-labelledby="alerts-title" className="space-y-3 rounded-2xl border border-gold-muted/60 bg-card p-4" data-testid="ingredient-alerts">
       <h2 id="alerts-title" className="font-display text-lg">
@@ -186,8 +221,21 @@ export function IngredientAlertsSection({ alerts, hasIngredients }: { alerts: In
       <p className="text-sm text-muted-foreground">
         Additives, sweeteners, preservatives and added sugars found in the declared ingredient list, with what each is for, what regulators say, how strong the evidence is and where it comes from. This is a reading of the label and product data, not a test of the food.
       </p>
+      {(ingredientsLang || incomplete) && hasIngredients && (
+        <p className="text-xs text-muted-foreground" data-testid="alerts-caveat">
+          {ingredientsLang ? "The ingredient list isn't in English, so added sugars and sodium sources in it may not be recognised. " : ""}
+          {incomplete ? "The ingredient list is marked incomplete. " : ""}
+          Check the package.
+        </p>
+      )}
       {alerts.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{hasIngredients ? "No additives, added sugars or sodium sources named in the product data." : "Unknown: there's no ingredient list in the product data yet. Check the package."}</p>
+        <p className="text-sm text-muted-foreground">
+          {hasIngredients
+            ? source === "label"
+              ? "No additives, added sugars or sodium sources recognised in the ingredient text. That isn't proof there are none: check the text matches the label."
+              : "No additives, added sugars or sodium sources named in the product data. That isn't proof there are none: product data can be incomplete."
+            : "Unknown: there's no ingredient list in the product data yet. Check the package."}
+        </p>
       ) : (
         <ul className="space-y-2" data-testid="additives">
           {alerts.map((a) => (

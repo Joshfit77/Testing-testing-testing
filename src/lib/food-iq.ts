@@ -10,7 +10,7 @@
  * 75% chance that a food is healthy or safe, and it says nothing about allergens, additives or a person's needs.
  */
 import { type DietType } from "@/lib/domain/diets";
-import { allergenLabel, type FoodFilters, type Nutrients, type QualityProduct } from "./food-quality";
+import { allergenLabel, allergenStatus, type FoodFilters, type Nutrients, type QualityProduct } from "./food-quality";
 
 export const FOOD_IQ_VERSION = "FIQ-0.1";
 
@@ -42,7 +42,7 @@ export function bandFor(score: number): { id: Band; label: string } {
 }
 
 export const SCORE_MEANING =
-  "A nutritional-quality rating per 100 g (or 100 ml), for comparing products. 75/100 doesn't mean a 75% chance a food is healthy or safe. It doesn't cover allergens, additives or your personal needs: see \"Fits your goals\" for those.";
+  "A nutritional-quality rating per 100 g (or 100 ml), for comparing products. 75/100 doesn't mean a 75% chance a food is healthy or safe. It doesn't cover allergens, processing or your personal needs (see \"Fits your goals\"), and leaves out additives, with one exception: drinks with non-sugar sweeteners lose points, as the breakdown shows.";
 
 export type FoodIqKind = "general" | "beverage" | "fats" | "water";
 export const KIND_LABEL: Record<FoodIqKind, string> = {
@@ -70,8 +70,10 @@ const WATER_TAGS = ["en:waters", "en:spring-waters", "en:mineral-waters", "en:na
 /** Non-sugar sweeteners covered by the WHO 2023 guideline (polyols aren't). */
 const NSS_CODES = new Set(["e950", "e951", "e952", "e954", "e955", "e957", "e959", "e960", "e960a", "e961", "e962", "e969"]);
 const NSS_WORDS = /\b(sucralose|aspartame|acesulfame|saccharin|steviol|stevia|cyclamate|neotame|advantame|monk ?fruit|mogrosides?)\b/i;
+/** "Aspartame-free", "no sweeteners", "without stevia": wording that says a sweetener is absent. */
+const NSS_ABSENT = /\b(?:(?:sucralose|aspartame|acesulfame|saccharin|steviol|stevia|cyclamate|neotame|advantame|sweetener)s?[- ]free|(?:no|without|free from) (?:artificial )?(?:sucralose|aspartame|acesulfame|saccharin|steviol|stevia|cyclamate|neotame|advantame|sweeteners?))\b/gi;
 export function hasNonSugarSweeteners(p: Pick<QualityProduct, "additives" | "ingredientsText">): boolean {
-  return p.additives.some((a) => NSS_CODES.has(a) || NSS_CODES.has(a.replace(/(i{1,3}|iv|v)$/, ""))) || NSS_WORDS.test(p.ingredientsText ?? "");
+  return p.additives.some((a) => NSS_CODES.has(a) || NSS_CODES.has(a.replace(/(i{1,3}|iv|v)$/, ""))) || NSS_WORDS.test((p.ingredientsText ?? "").replace(NSS_ABSENT, " "));
 }
 
 export function foodIqKind(p: QualityProduct): FoodIqKind {
@@ -448,8 +450,11 @@ export function fitsYourGoals(p: QualityProduct, m: MemberContext): GoalFit {
     if (share >= 25) conflicts.push(`${v.carbs_g} g of carbohydrates is ${share}% of your ${m.diet === "low_carb" ? "low-carb" : m.diet} daily carb target (${t.carbs_g} g).`);
   }
   for (const a of m.filters?.allergens ?? []) {
-    if (p.allergens.includes(a)) conflicts.push(`Contains ${allergenLabel(a).toLowerCase()}, which you've chosen to avoid.`);
-    else if (p.traces.includes(a)) conflicts.push(`May contain ${allergenLabel(a).toLowerCase()} (traces), which you've chosen to avoid.`);
+    const s = allergenStatus(p, a);
+    if (s.status === "conflict") conflicts.push(`Contains ${allergenLabel(a).toLowerCase()}, which you've chosen to avoid.`);
+    else if (s.status === "caution") conflicts.push(`May contain ${allergenLabel(a).toLowerCase()} (traces), which you've chosen to avoid.`);
+    // Missing or incomplete data is said out loud: it is never treated as "free of".
+    else if (s.status === "unknown") conflicts.push(`Can't check for ${allergenLabel(a).toLowerCase()}, which you've chosen to avoid: the allergen data is missing or incomplete. Read the label.`);
   }
   return { basis, rows, notes, conflicts };
 }

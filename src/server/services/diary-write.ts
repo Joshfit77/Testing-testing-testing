@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { scaleMacros, type Macros } from "@/lib/domain/nutrition";
 import { computeAmount, sanitizeBasis, unitIdForLabel, type FoodBasis } from "@/lib/domain/food-basis";
@@ -98,3 +99,8 @@ export function scaleItem(i: Record<string, unknown>, factor: number): Record<st
   };
 }
 
+/** The diary row id for item `index` of one save: the same save always gets the same ids. */
+export function rowClientId(clientId: string, index: number): string {
+  const h = createHash("sha256").update(`${clientId}:${index}`).digest("hex");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-${((parseInt(h[16]!, 16) & 0x3) | 0x8).toString(16)}${h.slice(17, 20)}-${h.slice(20, 32)}`;
+}

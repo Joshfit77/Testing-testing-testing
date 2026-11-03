@@ -102,7 +102,10 @@ export function BarcodeScanner({
   useEffect(() => stopCamera, [stopCamera]);
 
   const runLookup = useCallback(async (code: string, format?: RetailBarcodeFormat) => {
+    const offline = typeof navigator !== "undefined" && navigator.onLine === false;
     if (onCode) {
+      // Opening the product page needs the internet: say so instead of showing "Looking up…" forever.
+      if (offline) return setLookup({ kind: "error", code, message: "You're offline. Connect to the internet to look up products." });
       setLookup({ kind: "loading", code });
       onCode(code, format);
       return;
@@ -152,7 +155,8 @@ export function BarcodeScanner({
         return;
       }
       void hapticSuccess();
-      void runLookup(cleanBarcodeInput(res.code));
+      const code = cleanBarcodeInput(res.code);
+      void runLookup(code, res.format && barcodeLookupCandidates(code, res.format) ? res.format : undefined);
     } else if (res.kind === "cancelled") {
       setNativeMessage("Scan cancelled.");
     } else if (res.kind === "denied") {

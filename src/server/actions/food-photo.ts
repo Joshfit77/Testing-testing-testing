@@ -6,7 +6,8 @@ import { mealTypeSchema } from "@/lib/validation/schemas";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { assertFeature, EntitlementError, getUserPlan, requireUser } from "@/server/auth";
 import { getAiAllowance } from "@/server/services/ai-coach";
-import { amountColumns, findOrCreateMeal, LIMITS_ERROR, withinLimits, type MealItemRow } from "@/server/services/diary-write";
+import { amountColumns, findOrCreateMeal, LIMITS_ERROR, rowClientId, withinLimits, type MealItemRow } from "@/server/services/diary-write";
+import { isLoggableDate } from "@/lib/domain/food-photo";
 import { pickedFoodSchema, resolvePickedFood } from "@/server/services/food-resolve";
 import { logError } from "@/server/log";
 
@@ -42,13 +43,17 @@ const estimateItem = z.object({
   carbs_g: z.number().min(0).max(500),
   fat_g: z.number().min(0).max(300),
 });
-const databaseItem = z.object({ kind: z.literal("database"), picked: pickedFoodSchema });
+/** `estimatedAmount`: the food's values come from the database, but its amount is still the photo's estimate. */
+const databaseItem = z.object({ kind: z.literal("database"), picked: pickedFoodSchema, estimatedAmount: z.boolean().optional().default(false) });
 
 const logSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   mealType: mealTypeSchema,
+  /** One id per reviewed photo, made on the device: a retried or double-sent save can't add the items twice. */
+  clientId: z.string().uuid().optional(),
   items: z.array(z.discriminatedUnion("kind", [estimateItem, databaseItem])).min(1).max(15),
 });
+
 
 /**
  * Log the items the member confirmed. Photo estimates are saved as estimates ("photo" source); items matched to a
@@ -65,7 +70,8 @@ export async function logFoodPhotoItemsAction(input: unknown): Promise<Result> {
   if (!(await hasAi(user.id))) return { ok: false, error: "Food photo analysis is included with Pro." };
   const parsed = logSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Check the items: every one needs a name and calories and macros within range." };
-  const { date, mealType, items } = parsed.data;
+  const { date, mealType, items, clientId } = parsed.data;
+  if (!isLoggableDate(date)) return { ok: false, error: "Choose today or an earlier day." };
   const supabase = await getServerSupabase();
 
   const rows: MealItemRow[] = [];
@@ -99,12 +105,15 @@ export async function logFoodPhotoItemsAction(input: unknown): Promise<Result> {
     const cols = amountColumns(basis, quantity, unitId);
     if (!cols) return { ok: false, error: "Choose one of the units listed for this food." };
     if (!withinLimits(cols)) return { ok: false, error: LIMITS_ERROR };
-    rows.push({ food_id: rest.food_id, name: rest.name.slice(0, 160), is_estimate: rest.is_estimate, source: rest.source, ...cols });
+    const amount = item.estimatedAmount ? { amount_label: `${cols.amount_label ?? ""} (amount estimated from a photo)`.trim().slice(0, 160) } : {};
+    rows.push({ food_id: rest.food_id, name: rest.name.slice(0, 160), is_estimate: rest.is_estimate || item.estimatedAmount, source: rest.source, ...cols, ...amount });
   }
 
   try {
     const mealId = await findOrCreateMeal(supabase, user.id, date, mealType, "logged");
-    const { error } = await supabase.from("meal_items").insert(rows.map((r) => ({ meal_id: mealId, user_id: user.id, ...r })));
+    const { error } = await supabase.from("meal_items").insert(rows.map((r, i) => ({ meal_id: mealId, user_id: user.id, client_id: clientId ? rowClientId(clientId, i) : null, ...r })));
+    // Already saved by an earlier attempt of this same save (the whole insert is one statement: all rows or none).
+    if (error?.code === "23505" && clientId) return { ok: true, message: `Added ${rows.length} item${rows.length === 1 ? "" : "s"} to ${mealType}.` };
     if (error) throw error;
   } catch (err) {
     logError("food_photo.log", err);

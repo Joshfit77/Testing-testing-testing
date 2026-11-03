@@ -8,6 +8,7 @@ import {
   allergenLabel,
   COMPARE_ROWS,
   describeAdditive,
+  hasNoAllergenData,
   LEVELS_INFO,
   NOVA_INFO,
   NUTRI_SCORE_INFO,
@@ -208,7 +209,7 @@ export function IngredientsSection({ p }: { p: QualityProduct }) {
 }
 
 export function AllergensSection({ p }: { p: QualityProduct }) {
-  const noData = p.allergens.length === 0 && p.traces.length === 0 && !p.ingredientsText;
+  const noData = hasNoAllergenData(p);
   const diet = (v: QualityProduct["vegan"], word: string) =>
     v === "yes" ? `Looks ${word} from its ingredients` : v === "no" ? `Not ${word} (from its ingredients)` : v === "maybe" ? `Possibly not ${word}: some ingredients are unclear` : `Can't tell if it's ${word}`;
   return (
@@ -245,8 +246,9 @@ export function AllergensSection({ p }: { p: QualityProduct }) {
   );
 }
 
-const STATUS_ICON = { conflict: XCircle, caution: AlertTriangle, unknown: CircleHelp, ok: CheckCircle2 } as const;
-const STATUS_STYLE = { conflict: "text-[#f08a8a]", caution: "text-gold", unknown: "text-muted-foreground", ok: "text-[#5fc49a]" } as const;
+const STATUS_ICON = { conflict: XCircle, caution: AlertTriangle, unknown: CircleHelp, not_declared: Info, ok: CheckCircle2 } as const;
+const STATUS_STYLE = { conflict: "text-[#f08a8a]", caution: "text-gold", unknown: "text-muted-foreground", not_declared: "text-muted-foreground", ok: "text-[#5fc49a]" } as const;
+const STATUS_SR = { conflict: "Doesn't match: ", caution: "Caution: ", unknown: "Unknown: ", not_declared: "Not declared: ", ok: "Matches: " } as const;
 
 export function FilterResults({ results }: { results: FilterResult[] }) {
   if (!results.length) return <p className="text-sm text-muted-foreground">No filters set yet.</p>;
@@ -258,7 +260,7 @@ export function FilterResults({ results }: { results: FilterResult[] }) {
           <li key={i} className="flex items-start gap-2">
             <Icon className={cn("mt-0.5 size-4 shrink-0", STATUS_STYLE[r.status])} aria-hidden />
             <span>
-              <span className="sr-only">{r.status === "conflict" ? "Doesn't match: " : r.status === "caution" ? "Caution: " : r.status === "unknown" ? "Unknown: " : "Matches: "}</span>
+              <span className="sr-only">{STATUS_SR[r.status]}</span>
               {r.text}
             </span>
           </li>
@@ -406,7 +408,7 @@ export function CompareTable({ a, b, scores }: { a: QualityProduct; b: QualityPr
             </th>
             {[a, b].map((p) => (
               <td key={p.code} className="py-1.5">
-                {p.allergens.length ? p.allergens.map(allergenLabel).join(", ") : "None declared"}
+                {p.allergens.length ? p.allergens.map(allergenLabel).join(", ") : hasNoAllergenData(p) ? "No information" : "None declared in the data"}
               </td>
             ))}
           </tr>

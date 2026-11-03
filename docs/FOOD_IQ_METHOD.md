@@ -17,7 +17,9 @@ evidence). Tests: `tests/unit/food-iq.test.ts`, reference foods in `tests/fixtur
 
 - **What it is:** a nutritional-quality rating per 100 g (or 100 ml for drinks), for comparing products. 75/100 is
   **not** a 75% chance that a food is healthy or safe.
-- **What it leaves out:** allergens, additives, processing and personal needs. These are shown separately:
+- **What it leaves out:** allergens, processing, personal needs and additives, with one exception: drinks with
+  non-sugar sweeteners (E950–E969 or their names in the ingredients) lose 10 points, as the breakdown shows. Wording
+  that says a sweetener is absent ("aspartame-free") doesn't count. The rest is shown separately:
   - "Ingredients worth knowing about";
   - NOVA;
   - allergens;

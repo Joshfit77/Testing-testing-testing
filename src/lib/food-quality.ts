@@ -175,6 +175,16 @@ export interface OffQualityResponse {
   product?: Record<string, unknown>;
 }
 
+/**
+ * Whether a product's values are per 100 ml (a drink) or per 100 g. Its category decides when it has one: ice cream
+ * sold as "500 ml", soy sauce or syrup are foods, not drinks. Only a product without any category falls back to how
+ * its pack size is written.
+ */
+export function quantityUnit(categories: string[], servingUnit: unknown, quantity: string | null): "g" | "ml" {
+  if (categories.length) return categories.includes("en:beverages") ? "ml" : "g";
+  return String(servingUnit ?? "").toLowerCase() === "ml" || /\b\d+(?:[.,]\d+)?\s*(ml|cl|l)\b/i.test(quantity ?? "") ? "ml" : "g";
+}
+
 /** Normalise an OFF v2 product response. Null when the product isn't in OFF. */
 export function normalizeQualityProduct(json: OffQualityResponse | null | undefined, requestedCode: string): QualityProduct | null {
   const p = json?.product;
@@ -183,7 +193,7 @@ export function normalizeQualityProduct(json: OffQualityResponse | null | undefi
   const brand = text(typeof p.brands === "string" ? p.brands.split(",")[0] : null, 120);
   const name = text(p.product_name, 160) ?? text(p.product_name_en, 160) ?? text(p.generic_name, 160) ?? (brand ? `${brand} product` : `Product ${code}`);
   const quantity = text(p.quantity, 60);
-  const unit: "g" | "ml" = String(p.serving_quantity_unit ?? "").toLowerCase() === "ml" || /\b\d+(?:[.,]\d+)?\s*(ml|cl|l)\b/i.test(quantity ?? "") ? "ml" : "g";
+  const unit = quantityUnit(tags(p.categories_tags, 40), p.serving_quantity_unit, quantity);
   const nutriments = (p.nutriments && typeof p.nutriments === "object" ? p.nutriments : {}) as Record<string, unknown>;
   const servingQuantity = num(p.serving_quantity, 5000);
   const serving = servingQuantity && servingQuantity > 0 ? round1(servingQuantity) : null;
@@ -551,23 +561,33 @@ export function sanitizeFilters(raw: unknown): FoodFilters {
   };
 }
 
-export type FilterStatus = "conflict" | "caution" | "unknown" | "ok";
+/**
+ * "not_declared": the data is there and doesn't declare the allergen. That is never shown as a match or a tick: the
+ * data can be wrong or out of date, so it isn't proof that a product is free of an allergen.
+ */
+export type FilterStatus = "conflict" | "caution" | "unknown" | "not_declared" | "ok";
 export interface FilterResult {
   status: FilterStatus;
   text: string;
 }
 
-/** Check a product against the member's filters. Missing data is "unknown", never "ok". */
+/** No allergen declarations and no ingredient list: nothing can be said about allergens. */
+export const hasNoAllergenData = (p: Pick<QualityProduct, "allergens" | "traces" | "ingredientsText">) => p.allergens.length === 0 && p.traces.length === 0 && !p.ingredientsText;
+
+/** One allergen against a product's data. Absence in the data is at best "not declared", never "free of". */
+export function allergenStatus(p: QualityProduct, a: string): FilterResult {
+  const name = allergenLabel(a).toLowerCase();
+  if (p.allergens.includes(a)) return { status: "conflict", text: `Contains ${name} (declared).` };
+  if (p.traces.includes(a)) return { status: "caution", text: `May contain ${name} (traces declared).` };
+  if (hasNoAllergenData(p)) return { status: "unknown", text: `No allergen or ingredient information, so it can't be checked for ${name}.` };
+  if (p.incomplete.includes("ingredients")) return { status: "unknown", text: `The ingredient list is marked incomplete, so it can't be checked for ${name}. Read the label.` };
+  return { status: "not_declared", text: `No ${name} declared in this product's data. That isn't a guarantee: read the label.` };
+}
+
+/** Check a product against the member's filters. Missing data is "unknown", and no allergen is ever shown as "ok". */
 export function checkFilters(p: QualityProduct, f: FoodFilters): FilterResult[] {
   const out: FilterResult[] = [];
-  const noAllergenData = p.allergens.length === 0 && p.traces.length === 0 && !p.ingredientsText;
-  for (const a of f.allergens) {
-    const name = allergenLabel(a);
-    if (p.allergens.includes(a)) out.push({ status: "conflict", text: `Contains ${name.toLowerCase()} (declared).` });
-    else if (p.traces.includes(a)) out.push({ status: "caution", text: `May contain ${name.toLowerCase()} (traces declared).` });
-    else if (noAllergenData) out.push({ status: "unknown", text: `No allergen or ingredient information, so it can't be checked for ${name.toLowerCase()}.` });
-    else out.push({ status: "ok", text: `${name} isn't declared in the data. Check the label to be sure.` });
-  }
+  for (const a of f.allergens) out.push(allergenStatus(p, a));
   if (f.diet !== "none") {
     const s = f.diet === "vegan" ? p.vegan : p.vegetarian;
     const labelled = p.labels.includes(`en:${f.diet}`);
@@ -660,7 +680,12 @@ export function pickAlternatives(base: QualityProduct, candidates: QualityProduc
     seen.add(c.code);
     const cmp = comparable(base, c);
     if (!cmp.ok) continue;
-    if (filters && checkFilters(c, { ...filters, nutrition: [] }).some((r) => r.status === "conflict")) continue;
+    if (filters) {
+      // For an allergen the member avoids, only suggest products whose data covers it and declares neither the
+      // allergen nor traces of it; for a diet, never one that conflicts.
+      if (filters.allergens.some((a) => allergenStatus(c, a).status !== "not_declared")) continue;
+      if (checkFilters(c, { ...filters, allergens: [], nutrition: [] }).some((r) => r.status === "conflict")) continue;
+    }
     const reasons = alternativeReasons(base, c);
     if (reasons.length) out.push({ product: c, reasons, sameCategory: cmp.reason });
     if (out.length >= limit) break;

@@ -25,7 +25,9 @@ import { logError } from "@/server/log";
 
 export const metadata = { title: "Product details" };
 
-export default async function ProductQualityPage({ params }: { params: Promise<{ code: string }> }) {
+const FORMATS = ["ean13", "upca", "upce", "ean8"] as const;
+
+export default async function ProductQualityPage({ params, searchParams }: { params: Promise<{ code: string }>; searchParams: Promise<{ format?: string }> }) {
   const { user, profile } = await requireOnboardedUser();
   const { code: raw } = await params;
   const code = decodeURIComponent(raw).replace(/\D/g, "").slice(0, 14);
@@ -42,7 +44,8 @@ export default async function ProductQualityPage({ params }: { params: Promise<{
   let found: QualityLookup | null = null;
   let failed = false;
   try {
-    found = await getQualityProduct(code);
+    const f = (await searchParams).format;
+    found = await getQualityProduct(code, FORMATS.find((x) => x === f));
   } catch (err) {
     logError("food_quality.product", err);
     failed = true;
@@ -137,9 +140,23 @@ export default async function ProductQualityPage({ params }: { params: Promise<{
         <PageHeader eyebrow={[p.brand, p.quantity].filter(Boolean).join(" · ") || "Product"} title={p.name} description={`Barcode ${p.code}${p.category ? ` · ${tagLabel(p.category)}` : ""}`} />
       </div>
 
-      <FoodIqSummary score={score} enabled={scoreOn} positives={positives} concerns={concerns} />
+      <FoodIqSummary
+        score={score}
+        enabled={scoreOn}
+        positives={positives}
+        concerns={concerns}
+        unknown={(
+          [
+            ["sugars", p.per100.sugars_g],
+            ["salt", p.per100.salt_g],
+            ["saturated fat", p.per100.sat_fat_g],
+          ] as const
+        )
+          .filter(([, v]) => v == null)
+          .map(([w]) => w)}
+      />
       {scoreOn && <FoodIqBreakdown score={score} />}
-      <IngredientAlertsSection alerts={alerts} hasIngredients={Boolean(p.ingredientsText)} />
+      <IngredientAlertsSection alerts={alerts} hasIngredients={Boolean(p.ingredientsText)} ingredientsLang={p.ingredientsLang} incomplete={p.incomplete.includes("ingredients")} />
 
       {choice ? (
         <AddProductToDiary choice={choice} date={today} defaultMeal={mealForTime(new Date(2000, 0, 1, hour))} />

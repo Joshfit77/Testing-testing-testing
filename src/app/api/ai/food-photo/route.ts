@@ -1,8 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { FOOD_PHOTO_MAX_BYTES, sniffImageType } from "@/lib/domain/food-photo";
+import { FOOD_PHOTO_MAX_BYTES, FOOD_PHOTO_MAX_DIMENSION, sniffImageType } from "@/lib/domain/food-photo";
 import { authenticateRequest, planForAuth } from "@/server/api-auth";
 import { AI_ERROR_STATUS, AiError } from "@/server/services/ai-coach";
 import { analyzeFoodPhoto } from "@/server/services/food-photo";
+import { prepareImageForAi, UnreadableImageError } from "@/server/services/image-prep";
 import { logError } from "@/server/log";
 
 export const dynamic = "force-dynamic";
@@ -10,8 +11,9 @@ export const maxDuration = 60;
 
 /**
  * POST /api/ai/food-photo — multipart form with `photo` (JPEG, PNG or WebP, up to 5 MB) and optional `notes`.
- * Returns the AI's estimate for the member to correct and confirm. The photo is read into memory, sent to the AI
- * provider once and discarded: it is never stored. Entitlement, consent and usage limits are checked on the server.
+ * Returns the AI's estimate for the member to correct and confirm. The photo is read into memory, re-encoded on the
+ * server (upright, at most 1,024 px, every bit of metadata such as location removed), sent to the AI provider once and
+ * discarded: it is never stored. Entitlement, consent and usage limits are checked on the server.
  */
 export async function POST(request: NextRequest) {
   const auth = await authenticateRequest(request);
@@ -35,9 +37,17 @@ export async function POST(request: NextRequest) {
   if (!mediaType) return NextResponse.json({ error: "invalid_image", message: "That file isn't a JPEG, PNG or WebP photo." }, { status: 415 });
   const notes = String(form.get("notes") ?? "").trim().slice(0, 300);
 
+  let prepared: Awaited<ReturnType<typeof prepareImageForAi>>;
+  try {
+    prepared = await prepareImageForAi(bytes, mediaType, FOOD_PHOTO_MAX_DIMENSION);
+  } catch (err) {
+    if (err instanceof UnreadableImageError) return NextResponse.json({ error: "invalid_image", message: "That photo couldn't be read. Try another one." }, { status: 415 });
+    throw err;
+  }
+
   try {
     const plan = await planForAuth(auth);
-    const analysis = await analyzeFoodPhoto(auth.supabase, auth.user.id, plan, { base64: Buffer.from(bytes).toString("base64"), mediaType }, notes);
+    const analysis = await analyzeFoodPhoto(auth.supabase, auth.user.id, plan, { base64: Buffer.from(prepared.bytes).toString("base64"), mediaType: prepared.mediaType }, notes);
     return NextResponse.json(analysis, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {
     if (err instanceof AiError) {

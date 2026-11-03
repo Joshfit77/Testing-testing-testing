@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { ADDITIVE_EVIDENCE, EVIDENCE_LABEL, hasEvidence, ingredientAlerts } from "@/lib/additive-evidence";
+import { ADDITIVE_EVIDENCE, EVIDENCE_LABEL, hasEvidence, ingredientAlerts, sodiumSources } from "@/lib/additive-evidence";
 import { bandFor, fitsYourGoals, foodIqKind, foodIqScoreEnabled, hasNonSugarSweeteners, keyPoints, lin, nutrientClasses, positiveFactor, scoreFoodIq, type FoodIqScore } from "@/lib/food-iq";
-import { normalizeQualityProduct, type QualityProduct } from "@/lib/food-quality";
+import { normalizeQualityProduct, quantityUnit, type QualityProduct } from "@/lib/food-quality";
 import { PRODUCT_EXPLAIN_INSTRUCTIONS, productFactsForAi } from "@/lib/food-quality-ai";
 import { REFERENCE_FOODS, type ReferenceFood } from "../fixtures/food-iq-reference-foods";
 
@@ -191,10 +191,25 @@ describe("nutrient classifications", () => {
   });
 
   it("uses drink thresholds per 100 ml and shows per-serving amounts", () => {
-    const drink = nutrientClasses(product({ quantity: "330 ml", serving_size: "330 ml", serving_quantity: 330 }, { "energy-kcal_100g": 42, sugars_100g: 12, proteins_100g: 0, fat_100g: 0, "saturated-fat_100g": 0, salt_100g: 0 }));
+    const drink = nutrientClasses(product({ quantity: "330 ml", serving_size: "330 ml", serving_quantity: 330, categories_tags: ["en:beverages", "en:sodas"] }, { "energy-kcal_100g": 42, sugars_100g: 12, proteins_100g: 0, fat_100g: 0, "saturated-fat_100g": 0, salt_100g: 0 }));
     const sugar = drink.find((c) => c.id === "sugar_high")!;
     expect(sugar.detail).toMatch(/11.25 g/);
     expect(sugar.detail).toMatch(/A serving \(330 ml\) has 39.6 g/);
+  });
+});
+
+describe("allergens are never inferred from missing data", () => {
+  it("says it can't check an allergen the member avoids when the data is missing", () => {
+    const blank = product({ allergens_tags: [], traces_tags: [], ingredients_text: "" });
+    const fit = fitsYourGoals(blank, { targets: { calories: 2000, protein_g: 150, carbs_g: 200, fat_g: 70 }, goal: "maintain", diet: "balanced", filters: { allergens: ["en:peanuts"], diet: "none", nutrition: [] } });
+    expect(fit.conflicts.join(" ")).toMatch(/Can't check for peanuts/);
+  });
+
+  it("tells the AI that no allergen data means nothing is known", () => {
+    const blank = product({ allergens_tags: [], traces_tags: [], ingredients_text: "" });
+    const facts = productFactsForAi(blank, { score: scoreFoodIq(blank), alerts: [], alternatives: [] });
+    expect(facts).toMatch(/no allergen or ingredient information is available/);
+    expect(facts).not.toMatch(/Declared allergens: none listed/);
   });
 });
 
@@ -266,11 +281,58 @@ describe("ingredient evidence", () => {
   });
 
   it("lists sodium sources and added sugars from the ingredient text, with the label amounts", () => {
-    const ham = product({ ingredients_text: "Pork, water, salt, dextrose, preservative: sodium nitrite (E250)", additives_tags: ["en:e250"] }, { salt_100g: 2.2, sugars_100g: 1 });
+    const ham = product({ ingredients_text: "Pork, water, salt, dextrose, preservative: sodium nitrite (E250)", additives_tags: ["en:e250"], categories_tags: ["en:meats", "en:prepared-meats", "en:hams"] }, { salt_100g: 2.2, sugars_100g: 1 });
     const alerts = ingredientAlerts(ham);
     expect(alerts.find((a) => a.key === "e250")!.concern).toMatch(/Group 1/);
     expect(alerts.find((a) => a.key === "sodium_sources")!.purpose).toMatch(/salt, sodium nitrite.*2.2 g of salt per 100 g/);
+    expect(alerts.find((a) => a.key === "sodium_sources")!.dose).toMatch(/high in salt \(2.2 g per 100 g/);
     expect(alerts.find((a) => a.key === "added_sugars")!.purpose).toMatch(/dextrose/);
+    expect(alerts.find((a) => a.key === "added_sugars")!.dose).toMatch(/low in sugars/);
+  });
+
+  it("keeps IARC's processed-meat finding to processed meat, and doesn't read 'no added salt' as salt", () => {
+    // A Gouda with E252 isn't processed meat: no processed-meat cancer statistics.
+    const gouda = product({ ingredients_text: "Pasteurised milk, salt, cultures, rennet, preservative: E252", additives_tags: ["en:e252"], categories_tags: ["en:dairies", "en:cheeses", "en:goudas"] }, { salt_100g: 1.8 });
+    const nitrate = ingredientAlerts(gouda).find((a) => a.key === "e252")!;
+    expect(nitrate.concern).not.toMatch(/Group 1|processed meat/);
+    expect(nitrate.sources.map((s) => s.label).join(" ")).toMatch(/EFSA \(2017\)/);
+    const crackers = product({ ingredients_text: "Wheat flour, sunflower oil, no added salt, yeast" });
+    expect(ingredientAlerts(crackers).find((a) => a.key === "sodium_sources")).toBeUndefined();
+    expect(sodiumSources("Tomatoes, salt-free seasoning, unsalted butter, sea salt")).toEqual(["sea salt"]);
+  });
+
+  it("cites the documents that actually make each claim", () => {
+    const labels = (code: string) => ADDITIVE_EVIDENCE[code]!.sources.map((s) => s.label).join(" | ");
+    expect(labels("e320")).toMatch(/IARC Monographs volume 40/);
+    expect(labels("e924")).toMatch(/IARC Monographs volume 73/);
+    expect(labels("e924")).toMatch(/21 CFR 137.155/);
+    expect(labels("e443")).toMatch(/FDA \(2024\)/);
+    expect(labels("e621")).toMatch(/EFSA \(2017\): re-evaluation of glutamic acid/);
+    expect(labels("e954")).toMatch(/IARC Monographs volume 73/);
+    expect(labels("e120")).toMatch(/21 CFR 73.100/);
+  });
+
+  it("groups synthetic colours and emulsifying salts correctly", () => {
+    const p = product({ additives_tags: ["en:e129", "en:e100", "en:e339", "en:e322"] });
+    const group = (k: string) => ingredientAlerts(p).find((a) => a.key === k)!.group;
+    expect(group("e129")).toBe("Synthetic colour");
+    expect(group("e100")).toBe("Colour");
+    expect(group("e322")).toBe("Emulsifier");
+    expect(group("e339")).toBe("Acidity regulator");
+  });
+
+  it("doesn't count a sweetener the label says is absent", () => {
+    expect(hasNonSugarSweeteners({ additives: [], ingredientsText: "Carbonated water, sugar, flavourings. Aspartame-free." })).toBe(false);
+    expect(hasNonSugarSweeteners({ additives: [], ingredientsText: "Water, juice, no artificial sweeteners" })).toBe(false);
+    expect(hasNonSugarSweeteners({ additives: [], ingredientsText: "Water, sucralose" })).toBe(true);
+  });
+
+  it("measures a product per 100 ml only when it's a drink", () => {
+    expect(quantityUnit(["en:desserts", "en:frozen-desserts", "en:ice-creams"], "ml", "500 ml")).toBe("g");
+    expect(quantityUnit(["en:condiments", "en:sauces", "en:soy-sauces"], null, "250 ml")).toBe("g");
+    expect(quantityUnit(["en:beverages", "en:sodas"], null, "330 ml")).toBe("ml");
+    expect(quantityUnit([], null, "1 l")).toBe("ml");
+    expect(quantityUnit([], null, "200 g")).toBe("g");
   });
 
   it("gives the AI only reviewed evidence and real alternatives", () => {

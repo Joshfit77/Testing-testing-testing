@@ -22,7 +22,8 @@ export function QualityScanner() {
   return (
     <BarcodeScanner
       onFound={() => undefined}
-      onCode={(code) => router.push(`/nutrition/product/${encodeURIComponent(code)}`)}
+      // The barcode type travels with the code: an 8-digit code can be EAN-8 or UPC-E, which are different products.
+      onCode={(code, format) => router.push(`/nutrition/product/${encodeURIComponent(code)}${format ? `?format=${format}` : ""}`)}
       onEnterManually={() => router.push("/nutrition")}
     />
   );

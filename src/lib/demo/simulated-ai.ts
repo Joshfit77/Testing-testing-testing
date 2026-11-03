@@ -144,6 +144,8 @@ export function simulatedStructured(req: SimRequest): Record<string, unknown> | 
     });
     return {
       is_food: true,
+      photo_quality: "clear",
+      packaged: false,
       summary: `${SIMULATED_LABEL} The photo was not analysed; these are fixed sample items for you to review and edit.`,
       items: [
         it("Grilled chicken breast", "a palm-sized fillet", 150, 248, 46, 0, 5, "chicken breast"),

@@ -132,7 +132,7 @@ export function nativeBarcodeScannerAvailable(): boolean {
   return Boolean(cap?.PluginHeaders?.some((p) => p.name === BARCODE_PLUGIN));
 }
 
-export type NativeScanResult = { kind: "scanned"; code: string } | { kind: "cancelled" } | { kind: "denied" } | { kind: "error"; message: string };
+export type NativeScanResult = { kind: "scanned"; code: string; format?: "ean13" | "upca" | "upce" | "ean8" } | { kind: "cancelled" } | { kind: "denied" } | { kind: "error"; message: string };
 
 /**
  * Opens the system barcode scanner (full-screen camera) and resolves with the code. The plugin rejects
@@ -148,7 +148,10 @@ export async function scanBarcodeNative(): Promise<NativeScanResult> {
       cancelButtonAccessibilityLabel: "Cancel scanning",
     });
     const code = (res?.ScanResult ?? "").trim();
-    return code ? { kind: "scanned", code } : { kind: "cancelled" };
+    // The symbology, when the plugin reports it: an 8-digit code can be EAN-8 or UPC-E, which are different products.
+    const T = CapacitorBarcodeScannerTypeHint;
+    const format = res?.format === T.EAN_13 ? "ean13" : res?.format === T.UPC_A ? "upca" : res?.format === T.UPC_E ? "upce" : res?.format === T.EAN_8 ? "ean8" : undefined;
+    return code ? { kind: "scanned", code, format } : { kind: "cancelled" };
   } catch (err) {
     const e = err as { code?: string; message?: string } | null;
     const code = e?.code ?? "";

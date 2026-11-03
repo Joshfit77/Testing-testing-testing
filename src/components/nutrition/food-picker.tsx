@@ -8,7 +8,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarcodeScanner } from "@/components/nutrition/barcode-scanner";
 import { AmountPicker } from "@/components/nutrition/food-amount";
 import { ChoiceRow, foodChoice, searchErrorMessage, type MyFood } from "@/components/nutrition/nutrition-client";
-import { defaultUnit, type FoodChoice } from "@/lib/domain/food-basis";
+import { basisUnits, defaultUnit, type FoodBasis, type FoodChoice } from "@/lib/domain/food-basis";
+
+/** `grams` as an amount of this food, when it can be measured in grams. */
+export function gramsAmount(basis: FoodBasis, grams: number | null | undefined): { unitId: string; quantity: number } | null {
+  if (!grams || !Number.isFinite(grams) || grams <= 0) return null;
+  return basisUnits(basis).some((u) => u.id === "g") ? { unitId: "g", quantity: Math.round(grams) } : null;
+}
 import { prepareEntry, rankFoods } from "@/lib/domain/food-search";
 
 /**
@@ -24,6 +30,8 @@ export function FoodPickerDialog({
   title = "Add ingredient",
   submitLabel = "Add ingredient",
   initialQuery,
+  amountHint = "Pick the amount used in the whole recipe.",
+  preferGrams,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -35,6 +43,10 @@ export function FoodPickerDialog({
   submitLabel?: string;
   /** Start the search with this term (e.g. a food name suggested from a photo). */
   initialQuery?: string;
+  /** What the amount step asks for. */
+  amountHint?: string;
+  /** Start the amount step at this many grams when the food can be measured in grams (e.g. a photo's estimate). */
+  preferGrams?: number | null;
 }) {
   const [tab, setTab] = useState("search");
   const [q, setQ] = useState("");
@@ -81,14 +93,14 @@ export function FoodPickerDialog({
 
   const mine = myFoods.map((f) => foodChoice(f, "mine"));
   const mineFiltered = filter.trim() ? rankFoods(mine, filter, (c) => prepareEntry(c.name), 100) : mine;
-  const choose = (food: FoodChoice) => setPicked({ food, ...defaultUnit(food.basis) });
+  const choose = (food: FoodChoice) => setPicked({ food, ...(gramsAmount(food.basis, preferGrams) ?? defaultUnit(food.basis)) });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent side="bottom" className="max-h-[92dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{picked ? "How much?" : title}</DialogTitle>
-          <DialogDescription>{picked ? "Pick the amount used in the whole recipe." : "Search the food database, your foods, or scan a barcode."}</DialogDescription>
+          <DialogDescription>{picked ? amountHint : "Search the food database, your foods, or scan a barcode."}</DialogDescription>
         </DialogHeader>
         {picked ? (
           <div className="mt-3">

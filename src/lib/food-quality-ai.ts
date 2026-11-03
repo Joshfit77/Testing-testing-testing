@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { EVIDENCE_LABEL, type IngredientAlert } from "./additive-evidence";
 import { NUTRITION_SCORE_LABEL, type FoodIqScore } from "./food-iq";
-import { addedSugarIngredients, allergenLabel, describeAdditive, NOVA_INFO, NUTRIENT_KEYS, tagLabel, type Nutrients, type QualityProduct } from "./food-quality";
+import { addedSugarIngredients, allergenLabel, describeAdditive, hasNoAllergenData, NOVA_INFO, NUTRIENT_KEYS, tagLabel, type Nutrients, type QualityProduct } from "./food-quality";
 
 /** Pro: an AI explanation of a scanned product for the member's goals, from the known data only. */
 export const productExplanationSchema = z.object({
@@ -66,8 +66,10 @@ export function productFactsForAi(p: QualityProduct, extra: { score?: FoodIqScor
     `Nutri-Score: ${p.nutriScore.grade ? p.nutriScore.grade.toUpperCase() : p.nutriScore.status === "not_applicable" ? "not applicable" : "not available"}. NOVA: ${p.nova ? `${p.nova} (${NOVA_INFO.groups[p.nova]})` : "not available"}.`,
     `Ingredients: ${p.ingredientsText ? p.ingredientsText.slice(0, 1200) : "not available"}.`,
     `Forms of sugar in the ingredient list: ${sugars.length ? sugars.join(", ") : p.ingredientsText ? "none named" : "unknown"}.`,
-    `Additives: ${p.additives.length ? p.additives.map((a) => `${describeAdditive(a).code} ${describeAdditive(a).name}`).join(", ") : "none listed"}.`,
-    `Declared allergens: ${p.allergens.length ? p.allergens.map(allergenLabel).join(", ") : "none listed"}. May contain: ${p.traces.length ? p.traces.map(allergenLabel).join(", ") : "none listed"}.`,
+    `Additives: ${p.additives.length ? p.additives.map((a) => `${describeAdditive(a).code} ${describeAdditive(a).name}`).join(", ") : p.ingredientsText ? "none listed in the data (not proof there are none)" : "unknown (no ingredient list)"}.`,
+    hasNoAllergenData(p)
+      ? "Allergens: no allergen or ingredient information is available, so nothing is known about allergens. Never suggest it is free of any allergen."
+      : `Declared allergens: ${p.allergens.length ? p.allergens.map(allergenLabel).join(", ") : "none declared in the data"}. May contain: ${p.traces.length ? p.traces.map(allergenLabel).join(", ") : "none declared in the data"}. Data that doesn't declare an allergen is not proof the product is free of it.`,
     `Vegan: ${p.vegan}. Vegetarian: ${p.vegetarian}.`,
     p.incomplete.length ? `Open Food Facts marks these parts as incomplete: ${p.incomplete.join(", ")}.` : "",
     score?.status === "scored" ? `${NUTRITION_SCORE_LABEL} (experimental nutritional-quality rating per 100 ${p.unit}): ${score.score}/100, ${score.band.label}. ${score.summary}` : "",
