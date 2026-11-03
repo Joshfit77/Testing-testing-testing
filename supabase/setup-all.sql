@@ -5005,6 +5005,21 @@ create trigger faith_reminder_prefs_updated_at before update on public.faith_rem
 -- Row Level Security: owner-only
 -- ---------------------------------------------------------------------------------------------------------------
 
+-- Row level security on every new table (stated one by one so static checks can see it; the policies follow).
+alter table public.bible_reading_state enable row level security;
+alter table public.bible_reading_history enable row level security;
+alter table public.bible_highlights enable row level security;
+alter table public.bible_bookmarks enable row level security;
+alter table public.bible_notes enable row level security;
+alter table public.scripture_memory enable row level security;
+alter table public.bible_study_progress enable row level security;
+alter table public.faith_daily_goals enable row level security;
+alter table public.faith_reminder_prefs enable row level security;
+alter table public.faith_journeys enable row level security;
+alter table public.faith_journey_attempts enable row level security;
+alter table public.faith_journey_checkins enable row level security;
+alter table public.bible_ai_usage enable row level security;
+
 do $$
 declare
   t text;

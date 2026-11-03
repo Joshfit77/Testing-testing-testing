@@ -109,11 +109,11 @@ export function defaultFaithReminder(kind: FaithReminderKind): FaithReminder {
 }
 
 /**
- * Notification id bases (rest timer 4201, workout reminders 5200–5206). Weekly kinds: base + weekday. Dated kinds:
+ * Notification id bases (rest timer 4201, workout reminders 5200–5206, sleep alarm 5400–5410). Weekly kinds: base + weekday. Dated kinds:
  * base + days from today (0–6). 5310–5316 were the weekly prayer reminders before prayer became dated; they stay in
  * the cancel list so an older schedule on a device is cleared.
  */
-const ID_BASE: Record<FaithReminderKind, number> = { devotional: 5300, prayer: 5410, practices: 5320, reading: 5400, challenge: 5420, fitness: 5430, accountability: 5440, final: 5450, memorize: 5460 };
+const ID_BASE: Record<FaithReminderKind, number> = { devotional: 5300, practices: 5320, reading: 5500, prayer: 5510, challenge: 5520, fitness: 5530, accountability: 5540, final: 5550, memorize: 5560 };
 const LEGACY_PRAYER_IDS = ALL_DAYS.map((d) => 5310 + d);
 export const ALL_FAITH_REMINDER_IDS: number[] = [...FAITH_REMINDER_KINDS.flatMap((k) => ALL_DAYS.map((d) => ID_BASE[k] + d)), ...LEGACY_PRAYER_IDS];
 /** Today's dated notification id for a kind. */
