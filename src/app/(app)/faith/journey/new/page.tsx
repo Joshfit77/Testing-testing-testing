@@ -15,7 +15,7 @@ import { bibleMeta } from "@/server/bible/text";
 export const metadata = { title: "Choose a journey" };
 
 const step = "flex min-h-14 items-center justify-between gap-3 rounded-2xl border border-border bg-card px-4 py-3 hover:border-gold-muted";
-const minutesLabel = (m: number) => (m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`);
+const minutesLabel = (m: number) => (m < 60 ? `${m} min` : m % 60 === 0 ? `${m / 60} h` : `${Math.floor(m / 60)} h ${m % 60} min`);
 
 /**
  * Choosing a journey, one step per screen (links, so Back works): plan → book or topic → duration (each with its daily

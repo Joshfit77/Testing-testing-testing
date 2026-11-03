@@ -284,7 +284,7 @@ export function ChapterReader(props: {
         <div
           role="toolbar"
           aria-label={`Actions for ${ref}`}
-          className="fixed inset-x-2 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 mx-auto max-w-xl rounded-2xl border border-gold-muted bg-card/95 p-3 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.8)] backdrop-blur md:bottom-6"
+          className="fixed inset-x-2 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 mx-auto max-w-xl rounded-2xl border border-gold-muted bg-card p-3 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.8)] md:bottom-6"
         >
           <div className="mb-2 flex items-center justify-between gap-2">
             <p className="min-w-0 truncate text-sm font-semibold text-gold-highlight">{ref}</p>
