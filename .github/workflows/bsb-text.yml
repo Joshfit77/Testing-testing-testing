@@ -98,9 +98,10 @@ jobs:
         run: node scripts/build-bsb-bible.mjs bsb.txt src/data/bible/books.json bsb-bible "$BSB_SOURCE"
       - name: Mark the words of Jesus (red letter) from an official USFM edition of the BSB
         env:
-          # SHA-256 of the USFM edition the red-letter data comes from. Empty until the first run has been reviewed;
-          # once set, any other content is refused.
-          BSB_USFM_SHA256: ""
+          # SHA-256 of the publisher's USFM edition the red-letter data comes from (https://bereanbible.com/bsb_usfm.zip,
+          # first downloaded 2026-11-03 by run 41639831204: 66 books, words of Jesus marked with \wj). Any other
+          # content is refused; if the publisher revises the file, review it, then update this value.
+          BSB_USFM_SHA256: f0c56438eb89c98e8f62c5c00461e25cc35b098ad5b179bc350cede759ee5f87
         run: |
           set -euo pipefail
           fetch() { curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --max-filesize 104857600 -o "$2" "$1"; }

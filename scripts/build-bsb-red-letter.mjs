@@ -31,7 +31,7 @@ const NOTE = new Set(["f", "fe", "ef", "x", "ex", "fig", "rq"]);
 const HEADING = /^(id|ide|h|toc\d?|toca\d?|mt\d?|mte\d?|ms\d?|mr|s\d?|sr|r|d|sp|cl|cd|rem|sts|restore|imt\d?|is\d?|ip|ipi|im|imi|ipq|imq|ipr|iq\d?|ib|ili\d?|iot|io\d?|iex|imte\d?|ie|periph|usfm)$/;
 
 /** Parses one USFM book into Map(chapter → Map(verse → [{ text, wj }])). */
-function parseBook(src) {
+function parseBook(src, raw) {
   const chapters = new Map();
   let chapter = 0;
   let verse = 0;
@@ -51,6 +51,7 @@ function parseBook(src) {
     if (lead && HEADING.test(lead[1])) continue; // headings and titles never belong to a verse
     // Walk the line: markers start with a backslash; everything else is text.
     // An opening marker takes one following space as its delimiter; a closing marker (\\wj*) does not.
+    const touched = new Set(segs ? [`${chapter}:${verse}`] : []);
     const re = /\\(\+?)([a-z]+\d*)(\*?)|([^\\]+)/g;
     let m;
     while ((m = re.exec(line))) {
@@ -78,6 +79,7 @@ function parseBook(src) {
         if (!chapters.has(chapter)) chapters.set(chapter, new Map());
         segs = [];
         chapters.get(chapter).set(verse, segs);
+        touched.add(`${chapter}:${verse}`);
         continue;
       }
       if (NOTE.has(tag)) {
@@ -95,11 +97,55 @@ function parseBook(src) {
       if (!closing && /^(p|m|pi\d?|mi|nb|pc|pr|pm|pmo|pmc|pmr|cls|li\d?|lh|lf|lim\d?|q\d?|qr|qc|qa|qm\d?|qd|b|tr|th\d?|thr\d?|tc\d?|tcr\d?)$/.test(tag)) push(" ");
     }
     push(" "); // a line break is a space
+    for (const k of touched) raw?.set(k, ((raw.get(k) ?? "") + line + "\n").slice(0, 600));
   }
   return chapters;
 }
 
 const squash = (s) => s.replace(/\s+/g, " ");
+
+/**
+ * Editorial marks in the USFM that the app's text (bsb.txt) leaves out: a bracketed closing quote at the end of a
+ * paragraph whose speech continues ("[’’]"). They are punctuation, not words.
+ */
+const EDITORIAL = /\[[“”‘’"']+\]/g;
+const editorialSeen = new Map();
+
+/**
+ * A pattern that finds a stretch of USFM text in the app's verse text. Every word and punctuation mark must match
+ * exactly; the only freedom is typesetting space: around dashes, just inside quotation marks and parentheses (the USFM
+ * sometimes has "heaven— the Son" or "‘ I tell you" where the app has "heaven—the Son" and "‘I tell you").
+ */
+function stretchPattern(piece) {
+  const p = piece
+    .replace(/\s*([—–])\s*/g, "$1")
+    .replace(/([‘“(])\s+/g, "$1")
+    .replace(/\s+([’”)])/g, "$1");
+  let re = "";
+  for (const ch of p) {
+    if (/\s/.test(ch)) re += re.endsWith("\\s+") ? "" : "\\s+";
+    else if (ch === "—" || ch === "–") re += `\\s*${ch}\\s*`;
+    else if (ch === "‘" || ch === "“") re += `${ch}\\s*`;
+    else if (ch === "(") re += "\\(\\s*";
+    else if (ch === "’" || ch === "”") re += `\\s*${ch}`;
+    else if (ch === ")") re += "\\s*\\)";
+    else re += ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+  return new RegExp(re, "gu");
+}
+
+/** Finds a stretch at or after `from`; returns its [start, end) in the app's text, trimmed of edge spaces. */
+function findStretch(text, piece, from) {
+  const re = stretchPattern(piece);
+  re.lastIndex = from;
+  const m = re.exec(text);
+  if (!m) return null;
+  let start = m.index;
+  let end = m.index + m[0].length;
+  while (start < end && /\s/.test(text[start])) start++;
+  while (end > start && /\s/.test(text[end - 1])) end--;
+  return [start, end];
+}
 
 const out = {};
 const failures = [];
@@ -120,7 +166,9 @@ for (const file of readdirSync(usfmDir).sort()) {
   seenBooks.add(id);
   wjMarkers.open += (src.match(/\\\+?wj\s/g) ?? []).length;
   const book = JSON.parse(readFileSync(path.join(bibleDir, "books", `${id}.json`), "utf8"));
-  const parsed = parseBook(src);
+  for (const m of src.matchAll(EDITORIAL)) editorialSeen.set(m[0], (editorialSeen.get(m[0]) ?? 0) + 1);
+  const raw = new Map();
+  const parsed = parseBook(src, raw);
   for (const [c, verses] of parsed) {
     const rows = book.chapters[c - 1];
     if (!rows) continue;
@@ -139,22 +187,22 @@ for (const file of readdirSync(usfmDir).sort()) {
       let cursor = 0;
       let ok = true;
       for (const s of segs) {
-        const piece = squash(s.text).trim();
+        const piece = squash(s.text.replace(EDITORIAL, "")).trim();
         if (!piece) continue;
-        const at = t.indexOf(piece, cursor);
+        const found = findStretch(t, piece, cursor);
         if (!s.wj) {
-          if (at >= 0) cursor = at + piece.length;
+          if (found) cursor = found[1];
           continue;
         }
-        if (at < 0) {
+        if (!found) {
           ok = false;
-          failures.push(`${ref}: "${piece.slice(0, 80)}" (marked as His words) is not in the app's text: "${t.slice(0, 160)}"`);
+          failures.push(`${ref}: "${piece.slice(0, 300)}" (marked as His words) is not in the app's text: "${t.slice(0, 300)}"\n      USFM: ${(raw.get(`${c}:${v}`) ?? "").trim().replace(/\n/g, " | ").slice(0, 500)}`);
           break;
         }
         const prev = ranges.at(-1);
-        if (prev && /^[\s]*$/.test(t.slice(prev[1], at))) prev[1] = at + piece.length;
-        else ranges.push([at, at + piece.length]);
-        cursor = at + piece.length;
+        if (prev && /^\s*$/.test(t.slice(prev[1], found[0]))) prev[1] = found[1];
+        else ranges.push(found);
+        cursor = found[1];
       }
       if (!ok) continue;
       ((out[id] ??= {})[c] ??= {})[v] = ranges;
@@ -168,6 +216,7 @@ for (const file of readdirSync(usfmDir).sort()) {
 console.log(`USFM book files read: ${usfmFiles}; \\wj markers: ${wjMarkers.open}`);
 console.log(`Verses with words of Jesus: ${markedVerses} (${spans} stretches)`);
 console.log(`By book: ${Object.entries(perBook).map(([b, n]) => `${b} ${n}`).join(", ") || "none"}`);
+console.log(`Editorial marks left out (not in the app's text): ${[...editorialSeen].map(([k, n]) => `${k} ×${n}`).join(", ") || "none"}`);
 console.log(`Marked verses whose USFM wording differs from the app's (information; the marked words themselves matched): ${textDiffers.length}`);
 if (textDiffers.length) console.log(`  e.g. ${textDiffers.slice(0, 15).join(", ")}`);
 
