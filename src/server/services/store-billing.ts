@@ -14,6 +14,7 @@ import type { Plan } from "@/lib/domain/types";
 import { serverEnv } from "@/server/env";
 import { logInfo } from "@/server/log";
 import { recomputeEntitlement } from "@/server/services/billing";
+import { sandboxPurchasesAllowed } from "@/server/services/sandbox-testers";
 import { claimWebhookEvent, processClaimedEvent, type WebhookOutcome } from "@/server/services/webhook-events";
 
 /**
@@ -86,7 +87,8 @@ export async function syncStoreSubscriber(userId: string): Promise<Plan | null> 
     subscriber,
     { plus: serverEnv.revenueCatEntitlementPlus, pro: serverEnv.revenueCatEntitlementPro },
     previousPlans,
-    { allowTestStore: serverEnv.revenueCatAllowTestStore, allowSandbox: serverEnv.revenueCatAllowSandbox },
+    // Sandbox (free) purchases count only for allow-listed testers, by user id (or everywhere on a test deployment).
+    { allowTestStore: serverEnv.revenueCatAllowTestStore, allowSandbox: await sandboxPurchasesAllowed(userId) },
   );
   const { data: result, error } = await admin.rpc("apply_store_snapshot", { p_user_id: userId, p_fetched_at: fetchedAt.toISOString(), p_rows: rows });
   if (error) throw error;

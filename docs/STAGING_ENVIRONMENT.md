@@ -60,7 +60,7 @@ Deploy the branch you want to test. The iPhone app shows whatever this deploymen
 | `REVENUECAT_PUBLIC_KEY_IOS` | `appl_…` (public SDK key) | — |
 | `REVENUECAT_ENTITLEMENT_PRO` | `pro` (default) | — |
 | `REVENUECAT_PRODUCTS_PRO_MONTHLY`, `…_YEARLY` | the App Store product IDs you create (defaults `ngf_pro_monthly`, `ngf_pro_yearly`) | — |
-| `REVENUECAT_ALLOW_SANDBOX` | **`true` on staging**, so TestFlight purchases (always sandbox, never charged) unlock Pro | **`false`** unless you decide otherwise for App Review (docs/MOBILE_BILLING.md) |
+| `REVENUECAT_ALLOW_SANDBOX` | `true` on staging (every account's TestFlight purchases, always sandbox and never charged, unlock Pro) or `false` with the sandbox tester allow-list | **`false`**: App Review's demo account and TestFlight testers go on the sandbox tester allow-list (docs/MOBILE_BILLING.md "Sandbox purchases") |
 | `REVENUECAT_ALLOW_TEST_STORE` | unset | never `true` |
 | `LEGAL_TERMS_URL`, `LEGAL_PRIVACY_URL` | unset until counsel-reviewed documents exist (the app then links its drafts, marked as drafts) | final URLs |
 | `USDA_FDC_API_KEY` | optional free key; blank searches the bundled USDA database | — |

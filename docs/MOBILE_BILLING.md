@@ -57,21 +57,71 @@
    - `REVENUECAT_WEBHOOK_AUTH` (the exact header value)
    - `REVENUECAT_PUBLIC_KEY_IOS` / `REVENUECAT_PUBLIC_KEY_ANDROID`
    - optionally the product ids and entitlement ids
-   - `REVENUECAT_ALLOW_SANDBOX=true` while sandbox purchases must unlock Pro. The server ignores App Store / Play
-     **sandbox** purchases unless this is set (`storeRowsFromSubscriber`, `src/lib/billing/revenuecat.ts`), and every
-     purchase made from a development build, a TestFlight build, or by App Review is a sandbox purchase. The phone
-     always talks to the one deployed server (`CAP_SERVER_URL`), so set it on that deployment for the sandbox plan
-     below, for TestFlight and for App Review; without it, step 2 below ends with "Purchase received. Your membership
-     will update in a moment" and the member stays on Free, and Apple's App Review purchase test fails the same way.
-     The trade-off: while it is on, anyone running a TestFlight or development build (external testers too, including
-     through a public TestFlight link) gets Pro without paying. That is the owner's call; App Store production
-     purchases are never sandbox purchases. Leave `REVENUECAT_ALLOW_TEST_STORE=false`.
+   - Sandbox purchases: leave `REVENUECAT_ALLOW_SANDBOX=false` on production and use the **sandbox tester
+     allow-list** (next section) for App Review and TestFlight testers. Leave `REVENUECAT_ALLOW_TEST_STORE=false`.
 5. **Native build:** run `npm install` and `npx cap sync`. In Xcode, add the **In-App Purchase** capability to the app target. Then build in Xcode / Android Studio. The plugin is native code: an app binary built before this change can't make purchases; it shows "In-app purchases aren't available right now".
 6. **Yearly** is shown whenever the store offers `ngf_pro_yearly`; the paywall never shows a price the store doesn't return.
 
+## Sandbox purchases (tester allow-list)
+
+Every purchase made from a development build, a TestFlight build or by Apple's App Review is an App Store / Play
+**sandbox** purchase: free, and reported by RevenueCat with `is_sandbox: true`. Every build talks to the one deployed
+server (`CAP_SERVER_URL`), so the server decides which sandbox purchases count:
+
+| Setting | Sandbox purchases count for | Use |
+| --- | --- | --- |
+| `REVENUECAT_ALLOW_SANDBOX=false` (default) | only accounts on the **sandbox tester allow-list** | production, including TestFlight and App Review |
+| `REVENUECAT_ALLOW_SANDBOX=true` | every account | a separate test deployment only: anyone with a TestFlight build gets Pro free |
+
+How it is enforced (migration `20261103000052_sandbox_testers.sql`, `src/server/services/sandbox-testers.ts`):
+
+- The list (`sandbox_testers`) is keyed by the account's **user id** (`auth.users.id`, which is also its RevenueCat
+  app user id), never by email. An email typed on the admin page is only used to look the account up.
+- It is checked on the server twice: when RevenueCat is read (`syncStoreSubscriber`: an unlisted account's sandbox
+  purchases are not stored) and on every plan recompute (`recomputeEntitlement`: a stored sandbox row stops counting
+  the moment its account is removed or its entry expires).
+- Members cannot read or write the list (row level security with no policies; `is_sandbox_tester()` is not callable
+  by them), so nobody can enrol themselves. Only administrators (admin page) or the service role change it, and each
+  change is written to `admin_audit_logs` (`sandbox_tester.add` / `sandbox_tester.remove`).
+- Sandbox and production stay distinguishable: every `store_subscriptions` row keeps RevenueCat's `is_sandbox`, and
+  webhook deliveries keep RevenueCat's `environment` (`SANDBOX` / `PRODUCTION`) in `revenuecat_events`.
+- A sandbox purchase never becomes a production entitlement elsewhere: restored onto an unlisted account (a RevenueCat
+  transfer), it grants that account nothing. Production purchases are unaffected by the list.
+- No secrets are involved: the list lives in the database, not in source control or environment variables.
+
+**Enrol a tester** (admin → Subscriptions → Sandbox testers):
+
+1. Ask the tester to create their Narrow Gate Fitness account first (in the TestFlight build or on the web).
+2. Enter their account email (or user id), a short factual note ("App Review demo account", "TestFlight: internal
+   QA"), and optionally an end date (for example the end of the TestFlight round). **Add tester.**
+3. The server re-reads their store purchases at once: a sandbox purchase they already made starts counting.
+
+For **App Review**: create the demo account you give Apple in App Store Connect → App Review Information, enrol it,
+and the reviewer's sandbox purchase on it unlocks Pro.
+
+**Remove a tester:** **Remove** next to their entry. Their sandbox purchases stop counting immediately (plan
+recomputed); production purchases they made are unaffected. An entry past its end date counts as removed.
+
+Without the admin page (service role, e.g. the Supabase SQL editor):
+
+```sql
+-- enrol (user id from Authentication → Users)
+insert into public.sandbox_testers (user_id, note, expires_at) values ('<user-id>', 'App Review demo account', null)
+  on conflict (user_id) do update set note = excluded.note, expires_at = excluded.expires_at;
+-- remove
+delete from public.sandbox_testers where user_id = '<user-id>';
+```
+
+After an SQL change, the plan catches up at that member's next store sync (any purchase, renewal or "Restore
+purchases", or the next RevenueCat webhook); the admin page does it at once.
+
+Tests: `tests/integration/store-billing.test.ts` "sandbox tester allow-list" (unlisted → nothing; listed → Pro, stored
+as sandbox; removal and expiry end it; transfer to an unlisted account grants nothing; production unaffected; members
+cannot read, add themselves or call the check; deleting the account removes the entry).
+
 ## Sandbox test plan (on a real iPhone)
 
-Use a development build signed with your team, signed in with a **Sandbox** Apple Account (Settings → App Store → Sandbox Account).
+Use a development build signed with your team, signed in with a **Sandbox** Apple Account (Settings → App Store → Sandbox Account). Put the Narrow Gate Fitness account you test with on the sandbox tester allow-list first (above), or the purchase unlocks nothing.
 
 1. **New member:** open Plans & billing. Check that the prices show, along with the renewal terms, Terms and Privacy links, and Restore purchases.
 2. **Start Pro All Access monthly.** Pro applies at once: live GPS, the full program library, meal planning and Body Scan open, and the AI Coach asks for data-sharing consent, then works.

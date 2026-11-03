@@ -84,7 +84,8 @@ Follow [STAGING_ENVIRONMENT.md](STAGING_ENVIRONMENT.md):
 - a separate Supabase project with every migration applied;
 - an HTTPS deployment of the branch;
 - Stripe in **test mode**;
-- `REVENUECAT_ALLOW_SANDBOX=true` on staging only.
+- `REVENUECAT_ALLOW_SANDBOX=true` on staging only (on production, use the sandbox tester allow-list instead:
+  `docs/MOBILE_BILLING.md` "Sandbox purchases").
 
 Then run its smoke test. The TestFlight build loads this address, so test accounts and test purchases never touch
 production.

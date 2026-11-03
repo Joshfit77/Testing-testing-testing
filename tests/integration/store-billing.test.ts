@@ -236,4 +236,88 @@ describe.skipIf(!available)("App Store / Google Play subscriptions via RevenueCa
     expect(requests.at(-1)).toMatchObject({ method: "DELETE", id: "3f1c6a52-1b2c-4d3e-8f90-123456789abc" });
     expect(customers.has("3f1c6a52-1b2c-4d3e-8f90-123456789abc")).toBe(false);
   });
+
+  /**
+   * Sandbox tester allow-list (migration 052): sandbox purchases count for listed accounts only, by user id, checked
+   * on the server at every RevenueCat read and every plan recompute. REVENUECAT_ALLOW_SANDBOX is not set here.
+   */
+  describe("sandbox tester allow-list", () => {
+    let tester: TestUser;
+    let stranger: TestUser;
+    const svc = serviceClient();
+    const enrol = (u: TestUser, expiresAt: string | null = null) =>
+      svc.from("sandbox_testers").upsert({ user_id: u.id, note: "TestFlight: integration", expires_at: expiresAt }, { onConflict: "user_id" });
+    const sandboxPro = () => setCustomer(tester.id, { ngf_pro_monthly: sub({ is_sandbox: true, store_transaction_id: "sbx-1" }) }, { pro: "ngf_pro_monthly" });
+
+    beforeAll(async () => {
+      [tester, stranger] = await Promise.all([createTestUser("iap-tester"), createTestUser("iap-stranger")]);
+    });
+    afterAll(async () => {
+      await Promise.all([deleteTestUser(tester), deleteTestUser(stranger)]);
+    });
+
+    it("negative: an account not on the list gets nothing from a sandbox purchase", async () => {
+      sandboxPro();
+      await send({ id: `rc-${crypto.randomUUID()}`, type: "INITIAL_PURCHASE", app_user_id: tester.id });
+      expect(await ent(tester)).toMatchObject({ plan: "free" });
+      expect((await svc.from("store_subscriptions").select("id").eq("user_id", tester.id)).data).toEqual([]);
+    });
+
+    it("positive: once listed (by user id), the same sandbox purchase unlocks Pro, stored as a sandbox row", async () => {
+      await enrol(tester);
+      await send({ id: `rc-${crypto.randomUUID()}`, type: "RENEWAL", app_user_id: tester.id });
+      expect(await ent(tester)).toMatchObject({ plan: "pro", source: "app_store" });
+      const rows = (await svc.from("store_subscriptions").select("product_id, is_sandbox").eq("user_id", tester.id)).data;
+      expect(rows).toEqual([{ product_id: "ngf_pro_monthly", is_sandbox: true }]);
+    });
+
+    it("removal: taking the account off the list ends access at the next recompute, even with the sandbox row stored", async () => {
+      await svc.from("sandbox_testers").delete().eq("user_id", tester.id);
+      const { recomputeEntitlement } = await import("@/server/services/billing");
+      expect(await recomputeEntitlement(tester.id)).toBe("free");
+      // And a fresh read from RevenueCat stops storing it.
+      await syncStoreSubscriber(tester.id);
+      expect((await svc.from("store_subscriptions").select("id").eq("user_id", tester.id)).data).toEqual([]);
+    });
+
+    it("an expired entry counts as removed", async () => {
+      await enrol(tester, new Date(Date.now() - 60_000).toISOString());
+      await syncStoreSubscriber(tester.id);
+      expect(await ent(tester)).toMatchObject({ plan: "free" });
+      await enrol(tester, new Date(Date.now() + day).toISOString());
+      await syncStoreSubscriber(tester.id);
+      expect(await ent(tester)).toMatchObject({ plan: "pro" });
+    });
+
+    it("a listed tester's sandbox purchase restored onto an unlisted account grants that account nothing", async () => {
+      setCustomer(stranger.id, { ngf_pro_monthly: sub({ is_sandbox: true, store_transaction_id: "sbx-1" }) }, { pro: "ngf_pro_monthly" });
+      setCustomer(tester.id, {});
+      await send({ type: "TRANSFER", transferred_from: [tester.id], transferred_to: [stranger.id] });
+      expect(await ent(stranger)).toMatchObject({ plan: "free" });
+      expect(await ent(tester)).toMatchObject({ plan: "free" });
+    });
+
+    it("production purchases are unaffected: an unlisted account's real purchase still counts", async () => {
+      setCustomer(stranger.id, { ngf_pro_yearly: sub({ store_transaction_id: "prod-1" }) }, { pro: "ngf_pro_yearly" });
+      await syncStoreSubscriber(stranger.id);
+      expect(await ent(stranger)).toMatchObject({ plan: "pro", source: "app_store" });
+      const rows = (await svc.from("store_subscriptions").select("product_id, is_sandbox").eq("user_id", stranger.id)).data;
+      expect(rows).toEqual([{ product_id: "ngf_pro_yearly", is_sandbox: false }]);
+    });
+
+    it("members cannot read the list, add themselves, or call the check", async () => {
+      expect((await stranger.client.from("sandbox_testers").select("user_id")).error?.code).toBe("42501");
+      const planted = await stranger.client.from("sandbox_testers").insert({ user_id: stranger.id, note: "me" });
+      expect(planted.error?.code).toBe("42501");
+      expect((await svc.from("sandbox_testers").select("user_id").eq("user_id", stranger.id)).data).toEqual([]);
+      expect((await stranger.client.rpc("is_sandbox_tester", { p_user_id: tester.id })).error).not.toBeNull();
+    });
+
+    it("deleting a listed account removes its entry", async () => {
+      const leaving = await createTestUser("iap-leaving");
+      await enrol(leaving);
+      await svc.auth.admin.deleteUser(leaving.id);
+      expect((await svc.from("sandbox_testers").select("user_id").eq("user_id", leaving.id)).data).toEqual([]);
+    });
+  });
 });

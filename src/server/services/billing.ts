@@ -8,6 +8,7 @@ import { storeRowAsSubscription } from "@/lib/billing/revenuecat";
 import { isServiceRoleConfigured, serverEnv } from "@/server/env";
 import { logError, logInfo } from "@/server/log";
 import { claimWebhookEvent, processClaimedEvent, type WebhookOutcome } from "@/server/services/webhook-events";
+import { sandboxPurchasesAllowed } from "@/server/services/sandbox-testers";
 
 let stripeClient: Stripe | null = null;
 
@@ -242,7 +243,7 @@ export async function recomputeEntitlement(userId: string): Promise<Plan> {
       admin.from("subscriptions").select("plan, status, current_period_end, access_revoked_at").eq("user_id", userId),
       admin
         .from("store_subscriptions")
-        .select("store, plan, purchased_at, expires_at, grace_period_expires_at, unsubscribe_detected_at, billing_issue_detected_at, refunded_at")
+        .select("store, plan, purchased_at, expires_at, grace_period_expires_at, unsubscribe_detected_at, billing_issue_detected_at, refunded_at, is_sandbox")
         .eq("user_id", userId),
     ]);
     if (stripeRes.error) throw stripeRes.error;
@@ -253,7 +254,12 @@ export async function recomputeEntitlement(userId: string): Promise<Plan> {
         source: "stripe" as const,
       })),
     ];
-    for (const row of (storeRes.data ?? []) as (Parameters<typeof storeRowAsSubscription>[0] & { store: string })[]) {
+    const storeRows = (storeRes.data ?? []) as (Parameters<typeof storeRowAsSubscription>[0] & { store: string; is_sandbox: boolean })[];
+    // A stored sandbox purchase grants only while the member is still allowed sandbox purchases: removing a tester
+    // from the allow-list (or the entry expiring) ends it at the next recompute, without waiting for RevenueCat.
+    const sandboxOk = storeRows.some((r) => r.is_sandbox) ? await sandboxPurchasesAllowed(userId) : false;
+    for (const row of storeRows) {
+      if (row.is_sandbox && !sandboxOk) continue;
       const sub = storeRowAsSubscription(row);
       if (sub) candidates.push({ ...sub, source: row.store === "play_store" ? "play_store" : "app_store" });
     }

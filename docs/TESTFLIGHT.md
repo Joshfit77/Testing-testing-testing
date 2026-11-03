@@ -41,8 +41,10 @@ an error, so a build can't point at a placeholder.
 4. Set the environment variables from `.env.example`, with payments in test mode:
    - `NEXT_PUBLIC_SITE_URL` = your app address; Supabase URL, anon key and service-role key.
    - Stripe **test** keys only (`sk_test_...`); leave `STRIPE_LIVE_APPROVED=false` (live keys are ignored without it).
-   - `REVENUECAT_ALLOW_SANDBOX=true` on this test deployment only (TestFlight purchases are Apple sandbox purchases
-     and are free); `REVENUECAT_ALLOW_TEST_STORE=false`.
+   - TestFlight purchases are Apple sandbox purchases and are free. They unlock Pro only for accounts on the
+     **sandbox tester allow-list** (admin → Subscriptions → Sandbox testers; `docs/MOBILE_BILLING.md` "Sandbox
+     purchases"). Add each tester's account there. `REVENUECAT_ALLOW_SANDBOX=true` (every account) belongs on a
+     separate test deployment only. `REVENUECAT_ALLOW_TEST_STORE=false`.
    - `ANTHROPIC_API_KEY` for the AI coach (optional; the coach says so honestly when it isn't configured).
    - `FOOD_IQ_SCORE=off` until the method is reviewed.
 5. Deploy, then open `https://<your address>/api/health`. It should answer
