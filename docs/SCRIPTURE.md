@@ -54,3 +54,21 @@ The coach may quote only verses from that list, word for word, labelled "(BSB)".
 - Devotional titles that were KJV phrases ("Iron Sharpeneth Iron", "Come Ye Apart…") now use the BSB wording of
   the same verse. The topics and teaching are unchanged.
 - The offline edition (`standalone/index.html`, the Android APK) carries the same BSB text and attribution.
+
+## The complete Bible (reader, plans, search, AI helper)
+
+The Bible reader, reading plans, search, memory practice, studies and the Bible study helper use the whole BSB, built
+from the same official `bsb.txt` (pinned SHA-256 `2ac3af1de52d4e68261cba91d85c320b7eadc6560e830d99e591767b8ff5ca96`):
+
+1. `.github/workflows/bsb-text.yml` runs `scripts/build-bsb-bible.mjs`, which validates the file against the canon in
+   `src/data/bible/books.json` (66 books, 1,189 chapters, verse order, no duplicates) and writes
+   `public/bible/bsb/meta.json` and one JSON file per book.
+2. The result was committed to `public/bible/bsb` (31,102 verse numbers; 31,086 with text; the 16 the BSB keeps in
+   footnotes are recorded as such and shown as such, never filled in).
+3. `tests/unit/bible-dataset.test.ts` checks the canon, the counts, the content checksum and agreement with every
+   independently extracted passage in `src/data/bsb-passages.json`.
+
+The server reads the files from disk (`src/server/bible/text.ts`); `next.config.ts` traces them into server builds.
+Everything shown as Scripture (reader, search results, journey readings, challenge verses, study passages, memory
+verses, passages cited by the AI helper) is read from this dataset at render time, never typed by hand.
+See `docs/faith/README.md` for the features and `docs/faith/REVIEW.md` for content needing theological review.

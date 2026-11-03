@@ -103,13 +103,16 @@ export async function askBible(userId: string, plan: Plan, questionRaw: string, 
     const check = checkCitations(raw, (r) => getPassage(r).length > 0);
     const answer = markUnverified(raw || "I couldn't answer that. Try asking it another way.", check.unverified);
     const citations = check.verified.slice(0, 12).map((r) => ({ reference: formatReference(r), text: passageText(r) ?? "" }));
-    await Promise.all([
+    // (Every row names every column: in a multi-row insert a column one row leaves out is sent as null, not its default.)
+    const [saved, metered] = await Promise.all([
       service.from("bible_ai_messages").insert([
-        { user_id: userId, thread_id: threadId, role: "user", content: question },
+        { user_id: userId, thread_id: threadId, role: "user", content: question, citations: [] },
         { user_id: userId, thread_id: threadId, role: "assistant", content: answer.slice(0, 20000), citations: citations.map((c) => c.reference) },
       ]),
       service.from("bible_ai_usage").update({ status: "done", model, input_tokens: msg.usage.input_tokens, output_tokens: msg.usage.output_tokens }).eq("id", usageId as number),
     ]);
+    if (saved.error) logError("bible_ai.history", saved.error);
+    if (metered.error) logError("bible_ai.usage", metered.error);
     return { ok: true, threadId, answer, citations, unverified: check.unverified };
   } catch (e) {
     logError("bible_ai.call", e);
