@@ -32,6 +32,10 @@ public/anatomy/athlete-eco.*
 
 # Written by capacitor.config.ts at `npx cap sync` (the deployed address for the offline page)
 native-shell/server-url.js
+# Copied from public/ by capacitor.config.ts at `npx cap sync` (the offline Bible).
+native-shell/bible/
+native-shell/bible-offline.html
+native-shell/bible-offline.js
 
 # Secrets and signing material must never be committed (environment files other than the example, Apple and
 # Android signing keys, service-account credentials).

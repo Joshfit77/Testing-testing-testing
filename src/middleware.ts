@@ -22,7 +22,8 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Skip static assets, the service worker, manifest/icons and the Stripe webhook (which needs the raw body).
-    "/((?!_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest|icons/|api/stripe/webhook|api/revenuecat/webhook|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    // Skip static assets, the service worker, manifest/icons, the public-domain Bible text and its offline reader (which
+    // has its own fixed CSP, next.config.ts) and the Stripe webhook (which needs the raw body).
+    "/((?!_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest|icons/|bible/bsb/|bible-offline\\.|api/stripe/webhook|api/revenuecat/webhook|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

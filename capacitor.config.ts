@@ -1,6 +1,6 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 import { KeyboardResize, KeyboardStyle } from "@capacitor/keyboard";
-import { writeFileSync } from "node:fs";
+import { cpSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 /**
@@ -53,6 +53,10 @@ export function serverAddressScript(url: string): string {
 }
 if (!standalone && writesNativeConfig) {
   writeFileSync(join(process.cwd(), "native-shell", "server-url.js"), serverAddressScript(serverUrl));
+  // The offline Bible: the verified BSB text and its reader go into the app bundle, so the offline page (error.html)
+  // can open the Bible with no connection. Copied from public/ on every sync (not committed twice; see .gitignore).
+  cpSync(join(process.cwd(), "public", "bible", "bsb"), join(process.cwd(), "native-shell", "bible", "bsb"), { recursive: true });
+  for (const f of ["bible-offline.html", "bible-offline.js"]) cpSync(join(process.cwd(), "public", f), join(process.cwd(), "native-shell", f));
 }
 
 const config: CapacitorConfig = {

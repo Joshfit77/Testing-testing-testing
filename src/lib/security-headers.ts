@@ -61,6 +61,9 @@ export function contentSecurityPolicy({ supabaseUrl, production, https, nonce }:
     .join("; ");
 }
 
+/** The fixed policy of the static offline Bible reader (public/bible-offline.html): its own scripts and the cached Bible only. */
+export const OFFLINE_BIBLE_CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'none'";
+
 /** The static headers for every response (next.config.ts). The CSP comes from the middleware, with its nonce. */
 export function securityHeaders(opts: SecurityHeaderOptions): { key: string; value: string }[] {
   const headers = [

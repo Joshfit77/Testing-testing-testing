@@ -1195,3 +1195,14 @@ html[data-motion="reduce"] .ngs-haze { animation: none !important; opacity: 0.85
 html[data-motion="reduce"] :is(.ngs-dust, .ngo-white) { display: none; }
 html[data-motion="reduce"][data-intro="play"] .ngo-ui { animation: none !important; }
 html[data-motion="reduce"][data-intro="entering"] .ngo { animation: ngo-enter-out 0.4s ease-out forwards !important; }
+
+/* Bible reader: the verse a link pointed to glows gold for a moment (src/components/bible/chapter-reader.tsx). */
+@keyframes verse-focus {
+  0%,
+  40% {
+    background-color: color-mix(in srgb, var(--gold) 30%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}

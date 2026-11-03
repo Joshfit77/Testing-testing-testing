@@ -63,6 +63,14 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
           <p className="mt-1.5 text-sm text-white/85">{verse.reference} ({TRANSLATION.code})</p>
         </div>
       </section>
+      <Link href="/faith/bible" className="flex min-h-16 items-center gap-3 rounded-2xl border border-gold-muted bg-card px-4 py-3 hover:border-gold">
+        <BookOpen className="size-6 shrink-0 text-gold" aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="block font-semibold">Bible</span>
+          <span className="block truncate text-sm text-muted-foreground">The complete Berean Standard Bible: read, search, highlight and take notes.</span>
+        </span>
+        <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
+      </Link>
       <FaithChallenge
         today={challenge.today}
         rotatingDay={devotionalForDate(challenge.today).day}

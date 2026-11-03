@@ -90,6 +90,11 @@ export function passageText(ref: ScriptureRef): string | null {
   return verses.length ? verses.map((v) => v.text).join(" ") : null;
 }
 
+/** The last verse number of a chapter (counting verses the BSB keeps without text), or 0 if the chapter doesn't exist. */
+export function lastVerse(bookId: string, chapter: number): number {
+  return bibleMeta().books.find((b) => b.id === bookId)?.lastVerse[chapter - 1] ?? 0;
+}
+
 /** Word count of a chapter (for reading-time estimates). */
 export function chapterWords(bookId: string, chapter: number): number {
   return bibleMeta().books.find((b) => b.id === bookId)?.words[chapter - 1] ?? 0;
