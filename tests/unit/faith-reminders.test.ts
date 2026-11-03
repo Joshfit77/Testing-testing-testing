@@ -24,7 +24,9 @@ describe("faith reminders", () => {
   });
 
   it("uses ids that don't clash with workout reminders or each other", () => {
-    expect(new Set(ALL_FAITH_REMINDER_IDS).size).toBe(21);
+    // 9 kinds × 7, plus the 7 ids of the earlier weekly prayer reminders (cleared on every sync).
+    expect(new Set(ALL_FAITH_REMINDER_IDS).size).toBe(70);
+    expect(ALL_FAITH_REMINDER_IDS.length).toBe(70);
     for (let d = 0; d < 7; d++) expect(ALL_FAITH_REMINDER_IDS).not.toContain(REMINDER_ID_BASE + d);
   });
 

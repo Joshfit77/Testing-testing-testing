@@ -6,11 +6,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { isNativeApp } from "@/lib/native";
-import { syncFaithReminders } from "@/lib/native-reminders";
-import { FAITH_REMINDER_INFO, describeFaithReminder, type FaithReminder } from "@/lib/faith-reminders";
+import { cancelTodayFaithReminders, syncFaithReminders } from "@/lib/native-reminders";
+import { FAITH_REMINDER_INFO, describeFaithReminder, inQuietHours, type FaithReminder, type FaithReminderContext, type FaithReminderKind, type QuietHours } from "@/lib/faith-reminders";
 import { WEEKDAY_LABELS, type JsWeekday } from "@/lib/reminders";
 import { cn } from "@/lib/utils";
-import { saveFaithRemindersAction } from "@/server/actions/faith";
+import { getFaithReminderSyncAction, saveFaithQuietHoursAction, saveFaithRemindersAction } from "@/server/actions/faith";
+
+const GROUPS: { title: string; note?: string; kinds: FaithReminderKind[] }[] = [
+  { title: "Reading journey", note: "Reading and prayer reminders aren't sent once that day's activity is marked complete.", kinds: ["reading", "prayer", "accountability", "final"] },
+  { title: "Optional daily goals", kinds: ["challenge", "fitness"] },
+  { title: "More", kinds: ["devotional", "practices", "memorize"] },
+];
 
 type Status = { tone: "success" | "error"; text: string } | null;
 
@@ -18,8 +24,9 @@ type Status = { tone: "success" | "error"; text: string } | null;
  * Devotional, prayer and practice reminders. Off by default. Settings are saved to the account; the
  * iPhone/Android app turns them into local notifications. A browser can't, and this says so plainly.
  */
-export function FaithRemindersSettings({ initial }: { initial: FaithReminder[] }) {
+export function FaithRemindersSettings({ initial, initialQuiet }: { initial: FaithReminder[]; initialQuiet: QuietHours | null }) {
   const [list, setList] = useState<FaithReminder[]>(initial);
+  const [quiet, setQuiet] = useState<QuietHours | null>(initialQuiet);
   const [native, setNative] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<Status>(null);
@@ -36,15 +43,16 @@ export function FaithRemindersSettings({ initial }: { initial: FaithReminder[] }
     const empty = list.find((r) => r.enabled && r.weekdays.length === 0);
     if (empty) return setStatus({ tone: "error", text: `Pick at least one day for the ${FAITH_REMINDER_INFO[empty.kind].label.toLowerCase()} reminder.` });
     setSaving(true);
-    const res = await saveFaithRemindersAction(list);
-    if (!res.ok) {
+    const [res, q] = await Promise.all([saveFaithRemindersAction(list), saveFaithQuietHoursAction(quiet?.start ?? null, quiet?.end ?? null)]);
+    if (!res.ok || !q.ok) {
       setSaving(false);
-      return setStatus({ tone: "error", text: res.message ?? "Couldn't save your reminders." });
+      return setStatus({ tone: "error", text: (!res.ok ? res.message : q.message) ?? "Couldn't save your reminders." });
     }
     const on = list.filter((r) => r.enabled);
     if (isNativeApp()) {
-      const dev = await syncFaithReminders(res.reminders ?? list, { askPermission: true });
-      if (dev.ok) setStatus({ tone: "success", text: on.length ? `Saved. ${dev.scheduled} weekly notification${dev.scheduled === 1 ? "" : "s"} set on this device.` : "Saved. Faith reminders are off on this device." });
+      const sync = await getFaithReminderSyncAction().catch(() => null);
+      const dev = await syncFaithReminders(sync?.reminders ?? res.reminders ?? list, { askPermission: true, context: sync?.context ?? null });
+      if (dev.ok) setStatus({ tone: "success", text: on.length ? `Saved. ${dev.scheduled} notification${dev.scheduled === 1 ? "" : "s"} set on this device for the coming week.` : "Saved. Faith reminders are off on this device." });
       else if (dev.reason === "permission-denied")
         setStatus({ tone: "error", text: "Saved to your account, but notifications are turned off for Narrow Gate Fitness. Allow them in your device's Settings, then save again." });
       else setStatus({ tone: "error", text: "Saved to your account, but this device couldn't schedule the notifications. Please try again." });
@@ -59,25 +67,7 @@ export function FaithRemindersSettings({ initial }: { initial: FaithReminder[] }
     setSaving(false);
   };
 
-  return (
-    <section className="rounded-2xl border border-border bg-card p-4" aria-labelledby="faith-reminders-title">
-      <h2 id="faith-reminders-title" className="flex items-center gap-2 text-lg font-semibold">
-        <BellRing className="size-5 text-gold" aria-hidden /> Devotional, prayer and practices
-      </h2>
-      <p className="mt-1 text-sm text-muted-foreground">Optional and off unless you turn them on. Gentle nudges, never streak warnings.</p>
-
-      {native === false && (
-        <div className="mt-3 flex gap-3 rounded-xl border border-gold-muted/50 bg-gold/5 p-3 text-sm" data-testid="reminders-web-note">
-          <Smartphone className="mt-0.5 size-5 shrink-0 text-gold" aria-hidden />
-          <p>
-            You&apos;re using the web version. Your choices are saved to your account, but notifications are only delivered by the Narrow Gate Fitness app for
-            iPhone and Android (even when the app is closed). A web browser can&apos;t remind you while this site is closed.
-          </p>
-        </div>
-      )}
-
-      <div className="mt-4 space-y-4">
-        {list.map((r) => {
+  const renderReminder = (r: FaithReminder) => {
           const info = FAITH_REMINDER_INFO[r.kind];
           const sw = `fr-${r.kind}`;
           return (
@@ -123,11 +113,71 @@ export function FaithRemindersSettings({ initial }: { initial: FaithReminder[] }
                   <p className="text-xs text-muted-foreground">
                     Message: <span className="italic">{info.body}</span>
                   </p>
+                  {inQuietHours(r.time, quiet) && <p className="text-xs text-[#f08a8a]">This time is inside your quiet hours, so this reminder won&rsquo;t be sent.</p>}
                 </div>
               )}
             </fieldset>
           );
-        })}
+          };
+
+  return (
+    <section className="rounded-2xl border border-border bg-card p-4" aria-labelledby="faith-reminders-title">
+      <h2 id="faith-reminders-title" className="flex items-center gap-2 text-lg font-semibold">
+        <BellRing className="size-5 text-gold" aria-hidden /> Faith reminders
+      </h2>
+      <p className="mt-1 text-sm text-muted-foreground">Optional and off unless you turn them on. Gentle nudges, never streak warnings.</p>
+
+      {native === false && (
+        <div className="mt-3 flex gap-3 rounded-xl border border-gold-muted/50 bg-gold/5 p-3 text-sm" data-testid="reminders-web-note">
+          <Smartphone className="mt-0.5 size-5 shrink-0 text-gold" aria-hidden />
+          <p>
+            You&apos;re using the web version. Your choices are saved to your account, but notifications are only delivered by the Narrow Gate Fitness app for
+            iPhone and Android (even when the app is closed). A web browser can&apos;t remind you while this site is closed.
+          </p>
+        </div>
+      )}
+
+      <div className="mt-4 space-y-5">
+        {GROUPS.map((g) => (
+          <div key={g.title} className="space-y-3">
+            <div>
+              <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-gold">{g.title}</h3>
+              {g.note && <p className="text-xs text-muted-foreground">{g.note}</p>}
+            </div>
+            {list
+              .filter((r) => g.kinds.includes(r.kind))
+              .sort((a, b) => g.kinds.indexOf(a.kind) - g.kinds.indexOf(b.kind))
+              .map((r) => renderReminder(r))}
+          </div>
+        ))}
+        <fieldset className="rounded-xl border border-border p-3">
+          <legend className="sr-only">Quiet hours</legend>
+          <div className="flex min-h-11 items-center justify-between gap-3">
+            <div className="min-w-0">
+              <label htmlFor="fr-quiet" className="block text-[0.9375rem] font-semibold">
+                Quiet hours
+              </label>
+              <p className="text-xs text-muted-foreground">{quiet ? `No Faith reminders from ${quiet.start} to ${quiet.end}.` : "Choose times when no Faith reminder is sent."}</p>
+            </div>
+            <Switch id="fr-quiet" checked={Boolean(quiet)} onCheckedChange={(on) => setQuiet(on ? { start: "22:00", end: "07:00" } : null)} />
+          </div>
+          {quiet && (
+            <div className="mt-3 grid max-w-xs grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <label htmlFor="fr-quiet-start" className="text-sm font-medium">
+                  From
+                </label>
+                <Input id="fr-quiet-start" type="time" value={quiet.start} onChange={(e) => setQuiet({ ...quiet, start: e.target.value })} required />
+              </div>
+              <div className="space-y-1">
+                <label htmlFor="fr-quiet-end" className="text-sm font-medium">
+                  To
+                </label>
+                <Input id="fr-quiet-end" type="time" value={quiet.end} onChange={(e) => setQuiet({ ...quiet, end: e.target.value })} required />
+              </div>
+            </div>
+          )}
+        </fieldset>
       </div>
 
       {status && (
@@ -148,7 +198,7 @@ export function FaithRemindersSettings({ initial }: { initial: FaithReminder[] }
  * session (so settings saved on another device take effect here). Does nothing in a browser and never
  * prompts for permission on its own.
  */
-export function FaithReminderSync({ load }: { load: () => Promise<FaithReminder[]> }) {
+export function FaithReminderSync({ load }: { load: () => Promise<{ reminders: FaithReminder[]; context: Omit<FaithReminderContext, "now"> }> }) {
   useEffect(() => {
     if (!isNativeApp()) return;
     try {
@@ -158,8 +208,21 @@ export function FaithReminderSync({ load }: { load: () => Promise<FaithReminder[
       /* storage unavailable: sync anyway */
     }
     void load()
-      .then((r) => syncFaithReminders(r))
+      .then((r) => syncFaithReminders(r.reminders, { context: r.context }))
       .catch(() => undefined);
   }, [load]);
+  return null;
+}
+
+/**
+ * Cancels today's Faith reminders on this device for whatever is already done (rendered with today's state on the
+ * Faith tab and the journey; runs again whenever that state changes). Does nothing in a browser.
+ */
+export function FaithReminderTodaySync({ done }: { done: FaithReminderContext["done"] }) {
+  const key = `${done.reading}${done.prayer}${done.challenge}${done.fitness}`;
+  useEffect(() => {
+    void cancelTodayFaithReminders(done);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
   return null;
 }

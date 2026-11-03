@@ -324,7 +324,7 @@ export const customPracticeSchema = z.object({
 });
 
 export const faithReminderSchema = z.object({
-  kind: z.enum(["devotional", "prayer", "practices"]),
+  kind: z.enum(["reading", "prayer", "challenge", "fitness", "accountability", "final", "devotional", "practices", "memorize"]),
   enabled: z.boolean(),
   time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Choose a time"),
   weekdays: z.array(z.number().int().min(0).max(6)).max(7),
@@ -332,7 +332,7 @@ export const faithReminderSchema = z.object({
 export const faithRemindersSchema = z
   .array(faithReminderSchema)
   .min(1)
-  .max(3)
+  .max(9)
   .refine((list) => new Set(list.map((r) => r.kind)).size === list.length, "Each reminder once")
   .refine((list) => list.every((r) => !r.enabled || r.weekdays.length > 0), "Pick at least one day for each reminder that's on.");
 

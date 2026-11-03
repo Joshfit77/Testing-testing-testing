@@ -4,6 +4,7 @@ import { ActionButton } from "@/components/common/action-button";
 import { PageHeader } from "@/components/common/page-header";
 import { BackLink } from "@/components/platform/back-link";
 import { JourneyCheckIn } from "@/components/faith/journey-checkin";
+import { FaithReminderTodaySync } from "@/components/faith/faith-reminders-settings";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { Button } from "@/components/ui/button";
 import { chapterHref } from "@/lib/bible/books";
@@ -123,6 +124,7 @@ export default async function JourneyPage({ searchParams }: { searchParams: Prom
           <div className="mb-3">
             <Readings view={view} day={view.day!} />
           </div>
+          <FaithReminderTodaySync done={{ reading: view.reading, prayer: view.prayer, challenge: false, fitness: false }} />
           <JourneyCheckIn
             userId={user.id}
             journeyId={view.id}
