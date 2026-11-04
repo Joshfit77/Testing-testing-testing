@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Flag, Loader2, LocateFixed, Pause, Play, Save, SignalZero, Trash2, Volume2, VolumeX } from "lucide-react";
-import type { GpsDiagnostics, GpsHint } from "@/lib/domain/gps-track";
+import type { GpsDiagnostics, GpsFix, GpsHint } from "@/lib/domain/gps-track";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { NativeSelect, Textarea } from "@/components/ui/input";
@@ -31,6 +31,7 @@ import {
 } from "@/lib/domain/gps-track";
 import { buildScript, completedSets, phaseAt, scriptSeconds, type RunPrescription } from "@/lib/domain/run-session";
 import { canOpenLocationSettings, hasNativeBackgroundLocation, keepScreenOn, locationSourceLabel, openLocationSettings, watchLocation, type LocationError } from "@/lib/native/location";
+import { attachScreen, keepRecording, routeError, routeFix, shouldKeep, takeBack } from "@/lib/run/live-recording";
 import { saveGpsActivityAction } from "@/server/actions/gps-activities";
 
 export interface GuidedSession {
@@ -135,9 +136,51 @@ export function GpsRecorder({
   const script = useMemo(() => (guided ? buildScript(guided.prescriptions) : null), [guided]);
   const lastPhaseRef = useRef<number>(-1);
 
-  // A recording left on this device (closed tab, crash, phone restart, or finished but not saved because the save
-  // failed offline): offer it back. Only a draft too old to matter is removed; a finished one is never thrown away here.
+  // The latest track, key and session, for handing a recording over when the screen closes mid-recording.
+  const trackRef = useRef<TrackState | null>(null);
+  trackRef.current = track;
+  const pendingFixes = useRef<GpsFix[]>([]);
+  const handOver = useRef({ key: storageKey, guidedDayId: guided?.programDayId ?? null, href: "" });
+  handOver.current.key = storageKey;
+  handOver.current.guidedDayId = guided?.programDayId ?? null;
+
+  // Fixes reach this screen while it is open (src/lib/run/live-recording.ts routes them).
+  useEffect(
+    () =>
+      attachScreen({
+        fix: (fix) => {
+          // A fix means the signal is back: drop a warning left by a brief loss (tunnels, tall buildings).
+          setError(null);
+          // Until React applies it, the fix waits here, so a hand-over in that instant still carries it.
+          pendingFixes.current.push(fix);
+          setTrack((t) => {
+            const i = pendingFixes.current.indexOf(fix);
+            if (i >= 0) pendingFixes.current.splice(i, 1);
+            const next = t ? addFix(t, fix).state : t;
+            trackRef.current = next;
+            return next;
+          });
+        },
+        error: (e) => setError(e as LocationError),
+      }),
+    [],
+  );
+
+  // A recording that kept going while the member was elsewhere in the app comes straight back (watcher and all).
+  // Otherwise, a recording left on this device (closed tab, crash, phone restart, or finished but not saved because
+  // the save failed offline): offer it back. Only a draft too old to matter is removed; a finished one is never
+  // thrown away here.
   useEffect(() => {
+    handOver.current.href = `${window.location.pathname}${window.location.search}`;
+    const live = takeBack(storageKey, guided?.programDayId ?? null);
+    if (live) {
+      setKind(live.track.kind);
+      setTrack(live.track);
+      setNow(Date.now());
+      stopRef.current = live.stop;
+      wakeRef.current = live.wake;
+      return;
+    }
     try {
       const raw = localStorage.getItem(storageKey);
       if (!raw) return;
@@ -182,14 +225,7 @@ export function GpsRecorder({
     setError(null);
     stopWatching();
     const gen = watchGen.current;
-    const stop = await watchLocation(
-      (fix) => {
-        // A fix means the signal is back: drop a warning left by a brief loss (tunnels, tall buildings).
-        setError(null);
-        setTrack((t) => (t ? addFix(t, fix).state : t));
-      },
-      (e) => setError(e),
-    );
+    const stop = await watchLocation(routeFix, routeError);
     if (gen !== watchGen.current) {
       stop();
       return;
@@ -202,7 +238,23 @@ export function GpsRecorder({
     }
   }, [stopWatching]);
 
-  useEffect(() => () => stopWatching(), [stopWatching]);
+  // Leaving the screen mid-recording (another tab, the workout, the Bible) doesn't stop the recording: the watcher
+  // and the track are handed to the keeper, and a "Recording" pill leads back. Anything else stops the GPS.
+  useEffect(
+    () => () => {
+      let t = trackRef.current;
+      const stop = stopRef.current;
+      if (t && stop && shouldKeep(t)) {
+        for (const fix of pendingFixes.current.splice(0)) t = addFix(t, fix).state;
+        keepRecording({ ...handOver.current, track: t, stop, wake: wakeRef.current });
+        stopRef.current = null;
+        wakeRef.current = null;
+        return;
+      }
+      stopWatching();
+    },
+    [stopWatching],
+  );
 
   // Clock: elapsed time, signal-loss detection and the guided script.
   const active = track && (track.status === "recording" || track.status === "acquiring");

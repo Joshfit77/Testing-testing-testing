@@ -9,6 +9,7 @@
  */
 
 import { GPS_RECORDING_PREFIX } from "@/lib/opening";
+import { stopKept } from "@/lib/run/live-recording";
 
 export const DRAFT_PREFIX = "ngf.draft.";
 /** Drafts older than this are ignored and removed (30 days). */
@@ -85,6 +86,8 @@ export function clearDraft(userId: string, key: string): void {
  * person on a shared device finds nothing of the last one.
  */
 export function clearAllDrafts(userId?: string): number {
+  // A run still recording in the background of the app stops first, so it can't write its key back.
+  stopKept();
   const s = storage();
   if (!s) return 0;
   const prefixes = userId ? [`${DRAFT_PREFIX}${userId}.`, `${GPS_RECORDING_PREFIX}${userId}`] : [DRAFT_PREFIX, GPS_RECORDING_PREFIX];

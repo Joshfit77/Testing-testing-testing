@@ -9,6 +9,7 @@ import { Logo, LogoMark } from "@/components/common/logo";
 import { cn } from "@/lib/utils";
 import { MAIN_TABS, isActive, isTabActive, visibleSecondary } from "./nav-config";
 import { ActiveWorkoutPill } from "./active-workout-pill";
+import { ActiveRunPill } from "./active-run-pill";
 import { NavigationProgress } from "./navigation-progress";
 import { OfflineBanner } from "./offline-banner";
 import { ShellUserProvider } from "./shell-context";
@@ -162,7 +163,12 @@ export function AppShell({ children, userId, displayName, isAdmin, plan, textSiz
           </main>
         </div>
 
-        <ActiveWorkoutPill userId={userId} />
+        {/* Shortcuts back to a workout in progress and a run still recording: one slot above the tab bar, inside the
+            page's bottom padding, so neither ever covers the page. */}
+        <div className="pointer-events-none fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] left-1/2 z-40 flex -translate-x-1/2 flex-col-reverse items-center gap-2 md:bottom-6">
+          <ActiveWorkoutPill userId={userId} />
+          <ActiveRunPill />
+        </div>
 
         {/* Mobile bottom navigation: exactly five tabs, icon + label. */}
         <nav aria-label="Main sections" data-hide-with-keyboard className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-border bg-[#0b0b0b] md:hidden">

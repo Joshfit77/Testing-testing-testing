@@ -42,7 +42,7 @@ export function ActiveWorkoutPill({ userId }: { userId: string }) {
     <Link
       href="/train/workout"
       data-hide-with-keyboard
-      className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] left-1/2 z-40 flex min-h-11 -translate-x-1/2 items-center gap-2 rounded-full border border-gold-muted bg-card px-4 py-2.5 text-sm font-semibold text-gold-highlight shadow-[0_10px_30px_-10px_rgba(201,165,76,0.6)] md:bottom-6"
+      className="pointer-events-auto flex min-h-11 items-center gap-2 rounded-full border border-gold-muted bg-card px-4 py-2.5 text-sm font-semibold text-gold-highlight shadow-[0_10px_30px_-10px_rgba(201,165,76,0.6)]"
     >
       <Timer className="size-4 animate-pulse" aria-hidden />
       Resume: <span className="max-w-40 truncate text-foreground">{name}</span>

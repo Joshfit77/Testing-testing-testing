@@ -228,6 +228,80 @@ test.describe("live GPS runs and walks", () => {
     expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("run.recording.")))).toEqual([]);
   });
 
+  test("leaving the recorder mid-walk keeps recording; coming back carries on with nothing lost", async ({ page, context }) => {
+    test.setTimeout(180_000);
+    await signUpPro(page, uniqueEmail("gps-away"));
+    await completeOnboarding(page);
+    await context.grantPermissions(["geolocation"]);
+    await context.setGeolocation({ latitude: LAT0, longitude: LNG0, accuracy: 5 });
+    await page.goto("/run/record?kind=walk");
+    await page.getByTestId("gps-start").click();
+    await expect(page.getByTestId("gps-recording")).toBeVisible();
+    let m = await moveNorth(context, page, 0, 15, 3);
+    const toMetres = (text: string) => {
+      const v = Number(text.split(" ")[0]);
+      return text.endsWith("mi") ? v * 1609.344 : v * 1000;
+    };
+    const before = toMetres(await page.getByTestId("gps-distance").innerText());
+    expect(before).toBeGreaterThan(20);
+
+    // Over to Home with the tab bar (in-app navigation): the walk keeps recording, and a pill says so.
+    await page.getByRole("navigation", { name: "Main sections" }).getByRole("link", { name: "Home" }).click();
+    await page.waitForURL(/\/home/);
+    const pill = page.getByTestId("active-run-pill");
+    await expect(pill).toBeVisible();
+    await expect(pill).toContainText("Recording walk");
+    m = await moveNorth(context, page, m, 20, 3);
+    // The kept track is saved on the device as it goes (so a crash now still loses nothing).
+    await expect
+      .poll(() => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("run.recording.")).length))
+      .toBe(1);
+
+    // Back through the pill: the same walk, still recording, with the distance walked while away counted.
+    await pill.click();
+    await page.waitForURL(/\/run\/record\?kind=walk/);
+    await expect(page.getByTestId("gps-recording")).toBeVisible();
+    await expect(page.getByText(/You have an unfinished walk/)).toHaveCount(0);
+    await expect(pill).toHaveCount(0);
+    await expect.poll(async () => toMetres(await page.getByTestId("gps-distance").innerText())).toBeGreaterThan(before + 40);
+    // And it keeps going on this screen.
+    const back = toMetres(await page.getByTestId("gps-distance").innerText());
+    m = await moveNorth(context, page, m, 8, 3);
+    await expect.poll(async () => toMetres(await page.getByTestId("gps-distance").innerText())).toBeGreaterThan(back + 10);
+
+    // Finish: one walk, everything walked counted (about 43 × 3 m), nothing doubled.
+    await page.getByRole("button", { name: "Finish" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Finish" }).click();
+    const total = toMetres(await page.getByTestId("gps-review").getByTestId("review-distance").innerText());
+    expect(total).toBeGreaterThan(95);
+    expect(total).toBeLessThan(160);
+    expect(m).toBe(129);
+  });
+
+  test("signing out while a walk records in the background of the app stops it and leaves nothing on the device", async ({ page, context }) => {
+    test.setTimeout(150_000);
+    await signUpPro(page, uniqueEmail("gps-away-out"));
+    await completeOnboarding(page);
+    await context.grantPermissions(["geolocation"]);
+    await context.setGeolocation({ latitude: LAT0, longitude: LNG0, accuracy: 5 });
+    await page.goto("/run/record?kind=walk");
+    await page.getByTestId("gps-start").click();
+    await expect(page.getByTestId("gps-recording")).toBeVisible();
+    await moveNorth(context, page, 0, 6, 3);
+    // In-app navigation only (the page's JavaScript, and the kept recording, stay alive): Home, then Profile.
+    await page.getByRole("navigation", { name: "Main sections" }).getByRole("link", { name: "Home" }).click();
+    await expect(page.getByTestId("active-run-pill")).toBeVisible();
+    await page.getByRole("link", { name: /^Profile and settings for/ }).first().click();
+    await page.waitForURL(/\/profile/);
+    await page.locator("main").getByRole("button", { name: "Sign out" }).click();
+    await page.waitForURL(/\/login/);
+    // Nothing comes back afterwards: the kept recording would rewrite its key every 5 seconds if it were still running.
+    await expect.poll(() => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("run.recording.")))).toEqual([]);
+    await moveNorth(context, page, 18, 7, 3);
+    expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("run.recording.")))).toEqual([]);
+    await expect(page.getByTestId("active-run-pill")).toHaveCount(0);
+  });
+
   test("a reload while signed in offers to continue the same member's walk", async ({ page, context }) => {
     test.setTimeout(120_000);
     await signUpPro(page, uniqueEmail("gps-reload"));

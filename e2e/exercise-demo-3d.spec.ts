@@ -44,7 +44,8 @@ test.describe("3D anatomical demonstration", () => {
     await picker.getByPlaceholder("Search by name or muscle").fill("Kettlebell Swing");
     await picker.getByRole("button", { name: /^Kettlebell Swing/ }).first().click();
     await expect(picker).toBeHidden();
-    await page.getByRole("button", { name: "Show the Kettlebell Swing demonstration larger" }).click();
+    // (The current-set card and the exercise card both offer it; both open the same player.)
+    await page.getByTestId("current-set-card").getByRole("button", { name: "Show the Kettlebell Swing demonstration larger" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.locator("canvas[data-motion-canvas]")).toBeVisible();
     await expect(dialog.getByTestId("exercise-demo-3d")).toHaveCount(0);
