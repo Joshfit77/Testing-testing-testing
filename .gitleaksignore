@@ -1,0 +1,7 @@
+# Findings reviewed and accepted (gitleaks reads this file; one fingerprint per line).
+#
+# 2026-11-04: scripts/perf/progress-overview-load.mjs line 23 in commit 979b4a7 (2026-11-03) held the fixed password
+# the browser tests use for throwaway accounts on the local Supabase stack (the same value as PASSWORD in
+# e2e/helpers.ts, which .gitleaks.toml already allows under e2e/). It opens nothing outside a developer's own local
+# stack. The script now generates a random password each run; this entry only covers that historical commit.
+979b4a785e6657a08b4bb2cce4c063fda7b8f396:scripts/perf/progress-overview-load.mjs:generic-api-key:23

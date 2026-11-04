@@ -20,7 +20,7 @@ const rest = async (path, body, method = "POST") => {
 
 // A member with 3 weeks of data.
 const email = `perf-${Date.now()}@example.com`;
-const password = "Gate-Strong-2026";
+const password = `Perf-${crypto.randomUUID()}`; // a throwaway account on the local stack, new each run
 const u = await (await fetch(`${SB}/auth/v1/admin/users`, { method: "POST", headers: H, body: JSON.stringify({ email, password, email_confirm: true, user_metadata: { display_name: "Perf Member" } }) })).json();
 const id = u.id;
 await rest(`profiles?id=eq.${id}`, { onboarding_completed_at: new Date().toISOString(), display_name: "Perf Member", unit_system: "imperial", timezone: "UTC" }, "PATCH");
