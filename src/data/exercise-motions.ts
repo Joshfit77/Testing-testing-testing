@@ -29,6 +29,18 @@ import { aSkip, carry, gait, jumpRope, lateralShuffle, standHold } from "../lib/
 import { backExtension, bridge, calfRaise, hipAbduction, hackSquat, legMachine, legPress, nordic, seatSquat, singleLegRdl, splitSquat, stepUp } from "../lib/exercise-motion/patterns/lower2";
 import { coreMove } from "../lib/exercise-motion/patterns/core";
 import {
+  armOverArmSledPull,
+  bandPullApart,
+  cableCrunch,
+  landmineRotation,
+  medBallRotationalThrow,
+  medBallScoopToss,
+  medBallShotPut,
+  pallofPress,
+  rearDeltFlyFront,
+  sandbagToShoulder,
+} from "../lib/exercise-motion/patterns/throws-core-pulls";
+import {
   battleRopes,
   bearCrawl,
   bike,
@@ -129,7 +141,7 @@ export const EXERCISE_MOTIONS: Record<string, Builder> = {
   // ------------------------------------------------------------------ Shoulders / arms
   "lateral-raise": (id) => frontArms({ id, kind: "lateral-raise", label: `${F}Raises the dumbbells out to the sides to shoulder height with slightly bent elbows, then lowers slowly.` }),
   "cable-lateral-raise": (id) => frontArms({ id, kind: "cable-lateral-raise", label: `${F}One arm raises the cable handle from the opposite hip out to shoulder height and lowers.` }),
-  "rear-delt-fly": (id) => rearDeltFly(id, `${S}Bent over with a flat back: lifts the dumbbells out to the sides (toward the camera) with soft elbows and lowers.`),
+  "rear-delt-fly": (id) => rearDeltFlyFront(id, `${F}Hinged forward toward the camera with a flat back and soft knees, dumbbells hanging under the chest: raises them out to the sides with slightly bent elbows, leading with the elbows, until the arms are level with the shoulders, pauses, and lowers slowly.`),
   "triceps-pushdown": (id) => armIsolation({ id, kind: "pushdown", label: `${S}Elbows pinned at the sides: pushes the cable down until the arms are straight, then lets it rise to about 90°.` }),
   "overhead-triceps-extension": (id) => armIsolation({ id, kind: "overhead-extension", label: `${S}Dumbbell held overhead: bends the elbows to lower it behind the head and extends back up.` }),
   "dumbbell-curl": (id) => armIsolation({ id, kind: "curl", label: `${S}Elbows by the sides: curls the dumbbells up toward the shoulders and lowers them slowly.` }),
@@ -154,26 +166,26 @@ export const EXERCISE_MOTIONS: Record<string, Builder> = {
   "band-row": (id) => row({ id, kind: "band", label: `${S}Band anchored in front: rows the hands to the ribs squeezing the shoulder blades, then extends.` }),
   "inverted-row": (id) => row({ id, kind: "inverted", label: `${S}Hanging under a bar with heels on the floor and body straight: pulls the chest to the bar and lowers.` }),
   "face-pull": (id) => row({ id, kind: "face-pull", label: `${S}Cable at face height: pulls the rope toward the face with elbows high and out, then returns.` }),
-  "band-pull-apart": (id) => frontArms({ id, kind: "pull-apart", label: `${F}Arms straight in front: pulls the band apart until the arms form a T, then returns.` }),
+  "band-pull-apart": (id) => bandPullApart(id, `${F}Arms long in front at chest height: pulls the band apart, hands sweeping out to the sides until the arms form a T and the band touches the chest, then returns slowly.`),
   "chest-supported-row": (id) => row({ id, kind: "chest-supported", label: `${S}Chest on an incline bench: rows the dumbbells up beside the ribs and lowers.` }),
-  "arm-over-arm-sled-pull": (id) => row({ id, kind: "sled-pull", label: `${S}In an athletic stance: pulls the rope hand over hand, dragging the sled closer.` }),
+  "arm-over-arm-sled-pull": (id) => armOverArmSledPull(id, `${S}Braced in a staggered athletic stance: one hand pulls the rope from a long reach to the hip while the other reaches over it to grip farther along, so the sled keeps sliding closer; the pulled rope drops at the feet.`),
 
   // ------------------------------------------------------------------ Core
   plank: (id) => pushUp({ id, forearms: true, label: `${S}Forearm plank: holds a straight line from head to heels with the core braced.` }),
   "side-plank": (id) => coreMove(id, `${F}Side plank on one forearm: holds the body in a straight line with hips lifted.`, "side-plank"),
   "dead-bug": (id) => coreMove(id, `${S}Lying on the back with arms up and knees over hips: extends one arm overhead and the opposite leg out, then switches.`, "dead-bug"),
   "bird-dog": (id) => coreMove(id, `${S}On hands and knees: reaches one arm forward and the opposite leg back, holds, then switches sides.`, "bird-dog"),
-  "pallof-press": (id) => frontArms({ id, kind: "pallof", label: `${F}Standing side-on to a cable: presses the handle straight out from the chest, resists the rotation, and brings it back.` }),
+  "pallof-press": (id) => pallofPress(id, `${F}Standing side-on to a cable at chest height, handle at the sternum: presses it straight out toward the camera to arm's length, holds it there without letting the cable turn the body, and brings it back to the chest.`),
   "cable-woodchop": (id) => coreMove(id, `${F}Pulls the cable handle diagonally from high on one side to low across the body, rotating through the trunk.`, "woodchop"),
   "ab-wheel-rollout": (id) => coreMove(id, `${S}Kneeling: rolls the wheel forward until the body is nearly straight, then pulls back to the start.`, "ab-wheel"),
   "copenhagen-plank": (id) => coreMove(id, `${F}Side plank with the top leg on a bench: holds the hips up using the inner thigh.`, "copenhagen"),
-  "cable-crunch": (id) => coreMove(id, `${S}Kneeling under a high cable with the rope by the head: curls the trunk down toward the knees and returns.`, "cable-crunch"),
+  "cable-crunch": (id) => cableCrunch(id, `${S}Kneeling in front of a high cable with the rope beside the head: keeps the hips still and curls the ribs down toward the pelvis until the elbows reach the thighs, squeezes, and returns slowly.`),
 
   // ------------------------------------------------------------------ Rotation / throws
-  "medicine-ball-rotational-throw": (id) => coreMove(id, `${F}Loads the ball at one hip, rotates explosively to throw it into the wall, and catches the rebound.`, "rotational-throw"),
-  "medicine-ball-scoop-toss": (id) => medBall(id, `${S}Squats with the ball low between the legs, then extends explosively to scoop-toss it up and forward.`, "scoop"),
-  "medicine-ball-shot-put": (id) => coreMove(id, `${F}Ball held at the shoulder: steps and pushes it explosively away like a shot put.`, "shot-put"),
-  "landmine-rotation": (id) => coreMove(id, `${F}Arms straight on the end of the landmine: arcs the bar from one hip to the other, turning through the hips and trunk.`, "landmine-rotation"),
+  "medicine-ball-rotational-throw": (id) => medBallRotationalThrow(id, `${F}Side-on to a wall: loads the ball beside the far hip with the weight on the back leg, then the hips turn first, the back knee drives in and the arms whip the ball across the body into the wall; catches the rebound and resets.`),
+  "medicine-ball-scoop-toss": (id) => medBallScoopToss(id, `${F}Side-on to a wall: sits into the back hip with the ball low beside the back pocket, then drives the hips round and scoops the ball up and across into the wall at chest height; catches it and resets.`),
+  "medicine-ball-shot-put": (id) => medBallShotPut(id, `${F}Side-on to a wall in a fighting stance, ball at the rear shoulder with the elbow behind it: drives off the back foot, turns the hips and punches the ball off the shoulder into the wall; catches it and resets.`),
+  "landmine-rotation": (id) => landmineRotation(id, `${F}Both hands on the end of the landmine at chest height with long arms: turns the hips and pivots the back foot to arc the bar down to one hip, back up through the middle and over to the other hip.`),
 
   // ------------------------------------------------------------------ Carries
   "farmers-carry": (id) => carry(id, `${S}Walks tall with a heavy dumbbell in each hand at the sides.`, "farmer"),
@@ -195,7 +207,7 @@ export const EXERCISE_MOTIONS: Record<string, Builder> = {
   "pogo-jumps": (id) => jump(id, `${S}Quick, stiff-ankle hops on the balls of the feet.`, "pogo"),
   "lateral-bound": (id) => lateralBound(id, `${F}Bounds sideways from one leg to the other, sticking each single-leg landing.`),
   "medicine-ball-slam": (id) => medBall(id, `${S}Lifts the ball overhead on the toes and slams it into the floor, then squats to pick it up.`, "slam"),
-  "sandbag-to-shoulder": (id) => loadObject(id, `${S}Lifts the sandbag to the lap, then explodes the hips to pop it onto one shoulder.`, "sandbag-shoulder"),
+  "sandbag-to-shoulder": (id) => sandbagToShoulder(id, `${S}Hinges to grip the sandbag, laps it onto the thighs, extends the hips to pop it onto one shoulder, then brings it back down to the chest, the lap and the floor under control.`),
   "a-skip": (id) =>
     aSkip(id, `${S}Skips forward tall on the balls of the feet: one knee drives up until the thigh is about level with the hip, toes pulled up, while the other foot hops; the raised foot then strikes down under the hips as the other knee drives up, each arm swinging opposite its leg.`),
   "wall-drill": (id) => wallDrill(id, `${S}Leaning into a wall at about 45°: drives one knee up, then switches legs sharply.`),

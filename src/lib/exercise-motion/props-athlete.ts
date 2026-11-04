@@ -5,6 +5,7 @@
  * lifter and the hands on the bar, instead of one plate face hiding the head and hands.
  */
 import { add, landmarkDepth, len, sub, yawShift } from "./skeleton";
+import { drawKitProp } from "./props-athlete-kit";
 import type { Frame, PropDef, ResolvedProp, Vec } from "./types";
 
 type Ctx = CanvasRenderingContext2D;
@@ -471,6 +472,8 @@ export function athleteLayer(p: ResolvedProp, f: Frame): string {
  */
 export function drawPropAthlete(ctx: Ctx, p: ResolvedProp, f: Frame, pass: "main" | "extra" = "main"): boolean {
   const { def, at } = p;
+  // Equipment opted into props-athlete-kit.ts by its variant.
+  if (def.variant?.startsWith("kit-")) return pass === "main" ? drawKitProp(ctx, p, f) : true;
   const size = def.size;
   switch (def.kind) {
     case "barbell": {
