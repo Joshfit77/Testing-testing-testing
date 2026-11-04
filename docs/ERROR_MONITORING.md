@@ -36,3 +36,34 @@ header read from a file (never on the command line or in the log); the reply hol
 the run (GitHub emails the owner). It changes no price and charges nobody.
 
 Check after switching on: the run log shows `HTTP 200` and counts such as `{"stripe":{"checked":3,"failed":0,...}}`.
+
+## Activation checklist (owner; staging first)
+
+Nothing below is switched on yet. Do it on the **staging** deployment first, then on production only after approval.
+
+1. **Generate the secret** on your own computer: `openssl rand -base64 32` (32+ characters). Never paste it into chat,
+   commits or issues.
+2. **Deployment environment** (e.g. Vercel → Project → Settings → Environment Variables, staging environment):
+   `CRON_SECRET` = that value; `ERROR_REPORTING=on`; `NEXT_PUBLIC_ERROR_REPORTING=on`; confirm
+   `SUPABASE_SERVICE_ROLE_KEY` is set (reconciliation answers 503 without it). Redeploy (the `NEXT_PUBLIC_` value is
+   built into the app).
+3. **Check it from your computer** (changes nothing; the test report contains only made-up values):
+   `CRON_SECRET='<the value>' node scripts/ops/activation-check.mjs --url=https://<staging address>`
+   Expect: refused without a secret (401), refused with a wrong one (401), counts with the right one (200), test report
+   accepted (204). Then open the deployment's logs and find the `"scope":"client.error"` line: the email, token, id
+   and `?email=` must appear as `<email>`, `<token>`, `<id>` and be gone.
+4. **Log alerts:** point the host's log drain or alert rule at `"level":"error"` lines (owner's choice of service; if
+   it is a third party, list it in the privacy policy as a processor).
+5. **Schedule:** after the owner approves merging to `main`, set repository variable `BILLING_RECONCILE_URL` and
+   secret `CRON_SECRET` (GitHub → Settings → Secrets and variables → Actions); run "Billing reconciliation" once by
+   hand (Actions → Run workflow) and check `HTTP 200` with counts.
+6. **Switch off** at any time: unset `ERROR_REPORTING`/`NEXT_PUBLIC_ERROR_REPORTING` and redeploy; delete the
+   `BILLING_RECONCILE_URL` variable (the workflow then skips quietly).
+
+**Dry run done locally (2026-11-04, local Supabase, no Stripe or RevenueCat keys):** `scripts/ops/activation-check.mjs`
+against a local production build with a throwaway `CRON_SECRET` and `ERROR_REPORTING=on`: no secret → 401, wrong
+secret → 401, right secret → 200 with counts only (`{"stripe":{"checked":0,"failed":0,"skipped":true},"store":
+{…"skipped":true},"webhookEvents":{"stripeFailed":4,…}}` — the 4 are failed test webhook events in the local database
+that the report is meant to surface), test error report → 204 and one log line
+`{"scope":"client.error","message":"Test report activation-check-<n> for <email> token <token> id <id> at https://x.test/p","path":"/train/history/:id"}`
+with none of the original values anywhere in the log. Not yet run against a hosted deployment (none exists).

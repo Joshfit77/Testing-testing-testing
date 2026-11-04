@@ -40,7 +40,8 @@ jobs:
             https://*) ;;
             *) echo "::error::BILLING_RECONCILE_URL must be an https:// address"; exit 1 ;;
           esac
-          if echo "$BASE_URL" | grep -Eqi '\.(example|invalid|test|localhost)(/|$)'; then
+          # Reserved example/test names (RFC 2606/6761), e.g. app.example.org, staging.test, localhost.
+          if echo "$BASE_URL" | grep -Eqi '^https://([^/]*\.)?(example\.(com|net|org)|[^/]*\.(example|invalid|test|localhost)|localhost)(:[0-9]+)?(/|$)'; then
             echo "::error::BILLING_RECONCILE_URL points at a placeholder domain"; exit 1
           fi
           if [ "${#CRON_SECRET}" -lt 16 ]; then
