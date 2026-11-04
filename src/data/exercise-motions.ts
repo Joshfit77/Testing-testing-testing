@@ -53,8 +53,9 @@ import {
   mountainClimber,
   powerClean,
   rowing,
-  wallDrill,
 } from "../lib/exercise-motion/patterns/power";
+import { lateralBoundDrill, lateralShuffleDrill, proAgilityDrill, reactiveMirrorDrill, tDrill } from "../lib/exercise-motion/patterns/agility";
+import { agilityLadderDrill, bearCrawlDrill, threeConeDrill, walkingLungeDrill, wallDrillStraight } from "../lib/exercise-motion/patterns/drills";
 import { pose, stanceLegs, both } from "../lib/exercise-motion/build";
 import type { ExerciseMeta, MotionDef } from "../lib/exercise-motion/types";
 
@@ -109,7 +110,8 @@ export const EXERCISE_MOTIONS: Record<string, Builder> = {
   "seated-calf-raise": (id) => calfRaise(id, `${S}Seated with the pad on the knees: raises the heels, pauses, lowers into a stretch.`, { seated: true }),
 
   // ------------------------------------------------------------------ Lunge
-  "walking-lunge": (id) => splitSquat(id, `${S}Dumbbells at the sides: steps into a lunge, lowers the back knee toward the floor, and drives back up.`, "walking", "dumbbells"),
+  "walking-lunge": (id) =>
+    walkingLungeDrill(id, `${S}Dumbbells at the sides, torso tall: steps forward into a long lunge, lowers until both knees are near 90° with the back knee just off the floor, then drives through the front foot and steps the back leg through into the next lunge.`),
   "reverse-lunge": (id) => splitSquat(id, `${S}Steps one foot back, lowers until the back knee nearly touches the floor, then returns to standing.`, "reverse"),
   "bulgarian-split-squat": (id) => splitSquat(id, `${S}Rear foot on a bench: lowers straight down on the front leg and drives back up.`, "bulgarian", "dumbbells"),
   "step-up": (id) => stepUp(id, `${S}Places one foot on the box, drives up to stand tall on it, and steps back down under control.`),
@@ -205,12 +207,14 @@ export const EXERCISE_MOTIONS: Record<string, Builder> = {
   "broad-jump": (id) => jump(id, `${S}Counter-movement with an arm swing, jumps forward as far as possible, and sticks the landing.`, "broad"),
   "trap-bar-jump": (id) => jump(id, `${S}Holding a light trap bar: dips and jumps vertically, landing softly.`, "trap-bar"),
   "pogo-jumps": (id) => jump(id, `${S}Quick, stiff-ankle hops on the balls of the feet.`, "pogo"),
-  "lateral-bound": (id) => lateralBound(id, `${F}Bounds sideways from one leg to the other, sticking each single-leg landing.`),
+  "lateral-bound": (id) =>
+    lateralBoundDrill(id, `${F}From a quarter squat on one leg, pushes off sideways, lands softly on the other leg alone with hips back and knee over the toes, sticks the landing, then bounds back; the arms swing across like a speed skater's.`),
   "medicine-ball-slam": (id) => medBall(id, `${S}Lifts the ball overhead on the toes and slams it into the floor, then squats to pick it up.`, "slam"),
   "sandbag-to-shoulder": (id) => sandbagToShoulder(id, `${S}Hinges to grip the sandbag, laps it onto the thighs, extends the hips to pop it onto one shoulder, then brings it back down to the chest, the lap and the floor under control.`),
   "a-skip": (id) =>
     aSkip(id, `${S}Skips forward tall on the balls of the feet: one knee drives up until the thigh is about level with the hip, toes pulled up, while the other foot hops; the raised foot then strikes down under the hips as the other knee drives up, each arm swinging opposite its leg.`),
-  "wall-drill": (id) => wallDrill(id, `${S}Leaning into a wall at about 45°: drives one knee up, then switches legs sharply.`),
+  "wall-drill": (id) =>
+    wallDrillStraight(id, `${S}Hands on the wall, body in one straight line from head to heel at about 45°: one knee driven up with the toes pulled up, then a sharp switch that punches the down leg into the ground behind the hips.`),
   "acceleration-sprint": (id) => gait({ id, kind: "accel", label: `${S}Sprint start with a strong forward lean, powerful pushes and big arm drive.` }),
   "flying-sprint": (id) => gait({ id, kind: "sprint", label: `${S}Upright top-speed sprinting: high knees, feet striking under the hips, fast arms.` }),
   bounding: (id) => gait({ id, kind: "bound", label: `${S}Exaggerated running strides with long airborne phases.` }),
@@ -220,7 +224,8 @@ export const EXERCISE_MOTIONS: Record<string, Builder> = {
   "step-back-burpee": (id) => burpee(id, `${S}Hands down, steps one foot back at a time into a plank, steps back in, and stands — no jump.`, "step"),
   sprawl: (id) => burpee(id, `${S}From an athletic stance, drops the hands and shoots the legs back with hips low, then pops back up.`, "sprawl"),
   "mountain-climber": (id) => mountainClimber(id, `${S}Plank on the hands: drives the knees toward the chest one after the other.`),
-  "bear-crawl": (id) => bearCrawl(id, `${S}Hands and feet on the floor with knees hovering: crawls forward moving opposite hand and foot.`),
+  "bear-crawl": (id) =>
+    bearCrawlDrill(id, `${S}Hands under the shoulders, back flat, knees hovering an inch or two off the floor: crawls forward in small steps, moving the opposite hand and foot together.`),
   "jump-rope": (id) => jumpRope(id, `${S}Small bounces on the balls of the feet while the wrists turn the rope.`),
   "rowing-intervals": (id) => rowing(id, `${S}Rowing stroke: legs drive, then the body swings back and the arms pull the handle to the ribs; recovery reverses the order.`),
   "bike-intervals": (id) => bike(id, `${S}Pedalling a stationary bike at a steady cadence.`, false),
@@ -230,17 +235,23 @@ export const EXERCISE_MOTIONS: Record<string, Builder> = {
   shadowboxing: (id) => boxing(id, `${S}Boxing stance with hands up: throws a jab and a cross, returning to guard, light on the feet.`, false),
   "heavy-bag-rounds": (id) => boxing(id, `${S}Throws jab–cross combinations into a heavy bag, returning to guard.`, true),
   "battle-rope-waves": (id) => battleRopes(id, `${S}Half-squat stance: alternates arms up and down to send waves along the ropes.`),
-  "lateral-shuffle": (id) => lateralShuffle(id, `${F}Athletic stance: shuffles sideways without crossing the feet, then back.`),
+  "lateral-shuffle": (id) =>
+    lateralShuffleDrill(id, `${F}Low athletic stance, chest up: pushes off the trail foot to shuffle three steps sideways without crossing or clicking the feet, plants the outside foot with the hips dropping, and shuffles back.`),
   "hip-escape": (id) => coreMove(id, `${F}From above, lying along the mat: on the back with the knees bent, pushes off one foot, turns onto the side and drives the hips back into a C with the arms framing, then returns to the back and repeats to the other side, travelling head-first along the mat.`, "hip-escape"),
   "zone-2-run": (id) => gait({ id, kind: "jog", label: `${S}Easy, relaxed running stride.` }),
   "run-walk-intervals": (id) => gait({ id, kind: "jog", cycle: 0.82, label: `${S}Easy jogging stride (alternated with walking breaks).` }),
   "running-intervals": (id) => gait({ id, kind: "jog", cycle: 0.68, stride: 1.1, lean: 10, label: `${S}Faster running stride for hard intervals.` }),
   "stair-climb": (id) => stepUp(id, `${S}Steps up onto a stair with one foot, drives to stand tall, and steps down (stair-climb pattern).`, { boxH: 22 }),
-  "pro-agility-shuttle": (id) => lateralShuffle(id, `${F}Shuffles to one cone, touches the line, and changes direction to the other side.`, { touch: true, cones: true }),
-  "t-drill": (id) => lateralShuffle(id, `${F}Side-shuffles between cones, touching each, then returns.`, { touch: true, cones: true, steps: 3 }),
-  "three-cone-drill": (id) => lateralShuffle(id, `${F}Quick change of direction between cones with low hips and a touch at each.`, { touch: true, cones: true }),
-  "agility-ladder-drills": (id) => gait({ id, kind: "ladder", label: `${S}Quick, short running steps through an agility ladder.` }),
-  "reactive-mirror-drill": (id) => lateralShuffle(id, `${F}Mirrors a partner by shuffling quickly side to side in an athletic stance.`, { steps: 1 }),
+  "pro-agility-shuttle": (id) =>
+    proAgilityDrill(id, `${F}5-10-5, distances shortened to fit: from a low stance straddling the middle line, drives 5 yards to one side, plants the outside foot and touches the line with that hand, drives 10 yards to the far line and touches it with the other hand, then drives back through the middle.`),
+  "t-drill": (id) =>
+    tDrill(id, `${F}Seen from the top of the T, distances shortened: sprints forward from the start cone to the middle cone and touches it, shuffles left and touches, shuffles right past the middle and touches, shuffles back to the middle, then backpedals to the start, staying low without crossing the feet.`),
+  "three-cone-drill": (id) =>
+    threeConeDrill(id, `${S}Distances shortened, third cone set back from the camera: sprints to the second cone and touches the line, sprints back and touches the start line, sprints out again, rounds the second cone tightly, runs round the third cone and back round the second, and sprints past the start. Each 180° turn is shown as a quick fade.`),
+  "agility-ladder-drills": (id) =>
+    agilityLadderDrill(id, `${S}Two feet in each box: quick, light steps on the balls of the feet through the ladder, every foot landing between the rungs, arms driving the rhythm, eyes up.`),
+  "reactive-mirror-drill": (id) =>
+    reactiveMirrorDrill(id, `${F}Facing the partner (the viewer), low and square: split-steps, then mirrors each move fast: two quick shuffle steps and a plant, a short sprint forward and a backpedal back to the line, three shuffle steps the other way, then one back to the middle, never crossing the feet.`),
 
   // ------------------------------------------------------------------ Mobility
   "cat-cow": (id) => coreMove(id, `${S}On hands and knees: arches the back with the head up, then rounds the spine with the chin tucked.`, "cat-cow"),

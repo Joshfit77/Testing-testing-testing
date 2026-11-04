@@ -50,13 +50,16 @@ function fingerprint(slug: string): string {
  * when the engine's "inOut" keyframes moved to the monotone cubic curve (joints keep moving through positions they
  * pass instead of stopping at each one): the keyframe poses are unchanged, the in-betweens are smoother. Updated again
  * for the T-drill and the three-cone drill when the body's placement between keyframes moved onto the same curve (it
- * moved in straight lines, starting and stopping abruptly at each cone); their keyframes are unchanged.
+ * moved in straight lines, starting and stopping abruptly at each cone); their keyframes are unchanged. Updated again,
+ * on purpose, when these four were redrawn as travelling drills (they stepped in place; see
+ * tests/unit/exercise-agility-drills.test.ts): they no longer share the lateral-shuffle code, so the pins now guard the
+ * new drawings against accidental changes.
  */
 const UNCHANGED: Record<string, string> = {
-  "lateral-shuffle": "ab176e11f016c84e",
-  "t-drill": "ec39ac5022736217",
-  "three-cone-drill": "ccb93ab0424ed48e",
-  "reactive-mirror-drill": "63ccd65b0053604f",
+  "lateral-shuffle": "6dcf0915b3c6e220",
+  "t-drill": "8ed9338e1b7fc01c",
+  "three-cone-drill": "56d22657a39daae9",
+  "reactive-mirror-drill": "522971b454f18159",
 };
 
 describe("drill corrections do not disturb other exercises", () => {
