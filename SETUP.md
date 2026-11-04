@@ -121,7 +121,7 @@ To make a consistent set of AI-generated demo clips:
 4. **Auth → Email**: keep "Confirm email" enabled. Configure custom SMTP for production email delivery (Supabase's
    built-in sender is rate-limited and meant for testing, so beta testers' confirmation and reset emails may not arrive).
 5. **Auth → Email Templates (required)**: use the templates in `supabase/templates/` for "Confirm signup"
-   (`confirmation.html`) and "Reset password" (`recovery.html`), or run `npx supabase config push`. They link to
+   (`confirmation.html`) and "Reset password" (`recovery.html`) by pasting them in the dashboard (do **not** run `npx supabase config push` against a hosted project: it would also push the local `site_url` and localhost redirect URLs from `supabase/config.toml`). They link to
    `/auth/confirm?token_hash={{ .TokenHash }}&type=…`, which works in any browser. Supabase's default
    `{{ .ConfirmationURL }}` link ends in a code exchange that only works in the browser that asked for the email, so a
    password reset requested in the iPhone app fails when the link opens in Safari

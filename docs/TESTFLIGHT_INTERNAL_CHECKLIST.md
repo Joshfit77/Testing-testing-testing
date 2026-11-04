@@ -4,17 +4,18 @@ For the first internal TestFlight build, on physical iPhones. Tick each line onl
 the result, iOS version and phone model in `docs/device-testing/device-test-results.csv`. Step-by-step detail for many
 lines is in `docs/device-testing/DEVICE_TEST_SCRIPT.md`; this page is the list to get through.
 
-**Before the build (owner):** the private deployment is up and approved; `CAP_SERVER_URL` points at it; App Store
-Connect app record, bundle ID, signing, and the TestFlight internal group exist (`docs/TESTFLIGHT_SETUP_GUIDE.md`); a
-RevenueCat **sandbox** setup with the two products; Sandbox Apple IDs for testers; the test account(s) listed in
-`STORE_SANDBOX_TESTERS` if that allow-list is used. Use only test accounts, never a real member's.
+**Before the build (owner):** follow `docs/TESTFLIGHT_STEPS.md`. In short: the staging deployment is up and approved
+(the iPhone app loads it); App Store Connect app record, bundle ID, signing secrets and the TestFlight internal group
+exist; a RevenueCat **sandbox** setup with the two products; Sandbox Apple IDs for testers; each tester's app account is
+on the sandbox tester list (**Admin → Subscriptions → Sandbox testers**, the `sandbox_testers` table) unless
+`REVENUECAT_ALLOW_SANDBOX=true` is set on staging. Use only test accounts, never a real member's.
 
 Phones: at least one small (iPhone SE / 13 mini) and one large (Pro Max), on the current iOS and one version older.
 
 ## 1. Install, opening and account security
 
 - [ ] Install from TestFlight; the first launch plays the opening once; Skip and Enter work; later launches behave as designed.
-- [ ] Sign up with a new email; the confirmation email arrives; the link opens the app/site and lands on onboarding.
+- [ ] Sign up with a new email; the confirmation email arrives; the link opens in Safari (the app has no link handling yet), confirms the account, and signing in inside the app lands on onboarding.
 - [ ] Age confirmation and terms acceptance are required to sign up.
 - [ ] Sign out; sign in; wrong password shows a clear error; repeated wrong passwords are rate-limited.
 - [ ] Password reset email arrives and works once; an old link is refused.
@@ -24,7 +25,7 @@ Phones: at least one small (iPhone SE / 13 mini) and one large (Pro Max), on the
 
 ## 2. Purchases (sandbox only)
 
-- [ ] Profile → Membership shows Free vs Pro and the two prices exactly as configured ($19.99/month, $149.99/year).
+- [ ] Profile → Plans & billing shows Free vs Pro and the two prices exactly as configured ($19.99/month, $149.99/year).
 - [ ] Buy monthly with a Sandbox Apple ID: Apple's sheet appears (no web checkout inside the iPhone app); Pro unlocks after purchase.
 - [ ] Pro stays unlocked after closing/reopening the app and after signing in on a second phone.
 - [ ] Restore Purchases on a fresh install restores Pro.
@@ -69,7 +70,7 @@ Phones: at least one small (iPhone SE / 13 mini) and one large (Pro Max), on the
 - [ ] Deny Health access: the app explains and keeps working.
 - [ ] Disconnect stops syncing; previously imported data handling matches the privacy policy.
 
-## 7. AI coaching (needs the production API key on the deployment)
+## 7. AI coaching (needs an Anthropic API key on the staging deployment, with your spend approval; `docs/LIVE_AI_TEST_PLAN.md`)
 
 - [ ] Ask a training question: an answer arrives, with the AI disclosure visible.
 - [ ] Ask about pain/injury: the reply advises professional care and does not diagnose.

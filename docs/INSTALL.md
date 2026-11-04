@@ -28,16 +28,21 @@ Apple doesn't allow installing an app file directly. The options are:
 
 1. **Today, no account needed:** open the offline edition in Safari and tap
    **Share → Add to Home Screen**. It gets an icon and runs full-screen.
-2. **TestFlight (the real installed app):**
+2. **TestFlight (the real installed app):** follow `docs/TESTFLIGHT_STEPS.md` (staging server, Apple Developer, App
+   Store Connect, Supabase, RevenueCat, GitHub secrets, then the build). In short:
    1. Join the Apple Developer Program ($99/year) at developer.apple.com.
    2. In App Store Connect, create an app with bundle ID `com.narrowgatefitness.app`.
-   3. Create an App Store Connect API key (Users and Access → Integrations → App Store Connect API, role **App Manager**) and download the `.p8` file.
+   3. Create an App Store Connect API key (Users and Access → Integrations → App Store Connect API, role **Admin**,
+      which automatic signing needs) and download the `.p8` file.
    4. In GitHub, go to repository **Settings → Secrets and variables → Actions** and add these secrets:
       - `APPLE_TEAM_ID`
       - `ASC_KEY_ID`
       - `ASC_ISSUER_ID`
       - `ASC_KEY_P8_BASE64` (the `.p8` file, base64-encoded)
-   5. Run **Actions → iOS → Run workflow**, choosing `testflight` and the `offline` edition.
+   5. Run **Actions → iOS → Run workflow**. In **Use workflow from**, choose **`release/rc-2026-11-04`** (not `main`:
+      `main` still has an older iOS workflow that uploads the offline edition straight away). Choose job `testflight`,
+      enter the staging server's `https://` address, and tick **upload** only when you want the build sent to App Store
+      Connect.
    6. When processing finishes in App Store Connect, add yourself as a TestFlight tester and install from the TestFlight app.
 
 Every push also runs an iPhone **compile check** (the `simulator` job), so you'll know the iPhone app

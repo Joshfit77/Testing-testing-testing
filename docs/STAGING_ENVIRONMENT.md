@@ -25,7 +25,7 @@ Branch and commit this was written against: `security/payment-hardening-prelaunc
 4. **Auth → Email.** Keep "Confirm email" on. Add custom SMTP; Supabase's built-in sender is rate-limited, so testers'
    emails may not arrive.
 5. **Auth → Email Templates.** Use `supabase/templates/confirmation.html` ("Confirm signup") and
-   `supabase/templates/recovery.html` ("Reset password"), or run `npx supabase config push`. Without them, a password
+   `supabase/templates/recovery.html` ("Reset password") by pasting them in the dashboard (do **not** run `npx supabase config push` against a hosted project: it would also push the local `site_url` and localhost redirect URLs from `supabase/config.toml`). Without them, a password
    reset requested in the iPhone app fails when its link opens in Safari.
 6. **Storage.** The migrations create the buckets: `avatars`, `progress-photos` and `body-scans` are private, and
    `exercise-media` is public (admin uploads only). Check them under Storage after `db push`.
