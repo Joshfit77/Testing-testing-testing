@@ -1380,6 +1380,8 @@ function inclineBench(g: Gear) {
 /** The kinds drawn here, by kind (some only in a variant or a view). */
 function drawerFor(p: ResolvedProp, f: Frame): ((g: Gear) => void) | null {
   const { kind, variant } = p.def;
+  // Props drawn for a specific motion (props-athlete-kit.ts, variant "kit-…") keep their own drawing.
+  if (variant?.startsWith("kit-")) return null;
   switch (kind) {
     case "band":
       return band;
