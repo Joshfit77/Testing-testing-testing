@@ -19,6 +19,20 @@ async function displayOptions(page: Page) {
 }
 /** The display setting's save (not the reading-history POST to the same page). */
 const whenSaved = (page: Page) => page.waitForResponse((r) => r.request().method() === "POST" && /redLetters|biblePageTheme/.test(r.request().postData() ?? ""));
+/**
+ * Open a Bible page with the connection off and wait for the saved offline reader. Chromium applies
+ * context.setOffline to the service worker a moment after the page, so a navigation started right away can
+ * still reach the server through the worker and come back as the online page (seen in a trace: the worker's
+ * request returned 200 18 ms after going offline, requests a moment later failed as disconnected). A device that
+ * is really offline has no such window, so the navigation is retried until the worker sees the network gone.
+ * Each test goes offline only once (see below).
+ */
+async function openOffline(page: Page, path: string) {
+  await expect(async () => {
+    await page.goto(path).catch(() => undefined);
+    await expect(page.getByText(/You're offline\. This is the Bible saved on this device/)).toBeVisible({ timeout: 3_000 });
+  }).toPass({ timeout: 30_000 });
+}
 
 test.describe("Bible reader", () => {
   test("read, highlight, bookmark, note, search, history and text size; all free", async ({ page }) => {
@@ -181,8 +195,7 @@ test.describe("Bible reader", () => {
     await expect(page.getByText(/Saved on this device/)).toBeVisible({ timeout: 60_000 });
 
     await context.setOffline(true);
-    await page.goto("/faith/bible/john/3").catch(() => undefined);
-    await expect(page.getByText(/You're offline\. This is the Bible saved on this device/)).toBeVisible();
+    await openOffline(page, "/faith/bible/john/3");
     await expect(page.getByRole("heading", { name: "John 3" })).toBeVisible();
     await expect(page.locator("#v16")).toContainText(JOHN_3_16);
     await expect(page.locator("#v16 .wj")).toHaveText(JOHN_3_16);
@@ -195,16 +208,28 @@ test.describe("Bible reader", () => {
     await expect(page.getByRole("heading", { name: "John 21" })).toBeVisible();
     // Only Scripture: no account details on the offline page.
     expect(await page.locator("body").innerText()).not.toMatch(/@|Test Athlete/);
-
-    // Turning Red Letters off in the app reaches the offline reader on this device; the text is unchanged.
     await context.setOffline(false);
+  });
+
+  // Its own test, so the browser goes offline once: after an offline -> online -> offline cycle in one context,
+  // Chromium sometimes left the service worker online for 30 s and more (the page's own requests failed, the
+  // worker's navigations reached the server), which a real offline phone cannot do.
+  test("turning Red Letters off reaches the Bible saved for offline; the text is unchanged", async ({ page, context }) => {
+    await signUpAndConfirm(page, uniqueEmail("bible-offline-rl"));
+    await completeOnboarding(page);
     await page.goto("/faith/bible/john/3");
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    await page.reload(); // so the service worker controls the page
     const save = whenSaved(page);
     await (await displayOptions(page)).click();
     await save;
     await expect.poll(() => page.evaluate(() => localStorage.getItem("ngf.bible.redLetters"))).toBe("0");
+    await page.goto("/faith/bible");
+    await page.getByRole("button", { name: "Save for offline" }).click();
+    await expect(page.getByText(/Saved on this device/)).toBeVisible({ timeout: 60_000 });
+
     await context.setOffline(true);
-    await page.goto("/faith/bible/john/3").catch(() => undefined);
+    await openOffline(page, "/faith/bible/john/3");
     await expect(page.locator("#v16 .wj")).toHaveText(JOHN_3_16);
     expect(await colorOf(page, "#v16 .wj")).toBe(await colorOf(page, "#v16"));
     await context.setOffline(false);
