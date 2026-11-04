@@ -43,7 +43,7 @@ on:
         required: false
         default: "1.0.0"
   push:
-    branches: [main, claude/sharp-cray-8y0uuv, claude/testflight-prep]
+    branches: [main, claude/sharp-cray-8y0uuv, claude/testflight-prep, "release/**"]
     paths:
       - "standalone/**"
       - "ios/**"
