@@ -248,18 +248,23 @@ if (!SKIP_FLOWS) try {
   link(started, /Show the .* demonstration larger/, "state:demo-dialog");
   await page.keyboard.press("Escape");
   await dialog.waitFor({ state: "hidden" });
-  // Log two sets.
-  await page.getByLabel(/set 1 weight in lb/).first().fill("135");
-  await page.getByLabel(/set 1 reps/).first().fill("8");
-  await page.getByRole("button", { name: /Mark .* set 1 complete/ }).first().click();
+  // Log set 1 on the current-set card at the top (the main path: big steppers, one Complete set button), set 2 in the
+  // exercise card below.
+  const card = page.getByTestId("current-set-card");
+  await card.getByLabel("Weight (lb)").fill("135");
+  await card.getByLabel("Reps", { exact: true }).fill("8");
+  await card.getByTestId("complete-set").click();
   await page.waitForTimeout(800);
-  const set1 = await state("state:set-1-logged", "Set 1 logged, rest timer running");
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const set1 = await state("state:set-1-logged", "Set 1 logged: rest timer and Undo");
+  link(started, /Complete set/, "state:set-1-logged");
   link(started, /Mark .* set 1 complete/, "state:set-1-logged");
   for (const hs of started.hot) if (hs.kind === "input" || /weight|reps/i.test(hs.label)) hs.to = "state:set-1-logged";
   const w2 = page.getByLabel(/set 2 weight in lb/).first();
   if (await w2.count()) { await w2.fill("145"); await page.getByLabel(/set 2 reps/).first().fill("6"); await page.getByRole("button", { name: /Mark .* set 2 complete/ }).first().click(); await page.waitForTimeout(800); }
   const set2 = await state("state:set-2-logged", "Two sets logged");
   link(set1, /Mark .* set 2 complete/, "state:set-2-logged");
+  link(set1, /Complete set/, "state:set-2-logged");
   // Substitute the second exercise.
   await page.getByRole("button", { name: /^Options for / }).nth(1).click();
   await page.waitForTimeout(400);
@@ -282,7 +287,7 @@ if (!SKIP_FLOWS) try {
   // Finish.
   await page.getByRole("button", { name: "Finish" }).click();
   await page.waitForTimeout(500);
-  const confirm = await state("state:finish-confirm", "Finish the workout?", { full: false, closeTo: "state:substituted" });
+  const confirm = await state("state:finish-confirm", "Finish early?", { full: false, closeTo: "state:substituted" });
   for (const hs of confirm.hot) if (/cancel|keep|continue|back/i.test(hs.label) && !/Finish/.test(hs.label)) hs.to = "state:substituted";
   link(subd, /^Finish$/, "state:finish-confirm");
   link(set2, /^Finish$/, "state:finish-confirm");
