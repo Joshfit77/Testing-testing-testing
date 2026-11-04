@@ -3,8 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/react-hydration-replay-fix.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/react-hydration-replay-fix.mjs",
     "build": "next build",
+    "postbuild": "node scripts/react-hydration-replay-fix.mjs --verify-build",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
@@ -26,7 +29,8 @@
     "db:bundle": "bash scripts/bundle-sql.sh",
     "bible:red-letter-records": "tsx scripts/red-letter-records.ts",
     "videos:prompts": "tsx scripts/generate-video-prompts.ts",
-    "videos:import": "tsx scripts/import-exercise-videos.ts"
+    "videos:import": "tsx scripts/import-exercise-videos.ts",
+    "postinstall": "node scripts/react-hydration-replay-fix.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",

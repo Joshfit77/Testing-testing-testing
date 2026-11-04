@@ -37,7 +37,7 @@ export NEXT_PUBLIC_SITE_URL="${NEXT_PUBLIC_SITE_URL:-http://localhost:${PORT}}"
 # Set to empty (not unset) so values in .env.local are not loaded either.
 export STRIPE_SECRET_KEY="" STRIPE_WEBHOOK_SECRET="" REVENUECAT_SECRET_API_KEY="" REVENUECAT_WEBHOOK_AUTH="" REVENUECAT_PUBLIC_KEY_IOS="" REVENUECAT_PUBLIC_KEY_ANDROID=""
 
-npx next build
+npm run build
 echo
 echo "Narrow Gate Fitness demo: http://localhost:${PORT}"
 echo "On a phone on the same Wi-Fi: http://<this computer's IP address>:${PORT}"

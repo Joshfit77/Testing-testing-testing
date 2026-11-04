@@ -134,6 +134,8 @@ Before a public paid launch, in addition:
 7. WebKit e2e run on the macOS CI job.
 8. An intermittent React hydration error (#418) on `/faith/studies`, seen once in `phone-sweep` at 375 pt with the largest
    text and not reproduced on re-run. The page wasn't changed in this pass; the cause is probably in shared app-shell code and still needs finding.
+   **Resolved 2026-11-04:** the cause was a bug in the React build bundled with Next 15.5, not app code; fixed and
+   verified as described in `docs/HYDRATION_418.md`.
 
 ## 7. Ratings
 

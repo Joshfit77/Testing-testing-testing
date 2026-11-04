@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 import { OFFLINE_BIBLE_CSP, securityHeaders } from "./src/lib/security-headers";
 
@@ -19,6 +20,18 @@ const nextConfig: NextConfig = {
   // The 3D exercise showcase was retired (2026-11-04: exercise demos are 2D only); old links land on the exercise library.
   async redirects() {
     return [{ source: "/train/3d", destination: "/train/exercises", permanent: false }];
+  },
+  // The hydration fix (scripts/react-hydration-replay-fix.mjs, docs/HYDRATION_418.md) edits React inside
+  // node_modules/next, which webpack's build cache treats as unchanging: key the cache to the fix so a cached copy of
+  // the unfixed React is never reused. `npm run build` also checks the browser bundle for the fix afterwards.
+  webpack(config) {
+    if (config.cache && typeof config.cache === "object" && config.cache.type === "filesystem") {
+      config.cache.buildDependencies = {
+        ...config.cache.buildDependencies,
+        reactHydrationReplayFix: [path.join(process.cwd(), "scripts", "react-hydration-replay-fix.mjs")],
+      };
+    }
+    return config;
   },
   // Server code reads the Bible from public/bible/bsb with fs (src/server/bible/text.ts): ship those files with the
   // server functions that use them on hosts that trace dependencies (Vercel and other serverless builds).

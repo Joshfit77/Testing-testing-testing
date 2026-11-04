@@ -13,6 +13,8 @@ interface ToastItem {
 }
 
 let items: ToastItem[] = [];
+/** What the server renders, and so what the page starts from: no toasts. */
+const NO_TOASTS: ToastItem[] = [];
 let nextId = 1;
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
@@ -52,7 +54,8 @@ export function Toaster() {
       return () => listeners.delete(cb);
     },
     () => items,
-    () => items,
+    // Hydration must start from what the server sent (nothing), even if a toast was raised before this hydrated.
+    () => NO_TOASTS,
   );
   return (
     <div
