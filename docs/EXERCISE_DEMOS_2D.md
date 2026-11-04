@@ -35,9 +35,16 @@ and anatomically proportioned, the exercise's working muscles glowing gold (prim
 front view per exercise, chosen for the clearest read of the movement. It is now the only character: the older gold
 figure and the 3D figure are no longer shown anywhere in the app.
 
-Equipment redrawn in the athlete's style: barbell and plates, dumbbells, keg, bench, rack, cable tower, cable handles
-and rope, rowing station. Other equipment (kettlebell, pull-up bar, dip bars, bands, boxes, machines, sled, medicine
-ball) is drawn by the shared prop renderer, in a simpler style that still needs matching to the athlete.
+Equipment in the athlete's style (graphite with gold edges): barbell and plates, axle, dumbbells, keg, bench and
+incline bench, rack, cable tower, cable handles and rope, rowing station (`props-athlete.ts`); bands, trap bar,
+farmer's handles, log, yoke, sleds and ropes, leg press, hack squat, lat pulldown, leg extension and leg curl machines,
+stationary and air bikes, dip bars, pull-up rig, landmine and jump rope (`props-athlete-gear.ts`); the walls, bands,
+landmine and sled made for particular rebuilt motions (`props-athlete-kit.ts`); agility cones, floor lines and the
+ladder (`props-drills.ts`). Where a side-view barbell's near plate would hide the head or upper arms (squats, bench
+press, overhead press, cleans, Zercher, hip thrust), it is drawn see-through with a gold rim, and solid again where it
+covers nothing. Still in the plainer shared style, readable but not yet matched: kettlebell, battle ropes, ab wheel,
+machine chest press, seated calf raise, back-extension bench, rower, chair, and the boxes, mats, walls, medicine balls,
+sandbags and stones that were already dark and gold.
 
 ## 3. What an exercise shows (`src/lib/exercise-demo-readiness.ts`)
 
@@ -78,11 +85,30 @@ tests pass.
    default) and review all six phases.
 3. Set its entry in `src/data/exercise-demo-readiness.json` to `animated` (or `poses`), with a note if not animated.
 4. Regenerate the status page: `npx tsx --tsconfig tsconfig.json scripts/exercise-review/readiness-report.ts`.
-5. The owner records sign-off by adding the slug to `ownerApproved`.
+5. The owner records sign-off by adding the slug to `ownerApproved`. The owner's review sheet
+   (`node scripts/exercise-review/review-sheet.mjs <out.html>`) shows every exercise moving, with Approve / Needs work
+   and a note; decisions are kept against the motion's fingerprint, so a decision on an older version shows as out of
+   date. Approvals are copied into `ownerApproved` only from the owner's own decisions, never by code.
 
 ## 7. Not done / owner decisions
 
 - Owner review of the athlete look itself and of each exercise (none approved yet).
 - A coach's review of the exercises flagged in `src/data/exercise-review-notes.ts`.
-- Exercises in the Pose frames and Placeholder states need motion work (list in the status page).
+- Every exercise is now in the Animated state (phase 2, below). The Pose frames and Placeholder states stay in the
+  code for exercises added later or demoted after review.
+- The weakest reads, worth the owner's closest look: three-cone drill (turns are quick fades), thoracic open book,
+  Pallof press, rear delt fly (front view; can look like a lateral raise) and hip escape. Each has a limitation note.
 - Real-iPhone check of smoothness and battery on older phones (only checked in desktop Chromium at phone size).
+
+## 8. Phase 2 (2026-11-04): every exercise animated
+
+Four agents, each in its own branch, rebuilt the 31 exercises that were pose frames or placeholders (11 of them in
+launch tier 1) plus hip abduction, and restyled the equipment above; each was checked at six phases and in 1x / 0.5x
+frame strips, then by the reviewer, and merged. The merged code was re-rendered for all 157 exercises and reviewed
+again by eye. `node scripts/exercise-review/fingerprint.mjs --compare=<before.json>` (a hash of each exercise's
+keyframes) confirmed that exactly those 32 exercises changed movement and no other did. One merge interaction was
+caught by rendering, not by tests (the restyled band, sled and landmine replaced the drawings made for three rebuilt
+motions) and fixed so motion-specific props keep their own drawing.
+
+Result: 157 animated, 0 pose frames, 0 placeholders, 53 with a limitation note (status page). Nothing is
+owner-approved, and nothing has been reviewed by a coach.
