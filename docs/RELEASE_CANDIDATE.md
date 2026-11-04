@@ -192,10 +192,11 @@ and the harness's own spend ceiling.
 | Unit (Vitest), after the 2D, ops and hydration commits | **3,198 passed** in three full runs (fewer than before because the 3D tests were removed; new: 2D readiness, GPS lock, error monitoring, hydration regression). One earlier run made while a three-browser load test was saturating the machine had 1 failure that did not repeat in the next three runs; its name was not captured, so it is listed under I |
 | Integration against local Supabase (RLS, isolation, payments, AI limits, workouts, faith, sleep…) | **318 passed, 1 skipped** (live Open Food Facts test, needs internet by design) |
 | Production build (`npm run build`, clean `.next`) | PASS; the post-build check confirms the hydration fix is in the browser bundle |
-| Browser end to end, phone size (Chromium, Pixel 7 profile), on the build above | So far: the 2D demonstration specs **3/3 passed**; workout card, fast logging, workout reliability, GPS and CSP/layout specs **17/17 passed**. Phone sweep three runs in a row and the full suite: **in progress** when this was written (results added below when finished). The previous full run (before these commits) was 110 passed, 1 failed (#418 in the sweep), 18 skipped |
+| Browser end to end, phone size (Chromium, Pixel 7 profile), on the build above, 130 tests | **112 passed, 0 failed, 18 skipped** (14.4 min). Skipped as before: the 17 demo-mode tests (need a demo server) and the "no AI provider" test (can't run while the AI mock is on). Includes the new 2D demonstration specs, Body Scan, workouts, GPS and the opening gate |
+| Phone sweep (`e2e/phone-sweep.spec.ts`: every signed-in screen at 320–440 pt, largest text, reduced motion), three runs in a row after the hydration fix | **3/3 passed** (6.0, 5.8, 5.8 min), no hydration error (a fourth pass inside the full suite also passed) |
 | Hydration #418 load test (diagnostic production build, 3 parallel browsers, 4 phone widths, 44 pages, 1,584 page loads each) | **Before the fix: 7 errors** (all through React's replay path). **After: 0 errors**, with 9 loads going through that same path and hydrating cleanly (`docs/HYDRATION_418.md`) |
-| GitHub CI (`ci.yml`) on `release/rc-2026-11-04` @ `e227845`, run 41859668809 | **PASS**: typecheck, lint, unit tests, production build, integration tests on a fresh Supabase (`db reset` from the 53 migrations), gitleaks over the full history, `npm audit` (no high or critical advisories in production dependencies). The first run (@ `c14127d`) failed only the gitleaks step, fixed as described in C |
-| iOS workflow (`ios.yml`, job = checks) on the RC, run 41857518660 | **WebKit opening and navigation tests at iPhone 15 size: PASS.** The three macOS jobs (offline compile, unsigned Release device archive, full app in the iOS Simulator) **did not run**: no macOS runner was assigned within 15 minutes and GitHub cancelled them before any step ran; the one allowed re-run was still waiting for a macOS runner when this was written (check run 41857518660 on GitHub). The last completed macOS run (2026-11-03, `security/payment-hardening-prelaunch`) passed all three; the app code changed since then (workout logging, GPS), so the Simulator result for this RC is still owed |
+| GitHub CI (`ci.yml`) on `release/rc-2026-11-04` @ `1f63528`, run 41892280736 | **checks: PASS** (typecheck, lint, unit tests incl. the hydration regression test, production build incl. the post-build fix check); **security-scan: PASS** (gitleaks full history, `npm audit`). **integration: did not run its tests**: the GitHub runner's port 54324 was already in use when Supabase started its mail container (all 56 migrations had applied); one re-run was started. Integration passed locally (row above) and on the previous RC commit in CI (run 41859668809) |
+| iOS workflow (`ios.yml`) on the RC @ `1f63528`, run 41892280802 | **PASS, all four jobs:** offline-edition compile; unsigned Release device archive checked against App Store Connect's requirements; **the full app in the iOS Simulator** (launch, Enter Narrow Gate, relaunch, return from the background, XCUITest); WebKit opening and navigation tests at iPhone 15 size. (The earlier run, 41857518660, had its macOS jobs cancelled twice for want of a runner; this run got runners.) The signed TestFlight job is skipped unless asked |
 | WebKit (iPhone profile) tests | Run by the iOS workflow only (no WebKit here) |
 | Physical iPhone | **NOT RUN** (no device) |
 | Live AI, real store purchases, real Stripe Checkout | **NOT RUN** (no keys/accounts; $0 budget) |
@@ -205,11 +206,11 @@ and the harness's own spend ceiling.
 **Ready for internal beta, and ready for a TestFlight internal build once the owner deploys a staging server.**
 
 - For: one branch with every feature; access control, payments and AI limits verified against real requests on a
-  real database; 3,206 unit, 318 integration and the full browser suite passing; the iOS app builds and runs in the
-  Simulator on CI.
+  real database; 3,198 unit, 318 integration and the full browser suite passing; the hydration error found and fixed
+  at its cause; the iOS app builds, archives and runs in the Simulator on CI for this RC.
 - Not "Ready for App Store review": legal pages are outlines; no real device has run purchases, Health, GPS in the
   background, notifications or the camera; live AI unvalidated; error monitoring and the billing reconciliation
-  schedule are not set up.
+  schedule are built but switched off until the owner turns them on.
 - Not "public paid launch": all of the above plus real purchase testing and owner approval of the exercise
   demonstrations.
 
