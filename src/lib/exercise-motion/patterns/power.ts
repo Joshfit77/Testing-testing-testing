@@ -472,18 +472,42 @@ export function rowing(id: string, label: string): MotionDef {
   };
 }
 
-/** Stationary / air bike pedalling. */
+/**
+ * Stationary / air bike pedalling. The seat is set the way the instructions ask: the knee keeps a slight bend (about
+ * 30°) with the pedal at the bottom of the stroke, and bends to about 110° at the top. The crank sits ahead of the hip
+ * as on a real bike. Upright bike: the hands rest on a fixed handlebar. Air bike: the hands push and pull the moving
+ * handles, each handle travelling back as the pedal on its side comes forward (as the linkage does).
+ */
 export function bike(id: string, label: string, air: boolean): MotionDef {
-  const seat: Vec = [0, 92];
-  const root: RootRule = { pin: "butt", at: [seat[0], seat[1] + 2] };
-  const crank: Vec = [seat[0] + 14, 36];
   const R = 17;
-  const base = pose({ trunk: air ? 22 : 18, neck: -10, ...both({ armD: 20 }) });
-  const N = 8;
+  const base = pose({ trunk: air ? 16 : 24, neck: air ? -6 : -12, ...both({ armD: 20 }) });
+  // Hip joint relative to the buttock pinned on the seat.
+  const hip0 = worldPts(base, { pin: "butt", at: [0, 0] }).pelvis;
+  // Crank 18 cm ahead of the hip, its centre 33 cm up; the hip high enough that the ankle (about 6 cm behind and 8.5 cm
+  // above the pedal) is 87 cm from it at the bottom of the stroke (thigh 45 + shin 44 with the knee bent 27°; the foot
+  // angling on the pedal leaves the knee at about 30°).
+  const reach = Math.sqrt(BODY.thigh ** 2 + BODY.shin ** 2 + 2 * BODY.thigh * BODY.shin * Math.cos((27 * Math.PI) / 180));
+  const crank: Vec = [hip0[0] + 18, 33];
+  const ankleC: Vec = [crank[0] - 6, crank[1] + 8.5];
+  const hipY = ankleC[1] + Math.sqrt((reach - R) ** 2 - (crank[0] - 6 - hip0[0]) ** 2);
+  const root: RootRule = { pin: "butt", at: [0, hipY - hip0[1]] };
+  const seat: Vec = [0, hipY - hip0[1] - 2];
+  const W0 = worldPts(base, root);
+  // Upright bike: a fixed handlebar ahead of and below the shoulders (elbows softly bent). Air bike: each handle swings
+  // ±10° about its pivot, the grips passing below shoulder height (elbows from about 40° to 100°).
+  const bar: Vec = [W0.shoulder[0] + 48, W0.shoulder[1] - 36];
+  const pivot: Vec = [crank[0] + 30, crank[1] + 24];
+  const gripMid: Vec = [W0.shoulder[0] + 40, W0.shoulder[1] - 28];
+  const armLen = Math.hypot(gripMid[0] - pivot[0], gripMid[1] - pivot[1]);
+  const phi0 = Math.atan2(gripMid[0] - pivot[0], gripMid[1] - pivot[1]);
+  const grip = (phi: number): Vec => [pivot[0] + Math.sin(phi) * armLen, pivot[1] + Math.cos(phi) * armLen];
+  const SWING = (10 * Math.PI) / 180;
+  const N = 12;
   const specs: KeySpec[] = [];
   for (let i = 0; i < N; i++) {
     const a = (i / N) * Math.PI * 2;
     const pedal = (ang: number): Vec => [crank[0] + Math.cos(ang) * R, crank[1] + Math.sin(ang) * R];
+    // Pedalling forward: the near (right) pedal starts at the front and goes down, back and over the top.
     const fr = pedal(-a);
     const fl = pedal(-a + Math.PI);
     // Foot angle on the pedal adapts so the ankle stays within its range.
@@ -506,19 +530,29 @@ export function bike(id: string, label: string, air: boolean): MotionDef {
     let p = l1.p;
     const ankR = r1.ank;
     const ankL = l1.ank;
-    const W = worldPts(p, root);
-    const swing = air ? Math.cos(a) * 12 : 0;
-    const hR: Vec = [W.shoulder[0] + 44 + swing, W.shoulder[1] - 34];
-    const hL: Vec = [W.shoulder[0] + 44 - swing, W.shoulder[1] - 34];
+    // Right pedal forward (a = 0) → right handle pulled back, the left one pushed forward.
+    const hR: Vec = air ? grip(phi0 - SWING * Math.cos(a)) : bar;
+    const hL: Vec = air ? grip(phi0 + SWING * Math.cos(a)) : bar;
     p = handsTo(handsTo(p, root, hR, ["R"]), root, hL, ["L"]);
-    specs.push({ pose: p, dur: (air ? 0.62 : 0.8) / N, ease: "linear", ik: { footR: ankR, footL: ankL, handR: hR, handL: hL } });
+    // Catmull-Rom through twelve points of the circle: the pedals and grips travel on smooth round paths.
+    specs.push({ pose: p, dur: (air ? 0.62 : 0.8) / N, ease: "spline", ik: { footR: ankR, footL: ankL, handR: hR, handL: hL } });
   }
   return {
     id,
     view: "side",
     label,
     keyframes: keys(root, specs),
-    props: [{ id: "bike", kind: "bike", at: seat, layer: "far", variant: air ? undefined : "upright" }],
+    // `to` = the crank centre, `size` = the crank length. The air bike's handle arms swing about their pivot: the far
+    // one behind the far leg, the near one outside the near leg.
+    props: [
+      { id: "bike", kind: "bike", at: seat, to: crank, size: R, layer: "far", variant: air ? "air" : "upright" },
+      ...(air
+        ? ([
+            { id: "handleL", kind: "bike", variant: "handle", at: pivot, to: { lm: "handL" }, layer: "back" },
+            { id: "handleR", kind: "bike", variant: "handle", at: pivot, to: { lm: "handR" }, layer: "near" },
+          ] satisfies PropDef[])
+        : []),
+    ],
     stillPhase: 0,
   };
 }

@@ -623,9 +623,14 @@ export function drawProp(ctx: Ctx, p: ResolvedProp, f: Frame, t: number) {
       return;
     }
     case "bike": {
-      // `at` = seat top [x, y]. Fan in front; crank below the seat; handles move with the hands.
+      // variant "handle": an air bike's handle arm from its pivot (`at`) to the hand (`to`).
+      if (def.variant === "handle") {
+        if (p.to) machineFrame(ctx, [at, p.to], 2.6);
+        return;
+      }
+      // `at` = seat top [x, y], `to` = crank centre. Fan in front; the air bike's handles are separate props.
       const seat = at;
-      const crank: Vec = [seat[0] + 12, 36];
+      const crank: Vec = p.to ?? [seat[0] + 12, 36];
       const fan: Vec = [seat[0] + 70, 40];
       machineFrame(ctx, [[seat[0] - 30, 3], [seat[0] + 95, 3]], 4);
       machineFrame(ctx, [[seat[0] - 6, seat[1] - 4], crank, [fan[0] - 4, fan[1] + 4]], 4);
@@ -643,9 +648,7 @@ export function drawProp(ctx: Ctx, p: ResolvedProp, f: Frame, t: number) {
         line(ctx, fan, [fan[0] + Math.cos(a) * 25, fan[1] + Math.sin(a) * 25], 0.8, "rgba(212,170,60,0.3)");
       }
       pad(ctx, [seat[0] - 12, seat[1] - 3], [seat[0] + 8, seat[1] - 3], 6);
-      if (def.variant !== "upright") {
-        for (const h of ["handL", "handR"] as const) machineFrame(ctx, [f.pts[h], [fan[0] - 12, 48]], 2.6);
-      }
+      if (def.variant === "upright") machineFrame(ctx, [[fan[0] - 10, fan[1] + 20], f.pts.handR], 2.6);
       for (const s of ["L", "R"] as const) line(ctx, crank, f.pts[`sole${s}`], 2.2, "#2d2f33");
       return;
     }
@@ -747,6 +750,15 @@ export function drawProp(ctx: Ctx, p: ResolvedProp, f: Frame, t: number) {
     }
     case "legExtension":
     case "seatedLegCurl": {
+      // variant "handles": the grips at the seat's sides (`at`); "thighPad": the seated curl's thigh pad (`at`).
+      if (def.variant === "handles") {
+        line(ctx, add(at, [-6, 0]), add(at, [6, 0]), 2.6, "#1d1d1f");
+        return;
+      }
+      if (def.variant === "thighPad") {
+        pad(ctx, add(at, [-11, 0]), add(at, [11, 0]), 7);
+        return;
+      }
       // `at` = front of the seat (knee pivot), `to` = shin pad position.
       const s = at;
       pad(ctx, [s[0] - 45, s[1] - 4], [s[0], s[1] - 4], 8);
@@ -764,7 +776,8 @@ export function drawProp(ctx: Ctx, p: ResolvedProp, f: Frame, t: number) {
         ctx.strokeStyle = PAD_EDGE;
         ctx.stroke();
       }
-      if (def.kind === "seatedLegCurl") pad(ctx, [s[0] - 30, s[1] + 18], [s[0] + 2, s[1] + 18], 6);
+      // (variant "body": the thigh pad is its own prop.)
+      if (def.kind === "seatedLegCurl" && def.variant !== "body") pad(ctx, [s[0] - 30, s[1] + 18], [s[0] + 2, s[1] + 18], 6);
       return;
     }
     case "legCurl": {

@@ -462,6 +462,10 @@ function rowStation(ctx: Ctx, seatAt: Vec, f: Frame, hands: Vec | undefined) {
 export function athleteLayer(p: ResolvedProp, f: Frame): string {
   const l = p.layer ?? p.def.layer ?? "near";
   if (p.def.kind === "barbell" && f.view === "side" && !p.def.variant) return "near";
+  // A dumbbell held with a neutral grip (profile) in the near hand: its handle sits in the fist, so the hand closes over
+  // it instead of the bright handle crossing in front of the fist.
+  const held = p.def.follow ?? (typeof p.def.at === "object" && !Array.isArray(p.def.at) ? p.def.at.lm : undefined);
+  if (p.def.kind === "dumbbell" && p.def.orient === "profile" && l === "front" && f.view === "side" && held === "handR") return "near";
   return l;
 }
 
@@ -545,3 +549,6 @@ export function drawPropAthlete(ctx: Ctx, p: ResolvedProp, f: Frame, pass: "main
 export function extraLayer(p: ResolvedProp, f: Frame): string | null {
   return p.def.kind === "barbell" && f.view === "side" && !p.def.variant ? "far" : null;
 }
+
+// Shared with props-athlete-gear.ts (the rest of the equipment in this look).
+export { GOLD, STEEL_HI, STEEL, STEEL_LO, IRON_HI, IRON, IRON_LO, FRAME_HI, FRAME, FRAME_LO, LEATHER_HI, LEATHER, NEAR_SCALE, FAR_SCALE, steel, rrect, tube, cushion, pulley };

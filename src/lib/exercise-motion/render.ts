@@ -2,6 +2,7 @@ import { BODY, add, down, frontOf, up } from "./skeleton";
 import { drawProp } from "./props";
 import { drawAthlete, type Highlight } from "./athlete";
 import { athleteLayer, drawPropAthlete, extraLayer, propShift } from "./props-athlete";
+import { drawGearAthlete } from "./props-athlete-gear";
 import type { Frame, ResolvedProp, Vec } from "./types";
 
 export interface Palette {
@@ -83,6 +84,8 @@ export function renderFrame(ctx: CanvasRenderingContext2D, frame: Frame, cam: Ca
   if (opts.style === "athlete") {
     const layerA = (name: string) => {
       for (const p0 of frame.props) {
+        // Equipment drawn part by part at several depths (props-athlete-gear.ts): only its parts for this layer.
+        if (drawGearAthlete(ctx, p0, frame, t, name)) continue;
         // The athlete look's camera: a prop in a hand shifts with that hand.
         const dx = frame.view === "side" ? propShift(p0.def) : 0;
         const p: ResolvedProp = dx ? { ...p0, at: [p0.at[0] + dx, p0.at[1]], to: p0.to ? [p0.to[0] + dx, p0.to[1]] : undefined } : p0;
