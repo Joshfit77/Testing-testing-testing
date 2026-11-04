@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/states";
 import { Button } from "@/components/ui/button";
 import { addDays, daysBetween, isoDateInTz } from "@/lib/domain/dates";
-import { formatDuration, formatWeight } from "@/lib/domain/units";
+import { formatDuration, formatVolume } from "@/lib/domain/units";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
 import { listHistory } from "@/server/services/workouts";
@@ -55,7 +55,7 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
         </div>
         <div className="rounded-2xl border border-border bg-card p-4">
           <p className="text-xs uppercase tracking-wider text-muted-foreground">Volume · 30 days</p>
-          <p className="mt-1 font-display text-3xl font-bold">{formatWeight(volume30, units)}</p>
+          <p className="mt-1 font-display text-3xl font-bold">{formatVolume(volume30, units)}</p>
           <p className="text-xs text-muted-foreground">weight × reps, completed sets</p>
         </div>
       </section>
@@ -88,7 +88,7 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
                           <p className="truncate font-semibold">{w.name}</p>
                           <p className="text-xs text-muted-foreground">
                             {new Date(w.started_at).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: profile.timezone })} ·{" "}
-                            {formatDuration(dur)} · {w.exercise_count} exercises · {formatWeight(w.total_volume_kg, units)}
+                            {formatDuration(dur)} · {w.exercise_count} exercises · {formatVolume(w.total_volume_kg, units)}
                           </p>
                         </div>
                         <ChevronRight className="size-4 shrink-0 text-gold" aria-hidden />

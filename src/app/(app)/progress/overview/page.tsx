@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { addDays, isoDateInTz, parseRange, RANGES, rangeStart, type RangeKey } from "@/lib/domain/dates";
 import { hasFeature } from "@/lib/domain/plans";
-import { displayLength, displayWeight, formatDuration, formatWeight, kgToLb, lengthUnit, weightUnit } from "@/lib/domain/units";
+import { displayLength, displayWeight, formatDuration, formatWeight, kgToLb, lengthUnit, weightUnit, formatVolume } from "@/lib/domain/units";
 import { cn, titleCase } from "@/lib/utils";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
@@ -165,7 +165,7 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
           { label: "Workouts", value: String(training.total) },
           { label: "Per week", value: recentWorkoutsPerWeek.toFixed(1) },
           { label: "Training days", value: String(training.sessionDays) },
-          { label: "Volume", value: formatWeight(training.buckets.reduce((s, b) => s + b.volumeKg, 0), units) },
+          { label: "Volume", value: formatVolume(training.buckets.reduce((s, b) => s + b.volumeKg, 0), units) },
         ].map((s) => (
           <div key={s.label} className="rounded-2xl border border-border bg-card p-4">
             <p className="text-xs uppercase tracking-wider text-muted-foreground">{s.label}</p>

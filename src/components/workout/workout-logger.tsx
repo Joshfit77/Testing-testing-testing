@@ -13,7 +13,7 @@ import { Notice } from "@/components/common/states";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { cn } from "@/lib/utils";
 import type { UnitSystem } from "@/lib/domain/types";
-import { formatDuration, formatWeight } from "@/lib/domain/units";
+import { formatDuration, formatWeight, formatVolume } from "@/lib/domain/units";
 import {
   completionTotals,
   createDraft,
@@ -509,7 +509,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
             <>
               <dl className="stagger grid grid-cols-3 gap-2" data-testid="completion-stats">
                 {tile("Duration", formatDuration(result.durationSeconds), "stat-duration")}
-                {tile("Volume", result.volumeKg > 0 ? formatWeight(result.volumeKg, units) : "—", "stat-volume")}
+                {tile("Volume", result.volumeKg > 0 ? formatVolume(result.volumeKg, units) : "—", "stat-volume")}
                 {tile("Sets", totals && totals.setsPlanned > result.completedSets ? `${result.completedSets}/${totals.setsPlanned}` : String(result.completedSets), "stat-sets")}
                 {tile("Exercises", totals ? `${totals.exercisesDone}/${totals.exercisesPlanned}` : "—", "stat-exercises")}
                 {tile("Reps", totals && totals.reps > 0 ? String(totals.reps) : "—", "stat-reps")}
@@ -524,7 +524,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
           );
         })()}
         {(() => {
-          const line = comparedWithLastTime(result.volumeKg, result.previous, (kg) => formatWeight(kg, units));
+          const line = comparedWithLastTime(result.volumeKg, result.previous, (kg) => formatVolume(kg, units));
           return line ? (
             <p className="-mt-3 text-sm text-muted-foreground" data-testid="compared-with-last-time">
               {line}

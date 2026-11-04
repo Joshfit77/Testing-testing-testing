@@ -9,7 +9,7 @@ import { Input, Textarea } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Notice } from "@/components/common/states";
 import type { UnitSystem } from "@/lib/domain/types";
-import { formatDuration, formatWeight } from "@/lib/domain/units";
+import { formatDuration, formatWeight, formatVolume } from "@/lib/domain/units";
 import { formatDistance, usesDistance } from "@/lib/domain/exercise-tracking";
 import { createDraft, newId, workoutReducer, type DraftAction, type WorkoutDraft } from "@/lib/domain/workout-draft";
 import { deleteWorkoutAction, editWorkoutAction } from "@/server/actions/workouts";
@@ -121,7 +121,7 @@ export function WorkoutEditor({ session, catalog, units, timezone }: { session: 
           )}
           <p className="mt-1 text-sm text-muted-foreground">
             {new Date(session.startedAt).toLocaleString("en-US", { dateStyle: "full", timeStyle: "short", timeZone: timezone })} · {formatDuration(duration)} ·{" "}
-            {formatWeight(session.volumeKg, units)} volume
+            {formatVolume(session.volumeKg, units)} volume
           </p>
         </div>
         <div className="flex gap-2">

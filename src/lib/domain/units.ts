@@ -31,6 +31,15 @@ export function formatWeight(kg: number | null | undefined, units: UnitSystem): 
   return `${displayWeight(kg, units)} ${weightUnit(units)}`;
 }
 
+/**
+ * A training volume (weight × reps, summed): whole units with thousands separators, "1,950 lb". Volumes are stored in
+ * kg, so converting a total back to pounds leaves a rounding tail (1949.9 lb for 135×8 + 145×6) that no one entered.
+ */
+export function formatVolume(kg: number | null | undefined, units: UnitSystem): string {
+  if (kg == null || Number.isNaN(kg)) return "—";
+  return `${Math.round(units === "imperial" ? kgToLb(kg) : kg).toLocaleString("en-US")} ${weightUnit(units)}`;
+}
+
 export function displayLength(cm: number, units: UnitSystem): number {
   return round(units === "imperial" ? cmToIn(cm) : cm, 1);
 }

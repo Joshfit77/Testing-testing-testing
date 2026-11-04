@@ -178,7 +178,9 @@ const navHot = await page.evaluate(() => Array.from(document.querySelectorAll("n
 log(`tab bar ${navH}px: ${navHot.map((x) => x.label).join(", ")}`);
 
 // ---- 3. Breadth-first over the app's own links -------------------------------------------------------------------
-const queue = ["/home", "/train", "/run", "/nutrition", "/faith", "/coach", "/progress", "/profile", "/train/3d", "/train/exercises", ...PRIORITY];
+// FIRST=/a,/b captures those pages before anything else (with CONTINUE, to re-capture a few pages after a change).
+const FIRST = (process.env.FIRST ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+const queue = [...FIRST, "/home", "/train", "/run", "/nutrition", "/faith", "/coach", "/progress", "/profile", "/train/3d", "/train/exercises", ...PRIORITY];
 const queued = new Set(queue);
 if (CONTINUE) for (const sc of screens) for (const hs of sc.hot) { const t = hs.to && !hs.to.startsWith("state:") && !hs.to.startsWith("live3d:") ? hs.to.split("#")[0] : null; if (t && !byKey.has(t) && !queued.has(t) && INTERNAL(t)) { queued.add(t); queue.push(t); } }
 while (!FLOWS && queue.length && screens.length < MAX) {
