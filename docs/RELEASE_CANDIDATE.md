@@ -94,6 +94,11 @@ is fixed (see B).
 | `255e150` | 3D removed (167 files, incl. `src/lib/anatomy3d/`, `public/anatomy/`, `/train/3d`, `three` deps); `src/lib/exercise-demo-readiness.ts`, `src/data/exercise-demo-readiness.json`, `src/components/train/exercise-demo.tsx`, `src/components/workout/current-set-card.tsx`, docs | Owner direction: 2D only; honest demo states; form cues, common mistakes and Swap on the workout card (see F) |
 | `fe1c296` | `src/lib/domain/gps-track.ts`, `src/lib/run/live-recording.ts`, `src/components/run/gps-recorder.tsx`, error monitoring (`src/instrumentation*.ts`, `/api/client-errors`), `.github/workflows/billing-reconcile.yml`, TestFlight checklist, live-AI plan | Locked-iPhone GPS, dormant monitoring and reconciliation, test plans (see F, I) |
 | `45a7017` | `scripts/react-hydration-replay-fix.mjs`, `package.json` hooks, `next.config.ts`, `tests/unit/react-hydration-replay.test.ts`, `docs/HYDRATION_418.md` | Root cause and fix of the intermittent hydration error #418 (a bug in the React build Next 15.5 bundles; see I) |
+| `96bf245`, `7a90951` | `scripts/ops/activation-check.mjs`, `tests/unit/release-guards.test.ts`, `.github/workflows/billing-reconcile.yml`, `docs/ERROR_MONITORING.md`, `scripts/exercise-review/{tiers,review-data,review-sheet-entry}.ts`, `review-sheet.mjs` | Activation dry run for reconciliation and error reporting (nothing switched on); release guards for background GPS, the hydration hooks and the reconcile workflow's refusals; the owner's 2D review sheet |
+| `9a61fe6` | `docs/TESTFLIGHT_STEPS.md` (new), `docs/INSTALL.md`, `docs/TESTFLIGHT_INTERNAL_CHECKLIST.md`, `docs/STAGING_ENVIRONMENT.md`, `SETUP.md` | Step-by-step TestFlight runbook; corrections to docs that would have misled the first iPhone build |
+| `b75ea48`, `5968955` | `docs/HYDRATION_418.md`, `docs/NEXT16_UPGRADE_EVALUATION.md` (new) | Maintenance risks of the hydration fix; Next 16 evaluated in a throwaway trial, not upgraded |
+| `08cbff5`, `304304c`, `82e22c7`, `f4765ed`, `2449cc4` | `src/lib/exercise-motion/**` (new: `patterns/{agility,drills,floor,throws-core-pulls}.ts`, `props-athlete-{gear,kit}.ts`, `props-drills.ts`), `src/data/exercise-motions.ts`, `tests/unit/exercise-*.test.ts` | Four 2D branches merged: 32 exercises rebuilt, equipment restyled, see-through near plates; one merge interaction fixed (`82e22c7`) |
+| `1143f21`, `670e3a0` | `src/data/exercise-demo-readiness.json`, `docs/EXERCISE_DEMOS_2D{,_STATUS}.md`, `scripts/exercise-review/review-sheet.mjs` | All 157 demonstrations animated after review, notes corrected, nothing owner-approved; review sheet filters |
 
 ## C. Security
 
@@ -167,6 +172,14 @@ written steps, form cues and common mistakes. Nothing is owner-approved. Details
 per-exercise status: `docs/EXERCISE_DEMOS_2D_STATUS.md`. The workout card now shows the form cues, common mistakes
 and a Swap button.
 
+**Phase 2 (same day): every exercise animated.** The 12 pose-frame and 19 placeholder exercises (11 of them in launch
+tier 1) were rebuilt, plus hip abduction, and the equipment restyled to the athlete's look; near barbell plates are
+drawn see-through where they would hide the head or arms. All 157 were re-rendered from the merged code and reviewed
+by eye; motion fingerprints show only the 32 intended exercises changed movement. Now **157 animated, 0 pose frames,
+0 placeholders, 0 owner-approved**, 53 with a limitation note. Weakest reads, for the owner's closest look:
+three-cone drill, thoracic open book, Pallof press, rear delt fly, hip escape. Details: `docs/EXERCISE_DEMOS_2D.md` §8;
+review sheet: section K.
+
 **Video demonstrations** (`docs/EXERCISE_DEMOS_STATUS.md`): all 157 stay on the backlog (0 completed, 1 failed, 156
 missing). A clip is shown only once the owner approves it; none is.
 
@@ -226,7 +239,7 @@ and the harness's own spend ceiling.
 | P1 | Live AI evaluation | `docs/LIVE_AI_TEST_PLAN.md` | Owner: key in a spend-limited workspace + budget approval; then `--live --confirm-spend --max-usd 8` | Report in `docs/ai-eval/`, transcripts reviewed by a person |
 | P1 | App Store products and RevenueCat project | `docs/TESTFLIGHT_SETUP_GUIDE.md` §5–6 | Create the two Pro products at $19.99/$149.99 and map them in RevenueCat | Sandbox purchase on a device unlocks Pro; refund in sandbox revokes |
 | P2 | Health endpoint is liveness only | `src/app/api/health/route.ts` | Add a database check behind the cron secret | Returns 503 when Supabase is down |
-| P2 | 2D demonstrations not yet animated | `docs/EXERCISE_DEMOS_2D_STATUS.md` | Fix the motions of the pose-frame and placeholder exercises, launch tier 1 first; owner reviews the athlete look | Promoted per `docs/EXERCISE_DEMOS_2D.md` §6; owner approval per exercise |
+| P1 | Owner review of the 2D demonstrations | Review sheet (section K); `src/data/exercise-demo-readiness.json` `ownerApproved` | All 157 are animated and engineering-reviewed; none is owner-approved. Owner marks Approve / Needs work per exercise; approvals are copied into `ownerApproved` only on the owner's word; Needs-work notes become motion fixes | Each approved slug in `ownerApproved`; the five weakest reads looked at first |
 | P3 | Exercise videos (157) | `docs/EXERCISE_DEMOS_STATUS.md` | Backlog, after the 2D demos; clips must match the 2D character and need the owner's tools | Owner approval per clip |
 | Done | ~~Intermittent React hydration error #418~~ | Root cause: a bug in the React build bundled with Next 15.5 (a replayed element is matched against its own first child), not app code | Fixed in `45a7017` by applying React's upstream fix at install/build time (`docs/HYDRATION_418.md`) | 1,584-load capture: 7 errors before, 0 after; unit regression test; phone sweep, see G |
 | P3 | One unit test failed once under heavy machine load | Unknown test (name not captured); passed in the next three full runs | Run the unit suite under CPU load with the JSON reporter to name it, then remove its timing dependence | Unit suite passes under load |
@@ -253,6 +266,17 @@ error report is accepted (204) and must appear in the logs redacted. Dry run aga
 checks as expected and the log line redacted (details and the owner's steps: `docs/ERROR_MONITORING.md`, "Activation
 checklist"). The reconciliation workflow refuses `http://`, reserved example/test domains and short secrets
 (`release-guards.test.ts` runs the workflow's own check). Not run against a hosted deployment: none exists.
+
+## K. Owner review of the 2D demonstrations
+
+A private review page (owner-only): https://claude.ai/artifact/W7R8VXgyVCzbXXdXb2x7fw, built from `670e3a0` with
+`node scripts/exercise-review/review-sheet.mjs <out.html> --changed-since=<fingerprint before phase 2> --closely=…`.
+Every exercise plays in the app's own player (0.5x, scrubbing), with its six key positions, launch tier, what the app
+shows, its limitation note, written steps, cues and mistakes, and an **Approve / Needs work** record. Filters: Rebuilt
+(the 32 changed this phase), Look closely (the 5 weakest), tier, and your decisions. Only the page's owner can save a
+decision (checked: a write at an ordinary viewer's level is refused); each decision is stored with the animation's
+fingerprint, so it shows as out of date if the animation changes. Nothing on the page changes the app: approvals are
+copied into `ownerApproved` in `src/data/exercise-demo-readiness.json` only when the owner asks.
 
 ## TestFlight verification checklist
 
