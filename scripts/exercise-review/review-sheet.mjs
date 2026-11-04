@@ -4,7 +4,10 @@
  * what the app currently shows for it (animation, pose frames or a placeholder), its written steps, cues, mistakes and
  * review notes, and an Approve / Needs work record per exercise that only the page's owner can write.
  *
- *   node scripts/exercise-review/review-sheet.mjs <out.html>
+ *   node scripts/exercise-review/review-sheet.mjs <out.html> [--changed-since=<fingerprint.json>] [--closely=slug,slug]
+ *
+ * --changed-since marks the exercises whose animation differs from an earlier fingerprint file ("Rebuilt" filter);
+ * --closely marks exercises the reviewer wants the owner to look at hardest ("Look closely" filter).
  *
  * Each decision is stored with the animation's fingerprint (scripts/exercise-review/fingerprint.mjs), so an approval
  * covers exactly the version that was reviewed: when the animation changes, the sheet asks for a new review. Nothing
@@ -20,7 +23,11 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../..");
-const out = resolve(process.argv[2] ?? "review-sheet.html");
+const args = process.argv.slice(2);
+const out = resolve(args.find((a) => !a.startsWith("--")) ?? "review-sheet.html");
+const flag = (name) => args.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
+const since = flag("changed-since");
+const closely = new Set((flag("closely") ?? "").split(",").filter(Boolean));
 
 const data = JSON.parse(execFileSync("npx", ["tsx", "--tsconfig", "tsconfig.json", join(here, "review-data.ts")], { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }));
 const tmp = mkdtempSync(join(tmpdir(), "review-sheet-"));
@@ -28,7 +35,15 @@ execFileSync("node", [join(here, "fingerprint.mjs"), `--out=${join(tmp, "fp.json
 const fp = JSON.parse(readFileSync(join(tmp, "fp.json"), "utf8"));
 const commit = execFileSync("git", ["rev-parse", "--short", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
 const dirty = execFileSync("git", ["status", "--porcelain", "--", "src/lib/exercise-motion", "src/data/exercise-motions.ts", "src/data/exercise-demo-readiness.json"], { cwd: root, encoding: "utf8" }).trim();
-for (const r of data.rows) r.version = fp[r.slug]?.hash ?? "unknown";
+const before = since ? JSON.parse(readFileSync(resolve(since), "utf8")) : null;
+for (const r of data.rows) {
+  r.version = fp[r.slug]?.hash ?? "unknown";
+  r.rebuilt = before ? before[r.slug]?.hash !== r.version : false;
+  r.closely = closely.has(r.slug);
+}
+for (const s of closely) if (!data.rows.some((r) => r.slug === s)) throw new Error(`--closely: unknown exercise ${s}`);
+const nRebuilt = data.rows.filter((r) => r.rebuilt).length;
+const anyNotAnimated = data.rows.some((r) => r.readiness !== "animated");
 
 const bundle = await build({
   entryPoints: [join(here, "review-sheet-entry.ts")],
@@ -64,6 +79,7 @@ const html = `<title>2D Demo Review</title>
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { background: var(--bg); color: var(--text); font: 15px/1.5 var(--f-body); }
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
 .wrap { max-width: 1320px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
@@ -99,6 +115,8 @@ main { padding-block: 18px 60px; }
 .pill.animated { color: var(--ok); }
 .pill.poses { color: var(--warn); }
 .pill.placeholder { color: var(--bad); }
+.pill.rebuilt { color: var(--gold-hi); }
+.pill.closely { color: #0b0a08; background: var(--warn); border-color: var(--warn); }
 .pill.d-approve { color: #0b0a08; background: var(--ok); border-color: var(--ok); }
 .pill.d-needs-work { color: #0b0a08; background: var(--bad); border-color: var(--bad); }
 .pill.d-none, .pill.d-stale { color: var(--idle); }
@@ -141,6 +159,7 @@ footer { color: var(--faint); font-size: .8rem; padding-block: 0 40px; }
   <ul class="how">
     <li>Each card plays the demonstration in the app's own player. Use <b>0.5×</b> to study each phase and drag on the figure to scrub.</li>
     <li>The six stills underneath are the key positions of one repetition, in order.</li>
+    <li><b>Rebuilt</b> marks a demonstration whose movement was redone in the latest round of work; <b>Look closely</b> marks the ones the engineering review found weakest. Use the <b>Show</b> filter to see just those.</li>
     <li>The coloured label says what members see today: the animation, two pose frames, or a "demonstration in progress" box. Cards that are not shown in the app yet are marked on the player.</li>
     <li>Choose <b>Approve</b> only for a demonstration you would show members as it is, or <b>Needs work</b> with a short note. Each decision covers the exact animation you watched: if it changes later, the card asks you to look again.</li>
     <li>Nothing here changes the app. When you have finished, tell Claude which approvals to copy into the app's owner-approved list.</li>
@@ -149,13 +168,18 @@ footer { color: var(--faint); font-size: .8rem; padding-block: 0 40px; }
 </div></header>
 
 <div class="bar"><div class="wrap">
-  <div class="group" role="group" aria-label="What the app shows"><span>App shows</span>
+  <div class="group" role="group" aria-label="Which exercises"><span>Show</span>
+    <button class="chip" data-f="focus" data-v="all" aria-pressed="true">All</button>
+    ${nRebuilt ? `<button class="chip" data-f="focus" data-v="rebuilt" aria-pressed="false">Rebuilt (${nRebuilt})</button>` : ""}
+    ${closely.size ? `<button class="chip" data-f="focus" data-v="closely" aria-pressed="false">Look closely (${closely.size})</button>` : ""}
+  </div>
+${anyNotAnimated ? `  <div class="group" role="group" aria-label="What the app shows"><span>App shows</span>
     <button class="chip" data-f="state" data-v="all" aria-pressed="true">All</button>
     <button class="chip" data-f="state" data-v="animated" aria-pressed="false">Animated</button>
     <button class="chip" data-f="state" data-v="poses" aria-pressed="false">Pose frames</button>
     <button class="chip" data-f="state" data-v="placeholder" aria-pressed="false">Placeholder</button>
   </div>
-  <div class="group" role="group" aria-label="Launch priority"><span>Priority</span>
+` : ""}  <div class="group" role="group" aria-label="Launch priority"><span>Priority</span>
     <button class="chip" data-f="tier" data-v="all" aria-pressed="true">All</button>
     <button class="chip" data-f="tier" data-v="1" aria-pressed="false">Tier 1</button>
     <button class="chip" data-f="tier" data-v="2" aria-pressed="false">Tier 2</button>
@@ -188,8 +212,9 @@ footer { color: var(--faint); font-size: .8rem; padding-block: 0 40px; }
     placeholder: "The app shows a “demonstration in progress” box with the written steps. The animation above is not shown to members yet.",
   };
   const RIBBON = { poses: "In progress · members see pose frames", placeholder: "In progress · members see a placeholder" };
-  const filters = { state: "all", tier: "all", dec: "all", q: "" };
+  const filters = { focus: "all", state: "all", tier: "all", dec: "all", q: "" };
   try { Object.assign(filters, JSON.parse(localStorage.getItem("review-filters") || "{}"), { q: "" }); } catch { /* storage unavailable */ }
+  for (const f of ["focus", "state", "tier", "dec"]) if (!document.querySelector('.chip[data-f="' + f + '"][data-v="' + filters[f] + '"]')) filters[f] = "all";
   let decisions = {};
   let db = null;
   let canWrite = false;
@@ -225,7 +250,7 @@ footer { color: var(--faint); font-size: .8rem; padding-block: 0 40px; }
     const head = el("div", { class: "head" },
       el("h2", { text: r.name }),
       el("div", { class: "meta" }, el("code", { text: r.slug }), document.createTextNode(" · " + (r.programs ? "in " + r.programs + " program" + (r.programs === 1 ? "" : "s") + " (" + r.groups + ")" : "library only") + " · " + (r.view === "front" ? "front view" : "side view"))),
-      el("div", { class: "pills" }, el("span", { class: "pill tier", text: "Tier " + r.tier }), el("span", { class: "pill " + r.readiness, text: "App shows: " + STATE[r.readiness] }), decPill));
+      el("div", { class: "pills" }, el("span", { class: "pill tier", text: "Tier " + r.tier }), el("span", { class: "pill " + r.readiness, text: "App shows: " + STATE[r.readiness] }), r.rebuilt ? el("span", { class: "pill rebuilt", text: "Rebuilt" }) : null, r.closely ? el("span", { class: "pill closely", text: "Look closely" }) : null, decPill));
     const body = el("div", { class: "body" }, el("p", { class: "shows", text: SHOWS[r.readiness] }), r.note ? el("p", { class: "note", text: "Known limitation: " + r.note } ) : null);
     const det = el("details", {}, el("summary", { text: "How to do it, cues and common mistakes" }));
     const list = (title, items, ordered) => { if (!items.length) return; det.append(el("h3", { text: title })); const l = el(ordered ? "ol" : "ul"); for (const t of items) l.append(el("li", { text: t })); det.append(l); };
@@ -308,7 +333,7 @@ footer { color: var(--faint); font-size: .8rem; padding-block: 0 40px; }
     }
     const st = (s) => ROWS.filter((r) => r.readiness === s).length;
     const sum = document.getElementById("summary");
-    sum.replaceChildren(...[[st("animated"), "animated in the app"], [st("poses"), "pose frames"], [st("placeholder"), "placeholders"], [counts.approve, "you approved"], [counts["needs-work"], "need work"], [counts.none + counts.stale, "not reviewed yet"]].map(([n, t]) => el("div", {}, el("b", { text: String(n) }), el("span", { text: t }))));
+    sum.replaceChildren(...[[st("animated"), "animated in the app"], [st("poses"), "pose frames"], [st("placeholder"), "placeholders"], [ROWS.filter((r) => r.rebuilt).length, "rebuilt this round"], [ROWS.filter((r) => r.closely).length, "to look at closely"], [counts.approve, "you approved"], [counts["needs-work"], "need work"], [counts.none + counts.stale, "not reviewed yet"]].map(([n, t]) => el("div", {}, el("b", { text: String(n) }), el("span", { text: t }))));
     applyFilters();
   }
 
@@ -317,7 +342,8 @@ footer { color: var(--faint); font-size: .8rem; padding-block: 0 40px; }
     const q = filters.q.trim().toLowerCase();
     for (const k of cards.values()) {
       const d = decisionOf(k.r).kind;
-      const ok = (filters.state === "all" || k.r.readiness === filters.state) && (filters.tier === "all" || String(k.r.tier) === filters.tier) &&
+      const ok = (filters.focus === "all" || (filters.focus === "rebuilt" ? k.r.rebuilt : k.r.closely)) &&
+        (filters.state === "all" || k.r.readiness === filters.state) && (filters.tier === "all" || String(k.r.tier) === filters.tier) &&
         (filters.dec === "all" || (filters.dec === "none" ? d === "none" || d === "stale" : d === filters.dec)) &&
         (!q || k.r.name.toLowerCase().includes(q) || k.r.slug.includes(q));
       k.c.hidden = !ok;
@@ -325,7 +351,7 @@ footer { color: var(--faint); font-size: .8rem; padding-block: 0 40px; }
     }
     document.getElementById("count").textContent = shown + " of " + ROWS.length + " shown";
     for (const b of document.querySelectorAll(".chip")) b.setAttribute("aria-pressed", String(filters[b.dataset.f] === b.dataset.v));
-    try { localStorage.setItem("review-filters", JSON.stringify({ state: filters.state, tier: filters.tier, dec: filters.dec })); } catch { /* storage unavailable */ }
+    try { localStorage.setItem("review-filters", JSON.stringify({ focus: filters.focus, state: filters.state, tier: filters.tier, dec: filters.dec })); } catch { /* storage unavailable */ }
   }
   for (const b of document.querySelectorAll(".chip")) b.addEventListener("click", () => { filters[b.dataset.f] = b.dataset.v; applyFilters(); });
   document.getElementById("q").addEventListener("input", (e) => { filters.q = e.target.value; applyFilters(); });
@@ -354,5 +380,5 @@ console.log(`${out}: ${ROWS_SUMMARY(data.rows)}; ${(html.length / 1024).toFixed(
 
 function ROWS_SUMMARY(rows) {
   const c = (s) => rows.filter((r) => r.readiness === s).length;
-  return `${rows.length} exercises (animated ${c("animated")}, pose frames ${c("poses")}, placeholder ${c("placeholder")})`;
+  return `${rows.length} exercises (animated ${c("animated")}, pose frames ${c("poses")}, placeholder ${c("placeholder")}; rebuilt ${rows.filter((r) => r.rebuilt).length}, look closely ${rows.filter((r) => r.closely).length})`;
 }
