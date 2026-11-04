@@ -77,7 +77,7 @@ export function renderFrame(ctx: CanvasRenderingContext2D, frame: Frame, cam: Ca
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
 
-  if (opts.floor !== "none") drawShadow(ctx, frame);
+  if (opts.floor !== "none") zoomed(ctx, frame, () => drawShadow(ctx, frame));
   ctx.globalAlpha = frame.alpha;
   const t = opts.time ?? 0;
   if (opts.style === "athlete") {
@@ -92,7 +92,7 @@ export function renderFrame(ctx: CanvasRenderingContext2D, frame: Frame, cam: Ca
       }
     };
     layerA("back");
-    drawAthlete(ctx, frame, layerA, opts.highlight);
+    zoomed(ctx, frame, () => facing(ctx, frame, (f) => drawAthlete(ctx, f, layerA, opts.highlight)));
     layerA("front");
     ctx.globalAlpha = 1;
     return;
@@ -104,10 +104,46 @@ export function renderFrame(ctx: CanvasRenderingContext2D, frame: Frame, cam: Ca
     }
   };
   layer("back");
-  if (frame.view === "side") drawSideFigure(ctx, frame, layer);
-  else drawFrontFigure(ctx, frame, layer);
+  zoomed(ctx, frame, () => facing(ctx, frame, (f) => (f.view === "side" ? drawSideFigure(ctx, f, layer) : drawFrontFigure(ctx, f, layer))));
   layer("front");
   ctx.globalAlpha = 1;
+}
+
+/**
+ * Draw the figure at its perspective scale (frame.zoom, set only by motions that run toward or away from the viewer):
+ * scaled about the floor point on the camera's axis, so it stands on the same floor line, smaller when farther away.
+ */
+function zoomed(ctx: CanvasRenderingContext2D, frame: Frame, draw: () => unknown) {
+  const z = frame.zoom;
+  if (!z || z.s === 1) {
+    draw();
+    return;
+  }
+  ctx.save();
+  ctx.translate(z.x, 0);
+  ctx.scale(z.s, z.s);
+  ctx.translate(-z.x, 0);
+  draw();
+  ctx.restore();
+}
+
+/**
+ * A figure facing -x (frame.flipX, set only by motions that turn round): its landmarks are reported mirrored, so it is
+ * drawn from the un-mirrored landmarks inside a mirror about its pelvis.
+ */
+function facing(ctx: CanvasRenderingContext2D, frame: Frame, draw: (f: Frame) => unknown) {
+  const cx = frame.flipX;
+  if (cx === undefined) {
+    draw(frame);
+    return;
+  }
+  const pts = Object.fromEntries(Object.entries(frame.pts).map(([k, v]) => [k, [2 * cx - v[0], v[1]]])) as Frame["pts"];
+  ctx.save();
+  ctx.translate(cx, 0);
+  ctx.scale(-1, 1);
+  ctx.translate(-cx, 0);
+  draw({ ...frame, pts });
+  ctx.restore();
 }
 
 /** Draw at a fraction of the current opacity (a prop dissolving between two layers). */

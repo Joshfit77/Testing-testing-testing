@@ -5,6 +5,7 @@
  * lifter and the hands on the bar, instead of one plate face hiding the head and hands.
  */
 import { add, landmarkDepth, len, sub, yawShift } from "./skeleton";
+import { drawDrillProp } from "./props-drills";
 import type { Frame, PropDef, ResolvedProp, Vec } from "./types";
 
 type Ctx = CanvasRenderingContext2D;
@@ -473,6 +474,10 @@ export function drawPropAthlete(ctx: Ctx, p: ResolvedProp, f: Frame, pass: "main
   const { def, at } = p;
   const size = def.size;
   switch (def.kind) {
+    case "cone":
+    case "hurdleLine":
+    case "ladder":
+      return drawDrillProp(ctx, p, f);
     case "barbell": {
       if (def.variant === "front") {
         if (pass === "main") barFront(ctx, at, size ?? 22.5);

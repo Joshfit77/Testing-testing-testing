@@ -589,15 +589,33 @@ export function evaluate(c: CompiledMotion, time: number, opts: EvalOptions = {}
     return { def: pd, at, to: pd.to ? resolveAnchor(pd.to, sk) : undefined, layer, ...(fade ? { fade } : {}) };
   });
 
+  // Perspective (opt-in, only for motions whose keyframes set `zoom`): the figure's drawing scale, on the same curve.
+  let zoom: Frame["zoom"];
+  if (A.zoom !== undefined || B.zoom !== undefined) {
+    const zc = ease === "spline" || ease === "inOut" ? keySpline(c, i, u, (j) => [kfs[((j % n) + n) % n]!.zoom ?? 1, 0]) : null;
+    zoom = { s: zc ? zc[0] : lerp(A.zoom ?? 1, B.zoom ?? 1, w), x: def.zoomAt ?? 0 };
+  }
+
+  // Facing -x (opt-in): the landmarks mirrored about the pelvis; the renderer draws the figure mirrored to match.
+  let pts = sk.pts;
+  let flipX: number | undefined;
+  if (A.facing === -1) {
+    flipX = sk.pts.pelvis[0];
+    const cx = flipX;
+    pts = Object.fromEntries(Object.entries(sk.pts).map(([k, v]) => [k, [2 * cx - v[0], v[1]]])) as Frame["pts"];
+  }
+
   return {
     view,
     pose,
-    pts: sk.pts,
+    pts,
     seg: sk.seg,
     props,
     alpha: lerp(A.alpha ?? 1, B.alpha ?? 1, w),
     cameraX: travel * (t / T),
     lifted,
+    ...(zoom ? { zoom } : {}),
+    ...(flipX !== undefined ? { flipX } : {}),
   };
 }
 
@@ -614,7 +632,9 @@ export function motionBounds(c: CompiledMotion, samples = 48): { x0: number; x1:
   let y1 = -Infinity;
   for (let s = 0; s < samples; s++) {
     const f = evaluate(c, (s / samples) * c.duration);
-    const pts: Vec[] = Object.values(f.pts);
+    // A figure drawn in perspective (frame.zoom) is framed where it is drawn.
+    const z = f.zoom;
+    const pts: Vec[] = z ? Object.values(f.pts).map((p) => [z.x + (p[0] - z.x) * z.s, p[1] * z.s] as Vec) : Object.values(f.pts);
     for (const p of pts) {
       x0 = Math.min(x0, p[0] - f.cameraX - 12);
       x1 = Math.max(x1, p[0] - f.cameraX + 12);

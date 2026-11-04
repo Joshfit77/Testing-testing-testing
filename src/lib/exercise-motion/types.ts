@@ -146,6 +146,17 @@ export interface Keyframe {
    * the landing absorbs (see flightPath in timeline.ts); this keyframe's root sets where the path passes.
    */
   air?: boolean;
+  /**
+   * Perspective (opt-in): the figure is drawn at this scale, about the floor point at `MotionDef.zoomAt`, as if this far
+   * from the camera (1 = the normal distance, smaller = farther away). Used by drills that run toward or away from the
+   * viewer; keyframes without it are drawn at 1.
+   */
+  zoom?: number;
+  /**
+   * Facing (opt-in, side view): -1 draws the figure mirrored about its pelvis, facing -x, from this keyframe until the
+   * next one (a drill that turns round). The pose is authored facing +x as usual; landmarks are reported mirrored.
+   */
+  facing?: 1 | -1;
 }
 
 export type PropKind =
@@ -253,6 +264,8 @@ export interface MotionDef {
    * steps) and the support foot is held where it landed. Right foot lands at the start of the loop, left half-way.
    */
   run?: RunPath;
+  /** World x of the camera's axis for keyframe `zoom` (perspective): the figure shrinks toward this line. */
+  zoomAt?: number;
 }
 
 export interface RunPath {
@@ -273,6 +286,10 @@ export interface Frame {
   cameraX: number;
   /** How far the floor clamp had to raise the whole figure (diagnostic; ~0 for well-authored motions). */
   lifted?: number;
+  /** Perspective scale of the figure (only for motions whose keyframes set `zoom`): drawn s times its size about (x, 0). */
+  zoom?: { s: number; x: number };
+  /** Set when the figure faces -x (keyframe `facing`): the pelvis x it is mirrored about. `pts` are already mirrored. */
+  flipX?: number;
   /** Absolute (screen-plane) segment directions in degrees, down-angle convention. */
   seg: {
     T1: number;
