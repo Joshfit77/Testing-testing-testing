@@ -17,6 +17,11 @@ export interface DraftSet {
   rpe: number | null;
   isWarmup: boolean;
   completed: boolean;
+  /**
+   * Passed over on purpose ("Skip set"): not done, not counted, and not offered as the next set. Undo, or completing it
+   * after all, brings it back. Sent to the server like any unfinished set (completed: false). Missing on older drafts.
+   */
+  skipped?: boolean;
 }
 
 export interface DraftTarget {
@@ -49,6 +54,11 @@ export interface DraftExercise {
   restSeconds: number;
   target: DraftTarget | null;
   sets: DraftSet[];
+  /**
+   * Last time's numbers (or an accepted target) were filled in once already. Never filled again, so a value the member
+   * cleared on purpose (bodyweight) doesn't come back when the workout is resumed. Missing on older drafts.
+   */
+  prefilled?: boolean;
 }
 
 /** Current persisted format. v1 drafts (no distance, no supersets) are migrated by migrateDraft. */
@@ -103,6 +113,37 @@ export function setCanComplete(exercise: Pick<DraftExercise, "isTimed" | "usesDi
   return (set.reps ?? 0) > 0;
 }
 
+/** A set still to do: not done and not skipped. */
+export function setPending(set: Pick<DraftSet, "completed" | "skipped">): boolean {
+  return !set.completed && !set.skipped;
+}
+
+/** The last set done before `setId` on the same exercise (the one "Same as last set" copies), or null. */
+export function lastDoneBefore(exercise: Pick<DraftExercise, "sets">, setId: string): DraftSet | null {
+  const idx = exercise.sets.findIndex((s) => s.id === setId);
+  if (idx < 0) return null;
+  for (let i = idx - 1; i >= 0; i--) if (exercise.sets[i]!.completed) return exercise.sets[i]!;
+  return null;
+}
+
+/** Whether two sets carry the same numbers (what "Same as last set" would change). */
+export function sameNumbers(a: DraftSet, b: DraftSet): boolean {
+  return a.weightKg === b.weightKg && a.reps === b.reps && a.durationSeconds === b.durationSeconds && (a.distanceM ?? null) === (b.distanceM ?? null);
+}
+
+/** "8-10" / "8–10 reps" → {lo: 8, hi: 10}; "10" → {lo: 10, hi: 10}; null when there's no number. */
+export function targetRepRange(reps: string | null | undefined): { lo: number; hi: number } | null {
+  if (!reps) return null;
+  const range = reps.match(/(\d+)\s*(?:-|–|—|to)\s*(\d+)/);
+  if (range) {
+    const a = Number.parseInt(range[1]!, 10);
+    const b = Number.parseInt(range[2]!, 10);
+    return { lo: Math.min(a, b), hi: Math.max(a, b) };
+  }
+  const n = parseTargetReps(reps);
+  return n == null ? null : { lo: n, hi: n };
+}
+
 export type DraftAction =
   | { type: "rename"; name: string }
   | { type: "setNotes"; notes: string }
@@ -121,6 +162,11 @@ export type DraftAction =
   | { type: "toggleSetComplete"; exerciseKey: string; setId: string; now: string }
   /** Fills the empty fields of the sets not yet done from the last time this exercise was logged (never overwrites). */
   | { type: "prefillFromPrevious"; exerciseKey: string; sets: PreviousSetValues[] }
+  /** Pass over a set without doing it (it stays in the workout, not counted). */
+  | { type: "skipSet"; exerciseKey: string; setId: string }
+  | { type: "unskipSet"; exerciseKey: string; setId: string }
+  /** The set takes the numbers of the last set done before it on the same exercise ("Same as set 1"). */
+  | { type: "repeatLastSet"; exerciseKey: string; setId: string }
   /** Coming back to a draft last touched a while ago: the time away counts as paused, not as training. */
   | { type: "continueAfterGap"; now: string }
   | { type: "requestFinish"; now: string }
@@ -268,11 +314,11 @@ export function nextUp(draft: Pick<WorkoutDraft, "exercises">): { exerciseKey: s
     if (e.skipped) continue;
     if (e.sets.length === 0) return { exerciseKey: e.id, setId: null };
     if (e.supersetId) {
-      const next = supersetRoundOrder(supersetMembers(draft, e.id)).find((x) => !draft.exercises.find((m) => m.id === x.exerciseKey)!.sets.find((s) => s.id === x.setId)!.completed);
+      const next = supersetRoundOrder(supersetMembers(draft, e.id)).find((x) => setPending(draft.exercises.find((m) => m.id === x.exerciseKey)!.sets.find((s) => s.id === x.setId)!));
       if (next) return { exerciseKey: next.exerciseKey, setId: next.setId };
       continue;
     }
-    const set = e.sets.find((s) => !s.completed);
+    const set = e.sets.find(setPending);
     if (set) return { exerciseKey: e.id, setId: set.id };
   }
   return null;
@@ -406,12 +452,12 @@ function reduce(state: WorkoutDraft, action: DraftAction): WorkoutDraft {
           }
           completedNow = !s.completed;
           round = i;
-          return { ...s, completed: !s.completed };
+          return { ...s, completed: !s.completed, skipped: false };
         });
         // The numbers just logged become the next set's starting point, where it has none yet.
         if (completedNow && round >= 0) {
           const done = sets[round]!;
-          const next = sets.findIndex((s, i) => i > round && !s.completed);
+          const next = sets.findIndex((s, i) => i > round && setPending(s));
           if (next >= 0) {
             const n = sets[next]!;
             sets[next] = {
@@ -458,25 +504,55 @@ function reduce(state: WorkoutDraft, action: DraftAction): WorkoutDraft {
     case "clearRest":
       return { ...state, rest: { endsAt: null, durationSeconds: 0, pausedRemaining: null } };
     case "prefillFromPrevious": {
-      if (!action.sets.length) return state;
-      let changed = false;
+      const ex = state.exercises.find((e) => e.id === action.exerciseKey);
+      if (!ex || ex.prefilled || !action.sets.length) return state;
+      // Today's working sets take last time's working sets in order (the last one repeats for any extra sets); warm-up
+      // sets keep their own lighter numbers. Only empty fields are filled — except reps the program prescribed as a
+      // range, which take last time's reps when those fell inside the range (3 × 8–10 after 10, 8, 8 shows 10, 8, 8).
+      const range = targetRepRange(ex.target?.reps);
+      const untouched = !ex.sets.some((s) => s.completed);
+      let working = -1;
       const next = mapExercise(state, action.exerciseKey, (e) => ({
         ...e,
-        sets: e.sets.map((s, i) => {
+        prefilled: true,
+        sets: e.sets.map((s) => {
+          if (s.isWarmup) return s;
+          working++;
           if (s.completed) return s;
-          const p = action.sets[Math.min(i, action.sets.length - 1)]!;
-          const filled = {
+          const p = action.sets[Math.min(working, action.sets.length - 1)]!;
+          const inRange = range && range.hi > range.lo && untouched && s.reps === range.lo && p.reps != null && p.reps >= range.lo && p.reps <= range.hi;
+          return {
             ...s,
             weightKg: s.weightKg ?? p.weightKg,
-            reps: s.reps ?? p.reps,
+            reps: inRange ? p.reps : (s.reps ?? p.reps),
             durationSeconds: e.isTimed || e.usesDistance ? (s.durationSeconds ?? p.durationSeconds) : s.durationSeconds,
             distanceM: e.usesDistance ? (s.distanceM ?? p.distanceM) : s.distanceM,
           };
-          if (filled.weightKg !== s.weightKg || filled.reps !== s.reps || filled.durationSeconds !== s.durationSeconds || filled.distanceM !== s.distanceM) changed = true;
-          return filled;
         }),
       }));
-      return changed ? next : state;
+      return next;
+    }
+    case "skipSet":
+      return mapExercise(state, action.exerciseKey, (e) => ({
+        ...e,
+        sets: e.sets.map((s) => (s.id === action.setId && !s.completed ? { ...s, skipped: true } : s)),
+      }));
+    case "unskipSet":
+      return mapExercise(state, action.exerciseKey, (e) => ({
+        ...e,
+        sets: e.sets.map((s) => (s.id === action.setId && s.skipped ? { ...s, skipped: false } : s)),
+      }));
+    case "repeatLastSet": {
+      const ex = state.exercises.find((e) => e.id === action.exerciseKey);
+      const set = ex?.sets.find((s) => s.id === action.setId);
+      const from = ex ? lastDoneBefore(ex, action.setId) : null;
+      if (!ex || !set || set.completed || !from || sameNumbers(set, from)) return state;
+      return mapExercise(state, action.exerciseKey, (e) => ({
+        ...e,
+        sets: e.sets.map((s) =>
+          s.id === action.setId ? { ...s, weightKg: from.weightKg, reps: from.reps, durationSeconds: from.durationSeconds, distanceM: from.distanceM ?? null } : s,
+        ),
+      }));
     }
     case "continueAfterGap": {
       if (state.pausedAt) return state;
@@ -547,9 +623,13 @@ export function draftSummary(draft: WorkoutDraft) {
     exercises: active.length,
     completedSets: allSets.filter((s) => s.completed).length,
     totalSets: allSets.length,
+    /** Sets passed over with "Skip set" (not done, not counted, not still to do). */
+    skippedSets: allSets.filter((s) => s.skipped && !s.completed).length,
     /** Working sets only: what counts toward volume, records and the completion summary. */
     workingCompleted: working.filter((s) => s.completed).length,
     workingTotal: working.length,
+    /** Working sets neither done nor skipped: when any are left, finishing now is finishing early. */
+    workingRemaining: working.filter(setPending).length,
     volumeKg: totalVolume(allSets),
   };
 }
@@ -591,6 +671,19 @@ export function currentSetInfo(draft: Pick<WorkoutDraft, "exercises">): CurrentS
     warmupNumber: set && set.isWarmup ? warmups.indexOf(set) + 1 : null,
     warmupCount: warmups.length,
   };
+}
+
+/**
+ * What comes after the current set, worked out as if the current set were done (so superset order and skipped sets
+ * are followed the same way): the "Then: …" line on the current-set card. Null when the current set is the last one.
+ */
+export function afterCurrent(draft: Pick<WorkoutDraft, "exercises">): CurrentSetInfo | null {
+  const up = nextUp(draft);
+  if (!up?.setId) return null;
+  const passed = {
+    exercises: draft.exercises.map((e) => (e.id === up.exerciseKey ? { ...e, sets: e.sets.map((s) => (s.id === up.setId ? { ...s, skipped: true } : s)) } : e)),
+  };
+  return currentSetInfo(passed);
 }
 
 /** Totals for the completion screen, from the sets actually marked complete (warm-ups excluded). */
@@ -674,6 +767,39 @@ export function draftSnapshot(d: WorkoutDraft) {
     userProgramId: d.userProgramId,
     programDayId: d.programDayId,
     draft: d as unknown as Record<string, unknown>,
+  };
+}
+
+/**
+ * What Finish sends to the server: every exercise and set as logged. Sets not done (unfinished or skipped) go as
+ * `completed: false`, so they are kept with the session but never count toward volume, records or badges.
+ */
+export function finishPayload(d: WorkoutDraft, endedAt: string) {
+  return {
+    clientId: d.clientId,
+    name: d.name.trim() || "Workout",
+    userProgramId: d.userProgramId,
+    programDayId: d.programDayId,
+    startedAt: d.startedAt,
+    endedAt,
+    pausedSeconds: d.pausedSeconds,
+    notes: d.notes,
+    exercises: d.exercises.map((e) => ({
+      exerciseId: e.exerciseId,
+      substitutedFromId: e.substitutedFromId,
+      notes: e.notes,
+      skipped: e.skipped,
+      skipReason: e.skipReason,
+      sets: e.sets.map((s) => ({
+        reps: s.reps,
+        weightKg: s.weightKg,
+        durationSeconds: s.durationSeconds,
+        distanceM: s.distanceM ?? null,
+        rpe: s.rpe,
+        isWarmup: s.isWarmup,
+        completed: s.completed,
+      })),
+    })),
   };
 }
 

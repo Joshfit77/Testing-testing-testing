@@ -178,8 +178,10 @@ function SetRow({
         "grid items-center gap-2 rounded-xl px-1 py-1.5 transition-colors",
         gridFor(exercise),
         set.completed && "bg-success/10",
+        set.skipped && !set.completed && "opacity-50",
         isNext && !set.completed && "ring-1 ring-gold-muted",
       )}
+      data-skipped={set.skipped && !set.completed ? "" : undefined}
     >
       <button
         type="button"
@@ -240,7 +242,15 @@ function SetRow({
           onClick={() => dispatch({ type: "toggleSetComplete", exerciseKey: exercise.id, setId: set.id, now: new Date().toISOString() })}
           aria-pressed={set.completed}
           aria-disabled={!set.completed && !setCanComplete(exercise, set)}
-          aria-label={set.completed ? `${label} completed. Mark incomplete` : setCanComplete(exercise, set) ? `Mark ${label} complete` : `${label}: enter ${exercise.usesDistance ? "the distance" : exercise.isTimed ? "the seconds" : "reps"} to mark it complete`}
+          aria-label={
+            set.completed
+              ? `${label} completed. Mark incomplete`
+              : `${set.skipped ? `${label} skipped. ` : ""}${
+                  setCanComplete(exercise, set)
+                    ? `Mark ${label} complete`
+                    : `${label}: enter ${exercise.usesDistance ? "the distance" : exercise.isTimed ? "the seconds" : "reps"} to mark it complete`
+                }`
+          }
           title={!set.completed && !setCanComplete(exercise, set) ? `Enter ${exercise.usesDistance ? "the distance" : exercise.isTimed ? "the seconds" : "reps"} first` : undefined}
           className={cn(
             "flex size-11 items-center justify-center rounded-lg border transition-colors",

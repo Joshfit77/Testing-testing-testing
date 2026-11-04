@@ -1,20 +1,40 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, ChevronDown, Flag, Minus, Plus, SkipForward, Undo2 } from "lucide-react";
+import { BellRing, Check, ChevronDown, CopyPlus, Flag, Minus, Plus, SkipForward, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { displayWeight, formatDuration, toKg, weightUnit } from "@/lib/domain/units";
+import { ExerciseDemoMini } from "@/components/train/exercise-demo";
 import type { UnitSystem } from "@/lib/domain/types";
-import { setCanComplete, type CurrentSetInfo, type DraftAction, type DraftSet } from "@/lib/domain/workout-draft";
+import { lastDoneBefore, sameNumbers, setCanComplete, type CurrentSetInfo, type DraftAction, type DraftExercise, type DraftSet } from "@/lib/domain/workout-draft";
 
-/** One tap on − / + moves the weight by a plate pair's worth: 5 lb or 2.5 kg. */
 /**
  * After a completion, the Complete button moves on to the next set, so the per-set double-tap guard in the logger
  * can't see a shaky second tap: the card ignores a second completion this soon after the first.
  */
 const CARD_DOUBLE_TAP_MS = 700;
+/** One tap on − / + moves the weight by a plate pair's worth: 5 lb or 2.5 kg. */
 const WEIGHT_STEP: Record<UnitSystem, number> = { imperial: 5, metric: 2.5 };
+
+/** "155 lb × 8", "8 reps", "45 s": a set's numbers in a few characters (empty when it has none yet). */
+export function setNumbers(exercise: Pick<DraftExercise, "isTimed" | "usesDistance">, set: DraftSet, units: UnitSystem): string {
+  if (exercise.usesDistance) return "";
+  if (exercise.isTimed) return set.durationSeconds ? `${set.durationSeconds} s` : "";
+  const w = set.weightKg != null && set.weightKg > 0 ? `${displayWeight(set.weightKg, units)} ${weightUnit(units)}` : null;
+  if (w && set.reps) return `${w} × ${set.reps}`;
+  if (set.reps) return `${set.reps} reps`;
+  return w ?? "";
+}
+
+/** The "Then: …" line: what comes after this set, so the member knows what to set up during the rest. */
+export function thenText(current: CurrentSetInfo, after: CurrentSetInfo | null, units: UnitSystem): string {
+  if (!after) return "Last set, then finish.";
+  const label = (i: CurrentSetInfo) => (i.warmup ? `warm-up ${i.warmupNumber} of ${i.warmupCount}` : `set ${i.workingNumber} of ${i.workingCount}`);
+  const nums = after.set ? setNumbers(after.exercise, after.set, units) : "";
+  if (after.exercise.id === current.exercise.id) return `Then: ${label(after)}${nums ? ` · ${nums}` : ""}`;
+  return `Then: ${after.exercise.name}${after.set ? `, ${label(after)}` : ""}${nums ? ` · ${nums}` : ""}`;
+}
 
 function Stepper({
   label,
@@ -121,11 +141,17 @@ export interface CurrentSetCardProps {
   rest: number;
   restTotal: number;
   paused: boolean;
-  /** Scroll to the exercise's full card (its demonstration, notes, substitutions, every set). */
+  /** Scroll to the exercise's full card (every set, notes, substitutions). */
   onShowExercise: (exerciseKey: string) => void;
   onFinish: () => void;
   /** Un-complete a set just logged here (bypasses the double-tap guard; also ends the rest it started). */
   onUndo: (exerciseKey: string, setId: string) => void;
+  /** Open the skip-exercise sheet (it asks why, with the pain advice). */
+  onSkipExercise?: (exerciseKey: string) => void;
+  /** What comes after the current set ("Then: …"); null when this is the last one. */
+  after?: CurrentSetInfo | null;
+  /** The rest just ran out: say so for a few seconds, so the member knows to go. */
+  restOver?: boolean;
   /**
    * The card is scrolled off screen and the header's compact rest bar is showing instead: this one is then inert and
    * hidden from assistive technology, so there is only ever one rest timer to hear or reach.
@@ -134,14 +160,36 @@ export interface CurrentSetCardProps {
 }
 
 /**
- * The set to do now, front and centre: what it is, what you did last time, big weight and reps controls, one button
- * to complete it, then the rest countdown with Skip. It drives the same draft as the exercise cards below (so saving,
- * offline use and recovery after an interruption are unchanged), and the last completed set can be undone.
+ * The set to do now, front and centre: the exercise and its demonstration, what you did last time, big weight and
+ * reps controls already filled in, one button to complete it, then the rest countdown. It drives the same draft as the
+ * exercise cards below (so saving, offline use and recovery after an interruption are unchanged). A set just logged or
+ * skipped can be undone; the next set can take the last set's numbers with one tap.
  */
-export function CurrentSetCard({ info, units, dispatch, lastTime, target, rest, restTotal, paused, onShowExercise, onFinish, onUndo, restElsewhere = false }: CurrentSetCardProps) {
-  const [undo, setUndo] = useState<{ exerciseKey: string; setId: string; label: string } | null>(null);
+export function CurrentSetCard({
+  info,
+  units,
+  dispatch,
+  lastTime,
+  target,
+  rest,
+  restTotal,
+  paused,
+  onShowExercise,
+  onFinish,
+  onUndo,
+  onSkipExercise,
+  after = null,
+  restOver = false,
+  restElsewhere = false,
+}: CurrentSetCardProps) {
+  const [undo, setUndo] = useState<{ exerciseKey: string; setId: string; label: string; kind: "done" | "skipped" } | null>(null);
   const [blocked, setBlocked] = useState(false);
   const lastComplete = useRef(0);
+  // Anything else touched between two taps on Complete (a number changed, the rest skipped) shows the next tap is
+  // deliberate, not a bounce: the double-tap guard lets it through.
+  const deliberate = () => {
+    lastComplete.current = 0;
+  };
   // The undo offer goes away after a while, or when a different set is completed.
   useEffect(() => {
     if (!undo) return;
@@ -172,13 +220,35 @@ export function CurrentSetCard({ info, units, dispatch, lastTime, target, rest, 
         </div>
       </div>
       <div className="grid grid-cols-[1fr_1fr_2fr] gap-2">
-        <Button size="sm" variant="secondary" onClick={() => dispatch({ type: "adjustRest", deltaSeconds: -15, now: new Date().toISOString() })} aria-label="Subtract 15 seconds">
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => {
+            deliberate();
+            dispatch({ type: "adjustRest", deltaSeconds: -15, now: new Date().toISOString() });
+          }}
+          aria-label="Subtract 15 seconds"
+        >
           <Minus aria-hidden /> 15s
         </Button>
-        <Button size="sm" variant="secondary" onClick={() => dispatch({ type: "adjustRest", deltaSeconds: 15, now: new Date().toISOString() })} aria-label="Add 15 seconds">
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => {
+            deliberate();
+            dispatch({ type: "adjustRest", deltaSeconds: 15, now: new Date().toISOString() });
+          }}
+          aria-label="Add 15 seconds"
+        >
           <Plus aria-hidden /> 15s
         </Button>
-        <Button size="sm" onClick={() => dispatch({ type: "clearRest" })}>
+        <Button
+          size="sm"
+          onClick={() => {
+            deliberate();
+            dispatch({ type: "clearRest" });
+          }}
+        >
           <SkipForward aria-hidden /> Skip rest
         </Button>
       </div>
@@ -188,15 +258,16 @@ export function CurrentSetCard({ info, units, dispatch, lastTime, target, rest, 
   const undoRow = undo ? (
     <p className="flex items-center justify-between gap-2 text-sm" role="status" data-testid="set-undo">
       <span className="text-muted-foreground">
-        <Check className="mr-1 inline size-4 text-success" aria-hidden />
-        {undo.label} logged
+        {undo.kind === "done" ? <Check className="mr-1 inline size-4 text-success" aria-hidden /> : <SkipForward className="mr-1 inline size-4" aria-hidden />}
+        {undo.label} {undo.kind === "done" ? "logged" : "skipped"}
       </span>
       <Button
         size="sm"
         variant="ghost"
         onClick={() => {
-          onUndo(undo.exerciseKey, undo.setId);
-          lastComplete.current = 0; // completing it again straight away is deliberate, not a double tap
+          if (undo.kind === "done") onUndo(undo.exerciseKey, undo.setId);
+          else dispatch({ type: "unskipSet", exerciseKey: undo.exerciseKey, setId: undo.setId });
+          lastComplete.current = 0; // doing it again straight away is deliberate, not a double tap
           setUndo(null);
         }}
       >
@@ -226,28 +297,49 @@ export function CurrentSetCard({ info, units, dispatch, lastTime, target, rest, 
     : info.warmup
       ? `Warm-up ${info.warmupNumber} of ${info.warmupCount}`
       : `Set ${info.workingNumber} of ${info.workingCount}`;
-  const update = (patch: Partial<DraftSet>) => set && dispatch({ type: "updateSet", exerciseKey: exercise.id, setId: set.id, patch });
+  const update = (patch: Partial<DraftSet>) => {
+    if (!set) return;
+    deliberate();
+    dispatch({ type: "updateSet", exerciseKey: exercise.id, setId: set.id, patch });
+  };
   const unit = weightUnit(units);
   // Timed holds and distance work keep their own controls in the exercise card (stopwatch, distance units).
   const simple = !exercise.usesDistance;
+  // "Same as last set": offered when the next set doesn't already carry the numbers of the set just done.
+  const lastDone = set && simple ? lastDoneBefore(exercise, set.id) : null;
+  const repeatable = lastDone && set && !sameNumbers(lastDone, set) ? setNumbers(exercise, lastDone, units) : "";
+
+  /** A second tap this soon after the first (a bounce, a shaky hand) is the same tap. */
+  const settled = () => {
+    const t = Date.now();
+    if (t - lastComplete.current < CARD_DOUBLE_TAP_MS) return false;
+    lastComplete.current = t;
+    return true;
+  };
 
   const complete = () => {
     if (!set) return;
-    const t = Date.now();
-    if (t - lastComplete.current < CARD_DOUBLE_TAP_MS) return;
+    if (Date.now() - lastComplete.current < CARD_DOUBLE_TAP_MS) return;
     if (!setCanComplete(exercise, set)) {
       setBlocked(true);
       return;
     }
-    lastComplete.current = t;
+    settled();
     dispatch({ type: "toggleSetComplete", exerciseKey: exercise.id, setId: set.id, now: new Date().toISOString() });
-    setUndo({ exerciseKey: exercise.id, setId: set.id, label: `${exercise.name}, ${setLabel.toLowerCase()}` });
+    setUndo({ exerciseKey: exercise.id, setId: set.id, label: `${exercise.name}, ${setLabel.toLowerCase()}`, kind: "done" });
+  };
+
+  const skip = () => {
+    if (!set || !settled()) return;
+    dispatch({ type: "skipSet", exerciseKey: exercise.id, setId: set.id });
+    setUndo({ exerciseKey: exercise.id, setId: set.id, label: `${exercise.name}, ${setLabel.toLowerCase()}`, kind: "skipped" });
   };
 
   return (
     <section className="space-y-3 rounded-2xl border border-gold-muted bg-card p-4 shadow-[0_0_32px_-18px_rgba(230,199,110,0.6)]" aria-label="Current set" data-testid="current-set-card">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+      <div className="flex items-start gap-3">
+        <ExerciseDemoMini slug={exercise.slug} name={exercise.name} className="h-[72px] w-24" />
+        <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold uppercase tracking-widest text-gold">
             Exercise {info.exerciseNumber} of {info.exerciseCount}
             {exercise.supersetId ? " · superset" : ""}
@@ -258,10 +350,15 @@ export function CurrentSetCard({ info, units, dispatch, lastTime, target, rest, 
           {target && <p className="text-sm text-gold-highlight">{target}</p>}
           {lastTime && <p className="text-sm text-foreground/85" data-testid="current-last-time">{lastTime}</p>}
         </div>
-        <Button size="sm" variant="ghost" onClick={() => onShowExercise(exercise.id)} className="shrink-0">
-          Demo &amp; sets <ChevronDown aria-hidden />
-        </Button>
       </div>
+
+      {/* While resting, the countdown comes first: it is what the member is looking at. */}
+      {restRow}
+      {!resting && restOver && set && (
+        <p className="flex items-center gap-2 rounded-xl border border-gold-muted/60 bg-gold/10 px-3 py-2 font-semibold text-gold-highlight" role="status" data-testid="rest-over">
+          <BellRing className="size-4" aria-hidden /> Rest over. {setLabel} is ready.
+        </p>
+      )}
 
       <p className={cn("text-center font-display text-lg font-semibold uppercase", info.warmup ? "text-gold" : "text-foreground")} aria-live="polite" data-testid="current-set-label">
         {setLabel}
@@ -304,6 +401,21 @@ export function CurrentSetCard({ info, units, dispatch, lastTime, target, rest, 
       )}
       {set && !simple && <p className="text-sm text-muted-foreground">Enter the distance and time for this set in the exercise card below.</p>}
 
+      {set && repeatable && (
+        <Button
+          type="button"
+          variant="secondary"
+          className="w-full"
+          onClick={() => {
+            deliberate();
+            dispatch({ type: "repeatLastSet", exerciseKey: exercise.id, setId: set.id });
+          }}
+          data-testid="repeat-last-set"
+        >
+          <CopyPlus aria-hidden /> Same as last set ({repeatable})
+        </Button>
+      )}
+
       {set ? (
         <Button className="h-14 w-full text-lg" onClick={complete} data-testid="complete-set" disabled={!simple}>
           <Check className="size-5" aria-hidden /> Complete set
@@ -318,9 +430,27 @@ export function CurrentSetCard({ info, units, dispatch, lastTime, target, rest, 
           {exercise.isTimed ? "Enter the time you held it for, then complete the set." : "Enter your reps, then complete the set. Leave the weight empty for bodyweight."}
         </p>
       )}
-      {paused && <p className="text-xs text-muted-foreground">The workout is paused: the clock is stopped, and completing a set won&apos;t start a rest.</p>}
+      {/* Right under the button just tapped, where the thumb already is. */}
       {undoRow}
-      {restRow}
+      <div className="flex items-center justify-between gap-2">
+        <p className="min-w-0 text-sm text-muted-foreground" data-testid="then-next">
+          {set ? thenText(info, after, units) : null}
+        </p>
+        <Button size="sm" variant="ghost" className="shrink-0" onClick={() => onShowExercise(exercise.id)}>
+          All sets <ChevronDown aria-hidden />
+        </Button>
+      </div>
+      {set && (
+        <div className="grid grid-cols-2 gap-2">
+          <Button size="sm" variant="secondary" onClick={skip} data-testid="skip-set">
+            <SkipForward aria-hidden /> Skip set
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => onSkipExercise?.(exercise.id)} disabled={!onSkipExercise} data-testid="skip-exercise">
+            Skip exercise
+          </Button>
+        </div>
+      )}
+      {paused && <p className="text-xs text-muted-foreground">The workout is paused: the clock is stopped, and completing a set won&apos;t start a rest.</p>}
     </section>
   );
 }

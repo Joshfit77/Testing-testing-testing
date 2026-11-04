@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import type { UnitSystem } from "@/lib/domain/types";
 import { formatDuration, formatWeight, formatVolume } from "@/lib/domain/units";
 import {
+  afterCurrent,
   completionTotals,
   createDraft,
   currentSetInfo,
@@ -23,6 +24,7 @@ import {
   draftSummary,
   elapsedSeconds,
   finishFailureMessage,
+  finishPayload,
   migrateDraft,
   nextUp,
   restorableDraft,
@@ -31,7 +33,6 @@ import {
   restRemaining,
   workoutReducer,
   type DraftAction,
-  type DraftExercise,
   type DraftTarget,
   type ExerciseRef,
   type WorkoutDraft,
@@ -223,8 +224,16 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
   const touched = useRef(false);
   const latest = useRef<WorkoutDraft | null>(null);
   const retryDelay = useRef(0);
+  // One backup request at a time: a newer snapshot asked for while one is on its way goes right after it, so an older
+  // snapshot can never land last and overwrite a newer one.
+  const pushing = useRef(false);
+  const pushAgain = useRef(false);
+  // A set was just completed or skipped: back it up to the account now rather than after the usual short wait.
+  const saveNow = useRef(false);
   const lastToggle = useRef(new Map<string, number>());
   const prefilled = useRef(new Set<string>());
+  // "Rest over" on the card for a few seconds after the countdown ends.
+  const [restOverAt, setRestOverAt] = useState<number | null>(null);
   const [staleHours, setStaleHours] = useState<number | null>(null);
   const [sameSession, setSameSession] = useState(false);
 
@@ -288,8 +297,20 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
       setSync("local");
       return;
     }
+    if (pushing.current) {
+      pushAgain.current = true;
+      return;
+    }
+    pushing.current = true;
     setSync("saving");
     const res = await syncWorkoutDraftAction(draftSnapshot(d)).catch(() => ({ ok: false as const, error: "offline" }));
+    pushing.current = false;
+    if (pushAgain.current) {
+      // Changes arrived while this one was on its way: send the latest now (it supersedes this result either way).
+      pushAgain.current = false;
+      if (latest.current) void pushToServer(latest.current);
+      return;
+    }
     if (res.ok) {
       retryDelay.current = 0;
       setSync("synced");
@@ -312,27 +333,60 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
     const ok = saveLocalDraft(userId, draft);
     if (!ok) setError("This device couldn't store your workout locally. Keep this tab open until you finish.");
     if (syncTimer.current) clearTimeout(syncTimer.current);
+    if (saveNow.current) {
+      // A completed (or skipped) set is backed up to the account straight away, not after the typing debounce.
+      saveNow.current = false;
+      void pushToServer(draft);
+      return;
+    }
     syncTimer.current = setTimeout(() => void pushToServer(draft), 2000);
     return () => {
       if (syncTimer.current) clearTimeout(syncTimer.current);
     };
   }, [draft, phase, userId, pushToServer]);
 
-  // Empty fields take last time's numbers (the target's reps stay): the member corrects a value instead of typing
-  // every one. Only sets not yet done, and never a value already typed. In a deload week the weights stay empty: the
-  // week is meant to be lighter, so copying a normal week's loads would be the wrong number to start from.
+  // Leaving the app (home button, locking the phone, switching apps): send the latest numbers now instead of waiting
+  // for the debounce, which may never run in the background. The device copy is already saved on every change.
+  useEffect(() => {
+    if (phase !== "active") return;
+    const send = () => {
+      if (!touched.current || !latest.current) return;
+      if (syncTimer.current) clearTimeout(syncTimer.current);
+      void pushToServer(latest.current);
+    };
+    const flush = () => {
+      if (document.visibilityState === "hidden") send();
+    };
+    document.addEventListener("visibilitychange", flush);
+    window.addEventListener("pagehide", send);
+    return () => {
+      document.removeEventListener("visibilitychange", flush);
+      window.removeEventListener("pagehide", send);
+    };
+  }, [phase, pushToServer]);
+
+  // Empty fields take last time's numbers, once per exercise (the reducer remembers it in the draft, so a value
+  // cleared on purpose isn't refilled on resume). An exercise never logged before takes the target the member accepted
+  // from the training review or the coach, if there is one. In a deload week the weights stay empty: the week is meant
+  // to be lighter, so copying a normal week's loads would be the wrong number to start from.
   useEffect(() => {
     if (!draft || phase !== "active") return;
     for (const e of draft.exercises) {
+      if (e.prefilled || prefilled.current.has(e.id)) continue;
       const p = prev[e.exerciseId];
-      if (!p || prefilled.current.has(e.id)) continue;
+      const t = targets[e.exerciseId];
+      const working = p
+        ? p.sets
+            .filter((x) => x.completed && !x.isWarmup)
+            .map((x) => ({ reps: x.reps, weightKg: deload ? null : x.weightKg, durationSeconds: x.durationSeconds, distanceM: x.distanceM }))
+        : t && !e.isTimed && !e.usesDistance && (t.weightKg != null || t.reps != null)
+          ? [{ reps: t.reps, weightKg: deload ? null : t.weightKg, durationSeconds: null, distanceM: null }]
+          : [];
+      if (!working.length) continue;
       prefilled.current.add(e.id);
-      const working = p.sets
-        .filter((x) => x.completed && !x.isWarmup)
-        .map((x) => ({ reps: x.reps, weightKg: deload ? null : x.weightKg, durationSeconds: x.durationSeconds, distanceM: x.distanceM }));
-      if (working.length) setDraft((d) => (d ? workoutReducer(d, { type: "prefillFromPrevious", exerciseKey: e.id, sets: working }) : d));
+      setDraft((d) => (d ? workoutReducer(d, { type: "prefillFromPrevious", exerciseKey: e.id, sets: working }) : d));
     }
-  }, [draft, prev, phase, deload]);
+  }, [draft, prev, targets, phase, deload]);
 
   // "Last time" for exercises added during the workout (the page preloads the starting ones).
   const exerciseIds = draft ? draft.exercises.map((e) => e.exerciseId).join(",") : "";
@@ -363,7 +417,9 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
       if (t - (lastToggle.current.get(action.setId) ?? 0) < DOUBLE_TAP_MS) return;
       lastToggle.current.set(action.setId, t);
       void hapticSuccess();
+      setRestOverAt(null);
     }
+    if (action.type === "toggleSetComplete" || action.type === "skipSet" || action.type === "unskipSet") saveNow.current = true;
     touched.current = true;
     setDraft((d) => (d ? workoutReducer(d, action) : d));
   }, []);
@@ -373,6 +429,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
   const undoSet = useCallback((exerciseKey: string, setId: string) => {
     lastToggle.current.delete(setId);
     touched.current = true;
+    saveNow.current = true;
     const now = new Date().toISOString();
     setDraft((d) => {
       if (!d) return d;
@@ -403,6 +460,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
       restWasRunning.current = false;
       if (alerts.vibrate) void vibrate([200, 100, 200]);
       if (alerts.sound) beep();
+      setRestOverAt(Date.now());
       dispatch({ type: "clearRest" });
     }
   }, [rest, draft, dispatch, alerts]);
@@ -713,32 +771,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
     if (asked !== draft) setDraft(asked);
     const endedAt = asked.finishRequestedAt!;
     const finalDraft = asked.pausedAt ? workoutReducer(asked, { type: "resume", now: endedAt }) : asked;
-    const payload = {
-      clientId: finalDraft.clientId,
-      name: finalDraft.name.trim() || "Workout",
-      userProgramId: finalDraft.userProgramId,
-      programDayId: finalDraft.programDayId,
-      startedAt: finalDraft.startedAt,
-      endedAt,
-      pausedSeconds: finalDraft.pausedSeconds,
-      notes: finalDraft.notes,
-      exercises: finalDraft.exercises.map((e: DraftExercise) => ({
-        exerciseId: e.exerciseId,
-        substitutedFromId: e.substitutedFromId,
-        notes: e.notes,
-        skipped: e.skipped,
-        skipReason: e.skipReason,
-        sets: e.sets.map((s) => ({
-          reps: s.reps,
-          weightKg: s.weightKg,
-          durationSeconds: s.durationSeconds,
-          distanceM: s.distanceM ?? null,
-          rpe: s.rpe,
-          isWarmup: s.isWarmup,
-          completed: s.completed,
-        })),
-      })),
-    };
+    const payload = finishPayload(finalDraft, endedAt);
     const res = await finishWorkoutAction(payload).catch(() => ({ ok: false as const, error: finishFailureMessage(navigator.onLine) }));
     setSaving(false);
     if (!res.ok) {
@@ -790,7 +823,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
               </span>
               {paused && <span className="text-gold">Paused</span>}
               <span aria-hidden>·</span>
-              {summary.completedSets}/{summary.totalSets} sets
+              {summary.completedSets}/{summary.totalSets - summary.skippedSets} sets
               <span aria-hidden>·</span>
               <span className="inline-flex items-center gap-1" role="status">
                 {sync === "synced" ? (
@@ -821,6 +854,15 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
             <Flag aria-hidden /> Finish
           </Button>
         </div>
+
+        {summary.totalSets > 0 && (
+          <div className="mt-2" data-testid="workout-progress">
+            <ProgressBar
+              value={summary.totalSets - summary.skippedSets > 0 ? (summary.completedSets / (summary.totalSets - summary.skippedSets)) * 100 : 0}
+              label={`Workout progress: ${summary.completedSets} of ${summary.totalSets - summary.skippedSets} sets done`}
+            />
+          </div>
+        )}
 
         {(rest > 0 || draft.rest.pausedRemaining) && !cardVisible && (
           <div className="mt-3 flex items-center gap-3 rounded-xl border border-gold-muted/60 bg-gold/10 px-3 py-2" role="timer" aria-label="Rest timer" data-testid="header-rest">
@@ -869,6 +911,9 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
             onShowExercise={(key) => document.getElementById(`ex-${key}`)?.scrollIntoView({ behavior: "smooth", block: "center" })}
             onFinish={() => setFinishOpen(true)}
             onUndo={undoSet}
+            onSkipExercise={(key) => setSkipKey(key)}
+            after={afterCurrent(draft)}
+            restOver={restOverAt !== null && Date.parse(now) - restOverAt < 10_000}
             restElsewhere={!cardVisible}
           />
         </div>
@@ -1020,11 +1065,11 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
       <Dialog open={finishOpen} onOpenChange={setFinishOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{summary.workingCompleted < summary.workingTotal ? "Finish early?" : "Finish workout?"}</DialogTitle>
+            <DialogTitle>{summary.workingRemaining > 0 ? "Finish early?" : "Finish workout?"}</DialogTitle>
             <DialogDescription data-testid="finish-summary">
               {summary.workingCompleted} of {summary.workingTotal} working sets done across {summary.exercises} exercises · {formatDuration(elapsed)}.
               {summary.workingCompleted < summary.workingTotal
-                ? ` The ${summary.workingTotal - summary.workingCompleted} unfinished ${summary.workingTotal - summary.workingCompleted === 1 ? "set isn't" : "sets aren't"} counted: only completed sets go toward volume, records and badges. Keep training, or finish now.`
+                ? ` The ${summary.workingTotal - summary.workingCompleted} ${summary.workingRemaining === 0 ? "skipped" : "unfinished"} ${summary.workingTotal - summary.workingCompleted === 1 ? "set isn't" : "sets aren't"} counted: only completed sets go toward volume, records and badges.${summary.workingRemaining > 0 ? " Keep training, or finish now." : ""}`
                 : " Only sets marked complete count toward volume and records."}
             </DialogDescription>
           </DialogHeader>
