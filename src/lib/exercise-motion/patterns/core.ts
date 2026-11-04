@@ -91,7 +91,7 @@ export function coreMove(id: string, label: string, kind: CoreKind): MotionDef {
       const footTarget = cop ? 44 + 4 : 4;
       const T = solve1D((t) => worldPts(make(t), root, "front")[cop ? "ankleR" : "ankleL"][1] - footTarget, 50, 89);
       const W = worldPts(make(T), root, "front");
-      const props: PropDef[] = cop ? [{ id: "bench", kind: "box", at: [W.ankleR[0] - 6, 0], w: 34, h: 44, layer: "back" }] : [{ id: "mat", kind: "mat", at: [W.pelvis[0], 0], w: 220, layer: "back" }];
+      const props: PropDef[] = cop ? [{ id: "bench", kind: "box", variant: "bench", at: [W.ankleR[0] - 6, 0], w: 34, h: 44, layer: "back" }] : [{ id: "mat", kind: "mat", at: [W.pelvis[0], 0], w: 220, layer: "back" }];
       return {
         ...base,
         view: "front",

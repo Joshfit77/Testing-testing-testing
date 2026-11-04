@@ -419,23 +419,45 @@ export function legMachine(id: string, label: string, kind: "extension" | "seate
       stillPhase: 0.5,
     };
   }
-  const root: RootRule = { pin: "butt", at: [0, 52] };
-  const base = pose({ trunk: -6, ...both({ hip: 92, ankle: 8 }) });
+  // Seated: thighs level on the seat, the knees just past its front edge and in line with the lever's pivot. Leg
+  // extension: back against the reclined back pad. Seated curl: sitting tall and leaning a little forward off the pad
+  // (the cue), the thigh pad locked down on the thighs just behind the knees. Both hold the handles at the seat's sides.
   const ext = kind === "extension";
-  const at = (k: number) => armsLocal({ ...base, ...both({ knee: k }) }, [4, -26], [20, -44]);
+  // Seat high enough that the feet stay clear of the floor with the knees fully bent (seated curl).
+  const seatTop = 63;
+  const root: RootRule = { pin: "butt", at: [0, seatTop] };
+  const lean = ext ? -6 : 4;
+  const base = pose({ trunk: lean, neck: ext ? 2 : -4, ...both({ hip: 92 - lean - 6, ankle: 8 }) });
+  const W0 = worldPts(base, root);
+  const grip: Vec = [W0.pelvis[0] + 9, seatTop + 5];
+  const at = (k: number) => handsTo({ ...base, ...both({ knee: k, armD: 14 }) }, root, grip);
   const W = worldPts(at(90), root);
+  // Back pad: its face on the line through the low and upper back (leg extension), or touching the low back and
+  // reclined 2° (seated curl: the upper back leans off it).
+  const padLean = ext ? (Math.atan2(W.upperBack[0] - W.lowBack[0], W.upperBack[1] - W.lowBack[1]) * 180) / Math.PI : -2;
+  const padX = W.lowBack[0] - 0.5 - (W.lowBack[1] - seatTop) * Math.tan((padLean * Math.PI) / 180);
+  const seatFront = W.kneeR[0] - 9;
+  // Thigh pad on top of the thighs, 10 cm behind the knees.
+  const thighDir: Vec = [W.pelvis[0] - W.kneeR[0], W.pelvis[1] - W.kneeR[1]];
+  const tl = Math.hypot(thighDir[0], thighDir[1]);
+  const thighPad: Vec = [W.kneeR[0] + (thighDir[0] / tl) * 10 + (thighDir[1] / tl) * 11, W.kneeR[1] + (thighDir[1] / tl) * 10 - (thighDir[0] / tl) * 11];
+  const machine = ext ? "legExtension" : "seatedLegCurl";
   return {
     id,
     view: "side",
     label,
     keyframes: keys(root, [
-      { pose: at(ext ? 92 : 6), dur: 1, hold: 0.3, ease: "inOut" },
-      { pose: at(ext ? 6 : 110), dur: 2, hold: 0.4, ease: "inOut" },
+      { pose: at(ext ? 92 : 6), dur: 1, hold: 0.3, ease: "inOut", ik: { handL: grip, handR: grip } },
+      { pose: at(ext ? 6 : 110), dur: 2, hold: 0.4, ease: "inOut", ik: { handL: grip, handR: grip } },
     ]),
     props: [
-      { id: "m", kind: ext ? "legExtension" : "seatedLegCurl", variant: "body", at: [W.kneeR[0] + 2, 52], to: { lm: "ankleR", dx: ext ? 5 : -5 }, layer: "back" },
-      // The lever and shin pad in front of the leg, so the resistance is visible.
-      { id: "lever", kind: "machineLever", at: [W.kneeR[0] + 5, 54], to: { lm: "ankleR", dx: ext ? 5 : -5 }, layer: "front" },
+      // Frame, seat (front edge at `at`), back pad (`w` cm behind the seat's front edge, reclined `angle`°).
+      { id: "m", kind: machine, variant: "body", at: [seatFront, seatTop], angle: padLean, w: seatFront - padX, to: { lm: "ankleR" }, layer: "back" },
+      { id: "grips", kind: machine, variant: "handles", at: grip, layer: "near" },
+      ...(ext ? [] : [{ id: "thighPad", kind: machine, variant: "thighPad", at: thighPad, layer: "near" } satisfies PropDef]),
+      // The lever pivots in line with the knee; its roller pad sits on the front of the lower shin (extension) or behind
+      // the ankle, just above the heel (curl).
+      { id: "lever", kind: "machineLever", at: W.kneeR, to: { lm: "ankleR", dx: ext ? 9 : -9 }, variant: ext ? "front" : "back", layer: "front" },
     ],
     stillPhase: 0.5,
   };
