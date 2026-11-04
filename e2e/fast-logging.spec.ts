@@ -147,8 +147,9 @@ test.describe("fast workout logging", () => {
     await card.getByLabel("Reps", { exact: true }).fill("12");
     await card.getByTestId("complete-set").click();
     await expect(card.getByTestId("current-rest")).toBeVisible();
-    // Shorten the rest to a few seconds (−15s until it is nearly over).
-    for (let i = 0; i < 20 && (await restSeconds(page)) > 15; i++) await card.getByRole("button", { name: "Subtract 15 seconds" }).click();
+    // Shorten the rest to a few seconds (−15s at a time). Stop at 20s or less, so it ends between 6 and 20 seconds
+    // from now: stopping at 15 could leave 1s (e.g. 1:31 → … → 0:16 → 0:01), and the timer would vanish before the next read.
+    for (let i = 0; i < 20 && (await restSeconds(page)) > 20; i++) await card.getByRole("button", { name: "Subtract 15 seconds" }).click();
     await expect(card.getByTestId("rest-over")).toHaveText(/Rest over\. Set 2 of 3 is ready\./, { timeout: 25_000 });
 
     // Every control fits common phone widths: no sideways scrolling, nothing cut off.
