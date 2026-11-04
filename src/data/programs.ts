@@ -237,7 +237,9 @@ function hypertrophyWeeks(plans: DayPlan[], weeks: BlockWeek[], extras?: (week: 
                 return d;
               }
               const x: BuildEx = { ...e, sets: e.sets + (e.grow ? w.add : 0) };
-              if (e.rpe !== undefined) x.rpe = Math.min(9.5, w.rpe + (e.iso ? 0.5 : 0));
+              // The week sets the effort; an exercise written below the standard RPE 8 (a deadlift "kept submaximal")
+              // stays that far below it every week instead of being pushed up with the rest.
+              if (e.rpe !== undefined) x.rpe = Math.min(9.5, w.rpe + (e.iso ? 0.5 : 0) + Math.min(0, e.rpe - 8));
               return x;
             }),
             ...(extras ? extras(wi + 1, di) : []),

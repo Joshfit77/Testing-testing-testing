@@ -1,5 +1,6 @@
 import "server-only";
 import type { User } from "@supabase/supabase-js";
+import { demoModeOn } from "@/lib/demo/mode";
 
 /**
  * Demo mode: a private, isolated preview of the real app for the owner to click through.
@@ -10,10 +11,11 @@ import type { User } from "@supabase/supabase-js";
  *   - demo accounts are marked in `app_metadata.demo`, which only the service role can set (members can't edit it);
  *   - a demo account can switch itself between Free and Pro through a server-held entitlement (source `admin`);
  *   - AI replies always come from the scripted stand-in (src/lib/demo/simulated-ai.ts), in-process; any AI key is ignored.
- * Nothing here exists in a deployment without DEMO_MODE=true: every demo action and route checks it first.
+ * Nothing here exists in a deployment without DEMO_MODE=true: every demo action and route checks it first. It is also
+ * refused on a production or real-money deployment even when DEMO_MODE=true is set (src/lib/demo/mode.ts).
  */
 export function isDemoMode(): boolean {
-  return process.env.DEMO_MODE === "true";
+  return demoModeOn();
 }
 
 /** A demo account: marked by the server when the seed script or "Try onboarding" created it. */

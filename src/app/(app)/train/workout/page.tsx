@@ -9,6 +9,7 @@ import { getProgramDay } from "@/server/services/training";
 import { getExerciseTargets, getPreviousPerformance, getServerDraft } from "@/server/services/workouts";
 import { getTemplate } from "@/server/services/templates";
 import { migrateDraft } from "@/lib/domain/workout-draft";
+import type { SessionSlot } from "@/lib/domain/previous-performance";
 
 export const metadata = { title: "Workout" };
 
@@ -101,8 +102,11 @@ export default async function WorkoutPage({ searchParams }: { searchParams: Prom
   // "Last time" for the exercises this workout starts with (more are fetched as exercises are added).
   const restored = migrateDraft(serverDraft);
   const startIds = [...(template?.exercises.map((e) => e.exercise.id) ?? []), ...(restored?.exercises.map((e) => e.exerciseId) ?? [])];
+  // Which program day this is (from the link, or the workout being resumed): "last time" prefers the same day of the
+  // program, and a deload week doesn't pre-fill last week's weights.
+  const slot = await sessionSlot(supabase, template?.programDayId ?? restored?.programDayId ?? null);
   const [previous, targets] = await Promise.all([
-    getPreviousPerformance(supabase, user.id, startIds).catch(() => ({})),
+    getPreviousPerformance(supabase, user.id, startIds, slot).catch(() => ({})),
     getExerciseTargets(supabase, user.id, startIds).catch(() => ({})),
   ]);
 
@@ -113,8 +117,17 @@ export default async function WorkoutPage({ searchParams }: { searchParams: Prom
         template={template}
         previous={previous}
         targets={targets}
+        deload={slot?.deload ?? false}
         restAlerts={{ sound: profile.rest_timer_sound ?? true, vibrate: profile.rest_timer_vibrate ?? true }}
       />
     </>
   );
+}
+
+async function sessionSlot(supabase: Awaited<ReturnType<typeof getServerSupabase>>, programDayId: string | null): Promise<SessionSlot | null> {
+  if (!programDayId) return null;
+  const { data } = await supabase.from("program_days").select("day_number, week:program_weeks(program_id, is_deload)").eq("id", programDayId).maybeSingle();
+  const week = data?.week as unknown as { program_id: string; is_deload: boolean } | null;
+  if (!data || !week) return null;
+  return { programId: week.program_id, dayNumber: data.day_number as number, deload: !!week.is_deload };
 }

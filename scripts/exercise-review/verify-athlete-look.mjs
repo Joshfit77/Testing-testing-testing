@@ -68,7 +68,7 @@ for (const [slug, name] of [["back-squat", "Barbell Back Squat"], ["dumbbell-cur
   await page.evaluate(() => scrollBy(0, -40));
   filming = true;
   await page.waitForTimeout(1500);
-  check(`${name}: the athlete look, playing, marked as awaiting approval`, (await w.getAttribute("data-style")) === "athlete" && (await w.getAttribute("data-playing")) === "true" && (await page.getByText("New athlete look · awaiting approval").count()) === 1);
+  check(`${name}: the athlete look, playing, marked as still in review`, (await w.getAttribute("data-style")) === "athlete" && (await w.getAttribute("data-playing")) === "true" && (await page.getByText("New athlete look · still in review").count()) === 1);
   check(`${name}: no 2.5D clip, no 3D, no classic figure on the page`, (await page.getByTestId("exercise-demo-25d").count()) === 0 && (await page.getByTestId("exercise-demo-3d").count()) === 0);
   const a = await w.screenshot();
   await page.waitForTimeout(700);

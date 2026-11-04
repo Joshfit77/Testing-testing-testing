@@ -1,0 +1,62 @@
+{
+  "label": "current",
+  "runs": 1,
+  "project": "mobile",
+  "viewport": {
+    "width": 412,
+    "height": 839
+  },
+  "checks": {
+    "startVisibleWithoutScrolling": true,
+    "firstSetVisibleWithoutScrolling": true,
+    "firstTimeTipShown": true,
+    "upNextShown": true,
+    "programProgressShown": true
+  },
+  "summary": {
+    "onboardingDone": {
+      "medianMs": 1023,
+      "taps": 10,
+      "typed": 4
+    },
+    "loggerOpen": {
+      "medianMs": 1777,
+      "taps": 11,
+      "typed": 4
+    },
+    "firstSet": {
+      "medianMs": 2081,
+      "taps": 12,
+      "typed": 4
+    },
+    "workoutDone": {
+      "medianMs": 2636,
+      "taps": 14,
+      "typed": 4
+    }
+  },
+  "raw": [
+    {
+      "onboardingDone": {
+        "ms": 1023,
+        "taps": 10,
+        "typed": 4
+      },
+      "loggerOpen": {
+        "ms": 1777,
+        "taps": 11,
+        "typed": 4
+      },
+      "firstSet": {
+        "ms": 2081,
+        "taps": 12,
+        "typed": 4
+      },
+      "workoutDone": {
+        "ms": 2636,
+        "taps": 14,
+        "typed": 4
+      }
+    }
+  ]
+}

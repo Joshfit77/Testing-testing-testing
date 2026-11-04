@@ -38,9 +38,13 @@ export interface LastSync {
   date: string;
 }
 
+/**
+ * The plugin's module, not the plugin itself: a Capacitor plugin is a Proxy that answers every property, `then`
+ * included, so an async function that returns it is treated as a thenable and its promise never settles (the proxy
+ * turns `then` into a native call that doesn't exist). Callers take `LocalNotifications` off the module.
+ */
 async function plugin() {
-  const { LocalNotifications } = await import("@capacitor/local-notifications");
-  return LocalNotifications;
+  return import("@capacitor/local-notifications");
 }
 
 function platform(): "ios" | "android" | "web" {
@@ -100,7 +104,7 @@ export function lastSync(): LastSync | null {
 export async function notificationPermission(): Promise<PermissionState> {
   if (!isNativeApp()) return "unknown";
   try {
-    const p = (await (await plugin()).checkPermissions()).display;
+    const p = (await (await plugin()).LocalNotifications.checkPermissions()).display;
     return p === "granted" || p === "denied" ? p : "prompt";
   } catch {
     return "unknown";
@@ -110,7 +114,7 @@ export async function notificationPermission(): Promise<PermissionState> {
 /** Android channels (no-op elsewhere). Created before anything is scheduled on them. */
 export async function ensureChannels(): Promise<void> {
   if (!isNativeApp() || platform() !== "android") return;
-  const LocalNotifications = await plugin();
+  const { LocalNotifications } = await plugin();
   for (const c of NOTIFICATION_CHANNELS) {
     await LocalNotifications.createChannel({ id: c.id, name: c.name, description: c.description, importance: 3, visibility: 0, vibration: true });
   }
@@ -137,7 +141,7 @@ export function toCapacitor(plan: PlannedNotification[], os: "ios" | "android" |
 export async function cancelAllReminders(): Promise<void> {
   if (!isNativeApp()) return;
   try {
-    await (await plugin()).cancel({ notifications: ALL_REMINDER_IDS.map((id) => ({ id })) });
+    await (await plugin()).LocalNotifications.cancel({ notifications: ALL_REMINDER_IDS.map((id) => ({ id })) });
   } catch {
     /* nothing to cancel */
   }
@@ -152,7 +156,7 @@ export async function clearDeviceNotifications(): Promise<void> {
   store.remove(LAST_SYNC_KEY);
   if (!isNativeApp()) return;
   try {
-    const LocalNotifications = await plugin();
+    const { LocalNotifications } = await plugin();
     const { notifications } = await LocalNotifications.getPending();
     if (notifications.length) await LocalNotifications.cancel({ notifications: notifications.map((n) => ({ id: n.id })) });
     await LocalNotifications.removeAllDeliveredNotifications();
@@ -181,7 +185,7 @@ export async function syncReminders(
     return { ok: false, reason: "offline" };
   }
   try {
-    const LocalNotifications = await plugin();
+    const { LocalNotifications } = await plugin();
     // A different account than last time (signing out already cleared the phone; this covers an expired session):
     // none of the previous member's reminders may remain. Everything this app scheduled is replaced below anyway.
     if (store.get(OWNER_KEY) !== sync.owner) {
@@ -222,7 +226,7 @@ export function needsResync(now = Date.now(), today?: string, maxAgeMs = 15 * 60
 export async function cancelDoneToday(today: string, done: Partial<DoneToday>): Promise<number> {
   if (!isNativeApp()) return 0;
   try {
-    const LocalNotifications = await plugin();
+    const { LocalNotifications } = await plugin();
     const { notifications } = await LocalNotifications.getPending();
     const ids = notifications
       .filter((n) => isReminderId(n.id))
@@ -242,7 +246,7 @@ export async function cancelDoneToday(today: string, done: Partial<DoneToday>): 
 export async function installReminderTapHandler(navigate: (path: string) => void = (p) => window.location.assign(p)): Promise<() => void> {
   if (!isNativeApp()) return () => {};
   try {
-    const handle = await (await plugin()).addListener("localNotificationActionPerformed", (event) => {
+    const handle = await (await plugin()).LocalNotifications.addListener("localNotificationActionPerformed", (event) => {
       if (!isReminderId(event.notification.id)) return;
       navigate(safeNotificationPath((event.notification.extra as { url?: unknown } | undefined)?.url) ?? "/home");
     });

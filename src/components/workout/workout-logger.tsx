@@ -15,7 +15,9 @@ import { cn } from "@/lib/utils";
 import type { UnitSystem } from "@/lib/domain/types";
 import { formatDuration, formatWeight } from "@/lib/domain/units";
 import {
+  completionTotals,
   createDraft,
+  currentSetInfo,
   draftSnapshot,
   draftAgeHours,
   draftSummary,
@@ -53,7 +55,8 @@ import { createTemplateAction } from "@/server/actions/templates";
 import { lastTimeText, targetText, type PreviousPerformance } from "@/lib/domain/previous-performance";
 import { templateFromDraft } from "@/lib/domain/workout-templates";
 import { BadgeMedallion } from "@/components/achievements/badge-icon";
-import { ExerciseCard } from "./exercise-card";
+import { ExerciseCard, exerciseTargetText } from "./exercise-card";
+import { CurrentSetCard } from "./current-set-card";
 import { ExercisePicker, type CatalogItem } from "./exercise-picker";
 
 export interface WorkoutTemplate {
@@ -82,12 +85,16 @@ interface LoggerProps {
   restAlerts?: { sound: boolean; vibrate: boolean };
   /** A message from the page about how the workout was set up (shown under the header). */
   notice?: string | null;
+  /** Today is a program deload week: last time's reps are offered but not its weights (the week is lighter on purpose). */
+  deload?: boolean;
 }
 
 type Phase = "loading" | "conflict" | "active" | "finished";
 type SyncState = "idle" | "saving" | "synced" | "local";
 
 interface FinishResult {
+  /** The saved session, for its full summary page. */
+  sessionId: string;
   volumeKg: number;
   records: { exerciseId: string; recordType: string; value: number; first?: boolean }[];
   badges: UnlockedBadge[];
@@ -170,7 +177,7 @@ function beep() {
   }
 }
 
-export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraft, template, previous = {}, targets: initialTargets = {}, restAlerts = { sound: true, vibrate: true }, notice = null }: LoggerProps) {
+export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraft, template, previous = {}, targets: initialTargets = {}, restAlerts = { sound: true, vibrate: true }, notice = null, deload = false }: LoggerProps) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>("loading");
   const [draft, setDraft] = useState<WorkoutDraft | null>(null);
@@ -193,6 +200,20 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
   const [alerts, setAlerts] = useState(restAlerts);
   const [alertsError, setAlertsError] = useState<string | null>(null);
   const [finishedDraft, setFinishedDraft] = useState<WorkoutDraft | null>(null);
+  // While the current-set card (with its own rest timer) is on screen, the sticky header doesn't repeat the timer.
+  const [cardVisible, setCardVisible] = useState(false);
+  const cardObserver = useRef<IntersectionObserver | null>(null);
+  const observeCard = useCallback((el: HTMLDivElement | null) => {
+    cardObserver.current?.disconnect();
+    cardObserver.current = null;
+    if (!el || typeof IntersectionObserver === "undefined") {
+      setCardVisible(false);
+      return;
+    }
+    const io = new IntersectionObserver(([entry]) => setCardVisible(Boolean(entry?.isIntersecting)), { threshold: 0.25 });
+    io.observe(el);
+    cardObserver.current = io;
+  }, []);
   const [templateName, setTemplateName] = useState("");
   const [templateState, setTemplateState] = useState<{ saving: boolean; error: string | null; savedId: string | null }>({ saving: false, error: null, savedId: null });
   const restWasRunning = useRef(false);
@@ -298,17 +319,20 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
   }, [draft, phase, userId, pushToServer]);
 
   // Empty fields take last time's numbers (the target's reps stay): the member corrects a value instead of typing
-  // every one. Only sets not yet done, and never a value already typed.
+  // every one. Only sets not yet done, and never a value already typed. In a deload week the weights stay empty: the
+  // week is meant to be lighter, so copying a normal week's loads would be the wrong number to start from.
   useEffect(() => {
     if (!draft || phase !== "active") return;
     for (const e of draft.exercises) {
       const p = prev[e.exerciseId];
       if (!p || prefilled.current.has(e.id)) continue;
       prefilled.current.add(e.id);
-      const working = p.sets.filter((x) => x.completed && !x.isWarmup).map((x) => ({ reps: x.reps, weightKg: x.weightKg, durationSeconds: x.durationSeconds, distanceM: x.distanceM }));
+      const working = p.sets
+        .filter((x) => x.completed && !x.isWarmup)
+        .map((x) => ({ reps: x.reps, weightKg: deload ? null : x.weightKg, durationSeconds: x.durationSeconds, distanceM: x.distanceM }));
       if (working.length) setDraft((d) => (d ? workoutReducer(d, { type: "prefillFromPrevious", exerciseKey: e.id, sets: working }) : d));
     }
-  }, [draft, prev, phase]);
+  }, [draft, prev, phase, deload]);
 
   // "Last time" for exercises added during the workout (the page preloads the starting ones).
   const exerciseIds = draft ? draft.exercises.map((e) => e.exerciseId).join(",") : "";
@@ -342,6 +366,20 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
     }
     touched.current = true;
     setDraft((d) => (d ? workoutReducer(d, action) : d));
+  }, []);
+
+  // Undo on the current-set card is a deliberate second control, not a double tap: it always applies, and it resets
+  // the double-tap guard so completing the set again right away works too.
+  const undoSet = useCallback((exerciseKey: string, setId: string) => {
+    lastToggle.current.delete(setId);
+    touched.current = true;
+    const now = new Date().toISOString();
+    setDraft((d) => {
+      if (!d) return d;
+      const set = d.exercises.find((e) => e.id === exerciseKey)?.sets.find((x) => x.id === setId);
+      if (!set?.completed) return d;
+      return workoutReducer(workoutReducer(d, { type: "toggleSetComplete", exerciseKey, setId, now }), { type: "clearRest" });
+    });
   }, []);
 
   // Native: schedule a local notification for the end of rest so it fires while the app is backgrounded (only when
@@ -458,20 +496,33 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
           <h1 className="font-display text-4xl font-bold uppercase">Workout complete</h1>
           <p className="mt-2 text-muted-foreground">Faithful in the small things. Well done.</p>
         </div>
-        <dl className="stagger grid grid-cols-3 gap-2">
-          <div className="rounded-2xl border border-border bg-card p-3">
-            <dt className="text-xs uppercase tracking-wider text-muted-foreground">Duration</dt>
-            <dd className="font-display text-xl font-semibold">{formatDuration(result.durationSeconds)}</dd>
-          </div>
-          <div className="rounded-2xl border border-border bg-card p-3">
-            <dt className="text-xs uppercase tracking-wider text-muted-foreground">Sets</dt>
-            <dd className="font-display text-xl font-semibold">{result.completedSets}</dd>
-          </div>
-          <div className="rounded-2xl border border-border bg-card p-3">
-            <dt className="text-xs uppercase tracking-wider text-muted-foreground">Volume</dt>
-            <dd className="font-display text-xl font-semibold">{result.volumeKg > 0 ? formatWeight(result.volumeKg, units) : "—"}</dd>
-          </div>
-        </dl>
+        {(() => {
+          const totals = finishedDraft ? completionTotals(finishedDraft) : null;
+          const prs = result.records.filter((r) => !r.first).length;
+          const tile = (label: string, value: string, testId: string) => (
+            <div className="rounded-2xl border border-border bg-card p-3" data-testid={testId}>
+              <dt className="text-xs uppercase tracking-wider text-muted-foreground">{label}</dt>
+              <dd className="font-display text-xl font-semibold tabular-nums">{value}</dd>
+            </div>
+          );
+          return (
+            <>
+              <dl className="stagger grid grid-cols-3 gap-2" data-testid="completion-stats">
+                {tile("Duration", formatDuration(result.durationSeconds), "stat-duration")}
+                {tile("Volume", result.volumeKg > 0 ? formatWeight(result.volumeKg, units) : "—", "stat-volume")}
+                {tile("Sets", totals && totals.setsPlanned > result.completedSets ? `${result.completedSets}/${totals.setsPlanned}` : String(result.completedSets), "stat-sets")}
+                {tile("Exercises", totals ? `${totals.exercisesDone}/${totals.exercisesPlanned}` : "—", "stat-exercises")}
+                {tile("Reps", totals && totals.reps > 0 ? String(totals.reps) : "—", "stat-reps")}
+                {tile("New PRs", String(prs), "stat-records")}
+              </dl>
+              {totals && totals.setsPlanned > totals.setsDone && (
+                <p className="-mt-3 text-sm text-muted-foreground" data-testid="partial-note">
+                  {totals.setsDone} of {totals.setsPlanned} planned working sets done. Only completed sets count toward volume, records and badges.
+                </p>
+              )}
+            </>
+          );
+        })()}
         {(() => {
           const line = comparedWithLastTime(result.volumeKg, result.previous, (kg) => formatWeight(kg, units));
           return line ? (
@@ -480,6 +531,11 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
             </p>
           ) : null;
         })()}
+        <p className="-mt-2 text-sm">
+          <Link href={`/train/history/${result.sessionId}`} className="font-semibold text-gold-highlight underline-offset-4 hover:underline" data-testid="view-summary">
+            View the full summary
+          </Link>
+        </p>
         {result.next && (
           <section className="rounded-2xl border border-border bg-card p-4 text-left" aria-labelledby="next-title">
             <h2 id="next-title" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -643,6 +699,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
   // The set to do next: the first exercise with work left — inside a superset, alternating A1, B1, A2, B2.
   const up = nextUp(draft);
   const currentKey = up?.exerciseKey;
+  const current = currentSetInfo(draft);
   // Superset letters in order of appearance.
   const letters = new Map<string, string>();
   for (const e of draft.exercises) if (e.supersetId && !letters.has(e.supersetId)) letters.set(e.supersetId, String.fromCharCode(65 + letters.size));
@@ -696,6 +753,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
     setFinishedDraft(finalDraft);
     setTemplateName(finalDraft.name);
     setResult({
+      sessionId: res.data.sessionId,
       volumeKg: res.data.volumeKg,
       records: res.data.records,
       badges: res.data.badges ?? [],
@@ -764,8 +822,8 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
           </Button>
         </div>
 
-        {(rest > 0 || draft.rest.pausedRemaining) && (
-          <div className="mt-3 flex items-center gap-3 rounded-xl border border-gold-muted/60 bg-gold/10 px-3 py-2" role="timer" aria-label="Rest timer">
+        {(rest > 0 || draft.rest.pausedRemaining) && !cardVisible && (
+          <div className="mt-3 flex items-center gap-3 rounded-xl border border-gold-muted/60 bg-gold/10 px-3 py-2" role="timer" aria-label="Rest timer" data-testid="header-rest">
             <Timer className="size-5 text-gold" aria-hidden />
             <div className="flex-1">
               <p className="font-display text-2xl font-bold tabular-nums text-gold-highlight">
@@ -789,8 +847,32 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
       </div>
 
       {notice && <p className="rounded-xl border border-gold-muted/50 bg-gold/5 px-4 py-3 text-sm">{notice}</p>}
+      {deload && (
+        <p data-testid="deload-notice" className="rounded-xl border border-gold-muted/50 bg-gold/5 px-4 py-3 text-sm">
+          Deload week: lighter on purpose. Last time&apos;s weights aren&apos;t filled in; use about 60% of your recent working loads.
+        </p>
+      )}
       {!online && <Notice tone="warning">You&apos;re offline. Keep logging — everything is saved on this device and will sync when you reconnect.</Notice>}
       {error && <Notice tone="error">{error}</Notice>}
+
+      {draft.exercises.length > 0 && (
+        <div ref={observeCard}>
+          <CurrentSetCard
+            info={current}
+            units={units}
+            dispatch={dispatch}
+            lastTime={current ? lastTimeText(prev[current.exercise.exerciseId], units, current.exercise.isTimed) : null}
+            target={current ? (targetText(targets[current.exercise.exerciseId], units) ?? (exerciseTargetText(current.exercise, units) ? `Target ${exerciseTargetText(current.exercise, units)}` : null)) : null}
+            rest={rest}
+            restTotal={draft.rest.durationSeconds}
+            paused={paused}
+            onShowExercise={(key) => document.getElementById(`ex-${key}`)?.scrollIntoView({ behavior: "smooth", block: "center" })}
+            onFinish={() => setFinishOpen(true)}
+            onUndo={undoSet}
+            restElsewhere={!cardVisible}
+          />
+        </div>
+      )}
 
       {template && template.warmup.length > 0 && summary.completedSets === 0 && (
         <details className="rounded-2xl border border-border bg-card p-4">
@@ -938,10 +1020,12 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
       <Dialog open={finishOpen} onOpenChange={setFinishOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Finish workout?</DialogTitle>
-            <DialogDescription>
-              {summary.completedSets} of {summary.totalSets} sets completed across {summary.exercises} exercises · {formatDuration(elapsed)}. Only sets marked
-              complete count toward volume and records.
+            <DialogTitle>{summary.workingCompleted < summary.workingTotal ? "Finish early?" : "Finish workout?"}</DialogTitle>
+            <DialogDescription data-testid="finish-summary">
+              {summary.workingCompleted} of {summary.workingTotal} working sets done across {summary.exercises} exercises · {formatDuration(elapsed)}.
+              {summary.workingCompleted < summary.workingTotal
+                ? ` The ${summary.workingTotal - summary.workingCompleted} unfinished ${summary.workingTotal - summary.workingCompleted === 1 ? "set isn't" : "sets aren't"} counted: only completed sets go toward volume, records and badges. Keep training, or finish now.`
+                : " Only sets marked complete count toward volume and records."}
             </DialogDescription>
           </DialogHeader>
           {summary.completedSets === 0 && <Notice tone="warning">Mark at least one set complete before finishing.</Notice>}

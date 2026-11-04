@@ -10,9 +10,15 @@ test.describe("feature access, subscriptions and core sections", () => {
 
   test("onboarding blocks under-18 users", async ({ page }) => {
     await page.waitForURL(/\/onboarding/);
+    const next = () => page.getByRole("button", { name: /^Continue/ }).click();
     await page.getByRole("button", { name: "Build strength", exact: true }).click();
-    await page.getByRole("button", { name: /^Continue/ }).click();
-    await page.getByRole("button", { name: "Skip", exact: true }).click(); // optional second goal
+    await next();
+    await page.getByRole("button", { name: "1–3 years", exact: true }).click();
+    await next();
+    await next(); // schedule (defaults)
+    await page.getByRole("button", { name: /^Home gym/ }).click();
+    await next();
+    // About you comes before the plan is built; the optional questions come after it.
     await page.getByRole("button", { name: "Female", exact: true }).click();
     await page.getByLabel("Age").fill("16");
     await page.getByRole("button", { name: /^Continue/ }).click();

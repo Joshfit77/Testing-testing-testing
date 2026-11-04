@@ -98,7 +98,9 @@ test.describe("training stage 2B", () => {
     await page.getByLabel("One-Arm Dumbbell Row set 1 reps").fill("10");
     await page.getByRole("button", { name: "Mark One-Arm Dumbbell Row set 1 complete" }).click();
     await expect(page.getByRole("timer", { name: "Rest timer" })).toBeVisible();
-    await page.getByRole("button", { name: "Skip", exact: true }).click();
+    // Scrolled down to the exercise cards, the header's compact rest bar shows as well as the (off-screen) current-set
+    // card's; both end the same rest.
+    await page.getByRole("button", { name: /^Skip( rest)?$/ }).first().click();
     // Distance on the carry.
     await expect(page.getByLabel("Farmer's Carry set 1 distance in yd")).toHaveValue("40");
     await page.getByLabel("Farmer's Carry set 1 weight in lb").fill("50");

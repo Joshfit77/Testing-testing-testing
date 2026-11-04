@@ -15,9 +15,13 @@ export type AlarmScheduleResult =
 const TITLE = "Time to get up";
 const BODY = "Your Narrow Gate alarm. Snooze, or tap I'm up and tell the app how you slept.";
 
+/**
+ * The plugin's module, not the plugin itself: a Capacitor plugin is a Proxy that answers every property, `then`
+ * included, so an async function that returns it is treated as a thenable and its promise never settles (the proxy
+ * turns `then` into a native call that doesn't exist). Callers take `LocalNotifications` off the module.
+ */
 async function plugin() {
-  const { LocalNotifications } = await import("@capacitor/local-notifications");
-  return LocalNotifications;
+  return import("@capacitor/local-notifications");
 }
 
 function platform(): string {
@@ -26,7 +30,7 @@ function platform(): string {
 }
 
 /** True when Android will fire the alarm at the exact minute; other platforms are treated as exact. */
-async function exactAllowed(LocalNotifications: Awaited<ReturnType<typeof plugin>>): Promise<boolean> {
+async function exactAllowed(LocalNotifications: Awaited<ReturnType<typeof plugin>>["LocalNotifications"]): Promise<boolean> {
   if (platform() !== "android") return true;
   try {
     return (await LocalNotifications.checkExactNotificationSetting()).exact_alarm === "granted";
@@ -39,7 +43,7 @@ async function exactAllowed(LocalNotifications: Awaited<ReturnType<typeof plugin
 export async function requestExactAlarms(): Promise<boolean> {
   if (!isNativeApp() || platform() !== "android") return true;
   try {
-    return (await (await plugin()).changeExactNotificationSetting()).exact_alarm === "granted";
+    return (await (await plugin()).LocalNotifications.changeExactNotificationSetting()).exact_alarm === "granted";
   } catch {
     return false;
   }
@@ -48,7 +52,7 @@ export async function requestExactAlarms(): Promise<boolean> {
 export async function cancelSleepAlarm(): Promise<AlarmScheduleResult> {
   if (!isNativeApp()) return { ok: false, reason: "not-native" };
   try {
-    await (await plugin()).cancel({ notifications: ALL_ALARM_IDS.map((id) => ({ id })) });
+    await (await plugin()).LocalNotifications.cancel({ notifications: ALL_ALARM_IDS.map((id) => ({ id })) });
     return { ok: true, scheduled: 0, exact: true };
   } catch {
     return { ok: false, reason: "error" };
@@ -59,7 +63,7 @@ export async function cancelSleepAlarm(): Promise<AlarmScheduleResult> {
 export async function scheduleSleepAlarm(config: AlarmConfig): Promise<AlarmScheduleResult> {
   if (!isNativeApp()) return { ok: false, reason: "not-native" };
   try {
-    const LocalNotifications = await plugin();
+    const { LocalNotifications } = await plugin();
     const entries = alarmNotifications(config);
     if (entries.length) {
       const perm = await LocalNotifications.checkPermissions();
@@ -104,7 +108,7 @@ export async function syncSleepAlarmFromAccount(load: () => Promise<AlarmConfig 
       await cancelSleepAlarm();
       return;
     }
-    const LocalNotifications = await plugin();
+    const { LocalNotifications } = await plugin();
     if ((await LocalNotifications.checkPermissions()).display !== "granted") return;
     await scheduleSleepAlarm(config);
   } catch {
@@ -116,7 +120,7 @@ export async function syncSleepAlarmFromAccount(load: () => Promise<AlarmConfig 
 export async function pendingSleepAlarmCount(): Promise<number | null> {
   if (!isNativeApp()) return null;
   try {
-    const { notifications } = await (await plugin()).getPending();
+    const { notifications } = await (await plugin()).LocalNotifications.getPending();
     return notifications.filter((n) => ALL_ALARM_IDS.includes(n.id)).length;
   } catch {
     return null;
@@ -130,7 +134,7 @@ export async function pendingSleepAlarmCount(): Promise<number | null> {
 export async function installSleepAlarmActions(): Promise<() => void> {
   if (!isNativeApp()) return () => {};
   try {
-    const LocalNotifications = await plugin();
+    const { LocalNotifications } = await plugin();
     await LocalNotifications.registerActionTypes({
       types: [{ id: ALARM_ACTION_TYPE, actions: [{ id: "snooze", title: "Snooze" }, { id: "up", title: "I'm up", foreground: true }] }],
     });

@@ -542,11 +542,70 @@ export function restRemaining(draft: WorkoutDraft, now: string): number {
 export function draftSummary(draft: WorkoutDraft) {
   const active = draft.exercises.filter((e) => !e.skipped);
   const allSets = active.flatMap((e) => e.sets);
+  const working = allSets.filter((s) => !s.isWarmup);
   return {
     exercises: active.length,
     completedSets: allSets.filter((s) => s.completed).length,
     totalSets: allSets.length,
+    /** Working sets only: what counts toward volume, records and the completion summary. */
+    workingCompleted: working.filter((s) => s.completed).length,
+    workingTotal: working.length,
     volumeKg: totalVolume(allSets),
+  };
+}
+
+/** What the focused "current set" card shows: the set nextUp points at, numbered the way a person counts. */
+export interface CurrentSetInfo {
+  exercise: DraftExercise;
+  /** Null when the exercise has no sets yet. */
+  set: DraftSet | null;
+  /** 1-based, among the exercises not skipped. */
+  exerciseNumber: number;
+  exerciseCount: number;
+  warmup: boolean;
+  /** 1-based among the exercise's working sets (null for a warm-up set). */
+  workingNumber: number | null;
+  workingCount: number;
+  /** 1-based among its warm-up sets (null for a working set). */
+  warmupNumber: number | null;
+  warmupCount: number;
+}
+
+export function currentSetInfo(draft: Pick<WorkoutDraft, "exercises">): CurrentSetInfo | null {
+  const up = nextUp(draft);
+  if (!up) return null;
+  const active = draft.exercises.filter((e) => !e.skipped);
+  const exercise = active.find((e) => e.id === up.exerciseKey);
+  if (!exercise) return null;
+  const set = up.setId ? (exercise.sets.find((s) => s.id === up.setId) ?? null) : null;
+  const working = exercise.sets.filter((s) => !s.isWarmup);
+  const warmups = exercise.sets.filter((s) => s.isWarmup);
+  return {
+    exercise,
+    set,
+    exerciseNumber: active.indexOf(exercise) + 1,
+    exerciseCount: active.length,
+    warmup: Boolean(set?.isWarmup),
+    workingNumber: set && !set.isWarmup ? working.indexOf(set) + 1 : null,
+    workingCount: working.length,
+    warmupNumber: set && set.isWarmup ? warmups.indexOf(set) + 1 : null,
+    warmupCount: warmups.length,
+  };
+}
+
+/** Totals for the completion screen, from the sets actually marked complete (warm-ups excluded). */
+export function completionTotals(draft: Pick<WorkoutDraft, "exercises">) {
+  const active = draft.exercises.filter((e) => !e.skipped);
+  const working = active.flatMap((e) => e.sets.filter((s) => !s.isWarmup));
+  const done = working.filter((s) => s.completed);
+  return {
+    /** Exercises with at least one completed working set. */
+    exercisesDone: active.filter((e) => e.sets.some((s) => s.completed && !s.isWarmup)).length,
+    exercisesPlanned: active.length,
+    setsDone: done.length,
+    setsPlanned: working.length,
+    /** Reps of completed working sets (timed and distance sets have none). */
+    reps: done.reduce((n, s) => n + (s.reps ?? 0), 0),
   };
 }
 

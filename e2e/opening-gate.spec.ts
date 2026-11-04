@@ -28,7 +28,9 @@ async function waitForAnimations(page: Page, selector: string) {
   await page.evaluate(async (sel) => {
     const el = document.querySelector(sel);
     if (!el) throw new Error(`${sel} missing`);
-    await Promise.all(el.getAnimations().map((a) => a.finished));
+    // A cancelled animation rejects `finished` with an AbortError (the spec's behaviour); it has nothing left to wait
+    // for, so it counts as done rather than failing the wait.
+    await Promise.all(el.getAnimations().map((a) => a.finished.catch(() => undefined)));
   }, selector);
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,23 +42,35 @@ import { completeOnboardingAction } from "@/server/actions/onboarding";
 /** Goals where a target bodyweight matters; for the rest the goal-weight question starts hidden. */
 const WEIGHT_GOALS: PrimaryGoal[] = ["lose_fat", "build_muscle", "general_health"];
 
+/**
+ * The quick path is the first six screens: what the first program needs (goal, experience, schedule, equipment),
+ * then the basics for safety and the calorie budget (about you: 18+ only), then a name. "Build my plan" is on that
+ * sixth screen. The rest is optional personalisation, reached with "Personalise more" and skippable one by one;
+ * skipped answers use the defaults named on screen and can be changed later (Profile, Food).
+ */
 const STEPS = [
   { id: "goal", title: "Main goal" },
-  { id: "second", title: "Second goal (optional)" },
-  // Sex, age, height and weight on one screen: the same four answers, three fewer screens to tap through.
-  { id: "body", title: "About you" },
-  { id: "target", title: "Weight goal" },
-  { id: "activity", title: "Daily activity" },
   { id: "experience", title: "Experience" },
   { id: "schedule", title: "Schedule" },
   { id: "equipment", title: "Equipment" },
-  { id: "diet", title: "Diet style" },
+  // Sex, age, height and weight on one screen: the same four answers, three fewer screens to tap through.
+  { id: "body", title: "About you" },
+  { id: "finish", title: "Ready" },
+  { id: "second", title: "Second goal (optional)" },
+  { id: "target", title: "Weight goal (optional)" },
+  { id: "activity", title: "Daily activity (optional)" },
+  { id: "diet", title: "Diet style (optional)" },
   { id: "comfort", title: "Display (optional)" },
-  { id: "finish", title: "Last step" },
 ] as const;
 type StepId = (typeof STEPS)[number]["id"];
-/** Steps that can be skipped without an answer. */
-const OPTIONAL_STEPS: readonly StepId[] = ["second", "comfort"];
+/** Screens 1–6: everything the first plan needs. */
+const QUICK_STEPS = STEPS.findIndex((s) => s.id === "finish") + 1;
+/** Steps that can be skipped without an answer (each has a default). */
+const OPTIONAL_STEPS: readonly StepId[] = ["second", "target", "activity", "diet", "comfort"];
+/** Used when "Daily activity" is skipped; shown on the Ready screen and changeable in Profile. */
+const DEFAULT_ACTIVITY: ActivityLevel = "light";
+/** In-progress answers survive a reload of this tab (session storage; cleared when the plan is built). */
+const PROGRESS_KEY = "ngf.onboarding.progress.v1";
 
 const TEXT_SIZES: { value: TextSize; label: string; sample: string }[] = [
   { value: "default", label: "Default", sample: "text-base" },
@@ -122,7 +134,7 @@ function Question({ title, help, children }: { title: string; help?: React.React
  * The guided sign-up questionnaire: one question per screen with a progress bar and Back/Continue.
  * Answers stay in client state; one server action at the end saves everything and builds the plan.
  */
-export function OnboardingQuestionnaire({ initialName }: { initialName: string }) {
+export function OnboardingQuestionnaire({ userId, initialName }: { userId: string; initialName: string }) {
   const [step, setStep] = useState(0);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -149,6 +161,58 @@ export function OnboardingQuestionnaire({ initialName }: { initialName: string }
   const [secondGoal, setSecondGoal] = useState<SecondaryGoal | null>(null);
   const [textSize, setTextSize] = useState<TextSize>("default");
   const [reduceMotion, setReduceMotion] = useState(false);
+
+  // Save the answers so far for this tab, so a reload or an accidental back-swipe doesn't start over. They are tied
+  // to this account: someone else signing up in the same tab never sees them (age and weight are health data).
+  const saving = useRef(true);
+  const restored = useRef(false);
+  useEffect(() => {
+    if (restored.current) return;
+    restored.current = true;
+    try {
+      const raw = window.sessionStorage.getItem(PROGRESS_KEY);
+      if (!raw) return;
+      const p = JSON.parse(raw) as Partial<Record<string, unknown>>;
+      if (p.owner !== userId) {
+        window.sessionStorage.removeItem(PROGRESS_KEY);
+        return;
+      }
+      const str = (v: unknown) => (typeof v === "string" ? v : "");
+      if (typeof p.step === "number" && p.step >= 0 && p.step < STEPS.length) setStep(p.step);
+      if (typeof p.goal === "string" && (PRIMARY_GOALS as readonly string[]).includes(p.goal)) setGoal(p.goal as PrimaryGoal);
+      if (p.sex === "male" || p.sex === "female" || p.sex === "unspecified") setSex(p.sex as Sex);
+      setAge(str(p.age));
+      if (p.units === "metric" || p.units === "imperial") setUnits(p.units);
+      setFeet(str(p.feet));
+      setInches(str(p.inches));
+      setCm(str(p.cm));
+      setWeight(str(p.weight));
+      setGoalWeight(str(p.goalWeight));
+      if (typeof p.showGoalWeight === "boolean") setShowGoalWeight(p.showGoalWeight);
+      if (typeof p.pace === "number" && (WEEKLY_RATES_KG as readonly number[]).includes(p.pace)) setPace(p.pace as WeeklyRateKg);
+      if (typeof p.activity === "string" && (ACTIVITY_LEVELS as readonly string[]).includes(p.activity)) setActivity(p.activity as ActivityLevel);
+      if (typeof p.experience === "string" && (EXPERIENCE_LEVELS as readonly string[]).includes(p.experience)) setExperience(p.experience as ExperienceLevel);
+      if (typeof p.days === "number" && p.days >= 1 && p.days <= 7) setDays(p.days);
+      if (typeof p.minutes === "number" && (SESSION_MINUTES as readonly number[]).includes(p.minutes)) setMinutes(p.minutes);
+      if (typeof p.preset === "string" && EQUIPMENT_PRESETS.some((e) => e.label === p.preset)) setPreset(p.preset);
+      if (typeof p.dietType === "string" && (DIET_TYPES as readonly string[]).includes(p.dietType)) setDietType(p.dietType as DietType);
+      if (typeof p.name === "string" && p.name.trim()) setName(p.name);
+      if (typeof p.faith === "boolean") setFaith(p.faith);
+    } catch {
+      /* unreadable or blocked storage: start fresh */
+    }
+  }, [userId]);
+  useEffect(() => {
+    if (!saving.current || !restored.current) return;
+    try {
+      window.sessionStorage.setItem(
+        PROGRESS_KEY,
+        JSON.stringify({ owner: userId, step, goal, sex, age, units, feet, inches, cm, weight, goalWeight, showGoalWeight, pace, activity, experience, days, minutes, preset, dietType, name, faith }),
+      );
+    } catch {
+      /* storage full or blocked: the questionnaire still works, it just won't survive a reload */
+    }
+  }, [userId, step, goal, sex, age, units, feet, inches, cm, weight, goalWeight, showGoalWeight, pace, activity, experience, days, minutes, preset, dietType, name, faith]);
 
   const current: StepId = STEPS[step]!.id;
   const unit = weightUnit(units);
@@ -225,7 +289,7 @@ export function OnboardingQuestionnaire({ initialName }: { initialName: string }
         return !g || g < 25 || g > 400 ? "Please enter a valid goal weight, or skip it." : null;
       }
       case "activity":
-        return activity ? null : "Choose how active you are outside workouts.";
+        return null;
       case "experience":
         return experience ? null : "Choose your training experience.";
       case "schedule":
@@ -247,6 +311,12 @@ export function OnboardingQuestionnaire({ initialName }: { initialName: string }
 
   const skip = () => {
     if (current === "second") setSecondGoal(null);
+    if (current === "target") {
+      setGoalWeight("");
+      if (goal) setPace(defaultWeeklyRate(goal));
+    }
+    if (current === "activity") setActivity(null);
+    if (current === "diet") setDietType("balanced");
     if (current === "comfort") {
       setTextSize("default");
       setReduceMotion(false);
@@ -280,6 +350,12 @@ export function OnboardingQuestionnaire({ initialName }: { initialName: string }
       }
     }
     setError(null);
+    saving.current = false;
+    try {
+      window.sessionStorage.removeItem(PROGRESS_KEY);
+    } catch {
+      /* storage unavailable: nothing to clear */
+    }
     const equipment = EQUIPMENT_PRESETS.find((p) => p.label === preset)!.items;
     startTransition(async () => {
       const res = await completeOnboardingAction({
@@ -292,7 +368,7 @@ export function OnboardingQuestionnaire({ initialName }: { initialName: string }
         weightKg: weightKg()!,
         goalWeightKg: goalWeightKg(),
         weeklyChangeKg: effectivePace,
-        activityLevel: activity!,
+        activityLevel: activity ?? DEFAULT_ACTIVITY,
         experience: experience!,
         daysPerWeek: days,
         sessionMinutes: minutes,
@@ -305,7 +381,10 @@ export function OnboardingQuestionnaire({ initialName }: { initialName: string }
         timeZone: deviceTimeZone(),
       });
       // On success the action redirects to the plan summary; we only get here on failure.
-      if (res && !res.ok) setError(res.message ?? "Something went wrong. Please try again.");
+      if (res && !res.ok) {
+        saving.current = true;
+        setError(res.message ?? "Something went wrong. Please try again.");
+      }
     });
   };
 
@@ -320,17 +399,18 @@ export function OnboardingQuestionnaire({ initialName }: { initialName: string }
   const h = heightCm();
   const lowGoal = gwKg && h ? bmi(gwKg, h) < 18.5 : false;
   const last = step === STEPS.length - 1;
+  // The Ready screen builds the plan straight away; "Personalise more" goes on to the optional questions.
+  const ready = current === "finish";
+  const optionalIndex = step - QUICK_STEPS;
 
   return (
     <div className="space-y-6">
       <div>
         <div className="mb-2 flex justify-between text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          <span>
-            Question {step + 1} of {STEPS.length}
-          </span>
+          <span>{optionalIndex >= 0 ? `Optional ${optionalIndex + 1} of ${STEPS.length - QUICK_STEPS}` : `Question ${step + 1} of ${QUICK_STEPS}`}</span>
           <span className="text-gold">{STEPS[step]!.title}</span>
         </div>
-        <ProgressBar value={((step + 1) / STEPS.length) * 100} label="Onboarding progress" />
+        <ProgressBar value={optionalIndex >= 0 ? 100 : ((step + 1) / QUICK_STEPS) * 100} label="Onboarding progress" />
       </div>
 
       <form
@@ -338,7 +418,7 @@ export function OnboardingQuestionnaire({ initialName }: { initialName: string }
         className="rounded-2xl border border-border bg-card p-5 md:p-6"
         onSubmit={(e) => {
           e.preventDefault();
-          if (last) submit();
+          if (last || ready) submit();
           else next();
         }}
       >
@@ -558,7 +638,7 @@ export function OnboardingQuestionnaire({ initialName }: { initialName: string }
         )}
 
         {current === "finish" && (
-          <Question title="Last step">
+          <Question title="Ready to build your plan">
             <div className="space-y-2">
               <Label htmlFor="ob-name">What should we call you?</Label>
               <Input id="ob-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} autoComplete="given-name" />
@@ -574,6 +654,12 @@ export function OnboardingQuestionnaire({ initialName }: { initialName: string }
               </div>
               <Switch checked={faith} onCheckedChange={setFaith} aria-labelledby="faith-label" />
             </div>
+            <p className="text-sm text-muted-foreground" data-testid="onboarding-defaults">
+              Until you change them, we&apos;ll assume you&apos;re <strong className="text-foreground">{ACTIVITY_INFO[activity ?? DEFAULT_ACTIVITY].label.toLowerCase()}</strong> outside
+              workouts and eat a <strong className="text-foreground">{DIETS[dietType].name.toLowerCase()}</strong> diet
+              {goalWeight ? "" : ", with no goal weight"}. These only affect your calorie budget: answer them now with Personalise more, or later in
+              Profile and Food.
+            </p>
           </Question>
         )}
 
@@ -583,7 +669,27 @@ export function OnboardingQuestionnaire({ initialName }: { initialName: string }
           </div>
         )}
 
-        <div className="mt-6 flex items-center justify-between gap-3">
+        {ready ? (
+          // The Ready screen: building the plan is the main action, full width; the optional questions are secondary.
+          // (Three buttons in one row ran off the side of a phone.) The keys keep React from reusing these buttons for the
+          // next screen's: "Personalise more" turning into that screen's Continue (a submit button) during its own click
+          // would submit the form too and skip a question.
+          <div key="ready-actions" className="mt-6 space-y-2">
+            <Button type="submit" size="lg" className="w-full" disabled={pending} aria-busy={pending}>
+              {pending && <Loader2 className="animate-spin" aria-hidden />}
+              {pending ? "Building your plan…" : "Build my plan"}
+            </Button>
+            <div className="flex items-center justify-between gap-3">
+              <Button type="button" variant="ghost" onClick={back} disabled={pending} className="px-3">
+                <ArrowLeft aria-hidden /> Back
+              </Button>
+              <Button type="button" variant="ghost" onClick={next} disabled={pending}>
+                Personalise more <ArrowRight aria-hidden />
+              </Button>
+            </div>
+          </div>
+        ) : (
+        <div key="step-actions" className="mt-6 flex items-center justify-between gap-3">
           <Button type="button" variant="ghost" onClick={back} disabled={step === 0 || pending} className="px-3">
             <ArrowLeft aria-hidden /> <span className={OPTIONAL_STEPS.includes(current) ? "sr-only sm:not-sr-only" : undefined}>Back</span>
           </Button>
@@ -605,6 +711,7 @@ export function OnboardingQuestionnaire({ initialName }: { initialName: string }
             </div>
           )}
         </div>
+        )}
       </form>
     </div>
   );

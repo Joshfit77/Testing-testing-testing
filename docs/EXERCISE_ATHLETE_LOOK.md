@@ -10,7 +10,7 @@ software-rendered browser (phones draw canvases on the GPU).
 
 | | |
 | --- | --- |
-| Shown with the new look | Barbell Back Squat, Dumbbell Biceps Curl, Seated Cable Row, Easy Zone 2 Run, Running Intervals (badge "New athlete look · awaiting approval", with a "Classic look" button to compare) |
+| Shown with the new look | Barbell Back Squat, Dumbbell Biceps Curl, Seated Cable Row, Easy Zone 2 Run, Running Intervals (badge "New athlete look · still in review", with a "Classic look" button to compare) |
 | Everything else | The classic gold figure (the fallback, unchanged as a look) |
 | `ATHLETE_LOOK_FOR_ALL` | `false`: not switched on for the library (owner's decision) |
 | All 157 drawn in the new look | Yes, every frame of one loop each, headless Chromium; frame-stability audit below |

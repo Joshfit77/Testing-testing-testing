@@ -66,17 +66,23 @@ export interface OnboardingAnswers {
   reduceMotion?: boolean;
 }
 
-/** Answer the guided sign-up questionnaire (one question per screen) and submit it. Ends on the plan summary. */
+/**
+ * Answer the guided sign-up questionnaire (one question per screen) and submit it. Ends on the plan summary.
+ * Quick path: goal, experience, schedule, equipment, about you, then "Build my plan" on the Ready screen. The optional
+ * questions (second goal, goal weight and pace, daily activity, diet, display) are answered only when a test asks for
+ * one of them, through "Personalise more"; otherwise their defaults apply (lightly active, balanced diet).
+ */
 export async function answerOnboarding(page: Page, a: OnboardingAnswers = {}) {
   const next = () => page.getByRole("button", { name: /^Continue/ }).click();
+  const skip = () => page.getByRole("button", { name: "Skip", exact: true }).click();
   await page.waitForURL(/\/onboarding/);
   await page.getByRole("button", { name: a.goal ?? "Build strength", exact: true }).click();
   await next();
-  // Optional second goal.
-  if (a.secondGoal) {
-    await page.getByRole("group", { name: "Second goal" }).getByRole("button", { name: a.secondGoal, exact: true }).click();
-    await next();
-  } else await page.getByRole("button", { name: "Skip", exact: true }).click();
+  await page.getByRole("button", { name: a.experience ?? "1–3 years", exact: true }).click();
+  await next();
+  await next(); // schedule: 3 days × 45 min by default
+  await page.getByRole("button", { name: a.equipment ?? /^Home gym/ }).click();
+  await next();
   // About you: sex, age, height and weight on one screen.
   await page.getByRole("button", { name: a.sex ?? "Male", exact: true }).click();
   await page.getByLabel("Age").fill(a.age ?? "34");
@@ -84,25 +90,36 @@ export async function answerOnboarding(page: Page, a: OnboardingAnswers = {}) {
   await page.getByLabel("Height (in)").fill(a.inches ?? "10");
   await page.getByLabel(/Current weight/).fill(a.weightLb ?? "185");
   await next();
-  if (a.goalWeightLb) await page.getByLabel(/Goal weight/).fill(a.goalWeightLb);
-  if (a.pace) await page.getByRole("button", { name: a.pace }).click();
-  await next();
-  await page.getByRole("button", { name: a.activity ?? /^Lightly active/ }).click();
-  await next();
-  await page.getByRole("button", { name: a.experience ?? "1–3 years", exact: true }).click();
-  await next();
-  await next(); // schedule: 3 days × 45 min by default
-  await page.getByRole("button", { name: a.equipment ?? /^Home gym/ }).click();
-  await next();
-  if (a.diet) await page.getByRole("button", { name: a.diet }).click();
-  await next();
-  // Optional display step (text size, reduce motion).
-  if (a.textSize || a.reduceMotion) {
+  const more = a.secondGoal || a.goalWeightLb || a.pace || a.activity || a.diet || a.textSize || a.reduceMotion;
+  if (more) {
+    await page.getByRole("button", { name: "Personalise more" }).click();
+    if (a.secondGoal) {
+      await page.getByRole("group", { name: "Second goal" }).getByRole("button", { name: a.secondGoal, exact: true }).click();
+      await next();
+    } else await skip();
+    if (a.goalWeightLb || a.pace) {
+      if (a.goalWeightLb) await page.getByLabel(/Goal weight/).fill(a.goalWeightLb);
+      if (a.pace) await page.getByRole("button", { name: a.pace }).click();
+      await next();
+    } else await skip();
+    if (a.activity) {
+      await page.getByRole("button", { name: a.activity }).click();
+      await next();
+    } else await skip();
+    if (a.diet) {
+      await page.getByRole("button", { name: a.diet }).click();
+      await next();
+    } else await skip();
+    // Display (the last optional screen): set what was asked, then build.
     if (a.textSize) await page.getByRole("radio", { name: new RegExp(a.textSize + "$") }).click();
     if (a.reduceMotion) await page.getByRole("switch", { name: "Reduce motion" }).click();
-    await next();
-  } else await page.getByRole("button", { name: "Skip", exact: true }).click();
-  await page.getByRole("button", { name: "Build my plan" }).click();
+  }
+  // The main action must be fully on screen at phone width (three buttons in one row once pushed it off the edge).
+  const build = page.getByRole("button", { name: "Build my plan" });
+  const box = await build.boundingBox();
+  const width = page.viewportSize()?.width ?? 0;
+  if (box && width && box.x + box.width > width + 1) throw new Error(`"Build my plan" runs off the screen (${Math.round(box.x + box.width)}px > ${width}px)`);
+  await build.click();
   await page.waitForURL(/\/plan/, { timeout: 60_000 });
 }
 

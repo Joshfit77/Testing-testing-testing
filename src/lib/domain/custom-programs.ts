@@ -637,14 +637,26 @@ function heavyScheme(ctx: Ctx, wk: WeekPlan, volumeBias: boolean, lift: MainLift
   }
 }
 
+/**
+ * A goal max is attempted on test or meet day only when it is within reach of today's max (at most 5% above it):
+ * that is a realistic personal-record attempt. A bigger goal (goals up to 1.5× the max are accepted as long-term
+ * targets) would otherwise be prescribed as a single far beyond anything the member has lifted.
+ */
+export const GOAL_ATTEMPT_MAX_RATIO = 1.05;
+export function goalAttempt(goal: number | undefined, max: number | undefined): number | null {
+  return goal && max && goal > max && goal <= max * GOAL_ATTEMPT_MAX_RATIO ? goal : null;
+}
+
 function heavySlot(ctx: Ctx, wk: WeekPlan, lift: MainLift, options: string[], volumeBias: boolean): Slot {
   const s = heavyScheme(ctx, wk, volumeBias, lift);
   if (wk.kind === "test") {
     const max = ctx.input.maxesKg[lift];
     const goal = ctx.input.goalMaxesKg?.[lift];
     const u = ctx.input.units;
+    const reachable = goalAttempt(goal, max);
+    const longTerm = goal && max && goal > max && !reachable ? ` Your goal of ${formatLoad(goal, u)} is a longer-term target: build toward it over more blocks.` : "";
     const attempts = max
-      ? `Attempts: ~92% (${formatLoad(max * 0.92, u)}), ~97% (${formatLoad(max * 0.97, u)}), then ${goal && goal > max ? `your goal of ${formatLoad(goal, u)}` : `100–103% (${formatLoad(max * 1.02, u)})`} if it's there.`
+      ? `Attempts: ~92% (${formatLoad(max * 0.92, u)}), ~97% (${formatLoad(max * 0.97, u)}), then ${reachable ? `your goal of ${formatLoad(reachable, u)}` : `100–103% (${formatLoad(max * 1.02, u)})`} if it's there.${longTerm}`
       : "Work up in jumps of 5–10% to a heavy single you're confident in, then one more attempt only if it moved fast.";
     return {
       options,
@@ -1060,7 +1072,8 @@ function meetWeekDays(ctx: Ctx, lifts: MainLift[], d: number): ProgramDaySeed[] 
     lifts.map((lift) => {
       const goal = ctx.input.goalMaxesKg?.[lift];
       const max = ctx.input.maxesKg[lift];
-      const third = goal && max && goal > max ? `your goal of ${formatLoad(goal, u)}` : `100–103%${at(lift, 102)}`;
+      const reachable = goalAttempt(goal, max);
+      const third = reachable ? `your goal of ${formatLoad(reachable, u)}` : `100–103%${at(lift, 102)}`;
       return {
         options: COMPETITION_OPTIONS[lift],
         sets: 3,

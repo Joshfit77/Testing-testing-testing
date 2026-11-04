@@ -83,8 +83,27 @@ function adjustExercise(ex: ProgramExerciseSeed, seed: ProgramSeed, week: number
   return out;
 }
 
+/**
+ * Beginner programs never prescribe sets closer to failure than RPE 8.5 (one to two reps in reserve), the same limit
+ * the program builder uses for novices: a beginner's technique and recovery come first, and RPE estimates are least
+ * reliable early on.
+ */
+export const BEGINNER_MAX_RPE = 8.5;
+
 /** Expand a program's weekly template into concrete weeks with progression applied. */
 export function expandProgram(seed: ProgramSeed): ExpandedWeek[] {
+  const weeks = expandWeeks(seed);
+  if (seed.difficulty !== "beginner") return weeks;
+  return weeks.map((w) => ({
+    ...w,
+    days: w.days.map((d) => ({
+      ...d,
+      exercises: d.exercises.map((e) => (e.rpe != null && e.rpe > BEGINNER_MAX_RPE ? { ...e, rpe: BEGINNER_MAX_RPE } : e)),
+    })),
+  }));
+}
+
+function expandWeeks(seed: ProgramSeed): ExpandedWeek[] {
   if (seed.weekTemplates) {
     if (seed.weekTemplates.length !== seed.weeks) {
       throw new Error(`Program ${seed.slug} has ${seed.weekTemplates.length} week templates but ${seed.weeks} weeks`);

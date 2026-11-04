@@ -102,33 +102,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         </Notice>
       )}
 
-      {showScripture && (
-        <Link
-          href="/faith#todays-devotional"
-          className="group relative block overflow-hidden rounded-2xl border border-border bg-card focus-visible:ring-2 focus-visible:ring-gold-highlight"
-          aria-label={`Verse of the day, ${verse.reference}: ${verse.text} Open today's devotional.`}
-        >
-          {/* Decorative original artwork; the verse is the content. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/illustrations/mountains-sunrise.svg" alt="" aria-hidden className="absolute inset-0 size-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/25 to-transparent" aria-hidden />
-          <div className="relative flex min-h-40 flex-col justify-end p-4">
-            <p className="text-xs font-semibold text-champagne">Verse of the day</p>
-            <blockquote className="mt-1 max-w-[18rem] font-serif text-[1.375rem] leading-snug text-white [text-shadow:0_1px_8px_rgba(0,0,0,0.6)]">
-              <ScriptureText parts={scriptureParts(verse.reference, verseExcerpt(verse.text))} />
-            </blockquote>
-            <p className="mt-1.5 flex items-center gap-1 text-sm text-white/80">
-              {verse.reference} ({TRANSLATION.code}) <ChevronRight className="size-4 text-gold transition-transform group-hover:translate-x-0.5" aria-hidden />
-            </p>
-          </div>
-        </Link>
-      )}
-
-      <Suspense fallback={null}>
-        <TodaysRemindersSection supabase={supabase} userId={user.id} profile={profile} />
-      </Suspense>
-
-      {/* Today's workout */}
+      {/* Today's workout comes first: it is the one thing most members open the app to do. */}
       <section className={`${card} p-4`} aria-labelledby="today-title">
         <div className="flex items-center justify-between gap-2">
           <h2 id="today-title" className="text-sm font-semibold text-muted-foreground">
@@ -189,6 +163,33 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           </Link>
         )}
       </section>
+
+      {showScripture && (
+        <Link
+          href="/faith#todays-devotional"
+          className="group relative block overflow-hidden rounded-2xl border border-border bg-card focus-visible:ring-2 focus-visible:ring-gold-highlight"
+          aria-label={`Verse of the day, ${verse.reference}: ${verse.text} Open today's devotional.`}
+        >
+          {/* Decorative original artwork; the verse is the content. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/illustrations/mountains-sunrise.svg" alt="" aria-hidden className="absolute inset-0 size-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/25 to-transparent" aria-hidden />
+          <div className="relative flex min-h-40 flex-col justify-end p-4">
+            <p className="text-xs font-semibold text-champagne">Verse of the day</p>
+            <blockquote className="mt-1 max-w-[18rem] font-serif text-[1.375rem] leading-snug text-white [text-shadow:0_1px_8px_rgba(0,0,0,0.6)]">
+              <ScriptureText parts={scriptureParts(verse.reference, verseExcerpt(verse.text))} />
+            </blockquote>
+            <p className="mt-1.5 flex items-center gap-1 text-sm text-white/80">
+              {verse.reference} ({TRANSLATION.code}) <ChevronRight className="size-4 text-gold transition-transform group-hover:translate-x-0.5" aria-hidden />
+            </p>
+          </div>
+        </Link>
+      )}
+
+      <Suspense fallback={null}>
+        <TodaysRemindersSection supabase={supabase} userId={user.id} profile={profile} />
+      </Suspense>
+
 
       <div className="grid grid-cols-2 gap-3">
         {/* Nutrition summary */}

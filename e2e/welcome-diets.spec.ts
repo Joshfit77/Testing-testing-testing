@@ -22,7 +22,11 @@ test.describe("welcome, sign-up and diets", () => {
     await page.waitForURL(/\/onboarding/);
     await page.getByRole("button", { name: "Lose body fat", exact: true }).click();
     await page.getByRole("button", { name: /^Continue/ }).click();
-    await page.getByRole("button", { name: /^Continue/ }).click(); // optional second goal: Continue skips it too
+    await page.getByRole("button", { name: "Under 1 year", exact: true }).click();
+    await page.getByRole("button", { name: /^Continue/ }).click();
+    await page.getByRole("button", { name: /^Continue/ }).click(); // schedule: the default
+    await page.getByRole("button", { name: /^Dumbbells only/ }).click();
+    await page.getByRole("button", { name: /^Continue/ }).click();
     // About you (one screen): sex is required (only used for calorie math).
     await expect(page.getByText(/only for the calorie estimate/i)).toBeVisible();
     await page.getByRole("button", { name: /^Continue/ }).click();
@@ -35,18 +39,16 @@ test.describe("welcome, sign-up and diets", () => {
     await page.getByLabel("Height (in)").fill("5");
     await page.getByLabel(/Current weight/).fill("150");
     await page.getByRole("button", { name: /^Continue/ }).click();
+    // Ready: the defaults are named, and the optional questions are one tap away.
+    await expect(page.getByTestId("onboarding-defaults")).toContainText("lightly active");
+    await page.getByRole("button", { name: "Personalise more" }).click();
+    await page.getByRole("button", { name: /^Continue/ }).click(); // optional second goal: Continue skips it too
     await page.getByRole("button", { name: /^Continue/ }).click(); // weight goal is optional
     await page.getByRole("button", { name: /^Not very active/ }).click();
     await page.getByRole("button", { name: /^Continue/ }).click();
-    await page.getByRole("button", { name: "Under 1 year", exact: true }).click();
-    await page.getByRole("button", { name: /^Continue/ }).click();
-    await page.getByRole("button", { name: /^Continue/ }).click();
-    await page.getByRole("button", { name: /^Dumbbells only/ }).click();
-    await page.getByRole("button", { name: /^Continue/ }).click();
     await page.getByRole("button", { name: /Mediterranean/ }).click();
     await page.getByRole("button", { name: /^Continue/ }).click();
-    await page.getByRole("button", { name: "Skip", exact: true }).click(); // optional display step
-    await page.getByRole("button", { name: "Build my plan" }).click();
+    await page.getByRole("button", { name: "Build my plan" }).click(); // the display step is optional: build from here
     await page.waitForURL(/\/plan/, { timeout: 60_000 });
     await expect(page.getByRole("heading", { name: "Your plan is ready" })).toBeVisible();
 

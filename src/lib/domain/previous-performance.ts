@@ -28,7 +28,13 @@ export interface PreviousPerformance {
 export interface PreviousRow {
   exercise_id: string;
   skipped: boolean;
-  session: { id: string; started_at: string; status: string } | null;
+  session: {
+    id: string;
+    started_at: string;
+    status: string;
+    /** The program day the session was (for preferring the same kind of session; absent outside programs). */
+    program_day?: { day_number: number; week: { program_id: string; is_deload?: boolean | null } | null } | null;
+  } | null;
   sets: { set_number: number; reps: number | null; weight_kg: number | string | null; duration_seconds: number | null; distance_m: number | string | null; is_warmup: boolean; completed: boolean }[];
 }
 
@@ -115,4 +121,33 @@ export function targetText(t: { weightKg: number | null; reps: number | null } |
   if (!t || (t.weightKg == null && t.reps == null)) return null;
   const load = t.weightKg != null ? `${displayWeight(t.weightKg, units)} ${weightUnit(units)}` : null;
   return `Your target: ${[load, t.reps ? `${load ? "× " : ""}${t.reps} reps` : null].filter(Boolean).join(" ")}`;
+}
+
+/** Which kind of session today is: the same day of the same program ("Heavy Bench" is not "Bench Volume"). */
+export interface SessionSlot {
+  programId: string;
+  dayNumber: number;
+  /** Today is a deload week: only earlier deload sessions count as "the same day" (and vice versa). */
+  deload?: boolean;
+}
+
+/**
+ * Like latestPerformances, but for a program day it prefers the last time the member did this same day of the
+ * program: a heavy triples day and a volume day use the same lifts at very different weights and reps, so "last time"
+ * (and the numbers pre-filled from it) should come from the matching day. Exercises never done on this day fall back
+ * to their latest performance anywhere. Deload weeks only match deload weeks, so a lighter week never sets the
+ * numbers for a normal one.
+ */
+export function preferSameSession(rows: PreviousRow[], slot: SessionSlot | null | undefined, excludeSessionId?: string | null): Map<string, PreviousPerformance> {
+  const all = latestPerformances(rows, excludeSessionId);
+  if (!slot) return all;
+  const same = latestPerformances(
+    rows.filter((r) => {
+      const day = r.session?.program_day;
+      return day?.day_number === slot.dayNumber && day.week?.program_id === slot.programId && !!day.week.is_deload === !!slot.deload;
+    }),
+    excludeSessionId,
+  );
+  for (const [id, perf] of same) all.set(id, perf);
+  return all;
 }

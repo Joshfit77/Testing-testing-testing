@@ -1,4 +1,9 @@
 import "server-only";
+import { demoModeOn, demoModeRefused } from "@/lib/demo/mode";
+
+if (demoModeRefused()) {
+  console.warn("DEMO_MODE=true is ignored: this is a production or live-payments deployment (src/lib/demo/mode.ts).");
+}
 
 function listEnv(raw: string | undefined): string[] {
   return (raw ?? "").split(",").map((v) => v.trim()).filter(Boolean);
@@ -11,7 +16,7 @@ function listEnv(raw: string | undefined): string[] {
  */
 function stripeSecretKey(raw: string | undefined): string {
   // A demo deployment (DEMO_MODE=true) never takes payments, whatever keys it was given.
-  if (process.env.DEMO_MODE === "true") return "";
+  if (demoModeOn()) return "";
   const key = raw ?? "";
   return /^(sk|rk)_live_/.test(key) && process.env.STRIPE_LIVE_APPROVED !== "true" ? "" : key;
 }
@@ -25,7 +30,7 @@ const realMoneyDeployment = process.env.STRIPE_LIVE_APPROVED === "true";
 
 /** Store-billing secrets are ignored in a demo deployment, so in-app purchases can't run there either. */
 function storeSecret(raw: string | undefined): string {
-  return process.env.DEMO_MODE === "true" ? "" : (raw ?? "");
+  return demoModeOn() ? "" : (raw ?? "");
 }
 
 /** Server-only secrets. Never import this module from client components. */
@@ -34,7 +39,7 @@ export const serverEnv = {
   // Bearer secret for scheduled jobs (billing reconciliation). Unset: those endpoints refuse every call.
   cronSecret: process.env.CRON_SECRET ?? "",
   // A demo deployment never calls the AI provider, so its key is ignored there (see src/server/demo.ts).
-  anthropicApiKey: process.env.DEMO_MODE === "true" ? "" : (process.env.ANTHROPIC_API_KEY ?? ""),
+  anthropicApiKey: demoModeOn() ? "" : (process.env.ANTHROPIC_API_KEY ?? ""),
   stripeSecretKey: stripeSecretKey(process.env.STRIPE_SECRET_KEY),
   stripeWebhookSecret: storeSecret(process.env.STRIPE_WEBHOOK_SECRET),
   /** Pro All Access: $19.99 a month and $149.99 a year (the only prices sold to new customers). */
@@ -67,7 +72,7 @@ export const serverEnv = {
 };
 
 /** In demo mode AI features run against the scripted stand-in, so they count as configured. */
-export const isAiConfigured = () => Boolean(serverEnv.anthropicApiKey) || process.env.DEMO_MODE === "true";
+export const isAiConfigured = () => Boolean(serverEnv.anthropicApiKey) || demoModeOn();
 /** Web checkout needs the secret key and the Pro All Access monthly price (Plus is no longer sold). */
 export const isStripeConfigured = () => Boolean(serverEnv.stripeSecretKey && serverEnv.stripePricePro);
 /** The Pro All Access yearly Stripe price is configured. */

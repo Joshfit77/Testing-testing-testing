@@ -35,7 +35,7 @@ export interface ExerciseDemo25DProps {
 
 const STATUS_LABEL: Record<ExerciseDemoAsset["status"], string> = {
   "stand-in": "Stand-in · not the final art",
-  review: "New demo · awaiting approval",
+  review: "Preview demo · still in review",
   approved: "",
 };
 

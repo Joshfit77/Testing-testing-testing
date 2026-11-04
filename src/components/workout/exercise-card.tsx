@@ -115,6 +115,20 @@ function gridFor(exercise: DraftExercise): string {
  * beginner: they choose a light one (or an easier version) that leaves a few reps in reserve, and what they log
  * becomes the starting point the app progresses from.
  */
+/** "4 × 6-8 · RPE 8": the program's prescription for this exercise, or null outside a program. */
+export function exerciseTargetText(exercise: Pick<DraftExercise, "target">, units: UnitSystem): string | null {
+  const t = exercise.target;
+  return t
+    ? [
+        `${t.sets} × ${t.reps ?? (t.distanceM ? formatDistance(t.distanceM, units) : t.seconds ? formatDuration(t.seconds) : "")}`,
+        t.intensity,
+        t.rpe ? `RPE ${t.rpe}` : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : null;
+}
+
 export function firstTimeTip(exercise: Pick<DraftExercise, "isTimed" | "usesDistance">): string {
   if (exercise.usesDistance) return "First time: go at an easy, steady pace you could keep up. Log what you did.";
   if (exercise.isTimed) return "First time: an easy, steady effort. Stop early if your form slips, and log the time you did.";
@@ -289,16 +303,7 @@ export function ExerciseCard({
 }) {
   const [notesOpen, setNotesOpen] = useState(Boolean(exercise.notes));
   const done = exercise.sets.filter((s) => s.completed).length;
-  const t = exercise.target;
-  const targetText = t
-    ? [
-        `${t.sets} × ${t.reps ?? (t.distanceM ? formatDistance(t.distanceM, units) : t.seconds ? formatDuration(t.seconds) : "")}`,
-        t.intensity,
-        t.rpe ? `RPE ${t.rpe}` : null,
-      ]
-        .filter(Boolean)
-        .join(" · ")
-    : null;
+  const targetText = exerciseTargetText(exercise, units);
 
   if (exercise.skipped) {
     return (

@@ -77,7 +77,7 @@ export function ExerciseIllustration({
         ...(look ?? {}),
         styleToggle: controls && review,
         controlsInset: look ? 74 : 0,
-        badge: controls ? (look && review ? "New athlete look · awaiting approval" : "Animated demo") : "",
+        badge: controls ? (look && review ? "New athlete look · still in review" : "Animated demo") : "",
         meta: { slug, name, ...parsed },
         label: `Animated demonstration of ${name}. ${
           m.getMotion(slug, { slug, name, ...parsed }).label

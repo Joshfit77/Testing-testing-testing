@@ -7,7 +7,7 @@ test.describe("guided onboarding builds a plan", () => {
     await page.waitForURL(/\/onboarding/);
 
     // Progress bar + validation on a screen.
-    await expect(page.getByText("Question 1 of 11")).toBeVisible();
+    await expect(page.getByText("Question 1 of 6")).toBeVisible();
     await page.getByRole("button", { name: /^Continue/ }).click();
     await expect(page.getByText("Choose your main goal.")).toBeVisible();
 
@@ -49,5 +49,30 @@ test.describe("guided onboarding builds a plan", () => {
     await page.goto("/home");
     await expect(page.getByRole("link", { name: "Start Today's Workout" })).toBeVisible();
     await expect(page.getByRole("link", { name: /^Resume workout/ })).toHaveCount(0);
+  });
+  test("answers survive a reload, but never reach another account in the same tab", async ({ page }) => {
+    await signUpAndConfirm(page, uniqueEmail("resume"));
+    await page.waitForURL(/\/onboarding/);
+    await page.getByRole("button", { name: "Build strength", exact: true }).click();
+    await page.getByRole("button", { name: /^Continue/ }).click();
+    await page.getByRole("button", { name: "1–3 years", exact: true }).click();
+    await page.getByRole("button", { name: /^Continue/ }).click();
+    await expect(page.getByText("Question 3 of 6")).toBeVisible();
+
+    // A reload (or an accidental back-swipe) carries on where the member was.
+    await page.reload();
+    await expect(page.getByText("Question 3 of 6")).toBeVisible();
+
+    // Saved answers that belong to a different account are thrown away, not shown.
+    await page.evaluate(() => {
+      const key = "ngf.onboarding.progress.v1";
+      const saved = JSON.parse(sessionStorage.getItem(key) ?? "{}") as Record<string, unknown>;
+      sessionStorage.setItem(key, JSON.stringify({ ...saved, owner: "00000000-0000-0000-0000-000000000000", age: "61" }));
+    });
+    await page.reload();
+    await expect(page.getByText("Question 1 of 6")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Build strength", exact: true })).toHaveAttribute("aria-pressed", "false");
+    const owner = await page.evaluate(() => (JSON.parse(sessionStorage.getItem("ngf.onboarding.progress.v1") ?? "{}") as { owner?: string; age?: string }));
+    expect(owner.age ?? "").not.toBe("61");
   });
 });
