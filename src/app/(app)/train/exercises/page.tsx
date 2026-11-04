@@ -10,6 +10,7 @@ import { titleCase } from "@/lib/utils";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
 import { ExerciseThumb } from "@/components/train/exercise-demo";
+import { demoReadiness } from "@/lib/exercise-demo-readiness";
 import { MUSCLE_GROUPS, muscleGroup } from "@/lib/domain/muscle-groups";
 import { BackLink } from "@/components/platform/back-link";
 
@@ -37,7 +38,7 @@ export default async function ExercisesPage({
   let query = supabase
     .from("exercises")
     .select(
-      "slug, name, category, difficulty, primary_muscles, equipment, movement_pattern"
+      "slug, name, category, difficulty, primary_muscles, secondary_muscles, equipment, movement_pattern"
     )
     .eq("is_published", true)
     .order("name");
@@ -158,11 +159,14 @@ export default async function ExercisesPage({
                         category: e.category as string,
                         equipment: e.equipment as string[],
                       }}
+                      muscles={{ primary: (e.primary_muscles as string[] | null) ?? [], secondary: (e.secondary_muscles as string[] | null) ?? [] }}
                       className="h-full w-full"
                     />
-                    <span className="absolute bottom-0.5 left-0.5 rounded bg-black/60 px-1 text-[0.6875rem] font-semibold uppercase tracking-wider text-gold-highlight">
-                      Demo
-                    </span>
+                    {demoReadiness(e.slug as string) !== "placeholder" && (
+                      <span className="absolute bottom-0.5 left-0.5 rounded bg-black/60 px-1 text-[0.6875rem] font-semibold uppercase tracking-wider text-gold-highlight">
+                        {demoReadiness(e.slug as string) === "animated" ? "Demo" : "Poses"}
+                      </span>
+                    )}
                   </div>
                   <div className="flex min-w-0 flex-col">
                     <p className="font-semibold">{e.name as string}</p>

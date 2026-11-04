@@ -187,6 +187,8 @@ export type PropKind =
   | "legExtension"
   | "legCurl"
   | "seatedLegCurl"
+  /** A leg machine's lever arm and roller pad (`at` = pivot, `to` = pad), drawn in front of the leg it loads. */
+  | "machineLever"
   | "chestPress"
   | "latPulldown"
   | "cableRowSeat"

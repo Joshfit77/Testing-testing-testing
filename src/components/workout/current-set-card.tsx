@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { BellRing, Check, ChevronDown, CopyPlus, Flag, Minus, Plus, SkipForward, Undo2 } from "lucide-react";
+import { AlertTriangle, BellRing, Check, CheckCircle2, ChevronDown, CopyPlus, Flag, Lightbulb, Minus, Plus, Repeat2, SkipForward, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { displayWeight, formatDuration, toKg, weightUnit } from "@/lib/domain/units";
@@ -129,6 +129,14 @@ function RestRing({ remaining, total }: { remaining: number; total: number }) {
   );
 }
 
+/** The current exercise's coaching notes and trained muscles (from the exercise library). */
+export interface CurrentExerciseForm {
+  cues: readonly string[];
+  mistakes: readonly string[];
+  primary: readonly string[];
+  secondary: readonly string[];
+}
+
 export interface CurrentSetCardProps {
   info: CurrentSetInfo | null;
   units: UnitSystem;
@@ -157,6 +165,10 @@ export interface CurrentSetCardProps {
    * hidden from assistive technology, so there is only ever one rest timer to hear or reach.
    */
   restElsewhere?: boolean;
+  /** Form cues, common mistakes and trained muscles of the current exercise, when the library has them. */
+  form?: CurrentExerciseForm | null;
+  /** Open the substitute sheet for an exercise (its alternatives first). */
+  onSubstitute?: (exerciseKey: string) => void;
 }
 
 /**
@@ -181,6 +193,8 @@ export function CurrentSetCard({
   after = null,
   restOver = false,
   restElsewhere = false,
+  form = null,
+  onSubstitute,
 }: CurrentSetCardProps) {
   const [undo, setUndo] = useState<{ exerciseKey: string; setId: string; label: string; kind: "done" | "skipped" } | null>(null);
   const [blocked, setBlocked] = useState(false);
@@ -338,7 +352,7 @@ export function CurrentSetCard({
   return (
     <section className="space-y-3 rounded-2xl border border-gold-muted bg-card p-4 shadow-[0_0_32px_-18px_rgba(230,199,110,0.6)]" aria-label="Current set" data-testid="current-set-card">
       <div className="flex items-start gap-3">
-        <ExerciseDemoMini slug={exercise.slug} name={exercise.name} className="h-[72px] w-24" />
+        <ExerciseDemoMini slug={exercise.slug} name={exercise.name} muscles={form ? { primary: form.primary, secondary: form.secondary } : undefined} className="h-[72px] w-24" />
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold uppercase tracking-widest text-gold">
             Exercise {info.exerciseNumber} of {info.exerciseCount}
@@ -449,6 +463,47 @@ export function CurrentSetCard({
             Skip exercise
           </Button>
         </div>
+      )}
+      {((form && (form.cues.length > 0 || form.mistakes.length > 0)) || onSubstitute) && (
+        <details className="group rounded-xl border border-border bg-background/40" data-testid="current-form">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 text-sm font-semibold text-gold-highlight [&::-webkit-details-marker]:hidden">
+            <span className="flex items-center gap-2">
+              <Lightbulb className="size-4" aria-hidden /> Form cues &amp; common mistakes
+            </span>
+            <ChevronDown className="size-4 transition-transform group-open:rotate-180" aria-hidden />
+          </summary>
+          <div className="space-y-3 px-3 pb-3 text-sm">
+            {form && form.cues.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Cues</p>
+                <ul className="mt-1 space-y-1" data-testid="current-cues">
+                  {form.cues.map((c) => (
+                    <li key={c} className="flex gap-2">
+                      <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-gold" aria-hidden /> {c}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {form && form.mistakes.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Common mistakes</p>
+                <ul className="mt-1 space-y-1" data-testid="current-mistakes">
+                  {form.mistakes.map((c) => (
+                    <li key={c} className="flex gap-2">
+                      <AlertTriangle className="mt-0.5 size-4 shrink-0 text-gold" aria-hidden /> {c}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {onSubstitute && (
+              <Button size="sm" variant="secondary" className="w-full" onClick={() => onSubstitute(exercise.id)} data-testid="current-swap">
+                <Repeat2 aria-hidden /> Swap for another exercise
+              </Button>
+            )}
+          </div>
+        </details>
       )}
       {paused && <p className="text-xs text-muted-foreground">The workout is paused: the clock is stopped, and completing a set won&apos;t start a rest.</p>}
     </section>

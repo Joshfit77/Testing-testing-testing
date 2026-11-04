@@ -1,9 +1,9 @@
-# Assembles the iPhone demo: screens.json + captures -> out/app.html (page), out/s/*.webp, out/anatomy/* (3D parts).
-#   python3 -I build.py <cap dir> <showcase dir> <out dir> [quality]
+# Assembles the iPhone demo: screens.json + captures -> out/app.html (page), out/s/*.webp, out/s/nav-*.png.
+#   python3 -I build.py <cap dir> <out dir> [quality]
 import sys, os, json, glob, shutil, re
 from PIL import Image
-cap, show, out = sys.argv[1], sys.argv[2], sys.argv[3]
-q = int(sys.argv[4]) if len(sys.argv) > 4 else 88
+cap, out = sys.argv[1], sys.argv[2]
+q = int(sys.argv[3]) if len(sys.argv) > 3 else 88
 here = os.path.dirname(os.path.abspath(__file__))
 os.makedirs(f"{out}/s", exist_ok=True)
 data = json.load(open(f"{cap}/screens.json"))
@@ -24,7 +24,7 @@ for s in data["screens"]:
         if seen[r] > lim:
             dropped.append(s); continue
     kept.append(s)
-# Still too many: drop exercise pages from the end of the list (the library's later pages), never the five 3D ones.
+# Still too many: drop exercise pages from the end of the list (the library's later pages), never the five the crawl always captures (its PRIORITY list).
 PRIO = {"/train/exercises/kettlebell-swing", "/train/exercises/dumbbell-curl", "/train/exercises/inverted-row", "/train/exercises/cable-chest-fly", "/train/exercises/sled-push"}
 while len(kept) > MAX_SCREENS:
     i = max(i for i, s in enumerate(kept) if s["key"].startswith("/train/exercises/") and s["key"] not in PRIO and s["key"].count("/") == 3)
@@ -74,28 +74,16 @@ for s in data["screens"]:
         h["w"] = min(h["w"], 390 - h["x"]); h["h"] = min(h["h"], s["h"] - h["y"])
         if h["w"] < 6 or h["h"] < 6:
             continue
-        if h.get("kind") == "live" or h.get("to"):
+        if h.get("to"):
             taps += 1
         hot.append({k: v for k, v in h.items() if k in ("x", "y", "w", "h", "label", "to", "kind")})
     s["hot"] = hot
 data["taps"] = taps
 DATA = json.dumps({k: data[k] for k in ("date", "navH", "navHot", "screens", "alias", "taps")}, separators=(",", ":")).replace("</script", "<\\/script")
 page = open(f"{here}/viewer.html").read()
-# The showcase player: its bundle (built with SHOWCASE_LAZY) and the model parts as text files.
-art = open(f"{show}/artifact.html").read()
-parts = re.search(r"<script>window\.ECORCHE_PARTS = .*?</script>", art, re.S).group(0)
-setup = re.search(r"<script>window\.SHOWCASE = .*?</script>", art, re.S).group(0)
-js = open(f"{show}/app.js").read().replace("</script", "<\\/script")
 page = page.replace("<script>/*DATA*/</script>", "<script>window.DEMO = " + DATA + ";</script>")
-page = page.replace("<script>/*SHOWCASE*/</script>", parts + "\n" + setup.replace("<script>", "<script>window.SHOWCASE_LAZY = true; ") + "\n<script>" + js + "</script>")
 open(f"{out}/app.html", "w").write(page)
-# The model files next to the page.
-os.makedirs(f"{out}/anatomy/bake", exist_ok=True)
 files = {}
-for f in glob.glob(f"{show}/anatomy/*.txt") + glob.glob(f"{show}/anatomy/*.json") + glob.glob(f"{show}/anatomy/bake/*.txt"):
-    rel = os.path.relpath(f, show)
-    shutil.copy(f, f"{out}/{rel}")
-    files[rel] = os.path.getsize(f)
 for f in glob.glob(f"{out}/s/*"):
     files[os.path.relpath(f, out)] = os.path.getsize(f)
 # Pictures of screens no longer in the build.
@@ -107,4 +95,4 @@ json.dump(files, open(f"{out}/files.json", "w"), indent=0)
 json.dump(wide, open(f"{out}/wide.json", "w"))
 if wide: print("pages wider than the phone (cropped):", wide)
 tot = sum(files.values())
-print(f"screens {len(data['screens'])}, taps {taps}, page {os.path.getsize(out + '/app.html') / 1e6:.1f} MB, pictures {sum(sizes.values()) / 1e6:.1f} MB (avg {sum(sizes.values()) / len(sizes) / 1e3:.0f} KB), 3D {sum(v for k, v in files.items() if k.startswith('anatomy')) / 1e6:.1f} MB, files total {tot / 1e6:.1f} MB")
+print(f"screens {len(data['screens'])}, taps {taps}, page {os.path.getsize(out + '/app.html') / 1e6:.1f} MB, pictures {sum(sizes.values()) / 1e6:.1f} MB (avg {sum(sizes.values()) / len(sizes) / 1e3:.0f} KB), files total {tot / 1e6:.1f} MB")

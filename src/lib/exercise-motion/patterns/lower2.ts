@@ -411,7 +411,11 @@ export function legMachine(id: string, label: string, kind: "extension" | "seate
         { pose: at(4), dur: 1, hold: 0.3, ease: "inOut" },
         { pose: at(118), dur: 2, hold: 0.4, ease: "inOut" },
       ]),
-      props: [{ id: "m", kind: "legCurl", at: [W.kneeR[0] - 4, 66], to: { lm: "ankleR", dy: 6 }, layer: "back" }],
+      props: [
+        { id: "m", kind: "legCurl", variant: "body", at: [W.kneeR[0] - 4, 66], to: { lm: "ankleR", dy: 6 }, layer: "back" },
+        // The lever and ankle pad in front of the legs, so the resistance is visible.
+        { id: "lever", kind: "machineLever", at: [W.kneeR[0] - 10, 64], to: { lm: "ankleR", dy: 6 }, layer: "front" },
+      ],
       stillPhase: 0.5,
     };
   }
@@ -428,7 +432,11 @@ export function legMachine(id: string, label: string, kind: "extension" | "seate
       { pose: at(ext ? 92 : 6), dur: 1, hold: 0.3, ease: "inOut" },
       { pose: at(ext ? 6 : 110), dur: 2, hold: 0.4, ease: "inOut" },
     ]),
-    props: [{ id: "m", kind: ext ? "legExtension" : "seatedLegCurl", at: [W.kneeR[0] + 2, 52], to: { lm: "ankleR", dx: ext ? 5 : -5 }, layer: "back" }],
+    props: [
+      { id: "m", kind: ext ? "legExtension" : "seatedLegCurl", variant: "body", at: [W.kneeR[0] + 2, 52], to: { lm: "ankleR", dx: ext ? 5 : -5 }, layer: "back" },
+      // The lever and shin pad in front of the leg, so the resistance is visible.
+      { id: "lever", kind: "machineLever", at: [W.kneeR[0] + 5, 54], to: { lm: "ankleR", dx: ext ? 5 : -5 }, layer: "front" },
+    ],
     stillPhase: 0.5,
   };
 }

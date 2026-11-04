@@ -1,5 +1,9 @@
 # 2.5D exercise demonstrations: library status
 
+> **2026-11-04: this is the exercise-video backlog.** The app's demonstrations are the 2D athlete
+> (`docs/EXERCISE_DEMOS_2D.md`); a clip below is shown only once the owner approves it, so none is shown today (the
+> curl clip is FAILED and not approved). All 157 clips stay on the backlog, after the core 2D demonstrations.
+
 Generated 2026-10-30 by `scripts/exercise-demos/status.mjs` from the manifest and each source folder's meta.json.
 
 **COMPLETED** = a real moving clip in the app, at normal speed and as a 0.5× file, with frames for finger scrubbing, whose character, form, equipment, highlighting and playback were checked and passed. **FAILED** = a clip exists but a check failed. **MISSING** = no moving clip yet. Owner approval is separate and never implied. Physical-iPhone testing is listed separately.

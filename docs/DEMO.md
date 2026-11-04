@@ -94,8 +94,7 @@ The full talk track, tap by tap, is in `docs/PRESENTATION_GUIDE.md`.
 
 | Feature | In the demo |
 |---|---|
-| Opening, onboarding, Home, programs, all 157 demonstrations, workout logging (rest timer with −15 s and Skip), history, calendar | **Live** (real app, sample data) |
-| 3D exercise viewer (Train › 3D) | **Live, experimental**: five exercises; not the standard demonstration |
+| Opening, onboarding, Home, programs, the 2D exercise demonstrations (moving, pose frames or a labelled placeholder per exercise, `docs/EXERCISE_DEMOS_2D.md`), workout logging (rest timer with −15 s and Skip, form cues and common mistakes), history, calendar | **Live** (real app, sample data) |
 | Food diary, meal planner, recipes, grocery list, water, steps | **Live** (food search uses the built-in food database) |
 | Check a label (typed ingredients): additives, sugars, sodium, allergens, evidence notes | **Live**, rule tables in the app |
 | Barcode lookup | **Live, needs internet** (Open Food Facts). Type a real barcode from a product you have with you, or use the camera in the phone app. No products are made up |
@@ -120,7 +119,7 @@ demo has no push keys), never calls an AI model (replies are scripted and say so
 needs the phone app) and never records GPS without the phone's own permission prompt. The Free/Pro switch works only
 for accounts the server created as demo accounts, only when the server runs in demo mode.
 
-## The clickable iPhone demo (captured screens + the live 3D figure)
+## The clickable iPhone demo (captured screens)
 
 Built 2026-10-29 from this branch by `scripts/demo/iphone-demo/` (see its README): a private page that opens on an
 iPhone in Safari and fills the screen. Published as **Narrow Gate iPhone Demo**,
@@ -129,10 +128,10 @@ https://claude.ai/artifact/L1eCXFJ1a3UjtQuta3nzRU (private: only the owner and w
 | | |
 | --- | --- |
 | What it is | **Pictures of the real app**, captured in demo mode (sample data, purchases off, AI simulated) at iPhone size (390 CSS px at 3×, 1170 px wide, one WebP q88 pass), joined by the real tap targets: 396 screens, 3,417 taps. Every one of the 157 exercise pages, the programs, Home, Train, Run, Food, Faith, My Progress, Sleep & Recovery, AI Coach, Profile and the membership screen. |
-| What is live | The **3D anatomical figure**: the showcase player (`scripts/anatomy/preview/showcase.ts`, red-and-white Écorché with a Gold switch) runs on the phone for the five 3D exercises, opened from Train → 3D exercise showcase or from those exercises' pages: turn, pinch-zoom, play/pause, slow motion, Front/Side/Rear, Muscle Glow, status badge. |
+| What is live | Nothing moves in the pictures. (The published 2026-10-29 build also embedded the live 3D figure; the 3D figure was retired on 2026-11-04 and the tool no longer includes it. Rebuild the demo to match the app.) |
 | Captured step by step | The workout flow (start, demonstration dialog, log set 1 with the rest timer, set 2, exercise options, substitute picker, substituted, finish, summary) and the AI coach (question typed, simulated reply). |
 | Not live | Typing, timers, GPS, the camera, Apple Health, purchases, and any screen not among the captured ones (a tap says so). |
-| Checks | `verify.mjs` at iPhone 15 size: 29 of 29 tap-through checks (opening → welcome → sample data → tabs → back → the whole workout flow → menu → coach → the live figure loads, switches exercise and returns; every picture present; every tap target inside its screen; no page errors). |
+| Checks | `verify.mjs` at iPhone 15 size: 29 of 29 tap-through checks (opening → welcome → sample data → tabs → back → the whole workout flow → menu → coach; every picture present; every tap target inside its screen; no page errors). |
 | Found while capturing | Six pages overflow the phone's width at 390 px (the running programs' week tables: `/train/programs/10k-training` 507 px, `half-marathon-base-80-20` 611 px, `5k-training`, `aerobic-base-run-walk`, `powerbuilding-4-day` 404 px; `/progress/overview` 400 px). Not fixed in this round; the demo crops them. |
 
 It is not the live app on the phone: that is the private preview deployment above, which waits on the owner's

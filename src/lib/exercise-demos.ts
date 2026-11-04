@@ -1,15 +1,14 @@
 /**
  * The premium 2.5D exercise demonstrations: pre-rendered assets (a poster still, a short seamless loop, and the
  * phase stills) per exercise slug, built by scripts/exercise-demos/build.mjs into public/exercise-demos/<slug>/ and
- * listed in src/data/exercise-demos.json. The app shows one when it exists and keeps the animated illustration as
- * the fallback for every other exercise (and when the loop cannot play).
+ * listed in src/data/exercise-demos.json. The app shows one only once the owner has approved it; the 2D athlete
+ * (src/components/train/exercise-demo.tsx) is the demonstration for every other exercise and when a loop cannot play.
  *
  * Status is honest and visible: "stand-in" (a placeholder to judge the UI, not the final art), "review" (built,
  * awaiting the owner's approval) and "approved". Nothing is approved by code; the owner records it in the source
  * folder's meta.json and the build copies it here.
  */
 import manifest from "@/data/exercise-demos.json";
-import { usesAthleteLook } from "@/lib/athlete-look";
 
 export type DemoMode = "video" | "sequence" | "keyframes" | "poster";
 export type DemoStatus = "stand-in" | "review" | "approved";
@@ -114,11 +113,12 @@ export function getDemoAsset(slug: string): ExerciseDemoAsset | null {
 }
 
 /**
- * The 2.5D asset the app shows for an exercise: none while the exercise is drawn with the new athlete look (the 2D
- * animation then takes its place everywhere; the asset stays in the manifest).
+ * The 2.5D asset the app shows for an exercise: only one the owner has approved. Until then the 2D athlete is the
+ * demonstration everywhere (one consistent character), and the clip waits in the manifest on the video backlog.
  */
 export function shownDemoAsset(slug: string): ExerciseDemoAsset | null {
-  return usesAthleteLook(slug) ? null : getDemoAsset(slug);
+  const a = getDemoAsset(slug);
+  return a && a.status === "approved" ? a : null;
 }
 
 /** Whether the asset has something that moves (a loop or more than one phase still). */

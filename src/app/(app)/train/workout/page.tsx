@@ -21,7 +21,7 @@ export default async function WorkoutPage({ searchParams }: { searchParams: Prom
   const supabase = await getServerSupabase();
 
   const [exRes, altRes, serverDraft] = await Promise.all([
-    supabase.from("exercises").select("id, slug, name, is_timed, category, primary_muscles").eq("is_published", true).order("name"),
+    supabase.from("exercises").select("id, slug, name, is_timed, category, primary_muscles, secondary_muscles, form_cues, common_mistakes").eq("is_published", true).order("name"),
     supabase.from("exercise_alternatives").select("exercise_id, alternative_id"),
     getServerDraft(supabase, user.id),
   ]);
@@ -32,6 +32,9 @@ export default async function WorkoutPage({ searchParams }: { searchParams: Prom
     isTimed: e.is_timed as boolean,
     category: e.category as string,
     primary: e.primary_muscles as string[],
+    secondary: (e.secondary_muscles as string[] | null) ?? [],
+    cues: (e.form_cues as string[] | null) ?? [],
+    mistakes: (e.common_mistakes as string[] | null) ?? [],
   }));
   const alternatives: Record<string, string[]> = {};
   for (const a of altRes.data ?? []) (alternatives[a.exercise_id as string] ??= []).push(a.alternative_id as string);

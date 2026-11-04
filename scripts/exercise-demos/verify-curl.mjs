@@ -1,6 +1,6 @@
 // Verifies the dumbbell curl's 2.5D video inside the real app at iPhone 15 size and records it (Chromium; not a phone).
-// While the curl is in the athlete-look preview (src/lib/athlete-look.ts) the app shows the 2D athlete instead, and this
-// script does not apply; scripts/exercise-review/verify-athlete-look.mjs covers the preview.
+// The app shows a 2.5D clip only once the owner has approved it (status "approved" in src/data/exercise-demos.json);
+// until then the curl shows the 2D athlete and this script does not apply.
 //   BASE=http://localhost:3000 CHROMIUM=<path, optional> node scripts/exercise-demos/verify-curl.mjs <outdir>
 // Proves the curl's video plays inside the real app at iPhone 15 size, records it, and checks every surface and every
 // finger control: tap, sideways scrub, scroll, position bar, arrow keys, Normal / 0.5x (the real half-speed file),
@@ -79,7 +79,7 @@ await skipIntro(page);
 const demo = page.getByTestId("exercise-demo-25d").first(); // the page's player (the enlarged view is a second one)
 await demo.waitFor();
 check("curl page shows the new 2.5D player", (await demo.count()) === 1);
-check("no old gold illustration on the curl page", (await page.getByTestId("exercise-demo").count()) === 0 && (await page.getByTestId("exercise-demo-3d").count()) === 0);
+check("no old gold illustration on the curl page", (await page.getByTestId("exercise-demo").count()) === 0);
 await demo.scrollIntoViewIfNeeded();
 await page.evaluate(() => window.scrollBy(0, -60));
 filming = true;

@@ -754,7 +754,8 @@ export function drawProp(ctx: Ctx, p: ResolvedProp, f: Frame, t: number) {
       machineFrame(ctx, [[s[0] - 20, s[1] - 8], [s[0] - 20, 3]], 4);
       machineFrame(ctx, [[s[0] - 50, 3], [s[0] + 30, 3]], 4);
       machineFrame(ctx, [[s[0] + 3, s[1] + 2], [s[0] + 3, 3]], 3);
-      if (p.to) {
+      // variant "body": the lever and pad are a separate machineLever prop, drawn in front of the leg.
+      if (p.to && def.variant !== "body") {
         machineFrame(ctx, [[s[0] + 3, s[1] + 2], p.to], 3);
         ctx.fillStyle = PAD;
         ctx.beginPath();
@@ -773,13 +774,30 @@ export function drawProp(ctx: Ctx, p: ResolvedProp, f: Frame, t: number) {
       machineFrame(ctx, [[s[0] + 100, s[1] - 8], [s[0] + 100, 3]], 4);
       machineFrame(ctx, [[s[0] + 10, s[1] - 8], [s[0] + 10, 3]], 4);
       machineFrame(ctx, [[s[0] - 20, 3], [s[0] + 130, 3]], 4);
-      if (p.to) {
+      if (p.to && def.variant !== "body") {
         machineFrame(ctx, [[s[0] - 6, s[1] - 2], p.to], 3);
         ctx.fillStyle = PAD;
         ctx.beginPath();
         ctx.arc(p.to[0], p.to[1], 5.5, 0, Math.PI * 2);
         ctx.fill();
       }
+      return;
+    }
+    case "machineLever": {
+      // A leg machine's lever from its pivot to the roller pad on the shin or ankle, in front of the leg.
+      if (!p.to) return;
+      machineFrame(ctx, [at, p.to], 3.4);
+      ctx.fillStyle = PAD;
+      ctx.beginPath();
+      ctx.arc(p.to[0], p.to[1], 6.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = PAD_EDGE;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.fillStyle = PAD_EDGE;
+      ctx.beginPath();
+      ctx.arc(at[0], at[1], 2.2, 0, Math.PI * 2);
+      ctx.fill();
       return;
     }
     case "chestPress": {

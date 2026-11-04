@@ -13,7 +13,7 @@ import { exerciseMediaPublicUrl } from "@/lib/exercise-media";
 import { DemoVideo } from "@/components/train/demo-video";
 import { ExerciseDemo } from "@/components/train/exercise-demo";
 import { shownDemoAsset } from "@/lib/exercise-demos";
-import { usesAthleteLook } from "@/lib/athlete-look";
+import { demoCaption, demoReadiness } from "@/lib/exercise-demo-readiness";
 import { requireOnboardedUser } from "@/server/auth";
 import { BackLink } from "@/components/platform/back-link";
 
@@ -37,8 +37,8 @@ export default async function ExerciseDetailPage({ params, searchParams }: { par
   const hasVideo = media.some((m) => m.media_type === "video");
   const demoMeta = { name: ex.name, pattern: ex.movement_pattern, category: ex.category, equipment: ex.equipment, timed: ex.is_timed };
   const demo = shownDemoAsset(ex.slug);
-  // The athlete look gets a taller frame so the figure stays clear of its controls.
-  const athlete = usesAthleteLook(ex.slug);
+  const muscles = { primary: ex.primary_muscles ?? [], secondary: ex.secondary_muscles ?? [] };
+  const readiness = demoReadiness(ex.slug);
   const mediaUrl = (m: (typeof media)[number]) =>
     (m.external_url as string | null) ?? exerciseMediaPublicUrl(publicEnv.supabaseUrl, m.storage_path as string);
 
@@ -102,19 +102,17 @@ export default async function ExerciseDetailPage({ params, searchParams }: { par
               ))}
               {hasVideo && (
                 <details className="rounded-xl border border-border">
-                  <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-gold-highlight">{demo ? "Rendered demo" : "Animated demo"}</summary>
-                  <ExerciseDemo slug={ex.slug} name={ex.name} meta={demoMeta} className={demo ? "w-full" : cn(athlete ? "aspect-[4/3]" : "aspect-video", "w-full rounded-b-xl")} />
+                  <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-gold-highlight">{demo ? "Rendered demo" : readiness === "animated" ? "Animated demo" : "Demonstration"}</summary>
+                  <ExerciseDemo slug={ex.slug} name={ex.name} meta={demoMeta} muscles={muscles} className={demo ? "w-full" : "aspect-[4/3] w-full rounded-b-xl"} />
                 </details>
               )}
             </div>
           ) : null}
           {!hasVideo && (
             <figure className={media.length ? "px-3 pb-3" : undefined}>
-              <ExerciseDemo slug={ex.slug} name={ex.name} meta={demoMeta} className={cn(!demo && (athlete ? "aspect-[4/3]" : "aspect-video"), "w-full", media.length && "rounded-xl")} />
-              <figcaption className="px-3 pt-2 text-[0.6875rem] text-muted-foreground">
-                {demo
-                  ? "Rendered demonstration of the movement — a computer render, not filmed video, and not a substitute for coaching. Use 0.5× to study each phase."
-                  : "Animated illustration of the movement — not filmed video, and not a substitute for coaching. Use 0.5× to study each phase."}
+              <ExerciseDemo slug={ex.slug} name={ex.name} meta={demoMeta} muscles={muscles} className={cn(!demo && "aspect-[4/3]", "w-full", media.length && "rounded-xl")} />
+              <figcaption className="px-3 pt-2 text-[0.6875rem] text-muted-foreground" data-testid="demo-caption">
+                {demoCaption(readiness, Boolean(demo))} Not a substitute for coaching.{readiness === "animated" || demo ? " Use 0.5× to study each phase." : ""}
                 {EXERCISE_REVIEW_NOTES[ex.slug] && <span className="mt-1 block text-gold-highlight">{EXERCISE_REVIEW_NOTES[ex.slug]}</span>}
               </figcaption>
             </figure>

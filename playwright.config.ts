@@ -21,8 +21,7 @@ export default defineConfig({
     storageState: { cookies: [], origins: [{ origin: new URL(baseURL).origin, localStorage: [{ name: "ngf.e2e.noIntro", value: "1" }] }] },
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
-    // (Software WebGL, so the 3D anatomical demonstration can be checked on a machine without a GPU.)
-    launchOptions: { ...(existsSync(chromium) ? { executablePath: chromium } : {}), args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] },
+    launchOptions: existsSync(chromium) ? { executablePath: chromium } : {},
     // A protected Vercel preview (the demo-preview workflow) is reached with its automation bypass secret.
     ...(process.env.E2E_VERCEL_BYPASS ? { extraHTTPHeaders: { "x-vercel-protection-bypass": process.env.E2E_VERCEL_BYPASS, "x-vercel-set-bypass-cookie": "true" } } : {}),
   },

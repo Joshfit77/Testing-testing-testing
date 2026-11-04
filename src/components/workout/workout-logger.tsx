@@ -57,7 +57,7 @@ import { lastTimeText, targetText, type PreviousPerformance } from "@/lib/domain
 import { templateFromDraft } from "@/lib/domain/workout-templates";
 import { BadgeMedallion } from "@/components/achievements/badge-icon";
 import { ExerciseCard, exerciseTargetText } from "./exercise-card";
-import { CurrentSetCard } from "./current-set-card";
+import { CurrentSetCard, type CurrentExerciseForm } from "./current-set-card";
 import { ExercisePicker, type CatalogItem } from "./exercise-picker";
 
 export interface WorkoutTemplate {
@@ -915,6 +915,8 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
             after={afterCurrent(draft)}
             restOver={restOverAt !== null && Date.parse(now) - restOverAt < 10_000}
             restElsewhere={!cardVisible}
+            form={current ? formOf(catalogById.get(current.exercise.exerciseId)) : null}
+            onSubstitute={(key) => setSubstituteKey(key)}
           />
         </div>
       )}
@@ -1119,4 +1121,10 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
       </Dialog>
     </div>
   );
+}
+
+/** The current exercise's cues, mistakes and muscles from the library (null when the library has none of them). */
+function formOf(item: CatalogItem | undefined): CurrentExerciseForm | null {
+  if (!item) return null;
+  return { cues: item.cues ?? [], mistakes: item.mistakes ?? [], primary: item.primary ?? [], secondary: item.secondary ?? [] };
 }

@@ -2,7 +2,9 @@
  * Visual review of the animated exercise demonstrations: renders every catalog exercise at six phases of its loop
  * (start, early, middle, deepest/peak, return, end) on contact sheets, with the same camera for all six.
  *
- *   node scripts/exercise-review/contact-sheets.mjs [outDir] [--only=slug,slug] [--per=8] [--w=200]
+ *   node scripts/exercise-review/contact-sheets.mjs [outDir] [--only=slug,slug] [--per=8] [--w=200] [--style=athlete|classic]
+ *
+ * The app draws every demonstration with the athlete (the default here); --style=classic draws the older gold figure.
  *
  * Needs the bundled Chromium (Playwright). Output: outDir/sheet-NN.png and outDir/index.json (slug → sheet, row).
  * Tests can't judge whether a pose looks right; these sheets are for a person to inspect.
@@ -21,6 +23,7 @@ const per = Number(args.find((a) => a.startsWith("--per="))?.slice(6) ?? 8);
 // Cell width in px (height is 3/4 of it); use --w=400 to zoom in on a few exercises.
 const W = Number(args.find((a) => a.startsWith("--w="))?.slice(4) ?? 200);
 const H = Math.round(W * 0.75);
+const STYLE = args.find((a) => a.startsWith("--style="))?.slice(8) ?? "athlete";
 mkdirSync(outDir, { recursive: true });
 
 const bundle = await build({
@@ -53,7 +56,7 @@ for (let i = 0; i < slugs.length; i += per) {
   const group = slugs.slice(i, i + per);
   const sheet = String(i / per + 1).padStart(2, "0");
   await page.evaluate(
-    ({ group, PHASES, W, H }) => {
+    ({ group, PHASES, W, H, STYLE }) => {
       const root = document.getElementById("root");
       root.innerHTML = "";
       const head = document.createElement("div");
@@ -73,12 +76,13 @@ for (let i = 0; i < slugs.length; i += per) {
           const c = document.createElement("canvas");
           c.style.cssText = `width:${W}px;height:${H}px;background:#111010;border-radius:6px`;
           row.append(c);
-          EM.drawExerciseStill(c, slug, { meta, phase, width: W, height: H });
+          const look = STYLE === "athlete" ? { style: "athlete", highlight: EM.highlightFor(e.primary ?? [], e.secondary ?? []) } : {};
+          EM.drawExerciseStill(c, slug, { meta, phase, width: W, height: H, ...look });
         }
         root.append(row);
       }
     },
-    { group, PHASES, W, H },
+    { group, PHASES, W, H, STYLE },
   );
   const file = join(outDir, `sheet-${sheet}.png`);
   await page.locator("#root").screenshot({ path: file });

@@ -12,7 +12,7 @@ const MAX = Number(process.argv[3] ?? 240);
 fs.mkdirSync(path.join(out, "s"), { recursive: true });
 const log = (s) => console.log(`${new Date().toISOString().slice(11, 19)} ${s}`);
 
-const b = await chromium.launch({ executablePath: process.env.CHROMIUM, args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM });
 const { defaultBrowserType: _d, ...iPhone } = devices["iPhone 15"];
 const ctx = await b.newContext({ ...iPhone, viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, timezoneId: "America/New_York", reducedMotion: "reduce" });
 ctx.setDefaultTimeout(45000);
@@ -40,7 +40,7 @@ const INTERNAL = (href) => href.startsWith("/") && !href.startsWith("//");
 const SKIP = [/^\/admin/, /^\/logout/, /^\/api\//, /^\/legal\/.*#/, /sign-?out/i, /^\/profile\/delete/, /^\/auth\//, /\.(pdf|png|jpg)$/];
 const CAPS = [[/^\/train\/exercises\/[^/]+$/, 170], [/^\/train\/exercises\/[^/]+\/history/, 6], [/^\/calendar\?/, 6], [/^\/faith\/practices\?/, 6], [/^\/train\/workout\?/, 6], [/^\/nutrition\?date/, 4], [/^\/nutrition\/photo\?/, 3], [/^\/train\/programs\?category/, 13], [/^\/nutrition\/scanner\//, 10], [/^\/train\/programs\/[^/]+/, 12], [/^\/faith\/day/, 6], [/^\/train\/history\//, 6], [/^\/nutrition\/recipes\//, 8], [/^\/progress\/badges\//, 10], [/^\/supplements\//, 6], [/^\/nutrition\/foods?\//, 6]];
 const counts = new Map();
-const PRIORITY = ["/train/exercises/kettlebell-swing", "/train/exercises/dumbbell-curl", "/train/exercises/inverted-row", "/train/exercises/cable-chest-fly", "/train/exercises/sled-push", "/train/3d"];
+const PRIORITY = ["/train/exercises/kettlebell-swing", "/train/exercises/dumbbell-curl", "/train/exercises/inverted-row", "/train/exercises/cable-chest-fly", "/train/exercises/sled-push"];
 
 function normalize(href) {
   try {
@@ -180,9 +180,9 @@ log(`tab bar ${navH}px: ${navHot.map((x) => x.label).join(", ")}`);
 // ---- 3. Breadth-first over the app's own links -------------------------------------------------------------------
 // FIRST=/a,/b captures those pages before anything else (with CONTINUE, to re-capture a few pages after a change).
 const FIRST = (process.env.FIRST ?? "").split(",").map((x) => x.trim()).filter(Boolean);
-const queue = [...FIRST, "/home", "/train", "/run", "/nutrition", "/faith", "/coach", "/progress", "/profile", "/train/3d", "/train/exercises", ...PRIORITY];
+const queue = [...FIRST, "/home", "/train", "/run", "/nutrition", "/faith", "/coach", "/progress", "/profile", "/train/exercises", ...PRIORITY];
 const queued = new Set(queue);
-if (CONTINUE) for (const sc of screens) for (const hs of sc.hot) { const t = hs.to && !hs.to.startsWith("state:") && !hs.to.startsWith("live3d:") ? hs.to.split("#")[0] : null; if (t && !byKey.has(t) && !queued.has(t) && INTERNAL(t)) { queued.add(t); queue.push(t); } }
+if (CONTINUE) for (const sc of screens) for (const hs of sc.hot) { const t = hs.to && !hs.to.startsWith("state:") ? hs.to.split("#")[0] : null; if (t && !byKey.has(t) && !queued.has(t) && INTERNAL(t)) { queued.add(t); queue.push(t); } }
 while (!FLOWS && queue.length && screens.length < MAX) {
   const k = queue.shift();
   if (byKey.has(k) || !allowed(k)) continue;
@@ -192,25 +192,14 @@ while (!FLOWS && queue.length && screens.length < MAX) {
     const landed = normalize(page.url());
     if (landed !== k && byKey.has(landed)) { byKey.set(k, byKey.get(landed)); continue; }
     await page.locator("main, [role=main], body").first().waitFor();
-    if (/^\/train\/3d|^\/train\/exercises\/(kettlebell-swing|dumbbell-curl|inverted-row|cable-chest-fly|sled-push)$/.test(k)) {
-      // The 3D player: wait for the figure, pause it, so the picture shows the real player at rest.
-      try { await page.waitForFunction(() => document.querySelector('[data-testid="exercise-demo-3d"]')?.getAttribute("data-phase") === "ready", null, { timeout: 240000 }); } catch { log(`3D not ready on ${k}`); }
-      const pause = page.getByRole("button", { name: "Pause", exact: true }).first();
-      if (await pause.count()) { await pause.dispatchEvent("click"); await page.waitForTimeout(500); }
+    if (/^\/train\/exercises\/[^/]+$/.test(k)) {
+      // An exercise page: give the animated 2D demonstration a moment to draw (reduced motion keeps it at rest).
+      await page.locator('[data-testid="exercise-demo"] canvas[data-motion-canvas]').first().waitFor({ timeout: 8000 }).catch(() => log(`no demonstration canvas on ${k}`));
     }
     await settle();
     const rec = await capture(landed ?? k);
     if (landed && landed !== k) byKey.set(k, rec);
     count(landed ?? k);
-    // The 3D player's box: a live-3D target for the viewer.
-    const demo3d = page.locator('[data-testid="exercise-demo-3d"]');
-    const box3d = (await demo3d.count()) ? await demo3d.first().boundingBox().catch(() => null) : null;
-    if (box3d) {
-      const slug = (await page.evaluate(() => window.location.pathname.split("/").pop())) === "3d" ? "kettlebell-swing" : k.split("/").pop();
-      rec.hot.unshift({ x: Math.round(box3d.x), y: Math.round(box3d.y + (await page.evaluate(() => scrollY))), w: Math.round(box3d.width), h: Math.round(box3d.height), label: "Open the 3D figure", to: `live3d:${slug}`, kind: "live" });
-      const TAB3D = { "Kettlebell Swing": "kettlebell-swing", "Dumbbell Biceps Curl": "dumbbell-curl", "Dumbbell Curl": "dumbbell-curl", "Inverted Row": "inverted-row", "Cable Chest Fly": "cable-chest-fly", "Sled Push": "sled-push" };
-      if (k === "/train/3d") for (const hs of rec.hot) if (hs.kind === "button" && TAB3D[hs.label]) hs.to = `live3d:${TAB3D[hs.label]}`;
-    }
     for (const hs of rec.hot) {
       if (!hs.to) continue;
       const p = hs.to.split("#")[0];

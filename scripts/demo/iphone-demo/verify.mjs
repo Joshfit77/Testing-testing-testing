@@ -1,12 +1,12 @@
 // Taps through the built iPhone demo at iPhone size: the opening → welcome → sample data → tabs → the workout flow →
-// the menu → the live 3D figure; every screen's picture must exist; no page errors. node verify.mjs <out dir> <shots dir>
+// the menu → the AI coach; every screen's picture must exist; no page errors. node verify.mjs <out dir> <shots dir>
 import { chromium, devices } from "playwright";
 import fs from "node:fs";
 import path from "node:path";
 import http from "node:http";
 const out = process.argv[2], shots = process.argv[3];
 fs.mkdirSync(shots, { recursive: true });
-const MIME = { ".html": "text/html", ".webp": "image/webp", ".png": "image/png", ".txt": "text/plain", ".json": "application/json", ".js": "text/javascript" };
+const MIME = { ".html": "text/html", ".webp": "image/webp", ".png": "image/png", ".json": "application/json" };
 const srv = http.createServer((req, res) => {
   const p = path.join(out, decodeURIComponent(req.url.split("?")[0] === "/" ? "/app.html" : req.url.split("?")[0]));
   if (!p.startsWith(out) || !fs.existsSync(p) || fs.statSync(p).isDirectory()) { res.writeHead(404); return res.end(); }
@@ -19,7 +19,7 @@ const srv = http.createServer((req, res) => {
   fs.createReadStream(p).pipe(res);
 }).listen(0);
 const port = srv.address().port;
-const b = await chromium.launch({ executablePath: process.env.CHROMIUM, args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM });
 const { defaultBrowserType: _d, ...iPhone } = devices["iPhone 15"];
 const ctx = await b.newContext({ ...iPhone, deviceScaleFactor: 2, hasTouch: true });
 const page = await ctx.newPage();
@@ -94,7 +94,7 @@ await page.locator("#col .hs.link").first().tap(); await page.waitForTimeout(600
 check("substituted", c.title.startsWith("Substituted"), `${c.title} (first choice "${pick[0]}")`);
 await tapHot("^Finish$");
 c = await cur(); await shot("finish-confirm");
-check("finish confirm", c.title === "Finish the workout?", c.title);
+check("finish confirm", c.title === "Finish early?", c.title);
 await tapHot("Finish & save");
 c = await cur(); await shot("summary");
 check("workout summary", c.title === "Workout complete", c.title);
@@ -113,23 +113,6 @@ check("coach → typed question", c.title === "Question typed", c.title);
 await tapHot("Send message").catch(() => null);
 c = await cur(); await shot("coach-reply");
 check("typed → the coach's reply", c.title.startsWith("The coach"), c.title);
-// Live 3D
-await page.evaluate(() => window.demo.show(window.demo.resolve("/train/3d")));
-await page.waitForTimeout(800); await shot("train-3d-captured");
-const live = page.locator("#col .hs.live");
-check("the 3D showcase page has a live-3D target", (await live.count()) > 0);
-await live.first().scrollIntoViewIfNeeded(); await live.first().tap();
-const t0 = Date.now();
-await page.waitForFunction(() => window.ready === true, null, { timeout: 300000 }).catch(() => null);
-const ready = await page.evaluate(() => window.ready === true);
-check("live 3D figure loads (software WebGL here)", ready, `${Date.now() - t0} ms`);
-await page.locator("#play").tap(); await page.waitForTimeout(600); await shot("live-3d");
-await page.locator("#tabs button", { hasText: "Sled Push" }).tap();
-await page.waitForFunction(() => window.showcaseSlug === "sled-push" && window.ready === true, null, { timeout: 300000 }).catch(() => null);
-await page.locator("#play").tap(); await page.waitForTimeout(600); await shot("live-3d-sled");
-check("switch to another exercise in the live figure", (await page.evaluate(() => window.showcaseSlug)) === "sled-push");
-await page.locator("#live-back").tap(); await page.waitForTimeout(400);
-check("back from the live figure to the captured app", await page.evaluate(() => document.getElementById("live").hidden));
 // Every picture exists and every tap target lies inside its screen.
 const data = await page.evaluate(() => window.DEMO);
 let bad = 0, outside = 0, resolvable = 0, dead = 0;

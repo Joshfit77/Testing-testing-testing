@@ -37,7 +37,7 @@ export const PRESENTER_STEPS: readonly PresenterStep[] = [
   { n: 2, title: "Home", href: "/home", match: /^\/home$/, label: "sample", show: "Today's workout, nutrition, Faith and recovery at a glance." },
   { n: 3, title: "Programs", href: "/train/programs", match: /^\/(train\/(programs|build)(\/.*)?|plan|calendar)$/, label: "live", show: "The program library and the active plan." },
   { n: 4, title: "Live workout", href: "/train", match: /^\/train(\/(workout|review|templates)(\/.*)?|\/history(\/.*)?)?$/, label: "live", show: "Start today's workout, log a set, Skip the rest timer." },
-  { n: 5, title: "Exercise demos", href: "/train/exercises/back-squat", match: /^\/train\/(exercises|3d)(\/|$)/, label: "live", show: "Animated exercise demo; the 3D viewer is experimental." },
+  { n: 5, title: "Exercise demos", href: "/train/exercises/back-squat", match: /^\/train\/exercises(\/|$)/, label: "live", show: "The animated 2D demonstration, with form cues and common mistakes." },
   { n: 6, title: "AI coach", href: "/coach", match: /^\/coach(\/|$)/, label: "simulated", show: "Ask a question: the reply is scripted and says so." },
   { n: 7, title: "Nutrition", href: "/nutrition", match: /^\/nutrition(\/(diets|planner|grocery|insights|recipes|saved-meals|supplements|compare)(\/.*)?)?$/, label: "sample", show: "Today's food diary against the member's targets." },
   { n: 8, title: "Food photo", href: "/nutrition/photo", match: /^\/nutrition\/photo(\/|$)/, label: "simulated", show: "Any photo returns fixed sample items to review and edit." },

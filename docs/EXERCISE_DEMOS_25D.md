@@ -1,5 +1,10 @@
 # Premium 2.5D exercise demonstrations
 
+> **Superseded 2026-11-04.** The owner retired the 3D figure and chose one original 2D character for every exercise
+> (`docs/EXERCISE_DEMOS_2D.md`). The 2.5D clip pipeline described here stays for the exercise-video backlog, and a clip
+> is shown in the app only once the owner approves it. Mentions of 3D below are historical: that code, its model files
+> and the `/train/3d` page were removed.
+
 The owner's direction (2026-10-29): replace the live 3D anatomical figure, the gold anatomical models and the animated
 illustrations in the main exercise library with pre-rendered 2.5D demonstrations of **one athlete**: the realistic
 black-and-gold male from the owner's dumbbell curl reference image (same physique, face, hairstyle, dark graphite body,

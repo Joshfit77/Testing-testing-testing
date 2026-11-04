@@ -9,7 +9,7 @@ import { completeOnboarding, grantPlan, serviceRest, signUpAndConfirm, uniqueEma
  */
 const STATIC = [
   "/home", "/plan", "/calendar",
-  "/train", "/train/programs", "/train/exercises", "/train/history", "/train/templates", "/train/templates/new", "/train/build", "/train/recovery", "/train/review", "/train/3d",
+  "/train", "/train/programs", "/train/exercises", "/train/history", "/train/templates", "/train/templates/new", "/train/build", "/train/recovery", "/train/review",
   "/run", "/run?tab=log", "/run/record",
   "/nutrition", "/nutrition/diets", "/nutrition/recipes", "/nutrition/recipes/new", "/nutrition/planner", "/nutrition/grocery", "/nutrition/insights", "/nutrition/saved-meals", "/nutrition/supplements", "/nutrition/compare", "/nutrition/photo", "/nutrition/scanner",
   "/faith", "/faith/journal", "/faith/practices", "/profile/notifications",
