@@ -58,7 +58,7 @@ describe("billing reconciliation workflow refuses unsafe settings", () => {
       const out = join(dir, "out");
       writeFileSync(out, "");
       writeFileSync(join(dir, "step.sh"), script);
-      const r = spawnSync("bash", [join(dir, "step.sh")], { env: { PATH: process.env.PATH, GITHUB_OUTPUT: out, BASE_URL: url, CRON_SECRET: secret } });
+      const r = spawnSync("bash", [join(dir, "step.sh")], { env: { NODE_ENV: "test", PATH: process.env.PATH, GITHUB_OUTPUT: out, BASE_URL: url, CRON_SECRET: secret } });
       return { code: r.status, on: read(out).trim() };
     } finally {
       rmSync(dir, { recursive: true, force: true });
