@@ -91,6 +91,9 @@ is fixed (see B).
 | `c14127d`, (this update) | `docs/RELEASE_CANDIDATE.md` | Integration record, findings, results, backlog |
 | `528010f` | `.github/workflows/ci.yml` | gitleaks prints rule/file/line/commit of a finding (value redacted) |
 | `e227845` | `scripts/perf/progress-overview-load.mjs`, `.gitleaksignore` (new) | No fixed password in the perf script; the one historical finding accepted by fingerprint (see C) |
+| `255e150` | 3D removed (167 files, incl. `src/lib/anatomy3d/`, `public/anatomy/`, `/train/3d`, `three` deps); `src/lib/exercise-demo-readiness.ts`, `src/data/exercise-demo-readiness.json`, `src/components/train/exercise-demo.tsx`, `src/components/workout/current-set-card.tsx`, docs | Owner direction: 2D only; honest demo states; form cues, common mistakes and Swap on the workout card (see F) |
+| `fe1c296` | `src/lib/domain/gps-track.ts`, `src/lib/run/live-recording.ts`, `src/components/run/gps-recorder.tsx`, error monitoring (`src/instrumentation*.ts`, `/api/client-errors`), `.github/workflows/billing-reconcile.yml`, TestFlight checklist, live-AI plan | Locked-iPhone GPS, dormant monitoring and reconciliation, test plans (see F, I) |
+| `45a7017` | `scripts/react-hydration-replay-fix.mjs`, `package.json` hooks, `next.config.ts`, `tests/unit/react-hydration-replay.test.ts`, `docs/HYDRATION_418.md` | Root cause and fix of the intermittent hydration error #418 (a bug in the React build Next 15.5 bundles; see I) |
 
 ## C. Security
 
@@ -154,31 +157,31 @@ Still needs attention: the background backup and the rest alert with the phone l
 
 ## F. Exercise demonstrations and GPS
 
-**3D library** (`docs/anatomy3d/LIBRARY_STATUS.md`, unchanged in this RC): 18 exercises have a 3D motion; 11 PASS
-(automated QA and visual review), 3 POLISH NEEDED, 4 FAIL, 139 NOT TESTED; **0 owner-approved**. 3D is shown on the
-showcase page only; workouts and the exercise library show the 2D animated illustration (the e2e test enforces this).
-None of it is marked approved.
+**3D retired, 2D only (2026-11-04, owner direction).** The 3D figure, its showcase page (`/train/3d` now redirects to
+the exercise library), its 58 MB of model files (a third-party CC BY-SA anatomy model), tooling, tests and the
+`three`/`meshoptimizer` dependencies were removed; the 3D work stays in git history (`20fc052`) and on its remote
+branches. Body Scan and every other feature are untouched. Every exercise now uses one original 2D character, the
+black-and-gold athlete, in one of three honest states: **animated**, **pose frames** (start and mid-rep stills,
+labelled "animation in progress") or a labelled **placeholder** ("demonstration in progress"), always with the
+written steps, form cues and common mistakes. Nothing is owner-approved. Details: `docs/EXERCISE_DEMOS_2D.md`;
+per-exercise status: `docs/EXERCISE_DEMOS_2D_STATUS.md`. The workout card now shows the form cues, common mistakes
+and a Swap button.
 
-**Video demonstrations** (`docs/EXERCISE_DEMOS_STATUS.md`): 157 exercises, 0 COMPLETED, 1 FAILED (the curl clip's
-doubled dumbbell outline for about 0.27 s), 156 MISSING (no clip; they need a video model that can't run here). Every
-exercise still shows its existing animated illustration.
+**Video demonstrations** (`docs/EXERCISE_DEMOS_STATUS.md`): all 157 stay on the backlog (0 completed, 1 failed, 156
+missing). A clip is shown only once the owner approves it; none is.
 
-**GPS (fixed in this RC):** leaving the Run screen mid-run (another tab, the workout, the Bible) stopped the location
-watcher; nothing was recorded until the member came back and tapped Continue. Now the watcher and track are handed to
-`src/lib/run/live-recording.ts`, a "Recording walk: 0.34 mi" pill leads back, and the distance walked meanwhile
-counts (unit test: the kept distance equals an uninterrupted track of the same fixes). Pause, Finish, Discard,
-sign-out and account deletion still stop the GPS. Reload, app close and crash recovery are unchanged.
+**GPS:** leaving the Run screen mid-run keeps recording (in-app keeper and "Recording" pill). New today: a
+suspend-aware clock, so fixes queued while an iPhone is locked are counted instead of breaking the route
+(`docs/GPS_BACKGROUND_IPHONE.md`, unit-tested). **NOT RUN:** anything on a real phone (lock screen, app switching,
+calls, battery, outdoor accuracy); GPS is not production-ready until the device tests there pass.
 
-GPS status: browser-tested with simulated locations (route, pause, signal loss, approximate location, permission
-denied, reload recovery, leaving the screen, sign-out). **NOT RUN:** lock screen, app switching, incoming calls,
-battery use and route accuracy outdoors, all of which need a real phone with the native background-location plugin.
-GPS is not production-ready until those pass. Free/Pro gating is unchanged (live recording is Pro).
+**AI coaching:** covered by tests against a local mock. **Live model responses: NOT RUN** (no key, $0 budget);
+`docs/LIVE_AI_TEST_PLAN.md` lists what is needed (a key in a spend-limited workspace and the owner's budget approval)
+and the harness's own spend ceiling.
 
-**AI coaching:** the integration with Anthropic's API, database-backed allowances, atomic reservation, concurrency
-limits, model routing, request-id idempotency, consent gates and failure handling are covered by tests against a
-local mock of the API. **Live model responses: NOT RUN.** There is no Anthropic key in this environment and the
-budget is $0; `docs/ai-eval/AI_COACH_VALIDATION_REPORT.md` has the ready evaluation (20+ scenarios) and the command to
-run it with a spend cap once a key is provided.
+**Operations (new, dormant until the owner switches them on):** scheduled billing reconciliation
+(`.github/workflows/billing-reconcile.yml`) and redacted error monitoring (`src/instrumentation.ts`,
+`/api/client-errors`); `docs/ERROR_MONITORING.md`.
 
 ## G. Test results (this RC)
 
@@ -186,10 +189,11 @@ run it with a spend cap once a key is provided.
 | --- | --- |
 | TypeScript (`tsc --noEmit`) | PASS |
 | ESLint | PASS: 0 errors (4 old warnings in demo scripts) |
-| Unit (Vitest) | **3,206 passed** (locally and in CI) |
+| Unit (Vitest), after the 2D, ops and hydration commits | **3,198 passed** in three full runs (fewer than before because the 3D tests were removed; new: 2D readiness, GPS lock, error monitoring, hydration regression). One earlier run made while a three-browser load test was saturating the machine had 1 failure that did not repeat in the next three runs; its name was not captured, so it is listed under I |
 | Integration against local Supabase (RLS, isolation, payments, AI limits, workouts, faith, sleep…) | **318 passed, 1 skipped** (live Open Food Facts test, needs internet by design) |
-| Production build (`next build`) | PASS |
-| Browser end to end, phone size (Chromium, Pixel 7 profile), 129 tests | **110 passed, 1 failed, 18 skipped.** The failure: the phone sweep saw React hydration error #418 on `/nutrition/insights` and `/train/programs` (intermittent, pre-existing: earlier runs saw it on `/faith/studies` and passed on re-run; see I). Skipped: the 17 demo-mode tests (need a demo server; they passed 17/17 on 2026-11-04 against one) and the "no AI provider" test (can't run while the AI mock is on). Separately, the GPS, workout, journeys and 3D specs passed after the last code change, the opening-gate case that failed once under load passed 3 of 3 alone, and the phone sweep passed on its own on a clean build (7.8 min, every signed-in screen at 320–440 pt and the largest text). (Two sweep re-runs in between failed at sign-up because a development server started for debugging shared the production build's `.next` folder; a clean rebuild fixed it. That was the test setup, not the app.) |
+| Production build (`npm run build`, clean `.next`) | PASS; the post-build check confirms the hydration fix is in the browser bundle |
+| Browser end to end, phone size (Chromium, Pixel 7 profile), on the build above | So far: the 2D demonstration specs **3/3 passed**; workout card, fast logging, workout reliability, GPS and CSP/layout specs **17/17 passed**. Phone sweep three runs in a row and the full suite: **in progress** when this was written (results added below when finished). The previous full run (before these commits) was 110 passed, 1 failed (#418 in the sweep), 18 skipped |
+| Hydration #418 load test (diagnostic production build, 3 parallel browsers, 4 phone widths, 44 pages, 1,584 page loads each) | **Before the fix: 7 errors** (all through React's replay path). **After: 0 errors**, with 9 loads going through that same path and hydrating cleanly (`docs/HYDRATION_418.md`) |
 | GitHub CI (`ci.yml`) on `release/rc-2026-11-04` @ `e227845`, run 41859668809 | **PASS**: typecheck, lint, unit tests, production build, integration tests on a fresh Supabase (`db reset` from the 53 migrations), gitleaks over the full history, `npm audit` (no high or critical advisories in production dependencies). The first run (@ `c14127d`) failed only the gitleaks step, fixed as described in C |
 | iOS workflow (`ios.yml`, job = checks) on the RC, run 41857518660 | **WebKit opening and navigation tests at iPhone 15 size: PASS.** The three macOS jobs (offline compile, unsigned Release device archive, full app in the iOS Simulator) **did not run**: no macOS runner was assigned within 15 minutes and GitHub cancelled them before any step ran; the one allowed re-run was still waiting for a macOS runner when this was written (check run 41857518660 on GitHub). The last completed macOS run (2026-11-03, `security/payment-hardening-prelaunch`) passed all three; the app code changed since then (workout logging, GPS), so the Simulator result for this RC is still owed |
 | WebKit (iPhone profile) tests | Run by the iOS workflow only (no WebKit here) |
@@ -216,13 +220,16 @@ run it with a spend cap once a key is provided.
 | P0 | Legal pages incomplete | `src/app/legal/privacy/page.tsx`, `src/app/legal/terms/page.tsx` | Counsel completes the bracketed parts; `claude/production-readiness` (`src/app/legal/*`) has fuller older text to start from, which must be updated for sleep, Health, Bible/journal sharing and background GPS | Counsel sign-off; `tests/unit/legal-config.test.ts`-style checks for no "[" placeholders |
 | P0 | Real-device test pass | `docs/device-testing/DEVICE_TEST_SCRIPT.md` | Run the script on an iPhone via TestFlight: purchases (sandbox), restore, Health, GPS locked/backgrounded/calls, notifications, camera | Results recorded in `docs/device-testing/device-test-results.csv` |
 | P0 | Staging deployment | `docs/STAGING_ENVIRONMENT.md` | Owner approves a staging Vercel project + separate Supabase project | `/api/health` returns the RC commit |
-| P1 | Billing reconciliation not scheduled | `src/app/api/billing/reconcile/route.ts` | Schedule `POST /api/billing/reconcile` every 30 min with `Authorization: Bearer $CRON_SECRET` (Vercel Pro cron, or an external scheduler; a 30-minute `vercel.json` cron fails on the Hobby plan) | Integration test exists; check the job's 200s in logs |
-| P1 | Error monitoring | `src/server/log.ts` | Add a log drain or an error service (owner chooses; needs an account) | A forced error appears in the dashboard |
-| P1 | Live AI evaluation | `scripts/ai-eval/run.ts` | Run with a capped key | Report in `docs/ai-eval/` |
+| P1 | Billing reconciliation: switch on | `.github/workflows/billing-reconcile.yml` (added, dormant) | Owner: merge to `main` when approved, set variable `BILLING_RECONCILE_URL` and secret `CRON_SECRET` (`docs/ERROR_MONITORING.md`) | Run log shows HTTP 200 with counts |
+| P1 | Error monitoring: switch on | `src/instrumentation.ts`, `/api/client-errors` (added, redacted, off by default) | Owner: set `ERROR_REPORTING=on` and `NEXT_PUBLIC_ERROR_REPORTING=on`; point a log drain/alert at `"level":"error"` lines | A forced error appears in the log drain |
+| P1 | Live AI evaluation | `docs/LIVE_AI_TEST_PLAN.md` | Owner: key in a spend-limited workspace + budget approval; then `--live --confirm-spend --max-usd 8` | Report in `docs/ai-eval/`, transcripts reviewed by a person |
 | P1 | App Store products and RevenueCat project | `docs/TESTFLIGHT_SETUP_GUIDE.md` §5–6 | Create the two Pro products at $19.99/$149.99 and map them in RevenueCat | Sandbox purchase on a device unlocks Pro; refund in sandbox revokes |
 | P2 | Health endpoint is liveness only | `src/app/api/health/route.ts` | Add a database check behind the cron secret | Returns 503 when Supabase is down |
-| P2 | Exercise demonstrations | `docs/anatomy3d/LIBRARY_STATUS.md`, `docs/EXERCISE_DEMOS_STATUS.md` | Fix the 4 FAIL and 3 POLISH 3D motions; generate clips with the owner's tools | Owner approval per exercise |
-| P2 | Intermittent React hydration error #418 | Seen on `/faith/studies`, `/nutrition/insights`, `/train/programs` during the phone sweep; never on the same page twice in a row | Reproduce in development mode (the production build only gives the code) to get the mismatching element, then render that value only on the client or make server and client agree | `e2e/phone-sweep.spec.ts` passes three runs in a row |
+| P2 | 2D demonstrations not yet animated | `docs/EXERCISE_DEMOS_2D_STATUS.md` | Fix the motions of the pose-frame and placeholder exercises, launch tier 1 first; owner reviews the athlete look | Promoted per `docs/EXERCISE_DEMOS_2D.md` §6; owner approval per exercise |
+| P3 | Exercise videos (157) | `docs/EXERCISE_DEMOS_STATUS.md` | Backlog, after the 2D demos; clips must match the 2D character and need the owner's tools | Owner approval per clip |
+| Done | ~~Intermittent React hydration error #418~~ | Root cause: a bug in the React build bundled with Next 15.5 (a replayed element is matched against its own first child), not app code | Fixed in `45a7017` by applying React's upstream fix at install/build time (`docs/HYDRATION_418.md`) | 1,584-load capture: 7 errors before, 0 after; unit regression test; phone sweep, see G |
+| P3 | One unit test failed once under heavy machine load | Unknown test (name not captured); passed in the next three full runs | Run the unit suite under CPU load with the JSON reporter to name it, then remove its timing dependence | Unit suite passes under load |
+| P3 | Upgrade to Next 16 (owner decision) | `package.json` | Next 16 bundles a React with the hydration fix; then remove `scripts/react-hydration-replay-fix.mjs` and its hooks. A major upgrade: not done without approval | Full test suite on the upgrade branch |
 | P3 | Opening animation test is timing-sensitive under heavy load | `e2e/opening-gate.spec.ts` (iPhone 15 Pro Max case) | Wait for the overlay before measuring, or measure while paused | Passes repeatedly under 2 workers |
 
 ## TestFlight verification checklist
