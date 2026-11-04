@@ -99,6 +99,7 @@ is fixed (see B).
 | `b75ea48`, `5968955` | `docs/HYDRATION_418.md`, `docs/NEXT16_UPGRADE_EVALUATION.md` (new) | Maintenance risks of the hydration fix; Next 16 evaluated in a throwaway trial, not upgraded |
 | `08cbff5`, `304304c`, `82e22c7`, `f4765ed`, `2449cc4` | `src/lib/exercise-motion/**` (new: `patterns/{agility,drills,floor,throws-core-pulls}.ts`, `props-athlete-{gear,kit}.ts`, `props-drills.ts`), `src/data/exercise-motions.ts`, `tests/unit/exercise-*.test.ts` | Four 2D branches merged: 32 exercises rebuilt, equipment restyled, see-through near plates; one merge interaction fixed (`82e22c7`) |
 | `1143f21`, `670e3a0` | `src/data/exercise-demo-readiness.json`, `docs/EXERCISE_DEMOS_2D{,_STATUS}.md`, `scripts/exercise-review/review-sheet.mjs` | All 157 demonstrations animated after review, notes corrected, nothing owner-approved; review sheet filters |
+| `a503c6b`, `4d2eaa1` | `e2e/fast-logging.spec.ts`, `e2e/bible-reader.spec.ts` | Two test races found in full runs and traced (no app change): the rest-over test could shorten the rest to 1 s and read a timer that had just ended; the offline Bible test went offline twice in one browser context and Chromium sometimes left the service worker online. Same assertions; each spec passed repeated runs |
 
 ## C. Security
 
@@ -214,9 +215,29 @@ and the harness's own spend ceiling.
 | Physical iPhone | **NOT RUN** (no device) |
 | Live AI, real store purchases, real Stripe Checkout | **NOT RUN** (no keys/accounts; $0 budget) |
 
+### Phase 2 re-run (2026-11-04 evening, after the 2D merge; app code at `670e3a0`, tests at `4d2eaa1`)
+
+| Suite | Result |
+| --- | --- |
+| TypeScript, ESLint | PASS; 0 lint errors (the same 4 old warnings in demo scripts) |
+| Unit (Vitest) | **3,231 passed** (164 files) |
+| Integration against local Supabase | **318 passed, 1 skipped** (the live Open Food Facts test) |
+| Exercise motion tests after each merge | 838 → 1,201 → 1,221 passed; motion fingerprints: only the 32 intended exercises changed movement |
+| Production build (clean `.next`) | PASS; post-build check: hydration fix present in the browser bundle |
+| Browser end to end, phone size, 131 tests | **113 passed, 0 failed, 18 skipped** (12.1 min; skips as before: 17 demo-mode tests and the no-AI-provider test). Earlier full runs this round each had one failure, both test races, traced and fixed (`a503c6b`, `4d2eaa1`, section B); one run was cut short by a container restart |
+| 2D review sheet (`review-sheet.mjs`), desktop 1280 px and phone 390 px | Players and stills draw, filters show 157 / 32 rebuilt / 5 look closely, no horizontal scroll, no script errors. One bug found and fixed before publishing (filtered-out cards stayed in the layout). Published page: decisions store empty; a write at an ordinary viewer's level is refused |
+| GitHub CI (`ci.yml`) @ `8ceb88c`, run 41919377800 | **PASS** (and on every pushed commit this round) |
+| iOS workflow (`ios.yml`) @ `8ceb88c` (app code identical to `670e3a0`), run 41919377822 | **PASS, all four jobs:** full app in the iOS Simulator (launch, Enter Narrow Gate, relaunch, return from background); offline-edition compile; unsigned Release device archive checked against App Store Connect; WebKit opening and navigation tests at iPhone size. TestFlight job skipped (manual only) |
+| Physical iPhone, live AI, real purchases | **NOT RUN** (no device, keys or accounts; $0 budget) |
+
 ## H. Release readiness
 
 **Ready for internal beta, and ready for a TestFlight internal build once the owner deploys a staging server.**
+
+Phase 2 (2026-11-04 evening) changes nothing in that verdict: every exercise now has an animated 2D demonstration
+(none owner-approved yet), the reliability items in J are still in place and tested, and the full suite, CI and the
+iOS Simulator checks pass on the final code. What remains is the owner's: the TestFlight setup in
+`docs/TESTFLIGHT_STEPS.md`, the 2D review (K), and the decisions in I.
 
 - For: one branch with every feature; access control, payments and AI limits verified against real requests on a
   real database; 3,198 unit, 318 integration and the full browser suite passing; the hydration error found and fixed
