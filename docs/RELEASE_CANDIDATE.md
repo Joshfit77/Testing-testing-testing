@@ -256,7 +256,9 @@ checklist"). The reconciliation workflow refuses `http://`, reserved example/tes
 
 ## TestFlight verification checklist
 
-The full steps are in `docs/TESTFLIGHT.md` and `docs/TESTFLIGHT_SETUP_GUIDE.md`. For this RC:
+The exact owner steps from nothing to an installed beta (staging, Apple Developer, App Store Connect, Supabase,
+RevenueCat, GitHub secrets, first install) are in **`docs/TESTFLIGHT_STEPS.md`**; background in `docs/TESTFLIGHT.md`
+and `docs/TESTFLIGHT_SETUP_GUIDE.md`. On the iPhone, for this RC:
 
 1. Deploy `release/rc-2026-11-04` to a **staging** project (separate Supabase; Stripe test keys; `STRIPE_LIVE_APPROVED`
    unset; `DEMO_MODE` unset). Confirm `/api/health` shows the RC commit.
