@@ -1,6 +1,6 @@
 "use client";
 
-import { addFix, tick, trackTotals, type GpsFix, type TrackState } from "@/lib/domain/gps-track";
+import { addFix, suspendAwareTicker, trackTotals, type GpsFix, type TrackState } from "@/lib/domain/gps-track";
 
 /**
  * Keeps a run or walk recording while the member uses the rest of the app.
@@ -70,7 +70,7 @@ export function routeFix(fix: GpsFix): void {
 }
 
 export function routeError(e: unknown): void {
-  // While kept, a brief loss is recorded by tick() as a gap; the screen shows the message when it is open again.
+  // While kept, a brief loss is recorded as a gap by the clock below; the screen shows the message when open again.
   if (!kept) screen?.error(e);
 }
 
@@ -91,10 +91,12 @@ export function shouldKeep(track: TrackState | null): boolean {
 export function keepRecording(input: { key: string; guidedDayId: string | null; href: string; track: TrackState; stop: () => void; wake: (() => void) | null }): void {
   stopKept();
   const k: Kept = { ...input, timer: null, lastSave: 0 };
-  // The same 1 s clock the screen runs: notices a lost signal (recorded as a gap, never as distance).
+  // The same 1 s clock the screen runs: notices a lost signal (recorded as a gap, never as distance), without mistaking
+  // fixes queued while the phone was locked for a gap.
+  const step = suspendAwareTicker();
   k.timer = setInterval(() => {
     if (kept !== k) return;
-    k.track = tick(k.track, Date.now());
+    k.track = step(k.track, Date.now());
     save(k);
   }, 1000);
   kept = k;

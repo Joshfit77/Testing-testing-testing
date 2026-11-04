@@ -1,0 +1,62 @@
+# Scheduled billing reconciliation: calls POST /api/billing/reconcile on the deployed app every 30 minutes, so a
+# Stripe or App Store change whose webhook was missed is corrected within half an hour (src/server/services/
+# billing-reconcile.ts). The endpoint replies with counts only, never member data.
+#
+# DORMANT until the owner turns it on. It does nothing unless BOTH are set in the repository settings:
+#   - variable BILLING_RECONCILE_URL: the deployed app's HTTPS address, e.g. https://app.example.org
+#   - secret   CRON_SECRET:           the same value as the deployed app's CRON_SECRET (16+ characters)
+# GitHub runs scheduled workflows only from the default branch, so this also needs the owner's approved merge to main.
+# It makes no payment and changes no price: the endpoint only re-reads each provider's record of a subscription.
+name: Billing reconciliation
+
+on:
+  schedule:
+    - cron: "7,37 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: billing-reconcile
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      BASE_URL: ${{ vars.BILLING_RECONCILE_URL }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+    steps:
+      - name: Check it is configured (skip quietly if not)
+        id: cfg
+        run: |
+          if [ -z "$BASE_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "Billing reconciliation is not configured (BILLING_RECONCILE_URL variable and CRON_SECRET secret); nothing to do."
+            echo "on=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          case "$BASE_URL" in
+            https://*) ;;
+            *) echo "::error::BILLING_RECONCILE_URL must be an https:// address"; exit 1 ;;
+          esac
+          if echo "$BASE_URL" | grep -Eqi '\.(example|invalid|test|localhost)(/|$)'; then
+            echo "::error::BILLING_RECONCILE_URL points at a placeholder domain"; exit 1
+          fi
+          if [ "${#CRON_SECRET}" -lt 16 ]; then
+            echo "::error::CRON_SECRET is shorter than 16 characters (the app refuses it)"; exit 1
+          fi
+          echo "on=true" >> "$GITHUB_OUTPUT"
+
+      - name: Reconcile
+        if: steps.cfg.outputs.on == 'true'
+        run: |
+          # The secret goes in a header read from a file, never on the command line or in the log.
+          umask 077
+          printf 'Authorization: Bearer %s\n' "$CRON_SECRET" > "$RUNNER_TEMP/auth"
+          status=$(curl -sS -o "$RUNNER_TEMP/out.json" -w '%{http_code}' --max-time 120 -X POST -H @"$RUNNER_TEMP/auth" "${BASE_URL%/}/api/billing/reconcile")
+          rm -f "$RUNNER_TEMP/auth"
+          echo "HTTP $status"
+          # Counts only (the endpoint never returns member data).
+          head -c 2000 "$RUNNER_TEMP/out.json"; echo
+          if [ "$status" != "200" ]; then echo "::error::Billing reconciliation returned HTTP $status"; exit 1; fi

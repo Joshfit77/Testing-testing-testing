@@ -448,6 +448,27 @@ export function tick(s: TrackState, now: number): TrackState {
   return s;
 }
 
+/** A jump this long between two ticks of a 1-second clock means the page's JavaScript was paused (phone locked). */
+export const SUSPENDED_JUMP_MS = 5_000;
+
+/**
+ * tick() for a 1-second clock that the phone can pause. In the iPhone app the location service keeps recording while
+ * the screen is locked, but the page's JavaScript (this clock and the code that receives fixes) can be suspended; on
+ * unlock the fixes recorded meanwhile arrive in a burst, and this clock may run before them. Right after such a pause
+ * the signal is therefore not called lost for SIGNAL_LOST_MS, so the queued fixes are counted as the route they are.
+ * If none arrive in that time, the gap is recorded exactly as tick() would (from the last fix before the pause).
+ */
+export function suspendAwareTicker(): (s: TrackState, now: number) => TrackState {
+  let last: number | null = null;
+  let resumedAt: number | null = null;
+  return (s, now) => {
+    if (last != null && now - last > SUSPENDED_JUMP_MS) resumedAt = now;
+    last = now;
+    if (resumedAt != null && now - resumedAt < SIGNAL_LOST_MS) return s;
+    return tick(s, now);
+  };
+}
+
 export function pauseTrack(s: TrackState, now: number): TrackState {
   if (s.status !== "recording" && s.status !== "acquiring") return s;
   const periods = s.periods.map((p, i) => (i === s.periods.length - 1 && p.end == null ? { ...p, end: now } : p));

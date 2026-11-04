@@ -181,3 +181,45 @@ describe("saving the route", () => {
     expect(routeForSave(startTrack({ id: "x", kind: "run", unit: "km", now: T0 }))).toBeNull();
   });
 });
+
+describe("a locked phone (JavaScript paused while the location service keeps recording)", async () => {
+  const { suspendAwareTicker, SIGNAL_LOST_MS } = await import("@/lib/domain/gps-track");
+
+  /** 60 s of running before the lock, 90 s locked, 60 s after: fixes every second throughout (the service never stopped). */
+  const before = trace({ from: T0 + 1000, seconds: 60, speed: 3 });
+  const locked = trace({ from: T0 + 62_000, seconds: 89, speed: 3, startM: 61 * 3 });
+  const after = trace({ from: T0 + 152_000, seconds: 60, speed: 3, startM: 151 * 3 });
+  const expected = (60 + 90 + 60) * 3;
+
+  it("counts the fixes queued while locked when the clock happens to run before they arrive", () => {
+    const step = suspendAwareTicker();
+    let s = fresh();
+    for (const f of before) s = step(addFix(s, f).state, f.t);
+    // Unlock: the clock fires first (90 s after its last tick), then the queued fixes arrive in a burst.
+    const unlock = T0 + 152_500;
+    s = step(s, unlock);
+    expect(s.signalLost).toBe(false);
+    for (const f of locked) s = addFix(s, f).state;
+    for (const f of after) s = step(addFix(s, f).state, f.t + 600);
+    expect(s.gaps).toBe(0);
+    expect(trackTotals(s).distance_m).toBeGreaterThan(expected * 0.99);
+    expect(trackTotals(s).distance_m).toBeLessThan(expected * 1.01);
+  });
+
+  it("the plain clock would have broken the route there (what the suspend-aware clock prevents)", () => {
+    let s = fresh();
+    for (const f of before) s = tick(addFix(s, f).state, f.t);
+    s = tick(s, T0 + 152_500);
+    expect(s.signalLost).toBe(true);
+  });
+
+  it("still records a real gap when nothing arrives after the unlock", () => {
+    const step = suspendAwareTicker();
+    let s = fresh();
+    for (const f of before) s = step(addFix(s, f).state, f.t);
+    const unlock = T0 + 152_500;
+    for (let t = unlock; t <= unlock + SIGNAL_LOST_MS + 2000; t += 1000) s = step(s, t);
+    expect(s.signalLost).toBe(true);
+    expect(s.gaps).toBe(1);
+  });
+});

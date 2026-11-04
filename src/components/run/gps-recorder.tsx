@@ -25,7 +25,7 @@ import {
   resumeTrack,
   routeForSave,
   startTrack,
-  tick,
+  suspendAwareTicker,
   trackTotals,
   type TrackState,
 } from "@/lib/domain/gps-track";
@@ -260,10 +260,12 @@ export function GpsRecorder({
   const active = track && (track.status === "recording" || track.status === "acquiring");
   useEffect(() => {
     if (!active) return;
+    // Suspend-aware: after the phone was locked, fixes queued meanwhile arrive late and must not be read as a gap.
+    const step = suspendAwareTicker();
     const timer = setInterval(() => {
       const t = Date.now();
       setNow(t);
-      setTrack((cur) => (cur ? tick(cur, t) : cur));
+      setTrack((cur) => (cur ? step(cur, t) : cur));
     }, 1000);
     return () => clearInterval(timer);
   }, [active]);
