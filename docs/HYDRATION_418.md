@@ -97,10 +97,11 @@ The fix edits code inside `node_modules/next`, which is unusual. What can go wro
 | A build that skips the hooks (`npx next build` directly, or an install with `--ignore-scripts` followed by `next build`) | The unfixed React ships and the intermittent error returns | CI, the iOS workflow and the demo script all use `npm run build` (prebuild applies the fix, postbuild verifies the bundle). **On the host, set the Build Command to `npm run build`** (not `next build`). `tests/unit/release-guards.test.ts` fails if the hooks are removed from `package.json` |
 | A Next.js patch upgrade changes the bundled React | Either React already has the fix (script reports `upstream-fixed` and does nothing) or the code it patches moved (script fails `npm install`/`npm run build` with a message pointing here) | The script refuses to guess; `tests/unit/react-hydration-replay.test.ts` checks the installed builds |
 | A stale build cache reuses the unfixed React | Same as the first row | `next.config.ts` keys webpack's cache to the script; postbuild `--verify-build` fails the build if the browser bundle lacks the fix |
-| Switching the build to Turbopack | Turbopack ignores the webpack cache hook and lays out chunks differently; the patched source would still be bundled, but `--verify-build` may not find the React chunk and fail the build | Loud failure, not a silent one. Not planned on Next 15 |
+| Switching the build to Turbopack | Turbopack ignores the webpack cache hook | The patched source is still what gets bundled, and `--verify-build` still finds the React chunk (checked in the Next 16 trial, which builds with Turbopack). Not planned on Next 15 |
 | The patch differs from React's own fix | A subtle hydration difference | The patch is React's upstream change verbatim; the regression test reproduces the bug without it and passes with it on both the production and development builds |
 | Someone edits `node_modules` by hand | Unknown state | `npm ci` reinstalls clean files and the postinstall hook re-applies the fix; `node scripts/react-hydration-replay-fix.mjs --check` reports the state; `--restore` puts the originals back |
 | Package integrity | npm verifies each package before install scripts run; the fix changes files only after that, and only the 6 listed React DOM builds | `TARGETS` in the script |
 
-**Exit:** upgrading to Next 16 removes the need for the patch. That is a separate, larger change that needs the
-owner's approval; it has not been done (see `docs/RELEASE_CANDIDATE.md`, section I).
+**Exit:** upgrading to Next 16 removes the need for the patch (its bundled React has the fix; checked in a trial).
+That is a separate, larger change that needs the owner's approval and has not been done. The trial, the conditions
+and the step-by-step plan are in `docs/NEXT16_UPGRADE_EVALUATION.md`.
