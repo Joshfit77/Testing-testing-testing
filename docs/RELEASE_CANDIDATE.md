@@ -57,7 +57,7 @@ source for counsel, not merged.
 | Server-side Pro enforcement | payment-hardening | Yes | `tests/integration/pro-bypass.test.ts`, `plan-enforcement.test.ts` |
 | Workout logging and recovery | workout-experience + 2026-11-04 work | Yes | `tests/unit/workout-fast-logging.test.ts`, `tests/integration/workout-fast-logging.test.ts`, `e2e/fast-logging.spec.ts`, `e2e/workout-reliability.spec.ts` |
 | Onboarding (essentials first) and Home order | faith-discipleship (2026-11-04) | Yes | `e2e/onboarding-plan.spec.ts`, `e2e/features.spec.ts` |
-| 3D exercise demonstrations | anatomical-3d-exercises / 3d-in-workout | Yes, as a showcase page (`/train/3d`); workouts and the library show the 2D animation | `e2e/exercise-demo-3d.spec.ts`; `docs/anatomy3d/LIBRARY_STATUS.md` |
+| Exercise demonstrations | 2D athlete (3D retired in `255e150`) | Yes: one original black-and-gold 2D character, animated / pose frames / labelled placeholder; nothing owner-approved | `e2e/exercise-demo-2d.spec.ts`, `tests/unit/exercise-motion*.test.ts`; `docs/EXERCISE_DEMOS_2D_STATUS.md` |
 | GPS runs and walks | faith-discipleship (fix below) | Yes | `e2e/gps-run.spec.ts`, `tests/unit/gps-recorder.test.tsx` |
 | Faith: BSB Bible, journeys, prayer journal, red letters | faith-discipleship | Yes | `e2e/bible-reader.spec.ts`, `e2e/faith-journey.spec.ts` |
 | Sleep, Health / Health Connect import | nine-features → faith-discipleship | Yes | `e2e/sleep.spec.ts`, `tests/integration/sleep*.test.ts` |
@@ -232,6 +232,27 @@ and the harness's own spend ceiling.
 | P3 | One unit test failed once under heavy machine load | Unknown test (name not captured); passed in the next three full runs | Run the unit suite under CPU load with the JSON reporter to name it, then remove its timing dependence | Unit suite passes under load |
 | P3 | Upgrade to Next 16 (owner decision) | `package.json` | Next 16 bundles a React with the hydration fix; then remove `scripts/react-hydration-replay-fix.mjs` and its hooks. A major upgrade: not done without approval | Full test suite on the upgrade branch |
 | P3 | Opening animation test is timing-sensitive under heavy load | `e2e/opening-gate.spec.ts` (iPhone 15 Pro Max case) | Wait for the overlay before measuring, or measure while paused | Passes repeatedly under 2 workers |
+
+## J. Launch reliability re-check (phase 2, 2026-11-04)
+
+The owner asked to confirm that the background GPS work, workout sync, payments and user-data protections are still in
+this RC, and to prepare billing reconciliation and error monitoring for activation without switching anything on. Each
+row was checked in the code and by running its tests in this session (unit: 20 files, **159 passed**; integration
+against local Supabase: 9 files, **85 passed**; the browser tests run in the full suite, see G).
+
+| Area | What is in the RC | Where | Tests run now | Still needs |
+| --- | --- | --- | --- | --- |
+| Background GPS (iPhone) | Location background mode and both usage strings; pinned background-location plugin; lock-aware clock so fixes queued while locked are counted; recording continues when leaving the Run screen; stops on sign-out | `ios/App/App/Info.plist`, `package.json`, `src/lib/run/live-recording.ts`, `src/components/run/gps-recorder.tsx`, `src/lib/domain/gps-track.ts` | `release-guards.test.ts` (fails if the background mode, plugin pin or lock-aware clock is removed), `gps-track`, `gps-recorder`, `gps-accuracy`, `run-session`; browser: `e2e/gps-run.spec.ts` (pause, signal loss, approximate location, sign-out mid-walk, leaving mid-walk) | Real iPhone: locked screen, app switching, calls, battery, outdoor accuracy |
+| Workout sync | Draft saved per set; sent immediately, on backgrounding (`visibilitychange`) and when back online; retry with backoff (5 s to 2 min); saving is idempotent by the workout's client id; finished workouts are never resurrected | `src/components/workout/workout-logger.tsx`, `src/lib/domain/workout-draft.ts`, workout server actions | `workout-draft-session`, `workout-fast-logging`, `workout-discard`; integration `workouts.test.ts` (idempotent save, drafts, records), `workout-fast-logging.test.ts`; browser: `workout-reliability`, `fast-logging` | Locked-phone background flush on a real iPhone |
+| Payments | Stripe live keys refused without `STRIPE_LIVE_APPROVED=true`; Stripe and RevenueCat webhooks verified, exactly-once, ordered; Pro decided only on the server; sandbox purchases grant nothing outside the tester allow-list; the iPhone app never offers web checkout | `src/server/services/store-billing.ts`, `src/app/api/revenuecat/webhook/route.ts`, Stripe webhook route, `src/lib/domain/plans.ts` | `stripe-live-guard`, `revenuecat`, `billing-negative-auth`, `membership`, `demo-mode-guard`; integration `billing-integrity` (16), `store-billing`, `pro-bypass` (7), `plan-enforcement`; browser: `store-billing.spec.ts` | Sandbox purchase, restore and refund on a device with real App Store Connect products |
+| User-data protections | Row-level security on every table; member isolation; account deletion removes rows, files, the RevenueCat customer and the sign-in; export is the member's own rows only; prayer-journal text reaches the coach only when marked "Share with AI Coach", and coach memory never keeps it | `supabase/migrations/*`, `src/server/coach/snapshot.ts`, `src/lib/coach/memory.ts`, account deletion and export routes | `rls-coverage`, `account-deletion`, `account-coverage`, `export-route`, `coach-memory`, `coach-journal`, `coach-context`; integration `rls`, `cross-user-isolation` (13), `account-deletion` | Nothing device-specific; the legal text (P0 in I) |
+
+**Activation prepared, nothing switched on.** `scripts/ops/activation-check.mjs` checks a deployment without changing
+anything: reconciliation refuses no or wrong secret (401) and returns counts with the right one (200); a made-up client
+error report is accepted (204) and must appear in the logs redacted. Dry run against a local production build: all four
+checks as expected and the log line redacted (details and the owner's steps: `docs/ERROR_MONITORING.md`, "Activation
+checklist"). The reconciliation workflow refuses `http://`, reserved example/test domains and short secrets
+(`release-guards.test.ts` runs the workflow's own check). Not run against a hosted deployment: none exists.
 
 ## TestFlight verification checklist
 
