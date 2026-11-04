@@ -256,46 +256,63 @@ export function pushUp(o: PushUpOpts): MotionDef {
   };
 }
 
-/** Pike push-up: hips high, head lowers toward the floor between the hands. */
+/**
+ * Pike push-up: feet walked in about a metre from the hands and the hips high in an inverted V, arms straight in line
+ * with the trunk. The elbows bend back toward the feet (about 100° at the bottom, forearms angled, never lying on the
+ * floor) while the head lowers, crown first, to a point on the floor in front of the hands; the shoulders end up over the
+ * hands and the hips stay high. Then the arms press back to the V.
+ */
 export function pikePushUp(id: string, label: string): MotionDef {
   const root: RootRule = { pin: "toeR", at: [0, 0] };
-  // Legs ~35° from vertical, trunk pointing down-forward.
-  const make = (T: number, legLean: number): Pose => {
+  /** Straight legs leaning `legLean` from vertical (on the balls of the feet, toes pinned), trunk lean `T`. */
+  const make = (T: number, legLean: number, neck: number): Pose => {
     const thighA = -legLean; // pointing down-back from the hips
     const rot = -75;
-    return pose({ trunk: T, neck: 8, ...both({ hip: thighA + T, knee: 0, ankle: rot - thighA }) });
+    return pose({ trunk: T, neck, ...both({ hip: thighA + T, knee: 0, ankle: rot - thighA }) });
   };
-  const armsLine = (p: Pose): Pose => ({ ...p, shL: 180 + p.trunk * 0, shR: 180, elL: 0, elR: 0 });
-  const legLean = 38;
-  const topT = solve1D((t) => worldPts(armsLine(make(t, legLean)), root).handR[1] - BODY.r.hand, 100, 170);
-  const hand: Vec = [worldPts(armsLine(make(topT, legLean)), root).handR[0], BODY.r.hand];
-  // Bottom: crown of the head just in front of the hands, a few cm off the floor; hips stay high.
-  const target: Vec = [hand[0] + 10, 14];
-  let best = { T: topT, lean: legLean, err: Infinity };
-  for (let lean = legLean - 10; lean <= legLean + 25; lean += 1)
-    for (let T = 95; T <= 178; T += 1) {
-      const W = worldPts(make(T, lean), root);
-      const reach = Math.hypot(hand[0] - W.shoulder[0], hand[1] - W.shoulder[1]);
-      if (reach > ARM - 2) continue;
-      const err = Math.hypot(W.headTop[0] - target[0], W.headTop[1] - target[1]);
-      if (err < best.err) best = { T, lean, err };
-    }
-  const botT = best.T;
-  const botLean = best.lean;
-  const P = (T: number, lean: number) => {
-    const p = make(T, lean);
+  const armsLine = (p: Pose): Pose => ({ ...p, shL: 180, shR: 180, elL: 0, elR: 0 });
+  // Hands about 95 cm in front of the toes.
+  const hand: Vec = [95, BODY.r.hand];
+  const P = (T: number, lean: number, neck: number) => {
+    const p = make(T, lean, neck);
     const loc = toLocal(p, root, hand);
     return armTo(armTo(p, "L", loc), "R", loc);
   };
+  const NECK_TOP = 6;
+  const NECK_BOTTOM = 15;
+  // Top: straight arms in line with the trunk reach the hands.
+  let top = { T: 145, lean: 25, err: Infinity };
+  for (let lean = 10; lean <= 40; lean += 0.25)
+    for (let T = 130; T <= 165; T += 0.25) {
+      const W = worldPts(armsLine(make(T, lean, NECK_TOP)), root);
+      const err = Math.hypot(W.handR[0] - hand[0], W.handR[1] - hand[1]);
+      if (err < top.err) top = { T, lean, err };
+    }
+  // Bottom: elbows near 100°, forearms no flatter than about 45° from vertical, the crown about 20 cm in front of the
+  // hands and a hand's width off the floor, hips as high as that allows.
+  let bot = { T: top.T, lean: top.lean, cost: Infinity };
+  for (let lean = top.lean; lean <= 60; lean += 0.5)
+    for (let T = 120; T <= top.T; T += 0.5) {
+      const W = worldPts(make(T, lean, NECK_BOTTOM), root);
+      if (Math.hypot(hand[0] - W.shoulder[0], hand[1] - W.shoulder[1]) > ARM - 4) continue;
+      const q = P(T, lean, NECK_BOTTOM);
+      const Q = worldPts(q, root);
+      const fore = (Math.atan2(Q.handR[0] - Q.elbowR[0], Q.elbowR[1] - Q.handR[1]) * 180) / Math.PI;
+      const low = Math.min(Q.headTop[1], Q.foreheadFront[1]);
+      const cost = ((q.elR - 100) / 5) ** 2 + ((Q.headTop[0] - hand[0] - 20) / 4) ** 2 + ((low - 12) / 2) ** 2 + Math.max(0, (fore - 45) / 3) ** 2 - Q.pelvis[1] / 20;
+      if (cost < bot.cost) bot = { T, lean, cost };
+    }
+  const at = (u: number) => P(top.T + (bot.T - top.T) * u, top.lean + (bot.lean - top.lean) * u, NECK_TOP + (NECK_BOTTOM - NECK_TOP) * u);
   return {
     id,
     view: "side",
     label,
     keyframes: keys(root, [
-      { pose: P(topT, legLean), dur: 1, hold: 0.3, ease: "spline", ik: ik2(hand) },
-      { pose: P((topT + botT) / 2, (legLean + botLean) / 2), dur: 1, ease: "spline", ik: ik2(hand) },
-      { pose: P(botT, botLean), dur: 0.6, hold: 0.15, ease: "spline", ik: ik2(hand) },
-      { pose: P((topT + botT) / 2, (legLean + botLean) / 2), dur: 0.6, ease: "spline", ik: ik2(hand) },
+      { pose: at(0), dur: 0.55, hold: 0.35, ease: "spline", ik: ik2(hand) },
+      { pose: at(0.3), dur: 0.55, ease: "spline", ik: ik2(hand) },
+      { pose: at(0.7), dur: 0.5, ease: "spline", ik: ik2(hand) },
+      { pose: at(1), dur: 0.45, hold: 0.2, ease: "spline", ik: ik2(hand) },
+      { pose: at(0.6), dur: 0.45, ease: "spline", ik: ik2(hand) },
     ]),
     props: [],
     footGrounded: true,
@@ -1008,14 +1025,27 @@ export function frontArms(o: FrontArmOpts): MotionDef {
         { id: "cable", kind: "cable", at: [-98, 120], to: { lm: "hands" }, layer: "near" },
       ];
       break;
-    case "posing":
+    case "posing": {
+      // Front relaxed → front double biceps → relaxed → front lat spread → (relaxed). Each pose is hit from the relaxed
+      // stance, as when practising them one by one. Lat spread: fists on the waist just above the hip bones, elbows flared
+      // wide and a little forward, so the forearms angle back in to the waist.
+      const relaxed = F({ ...both({ sh: 18, el: 8 }) });
+      let lat = F({ ...both({ armD: 18 }) });
+      for (const s of ["L", "R"] as const) {
+        const W0 = worldPts(lat, root, "front");
+        const k2 = s === "L" ? 1 : -1;
+        const fist: Vec = [W0.waist[0] + k2 * 17.5, W0.waist[1] - 3];
+        const elbow: Vec = [W0[`shoulder${s}`][0] + k2 * 19, W0[`shoulder${s}`][1] - 22];
+        lat = armThrough(lat, s, toLocal(lat, root, elbow, "front"), toLocal(lat, root, fist, "front"), "front");
+      }
       specs = [
-        // Front relaxed → front double biceps → lat spread → relax.
-        k(F({ ...both({ sh: 18, el: 8 }) }), 0.8, 0.6),
+        k(relaxed, 0.8, 0.6),
         k(F({ ...both({ sh: 95, el: 115 }), neck: 0 }), 0.7, 1.5),
-        k(F({ ...both({ sh: 30, el: 70, armD: 20 }) }), 0.7, 1.5),
+        k(relaxed, 0.75, 0.35),
+        k(lat, 0.75, 1.5),
       ];
       break;
+    }
   }
   return {
     id: o.id,

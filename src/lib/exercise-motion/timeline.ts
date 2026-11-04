@@ -598,6 +598,7 @@ export function evaluate(c: CompiledMotion, time: number, opts: EvalOptions = {}
     alpha: lerp(A.alpha ?? 1, B.alpha ?? 1, w),
     cameraX: travel * (t / T),
     lifted,
+    ...(def.legsInFront ? { legsInFront: true } : {}),
   };
 }
 
@@ -643,6 +644,7 @@ function propExtent(p: ResolvedProp): [number, number, number, number] | null {
     case "rack":
     case "pullupBar":
     case "mat":
+    case "floorMat":
     case "ladder":
     case "hurdleLine":
     case "cable":

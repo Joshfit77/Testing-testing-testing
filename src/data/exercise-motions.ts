@@ -231,7 +231,7 @@ export const EXERCISE_MOTIONS: Record<string, Builder> = {
   "heavy-bag-rounds": (id) => boxing(id, `${S}Throws jab–cross combinations into a heavy bag, returning to guard.`, true),
   "battle-rope-waves": (id) => battleRopes(id, `${S}Half-squat stance: alternates arms up and down to send waves along the ropes.`),
   "lateral-shuffle": (id) => lateralShuffle(id, `${F}Athletic stance: shuffles sideways without crossing the feet, then back.`),
-  "hip-escape": (id) => coreMove(id, `${S}Lying on the back: pushes off one foot and shrimps the hips away, then resets the feet.`, "hip-escape"),
+  "hip-escape": (id) => coreMove(id, `${F}From above, lying along the mat: on the back with the knees bent, pushes off one foot, turns onto the side and drives the hips back into a C with the arms framing, then returns to the back and repeats to the other side, travelling head-first along the mat.`, "hip-escape"),
   "zone-2-run": (id) => gait({ id, kind: "jog", label: `${S}Easy, relaxed running stride.` }),
   "run-walk-intervals": (id) => gait({ id, kind: "jog", cycle: 0.82, label: `${S}Easy jogging stride (alternated with walking breaks).` }),
   "running-intervals": (id) => gait({ id, kind: "jog", cycle: 0.68, stride: 1.1, lean: 10, label: `${S}Faster running stride for hard intervals.` }),
@@ -245,14 +245,14 @@ export const EXERCISE_MOTIONS: Record<string, Builder> = {
   // ------------------------------------------------------------------ Mobility
   "cat-cow": (id) => coreMove(id, `${S}On hands and knees: arches the back with the head up, then rounds the spine with the chin tucked.`, "cat-cow"),
   "worlds-greatest-stretch": (id) => coreMove(id, `${S}Deep lunge with one hand down: drops the elbow toward the front foot, then reaches that arm up toward the ceiling.`, "worlds-greatest"),
-  "90-90-hip-switch": (id) => coreMove(id, `${F}Seated with both knees bent 90°: rotates both knees from one side to the other.`, "90-90"),
-  "thoracic-open-book": (id) => coreMove(id, `View from above. Lying on one side with knees stacked: sweeps the top arm open across the chest and back.`, "open-book"),
+  "90-90-hip-switch": (id) => coreMove(id, `${F}Seen from slightly above: sits tall with the hands on the mat behind, one leg in front and one to the side with both knees bent 90°, then lifts both knees and rotates them over so the legs switch sides.`, "90-90"),
+  "thoracic-open-book": (id) => coreMove(id, `${F}Seen from slightly above: lying on one side with the hips and knees bent to 90° and the knees stacked, arms straight out in front; the top arm opens up and over to the floor behind, the head and eyes following the hand, then returns.`, "open-book"),
   "couch-stretch": (id) => coreMove(id, `${S}Back knee on the floor against a wall with the shin up the wall: tall torso, gently pushes the hips forward.`, "couch-stretch"),
   "supine-hamstring-stretch": (id) => coreMove(id, `${S}Lying on the back: a band around one foot draws the straight leg up toward vertical.`, "hamstring-stretch"),
   "childs-pose": (id) => coreMove(id, `${S}Kneeling, sits the hips back to the heels with arms reaching forward on the floor, breathing slowly.`, "childs-pose"),
   "ankle-knee-to-wall": (id) => coreMove(id, `${S}Front foot near a wall: drives the knee forward to touch the wall while the heel stays down.`, "knee-to-wall"),
   "band-pass-through": (id) => coreMove(id, `${S}Holding a band wide with straight arms: lifts it from the hips up over the head and back.`, "pass-through"),
-  "figure-four-stretch": (id) => coreMove(id, `${S}Lying on the back with one ankle crossed over the other knee: draws the legs toward the chest.`, "figure-four"),
+  "figure-four-stretch": (id) => coreMove(id, `${F}Seen from above, lying on the back: one ankle crossed over the opposite thigh just above the knee, the hands draw that thigh toward the chest and hold.`, "figure-four"),
   "single-leg-balance": (id) => coreMove(id, `${S}Balances on one leg with the other knee lifted, making small corrections.`, "single-leg-balance"),
 
   // ------------------------------------------------------------------ Neck
@@ -363,8 +363,8 @@ export function fallbackMotion(meta: ExerciseMeta): MotionDef {
   if (named(m, /child/)) return coreMove(id, L("Child's pose"), "childs-pose");
   if (named(m, /couch|hip flexor/)) return coreMove(id, L("Hip-flexor stretch"), "couch-stretch");
   if (named(m, /hamstring/)) return coreMove(id, L("Hamstring stretch"), "hamstring-stretch");
-  if (named(m, /pigeon|figure|glute stretch|piriformis/)) return coreMove(id, L("Glute stretch"), "figure-four");
-  if (named(m, /open book|thoracic|t-spine/)) return coreMove(id, L("Thoracic rotation", "View from above. "), "open-book");
+  if (named(m, /pigeon|figure|glute stretch|piriformis/)) return coreMove(id, L("Glute stretch", F), "figure-four");
+  if (named(m, /open book|thoracic|t-spine/)) return coreMove(id, L("Thoracic rotation", F), "open-book");
   if (named(m, /90.?90/)) return coreMove(id, L("Hip switch", F), "90-90");
   if (named(m, /ankle/)) return coreMove(id, L("Ankle mobility"), "knee-to-wall");
   if (named(m, /pass.?through|dislocat/)) return coreMove(id, L("Shoulder pass-through"), "pass-through");

@@ -9,6 +9,7 @@ import {
   legTo,
   lm,
   mix,
+  plantLeg,
   pose,
   solve1D,
   stanceLegs,
@@ -22,6 +23,7 @@ import {
 } from "../build";
 import { handsTo, legsTo, toLocal } from "./upper";
 import { squatPose } from "./lower";
+import { figureFour, hip9090, hipEscape, openBook } from "./floor";
 
 const ARM = BODY.upperArm + BODY.forearm;
 const breathe = (p: Pose, d = 2): Pose => ({ ...p, spine: p.spine + d });
@@ -246,43 +248,15 @@ export function coreMove(id: string, label: string, kind: CoreKind): MotionDef {
         stillPhase: 0.5,
       });
     }
-    case "figure-four": {
-      const a = pose({ trunk: -90, neck: 12, hipL: 75, kneeL: 90, ankleL: 0, hipR: 70, kneeR: 105, ankleR: 0, legDR: 48, ...both({ sh: 8, el: 4 }) });
-      const b = { ...a, hipL: 92, hipR: 86 };
-      return M({ ground: 0 }, hold2(a, b, 2.2), { props: [mat], stillPhase: 0.5 });
-    }
-    case "open-book": {
-      // Seen from above: side-lying, knees stacked, top arm sweeps open across the chest.
-      const p = pose({ trunk: 90, neck: 0, ...both({ hip: 90, knee: 90, ankle: -20, sh: 90, el: 0 }) });
-      const mid = { ...p, shR: 10, armDR: 80, neck: -10 };
-      const open = { ...p, shR: -80, armDR: 10, neck: -25 };
-      return M({ ground: 0 }, [
-        { pose: p, dur: 1.5, hold: 0.3, ease: "inOut" },
-        { pose: mid, dur: 1.2, ease: "linear" },
-        { pose: open, dur: 1.2, hold: 1.2, ease: "out" },
-        { pose: mid, dur: 1.5, ease: "in" },
-      ], { floor: "none", allowLimits: ["shR"], stillPhase: 0.55, props: [{ id: "mat", kind: "pad", at: [10, -26], w: 220, h: 86, layer: "back" }] });
-    }
-    case "90-90": {
-      // Seated, hands behind. Front leg: thigh toward the camera, shin across; back leg: thigh out to the side, shin back.
-      const arms = { ...both({ sh: 30, el: 0, armD: 45 }) };
-      const sideA = pose({ ...arms, trunk: -4, hipL: 70, legDL: 70, kneeL: 90, ankleL: -95, hipR: 88, kneeR: 120, ankleR: 70 });
-      const sideB = pose({ ...arms, trunk: 4, hipR: 70, legDR: 70, kneeR: 90, ankleR: -95, hipL: 88, kneeL: 120, ankleL: 70 });
-      const midP = pose({ ...arms, hipL: 150, hipR: 150, legDL: 55, legDR: 55, kneeL: 90, kneeR: 90, ankleL: -8, ankleR: -8, shinDL: 72, shinDR: 72 });
-      return {
-        ...base,
-        view: "front",
-        keyframes: keys({ ground: 0 }, [
-          { pose: sideA, dur: 1.2, hold: 0.8, ease: "inOut" },
-          { pose: midP, dur: 1.2, ease: "inOut" },
-          { pose: sideB, dur: 1.2, hold: 0.8, ease: "inOut" },
-          { pose: midP, dur: 1.2, ease: "inOut" },
-        ]),
-        props: [mat],
-        allowLimits: ["hipL", "hipR", "ankleL", "ankleR"],
-        stillPhase: 0,
-      };
-    }
+    case "figure-four":
+      // Front view from above (the crossed leg makes its "4" along the mat), posed in 3D (patterns/floor.ts).
+      return figureFour(id, label);
+    case "open-book":
+      // Front view from a raised camera of the side-lying athlete, posed in 3D (patterns/floor.ts).
+      return openBook(id, label);
+    case "90-90":
+      // Front view from a raised camera, posed in 3D (patterns/floor.ts).
+      return hip9090(id, label);
     case "worlds-greatest": {
       // Deep lunge with the torso low over the front thigh so the far hand rests flat on the floor inside the front
       // foot; the near elbow drops toward the instep, then the torso rotates open and that arm points at the ceiling.
@@ -303,10 +277,62 @@ export function coreMove(id: string, label: string, kind: CoreKind): MotionDef {
       // range, hence allowLimits below.
       const T2 = lunge.trunk + lunge.spine;
       const reach = { ...lunge, shR: 180 + T2, elR: 0, armDR: 0, foreDR: 0, neck: -45 };
+      // The arm opens by rotating with the chest about the spine: from hanging toward the instep it swings out toward the
+      // camera (shortening as it points at the viewer) and on up to the ceiling, the elbow straightening on the way;
+      // it never sweeps forward through a front reach. `phi` is that rotation (0 = down, 90 = at the camera, 180 = up),
+      // `dir` the arm's drawn direction (0 = down, 180 = up; while it points almost at the camera its direction hardly
+      // shows), `bend` the elbow.
+      const armDown = elbowIn.shR - T2;
+      const open = (phi: number, dir: number, bend: number): Pose => {
+        const d = phi <= 90 ? phi : 180 - phi;
+        return { ...lunge, shR: T2 + dir, elR: bend, armDR: d, foreDR: Math.min(89, d + bend * 0.3), neck: -26 - 19 * (phi / 180) };
+      };
+      const a1 = open(35, armDown * 0.6, elbowIn.elR * 0.35);
+      const a2 = open(65, armDown * 0.2, 8);
+      const a3 = open(82, 45, 4);
+      const a4 = open(98, 135, 2);
+      const a5 = open(130, 180, 0);
+      const ik = { handL, footL: rear };
+      const sweep = (p: Pose, dur: number): KeySpec => ({ pose: p, dur, ease: "inOut", ik });
+      // Then both hands down inside the front foot, and the hips shift back over the back knee, which comes down to the
+      // floor, to straighten the front leg (the hamstring stretch), the torso folding over it; both feet stay put.
+      const handR2: Vec = [handL[0] + 5, BODY.r.hand];
+      const handsDown = handsTo(lunge, root, handR2, ["R"]);
+      const frontAnkle = ankleForSole(0, 0);
+      const PX = frontAnkle[0] - 78.5;
+      // The back foot stays on the ball of the foot where it was, its toes tucking under as the knee comes down.
+      const rearBall: Vec = [worldPts(handsDown, root).ballL[0], 0];
+      const hamAt = (py: number, T: number) => {
+        let p = pose({ trunk: T, spine: 22, neck: -8 });
+        p = legTo(p, "R", [frontAnkle[0] - PX, frontAnkle[1] - py], 0);
+        return plantLeg(p, "L", [PX, py], rearBall, -66);
+      };
+      const at = (py: number): RootRule => ({ pin: "pelvis", at: [PX, py] });
+      const PY = solve1D((y) => worldPts(hamAt(y, 120), at(y)).kneeCapL[1] - 0.8, 30, 80);
+      const Th = solve1D((t) => {
+        const W = worldPts(hamAt(PY, t), at(PY));
+        return Math.hypot(W.shoulder[0] - handL[0], W.shoulder[1] - handL[1]) - 51;
+      }, 112, 70);
+      const ham = handsTo(handsTo(hamAt(PY, Th), root, handL, ["L"]), root, handR2, ["R"]);
+      const ik2h = { handL, handR: handR2, footL: rear };
+      const ikHam = { handL, handR: handR2, footL: worldPts(ham, root).ankleL };
       return M(root, [
-        { pose: elbowIn, dur: 1.5, hold: 0.6, ease: "inOut", ik: { handL, footL: rear } },
-        { pose: reach, dur: 1.5, hold: 1, ease: "inOut", ik: { handL, footL: rear } },
-      ], { stillPhase: 0.6, allowLimits: ["shR"] });
+        { pose: elbowIn, dur: 0.45, hold: 0.6, ease: "inOut", ik },
+        sweep(a1, 0.4),
+        sweep(a2, 0.25),
+        sweep(a3, 0.25),
+        sweep(a4, 0.3),
+        sweep(a5, 0.45),
+        { pose: reach, dur: 0.45, hold: 1, ease: "inOut", ik },
+        sweep(a5, 0.3),
+        sweep(a4, 0.25),
+        sweep(a3, 0.25),
+        sweep(a2, 0.4),
+        sweep(a1, 0.45),
+        { pose: handsDown, dur: 1, hold: 0.2, ease: "inOut", ik: ik2h },
+        { pose: ham, dur: 1, hold: 1.2, ease: "inOut", ik: ikHam },
+        { pose: handsDown, dur: 0.6, ease: "inOut", ik: ik2h },
+      ], { stillPhase: 0.33, allowLimits: ["shR"] });
     }
     case "knee-to-wall": {
       const root: RootRule = { pin: "soleR", at: [0, 0] };
@@ -375,25 +401,9 @@ export function coreMove(id: string, label: string, kind: CoreKind): MotionDef {
         ],
       });
     }
-    case "hip-escape": {
-      // Supine, knees bent: push off the near foot and shrimp the hips away, then slide the feet back in.
-      const flat = armsLocal(pose({ trunk: -90, neck: 14, ...both({ hip: 70, knee: 100, ankle: -5 }) }), [14, 0], [24, 10]);
-      const footW = (p: Pose, x: number) => {
-        const W = worldPts(p, { ground: x });
-        return ankleForSole(W.pelvis[0] + 46, 0);
-      };
-      const f0 = footW(flat, 0);
-      const k0 = legsTo(flat, { ground: 0 }, f0);
-      const shrimpBase = armsLocal(pose({ trunk: -98, spine: 28, neck: 24, ...both({ hip: 60, knee: 40, ankle: -5 }) }), [16, -6], [34, -6]);
-      const k1 = legsTo(shrimpBase, { ground: -34 }, f0);
-      const f2 = footW(flat, -34);
-      const k2 = legsTo(flat, { ground: -34 }, f2);
-      return M({ ground: 0 }, [
-        { pose: k0, dur: 0.6, hold: 0.25, ease: "inOut", root: { ground: 0 }, ik: { footL: f0, footR: f0 } },
-        { pose: k1, dur: 0.6, hold: 0.2, ease: "inOut", root: { ground: -34 }, ik: { footL: f0, footR: f0 } },
-        { pose: k2, dur: 0.6, ease: "inOut", root: { ground: -34 }, ik: { footL: [f2[0], f2[1]], footR: [f2[0], f2[1]] } },
-      ], { travel: -34, props: [], stillPhase: 0.4 });
-    }
+    case "hip-escape":
+      // Seen from above, on the side (patterns/floor.ts).
+      return hipEscape(id, label);
     case "woodchop":
     case "landmine-rotation":
     case "rotational-throw":
