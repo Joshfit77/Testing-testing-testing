@@ -132,14 +132,92 @@ const PLATE_T = 5; // plate thickness (cm)
 /** Perspective: the near plates are closer to the camera than the lifter, the far ones farther (camera about 4 m away). */
 const NEAR_SCALE = 1.08;
 const FAR_SCALE = 0.86;
+/** Opacity of the near plates' iron where they would hide the lifter's head or arms (see plateCover). */
+const GHOST_IRON = 0.4;
+
+/** Distance from p to the segment a–b. */
+function segDist(p: Vec, a: Vec, b: Vec): number {
+  const d = sub(b, a);
+  const L2 = d[0] * d[0] + d[1] * d[1] || 1e-9;
+  const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * d[0] + (p[1] - a[1]) * d[1]) / L2));
+  return len([p[0] - a[0] - t * d[0], p[1] - a[1] - t * d[1]]);
+}
+
+/**
+ * How much a side-view bar's near plates (centred at `c`, radius `r`) cover the lifter's head or upper arms: 0 when they
+ * are clear of them (a deadlift, a row: the plates at the shins, thighs or belly look as before), rising smoothly to 1 as
+ * they come over the face, the head or an arm (a front rack, a Zercher cradle, a press at the shoulders, a bar on the
+ * traps, a bench press at the chest). A continuous function of the pose, so the plates never flick between looks.
+ */
+function plateCover(f: Frame, c: Vec, r: number): number {
+  const P = f.pts;
+  const arm = (s: "L" | "R") => {
+    const dx = yawShift(landmarkDepth(`elbow${s}`));
+    return r + 5.5 - segDist(c, [P.shoulder[0] + dx, P.shoulder[1]], [P[`elbow${s}`][0] + dx, P[`elbow${s}`][1]]);
+  };
+  // The head as a capsule from its centre to the face (the profile, nose and brow), so a face looking up from a bench
+  // counts as well as one looking ahead.
+  const head = r + 11 - segDist(c, P.head, P.foreheadFront);
+  const depth = Math.max(head, arm("L"), arm("R"));
+  const t = Math.max(0, Math.min(1, (depth - 1) / 10));
+  return t * t * (3 - 2 * t);
+}
+
+let scratch: HTMLCanvasElement | null = null;
+
+/**
+ * Paint `draw` as one layer at opacity `alpha` (group opacity: overlapping parts don't add up), using a scratch canvas
+ * over the world box `box` = [x0, y0, x1, y1]. Falls back to drawing directly where there is no DOM canvas.
+ */
+function groupAlpha(ctx: Ctx, box: [number, number, number, number], alpha: number, draw: (c: Ctx) => void) {
+  if (typeof document === "undefined" || typeof ctx.getTransform !== "function") {
+    const g = ctx.globalAlpha;
+    ctx.globalAlpha = g * alpha;
+    draw(ctx);
+    ctx.globalAlpha = g;
+    return;
+  }
+  const m = ctx.getTransform();
+  const xs: number[] = [];
+  const ys: number[] = [];
+  for (const x of [box[0], box[2]])
+    for (const y of [box[1], box[3]]) {
+      xs.push(m.a * x + m.c * y + m.e);
+      ys.push(m.b * x + m.d * y + m.f);
+    }
+  const x0 = Math.floor(Math.min(...xs)) - 2;
+  const y0 = Math.floor(Math.min(...ys)) - 2;
+  const w = Math.min(4096, Math.ceil(Math.max(...xs)) + 2 - x0);
+  const h = Math.min(4096, Math.ceil(Math.max(...ys)) + 2 - y0);
+  if (w <= 0 || h <= 0) return;
+  scratch ??= document.createElement("canvas");
+  if (scratch.width < w) scratch.width = w;
+  if (scratch.height < h) scratch.height = h;
+  const o = scratch.getContext("2d");
+  if (!o) return;
+  o.setTransform(1, 0, 0, 1, 0, 0);
+  o.clearRect(0, 0, w, h);
+  o.setTransform(m.a, m.b, m.c, m.d, m.e - x0, m.f - y0);
+  o.globalAlpha = 1;
+  o.lineJoin = ctx.lineJoin;
+  draw(o);
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha *= alpha;
+  ctx.drawImage(scratch, 0, 0, w, h, x0, y0, w, h);
+  ctx.restore();
+}
 
 /**
  * One half of a barbell, seen with the athlete look's camera (CAMERA_YAW): the bar from its middle (on the traps, in
  * the hands, on the chest) out to the collar, two plates and the sleeve's end. The hands, shifted by the same camera
  * (a shoulder-width grip), land on it. `side` +1 is the half toward the viewer (drawn before the near arm, so the hand
  * closes over the bar), -1 the far half (drawn behind the athlete). Parts are painted far to near.
+ * `ghost` (0..1, near half only): how see-through the near plates are drawn — where they would hide the lifter's head or
+ * arms the iron is dimmed as one layer (the head, the rack or the cradle shows through) and the gold rim stays crisp, so
+ * it still reads as a loaded plate. `shaftW`: the bar's thickness (cm; an axle is thicker).
  */
-function barAcross(ctx: Ctx, at: Vec, r0: number, side: 1 | -1) {
+function barAcross(ctx: Ctx, at: Vec, r0: number, side: 1 | -1, ghost = 0, shaftW = 2.6) {
   const sc = side > 0 ? NEAR_SCALE : FAR_SCALE;
   const P = (z: number): Vec => [at[0] + yawShift(z * side) * sc, at[1]];
   const r = r0 * sc;
@@ -158,7 +236,7 @@ function barAcross(ctx: Ctx, at: Vec, r0: number, side: 1 | -1) {
     }
   };
   // A plate between depths z0 and z1 (outward from the centre): its rim band, then the face toward the viewer.
-  const plate = (z0: number, z1: number) => {
+  const plate = (c: Ctx, z0: number, z1: number) => {
     const a = P(z0);
     const b = P(z1);
     const d = sub(b, a);
@@ -173,29 +251,47 @@ function barAcross(ctx: Ctx, at: Vec, r0: number, side: 1 | -1) {
     band.arc(a[0], a[1], r, 0, Math.PI * 2);
     band.moveTo(b[0] + r, b[1]);
     band.arc(b[0], b[1], r, 0, Math.PI * 2);
-    ctx.fillStyle = IRON_LO;
-    ctx.fill(band, "nonzero");
+    c.fillStyle = IRON_LO;
+    c.fill(band, "nonzero");
     // The face the viewer sees: the outer one on the near half, the inner one on the far half.
     const face = side > 0 ? b : a;
-    plateFace(ctx, face, r, side > 0 ? 2.6 * sc : 0);
+    plateFace(c, face, r, side > 0 ? 2.6 * sc : 0);
     if (shadow) {
-      ctx.fillStyle = `rgba(0,0,0,${shadow})`;
-      ctx.beginPath();
-      ctx.arc(face[0], face[1], r + 0.3, 0, Math.PI * 2);
-      ctx.fill();
+      c.fillStyle = `rgba(0,0,0,${shadow})`;
+      c.beginPath();
+      c.arc(face[0], face[1], r + 0.3, 0, Math.PI * 2);
+      c.fill();
     }
   };
-  const shaft = () => line(at, P(COLLAR), 2.6 * sc, "round");
+  const shaft = () => line(at, P(COLLAR), shaftW * sc, "round");
   const sleeve = () => line(P(COLLAR + 2 * PLATE_T), P(COLLAR + 2 * PLATE_T + 9), 4.2 * sc, "butt");
   if (side > 0) {
     shaft();
-    plate(COLLAR, COLLAR + PLATE_T);
-    plate(COLLAR + PLATE_T, COLLAR + 2 * PLATE_T);
+    const plates = (c: Ctx) => {
+      plate(c, COLLAR, COLLAR + PLATE_T);
+      plate(c, COLLAR + PLATE_T, COLLAR + 2 * PLATE_T);
+    };
+    if (ghost > 0) {
+      const a = P(COLLAR);
+      const b = P(COLLAR + 2 * PLATE_T);
+      groupAlpha(ctx, [Math.min(a[0], b[0]) - r - 1, at[1] - r - 1, Math.max(a[0], b[0]) + r + 1, at[1] + r + 1], 1 - ghost * (1 - GHOST_IRON), plates);
+      // The outer plate's gold rim and ring stay crisp over the dimmed iron.
+      ctx.lineWidth = Math.max(0.5, r * 0.035);
+      ctx.strokeStyle = `rgba(${GOLD},${0.8 * ghost})`;
+      ctx.beginPath();
+      ctx.arc(b[0], b[1], r - 0.2, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.lineWidth = 0.4;
+      ctx.strokeStyle = `rgba(${GOLD},${0.3 * ghost})`;
+      ctx.beginPath();
+      ctx.arc(b[0], b[1], r * 0.58, 0, Math.PI * 2);
+      ctx.stroke();
+    } else plates(ctx);
     sleeve();
   } else {
     sleeve();
-    plate(COLLAR + PLATE_T, COLLAR + 2 * PLATE_T);
-    plate(COLLAR, COLLAR + PLATE_T);
+    plate(ctx, COLLAR + PLATE_T, COLLAR + 2 * PLATE_T);
+    plate(ctx, COLLAR, COLLAR + PLATE_T);
     shaft();
   }
 }
@@ -206,15 +302,26 @@ function barAcross(ctx: Ctx, at: Vec, r0: number, side: 1 | -1) {
  */
 function barFront(ctx: Ctx, c: Vec, r: number) {
   const [x, y] = c;
-  // Shaft, knurled in the middle third, and the sleeves.
+  // Shaft: dark brushed steel, lit along its upper edge (the long bar read as a bright white line in full steel), knurled
+  // in the middle third.
   ctx.lineCap = "butt";
-  ctx.strokeStyle = steel(ctx, [x, y + 1.4], [x, y - 1.4]);
-  ctx.lineWidth = 2.8;
+  const sg = ctx.createLinearGradient(x, y + 1.5, x, y - 1.5);
+  sg.addColorStop(0, "#767c83");
+  sg.addColorStop(0.45, "#4a4f55");
+  sg.addColorStop(1, "#1d2024");
+  ctx.strokeStyle = sg;
+  ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.moveTo(x - 64, y);
   ctx.lineTo(x + 64, y);
   ctx.stroke();
-  ctx.strokeStyle = "rgba(0,0,0,0.25)";
+  ctx.strokeStyle = "rgba(214,218,222,0.3)";
+  ctx.lineWidth = 0.4;
+  ctx.beginPath();
+  ctx.moveTo(x - 63, y + 0.9);
+  ctx.lineTo(x + 63, y + 0.9);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(0,0,0,0.3)";
   ctx.lineWidth = 0.35;
   for (let k = -20; k <= 20; k += 2.2) {
     ctx.beginPath();
@@ -223,37 +330,109 @@ function barFront(ctx: Ctx, c: Vec, r: number) {
     ctx.stroke();
   }
   for (const k of [-1, 1]) {
+    // Sleeve, collar (steel with a gold edge, as on the side-view bar), then two plates a side, the inner one first.
     ctx.strokeStyle = steel(ctx, [x, y + 2.1], [x, y - 2.1]);
     ctx.lineWidth = 4.2;
     ctx.beginPath();
     ctx.moveTo(x + k * 62, y);
     ctx.lineTo(x + k * 112, y);
     ctx.stroke();
-    // Collar.
-    rrect(ctx, x + k * 63 - 1.6, y - 3.4, 3.2, 6.8, 0.8);
-    ctx.fillStyle = STEEL;
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.fillRect(x + k * 97 - 0.5, y - 2.1, 1, 4.2);
+    rrect(ctx, x + k * 63.4 - 1.8, y - 3.6, 3.6, 7.2, 0.9);
+    ctx.fillStyle = steel(ctx, [x, y + 3.6], [x, y - 3.6]);
     ctx.fill();
-    // Two plates a side, the inner one first.
+    ctx.strokeStyle = `rgba(${GOLD},0.45)`;
+    ctx.lineWidth = 0.3;
+    ctx.stroke();
     for (let i = 0; i < 2; i++) {
-      const px = x + k * (67.5 + i * 5.6);
-      rrect(ctx, px - 2.6, y - r, 5.2, 2 * r, 1.6);
-      const g = ctx.createLinearGradient(px - 2.6, y, px + 2.6, y);
-      g.addColorStop(0, IRON_HI);
-      g.addColorStop(0.45, IRON);
+      // Iron plate edge-on: its rim is lit from above (the key light) and falls into shadow below, with the gold edge
+      // of each face, like the plate faces on the side-view bar.
+      const px = x + k * (68.2 + i * 6.4);
+      const t = 6;
+      rrect(ctx, px - t / 2, y - r, t, 2 * r, 2.2);
+      const g = ctx.createLinearGradient(px, y + r, px, y - r);
+      g.addColorStop(0, "#3a3a3e");
+      g.addColorStop(0.18, "#56565b");
+      g.addColorStop(0.5, "#2b2b2e");
       g.addColorStop(1, IRON_LO);
       ctx.fillStyle = g;
       ctx.fill();
-      ctx.strokeStyle = `rgba(${GOLD},0.75)`;
-      ctx.lineWidth = 0.45;
+      const side = ctx.createLinearGradient(px - t / 2, y, px + t / 2, y);
+      side.addColorStop(0, "rgba(0,0,0,0.35)");
+      side.addColorStop(0.35, "rgba(0,0,0,0)");
+      side.addColorStop(0.7, "rgba(255,255,255,0.05)");
+      side.addColorStop(1, "rgba(0,0,0,0.3)");
+      ctx.fillStyle = side;
+      ctx.fill();
+      ctx.strokeStyle = `rgba(${GOLD},0.8)`;
+      ctx.lineWidth = 0.5;
       ctx.stroke();
-      ctx.strokeStyle = "rgba(255,255,255,0.08)";
-      ctx.lineWidth = 0.8;
+      // Raised rim lips at the top and bottom of the plate, and the hub band where it meets the sleeve.
+      ctx.strokeStyle = "rgba(255,255,255,0.1)";
+      ctx.lineWidth = 1.2;
+      for (const s of [1, -1]) {
+        ctx.beginPath();
+        ctx.moveTo(px - t / 2 + 0.8, y + s * (r - 2.2));
+        ctx.lineTo(px + t / 2 - 0.8, y + s * (r - 2.2));
+        ctx.stroke();
+      }
+      ctx.strokeStyle = `rgba(${GOLD},0.28)`;
+      ctx.lineWidth = 0.35;
       ctx.beginPath();
-      ctx.moveTo(px - 1.6, y - r + 2);
-      ctx.lineTo(px - 1.6, y + r - 2);
+      ctx.moveTo(px - t / 2 + 0.6, y + r * 0.58);
+      ctx.lineTo(px + t / 2 - 0.6, y + r * 0.58);
+      ctx.moveTo(px - t / 2 + 0.6, y - r * 0.58);
+      ctx.lineTo(px + t / 2 - 0.6, y - r * 0.58);
       ctx.stroke();
     }
   }
+}
+
+/**
+ * A training mat lying on the floor, seen from above or from a raised camera: a dark graphite rubber surface with rounded
+ * corners, a gold edge and faint ridges along its length (`at` = centre, `w` × `h` on screen, `angle` degrees).
+ * `seams` > 0: the joins of floor tiles across it every `seams` cm of world x (so a drill that travels a whole number
+ * of tiles per loop moves over the floor seamlessly).
+ */
+function floorMat(ctx: Ctx, c: Vec, w: number, h: number, angle = 0, seams = 0) {
+  ctx.save();
+  ctx.translate(c[0], c[1]);
+  ctx.rotate((angle * Math.PI) / 180);
+  rrect(ctx, -w / 2, -h / 2, w, h, Math.min(6, h / 4));
+  const g = ctx.createLinearGradient(0, h / 2, 0, -h / 2);
+  g.addColorStop(0, "#24221f");
+  g.addColorStop(0.5, "#1a1917");
+  g.addColorStop(1, "#121110");
+  ctx.fillStyle = g;
+  ctx.fill();
+  ctx.strokeStyle = `rgba(${GOLD},0.5)`;
+  ctx.lineWidth = 0.6;
+  ctx.stroke();
+  ctx.clip();
+  ctx.strokeStyle = "rgba(255,255,255,0.025)";
+  ctx.lineWidth = 0.8;
+  for (let y = -h / 2 + 6; y < h / 2 - 3; y += 6) {
+    ctx.beginPath();
+    ctx.moveTo(-w / 2 + 3, y);
+    ctx.lineTo(w / 2 - 3, y);
+    ctx.stroke();
+  }
+  if (seams > 0) {
+    ctx.strokeStyle = "rgba(0,0,0,0.4)";
+    ctx.lineWidth = 0.7;
+    for (let x = Math.ceil((c[0] - w / 2) / seams) * seams; x < c[0] + w / 2; x += seams) {
+      ctx.beginPath();
+      ctx.moveTo(x - c[0], -h / 2);
+      ctx.lineTo(x - c[0], h / 2);
+      ctx.stroke();
+    }
+  }
+  rrect(ctx, -w / 2 + 3, -h / 2 + 3, w - 6, h - 6, Math.min(4, h / 5));
+  ctx.strokeStyle = `rgba(${GOLD},0.12)`;
+  ctx.lineWidth = 0.4;
+  ctx.stroke();
+  ctx.restore();
 }
 
 /** Screen shift of a prop with the athlete look's camera: it follows the depth of the landmark it is anchored to. */
@@ -455,13 +634,16 @@ function rowStation(ctx: Ctx, seatAt: Vec, f: Frame, hands: Vec | undefined) {
   if (hands) cableTo(ctx, pul, hands, "v");
 }
 
+/** A barbell drawn across the picture in halves (barAcross): a plain bar or an axle, seen from the side. */
+const barInHalves = (p: ResolvedProp, f: Frame) => p.def.kind === "barbell" && f.view === "side" && (!p.def.variant || p.def.variant === "axle");
+
 /**
  * Where a prop is drawn in the athlete look. A side-view barbell draws its near half under the near arm (the hand
  * closes over it) and its far half behind the athlete.
  */
 export function athleteLayer(p: ResolvedProp, f: Frame): string {
   const l = p.layer ?? p.def.layer ?? "near";
-  if (p.def.kind === "barbell" && f.view === "side" && !p.def.variant) return "near";
+  if (barInHalves(p, f)) return "near";
   return l;
 }
 
@@ -478,12 +660,19 @@ export function drawPropAthlete(ctx: Ctx, p: ResolvedProp, f: Frame, pass: "main
         if (pass === "main") barFront(ctx, at, size ?? 22.5);
         return true;
       }
-      if (f.view !== "side" || def.variant) return false;
-      barAcross(ctx, at, size ?? 22.5, pass === "main" ? 1 : -1);
+      if (!barInHalves(p, f)) return false;
+      const r0 = size ?? 22.5;
+      const near = pass === "main";
+      const ghost = near ? plateCover(f, [at[0] + yawShift(COLLAR + PLATE_T) * NEAR_SCALE, at[1]], r0 * NEAR_SCALE) : 0;
+      // An axle is a thick (5 cm) bar.
+      barAcross(ctx, at, r0, near ? 1 : -1, ghost, def.variant === "axle" ? 5 : 2.6);
       return true;
     }
     case "plate":
       plateFace(ctx, at, size ?? 22.5);
+      return true;
+    case "floorMat":
+      floorMat(ctx, at, def.w ?? 200, def.h ?? 80, def.angle ?? 0, def.size ?? 0);
       return true;
     case "dumbbell": {
       const hand = def.follow ?? "handR";
@@ -543,5 +732,5 @@ export function drawPropAthlete(ctx: Ctx, p: ResolvedProp, f: Frame, pass: "main
 
 /** The layer of a prop's second part, if it has one: a side-view barbell's far half, behind the athlete. */
 export function extraLayer(p: ResolvedProp, f: Frame): string | null {
-  return p.def.kind === "barbell" && f.view === "side" && !p.def.variant ? "far" : null;
+  return barInHalves(p, f) ? "far" : null;
 }

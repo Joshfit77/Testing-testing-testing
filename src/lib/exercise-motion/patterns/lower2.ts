@@ -1,6 +1,7 @@
 import { BODY, ankleForSole } from "../skeleton";
 import {
   FEET,
+  armThrough,
   armsLocal,
   both,
   centerOfMass,
@@ -522,8 +523,23 @@ export function backExtension(id: string, label: string): MotionDef {
 /** Seated hip abduction (machine or band above the knees), front view. */
 export function hipAbduction(id: string, label: string): MotionDef {
   const root: RootRule = { pin: "pelvis", at: [0, 52] };
+  // Torso leaned slightly forward and braced, both hands gripping the sides of the bench beside the hips (arms long,
+  // elbows soft and a little out); only the legs move.
+  const SEAT_W = 56;
+  const arms = (p: Pose): Pose => {
+    let out = p;
+    for (const s of ["L", "R"] as const) {
+      const k = s === "L" ? 1 : -1;
+      const W = worldPts(out, root, "front");
+      const sh = W[`shoulder${s}`];
+      const hand: Vec = [k * (SEAT_W / 2 + 1), 44.5];
+      const elbow: Vec = [(sh[0] + hand[0]) / 2 + k * 4.5, (sh[1] + hand[1]) / 2 + 1];
+      out = armThrough(out, s, toLocal(out, root, elbow, "front"), toLocal(out, root, hand, "front"), "front");
+    }
+    return out;
+  };
   const at = (abd: number) =>
-    pose({ trunk: 0, neck: 0, hipL: 84, hipR: 84, legDL: 90 - abd, legDR: 90 - abd, kneeL: 0, kneeR: 0, ankleL: abd * 0.25, ankleR: abd * 0.25, shL: 22, shR: 22, elL: 30, elR: 30 });
+    arms(pose({ trunk: 0, trunkD: 8, neck: -4, hipL: 84, hipR: 84, legDL: 90 - abd, legDR: 90 - abd, kneeL: 0, kneeR: 0, ankleL: abd * 0.25, ankleR: abd * 0.25 }));
   return {
     id,
     view: "front",
@@ -533,7 +549,7 @@ export function hipAbduction(id: string, label: string): MotionDef {
       { pose: at(42), dur: 1.2, hold: 0.8, ease: "inOut" },
     ]),
     props: [
-      { id: "seat", kind: "box", at: [0, 0], w: 50, h: 44, layer: "far" },
+      { id: "seat", kind: "box", at: [0, 0], w: SEAT_W, h: 44, layer: "far" },
       { id: "band", kind: "band", at: { lm: "kneeL", dy: 6 }, to: { lm: "kneeR", dy: 6 }, layer: "near" },
     ],
     allowLimits: ["hipL", "hipR"],

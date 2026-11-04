@@ -957,20 +957,13 @@ function drawFront(ctx: Ctx, f: Frame, layer: LayerFn, hl: Highlight) {
       lineW(ctx, [add(add(p.pelvis, u1, 7.6), r1, 14.4), add(add(p.pelvis, u1, 7.2), r1, 0), add(add(p.pelvis, u1, 7.6), r1, -14.4)], 0.5, 0.4);
     },
   };
-  const items: Item[] = [
-    { layer: "far" },
-    legs[0]!.skin,
-    legs[1]!.skin,
-    legs[0]!.shoe,
-    legs[1]!.shoe,
-    { layer: "mid" },
-    torso,
-    shorts,
-    headG,
-    hairG,
-    { layer: "near" },
-    ...(["L", "R"] as const).map((s) => armGroup(ctx, p[`shoulder${s}`], p[`elbow${s}`], p[`hand${s}`], SKIN_NEAR, hl, 1, 0.3, s === "R")),
-  ];
+  const legItems: Item[] = [legs[0]!.skin, legs[1]!.skin, legs[0]!.shoe, legs[1]!.shoe];
+  const arms = (["L", "R"] as const).map((s) => armGroup(ctx, p[`shoulder${s}`], p[`elbow${s}`], p[`hand${s}`], SKIN_NEAR, hl, 1, 0.3, s === "R"));
+  // Opt-in (MotionDef.legsInFront): a body seen from above with its thighs raised toward the viewer has its legs, and the
+  // shorts over them, in front of the torso.
+  const items: Item[] = f.legsInFront
+    ? [{ layer: "far" }, { layer: "mid" }, torso, headG, hairG, ...legItems, shorts, { layer: "near" }, ...arms]
+    : [{ layer: "far" }, ...legItems, { layer: "mid" }, torso, shorts, headG, hairG, { layer: "near" }, ...arms];
   render(ctx, items, layer);
 }
 

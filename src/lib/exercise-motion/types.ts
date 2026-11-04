@@ -182,6 +182,12 @@ export type PropKind =
   | "landmine"
   | "abWheel"
   | "mat"
+  /**
+   * A mat lying on the floor, seen from above or from a raised camera (floor-level drills drawn in those views): `at` =
+   * its centre, `w` × `h` its size on screen, `angle` an optional turn (degrees), `size` the spacing of floor-tile joins
+   * across it (cm of world x; 0 = none).
+   */
+  | "floorMat"
   | "legPress"
   | "hackSquat"
   | "legExtension"
@@ -246,6 +252,12 @@ export interface MotionDef {
   mirror?: boolean;
   /** Floor style. */
   floor?: "plain" | "mat" | "none";
+  /**
+   * Front view only, opt-in: draw the legs (and shorts) in front of the torso instead of behind it, for a body seen from
+   * above or from a raised camera whose thighs come up toward the viewer (a knee pulled to the chest, a leg crossed
+   * over the other, knees bent toward the camera while lying on one side).
+   */
+  legsInFront?: boolean;
   /** Joint-limit checks to skip for deliberately stylised poses (documented in the definition). */
   allowLimits?: PoseKey[];
   /**
@@ -273,6 +285,8 @@ export interface Frame {
   cameraX: number;
   /** How far the floor clamp had to raise the whole figure (diagnostic; ~0 for well-authored motions). */
   lifted?: number;
+  /** Copied from MotionDef.legsInFront (front view: legs drawn in front of the torso). */
+  legsInFront?: boolean;
   /** Absolute (screen-plane) segment directions in degrees, down-angle convention. */
   seg: {
     T1: number;
