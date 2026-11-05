@@ -823,9 +823,12 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
               </span>
               {paused && <span className="text-gold">Paused</span>}
               <span aria-hidden>·</span>
-              {summary.completedSets}/{summary.totalSets - summary.skippedSets} sets
-              <span aria-hidden>·</span>
-              <span className="inline-flex items-center gap-1" role="status">
+              <span className="whitespace-nowrap">
+                {summary.completedSets}/{summary.totalSets - summary.skippedSets} sets
+              </span>
+              {/* The separator only when there is a sync status after it (none before the first save). */}
+              {sync !== "idle" && <span aria-hidden>·</span>}
+              <span className="inline-flex items-center gap-1 whitespace-nowrap" role="status">
                 {sync === "synced" ? (
                   <>
                     <Cloud className="size-3.5" aria-hidden /> Synced

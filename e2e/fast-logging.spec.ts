@@ -33,6 +33,10 @@ test.describe("fast workout logging", () => {
     const uid = await userIdFor(email);
 
     await page.goto("/train/workout");
+    // Before anything is saved there is no sync status, so no separator dangles after the set count.
+    const meta = page.locator("p").filter({ hasText: /\d+\/\d+ sets/ }).first();
+    await expect(meta).toBeVisible();
+    await expect(meta).not.toHaveText(/·\s*$/);
     await pickExercise(page, "Barbell Bench Press");
     const card = page.getByTestId("current-set-card");
     await expect(card.getByTestId("current-exercise")).toHaveText(/Barbell Bench Press/i);
@@ -42,6 +46,7 @@ test.describe("fast workout logging", () => {
     await expect(card.getByTestId("then-next")).toHaveText(/^Then: set 2 of 3$/i);
     // (Wait for the backup of "exercise added", so the next one is the set's own.)
     await expect(page.getByText("Synced", { exact: true })).toBeVisible();
+    await expect(meta).toHaveText(/sets\s*·\s*Synced$/);
 
     // Set 1: 135 × 10, one tap. The backup to the account goes out straight away, not after the 2-second typing wait.
     await card.getByLabel("Weight (lb)").fill("135");
