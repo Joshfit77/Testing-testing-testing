@@ -36,8 +36,6 @@ let n = 0;
 const shot = async (name) => { n++; await page.screenshot({ path: path.join(shots, `${String(n).padStart(2, "0")}-${name}.png`) }); };
 const cur = () => page.evaluate(() => ({ key: window.demo.screens.find((s) => document.querySelector("#title b")?.textContent === (s.title || s.key))?.key ?? null, title: document.querySelector("#title b")?.textContent, back: !document.getElementById("back").disabled, nav: !document.getElementById("navbar").hidden }));
 const tapHot = async (re) => {
-  const b = page.locator("#col .hs").filter({ has: page.locator(`xpath=self::*[matches(@aria-label, '${re}')]`) });
-  const btn = page.locator("#col .hs").getByText("");
   const all = await page.locator("#col .hs").evaluateAll((els, re) => els.map((e, i) => ({ i, l: e.getAttribute("aria-label"), cls: e.className })).filter((x) => new RegExp(re, "i").test(x.l)), re);
   if (!all.length) { check(`tap target /${re}/ exists`, false); return null; }
   const el = page.locator("#col .hs").nth(all[0].i);

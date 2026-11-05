@@ -23,7 +23,6 @@ const errors = [];
 page.on("pageerror", (e) => errors.push(`page: ${e.message.split("\n")[0]}`));
 
 // The fixed tab bar is captured once per tab and drawn by the viewer; the pages are captured without it.
-const HIDE_NAV = `nav[data-hide-with-keyboard]{visibility:hidden!important} *{caret-color:transparent!important}`;
 await ctx.addInitScript(() => {
   const st = document.createElement("style");
   st.id = "ng-cap";
@@ -310,7 +309,7 @@ if (!SKIP_FLOWS) try {
   await page.getByRole("button", { name: "Send message" }).click();
   await page.getByTestId("coach-reply").last().waitFor({ timeout: 30000 });
   await settle(1200);
-  const reply = await state("state:coach-reply", "The coach's reply (simulated in the demo)", { group: "AI Coach", tab: "none" });
+  await state("state:coach-reply", "The coach's reply (simulated in the demo)", { group: "AI Coach", tab: "none" });
   link(typed, /Send message/, "state:coach-reply");
   if (coach) link(coach, /Send message/, "state:coach-typed");
 } catch (e) { log(`coach flow FAILED: ${String(e.message).split("\n")[0].slice(0, 200)}`); errors.push(`coach: ${e.message.split("\n")[0]}`); }
