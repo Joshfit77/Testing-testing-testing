@@ -62,11 +62,13 @@ export default async function ExercisesPage({
         description="Technique guides, form cues, common mistakes and alternatives."
       />
 
+      {/* One row only from xl: beside the side menu (from md) the four fixed-width selects are wider than the column on
+          a tablet or an unfolded phone (Galaxy Z Fold), which made the page scroll sideways. */}
       <form
-        className="grid grid-cols-2 gap-2 rounded-2xl border border-border bg-card p-3 md:grid-cols-[1fr_170px_170px_170px_170px_auto]"
+        className="grid grid-cols-2 gap-2 rounded-2xl border border-border bg-card p-3 md:grid-cols-4 xl:grid-cols-[1fr_170px_170px_170px_170px_auto]"
         role="search"
       >
-        <label className="relative col-span-2 md:col-span-1">
+        <label className="relative col-span-2 md:col-span-4 xl:col-span-1">
           <span className="sr-only">Search exercises</span>
           <Search
             className="pointer-events-none absolute left-3 top-3.5 size-4 text-muted-foreground"
@@ -119,7 +121,7 @@ export default async function ExercisesPage({
             </option>
           ))}
         </NativeSelect>
-        <Button type="submit" variant="secondary" className="col-span-2 md:col-span-1">
+        <Button type="submit" variant="secondary" className="col-span-2 md:col-span-4 xl:col-span-1">
           Filter
         </Button>
       </form>

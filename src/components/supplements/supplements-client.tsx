@@ -132,13 +132,15 @@ export function SupplementsClient({ today, stack, takenToday, dietId, dietName }
         ))}
       </div>
 
-      <ul className="grid gap-4 md:grid-cols-2" aria-label="Supplements">
+      {/* Two columns only from lg: beside the side menu on a 768-point iPad, two cards left the category and "Add to
+          stack" no room and the page scrolled sideways. */}
+      <ul className="grid gap-4 lg:grid-cols-2" aria-label="Supplements">
         {shown.map((s) => {
           const added = inStack.has(s.id);
           const note = dietNote(s, dietId, dietName);
           const busy = pendingKey === `stack:${s.id}`;
           return (
-            <li key={s.id} className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4" aria-labelledby={`sup-${s.id}`}>
+            <li key={s.id} className="flex min-w-0 flex-col gap-3 rounded-2xl border border-border bg-card p-4" aria-labelledby={`sup-${s.id}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h3 id={`sup-${s.id}`} className="flex items-center gap-2 font-display text-lg font-semibold uppercase leading-tight">
@@ -165,7 +167,7 @@ export function SupplementsClient({ today, stack, takenToday, dietId, dietName }
                   <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden /> {note}
                 </p>
               )}
-              <div className="mt-auto flex items-center justify-between gap-3 pt-1">
+              <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-1">
                 <Badge variant="outline">{SUPPLEMENT_CATEGORY_LABELS[s.category]}</Badge>
                 {added ? (
                   <Button

@@ -15,7 +15,8 @@ import { detailPages, problems, STATIC, watch } from "./screen-checks";
  * doesn't change what is checked). Real-device checks are in docs/device-testing/DEVICE_TEST_SCRIPT.md.
  *
  *   E2E_DEVICE_MATRIX=1 npx playwright test e2e/device-matrix.spec.ts --project=mobile --workers=4
- *   E2E_DEVICE_MATRIX=ios | android   only that platform's models
+ *   E2E_DEVICE_MATRIX=ios | android   only that platform's phones
+ *   E2E_DEVICE_MATRIX=tablets         iPads and Galaxy Tabs instead (portrait), with the side menu layout
  *   E2E_MATRIX_OUT=dir                results (one JSON per run) and photos; default test-results/device-matrix
  */
 const which = process.env.E2E_DEVICE_MATRIX ?? "";
@@ -30,8 +31,10 @@ const OUT = process.env.E2E_MATRIX_OUT ?? "test-results/device-matrix";
 type Group = { key: string; ios: boolean; width: number; height: number; models: string[] };
 const groups = new Map<string, Group>();
 for (const [name, d] of Object.entries(devices)) {
-  if (!/^(iPhone|Pixel|Galaxy)/.test(name) || /landscape/i.test(name) || /Tab\b/.test(name) || !d.isMobile || NOT_AN_APP_SCREEN.has(name)) continue;
-  const ios = name.startsWith("iPhone");
+  if (/landscape/i.test(name) || !d.isMobile || NOT_AN_APP_SCREEN.has(name)) continue;
+  const tablet = /^(iPad|Galaxy Tab)/.test(name);
+  if (which === "tablets" ? !tablet : tablet || !/^(iPhone|Pixel|Galaxy)/.test(name)) continue;
+  const ios = /^iP(hone|ad)/.test(name);
   if (which === "ios" && !ios) continue;
   if (which === "android" && ios) continue;
   const key = `${ios ? "ios" : "android"}-${d.viewport.width}x${d.viewport.height}`;
