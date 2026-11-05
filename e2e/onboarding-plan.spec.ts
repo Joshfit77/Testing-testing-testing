@@ -7,7 +7,7 @@ test.describe("guided onboarding builds a plan", () => {
     await page.waitForURL(/\/onboarding/);
 
     // Progress bar + validation on a screen.
-    await expect(page.getByText("Question 1 of 6")).toBeVisible();
+    await expect(page.getByText("Question 1 of 5")).toBeVisible();
     await page.getByRole("button", { name: /^Continue/ }).click();
     await expect(page.getByText("Choose your main goal.")).toBeVisible();
 
@@ -57,11 +57,11 @@ test.describe("guided onboarding builds a plan", () => {
     await page.getByRole("button", { name: /^Continue/ }).click();
     await page.getByRole("button", { name: "1–3 years", exact: true }).click();
     await page.getByRole("button", { name: /^Continue/ }).click();
-    await expect(page.getByText("Question 3 of 6")).toBeVisible();
+    await expect(page.getByText("Question 3 of 5")).toBeVisible();
 
     // A reload (or an accidental back-swipe) carries on where the member was.
     await page.reload();
-    await expect(page.getByText("Question 3 of 6")).toBeVisible();
+    await expect(page.getByText("Question 3 of 5")).toBeVisible();
 
     // Saved answers that belong to a different account are thrown away, not shown.
     await page.evaluate(() => {
@@ -70,7 +70,7 @@ test.describe("guided onboarding builds a plan", () => {
       sessionStorage.setItem(key, JSON.stringify({ ...saved, owner: "00000000-0000-0000-0000-000000000000", age: "61" }));
     });
     await page.reload();
-    await expect(page.getByText("Question 1 of 6")).toBeVisible();
+    await expect(page.getByText("Question 1 of 5")).toBeVisible();
     await expect(page.getByRole("button", { name: "Build strength", exact: true })).toHaveAttribute("aria-pressed", "false");
     const owner = await page.evaluate(() => (JSON.parse(sessionStorage.getItem("ngf.onboarding.progress.v1") ?? "{}") as { owner?: string; age?: string }));
     expect(owner.age ?? "").not.toBe("61");

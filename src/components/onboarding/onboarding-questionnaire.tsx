@@ -407,7 +407,9 @@ export function OnboardingQuestionnaire({ userId, initialName }: { userId: strin
     <div className="space-y-6">
       <div>
         <div className="mb-2 flex justify-between text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          <span>{optionalIndex >= 0 ? `Optional ${optionalIndex + 1} of ${STEPS.length - QUICK_STEPS}` : `Question ${step + 1} of ${QUICK_STEPS}`}</span>
+          {/* The quick part is five questions and the Ready screen; the counter counts only the questions (the welcome
+              page promises five). */}
+          <span>{optionalIndex >= 0 ? `Optional ${optionalIndex + 1} of ${STEPS.length - QUICK_STEPS}` : ready ? `All ${QUICK_STEPS - 1} answered` : `Question ${step + 1} of ${QUICK_STEPS - 1}`}</span>
           <span className="text-gold">{STEPS[step]!.title}</span>
         </div>
         <ProgressBar value={optionalIndex >= 0 ? 100 : ((step + 1) / QUICK_STEPS) * 100} label="Onboarding progress" />

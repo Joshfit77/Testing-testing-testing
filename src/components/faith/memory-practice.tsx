@@ -109,11 +109,12 @@ export function MemoryPractice({ id, text, parts, reference, level }: { id: stri
         </div>
       )}
 
+      {/* Half a phone's width each: the labels may take two lines rather than run past the button's edge. */}
       <div className="grid grid-cols-2 gap-2">
-        <Button type="button" disabled={pending} onClick={() => finish("remembered")}>
+        <Button type="button" disabled={pending} onClick={() => finish("remembered")} className="h-auto min-h-11 whitespace-normal px-3 py-2 leading-tight">
           <ThumbsUp aria-hidden /> I remembered it
         </Button>
-        <Button type="button" variant="secondary" disabled={pending} onClick={() => finish("struggled")}>
+        <Button type="button" variant="secondary" disabled={pending} onClick={() => finish("struggled")} className="h-auto min-h-11 whitespace-normal px-3 py-2 leading-tight">
           <Undo2 aria-hidden /> Needs more practice
         </Button>
       </div>
