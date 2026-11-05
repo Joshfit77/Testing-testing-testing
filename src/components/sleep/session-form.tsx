@@ -6,18 +6,7 @@ import { Input, NativeSelect, Textarea } from "@/components/ui/input";
 import { initialActionState } from "@/lib/action-state";
 import { isoToLocalInput, isValidTimeZone, type SleepSession } from "@/lib/domain/sleep";
 import { saveSleepSessionAction } from "@/server/actions/sleep";
-
-function zoneOptions(current: string): string[] {
-  let zones: string[] = [];
-  try {
-    zones = (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf?.("timeZone") ?? [];
-  } catch {
-    zones = [];
-  }
-  if (!zones.includes(current)) zones = [current, ...zones];
-  if (!zones.includes("UTC")) zones.push("UTC");
-  return zones;
-}
+import { initialTimeZoneOptions, timeZoneOptions } from "@/lib/time-zone-options";
 
 function deviceZone(fallback: string): string {
   try {
@@ -38,11 +27,11 @@ export function SleepSessionForm({ session, timezone, defaults, returnTo }: { se
   // The first render must match the server's HTML, so it uses the account's zone; the phone's own zone and its list of
   // zones (which differ from the server's) are applied once the form is on the device.
   const [zone, setZone] = useState(session?.timezone ?? timezone);
-  const [zones, setZones] = useState(() => [...new Set([session?.timezone ?? timezone, "UTC"])]);
+  const [zones, setZones] = useState(() => initialTimeZoneOptions(session?.timezone ?? timezone));
   useEffect(() => {
     const z = session?.timezone ?? deviceZone(timezone);
     setZone(z);
-    setZones(zoneOptions(z));
+    setZones(timeZoneOptions(z));
   }, [session?.timezone, timezone]);
   const local = (iso: string | null | undefined) => (iso ? isoToLocalInput(iso, session?.timezone ?? zone) : "");
   const err = (name: string) => state.fieldErrors?.[name];

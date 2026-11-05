@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useMemo, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { FieldError, FormMessage, SubmitButton } from "@/components/common/form-status";
 import { Input, NativeSelect } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { confirmDialog } from "@/components/ui/confirm";
 import { initialActionState } from "@/lib/action-state";
 import { cmToFeetInches, feetInchesToCm } from "@/lib/domain/units";
+import { initialTimeZoneOptions, timeZoneOptions } from "@/lib/time-zone-options";
 import type { UnitSystem } from "@/lib/domain/types";
 import { deleteAccountAction, updateProfileAction, withdrawWellnessConsentAction, setAiDataConsentAction } from "@/server/actions/profile";
 
@@ -23,13 +24,11 @@ export function ProfileForm({
   const [inches, setInches] = useState(initial.heightCm ? String(fi.inches) : "");
   const [cm, setCm] = useState(initial.heightCm ? String(initial.heightCm) : "");
   const [faith, setFaith] = useState(initial.faithEnabled);
-  const zones = useMemo(() => {
-    try {
-      return (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf?.("timeZone") ?? [initial.timezone];
-    } catch {
-      return [initial.timezone];
-    }
-  }, [initial.timezone]);
+  // The first render must match the server's HTML, so it offers only the member's zone (and UTC); the device's own list
+  // of zones differs from the server's (Safari's isn't Node's: React error #418 on this page) and is added once the
+  // form is on the device. The member's zone is always in the list, so saving the form never changes it by accident.
+  const [zones, setZones] = useState(() => initialTimeZoneOptions(initial.timezone));
+  useEffect(() => setZones(timeZoneOptions(initial.timezone)), [initial.timezone]);
   const heightCm = units === "metric" ? cm : feet ? String(feetInchesToCm(Number(feet), Number(inches || 0))) : "";
   const fe = state.fieldErrors ?? {};
 

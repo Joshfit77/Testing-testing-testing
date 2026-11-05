@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { devices, expect, test } from "@playwright/test";
 import { completeOnboarding, grantPlan, signUpAndConfirm, uniqueEmail } from "./helpers";
-import { detailPages, problems, STATIC, watch } from "./screen-checks";
+import { detailPages, problems, STATIC, visit, watch } from "./screen-checks";
 
 /**
  * Every iPhone and Android phone in Playwright's device list, portrait: each signed-in screen (the phone sweep's list)
@@ -58,13 +58,14 @@ for (const g of [...groups.values()].sort((a, b) => a.width - b.width || a.heigh
     await signUpAndConfirm(page, email);
     await completeOnboarding(page);
     await grantPlan(email, "pro");
-    const errors = await watch(page);
-    const pages = [...STATIC, ...(await detailPages(page))];
+    const errors = await watch(page, new URL(baseURL!).origin);
+    const retries: string[] = [];
+    const pages = [...STATIC, ...(await detailPages(page, retries))];
 
     const found: string[] = [];
     for (const p of pages) {
       errors.length = 0;
-      const res = await page.goto(p);
+      const res = await visit(page, p, retries);
       if ((res?.status() ?? 0) >= 400) found.push(`${p}: HTTP ${res?.status()}`);
       await page.waitForLoadState("networkidle").catch(() => null);
       for (const issue of [...(await problems(page, g.width)), ...errors]) found.push(`${p}: ${issue}`);
@@ -72,11 +73,11 @@ for (const g of [...groups.values()].sort((a, b) => a.width - b.width || a.heigh
     const shots = path.join(OUT, "photos", g.key);
     fs.mkdirSync(shots, { recursive: true });
     for (const [i, p] of PHOTOS.entries()) {
-      await page.goto(p);
+      await visit(page, p, retries);
       await page.waitForLoadState("networkidle").catch(() => null);
       await page.screenshot({ path: path.join(shots, `${String(i).padStart(2, "0")}-${p.replace(/\W+/g, "-").replace(/^-/, "")}.png`) });
     }
-    fs.writeFileSync(path.join(OUT, `${g.key}.json`), JSON.stringify({ ...g, engine: browser.browserType().name(), screens: pages.length, problems: found }, null, 1));
+    fs.writeFileSync(path.join(OUT, `${g.key}.json`), JSON.stringify({ ...g, engine: browser.browserType().name(), screens: pages.length, problems: found, cancelledPrefetches: errors.cancelledPrefetches, navigationRetries: retries }, null, 1));
     await context.close();
     expect(found, found.join("\n")).toEqual([]);
   });

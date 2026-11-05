@@ -21,9 +21,27 @@ export const STATIC = [
   "/profile", "/profile/preferences", "/profile/billing",
 ];
 
-export async function watch(page: Page) {
-  const errors: string[] = [];
-  page.on("pageerror", (e) => errors.push(`script error: ${e.message.slice(0, 160)}`));
+/**
+ * WebKit reports a cancelled fetch as an error: leaving a page cancels the app's own route prefetches (Next.js
+ * `?_rsc=` requests), and WebKit raises "… due to access control checks" for each. Chromium doesn't. Those are
+ * counted (watch().cancelledPrefetches), not treated as defects; any other message, or one for another origin, is.
+ */
+export function isCancelledPrefetch(message: string, origin: string): boolean {
+  // As Playwright reports it from WebKit: "[Fetch API cannot load ][http:]/localhost:3000/faith?_rsc=… due to access
+  // control checks." (the scheme can be cut off), so the host is compared rather than the full origin.
+  const m = /(\S+?)\.? due to access control checks/i.exec(message);
+  const target = m && /^(?:https?:)?\/*([^/?#\s]+)[^?#\s]*\?(\S*)$/.exec(m[1]!);
+  if (!target) return false;
+  return target[1] === new URL(origin).host && new URLSearchParams(target[2]).has("_rsc");
+}
+
+export async function watch(page: Page, origin?: string) {
+  const errors: string[] & { cancelledPrefetches?: number } = [];
+  errors.cancelledPrefetches = 0;
+  page.on("pageerror", (e) => {
+    if (origin && isCancelledPrefetch(e.message, origin)) errors.cancelledPrefetches! += 1;
+    else errors.push(`script error: ${e.message.slice(0, 160)}`);
+  });
   await page.addInitScript(() => {
     document.addEventListener("securitypolicyviolation", (e) => {
       (window as unknown as { __csp?: string[] }).__csp = [...((window as unknown as { __csp?: string[] }).__csp ?? []), `${e.violatedDirective} ${e.blockedURI || "inline"}`];
@@ -73,13 +91,29 @@ export async function problems(page: Page, width: number): Promise<string[]> {
   }, width);
 }
 
+/**
+ * page.goto, once more if a navigation the app had already started (e.g. the welcome redirect after onboarding, which
+ * WebKit can finish late) interrupts it. Each retry is recorded in `retries` so a run shows how often it happened; an
+ * app that kept navigating on its own would still fail, on the second attempt.
+ */
+export async function visit(page: Page, url: string, retries?: string[]) {
+  try {
+    return await page.goto(url);
+  } catch (e) {
+    if (!/interrupted by another navigation/i.test(String(e))) throw e;
+    retries?.push(`${url}: ${String(e).split("\n")[0]!.slice(0, 140)}`);
+    await page.waitForLoadState("load").catch(() => null);
+    return page.goto(url);
+  }
+}
+
 /** One of each kind of detail screen, found the way a member would. */
-export async function detailPages(page: Page): Promise<string[]> {
-  await page.goto("/train/exercises");
+export async function detailPages(page: Page, retries?: string[]): Promise<string[]> {
+  await visit(page, "/train/exercises", retries);
   const exercise = await page.locator('a[href^="/train/exercises/"]').first().getAttribute("href");
-  await page.goto("/train/programs");
+  await visit(page, "/train/programs", retries);
   const program = await page.locator('a[href^="/train/programs/"]').first().getAttribute("href");
-  await page.goto("/nutrition/recipes");
+  await visit(page, "/nutrition/recipes", retries);
   const recipe = await page.locator('a[href^="/nutrition/recipes/app/"]').first().getAttribute("href");
   return [exercise!, `${exercise!}/history`, program!, "/train/programs/half-marathon-base-80-20", recipe!].filter(Boolean);
 }
