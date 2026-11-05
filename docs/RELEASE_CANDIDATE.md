@@ -6,6 +6,12 @@ This document is the integration record, the security and payment findings, the 
 result below was produced in this session unless it says otherwise; anything not run is marked **NOT RUN** with the
 reason.
 
+**Update 2026-11-05:** the QA pass in `docs/QA_REPORT_2026-11-05.md` re-ran every suite on the final code, fixed
+eleven defects (hydration on run pages, the sleep energy chart and goal wording, the workout header, the onboarding
+count, label overflow on phones, sideways scrolling on unfolded Folds and 768-point iPads, and the demo on wide
+phones), checked 74 phone and 8 tablet models, regenerated the demo at iPhone 15 Pro size, and lists the launch
+blockers by priority. The readiness verdict in H is unchanged.
+
 ## A. GitHub state
 
 ### Which branch is the app
