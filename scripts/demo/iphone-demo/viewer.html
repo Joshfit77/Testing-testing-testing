@@ -45,8 +45,9 @@
     .phone::after { display: none; }
     .screen { border-radius: 0; height: 100dvh; padding-top: env(safe-area-inset-top, 0px); }
     /* Any phone, iPhone or Android, 320 to 500 points wide: the pictures and the tab bar fill its width (the tap
-       targets and live demonstrations are placed in percentages, so they scale with them). */
-    .col, .navbar { max-width: none; }
+       targets and live demonstrations are placed in percentages, so they scale with them). Scoped to .screen so it
+       outranks the base .col/.navbar rules further down. */
+    .screen .col, .screen .navbar { max-width: none; }
   }
 
   /* The phone's screen: a thin demo bar, the captured screen (scrolls), the app's tab bar. */

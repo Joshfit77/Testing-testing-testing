@@ -52,10 +52,11 @@ await page.waitForTimeout(1200);
 // The opening plays live (the app's own scene and CSS) over the welcome screen; Enter Narrow Gate goes in.
 const opening = page.locator("#screen .ngo");
 check("the opening plays first", (await opening.count()) === 1 && (await opening.isVisible()));
-await page.waitForTimeout(2600);
-await shot("opening");
+// The opening closes itself 5.6 s after it starts, and a picture of its animated scene can take seconds to draw
+// without a GPU: read the verse and tap Enter first, and take the picture as it moves into the light.
 check("its verse is Matthew 7:13–14 (BSB)", /Matthew 7:13–14 \(BSB\)/.test((await opening.locator("figcaption").textContent()) ?? ""));
 await opening.getByRole("button", { name: "Enter Narrow Gate" }).tap();
+await shot("opening-enter");
 await opening.waitFor({ state: "detached", timeout: 6000 }).catch(() => {});
 let c = await cur(); await shot("welcome");
 check("Enter Narrow Gate → welcome", (await opening.count()) === 0 && c.title === "Welcome", c.title);
