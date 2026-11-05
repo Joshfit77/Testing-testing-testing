@@ -55,11 +55,12 @@ export function SleepTimerCard({ running, timezone, disabled }: { running: Sleep
             <input type="hidden" name="id" value={id} />
             <input type="hidden" name="timezone" value={zone} />
             <FormMessage state={state} />
+            {/* Half a phone's width each: on a 320-point screen the labels take two lines rather than run past the edge. */}
             <div className="grid grid-cols-2 gap-2">
-              <SubmitButton name="kind" value="night" pendingLabel="Starting…" disabled={disabled}>
+              <SubmitButton name="kind" value="night" pendingLabel="Starting…" disabled={disabled} className="h-auto min-h-11 whitespace-normal px-3 py-2 leading-tight">
                 <Moon className="size-4" aria-hidden /> Going to bed
               </SubmitButton>
-              <SubmitButton name="kind" value="nap" variant="secondary" pendingLabel="Starting…" disabled={disabled}>
+              <SubmitButton name="kind" value="nap" variant="secondary" pendingLabel="Starting…" disabled={disabled} className="h-auto min-h-11 whitespace-normal px-3 py-2 leading-tight">
                 <SunMedium className="size-4" aria-hidden /> Starting a nap
               </SubmitButton>
             </div>
