@@ -8,8 +8,11 @@ q = int(sys.argv[3]) if len(sys.argv) > 3 else 88
 here = os.path.dirname(os.path.abspath(__file__))
 os.makedirs(f"{out}/s", exist_ok=True)
 data = json.load(open(f"{cap}/screens.json"))
+PW, PH = data.get("phone", {}).get("w", 390), data.get("phone", {}).get("h", 844)
+PX = PW * 3  # pictures are captured at 3x
+data["phone"] = {"w": PW, "h": PH}
 if not any(s["key"] == "state:opening" for s in data["screens"]) and os.path.exists(f"{cap}/s/s001.png"):
-    data["screens"].insert(0, {"id": "s001", "key": "state:opening", "title": "Opening", "h": 844, "file": "s/s001.png", "tab": "hidden", "group": "Welcome", "hot": []})
+    data["screens"].insert(0, {"id": "s001", "key": "state:opening", "title": "Opening", "h": PH, "file": "s/s001.png", "tab": "hidden", "group": "Welcome", "hot": []})
 # Hosting allows 511 files per version: the long date series (calendar days, practice days, workout days, diary dates)
 # are kept to a few each; a tap on a dropped one lands on the section's main screen (resolve() strips the query).
 MAX_SCREENS = int(os.environ.get("MAX_SCREENS", "488"))
@@ -44,9 +47,9 @@ wide = []
 for s in data["screens"]:
     src = f"{cap}/{s['file']}"
     im = Image.open(src)
-    if im.size[0] != 1170:  # the page overflowed sideways (an app defect, noted in the report); keep the phone's width
+    if im.size[0] != PX:  # the page overflowed sideways (an app defect, noted in the report); keep the phone's width
         wide.append((s["id"], s["key"], round(im.size[0] / 3)))
-        im = im.crop((0, 0, 1170, im.size[1]))
+        im = im.crop((0, 0, PX, im.size[1]))
     H = im.size[1]
     LIM = 15000  # WebP allows 16383 px; chunks of 5000 CSS px
     parts = []
@@ -56,7 +59,7 @@ for s in data["screens"]:
         h = min(LIM, H - y)
         dst = f"{out}/s/{s['id']}{'-' + str(i) if H > LIM else ''}.webp"
         if not os.path.exists(dst) or os.path.getmtime(dst) < os.path.getmtime(src):
-            im.crop((0, y, 1170, y + h)).convert("RGB").save(dst, "WEBP", quality=q, method=4)
+            im.crop((0, y, PX, y + h)).convert("RGB").save(dst, "WEBP", quality=q, method=4)
         parts.append([os.path.basename(dst), round(h / 3, 2)])
         sizes[dst] = os.path.getsize(dst)
         y += h
@@ -68,16 +71,16 @@ for f in glob.glob(f"{cap}/s/nav-*.png"):
 taps = 0
 for s in data["screens"]:
     if s["key"] == "state:opening":  # the opening overlay: a tap anywhere enters (as its Enter button does)
-        s["hot"] = [{"x": 0, "y": 0, "w": 390, "h": s["h"], "label": "Enter the narrow gate", "to": "/", "kind": "a"}]
+        s["hot"] = [{"x": 0, "y": 0, "w": PW, "h": s["h"], "label": "Enter the narrow gate", "to": "/", "kind": "a"}]
     s.pop("file", None)
     hot = []
     for h in s["hot"]:
         # Targets scrolled off the phone's width (horizontal rows) are clipped to it; those wholly outside are dropped.
-        if h["x"] >= 390 or h["x"] + h["w"] <= 0 or h["y"] >= s["h"]:
+        if h["x"] >= PW or h["x"] + h["w"] <= 0 or h["y"] >= s["h"]:
             continue
         if h["x"] < 0:
             h["w"] += h["x"]; h["x"] = 0
-        h["w"] = min(h["w"], 390 - h["x"]); h["h"] = min(h["h"], s["h"] - h["y"])
+        h["w"] = min(h["w"], PW - h["x"]); h["h"] = min(h["h"], s["h"] - h["y"])
         if h["w"] < 6 or h["h"] < 6:
             continue
         if h.get("to") and h.get("kind") != "live":
@@ -85,7 +88,7 @@ for s in data["screens"]:
         hot.append({k: v for k, v in h.items() if k in ("x", "y", "w", "h", "label", "to", "kind", "name", "controls")})
     s["hot"] = hot
 data["taps"] = taps
-DATA = json.dumps({k: data[k] for k in ("date", "navH", "navHot", "screens", "alias", "taps")}, separators=(",", ":")).replace("</script", "<\\/script")
+DATA = json.dumps({k: data[k] for k in ("date", "phone", "navH", "navHot", "screens", "alias", "taps")}, separators=(",", ":")).replace("</script", "<\\/script")
 page = open(f"{here}/viewer.html").read()
 page = page.replace("<script>/*DATA*/</script>", "<script>window.DEMO = " + DATA + ";</script>")
 # The live parts: the app's 2D exercise engine (engine.mjs) and the opening's own pictures and fonts.

@@ -12,7 +12,7 @@
     --pass: #6fcf97; --polish: #f2c94c; --fail: #eb5757;
     --body: "Inter", -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
     --display: "Montserrat", "Inter", system-ui, sans-serif;
-    --top-h: 34px; --W: 390px;
+    --top-h: 34px; --W: 390px; --H: 844px;
     color-scheme: dark;
   }
   * { box-sizing: border-box; }
@@ -31,7 +31,7 @@
   .copy ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
   .copy b { color: var(--fg); font-weight: 600; }
   .truth { border-left: 2px solid var(--gold); padding-left: 14px; font-size: 14px; }
-  .phone { position: relative; width: var(--W); height: 844px; padding: 14px; border-radius: 62px; background: linear-gradient(145deg, #3a352c, #16140f 40%, #2a261e); box-shadow: 0 0 0 1.5px #4a4336, 0 40px 90px -30px rgba(217, 182, 94, .35), 0 30px 60px -20px #000; box-sizing: content-box; }
+  .phone { position: relative; width: var(--W); height: var(--H); padding: 14px; border-radius: 62px; background: linear-gradient(145deg, #3a352c, #16140f 40%, #2a261e); box-shadow: 0 0 0 1.5px #4a4336, 0 40px 90px -30px rgba(217, 182, 94, .35), 0 30px 60px -20px #000; box-sizing: content-box; }
   .phone::after { content: ""; position: absolute; right: -3px; top: 190px; width: 3px; height: 92px; border-radius: 0 3px 3px 0; background: #3a352c; }
   .screen { position: relative; width: 100%; height: 100%; border-radius: 48px; background: #000; overflow: hidden; display: flex; flex-direction: column; }
   .scaler { transform-origin: top center; }
@@ -44,6 +44,9 @@
     .phone { width: 100%; height: 100dvh; padding: 0; border-radius: 0; box-shadow: none; background: none; }
     .phone::after { display: none; }
     .screen { border-radius: 0; height: 100dvh; padding-top: env(safe-area-inset-top, 0px); }
+    /* Any phone, iPhone or Android, 320 to 500 points wide: the pictures and the tab bar fill its width (the tap
+       targets and live demonstrations are placed in percentages, so they scale with them). */
+    .col, .navbar { max-width: none; }
   }
 
   /* The phone's screen: a thin demo bar, the captured screen (scrolls), the app's tab bar. */
@@ -448,6 +451,10 @@ html[data-motion="reduce"][data-intro="entering"] .ngo { animation: ngo-enter-ou
 <script>
 (function () {
   const D = window.DEMO;
+  // The phone's screen in points (iPhone 15 Pro: 393 x 852); older builds were captured at 390 x 844.
+  const PW = (D.phone && D.phone.w) || 390, PH = (D.phone && D.phone.h) || 844;
+  document.documentElement.style.setProperty("--W", PW + "px");
+  document.documentElement.style.setProperty("--H", PH + "px");
   const SCREENS = D.screens;
   const BYKEY = Object.fromEntries(SCREENS.map((s) => [s.key, s]));
   const BYID = Object.fromEntries(SCREENS.map((s) => [s.id, s]));
@@ -493,7 +500,7 @@ html[data-motion="reduce"][data-intro="entering"] .ngo { animation: ngo-enter-ou
     let loaded = 0;
     for (const [file, ph] of pics) {
       const img = document.createElement("img");
-      img.className = "shot"; img.alt = s.title || s.key; img.width = 390; img.height = ph; img.draggable = false;
+      img.className = "shot"; img.alt = s.title || s.key; img.width = PW; img.height = ph; img.draggable = false;
       img.onload = () => { if (++loaded === pics.length) { $("loadbar").style.transform = "scaleX(1)"; setTimeout(() => ($("loadbar").style.transform = "scaleX(0)"), 300); } };
       img.onerror = () => toast("This screen's picture did not load. Check the connection and try again.");
       img.src = "s/" + file;
@@ -506,7 +513,7 @@ html[data-motion="reduce"][data-intro="entering"] .ngo { animation: ngo-enter-ou
       const b = document.createElement("button");
       b.type = "button";
       b.className = "hs " + (h.kind === "live" ? "live" : h.to && resolve(h.to) ? "link" : "dead");
-      b.style.left = (h.x / 390 * 100) + "%"; b.style.width = (h.w / 390 * 100) + "%";
+      b.style.left = (h.x / PW * 100) + "%"; b.style.width = (h.w / PW * 100) + "%";
       b.style.top = (h.y / s.h * 100) + "%"; b.style.height = (h.h / s.h * 100) + "%";
       b.setAttribute("aria-label", h.label || "Control");
       b.addEventListener("click", (e) => { e.stopPropagation(); tap(h); });
@@ -536,7 +543,7 @@ html[data-motion="reduce"][data-intro="entering"] .ngo { animation: ngo-enter-ou
   for (const t of D.navHot) {
     const b = document.createElement("button");
     b.type = "button"; b.className = "hs";
-    b.style.left = (t.x / 390 * 100) + "%"; b.style.width = (t.w / 390 * 100) + "%"; b.style.top = "0"; b.style.height = "100%";
+    b.style.left = (t.x / PW * 100) + "%"; b.style.width = (t.w / PW * 100) + "%"; b.style.top = "0"; b.style.height = "100%";
     b.setAttribute("aria-label", t.label);
     b.addEventListener("click", () => { const own = isNM(current) && BYKEY["state:nm" + t.to]; const s = own || resolve(t.to); if (s) show(s); });
     navhot.append(b);
@@ -554,7 +561,7 @@ html[data-motion="reduce"][data-intro="entering"] .ngo { animation: ngo-enter-ou
     for (const s of groups[g]) { const b = document.createElement("button"); b.innerHTML = esc(s.title || s.key) + "<small>" + esc(s.key.startsWith("state:") ? "" : s.key) + "</small>"; b.addEventListener("click", () => { $("sheet").hidden = true; show(s); }); d.append(b); }
     gEl.append(d);
   }
-  $("about").innerHTML = "<b>What this demo is.</b> Pictures of the real Narrow Gate Fitness app, captured in demo mode (sample data, purchases off, AI replies simulated) at iPhone size on " + esc(D.date.slice(0, 10)) + ", joined by tap targets: " + SCREENS.length + " screens, " + D.taps + " taps. The <b>exercise demonstrations are live</b>: the app's own animation engine runs on this device.<ul><li>Typing, timers, GPS, the camera, Apple Health and purchases are not live in pictures. The workout flow (start, demonstration, log sets, rest timer, substitute, finish, summary) and the AI coach's reply are captured step by step.</li><li><b>Start as a new member</b> on the welcome screen walks a brand-new account through the five essential sign-up questions and the Ready screen (the optional ones are shown once, under Personalise more), the plan it builds, its first workout screen, and that member's own app on the Free plan (empty history, Pro features locked). The answers are picked for the demo: a tap on any answer or field fills the step in.</li><li>Nothing here touches a real account or charges anything.</li><li>The real app on a phone needs the private preview deployment, which waits on the owner's approval.</li></ul>";
+  $("about").innerHTML = "<b>What this demo is.</b> Pictures of the real Narrow Gate Fitness app, captured in demo mode (sample data, purchases off, AI replies simulated) at " + (PW === 393 && PH === 852 ? "iPhone 15 Pro size (393 × 852 points, 3×)" : "iPhone size (" + PW + " × " + PH + " points, 3×)") + " and scaled to the width of the phone showing them (any iPhone or Android phone; the real app lays itself out for each screen size instead) on " + esc(D.date.slice(0, 10)) + ", joined by tap targets: " + SCREENS.length + " screens, " + D.taps + " taps. The <b>exercise demonstrations are live</b>: the app's own animation engine runs on this device.<ul><li>Typing, timers, GPS, the camera, Apple Health and purchases are not live in pictures. The workout flow (start, demonstration, log sets, rest timer, substitute, finish, summary) and the AI coach's reply are captured step by step.</li><li><b>Start as a new member</b> on the welcome screen walks a brand-new account through the five essential sign-up questions and the Ready screen (the optional ones are shown once, under Personalise more), the plan it builds, its first workout screen, and that member's own app on the Free plan (empty history, Pro features locked). The answers are picked for the demo: a tap on any answer or field fills the step in.</li><li>Nothing here touches a real account or charges anything.</li><li>The real app on a phone needs the private preview deployment, which waits on the owner's approval.</li></ul>";
   $("menu").addEventListener("click", () => ($("sheet").hidden = false));
   $("close-sheet").addEventListener("click", () => ($("sheet").hidden = true));
 
@@ -569,7 +576,7 @@ html[data-motion="reduce"][data-intro="entering"] .ngo { animation: ngo-enter-ou
     if (!e) return;
     const div = document.createElement("div");
     div.className = "live2d";
-    div.style.left = (h.x / 390 * 100) + "%"; div.style.width = (h.w / 390 * 100) + "%";
+    div.style.left = (h.x / PW * 100) + "%"; div.style.width = (h.w / PW * 100) + "%";
     div.style.top = (h.y / s.h * 100) + "%"; div.style.height = (h.h / s.h * 100) + "%";
     const controls = h.controls !== false;
     // A small looping thumbnail (the workout screen's) is part of a button in the app: taps go through to it.
@@ -623,7 +630,7 @@ html[data-motion="reduce"][data-intro="entering"] .ngo { animation: ngo-enter-ou
 
   // Fit the life-size phone on shorter laptop screens.
   const sc = $("scaler");
-  function fit() { if (window.innerWidth <= 520) { sc.style.transform = ""; sc.style.height = ""; return; } const k = Math.min(1, (window.innerHeight - 56) / 872); sc.style.transform = k < 1 ? "scale(" + k.toFixed(3) + ")" : ""; sc.style.height = k < 1 ? Math.round(872 * k) + "px" : ""; }
+  function fit() { if (window.innerWidth <= 520) { sc.style.transform = ""; sc.style.height = ""; return; } const k = Math.min(1, (window.innerHeight - 56) / (PH + 28)); sc.style.transform = k < 1 ? "scale(" + k.toFixed(3) + ")" : ""; sc.style.height = k < 1 ? Math.round((PH + 28) * k) + "px" : ""; }
   fit(); window.addEventListener("resize", fit);
 
   const startKey = location.hash.length > 1 ? decodeURIComponent(location.hash.slice(1)) : null;

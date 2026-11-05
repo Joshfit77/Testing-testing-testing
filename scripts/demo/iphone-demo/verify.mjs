@@ -1,6 +1,6 @@
 // Taps through the built iPhone demo at iPhone size: the live opening → welcome → sample data → tabs → the workout flow
 // → the menu → the AI coach → the live exercise demonstrations → the new-member path; every screen's picture must exist;
-// no page errors.   CHROMIUM=... node verify.mjs <out dir> <shots dir>
+// no page errors. Then, on every iPhone and Android viewport in Playwright's device list, that the demo fills the phone.   CHROMIUM=... node verify.mjs <out dir> <shots dir>
 import { chromium, devices } from "playwright";
 import fs from "node:fs";
 import path from "node:path";
@@ -156,13 +156,53 @@ const data = await page.evaluate(() => window.DEMO);
 let bad = 0, outside = 0, resolvable = 0, dead = 0;
 for (const s of data.screens) {
   for (const [f] of s.pics || [[s.id + ".webp"]]) if (!fs.existsSync(path.join(out, "s", f))) bad++;
-  for (const h of s.hot) { if (h.x < 0 || h.y < 0 || h.x + h.w > 392 || h.y + h.h > s.h + 2) outside++; if (h.to) { if (await page.evaluate((to) => !!window.demo.resolve(to), h.to)) resolvable++; else dead++; } }
+  for (const h of s.hot) { if (h.x < 0 || h.y < 0 || h.x + h.w > (data.phone?.w ?? 390) + 2 || h.y + h.h > s.h + 2) outside++; if (h.to) { if (await page.evaluate((to) => !!window.demo.resolve(to), h.to)) resolvable++; else dead++; } }
 }
 check("every screen's picture exists", bad === 0, `${data.screens.length} screens`);
 check("tap targets lie inside their screens", outside === 0, `${outside} outside`);
 console.log(`targets: ${resolvable} lead to a captured screen, ${dead} to screens not captured`);
 check("no page errors", errors.length === 0, errors.slice(0, 5).join(" | "));
 check("no missing files requested", missing.length === 0, missing.slice(0, 5).join(" | "));
-fs.writeFileSync(path.join(shots, "results.json"), JSON.stringify({ results, errors, missing, resolvable, dead, screens: data.screens.length, taps: data.taps }, null, 1));
+// Every iPhone and Android phone in Playwright's device list (portrait, one run per viewport and platform): the demo
+// fills the phone's width (pictures and tab bar), nothing scrolls sideways, and the opening, the sign-in and a tab work.
+const phones = new Map();
+for (const [name, d] of Object.entries(devices)) {
+  if (!/^(iPhone|Pixel|Galaxy)/.test(name) || /landscape|Tab\b|Flip \d Cover/i.test(name) || !d.isMobile) continue;
+  const key = `${name.startsWith("iPhone") ? "ios" : "android"}-${d.viewport.width}x${d.viewport.height}`;
+  if (!phones.has(key)) phones.set(key, { key, name, models: [] });
+  phones.get(key).models.push(name);
+}
+const perPhone = [];
+for (const ph of phones.values()) {
+  const { defaultBrowserType: _t, ...dev } = devices[ph.name];
+  const pctx = await b.newContext({ ...dev, deviceScaleFactor: 1 });
+  const pp = await pctx.newPage();
+  const errs = [];
+  pp.on("pageerror", (e) => errs.push(e.message.split("\n")[0]));
+  await pp.goto(`http://localhost:${port}/app.html`);
+  await pp.waitForFunction(() => window.demo);
+  const vw = dev.viewport.width;
+  let ok = (await pp.locator("#screen .ngo").count()) === 1;
+  await pp.locator("#screen .ngo").getByRole("button", { name: "Skip intro" }).tap().catch(() => { ok = false; });
+  await pp.locator("#screen .ngo").waitFor({ state: "detached", timeout: 6000 }).catch(() => { ok = false; });
+  const sample = (await pp.locator("#col .hs").evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")))).findIndex((l) => /Explore with sample data/i.test(l ?? ""));
+  if (sample >= 0) { await pp.locator("#col .hs").nth(sample).tap(); await pp.waitForTimeout(500); } else ok = false;
+  const m = await pp.evaluate(() => ({
+    col: document.getElementById("col").getBoundingClientRect().width,
+    nav: document.getElementById("navbar").getBoundingClientRect().width,
+    scroll: document.documentElement.scrollWidth, inner: window.innerWidth,
+    title: window.demo.screens.find((s) => document.querySelector("#title b")?.textContent === (s.title || s.key))?.key ?? null,
+  }));
+  await pp.locator('#navhot .hs[aria-label="Train"]').tap().catch(() => { ok = false; });
+  await pp.waitForTimeout(500);
+  const after = await pp.evaluate(() => window.demo.screens.find((s) => document.querySelector("#title b")?.textContent === (s.title || s.key))?.key ?? null);
+  const fills = vw <= 520 ? Math.abs(m.col - vw) <= 1 && Math.abs(m.nav - vw) <= 1 : true;
+  const pass = ok && fills && m.scroll <= m.inner && m.title === "/home" && after === "/train" && errs.length === 0;
+  perPhone.push({ ...ph, viewport: dev.viewport, col: m.col, nav: m.nav, scroll: m.scroll, home: m.title, afterTrainTab: after, errors: errs, pass });
+  if (!pass) console.log(`  ${ph.models.join(", ")}: col ${m.col} nav ${m.nav} of ${vw}, scroll ${m.scroll}, ${m.title} → ${after} ${errs.join(" | ")}`);
+  await pctx.close();
+}
+check("fills and works on every iPhone and Android viewport", perPhone.every((r) => r.pass), `${perPhone.filter((r) => r.pass).length}/${perPhone.length} viewports (${perPhone.reduce((n, r) => n + r.models.length, 0)} models)`);
+fs.writeFileSync(path.join(shots, "results.json"), JSON.stringify({ results, errors, missing, resolvable, dead, screens: data.screens.length, taps: data.taps, phones: perPhone }, null, 1));
 console.log(`${results.filter((r) => r.ok).length}/${results.length} checks ok`);
 await b.close(); srv.close();

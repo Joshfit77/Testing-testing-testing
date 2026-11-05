@@ -1,7 +1,11 @@
 # The clickable iPhone demo (captured screens of the real app)
 
-A private web page that opens on an iPhone (Safari) and tap-navigates **pictures of the real app**, captured in demo
-mode with sample data at iPhone size (390 CSS px, 3×: 1170 px wide, one WebP pass), joined by the real tap targets.
+A private web page that opens on any phone (iPhone or Android) and tap-navigates **pictures of the real app**,
+captured in demo mode with sample data at iPhone 15 Pro size (393 × 852 CSS px, 3×: 1179 px wide, one WebP pass;
+`PHONE_W`/`PHONE_H` change it), joined by the real tap targets. On a phone the pictures and the tab bar fill the
+screen's width, from 320 to 500 points (tap targets and live demonstrations are placed in percentages, so they scale
+with them); on a desktop it shows an iPhone-size frame. The real app lays itself out for each phone instead: that is
+checked separately, model by model (`e2e/device-matrix.spec.ts`).
 Three parts are live rather than pictures:
 
 - **The opening**: the app's own scene and CSS play first, over the welcome screen (Enter Narrow Gate or Skip intro).
@@ -34,7 +38,7 @@ node scripts/demo/iphone-demo/verify.mjs out out-shots                          
 goes up in parts (pictures first, then the rest; send `null` for pictures of the previous version that are not in
 the new one, or they stay and count against the 511).
 
-- `crawl.mjs`: Playwright, iPhone 15 viewport, `deviceScaleFactor: 3`, lossless PNG, reduced motion; the fixed tab bar
+- `crawl.mjs`: Playwright, iPhone 15 Pro (393 × 852 unless `PHONE_W`/`PHONE_H`), `deviceScaleFactor: 3`, lossless PNG, reduced motion; the fixed tab bar
   is hidden during each page's capture and shot once per tab; every link, button, tab, menu item and summary is
   recorded with its box (in the picture's space: the page for a full-page picture, the screen for a dialog or menu
   shown over a scrolled page); the pages a link leads to are queued breadth-first (caps per section keep it to a few
@@ -59,4 +63,6 @@ the new one, or they stay and count against the 511).
 - `verify.mjs`: serves the build as the artifact wrapper does and taps through the live opening, sample-data sign-in,
   tabs, back, the workout flow, the menu and the coach; checks that the live demonstrations draw, move and carry the
   app's badge and label (and that every captured exercise page has one); walks the new-member path; and checks every
-  screen's picture exists and every target lies inside its screen.
+  screen's picture exists and every target lies inside its screen. Then, on every iPhone and Android viewport in
+  Playwright's device list, that the demo fills the phone's width, nothing scrolls sideways, and the opening, the
+  sample-data sign-in and a tab work.

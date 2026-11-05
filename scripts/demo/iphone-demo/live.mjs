@@ -14,9 +14,9 @@ if (!fs.existsSync(path.join(cap, "screens.before-live.json"))) fs.copyFileSync(
 const log = (s) => console.log(`${new Date().toISOString().slice(11, 19)} ${s}`);
 
 const b = await chromium.launch({ executablePath: process.env.CHROMIUM });
-const { defaultBrowserType: _d, ...iPhone } = devices["iPhone 15"];
+const { defaultBrowserType: _d, ...iPhone } = devices["iPhone 15 Pro"];
 // The crawl's context (same viewport, time zone, reduced motion, no transitions); 1x is enough to measure boxes.
-const ctx = await b.newContext({ ...iPhone, viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, timezoneId: "America/New_York", reducedMotion: "reduce" });
+const ctx = await b.newContext({ ...iPhone, viewport: { width: Number(process.env.PHONE_W ?? 393), height: Number(process.env.PHONE_H ?? 852) }, deviceScaleFactor: 1, timezoneId: "America/New_York", reducedMotion: "reduce" });
 ctx.setDefaultTimeout(45000);
 await ctx.addInitScript(() => {
   const st = document.createElement("style");

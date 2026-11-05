@@ -1,5 +1,5 @@
 // Captures the real Narrow Gate Fitness app (demo mode, sample data) at iPhone size for the clickable iPhone demo:
-// every screen as a full-page picture at 3x (1170 px wide) with the tappable links' boxes, the fixed tab bar on its
+// every screen as a full-page picture at 3x (PHONE_W x 3 px wide) with the tappable links' boxes, the fixed tab bar on its
 // own, and the scripted states of the workout flow and the AI coach. Output: <out>/s/*.png + <out>/screens.json.
 //   BASE=http://localhost:3000 node crawl.mjs <out> [maxScreens]
 import { chromium, devices } from "playwright";
@@ -9,12 +9,14 @@ import path from "node:path";
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const out = process.argv[2] ?? "cap";
 const MAX = Number(process.argv[3] ?? 240);
+// The phone's screen in points: iPhone 15 Pro (393 x 852) unless PHONE_W / PHONE_H say otherwise.
+const W = Number(process.env.PHONE_W ?? 393), H = Number(process.env.PHONE_H ?? 852);
 fs.mkdirSync(path.join(out, "s"), { recursive: true });
 const log = (s) => console.log(`${new Date().toISOString().slice(11, 19)} ${s}`);
 
 const b = await chromium.launch({ executablePath: process.env.CHROMIUM });
-const { defaultBrowserType: _d, ...iPhone } = devices["iPhone 15"];
-const ctx = await b.newContext({ ...iPhone, viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, timezoneId: "America/New_York", reducedMotion: "reduce" });
+const { defaultBrowserType: _d, ...iPhone } = devices["iPhone 15 Pro"];
+const ctx = await b.newContext({ ...iPhone, viewport: { width: W, height: H }, deviceScaleFactor: 3, timezoneId: "America/New_York", reducedMotion: "reduce" });
 ctx.setDefaultTimeout(45000);
 const page = await ctx.newPage();
 const errors = [];
@@ -80,7 +82,7 @@ async function settle(ms = 900) {
   await page.evaluate(() => window.scrollTo(0, 0));
 }
 
-/** The tappable targets on the page as boxes in the picture's space (CSS px at 390 wide): document space for a
+/** The tappable targets on the page as boxes in the picture's space (CSS px at the phone's width): document space for a
  * full-page picture, the screen for a picture of the screen (a dialog or menu over a scrolled page). */
 async function hotspots(scope, onScreen = false) {
   return page.evaluate(({ scope, onScreen }) => {
@@ -113,7 +115,7 @@ async function capture(key, { title, full = true, group, tab, extraHot = [], sco
   if (full) await page.evaluate(() => window.scrollTo(0, 0));
   await navHidden(true);
   await page.screenshot({ path: path.join(out, file), fullPage: full, timeout: 120000, animations: "disabled" });
-  const h = full ? await page.evaluate(() => Math.max(document.documentElement.scrollHeight, document.body.scrollHeight)) : 844;
+  const h = full ? await page.evaluate(() => Math.max(document.documentElement.scrollHeight, document.body.scrollHeight)) : H;
   const t = title ?? (await page.title()).replace(/ [·|–-] Narrow Gate.*$/, "");
   const hot = (await hotspots(scope, !full)).map((x) => ({ ...x, to: x.href ? normalize(x.href) : null }));
   const rec = { id: sid, key, title: t, h, file, tab: tab ?? tabOf(key), group, hot: [...extraHot, ...hot] };
@@ -169,7 +171,7 @@ async function navShot(name) {
   await navHidden(false);
   await page.waitForTimeout(150);
   const box = await nav.boundingBox();
-  await page.screenshot({ path: path.join(out, `s/nav-${name}.png`), clip: { x: 0, y: box.y, width: 390, height: box.height }, timeout: 60000 });
+  await page.screenshot({ path: path.join(out, `s/nav-${name}.png`), clip: { x: 0, y: box.y, width: W, height: box.height }, timeout: 60000 });
   await navHidden(true);
   return box.height;
 }
@@ -316,6 +318,6 @@ if (!SKIP_FLOWS) try {
 // Any label-less textarea/input targets: send them to the same screen (a tap just focuses them in the real app).
 const alias = {};
 for (const [k, rec] of byKey) if (rec.key !== k) alias[k] = rec.key;
-fs.writeFileSync(path.join(out, "screens.json"), JSON.stringify({ base: BASE, date: new Date().toISOString(), navH, navHot, screens, alias, errors }, null, 1));
+fs.writeFileSync(path.join(out, "screens.json"), JSON.stringify({ base: BASE, date: new Date().toISOString(), phone: { w: W, h: H }, navH, navHot, screens, alias, errors }, null, 1));
 log(`done: ${screens.length} screens; errors ${errors.length}`);
 await b.close();
