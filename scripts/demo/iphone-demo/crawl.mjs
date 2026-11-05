@@ -80,9 +80,11 @@ async function settle(ms = 900) {
   await page.evaluate(() => window.scrollTo(0, 0));
 }
 
-/** The tappable targets on the page as document-space boxes (CSS px at 390 wide). */
-async function hotspots(scope) {
-  return page.evaluate(({ scope }) => {
+/** The tappable targets on the page as boxes in the picture's space (CSS px at 390 wide): document space for a
+ * full-page picture, the screen for a picture of the screen (a dialog or menu over a scrolled page). */
+async function hotspots(scope, onScreen = false) {
+  return page.evaluate(({ scope, onScreen }) => {
+    const dy = onScreen ? 0 : scrollY;
     const root = scope ? (Array.from(document.querySelectorAll(scope)).pop() || document) : document;
     const els = Array.from(root.querySelectorAll("a[href], button, [role=button], [role=tab], [role=menuitem], summary, input[type=submit], label"));
     const res = [];
@@ -95,13 +97,13 @@ async function hotspots(scope) {
       if (cs.visibility === "hidden" || cs.display === "none" || cs.opacity === "0") continue;
       const href = el.getAttribute("href");
       const label = (el.getAttribute("aria-label") || el.textContent || "").trim().replace(/\s+/g, " ").slice(0, 60);
-      const key = `${Math.round(r.left)},${Math.round(r.top + scrollY)},${Math.round(r.width)}`;
+      const key = `${Math.round(r.left)},${Math.round(r.top + dy)},${Math.round(r.width)}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      res.push({ x: Math.round(r.left), y: Math.round(r.top + scrollY), w: Math.round(r.width), h: Math.round(r.height), label, href: href ?? null, kind: el.tagName.toLowerCase(), testid: el.getAttribute("data-testid"), pressed: el.getAttribute("aria-pressed") });
+      res.push({ x: Math.round(r.left), y: Math.round(r.top + dy), w: Math.round(r.width), h: Math.round(r.height), label, href: href ?? null, kind: el.tagName.toLowerCase(), testid: el.getAttribute("data-testid"), pressed: el.getAttribute("aria-pressed") });
     }
     return res;
-  }, { scope });
+  }, { scope, onScreen });
 }
 
 async function capture(key, { title, full = true, group, tab, extraHot = [], scope } = {}) {
@@ -113,7 +115,7 @@ async function capture(key, { title, full = true, group, tab, extraHot = [], sco
   await page.screenshot({ path: path.join(out, file), fullPage: full, timeout: 120000, animations: "disabled" });
   const h = full ? await page.evaluate(() => Math.max(document.documentElement.scrollHeight, document.body.scrollHeight)) : 844;
   const t = title ?? (await page.title()).replace(/ [·|–-] Narrow Gate.*$/, "");
-  const hot = (await hotspots(scope)).map((x) => ({ ...x, to: x.href ? normalize(x.href) : null }));
+  const hot = (await hotspots(scope, !full)).map((x) => ({ ...x, to: x.href ? normalize(x.href) : null }));
   const rec = { id: sid, key, title: t, h, file, tab: tab ?? tabOf(key), group, hot: [...extraHot, ...hot] };
   screens.push(rec);
   byKey.set(key, rec);

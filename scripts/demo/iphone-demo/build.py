@@ -1,4 +1,5 @@
-# Assembles the iPhone demo: screens.json + captures -> out/app.html (page), out/s/*.webp, out/s/nav-*.png.
+# Assembles the iPhone demo: screens.json + captures -> out/app.html (page), out/s/*.webp, out/s/nav-*.png, and the
+# opening's pictures and the app's fonts (out/opening, out/fonts). Run engine.mjs first: it writes out/ngf.js.
 #   python3 -I build.py <cap dir> <out dir> [quality]
 import sys, os, json, glob, shutil, re
 from PIL import Image
@@ -12,11 +13,16 @@ if not any(s["key"] == "state:opening" for s in data["screens"]) and os.path.exi
 # Hosting allows 511 files per version: the long date series (calendar days, practice days, workout days, diary dates)
 # are kept to a few each; a tap on a dropped one lands on the section's main screen (resolve() strips the query).
 MAX_SCREENS = int(os.environ.get("MAX_SCREENS", "488"))
-SERIES = [(re.compile(r"^/calendar\?"), 6), (re.compile(r"^/faith/practices\?"), 6), (re.compile(r"^/train/workout\?"), 6), (re.compile(r"^/nutrition\?date"), 4), (re.compile(r"^/nutrition/photo\?"), 3), (re.compile(r"^/train/exercises/[^/]+/history"), 6), (re.compile(r"^/train/programs\?category"), 8), (re.compile(r"^/faith\?theme"), 3), (re.compile(r"^/faith/journal\?filter"), 3), (re.compile(r"^/run/activities/"), 4), (re.compile(r"^/train/history/"), 4), (re.compile(r"^/progress/sleep/log\?"), 2), (re.compile(r"^/nutrition/insights\?end"), 4), (re.compile(r"^/progress/sleep/checkin\?day"), 4)]
+SERIES = [(re.compile(r"^/calendar\?"), 6), (re.compile(r"^/faith/practices\?"), 6), (re.compile(r"^/train/workout\?"), 6), (re.compile(r"^/nutrition\?date"), 2), (re.compile(r"^/nutrition/photo\?"), 3), (re.compile(r"^/train/exercises/[^/]+/history"), 6), (re.compile(r"^/train/programs\?category"), 8), (re.compile(r"^/faith\?theme"), 1), (re.compile(r"^/faith/journal\?filter"), 3), (re.compile(r"^/run/activities/"), 4), (re.compile(r"^/train/history/"), 4), (re.compile(r"^/progress/sleep/log\?"), 2), (re.compile(r"^/nutrition/insights\?end"), 4), (re.compile(r"^/progress/sleep/checkin\?day"), 4), (re.compile(r"^/faith/bible/[^?]+\?v="), 0), (re.compile(r"^/progress/overview\?range"), 2)]
+BOOKS_KEPT = {"search", "saved", "history", "genesis", "exodus", "deuteronomy", "joshua", "ruth", "1-samuel", "psalms", "proverbs", "ecclesiastes", "isaiah", "jeremiah", "daniel", "jonah", "matthew", "mark", "luke", "john", "acts", "romans", "1-corinthians", "galatians", "ephesians", "philippians", "hebrews", "james", "1-peter", "1-john", "revelation"}
 seen = {}
 kept = []
 dropped = []
 for s in data["screens"]:
+    # The Bible's book pages (each a grid of chapter numbers) are kept for the most-read books only.
+    bm = re.match(r"^/faith/bible/([^/?]+)$", s["key"])
+    if bm and bm.group(1) not in BOOKS_KEPT:
+        dropped.append(s); continue
     lim = next((n for r, n in SERIES if r.search(s["key"])), None)
     if lim is not None:
         r = next(r for r, n in SERIES if r.search(s["key"]))
@@ -74,17 +80,30 @@ for s in data["screens"]:
         h["w"] = min(h["w"], 390 - h["x"]); h["h"] = min(h["h"], s["h"] - h["y"])
         if h["w"] < 6 or h["h"] < 6:
             continue
-        if h.get("to"):
+        if h.get("to") and h.get("kind") != "live":
             taps += 1
-        hot.append({k: v for k, v in h.items() if k in ("x", "y", "w", "h", "label", "to", "kind")})
+        hot.append({k: v for k, v in h.items() if k in ("x", "y", "w", "h", "label", "to", "kind", "name", "controls")})
     s["hot"] = hot
 data["taps"] = taps
 DATA = json.dumps({k: data[k] for k in ("date", "navH", "navHot", "screens", "alias", "taps")}, separators=(",", ":")).replace("</script", "<\\/script")
 page = open(f"{here}/viewer.html").read()
 page = page.replace("<script>/*DATA*/</script>", "<script>window.DEMO = " + DATA + ";</script>")
+# The live parts: the app's 2D exercise engine (engine.mjs) and the opening's own pictures and fonts.
+ngf_path = f"{out}/ngf.js"
+if not os.path.exists(ngf_path):
+    sys.exit("out/ngf.js is missing: run  node scripts/demo/iphone-demo/engine.mjs <out dir>  first")
+ngf = open(ngf_path).read()
+assert "</script" not in ngf
+page = page.replace("<script>/*NGF*/</script>", "<script>" + ngf.rstrip() + "</script>")
+root = os.path.abspath(os.path.join(here, "..", "..", ".."))
+for sub, src_dir, names in (("opening", "public/opening", ["gate-base.webp", "gate-door.webp", "gate-haze.webp", "gate-light.webp"]),
+                            ("fonts", "src/app/fonts", ["inter-latin-wght-normal.woff2", "plus-jakarta-sans-latin-wght-normal.woff2", "lora-latin-wght-normal.woff2", "lora-latin-wght-italic.woff2"])):
+    os.makedirs(f"{out}/{sub}", exist_ok=True)
+    for n in names:
+        shutil.copy(f"{root}/{src_dir}/{n}", f"{out}/{sub}/{n}")
 open(f"{out}/app.html", "w").write(page)
 files = {}
-for f in glob.glob(f"{out}/s/*"):
+for f in glob.glob(f"{out}/s/*") + glob.glob(f"{out}/opening/*") + glob.glob(f"{out}/fonts/*"):
     files[os.path.relpath(f, out)] = os.path.getsize(f)
 # Pictures of screens no longer in the build.
 used = {f for s in data["screens"] for f, _ in s["pics"]}

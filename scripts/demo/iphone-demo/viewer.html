@@ -9,6 +9,7 @@
     --bg: #070707; --panel: #121109; --card: #151515; --line: #2b2824; --line2: rgba(214, 170, 82, 0.35);
     --fg: #f1ece1; --muted: #a99c82; --dim: #8f8b84;
     --gold: #d9b65e; --gold-hi: #ffd98a; --gold-lo: #8c6a2f;
+    --pass: #6fcf97; --polish: #f2c94c; --fail: #eb5757;
     --body: "Inter", -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
     --display: "Montserrat", "Inter", system-ui, sans-serif;
     --top-h: 34px; --W: 390px;
@@ -57,6 +58,9 @@
   .shot { display: block; width: 100%; height: auto; }
   .hs { position: absolute; margin: 0; padding: 0; border: 0; background: transparent; border-radius: 8px; cursor: pointer; -webkit-tap-highlight-color: rgba(217, 182, 94, .25); }
   .hs.link { outline: 2px solid transparent; outline-offset: -2px; transition: outline-color .3s; }
+  .hs.live { outline: 2px solid rgba(217, 182, 94, .9); outline-offset: -2px; box-shadow: 0 0 0 4px rgba(217, 182, 94, .15) inset; }
+  /* An exercise demonstration playing live in its place (the app's own 2D engine). */
+  .live2d { position: absolute; overflow: hidden; background: #0a0a0a; border-radius: 10px; z-index: 2; }
   .hint .hs.link, .flash .hs.link { outline-color: rgba(217, 182, 94, .75); }
   .hs:focus-visible { outline: 2px solid var(--gold-hi); }
   .navbar { flex: none; position: relative; width: 100%; max-width: var(--W); margin: 0 auto; background: #0b0b0b; padding-bottom: env(safe-area-inset-bottom, 0px); }
@@ -81,18 +85,332 @@
   .grp button { all: unset; cursor: pointer; display: block; width: 100%; padding: 9px 10px; border-radius: 8px; font-size: 14px; border: 1px solid transparent; }
   .grp button:hover, .grp button:focus-visible { border-color: var(--line2); background: var(--card); }
   .grp small { color: var(--dim); margin-left: 6px; font-size: 12px; }
+
+
+  /* The app's own opening (src/app/globals.css), played live as the first screen, inside the phone. */
+  @font-face { font-family: "NG Inter"; src: url(fonts/inter-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "NG Jakarta"; src: url(fonts/plus-jakarta-sans-latin-wght-normal.woff2) format("woff2"); font-weight: 200 800; font-display: swap; }
+  @font-face { font-family: "NG Lora"; src: url(fonts/lora-latin-wght-normal.woff2) format("woff2"); font-weight: 400 700; font-style: normal; font-display: swap; }
+  @font-face { font-family: "NG Lora"; src: url(fonts/lora-latin-wght-italic.woff2) format("woff2"); font-weight: 400 700; font-style: italic; font-display: swap; }
+  #screen .ngo { position: absolute; z-index: 40; --font-inter: "NG Inter"; --font-heading: "NG Jakarta"; --font-serif-face: "NG Lora"; }
+  #screen .ngo .size-9 { width: 2.25rem; height: 2.25rem; }
+/*
+ * Narrow Gate opening: plays on every full load of the app (see src/lib/opening.ts for when and why). State is on
+ * <html data-intro>: "play" → "entering" (Enter Narrow Gate, or the end of the sequence) or "leaving" (Skip intro,
+ * Escape) → "done"; or "off". The gate is a rendered scene (.ngs-*, NarrowGateArt). Timeline: dark, then the logo
+ * (0.15 s); the scene fades up with light leaking round the shut door (0.45 s); the door opens on its hinge and soft
+ * white light pours out (1.3–2.9 s); the verse (1.7 s) and Enter Narrow Gate (2.15 s). At 3.85 s, or as soon as Enter
+ * is pressed, the camera moves forward through the doorway into the light, the light fills the screen and the app
+ * fades in (gone at about 5 s; about 1.2 s after Enter). Skip intro just fades it out.
+ */
+.ngo {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: none;
+  overflow: hidden;
+  background: #050505;
+  color: #f1ead6;
+  --ngs-bg: #050505;
+}
+html:is([data-intro="play"], [data-intro="entering"], [data-intro="leaving"]) .ngo { display: block; }
+html:is([data-intro="play"], [data-intro="entering"], [data-intro="leaving"]) body { overflow: hidden; }
+html[data-intro="play"] .ngo { animation: ngo-exit 0.4s ease-out 4.65s forwards; }
+html[data-intro="entering"] .ngo { animation: ngo-enter-out 0.42s ease-out 0.8s forwards; }
+html[data-intro="leaving"] .ngo { animation: ngo-leave 0.35s ease-in forwards; }
+.ngo:focus { outline: none; }
+
+/* ---- The scene. Sized by the screen's height so the gate sits between the logo and the verse on every phone. */
+.ngs {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  /* The doorway (with its architrave) takes about 40% of the scene's height: size the scene so it fits the space
+     between the logo (top ~150 px) and the verse (bottom ~290 px), and centre it in that space. */
+  --scene-h: clamp(60svh, calc((100svh - 440px) * 2.25), min(118svh, 1150px));
+  --scene-top: calc((100svh - 140px) / 2 + 8px - var(--scene-h) * 0.4325);
+  --scene-x: 50%;
+}
+.ngs-push,
+.ngs-drift { position: absolute; inset: 0; transform-origin: var(--scene-x) calc(var(--scene-top) + var(--scene-h) * var(--gate-y)); }
+.ngs-drift { animation: ngs-drift 3.6s cubic-bezier(0.25, 0.1, 0.25, 1) 0.3s both; }
+.ngs-box {
+  position: absolute;
+  top: var(--scene-top);
+  left: var(--scene-x);
+  height: var(--scene-h);
+  aspect-ratio: 2 / 3;
+  transform: translateX(-50%);
+  container-type: size;
+}
+.ngs-scene { position: absolute; inset: 0; perspective: var(--persp); perspective-origin: var(--po); animation: ngo-fade 0.95s cubic-bezier(0.3, 0.1, 0.3, 1) 0.45s both; }
+.ngs-base,
+.ngs-light { position: absolute; inset: 0; background: url(opening/gate-base.webp) center / 100% 100% no-repeat; }
+.ngs-light { background-image: url(opening/gate-light.webp); }
+/* What the open door lets out, added to the shut scene: light on the floor and the reveal, lit haze, bloom. */
+.ngs-light { mix-blend-mode: plus-lighter; opacity: 0; animation: ngo-fade 1.65s cubic-bezier(0.4, 0, 0.2, 1) 1.35s both; }
+/* Older WebKit has no plus-lighter: screen looks almost the same over this dark scene. */
+@supports not (mix-blend-mode: plus-lighter) { .ngs-light { mix-blend-mode: screen; } }
+.ngs-door {
+  position: absolute;
+  left: var(--door-l);
+  top: var(--door-t);
+  width: var(--door-w);
+  height: var(--door-h);
+  overflow: hidden;
+  border-radius: 50% 50% 0 0 / var(--door-r) var(--door-r) 0 0;
+  background: url(opening/gate-door.webp) center / 100% 100% no-repeat;
+  transform-origin: 0 50%;
+  backface-visibility: hidden;
+  animation: ngs-open 1.6s cubic-bezier(0.55, 0.05, 0.3, 1) 1.3s both;
+}
+/* The leaf darkens as it turns away from the little light in front of it. */
+.ngs-door::after { content: ""; position: absolute; inset: 0; background: #000; opacity: 0; animation: ngs-shade 1.6s cubic-bezier(0.55, 0.05, 0.3, 1) 1.3s both; }
+.ngs-haze {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  mix-blend-mode: screen;
+  opacity: 0;
+  -webkit-mask: radial-gradient(ellipse 30% 27% at 50% 47%, #000 18%, transparent 78%);
+  mask: radial-gradient(ellipse 30% 27% at 50% 47%, #000 18%, transparent 78%);
+  animation: ngs-haze 1.8s ease-out 1.6s both;
+}
+.ngs-haze::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 200%;
+  background: url(opening/gate-haze.webp) 0 0 / 50% auto repeat;
+  animation: ngs-mist 26s linear infinite;
+}
+.ngs-dust { position: absolute; inset: 0; pointer-events: none; }
+.ngs-dust i {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 252, 244, 0.95), rgba(255, 252, 244, 0) 70%);
+  opacity: 0;
+  animation: ngs-mote-in 1.4s ease-out both, ngs-mote 7s ease-in-out infinite alternate;
+}
+/* Fade the picture's edges into the page. */
+.ngs-edge {
+  position: absolute;
+  inset: -1px;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, var(--ngs-bg) 0%, transparent 16%, transparent 84%, var(--ngs-bg) 100%),
+    linear-gradient(0deg, var(--ngs-bg) 0%, transparent 9%),
+    linear-gradient(180deg, var(--ngs-bg) 0%, transparent 6%);
+}
+/* The move into the light (only the intro's own gate: the welcome page's still gate stays put). */
+html[data-intro="play"] .ngo .ngs-push { animation: ngs-push 0.9s cubic-bezier(0.55, 0, 0.9, 0.4) 3.85s both; }
+html[data-intro="entering"] .ngo .ngs-push { animation: ngs-push-now 0.9s cubic-bezier(0.55, 0, 0.9, 0.4) both; }
+
+/* ---- Words and buttons */
+.ngo-scrim {
+  position: absolute;
+  inset: auto 0 0;
+  height: 48%;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(5, 5, 5, 0), rgba(5, 5, 5, 0.6) 36%, rgba(5, 5, 5, 0.86));
+  animation: ngo-fade 0.8s ease 1.5s both;
+}
+.ngo-ui { position: absolute; inset: 0; pointer-events: none; }
+html[data-intro="play"] .ngo-ui { animation: ngo-out 0.25s ease-in 3.85s forwards; }
+html[data-intro="entering"] .ngo-ui { animation: ngo-hide 0.25s ease-in forwards; }
+html[data-intro="play"] .ngo-scrim { animation: ngo-fade 0.8s ease 1.5s both, ngo-out 0.25s ease-in 3.85s forwards; }
+html[data-intro="entering"] .ngo-scrim { animation: ngo-fade 0.8s ease 1.5s both, ngo-hide 0.25s ease-in forwards; }
+.ngo-skip,
+.ngo-enter { pointer-events: auto; cursor: pointer; }
+.ngo-skip {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 12px);
+  right: calc(env(safe-area-inset-right) + 14px);
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(201, 165, 76, 0.45);
+  background: rgba(12, 11, 9, 0.6);
+  padding: 0 16px;
+  font: 600 0.8125rem/1 var(--font-inter), system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  color: #e9cf86;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: ngo-fade 0.5s ease 0.3s both;
+}
+.ngo-skip:hover { border-color: #c9a54c; color: #f7e7b4; }
+.ngo-skip:focus-visible,
+.ngo-enter:focus-visible { outline: 2px solid #f7e7b4; outline-offset: 3px; }
+.ngo-brand {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 62px);
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  animation: ngo-rise 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) 0.15s both;
+}
+.ngo-brand svg { width: 40px; height: 40px; }
+.ngo-word { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 0; line-height: 1; white-space: nowrap; }
+.ngo-word b {
+  font: 600 1.06rem/1 var(--font-serif-face), Georgia, serif;
+  letter-spacing: 0.22em;
+  padding-left: 0.22em;
+  text-transform: uppercase;
+  background: linear-gradient(100deg, #f4e4b4, #c9a54c 55%, #a07a35);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.ngo-word small { font: 600 0.62rem/1 var(--font-inter), system-ui, sans-serif; letter-spacing: 0.55em; padding-left: 0.55em; text-transform: uppercase; color: #a39c8f; }
+.ngo-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(env(safe-area-inset-bottom) + 22px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 0 20px;
+  text-align: center;
+}
+.ngo-verse { margin: 0; max-width: 31em; animation: ngo-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) 1.7s both; }
+.ngo-verse blockquote {
+  margin: 0;
+  font: 500 clamp(0.98rem, 0.92rem + 0.3vw, 1.18rem)/1.58 var(--font-serif-face), Georgia, serif;
+  color: #f2ede2;
+  text-wrap: pretty;
+  text-shadow: 0 1px 14px rgba(0, 0, 0, 0.65);
+}
+.ngo-verse figcaption { margin-top: 10px; font: 700 0.72rem/1 var(--font-inter), system-ui, sans-serif; letter-spacing: 0.22em; text-transform: uppercase; color: #c9a54c; }
+.ngo-enter {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  border: 1px solid #e8d49a;
+  background: linear-gradient(180deg, #f1e3b8, #cfae5c 58%, #a8863e);
+  padding: 0 26px;
+  font: 800 0.8125rem/1 var(--font-heading), system-ui, sans-serif;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #120e06;
+  box-shadow: 0 8px 24px -14px rgba(241, 223, 168, 0.7);
+  animation: ngo-rise-in 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) 2.15s both;
+}
+.ngo-enter:hover { filter: brightness(1.06); }
+/* The light the camera moves into: soft, warm white, not pure. */
+.ngo-white {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(ellipse 85% 70% at 50% 42%, #fffdf8 0%, #f7f3ea 55%, #ece6da 100%);
+}
+html[data-intro="play"] .ngo-white { animation: ngo-fade 0.55s cubic-bezier(0.5, 0, 0.6, 1) 4.1s both; }
+html[data-intro="entering"] .ngo-white { animation: ngo-flood 0.55s cubic-bezier(0.5, 0, 0.6, 1) 0.25s both; }
+
+/* Still gate (welcome page): open, at rest, the mist drifting slowly; its window's edges feathered into the page. */
+.ngs--still {
+  position: relative;
+  inset: auto;
+  aspect-ratio: 4 / 5;
+  --ngs-bg: var(--background);
+  --scene-h: 165%;
+  --scene-top: -28%;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 16%, #000 84%, transparent), linear-gradient(to bottom, transparent, #000 10%, #000 82%, transparent);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to right, transparent, #000 16%, #000 84%, transparent), linear-gradient(to bottom, transparent, #000 10%, #000 82%, transparent);
+  mask-composite: intersect;
+}
+.ngs--still :is(.ngs-push, .ngs-drift, .ngs-scene) { animation: none !important; }
+.ngs--still .ngs-light { animation: none; opacity: 1; }
+.ngs--still .ngs-door { animation: none; transform: rotateY(80deg); }
+.ngs--still .ngs-door::after { animation: none; opacity: 0.55; }
+.ngs--still .ngs-haze { animation: none; opacity: 0.85; }
+.ngs--still .ngs-haze::before { animation-duration: 60s; }
+
+/* Short landscape screens: the gate on the left, the words on the right. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .ngs { --scene-h: 135svh; --scene-top: calc(50svh - 135svh * 0.4416); --scene-x: 27%; }
+  .ngo-brand { left: 50%; top: calc(env(safe-area-inset-top) + 18px); flex-direction: row; }
+  .ngo-brand svg { width: 32px; height: 32px; }
+  .ngo-bottom { left: 50%; right: 3%; bottom: calc(env(safe-area-inset-bottom) + 14px); gap: 12px; }
+  .ngo-verse blockquote { font-size: 0.94rem; line-height: 1.5; }
+  .ngo-scrim { display: none; }
+}
+/* Very short portrait screens (iPhone SE 1st gen, zoomed display). */
+@media (orientation: portrait) and (max-height: 600px) {
+  .ngo-brand { top: calc(env(safe-area-inset-top) + 58px); gap: 6px; }
+  .ngo-brand svg { width: 32px; height: 32px; }
+  .ngo-bottom { gap: 12px; bottom: calc(env(safe-area-inset-bottom) + 14px); }
+  .ngo-verse blockquote { font-size: 0.94rem; line-height: 1.45; }
+}
+
+@keyframes ngo-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ngo-out { to { opacity: 0; } }
+/* Enter Narrow Gate starts these mid-sequence: they need names of their own (an animation that keeps its name keeps
+   its start time, so it would jump straight to its end). */
+@keyframes ngo-hide { to { opacity: 0; } }
+@keyframes ngo-flood { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ngo-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes ngo-rise-in { from { opacity: 0; transform: translateY(10px); visibility: hidden; } to { opacity: 1; transform: none; visibility: visible; } }
+@keyframes ngs-drift { from { transform: scale(1); } to { transform: scale(1.04); } }
+@keyframes ngs-open { from { transform: rotateY(0deg); } to { transform: rotateY(80deg); } }
+@keyframes ngs-shade { from { opacity: 0; } to { opacity: 0.55; } }
+@keyframes ngs-haze { from { opacity: 0; } to { opacity: 0.85; } }
+@keyframes ngs-mist { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes ngs-mote-in { from { opacity: 0; } to { opacity: 0.45; } }
+@keyframes ngs-mote { from { transform: translate(0, 0); } to { transform: translate(1.4cqh, -5cqh); } }
+@keyframes ngs-push { from { transform: scale(1); } to { transform: scale(4.6); } }
+@keyframes ngs-push-now { from { transform: scale(1); } to { transform: scale(4.6); } }
+@keyframes ngo-exit { from { opacity: 1; } to { opacity: 0; visibility: hidden; pointer-events: none; } }
+@keyframes ngo-enter-out { from { opacity: 1; } to { opacity: 0; visibility: hidden; pointer-events: none; } }
+@keyframes ngo-leave { from { opacity: 1; } to { opacity: 0; visibility: hidden; pointer-events: none; } }
+
+/* Reduced motion (device or in-app setting): nothing moves. The door is shown open and the light on, everything
+   fades in once; Enter, Skip and the end of the sequence fade it out, without the move into the light. */
+@media (prefers-reduced-motion: reduce) {
+  :is(.ngs-drift, .ngs-push) { animation: none !important; }
+  .ngs-haze::before { animation: none !important; }
+  .ngs-door { animation: none !important; transform: rotateY(80deg); }
+  .ngs-door::after { animation: none !important; opacity: 0.55; }
+  :is(.ngs-scene, .ngs-light, .ngo-brand, .ngo-verse, .ngo-scrim) { animation: ngo-fade 0.4s ease 0.1s both !important; }
+  .ngo-enter { animation: ngo-fade 0.4s ease 0.1s both !important; }
+  .ngs-haze { animation: none !important; opacity: 0.85; }
+  :is(.ngs-dust, .ngo-white) { display: none; }
+  html[data-intro="play"] .ngo-ui { animation: none !important; }
+  html[data-intro="entering"] .ngo { animation: ngo-enter-out 0.4s ease-out forwards !important; }
+}
+html[data-motion="reduce"] :is(.ngs-drift, .ngs-push) { animation: none !important; }
+html[data-motion="reduce"] .ngs-haze::before { animation: none !important; }
+html[data-motion="reduce"] .ngs-door { animation: none !important; transform: rotateY(80deg); }
+html[data-motion="reduce"] .ngs-door::after { animation: none !important; opacity: 0.55; }
+html[data-motion="reduce"] :is(.ngs-scene, .ngs-light, .ngo-brand, .ngo-verse, .ngo-scrim) { animation: ngo-fade 0.4s ease 0.1s both !important; }
+html[data-motion="reduce"] .ngo-enter { animation: ngo-fade 0.4s ease 0.1s both !important; }
+html[data-motion="reduce"] .ngs-haze { animation: none !important; opacity: 0.85; }
+html[data-motion="reduce"] :is(.ngs-dust, .ngo-white) { display: none; }
+html[data-motion="reduce"][data-intro="play"] .ngo-ui { animation: none !important; }
+html[data-motion="reduce"][data-intro="entering"] .ngo { animation: ngo-enter-out 0.4s ease-out forwards !important; }
+
 </style>
 
 <main class="wrap">
   <section class="copy" aria-labelledby="t">
-    <div class="eyebrow">iPhone demo · captured screens</div>
+    <div class="eyebrow">iPhone demo · captured screens + live exercise demos</div>
     <h1 id="t">Narrow Gate <span>Fitness</span></h1>
-    <p class="truth">What you are tapping through are <b>captured screens of the real app</b>: pictures taken in demo mode with clearly labelled sample data at iPhone size, joined by tap targets. Exercise pages show the app's <b>animated 2D demonstration</b> as it appears there, captured in the picture.</p>
+    <p class="truth">What you are tapping through are <b>pictures of the real app</b>, captured in demo mode with clearly labelled sample data at iPhone size, joined by tap targets. The <b>exercise demonstrations play live</b>: the app's own animation engine running on your device, not a recording.</p>
     <ol>
-      <li>Tap <b>Enter</b> on the opening, then <b>Explore with sample data</b>.</li>
+      <li>Tap <b>Enter</b> on the opening, then <b>Explore with sample data</b>, or <b>Start as a new member</b> to sign up as someone new: five quick questions, the plan they build, their first workout, and that member's own empty app.</li>
       <li>Use the five tabs <b>Home, Train, Run, Food, Faith</b>; <b>‹</b> goes back; <b>☰</b> lists every captured screen.</li>
-      <li>Open an exercise from <b>Train</b> to see its page with the 2D demonstration figure; in a picture it does not move.</li>
-      <li>Typing, timers, animations, GPS, the camera and purchases are not live in pictures; the workout flow is captured step by step.</li>
+      <li>Open any exercise (<b>Train → Exercises</b>): its demonstration plays live: the app's black-and-gold 2D athlete, with the working muscles lit. Tap the picture to pause, drag to scrub, 1× / 0.5×. All 157 are animated; none has had the owner's sign-off yet.</li>
+      <li>Typing, timers, GPS, the camera and purchases are not live in pictures; the workout flow is captured step by step.</li>
     </ol>
     <p>Open this page on an iPhone and it fills the screen.</p>
   </section>
@@ -117,11 +435,15 @@
             <div id="groups"></div>
           </div>
         </section>
+
       </div>
     </div>
   </div>
 </main>
 
+<template id="opening-tpl"><div class="ngo" role="dialog" aria-modal="true" aria-label="Narrow Gate Fitness opening" aria-describedby="ngo-verse" tabindex="-1" data-testid="opening-overlay"><div class="ngs" style="--door-l:42.079%;--door-t:27.421%;--door-w:15.718%;--door-h:33.434%;--door-r:15.671%;--persp:58.519cqh;--po:50.000% 46.296%;--gate-x:50.000%;--gate-y:0.4416" data-testid="animated-narrow-door" aria-hidden="true"><div class="ngs-push"><div class="ngs-drift"><div class="ngs-box"><div class="ngs-scene"><div class="ngs-base"></div><div class="ngs-light"></div><div class="ngs-door" data-testid="gate-door"></div></div><div class="ngs-haze"></div><div class="ngs-dust"><i style="left:47.2%;top:48%;width:0.22cqh;height:0.22cqh;animation-delay:2.2s, 2.2s"></i><i style="left:52.6%;top:55%;width:0.18cqh;height:0.18cqh;animation-delay:2.8000000000000003s, 2.8000000000000003s"></i><i style="left:49.4%;top:62%;width:0.26cqh;height:0.26cqh;animation-delay:3.3000000000000003s, 3.3000000000000003s"></i><i style="left:54.1%;top:44%;width:0.16cqh;height:0.16cqh;animation-delay:2.5s, 2.5s"></i><i style="left:45.8%;top:58%;width:0.2cqh;height:0.2cqh;animation-delay:3.8000000000000003s, 3.8000000000000003s"></i><i style="left:51.3%;top:39%;width:0.17cqh;height:0.17cqh;animation-delay:3.1s, 3.1s"></i><i style="left:48.6%;top:70%;width:0.24cqh;height:0.24cqh;animation-delay:2.6s, 2.6s"></i><i style="left:53.4%;top:66%;width:0.19cqh;height:0.19cqh;animation-delay:3.5s, 3.5s"></i></div><div class="ngs-edge"></div></div></div></div></div><div class="ngo-scrim" aria-hidden="true"></div><div class="ngo-ui" data-testid="narrow-gate-opening"><button type="button" class="ngo-skip" data-intro-dismiss="">Skip intro</button><div class="ngo-brand"><svg viewBox="0 0 48 48" aria-hidden="true" class="size-9"><defs><linearGradient id="ngf-gold-_R_36db_" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#F1DFA8"></stop><stop offset="55%" stop-color="#C9A54C"></stop><stop offset="100%" stop-color="#8C6A2F"></stop></linearGradient></defs><rect x="1" y="1" width="46" height="46" rx="12" fill="#151515" stroke="#2B2824"></rect><path d="M12 38V20a12 12 0 0 1 24 0v18" fill="none" stroke="url(#ngf-gold-_R_36db_)" stroke-width="3.5" stroke-linecap="round"></path><path d="M21 38V24a3 3 0 0 1 6 0v14" fill="url(#ngf-gold-_R_36db_)"></path><path d="M9 38h30" stroke="url(#ngf-gold-_R_36db_)" stroke-width="3" stroke-linecap="round"></path></svg><h2 class="ngo-word"><b>Narrow Gate</b> <small>Fitness</small></h2></div><div class="ngo-bottom"><figure class="ngo-verse"><blockquote id="ngo-verse">“<!-- -->Enter through the narrow gate. For wide is the gate and broad is the way that leads to destruction, and many enter through it. But small is the gate and narrow the way that leads to life, and only a few find it.<!-- -->”</blockquote><figcaption>Matthew 7:13–14 (<!-- -->BSB<!-- -->)</figcaption></figure><button type="button" class="ngo-enter" data-intro-enter="">Enter Narrow Gate</button></div></div><div class="ngo-white" aria-hidden="true"></div></div></template>
+<!-- The app's own 2D exercise engine and exercise list (src/lib/exercise-motion, src/data/exercises), bundled by engine.mjs. -->
+<script>/*NGF*/</script>
 <script>/*DATA*/</script>
 <script>
 (function () {
@@ -135,7 +457,7 @@
   const screen = $("screen");
   screen.style.setProperty("--nav-h", D.navH + "px");
   const trail = [];
-  let current = null, hint = false;
+  let current = null, hint = false, live = [];
   try { hint = localStorage.getItem("ng-hint") === "1"; } catch {}
   $("hint").setAttribute("aria-pressed", String(hint));
   $("hint").classList.toggle("on", hint);
@@ -152,12 +474,15 @@
     if (BYKEY[k]) return BYKEY[k];
     const p = k.split("?")[0];
     if (BYKEY[p]) return BYKEY[p];
+    if (ALIAS[p] && ALIAS[p] !== k) return resolve(ALIAS[p]);
     return SCREENS.find((s) => s.key.split("?")[0] === p) || null;
   }
   const groupOf = (s) => s.group || (s.key === "/" || s.key.startsWith("/login") || s.key.startsWith("/signup") || s.key.startsWith("/legal") || s.key.startsWith("/plan") ? "Welcome and setup" : s.key.startsWith("/coach") ? "AI Coach" : s.key.startsWith("/train") ? "Train" : s.key.startsWith("/run") ? "Run" : s.key.startsWith("/nutrition") ? "Food" : s.key.startsWith("/faith") ? "Faith" : s.key.startsWith("/progress") ? "My Progress" : s.key.startsWith("/profile") ? "Profile and membership" : "Home");
 
+  const isNM = (s) => !!s && s.key.startsWith("state:nm");
   function show(s, opts) {
     opts = opts || {};
+    if (s.key === "state:opening" && BYKEY["/"] && s !== BYKEY["/"]) { show(BYKEY["/"], opts); playOpening(); return; }
     if (current && !opts.back && current !== s) trail.push(current.id);
     current = s;
     $("back").disabled = trail.length === 0;
@@ -174,10 +499,13 @@
       img.src = "s/" + file;
       col.append(img);
     }
+    for (const c of live) c.destroy();
+    live = [];
     for (const h of s.hot || []) {
+      if (h.kind === "live") { mountLive(h, s); continue; }
       const b = document.createElement("button");
       b.type = "button";
-      b.className = "hs " + (h.to && resolve(h.to) ? "link" : "dead");
+      b.className = "hs " + (h.kind === "live" ? "live" : h.to && resolve(h.to) ? "link" : "dead");
       b.style.left = (h.x / 390 * 100) + "%"; b.style.width = (h.w / 390 * 100) + "%";
       b.style.top = (h.y / s.h * 100) + "%"; b.style.height = (h.h / s.h * 100) + "%";
       b.setAttribute("aria-label", h.label || "Control");
@@ -195,7 +523,9 @@
     if (!h.to) { toast(h.kind === "button" || h.kind === "summary" || h.kind === "label" ? "“" + (h.label || "This control") + "” works in the real app; this demo is pictures of it, so it is not live here." : "Not captured in this demo."); return; }
     const t = resolve(h.to);
     if (!t) { toast("“" + (h.label || h.to) + "” leads to a screen that is not among the " + SCREENS.length + " captured here."); return; }
+    const leaving = isNM(current) && !isNM(t) && t.key !== "/";
     show(t);
+    if (leaving) toast("This screen was captured with the sample member's account, so it shows their data, not the new member's.", 4200);
   }
   col.addEventListener("click", () => { if (current && current.closeTo) { const t = resolve(current.closeTo); if (t) show(t, { back: true }); } });
   $("back").addEventListener("click", () => { const id = trail.pop(); if (id && BYID[id]) show(BYID[id], { back: true }); $("back").disabled = trail.length === 0; });
@@ -208,7 +538,7 @@
     b.type = "button"; b.className = "hs";
     b.style.left = (t.x / 390 * 100) + "%"; b.style.width = (t.w / 390 * 100) + "%"; b.style.top = "0"; b.style.height = "100%";
     b.setAttribute("aria-label", t.label);
-    b.addEventListener("click", () => { const s = resolve(t.to); if (s) show(s); });
+    b.addEventListener("click", () => { const own = isNM(current) && BYKEY["state:nm" + t.to]; const s = own || resolve(t.to); if (s) show(s); });
     navhot.append(b);
   }
   navhot.style.cssText = "position:absolute;inset:0;";
@@ -216,7 +546,7 @@
   // The menu.
   const groups = {};
   for (const s of SCREENS) (groups[groupOf(s)] ||= []).push(s);
-  const ORDER = ["Welcome", "Welcome and setup", "Home", "Train", "Workout", "AI Coach", "Run", "Food", "Faith", "My Progress", "Profile and membership"];
+  const ORDER = ["Welcome", "New member", "Welcome and setup", "Home", "Train", "Workout", "AI Coach", "Run", "Food", "Faith", "My Progress", "Profile and membership"];
   const gEl = $("groups");
   for (const g of [...ORDER.filter((g) => groups[g]), ...Object.keys(groups).filter((g) => !ORDER.includes(g))]) {
     const d = document.createElement("div"); d.className = "grp";
@@ -224,9 +554,70 @@
     for (const s of groups[g]) { const b = document.createElement("button"); b.innerHTML = esc(s.title || s.key) + "<small>" + esc(s.key.startsWith("state:") ? "" : s.key) + "</small>"; b.addEventListener("click", () => { $("sheet").hidden = true; show(s); }); d.append(b); }
     gEl.append(d);
   }
-  $("about").innerHTML = "<b>What this demo is.</b> Pictures of the real Narrow Gate Fitness app, captured in demo mode (sample data, purchases off, AI replies simulated) at iPhone size on " + esc(D.date.slice(0, 10)) + ", joined by tap targets: " + SCREENS.length + " screens, " + D.taps + " taps. Exercise pages show the app's animated 2D demonstration, captured in the pictures.<ul><li>Typing, timers, animations, GPS, the camera, Apple Health and purchases are not live in pictures. The workout flow (start, demonstration, log sets, rest timer, substitute, finish, summary) and the AI coach's reply are captured step by step.</li><li>Nothing here touches a real account or charges anything.</li><li>The real app on a phone needs the private preview deployment, which waits on the owner's approval.</li></ul>";
+  $("about").innerHTML = "<b>What this demo is.</b> Pictures of the real Narrow Gate Fitness app, captured in demo mode (sample data, purchases off, AI replies simulated) at iPhone size on " + esc(D.date.slice(0, 10)) + ", joined by tap targets: " + SCREENS.length + " screens, " + D.taps + " taps. The <b>exercise demonstrations are live</b>: the app's own animation engine runs on this device.<ul><li>Typing, timers, GPS, the camera, Apple Health and purchases are not live in pictures. The workout flow (start, demonstration, log sets, rest timer, substitute, finish, summary) and the AI coach's reply are captured step by step.</li><li><b>Start as a new member</b> on the welcome screen walks a brand-new account through the five essential sign-up questions and the Ready screen (the optional ones are shown once, under Personalise more), the plan it builds, its first workout screen, and that member's own app on the Free plan (empty history, Pro features locked). The answers are picked for the demo: a tap on any answer or field fills the step in.</li><li>Nothing here touches a real account or charges anything.</li><li>The real app on a phone needs the private preview deployment, which waits on the owner's approval.</li></ul>";
   $("menu").addEventListener("click", () => ($("sheet").hidden = false));
   $("close-sheet").addEventListener("click", () => ($("sheet").hidden = true));
+
+  // The exercise demonstrations: mounted with the options the app's player uses (src/components/train/exercise-demo.tsx:
+  // the black-and-gold athlete with the exercise's muscles lit, play/pause and 1x/0.5x, the "Animated demo" badge).
+  function mountLive(h, s) {
+    const NGF = window.NGF;
+    if (!NGF) return;
+    let slug = (h.to || "").slice(7);
+    if (!slug && h.name) { const m = NGF.EXERCISES.find((x) => x.name === h.name); slug = m ? m.slug : ""; }
+    const e = NGF.EXERCISES.find((x) => x.slug === slug);
+    if (!e) return;
+    const div = document.createElement("div");
+    div.className = "live2d";
+    div.style.left = (h.x / 390 * 100) + "%"; div.style.width = (h.w / 390 * 100) + "%";
+    div.style.top = (h.y / s.h * 100) + "%"; div.style.height = (h.h / s.h * 100) + "%";
+    const controls = h.controls !== false;
+    // A small looping thumbnail (the workout screen's) is part of a button in the app: taps go through to it.
+    if (controls) div.addEventListener("click", (ev) => ev.stopPropagation());
+    else div.style.pointerEvents = "none";
+    col.append(div);
+    try {
+      const meta = { slug, name: e.name, pattern: e.pattern, category: e.category, equipment: e.equipment, timed: e.timed };
+      live.push(NGF.mountExerciseMotion(div, slug, {
+        autoplay: true, controls, style: "athlete", highlight: NGF.highlightFor(e.primary || [], e.secondary || []), controlsInset: 74,
+        badge: controls ? "Animated demo" : "",
+        meta,
+        label: "Animated demonstration of " + e.name + ". " + NGF.getMotion(slug, meta).label,
+      }));
+    } catch (err) { div.remove(); }
+  }
+
+  // The opening: Enter Narrow Gate moves into the light, Skip intro fades out, left alone it plays to the end.
+  const D0 = document.documentElement;
+  let openTimer = 0;
+  function closeOpening() {
+    clearTimeout(openTimer);
+    D0.dataset.intro = "done";
+    const o = document.querySelector("#screen .ngo");
+    if (o) o.remove();
+  }
+  function playOpening() {
+    const tpl = $("opening-tpl");
+    if (!tpl || !tpl.innerHTML.trim()) return;
+    closeOpening();
+    const holder = document.createElement("div");
+    holder.innerHTML = tpl.innerHTML;
+    const o = holder.firstElementChild;
+    $("screen").append(o);
+    void o.offsetWidth;
+    D0.dataset.intro = "play";
+    const go = (state, ms) => { if (D0.dataset.intro !== "play") return; D0.dataset.intro = state; clearTimeout(openTimer); openTimer = setTimeout(closeOpening, ms); };
+    o.addEventListener("click", (e) => {
+      const t = e.target;
+      if (t.closest("[data-intro-enter]")) go("entering", 1520);
+      else if (t.closest("[data-intro-dismiss]")) go("leaving", 500);
+    });
+    o.addEventListener("animationend", (e) => { if (e.target === o && /^ngo-(exit|leave|enter-out)$/.test(e.animationName)) closeOpening(); });
+    openTimer = setTimeout(closeOpening, 5600);
+    o.focus({ preventScroll: true });
+  }
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && D0.dataset.intro === "play") { D0.dataset.intro = "leaving"; clearTimeout(openTimer); openTimer = setTimeout(closeOpening, 500); } });
+  window.playOpening = playOpening;
 
   function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 

@@ -1,13 +1,15 @@
-// Taps through the built iPhone demo at iPhone size: the opening → welcome → sample data → tabs → the workout flow →
-// the menu → the AI coach; every screen's picture must exist; no page errors. node verify.mjs <out dir> <shots dir>
+// Taps through the built iPhone demo at iPhone size: the live opening → welcome → sample data → tabs → the workout flow
+// → the menu → the AI coach → the live exercise demonstrations → the new-member path; every screen's picture must exist;
+// no page errors.   CHROMIUM=... node verify.mjs <out dir> <shots dir>
 import { chromium, devices } from "playwright";
 import fs from "node:fs";
 import path from "node:path";
 import http from "node:http";
 const out = process.argv[2], shots = process.argv[3];
 fs.mkdirSync(shots, { recursive: true });
-const MIME = { ".html": "text/html", ".webp": "image/webp", ".png": "image/png", ".json": "application/json" };
+const MIME = { ".html": "text/html", ".webp": "image/webp", ".png": "image/png", ".json": "application/json", ".woff2": "font/woff2" };
 const srv = http.createServer((req, res) => {
+  if (req.url === "/favicon.ico") { res.writeHead(204); return res.end(); } // the artifact host serves its own
   const p = path.join(out, decodeURIComponent(req.url.split("?")[0] === "/" ? "/app.html" : req.url.split("?")[0]));
   if (!p.startsWith(out) || !fs.existsSync(p) || fs.statSync(p).isDirectory()) { res.writeHead(404); return res.end(); }
   if (p.endsWith("app.html")) {
@@ -47,12 +49,16 @@ const tapHot = async (re) => {
 await page.goto(`http://localhost:${port}/app.html`);
 await page.waitForFunction(() => window.demo);
 await page.waitForTimeout(1200);
+// The opening plays live (the app's own scene and CSS) over the welcome screen; Enter Narrow Gate goes in.
+const opening = page.locator("#screen .ngo");
+check("the opening plays first", (await opening.count()) === 1 && (await opening.isVisible()));
+await page.waitForTimeout(2600);
 await shot("opening");
-let c = await cur();
-check("first screen is the opening", c.title === "Opening", c.title);
-await tapHot("Enter|Skip");
-c = await cur(); await shot("welcome");
-check("opening → welcome", c.title === "Welcome", c.title);
+check("its verse is Matthew 7:13–14 (BSB)", /Matthew 7:13–14 \(BSB\)/.test((await opening.locator("figcaption").textContent()) ?? ""));
+await opening.getByRole("button", { name: "Enter Narrow Gate" }).tap();
+await opening.waitFor({ state: "detached", timeout: 6000 }).catch(() => {});
+let c = await cur(); await shot("welcome");
+check("Enter Narrow Gate → welcome", (await opening.count()) === 0 && c.title === "Welcome", c.title);
 await tapHot("Explore with sample data");
 c = await cur(); await shot("home");
 check("welcome → Today (/home), tab bar shown", c.key === "/home" && c.nav, `${c.key} nav=${c.nav}`);
@@ -113,6 +119,38 @@ check("coach → typed question", c.title === "Question typed", c.title);
 await tapHot("Send message").catch(() => null);
 c = await cur(); await shot("coach-reply");
 check("typed → the coach's reply", c.title.startsWith("The coach"), c.title);
+// The exercise demonstrations play live: the app's engine draws, moves and carries the app's badge and label.
+const frame = () => page.evaluate(() => Array.from(document.querySelectorAll("#col .live2d canvas")).map((cv) => {
+  const d = cv.getContext("2d")?.getImageData(0, 0, cv.width, cv.height).data; if (!d) return null;
+  let h = 0, lit = 0; for (let i = 0; i < d.length; i += 4 * 37) { h = (h * 31 + d[i] + d[i + 1] * 3 + d[i + 2] * 7) % 1e9; if (d[i] + d[i + 1] + d[i + 2] > 90) lit++; }
+  return { h, lit };
+})[0]);
+for (const key of ["/train/exercises/back-squat", "/train/exercises/kettlebell-swing", "state:demo-dialog"]) {
+  await page.evaluate((k) => window.demo.show(window.demo.screens.find((s) => s.key === k)), key);
+  await page.waitForTimeout(500);
+  const box = page.locator("#col .live2d").first();
+  if (!(await box.count())) { check(`${key}: live demonstration`, false); continue; }
+  await box.scrollIntoViewIfNeeded(); await page.waitForTimeout(500);
+  const a = await frame(); await page.waitForTimeout(700); const z = await frame();
+  const label = await box.evaluate((el) => el.querySelector("[aria-label^='Animated demonstration of']")?.getAttribute("aria-label") ?? "");
+  check(`${key}: live demonstration draws and moves`, !!a && a.lit > 20 && !!z && a.h !== z.h, `"${label.slice(0, 60)}"`);
+  check(`${key}: badge and label as in the app`, /Animated demo/.test(await box.textContent()) && /^Animated demonstration of .+\. .+/.test(label));
+}
+await shot("live-demo-dialog");
+const ex = await page.evaluate(() => { const l = window.demo.screens.filter((s) => /^\/train\/exercises\/[^/?]+$/.test(s.key)); return [l.length, l.filter((s) => s.hot.some((h) => h.kind === "live")).length]; });
+check("every captured exercise page has its live demonstration", ex[0] > 0 && ex[0] === ex[1], `${ex[1]}/${ex[0]}`);
+// The new-member path (new-member.mjs): Welcome → the five questions → Ready → plan → first workout.
+if (await page.evaluate(() => window.demo.screens.some((s) => s.key === "state:nm-goal"))) {
+  await page.evaluate(() => window.demo.show(window.demo.screens.find((s) => s.key === "/")));
+  await page.waitForTimeout(400);
+  for (const [re, want] of [["Start as a new member", /Main goal$/], ["Lose body fat", /Main goal: /], ["^Continue", /Experience$/], ["Under 1 year", /Experience: /], ["^Continue", /Schedule$/], ["^4 days$", /Schedule: 4 days/],
+    ["^Continue", /Equipment$/], ["Full gym", /Equipment: /], ["^Continue", /About you$/], ["^Male$", /About you: /], ["^Continue", /Ready to build your plan/], ["Build my plan", /Your plan/], ["Start my first workout|Start Today.s Workout", /First workout/]]) {
+    const hit = await tapHot(re); c = await cur();
+    if (!hit || !want.test(c.title ?? "")) { check(`new member: "${re}" → ${want}`, false, c.title); break; }
+  }
+  c = await cur(); await shot("new-member-first-workout");
+  check("new member: questions → plan → first workout", /First workout/.test(c.title ?? ""), c.title);
+} else check("new member path captured (run new-member.mjs)", false);
 // Every picture exists and every tap target lies inside its screen.
 const data = await page.evaluate(() => window.DEMO);
 let bad = 0, outside = 0, resolvable = 0, dead = 0;
