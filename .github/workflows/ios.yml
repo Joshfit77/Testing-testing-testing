@@ -11,6 +11,8 @@ name: iOS
 #      artifact.
 #    - webkit: the opening and navigation browser tests in WebKit (Safari's engine) at iPhone size, signed in
 #      against a local Supabase.
+#    - webkit-iphones (manual only, job = webkit-matrix): every signed-in screen at every iPhone size in Playwright's
+#      device list, in WebKit (e2e/device-matrix.spec.ts with E2E_DEVICE_MATRIX=ios). Linux only, no Mac minutes.
 #
 # 2) testflight — manual only. Builds the ONLINE app (it loads server_url; never the offline edition), signs it
 #    with your App Store Connect API key, and uploads it to App Store Connect only when upload = true.
@@ -23,9 +25,9 @@ on:
   workflow_dispatch:
     inputs:
       job:
-        description: "checks = compile + full app in the Simulator + WebKit tests; testflight = signed build"
+        description: "checks = compile + full app in the Simulator + WebKit tests; testflight = signed build; webkit-matrix = every iPhone size in WebKit"
         type: choice
-        options: [checks, testflight]
+        options: [checks, testflight, webkit-matrix]
         default: checks
       server_url:
         description: "testflight: https:// address of the deployed app (the iPhone app loads it)"
@@ -324,6 +326,46 @@ jobs:
         if: failure()
         with:
           name: webkit-test-results
+          path: test-results
+          if-no-files-found: ignore
+
+  webkit-iphones:
+    name: Every iPhone size in WebKit (device matrix)
+    if: github.event_name == 'workflow_dispatch' && inputs.job == 'webkit-matrix'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Start Supabase (local, throwaway)
+        run: npx supabase start
+      - name: Point the app at it
+        run: |
+          eval "$(npx supabase status -o env | grep -E '^(API_URL|ANON_KEY|SERVICE_ROLE_KEY)=')"
+          echo "::add-mask::$ANON_KEY"
+          echo "::add-mask::$SERVICE_ROLE_KEY"
+          {
+            echo "NEXT_PUBLIC_SITE_URL=http://localhost:3000"
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+            # The matrix signs up one account per iPhone size from this one machine: raise (never lower) the limits.
+            echo "AUTH_RATE_LIMIT_SCALE=50"
+          } > .env.local
+      - run: npm run build
+      - run: npx playwright install --with-deps webkit
+      - name: Device matrix, every iPhone (WebKit)
+        run: E2E_WEBKIT=1 E2E_DEVICE_MATRIX=ios E2E_MATRIX_OUT=test-results/device-matrix npx playwright test e2e/device-matrix.spec.ts --project=iphone-webkit --workers=2
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: webkit-iphones
           path: test-results
           if-no-files-found: ignore
 
