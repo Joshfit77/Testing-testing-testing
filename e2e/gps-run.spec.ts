@@ -89,6 +89,14 @@ test.describe("live GPS runs and walks", () => {
     await expect(page.getByTestId("route-map")).toBeVisible();
     await expect(page.getByTestId("activity-distance")).toHaveText(distance);
     await expect(page.getByTestId("activity-notes")).toHaveText("Evening walk");
+    // Opened fresh (not by the in-app navigation above), the page hydrates without errors: the map's accessible title
+    // used to be empty in the server's HTML and filled in the browser (React #418 on every run's page).
+    const pageErrors: string[] = [];
+    page.on("pageerror", (e) => pageErrors.push(e.message.slice(0, 160)));
+    await page.reload();
+    await page.waitForLoadState("networkidle");
+    await expect(page.getByTestId("route-map").locator("title").first()).toHaveText(/^Route of this walk/);
+    expect(pageErrors).toEqual([]);
 
     await page.goto("/run?tab=history");
     await expect(page.getByText("Evening walk").or(page.getByRole("link", { name: /Walk/ })).first()).toBeVisible();

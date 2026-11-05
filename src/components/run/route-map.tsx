@@ -116,10 +116,9 @@ export function RouteMap({
   const here = current ? pt([current.lng, current.lat]) : null;
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className={className} role="img" aria-labelledby={`${id}-t`} data-testid="route-map">
-      <title id={`${id}-t`}>
-        {label ?? `Route map with ${lines.length} recorded ${lines.length === 1 ? "stretch" : "stretches"}`}
-        {markers.length ? `, ${markers.length} ${unit} marker${markers.length === 1 ? "" : "s"}` : ""}
-      </title>
+      {/* One string: React server-renders a title element only from a single string child, so two children came out
+          empty on the server and filled in the browser (hydration error #418 on every run's page). */}
+      <title id={`${id}-t`}>{`${label ?? `Route map with ${lines.length} recorded ${lines.length === 1 ? "stretch" : "stretches"}`}${markers.length ? `, ${markers.length} ${unit} marker${markers.length === 1 ? "" : "s"}` : ""}`}</title>
       <rect x="0" y="0" width={W} height={H} rx="14" fill="#100f0d" stroke="#2a261f" />
       {breaks.map(([a, b], i) => (
         <line key={`b${i}`} x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke="#a39a86" strokeOpacity="0.55" strokeWidth="1.5" strokeDasharray="3 4" data-testid="route-break">

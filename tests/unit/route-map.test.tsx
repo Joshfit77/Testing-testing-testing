@@ -1,4 +1,5 @@
 import { render } from "@testing-library/react";
+import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { distanceMarkers, RouteMap } from "@/components/run/route-map";
 
@@ -29,5 +30,17 @@ describe("route map", () => {
     rerender(<RouteMap coordinates={[north(0, 1200)]} unit="mi" current={{ lat: 40 + 1250 / 111_195, lng: -75, accuracy: 6 }} />);
     expect(getByTestId("route-current").textContent).toContain("±6 m");
     expect(getByTestId("route-map").textContent).toMatch(/ft|mi/);
+  });
+
+  it("server-renders the same accessible title the browser renders (no hydration mismatch, React #418)", () => {
+    // React renders a <title> from a single string only: with two text children the server sent an empty title while
+    // the browser filled it in, so every run's detail page failed to hydrate.
+    const html = renderToString(<RouteMap coordinates={[north(0, 3300)]} unit="mi" label="Route of this run" />);
+    const title = html.match(/<title id="[^"]*-t">([^<]*)<\/title>/)?.[1];
+    expect(title).toBe("Route of this run, 2 mi markers");
+    const plain = renderToString(<RouteMap coordinates={[north(0, 400)]} unit="km" />);
+    expect(plain.match(/<title id="[^"]*-t">([^<]*)<\/title>/)?.[1]).toBe("Route map with 1 recorded stretch");
+    // Every title in the map is a single, non-empty string on the server.
+    for (const t of html.matchAll(/<title[^>]*>([^<]*)<\/title>/g)) expect(t[1]!.trim()).not.toBe("");
   });
 });

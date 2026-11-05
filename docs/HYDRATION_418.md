@@ -105,3 +105,20 @@ The fix edits code inside `node_modules/next`, which is unusual. What can go wro
 **Exit:** upgrading to Next 16 removes the need for the patch (its bundled React has the fix; checked in a trial).
 That is a separate, larger change that needs the owner's approval and has not been done. The trial, the conditions
 and the step-by-step plan are in `docs/NEXT16_UPGRADE_EVALUATION.md`.
+
+## A second, separate cause (fixed 2026-11-05): a two-part SVG title on the run page
+
+Not the replay bug above, and not intermittent: every run or walk's page (`/run/activities/<id>`) failed to hydrate
+on a full load, in any time zone. Found by a hydration sweep of every page the demo crawler reaches (364 pages, signed
+in to the sample account, New York time and UTC): 4 pages raised #418, all of them run pages.
+
+- **Cause:** the route map's accessible SVG title was written as two pieces of text
+  (`{label}{markers ? ", 3 mi markers" : ""}`). React server-renders a title element only from a single string child,
+  so the server sent an empty title while the browser filled it in; React then threw #418 and re-rendered the page in
+  the browser. The in-app navigation the existing tests used never hydrates server HTML, so nothing caught it.
+- **Fix:** one template string (`src/components/run/route-map.tsx`). No other title in `src` has more than one child.
+- **Covered by:** `tests/unit/route-map.test.tsx` server-renders the map and checks the title text (fails without the
+  fix: the title came back empty); `e2e/gps-run.spec.ts` reloads a saved walk's page and requires no page errors.
+- **Re-checked after the fix:** the same 364-page sweep, New York time and UTC: 0 pages with #418 (before: 4).
+- **Rule of thumb:** give a `<title>` (in SVG or the document) a single string: a template literal, not text mixed
+  with `{expressions}`.
