@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
-import { completeOnboarding, seedRows, serviceRest, signUpAndConfirm, uniqueEmail, userIdFor } from "./helpers";
+import { completeOnboarding, grantPlan, seedRows, serviceRest, signUpAndConfirm, uniqueEmail, userIdFor } from "./helpers";
 
 /** Fills the sleep form with eight hours ending two minutes ago (the test account's time zone is UTC). */
 async function fillLastEightHours(page: Page) {
@@ -77,6 +77,9 @@ test.describe("Sleep & Recovery", () => {
     await lastNight.getByRole("link", { name: "Nightly report" }).click();
     await page.waitForURL(new RegExp(`/progress/sleep/night/${night}$`));
     await expect(page.getByText("Recorded by Apple Watch (test)", { exact: true })).toBeVisible();
+    // The watch measured it: not called "your estimate".
+    await expect(page.getByText("recorded by your device", { exact: true })).toBeVisible();
+    await expect(page.getByText("your estimate", { exact: true })).toHaveCount(0);
     const stages = page.getByRole("heading", { name: "Sleep stages" }).locator("..");
     await expect(stages.getByRole("img", { name: /Sleep stages from 11:10 PM to 6:50 AM/ })).toBeVisible();
     await expect(stages).toContainText("Deep");
@@ -114,6 +117,16 @@ test.describe("Sleep & Recovery", () => {
     await expect(page.getByTestId("sleep-connection")).toContainText("Connected to Apple Health");
     await expect(page.getByRole("button", { name: "Disconnect", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: /Disconnect and remove imported/ })).toBeVisible();
+
+    // Pro: the daily energy curve draws real bars for the waking hours (they once all drew at zero height).
+    await grantPlan(email, "pro");
+    await page.goto("/progress/sleep/energy");
+    const bars = page.getByRole("list", { name: "Estimated alertness by hour" }).getByTestId("energy-bar");
+    await expect(bars.first()).toBeAttached();
+    const heights = await bars.evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
+    expect(heights.length).toBeGreaterThanOrEqual(12);
+    expect(Math.max(...heights), "the tallest waking-hour bar has a real height").toBeGreaterThan(40);
+    expect(Math.min(...heights), "asleep hours still show a thin bar").toBeGreaterThan(0);
   });
 
   test("consent, the sleep timer, entering a night by hand, editing, overlap and deletion", async ({ page }) => {

@@ -73,5 +73,7 @@ export function averageAsleepMinutes(nights: NightSummary[]): number | null {
 /** Whole-number percent of the goal, not capped (a night over the goal reads over 100). */
 export function goalPct(asleepMinutes: number | null, goalMinutes: number): number | null {
   if (asleepMinutes === null || goalMinutes <= 0) return null;
-  return Math.round((asleepMinutes / goalMinutes) * 100);
+  const pct = Math.round((asleepMinutes / goalMinutes) * 100);
+  // Never rounded up to 100% short of the goal: 7h 59m of 8h is 99%, not "Goal reached".
+  return asleepMinutes < goalMinutes ? Math.min(pct, 99) : pct;
 }

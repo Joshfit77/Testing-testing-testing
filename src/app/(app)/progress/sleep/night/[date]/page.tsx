@@ -112,7 +112,7 @@ export default async function NightReportPage({ params }: { params: Promise<{ da
             </div>
             <p className="mt-2 flex items-baseline gap-2">
               <span className="font-display text-5xl font-bold text-gold-highlight">{formatDuration(night.asleepMinutes)}</span>
-              <span className="text-sm text-muted-foreground">{night.asleepEstimated ? "taken as time in bed" : "your estimate"}</span>
+              <span className="text-sm text-muted-foreground">{night.asleepEstimated ? "taken as time in bed" : night.recorded ? "recorded by your device" : "your estimate"}</span>
             </p>
             {pct !== null && (
               <div className="mt-3 space-y-1">

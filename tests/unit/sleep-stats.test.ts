@@ -61,5 +61,8 @@ describe("averages and goal", () => {
     expect(goalPct(450, 480)).toBe(94);
     expect(goalPct(540, 480)).toBe(113);
     expect(goalPct(null, 480)).toBeNull();
+    // Short of the goal never rounds up to 100% (which the pages read as "Goal reached").
+    expect(goalPct(479, 480)).toBe(99);
+    expect(goalPct(480, 480)).toBe(100);
   });
 });

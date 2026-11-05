@@ -57,18 +57,21 @@ export default async function SleepEnergyPage() {
           {debt.nightsWithData ? ` and an estimated ${Math.round(debt.debtMinutes / 6) / 10} h of sleep debt` : ""}
           {r.scale < 1 ? ` (curve lowered to ${Math.round(r.scale * 100)}%)` : ""}.
         </p>
-        <ol className="mt-4 flex h-32 items-end gap-0.5" aria-label="Estimated alertness by hour">
+        {/* Columns stretch to the chart's height so each bar's percentage has something to be a percentage of (with
+            the columns bottom-aligned they shrank to their content and every bar drew at zero height). Every column
+            keeps the same label row, so all bars share one scale. */}
+        <ol className="mt-4 flex h-32 gap-0.5" aria-label="Estimated alertness by hour">
           {r.points.map((p) => (
-            <li key={p.minute} className="flex flex-1 flex-col items-center justify-end gap-1">
+            <li key={p.minute} className="flex flex-1 flex-col items-center gap-1">
               <span className="sr-only">
                 {formatClock(p.minute)}: {p.level === null ? "asleep" : `${p.level} out of 100`}
               </span>
-              <span aria-hidden className={cn("w-full rounded-t", p.level === null ? "h-1 bg-elevated" : p.level >= 80 ? "bg-gold-gradient" : p.level >= 65 ? "bg-champagne" : "bg-bronze")} style={{ height: `${p.level === null ? 4 : Math.max(6, p.level)}%` }} />
-              {p.minute % 360 === 0 && (
-                <span aria-hidden className="text-[0.625rem] text-muted-foreground">
-                  {formatClock(p.minute).replace(":00", "")}
-                </span>
-              )}
+              <span aria-hidden className="flex w-full flex-1 items-end">
+                <span data-testid="energy-bar" className={cn("w-full rounded-t", p.level === null ? "bg-elevated" : p.level >= 80 ? "bg-gold-gradient" : p.level >= 65 ? "bg-champagne" : "bg-bronze")} style={{ height: `${p.level === null ? 4 : Math.max(6, p.level)}%` }} />
+              </span>
+              <span aria-hidden className="h-3 whitespace-nowrap text-[0.625rem] leading-3 text-muted-foreground">
+                {p.minute % 360 === 0 ? formatClock(p.minute).replace(":00", "") : ""}
+              </span>
             </li>
           ))}
         </ol>
