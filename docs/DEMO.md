@@ -36,7 +36,7 @@ Wi-Fi, open `http://<your computer's IP address>:3000`.
 | Command | What it does |
 |---|---|
 | `npm run demo` | Starts the database, loads the sample account, builds and serves the demo on port 3000 |
-| `npm run demo:reset` | Puts the sample account back to its starting state in about 10 seconds while the demo keeps running (the password stays the same; sign in again with **Explore with sample data**) |
+| `npm run demo:reset` | Puts the sample account back to its starting state in about 10 seconds while the demo keeps running (the password stays the same; sign in again with **Explore with sample data**). The same thing from inside the app: the demo bar's **Reset demo** button (below) |
 | `DEMO_RESET_LOCAL_DB=true npm run demo` | Wipes the **local** database first (only needed if you used it for development) |
 | `DEMO_SHOW_SCORE=on npm run demo` | Also shows the experimental Nutrition Score number on product pages. Off by default: the formula hasn't had its dietitian review (`docs/FOOD_IQ_METHOD.md`) |
 | `PORT=3001 npm run demo` | Another port |
@@ -75,7 +75,12 @@ screen recordings).
 - **The opening plays once per browser tab**, at the start, not again on every reload. Stop 1 (**Play the opening**)
   plays it again on purpose.
 - **Recovering from a mistake:** a wrong tap is undone with Back or the list. If sample data got changed (a workout
-  saved, a reading marked), run `npm run demo:reset` in Terminal and tap **Explore with sample data** again.
+  saved, a reading marked), tap **Reset demo** in the demo bar (or run `npm run demo:reset` in Terminal and tap
+  **Explore with sample data** again).
+- **Reset demo** (demo bar, sample account only): after a confirmation it wipes everything the sample account logged
+  and re-seeds its history, keeps you signed in and returns to Home. It exists only when the server runs in demo mode,
+  only for the account the server created as the demo account, never for any other account, and is limited to six
+  resets in ten minutes (`src/server/actions/demo.ts`, `src/server/demo-seed.ts`; `e2e/demo-reset.spec.ts`).
 - The panel is only links: it unlocks nothing. It is remembered only in this browser tab.
 
 The full talk track, tap by tap, is in `docs/PRESENTATION_GUIDE.md`.
