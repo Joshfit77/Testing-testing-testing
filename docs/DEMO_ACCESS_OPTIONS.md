@@ -50,8 +50,8 @@ What exists today, on the `claude/faith-discipleship` branch and its mirror `rel
 
 ## Option 4: the screenshot tour (secondary reference only)
 
-The published page is pictures of the real app with tap targets, 458 screens, fixed from this round to fill any
-phone with one scroll area. It shows what the screens look like; it cannot log anything, keep state, type, or scroll
+The published page (version 22, rebuilt from `692af7c`) is pictures of the real app with tap targets, 458 screens,
+fixed from this round to fill any phone with one scroll area. It shows what the screens look like; it cannot log anything, keep state, type, or scroll
 inside a screen the way the app does. Keep it for a glance or for people who should not have demo credentials.
 
 ## Recommendation

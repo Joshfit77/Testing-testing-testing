@@ -126,21 +126,22 @@ for accounts the server created as demo accounts, only when the server runs in d
 
 ## The clickable iPhone demo (captured screens)
 
-Rebuilt 2026-11-06 (page version 19) from commit `fc9b919` of this branch by `scripts/demo/iphone-demo/` (see its
+Rebuilt 2026-11-06 (page version 22) from commit `692af7c` of this branch by `scripts/demo/iphone-demo/` (see its
 README): a private page that opens on an iPhone in Safari and fills the screen. Published as **Narrow Gate iPhone Demo**,
 https://claude.ai/artifact/L1eCXFJ1a3UjtQuta3nzRU (private: only the owner and whoever the owner shares it with).
 
 | | |
 | --- | --- |
-| What it is | **Pictures of the real app**, captured in demo mode (sample data, purchases off, AI simulated) at iPhone size (390 CSS px at 3×, 1170 px wide, one WebP q88 pass), joined by the real tap targets: 458 screens, 5,314 taps (3,975 land on a captured screen; the rest say the screen was not captured). The five tabs (Home, Train, Nutrition, Faith, You), Quick Add, Search, Customize Home, Run, the programs, 144 of the 157 exercise pages (the page's hosting allows 511 files, so 13 of the library's later pages are left out), My Progress, Sleep & Recovery, AI Coach, the settings and the membership screen. |
-| What is live | Nothing moves in the pictures; the 2D exercise demonstrations are shown at their first frame. |
-| Captured step by step | The workout flow (start, demonstration dialog, log set 1 with the rest timer, set 2, exercise options, substitute picker, substituted, finish, summary) and the AI coach (question typed, simulated reply). |
+| What it is | **Pictures of the real app**, captured in demo mode (sample data, purchases off, AI simulated) at iPhone size (390 CSS px at 3×, 1170 px wide, one WebP q88 pass), joined by the real tap targets: 458 screens, 5,424 taps (4,119 land on a captured screen; the rest say the screen was not captured). The five tabs (Home, Train, Nutrition, Faith, You), Quick Add, Search, Customize, Run, the programs, 144 of the 157 exercise pages (the page's hosting allows 511 files, so 13 of the library's later pages are left out), My Progress, Sleep & Recovery, AI Coach, the settings and the membership screen. |
+| What is live | The 2D exercise demonstrations draw and move on all 144 captured exercise pages and in the workout's demonstration dialog; everything else is a picture. |
+| Captured step by step | The workout flow (start, demonstration dialog, log set 1 with the rest timer, set 2, exercise options, substitute picker, substituted, finish, summary), the AI coach (question typed, simulated reply) and the new-member path (questions → plan → first workout). |
 | Not live | Typing, timers, GPS, the camera, Apple Health, purchases, and any screen not among the captured ones (a tap says so). |
-| Checks | `verify.mjs` (2026-11-06): 36 of 36 checks (opening → welcome → sample data → the five tabs → back → the whole workout flow → menu → coach; every picture present; every tap target inside its screen; no page errors; fills 39 of 39 iPhone and Android viewports, 74 models). |
-| Found while capturing | No page is wider than the phone any more (the running programs' week tables and the overview were fixed earlier). Seven React hydration errors on the Nutrition pages: the capture emulates a phone in New York while the server runs in UTC, and the Recent foods card named the meal for the device's time of day during render. Fixed after the capture (`2294d3a`, with `e2e/nutrition-timezone.spec.ts`); the pictures show the page after React's recovery, which looks the same. The day chips, verse-card name and Recent foods wording changed after this capture (`bff2748`, `2294d3a`); none of it is visible at this size. |
+| On a phone | The page never scrolls itself: only the captured screen does, at the full width in portrait and centred at its captured width in landscape, with the phone's safe areas applied once (fixed this round after the owner found the page too small with a second scroll on an iPhone 14 Pro). |
+| Checks | `verify.mjs` (2026-11-06): 36 of 36 checks (opening → welcome → sample data → the five tabs → back → the whole workout flow → menu → coach → new member; every picture present; every tap target inside its screen; no page errors; no missing files; fills 39 of 39 iPhone and Android viewports, 74 models). |
 
 It is not the live app on the phone: that is the private preview deployment above, which waits on the owner's
-one-time setup (the six repository secrets) and a `demo-preview-*` tag, and the TestFlight build after it.
+one-time setup (the six repository secrets) and a `demo-preview-*` tag, and the TestFlight build after it. The
+real app in demo mode (`npm run demo`) is the primary demo; the page is a reference.
 
 ## Private hosted preview (Vercel, protected)
 

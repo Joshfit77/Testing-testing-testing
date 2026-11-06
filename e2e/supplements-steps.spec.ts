@@ -34,7 +34,7 @@ test.describe("supplements and steps", () => {
     await page.reload();
     await expect(page.getByTestId("stack-count")).toHaveText("1 of 1 taken");
 
-    await page.getByRole("button", { name: "Remove Creatine monohydrate from stack" }).click();
+    await page.getByRole("button", { name: "Remove from stack: Creatine monohydrate" }).click();
     await expect(page.getByText(/Your stack is empty/)).toBeVisible();
     await expect(page.getByRole("button", { name: "Add to stack: Creatine monohydrate" })).toBeVisible();
   });

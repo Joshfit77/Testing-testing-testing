@@ -175,7 +175,9 @@ test.describe("Stage 1 journeys", () => {
     await page.getByRole("button", { name: "Save entry" }).click();
     await expect(page.getByText("Entry saved. Only you can see it.")).toBeVisible();
     await expect(body).toHaveValue("");
+    // With no draft left the fold is closed again after a reload; open it to see the empty form.
     await page.reload();
+    await page.getByTestId("faith-journal").locator("summary").click();
     await expect(body).toHaveValue("");
     await expect(page.getByTestId("draft-restored")).toHaveCount(0);
     await expect(page.getByText("Half-written prayer about patience")).toBeVisible();
