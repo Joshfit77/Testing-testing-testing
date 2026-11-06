@@ -111,7 +111,7 @@ export function RankBoard({
               )}
             >
               {c.label}
-              <span className="mt-0.5 text-[0.7rem] font-medium normal-case tracking-normal text-muted-foreground">
+              <span className="mt-0.5 text-xs font-medium normal-case tracking-normal text-muted-foreground">
                 {p.current ? `Rank ${p.current.level} of 9` : "Not started"}
               </span>
             </button>

@@ -23,7 +23,7 @@ function Rating({ name, value }: { name: RatingField; value: number | null }) {
           </label>
         ))}
       </div>
-      <div className="mt-1 flex justify-between text-[0.6875rem] text-muted-foreground">
+      <div className="mt-1 flex justify-between text-xs text-muted-foreground">
         <span>{r.low}</span>
         <span>{r.high}</span>
       </div>

@@ -550,7 +550,7 @@ export function ExerciseDemo25D({ slug, name, asset, className, controls = true,
           </span>
         )}
         {controls && (!moves || (failed && hasLoop)) && (
-          <p className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-3 pb-2 pt-6 text-[0.6875rem] text-foreground/90" role="status">
+          <p className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-3 pb-2 pt-6 text-xs text-foreground/90" role="status">
             {failed && hasLoop ? "The video could not be played on this device; showing its still." : "Still only: the animated loop for this exercise has not been produced yet."}
           </p>
         )}
@@ -661,7 +661,7 @@ export function ExerciseDemo25D({ slug, name, asset, className, controls = true,
         </div>
       )}
       {controls && !expanded && (interactive || asset.highlighted.length > 0) && (
-        <p className="bg-[#0d0b08] px-3 pb-2 text-[0.6875rem] leading-snug text-muted-foreground">
+        <p className="bg-[#0d0b08] px-3 pb-2 text-xs leading-snug text-muted-foreground">
           {interactive && (
             <>
               Tap the picture to play or pause; drag sideways to move through the rep.{" "}
@@ -675,7 +675,7 @@ export function ExerciseDemo25D({ slug, name, asset, className, controls = true,
           )}
         </p>
       )}
-      {asset.note && controls && !expanded && asset.status !== "approved" && <p className="bg-[#0d0b08] px-3 pb-2 text-[0.6875rem] text-muted-foreground">{asset.note}</p>}
+      {asset.note && controls && !expanded && asset.status !== "approved" && <p className="bg-[#0d0b08] px-3 pb-2 text-xs text-muted-foreground">{asset.note}</p>}
       {controls && !expanded && interactive && (
         <Dialog open={enlarged !== null} onOpenChange={(o) => !o && closeEnlarged()}>
           <DialogContent className="left-0 top-0 h-[100dvh] max-h-none w-screen max-w-none translate-x-0 translate-y-0 justify-center gap-1 overflow-y-auto rounded-none border-0 bg-black p-0 pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]">

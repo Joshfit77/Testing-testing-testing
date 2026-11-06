@@ -98,7 +98,7 @@ export function MembershipPlans({
               >
                 {i === "month" ? "Monthly" : "Yearly"}
                 {i === "year" && prices.savingsPercent ? (
-                  <span className={cn("rounded-full px-2 py-0.5 text-[0.7rem] font-bold", shown === i ? "bg-black/15" : "bg-gold/15 text-gold-highlight")}>Save {prices.savingsPercent}%</span>
+                  <span className={cn("rounded-full px-2 py-0.5 text-xs font-bold", shown === i ? "bg-black/15" : "bg-gold/15 text-gold-highlight")}>Save {prices.savingsPercent}%</span>
                 ) : null}
               </button>
             ))}

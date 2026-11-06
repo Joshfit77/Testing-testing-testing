@@ -331,7 +331,7 @@ export function ChapterReader(props: {
                   props.focusVerse === r.v && !selected.length && "animate-[verse-focus_2.4s_ease-out]",
                 )}
               >
-                <sup className="mr-1 select-none font-sans text-[0.65em] font-semibold text-[var(--reader-verse)]" aria-label={`Verse ${r.v}`}>
+                <sup className="mr-1 select-none font-sans text-[0.7em] font-semibold text-[var(--reader-verse)]" aria-label={`Verse ${r.v}`}>
                   {r.v}
                 </sup>
                 <ScriptureText text={r.t} jesus={props.jesus?.[r.v]} />

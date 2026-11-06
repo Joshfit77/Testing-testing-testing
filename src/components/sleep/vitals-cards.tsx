@@ -51,7 +51,7 @@ export function VitalsCards({ vitals, deviceName, compact, className }: { vitals
 /** "Recorded by Apple Watch" or "Entered by hand": the one label that tells a measurement from an entry. */
 export function RecordedBadge({ recorded, deviceName, className }: { recorded: boolean; deviceName: string | null; className?: string }) {
   return (
-    <span className={cn("inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[0.6875rem] font-semibold", recorded ? "border-gold-muted/70 text-gold-highlight" : "border-border text-muted-foreground", className)}>
+    <span className={cn("inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs font-semibold", recorded ? "border-gold-muted/70 text-gold-highlight" : "border-border text-muted-foreground", className)}>
       {recorded ? `Recorded by ${deviceName ?? "your device"}` : "Entered by hand"}
     </span>
   );

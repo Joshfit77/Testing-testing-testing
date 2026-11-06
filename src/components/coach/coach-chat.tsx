@@ -175,7 +175,7 @@ function CopyButton({ text }: { text: string }) {
           setCopied(false);
         }
       }}
-      className="inline-flex items-center gap-1 rounded-lg px-1.5 py-1 text-[0.6875rem] text-muted-foreground hover:bg-elevated hover:text-foreground"
+      className="inline-flex items-center gap-1 rounded-lg px-1.5 py-1 text-xs text-muted-foreground hover:bg-elevated hover:text-foreground"
       aria-label={copied ? "Copied" : "Copy reply"}
     >
       {copied ? <Check className="size-3.5" aria-hidden /> : <Copy className="size-3.5" aria-hidden />} {copied ? "Copied" : "Copy"}
@@ -573,7 +573,7 @@ function CoachChatView({ conversationId: initialId, initialMessages, initialQues
             {memoryNote && <span role="alert" className="text-[#f08a8a]">{memoryNote}</span>}
           </div>
         )}
-        <p className="mt-2 text-[0.6875rem] text-muted-foreground">
+        <p className="mt-2 text-xs text-muted-foreground">
           You&apos;re chatting with an AI. Its answers can be wrong, incomplete or out of date, and it isn&apos;t a doctor, dietitian or physical therapist; this
           is not medical advice. Suggested changes only apply when you tap Confirm. Don&apos;t share sensitive health details you don&apos;t want stored. Stop any exercise that causes pain.
         </p>

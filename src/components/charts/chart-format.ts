@@ -8,7 +8,7 @@
 export const SERIES_GOLD = "#C9A54C";
 export const CATEGORICAL = ["#B08D3A", "#4A86C0", "#C46658"] as const;
 
-export const AXIS = { stroke: "#6b6b6b", fontSize: 11, tickLine: false, axisLine: false } as const;
+export const AXIS = { stroke: "#6b6b6b", fontSize: 12, tickLine: false, axisLine: false } as const;
 export const GRID = "#262626";
 
 export interface SeriesDef {

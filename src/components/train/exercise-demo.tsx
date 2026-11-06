@@ -265,7 +265,7 @@ export function ExerciseDemoMini({
               className={cn("mt-3 w-full rounded-xl", asset ? "max-h-[60vh]" : "aspect-[4/3]")}
             />
           ) : null}
-          <p className="mt-2 text-[0.6875rem] text-muted-foreground">{demoCaption(readiness, Boolean(asset))}</p>
+          <p className="mt-2 text-xs text-muted-foreground">{demoCaption(readiness, Boolean(asset))}</p>
         </DialogContent>
       </Dialog>
     </>

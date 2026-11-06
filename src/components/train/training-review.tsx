@@ -297,7 +297,7 @@ export function TrainingReviewView({
               <li key={a.id} className="flex items-start justify-between gap-3 p-3 text-sm" data-testid="training-adjustment">
                 <div>
                   <p className={cn(a.reverted_at && "text-muted-foreground line-through")}>{a.summary}</p>
-                  <p className="text-[0.6875rem] text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     {new Date(a.created_at).toLocaleDateString()} · {a.source === "coach" ? "from the AI coach" : "from this review"}
                     {a.reverted_at ? " · undone" : ""}
                   </p>

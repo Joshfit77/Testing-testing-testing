@@ -56,7 +56,7 @@ export function StageTimeline({ stages, bedAt, wakeAt, timeZone, className }: { 
   return (
     <figure className={cn("space-y-2", className)}>
       <div className="grid grid-cols-[3.25rem_1fr] gap-x-2">
-        <div className="grid grid-rows-4 text-[0.6875rem] leading-none text-muted-foreground" aria-hidden>
+        <div className="grid grid-rows-4 text-xs leading-none text-muted-foreground" aria-hidden>
           {rows.map((r) => (
             <span key={r} className="flex items-center">
               {STAGE_LABEL[r]}

@@ -86,7 +86,7 @@ export function FoodIqSummary({
           {NUTRITION_FEATURE_TITLE}
         </h2>
         {enabled && score.status === "scored" && (
-          <span className="inline-flex items-center gap-1 rounded-full border border-gold-muted/60 px-2 py-0.5 text-[0.7rem] font-semibold text-champagne" data-testid="food-iq-experimental">
+          <span className="inline-flex items-center gap-1 rounded-full border border-gold-muted/60 px-2 py-0.5 text-xs font-semibold text-champagne" data-testid="food-iq-experimental">
             <FlaskConical className="size-3" aria-hidden /> Experimental · not yet reviewed
           </span>
         )}
@@ -190,7 +190,7 @@ const EVIDENCE_ICON: Record<EvidenceClass, typeof ShieldAlert> = { regulatory: S
 export function EvidenceBadge({ cls }: { cls: EvidenceClass }) {
   const Icon = EVIDENCE_ICON[cls];
   return (
-    <span className={cn("inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[0.7rem] font-semibold", EVIDENCE_STYLE[cls])} title={EVIDENCE_HELP[cls]}>
+    <span className={cn("inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs font-semibold", EVIDENCE_STYLE[cls])} title={EVIDENCE_HELP[cls]}>
       <Icon className="size-3" aria-hidden />
       {EVIDENCE_LABEL[cls]}
     </span>

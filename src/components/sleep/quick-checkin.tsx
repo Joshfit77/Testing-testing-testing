@@ -31,7 +31,7 @@ export function QuickCheckin({ day, restedness }: { day: string; restedness: num
             </button>
           ))}
         </div>
-        <div className="mt-1 flex justify-between text-[0.6875rem] text-muted-foreground">
+        <div className="mt-1 flex justify-between text-xs text-muted-foreground">
           <span>{r.low}</span>
           <span>{r.high}</span>
         </div>

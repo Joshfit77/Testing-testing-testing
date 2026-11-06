@@ -105,12 +105,12 @@ export function SuggestionCard({ messageId, proposal, status, onChange }: { mess
             ] as const
           ).map(([label, value, prev, unit]) => (
             <div key={label} className="rounded-xl bg-elevated/60 p-2">
-              <dt className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">{label}</dt>
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">{label}</dt>
               <dd className="font-semibold">
                 {value}
                 <span className="text-xs font-normal text-muted-foreground"> {unit}</span>
               </dd>
-              {prev != null && prev !== value && <dd className="text-[0.6875rem] text-muted-foreground">was {prev}</dd>}
+              {prev != null && prev !== value && <dd className="text-xs text-muted-foreground">was {prev}</dd>}
             </div>
           ))}
         </dl>
@@ -146,7 +146,7 @@ export function SuggestionCard({ messageId, proposal, status, onChange }: { mess
           </div>
         ) : (
           <div className="mt-2 text-sm">
-            <p className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">{MEMORY_CATEGORY_LABELS[memCategory]}</p>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">{MEMORY_CATEGORY_LABELS[memCategory]}</p>
             <p className="mt-0.5">{memText}</p>
           </div>
         ))}
@@ -193,7 +193,7 @@ export function SuggestionCard({ messageId, proposal, status, onChange }: { mess
 
       {proposal.kind === "memory_forget" && (
         <div className="mt-2 text-sm">
-          <p className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">{MEMORY_CATEGORY_LABELS[proposal.category]}</p>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">{MEMORY_CATEGORY_LABELS[proposal.category]}</p>
           <p className="mt-0.5">{proposal.content}</p>
         </div>
       )}

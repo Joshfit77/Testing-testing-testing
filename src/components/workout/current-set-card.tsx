@@ -71,7 +71,7 @@ function Stepper({
   };
   return (
     <div className="min-w-0 space-y-1" data-testid={testId}>
-      <p className="text-center text-[0.7rem] font-semibold uppercase tracking-widest text-muted-foreground">
+      <p className="text-center text-xs font-semibold uppercase tracking-widest text-muted-foreground">
         {label} {unit && <span className="normal-case tracking-normal">({unit})</span>}
       </p>
       <div className="flex items-center gap-1.5">

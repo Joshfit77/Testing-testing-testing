@@ -248,7 +248,7 @@ export function MemoryManager({
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="text-sm">{m.content}</p>
-                          <p className="mt-1 flex flex-wrap items-center gap-2 text-[0.6875rem] text-muted-foreground">
+                          <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                             {new Date(m.created_at).toLocaleDateString()} · {SOURCE_LABEL[m.source]}
                             {m.category === "recovery" && !wellnessConsent && <Badge variant="secondary">not used: wellness sharing is off</Badge>}
                           </p>
