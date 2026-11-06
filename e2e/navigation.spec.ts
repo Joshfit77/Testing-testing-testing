@@ -104,7 +104,10 @@ test.describe("navigation shell", () => {
     await expect(page.getByRole("navigation", { name: "Training sections" }).getByRole("link")).toHaveText([/Programs/, /Exercises/, /Training calendar/]);
     await page.goto("/nutrition");
     await expect(page.getByRole("heading", { name: "Water", exact: true })).toHaveCount(0);
-    await expect(page.locator("main details").first()).toContainText("More tools");
+    // "More tools" moved up one place: it now comes before "Saved meals" under More.
+    const groupIds = await page.locator("main details[id]").evaluateAll((els) => els.map((e) => e.id));
+    expect(groupIds.indexOf("tools")).toBeGreaterThanOrEqual(0);
+    expect(groupIds.indexOf("tools")).toBeLessThan(groupIds.indexOf("saved"));
     await page.goto("/profile/customize");
     await page.getByRole("button", { name: "Reset to the default for my goal" }).click();
     await page.waitForTimeout(800);

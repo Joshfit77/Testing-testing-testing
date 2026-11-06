@@ -158,6 +158,7 @@ test.describe("Stage 1 journeys", () => {
     await signUpAndConfirm(page, uniqueEmail("journal"));
     await completeOnboarding(page);
     await tab(page, "Faith", /\/faith/);
+    await page.getByTestId("faith-journal").locator("summary").click();
     const body = page.getByRole("textbox", { name: "Reflection" });
     await body.fill("Half-written prayer about patience");
     await page.waitForTimeout(600);

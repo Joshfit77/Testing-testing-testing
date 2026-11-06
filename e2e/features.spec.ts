@@ -79,6 +79,7 @@ test.describe("feature access, subscriptions and core sections", () => {
     await page.goto("/faith");
     await expect(page.getByRole("heading", { name: "Faith", level: 1 })).toBeVisible();
     await expect(page.getByText("Verse of the day")).toBeVisible();
+    await page.getByTestId("faith-journal").locator("summary").click();
     await page.getByRole("textbox", { name: "Reflection" }).fill("Grateful for strength today.");
     await page.getByRole("button", { name: "Save entry" }).click();
     await expect(page.getByText("Entry saved. Only you can see it.")).toBeVisible();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo } from "react";
+import { useActionState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Bot, Lock } from "lucide-react";
 import { FieldError, FormMessage, SubmitButton } from "@/components/common/form-status";
@@ -59,8 +59,13 @@ export function JournalForm({ today, entry, defaultRef, defaultKind, onSaved }: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.ok, state.at, clearDraft]);
   const kind = v.kind && (JOURNAL_KINDS as readonly string[]).includes(v.kind) ? v.kind : "reflection";
+  // A restored draft opens the fold the form sits in (the Faith tab keeps the form behind a one-line summary).
+  const formRef = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    if (draft.restored) formRef.current?.closest("details")?.setAttribute("open", "");
+  }, [draft.restored]);
   return (
-    <form action={action} className="space-y-3">
+    <form ref={formRef} action={action} className="space-y-3">
       {entry && <input type="hidden" name="id" value={entry.id} />}
       {draft.restored && <DraftRestoredNotice label="Unsaved journal entry restored" onDiscard={draft.clear} onDismiss={draft.dismissRestored} />}
       <fieldset>
