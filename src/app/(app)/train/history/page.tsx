@@ -45,14 +45,14 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
       <PageHeader back={{ href: "/train", label: "Train" }} title="Workout history" description="Review, edit or delete past sessions." />
 
       <section className="grid grid-cols-2 gap-3" aria-label="Last 30 days">
-        <div className="rounded-2xl border border-border bg-card p-4">
+        <div className="min-w-0 rounded-2xl border border-border bg-card p-4">
           <p className="text-xs uppercase tracking-wider text-muted-foreground">Workouts · 30 days</p>
-          <p className="mt-1 font-display text-3xl font-bold">{(last30 ?? []).length}</p>
+          <p className="mt-1 font-display text-2xl font-bold sm:text-3xl">{(last30 ?? []).length}</p>
           <p className="text-xs text-muted-foreground">≈ {perWeek.toFixed(1)} per week</p>
         </div>
-        <div className="rounded-2xl border border-border bg-card p-4">
+        <div className="min-w-0 rounded-2xl border border-border bg-card p-4">
           <p className="text-xs uppercase tracking-wider text-muted-foreground">Volume · 30 days</p>
-          <p className="mt-1 font-display text-3xl font-bold">{formatVolume(volume30, units)}</p>
+          <p className="mt-1 break-words font-display text-2xl font-bold sm:text-3xl">{formatVolume(volume30, units)}</p>
           <p className="text-xs text-muted-foreground">weight × reps, completed sets</p>
         </div>
       </section>

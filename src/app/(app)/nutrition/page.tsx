@@ -274,7 +274,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
           </h3>
           {goals && remaining != null ? (
             <>
-              <div className="mt-3 grid grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] items-center gap-1 text-center" data-testid="budget-equation">
+              <div className="mt-3 flex flex-wrap items-center justify-center gap-x-2 gap-y-2 text-center [&>div]:min-w-[3.5rem] [&>div]:flex-1" data-testid="budget-equation">
                 <div>
                   <p className="font-display text-xl font-bold tabular-nums sm:text-2xl" data-testid="budget-goal">{goals.calories}</p>
                   <p className="text-xs text-muted-foreground">Goal</p>
@@ -666,12 +666,12 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
       {/* Logging first: the three ways to add food, on the first screen, each a full-height button. */}
       <div className="grid grid-cols-3 gap-2" data-testid="log-actions">
         <AddFoodDialog date={date} myFoods={myFoods} commonFoods={commonFoods} remoteSearch={remoteSearch} categories={categories} dietName={diet.name} recent={recent} frequent={frequent} favorites={favorites} autoOpen={sp.add === "1"} />
-        <Button asChild variant="secondary" className="h-auto min-h-14 flex-col gap-1 py-2 [&_svg]:size-5">
+        <Button asChild variant="secondary" className="h-auto min-h-14 flex-col gap-1 whitespace-normal px-1 py-2 text-center [&_svg]:size-5">
           <Link href="/nutrition/scanner">
             <ScanBarcode aria-hidden /> Scan barcode
           </Link>
         </Button>
-        <Button asChild variant="secondary" className="h-auto min-h-14 flex-col gap-1 py-2 [&_svg]:size-5">
+        <Button asChild variant="secondary" className="h-auto min-h-14 flex-col gap-1 whitespace-normal px-1 py-2 text-center [&_svg]:size-5">
           <Link href={`/nutrition/photo?date=${date}`}>
             <Camera aria-hidden /> Meal photo
           </Link>

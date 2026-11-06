@@ -94,7 +94,7 @@ export function FaithChallenge({ today, rotatingDay, enrollment, currentDay, che
           <ScriptureText text={todaysDevotional.scripture} parts={devotionalParts?.[todaysDevotional.day]} />
           &rdquo;</p>
         <div className="mt-4">
-          <Button onClick={() => setDialog(enrolled ? { kind: "day", day: currentDay! } : { kind: "read" })}>
+          <Button className="h-auto min-h-11 max-w-full whitespace-normal" onClick={() => setDialog(enrolled ? { kind: "day", day: currentDay! } : { kind: "read" })}>
             <BookOpenText aria-hidden /> Read today&apos;s devotional
           </Button>
         </div>

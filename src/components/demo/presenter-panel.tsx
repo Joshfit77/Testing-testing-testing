@@ -117,7 +117,7 @@ export function PresenterPanel() {
   return (
     <nav aria-label="Presenter" className="w-full basis-full border-t border-gold-muted/40 pt-2" data-testid="presenter-panel">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="flex min-w-0 flex-1 items-center gap-2">
+        <span className="flex min-w-0 flex-1 basis-[12rem] items-center gap-2">
           <Presentation className="size-3.5 shrink-0 text-gold" aria-hidden />
           {step ? (
             <span className="flex min-w-0 items-center gap-1.5" data-testid="presenter-current">

@@ -312,7 +312,7 @@ export function AddFoodDialog({
   return (
     <>
       <Button
-        className="h-auto min-h-14 w-full flex-col gap-1 py-2 [&_svg]:size-5"
+        className="h-auto min-h-14 w-full flex-col gap-1 whitespace-normal px-1 py-2 text-center [&_svg]:size-5"
         onClick={() => {
           setOpen(true);
           setResult(null);

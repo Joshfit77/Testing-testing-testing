@@ -141,7 +141,7 @@ export default async function ProgramsPage({ searchParams }: { searchParams: Pro
             {mine.map(
               (m) =>
                 m.program && (
-                  <li key={m.id} className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-3 pl-4">
+                  <li key={m.id} className="flex min-w-0 items-center justify-between gap-3 rounded-2xl border border-border bg-card p-3 pl-4">
                     <Link href={`/train/programs/${m.program.slug}`} className="flex min-h-11 min-w-0 flex-1 flex-col justify-center hover:text-gold-highlight">
                       <p className="truncate font-semibold">{m.program.name}</p>
                       <p className="text-xs text-muted-foreground">

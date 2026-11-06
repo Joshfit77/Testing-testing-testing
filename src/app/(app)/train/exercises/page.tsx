@@ -143,7 +143,7 @@ export default async function ExercisesPage({
           </p>
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {exercises.map((e) => (
-              <li key={e.slug as string}>
+              <li key={e.slug as string} className="min-w-0">
                 <Link
                   href={`/train/exercises/${e.slug}`}
                   className="flex h-full gap-3 rounded-2xl border border-border bg-card p-4 hover:border-gold-muted"

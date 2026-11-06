@@ -53,10 +53,11 @@ function WeekBars({ week, goal, today }: { week: StepsCardProps["week"]; goal: n
           ))}
         </div>
       </div>
-      <div className="mt-1 flex gap-1.5 text-center text-xs uppercase tracking-wider text-muted-foreground" aria-hidden>
+      <div className="mt-1 flex gap-1.5 text-center text-xs uppercase tracking-wider text-muted-foreground @container" aria-hidden>
         {week.map((d) => (
-          <span key={d.day} className={cn("flex-1", d.day === today && "font-semibold text-gold-highlight")}>
-            {weekday(d.day)}
+          <span key={d.day} className={cn("min-w-0 flex-1", d.day === today && "font-semibold text-gold-highlight")}>
+            <span className="@[16rem]:hidden">{weekday(d.day).slice(0, 1)}</span>
+            <span className="hidden @[16rem]:inline">{weekday(d.day)}</span>
           </span>
         ))}
       </div>
@@ -183,7 +184,7 @@ export function StepsCard({ today, goal, todaySteps, todaySource, week }: StepsC
         </Button>
       </CardHeader>
       <CardContent className="grid flex-1 gap-6 md:grid-cols-2">
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           {editingGoal && <GoalForm goal={goal} onDone={() => setEditingGoal(false)} />}
           <div className="flex items-center gap-4">
             <ProgressRing ariaLabel="Steps today" value={pct} label={formatSteps(todaySteps)} sublabel={`/ ${formatSteps(goal)}`} />
@@ -224,7 +225,7 @@ export function StepsCard({ today, goal, todaySteps, todaySource, week }: StepsC
           </form>
         </div>
 
-        <div className="flex flex-col justify-between gap-4">
+        <div className="flex min-w-0 flex-col justify-between gap-4">
           <WeekBars week={week} goal={goal} today={today} />
           <HealthSync />
         </div>

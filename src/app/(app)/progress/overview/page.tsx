@@ -157,16 +157,16 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
         ))}
       </nav>
 
-      <section className="grid grid-cols-2 gap-3 md:grid-cols-4" aria-label="Summary">
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Summary">
         {[
           { label: "Workouts", value: String(training.total) },
           { label: "Per week", value: recentWorkoutsPerWeek.toFixed(1) },
           { label: "Training days", value: String(training.sessionDays) },
           { label: "Volume", value: formatVolume(training.buckets.reduce((s, b) => s + b.volumeKg, 0), units) },
         ].map((s) => (
-          <div key={s.label} className="rounded-2xl border border-border bg-card p-4">
-            <p className="text-xs uppercase tracking-wider text-muted-foreground">{s.label}</p>
-            <p className="mt-1 font-display text-2xl font-bold md:text-3xl">{s.value}</p>
+          <div key={s.label} className="min-w-0 rounded-2xl border border-border bg-card p-4">
+            <p className="break-words text-xs uppercase tracking-wider text-muted-foreground">{s.label}</p>
+            <p className="mt-1 break-words font-display text-2xl font-bold md:text-3xl">{s.value}</p>
           </div>
         ))}
       </section>

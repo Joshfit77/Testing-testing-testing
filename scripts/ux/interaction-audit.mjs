@@ -40,6 +40,10 @@ const snapshot = () =>
     statuses: [...document.querySelectorAll("[role=status], [role=alert], [aria-live]")].map((e) => e.textContent.trim()).filter(Boolean).join(" | ").slice(0, 120),
     open: document.querySelectorAll("details[open], [aria-expanded=true]").length,
     focusInput: /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName ?? ""),
+    // Toggles, tabs, radios and switches change a state attribute rather than the text on the screen.
+    states: [...document.querySelectorAll("[aria-pressed], [aria-selected], [aria-checked], [aria-current], [data-state]")].map((e) => (e.getAttribute("aria-pressed") ?? "") + (e.getAttribute("aria-selected") ?? "") + (e.getAttribute("aria-checked") ?? "") + (e.getAttribute("aria-current") ?? "") + (e.getAttribute("data-state") ?? "")).join("|"),
+    labels: [...document.querySelectorAll("main button[aria-label], main [role=button][aria-label]")].map((e) => e.getAttribute("aria-label")).join("|"),
+    text2: document.body.innerText,
   }));
 const results = [];
 const links = new Set();
@@ -62,7 +66,7 @@ for (const route of ROUTES) {
   };
   const first = await list();
   for (const l of first.links) if (l.href && !/^(mailto:|tel:|#|javascript:)/.test(l.href) && !/^https?:\/\//.test(l.href)) links.add(l.href.split("#")[0]);
-  for (let k = 0; k < first.buttons.length; k++) {
+  for (let k = 0; k < (process.env.ONLY_LINKS ? 0 : first.buttons.length); k++) {
     const b = first.buttons[k];
     if (b.disabled) { results.push({ route, control: b.name, kind: b.kind, outcome: "disabled", note: b.title || "(no explanation on the control)" }); continue; }
     if (NEVER.test(b.name)) { results.push({ route, control: b.name, kind: b.kind, outcome: "skipped (destructive)" }); continue; }
@@ -85,7 +89,9 @@ for (const route of ROUTES) {
     else if (after.open !== before.open) outcome = after.open > before.open ? "expanded" : "collapsed";
     else if (after.statuses && after.statuses !== before.statuses) outcome = `status: ${after.statuses.slice(0, 80)}`;
     else if (after.focusInput && !before.focusInput) outcome = "focused an input";
-    else if (Math.abs(after.text - before.text) > 2) outcome = "page changed";
+    else if (after.states !== before.states) outcome = "toggled a state (pressed/selected/checked)";
+    else if (after.labels !== before.labels) outcome = "its label changed";
+    else if (after.text2 !== before.text2) outcome = "page changed";
     results.push({ route, control: b.name, kind: b.kind, outcome, errors: errors.slice(0, 2) });
   }
 }
@@ -96,8 +102,8 @@ for (const href of [...links].sort()) {
     const res = await page.goto(href, { waitUntil: "load", timeout: 30000 });
     await page.waitForTimeout(200);
     const text = await page.evaluate(() => document.body.innerText);
-    const crash = /Application error|Something went wrong|couldn.t load this page|This page could not be found/i.test(text);
-    linkResults.push({ href, status: res?.status() ?? 0, crash, landed: new URL(page.url()).pathname });
+    const phrase = text.match(/Application error|Something went wrong|couldn.t load this page|This page could not be found/i)?.[0] ?? null;
+    linkResults.push({ href, status: res?.status() ?? 0, crash: Boolean(phrase), phrase, landed: new URL(page.url()).pathname });
   } catch (e) { linkResults.push({ href, status: 0, crash: true, note: String(e.message).slice(0, 80) }); }
 }
 await browser.close();
@@ -108,4 +114,4 @@ const badLinks = linkResults.filter((l) => l.crash || l.status >= 400);
 console.log(`${results.length} controls pressed or recorded on ${ROUTES.length} screens; ${dead.length} with no visible effect; ${unexplained.length} disabled without an explanation; ${links.size} links checked, ${badLinks.length} bad`);
 for (const r of dead) console.log(`DEAD? ${r.route}: ${r.kind} "${r.control}" ${r.note ?? ""} ${r.errors?.length ? "errors: " + r.errors.join(" | ") : ""}`);
 for (const r of unexplained) console.log(`DISABLED ${r.route}: "${r.control}"`);
-for (const l of badLinks) console.log(`LINK ${l.href}: ${l.status} ${l.crash ? "crash/404 text" : ""} ${l.note ?? ""}`);
+for (const l of badLinks) console.log(`LINK ${l.href}: ${l.status} ${l.phrase ? `"${l.phrase}"` : ""} ${l.note ?? ""}`);

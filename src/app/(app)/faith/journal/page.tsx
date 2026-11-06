@@ -114,7 +114,7 @@ export default async function JournalPage({ searchParams }: { searchParams: Prom
           ) : (
             <ul className="grid gap-2 md:grid-cols-2">
               {entries.map((e) => (
-                <li key={e.id}>
+                <li key={e.id} className="min-w-0">
                   <JournalEntryCard entry={e} />
                 </li>
               ))}

@@ -157,6 +157,7 @@ export function CopyMealButton({ fromDate, toDate, mealType, label }: { fromDate
         type="button"
         size="sm"
         variant="ghost"
+        className="h-auto min-h-9 max-w-full whitespace-normal text-left"
         disabled={pending}
         aria-busy={pending}
         onClick={() =>

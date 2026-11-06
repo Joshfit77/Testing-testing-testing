@@ -212,7 +212,7 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
           </h2>
           <ul className="grid gap-2 md:grid-cols-3">
             {journal.map((j) => (
-              <li key={j.id}>
+              <li key={j.id} className="min-w-0">
                 <JournalEntryCard entry={j} />
               </li>
             ))}

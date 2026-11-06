@@ -193,7 +193,7 @@ export function AppShell({ children, userId, displayName, isAdmin, plan, textSiz
             {MAIN_TABS.map((item) => {
               const active = isTabActive(pathname, item);
               return (
-                <li key={item.href}>
+                <li key={item.href} className="min-w-0">
                   <Link
                     href={tabHrefs[item.href] ?? item.href}
                     {...restoreScroll}
@@ -204,7 +204,7 @@ export function AppShell({ children, userId, displayName, isAdmin, plan, textSiz
                     )}
                   >
                     <item.icon className={cn("size-6 transition-colors", active && "text-gold")} strokeWidth={active ? 2.25 : 1.75} aria-hidden />
-                    <span className="max-w-full truncate px-0.5 [font-size:clamp(0.6875rem,0.75rem,0.8125rem)]">{item.label}</span>
+                    <span className="max-w-full truncate [font-size:clamp(0.625rem,3vw,0.75rem)]">{item.label}</span>
                   </Link>
                 </li>
               );

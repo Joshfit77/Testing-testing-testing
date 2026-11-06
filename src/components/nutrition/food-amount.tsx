@@ -235,9 +235,12 @@ export function EditableMealItem({ item }: { item: EditableItem }) {
       >
         <p className="truncate text-sm font-semibold">
           <span className="sr-only">Edit </span>
-          {item.name} <SourceBadge source={item.source} isEstimate={item.isEstimate} />
+          {item.name}
         </p>
-        <p className="text-xs text-muted-foreground">{item.summary}</p>
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+          <span>{item.summary}</span>
+          <SourceBadge source={item.source} isEstimate={item.isEstimate} />
+        </p>
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent side="bottom" className="max-h-[92dvh] overflow-y-auto">

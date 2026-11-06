@@ -18,8 +18,8 @@ export function CoachButton({ className }: { className?: string }) {
     >
       <span className="inline-flex h-[2.125rem] items-center gap-1.5 rounded-full border border-gold/90 bg-black/30 px-3 text-sm font-semibold text-gold-highlight transition-colors group-hover:bg-gold/10 group-focus-visible:ring-2 group-focus-visible:ring-gold-highlight">
         <MessageCircle className="size-4" aria-hidden />
-        <span className="hidden min-[360px]:inline">AI Coach</span>
-        <span className="min-[360px]:hidden">Coach</span>
+        <span className="hidden @[22rem]:inline">AI Coach</span>
+        <span className="@[22rem]:hidden">Coach</span>
       </span>
     </Link>
   );
@@ -61,9 +61,9 @@ export function MainHeader({ title, subtitle, right, className }: { title: React
   const { userId, today } = useShellUser();
   return (
     <header className={cn("mb-4", className)}>
-      <div className="flex items-center justify-between gap-2">
-        <h1 className="min-w-0 truncate font-display text-[1.625rem] font-bold leading-tight tracking-tight md:text-[1.75rem]">{title}</h1>
-        <div className="flex shrink-0 items-center gap-0.5">
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 @container">
+        <h1 className="min-w-0 flex-1 basis-[6.5rem] truncate font-display text-[1.625rem] font-bold leading-tight tracking-tight md:text-[1.75rem]">{title}</h1>
+        <div className="ml-auto flex shrink-0 items-center gap-0.5">
           {right}
           <SearchButton />
           {userId && <QuickAddButton userId={userId} today={today} />}

@@ -163,17 +163,17 @@ export function MembershipPlans({
       </div>
 
       <div className="overflow-x-auto rounded-2xl border border-border bg-card">
-        <table className="w-full min-w-[22rem] text-sm">
+        <table className="w-full min-w-[17rem] text-sm">
           <caption className="sr-only">What Free and Pro All Access include</caption>
           <thead>
             <tr className="border-b border-border text-left">
               <th scope="col" className="p-4 font-display text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                 Compare
               </th>
-              <th scope="col" className="w-24 p-4 text-center font-display text-xs font-semibold uppercase tracking-widest">
+              <th scope="col" className="w-16 p-3 text-center font-display text-xs font-semibold uppercase tracking-widest">
                 Free
               </th>
-              <th scope="col" className="w-32 p-4 text-center font-display text-xs font-semibold uppercase tracking-widest text-gold-highlight">
+              <th scope="col" className="w-20 p-3 text-center font-display text-xs font-semibold uppercase tracking-widest text-gold-highlight">
                 Pro
               </th>
             </tr>
@@ -190,10 +190,10 @@ export function MembershipPlans({
                   <th scope="row" className="p-4 text-left font-normal">
                     {row.label}
                   </th>
-                  <td className="p-4 text-center">
+                  <td className="p-3 text-center">
                     <Cell value={row.free} />
                   </td>
-                  <td className="p-4 text-center">
+                  <td className="p-3 text-center">
                     <Cell value={row.pro} pro />
                   </td>
                 </tr>
