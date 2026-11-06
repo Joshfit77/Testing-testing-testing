@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useSyncExternalStore, useTransition } from "react";
 import { Plus } from "lucide-react";
 import { ResultLine } from "@/components/nutrition/diary-client";
 import { Button } from "@/components/ui/button";
@@ -14,9 +14,14 @@ import { relogItemAction } from "@/server/actions/nutrition";
  * Add food dialog's Recent tab uses, into the meal for the time of day (on this device's clock). Shown only when
  * there is something recent to offer.
  */
+const subscribeNever = () => () => {};
+
 export function QuickRelog({ date, recent, frequent, max = 6 }: { date: string; recent: QuickFood[]; frequent: QuickFood[]; max?: number }) {
   const [result, setResult] = useState<ActionState | null>(null);
   const [pending, start] = useTransition();
+  // The meal comes from the device's clock, which the server can't know (a phone in New York and a server in UTC
+  // disagree), so it is read only on the device after hydration; the server and the first client render say nothing.
+  const meal = useSyncExternalStore(subscribeNever, () => mealForTime(new Date()), () => null);
   // Most recent first, then the most frequent ones not already listed, up to `max`.
   const seen = new Set<string>();
   const foods = [...recent, ...frequent].filter((f) => {
@@ -37,7 +42,7 @@ export function QuickRelog({ date, recent, frequent, max = 6 }: { date: string; 
       <h2 id="quick-relog-title" className="text-lg font-semibold">
         Recent foods
       </h2>
-      <p className="text-sm text-muted-foreground">One tap adds it to {mealForTime(new Date())} with the same amount as last time.</p>
+      <p className="text-sm text-muted-foreground">One tap adds it to {meal ?? "the meal for this time of day"} with the same amount as last time.</p>
       <ul className="mt-2 divide-y divide-border" aria-busy={pending}>
         {foods.map((f) => (
           <li key={f.id} className="flex items-center justify-between gap-3 py-1.5">
