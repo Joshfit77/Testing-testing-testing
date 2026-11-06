@@ -16,12 +16,13 @@ test("Reset demo restores the sample account and keeps the member signed in", as
   await page.getByRole("button", { name: "Explore with sample data" }).click();
   await page.waitForURL(/\/home/);
   const water = page.getByTestId("home-water");
-  const before = (await water.innerText()).replace(/\s+/g, " ");
+  const text = async () => (await page.getByTestId("home-water").innerText()).replace(/\s+/g, " ").trim();
+  const before = await text();
   await water.getByRole("button", { name: /\+250 ml/ }).click();
-  await expect(water).not.toHaveText(before, { timeout: 10000 });
+  await expect.poll(text, { timeout: 10000 }).not.toBe(before);
   await page.getByTestId("demo-reset").click();
   await page.getByRole("dialog").getByRole("button", { name: "Reset demo" }).click();
   await page.waitForURL(/\/home\?reset=1/, { timeout: 90000 });
-  await expect(page.getByTestId("home-water")).toHaveText(before, { timeout: 15000 });
+  await expect.poll(text, { timeout: 15000 }).toBe(before);
   await expect(page.getByTestId("demo-bar")).toBeVisible();
 });
