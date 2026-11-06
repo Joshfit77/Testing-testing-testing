@@ -148,7 +148,7 @@ export default async function ExerciseDetailPage({ params, searchParams }: { par
               <ul className="mt-2 space-y-1.5">
                 {alts.map((a) => (
                   <li key={a.slug}>
-                    <Link href={`/train/exercises/${a.slug}`} className="text-sm text-gold-highlight hover:underline">
+                    <Link href={`/train/exercises/${a.slug}`} className="inline-flex min-h-11 items-center text-sm text-gold-highlight hover:underline">
                       {a.name}
                     </Link>{" "}
                     <span className="text-xs text-muted-foreground">· {titleCase(a.difficulty)}</span>

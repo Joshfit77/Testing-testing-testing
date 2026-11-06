@@ -701,7 +701,7 @@ html[data-motion="reduce"] .badge-fx { display: none; }
   margin-top: 6px;
   font-family: var(--font-engraved), var(--font-serif);
   font-weight: 600;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: #d8d2c4;
@@ -821,7 +821,7 @@ html[data-motion="reduce"] .badge-fx { display: none; }
 .rank-name {
   font-family: var(--font-engraved), var(--font-serif);
   font-weight: 800;
-  font-size: clamp(0.72rem, 0.1rem + 3.1vw, 1.05rem);
+  font-size: clamp(0.75rem, 0.1rem + 3.1vw, 1.05rem);
   line-height: 1.15;
   letter-spacing: 0;
   text-transform: uppercase;
@@ -870,7 +870,7 @@ html[data-motion="reduce"] .badge-fx { display: none; }
   gap: 4px;
   padding: 2px 8px;
   border-radius: 999px;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 600;
   background: rgba(8, 7, 5, 0.85);
   border: 1px solid rgba(201, 165, 76, 0.5);

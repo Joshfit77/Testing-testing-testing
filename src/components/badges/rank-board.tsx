@@ -128,7 +128,7 @@ export function RankBoard({
           <div className="pointer-events-none absolute -left-10 -top-10 size-48 rounded-full bg-gold/10 blur-3xl" aria-hidden />
           <BadgeArt category={tab} level={current.current?.level ?? 1} size={60} locked={!current.current} animate={Boolean(current.current)} />
           <div className="relative min-w-0 flex-1">
-            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-gold">{info.subtitle}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gold">{info.subtitle}</p>
             <p className="mt-0.5 font-display text-2xl font-bold">{current.current ? current.current.name : "Your first rank awaits"}</p>
             <p className="text-sm text-muted-foreground">
               {current.current ? `Rank ${current.current.level} of 9` : `Start with ${current.ranks[0]!.name}`} · {current.count.toLocaleString("en-US")}{" "}

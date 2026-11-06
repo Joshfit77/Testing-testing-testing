@@ -408,7 +408,7 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
                 {bests.map((b) => (
                   <tr key={b.exerciseId} className="border-t border-border">
                     <td className="px-4 py-2.5 font-semibold">
-                      <Link href={`/train/exercises/${b.slug}`} className="hover:text-gold-highlight">
+                      <Link href={`/train/exercises/${b.slug}`} className="inline-flex min-h-11 items-center hover:text-gold-highlight">
                         {b.exercise}
                       </Link>
                     </td>
