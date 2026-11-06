@@ -81,7 +81,9 @@ export async function problems(page: Page, width: number): Promise<string[]> {
           const r = el.getBoundingClientRect();
           const s = getComputedStyle(el);
           // (Screen-reader-only text, e.g. a chart's data list, is 1 px and clipped: not something the eye has to find.)
-          return r.height > 1 && r.width > 1 && s.visibility !== "hidden" && s.position !== "fixed" && s.position !== "sticky" && !el.closest("[role=dialog], [data-state=closed], [aria-hidden=true], .sr-only");
+          // (Content folded inside a closed <details> is not on screen either: Chromium still gives it a box.)
+          const folded = [...el.ownerDocument.querySelectorAll("details:not([open])")].some((d) => d.contains(el) && !(el.closest("summary")?.parentElement === d));
+          return r.height > 1 && r.width > 1 && !folded && s.visibility !== "hidden" && s.position !== "fixed" && s.position !== "sticky" && !el.closest("[role=dialog], [data-state=closed], [aria-hidden=true], .sr-only");
         })
         .filter((el) => el.getBoundingClientRect().bottom > top + 2);
       if (hidden.length) out.push(`under the tab bar at the end of the page: ${hidden.slice(0, 2).map((el) => `${el.tagName.toLowerCase()} "${(el.textContent ?? "").trim().slice(0, 30)}"`).join("; ")}`);

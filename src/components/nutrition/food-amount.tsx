@@ -232,9 +232,9 @@ export function EditableMealItem({ item }: { item: EditableItem }) {
           setResult(null);
           setOpen(true);
         }}
-        aria-label={`Edit ${item.name}`}
       >
         <p className="truncate text-sm font-semibold">
+          <span className="sr-only">Edit </span>
           {item.name} <SourceBadge source={item.source} isEstimate={item.isEstimate} />
         </p>
         <p className="text-xs text-muted-foreground">{item.summary}</p>

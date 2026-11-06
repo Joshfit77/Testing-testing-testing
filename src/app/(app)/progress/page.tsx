@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Award, ChevronRight, History, LineChart, Moon, PersonStanding, ScanLine } from "lucide-react";
 import { MainHeader } from "@/components/shell/main-header";
+import { BackLink } from "@/components/platform/back-link";
 import { StepsCard } from "@/components/steps/steps-card";
 import { addDays, isoDateInTz } from "@/lib/domain/dates";
 import { canUseBodyScan } from "@/lib/domain/body-scan";
@@ -62,6 +63,7 @@ export default async function ProgressHubPage() {
 
   return (
     <div className="space-y-4">
+      <BackLink href="/profile">You</BackLink>
       <MainHeader title="My Progress" subtitle={`${data.workoutsThisWeek} this week · ${data.weekStreak} week streak`} />
 
       <nav aria-label="My Progress sections" className="space-y-2">

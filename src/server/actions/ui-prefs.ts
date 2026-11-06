@@ -6,6 +6,7 @@ import { actionError, actionOk, type ActionState } from "@/lib/action-state";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireUser } from "@/server/auth";
 import { logError } from "@/server/log";
+import { FAITH_SECTIONS, HOME_MODULES } from "@/lib/layout-prefs";
 
 const prefsSchema = z
   .object({
@@ -16,6 +17,13 @@ const prefsSchema = z
     redLetters: z.boolean().optional(),
     /** Bible reader: dark or light reading page. */
     biblePageTheme: z.enum(["dark", "light"]).optional(),
+    /** Home modules order/hidden and Faith sections hidden (src/lib/layout-prefs.ts); replaces the stored layout. */
+    layout: z
+      .object({
+        home: z.object({ order: z.array(z.enum(HOME_MODULES)).max(20).optional(), hidden: z.array(z.enum(HOME_MODULES)).max(20).optional() }).optional(),
+        faith: z.object({ hidden: z.array(z.enum(FAITH_SECTIONS)).max(20).optional() }).optional(),
+      })
+      .optional(),
   })
   .refine((v) => Object.values(v).some((x) => x !== undefined), "Nothing to save");
 
@@ -32,6 +40,7 @@ export async function updateUiPrefsAction(input: UiPrefsInput): Promise<ActionSt
   if (parsed.data.homeScripture !== undefined) row.home_scripture = parsed.data.homeScripture;
   if (parsed.data.redLetters !== undefined) row.bible_red_letters = parsed.data.redLetters;
   if (parsed.data.biblePageTheme !== undefined) row.bible_page_theme = parsed.data.biblePageTheme;
+  if (parsed.data.layout !== undefined) row.layout_prefs = parsed.data.layout;
   const supabase = await getServerSupabase();
   const { error } = await supabase.from("profiles").update(row).eq("id", user.id);
   if (error) {

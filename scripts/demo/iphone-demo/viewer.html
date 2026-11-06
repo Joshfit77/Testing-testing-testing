@@ -485,7 +485,7 @@ html[data-motion="reduce"][data-intro="entering"] .ngo { animation: ngo-enter-ou
     if (ALIAS[p] && ALIAS[p] !== k) return resolve(ALIAS[p]);
     return SCREENS.find((s) => s.key.split("?")[0] === p) || null;
   }
-  const groupOf = (s) => s.group || (s.key === "/" || s.key.startsWith("/login") || s.key.startsWith("/signup") || s.key.startsWith("/legal") || s.key.startsWith("/plan") ? "Welcome and setup" : s.key.startsWith("/coach") ? "AI Coach" : s.key.startsWith("/train") ? "Train" : s.key.startsWith("/run") ? "Run" : s.key.startsWith("/nutrition") ? "Food" : s.key.startsWith("/faith") ? "Faith" : s.key.startsWith("/progress") ? "My Progress" : s.key.startsWith("/profile") ? "Profile and membership" : "Home");
+  const groupOf = (s) => s.group || (s.key === "/" || s.key.startsWith("/login") || s.key.startsWith("/signup") || s.key.startsWith("/legal") || s.key.startsWith("/plan") ? "Welcome and setup" : s.key.startsWith("/coach") ? "AI Coach" : s.key.startsWith("/train") ? "Train" : s.key.startsWith("/run") ? "Run" : s.key.startsWith("/nutrition") ? "Nutrition" : s.key.startsWith("/faith") ? "Faith" : s.key.startsWith("/progress") ? "My Progress" : s.key.startsWith("/profile") ? "You (settings and membership)" : "Home");
 
   const isNM = (s) => !!s && s.key.startsWith("state:nm");
   function show(s, opts) {
@@ -554,7 +554,7 @@ html[data-motion="reduce"][data-intro="entering"] .ngo { animation: ngo-enter-ou
   // The menu.
   const groups = {};
   for (const s of SCREENS) (groups[groupOf(s)] ||= []).push(s);
-  const ORDER = ["Welcome", "New member", "Welcome and setup", "Home", "Train", "Workout", "AI Coach", "Run", "Food", "Faith", "My Progress", "Profile and membership"];
+  const ORDER = ["Welcome", "New member", "Welcome and setup", "Home", "Train", "Workout", "AI Coach", "Run", "Nutrition", "Faith", "My Progress", "You (settings and membership)"];
   const gEl = $("groups");
   for (const g of [...ORDER.filter((g) => groups[g]), ...Object.keys(groups).filter((g) => !ORDER.includes(g))]) {
     const d = document.createElement("div"); d.className = "grp";

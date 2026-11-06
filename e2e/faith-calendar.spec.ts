@@ -10,7 +10,7 @@ test.describe("Stage 2C: faith flows, onboarding additions and the training cale
     await expect(page.locator("html")).toHaveAttribute("data-motion", "reduce");
 
     await page.goto("/profile");
-    await page.getByRole("link", { name: /Edit onboarding details/ }).click();
+    await page.getByRole("link", { name: /Goals & training preferences/ }).click();
     await page.waitForURL(/\/profile\/preferences/);
     await page.getByRole("button", { name: /^Continue/ }).click();
     await expect(page.getByRole("group", { name: "Second goal" }).getByRole("button", { name: "Train for a 5K" })).toHaveAttribute("aria-pressed", "true");

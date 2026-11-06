@@ -123,7 +123,7 @@ async function capture(key, { title, full = true, group, tab, extraHot = [], sco
   log(`${sid} ${key} (${h}px, ${hot.length} targets)`);
   return rec;
 }
-const tabOf = (k) => (k.startsWith("/home") ? "/home" : k.startsWith("/train") ? "/train" : k.startsWith("/run") ? "/run" : k.startsWith("/nutrition") ? "/nutrition" : k.startsWith("/faith") ? "/faith" : k.startsWith("/coach") || k.startsWith("/progress") || k.startsWith("/profile") || k.startsWith("/calendar") ? "none" : "hidden");
+const tabOf = (k) => (k.startsWith("/home") || k.startsWith("/calendar") || k.startsWith("/search") ? "/home" : k.startsWith("/train") || k.startsWith("/run") ? "/train" : k.startsWith("/nutrition") ? "/nutrition" : k.startsWith("/faith") ? "/faith" : k.startsWith("/coach") || k.startsWith("/progress") || k.startsWith("/profile") ? "/profile" : "hidden");
 
 // ---- 1. Opening and welcome -------------------------------------------------------------------------------------
 await page.goto(`${BASE}/`);
@@ -174,7 +174,7 @@ async function navShot(name) {
   await navHidden(true);
   return box.height;
 }
-const TABS = [["/home", "home"], ["/train", "train"], ["/run", "run"], ["/nutrition", "nutrition"], ["/faith", "faith"], ["/coach", "none"]];
+const TABS = [["/home", "home"], ["/train", "train"], ["/nutrition", "nutrition"], ["/faith", "faith"], ["/profile", "profile"]];
 let navH = navBox?.height ?? 64;
 if (!FLOWS) for (const [href, name] of TABS) { await page.goto(`${BASE}${href}`); await page.locator("main").waitFor(); await page.waitForTimeout(600); navH = await navShot(name); }
 const navHot = await page.evaluate(() => Array.from(document.querySelectorAll("nav[data-hide-with-keyboard] a")).map((a) => { const r = a.getBoundingClientRect(); return { x: Math.round(r.left), w: Math.round(r.width), label: a.textContent.trim(), to: new URL(a.href).pathname }; }));
@@ -304,12 +304,12 @@ if (!SKIP_FLOWS) try {
   for (let i = 0; i < 20; i++) { await box.fill("Review my training this week"); await page.waitForTimeout(500); if ((await box.inputValue()) === "Review my training this week" && (await page.getByRole("button", { name: "Send message" }).isEnabled())) break; }
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.waitForTimeout(300);
-  const typed = await state("state:coach-typed", "Question typed", { group: "AI Coach", tab: "none" });
+  const typed = await state("state:coach-typed", "Question typed", { group: "AI Coach", tab: "/profile" });
   if (coach) for (const hs of coach.hot) if (/Message the AI coach|textarea/i.test(hs.label) || hs.kind === "textarea") hs.to = "state:coach-typed";
   await page.getByRole("button", { name: "Send message" }).click();
   await page.getByTestId("coach-reply").last().waitFor({ timeout: 30000 });
   await settle(1200);
-  await state("state:coach-reply", "The coach's reply (simulated in the demo)", { group: "AI Coach", tab: "none" });
+  await state("state:coach-reply", "The coach's reply (simulated in the demo)", { group: "AI Coach", tab: "/profile" });
   link(typed, /Send message/, "state:coach-reply");
   if (coach) link(coach, /Send message/, "state:coach-typed");
 } catch (e) { log(`coach flow FAILED: ${String(e.message).split("\n")[0].slice(0, 200)}`); errors.push(`coach: ${e.message.split("\n")[0]}`); }

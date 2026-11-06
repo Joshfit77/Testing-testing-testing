@@ -29,9 +29,9 @@ test.describe("Stage 1 journeys", () => {
 
     // Visit every other tab; the Resume bar stays available.
     for (const [name, url] of [
-      ["Food", /\/nutrition/],
+      ["Nutrition", /\/nutrition/],
       ["Faith", /\/faith/],
-      ["Run", /\/run/],
+      ["You", /\/profile/],
       ["Home", /\/home/],
     ] as const) {
       await tab(page, name, url);
@@ -47,9 +47,10 @@ test.describe("Stage 1 journeys", () => {
     await expect(page.getByRole("button", { name: /set 1 completed/ }).first()).toBeVisible();
     await expect(page.getByLabel(/set 2 weight in lb/).first()).toHaveValue("145");
 
-    // The Train tab doesn't reopen the live session screen by itself (the Resume bar does).
-    await tab(page, "Food", /\/nutrition/);
-    await tab(page, "Train", /\/train$/);
+    // While a workout is in progress, the Train tab goes straight back to it (one tap, nothing lost).
+    await tab(page, "Nutrition", /\/nutrition/);
+    await tab(page, "Train", /\/train\/workout/);
+    await expect(page.getByLabel(/set 2 weight in lb/).first()).toHaveValue("145");
   });
 
   test("food: add, edit, copy and delete keep the totals right; favorites and the manual-entry draft persist", async ({ page }) => {
@@ -132,7 +133,7 @@ test.describe("Stage 1 journeys", () => {
     await page.waitForTimeout(600);
     await page.keyboard.press("Escape");
     await tab(page, "Train", /\/train/);
-    await tab(page, "Food", /\/nutrition/);
+    await tab(page, "Nutrition", /\/nutrition/);
     await page.reload();
     await page.getByRole("button", { name: "Add food" }).click();
     dialog = page.getByRole("dialog");
@@ -192,7 +193,7 @@ test.describe("Stage 1 journeys", () => {
     expect(before).toBeGreaterThan(500);
 
     // Switch to Food and back to Train: same filters, same place in the list.
-    await tab(page, "Food", /\/nutrition/);
+    await tab(page, "Nutrition", /\/nutrition/);
     await tabs(page).getByRole("link", { name: "Train", exact: true }).click();
     await page.waitForURL(/\/train\/exercises\?.*equipment=dumbbell/);
     await expect(page.getByLabel("Equipment")).toHaveValue("dumbbell");

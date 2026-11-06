@@ -66,7 +66,7 @@ export function sectionFor(pathname: string): string | null {
  * Screens never restored by a tab tap: live sessions have their own Resume bar, and edit/new forms
  * shouldn't reopen on their own.
  */
-const TRANSIENT = [/^\/train\/workout(\/|$)/, /\/edit(\/|$)/, /\/new(\/|$)/, /\/record(\/|$)/];
+const TRANSIENT = [/^\/train\/workout(\/|$)/, /\/edit(\/|$)/, /\/new(\/|$)/, /\/record(\/|$)/, /^\/coach(\/|$)/, /^\/search(\/|$)/];
 
 export function isRememberable(pathname: string): boolean {
   return !TRANSIENT.some((r) => r.test(pathname));

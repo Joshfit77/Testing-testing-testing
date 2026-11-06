@@ -63,7 +63,8 @@ test.describe("welcome, sign-up and diets", () => {
     await grantPlan(email, "plus");
 
     await page.goto("/nutrition");
-    await expect(page.getByText("Your diet")).toBeVisible();
+    await page.getByTestId("group-tools").locator("summary").click();
+    await expect(page.getByText("Your diet", { exact: true })).toBeVisible();
     await expect(page.getByText("Balanced", { exact: true })).toBeVisible();
     await page.getByRole("link", { name: /Your diet/ }).click();
     await page.waitForURL(/\/nutrition\/diets/);
@@ -73,6 +74,7 @@ test.describe("welcome, sign-up and diets", () => {
     await expect(page.getByRole("status").filter({ hasText: "Your diet is now Keto." })).toBeVisible();
 
     await page.goto("/nutrition");
+    await page.getByTestId("group-tools").locator("summary").click();
     await expect(page.getByText("Keto", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Add food" }).click();
     await page.getByPlaceholder("e.g. chicken, banana, rice").fill("salmon");

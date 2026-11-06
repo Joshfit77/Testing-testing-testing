@@ -140,9 +140,9 @@ test.describe("opening gate", () => {
     const nav = page.getByRole("navigation", { name: "Main sections" }).last();
     for (const [name, url] of [
       ["Train", /\/train/],
-      ["Run", /\/run/],
-      ["Food", /\/nutrition/],
+      ["Nutrition", /\/nutrition/],
       ["Faith", /\/faith/],
+      ["You", /\/profile/],
       ["Home", /\/home/],
     ] as const) {
       await nav.getByRole("link", { name }).click();

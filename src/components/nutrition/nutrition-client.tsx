@@ -138,6 +138,7 @@ export function AddFoodDialog({
   recent = [],
   frequent = [],
   favorites = [],
+  autoOpen = false,
 }: {
   date: string;
   myFoods: MyFood[];
@@ -151,8 +152,13 @@ export function AddFoodDialog({
   frequent?: QuickFood[];
   /** Starred foods (newest first). */
   favorites?: FoodChoice[];
+  /** Open the dialog as soon as the page loads (the Quick Add sheet links to /nutrition?add=1). */
+  autoOpen?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (autoOpen) setOpen(true);
+  }, [autoOpen]);
   const [mealType, setMealType] = useState("breakfast");
   // Each time the food search opens, start on the meal for the time of day (on this device's clock).
   useEffect(() => {
@@ -306,6 +312,7 @@ export function AddFoodDialog({
   return (
     <>
       <Button
+        className="h-auto min-h-14 w-full flex-col gap-1 py-2 [&_svg]:size-5"
         onClick={() => {
           setOpen(true);
           setResult(null);

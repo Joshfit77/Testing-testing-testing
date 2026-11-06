@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, ChevronRight, Dumbbell } from "lucide-react";
+import { ChevronRight, Dumbbell } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/states";
 import { Button } from "@/components/ui/button";
@@ -42,10 +42,7 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
 
   return (
     <div className="space-y-6">
-      <Link href="/train" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="size-4" aria-hidden /> Train
-      </Link>
-      <PageHeader title="Workout history" description="Review, edit or delete past sessions." />
+      <PageHeader back={{ href: "/train", label: "Train" }} title="Workout history" description="Review, edit or delete past sessions." />
 
       <section className="grid grid-cols-2 gap-3" aria-label="Last 30 days">
         <div className="rounded-2xl border border-border bg-card p-4">

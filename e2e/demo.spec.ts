@@ -269,7 +269,7 @@ test.describe("demo flows", () => {
     await page.waitForURL(/\/login/);
     await page.getByRole("button", { name: "Explore with sample data" }).click();
     await page.waitForURL(/\/home/);
-    await expect(page.getByRole("link", { name: "Profile and settings for Demo Athlete" }).first()).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Hi, Demo" })).toBeVisible();
   });
 
   test("demo accounts can't reach admin pages", async ({ page }) => {

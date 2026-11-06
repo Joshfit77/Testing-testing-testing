@@ -127,7 +127,7 @@ https://claude.ai/artifact/L1eCXFJ1a3UjtQuta3nzRU (private: only the owner and w
 
 | | |
 | --- | --- |
-| What it is | **Pictures of the real app**, captured in demo mode (sample data, purchases off, AI simulated) at iPhone size (390 CSS px at 3×, 1170 px wide, one WebP q88 pass), joined by the real tap targets: 396 screens, 3,417 taps. Every one of the 157 exercise pages, the programs, Home, Train, Run, Food, Faith, My Progress, Sleep & Recovery, AI Coach, Profile and the membership screen. |
+| What it is | **Pictures of the real app**, captured in demo mode (sample data, purchases off, AI simulated) at iPhone size (390 CSS px at 3×, 1170 px wide, one WebP q88 pass), joined by the real tap targets: 396 screens, 3,417 taps. Every one of the 157 exercise pages, the programs, Home, Train, Run, Nutrition, Faith, My Progress, Sleep & Recovery, AI Coach, You (settings) and the membership screen. Tabs are Home, Train, Nutrition, Faith and You (2026-11-06). |
 | What is live | Nothing moves in the pictures. (The published 2026-10-29 build also embedded the live 3D figure; the 3D figure was retired on 2026-11-04 and the tool no longer includes it. Rebuild the demo to match the app.) |
 | Captured step by step | The workout flow (start, demonstration dialog, log set 1 with the rest timer, set 2, exercise options, substitute picker, substituted, finish, summary) and the AI coach (question typed, simulated reply). |
 | Not live | Typing, timers, GPS, the camera, Apple Health, purchases, and any screen not among the captured ones (a tap says so). |

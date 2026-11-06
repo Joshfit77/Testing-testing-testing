@@ -9,9 +9,11 @@ beforeEach(() => sessionStorage.clear());
 describe("section memory", () => {
   it("maps paths to their main tab", () => {
     expect(sectionFor("/train/exercises/back-squat")).toBe("/train");
-    expect(sectionFor("/progress/overview")).toBe("/home");
+    expect(sectionFor("/progress/overview")).toBe("/profile");
     expect(sectionFor("/nutrition")).toBe("/nutrition");
-    expect(sectionFor("/coach")).toBeNull();
+    expect(sectionFor("/coach")).toBe("/profile");
+    expect(sectionFor("/run/record")).toBe("/train");
+    expect(sectionFor("/admin")).toBeNull();
   });
 
   it("returns to the last screen and filters used in a section", () => {
@@ -27,6 +29,9 @@ describe("section memory", () => {
     rememberLocation("/train/workout", "");
     expect(isRememberable("/train/workout")).toBe(false);
     expect(isRememberable("/run/activities/abc/edit")).toBe(false);
+    // The AI Coach and Search are reached from every header; the You and Home tabs never reopen them.
+    expect(isRememberable("/coach")).toBe(false);
+    expect(isRememberable("/search")).toBe(false);
     expect(lastHrefFor("/train", "/home")).toBe("/train/programs?goal=strength");
   });
 

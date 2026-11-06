@@ -22,6 +22,8 @@ export interface ProfileRow {
   home_scripture?: boolean;
   bible_red_letters?: boolean;
   bible_page_theme?: "dark" | "light";
+  /** Added in 20261106000057_layout_prefs: Home/Faith dashboard layout (null = default for the member's goal). */
+  layout_prefs?: unknown;
   rest_timer_sound?: boolean;
   rest_timer_vibrate?: boolean;
   /** Added in 20261024000034_sleep (4–12 hours, default 8). */

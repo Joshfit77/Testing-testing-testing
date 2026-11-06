@@ -40,7 +40,7 @@ test.describe("Bible reader", () => {
     await completeOnboarding(page);
 
     await page.goto("/faith");
-    await page.getByRole("link", { name: /^Bible The complete Berean Standard Bible/ }).click();
+    await page.getByRole("navigation", { name: "Bible tools" }).getByRole("link", { name: "Bible", exact: true }).click();
     await page.waitForURL(/\/faith\/bible$/);
     await expect(page.getByRole("heading", { name: "Bible", exact: true })).toBeVisible();
     await expect(page.getByText(/66 books, 1,189 chapters/)).toBeVisible();

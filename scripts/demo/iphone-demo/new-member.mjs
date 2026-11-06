@@ -24,7 +24,7 @@ await ctx.addInitScript(() => {
 });
 const page = await ctx.newPage();
 const normalize = (href) => { try { const u = new URL(href, BASE); return u.origin === new URL(BASE).origin ? u.pathname + u.search : null; } catch { return null; } };
-const tabOf = (k) => (k.startsWith("/home") ? "/home" : k.startsWith("/train") ? "/train" : k.startsWith("/run") ? "/run" : k.startsWith("/nutrition") ? "/nutrition" : k.startsWith("/faith") ? "/faith" : k.startsWith("/coach") || k.startsWith("/progress") || k.startsWith("/profile") || k.startsWith("/calendar") ? "none" : "hidden");
+const tabOf = (k) => (k.startsWith("/home") || k.startsWith("/calendar") || k.startsWith("/search") ? "/home" : k.startsWith("/train") || k.startsWith("/run") ? "/train" : k.startsWith("/nutrition") ? "/nutrition" : k.startsWith("/faith") ? "/faith" : k.startsWith("/coach") || k.startsWith("/progress") || k.startsWith("/profile") ? "/profile" : "hidden");
 
 async function settle(ms = 900) {
   await page.waitForLoadState("domcontentloaded");

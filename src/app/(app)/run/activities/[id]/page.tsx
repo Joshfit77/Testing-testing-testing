@@ -1,6 +1,7 @@
 import Link from "next/link";
+import { BackLink } from "@/components/platform/back-link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, MapPinOff, Pencil } from "lucide-react";
+import { MapPinOff, Pencil } from "lucide-react";
 import { DeleteActivityButton } from "@/components/run/delete-activity-button";
 import { SourceBadge } from "@/components/run/activity-summary-ui";
 import { Button } from "@/components/ui/button";
@@ -46,9 +47,7 @@ export default async function ActivityDetailPage({ params, searchParams }: { par
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
-      <Link href="/run?tab=history" className="inline-flex min-h-11 items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="size-4" aria-hidden /> Run history
-      </Link>
+      <BackLink href="/run?tab=history">Run history</BackLink>
       <header className="space-y-1">
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="font-display text-[1.625rem] font-bold leading-tight">{label}</h1>

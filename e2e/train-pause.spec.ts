@@ -10,6 +10,7 @@ test.describe("pausing and resuming a program", () => {
     const programLink = page.getByRole("link", { name: /Week 1 of \d+/ });
     await expect(programLink).toBeVisible();
     const programHref = (await programLink.getAttribute("href"))!;
+    await page.locator("details", { hasText: "exercises in this session" }).locator("summary").click();
     await page.getByRole("button", { name: "Pause program" }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Confirm" }).click();
 

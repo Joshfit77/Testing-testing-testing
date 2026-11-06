@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BellRing, ChevronRight, CreditCard, Download, KeyRound, LogOut, SlidersHorizontal, TrendingUp } from "lucide-react";
+import { Award, BellRing, ChevronRight, CreditCard, Download, KeyRound, LayoutGrid, LogOut, Moon, Target, TrendingUp } from "lucide-react";
 import { MainHeader } from "@/components/shell/main-header";
 import { DisplaySettings } from "@/components/profile/display-settings";
 import { DeleteAccountForm, ProfileForm, WithdrawConsentForm, AiConsentOffForm } from "@/components/profile/profile-forms";
@@ -11,8 +11,9 @@ import { signOutAction } from "@/server/actions/auth";
 import { SignOutForm } from "@/components/shell/sign-out-form";
 import { LegalLinks } from "@/components/profile/legal-links";
 import { legalLinks } from "@/server/services/store-billing";
+import { getDashboardData } from "@/server/services/dashboard";
 
-export const metadata = { title: "Profile & Settings" };
+export const metadata = { title: "You" };
 
 const section = "rounded-2xl border border-border bg-card p-4 md:p-5";
 const h2 = "mb-3 text-lg font-semibold";
@@ -30,23 +31,34 @@ function Row({ href, icon: Icon, title, body }: { href: string; icon: typeof Che
   );
 }
 
+/**
+ * You: progress, goals, notifications, membership and the account, in one tab. Settings that used to be reached
+ * through an avatar in the header are all here, one tap from anywhere.
+ */
 export default async function ProfilePage() {
   const { user, profile } = await requireOnboardedUser();
   const plan = await getUserPlan(user.id);
   const plans = getPlans();
   const supabase = await getServerSupabase();
-  const { data: ent } = await supabase.from("user_entitlements").select("source").eq("user_id", user.id).maybeSingle();
+  const [{ data: ent }, dashboard] = await Promise.all([
+    supabase.from("user_entitlements").select("source").eq("user_id", user.id).maybeSingle(),
+    getDashboardData(supabase, user.id, profile.timezone).catch(() => null),
+  ]);
   // Account deletion can't cancel an App Store or Google Play subscription (App Store guideline 5.1.1(v)).
   const storeBilled = plan !== "free" && (ent?.source === "app_store" || ent?.source === "play_store") ? (ent.source === "app_store" ? "App Store" : "Google Play") : null;
+  const name = profile.display_name ?? "Athlete";
   return (
     <div className="space-y-4">
-      <MainHeader title="Profile & Settings" subtitle={<span className="block truncate">{user.email}</span>} />
+      <MainHeader title="You" subtitle={<span className="block truncate">{name} · {plans[plan].name} plan · {user.email}</span>} />
 
-      <nav aria-label="Profile sections" className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
-        <Row href="/profile/preferences" icon={SlidersHorizontal} title="Edit onboarding details" body="Goals (main and second), schedule, equipment, diet, body and display" />
-        <Row href="/profile/notifications" icon={BellRing} title="Notifications" body="Reminders for Faith, workouts, food, water and recovery" />
-        <Row href="/profile/billing" icon={CreditCard} title="Plans & billing" body={`Current plan: ${getPlans()[plan].name}`} />
-        <Row href="/progress" icon={TrendingUp} title="My Progress" body="Overview, badges and history" />
+      <nav aria-label="Your sections" className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
+        <Row href="/progress" icon={TrendingUp} title="My Progress" body={dashboard ? `${dashboard.workoutsThisWeek} workout${dashboard.workoutsThisWeek === 1 ? "" : "s"} this week · ${dashboard.weekStreak} week streak · overview, body map, photos` : "Overview, body map, photos and history"} />
+        <Row href="/progress/badges" icon={Award} title="Badges" body="Milestones you've earned and what's next" />
+        <Row href="/progress/sleep" icon={Moon} title="Sleep & Recovery" body="Nightly reports, sleep debt, schedule and energy" />
+        <Row href="/profile/preferences" icon={Target} title="Goals & training preferences" body="Goals, experience, schedule, equipment, diet and body" />
+        <Row href="/profile/notifications" icon={BellRing} title="Notifications" body="Reminders for Faith, workouts, food, water and recovery; quiet hours" />
+        <Row href="/profile/billing" icon={CreditCard} title="Plans & billing" body={`Current plan: ${plans[plan].name}`} />
+        <Row href="/profile/customize" icon={LayoutGrid} title="Customize Home" body="Choose and order what Home and Faith show first" />
       </nav>
 
       <section id="account" className={section} aria-labelledby="account-title">
@@ -71,9 +83,7 @@ export default async function ProfilePage() {
         <h2 id="display-title" className={h2}>
           Display &amp; Faith
         </h2>
-        <DisplaySettings
-          initial={{ textSize: profile.text_size ?? "default", reduceMotion: profile.reduce_motion ?? false, homeScripture: profile.home_scripture ?? true }}
-        />
+        <DisplaySettings initial={{ textSize: profile.text_size ?? "default", reduceMotion: profile.reduce_motion ?? false, homeScripture: profile.home_scripture ?? true }} />
       </section>
 
       <section id="privacy" className={`${section} space-y-5`} aria-labelledby="privacy-title">
@@ -116,13 +126,11 @@ export default async function ProfilePage() {
         <LegalLinks legal={legalLinks()} />
         <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4">
           <p className="font-semibold text-destructive-foreground">Delete account</p>
-          <p className="mb-3 text-sm text-muted-foreground">
-            This cancels any subscription bought on this website and permanently deletes your account and data. It can&apos;t be undone.
-          </p>
+          <p className="mb-3 text-sm text-muted-foreground">This cancels any subscription bought on this website and permanently deletes your account and data. It can&apos;t be undone.</p>
           {storeBilled ? (
             <p role="alert" className="mb-3 rounded-lg border border-[#a8802f]/60 bg-[#a8802f]/10 p-3 text-sm">
-              Your {plans[plan].name} subscription is billed by the {storeBilled}. Deleting your account won&apos;t cancel it — cancel it first in your{" "}
-              {storeBilled} subscription settings ({storeBilled === "App Store" ? "Settings → your name → Subscriptions" : "Google Play → Payments & subscriptions"}).
+              Your {plans[plan].name} subscription is billed by the {storeBilled}. Deleting your account won&apos;t cancel it — cancel it first in your {storeBilled} subscription settings (
+              {storeBilled === "App Store" ? "Settings → your name → Subscriptions" : "Google Play → Payments & subscriptions"}).
             </p>
           ) : null}
           <DeleteAccountForm />

@@ -15,6 +15,7 @@ import { OfflineBanner } from "./offline-banner";
 import { ShellUserProvider } from "./shell-context";
 import { RESTORE_SCROLL_ATTR } from "./scroll-memory";
 import { useTabHrefs } from "@/lib/nav-memory";
+import { DRAFT_EVENT, loadLocalDraft } from "@/lib/workout-storage";
 import { applyBibleDisplay, RED_LETTERS_OFF_CLASS, type BiblePageTheme } from "@/lib/bible/reading-display";
 
 export type TextSize = "default" | "large" | "xlarge";
@@ -31,6 +32,8 @@ interface AppShellProps {
   redLetters?: boolean;
   biblePageTheme?: BiblePageTheme;
   signOutAction: () => Promise<void>;
+  /** Today's date (YYYY-MM-DD) in the member's time zone, for Quick Add. */
+  today: string;
 }
 
 const COLLAPSE_KEY = "ngf.sidebar.collapsed";
@@ -50,13 +53,27 @@ export function applyDisplayPrefs(textSize: TextSize, reduceMotion: boolean) {
   }
 }
 
-export function AppShell({ children, userId, displayName, isAdmin, plan, textSize, reduceMotion, redLetters = true, biblePageTheme = "dark", signOutAction }: AppShellProps) {
+export function AppShell({ children, userId, displayName, isAdmin, plan, textSize, reduceMotion, redLetters = true, biblePageTheme = "dark", signOutAction, today }: AppShellProps) {
   const pathname = usePathname();
   const secondary = visibleSecondary({ isAdmin });
   const [collapsed, setCollapsed] = useState(false);
-  const shellUser = useMemo(() => ({ displayName, plan }), [displayName, plan]);
+  const shellUser = useMemo(() => ({ userId, displayName, plan, today }), [userId, displayName, plan, today]);
   // Tab links return to the last screen (and filters) used in that section this session (src/lib/nav-memory.ts).
-  const tabHrefs = useTabHrefs(MAIN_TABS.map((t) => t.href));
+  const remembered = useTabHrefs(MAIN_TABS.map((t) => t.href));
+  // While a workout is in progress on this device, the Train tab goes straight back to it: switching tabs never
+  // loses the workout (it is saved on the device and on the server), and getting back to it is one tap.
+  const [workoutActive, setWorkoutActive] = useState(false);
+  useEffect(() => {
+    const refresh = () => setWorkoutActive(Boolean(loadLocalDraft(userId)));
+    refresh();
+    window.addEventListener(DRAFT_EVENT, refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.removeEventListener(DRAFT_EVENT, refresh);
+      window.removeEventListener("storage", refresh);
+    };
+  }, [userId]);
+  const tabHrefs = workoutActive && !pathname.startsWith("/train/workout") ? { ...remembered, "/train": "/train/workout" } : remembered;
   const restoreScroll = { [RESTORE_SCROLL_ATTR]: "" };
 
   useEffect(() => {

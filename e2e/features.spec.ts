@@ -87,7 +87,7 @@ test.describe("feature access, subscriptions and core sections", () => {
   test("food log on the Free plan: search built-in foods and log a serving", async ({ page }) => {
     await completeOnboarding(page);
     await page.goto("/nutrition");
-    await expect(page.getByRole("heading", { name: "Food", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Nutrition", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Add food" }).click();
     await page.getByPlaceholder("e.g. chicken, banana, rice").fill("banana");
     await page.getByRole("region", { name: "Common foods" }).getByRole("button", { name: /^Banana/ }).first().click();

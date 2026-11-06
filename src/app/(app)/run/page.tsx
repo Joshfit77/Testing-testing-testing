@@ -9,6 +9,7 @@ import { getActiveProgramRef } from "@/server/coach/snapshot";
 import { ActivityListItem, WeekTotalsLine } from "@/components/run/activity-summary-ui";
 import { parseRunTab, RunTabs } from "@/components/run/run-tabs";
 import { MainHeader } from "@/components/shell/main-header";
+import { BackLink } from "@/components/platform/back-link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -60,6 +61,7 @@ export default async function RunPage({ searchParams }: { searchParams: Promise<
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
+      <BackLink href="/train">Train</BackLink>
       <MainHeader title="Run" subtitle="Runs and walks, outdoors or on the treadmill." />
       <RunTabs active={tab} />
       {tab === "outdoor" && <OutdoorTab userId={user.id} supabase={supabase} />}

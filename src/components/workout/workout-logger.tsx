@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BellRing, BookmarkPlus, Cloud, CloudOff, Flag, Loader2, Minus, Pause, Play, Plus, Timer, Trash2, Trophy, Vibrate, X } from "lucide-react";
+import { BellRing, BookmarkPlus, ChevronDown, Cloud, CloudOff, Flag, Loader2, Maximize2, Minimize2, Minus, Pause, Play, Plus, Timer, Trash2, Trophy, Undo2, Vibrate, X } from "lucide-react";
 import { Celebration } from "@/components/common/celebration";
 import { Button } from "@/components/ui/button";
 import { confirmDialog } from "@/components/ui/confirm";
@@ -12,6 +12,7 @@ import { Input, Textarea } from "@/components/ui/input";
 import { Notice } from "@/components/common/states";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { cn } from "@/lib/utils";
+import { useSessionState } from "@/lib/nav-memory";
 import type { UnitSystem } from "@/lib/domain/types";
 import { formatDuration, formatWeight, formatVolume } from "@/lib/domain/units";
 import {
@@ -203,6 +204,18 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
   const [finishedDraft, setFinishedDraft] = useState<WorkoutDraft | null>(null);
   // While the current-set card (with its own rest timer) is on screen, the sticky header doesn't repeat the timer.
   const [cardVisible, setCardVisible] = useState(false);
+  // Focus: only the sticky header and the current set on screen (the tab bar goes too), for a distraction-free
+  // workout. Remembered for the session; everything is one tap away with "Show everything".
+  const [focus, setFocus] = useSessionState("workout.focus", false);
+  useEffect(() => {
+    if (focus) document.documentElement.dataset.workoutFocus = "1";
+    else delete document.documentElement.dataset.workoutFocus;
+    return () => {
+      delete document.documentElement.dataset.workoutFocus;
+    };
+  }, [focus]);
+  // "Next exercise" from the card: the sets left on that exercise are marked not done, with one Undo.
+  const [movedOn, setMovedOn] = useState<{ exerciseKey: string; name: string; setIds: string[] } | null>(null);
   const cardObserver = useRef<IntersectionObserver | null>(null);
   const observeCard = useCallback((el: HTMLDivElement | null) => {
     cardObserver.current?.disconnect();
@@ -763,6 +776,15 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
   for (const e of draft.exercises) if (e.supersetId && !letters.has(e.supersetId)) letters.set(e.supersetId, String.fromCharCode(65 + letters.size));
   const substituteTarget = draft.exercises.find((e) => e.id === substituteKey) ?? null;
 
+  const nextExercise = (exerciseKey: string) => {
+    const ex = draft.exercises.find((e) => e.id === exerciseKey);
+    if (!ex) return;
+    const setIds = ex.sets.filter((x) => !x.completed && !x.skipped).map((x) => x.id);
+    for (const setId of setIds) dispatch({ type: "skipSet", exerciseKey, setId });
+    dispatch({ type: "clearRest" });
+    setMovedOn(setIds.length ? { exerciseKey, name: ex.name, setIds } : null);
+  };
+
   const finish = async () => {
     setSaving(true);
     setError(null);
@@ -845,6 +867,9 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
               </span>
             </p>
           </div>
+          <Button variant="secondary" size="icon" onClick={() => setFocus(!focus)} aria-pressed={focus} aria-label={focus ? "Show everything" : "Focus on the current set"} data-testid="workout-focus">
+            {focus ? <Minimize2 aria-hidden /> : <Maximize2 aria-hidden />}
+          </Button>
           <Button
             variant="secondary"
             size="icon"
@@ -915,6 +940,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
             onFinish={() => setFinishOpen(true)}
             onUndo={undoSet}
             onSkipExercise={(key) => setSkipKey(key)}
+            onNextExercise={nextExercise}
             after={afterCurrent(draft)}
             restOver={restOverAt !== null && Date.parse(now) - restOverAt < 10_000}
             restElsewhere={!cardVisible}
@@ -924,7 +950,31 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
         </div>
       )}
 
-      {template && template.warmup.length > 0 && summary.completedSets === 0 && (
+      {movedOn && (
+        <p className="flex items-center justify-between gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm" role="status" data-testid="moved-on">
+          <span>
+            Moved on from {movedOn.name}: {movedOn.setIds.length} {movedOn.setIds.length === 1 ? "set" : "sets"} left undone.
+          </span>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              for (const setId of movedOn.setIds) dispatch({ type: "unskipSet", exerciseKey: movedOn.exerciseKey, setId });
+              setMovedOn(null);
+            }}
+          >
+            <Undo2 aria-hidden /> Undo
+          </Button>
+        </p>
+      )}
+
+      {focus && draft.exercises.length > 0 && (
+        <Button variant="outline" className="w-full" onClick={() => setFocus(false)}>
+          <Minimize2 aria-hidden /> Show everything
+        </Button>
+      )}
+
+      {!focus && template && template.warmup.length > 0 && summary.completedSets === 0 && (
         <details className="rounded-2xl border border-border bg-card p-4">
           <summary className="cursor-pointer font-display text-lg font-semibold uppercase">Warm-up</summary>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
@@ -935,6 +985,8 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
         </details>
       )}
 
+      {!focus && (
+        <>
       {draft.exercises.length === 0 && (
         <div className="rounded-2xl border border-dashed border-border p-8 text-center">
           <p className="font-semibold">No exercises yet</p>
@@ -974,35 +1026,45 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
         <Plus aria-hidden /> Add exercise
       </Button>
 
-      <section className="rounded-2xl border border-border bg-card p-4" aria-labelledby="rest-alerts-title">
-        <h2 id="rest-alerts-title" className="font-display text-lg font-semibold uppercase">
-          Rest timer alerts
-        </h2>
-        <p className="text-xs text-muted-foreground">When a rest ends. Saved to your profile.</p>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          <Button type="button" variant={alerts.sound ? "default" : "secondary"} aria-pressed={alerts.sound} onClick={() => void saveAlerts({ ...alerts, sound: !alerts.sound })}>
-            <BellRing aria-hidden /> Sound {alerts.sound ? "on" : "off"}
-          </Button>
-          <Button type="button" variant={alerts.vibrate ? "default" : "secondary"} aria-pressed={alerts.vibrate} onClick={() => void saveAlerts({ ...alerts, vibrate: !alerts.vibrate })}>
-            <Vibrate aria-hidden /> Vibrate {alerts.vibrate ? "on" : "off"}
+      <details className="group rounded-2xl border border-border bg-card" data-testid="workout-more">
+        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-2 px-4 text-[0.9375rem] font-semibold [&::-webkit-details-marker]:hidden">
+          <span>More: rest alerts, notes, discard</span>
+          <ChevronDown className="size-5 text-gold transition-transform group-open:rotate-180" aria-hidden />
+        </summary>
+        <div className="space-y-4 px-4 pb-4">
+          <section className="rounded-2xl border border-border bg-card p-4" aria-labelledby="rest-alerts-title">
+            <h2 id="rest-alerts-title" className="font-display text-lg font-semibold uppercase">
+              Rest timer alerts
+            </h2>
+            <p className="text-xs text-muted-foreground">When a rest ends. Saved to your profile.</p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <Button type="button" variant={alerts.sound ? "default" : "secondary"} aria-pressed={alerts.sound} onClick={() => void saveAlerts({ ...alerts, sound: !alerts.sound })}>
+                <BellRing aria-hidden /> Sound {alerts.sound ? "on" : "off"}
+              </Button>
+              <Button type="button" variant={alerts.vibrate ? "default" : "secondary"} aria-pressed={alerts.vibrate} onClick={() => void saveAlerts({ ...alerts, vibrate: !alerts.vibrate })}>
+                <Vibrate aria-hidden /> Vibrate {alerts.vibrate ? "on" : "off"}
+              </Button>
+            </div>
+            {typeof navigator !== "undefined" && !canVibrate() && alerts.vibrate && (
+              <p className="mt-1 text-xs text-muted-foreground">This browser can&apos;t vibrate (iPhone Safari doesn&apos;t support it); the iPhone app vibrates and sends its own alert.</p>
+            )}
+            {alertsError && <Notice tone="error" className="mt-2">{alertsError}</Notice>}
+          </section>
+
+          <section className="rounded-2xl border border-border bg-card p-4">
+            <label htmlFor="workout-notes" className="font-display text-lg font-semibold uppercase">
+              Workout notes
+            </label>
+            <Textarea id="workout-notes" className="mt-2" value={draft.notes} onChange={(e) => dispatch({ type: "setNotes", notes: e.target.value })} placeholder="How did the session feel?" maxLength={2000} />
+          </section>
+
+          <Button variant="ghost" className="w-full text-[#f08a8a]" onClick={() => setDiscardOpen(true)}>
+            <Trash2 aria-hidden /> Discard workout
           </Button>
         </div>
-        {typeof navigator !== "undefined" && !canVibrate() && alerts.vibrate && (
-          <p className="mt-1 text-xs text-muted-foreground">This browser can&apos;t vibrate (iPhone Safari doesn&apos;t support it); the iPhone app vibrates and sends its own alert.</p>
-        )}
-        {alertsError && <Notice tone="error" className="mt-2">{alertsError}</Notice>}
-      </section>
-
-      <section className="rounded-2xl border border-border bg-card p-4">
-        <label htmlFor="workout-notes" className="font-display text-lg font-semibold uppercase">
-          Workout notes
-        </label>
-        <Textarea id="workout-notes" className="mt-2" value={draft.notes} onChange={(e) => dispatch({ type: "setNotes", notes: e.target.value })} placeholder="How did the session feel?" maxLength={2000} />
-      </section>
-
-      <Button variant="ghost" className="w-full text-[#f08a8a]" onClick={() => setDiscardOpen(true)}>
-        <Trash2 aria-hidden /> Discard workout
-      </Button>
+      </details>
+        </>
+      )}
 
       <ExercisePicker
         open={pickerOpen}

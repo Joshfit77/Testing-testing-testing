@@ -6,8 +6,9 @@ test.describe("supplements and steps", () => {
     await signUpAndConfirm(page, uniqueEmail("supps"));
     await completeOnboarding(page);
 
-    // Linked from the free Food view.
+    // Linked from the free Nutrition view (under "More tools").
     await page.goto("/nutrition");
+    await page.locator("main details", { hasText: "More tools" }).locator("summary").click();
     await page.getByRole("link", { name: /Supplements/ }).first().click();
     await page.waitForURL(/\/nutrition\/supplements/);
     await expect(page.getByRole("heading", { name: "Supplements", level: 1 })).toBeVisible();
@@ -50,10 +51,11 @@ test.describe("supplements and steps", () => {
     await expect(page.getByText("Not suitable for your Vegan diet — try Plant protein (pea or soy blend).").first()).toBeVisible();
   });
 
-  test("steps can be entered by hand (Home → Steps) and the goal changed", async ({ page }) => {
+  test("steps can be entered by hand (You → My Progress → Steps) and the goal changed", async ({ page }) => {
     await signUpAndConfirm(page, uniqueEmail("steps"));
     await completeOnboarding(page);
-    await page.getByRole("navigation", { name: "More for today" }).getByRole("link", { name: "Steps" }).click();
+    await page.getByRole("navigation", { name: "Main sections" }).last().getByRole("link", { name: "You" }).click();
+    await page.getByRole("navigation", { name: "Your sections" }).getByRole("link", { name: /My Progress/ }).click();
     await page.waitForURL(/\/progress/);
 
     await expect(page.getByTestId("steps-today")).toHaveText("0 steps today");

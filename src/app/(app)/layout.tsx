@@ -12,6 +12,7 @@ import { NotificationSync } from "@/components/notifications/notification-sync";
 import { getNotificationSyncAction, importDeviceWorkoutReminderAction } from "@/server/actions/notifications";
 import { DemoBar } from "@/components/demo/demo-bar";
 import { demoAiSimulated, isDemoMode, isDemoUser } from "@/server/demo";
+import { isoDateInTz } from "@/lib/domain/dates";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   if (!isSupabaseConfigured()) return <SetupRequired />;
@@ -28,6 +29,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       isAdmin={profile.role === "admin"}
       plan={getPlans()[plan].name}
       signOutAction={signOutAction}
+      today={isoDateInTz(new Date(), profile.timezone)}
     >
       {/* Stage 1C: scroll + section memory, keyboard avoidance and per-user form drafts. */}
       <Suspense fallback={null}>

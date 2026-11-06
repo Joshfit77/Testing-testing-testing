@@ -1,9 +1,7 @@
-import Link from "next/link";
-import { ArrowLeft, Lock } from "lucide-react";
+import { Lock } from "lucide-react";
 import { BadgeMedallion, TIER_LABEL } from "@/components/achievements/badge-icon";
 import { PageHeader } from "@/components/common/page-header";
 import { ErrorState } from "@/components/common/states";
-import { Button } from "@/components/ui/button";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { BADGE_CATEGORIES, badgePercent, computeAchievements, type BadgeState } from "@/lib/domain/achievements";
 import { isoDateInTz } from "@/lib/domain/dates";
@@ -84,18 +82,10 @@ export default async function BadgesPage({ searchParams }: { searchParams: Promi
     logError("badges.load", err);
   }
 
-  const back = (
-    <Button asChild variant="ghost" size="sm">
-      <Link href="/progress">
-        <ArrowLeft aria-hidden /> Progress
-      </Link>
-    </Button>
-  );
-
   if (!badges) {
     return (
       <div className="space-y-6">
-        <PageHeader eyebrow="Progress" title="Badges" actions={back} />
+        <PageHeader back={{ href: "/progress", label: "My Progress" }} eyebrow="Progress" title="Badges" />
         <ErrorState description="We couldn't load your badges right now. Please try again in a moment." />
       </div>
     );
@@ -108,10 +98,10 @@ export default async function BadgesPage({ searchParams }: { searchParams: Promi
   return (
     <div className="space-y-6">
       <PageHeader
+        back={{ href: "/progress", label: "My Progress" }}
         eyebrow="Progress"
         title="Badges"
         description="Earned from the training, eating and faithful habits you already log. Faithful in the small things."
-        actions={back}
       />
 
       <RankBoard

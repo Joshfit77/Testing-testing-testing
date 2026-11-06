@@ -6,7 +6,7 @@ import { OPENING_LAUNCH_COOKIE, OPENING_LAUNCH_COOKIE_MAX_AGE, RETURNING_COOKIE 
 
 // Every signed-in area. A signed-out visit is sent to /login with `next` (path + query) so signing in
 // lands back on the same screen instead of bouncing to /home.
-export const PROTECTED_PREFIXES = ["/home", "/train", "/run", "/coach", "/nutrition", "/progress", "/calendar", "/plan", "/faith", "/profile", "/onboarding", "/admin"];
+export const PROTECTED_PREFIXES = ["/home", "/train", "/run", "/coach", "/nutrition", "/progress", "/calendar", "/plan", "/faith", "/profile", "/search", "/onboarding", "/admin"];
 const AUTH_PAGES = ["/login", "/signup"];
 
 /**

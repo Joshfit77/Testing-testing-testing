@@ -142,7 +142,8 @@ test.describe("fast workout logging", () => {
     const card = page.getByTestId("current-set-card");
     await expect(card.getByTestId("current-exercise")).toHaveText(/Barbell Bench Press/i);
 
-    // Skip the whole exercise from the card (the sheet asks why, with the pain advice).
+    // Skip the whole exercise from the card (under form cues; the sheet asks why, with the pain advice).
+    await card.getByTestId("current-form").locator("summary").click();
     await card.getByTestId("skip-exercise").click();
     await page.getByRole("dialog").getByRole("button", { name: "No equipment" }).click();
     await expect(card.getByTestId("current-exercise")).toHaveText(/Dumbbell Biceps Curl/i);

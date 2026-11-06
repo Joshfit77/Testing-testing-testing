@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, BellRing, Check, CheckCircle2, ChevronDown, CopyPlus, Flag, Lightbulb, Minus, Plus, Repeat2, SkipForward, Undo2 } from "lucide-react";
+import { AlertTriangle, ArrowRight, BellRing, Check, CheckCircle2, ChevronDown, CopyPlus, Flag, Lightbulb, Minus, Plus, Repeat2, SkipForward, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { displayWeight, formatDuration, toKg, weightUnit } from "@/lib/domain/units";
@@ -156,6 +156,8 @@ export interface CurrentSetCardProps {
   onUndo: (exerciseKey: string, setId: string) => void;
   /** Open the skip-exercise sheet (it asks why, with the pain advice). */
   onSkipExercise?: (exerciseKey: string) => void;
+  /** Move on to the next exercise now: the sets left on this one are marked not done (undoable), no questions asked. */
+  onNextExercise?: (exerciseKey: string) => void;
   /** What comes after the current set ("Then: …"); null when this is the last one. */
   after?: CurrentSetInfo | null;
   /** The rest just ran out: say so for a few seconds, so the member knows to go. */
@@ -190,6 +192,7 @@ export function CurrentSetCard({
   onFinish,
   onUndo,
   onSkipExercise,
+  onNextExercise,
   after = null,
   restOver = false,
   restElsewhere = false,
@@ -456,19 +459,19 @@ export function CurrentSetCard({
       </div>
       {set && (
         <div className="grid grid-cols-2 gap-2">
-          <Button size="sm" variant="secondary" onClick={skip} data-testid="skip-set">
+          <Button variant="secondary" className="h-12" onClick={skip} data-testid="skip-set">
             <SkipForward aria-hidden /> Skip set
           </Button>
-          <Button size="sm" variant="secondary" onClick={() => onSkipExercise?.(exercise.id)} disabled={!onSkipExercise} data-testid="skip-exercise">
-            Skip exercise
+          <Button variant="secondary" className="h-12" onClick={() => onNextExercise?.(exercise.id)} disabled={!onNextExercise} data-testid="next-exercise">
+            Next exercise <ArrowRight aria-hidden />
           </Button>
         </div>
       )}
-      {((form && (form.cues.length > 0 || form.mistakes.length > 0)) || onSubstitute) && (
+      {((form && (form.cues.length > 0 || form.mistakes.length > 0)) || onSubstitute || onSkipExercise) && (
         <details className="group rounded-xl border border-border bg-background/40" data-testid="current-form">
           <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 text-sm font-semibold text-gold-highlight [&::-webkit-details-marker]:hidden">
             <span className="flex items-center gap-2">
-              <Lightbulb className="size-4" aria-hidden /> Form cues &amp; common mistakes
+              <Lightbulb className="size-4" aria-hidden /> Form cues, swap or skip
             </span>
             <ChevronDown className="size-4 transition-transform group-open:rotate-180" aria-hidden />
           </summary>
@@ -497,10 +500,19 @@ export function CurrentSetCard({
                 </ul>
               </div>
             )}
-            {onSubstitute && (
-              <Button size="sm" variant="secondary" className="w-full" onClick={() => onSubstitute(exercise.id)} data-testid="current-swap">
-                <Repeat2 aria-hidden /> Swap for another exercise
-              </Button>
+            {(onSubstitute || onSkipExercise) && (
+              <div className="grid grid-cols-2 gap-2">
+                {onSubstitute && (
+                  <Button variant="secondary" className="h-auto min-h-11 whitespace-normal" onClick={() => onSubstitute(exercise.id)} data-testid="current-swap">
+                    <Repeat2 aria-hidden /> Swap exercise
+                  </Button>
+                )}
+                {onSkipExercise && set && (
+                  <Button variant="secondary" className="h-auto min-h-11 whitespace-normal" onClick={() => onSkipExercise(exercise.id)} data-testid="skip-exercise">
+                    Skip exercise (say why)
+                  </Button>
+                )}
+              </div>
             )}
           </div>
         </details>

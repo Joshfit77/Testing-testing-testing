@@ -1,6 +1,5 @@
-import Link from "next/link";
+import { BackLink } from "@/components/platform/back-link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import { ActivityForm } from "@/components/run/activity-form";
 import { Card, CardContent } from "@/components/ui/card";
 import { distanceUnitFor, formatHms, fromMeters, utcToLocalParts } from "@/lib/domain/activities";
@@ -26,9 +25,7 @@ export default async function EditActivityPage({ params }: { params: Promise<{ i
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
-      <Link href={`/run/activities/${a.id}`} className="inline-flex min-h-11 items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="size-4" aria-hidden /> Activity
-      </Link>
+      <BackLink href={`/run/activities/${a.id}`}>Activity</BackLink>
       <h1 className="font-display text-[1.625rem] font-bold leading-tight">Edit {a.kind}</h1>
       <Card>
         <CardContent className="pt-5">

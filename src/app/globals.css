@@ -24,6 +24,8 @@
   --success: #3fa077;
   --destructive: #d45c5c;
   --destructive-foreground: #f08a8a;
+  /* Solid red button fill: white text on it reads at 5.6:1 (the lighter --destructive is for text and borders on black). */
+  --destructive-solid: #b93a3a;
   /* Words of Jesus in Scripture ("red letter"). At least 4.5:1 on the page, cards and every highlight colour. */
   --red-letter: #f0736a;
   /* Radii: 12px cards, 10px inputs, full pills. */
@@ -61,6 +63,7 @@
   --color-accent: var(--elevated);
   --color-accent-foreground: var(--foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-solid: var(--destructive-solid);
   --color-success: var(--success);
   --color-red-letter: var(--red-letter);
   --color-border: var(--border);
@@ -1216,4 +1219,9 @@ html[data-motion="reduce"][data-intro="entering"] .ngo { animation: ngo-enter-ou
   100% {
     background-color: transparent;
   }
+}
+
+/* Distraction-free workout (Focus in the workout header): the tab bar steps aside; Show everything brings it back. */
+html[data-workout-focus="1"] nav[aria-label="Main sections"] {
+  display: none;
 }

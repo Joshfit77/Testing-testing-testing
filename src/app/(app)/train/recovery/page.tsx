@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, Clock, HeartPulse, Leaf, ShieldAlert } from "lucide-react";
+import { Clock, HeartPulse, Leaf, ShieldAlert } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { CheckinForm } from "@/components/recovery/checkin-form";
 import { Button } from "@/components/ui/button";
@@ -31,10 +31,8 @@ export default async function RecoveryPage() {
 
   return (
     <div className="space-y-6">
-      <Link href="/train" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="size-4" aria-hidden /> Train
-      </Link>
       <PageHeader
+        back={{ href: "/train", label: "Train" }}
         eyebrow="Recovery"
         title="Recovery & mobility"
         description="Check in on how you feel, then choose the right amount of training. Guidance here is general and not medical treatment."

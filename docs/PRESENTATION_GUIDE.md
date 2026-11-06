@@ -67,8 +67,8 @@ One take, about 30 seconds. Start on the opening.
 | 0:10 | 2 Home | **Explore with sample data** | Home | "Demo Athlete, 28, eight weeks into training. Home shows today's workout, food, reminders and last night's sleep." |
 | 0:25 | 4 Live workout | Train › **Start workout early** › tick set 1 › **Skip** on the rest timer | Log a set | "The plan picks today's workout. A set is one tap; the rest timer starts on its own." |
 | 0:45 | 5 Exercise demos | Back, tap **Barbell Back Squat** | Every exercise demonstrated | "Every exercise has an animated demonstration you can slow to half speed." |
-| 0:55 | 7 Nutrition | Food tab | Food diary | "The food diary counts against the member's own targets." |
-| 1:10 | 9 Ingredients | **Nutrition Score** › **Search by name**, or Food › Check a label | Ingredients explained | "Ingredients are explained with what regulators say and how strong the evidence is. Presence isn't treated as proof of harm." |
+| 0:55 | 7 Nutrition | Nutrition tab | Food diary | "The food diary counts against the member's own targets." |
+| 1:10 | 9 Ingredients | **Nutrition Score** › **Search by name**, or Nutrition › More tools › Check a label | Ingredients explained | "Ingredients are explained with what regulators say and how strong the evidence is. Presence isn't treated as proof of harm." |
 | 1:25 | 13 Faith | Faith tab | Faith: free | "The Faith section is free: a reading plan with a daily Bible reading and prayer." |
 | 1:40 | 19 Free vs Pro | Profile › **Plans & billing**, tap **Yearly** | $149.99 a year · $19.99 a month | "Free to start. Pro All Access is $149.99 a year, or $19.99 a month. Nothing is charged in this demo." |
 | 1:55 | 20 Close | Home | | "That's Narrow Gate Fitness." |
@@ -134,7 +134,7 @@ yet:** rehearse it twice; at a calm pace it should fit inside 90 seconds, but ch
 
 ### 3:30–4:10 · Nutrition (stops 7 and 9)
 
-- **Next** › Food: "Thirty days of logged food. Today against target, water, and what's left."
+- **Next** › Nutrition: "Thirty days of logged food. Today against target, water, and what's left."
 - **Next** twice (skip the photo) › Check a label. Paste: `Water, sugar, citric acid, sodium benzoate, sucralose,
   natural flavours.` › **Check these ingredients**.
 - **Voiceover:** "For a packaged food, the app explains each additive: what regulators have said, how strong the
@@ -196,7 +196,7 @@ The same 20 stops at about a minute each, plus these deeper moments. Leave 3–4
   history** to show it saved.
 - **Stop 5:** Train › **Exercises**: the library of 157, with filters.
 - **Stop 6:** ask "Review my training" and show the app's own tool result behind the simulated wording.
-- **Stop 7:** **Meal planner** and **Grocery list** from the Food page.
+- **Stop 7:** **Meal planner** and **Grocery list** from the Nutrition page (under More tools).
 - **Stop 9:** with internet, **Scan it** › type the barcode of a product you brought; the product page shows its
   nutrition, ingredients and allergens from Open Food Facts. Never type a made-up code.
 - **Stop 11:** Overview charts and personal records.

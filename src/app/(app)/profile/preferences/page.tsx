@@ -1,5 +1,3 @@
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { OnboardingWizard } from "@/components/onboarding/onboarding-wizard";
 import type { DietaryPreference, Equipment, ExperienceLevel, PrimaryGoal, ProgramType, SecondaryGoal } from "@/lib/domain/types";
@@ -26,10 +24,7 @@ export default async function PreferencesPage({ searchParams }: { searchParams: 
   ]);
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <Link href="/profile" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="size-4" aria-hidden /> Profile
-      </Link>
-      <PageHeader title="Training preferences" description="Update any onboarding answer. Optionally rebuild your starter program from the new answers." />
+      <PageHeader back={{ href: "/profile", label: "You" }} title="Training preferences" description="Update any onboarding answer. Optionally rebuild your starter program from the new answers." />
       {a?.primary_goal && profile.birth_year && profile.height_cm && w?.weight_kg && (
         <SchedulePreview
           answers={{

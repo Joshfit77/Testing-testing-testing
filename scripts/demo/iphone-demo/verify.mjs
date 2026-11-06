@@ -62,7 +62,7 @@ await tapHot("Explore with sample data");
 c = await cur(); await shot("home");
 check("welcome → Today (/home), tab bar shown", c.key === "/home" && c.nav, `${c.key} nav=${c.nav}`);
 // Tab bar
-for (const [label, key] of [["Train", "/train"], ["Food", "/nutrition"], ["Faith", "/faith"], ["Run", "/run"], ["Home", "/home"]]) {
+for (const [label, key] of [["Train", "/train"], ["Nutrition", "/nutrition"], ["Faith", "/faith"], ["You", "/profile"], ["Home", "/home"]]) {
   await page.locator("#navhot .hs", { hasText: "" }).filter({ has: page.locator(`xpath=self::*[@aria-label='${label}']`) }).first().tap().catch(async () => page.locator(`#navhot .hs[aria-label="${label}"]`).tap());
   await page.waitForTimeout(600);
   c = await cur();
@@ -71,7 +71,7 @@ for (const [label, key] of [["Train", "/train"], ["Food", "/nutrition"], ["Faith
 await shot("home-again");
 // Back
 await page.locator("#back").tap(); await page.waitForTimeout(500); c = await cur();
-check("back returns to the previous screen", c.key === "/run", c.key);
+check("back returns to the previous screen", c.key === "/profile", c.key);
 // Workout flow
 await page.locator('#navhot .hs[aria-label="Train"]').tap(); await page.waitForTimeout(600);
 await tapHot("Start workout|Start today|Resume workout");

@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Dumbbell, Footprints, Lock, Moon, PersonStan
 import { ActionButton } from "@/components/common/action-button";
 import { MoveSession } from "@/components/calendar/move-session";
 import { MainHeader } from "@/components/shell/main-header";
+import { BackLink } from "@/components/platform/back-link";
 import { buildCalendar, isIsoDate, isMonth, monthGrid, shiftMonth, type CalendarDay, type CalendarEntry, type CompletedItem } from "@/lib/domain/calendar";
 import { activeMinutes } from "@/lib/domain/activity-week";
 import { addDays, isoDateInTz, startOfWeek } from "@/lib/domain/dates";
@@ -98,6 +99,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="space-y-4">
+      <BackLink href="/home">Home</BackLink>
       <MainHeader title="Training calendar" subtitle="Workouts, runs, walks, planned sessions and rest days." />
 
       <div className="flex items-center justify-between gap-2">

@@ -17,7 +17,7 @@ import { copyMealsAction, logFoodAction, updateBudgetAction } from "@/server/act
 import { useDraft } from "@/lib/use-draft";
 import { DraftRestoredNotice } from "@/components/drafts/draft-notice";
 
-function ResultLine({ result }: { result: ActionState | null }) {
+export function ResultLine({ result }: { result: ActionState | null }) {
   if (!result?.message) return null;
   return (
     <p role={result.ok ? "status" : "alert"} className={result.ok ? "text-sm text-[#5fc49a]" : "text-sm text-[#f08a8a]"}>

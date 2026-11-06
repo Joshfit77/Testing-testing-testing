@@ -34,7 +34,7 @@ export function PracticesPanel({ practices, checkins, today }: { practices: Prac
     <div className="space-y-4">
       {practices.length > 0 && (
         <>
-          <div className="scrollbar-none -mx-1 flex gap-1.5 overflow-x-auto px-1" role="group" aria-label="Day to check off">
+          <div className="grid grid-cols-7 gap-1" role="group" aria-label="Day to check off">
             {days.map((d) => {
               const l = dayLabel(d, today);
               return (
@@ -42,15 +42,15 @@ export function PracticesPanel({ practices, checkins, today }: { practices: Prac
                   key={d}
                   type="button"
                   aria-pressed={d === day}
-                  aria-label={l.long}
                   onClick={() => setDay(d)}
                   className={cn(
-                    "flex min-h-12 min-w-12 shrink-0 flex-col items-center justify-center rounded-xl border px-2 text-xs font-semibold",
+                    "flex min-h-12 min-w-0 flex-col items-center justify-center rounded-xl border px-1 text-xs font-semibold",
                     d === day ? "border-gold bg-gold/12 text-gold-highlight" : "border-border bg-elevated/50 text-muted-foreground",
                   )}
                 >
                   <span>{l.short}</span>
                   <span className="tabular-nums">{Number(d.slice(8))}</span>
+                  <span className="sr-only">, {l.long}</span>
                 </button>
               );
             })}

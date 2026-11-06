@@ -299,7 +299,7 @@ test.describe("live GPS runs and walks", () => {
     // In-app navigation only (the page's JavaScript, and the kept recording, stay alive): Home, then Profile.
     await page.getByRole("navigation", { name: "Main sections" }).getByRole("link", { name: "Home" }).click();
     await expect(page.getByTestId("active-run-pill")).toBeVisible();
-    await page.getByRole("link", { name: /^Profile and settings for/ }).first().click();
+    await page.getByRole("navigation", { name: "Main sections" }).getByRole("link", { name: "You" }).click();
     await page.waitForURL(/\/profile/);
     await page.locator("main").getByRole("button", { name: "Sign out" }).click();
     await page.waitForURL(/\/login/);

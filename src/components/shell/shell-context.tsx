@@ -3,11 +3,14 @@
 import { createContext, useContext } from "react";
 
 export interface ShellUser {
+  userId: string;
   displayName: string;
   plan: string;
+  /** Today's date (YYYY-MM-DD) in the member's time zone, for Quick Add. */
+  today: string;
 }
 
-const ShellUserContext = createContext<ShellUser>({ displayName: "Athlete", plan: "" });
+const ShellUserContext = createContext<ShellUser>({ userId: "", displayName: "Athlete", plan: "", today: "" });
 
 export const ShellUserProvider = ShellUserContext.Provider;
 

@@ -687,7 +687,7 @@ test.describe("AI coach", () => {
     await completeOnboarding(page);
     await grantPlan(email, "plus");
     await page.goto("/nutrition");
-    await page.getByRole("navigation", { name: "Food tools" }).getByRole("link", { name: "Meal photo" }).click();
+    await page.getByRole("link", { name: "Meal photo" }).first().click();
     await expect(page.getByText("Included with Pro")).toBeVisible();
 
     await grantPlan(email, "pro");

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Activity, BarChart3, BookmarkCheck, CalendarDays, ChevronRight, Dumbbell, HeartPulse, History, Pause, Plus, Wand2 } from "lucide-react";
+import { Activity, BarChart3, BookmarkCheck, CalendarDays, ChevronDown, ChevronRight, Dumbbell, Footprints, HeartPulse, History, Pause, Plus, Wand2 } from "lucide-react";
 import { ActionButton } from "@/components/common/action-button";
 import { TodayWorkoutAction } from "@/components/home/today-workout-action";
 import { MainHeader } from "@/components/shell/main-header";
@@ -17,7 +17,13 @@ import { isoDateInTz } from "@/lib/domain/dates";
 export const metadata = { title: "Train" };
 
 const card = "rounded-2xl border border-border bg-card";
+const row = `${card} flex min-h-14 items-center gap-3 px-4 py-3 hover:border-gold-muted`;
 
+/**
+ * Train: today's session with Start on the first screen, then running (GPS runs and walks live here now), the
+ * program, the exercise library and the calendar. Builder, history, templates, recovery and the training review are
+ * one tap further, under "More training tools" (nothing was removed).
+ */
 export default async function TrainPage() {
   const { user, profile } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
@@ -33,93 +39,72 @@ export default async function TrainPage() {
   const canReview = (await getAiAllowance(user.id, plan)).chatLimit > 0;
   const today = active?.today ?? null;
   const todayIso = isoDateInTz(new Date(), tz);
-  // The calendar may have the next session planned (or moved) to a later day.
-  // (With no active program both are absent, so compare only when there is a session and a day.)
   const first = schedule?.planned[0];
   const next = first && today && first.dayId === today.id ? first : null;
   const plannedLater = next && next.date > todayIso ? next : null;
-  const plannedLabel = plannedLater
-    ? new Date(`${plannedLater.date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" })
-    : null;
+  const plannedLabel = plannedLater ? new Date(`${plannedLater.date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" }) : null;
   const startHref = today && active ? `/train/workout?day=${today.id}&up=${active.userProgramId}` : "/train/workout?blank=1";
 
   const tools = [
-    { href: "/train/programs", icon: BarChart3, label: "Programs" },
-    { href: "/train/exercises", icon: Dumbbell, label: "Exercises" },
     { href: "/train/build", icon: Wand2, label: canBuild ? "Program builder" : "Program builder (Pro)" },
     { href: "/train/history", icon: History, label: "Workout history" },
     { href: "/train/templates", icon: BookmarkCheck, label: "My workouts" },
     { href: "/train/workout?blank=1", icon: Plus, label: "Empty workout" },
     { href: "/train/recovery", icon: HeartPulse, label: "Recovery" },
     { href: "/train/review", icon: Activity, label: canReview ? "Training review" : "Training review (Pro)" },
-    { href: "/calendar", icon: CalendarDays, label: "Training calendar" },
   ];
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <MainHeader title="Train" />
 
-      <section aria-labelledby="program-title">
-        <div className="mb-2 flex items-center justify-between">
-          <h2 id="program-title" className="text-lg font-semibold">
-            Your program
+      <section aria-labelledby="today-title" className={`${card} overflow-hidden`}>
+        <div className="px-4 pt-4">
+          <h2 id="today-title" className="text-sm font-semibold text-muted-foreground">
+            Today&apos;s workout
           </h2>
-          <Link href="/train/programs" className="inline-flex min-h-11 items-center px-1 text-sm font-semibold text-gold-highlight hover:underline">
-            View all
-          </Link>
-        </div>
-        {active ? (
-          <Link href={`/train/programs/${active.programSlug}`} className={`${card} flex min-h-16 items-center gap-3 px-4 py-3 hover:border-gold-muted`}>
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-border bg-elevated text-gold">
-              <Dumbbell className="size-5" aria-hidden />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate font-semibold">{active.programName}</span>
-              <span className="block truncate text-sm text-muted-foreground">
-                Week {active.currentWeek} of {active.durationWeeks}
-                {active.isDeload ? " · Deload week" : active.weekFocus ? ` · ${active.weekFocus}` : ""}
+          {active && (
+            <Link href={`/train/programs/${active.programSlug}`} className="mt-1 flex min-h-11 items-center gap-2 text-sm font-semibold text-gold-highlight hover:underline">
+              <span className="min-w-0 truncate">{active.programName}</span>
+              <span className="shrink-0 text-muted-foreground">
+                · Week {active.currentWeek} of {active.durationWeeks}
+                {active.isDeload ? " · Deload" : ""}
               </span>
-            </span>
-            <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
-          </Link>
-        ) : (
-          <div className={`${card} p-4`}>
-            <p className="font-semibold">No active program</p>
-            <p className="mt-1 text-sm text-muted-foreground">Build one around your goals, start one from the library, or log a free workout.</p>
-            {/* The builder is Pro; Free members get the program library first (it has free programs). */}
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <Button asChild variant={canBuild ? "default" : "secondary"}>
-                <Link href="/train/build">{canBuild ? "Build my program" : "Build (Pro)"}</Link>
-              </Button>
-              <Button asChild variant={canBuild ? "secondary" : "default"}>
-                <Link href="/train/programs">Browse programs</Link>
-              </Button>
+              <ChevronRight className="size-4 shrink-0" aria-hidden />
+            </Link>
+          )}
+        </div>
+        {today ? (
+          <>
+            <div className="flex items-center gap-3 px-4 py-3">
+              <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-gold/12 text-gold">
+                <Dumbbell className="size-6" aria-hidden />
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-lg font-semibold">{today.name}</span>
+                <span className="block text-sm text-muted-foreground">
+                  {[today.estimated_minutes ? `${today.estimated_minutes} min` : null, `${today.exercises.length} exercise${today.exercises.length === 1 ? "" : "s"}`].filter(Boolean).join(" · ")}
+                </span>
+              </span>
             </div>
-          </div>
-        )}
-      </section>
-
-      <section aria-labelledby="today-title">
-        <h2 id="today-title" className="mb-2 text-lg font-semibold">
-          Today&apos;s workout
-        </h2>
-        <div className={`${card} overflow-hidden`}>
-          {today ? (
-            <>
-              <div className="flex items-center gap-3 border-b border-border px-4 py-3">
-                <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-gold/12 text-gold">
-                  <Dumbbell className="size-6" aria-hidden />
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-lg font-semibold">{today.name}</span>
-                  <span className="block text-sm text-muted-foreground">
-                    {[today.estimated_minutes ? `${today.estimated_minutes} min` : null, `${today.exercises.length} exercise${today.exercises.length === 1 ? "" : "s"}`]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </span>
-                </span>
-              </div>
-              <ul className="divide-y divide-border" aria-label="Exercises">
+            <div className="px-4">
+              <TodayWorkoutAction userId={user.id} startHref={startHref} serverInProgress={(inProgressRes.data?.name as string | undefined) ?? null} {...(plannedLater ? { startLabel: "Start workout early" } : {})} />
+              {plannedLater && (
+                <p className="pt-2 text-center text-sm text-muted-foreground">
+                  Planned for {plannedLabel}
+                  {plannedLater.moved ? " (moved)" : ""} ·{" "}
+                  <Link href={`/calendar?day=${plannedLater.date}`} className="font-semibold text-gold-highlight hover:underline">
+                    Open calendar
+                  </Link>
+                </p>
+              )}
+            </div>
+            <details className="group mt-2 border-t border-border">
+              <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-4 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+                <span>{today.exercises.length} exercises in this session</span>
+                <ChevronDown className="size-5 text-gold transition-transform group-open:rotate-180" aria-hidden />
+              </summary>
+              <ul className="divide-y divide-border border-t border-border" aria-label="Exercises">
                 {today.exercises.map((e, i) => (
                   <li key={e.id}>
                     <Link href={`/train/exercises/${e.exercise.slug}`} className="flex min-h-14 items-center gap-3 px-4 py-2 hover:bg-elevated/50">
@@ -129,8 +114,7 @@ export default async function TrainPage() {
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-medium">{e.exercise.name}</span>
                         <span className="block text-sm text-muted-foreground">
-                          {e.sets} {e.sets === 1 ? "set" : "sets"} ×{" "}
-                          {e.reps ? `${e.reps} reps` : e.duration_seconds ? formatDuration(e.duration_seconds) : "—"}
+                          {e.sets} {e.sets === 1 ? "set" : "sets"} × {e.reps ? `${e.reps} reps` : e.duration_seconds ? formatDuration(e.duration_seconds) : "—"}
                         </span>
                       </span>
                       <ChevronRight className="size-4 shrink-0 text-gold" aria-hidden />
@@ -138,48 +122,83 @@ export default async function TrainPage() {
                   </li>
                 ))}
               </ul>
-              <div className="space-y-1 p-4 pt-3">
-                {plannedLater && (
-                  <p className="pb-1 text-sm text-muted-foreground">
-                    Planned for {plannedLabel}
-                    {plannedLater.moved ? " (moved)" : ""} ·{" "}
-                    <Link href={`/calendar?day=${plannedLater.date}`} className="font-semibold text-gold-highlight hover:underline">
-                      Open calendar
-                    </Link>
-                  </p>
-                )}
-                <TodayWorkoutAction
-                  userId={user.id}
-                  startHref={startHref}
-                  serverInProgress={(inProgressRes.data?.name as string | undefined) ?? null}
-                  {...(plannedLater ? { startLabel: "Start workout early" } : {})}
-                />
+              <div className="p-3">
                 <ActionButton action={pauseActiveProgramAction} fields={{}} variant="ghost" className="w-full" confirmMessage="Pause this program? You can resume it from Programs.">
                   <Pause aria-hidden /> Pause program
                 </ActionButton>
               </div>
-            </>
-          ) : (
-            <div className="p-4">
-              <p className="text-sm text-muted-foreground">
-                {active ? "You've finished this program. Choose your next one, or log a free workout." : "No scheduled session. Log a free workout any time."}
-              </p>
-              <div className="mt-3">
-                <TodayWorkoutAction userId={user.id} startHref={startHref} serverInProgress={(inProgressRes.data?.name as string | undefined) ?? null} />
+            </details>
+          </>
+        ) : (
+          <div className="p-4 pt-2">
+            <p className="text-sm text-muted-foreground">
+              {active ? "You've finished this program. Choose your next one, or log a free workout." : "No active program. Build one around your goals, start one from the library, or log a free workout."}
+            </p>
+            <div className="mt-3 space-y-2">
+              <TodayWorkoutAction userId={user.id} startHref={startHref} serverInProgress={(inProgressRes.data?.name as string | undefined) ?? null} />
+              {/* The builder is Pro; Free members get the program library first (it has free programs). */}
+              <div className="grid grid-cols-2 gap-2">
+                <Button asChild variant={canBuild ? "default" : "secondary"}>
+                  <Link href="/train/build">{canBuild ? "Build my program" : "Build (Pro)"}</Link>
+                </Button>
+                <Button asChild variant={canBuild ? "secondary" : "default"}>
+                  <Link href="/train/programs">Browse programs</Link>
+                </Button>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </section>
 
-      <nav aria-label="Training tools" className="grid grid-cols-2 gap-2">
-        {tools.map((t, i) => (
-          <Link key={t.href} href={t.href} className={`${card} ${i === tools.length - 1 && tools.length % 2 === 1 ? "col-span-2" : ""} flex min-h-14 items-center gap-2.5 px-3 py-2 text-[0.9375rem] font-medium leading-tight hover:border-gold-muted`}>
-            <t.icon className="size-5 shrink-0 text-gold" aria-hidden />
-            <span className="min-w-0 flex-1">{t.label}</span>
-          </Link>
-        ))}
+      <nav aria-label="Training sections" className="space-y-2">
+        <Link href="/run" className={row}>
+          <Footprints className="size-5 shrink-0 text-gold" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Run &amp; walk</span>
+            <span className="block truncate text-sm text-muted-foreground">GPS runs and walks, running plans, records</span>
+          </span>
+          <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
+        </Link>
+        <Link href="/train/programs" className={row}>
+          <BarChart3 className="size-5 shrink-0 text-gold" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Programs</span>
+            <span className="block truncate text-sm text-muted-foreground">{active ? `Active: ${active.programName}` : "Strength, muscle, conditioning, sport and running plans"}</span>
+          </span>
+          <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
+        </Link>
+        <Link href="/train/exercises" className={row}>
+          <Dumbbell className="size-5 shrink-0 text-gold" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Exercises</span>
+            <span className="block truncate text-sm text-muted-foreground">The library, with demonstrations and your history for each</span>
+          </span>
+          <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
+        </Link>
+        <Link href="/calendar" className={row}>
+          <CalendarDays className="size-5 shrink-0 text-gold" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Training calendar</span>
+            <span className="block truncate text-sm text-muted-foreground">Workouts, runs, walks, planned sessions and rest days</span>
+          </span>
+          <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
+        </Link>
       </nav>
+
+      <details className={`group ${card}`} data-testid="train-tools">
+        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between px-4 text-[0.9375rem] font-semibold [&::-webkit-details-marker]:hidden">
+          <span>More training tools</span>
+          <ChevronDown className="size-5 text-gold transition-transform group-open:rotate-180" aria-hidden />
+        </summary>
+        <nav aria-label="Training tools" className="grid grid-cols-2 gap-2 px-3 pb-3">
+          {tools.map((t) => (
+            <Link key={t.href} href={t.href} className="flex min-h-14 items-center gap-2.5 rounded-xl border border-border bg-elevated/50 px-3 py-2 text-[0.9375rem] font-medium leading-tight hover:border-gold-muted">
+              <t.icon className="size-5 shrink-0 text-gold" aria-hidden />
+              <span className="min-w-0 flex-1">{t.label}</span>
+            </Link>
+          ))}
+        </nav>
+      </details>
     </div>
   );
 }

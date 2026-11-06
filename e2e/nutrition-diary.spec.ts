@@ -1,6 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
 import { completeOnboarding, grantPlan, signUpAndConfirm, uniqueEmail } from "./helpers";
 
+/** The Nutrition page keeps its deeper tools in collapsed groups; open them all so every part is on the page. */
+async function openGroups(page: Page) {
+  await page.locator("main details").evaluateAll((ds) => ds.forEach((d) => ((d as HTMLDetailsElement).open = true)));
+}
+
 const num = async (page: Page, id: string) => Number((await page.getByTestId(id).innerText()).replace(/[^\d-]/g, ""));
 
 async function quickAdd(page: Page, meal: string, calories: string) {
@@ -20,6 +25,7 @@ test.describe("food diary (MyFitnessPal style)", () => {
     await grantPlan(email, "plus");
 
     await page.goto("/nutrition");
+    await openGroups(page);
     // Maintenance = Mifflin-St Jeor (1785) × 1.375 ≈ 2455 → 2,460 kcal goal at "maintain".
     await expect(page.getByTestId("budget-goal")).toHaveText("2460");
     expect(await num(page, "budget-food")).toBe(0);

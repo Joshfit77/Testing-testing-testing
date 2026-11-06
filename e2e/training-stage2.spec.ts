@@ -65,6 +65,7 @@ test.describe("training stage 2B", () => {
     await completeOnboarding(page);
 
     await page.goto("/train");
+    await page.getByTestId("train-tools").locator("summary").click();
     await page.getByRole("navigation", { name: "Training tools" }).getByRole("link", { name: "My workouts" }).click();
     await page.waitForURL(/\/train\/templates$/);
     await expect(page.getByText("No saved workouts yet")).toBeVisible();
@@ -117,6 +118,7 @@ test.describe("training stage 2B", () => {
     const lastTimes = page.getByTestId("last-time");
     await expect(lastTimes.filter({ hasText: "Last time: 1×8 @ 100 lb" })).toBeVisible();
     await expect(lastTimes.filter({ hasText: "Last time: 1 × 40 yd @ 50 lb" })).toBeVisible();
+    await page.getByTestId("workout-more").locator("summary").click();
     await page.getByRole("button", { name: "Discard workout" }).click();
     await page.getByRole("button", { name: "Discard", exact: true }).click();
     await page.waitForURL(/\/train$/);

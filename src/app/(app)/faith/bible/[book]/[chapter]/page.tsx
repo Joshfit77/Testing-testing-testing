@@ -48,6 +48,24 @@ export default async function ChapterPage({ params, searchParams }: { params: Pr
         </Link>
       </header>
 
+      {/* Chapter turns at the top as well as the bottom: visible buttons, never a swipe. */}
+      <nav aria-label="Chapter navigation" className="mx-auto flex max-w-[38rem] items-center justify-between gap-2 pb-1">
+        {prev ? (
+          <Link href={chapterHref(prev.book, prev.chapter)} aria-label={`Previous chapter, ${chapterLabel(prev.book, prev.chapter)}`} className="inline-flex min-h-11 items-center gap-1 rounded-full border border-border px-3 text-sm font-semibold text-foreground hover:border-gold-muted">
+            <ChevronLeft className="size-4 text-gold" aria-hidden /> {chapterLabel(prev.book, prev.chapter)}
+          </Link>
+        ) : (
+          <span />
+        )}
+        {next ? (
+          <Link href={chapterHref(next.book, next.chapter)} aria-label={`Next chapter, ${chapterLabel(next.book, next.chapter)}`} className="inline-flex min-h-11 items-center gap-1 rounded-full border border-border px-3 text-sm font-semibold text-foreground hover:border-gold-muted">
+            {chapterLabel(next.book, next.chapter)} <ChevronRight className="size-4 text-gold" aria-hidden />
+          </Link>
+        ) : (
+          <span />
+        )}
+      </nav>
+
       <ChapterReader
         key={`${book.id}.${chapter}`}
         bookId={book.id}

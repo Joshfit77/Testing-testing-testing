@@ -12,6 +12,11 @@ import { BAR_CODE } from "./off-mock";
 // Open Food Facts is answered by the shared mock in off-mock.ts, started by global-setup.ts.
 const OFF_PORT = Number(process.env.E2E_OFF_MOCK_PORT ?? 0);
 
+/** The Nutrition page keeps its deeper tools in collapsed groups; open them all so every part is on the page. */
+async function openGroups(page: Page) {
+  await page.locator("main details").evaluateAll((ds) => ds.forEach((d) => ((d as HTMLDetailsElement).open = true)));
+}
+
 async function openAddFood(page: Page) {
   await page.getByRole("button", { name: "Add food" }).click();
   const dialog = page.getByRole("dialog");
@@ -26,6 +31,7 @@ test.describe("food amounts (MyFitnessPal style)", () => {
     await signUpAndConfirm(page, email);
     await completeOnboarding(page);
     await page.goto("/nutrition");
+    await openGroups(page);
 
     // Empty search: browse chips and popular foods.
     let dialog = await openAddFood(page);

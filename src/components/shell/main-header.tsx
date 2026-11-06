@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { MessageCircle } from "lucide-react";
-import { LogoMark } from "@/components/common/logo";
+import { MessageCircle, Search } from "lucide-react";
+import { QuickAddButton } from "./quick-add";
 import { cn } from "@/lib/utils";
 import { initials, useShellUser } from "./shell-context";
 
@@ -18,7 +18,8 @@ export function CoachButton({ className }: { className?: string }) {
     >
       <span className="inline-flex h-[2.125rem] items-center gap-1.5 rounded-full border border-gold/90 bg-black/30 px-3 text-sm font-semibold text-gold-highlight transition-colors group-hover:bg-gold/10 group-focus-visible:ring-2 group-focus-visible:ring-gold-highlight">
         <MessageCircle className="size-4" aria-hidden />
-        AI Coach
+        <span className="hidden min-[360px]:inline">AI Coach</span>
+        <span className="min-[360px]:hidden">Coach</span>
       </span>
     </Link>
   );
@@ -40,23 +41,32 @@ export function ProfileButton({ className }: { className?: string }) {
   );
 }
 
+/** Unified search: exercises, programs, foods, recipes, the Bible and settings in one place. */
+export function SearchButton({ className }: { className?: string }) {
+  return (
+    <Link href="/search" aria-label="Search" className={cn("group inline-flex size-11 shrink-0 items-center justify-center rounded-full focus-visible:outline-none", className)}>
+      <span className="flex size-[2.125rem] items-center justify-center rounded-full border border-border bg-black/30 text-foreground transition-colors group-hover:border-gold-muted group-focus-visible:ring-2 group-focus-visible:ring-gold-highlight">
+        <Search className="size-4" aria-hidden />
+      </span>
+    </Link>
+  );
+}
+
 /**
- * Header for every main screen (Home, Train, Run, Food, Faith and their main sub-screens):
- * title at left, then the AI Coach pill and the profile icon at right (SPEC §2).
+ * Header for every main screen (Home, Train, Nutrition, Faith, You and their main sub-screens): the title at left;
+ * Search, Quick Add and the AI Coach at right. One row on phones (the You tab replaced the old avatar row, so the
+ * header no longer spends a row on the logo and a profile link); desktop keeps the avatar for the sidebar layout.
  */
 export function MainHeader({ title, subtitle, right, className }: { title: React.ReactNode; subtitle?: React.ReactNode; right?: React.ReactNode; className?: string }) {
+  const { userId, today } = useShellUser();
   return (
-    <header className={cn("mb-5", className)}>
-      <div className="flex items-center justify-between gap-2 md:hidden">
-        <Link href="/home" aria-label="Narrow Gate Fitness home" className="-ml-1 inline-flex size-11 items-center justify-center">
-          <LogoMark className="size-8" />
-        </Link>
-        <ProfileButton className="-mr-1" />
-      </div>
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="min-w-0 font-display text-[1.625rem] font-bold leading-tight tracking-tight md:text-[1.75rem]">{title}</h1>
-        <div className="flex shrink-0 items-center gap-1">
+    <header className={cn("mb-4", className)}>
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="min-w-0 truncate font-display text-[1.625rem] font-bold leading-tight tracking-tight md:text-[1.75rem]">{title}</h1>
+        <div className="flex shrink-0 items-center gap-0.5">
           {right}
+          <SearchButton />
+          {userId && <QuickAddButton userId={userId} today={today} />}
           <CoachButton />
           <ProfileButton className="hidden md:inline-flex" />
         </div>

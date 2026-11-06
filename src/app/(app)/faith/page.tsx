@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BellRing, BookMarked, BookOpen, Brain, ChevronRight, Flame, GraduationCap, MessageCircleQuestion, NotebookPen, Route, Search, Sparkles } from "lucide-react";
+import { BellRing, BookMarked, BookOpen, Brain, ChevronRight, Flame, GraduationCap, MessageCircleQuestion, NotebookPen, Route, Search, Sparkles, SlidersHorizontal } from "lucide-react";
 import { MainHeader } from "@/components/shell/main-header";
 import { EmptyState } from "@/components/common/states";
 import { FaithChallenge } from "@/components/faith/faith-challenge";
@@ -12,6 +12,7 @@ import { devotionalForDate } from "@/lib/domain/challenge";
 import { verseExcerpt } from "@/lib/domain/scripture";
 import { addDays, isoDateInTz, startOfWeek } from "@/lib/domain/dates";
 import { describeFaithReminder, FAITH_REMINDER_INFO } from "@/lib/faith-reminders";
+import { parseLayoutPrefs, type FaithSection } from "@/lib/layout-prefs";
 import { cn } from "@/lib/utils";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
@@ -40,6 +41,11 @@ function devotionalRedLetter(): Record<number, TextPart[]> {
 
 export const metadata = { title: "Faith" };
 
+const card = "rounded-2xl border border-border bg-card";
+const h2 = "text-lg font-semibold";
+/** A folded section's title row: a full-width, 44 px tap target. */
+const summary = "flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-4 text-lg font-semibold [&::-webkit-details-marker]:hidden";
+
 export default async function FaithPage({ searchParams }: { searchParams: Promise<{ theme?: string }> }) {
   const sp = await searchParams;
   const { user, profile } = await requireOnboardedUser();
@@ -50,6 +56,9 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
   const motivation = FAITH_MOTIVATIONS[new Date(`${today}T00:00:00Z`).getUTCDate() % FAITH_MOTIVATIONS.length];
   const theme = sp.theme && sp.theme in THEME_LABELS ? (sp.theme as FaithTheme) : null;
   const scriptures = theme ? SCRIPTURES.filter((s) => s.themes.includes(theme)) : SCRIPTURES;
+  // Sections the member chose to hide (You → Customize Home). The quick actions and Bible tools are always there.
+  const hidden = new Set<FaithSection>(parseLayoutPrefs(profile.layout_prefs).faith?.hidden ?? []);
+  const show = (s: FaithSection) => !hidden.has(s);
 
   const [journalRes, journalCountRes, practiceData, devotionalsRes, challenge, reminders, journey, goals, reading] = await Promise.all([
     supabase.from("faith_journal_entries").select(JOURNAL_SELECT).eq("user_id", user.id).order("entry_date", { ascending: false }).order("created_at", { ascending: false }).limit(3),
@@ -75,42 +84,61 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
   const journal = (journalRes.data ?? []) as unknown as JournalRow[];
   const journalCount = journalCountRes.count ?? journal.length;
   const remindersOn = reminders.filter((r) => r.enabled);
+  const readHref = reading ? chapterHref(reading.book, reading.chapter, reading.verse ?? undefined) : "/faith/bible";
+  const quickAction = `${card} flex min-h-14 flex-col items-center justify-center gap-1 px-2 py-2 text-center text-sm font-semibold leading-tight hover:border-gold-muted`;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <MainHeader title="Faith" />
 
-      <TodayCard userId={user.id} journey={journey} goals={goals} />
+      {/* The three things members open Faith for, on the first screen: read, today's devotional, pray. */}
+      <nav aria-label="Faith quick actions" className="grid grid-cols-3 gap-2">
+        <Link href={readHref} className={quickAction}>
+          <BookOpen className="size-6 text-gold" aria-hidden />
+          <span>{reading ? "Continue reading" : "Read the Bible"}</span>
+          {reading && (
+            <span className="block max-w-full truncate text-xs font-normal text-muted-foreground">
+              {chapterLabel(reading.book, reading.chapter)}
+              {reading.verse ? `:${reading.verse}` : ""}
+            </span>
+          )}
+        </Link>
+        {show("challenge") ? (
+          <a href="#todays-devotional" className={quickAction}>
+            <Sparkles className="size-6 text-gold" aria-hidden />
+            <span>Today&apos;s devotional</span>
+            <span className="block text-xs font-normal text-muted-foreground">Day {devotionalForDate(challenge.today).day} of 40</span>
+          </a>
+        ) : (
+          <Link href="/faith/studies" className={quickAction}>
+            <GraduationCap className="size-6 text-gold" aria-hidden />
+            <span>Studies</span>
+          </Link>
+        )}
+        <Link href="/faith/journal/new?kind=daily" className={quickAction}>
+          <NotebookPen className="size-6 text-gold" aria-hidden />
+          <span>Write a prayer</span>
+          <span className="block text-xs font-normal text-muted-foreground">Private</span>
+        </Link>
+      </nav>
 
-      <Link
-        href={reading ? chapterHref(reading.book, reading.chapter, reading.verse ?? undefined) : "/faith/bible"}
-        className="flex min-h-16 items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 hover:border-gold-muted"
-      >
-        <BookOpen className="size-6 shrink-0 text-gold" aria-hidden />
-        <span className="min-w-0 flex-1">
-          <span className="block font-semibold">{reading ? "Continue reading" : "Bible"}</span>
-          <span className="block truncate text-sm text-muted-foreground">
-            {reading ? `${chapterLabel(reading.book, reading.chapter)}${reading.verse ? `:${reading.verse}` : ""} · Berean Standard Bible` : "The complete Berean Standard Bible: read, search, highlight and take notes."}
-          </span>
-        </span>
-        <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
-      </Link>
+      {show("today") && <TodayCard userId={user.id} journey={journey} goals={goals} />}
 
       <nav aria-label="Bible tools" className="grid grid-cols-4 gap-2">
         {tools.map(({ href, label, icon: Icon }) => (
-          <Link key={href} href={href} className="flex min-h-16 flex-col items-center justify-center gap-1 rounded-2xl border border-border bg-card text-xs font-semibold hover:border-gold-muted">
+          <Link key={href} href={href} className={`${card} flex min-h-16 flex-col items-center justify-center gap-1 text-xs font-semibold hover:border-gold-muted`}>
             <Icon className="size-5 text-gold" aria-hidden />
             {label}
           </Link>
         ))}
       </nav>
 
-      <section className="relative overflow-hidden rounded-2xl border border-border bg-card" aria-labelledby="verse-title">
+      <section className={`relative overflow-hidden ${card}`} aria-labelledby="verse-title">
         {/* Decorative original artwork; the verse is the content. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/illustrations/cross-dusk.svg" alt="" aria-hidden className="absolute inset-0 size-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/10" aria-hidden />
-        <div className="relative flex min-h-52 flex-col justify-end p-4 md:min-h-64 md:p-6">
+        <div className="relative flex min-h-44 flex-col justify-end p-4 md:min-h-56 md:p-6">
           <h2 id="verse-title" className="text-xs font-semibold text-champagne/90">
             Verse of the day
           </h2>
@@ -120,44 +148,50 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
           <p className="mt-1.5 text-sm text-white/85">{verse.reference} ({TRANSLATION.code})</p>
         </div>
       </section>
-      <h2 className="pt-2 font-display text-xl font-bold uppercase">Spiritual growth</h2>
-      <FaithChallenge
-        today={challenge.today}
-        rotatingDay={devotionalForDate(challenge.today).day}
-        enrollment={challenge.active ? { id: challenge.active.id, startedOn: challenge.active.startedOn } : null}
-        currentDay={challenge.currentDay}
-        checkins={challenge.checkins}
-        workoutDates={challenge.workoutDates}
-        lastCompletedAt={challenge.lastCompleted?.completedAt ?? null}
-        devotionalParts={devotionalRedLetter()}
-      />
+
+      {show("challenge") && (
+        <FaithChallenge
+          today={challenge.today}
+          rotatingDay={devotionalForDate(challenge.today).day}
+          enrollment={challenge.active ? { id: challenge.active.id, startedOn: challenge.active.startedOn } : null}
+          currentDay={challenge.currentDay}
+          checkins={challenge.checkins}
+          workoutDates={challenge.workoutDates}
+          lastCompletedAt={challenge.lastCompleted?.completedAt ?? null}
+          devotionalParts={devotionalRedLetter()}
+        />
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <section className="min-w-0 rounded-2xl border border-border bg-card p-4" aria-labelledby="practices-title">
-          <h2 id="practices-title" className="flex items-center gap-2 text-lg font-semibold">
-            <Sparkles className="size-5 text-gold" aria-hidden /> Daily practices
-          </h2>
-          <p className="mb-3 text-sm text-muted-foreground">Small, faithful habits. Check them off as you go; nothing here is graded.</p>
-          <PracticesPanel practices={practiceData.practices} checkins={practiceData.checkins} today={today} />
-        </section>
-
-        <section className="min-w-0 rounded-2xl border border-border bg-card p-4" aria-labelledby="journal-new">
-          <div className="mb-1 flex items-center justify-between gap-2">
-            <h2 id="journal-new" className="flex items-center gap-2 text-lg font-semibold">
-              <NotebookPen className="size-5 text-gold" aria-hidden /> Prayer journal
+        {show("practices") && (
+          <section className={`min-w-0 ${card} p-4`} aria-labelledby="practices-title">
+            <h2 id="practices-title" className={`flex items-center gap-2 ${h2}`}>
+              <Sparkles className="size-5 text-gold" aria-hidden /> Daily practices
             </h2>
-            <Link href="/faith/journal" className="inline-flex min-h-11 items-center gap-1 px-1 text-sm font-semibold text-gold-highlight hover:underline">
-              All entries{journalCount ? ` (${journalCount})` : ""} <ChevronRight className="size-4" aria-hidden />
-            </Link>
-          </div>
-          <p className="mb-3 text-sm text-muted-foreground">Prayers, praise and reflections. Private by default.</p>
-          <JournalForm today={today} defaultRef={verse.reference} />
-        </section>
+            <p className="mb-3 text-sm text-muted-foreground">Small, faithful habits. Check them off as you go; nothing here is graded.</p>
+            <PracticesPanel practices={practiceData.practices} checkins={practiceData.checkins} today={today} />
+          </section>
+        )}
+
+        {show("journal") && (
+          <section className={`min-w-0 ${card} p-4`} aria-labelledby="journal-new">
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <h2 id="journal-new" className={`flex items-center gap-2 ${h2}`}>
+                <NotebookPen className="size-5 text-gold" aria-hidden /> Prayer journal
+              </h2>
+              <Link href="/faith/journal" className="inline-flex min-h-11 items-center gap-1 px-1 text-sm font-semibold text-gold-highlight hover:underline">
+                All entries{journalCount ? ` (${journalCount})` : ""} <ChevronRight className="size-4" aria-hidden />
+              </Link>
+            </div>
+            <p className="mb-3 text-sm text-muted-foreground">Prayers, praise and reflections. Private by default.</p>
+            <JournalForm today={today} defaultRef={verse.reference} />
+          </section>
+        )}
       </div>
 
-      {journal.length > 0 && (
+      {show("journal") && journal.length > 0 && (
         <section aria-labelledby="entries-title">
-          <h2 id="entries-title" className="mb-2 text-lg font-semibold">
+          <h2 id="entries-title" className={`mb-2 ${h2}`}>
             Recent entries
           </h2>
           <ul className="grid gap-2 md:grid-cols-3">
@@ -170,7 +204,7 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
         </section>
       )}
 
-      <Link href="/profile/notifications#faith" className="flex min-h-14 items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 hover:border-gold-muted">
+      <Link href="/profile/notifications#faith" className={`${card} flex min-h-14 items-center gap-3 px-4 py-3 hover:border-gold-muted`}>
         <BellRing className="size-5 shrink-0 text-gold" aria-hidden />
         <span className="min-w-0 flex-1">
           <span className="block font-semibold">Faith reminders</span>
@@ -181,90 +215,115 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
         <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
       </Link>
 
-      <section className="rounded-2xl border border-border bg-card p-4 text-[0.9375rem]" aria-label="Today's verse in full">
-        <blockquote className="font-serif text-lg leading-relaxed">
-          &ldquo;
-          <ScriptureText parts={scriptureParts(verse.reference, verse.text)} />
-          &rdquo;
-        </blockquote>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {verse.reference} · {TRANSLATION.name} ({TRANSLATION.license})
-        </p>
-        <p className="mt-3">
-          <strong className="text-gold-highlight">Reflect:</strong> {verse.reflection}
-        </p>
-        <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
-          <Flame className="size-4 shrink-0 text-gold" aria-hidden /> {motivation}
-        </p>
-      </section>
+      {/* More to read, folded so the daily things above stay on the first screens. Each opens with one tap. */}
+      {show("reflection") && (
+        <details className={card} aria-label="Today's verse in full">
+          <summary className={summary}>
+            <span className="flex items-center gap-2">
+              <Flame className="size-5 text-gold" aria-hidden /> Today&apos;s verse, reflection and motivation
+            </span>
+            <ChevronRight className="size-4 shrink-0 text-gold transition-transform [details[open]_&]:rotate-90" aria-hidden />
+          </summary>
+          <div className="space-y-3 px-4 pb-4 text-[0.9375rem]">
+            <blockquote className="font-serif text-lg leading-relaxed">
+              &ldquo;
+              <ScriptureText parts={scriptureParts(verse.reference, verse.text)} />
+              &rdquo;
+            </blockquote>
+            <p className="text-sm text-muted-foreground">
+              {verse.reference} · {TRANSLATION.name} ({TRANSLATION.license})
+            </p>
+            <p>
+              <strong className="text-gold-highlight">Reflect:</strong> {verse.reflection}
+            </p>
+            <p className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Flame className="size-4 shrink-0 text-gold" aria-hidden /> {motivation}
+            </p>
+          </div>
+        </details>
+      )}
 
-      <section aria-labelledby="scripture-title">
-        <h2 id="scripture-title" className="mb-3 flex items-center gap-2 font-display text-xl font-bold uppercase">
-          <BookOpen className="size-5 text-gold" aria-hidden /> Scripture by theme
-        </h2>
-        <nav aria-label="Themes" className="scrollbar-none -mx-4 mb-4 flex gap-2 overflow-x-auto px-4">
-          <Link href="/faith#scripture-title" aria-current={!theme ? "page" : undefined} className={cn("inline-flex min-h-11 shrink-0 items-center rounded-full border px-4 text-sm font-semibold", !theme ? "border-gold bg-gold/10 text-gold-highlight" : "border-border text-muted-foreground")}>
-            All
-          </Link>
-          {(Object.keys(THEME_LABELS) as (FaithTheme | "other")[])
-            .filter((t) => t !== "other")
-            .map((t) => (
-              <Link
-                key={t}
-                href={`/faith?theme=${t}#scripture-title`}
-                aria-current={theme === t ? "page" : undefined}
-                className={cn("inline-flex min-h-11 shrink-0 items-center rounded-full border px-4 text-sm font-semibold", theme === t ? "border-gold bg-gold/10 text-gold-highlight" : "border-border text-muted-foreground")}
-              >
-                {THEME_LABELS[t]}
+      {show("themes") && (
+        <details className={card} open={Boolean(theme)}>
+          <summary className={summary} id="scripture-title">
+            <span className="flex items-center gap-2">
+              <BookOpen className="size-5 text-gold" aria-hidden /> Scripture by theme
+            </span>
+            <ChevronRight className="size-4 shrink-0 text-gold transition-transform [details[open]_&]:rotate-90" aria-hidden />
+          </summary>
+          <section className="px-4 pb-4" aria-labelledby="scripture-title">
+            {/* Every theme is a visible button; the row wraps rather than scrolling sideways. */}
+            <nav aria-label="Themes" className="mb-4 flex flex-wrap gap-2">
+              <Link href="/faith#scripture-title" aria-current={!theme ? "page" : undefined} className={cn("inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-semibold", !theme ? "border-gold bg-gold/10 text-gold-highlight" : "border-border text-muted-foreground")}>
+                All
               </Link>
-            ))}
-        </nav>
-        <ul className="grid gap-3 md:grid-cols-2">
-          {scriptures.map((s) => (
-            <li key={s.reference} className="rounded-2xl border border-border bg-card p-4">
-              <p className="text-sm italic">
-                &ldquo;
-                <ScriptureText parts={scriptureParts(s.reference, s.text)} />
-                &rdquo;
-              </p>
-              <p className="mt-2 text-xs font-semibold text-gold">{s.reference} ({TRANSLATION.code})</p>
-              <div className="mt-2 flex flex-wrap gap-1">
-                {s.themes.map((t) => (
-                  <Badge key={t} variant="secondary">
+              {(Object.keys(THEME_LABELS) as (FaithTheme | "other")[])
+                .filter((t) => t !== "other")
+                .map((t) => (
+                  <Link
+                    key={t}
+                    href={`/faith?theme=${t}#scripture-title`}
+                    aria-current={theme === t ? "page" : undefined}
+                    className={cn("inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-semibold", theme === t ? "border-gold bg-gold/10 text-gold-highlight" : "border-border text-muted-foreground")}
+                  >
                     {THEME_LABELS[t]}
-                  </Badge>
+                  </Link>
                 ))}
-              </div>
-            </li>
-          ))}
-        </ul>
-      </section>
+            </nav>
+            <ul className="grid gap-3 md:grid-cols-2">
+              {scriptures.map((s) => (
+                <li key={s.reference} className="rounded-xl border border-border bg-elevated/40 p-4">
+                  <p className="text-sm italic">
+                    &ldquo;
+                    <ScriptureText parts={scriptureParts(s.reference, s.text)} />
+                    &rdquo;
+                  </p>
+                  <p className="mt-2 text-xs font-semibold text-gold">{s.reference} ({TRANSLATION.code})</p>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {s.themes.map((t) => (
+                      <Badge key={t} variant="secondary">
+                        {THEME_LABELS[t]}
+                      </Badge>
+                    ))}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </details>
+      )}
 
-      <section aria-labelledby="devotionals-title">
-        <h2 id="devotionals-title" className="mb-3 font-display text-xl font-bold uppercase">
-          Devotionals
-        </h2>
-        {(devotionalsRes.data ?? []).length ? (
-          <ul className="grid gap-3 md:grid-cols-3">
-            {(devotionalsRes.data ?? []).map((d) => (
-              <li key={d.id as string} className="rounded-2xl border border-border bg-card p-4">
-                <p className="font-display text-lg font-semibold uppercase">{d.title as string}</p>
-                {d.scripture_ref && <p className="text-xs text-gold">{d.scripture_ref as string}</p>}
-                <p className="mt-2 text-sm text-muted-foreground">{d.body as string}</p>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <EmptyState title="No devotionals published yet" />
-        )}
-      </section>
+      {show("devotionals") && (
+        <details className={card}>
+          <summary className={summary} id="devotionals-title">
+            <span className="flex items-center gap-2">
+              <GraduationCap className="size-5 text-gold" aria-hidden /> Devotionals
+            </span>
+            <ChevronRight className="size-4 shrink-0 text-gold transition-transform [details[open]_&]:rotate-90" aria-hidden />
+          </summary>
+          <section className="px-4 pb-4" aria-labelledby="devotionals-title">
+            {(devotionalsRes.data ?? []).length ? (
+              <ul className="grid gap-3 md:grid-cols-3">
+                {(devotionalsRes.data ?? []).map((d) => (
+                  <li key={d.id as string} className="rounded-xl border border-border bg-elevated/40 p-4">
+                    <p className="text-lg font-semibold">{d.title as string}</p>
+                    {d.scripture_ref && <p className="text-xs text-gold">{d.scripture_ref as string}</p>}
+                    <p className="mt-2 text-sm text-muted-foreground">{d.body as string}</p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <EmptyState title="No devotionals published yet" />
+            )}
+          </section>
+        </details>
+      )}
 
-      <p className="text-sm text-muted-foreground">
-        Faith is always here in its own tab. You can hide the Scripture card on Home in{" "}
-        <Link href="/profile#display" className="font-semibold text-gold-highlight underline">
-          Profile &amp; Settings
+      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+        <Link href="/profile/customize" className="inline-flex min-h-11 items-center gap-1 font-semibold text-gold-highlight hover:underline">
+          <SlidersHorizontal className="size-4" aria-hidden /> Customize this screen
         </Link>
-        .
+        <span>Faith is always here in its own tab; the Scripture card on Home can be turned off in You.</span>
       </p>
       <ScriptureNotice />
     </div>

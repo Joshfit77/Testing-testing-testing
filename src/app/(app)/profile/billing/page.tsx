@@ -1,5 +1,3 @@
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { Notice } from "@/components/common/states";
 import { PortalButton } from "@/components/profile/billing-buttons";
@@ -87,10 +85,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
 
   return (
     <div className="space-y-6">
-      <Link href="/profile" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="size-4" aria-hidden /> Profile
-      </Link>
-      <PageHeader eyebrow="Membership" title="Plans & billing" description="Free, or Pro All Access monthly or yearly. Change or cancel any time." />
+      <PageHeader back={{ href: "/profile", label: "You" }} eyebrow="Membership" title="Plans & billing" description="Free, or Pro All Access monthly or yearly. Change or cancel any time." />
 
       {isDemoMode() && (
         <Notice tone="warning">

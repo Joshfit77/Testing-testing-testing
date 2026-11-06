@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { NotificationTodaySync } from "@/components/notifications/notification-sync";
-import { BarChart3, BookMarked, Camera, ScanBarcode, CalendarClock, CalendarDays, ChevronLeft, ChevronRight, CookingPot, Pill, Salad, Scale, ShoppingCart, Trash2, TrendingUp } from "lucide-react";
+import { BarChart3, BookMarked, Camera, ScanBarcode, CalendarClock, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, CookingPot, Pill, Salad, Scale, ShoppingCart, Trash2, TrendingUp } from "lucide-react";
 import { BarSeriesChart } from "@/components/charts/charts";
 import { MainHeader } from "@/components/shell/main-header";
 import { BudgetForm, CopyMealButton, QuickAddDialog } from "@/components/nutrition/diary-client";
@@ -40,8 +40,26 @@ import { DIETS, fitsDiet, isDietType } from "@/lib/domain/diets";
 import { MEAL_TYPES } from "@/lib/domain/meals";
 import { exerciseForDay } from "@/lib/domain/exercise-energy";
 import { DayMarkControls } from "@/components/nutrition/day-mark";
+import { QuickRelog } from "@/components/nutrition/quick-relog";
+import { isMinor } from "@/lib/layout-prefs";
 
-export const metadata = { title: "Food" };
+export const metadata = { title: "Nutrition" };
+
+/** A collapsed group of the page's deeper tools: open on demand, nothing removed. */
+function Group({ id, title, hint, children, open = false }: { id: string; title: string; hint?: string; children: React.ReactNode; open?: boolean }) {
+  return (
+    <details id={id} className="group rounded-2xl border border-border bg-card" open={open} data-testid={`group-${id}`}>
+      <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+        <span className="min-w-0">
+          <span className="block text-lg font-semibold">{title}</span>
+          {hint && <span className="block truncate text-sm text-muted-foreground">{hint}</span>}
+        </span>
+        <ChevronDown className="size-5 shrink-0 text-gold transition-transform group-open:rotate-180" aria-hidden />
+      </summary>
+      <div className="space-y-4 border-t border-border p-4">{children}</div>
+    </details>
+  );
+}
 
 interface MealRow {
   id: string;
@@ -113,7 +131,7 @@ function editableItem(i: MealRow["meal_items"][number], mealType: string, favori
   };
 }
 
-export default async function NutritionPage({ searchParams }: { searchParams: Promise<{ date?: string }> }) {
+export default async function NutritionPage({ searchParams }: { searchParams: Promise<{ date?: string; add?: string }> }) {
   const sp = await searchParams;
   const { user, profile } = await requireOnboardedUser();
   // The food diary, search, barcode scanning and macros are free on every plan.
@@ -240,10 +258,14 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
 
   // Weight goal.
   const weeksLeft = ctx?.budget && ctx.goalWeightKg ? weeksToGoal(ctx.weightKg, ctx.goalWeightKg, ctx.budget.effectiveWeeklyChangeKg) : null;
+  // Members under 18 keep the whole food log, macros and water; the weight projection and pace framing are not shown
+  // to them (an age-appropriate safeguard, not a limit on anything they can log or do).
+  const minor = isMinor(profile.birth_year);
+  const h2 = "text-lg font-semibold";
 
   return (
-    <div className="space-y-6">
-      <MainHeader title="Food" />
+    <div className="space-y-4">
+      <MainHeader title="Nutrition" />
       {date === today && (
         <NotificationTodaySync
           today={today}
@@ -256,7 +278,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
           }}
         />
       )}
-      <nav className="-mt-4 -mb-1 flex items-center justify-center gap-2" aria-label="Choose day">
+      <nav className="-mt-3 flex items-center justify-center gap-2" aria-label="Choose day">
         <Button asChild variant="ghost" size="icon" aria-label="Previous day">
           <Link href={`/nutrition?date=${addDays(date, -1)}`}>
             <ChevronLeft aria-hidden />
@@ -277,50 +299,42 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
         </Button>
       </nav>
 
-      <section aria-labelledby="food-iq-cta" className="rounded-2xl border border-gold/70 bg-gradient-to-br from-gold/12 via-card to-card p-4 shadow-bronze md:p-5" data-testid="food-iq-cta">
-        <div className="flex items-start gap-3">
-          <span className="grid size-11 shrink-0 place-items-center rounded-xl border border-gold-muted/60 bg-elevated">
-            <ScanBarcode className="size-6 text-gold" aria-hidden />
-          </span>
-          <div className="min-w-0">
-            <p id="food-iq-cta" className="font-display text-xs font-bold uppercase tracking-[0.16em] text-gold">
-              {NUTRITION_FEATURE_TITLE}
-            </p>
-            <p className="mt-1 text-[1.0625rem] font-semibold leading-snug">Scan a packaged food&apos;s barcode to review its nutrition and ingredients.</p>
-            <p className="mt-1 text-sm text-muted-foreground">Additives, sweeteners, preservatives and added sugars from the declared ingredient list, each with what regulators say, how strong the evidence is and where it comes from. It reads the label and product data; it doesn&apos;t test the food itself.</p>
-          </div>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Button asChild size="lg">
-            <Link href="/nutrition/scanner">
-              <ScanBarcode aria-hidden /> Scan a product
-            </Link>
-          </Button>
-          <Button asChild size="lg" variant="secondary">
-            <Link href="/nutrition/scanner#search">Search by name</Link>
-          </Button>
-        </div>
-      </section>
+      {/* Logging first: the three ways to add food, on the first screen, each a full-height button. */}
+      <div className="grid grid-cols-3 gap-2" data-testid="log-actions">
+        <AddFoodDialog date={date} myFoods={myFoods} commonFoods={commonFoods} remoteSearch={remoteSearch} categories={categories} dietName={diet.name} recent={recent} frequent={frequent} favorites={favorites} autoOpen={sp.add === "1"} />
+        <Button asChild variant="secondary" className="h-auto min-h-14 flex-col gap-1 py-2 [&_svg]:size-5">
+          <Link href="/nutrition/scanner">
+            <ScanBarcode aria-hidden /> Scan barcode
+          </Link>
+        </Button>
+        <Button asChild variant="secondary" className="h-auto min-h-14 flex-col gap-1 py-2 [&_svg]:size-5">
+          <Link href={`/nutrition/photo?date=${date}`}>
+            <Camera aria-hidden /> Meal photo
+          </Link>
+        </Button>
+      </div>
 
-      <section className="rounded-2xl border border-border bg-card p-4 md:p-5" aria-labelledby="totals-title">
+      <QuickRelog date={date} recent={recent} frequent={frequent} />
+
+      <section id="totals" className="rounded-2xl border border-border bg-card p-4" aria-labelledby="totals-title">
         <h2 id="totals-title" className="sr-only">
           Daily totals
         </h2>
-        <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-center">
+        <div className="flex items-center gap-4">
           <ProgressRing
-            size={176}
-            stroke={12}
+            size={128}
+            stroke={10}
             ariaLabel="Calories eaten of daily goal"
             value={progressPct(totals.calories, goals?.calories ?? 0)}
-            label={<span className="text-3xl font-bold tabular-nums">{Math.round(totals.calories).toLocaleString()}</span>}
+            label={<span className="text-2xl font-bold tabular-nums">{Math.round(totals.calories).toLocaleString()}</span>}
             sublabel={
               <>
-                <span className="block text-sm text-foreground/90">calories eaten</span>
-                {goals && <span className="mt-1 block">{goals.calories.toLocaleString()} daily goal</span>}
+                <span className="block text-xs text-foreground/90">calories</span>
+                {goals && <span className="block text-xs">of {goals.calories.toLocaleString()}</span>}
               </>
             }
           />
-          <dl className="w-full flex-1 space-y-3">
+          <dl className="min-w-0 flex-1 space-y-2.5">
             {(
               [
                 ["Protein", totals.protein_g, goals?.protein_g, "protein_g"],
@@ -328,162 +342,54 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
                 ["Fat", totals.fat_g, goals?.fat_g, "fat_g"],
               ] as const
             ).map(([l, v, g, key]) => (
-              <div key={l} className="grid grid-cols-[4.5rem_6.5rem_1fr] items-center gap-2 text-[0.9375rem]">
+              <div key={l} className="flex flex-wrap items-baseline justify-between gap-x-2 text-[0.9375rem]">
                 <dt className="font-semibold">{l}</dt>
                 <dd className="tabular-nums text-muted-foreground" data-incomplete={incomplete.includes(key) ? "true" : undefined}>
                   {incomplete.includes(key) ? <span title="At least: some entries don't list this macro">≥ </span> : null}
                   {Math.round(v)}
                   {g ? ` / ${g}` : ""} g
                 </dd>
-                <dd>
+                <dd className="mt-1 basis-full">
                   <ProgressBar value={g ? progressPct(v, g) : 0} label={`${l} progress`} />
                 </dd>
               </div>
             ))}
           </dl>
         </div>
-        {anyEstimate && <p className="mt-3 text-sm text-gold">Includes estimated entries (marked “estimate”).</p>}
+        {goals && remaining != null && (
+          <p className="mt-3 text-sm text-muted-foreground">
+            <span className={`font-semibold tabular-nums ${remaining < 0 ? "text-[#f08a8a]" : "text-gold-highlight"}`}>{remaining}</span> kcal remaining today
+            {exercise ? ` (after ${exercise} from exercise)` : ""}.
+          </p>
+        )}
+        {anyEstimate && <p className="mt-2 text-sm text-gold">Includes estimated entries (marked “estimate”).</p>}
         {incomplete.length > 0 && (
-          <p className="mt-3 text-sm text-gold" data-testid="incomplete-macros">
+          <p className="mt-2 text-sm text-gold" data-testid="incomplete-macros">
             {incomplete.map((k) => ({ protein_g: "Protein", carbs_g: "Carbs", fat_g: "Fat" })[k]).join(", ")} {incomplete.length === 1 ? "is" : "are"} a minimum: some entries don&apos;t list{" "}
             {incomplete.length === 1 ? "it" : "them"} (shown as “—”).
           </p>
         )}
-        {!goals && <p className="mt-3 text-sm text-muted-foreground">Set targets below to see progress.</p>}
-      </section>
-
-      <div className="space-y-2">
-        <div className="[&>button]:w-full">
-          <AddFoodDialog date={date} myFoods={myFoods} commonFoods={commonFoods} remoteSearch={remoteSearch} categories={categories} dietName={diet.name} recent={recent} frequent={frequent} favorites={favorites} />
-        </div>
-        <nav aria-label="Food tools" className="grid grid-cols-2 gap-2">
-          {(
-            [
-              ["/nutrition/scanner", NUTRITION_SCORE_LABEL, ScanBarcode],
-              [`/nutrition/photo?date=${date}`, "Meal photo", Camera],
-              ["/nutrition/recipes", "Recipes", CookingPot],
-              ["/nutrition/saved-meals", "Saved meals", BookMarked],
-              ["/nutrition/planner", "Meal planner", CalendarDays],
-              ["/nutrition/grocery", "Grocery list", ShoppingCart],
-              ["/nutrition/insights", "Insights", BarChart3],
-              ["/nutrition/supplements", "Supplements", Pill],
-            ] as const
-          ).map(([href, text, Icon]) => (
-            <Link key={href} href={href} className="flex min-h-12 items-center gap-2 rounded-2xl border border-border bg-card px-3 text-[0.9375rem] font-medium hover:border-gold-muted">
-              <Icon className="size-4 shrink-0 text-gold" aria-hidden />
-              <span className="min-w-0 flex-1">{text}</span>
-            </Link>
-          ))}
-        </nav>
-      </div>
-
-      <section aria-labelledby="budget-strip-title" className="rounded-2xl border border-gold-muted/60 bg-card-gradient p-4">
-        <h2 id="budget-strip-title" className="text-sm font-semibold text-gold">
-          Calories remaining
-        </h2>
-        {goals && remaining != null ? (
-          <>
-            <div className="mt-3 grid grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] items-center gap-1 text-center" data-testid="budget-equation">
-              <div>
-                <p className="font-display text-xl font-bold tabular-nums sm:text-2xl" data-testid="budget-goal">{goals.calories}</p>
-                <p className="text-xs text-muted-foreground">Goal</p>
-              </div>
-              <span className="text-muted-foreground" aria-hidden>−</span>
-              <div>
-                <p className="font-display text-xl font-bold tabular-nums sm:text-2xl" data-testid="budget-food">{food}</p>
-                <p className="text-xs text-muted-foreground">Food</p>
-              </div>
-              <span className="text-muted-foreground" aria-hidden>+</span>
-              <div>
-                <p className="font-display text-xl font-bold tabular-nums sm:text-2xl" data-testid="budget-exercise">{exercise}</p>
-                <p className="text-xs text-muted-foreground">Exercise (est.)</p>
-              </div>
-              <span className="text-muted-foreground" aria-hidden>=</span>
-              <div>
-                <p className={`font-display text-xl font-bold tabular-nums sm:text-2xl ${remaining < 0 ? "text-[#f08a8a]" : "text-gold-highlight"}`} data-testid="budget-remaining">
-                  {remaining}
-                </p>
-                <p className="text-xs text-muted-foreground">Remaining</p>
-              </div>
-            </div>
-            <p className="sr-only">
-              Goal {goals.calories} minus food {food} plus exercise {exercise} equals {remaining} calories remaining.
-            </p>
-            <p className="mt-2 text-xs text-muted-foreground">{goals.is_estimate ? "Goal is an estimate." : "Goal is your custom target."}</p>
-            {ex ? (
-              <div className="mt-2 text-xs text-muted-foreground" data-testid="exercise-breakdown">
-                <p>
-                  Exercise (estimate): workouts {ex.workouts}
-                  {workouts.length ? ` (${workoutMins} min)` : ""} + runs and walks {ex.activities} + extra steps {ex.steps}.
-                </p>
-                <p className="mt-0.5">
-                  {ex.baseline == null
-                    ? "Steps aren't added until your daily activity level is set, because we can't tell which steps your budget already covers."
-                    : `Your activity level already covers about ${ex.baseline.toLocaleString()} steps a day${ex.stepsFromActivities ? `, and about ${ex.stepsFromActivities.toLocaleString()} steps belong to the runs and walks counted above` : ""}; only steps beyond that add calories (${ex.extraSteps.toLocaleString()} of ${ex.stepCount.toLocaleString()} today), so nothing is counted twice.`}
-                </p>
-              </div>
-            ) : (
-              <p className="mt-2 text-xs text-muted-foreground">Log your bodyweight to estimate exercise calories.</p>
-            )}
-            {projected != null && (
-              <p className="mt-2 flex items-start gap-2 rounded-xl border border-border bg-card/60 px-3 py-2 text-sm" data-testid="projection">
-                <TrendingUp className="mt-0.5 size-4 shrink-0 text-gold" aria-hidden />
-                <span>
-                  If every day were like today, you&apos;d weigh about <span className="font-semibold">{formatWeight(projected, units)}</span> in 5 weeks.
-                  <span className="block text-xs text-muted-foreground">An estimate from today&apos;s food and exercise, not a prediction.</span>
-                </span>
-              </p>
-            )}
-          </>
-        ) : (
-          <p className="mt-2 text-sm text-muted-foreground">Set your daily targets below to see your calories remaining.</p>
+        {!goals && (
+          <p className="mt-2 text-sm text-muted-foreground">
+            No daily target set: log food without counting, or set one under{" "}
+            <a href="#targets" className="font-semibold text-gold-highlight underline">
+              Targets &amp; calorie budget
+            </a>
+            .
+          </p>
         )}
       </section>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
-        <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="nutrients-title">
-          <div data-testid="nutrient-totals">
-            <h2 id="nutrients-title" className="text-lg font-semibold">Nutrients</h2>
-            {!(nutrients.fiber.count || nutrients.sugar.count || nutrients.sodium.count) ? (
-              <p className="mt-1 text-xs text-muted-foreground">Fiber, sugar and sodium appear here for foods logged from the food database or a barcode.</p>
-            ) : (
-              <dl className="mt-2 grid grid-cols-3 gap-2 text-center">
-                {(
-                  [
-                    ["Fiber", nutrients.fiber, "g", "nutrient-fiber"],
-                    ["Sugar", nutrients.sugar, "g", "nutrient-sugar"],
-                    ["Sodium", nutrients.sodium, "mg", "nutrient-sodium"],
-                  ] as const
-                ).map(([l, t, u, id]) => (
-                  <div key={l} className="rounded-xl border border-border bg-card/60 p-2">
-                    <dt className="text-xs text-muted-foreground">{l}</dt>
-                    <dd className="font-semibold tabular-nums" data-testid={id}>
-                      {t.count ? `${u === "mg" ? Math.round(t.total) : Math.round(t.total * 10) / 10} ${u}` : "—"}
-                    </dd>
-                    <dd className="text-xs text-muted-foreground">
-                      {t.count === nutrients.items ? "all foods" : `from ${t.count} of ${nutrients.items} foods with data`}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            )}
-          </div>
-          {goals && goals.calories - totals.calories > 0 && (
-            <p className="mt-3 text-sm text-muted-foreground">{Math.round(goals.calories - totals.calories)} kcal remaining for the day.</p>
-          )}
-        </section>
-
-        <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="water-title">
-          <h2 id="water-title" className="mb-3 font-display text-lg font-semibold uppercase">
-            Water
-          </h2>
-          <WaterCard date={date} totalMl={water} goalMl={goals?.water_ml ?? 2500} />
-        </section>
-      </div>
+      <section className="rounded-2xl border border-border bg-card p-4" aria-labelledby="water-title">
+        <h2 id="water-title" className={`mb-2 ${h2}`}>
+          Water
+        </h2>
+        <WaterCard date={date} totalMl={water} goalMl={goals?.water_ml ?? 2500} />
+      </section>
 
       <section aria-labelledby="meals-title" className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 id="meals-title" className="font-display text-2xl font-bold uppercase">
+          <h2 id="meals-title" className={h2}>
             Meals
           </h2>
           <div className="flex flex-wrap items-center gap-2">
@@ -503,7 +409,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
           return (
             <div key={type} className="rounded-2xl border border-border bg-card p-4" data-testid={`meal-${type}`}>
               <div className="mb-2 flex items-center justify-between">
-                <h3 className="font-display text-lg font-semibold uppercase">{title}</h3>
+                <h3 className="font-semibold">{title}</h3>
                 <span className="text-sm tabular-nums text-muted-foreground">
                   {Math.round(mt.calories)} kcal · {Math.round(mt.protein_g)}g protein
                 </span>
@@ -522,7 +428,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
                       <ActionButton
                         action={deleteMealItemAction}
                         fields={{ id: i.id }}
-                        size="icon-sm"
+                        size="icon"
                         variant="ghost"
                         aria-label={`Remove ${i.name}`}
                         confirmMessage={`Remove ${i.name} from ${title.toLowerCase()}?`}
@@ -551,7 +457,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
         })}
         {planned.length > 0 && (
           <div className="rounded-2xl border border-dashed border-gold-muted/60 bg-card/60 p-4">
-            <h3 className="mb-2 flex items-center gap-2 font-display text-lg font-semibold uppercase">
+            <h3 className="mb-2 flex items-center gap-2 font-semibold">
               <CalendarClock className="size-4 text-gold" aria-hidden /> Planned for this day
             </h3>
             <ul className="space-y-2">
@@ -560,8 +466,8 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
                   <span className="text-sm">
                     <span className="font-semibold capitalize">{m.meal_type}</span>: {m.meal_items.map((i) => i.name).join(", ")}
                   </span>
-                  <ActionButton action={markPlannedEatenAction} fields={{ mealId: m.id }} size="sm" variant="secondary">
-Mark eaten
+                  <ActionButton action={markPlannedEatenAction} fields={{ mealId: m.id }} size="sm" variant="secondary" className="min-h-11">
+                    Mark eaten
                   </ActionButton>
                 </li>
               ))}
@@ -570,7 +476,107 @@ Mark eaten
         )}
       </section>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      {/* The deeper tools, each a group that opens on demand. Nothing below is new or removed: it was all on the page. */}
+      <h2 className="pt-2 text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">More</h2>
+
+      <Group id="budget" title="Calories remaining & today's estimate" hint={goals && remaining != null ? `${remaining} kcal remaining · exercise ${exercise} (est.)` : "Set daily targets to see this"}>
+        <section aria-labelledby="budget-strip-title" className="rounded-xl border border-gold-muted/60 bg-card-gradient p-4">
+          <h3 id="budget-strip-title" className="text-sm font-semibold text-gold">
+            Calories remaining
+          </h3>
+          {goals && remaining != null ? (
+            <>
+              <div className="mt-3 grid grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] items-center gap-1 text-center" data-testid="budget-equation">
+                <div>
+                  <p className="font-display text-xl font-bold tabular-nums sm:text-2xl" data-testid="budget-goal">{goals.calories}</p>
+                  <p className="text-xs text-muted-foreground">Goal</p>
+                </div>
+                <span className="text-muted-foreground" aria-hidden>−</span>
+                <div>
+                  <p className="font-display text-xl font-bold tabular-nums sm:text-2xl" data-testid="budget-food">{food}</p>
+                  <p className="text-xs text-muted-foreground">Food</p>
+                </div>
+                <span className="text-muted-foreground" aria-hidden>+</span>
+                <div>
+                  <p className="font-display text-xl font-bold tabular-nums sm:text-2xl" data-testid="budget-exercise">{exercise}</p>
+                  <p className="text-xs text-muted-foreground">Exercise (est.)</p>
+                </div>
+                <span className="text-muted-foreground" aria-hidden>=</span>
+                <div>
+                  <p className={`font-display text-xl font-bold tabular-nums sm:text-2xl ${remaining < 0 ? "text-[#f08a8a]" : "text-gold-highlight"}`} data-testid="budget-remaining">
+                    {remaining}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Remaining</p>
+                </div>
+              </div>
+              <p className="sr-only">
+                Goal {goals.calories} minus food {food} plus exercise {exercise} equals {remaining} calories remaining.
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">{goals.is_estimate ? "Goal is an estimate." : "Goal is your custom target."}</p>
+              {ex ? (
+                <div className="mt-2 text-xs text-muted-foreground" data-testid="exercise-breakdown">
+                  <p>
+                    Exercise (estimate): workouts {ex.workouts}
+                    {workouts.length ? ` (${workoutMins} min)` : ""} + runs and walks {ex.activities} + extra steps {ex.steps}.
+                  </p>
+                  <p className="mt-0.5">
+                    {ex.baseline == null
+                      ? "Steps aren't added until your daily activity level is set, because we can't tell which steps your budget already covers."
+                      : `Your activity level already covers about ${ex.baseline.toLocaleString()} steps a day${ex.stepsFromActivities ? `, and about ${ex.stepsFromActivities.toLocaleString()} steps belong to the runs and walks counted above` : ""}; only steps beyond that add calories (${ex.extraSteps.toLocaleString()} of ${ex.stepCount.toLocaleString()} today), so nothing is counted twice.`}
+                  </p>
+                </div>
+              ) : (
+                <p className="mt-2 text-xs text-muted-foreground">Log your bodyweight to estimate exercise calories.</p>
+              )}
+              {projected != null && !minor && (
+                <p className="mt-2 flex items-start gap-2 rounded-xl border border-border bg-card/60 px-3 py-2 text-sm" data-testid="projection">
+                  <TrendingUp className="mt-0.5 size-4 shrink-0 text-gold" aria-hidden />
+                  <span>
+                    If every day were like today, you&apos;d weigh about <span className="font-semibold">{formatWeight(projected, units)}</span> in 5 weeks.
+                    <span className="block text-xs text-muted-foreground">An estimate from today&apos;s food and exercise, not a prediction.</span>
+                  </span>
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="mt-2 text-sm text-muted-foreground">Set your daily targets below to see your calories remaining.</p>
+          )}
+        </section>
+      </Group>
+
+      <Group id="nutrients" title="Nutrients" hint="Fiber, sugar and sodium from today's foods">
+        <div data-testid="nutrient-totals">
+          <h3 id="nutrients-title" className="sr-only">Nutrients</h3>
+          {!(nutrients.fiber.count || nutrients.sugar.count || nutrients.sodium.count) ? (
+            <p className="text-xs text-muted-foreground">Fiber, sugar and sodium appear here for foods logged from the food database or a barcode.</p>
+          ) : (
+            <dl className="grid grid-cols-3 gap-2 text-center">
+              {(
+                [
+                  ["Fiber", nutrients.fiber, "g", "nutrient-fiber"],
+                  ["Sugar", nutrients.sugar, "g", "nutrient-sugar"],
+                  ["Sodium", nutrients.sodium, "mg", "nutrient-sodium"],
+                ] as const
+              ).map(([l, t, u, id]) => (
+                <div key={l} className="rounded-xl border border-border bg-card/60 p-2">
+                  <dt className="text-xs text-muted-foreground">{l}</dt>
+                  <dd className="font-semibold tabular-nums" data-testid={id}>
+                    {t.count ? `${u === "mg" ? Math.round(t.total) : Math.round(t.total * 10) / 10} ${u}` : "—"}
+                  </dd>
+                  <dd className="text-xs text-muted-foreground">
+                    {t.count === nutrients.items ? "all foods" : `from ${t.count} of ${nutrients.items} foods with data`}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          )}
+        </div>
+        {goals && goals.calories - totals.calories > 0 && (
+          <p className="text-sm text-muted-foreground">{Math.round(goals.calories - totals.calories)} kcal remaining for the day.</p>
+        )}
+      </Group>
+
+      <Group id="week" title="This week & history" hint={summary.daysLogged ? `${summary.average} kcal a day on average` : "Charts and your daily history"}>
         <div className="space-y-2">
           <BarSeriesChart
             title="This week"
@@ -605,11 +611,41 @@ Mark eaten
             </Link>
           </p>
         </div>
+        <BarSeriesChart
+          title="Last 14 days"
+          description="Calories logged per day"
+          data={history.map((d) => ({ date: d.date, calories: d.calories }))}
+          xKey="date"
+          xFormat="date"
+          decimals={0}
+          valueSuffix=" kcal"
+          series={[{ key: "calories", label: "Calories" }]}
+          emptyMessage="Your daily history will appear here."
+        />
+        <section aria-labelledby="history-title">
+          <h3 id="history-title" className="mb-2 font-semibold">
+            Daily history
+          </h3>
+          <ul className="max-h-64 space-y-1 overflow-y-auto text-sm">
+            {[...history].reverse().map((d) => (
+              <li key={d.date}>
+                <Link href={`/nutrition?date=${d.date}`} className="flex min-h-11 items-center justify-between rounded-lg px-2 hover:bg-elevated">
+                  <span className="text-muted-foreground">{d.date}</span>
+                  <span className="tabular-nums">
+                    {d.calories ? `${d.calories} kcal · P ${d.protein} · C ${d.carbs} · F ${d.fat}` : "—"}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      </Group>
 
-        <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="weight-goal-title">
-          <h2 id="weight-goal-title" className="mb-3 flex items-center gap-2 font-display text-lg font-semibold uppercase">
+      <Group id="weight" title="Weight goal" hint={ctx?.goalWeightKg ? `${formatWeight(ctx.weightKg, units)} now · goal ${formatWeight(ctx.goalWeightKg, units)}` : ctx ? `${formatWeight(ctx.weightKg, units)} now` : "Log your bodyweight to start"}>
+        <section aria-labelledby="weight-goal-title">
+          <h3 id="weight-goal-title" className="mb-3 flex items-center gap-2 font-semibold">
             <Scale className="size-4 text-gold" aria-hidden /> Weight goal
-          </h2>
+          </h3>
           {ctx ? (
             ctx.goalWeightKg ? (
               <div className="space-y-3">
@@ -630,101 +666,54 @@ Mark eaten
                 <ProgressBar value={weightGoalProgress(ctx.startWeightKg, ctx.weightKg, ctx.goalWeightKg)} label="Progress toward goal weight" />
                 <p className="text-sm text-muted-foreground">
                   {weightGoalProgress(ctx.startWeightKg, ctx.weightKg, ctx.goalWeightKg)}% of the way.{" "}
-                  {weeksLeft === 0
-                    ? "You've reached your goal weight."
-                    : weeksLeft != null
-                      ? `At ${paceLabel(ctx.budget!.effectiveWeeklyChangeKg, units).toLowerCase()}, estimated goal date ${formatLongDate(goalDate(today, weeksLeft))}.`
-                      : "Choose a pace toward your goal below to see an estimated goal date."}
+                  {minor
+                    ? null
+                    : weeksLeft === 0
+                      ? "You've reached your goal weight."
+                      : weeksLeft != null
+                        ? `At ${paceLabel(ctx.budget!.effectiveWeeklyChangeKg, units).toLowerCase()}, estimated goal date ${formatLongDate(goalDate(today, weeksLeft))}.`
+                        : "Choose a pace toward your goal below to see an estimated goal date."}
                 </p>
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
-                Current weight {formatWeight(ctx.weightKg, units)}. Set a goal weight under Daily targets to track progress toward it.
+                Current weight {formatWeight(ctx.weightKg, units)}. Set a goal weight under Targets to track progress toward it.
               </p>
             )
           ) : (
             <p className="text-sm text-muted-foreground">Log your bodyweight to start tracking a weight goal.</p>
           )}
-          <Button asChild variant="secondary" size="sm" className="mt-3">
+          <Button asChild variant="secondary" size="sm" className="mt-3 min-h-11">
             <Link href="/progress/overview#log-weight">Log weight</Link>
           </Button>
         </section>
-      </div>
+      </Group>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <BarSeriesChart
-          title="Last 14 days"
-          description="Calories logged per day"
-          data={history.map((d) => ({ date: d.date, calories: d.calories }))}
-          xKey="date"
-          xFormat="date"
-          decimals={0}
-          valueSuffix=" kcal"
-          series={[{ key: "calories", label: "Calories" }]}
-          emptyMessage="Your daily history will appear here."
-        />
-        <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="history-title">
-          <h2 id="history-title" className="mb-3 font-display text-lg font-semibold uppercase">
-            Daily history
-          </h2>
-          <ul className="max-h-64 space-y-1 overflow-y-auto text-sm">
-            {[...history].reverse().map((d) => (
-              <li key={d.date}>
-                <Link href={`/nutrition?date=${d.date}`} className="flex justify-between rounded-lg px-2 py-1.5 hover:bg-elevated">
-                  <span className="text-muted-foreground">{d.date}</span>
-                  <span className="tabular-nums">
-                    {d.calories ? `${d.calories} kcal · P ${d.protein} · C ${d.carbs} · F ${d.fat}` : "—"}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+      <Group id="targets" title="Targets & calorie budget" hint={goals ? `${goals.calories} kcal · P ${goals.protein_g} · C ${goals.carbs_g} · F ${goals.fat_g}${goals.is_estimate ? " (estimate)" : ""}` : "Optional: an estimate from your goal, or your own numbers"}>
+        <section aria-labelledby="targets-title">
+          <h3 id="targets-title" className="sr-only">
+            Daily targets
+          </h3>
+          <div className="mb-5 space-y-2 rounded-xl border border-border bg-elevated/40 p-4">
+            <h4 className="text-sm font-semibold">Calorie budget</h4>
+            <p className="text-xs text-muted-foreground">
+              Change your goal weight, weekly pace or daily activity and we&apos;ll recalculate your calories and macros (an estimate).
+              {ctx?.budget ? ` Maintenance is about ${ctx.budget.maintenance} kcal/day before workouts.` : ""}
+            </p>
+            <BudgetForm units={units} goalWeightKg={ctx?.goalWeightKg ?? null} weeklyChangeKg={ctx?.weeklyChangeKg ?? null} activity={ctx?.activity ?? null} />
+          </div>
+          <h4 className="mb-2 text-sm font-semibold">Custom targets</h4>
+          <p className="mb-3 text-xs text-muted-foreground">Prefer your own numbers? Enter them here; they replace the estimate until you recalculate.</p>
+          <GoalsForm goals={goals} />
         </section>
-      </div>
+      </Group>
 
-
-      <Link href="/nutrition/diets" className="lift flex items-center justify-between gap-3 rounded-2xl border border-gold-muted/60 bg-card-gradient p-4">
-        <span>
-          <span className="text-sm font-semibold text-gold">Your diet</span>
-          <span className="mt-1 block font-display text-xl font-semibold uppercase">{diet.name}</span>
-          <span className="block text-sm text-muted-foreground">{diet.eatingWindow ?? diet.tagline}</span>
-        </span>
-        <span className="shrink-0 text-sm font-semibold text-gold-highlight">Change</span>
-      </Link>
-
-      <Link href="/nutrition/supplements" className="lift flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-4">
-        <span>
-          <span className="flex items-center gap-2 font-display text-lg font-semibold uppercase">
-            <Pill className="size-4 text-gold" aria-hidden /> Supplements
-          </span>
-          <span className="block text-sm text-muted-foreground">Evidence, doses and your daily stack.</span>
-        </span>
-        <ChevronRight className="size-4 shrink-0 text-gold" aria-hidden />
-      </Link>
-
-      <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="targets-title">
-        <h2 id="targets-title" className="mb-3 font-display text-xl font-bold uppercase">
-          Daily targets
-        </h2>
-        <div className="mb-5 space-y-2 rounded-xl border border-border bg-elevated/40 p-4">
-          <h3 className="text-sm font-semibold">Calorie budget</h3>
-          <p className="text-xs text-muted-foreground">
-            Change your goal weight, weekly pace or daily activity and we&apos;ll recalculate your calories and macros (an estimate).
-            {ctx?.budget ? ` Maintenance is about ${ctx.budget.maintenance} kcal/day before workouts.` : ""}
-          </p>
-          <BudgetForm units={units} goalWeightKg={ctx?.goalWeightKg ?? null} weeklyChangeKg={ctx?.weeklyChangeKg ?? null} activity={ctx?.activity ?? null} />
-        </div>
-        <h3 className="mb-2 text-sm font-semibold">Custom targets</h3>
-        <p className="mb-3 text-xs text-muted-foreground">Prefer your own numbers? Enter them here; they replace the estimate until you recalculate.</p>
-        <GoalsForm goals={goals} />
-      </section>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="saved-title">
-          <h2 id="saved-title" className="mb-1 flex items-center gap-2 font-display text-xl font-bold uppercase">
+      <Group id="saved" title="Saved meals, recipes & my foods" hint={`${templates.length} saved ${templates.length === 1 ? "meal" : "meals"} · ${myFoods.length} of my foods`}>
+        <section aria-labelledby="saved-title">
+          <h3 id="saved-title" className="mb-1 flex items-center gap-2 font-semibold">
             <BookMarked className="size-5 text-gold" aria-hidden /> Saved meals
-          </h2>
-          <p className="mb-4 text-xs text-muted-foreground">Save any logged meal above with “Save as meal”, then log or plan it for any date.</p>
+          </h3>
+          <p className="mb-3 text-xs text-muted-foreground">Save any logged meal above with “Save as meal”, then log or plan it for any date.</p>
           <Link href="/nutrition/saved-meals" className="flex min-h-11 items-center justify-between gap-2 rounded-xl border border-border bg-elevated/40 px-3 py-2 text-[0.9375rem] hover:border-gold-muted">
             <span>
               {templates.length ? `${templates.length} saved ${templates.length === 1 ? "meal" : "meals"}` : "No saved meals yet"}
@@ -737,11 +726,11 @@ Mark eaten
           </Link>
           {upcoming.length > 0 && (
             <div className="mt-5">
-              <h3 className="mb-2 text-sm font-semibold">Meal plan · upcoming</h3>
+              <h4 className="mb-2 text-sm font-semibold">Meal plan · upcoming</h4>
               <ul className="space-y-1 text-sm">
                 {upcoming.map((m) => (
                   <li key={m.id}>
-                    <Link href={`/nutrition?date=${m.eaten_on}`} className="flex justify-between rounded-lg px-2 py-1 hover:bg-elevated">
+                    <Link href={`/nutrition?date=${m.eaten_on}`} className="flex min-h-11 items-center justify-between rounded-lg px-2 hover:bg-elevated">
                       <span className="capitalize text-muted-foreground">
                         {m.eaten_on} · {m.meal_type}
                       </span>
@@ -753,11 +742,10 @@ Mark eaten
             </div>
           )}
         </section>
-
-        <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="foods-title">
-          <h2 id="foods-title" className="mb-4 flex items-center gap-2 font-display text-xl font-bold uppercase">
+        <section aria-labelledby="foods-title" className="border-t border-border pt-4">
+          <h3 id="foods-title" className="mb-3 flex items-center gap-2 font-semibold">
             <Salad className="size-5 text-gold" aria-hidden /> My foods
-          </h2>
+          </h3>
           <CustomFoodForm />
           {myFoods.length > 0 && (
             <ul className="mt-5 divide-y divide-border">
@@ -770,15 +758,78 @@ Mark eaten
                       {f.source === "usda" ? " · USDA" : ""}
                     </span>
                   </span>
-                  <ActionButton action={deleteCustomFoodAction} fields={{ id: f.id }} size="icon-sm" variant="ghost" aria-label={`Delete ${f.name}`} confirmMessage={`Delete ${f.name} from My foods?`} confirmDetail="Entries you already logged stay in your diary." confirmLabel="Delete">
-<Trash2 aria-hidden />
+                  <ActionButton action={deleteCustomFoodAction} fields={{ id: f.id }} size="icon" variant="ghost" aria-label={`Delete ${f.name}`} confirmMessage={`Delete ${f.name} from My foods?`} confirmDetail="Entries you already logged stay in your diary." confirmLabel="Delete">
+                    <Trash2 aria-hidden />
                   </ActionButton>
                 </li>
               ))}
             </ul>
           )}
         </section>
-      </div>
+      </Group>
+
+      <Group id="tools" title="More tools" hint={`${NUTRITION_SCORE_LABEL}, recipes, planner, grocery list, insights, supplements, your diet`}>
+        <section aria-labelledby="food-iq-cta" className="rounded-xl border border-gold/70 bg-gradient-to-br from-gold/12 via-card to-card p-4 shadow-bronze" data-testid="food-iq-cta">
+          <div className="flex items-start gap-3">
+            <span className="grid size-11 shrink-0 place-items-center rounded-xl border border-gold-muted/60 bg-elevated">
+              <ScanBarcode className="size-6 text-gold" aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <p id="food-iq-cta" className="font-display text-xs font-bold uppercase tracking-[0.16em] text-gold">
+                {NUTRITION_FEATURE_TITLE}
+              </p>
+              <p className="mt-1 text-[1.0625rem] font-semibold leading-snug">Scan a packaged food&apos;s barcode to review its nutrition and ingredients.</p>
+              <p className="mt-1 text-sm text-muted-foreground">Additives, sweeteners, preservatives and added sugars from the declared ingredient list, each with what regulators say, how strong the evidence is and where it comes from. It reads the label and product data; it doesn&apos;t test the food itself.</p>
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button asChild size="lg">
+              <Link href="/nutrition/scanner">
+                <ScanBarcode aria-hidden /> Scan a product
+              </Link>
+            </Button>
+            <Button asChild size="lg" variant="secondary">
+              <Link href="/nutrition/scanner#search">Search by name</Link>
+            </Button>
+          </div>
+        </section>
+        <nav aria-label="Food tools" className="grid grid-cols-2 gap-2">
+          {(
+            [
+              ["/nutrition/scanner", NUTRITION_SCORE_LABEL, ScanBarcode],
+              [`/nutrition/photo?date=${date}`, "Meal photo", Camera],
+              ["/nutrition/recipes", "Recipes", CookingPot],
+              ["/nutrition/saved-meals", "Saved meals", BookMarked],
+              ["/nutrition/planner", "Meal planner", CalendarDays],
+              ["/nutrition/grocery", "Grocery list", ShoppingCart],
+              ["/nutrition/insights", "Insights", BarChart3],
+              ["/nutrition/supplements", "Supplements", Pill],
+            ] as const
+          ).map(([href, text, Icon]) => (
+            <Link key={href} href={href} className="flex min-h-12 items-center gap-2 rounded-xl border border-border bg-elevated/40 px-3 text-[0.9375rem] font-medium hover:border-gold-muted">
+              <Icon className="size-4 shrink-0 text-gold" aria-hidden />
+              <span className="min-w-0 flex-1">{text}</span>
+            </Link>
+          ))}
+        </nav>
+        <Link href="/nutrition/diets" className="lift flex min-h-14 items-center justify-between gap-3 rounded-xl border border-gold-muted/60 bg-card-gradient p-4">
+          <span>
+            <span className="text-sm font-semibold text-gold">Your diet</span>
+            <span className="mt-1 block text-lg font-semibold">{diet.name}</span>
+            <span className="block text-sm text-muted-foreground">{diet.eatingWindow ?? diet.tagline}</span>
+          </span>
+          <span className="shrink-0 text-sm font-semibold text-gold-highlight">Change</span>
+        </Link>
+        <Link href="/nutrition/supplements" className="lift flex min-h-14 items-center justify-between gap-3 rounded-xl border border-border bg-elevated/40 p-4">
+          <span>
+            <span className="flex items-center gap-2 font-semibold">
+              <Pill className="size-4 text-gold" aria-hidden /> Supplements
+            </span>
+            <span className="block text-sm text-muted-foreground">Evidence, doses and your daily stack.</span>
+          </span>
+          <ChevronRight className="size-4 shrink-0 text-gold" aria-hidden />
+        </Link>
+      </Group>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Award, CheckCircle2, ChevronLeft, Lock, Target, Trash2, Trophy } from "lucide-react";
+import { Award, CheckCircle2, Lock, Target, Trash2, Trophy } from "lucide-react";
 import { BarSeriesChart, CATEGORICAL, LineSeriesChart } from "@/components/charts/charts";
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState, Notice } from "@/components/common/states";
@@ -128,11 +128,8 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="space-y-6">
-      <Link href="/progress" className="-ml-2 inline-flex min-h-11 items-center gap-1 px-2 text-sm text-muted-foreground hover:text-foreground">
-        <ChevronLeft className="size-4" aria-hidden /> My Progress
-      </Link>
       <PageHeader
-        className="-mt-4"
+        back={{ href: "/progress", label: "My Progress" }}
         title="Overview"
         description="Every rep you log adds up. Here's the trend."
         actions={

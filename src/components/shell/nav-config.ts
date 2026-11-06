@@ -4,25 +4,29 @@ export interface NavItem {
   href: string;
   label: string;
   icon: LucideIcon;
-  /** Extra path prefixes that belong to this tab (e.g. Progress lives under Home). */
+  /** Extra path prefixes that belong to this tab (e.g. Run lives under Train, My Progress under You). */
   alsoMatches?: string[];
   requiresAdmin?: boolean;
 }
 
-/** The five main tabs, in this exact order, on every screen size (SPEC §2). */
+/**
+ * The five main tabs, in this exact order, on every screen size: Home, Train, Nutrition, Faith, You.
+ * Running and walking belong to Train (they are training); My Progress, the AI Coach's screen and settings belong
+ * to You. The calendar and the plan screen belong to Home (they are about the member's week).
+ */
 export const MAIN_TABS: NavItem[] = [
-  { href: "/home", label: "Home", icon: House, alsoMatches: ["/progress", "/calendar", "/plan"] },
-  { href: "/train", label: "Train", icon: Dumbbell },
-  { href: "/run", label: "Run", icon: Footprints },
-  { href: "/nutrition", label: "Food", icon: Utensils },
+  { href: "/home", label: "Home", icon: House, alsoMatches: ["/calendar", "/plan", "/search"] },
+  { href: "/train", label: "Train", icon: Dumbbell, alsoMatches: ["/run"] },
+  { href: "/nutrition", label: "Nutrition", icon: Utensils },
   { href: "/faith", label: "Faith", icon: BookOpen },
+  { href: "/profile", label: "You", icon: UserRound, alsoMatches: ["/progress", "/coach"] },
 ];
 
-/** Secondary destinations shown only in the desktop sidebar (mobile reaches them from the header or the tabs). */
+/** Secondary destinations shown only in the desktop sidebar (phones reach them from the tabs and headers). */
 export const SECONDARY_LINKS: NavItem[] = [
   { href: "/coach", label: "AI Coach", icon: Bot },
+  { href: "/run", label: "Run", icon: Footprints },
   { href: "/progress", label: "My Progress", icon: LineChart },
-  { href: "/profile", label: "Profile & Settings", icon: UserRound },
   { href: "/admin", label: "Admin", icon: Shield, requiresAdmin: true },
 ];
 
@@ -44,7 +48,7 @@ export function isActive(pathname: string, href: string): boolean {
   return matches(pathname, href);
 }
 
-/** The main tab that owns a path, or null (Coach, Profile, Admin belong to no tab). */
+/** The main tab that owns a path, or null (Admin belongs to no tab). */
 export function activeTab(pathname: string): NavItem | null {
   return MAIN_TABS.find((t) => isTabActive(pathname, t)) ?? null;
 }
