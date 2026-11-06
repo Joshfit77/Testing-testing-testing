@@ -160,11 +160,11 @@ function ReminderRow({
                     key={w.day}
                     type="button"
                     aria-pressed={on}
-                    aria-label={w.long}
                     onClick={() => toggleDay(w.day)}
                     className={cn("min-h-11 rounded-lg border text-xs font-semibold", on ? "border-gold bg-gold/15 text-gold-highlight" : "border-border bg-elevated/50 text-muted-foreground")}
                   >
-                    {w.short.slice(0, 2)}
+                    {w.short}
+                    <span className="sr-only"> {w.long}</span>
                   </button>
                 );
               })}

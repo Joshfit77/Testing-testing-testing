@@ -238,11 +238,11 @@ export function mountMotion(host: HTMLElement, def: MotionDef, opts: MountOption
     }
     if (speedBtn) {
       speedBtn.textContent = speed === 1 ? "1×" : "0.5×";
-      speedBtn.setAttribute("aria-label", `Playback speed ${speed === 1 ? "normal" : "half"}. Switch to ${speed === 1 ? "half" : "normal"} speed`);
+      speedBtn.setAttribute("aria-label", `${speed === 1 ? "1×" : "0.5×"} Playback speed ${speed === 1 ? "normal" : "half"}. Switch to ${speed === 1 ? "half" : "normal"} speed`);
     }
     if (styleBtn) {
       styleBtn.textContent = style === "athlete" ? "Classic look" : "New look";
-      styleBtn.setAttribute("aria-label", style === "athlete" ? "Show the classic gold figure" : "Show the new athlete look");
+      styleBtn.setAttribute("aria-label", style === "athlete" ? "Classic look: show the classic gold figure" : "New look: show the new athlete look");
     }
     if (fullBtn) {
       fullBtn.innerHTML = fullscreen ? EXIT_SVG : FULL_SVG;

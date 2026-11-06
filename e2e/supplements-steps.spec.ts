@@ -21,7 +21,7 @@ test.describe("supplements and steps", () => {
     await expect(page.getByRole("heading", { name: "Creatine monohydrate" })).toHaveCount(0);
     await page.getByRole("button", { name: "Performance" }).click();
 
-    await page.getByRole("button", { name: "Add Creatine monohydrate to stack" }).click();
+    await page.getByRole("button", { name: "Add to stack: Creatine monohydrate" }).click();
     await expect(page.getByRole("status").filter({ hasText: "Creatine monohydrate added to your stack." })).toBeVisible();
     await expect(page.getByTestId("stack-count")).toHaveText("0 of 1 taken");
 
@@ -36,7 +36,7 @@ test.describe("supplements and steps", () => {
 
     await page.getByRole("button", { name: "Remove Creatine monohydrate from stack" }).click();
     await expect(page.getByText(/Your stack is empty/)).toBeVisible();
-    await expect(page.getByRole("button", { name: "Add Creatine monohydrate to stack" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Add to stack: Creatine monohydrate" })).toBeVisible();
   });
 
   test("vegan users see diet notes on animal-based supplements", async ({ page }) => {

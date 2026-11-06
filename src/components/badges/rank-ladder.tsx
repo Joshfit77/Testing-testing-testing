@@ -63,9 +63,8 @@ export function RankLadder({
                 type="button"
                 onClick={() => onOpen(r)}
                 className={cn("rank-row", r.earned ? "is-earned" : "is-locked", current && "is-current")}
-                aria-label={`${r.name}, rank ${r.level} of 9, ${r.earned ? "earned" : "locked"}`}
               >
-                <span className="rank-num" aria-hidden>
+                <span className="rank-num">
                   <span>{r.level}</span>
                 </span>
                 <span className="rank-art">
@@ -111,6 +110,9 @@ export function RankLadder({
                       </span>
                     </>
                   )}
+                  <span className="sr-only">
+                    , rank {r.level} of 9, {r.earned ? "earned" : "locked"}
+                  </span>
                 </span>
               </button>
               {r.earned && verses[r.reference] ? (

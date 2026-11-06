@@ -361,7 +361,7 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
                           </ActionButton>
                         ) : (
                           <>
-                            <ActionButton action={setGoalStatusAction} fields={{ id: g.id as string, status: "completed" }} size="sm" variant="secondary" aria-label={`Mark ${g.title} complete`}>
+                            <ActionButton action={setGoalStatusAction} fields={{ id: g.id as string, status: "completed" }} size="sm" variant="secondary" aria-label={`Done: mark ${g.title} complete`}>
                               <CheckCircle2 aria-hidden /> Done
                             </ActionButton>
                             <ActionButton action={setGoalStatusAction} fields={{ id: g.id as string, status: "archived" }} size="icon-sm" variant="ghost" aria-label={`Archive ${g.title}`}>

@@ -176,7 +176,7 @@ export function SupplementsClient({ today, stack, takenToday, dietId, dietName }
                     variant="ghost"
                     disabled={busy}
                     aria-busy={busy}
-                    aria-label={`Remove ${s.name} from stack`}
+                    aria-label={`Remove from stack: ${s.name}`}
                     onClick={() => run(`stack:${s.id}`, () => removeFromStackAction({ supplementId: s.id }))}
                   >
                     {busy ? <Loader2 className="animate-spin" aria-hidden /> : <Minus aria-hidden />} Remove
@@ -188,7 +188,7 @@ export function SupplementsClient({ today, stack, takenToday, dietId, dietName }
                     variant="outline"
                     disabled={busy}
                     aria-busy={busy}
-                    aria-label={`Add ${s.name} to stack`}
+                    aria-label={`Add to stack: ${s.name}`}
                     onClick={() => run(`stack:${s.id}`, () => addToStackAction({ supplementId: s.id }))}
                   >
                     {busy ? <Loader2 className="animate-spin" aria-hidden /> : <Plus aria-hidden />} Add to stack

@@ -11,11 +11,11 @@ test.describe("rank badges (Fitness, Food, Faith)", () => {
     await expect(tabs.getByRole("tab")).toHaveCount(3);
     await expect(tabs.getByRole("tab", { name: /Fitness/ })).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("list", { name: "Fitness ranks" }).getByRole("listitem")).toHaveCount(9);
-    await expect(page.getByRole("button", { name: "Foundation, rank 1 of 9, locked" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Conqueror, rank 9 of 9, locked" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Foundation.*rank 1 of 9, locked/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Conqueror.*rank 9 of 9, locked/ })).toBeVisible();
 
     // Detail view: requirement, progress and the BSB verse.
-    await page.getByRole("button", { name: "Disciplined, rank 4 of 9, locked" }).click();
+    await page.getByRole("button", { name: /Disciplined.*rank 4 of 9, locked/ }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("heading", { name: "Disciplined" })).toBeVisible();
     await expect(dialog.getByText("Complete 50 workouts.")).toBeVisible();
@@ -27,7 +27,7 @@ test.describe("rank badges (Fitness, Food, Faith)", () => {
     await expect(page.getByRole("list", { name: "Food ranks" }).getByRole("listitem")).toHaveCount(9);
     await tabs.getByRole("tab", { name: /Faith/ }).click();
     await expect(page.getByRole("list", { name: "Faith ranks" }).getByRole("listitem")).toHaveCount(9);
-    await expect(page.getByRole("button", { name: "Seed, rank 1 of 9, locked" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Seed.*rank 1 of 9, locked/ })).toBeVisible();
 
     // Take part in Faith once (check off a practice): Seed is earned, and stays earned after a reload.
     await page.goto("/faith");
@@ -42,7 +42,7 @@ test.describe("rank badges (Fitness, Food, Faith)", () => {
     await expect(reveal.getByText("New Faith rank")).toBeVisible();
     await expect(reveal.getByText("Mark 4:26 (BSB)")).toBeVisible();
     await reveal.getByRole("button", { name: "Continue" }).click();
-    await expect(page.getByRole("button", { name: "Seed, rank 1 of 9, earned" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Seed.*rank 1 of 9, earned/ })).toBeVisible();
     await expect(page.getByRole("tab", { name: /Faith/ })).toContainText("Rank 1 of 9");
     // An earned rank shows its verse on the badge list; locked ranks don't yet.
     const faithRanks = page.getByRole("list", { name: "Faith ranks" });
@@ -52,9 +52,9 @@ test.describe("rank badges (Fitness, Food, Faith)", () => {
 
     // After a reload it is still earned, and the reveal doesn't repeat.
     await page.reload();
-    await expect(page.getByRole("button", { name: "Seed, rank 1 of 9, earned" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Seed.*rank 1 of 9, earned/ })).toBeVisible();
     await expect(page.getByRole("dialog")).toHaveCount(0);
-    await page.getByRole("button", { name: "Seed, rank 1 of 9, earned" }).click();
+    await page.getByRole("button", { name: /Seed.*rank 1 of 9, earned/ }).click();
     await expect(page.getByRole("dialog").getByText(/^Earned /)).toBeVisible();
     await expect(page.getByRole("dialog").getByText("Mark 4:26 (BSB)")).toBeVisible();
     await expect(page.getByRole("dialog").getByText(/don.t measure your faith/)).toBeVisible();
