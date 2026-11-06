@@ -137,4 +137,182 @@ public.profiles drop column layout_prefs;` and nothing else reads it. It was app
 Why a column rather than browser storage: the owner asked for preferences to be remembered and for the dashboard to be
 customizable; a per-device setting would differ between a member's phone and tablet.
 
-<!-- RESULTS -->
+## 2. How it was measured
+
+`scripts/ux/measure-journeys.mjs` drives the real app in Chromium at iPhone 15 Pro size (393×852, touch, device scale
+1) on the local demo server (the sample member, Pro view, nothing charged), signed in once, and for each of 24
+everyday journeys counts **taps**, **how far the page had to scroll** to reach each control (0 = it was on the first
+screen), **horizontal swipe rows seen**, **time**, **page errors**, and whether the journey **completed**. The same
+script with the same journeys ran on the layout as it was on 2026-11-05 (`before`) and on the finished layout
+(`after`); where the new layout offers a shorter path (the control is on the first screen) the journey takes it, so
+the comparison is "how far does a member have to go", not "same clicks on a different page". Every journey starts
+with no remembered tab locations and no workout draft on the device (except the three that begin inside a workout),
+the way a member who has just opened the app would. Each main screen is also measured for height in screens, cards,
+controls, controls smaller than 44 px, sideways scroll, and axe-core 4.14 WCAG 2.1 A/AA violations. The `before`
+numbers were taken on the same script with the earlier page; six of the "small targets" on every screen are the
+demo bar's own Free/Pro, Back/Next and presenter controls, which are not part of the app.
+
+`scripts/ux/compare-journeys.mjs before.json after.json` prints the tables below. The raw JSON for every run is kept
+with the session, not in the repository.
+
+## 3. Before and after, iPhone 15 Pro
+
+| Journey | Before (taps, scrolling) | After (taps, scrolling) | Taps | Scrolling px | Time after |
+| --- | --- | --- | --- | --- | --- |
+| Start today's workout | 1 tap, 0 px | 1 tap, 0 px | 1 → 1 (same) | 0 → 0 (same) | 0.4 s |
+| Complete the first set of a workout | 2 taps, 0 px | 2 taps, 0 px | 2 → 2 (same) | 0 → 0 (same) | 1.1 s |
+| Move on to the next exercise | 2 taps, 531 px | 1 tap, 84 px | 2 → 1 (−1) | 531 → 84 (−447) | 0.6 s |
+| Log a recent food again | 3 taps, 619 px | 2 taps, 64 px | 3 → 2 (−1) | 619 → 64 (−555) | 1.1 s |
+| Open food search | 2 taps, 374 px | 2 taps, 64 px | 2 → 2 (same) | 374 → 64 (−310) | 1.1 s |
+| Scan a barcode | 2 taps, 64 px | 2 taps, 64 px | 2 → 2 (same) | 64 → 64 (same) | 1.1 s |
+| Log a glass of water | 2 taps, 1380 px | 1 tap, 0 px | 2 → 1 (−1) | 1380 → 0 (−1380) | 0.4 s |
+| Continue Bible reading | 2 taps, 648 px | 1 tap, 178 px | 2 → 1 (−1) | 648 → 178 (−470) | 0.4 s |
+| Write a prayer | 2 taps, 64 px | 2 taps, 64 px | 2 → 2 (same) | 64 → 64 (same) | 1.1 s |
+| Open today's devotional | 2 taps, 1408 px | 1 tap, 230 px | 2 → 1 (−1) | 1408 → 230 (−1178) | 0.4 s |
+| Start a GPS run | 2 taps, 64 px | 1 tap, 323 px | 2 → 1 (−1) | 64 → 323 (+259) | 0.4 s |
+| Open the AI Coach | 1 tap, 0 px | 1 tap, 0 px | 1 → 1 (same) | 0 → 0 (same) | 0.5 s |
+| See My Progress | 1 tap, 720 px | 1 tap, 615 px | 1 → 1 (same) | 720 → 615 (−105) | 0.4 s |
+| Open Plans & billing | 2 taps, 0 px | 2 taps, 64 px | 2 → 2 (same) | 0 → 64 (+64) | 1.0 s |
+| Open notification settings | 2 taps, 0 px | 2 taps, 64 px | 2 → 2 (same) | 0 → 64 (+64) | 0.9 s |
+| Open the training calendar | 1 tap, 892 px | 1 tap, 714 px | 1 → 1 (same) | 892 → 714 (−178) | 0.4 s |
+| Open the exercise library | 2 taps, 365 px | 2 taps, 64 px | 2 → 2 (same) | 365 → 64 (−301) | 1.0 s |
+| Finish a workout | not completed ("Finish & save" is disabled here (nothing to confirm yet)) | 2 taps, 0 px |  |  | 1.0 s |
+| Review today's nutrition (calories and macros in view) | 1 tap, 306 px | 1 tap, 325 px | 1 → 1 (same) | 306 → 325 (+19) | 0.5 s |
+| Read a Bible chapter (Scripture text in view) | 2 taps, 648 px | 1 tap, 180 px | 2 → 1 (−1) | 648 → 180 (−468) | 0.5 s |
+| Turn to the next chapter | 1 tap, 0 px | 1 tap, 0 px | 1 → 1 (same) | 0 → 0 (same) | 0.5 s |
+| Change training goals | 2 taps, 0 px | 2 taps, 64 px | 2 → 2 (same) | 0 → 64 (+64) | 0.9 s |
+| Find an advanced training tool (Training review) | 2 taps, 557 px | 3 taps, 486 px | 2 → 3 (+1) | 557 → 486 (−71) | 1.4 s |
+| Return to Home from deep in the Bible | 1 tap, 64 px | 1 tap, 64 px | 1 → 1 (same) | 64 → 64 (same) | 0.4 s |
+| **Total over the 23 journeys completed both times** | **40 taps, 8704 px** | **34 taps, 3711 px** | **40 → 34** | **8704 → 3711** | |
+
+| Screen | Before: screens tall, cards, controls, small targets | After: screens tall, cards, controls, small targets | axe (WCAG A/AA) before → after |
+| --- | --- | --- | --- |
+| /home | 2.3, 12, 30, 7 | 2.6, 11, 34, 7 | label-content-name-mismatch×3 → none |
+| /train | 1.8, 11, 28, 6 | 1.3, 6, 28, 7 | label-content-name-mismatch×1 → none |
+| /nutrition | 9.4, 28, 98, 53 | 4.9, 18, 103, 27 | label-content-name-mismatch×11 → none |
+| /faith | 11, 45, 73, 15 | 6.3, 28, 73, 12 | label-content-name-mismatch×8 → none |
+| /profile | 3.8, 4, 30, 10 | 4.1, 4, 33, 10 | color-contrast×1, label-content-name-mismatch×1 → none |
+| /progress | 2, 7, 17, 7 | 2, 7, 18, 7 | label-content-name-mismatch×1 → none |
+| /run | 3.5, 11, 28, 14 | 3.5, 11, 29, 14 | label-content-name-mismatch×1 → none |
+| /train/workout | 3.5, 9, 59, 39 | 1, 4, 13, 6 | label-content-name-mismatch×5 → none |
+
+**Reading the numbers.** The seven journeys that got shorter by a tap are the ones the owner named first: water,
+the devotional, continuing the reading, the next exercise, a run, re-logging a food. "Open Plans & billing",
+"Notifications" and "Change goals" gained 64 px of scrolling (one tab-bar height) because they moved from a header
+avatar to the You tab, where the whole list is on the first screen; the tap count is unchanged. "Start a GPS run"
+trades one tap for a scroll on Home because Run is now a quick action under the workout and nutrition cards, and a
+member can put Quick actions first from Customize Home. "Find an advanced training tool" costs one more tap (Train,
+More training tools, Training review) and 71 px less scrolling: the advanced tools are deliberately one fold away. "Finish a workout" did not complete before the change
+because its "Finish & save" button was disabled on a workout with no set logged; after, the confirmation is reachable
+with the completed set in the same place.
+
+### Other sizes and large text
+
+| Size | Journeys completed | Taps (all journeys) | Scrolling px (all) | Swipe rows | Page errors | Screens tall: Nutrition / Faith / You | Sideways scroll | axe A/AA violations |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| iPhone 15 Pro, 393×852 | 24 of 24 | 36 | 3,711 | 0 | 0 | 4.9 / 6.3 / 4.1 | none | 0 |
+| iPhone SE, 320×568 | 24 of 24 | 36 | 9,144 | 0 | 0 | 8 / 10 / 6.8 | none | 0 |
+| iPhone 15 Pro Max, 440×956 | 24 of 24 | 36 | 2,701 | 0 | 0 | 4.1 / 5.5 / 3.6 | none | 0 |
+| iPhone 15 Pro, Extra large text | 24 of 24 | 36 | 7,842 | 0 | 0 | 6.8 / 8.5 / 5.7 | none | 0 |
+
+
+The small screen (iPhone SE, 320×568) needs more scrolling on every journey, as any layout does on a screen with
+40% less height; nothing fails there, no screen scrolls sideways, and the smallest control the app itself places is
+still 44 px tall. At the "Extra large" text setting every journey completes with the same taps; fifteen of them
+need more scrolling (7,842 px over all journeys against 3,711 at the default size) and none fails.
+
+### Accessibility checks (automated only)
+
+axe-core A/AA on the eight main screens after the change: **no violations** on any of them (before: 31 nodes across the eight, one colour-contrast and thirty label/name mismatches). These are automated checks; no screen-reader
+session (VoiceOver, TalkBack) and no keyboard-only session with a real assistive technology was run, so the app is
+not described as accessible, only as passing these checks.
+
+## 4. Test results
+
+| Check | Result | Where |
+| --- | --- | --- |
+| TypeScript (`tsc --noEmit`) and ESLint on every changed file | clean | local, final commit |
+| Unit and integration suite (`vitest run`) | **3,562 passed, 1 skipped** (3,563) | local, build `1H2ZFqEkA72n5ssRkI8BU` (commit fc9b919) |
+| Browser suite, production build, Chromium Pixel 7 project (`playwright test`) | **117 passed, 0 failed**, 58 skipped (the WebKit iPhone project runs in CI only; the device-matrix audit, demo-server-only and no-mock variants skip locally, as in every earlier run) | local, same build; `e2e-final2.log` |
+| Affected specs after the last three fixes (navigation, nutrition diary, nutrition time zone, profile time zone, faith calendar, features, journeys, fast logging) | **19 passed, 0 failed** | local, build of commit 2294d3a |
+| `e2e/nutrition-timezone.spec.ts` (new) | fails on the build before the fix with hydration error #418; passes on the rebuilt server | proves the fix, see section 1 |
+| CI workflow on `release/rc-2026-11-04` | run 116 **success** (fc9b919); the runs for bff2748 and 2294d3a are listed in section 9 | GitHub Actions |
+| Demo package `verify.mjs` | **36 of 36** checks (tap-through, every picture, every target inside its screen, no page errors, fills 39 of 39 iPhone and Android viewports) | local; published as page version 19 |
+| Route sweep for hydration errors (520 captured routes, Chromium, server and phone in UTC) | 0 errors | `hydration-scan` on the demo server |
+
+Not run: real devices, screen readers, the iOS Simulator workflow for this change (the iOS workflow runs on push; its result for the last commit is in section 9).
+
+## 5. The persona scenarios
+
+Each scenario was walked on the real app (demo account, 393×852) and is also in the measured journeys above where it
+maps to one.
+
+| Persona | What they do | What the app shows them (after) |
+| --- | --- | --- |
+| Beginner (first week, "general health", 3 days × 30 min) | Opens the app, wants to be told what to do | Home: nutrition first (the goal's daily habit), then today's workout with Start and one line under it ("Tap Start and the app walks you through each exercise…"), then Faith today. The workout screen shows one exercise at a time with the 2D demonstration, "Last time", target and Complete set; everything advanced (alerts, notes, swap, skip with reason) is folded. Start to the first completed set: 2 taps, no scrolling. |
+| Athlete / bodybuilder ("build muscle", 5 days × 60 min) | Checks the program, logs quickly, wants history and volume | Home: workout first, nutrition, then Sleep & Recovery above This week. Train shows the program link ("Powerbuilding 4-Day · Week 4 of 8 · Deload") and Start on the first screen; the exercise list is one fold away; Workout history, the builder, My workouts and Training review are under "More training tools" (2 taps from Home). In a workout: Next exercise and Skip set beside each other, previous performance inline, Focus mode hides everything but the current set. |
+| Busy parent (3 days × 20–30 min) | Needs the fastest path to a workout, water and food | Home: workout and Quick actions first; Quick Add (+) in every header: water in one tap from any screen, food in two, a quick workout or a run in one. Resume is on Home and on the Train tab while a workout is in progress, so an interrupted session is never lost (saved on the device at every set and to the server in the background; visibility change and page hide flush it). |
+| Older adult | Wants readable text, large targets and no guessing | Text size Large / Extra large under You → Display, applied immediately and remembered on the account; every control the app places is at least 44 px; no feature is removed or reordered by age (nothing is inferred from age). Measured at Extra large: every journey completes with the same taps. |
+| Teen (under 18, from the birth year given) | Logs food and trains | Nutrition: the 5-week weight projection and the weight-goal pace sentence are not shown; everything else is the same, nothing else is inferred. Without a daily target the page says "log what you like, or set targets": nobody is pushed into calorie counting. |
+| Faith-focused | Reads daily, prays, follows the 40 days | Faith tab first screen: Continue reading at the exact chapter and verse, Today's devotional (day N of 40), Write a prayer; Previous/Next chapter at the top and the bottom of every chapter; Home keeps Faith today and the verse (both can be moved up from Customize Home). Private prayer content stays out of the AI context, as before. |
+
+## 6. Data loss and recovery (reviewed, not changed)
+
+- Workout: every set change is written to the device immediately (`saveLocalDraft`) and to the server in the
+  background (`syncWorkoutDraftAction`), with a flush on `visibilitychange` and `pagehide`; the header shows "Saved on
+  device" / "Synced". Switching tabs keeps the draft; the Train tab and the Resume pill return to it. Finishing while
+  offline or signed out keeps the workout and says so (`finishFailureMessage`). Verified again by
+  `e2e/workout-reliability.spec.ts` and `e2e/journeys.spec.ts` (Train tab returns to an active draft).
+- Food, water, prayer, weight from Quick Add use the same server actions as their screens; a failure returns the
+  action's own sentence on the sheet and nothing is written twice.
+- Forms keep their drafts in session storage (journal, custom food, coach question); the Bible reader keeps the
+  position per account.
+- Layout preferences are on the profile; an unreadable value is treated as "no preference", never as an error.
+
+## 7. What remains incomplete
+
+- **Customize Home** reorders modules and hides them; it does not yet let a member hide the Train or Nutrition tab's
+  secondary sections (only Faith's), and the Nutrition tab's folded groups are not reorderable.
+- **Unified search** covers screens/settings, exercises, programs, foods, recipes and the Bible; it does not search a
+  member's own journal entries, workout history or saved meals.
+- **Small targets by bounding box:** the measurement counts a control's drawn box, so the compact water buttons
+  (36 px tall, with an invisible 44 px hit area), the 48×28 switches (also with a hit area) and a few inline text links
+  ("Notification settings" on Home, "Open calendar" on Train, "berean.bible" on Faith) are counted as small. The
+  inline links are genuinely small and were left as they are; a thumb-test on a real phone should decide them.
+- **Nutrition and Faith are still the longest screens** (about 4.9 and 6.3 screens tall at 393×852) because
+  everything the owner asked to keep is still there, folded; a member who opens every fold scrolls as before.
+- The `before` measurements were taken once, on the demo account only; the per-persona Home orders were checked by
+  unit tests and by eye, not by a separate measured run per persona.
+- No visual redesign of the sub-screens beyond Back links and header consistency (billing, preferences, badges,
+  history, recovery, run activities, calendar).
+
+## 8. What still needs real devices
+
+- Real iPhones (SE, 15 Pro, Pro Max) and Android phones in Safari/Chrome and in the Capacitor shells: tap targets
+  with a thumb, the keyboard over the nutrition and prayer forms, safe-area insets with the new one-row header and
+  the five tabs, momentum scrolling in the folded sections.
+- VoiceOver and TalkBack through a full workout, a food log and a chapter (labels, focus order on the Quick Add sheet,
+  the Focus mode announcement).
+- Switch control / keyboard-only navigation of the workout screen.
+- Offline: airplane mode mid-workout and during Quick Add, then reconnecting (the browser tests simulate offline; a
+  phone's radio behaves differently).
+- Camera (barcode and meal photo), GPS (the run from Quick Add) and App Store / Play purchases: not touched by this
+  work and not re-verified on hardware; the earlier device checklists still apply.
+- Large-text and bold-text system settings on iOS and Android (the app's own text-size setting was measured; the OS
+  setting was not).
+
+## 9. Commits and CI
+
+All on `claude/faith-discipleship`, mirrored to `release/rc-2026-11-04`.
+
+| Commit | What | CI (`ci.yml`) | iOS (`ios.yml`) |
+| --- | --- | --- | --- |
+| `fc9b919` | The navigation and UX work, migration, tests, measurement scripts, this report's first half | run 116, success | run 74, cancelled by the next push |
+| `bff2748` | Faith day chips 45 px wide, Home verse card named by its printed text | run 117, success | run 75, success |
+| `2294d3a` | Recent foods meal label read on the device only (hydration error in other time zones), regression test | run 118, success | run 76, see the commit after this one |
+| this commit | Customize Home on its own screen was already in fc9b919; here: the report's results, the demo doc, the seed script's password suffix | | |
+
+The demo page: https://claude.ai/artifact/L1eCXFJ1a3UjtQuta3nzRU, version 19 (captured from fc9b919, private).
+
+Nothing was deployed, no payment was enabled and nothing was merged into `main`.
+

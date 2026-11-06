@@ -121,18 +121,18 @@ for accounts the server created as demo accounts, only when the server runs in d
 
 ## The clickable iPhone demo (captured screens)
 
-Built 2026-10-29 from this branch by `scripts/demo/iphone-demo/` (see its README): a private page that opens on an
-iPhone in Safari and fills the screen. Published as **Narrow Gate iPhone Demo**,
+Rebuilt 2026-11-06 (page version 19) from commit `fc9b919` of this branch by `scripts/demo/iphone-demo/` (see its
+README): a private page that opens on an iPhone in Safari and fills the screen. Published as **Narrow Gate iPhone Demo**,
 https://claude.ai/artifact/L1eCXFJ1a3UjtQuta3nzRU (private: only the owner and whoever the owner shares it with).
 
 | | |
 | --- | --- |
-| What it is | **Pictures of the real app**, captured in demo mode (sample data, purchases off, AI simulated) at iPhone size (390 CSS px at 3×, 1170 px wide, one WebP q88 pass), joined by the real tap targets: 396 screens, 3,417 taps. Every one of the 157 exercise pages, the programs, Home, Train, Run, Nutrition, Faith, My Progress, Sleep & Recovery, AI Coach, You (settings) and the membership screen. Tabs are Home, Train, Nutrition, Faith and You (2026-11-06). |
-| What is live | Nothing moves in the pictures. (The published 2026-10-29 build also embedded the live 3D figure; the 3D figure was retired on 2026-11-04 and the tool no longer includes it. Rebuild the demo to match the app.) |
+| What it is | **Pictures of the real app**, captured in demo mode (sample data, purchases off, AI simulated) at iPhone size (390 CSS px at 3×, 1170 px wide, one WebP q88 pass), joined by the real tap targets: 458 screens, 5,314 taps (3,975 land on a captured screen; the rest say the screen was not captured). The five tabs (Home, Train, Nutrition, Faith, You), Quick Add, Search, Customize Home, Run, the programs, 144 of the 157 exercise pages (the page's hosting allows 511 files, so 13 of the library's later pages are left out), My Progress, Sleep & Recovery, AI Coach, the settings and the membership screen. |
+| What is live | Nothing moves in the pictures; the 2D exercise demonstrations are shown at their first frame. |
 | Captured step by step | The workout flow (start, demonstration dialog, log set 1 with the rest timer, set 2, exercise options, substitute picker, substituted, finish, summary) and the AI coach (question typed, simulated reply). |
 | Not live | Typing, timers, GPS, the camera, Apple Health, purchases, and any screen not among the captured ones (a tap says so). |
-| Checks | `verify.mjs` at iPhone 15 size: 29 of 29 tap-through checks (opening → welcome → sample data → tabs → back → the whole workout flow → menu → coach; every picture present; every tap target inside its screen; no page errors). |
-| Found while capturing | Six pages overflow the phone's width at 390 px (the running programs' week tables: `/train/programs/10k-training` 507 px, `half-marathon-base-80-20` 611 px, `5k-training`, `aerobic-base-run-walk`, `powerbuilding-4-day` 404 px; `/progress/overview` 400 px). Not fixed in this round; the demo crops them. |
+| Checks | `verify.mjs` (2026-11-06): 36 of 36 checks (opening → welcome → sample data → the five tabs → back → the whole workout flow → menu → coach; every picture present; every tap target inside its screen; no page errors; fills 39 of 39 iPhone and Android viewports, 74 models). |
+| Found while capturing | No page is wider than the phone any more (the running programs' week tables and the overview were fixed earlier). Seven React hydration errors on the Nutrition pages: the capture emulates a phone in New York while the server runs in UTC, and the Recent foods card named the meal for the device's time of day during render. Fixed after the capture (`2294d3a`, with `e2e/nutrition-timezone.spec.ts`); the pictures show the page after React's recovery, which looks the same. The day chips, verse-card name and Recent foods wording changed after this capture (`bff2748`, `2294d3a`); none of it is visible at this size. |
 
 It is not the live app on the phone: that is the private preview deployment above, which waits on the owner's
 one-time setup (the six repository secrets) and a `demo-preview-*` tag, and the TestFlight build after it.

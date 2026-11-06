@@ -780,7 +780,9 @@ async function main() {
   }
   await removeDemoAccounts();
   // Re-seeding under a running demo server keeps its password (DEMO_ACCOUNT_PASSWORD); otherwise a new random one.
-  const password = process.env.DEMO_ACCOUNT_PASSWORD || randomBytes(18).toString("base64url");
+  // The suffix keeps every random password inside the auth policy (a lower-case letter, an upper-case letter and a
+  // digit each): a 24-character random string alone failed it now and then.
+  const password = process.env.DEMO_ACCOUNT_PASSWORD || `${randomBytes(18).toString("base64url")}aZ9`;
   const userId = await createMember(password);
   const sessions = await seedTraining(userId);
   await seedFood(userId);
