@@ -678,7 +678,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
         </Button>
       </div>
 
-      {nutritionSections.includes("relog") && <QuickRelog date={date} recent={recent} frequent={frequent} />}
+      {nutritionSections.includes("relog") && <QuickRelog date={date} recent={recent} frequent={frequent} max={4} />}
 
       <section id="totals" className="rounded-2xl border border-border bg-card p-4" aria-labelledby="totals-title">
         <h2 id="totals-title" className="sr-only">
@@ -773,12 +773,14 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
           const mt = sumMacros(items.map((i) => ({ calories: Number(i.calories), protein_g: Number(i.protein_g) })));
           const prevCount = prevCounts.get(type) ?? 0;
           return (
-            <div key={type} className="rounded-2xl border border-border bg-card p-4" data-testid={`meal-${type}`}>
-              <div className="mb-2 flex items-center justify-between">
+            <div key={type} className={`rounded-2xl border border-border bg-card ${items.length ? "p-4" : "px-4 py-2"}`} data-testid={`meal-${type}`}>
+              <div className={`flex items-center justify-between ${items.length ? "mb-2" : ""}`}>
                 <h3 className="font-semibold">{title}</h3>
-                <span className="text-sm tabular-nums text-muted-foreground">
-                  {Math.round(mt.calories)} kcal · {Math.round(mt.protein_g)}g protein
-                </span>
+                {items.length > 0 && (
+                  <span className="text-sm tabular-nums text-muted-foreground">
+                    {Math.round(mt.calories)} kcal · {Math.round(mt.protein_g)}g protein
+                  </span>
+                )}
               </div>
               {items.length > 0 && (
                 <ul className="divide-y divide-border">
@@ -813,10 +815,13 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
                   <CopyMealButton fromDate={prevDate} toDate={date} mealType={type} label={`Copy ${title.toLowerCase()} from ${prevLabel} (${prevCount})`} />
                 )}
               </div>
-              {ms[0] && (
-                <div className="mt-3 border-t border-border pt-3">
-                  <SaveMealForm mealId={ms[0].id} defaultName={`${title} ${date}`} />
-                </div>
+              {ms[0] && items.length > 0 && (
+                <details className="mt-2 border-t border-border pt-1">
+                  <summary className="flex min-h-11 cursor-pointer list-none items-center text-sm font-semibold text-gold-highlight [&::-webkit-details-marker]:hidden">Save {title.toLowerCase()} to log again</summary>
+                  <div className="pb-2">
+                    <SaveMealForm mealId={ms[0].id} defaultName={`${title} ${date}`} />
+                  </div>
+                </details>
               )}
             </div>
           );

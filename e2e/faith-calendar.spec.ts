@@ -31,7 +31,8 @@ test.describe("Stage 2C: faith flows, onboarding additions and the training cale
     await answerOnboarding(page);
     await page.goto("/faith");
 
-    // Daily practices: choose two, check one off, gentle weekly wording (no streaks or scores).
+    // Daily practices (folded on the Faith tab): choose two, check one off, gentle weekly wording (no streaks or scores).
+    await page.getByTestId("faith-practices").locator("summary").click();
     await page.getByRole("button", { name: "Add Prayer" }).click();
     await expect(page.getByRole("button", { name: /^Prayer, Today/ })).toBeVisible();
     await page.getByRole("button", { name: "Add Scripture reading" }).click();
@@ -46,7 +47,8 @@ test.describe("Stage 2C: faith flows, onboarding additions and the training cale
     await expect(page.getByText(/You made time for your practices on 1 day/)).toBeVisible();
     await page.goto("/faith");
 
-    // Write a prayer request: private by default.
+    // Write a prayer request (the inline form is folded; the quick action at the top opens the full page): private by default.
+    await page.getByTestId("faith-journal").locator("summary").click();
     await page.locator("label", { hasText: /^Prayer request$/ }).click();
     await expect(page.getByRole("radio", { name: "Prayer request" })).toBeChecked();
     await page.getByLabel("Title (optional)").fill("Healing for Sam");

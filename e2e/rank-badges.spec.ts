@@ -31,6 +31,7 @@ test.describe("rank badges (Fitness, Food, Faith)", () => {
 
     // Take part in Faith once (check off a practice): Seed is earned, and stays earned after a reload.
     await page.goto("/faith");
+    await page.getByTestId("faith-practices").locator("summary").click();
     await page.getByRole("button", { name: "Add Prayer" }).click();
     await page.getByRole("button", { name: /^Prayer, Today/ }).click();
     await expect(page.getByRole("button", { name: /^Prayer, Today/ })).toHaveAttribute("aria-pressed", "true");

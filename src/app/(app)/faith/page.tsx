@@ -164,28 +164,44 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
 
       <div className="grid gap-4 lg:grid-cols-2">
         {show("practices") && (
-          <section className={`min-w-0 ${card} p-4`} aria-labelledby="practices-title">
-            <h2 id="practices-title" className={`flex items-center gap-2 ${h2}`}>
-              <Sparkles className="size-5 text-gold" aria-hidden /> Daily practices
-            </h2>
-            <p className="mb-3 text-sm text-muted-foreground">Small, faithful habits. Check them off as you go; nothing here is graded.</p>
-            <PracticesPanel practices={practiceData.practices} checkins={practiceData.checkins} today={today} />
-          </section>
+          <details className={`min-w-0 ${card}`} data-testid="faith-practices">
+            <summary className={summary}>
+              <span className="flex items-center gap-2">
+                <Sparkles className="size-5 text-gold" aria-hidden /> Daily practices
+              </span>
+              <span className="text-sm font-normal text-muted-foreground">{practiceData.practices.length ? `${practiceData.practices.length} chosen` : "Choose a few"}</span>
+            </summary>
+            <section className="px-4 pb-4" aria-labelledby="practices-title">
+              <h2 id="practices-title" className="sr-only">
+                Daily practices
+              </h2>
+              <p className="mb-3 text-sm text-muted-foreground">Small, faithful habits. Check them off as you go; nothing here is graded.</p>
+              <PracticesPanel practices={practiceData.practices} checkins={practiceData.checkins} today={today} />
+            </section>
+          </details>
         )}
 
         {show("journal") && (
-          <section className={`min-w-0 ${card} p-4`} aria-labelledby="journal-new">
-            <div className="mb-1 flex items-center justify-between gap-2">
-              <h2 id="journal-new" className={`flex items-center gap-2 ${h2}`}>
+          <details className={`min-w-0 ${card}`} data-testid="faith-journal">
+            <summary className={summary}>
+              <span className="flex items-center gap-2">
                 <NotebookPen className="size-5 text-gold" aria-hidden /> Prayer journal
-              </h2>
-              <Link href="/faith/journal" className="inline-flex min-h-11 items-center gap-1 px-1 text-sm font-semibold text-gold-highlight hover:underline">
-                All entries{journalCount ? ` (${journalCount})` : ""} <ChevronRight className="size-4" aria-hidden />
-              </Link>
-            </div>
-            <p className="mb-3 text-sm text-muted-foreground">Prayers, praise and reflections. Private by default.</p>
-            <JournalForm today={today} defaultRef={verse.reference} />
-          </section>
+              </span>
+              <span className="text-sm font-normal text-muted-foreground">{journalCount ? `${journalCount} ${journalCount === 1 ? "entry" : "entries"}` : "Write here"}</span>
+            </summary>
+            <section className="px-4 pb-4" aria-labelledby="journal-new">
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <h2 id="journal-new" className="sr-only">
+                  Prayer journal
+                </h2>
+                <p className="text-sm text-muted-foreground">Prayers, praise and reflections. Private by default.</p>
+                <Link href="/faith/journal" className="inline-flex min-h-11 shrink-0 items-center gap-1 px-1 text-sm font-semibold text-gold-highlight hover:underline">
+                  All entries{journalCount ? ` (${journalCount})` : ""} <ChevronRight className="size-4" aria-hidden />
+                </Link>
+              </div>
+              <JournalForm today={today} defaultRef={verse.reference} />
+            </section>
+          </details>
         )}
       </div>
 
