@@ -93,7 +93,7 @@ export default async function TrainPage() {
                 <p className="pt-2 text-center text-sm text-muted-foreground">
                   Planned for {plannedLabel}
                   {plannedLater.moved ? " (moved)" : ""} ·{" "}
-                  <Link href={`/calendar?day=${plannedLater.date}`} className="font-semibold text-gold-highlight hover:underline">
+                  <Link href={`/calendar?day=${plannedLater.date}`} className="inline-flex min-h-11 items-center rounded-lg px-3 font-semibold text-gold-highlight underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-gold-highlight">
                     Open calendar
                   </Link>
                 </p>
