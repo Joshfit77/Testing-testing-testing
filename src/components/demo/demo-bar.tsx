@@ -1,13 +1,14 @@
 import { FlaskConical } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { setDemoPlanAction } from "@/server/actions/demo";
+import { resetDemoAction, setDemoPlanAction } from "@/server/actions/demo";
+import { ActionButton } from "@/components/common/action-button";
 import { PresenterPanel } from "@/components/demo/presenter-panel";
 
 /**
  * Shown on every screen of a demo deployment: what's sample data, the server-held Free/Pro switch, and the presenter's
  * guided path (20 stops, skip and return).
  */
-export function DemoBar({ plan, canSwitch, aiSimulated }: { plan: "free" | "pro" | "plus"; canSwitch: boolean; aiSimulated: boolean }) {
+export function DemoBar({ plan, canSwitch, canReset = false, aiSimulated }: { plan: "free" | "pro" | "plus"; canSwitch: boolean; canReset?: boolean; aiSimulated: boolean }) {
   return (
     <div
       role="note"
@@ -40,6 +41,20 @@ export function DemoBar({ plan, canSwitch, aiSimulated }: { plan: "free" | "pro"
             </button>
           ))}
         </form>
+      )}
+      {canReset && (
+        <ActionButton
+          action={resetDemoAction}
+          fields={{}}
+          variant="ghost"
+          size="sm"
+          className="h-8 px-2 text-xs text-gold-highlight"
+          data-testid="demo-reset"
+          confirmMessage="Reset the demo? The sample account goes back to its starting state: anything logged in this session is removed and the sample history comes back. No other account is touched."
+          confirmLabel="Reset demo"
+        >
+          Reset demo
+        </ActionButton>
       )}
       <PresenterPanel />
     </div>

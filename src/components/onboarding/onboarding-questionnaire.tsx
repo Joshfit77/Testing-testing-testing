@@ -701,7 +701,7 @@ export function OnboardingQuestionnaire({ userId, initialName }: { userId: strin
               {pending ? "Building your plan…" : "Build my plan"}
             </Button>
           ) : (
-            <div className="flex items-center gap-1">
+            <div className="flex flex-wrap items-center gap-1">
               {OPTIONAL_STEPS.includes(current) && (
                 <Button type="button" variant="ghost" onClick={skip}>
                   Skip

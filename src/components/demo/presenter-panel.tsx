@@ -45,7 +45,7 @@ const LABEL_STYLE: Record<StepLabel, string> = {
 
 export function StepTag({ label }: { label: StepLabel }) {
   return (
-    <span className={cn("shrink-0 whitespace-nowrap rounded-full border px-1.5 py-px text-[0.625rem] font-semibold uppercase tracking-wider", LABEL_STYLE[label])} data-testid={`presenter-tag-${label}`}>
+    <span className={cn("shrink-0 whitespace-nowrap rounded-full border px-1.5 py-px text-xs font-semibold uppercase tracking-wider", LABEL_STYLE[label])} data-testid={`presenter-tag-${label}`}>
       {STEP_LABEL_TEXT[label]}
     </span>
   );

@@ -13,6 +13,7 @@ import { getActiveProgram } from "@/server/services/training";
 import { getAiAllowance } from "@/server/services/ai-coach";
 import { loadProgramSchedule } from "@/server/services/schedule";
 import { isoDateInTz } from "@/lib/domain/dates";
+import { parseLayoutPrefs, sectionLayout, TRAIN_SECTIONS, type TrainSection } from "@/lib/layout-prefs";
 
 export const metadata = { title: "Train" };
 
@@ -45,6 +46,7 @@ export default async function TrainPage() {
   const plannedLabel = plannedLater ? new Date(`${plannedLater.date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" }) : null;
   const startHref = today && active ? `/train/workout?day=${today.id}&up=${active.userProgramId}` : "/train/workout?blank=1";
 
+  const sections = sectionLayout(TRAIN_SECTIONS, parseLayoutPrefs(profile.layout_prefs).train);
   const tools = [
     { href: "/train/build", icon: Wand2, label: canBuild ? "Program builder" : "Program builder (Pro)" },
     { href: "/train/history", icon: History, label: "Workout history" },
@@ -53,6 +55,49 @@ export default async function TrainPage() {
     { href: "/train/recovery", icon: HeartPulse, label: "Recovery" },
     { href: "/train/review", icon: Activity, label: canReview ? "Training review" : "Training review (Pro)" },
   ];
+
+  const rows: Record<Exclude<TrainSection, "tools">, React.ReactNode> = {
+    run: (
+        <Link key="/run" href="/run" className={row}>
+          <Footprints className="size-5 shrink-0 text-gold" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Run &amp; walk</span>
+            <span className="block truncate text-sm text-muted-foreground">GPS runs and walks, running plans, records</span>
+          </span>
+          <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
+        </Link>
+    ),
+    programs: (
+        <Link key="/train/programs" href="/train/programs" className={row}>
+          <BarChart3 className="size-5 shrink-0 text-gold" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Programs</span>
+            <span className="block truncate text-sm text-muted-foreground">{active ? `Active: ${active.programName}` : "Strength, muscle, conditioning, sport and running plans"}</span>
+          </span>
+          <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
+        </Link>
+    ),
+    exercises: (
+        <Link key="/train/exercises" href="/train/exercises" className={row}>
+          <Dumbbell className="size-5 shrink-0 text-gold" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Exercises</span>
+            <span className="block truncate text-sm text-muted-foreground">The library, with demonstrations and your history for each</span>
+          </span>
+          <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
+        </Link>
+    ),
+    calendar: (
+        <Link key="/calendar" href="/calendar" className={row}>
+          <CalendarDays className="size-5 shrink-0 text-gold" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Training calendar</span>
+            <span className="block truncate text-sm text-muted-foreground">Workouts, runs, walks, planned sessions and rest days</span>
+          </span>
+          <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
+        </Link>
+    ),
+  };
 
   return (
     <div className="space-y-4">
@@ -150,41 +195,13 @@ export default async function TrainPage() {
         )}
       </section>
 
-      <nav aria-label="Training sections" className="space-y-2">
-        <Link href="/run" className={row}>
-          <Footprints className="size-5 shrink-0 text-gold" aria-hidden />
-          <span className="min-w-0 flex-1">
-            <span className="block font-semibold">Run &amp; walk</span>
-            <span className="block truncate text-sm text-muted-foreground">GPS runs and walks, running plans, records</span>
-          </span>
-          <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
-        </Link>
-        <Link href="/train/programs" className={row}>
-          <BarChart3 className="size-5 shrink-0 text-gold" aria-hidden />
-          <span className="min-w-0 flex-1">
-            <span className="block font-semibold">Programs</span>
-            <span className="block truncate text-sm text-muted-foreground">{active ? `Active: ${active.programName}` : "Strength, muscle, conditioning, sport and running plans"}</span>
-          </span>
-          <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
-        </Link>
-        <Link href="/train/exercises" className={row}>
-          <Dumbbell className="size-5 shrink-0 text-gold" aria-hidden />
-          <span className="min-w-0 flex-1">
-            <span className="block font-semibold">Exercises</span>
-            <span className="block truncate text-sm text-muted-foreground">The library, with demonstrations and your history for each</span>
-          </span>
-          <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
-        </Link>
-        <Link href="/calendar" className={row}>
-          <CalendarDays className="size-5 shrink-0 text-gold" aria-hidden />
-          <span className="min-w-0 flex-1">
-            <span className="block font-semibold">Training calendar</span>
-            <span className="block truncate text-sm text-muted-foreground">Workouts, runs, walks, planned sessions and rest days</span>
-          </span>
-          <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
-        </Link>
-      </nav>
-
+      {/* The sections in the member's order (You → Customize); a hidden one is still one tap away in Search. */}
+      {sections.some((x) => x !== "tools") && (
+        <nav aria-label="Training sections" className="space-y-2">
+          {sections.filter((x): x is Exclude<TrainSection, "tools"> => x !== "tools").map((x) => rows[x])}
+        </nav>
+      )}
+      {sections.includes("tools") && (
       <details className={`group ${card}`} data-testid="train-tools">
         <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between px-4 text-[0.9375rem] font-semibold [&::-webkit-details-marker]:hidden">
           <span>More training tools</span>
@@ -199,6 +216,7 @@ export default async function TrainPage() {
           ))}
         </nav>
       </details>
+      )}
     </div>
   );
 }

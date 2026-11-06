@@ -70,7 +70,7 @@ function ChartFrame({ title, description, data, xKey, series, xFormat, valueSuff
           <button
             type="button"
             onClick={() => setTable((t) => !t)}
-            className="flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-elevated hover:text-foreground"
+            className="flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-elevated hover:text-foreground"
             aria-label={table ? `Show ${title} as chart` : `Show ${title} as table`}
             aria-pressed={table}
           >

@@ -115,7 +115,7 @@ export function WithdrawConsentForm() {
         });
       }}
     >
-      <SubmitButton variant="secondary" pendingLabel="Removing…">
+      <SubmitButton variant="secondary" pendingLabel="Removing…" className="h-auto w-full whitespace-normal py-2">
         Withdraw consent &amp; delete wellness data
       </SubmitButton>
       <FormMessage state={state} />
@@ -128,7 +128,7 @@ export function AiConsentOffForm() {
   const [state, action] = useActionState(async () => setAiDataConsentAction(false), initialActionState);
   return (
     <form action={action} className="space-y-2">
-      <SubmitButton variant="secondary" pendingLabel="Turning off…">
+      <SubmitButton variant="secondary" pendingLabel="Turning off…" className="h-auto w-full whitespace-normal py-2">
         Turn off AI Coach data sharing
       </SubmitButton>
       <FormMessage state={state} />

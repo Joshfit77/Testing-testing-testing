@@ -475,7 +475,7 @@ export function GpsRecorder({
           </div>
         )}
         <p className="text-center text-xs text-muted-foreground">
-          No GPS? <Link href="/run?tab=log" className="underline">Log a run or walk by hand</Link>.
+          No GPS? <Link href="/run?tab=log" className="inline-flex min-h-11 items-center underline">Log a run or walk by hand</Link>.
         </p>
       </div>
     );

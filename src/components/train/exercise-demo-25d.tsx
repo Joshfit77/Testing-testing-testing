@@ -542,10 +542,10 @@ export function ExerciseDemo25D({ slug, name, asset, className, controls = true,
           </button>
         )}
         {controls && badge && (
-          <span className="pointer-events-none absolute left-2 top-2 rounded bg-black/60 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wider text-gold-highlight">{badge}</span>
+          <span className="pointer-events-none absolute left-2 top-2 rounded bg-black/60 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-gold-highlight">{badge}</span>
         )}
         {interactive && !playing && !ended && (
-          <span className="pointer-events-none absolute bottom-2 right-2 rounded bg-black/60 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wider text-foreground/90">
+          <span className="pointer-events-none absolute bottom-2 right-2 rounded bg-black/60 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-foreground/90">
             {scrubbing ? "Scrubbing" : "Paused · tap to play"}
           </span>
         )}
@@ -555,7 +555,7 @@ export function ExerciseDemo25D({ slug, name, asset, className, controls = true,
           </p>
         )}
         {!hasLoop && asset.phases.length > 1 && (
-          <span className="pointer-events-none absolute bottom-2 right-2 rounded bg-black/60 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wider text-foreground/90">{asset.phases[phase]?.label}</span>
+          <span className="pointer-events-none absolute bottom-2 right-2 rounded bg-black/60 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-foreground/90">{asset.phases[phase]?.label}</span>
         )}
       </div>
       {interactive && (

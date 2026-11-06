@@ -62,7 +62,7 @@ export function BarPlot(props: PlotProps) {
             stroke="#e8e2d0"
             strokeDasharray="4 4"
             ifOverflow="extendDomain"
-            label={{ value: props.referenceLine.label, position: "insideTopRight", fill: "#a39e90", fontSize: 11 }}
+            label={{ value: props.referenceLine.label, position: "insideTopRight", fill: "#a39e90", fontSize: 12 }}
           />
         )}
         {series.map((s, i) => (

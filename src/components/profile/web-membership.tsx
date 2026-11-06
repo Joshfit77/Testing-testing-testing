@@ -79,11 +79,11 @@ export function WebMembership({
       footer={
         <p className="text-xs leading-relaxed text-muted-foreground">
           {renewalTerms("web")} Prices in US dollars; sales tax may apply where required.{" "}
-          <a href={legal.termsUrl} className="text-gold-highlight underline" target="_blank" rel="noopener">
+          <a href={legal.termsUrl} className="inline-flex min-h-11 items-center text-gold-highlight underline" target="_blank" rel="noopener">
             Terms of Service
           </a>{" "}
           ·{" "}
-          <a href={legal.privacyUrl} className="text-gold-highlight underline" target="_blank" rel="noopener">
+          <a href={legal.privacyUrl} className="inline-flex min-h-11 items-center text-gold-highlight underline" target="_blank" rel="noopener">
             Privacy Policy
           </a>
           {!legal.final && " (drafts awaiting legal review)"}

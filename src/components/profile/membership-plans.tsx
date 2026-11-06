@@ -92,7 +92,7 @@ export function MembershipPlans({
                 data-testid={`interval-${i}`}
                 onClick={() => onIntervalChange(i)}
                 className={cn(
-                  "inline-flex min-h-10 items-center gap-2 rounded-full px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-highlight",
+                  "inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-highlight",
                   shown === i ? "bg-gold-gradient text-black" : "text-muted-foreground hover:text-foreground",
                 )}
               >

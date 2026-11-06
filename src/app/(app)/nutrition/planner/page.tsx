@@ -132,7 +132,7 @@ export default async function PlannerPage() {
           </p>
           <p className="text-sm text-muted-foreground">
             {targets.origin === "custom" ? "Your custom targets" : "Your estimated calorie budget"} · {DIETS[targets.diet].name} diet (
-            <Link href="/nutrition/diets" className="underline">
+            <Link href="/nutrition/diets" className="inline-flex min-h-11 items-center underline">
               change
             </Link>
             ) · {prefs.mealsPerDay} meals a day · {prefs.budget} budget

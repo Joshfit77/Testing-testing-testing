@@ -148,7 +148,7 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
             href={`/progress/overview?range=${r}${sp.ex ? `&ex=${sp.ex}` : ""}`}
             aria-current={r === range ? "page" : undefined}
             className={cn(
-              "flex h-10 items-center rounded-xl border px-4 text-sm font-semibold",
+              "flex min-h-11 items-center rounded-xl border px-4 text-sm font-semibold",
               r === range ? "border-gold bg-gold/10 text-gold-highlight" : "border-border text-muted-foreground hover:text-foreground",
             )}
           >

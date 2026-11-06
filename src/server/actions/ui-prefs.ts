@@ -6,7 +6,7 @@ import { actionError, actionOk, type ActionState } from "@/lib/action-state";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireUser } from "@/server/auth";
 import { logError } from "@/server/log";
-import { FAITH_SECTIONS, HOME_MODULES } from "@/lib/layout-prefs";
+import { FAITH_SECTIONS, HOME_MODULES, NUTRITION_SECTIONS, TRAIN_SECTIONS } from "@/lib/layout-prefs";
 
 const prefsSchema = z
   .object({
@@ -22,6 +22,8 @@ const prefsSchema = z
       .object({
         home: z.object({ order: z.array(z.enum(HOME_MODULES)).max(20).optional(), hidden: z.array(z.enum(HOME_MODULES)).max(20).optional() }).optional(),
         faith: z.object({ hidden: z.array(z.enum(FAITH_SECTIONS)).max(20).optional() }).optional(),
+        train: z.object({ order: z.array(z.enum(TRAIN_SECTIONS)).max(20).optional(), hidden: z.array(z.enum(TRAIN_SECTIONS)).max(20).optional() }).optional(),
+        nutrition: z.object({ order: z.array(z.enum(NUTRITION_SECTIONS)).max(20).optional(), hidden: z.array(z.enum(NUTRITION_SECTIONS)).max(20).optional() }).optional(),
       })
       .optional(),
   })

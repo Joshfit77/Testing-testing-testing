@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultHomeOrder, homeLayout, isMinor, parseLayoutPrefs, type HomeProfile } from "@/lib/layout-prefs";
+import { defaultHomeOrder, homeLayout, isMinor, NUTRITION_SECTIONS, parseLayoutPrefs, sectionLayout, TRAIN_SECTIONS, type HomeProfile } from "@/lib/layout-prefs";
 
 const base: HomeProfile = { goal: null, experience: null, daysPerWeek: 4, sessionMinutes: 45, faithEnabled: true, homeScripture: true };
 
@@ -50,5 +50,22 @@ describe("under-18 safeguard", () => {
     expect(isMinor(2010, now)).toBe(true);
     expect(isMinor(2008, now)).toBe(false);
     expect(isMinor(null, now)).toBe(false);
+  });
+});
+
+describe("Train and Nutrition sections", () => {
+  it("keeps only known Train and Nutrition entries, de-duplicated", () => {
+    const p = parseLayoutPrefs({ train: { order: ["tools", "run", "run", "nope"], hidden: ["calendar", 7] }, nutrition: { hidden: ["water", "budget"] }, faith: 3 });
+    expect(p.train).toEqual({ order: ["tools", "run"], hidden: ["calendar"] });
+    expect(p.nutrition).toEqual({ hidden: ["water", "budget"] });
+    expect(parseLayoutPrefs({ train: { order: [] } }).train).toBeUndefined();
+  });
+  it("orders a tab's sections the member's way, appends the rest in their default place, and drops hidden ones", () => {
+    expect(sectionLayout(TRAIN_SECTIONS, undefined)).toEqual([...TRAIN_SECTIONS]);
+    expect(sectionLayout(TRAIN_SECTIONS, { order: ["tools", "exercises"], hidden: ["run"] })).toEqual(["tools", "exercises", "programs", "calendar"]);
+    expect(sectionLayout(NUTRITION_SECTIONS, { hidden: ["relog", "water", "tools"] })).toEqual(["budget", "nutrients", "week", "weight", "targets", "saved"]);
+  });
+  it("never hides a section the tab always shows", () => {
+    expect(sectionLayout(["a", "b", "c"] as const, { hidden: ["a", "b"] }, ["a"])).toEqual(["a", "c"]);
   });
 });

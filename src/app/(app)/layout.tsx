@@ -11,7 +11,7 @@ import { getPlans } from "@/lib/domain/plans";
 import { NotificationSync } from "@/components/notifications/notification-sync";
 import { getNotificationSyncAction, importDeviceWorkoutReminderAction } from "@/server/actions/notifications";
 import { DemoBar } from "@/components/demo/demo-bar";
-import { demoAiSimulated, isDemoMode, isDemoUser } from "@/server/demo";
+import { demoAccount, demoAiSimulated, isDemoMode, isDemoUser } from "@/server/demo";
 import { isoDateInTz } from "@/lib/domain/dates";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -38,7 +38,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <KeyboardAvoidance />
       {/* In the iPhone/Android app: keep this phone's reminders (Faith, workouts, food, recovery) in line with the account. */}
       <NotificationSync load={getNotificationSyncAction} importWorkout={importDeviceWorkoutReminderAction} />
-      {isDemoMode() && <DemoBar plan={plan} canSwitch={isDemoUser(user)} aiSimulated={demoAiSimulated()} />}
+      {isDemoMode() && <DemoBar plan={plan} canSwitch={isDemoUser(user)} canReset={isDemoUser(user) && user.email === demoAccount()?.email} aiSimulated={demoAiSimulated()} />}
       <DraftUserProvider userId={user.id}>{children}</DraftUserProvider>
     </AppShell>
   );

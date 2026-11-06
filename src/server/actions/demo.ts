@@ -9,6 +9,7 @@ import { signupAcceptances } from "@/lib/legal/versions";
 import { getServerSupabase, getServiceSupabase } from "@/lib/supabase/server";
 import { requireUser } from "@/server/auth";
 import { demoAccount, isDemoMode, isDemoUser } from "@/server/demo";
+import { resetSampleAccount } from "@/server/demo-seed";
 import { logError } from "@/server/log";
 import { hashKey, rateLimit } from "@/server/rate-limit";
 
@@ -66,4 +67,24 @@ export async function setDemoPlanAction(formData: FormData): Promise<void> {
     .upsert({ user_id: user.id, plan, source: plan === "pro" ? "admin" : "default", valid_until: null }, { onConflict: "user_id" });
   if (error) logError("demo.plan", error);
   revalidatePath("/", "layout");
+}
+
+/**
+ * Reset demo: the sample account goes back to its starting state (every row and file of that one account removed,
+ * then the sample history seeded again) without touching any other account. Demo servers only, the sample account
+ * only, and the member stays signed in.
+ */
+export async function resetDemoAction(_formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const account = demoAccount();
+  if (!isDemoMode() || !account || !isDemoUser(user) || user.email !== account.email) return;
+  if (!(await rateLimit(`demo-reset:${user.id}`, 6, 10 * 60_000)).ok) return;
+  try {
+    await resetSampleAccount(getServiceSupabase(), user.id);
+  } catch (e) {
+    logError("demo.reset", e);
+    return;
+  }
+  revalidatePath("/", "layout");
+  redirect("/home?reset=1");
 }

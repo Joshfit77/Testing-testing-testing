@@ -204,7 +204,7 @@ export function AppShell({ children, userId, displayName, isAdmin, plan, textSiz
                     )}
                   >
                     <item.icon className={cn("size-6 transition-colors", active && "text-gold")} strokeWidth={active ? 2.25 : 1.75} aria-hidden />
-                    {item.label}
+                    <span className="max-w-full truncate px-0.5 [font-size:clamp(0.6875rem,0.75rem,0.8125rem)]">{item.label}</span>
                   </Link>
                 </li>
               );

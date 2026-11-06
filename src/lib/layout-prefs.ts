@@ -36,9 +36,62 @@ export const FAITH_SECTION_LABELS: Record<FaithSection, string> = {
   reflection: "Verse of the day in full",
 };
 
+/** The Train hub's sections after today's workout (which always stays). */
+export const TRAIN_SECTIONS = ["run", "programs", "exercises", "calendar", "tools"] as const;
+export type TrainSection = (typeof TRAIN_SECTIONS)[number];
+export const TRAIN_SECTION_LABELS: Record<TrainSection, { title: string; body: string }> = {
+  run: { title: "Run & walk", body: "GPS runs and walks, running plans, records" },
+  programs: { title: "Programs", body: "Your program and the library" },
+  exercises: { title: "Exercises", body: "The library, with demonstrations and your history" },
+  calendar: { title: "Training calendar", body: "Planned sessions, runs and rest days" },
+  tools: { title: "More training tools", body: "Builder, history, My workouts, recovery, training review" },
+};
+
+/** The Nutrition tab's sections after the three logging buttons, the daily totals and the meals (which always stay). */
+export const NUTRITION_SECTIONS = ["relog", "water", "budget", "nutrients", "week", "weight", "targets", "saved", "tools"] as const;
+export type NutritionSection = (typeof NUTRITION_SECTIONS)[number];
+export const NUTRITION_SECTION_LABELS: Record<NutritionSection, { title: string; body: string }> = {
+  relog: { title: "Recent foods", body: "One tap logs a recent food again" },
+  water: { title: "Water", body: "Glasses and the daily goal" },
+  budget: { title: "Calories remaining & today's estimate", body: "What's left of today's budget" },
+  nutrients: { title: "Nutrients", body: "Fiber, sugar and sodium" },
+  week: { title: "This week & history", body: "Charts and daily history" },
+  weight: { title: "Weight goal", body: "Bodyweight log and goal" },
+  targets: { title: "Targets & calorie budget", body: "Your daily numbers" },
+  saved: { title: "Saved meals, recipes & my foods", body: "Things you log often" },
+  tools: { title: "More tools", body: "Nutrition Score, recipes, planner, grocery, insights, supplements, diet" },
+};
+
+export interface SectionPrefs<T extends string> {
+  order?: T[];
+  hidden?: T[];
+}
 export interface LayoutPrefs {
   home?: { order?: HomeModule[]; hidden?: HomeModule[] };
   faith?: { hidden?: FaithSection[] };
+  train?: SectionPrefs<TrainSection>;
+  nutrition?: SectionPrefs<NutritionSection>;
+}
+
+function sectionPrefs<T extends string>(raw: unknown, all: readonly T[]): SectionPrefs<T> | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, unknown>;
+  const keep = (v: unknown) => (Array.isArray(v) ? [...new Set(v.filter((x): x is T => (all as readonly string[]).includes(x as string)))] : undefined);
+  const order = keep(o.order);
+  const hidden = keep(o.hidden);
+  if (!order?.length && !hidden) return undefined;
+  return { ...(order?.length ? { order } : {}), ...(hidden ? { hidden } : {}) };
+}
+
+/**
+ * A tab's sections in the member's order (new sections appended in their default place) minus the hidden ones;
+ * `always` can't be hidden.
+ */
+export function sectionLayout<T extends string>(all: readonly T[], prefs: SectionPrefs<T> | undefined, always: readonly T[] = []): T[] {
+  const chosen = prefs?.order ?? [];
+  const order = [...chosen.filter((m) => all.includes(m)), ...all.filter((m) => !chosen.includes(m))];
+  const hidden = new Set(prefs?.hidden ?? []);
+  return order.filter((m) => always.includes(m) || !hidden.has(m));
 }
 
 /** The stored JSON, kept only where it is well-formed (anything else is treated as "no preference"). */
@@ -56,6 +109,10 @@ export function parseLayoutPrefs(raw: unknown): LayoutPrefs {
   if (faith && typeof faith === "object" && Array.isArray(faith.hidden)) {
     out.faith = { hidden: [...new Set(faith.hidden.filter((s): s is FaithSection => (FAITH_SECTIONS as readonly string[]).includes(s as string)))] };
   }
+  const train = sectionPrefs(o.train, TRAIN_SECTIONS);
+  if (train) out.train = train;
+  const nutrition = sectionPrefs(o.nutrition, NUTRITION_SECTIONS);
+  if (nutrition) out.nutrition = nutrition;
   return out;
 }
 

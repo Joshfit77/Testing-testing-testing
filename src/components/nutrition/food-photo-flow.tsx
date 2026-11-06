@@ -25,7 +25,6 @@ import {
   type QuestionTopic,
 } from "@/lib/domain/food-photo";
 import { compressImage } from "@/lib/image-compress";
-import { cn } from "@/lib/utils";
 import { logFoodPhotoItemsAction, setFoodPhotoConsentAction } from "@/server/actions/food-photo";
 import type { MyFood } from "@/components/nutrition/nutrition-client";
 
@@ -578,7 +577,7 @@ export function FoodPhotoFlow({ date: initialDate, defaultMeal, myFoods, extras,
 
       <p className="text-xs text-muted-foreground">
         Don&apos;t want meal photos sent to the AI any more?{" "}
-        <button className={cn("underline")} onClick={() => void setFoodPhotoConsentAction(false).then(() => router.refresh())}>
+        <button type="button" className="inline-flex min-h-11 items-center underline" onClick={() => void setFoodPhotoConsentAction(false).then(() => router.refresh())}>
           Turn off meal photo analysis
         </button>
         .

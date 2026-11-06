@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookOpen, ChevronRight, CookingPot, Dumbbell, LayoutList, Search, Utensils } from "lucide-react";
+import { BookOpen, ChevronRight, CookingPot, Dumbbell, History, LayoutList, NotebookPen, Search, Utensils } from "lucide-react";
 import { BackLink } from "@/components/platform/back-link";
 import { PageHeader } from "@/components/common/page-header";
 import { ScriptureText } from "@/components/bible/scripture-text";
@@ -9,8 +9,10 @@ import { APP_RECIPES } from "@/data/app-recipes";
 import { COMMON_FOODS } from "@/data/foods";
 import { PROGRAMS } from "@/data/programs";
 import { prepareEntry, rankFoods } from "@/lib/domain/food-search";
+import { hasFeature } from "@/lib/domain/plans";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { requireOnboardedUser } from "@/server/auth";
+import { getUserPlan, requireOnboardedUser } from "@/server/auth";
+import { searchPersonal, type PersonalResults } from "@/server/services/personal-search";
 import { searchBible } from "@/server/bible/text";
 import { bookById, chapterHref } from "@/lib/bible/books";
 
@@ -94,8 +96,8 @@ function Group({ title, icon: Icon, rows, more }: { title: string; icon: typeof 
 export default async function SearchPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const { q = "" } = await searchParams;
   const query = q.trim().slice(0, 80);
-  const { user } = await requireOnboardedUser();
-  void user;
+  const { user, profile } = await requireOnboardedUser();
+  let personal: PersonalResults = { workouts: [], meals: [], journal: [] };
   let exercises: Row[] = [];
   let programs: Row[] = [];
   let foods: Row[] = [];
@@ -104,6 +106,9 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   let bible: { rows: Row[]; total: number } = { rows: [], total: 0 };
   if (query.length >= 2) {
     const supabase = await getServerSupabase();
+    // The member's own things first: their client (row-level security) and their id, never anyone else's rows.
+    const plan = await getUserPlan(user.id);
+    personal = await searchPersonal(supabase, user.id, query, { nutritionTools: hasFeature(plan, "nutrition_tracking"), timeZone: profile.timezone ?? "UTC" });
     const { data: ex } = await supabase.from("exercises").select("slug, name, category, primary_muscles").eq("is_published", true);
     const exRows = (ex ?? []) as { slug: string; name: string; category: string; primary_muscles: string[] | null }[];
     exercises = rankFoods(exRows, query, (e) => prepareEntry(`${e.name} ${e.category} ${(e.primary_muscles ?? []).join(" ")}`), 6).map((e) => ({
@@ -129,12 +134,12 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
       })),
     };
   }
-  const total = exercises.length + programs.length + foods.length + recipes.length + screens.length + bible.rows.length;
+  const total = exercises.length + programs.length + foods.length + recipes.length + screens.length + bible.rows.length + personal.workouts.length + personal.meals.length + personal.journal.length;
 
   return (
     <div className="space-y-4">
       <BackLink href="/home">Home</BackLink>
-      <PageHeader title="Search" description="Exercises, programs, foods, recipes, the Bible, and every screen and setting." className="mb-2" />
+      <PageHeader title="Search" description="Your workouts, saved meals and prayers; exercises, programs, foods, recipes, the Bible, and every screen and setting." className="mb-2" />
       <form action="/search" method="get" role="search" className="flex gap-2">
         <label htmlFor="search-q" className="sr-only">
           Search
@@ -145,6 +150,9 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
         </Button>
       </form>
       {query.length >= 2 && total === 0 && <p className="text-sm text-muted-foreground">Nothing matched &ldquo;{query}&rdquo;. Try a shorter word, or a book and chapter for the Bible.</p>}
+      <Group title="Your workouts" icon={History} rows={personal.workouts} more={{ href: "/train/history", label: "Workout history" }} />
+      <Group title="Your saved meals, recipes & foods" icon={Utensils} rows={personal.meals} more={{ href: "/nutrition/saved-meals", label: "Saved meals" }} />
+      <Group title="Your prayer journal" icon={NotebookPen} rows={personal.journal} more={{ href: "/faith/journal", label: "Prayer journal" }} />
       <Group title="Screens & settings" icon={LayoutList} rows={screens} />
       <Group title="Exercises" icon={Dumbbell} rows={exercises} more={{ href: `/train/exercises?q=${encodeURIComponent(query)}`, label: "All exercises" }} />
       <Group title="Programs" icon={Dumbbell} rows={programs} more={{ href: "/train/programs", label: "Program library" }} />
@@ -153,7 +161,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
       <Group title={bible.total ? `Bible (${bible.total.toLocaleString("en-US")} verses)` : "Bible"} icon={BookOpen} rows={bible.rows} more={{ href: `/faith/bible/search?q=${encodeURIComponent(query)}`, label: "All Bible results" }} />
       {query.length < 2 && (
         <p className="text-sm text-muted-foreground">
-          <BookOpen className="mr-1 inline size-4 text-gold" aria-hidden /> Type at least two letters. Bible results open the chapter at the verse; foods open the Nutrition tab&apos;s Add food dialog.
+          <BookOpen className="mr-1 inline size-4 text-gold" aria-hidden /> Type at least two letters. Your own workouts, saved meals and prayer entries come first (only yours, never anyone else&apos;s); Bible results open the chapter at the verse; foods open the Nutrition tab&apos;s Add food dialog.
         </p>
       )}
     </div>

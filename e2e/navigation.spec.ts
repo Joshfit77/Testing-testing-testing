@@ -92,11 +92,28 @@ test.describe("navigation shell", () => {
     await page.waitForTimeout(800);
     await page.goto("/home");
     await expect(page.getByRole("link", { name: /^Verse of the day/ })).toHaveCount(0);
+    // Train and Nutrition sections can be hidden and reordered too; reset puts everything back.
+    await page.goto("/profile/customize");
+    await page.getByRole("button", { name: "Hide Run & walk on Train" }).click();
+    await page.waitForTimeout(800);
+    await page.getByRole("button", { name: "Move More tools up" }).click();
+    await page.waitForTimeout(800);
+    await page.getByRole("button", { name: "Hide Water on Nutrition" }).click();
+    await page.waitForTimeout(800);
+    await page.goto("/train");
+    await expect(page.getByRole("navigation", { name: "Training sections" }).getByRole("link")).toHaveText([/Programs/, /Exercises/, /Training calendar/]);
+    await page.goto("/nutrition");
+    await expect(page.getByRole("heading", { name: "Water", exact: true })).toHaveCount(0);
+    await expect(page.locator("main details").first()).toContainText("More tools");
     await page.goto("/profile/customize");
     await page.getByRole("button", { name: "Reset to the default for my goal" }).click();
     await page.waitForTimeout(800);
     await page.goto("/home");
     await expect(page.getByRole("link", { name: /^Verse of the day/ })).toBeVisible();
+    await page.goto("/train");
+    await expect(page.getByRole("navigation", { name: "Training sections" }).getByRole("link")).toHaveText([/Run & walk/, /Programs/, /Exercises/, /Training calendar/]);
+    await page.goto("/nutrition");
+    await expect(page.getByRole("heading", { name: "Water", exact: true })).toBeVisible();
     await page.goto("/profile");
 
     // Text size applies immediately and persists across reloads.

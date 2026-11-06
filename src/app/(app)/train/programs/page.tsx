@@ -101,7 +101,7 @@ export default async function ProgramsPage({ searchParams }: { searchParams: Pro
   const anyFilter = nFilters > 0 || Boolean(filters.q) || Boolean(filters.category);
   const chip = (active: boolean) =>
     cn(
-      "inline-flex min-h-11 shrink-0 items-center rounded-full border px-4 text-sm font-semibold",
+      "inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-semibold",
       active ? "border-gold bg-gold/10 text-gold-highlight" : "border-border text-muted-foreground hover:text-foreground",
     );
   const mine = (mineRes.data ?? []) as unknown as {
@@ -142,7 +142,7 @@ export default async function ProgramsPage({ searchParams }: { searchParams: Pro
               (m) =>
                 m.program && (
                   <li key={m.id} className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-3 pl-4">
-                    <Link href={`/train/programs/${m.program.slug}`} className="min-w-0 hover:text-gold-highlight">
+                    <Link href={`/train/programs/${m.program.slug}`} className="flex min-h-11 min-w-0 flex-1 flex-col justify-center hover:text-gold-highlight">
                       <p className="truncate font-semibold">{m.program.name}</p>
                       <p className="text-xs text-muted-foreground">
                         {titleCase(m.status)}
@@ -252,11 +252,11 @@ export default async function ProgramsPage({ searchParams }: { searchParams: Pro
           </details>
         </form>
 
-        <nav aria-label="Program categories" className="scrollbar-none -mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+        <nav aria-label="Program categories" className="flex flex-wrap gap-2 pb-1">
           <Link href={`/train/programs${catalogQuery({ ...filters, category: undefined })}#library`} aria-current={!filters.category ? "page" : undefined} className={chip(!filters.category)}>
             All
           </Link>
-          {/* The selected category comes first so it's visible without scrolling the chip row. */}
+          {/* The selected category comes first so it's on the first row of chips. */}
           {[...SPEC_CATEGORIES].sort((a, b) => Number(b.id === filters.category) - Number(a.id === filters.category)).map((c) => (
             <Link key={c.id} href={`/train/programs${catalogQuery({ ...filters, category: c.id })}#library`} aria-current={filters.category === c.id ? "page" : undefined} className={chip(filters.category === c.id)}>
               {c.label}

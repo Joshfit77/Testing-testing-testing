@@ -471,7 +471,7 @@ export function OnboardingWizard({ initial, mode = "create" }: { initial: Onboar
       {error && <Notice tone="error">{error}</Notice>}
       {success && <Notice tone="success">{success}</Notice>}
 
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <Button type="button" variant="ghost" onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0 || pending}>
           <ArrowLeft aria-hidden /> Back
         </Button>

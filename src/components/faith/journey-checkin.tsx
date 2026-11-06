@@ -163,7 +163,7 @@ export function JourneyCheckIn({
                     </Button>
                   ) : (
                     !isQueued && (
-                      <Button type="button" size="sm" disabled={pending} onClick={() => mark(r.id)}>
+                      <Button type="button" size="sm" className="h-auto min-h-9 whitespace-normal py-1.5 text-left" disabled={pending} onClick={() => mark(r.id)}>
                         <CheckCircle2 aria-hidden /> {r.id === "reading" ? "Mark reading complete" : "Mark prayer complete"}
                       </Button>
                     )

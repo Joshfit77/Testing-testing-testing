@@ -167,13 +167,13 @@ export function ExercisePoseFrames({ slug, name, meta, muscles, className, contr
             role="img"
             aria-label={`${name}, ${p.label.toLowerCase()} position`}
           />
-          <figcaption className="absolute bottom-1.5 left-1.5 rounded bg-black/65 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-widest text-gold-highlight">
+          <figcaption className="absolute bottom-1.5 left-1.5 rounded bg-black/65 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-widest text-gold-highlight">
             {p.label}
           </figcaption>
         </figure>
       ))}
       {controls && (
-        <span className="absolute left-1.5 top-1.5 rounded bg-black/65 px-1.5 py-0.5 text-[0.625rem] font-semibold text-muted-foreground" data-testid="pose-frames-badge">
+        <span className="absolute left-1.5 top-1.5 rounded bg-black/65 px-1.5 py-0.5 text-xs font-semibold text-muted-foreground" data-testid="pose-frames-badge">
           Pose frames · animation in progress
         </span>
       )}
@@ -196,7 +196,7 @@ export function DemoPlaceholder({ name, className, compact = false }: { name: st
     >
       <Hourglass className={cn("text-gold", compact ? "size-4" : "size-6")} aria-hidden />
       {compact ? (
-        <span className="text-[0.625rem] font-semibold uppercase leading-tight tracking-widest text-muted-foreground">Demo soon</span>
+        <span className="text-xs font-semibold uppercase leading-tight tracking-widest text-muted-foreground">Demo soon</span>
       ) : (
         <>
           <span className="text-sm font-semibold text-foreground">Demonstration in progress</span>

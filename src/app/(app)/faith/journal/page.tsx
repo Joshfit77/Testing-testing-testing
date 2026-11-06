@@ -76,14 +76,14 @@ export default async function JournalPage({ searchParams }: { searchParams: Prom
         </Button>
       </form>
 
-      <nav aria-label="Filter entries" className="scrollbar-none -mx-4 flex gap-2 overflow-x-auto px-4">
+      <nav aria-label="Filter entries" className="flex flex-wrap gap-2">
         {JOURNAL_FILTERS.map((f) => (
           <Link
             key={f}
             href={href(f)}
             aria-current={filter === f ? "page" : undefined}
             className={cn(
-              "inline-flex min-h-11 shrink-0 items-center rounded-full border px-4 text-sm font-semibold",
+              "inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-semibold",
               filter === f ? "border-gold bg-gold/10 text-gold-highlight" : "border-border text-muted-foreground",
             )}
           >

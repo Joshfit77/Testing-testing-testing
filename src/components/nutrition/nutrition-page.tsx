@@ -30,10 +30,10 @@ export const FOOD_TOOLS = [
 
 export function FoodToolsNav({ current }: { current: string }) {
   return (
-    <nav aria-label="Food tools" className="-mx-4 overflow-x-auto px-4 pb-1">
-      <ul className="flex gap-2">
+    <nav aria-label="Food tools" className="pb-1">
+      <ul className="flex flex-wrap gap-2">
         {FOOD_TOOLS.map((t) => (
-          <li key={t.href} className="shrink-0">
+          <li key={t.href}>
             <Link
               href={t.href}
               aria-current={t.href === current ? "page" : undefined}

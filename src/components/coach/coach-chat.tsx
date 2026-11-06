@@ -368,7 +368,7 @@ function CoachChatView({ conversationId: initialId, initialMessages, initialQues
             role="tab"
             aria-selected={mode === "chat"}
             onClick={() => setMode("chat")}
-            className={cn("flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold", mode === "chat" ? "bg-elevated text-gold-highlight" : "text-muted-foreground")}
+            className={cn("flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold", mode === "chat" ? "bg-elevated text-gold-highlight" : "text-muted-foreground")}
           >
             <MessageSquare className="size-4" aria-hidden /> Ask
           </button>
@@ -378,9 +378,9 @@ function CoachChatView({ conversationId: initialId, initialMessages, initialQues
             onClick={() => canGeneratePlans && setMode("plan")}
             disabled={!canGeneratePlans}
             title={canGeneratePlans ? undefined : "Plan generation is included with Pro All Access"}
-            className={cn("flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold disabled:opacity-50", mode === "plan" ? "bg-elevated text-gold-highlight" : "text-muted-foreground")}
+            className={cn("flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold disabled:opacity-50", mode === "plan" ? "bg-elevated text-gold-highlight" : "text-muted-foreground")}
           >
-            <Sparkles className="size-4" aria-hidden /> Plan {!canGeneratePlans && <span className="text-[0.6875rem] uppercase">Pro</span>}
+            <Sparkles className="size-4" aria-hidden /> Plan {!canGeneratePlans && <span className="text-xs uppercase">Pro</span>}
           </button>
         </div>
         <div className="flex items-center gap-3">

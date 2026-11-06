@@ -53,7 +53,7 @@ export interface MotionController {
 }
 
 const BTN =
-  "display:inline-flex;align-items:center;justify-content:center;gap:4px;min-width:44px;height:36px;padding:0 10px;border-radius:999px;" +
+  "display:inline-flex;align-items:center;justify-content:center;gap:4px;min-width:44px;height:44px;padding:0 12px;border-radius:999px;" +
   "border:1px solid rgba(212,170,60,0.45);background:rgba(10,10,10,0.72);color:#f3d77a;font:600 12px/1 system-ui,sans-serif;cursor:pointer;" +
   "backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)";
 

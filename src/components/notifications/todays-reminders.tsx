@@ -48,7 +48,7 @@ export function TodaysReminders({ items }: { items: TodayReminder[] }) {
       </ul>
       <p className="mt-2 text-xs text-muted-foreground">
         Shown here because this device isn&rsquo;t showing notifications.{" "}
-        <Link href="/profile/notifications" className="font-semibold text-gold-highlight underline">
+        <Link href="/profile/notifications" className="inline-flex min-h-11 items-center font-semibold text-gold-highlight underline">
           Notification settings
         </Link>
       </p>
