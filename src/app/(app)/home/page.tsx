@@ -243,7 +243,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         key="verse"
         href="/faith#todays-devotional"
         className="group relative block overflow-hidden rounded-2xl border border-border bg-card focus-visible:ring-2 focus-visible:ring-gold-highlight"
-        aria-label={`Verse of the day, ${verse.reference}: ${verse.text} Open today's devotional.`}
       >
         {/* Decorative original artwork; the verse is the content. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -257,6 +256,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           <p className="mt-1.5 flex items-center gap-1 text-sm text-white/80">
             {verse.reference} ({TRANSLATION.code}) <ChevronRight className="size-4 text-gold transition-transform group-hover:translate-x-0.5" aria-hidden />
           </p>
+          <span className="sr-only">. Open today&apos;s devotional.</span>
         </div>
       </Link>
     ) : null,

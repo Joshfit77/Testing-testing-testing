@@ -34,7 +34,7 @@ export function PracticesPanel({ practices, checkins, today }: { practices: Prac
     <div className="space-y-4">
       {practices.length > 0 && (
         <>
-          <div className="grid grid-cols-7 gap-1" role="group" aria-label="Day to check off">
+          <div className="grid grid-cols-7 gap-0.5" role="group" aria-label="Day to check off">
             {days.map((d) => {
               const l = dayLabel(d, today);
               return (
