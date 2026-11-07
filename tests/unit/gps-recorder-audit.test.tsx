@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GpsFix } from "@/lib/domain/gps-track";
 
 /**
@@ -252,5 +252,24 @@ describe("treadmill and manual entry", () => {
     expect(location.watchLocation).not.toHaveBeenCalled();
     expect(location.browserLocationPermission).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
+  });
+});
+
+describe("the clock while paused", () => {
+  beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }));
+  afterEach(() => vi.useRealTimers());
+
+  it("total time keeps counting through a pause (pauses are part of total time), while moving time stops", async () => {
+    const { fix } = await startRecording();
+    walk(fix, Date.now(), 5);
+    await act(() => vi.advanceTimersByTimeAsync(5_000));
+    fireEvent.click(screen.getByRole("button", { name: "Pause" }));
+    expect(await screen.findByText("Paused")).toBeInTheDocument();
+    const elapsedAtPause = screen.getByTestId("gps-elapsed").textContent!;
+    const movingAtPause = screen.getByTestId("gps-moving").textContent!;
+    await act(() => vi.advanceTimersByTimeAsync(10_000));
+    const toS = (hms: string) => hms.split(":").reduce((s, p) => s * 60 + Number(p), 0);
+    expect(toS(screen.getByTestId("gps-elapsed").textContent!)).toBeGreaterThanOrEqual(toS(elapsedAtPause) + 9);
+    expect(screen.getByTestId("gps-moving").textContent).toBe(movingAtPause);
   });
 });

@@ -256,8 +256,9 @@ export function GpsRecorder({
     [stopWatching],
   );
 
-  // Clock: elapsed time, signal-loss detection and the guided script.
-  const active = track && (track.status === "recording" || track.status === "acquiring");
+  // Clock: elapsed time, signal-loss detection and the guided script. It runs through a pause too: total time includes
+  // pauses (only moving time stops), and tick() leaves a paused track alone.
+  const active = track && track.status !== "finished";
   useEffect(() => {
     if (!active) return;
     // Suspend-aware: after the phone was locked, fixes queued meanwhile arrive late and must not be read as a gap.
