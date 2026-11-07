@@ -267,7 +267,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               {data.weekStreak > 0 ? <span className="text-muted-foreground"> · {data.weekStreak} week streak</span> : null}
             </span>
           </span>
-          <ChevronRight className="size-6 shrink-0 text-foreground/80" aria-hidden />
+          <span className="flex shrink-0 items-center gap-1 text-sm font-semibold text-gold-highlight">
+            My Progress <ChevronRight className="size-5" aria-hidden />
+          </span>
         </Link>
         <ProgressBar className="mt-3 h-3" value={weeklyTarget ? Math.min(100, (sessionsThisWeek / weeklyTarget) * 100) : sessionsThisWeek > 0 ? 100 : 0} label="Workouts done this week" />
         <WeekBars days={weekly.days} className="mt-4" />
@@ -305,7 +307,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     <div className="space-y-3">
       <SceneHero className={isDemoMode() ? "-mx-4 rounded-2xl md:mx-0" : "-mx-4 -mt-[calc(env(safe-area-inset-top)+0.25rem)] pt-[env(safe-area-inset-top)] md:mx-0 md:mt-0 md:rounded-2xl"} minHeight="min-h-[21rem]">
         <div className="flex flex-col px-4 pb-6 pt-3">
-          <div className="flex items-center justify-between gap-2">
+          <header className="flex items-center justify-between gap-2 @container">
             <span className="inline-flex items-center gap-2">
               <LogoMark className="size-8" />
               <span className="font-serif text-sm font-semibold uppercase leading-none tracking-[0.18em] text-champagne [text-shadow:0_1px_6px_rgba(0,0,0,0.7)]">Narrow Gate Fitness</span>
@@ -315,7 +317,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               <QuickAddButton userId={user.id} today={data.today} />
               <CoachButton />
             </span>
-          </div>
+          </header>
           <h1 className="mt-14 font-display text-[2.125rem] font-bold leading-[1.1] tracking-tight text-white [text-shadow:0_2px_12px_rgba(0,0,0,0.7)] [text-wrap:balance]">
             {greeting},
             <br />

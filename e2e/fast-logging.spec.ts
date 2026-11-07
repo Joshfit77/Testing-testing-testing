@@ -20,7 +20,7 @@ const isBackup = (r: { method(): string; headers(): Record<string, string> }) =>
 
 /** Seconds shown on the card's rest timer ("1:45" → 105). */
 async function restSeconds(page: Page): Promise<number> {
-  const text = (await page.getByTestId("current-rest").locator("span").first().innerText()).trim();
+  const text = (await page.getByTestId("current-rest").getByTestId("rest-remaining").innerText()).trim();
   const [m, s] = text.split(":").map(Number);
   return m! * 60 + s!;
 }
@@ -153,10 +153,10 @@ test.describe("fast workout logging", () => {
     await card.getByLabel("Reps", { exact: true }).fill("12");
     await card.getByTestId("complete-set").click();
     await expect(card.getByTestId("current-rest")).toBeVisible();
-    // Shorten the rest to a few seconds (−15s at a time). Stop at 20s or less, so it ends between 6 and 20 seconds
-    // from now: stopping at 15 could leave 1s (e.g. 1:31 → … → 0:16 → 0:01), and the timer would vanish before the next read.
-    for (let i = 0; i < 20 && (await restSeconds(page)) > 20; i++) await card.getByRole("button", { name: "Subtract 30 seconds" }).click();
-    await expect(card.getByTestId("rest-over")).toHaveText(/Rest over\. Set 2 of 3 is ready\./, { timeout: 25_000 });
+    // Shorten the rest to a few seconds (−30s at a time). Stop at 35s or less, so it ends between 6 and 35 seconds
+    // from now: taking 30 off 30 would end it at once, and the timer would vanish before the next read.
+    for (let i = 0; i < 20 && (await restSeconds(page)) > 35; i++) await card.getByRole("button", { name: "Subtract 30 seconds" }).click();
+    await expect(card.getByTestId("rest-over")).toHaveText(/Rest over\. Set 2 of 3 is ready\./, { timeout: 40_000 });
 
     // Every control fits common phone widths: no sideways scrolling, nothing cut off.
     await card.getByTestId("complete-set").click();

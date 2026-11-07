@@ -237,13 +237,16 @@ export function CurrentSetCard({
         <div className="relative">
           <RestRing remaining={rest} total={restTotal} />
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Rest</span>
-            <span className="font-display text-[2.5rem] font-bold leading-none tabular-nums text-gold-highlight">{formatDuration(rest)}</span>
+            {/* The time comes first in the DOM (what assistive tech and the tests read); the label sits above it visually. */}
+            <span className="order-2 font-display text-[2.5rem] font-bold leading-none tabular-nums text-gold-highlight" data-testid="rest-remaining">
+              {formatDuration(rest)}
+            </span>
+            <span className="order-1 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Rest</span>
             {onTogglePause && (
               <button
                 type="button"
                 onClick={onTogglePause}
-                className="mt-2 flex size-10 items-center justify-center rounded-full bg-gold-gradient text-black shadow-bronze focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-highlight"
+                className="order-3 mt-2 flex size-10 items-center justify-center rounded-full bg-gold-gradient text-black shadow-bronze focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-highlight"
                 aria-label={paused ? "Resume rest" : "Pause rest"}
                 aria-pressed={paused}
               >

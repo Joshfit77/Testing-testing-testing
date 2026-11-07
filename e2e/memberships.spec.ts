@@ -36,13 +36,13 @@ test.describe("memberships", () => {
 
     // Every Fitness, Food and Faith rank is earnable on Free.
     await page.goto("/progress/badges");
-    await expect(page.getByRole("button", { name: "Foundation, rank 1 of 9, locked" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Conqueror, rank 9 of 9, locked" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Foundation.*rank 1 of 9, locked/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Conqueror.*rank 9 of 9, locked/ })).toBeVisible();
     await expect(page.getByText(/included with Pro/i)).toHaveCount(0);
     await page.getByRole("tab", { name: /Food/ }).click();
     await expect(page.getByRole("list", { name: "Food ranks" }).getByRole("listitem")).toHaveCount(9);
     await page.getByRole("tab", { name: /Faith/ }).click();
-    await expect(page.getByRole("button", { name: "Cedar, rank 9 of 9, locked" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Cedar.*rank 9 of 9, locked/ })).toBeVisible();
 
     // Five saved workouts on Free; existing ones stay usable, new ones need Pro.
     await page.goto("/train/templates");
@@ -70,7 +70,7 @@ test.describe("memberships", () => {
     await expect(page.getByTestId("current-plan")).toContainText("Plus");
     await expect(page.getByText(/no longer offered to new members/)).toBeVisible();
     await page.goto("/progress/badges");
-    await expect(page.getByRole("button", { name: "Disciplined, rank 4 of 9, locked" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Disciplined.*rank 4 of 9, locked/ })).toBeVisible();
     await page.goto("/train/templates");
     await expect(page.getByTestId("template-limit")).toHaveCount(0);
 
