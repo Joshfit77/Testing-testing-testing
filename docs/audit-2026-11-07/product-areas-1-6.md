@@ -190,9 +190,17 @@ down, see Environment status); **code review** = conclusion from reading the cod
 | Typecheck after the fix | `npx tsc --noEmit -p .` | exit 0 |
 | Lint of changed files | `npx eslint src/lib/validation/schemas.ts tests/unit/validation-dates.test.ts` | clean |
 
-Integration (`tests/integration/*`, 27 files relevant to these areas) and e2e (`e2e/*.spec.ts`) — **not run**: Docker daemon
-down, local Supabase unreachable for the whole audit window (re-checked after every step). The baseline in the
-addendum (integration 157 passed / 27 files; e2e core-flow + current-set-card passed) is the last real result.
+## Integration suites executed (vitest `--project integration`, local Supabase, after it came back at ~23:10 UTC)
+
+Docker and local Supabase were down for the first part of the audit (every check returned `000`); the lead restored
+them, and the integration batch for these six areas was then run for real:
+
+| Batch | Command | Result |
+| --- | --- | --- |
+| 33 files: onboarding-plan, activation-events, legal-acceptances, account-security, auth-email-links, workouts, workout-fast-logging, custom-programs, training-stage2, adaptive-training, edit-safety, food-amounts, food-favorites, food-photo, food-quality, barcode-media, ai-meal-plan, recipes-planner, personal-search, faith-features, faith-journeys, faith-calendar, bible-ai-helper, bible-display-prefs, ai-limits, ai-route-limits, coach-memory, coach-feedback, coach-provider-limits, plan-enforcement, pro-bypass, rls, cross-user-isolation | `npx vitest run --project integration <files>` | **33 files, 194 tests passed, 0 skipped**, 46.9 s |
+
+Every "integration … not run" note in the per-area tables below therefore now reads as **ran, passed** for the files
+listed above; the e2e status is given in the e2e section at the end.
 
 ## Ad-hoc probes (pure functions, executed)
 
@@ -445,11 +453,19 @@ addendum (integration 157 passed / 27 files; e2e core-flow + current-set-card pa
 
 ## Data isolation check with the service-role REST helper
 
-The brief asked for a probe through the authenticated client against another user's rows using `e2e/helpers.ts
-serviceRest/seedRows`. **Not executed**: both the helper and the authenticated client need the local Supabase, which was
-unreachable for the whole audit. The committed `cross-user-isolation.test.ts` performs exactly this probe for every
-user-owned table (seed as Alice, read/update/delete/insert as Bob, as admin and as anon) and passed in the addendum's
-baseline run (part of the 157).
+**Executed** once Supabase was back, as a scratch integration test (removed afterwards; the committed
+`cross-user-isolation.test.ts` covers every user-owned table the same way and passed in the batch above). Method: rows
+seeded as Alice through the service-role REST endpoint (the same call `e2e/helpers.ts serviceRest/seedRows` makes) in
+`workout_sessions`, `meals`, `faith_journal_entries` (body "Private prayer: …"), `ai_conversations`, `coach_memories`;
+then Bob, signed in through the anon client (RLS applies):
+
+- Alice sees each of her 5 rows (non-vacuous).
+- Bob `select … eq id` and `select … eq user_id=alice` → **0 rows in every table**.
+- Bob `update {user_id: bob}` and `delete` by id → **0 rows affected**; Alice's rows still hers.
+- Bob `insert` a journal entry or a coach memory with `user_id = alice` → **refused** (policy violation); Alice still
+  has exactly one journal entry.
+- Result: 4/4 probe tests passed. (`bible_notes` seeding failed on its own check constraint for `book_id`, so that
+  table was covered by `cross-user-isolation.test.ts` only.)
 
 ## Commits in this worktree
 - `72fab90` Audit areas 1-6: inventory and environment status
