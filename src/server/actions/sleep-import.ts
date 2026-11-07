@@ -5,7 +5,7 @@ import { z } from "zod";
 import { actionError, actionOk, type ActionState } from "@/lib/action-state";
 import { isoDateInTz } from "@/lib/domain/dates";
 import { findOverlap, isValidTimeZone, nightOf, validateSleepSession, type SleepSessionTimes } from "@/lib/domain/sleep";
-import { IMPORT_SOURCE_LABEL, MAX_IMPORT_HOURS, VITAL_RANGES } from "@/lib/domain/sleep-import";
+import { IMPORT_SOURCE_LABEL, importedSessionKind, MAX_IMPORT_HOURS, VITAL_RANGES } from "@/lib/domain/sleep-import";
 import { hasVitals, type SleepVitals } from "@/lib/domain/sleep";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getProfile, requireUser } from "@/server/auth";
@@ -160,7 +160,9 @@ export async function importSleepAction(input: unknown): Promise<ImportSummary> 
       }
       continue;
     }
-    const times: SleepSessionTimes = { kind: "night", timezone: v.timezone, startedAt: s.startedAt, endedAt: s.endedAt, onsetAt: s.onsetAt, finalWakeAt: s.finalWakeAt, awakeMinutes: s.awakeMinutes, awakenings: s.awakenings };
+    // The platform doesn't say night or nap; a short daytime record is a nap so it never inflates a night's totals.
+    const kind = importedSessionKind(s.startedAt, s.endedAt, v.timezone);
+    const times: SleepSessionTimes = { kind, timezone: v.timezone, startedAt: s.startedAt, endedAt: s.endedAt, onsetAt: s.onsetAt, finalWakeAt: s.finalWakeAt, awakeMinutes: s.awakeMinutes, awakenings: s.awakenings };
     const check = validateSleepSession(times, now + 60_000);
     if (!check.ok || (Date.parse(s.endedAt) - Date.parse(s.startedAt)) / 3_600_000 > MAX_IMPORT_HOURS) {
       rejected++;
@@ -174,7 +176,7 @@ export async function importSleepAction(input: unknown): Promise<ImportSummary> 
     const { error } = await supabase.from("sleep_sessions").insert({
       id,
       user_id: user.id,
-      kind: "night",
+      kind,
       started_at: s.startedAt,
       ended_at: s.endedAt,
       onset_at: s.onsetAt,
@@ -226,7 +228,7 @@ export async function importSleepAction(input: unknown): Promise<ImportSummary> 
   const parts = [`${added} added`];
   if (updated) parts.push(`${updated} gained overnight measurements`);
   if (duplicates - updated > 0) parts.push(`${duplicates - updated} already imported`);
-  if (conflicts) parts.push(`${conflicts} skipped (overlap an entry you made)`);
+  if (conflicts) parts.push(`${conflicts} skipped (overlap sleep already stored)`);
   if (rejected) parts.push(`${rejected} couldn't be used`);
   return { ...actionOk(`${label}: ${parts.join(", ")}.`), added, duplicates, conflicts, rejected, updated, withVitals };
 }

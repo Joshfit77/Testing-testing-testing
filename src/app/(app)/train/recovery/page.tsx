@@ -59,6 +59,7 @@ export default async function RecoveryPage() {
                   <span className="text-muted-foreground"> / 100 · {latest.checked_on as string}</span>
                 </p>
                 <p className="mt-2 text-sm text-muted-foreground">{readinessNote(band)}</p>
+                <p className="mt-1 text-xs text-muted-foreground">Worked out from your four answers (sleep quality, energy, soreness, stress), not from any measurement.</p>
               </>
             ) : (
               <p className="mt-2 text-sm text-muted-foreground">No check-ins yet. Your readiness note will appear here.</p>

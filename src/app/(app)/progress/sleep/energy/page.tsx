@@ -48,6 +48,20 @@ export default async function SleepEnergyPage() {
       <BackLink href="/progress/sleep">Sleep & Recovery</BackLink>
       <PageHeader eyebrow="Sleep & Recovery" title="Daily energy" description="An estimate of how alert you're likely to feel through today, and what you actually reported. Two different things, shown together on purpose." />
 
+      {!lastNight && w.anchorWake === null ? (
+        <section className={card} aria-labelledby="curve-title">
+          <h2 id="curve-title" className="font-display text-xl font-bold uppercase">
+            Estimated alertness today
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Nothing to estimate from yet: no night is logged for this morning and there is no typical or chosen wake time. Log last night, or set a wake time under{" "}
+            <Link href="/progress/sleep/schedule" className="font-semibold text-gold-highlight underline">
+              Sleep schedule
+            </Link>
+            , and the hour-by-hour estimate appears here. A curve drawn from an assumed wake time would be a guess, not an estimate from your data.
+          </p>
+        </section>
+      ) : (
       <section className={card} aria-labelledby="curve-title">
         <h2 id="curve-title" className="font-display text-xl font-bold uppercase">
           Estimated alertness today
@@ -91,6 +105,7 @@ export default async function SleepEnergyPage() {
           </div>
         </dl>
       </section>
+      )}
 
       <section className={card} aria-labelledby="reported-title">
         <h2 id="reported-title" className="font-display text-xl font-bold uppercase">
