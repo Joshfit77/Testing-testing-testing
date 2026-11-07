@@ -204,6 +204,7 @@ npx vitest run tests/unit/gps-recorder-audit.test.tsx -t "clock while paused"   
 npx vitest run <the six GPS unit files>                                                            → 6 files, 90 passed (after the fix)
 npx vitest run (full suite)                                                                        → 170 files passed, 49 skipped; 3,303 tests passed, 319 skipped
 npx tsc --noEmit -p .                                                                              → exit 0
+npx next build                                                                                     → "Compiled successfully", exit 0 (/run/record, /run/activities/[id] built)
 npx eslint <changed files>                                                                         → clean
 e2e / integration                                                                                  → not run (Docker daemon down; Supabase 127.0.0.1:54321 unreachable)
 ```
