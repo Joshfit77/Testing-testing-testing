@@ -68,11 +68,11 @@ test.describe("fast workout logging", () => {
         [false, null],
       ]);
 
-    // The programmed rest starts by itself; add 15 seconds, then skip it.
+    // The programmed rest starts by itself; add 30 seconds, then skip it.
     await expect(card.getByTestId("current-rest")).toBeVisible();
     const before = await restSeconds(page);
-    await card.getByRole("button", { name: "Add 15 seconds" }).click();
-    expect(await restSeconds(page)).toBeGreaterThanOrEqual(before + 13);
+    await card.getByRole("button", { name: "Add 30 seconds" }).click();
+    expect(await restSeconds(page)).toBeGreaterThanOrEqual(before + 28);
     await card.getByRole("button", { name: "Skip rest" }).click();
     await expect(card.getByTestId("current-rest")).toHaveCount(0);
 
@@ -155,7 +155,7 @@ test.describe("fast workout logging", () => {
     await expect(card.getByTestId("current-rest")).toBeVisible();
     // Shorten the rest to a few seconds (−15s at a time). Stop at 20s or less, so it ends between 6 and 20 seconds
     // from now: stopping at 15 could leave 1s (e.g. 1:31 → … → 0:16 → 0:01), and the timer would vanish before the next read.
-    for (let i = 0; i < 20 && (await restSeconds(page)) > 20; i++) await card.getByRole("button", { name: "Subtract 15 seconds" }).click();
+    for (let i = 0; i < 20 && (await restSeconds(page)) > 20; i++) await card.getByRole("button", { name: "Subtract 30 seconds" }).click();
     await expect(card.getByTestId("rest-over")).toHaveText(/Rest over\. Set 2 of 3 is ready\./, { timeout: 25_000 });
 
     // Every control fits common phone widths: no sideways scrolling, nothing cut off.

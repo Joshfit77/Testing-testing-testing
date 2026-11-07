@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { NotificationTodaySync } from "@/components/notifications/notification-sync";
-import { BarChart3, BookMarked, Camera, ScanBarcode, CalendarClock, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, CookingPot, Pill, Salad, Scale, ShoppingCart, Trash2, TrendingUp } from "lucide-react";
+import { BarChart3, BookMarked, Camera, ScanBarcode, CalendarClock, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Coffee, Cookie, CookingPot, Moon, Pill, Salad, Scale, ShoppingCart, Sun, Trash2, TrendingUp, type LucideIcon } from "lucide-react";
 import { BarSeriesChart } from "@/components/charts/charts";
 import { MainHeader } from "@/components/shell/main-header";
 import { BudgetForm, CopyMealButton, QuickAddDialog } from "@/components/nutrition/diary-client";
@@ -642,21 +642,21 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
           }}
         />
       )}
-      <nav className="-mt-3 flex items-center justify-center gap-2" aria-label="Choose day">
-        <Button asChild variant="ghost" size="icon" aria-label="Previous day">
+      <nav className="-mt-3 flex items-center justify-center gap-3" aria-label="Choose day">
+        <Button asChild variant="secondary" size="icon" className="rounded-full" aria-label="Previous day">
           <Link href={`/nutrition?date=${addDays(date, -1)}`}>
             <ChevronLeft aria-hidden />
           </Link>
         </Button>
         <div className="min-w-32 text-center">
-          <p className="text-base font-semibold">{label}</p>
+          <p className="font-display text-xl font-bold">{label}</p>
           {date !== today && (
             <Link href="/nutrition" className="text-sm text-gold-highlight hover:underline">
               Back to today
             </Link>
           )}
         </div>
-        <Button asChild variant="ghost" size="icon" aria-label="Next day">
+        <Button asChild variant="secondary" size="icon" className="rounded-full" aria-label="Next day">
           <Link href={`/nutrition?date=${addDays(date, 1)}`}>
             <ChevronRight aria-hidden />
           </Link>
@@ -664,14 +664,14 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
       </nav>
 
       {/* Logging first: the three ways to add food, on the first screen, each a full-height button. */}
-      <div className="grid grid-cols-3 gap-2" data-testid="log-actions">
+      <div className="grid grid-cols-3 gap-3" data-testid="log-actions">
         <AddFoodDialog date={date} myFoods={myFoods} commonFoods={commonFoods} remoteSearch={remoteSearch} categories={categories} dietName={diet.name} recent={recent} frequent={frequent} favorites={favorites} autoOpen={sp.add === "1"} />
-        <Button asChild variant="secondary" className="h-auto min-h-14 flex-col gap-1 whitespace-normal px-1 py-2 text-center [&_svg]:size-5">
+        <Button asChild variant="secondary" className="h-auto min-h-[4.75rem] flex-col gap-1.5 whitespace-normal rounded-2xl border-border bg-card px-1 py-3 text-center text-sm hover:border-gold-muted [&_svg]:size-6 [&_svg]:text-gold">
           <Link href="/nutrition/scanner">
             <ScanBarcode aria-hidden /> Scan barcode
           </Link>
         </Button>
-        <Button asChild variant="secondary" className="h-auto min-h-14 flex-col gap-1 whitespace-normal px-1 py-2 text-center [&_svg]:size-5">
+        <Button asChild variant="secondary" className="h-auto min-h-[4.75rem] flex-col gap-1.5 whitespace-normal rounded-2xl border-border bg-card px-1 py-3 text-center text-sm hover:border-gold-muted [&_svg]:size-6 [&_svg]:text-gold">
           <Link href={`/nutrition/photo?date=${date}`}>
             <Camera aria-hidden /> Meal photo
           </Link>
@@ -686,26 +686,25 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
         </h2>
         <div className="flex items-center gap-4">
           <ProgressRing
-            size={128}
-            stroke={10}
+            size={136}
+            stroke={11}
             ariaLabel="Calories eaten of daily goal"
             value={progressPct(totals.calories, goals?.calories ?? 0)}
-            label={<span className="text-2xl font-bold tabular-nums">{Math.round(totals.calories).toLocaleString()}</span>}
+            label={<span className="font-display text-[1.625rem] font-bold leading-none tabular-nums">{Math.round(totals.calories).toLocaleString()}</span>}
             sublabel={
               <>
-                <span className="block text-xs text-foreground/90">calories</span>
-                {goals && <span className="block text-xs">of {goals.calories.toLocaleString()}</span>}
+                {goals ? <span className="mt-1 block text-xs text-foreground/90">of {goals.calories.toLocaleString()} cal</span> : <span className="mt-1 block text-xs text-foreground/90">calories</span>}
               </>
             }
           />
-          <dl className="min-w-0 flex-1 space-y-2.5">
+          <dl className="min-w-0 flex-1 space-y-3">
             {(
               [
-                ["Protein", totals.protein_g, goals?.protein_g, "protein_g"],
-                ["Carbs", totals.carbs_g, goals?.carbs_g, "carbs_g"],
-                ["Fat", totals.fat_g, goals?.fat_g, "fat_g"],
+                ["Protein", totals.protein_g, goals?.protein_g, "protein_g", "bg-[#5aa9ff]"],
+                ["Carbs", totals.carbs_g, goals?.carbs_g, "carbs_g", "bg-gold-gradient"],
+                ["Fat", totals.fat_g, goals?.fat_g, "fat_g", "bg-[#b48cff]"],
               ] as const
-            ).map(([l, v, g, key]) => (
+            ).map(([l, v, g, key, bar]) => (
               <div key={l} className="flex flex-wrap items-baseline justify-between gap-x-2 text-[0.9375rem]">
                 <dt className="font-semibold">{l}</dt>
                 <dd className="tabular-nums text-muted-foreground" data-incomplete={incomplete.includes(key) ? "true" : undefined}>
@@ -714,7 +713,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
                   {g ? ` / ${g}` : ""} g
                 </dd>
                 <dd className="mt-1 basis-full">
-                  <ProgressBar value={g ? progressPct(v, g) : 0} label={`${l} progress`} />
+                  <ProgressBar value={g ? progressPct(v, g) : 0} label={`${l} progress`} barClassName={bar} />
                 </dd>
               </div>
             ))}
@@ -768,19 +767,23 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
         )}
         <DayMarkControls date={date} mark={dayMark} hasFood={food > 0} />
         {MEAL_TYPES.map(([type, title]) => {
+          const MealIcon: LucideIcon = { breakfast: Coffee, lunch: Sun, dinner: Moon, snack: Cookie }[type];
           const ms = logged.filter((m) => m.meal_type === type);
           const items = ms.flatMap((m) => m.meal_items);
           const mt = sumMacros(items.map((i) => ({ calories: Number(i.calories), protein_g: Number(i.protein_g) })));
           const prevCount = prevCounts.get(type) ?? 0;
           return (
-            <div key={type} className={`rounded-2xl border border-border bg-card ${items.length ? "p-4" : "px-4 py-2"}`} data-testid={`meal-${type}`}>
-              <div className={`flex items-center justify-between ${items.length ? "mb-2" : ""}`}>
-                <h3 className="font-semibold">{title}</h3>
-                {items.length > 0 && (
-                  <span className="text-sm tabular-nums text-muted-foreground">
-                    {Math.round(mt.calories)} kcal · {Math.round(mt.protein_g)}g protein
-                  </span>
-                )}
+            <div key={type} className={`rounded-2xl border border-border bg-card ${items.length ? "p-4" : "px-4 py-3"}`} data-testid={`meal-${type}`}>
+              <div className={`flex items-center gap-3 ${items.length ? "mb-2" : ""}`}>
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-gold/10 text-gold" aria-hidden>
+                  <MealIcon className="size-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-semibold">{title}</h3>
+                  <p className="text-sm tabular-nums text-muted-foreground">
+                    {items.length > 0 ? `${Math.round(mt.calories)} kcal · ${Math.round(mt.protein_g)}g protein` : "Nothing logged"}
+                  </p>
+                </div>
               </div>
               {items.length > 0 && (
                 <ul className="divide-y divide-border">

@@ -1,4 +1,4 @@
-import { BookOpen, Dumbbell, Footprints, House, LineChart, Shield, UserRound, Utensils, Bot, type LucideIcon } from "lucide-react";
+import { BicepsFlexed, BookOpen, Bot, Cross, Footprints, House, LineChart, Shield, UserRound, Utensils, type LucideIcon } from "lucide-react";
 
 export interface NavItem {
   href: string;
@@ -16,9 +16,9 @@ export interface NavItem {
  */
 export const MAIN_TABS: NavItem[] = [
   { href: "/home", label: "Home", icon: House, alsoMatches: ["/calendar", "/plan", "/search"] },
-  { href: "/train", label: "Train", icon: Dumbbell, alsoMatches: ["/run"] },
+  { href: "/train", label: "Train", icon: BicepsFlexed, alsoMatches: ["/run"] },
   { href: "/nutrition", label: "Nutrition", icon: Utensils },
-  { href: "/faith", label: "Faith", icon: BookOpen },
+  { href: "/faith", label: "Faith", icon: Cross },
   { href: "/profile", label: "You", icon: UserRound, alsoMatches: ["/progress", "/coach"] },
 ];
 

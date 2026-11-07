@@ -106,7 +106,7 @@ test.describe("feature access, subscriptions and core sections", () => {
     // Only Free and Pro All Access are offered, at the approved prices; Plus is never offered.
     await expect(page.getByTestId("plan-free")).toContainText("$0");
     await expect(page.getByTestId("pro-price")).toHaveText("$19.99 / month");
-    await page.getByRole("radio", { name: /Yearly/ }).click();
+    await page.getByRole("radio", { name: /Yearly|Annual/ }).click();
     await expect(page.getByTestId("pro-price")).toHaveText("$149.99 / year");
     await expect(page.getByText("About $12.49 a month, billed yearly.")).toBeVisible();
     await expect(page.getByRole("radio", { name: /Save 37%/ })).toBeVisible();

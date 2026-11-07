@@ -97,7 +97,7 @@ test.describe("Notifications settings", () => {
     await expect(page.getByRole("switch", { name: /Pause all optional reminders/ })).toHaveAttribute("aria-checked", "true");
     await expect(reminderSwitch(page, "Bible reading")).toHaveAttribute("aria-checked", "true");
     await page.goto("/home");
-    await expect(page.getByRole("heading", { name: /^Hi, / })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^Good (morning|afternoon|evening), / })).toBeVisible();
     await expect(page.getByTestId("todays-reminders")).toHaveCount(0);
 
     // Travelling: a device in another time zone is told, and can move the account (and reminders) to it.

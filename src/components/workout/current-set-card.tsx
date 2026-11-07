@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, ArrowRight, BellRing, Check, CheckCircle2, ChevronDown, CopyPlus, Flag, Lightbulb, Minus, Plus, Repeat2, SkipForward, Undo2 } from "lucide-react";
+import { AlertTriangle, ArrowRight, BellRing, Check, CheckCircle2, ChevronDown, CopyPlus, Flag, Info, Lightbulb, Minus, Pause, Play, Plus, Repeat2, SkipForward, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { displayWeight, formatDuration, toKg, weightUnit } from "@/lib/domain/units";
-import { ExerciseDemoMini } from "@/components/train/exercise-demo";
+import { ExerciseDemo } from "@/components/train/exercise-demo";
+import { ExerciseInfoDialog } from "@/components/train/exercise-info-dialog";
 import type { UnitSystem } from "@/lib/domain/types";
 import { lastDoneBefore, sameNumbers, setCanComplete, type CurrentSetInfo, type DraftAction, type DraftExercise, type DraftSet } from "@/lib/domain/workout-draft";
 
@@ -108,18 +109,18 @@ function Stepper({
 
 /** A ring that empties as the rest runs down. Decorative: the time is also written out. */
 function RestRing({ remaining, total }: { remaining: number; total: number }) {
-  const r = 26;
+  const r = 27;
   const c = 2 * Math.PI * r;
   const frac = total > 0 ? Math.min(1, Math.max(0, remaining / total)) : 0;
   return (
-    <svg viewBox="0 0 64 64" className="size-16 shrink-0 -rotate-90" aria-hidden>
-      <circle cx="32" cy="32" r={r} fill="none" strokeWidth="5" className="stroke-elevated" />
+    <svg viewBox="0 0 64 64" className="size-44 shrink-0 -rotate-90" aria-hidden>
+      <circle cx="32" cy="32" r={r} fill="none" strokeWidth="4" className="stroke-[#2a2620]" />
       <circle
         cx="32"
         cy="32"
         r={r}
         fill="none"
-        strokeWidth="5"
+        strokeWidth="4"
         strokeLinecap="round"
         className="stroke-gold transition-[stroke-dashoffset] duration-1000 ease-linear"
         strokeDasharray={c}
@@ -131,6 +132,8 @@ function RestRing({ remaining, total }: { remaining: number; total: number }) {
 
 /** The current exercise's coaching notes and trained muscles (from the exercise library). */
 export interface CurrentExerciseForm {
+  /** The library's written set-up steps. */
+  steps: readonly string[];
   cues: readonly string[];
   mistakes: readonly string[];
   primary: readonly string[];
@@ -171,6 +174,8 @@ export interface CurrentSetCardProps {
   form?: CurrentExerciseForm | null;
   /** Open the substitute sheet for an exercise (its alternatives first). */
   onSubstitute?: (exerciseKey: string) => void;
+  /** Pause or resume the workout clock (the rest countdown pauses with it). */
+  onTogglePause?: () => void;
 }
 
 /**
@@ -198,7 +203,9 @@ export function CurrentSetCard({
   restElsewhere = false,
   form = null,
   onSubstitute,
+  onTogglePause,
 }: CurrentSetCardProps) {
+  const [infoOpen, setInfoOpen] = useState(false);
   const [undo, setUndo] = useState<{ exerciseKey: string; setId: string; label: string; kind: "done" | "skipped" } | null>(null);
   const [blocked, setBlocked] = useState(false);
   const lastComplete = useRef(0);
@@ -217,50 +224,61 @@ export function CurrentSetCard({
 
   const resting = rest > 0;
   const restRow = resting ? (
-    // Two rows, so it fits a phone: the countdown and what happens next, then the controls.
+    // The countdown big in the middle, pause under it, then the adjustments: what the member is looking at while resting.
     <div
-      className="space-y-3 rounded-xl border border-gold-muted/60 bg-gold/10 p-3"
+      className="space-y-3 rounded-2xl border border-gold-muted/50 bg-[#0e0c08] p-4"
       role={restElsewhere ? undefined : "timer"}
       aria-label={restElsewhere ? undefined : "Rest timer"}
       aria-hidden={restElsewhere || undefined}
       inert={restElsewhere}
       data-testid="current-rest"
     >
-      <div className="flex items-center gap-3">
-        <div className="relative shrink-0">
+      <div className="flex flex-col items-center">
+        <div className="relative">
           <RestRing remaining={rest} total={restTotal} />
-          <span className="absolute inset-0 flex items-center justify-center font-display text-sm font-bold tabular-nums text-gold-highlight">{formatDuration(rest)}</span>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Rest</span>
+            <span className="font-display text-[2.5rem] font-bold leading-none tabular-nums text-gold-highlight">{formatDuration(rest)}</span>
+            {onTogglePause && (
+              <button
+                type="button"
+                onClick={onTogglePause}
+                className="mt-2 flex size-10 items-center justify-center rounded-full bg-gold-gradient text-black shadow-bronze focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-highlight"
+                aria-label={paused ? "Resume rest" : "Pause rest"}
+                aria-pressed={paused}
+              >
+                {paused ? <Play className="ml-0.5 size-5 fill-current" aria-hidden /> : <Pause className="size-5 fill-current" aria-hidden />}
+              </button>
+            )}
+          </div>
         </div>
-        <div className="min-w-0 flex-1">
-          <p className="font-display text-lg font-semibold uppercase">Rest</p>
-          <p className="text-sm text-muted-foreground">{info?.set ? "Next set when the timer ends, or skip it." : "Rest, then finish when you're ready."}</p>
-        </div>
+        <p className="mt-1 text-sm text-muted-foreground">{paused ? "Paused." : info?.set ? "Next set when the timer ends, or skip it." : "Rest, then finish when you're ready."}</p>
       </div>
-      <div className="grid grid-cols-[1fr_1fr_2fr] gap-2">
+      <div className="grid grid-cols-3 gap-2">
         <Button
-          size="sm"
           variant="secondary"
+          className="h-12 rounded-full border-border bg-[#171512] px-2 text-[0.9375rem] font-semibold"
           onClick={() => {
             deliberate();
-            dispatch({ type: "adjustRest", deltaSeconds: -15, now: new Date().toISOString() });
+            dispatch({ type: "adjustRest", deltaSeconds: -30, now: new Date().toISOString() });
           }}
-          aria-label="Subtract 15 seconds"
+          aria-label="Subtract 30 seconds"
         >
-          <Minus aria-hidden /> 15s
+          <Minus aria-hidden /> 30s
         </Button>
         <Button
-          size="sm"
           variant="secondary"
+          className="h-12 rounded-full border-border bg-[#171512] px-2 text-[0.9375rem] font-semibold"
           onClick={() => {
             deliberate();
-            dispatch({ type: "adjustRest", deltaSeconds: 15, now: new Date().toISOString() });
+            dispatch({ type: "adjustRest", deltaSeconds: 30, now: new Date().toISOString() });
           }}
-          aria-label="Add 15 seconds"
+          aria-label="Add 30 seconds"
         >
-          <Plus aria-hidden /> 15s
+          <Plus aria-hidden /> 30s
         </Button>
         <Button
-          size="sm"
+          className="h-12 rounded-full px-2 text-[0.9375rem]"
           onClick={() => {
             deliberate();
             dispatch({ type: "clearRest" });
@@ -296,8 +314,8 @@ export function CurrentSetCard({
   // Everything done: say so, keep the rest timer, and offer Finish.
   if (!info) {
     return (
-      <section className="space-y-3 rounded-2xl border border-gold-muted bg-card p-4" aria-label="Current set" data-testid="current-set-card">
-        <p className="font-display text-lg font-semibold uppercase">Every planned set is done</p>
+      <section className="card-gold space-y-3 rounded-2xl p-4" aria-label="Current set" data-testid="current-set-card">
+        <p className="font-display text-xl font-bold">Every planned set is done</p>
         <p className="text-sm text-muted-foreground">Add another set or exercise below, or finish and see your summary.</p>
         {undoRow}
         {restRow}
@@ -353,21 +371,36 @@ export function CurrentSetCard({
   };
 
   return (
-    <section className="space-y-3 rounded-2xl border border-gold-muted bg-card p-4 shadow-[0_0_32px_-18px_rgba(230,199,110,0.6)]" aria-label="Current set" data-testid="current-set-card">
+    <section className="card-gold space-y-4 rounded-2xl p-4" aria-label="Current set" data-testid="current-set-card">
       <div className="flex items-start gap-3">
-        <ExerciseDemoMini slug={exercise.slug} name={exercise.name} muscles={form ? { primary: form.primary, secondary: form.secondary } : undefined} className="h-[72px] w-24" />
+        <button
+          type="button"
+          onClick={() => setInfoOpen(true)}
+          className="group relative h-[72px] w-24 shrink-0 overflow-hidden rounded-xl border border-border bg-[#0a0a0a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+          aria-label={`Show the ${exercise.name} demonstration larger`}
+        >
+          <ExerciseDemo slug={exercise.slug} name={exercise.name} muscles={form ? { primary: form.primary, secondary: form.secondary } : undefined} controls={false} className="pointer-events-none h-full w-full" />
+        </button>
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold uppercase tracking-widest text-gold">
             Exercise {info.exerciseNumber} of {info.exerciseCount}
             {exercise.supersetId ? " · superset" : ""}
           </p>
-          <h2 className="line-clamp-2 break-words font-display text-2xl font-bold uppercase leading-tight [text-wrap:balance]" data-testid="current-exercise">
+          <h2 className="line-clamp-2 break-words font-display text-[1.75rem] font-bold leading-tight [text-wrap:balance]" data-testid="current-exercise">
             {exercise.name}
           </h2>
           {target && <p className="text-sm text-gold-highlight">{target}</p>}
           {lastTime && <p className="text-sm text-foreground/85" data-testid="current-last-time">{lastTime}</p>}
         </div>
       </div>
+      <ExerciseInfoDialog
+        open={infoOpen}
+        onOpenChange={setInfoOpen}
+        slug={exercise.slug}
+        name={exercise.name}
+        muscles={form ? { primary: form.primary, secondary: form.secondary } : undefined}
+        text={form ? { steps: form.steps, cues: form.cues, mistakes: form.mistakes } : null}
+      />
 
       {/* While resting, the countdown comes first: it is what the member is looking at. */}
       {restRow}
@@ -377,9 +410,44 @@ export function CurrentSetCard({
         </p>
       )}
 
-      <p className={cn("text-center font-display text-lg font-semibold uppercase", info.warmup ? "text-gold" : "text-foreground")} aria-live="polite" data-testid="current-set-label">
+      <p className={cn("text-center font-display text-lg font-semibold", info.warmup ? "text-gold" : "text-muted-foreground")} aria-live="polite" data-testid="current-set-label">
         {setLabel}
       </p>
+      {set && simple && exercise.sets.length > 1 && (
+        <ol className="space-y-1.5" aria-label="Sets" data-testid="set-rows">
+          {(() => {
+            let warm = 0;
+            let work = 0;
+            return exercise.sets.map((row) => {
+              const n = row.isWarmup ? ++warm : ++work;
+              const active = row.id === set.id;
+              const nums = setNumbers(exercise, row, units);
+              return (
+                <li
+                  key={row.id}
+                  className={cn(
+                    "flex min-h-11 items-center gap-3 rounded-xl px-3 text-[0.9375rem]",
+                    active ? "bg-gold-gradient font-semibold text-black shadow-bronze" : row.completed ? "bg-[#101010] text-foreground" : "bg-[#101010] text-muted-foreground",
+                    row.skipped && !active && "line-through opacity-60",
+                  )}
+                  aria-current={active ? "step" : undefined}
+                  data-testid={active ? "set-row-active" : undefined}
+                >
+                  <span className={cn("w-7 text-sm font-semibold tabular-nums", active ? "text-black/70" : "text-muted-foreground")}>{row.isWarmup ? `W${n}` : n}</span>
+                  <span className="min-w-0 flex-1 truncate tabular-nums">{nums || (row.skipped ? "Skipped" : active ? "Enter your numbers" : "—")}</span>
+                  {row.completed ? (
+                    <span className={cn("flex size-6 items-center justify-center rounded-full", active ? "bg-black/15 text-black" : "bg-gold/20 text-gold-highlight")} aria-label="Done">
+                      <Check className="size-4" aria-hidden />
+                    </span>
+                  ) : (
+                    <span className={cn("block size-6 rounded-full border-2", active ? "border-black/60" : "border-[#3a352c]")} aria-hidden />
+                  )}
+                </li>
+              );
+            });
+          })()}
+        </ol>
+      )}
 
       {set && simple && (
         <div className={cn("grid gap-3", exercise.isTimed ? "grid-cols-1" : "grid-cols-2")}>
@@ -467,6 +535,20 @@ export function CurrentSetCard({
           </Button>
         </div>
       )}
+      <div className="grid grid-cols-2 gap-2">
+        <Button variant="outline" className="h-12 rounded-full border-gold-muted/70 text-gold-highlight" onClick={() => setInfoOpen(true)} data-testid="exercise-info-button">
+          <Info aria-hidden /> Exercise info
+        </Button>
+        <Button
+          variant="outline"
+          className="h-12 rounded-full border-gold-muted/70 text-gold-highlight"
+          onClick={() => onSubstitute?.(exercise.id)}
+          disabled={!onSubstitute}
+          data-testid="substitute-button"
+        >
+          <Repeat2 aria-hidden /> Substitute
+        </Button>
+      </div>
       {((form && (form.cues.length > 0 || form.mistakes.length > 0)) || onSubstitute || onSkipExercise) && (
         <details className="group rounded-xl border border-border bg-background/40" data-testid="current-form">
           <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 text-sm font-semibold text-gold-highlight [&::-webkit-details-marker]:hidden">

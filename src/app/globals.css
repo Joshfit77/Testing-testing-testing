@@ -282,6 +282,32 @@ html[data-text-size="xlarge"] {
   .bg-card-gradient {
     background: radial-gradient(120% 140% at 0% 0%, rgba(201, 165, 76, 0.12) 0%, rgba(23, 23, 23, 0) 55%), var(--card);
   }
+  /* A charcoal card with a thin gold-gradient edge and a soft gold glow: the day's workout, a new record, the Pro
+     benefits. The border is painted by a second background layer, so the radius and padding stay ordinary. */
+  .card-gold {
+    border: 1.5px solid transparent;
+    background:
+      linear-gradient(180deg, #1a160e 0%, #121009 100%) padding-box,
+      linear-gradient(135deg, #f1dfa8 0%, #c9a54c 45%, #8c6a2f 100%) border-box;
+    box-shadow: 0 14px 40px -24px rgba(201, 165, 76, 0.7);
+  }
+  .card-gold-strong {
+    border: 2px solid transparent;
+    background:
+      linear-gradient(180deg, #221a0c 0%, #15110a 100%) padding-box,
+      linear-gradient(135deg, #f5d27e 0%, #c9a54c 50%, #a3802f 100%) border-box;
+    box-shadow: 0 0 36px -10px rgba(230, 199, 110, 0.55);
+  }
+  /* A round gold play / action button. */
+  .btn-gold-round {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    background: linear-gradient(180deg, var(--champagne) 0%, var(--gold) 55%, var(--bronze) 130%);
+    color: #0b0b0b;
+    box-shadow: 0 10px 24px -10px rgba(201, 165, 76, 0.9);
+  }
   .hero-glow {
     background:
       radial-gradient(60% 60% at 80% 0%, rgba(230, 199, 110, 0.16) 0%, rgba(9, 9, 9, 0) 70%),

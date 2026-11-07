@@ -68,6 +68,29 @@ export function CoachChat(props: Props) {
   return <CoachChatView key={next.key} {...props} onCreated={(id) => setChat((c) => chatCreated(c, id))} />;
 }
 
+/** "Today at 9:24 AM", "Yesterday at 6:10 PM", or "Nov 3 at 7:00 AM": when a message was sent, in the member's clock. */
+function messageTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const now = new Date();
+  const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  if (sameDay(d, now)) return `Today at ${time}`;
+  if (sameDay(d, yesterday)) return `Yesterday at ${time}`;
+  return `${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })} at ${time}`;
+}
+
+/** The coach's gold medallion beside its messages. */
+function CoachAvatar({ className }: { className?: string }) {
+  return (
+    <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-full bg-gold-gradient text-black shadow-bronze", className)} aria-hidden>
+      <Bot className="size-5" />
+    </span>
+  );
+}
+
 const DEFAULT_SUGGESTIONS = [
   "Why did my bench stall?",
   "Plan my deload",
@@ -431,18 +454,28 @@ function CoachChatView({ conversationId: initialId, initialMessages, initialQues
       </p>
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
         {messages.length === 0 && (
-          <div className="py-6 text-center">
-            <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-gold/10 text-gold">
-              <Bot className="size-7" aria-hidden />
+          <div className="space-y-4">
+            <div className="flex items-end gap-2">
+              <CoachAvatar />
+              <div className="min-w-0">
+                <div className="max-w-[92%] rounded-2xl rounded-bl-md border border-border bg-elevated/70 px-4 py-3 md:max-w-[80%]">
+                  <p className="font-display text-lg font-semibold">How can I help you train?</p>
+                  <p className="mt-1 text-sm text-foreground/85">
+                    I read your goals, program, workouts, food log and bodyweight to give specific advice, and I can suggest changes for you to confirm.{" "}
+                    {canGeneratePlans ? "Switch to Plan mode to draft a new program you can review before saving." : ""}
+                  </p>
+                </div>
+                <p className="mt-1 px-1 text-xs text-muted-foreground">{messageTime(new Date().toISOString())}</p>
+              </div>
             </div>
-            <p className="mt-3 font-display text-xl font-semibold uppercase">How can I help you train?</p>
-            <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-              I read your goals, program, workouts, food log and bodyweight to give specific advice, and I can suggest changes for you to confirm.{" "}
-              {canGeneratePlans ? "Switch to Plan mode to draft a new program you can review before saving." : ""}
-            </p>
-            <div className="mx-auto mt-5 grid max-w-2xl gap-2 sm:grid-cols-2" aria-label="Suggested questions">
+            <div className="flex flex-wrap gap-2 pl-11" aria-label="Suggested questions">
               {starters.map((s) => (
-                <button key={s} disabled={!enabled} onClick={() => send(s)} className="rounded-xl border border-border bg-elevated/60 px-3 py-2.5 text-left text-sm hover:border-gold-muted disabled:opacity-50">
+                <button
+                  key={s}
+                  disabled={!enabled}
+                  onClick={() => send(s)}
+                  className="min-h-11 rounded-full border border-gold-muted/70 bg-[#141209] px-4 py-2 text-left text-sm font-medium text-gold-highlight hover:border-gold disabled:opacity-50"
+                >
                   {s}
                 </button>
               ))}
@@ -450,8 +483,10 @@ function CoachChatView({ conversationId: initialId, initialMessages, initialQues
           </div>
         )}
         {messages.map((m) => (
-          <div key={m.id} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
-            <div className={cn("max-w-[92%] rounded-2xl px-4 py-3 md:max-w-[80%]", m.role === "user" ? "bg-gold/15 text-foreground" : "border border-border bg-elevated/70")} data-testid={m.role === "assistant" ? "coach-reply" : undefined}>
+          <div key={m.id} className={cn("flex items-end gap-2", m.role === "user" ? "justify-end" : "justify-start")}>
+            {m.role === "assistant" && <CoachAvatar />}
+            <div className={cn("min-w-0 max-w-[92%] md:max-w-[80%]", m.role === "user" && "flex flex-col items-end")}>
+            <div className={cn("rounded-2xl px-4 py-3", m.role === "user" ? "rounded-br-md bg-gold-gradient text-black" : "rounded-bl-md border border-border bg-elevated/70")} data-testid={m.role === "assistant" ? "coach-reply" : undefined}>
               {m.role === "assistant" ? <Markdown text={m.content} /> : <p className="whitespace-pre-wrap text-sm">{m.content}</p>}
               {m.proposal &&
                 (isCoachProposal(m.proposal) ? (
@@ -475,11 +510,14 @@ function CoachChatView({ conversationId: initialId, initialMessages, initialQues
               )}
               {feedbackEnabled && m.role === "assistant" && !m.id.startsWith("tmp-") && <CoachFeedback messageId={m.id} />}
             </div>
+            <p className="mt-1 px-1 text-xs text-muted-foreground">{messageTime(m.created_at)}</p>
+            </div>
           </div>
         ))}
         {sending && (
-          <div className="flex justify-start" aria-busy="true">
-            <div className="max-w-[92%] space-y-2 rounded-2xl border border-border bg-elevated/70 px-4 py-3 md:max-w-[80%]">
+          <div className="flex items-end gap-2" aria-busy="true">
+            <CoachAvatar />
+            <div className="max-w-[92%] space-y-2 rounded-2xl rounded-bl-md border border-border bg-elevated/70 px-4 py-3 md:max-w-[80%]">
               <ActivityList items={activity} status={draft ? null : status} />
               {draft && <Markdown text={draft} />}
             </div>
@@ -517,7 +555,7 @@ function CoachChatView({ conversationId: initialId, initialMessages, initialQues
           </div>
         )}
         <form
-          className="flex items-end gap-2"
+          className="flex items-end gap-2 rounded-[1.75rem] border border-border bg-[#101010] p-1.5 pl-4 focus-within:border-gold-muted"
           onSubmit={(e) => {
             e.preventDefault();
             void send(input);
@@ -538,12 +576,12 @@ function CoachChatView({ conversationId: initialId, initialMessages, initialQues
             }}
             disabled={!enabled}
             maxLength={4000}
-            rows={2}
-            className="min-h-12 resize-none"
-            placeholder={mode === "plan" ? "Describe the plan you want (goal, days, equipment, focus)…" : "Ask about training, technique, recovery or nutrition…"}
+            rows={1}
+            className="max-h-40 min-h-11 resize-none border-0 bg-transparent px-0 py-2.5 text-base shadow-none focus-visible:ring-0"
+            placeholder={mode === "plan" ? "Describe the plan you want (goal, days, equipment, focus)…" : "Ask your coach…"}
           />
-          <Button type="submit" size="icon" disabled={!enabled || sending || !input.trim()} aria-label="Send message">
-            {sending ? <Loader2 className="animate-spin" aria-hidden /> : <Send aria-hidden />}
+          <Button type="submit" size="icon" className="size-11 shrink-0 rounded-full" disabled={!enabled || sending || !input.trim()} aria-label="Send message">
+            {sending ? <Loader2 className="animate-spin" aria-hidden /> : <Send className="ml-0.5 size-5" aria-hidden />}
           </Button>
         </form>
         {memory?.enabled && (

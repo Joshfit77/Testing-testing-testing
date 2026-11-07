@@ -21,6 +21,8 @@ import { JOURNAL_SELECT, loadFaithReminders, loadPractices, type JournalRow } fr
 import { ScriptureNotice } from "@/components/faith/scripture-notice";
 import { TodayCard } from "@/components/faith/today-card";
 import { chapterHref, chapterLabel } from "@/lib/bible/books";
+import { parseReference } from "@/lib/bible/reference";
+import { SceneHero } from "@/components/common/scene-hero";
 import { loadDailyGoals } from "@/server/services/daily-goals";
 import { loadActiveJourney } from "@/server/services/journeys";
 import { loadReadingState } from "@/server/services/bible";
@@ -85,11 +87,25 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
   const journalCount = journalCountRes.count ?? journal.length;
   const remindersOn = reminders.filter((r) => r.enabled);
   const readHref = reading ? chapterHref(reading.book, reading.chapter, reading.verse ?? undefined) : "/faith/bible";
+  const verseRef = parseReference(verse.reference);
+  const verseChapterHref = verseRef ? chapterHref(verseRef.bookId, verseRef.chapter, verseRef.verseStart) : "/faith/bible";
   const quickAction = `${card} flex min-h-14 flex-col items-center justify-center gap-1 px-2 py-2 text-center text-sm font-semibold leading-tight hover:border-gold-muted`;
 
   return (
     <div className="space-y-4">
       <MainHeader title="Faith" />
+
+      <nav aria-label="Faith sections" className="flex gap-1 rounded-full border border-border bg-[#101010] p-1">
+        {[
+          ["Bible", "/faith/bible"],
+          ["Prayer", "/faith/journal"],
+          ["Plans", "/faith/studies"],
+        ].map(([label, href]) => (
+          <Link key={href} href={href!} className="flex min-h-11 flex-1 items-center justify-center rounded-full px-3 text-[0.9375rem] font-semibold text-foreground/85 hover:bg-elevated hover:text-foreground">
+            {label}
+          </Link>
+        ))}
+      </nav>
 
       {/* The three things members open Faith for, on the first screen: read, today's devotional, pray. */}
       <nav aria-label="Faith quick actions" className="grid grid-cols-3 gap-2">
@@ -133,21 +149,20 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
         ))}
       </nav>
 
-      <section className={`relative overflow-hidden ${card}`} aria-labelledby="verse-title">
-        {/* Decorative original artwork; the verse is the content. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/illustrations/cross-dusk.svg" alt="" aria-hidden className="absolute inset-0 size-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/10" aria-hidden />
-        <div className="relative flex min-h-44 flex-col justify-end p-4 md:min-h-56 md:p-6">
-          <h2 id="verse-title" className="text-xs font-semibold text-champagne/90">
+      <SceneHero className="rounded-2xl border border-gold-muted/40" art="/illustrations/cross-dusk.svg" overlay="to-left" minHeight="min-h-[15rem]">
+        <section className="flex min-h-[15rem] flex-col justify-end p-4 md:p-6" aria-labelledby="verse-title">
+          <h2 id="verse-title" className="text-xs font-semibold uppercase tracking-[0.2em] text-champagne/90">
             Verse of the day
           </h2>
-          <p className="mt-1 max-w-[20rem] font-serif text-2xl leading-snug text-white [text-shadow:0_1px_8px_rgba(0,0,0,0.6)]" aria-hidden>
+          <p className="mt-1 max-w-[20rem] font-serif text-[1.375rem] italic leading-snug text-white [text-shadow:0_1px_8px_rgba(0,0,0,0.6)]" aria-hidden>
             <ScriptureText parts={scriptureParts(verse.reference, verseExcerpt(verse.text))} />
           </p>
           <p className="mt-1.5 text-sm text-white/85">{verse.reference} ({TRANSLATION.code})</p>
-        </div>
-      </section>
+          <Link href={verseChapterHref} className="mt-3 inline-flex h-11 w-fit items-center gap-2 rounded-full bg-gold-gradient px-5 text-sm font-semibold text-black shadow-bronze hover:brightness-110" data-testid="read-chapter">
+            <BookOpen className="size-4" aria-hidden /> Read chapter
+          </Link>
+        </section>
+      </SceneHero>
 
       {show("challenge") && (
         <FaithChallenge

@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Check, ChartLine, Dumbbell, Hammer, Minus, Moon, Route, Salad, ScanLine, Sparkles } from "lucide-react";
+import { Check, ChartLine, Crown, Dumbbell, Hammer, Minus, Moon, Route, Salad, ScanLine, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { ComparisonSection } from "@/lib/domain/membership";
 import type { Plan } from "@/lib/domain/types";
@@ -73,43 +73,59 @@ export function MembershipPlans({
   return (
     <section className="space-y-6" aria-labelledby="membership-title">
       <div className="text-center">
-        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">Membership</p>
-        <h2 id="membership-title" className="mt-2 font-display text-3xl font-bold uppercase tracking-wide md:text-4xl">
-          Choose your path
+        <span className="mx-auto flex size-16 items-center justify-center rounded-full bg-gold/10 text-gold" aria-hidden>
+          <Crown className="size-9" />
+        </span>
+        <p className="mt-3 text-xs font-semibold uppercase tracking-[0.25em] text-gold">Membership</p>
+        <h2 id="membership-title" className="mt-1 font-display text-[2rem] font-bold leading-tight text-gold-gradient">
+          Narrow Gate Pro
         </h2>
         <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">Start free. Upgrade when you&apos;re ready for every premium feature.</p>
       </div>
 
+      <div className="card-gold rounded-2xl p-5" aria-label="What Pro includes">
+        <ul className="space-y-3 text-[0.9375rem]">
+          {PRO_HIGHLIGHTS.slice(0, 4).map(({ icon: Icon, text }) => (
+            <li key={text} className="flex items-center gap-3">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gold/15 text-gold">
+                <Icon className="size-4" aria-hidden />
+              </span>
+              {text}
+            </li>
+          ))}
+        </ul>
+      </div>
+
       {yearOffered && (
-        <div className="flex justify-center">
-          <div role="radiogroup" aria-label="Billing period" className="inline-flex items-center gap-1 rounded-full border border-border bg-card p-1">
-            {(["month", "year"] as const).map((i) => (
-              <button
-                key={i}
-                type="button"
-                role="radio"
-                aria-checked={shown === i}
-                data-testid={`interval-${i}`}
-                onClick={() => onIntervalChange(i)}
-                className={cn(
-                  "inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-highlight",
-                  shown === i ? "bg-gold-gradient text-black" : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {i === "month" ? "Monthly" : "Yearly"}
-                {i === "year" && prices.savingsPercent ? (
-                  <span className={cn("rounded-full px-2 py-0.5 text-xs font-bold", shown === i ? "bg-black/15" : "bg-gold/15 text-gold-highlight")}>Save {prices.savingsPercent}%</span>
-                ) : null}
-              </button>
-            ))}
-          </div>
+        <div role="radiogroup" aria-label="Billing period" className="grid grid-cols-2 gap-3">
+          {(["month", "year"] as const).map((i) => (
+            <button
+              key={i}
+              type="button"
+              role="radio"
+              aria-checked={shown === i}
+              data-testid={`interval-${i}`}
+              onClick={() => onIntervalChange(i)}
+              className={cn(
+                "relative flex min-h-[6.5rem] flex-col items-start justify-end rounded-2xl p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-highlight",
+                shown === i ? "card-gold-strong" : "border border-border bg-card hover:border-gold-muted",
+              )}
+            >
+              {i === "year" && prices.savingsPercent ? (
+                <span className="absolute right-3 top-3 rounded-full bg-gold-gradient px-2 py-0.5 text-xs font-bold text-black">Save {prices.savingsPercent}%</span>
+              ) : null}
+              <span className="text-sm font-semibold text-muted-foreground">{i === "month" ? "Monthly" : "Annual"}</span>
+              <span className="mt-1 font-display text-2xl font-bold tabular-nums">{i === "month" ? (prices.month ?? "—") : (prices.year ?? "—")}</span>
+              <span className="text-xs text-muted-foreground">{i === "month" ? "per month" : prices.yearPerMonth ? `per year · about ${prices.yearPerMonth}/mo` : "per year"}</span>
+            </button>
+          ))}
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+      <div className="grid gap-4 md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
         <article
           aria-labelledby="plan-free-title"
-          className={cn("flex flex-col rounded-2xl border bg-card p-6", currentPlan === "free" ? "border-gold-muted" : "border-border")}
+          className={cn("order-2 flex flex-col rounded-2xl border bg-card p-6", currentPlan === "free" ? "border-gold-muted" : "border-border")}
           data-testid="plan-free"
         >
           <div className="flex items-center justify-between gap-2">
@@ -132,7 +148,7 @@ export function MembershipPlans({
 
         <article
           aria-labelledby="plan-pro-title"
-          className="relative flex flex-col overflow-hidden rounded-2xl border border-gold-muted bg-card-gradient p-6 shadow-[0_24px_70px_-34px_rgba(201,165,76,0.75)]"
+          className="card-gold relative order-1 flex flex-col overflow-hidden rounded-2xl p-6"
           data-testid="plan-pro"
         >
           <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-gold-highlight to-transparent" />

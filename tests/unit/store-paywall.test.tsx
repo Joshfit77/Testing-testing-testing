@@ -66,7 +66,7 @@ describe("in-app membership screen", () => {
 
   it("switches to yearly with the per-month equivalent and the saving", async () => {
     render(<StorePaywall {...props} />);
-    fireEvent.click(await screen.findByRole("radio", { name: /Yearly/ }));
+    fireEvent.click(await screen.findByRole("radio", { name: /Yearly|Annual/ }));
     expect(screen.getByRole("radio", { name: /Save 37%/ })).toHaveAttribute("aria-checked", "true");
     expect(screen.getByTestId("pro-price")).toHaveTextContent("$149.99 / year");
     expect(screen.getByText("About $12.49 a month, billed yearly.")).toBeInTheDocument();
@@ -141,7 +141,7 @@ describe("in-app membership screen", () => {
   it("lets a monthly Pro member switch to yearly through the same store subscription", async () => {
     render(<StorePaywall {...props} currentPlan="pro" source="app_store" currentProductId="ngf_pro_monthly" currentInterval="month" />);
     expect(await screen.findByText("This is your current membership.")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("radio", { name: /Yearly/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /Yearly|Annual/ }));
     fireEvent.click(screen.getByRole("button", { name: "Switch to yearly · $149.99" }));
     await waitFor(() => expect(store.purchase).toHaveBeenCalledWith(expect.objectContaining({ identifier: "ngf_pro_yearly" }), { oldProductId: "ngf_pro_monthly" }));
   });

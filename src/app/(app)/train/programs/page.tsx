@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, Clock, Dumbbell, Lock, Search, ShieldAlert, SlidersHorizontal, Trash2, Wand2 } from "lucide-react";
+import { ChevronRight, Dumbbell, Lock, Search, ShieldAlert, SlidersHorizontal, Trash2, Wand2 } from "lucide-react";
 import { MainHeader } from "@/components/shell/main-header";
 import { EmptyState } from "@/components/common/states";
 import { Badge } from "@/components/ui/badge";
@@ -101,9 +101,11 @@ export default async function ProgramsPage({ searchParams }: { searchParams: Pro
   const anyFilter = nFilters > 0 || Boolean(filters.q) || Boolean(filters.category);
   const chip = (active: boolean) =>
     cn(
-      "inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-semibold",
-      active ? "border-gold bg-gold/10 text-gold-highlight" : "border-border text-muted-foreground hover:text-foreground",
+      "inline-flex min-h-11 shrink-0 items-center rounded-full px-4 text-[0.9375rem] font-semibold transition-colors",
+      active ? "bg-gold-gradient text-black shadow-bronze" : "border border-border bg-[#101010] text-foreground/85 hover:text-foreground",
     );
+  /** The app's own vector scenes, one per card (by category), in place of photography. */
+  const ART = ["/illustrations/mountains-sunrise.svg", "/illustrations/sunrise-cross.svg", "/illustrations/cross-dusk.svg"];
   const mine = (mineRes.data ?? []) as unknown as {
     id: string;
     status: string;
@@ -252,7 +254,7 @@ export default async function ProgramsPage({ searchParams }: { searchParams: Pro
           </details>
         </form>
 
-        <nav aria-label="Program categories" className="flex flex-wrap gap-2 pb-1">
+        <nav aria-label="Program categories" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
           <Link href={`/train/programs${catalogQuery({ ...filters, category: undefined })}#library`} aria-current={!filters.category ? "page" : undefined} className={chip(!filters.category)}>
             All
           </Link>
@@ -292,9 +294,16 @@ export default async function ProgramsPage({ searchParams }: { searchParams: Pro
                     const { total, required } = requiredSessions(p.days_per_week, p.duration_weeks);
                     return (
                       <li key={p.id}>
-                        <Link href={`/train/programs/${p.slug}`} className="bg-card-gradient flex h-full flex-col rounded-2xl border border-border p-4 hover:border-gold-muted">
+                        <Link href={`/train/programs/${p.slug}`} className="card-gold flex h-full flex-col overflow-hidden rounded-2xl hover:brightness-110">
+                          <div className="relative h-28 bg-[#140d05]" aria-hidden>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={ART[(SPEC_CATEGORIES.findIndex((x) => x.id === c.id) + items.indexOf(p)) % ART.length]} alt="" className="absolute inset-0 size-full object-cover" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-[#15110a] via-[#15110a]/40 to-transparent" />
+                            <p className="absolute bottom-2 left-4 text-xs font-semibold uppercase tracking-widest text-champagne">{p.categoryName ?? "Program"}</p>
+                          </div>
+                          <div className="flex flex-1 flex-col p-4">
                           <div className="flex items-start justify-between gap-2">
-                            <p className="text-xs font-semibold text-gold">{p.categoryName ?? "Program"}</p>
+                            <h4 className="font-display text-xl font-bold leading-tight">{p.name}</h4>
                             {locked ? (
                               <Badge>
                                 <Lock className="size-3" aria-hidden /> Pro
@@ -303,17 +312,12 @@ export default async function ProgramsPage({ searchParams }: { searchParams: Pro
                               p.tier === "free" && <Badge variant="success">Free</Badge>
                             )}
                           </div>
-                          <h4 className="mt-1.5 font-display text-lg font-bold uppercase leading-tight">{p.name}</h4>
                           <p className="mt-1.5 flex-1 text-sm text-muted-foreground">{p.summary}</p>
-                          <div className="mt-3 flex flex-wrap gap-1.5">
+                          <p className="mt-3 text-sm font-semibold text-gold-highlight">
+                            {p.days_per_week} days/week • {p.duration_weeks} {p.duration_weeks === 1 ? "week" : "weeks"} • ~{p.session_minutes} min
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-1.5">
                             <Badge variant="secondary">{titleCase(p.difficulty)}</Badge>
-                            <Badge variant="secondary">
-                              {p.duration_weeks} {p.duration_weeks === 1 ? "week" : "weeks"}
-                            </Badge>
-                            <Badge variant="secondary">{p.days_per_week}×/week</Badge>
-                            <Badge variant="secondary">
-                              <Clock className="size-3" aria-hidden /> ~{p.session_minutes} min
-                            </Badge>
                           </div>
                           <dl className="mt-3 space-y-1 text-xs text-muted-foreground">
                             <div className="flex gap-1.5">
@@ -332,6 +336,7 @@ export default async function ProgramsPage({ searchParams }: { searchParams: Pro
                               <ShieldAlert className="size-3.5 shrink-0" aria-hidden /> Not yet reviewed by a qualified coach
                             </p>
                           )}
+                        </div>
                         </Link>
                       </li>
                     );

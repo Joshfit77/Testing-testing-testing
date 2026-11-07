@@ -188,7 +188,7 @@ export function AppShell({ children, userId, displayName, isAdmin, plan, textSiz
         </div>
 
         {/* Mobile bottom navigation: exactly five tabs, icon + label. */}
-        <nav aria-label="Main sections" data-hide-with-keyboard className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-border bg-[#0b0b0b] md:hidden">
+        <nav aria-label="Main sections" data-hide-with-keyboard className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-[#1f1c17] bg-[#0a0a0a]/95 backdrop-blur md:hidden">
           <ul className="mx-auto grid max-w-lg grid-cols-5">
             {MAIN_TABS.map((item) => {
               const active = isTabActive(pathname, item);
@@ -199,11 +199,11 @@ export function AppShell({ children, userId, displayName, isAdmin, plan, textSiz
                     {...restoreScroll}
                     aria-current={active ? "page" : undefined}
                     className={cn(
-                      "flex h-16 min-w-0 flex-col items-center justify-center gap-1 whitespace-nowrap text-xs font-semibold transition-colors duration-200 active:scale-95",
-                      active ? "text-gold-highlight" : "text-muted-foreground hover:text-foreground",
+                      "flex h-[4.25rem] min-w-0 flex-col items-center justify-center gap-1 whitespace-nowrap text-xs font-semibold transition-colors duration-200 active:scale-95",
+                      active ? "text-gold-highlight" : "text-foreground/80 hover:text-foreground",
                     )}
                   >
-                    <item.icon className={cn("size-6 transition-colors", active && "text-gold")} strokeWidth={active ? 2.25 : 1.75} aria-hidden />
+                    <item.icon className={cn("size-[1.625rem] transition-colors", active && "text-gold")} strokeWidth={active ? 2 : 1.5} aria-hidden />
                     <span className="max-w-full truncate [font-size:clamp(0.625rem,3vw,0.75rem)]">{item.label}</span>
                   </Link>
                 </li>

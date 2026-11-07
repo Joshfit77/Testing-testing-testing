@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BellRing, BookmarkPlus, ChevronDown, Cloud, CloudOff, Flag, Loader2, Maximize2, Minimize2, Minus, Pause, Play, Plus, Timer, Trash2, Trophy, Undo2, Vibrate, X } from "lucide-react";
+import { ArrowRight, BellRing, BookmarkPlus, Check, ChevronDown, Cloud, Trophy, CloudOff, Flag, Loader2, Maximize2, Minimize2, Minus, Pause, Play, Plus, Timer, Trash2, Undo2, Vibrate, X } from "lucide-react";
 import { Celebration } from "@/components/common/celebration";
 import { Button } from "@/components/ui/button";
 import { confirmDialog } from "@/components/ui/confirm";
@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input, Textarea } from "@/components/ui/input";
 import { Notice } from "@/components/common/states";
 import { ProgressBar } from "@/components/ui/progress-bar";
+import { Clock3, Dumbbell, Layers, Repeat } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSessionState } from "@/lib/nav-memory";
 import type { UnitSystem } from "@/lib/domain/types";
@@ -560,31 +561,44 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
     return (
       <div className="mx-auto max-w-xl space-y-6 text-center">
         <Celebration pieces={result.records.length > 0 ? 160 : 70} />
-        <div className="mx-auto flex size-20 animate-bounce-in items-center justify-center rounded-full bg-gold-gradient text-black shadow-[0_0_40px_-6px_rgba(230,199,110,0.7)]">
-          <Trophy className="size-9" aria-hidden />
+        <div className="mx-auto flex size-24 animate-bounce-in items-center justify-center rounded-full bg-gold-gradient text-black shadow-[0_0_48px_-6px_rgba(230,199,110,0.75)]">
+          <Check className="size-12" strokeWidth={3} aria-hidden />
         </div>
         <div>
-          <h1 className="font-display text-4xl font-bold uppercase">Workout complete</h1>
-          <p className="mt-2 text-muted-foreground">Faithful in the small things. Well done.</p>
+          <h1 className="font-display text-[2.125rem] font-bold leading-tight text-gold-gradient">Workout Complete!</h1>
+          <p className="mt-1 text-lg text-foreground/90">{finishedDraft?.name ?? draft?.name ?? "Workout"}</p>
+          <p className="mt-1 text-sm text-muted-foreground">Faithful in the small things. Well done.</p>
         </div>
         {(() => {
           const totals = finishedDraft ? completionTotals(finishedDraft) : null;
           const prs = result.records.filter((r) => !r.first).length;
-          const tile = (label: string, value: string, testId: string) => (
-            <div className="rounded-2xl border border-border bg-card p-3" data-testid={testId}>
-              <dt className="text-xs uppercase tracking-wider text-muted-foreground">{label}</dt>
-              <dd className="font-display text-xl font-semibold tabular-nums">{value}</dd>
+          const tile = (label: string, value: string, testId: string, Icon: typeof Clock3) => (
+            <div className="flex min-h-[4.75rem] items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 text-left" data-testid={testId}>
+              <Icon className="size-7 shrink-0 text-gold" aria-hidden />
+              <div className="min-w-0">
+                <dt className="text-sm text-muted-foreground">{label}</dt>
+                <dd className="truncate font-display text-[1.375rem] font-bold leading-tight tabular-nums">{value}</dd>
+              </div>
             </div>
           );
           return (
             <>
-              <dl className="stagger grid grid-cols-3 gap-2" data-testid="completion-stats">
-                {tile("Duration", formatDuration(result.durationSeconds), "stat-duration")}
-                {tile("Volume", result.volumeKg > 0 ? formatVolume(result.volumeKg, units) : "—", "stat-volume")}
-                {tile("Sets", totals && totals.setsPlanned > result.completedSets ? `${result.completedSets}/${totals.setsPlanned}` : String(result.completedSets), "stat-sets")}
-                {tile("Exercises", totals ? `${totals.exercisesDone}/${totals.exercisesPlanned}` : "—", "stat-exercises")}
-                {tile("Reps", totals && totals.reps > 0 ? String(totals.reps) : "—", "stat-reps")}
-                {tile("New PRs", String(prs), "stat-records")}
+              <dl className="stagger grid grid-cols-2 gap-3" data-testid="completion-stats">
+                {tile("Duration", formatDuration(result.durationSeconds), "stat-duration", Clock3)}
+                {tile("Volume", result.volumeKg > 0 ? formatVolume(result.volumeKg, units) : "—", "stat-volume", Dumbbell)}
+                {tile("Sets", totals && totals.setsPlanned > result.completedSets ? `${result.completedSets}/${totals.setsPlanned}` : String(result.completedSets), "stat-sets", Layers)}
+                {tile("Reps", totals && totals.reps > 0 ? String(totals.reps) : "—", "stat-reps", Repeat)}
+                <div className="col-span-2 flex items-center justify-center gap-4 text-sm text-muted-foreground">
+                  <span data-testid="stat-exercises">
+                    <dt className="inline">Exercises </dt>
+                    <dd className="inline font-semibold text-foreground tabular-nums">{totals ? `${totals.exercisesDone}/${totals.exercisesPlanned}` : "—"}</dd>
+                  </span>
+                  <span aria-hidden>·</span>
+                  <span data-testid="stat-records">
+                    <dt className="inline">New PRs </dt>
+                    <dd className="inline font-semibold text-foreground tabular-nums">{prs}</dd>
+                  </span>
+                </div>
               </dl>
               {totals && totals.setsPlanned > totals.setsDone && (
                 <p className="-mt-3 text-sm text-muted-foreground" data-testid="partial-note">
@@ -602,11 +616,51 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
             </p>
           ) : null;
         })()}
-        <p className="-mt-2 text-sm">
-          <Link href={`/train/history/${result.sessionId}`} className="font-semibold text-gold-highlight underline-offset-4 hover:underline" data-testid="view-summary">
-            View the full summary
-          </Link>
-        </p>
+        {result.records.some((r) => !r.first) && (
+          <section className="card-gold-strong animate-bounce-in rounded-2xl p-4 text-left [animation-delay:250ms]" aria-labelledby="prs-title">
+            <h2 id="prs-title" className="flex items-center gap-2 font-display text-lg font-bold text-gold-gradient">
+              <Trophy className="size-5 text-gold" aria-hidden /> New Personal Record!
+            </h2>
+            <ul className="mt-1 space-y-1 text-[0.9375rem]">
+              {result.records.filter((r) => !r.first).map((r, i) => (
+                <li key={i}>
+                  <strong>{catalogById.get(r.exerciseId)?.name ?? "Exercise"}</strong> – {RECORD_LABEL[r.recordType] ?? r.recordType}:{" "}
+                  {r.recordType === "max_duration" ? formatDuration(r.value) : r.recordType === "max_reps" ? `${r.value} reps` : formatWeight(r.value, units)}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+        {result.reflection && (
+          <section className="rounded-2xl border border-border bg-card p-4" data-testid="workout-reflection">
+            <blockquote className="font-serif text-lg italic leading-relaxed text-foreground/95">
+              <ScriptureText parts={result.reflection.parts} />
+            </blockquote>
+            <p className="mt-1 text-sm text-gold-highlight">{result.reflection.reference} (BSB)</p>
+            <details className="mt-2 text-left">
+              <summary className="min-h-11 cursor-pointer text-sm text-muted-foreground">Reflect on it (optional)</summary>
+              <p className="mt-1 text-sm">{result.reflection.prompt}</p>
+              <Link
+                href={`/faith/journal/new?kind=reflection&ref=${encodeURIComponent(result.reflection.reference)}`}
+                className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-gold-highlight underline-offset-4 hover:underline"
+              >
+                Write a reflection
+              </Link>
+            </details>
+          </section>
+        )}
+        <div className="space-y-2">
+          <Button asChild size="lg" className="h-14 w-full text-lg">
+            <Link href={result.next && !result.next.programDone ? "/train" : "/home"} data-testid="next-workout">
+              {result.next && !result.next.programDone ? "Next Workout" : "Back to Home"} <ArrowRight aria-hidden />
+            </Link>
+          </Button>
+          <Button asChild variant="secondary" size="lg" className="h-12 w-full">
+            <Link href={`/train/history/${result.sessionId}`} data-testid="view-summary">
+              View Summary
+            </Link>
+          </Button>
+        </div>
         {result.next && (
           <section className="rounded-2xl border border-border bg-card p-4 text-left" aria-labelledby="next-title">
             <h2 id="next-title" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -631,21 +685,6 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
                 <ProgramProgress next={result.next} />
               </>
             )}
-          </section>
-        )}
-        {result.records.some((r) => !r.first) && (
-          <section className="animate-bounce-in rounded-2xl border border-gold-muted bg-gold/5 p-4 text-left [animation-delay:250ms]" aria-labelledby="prs-title">
-            <h2 id="prs-title" className="mb-2 font-display text-lg font-semibold uppercase text-gold-highlight">
-              New personal records
-            </h2>
-            <ul className="space-y-1 text-sm">
-              {result.records.filter((r) => !r.first).map((r, i) => (
-                <li key={i}>
-                  <strong>{catalogById.get(r.exerciseId)?.name ?? "Exercise"}</strong> — {RECORD_LABEL[r.recordType] ?? r.recordType}:{" "}
-                  {r.recordType === "max_duration" ? formatDuration(r.value) : r.recordType === "max_reps" ? `${r.value} reps` : formatWeight(r.value, units)}
-                </li>
-              ))}
-            </ul>
           </section>
         )}
         {result.records.some((r) => r.first) && (
@@ -735,29 +774,13 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
             </ul>
           </section>
         )}
-        {result.reflection && (
-          <details className="rounded-2xl border border-border bg-card p-4 text-left" data-testid="workout-reflection">
-            <summary className="min-h-11 cursor-pointer font-display text-lg font-semibold uppercase">A verse to close with</summary>
-            <blockquote className="mt-2 font-serif text-lg leading-relaxed">
-              <ScriptureText parts={result.reflection.parts} />
-            </blockquote>
-            <p className="mt-1 text-sm text-muted-foreground">{result.reflection.reference} (BSB)</p>
-            <p className="mt-2 text-sm">{result.reflection.prompt}</p>
-            <Link
-              href={`/faith/journal/new?kind=reflection&ref=${encodeURIComponent(result.reflection.reference)}`}
-              className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-gold-highlight underline-offset-4 hover:underline"
-            >
-              Write a reflection (optional)
-            </Link>
-          </details>
-        )}
-        <div className="flex flex-wrap justify-center gap-2">
-          <Button asChild>
-            <Link href="/home">Back to home</Link>
-          </Button>
-          <Button asChild variant="secondary">
-            <Link href="/train/history">View history</Link>
-          </Button>
+        <div className="flex flex-wrap justify-center gap-4 text-sm">
+          <Link href="/home" className="min-h-11 py-2 font-semibold text-gold-highlight underline-offset-4 hover:underline">
+            Back to home
+          </Link>
+          <Link href="/train/history" className="min-h-11 py-2 font-semibold text-gold-highlight underline-offset-4 hover:underline">
+            View history
+          </Link>
         </div>
       </div>
     );
@@ -839,7 +862,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
               className="h-9 overflow-hidden text-ellipsis border-transparent bg-transparent px-0 font-display text-xl font-bold uppercase focus-visible:border-border focus-visible:px-2"
               maxLength={120}
             />
-            <p className="flex items-center gap-2 text-xs text-muted-foreground">
+            <p className="flex items-center gap-2 overflow-hidden whitespace-nowrap text-xs text-muted-foreground">
               <span className={cn("font-display text-base font-semibold tabular-nums", paused ? "text-gold" : "text-foreground")} aria-live="off">
                 {formatDuration(elapsed)}
               </span>
@@ -903,10 +926,10 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
                 <div className="h-full bg-gold-gradient transition-[width] duration-1000" style={{ width: `${draft.rest.durationSeconds ? (rest / draft.rest.durationSeconds) * 100 : 0}%` }} />
               </div>
             </div>
-            <Button size="icon-sm" variant="ghost" onClick={() => dispatch({ type: "adjustRest", deltaSeconds: -15, now: new Date().toISOString() })} aria-label="Subtract 15 seconds">
+            <Button size="icon-sm" variant="ghost" onClick={() => dispatch({ type: "adjustRest", deltaSeconds: -30, now: new Date().toISOString() })} aria-label="Subtract 30 seconds">
               <Minus aria-hidden />
             </Button>
-            <Button size="icon-sm" variant="ghost" onClick={() => dispatch({ type: "adjustRest", deltaSeconds: 15, now: new Date().toISOString() })} aria-label="Add 15 seconds">
+            <Button size="icon-sm" variant="ghost" onClick={() => dispatch({ type: "adjustRest", deltaSeconds: 30, now: new Date().toISOString() })} aria-label="Add 30 seconds">
               <Plus aria-hidden />
             </Button>
             <Button size="sm" variant="secondary" onClick={() => dispatch({ type: "clearRest" })}>
@@ -946,6 +969,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
             restElsewhere={!cardVisible}
             form={current ? formOf(catalogById.get(current.exercise.exerciseId)) : null}
             onSubstitute={(key) => setSubstituteKey(key)}
+            onTogglePause={() => dispatch({ type: paused ? "resume" : "pause", now: new Date().toISOString() })}
           />
         </div>
       )}
@@ -1191,5 +1215,5 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
 /** The current exercise's cues, mistakes and muscles from the library (null when the library has none of them). */
 function formOf(item: CatalogItem | undefined): CurrentExerciseForm | null {
   if (!item) return null;
-  return { cues: item.cues ?? [], mistakes: item.mistakes ?? [], primary: item.primary ?? [], secondary: item.secondary ?? [] };
+  return { steps: item.steps ?? [], cues: item.cues ?? [], mistakes: item.mistakes ?? [], primary: item.primary ?? [], secondary: item.secondary ?? [] };
 }

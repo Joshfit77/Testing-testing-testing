@@ -13,7 +13,7 @@ test.describe("navigation shell", () => {
     await expect(page.getByRole("button", { name: "More" })).toHaveCount(0);
 
     // Home: greeting, Scripture card, today's workout, nutrition, Faith today, quick actions, My Progress.
-    await expect(page.getByRole("heading", { level: 1, name: /^Hi, / })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: /^Good (morning|afternoon|evening), / })).toBeVisible();
     await expect(page.getByRole("link", { name: /^Verse of the day/ })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Today's workout" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Today's nutrition" })).toBeVisible();
@@ -30,7 +30,7 @@ test.describe("navigation shell", () => {
 
     // Every main screen has the Search, Quick add and AI Coach controls in its header, and the You tab.
     for (const [href, title] of [
-      ["/home", /^Hi, /],
+      ["/home", /^Good (morning|afternoon|evening), /],
       ["/train", "Train"],
       ["/nutrition", "Nutrition"],
       ["/faith", "Faith"],

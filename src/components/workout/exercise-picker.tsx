@@ -15,7 +15,8 @@ export interface CatalogItem {
   primary: string[];
   /** Muscles worked secondarily (they glow softly on the demonstration). */
   secondary?: string[];
-  /** Form cues and common mistakes, shown on the workout's current-set card. */
+  /** Set-up steps, form cues and common mistakes, shown on the workout's current-set card and its demonstration. */
+  steps?: string[];
   cues?: string[];
   mistakes?: string[];
 }

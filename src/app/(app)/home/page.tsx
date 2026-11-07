@@ -1,12 +1,18 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { TodaysRemindersSection } from "@/components/notifications/todays-reminders-section";
-import { BarChart3, BookOpen, Bot, CalendarDays, ChevronRight, Dumbbell, Footprints, HandHeart, Moon, ScanBarcode, SlidersHorizontal, Sparkles, Utensils, Wand2 } from "lucide-react";
+import { BarChart3, BookOpen, Bot, CalendarDays, ChevronRight, Footprints, HandHeart, HeartPulse, Moon, ScanBarcode, SlidersHorizontal, Sparkles, Utensils, Wand2 } from "lucide-react";
+import { SceneHero } from "@/components/common/scene-hero";
+import { LogoMark } from "@/components/common/logo";
+import { StatTile } from "@/components/ui/stat-tile";
+import { CoachButton, SearchButton } from "@/components/shell/main-header";
+import { QuickAddButton } from "@/components/shell/quick-add";
+import { readinessBand } from "@/lib/domain/readiness";
+import { isDemoMode } from "@/server/demo";
 import { Notice } from "@/components/common/states";
 import { TodayWorkoutAction } from "@/components/home/today-workout-action";
 import { WaterQuick } from "@/components/home/water-quick";
 import { WeekBars } from "@/components/home/week-bars";
-import { MainHeader } from "@/components/shell/main-header";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { TRANSLATION, scriptureForDate } from "@/data/content";
 import { progressPct } from "@/lib/domain/nutrition";
@@ -49,7 +55,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     return buildWeeklyActivity(new Date(), profile.timezone, { workouts: [] });
   });
   const todayIso = isoDateInTz(new Date(), profile.timezone);
-  const [plan, data, active, weekly, inProgressRes, answersRes, schedule, waterRes, goalsRes, reading] = await Promise.all([
+  const [plan, data, active, weekly, inProgressRes, answersRes, schedule, waterRes, goalsRes, reading, readinessRes] = await Promise.all([
     getUserPlan(user.id),
     getDashboardData(supabase, user.id, profile.timezone),
     getActiveProgram(supabase, user.id),
@@ -63,6 +69,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     supabase.from("water_entries").select("amount_ml").eq("user_id", user.id).eq("recorded_on", todayIso),
     supabase.from("nutrition_goals").select("water_ml").eq("user_id", user.id).maybeSingle(),
     loadReadingState(supabase, user.id).catch(() => null),
+    supabase.from("recovery_checkins").select("readiness_score, checked_on").eq("user_id", user.id).order("checked_on", { ascending: false }).limit(1).maybeSingle(),
   ]);
   // Last night's sleep: only after wellness consent, and never blocking the page.
   const lastNight = profile.wellness_consent_at
@@ -76,6 +83,12 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const answers = answersRes.data as { primary_goal: PrimaryGoal; experience: ExperienceLevel; days_per_week: number; session_minutes: number } | null;
   const name = profile.display_name ?? "Athlete";
   const firstName = name.trim().split(/\s+/)[0] || name;
+  // The greeting follows the member's clock, like the reference screens ("Good morning, …").
+  const hour = Number(new Intl.DateTimeFormat("en-US", { hour: "numeric", hour12: false, timeZone: profile.timezone }).format(new Date()));
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const readiness = readinessRes.data ? { score: readinessRes.data.readiness_score as number, on: readinessRes.data.checked_on as string } : null;
+  const readinessToday = readiness?.on === todayIso || readiness?.on === isoDateInTz(new Date(Date.now() - 86400000), profile.timezone);
+  const readinessLabel = !readiness || !readinessToday ? "Check in" : readinessBand(readiness.score) === "high" ? "Ready" : readinessBand(readiness.score) === "moderate" ? "Go easy" : "Rest";
   const showScripture = profile.home_scripture ?? true;
   const verse = scriptureForDate(data.today);
   const startHref = active?.today ? `/train/workout?day=${active.today.id}&up=${active.userProgramId}` : "/train/workout?blank=1";
@@ -103,56 +116,58 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
   const modules: Record<HomeModule, React.ReactNode> = {
     workout: (
-      <section key="workout" className={`${card} p-4`} aria-labelledby="today-title" data-testid="home-workout">
-        <div className="flex items-center justify-between gap-2">
-          <h2 id="today-title" className="text-sm font-semibold text-muted-foreground">
-            Today&apos;s workout
-          </h2>
-          {plannedLater && (
-            <span className="rounded-full border border-border px-2 py-0.5 text-xs font-semibold text-muted-foreground" data-testid="today-rest">
-              Rest day today
-            </span>
+      <section key="workout" className="space-y-3" aria-labelledby="today-title" data-testid="home-workout">
+        <div className="card-gold rounded-2xl p-4">
+          <div className="flex items-center gap-3">
+            <Link href={active ? `/train/programs/${active.programSlug}` : "/train"} className="min-w-0 flex-1 rounded-xl hover:bg-white/5">
+              <span className="flex items-center gap-2">
+                <h2 id="today-title" className="font-display text-xl font-bold">
+                  Today&apos;s Workout
+                </h2>
+                {plannedLater && (
+                  <span className="rounded-full border border-gold/50 bg-black/30 px-2 py-0.5 text-xs font-semibold text-gold-highlight" data-testid="today-rest">
+                    Rest day today
+                  </span>
+                )}
+              </span>
+              <span className="mt-0.5 block truncate text-lg font-semibold text-foreground/95">{today ? today.name : active ? "Program complete" : "No program yet"}</span>
+              <span className="block text-sm text-muted-foreground" data-testid="today-detail">
+                {today && active && plannedLater
+                  ? `Week ${active.currentWeek} · Day ${active.currentDay} of ${active.daysPerWeek} · planned for ${plannedLabel}${plannedLater.moved ? " (moved)" : ""}`
+                  : today && active
+                    ? [today.estimated_minutes ? `${today.estimated_minutes} min` : null, `${today.exercises.length} exercise${today.exercises.length === 1 ? "" : "s"}`, `Week ${active.currentWeek} of ${active.durationWeeks}`, `Day ${active.currentDay} of ${active.daysPerWeek}`]
+                        .filter(Boolean)
+                        .join(" • ")
+                    : active
+                      ? "Choose your next program in Train"
+                      : "Log a free workout or pick a program"}
+              </span>
+            </Link>
+            <TodayWorkoutAction round userId={user.id} startHref={startHref} serverInProgress={(inProgressRes.data?.name as string | undefined) ?? null} startLabel={plannedLater ? "Start workout early" : today ? "Start Today's Workout" : "Start workout"} />
+          </div>
+          {beginner && today && (
+            <p className="mt-3 text-sm text-muted-foreground" data-testid="beginner-hint">
+              Tap play and the app walks you through each exercise, one set at a time, with a demonstration and a rest timer.
+            </p>
+          )}
+          {(next || !active) && (
+            <div className="mt-2 flex flex-wrap items-center gap-x-4">
+              {next && (
+                <Link href={`/calendar?day=${next.date}`} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-gold-highlight hover:underline">
+                  <CalendarDays className="size-4" aria-hidden /> {plannedLater ? "Change the date" : "Move to another day"}
+                </Link>
+              )}
+              {!active && (
+                <Link href={hasFeature(plan, "custom_program_builder") ? "/train/build" : "/train/programs"} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-gold-highlight hover:underline">
+                  <Wand2 className="size-4" aria-hidden /> {hasFeature(plan, "custom_program_builder") ? "Build my program" : "Choose a program"}
+                </Link>
+              )}
+            </div>
           )}
         </div>
-        <Link href={active ? `/train/programs/${active.programSlug}` : "/train"} className="mt-2 flex min-h-14 items-center gap-3 rounded-xl hover:bg-elevated/50">
-          <span className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-border bg-elevated text-gold">
-            <Dumbbell className="size-6" aria-hidden />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-lg font-semibold">{today ? today.name : active ? "Program complete" : "No program yet"}</span>
-            <span className="block text-sm text-muted-foreground" data-testid="today-detail">
-              {today && active && plannedLater
-                ? `Week ${active.currentWeek} · Day ${active.currentDay} of ${active.daysPerWeek} · planned for ${plannedLabel}${plannedLater.moved ? " (moved)" : ""}`
-                : today && active
-                  ? [`Week ${active.currentWeek} of ${active.durationWeeks}`, `Day ${active.currentDay} of ${active.daysPerWeek}`, today.estimated_minutes ? `${today.estimated_minutes} min` : null, `${today.exercises.length} exercise${today.exercises.length === 1 ? "" : "s"}`]
-                      .filter(Boolean)
-                      .join(" · ")
-                  : active
-                    ? "Choose your next program in Train"
-                    : "Log a free workout or pick a program"}
-            </span>
-          </span>
-          <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
-        </Link>
-        <div className="mt-3">
-          <TodayWorkoutAction userId={user.id} startHref={startHref} serverInProgress={(inProgressRes.data?.name as string | undefined) ?? null} startLabel={plannedLater ? "Start workout early" : today ? "Start Today's Workout" : "Start workout"} />
-        </div>
-        {beginner && today && (
-          <p className="mt-2 text-sm text-muted-foreground" data-testid="beginner-hint">
-            Tap Start and the app walks you through each exercise, one set at a time, with a demonstration and a rest timer.
-          </p>
-        )}
-        <div className="mt-1 flex flex-wrap items-center justify-center gap-x-4">
-          {next && (
-            <Link href={`/calendar?day=${next.date}`} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-gold-highlight hover:underline">
-              <CalendarDays className="size-4" aria-hidden /> {plannedLater ? "Change the date" : "Move to another day"}
-            </Link>
-          )}
-          {!active && (
-            <Link href={hasFeature(plan, "custom_program_builder") ? "/train/build" : "/train/programs"} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-gold-highlight hover:underline">
-              <Wand2 className="size-4" aria-hidden /> {hasFeature(plan, "custom_program_builder") ? "Build my program" : "Choose a program"}
-            </Link>
-          )}
+        <div className="grid grid-cols-2 gap-3" aria-label="Recovery and progress">
+          <StatTile icon={HeartPulse} label="Recovery" value={readinessLabel} tone={readinessLabel === "Ready" ? "good" : "default"} href="/train/recovery" testId="home-recovery" />
+          <StatTile icon={BarChart3} label="Week streak" value={data.weekStreak === 1 ? "1 week" : `${data.weekStreak} weeks`} tone={data.weekStreak > 0 ? "good" : "default"} href="/progress" testId="home-progress" />
         </div>
       </section>
     ),
@@ -238,48 +253,24 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         ))}
       </nav>
     ),
-    verse: showScripture ? (
-      <Link
-        key="verse"
-        href="/faith#todays-devotional"
-        className="group relative block overflow-hidden rounded-2xl border border-border bg-card focus-visible:ring-2 focus-visible:ring-gold-highlight"
-      >
-        {/* Decorative original artwork; the verse is the content. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/illustrations/mountains-sunrise.svg" alt="" aria-hidden className="absolute inset-0 size-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/65 via-black/30 to-transparent" aria-hidden />
-        <div className="relative flex min-h-32 flex-col justify-end p-4">
-          <p className="text-xs font-semibold text-champagne">Verse of the day</p>
-          <blockquote className="mt-1 max-w-[18rem] font-serif text-[1.25rem] leading-snug text-white [text-shadow:0_1px_8px_rgba(0,0,0,0.6)]">
-            <ScriptureText parts={scriptureParts(verse.reference, verseExcerpt(verse.text))} />
-          </blockquote>
-          <p className="mt-1.5 flex items-center gap-1 text-sm text-white/80">
-            {verse.reference} ({TRANSLATION.code}) <ChevronRight className="size-4 text-gold transition-transform group-hover:translate-x-0.5" aria-hidden />
-          </p>
-          <span className="sr-only">. Open today&apos;s devotional.</span>
-        </div>
-      </Link>
-    ) : null,
+    verse: null,
     week: (
-      <section key="week" className={`${card} p-4`} aria-labelledby="home-week">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 id="home-week" className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-              <BarChart3 className="size-4 text-gold" aria-hidden /> This week
+      <section key="week" className={`${card} p-4`} aria-labelledby="home-week" data-testid="home-week">
+        <Link href="/progress" className="flex items-center justify-between gap-3 rounded-xl hover:bg-elevated/40">
+          <span className="min-w-0">
+            <h2 id="home-week" className="font-display text-xl font-bold">
+              This Week
             </h2>
-            <p className="mt-1 text-xl font-bold tabular-nums">
-              {sessionsThisWeek}
-              {weeklyTarget ? <span className="text-sm font-medium text-muted-foreground"> / {weeklyTarget}</span> : null}
-              <span className="text-sm font-medium text-muted-foreground"> workouts</span>
-            </p>
-          </div>
-          <WeekBars days={weekly.days} className="w-36" />
-        </div>
-        <Link href="/progress" className="mt-3 flex min-h-11 items-center gap-2 rounded-xl border border-gold/70 bg-gradient-to-r from-gold/12 to-transparent px-3 text-sm font-semibold hover:border-gold-highlight">
-          <span className="flex-1">My Progress</span>
-          <span className="text-muted-foreground">{data.weekStreak} week streak</span>
-          <ChevronRight className="size-4 text-gold" aria-hidden />
+            <span className="block text-base text-foreground/90">
+              <span className="font-semibold tabular-nums">{sessionsThisWeek}</span>
+              {weeklyTarget ? <span className="tabular-nums"> of {weeklyTarget}</span> : null} workouts
+              {data.weekStreak > 0 ? <span className="text-muted-foreground"> · {data.weekStreak} week streak</span> : null}
+            </span>
+          </span>
+          <ChevronRight className="size-6 shrink-0 text-foreground/80" aria-hidden />
         </Link>
+        <ProgressBar className="mt-3 h-3" value={weeklyTarget ? Math.min(100, (sessionsThisWeek / weeklyTarget) * 100) : sessionsThisWeek > 0 ? 100 : 0} label="Workouts done this week" />
+        <WeekBars days={weekly.days} className="mt-4" />
       </section>
     ),
     sleep: (
@@ -312,7 +303,39 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
   return (
     <div className="space-y-3">
-      <MainHeader title={`Hi, ${firstName}`} subtitle={<p className="truncate">{todayLong}</p>} />
+      <SceneHero className={isDemoMode() ? "-mx-4 rounded-2xl md:mx-0" : "-mx-4 -mt-[calc(env(safe-area-inset-top)+0.25rem)] pt-[env(safe-area-inset-top)] md:mx-0 md:mt-0 md:rounded-2xl"} minHeight="min-h-[21rem]">
+        <div className="flex flex-col px-4 pb-6 pt-3">
+          <div className="flex items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-2">
+              <LogoMark className="size-8" />
+              <span className="font-serif text-sm font-semibold uppercase leading-none tracking-[0.18em] text-champagne [text-shadow:0_1px_6px_rgba(0,0,0,0.7)]">Narrow Gate Fitness</span>
+            </span>
+            <span className="flex items-center gap-0.5">
+              <SearchButton />
+              <QuickAddButton userId={user.id} today={data.today} />
+              <CoachButton />
+            </span>
+          </div>
+          <h1 className="mt-14 font-display text-[2.125rem] font-bold leading-[1.1] tracking-tight text-white [text-shadow:0_2px_12px_rgba(0,0,0,0.7)] [text-wrap:balance]">
+            {greeting},
+            <br />
+            {firstName}
+          </h1>
+          <p className="mt-2 text-sm text-white/80 [text-shadow:0_1px_6px_rgba(0,0,0,0.7)]">{todayLong}</p>
+          {showScripture && (
+            <Link href="/faith#todays-devotional" className="group mt-4 block max-w-[22rem] rounded-lg focus-visible:ring-2 focus-visible:ring-gold-highlight">
+              <span className="sr-only">Verse of the day: </span>
+              <blockquote className="font-serif text-[1.0625rem] italic leading-snug text-white [text-shadow:0_1px_8px_rgba(0,0,0,0.75)]">
+                &ldquo;<ScriptureText parts={scriptureParts(verse.reference, verseExcerpt(verse.text))} />&rdquo;
+              </blockquote>
+              <span className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-white/90 [text-shadow:0_1px_6px_rgba(0,0,0,0.7)]">
+                {verse.reference} ({TRANSLATION.code}) <ChevronRight className="size-4 text-gold-highlight transition-transform group-hover:translate-x-0.5" aria-hidden />
+              </span>
+              <span className="sr-only">. Open today&apos;s devotional.</span>
+            </Link>
+          )}
+        </div>
+      </SceneHero>
 
       {sp.welcome && <Notice tone="success">Welcome to Narrow Gate Fitness, {name}! Your starter program is ready — today&apos;s session is below.</Notice>}
       {sp.password === "updated" && <Notice tone="success">Your password was updated.</Notice>}

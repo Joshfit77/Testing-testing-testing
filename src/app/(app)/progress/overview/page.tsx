@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Award, CheckCircle2, Lock, Target, Trash2, Trophy } from "lucide-react";
+import { Award, CheckCircle2, Lock, Target, Trash2, TrendingDown, TrendingUp, Trophy } from "lucide-react";
 import { BarSeriesChart, CATEGORICAL, LineSeriesChart } from "@/components/charts/charts";
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState, Notice } from "@/components/common/states";
@@ -104,6 +104,7 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
     waist: m.waist_cm == null ? null : displayLength(Number(m.waist_cm), units),
     chest: m.chest_cm == null ? null : displayLength(Number(m.chest_cm), units),
     hips: m.hips_cm == null ? null : displayLength(Number(m.hips_cm), units),
+    bodyFat: m.body_fat_pct == null ? null : Number(m.body_fat_pct),
   }));
 
   const goals = goalsRes.data ?? [];
@@ -141,21 +142,96 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
         }
       />
 
-      <nav aria-label="Time range" className="flex flex-wrap gap-2">
+      <nav aria-label="Time range" className="flex gap-1 rounded-full border border-border bg-[#101010] p-1">
         {(Object.keys(RANGES) as RangeKey[]).map((r) => (
           <Link
             key={r}
             href={`/progress/overview?range=${r}${sp.ex ? `&ex=${sp.ex}` : ""}`}
             aria-current={r === range ? "page" : undefined}
             className={cn(
-              "flex min-h-11 items-center rounded-xl border px-4 text-sm font-semibold",
-              r === range ? "border-gold bg-gold/10 text-gold-highlight" : "border-border text-muted-foreground hover:text-foreground",
+              "flex min-h-11 flex-1 items-center justify-center rounded-full px-3 text-sm font-semibold transition-colors",
+              r === range ? "bg-gold-gradient text-black shadow-bronze" : "text-foreground/85 hover:text-foreground",
             )}
           >
             {RANGES[r].label}
           </Link>
         ))}
       </nav>
+
+      {(() => {
+        // The headline strength trend: the chosen exercise, else the first of the big three with data in this range.
+        const pick = selected ? { id: selected.id as string, name: selected.name as string } : BIG_THREE.map((b) => ({ id: exBySlug.get(b.slug)?.id as string | undefined, name: b.label })).find((b) => b.id && (strength.get(b.id)?.size ?? 0) > 0);
+        const pts = pick?.id ? [...(strength.get(pick.id)?.entries() ?? [])].sort(([a], [b]) => a.localeCompare(b)) : [];
+        if (!pick || pts.length === 0) return null;
+        const first = displayWeight(pts[0]![1] as number, units);
+        const last = displayWeight(pts[pts.length - 1]![1] as number, units);
+        const delta = Math.round((last - first) * 10) / 10;
+        const unit = weightUnit(units);
+        return (
+          <section className="card-gold rounded-2xl p-4" aria-label="Strength trend" data-testid="strength-trend">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate font-semibold">{pick.name} (1RM)</p>
+                <p className={cn("mt-0.5 flex items-center gap-1 text-sm font-semibold", delta > 0 ? "text-[#58d68d]" : delta < 0 ? "text-[#f0a35a]" : "text-muted-foreground")}>
+                  {delta > 0 ? <TrendingUp className="size-4" aria-hidden /> : delta < 0 ? <TrendingDown className="size-4" aria-hidden /> : null}
+                  {delta > 0 ? "+" : ""}
+                  {delta} {unit} over {RANGES[range].label}
+                </p>
+              </div>
+              <p className="shrink-0 font-display text-[1.75rem] font-bold leading-none text-gold-gradient tabular-nums">
+                {Math.round(last)} {unit}
+              </p>
+            </div>
+            <div className="mt-3">
+              <LineSeriesChart
+                title={`${pick.name} · estimated 1RM`}
+                description={RANGES[range].label}
+                data={pts.map(([date, v]) => ({ date, e1rm: displayWeight(v as number, units) }))}
+                xKey="date"
+                xFormat="date"
+                valueSuffix={` ${unit}`}
+                series={[{ key: "e1rm", label: "Est. 1RM" }]}
+                emptyMessage=""
+              />
+            </div>
+          </section>
+        );
+      })()}
+
+      {(() => {
+        // Body metrics with the change across the range: weight, body fat and waist (only what the member logged).
+        const row = (label: string, first: number | null, last: number | null, unit: string, decimals = 1) => {
+          if (last == null) return null;
+          const d = first == null ? null : Math.round((last - first) * 10) / 10;
+          return (
+            <li key={label} className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-card px-4 py-3">
+              <span className="font-medium">{label}</span>
+              <span className="flex items-center gap-3">
+                {d != null && d !== 0 && (
+                  <span className={cn("flex items-center gap-0.5 text-sm font-semibold tabular-nums", d < 0 ? "text-[#58d68d]" : "text-gold-highlight")}>
+                    {d < 0 ? "▼" : "▲"} {Math.abs(d).toFixed(decimals)} {unit}
+                  </span>
+                )}
+                <span className="font-display text-xl font-bold tabular-nums">
+                  {last.toFixed(decimals)} {unit}
+                </span>
+              </span>
+            </li>
+          );
+        };
+        const bf = measurements.filter((m) => m.bodyFat != null);
+        const waist = measurements.filter((m) => m.waist != null);
+        const rows = [
+          row("Body weight", weights[0]?.weight ?? null, weights[weights.length - 1]?.weight ?? null, weightUnit(units)),
+          row("Body fat", bf[0]?.bodyFat ?? null, bf[bf.length - 1]?.bodyFat ?? null, "%"),
+          row("Waist", waist[0]?.waist ?? null, waist[waist.length - 1]?.waist ?? null, lengthUnit(units)),
+        ].filter(Boolean);
+        return rows.length ? (
+          <ul className="space-y-2" aria-label="Body metrics" data-testid="body-metrics">
+            {rows}
+          </ul>
+        ) : null;
+      })()}
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Summary">
         {[
