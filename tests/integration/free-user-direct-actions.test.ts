@@ -136,8 +136,8 @@ describe.skipIf(!available)("a Free member calling Pro server actions directly i
       await coach.applyProposalAction(randomUUID(), true),
       await coach.applyCoachProposalAction(randomUUID()),
       await memory.setCoachMemoryEnabledAction(true),
-      await memory.addCoachMemoryAction({ category: "preference", content: "Prefers morning sessions" }),
-      await memory.updateCoachMemoryAction(randomUUID(), { category: "preference", content: "Evenings" }),
+      await memory.addCoachMemoryAction({ category: "schedule", content: "Prefers morning sessions" }),
+      await memory.updateCoachMemoryAction(randomUUID(), { category: "schedule", content: "Evenings" }),
       await adaptive.acceptRecommendationAction("deload_week"),
       await adaptive.rejectRecommendationAction("deload_week"),
       await adaptive.restoreRecommendationAction("deload_week"),
@@ -156,7 +156,7 @@ describe.skipIf(!available)("a Free member calling Pro server actions directly i
     const limit = getPlans().free.templateLimit!;
     const { error } = await svc.from("workout_templates").insert(Array.from({ length: limit }, (_, i) => ({ user_id: free.id, name: `Seeded ${i + 1}` })));
     if (error) throw error;
-    const ids = await exerciseIds(["barbell-back-squat"]);
+    const ids = await exerciseIds(["back-squat"]);
     const exerciseId = Object.values(ids)[0];
     expect(exerciseId).toBeTruthy();
     const res = await createTemplateAction({
