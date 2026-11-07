@@ -812,6 +812,17 @@ export function restorableDraft(local: WorkoutDraft | null, server: WorkoutDraft
   return newerDraft(keep(local), keep(server));
 }
 
+/**
+ * Another tab or window of the same account saved this workout: the copy to switch to, or null to keep this tab's.
+ * Only the same workout counts (a different one is handled by the restore logic when the logger opens), and only
+ * when the other copy is strictly newer, so the two tabs converge on the latest sets instead of the slower tab
+ * writing its older draft over the other's.
+ */
+export function draftFromOtherTab(mine: WorkoutDraft | null, other: WorkoutDraft | null): WorkoutDraft | null {
+  if (!mine || !other || mine.clientId !== other.clientId) return null;
+  return Date.parse(other.updatedAt) > Date.parse(mine.updatedAt) ? other : null;
+}
+
 /** Pick whichever draft was modified most recently (local vs server). */
 export function newerDraft(a: WorkoutDraft | null, b: WorkoutDraft | null): WorkoutDraft | null {
   if (!a) return b;

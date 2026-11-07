@@ -21,6 +21,7 @@ import {
   completionTotals,
   createDraft,
   currentSetInfo,
+  draftFromOtherTab,
   draftSnapshot,
   draftAgeHours,
   draftSummary,
@@ -41,7 +42,7 @@ import {
 } from "@/lib/domain/workout-draft";
 import { canVibrate, cancelRestNotification, hapticSuccess, scheduleRestNotification, vibrate } from "@/lib/native";
 import { cancelDoneToday, deviceToday } from "@/lib/native-notifications";
-import { clearLocalDraft, discardedWorkoutIds, loadLocalDraft, rememberDiscard, saveLocalDraft } from "@/lib/workout-storage";
+import { clearLocalDraft, discardedWorkoutIds, loadLocalDraft, localDraftKey, rememberDiscard, saveLocalDraft } from "@/lib/workout-storage";
 import {
   discardWorkoutAction,
   finishWorkoutAction,
@@ -305,6 +306,22 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
       window.removeEventListener("offline", update);
     };
   }, []);
+
+  // Another tab or window of this account saved the same workout (a `storage` event fires only in the other tabs):
+  // switch to its newer copy, so two tabs converge on the latest sets instead of the slower one writing its older draft
+  // over the other's on its next change.
+  useEffect(() => {
+    if (phase !== "active") return;
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== localDraftKey(userId) || !e.newValue) return;
+      const other = draftFromOtherTab(latest.current, loadLocalDraft(userId));
+      if (!other) return;
+      touched.current = true;
+      setDraft(other);
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [phase, userId]);
 
   const pushToServer = useCallback(async (d: WorkoutDraft) => {
     if (!navigator.onLine) {
