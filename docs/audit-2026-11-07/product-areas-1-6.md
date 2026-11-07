@@ -174,3 +174,284 @@ tracking, (5) Faith, Bible reading, prayer and discipleship, (6) AI Coach functi
   `coach-feedback`, `coach-provider-limits`, `plan-enforcement`, `pro-bypass`; e2e `coach.spec.ts`.
 
 ---
+
+# Results
+
+Legend: **ran** = executed in this audit with the count shown; **not run** = could not be executed here (local Supabase
+down, see Environment status); **code review** = conclusion from reading the code, not from executing it.
+
+## Unit suites executed (vitest, no database)
+
+| Batch | Command | Result |
+| --- | --- | --- |
+| Areas 1-3 (25 files: starter-program, program-generator, auth-link-routes, auth-email-templates, launch-routing, workout-draft-session, workout-fast-logging, workout-logger-stage2, workout-timers, workout-discard, program-builder, program-library, program-safety-caps, program-catalog, custom-programs, sport-programs, exercise-demo-2d, exercise-demo-player, exercise-demos, exercise-motions, exercise-motion-quality, exercise-drills, exercise-agility-drills, exercise-media, exercise-form) | `npx vitest run <files>` | **25 files, 1976 tests passed**, 25.8 s |
+| Areas 4-6 (33 files: diary, meal-time, food-units, food-basis, food-search, barcode, food-photo, food-quality, food-iq, nutrition, nutrition-insights, nutrition-audit, nutrition-score-formula, popular-foods, meal-planner, ai-meal-plan, meal-plan-notes, bible-reader, bible-offline, bible-plans, bible-dataset, bible-ai, faith-memory-challenges, faith-reminders, faith-reminders-dated, coach-journal, coach-context, coach-prompt, coach-tools, coach-memory, coach-routing, coach-chat-key, coach-feedback) | `npx vitest run <files>` | **33 files, 425 tests passed**, 13.8 s |
+| Regression test added (validation-dates) + diary, nutrition, coach-journal, faith-reminders-dated | `npx vitest run tests/unit/validation-dates.test.ts ...` | **5 files, 41 tests passed** |
+| Typecheck after the fix | `npx tsc --noEmit -p .` | exit 0 |
+| Lint of changed files | `npx eslint src/lib/validation/schemas.ts tests/unit/validation-dates.test.ts` | clean |
+
+Integration (`tests/integration/*`, 27 files relevant to these areas) and e2e (`e2e/*.spec.ts`) — **not run**: Docker daemon
+down, local Supabase unreachable for the whole audit window (re-checked after every step). The baseline in the
+addendum (integration 157 passed / 27 files; e2e core-flow + current-set-card passed) is the last real result.
+
+## Ad-hoc probes (pure functions, executed)
+
+1. **Validation schemas** (`src/lib/validation/schemas.ts`, scratch vitest, removed after the run):
+   - `onboardingPlanSchema`: age 17 → rejected ("adults (18+)"); age 101 → rejected; weight 1000 kg → rejected
+     ("Check your weight"); height 50 cm → rejected; age "abc" → rejected; display name 61 chars → rejected;
+     time zone "Mars/Olympus" → **accepted by the schema**, but `completeOnboardingAction` only writes it when
+     `isValidTimeZone()` is true (onboarding.ts line 128), so the profile keeps its default; no bug.
+   - `signUpSchema` without the 18+ confirmation → rejected server-side ("You must be 18 or older").
+   - `finishWorkoutSchema`: a completed set with 0 reps → accepted; weight 1000 kg → accepted (cap is 1500);
+     1600 kg → rejected; -1 reps → rejected. Records are only computed for `w > 0 && reps > 0`
+     (`src/lib/domain/strength.ts:55`), so a 0-rep set never becomes a PR, but a 1000 kg set does become a
+     "max weight" record. Finding L-3 below.
+   - `logFoodSchema` / `waterSchema` / `weightEntrySchema`: "2026-02-30", "2026-13-01", "0000-00-00" → **accepted**
+     (regex only). Verified bug, fixed (B-1).
+2. **Starter program over every answer the questionnaire can send** (scratch vitest, removed): all 6 goals × 5
+   experience levels × days 1-7 × session 30/45/60/75 × every secondary goal incl. none × no equipment / each single
+   equipment item = **209,664 combinations, 0 failures**: every build produced the expected number of weeks, no empty
+   day, every exercise slug in the catalog. (The committed `starter-program.test.ts` only sweeps days 2/4/6 at 45 min
+   with the equipment presets.) Days outside the program type's range are clamped in `starterProgramInput`.
+3. **2D readiness vs catalog** (python over the data files): 157 published exercises, 157 readiness entries, all
+   `animated`, 0 missing, 0 extra, `ownerApproved: []`. `tests/unit/exercise-demo-2d.test.ts` asserts the same plus
+   "no three.js, no 3D module, page or model files"; a grep for `three`, `gltf`, `glb`, `webgl` in `src/` and
+   `package.json` found nothing (the word "3D" appears only in geometry comments of the 2D pose maths).
+
+---
+
+## Area 1 — Onboarding and first-workout activation: findings
+
+### Workflows and failure scenarios
+| Scenario | How | Result |
+| --- | --- | --- |
+| Sign-up → confirm → onboarding → plan → first workout | e2e `core-flow.spec.ts`, `onboarding-plan.spec.ts`, `first-workout-activation.spec.ts` | **not run** (Supabase down); baseline in addendum says core-flow passed on this branch |
+| Under-18 / invalid height, weight, age, name | schema probe (above) | rejected server-side, field messages present |
+| Onboarding abandoned halfway and resumed | code review `onboarding-questionnaire.tsx` 170-215: answers + step saved to localStorage under the user id, restored on mount; `onboarding-plan.spec.ts` test "answers survive a reload, but never reach another account in the same tab" | behaviour implemented; spec **not run** |
+| Server failure during onboarding | code review `completeOnboardingAction`: `onboarding_completed_at` is written **last**; a failure returns an error and leaves the member on the questionnaire | correct |
+| Duplicate sign-up (existing e-mail) | code review `signUpAction`: Supabase `signUp` is called with confirmations on; an existing e-mail returns no error and the UI says "Check your inbox" (no enumeration). No test covers it. | **not executed**; recommend an integration test |
+| Sign-up rate limits | code review: 5 / 10 min per address, `AUTH_RATE_LIMIT_SCALE` can only raise | server-side |
+| First workout started then reloaded | code review `workout-logger.tsx` 265-290: local draft vs server draft (`getServerDraft`), newest wins, discarded ids honoured, stale (> STALE_DRAFT_HOURS) or different-session drafts ask the member; e2e `workout-reliability.spec.ts` | implemented; spec **not run** |
+| Activation events | migration 51: triggers only, `activation_record` not executable by members; unique (user, event, workout) | server-validated, idempotent by construction (code review) |
+
+### Bugs / observations
+- **L-1 (low, latent, not fixed)**: `saveOnboardingAction` (the Profile → Preferences "rebuild" wizard) sets
+  `onboarding_completed_at` *before* building the program (onboarding.ts lines 47-48 vs 77-93). It is only reachable
+  once onboarding is already complete (`profile/preferences/page.tsx`), so `firstTime` is false in practice; if the
+  wizard were ever wired to first-time onboarding again a build failure would strand the member on /home without a
+  program. Suggest moving the completion write after the build, as `completeOnboardingAction` does.
+- **L-2 (low, not fixed)**: `completeOnboardingAction` accepts any `timeZone` string ≤ 64 chars and silently keeps UTC
+  for an unknown one; the member is never told. `signInAction` later repairs it from the device (profiles still on
+  UTC). Acceptable for launch.
+
+### Security / enforcement
+- All writes go through the cookie-bound client under RLS; `signups` feature flag and rate limits are server-side.
+- Legal acceptances are recorded by a database trigger from the sign-up metadata (auth.ts 51-55).
+
+### Browser-tested vs device
+- Nothing in this area needs native hardware. e2e browser coverage exists but **was not executed in this audit**.
+
+### Scores
+- Functionality **7/10** — complete flow with plan summary and starter program; probes show the generator never fails for
+  any accepted answer; but the browser flow was not re-run here.
+- Reliability **7/10** — idempotent writes (weight upsert, program activation), completion written last, draft resume;
+  duplicate sign-up path untested.
+- Security **8/10** — 18+, terms and risk acknowledgement enforced server-side; rate limits; RLS everywhere; activation
+  events trigger-only.
+
+### Launch blockers (ranked)
+1. Re-run `core-flow`, `onboarding-plan`, `first-workout-activation` e2e on a working Supabase before launch (not a code
+   defect; a verification gap caused by the environment).
+2. Add an integration test for a second sign-up with an existing e-mail (expect no second account, no enumeration).
+
+---
+
+## Area 2 — Workout logging and training programs: findings
+
+### Workflows and failure scenarios
+| Scenario | How | Result |
+| --- | --- | --- |
+| Log sets, finish, records, next session | unit batch above (workout-* , program-*: 1976 tests incl. these) | **ran, passed** |
+| Finish saved twice on retry | code review `finishWorkout` (services/workouts.ts 205-220): looks up `(user_id, client_id)` (unique index, core schema line 281); a completed session is returned again with its records; a partial first attempt is reused and its exercise rows cleared | idempotent; integration `workouts.test.ts` covers it — **not run** |
+| Two finishes at the same instant | code review: second insert hits the unique index → `WorkoutError("db")` → "We couldn't save your workout. It's still on this device" → the retry returns the completed session | safe, one extra tap |
+| Set with 0 reps | probe | accepted, counts as a completed set, never a record |
+| Set with 1000 kg | probe | accepted (cap 1500 kg), becomes a "max weight" personal record; no plausibility warning in the UI (`grep` found none) — **L-3** |
+| Program with a missing exercise | code review `createPrivateProgram` (services/programs.ts 21-27): throws `Unknown exercises: …` before any row is written; `startProgramAction` reports "Couldn't start the program"; workout page catalog is `is_published = true` only, logger falls back to "Exercise" for unknown ids (`workout-logger.tsx` 627/702) | handled; no silent corruption |
+| Draft sync while offline | code review: `syncWorkoutDraftAction` failure returns a message and the local copy stays; one in-flight backup at a time so an older snapshot can't overwrite a newer one (logger 241-243) | correct |
+| Workout page reload | see Area 1 row | implemented |
+
+### Bugs / observations
+- **L-3 (low, not fixed)**: no plausibility guard on logged weight below the hard cap of 1500 kg; a typo of 1000 kg
+  becomes a personal record and is used by the estimated-1RM and rank code. Suggest a soft confirmation above, say,
+  500 kg (or 3× bodyweight) in `current-set-card.tsx`, not a schema change.
+- `finishWorkoutSchema` accepts `startedAt`/`endedAt` in any order and any age; `activation_clamp_start` protects the
+  activation metric but not the session's own `started_at`. Low; history sorting only.
+
+### Security / enforcement
+- `userProgramId` is re-checked against the caller (services/workouts.ts 222-226); template limit for Free is enforced
+  in `templates.ts` via plan (`PLAN_FREE_TEMPLATE_LIMIT`), code review only. `v1/workouts` route authenticates per
+  request (`api-auth.ts`).
+
+### Scores
+- Functionality **8/10** — large, passing unit coverage; honest fallbacks for unknown exercises.
+- Reliability **8/10** — idempotent finish keyed on client id, draft merge rules, offline messaging; integration not re-run.
+- Security **8/10** — RLS + ownership checks on program links; nothing trusted from the client about the plan.
+
+### Launch blockers
+1. None code-level. Re-run `workouts.test.ts`, `workout-fast-logging.test.ts`, `edit-safety.test.ts` and the
+   `current-set-card`/`workout-reliability` e2e when Supabase is back.
+2. (Nice to have) L-3 soft confirmation for implausible loads.
+
+---
+
+## Area 3 — Original 2D exercise demonstrations: findings
+
+### Workflows and failure scenarios
+| Scenario | How | Result |
+| --- | --- | --- |
+| Every published exercise has an honest state | data check + `exercise-demo-2d.test.ts` ("has a reviewed readiness for every catalog exercise, and nothing else"; "never treats an unreviewed exercise as finished") | **ran, passed**; 157/157 animated, 0 owner-approved |
+| Placeholder never looks finished | code review `exercise-demo.tsx` 188-205: a bordered box with "Demonstration in progress", `data-demo-readiness="placeholder"`, aria-label says to follow the written steps; `poses` state is captioned "Pose frames · animation in progress" | honest; e2e `exercise-demo-2d.spec.ts` "each state is shown honestly, and the 3D page is gone" **not run** |
+| No 3D leftovers | unit test + grep | none |
+| 2.5D clip gating | `exercise-demos.ts shownDemoAsset`: shown only when `status === "approved"`; the only clip (dumbbell-curl) is `review` with equipment check FAIL | 2D athlete is what members see everywhere |
+| Motion quality | `exercise-motion-quality`, `exercise-motions`, `exercise-drills`, `exercise-agility-drills` | **ran, passed** (part of the 1976) |
+
+### Observations
+- The readiness file says every exercise is `animated` after the 2026-11-04 review, yet `ownerApproved` is empty. That is
+  honest by design (code never approves), but it means launch ships 157 demonstrations the owner has not signed off.
+  Not a code bug; a sign-off task.
+- Visual correctness of the drawings cannot be judged by automated tests; the review notes in the readiness file are the
+  evidence. I did not re-render frames in this audit.
+
+### Scores
+- Functionality **8/10** — a complete, consistent state machine with captions and fallbacks for all 157 exercises.
+- Reliability **8/10** — pure client-side SVG, no network; player unit tests pass.
+- Security **n/a** (static content) — 10/10 for "nothing to attack".
+- Accuracy **not scored by me**: depends on the owner's visual sign-off (none recorded).
+
+### Launch blockers
+1. Owner sign-off of the 2D demonstrations (`ownerApproved` is empty); the app is honest about this only to developers,
+   members see finished-looking animations.
+
+---
+
+## Area 4 — Nutrition and food tracking: findings
+
+### Workflows and failure scenarios
+| Scenario | How | Result |
+| --- | --- | --- |
+| Diary maths, units, meal times, search ranking, barcode normalisation, photo/label parsing | unit batch (425 tests incl. these) | **ran, passed** |
+| Food search with no network | code review `api/foods/search/route.ts` 49-69: local USDA search always answers; the remote search is wrapped, sets `remoteError: true`; the OFF client aborts after 8 s and raises `OffUnavailableError` | degrades to local results |
+| Barcode not found | code review `lookupBarcode`: OFF 404 → `{status: "not_found"}`; product page shows "Product not found"; scanner shows an offline message when `navigator.onLine === false` | handled |
+| Barcode lookup failure | 502 `lookup_failed`; scanner "Lookup failed. Check your connection" | handled |
+| Photo flow with the AI failing | code review `api/ai/food-photo/route.ts`: 411/413/400/415 for bad uploads; provider failure → 500 "Something went wrong"; `ai-coach.ts` 512-516 releases the usage reservation on provider errors, so a failed call is not charged | handled; e2e `coach.spec.ts` meal-photo test **not run** |
+| Meal logged across midnight in another zone | code review: the diary's "today" is `isoDateInTz(now, profile.timezone)` on the server (nutrition/page.tsx 138); the client sends that `date`, so a meal logged at 00:30 local goes to the member's new day if the page was loaded after midnight; a page left open from before midnight logs to the previous day (the date is visible in the header). `nutrition-timezone.spec.ts` **not run** | acceptable; document |
+| Invalid calendar date from a client | probe | **accepted by schema → DB error → generic failure**; fixed (B-1) |
+| Logging the same item twice on retry | code review `logFoodAction` 99-102: `meal_items.client_id` unique per user (migration 40), duplicate → success message | idempotent |
+
+### Bugs
+- **B-1 (low, fixed in 31a7fd8, regression test added)** — `isoDate` in `src/lib/validation/schemas.ts` validated only the
+  shape `\d{4}-\d{2}-\d{2}`, so "2026-02-30" passed `logFoodSchema`, `waterSchema`, `weightEntrySchema`, the journal entry
+  date and others, failed at the `date` column, logged a server error and showed "try again". Fix: `.refine(isValidIsoDate)`
+  (shared helper from `src/lib/domain/dates.ts`). Test: `tests/unit/validation-dates.test.ts` (4 tests). Two local
+  copies of the regex remain in `src/server/actions/progress-photos.ts:16` (not my area) and `src/lib/coach/tools.ts:20`
+  (model-supplied dates; a bad one becomes a tool error the model retries) — left as is.
+
+### Security / enforcement
+- `nutrition_tracking` feature and AI photo/label routes are gated server-side from the entitlement (barcode route line
+  18; `planForAuth` in `api-auth.ts`); OFF requests are server-side only (no key exposure).
+- Photo consent is a separate server-recorded flag (`setFoodPhotoConsentAction`).
+
+### Browser-tested vs device
+- Barcode camera scanning and photo capture: **needs a physical iPhone/Android**; only the upload/lookup paths are
+  browser-testable (and were not re-run here).
+
+### Scores
+- Functionality **8/10**, Reliability **7/10** (offline/not-found paths handled; one validation gap fixed; integration
+  not re-run), Security **8/10**, Accuracy **not re-assessed** (nutrition-audit and score-formula unit tests pass).
+
+### Launch blockers
+1. Re-run `food-amounts`, `food-photo`, `barcode-media`, `food-quality` integration and the `nutrition-*`,
+   `label-check`, `food-quality` e2e specs on a live Supabase.
+2. Camera/scan on real devices.
+
+---
+
+## Area 5 — Faith, Bible reading, prayer and discipleship: findings
+
+### Workflows and failure scenarios
+| Scenario | How | Result |
+| --- | --- | --- |
+| Reader, plans, offline bundle, dataset integrity, memory challenges, reminders | unit batch | **ran, passed** |
+| Bible reader offline | code review `public/sw.js`: `/bible/bsb/*`, `/bible-offline.html|js` served cache-first from `ngf-bible-v1`, navigations under `/faith/bible` fall back to the offline reader; `offline-bible.tsx` downloads shell + text (4.2 MB) with partial/error states and "Finish saving" | implemented; e2e `bible-reader.spec.ts` offline tests **not run** |
+| Journey day rollover at midnight in the member's zone | code review migration 53 `faith_journey_check_in_at` 424-482: `v_today := (now() at time zone faith_safe_tz(profile.timezone))::date`; an offline tap for yesterday is accepted only within `faith_offline_grace()`, otherwise `faith_offline_too_late`; closed days raise `faith_day_closed`; undo is today-only | server decides the day; honest errors mapped in `journeys.ts` |
+| Prayer-journal privacy (RLS) | migration 53 lines 689-702: per-table own-row policies; `cross-user-isolation.test.ts` "another member cannot read any other member's rows in any user-owned table" and `rls.test.ts` "admins see aggregate metrics but not users' private health or journal data" | **not run** this audit; policies verified by reading |
+| Prayer journal never in the AI context | code review: coach snapshot reads `faith_journal_entries` only with `share_with_coach = true` (snapshot.ts 181-188) and `journalEntriesForCoach` filters again; Bible AI reads no journal (bible-ai.ts 27); the `remember` tool is told never to save journal content; `coach-journal.test.ts` **ran, passed** | default-private; opt-in per entry |
+
+### Observations / policy
+- **P-1 (policy, not a bug)**: the owner's rule is "Keep private prayer content out of any AI context". The code
+  honours it for everything the member has not explicitly shared, and offers a per-entry "Share with AI Coach" switch
+  (off by default) that puts a 1-line excerpt into the coach context. If the owner intends *no* journal content ever,
+  `setJournalShareAction` and the snapshot query should be removed; otherwise this is a deliberate, consented exception
+  and should be named in the privacy policy. Flagging for the owner's decision.
+- Reminders and offline check-ins depend on the profile time zone; a member who never set one is on UTC until their
+  next sign-in (see L-2).
+
+### Browser-tested vs device
+- Service-worker offline reading: browser-testable (e2e exists, not re-run). Native reminder notifications: **needs a
+  physical device**.
+
+### Scores
+- Functionality **8/10**, Reliability **8/10** (day logic in the database with an offline grace window),
+  Security **9/10** (own-row RLS on every table, AI exclusion by default, privileged RPCs with `security definer` and
+  `auth.uid()`), Accuracy of Scripture text: dataset tests pass (`bible-dataset.test.ts`), not re-verified by me.
+
+### Launch blockers
+1. Owner decision on P-1 (explicit opt-in sharing of journal excerpts with the coach).
+2. Re-run `faith-features`, `faith-journeys`, `bible-ai-helper` integration and `bible-reader`/`faith-journey` e2e.
+
+---
+
+## Area 6 — AI Coach functionality and personalization: findings
+
+### Workflows and failure scenarios
+| Scenario | How | Result |
+| --- | --- | --- |
+| Context building, prompt caching blocks, tool schemas, routing, memory parsing, chat key | unit batch (coach-*: part of the 425) | **ran, passed** |
+| Free member | code review `ai-coach.ts` 129-131: `chatLimit <= 0` → `not_entitled` ("included with Pro All Access") before any provider call; proposals: `applyProposalAction`/`applyCoachProposalAction` re-check the allowance server-side | server-side |
+| Quota exhaustion | `reserve_ai_usage` RPC (migration 25) raises `ai_quota`/`ai_quota_plan`/`ai_rate_limited`; mapped to 429 with a plain message; the in-memory limiter is only a burst guard | cross-instance, durable; `ai-limits.test.ts` "requests sent at the same moment can't overshoot" **not run** |
+| Provider failure after reservation | 512-525: reservation released, orphan user message deleted, specific messages for auth/overload/connection | no double charge; e2e "one answer, one charge" **not run** |
+| Tool errors | `tools.ts fail()` returns `{error}` with `is_error: true` to the model; unparseable tool input is retried up to 2× (ai-coach.ts 285-292) | handled |
+| Proposal applied twice | claim-first update `proposal_status = 'applied' where status = 'proposed'` returning rows; second tap gets "already handled"; failure rolls the status back | idempotent |
+| Memory off | snapshot reads `coach_memories` only when `profiles.coach_memory_enabled`; conversation-level `memory_off`; system prompt tells the model not to offer; `addCoachMemoryAction` refuses unless Pro **and** enabled (server) | enforced in data, prompt and action |
+| Not configured | e2e "says honestly when the coach isn't configured" **not run**; code maps `AuthenticationError` to `not_configured` | honest |
+
+### Observations
+- No bugs found in this area by reading or by unit tests. The e2e coach spec (10 tests) is the real proof of the
+  streaming path and could not be run.
+
+### Security / enforcement
+- Entitlement checks are server-side in the service and in each action; `ai_usage_events` is written with the service
+  role only (members cannot reserve usage: `ai-limits.test.ts` line 50, not run). Prayer content excluded by default.
+
+### Scores
+- Functionality **8/10**, Reliability **8/10**, Security **9/10**, Personalization accuracy **not scored** (depends on a
+  live model; mock-only here).
+
+### Launch blockers
+1. Re-run `coach.spec.ts` (with the Anthropic mock) and `ai-limits`, `ai-route-limits`, `coach-memory`, `pro-bypass`
+   integration tests once Supabase is up.
+
+---
+
+## Data isolation check with the service-role REST helper
+
+The brief asked for a probe through the authenticated client against another user's rows using `e2e/helpers.ts
+serviceRest/seedRows`. **Not executed**: both the helper and the authenticated client need the local Supabase, which was
+unreachable for the whole audit. The committed `cross-user-isolation.test.ts` performs exactly this probe for every
+user-owned table (seed as Alice, read/update/delete/insert as Bob, as admin and as anon) and passed in the addendum's
+baseline run (part of the 157).
+
+## Commits in this worktree
+- `72fab90` Audit areas 1-6: inventory and environment status
+- `31a7fd8` Validate date fields as real calendar dates (B-1) + regression test `tests/unit/validation-dates.test.ts`
+- (this commit) Findings for areas 1-6
