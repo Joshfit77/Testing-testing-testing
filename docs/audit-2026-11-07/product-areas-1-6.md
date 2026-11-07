@@ -202,6 +202,46 @@ them, and the integration batch for these six areas was then run for real:
 Every "integration … not run" note in the per-area tables below therefore now reads as **ran, passed** for the files
 listed above; the e2e status is given in the e2e section at the end.
 
+| Added in this audit | Command | Result |
+| --- | --- | --- |
+| `tests/integration/duplicate-signup.test.ts` (new, see B-2) | `npx vitest run --project integration tests/integration/duplicate-signup.test.ts` | **1 passed** (after the fix; it failed before it with `user_already_exists` → "We couldn't create your account") |
+
+## e2e executed (Playwright, production build on port 3103, mocks on 4785/4786)
+
+Server: `npx next build` (exit 0) then `QA_MARK=audit AUTH_RATE_LIMIT_SCALE=50 ANTHROPIC_API_KEY=e2e-test-key
+ANTHROPIC_BASE_URL=http://127.0.0.1:4785 OFF_API_BASE_URL=http://127.0.0.1:4786 DEMO_MODE= npx next start -p 3103`;
+each spec run alone with `E2E_ANTHROPIC_MOCK_PORT=4785 E2E_OFF_MOCK_PORT=4786 E2E_BASE_URL=http://localhost:3103
+npx playwright test e2e/<spec>.spec.ts --trace off --reporter=line`. Server stopped afterwards.
+
+**First pass: every signed-in spec failed at sign-up** with `page.goto: net::ERR_CONNECTION_REFUSED at
+http://localhost:3000/auth/confirm?…` — `e2e/helpers.ts getEmailLink` followed the confirmation link exactly as
+Supabase wrote it from its own `site_url` (localhost:3000), so on any other port the suite cannot sign in (the GPS
+auditor saw the same). Fix (commit 42a05a3): `retargetAppLink()` re-points app links at `E2E_BASE_URL`, leaving
+Supabase's `/auth/v1/verify` links alone. Second pass, real results:
+
+| Spec | Tests | Result |
+| --- | --- | --- |
+| first-workout-activation | 1 | **1 passed** (5.7 s) |
+| onboarding-plan | 2 | **2 passed** (7.2 s) — incl. "answers survive a reload, but never reach another account in the same tab" |
+| exercise-demo-2d | 2 | **2 passed** (11.5 s) — "each state is shown honestly, and the 3D page is gone"; cues/mistakes/swap |
+| workout-reliability | 1 | **1 passed** (12.1 s) — leaving leaves nothing behind; logging survives a double tap |
+| nutrition-diary | 1 | **1 passed** (10.2 s) |
+| nutrition-timezone | 1 | **1 passed** (6.3 s) |
+| bible-reader | 3 | **3 passed** (36.0 s) — incl. both offline tests |
+| faith-journey | 3 | first run **2 passed, 1 failed**; after the harness fix below **3 passed** (19.9 s) |
+| coach | 10 | **9 passed, 1 skipped** (1.2 min) — the skip is "says honestly when the coach isn't configured", skipped by design when a mock provider is set |
+
+faith-journey failure: the Bible-helper test starts its AI stand-in on the hard-coded port **4777** while the brief's
+server points `ANTHROPIC_BASE_URL` at 4785, so the app logged `bible_ai.call Connection error` and the answer stayed
+"Reading the passages…". Not an app bug: the spec now listens on `E2E_ANTHROPIC_MOCK_PORT` (4777 when unset), the
+same convention as `coach.spec.ts`. Re-run: 3/3 passed.
+
+e2e totals for these areas: **23 passed, 1 skipped (by design), 0 failed** after the two harness fixes. The "re-run
+… integration / e2e when Supabase is back" launch-blocker items in the per-area sections below are therefore closed
+for the specs named in this table; `core-flow`, `fast-logging`, `current-set-card`, `train-pause`, `training-stage2`,
+`training-review`, `program-builder`, `program-library`, `food-amounts`, `food-quality`, `label-check`,
+`welcome-diets`, `recipes-planner`, `faith-calendar`, `journeys` and `challenge` were **not** re-run in this audit.
+
 ## Ad-hoc probes (pure functions, executed)
 
 1. **Validation schemas** (`src/lib/validation/schemas.ts`, scratch vitest, removed after the run):
@@ -237,12 +277,18 @@ listed above; the e2e status is given in the e2e section at the end.
 | Under-18 / invalid height, weight, age, name | schema probe (above) | rejected server-side, field messages present |
 | Onboarding abandoned halfway and resumed | code review `onboarding-questionnaire.tsx` 170-215: answers + step saved to localStorage under the user id, restored on mount; `onboarding-plan.spec.ts` test "answers survive a reload, but never reach another account in the same tab" | behaviour implemented; spec **not run** |
 | Server failure during onboarding | code review `completeOnboardingAction`: `onboarding_completed_at` is written **last**; a failure returns an error and leaves the member on the questionnaire | correct |
-| Duplicate sign-up (existing e-mail) | code review `signUpAction`: Supabase `signUp` is called with confirmations on; an existing e-mail returns no error and the UI says "Check your inbox" (no enumeration). No test covers it. | **not executed**; recommend an integration test |
+| Duplicate sign-up (existing e-mail) | **executed** (new `tests/integration/duplicate-signup.test.ts`): the local stack answers `auth.signUp` for a confirmed existing address with `422 user_already_exists`, not the obfuscated user the code assumed, so `signUpAction` showed "We couldn't create your account. Please try again." and logged an error | **bug B-2, fixed**: same "Check your inbox" answer as a new sign-up (+ "Already have an account? Sign in instead."), no account created, original password and profile untouched; 1 test passed |
 | Sign-up rate limits | code review: 5 / 10 min per address, `AUTH_RATE_LIMIT_SCALE` can only raise | server-side |
 | First workout started then reloaded | code review `workout-logger.tsx` 265-290: local draft vs server draft (`getServerDraft`), newest wins, discarded ids honoured, stale (> STALE_DRAFT_HOURS) or different-session drafts ask the member; e2e `workout-reliability.spec.ts` | implemented; spec **not run** |
 | Activation events | migration 51: triggers only, `activation_record` not executable by members; unique (user, event, workout) | server-validated, idempotent by construction (code review) |
 
 ### Bugs / observations
+- **B-2 (medium, fixed in 42a05a3, integration test added)**: `src/server/actions/auth.ts signUpAction` treated
+  Supabase's `user_already_exists` (422) as an unknown failure: a member who already had an account and tried to sign
+  up again saw "We couldn't create your account. Please try again." (and would keep retrying), while the server logged
+  an `auth.signup` error each time. Whether production GoTrue returns this error or the obfuscated user depends on its
+  configuration, so both paths now give the same generic answer. Test: `tests/integration/duplicate-signup.test.ts`
+  (calls the action with mocked `next/headers`; asserts no second account, unchanged password and profile).
 - **L-1 (low, latent, not fixed)**: `saveOnboardingAction` (the Profile → Preferences "rebuild" wizard) sets
   `onboarding_completed_at` *before* building the program (onboarding.ts lines 47-48 vs 77-93). It is only reachable
   once onboarding is already complete (`profile/preferences/page.tsx`), so `firstTime` is false in practice; if the
@@ -268,9 +314,11 @@ listed above; the e2e status is given in the e2e section at the end.
   events trigger-only.
 
 ### Launch blockers (ranked)
-1. Re-run `core-flow`, `onboarding-plan`, `first-workout-activation` e2e on a working Supabase before launch (not a code
-   defect; a verification gap caused by the environment).
-2. Add an integration test for a second sign-up with an existing e-mail (expect no second account, no enumeration).
+1. None remaining in code after B-2. `onboarding-plan` and `first-workout-activation` e2e passed on this branch in this
+   audit; `core-flow` was not re-run here (the addendum baseline passed it).
+2. Confirm on the production Supabase project which duplicate-sign-up behaviour GoTrue is configured for (obfuscated
+   user vs `user_already_exists`); the action now handles both, but the e-mail copy a duplicate member receives (if any)
+   comes from Supabase's templates.
 
 ---
 
@@ -470,4 +518,8 @@ then Bob, signed in through the anon client (RLS applies):
 ## Commits in this worktree
 - `72fab90` Audit areas 1-6: inventory and environment status
 - `31a7fd8` Validate date fields as real calendar dates (B-1) + regression test `tests/unit/validation-dates.test.ts`
-- (this commit) Findings for areas 1-6
+- `d395849` Findings for areas 1-6 (first pass, Supabase down)
+- `b982ac7` Integration results and the isolation probe
+- `42a05a3` Duplicate sign-up answered like a new one (B-2) + `tests/integration/duplicate-signup.test.ts`; e2e helper
+  follows e-mail links on `E2E_BASE_URL`
+- (this commit) e2e results; `faith-journey.spec.ts` Bible-helper mock on `E2E_ANTHROPIC_MOCK_PORT`
