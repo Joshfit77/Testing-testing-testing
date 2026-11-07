@@ -43,7 +43,9 @@ export async function signUpAndConfirm(page: Page, email: string, name = "Test A
   await page.getByRole("button", { name: "Create account" }).click();
   await page.getByText("Check your inbox").waitFor();
   const link = await getEmailLink(email, CONFIRMATION_LINK);
-  await page.goto(link);
+  // Supabase's site_url is http://localhost:3000; when the suite runs against another port (E2E_BASE_URL), follow the
+  // app's confirmation link on that server instead (the token is verified by Supabase, not by the origin).
+  await page.goto(link.replace(/^http:\/\/localhost:3000(?=\/)/, new URL(page.url()).origin));
 }
 
 export interface OnboardingAnswers {

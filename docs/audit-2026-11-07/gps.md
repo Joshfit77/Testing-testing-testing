@@ -3,10 +3,10 @@
 Branch under audit: `claude/faith-discipleship` at 4bdd1db (59c854e + docs). Worktree branch:
 `worktree-agent-a22072019219a6932`. Status lines are appended as work proceeds; anything not marked "proved" was not run.
 
-Environment note: Docker (and so local Supabase on 127.0.0.1:54321) was down for the whole audit (`docker info`: cannot
-connect to the daemon). Per the brief, daemons were not restarted. Integration tests and the signed-in Playwright
-flows could therefore not run; what was proved comes from unit tests on the pure functions, the component tests
-(jsdom), the production build, and code review of the server action, database triggers and RLS.
+Environment note: Docker (and so local Supabase on 127.0.0.1:54321) was down for most of the audit (`docker info`:
+cannot connect to the daemon); per the brief, daemons were not restarted. The unit, component and build work was done
+first; when the lead reported Supabase back, the integration tests and the signed-in Playwright GPS flows were run
+and their real results recorded below (§2, §9).
 
 ## 1. Inventory
 
@@ -105,10 +105,11 @@ Legend: **proved** = ran here with the stated result; **code-reviewed** = read, 
 | Session recovery after reload / crash | Unit: 12 h window, `recoverTrack` adds a gap and never counts the missing stretch, v1 drafts upgrade; component (existing): finished-but-unsaved offered back, old drafts removed | **proved** |
 | Loss of internet | Component: offline save → "You're offline…", draft kept with status finished; online but unreachable → "Couldn't reach the server…"; later retry succeeds with the **same id** (idempotent on the server: `23505` → "Already saved") | **proved** |
 | Treadmill / manual entry independent of GPS | Component: `ActivityForm` renders and previews pace with `navigator.geolocation` spied — never called; server action schema restricts `source` to manual/treadmill and forces `route: null` | **proved** |
-| Free vs Pro | Server action unit tests + DB trigger `enforce_live_gps_plan` (reviewed; integration test exists but Supabase was down) + recorder lock (`canRecord=false`: no Start, no location request) | **proved (action), code-reviewed (trigger)** |
+| Free vs Pro | Server action unit tests + DB trigger `enforce_live_gps_plan` (integration test against local Supabase) + recorder lock (`canRecord=false`: no Start, no location request) | **proved (action, trigger and client)** |
 | Guided run (program day) | Existing unit (`run-session`) and code review of `logProgramRun` (`finishWorkout` keyed on `client_id = activity id`, so a retry does not double-log) | **code-reviewed** |
 | Background recording, locked screen, interruptions, battery, real accuracy | — | **device** (script: `gps-device-test-script.md`) |
-| e2e (`e2e/gps-run.spec.ts`, 9 scenarios; `e2e/run.spec.ts`) | Need sign-up against local Supabase | **not run**: Docker daemon down for the whole audit (`docker info` fails). The earlier auditors' baseline had e2e core subsets passing; these specs were not in that subset, so their current status is **unknown**. |
+| e2e (`e2e/gps-run.spec.ts`, 9 scenarios; `e2e/run.spec.ts`, 1) | Production build on port 3101 (mock ports 4781/4782), Chromium geolocation override | **proved: 10 passed (3.0 min)** once Docker returned — walk with pause saved once with route and history, guided program run, permission denied, signal loss warning clears, approximate location hint, sign-out clears the device, hand-over to another screen and back, reload offers to continue, manual run + treadmill walk with weekly mileage / edit / delete. First attempt: all 10 failed at sign-up because the confirmation email links to `localhost:3000` (see §4 B6). |
+| Integration (`tests/integration/gps-running.test.ts` 5, `tests/integration/activities.test.ts` 11) | vitest against local Supabase | **proved: 16 passed** — includes "live GPS is Pro: Free can't record or attach a route" (the database trigger), duplicate guards, RLS isolation, delete strips the route. |
 | Full unit suite after the changes | `npx vitest run` | **proved**: 170 files passed, 49 skipped (integration, no Supabase); 3,303 tests passed, 319 skipped |
 
 ## 3. Failure scenarios tested
@@ -141,13 +142,14 @@ Legend: **proved** = ran here with the stated result; **code-reviewed** = read, 
 | B3 | Low (behaviour to confirm with the owner) | After a crash/force-quit, "Continue recording" counts the whole time away as *moving* time (the UI says the time is kept as a gap with no distance). A member who reopens after 3 hours gets a 3-hour run at a very slow pace. Pausing the recovered track at recovery (so the member chooses Resume) would be more honest. | `src/lib/domain/gps-track.ts:594-599`; test "recovery … time away as a gap" (`moving_s` = 720 for 60 s of fixes) | Not changed (product decision; a one-line change if wanted). |
 | B4 | Low | A recording left while **acquiring** (e.g. permission denied, no fix ever) is still handed to the keeper when the member navigates away, so the "Recording run: 0.00 km" pill stays until they come back and discard; the kept clock never marks a gap because `lastFixAt` is null. | `src/lib/run/live-recording.ts:208-210`, `gps-track.ts:446` | Not changed; low impact. |
 | B5 | Info | The first fix after Resume is ignored when its GPS timestamp is ≤ the resume instant (`resumeTrack` sets `lastFixAt = now`); costs at most ~1 s of data per resume. | `gps-track.ts:481` | Not changed. |
+| B6 | Low (test infrastructure) | `e2e/helpers.ts` `signUpAndConfirm` followed the confirmation email link verbatim; Supabase's `site_url` is `http://localhost:3000`, so every signed-in e2e spec failed with `ERR_CONNECTION_REFUSED` when run against any other port (as the brief requires auditors to do). | Playwright run on 3101: 10/10 failed at `helpers.ts:46`, error context `net::ERR_CONNECTION_REFUSED at http://localhost:3000/auth/confirm?...` | **Fixed**: the link's host is rewritten to the origin the test is running against (the token is verified by Supabase, not the origin). Re-run: 10/10 passed. No behaviour change on port 3000. |
 
 No distance, pace or split maths error was found: the new scenario assertions on synthetic traces (plus the 12 existing
 controlled scenarios) all hold.
 
 ## 5. Security, data isolation and subscription enforcement
 
-- **Pro gate is server-side twice.** (1) `saveGpsActivityAction` reads the plan with `getUserPlan(user.id)` (entitlements table, session user) and refuses Free before parsing or touching the database — proved by unit test with a perfect payload and with `plan: "pro"` / `user_id` tampering in the payload. (2) The `activities_live_gps_plan` trigger (security definer) refuses `source='gps'` or a non-null `route` for `plan_rank(plan_of(uid)) < 'plus'` on insert **and** update, so even a direct PostgREST call with the user's JWT cannot save a live recording or attach a route to a manual entry (`20261102000048_low_findings_hardening.sql:52-75`; integration test `gps-running.test.ts` "live GPS is Pro…" exists — **not run here**, Supabase down). The client lock (`canRecord`) is convenience only.
+- **Pro gate is server-side twice.** (1) `saveGpsActivityAction` reads the plan with `getUserPlan(user.id)` (entitlements table, session user) and refuses Free before parsing or touching the database — proved by unit test with a perfect payload and with `plan: "pro"` / `user_id` tampering in the payload. (2) The `activities_live_gps_plan` trigger (security definer) refuses `source='gps'` or a non-null `route` for `plan_rank(plan_of(uid)) < 'plus'` on insert **and** update, so even a direct PostgREST call with the user's JWT cannot save a live recording or attach a route to a manual entry (`20261102000048_low_findings_hardening.sql:52-75`; **proved** by the integration test `gps-running.test.ts` "live GPS is Pro: Free can't record or attach a route, but keeps managing runs recorded earlier", run against local Supabase: 5/5 passed). The client lock (`canRecord`) is convenience only.
 - **No API bypass.** No `/api/health` or `/api/v1/*` route reads or writes `activities`; the only write paths are the two server actions, both on the cookie session, so RLS and the trigger apply. `createActivityAction`'s zod schema only accepts `source` manual|treadmill and writes `route: null, splits: null`.
 - **Ownership.** All reads filter `user_id = session user` and `deleted_at is null`; RLS is owner-only for select/insert/update/delete; no admin policy on `activities` (routes are private data). `user_id` in a payload is ignored (proved).
 - **Route data at rest.** `activities.route` jsonb, `[lng, lat]` at 5 decimals (~1 m), ≤ 150 kB, `is_private=true` default; start/finish points are stored as recorded — there is **no privacy-zone trimming** around home (routes are owner-only, so the exposure is limited to the owner's own account/export; noted as a product choice).
@@ -170,7 +172,7 @@ controlled scenarios) all hold.
 | Interruptions (calls), Low Power Mode, battery, update rate | Not possible here | C5, C6, C10 |
 | Native plugin present in the build at all | Not possible here (`npx cap sync` never run in this environment) | Pre-flight check in the script |
 | Apple Health workout write | N/A (not implemented, by design) | E (confirm nothing is written) |
-| e2e Playwright flows (signed-in) | **Blocked this session** (Supabase down) | — |
+| e2e Playwright flows (signed-in, Chromium geolocation override) | Proved: 10/10 passed on the production build (port 3101) | — |
 
 ## 7. Remaining launch blockers in this area (ranked)
 
@@ -178,11 +180,12 @@ controlled scenarios) all hold.
    suspension and content-process termination risks in `docs/GPS_BACKGROUND_IPHONE.md`). Until script section C passes,
    the store listing must not promise locked-screen recording; the Run tab already says "the phone app is being prepared
    to keep recording with the screen locked".
-2. **e2e and integration suites for GPS not executed this session** (infrastructure). Re-run `e2e/gps-run.spec.ts`,
-   `tests/integration/gps-running.test.ts` and `tests/integration/activities.test.ts` once Docker is back.
-3. Decide B3 (time away after a crash counted as moving time) before launch; a one-line change if the owner wants it paused.
-4. Real-world accuracy figures are unknown (only controlled traces): keep marketing to "measured from your phone's GPS".
-5. (Low) B4: the "Recording" pill after an abandoned permission-denied start.
+2. Decide B3 (time away after a crash counted as moving time) before launch; a one-line change if the owner wants it paused.
+3. Real-world accuracy figures are unknown (only controlled traces): keep marketing to "measured from your phone's GPS".
+4. (Low) B4: the "Recording" pill after an abandoned permission-denied start.
+
+(The e2e and integration suites for this area were run once Supabase returned: 10/10 and 16/16 passed, so they are no
+longer a blocker.)
 
 ## 8. Scores (0–10)
 
@@ -206,5 +209,11 @@ npx vitest run (full suite)                                                     
 npx tsc --noEmit -p .                                                                              → exit 0
 npx next build                                                                                     → "Compiled successfully", exit 0 (/run/record, /run/activities/[id] built)
 npx eslint <changed files>                                                                         → clean
-e2e / integration                                                                                  → not run (Docker daemon down; Supabase 127.0.0.1:54321 unreachable)
+npx vitest run tests/integration/gps-running.test.ts tests/integration/activities.test.ts          → 2 files, 16 passed (after Supabase returned)
+QA_MARK=audit AUTH_RATE_LIMIT_SCALE=50 ANTHROPIC_API_KEY=e2e-test-key ANTHROPIC_BASE_URL=http://127.0.0.1:4781 \
+  OFF_API_BASE_URL=http://127.0.0.1:4782 DEMO_MODE= npx next start -p 3101
+E2E_ANTHROPIC_MOCK_PORT=4781 E2E_OFF_MOCK_PORT=4782 E2E_BASE_URL=http://localhost:3101 \
+  npx playwright test e2e/gps-run.spec.ts e2e/run.spec.ts --trace off --reporter=line
+  → first run: 10 failed at sign-up (confirmation link hard-coded to localhost:3000, B6)
+  → after the helpers.ts fix: 10 passed (3.0 min)
 ```
