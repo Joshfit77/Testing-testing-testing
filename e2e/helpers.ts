@@ -12,11 +12,22 @@ export async function getEmailLink(to: string, pattern: RegExp, timeoutMs = 20_0
       const msg = (await (await fetch(`${MAILPIT}/api/v1/message/${list.messages[0]!.ID}`)).json()) as { HTML: string; Text: string };
       const body = `${msg.HTML}\n${msg.Text}`.replace(/&amp;/g, "&");
       const link = body.match(pattern)?.[0];
-      if (link) return link;
+      if (link) return onBaseUrl(link);
     }
     await new Promise((r) => setTimeout(r, 500));
   }
   throw new Error(`No email for ${to}`);
+}
+
+/**
+ * Supabase builds emailed links from its own site_url (localhost:3000, supabase/config.toml). When the specs run
+ * against a server on another port (E2E_BASE_URL), the app's own links are followed there instead; Supabase's
+ * /auth/v1/verify links are left alone.
+ */
+function onBaseUrl(link: string): string {
+  const base = process.env.E2E_BASE_URL;
+  if (!base) return link;
+  return link.startsWith("http://localhost:3000/") ? `${base.replace(/\/$/, "")}${link.slice("http://localhost:3000".length)}` : link;
 }
 
 export function uniqueEmail(prefix = "e2e") {
