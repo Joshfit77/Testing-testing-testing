@@ -3,6 +3,8 @@ import { migrateDraft, type WorkoutDraft } from "@/lib/domain/workout-draft";
 
 /** Local persistence of the in-progress workout, keyed per user so shared devices don't mix accounts. */
 const key = (userId: string) => `ngf.workout.draft.${userId}`;
+/** The localStorage key of the member's in-progress workout (a `storage` event with this key means another tab saved it). */
+export const localDraftKey = key;
 export const DRAFT_EVENT = "ngf:workout-draft";
 
 export function loadLocalDraft(userId: string): WorkoutDraft | null {
