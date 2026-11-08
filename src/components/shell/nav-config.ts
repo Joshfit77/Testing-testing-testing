@@ -1,4 +1,4 @@
-import { BicepsFlexed, BookOpen, Bot, Cross, Footprints, House, LineChart, Shield, UserRound, Utensils, type LucideIcon } from "lucide-react";
+import { BicepsFlexed, Bot, Cross, Footprints, House, LineChart, Shield, UserRound, Utensils, type LucideIcon } from "lucide-react";
 
 export interface NavItem {
   href: string;
