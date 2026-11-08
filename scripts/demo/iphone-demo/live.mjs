@@ -98,7 +98,15 @@ if (dlg) {
   const started = data.screens.find((s) => s.key === "state:workout-started");
   const named = started?.hot.map((h) => (h.label.match(/^Show the (.+) demonstration larger$/) || [])[1]).find(Boolean);
   if (named) for (const x of list) x.name = named;
-  if (list.length) { apply(dlg, list); log(`demonstration dialog: ${JSON.stringify(list)}`); } else log("demonstration dialog: no live box");
+  if (list.length) {
+    apply(dlg, list);
+    // The Execution and Mistakes tabs show the same player in the same place.
+    for (const key of ["state:demo-dialog-execution", "state:demo-dialog-mistakes"]) {
+      const t = data.screens.find((s) => s.key === key);
+      if (t) apply(t, list.map((x) => ({ ...x })));
+    }
+    log(`demonstration dialog: ${JSON.stringify(list)}`);
+  } else log("demonstration dialog: no live box");
   await page.keyboard.press("Escape");
 }
 fs.writeFileSync(file, JSON.stringify(data));

@@ -240,6 +240,20 @@ if (!SKIP_FLOWS) try {
   const demoDlg = await state("state:demo-dialog", "Exercise demonstration", { full: false, closeTo: "state:workout-started" });
   for (const hs of demoDlg.hot) if (/close|done|back/i.test(hs.label)) hs.to = "state:workout-started";
   link(started, /Show the .* demonstration larger/, "state:demo-dialog");
+  link(started, /^Exercise info$/, "state:demo-dialog");
+  // The dialog's Setup / Execution / Mistakes tabs: one state each, wired to one another.
+  const tabStates = { Setup: demoDlg };
+  for (const [tab, key] of [["Execution", "state:demo-dialog-execution"], ["Mistakes", "state:demo-dialog-mistakes"]]) {
+    await dialog.getByRole("tab", { name: tab }).click();
+    await page.waitForTimeout(500);
+    const rec = await state(key, `Exercise demonstration: ${tab.toLowerCase()}`, { full: false, closeTo: "state:workout-started" });
+    for (const hs of rec.hot) if (/close|done|back/i.test(hs.label)) hs.to = "state:workout-started";
+    tabStates[tab] = rec;
+  }
+  const tabKey = { Setup: "state:demo-dialog", Execution: "state:demo-dialog-execution", Mistakes: "state:demo-dialog-mistakes" };
+  for (const rec of Object.values(tabStates)) for (const [tab, key] of Object.entries(tabKey)) {
+    const hs = rec.hot.find((x) => x.label === tab); if (hs) hs.to = key;
+  }
   await page.keyboard.press("Escape");
   await dialog.waitFor({ state: "hidden" });
   // Log set 1 on the current-set card at the top (the main path: big steppers, one Complete set button), set 2 in the
