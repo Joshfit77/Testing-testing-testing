@@ -19,6 +19,8 @@ export interface DebtDay {
   date: string;
   /** Minutes asleep, or null when nothing was logged. */
   asleep: number | null;
+  /** True when the night has no fell-asleep / awake detail, so `asleep` is really time in bed. */
+  estimated: boolean;
   /** Added to the debt (goal − asleep), 0 when at goal or no data. */
   shortfall: number;
   /** Paid back from the debt, 0 when under goal or no data. */
@@ -68,7 +70,7 @@ export function sleepDebt(nights: NightSummary[], goalMinutes: number, endDate: 
     const date = addDays(endDate, -i);
     const n = byDate.get(date);
     if (!n) {
-      days.push({ date, asleep: null, shortfall: 0, repaid: 0, debt: Math.round(debt) });
+      days.push({ date, asleep: null, estimated: false, shortfall: 0, repaid: 0, debt: Math.round(debt) });
       continue;
     }
     withData++;
@@ -83,7 +85,7 @@ export function sleepDebt(nights: NightSummary[], goalMinutes: number, endDate: 
     }
     totalShortfall += shortfall;
     totalRepaid += repaid;
-    days.push({ date, asleep: n.asleepMinutes, shortfall: Math.round(shortfall), repaid: Math.round(repaid), debt: Math.round(debt) });
+    days.push({ date, asleep: n.asleepMinutes, estimated: n.asleepEstimated, shortfall: Math.round(shortfall), repaid: Math.round(repaid), debt: Math.round(debt) });
   }
   const now = Math.round(debt);
   let trend: DebtTrend | null = null;

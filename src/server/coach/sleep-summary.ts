@@ -1,7 +1,8 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { addDays, isoDateInTz } from "@/lib/domain/dates";
-import { clockMinutesInTz, DEFAULT_SLEEP_GOAL_MINUTES, formatClock, formatDuration, HRV_METHOD_LABEL, minutesBetween, summarizeNights, type NightSummary } from "@/lib/domain/sleep";
+import { clockMinutesInTz, DEFAULT_SLEEP_GOAL_MINUTES, formatClock, formatDuration, HRV_METHOD_LABEL, summarizeNights, type NightSummary } from "@/lib/domain/sleep";
+import { stageShares } from "@/lib/domain/sleep-import";
 import { associations, clockToMinutes, describeAssociation } from "@/lib/domain/sleep-checkins";
 import { sleepDebt } from "@/lib/domain/sleep-debt";
 import { nightlyScore } from "@/lib/domain/sleep-score";
@@ -35,7 +36,9 @@ export async function buildSleepSummary(supabase: SupabaseClient, userId: string
   const avg = averageAsleepMinutes(nights);
   const last = nights[0]!;
   const gaps: string[] = [];
-  if (nights.every((n) => n.asleepEstimated)) gaps.push("No night has when-fell-asleep or awake-time detail, so 'asleep' means time in bed throughout.");
+  const inBedOnly = nights.filter((n) => n.asleepEstimated).length;
+  if (inBedOnly === nights.length) gaps.push("No night has when-fell-asleep or awake-time detail, so 'asleep' means time in bed throughout.");
+  else if (inBedOnly) gaps.push(`${inBedOnly} of ${nights.length} nights have no when-fell-asleep or awake-time detail, so their 'asleep' is time in bed; the averages, shortest and longest mix the two.`);
   if (pattern.typicalBed === null) gaps.push("Fewer than three nights in the last two weeks, so there is no typical bedtime or wake time yet.");
   if (!checkins.length) gaps.push("No check-ins, so there are no habit patterns and no reported energy.");
   const recordedNights = nights.filter((n) => n.recorded);
@@ -74,13 +77,20 @@ async function describeRecorded(supabase: SupabaseClient, userId: string, record
   const latest = recordedNights[0]!;
   const sample = recordedNights.slice(0, 30);
   const stages = await listSleepStages(supabase, userId, sample.flatMap((n) => n.sessions.map((s) => s.id)));
+  // A stage the device never recorded is null, never "0m": a phone's bare asleep record says nothing about deep or REM.
   const shares = (rows: typeof stages) => {
-    const minutes: Record<string, number> = {};
-    for (const s of rows) minutes[s.stage] = (minutes[s.stage] ?? 0) + minutesBetween(s.started_at, s.ended_at);
-    const asleep = Object.entries(minutes).filter(([k]) => k !== "awake").reduce((a, [, v]) => a + v, 0);
-    if (!asleep) return null;
-    const pct = (k: string) => (minutes[k] ? Math.round((minutes[k]! / asleep) * 100) : null);
-    return { asleep_by_stage: formatDuration(asleep), deep: formatDuration(minutes.deep ?? 0), deep_pct: pct("deep"), rem: formatDuration(minutes.rem ?? 0), rem_pct: pct("rem"), light: formatDuration(minutes.light ?? 0), light_pct: pct("light"), awake: formatDuration(minutes.awake ?? 0), unlabelled_asleep: minutes.asleep ? formatDuration(minutes.asleep) : null };
+    const t = stageShares(rows.map((r) => ({ stage: r.stage, startedAt: r.started_at, endedAt: r.ended_at })));
+    if (!t) return null;
+    const part = (p: { minutes: number; pct: number } | null) => (p ? { minutes: formatDuration(p.minutes), pct: p.pct } : null);
+    return {
+      asleep_by_stage: formatDuration(t.asleepMinutes),
+      stage_detail: t.staged ? "light, deep and REM recorded" : "the device recorded sleep without stages: deep, REM and light are unknown, not zero",
+      deep: part(t.deep),
+      rem: part(t.rem),
+      light: part(t.light),
+      awake: t.awakeMinutes ? formatDuration(t.awakeMinutes) : null,
+      unlabelled_asleep: part(t.unlabelled),
+    };
   };
   const latestIds = new Set(latest.sessions.map((s) => s.id));
   const hr = (n: NightSummary) => n.vitals?.heartRate?.avg ?? null;
