@@ -56,13 +56,18 @@ export async function signUpAction(_prev: ActionState, formData: FormData): Prom
   });
   if (error) {
     if (error.status === 429) return actionError("Too many attempts. Please wait a minute and try again.");
+    // An address that already has an account: the same answer as a new sign-up, so the form never says who is
+    // registered (Supabase itself answers this way when configured to obfuscate; some stacks return this error instead).
+    if (error.code === "user_already_exists" || /already registered/i.test(error.message)) return actionOk(SIGNUP_SENT);
     if (/password/i.test(error.message)) return actionError(error.message, { password: error.message });
     logError("auth.signup", error);
     return actionError("We couldn't create your account. Please try again.");
   }
   if (data.session) redirect("/onboarding");
-  return actionOk("Check your inbox to confirm your email address, then sign in.");
+  return actionOk(SIGNUP_SENT);
 }
+
+const SIGNUP_SENT = "Check your inbox to confirm your email address, then sign in. Already have an account? Sign in instead.";
 
 export async function signInAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = signInSchema.safeParse({ email: formData.get("email"), password: formData.get("password") });
