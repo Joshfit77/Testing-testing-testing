@@ -35,8 +35,13 @@ for (let i = 0; i < 80; i++) {
   if ((await weight.count()) && !(await weight.inputValue())) { await weight.fill("45"); taps++; fields++; }
   const reps = card.getByTestId("current-reps").locator("input");
   if ((await reps.count()) && !(await reps.inputValue())) { await reps.fill("8"); taps++; fields++; }
+  // Wait for the header's "n/12 sets" to move on before the next set.
+  const counter = page.getByText(/^\d+\/\d+ sets$/).first();
+  const before = (await counter.textContent().catch(() => ""))?.trim();
   await tap(done); sets++;
-  await page.waitForTimeout(150);
+  for (let w = 0; w < 25 && (await counter.textContent().catch(() => ""))?.trim() === before; w++) await page.waitForTimeout(200);
+  // The logger ignores a second Complete within 700 ms (CARD_DOUBLE_TAP_MS); a member rests far longer than that.
+  await page.waitForTimeout(750);
 }
 await shot("all-sets-done");
 await tap(page.getByRole("button", { name: "Finish workout" }).first());

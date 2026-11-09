@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Loader2, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ActionState } from "@/lib/action-state";
 import { UNDO_LOG_MS, type LogResult } from "@/lib/domain/diary";
+import { isCovered, prefersReducedMotion } from "@/lib/keyboard";
 import { cn } from "@/lib/utils";
 import { undoLoggedItemsAction } from "@/server/actions/nutrition";
 
@@ -24,6 +25,29 @@ function LoggedUndoLine({ result, className, onUndone }: { result: LogResult; cl
   const [undone, setUndone] = useState<ActionState | null>(null);
   const [pending, start] = useTransition();
   const canUndo = result.ok && Boolean(result.itemIds?.length);
+  const line = useRef<HTMLDivElement & HTMLParagraphElement>(null);
+  // The confirmation can appear below the fold or behind the phone tab bar (a long Recent foods list puts it there):
+  // bring it into view so the member sees what was logged and can reach Undo. Inside a dialog the dialog scrolls.
+  // Checked again once the page settles: the refresh that follows a log re-renders the list above and can push the
+  // line down after it first appeared.
+  useEffect(() => {
+    const reveal = () => {
+      const el = line.current;
+      if (!el) return;
+      // The phone tab bar; the desktop sidebar shares its label but is hidden (zero size) on a phone.
+      const tabBar = el.closest('[role="dialog"]')
+        ? undefined
+        : [...document.querySelectorAll<HTMLElement>('nav[aria-label="Main sections"]')].map((n) => n.getBoundingClientRect()).find((r) => r.height > 0 && r.bottom >= window.innerHeight - 1);
+      const visibleBottom = tabBar ? tabBar.top : window.innerHeight;
+      if (isCovered(el.getBoundingClientRect(), 0, visibleBottom)) el.scrollIntoView?.({ block: "center", behavior: prefersReducedMotion() ? "auto" : "smooth" });
+    };
+    const frame = requestAnimationFrame(reveal);
+    const timers = [300, 1000].map((ms) => setTimeout(reveal, ms));
+    return () => {
+      cancelAnimationFrame(frame);
+      timers.forEach(clearTimeout);
+    };
+  }, []);
   useEffect(() => {
     if (!canUndo) return;
     const t = setTimeout(() => setExpired(true), UNDO_LOG_MS);
@@ -32,14 +56,14 @@ function LoggedUndoLine({ result, className, onUndone }: { result: LogResult; cl
 
   if (!result.ok) {
     return (
-      <p role="alert" className={cn("text-sm text-[#f08a8a]", className)}>
+      <p ref={line} role="alert" className={cn("text-sm text-[#f08a8a]", className)}>
         {result.message}
       </p>
     );
   }
   const shown = undone ?? result;
   return (
-    <div className={cn("flex flex-wrap items-center gap-x-2 gap-y-1", className)}>
+    <div ref={line} className={cn("flex flex-wrap items-center gap-x-2 gap-y-1", className)}>
       <p role={shown.ok ? "status" : "alert"} className={cn("text-sm", shown.ok ? "text-[#5fc49a]" : "text-[#f08a8a]")}>
         {shown.message}
       </p>

@@ -159,8 +159,10 @@ export async function j15({ page, tap, tab }) {
   const again = page.getByRole("button", { name: /^Add .+ again$/ }).filter({ visible: true });
   if (!(await again.count())) return "SKIPPED: nothing recent to re-log";
   await tap(again, "one-tap re-log");
-  const undo = page.getByRole("button", { name: "Undo" }).filter({ visible: true });
-  if (!(await undo.first().isVisible({ timeout: 5000 }).catch(() => false))) return "BLOCKED: no Undo after logging";
+  // Exactly "Undo" inside Recent foods: the water card's "Undo last water entry" is always on the page.
+  const undo = page.getByTestId("quick-relog-section").getByRole("button", { name: "Undo", exact: true }).filter({ visible: true });
+  // isVisible() does not wait; give the server its time to answer before deciding there is no Undo.
+  if (!(await undo.first().waitFor({ state: "visible", timeout: 8000 }).then(() => true).catch(() => false))) return "BLOCKED: no Undo after logging";
   await tap(undo, "Undo");
   await page.getByText(/^Undone/).first().waitFor({ timeout: 8000 });
   return "logged and undone";

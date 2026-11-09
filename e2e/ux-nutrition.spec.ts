@@ -48,8 +48,14 @@ test.describe("food diary, first-time fixes", () => {
     await recent.getByTestId("quick-relog").first().click();
     await expect(recent.getByRole("status")).toHaveText(/^Logged .+ to (breakfast|lunch|dinner|snacks)\.$/);
     await expect(diaryRows(page)).toHaveCount(before + 1);
+    // The confirmation and its Undo are brought on screen, clear of the tab bar (a long Recent list used to leave them
+    // underneath it).
+    const undo = recent.getByRole("button", { name: "Undo" });
+    await expect(undo).toBeInViewport({ ratio: 1 });
+    const tabBarTop = (await page.getByRole("navigation", { name: "Main sections" }).boundingBox())!.y;
+    await expect.poll(async () => { const b = (await undo.boundingBox())!; return b.y + b.height <= tabBarTop; }).toBe(true);
 
-    await recent.getByRole("button", { name: "Undo" }).click();
+    await undo.click();
     await expect(recent.getByRole("status")).toHaveText("Undone: removed from your diary.");
     await expect(recent.getByRole("button", { name: "Undo" })).toHaveCount(0);
     await expect(diaryRows(page)).toHaveCount(before);
