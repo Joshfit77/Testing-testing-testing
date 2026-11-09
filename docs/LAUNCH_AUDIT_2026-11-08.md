@@ -42,6 +42,7 @@ tables and migrations, native plugins, integrations):
 | 7 Subscriptions | Proof that a Free member calling every Pro server action directly is refused and nothing is written | Test added | `tests/integration/free-user-direct-actions.test.ts` (9) |
 | 7 Docs | Four documents still listed retired prices ($24.99 / $249.99); now $19.99 / $149.99 | Low | — |
 | Tooling | e2e e-mail links and the Bible-helper mock now follow the server and port under test, so the suite runs on any port | Low | whole e2e suite |
+| 6 AI Coach (found 2026-11-09 by the demo crawl) | The redesign's "Today at 9:24 AM" message stamps were built in the server's time zone, so every visit to the coach from another zone hit React hydration error #418; the stamp is now rendered in the browser only | Medium | `e2e/coach-timezone.spec.ts` (browser 14 h ahead of UTC) and `coach.spec.ts`: 10 passed, 1 skipped by design, on a fresh production build |
 
 ## 3. Test results on the merged branch (this audit, real numbers)
 
