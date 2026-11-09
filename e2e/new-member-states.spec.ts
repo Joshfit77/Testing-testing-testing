@@ -19,6 +19,11 @@ test.describe("a new member's first look", () => {
     await signUpAndConfirm(page, uniqueEmail("newstates"));
     await completeOnboarding(page);
 
+    // The plan screen's buttons keep their full height on a phone (flex-1 in a column used to collapse them to 26 px).
+    await page.goto("/plan");
+    const home = page.getByRole("link", { name: /Go to Home/ });
+    expect((await home.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+
     // Home: today's workout from the new plan, nothing logged, the Bible starting at John 1.
     await page.goto("/home");
     await expect(page.getByRole("link", { name: /^Start today's workout/i })).toBeVisible();

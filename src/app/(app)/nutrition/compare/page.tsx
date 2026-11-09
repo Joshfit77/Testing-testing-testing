@@ -23,7 +23,7 @@ export default async function CompareProductsPage({ searchParams }: { searchPara
   const b = clean(sp.b);
   if (!hasFeature(await getUserPlan(user.id), "food_comparisons")) {
     return (
-      <PlanLocked
+      <PlanLocked freeAlternative={{ href: "/nutrition/scanner", label: "Check one product" }}
         back={{ href: a ? `/nutrition/product/${a}` : "/nutrition/scanner", label: "Back" }}
         eyebrow={NUTRITION_FEATURE_TITLE}
         title="Compare products"

@@ -46,7 +46,7 @@ function TipItem({ tip }: { tip: SleepTip }) {
     <li className="rounded-xl bg-elevated p-3">
       <div className="flex items-start justify-between gap-2">
         <p className="font-semibold">{tip.title}</p>
-        <ActionButton action={dismissSleepTipAction} fields={{ key: tip.key }} variant="ghost" size="icon-sm" aria-label={`Dismiss: ${tip.title}`}>
+        <ActionButton action={dismissSleepTipAction} fields={{ key: tip.key }} variant="ghost" size="icon-sm" className="shrink-0" aria-label={`Dismiss: ${tip.title}`}>
           <X className="size-4" aria-hidden />
         </ActionButton>
       </div>

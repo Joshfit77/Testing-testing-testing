@@ -270,7 +270,7 @@ export function TrainingReviewView({
           {review.recovery.avgReadiness7 != null ? `Average readiness ${review.recovery.avgReadiness7}/100 this week` : "No check-ins this week"}
           {review.recovery.rpeDrift != null ? `; logged effort ${review.recovery.rpeDrift >= 0 ? "+" : ""}${review.recovery.rpeDrift} RPE versus plan` : ""}.
         </p>
-        <Link href="/train/recovery" className="mt-1 inline-block text-sm text-gold-highlight underline">
+        <Link href="/train/recovery" className="mt-1 inline-flex min-h-11 items-center text-sm text-gold-highlight underline">
           Log a recovery check-in
         </Link>
       </section>

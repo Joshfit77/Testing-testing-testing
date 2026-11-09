@@ -821,7 +821,7 @@ export function CustomFoodForm() {
           </div>
         ))}
       </div>
-      <label className="flex items-center gap-2 text-sm">
+      <label className="flex min-h-11 items-center gap-2 text-sm">
         <input type="checkbox" name="isEstimate" checked={v.isEstimate} onChange={set("isEstimate")} className="size-5 accent-[#C9A54C]" />
         Values are an estimate (not copied from a label)
       </label>

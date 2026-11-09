@@ -13,7 +13,9 @@ await page.goto(BASE + "/login"); await shot("login"); await tap(page.getByRole(
 const cont = () => tap(page.getByRole("button", { name: /^Continue/ }));
 await shot("goal"); await tap(page.getByRole("button", { name: "Build muscle", exact: true })); await cont();
 await shot("experience"); await tap(page.getByRole("button", { name: "Under 1 year", exact: true })); await cont();
-await shot("schedule"); await tap(page.getByRole("button", { name: /^3\s*days$/ }).first()); await tap(page.getByRole("button", { name: /^45\s*min$/ }).first()); await cont();
+// 3 days and 45 minutes are preselected (aria-pressed); a member who accepts them only taps Continue.
+const pick = async (loc) => { if ((await loc.getAttribute("aria-pressed")) !== "true") await tap(loc); };
+await shot("schedule"); await pick(page.getByRole("button", { name: /^3\s*days$/ }).first()); await pick(page.getByRole("button", { name: /^45\s*min$/ }).first()); await cont();
 await shot("equipment"); await tap(page.getByRole("button", { name: /^Full gym/ })); await cont();
 await shot("body"); await tap(page.getByRole("button", { name: "Male", exact: true })).catch(() => {});
 for (const [l, v] of [["Age", "30"], ["Height (ft)", "5"], ["Height (in)", "10"]]) { await page.getByLabel(l).fill(v); taps++; }

@@ -220,13 +220,13 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
 
       <div className="flex flex-col gap-3 sm:flex-row">
         {!active?.today && (
-          <Button asChild size="lg" className="flex-1">
+          <Button asChild size="lg" className="sm:flex-1">
             <Link href="/train/build">
               <Dumbbell aria-hidden /> Build a program
             </Link>
           </Button>
         )}
-        <Button asChild size="lg" variant={active?.today ? "secondary" : "outline"} className="flex-1">
+        <Button asChild size="lg" variant={active?.today ? "secondary" : "outline"} className="sm:flex-1">
           <Link href={isNew ? "/home?welcome=1" : "/home"}>
             <Home aria-hidden /> Go to Home
           </Link>

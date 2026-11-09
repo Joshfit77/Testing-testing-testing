@@ -24,6 +24,24 @@ test.describe("memberships", () => {
       await expect(page.getByText("Included with Pro All Access"), path).toBeVisible();
     }
 
+    // No locked screen is a dead end: each offers a free next step beside "See plans", and the step works.
+    for (const [path, label, dest] of [
+      ["/progress/sleep/debt", "Log last night's sleep", /\/progress\/sleep\/log/],
+      ["/progress/sleep/energy", "Log last night's sleep", /\/progress\/sleep\/log/],
+      ["/progress/sleep/training", "Log last night's sleep", /\/progress\/sleep\/log/],
+      ["/progress/sleep/schedule", "Log last night's sleep", /\/progress\/sleep\/log/],
+      ["/progress/body-map", "See my progress", /\/progress\/overview/],
+      ["/progress/body-scan", "Add a progress photo", /\/progress\/overview/],
+      ["/nutrition/compare", "Check one product", /\/nutrition\/scanner/],
+      ["/train/build", "Browse free programs", /\/train\/programs/],
+      ["/train/review", "See my workout history", /\/train\/history/],
+    ] as const) {
+      await page.goto(path);
+      await expect(page.getByRole("link", { name: "See plans" }), path).toBeVisible();
+      await page.getByRole("link", { name: label }).click();
+      await page.waitForURL(dest);
+    }
+
     // The AI coach is Pro only, and nothing asks for AI data sharing on Free.
     await page.goto("/coach");
     await expect(page.getByTestId("coach-upsell")).toBeVisible();
