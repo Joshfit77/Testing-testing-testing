@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   analyzeTraining,
   applyModification,
+  consistencyText,
+  friendlyDay,
   loadIncrementKg,
   repTarget,
   roundLoadKg,
@@ -205,5 +207,29 @@ describe("logged sleep in the review", () => {
     const manual = analyzeTraining(input({ sleep: { goalMinutes: 480, nights: nights.map((n) => ({ date: n.date, asleepMinutes: n.asleepMinutes })) } }));
     expect(manual.recovery.recorded).toBeNull();
     expect(manual.dataGaps.join(" ")).toMatch(/recorded by a wearable/);
+  });
+});
+
+describe("consistency sentence (count, plan and % over the same days)", () => {
+  it("a program started 21 days ago: workouts since then against the plan since then", () => {
+    // 3 days a week for 21 days = about 9 planned; 7 done since the start, plus older workouts that don't count here.
+    const days = [0, 2, 5, 8, 11, 14, 17];
+    const workouts = [...days.map((d) => wo(d, [{ ...bench, sets: sets(3, 80, 5) }])), wo(25, [{ ...bench, sets: sets(3, 80, 5) }]), wo(27, [{ ...bench, sets: sets(3, 80, 5) }])];
+    const c = analyzeTraining(input({ workouts, program: program({ startedOn: addDays(TODAY, -20) }) })).consistency;
+    expect(c.sessionsLast28).toBe(9);
+    expect([c.sessionsInWindow, c.plannedLast28, c.plannedWindowDays, c.pct]).toEqual([7, 9, 21, 78]);
+    expect(consistencyText(c, TODAY, "Strength Builder")).toBe("7 workouts of about 9 planned since you started (78%) on Strength Builder. Last workout: today.");
+  });
+
+  it("a program running longer than 4 weeks: the last 4 weeks on both sides", () => {
+    const workouts = [1, 3, 6, 9, 13].map((d) => wo(d, [{ ...squat, sets: sets(3, 100, 5) }]));
+    const c = analyzeTraining(input({ workouts })).consistency;
+    expect(consistencyText(c, TODAY, "Strength Builder")).toBe("5 workouts of about 12 planned in the last 4 weeks (42%) on Strength Builder. Last workout: yesterday.");
+  });
+
+  it("no program: just the count, and a readable date", () => {
+    const c = analyzeTraining(input({ program: null, workouts: [wo(5, [{ ...bench, sets: sets(3, 80, 5) }])] })).consistency;
+    expect(consistencyText(c, TODAY, null)).toBe("1 workout in the last 4 weeks. Last workout: Sat, Oct 17.");
+    expect(friendlyDay(TODAY, TODAY)).toBe("today");
   });
 });

@@ -14,7 +14,9 @@ export function DeleteActivityButton({ id, label }: { id: string; label: string 
   return (
     <Button
       type="button"
-      variant="destructive"
+      // A quiet, secondary action (it still asks first): never the biggest thing on the page.
+      variant="ghost"
+      className="text-destructive-foreground hover:text-destructive-foreground"
       disabled={pending}
       aria-busy={pending}
       onClick={async () => {

@@ -39,6 +39,7 @@ export default async function TrainingReviewPage() {
       <TrainingReviewView
         review={review}
         units={input.units}
+        today={input.today}
         programName={input.program?.name ?? null}
         adjustments={(adjustments ?? []) as { id: string; kind: string; summary: string; source: string; created_at: string; reverted_at: string | null }[]}
       />

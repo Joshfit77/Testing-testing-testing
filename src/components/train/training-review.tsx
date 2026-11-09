@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Notice } from "@/components/common/states";
 import { cn } from "@/lib/utils";
-import type { Recommendation, TrainingReview } from "@/lib/domain/adaptive-training";
+import { consistencyText, type Recommendation, type TrainingReview } from "@/lib/domain/adaptive-training";
 import { displayWeight, weightUnit } from "@/lib/domain/units";
 import type { UnitSystem } from "@/lib/domain/types";
 import { acceptRecommendationAction, rejectRecommendationAction, restoreRecommendationAction, undoAdjustmentAction } from "@/server/actions/adaptive-training";
@@ -134,11 +134,14 @@ function RecommendationCard({ rec, units, onDone }: { rec: Recommendation; units
 export function TrainingReviewView({
   review,
   units,
+  today,
   programName,
   adjustments,
 }: {
   review: TrainingReview;
   units: UnitSystem;
+  /** The member's local date (YYYY-MM-DD) the review was built for. */
+  today: string;
   programName: string | null;
   adjustments: { id: string; kind: string; summary: string; source: string; created_at: string; reverted_at: string | null }[];
 }) {
@@ -201,10 +204,8 @@ export function TrainingReviewView({
         <h2 id="consistency" className="flex items-center gap-2 font-semibold">
           <Activity className="size-4 text-gold" aria-hidden /> Consistency
         </h2>
-        <p className="mt-1 text-sm">
-          {c.sessionsLast28} workout{c.sessionsLast28 === 1 ? "" : "s"} in the last 4 weeks
-          {c.plannedLast28 ? ` of about ${c.plannedLast28} planned${c.pct != null ? ` (${c.pct}%)` : ""}` : ""}
-          {programName ? ` on ${programName}` : ""}. Last workout: {c.lastSession ?? "none yet"}.
+        <p className="mt-1 text-sm" data-testid="review-consistency">
+          {consistencyText(c, today, programName)}
         </p>
         {review.weeksSinceDeload != null && <p className="mt-1 text-sm text-muted-foreground">{review.weeksSinceDeload} weeks since the last lighter week in this program.</p>}
       </section>
