@@ -262,6 +262,21 @@ export function defaultManualNight(now: Date, timeZone: string): { startedAt: st
   return { startedAt: `${addDays(wakeDay, -1)}T22:30`, endedAt: `${wakeDay}T06:30` };
 }
 
+/** How long a nap entered by hand defaults to. */
+export const DEFAULT_NAP_MINUTES = 30;
+
+/**
+ * Defaults for entering sleep by hand. A night uses the overnight defaults above; a nap is the half hour ending now
+ * (rounded down to five minutes), so it is nap-sized, never in the future, and lands on today.
+ */
+export function defaultManualEntry(kind: SleepKind, now: Date, timeZone: string): { startedAt: string; endedAt: string } {
+  if (kind === "night") return defaultManualNight(now, timeZone);
+  const zone = safeZone(timeZone);
+  const end = Math.floor(now.getTime() / (5 * MINUTE_MS)) * 5 * MINUTE_MS;
+  const start = end - DEFAULT_NAP_MINUTES * MINUTE_MS;
+  return { startedAt: isoToLocalInput(new Date(start).toISOString(), zone), endedAt: isoToLocalInput(new Date(end).toISOString(), zone) };
+}
+
 /** An instant as a datetime-local field value ("2026-10-22T22:30") in a time zone. */
 export function isoToLocalInput(iso: string, timeZone: string): string {
   const t = parseIso(iso);

@@ -21,7 +21,7 @@ export interface EnergyRhythm {
   /** Hour ranges (clock minutes) where the estimate is at its highest and lowest. */
   peaks: { start: number; end: number }[];
   dips: { start: number; end: number }[];
-  /** Suggested start of winding down (an hour before the bed window). */
+  /** Suggested start of winding down: an hour before the target bedtime, the same as windDownStart() of its bed window. */
   windDown: number;
   /** Multiplier applied for short sleep and debt, for the explanation. */
   scale: number;

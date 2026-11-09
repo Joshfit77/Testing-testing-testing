@@ -17,6 +17,15 @@ export function SleepConsentCard() {
       <p className="mt-2 text-sm text-muted-foreground">
         Sleep times, naps and check-ins are optional wellness information. They are stored in your account, shown only to you, never shared with the AI coach unless you ask it about your sleep, and deleted with your account. You can delete any entry at any time.
       </p>
+      <div className="mt-3 rounded-xl bg-elevated p-3 text-sm">
+        <p className="font-semibold">Once it&apos;s on, you can</p>
+        <ul className="mt-1 list-disc space-y-0.5 pl-5 text-muted-foreground">
+          <li>connect Apple Health or Health Connect in the phone app, so your watch&apos;s nights arrive by themselves</li>
+          <li>tap the sleep timer at bedtime and again when you get up</li>
+          <li>enter last night by hand in under a minute</li>
+        </ul>
+        <p className="mt-2 text-muted-foreground">Then this page shows last night, your week and one thing worth trying.</p>
+      </div>
       <form action={action} className="mt-4 space-y-3">
         <label className="flex min-h-11 items-center gap-3 text-sm">
           <input type="checkbox" name="consent" className="size-5 accent-gold" aria-describedby={state.fieldErrors?.consent ? "sleep-consent-error" : undefined} />

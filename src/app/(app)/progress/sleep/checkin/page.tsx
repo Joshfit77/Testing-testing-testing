@@ -2,9 +2,9 @@ import { notFound } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import { ActionButton } from "@/components/common/action-button";
 import { PageHeader } from "@/components/common/page-header";
-import { Notice } from "@/components/common/states";
 import { BackLink } from "@/components/platform/back-link";
 import { SleepCheckinForm } from "@/components/sleep/checkin-form";
+import { SleepConsentCard } from "@/components/sleep/consent-card";
 import { formatNightDate } from "@/components/sleep/session-list";
 import { addDays, isoDateInTz } from "@/lib/domain/dates";
 import { getServerSupabase } from "@/lib/supabase/server";
@@ -39,7 +39,8 @@ export default async function SleepCheckinPage({ searchParams }: { searchParams:
           ) : undefined
         }
       />
-      {!profile.wellness_consent_at ? <Notice tone="warning">Allow sleep logging on the Sleep & Recovery page first.</Notice> : <SleepCheckinForm day={day} checkin={checkin} />}
+      {/* Before consent the same card as the dashboard, right here, instead of sending the member back to find it. */}
+      {!profile.wellness_consent_at ? <SleepConsentCard /> : <SleepCheckinForm day={day} checkin={checkin} />}
     </div>
   );
 }
