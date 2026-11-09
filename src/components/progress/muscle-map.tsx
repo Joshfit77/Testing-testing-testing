@@ -26,6 +26,7 @@ import {
 import type { UnitSystem } from "@/lib/domain/types";
 import { displayWeight, formatDuration, formatWeight, weightUnit } from "@/lib/domain/units";
 import { cn } from "@/lib/utils";
+import { RECORD_TYPE_LABEL } from "@/lib/domain/record-labels";
 import { setStrengthStandardsAction } from "@/server/actions/body-map";
 import { BodyFigure, type FigureView, type RegionPaint } from "./body-figure";
 import { BELOW_BRONZE_COLOR, RANK_COLORS, StrengthRankEmblem } from "./strength-rank-emblem";
@@ -39,13 +40,7 @@ const VOLUME_LABELS: Record<VolumeBand, string> = {
   high: "Above the usual range",
   no_range: "Trained (no set range for this region)",
 };
-const RECORD_LABELS: Record<string, string> = {
-  estimated_1rm: "Estimated 1-rep max",
-  max_weight: "Heaviest set",
-  max_reps: "Most reps",
-  max_set_volume: "Best set volume",
-  max_duration: "Longest hold",
-};
+const RECORD_LABELS: Record<string, string> = RECORD_TYPE_LABEL;
 
 function shortDate(d: string): string {
   return new Date(`${d}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: d.slice(0, 4) === new Date().toISOString().slice(0, 4) ? undefined : "numeric", timeZone: "UTC" });

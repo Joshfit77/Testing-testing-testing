@@ -301,13 +301,22 @@ export async function finishWorkout(
  */
 export async function rebuildRecords(supabase: SupabaseClient, userId: string, exerciseIds: string[]): Promise<void> {
   if (!exerciseIds.length) return;
-  const { data, error } = await supabase
-    .from("workout_exercises")
-    .select("exercise_id, skipped, session:workout_sessions!inner(id, status, started_at, ended_at), sets:workout_sets(reps, weight_kg, duration_seconds, completed, is_warmup)")
-    .eq("user_id", userId)
-    .in("exercise_id", exerciseIds)
-    .eq("session.status", "completed");
-  if (error) throw new WorkoutError(error.message);
+  // Paged (the API returns at most 1,000 rows per request): an unpaged read dropped older sessions for members with a
+  // long history, and the rebuild then deleted records those sessions held.
+  const data: unknown[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data: page, error } = await supabase
+      .from("workout_exercises")
+      .select("id, exercise_id, skipped, session:workout_sessions!inner(id, status, started_at, ended_at), sets:workout_sets(reps, weight_kg, duration_seconds, completed, is_warmup)")
+      .eq("user_id", userId)
+      .in("exercise_id", exerciseIds)
+      .eq("session.status", "completed")
+      .order("id")
+      .range(from, from + 999);
+    if (error) throw new WorkoutError(error.message);
+    data.push(...(page ?? []));
+    if (!page || page.length < 1000) break;
+  }
 
   type Row = {
     exercise_id: string;

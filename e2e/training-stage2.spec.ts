@@ -128,7 +128,10 @@ test.describe("training stage 2B", () => {
     await expect(page.getByRole("link", { name: /Search YouTube for more/ })).toBeVisible();
     await page.getByRole("link", { name: /Your history/ }).click();
     await page.waitForURL(/\/train\/exercises\/bench-press\/history/);
-    await expect(page.getByTestId("best-set")).toContainText("100 lb × 8");
+    // The headline is the best estimated 1RM, named as an estimate, with the set it was calculated from.
+    await expect(page.getByRole("heading", { name: /Best Estimated 1RM/i })).toBeVisible();
+    await expect(page.getByTestId("best-set")).toHaveText("126.7 lb");
+    await expect(page.getByText(/Calculated from 100 lb × 8/)).toBeVisible();
     await expect(page.getByRole("heading", { name: "Recent sessions" })).toBeVisible();
     await expect(page.getByRole("link", { name: /E2E Push Pull/ })).toBeVisible();
 
