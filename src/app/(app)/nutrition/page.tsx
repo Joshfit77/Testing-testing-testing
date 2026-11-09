@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { NotificationTodaySync } from "@/components/notifications/notification-sync";
-import { BarChart3, BookMarked, Camera, ScanBarcode, CalendarClock, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Coffee, Cookie, CookingPot, Moon, Pill, Salad, Scale, ShoppingCart, Sun, Trash2, TrendingUp, type LucideIcon } from "lucide-react";
+import { BarChart3, BookMarked, Camera, ScanBarcode, CalendarClock, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Coffee, Cookie, Moon, Pill, Salad, Scale, ShoppingCart, Sun, Trash2, TrendingUp, type LucideIcon } from "lucide-react";
+import { ProTag } from "@/components/nutrition/pro-tag";
 import { BarSeriesChart } from "@/components/charts/charts";
 import { MainHeader } from "@/components/shell/main-header";
 import { BudgetForm, CopyMealButton, QuickAddDialog } from "@/components/nutrition/diary-client";
@@ -17,17 +18,19 @@ import { Button } from "@/components/ui/button";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { ProgressRing } from "@/components/ui/progress-ring";
 import { addDays, isoDateInTz, isValidIsoDate } from "@/lib/domain/dates";
-import { NUTRITION_FEATURE_TITLE, NUTRITION_SCORE_LABEL } from "@/lib/food-iq";
+import { NUTRITION_SCORE_LABEL } from "@/lib/food-iq";
 import { progressPct, sumMacros } from "@/lib/domain/nutrition";
+import { hasFeature } from "@/lib/domain/plans";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { requireOnboardedUser } from "@/server/auth";
+import { getUserPlan, requireOnboardedUser } from "@/server/auth";
+import { getAiAllowance } from "@/server/services/ai-coach";
 import { isFoodSearchConfigured } from "@/server/env";
 import { isFlagEnabled } from "@/server/flags";
 import { deleteCustomFoodAction, deleteMealItemAction, markPlannedEatenAction } from "@/server/actions/nutrition";
 import { getNutritionDaily } from "@/server/services/progress";
 import { loadBudgetContext } from "@/server/services/nutrition-targets";
 import { projectWeightKg, remainingCalories, weeksToGoal } from "@/lib/domain/calorie-budget";
-import { formatLongDate, goalDate, paceLabel, recentAndFrequent, weeklySummary, weightGoalProgress, workoutMinutes, type DiaryItem } from "@/lib/domain/diary";
+import { diaryDayLabel, entryAmount, formatLongDate, goalDate, monthDay, paceLabel, recentAndFrequent, weeklySummary, weightGoalProgress, workoutMinutes, type DiaryItem } from "@/lib/domain/diary";
 import { formatWeight } from "@/lib/domain/units";
 import { COMMON_FOODS } from "@/data/foods";
 import { EditableMealItem, type EditableItem } from "@/components/nutrition/food-amount";
@@ -131,7 +134,7 @@ function editableItem(i: MealRow["meal_items"][number], mealType: string, favori
   };
 }
 
-export default async function NutritionPage({ searchParams }: { searchParams: Promise<{ date?: string; add?: string }> }) {
+export default async function NutritionPage({ searchParams }: { searchParams: Promise<{ date?: string; add?: string; tab?: string }> }) {
   const sp = await searchParams;
   const { user, profile } = await requireOnboardedUser();
   // The food diary, search, barcode scanning and macros are free on every plan.
@@ -140,7 +143,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
   const date = isValidIsoDate(sp.date) ? sp.date : today;
   const supabase = await getServerSupabase();
   const prevDate = addDays(date, -1);
-  const [mealsRes, goalsRes, waterRes, foodsRes, templatesRes, plannedRes, history, flag, commonRes, dietRes, prevRes, recentRes, workoutsRes, ctx, categories, favoritesRes, stepsRes, activitiesRes, markRes] = await Promise.all([
+  const [mealsRes, goalsRes, waterRes, foodsRes, templatesRes, plannedRes, history, flag, commonRes, dietRes, prevRes, recentRes, workoutsRes, ctx, categories, favoritesRes, stepsRes, activitiesRes, markRes, planRes] = await Promise.all([
     supabase
       .from("meals")
       .select("id, meal_type, status, name, meal_items(id, name, servings, calories, protein_g, carbs_g, fat_g, is_estimate, fiber_g, sugar_g, sodium_mg, grams, quantity, unit_label, amount_label, source, basis)")
@@ -168,7 +171,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
     supabase.from("meals").select("meal_type, meal_items(id)").eq("user_id", user.id).eq("eaten_on", prevDate).eq("status", "logged").eq("is_template", false),
     supabase
       .from("meal_items")
-      .select("id, name, calories, protein_g, carbs_g, fat_g, created_at, meal:meals!inner(eaten_on, status, is_template)")
+      .select("id, name, calories, protein_g, carbs_g, fat_g, servings, amount_label, created_at, meal:meals!inner(eaten_on, status, is_template)")
       .eq("user_id", user.id)
       .eq("meal.is_template", false)
       .eq("meal.status", "logged")
@@ -194,7 +197,13 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
       .gte("started_at", `${addDays(date, -1)}T00:00:00Z`)
       .lt("started_at", `${addDays(date, 2)}T00:00:00Z`),
     supabase.from("nutrition_day_marks").select("status").eq("user_id", user.id).eq("day", date).maybeSingle(),
+    getUserPlan(user.id),
   ]);
+  // Only to label Pro tools ("Pro" tag) before the tap; each tool still enforces its own plan on the server.
+  const planningIncluded = hasFeature(planRes, "meal_planning");
+  // Meal photo is gated by the AI allowance (as on /nutrition/photo); if that can't be read, show no tag.
+  const photoAllowance = await getAiAllowance(user.id, planRes).catch(() => null);
+  const photoIncluded = photoAllowance ? photoAllowance.chatLimit > 0 : true;
   const favorites = ((favoritesRes.data ?? []) as FavoriteRow[]).map(choiceFromFavorite).filter((f): f is NonNullable<typeof f> => f != null);
   const favoriteKeys = new Set(favorites.map((f) => f.key));
 
@@ -216,6 +225,16 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
     return { ...f, fitsDiet: known ? fitsDiet(known, diet.id) : false };
   });
   const templates = (templatesRes.data ?? []) as unknown as { id: string; name: string; yield_servings: number; meal_items: { calories: number; protein_g: number }[] }[];
+  // One serving of each saved meal, for the Add food sheet's "Saved meals" tab.
+  const savedMeals = templates.map((t) => {
+    const per = Math.max(0.01, Number(t.yield_servings) || 1);
+    return {
+      id: t.id,
+      name: t.name,
+      calories: t.meal_items.reduce((s, i) => s + Number(i.calories), 0) / per,
+      protein_g: t.meal_items.reduce((s, i) => s + Number(i.protein_g), 0) / per,
+    };
+  });
   const upcoming = (plannedRes.data ?? []) as unknown as { id: string; eaten_on: string; meal_type: string; meal_items: { name: string }[] }[];
   const label = date === today ? "Today" : new Date(`${date}T00:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" });
   const remoteSearch = isFoodSearchConfigured() && flag;
@@ -230,8 +249,29 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
 
   // Recent and frequent foods (last 30 days) for one-tap re-logging.
   const { recent, frequent } = recentAndFrequent(
-    ((recentRes.data ?? []) as unknown as { id: string; name: string; calories: number; protein_g: number; carbs_g: number; fat_g: number; created_at: string }[]).map(
-      (i): DiaryItem => ({ id: i.id, name: i.name, calories: Number(i.calories), protein_g: Number(i.protein_g), carbs_g: Number(i.carbs_g), fat_g: Number(i.fat_g), loggedAt: i.created_at }),
+    (
+      (recentRes.data ?? []) as unknown as {
+        id: string;
+        name: string;
+        calories: number;
+        protein_g: number;
+        carbs_g: number;
+        fat_g: number;
+        servings: number | null;
+        amount_label: string | null;
+        created_at: string;
+      }[]
+    ).map(
+      (i): DiaryItem => ({
+        id: i.id,
+        name: i.name,
+        calories: Number(i.calories),
+        protein_g: Number(i.protein_g),
+        carbs_g: Number(i.carbs_g),
+        fat_g: Number(i.fat_g),
+        loggedAt: i.created_at,
+        amount: entryAmount(i.amount_label, i.servings),
+      }),
     ),
   );
 
@@ -267,7 +307,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
   const nutritionSections = sectionLayout(NUTRITION_SECTIONS, parseLayoutPrefs(profile.layout_prefs).nutrition);
   const groups: Partial<Record<NutritionSection, React.ReactNode>> = {
     budget: (
-      <Group key="budget" id="budget" title="Calories remaining & today's estimate" hint={goals && remaining != null ? `${remaining} kcal remaining · exercise ${exercise} (est.)` : "Set daily targets to see this"}>
+      <Group key="budget" id="budget" title="Calories remaining & today's estimate" hint={goals && remaining != null ? `${goals.calories} goal · ${food} food · ${exercise} exercise (est.)` : "Set daily targets to see this"}>
         <section aria-labelledby="budget-strip-title" className="rounded-xl border border-gold-muted/60 bg-card-gradient p-4">
           <h3 id="budget-strip-title" className="text-sm font-semibold text-gold">
             Calories remaining
@@ -360,9 +400,6 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
             </dl>
           )}
         </div>
-        {goals && goals.calories - totals.calories > 0 && (
-          <p className="text-sm text-muted-foreground">{Math.round(goals.calories - totals.calories)} kcal remaining for the day.</p>
-        )}
       </Group>
     ),
     week: (
@@ -420,7 +457,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
             {[...history].reverse().map((d) => (
               <li key={d.date}>
                 <Link href={`/nutrition?date=${d.date}`} className="flex min-h-11 items-center justify-between rounded-lg px-2 hover:bg-elevated">
-                  <span className="text-muted-foreground">{d.date}</span>
+                  <span className="text-muted-foreground">{diaryDayLabel(d.date, today)}</span>
                   <span className="tabular-nums">
                     {d.calories ? `${d.calories} kcal · P ${d.protein} · C ${d.carbs} · F ${d.fat}` : "—"}
                   </span>
@@ -514,8 +551,9 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
             <ChevronRight className="size-4 text-gold" aria-hidden />
           </Link>
           <Link href="/nutrition/recipes" className="mt-2 flex min-h-11 items-center justify-between gap-2 rounded-xl border border-border bg-elevated/40 px-3 py-2 text-[0.9375rem] hover:border-gold-muted">
-            <span>Recipes: build from ingredients with servings</span>
-            <ChevronRight className="size-4 text-gold" aria-hidden />
+            <span className="min-w-0 flex-1">Recipes: build from ingredients with servings</span>
+            {!planningIncluded && <ProTag />}
+            <ChevronRight className="size-4 shrink-0 text-gold" aria-hidden />
           </Link>
           {upcoming.length > 0 && (
             <div className="mt-5">
@@ -524,8 +562,8 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
                 {upcoming.map((m) => (
                   <li key={m.id}>
                     <Link href={`/nutrition?date=${m.eaten_on}`} className="flex min-h-11 items-center justify-between rounded-lg px-2 hover:bg-elevated">
-                      <span className="capitalize text-muted-foreground">
-                        {m.eaten_on} · {m.meal_type}
+                      <span className="text-muted-foreground">
+                        {diaryDayLabel(m.eaten_on, today)} · <span className="capitalize">{m.meal_type}</span>
                       </span>
                       <span className="truncate pl-3">{m.meal_items.map((i) => i.name).join(", ")}</span>
                     </Link>
@@ -562,47 +600,34 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
       </Group>
     ),
     tools: (
-      <Group key="tools" id="tools" title="More tools" hint={`${NUTRITION_SCORE_LABEL}, recipes, planner, grocery list, insights, supplements, your diet`}>
-        <section aria-labelledby="food-iq-cta" className="rounded-xl border border-gold/70 bg-gradient-to-br from-gold/12 via-card to-card p-4 shadow-bronze" data-testid="food-iq-cta">
-          <div className="flex items-start gap-3">
-            <span className="grid size-11 shrink-0 place-items-center rounded-xl border border-gold-muted/60 bg-elevated">
-              <ScanBarcode className="size-6 text-gold" aria-hidden />
-            </span>
-            <div className="min-w-0">
-              <p id="food-iq-cta" className="font-display text-xs font-bold uppercase tracking-[0.16em] text-gold">
-                {NUTRITION_FEATURE_TITLE}
-              </p>
-              <p className="mt-1 text-[1.0625rem] font-semibold leading-snug">Scan a packaged food&apos;s barcode to review its nutrition and ingredients.</p>
-              <p className="mt-1 text-sm text-muted-foreground">Additives, sweeteners, preservatives and added sugars from the declared ingredient list, each with what regulators say, how strong the evidence is and where it comes from. It reads the label and product data; it doesn&apos;t test the food itself.</p>
-            </div>
-          </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Button asChild size="lg">
-              <Link href="/nutrition/scanner">
-                <ScanBarcode aria-hidden /> Scan a product
-              </Link>
-            </Button>
-            <Button asChild size="lg" variant="secondary">
-              <Link href="/nutrition/scanner#search">Search by name</Link>
-            </Button>
-          </div>
-        </section>
+      <Group key="tools" id="tools" title="More tools" hint={`${NUTRITION_SCORE_LABEL}, meal photo, planner, grocery list, insights, supplements, your diet`}>
         <nav aria-label="Food tools" className="grid grid-cols-2 gap-2">
+          {/* The Nutrition Score analyser: one row. Logging a barcode is the Scan barcode tile at the top. */}
+          <Link
+            href="/nutrition/scanner"
+            className="col-span-2 flex min-h-14 items-center gap-3 rounded-xl border border-gold-muted/60 bg-elevated/40 px-3 py-2 hover:border-gold-muted"
+            data-testid="food-iq-cta"
+          >
+            <ScanBarcode className="size-5 shrink-0 text-gold" aria-hidden />
+            <span className="min-w-0 flex-1">
+              <span className="block text-[0.9375rem] font-semibold">{NUTRITION_SCORE_LABEL}</span>
+              <span className="block text-sm text-muted-foreground">Check a packaged food&apos;s label and ingredients. It reads the label; it doesn&apos;t test the food.</span>
+            </span>
+            <ChevronRight className="size-4 shrink-0 text-gold" aria-hidden />
+          </Link>
           {(
             [
-              ["/nutrition/scanner", NUTRITION_SCORE_LABEL, ScanBarcode],
-              [`/nutrition/photo?date=${date}`, "Meal photo", Camera],
-              ["/nutrition/recipes", "Recipes", CookingPot],
-              ["/nutrition/saved-meals", "Saved meals", BookMarked],
-              ["/nutrition/planner", "Meal planner", CalendarDays],
-              ["/nutrition/grocery", "Grocery list", ShoppingCart],
-              ["/nutrition/insights", "Insights", BarChart3],
-              ["/nutrition/supplements", "Supplements", Pill],
+              [`/nutrition/photo?date=${date}`, "Meal photo", Camera, !photoIncluded],
+              ["/nutrition/planner", "Meal planner", CalendarDays, !planningIncluded],
+              ["/nutrition/grocery", "Grocery list", ShoppingCart, !planningIncluded],
+              ["/nutrition/insights", "Insights", BarChart3, false],
+              ["/nutrition/supplements", "Supplements", Pill, false],
             ] as const
-          ).map(([href, text, Icon]) => (
+          ).map(([href, text, Icon, pro]) => (
             <Link key={href} href={href} className="flex min-h-12 items-center gap-2 rounded-xl border border-border bg-elevated/40 px-3 text-[0.9375rem] font-medium hover:border-gold-muted">
               <Icon className="size-4 shrink-0 text-gold" aria-hidden />
               <span className="min-w-0 flex-1">{text}</span>
+              {pro && <ProTag />}
             </Link>
           ))}
         </nav>
@@ -613,15 +638,6 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
             <span className="block text-sm text-muted-foreground">{diet.eatingWindow ?? diet.tagline}</span>
           </span>
           <span className="shrink-0 text-sm font-semibold text-gold-highlight">Change</span>
-        </Link>
-        <Link href="/nutrition/supplements" className="lift flex min-h-14 items-center justify-between gap-3 rounded-xl border border-border bg-elevated/40 p-4">
-          <span>
-            <span className="flex items-center gap-2 font-semibold">
-              <Pill className="size-4 text-gold" aria-hidden /> Supplements
-            </span>
-            <span className="block text-sm text-muted-foreground">Evidence, doses and your daily stack.</span>
-          </span>
-          <ChevronRight className="size-4 shrink-0 text-gold" aria-hidden />
         </Link>
       </Group>
     ),
@@ -651,7 +667,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
         <div className="min-w-32 text-center">
           <p className="font-display text-xl font-bold">{label}</p>
           {date !== today && (
-            <Link href="/nutrition" className="text-sm text-gold-highlight hover:underline">
+            <Link href="/nutrition" className="inline-flex min-h-11 items-center text-sm text-gold-highlight hover:underline">
               Back to today
             </Link>
           )}
@@ -665,15 +681,28 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
 
       {/* Logging first: the three ways to add food, on the first screen, each a full-height button. */}
       <div className="grid grid-cols-3 gap-3" data-testid="log-actions">
-        <AddFoodDialog date={date} myFoods={myFoods} commonFoods={commonFoods} remoteSearch={remoteSearch} categories={categories} dietName={diet.name} recent={recent} frequent={frequent} favorites={favorites} autoOpen={sp.add === "1"} />
-        <Button asChild variant="secondary" className="h-auto min-h-[4.75rem] flex-col gap-1.5 whitespace-normal rounded-2xl border-border bg-card px-1 py-3 text-center text-sm hover:border-gold-muted [&_svg]:size-6 [&_svg]:text-gold">
-          <Link href="/nutrition/scanner">
-            <ScanBarcode aria-hidden /> Scan barcode
-          </Link>
-        </Button>
-        <Button asChild variant="secondary" className="h-auto min-h-[4.75rem] flex-col gap-1.5 whitespace-normal rounded-2xl border-border bg-card px-1 py-3 text-center text-sm hover:border-gold-muted [&_svg]:size-6 [&_svg]:text-gold">
+        {/* Add food, and Scan barcode (the same sheet, on its Scan tab: logging, not the Nutrition Score analyser,
+            which stays under More tools). */}
+        <AddFoodDialog
+          date={date}
+          dayLabel={label}
+          myFoods={myFoods}
+          commonFoods={commonFoods}
+          remoteSearch={remoteSearch}
+          categories={categories}
+          dietName={diet.name}
+          recent={recent}
+          frequent={frequent}
+          favorites={favorites}
+          savedMeals={savedMeals}
+          autoOpen={sp.add === "1"}
+          initialTab={sp.tab}
+          scanTile
+        />
+        <Button asChild variant="secondary" className="relative h-auto min-h-[4.75rem] flex-col gap-1.5 whitespace-normal rounded-2xl border-border bg-card px-1 py-3 text-center text-sm hover:border-gold-muted [&_svg]:size-6 [&_svg]:text-gold">
           <Link href={`/nutrition/photo?date=${date}`}>
             <Camera aria-hidden /> Meal photo
+            {!photoIncluded && <ProTag className="absolute right-1.5 top-1.5" />}
           </Link>
         </Button>
       </div>
@@ -758,14 +787,13 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
             Meals
           </h2>
           <div className="flex flex-wrap items-center gap-2">
-            <QuickAddDialog date={date} />
+            <QuickAddDialog date={date} dayLabel={label} />
             {prevTotal > 0 && <CopyMealButton fromDate={prevDate} toDate={date} label={date === today ? "Copy yesterday" : `Copy all from ${prevLabel}`} />}
           </div>
         </div>
         {logged.length === 0 && planned.length === 0 && (
           <p className="text-sm text-muted-foreground">Nothing logged yet. Use &ldquo;Add food&rdquo; to search, pick a recent or saved food, or quick add calories.</p>
         )}
-        <DayMarkControls date={date} mark={dayMark} hasFood={food > 0} />
         {MEAL_TYPES.map(([type, title]) => {
           const MealIcon: LucideIcon = { breakfast: Coffee, lunch: Sun, dinner: Moon, snack: Cookie }[type];
           const ms = logged.filter((m) => m.meal_type === type);
@@ -813,16 +841,16 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
                 </ul>
               )}
               <div className="mt-2 flex flex-wrap items-center gap-1">
-                <QuickAddDialog date={date} mealType={type} compact />
+                <QuickAddDialog date={date} dayLabel={label} mealType={type} compact />
                 {prevCount > 0 && (
                   <CopyMealButton fromDate={prevDate} toDate={date} mealType={type} label={`Copy ${title.toLowerCase()} from ${prevLabel} (${prevCount})`} />
                 )}
               </div>
               {ms[0] && items.length > 0 && (
                 <details className="mt-2 border-t border-border pt-1">
-                  <summary className="flex min-h-11 cursor-pointer list-none items-center text-sm font-semibold text-gold-highlight [&::-webkit-details-marker]:hidden">Save {title.toLowerCase()} to log again</summary>
+                  <summary className="flex min-h-11 cursor-pointer list-none items-center text-sm font-semibold text-gold-highlight [&::-webkit-details-marker]:hidden">Save as meal</summary>
                   <div className="pb-2">
-                    <SaveMealForm mealId={ms[0].id} defaultName={`${title} ${date}`} />
+                    <SaveMealForm mealId={ms[0].id} defaultName={`${title}, ${monthDay(date)}`} />
                   </div>
                 </details>
               )}
@@ -848,6 +876,9 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
             </ul>
           </div>
         )}
+        {/* Below the meals: "Mark day complete" once food is logged. On an empty day only "I ate nothing this day",
+            and not at all for a member who hasn't logged any food yet. */}
+        {(food > 0 || dayMark || recent.length > 0) && <DayMarkControls date={date} mark={dayMark} hasFood={food > 0} />}
       </section>
 
       {nutritionSections.some((x) => x in groups) && (

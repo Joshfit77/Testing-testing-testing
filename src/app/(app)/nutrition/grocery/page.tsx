@@ -100,15 +100,6 @@ export default async function GroceryPage() {
           <AddGroceryItemForm />
         </div>
       </section>
-
-      <section aria-labelledby="cost-title" className="rounded-2xl border border-border bg-card p-4">
-        <h2 id="cost-title" className="text-lg font-semibold">
-          Cost
-        </h2>
-        <p className="mt-1 text-[0.9375rem] text-muted-foreground" data-testid="grocery-cost">
-          No cost estimate. We don&apos;t have a sourced, dated price table (such as USDA or Bureau of Labor Statistics average retail prices) built in yet, and we won&apos;t show a price we can&apos;t back up. The planner&apos;s budget setting is a rough guide by ingredient type, not a price.
-        </p>
-      </section>
     </div>
   );
 }

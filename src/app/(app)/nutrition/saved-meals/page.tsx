@@ -34,7 +34,7 @@ interface TemplateItem {
 }
 
 export default async function SavedMealsPage() {
-  const { user, profile, allowed } = await nutritionPageUser();
+  const { user, profile, allowed, planningIncluded } = await nutritionPageUser();
   if (!allowed) return <NutritionLocked title="Saved meals" description="Save a meal you eat often and log it again in one step." />;
   const supabase = await getServerSupabase();
   const today = isoDateInTz(new Date(), profile.timezone);
@@ -51,7 +51,7 @@ export default async function SavedMealsPage() {
     <div className="space-y-6">
       <BackLink href="/nutrition">Food</BackLink>
       <PageHeader eyebrow="Food" title="Saved meals" description="Meals you saved from your diary. Log or plan one for any day in a single step." />
-      <FoodToolsNav current="/nutrition/saved-meals" />
+      <FoodToolsNav current="/nutrition/saved-meals" planningIncluded={planningIncluded} />
       <p className="text-[0.9375rem] text-muted-foreground">
         To save a meal, log it in the{" "}
         <Link href="/nutrition" className="font-semibold text-gold-highlight underline">

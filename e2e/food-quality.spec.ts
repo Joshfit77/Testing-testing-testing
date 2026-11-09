@@ -25,17 +25,16 @@ test.describe("Narrow Gate Food IQ", () => {
     await signUpAndConfirm(page, uniqueEmail("quality-free"));
     await completeOnboarding(page);
     await page.goto("/nutrition");
-    // Scanning is on the first screen of Nutrition; the full Nutrition Score explanation is in "More tools", honest
-    // about what it reads, together with the tools.
-    const scanBox = (await page.getByRole("link", { name: "Scan barcode" }).boundingBox())!;
+    // Scanning to log is on the first screen of Nutrition (the Add food sheet's Scan tab); the Nutrition Score
+    // analyser is one row in "More tools", honest about what it reads.
+    const scanBox = (await page.getByRole("button", { name: "Scan barcode" }).boundingBox())!;
     const totalsBox = (await page.locator("section[aria-labelledby='totals-title']").boundingBox())!;
     expect(scanBox.y).toBeLessThan(totalsBox.y);
     await page.locator("main details", { hasText: "More tools" }).locator("summary").click();
-    await expect(page.getByTestId("food-iq-cta")).toContainText("Narrow Gate Nutrition Score");
-    await expect(page.getByTestId("food-iq-cta")).toContainText("Scan a packaged food's barcode to review its nutrition and ingredients.");
-    await expect(page.getByTestId("food-iq-cta")).toContainText("doesn't test the food itself");
-    await expect(page.getByTestId("food-iq-cta").getByRole("link", { name: "Scan a product" })).toBeVisible();
-    await page.getByRole("navigation", { name: "Food tools" }).getByRole("link", { name: "Nutrition Score" }).click();
+    await expect(page.getByTestId("food-iq-cta")).toContainText("Nutrition Score");
+    await expect(page.getByTestId("food-iq-cta")).toContainText("Check a packaged food's label and ingredients.");
+    await expect(page.getByTestId("food-iq-cta")).toContainText("doesn't test the food");
+    await page.getByRole("navigation", { name: "Food tools" }).getByRole("link", { name: /^Nutrition Score/ }).click();
     await expect(page.getByRole("heading", { name: "Narrow Gate Nutrition Score", level: 1 })).toBeVisible();
     await expect(page.getByTestId("my-filters")).toContainText("included with Pro All Access");
     await typeBarcode(page, Q.honey);

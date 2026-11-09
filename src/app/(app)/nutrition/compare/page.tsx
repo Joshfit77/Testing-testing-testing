@@ -6,7 +6,7 @@ import { BackLink } from "@/components/platform/back-link";
 import { CompareWith } from "@/components/nutrition/quality-client";
 import { CompareTable } from "@/components/nutrition/quality-sections";
 import { hasFeature } from "@/lib/domain/plans";
-import { foodIqScoreEnabled, NUTRITION_FEATURE_TITLE, scoreFoodIq } from "@/lib/food-iq";
+import { foodIqScoreEnabled, NUTRITION_FEATURE_TITLE, NUTRITION_SCORE_LABEL, scoreFoodIq } from "@/lib/food-iq";
 import { comparable, OFF_DATA_NOTICE } from "@/lib/food-quality";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { getQualityProduct } from "@/server/services/food-quality";
@@ -32,11 +32,12 @@ export default async function CompareProductsPage({ searchParams }: { searchPara
       />
     );
   }
-  const back = <BackLink href={a ? `/nutrition/product/${a}` : "/nutrition/scanner"}>Back to the product</BackLink>;
+  const back = <BackLink href={a ? `/nutrition/product/${a}` : "/nutrition/scanner"}>{a ? "Back to the product" : NUTRITION_SCORE_LABEL}</BackLink>;
   if (!a) {
     return (
       <div className="mx-auto max-w-2xl space-y-5">
         {back}
+        <PageHeader eyebrow={NUTRITION_FEATURE_TITLE} title="Compare products" />
         <Notice>Scan or open a product first, then choose &ldquo;Compare with another product&rdquo;.</Notice>
       </div>
     );

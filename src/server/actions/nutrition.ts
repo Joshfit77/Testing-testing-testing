@@ -15,6 +15,7 @@ import { amountColumns, findOrCreateMeal, ITEM_COLUMNS, LIMITS_ERROR, scaleItem,
 import { logError } from "@/server/log";
 import { estimateAndSaveTargets } from "@/server/services/nutrition-targets";
 import { FAVORITE_KEY_PATTERN } from "@/lib/domain/food-favorites";
+import { loggedMessage, type LogResult } from "@/lib/domain/diary";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const uuid = z.string().uuid();
@@ -56,7 +57,11 @@ const logFoodSchema = z.object({
   item: logFoodInput,
 });
 
-export async function logFoodAction(input: unknown): Promise<ActionState> {
+/**
+ * Every log returns the ids of the diary rows it added (`itemIds`), so "Undo" next to the confirmation removes
+ * exactly those rows and nothing else (`undoLoggedItemsAction`).
+ */
+export async function logFoodAction(input: unknown): Promise<LogResult> {
   try {
     const { user, supabase } = await nutritionCtx();
     const parsed = logFoodSchema.safeParse(input);
@@ -96,14 +101,21 @@ export async function logFoodAction(input: unknown): Promise<ActionState> {
       row = { ...meta, name: meta.name.slice(0, 160), ...cols };
     }
     const mealId = await findOrCreateMeal(supabase, user.id, date, mealType, status);
-    const { error } = await supabase.from("meal_items").insert({ meal_id: mealId, user_id: user.id, client_id: clientId ?? null, ...row });
-    const amountText = row.amount_label ? ` (${row.amount_label})` : "";
-    // The same attempt arriving twice: the first insert won, so this one is already done.
-    if (error?.code === "23505" && clientId) return actionOk(`${status === "planned" ? "Planned" : "Logged"} ${row.name}${amountText}.`);
+    const { data: inserted, error } = await supabase
+      .from("meal_items")
+      .insert({ meal_id: mealId, user_id: user.id, client_id: clientId ?? null, ...row })
+      .select("id")
+      .single();
+    const message = loggedMessage({ name: row.name, amount: row.amount_label, mealType, planned: status === "planned" });
+    // The same attempt arriving twice: the first insert won, so this one is already done (and Undo removes that row).
+    if (error?.code === "23505" && clientId) {
+      const { data: first } = await supabase.from("meal_items").select("id").eq("user_id", user.id).eq("client_id", clientId).maybeSingle();
+      return { ...actionOk(message), itemIds: first ? [first.id as string] : [] };
+    }
     if (error) throw error;
     revalidatePath("/nutrition");
     revalidatePath("/home");
-    return actionOk(`${status === "planned" ? "Planned" : "Logged"} ${row.name}${amountText}.`);
+    return { ...actionOk(message), itemIds: inserted ? [inserted.id as string] : [] };
   } catch (err) {
     return guard(err, "nutrition.log");
   }
@@ -147,6 +159,14 @@ export async function updateMealItemAction(input: unknown): Promise<ActionState>
   }
 }
 
+/** Removes a diary meal (never a saved meal) once its last item is gone. */
+async function removeEmptyMeals(supabase: Awaited<ReturnType<typeof getServerSupabase>>, userId: string, mealIds: string[]) {
+  for (const mealId of new Set(mealIds)) {
+    const { count } = await supabase.from("meal_items").select("id", { count: "exact", head: true }).eq("meal_id", mealId);
+    if (!count) await supabase.from("meals").delete().eq("id", mealId).eq("user_id", userId).eq("is_template", false);
+  }
+}
+
 export async function deleteMealItemAction(formData: FormData): Promise<void> {
   const user = await requireUser();
   const id = uuid.safeParse(formData.get("id"));
@@ -154,12 +174,38 @@ export async function deleteMealItemAction(formData: FormData): Promise<void> {
   const supabase = await getServerSupabase();
   const { data: item } = await supabase.from("meal_items").select("meal_id").eq("id", id.data).eq("user_id", user.id).maybeSingle();
   await supabase.from("meal_items").delete().eq("id", id.data).eq("user_id", user.id);
-  if (item) {
-    const { count } = await supabase.from("meal_items").select("id", { count: "exact", head: true }).eq("meal_id", item.meal_id);
-    if (!count) await supabase.from("meals").delete().eq("id", item.meal_id).eq("user_id", user.id).eq("is_template", false);
-  }
+  if (item) await removeEmptyMeals(supabase, user.id, [item.meal_id as string]);
   revalidatePath("/nutrition");
   revalidatePath("/home");
+}
+
+/**
+ * "Undo" right after logging: removes exactly the diary rows that log returned (`itemIds`), only the signed-in
+ * member's (scoped by user id here, and by row-level security in the database), never a saved meal's items.
+ */
+export async function undoLoggedItemsAction(input: unknown): Promise<ActionState> {
+  try {
+    const user = await requireUser();
+    const parsed = z.object({ ids: z.array(uuid).min(1).max(200) }).safeParse(input);
+    if (!parsed.success) return actionError("There's nothing to undo.");
+    const supabase = await getServerSupabase();
+    const { data: rows } = await supabase
+      .from("meal_items")
+      .select("id, meal_id, meal:meals!inner(is_template)")
+      .eq("user_id", user.id)
+      .eq("meal.is_template", false)
+      .in("id", parsed.data.ids);
+    const ids = ((rows ?? []) as { id: string; meal_id: string }[]).map((r) => r.id);
+    if (!ids.length) return actionOk("Already removed.");
+    const { error } = await supabase.from("meal_items").delete().eq("user_id", user.id).in("id", ids);
+    if (error) throw error;
+    await removeEmptyMeals(supabase, user.id, ((rows ?? []) as { meal_id: string }[]).map((r) => r.meal_id));
+    revalidatePath("/nutrition");
+    revalidatePath("/home");
+    return actionOk(ids.length === 1 ? "Undone: removed from your diary." : `Undone: ${ids.length} items removed from your diary.`);
+  } catch (err) {
+    return guard(err, "nutrition.undo_log");
+  }
 }
 
 export async function markPlannedEatenAction(formData: FormData): Promise<void> {
@@ -280,7 +326,7 @@ export async function saveMealTemplateAction(_prev: ActionState, formData: FormD
   }
 }
 
-export async function logTemplateAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export async function logTemplateAction(_prev: ActionState, formData: FormData): Promise<LogResult> {
   try {
     const { user, supabase } = await nutritionCtx();
     const parsed = z
@@ -293,13 +339,17 @@ export async function logTemplateAction(_prev: ActionState, formData: FormData):
     const { data: items } = await supabase.from("meal_items").select(ITEM_COLUMNS).eq("meal_id", tpl.id);
     const factor = servings / Number(tpl.yield_servings);
     const mealId = await findOrCreateMeal(supabase, user.id, date, mealType, status);
-    const { error } = await supabase.from("meal_items").insert(
-      ((items ?? []) as Record<string, unknown>[]).map((i) => ({ ...scaleItem(i, factor), meal_id: mealId, user_id: user.id })),
-    );
+    const { data: inserted, error } = await supabase
+      .from("meal_items")
+      .insert(((items ?? []) as Record<string, unknown>[]).map((i) => ({ ...scaleItem(i, factor), meal_id: mealId, user_id: user.id })))
+      .select("id");
     if (error) throw error;
     revalidatePath("/nutrition");
     revalidatePath("/home");
-    return actionOk(`${status === "planned" ? "Planned" : "Logged"} ${servings} serving(s) of ${tpl.name as string}.`);
+    return {
+      ...actionOk(loggedMessage({ name: tpl.name as string, amount: `${servings} ${servings === 1 ? "serving" : "servings"}`, mealType, planned: status === "planned" })),
+      itemIds: ((inserted ?? []) as { id: string }[]).map((r) => r.id),
+    };
   } catch (err) {
     return guard(err, "nutrition.log_template");
   }
@@ -388,7 +438,7 @@ export async function updateGoalsAction(_prev: ActionState, formData: FormData):
  * Copy logged food from one day to another (MyFitnessPal's "copy from yesterday"): one meal, or the whole
  * day when no meal type is given. Items are added to the target day's meals; nothing is removed.
  */
-export async function copyMealsAction(input: unknown): Promise<ActionState> {
+export async function copyMealsAction(input: unknown): Promise<LogResult> {
   try {
     const { user, supabase } = await nutritionCtx();
     const parsed = z.object({ fromDate: isoDate, toDate: isoDate, mealType: mealTypeSchema.optional() }).safeParse(input);
@@ -408,23 +458,28 @@ export async function copyMealsAction(input: unknown): Promise<ActionState> {
     const source = ((meals ?? []) as unknown as { meal_type: string; meal_items: Record<string, unknown>[] }[]).filter((m) => m.meal_items.length);
     if (!source.length) return actionError(mealType ? "There's nothing logged for that meal on the day before." : "There's nothing logged on the day before.");
     let copied = 0;
+    const itemIds: string[] = [];
     for (const type of [...new Set(source.map((m) => m.meal_type))]) {
       const items = source.filter((m) => m.meal_type === type).flatMap((m) => m.meal_items);
       const mealId = await findOrCreateMeal(supabase, user.id, toDate, type, "logged");
-      const { error } = await supabase.from("meal_items").insert(items.map((i) => ({ ...i, meal_id: mealId, user_id: user.id })));
+      const { data: inserted, error } = await supabase
+        .from("meal_items")
+        .insert(items.map((i) => ({ ...i, meal_id: mealId, user_id: user.id })))
+        .select("id");
       if (error) throw error;
+      itemIds.push(...((inserted ?? []) as { id: string }[]).map((r) => r.id));
       copied += items.length;
     }
     revalidatePath("/nutrition");
     revalidatePath("/home");
-    return actionOk(`Copied ${copied} ${copied === 1 ? "item" : "items"}.`);
+    return { ...actionOk(`Copied ${copied} ${copied === 1 ? "item" : "items"}.`), itemIds };
   } catch (err) {
     return guard(err, "nutrition.copy");
   }
 }
 
 /** One-tap re-log of a food the user logged before (recent / frequent foods). */
-export async function relogItemAction(input: unknown): Promise<ActionState> {
+export async function relogItemAction(input: unknown): Promise<LogResult> {
   try {
     const { user, supabase } = await nutritionCtx();
     const parsed = z.object({ itemId: uuid, date: isoDate, mealType: mealTypeSchema, status: z.enum(["logged", "planned"]).default("logged") }).safeParse(input);
@@ -433,11 +488,18 @@ export async function relogItemAction(input: unknown): Promise<ActionState> {
     const { data: item } = await supabase.from("meal_items").select(ITEM_COLUMNS).eq("id", itemId).eq("user_id", user.id).maybeSingle();
     if (!item) return actionError("That food couldn't be found. It may have been deleted.");
     const mealId = await findOrCreateMeal(supabase, user.id, date, mealType, status);
-    const { error } = await supabase.from("meal_items").insert({ ...item, meal_id: mealId, user_id: user.id });
+    const { data: inserted, error } = await supabase
+      .from("meal_items")
+      .insert({ ...item, meal_id: mealId, user_id: user.id })
+      .select("id")
+      .single();
     if (error) throw error;
     revalidatePath("/nutrition");
     revalidatePath("/home");
-    return actionOk(`${status === "planned" ? "Planned" : "Logged"} ${item.name as string}.`);
+    return {
+      ...actionOk(loggedMessage({ name: item.name as string, amount: item.amount_label as string | null, mealType, planned: status === "planned" })),
+      itemIds: inserted ? [inserted.id as string] : [],
+    };
   } catch (err) {
     return guard(err, "nutrition.relog");
   }

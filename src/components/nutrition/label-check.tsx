@@ -180,7 +180,7 @@ export function LabelCheck({ photo, date: initialDate, defaultMeal }: { photo: {
             <Textarea id="label-statement" rows={2} maxLength={600} value={statement} onChange={(e) => setStatement(e.target.value)} placeholder="e.g. Contains: milk. May contain: nuts." />
           </div>
           <details className="rounded-xl border border-border p-3" open={fromPhoto != null && label != null}>
-            <summary className="cursor-pointer text-sm font-semibold">Nutrition from the label (optional)</summary>
+            <summary className="-my-3 min-h-11 cursor-pointer py-3 text-sm font-semibold">Nutrition from the label (optional)</summary>
             <div className="mt-3 space-y-3">
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1">

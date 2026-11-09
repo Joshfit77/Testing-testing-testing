@@ -9,6 +9,7 @@ import { FitsYourGoals, FoodIqBreakdown, FoodIqSummary, IngredientAlertsSection,
 import { ingredientAlerts } from "@/lib/additive-evidence";
 import { DIET_TYPES, type DietType } from "@/lib/domain/diets";
 import { fitsYourGoals, foodIqScoreEnabled, keyPoints, nutrientClasses, NUTRITION_FEATURE_TITLE, NUTRITION_SCORE_LABEL, scoreFoodIq, type FoodIqScore } from "@/lib/food-iq";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { isoDateInTz } from "@/lib/domain/dates";
 import type { FoodChoice } from "@/lib/domain/food-basis";
@@ -62,12 +63,19 @@ export default async function ProductQualityPage({ params, searchParams }: { par
             Barcode {code || raw} isn&apos;t in Open Food Facts yet, so there&apos;s nothing to show, and nothing is guessed. You can log it yourself from the food diary using the label.
           </Notice>
         )}
-        <div className="flex flex-wrap gap-4">
-          <Link href="/nutrition/label" className="text-sm font-semibold text-gold-highlight underline">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          {failed && (
+            <Button asChild variant="secondary" className="min-h-11">
+              <Link href={`/nutrition/product/${code || raw}`} prefetch={false}>
+                Try again
+              </Link>
+            </Button>
+          )}
+          <Link href="/nutrition/label" className="inline-flex min-h-11 items-center text-sm font-semibold text-gold-highlight underline">
             Check its ingredient label instead
           </Link>
-          <Link href="/nutrition" className="text-sm font-semibold text-gold-highlight underline">
-            Go to the food diary
+          <Link href="/nutrition?add=1" className="inline-flex min-h-11 items-center text-sm font-semibold text-gold-highlight underline">
+            Add it in the food diary
           </Link>
         </div>
       </div>

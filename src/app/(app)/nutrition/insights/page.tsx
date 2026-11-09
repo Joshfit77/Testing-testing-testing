@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { Notice } from "@/components/common/states";
 import { BackLink } from "@/components/platform/back-link";
@@ -17,15 +17,16 @@ export const metadata = { title: "Nutrition insights" };
 const MACRO_LABEL: Record<MacroKey, string> = { protein_g: "protein", carbs_g: "carbs", fat_g: "fat" };
 const dayLabel = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
 
+/** A tag only for a day the member marked (complete, or ate nothing); ordinary days need no label. */
 function StateBadge({ d }: { d: DaySummary }) {
-  if (d.state === "not_logged") return <Badge variant="outline">Not logged</Badge>;
   if (d.state === "logged_zero") return <Badge variant="secondary">Logged as zero</Badge>;
-  return d.markedComplete ? <Badge variant="success">Complete</Badge> : <Badge variant="secondary">Logged · not marked complete</Badge>;
+  if (d.state !== "not_logged" && d.markedComplete) return <Badge variant="success">Complete</Badge>;
+  return null;
 }
 
 export default async function InsightsPage({ searchParams }: { searchParams: Promise<{ end?: string }> }) {
   const sp = await searchParams;
-  const { user, profile, allowed } = await nutritionPageUser();
+  const { user, profile, allowed, planningIncluded } = await nutritionPageUser();
   if (!allowed) return <NutritionLocked title="Nutrition insights" description="See your week: calories and macros against your targets, logged versus missing days, and your top protein and calorie sources." />;
   const today = isoDateInTz(new Date(), profile.timezone);
   const end = sp.end && /^\d{4}-\d{2}-\d{2}$/.test(sp.end) && sp.end <= today ? sp.end : today;
@@ -67,7 +68,7 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
     <div className="space-y-6">
       <BackLink href="/nutrition">Food</BackLink>
       <PageHeader eyebrow="Food" title="Nutrition insights" description="Your week of eating against your targets. Days you didn't log are left out of the averages, not counted as zero." />
-      <FoodToolsNav current="/nutrition/insights" />
+      <FoodToolsNav current="/nutrition/insights" planningIncluded={planningIncluded} />
 
       <nav className="flex items-center justify-between gap-2" aria-label="Choose week">
         <Button asChild variant="ghost" size="icon" aria-label="Previous week">
@@ -132,6 +133,16 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
         <h2 id="days-title" className="text-lg font-semibold">
           Day by day
         </h2>
+        {week.days.every((d) => d.state === "not_logged") ? (
+          <div className="rounded-2xl border border-dashed border-border p-4">
+            <p className="text-[0.9375rem] text-muted-foreground">Nothing logged this week yet.</p>
+            <Button asChild className="mt-3 min-h-11">
+              <Link href="/nutrition?add=1">
+                <Plus aria-hidden /> Add food
+              </Link>
+            </Button>
+          </div>
+        ) : (
         <ul className="space-y-2" data-testid="insights-day-list">
           {week.days.map((d) => {
             const pct = goals ? Math.min(100, pctOfTarget(d.totals.calories, goals.calories) ?? 0) : 0;
@@ -165,6 +176,7 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
             );
           })}
         </ul>
+        )}
         <p className="text-sm text-muted-foreground">
           “Logged as zero” is a day you marked as eating nothing (or logged only zero-calorie items); it counts as 0. Mark days complete or as a fast from the diary.
         </p>
