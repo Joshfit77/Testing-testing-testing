@@ -1,13 +1,16 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Route, Search } from "lucide-react";
 import { BackLink } from "@/components/platform/back-link";
 import { ChapterReader } from "@/components/bible/chapter-reader";
+import { JourneyCheckIn } from "@/components/faith/journey-checkin";
 import { bookBySlug, chapterHref, chapterLabel, nextChapter, previousChapter } from "@/lib/bible/books";
+import { refsIncludeChapter } from "@/lib/faith/today-reading";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
 import { bibleMeta, chapterWordsOfJesus, getChapter, lastVerse, versesWithoutText } from "@/server/bible/text";
 import { loadChapterAnnotations, loadReadingState } from "@/server/services/bible";
+import { loadActiveJourney } from "@/server/services/journeys";
 
 export async function generateMetadata({ params }: { params: Promise<{ book: string; chapter: string }> }) {
   const { book: slug, chapter } = await params;
@@ -23,7 +26,13 @@ export default async function ChapterPage({ params, searchParams }: { params: Pr
   if (!book || !verses) notFound();
   const { user, profile } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
-  const [notes, state] = await Promise.all([loadChapterAnnotations(supabase, user.id, book.id, chapter), loadReadingState(supabase, user.id)]);
+  const [notes, state, journey] = await Promise.all([
+    loadChapterAnnotations(supabase, user.id, book.id, chapter),
+    loadReadingState(supabase, user.id),
+    loadActiveJourney(supabase, user.id, profile.timezone ?? "UTC"),
+  ]);
+  // This chapter is part of today's journey reading: offer the same check-in as the journey, at the end of the chapter.
+  const today = journey?.day && journey.todayPlan && refsIncludeChapter(journey.todayPlan.refs, book.id, chapter) ? { journey, day: journey.day, plan: journey.todayPlan } : null;
   const v = Number(sp.v);
   const focusVerse = Number.isInteger(v) && v >= 1 && v <= lastVerse(book.id, chapter) ? v : null;
   const prev = previousChapter(book.id, chapter);
@@ -82,6 +91,30 @@ export default async function ChapterPage({ params, searchParams }: { params: Pr
         fontScale={state?.fontScale ?? 1}
         focusVerse={focusVerse}
       />
+
+      {today && (
+        <section className="mx-auto max-w-[38rem] space-y-3 rounded-2xl border border-gold-muted bg-card p-4" aria-labelledby="reader-today-title" data-testid="reader-today">
+          <div>
+            <h2 id="reader-today-title" className="font-semibold">
+              Today &middot; Day {today.day} of {today.journey.durationDays}
+            </h2>
+            <p className="text-sm text-muted-foreground">Today&rsquo;s reading: {today.plan.label}</p>
+          </div>
+          <JourneyCheckIn
+            userId={user.id}
+            journeyId={today.journey.id}
+            day={today.day}
+            reading={today.journey.reading}
+            prayer={today.journey.prayer}
+            minutes={today.plan.minutes}
+            readingHref={null}
+            only="reading"
+          />
+          <Link href="/faith/journey" className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-gold-highlight hover:underline">
+            <Route className="size-4" aria-hidden /> Back to today
+          </Link>
+        </section>
+      )}
 
       <nav aria-label="Chapters" className="mx-auto grid max-w-[38rem] grid-cols-2 gap-2 pt-6">
         {prev ? (

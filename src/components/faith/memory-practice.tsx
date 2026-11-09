@@ -62,7 +62,7 @@ export function MemoryPractice({ id, text, parts, reference, level }: { id: stri
           <p className="font-serif text-xl leading-[1.9]" data-testid="memory-text">
             {words.map((w, i) =>
               w.hidden && !shown.has(i) ? (
-                <button key={i} type="button" onClick={() => setShown((s) => new Set(s).add(i))} className="mx-0.5 rounded bg-elevated px-1 font-mono text-base text-muted-foreground" aria-label="Hidden word: tap to show">
+                <button key={i} type="button" onClick={() => setShown((s) => new Set(s).add(i))} className="relative mx-0.5 rounded bg-elevated px-1 font-mono text-base text-muted-foreground after:absolute after:-inset-x-2.5 after:-inset-y-2.5 after:content-['']" aria-label="Hidden word: tap to show">
                   {w.hint}
                 </button>
               ) : (

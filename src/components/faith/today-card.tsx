@@ -7,7 +7,7 @@ import { ProgressBar } from "@/components/ui/progress-bar";
 import { Button } from "@/components/ui/button";
 import { chapterHref } from "@/lib/bible/books";
 import { formatLongDate } from "@/lib/faith/dates";
-import { JOURNEY_RULE, RESTART_MESSAGE, RESTART_REFERENCE } from "@/lib/faith/journey-copy";
+import { RESTART_MESSAGE, RESTART_REFERENCE } from "@/lib/faith/journey-copy";
 import { cn } from "@/lib/utils";
 import { toggleDailyGoalAction } from "@/server/actions/faith";
 import type { DailyGoals } from "@/server/services/daily-goals";
@@ -38,7 +38,6 @@ export function TodayCard({ userId, journey, goals }: { userId: string; journey:
               </h2>
               <span className="block text-sm text-muted-foreground">
                 {journey.day ? `Day ${journey.day} of ${journey.durationDays}` : `Begins ${formatLongDate(journey.attempt.startedOn)}`}
-                {journey.attempt.number > 1 ? ` · attempt ${journey.attempt.number}` : ""}
               </span>
             </span>
             <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
@@ -77,7 +76,6 @@ export function TodayCard({ userId, journey, goals }: { userId: string; journey:
             Begin a reading journey
           </h2>
           <p className="mt-1 text-[0.9375rem] text-muted-foreground">Read through Scripture in 30 to 365 days, with Bible reading and prayer each day.</p>
-          <p className="mt-2 text-sm">{JOURNEY_RULE}</p>
           <Button asChild className="mt-3" size="sm">
             <Link href="/faith/journey/new">
               <Plus aria-hidden /> Choose a journey

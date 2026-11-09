@@ -20,7 +20,8 @@ test.describe("Faith discipleship", () => {
 
     await page.goto("/faith");
     const today = page.getByRole("region", { name: "Begin a reading journey" });
-    await expect(today.getByText(RULE)).toBeVisible();
+    // The restart rule isn't a newcomer's first message: it's shown, with its grace line, where the journey is started.
+    await expect(today.getByText(RULE)).toHaveCount(0);
     await today.getByRole("link", { name: "Choose a journey" }).click();
     await page.waitForURL(/\/faith\/journey\/new$/);
 
@@ -110,7 +111,7 @@ test.describe("Faith discipleship", () => {
     // A study lesson: the passage in full; draft notes aren't shown to members; own notes saved; complete.
     await page.goto("/faith/studies/gospel/good-news");
     await expect(page.getByRole("region", { name: "Mark 1:1–15" })).toContainText("This is the beginning of the gospel of Jesus Christ, the Son of God.");
-    await expect(page.getByText("Study notes for this lesson are being reviewed and will appear here once approved.")).toBeVisible();
+    await expect(page.getByText("Read the passage slowly, and write down what you notice.")).toBeVisible();
     await expect(page.getByText("Study notes (not Scripture)")).toHaveCount(0);
     await page.getByLabel("Your notes").fill("The time is fulfilled.");
     await page.getByRole("button", { name: "Save notes" }).click();

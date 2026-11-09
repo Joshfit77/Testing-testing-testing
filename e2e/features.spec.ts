@@ -79,10 +79,12 @@ test.describe("feature access, subscriptions and core sections", () => {
     await page.goto("/faith");
     await expect(page.getByRole("heading", { name: "Faith", level: 1 })).toBeVisible();
     await expect(page.getByText("Verse of the day")).toBeVisible();
-    await page.getByTestId("faith-journal").locator("summary").click();
-    await page.getByRole("textbox", { name: "Reflection" }).fill("Grateful for strength today.");
+    await page.getByRole("navigation", { name: "Faith quick actions" }).getByRole("link", { name: /Write a prayer/ }).click();
+    await page.waitForURL(/\/faith\/journal\/new/);
+    await page.getByRole("textbox", { name: "Prayer", exact: true }).fill("Grateful for strength today.");
     await page.getByRole("button", { name: "Save entry" }).click();
-    await expect(page.getByText("Entry saved. Only you can see it.")).toBeVisible();
+    await page.waitForURL(/\/faith\/journal$/);
+    await expect(page.getByText("Grateful for strength today.")).toBeVisible();
   });
 
   test("food log on the Free plan: search built-in foods and log a serving", async ({ page }) => {

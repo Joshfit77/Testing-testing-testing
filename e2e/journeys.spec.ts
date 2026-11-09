@@ -158,29 +158,30 @@ test.describe("Stage 1 journeys", () => {
     await signUpAndConfirm(page, uniqueEmail("journal"));
     await completeOnboarding(page);
     await tab(page, "Faith", /\/faith/);
-    await page.getByTestId("faith-journal").locator("summary").click();
-    const body = page.getByRole("textbox", { name: "Reflection" });
+    await page.getByRole("navigation", { name: "Faith quick actions" }).getByRole("link", { name: /Write a prayer/ }).click();
+    await page.waitForURL(/\/faith\/journal\/new/);
+    const body = page.getByRole("textbox", { name: "Prayer", exact: true });
     await body.fill("Half-written prayer about patience");
     await page.waitForTimeout(600);
 
     // Leave and come back: the draft is restored, and says so.
     await tab(page, "Home", /\/home/);
     await tab(page, "Faith", /\/faith/);
+    await page.getByRole("navigation", { name: "Faith quick actions" }).getByRole("link", { name: /Write a prayer/ }).click();
+    await page.waitForURL(/\/faith\/journal\/new/);
     await expect(body).toHaveValue("Half-written prayer about patience");
     await expect(page.getByTestId("draft-restored")).toContainText("Unsaved journal entry restored");
 
-    // A reload (app reopened) keeps it too; saving clears it.
+    // A reload (app reopened) keeps it too; saving clears it and returns to the journal.
     await page.reload();
     await expect(body).toHaveValue("Half-written prayer about patience");
     await page.getByRole("button", { name: "Save entry" }).click();
-    await expect(page.getByText("Entry saved. Only you can see it.")).toBeVisible();
-    await expect(body).toHaveValue("");
-    // With no draft left the fold is closed again after a reload; open it to see the empty form.
-    await page.reload();
-    await page.getByTestId("faith-journal").locator("summary").click();
+    await page.waitForURL(/\/faith\/journal$/);
+    await expect(page.getByText("Half-written prayer about patience")).toBeVisible();
+    // With no draft left, a new entry opens empty.
+    await page.goto("/faith/journal/new?kind=daily");
     await expect(body).toHaveValue("");
     await expect(page.getByTestId("draft-restored")).toHaveCount(0);
-    await expect(page.getByText("Half-written prayer about patience")).toBeVisible();
   });
 
   test("filters and scroll position come back when you return to a tab, and Back returns to the list", async ({ page }) => {
