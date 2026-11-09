@@ -51,7 +51,7 @@ const hotspots = () => page.evaluate(() => {
 async function capture(key, title, tab, group) {
   const sid = `s${String(++n).padStart(3, "0")}`;
   const f = `s/${sid}.png`;
-  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.evaluate(() => { window.scrollTo(0, 0); document.querySelectorAll("nav[data-hide-with-keyboard]").forEach((n) => (n.style.visibility = "hidden")); });
   await page.screenshot({ path: path.join(out, f), fullPage: true, timeout: 120000, animations: "disabled" });
   const h = await page.evaluate(() => Math.max(document.documentElement.scrollHeight, document.body.scrollHeight));
   const hot = (await hotspots()).map(({ href, ...x }) => ({ ...x, to: href ? normalize(href) : null }));
