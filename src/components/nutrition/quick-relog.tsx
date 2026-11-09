@@ -2,22 +2,21 @@
 
 import { useState, useSyncExternalStore, useTransition } from "react";
 import { Plus } from "lucide-react";
-import { ResultLine } from "@/components/nutrition/diary-client";
+import { LoggedUndo } from "@/components/nutrition/logged-undo";
 import { Button } from "@/components/ui/button";
-import type { ActionState } from "@/lib/action-state";
-import type { QuickFood } from "@/lib/domain/diary";
+import { mealPhrase, quickFoodSummary, type LogResult, type QuickFood } from "@/lib/domain/diary";
 import { mealForTime } from "@/lib/domain/meal-time";
 import { relogItemAction } from "@/server/actions/nutrition";
 
 /**
  * One-tap re-logging of the foods a member eats most, right on the Nutrition page: the same `relogItemAction` the
  * Add food dialog's Recent tab uses, into the meal for the time of day (on this device's clock). Shown only when
- * there is something recent to offer.
+ * there is something recent to offer. Each row shows the amount one tap adds; the confirmation offers Undo.
  */
 const subscribeNever = () => () => {};
 
 export function QuickRelog({ date, recent, frequent, max = 6 }: { date: string; recent: QuickFood[]; frequent: QuickFood[]; max?: number }) {
-  const [result, setResult] = useState<ActionState | null>(null);
+  const [result, setResult] = useState<LogResult | null>(null);
   const [pending, start] = useTransition();
   // The meal comes from the device's clock, which the server can't know (a phone in New York and a server in UTC
   // disagree), so it is read only on the device after hydration; the server and the first client render say nothing.
@@ -42,14 +41,14 @@ export function QuickRelog({ date, recent, frequent, max = 6 }: { date: string; 
       <h2 id="quick-relog-title" className="text-lg font-semibold">
         Recent foods
       </h2>
-      <p className="text-sm text-muted-foreground">One tap adds it to {meal ?? "the meal for this time of day"} with the same amount as last time.</p>
+      <p className="text-sm text-muted-foreground">One tap adds the amount shown to {meal ? mealPhrase(meal) : "the meal for this time of day"}.</p>
       <ul className="mt-2 divide-y divide-border" aria-busy={pending}>
         {foods.map((f) => (
           <li key={f.id} className="flex items-center justify-between gap-3 py-1.5">
             <span className="min-w-0">
               <span className="block truncate font-medium">{f.name}</span>
-              <span className="text-sm text-muted-foreground">
-                {Math.round(f.calories)} kcal · P {Math.round(Number(f.protein_g))} g
+              <span className="block text-sm text-muted-foreground" data-testid="quick-relog-amount">
+                {quickFoodSummary(f)}
               </span>
             </span>
             <Button size="sm" variant="secondary" className="min-h-11 shrink-0" disabled={pending} onClick={() => relog(f.id)} aria-label={`Add ${f.name} again`} data-testid="quick-relog">
@@ -58,9 +57,7 @@ export function QuickRelog({ date, recent, frequent, max = 6 }: { date: string; 
           </li>
         ))}
       </ul>
-      <div className="mt-2">
-        <ResultLine result={result} />
-      </div>
+      <LoggedUndo result={result} className="mt-2" />
     </section>
   );
 }

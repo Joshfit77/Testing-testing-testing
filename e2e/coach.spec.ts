@@ -640,6 +640,8 @@ test.describe("AI coach", () => {
     await expect(page.getByLabel("Message the AI coach")).toBeVisible();
 
     await page.goto("/nutrition/planner");
+    // "Generate a week" is the planner's primary action; the AI draft opens on demand.
+    await page.getByTestId("ai-plan-disclosure").locator("summary").click();
     const panel = page.getByRole("region", { name: "AI meal plan" });
     await panel.getByLabel("Days").selectOption("3");
     await panel.getByLabel("Focus").selectOption("high_protein");

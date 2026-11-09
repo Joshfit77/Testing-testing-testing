@@ -26,6 +26,6 @@ test("Nutrition hydrates cleanly on a phone in another time zone, with recent fo
   await page.goto("/nutrition");
   await page.waitForLoadState("networkidle");
   await expect(page.getByTestId("quick-relog-section")).toBeVisible();
-  await expect(page.getByText(/One tap adds it to (breakfast|lunch|dinner|snack) with the same amount/)).toBeVisible();
+  await expect(page.getByText(/One tap adds the amount shown to (breakfast|lunch|dinner|snacks)\./)).toBeVisible();
   expect(errors.filter((e) => /418|423|hydrat/i.test(e)), "no hydration error").toEqual([]);
 });
