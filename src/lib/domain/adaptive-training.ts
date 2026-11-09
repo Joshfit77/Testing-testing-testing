@@ -119,7 +119,19 @@ export interface Recommendation {
 
 export interface TrainingReview {
   windowDays: number;
-  consistency: { sessionsLast28: number; plannedLast28: number | null; pct: number | null; lastSession: string | null; missedThisWeek: number | null };
+  /**
+   * sessionsLast28 counts the last 28 days. The plan comparison uses one window for both numbers: the last 28 days,
+   * or the days since the program started when that is shorter (plannedWindowDays). pct = sessionsInWindow / plannedLast28.
+   */
+  consistency: {
+    sessionsLast28: number;
+    plannedLast28: number | null;
+    pct: number | null;
+    lastSession: string | null;
+    missedThisWeek: number | null;
+    sessionsInWindow: number;
+    plannedWindowDays: number;
+  };
   volume: { region: BodyRegion; label: string; setsPerWeek: number; range: [number, number] | null; status: "below" | "within" | "above" | "untracked" }[];
   lifts: { slug: string; name: string; sessions: number; firstE1rmKg: number; lastE1rmKg: number; bestE1rmKg: number; changePct: number; sessionsSinceBest: number; plateau: boolean }[];
   recovery: {
@@ -182,6 +194,30 @@ function bestE1rm(sets: ReviewSet[]): number | null {
   return best;
 }
 
+/** "today", "yesterday", or "Sat, Nov 7" (a YYYY-MM-DD date, read as a calendar day). */
+export function friendlyDay(date: string, today: string): string {
+  if (date === today) return "today";
+  if (date === addDays(today, -1)) return "yesterday";
+  const d = new Date(`${date}T00:00:00Z`);
+  return Number.isNaN(d.getTime()) ? date : d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+}
+
+/**
+ * The review's consistency sentence, with the count, the plan and the percentage over the same days:
+ * "7 workouts of about 9 planned since you started (78%) on Powerbuilding. Last workout: yesterday."
+ */
+export function consistencyText(c: TrainingReview["consistency"], today: string, programName?: string | null): string {
+  const n = (k: number) => `${k} workout${k === 1 ? "" : "s"}`;
+  let head: string;
+  if (c.plannedLast28) {
+    const since = c.plannedWindowDays < 28 ? "since you started" : "in the last 4 weeks";
+    head = `${n(c.sessionsInWindow)} of about ${c.plannedLast28} planned ${since}${c.pct != null ? ` (${c.pct}%)` : ""}${programName ? ` on ${programName}` : ""}`;
+  } else {
+    head = `${n(c.sessionsLast28)} in the last 4 weeks`;
+  }
+  return `${head}. Last workout: ${c.lastSession ? friendlyDay(c.lastSession, today) : "none yet"}.`;
+}
+
 export function analyzeTraining(input: ReviewInput): TrainingReview {
   const { today, units } = input;
   const w = (kg: number) => `${displayWeight(kg, units)} ${weightUnit(units)}`;
@@ -209,6 +245,8 @@ export function analyzeTraining(input: ReviewInput): TrainingReview {
     pct: plannedLast28 ? Math.min(100, Math.round((sessionsInWindow / plannedLast28) * 100)) : null,
     lastSession: workouts.at(-1)?.date ?? null,
     missedThisWeek: null as number | null,
+    sessionsInWindow,
+    plannedWindowDays: plannedWindow,
   };
   if (program) {
     const weekStart = addDays(today, -((new Date(`${today}T00:00:00Z`).getUTCDay() + 6) % 7));

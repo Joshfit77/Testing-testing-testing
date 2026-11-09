@@ -142,7 +142,7 @@ export default async function ActivityDetailPage({ params, searchParams }: { par
         </p>
       )}
 
-      <div className="flex flex-col gap-2 sm:flex-row">
+      <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
         {a.source !== "gps" && (
           <Button asChild variant="secondary" className="w-full sm:flex-1">
             <Link href={`/run/activities/${a.id}/edit`}>

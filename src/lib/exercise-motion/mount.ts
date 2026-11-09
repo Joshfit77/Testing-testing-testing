@@ -28,7 +28,7 @@ export interface MountOptions {
   highlight?: Highlight;
   /** Show a button that switches between the athlete and the classic look (for reviewing the new look). */
   styleToggle?: boolean;
-  /** Keep the figure this many CSS px above the bottom edge, clear of the controls (default 0: they overlap the floor). */
+  /** Keep the figure this many extra CSS px above the picture's bottom edge (default 0; the controls have their own strip under the picture). */
   controlsInset?: number;
 }
 
@@ -100,16 +100,21 @@ export function mountMotion(host: HTMLElement, def: MotionDef, opts: MountOption
   let fullscreen = false;
   const interactive = !still && opts.controls !== false;
 
+  // The picture (stage) on top and, when there are controls, their own strip under it: nothing covers the athlete.
   const wrap = doc.createElement("div");
-  const WRAP_CSS = "position:relative;width:100%;height:100%;overflow:hidden;border-radius:inherit;background:#0a0a0a";
+  const WRAP_CSS = "position:relative;width:100%;height:100%;overflow:hidden;border-radius:inherit;background:#0a0a0a;display:flex;flex-direction:column";
   wrap.style.cssText = WRAP_CSS;
   wrap.setAttribute("data-exercise-motion", def.id);
+  const stage = doc.createElement("div");
+  stage.style.cssText = "position:relative;flex:1 1 auto;min-height:0;overflow:hidden";
+  stage.setAttribute("data-motion-stage", "");
   const canvas = doc.createElement("canvas");
   canvas.style.cssText = "display:block;width:100%;height:100%";
   canvas.setAttribute("role", "img");
   canvas.setAttribute("aria-label", opts.label ?? `Animated demonstration. ${def.label}`);
   canvas.setAttribute("data-motion-canvas", "");
-  wrap.appendChild(canvas);
+  stage.appendChild(canvas);
+  wrap.appendChild(stage);
   host.appendChild(wrap);
   const ctx = canvas.getContext("2d");
 
@@ -127,17 +132,19 @@ export function mountMotion(host: HTMLElement, def: MotionDef, opts: MountOption
       "position:absolute;left:10px;top:10px;padding:4px 8px;border-radius:999px;background:rgba(10,10,10,0.6);border:1px solid rgba(212,170,60,0.35);" +
       "color:#e9c869;font:600 10px/1 system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;pointer-events:none";
     badgeEl.setAttribute("aria-hidden", "true");
-    wrap.appendChild(badgeEl);
+    stage.appendChild(badgeEl);
   }
   if (interactive) {
     // Finger control: tap the picture to play or pause; drag sideways to move through the rep (the picture's width is
     // one loop); up-and-down drags still scroll the page.
-    wrap.style.touchAction = "pan-y";
+    stage.style.touchAction = "pan-y";
     wrap.tabIndex = 0;
     wrap.setAttribute("aria-roledescription", "exercise animation");
     wrap.setAttribute("aria-label", `${opts.label ?? def.label} Tap to play or pause; drag sideways, or use the arrow keys, to move through the movement.`);
-    const pos = doc.createElement("div");
-    pos.style.cssText = "position:absolute;left:10px;right:10px;bottom:52px;display:flex";
+    // One strip under the picture: play, speed, the position bar (a 44px-tall touch target) and full screen.
+    const row = doc.createElement("div");
+    row.style.cssText = "flex:none;display:flex;gap:8px;align-items:center;padding:6px 8px;background:#0a0a0a;border-top:1px solid rgba(212,170,60,0.18)";
+    row.setAttribute("data-motion-controls", "");
     bar = doc.createElement("input");
     bar.type = "range";
     bar.min = "0";
@@ -145,16 +152,12 @@ export function mountMotion(host: HTMLElement, def: MotionDef, opts: MountOption
     bar.step = "1";
     bar.value = "0";
     bar.setAttribute("aria-label", "Position in the movement");
-    bar.style.cssText = "width:100%;height:22px;margin:0;accent-color:#d4aa3c;cursor:pointer;background:transparent";
+    bar.style.cssText = "flex:1 1 auto;min-width:0;width:100%;height:44px;margin:0;accent-color:#d4aa3c;cursor:pointer;background:transparent";
     bar.addEventListener("input", () => {
       if (!bar) return;
       if (playing) ctrl.pause();
       ctrl.seek(Number(bar.value) / 1000);
     });
-    pos.appendChild(bar);
-    wrap.appendChild(pos);
-    const row = doc.createElement("div");
-    row.style.cssText = "position:absolute;left:10px;right:10px;bottom:10px;display:flex;gap:8px;align-items:center";
     playBtn = doc.createElement("button");
     playBtn.type = "button";
     playBtn.style.cssText = BTN;
@@ -164,6 +167,7 @@ export function mountMotion(host: HTMLElement, def: MotionDef, opts: MountOption
     playBtn.addEventListener("click", () => ctrl.toggle());
     speedBtn.addEventListener("click", () => ctrl.setSpeed(speed === 1 ? 0.5 : 1));
     row.append(playBtn, speedBtn);
+    row.append(bar);
     if (opts.styleToggle) {
       styleBtn = doc.createElement("button");
       styleBtn.type = "button";
@@ -173,18 +177,18 @@ export function mountMotion(host: HTMLElement, def: MotionDef, opts: MountOption
     }
     fullBtn = doc.createElement("button");
     fullBtn.type = "button";
-    fullBtn.style.cssText = BTN + ";margin-left:auto";
+    fullBtn.style.cssText = BTN;
     fullBtn.addEventListener("click", () => ctrl.toggleFullscreen());
     row.append(fullBtn);
     wrap.appendChild(row);
 
     let drag: { id: number; x: number; y: number; t: number; start: number; intent: "" | "scrub" | "scroll" } | null = null;
-    wrap.addEventListener("pointerdown", (e) => {
+    stage.addEventListener("pointerdown", (e) => {
       if ((e.target as HTMLElement).closest("button,input")) return;
       if (e.pointerType === "mouse" && e.button !== 0) return;
       drag = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), start: clock / compiled.duration, intent: "" };
     });
-    wrap.addEventListener("pointermove", (e) => {
+    stage.addEventListener("pointermove", (e) => {
       const d = drag;
       if (!d || d.id !== e.pointerId) return;
       const dx = e.clientX - d.x;
@@ -197,14 +201,14 @@ export function mountMotion(host: HTMLElement, def: MotionDef, opts: MountOption
           return;
         }
         try {
-          wrap.setPointerCapture(e.pointerId);
+          stage.setPointerCapture(e.pointerId);
         } catch {
           // Capture is a nicety: the drag works while the finger stays on the picture.
         }
         wrap.setAttribute("data-scrubbing", "true");
         if (playing) ctrl.pause();
       }
-      const w = wrap.getBoundingClientRect().width || 1;
+      const w = stage.getBoundingClientRect().width || 1;
       ctrl.seek(d.start + dx / w);
     });
     const end = (e: PointerEvent) => {
@@ -215,8 +219,8 @@ export function mountMotion(host: HTMLElement, def: MotionDef, opts: MountOption
         wrap.setAttribute("data-scrubbing", "false");
       } else if (e.type === "pointerup" && Math.abs(e.clientX - d.x) < 10 && Math.abs(e.clientY - d.y) < 10 && performance.now() - d.t < 450) ctrl.toggle();
     };
-    wrap.addEventListener("pointerup", end);
-    wrap.addEventListener("pointercancel", end);
+    stage.addEventListener("pointerup", end);
+    stage.addEventListener("pointercancel", end);
     wrap.addEventListener("keydown", (e) => {
       if ((e.target as HTMLElement).closest("button,input")) return;
       if (e.key === " " || e.key === "Enter") {
@@ -256,7 +260,7 @@ export function mountMotion(host: HTMLElement, def: MotionDef, opts: MountOption
   };
 
   const resize = () => {
-    const r = wrap.getBoundingClientRect();
+    const r = stage.getBoundingClientRect();
     const w = Math.max(1, Math.round(r.width));
     const h = Math.max(1, Math.round(r.height));
     const dpr = Math.min(2.5, win.devicePixelRatio || 1);
@@ -299,7 +303,7 @@ export function mountMotion(host: HTMLElement, def: MotionDef, opts: MountOption
   let io: IntersectionObserver | null = null;
   if (typeof ResizeObserver !== "undefined") {
     ro = new ResizeObserver(() => resize());
-    ro.observe(wrap);
+    ro.observe(stage);
   } else win.addEventListener("resize", resize);
   if (!still && typeof IntersectionObserver !== "undefined") {
     io = new IntersectionObserver((entries) => {
@@ -331,7 +335,7 @@ export function mountMotion(host: HTMLElement, def: MotionDef, opts: MountOption
       wrap.removeAttribute("data-pseudo-fullscreen");
       wrap.style.cssText = WRAP_CSS;
     }
-    if (interactive) wrap.style.touchAction = on ? "none" : "pan-y";
+    if (interactive) stage.style.touchAction = on ? "none" : "pan-y";
   };
 
   const ctrl: MotionController = {

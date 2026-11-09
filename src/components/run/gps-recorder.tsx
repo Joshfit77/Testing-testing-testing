@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Flag, Loader2, LocateFixed, Pause, Play, Save, SignalZero, Trash2, Volume2, VolumeX } from "lucide-react";
-import type { GpsDiagnostics, GpsFix, GpsHint } from "@/lib/domain/gps-track";
+import { Flag, Loader2, LocateFixed, Pause, PenLine, Play, Save, SignalZero, Trash2, Volume2, VolumeX } from "lucide-react";
+import { APPROVED_PRO_PRICE_CENTS } from "@/lib/domain/plans";
+import { FIRST_FIX_ACCURACY_M, type GpsDiagnostics, type GpsFix, type GpsHint } from "@/lib/domain/gps-track";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { NativeSelect, Textarea } from "@/components/ui/input";
@@ -54,6 +55,10 @@ const HINT_TEXT: Record<GpsHint, string> = {
   slow_updates: "Location updates are arriving slowly (more than 5 seconds apart). Keep this screen open and turn off battery or low-power saving for the browser.",
   many_outliers: "Several readings jumped away from your route and were ignored (tall buildings or trees reflect GPS signals).",
 };
+
+const usd = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+/** The approved Pro All Access prices: "$19.99/month or $149.99/year". */
+const PRO_PRICE_LINE = `${usd(APPROVED_PRO_PRICE_CENTS.month)}/month or ${usd(APPROVED_PRO_PRICE_CENTS.year)}/year`;
 
 const fmtM = (m: number, unit: DistanceUnit) => (unit === "mi" ? `${Math.round(m * 3.28084)} ft` : `${Math.round(m)} m`);
 
@@ -428,7 +433,7 @@ export function GpsRecorder({
             </ol>
           </section>
         )}
-        {!guided && (
+        {!guided && canRecord && (
           <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Activity">
             {(["run", "walk"] as const).map((k) => (
               <button
@@ -445,13 +450,15 @@ export function GpsRecorder({
             ))}
           </div>
         )}
-        <ul className="space-y-1 text-sm text-muted-foreground">
-          <li className="flex gap-2">
-            <LocateFixed className="mt-0.5 size-4 shrink-0 text-gold" aria-hidden /> {locationSourceLabel()}.{" "}
-            {!hasNativeBackgroundLocation() && "Browsers stop location updates when the screen locks; any time without a signal is kept as a gap, never guessed."}
-          </li>
-          <li>Location is used only while you record, and your route is private to you.</li>
-        </ul>
+        {canRecord && (
+          <ul className="space-y-1 text-sm text-muted-foreground">
+            <li className="flex gap-2">
+              <LocateFixed className="mt-0.5 size-4 shrink-0 text-gold" aria-hidden /> {locationSourceLabel()}.{" "}
+              {!hasNativeBackgroundLocation() && "Browsers stop location updates when the screen locks; any time without a signal is kept as a gap, never guessed."}
+            </li>
+            <li>Location is used only while you record, and your route is private to you.</li>
+          </ul>
+        )}
         {error && (
           <Notice tone="error">
             {ERROR_TEXT[error]}
@@ -463,21 +470,33 @@ export function GpsRecorder({
           </Notice>
         )}
         {canRecord ? (
-          <Button className="w-full" size="lg" onClick={start} data-testid="gps-start">
-            <Play aria-hidden /> Start {guided ? "guided run" : kind}
-          </Button>
-        ) : (
-          <div className="space-y-2 rounded-2xl border border-gold-muted/60 bg-card p-4 text-center" data-testid="gps-locked">
-            <p className="font-semibold">Live GPS recording is included with Pro All Access</p>
-            <p className="text-sm text-muted-foreground">Route maps, distance, pace and splits from your phone&apos;s GPS. Runs and walks you recorded before stay yours to view, edit and delete.</p>
-            <Button asChild className="w-full">
-              <Link href="/profile/billing">See Pro All Access</Link>
+          <>
+            <Button className="h-14 w-full text-lg" size="lg" onClick={start} data-testid="gps-start">
+              <Play aria-hidden /> Start {guided ? "guided run" : kind}
             </Button>
-          </div>
+            <p className="text-center text-sm text-muted-foreground">
+              No GPS? <Link href="/run?tab=log" className="inline-flex min-h-11 items-center underline">Log a run or walk by hand</Link>.
+            </p>
+          </>
+        ) : (
+          <>
+            {/* Free: the free way to log comes first, so this screen is never a dead end. Saving stays enforced on the server. */}
+            <Button asChild className="h-14 w-full text-lg" data-testid="gps-log-by-hand">
+              <Link href="/run?tab=log">
+                <PenLine aria-hidden /> Log a run or walk by hand (free)
+              </Link>
+            </Button>
+            <div className="space-y-2 rounded-2xl border border-border bg-card p-4" data-testid="gps-locked">
+              <p className="text-sm">
+                <span className="font-semibold">Live GPS recording is included with Pro All Access</span>{" "}
+                <span className="text-muted-foreground">({PRO_PRICE_LINE}): route map, distance, pace and splits. Runs and walks you recorded before stay yours.</span>
+              </p>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/profile/billing">See Pro All Access</Link>
+              </Button>
+            </div>
+          </>
         )}
-        <p className="text-center text-xs text-muted-foreground">
-          No GPS? <Link href="/run?tab=log" className="inline-flex min-h-11 items-center underline">Log a run or walk by hand</Link>.
-        </p>
       </div>
     );
   }
@@ -545,10 +564,17 @@ export function GpsRecorder({
   return (
     <div className="space-y-4" data-testid="gps-recording">
       <div className="flex items-center justify-between gap-2">
-        <Badge variant={track.status === "paused" ? "secondary" : "success"}>{track.status === "acquiring" ? "Waiting for GPS" : track.status === "paused" ? "Paused" : "Recording"}</Badge>
-        <span className="text-xs text-muted-foreground" data-testid="gps-accuracy">
-          {track.lastAccuracy != null ? `GPS ±${track.lastAccuracy} m` : "No fix yet"}
-        </span>
+        <Badge variant={track.status === "paused" ? "secondary" : "success"} className="px-3 py-1 text-sm">
+          {track.status === "acquiring" ? "Waiting for GPS" : track.status === "paused" ? "Paused" : "Recording"}
+        </Badge>
+        {(() => {
+          const good = track.lastAccuracy != null && !track.signalLost && track.lastAccuracy <= FIRST_FIX_ACCURACY_M;
+          return (
+            <Badge variant={track.lastAccuracy == null ? "outline" : good ? "success" : "destructive"} className="px-3 py-1 text-sm tabular-nums" data-testid="gps-accuracy">
+              {track.lastAccuracy == null ? "No GPS fix yet" : track.signalLost ? "GPS lost" : `GPS ${good ? "good" : "weak"} ±${track.lastAccuracy} m`}
+            </Badge>
+          );
+        })()}
       </div>
       {track.status === "acquiring" && !diag?.hints.includes("precise_off") && (
         <Notice tone="info">Waiting for a good GPS fix (within 20 m). Time is running; distance starts with the first good fix.</Notice>
@@ -642,7 +668,7 @@ export function GpsRecorder({
       <div className="sticky bottom-[calc(5.5rem+env(safe-area-inset-bottom))] flex gap-2 rounded-2xl border border-border bg-background/95 p-2 backdrop-blur">
         {track.status === "paused" ? (
           <Button
-            className="flex-1"
+            className="h-14 flex-1 text-lg"
             onClick={async () => {
               setTrack((t) => (t ? resumeTrack(t, Date.now()) : t));
               await beginWatching();
@@ -652,7 +678,7 @@ export function GpsRecorder({
           </Button>
         ) : (
           <Button
-            className="flex-1"
+            className="h-14 flex-1 text-lg"
             variant="secondary"
             onClick={() => {
               stopWatching();
@@ -663,7 +689,7 @@ export function GpsRecorder({
           </Button>
         )}
         <Button
-          className="flex-1"
+          className="h-14 flex-1 text-lg"
           onClick={async () => {
             const ok = await confirmDialog({ title: `Finish this ${track.kind}?`, message: "You'll review it before saving.", confirmLabel: "Finish" });
             if (ok) finish();
@@ -672,7 +698,7 @@ export function GpsRecorder({
           <Flag aria-hidden /> Finish
         </Button>
         {track.status === "paused" && (
-          <Button variant="ghost" size="icon" aria-label="Discard recording" onClick={discard}>
+          <Button variant="ghost" size="icon" className="size-14" aria-label="Discard recording" onClick={discard}>
             <Trash2 aria-hidden />
           </Button>
         )}
