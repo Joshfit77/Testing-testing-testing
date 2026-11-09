@@ -74,7 +74,7 @@ for (const size of sizes) {
       await page.goto("/train/exercises/goblet-squat");
       const card = page.getByTestId("exercise-milestone");
       await expect(card.getByRole("heading", { name: "First milestone" })).toBeVisible();
-      await expect(card.getByText("Set your starting point")).toBeVisible();
+      await expect(card.getByText("Set your starting point", { exact: true })).toBeVisible();
       await expect(card.getByTestId("milestone-target")).toHaveCount(0);
     });
 
