@@ -15,6 +15,9 @@ import { ExerciseDemo } from "@/components/train/exercise-demo";
 import { shownDemoAsset } from "@/lib/exercise-demos";
 import { demoCaption, demoReadiness } from "@/lib/exercise-demo-readiness";
 import { requireOnboardedUser } from "@/server/auth";
+import { exerciseMilestone } from "@/lib/domain/exercise-milestones";
+import { ExerciseMilestoneCard } from "@/components/train/exercise-milestone";
+import { loadExerciseHistory } from "@/server/services/exercise-history";
 import { BackLink } from "@/components/platform/back-link";
 
 export const metadata = { title: "Exercise" };
@@ -23,15 +26,17 @@ export default async function ExerciseDetailPage({ params, searchParams }: { par
   const { slug } = await params;
   // Opened from the workout logger: Back returns to the workout (its draft is kept), not to the library.
   const fromWorkout = (await searchParams).from === "workout";
-  await requireOnboardedUser();
+  const { user, profile } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
   const { data } = await supabase.from("exercises").select("*").eq("slug", slug).maybeSingle();
   if (!data) notFound();
   const ex = data as ExerciseRow;
-  const [altsRes, mediaRes] = await Promise.all([
+  const [altsRes, mediaRes, history] = await Promise.all([
     supabase.from("exercise_alternatives").select("alt:exercises!exercise_alternatives_alternative_id_fkey(slug, name, difficulty)").eq("exercise_id", ex.id),
     supabase.from("exercise_media").select("id, media_type, storage_path, external_url, license, attribution, alt_text").eq("exercise_id", ex.id),
+    loadExerciseHistory(supabase, user.id, ex.id),
   ]);
+  const milestone = exerciseMilestone(history.sessions, { slug: ex.slug, name: ex.name }, profile.unit_system);
   const alts = (altsRes.data ?? []).map((a) => a.alt as unknown as { slug: string; name: string; difficulty: string }).filter(Boolean);
   const media = mediaRes.data ?? [];
   const hasVideo = media.some((m) => m.media_type === "video");
@@ -57,6 +62,8 @@ export default async function ExerciseDetailPage({ params, searchParams }: { par
           {ex.low_impact && <Badge variant="success">Low impact</Badge>}
         </div>
       </header>
+
+      <ExerciseMilestoneCard milestone={milestone} name={ex.name} timeZone={profile.timezone ?? "UTC"} compact />
 
       <Link
         href={`/train/exercises/${ex.slug}/history`}

@@ -1,6 +1,7 @@
 import {
   BADGE_CATALOG,
   badgePercent,
+  badgeRemaining,
   badgesUnlockedBySession,
   computeAchievements,
   dailyStreakEarnedAt,
@@ -228,5 +229,35 @@ describe("badges unlocked by a workout", () => {
   it("returns nothing for an ordinary session", () => {
     const ws = workouts(12);
     expect(badgesUnlockedBySession(stats({ workouts: ws }), ws[11]!.sessionId, TODAY)).toEqual([]);
+  });
+});
+
+describe("progress toward locked badges", () => {
+  it("every count badge says what it counts, so the remaining amount reads naturally", () => {
+    for (const b of BADGE_CATALOG.filter((x) => x.unit === "count")) {
+      expect(b.counts, b.id).toBeDefined();
+      expect(b.counts![0].length).toBeGreaterThan(0);
+      expect(b.counts![1].length).toBeGreaterThan(0);
+    }
+  });
+
+  it("reports what is left: 7 of 10 workouts is 70% with 3 remaining", () => {
+    const b = badge(computeAchievements(stats({ workouts: workouts(7) }), TODAY), "workouts-10");
+    expect(b).toMatchObject({ earned: false, current: 7, target: 10 });
+    expect(badgePercent(b)).toBe(70);
+    expect(badgeRemaining(b)).toBe(3);
+    expect(b.counts).toEqual(["workout", "workouts"]);
+  });
+
+  it("nothing is left once a badge is earned, and the earned badge keeps its date", () => {
+    const b = badge(computeAchievements(stats({ workouts: workouts(12) }), TODAY), "workouts-10");
+    expect(b.earned).toBe(true);
+    expect(b.earnedAt).not.toBeNull();
+    expect(badgeRemaining(b)).toBe(0);
+    expect(badgePercent(b)).toBe(100);
+  });
+
+  it("never reports a negative remainder", () => {
+    expect(badgeRemaining({ current: 12, target: 10, earned: false })).toBe(0);
   });
 });

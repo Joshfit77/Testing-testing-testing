@@ -5,7 +5,10 @@ import { LineSeriesChart } from "@/components/charts/charts";
 import { EmptyState } from "@/components/common/states";
 import { BackLink } from "@/components/platform/back-link";
 import { Button } from "@/components/ui/button";
-import { buildExerciseHistory, type BestSet, type HistoryRow } from "@/lib/domain/exercise-history";
+import type { BestSet } from "@/lib/domain/exercise-history";
+import { exerciseMilestone } from "@/lib/domain/exercise-milestones";
+import { ExerciseMilestoneCard } from "@/components/train/exercise-milestone";
+import { loadExerciseHistory } from "@/server/services/exercise-history";
 import { formatDistance } from "@/lib/domain/exercise-tracking";
 import { hasFeature } from "@/lib/domain/plans";
 import { summarizeSets } from "@/lib/domain/previous-performance";
@@ -35,19 +38,9 @@ export default async function ExerciseHistoryPage({ params }: { params: Promise<
   const supabase = await getServerSupabase();
   const { data: ex } = await supabase.from("exercises").select("id, slug, name, is_timed").eq("slug", slug).maybeSingle();
   if (!ex) notFound();
-  const [plan, rowsRes] = await Promise.all([
-    getUserPlan(user.id),
-    supabase
-      .from("workout_exercises")
-      .select("skipped, session:workout_sessions!inner(id, name, started_at, status), sets:workout_sets(set_number, reps, weight_kg, duration_seconds, distance_m, is_warmup, completed)")
-      .eq("user_id", user.id)
-      .eq("exercise_id", ex.id)
-      .eq("session.status", "completed")
-      .order("created_at", { ascending: false })
-      .limit(200),
-  ]);
+  const [plan, history] = await Promise.all([getUserPlan(user.id), loadExerciseHistory(supabase, user.id, ex.id as string)]);
   const units = profile.unit_system;
-  const history = buildExerciseHistory((rowsRes.data ?? []) as unknown as HistoryRow[]);
+  const milestone = exerciseMilestone(history.sessions, { slug: ex.slug as string, name: ex.name as string }, units);
   const advanced = hasFeature(plan, "advanced_analytics");
   const tz = profile.timezone ?? "UTC";
   const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: tz });
@@ -62,6 +55,8 @@ export default async function ExerciseHistoryPage({ params }: { params: Promise<
           {history.sessions.length} {history.sessions.length === 1 ? "session" : "sessions"} logged · completed working sets only
         </p>
       </header>
+
+      <ExerciseMilestoneCard milestone={milestone} name={ex.name as string} timeZone={tz} />
 
       {history.sessions.length === 0 ? (
         <EmptyState
