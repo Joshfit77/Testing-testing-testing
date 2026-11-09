@@ -34,7 +34,10 @@ export async function j03({ page, tap, type, tab }) {
     return `one-tap re-log: ${name}`;
   }
   await tap(page.getByRole("button", { name: /Add food/ }), "Add food");
-  await type(page.getByPlaceholder(/^e\.g\. chicken/), "banana", "search");
+  const searchTab = page.getByRole("dialog").getByRole("tab", { name: "Search" });
+  let box = page.getByLabel("Search foods").or(page.getByPlaceholder(/^e\.g\. chicken/));
+  if (!(await box.first().isVisible().catch(() => false)) && (await searchTab.count())) { await tap(searchTab, "Search tab"); box = page.getByLabel("Search foods").or(page.getByPlaceholder(/^e\.g\. chicken/)); }
+  await type(box, "banana", "search");
   const pick = page.getByRole("dialog").getByRole("button", { name: /^Banana\b/ });
   await pick.first().waitFor({ timeout: 15000 });
   await tap(pick, "pick Banana");
@@ -47,7 +50,11 @@ export async function j04({ page, tap }) {
   await tap(page.getByRole("link", { name: /Outdoor run/ }), "Outdoor run");
   await page.waitForURL(/\/run\/record/);
   const start = page.getByRole("button", { name: /^Start( run| walk| recording)?$/i });
-  if (!(await vis(start))) { const body = (await page.locator("main").innerText()).slice(0, 160).replace(/\s+/g, " "); return `no Start button: ${body}`; }
+  if (!(await vis(start))) {
+    const free = page.getByRole("link", { name: /Log a run or walk by hand/ });
+    if (await vis(free)) return "BLOCKED (Free): GPS is Pro; offered 'Log a run or walk by hand (free)' as the first action";
+    const body = (await page.locator("main").innerText()).slice(0, 160).replace(/\s+/g, " "); return `BLOCKED: no Start button and no free path: ${body}`;
+  }
   await tap(start, "Start");
   await page.getByRole("button", { name: /^Pause/i }).first().waitFor({ timeout: 10000 });
   // Clean up: discard the recording.
@@ -107,6 +114,8 @@ export async function j09({ page, tap, type }) {
 export async function j10({ page, tap }) {
   await tap(page.getByRole("link", { name: /AI Coach/ }), "AI Coach");
   await page.waitForURL(/\/coach/);
+  const upsell = page.getByTestId("coach-upsell");
+  if (await upsell.isVisible().catch(() => false)) return `BLOCKED (Free): one card with the price — ${(await page.getByTestId("coach-upsell-price").innerText().catch(() => "")).replace(/\s+/g, " ")}`;
   const prompt = page.locator("main").getByRole("button", { name: /\?$/ }).first();
   const text = (await prompt.textContent())?.trim();
   if (await prompt.isDisabled().catch(() => false)) { const why = (await page.locator("main").innerText()).match(/[^.\n]*(Pro|plan|limit|allowance)[^.\n]*/)?.[0]; return `BLOCKED: prompt "${text}" disabled — ${why ?? "no reason shown"}`; }
@@ -130,4 +139,29 @@ export async function j13({ page, tap }) {
   await tap(page.locator('nav[data-hide-with-keyboard]').getByRole("link", { name: "Train", exact: true }), "Train tab"); await page.waitForURL(/\/train$/); await page.getByRole("heading", { level: 1 }).waitFor();
   await tap(page.locator('main a[href="/train/programs"]').filter({ visible: true }), "Programs");
   await page.waitForURL(/\/train\/programs$/);
+}
+
+export async function j14({ page, tap }) {
+  await tap(page.getByRole("button", { name: "Quick add" }), "Quick add");
+  const sleep = page.getByTestId("quick-add-sheet").getByRole("link", { name: "Sleep" });
+  if (!(await sleep.count())) return "BLOCKED: no Sleep tile in Quick add";
+  await tap(sleep, "Sleep");
+  await page.waitForURL(/sleep\/log/);
+  const box = page.getByRole("checkbox", { name: /I agree to store my sleep/ });
+  if (await box.count()) { await tap(box, "consent checkbox"); await tap(page.getByRole("button", { name: /Allow sleep logging/ }), "Allow sleep logging"); await page.waitForTimeout(1200); }
+  await tap(page.getByRole("button", { name: /^(Save|Log)/i }), "Save (defaults)");
+  await page.waitForURL(/\/progress\/sleep(\/night|$)/, { timeout: 10000 }).catch(() => {});
+  const err = (await page.locator('[role="alert"]:not(#__next-route-announcer__)').filter({ hasNotText: /Narrow Gate Fitness/ }).first().textContent({ timeout: 1500 }).catch(() => "")) ?? "";
+  return err ? `alert: ${err.slice(0, 100)}` : "saved";
+}
+export async function j15({ page, tap, tab }) {
+  await tap(tab("Nutrition"), "Nutrition tab"); await page.waitForURL(/\/nutrition/);
+  const again = page.getByRole("button", { name: /^Add .+ again$/ }).filter({ visible: true });
+  if (!(await again.count())) return "SKIPPED: nothing recent to re-log";
+  await tap(again, "one-tap re-log");
+  const undo = page.getByRole("button", { name: "Undo" }).filter({ visible: true });
+  if (!(await undo.first().isVisible({ timeout: 5000 }).catch(() => false))) return "BLOCKED: no Undo after logging";
+  await tap(undo, "Undo");
+  await page.getByText(/^Undone/).first().waitFor({ timeout: 8000 });
+  return "logged and undone";
 }

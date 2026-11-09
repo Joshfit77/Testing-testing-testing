@@ -22,5 +22,26 @@ await shot("body-filled"); await cont(); await shot("name-ready"); await tap(pag
 await page.waitForURL(/\/(plan|home)/, { timeout: 60000 }); await page.waitForLoadState("networkidle").catch(() => {}); await shot("after-onboarding");
 const first = page.getByRole("link", { name: /Start my first workout|Start Today.s Workout/i }).first();
 await tap(first); await page.waitForURL(/\/train\/workout/); await page.waitForLoadState("networkidle").catch(() => {}); await shot("first-workout");
-console.log(JSON.stringify({ tapsFromLoginToFirstWorkout: taps, seconds: (Date.now() - t0) / 1000, landedOn: page.url() }));
+const toStart = taps, startSeconds = (Date.now() - t0) / 1000;
+// Then finish that first workout the way a new member would: type a weight on each exercise's first set when it is
+// empty (it carries down to the next sets), take the prefilled reps, tap Complete set for every set, then Finish & save.
+let fields = 0, sets = 0;
+const card = page.getByTestId("current-set-card");
+for (let i = 0; i < 80; i++) {
+  if (await page.getByRole("button", { name: "Finish workout" }).first().isVisible().catch(() => false)) break;
+  const done = card.getByTestId("complete-set");
+  if (!(await done.isVisible().catch(() => false))) break;
+  const weight = card.getByTestId("current-weight").locator("input");
+  if ((await weight.count()) && !(await weight.inputValue())) { await weight.fill("45"); taps++; fields++; }
+  const reps = card.getByTestId("current-reps").locator("input");
+  if ((await reps.count()) && !(await reps.inputValue())) { await reps.fill("8"); taps++; fields++; }
+  await tap(done); sets++;
+  await page.waitForTimeout(150);
+}
+await shot("all-sets-done");
+await tap(page.getByRole("button", { name: "Finish workout" }).first());
+await tap(page.getByRole("button", { name: "Finish & save" }));
+await page.waitForURL((u) => !/\/train\/workout$/.test(u.pathname) || /done|complete|summary/.test(u.href), { timeout: 30000 }).catch(() => {});
+await page.waitForLoadState("networkidle").catch(() => {}); await shot("workout-complete");
+console.log(JSON.stringify({ tapsFromLoginToFirstWorkout: toStart, secondsToStart: startSeconds, landedOn: "/train/workout", setsCompleted: sets, fieldsTyped: fields, tapsFromLoginToWorkoutSaved: taps, finalUrl: page.url(), completionHeading: (await page.getByRole("heading").first().textContent().catch(() => ""))?.trim() }));
 await b.close();
