@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Check, ChartLine, Crown, Dumbbell, Hammer, Minus, Moon, Route, Salad, ScanLine, Sparkles } from "lucide-react";
+import { Check, ChartLine, ChevronDown, Dumbbell, Hammer, Minus, Moon, Route, Salad, ScanLine, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { ComparisonSection } from "@/lib/domain/membership";
 import type { Plan } from "@/lib/domain/types";
@@ -42,7 +42,9 @@ const FREE_HIGHLIGHTS = [
 ];
 
 /**
- * The two memberships new customers can choose: Free and Pro All Access, monthly or yearly. Presentational only:
+ * The two memberships new customers can choose: Free and Pro All Access, monthly or yearly. Both prices come first
+ * (the billing period choice), then the two plans, with the full comparison folded under "Compare Free and Pro" so
+ * the features aren't listed three times on the first screens. Presentational only:
  * the caller supplies the prices of the channel the member is buying through and the buttons that act on it, so
  * the website (Stripe) and the iPhone/Android app (App Store/Google Play) show the same plans and wording.
  */
@@ -71,30 +73,10 @@ export function MembershipPlans({
   const onPro = currentPlan === "pro";
 
   return (
-    <section className="space-y-6" aria-labelledby="membership-title">
-      <div className="text-center">
-        <span className="mx-auto flex size-16 items-center justify-center rounded-full bg-gold/10 text-gold" aria-hidden>
-          <Crown className="size-9" />
-        </span>
-        <p className="mt-3 text-xs font-semibold uppercase tracking-[0.25em] text-gold">Membership</p>
-        <h2 id="membership-title" className="mt-1 font-display text-[2rem] font-bold leading-tight text-gold-gradient">
-          Narrow Gate Pro
-        </h2>
-        <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">Start free. Upgrade when you&apos;re ready for every premium feature.</p>
-      </div>
-
-      <div className="card-gold rounded-2xl p-5" aria-label="What Pro includes">
-        <ul className="space-y-3 text-[0.9375rem]">
-          {PRO_HIGHLIGHTS.slice(0, 4).map(({ icon: Icon, text }) => (
-            <li key={text} className="flex items-center gap-3">
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gold/15 text-gold">
-                <Icon className="size-4" aria-hidden />
-              </span>
-              {text}
-            </li>
-          ))}
-        </ul>
-      </div>
+    <section className="space-y-4" aria-labelledby="membership-title">
+      <h2 id="membership-title" className="sr-only">
+        Memberships
+      </h2>
 
       {yearOffered && (
         <div role="radiogroup" aria-label="Billing period" className="grid grid-cols-2 gap-3">
@@ -178,46 +160,52 @@ export function MembershipPlans({
         </article>
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-border bg-card">
-        <table className="w-full min-w-[17rem] text-sm">
-          <caption className="sr-only">What Free and Pro All Access include</caption>
-          <thead>
-            <tr className="border-b border-border text-left">
-              <th scope="col" className="p-4 font-display text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                Compare
-              </th>
-              <th scope="col" className="w-16 p-3 text-center font-display text-xs font-semibold uppercase tracking-widest">
-                Free
-              </th>
-              <th scope="col" className="w-20 p-3 text-center font-display text-xs font-semibold uppercase tracking-widest text-gold-highlight">
-                Pro
-              </th>
-            </tr>
-          </thead>
-          {comparison.map((section) => (
-            <tbody key={section.title}>
-              <tr>
-                <th scope="colgroup" colSpan={3} className="bg-elevated/60 px-4 py-2 text-left text-xs font-semibold uppercase tracking-widest text-gold">
-                  {section.title}
+      <details className="group rounded-2xl border border-border bg-card" data-testid="plan-comparison">
+        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-2 px-4 font-semibold [&::-webkit-details-marker]:hidden">
+          Compare Free and Pro
+          <ChevronDown className="size-5 text-gold transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
+        </summary>
+        <div className="overflow-x-auto border-t border-border">
+          <table className="w-full min-w-[17rem] text-sm">
+            <caption className="sr-only">What Free and Pro All Access include</caption>
+            <thead>
+              <tr className="border-b border-border text-left">
+                <th scope="col" className="p-4 font-display text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                  Compare
+                </th>
+                <th scope="col" className="w-16 p-3 text-center font-display text-xs font-semibold uppercase tracking-widest">
+                  Free
+                </th>
+                <th scope="col" className="w-20 p-3 text-center font-display text-xs font-semibold uppercase tracking-widest text-gold-highlight">
+                  Pro
                 </th>
               </tr>
-              {section.rows.map((row) => (
-                <tr key={row.label} className="border-t border-border/60">
-                  <th scope="row" className="p-4 text-left font-normal">
-                    {row.label}
+            </thead>
+            {comparison.map((section) => (
+              <tbody key={section.title}>
+                <tr>
+                  <th scope="colgroup" colSpan={3} className="bg-elevated/60 px-4 py-2 text-left text-xs font-semibold uppercase tracking-widest text-gold">
+                    {section.title}
                   </th>
-                  <td className="p-3 text-center">
-                    <Cell value={row.free} />
-                  </td>
-                  <td className="p-3 text-center">
-                    <Cell value={row.pro} pro />
-                  </td>
                 </tr>
-              ))}
-            </tbody>
-          ))}
-        </table>
-      </div>
+                {section.rows.map((row) => (
+                  <tr key={row.label} className="border-t border-border/60">
+                    <th scope="row" className="p-4 text-left font-normal">
+                      {row.label}
+                    </th>
+                    <td className="p-3 text-center">
+                      <Cell value={row.free} />
+                    </td>
+                    <td className="p-3 text-center">
+                      <Cell value={row.pro} pro />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            ))}
+          </table>
+        </div>
+      </details>
 
       {footer}
     </section>

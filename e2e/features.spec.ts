@@ -114,6 +114,9 @@ test.describe("feature access, subscriptions and core sections", () => {
     await expect(page.getByTestId("pro-price")).toHaveText("$149.99 / year");
     await expect(page.getByText("About $12.49 a month, billed yearly.")).toBeVisible();
     await expect(page.getByRole("radio", { name: /Save 37%/ })).toBeVisible();
+    // The full comparison is folded under "Compare Free and Pro"; Faith being free is on the first screen.
+    await expect(page.getByTestId("faith-free")).toBeInViewport();
+    await page.getByText("Compare Free and Pro").click();
     await expect(page.getByText("150 requests / month")).toBeVisible();
     await expect(page.getByText(/\$11\.99|\$24\.99|\$249\.99/)).toHaveCount(0);
     // No Stripe keys in this test environment: no checkout is offered, and nothing pretends to be one.
