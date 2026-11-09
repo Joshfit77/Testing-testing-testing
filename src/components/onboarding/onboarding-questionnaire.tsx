@@ -134,7 +134,7 @@ function Question({ title, help, children }: { title: string; help?: React.React
  * The guided sign-up questionnaire: one question per screen with a progress bar and Back/Continue.
  * Answers stay in client state; one server action at the end saves everything and builds the plan.
  */
-export function OnboardingQuestionnaire({ userId, initialName }: { userId: string; initialName: string }) {
+export function OnboardingQuestionnaire({ userId, initialName, intro }: { userId: string; initialName: string; /** Shown above the first question only. */ intro?: React.ReactNode }) {
   const [step, setStep] = useState(0);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -405,6 +405,7 @@ export function OnboardingQuestionnaire({ userId, initialName }: { userId: strin
 
   return (
     <div className="space-y-6">
+      {step === 0 && intro}
       <div>
         <div className="mb-2 flex justify-between text-xs font-semibold uppercase tracking-widest text-muted-foreground">
           {/* The quick part is five questions and the Ready screen; the counter counts only the questions (the welcome
