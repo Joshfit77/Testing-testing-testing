@@ -12,13 +12,13 @@ test.describe("navigation shell", () => {
     await expect(tabs.first()).toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("button", { name: "More" })).toHaveCount(0);
 
-    // Home: greeting, Scripture card, today's workout, nutrition, Faith today, quick actions, My Progress.
+    // Home: greeting, Scripture card, today's workout, nutrition, Faith today, My Progress. Quick actions start hidden (the header has them).
     await expect(page.getByRole("heading", { level: 1, name: /^Good (morning|afternoon|evening), / })).toBeVisible();
     await expect(page.getByRole("link", { name: /^Verse of the day/ })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Today's workout" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Today's nutrition" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Faith today" })).toBeVisible();
-    await expect(page.getByRole("navigation", { name: "Quick actions" }).getByRole("link")).toHaveText(["Run", "Log food", "AI Coach"]);
+    await expect(page.getByRole("navigation", { name: "Quick actions" })).toHaveCount(0);
     await page.getByRole("link", { name: /My Progress/ }).click();
     await page.waitForURL(/\/progress$/);
     await expect(page.getByRole("heading", { level: 1, name: "My Progress" })).toBeVisible();

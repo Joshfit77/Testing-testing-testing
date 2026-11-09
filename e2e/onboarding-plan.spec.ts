@@ -47,7 +47,7 @@ test.describe("guided onboarding builds a plan", () => {
     // The program is the active one on Home. Opening the logger and leaving logged nothing, so nothing was saved:
     // Home still offers to start the session (no phantom "Resume workout").
     await page.goto("/home");
-    await expect(page.getByRole("link", { name: "Start Today's Workout" })).toBeVisible();
+    await expect(page.getByRole("link", { name: /^Start today's workout/ })).toBeVisible();
     await expect(page.getByRole("link", { name: /^Resume workout/ })).toHaveCount(0);
   });
   test("answers survive a reload, but never reach another account in the same tab", async ({ page }) => {

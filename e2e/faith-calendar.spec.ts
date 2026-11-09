@@ -113,7 +113,7 @@ test.describe("Stage 2C: faith flows, onboarding additions and the training cale
 
     await page.goto("/home");
     await expect(page.getByTestId("today-rest")).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "Start Today's Workout" })).toBeVisible();
+    await expect(page.getByRole("link", { name: /^Start today's workout/ })).toBeVisible();
 
     await page.goto("/calendar");
     await expect(page.getByRole("heading", { level: 1, name: "Training calendar" })).toBeVisible();
@@ -137,7 +137,7 @@ test.describe("Stage 2C: faith flows, onboarding additions and the training cale
     await expect(page.getByRole("region", { name: "Up next" }).getByTestId("planned-session").first()).not.toContainText("Moved");
     await page.goto("/home");
     await expect(page.getByTestId("today-rest")).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "Start Today's Workout" })).toBeVisible();
+    await expect(page.getByRole("link", { name: /^Start today's workout/ })).toBeVisible();
 
     // Week view lists the days.
     await page.goto("/calendar?view=week");
