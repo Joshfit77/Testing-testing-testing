@@ -224,7 +224,8 @@ export function TemplateEditor({ templateId, initial, catalog, units }: { templa
         </label>
         <Textarea id="tpl-notes" value={value.notes} onChange={(e) => set((v) => ({ ...v, notes: e.target.value.slice(0, 2000) }))} placeholder="Cues, warm-up, equipment settings" />
       </div>
-      <p className="text-xs text-muted-foreground">Supersets alternate one set of each exercise, with rest only after the round (the longest rest in the superset).</p>
+      {/* Only once there are two exercises to join. */}
+      {value.exercises.length >= 2 && <p className="text-xs text-muted-foreground">Supersets alternate one set of each exercise, with rest only after the round (the longest rest in the superset).</p>}
 
       {error && <Notice tone="error">{error}</Notice>}
       <Button type="button" className="w-full" onClick={save} disabled={pending} aria-busy={pending}>

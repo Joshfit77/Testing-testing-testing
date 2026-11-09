@@ -42,6 +42,20 @@ interface PeRow {
   exercise: { id: string; slug: string; name: string } | null;
 }
 
+/** Split a long description into its opening (about two sentences) and the rest, which sits behind "More". */
+function splitIntro(text: string): [string, string] {
+  const t = text.trim();
+  if (t.length <= 240) return [t, ""];
+  const sentences = t.match(/[^.!?]+[.!?]+(\s+|$)/g) ?? [t];
+  let lead = "";
+  for (const sentence of sentences) {
+    if (lead && lead.length + sentence.length > 200) break;
+    lead += sentence;
+  }
+  const rest = t.slice(lead.length).trim();
+  return rest ? [lead.trim(), rest] : [t, ""];
+}
+
 export default async function ProgramDetailPage({
   params,
   searchParams,
@@ -119,7 +133,24 @@ export default async function ProgramDetailPage({
           {(categoryRes.data?.name as string) ?? (program.source === "ai" ? "AI-generated" : "Personal program")}
         </p>
         <h1 className="mt-2 font-display text-4xl font-bold uppercase leading-none md:text-5xl">{program.name}</h1>
-        <p className="mt-3 max-w-3xl text-sm text-muted-foreground md:text-base">{program.description || program.summary}</p>
+        {(() => {
+          // The first sentence or two up front; the rest one tap away.
+          const [lead, rest] = splitIntro(program.description || program.summary);
+          return (
+            <div className="mt-3 max-w-3xl text-sm text-muted-foreground md:text-base">
+              <p>{lead}</p>
+              {rest && (
+                <details className="group">
+                  <summary className="inline-flex min-h-11 cursor-pointer list-none items-center font-semibold text-gold-highlight [&::-webkit-details-marker]:hidden">
+                    <span className="group-open:hidden">More</span>
+                    <span className="hidden group-open:inline">Less</span>
+                  </summary>
+                  <p>{rest}</p>
+                </details>
+              )}
+            </div>
+          );
+        })()}
         <div className="mt-4 flex flex-wrap gap-2">
           <Badge variant="secondary">{titleCase(program.difficulty)}</Badge>
           <Badge variant="secondary">
@@ -160,7 +191,7 @@ export default async function ProgramDetailPage({
           <h2 className="flex items-center gap-2 font-display text-lg font-semibold uppercase">
             <Dumbbell className="size-4 text-gold" aria-hidden /> Equipment needed
           </h2>
-          <p className="mt-2 text-sm text-muted-foreground">{equipmentSummary(program.equipment)}</p>
+          {program.equipment.length === 0 && <p className="mt-2 text-sm text-muted-foreground">{equipmentSummary(program.equipment)}</p>}
           {program.equipment.length > 0 && (
             <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Equipment list">
               {program.equipment.map((e) => (
@@ -276,7 +307,7 @@ export default async function ProgramDetailPage({
                     </p>
                   </div>
                   {!locked && (
-                    <Button asChild size="sm" variant={isNext ? "default" : "secondary"}>
+                    <Button asChild variant={isNext ? "default" : "secondary"} className="shrink-0">
                       <Link href={`/train/workout?day=${d.id}${userProgram ? `&up=${userProgram.id}` : ""}`}>
                         <Play aria-hidden /> Start
                       </Link>
@@ -288,7 +319,7 @@ export default async function ProgramDetailPage({
                     {exs.map((e) => (
                       <li key={e.id} className="py-3">
                         <div className="flex items-start justify-between gap-3">
-                          <Link href={`/train/exercises/${e.exercise?.slug}`} className="font-semibold hover:text-gold-highlight">
+                          <Link href={`/train/exercises/${e.exercise?.slug}`} className="-my-2.5 inline-block py-2.5 font-semibold hover:text-gold-highlight">
                             {e.exercise?.name}
                           </Link>
                           <span className="shrink-0 font-display text-base font-semibold text-gold-highlight">
