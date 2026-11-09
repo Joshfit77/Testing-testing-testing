@@ -67,10 +67,15 @@ test.describe("2D exercise demonstrations", () => {
     await expect(card.getByTestId("current-exercise")).toHaveText(/Barbell Bench Press/i);
     await expect(card.getByRole("button", { name: "Show the Barbell Bench Press demonstration larger" })).toBeVisible();
 
-    const form = card.getByTestId("current-form");
-    await form.locator("summary").click();
-    await expect(form.getByTestId("current-cues").locator("li").first()).toBeVisible();
-    await expect(form.getByTestId("current-mistakes").locator("li").first()).toBeVisible();
+    // Form cues and common mistakes live in Exercise info (one place, not repeated on the card).
+    await card.getByTestId("exercise-info-button").click();
+    const info = page.getByTestId("exercise-info");
+    await info.getByTestId("info-tab-execution").click();
+    await expect(info.getByTestId("info-execution").locator("li").first()).toBeVisible();
+    await info.getByTestId("info-tab-mistakes").click();
+    await expect(info.getByTestId("info-mistakes").locator("li").first()).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(info).toBeHidden();
 
     // Logging is unchanged: one tap completes the set.
     await card.getByLabel("Weight (lb)").fill("135");
@@ -79,7 +84,7 @@ test.describe("2D exercise demonstrations", () => {
     await expect(card.getByTestId("current-rest")).toBeVisible();
 
     // Swap opens the substitute sheet with the alternatives; picking one replaces the exercise, keeping the done set.
-    await form.getByTestId("current-swap").click();
+    await card.getByTestId("current-swap").click();
     const sheet = page.getByRole("dialog");
     await expect(sheet).toContainText(/Barbell Bench Press/);
     await sheet.getByRole("button", { name: /^Dumbbell Bench Press/ }).first().click();

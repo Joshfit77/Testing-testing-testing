@@ -113,7 +113,7 @@ describe("permission and signal states", () => {
     for (let i = 0; i < 6; i++) fix({ lat: 40 + (i * 2) / M_PER_DEG_LAT, lng: -75, accuracy: 2500, t: t0 + i * 1000 });
     expect(await screen.findByTestId("gps-hint-precise")).toHaveTextContent(/Precise Location/);
     expect(screen.getByTestId("gps-distance")).toHaveTextContent("0.00 km");
-    expect(screen.getByTestId("gps-accuracy")).toHaveTextContent("GPS ±2500 m");
+    expect(screen.getByTestId("gps-accuracy")).toHaveTextContent("GPS weak ±2500 m");
     expect(screen.queryByText(/Waiting for a good GPS fix/)).toBeNull();
   });
 
@@ -122,7 +122,11 @@ describe("permission and signal states", () => {
     expect(await screen.findByTestId("gps-locked")).toHaveTextContent(/Pro All Access/);
     expect(screen.queryByTestId("gps-start")).toBeNull();
     expect(screen.getByRole("link", { name: "See Pro All Access" })).toHaveAttribute("href", "/profile/billing");
-    expect(screen.getByRole("link", { name: /Log a run or walk by hand/ })).toHaveAttribute("href", "/run?tab=log");
+    expect(screen.getByRole("link", { name: "Log a run or walk by hand (free)" })).toHaveAttribute("href", "/run?tab=log");
+    // The free way comes first, the run/walk picker (a choice they can't use) is gone, and the price is said once.
+    expect(screen.getByTestId("gps-log-by-hand").compareDocumentPosition(screen.getByTestId("gps-locked")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByRole("radiogroup", { name: "Activity" })).toBeNull();
+    expect(screen.getByTestId("gps-locked")).toHaveTextContent("$19.99/month or $149.99/year");
     expect(location.watchLocation).not.toHaveBeenCalled();
   });
 });

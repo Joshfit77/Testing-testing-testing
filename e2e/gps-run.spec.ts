@@ -45,7 +45,7 @@ test.describe("live GPS runs and walks", () => {
     await expect(page.getByTestId("gps-recording")).toBeVisible();
 
     let m = await moveNorth(context, page, 0, 25, 3);
-    await expect(page.getByTestId("gps-accuracy")).toHaveText("GPS ±5 m");
+    await expect(page.getByTestId("gps-accuracy")).toHaveText("GPS good ±5 m");
     const firstDistance = await page.getByTestId("gps-distance").innerText();
     expect(firstDistance).not.toMatch(/^0(\.00)? /);
     // GPS details: source, accuracy and counts (never a position); the live map shows where you are now.
