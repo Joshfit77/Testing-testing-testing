@@ -54,18 +54,17 @@ test.describe("Sleep & Recovery", () => {
     // The connection the phone app recorded on the profile (the member connected there and now looks on the web).
     await serviceRest(`profiles?id=eq.${await userIdFor(email)}`, { method: "PATCH", body: { sleep_import_source: "apple_health", sleep_import_connected_at: at(night, "06:55", -3) }, prefer: "return=minimal" });
 
-    // Hub: recorded badge, the stage bar and the three measurement tiles; the source card knows the last sync.
+    // Hub: recorded badge and time asleep, the same figure as the nightly report (11:25 PM to 6:42 AM less the 14
+    // minutes awake); the stage bar and measurement tiles live on the nightly report. The source line inside the
+    // card knows the last sync.
     await page.goto("/progress/sleep");
     const lastNight = page.getByRole("heading", { name: "Last night" }).locator("..").locator("..");
     await expect(lastNight).toContainText("Recorded by Apple Watch (test)");
     await expect(lastNight).toContainText("asleep (recorded)");
-    // 7h 9m of stage time, awake (15+8+8 = 31 min) not counted.
-    await expect(lastNight).toContainText("7h 9m");
-    await expect(lastNight.getByRole("img", { name: /Deep 1h 20m/ })).toBeVisible();
-    await expect(lastNight).toContainText("54");
-    await expect(lastNight).toContainText("41.5");
-    await expect(lastNight).toContainText("14.2");
-    const source = page.getByTestId("sleep-source");
+    await expect(lastNight).toContainText("7h 3m");
+    await expect(lastNight.getByRole("img", { name: /Deep 1h 20m/ })).toHaveCount(0);
+    await expect(lastNight.getByTestId("sleep-insight")).toBeVisible();
+    const source = lastNight.getByTestId("sleep-source");
     await expect(source).toContainText("Apple Watch (test) via Apple Health");
     await expect(source).toContainText("Last synced");
     await expect(source).toContainText("with overnight measurements");
@@ -79,6 +78,7 @@ test.describe("Sleep & Recovery", () => {
     await expect(page.getByText("Recorded by Apple Watch (test)", { exact: true })).toBeVisible();
     // The watch measured it: not called "your estimate".
     await expect(page.getByText("recorded by your device", { exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Time asleep" }).locator("..").locator("..")).toContainText("7h 3m");
     await expect(page.getByText("your estimate", { exact: true })).toHaveCount(0);
     const stages = page.getByRole("heading", { name: "Sleep stages" }).locator("..");
     await expect(stages.getByRole("img", { name: /Sleep stages from 11:10 PM to 6:50 AM/ })).toBeVisible();
@@ -87,6 +87,11 @@ test.describe("Sleep & Recovery", () => {
     await expect(stages).toContainText("19% of sleep");
     await expect(stages).toContainText("REM");
     await expect(stages).toContainText("1h 37m");
+    await expect(stages.getByRole("img", { name: /Deep 1h 20m/ })).toBeVisible();
+    // The time axis: short labels every two hours, with bed and up times on their own line.
+    await expect(stages.getByText("2 AM", { exact: true })).toBeVisible();
+    await expect(stages.getByText("In bed 11:10 PM")).toBeVisible();
+    await expect(stages.getByText("Up 6:50 AM")).toBeVisible();
     await stages.getByText("Every interval").click();
     await expect(stages.getByRole("list", { name: "Stage intervals" }).getByRole("listitem")).toHaveCount(12);
     await expect(stages).toContainText("no validated way exists to turn stage shares or overnight measurements into one number");
@@ -115,8 +120,13 @@ test.describe("Sleep & Recovery", () => {
     await page.goto("/progress/sleep/settings");
     await expect(page.getByRole("list", { name: "Recent imports" })).toContainText("Apple Watch (test)");
     await expect(page.getByTestId("sleep-connection")).toContainText("Connected to Apple Health");
-    await expect(page.getByRole("button", { name: "Disconnect", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Disconnect and remove imported/ })).toBeVisible();
+    // One Disconnect…, whose confirm step asks whether to keep or remove the imported nights.
+    await page.getByRole("button", { name: "Disconnect…" }).click();
+    const confirm = page.getByRole("dialog");
+    await expect(confirm.getByRole("button", { name: "Disconnect, keep imported nights" })).toBeVisible();
+    await expect(confirm.getByRole("button", { name: "Disconnect and remove imported nights" })).toBeVisible();
+    await confirm.getByRole("button", { name: "Cancel" }).click();
+    await expect(confirm).toHaveCount(0);
 
     // Pro: the daily energy curve draws real bars for the waking hours (they once all drew at zero height).
     await grantPlan(email, "pro");
@@ -139,8 +149,15 @@ test.describe("Sleep & Recovery", () => {
     await page.getByRole("link", { name: /Sleep & Recovery/ }).click();
     await page.waitForURL(/\/progress\/sleep$/);
 
-    // Consent first: no timer, no manual entry until it's given.
+    // Consent first: no timer, no manual entry until it's given. The check-in and manual entry pages offer the same
+    // consent card in place rather than a dead end.
     await expect(page.getByRole("heading", { name: "Before you start" })).toBeVisible();
+    for (const path of ["/progress/sleep/log", "/progress/sleep/checkin"]) {
+      await page.goto(path);
+      await expect(page.getByRole("heading", { name: "Before you start" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Allow sleep logging" })).toBeVisible();
+    }
+    await page.goto("/progress/sleep");
     await expect(page.getByRole("link", { name: /Enter sleep by hand/ })).toHaveCount(0);
     await page.getByRole("button", { name: "Allow sleep logging" }).click();
     await expect(page.getByText("Tick the box to allow sleep logging.")).toBeVisible();
@@ -204,7 +221,7 @@ test.describe("Sleep & Recovery", () => {
     await page.waitForURL(/\/progress\/sleep$/);
     // The Progress tab's card opens the same dashboard.
     await page.goto("/progress");
-    await expect(page.getByRole("link", { name: /Sleep & Recovery/ })).toContainText("Sleep from Apple Health, Health Connect or by hand");
+    await expect(page.getByRole("link", { name: /Sleep & Recovery/ })).toContainText("Last night, trends and schedule");
     await page.getByRole("link", { name: /Sleep & Recovery/ }).click();
     await page.waitForURL(/\/progress\/sleep$/);
 

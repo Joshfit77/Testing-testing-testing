@@ -15,6 +15,12 @@ import { getStepsDaily, type StepsSummary } from "@/server/services/steps";
 
 export const metadata = { title: "My Progress" };
 
+/** "8-week streak · 1 workout this week": the streak first, so an early-week zero doesn't read as a lapse. */
+function progressSubtitle(thisWeek: number, weekStreak: number): string {
+  const week = `${thisWeek} workout${thisWeek === 1 ? "" : "s"} this week`;
+  return weekStreak > 0 ? `${weekStreak}-week streak · ${week}` : week;
+}
+
 export default async function ProgressHubPage() {
   const { user, profile } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
@@ -30,41 +36,40 @@ export default async function ProgressHubPage() {
       href: "/progress/overview",
       icon: LineChart,
       title: "Overview",
-      body: `${data.workoutsTotal} workout${data.workoutsTotal === 1 ? "" : "s"} completed · weight, records, photos and trends`,
+      body: `${data.workoutsTotal} workout${data.workoutsTotal === 1 ? "" : "s"} · records and trends`,
     },
     {
       href: "/progress/sleep",
       icon: Moon,
       title: "Sleep & Recovery",
-      body: "Sleep from Apple Health, Health Connect or by hand: nightly reports and scores, history, estimated sleep debt, your schedule and energy patterns",
+      body: "Last night, trends and schedule",
     },
     {
       href: "/progress/body-map",
       icon: PersonStanding,
       title: "Strength & Body Map",
-      body: hasFeature(plan, "advanced_analytics")
-        ? "Muscle map, Bronze-to-Disciple strength ranks and trends for each muscle group"
-        : "Pro: a muscle map with strength ranks and trends for each muscle group",
+      body: hasFeature(plan, "advanced_analytics") ? "Strength ranks by muscle group" : "Pro: strength ranks by muscle",
     },
     {
       href: "/progress/body-scan",
       icon: ScanLine,
       title: "Body Scan",
-      body: canUseBodyScan(plan) ? "Guided front, side and rear photos with measurements, compared over time" : "Pro: guided body photos and measurements, compared over time",
+      body: canUseBodyScan(plan) ? "Guided photos and measurements" : "Pro: guided photos and measurements",
     },
     {
       href: "/progress/badges",
       icon: Award,
       title: "Badges",
-      body: "Milestones you've earned and what's next",
+      body: "Milestones earned and what's next",
     },
-    { href: "/train/history", icon: History, title: "History", body: "Every completed workout, with sets and notes" },
+    { href: "/train/history", icon: History, title: "History", body: "Every completed workout" },
   ];
 
   return (
     <div className="space-y-4">
       <BackLink href="/profile">You</BackLink>
-      <MainHeader title="My Progress" subtitle={`${data.workoutsThisWeek} this week · ${data.weekStreak} week streak`} />
+      {/* The header truncates long titles; this one wraps instead so it never reads "My Progre…". */}
+      <MainHeader title={<span className="whitespace-normal">My Progress</span>} subtitle={progressSubtitle(data.workoutsThisWeek, data.weekStreak)} />
 
       <nav aria-label="My Progress sections" className="space-y-2">
         {sections.map((s) => (

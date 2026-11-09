@@ -149,7 +149,7 @@ export default async function NightReportPage({ params }: { params: Promise<{ da
 
           <section className={card} aria-labelledby="night-compare-title">
             <h2 id="night-compare-title" className="font-display text-xl font-bold uppercase">
-              Compared with your last two weeks
+              Compared with the two weeks before
             </h2>
             {!analytics ? (
               <p className="mt-2 text-sm text-muted-foreground">

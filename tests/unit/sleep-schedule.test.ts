@@ -1,5 +1,6 @@
 import { formatClock, summarizeNights, type SleepSession } from "@/lib/domain/sleep";
-import { consistencyScore, sleepWindows } from "@/lib/domain/sleep-schedule";
+import { consistencyScore, sleepWindows, targetBedtime, windDownStart } from "@/lib/domain/sleep-schedule";
+import { energyRhythm } from "@/lib/domain/sleep-energy";
 
 const night = (date: string, bed: string, wake: string, onset?: string): SleepSession => ({
   id: `${date}`,
@@ -74,5 +75,22 @@ describe("sleep windows v1", () => {
     expect(consistencyScore({ nights: 5, typicalBed: 0, typicalWake: 0, bedSpread: 0, wakeSpread: 0, steadiness: "steady" })).toBe(100);
     expect(consistencyScore({ nights: 5, typicalBed: 0, typicalWake: 0, bedSpread: 60, wakeSpread: 60, steadiness: "variable" })).toBe(50);
     expect(consistencyScore({ nights: 1, typicalBed: null, typicalWake: null, bedSpread: null, wakeSpread: null, steadiness: null })).toBeNull();
+  });
+});
+
+describe("one wind-down time", () => {
+  it("is half an hour before the bedtime window opens, and the energy estimate agrees", () => {
+    const w = sleepWindows([], GOAL, 6 * 60 + 30);
+    // 6:30 AM wake, 8h goal, 15 min to fall asleep and 10 to settle: centred on 10:05 PM, opening at 9:35 PM.
+    expect(formatClock(w.bedWindow!.start)).toBe("9:35 PM");
+    expect(formatClock(targetBedtime(w.bedWindow!))).toBe("10:05 PM");
+    expect(formatClock(windDownStart(w.bedWindow!))).toBe("9:05 PM");
+    const r = energyRhythm(6 * 60 + 30, targetBedtime(w.bedWindow!), 480, GOAL, 0);
+    expect(r.windDown).toBe(windDownStart(w.bedWindow!));
+  });
+
+  it("wraps around midnight", () => {
+    expect(windDownStart({ start: 10, end: 70 })).toBe(1420);
+    expect(targetBedtime({ start: 1430, end: 50 })).toBe(20);
   });
 });

@@ -3,6 +3,7 @@ import { ActionButton } from "@/components/common/action-button";
 import { PageHeader } from "@/components/common/page-header";
 import { Notice } from "@/components/common/states";
 import { BackLink } from "@/components/platform/back-link";
+import { DisconnectSleepSource } from "@/components/sleep/disconnect-source";
 import { SleepGoalForm } from "@/components/sleep/goal-form";
 import { SleepImportCard } from "@/components/sleep/import-card";
 import { DEFAULT_SLEEP_GOAL_MINUTES, formatDuration } from "@/lib/domain/sleep";
@@ -10,7 +11,7 @@ import { IMPORT_SOURCE_LABEL } from "@/lib/domain/sleep-import";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
 import { deleteAllSleepDataAction } from "@/server/actions/sleep";
-import { deleteImportedSleepAction, disconnectSleepSourceAction, setSleepImportEnabledAction } from "@/server/actions/sleep-import";
+import { deleteImportedSleepAction, setSleepImportEnabledAction } from "@/server/actions/sleep-import";
 import { listSleepImportRuns } from "@/server/services/sleep";
 
 export const metadata = { title: "Sleep settings" };
@@ -85,12 +86,8 @@ export default async function SleepSettingsPage() {
         </div>
         {profile.sleep_import_source && (
           <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-4">
-            <ActionButton action={disconnectSleepSourceAction} fields={{}} variant="secondary" confirmMessage={`Disconnect ${IMPORT_SOURCE_LABEL[profile.sleep_import_source]}?`} confirmLabel="Disconnect" confirmDetail="Imports stop and the connection is forgotten. Nights already imported stay unless you remove them below.">
-              Disconnect
-            </ActionButton>
-            <ActionButton action={disconnectSleepSourceAction} fields={{ remove: "on" }} variant="destructive" confirmMessage={`Disconnect and remove imported nights?`} confirmLabel="Disconnect and remove" confirmDetail="Imports stop, the connection is forgotten and every imported night goes. Entries you made yourself stay; your phone's own health records are not touched.">
-              <Trash2 className="size-4" aria-hidden /> Disconnect and remove imported
-            </ActionButton>
+            <DisconnectSleepSource sourceLabel={IMPORT_SOURCE_LABEL[profile.sleep_import_source]} importedCount={importedCount ?? 0} />
+            <span className="text-sm text-muted-foreground">You choose whether imported nights stay or go.</span>
           </div>
         )}
       </section>

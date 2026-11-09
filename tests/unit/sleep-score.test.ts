@@ -1,5 +1,5 @@
 import { summarizeNights, type SleepSession } from "@/lib/domain/sleep";
-import { nightlyScore, scoreBand, SLEEP_SCORE_VERSION } from "@/lib/domain/sleep-score";
+import { averageScore, nightlyScore, scoreBand, SLEEP_SCORE_VERSION } from "@/lib/domain/sleep-score";
 import { scheduleStats } from "@/lib/domain/sleep-stats";
 
 const session = (over: Partial<SleepSession>): SleepSession => ({
@@ -71,5 +71,28 @@ describe("nightly score v1", () => {
     expect(scoreBand(80)).toBe("restful");
     expect(scoreBand(60)).toBe("fair");
     expect(scoreBand(59)).toBe("rough");
+  });
+});
+
+describe("partial scores", () => {
+  it("tags a night with only bed and getting-up times as partial, without changing the night", () => {
+    const n = nightOf();
+    const s = nightlyScore(n, GOAL, null);
+    expect(s.partial).toBe(true);
+    expect(s.score).toBe(100);
+    expect(n.asleepEstimated).toBe(true);
+    expect(nightlyScore(nightOf({ awakeMinutes: 10, awakenings: 1 }), GOAL, null).partial).toBe(false);
+  });
+
+  it("leaves partial scores out of the average and says how many", () => {
+    expect(averageScore([{ score: 100, partial: true }, { score: 70, partial: false }, { score: 80, partial: false }])).toEqual({ average: 75, counted: 2, partial: 1 });
+    expect(averageScore([{ score: 100, partial: true }])).toEqual({ average: null, counted: 0, partial: 1 });
+    expect(averageScore([])).toEqual({ average: null, counted: 0, partial: 0 });
+  });
+
+  it("rounds the duration part like every goal bar: never 100% short of the goal", () => {
+    // 7h 58m of an 8h goal.
+    const s = nightlyScore(nightOf({ endedAt: "2026-10-23T05:58:00Z" }), GOAL, null);
+    expect(s.components[0]!.detail).toMatch(/^99% of your goal/);
   });
 });

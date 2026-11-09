@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/common/page-header";
-import { Notice } from "@/components/common/states";
 import { BackLink } from "@/components/platform/back-link";
+import { SleepConsentCard } from "@/components/sleep/consent-card";
 import { SleepSessionForm } from "@/components/sleep/session-form";
 import { defaultManualNight } from "@/lib/domain/sleep";
 import { getServerSupabase } from "@/lib/supabase/server";
@@ -23,7 +23,7 @@ export default async function SleepLogPage({ searchParams }: { searchParams: Pro
       <BackLink href="/progress/sleep">Sleep & Recovery</BackLink>
       <PageHeader eyebrow="Sleep & Recovery" title={session ? "Edit sleep" : "Enter sleep by hand"} description="When you got into bed and when you got up. The rest is optional." />
       {!profile.wellness_consent_at ? (
-        <Notice tone="warning">Allow sleep logging on the Sleep & Recovery page first.</Notice>
+        <SleepConsentCard />
       ) : (
         <section className="rounded-2xl border border-border bg-card p-5">
           <SleepSessionForm session={session ?? undefined} timezone={tz} defaults={defaultManualNight(new Date(), tz)} />

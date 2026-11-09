@@ -16,6 +16,9 @@ export const WAKE_WINDOW_HALF = 15;
 /** Largest nightly shift suggested when moving towards a new bedtime. */
 export const SHIFT_PER_NIGHT = 15;
 
+/** Winding down starts this long before the bedtime window opens. */
+export const WIND_DOWN_LEAD_MINUTES = 30;
+
 export interface ClockWindow {
   start: number;
   end: number;
@@ -110,4 +113,17 @@ export function sleepWindows(nights: NightSummary[], goalMinutes: number, target
   else if (pattern.steadiness === "steady") guidance.push("Your rhythm is steady. Keep the wake time where it is; adjust bedtime only if you're short of your goal.");
 
   return { version: SLEEP_SCHEDULE_VERSION, nights: pattern.nights, anchorWake, anchorSource, latencyMinutes: latency, wakeWindow, bedWindow, pattern, consistency: consistencyScore(pattern), weekendShift, adjustment, guidance };
+}
+
+/**
+ * The one wind-down time every sleep screen shows: half an hour before the bedtime window opens (an hour before the
+ * window's centre, the bedtime the energy estimate uses).
+ */
+export function windDownStart(bedWindow: ClockWindow): number {
+  return wrap(bedWindow.start - WIND_DOWN_LEAD_MINUTES);
+}
+
+/** The bedtime a window is built around (its centre). */
+export function targetBedtime(bedWindow: ClockWindow): number {
+  return wrap(bedWindow.start + BED_WINDOW_HALF);
 }

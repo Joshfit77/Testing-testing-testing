@@ -1,12 +1,13 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { FieldError, FormMessage, SubmitButton } from "@/components/common/form-status";
 import { Input, NativeSelect, Textarea } from "@/components/ui/input";
 import { initialActionState } from "@/lib/action-state";
-import { isoToLocalInput, isValidTimeZone, type SleepSession } from "@/lib/domain/sleep";
+import { defaultManualEntry, isoToLocalInput, isValidTimeZone, type SleepKind, type SleepSession } from "@/lib/domain/sleep";
 import { saveSleepSessionAction } from "@/server/actions/sleep";
 import { initialTimeZoneOptions, timeZoneOptions } from "@/lib/time-zone-options";
+import { cn } from "@/lib/utils";
 
 function deviceZone(fallback: string): string {
   try {
@@ -34,6 +35,20 @@ export function SleepSessionForm({ session, timezone, defaults, returnTo }: { se
     setZones(timeZoneOptions(z));
   }, [session?.timezone, timezone]);
   const local = (iso: string | null | undefined) => (iso ? isoToLocalInput(iso, session?.timezone ?? zone) : "");
+  // A new entry's times follow the kind until the member types a time: a night keeps the overnight defaults, a nap
+  // switches to the half hour ending now (overnight times would be refused as far too long for a nap).
+  const startRef = useRef<HTMLInputElement>(null);
+  const endRef = useRef<HTMLInputElement>(null);
+  const timesEdited = useRef(false);
+  const onKind = (kind: SleepKind) => {
+    if (session || timesEdited.current || !startRef.current || !endRef.current) return;
+    const d = kind === "night" ? defaults : defaultManualEntry("nap", new Date(), zone);
+    startRef.current.value = d.startedAt;
+    endRef.current.value = d.endedAt;
+  };
+  const markEdited = () => {
+    timesEdited.current = true;
+  };
   const err = (name: string) => state.fieldErrors?.[name];
   const field = "space-y-1.5";
   const label = "block text-sm font-semibold";
@@ -48,7 +63,7 @@ export function SleepSessionForm({ session, timezone, defaults, returnTo }: { se
         <div className="grid grid-cols-2 gap-2">
           {(["night", "nap"] as const).map((k) => (
             <label key={k} className="cursor-pointer">
-              <input type="radio" name="kind" value={k} defaultChecked={(session?.kind ?? "night") === k} className="peer sr-only" />
+              <input type="radio" name="kind" value={k} defaultChecked={(session?.kind ?? "night") === k} onChange={() => onKind(k)} className="peer sr-only" />
               <span className="flex h-11 items-center justify-center rounded-xl border border-border bg-elevated text-sm font-semibold capitalize peer-checked:border-gold peer-checked:bg-gold/15 peer-checked:text-gold-highlight peer-focus-visible:ring-2 peer-focus-visible:ring-gold-highlight">
                 {k === "night" ? "A night's sleep" : "A nap"}
               </span>
@@ -62,35 +77,36 @@ export function SleepSessionForm({ session, timezone, defaults, returnTo }: { se
           <label htmlFor="sleep-started" className={label}>
             Got into bed
           </label>
-          <Input id="sleep-started" name="startedAt" type="datetime-local" required defaultValue={session ? local(session.startedAt) : defaults.startedAt} aria-invalid={Boolean(err("startedAt"))} aria-describedby={err("startedAt") ? "sleep-started-error" : undefined} />
+          <Input ref={startRef} onInput={markEdited} id="sleep-started" name="startedAt" type="datetime-local" required defaultValue={session ? local(session.startedAt) : defaults.startedAt} aria-invalid={Boolean(err("startedAt"))} aria-describedby={err("startedAt") ? "sleep-started-error" : undefined} />
           <FieldError id="sleep-started-error" message={err("startedAt")} />
         </div>
         <div className={field}>
           <label htmlFor="sleep-ended" className={label}>
             Got up
           </label>
-          <Input id="sleep-ended" name="endedAt" type="datetime-local" required defaultValue={session ? local(session.endedAt) : defaults.endedAt} aria-invalid={Boolean(err("endedAt"))} aria-describedby={err("endedAt") ? "sleep-ended-error" : undefined} />
+          <Input ref={endRef} onInput={markEdited} id="sleep-ended" name="endedAt" type="datetime-local" required defaultValue={session ? local(session.endedAt) : defaults.endedAt} aria-invalid={Boolean(err("endedAt"))} aria-describedby={err("endedAt") ? "sleep-ended-error" : undefined} />
           <FieldError id="sleep-ended-error" message={err("endedAt")} />
         </div>
       </div>
 
-      <div className={field}>
-        <label htmlFor="sleep-zone" className={label}>
-          Time zone
-        </label>
-        <NativeSelect id="sleep-zone" name="timezone" value={zone} onChange={(e) => setZone(e.target.value)}>
-          {zones.map((z) => (
-            <option key={z} value={z}>
-              {z.replace(/_/g, " ")}
-            </option>
-          ))}
-        </NativeSelect>
-        <p className="text-xs text-muted-foreground">Where you slept. Travelling? Pick the zone you were in so the night lands on the right day.</p>
-      </div>
+      <p className="-mt-2 text-xs text-muted-foreground">Times are in {zone.replace(/_/g, " ")}. Travelling? Change the zone under More detail.</p>
 
-      <details className="rounded-xl border border-border bg-elevated p-4" open={Boolean(session?.onsetAt || session?.finalWakeAt || session?.awakenings != null || session?.awakeMinutes != null)}>
-        <summary className="cursor-pointer text-sm font-semibold">More detail (optional)</summary>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+      <details className="rounded-xl border border-border bg-elevated px-4 py-1" open={Boolean(session?.onsetAt || session?.finalWakeAt || session?.awakenings != null || session?.awakeMinutes != null || (session && session.timezone !== timezone))}>
+        <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold">More detail (optional)</summary>
+        <div className="mt-3 mb-3 grid gap-4 sm:grid-cols-2">
+          <div className={cn(field, "sm:col-span-2")}>
+            <label htmlFor="sleep-zone" className={label}>
+              Time zone
+            </label>
+            <NativeSelect id="sleep-zone" name="timezone" value={zone} onChange={(e) => setZone(e.target.value)}>
+              {zones.map((z) => (
+                <option key={z} value={z}>
+                  {z.replace(/_/g, " ")}
+                </option>
+              ))}
+            </NativeSelect>
+            <p className="text-xs text-muted-foreground">Where you slept. Travelling? Pick the zone you were in so the night lands on the right day.</p>
+          </div>
           <div className={field}>
             <label htmlFor="sleep-onset" className={label}>
               Fell asleep (about)
@@ -120,7 +136,7 @@ export function SleepSessionForm({ session, timezone, defaults, returnTo }: { se
             <FieldError id="sleep-awake-minutes-error" message={err("awakeMinutes")} />
           </div>
         </div>
-        <p className="mt-3 text-xs text-muted-foreground">These are your own estimates. Without them, time asleep is taken as time in bed and labelled as such.</p>
+        <p className="mb-3 text-xs text-muted-foreground">These are your own estimates. Without them, time asleep is taken as time in bed and labelled as such.</p>
       </details>
 
       <div className={field}>
