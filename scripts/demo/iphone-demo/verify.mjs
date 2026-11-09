@@ -15,6 +15,8 @@ const srv = http.createServer((req, res) => {
   if (p.endsWith("app.html")) {
     // Served as the artifact wrapper serves it: doctype, charset and viewport, then the page.
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    // PUBLISHED=1: app.html is the page as downloaded from the published artifact (already wrapped), served as is.
+    if (process.env.PUBLISHED === "1") return res.end(fs.readFileSync(p, "utf8"));
     return res.end('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui}img{max-width:100%}[hidden]{display:none!important}</style></head><body>' + fs.readFileSync(p, "utf8") + "</body></html>");
   }
   res.writeHead(200, { "content-type": MIME[path.extname(p)] ?? "application/octet-stream" });
@@ -124,7 +126,7 @@ const frame = () => page.evaluate(() => Array.from(document.querySelectorAll("#c
   let h = 0, lit = 0; for (let i = 0; i < d.length; i += 4 * 37) { h = (h * 31 + d[i] + d[i + 1] * 3 + d[i + 2] * 7) % 1e9; if (d[i] + d[i + 1] + d[i + 2] > 90) lit++; }
   return { h, lit };
 })[0]);
-for (const key of ["/train/exercises/back-squat", "/train/exercises/kettlebell-swing", "state:demo-dialog"]) {
+for (const key of ["/train/exercises/back-squat", "/train/exercises/kettlebell-swing", "state:demo-dialog", "state:demo-dialog-execution", "state:demo-dialog-mistakes"]) {
   await page.evaluate((k) => window.demo.show(window.demo.screens.find((s) => s.key === k)), key);
   await page.waitForTimeout(500);
   const box = page.locator("#col .live2d").first();
@@ -136,6 +138,21 @@ for (const key of ["/train/exercises/back-squat", "/train/exercises/kettlebell-s
   check(`${key}: badge and label as in the app`, /Animated demo/.test(await box.textContent()) && /^Animated demonstration of .+\. .+/.test(label));
 }
 await shot("live-demo-dialog");
+// The demonstration dialog's Setup / Execution / Mistakes tabs lead to each other; Run log's Treadmill pill to its form.
+await page.evaluate(() => window.demo.show(window.demo.screens.find((s) => s.key === "state:demo-dialog")));
+await page.waitForTimeout(500);
+for (const [tab, key] of [["Execution", "state:demo-dialog-execution"], ["Mistakes", "state:demo-dialog-mistakes"], ["Setup", "state:demo-dialog"]]) {
+  await tapHot(`^${tab}$`);
+  const c = await cur();
+  check(`demonstration tab ${tab}`, c.key === key, c.title);
+}
+if (await page.evaluate(() => !!window.demo.screens.find((s) => s.key === "/run?tab=log"))) {
+  await page.evaluate(() => window.demo.show(window.demo.screens.find((s) => s.key === "/run?tab=log")));
+  await page.waitForTimeout(500);
+  await tapHot("^Treadmill$");
+  const c = await cur();
+  check("Run log → Treadmill", c.key === "state:run-treadmill", c.title);
+}
 const ex = await page.evaluate(() => { const l = window.demo.screens.filter((s) => /^\/train\/exercises\/[^/?]+$/.test(s.key)); return [l.length, l.filter((s) => s.hot.some((h) => h.kind === "live")).length]; });
 check("every captured exercise page has its live demonstration", ex[0] > 0 && ex[0] === ex[1], `${ex[1]}/${ex[0]}`);
 // The new-member path (new-member.mjs): Welcome → the five questions → Ready → plan → first workout.
