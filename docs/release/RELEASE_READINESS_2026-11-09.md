@@ -51,8 +51,8 @@ CI does not run the Playwright suites or the combined tree. Those were run local
 | Unit (vitest) | **3,501 passed** of 3,501 (185 files) |
 | Integration (vitest, local Supabase, `db reset`) | **336 passed, 1 skipped** of 337 (53 files + 1 skipped) |
 | Production build | pass |
-| Production e2e (Playwright, Pixel 7 Chromium, production server with the e2e test config) | **Not yet recorded** (run in progress; the result will be added in the next commit) |
-| Demo e2e (Playwright, `DEMO_MODE`, sample account) | **Not yet recorded** (runs after the production suite) |
+| Production e2e (Playwright, Pixel 7 Chromium, production server with the e2e test config) | **123 passed, 0 failed, 99 skipped** of 222 (11.6 min). Skips: 57 demo-only tests (run below), 39 device-matrix and 1 button-sweep audits (opt-in tools), 1 demo-reset (demo servers only), 1 "coach not configured" (correctly skipped when the AI mock is on). Run with `E2E_ANTHROPIC_MOCK_PORT=4777 E2E_OFF_MOCK_PORT=4778`. A first attempt without those two settings was stopped and discarded: it is not a valid configuration (see `REGRESSION_CHECKLIST.md`). |
+| Demo e2e (Playwright, `DEMO_MODE`, sample account) | **57 passed, 1 skipped** of 58 (2.8 min): `achievement-progress`, `demo`, the five `ux-*` specs and `demo-reset`, against a freshly reset and seeded database. The skip is the sleep stage-chart test, which skips itself when the latest sample night has no stages. |
 
 The suites include the checks the owner named for the combined result:
 - **Badge progress:** integration `badge-progress`, `e2e/achievement-progress`, `e2e/rank-badges`.
