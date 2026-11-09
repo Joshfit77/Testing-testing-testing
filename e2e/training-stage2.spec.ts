@@ -166,10 +166,13 @@ test.describe("training stage 2B", () => {
     await signUpAndConfirm(page, uniqueEmail("library-filters"));
     await completeOnboarding(page);
     await page.goto("/train/exercises");
-    await page.getByLabel("Muscle group").selectOption("chest");
-    await page.getByLabel("Difficulty").selectOption("beginner");
-    await page.getByRole("button", { name: "Filter" }).click();
+    // One tap on a muscle chip filters; the rest sit under "More filters".
+    await page.getByRole("navigation", { name: "Muscles" }).getByRole("link", { name: "Chest", exact: true }).click();
     await page.waitForURL(/muscle=chest/);
+    await page.getByText("More filters").click();
+    await page.getByLabel("Difficulty").selectOption("beginner");
+    await page.getByRole("button", { name: "Apply filters" }).click();
+    await page.waitForURL(/difficulty=beginner/);
     expect(page.url()).toMatch(/difficulty=beginner/);
     await expect(page.getByRole("link", { name: /^Push-Up/ })).toBeVisible();
     await expect(page.getByRole("link", { name: /Barbell Bench Press/ })).toHaveCount(0); // intermediate
