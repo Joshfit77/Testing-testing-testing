@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { hideDemoChrome } from "./helpers";
 
 /**
  * First-time-user UX fixes for My Progress and Sleep & Recovery, at phone size, against the demo server
@@ -29,6 +30,7 @@ test.describe("My Progress and Sleep & Recovery at phone size", () => {
     await enterDemo(page);
     await page.goto("/progress/sleep");
     await expect(page.getByTestId("demo-note-sleep")).toBeVisible();
+    await hideDemoChrome(page); // what a production member sees on the first screen
     const card = page.locator('section[aria-labelledby="last-night-title"]');
     await expect(card.getByText(/^\d+h( \d+m)?$|^\d+m$/).first()).toBeInViewport();
     await expect(card.getByText("/ 100", { exact: false }).first()).toBeInViewport();

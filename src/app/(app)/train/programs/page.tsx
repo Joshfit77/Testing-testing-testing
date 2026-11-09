@@ -296,12 +296,12 @@ export default async function ProgramsPage({ searchParams }: { searchParams: Pro
                   <h3 id={`cat-${c.id}`} className="mb-2 font-display text-lg font-bold uppercase leading-tight">
                     {c.label}
                   </h3>
-                  <ul className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                  <ul className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
                     {shown.map((p) => {
                       const locked = !canAccessTier(plan, p.tier);
                       return (
-                        <li key={p.id}>
-                          <Link href={`/train/programs/${p.slug}`} className="card-gold flex h-full flex-col rounded-2xl p-4 hover:brightness-110">
+                        <li key={p.id} className="min-w-0">
+                          <Link href={`/train/programs/${p.slug}`} className="card-gold flex h-full min-w-0 flex-col rounded-2xl p-4 hover:brightness-110">
                             <div className="flex items-start justify-between gap-2">
                               <h4 className="font-display text-xl font-bold leading-tight">{p.name}</h4>
                               {locked ? (

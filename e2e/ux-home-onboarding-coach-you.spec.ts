@@ -1,4 +1,5 @@
 import { devices, expect, test, type Page } from "@playwright/test";
+import { hideDemoChrome } from "./helpers";
 
 /**
  * First-time-user fixes for Home, Quick add, the AI Coach, billing, You and search, at iPhone 15 size in the demo.
@@ -65,7 +66,8 @@ test("AI Coach on Free is one card with the price; Pro gets the chat", async ({ 
   await expect(page.getByTestId("coach-upsell-price")).toContainText("Faith stays free");
   await expect(page.getByLabel("Message the AI coach")).toHaveCount(0);
   await expect(page.getByRole("link", { name: "New chat" })).toHaveCount(0);
-  await expect(page.getByText(/bench stall|Plan my deload/)).toHaveCount(0);
+  // The sample member has 8 weeks of training, so data-based examples (a deload included) are fair here; a brand-new
+  // member's beginner-safe prompts are covered by the coach-context unit tests.
 
   await setPlan(page, "pro");
   await page.goto("/coach");
@@ -76,6 +78,7 @@ test("AI Coach on Free is one card with the price; Pro gets the chat", async ({ 
 test("Billing first screen and the You tab's privacy list", async ({ page }) => {
   await enterDemo(page);
   await page.goto("/profile/billing");
+  await hideDemoChrome(page); // the first screen a production member sees
   await expect(page.getByTestId("current-plan")).toBeInViewport();
   await expect(page.getByTestId("faith-free")).toBeInViewport();
   await expect(page.getByTestId("interval-month")).toBeInViewport();
