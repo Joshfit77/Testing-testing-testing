@@ -26,6 +26,10 @@ separate ideas and are shown separately._
 - A night is **recorded** when every session in it came from Apple Health or Health Connect; the report, hub and
   history then show "Recorded by {device}" and otherwise "Entered by hand". The device is the health platform's
   source name for the stage samples.
+- The platforms don't say whether a record is a night or a nap. An imported record of **3 hours or less that starts
+  between 9 AM and 8 PM** (local clock in the zone the import was made in) is stored as a nap, listed under its own
+  day and never added to a night's totals, score or debt; everything else is a night. Before this rule an afternoon
+  nap was summed into "last night".
 - **Stages** are the device's intervals, untouched. HealthKit's in-bed envelope overlaps the stage samples and is
   never counted as one; one stage writer is kept per night (the source with light/deep/REM detail, then the one with
   the most minutes) and any same-source overlap is clipped to the earlier interval, so the stage total can never
@@ -81,6 +85,7 @@ A rolling estimate over the last 14 nights, kept separate from the nightly score
 - A night over the goal pays back **half** of the extra (`(asleep − goal) × 0.5`), and only against what is still
   owed, so sleeping in never cancels lost sleep hour for hour and the estimate never goes below zero.
 - A night with nothing logged changes nothing; it is shown as "not logged", never as zero sleep.
+- A night without fell-asleep or awake detail counts its time in bed as time asleep, and the table marks it "in bed".
 - Trend: the estimate now against the estimate a week earlier (±60 min = rising/falling), once three nights are logged.
 - Bands: up to 1 h "on track", up to 3 h "a little behind", beyond that "running a deficit".
 

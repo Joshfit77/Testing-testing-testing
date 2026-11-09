@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { Bot, Check, CheckCircle2, ClipboardList, Copy, Loader2, MessageSquare, RotateCcw, Search, Send, Sparkles, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
@@ -80,6 +80,16 @@ function messageTime(iso: string): string {
   if (sameDay(d, now)) return `Today at ${time}`;
   if (sameDay(d, yesterday)) return `Yesterday at ${time}`;
   return `${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })} at ${time}`;
+}
+
+const subscribeNever = () => () => {};
+/**
+ * The time stamp under a message, rendered in the browser only: the server runs on its own clock and time zone, so text
+ * built from "now" there would differ from the member's and break hydration (React #418). Empty on the server pass.
+ */
+function MessageTime({ iso }: { iso?: string }) {
+  const label = useSyncExternalStore(subscribeNever, () => messageTime(iso ?? new Date().toISOString()), () => "");
+  return <p className="mt-1 min-h-4 px-1 text-xs text-muted-foreground">{label}</p>;
 }
 
 /** The coach's gold medallion beside its messages. */
@@ -465,7 +475,7 @@ function CoachChatView({ conversationId: initialId, initialMessages, initialQues
                     {canGeneratePlans ? "Switch to Plan mode to draft a new program you can review before saving." : ""}
                   </p>
                 </div>
-                <p className="mt-1 px-1 text-xs text-muted-foreground">{messageTime(new Date().toISOString())}</p>
+                <MessageTime />
               </div>
             </div>
             <div className="flex flex-wrap gap-2 pl-11" aria-label="Suggested questions">
@@ -510,7 +520,7 @@ function CoachChatView({ conversationId: initialId, initialMessages, initialQues
               )}
               {feedbackEnabled && m.role === "assistant" && !m.id.startsWith("tmp-") && <CoachFeedback messageId={m.id} />}
             </div>
-            <p className="mt-1 px-1 text-xs text-muted-foreground">{messageTime(m.created_at)}</p>
+            <MessageTime iso={m.created_at} />
             </div>
           </div>
         ))}

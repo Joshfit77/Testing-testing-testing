@@ -11,11 +11,13 @@ import {
 import { CARDIO_MODALITIES, COMBINABLE_TYPES, CUSTOM_PROGRAM_TYPES, CUSTOM_TYPES, SHOW_DIVISIONS, weeksRange } from "@/lib/domain/custom-programs";
 import { COMBINE_GOALS } from "@/lib/domain/combined-goals";
 import { ACTIVITY_LEVELS, isWeeklyRate } from "@/lib/domain/calorie-budget";
+import { isValidIsoDate } from "@/lib/domain/dates";
 import { SESSION_MINUTES } from "@/lib/domain/starter-program";
 import { FAITH_REMINDER_KINDS } from "@/lib/faith-reminders";
 import { APP_REMINDER_KINDS, WATER_INTERVALS } from "@/lib/notifications/catalog";
 
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
+// A real calendar date, not just the shape of one: "2026-02-30" used to pass and fail only at the database.
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD").refine(isValidIsoDate, "Use a real calendar date (YYYY-MM-DD)");
 const optionalNumber = (min: number, max: number) =>
   z.preprocess((v) => (v === "" || v === null || v === undefined ? null : Number(v)), z.number().min(min).max(max).nullable());
 

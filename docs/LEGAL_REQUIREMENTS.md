@@ -91,8 +91,8 @@
   - AI coach answers are general information, may be wrong, and suggested changes apply only when the member confirms them.
   - Calorie and photo-free food estimates are approximate.
 - **Subscriptions:**
-  - Free / Plus $11.99 per month / Pro $24.99 per month;
-  - yearly Plus $99.99 / Pro $249.99 when offered;
+  - Free / Pro All Access $19.99 per month or $149.99 per year;
+  - legacy Plus $11.99 per month, for members who subscribed before the October 2026 plan change only;
   - auto-renewal, cancellation, access until the end of the paid period;
   - price changes with notice;
   - what each plan includes, and the AI message allowance (Pro 150 per month).

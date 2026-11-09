@@ -6,7 +6,7 @@
  * HealthKit returns a list of samples per sleep category (an "in bed" envelope and asleep/awake/stage segments) that
  * may overlap; Health Connect returns a session with stage segments. Both arrive as HealthSample-like objects here.
  */
-import type { SleepSource, SleepVitals, VitalStat } from "@/lib/domain/sleep";
+import { clockMinutesInTz, type SleepKind, type SleepSource, type SleepVitals, type VitalStat } from "@/lib/domain/sleep";
 
 export type PlatformSleepState = "inBed" | "asleep" | "awake" | "rem" | "deep" | "light";
 
@@ -52,6 +52,57 @@ export const MERGE_GAP_MINUTES = 30;
 /** A record shorter than this is noise, not sleep. */
 export const MIN_IMPORT_MINUTES = 10;
 export const MAX_IMPORT_HOURS = 24;
+/**
+ * Health platforms don't say whether a record is a night or a nap. A record this short that starts in the daytime
+ * (local clock, in the zone the import was made in) is kept as a nap, so it is listed under its own day and never
+ * added to the night's totals, score or debt. Anything longer, or starting in the evening or night, is a night.
+ */
+export const NAP_MAX_MINUTES = 3 * 60;
+export const NAP_START_FROM_MINUTES = 9 * 60;
+export const NAP_START_UNTIL_MINUTES = 20 * 60;
+
+export function importedSessionKind(startedAt: string, endedAt: string, timeZone: string): SleepKind {
+  const minutes = (Date.parse(endedAt) - Date.parse(startedAt)) / 60_000;
+  if (!Number.isFinite(minutes) || minutes > NAP_MAX_MINUTES) return "night";
+  const start = clockMinutesInTz(startedAt, timeZone);
+  return start >= NAP_START_FROM_MINUTES && start < NAP_START_UNTIL_MINUTES ? "nap" : "night";
+}
+
+export type StoredStage = "awake" | "light" | "deep" | "rem" | "asleep" | "unknown";
+
+export interface StageShares {
+  /** Minutes in every non-awake interval added up. */
+  asleepMinutes: number;
+  awakeMinutes: number;
+  /** Minutes and share of time asleep per stage; null when the device recorded no interval of that stage. */
+  deep: { minutes: number; pct: number } | null;
+  rem: { minutes: number; pct: number } | null;
+  light: { minutes: number; pct: number } | null;
+  /** Sleep the device didn't split into stages ("asleep", stage not given). */
+  unlabelled: { minutes: number; pct: number } | null;
+  /** True when at least one light, deep or REM interval exists; false for a bare asleep/awake record. */
+  staged: boolean;
+}
+
+/**
+ * Totals and shares from stored stage intervals, for the AI coach. A stage the device never recorded is null, not
+ * zero: a phone's bare "asleep" record says nothing about deep or REM sleep. Returns null without any sleeping interval.
+ */
+export function stageShares(rows: { stage: StoredStage; startedAt: string; endedAt: string }[]): StageShares | null {
+  const minutes: Partial<Record<StoredStage, number>> = {};
+  for (const r of rows) {
+    const m = (Date.parse(r.endedAt) - Date.parse(r.startedAt)) / 60_000;
+    if (!Number.isFinite(m) || m <= 0) continue;
+    minutes[r.stage] = (minutes[r.stage] ?? 0) + m;
+  }
+  const asleep = Math.round((Object.keys(minutes) as StoredStage[]).filter((k) => k !== "awake").reduce((acc, k) => acc + (minutes[k] ?? 0), 0));
+  if (!asleep) return null;
+  const part = (k: StoredStage) => (minutes[k] ? { minutes: Math.round(minutes[k]!), pct: Math.round((minutes[k]! / asleep) * 100) } : null);
+  const deep = part("deep");
+  const rem = part("rem");
+  const light = part("light");
+  return { asleepMinutes: asleep, awakeMinutes: Math.round(minutes.awake ?? 0), deep, rem, light, unlabelled: part("asleep"), staged: Boolean(deep || rem || light) };
+}
 
 const ms = (iso: string) => Date.parse(iso);
 const STAGE_MAP: Record<PlatformSleepState, ImportedStage | null> = { inBed: null, asleep: "asleep", awake: "awake", rem: "rem", deep: "deep", light: "light" };

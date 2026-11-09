@@ -6,8 +6,10 @@ import { completeOnboarding, serviceRest, signUpAndConfirm, uniqueEmail, userIdF
  * The discipleship features end to end, on a Free account: choosing a reading journey (daily load shown first, the
  * rule acknowledged), the two required daily check-ins, an automatic restart after a missed prayer, the optional
  * goals tracked separately, Scripture memory, a guided study, the prayer journal's new kinds, and the Bible study
- * helper against a local stand-in for the AI API (the app server runs with ANTHROPIC_BASE_URL at port 4777).
+ * helper against a local stand-in for the AI API (the app server runs with ANTHROPIC_BASE_URL pointing at
+ * E2E_ANTHROPIC_MOCK_PORT, the same port coach.spec.ts uses; 4777 when unset).
  */
+const BIBLE_MOCK_PORT = Number(process.env.E2E_ANTHROPIC_MOCK_PORT ?? 4777);
 const RULE = "If you miss your daily Bible reading or prayer, your current journey restarts at Day 1. Your previous reading history and notes will still be saved.";
 
 test.describe("Faith discipleship", () => {
@@ -158,10 +160,10 @@ test.describe("Faith discipleship", () => {
       });
       await new Promise<void>((resolve, reject) => {
         mock!.once("error", reject);
-        mock!.listen(4777, "127.0.0.1", () => resolve());
+        mock!.listen(BIBLE_MOCK_PORT, "127.0.0.1", () => resolve());
       });
     } catch {
-      test.skip(true, "port 4777 is in use (another AI mock is running)");
+      test.skip(true, `port ${BIBLE_MOCK_PORT} is in use (another AI mock is running)`);
     }
     try {
       await signUpAndConfirm(page, uniqueEmail("ask"));

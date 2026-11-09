@@ -27,10 +27,13 @@ BASE=http://localhost:3000 node scripts/demo/iphone-demo/crawl.mjs cap 520      
 npm run demo:reset && FLOWS=1 node scripts/demo/iphone-demo/crawl.mjs cap 600     # optional: re-do only the flows
 BASE=http://localhost:3000 node scripts/demo/iphone-demo/live.mjs cap             # where each live demonstration sits
 BASE=http://localhost:3000 node scripts/demo/iphone-demo/new-member.mjs cap       # the new-member path (new local account)
+BASE=http://localhost:3000 node scripts/demo/iphone-demo/extras.mjs cap           # in-page states links cannot reach (Run log → Treadmill)
 npm run demo:reset                                                                # the sample account back to its start
 node scripts/demo/iphone-demo/engine.mjs out                                      # out/ngf.js: the app's 2D engine
 python3 -I scripts/demo/iphone-demo/build.py cap out 88                           # out/app.html, out/s, out/opening, out/fonts
+#   it warns when the set needs more than 511 files; then lower MAX_SCREENS (462 on 2026-11-09, for 508 files) and run it again
 node scripts/demo/iphone-demo/verify.mjs out out-shots                            # taps through it at iPhone size
+PUBLISHED=1 node scripts/demo/iphone-demo/verify.mjs pub pub-shots              # the same on the page downloaded from the artifact (app.html = its index.html)
 ```
 
 `out/app.html` is the page, published as a claude.ai artifact with `out/files.json`'s files (`s/*`, `opening/*`,
@@ -51,6 +54,8 @@ the new one, or they stay and count against the 511).
 - `new-member.mjs`: "Start as a new member" on the welcome screen (a fresh demo account in the local database): each
   of the five questions as asked and as answered, Ready, the first optional question, the plan, the first workout
   screen and the member's own tabs, wired like the app (answers fill the step in, Continue goes on, Back goes back).
+- `extras.mjs`: signs in to the sample account and captures states inside a page that only a button reaches (the Run
+  log with Treadmill chosen), wired to the buttons that switch between them.
 - `engine.mjs`: bundles `src/lib/exercise-motion` and `src/data/exercises` (esbuild, IIFE, global `NGF`).
 - `build.py`: PNG → WebP (q88; pictures taller than WebP's limit are split and stacked), tap targets clipped to the
   phone's width, long date series and the Bible's book pages cut to a few each so the set fits 511 files (a tap on a

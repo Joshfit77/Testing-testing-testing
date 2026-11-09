@@ -114,6 +114,8 @@ for f in os.listdir(f"{out}/s"):
     if f.endswith(".webp") and f not in used:
         os.remove(f"{out}/s/{f}"); files.pop(f"s/{f}", None)
 json.dump(files, open(f"{out}/files.json", "w"), indent=0)
+if len(files) + 1 > 511:  # the page itself is one more file
+    print(f"WARNING: {len(files) + 1} files: a version holds at most 511; lower MAX_SCREENS and build again")
 json.dump(wide, open(f"{out}/wide.json", "w"))
 if wide: print("pages wider than the phone (cropped):", wide)
 tot = sum(files.values())

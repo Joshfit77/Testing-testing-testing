@@ -12,11 +12,28 @@ export async function getEmailLink(to: string, pattern: RegExp, timeoutMs = 20_0
       const msg = (await (await fetch(`${MAILPIT}/api/v1/message/${list.messages[0]!.ID}`)).json()) as { HTML: string; Text: string };
       const body = `${msg.HTML}\n${msg.Text}`.replace(/&amp;/g, "&");
       const link = body.match(pattern)?.[0];
-      if (link) return link;
+      if (link) return retargetAppLink(link);
     }
     await new Promise((r) => setTimeout(r, 500));
   }
   throw new Error(`No email for ${to}`);
+}
+
+/**
+ * Supabase builds e-mail links from its own `site_url` (http://localhost:3000 locally). When the suite runs against an
+ * app on another port (E2E_BASE_URL), a link into the app is re-pointed at that server; Supabase's own /auth/v1/verify
+ * links are left alone.
+ */
+export function retargetAppLink(link: string): string {
+  const base = process.env.E2E_BASE_URL;
+  if (!base) return link;
+  const target = new URL(base);
+  const url = new URL(link);
+  if (url.hostname !== "localhost" && url.hostname !== "127.0.0.1") return link;
+  if (url.port === "54321") return link;
+  url.protocol = target.protocol;
+  url.host = target.host;
+  return url.toString();
 }
 
 export function uniqueEmail(prefix = "e2e") {
@@ -43,7 +60,9 @@ export async function signUpAndConfirm(page: Page, email: string, name = "Test A
   await page.getByRole("button", { name: "Create account" }).click();
   await page.getByText("Check your inbox").waitFor();
   const link = await getEmailLink(email, CONFIRMATION_LINK);
-  await page.goto(link);
+  // Supabase's site_url is http://localhost:3000; when the suite runs against another port (E2E_BASE_URL), follow the
+  // app's confirmation link on that server instead (the token is verified by Supabase, not by the origin).
+  await page.goto(link.replace(/^http:\/\/localhost:3000(?=\/)/, new URL(page.url()).origin));
 }
 
 export interface OnboardingAnswers {
