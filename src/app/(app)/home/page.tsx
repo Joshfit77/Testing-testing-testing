@@ -31,6 +31,7 @@ import { addDays, isoDateInTz } from "@/lib/domain/dates";
 import { loadProgramSchedule } from "@/server/services/schedule";
 import { buildWeeklyActivity } from "@/lib/domain/activity-week";
 import { verseExcerpt } from "@/lib/domain/scripture";
+import { todayWorkoutLink } from "./today-workout/link";
 import { scriptureParts } from "@/server/bible/text";
 import { ScriptureText } from "@/components/bible/scripture-text";
 import { loadReadingState } from "@/server/services/bible";
@@ -91,7 +92,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const readinessLabel = !readiness || !readinessToday ? "Check in" : readinessBand(readiness.score) === "high" ? "Ready" : readinessBand(readiness.score) === "moderate" ? "Go easy" : "Rest";
   const showScripture = profile.home_scripture ?? true;
   const verse = scriptureForDate(data.today);
-  const startHref = active?.today ? `/train/workout?day=${active.today.id}&up=${active.userProgramId}` : "/train/workout?blank=1";
+  const todayWorkout = todayWorkoutLink(active, schedule, data.today);
+  const startHref = todayWorkout.href;
   const weeklyTarget = active?.daysPerWeek ?? answers?.days_per_week ?? null;
   const sessionsThisWeek = weekly.workouts.length;
   const todayLong = new Date(`${data.today}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
@@ -314,7 +316,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             </span>
             <span className="flex items-center gap-0.5">
               <SearchButton />
-              <QuickAddButton userId={user.id} today={data.today} />
+              <QuickAddButton userId={user.id} today={data.today} todayWorkout={todayWorkout} />
               <CoachButton />
             </span>
           </header>
