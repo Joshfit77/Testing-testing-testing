@@ -6,9 +6,10 @@ import { EmptyState } from "@/components/common/states";
 import { BackLink } from "@/components/platform/back-link";
 import { Button } from "@/components/ui/button";
 import type { BestSet } from "@/lib/domain/exercise-history";
-import { exerciseMilestone } from "@/lib/domain/exercise-milestones";
+import { activityKindFor, exerciseMilestone } from "@/lib/domain/exercise-milestones";
 import { ExerciseMilestoneCard } from "@/components/train/exercise-milestone";
-import { loadExerciseHistory } from "@/server/services/exercise-history";
+import { loadExerciseHistory, loadMilestoneActivities } from "@/server/services/exercise-history";
+import { RECORD_TERMS } from "@/lib/domain/record-labels";
 import { formatDistance } from "@/lib/domain/exercise-tracking";
 import { hasFeature } from "@/lib/domain/plans";
 import { summarizeSets } from "@/lib/domain/previous-performance";
@@ -19,16 +20,21 @@ import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 
 export const metadata = { title: "Exercise history" };
 
-function bestText(b: BestSet, units: UnitSystem): string {
+/**
+ * The history's headline best, in the app's shared terms. For weight × reps sets it is the best estimated 1RM, a
+ * calculation, so it is labelled as one and shows the set it came from; the heaviest weight actually lifted is the
+ * milestone card's "Heaviest lift" above it, so the two never compete for the same name.
+ */
+function bestHeadline(b: BestSet, units: UnitSystem): { title: string; value: string; from: string | null } {
   switch (b.kind) {
     case "e1rm":
-      return `${formatWeight(b.weightKg, units)} × ${b.reps} (estimated 1RM ${formatWeight(b.e1rmKg, units)})`;
+      return { title: `Best ${RECORD_TERMS.estimated_1rm}`, value: formatWeight(b.e1rmKg, units), from: `Calculated from ${formatWeight(b.weightKg, units)} × ${b.reps}` };
     case "reps":
-      return `${b.reps} reps`;
+      return { title: RECORD_TERMS.max_reps, value: `${b.reps} reps`, from: null };
     case "duration":
-      return formatDuration(b.seconds);
+      return { title: RECORD_TERMS.max_duration, value: formatDuration(b.seconds), from: null };
     case "distance":
-      return `${formatDistance(b.metres, units)}${b.weightKg ? ` with ${formatWeight(b.weightKg, units)}` : ""}`;
+      return { title: RECORD_TERMS.max_distance, value: formatDistance(b.metres, units), from: b.weightKg ? `With ${formatWeight(b.weightKg, units)}` : null };
   }
 }
 
@@ -38,9 +44,14 @@ export default async function ExerciseHistoryPage({ params }: { params: Promise<
   const supabase = await getServerSupabase();
   const { data: ex } = await supabase.from("exercises").select("id, slug, name, is_timed").eq("slug", slug).maybeSingle();
   if (!ex) notFound();
-  const [plan, history] = await Promise.all([getUserPlan(user.id), loadExerciseHistory(supabase, user.id, ex.id as string)]);
+  const actKind = activityKindFor(ex.slug as string);
+  const [plan, history, activities] = await Promise.all([
+    getUserPlan(user.id),
+    loadExerciseHistory(supabase, user.id, ex.id as string),
+    actKind ? loadMilestoneActivities(supabase, user.id, actKind) : Promise.resolve([]),
+  ]);
   const units = profile.unit_system;
-  const milestone = exerciseMilestone(history.sessions, { slug: ex.slug as string, name: ex.name as string }, units);
+  const milestone = exerciseMilestone(history.sessions, { slug: ex.slug as string, name: ex.name as string }, units, { activities });
   const advanced = hasFeature(plan, "advanced_analytics");
   const tz = profile.timezone ?? "UTC";
   const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: tz });
@@ -61,7 +72,7 @@ export default async function ExerciseHistoryPage({ params }: { params: Promise<
       {history.sessions.length === 0 ? (
         <EmptyState
           title="No sets logged yet"
-          description="Log this exercise in a workout and your best set, estimated 1RM trend and recent sessions will appear here."
+          description="Log this exercise in a workout and your heaviest lift, estimated 1RM trend and recent sessions will appear here."
           action={
             <Button asChild variant="secondary">
               <Link href="/train/workout?blank=1">Start a workout</Link>
@@ -70,17 +81,24 @@ export default async function ExerciseHistoryPage({ params }: { params: Promise<
         />
       ) : (
         <>
-          {history.best && (
-            <section className="rounded-2xl border border-gold-muted/60 bg-gold/5 p-4" aria-labelledby="best-title">
-              <h2 id="best-title" className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-gold-highlight">
-                <Trophy className="size-4" aria-hidden /> Best set
-              </h2>
-              <p className="mt-1 text-lg font-semibold" data-testid="best-set">
-                {bestText(history.best, units)}
-              </p>
-              <p className="text-xs text-muted-foreground">{fmtDate(history.best.date)}</p>
-            </section>
-          )}
+          {history.best &&
+            (() => {
+              const h = bestHeadline(history.best, units);
+              return (
+                <section className="rounded-2xl border border-gold-muted/60 bg-gold/5 p-4" aria-labelledby="best-title">
+                  <h2 id="best-title" className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-gold-highlight">
+                    <Trophy className="size-4" aria-hidden /> {h.title}
+                  </h2>
+                  <p className="mt-1 text-lg font-semibold" data-testid="best-set">
+                    {h.value}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {h.from ? `${h.from} · ` : ""}
+                    {fmtDate(history.best.date)}
+                  </p>
+                </section>
+              );
+            })()}
 
           {history.trend.length > 0 &&
             (advanced ? (

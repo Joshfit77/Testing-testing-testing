@@ -23,6 +23,62 @@ Ranks are worked out from the activity a person has already saved. They're never
 > Note: this reverses the earlier rule that faith activity is never scored (SPEC §12, checklist 12.18), at the
 > owner's request. The ranks count days of taking part only.
 
+## Badge progress, personal bests and milestones (2026-11-09)
+
+Everything here is worked out from saved data on every view, like the ranks: nothing is stored as an award, so an
+edited or deleted workout or run moves it back, a retried save never awards twice, and nobody can award themselves.
+Free and Pro members see the same badge progress and milestones (trend charts stay Pro).
+
+**Badge progress.** Every one of the "More achievements" badges shows how far along it is: a percentage, what is left
+("3 workouts remaining", "2 more weeks in a row", "40 lb to go"), and "Unlocked · date" once earned. Locked badges are
+listed closest-to-earned first (`badgeRemaining`, `badgePercent` in `src/lib/domain/achievements.ts`).
+
+**One set of words for personal bests** (`src/lib/domain/record-labels.ts`, used by the milestone card, the workout
+summary, the history page, My Progress and the muscle map):
+
+| Term | Meaning |
+| --- | --- |
+| Heaviest lift | The most weight completed for at least one rep (record type `max_weight`). A weight actually lifted. |
+| Estimated 1RM | A calculation (Epley) from a set's weight and reps (`estimated_1rm`). It can exceed anything lifted, so it is always called "estimated", and the history page shows the set it was calculated from. |
+| Most reps / Most reps at bodyweight | The most reps in one set; for bodyweight exercises, sets with no added weight. |
+| Heaviest added weight | The most weight added to a bodyweight exercise (weighted pull-ups, dips) for at least one rep. |
+| Longest hold / Longest session | The longest timed set of a hold (plank, hang) / of cardio logged by time. |
+| Longest run / walk / distance | The longest single effort. |
+
+**Next milestone** (`src/lib/domain/exercise-milestones.ts`, card in `src/components/train/exercise-milestone.tsx`), on
+each exercise page, its history page and, for runs and walks, the Run tab. The metric follows how the exercise is
+measured (from the exercise catalog), and the next target is a round number one sensible step above the best:
+
+| Exercise | Metric | Notes |
+| --- | --- | --- |
+| Weight × reps lifts | Heaviest lift | 5 / 10 / 25 lb or 2.5 / 5 / 10 kg steps by size of the lift |
+| Bodyweight (push-ups, pull-ups, dips, inverted rows) | Most reps at bodyweight, and Heaviest added weight as a second track | The two tracks never override each other: one weighted set doesn't hide the rep count, and weighted reps don't count as bodyweight reps |
+| Holds (plank, hangs) | Longest hold | "Hold 0:08 longer…" |
+| Cardio logged by time | Longest session | "Keep going 5:00 longer…", never "hold" |
+| Carries, sleds | Longest distance (yd / m) | load shown as context |
+| Runs and walks (zone-2 run, intervals, run-walk, brisk walk) | Longest run / walk (mi / km) | Every saved activity on the Run tab counts: GPS (Pro), treadmill and entered by hand (Free and Pro), plus any distance logged on the exercise's own sets. A guided GPS program run saves its sets by time only; its distance comes from the run itself. Time-only entries and deleted runs don't count. |
+
+The Run tab shows "Next run milestone" and "Next walk milestone" cards from the same data.
+
+**Complete history, never capped.** Histories are read in full (`loadExerciseHistories`, paged past the API's
+1,000-row limit), so an all-time best from years ago is never forgotten. The same paging now applies to the
+personal-record rebuild after an edit or delete (`rebuildRecords`) and to the run records list
+(`listRunsForRecords`), which previously stopped at the first 1,000 rows.
+
+**Milestone reached.** When a finished workout meets the target its exercise card was showing, the Workout Complete
+screen shows a "Milestone reached" card (`src/components/train/milestone-celebration.tsx`): a gold medallion, one soft
+ring of light and one sheen across the card, played once, with the confetti. With reduced motion (device setting or
+the app's own) nothing moves and the card simply appears; it is announced to screen readers as a status. It is worked
+out from the saved history (`reachedMilestones`), so a retried save shows the same result and nothing is stored.
+Each track is reported separately (for example both "Most reps at bodyweight: 12 reps" and "Heaviest added weight:
+25 lb").
+
+**Tests.** `tests/unit/exercise-milestones.test.ts` (each metric, runs from every source, weighted bodyweight, long
+histories, edits and deletes, reached milestones), `tests/unit/achievements.test.ts`,
+`tests/integration/badge-progress.test.ts` (against the database: edit and delete move badges, records and milestones
+back; a retried save; runs from the Run tab and a deleted one; a 1,050-session history read in full) and
+`e2e/achievement-progress.spec.ts` (demo mode).
+
 ## Thresholds (proposed — please confirm)
 
 The existing badge thresholds are reused where they exist. The rest are proposals, and every number lives in

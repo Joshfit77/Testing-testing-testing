@@ -42,18 +42,27 @@ export async function getActivity(supabase: SupabaseClient, userId: string, id: 
   return data ? normalise(data as Raw) : null;
 }
 
-/** Every live run, for personal bests (summary columns only). */
+/**
+ * Every live run, for personal bests (summary columns only). Paged: the API returns at most 1,000 rows per request,
+ * so a single capped request silently dropped every run after the first 1,000 and with them any record they held.
+ */
 export async function listRunsForRecords(supabase: SupabaseClient, userId: string): Promise<ActivityRow[]> {
-  const { data, error } = await supabase
-    .from("activities")
-    .select(COLUMNS)
-    .eq("user_id", userId)
-    .eq("kind", "run")
-    .is("deleted_at", null)
-    .order("started_at", { ascending: true })
-    .limit(5000);
-  if (error) throw error;
-  return ((data ?? []) as Raw[]).map(normalise);
+  const PAGE = 1000;
+  const out: ActivityRow[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from("activities")
+      .select(COLUMNS)
+      .eq("user_id", userId)
+      .eq("kind", "run")
+      .is("deleted_at", null)
+      .order("started_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    out.push(...((data ?? []) as Raw[]).map(normalise));
+    if (!data || data.length < PAGE) return out;
+  }
 }
 
 export interface ActivityGpsDetail {

@@ -33,6 +33,9 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { hasFeature } from "@/lib/domain/plans";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { listActivities, listRunsForRecords } from "@/server/services/activities";
+import { loadMilestoneActivities } from "@/server/services/exercise-history";
+import { activityMilestone } from "@/lib/domain/exercise-milestones";
+import { ExerciseMilestoneCard } from "@/components/train/exercise-milestone";
 import { programDays } from "@/server/services/training";
 
 export const metadata = { title: "Run" };
@@ -171,13 +174,18 @@ async function Overview({ userId, tz, unit, thisWeek, today, supabase }: { userI
   const since = localToUtcIso(addDays(thisWeek, -1), "00:00", tz) ?? `${addDays(thisWeek, -1)}T00:00:00Z`;
   const chartStart = addDays(thisWeek, -7 * 11);
   const chartSince = localToUtcIso(chartStart, "00:00", tz) ?? `${chartStart}T00:00:00Z`;
-  const [recent, runs, { data: programs }, twelveWeeks, { data: goalRows }] = await Promise.all([
+  const [recent, runs, { data: programs }, twelveWeeks, { data: goalRows }, distanceActs] = await Promise.all([
     listActivities(supabase, userId, { since }),
     listRunsForRecords(supabase, userId),
     supabase.from("training_programs").select("slug, name, tier").eq("is_published", true).in("slug", RUN_PROGRAMS.map((p) => p.slug)),
     listActivities(supabase, userId, { since: chartSince, limit: 1000 }),
     supabase.from("running_goals").select("id, kind, distance_m, target_s, created_at").eq("user_id", userId).is("archived_at", null).order("created_at"),
+    // Every run and walk with a distance, GPS, treadmill or by hand, Free and Pro alike: the distance milestones.
+    loadMilestoneActivities(supabase, userId),
   ]);
+  const units = unit === "mi" ? "imperial" : "metric";
+  const runMilestone = activityMilestone(distanceActs, "run", units);
+  const walkMilestone = activityMilestone(distanceActs, "walk", units);
   const week = totalsForWeek(recent, tz, thisWeek);
   const bests = personalBests(runs);
   // Weekly distance and average run pace over the last 12 weeks (empty weeks included).
@@ -300,6 +308,16 @@ async function Overview({ userId, tz, unit, thisWeek, today, supabase }: { userI
           connectNulls={false}
           emptyMessage="Pace shows once you have runs with a distance."
         />
+      </section>
+
+      <section aria-labelledby="run-milestones" className="space-y-2" data-testid="run-milestones">
+        <h2 id="run-milestones" className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">
+          Milestones
+        </h2>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <ExerciseMilestoneCard milestone={runMilestone} name="Run" timeZone={tz} title="Next run milestone" testId="run-milestone" />
+          <ExerciseMilestoneCard milestone={walkMilestone} name="Walk" timeZone={tz} title="Next walk milestone" testId="walk-milestone" />
+        </div>
       </section>
 
       <section aria-labelledby="run-goal-list" className="space-y-2">

@@ -31,13 +31,15 @@ for (const size of sizes) {
   test.describe(`achievement progress at ${size.name} size`, () => {
     test.use(size.use);
 
-    test("a lift shows its personal best and the next weight milestone above it", async ({ page }) => {
+    test("a lift shows its heaviest lift and the next weight milestone above it", async ({ page }) => {
       await enterDemo(page);
       await page.goto("/train/exercises/back-squat/history");
       const card = page.getByTestId("exercise-milestone");
       await expect(card).toBeVisible();
       await expect(card.getByRole("heading", { name: "Next milestone" })).toBeVisible();
-      await expect(card.getByText("Personal best")).toBeVisible();
+      await expect(card.getByTestId("milestone-primary-label")).toHaveText("Heaviest lift");
+      // The history headline is the estimated 1RM, named as an estimate, never as a lift or a "best set".
+      await expect(page.getByRole("heading", { name: /Best Estimated 1RM/i })).toBeVisible();
       const target = await card.getByTestId("milestone-target").textContent();
       expect(target).toMatch(/ lb$/);
       await expect(card.getByRole("progressbar")).toBeVisible();
@@ -72,8 +74,29 @@ for (const size of sizes) {
       await page.goto("/train/exercises/goblet-squat");
       const card = page.getByTestId("exercise-milestone");
       await expect(card.getByRole("heading", { name: "First milestone" })).toBeVisible();
-      await expect(card.getByText("Log your first set")).toBeVisible();
+      await expect(card.getByText("Set your starting point")).toBeVisible();
       await expect(card.getByTestId("milestone-target")).toHaveCount(0);
+    });
+
+    test("the Run tab shows the next run and walk milestones from saved runs and walks", async ({ page }) => {
+      await enterDemo(page);
+      await page.goto("/run");
+      const run = page.getByTestId("run-milestone");
+      await expect(run).toBeVisible();
+      await expect(run.getByTestId("milestone-primary-label")).toHaveText("Longest run");
+      await expect(run.getByTestId("milestone-target")).toHaveText(/^[\d.]+ mi$/);
+      await expect(run.getByTestId("milestone-message")).toHaveText(/^Go [\d.]+ mi farther than your longest run to reach [\d.]+ mi\.$/);
+      await expect(page.getByTestId("walk-milestone")).toBeVisible();
+      await fitsWidth(page);
+    });
+
+    test("a zone-2 run exercise counts runs saved on the Run tab, by distance, never as a hold", async ({ page }) => {
+      await enterDemo(page);
+      await page.goto("/train/exercises/zone-2-run");
+      const card = page.getByTestId("exercise-milestone");
+      await expect(card.getByTestId("milestone-primary-label")).toHaveText("Longest run");
+      await expect(card.getByTestId("milestone-target")).toHaveText(/^[\d.]+ mi$/);
+      await expect(card.getByTestId("milestone-message")).not.toHaveText(/hold/i);
     });
 
     test("badges show progress, percentage and what remains; earned ones say Unlocked", async ({ page }) => {
