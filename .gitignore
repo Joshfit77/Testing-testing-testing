@@ -51,3 +51,7 @@ service-account*.json
 
 # AI coach evaluation runs (scripts/ai-eval): transcripts and model output, kept local
 ai-eval-results/
+
+# UX measurement tooling: local sign-in for the seeded occasional member, and run output
+scripts/ux/occasional.env
+scripts/ux/out/
