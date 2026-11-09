@@ -113,3 +113,41 @@ for (const size of sizes) {
     });
   });
 }
+
+test.describe("milestone celebration at iPhone size", () => {
+  test.use(sizes[0]!.use);
+
+  test("finishing a workout that reaches a milestone celebrates it without pushing the page wider than the phone", async ({ page }) => {
+    await enterDemo(page);
+    // The next bench milestone from the member's saved history: logging it in today's workout reaches it.
+    await page.goto("/train/exercises/bench-press/history");
+    const target = value(await page.getByTestId("exercise-milestone").getByTestId("milestone-target").textContent());
+    expect(target).toBeGreaterThan(0);
+
+    await page.goto("/train");
+    await page.locator("main").getByRole("link", { name: /Start workout|Start today's workout|Start/ }).first().click();
+    await page.waitForURL(/\/train\/workout/);
+    const card = page.getByTestId("current-set-card");
+    await expect(card).toContainText(/Bench Press/);
+    await card.getByLabel("Weight (lb)").fill(String(target));
+    await card.getByLabel("Reps", { exact: true }).fill("1");
+    await card.getByTestId("complete-set").click();
+    await page.getByRole("button", { name: "Finish", exact: true }).click();
+
+    // Watch the page width on every frame while the completion screen and its cards animate in.
+    await page.evaluate(() => {
+      const w = window as unknown as { __maxOverflow: number };
+      w.__maxOverflow = 0;
+      const tick = () => {
+        w.__maxOverflow = Math.max(w.__maxOverflow, document.documentElement.scrollWidth - document.documentElement.clientWidth);
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    await page.getByRole("button", { name: "Finish & save" }).click();
+    await expect(page.getByRole("heading", { name: /Workout complete/i })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText("Milestone reached")).toBeVisible();
+    await page.waitForTimeout(2_000);
+    expect(await page.evaluate(() => (window as unknown as { __maxOverflow: number }).__maxOverflow)).toBeLessThanOrEqual(1);
+  });
+});

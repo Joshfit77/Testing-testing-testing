@@ -95,6 +95,8 @@
   --animate-toast-out: toast-out 0.2s ease-in both;
   --animate-page-in: page-in 0.32s cubic-bezier(0.2, 0.8, 0.3, 1) both;
   --animate-bounce-in: bounce-in 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
+  /* For full-width cards: grows to its own size and never past it, so it can't push the page wider than the phone. */
+  --animate-card-in: card-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 
   @keyframes fade-up {
     from {
@@ -201,6 +203,16 @@
     }
     100% {
       transform: scale(1);
+    }
+  }
+  @keyframes card-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px) scale(0.94);
+    }
+    to {
+      opacity: 1;
+      transform: none;
     }
   }
   @keyframes shimmer {
@@ -1274,7 +1286,7 @@ html[data-workout-focus="1"] nav[aria-label="Main sections"] {
   pointer-events: none;
 }
 .milestone-card {
-  animation: bounce-in 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.3) 0.15s both;
+  animation: card-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) 0.15s both;
 }
 @keyframes milestone-ring {
   0% { opacity: 0.9; transform: scale(1); }

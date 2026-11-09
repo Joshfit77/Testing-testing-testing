@@ -635,7 +635,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
         })()}
         <MilestoneCelebration milestones={result.milestones} />
         {result.records.some((r) => !r.first) && (
-          <section className="card-gold-strong animate-bounce-in rounded-2xl p-4 text-left [animation-delay:250ms]" aria-labelledby="prs-title">
+          <section className="card-gold-strong animate-card-in rounded-2xl p-4 text-left [animation-delay:250ms]" aria-labelledby="prs-title">
             <h2 id="prs-title" className="flex items-center gap-2 font-display text-lg font-bold text-gold-gradient">
               <Trophy className="size-5 text-gold" aria-hidden /> New Personal Record!
             </h2>
