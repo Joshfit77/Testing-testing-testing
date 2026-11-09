@@ -1,5 +1,5 @@
 // Performance check for the pages the first-time UX work changed, on the demo sample account (the largest history).
-//   BASE=http://localhost:3000 node scripts/ux/perf.mjs <out.json> [runs=3]
+//   BASE=http://localhost:3000 [ROUTES=/home,/run] node scripts/ux/perf.mjs <out.json> [runs=3]
 // Each page is loaded fresh `runs` times at iPhone 15 Pro size with the CPU slowed 4x (Chrome DevTools throttling, a
 // rough stand-in for a mid-range phone, not a device measurement). Per page it records the median of: time to the
 // load event and to network idle, DOM elements, JS heap after load, and main-thread long tasks (>50 ms) during load.
@@ -7,11 +7,13 @@
 import { chromium, devices } from "playwright";
 import fs from "node:fs";
 const BASE = process.env.BASE ?? "http://localhost:3000", OUT = process.argv[2], RUNS = Number(process.argv[3] ?? 3);
-const ROUTES = [
+const ALL_ROUTES = [
   ["/home", false], ["/train/programs", false], ["/train/exercises", false], ["/train/exercises/back-squat", true],
   ["/train/history", false], ["/progress/overview", false], ["/progress/sleep", false], ["/progress/sleep/history", false],
   ["/run", false], ["/nutrition", false], ["/faith", false],
 ];
+// ROUTES=/a,/b limits the run to those pages.
+const ROUTES = process.env.ROUTES ? ALL_ROUTES.filter(([r]) => process.env.ROUTES.split(",").includes(r)) : ALL_ROUTES;
 const b = await chromium.launch({ executablePath: process.env.CHROMIUM || undefined });
 const { defaultBrowserType: _d, ...iPhone } = devices["iPhone 15 Pro"];
 const ctx = await b.newContext({ ...iPhone, viewport: { width: 393, height: 852 }, deviceScaleFactor: 2, timezoneId: "America/New_York" });
