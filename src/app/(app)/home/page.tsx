@@ -35,7 +35,8 @@ import { todayWorkoutLink } from "./today-workout/link";
 import { scriptureParts } from "@/server/bible/text";
 import { ScriptureText } from "@/components/bible/scripture-text";
 import { loadReadingState } from "@/server/services/bible";
-import { chapterHref, chapterLabel } from "@/lib/bible/books";
+import { loadActiveJourney } from "@/server/services/journeys";
+import { todayReadingLink } from "@/lib/faith/today-reading";
 
 export const metadata = { title: "Home" };
 
@@ -56,7 +57,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     return buildWeeklyActivity(new Date(), profile.timezone, { workouts: [] });
   });
   const todayIso = isoDateInTz(new Date(), profile.timezone);
-  const [plan, data, active, weekly, inProgressRes, answersRes, schedule, waterRes, goalsRes, reading, readinessRes] = await Promise.all([
+  const [plan, data, active, weekly, inProgressRes, answersRes, schedule, waterRes, goalsRes, reading, readinessRes, journey] = await Promise.all([
     getUserPlan(user.id),
     getDashboardData(supabase, user.id, profile.timezone),
     getActiveProgram(supabase, user.id),
@@ -71,7 +72,13 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     supabase.from("nutrition_goals").select("water_ml").eq("user_id", user.id).maybeSingle(),
     loadReadingState(supabase, user.id).catch(() => null),
     supabase.from("recovery_checkins").select("readiness_score, checked_on").eq("user_id", user.id).order("checked_on", { ascending: false }).limit(1).maybeSingle(),
+    loadActiveJourney(supabase, user.id, profile.timezone).catch((err: unknown) => {
+      logError("home.journey", err);
+      return null;
+    }),
   ]);
+  // One answer to "what should I read now?", shared with the Faith tab: today's journey passage, else the last chapter.
+  const read = todayReadingLink(journey, reading);
   // Last night's sleep: only after wellness consent, and never blocking the page.
   const lastNight = profile.wellness_consent_at
     ? await listSleepSessions(supabase, user.id, { fromNight: addDays(todayIso, -1), toNight: todayIso })
@@ -220,14 +227,14 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         <h2 id="home-faith" className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
           <BookOpen className="size-4 text-gold" aria-hidden /> Faith today
         </h2>
-        <Link href={reading ? chapterHref(reading.book, reading.chapter, reading.verse ?? undefined) : "/faith/bible"} className="mt-2 flex min-h-14 items-center gap-3 rounded-xl hover:bg-elevated/50">
+        <Link href={read.href} className="mt-2 flex min-h-14 items-center gap-3 rounded-xl hover:bg-elevated/50" data-testid="home-reading-link">
           <span className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-border bg-elevated text-gold">
             <BookOpen className="size-6" aria-hidden />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-lg font-semibold">{reading ? "Continue reading" : "Read the Bible"}</span>
+            <span className="block text-lg font-semibold">{read.title}</span>
             <span className="block truncate text-sm text-muted-foreground">
-              {reading ? `${chapterLabel(reading.book, reading.chapter)}${reading.verse ? `:${reading.verse}` : ""} · ${TRANSLATION.name}` : `The ${TRANSLATION.name}, free to read`}
+              {read.detail} · {TRANSLATION.name}
             </span>
           </span>
           <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
