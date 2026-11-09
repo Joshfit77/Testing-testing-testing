@@ -12,10 +12,11 @@ export interface NavItem {
 /**
  * The five main tabs, in this exact order, on every screen size: Home, Train, Nutrition, Faith, You.
  * Running and walking belong to Train (they are training); My Progress, the AI Coach's screen and settings belong
- * to You. The calendar and the plan screen belong to Home (they are about the member's week).
+ * to You. The calendar and the plan screen belong to Home (they are about the member's week). Search belongs to no
+ * tab: it is opened from every header, so lighting up Home there was wrong.
  */
 export const MAIN_TABS: NavItem[] = [
-  { href: "/home", label: "Home", icon: House, alsoMatches: ["/calendar", "/plan", "/search"] },
+  { href: "/home", label: "Home", icon: House, alsoMatches: ["/calendar", "/plan"] },
   { href: "/train", label: "Train", icon: BicepsFlexed, alsoMatches: ["/run"] },
   { href: "/nutrition", label: "Nutrition", icon: Utensils },
   { href: "/faith", label: "Faith", icon: Cross },
