@@ -1,4 +1,5 @@
 import { devices, expect, test, type Page } from "@playwright/test";
+import { hideDemoChrome } from "./helpers";
 
 /**
  * First-time-user fixes in Train & Run (phone size, demo mode): the free way to log a run, shorter program and
@@ -47,6 +48,7 @@ test.describe("Train & Run, first-time fixes", () => {
 
   test("program library: 3 per category with See all, no misleading Complete line, far shorter", async ({ page }) => {
     await page.goto("/train/programs");
+    await hideDemoChrome(page); // measure the length a production member scrolls
     await expect(page.locator("main").getByText(/^Complete:/)).toHaveCount(0);
     for (const section of await page.locator("section[aria-labelledby^='cat-']").all()) {
       expect(await section.locator("ul > li").count()).toBeLessThanOrEqual(3);

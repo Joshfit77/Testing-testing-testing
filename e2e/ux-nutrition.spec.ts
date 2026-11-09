@@ -27,7 +27,9 @@ async function setPlan(page: Page, plan: "free" | "pro") {
 }
 
 /** Logged diary rows today (each has a Remove button). */
-const diaryRows = (page: Page) => page.locator('[data-testid^="meal-"] li').filter({ has: page.getByRole("button", { name: /^Remove / }) });
+// Counted by markup, not by role: while the Add food dialog is open the diary behind it is hidden from accessibility
+// queries, but its rows are still there.
+const diaryRows = (page: Page) => page.locator('[data-testid^="meal-"] li:has(button[aria-label^="Remove "])');
 
 async function fitsWidth(page: Page) {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -107,17 +109,19 @@ test.describe("food diary, first-time fixes", () => {
     await meal.locator("summary", { hasText: "Save as meal" }).click();
     const name = meal.getByLabel("Save as meal");
     await expect(name).toHaveValue(/^(Breakfast|Lunch|Dinner|Snack), [A-Z][a-z]{2} \d{1,2}$/);
-    await name.fill("UX test meal");
+    // A name of its own, so a saved meal left by an earlier run can never match.
+    const mealName = `UX test meal ${Date.now().toString(36)}`;
+    await name.fill(mealName);
     await meal.getByRole("button", { name: "Save", exact: true }).click();
-    await expect(page.getByRole("status").filter({ hasText: "Saved “UX test meal”" })).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: `Saved “${mealName}”` })).toBeVisible();
 
     await page.reload();
     const before = await diaryRows(page).count();
     await page.getByRole("button", { name: "Add food" }).click();
     const dialog = page.getByRole("dialog");
     await dialog.getByRole("tab", { name: "Saved meals" }).click();
-    await dialog.getByRole("button", { name: "Add UX test meal" }).click();
-    await expect(dialog.getByRole("status")).toHaveText(/^Logged UX test meal \(1 serving\) to (breakfast|lunch|dinner|snacks)\.$/);
+    await dialog.getByRole("button", { name: `Add ${mealName}`, exact: true }).click();
+    await expect(dialog.getByRole("status")).toHaveText(new RegExp(`^Logged ${mealName} \\(1 serving\\) to (breakfast|lunch|dinner|snacks)\\.$`));
     await expect.poll(() => diaryRows(page).count()).toBeGreaterThan(before);
 
     // Undo removes every row that saved meal added, and nothing else.
