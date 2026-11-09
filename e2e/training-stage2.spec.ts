@@ -43,7 +43,7 @@ test.describe("training stage 2B", () => {
     const seated = page.getByRole("link", { name: /Seated Strength & Mobility/ });
     await expect(seated).toBeVisible();
     await expect(seated.getByText("Not yet reviewed by a qualified coach")).toBeVisible();
-    await expect(seated.getByText(/sessions \(80%\)/)).toBeVisible();
+    // The card no longer repeats the completion rule (first-time UX audit TR2); the program page states it below.
     await seated.click();
     await expect(page.getByRole("heading", { name: "Equipment needed" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "To complete it" })).toBeVisible();

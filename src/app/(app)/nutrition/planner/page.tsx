@@ -192,7 +192,7 @@ export default async function PlannerPage() {
           <summary className={SUMMARY}>
             <span>
               <span className="block font-semibold">{aiEntitled ? "Draft with AI instead" : "Draft with AI"}</span>
-              <span className="block text-sm text-muted-foreground">{aiDraft ? "A draft is waiting for your review" : aiEntitled ? "You review it before anything is saved" : "Included with Pro All Access"}</span>
+              <span className="block text-sm text-muted-foreground">{aiDraft ? "A draft is waiting for your review" : aiEntitled ? "You review it before anything is saved" : "Pro adds AI-arranged plans"}</span>
             </span>
             <ChevronDown className="size-5 shrink-0 text-gold transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
           </summary>
