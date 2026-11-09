@@ -47,7 +47,8 @@ test.describe("a new member's first look", () => {
     // Badges: every rank not started, the first one a single workout away.
     await page.goto("/progress/badges");
     await expect(page.getByText("Not started")).toHaveCount(3);
-    await expect(page.getByText("0 / 1 workout")).toBeVisible();
+    // Exact text: the badge-progress work adds its own "0 / 1 workouts" progress line to this page.
+    await expect(page.getByText("0 / 1 workout", { exact: true })).toBeVisible();
     await noBrokenValues(page);
 
     // Overview: zero workouts and an empty chart, not a trend drawn from nothing. The only bodyweight is the one

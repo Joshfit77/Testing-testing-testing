@@ -69,6 +69,7 @@ How each result was verified is stated with it:
 | Production run 1 | `training-stage2:13` | Outdated assertion after an intended change | The program card's "Complete: … (80%)" line was removed on purpose (audit TR2) | Card assertion removed; the detail page's "Complete at least 80% of the 18 sessions" assertion stays |
 | Demo run | `ux-nutrition:40` (new check) | **App defect** | After a one-tap re-log with four or more recent foods, the Undo sat at y≈787 behind the tab bar (y=783) | `LoggedUndo` scrolls the confirmation into view when it is covered (details below). It failed 1 of 2 runs before the fix and passed 5 of 5 after |
 | Demo runs before this audit | `ux-*`, `demo` | Shared test account | Parallel workers changed the one sample account under each other | `playwright.config.ts` runs demo specs on one worker (`E2E_DEMO`) |
+| Badge trial merge | `new-member-states` (new in this audit) | Brittle new check | Matched the text "0 / 1 workout", which the badge branch's added progress line also contains | Matches the rank's exact text; passes on both trees |
 | UX harness | j15 (Undo a food) | Harness bug | `isVisible({timeout})` does not wait; "Undo" also matched the water card's "Undo last water entry" (a distinct accessible name, not an app issue) | Exact name inside Recent foods, and a real wait |
 | UX harness | first-workout count | Harness bug | Tapping Complete set within 700 ms of the last set hit the logger's deliberate double-tap guard (`CARD_DOUBLE_TAP_MS`) | Harness waits for the set counter and 0.75 s; every set then registers on one tap |
 
@@ -223,8 +224,20 @@ failed requests, and no horizontal overflow, in any state.
   - 3,501 unit tests pass;
   - 336 integration tests pass (1 opt-in test skipped);
   - `next build` succeeds;
-  - the production browser suite gives 119 passed, 0 failed.
-- **Re-checked at the final head:** BADGE_FINAL.
+  - the production browser suite gives 119 passed, 0 failed (run before this audit's last fixes; re-checked below).
+- **Re-checked at the final head** (`c460f53` merged with `eceaf0a`; again no conflicts; typecheck clean; build
+  succeeds):
+  - **Production mode, specs nearest the overlap, 28 tests:** new member, workout data preservation, sleep,
+    memberships, features, training, core flow, run, current-set card, workout reliability, journeys. 27 passed on the
+    first run. My new `new-member-states` check failed: it matched the text "0 / 1 workout", and the badge branch adds
+    its own "0 / 1 workouts" progress line to the Badges page, so the text appeared twice. The check now matches the
+    rank's exact text. It passes on both the merged tree and this branch.
+  - **Demo mode, 58 tests:** the badge branch's 15 `achievement-progress` tests, `demo`, `demo-reset` and the five
+    `ux-*` specs. 57 passed, 0 failed, 1 skipped (the stage-chart check; the sample night has no stages).
+  - **Two discarded attempts:** both were my setup errors, not code results.
+    - The first started the demo server while a production server still held port 3000, so every demo test ran
+      against a non-demo server.
+    - The second overlapped with the tail of the first on the shared sample account.
 
 ## 9. Performance
 
