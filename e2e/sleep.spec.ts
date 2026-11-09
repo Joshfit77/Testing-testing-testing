@@ -92,6 +92,13 @@ test.describe("Sleep & Recovery", () => {
     await expect(stages.getByText("2 AM", { exact: true })).toBeVisible();
     await expect(stages.getByText("In bed 11:10 PM")).toBeVisible();
     await expect(stages.getByText("Up 6:50 AM")).toBeVisible();
+    // No two time labels overlap, and none runs past the chart, at phone width.
+    const axis = stages.getByTestId("stage-axis");
+    const boxes = await axis.locator("span").evaluateAll((els) => els.map((e) => e.getBoundingClientRect()).map((r) => ({ left: r.left, right: r.right })));
+    expect(boxes.length).toBeGreaterThan(1);
+    for (let i = 1; i < boxes.length; i++) expect(boxes[i]!.left, "stage axis labels overlap").toBeGreaterThanOrEqual(boxes[i - 1]!.right);
+    const axisBox = await axis.evaluate((el) => el.getBoundingClientRect());
+    for (const b of boxes) expect(b.right).toBeLessThanOrEqual(axisBox.right + 1);
     await stages.getByText("Every interval").click();
     await expect(stages.getByRole("list", { name: "Stage intervals" }).getByRole("listitem")).toHaveCount(12);
     await expect(stages).toContainText("no validated way exists to turn stage shares or overnight measurements into one number");

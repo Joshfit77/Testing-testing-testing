@@ -174,8 +174,17 @@ a separate, measured prototype with real-member testing.
 
 ## 6. What was changed in this pass
 
-Filled in from the merged implementation; see `FIRST_TIME_UX_RESULTS.md` for before/after screenshots, the per-change
-table (original issue, changed interaction, member benefit, verification) and the after measurements.
+Issues ranked 1–24 were addressed, except the badge-branch halves listed in §7. Two more defects found in the final
+audit were also fixed:
+- the planner's lock wording shown to legacy Plus members;
+- the food-log Undo sitting behind the tab bar.
+
+`FIRST_TIME_UX_RESULTS.md` has:
+- the per-change table (original issue, changed interaction, member benefit, verification);
+- the after measurements for all three account states;
+- before/after screenshots (`docs/ux/screenshots/2026-11-09/`);
+- test results, performance and badge-branch compatibility;
+- what still needs a phone or people.
 
 ## 7. Deferred to the badge branch (PR #9, `claude/badge-progress`)
 
