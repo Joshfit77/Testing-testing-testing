@@ -13,9 +13,9 @@ import { loadReadingState } from "@/server/services/bible";
 
 export const metadata = { title: "Bible" };
 
-function BookGrid({ books, label }: { books: readonly BibleBook[]; label: string }) {
+function BookGrid({ id, books, label }: { id: string; books: readonly BibleBook[]; label: string }) {
   return (
-    <section aria-label={label}>
+    <section id={id} aria-label={label} className="scroll-mt-20">
       <h2 className="mb-2 text-sm font-semibold uppercase tracking-[0.14em] text-gold">{label}</h2>
       <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
         {books.map((b) => (
@@ -97,8 +97,20 @@ export default async function BiblePage() {
         ))}
       </nav>
 
-      <BookGrid books={OLD_TESTAMENT} label="Old Testament" />
-      <BookGrid books={NEW_TESTAMENT} label="New Testament" />
+      {/* The New Testament starts two screens down: jump straight to either. */}
+      <nav aria-label="Testaments" className="grid grid-cols-2 gap-2">
+        {[
+          ["#old-testament", "Old Testament"],
+          ["#new-testament", "New Testament"],
+        ].map(([href, label]) => (
+          <a key={href} href={href} className="flex min-h-11 items-center justify-center rounded-xl border border-border bg-card px-3 text-sm font-semibold text-gold-highlight hover:border-gold-muted">
+            {label}
+          </a>
+        ))}
+      </nav>
+
+      <BookGrid id="old-testament" books={OLD_TESTAMENT} label="Old Testament" />
+      <BookGrid id="new-testament" books={NEW_TESTAMENT} label="New Testament" />
 
       <OfflineBible bookIds={[...OLD_TESTAMENT, ...NEW_TESTAMENT].map((b) => b.id)} />
 

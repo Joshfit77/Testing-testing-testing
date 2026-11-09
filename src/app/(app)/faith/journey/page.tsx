@@ -63,8 +63,11 @@ export default async function JourneyPage({ searchParams }: { searchParams: Prom
         <section className="rounded-2xl border border-border bg-card p-4">
           <p className="font-semibold">How a journey works</p>
           <p className="mt-1 text-[0.9375rem]">Each day has a Bible reading and time for prayer. Mark each one complete when you&rsquo;ve done it.</p>
-          <p className="mt-2 rounded-xl border border-gold-muted bg-gold/8 p-3 text-[0.9375rem] font-semibold">{JOURNEY_RULE}</p>
-          <p className="mt-2 text-sm text-muted-foreground">{RULE_GRACE}</p>
+          {/* The rule and its grace line together, with equal weight. */}
+          <div className="mt-2 space-y-2 rounded-xl border border-gold-muted bg-gold/8 p-3 text-[0.9375rem]">
+            <p>{JOURNEY_RULE}</p>
+            <p>{RULE_GRACE}</p>
+          </div>
           <Button asChild className="mt-3">
             <Link href="/faith/journey/new">
               <Plus aria-hidden /> Choose a journey
@@ -86,7 +89,7 @@ export default async function JourneyPage({ searchParams }: { searchParams: Prom
     <div className="space-y-5">
       <BackLink href="/faith">Faith</BackLink>
       <PageHeader
-        eyebrow={`${view.durationDays}-day journey${view.attempt.number > 1 ? ` · attempt ${view.attempt.number}` : ""}`}
+        eyebrow={`${view.durationDays}-day journey`}
         title={view.title}
         description={notStarted ? `Begins ${formatLongDate(view.attempt.startedOn)}.` : `Day ${view.day} of ${view.durationDays} · ${done.length} complete`}
         className="mb-2"
@@ -142,7 +145,7 @@ export default async function JourneyPage({ searchParams }: { searchParams: Prom
           <h2 id="next-title" className="flex items-center gap-2 font-semibold">
             <CalendarDays className="size-5 text-gold" aria-hidden /> Coming up
           </h2>
-          <Link href="/faith/journey/schedule" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-gold-highlight hover:underline">
+          <Link href={`/faith/journey/schedule${view.day ? `#day-${view.day}` : ""}`} className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-gold-highlight hover:underline">
             Full schedule <ChevronRight className="size-4" aria-hidden />
           </Link>
         </div>
@@ -187,9 +190,8 @@ export default async function JourneyPage({ searchParams }: { searchParams: Prom
       <section className="rounded-2xl border border-border bg-card p-4 text-[0.9375rem]">
         <p className="font-semibold">The daily rule</p>
         <p className="mt-1">{JOURNEY_RULE}</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Days follow your time zone ({view.timezone}). {RULE_GRACE}
-        </p>
+        <p className="mt-1">{RULE_GRACE}</p>
+        <p className="mt-1 text-sm text-muted-foreground">Days follow your time zone ({view.timezone}).</p>
       </section>
 
       {view.attempts.length > 1 && (

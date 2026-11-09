@@ -3,12 +3,11 @@ import { BellRing, BookMarked, BookOpen, Brain, ChevronRight, Flame, GraduationC
 import { MainHeader } from "@/components/shell/main-header";
 import { EmptyState } from "@/components/common/states";
 import { FaithChallenge } from "@/components/faith/faith-challenge";
-import { JournalForm } from "@/components/faith/faith-forms";
 import { JournalEntryCard } from "@/components/faith/journal-entry-card";
 import { PracticesPanel } from "@/components/faith/practices-panel";
 import { Badge } from "@/components/ui/badge";
 import { FAITH_MOTIVATIONS, SCRIPTURES, THEME_LABELS, TRANSLATION, scriptureForDate, type FaithTheme } from "@/data/content";
-import { devotionalForDate } from "@/lib/domain/challenge";
+import { challengeDayLabel, devotionalForDate } from "@/lib/domain/challenge";
 import { verseExcerpt } from "@/lib/domain/scripture";
 import { addDays, isoDateInTz, startOfWeek } from "@/lib/domain/dates";
 import { describeFaithReminder, FAITH_REMINDER_INFO } from "@/lib/faith-reminders";
@@ -20,7 +19,8 @@ import { getChallengeState } from "@/server/services/challenge";
 import { JOURNAL_SELECT, loadFaithReminders, loadPractices, type JournalRow } from "@/server/services/faith";
 import { ScriptureNotice } from "@/components/faith/scripture-notice";
 import { TodayCard } from "@/components/faith/today-card";
-import { chapterHref, chapterLabel } from "@/lib/bible/books";
+import { chapterHref } from "@/lib/bible/books";
+import { todayReadingLink } from "@/lib/faith/today-reading";
 import { parseReference } from "@/lib/bible/reference";
 import { SceneHero } from "@/components/common/scene-hero";
 import { loadDailyGoals } from "@/server/services/daily-goals";
@@ -86,7 +86,10 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
   const journal = (journalRes.data ?? []) as unknown as JournalRow[];
   const journalCount = journalCountRes.count ?? journal.length;
   const remindersOn = reminders.filter((r) => r.enabled);
-  const readHref = reading ? chapterHref(reading.book, reading.chapter, reading.verse ?? undefined) : "/faith/bible";
+  // Today's journey passage first, then the last chapter opened, then John 1 for someone new (src/lib/faith/today-reading.ts).
+  const read = todayReadingLink(journey, reading);
+  // Only the member's own day in the 40-day challenge; the shared calendar rotation is nobody's progress.
+  const devotionalDay = challengeDayLabel(challenge.active ? challenge.currentDay : null);
   const verseRef = parseReference(verse.reference);
   const verseChapterHref = verseRef ? chapterHref(verseRef.bookId, verseRef.chapter, verseRef.verseStart) : "/faith/bible";
   const quickAction = `${card} flex min-h-14 flex-col items-center justify-center gap-1 px-2 py-2 text-center text-sm font-semibold leading-tight hover:border-gold-muted`;
@@ -95,35 +98,18 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
     <div className="space-y-4">
       <MainHeader title="Faith" />
 
-      <nav aria-label="Faith sections" className="flex gap-1 rounded-full border border-border bg-[#101010] p-1">
-        {[
-          ["Bible", "/faith/bible"],
-          ["Prayer", "/faith/journal"],
-          ["Plans", "/faith/studies"],
-        ].map(([label, href]) => (
-          <Link key={href} href={href!} className="flex min-h-11 flex-1 items-center justify-center rounded-full px-3 text-[0.9375rem] font-semibold text-foreground/85 hover:bg-elevated hover:text-foreground">
-            {label}
-          </Link>
-        ))}
-      </nav>
-
       {/* The three things members open Faith for, on the first screen: read, today's devotional, pray. */}
       <nav aria-label="Faith quick actions" className="grid grid-cols-3 gap-2">
-        <Link href={readHref} className={quickAction}>
+        <Link href={read.href} className={quickAction} data-testid="faith-read">
           <BookOpen className="size-6 text-gold" aria-hidden />
-          <span>{reading ? "Continue reading" : "Read the Bible"}</span>
-          {reading && (
-            <span className="block max-w-full truncate text-xs font-normal text-muted-foreground">
-              {chapterLabel(reading.book, reading.chapter)}
-              {reading.verse ? `:${reading.verse}` : ""}
-            </span>
-          )}
+          <span>{read.title}</span>
+          <span className="block max-w-full truncate text-sm font-normal text-muted-foreground">{read.kind === "start" ? "John 1" : read.detail}</span>
         </Link>
         {show("challenge") ? (
           <a href="#todays-devotional" className={quickAction}>
             <Sparkles className="size-6 text-gold" aria-hidden />
             <span>Today&apos;s devotional</span>
-            <span className="block text-xs font-normal text-muted-foreground">Day {devotionalForDate(challenge.today).day} of 40</span>
+            {devotionalDay && <span className="block text-sm font-normal text-muted-foreground">{devotionalDay}</span>}
           </a>
         ) : (
           <Link href="/faith/studies" className={quickAction}>
@@ -134,7 +120,7 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
         <Link href="/faith/journal/new?kind=daily" className={quickAction}>
           <NotebookPen className="size-6 text-gold" aria-hidden />
           <span>Write a prayer</span>
-          <span className="block text-xs font-normal text-muted-foreground">Private</span>
+          <span className="block text-sm font-normal text-muted-foreground">Private</span>
         </Link>
       </nav>
 
@@ -142,7 +128,7 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
 
       <nav aria-label="Bible tools" className="grid grid-cols-4 gap-2">
         {tools.map(({ href, label, icon: Icon }) => (
-          <Link key={href} href={href} className={`${card} flex min-h-16 flex-col items-center justify-center gap-1 text-xs font-semibold hover:border-gold-muted`}>
+          <Link key={href} href={href} className={`${card} flex min-h-16 flex-col items-center justify-center gap-1 text-sm font-semibold hover:border-gold-muted`}>
             <Icon className="size-5 text-gold" aria-hidden />
             {label}
           </Link>
@@ -195,36 +181,18 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
             </section>
           </details>
         )}
-
-        {show("journal") && (
-          <details className={`min-w-0 ${card}`} data-testid="faith-journal">
-            <summary className={summary}>
-              <span className="flex items-center gap-2">
-                <NotebookPen className="size-5 text-gold" aria-hidden /> Prayer journal
-              </span>
-              <span className="text-sm font-normal text-muted-foreground">{journalCount ? `${journalCount} ${journalCount === 1 ? "entry" : "entries"}` : "Write here"}</span>
-            </summary>
-            <section className="px-4 pb-4" aria-labelledby="journal-new">
-              <div className="mb-1 flex items-center justify-between gap-2">
-                <h2 id="journal-new" className="sr-only">
-                  Prayer journal
-                </h2>
-                <p className="text-sm text-muted-foreground">Prayers, praise and reflections. Private by default.</p>
-                <Link href="/faith/journal" className="inline-flex min-h-11 shrink-0 items-center gap-1 px-1 text-sm font-semibold text-gold-highlight hover:underline">
-                  All entries{journalCount ? ` (${journalCount})` : ""} <ChevronRight className="size-4" aria-hidden />
-                </Link>
-              </div>
-              <JournalForm today={today} defaultRef={verse.reference} />
-            </section>
-          </details>
-        )}
       </div>
 
       {show("journal") && journal.length > 0 && (
         <section aria-labelledby="entries-title">
-          <h2 id="entries-title" className={`mb-2 ${h2}`}>
-            Recent entries
-          </h2>
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <h2 id="entries-title" className={h2}>
+              Recent prayers
+            </h2>
+            <Link href="/faith/journal" className="inline-flex min-h-11 shrink-0 items-center gap-1 px-1 text-sm font-semibold text-gold-highlight hover:underline">
+              All entries{journalCount ? ` (${journalCount})` : ""} <ChevronRight className="size-4" aria-hidden />
+            </Link>
+          </div>
           <ul className="grid gap-2 md:grid-cols-3">
             {journal.map((j) => (
               <li key={j.id} className="min-w-0">
@@ -350,12 +318,9 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
         </details>
       )}
 
-      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-        <Link href="/profile/customize" className="inline-flex min-h-11 items-center gap-1 font-semibold text-gold-highlight hover:underline">
-          <SlidersHorizontal className="size-4" aria-hidden /> Customize this screen
-        </Link>
-        <span>Faith is always here in its own tab; the Scripture card on Home can be turned off in You.</span>
-      </p>
+      <Link href="/profile/customize" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-gold-highlight hover:underline">
+        <SlidersHorizontal className="size-4" aria-hidden /> Customize this screen
+      </Link>
       <ScriptureNotice />
     </div>
   );

@@ -29,6 +29,8 @@ export function BibleAsk({ initialThread, initialMessages, remaining }: { initia
   const [question, setQuestion] = useState("");
   const [left, setLeft] = useState(remaining);
   const [pending, start] = useTransition();
+  // Anything saved to delete: the page loads the latest conversation, so none means no history at all.
+  const [hasHistory, setHasHistory] = useState(initialMessages.length > 0);
 
   function ask() {
     const q = question.trim();
@@ -43,6 +45,7 @@ export function BibleAsk({ initialThread, initialMessages, remaining }: { initia
         return toast.error(r.error);
       }
       setLeft((n) => Math.max(0, n - 1));
+      setHasHistory(true);
       setMessages((m) => [...m, { role: "assistant", content: r.answer, citations: r.citations }]);
     });
   }
@@ -119,20 +122,23 @@ export function BibleAsk({ initialThread, initialMessages, remaining }: { initia
           </div>
         </div>
       </form>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        onClick={async () => {
-          if (!(await confirmDialog({ title: "Delete your Bible helper history?", message: "All your questions and answers here will be deleted.", confirmLabel: "Delete", destructive: true }))) return;
-          await clearBibleAiHistoryAction();
-          setMessages([]);
-          setThread(crypto.randomUUID());
-          router.refresh();
-        }}
-      >
-        <Trash2 aria-hidden /> Delete history
-      </Button>
+      {hasHistory && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={async () => {
+            if (!(await confirmDialog({ title: "Delete your Bible helper history?", message: "All your questions and answers here will be deleted.", confirmLabel: "Delete", destructive: true }))) return;
+            await clearBibleAiHistoryAction();
+            setMessages([]);
+            setHasHistory(false);
+            setThread(crypto.randomUUID());
+            router.refresh();
+          }}
+        >
+          <Trash2 aria-hidden /> Delete history
+        </Button>
+      )}
     </div>
   );
 }

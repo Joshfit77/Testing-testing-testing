@@ -36,6 +36,9 @@ export default async function JournalPage({ searchParams }: { searchParams: Prom
   const { data, error } = await query.order("entry_date", { ascending: false }).order("created_at", { ascending: false }).limit(PAGE + 1);
   const rows = (data ?? []) as unknown as JournalRow[];
   const entries = rows.slice(0, PAGE);
+  // A journal with nothing in it at all (archived included) shows just the way to start, not search and filters.
+  const unfiltered = filter === "all" && !q;
+  const empty = !error && unfiltered && entries.length === 0 && ((await supabase.from("faith_journal_entries").select("id", { count: "exact", head: true }).eq("user_id", user.id)).count ?? 0) === 0;
 
   const href = (f: string) => {
     const p = new URLSearchParams();
@@ -65,32 +68,36 @@ export default async function JournalPage({ searchParams }: { searchParams: Prom
         }
       />
 
-      <form role="search" action="/faith/journal" className="flex gap-2">
-        {filter !== "all" && <input type="hidden" name="filter" value={filter} />}
-        <label htmlFor="journal-q" className="sr-only">
-          Search your journal
-        </label>
-        <Input id="journal-q" name="q" type="search" defaultValue={q} placeholder="Search titles, prayers, Scripture" maxLength={80} className="flex-1" />
-        <Button type="submit" variant="secondary" aria-label="Search">
-          <Search aria-hidden />
-        </Button>
-      </form>
+      {!empty && (
+        <>
+          <form role="search" action="/faith/journal" className="flex gap-2">
+            {filter !== "all" && <input type="hidden" name="filter" value={filter} />}
+            <label htmlFor="journal-q" className="sr-only">
+              Search your journal
+            </label>
+            <Input id="journal-q" name="q" type="search" defaultValue={q} placeholder="Search titles, prayers, Scripture" maxLength={80} className="flex-1" />
+            <Button type="submit" variant="secondary" aria-label="Search">
+              <Search aria-hidden />
+            </Button>
+          </form>
 
-      <nav aria-label="Filter entries" className="flex flex-wrap gap-2">
-        {JOURNAL_FILTERS.map((f) => (
-          <Link
-            key={f}
-            href={href(f)}
-            aria-current={filter === f ? "page" : undefined}
-            className={cn(
-              "inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-semibold",
-              filter === f ? "border-gold bg-gold/10 text-gold-highlight" : "border-border text-muted-foreground",
-            )}
-          >
-            {JOURNAL_FILTER_LABELS[f]}
-          </Link>
-        ))}
-      </nav>
+          <nav aria-label="Filter entries" className="flex flex-wrap gap-2">
+            {JOURNAL_FILTERS.map((f) => (
+              <Link
+                key={f}
+                href={href(f)}
+                aria-current={filter === f ? "page" : undefined}
+                className={cn(
+                  "inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-semibold",
+                  filter === f ? "border-gold bg-gold/10 text-gold-highlight" : "border-border text-muted-foreground",
+                )}
+              >
+                {JOURNAL_FILTER_LABELS[f]}
+              </Link>
+            ))}
+          </nav>
+        </>
+      )}
 
       {error ? (
         <p role="alert" className="rounded-2xl border border-destructive/40 bg-destructive/5 p-4 text-sm">
@@ -124,7 +131,7 @@ export default async function JournalPage({ searchParams }: { searchParams: Prom
         </>
       ) : (
         <p className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground">
-          {q || filter !== "all" ? "No entries match. Try another word or filter." : "No entries yet. Write your first prayer on the Faith tab."}
+          {q || filter !== "all" ? "No entries match. Try another word or filter." : "Nothing here yet. Tap New entry to write your first prayer."}
         </p>
       )}
     </div>

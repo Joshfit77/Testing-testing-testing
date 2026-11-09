@@ -2,9 +2,8 @@
 
 import { useActionState, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpenText, Check, Flag, Loader2, Lock, PartyPopper, RotateCcw } from "lucide-react";
+import { BookOpenText, Check, ChevronRight, Flag, Loader2, Lock, RotateCcw } from "lucide-react";
 import { FieldError, FormMessage, SubmitButton } from "@/components/common/form-status";
-import { Notice } from "@/components/common/states";
 import { DevotionalContent } from "@/components/faith/devotional-content";
 import { ScriptureText } from "@/components/bible/scripture-text";
 import type { TextPart } from "@/lib/bible/red-letter";
@@ -15,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { CHALLENGE_DAYS, CHALLENGE_NAME, devotionalForDay } from "@/data/devotionals";
 import { initialActionState, type ActionState } from "@/lib/action-state";
-import { challengeDays, completedDayCount, type ChallengeCheckin, type ChallengeDay } from "@/lib/domain/challenge";
+import { challengeDayLabel, challengeDays, completedDayCount, type ChallengeCheckin, type ChallengeDay } from "@/lib/domain/challenge";
 import { cn } from "@/lib/utils";
 import { leaveChallengeAction, restartChallengeAction, saveChallengeCheckinAction, startChallengeAction } from "@/server/actions/challenge";
 import { TRANSLATION } from "@/data/content";
@@ -84,7 +83,7 @@ export function FaithChallenge({ today, rotatingDay, enrollment, currentDay, che
       {/* Today's devotional */}
       <section id="todays-devotional" className="rounded-2xl border border-gold-muted/50 bg-card p-5 md:p-6" aria-labelledby="devotional-title">
         <p className="text-sm font-semibold text-gold">
-          {enrolled ? `Today's devotional · Day ${currentDay} of ${CHALLENGE_DAYS}` : "Today's devotional"}
+          {enrolled ? `Today's devotional · ${challengeDayLabel(currentDay)}` : "Today's devotional"}
         </p>
         <h2 id="devotional-title" className="mt-2 font-display text-2xl font-bold uppercase leading-tight">
           {todaysDevotional.title}
@@ -98,16 +97,33 @@ export function FaithChallenge({ today, rotatingDay, enrollment, currentDay, che
             <BookOpenText aria-hidden /> Read today&apos;s devotional
           </Button>
         </div>
+        {/* Not in the challenge: one quiet link instead of a second large card. Its pop-up explains it and starts it. */}
+        {!(enrollment && currentDay) && (
+          <button
+            id="challenge"
+            type="button"
+            onClick={() => setDialog({ kind: "start" })}
+            className="mt-4 flex min-h-14 w-full items-center gap-3 rounded-xl border border-border bg-elevated/50 px-3 py-2 text-left hover:border-gold-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-highlight"
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block font-semibold">{CHALLENGE_NAME}</span>
+              <span className="block text-sm text-muted-foreground">
+                {lastCompletedAt ? `You finished all 40 days on ${formatDate(lastCompletedAt)}. Walk them again?` : "40 days of Scripture and training, at your own pace"}
+              </span>
+            </span>
+            <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
+          </button>
+        )}
       </section>
 
-      {/* Challenge */}
-      <section id="challenge" className="bg-card-gradient rounded-2xl border border-border p-5 md:p-6" aria-labelledby="challenge-title">
-        <p className="text-sm font-semibold text-gold">Faith &amp; fitness challenge</p>
-        <h2 id="challenge-title" className="mt-2 font-display text-2xl font-bold uppercase leading-tight">
-          {CHALLENGE_NAME}
-        </h2>
+      {/* Challenge (enrolled members) */}
+      {enrollment && currentDay && (
+        <section id="challenge" className="bg-card-gradient rounded-2xl border border-border p-5 md:p-6" aria-labelledby="challenge-title">
+          <p className="text-sm font-semibold text-gold">Faith &amp; fitness challenge</p>
+          <h2 id="challenge-title" className="mt-2 font-display text-2xl font-bold uppercase leading-tight">
+            {CHALLENGE_NAME}
+          </h2>
 
-        {enrollment && currentDay ? (
           <div className="mt-4 space-y-4">
             <div>
               <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2 text-sm">
@@ -185,27 +201,8 @@ export function FaithChallenge({ today, rotatingDay, enrollment, currentDay, che
               </Button>
             </div>
           </div>
-        ) : (
-          <div className="mt-3 space-y-4">
-            {lastCompletedAt && (
-              <Notice tone="success">
-                <span className="flex items-start gap-2">
-                  <PartyPopper className="mt-0.5 size-4 shrink-0 text-gold" aria-hidden />
-                  <span>
-                    You walked all 40 days through the narrow gate — finished {formatDate(lastCompletedAt)}. Give thanks for His grace along the way, and keep
-                    walking one faithful day at a time.
-                  </span>
-                </span>
-              </Notice>
-            )}
-            <p className="max-w-2xl text-sm text-muted-foreground">
-              Forty days of scripture, a short devotional, a one-line prayer and a training prompt. Check off your reading and your training each day, and
-              catch up whenever life gets in the way. Grace, not perfection.
-            </p>
-            <Button onClick={() => setDialog({ kind: "start" })}>{lastCompletedAt ? "Start the challenge again" : "Start the challenge"}</Button>
-          </div>
-        )}
-      </section>
+        </section>
+      )}
 
       {/* Read-only devotional (not enrolled) */}
       <Dialog open={dialog?.kind === "read"} onOpenChange={closeDialog}>
