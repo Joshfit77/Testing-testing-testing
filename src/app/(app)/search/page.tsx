@@ -144,7 +144,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
         <label htmlFor="search-q" className="sr-only">
           Search
         </label>
-        <Input id="search-q" name="q" type="search" defaultValue={query} placeholder="e.g. squat, banana, John 3:16, notifications" autoFocus className="h-12 text-base" />
+        <Input id="search-q" name="q" type="search" defaultValue={query} placeholder="squat, banana, John 3:16" autoFocus className="h-12 text-base" />
         <Button type="submit" className="h-12">
           <Search aria-hidden /> Search
         </Button>
@@ -161,7 +161,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
       <Group title={bible.total ? `Bible (${bible.total.toLocaleString("en-US")} verses)` : "Bible"} icon={BookOpen} rows={bible.rows} more={{ href: `/faith/bible/search?q=${encodeURIComponent(query)}`, label: "All Bible results" }} />
       {query.length < 2 && (
         <p className="text-sm text-muted-foreground">
-          <BookOpen className="mr-1 inline size-4 text-gold" aria-hidden /> Type at least two letters. Your own workouts, saved meals and prayer entries come first (only yours, never anyone else&apos;s); Bible results open the chapter at the verse; foods open the Nutrition tab&apos;s Add food dialog.
+          <BookOpen className="mr-1 inline size-4 text-gold" aria-hidden /> Type at least two letters. Your own workouts, meals and prayers come first, and only you see them.
         </p>
       )}
     </div>

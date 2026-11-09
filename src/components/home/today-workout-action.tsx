@@ -15,15 +15,15 @@ export function TodayWorkoutAction({
   startHref,
   serverInProgress,
   startLabel = "Start workout",
-  round = false,
+  detail,
 }: {
   userId: string;
   startHref: string;
   serverInProgress: string | null;
   /** e.g. "Start workout early" when the next session is planned for a later day. */
   startLabel?: string;
-  /** A big round gold play button (the Home card); the label stays as the accessible name. */
-  round?: boolean;
+  /** Shown after the start label, e.g. "43 min". */
+  detail?: string | null;
 }) {
   const [draftName, setDraftName] = useState<string | null>(null);
   useEffect(() => {
@@ -38,22 +38,10 @@ export function TodayWorkoutAction({
   }, [userId]);
 
   const resumeName = draftName ?? serverInProgress;
-  if (round) {
-    return (
-      <Link
-        href={resumeName ? "/train/workout" : startHref}
-        aria-label={resumeName ? `Resume workout: ${resumeName}` : startLabel}
-        className="btn-gold-round size-16 shrink-0 transition-transform hover:brightness-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-highlight focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-        data-testid={resumeName ? "resume-workout" : "start-workout"}
-      >
-        {resumeName ? <RotateCcw className="size-7" strokeWidth={2.5} aria-hidden /> : <Play className="ml-1 size-7 fill-current" aria-hidden />}
-      </Link>
-    );
-  }
   if (resumeName) {
     return (
       <Button asChild className="w-full">
-        <Link href="/train/workout" aria-label={`Resume workout: ${resumeName}`}>
+        <Link href="/train/workout" aria-label={`Resume workout: ${resumeName}`} data-testid="resume-workout">
           <RotateCcw aria-hidden /> Resume workout
         </Link>
       </Button>
@@ -61,8 +49,9 @@ export function TodayWorkoutAction({
   }
   return (
     <Button asChild className="w-full">
-      <Link href={startHref}>
+      <Link href={startHref} data-testid="start-workout">
         <Play aria-hidden /> {startLabel}
+        {detail ? <span className="font-medium opacity-80">· {detail}</span> : null}
       </Link>
     </Button>
   );

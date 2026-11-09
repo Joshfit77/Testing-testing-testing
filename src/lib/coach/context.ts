@@ -352,17 +352,47 @@ export function formatAthleteContext(s: AthleteSnapshot, opts: { maxWorkouts?: n
   return lines.join("\n");
 }
 
-/** Starter questions tailored to the athlete's data (shown on an empty chat). */
-export function suggestedQuestions(s: Pick<AthleteSnapshot, "workouts" | "program" | "targets" | "goal" | "weights" | "today">): string[] {
+/** Starter questions for a member with no training history: safe first steps, nothing that assumes experience. */
+export const BEGINNER_QUESTIONS = ["How do I start my first week?", "How much protein should I aim for?", "How do I warm up for today's workout?"] as const;
+
+/** Whole weeks the athlete has been training: from their first logged session, or the weeks of the program behind them. */
+export function weeksTrained(s: Pick<AthleteSnapshot, "sessionDates" | "workouts" | "program" | "today">): number {
+  const dates = [...s.sessionDates, ...s.workouts.map((w) => w.date)].filter(Boolean).sort();
+  const first = dates[0];
+  const fromHistory = first ? Math.floor((Date.parse(`${s.today}T12:00:00Z`) - Date.parse(`${first}T12:00:00Z`)) / (7 * 86400000)) : 0;
+  const fromProgram = s.program ? Math.max(0, s.program.week - 1) : 0;
+  return Math.max(0, fromHistory, fromProgram);
+}
+
+/** A deload only makes sense after a month or more of training. */
+const DELOAD_AFTER_WEEKS = 4;
+
+/**
+ * Starter questions tailored to the athlete's data (shown on an empty chat, and as examples when the coach can't be
+ * used). A member with no history gets beginner-safe questions; "Plan my deload" waits for 4+ weeks of training.
+ */
+export function suggestedQuestions(s: Pick<AthleteSnapshot, "workouts" | "program" | "targets" | "goal" | "weights" | "today" | "sessionDates">): string[] {
+  const next = s.program?.days.find((d) => d.dayNumber === s.program!.nextDay) ?? null;
+  if (!s.workouts.length && !s.sessionDates.length) {
+    const out: string[] = [BEGINNER_QUESTIONS[0], BEGINNER_QUESTIONS[1]];
+    if (s.program) {
+      out.push(next ? `How do I warm up for today's ${next.name} workout?` : BEGINNER_QUESTIONS[2]);
+      out.push(next ? `What should I eat before today's ${next.name} workout?` : "What should I eat before my workout today?");
+    } else {
+      out.push("Which program fits my goal and schedule?");
+      out.push("How do I warm up before a workout?");
+    }
+    return out;
+  }
   const out: string[] = [];
   const trends = liftTrends(s.workouts);
   const stalled = trends.find((t) => t.sessionsSinceBest >= 2 || t.changePct <= 0);
   if (stalled) out.push(`Why did my ${stalled.name.toLowerCase()} stall?`);
   else if (trends[0]) out.push(`How should I progress my ${trends[0].name.toLowerCase()} next week?`);
   if (s.program) {
-    const next = s.program.days.find((d) => d.dayNumber === s.program!.nextDay);
     out.push(next ? `What should I eat before today's ${next.name} workout?` : "What should I eat before my workout today?");
-    out.push(s.program.isDeload ? "How should I run this deload week?" : "Plan my deload");
+    if (s.program.isDeload) out.push("How should I run this deload week?");
+    else if (weeksTrained(s) >= DELOAD_AFTER_WEEKS) out.push("Plan my deload");
   } else {
     out.push("What should I eat before my workout today?");
     out.push("Which program fits my goal and schedule?");
@@ -370,7 +400,6 @@ export function suggestedQuestions(s: Pick<AthleteSnapshot, "workouts" | "progra
   if (s.targets) out.push("Am I eating enough protein for my goal?");
   if (s.goal === "lose_fat" && s.weights.length >= 2) out.push("Am I losing weight at a good pace?");
   else if (s.goal === "build_muscle") out.push("How much should I eat to gain muscle without much fat?");
-  if (!s.workouts.length) out.push("How should I start if I'm new to lifting?");
   out.push("Suggest a swap for an exercise that bothers my shoulder");
   return [...new Set(out)].slice(0, 6);
 }

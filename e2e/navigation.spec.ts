@@ -12,13 +12,13 @@ test.describe("navigation shell", () => {
     await expect(tabs.first()).toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("button", { name: "More" })).toHaveCount(0);
 
-    // Home: greeting, Scripture card, today's workout, nutrition, Faith today, quick actions, My Progress.
+    // Home: greeting, Scripture card, today's workout, nutrition, Faith today, My Progress. Quick actions start hidden (the header has them).
     await expect(page.getByRole("heading", { level: 1, name: /^Good (morning|afternoon|evening), / })).toBeVisible();
     await expect(page.getByRole("link", { name: /^Verse of the day/ })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Today's workout" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Today's nutrition" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Faith today" })).toBeVisible();
-    await expect(page.getByRole("navigation", { name: "Quick actions" }).getByRole("link")).toHaveText(["Run", "Log food", "AI Coach"]);
+    await expect(page.getByRole("navigation", { name: "Quick actions" })).toHaveCount(0);
     await page.getByRole("link", { name: /My Progress/ }).click();
     await page.waitForURL(/\/progress$/);
     await expect(page.getByRole("heading", { level: 1, name: "My Progress" })).toBeVisible();
@@ -44,10 +44,13 @@ test.describe("navigation shell", () => {
       await expect(tabs.filter({ hasText: "You" })).toBeVisible();
     }
 
-    // Quick add opens the sheet with the six everyday things, and the Food tile opens the Add food dialog.
+    // Quick add opens the sheet with the everyday things: today's program session (not an empty one) comes first, from
+    // any screen, and sleep is one tap away. The Food tile opens the Add food dialog.
     await page.goto("/faith");
     await page.getByTestId("quick-add").click();
-    await expect(page.getByTestId("quick-add-sheet").getByRole("link")).toHaveText(["Food", "Quick workout", "Outdoor run", "Prayer", "Weight"]);
+    await expect(page.getByTestId("quick-add-sheet").getByRole("link")).toHaveText([/^Today's workout/, "Food", "Outdoor run", "Prayer", "Weight", "Sleep"]);
+    await expect(page.getByTestId("quick-add-workout")).toHaveAttribute("href", /\/train\/workout\?day=/);
+    await expect(page.getByTestId("quick-add-sheet").getByRole("link", { name: "Sleep" })).toHaveAttribute("href", "/progress/sleep/log");
     await expect(page.getByRole("button", { name: "Water: add 250 ml" })).toBeVisible();
     await page.getByTestId("quick-add-sheet").getByRole("link", { name: "Food" }).click();
     await page.waitForURL(/\/nutrition\?add=1/);

@@ -6,11 +6,16 @@ import { QuickAddButton } from "./quick-add";
 import { cn } from "@/lib/utils";
 import { initials, useShellUser } from "./shell-context";
 
-/** Compact gold-outlined "AI Coach" pill: ~34px visual height, 44px touch target. */
-export function CoachButton({ className }: { className?: string }) {
+/**
+ * Compact gold-outlined "AI Coach" pill: ~34px visual height, 44px touch target. `compact` always shows the short
+ * "Coach" label (Home's header also carries the wordmark, so the long label would push the pill off a 393pt phone);
+ * the accessible name stays "AI Coach" either way.
+ */
+export function CoachButton({ className, compact = false }: { className?: string; compact?: boolean }) {
   return (
     <Link
       href="/coach"
+      aria-label="AI Coach"
       className={cn(
         "group relative inline-flex h-11 shrink-0 items-center justify-center rounded-full focus-visible:outline-none",
         className,
@@ -18,8 +23,14 @@ export function CoachButton({ className }: { className?: string }) {
     >
       <span className="inline-flex h-[2.125rem] items-center gap-1.5 rounded-full border border-gold/90 bg-black/30 px-3 text-sm font-semibold text-gold-highlight transition-colors group-hover:bg-gold/10 group-focus-visible:ring-2 group-focus-visible:ring-gold-highlight">
         <MessageCircle className="size-4" aria-hidden />
-        <span className="hidden @[22rem]:inline">AI Coach</span>
-        <span className="@[22rem]:hidden">Coach</span>
+        {compact ? (
+          <span>Coach</span>
+        ) : (
+          <>
+            <span className="hidden @[22rem]:inline">AI Coach</span>
+            <span className="@[22rem]:hidden">Coach</span>
+          </>
+        )}
       </span>
     </Link>
   );
