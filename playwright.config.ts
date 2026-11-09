@@ -12,6 +12,8 @@ export default defineConfig({
   timeout: 90_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,
+  // Demo-mode specs (E2E_DEMO=1) share one sample account, and one of them resets it, so they run one at a time.
+  ...(process.env.E2E_DEMO ? { workers: 1 } : {}),
   retries: 0,
   reporter: [["list"]],
   use: {

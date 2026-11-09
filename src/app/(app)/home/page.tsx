@@ -31,10 +31,12 @@ import { addDays, isoDateInTz } from "@/lib/domain/dates";
 import { loadProgramSchedule } from "@/server/services/schedule";
 import { buildWeeklyActivity } from "@/lib/domain/activity-week";
 import { verseExcerpt } from "@/lib/domain/scripture";
+import { todayWorkoutLink } from "./today-workout/link";
 import { scriptureParts } from "@/server/bible/text";
 import { ScriptureText } from "@/components/bible/scripture-text";
 import { loadReadingState } from "@/server/services/bible";
-import { chapterHref, chapterLabel } from "@/lib/bible/books";
+import { loadActiveJourney } from "@/server/services/journeys";
+import { todayReadingLink } from "@/lib/faith/today-reading";
 
 export const metadata = { title: "Home" };
 
@@ -55,7 +57,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     return buildWeeklyActivity(new Date(), profile.timezone, { workouts: [] });
   });
   const todayIso = isoDateInTz(new Date(), profile.timezone);
-  const [plan, data, active, weekly, inProgressRes, answersRes, schedule, waterRes, goalsRes, reading, readinessRes] = await Promise.all([
+  const [plan, data, active, weekly, inProgressRes, answersRes, schedule, waterRes, goalsRes, reading, readinessRes, journey] = await Promise.all([
     getUserPlan(user.id),
     getDashboardData(supabase, user.id, profile.timezone),
     getActiveProgram(supabase, user.id),
@@ -70,7 +72,13 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     supabase.from("nutrition_goals").select("water_ml").eq("user_id", user.id).maybeSingle(),
     loadReadingState(supabase, user.id).catch(() => null),
     supabase.from("recovery_checkins").select("readiness_score, checked_on").eq("user_id", user.id).order("checked_on", { ascending: false }).limit(1).maybeSingle(),
+    loadActiveJourney(supabase, user.id, profile.timezone).catch((err: unknown) => {
+      logError("home.journey", err);
+      return null;
+    }),
   ]);
+  // One answer to "what should I read now?", shared with the Faith tab: today's journey passage, else the last chapter.
+  const read = todayReadingLink(journey, reading);
   // Last night's sleep: only after wellness consent, and never blocking the page.
   const lastNight = profile.wellness_consent_at
     ? await listSleepSessions(supabase, user.id, { fromNight: addDays(todayIso, -1), toNight: todayIso })
@@ -91,7 +99,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const readinessLabel = !readiness || !readinessToday ? "Check in" : readinessBand(readiness.score) === "high" ? "Ready" : readinessBand(readiness.score) === "moderate" ? "Go easy" : "Rest";
   const showScripture = profile.home_scripture ?? true;
   const verse = scriptureForDate(data.today);
-  const startHref = active?.today ? `/train/workout?day=${active.today.id}&up=${active.userProgramId}` : "/train/workout?blank=1";
+  const todayWorkout = todayWorkoutLink(active, schedule, data.today);
+  const startHref = todayWorkout.href;
   const weeklyTarget = active?.daysPerWeek ?? answers?.days_per_week ?? null;
   const sessionsThisWeek = weekly.workouts.length;
   const todayLong = new Date(`${data.today}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
@@ -101,7 +110,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const plannedLabel = plannedLater ? new Date(`${plannedLater.date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" }) : null;
   const water = (waterRes.data ?? []).reduce((s, w) => s + (w.amount_ml as number), 0);
   const waterGoal = (goalsRes.data?.water_ml as number | undefined) ?? 2500;
-  const beginner = answers?.experience === "new" || answers?.experience === "beginner";
   const layout = homeLayout(
     {
       goal: answers?.primary_goal ?? null,
@@ -118,38 +126,39 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     workout: (
       <section key="workout" className="space-y-3" aria-labelledby="today-title" data-testid="home-workout">
         <div className="card-gold rounded-2xl p-4">
-          <div className="flex items-center gap-3">
-            <Link href={active ? `/train/programs/${active.programSlug}` : "/train"} className="min-w-0 flex-1 rounded-xl hover:bg-white/5">
-              <span className="flex items-center gap-2">
-                <h2 id="today-title" className="font-display text-xl font-bold">
-                  Today&apos;s Workout
-                </h2>
-                {plannedLater && (
-                  <span className="rounded-full border border-gold/50 bg-black/30 px-2 py-0.5 text-xs font-semibold text-gold-highlight" data-testid="today-rest">
-                    Rest day today
-                  </span>
-                )}
-              </span>
-              <span className="mt-0.5 block truncate text-lg font-semibold text-foreground/95">{today ? today.name : active ? "Program complete" : "No program yet"}</span>
-              <span className="block text-sm text-muted-foreground" data-testid="today-detail">
-                {today && active && plannedLater
-                  ? `Week ${active.currentWeek} · Day ${active.currentDay} of ${active.daysPerWeek} · planned for ${plannedLabel}${plannedLater.moved ? " (moved)" : ""}`
-                  : today && active
-                    ? [today.estimated_minutes ? `${today.estimated_minutes} min` : null, `${today.exercises.length} exercise${today.exercises.length === 1 ? "" : "s"}`, `Week ${active.currentWeek} of ${active.durationWeeks}`, `Day ${active.currentDay} of ${active.daysPerWeek}`]
-                        .filter(Boolean)
-                        .join(" • ")
-                    : active
-                      ? "Choose your next program in Train"
-                      : "Log a free workout or pick a program"}
-              </span>
-            </Link>
-            <TodayWorkoutAction round userId={user.id} startHref={startHref} serverInProgress={(inProgressRes.data?.name as string | undefined) ?? null} startLabel={plannedLater ? "Start workout early" : today ? "Start Today's Workout" : "Start workout"} />
+          <Link href={active ? `/train/programs/${active.programSlug}` : "/train"} className="block min-w-0 rounded-xl hover:bg-white/5">
+            <span className="flex items-center gap-2">
+              <h2 id="today-title" className="font-display text-xl font-bold">
+                Today&apos;s Workout
+              </h2>
+              {plannedLater && (
+                <span className="rounded-full border border-gold/50 bg-black/30 px-2 py-0.5 text-xs font-semibold text-gold-highlight" data-testid="today-rest">
+                  Rest day today
+                </span>
+              )}
+            </span>
+            <span className="mt-0.5 block truncate text-lg font-semibold text-foreground/95">{today ? today.name : active ? "Program complete" : "No program yet"}</span>
+            <span className="block text-sm text-muted-foreground" data-testid="today-detail">
+              {today && active && plannedLater
+                ? `Week ${active.currentWeek} · Day ${active.currentDay} of ${active.daysPerWeek} · planned for ${plannedLabel}${plannedLater.moved ? " (moved)" : ""}`
+                : today && active
+                  ? [today.estimated_minutes ? `${today.estimated_minutes} min` : null, `${today.exercises.length} exercise${today.exercises.length === 1 ? "" : "s"}`, `Week ${active.currentWeek} of ${active.durationWeeks}`, `Day ${active.currentDay} of ${active.daysPerWeek}`]
+                      .filter(Boolean)
+                      .join(" • ")
+                  : active
+                    ? "Choose your next program in Train"
+                    : "Log a free workout or pick a program"}
+            </span>
+          </Link>
+          <div className="mt-3">
+            <TodayWorkoutAction
+              userId={user.id}
+              startHref={startHref}
+              serverInProgress={(inProgressRes.data?.name as string | undefined) ?? null}
+              startLabel={plannedLater ? "Start workout early" : today ? "Start today's workout" : "Start workout"}
+              detail={today?.estimated_minutes ? `${today.estimated_minutes} min` : null}
+            />
           </div>
-          {beginner && today && (
-            <p className="mt-3 text-sm text-muted-foreground" data-testid="beginner-hint">
-              Tap play and the app walks you through each exercise, one set at a time, with a demonstration and a rest timer.
-            </p>
-          )}
           {(next || !active) && (
             <div className="mt-2 flex flex-wrap items-center gap-x-4">
               {next && (
@@ -218,14 +227,14 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         <h2 id="home-faith" className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
           <BookOpen className="size-4 text-gold" aria-hidden /> Faith today
         </h2>
-        <Link href={reading ? chapterHref(reading.book, reading.chapter, reading.verse ?? undefined) : "/faith/bible"} className="mt-2 flex min-h-14 items-center gap-3 rounded-xl hover:bg-elevated/50">
+        <Link href={read.href} className="mt-2 flex min-h-14 items-center gap-3 rounded-xl hover:bg-elevated/50" data-testid="home-reading-link">
           <span className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-border bg-elevated text-gold">
             <BookOpen className="size-6" aria-hidden />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-lg font-semibold">{reading ? "Continue reading" : "Read the Bible"}</span>
+            <span className="block text-lg font-semibold">{read.title}</span>
             <span className="block truncate text-sm text-muted-foreground">
-              {reading ? `${chapterLabel(reading.book, reading.chapter)}${reading.verse ? `:${reading.verse}` : ""} · ${TRANSLATION.name}` : `The ${TRANSLATION.name}, free to read`}
+              {read.detail} · {TRANSLATION.name}
             </span>
           </span>
           <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
@@ -308,14 +317,15 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       <SceneHero className={isDemoMode() ? "-mx-4 rounded-2xl md:mx-0" : "-mx-4 -mt-[calc(env(safe-area-inset-top)+0.25rem)] pt-[env(safe-area-inset-top)] md:mx-0 md:mt-0 md:rounded-2xl"} minHeight="min-h-[21rem]">
         <div className="flex flex-col px-4 pb-6 pt-3">
           <header className="flex items-center justify-between gap-2 @container">
-            <span className="inline-flex items-center gap-2">
-              <LogoMark className="size-8" />
-              <span className="font-serif text-sm font-semibold uppercase leading-none tracking-[0.18em] text-champagne [text-shadow:0_1px_6px_rgba(0,0,0,0.7)]">Narrow Gate Fitness</span>
+            {/* The buttons never shrink (they were pushed past the screen edge); the wordmark wraps instead. */}
+            <span className="inline-flex min-w-0 items-center gap-2">
+              <LogoMark className="size-8 shrink-0" />
+              <span className="min-w-0 font-serif text-sm font-semibold uppercase leading-none tracking-[0.18em] text-champagne [text-shadow:0_1px_6px_rgba(0,0,0,0.7)]">Narrow Gate Fitness</span>
             </span>
-            <span className="flex items-center gap-0.5">
+            <span className="flex shrink-0 items-center gap-0.5">
               <SearchButton />
-              <QuickAddButton userId={user.id} today={data.today} />
-              <CoachButton />
+              <QuickAddButton userId={user.id} today={data.today} todayWorkout={todayWorkout} />
+              <CoachButton compact />
             </span>
           </header>
           <h1 className="mt-14 font-display text-[2.125rem] font-bold leading-[1.1] tracking-tight text-white [text-shadow:0_2px_12px_rgba(0,0,0,0.7)] [text-wrap:balance]">

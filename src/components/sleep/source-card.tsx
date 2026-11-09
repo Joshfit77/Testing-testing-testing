@@ -40,7 +40,7 @@ function ago(iso: string, now: number): string {
  * app it also syncs by itself when the app opens with a stale sync, and on pull-to-refresh. On the web it says how
  * to connect, because a browser can't read Apple Health or Health Connect.
  */
-export function SleepSourceCard({ status }: { status: SleepSourceStatus }) {
+export function SleepSourceCard({ status, variant = "card" }: { status: SleepSourceStatus; variant?: "card" | "inline" }) {
   const router = useRouter();
   const [platform, setPlatform] = useState<HealthPlatform | null | undefined>(undefined);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
@@ -97,6 +97,47 @@ export function SleepSourceCard({ status }: { status: SleepSourceStatus }) {
   const sourceName = status.source ? IMPORT_SOURCE_LABEL[status.source] : null;
   const deviceLine = status.deviceName ?? status.lastSync?.device ?? null;
 
+  const syncLine =
+    connected && status.lastSync
+      ? `Last synced ${ago(status.lastSync.at, now)}${status.lastSync.added ? ` · ${status.lastSync.added} new` : ""}${status.lastSync.withVitals ? " · with overnight measurements" : ""}`
+      : connected
+        ? "Connected; no sync recorded yet."
+        : null;
+  const feedback = message && (
+    <p role={message.ok ? "status" : "alert"} className={message.ok ? "mt-2 basis-full text-sm text-success" : "mt-2 basis-full text-sm text-destructive-foreground"}>
+      {message.text}
+    </p>
+  );
+
+  // One line inside the Last night card: where the nights come from, the last sync, and Sync now / Manage. Syncing
+  // works exactly as in the full card (on open when stale, on pull-to-refresh, and by tapping).
+  if (variant === "inline") {
+    if (platform === undefined) return <p className="min-h-11 text-sm text-muted-foreground">Checking this device…</p>;
+    const Icon = platform ? Watch : Smartphone;
+    return (
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm" data-testid="sleep-source">
+        <p className="flex min-w-0 flex-1 basis-48 items-start gap-2 text-muted-foreground">
+          <Icon className="mt-0.5 size-4 shrink-0 text-gold" aria-hidden />
+          <span>
+            <span className="font-semibold text-foreground">{connected ? `${deviceLine ?? "Wearable"} via ${sourceName}` : platform ? `${HEALTH_APP_NAME[platform]} not connected` : "Watch sleep arrives through the phone app"}</span>
+            {syncLine ? ` · ${syncLine}` : ""}
+          </span>
+        </p>
+        <div className="flex items-center gap-2">
+          {platform && (
+            <Button type="button" size="sm" variant="secondary" onClick={() => sync(false)} disabled={pending || !status.importEnabled} aria-busy={pending}>
+              {pending ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <RefreshCw className="size-4" aria-hidden />} {connected ? "Sync now" : `Connect ${HEALTH_APP_NAME[platform]}`}
+            </Button>
+          )}
+          <Link href="/progress/sleep/settings#devices" className="inline-flex min-h-11 items-center font-semibold text-gold-highlight underline">
+            {connected ? "Manage" : "Connection settings"}
+          </Link>
+        </div>
+        {feedback}
+      </div>
+    );
+  }
+
   if (platform === undefined) {
     return (
       <section className={card} aria-labelledby="source-title">
@@ -119,11 +160,9 @@ export function SleepSourceCard({ status }: { status: SleepSourceStatus }) {
             {connected ? `${deviceLine ?? "Wearable"} via ${sourceName}` : platform ? `Connect ${HEALTH_APP_NAME[platform]}` : "Connect your watch"}
           </h2>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            {connected && status.lastSync
-              ? `Last synced ${ago(status.lastSync.at, now)}${status.lastSync.added ? ` · ${status.lastSync.added} new` : ""}${status.lastSync.withVitals ? " · with overnight measurements" : ""}`
-              : connected
-                ? "Connected; no sync recorded yet."
-                : platform
+            {syncLine
+              ? syncLine
+              : platform
                   ? `Sleep, stages and overnight heart rate, HRV and breathing from any watch or ring that writes to ${HEALTH_APP_NAME[platform]} (Apple Watch, Oura, Garmin, WHOOP and more).`
                   : "In the Narrow Gate phone app, connect Apple Health or Health Connect once and every night your watch records appears here by itself, stages and overnight heart rate included. On the web, use the timer or enter nights by hand."}
           </p>
@@ -145,11 +184,7 @@ export function SleepSourceCard({ status }: { status: SleepSourceStatus }) {
           </Button>
         )}
       </div>
-      {message && (
-        <p role={message.ok ? "status" : "alert"} className={message.ok ? "mt-2 text-sm text-success" : "mt-2 text-sm text-destructive-foreground"}>
-          {message.text}
-        </p>
-      )}
+      {feedback}
     </section>
   );
 }

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Trash2 } from "lucide-react";
+import { ChevronDown, Trash2 } from "lucide-react";
 import { ActionButton } from "@/components/common/action-button";
 import { PageHeader } from "@/components/common/page-header";
 import { Notice } from "@/components/common/states";
@@ -22,6 +22,8 @@ import { getAiAllowance } from "@/server/services/ai-coach";
 import { draftView, loadDraft } from "@/server/services/ai-meal-plan";
 
 export const metadata = { title: "Meal planner" };
+
+const SUMMARY = "flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden";
 
 const dayTitle = (iso: string, today: string) =>
   `${iso === today ? "Today · " : ""}${new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" })}`;
@@ -143,8 +145,7 @@ export default async function PlannerPage() {
         </section>
       )}
 
-      {targets && <AiMealPlanPanel entitled={aiEntitled} defaultStart={today} draft={aiDraft} />}
-
+      {/* One primary action: generate a week. The AI draft and the settings open on demand. */}
       {targets && (
         <section aria-labelledby="generate-title" className="rounded-2xl border border-gold-muted/60 bg-card-gradient p-4">
           <h2 id="generate-title" className="mb-3 text-lg font-semibold">
@@ -185,12 +186,39 @@ export default async function PlannerPage() {
         </section>
       )}
 
-      <section aria-labelledby="settings-title" className="rounded-2xl border border-border bg-card p-4">
-        <h2 id="settings-title" className="mb-3 text-lg font-semibold">
-          Planner settings
-        </h2>
-        <PlannerSettingsForm prefs={prefs} />
-      </section>
+      {targets && (
+        // Open while an AI draft waits for review, so it can't be missed.
+        <details className="group rounded-2xl border border-border bg-card" open={Boolean(aiDraft)} data-testid="ai-plan-disclosure">
+          <summary className={SUMMARY}>
+            <span>
+              <span className="block font-semibold">{aiEntitled ? "Draft with AI instead" : "Draft with AI"}</span>
+              <span className="block text-sm text-muted-foreground">{aiDraft ? "A draft is waiting for your review" : aiEntitled ? "You review it before anything is saved" : "Pro adds AI-arranged plans"}</span>
+            </span>
+            <ChevronDown className="size-5 shrink-0 text-gold transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
+          </summary>
+          <div className="border-t border-border p-3">
+            <AiMealPlanPanel entitled={aiEntitled} defaultStart={today} draft={aiDraft} />
+          </div>
+        </details>
+      )}
+
+      <details className="group rounded-2xl border border-border bg-card" data-testid="planner-settings">
+        <summary className={SUMMARY}>
+          <span>
+            <span id="settings-title" className="block font-semibold">
+              Planner settings
+            </span>
+            <span className="block text-sm text-muted-foreground">
+              {prefs.mealsPerDay} meals a day · {prefs.budget} budget
+              {prefs.allergies.length ? ` · ${prefs.allergies.length} ${prefs.allergies.length === 1 ? "allergy" : "allergies"}` : ""}
+            </span>
+          </span>
+          <ChevronDown className="size-5 shrink-0 text-gold transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
+        </summary>
+        <div className="border-t border-border p-4">
+          <PlannerSettingsForm prefs={prefs} />
+        </div>
+      </details>
     </div>
   );
 }

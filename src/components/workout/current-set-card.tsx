@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, ArrowRight, BellRing, Check, CheckCircle2, ChevronDown, CopyPlus, Flag, Info, Lightbulb, Minus, Pause, Play, Plus, Repeat2, SkipForward, Undo2 } from "lucide-react";
+import { ArrowRight, BellRing, Check, ChevronDown, CopyPlus, Flag, Info, Minus, Pause, Play, Plus, Repeat2, SkipForward, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { displayWeight, formatDuration, toKg, weightUnit } from "@/lib/domain/units";
@@ -17,6 +17,8 @@ import { lastDoneBefore, sameNumbers, setCanComplete, type CurrentSetInfo, type 
 const CARD_DOUBLE_TAP_MS = 700;
 /** One tap on − / + moves the weight by a plate pair's worth: 5 lb or 2.5 kg. */
 const WEIGHT_STEP: Record<UnitSystem, number> = { imperial: 5, metric: 2.5 };
+/** Skip set · Swap · Next exercise: three equal, quieter buttons (icon over label) that fit a 320px-wide phone. */
+const SECONDARY_MOVE = "h-auto min-h-14 flex-col gap-1 whitespace-normal px-1 py-1.5 text-sm leading-tight";
 
 /** "155 lb × 8", "8 reps", "45 s": a set's numbers in a few characters (empty when it has none yet). */
 export function setNumbers(exercise: Pick<DraftExercise, "isTimed" | "usesDistance">, set: DraftSet, units: UnitSystem): string {
@@ -35,6 +37,20 @@ export function thenText(current: CurrentSetInfo, after: CurrentSetInfo | null, 
   const nums = after.set ? setNumbers(after.exercise, after.set, units) : "";
   if (after.exercise.id === current.exercise.id) return `Then: ${label(after)}${nums ? ` · ${nums}` : ""}`;
   return `Then: ${after.exercise.name}${after.set ? `, ${label(after)}` : ""}${nums ? ` · ${nums}` : ""}`;
+}
+
+/**
+ * One tap on − / +: a value already on the step moves by one step; a value between steps (292.1 lb carried over
+ * from a kg entry) snaps to the nearest step in that direction (292.1 → 295 or 290). Never below 0; − on an empty
+ * field leaves it empty. Only the number being entered changes: sets already logged are untouched.
+ */
+export function stepValue(value: number | null, dir: 1 | -1, step: number): number | null {
+  if (value == null) return dir < 0 ? null : step;
+  const round = (n: number) => Math.round(n * 100) / 100;
+  const steps = value / step;
+  const onStep = Math.abs(steps - Math.round(steps)) < 1e-6;
+  const next = onStep ? (Math.round(steps) + dir) * step : (dir > 0 ? Math.ceil(steps) : Math.floor(steps)) * step;
+  return Math.max(0, round(next));
 }
 
 function Stepper({
@@ -65,11 +81,7 @@ function Stepper({
     const n = Number(t);
     if (Number.isFinite(n) && n >= 0) onChange(n);
   };
-  const bump = (dir: 1 | -1) => {
-    const base = value ?? 0;
-    const next = Math.max(0, Math.round((base + dir * step) * 100) / 100);
-    onChange(dir < 0 && value == null ? null : next);
-  };
+  const bump = (dir: 1 | -1) => onChange(stepValue(value, dir, step));
   return (
     <div className="min-w-0 space-y-1" data-testid={testId}>
       <p className="text-center text-xs font-semibold uppercase tracking-widest text-muted-foreground">
@@ -394,6 +406,15 @@ export function CurrentSetCard({
           </h2>
           {target && <p className="text-sm text-gold-highlight">{target}</p>}
           {lastTime && <p className="text-sm text-foreground/85" data-testid="current-last-time">{lastTime}</p>}
+          {/* Setup, form cues and common mistakes live in one place: the info sheet (also opened by the picture). */}
+          <button
+            type="button"
+            onClick={() => setInfoOpen(true)}
+            className="-ml-1 inline-flex min-h-11 items-center gap-1.5 rounded-lg px-1 text-sm font-semibold text-gold-highlight underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+            data-testid="exercise-info-button"
+          >
+            <Info className="size-4" aria-hidden /> Exercise info
+          </button>
         </div>
       </div>
       <ExerciseInfoDialog
@@ -520,88 +541,39 @@ export function CurrentSetCard({
       )}
       {/* Right under the button just tapped, where the thumb already is. */}
       {undoRow}
-      <div className="flex items-center justify-between gap-2">
-        <p className="min-w-0 text-sm text-muted-foreground" data-testid="then-next">
-          {set ? thenText(info, after, units) : null}
+      {set && (
+        <p className="text-sm text-muted-foreground" data-testid="then-next">
+          {thenText(info, after, units)}
         </p>
+      )}
+      {/* One row of secondary moves under the one primary action. */}
+      <div className={cn("grid gap-2", set ? "grid-cols-3" : "grid-cols-1")}>
+        {set && (
+          <Button variant="secondary" className={SECONDARY_MOVE} onClick={skip} data-testid="skip-set">
+            <SkipForward aria-hidden /> Skip set
+          </Button>
+        )}
+        <Button variant="secondary" className={SECONDARY_MOVE} onClick={() => onSubstitute?.(exercise.id)} disabled={!onSubstitute} data-testid="current-swap">
+          <Repeat2 aria-hidden /> Swap
+        </Button>
+        {set && (
+          <Button variant="secondary" className={SECONDARY_MOVE} onClick={() => onNextExercise?.(exercise.id)} disabled={!onNextExercise} data-testid="next-exercise">
+            <ArrowRight aria-hidden /> Next exercise
+          </Button>
+        )}
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        {onSkipExercise && set ? (
+          <Button size="sm" variant="ghost" className="shrink-0" onClick={() => onSkipExercise(exercise.id)} data-testid="skip-exercise">
+            Skip exercise…
+          </Button>
+        ) : (
+          <span />
+        )}
         <Button size="sm" variant="ghost" className="shrink-0" onClick={() => onShowExercise(exercise.id)}>
           All sets <ChevronDown aria-hidden />
         </Button>
       </div>
-      {set && (
-        <div className="grid grid-cols-2 gap-2">
-          <Button variant="secondary" className="h-12" onClick={skip} data-testid="skip-set">
-            <SkipForward aria-hidden /> Skip set
-          </Button>
-          <Button variant="secondary" className="h-12" onClick={() => onNextExercise?.(exercise.id)} disabled={!onNextExercise} data-testid="next-exercise">
-            Next exercise <ArrowRight aria-hidden />
-          </Button>
-        </div>
-      )}
-      <div className="grid grid-cols-2 gap-2">
-        <Button variant="outline" className="h-12 rounded-full border-gold-muted/70 text-gold-highlight" onClick={() => setInfoOpen(true)} data-testid="exercise-info-button">
-          <Info aria-hidden /> Exercise info
-        </Button>
-        <Button
-          variant="outline"
-          className="h-12 rounded-full border-gold-muted/70 text-gold-highlight"
-          onClick={() => onSubstitute?.(exercise.id)}
-          disabled={!onSubstitute}
-          data-testid="substitute-button"
-        >
-          <Repeat2 aria-hidden /> Substitute
-        </Button>
-      </div>
-      {((form && (form.cues.length > 0 || form.mistakes.length > 0)) || onSubstitute || onSkipExercise) && (
-        <details className="group rounded-xl border border-border bg-background/40" data-testid="current-form">
-          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 text-sm font-semibold text-gold-highlight [&::-webkit-details-marker]:hidden">
-            <span className="flex items-center gap-2">
-              <Lightbulb className="size-4" aria-hidden /> Form cues, swap or skip
-            </span>
-            <ChevronDown className="size-4 transition-transform group-open:rotate-180" aria-hidden />
-          </summary>
-          <div className="space-y-3 px-3 pb-3 text-sm">
-            {form && form.cues.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Cues</p>
-                <ul className="mt-1 space-y-1" data-testid="current-cues">
-                  {form.cues.map((c) => (
-                    <li key={c} className="flex gap-2">
-                      <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-gold" aria-hidden /> {c}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {form && form.mistakes.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Common mistakes</p>
-                <ul className="mt-1 space-y-1" data-testid="current-mistakes">
-                  {form.mistakes.map((c) => (
-                    <li key={c} className="flex gap-2">
-                      <AlertTriangle className="mt-0.5 size-4 shrink-0 text-gold" aria-hidden /> {c}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {(onSubstitute || onSkipExercise) && (
-              <div className="grid grid-cols-2 gap-2">
-                {onSubstitute && (
-                  <Button variant="secondary" className="h-auto min-h-11 whitespace-normal" onClick={() => onSubstitute(exercise.id)} data-testid="current-swap">
-                    <Repeat2 aria-hidden /> Swap exercise
-                  </Button>
-                )}
-                {onSkipExercise && set && (
-                  <Button variant="secondary" className="h-auto min-h-11 whitespace-normal" onClick={() => onSkipExercise(exercise.id)} data-testid="skip-exercise">
-                    Skip exercise (say why)
-                  </Button>
-                )}
-              </div>
-            )}
-          </div>
-        </details>
-      )}
       {paused && <p className="text-xs text-muted-foreground">The workout is paused: the clock is stopped, and completing a set won&apos;t start a rest.</p>}
     </section>
   );

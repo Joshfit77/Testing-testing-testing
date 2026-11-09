@@ -5,7 +5,7 @@
  * Full method: docs/SLEEP_METHOD.md.
  */
 import { circularDistance, clockMinutesInTz, type NightSummary } from "@/lib/domain/sleep";
-import type { ScheduleStats } from "@/lib/domain/sleep-stats";
+import { goalPct, type ScheduleStats } from "@/lib/domain/sleep-stats";
 
 export const SLEEP_SCORE_VERSION = 1;
 
@@ -36,6 +36,11 @@ export interface SleepScore {
   missing: MissingComponent[];
   /** "duration and timing", for the label next to the score. */
   basedOn: string;
+  /**
+   * True when only bed and getting-up times were entered, so "time asleep" is really time in bed. Such a score is
+   * shown tagged "Partial" and left out of score averages; the stored night is unchanged.
+   */
+  partial: boolean;
 }
 
 export const SCORE_BAND_TEXT: Record<ScoreBand, string> = {
@@ -72,7 +77,8 @@ export function nightlyScore(night: NightSummary, goalMinutes: number, pattern: 
     label: LABELS.duration,
     weight: WEIGHTS.duration,
     points: pts(ramp(ratio, 0.5, 1), WEIGHTS.duration),
-    detail: `${Math.round(ratio * 100)}% of your goal${night.asleepEstimated ? " (time in bed, as nothing else was entered)" : ""}`,
+    // The same rounding as every goal bar: never "100%" short of the goal.
+    detail: `${goalPct(night.asleepMinutes, goalMinutes) ?? 0}% of your goal${night.asleepEstimated ? " (time in bed, as nothing else was entered)" : ""}`,
   });
 
   // Efficiency: 90%+ is full marks, 60% or less is none.
@@ -97,5 +103,15 @@ export function nightlyScore(night: NightSummary, goalMinutes: number, pattern: 
   const score = Math.round((earned / weight) * 100);
   const names = components.map((c) => (c.key === "duration" ? "duration" : c.key === "efficiency" ? "efficiency" : c.key === "timing" ? "timing" : "wake-ups"));
   const basedOn = names.length === 1 ? names[0]! : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
-  return { score, version: SLEEP_SCORE_VERSION, band: scoreBand(score), components, missing, basedOn };
+  return { score, version: SLEEP_SCORE_VERSION, band: scoreBand(score), components, missing, basedOn, partial: night.asleepEstimated };
+}
+
+/** Average of the full scores; partial ones (time in bed only) are counted separately and left out. */
+export function averageScore(scores: Pick<SleepScore, "score" | "partial">[]): { average: number | null; counted: number; partial: number } {
+  const full = scores.filter((s) => !s.partial);
+  return {
+    average: full.length ? Math.round(full.reduce((acc, s) => acc + s.score, 0) / full.length) : null,
+    counted: full.length,
+    partial: scores.length - full.length,
+  };
 }

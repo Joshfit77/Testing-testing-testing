@@ -6,7 +6,8 @@
 #
 #   npm run demo:reset
 #
-# Like the demo itself, it only ever touches the database on this computer, and only demo accounts.
+# Like the demo itself, it only ever touches the database on this computer. It resets only the sample account, in
+# place: new-member demo accounts (and any test using one) are left alone.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 command -v docker >/dev/null || { echo "Docker is required (it runs the local database)."; exit 1; }
@@ -16,5 +17,5 @@ export NEXT_PUBLIC_SUPABASE_URL="$API_URL" SUPABASE_SERVICE_ROLE_KEY="$SERVICE_R
 export DEMO_CREDENTIALS_FILE=".demo-credentials.local"
 # Keep the running server's password (it read this file when it started).
 if [ -f "$DEMO_CREDENTIALS_FILE" ]; then set -a; . "./$DEMO_CREDENTIALS_FILE"; set +a; fi
-npx tsx --conditions=react-server scripts/demo/seed-demo.ts
+npx tsx --conditions=react-server scripts/demo/seed-demo.ts --reset
 echo "Demo reset. In the browser: reload, then tap 'Explore with sample data'."

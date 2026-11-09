@@ -15,7 +15,7 @@ export default async function BodyMapPage({ searchParams }: { searchParams: Prom
   const { user } = await requireOnboardedUser();
   if (!hasFeature(await getUserPlan(user.id), "advanced_analytics")) {
     return (
-      <PlanLocked
+      <PlanLocked freeAlternative={{ href: "/progress/overview", label: "See my progress" }}
         back={{ href: "/progress", label: "My Progress" }}
         eyebrow="My Progress"
         title="Strength & Body Map"

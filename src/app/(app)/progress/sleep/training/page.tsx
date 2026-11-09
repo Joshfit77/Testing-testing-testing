@@ -19,7 +19,7 @@ export default async function SleepTrainingPage() {
   const { user, profile } = await requireOnboardedUser();
   const plan = await getUserPlan(user.id);
   if (!hasFeature(plan, "sleep_ai_coaching")) {
-    return <PlanLocked back={{ href: "/progress/sleep", label: "Sleep & Recovery" }} eyebrow="Sleep & Recovery" title="Sleep & training" description="Your sleep and your training side by side: the nights before workouts, how hard sessions felt after short nights, how rested you said you were, and the training review's sleep-aware suggestions, which you accept or decline." />;
+    return <PlanLocked freeAlternative={{ href: "/progress/sleep/log", label: "Log last night's sleep" }} back={{ href: "/progress/sleep", label: "Sleep & Recovery" }} eyebrow="Sleep & Recovery" title="Sleep & training" description="Your sleep and your training side by side: the nights before workouts, how hard sessions felt after short nights, how rested you said you were, and the training review's sleep-aware suggestions, which you accept or decline." />;
   }
   const tz = profile.timezone ?? "UTC";
   const today = isoDateInTz(new Date(), tz);

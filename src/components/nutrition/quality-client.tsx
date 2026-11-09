@@ -181,8 +181,8 @@ export function FiltersEditor({ initial }: { initial: FoodFilters }) {
         <legend className="text-sm font-semibold">Allergens to avoid</legend>
         <div className="mt-1 grid grid-cols-2 gap-1 text-sm sm:grid-cols-3">
           {Object.entries(ALLERGENS).map(([tag, label]) => (
-            <label key={tag} className="flex items-center gap-2">
-              <input type="checkbox" className="size-4 accent-[#cfa53e]" checked={f.allergens.includes(tag)} onChange={() => setF((c) => ({ ...c, allergens: toggle(c.allergens, tag) }))} />
+            <label key={tag} className="flex min-h-11 items-center gap-2">
+              <input type="checkbox" className="size-5 accent-[#cfa53e]" checked={f.allergens.includes(tag)} onChange={() => setF((c) => ({ ...c, allergens: toggle(c.allergens, tag) }))} />
               {label}
             </label>
           ))}
@@ -200,8 +200,8 @@ export function FiltersEditor({ initial }: { initial: FoodFilters }) {
         <legend className="text-sm font-semibold">Nutrition preferences</legend>
         <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm">
           {NUTRITION_FILTERS.map((n: NutritionFilter) => (
-            <label key={n} className="flex items-center gap-2">
-              <input type="checkbox" className="size-4 accent-[#cfa53e]" checked={f.nutrition.includes(n)} onChange={() => setF((c) => ({ ...c, nutrition: toggle(c.nutrition, n) }))} />
+            <label key={n} className="flex min-h-11 items-center gap-2">
+              <input type="checkbox" className="size-5 accent-[#cfa53e]" checked={f.nutrition.includes(n)} onChange={() => setF((c) => ({ ...c, nutrition: toggle(c.nutrition, n) }))} />
               {NUTRITION_FILTER_LABELS[n]}
             </label>
           ))}

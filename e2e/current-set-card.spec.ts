@@ -13,7 +13,7 @@ test.describe("current set card", () => {
     await completeOnboarding(page);
 
     await page.goto("/home");
-    await page.getByRole("link", { name: /^Start (Today's Workout|workout)/ }).click();
+    await page.getByRole("link", { name: /^Start (Today's Workout|workout)/i }).click();
     await page.waitForURL(/\/train\/workout\?day=/);
     const workoutUrl = new URL(page.url());
 

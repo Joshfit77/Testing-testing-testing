@@ -42,9 +42,10 @@ export interface Bounds {
 
 /** Fit the motion's bounds into a canvas; `insetBottom` (CSS px) keeps the figure above controls drawn over the bottom. */
 export function fitCamera(b: Bounds, w: number, h: number, dpr: number, mirror = false, insetBottom = 0): Camera {
-  const padX = 0.06 * w;
-  const padTop = 0.07 * h;
-  const padBottom = 0.12 * h + insetBottom;
+  // A tight fit, so the athlete fills the frame on a phone (the floor and shadow still fit under the feet).
+  const padX = 0.05 * w;
+  const padTop = 0.05 * h;
+  const padBottom = 0.06 * h + insetBottom;
   const bw = Math.max(60, b.x1 - b.x0);
   const bh = Math.max(60, b.y1 - Math.min(0, b.y0));
   const scale = Math.min((w - 2 * padX) / bw, (h - padTop - padBottom) / bh);
@@ -159,9 +160,10 @@ function withAlpha(ctx: CanvasRenderingContext2D, a: number, draw: () => unknown
 
 function drawBackdrop(ctx: CanvasRenderingContext2D, w: number, h: number, cam: Camera, frame: Frame, floor: boolean) {
   const g = ctx.createRadialGradient(w * 0.5, h * 0.42, 0, w * 0.5, h * 0.5, Math.max(w, h) * 0.75);
-  g.addColorStop(0, "#1c1810");
-  g.addColorStop(0.55, "#110f0b");
-  g.addColorStop(1, "#070707");
+  // A lighter, warm stage behind the figure, so the dark athlete stands out from it.
+  g.addColorStop(0, "#3a3122");
+  g.addColorStop(0.55, "#221d15");
+  g.addColorStop(1, "#100e0b");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
   if (!floor) return;

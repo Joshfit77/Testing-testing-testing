@@ -158,7 +158,7 @@ export function ActivityForm({ mode, initial, today }: { mode: "create" | "edit"
                 type="button"
                 aria-pressed={unit === u}
                 onClick={() => setUnit(u)}
-                className={cn("min-h-9 min-w-11 rounded-lg px-2 text-sm font-semibold", unit === u ? "bg-gold-gradient text-primary-foreground" : "text-muted-foreground")}
+                className={cn("relative min-h-9 min-w-11 rounded-lg px-2 text-sm font-semibold after:absolute after:inset-x-0 after:-inset-y-1 after:content-['']", unit === u ? "bg-gold-gradient text-primary-foreground" : "text-muted-foreground")}
               >
                 {u}
               </button>

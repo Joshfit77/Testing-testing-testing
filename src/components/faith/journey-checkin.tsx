@@ -51,6 +51,7 @@ export function JourneyCheckIn({
   prayer,
   readingHref,
   minutes,
+  only,
 }: {
   userId: string;
   journeyId: string;
@@ -59,6 +60,8 @@ export function JourneyCheckIn({
   prayer: boolean;
   readingHref: string | null;
   minutes: number;
+  /** Show just one activity's row (the Bible reader shows the reading row at the end of today's chapter). */
+  only?: Activity;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -126,10 +129,11 @@ export function JourneyCheckIn({
     });
   }
 
-  const rows: { id: Activity; done: boolean; title: string; detail: string; icon: typeof BookOpen }[] = [
+  const allRows: { id: Activity; done: boolean; title: string; detail: string; icon: typeof BookOpen }[] = [
     { id: "reading", done: reading, title: "Today's Bible reading", detail: `About ${minutes} min`, icon: BookOpen },
     { id: "prayer", done: prayer, title: "Prayer", detail: "Time with God in prayer. Writing it down is optional.", icon: HandHeart },
   ];
+  const rows = allRows.filter((r) => !only || r.id === only);
 
   return (
     <div className="space-y-2">
@@ -164,7 +168,7 @@ export function JourneyCheckIn({
                   ) : (
                     !isQueued && (
                       <Button type="button" size="sm" className="h-auto min-h-9 whitespace-normal py-1.5 text-left" disabled={pending} onClick={() => mark(r.id)}>
-                        <CheckCircle2 aria-hidden /> {r.id === "reading" ? "Mark reading complete" : "Mark prayer complete"}
+                        <CheckCircle2 aria-hidden /> {r.id === "reading" ? (only === "reading" ? "Mark today's reading complete" : "Mark reading complete") : "Mark prayer complete"}
                       </Button>
                     )
                   )}

@@ -204,3 +204,13 @@ export async function serviceRest<T = unknown>(path: string, init: { method?: st
   const text = await res.text();
   return (text ? JSON.parse(text) : null) as T;
 }
+
+/**
+ * Hide what only the demo shows (the demo bar and the "Demo: …" notices), so a "first screen" check measures what a
+ * production member sees. Call after each navigation.
+ */
+export async function hideDemoChrome(page: Page) {
+  await page.addStyleTag({
+    content: `[data-testid="demo-bar"], *:has(> [data-testid^="demo-note-"]), *:has(> [data-testid="demo-ai-simulated"]), *:has(> [data-testid="demo-purchases-off"]) { display: none !important; }`,
+  });
+}

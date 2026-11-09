@@ -56,7 +56,7 @@ export function RunningGoals({ goals, unit }: { goals: GoalView[]; unit: Distanc
                   </p>
                   <p className="text-sm text-muted-foreground">{g.detail}</p>
                 </div>
-                <Button size="icon-sm" variant="ghost" aria-label={`Remove goal: ${g.title}`} disabled={pending} onClick={() => run(() => removeRunningGoalAction(g.id))}>
+                <Button size="icon-sm" variant="ghost" className="shrink-0" aria-label={`Remove goal: ${g.title}`} disabled={pending} onClick={() => run(() => removeRunningGoalAction(g.id))}>
                   <Trash2 aria-hidden />
                 </Button>
               </div>

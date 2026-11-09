@@ -18,7 +18,7 @@ export default async function TrainingReviewPage() {
         back={{ href: "/train", label: "Train" }}
         eyebrow="Train"
         title="Training review"
-       
+        freeAlternative={{ href: "/train/history", label: "See my workout history" }}
         description="A weekly look at your consistency, strength trends, volume and recovery, with explained suggestions you can accept, adjust or turn down."
       />
     );
@@ -39,6 +39,7 @@ export default async function TrainingReviewPage() {
       <TrainingReviewView
         review={review}
         units={input.units}
+        today={input.today}
         programName={input.program?.name ?? null}
         adjustments={(adjustments ?? []) as { id: string; kind: string; summary: string; source: string; created_at: string; reverted_at: string | null }[]}
       />

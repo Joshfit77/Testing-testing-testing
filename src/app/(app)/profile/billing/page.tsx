@@ -1,3 +1,4 @@
+import { BookOpen } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { Notice } from "@/components/common/states";
 import { PortalButton } from "@/components/profile/billing-buttons";
@@ -158,6 +159,9 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
           </div>
           {stripeActive && isStripeConfigured() && !native && <PortalButton />}
         </div>
+        <p className="mt-3 flex items-center gap-2 border-t border-border pt-3 text-sm text-foreground/90" data-testid="faith-free">
+          <BookOpen className="size-4 shrink-0 text-gold" aria-hidden /> Faith is always free: the Bible, devotionals and prayer journal.
+        </p>
         {cancelling && periodEnd && (
           <p className="mt-3 text-sm text-[#e2c477]">Your membership is set to cancel. You keep {plans[plan].name} until {dateFmt(periodEnd)} and won&apos;t be charged again.</p>
         )}

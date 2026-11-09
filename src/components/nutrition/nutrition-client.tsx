@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { Droplets, Loader2, Plus, Search, Undo2, X } from "lucide-react";
+import { ChevronDown, Droplets, Loader2, Plus, ScanBarcode, Search, Undo2, X } from "lucide-react";
 import { FieldError, FormMessage, SubmitButton } from "@/components/common/form-status";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -19,10 +20,12 @@ import { useDraft } from "@/lib/use-draft";
 import { useSessionState } from "@/lib/nav-memory";
 import { basisFromFoodRow, defaultUnit, type FoodChoice } from "@/lib/domain/food-basis";
 import { prepareEntry, rankFoods } from "@/lib/domain/food-search";
-import { initialActionState, type ActionState } from "@/lib/action-state";
+import { initialActionState } from "@/lib/action-state";
 import { MEAL_TYPES } from "@/lib/domain/meals";
 import { caloriesFromMacros } from "@/lib/domain/nutrition";
-import type { QuickFood } from "@/lib/domain/diary";
+import { quickFoodSummary, shortDate, waterLitres, type LogResult, type QuickFood } from "@/lib/domain/diary";
+import { LoggedUndo } from "@/components/nutrition/logged-undo";
+import { cn } from "@/lib/utils";
 import {
   addWaterAction,
   createCustomFoodAction,
@@ -128,8 +131,24 @@ export function ChoiceRow({
   );
 }
 
+/** A saved meal for the Add food sheet's "Saved meals" tab: one serving's numbers. */
+export interface SavedMealChoice {
+  id: string;
+  name: string;
+  calories: number;
+  protein_g: number;
+}
+
+const TAB_IDS = ["recent", "search", "scan", "saved", "favorites", "mine", "manual"] as const;
+/** Tabs keep their full label and scroll sideways rather than squeeze ("M…"). */
+const TAB_CLASS = "grow shrink-0";
+/** The big logging tiles on the diary's first screen. */
+const TILE_CLASS =
+  "h-auto min-h-[4.75rem] w-full flex-col gap-1.5 whitespace-normal rounded-2xl border-border bg-card px-1 py-3 text-center text-sm hover:border-gold-muted [&_svg]:size-6 [&_svg]:text-gold";
+
 export function AddFoodDialog({
   date,
+  dayLabel,
   myFoods,
   commonFoods,
   remoteSearch,
@@ -138,9 +157,14 @@ export function AddFoodDialog({
   recent = [],
   frequent = [],
   favorites = [],
+  savedMeals = [],
   autoOpen = false,
+  initialTab,
+  scanTile = false,
 }: {
   date: string;
+  /** "Today", or the day in words ("Mon, Nov 9"); defaults to the date in words. */
+  dayLabel?: string;
   myFoods: MyFood[];
   commonFoods: MyFood[];
   /** USDA FoodData Central API (branded foods) is configured in addition to the built-in database. */
@@ -152,26 +176,42 @@ export function AddFoodDialog({
   frequent?: QuickFood[];
   /** Starred foods (newest first). */
   favorites?: FoodChoice[];
+  /** The member's saved meals, logged one serving at a time from the "Saved meals" tab. */
+  savedMeals?: SavedMealChoice[];
   /** Open the dialog as soon as the page loads (the Quick Add sheet links to /nutrition?add=1). */
   autoOpen?: boolean;
+  /** With autoOpen: the tab to open on (e.g. /nutrition?add=1&tab=scan). */
+  initialTab?: string;
+  /** Also render a "Scan barcode" tile that opens this sheet on its Scan tab (logging, not the product analyser). */
+  scanTile?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  // A tab asked for by how the sheet was opened (the Scan barcode tile, ?tab=scan). It wins over the remembered
+  // tab for this opening only, so the next plain "Add food" opens where the member left off.
+  const [forcedTab, setForcedTab] = useState<string | null>(null);
   useEffect(() => {
-    if (autoOpen) setOpen(true);
-  }, [autoOpen]);
+    if (!autoOpen) return;
+    setOpen(true);
+    if (initialTab && (TAB_IDS as readonly string[]).includes(initialTab)) setForcedTab(initialTab);
+  }, [autoOpen, initialTab]);
   const [mealType, setMealType] = useState("breakfast");
   // Each time the food search opens, start on the meal for the time of day (on this device's clock).
   useEffect(() => {
     if (open) setMealType(mealForTime(new Date()));
   }, [open]);
   const [status, setStatus] = useState("logged");
-  const [result, setResult] = useState<ActionState | null>(null);
+  const [result, setResult] = useState<LogResult | null>(null);
   const [pending, startTransition] = useTransition();
   const hasRecent = recent.length > 0;
+  const hasSaved = savedMeals.length > 0;
   // The tab, search text and food type are remembered for this browser tab (sessionStorage), so they
   // survive switching app sections and reopening the dialog.
   // null = not chosen yet: then the default follows the data (Recent once you've logged something).
-  const [chosenTab, setTab] = useSessionState<string | null>("food.add.tab", null);
+  const [chosenTab, setChosenTab] = useSessionState<string | null>("food.add.tab", null);
+  const setTab = (t: string | null) => {
+    setForcedTab(null);
+    setChosenTab(t);
+  };
   const [picked, setPicked] = useState<FoodChoice | null>(null);
   // Favorites: server list plus optimistic stars/un-stars made in this dialog.
   const [favOverrides, setFavOverrides] = useState<Record<string, FoodChoice | null>>({});
@@ -182,7 +222,23 @@ export function AddFoodDialog({
     return [...added, ...base];
   }, [favorites, favOverrides]);
   const favKeys = useMemo(() => new Set(favList.map((f) => f.key)), [favList]);
-  const tab = chosenTab ?? (hasRecent ? "recent" : favList.length ? "favorites" : "search");
+  // A new member (nothing logged, nothing starred) starts on Search, which shows Popular foods first.
+  // A tab that has nothing in it (no recent foods, no saved meals) is never shown.
+  const usable = (t: string | null) => (t && !(t === "recent" && !hasRecent) && !(t === "saved" && !hasSaved) ? t : null);
+  const tab = usable(forcedTab) ?? usable(chosenTab) ?? (hasRecent ? "recent" : favList.length ? "favorites" : "search");
+  // Keep the chosen tab in view in the scrolling tab row (e.g. Scan, opened from the tile).
+  const tabListRef = useRef<HTMLDivElement>(null);
+  const [tabsAtEnd, setTabsAtEnd] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const t = setTimeout(() => {
+      const list = tabListRef.current;
+      if (!list) return;
+      list.querySelector<HTMLElement>('[data-state="active"]')?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+      setTabsAtEnd(list.scrollLeft + list.clientWidth >= list.scrollWidth - 4);
+    }, 0);
+    return () => clearTimeout(t);
+  }, [open, tab]);
   const onFavorite = (food: FoodChoice, on: boolean) => setFavOverrides((o) => ({ ...o, [food.key]: on ? food : null }));
 
   // Search / browse state
@@ -280,16 +336,28 @@ export function AddFoodDialog({
       setResult(await relogItemAction({ itemId, date, mealType, status }));
     });
 
+  // One serving of a saved meal into the meal chosen above (the meal for the time of day unless changed).
+  const logSaved = (templateId: string) =>
+    startTransition(async () => {
+      const fd = new FormData();
+      fd.set("templateId", templateId);
+      fd.set("date", date);
+      fd.set("mealType", mealType);
+      fd.set("servings", "1");
+      fd.set("status", status);
+      setResult(await logTemplateAction(initialActionState, fd));
+    });
+
   const quickRow = (f: QuickFood, showCount: boolean) => (
     <li key={f.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-elevated/50 px-3 py-2">
       <span className="min-w-0">
         <span className="block truncate text-sm font-semibold">{f.name}</span>
-        <span className="text-xs text-muted-foreground">
-          {Math.round(f.calories)} kcal · P {Number(f.protein_g)} · C {Number(f.carbs_g)} · F {Number(f.fat_g)}
+        <span className="text-sm text-muted-foreground">
+          {quickFoodSummary(f)}
           {showCount ? ` · logged ${f.count}×` : ""}
         </span>
       </span>
-      <Button size="sm" disabled={pending} onClick={() => relog(f.id)} aria-label={`Add ${f.name} again`}>
+      <Button size="sm" className="min-h-11 shrink-0" disabled={pending} onClick={() => relog(f.id)} aria-label={`Add ${f.name} again`}>
         <Plus aria-hidden /> Add
       </Button>
     </li>
@@ -313,28 +381,46 @@ export function AddFoodDialog({
     <>
       <Button
         variant="secondary"
-        className="h-auto min-h-[4.75rem] w-full flex-col gap-1.5 whitespace-normal rounded-2xl border-border bg-card px-1 py-3 text-center text-sm hover:border-gold-muted [&_svg]:size-6 [&_svg]:text-gold"
+        className={TILE_CLASS}
         onClick={() => {
           setOpen(true);
           setResult(null);
           setPicked(null);
+          setForcedTab(null);
           // A remembered tab that has nothing in it any more falls back to the default.
-          if ((chosenTab === "recent" && !hasRecent) || (chosenTab === "favorites" && !favList.length)) setTab(null);
+          if ((chosenTab === "recent" && !hasRecent) || (chosenTab === "favorites" && !favList.length) || (chosenTab === "saved" && !hasSaved)) setTab(null);
         }}
       >
         <Plus aria-hidden /> Add food
       </Button>
-      <Dialog open={open} onOpenChange={setOpen}>
+      {scanTile && (
+        <Button
+          variant="secondary"
+          className={TILE_CLASS}
+          data-testid="scan-tile"
+          onClick={() => {
+            setResult(null);
+            setPicked(null);
+            setForcedTab("scan");
+            setOpen(true);
+          }}
+        >
+          <ScanBarcode aria-hidden /> Scan barcode
+        </Button>
+      )}
+      <Dialog
+        open={open}
+        onOpenChange={(o) => {
+          setOpen(o);
+          if (!o) setForcedTab(null);
+        }}
+      >
         <DialogContent side="bottom" className="max-h-[92dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{picked ? "How much?" : "Add food"}</DialogTitle>
-            <DialogDescription>For {date}</DialogDescription>
+            <DialogDescription>For {dayLabel ?? shortDate(date)}</DialogDescription>
           </DialogHeader>
-          {result?.message && (
-            <p role={result.ok ? "status" : "alert"} className={result.ok ? "mt-3 text-sm text-[#5fc49a]" : "mt-3 text-sm text-[#f08a8a]"}>
-              {result.message}
-            </p>
-          )}
+          <LoggedUndo result={result} className="mt-3" />
           {picked ? (
             <div className="mt-3">
               <AmountPicker
@@ -364,28 +450,51 @@ export function AddFoodDialog({
             <>
               <MealControls mealType={mealType} setMealType={setMealType} status={status} setStatus={setStatus} idPrefix="add" />
               <Tabs value={tab} onValueChange={setTab} className="mt-4">
-                <TabsList className="w-full justify-start overflow-x-auto">
-                  {hasRecent && (
-                    <TabsTrigger value="recent" className="flex-1">
-                      Recent
+                {/* The tabs scroll sideways on a phone; a fade on the right edge shows there are more. */}
+                <div className="relative">
+                  <TabsList
+                    ref={tabListRef}
+                    className="w-full justify-start overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                    onScroll={(e) => {
+                      const el = e.currentTarget;
+                      setTabsAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 4);
+                    }}
+                  >
+                    {hasRecent && (
+                      <TabsTrigger value="recent" className={TAB_CLASS}>
+                        Recent
+                      </TabsTrigger>
+                    )}
+                    <TabsTrigger value="search" className={TAB_CLASS}>
+                      Search
                     </TabsTrigger>
-                  )}
-                  <TabsTrigger value="favorites" className="flex-1">
-                    Favorites
-                  </TabsTrigger>
-                  <TabsTrigger value="search" className="flex-1">
-                    Search
-                  </TabsTrigger>
-                  <TabsTrigger value="scan" className="flex-1">
-                    Scan
-                  </TabsTrigger>
-                  <TabsTrigger value="mine" className="flex-1">
-                    My foods
-                  </TabsTrigger>
-                  <TabsTrigger value="manual" className="flex-1">
-                    Manual
-                  </TabsTrigger>
-                </TabsList>
+                    <TabsTrigger value="scan" className={TAB_CLASS}>
+                      Scan
+                    </TabsTrigger>
+                    {hasSaved && (
+                      <TabsTrigger value="saved" className={TAB_CLASS}>
+                        Saved meals
+                      </TabsTrigger>
+                    )}
+                    <TabsTrigger value="favorites" className={TAB_CLASS}>
+                      Favorites
+                    </TabsTrigger>
+                    <TabsTrigger value="mine" className={TAB_CLASS}>
+                      My foods
+                    </TabsTrigger>
+                    <TabsTrigger value="manual" className={TAB_CLASS}>
+                      Manual
+                    </TabsTrigger>
+                  </TabsList>
+                  <span
+                    aria-hidden
+                    data-testid="tabs-more-cue"
+                    className={cn(
+                      "pointer-events-none absolute inset-y-px right-px w-10 rounded-r-xl bg-gradient-to-l from-card to-transparent transition-opacity motion-reduce:transition-none",
+                      tabsAtEnd ? "opacity-0" : "opacity-100",
+                    )}
+                  />
+                </div>
 
                 {hasRecent && (
                   <TabsContent value="recent">
@@ -400,8 +509,34 @@ export function AddFoodDialog({
                         <p className={sectionTitle}>Recent</p>
                         <ul className="mt-2 space-y-2">{recent.map((f) => quickRow(f, false))}</ul>
                       </section>
-                      <p className="text-xs text-muted-foreground">One tap adds the same amount you logged last time to the meal chosen above.</p>
+                      <p className="text-xs text-muted-foreground">One tap adds the amount shown to the meal chosen above.</p>
                     </div>
+                  </TabsContent>
+                )}
+
+                {hasSaved && (
+                  <TabsContent value="saved">
+                    <section aria-label="Saved meals">
+                      <ul className="space-y-2">
+                        {savedMeals.map((m) => (
+                          <li key={m.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-elevated/50 px-3 py-2">
+                            <span className="min-w-0">
+                              <span className="block truncate text-sm font-semibold">{m.name}</span>
+                              <span className="text-sm text-muted-foreground">
+                                1 serving · {Math.round(m.calories)} kcal · P {Math.round(m.protein_g)} g
+                              </span>
+                            </span>
+                            <Button size="sm" className="min-h-11 shrink-0" disabled={pending} onClick={() => logSaved(m.id)} aria-label={`Add ${m.name}`}>
+                              <Plus aria-hidden /> Add
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="mt-2 text-xs text-muted-foreground">One tap adds one serving to the meal chosen above.</p>
+                      <Link href="/nutrition/saved-meals" className="inline-flex min-h-11 items-center text-sm font-semibold text-gold-highlight underline">
+                        More servings, another day, or manage saved meals
+                      </Link>
+                    </section>
                   </TabsContent>
                 )}
 
@@ -426,18 +561,26 @@ export function AddFoodDialog({
                   {cat != null && (
                     <div className="mb-2 flex items-center justify-between gap-2">
                       <p className="text-sm font-semibold">{categories[cat]}</p>
-                      <Button type="button" size="sm" variant="ghost" onClick={() => setCat(null)}>
+                      <Button type="button" size="sm" variant="ghost" className="min-h-11" onClick={() => setCat(null)}>
                         <X aria-hidden /> All types
                       </Button>
                     </div>
                   )}
-                  <label className="relative block">
-                    <span className="sr-only">{cat != null ? `Search ${categories[cat]}` : "Search foods"}</span>
+                  <Label htmlFor="food-search" className="mb-1 block">
+                    {cat != null ? `Search ${categories[cat]}` : "Search foods"}
+                  </Label>
+                  <div className="relative">
                     <Search className="pointer-events-none absolute left-3 top-3.5 size-4 text-muted-foreground" aria-hidden />
-                    <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={cat != null ? `Search ${categories[cat]}` : "e.g. chicken, banana, rice"} className="pl-9" />
-                  </label>
+                    <Input
+                      id="food-search"
+                      value={q}
+                      onChange={(e) => setQ(e.target.value)}
+                      placeholder={cat != null ? `Search ${categories[cat]}` : "e.g. chicken, banana, rice"}
+                      className="pl-9"
+                    />
+                  </div>
                   {dietName && searching && (
-                    <label className="mt-2 flex items-center gap-2 text-sm">
+                    <label className="mt-2 flex min-h-11 items-center gap-2 text-sm">
                       <input type="checkbox" checked={dietOnly} onChange={(e) => setDietOnly(e.target.checked)} className="size-5 accent-[#C9A54C]" />
                       Only show built-in foods that fit {dietName}
                     </label>
@@ -447,28 +590,6 @@ export function AddFoodDialog({
                       <p role="alert" className="text-sm text-[#f08a8a]">
                         {search.message}
                       </p>
-                    )}
-
-                    {cat == null && !searching && (
-                      <section aria-label="Browse by type">
-                        <p className={sectionTitle}>Browse by type</p>
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          {categories.map((c, i) => (
-                            <button
-                              key={c}
-                              type="button"
-                              onClick={() => {
-                                setCat(i);
-                                setQ("");
-                                setResults([]);
-                              }}
-                              className="rounded-full border border-border bg-elevated/60 px-3 py-1.5 text-xs hover:border-gold-muted hover:text-gold-highlight"
-                            >
-                              {c}
-                            </button>
-                          ))}
-                        </div>
-                      </section>
                     )}
 
                     {searching && myMatches.length > 0 && (
@@ -504,6 +625,32 @@ export function AddFoodDialog({
                       )}
                       <p className="mt-2 text-xs text-muted-foreground">USDA FoodData Central (SR Legacy, public domain). Values per 100 g; pick any amount next.</p>
                     </section>
+
+                    {/* The 25 USDA food groups, closed until asked for: a new member sees Popular foods first. */}
+                    {cat == null && !searching && (
+                      <details className="group rounded-xl border border-border" data-testid="browse-by-type">
+                        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+                          Browse by type
+                          <ChevronDown className="size-4 shrink-0 text-gold transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
+                        </summary>
+                        <section aria-label="Browse by type" className="flex flex-wrap gap-1.5 border-t border-border p-3">
+                          {categories.map((c, i) => (
+                            <button
+                              key={c}
+                              type="button"
+                              onClick={() => {
+                                setCat(i);
+                                setQ("");
+                                setResults([]);
+                              }}
+                              className="min-h-11 rounded-full border border-border bg-elevated/60 px-3 py-1.5 text-sm hover:border-gold-muted hover:text-gold-highlight"
+                            >
+                              {c}
+                            </button>
+                          ))}
+                        </section>
+                      </details>
+                    )}
 
                     {searching && (
                       <section aria-label="Common foods">
@@ -674,7 +821,7 @@ export function CustomFoodForm() {
           </div>
         ))}
       </div>
-      <label className="flex items-center gap-2 text-sm">
+      <label className="flex min-h-11 items-center gap-2 text-sm">
         <input type="checkbox" name="isEstimate" checked={v.isEstimate} onChange={set("isEstimate")} className="size-5 accent-[#C9A54C]" />
         Values are an estimate (not copied from a label)
       </label>
@@ -687,11 +834,12 @@ export function CustomFoodForm() {
 export function WaterCard({ date, totalMl, goalMl }: { date: string; totalMl: number; goalMl: number }) {
   const [state, action] = useActionState(addWaterAction, initialActionState);
   const pct = goalMl ? Math.min(100, Math.round((totalMl / goalMl) * 100)) : 0;
+  const water = waterLitres(totalMl, goalMl);
   return (
     <div className="space-y-3">
       <div className="flex items-end justify-between">
-        <p className="font-display text-3xl font-bold">
-          {(totalMl / 1000).toFixed(2)} <span className="text-base text-muted-foreground">/ {(goalMl / 1000).toFixed(1)} L</span>
+        <p className="font-display text-3xl font-bold tabular-nums" data-testid="water-total">
+          {water.total} <span className="text-base text-muted-foreground">of {water.goal} L</span>
         </p>
         <Droplets className="size-6 text-[#4A86C0]" aria-hidden />
       </div>
@@ -703,7 +851,7 @@ export function WaterCard({ date, totalMl, goalMl }: { date: string; totalMl: nu
           <form key={ml} action={action}>
             <input type="hidden" name="date" value={date} />
             <input type="hidden" name="amountMl" value={ml} />
-            <SubmitButton size="sm" variant="secondary" pendingLabel="…">
+            <SubmitButton size="sm" variant="secondary" className="min-h-11" pendingLabel="…">
               +{ml} ml
             </SubmitButton>
           </form>
@@ -711,7 +859,7 @@ export function WaterCard({ date, totalMl, goalMl }: { date: string; totalMl: nu
         {totalMl > 0 && (
           <form action={undoWaterAction}>
             <input type="hidden" name="date" value={date} />
-            <Button type="submit" size="sm" variant="ghost" aria-label="Undo last water entry">
+            <Button type="submit" size="sm" variant="ghost" className="min-h-11" aria-label="Undo last water entry">
               <Undo2 aria-hidden /> Undo
             </Button>
           </form>
@@ -773,15 +921,15 @@ export function SaveMealForm({ mealId, defaultName }: { mealId: string; defaultN
         <Label htmlFor={`sm-${mealId}`} className="text-xs">
           Save as meal
         </Label>
-        <Input id={`sm-${mealId}`} name="name" defaultValue={defaultName} maxLength={120} required className="h-9" />
+        <Input id={`sm-${mealId}`} name="name" defaultValue={defaultName} maxLength={120} required className="h-11" />
       </div>
       <div className="w-24 space-y-1">
         <Label htmlFor={`sy-${mealId}`} className="text-xs">
           Makes (servings)
         </Label>
-        <Input id={`sy-${mealId}`} name="yieldServings" type="number" inputMode="decimal" min={1} step="0.5" defaultValue="1" className="h-9" />
+        <Input id={`sy-${mealId}`} name="yieldServings" type="number" inputMode="decimal" min={1} step="0.5" defaultValue="1" className="h-11" />
       </div>
-      <SubmitButton size="sm" variant="secondary">
+      <SubmitButton size="sm" variant="secondary" className="min-h-11">
         Save
       </SubmitButton>
       <div className="w-full">
@@ -793,7 +941,10 @@ export function SaveMealForm({ mealId, defaultName }: { mealId: string; defaultN
 
 export function LogTemplateForm({ templateId, date }: { templateId: string; date: string }) {
   const [state, action] = useActionState(logTemplateAction, initialActionState);
+  // Starts on the meal for the time of day, as the Add food sheet does. Read on the device after hydration (the
+  // server's clock and time zone can differ from the phone's); the member can change it.
   const [mealType, setMealType] = useState("dinner");
+  useEffect(() => setMealType(mealForTime(new Date())), []);
   const [status, setStatus] = useState("logged");
   return (
     <form action={action} className="space-y-2">
@@ -813,12 +964,12 @@ export function LogTemplateForm({ templateId, date }: { templateId: string; date
         <Label htmlFor={`td-${templateId}`} className="text-xs">
           Date
         </Label>
-        <Input id={`td-${templateId}`} name="date" type="date" defaultValue={date} className="h-9 w-40" />
-        <SubmitButton size="sm" className="ml-auto">
+        <Input id={`td-${templateId}`} name="date" type="date" defaultValue={date} className="h-11 w-40" />
+        <SubmitButton size="sm" className="ml-auto min-h-11">
           Add
         </SubmitButton>
       </div>
-      <FormMessage state={state} />
+      <LoggedUndo result={state.message ? state : null} />
     </form>
   );
 }

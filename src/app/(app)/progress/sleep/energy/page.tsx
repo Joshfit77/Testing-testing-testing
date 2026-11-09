@@ -4,11 +4,11 @@ import { PlanLocked } from "@/components/common/plan-locked";
 import { BackLink } from "@/components/platform/back-link";
 import { addDays, isoDateInTz } from "@/lib/domain/dates";
 import { hasFeature } from "@/lib/domain/plans";
-import { clockMinutesInTz, DEFAULT_SLEEP_GOAL_MINUTES, formatClock, summarizeNights } from "@/lib/domain/sleep";
+import { clockMinutesInTz, DEFAULT_SLEEP_GOAL_MINUTES, formatClock, formatDuration, summarizeNights } from "@/lib/domain/sleep";
 import { clockToMinutes, RATING_LABELS } from "@/lib/domain/sleep-checkins";
 import { sleepDebt } from "@/lib/domain/sleep-debt";
 import { energyRhythm, SLEEP_ENERGY_VERSION } from "@/lib/domain/sleep-energy";
-import { sleepWindows } from "@/lib/domain/sleep-schedule";
+import { sleepWindows, targetBedtime, windDownStart } from "@/lib/domain/sleep-schedule";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
@@ -20,7 +20,7 @@ export default async function SleepEnergyPage() {
   const { user, profile } = await requireOnboardedUser();
   const plan = await getUserPlan(user.id);
   if (!hasFeature(plan, "sleep_analytics")) {
-    return <PlanLocked back={{ href: "/progress/sleep", label: "Sleep & Recovery" }} eyebrow="Sleep & Recovery" title="Daily energy" description="An hour-by-hour estimate of when you're likely to feel sharp or flat today, from your wake time, last night and sleep debt, shown next to the energy you actually report." />;
+    return <PlanLocked freeAlternative={{ href: "/progress/sleep/log", label: "Log last night's sleep" }} back={{ href: "/progress/sleep", label: "Sleep & Recovery" }} eyebrow="Sleep & Recovery" title="Daily energy" description="An hour-by-hour estimate of when you're likely to feel sharp or flat today, from your wake time, last night and sleep debt, shown next to the energy you actually report." />;
   }
   const tz = profile.timezone ?? "UTC";
   const today = isoDateInTz(new Date(), tz);
@@ -32,9 +32,11 @@ export default async function SleepEnergyPage() {
   const w = sleepWindows(nights, goal, clockToMinutes(profile.sleep_target_wake ?? null));
   // Today's curve hangs off this morning's actual wake time when it was logged, else the member's usual one.
   const wakeMinutes = lastNight ? clockMinutesInTz(lastNight.wakeAt, lastNight.timezone) : (w.anchorWake ?? 7 * 60);
-  const bedMinutes = w.bedWindow ? Math.round((w.bedWindow.start + 30) % 1440) : (wakeMinutes + 16 * 60) % 1440;
+  const bedMinutes = w.bedWindow ? targetBedtime(w.bedWindow) : (wakeMinutes + 16 * 60) % 1440;
   const debt = sleepDebt(nights, goal, today);
   const r = energyRhythm(wakeMinutes, bedMinutes, lastNight?.asleepMinutes ?? null, goal, debt.nightsWithData ? debt.debtMinutes : 0);
+  // One wind-down time across the sleep screens: half an hour before the bedtime window opens.
+  const windDown = w.bedWindow ? windDownStart(w.bedWindow) : r.windDown;
   const reported = [
     ["energy_morning", checkin?.energy_morning ?? null],
     ["energy_afternoon", checkin?.energy_afternoon ?? null],
@@ -67,8 +69,8 @@ export default async function SleepEnergyPage() {
           Estimated alertness today
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          From {lastNight || w.anchorWake !== null ? `a ${formatClock(wakeMinutes)} wake time` : `an assumed ${formatClock(wakeMinutes)} wake time (nothing logged and no wake time set)`}{lastNight ? `, last night's ${Math.round(lastNight.asleepMinutes / 6) / 10} h` : ", no night logged"}
-          {debt.nightsWithData ? ` and an estimated ${Math.round(debt.debtMinutes / 6) / 10} h of sleep debt` : ""}
+          From {lastNight || w.anchorWake !== null ? `a ${formatClock(wakeMinutes)} wake time` : `an assumed ${formatClock(wakeMinutes)} wake time (nothing logged and no wake time set)`}{lastNight ? `, last night's ${formatDuration(lastNight.asleepMinutes)}${lastNight.asleepEstimated ? " in bed" : ""}` : ", no night logged"}
+          {debt.nightsWithData ? ` and an estimated ${formatDuration(debt.debtMinutes)} of sleep debt` : ""}
           {r.scale < 1 ? ` (curve lowered to ${Math.round(r.scale * 100)}%)` : ""}.
         </p>
         {/* Columns stretch to the chart's height so each bar's percentage has something to be a percentage of (with
@@ -101,7 +103,7 @@ export default async function SleepEnergyPage() {
           </div>
           <div className="rounded-xl bg-elevated p-3">
             <dt className="text-xs text-muted-foreground">Start winding down</dt>
-            <dd className="font-semibold">{formatClock(r.windDown)}</dd>
+            <dd className="font-semibold">{formatClock(windDown)}</dd>
           </div>
         </dl>
       </section>

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Award, BellRing, ChevronRight, CreditCard, Download, KeyRound, LayoutGrid, LogOut, Moon, Target, TrendingUp } from "lucide-react";
+import { Award, BellRing, Brain, Camera, ChevronRight, CreditCard, Download, HandHeart, HeartPulse, KeyRound, LayoutGrid, LogOut, MapPin, Moon, ScanLine, ShieldCheck, Target, TrendingUp } from "lucide-react";
 import { MainHeader } from "@/components/shell/main-header";
 import { DisplaySettings } from "@/components/profile/display-settings";
 import { DeleteAccountForm, ProfileForm, WithdrawConsentForm, AiConsentOffForm } from "@/components/profile/profile-forms";
@@ -30,6 +30,17 @@ function Row({ href, icon: Icon, title, body }: { href: string; icon: typeof Che
     </Link>
   );
 }
+
+/** Where each permission or private record is managed today: links only, nothing is set from this list. */
+const PRIVACY_LINKS = [
+  { href: "/progress/sleep/settings", icon: HeartPulse, title: "Apple Health & sleep", body: "Wellness consent and watch import" },
+  { href: "/run/record?kind=run", icon: MapPin, title: "Location (GPS)", body: "Asked when you record a run; change it in phone settings" },
+  { href: "/coach/memory", icon: Brain, title: "AI Coach memory", body: "What the coach remembers, and turning it off" },
+  { href: "/progress/overview#photos", icon: Camera, title: "Progress photos", body: "Private to you; view or delete them" },
+  { href: "/progress/body-scan", icon: ScanLine, title: "Body Scan photos", body: "Consent, scans and deleting them" },
+  { href: "/faith/journal", icon: HandHeart, title: "Prayer journal", body: "Private; shared with the coach only per entry" },
+  { href: "#privacy", icon: Download, title: "Export or delete my data", body: "Download everything, or delete your account" },
+] as const;
 
 /**
  * You: progress, goals, notifications, membership and the account, in one tab. Settings that used to be reached
@@ -86,7 +97,27 @@ export default async function ProfilePage() {
         <DisplaySettings initial={{ textSize: profile.text_size ?? "default", reduceMotion: profile.reduce_motion ?? false, homeScripture: profile.home_scripture ?? true }} />
       </section>
 
-      <section id="privacy" className={`${section} space-y-5`} aria-labelledby="privacy-title">
+      <nav aria-labelledby="permissions-title" className="overflow-hidden rounded-2xl border border-border bg-card" data-testid="privacy-permissions">
+        <h2 id="permissions-title" className="flex items-center gap-2 px-4 pb-1 pt-4 text-lg font-semibold">
+          <ShieldCheck className="size-5 text-gold" aria-hidden /> Privacy &amp; permissions
+        </h2>
+        <ul className="divide-y divide-border">
+          {PRIVACY_LINKS.map(({ href, icon: Icon, title, body }) => (
+            <li key={href}>
+              <Link href={href} className="flex min-h-12 items-center gap-3 px-4 py-2 hover:bg-elevated/50">
+                <Icon className="size-4 shrink-0 text-gold" aria-hidden />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold">{title}</span>
+                  <span className="block text-xs text-muted-foreground">{body}</span>
+                </span>
+                <ChevronRight className="size-4 shrink-0 text-gold" aria-hidden />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
+
+      <section id="privacy" className={`${section} scroll-mt-24 space-y-5`} aria-labelledby="privacy-title">
         <h2 id="privacy-title" className="text-lg font-semibold">
           Privacy &amp; data
         </h2>

@@ -75,7 +75,9 @@ test.describe("Recipes, meal planner and grocery list", () => {
 
     // ---- Generate a meal plan.
     await page.goto("/nutrition/planner");
-    // AI meal plans are Pro: a Plus member sees where to get them, not the AI form.
+    // AI meal plans are Pro: a Plus member sees where to get them, not the AI form. "Generate a week" is the one
+    // primary action; the AI option opens on demand.
+    await page.getByTestId("ai-plan-disclosure").locator("summary").click();
     await expect(page.getByRole("region", { name: "AI meal plans" })).toContainText("Pro adds AI-arranged plans");
     await expect(page.getByRole("button", { name: "Draft my plan" })).toHaveCount(0);
     await expect(page.getByText(/The plan is an estimate/)).toBeVisible();
@@ -107,7 +109,8 @@ test.describe("Recipes, meal planner and grocery list", () => {
 
     // ---- Build the grocery list and check an item off.
     await page.goto("/nutrition/grocery");
-    await expect(page.getByTestId("grocery-cost")).toContainText("No cost estimate");
+    // No price is shown, and no card explains its absence.
+    await expect(page.getByTestId("grocery-cost")).toHaveCount(0);
     await page.getByRole("button", { name: "Build list from my plan" }).click();
     await expect(page.getByRole("status").filter({ hasText: /Grocery list built/ })).toBeVisible();
     const items = page.getByTestId("grocery-item");

@@ -128,7 +128,7 @@ export function AiConsentOffForm() {
   const [state, action] = useActionState(async () => setAiDataConsentAction(false), initialActionState);
   return (
     <form action={action} className="space-y-2">
-      <SubmitButton variant="secondary" pendingLabel="Turning off…" className="h-auto w-full whitespace-normal py-2">
+      <SubmitButton variant="secondary" pendingLabel="Turning off…" className="h-auto min-h-11 w-full whitespace-normal py-2">
         Turn off AI Coach data sharing
       </SubmitButton>
       <FormMessage state={state} />

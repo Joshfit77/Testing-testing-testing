@@ -45,8 +45,12 @@ test.describe("feature access, subscriptions and core sections", () => {
     await expect(page.getByText("Included with Pro All Access")).toBeVisible();
 
     await page.goto("/coach");
-    await expect(page.getByText(/isn't configured on this server|included with Pro/).first()).toBeVisible();
-    await expect(page.getByRole("button", { name: "Send message" })).toBeDisabled();
+    // Free: one card with what the coach does, the Pro prices and a link to the plans; no disabled chat.
+    await expect(page.getByTestId("coach-upsell")).toBeVisible();
+    await expect(page.getByTestId("coach-upsell-price")).toContainText("Faith stays free");
+    await expect(page.getByRole("link", { name: "See plans" })).toHaveAttribute("href", "/profile/billing");
+    await expect(page.getByRole("button", { name: "Send message" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "New chat" })).toHaveCount(0);
 
     await page.goto("/profile/billing");
     await expect(page.getByRole("heading", { name: "Plans & billing" })).toBeVisible();
@@ -79,10 +83,12 @@ test.describe("feature access, subscriptions and core sections", () => {
     await page.goto("/faith");
     await expect(page.getByRole("heading", { name: "Faith", level: 1 })).toBeVisible();
     await expect(page.getByText("Verse of the day")).toBeVisible();
-    await page.getByTestId("faith-journal").locator("summary").click();
-    await page.getByRole("textbox", { name: "Reflection" }).fill("Grateful for strength today.");
+    await page.getByRole("navigation", { name: "Faith quick actions" }).getByRole("link", { name: /Write a prayer/ }).click();
+    await page.waitForURL(/\/faith\/journal\/new/);
+    await page.getByRole("textbox", { name: "Prayer", exact: true }).fill("Grateful for strength today.");
     await page.getByRole("button", { name: "Save entry" }).click();
-    await expect(page.getByText("Entry saved. Only you can see it.")).toBeVisible();
+    await page.waitForURL(/\/faith\/journal$/);
+    await expect(page.getByText("Grateful for strength today.")).toBeVisible();
   });
 
   test("food log on the Free plan: search built-in foods and log a serving", async ({ page }) => {
@@ -103,6 +109,8 @@ test.describe("feature access, subscriptions and core sections", () => {
     await expect(page.getByText("210").first()).toBeVisible();
 
     await page.goto("/profile/billing");
+    // Faith being free is on the first screen, before any scrolling.
+    await expect(page.getByTestId("faith-free")).toBeInViewport();
     // Only Free and Pro All Access are offered, at the approved prices; Plus is never offered.
     await expect(page.getByTestId("plan-free")).toContainText("$0");
     await expect(page.getByTestId("pro-price")).toHaveText("$19.99 / month");
@@ -110,6 +118,8 @@ test.describe("feature access, subscriptions and core sections", () => {
     await expect(page.getByTestId("pro-price")).toHaveText("$149.99 / year");
     await expect(page.getByText("About $12.49 a month, billed yearly.")).toBeVisible();
     await expect(page.getByRole("radio", { name: /Save 37%/ })).toBeVisible();
+    // The full comparison is folded under "Compare Free and Pro".
+    await page.getByText("Compare Free and Pro").click();
     await expect(page.getByText("150 requests / month")).toBeVisible();
     await expect(page.getByText(/\$11\.99|\$24\.99|\$249\.99/)).toHaveCount(0);
     // No Stripe keys in this test environment: no checkout is offered, and nothing pretends to be one.

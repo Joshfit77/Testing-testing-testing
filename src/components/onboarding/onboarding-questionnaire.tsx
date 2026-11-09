@@ -134,7 +134,7 @@ function Question({ title, help, children }: { title: string; help?: React.React
  * The guided sign-up questionnaire: one question per screen with a progress bar and Back/Continue.
  * Answers stay in client state; one server action at the end saves everything and builds the plan.
  */
-export function OnboardingQuestionnaire({ userId, initialName }: { userId: string; initialName: string }) {
+export function OnboardingQuestionnaire({ userId, initialName, intro }: { userId: string; initialName: string; /** Shown above the first question only. */ intro?: React.ReactNode }) {
   const [step, setStep] = useState(0);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -405,6 +405,7 @@ export function OnboardingQuestionnaire({ userId, initialName }: { userId: strin
 
   return (
     <div className="space-y-6">
+      {step === 0 && intro}
       <div>
         <div className="mb-2 flex justify-between text-xs font-semibold uppercase tracking-widest text-muted-foreground">
           {/* The quick part is five questions and the Ready screen; the counter counts only the questions (the welcome
@@ -448,7 +449,7 @@ export function OnboardingQuestionnaire({ userId, initialName }: { userId: strin
         )}
 
         {current === "comfort" && (
-          <Question title="Make it comfortable to read" help="Optional. Changes apply right away, and you can change them later in Profile & Settings.">
+          <Question title="Make it comfortable to read" help="Optional. Changes apply right away, and you can change them later in the You tab.">
             <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Text size">
               {TEXT_SIZES.map((t) => (
                 <button
@@ -660,7 +661,7 @@ export function OnboardingQuestionnaire({ userId, initialName }: { userId: strin
               Until you change them, we&apos;ll assume you&apos;re <strong className="text-foreground">{ACTIVITY_INFO[activity ?? DEFAULT_ACTIVITY].label.toLowerCase()}</strong> outside
               workouts and eat a <strong className="text-foreground">{DIETS[dietType].name.toLowerCase()}</strong> diet
               {goalWeight ? "" : ", with no goal weight"}. These only affect your calorie budget: answer them now with Personalise more, or later in
-              Profile and Food.
+              the You and Nutrition tabs.
             </p>
           </Question>
         )}

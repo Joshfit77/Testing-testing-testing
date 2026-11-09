@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Bot, Lock } from "lucide-react";
+import { Bot, ChevronRight, Lock } from "lucide-react";
 import { FieldError, FormMessage, SubmitButton } from "@/components/common/form-status";
 import { Input, NativeSelect, Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,7 +27,11 @@ export interface JournalEntryInput {
 
 const BODY_LABEL: Record<JournalKind, string> = { daily: "Prayer", request: "Prayer", intercession: "Who and what you're praying for", praise: "Thanks and praise", confession: "Confession", reflection: "Reflection" };
 
-/** New or edit prayer-journal entry. Unsaved text is kept as a device-only draft until it is saved. */
+/**
+ * New or edit prayer-journal entry. The prayer itself comes first and Save stays on the first screen; type, title,
+ * Scripture, date and theme sit under "More options" (a new entry is a daily prayer unless opened for another kind).
+ * Unsaved text is kept as a device-only draft until it is saved.
+ */
 export function JournalForm({ today, entry, defaultRef, defaultKind, onSaved }: { today: string; entry?: JournalEntryInput; defaultRef?: string; defaultKind?: JournalKind; onSaved?: () => void }) {
   const router = useRouter();
   const [state, action] = useActionState(saveJournalEntryAction, initialActionState);
@@ -36,7 +40,7 @@ export function JournalForm({ today, entry, defaultRef, defaultKind, onSaved }: 
   const blank = useMemo(
     () => ({
       entryDate: entry?.entry_date ?? today,
-      kind: (entry?.kind ?? defaultKind ?? "reflection") as JournalKind,
+      kind: (entry?.kind ?? defaultKind ?? "daily") as JournalKind,
       theme: entry?.theme ?? "",
       scriptureRef: entry?.scripture_ref ?? defaultRef ?? "",
       title: entry?.title ?? "",
@@ -58,63 +62,81 @@ export function JournalForm({ today, entry, defaultRef, defaultKind, onSaved }: 
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.ok, state.at, clearDraft]);
-  const kind = v.kind && (JOURNAL_KINDS as readonly string[]).includes(v.kind) ? v.kind : "reflection";
+  const kind = v.kind && (JOURNAL_KINDS as readonly string[]).includes(v.kind) ? v.kind : "daily";
   // A restored draft opens the fold the form sits in (the Faith tab keeps the form behind a one-line summary).
   const formRef = useRef<HTMLFormElement>(null);
   useEffect(() => {
     if (draft.restored) formRef.current?.closest("details")?.setAttribute("open", "");
   }, [draft.restored]);
+  // "More options" opens by itself when something in it needs attention (an empty date, or an error there).
+  const moreRef = useRef<HTMLDetailsElement>(null);
+  const moreNeeded = !v.entryDate || Boolean(state.fieldErrors && Object.keys(state.fieldErrors).some((k) => k !== "body"));
+  useEffect(() => {
+    if (moreNeeded && moreRef.current) moreRef.current.open = true;
+  }, [moreNeeded]);
   return (
     <form ref={formRef} action={action} className="space-y-3">
       {entry && <input type="hidden" name="id" value={entry.id} />}
       {draft.restored && <DraftRestoredNotice label="Unsaved journal entry restored" onDiscard={draft.clear} onDismiss={draft.dismissRestored} />}
-      <fieldset>
-        <legend className="mb-1.5 text-sm font-medium">Type</legend>
-        <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Entry type">
-          {JOURNAL_KINDS.map((k) => (
-            <label
-              key={k}
-              className={cn(
-                "flex min-h-11 cursor-pointer items-center justify-center rounded-xl border px-2 text-center text-xs font-semibold leading-tight focus-within:ring-2 focus-within:ring-gold-highlight",
-                kind === k ? "border-gold bg-gold/12 text-gold-highlight" : "border-border bg-elevated/50 text-muted-foreground",
-              )}
-            >
-              <input type="radio" name="kind" value={k} checked={kind === k} onChange={() => draft.setValue((d) => ({ ...d, kind: k }))} className="sr-only" />
-              {k === "praise" ? "Praise" : JOURNAL_KIND_LABELS[k]}
-            </label>
-          ))}
-        </div>
-      </fieldset>
-      <div className="space-y-1">
-        <Label htmlFor={`j-title-${id}`}>Title (optional)</Label>
-        <Input id={`j-title-${id}`} name="title" maxLength={120} value={v.title} onChange={set("title")} placeholder={kind === "request" || kind === "intercession" ? "e.g. Mum's recovery" : undefined} />
-      </div>
       <div className="space-y-1">
         <Label htmlFor={`j-body-${id}`}>{BODY_LABEL[kind]}</Label>
         <Textarea id={`j-body-${id}`} name="body" required maxLength={10000} value={v.body} onChange={set("body")} className="min-h-32" aria-invalid={Boolean(state.fieldErrors?.body)} />
         <FieldError message={state.fieldErrors?.body} />
       </div>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <div className="space-y-1">
-          <Label htmlFor={`j-ref-${id}`}>Scripture (optional)</Label>
-          <Input id={`j-ref-${id}`} name="scriptureRef" maxLength={80} value={v.scriptureRef} onChange={set("scriptureRef")} placeholder="e.g. Galatians 6:9" />
+      <details ref={moreRef} open={entry ? true : undefined} className="group rounded-xl border border-border bg-elevated/30">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+          <span className="shrink-0">More options</span>
+          <span className="min-w-0 flex-1 truncate text-right font-normal text-muted-foreground">
+            {JOURNAL_KIND_LABELS[kind]}
+            {v.scriptureRef ? ` · ${v.scriptureRef}` : ""}
+          </span>
+          <ChevronRight className="size-4 shrink-0 text-gold transition-transform group-open:rotate-90 motion-reduce:transition-none" aria-hidden />
+        </summary>
+        <div className="space-y-3 px-3 pb-3">
+          <fieldset>
+            <legend className="mb-1.5 text-sm font-medium">Type</legend>
+            <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Entry type">
+              {JOURNAL_KINDS.map((k) => (
+                <label
+                  key={k}
+                  className={cn(
+                    "flex min-h-11 cursor-pointer items-center justify-center rounded-xl border px-2 text-center text-xs font-semibold leading-tight focus-within:ring-2 focus-within:ring-gold-highlight",
+                    kind === k ? "border-gold bg-gold/12 text-gold-highlight" : "border-border bg-elevated/50 text-muted-foreground",
+                  )}
+                >
+                  <input type="radio" name="kind" value={k} checked={kind === k} onChange={() => draft.setValue((d) => ({ ...d, kind: k }))} className="sr-only" />
+                  {k === "praise" ? "Praise" : JOURNAL_KIND_LABELS[k]}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <div className="space-y-1">
+            <Label htmlFor={`j-title-${id}`}>Title (optional)</Label>
+            <Input id={`j-title-${id}`} name="title" maxLength={120} value={v.title} onChange={set("title")} placeholder={kind === "request" || kind === "intercession" ? "e.g. Mum's recovery" : undefined} />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="space-y-1">
+              <Label htmlFor={`j-ref-${id}`}>Scripture (optional)</Label>
+              <Input id={`j-ref-${id}`} name="scriptureRef" maxLength={80} value={v.scriptureRef} onChange={set("scriptureRef")} placeholder="e.g. Galatians 6:9" />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor={`j-date-${id}`}>Date</Label>
+              <Input id={`j-date-${id}`} name="entryDate" type="date" value={v.entryDate} onChange={set("entryDate")} required />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor={`j-theme-${id}`}>Theme</Label>
+              <NativeSelect id={`j-theme-${id}`} name="theme" value={v.theme} onChange={set("theme")}>
+                <option value="">None</option>
+                {Object.entries(THEME_LABELS).map(([k, l]) => (
+                  <option key={k} value={k}>
+                    {l}
+                  </option>
+                ))}
+              </NativeSelect>
+            </div>
+          </div>
         </div>
-        <div className="space-y-1">
-          <Label htmlFor={`j-date-${id}`}>Date</Label>
-          <Input id={`j-date-${id}`} name="entryDate" type="date" value={v.entryDate} onChange={set("entryDate")} required />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor={`j-theme-${id}`}>Theme</Label>
-          <NativeSelect id={`j-theme-${id}`} name="theme" value={v.theme} onChange={set("theme")}>
-            <option value="">None</option>
-            {Object.entries(THEME_LABELS).map(([k, l]) => (
-              <option key={k} value={k}>
-                {l}
-              </option>
-            ))}
-          </NativeSelect>
-        </div>
-      </div>
+      </details>
       <label className="flex min-h-11 items-start gap-3 rounded-xl border border-border bg-elevated/40 p-3 text-sm">
         <input
           type="checkbox"

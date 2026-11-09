@@ -47,19 +47,19 @@ test.describe("Stage 2C: faith flows, onboarding additions and the training cale
     await expect(page.getByText(/You made time for your practices on 1 day/)).toBeVisible();
     await page.goto("/faith");
 
-    // Write a prayer request (the inline form is folded; the quick action at the top opens the full page): private by default.
-    await page.getByTestId("faith-journal").locator("summary").click();
+    // Write a prayer request from the Faith quick action (type and title are under More options): private by default.
+    await page.getByRole("navigation", { name: "Faith quick actions" }).getByRole("link", { name: /Write a prayer/ }).click();
+    await page.waitForURL(/\/faith\/journal\/new/);
+    await page.getByText("More options", { exact: true }).click();
     await page.locator("label", { hasText: /^Prayer request$/ }).click();
     await expect(page.getByRole("radio", { name: "Prayer request" })).toBeChecked();
     await page.getByLabel("Title (optional)").fill("Healing for Sam");
     await page.getByRole("textbox", { name: "Prayer", exact: true }).fill("Lord, please bring Sam rest and healing this week.");
     await expect(page.getByRole("checkbox", { name: /Share with AI Coach/ })).not.toBeChecked();
     await page.getByRole("button", { name: "Save entry" }).click();
-    await expect(page.getByText("Entry saved. Only you can see it.")).toBeVisible();
 
-    // Find it by search, open it, mark it answered.
-    await page.getByRole("link", { name: /All entries/ }).click();
-    await page.waitForURL(/\/faith\/journal/);
+    // Saving returns to the journal. Find it by search, open it, mark it answered.
+    await page.waitForURL(/\/faith\/journal$/);
     await page.getByRole("searchbox", { name: "Search your journal" }).fill("Sam rest");
     await page.getByRole("button", { name: "Search", exact: true }).click();
     await page.waitForURL(/q=Sam/);
@@ -113,7 +113,7 @@ test.describe("Stage 2C: faith flows, onboarding additions and the training cale
 
     await page.goto("/home");
     await expect(page.getByTestId("today-rest")).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "Start Today's Workout" })).toBeVisible();
+    await expect(page.getByRole("link", { name: /^Start today's workout/ })).toBeVisible();
 
     await page.goto("/calendar");
     await expect(page.getByRole("heading", { level: 1, name: "Training calendar" })).toBeVisible();
@@ -137,7 +137,7 @@ test.describe("Stage 2C: faith flows, onboarding additions and the training cale
     await expect(page.getByRole("region", { name: "Up next" }).getByTestId("planned-session").first()).not.toContainText("Moved");
     await page.goto("/home");
     await expect(page.getByTestId("today-rest")).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "Start Today's Workout" })).toBeVisible();
+    await expect(page.getByRole("link", { name: /^Start today's workout/ })).toBeVisible();
 
     // Week view lists the days.
     await page.goto("/calendar?view=week");

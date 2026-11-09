@@ -5,7 +5,7 @@ import { clockMinutesInTz, DEFAULT_SLEEP_GOAL_MINUTES, formatClock, formatDurati
 import { stageShares } from "@/lib/domain/sleep-import";
 import { associations, clockToMinutes, describeAssociation } from "@/lib/domain/sleep-checkins";
 import { sleepDebt } from "@/lib/domain/sleep-debt";
-import { nightlyScore } from "@/lib/domain/sleep-score";
+import { averageScore, nightlyScore } from "@/lib/domain/sleep-score";
 import { sleepWindows } from "@/lib/domain/sleep-schedule";
 import { averageAsleepMinutes, scheduleStats } from "@/lib/domain/sleep-stats";
 import { listSleepCheckins, listSleepSessions, listSleepStages } from "@/server/services/sleep";
@@ -32,7 +32,9 @@ export async function buildSleepSummary(supabase: SupabaseClient, userId: string
   const pattern = scheduleStats(fortnight);
   const windows = sleepWindows(fortnight, goal, clockToMinutes((profile.sleep_target_wake as string | null) ?? null));
   const debt = sleepDebt(fortnight, goal, today);
-  const scores = nights.map((n) => nightlyScore(n, goal, scheduleStats(all.filter((e) => e.nightOf < n.nightOf && e.nightOf >= addDays(n.nightOf, -14)))).score);
+  const scores = nights.map((n) => nightlyScore(n, goal, scheduleStats(all.filter((e) => e.nightOf < n.nightOf && e.nightOf >= addDays(n.nightOf, -14)))));
+  // Partial nights (time in bed only) would score high on thin data, so the average leaves them out, as every sleep screen does.
+  const scoreAverage = averageScore(scores);
   const avg = averageAsleepMinutes(nights);
   const last = nights[0]!;
   const gaps: string[] = [];
@@ -56,7 +58,8 @@ export async function buildSleepSummary(supabase: SupabaseClient, userId: string
     last_night: { date: last.nightOf, asleep: formatDuration(last.asleepMinutes), in_bed_only: last.asleepEstimated, bed: formatClock(clockMinutesInTz(last.bedAt, last.timezone)), source: last.sources.join(", "), recorded_by: last.recorded ? (last.deviceName ?? "a wearable") : null },
     recorded,
     typical_times: pattern.typicalBed === null ? null : { bedtime: formatClock(pattern.typicalBed), wake: formatClock(pattern.typicalWake!), bedtime_moves_minutes: pattern.bedSpread, wake_moves_minutes: pattern.wakeSpread, steadiness: pattern.steadiness },
-    average_nightly_score: scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null,
+    average_nightly_score: scoreAverage.average === null ? null : Math.round(scoreAverage.average),
+    partial_nights_left_out_of_score: scoreAverage.partial,
     estimated_sleep_debt: debt.nightsWithData ? { minutes_behind: debt.debtMinutes, band: debt.band, trend: debt.trend, how: "Rolling 14 nights: a short night adds its whole shortfall; a long night repays half of the extra, only against what's owed; unlogged nights change nothing. An estimate from entries, not a measurement." } : null,
     suggested_windows: windows.bedWindow ? { bedtime: `${formatClock(windows.bedWindow.start)}–${formatClock(windows.bedWindow.end)}`, wake: `${formatClock(windows.wakeWindow!.start)}–${formatClock(windows.wakeWindow!.end)}`, based_on: windows.anchorSource === "target" ? "the wake time they chose" : "their typical wake time", gradual_plan: windows.adjustment ? `${windows.adjustment.minutesPerNight} min ${windows.adjustment.direction} a night for about ${windows.adjustment.nights} nights` : null } : null,
     checkin_patterns: associations(nights, checkins).map(describeAssociation),

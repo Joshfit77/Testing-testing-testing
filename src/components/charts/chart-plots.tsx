@@ -5,7 +5,7 @@
  * JavaScript, so screens with charts become usable sooner; the title, legend, table view and empty state don't wait.
  */
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { AXIS, CATEGORICAL, GRID, SERIES_GOLD, formatters, type SeriesDef, type XFormat } from "./chart-format";
+import { AXIS, CATEGORICAL, GRID, SERIES_GOLD, compactTick, formatters, yAxisWidth, type SeriesDef, type XFormat } from "./chart-format";
 
 export interface PlotProps {
   data: Record<string, string | number | null>[];
@@ -17,6 +17,18 @@ export interface PlotProps {
   yDomain?: [number | string, number | string];
   /** Optional horizontal target line (e.g. a daily calorie goal). */
   referenceLine?: { value: number; label: string };
+}
+
+/** The y-axis's tick format and a width that fits its widest label (never clipped, whatever the numbers). */
+function yAxisFor(props: PlotProps) {
+  const values: number[] = [];
+  for (const row of props.data) for (const s of props.series) if (typeof row[s.key] === "number") values.push(row[s.key] as number);
+  for (const d of props.yDomain ?? []) if (typeof d === "number") values.push(d);
+  if (props.referenceLine) values.push(props.referenceLine.value);
+  return {
+    tickFormatter: (v: number) => compactTick(v, props.valueSuffix, props.decimals),
+    width: yAxisWidth(values, props.valueSuffix, props.decimals),
+  };
 }
 
 function ChartTooltip({
@@ -51,10 +63,10 @@ export function BarPlot(props: PlotProps) {
   const { formatX, formatValue } = formatters(props.xFormat, props.valueSuffix, props.decimals);
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={data} margin={{ top: 4, right: 4, left: -16, bottom: 0 }} barGap={2}>
+      <BarChart data={data} margin={{ top: 4, right: 4, left: 0, bottom: 0 }} barGap={2}>
         <CartesianGrid vertical={false} stroke={GRID} />
         <XAxis dataKey={xKey} {...AXIS} tickFormatter={formatX} minTickGap={8} />
-        <YAxis {...AXIS} allowDecimals={false} tickFormatter={(v: number) => formatValue(v)} width={48} />
+        <YAxis {...AXIS} allowDecimals={false} {...yAxisFor(props)} />
         <Tooltip cursor={{ fill: "rgba(201,165,76,0.08)" }} content={<ChartTooltip formatX={formatX} formatValue={formatValue} />} />
         {props.referenceLine && (
           <ReferenceLine
@@ -86,10 +98,10 @@ export function LinePlot(props: PlotProps & { connectNulls?: boolean }) {
   const { formatX, formatValue } = formatters(props.xFormat, props.valueSuffix, props.decimals);
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <LineChart data={data} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+      <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
         <CartesianGrid vertical={false} stroke={GRID} />
         <XAxis dataKey={xKey} {...AXIS} tickFormatter={formatX} minTickGap={16} />
-        <YAxis {...AXIS} domain={yDomain ?? ["auto", "auto"]} tickFormatter={formatValue} width={52} />
+        <YAxis {...AXIS} domain={yDomain ?? ["auto", "auto"]} {...yAxisFor(props)} />
         <Tooltip cursor={{ stroke: "#8C7139", strokeWidth: 1 }} content={<ChartTooltip formatX={formatX} formatValue={formatValue} />} />
         {series.map((s, i) => (
           <Line

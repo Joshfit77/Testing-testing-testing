@@ -11,7 +11,7 @@ test.describe("a dependable first workout", () => {
 
   async function startTodaysWorkout(page: Page) {
     await page.goto("/home");
-    await page.getByRole("link", { name: /^Start (Today's Workout|workout)/ }).click();
+    await page.getByRole("link", { name: /^Start (Today's Workout|workout)/i }).click();
     await page.waitForURL(/\/train\/workout/);
     await page.getByLabel(/set 1 weight in lb/).first().waitFor();
   }
@@ -24,7 +24,7 @@ test.describe("a dependable first workout", () => {
     // Open the workout, type nothing, go back: Home still offers to start it, and no "Resume" pill appears.
     await startTodaysWorkout(page);
     await page.goto("/home");
-    await expect(page.getByRole("link", { name: /^Start (Today's Workout|workout)/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: /^Start (Today's Workout|workout)/i })).toBeVisible();
     await expect(page.getByRole("link", { name: /^Resume/ })).toHaveCount(0);
     await page.goto("/nutrition");
     await expect(page.getByRole("link", { name: /^Resume:/ })).toHaveCount(0);

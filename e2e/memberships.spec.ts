@@ -24,9 +24,29 @@ test.describe("memberships", () => {
       await expect(page.getByText("Included with Pro All Access"), path).toBeVisible();
     }
 
+    // No locked screen is a dead end: each offers a free next step beside "See plans", and the step works.
+    for (const [path, label, dest] of [
+      ["/progress/sleep/debt", "Log last night's sleep", /\/progress\/sleep\/log/],
+      ["/progress/sleep/energy", "Log last night's sleep", /\/progress\/sleep\/log/],
+      ["/progress/sleep/training", "Log last night's sleep", /\/progress\/sleep\/log/],
+      ["/progress/sleep/schedule", "Log last night's sleep", /\/progress\/sleep\/log/],
+      ["/progress/body-map", "See my progress", /\/progress\/overview/],
+      ["/progress/body-scan", "Add a progress photo", /\/progress\/overview/],
+      ["/nutrition/compare", "Check one product", /\/nutrition\/scanner/],
+      ["/train/build", "Browse free programs", /\/train\/programs/],
+      ["/train/review", "See my workout history", /\/train\/history/],
+    ] as const) {
+      await page.goto(path);
+      await expect(page.getByRole("link", { name: "See plans" }), path).toBeVisible();
+      await page.getByRole("link", { name: label }).click();
+      await page.waitForURL(dest);
+    }
+
     // The AI coach is Pro only, and nothing asks for AI data sharing on Free.
     await page.goto("/coach");
-    await expect(page.getByText("AI coaching is included with Pro All Access.")).toBeVisible();
+    await expect(page.getByTestId("coach-upsell")).toBeVisible();
+    await expect(page.getByTestId("coach-upsell-price")).toHaveText("Pro · $19.99/month or $149.99/year · Faith stays free");
+    await expect(page.getByLabel("Message the AI coach")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Allow and continue" })).toHaveCount(0);
 
     // Live GPS recording is Pro; logging a run by hand stays free.
@@ -75,11 +95,11 @@ test.describe("memberships", () => {
     await expect(page.getByTestId("template-limit")).toHaveCount(0);
 
     await page.goto("/coach");
-    await expect(page.getByText("AI coaching is included with Pro All Access.")).toBeVisible();
+    await expect(page.getByTestId("coach-upsell")).toBeVisible();
 
     await grantPlan(email, "pro");
     await page.goto("/coach");
-    await expect(page.getByText("AI coaching is included with Pro All Access.")).toHaveCount(0);
+    await expect(page.getByTestId("coach-upsell")).toHaveCount(0);
     await page.goto("/profile/billing");
     await expect(page.getByTestId("current-plan")).toHaveText("Pro All Access");
   });

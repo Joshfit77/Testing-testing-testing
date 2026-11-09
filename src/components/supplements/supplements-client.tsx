@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, Circle, Loader2, Minus, Pill, Plus, TriangleAlert } from "lucide-react";
+import { Check, ChevronDown, Circle, Loader2, Minus, Pill, Plus, TriangleAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toaster";
@@ -126,7 +126,7 @@ export function SupplementsClient({ today, stack, takenToday, dietId, dietName }
 
       <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by category">
         {(["all", ...SUPPLEMENT_CATEGORIES] as const).map((c) => (
-          <Button key={c} type="button" size="sm" variant={category === c ? "default" : "secondary"} aria-pressed={category === c} onClick={() => setCategory(c)}>
+          <Button key={c} type="button" size="sm" className="min-h-11" variant={category === c ? "default" : "secondary"} aria-pressed={category === c} onClick={() => setCategory(c)}>
             {c === "all" ? "All" : SUPPLEMENT_CATEGORY_LABELS[c]}
           </Button>
         ))}
@@ -152,21 +152,30 @@ export function SupplementsClient({ today, stack, takenToday, dietId, dietName }
                   {EVIDENCE_LABELS[s.evidence]}
                 </Badge>
               </div>
-              <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-                <dt className="text-muted-foreground">Dose</dt>
-                <dd>{s.dose}</dd>
-                <dt className="text-muted-foreground">Timing</dt>
-                <dd>{s.timing}</dd>
-              </dl>
-              <p className="text-xs text-muted-foreground">
-                <span className="font-semibold text-foreground/80">Cautions: </span>
-                {s.cautions}
-              </p>
               {note && (
-                <p className="flex items-start gap-1.5 text-xs text-gold">
-                  <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden /> {note}
+                <p className="flex items-start gap-1.5 text-sm text-gold">
+                  <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden /> {note}
                 </p>
               )}
+              {/* The detail opens on demand, as on Diets: dose, timing and cautions are one tap away, not removed. */}
+              <details className="group rounded-xl border border-border" data-testid="supplement-details">
+                <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+                  Dose, timing and cautions
+                  <ChevronDown className="size-4 shrink-0 text-gold transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
+                </summary>
+                <div className="space-y-2 border-t border-border p-3">
+                  <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+                    <dt className="text-muted-foreground">Dose</dt>
+                    <dd>{s.dose}</dd>
+                    <dt className="text-muted-foreground">Timing</dt>
+                    <dd>{s.timing}</dd>
+                  </dl>
+                  <p className="text-sm text-muted-foreground">
+                    <span className="font-semibold text-foreground/80">Cautions: </span>
+                    {s.cautions}
+                  </p>
+                </div>
+              </details>
               <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-1">
                 <Badge variant="outline">{SUPPLEMENT_CATEGORY_LABELS[s.category]}</Badge>
                 {added ? (
@@ -174,6 +183,7 @@ export function SupplementsClient({ today, stack, takenToday, dietId, dietName }
                     type="button"
                     size="sm"
                     variant="ghost"
+                    className="min-h-11"
                     disabled={busy}
                     aria-busy={busy}
                     aria-label={`Remove from stack: ${s.name}`}
@@ -186,6 +196,7 @@ export function SupplementsClient({ today, stack, takenToday, dietId, dietName }
                     type="button"
                     size="sm"
                     variant="outline"
+                    className="min-h-11"
                     disabled={busy}
                     aria-busy={busy}
                     aria-label={`Add to stack: ${s.name}`}

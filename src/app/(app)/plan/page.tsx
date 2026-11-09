@@ -153,7 +153,7 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
                       Estimated goal date: <span className="font-semibold text-foreground">{formatLongDate(goalDate(today, weeks))}</span> (about {weeks} weeks at this pace).
                     </p>
                   ) : ctx.goalWeightKg ? null : (
-                    <p className="text-muted-foreground">Add a goal weight on the Food page to see an estimated goal date.</p>
+                    <p className="text-muted-foreground">Add a goal weight in the Nutrition tab to see an estimated goal date.</p>
                   ))}
                 {usesBudget && budget.floored && (
                   <Notice tone="warning">
@@ -172,7 +172,7 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
             </p>
           </>
         ) : (
-          <p className="mt-3 text-sm text-muted-foreground">No calorie budget yet. Log your bodyweight in Progress, then set targets on the Food page.</p>
+          <p className="mt-3 text-sm text-muted-foreground">No calorie budget yet. Log your bodyweight in Progress, then set targets in the Nutrition tab.</p>
         )}
       </section>
 
@@ -189,7 +189,7 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
             {why && (
               <p className="mt-2 rounded-xl border border-gold-muted/50 bg-gold/5 px-3 py-2 text-sm" data-testid="program-why">
                 <span className="font-semibold text-gold-highlight">Why this program: </span>
-                because {why}. Change your goals or equipment any time in Profile &amp; Settings; your workout history stays.
+                because {why}. Change your goals or equipment any time in the You tab; your workout history stays.
               </p>
             )}
             {program.weekOne.length > 0 && (
@@ -220,13 +220,13 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
 
       <div className="flex flex-col gap-3 sm:flex-row">
         {!active?.today && (
-          <Button asChild size="lg" className="flex-1">
+          <Button asChild size="lg" className="sm:flex-1">
             <Link href="/train/build">
               <Dumbbell aria-hidden /> Build a program
             </Link>
           </Button>
         )}
-        <Button asChild size="lg" variant={active?.today ? "secondary" : "outline"} className="flex-1">
+        <Button asChild size="lg" variant={active?.today ? "secondary" : "outline"} className="sm:flex-1">
           <Link href={isNew ? "/home?welcome=1" : "/home"}>
             <Home aria-hidden /> Go to Home
           </Link>

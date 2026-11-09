@@ -1,6 +1,8 @@
 import {
   circularMedianMinutes,
+  defaultManualEntry,
   defaultManualNight,
+  DEFAULT_NAP_MINUTES,
   circularSpreadMinutes,
   clockMinutesInTz,
   findOverlap,
@@ -222,5 +224,31 @@ describe("defaultManualNight", () => {
     expect(defaultManualNight(new Date("2026-10-25T05:00:00Z"), "America/New_York")).toEqual({ startedAt: "2026-10-23T22:30", endedAt: "2026-10-24T06:30" });
     // 05:00 UTC is 2:00 PM in Tokyo: last night.
     expect(defaultManualNight(new Date("2026-10-25T05:00:00Z"), "Asia/Tokyo")).toEqual({ startedAt: "2026-10-24T22:30", endedAt: "2026-10-25T06:30" });
+  });
+});
+
+describe("defaultManualEntry", () => {
+  it("keeps the overnight defaults for a night", () => {
+    const now = new Date("2026-10-25T09:00:00Z");
+    expect(defaultManualEntry("night", now, "UTC")).toEqual(defaultManualNight(now, "UTC"));
+  });
+
+  it("makes a nap the half hour ending now, in the member's zone", () => {
+    expect(DEFAULT_NAP_MINUTES).toBe(30);
+    expect(defaultManualEntry("nap", new Date("2026-10-25T14:07:40Z"), "UTC")).toEqual({ startedAt: "2026-10-25T13:35", endedAt: "2026-10-25T14:05" });
+    // 14:07 UTC is 10:07 AM in New York (EDT).
+    expect(defaultManualEntry("nap", new Date("2026-10-25T14:07:40Z"), "America/New_York")).toEqual({ startedAt: "2026-10-25T09:35", endedAt: "2026-10-25T10:05" });
+  });
+
+  it("gives nap defaults the save check accepts: nap-sized and never in the future", () => {
+    const now = new Date("2026-10-25T14:07:40Z");
+    const d = defaultManualEntry("nap", now, "Asia/Kolkata");
+    const startedAt = zonedTimeToIso(d.startedAt, "Asia/Kolkata")!;
+    const endedAt = zonedTimeToIso(d.endedAt, "Asia/Kolkata")!;
+    expect(validateSleepSession({ startedAt, endedAt, timezone: "Asia/Kolkata", kind: "nap" }, now.getTime())).toEqual({ ok: true });
+    expect(Date.parse(endedAt)).toBeLessThanOrEqual(now.getTime());
+    // The overnight defaults would be refused as a nap (longer than six hours).
+    const night = defaultManualNight(now, "UTC");
+    expect(validateSleepSession({ startedAt: zonedTimeToIso(night.startedAt, "UTC")!, endedAt: zonedTimeToIso(night.endedAt, "UTC")!, timezone: "UTC", kind: "nap" }, now.getTime()).ok).toBe(false);
   });
 });

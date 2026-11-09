@@ -134,7 +134,7 @@ export default async function LessonPage({ params }: { params: Promise<{ study: 
         </section>
       ) : (
         <p className="rounded-xl border border-border bg-elevated/50 p-3 text-sm text-muted-foreground">
-          {lesson.notes ? "Study notes for this lesson are being reviewed and will appear here once approved." : "Study notes for this lesson are still being written."} Read the passage slowly, and write down what you notice.
+          Read the passage slowly, and write down what you notice.
         </p>
       )}
 

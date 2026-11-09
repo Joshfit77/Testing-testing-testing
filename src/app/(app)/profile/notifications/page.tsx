@@ -3,14 +3,21 @@ import { PageHeader } from "@/components/common/page-header";
 import { NotificationSettingsForm } from "@/components/notifications/notification-settings";
 import { requireOnboardedUser } from "@/server/auth";
 import { getNotificationSyncAction } from "@/server/actions/notifications";
+import { sleepWindows, windDownStart } from "@/lib/domain/sleep-schedule";
+import { clockToMinutes } from "@/lib/domain/sleep-checkins";
 
 export const metadata = { title: "Notifications" };
 
-/** "HH:MM" thirty minutes before the bedtime the sleep goal implies (wake time minus sleep goal), or null. */
+/**
+ * "HH:MM" wind-down suggestion from the member's target wake time and sleep goal: the same time the sleep screens show
+ * (half an hour before the bedtime window opens, from `sleepWindows`), or null without a wake time and goal.
+ */
 function windDownFrom(wake: string | null | undefined, goalMinutes: number | null | undefined): string | null {
-  const m = /^(\d{2}):(\d{2})/.exec(wake ?? "");
-  if (!m || !goalMinutes) return null;
-  const t = (((Number(m[1]) * 60 + Number(m[2]) - goalMinutes - 30) % 1440) + 1440) % 1440;
+  const wakeMinutes = clockToMinutes(wake ?? null);
+  if (wakeMinutes === null || !goalMinutes) return null;
+  const bedWindow = sleepWindows([], goalMinutes, wakeMinutes).bedWindow;
+  if (!bedWindow) return null;
+  const t = windDownStart(bedWindow);
   return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
 }
 

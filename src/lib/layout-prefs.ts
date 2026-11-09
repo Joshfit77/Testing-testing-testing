@@ -94,16 +94,28 @@ export function sectionLayout<T extends string>(all: readonly T[], prefs: Sectio
   return order.filter((m) => always.includes(m) || !hidden.has(m));
 }
 
-/** The stored JSON, kept only where it is well-formed (anything else is treated as "no preference"). */
+/**
+ * Home modules that start hidden until the member turns them on in Customize Home. Quick actions (Run, Log food,
+ * AI Coach) repeat the header and the nutrition card, so a new Home leaves them out; a member who has saved their
+ * own Home layout keeps it exactly as saved.
+ */
+export const DEFAULT_HIDDEN_HOME: readonly HomeModule[] = ["quick"];
+
+/**
+ * The stored JSON, kept only where it is well-formed (anything else is treated as "no preference"). With no saved
+ * hidden list for Home, the default hidden modules apply.
+ */
 export function parseLayoutPrefs(raw: unknown): LayoutPrefs {
-  if (!raw || typeof raw !== "object") return {};
+  if (!raw || typeof raw !== "object") return { home: { hidden: [...DEFAULT_HIDDEN_HOME] } };
   const o = raw as Record<string, unknown>;
   const out: LayoutPrefs = {};
   const home = o.home as Record<string, unknown> | undefined;
   if (home && typeof home === "object") {
     const order = Array.isArray(home.order) ? home.order.filter((m): m is HomeModule => (HOME_MODULES as readonly string[]).includes(m as string)) : undefined;
     const hidden = Array.isArray(home.hidden) ? home.hidden.filter((m): m is HomeModule => (HOME_MODULES as readonly string[]).includes(m as string)) : undefined;
-    out.home = { ...(order?.length ? { order: [...new Set(order)] } : {}), ...(hidden ? { hidden: [...new Set(hidden)] } : {}) };
+    out.home = { ...(order?.length ? { order: [...new Set(order)] } : {}), hidden: hidden ? [...new Set(hidden)] : [...DEFAULT_HIDDEN_HOME] };
+  } else {
+    out.home = { hidden: [...DEFAULT_HIDDEN_HOME] };
   }
   const faith = o.faith as Record<string, unknown> | undefined;
   if (faith && typeof faith === "object" && Array.isArray(faith.hidden)) {
@@ -127,25 +139,27 @@ export interface HomeProfile {
 }
 
 /**
- * The default Home order for a member, from their answers:
- * - every member: today's workout, then today's nutrition, then Faith, then quick actions;
- * - fat loss and general health: nutrition first (the daily habit that matters most for that goal);
- * - muscle and strength: workout, nutrition, sleep & recovery higher (recovery drives those goals);
- * - conditioning, athletic and combat sports: workout, quick actions (the run is one tap), recovery;
- * - a short schedule (3 days or fewer at 30 minutes or less, the "busy parent" pattern): workout and quick actions
- *   first, so the fast paths are on the first screen;
+ * The default Home order for a member, from their answers. Today's workout is always first: starting it is the one
+ * thing Home is for. Then:
+ * - every member: today's nutrition, then Faith;
+ * - fat loss and general health: nutrition straight after the workout (the daily habit that matters most there);
+ * - muscle and strength: sleep & recovery higher (recovery drives those goals);
+ * - conditioning, athletic and combat sports: recovery higher;
+ * - a short schedule (3 days or fewer at 30 minutes or less, the "busy parent" pattern): nutrition and Faith only,
+ *   the rest further down;
  * - Faith switched off in onboarding: the Faith modules move last (never removed: Faith is always a tab).
+ * Quick actions come last and start hidden (DEFAULT_HIDDEN_HOME); the header's Quick add covers them.
  */
 export function defaultHomeOrder(p: HomeProfile): HomeModule[] {
   const busy = (p.daysPerWeek ?? 7) <= 3 && (p.sessionMinutes ?? 60) <= 30;
   let order: HomeModule[];
-  if (busy) order = ["workout", "quick", "nutrition", "faith", "verse", "week", "calendar", "sleep"];
-  else if (p.goal === "lose_fat" || p.goal === "general_health") order = ["nutrition", "workout", "faith", "quick", "verse", "week", "sleep", "calendar"];
-  else if (p.goal === "build_muscle" || p.goal === "build_strength") order = ["workout", "nutrition", "sleep", "faith", "quick", "verse", "week", "calendar"];
-  else if (p.goal === "improve_conditioning" || p.goal === "athletic_performance" || p.goal === "combat_sports") order = ["workout", "quick", "nutrition", "sleep", "faith", "verse", "week", "calendar"];
-  else order = ["workout", "nutrition", "faith", "quick", "verse", "week", "sleep", "calendar"];
+  if (busy) order = ["workout", "nutrition", "faith", "verse", "week", "calendar", "sleep"];
+  else if (p.goal === "lose_fat" || p.goal === "general_health") order = ["workout", "nutrition", "faith", "verse", "week", "sleep", "calendar"];
+  else if (p.goal === "build_muscle" || p.goal === "build_strength") order = ["workout", "nutrition", "sleep", "faith", "verse", "week", "calendar"];
+  else if (p.goal === "improve_conditioning" || p.goal === "athletic_performance" || p.goal === "combat_sports") order = ["workout", "nutrition", "sleep", "faith", "verse", "week", "calendar"];
+  else order = ["workout", "nutrition", "faith", "verse", "week", "sleep", "calendar"];
   if (!p.faithEnabled) order = [...order.filter((m) => m !== "faith" && m !== "verse"), "faith", "verse"];
-  return order;
+  return [...order, "quick"];
 }
 
 /** The modules to show, in order: the member's own order (with any new modules appended), minus the hidden ones. */

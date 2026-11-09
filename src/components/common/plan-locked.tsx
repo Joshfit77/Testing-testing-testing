@@ -11,11 +11,14 @@ export function PlanLocked({
   eyebrow,
   title,
   description,
+  freeAlternative,
 }: {
   back: { href: string; label: string };
   eyebrow?: string;
   title: string;
   description: string;
+  /** A free way forward from here (e.g. "Browse free programs"), shown beside "See plans" so the lock isn't a dead end. */
+  freeAlternative?: { href: string; label: string };
 }) {
   return (
     <div className="space-y-6">
@@ -26,9 +29,16 @@ export function PlanLocked({
         title="Included with Pro All Access"
         description={description}
         action={
-          <Button asChild>
-            <Link href="/profile/billing">See plans</Link>
-          </Button>
+          <div className="flex flex-wrap justify-center gap-2">
+            <Button asChild>
+              <Link href="/profile/billing">See plans</Link>
+            </Button>
+            {freeAlternative && (
+              <Button asChild variant="secondary">
+                <Link href={freeAlternative.href}>{freeAlternative.label}</Link>
+              </Button>
+            )}
+          </div>
         }
       />
     </div>

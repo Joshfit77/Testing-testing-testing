@@ -91,7 +91,7 @@ export function ExerciseIllustration({
         controls,
         style: "athlete",
         highlight,
-        controlsInset: 74,
+        // The controls sit in their own strip under the picture, so the athlete needs no room kept clear for them.
         badge: controls ? "Animated demo" : "",
         meta: { slug, name, ...parsed },
         label: `Animated demonstration of ${name}. ${m.getMotion(slug, { slug, name, ...parsed }).label}`,

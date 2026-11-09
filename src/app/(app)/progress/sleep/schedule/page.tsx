@@ -7,7 +7,7 @@ import { addDays, isoDateInTz } from "@/lib/domain/dates";
 import { hasFeature } from "@/lib/domain/plans";
 import { DEFAULT_SLEEP_GOAL_MINUTES, formatClock, formatDuration, summarizeNights } from "@/lib/domain/sleep";
 import { clockToMinutes } from "@/lib/domain/sleep-checkins";
-import { SLEEP_SCHEDULE_VERSION, sleepWindows } from "@/lib/domain/sleep-schedule";
+import { SLEEP_SCHEDULE_VERSION, sleepWindows, windDownStart } from "@/lib/domain/sleep-schedule";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { listSleepSessions } from "@/server/services/sleep";
@@ -18,7 +18,7 @@ export default async function SleepSchedulePage() {
   const { user, profile } = await requireOnboardedUser();
   const plan = await getUserPlan(user.id);
   if (!hasFeature(plan, "sleep_analytics")) {
-    return <PlanLocked back={{ href: "/progress/sleep", label: "Sleep & Recovery" }} eyebrow="Sleep & Recovery" title="Sleep schedule" description="A suggested bedtime and wake-up window from your own nights and goal, how steady your rhythm is, and a gradual plan when your bedtime needs to move." />;
+    return <PlanLocked freeAlternative={{ href: "/progress/sleep/log", label: "Log last night's sleep" }} back={{ href: "/progress/sleep", label: "Sleep & Recovery" }} eyebrow="Sleep & Recovery" title="Sleep schedule" description="A suggested bedtime and wake-up window from your own nights and goal, how steady your rhythm is, and a gradual plan when your bedtime needs to move." />;
   }
   const tz = profile.timezone ?? "UTC";
   const today = isoDateInTz(new Date(), tz);
@@ -46,6 +46,12 @@ export default async function SleepSchedulePage() {
               <p className="mt-2 font-display text-3xl font-bold text-gold-highlight">{win(w.bedWindow)}</p>
               <p className="mt-1 text-sm text-muted-foreground">
                 For {formatDuration(goal)} asleep by {formatClock(w.anchorWake!)}, allowing {formatDuration(w.latencyMinutes)} to fall asleep{w.latencyMinutes === 15 && !nights.some((n) => n.latencyMinutes !== null) ? " (a default; enter when you fall asleep for a better figure)" : " (your typical)"}.
+              </p>
+              <p className="mt-2 text-sm">
+                Start winding down around <strong>{formatClock(windDownStart(w.bedWindow))}</strong>.{" "}
+                <Link href="/profile/notifications" className="inline-flex min-h-11 items-center font-semibold text-gold-highlight underline">
+                  Set a wind-down reminder
+                </Link>
               </p>
             </>
           ) : (

@@ -182,7 +182,7 @@ export function CustomizeLayout({ defaultOrder, prefs }: { defaultOrder: HomeMod
           ))}
         </ul>
       </div>
-      <Button type="button" variant="secondary" className="h-auto w-full whitespace-normal" onClick={reset}>
+      <Button type="button" variant="secondary" className="h-auto min-h-11 w-full whitespace-normal" onClick={reset}>
         <RotateCcw aria-hidden /> Reset to the default for my goal
       </Button>
     </div>

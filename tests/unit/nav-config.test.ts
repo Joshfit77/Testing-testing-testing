@@ -21,10 +21,11 @@ describe("bottom navigation", () => {
     expect(activeTab("/profile/billing")?.label).toBe("You");
     expect(activeTab("/coach")?.label).toBe("You");
   });
-  it("keeps the calendar, the plan and search under Home, and avoids prefix collisions", () => {
+  it("keeps the calendar and the plan under Home, search under no tab, and avoids prefix collisions", () => {
     expect(activeTab("/calendar")?.label).toBe("Home");
     expect(activeTab("/plan")?.label).toBe("Home");
-    expect(activeTab("/search")?.label).toBe("Home");
+    expect(activeTab("/search")).toBeNull();
+    expect(MAIN_TABS.some((t) => isTabActive("/search", t))).toBe(false);
     expect(activeTab("/admin")).toBeNull();
     expect(isTabActive("/training", MAIN_TABS[1]!)).toBe(false);
     expect(isTabActive("/home", MAIN_TABS[1]!)).toBe(false);

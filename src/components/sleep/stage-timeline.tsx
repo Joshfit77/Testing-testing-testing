@@ -1,4 +1,5 @@
 import { clockMinutesInTz, formatClock, formatDuration, minutesBetween } from "@/lib/domain/sleep";
+import { stageAxisTicks } from "@/lib/domain/sleep-axis";
 import type { SleepStageRow } from "@/server/services/sleep";
 import { cn } from "@/lib/utils";
 
@@ -43,15 +44,8 @@ export function StageTimeline({ stages, bedAt, wakeAt, timeZone, className }: { 
   const end = Date.parse(wakeAt);
   const span = Math.max(1, end - start);
   const pct = (iso: string) => Math.min(100, Math.max(0, ((Date.parse(iso) - start) / span) * 100));
-  // Hour ticks on the hour, at most every two hours when the night is long.
-  const ticks: { left: number; label: string }[] = [];
-  const firstHour = new Date(start);
-  firstHour.setUTCMinutes(0, 0, 0);
-  const stepMs = span > 10 * 3_600_000 ? 2 * 3_600_000 : 3_600_000;
-  for (let t = firstHour.getTime() + 3_600_000; t < end; t += stepMs) {
-    if (t <= start) continue;
-    ticks.push({ left: ((t - start) / span) * 100, label: formatClock(clockMinutesInTz(new Date(t).toISOString(), timeZone)) });
-  }
+  // Short labels every two hours on the night's own local hours; none near the ends, where bed and up times sit.
+  const ticks = stageAxisTicks(bedAt, wakeAt, timeZone);
   const rows: StageKey[] = ["awake", "rem", "light", "deep"];
   return (
     <figure className={cn("space-y-2", className)}>
@@ -80,14 +74,17 @@ export function StageTimeline({ stages, bedAt, wakeAt, timeZone, className }: { 
           ))}
         </div>
         <span />
-        <div className="relative h-4 text-[0.625rem] text-muted-foreground" aria-hidden>
-          <span className="absolute left-0">{formatClock(clockMinutesInTz(bedAt, timeZone))}</span>
+        <div className="relative h-4 whitespace-nowrap text-[0.6875rem] text-muted-foreground" aria-hidden data-testid="stage-axis">
           {ticks.map((t) => (
             <span key={t.label} className="absolute -translate-x-1/2" style={{ left: `${t.left}%` }}>
               {t.label}
             </span>
           ))}
-          <span className="absolute right-0">{formatClock(clockMinutesInTz(wakeAt, timeZone))}</span>
+        </div>
+        <span />
+        <div className="flex justify-between gap-2 text-xs text-muted-foreground" aria-hidden>
+          <span>In bed {formatClock(clockMinutesInTz(bedAt, timeZone))}</span>
+          <span>Up {formatClock(clockMinutesInTz(wakeAt, timeZone))}</span>
         </div>
       </div>
       <figcaption className="sr-only">

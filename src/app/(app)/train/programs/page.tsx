@@ -19,7 +19,6 @@ import {
   GOAL_FILTERS,
   MINUTES_FILTERS,
   parseCatalogFilters,
-  requiredSessions,
   SPEC_CATEGORIES,
   specCategoriesFor,
   type CatalogFilters,
@@ -33,6 +32,9 @@ import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { removeSavedProgramAction } from "@/server/actions/programs";
 
 export const metadata = { title: "Programs" };
+
+/** Programs shown per category before "See all" when browsing the whole library. */
+const PER_CATEGORY = 3;
 
 interface ProgramCardRow {
   id: string;
@@ -104,14 +106,28 @@ export default async function ProgramsPage({ searchParams }: { searchParams: Pro
       "inline-flex min-h-11 shrink-0 items-center rounded-full px-4 text-[0.9375rem] font-semibold transition-colors",
       active ? "bg-gold-gradient text-black shadow-bronze" : "border border-border bg-[#101010] text-foreground/85 hover:text-foreground",
     );
-  /** The app's own vector scenes, one per card (by category), in place of photography. */
-  const ART = ["/illustrations/mountains-sunrise.svg", "/illustrations/sunrise-cross.svg", "/illustrations/cross-dusk.svg"];
   const mine = (mineRes.data ?? []) as unknown as {
     id: string;
     status: string;
     current_week: number;
     program: { id: string; slug: string; name: string; duration_weeks: number; source: string } | null;
   }[];
+
+  const builder = (
+    <Link href="/train/build" className="group flex items-center gap-3 rounded-2xl border border-gold-muted/60 bg-gold/5 p-4 hover:border-gold">
+      <span className="rounded-xl bg-gold-gradient p-2.5 text-primary-foreground">
+        <Wand2 className="size-5" aria-hidden />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold">Build my program</span>
+        <span className="block text-sm text-muted-foreground">
+          Built around your numbers, goals, schedule and equipment — including combined goals like strength + a 5K.{" "}
+          {canBuild ? "" : "Included with Pro All Access."}
+        </span>
+      </span>
+      <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
+    </Link>
+  );
 
   return (
     <div className="space-y-6">
@@ -120,19 +136,8 @@ export default async function ProgramsPage({ searchParams }: { searchParams: Pro
         <MainHeader title="Programs" subtitle="Search the library, filter it to your goal, schedule and equipment, or build your own." />
       </div>
 
-      <Link href="/train/build" className="group flex items-center gap-3 rounded-2xl border border-gold-muted/60 bg-gold/5 p-4 hover:border-gold">
-        <span className="rounded-xl bg-gold-gradient p-2.5 text-primary-foreground">
-          <Wand2 className="size-5" aria-hidden />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block font-semibold">Build my program</span>
-          <span className="block text-sm text-muted-foreground">
-            Built around your numbers, goals, schedule and equipment — including combined goals like strength + a 5K.{" "}
-            {canBuild ? "" : "Included with Pro All Access."}
-          </span>
-        </span>
-        <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
-      </Link>
+      {/* Pro: the builder leads. Free: the free library comes first and the builder follows it. */}
+      {canBuild && builder}
 
       {mine.length > 0 && (
         <section aria-labelledby="mine-title">
@@ -283,70 +288,67 @@ export default async function ProgramsPage({ searchParams }: { searchParams: Pro
           />
         ) : (
           <div className="space-y-6">
-            {groups.map(({ category: c, items }) => (
-              <section key={c.id} aria-labelledby={`cat-${c.id}`}>
-                <h3 id={`cat-${c.id}`} className="mb-2 font-display text-lg font-bold uppercase leading-tight">
-                  {c.label}
-                </h3>
-                <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                  {items.map((p) => {
-                    const locked = !canAccessTier(plan, p.tier);
-                    const { total, required } = requiredSessions(p.days_per_week, p.duration_weeks);
-                    return (
-                      <li key={p.id}>
-                        <Link href={`/train/programs/${p.slug}`} className="card-gold flex h-full flex-col overflow-hidden rounded-2xl hover:brightness-110">
-                          <div className="relative h-28 bg-[#140d05]" aria-hidden>
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={ART[(SPEC_CATEGORIES.findIndex((x) => x.id === c.id) + items.indexOf(p)) % ART.length]} alt="" className="absolute inset-0 size-full object-cover" />
-                            <div className="absolute inset-0 bg-gradient-to-t from-[#15110a] via-[#15110a]/40 to-transparent" />
-                            <p className="absolute bottom-2 left-4 text-xs font-semibold uppercase tracking-widest text-champagne">{p.categoryName ?? "Program"}</p>
-                          </div>
-                          <div className="flex flex-1 flex-col p-4">
-                          <div className="flex items-start justify-between gap-2">
-                            <h4 className="font-display text-xl font-bold leading-tight">{p.name}</h4>
-                            {locked ? (
-                              <Badge>
-                                <Lock className="size-3" aria-hidden /> Pro
-                              </Badge>
-                            ) : (
-                              p.tier === "free" && <Badge variant="success">Free</Badge>
-                            )}
-                          </div>
-                          <p className="mt-1.5 flex-1 text-sm text-muted-foreground">{p.summary}</p>
-                          <p className="mt-3 text-sm font-semibold text-gold-highlight">
-                            {p.days_per_week} days/week • {p.duration_weeks} {p.duration_weeks === 1 ? "week" : "weeks"} • ~{p.session_minutes} min
-                          </p>
-                          <div className="mt-2 flex flex-wrap gap-1.5">
-                            <Badge variant="secondary">{titleCase(p.difficulty)}</Badge>
-                          </div>
-                          <dl className="mt-3 space-y-1 text-xs text-muted-foreground">
-                            <div className="flex gap-1.5">
-                              <dt>
-                                <Dumbbell className="mt-0.5 size-3.5 text-gold" aria-label="Equipment" />
-                              </dt>
-                              <dd>{equipmentSummary(p.equipment)}</dd>
+            {groups.map(({ category: c, items }) => {
+              // Browsing everything: 3 per category, and the category chip's own page for the rest.
+              const shown = filters.category ? items : items.slice(0, PER_CATEGORY);
+              return (
+                <section key={c.id} aria-labelledby={`cat-${c.id}`}>
+                  <h3 id={`cat-${c.id}`} className="mb-2 font-display text-lg font-bold uppercase leading-tight">
+                    {c.label}
+                  </h3>
+                  <ul className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+                    {shown.map((p) => {
+                      const locked = !canAccessTier(plan, p.tier);
+                      return (
+                        <li key={p.id} className="min-w-0">
+                          <Link href={`/train/programs/${p.slug}`} className="card-gold flex h-full min-w-0 flex-col rounded-2xl p-4 hover:brightness-110">
+                            <div className="flex items-start justify-between gap-2">
+                              <h4 className="font-display text-xl font-bold leading-tight">{p.name}</h4>
+                              {locked ? (
+                                <Badge>
+                                  <Lock className="size-3" aria-hidden /> Pro
+                                </Badge>
+                              ) : (
+                                p.tier === "free" && <Badge variant="success">Free</Badge>
+                              )}
                             </div>
-                            <div>
-                              <dt className="inline font-semibold text-foreground/80">Complete: </dt>
-                              <dd className="inline">{p.duration_weeks <= 1 ? `all ${total} sessions` : `${required} of ${total} sessions (80%)`}</dd>
-                            </div>
-                          </dl>
-                          {p.needs_specialist_review && (
-                            <p className="mt-2 flex items-center gap-1.5 text-xs text-gold-highlight">
-                              <ShieldAlert className="size-3.5 shrink-0" aria-hidden /> Not yet reviewed by a qualified coach
+                            <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{p.summary}</p>
+                            <p className="mt-2 text-sm font-semibold text-gold-highlight">
+                              {titleCase(p.difficulty)} • {p.days_per_week} days/week • {p.duration_weeks} {p.duration_weeks === 1 ? "week" : "weeks"} • ~{p.session_minutes} min
                             </p>
-                          )}
-                        </div>
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </section>
-            ))}
+                            <p className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                              <Dumbbell className="size-3.5 shrink-0 text-gold" aria-label="Equipment" />
+                              <span className="truncate">{equipmentSummary(p.equipment)}</span>
+                            </p>
+                            {p.needs_specialist_review && (
+                              <p className="mt-2 flex items-center gap-1.5 text-xs text-gold-highlight">
+                                <ShieldAlert className="size-3.5 shrink-0" aria-hidden /> Not yet reviewed by a qualified coach
+                              </p>
+                            )}
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  {shown.length < items.length && (
+                    <Link
+                      href={`/train/programs${catalogQuery({ ...filters, category: c.id })}#library`}
+                      className="mt-1 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-gold-highlight underline-offset-4 hover:underline"
+                      data-testid={`see-all-${c.id}`}
+                    >
+                      See all {items.length}
+                      <span className="sr-only"> {c.label} programs</span>
+                      <ChevronRight className="size-4" aria-hidden />
+                    </Link>
+                  )}
+                </section>
+              );
+            })}
           </div>
         )}
       </section>
+
+      {!canBuild && builder}
     </div>
   );
 }

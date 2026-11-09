@@ -5,6 +5,8 @@
  *
  *   npx tsx scripts/demo/seed-demo.ts            (normally run by scripts/demo/run-demo.sh)
  *   npx tsx scripts/demo/seed-demo.ts --check-only   (only the safety checks below; changes nothing)
+ *   npx tsx scripts/demo/seed-demo.ts --reset        (npm run demo:reset: put ONLY the sample account back to its
+ *                                                     starting state; every other account, demo or not, is untouched)
  *
  * Safety:
  * - It only writes to the Supabase project in NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY.
@@ -17,7 +19,7 @@ import { randomBytes } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { signupAcceptances } from "@/lib/legal/versions";
-import { seedSampleData, seedSampleProfile, setSeedClient } from "@/server/demo-seed";
+import { resetSampleAccount, seedSampleData, seedSampleProfile, setSeedClient } from "@/server/demo-seed";
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
@@ -64,6 +66,17 @@ async function removeDemoAccounts() {
   }
 }
 
+/** The sample account's id, or null. Matched by its email AND the demo flag, so a real account can never match. */
+async function findSampleAccount(): Promise<string | null> {
+  for (let page = 1; ; page++) {
+    const { data, error } = await db.auth.admin.listUsers({ page, perPage: 200 });
+    if (error) fail(`listing accounts: ${error.message}`);
+    const hit = data.users.find((u) => u.email === EMAIL && u.app_metadata?.demo === true);
+    if (hit) return hit.id;
+    if (data.users.length < 200) return null;
+  }
+}
+
 // ---------- The sample member
 
 async function createMember(password: string): Promise<string> {
@@ -88,7 +101,20 @@ async function main() {
     console.log("seed-demo: the target holds no accounts except demo accounts.");
     return;
   }
-  await removeDemoAccounts();
+  if (process.argv.includes("--reset")) {
+    // Only the sample account, in place: same id and password, so a running demo server keeps working, and new-member
+    // demo accounts (or a test using one at this moment) are never touched. The same scoped reset as the in-app
+    // Reset demo button.
+    const sample = await findSampleAccount();
+    if (sample) {
+      await resetSampleAccount(db, sample);
+      console.log("seed-demo: sample account reset in place; no other account was changed.");
+      return;
+    }
+    console.log("seed-demo: no sample account yet, so creating it (other accounts are left alone).");
+  } else {
+    await removeDemoAccounts();
+  }
   // Re-seeding under a running demo server keeps its password (DEMO_ACCOUNT_PASSWORD); otherwise a new random one.
   // The suffix keeps every random password inside the auth policy (a lower-case letter, an upper-case letter and a
   // digit each): a 24-character random string alone failed it now and then.

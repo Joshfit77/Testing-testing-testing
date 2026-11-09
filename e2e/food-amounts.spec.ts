@@ -33,10 +33,12 @@ test.describe("food amounts (MyFitnessPal style)", () => {
     await page.goto("/nutrition");
     await openGroups(page);
 
-    // Empty search: browse chips and popular foods.
+    // Empty search: popular foods first; the food groups open on demand under "Browse by type".
     let dialog = await openAddFood(page);
-    await expect(dialog.getByRole("region", { name: "Browse by type" }).getByRole("button", { name: "Poultry Products" })).toBeVisible();
     await expect(dialog.getByRole("region", { name: "Popular foods" }).getByRole("button").first()).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Poultry Products" })).toBeHidden();
+    await dialog.getByTestId("browse-by-type").locator("summary").click();
+    await expect(dialog.getByRole("region", { name: "Browse by type" }).getByRole("button", { name: "Poultry Products" })).toBeVisible();
 
     // Search and pick the USDA roasted chicken breast.
     await dialog.getByPlaceholder("e.g. chicken, banana, rice").fill("chicken breast");
@@ -57,7 +59,8 @@ test.describe("food amounts (MyFitnessPal style)", () => {
     await expect(dialog.getByText("= 6 oz (170 g)")).toBeVisible();
     await dialog.getByLabel("Meal", { exact: true }).selectOption("lunch");
     await dialog.getByRole("button", { name: "Log food" }).click();
-    await expect(dialog.getByRole("status")).toHaveText("Logged Chicken breast, cooked (roasted) (6 oz (170 g)).");
+    await expect(dialog.getByRole("status")).toHaveText("Logged Chicken breast, cooked (roasted) (6 oz (170 g)) to lunch.");
+    await expect(dialog.getByRole("button", { name: "Undo" })).toBeVisible();
     await page.keyboard.press("Escape");
 
     const lunch = page.getByTestId("meal-lunch");
@@ -82,6 +85,7 @@ test.describe("food amounts (MyFitnessPal style)", () => {
 
     // Browse a category, paginate and narrow it.
     dialog = await openAddFood(page);
+    await dialog.getByTestId("browse-by-type").locator("summary").click();
     await dialog.getByRole("button", { name: "Fruits and Fruit Juices" }).click();
     const fruits = dialog.getByRole("region", { name: "Fruits and Fruit Juices" });
     await expect(fruits.getByText(/USDA · \d+ foods/)).toBeVisible();
@@ -116,7 +120,7 @@ test.describe("food amounts (MyFitnessPal style)", () => {
     await expect(dialog.getByTestId("amount-calories")).toHaveText("420");
     await dialog.getByLabel("Meal", { exact: true }).selectOption("snack");
     await dialog.getByRole("button", { name: "Log food" }).click();
-    await expect(dialog.getByRole("status")).toHaveText("Logged Peanut Protein Bar (Test Foods) (2 × 1 bar (60 g) = 120 g).");
+    await expect(dialog.getByRole("status")).toHaveText("Logged Peanut Protein Bar (Test Foods) (2 × 1 bar (60 g) = 120 g) to snacks.");
     await page.keyboard.press("Escape");
     await expect(page.getByTestId("meal-snack").getByText(/2 × 1 bar \(60 g\) = 120 g · 420 kcal/)).toBeVisible();
     await expect(page.getByTestId("nutrient-fiber")).toHaveText("12 g");

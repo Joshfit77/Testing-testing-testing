@@ -1,3 +1,6 @@
+import Link from "next/link";
+import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/common/page-header";
 import { PlanLocked } from "@/components/common/plan-locked";
 import { AiConsentCard } from "@/components/coach/ai-consent-card";
@@ -53,13 +56,22 @@ export default async function FoodPhotoPage({ searchParams }: { searchParams: Pr
   }
   if (usage.chatLimit <= 0) {
     return (
-      <PlanLocked
-        back={{ href: "/nutrition", label: "Food" }}
-        eyebrow="Food"
-        title="Meal photo"
-       
-        description="Take a photo of your meal and get estimated foods, portions, calories and macros to check, correct and add to your diary."
-      />
+      <div className="space-y-4">
+        <PlanLocked
+          back={{ href: "/nutrition", label: "Food" }}
+          eyebrow="Food"
+          title="Meal photo"
+          description="Take a photo of your meal and get estimated foods, portions, calories and macros to check, correct and add to your diary."
+        />
+        {/* Logging stays free: the way back to it, right from the lock. */}
+        <div className="flex justify-center">
+          <Button asChild variant="secondary" className="min-h-11">
+            <Link href={`/nutrition?add=1${isValidIsoDate(sp.date) ? `&date=${sp.date}` : ""}`}>
+              <Plus aria-hidden /> Add food instead
+            </Link>
+          </Button>
+        </div>
+      </div>
     );
   }
   const { data: consent } = await supabase.from("profiles").select("ai_data_consent_at, food_photo_consent_at").eq("id", user.id).maybeSingle();

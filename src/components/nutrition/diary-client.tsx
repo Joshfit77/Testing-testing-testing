@@ -9,13 +9,14 @@ import { Input, NativeSelect } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { initialActionState, type ActionState } from "@/lib/action-state";
 import { ACTIVITY_INFO, ACTIVITY_LEVELS, WEEKLY_RATES_KG, type ActivityLevel } from "@/lib/domain/calorie-budget";
-import { paceLabel } from "@/lib/domain/diary";
+import { paceLabel, shortDate, type LogResult } from "@/lib/domain/diary";
 import { MEAL_TYPES } from "@/lib/domain/meals";
 import type { UnitSystem } from "@/lib/domain/types";
 import { displayWeight, toKg, weightUnit } from "@/lib/domain/units";
 import { copyMealsAction, logFoodAction, updateBudgetAction } from "@/server/actions/nutrition";
 import { useDraft } from "@/lib/use-draft";
 import { DraftRestoredNotice } from "@/components/drafts/draft-notice";
+import { LoggedUndo } from "@/components/nutrition/logged-undo";
 
 export function ResultLine({ result }: { result: ActionState | null }) {
   if (!result?.message) return null;
@@ -27,14 +28,27 @@ export function ResultLine({ result }: { result: ActionState | null }) {
 }
 
 /** MyFitnessPal-style "Quick add": just calories (and optional macros) into a meal. */
-export function QuickAddDialog({ date, mealType: initialMeal = "breakfast", label = "Quick add", compact = false }: { date: string; mealType?: string; label?: string; compact?: boolean }) {
+export function QuickAddDialog({
+  date,
+  dayLabel,
+  mealType: initialMeal = "breakfast",
+  label = "Quick add",
+  compact = false,
+}: {
+  date: string;
+  /** "Today", or the day's date in words; defaults to "Mon, Nov 9". */
+  dayLabel?: string;
+  mealType?: string;
+  label?: string;
+  compact?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [mealType, setMealType] = useState(initialMeal);
   // Unsent numbers are kept as a draft on this device (one per Quick add button) until they're added.
   const draft = useDraft(`food.quickadd.${compact ? initialMeal : "any"}`, { calories: "", protein_g: "", carbs_g: "", fat_g: "" });
   const values = draft.value;
   const setValues = draft.setValue;
-  const [result, setResult] = useState<ActionState | null>(null);
+  const [result, setResult] = useState<LogResult | null>(null);
   const [pending, start] = useTransition();
   const mealName = MEAL_TYPES.find(([v]) => v === mealType)?.[1] ?? "meal";
 
@@ -71,6 +85,7 @@ export function QuickAddDialog({ date, mealType: initialMeal = "breakfast", labe
         type="button"
         size="sm"
         variant={compact ? "ghost" : "secondary"}
+        className="min-h-11"
         onClick={() => {
           setMealType(initialMeal);
           setResult(null);
@@ -84,7 +99,7 @@ export function QuickAddDialog({ date, mealType: initialMeal = "breakfast", labe
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Quick add calories</DialogTitle>
-            <DialogDescription>For {date}. Use it when you know the numbers but not the food.</DialogDescription>
+            <DialogDescription>For {dayLabel ?? shortDate(date)}. Use it when you know the numbers but not the food.</DialogDescription>
           </DialogHeader>
           {draft.restored && <DraftRestoredNotice onDiscard={draft.clear} onDismiss={draft.dismissRestored} />}
           <form
@@ -136,7 +151,7 @@ export function QuickAddDialog({ date, mealType: initialMeal = "breakfast", labe
               ))}
             </div>
             <p className="text-xs text-muted-foreground">Macros are optional.</p>
-            <ResultLine result={result} />
+            <LoggedUndo result={result} />
             <Button type="submit" className="w-full" disabled={pending} aria-busy={pending}>
               {pending && <Loader2 className="animate-spin" aria-hidden />} Add to {mealName}
             </Button>
@@ -149,7 +164,7 @@ export function QuickAddDialog({ date, mealType: initialMeal = "breakfast", labe
 
 /** Copy one meal (or the whole day) from another day into this one. */
 export function CopyMealButton({ fromDate, toDate, mealType, label }: { fromDate: string; toDate: string; mealType?: string; label: string }) {
-  const [result, setResult] = useState<ActionState | null>(null);
+  const [result, setResult] = useState<LogResult | null>(null);
   const [pending, start] = useTransition();
   return (
     <span className="inline-flex flex-wrap items-center gap-2">
@@ -157,7 +172,7 @@ export function CopyMealButton({ fromDate, toDate, mealType, label }: { fromDate
         type="button"
         size="sm"
         variant="ghost"
-        className="h-auto min-h-9 max-w-full whitespace-normal text-left"
+        className="h-auto min-h-11 max-w-full whitespace-normal text-left"
         disabled={pending}
         aria-busy={pending}
         onClick={() =>
@@ -168,7 +183,7 @@ export function CopyMealButton({ fromDate, toDate, mealType, label }: { fromDate
       >
         {pending ? <Loader2 className="animate-spin" aria-hidden /> : <Copy aria-hidden />} {label}
       </Button>
-      <ResultLine result={result} />
+      <LoggedUndo result={result} />
     </span>
   );
 }

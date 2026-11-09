@@ -59,4 +59,48 @@ describe("entering sleep by hand", () => {
     expect(container.querySelector<HTMLSelectElement>("#sleep-zone")!.value).toBe("Europe/London");
     expect(container.querySelector<HTMLInputElement>("#sleep-started")!.value).toBe("2026-10-30T22:00");
   });
+
+  it("switches a new entry to nap-sized times when A nap is chosen, and back for a night", async () => {
+    onDevice("UTC");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-31T14:07:00Z"));
+    try {
+      const container = document.createElement("div");
+      document.body.append(container);
+      const { createRoot } = await import("react-dom/client");
+      const defaults = { startedAt: "2026-10-30T22:30", endedAt: "2026-10-31T06:30" };
+      await act(async () => {
+        createRoot(container).render(<SleepSessionForm timezone="UTC" defaults={defaults} />);
+      });
+      const start = container.querySelector<HTMLInputElement>("#sleep-started")!;
+      const end = container.querySelector<HTMLInputElement>("#sleep-ended")!;
+      const radio = (k: string) => container.querySelector<HTMLInputElement>(`input[name="kind"][value="${k}"]`)!;
+      await act(async () => radio("nap").click());
+      expect([start.value, end.value]).toEqual(["2026-10-31T13:35", "2026-10-31T14:05"]);
+      await act(async () => radio("night").click());
+      expect([start.value, end.value]).toEqual([defaults.startedAt, defaults.endedAt]);
+      // The time zone is under More detail, with a one-line reminder of it next to the times.
+      expect(container.querySelector("details #sleep-zone")).not.toBeNull();
+      expect(container.textContent).toContain("Times are in UTC.");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("leaves times the member typed alone when the kind changes", async () => {
+    onDevice("UTC");
+    const container = document.createElement("div");
+    document.body.append(container);
+    const { createRoot } = await import("react-dom/client");
+    await act(async () => {
+      createRoot(container).render(<SleepSessionForm timezone="UTC" defaults={{ startedAt: "2026-10-30T22:30", endedAt: "2026-10-31T06:30" }} />);
+    });
+    const start = container.querySelector<HTMLInputElement>("#sleep-started")!;
+    await act(async () => {
+      start.value = "2026-10-31T13:00";
+      start.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => container.querySelector<HTMLInputElement>('input[name="kind"][value="nap"]')!.click());
+    expect(start.value).toBe("2026-10-31T13:00");
+  });
 });

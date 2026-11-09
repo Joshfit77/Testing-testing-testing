@@ -64,7 +64,7 @@ test.describe("food diary (MyFitnessPal style)", () => {
     await expect(dialog.getByRole("tab", { name: "Recent" })).toHaveAttribute("aria-selected", "true");
     await expect(dialog.getByLabel("Frequent foods")).toBeVisible();
     await dialog.getByLabel("Frequent foods").getByRole("button", { name: "Add Quick add again" }).first().click();
-    await expect(dialog.getByText("Logged Quick add.")).toBeVisible();
+    await expect(dialog.getByText(/^Logged Quick add to (breakfast|lunch|dinner|snacks)\.$/)).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(page.getByTestId("budget-food")).not.toHaveText("1100");
 

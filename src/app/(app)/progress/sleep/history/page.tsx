@@ -7,9 +7,10 @@ import { BackLink } from "@/components/platform/back-link";
 import { formatNightDate } from "@/components/sleep/session-list";
 import { StageBar, stageTotals } from "@/components/sleep/stage-timeline";
 import { VitalsTrend } from "@/components/sleep/vitals-cards";
+import { PartialTag } from "@/components/sleep/score-card";
 import { addDays, isoDateInTz, parseRange, RANGES, rangeStart, type RangeKey } from "@/lib/domain/dates";
 import { clockMinutesInTz, DEFAULT_SLEEP_GOAL_MINUTES, formatClock, formatDuration, summarizeNights } from "@/lib/domain/sleep";
-import { nightlyScore } from "@/lib/domain/sleep-score";
+import { averageScore, nightlyScore } from "@/lib/domain/sleep-score";
 import { describeShift, SLEEP_ANALYTICS_VERSION, trend, weekdayWeekend } from "@/lib/domain/sleep-analytics";
 import { hasFeature } from "@/lib/domain/plans";
 import { averageAsleepMinutes, goalPct, nightSlots, scheduleStats } from "@/lib/domain/sleep-stats";
@@ -45,7 +46,9 @@ export default async function SleepHistoryPage({ searchParams }: { searchParams:
   const atGoal = nights.filter((n) => n.asleepMinutes >= goal).length;
   const longest = nights.length ? Math.max(...nights.map((n) => n.asleepMinutes)) : null;
   const shortest = nights.length ? Math.min(...nights.map((n) => n.asleepMinutes)) : null;
-  const avgScore = scored.length ? Math.round(scored.reduce((acc, s) => acc + s.score.score, 0) / scored.length) : null;
+  // Partial scores (time in bed only) are tagged in the list and left out of the average.
+  const scoreAvg = averageScore(scored.map((s) => s.score));
+  const avgScore = scoreAvg.average;
   const bucket = range === "1y" ? "month" : "week";
   const points = range === "7d" ? null : trend(nights, start, today, bucket, goal);
   // Stage mix over the most recent recorded nights in the range (30 at most keeps the query small).
@@ -96,7 +99,10 @@ export default async function SleepHistoryPage({ searchParams }: { searchParams:
         ) : (
           <p className="mt-2 text-sm text-muted-foreground">No nights logged in this range. Nights you log appear here; days without an entry stay empty rather than counting as no sleep.</p>
         )}
-        <p className="mt-3 text-xs text-muted-foreground">Averages cover logged nights only. Nights without detail count time in bed as time asleep, and each score is based only on what that night had entered.</p>
+        <p className="mt-3 text-xs text-muted-foreground">
+          Averages cover logged nights only. Nights without detail count time in bed as time asleep, and each score is based only on what that night had entered.
+          {scoreAvg.partial > 0 ? ` The average score leaves out ${scoreAvg.partial} partial ${scoreAvg.partial === 1 ? "score" : "scores"} (time in bed only).` : ""}
+        </p>
       </section>
 
       <section className={card} aria-labelledby="chart-title">
@@ -214,9 +220,9 @@ export default async function SleepHistoryPage({ searchParams }: { searchParams:
                       {n.asleepEstimated ? " in bed" : " asleep"} · {pct}% of goal
                     </p>
                   </div>
-                  <span className="text-right">
+                  <span className="flex flex-col items-end text-right">
                     <span className="block font-display text-2xl font-bold text-gold-highlight">{score.score}</span>
-                    <span className="block text-xs text-muted-foreground">score</span>
+                    {score.partial ? <PartialTag className="px-1.5 py-0" /> : <span className="block text-xs text-muted-foreground">score</span>}
                   </span>
                   <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
                 </Link>

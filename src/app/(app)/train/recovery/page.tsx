@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Clock, HeartPulse, Leaf, ShieldAlert } from "lucide-react";
+import { BookOpen, ChevronDown, Clock, HeartPulse, Leaf, ShieldAlert } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { CheckinForm } from "@/components/recovery/checkin-form";
 import { Button } from "@/components/ui/button";
@@ -94,71 +94,83 @@ export default async function RecoveryPage() {
         </div>
       </div>
 
-      <section aria-labelledby="rest-title">
-        <h2 id="rest-title" className="mb-3 font-display text-xl font-bold uppercase">
-          Rest-day activities
-        </h2>
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          {REST_DAY_ACTIVITIES.map((a) => (
-            <li key={a.title} className="rounded-2xl border border-border bg-card p-4">
-              <p className="font-semibold">{a.title}</p>
-              {a.minutes > 0 && (
-                <p className="mt-1 flex items-center gap-1 text-xs text-gold">
-                  <Clock className="size-3" aria-hidden /> {a.minutes} min
-                </p>
-              )}
-              <p className="mt-2 text-xs text-muted-foreground">{a.description}</p>
-            </li>
-          ))}
-        </ul>
-      </section>
+      {/* Reference reading, one tap away, so the check-in and today's readiness lead the page. */}
+      <details className="group rounded-2xl border border-border bg-card" data-testid="recovery-guides">
+        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-2 px-5 font-display text-lg font-bold uppercase [&::-webkit-details-marker]:hidden">
+          <span className="flex items-center gap-2">
+            <BookOpen className="size-5 text-gold" aria-hidden /> Guides
+            <span className="font-sans text-sm font-normal normal-case text-muted-foreground">rest days, warm-up, cooldown, modifications</span>
+          </span>
+          <ChevronDown className="size-5 shrink-0 text-gold transition-transform group-open:rotate-180" aria-hidden />
+        </summary>
+        <div className="space-y-6 px-5 pb-5">
+          <section aria-labelledby="rest-title">
+            <h2 id="rest-title" className="mb-3 font-display text-xl font-bold uppercase">
+              Rest-day activities
+            </h2>
+            <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              {REST_DAY_ACTIVITIES.map((a) => (
+                <li key={a.title} className="rounded-2xl border border-border bg-card p-4">
+                  <p className="font-semibold">{a.title}</p>
+                  {a.minutes > 0 && (
+                    <p className="mt-1 flex items-center gap-1 text-xs text-gold">
+                      <Clock className="size-3" aria-hidden /> {a.minutes} min
+                    </p>
+                  )}
+                  <p className="mt-2 text-xs text-muted-foreground">{a.description}</p>
+                </li>
+              ))}
+            </ul>
+          </section>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="warmup-title">
-          <h2 id="warmup-title" className="font-display text-lg font-semibold uppercase">
-            General warm-up
-          </h2>
-          <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
-            {STANDARD_WARMUP.map((w) => (
-              <li key={w}>{w}</li>
-            ))}
-          </ol>
-        </section>
-        <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="cooldown-title">
-          <h2 id="cooldown-title" className="font-display text-lg font-semibold uppercase">
-            General cooldown
-          </h2>
-          <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
-            {STANDARD_COOLDOWN.map((w) => (
-              <li key={w}>{w}</li>
-            ))}
-          </ol>
-        </section>
-      </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="warmup-title">
+              <h2 id="warmup-title" className="font-display text-lg font-semibold uppercase">
+                General warm-up
+              </h2>
+              <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
+                {STANDARD_WARMUP.map((w) => (
+                  <li key={w}>{w}</li>
+                ))}
+              </ol>
+            </section>
+            <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="cooldown-title">
+              <h2 id="cooldown-title" className="font-display text-lg font-semibold uppercase">
+                General cooldown
+              </h2>
+              <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
+                {STANDARD_COOLDOWN.map((w) => (
+                  <li key={w}>{w}</li>
+                ))}
+              </ol>
+            </section>
+          </div>
 
-      <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="mods-title">
-        <h2 id="mods-title" className="flex items-center gap-2 font-display text-xl font-bold uppercase">
-          <ShieldAlert className="size-5 text-gold" aria-hidden /> Exercise modifications
-        </h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          You can skip any exercise that causes pain — the workout logger has a &ldquo;Causes pain&rdquo; skip option. These suggestions are not a
-          rehabilitation plan.
-        </p>
-        <dl className="mt-4 grid gap-4 md:grid-cols-2">
-          {EXERCISE_MODIFICATIONS.map((m) => (
-            <div key={m.situation} className="rounded-xl bg-elevated/50 p-4">
-              <dt className="font-semibold">{m.situation}</dt>
-              <dd>
-                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-                  {m.options.map((o) => (
-                    <li key={o}>{o}</li>
-                  ))}
-                </ul>
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </section>
+          <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="mods-title">
+            <h2 id="mods-title" className="flex items-center gap-2 font-display text-xl font-bold uppercase">
+              <ShieldAlert className="size-5 text-gold" aria-hidden /> Exercise modifications
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              You can skip any exercise that causes pain — the workout logger has a &ldquo;Causes pain&rdquo; skip option. These suggestions are not a
+              rehabilitation plan.
+            </p>
+            <dl className="mt-4 grid gap-4 md:grid-cols-2">
+              {EXERCISE_MODIFICATIONS.map((m) => (
+                <div key={m.situation} className="rounded-xl bg-elevated/50 p-4">
+                  <dt className="font-semibold">{m.situation}</dt>
+                  <dd>
+                    <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                      {m.options.map((o) => (
+                        <li key={o}>{o}</li>
+                      ))}
+                    </ul>
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        </div>
+      </details>
 
       <div className="flex justify-center">
         <Button asChild variant="secondary">
