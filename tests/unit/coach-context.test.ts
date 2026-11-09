@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { adherence, bodyweightTrend, formatAthleteContext, liftTrends, suggestedQuestions, topSet } from "@/lib/coach/context";
+import { adherence, BEGINNER_QUESTIONS, bodyweightTrend, formatAthleteContext, liftTrends, suggestedQuestions, topSet, weeksTrained } from "@/lib/coach/context";
 import { athleteFixture, emptyAthlete } from "./fixtures/coach-fixtures";
 
 describe("coach context builder", () => {
@@ -113,10 +113,36 @@ describe("context helpers", () => {
     const q = suggestedQuestions(athleteFixture());
     expect(q[0]).toBe("Why did my bench press stall?");
     expect(q).toContain("What should I eat before today's Bench day workout?");
-    expect(q).toContain("Plan my deload");
     expect(q.length).toBeLessThanOrEqual(6);
+  });
+
+  it("gives a member with no history beginner-safe questions, never veteran ones", () => {
+    const veteran = /stall|deload|swap|alternatives|progress my/i;
     const fresh = suggestedQuestions(emptyAthlete());
-    expect(fresh).toContain("What should I eat before my workout today?");
-    expect(fresh).toContain("How should I start if I'm new to lifting?");
+    expect(fresh).toEqual(["How do I start my first week?", "How much protein should I aim for?", "Which program fits my goal and schedule?", "How do I warm up before a workout?"]);
+    // A new member with a starter program (week 1, nothing logged yet).
+    const starter = suggestedQuestions(athleteFixture({ workouts: [], sessionDates: [], prs: [], program: { ...athleteFixture().program!, week: 1, nextDay: 1 } }));
+    expect(starter.slice(0, 2)).toEqual([BEGINNER_QUESTIONS[0], BEGINNER_QUESTIONS[1]]);
+    expect(starter).toContain("How do I warm up for today's Squat day workout?");
+    expect(starter).toContain("What should I eat before today's Squat day workout?");
+    for (const q of [...fresh, ...starter]) expect(q).not.toMatch(veteran);
+  });
+
+  it("offers a deload only after 4 or more weeks of training", () => {
+    const base = athleteFixture();
+    expect(weeksTrained(base)).toBe(2);
+    expect(suggestedQuestions(base)).not.toContain("Plan my deload");
+    // Week 1 of a program with one session logged.
+    const week1 = athleteFixture({ program: { ...base.program!, week: 1 }, sessionDates: ["2026-10-19"], workouts: base.workouts.slice(0, 1).map((w) => ({ ...w, date: "2026-10-19" })) });
+    expect(suggestedQuestions(week1)).not.toContain("Plan my deload");
+    // Three weeks in: still no.
+    const threeWeeks = athleteFixture({ program: { ...base.program!, week: 1 }, sessionDates: ["2026-09-28", "2026-10-19"] });
+    expect(weeksTrained(threeWeeks)).toBe(3);
+    expect(suggestedQuestions(threeWeeks)).not.toContain("Plan my deload");
+    // Four weeks of logged history, or a program in week 5: yes.
+    expect(suggestedQuestions(athleteFixture({ program: { ...base.program!, week: 1 }, sessionDates: ["2026-09-21", "2026-10-19"] }))).toContain("Plan my deload");
+    expect(suggestedQuestions(athleteFixture({ program: { ...base.program!, week: 5 } }))).toContain("Plan my deload");
+    // A program's own deload week is named as such.
+    expect(suggestedQuestions(athleteFixture({ program: { ...base.program!, isDeload: true } }))).toContain("How should I run this deload week?");
   });
 });

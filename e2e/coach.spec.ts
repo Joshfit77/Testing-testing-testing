@@ -278,7 +278,7 @@ test.describe("AI coach", () => {
     await completeOnboarding(page);
     await grantPlan(email, "pro");
     await page.goto("/coach");
-    await expect(page.getByText(/isn't configured on this server/)).toBeVisible();
+    await expect(page.getByText("The coach is unavailable right now. Everything else in the app works normally.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Send message" })).toBeDisabled();
   });
 
@@ -296,9 +296,10 @@ test.describe("AI coach", () => {
     await expect(page.getByLabel("Message the AI coach")).toHaveCount(0);
     await page.getByRole("button", { name: "Allow and continue" }).click();
 
-    // Starter questions are built from the user's data (new user with a starter program).
+    // Starter questions are built from the user's data (new user with a starter program): beginner-safe, no deload yet.
     const starters = page.getByLabel("Suggested questions");
-    await expect(starters.getByRole("button", { name: "Plan my deload" })).toBeVisible();
+    await expect(starters.getByRole("button", { name: "How do I start my first week?" })).toBeVisible();
+    await expect(starters.getByRole("button", { name: "Plan my deload" })).toHaveCount(0);
     await expect(starters.getByRole("button", { name: /What should I eat before today's .+ workout\?/ })).toBeVisible();
 
     // A tool-using answer: activity indicator, then markdown (table + list).

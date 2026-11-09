@@ -20,6 +20,7 @@ import type { CoachProposal } from "@/lib/coach/tools";
 import { applyProposalAction, deleteConversationAction, dismissProposalAction } from "@/server/actions/coach";
 import { setConversationMemoryOffAction } from "@/server/actions/coach-memory";
 import { chatCreated, initialChatKey, nextChatKey } from "@/lib/coach/chat-key";
+import { BEGINNER_QUESTIONS } from "@/lib/coach/context";
 
 /** A random id for one message (RFC 4122 v4), also where crypto.randomUUID isn't available. */
 export function newRequestId(): string {
@@ -58,6 +59,8 @@ interface Props {
   memory?: { enabled: boolean; chatOff: boolean } | null;
   /** TestFlight "Was this coaching advice useful?" under replies: only when the owner has switched it on. */
   feedbackEnabled?: boolean;
+  /** The membership doesn't include the coach: an earlier chat can be read, but there's no box to type in. */
+  readOnly?: boolean;
 }
 
 /** Keeps a new chat on screen while it moves to its own URL; another chat, or "New chat", starts fresh (see chat-key). */
@@ -101,14 +104,8 @@ function CoachAvatar({ className }: { className?: string }) {
   );
 }
 
-const DEFAULT_SUGGESTIONS = [
-  "Why did my bench stall?",
-  "Plan my deload",
-  "What should I eat before my workout today?",
-  "Suggest alternatives to barbell back squats",
-  "How much protein should I aim for?",
-  "Review my training consistency",
-];
+/** Used only if the page couldn't build questions from the member's data: safe for someone on day one. */
+const DEFAULT_SUGGESTIONS: readonly string[] = BEGINNER_QUESTIONS;
 
 function PlanPreview({ message, names, onChange }: { message: ChatMessage; names: Record<string, string>; onChange: (status: ChatMessage["proposal_status"]) => void }) {
   const plan = message.proposal as AiPlan;
@@ -243,7 +240,7 @@ type StreamEvent =
   | { type: "done"; result: { conversationId: string; userMessage: ChatMessage; assistantMessage: ChatMessage; usage: { used: number; limit: number } } }
   | { type: "error"; message?: string };
 
-function CoachChatView({ conversationId: initialId, initialMessages, initialQuestion, enabled, disabledReason, canGeneratePlans, usage: initialUsage, exerciseNames, suggestions, memory, feedbackEnabled, onCreated }: Props & { onCreated: (id: string) => void }) {
+function CoachChatView({ conversationId: initialId, initialMessages, initialQuestion, enabled, disabledReason, canGeneratePlans, usage: initialUsage, exerciseNames, suggestions, memory, feedbackEnabled, readOnly = false, onCreated }: Props & { onCreated: (id: string) => void }) {
   const router = useRouter();
   const [conversationId, setConversationId] = useState(initialId);
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
@@ -396,26 +393,29 @@ function CoachChatView({ conversationId: initialId, initialMessages, initialQues
   return (
     <div className="flex min-h-[60dvh] flex-col rounded-2xl border border-border bg-card">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border p-3">
-        <div className="flex gap-1 rounded-xl border border-border bg-background p-1" role="tablist" aria-label="Coach mode">
-          <button
-            role="tab"
-            aria-selected={mode === "chat"}
-            onClick={() => setMode("chat")}
-            className={cn("flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold", mode === "chat" ? "bg-elevated text-gold-highlight" : "text-muted-foreground")}
-          >
-            <MessageSquare className="size-4" aria-hidden /> Ask
-          </button>
-          <button
-            role="tab"
-            aria-selected={mode === "plan"}
-            onClick={() => canGeneratePlans && setMode("plan")}
-            disabled={!canGeneratePlans}
-            title={canGeneratePlans ? undefined : "Plan generation is included with Pro All Access"}
-            className={cn("flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold disabled:opacity-50", mode === "plan" ? "bg-elevated text-gold-highlight" : "text-muted-foreground")}
-          >
-            <Sparkles className="size-4" aria-hidden /> Plan {!canGeneratePlans && <span className="text-xs uppercase">Pro</span>}
-          </button>
-        </div>
+        {/* Plan mode only for members whose membership includes plan drafting; otherwise there is just the chat. */}
+        {canGeneratePlans ? (
+          <div className="flex gap-1 rounded-xl border border-border bg-background p-1" role="tablist" aria-label="Coach mode">
+            <button
+              role="tab"
+              aria-selected={mode === "chat"}
+              onClick={() => setMode("chat")}
+              className={cn("flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold", mode === "chat" ? "bg-elevated text-gold-highlight" : "text-muted-foreground")}
+            >
+              <MessageSquare className="size-4" aria-hidden /> Ask
+            </button>
+            <button
+              role="tab"
+              aria-selected={mode === "plan"}
+              onClick={() => setMode("plan")}
+              className={cn("flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold", mode === "plan" ? "bg-elevated text-gold-highlight" : "text-muted-foreground")}
+            >
+              <Sparkles className="size-4" aria-hidden /> Plan
+            </button>
+          </div>
+        ) : (
+          <span />
+        )}
         <div className="flex items-center gap-3">
           {usage.limit > 0 && (
             <span className="text-xs text-muted-foreground">
@@ -536,6 +536,14 @@ function CoachChatView({ conversationId: initialId, initialMessages, initialQues
         <div ref={endRef} />
       </div>
 
+      {readOnly ? (
+        <div className="border-t border-border p-3 text-sm text-muted-foreground">
+          {disabledReason}{" "}
+          <Link href="/profile/billing" className="inline-flex min-h-11 items-center font-semibold text-gold-highlight underline">
+            See plans
+          </Link>
+        </div>
+      ) : (
       <div className="border-t border-border p-3">
         {!enabled && disabledReason && <Notice tone="info" className="mb-3">{disabledReason}</Notice>}
         {error && (
@@ -595,8 +603,8 @@ function CoachChatView({ conversationId: initialId, initialMessages, initialQues
           </Button>
         </form>
         {memory?.enabled && (
-          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-            <label className="inline-flex items-center gap-2">
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
+            <label className="inline-flex min-h-11 items-center gap-2">
               <input
                 type="checkbox"
                 className="size-4 accent-[#C9A54C]"
@@ -615,17 +623,25 @@ function CoachChatView({ conversationId: initialId, initialMessages, initialQues
               />
               Coach may suggest things to remember from this chat
             </label>
-            <Link href="/coach/memory" className="underline">
+            <Link href="/coach/memory" className="inline-flex min-h-11 items-center px-1 underline">
               Memory
             </Link>
             {memoryNote && <span role="alert" className="text-[#f08a8a]">{memoryNote}</span>}
           </div>
         )}
-        <p className="mt-2 text-xs text-muted-foreground">
-          You&apos;re chatting with an AI. Its answers can be wrong, incomplete or out of date, and it isn&apos;t a doctor, dietitian or physical therapist; this
-          is not medical advice. Suggested changes only apply when you tap Confirm. Don&apos;t share sensitive health details you don&apos;t want stored. Stop any exercise that causes pain.
-        </p>
+        <details className="mt-1 text-xs text-muted-foreground" data-testid="coach-disclaimer">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 [&::-webkit-details-marker]:hidden">
+            <span className="min-w-0 flex-1">AI answers can be wrong and aren&apos;t medical advice. Changes only apply when you tap Confirm.</span>
+            <span className="shrink-0 font-semibold text-gold-highlight underline">More</span>
+          </summary>
+          <p className="pb-1">
+            You&apos;re chatting with an AI. Its answers can be wrong, incomplete or out of date, and it isn&apos;t a doctor, dietitian or physical therapist; this
+            is not medical advice. Suggested changes only apply when you tap Confirm. Don&apos;t share sensitive health details you don&apos;t want stored. Stop any
+            exercise that causes pain.
+          </p>
+        </details>
       </div>
+      )}
     </div>
   );
 }

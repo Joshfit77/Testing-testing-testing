@@ -26,7 +26,9 @@ test.describe("memberships", () => {
 
     // The AI coach is Pro only, and nothing asks for AI data sharing on Free.
     await page.goto("/coach");
-    await expect(page.getByText("AI coaching is included with Pro All Access.")).toBeVisible();
+    await expect(page.getByTestId("coach-upsell")).toBeVisible();
+    await expect(page.getByTestId("coach-upsell-price")).toHaveText("Pro · $19.99/month or $149.99/year · Faith stays free");
+    await expect(page.getByLabel("Message the AI coach")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Allow and continue" })).toHaveCount(0);
 
     // Live GPS recording is Pro; logging a run by hand stays free.
@@ -75,11 +77,11 @@ test.describe("memberships", () => {
     await expect(page.getByTestId("template-limit")).toHaveCount(0);
 
     await page.goto("/coach");
-    await expect(page.getByText("AI coaching is included with Pro All Access.")).toBeVisible();
+    await expect(page.getByTestId("coach-upsell")).toBeVisible();
 
     await grantPlan(email, "pro");
     await page.goto("/coach");
-    await expect(page.getByText("AI coaching is included with Pro All Access.")).toHaveCount(0);
+    await expect(page.getByTestId("coach-upsell")).toHaveCount(0);
     await page.goto("/profile/billing");
     await expect(page.getByTestId("current-plan")).toHaveText("Pro All Access");
   });
