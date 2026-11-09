@@ -15,6 +15,9 @@ import { ExerciseDemo } from "@/components/train/exercise-demo";
 import { shownDemoAsset } from "@/lib/exercise-demos";
 import { demoCaption, demoReadiness } from "@/lib/exercise-demo-readiness";
 import { requireOnboardedUser } from "@/server/auth";
+import { activityKindFor, exerciseMilestone } from "@/lib/domain/exercise-milestones";
+import { ExerciseMilestoneCard } from "@/components/train/exercise-milestone";
+import { loadExerciseHistory, loadMilestoneActivities } from "@/server/services/exercise-history";
 import { BackLink } from "@/components/platform/back-link";
 
 export const metadata = { title: "Exercise" };
@@ -23,15 +26,20 @@ export default async function ExerciseDetailPage({ params, searchParams }: { par
   const { slug } = await params;
   // Opened from the workout logger: Back returns to the workout (its draft is kept), not to the library.
   const fromWorkout = (await searchParams).from === "workout";
-  await requireOnboardedUser();
+  const { user, profile } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
   const { data } = await supabase.from("exercises").select("*").eq("slug", slug).maybeSingle();
   if (!data) notFound();
   const ex = data as ExerciseRow;
-  const [altsRes, mediaRes] = await Promise.all([
+  const actKind = activityKindFor(ex.slug);
+  const [altsRes, mediaRes, history, activities] = await Promise.all([
     supabase.from("exercise_alternatives").select("alt:exercises!exercise_alternatives_alternative_id_fkey(slug, name, difficulty)").eq("exercise_id", ex.id),
     supabase.from("exercise_media").select("id, media_type, storage_path, external_url, license, attribution, alt_text").eq("exercise_id", ex.id),
+    loadExerciseHistory(supabase, user.id, ex.id),
+    // Runs and walks: every saved activity on the Run tab counts too (GPS, treadmill or by hand).
+    actKind ? loadMilestoneActivities(supabase, user.id, actKind) : Promise.resolve([]),
   ]);
+  const milestone = exerciseMilestone(history.sessions, { slug: ex.slug, name: ex.name }, profile.unit_system, { activities });
   const alts = (altsRes.data ?? []).map((a) => a.alt as unknown as { slug: string; name: string; difficulty: string }).filter(Boolean);
   const media = mediaRes.data ?? [];
   const hasVideo = media.some((m) => m.media_type === "video");
@@ -58,6 +66,8 @@ export default async function ExerciseDetailPage({ params, searchParams }: { par
         </div>
       </header>
 
+      <ExerciseMilestoneCard milestone={milestone} name={ex.name} timeZone={profile.timezone ?? "UTC"} compact />
+
       <Link
         href={`/train/exercises/${ex.slug}/history`}
         className="flex min-h-14 items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 hover:border-gold-muted"
@@ -65,7 +75,7 @@ export default async function ExerciseDetailPage({ params, searchParams }: { par
         <BarChart3 className="size-5 shrink-0 text-gold" aria-hidden />
         <span className="min-w-0 flex-1">
           <span className="block font-semibold">Your history</span>
-          <span className="block text-xs text-muted-foreground">Best set, estimated 1RM trend and your last sessions</span>
+          <span className="block text-xs text-muted-foreground">Heaviest lift, estimated 1RM trend and your last sessions</span>
         </span>
         <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
       </Link>

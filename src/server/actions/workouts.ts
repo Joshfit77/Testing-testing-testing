@@ -28,6 +28,9 @@ import type { TextPart } from "@/lib/bible/red-letter";
 import { scriptureParts } from "@/server/bible/text";
 import { nextSessionSummary, type NextSession } from "@/server/services/schedule";
 import type { PreviousPerformance } from "@/lib/domain/previous-performance";
+import { reachedMilestones, type ReachedMilestone } from "@/lib/domain/exercise-milestones";
+import type { UnitSystem } from "@/lib/domain/types";
+import { loadExerciseHistories } from "@/server/services/exercise-history";
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -89,12 +92,25 @@ export interface Reflection {
   prompt: string;
 }
 
+/** For each exercise in a just-saved session, the milestones its sets reached (all-time history, paged). */
+async function milestonesReached(supabase: Awaited<ReturnType<typeof getServerSupabase>>, userId: string, sessionId: string, exerciseIds: string[], units: UnitSystem): Promise<ReachedMilestone[]> {
+  const ids = [...new Set(exerciseIds)];
+  if (!ids.length) return [];
+  const [{ data: exs }, histories] = await Promise.all([supabase.from("exercises").select("id, slug, name").in("id", ids), loadExerciseHistories(supabase, userId, ids)]);
+  return reachedMilestones(
+    ((exs ?? []) as { id: string; slug: string; name: string }[]).map((e) => ({ ...e, sessions: histories.get(e.id)?.sessions ?? [] })),
+    sessionId,
+    units,
+  );
+}
+
 export async function finishWorkoutAction(input: unknown): Promise<
   Result<{
     sessionId: string;
     volumeKg: number;
     records: NewRecord[];
     badges: UnlockedBadge[];
+    milestones: ReachedMilestone[];
     next: NextSession | null;
     previous: PreviousSession | null;
     reflection: Reflection | null;
@@ -112,6 +128,17 @@ export async function finishWorkoutAction(input: unknown): Promise<
     // Badges are worked out from the saved sessions, so a retried finish (first response lost) shows them too.
     const badges = await unlockedBadges(supabase, user.id, res.sessionId);
     const profile = await getProfile(user.id);
+    // Milestones this session reached, from the saved history (so a retried finish shows them too). Never blocks the save.
+    const milestones = await milestonesReached(
+      supabase,
+      user.id,
+      res.sessionId,
+      parsed.data.exercises.filter((e) => !e.skipped).map((e) => e.exerciseId),
+      profile?.unit_system ?? "imperial",
+    ).catch((err: unknown) => {
+      logError("workouts.finish.milestones", err);
+      return [] as ReachedMilestone[];
+    });
     const tz = profile?.timezone ?? "UTC";
     // What the program has next, also after a workout outside it (never blocks the save: the summary goes without).
     const programId =
@@ -136,7 +163,7 @@ export async function finishWorkoutAction(input: unknown): Promise<
     const verse = profile?.faith_enabled ? scriptureForDate(isoDateInTz(new Date(), tz)) : null;
     const reflection = verse ? { reference: verse.reference, parts: scriptureParts(verse.reference, verse.text), prompt: verse.reflection } : null;
     revalidatePath("/", "layout");
-    return { ok: true, data: { sessionId: res.sessionId, volumeKg: res.volumeKg, records: res.records, badges, next, previous, reflection } };
+    return { ok: true, data: { sessionId: res.sessionId, volumeKg: res.volumeKg, records: res.records, badges, milestones, next, previous, reflection } };
   } catch (err) {
     logError("workouts.finish", err);
     return { ok: false, error: err instanceof WorkoutError && err.code === "invalid" ? "One of the exercises is no longer available." : "We couldn't save your workout. It's still on this device — please try again." };

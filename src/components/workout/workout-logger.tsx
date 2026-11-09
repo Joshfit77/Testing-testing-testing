@@ -15,6 +15,9 @@ import { Clock3, Dumbbell, Layers, Repeat } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSessionState } from "@/lib/nav-memory";
 import type { UnitSystem } from "@/lib/domain/types";
+import { RECORD_TYPE_LABEL } from "@/lib/domain/record-labels";
+import type { ReachedMilestone } from "@/lib/domain/exercise-milestones";
+import { MilestoneCelebration } from "@/components/train/milestone-celebration";
 import { formatDuration, formatWeight, formatVolume } from "@/lib/domain/units";
 import {
   afterCurrent,
@@ -102,6 +105,8 @@ interface FinishResult {
   volumeKg: number;
   records: { exerciseId: string; recordType: string; value: number; first?: boolean }[];
   badges: UnlockedBadge[];
+  /** Milestones this session reached (exercise cards' next targets now met). */
+  milestones: ReachedMilestone[];
   durationSeconds: number;
   /** What the program has next, so the member leaves knowing what to do. */
   next: NextSession | null;
@@ -148,13 +153,8 @@ function ageText(hours: number): string {
   return `${days} day${days === 1 ? "" : "s"} ago`;
 }
 
-const RECORD_LABEL: Record<string, string> = {
-  estimated_1rm: "estimated 1RM",
-  max_weight: "heaviest set",
-  max_reps: "most reps",
-  max_set_volume: "best set volume",
-  max_duration: "longest set",
-};
+/** The shared record terms (record-labels.ts), lower-case for use mid-sentence; 1RM keeps its capitals. */
+const RECORD_LABEL: Record<string, string> = Object.fromEntries(Object.entries(RECORD_TYPE_LABEL).map(([k, v]) => [k, v.replace(/^([A-Z])([a-z])/, (_, a: string, b: string) => a.toLowerCase() + b)]));
 
 function defaultName(): string {
   const d = new Date();
@@ -577,7 +577,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
   if (phase === "finished" && result) {
     return (
       <div className="mx-auto max-w-xl space-y-6 text-center">
-        <Celebration pieces={result.records.length > 0 ? 160 : 70} />
+        <Celebration pieces={result.records.length > 0 || result.milestones.length > 0 ? 160 : 70} />
         <div className="mx-auto flex size-24 animate-bounce-in items-center justify-center rounded-full bg-gold-gradient text-black shadow-[0_0_48px_-6px_rgba(230,199,110,0.75)]">
           <Check className="size-12" strokeWidth={3} aria-hidden />
         </div>
@@ -633,8 +633,9 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
             </p>
           ) : null;
         })()}
+        <MilestoneCelebration milestones={result.milestones} />
         {result.records.some((r) => !r.first) && (
-          <section className="card-gold-strong animate-bounce-in rounded-2xl p-4 text-left [animation-delay:250ms]" aria-labelledby="prs-title">
+          <section className="card-gold-strong animate-card-in rounded-2xl p-4 text-left [animation-delay:250ms]" aria-labelledby="prs-title">
             <h2 id="prs-title" className="flex items-center gap-2 font-display text-lg font-bold text-gold-gradient">
               <Trophy className="size-5 text-gold" aria-hidden /> New Personal Record!
             </h2>
@@ -852,6 +853,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
       volumeKg: res.data.volumeKg,
       records: res.data.records,
       badges: res.data.badges ?? [],
+      milestones: res.data.milestones ?? [],
       durationSeconds: elapsedSeconds(finalDraft, endedAt),
       next: res.data.next ?? null,
       completedSets: finalDraft.exercises.filter((e) => !e.skipped).reduce((n, e) => n + e.sets.filter((s) => s.completed && !s.isWarmup).length, 0),

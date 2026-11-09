@@ -475,7 +475,7 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
                 <tr>
                   <th className="px-4 py-3 font-semibold">Exercise</th>
                   <th className="px-4 py-3 font-semibold">Est. 1RM</th>
-                  <th className="px-4 py-3 font-semibold">Heaviest</th>
+                  <th className="px-4 py-3 font-semibold">Heaviest lift</th>
                   <th className="px-4 py-3 font-semibold">Reps / Time</th>
                   <th className="px-4 py-3 font-semibold">Last PR</th>
                 </tr>
