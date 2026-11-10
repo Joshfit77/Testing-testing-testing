@@ -37,8 +37,9 @@ How each result was verified is stated with it:
   - Nothing was merged.
 - **Performance:** no regression, by alternating A/B runs, including an account with 435 workouts and 7,590 sets.
   Programs has 46% fewer page elements and Exercises 26% fewer.
-- **Onboarding to the first workout:** still 19 interactions. A finished, saved first workout takes 39 in total.
-  §5 lists the steps that could still go.
+- **Onboarding to the first workout:** 17 interactions. A finished, saved first workout takes 37 in total. (An
+  earlier count of 19 / 39 included two taps on choices that are already selected by default; see §5.) §5 lists the
+  steps that could still go.
 
 ## 2. Test results
 
@@ -116,21 +117,24 @@ Manual sleep logging after consent and Free manual run logging have their own pr
 
 ## 5. First-time journey
 
-**Onboarding, from the login screen to the first workout: 19 interactions across 7 screens.** This is the same as the
-baseline; onboarding was not changed in this pass.
+**Onboarding, from the opening screen to the first workout: 17 interactions across 7 screens.** Onboarding was not
+changed in this pass. The first count (19) came from the measuring script tapping the days and session-length choices
+that are already selected by default; `scripts/ux/onboarding.mjs` now taps a choice only when it is not already
+selected, which is what a member accepting the defaults does.
 
 | Step | Interactions |
 |---|---|
+| Skip the opening | 1 |
 | "Start as a new member" | 1 |
 | Goal, then Continue | 2 |
 | Experience, then Continue | 2 |
-| Days, session length, then Continue | 3 |
+| Days and session length (preselected), then Continue | 1 |
 | Equipment, then Continue | 2 |
 | Sex, age, height (ft), height (in), weight, then Continue | 6 |
 | "Build my plan" | 1 |
 | Start the first workout from the plan screen | 1 |
 
-**To a saved first workout: 39 interactions** (browser-verified, `scripts/ux/onboarding.mjs`). That is the 19 above,
+**To a saved first workout: 37 interactions** (browser-verified, `scripts/ux/onboarding.mjs`). That is the 17 above,
 then:
 - 6 typed weights, one per exercise; each carries down to the next set;
 - 12 taps on Complete set, one per set; reps come prefilled;
@@ -359,6 +363,63 @@ Each row gives the original issue, what changed, the benefit, and how it was ver
 - Comprehension of the new wording.
 
 **Still to do:**
-- Onboarding is still 19 interactions (§5 has three proposals).
+- Onboarding is 17 interactions (§5 has three proposals; each needs an owner decision).
 - The navigation change (Home/Train/Food/Faith/Progress) is not prototyped.
 - The badge-dependent items wait for PR #9.
+
+## 13. Release integration follow-up (commit 21d376a)
+
+**CI run 136 on 840d4a2.** Attempt 1 created only the `security-scan` job. The `checks` and `integration` jobs were
+never scheduled, so no code ran and nothing failed. A re-run (attempt 2) passed all three jobs with no change. This
+is recorded as a GitHub Actions scheduling fault, not a code failure. The next push (21d376a, run 137) passed all
+three jobs on the first attempt.
+
+**The 198 "controls under 44 px" (§7) re-measured with the real tap area.** `scripts/ux/targets.mjs` measures each
+control's hit area, including the invisible `::after` extension the shared small buttons use and a checkbox's whole
+label row. On the established-member pass that leaves 43 controls that are really small. Most of the 198 were small
+buttons whose hit area is already 44 px. Fixes in this commit took the 43 down to 25 (`targets-after`), and the
+plan-screen fix below to 24. Frequently used controls came first:
+
+| Fixed | Where |
+|---|---|
+| Tab triggers (every segmented tab bar) get a 44 px hit area | `components/ui/tabs.tsx` |
+| mi / km toggle on the run form | `components/run/activity-form.tsx` |
+| "Estimate" row in nutrition, recovery link in training review | `nutrition-client.tsx`, `training-review.tsx` |
+| Remove-goal (running goals), Dismiss (sleep) buttons no longer squeezed | `running-goals.tsx`, `sleep/page.tsx` |
+| Reset layout, AI-off buttons wrap instead of shrinking | `customize-layout.tsx`, `profile-forms.tsx` |
+| Plan screen: "Go to Home" and "Start" kept their full 48 px on phones (were 26 px) | `plan/page.tsx`; asserted in `new-member-states.spec` |
+
+The 24 left are listed here, not fixed:
+
+- **17 on the Pro Body Map**, a rarely used screen. They are in `muscle-map.tsx`, which PR #9 also changes, so they
+  are left for after the merge.
+- **The workout name field, a record-time link on Run ("27:05"), and the "Recent entries" toggle on Overview.** These are in files PR #9 owns
+  (`workout-logger.tsx`, `run/page.tsx`, `progress/overview/page.tsx`); same reason.
+- **Two Bible verse lines (36 px).** Running text, which WCAG 2.5.8 exempts. Each verse is a full-width row.
+- **One "More / Less" toggle (35 px wide)** on a program page.
+
+**Dead ends.** Seven Pro lock screens now offer a free next step beside "See plans":
+
+| Locked page | Free next step |
+|---|---|
+| Sleep debt, energy, training, schedule | Log last night's sleep |
+| Body Scan | Add a progress photo |
+| Body Map | See my progress |
+| Product compare | Check one product |
+
+`memberships.spec` follows each of these, plus the two older ones (`/train/build`, `/train/review`), to its
+destination.
+
+**Daily workflow without scrolling.** `scripts/ux/first-screen.mjs` opens each daily action's own screen at iPhone 15
+Pro size (393 × 852) and checks that the action sits above the tab bar. The actions checked:
+- Start workout and Quick add on Home;
+- Add food and one-tap re-log on Nutrition;
+- today's reading on Faith;
+- the sleep entry;
+- Complete set in a workout.
+
+For an established member (sample data), every one is on the first screen. For a new member, every action the screen
+shows is on the first screen (one-tap re-log has nothing to re-log yet), except the one-time "Allow sleep logging" consent, which is 0.16 screens below the fold. This is a browser measurement,
+not a device one.
+
+**Five-tab navigation** is unchanged. No prototype was tested, so no replacement was made.
