@@ -12,6 +12,7 @@ import { formVideoSearchUrl, videoEmbedUrl } from "@/lib/media";
 import { exerciseMediaPublicUrl } from "@/lib/exercise-media";
 import { DemoVideo } from "@/components/train/demo-video";
 import { ExerciseDemo } from "@/components/train/exercise-demo";
+import { MuscleKey } from "@/components/train/muscle-key";
 import { shownDemoAsset } from "@/lib/exercise-demos";
 import { demoCaption, demoReadiness } from "@/lib/exercise-demo-readiness";
 import { requireOnboardedUser } from "@/server/auth";
@@ -66,20 +67,6 @@ export default async function ExerciseDetailPage({ params, searchParams }: { par
         </div>
       </header>
 
-      <ExerciseMilestoneCard milestone={milestone} name={ex.name} timeZone={profile.timezone ?? "UTC"} compact />
-
-      <Link
-        href={`/train/exercises/${ex.slug}/history`}
-        className="flex min-h-14 items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 hover:border-gold-muted"
-      >
-        <BarChart3 className="size-5 shrink-0 text-gold" aria-hidden />
-        <span className="min-w-0 flex-1">
-          <span className="block font-semibold">Your history</span>
-          <span className="block text-xs text-muted-foreground">Heaviest lift, estimated 1RM trend and your last sessions</span>
-        </span>
-        <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
-      </Link>
-
       <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
         <section aria-label="Demonstration media" className="overflow-hidden rounded-2xl border border-border bg-card">
           {media.length ? (
@@ -113,14 +100,14 @@ export default async function ExerciseDetailPage({ params, searchParams }: { par
               {hasVideo && (
                 <details className="rounded-xl border border-border">
                   <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-gold-highlight">{demo ? "Rendered demo" : readiness === "animated" ? "Animated demo" : "Demonstration"}</summary>
-                  <ExerciseDemo slug={ex.slug} name={ex.name} meta={demoMeta} muscles={muscles} className={demo ? "w-full" : "aspect-[4/3] w-full rounded-b-xl"} />
+                  <ExerciseDemo slug={ex.slug} name={ex.name} meta={demoMeta} muscles={muscles} className={demo ? "w-full" : "aspect-[5/6] w-full rounded-b-xl sm:aspect-[4/3]"} />
                 </details>
               )}
             </div>
           ) : null}
           {!hasVideo && (
             <figure className={media.length ? "px-3 pb-3" : undefined}>
-              <ExerciseDemo slug={ex.slug} name={ex.name} meta={demoMeta} muscles={muscles} className={cn(!demo && "aspect-[4/3]", "w-full", media.length && "rounded-xl")} />
+              <ExerciseDemo slug={ex.slug} name={ex.name} meta={demoMeta} muscles={muscles} className={cn(!demo && "aspect-[5/6] sm:aspect-[4/3]", "w-full", media.length && "rounded-xl")} />
               <figcaption className="px-3 pt-2 text-xs text-muted-foreground" data-testid="demo-caption">
                 {demoCaption(readiness, Boolean(demo))} Not a substitute for coaching.{readiness === "animated" || demo ? " Use 0.5× to study each phase." : ""}
                 {EXERCISE_REVIEW_NOTES[ex.slug] && <span className="mt-1 block text-gold-highlight">{EXERCISE_REVIEW_NOTES[ex.slug]}</span>}
@@ -142,8 +129,8 @@ export default async function ExerciseDetailPage({ params, searchParams }: { par
 
         <section className="rounded-2xl border border-border bg-card p-5" aria-label="Muscles and equipment">
           <h2 className="font-display text-lg font-semibold uppercase">Target muscles</h2>
-          <p className="mt-1 text-sm">{ex.primary_muscles.map(titleCase).join(", ")}</p>
-          {ex.secondary_muscles.length > 0 && <p className="mt-1 text-xs text-muted-foreground">Also works: {ex.secondary_muscles.map(titleCase).join(", ")}</p>}
+          {/* Keyed to the athlete's glow when the 2D athlete is what the page shows (not a filmed or rendered clip). */}
+          <MuscleKey className="mt-3" primary={ex.primary_muscles} secondary={ex.secondary_muscles} showColours={!hasVideo && !demo && readiness !== "placeholder"} />
           <h2 className="mt-5 font-display text-lg font-semibold uppercase">Equipment</h2>
           <div className="mt-2 flex flex-wrap gap-2">
             {ex.equipment.map((e) => (
@@ -169,6 +156,20 @@ export default async function ExerciseDetailPage({ params, searchParams }: { par
           )}
         </section>
       </div>
+
+      <ExerciseMilestoneCard milestone={milestone} name={ex.name} timeZone={profile.timezone ?? "UTC"} compact />
+
+      <Link
+        href={`/train/exercises/${ex.slug}/history`}
+        className="flex min-h-14 items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 hover:border-gold-muted"
+      >
+        <BarChart3 className="size-5 shrink-0 text-gold" aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="block font-semibold">Your history</span>
+          <span className="block text-xs text-muted-foreground">Heaviest lift, estimated 1RM trend and your last sessions</span>
+        </span>
+        <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
+      </Link>
 
       <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="how-title">
         <h2 id="how-title" className="font-display text-xl font-bold uppercase">

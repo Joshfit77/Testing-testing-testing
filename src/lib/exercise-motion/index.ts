@@ -9,12 +9,12 @@
  *   const ctrl = mountExerciseMotion(element, "back-squat", { autoplay: true });
  *   ctrl.pause(); ctrl.play(); ctrl.setSpeed(0.5); ctrl.destroy();
  */
-import { EXERCISE_MOTIONS, fallbackMotion } from "../../data/exercise-motions";
+import { EXERCISE_MOTIONS, EXERCISE_MOTION_VIEWS, fallbackMotion } from "../../data/exercise-motions";
 import { mountMotion, type MotionController, type MountOptions } from "./mount";
 import { compileMotion, evaluate, motionBounds, stillFrame } from "./timeline";
 import { fitCamera, renderFrame, type FigureStyle } from "./render";
 import { highlightFor, type Highlight } from "./athlete";
-import type { ExerciseMeta, MotionDef } from "./types";
+import type { ExerciseMeta, MotionDef, View } from "./types";
 
 const cache = new Map<string, MotionDef>();
 
@@ -42,6 +42,36 @@ export function getMotion(slug: string, meta?: ExerciseMeta): MotionDef {
   return def;
 }
 
+/** One camera angle of an exercise's demonstration. */
+export interface MotionView {
+  view: View;
+  /** Short name for the view switch ("Side", "Front"). */
+  label: string;
+  def: MotionDef;
+}
+
+const VIEW_LABEL: Record<View, string> = { side: "Side", front: "Front" };
+
+/**
+ * Every camera angle of an exercise's demonstration: the main view first, then the extra views from
+ * EXERCISE_MOTION_VIEWS (none for most exercises). Each extra view shares the main view's timing.
+ */
+export function getMotionViews(slug: string, meta?: ExerciseMeta): MotionView[] {
+  const main = getMotion(slug, meta);
+  const out: MotionView[] = [{ view: main.view, label: VIEW_LABEL[main.view], def: main }];
+  for (const [view, build] of Object.entries(EXERCISE_MOTION_VIEWS[slug] ?? {}) as [View, (id: string) => MotionDef][]) {
+    if (view === main.view) continue;
+    const key = `${slug}@${view}`;
+    let def = cache.get(key);
+    if (!def) {
+      def = build(slug);
+      cache.set(key, def);
+    }
+    out.push({ view, label: VIEW_LABEL[view], def });
+  }
+  return out;
+}
+
 /** Plain-language description of the movement (used as the accessible label). */
 export function motionLabel(slug: string, meta?: ExerciseMeta): string {
   return getMotion(slug, meta).label;
@@ -49,12 +79,14 @@ export function motionLabel(slug: string, meta?: ExerciseMeta): string {
 
 /** Mount a looping animated demonstration of an exercise into `element`. */
 export function mountExerciseMotion(element: HTMLElement, slug: string, options: MountOptions = {}): MotionController {
-  return mountMotion(element, getMotion(slug, options.meta), options);
+  // Exercises with more than one camera view get the view switch (shown only on an interactive player).
+  const views = options.views ?? getMotionViews(slug, options.meta).map((v) => ({ label: v.label, def: v.def }));
+  return mountMotion(element, views[0]?.def ?? getMotion(slug, options.meta), { ...options, views });
 }
 
 /** Draw a single still frame (phase 0..1 of the loop, default the motion's still phase) into a canvas. */
-export function drawExerciseStill(canvas: HTMLCanvasElement, slug: string, opts: { meta?: ExerciseMeta; phase?: number; width?: number; height?: number; style?: FigureStyle; highlight?: Highlight } = {}): void {
-  const def = getMotion(slug, opts.meta);
+export function drawExerciseStill(canvas: HTMLCanvasElement, slug: string, opts: { meta?: ExerciseMeta; phase?: number; width?: number; height?: number; style?: FigureStyle; highlight?: Highlight; view?: View } = {}): void {
+  const def = (opts.view && getMotionViews(slug, opts.meta).find((v) => v.view === opts.view)?.def) || getMotion(slug, opts.meta);
   const c = compileMotion(def);
   const w = opts.width ?? canvas.clientWidth ?? 160;
   const h = opts.height ?? canvas.clientHeight ?? 120;
@@ -67,5 +99,5 @@ export function drawExerciseStill(canvas: HTMLCanvasElement, slug: string, opts:
   renderFrame(ctx, frame, fitCamera(motionBounds(c), w, h, dpr, def.mirror), { floor: def.floor, style: opts.style, highlight: opts.highlight });
 }
 
-export { EXERCISE_MOTIONS, fallbackMotion, mountMotion, compileMotion, evaluate, motionBounds, renderFrame, fitCamera, highlightFor };
+export { EXERCISE_MOTIONS, EXERCISE_MOTION_VIEWS, fallbackMotion, mountMotion, compileMotion, evaluate, motionBounds, renderFrame, fitCamera, highlightFor };
 export type { MotionController, MountOptions, MotionDef, ExerciseMeta, FigureStyle, Highlight };

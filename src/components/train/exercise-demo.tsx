@@ -13,6 +13,7 @@ import type { ExerciseMeta } from "@/lib/exercise-motion/types";
 import { shownDemoAsset as getDemoAsset } from "@/lib/exercise-demos";
 import { demoCaption, demoReadiness } from "@/lib/exercise-demo-readiness";
 import { ExerciseDemo25D, ExerciseDemo25DStill } from "./exercise-demo-25d";
+import { MuscleKey } from "./muscle-key";
 
 /**
  * Exercise demonstrations: one original 2D character, the black-and-gold athlete (src/lib/exercise-motion/athlete.ts),
@@ -227,6 +228,21 @@ export function ExerciseDemoMini({
   const [open, setOpen] = useState(false);
   const asset = getDemoAsset(slug);
   const readiness = demoReadiness(slug);
+  // The muscle key in the enlarged view: from the caller, or looked up in the catalog once the dialog opens (loaded on
+  // demand, so the workout screen pays nothing until someone taps the demo).
+  const [catalogMuscles, setCatalogMuscles] = useState<DemoMuscles | null>(null);
+  useEffect(() => {
+    if (!open || muscles || catalogMuscles) return;
+    let cancelled = false;
+    void import("@/data/exercises").then(({ EXERCISES }) => {
+      const e = EXERCISES.find((x) => x.slug === slug);
+      if (!cancelled && e) setCatalogMuscles({ primary: e.primary, secondary: e.secondary });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, muscles, catalogMuscles, slug]);
+  const keyMuscles = muscles ?? catalogMuscles;
   return (
     <>
       <button
@@ -262,10 +278,13 @@ export function ExerciseDemoMini({
               name={name}
               meta={meta}
               muscles={muscles}
-              className={cn("mt-3 w-full rounded-xl", asset ? "max-h-[60vh]" : "aspect-[4/3]")}
+              className={cn("mt-3 w-full rounded-xl", asset ? "max-h-[60vh]" : "aspect-square max-h-[62vh]")}
             />
           ) : null}
           <p className="mt-2 text-xs text-muted-foreground">{demoCaption(readiness, Boolean(asset))}</p>
+          {keyMuscles && keyMuscles.primary.length > 0 && (
+            <MuscleKey className="mt-3" primary={keyMuscles.primary} secondary={keyMuscles.secondary ?? []} showColours={!asset && readiness !== "placeholder"} />
+          )}
         </DialogContent>
       </Dialog>
     </>

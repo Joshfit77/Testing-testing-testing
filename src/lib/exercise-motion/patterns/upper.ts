@@ -88,7 +88,18 @@ export function benchPress(o: BenchOpts): MotionDef {
         ? [chest[0] + 3, chest[1] + 4]
         : [chest[0] + (incline ? -3 : 6), chest[1] + 3];
   const midDown: Vec = [(top[0] + touch[0]) / 2 + 2, (top[1] + touch[1]) / 2];
-  const P = (h: Vec) => handsTo(base, root, h);
+  // Forearms stay close to vertical under the bar all the way down (the cue "forearms vertical"): the elbow is placed a
+  // forearm's length under the hand, slightly toward the feet, and the upper arm points out of the picture as far as it
+  // must (elbows out to the side about 45-70°, seen from the side). At lockout the arm is straight.
+  const fore = BODY.forearm * Math.cos((12 * Math.PI) / 180);
+  const P = (h: Vec) => {
+    const shW = worldPts(base, root).shoulder;
+    if (Math.hypot(h[0] - shW[0], h[1] - shW[1]) > ARM - 3) return handsTo(base, root, h);
+    let p = base;
+    const elbowW: Vec = [h[0] + 3, h[1] - fore];
+    for (const s of ["L", "R"] as const) p = armThrough(p, s, toLocal(p, root, elbowW), toLocal(p, root, h));
+    return p;
+  };
   const ft = { footL: ankle, footR: ankle };
   const pinsY = touch[1] + 6;
   const bottom: Vec = o.pins ? [touch[0], pinsY] : touch;
@@ -106,7 +117,9 @@ export function benchPress(o: BenchOpts): MotionDef {
     props.push({ id: "dbR", kind: "dumbbell", at: { lm: "handR" }, orient: "end", layer: "front" });
   } else {
     props.push({ id: "rack", kind: "rack", at: [sh[0] - 22, top[1] - 6], layer: "back", h: o.pins ? pinsY - 3 : undefined });
-    props.push({ id: "bar", kind: "barbell", at: { lm: "hands" }, layer: "front" });
+    // 35 cm (about 35 lb) plates: the bar height on a bench does not depend on plate size, and smaller plates keep the
+    // lifter's face and forearms readable from the side.
+    props.push({ id: "bar", kind: "barbell", at: { lm: "hands" }, layer: "front", size: 17.5 });
   }
   return {
     id: o.id,

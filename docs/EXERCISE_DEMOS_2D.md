@@ -4,6 +4,9 @@ Owner direction, 2026-11-04: no 3D exercise models. One original 2D character, c
 premium on the app's dark background, light and reliable on iPhone. Incomplete demonstrations are never presented as
 finished. Per-exercise status: [`docs/EXERCISE_DEMOS_2D_STATUS.md`](EXERCISE_DEMOS_2D_STATUS.md) (generated).
 
+> **2026-11-10:** the premium pass (two-tier muscle glow, Side/Front views, replay, measured fixes to the five priority
+> lifts, muscle key) is documented in [`EXERCISE_ANIMATION_2D.md`](EXERCISE_ANIMATION_2D.md).
+
 ## 1. What was removed or retired (the 3D system)
 
 | Removed | What it was | Notes |

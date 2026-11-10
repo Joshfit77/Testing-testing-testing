@@ -32,10 +32,12 @@ const root = resolve(flag("root", join(here, "../..")));
 const tag = flag("tag", "after");
 const stripN = Number(flag("strip", 12));
 const style = flag("style", "classic");
+// --view=front: an extra camera view from EXERCISE_MOTION_VIEWS (athlete style only).
+const view = flag("view", "");
 mkdirSync(join(outDir, "frames"), { recursive: true });
 
 const bundle = await build({
-  stdin: { contents: style === "athlete" ? `export { drawExerciseStill, getMotion, compileMotion, highlightFor } from "./src/lib/exercise-motion"; export { EXERCISES } from "./src/data/exercises";` : `export { drawExerciseStill, getMotion, compileMotion } from "./src/lib/exercise-motion"; export { EXERCISES } from "./src/data/exercises";`, resolveDir: root, loader: "ts" },
+  stdin: { contents: style === "athlete" ? `export { drawExerciseStill, getMotion, getMotionViews, compileMotion, highlightFor } from "./src/lib/exercise-motion"; export { EXERCISES } from "./src/data/exercises";` : `export { drawExerciseStill, getMotion, compileMotion } from "./src/lib/exercise-motion"; export { EXERCISES } from "./src/data/exercises";`, resolveDir: root, loader: "ts" },
   bundle: true,
   format: "iife",
   globalName: "EM",
@@ -50,19 +52,19 @@ const page = await browser.newPage({ viewport: { width: W, height: H }, deviceSc
 await page.setContent(`<html><body style="margin:0;background:#070707"><canvas id=c width=${W} height=${H} style="width:${W}px;height:${H}px"></canvas><script>${js}</script></body></html>`);
 
 for (const slug of slugs) {
-  const info = await page.evaluate((slug) => {
+  const info = await page.evaluate(({ slug, view }) => {
     const e = EM.EXERCISES.find((x) => x.slug === slug);
     const meta = { slug, name: e.name, pattern: e.pattern, category: e.category, equipment: e.equipment, timed: e.timed };
-    const def = EM.getMotion(slug, meta);
+    const def = (view && EM.getMotionViews?.(slug, meta).find((v) => v.view === view)?.def) || EM.getMotion(slug, meta);
     return { name: e.name, view: def.view, duration: EM.compileMotion(def).duration, label: def.label };
-  }, slug);
+  }, { slug, view });
   const draw = async (phase) => {
-    await page.evaluate(({ slug, phase, W, H, style }) => {
+    await page.evaluate(({ slug, phase, W, H, style, view }) => {
       const e = EM.EXERCISES.find((x) => x.slug === slug);
       const meta = { slug, name: e.name, pattern: e.pattern, category: e.category, equipment: e.equipment, timed: e.timed };
       const look = style === "athlete" ? { style, highlight: EM.highlightFor(e.primary, e.secondary) } : {};
-      EM.drawExerciseStill(document.getElementById("c"), slug, { meta, phase, width: W, height: H, ...look });
-    }, { slug, phase, W, H, style });
+      EM.drawExerciseStill(document.getElementById("c"), slug, { meta, phase, width: W, height: H, ...look, ...(view ? { view } : {}) });
+    }, { slug, phase, W, H, style, view });
     return page.locator("#c").screenshot({ type: "png" });
   };
   for (const speed of speeds) {

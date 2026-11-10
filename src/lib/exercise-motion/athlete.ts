@@ -17,6 +17,7 @@
  */
 import { BODY, add, frontOf, up, yawShift } from "./skeleton";
 import type { Frame, Vec } from "./types";
+import { PRIMARY_RGB, SECONDARY_RGB } from "./muscle-colors";
 
 type Ctx = CanvasRenderingContext2D;
 type LayerFn = (name: string) => void;
@@ -124,8 +125,8 @@ interface Tone {
   /** Strength of the few gold anatomical lines. */
   line: number;
 }
-const SKIN_NEAR: Tone = { base: "#2c2927", hi: 0.3, lo: 0.66, rim: 0.95, line: 0.22 };
-const SKIN_FAR: Tone = { base: "#1d1b1a", hi: 0.1, lo: 0.52, rim: 0.42, line: 0.08 };
+const SKIN_NEAR: Tone = { base: "#3b3633", hi: 0.34, lo: 0.62, rim: 1, line: 0.24 };
+const SKIN_FAR: Tone = { base: "#262321", hi: 0.12, lo: 0.52, rim: 0.48, line: 0.08 };
 const CLOTH_NEAR: Tone = { base: "#121213", hi: 0.09, lo: 0.5, rim: 0.6, line: 0 };
 const CLOTH_FAR: Tone = { base: "#0c0c0d", hi: 0.04, lo: 0.45, rim: 0.28, line: 0 };
 const SHOE: Tone = { base: "#151516", hi: 0.14, lo: 0.5, rim: 0.55, line: 0 };
@@ -267,18 +268,44 @@ function groove(ctx: Ctx, s: Seg, t: number, off: number, rx: number, ry: number
   blob(ctx, at(s, t, off), s.d, rx, ry, "0,0,0", a);
 }
 
-/** A working muscle: an amber glow of fixed strength. */
-function glow(ctx: Ctx, c: Vec, axis: Vec, rx: number, ry: number, k: number) {
+/**
+ * A region's glow: its strength `k` (the region's value times any per-part factor) and its tier. Primary muscles
+ * (highlightFor gives them 1) glow gold; secondary ones (0.42) glow a cool steel blue, so the two read apart at a glance
+ * and match the legend under the player (SECONDARY_RGB / PRIMARY_RGB).
+ */
+interface Glow {
+  k: number;
+  secondary: boolean;
+}
+/** Below this a region counts as secondary (highlightFor: primary 1, secondary 0.42). */
+const PRIMARY_MIN = 0.7;
+function gk(v: number | undefined, factor = 1): Glow {
+  const x = v ?? 0;
+  return { k: x * factor, secondary: x > 0 && x < PRIMARY_MIN };
+}
+
+
+/** A working muscle: a glow of fixed strength, gold for a primary mover, steel blue for a secondary one. */
+function glow(ctx: Ctx, c: Vec, axis: Vec, rx: number, ry: number, gl: Glow) {
+  // Secondary regions arrive at 0.42; lift them so the blue reads clearly while staying below the gold.
+  const k = gl.secondary ? Math.min(1, gl.k * 1.55) : gl.k;
   if (k <= 0) return;
   ctx.save();
   ctx.translate(c[0], c[1]);
   ctx.rotate(Math.atan2(axis[1], axis[0]));
   ctx.scale(rx, ry);
   const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
-  g.addColorStop(0, `rgba(255,198,92,${0.82 * k})`);
-  g.addColorStop(0.4, `rgba(226,166,64,${0.55 * k})`);
-  g.addColorStop(0.78, `rgba(190,130,40,${0.2 * k})`);
-  g.addColorStop(1, "rgba(190,130,40,0)");
+  if (gl.secondary) {
+    g.addColorStop(0, `rgba(170,208,240,${0.62 * k})`);
+    g.addColorStop(0.42, `rgba(${SECONDARY_RGB},${0.42 * k})`);
+    g.addColorStop(0.8, `rgba(80,130,180,${0.14 * k})`);
+    g.addColorStop(1, "rgba(80,130,180,0)");
+  } else {
+    g.addColorStop(0, `rgba(255,204,104,${0.86 * k})`);
+    g.addColorStop(0.4, `rgba(${PRIMARY_RGB},${0.58 * k})`);
+    g.addColorStop(0.78, `rgba(190,130,40,${0.2 * k})`);
+    g.addColorStop(1, "rgba(190,130,40,0)");
+  }
   ctx.fillStyle = g;
   ctx.beginPath();
   ctx.arc(0, 0, 1, 0, Math.PI * 2);
@@ -435,12 +462,12 @@ function armGroup(ctx: Ctx, sh: Vec, el: Vec, hd: Vec, tone: Tone, hl: Highlight
       groove(ctx, fore, 0.36, 0.2 * sgn, 9, 0.9, tone.lo * 0.4);
       blob(ctx, at(fore, 0.8, -1.2 * sgn), fore.d, 1.8, 1.4, WARM, tone.hi * 0.4);
       blob(ctx, P(3.4, -1.6), fore.d, 2.6, 2, WARM, tone.hi * 0.6);
-      glow(ctx, at(upper, 0.56, 2.4 * sgn), upper.d, 9.5, 3.8 + flex, k * (hl.biceps ?? 0));
-      glow(ctx, at(upper, 0.5, -2.6 * sgn), upper.d, 10.5, 3.9, k * (hl.triceps ?? 0));
-      glow(ctx, at(upper, 0.02, 2.8 * sgn), upper.d, 6.5, 4.6, k * (hl.frontDelts ?? 0));
-      glow(ctx, at(upper, 0.04, 0), upper.d, 7.2, 5.6, k * (hl.sideDelts ?? 0));
-      glow(ctx, at(upper, 0.02, -3 * sgn), upper.d, 6.5, 4.6, k * (hl.rearDelts ?? 0));
-      glow(ctx, at(fore, 0.28, 0.6 * sgn), fore.d, 9, 3.8, k * (hl.forearms ?? 0));
+      glow(ctx, at(upper, 0.56, 2.4 * sgn), upper.d, 9.5, 3.8 + flex, gk(hl.biceps, k));
+      glow(ctx, at(upper, 0.5, -2.6 * sgn), upper.d, 10.5, 3.9, gk(hl.triceps, k));
+      glow(ctx, at(upper, 0.02, 2.8 * sgn), upper.d, 6.5, 4.6, gk(hl.frontDelts, k));
+      glow(ctx, at(upper, 0.04, 0), upper.d, 7.2, 5.6, gk(hl.sideDelts, k));
+      glow(ctx, at(upper, 0.02, -3 * sgn), upper.d, 6.5, 4.6, gk(hl.rearDelts, k));
+      glow(ctx, at(fore, 0.28, 0.6 * sgn), fore.d, 9, 3.8, gk(hl.forearms, k));
       line(ctx, upper, [[0.12, 6.4 * sgn], [0.3, 3.8 * sgn], [0.36, 0.4 * sgn]], tone.line);
       lineW(ctx, [P(0.9, 4.1), P(3.6, 2.8), P(4.4, 0.4)], tone.line * 0.8, 0.24);
     },
@@ -475,11 +502,11 @@ function legParts(ctx: Ctx, hip: Vec, knee: Vec, ankle: Vec, footRot: number, sk
       groove(ctx, shin, 0.36, -0.8 * sgn, 12, 0.9, skinT.lo * 0.4);
       belly(ctx, shin, 0.38, 2.4 * sgn, 11, 1.8, skinT, sgn);
       groove(ctx, shin, 0.86, -1.4 * sgn, 4, 1.0, skinT.lo * 0.3);
-      glow(ctx, at(thigh, 0.6, 3.8 * sgn), thigh.d, 19, 5.8, k * (hl.quads ?? 0));
-      glow(ctx, at(thigh, 0.58, -3.6 * sgn), thigh.d, 18, 5.2, k * (hl.hamstrings ?? 0));
-      glow(ctx, at(thigh, 0.32, front ? -4 * sgn : 0), thigh.d, 12, 4, k * (hl.adductors ?? 0) * 0.8);
-      glow(ctx, at(shin, 0.3, -3.6 * sgn), shin.d, 12, 4.6, k * (hl.calves ?? 0));
-      glow(ctx, at(shin, 0.4, 2.2 * sgn), shin.d, 12, 2.4, k * (hl.shins ?? 0));
+      glow(ctx, at(thigh, 0.6, 3.8 * sgn), thigh.d, 19, 5.8, gk(hl.quads, k));
+      glow(ctx, at(thigh, 0.58, -3.6 * sgn), thigh.d, 18, 5.2, gk(hl.hamstrings, k));
+      glow(ctx, at(thigh, 0.32, front ? -4 * sgn : 0), thigh.d, 12, 4, gk(hl.adductors, k * 0.8));
+      glow(ctx, at(shin, 0.3, -3.6 * sgn), shin.d, 12, 4.6, gk(hl.calves, k));
+      glow(ctx, at(shin, 0.4, 2.2 * sgn), shin.d, 12, 2.4, gk(hl.shins, k));
       line(ctx, thigh, [[0.5, 6.6 * sgn], [0.72, 5.4 * sgn], [0.9, 2.8 * sgn]], skinT.line);
       line(ctx, shin, [[0.1, -3.4 * sgn], [0.3, -4.4 * sgn], [0.52, -2 * sgn]], skinT.line * 0.8);
     },
@@ -497,7 +524,7 @@ function legParts(ctx: Ctx, hip: Vec, knee: Vec, ankle: Vec, footRot: number, sk
   const sleevePts = [...so.slice(0, 4), at(thigh, 0.42, hemF), at(thigh, 0.42, hemB), ...so.slice(5)];
   const sleeveShade = () => {
     form(ctx, thigh, 10.5, clothT, -0.05, 0.42);
-    glow(ctx, at(thigh, 0.3, 4 * sgn), thigh.d, 12, 5, k * (hl.quads ?? 0) * 0.3);
+    glow(ctx, at(thigh, 0.3, 4 * sgn), thigh.d, 12, 5, gk(hl.quads, k * 0.3));
     lineW(ctx, [at(thigh, -0.02, front ? 9 * sgn : 0.8), at(thigh, 0.41, front ? 9.6 * sgn : 0.6)], clothT === CLOTH_NEAR ? 0.7 : 0.3, 0.5);
     lineW(ctx, [at(thigh, 0.415, hemF * 0.97), at(thigh, 0.415, hemB * 0.97)], clothT === CLOTH_NEAR ? 0.22 : 0.1, 0.35);
   };
@@ -766,14 +793,14 @@ function torsoSideGroup(ctx: Ctx, f: Frame, hl: Highlight): Group {
       blob(ctx, add(add(m, u2, th * 0.56), f2, -4), u2, 9, 1.2, "0,0,0", 0.26);
       // The erector groove down the lower back.
       blob(ctx, add(add(m, u1, -3), f1, -8.6), u1, 9, 0.9, "0,0,0", 0.3);
-      glow(ctx, add(add(m, u2, th * 0.6), f2, 8.5), u2, 7.5, 5.5, hl.chest ?? 0);
-      glow(ctx, add(add(m, u1, -2), f1, 7.2), u1, 13, 3.6, hl.abs ?? 0);
-      glow(ctx, add(add(m, u1, -1), f1, 1.5), u1, 11, 5.5, hl.obliques ?? 0);
-      glow(ctx, add(add(m, u2, th * 0.42), f2, -5.5), u2, 13, 5.2, hl.lats ?? 0);
-      glow(ctx, add(add(m, u2, th * 0.74), f2, -7.2), u2, 9, 5, hl.upperBack ?? 0);
-      glow(ctx, add(add(neckBase, u2, -2), f2, -6), u2, 6, 4.5, hl.traps ?? 0);
-      glow(ctx, add(add(m, u1, -6), f1, -6.4), u1, 11, 3.6, hl.lowerBack ?? 0);
-      glow(ctx, nm, seg(base, top).d, 7, 4, hl.neck ?? 0);
+      glow(ctx, add(add(m, u2, th * 0.6), f2, 8.5), u2, 7.5, 5.5, gk(hl.chest));
+      glow(ctx, add(add(m, u1, -2), f1, 7.2), u1, 13, 3.6, gk(hl.abs));
+      glow(ctx, add(add(m, u1, -1), f1, 1.5), u1, 11, 5.5, gk(hl.obliques));
+      glow(ctx, add(add(m, u2, th * 0.42), f2, -5.5), u2, 13, 5.2, gk(hl.lats));
+      glow(ctx, add(add(m, u2, th * 0.74), f2, -7.2), u2, 9, 5, gk(hl.upperBack));
+      glow(ctx, add(add(neckBase, u2, -2), f2, -6), u2, 6, 4.5, gk(hl.traps));
+      glow(ctx, add(add(m, u1, -6), f1, -6.4), u1, 11, 3.6, gk(hl.lowerBack));
+      glow(ctx, nm, seg(base, top).d, 7, 4, gk(hl.neck));
       const L = tone.line;
       lineW(ctx, [add(add(m, u2, th * 0.42), f2, 15.6), add(add(m, u2, th * 0.36), f2, 10.4), add(add(m, u2, th * 0.5), f2, 4.2)], L);
       lineW(ctx, [add(add(m, u2, th * 0.7), f2, -3.5), add(add(m, u2, th * 0.34), f2, -9.4), add(add(pelvis, u1, 16), f1, -7)], L * 0.6);
@@ -802,8 +829,8 @@ function shortsSideGroup(ctx: Ctx, f: Frame, hl: Highlight, sleevePts: Vec[], sl
       // The gluteal mass rounds the seat; the fold beneath it.
       blob(ctx, P(-8.5, -1), u1, 6.5, 6.5, WARM, tone.hi * 1.3 * clamp(0.5 - 0.5 * facing(f1), 0, 1));
       blob(ctx, P(-6, -9.6), f1, 6, 1.2, "0,0,0", 0.35);
-      glow(ctx, P(-6.4, -1), u1, 8.5, 7, (hl.glutes ?? 0) * 0.65);
-      glow(ctx, P(6.5, -2), u1, 6, 5, (hl.hipFlexors ?? 0) * 0.45);
+      glow(ctx, P(-6.4, -1), u1, 8.5, 7, gk(hl.glutes, 0.65));
+      glow(ctx, P(6.5, -2), u1, 6, 5, gk(hl.hipFlexors, 0.45));
       sleeveShade();
       // Waistband with a gold edge.
       lineW(ctx, [P(10.7, 8.8), P(0, 8.2), P(-10.6, 8.0)], 0.5, 0.45);
@@ -881,17 +908,17 @@ function drawFront(ctx: Ctx, f: Frame, layer: LayerFn, hl: Highlight) {
       for (const k of [1, -1]) {
         blob(ctx, add(chestC, r2, k * 7.5 + 1.5), r2, 6.5, 4.2, WARM, tone.hi * (k > 0 ? 0.9 : 0.45));
         blob(ctx, add(add(p.mid, u2, th * 0.38), r2, k * 7.5), r2, 7, 1.6, "0,0,0", 0.3);
-        glow(ctx, add(chestC, r2, k * 7.5), r2, 8, 5.5, hl.chest ?? 0);
-        glow(ctx, add(add(p.mid, u2, th * 0.3), r2, k * 14), u2, 10, 4, hl.lats ?? 0);
-        glow(ctx, add(add(p.mid, u1, -4), r1, k * 11.5), u1, 9, 4, hl.obliques ?? 0);
-        glow(ctx, add(add(p.neckBase, u2, -1.5), r2, k * 7.5), r2, 6, 3, hl.traps ?? 0);
+        glow(ctx, add(chestC, r2, k * 7.5), r2, 8, 5.5, gk(hl.chest));
+        glow(ctx, add(add(p.mid, u2, th * 0.3), r2, k * 14), u2, 10, 4, gk(hl.lats));
+        glow(ctx, add(add(p.mid, u1, -4), r1, k * 11.5), u1, 9, 4, gk(hl.obliques));
+        glow(ctx, add(add(p.neckBase, u2, -1.5), r2, k * 7.5), r2, 6, 3, gk(hl.traps));
         lineW(ctx, [add(add(p.mid, u2, th * 0.4), r2, k * 2), add(add(p.mid, u2, th * 0.36), r2, k * 10.5), add(add(p.mid, u2, th * 0.6), r2, k * 17)], L);
       }
       // The six-pack: soft light on each block, the linea alba between.
       for (const y of [th * 0.12, -3.5, -10.5]) for (const k of [1, -1]) blob(ctx, add(add(p.mid, u2, y), r2, k * 3.6), u2, 2.6, 3, WARM, tone.hi * (k > 0 ? 0.7 : 0.4));
       blob(ctx, add(p.mid, u1, -3), u1, 14, 0.9, "0,0,0", 0.28);
-      glow(ctx, add(p.mid, u1, -3), u1, 13, 6, hl.abs ?? 0);
-      glow(ctx, mid(nb, nt), up(ha), 6, 4, hl.neck ?? 0);
+      glow(ctx, add(p.mid, u1, -3), u1, 13, 6, gk(hl.abs));
+      glow(ctx, mid(nb, nt), up(ha), 6, 4, gk(hl.neck));
     },
   };
   const W = headFrame(p.head, ha);

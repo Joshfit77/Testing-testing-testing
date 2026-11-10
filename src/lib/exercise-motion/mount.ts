@@ -30,6 +30,11 @@ export interface MountOptions {
   styleToggle?: boolean;
   /** Keep the figure this many extra CSS px above the picture's bottom edge (default 0; the controls have their own strip under the picture). */
   controlsInset?: number;
+  /**
+   * Camera views of the same movement (e.g. side and front), the first being `def`. With two or more, an interactive
+   * player shows a small view switch over the picture; switching keeps the position in the rep.
+   */
+  views?: { label: string; def: MotionDef }[];
 }
 
 export interface MotionController {
@@ -40,6 +45,11 @@ export interface MotionController {
   readonly playing: boolean;
   readonly speed: number;
   readonly motion: MotionDef;
+  /** Show another camera view (index into `views`), keeping the position in the rep. */
+  setView(index: number): void;
+  readonly view: number;
+  /** Go back to the start of the movement and play. */
+  replay(): void;
   /** Jump to a phase of the loop (0..1) and redraw (used for previews and screenshots). */
   seek(phase: number): void;
   /** Where the loop is, 0..1. */
@@ -57,6 +67,8 @@ const BTN =
   "border:1px solid rgba(212,170,60,0.45);background:rgba(10,10,10,0.72);color:#f3d77a;font:600 12px/1 system-ui,sans-serif;cursor:pointer;" +
   "backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)";
 
+const REPLAY_SVG =
+  '<svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>';
 const PLAY_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>';
 const PAUSE_SVG =
   '<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><rect x="5" y="4" width="5" height="16" rx="1"/><rect x="14" y="4" width="5" height="16" rx="1"/></svg>';
@@ -82,8 +94,11 @@ function prefersReducedMotion(): boolean {
 export function mountMotion(host: HTMLElement, def: MotionDef, opts: MountOptions = {}): MotionController {
   const doc = host.ownerDocument;
   const win = doc.defaultView ?? window;
-  const compiled: CompiledMotion = compileMotion(def);
-  const bounds: Bounds = motionBounds(compiled);
+  const views = opts.views && opts.views.length > 1 ? opts.views : [{ label: "", def }];
+  let viewIndex = 0;
+  let current: MotionDef = def;
+  let compiled: CompiledMotion = compileMotion(def);
+  let bounds: Bounds = motionBounds(compiled);
   const reduced = opts.reducedMotion ?? prefersReducedMotion();
   const still = Boolean(opts.still);
   let playing = !still && (opts.autoplay ?? true) && !reduced;
@@ -97,6 +112,12 @@ export function mountMotion(host: HTMLElement, def: MotionDef, opts: MountOption
   let cam: Camera | null = null;
 
   let style: FigureStyle = opts.style ?? "classic";
+  // Canvas pixel density. The soft-shaded figure looks the same at 2x as at 3x on a phone, and drawing cost grows with
+  // the pixel count, so the live player caps it at 2. If frames still run over budget on a slow device (an average draw
+  // over ~12 ms), it steps down once to 1.5x rather than dropping frames.
+  let maxDpr = 2;
+  let drawAvg = 0;
+  let drawCount = 0;
   let fullscreen = false;
   const interactive = !still && opts.controls !== false;
 
@@ -119,6 +140,8 @@ export function mountMotion(host: HTMLElement, def: MotionDef, opts: MountOption
   const ctx = canvas.getContext("2d");
 
   let playBtn: HTMLButtonElement | null = null;
+  let replayBtn: HTMLButtonElement | null = null;
+  const viewBtns: HTMLButtonElement[] = [];
   let speedBtn: HTMLButtonElement | null = null;
   let styleBtn: HTMLButtonElement | null = null;
   let fullBtn: HTMLButtonElement | null = null;
@@ -164,9 +187,16 @@ export function mountMotion(host: HTMLElement, def: MotionDef, opts: MountOption
     speedBtn = doc.createElement("button");
     speedBtn.type = "button";
     speedBtn.style.cssText = BTN;
+    replayBtn = doc.createElement("button");
+    replayBtn.type = "button";
+    replayBtn.style.cssText = BTN;
+    replayBtn.innerHTML = REPLAY_SVG;
+    replayBtn.setAttribute("aria-label", "Replay from the start");
+    replayBtn.setAttribute("data-motion-replay", "");
     playBtn.addEventListener("click", () => ctrl.toggle());
+    replayBtn.addEventListener("click", () => ctrl.replay());
     speedBtn.addEventListener("click", () => ctrl.setSpeed(speed === 1 ? 0.5 : 1));
-    row.append(playBtn, speedBtn);
+    row.append(playBtn, replayBtn, speedBtn);
     row.append(bar);
     if (opts.styleToggle) {
       styleBtn = doc.createElement("button");
@@ -181,6 +211,34 @@ export function mountMotion(host: HTMLElement, def: MotionDef, opts: MountOption
     fullBtn.addEventListener("click", () => ctrl.toggleFullscreen());
     row.append(fullBtn);
     wrap.appendChild(row);
+
+    // Camera views (side / front): a segmented switch in its own strip above the picture, so nothing covers the athlete.
+    if (views.length > 1) {
+      const strip = doc.createElement("div");
+      strip.style.cssText = "flex:none;display:flex;justify-content:center;padding:6px 8px 0;background:#0a0a0a";
+      const sw = doc.createElement("div");
+      sw.setAttribute("role", "group");
+      sw.setAttribute("aria-label", "Camera view");
+      sw.setAttribute("data-motion-views", "");
+      sw.style.cssText = "display:flex;gap:2px;padding:2px;border-radius:999px;background:rgba(20,20,20,0.9);border:1px solid rgba(212,170,60,0.4)";
+      views.forEach((v, i) => {
+        const b = doc.createElement("button");
+        b.type = "button";
+        b.textContent = v.label;
+        b.setAttribute("aria-label", `${v.label} view`);
+        b.setAttribute("data-motion-view", String(i));
+        // A 40px-tall pill whose touch area reaches 44px with the group's padding and border.
+        b.style.cssText = "min-width:56px;height:40px;padding:0 12px;border:0;border-radius:999px;font:600 12px/1 system-ui,sans-serif;cursor:pointer;letter-spacing:.02em";
+        b.addEventListener("click", (e) => {
+          e.stopPropagation();
+          ctrl.setView(i);
+        });
+        viewBtns.push(b);
+        sw.appendChild(b);
+      });
+      strip.appendChild(sw);
+      wrap.insertBefore(strip, stage);
+    }
 
     let drag: { id: number; x: number; y: number; t: number; start: number; intent: "" | "scrub" | "scroll" } | null = null;
     stage.addEventListener("pointerdown", (e) => {
@@ -248,6 +306,12 @@ export function mountMotion(host: HTMLElement, def: MotionDef, opts: MountOption
       styleBtn.textContent = style === "athlete" ? "Classic look" : "New look";
       styleBtn.setAttribute("aria-label", style === "athlete" ? "Classic look: show the classic gold figure" : "New look: show the new athlete look");
     }
+    viewBtns.forEach((b, i) => {
+      const on = i === viewIndex;
+      b.setAttribute("aria-pressed", String(on));
+      b.style.background = on ? "#d4aa3c" : "transparent";
+      b.style.color = on ? "#0a0a0a" : "#f3d77a";
+    });
     if (fullBtn) {
       fullBtn.innerHTML = fullscreen ? EXIT_SVG : FULL_SVG;
       fullBtn.setAttribute("aria-label", fullscreen ? "Exit full screen" : "Full screen");
@@ -256,6 +320,7 @@ export function mountMotion(host: HTMLElement, def: MotionDef, opts: MountOption
     wrap.setAttribute("data-speed", String(speed));
     wrap.setAttribute("data-style", style);
     wrap.setAttribute("data-fullscreen", String(fullscreen));
+    wrap.setAttribute("data-view", current.view);
     opts.onChange?.({ playing, speed, style });
   };
 
@@ -263,19 +328,19 @@ export function mountMotion(host: HTMLElement, def: MotionDef, opts: MountOption
     const r = stage.getBoundingClientRect();
     const w = Math.max(1, Math.round(r.width));
     const h = Math.max(1, Math.round(r.height));
-    const dpr = Math.min(2.5, win.devicePixelRatio || 1);
+    const dpr = Math.min(maxDpr, win.devicePixelRatio || 1);
     if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
       canvas.width = Math.round(w * dpr);
       canvas.height = Math.round(h * dpr);
     }
-    cam = fitCamera(bounds, w, h, dpr, def.mirror, interactive ? (opts.controlsInset ?? 0) : 0);
+    cam = fitCamera(bounds, w, h, dpr, current.mirror, interactive ? (opts.controlsInset ?? 0) : 0);
     draw();
   };
 
   const draw = () => {
     if (!ctx || !cam) return;
     const frame = evaluate(compiled, clock);
-    renderFrame(ctx, frame, cam, { time: clock, floor: def.floor, style, highlight: opts.highlight });
+    renderFrame(ctx, frame, cam, { time: clock, floor: current.floor, style, highlight: opts.highlight });
     // The position bar follows the picture (unless the bar itself is being dragged).
     if (bar && doc.activeElement !== bar) bar.value = String(Math.round((clock / compiled.duration) * 1000));
   };
@@ -286,7 +351,17 @@ export function mountMotion(host: HTMLElement, def: MotionDef, opts: MountOption
     const dt = last ? Math.min(0.1, (now - last) / 1000) : 0;
     last = now;
     clock = (clock + dt * speed) % compiled.duration;
+    const t0 = performance.now();
     draw();
+    // Adaptive quality: a running average of the draw time; step the pixel density down once if it stays high.
+    const ms = performance.now() - t0;
+    drawCount++;
+    drawAvg = drawCount === 1 ? ms : drawAvg * 0.9 + ms * 0.1;
+    if (drawCount > 45 && drawAvg > 12 && maxDpr > 1.5 && (win.devicePixelRatio || 1) > 1.5) {
+      maxDpr = 1.5;
+      wrap.setAttribute("data-quality", "reduced");
+      resize();
+    }
     raf = win.requestAnimationFrame(loop);
   };
   const start = () => {
@@ -365,7 +440,32 @@ export function mountMotion(host: HTMLElement, def: MotionDef, opts: MountOption
     get speed() {
       return speed;
     },
-    motion: def,
+    get motion() {
+      return current;
+    },
+    setView(index: number) {
+      if (index === viewIndex || index < 0 || index >= views.length) return;
+      // Keep the position in the rep: the views share their timing, so the same fraction of the loop is the same moment.
+      const phase = clock / compiled.duration;
+      viewIndex = index;
+      current = views[index]!.def;
+      compiled = compileMotion(current);
+      bounds = motionBounds(compiled);
+      clock = phase * compiled.duration;
+      wrap.setAttribute("data-exercise-motion", current.id);
+      canvas.setAttribute("aria-label", opts.label && index === 0 ? opts.label : `Animated demonstration. ${current.label}`);
+      syncUi();
+      resize();
+    },
+    get view() {
+      return viewIndex;
+    },
+    replay() {
+      if (still) return;
+      clock = 0;
+      draw();
+      if (!playing) ctrl.play();
+    },
     seek(phase: number) {
       clock = (((phase % 1) + 1) % 1) * compiled.duration;
       draw();

@@ -159,11 +159,12 @@ function withAlpha(ctx: CanvasRenderingContext2D, a: number, draw: () => unknown
 }
 
 function drawBackdrop(ctx: CanvasRenderingContext2D, w: number, h: number, cam: Camera, frame: Frame, floor: boolean) {
-  const g = ctx.createRadialGradient(w * 0.5, h * 0.42, 0, w * 0.5, h * 0.5, Math.max(w, h) * 0.75);
-  // A lighter, warm stage behind the figure, so the dark athlete stands out from it.
-  g.addColorStop(0, "#3a3122");
-  g.addColorStop(0.55, "#221d15");
-  g.addColorStop(1, "#100e0b");
+  const g = ctx.createRadialGradient(w * 0.5, h * 0.4, 0, w * 0.5, h * 0.5, Math.max(w, h) * 0.72);
+  // A dark stage with a soft warm pool of light behind the figure: the graphite athlete and its gold rim light read
+  // against it, and the page's black frames it without a hard edge.
+  g.addColorStop(0, "#2b251b");
+  g.addColorStop(0.45, "#17140f");
+  g.addColorStop(1, "#080706");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
   if (!floor) return;

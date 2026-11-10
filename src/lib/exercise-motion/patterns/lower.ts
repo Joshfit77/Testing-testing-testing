@@ -109,7 +109,8 @@ export function squat(o: SquatOpts): MotionDef {
   const props: PropDef[] = [...(o.props ?? [])];
   if (implement === "barbell") {
     const at = o.load === "back" ? { lm: "trap" as const } : o.load === "front" ? { lm: "rack" as const } : o.load === "zercher" ? { lm: "elbowR" as const, dx: 3, dy: 6 } : { lm: "hands" as const };
-    props.push({ id: "bar", kind: "barbell", at, layer: "front", ...(o.load === "back" ? { orient: "across" as const } : {}) });
+    // Bar on the back: 35 cm plates (its height is set by the lifter, not the plates), so the head stays readable.
+    props.push({ id: "bar", kind: "barbell", at, layer: "front", ...(o.load === "back" ? { orient: "across" as const, size: 17.5 } : {}) });
   } else if (implement === "dumbbell") props.push({ id: "db", kind: "dumbbell", at: { lm: "hands", dy: -3 }, orient: "profile", angle: 90, layer: "near", size: 1.05 });
   else if (implement === "kettlebell") props.push({ id: "kb", kind: "kettlebell", at: { lm: "hands" }, orient: "vertical", layer: "near" });
   const specs = rep((s) => squatPose(s, o), { down: o.down ?? 2, up: o.up ?? 1, holdBottom: o.holdBottom, holdTop: o.holdTop ?? 0.4 });
@@ -186,6 +187,10 @@ export interface PullOpts {
   /** Height of a platform the lifter stands on (deficit pulls). Bar heights are measured from the floor. */
   platform?: number;
   armLen?: number;
+  /** How far the shoulders start in front of the bar off the floor (cm, default 4: just ahead of it). */
+  shoulderAhead?: number;
+  /** How far the shoulders finish behind the bar at lockout (cm, default 9): a tall finish, hips through. */
+  lockBack?: number;
 }
 
 const ARM = BODY.upperArm + BODY.forearm;
@@ -198,8 +203,12 @@ export function pullPose(barY: number, o: PullOpts): Pose {
   const shin0 = o.shin0 ?? 12;
   const frac = Math.max(0, Math.min(1, (barY - y0) / (kneeH - y0)));
   const shin = shin0 * (1 - frac) * (1 - frac * 0.3);
-  const delta = 7 * (1 - Math.max(0, Math.min(1, (barY - y0) / (84 - y0))));
-  const S: Vec = [barX + delta, barY + Math.sqrt(ARM * ARM - delta * delta) - 0.5];
+  // Shoulders: a little ahead of the bar off the floor, over it at the knees, and just behind it at lockout (standing
+  // tall with the hips through, not leaning over the bar).
+  const up = Math.max(0, Math.min(1, (barY - y0) / ((o.barTop ?? 86) - y0)));
+  const delta = (o.shoulderAhead ?? 4) * (1 - up) - (o.lockBack ?? 9) * up * up;
+  // Arms hang straight: the shoulder sits a full arm's length from the bar (a 0.5 cm shortfall bends the elbow ~14°).
+  const S: Vec = [barX + delta, barY + Math.sqrt(ARM * ARM - delta * delta) - 0.03];
   let p = solvePull(shin, S, o.spine ?? 0);
   p = handsAt(p, [barX, barY]);
   p.neck = -Math.max(0, p.trunk - 15) * 0.35;
@@ -231,7 +240,9 @@ export function rdlPose(barY: number, o: PullOpts): Pose {
 export function pull(o: PullOpts): MotionDef {
   const plat = o.platform ?? 0;
   const y0 = (o.barStart ?? 22.5) - plat;
-  const top = o.barTop ?? 83.5;
+  // Floor pulls lock out standing tall (shoulders ~9 cm behind the bar, arms straight): the bar then hangs at about
+  // 86 cm on this figure. A Romanian deadlift's soft-kneed top stays where it was.
+  const top = o.barTop ?? (o.fromTop ? 83.5 : 86);
   const at = (s: number) => {
     // s: 0 = lockout, 1 = bottom.
     const y = top + (y0 - top) * s;

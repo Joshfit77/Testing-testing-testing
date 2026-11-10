@@ -56,10 +56,14 @@ import {
 } from "../lib/exercise-motion/patterns/power";
 import { lateralBoundDrill, lateralShuffleDrill, proAgilityDrill, reactiveMirrorDrill, tDrill } from "../lib/exercise-motion/patterns/agility";
 import { agilityLadderDrill, bearCrawlDrill, threeConeDrill, walkingLungeDrill, wallDrillStraight } from "../lib/exercise-motion/patterns/drills";
+import { backSquatFront, curlFront, deadliftFront } from "../lib/exercise-motion/patterns/front-views";
 import { pose, stanceLegs, both } from "../lib/exercise-motion/build";
-import type { ExerciseMeta, MotionDef } from "../lib/exercise-motion/types";
+import type { ExerciseMeta, MotionDef, View } from "../lib/exercise-motion/types";
 
 type Builder = (id: string) => MotionDef;
+
+/** Shared by the back squat's side and front views, so both show the same depth, lean and timing. */
+const BACK_SQUAT = { load: "back" as const, balanceX: -1 };
 
 const S = "Side view. ";
 const F = "Front view. ";
@@ -68,7 +72,7 @@ const F = "Front view. ";
 export const EXERCISE_MOTIONS: Record<string, Builder> = {
   // ------------------------------------------------------------------ Squat
   "back-squat": (id) =>
-    squat({ id, load: "back", label: `${S}Barbell on the upper back: sits down between the hips to just below parallel over two seconds, bar staying over mid-foot, then stands up in one second.`, props: [{ id: "rack", kind: "rack", at: [-70, 140], layer: "back" }] }),
+    squat({ id, ...BACK_SQUAT, label: `${S}Barbell on the upper back: sits down between the hips to just below parallel over two seconds, bar staying over mid-foot, then stands up in one second.`, props: [{ id: "rack", kind: "rack", at: [-70, 140], layer: "back" }] }),
   "front-squat": (id) => squat({ id, load: "front", knee: 135, shin: 40, label: `${S}Bar racked on the front of the shoulders with elbows high: squats straight down with an upright torso, then drives up.` }),
   "goblet-squat": (id) => squat({ id, load: "goblet", implement: "dumbbell", knee: 135, shin: 38, label: `${S}Dumbbell held vertically at the chest: squats deep with the chest up, pauses briefly, stands.`, holdBottom: 0.3 }),
   "bodyweight-squat": (id) => squat({ id, load: "arms-forward", label: `${S}Arms reach forward as the hips sit back and down to parallel, heels down, then stands tall.` }),
@@ -280,6 +284,24 @@ const named = (m: ExerciseMeta, re: RegExp) => re.test(`${m.slug} ${m.name ?? ""
  * Pattern-based motion for an exercise without a hand-made definition. Uses the name first (most specific),
  * then the movement pattern and equipment, so new catalog entries still get a sensible demonstration.
  */
+/**
+ * Extra camera views for exercises where a second angle teaches something the main one cannot (knee tracking, stance
+ * and grip width from the front; bar path and depth from the side). The main view stays EXERCISE_MOTIONS[slug]; each
+ * extra view is built from the same solver and timing, so switching views keeps the position in the rep. Exercises not
+ * listed have one view. Front views of lying, seated or rotational movements are left out on purpose: they add little.
+ */
+export const EXERCISE_MOTION_VIEWS: Record<string, Partial<Record<View, Builder>>> = {
+  "back-squat": {
+    front: (id) => backSquatFront(id, `${F}Feet a little wider than the hips, toes slightly out: the knees track out over the toes as the hips sit down between them to parallel, bar across the upper back, then drives up.`, BACK_SQUAT),
+  },
+  "conventional-deadlift": {
+    front: (id) => deadliftFront(id, `${F}Feet about hip width, hands just outside the legs with straight arms: the bar rises over the feet to a tall lockout, then lowers under control.`),
+  },
+  "dumbbell-curl": {
+    front: (id) => curlFront(id, `${F}Palms forward and upper arms still at the sides: curls both dumbbells up toward the shoulders and lowers them slowly.`),
+  },
+};
+
 export function fallbackMotion(meta: ExerciseMeta): MotionDef {
   const id = meta.slug;
   const name = meta.name ?? meta.slug.replace(/-/g, " ");

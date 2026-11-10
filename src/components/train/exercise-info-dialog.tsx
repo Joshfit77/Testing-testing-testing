@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { shownDemoAsset as getDemoAsset } from "@/lib/exercise-demos";
 import { demoCaption, demoReadiness } from "@/lib/exercise-demo-readiness";
 import { ExerciseDemo, type DemoMuscles } from "./exercise-demo";
+import { MuscleKey } from "./muscle-key";
 
 export interface ExerciseInfoText {
   /** How to set up (the library's written steps). */
@@ -17,7 +18,7 @@ export interface ExerciseInfoText {
   mistakes: readonly string[];
 }
 
-type Tab = "setup" | "execution" | "mistakes";
+type Tab = "setup" | "execution" | "mistakes" | "muscles";
 
 /**
  * The exercise demonstration, full width: the moving 2D athlete (or a 2.5D clip, pose frames or the labelled
@@ -43,16 +44,18 @@ export function ExerciseInfoDialog({
   const [full, setFull] = useState(false);
   const asset = getDemoAsset(slug);
   const readiness = demoReadiness(slug);
-  const lists: Record<Tab, readonly string[]> = {
+  const lists: Record<Exclude<Tab, "muscles">, readonly string[]> = {
     setup: text?.steps ?? [],
     execution: text?.cues ?? [],
     mistakes: text?.mistakes ?? [],
   };
-  const empty: Record<Tab, string> = {
+  const empty: Record<Exclude<Tab, "muscles">, string> = {
     setup: "No written set-up steps for this exercise yet.",
     execution: "No form cues for this exercise yet.",
     mistakes: "No common mistakes listed for this exercise yet.",
   };
+  // The muscle key (gold primary, blue secondary, as they glow on the athlete) when the muscles are known.
+  const hasMuscles = Boolean(muscles && muscles.primary.length > 0);
   const Icon = tab === "mistakes" ? AlertTriangle : tab === "setup" ? ListOrdered : CheckCircle2;
   return (
     <Dialog
@@ -95,9 +98,17 @@ export function ExerciseInfoDialog({
                 { key: "setup", label: "Setup", active: tab === "setup", testId: "info-tab-setup" },
                 { key: "execution", label: "Execution", active: tab === "execution", testId: "info-tab-execution" },
                 { key: "mistakes", label: "Mistakes", active: tab === "mistakes", testId: "info-tab-mistakes" },
+                ...(hasMuscles ? [{ key: "muscles", label: "Muscles", active: tab === "muscles", testId: "info-tab-muscles" }] : []),
               ]}
               onSelect={(k) => setTab(k as Tab)}
             />
+            {tab === "muscles" ? (
+              muscles && (
+                <div data-testid="info-muscles" role="tabpanel">
+                  <MuscleKey primary={muscles.primary} secondary={muscles.secondary ?? []} showColours={!asset && readiness !== "placeholder"} />
+                </div>
+              )
+            ) : (
             <ul className="space-y-2.5 text-[0.9375rem] leading-snug" data-testid={`info-${tab}`} role="tabpanel">
               {lists[tab].length === 0 ? (
                 <li className="text-sm text-muted-foreground">{empty[tab]}</li>
@@ -116,6 +127,7 @@ export function ExerciseInfoDialog({
                 ))
               )}
             </ul>
+            )}
           </div>
         )}
       </DialogContent>

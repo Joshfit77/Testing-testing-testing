@@ -135,7 +135,7 @@ const PLATE_T = 5; // plate thickness (cm)
 const NEAR_SCALE = 1.08;
 const FAR_SCALE = 0.86;
 /** Opacity of the near plates' iron where they would hide the lifter's head or arms (see plateCover). */
-const GHOST_IRON = 0.4;
+const GHOST_IRON = 0.26;
 
 /** Distance from p to the segment a–b. */
 function segDist(p: Vec, a: Vec, b: Vec): number {
