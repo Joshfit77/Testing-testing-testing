@@ -75,7 +75,7 @@ for (const slug of slugs) {
     const n = Math.round((info.duration / speed) * fps);
     for (let k = 0; k < n; k++) writeFileSync(join(dir, `f${String(k).padStart(4, "0")}.png`), await draw(k / n));
     const mp4 = join(outDir, `${tag}-${slug}-${speed}x.mp4`);
-    execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-framerate", String(fps), "-i", join(dir, "f%04d.png"), "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20", mp4]);
+    execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-framerate", String(fps), "-i", join(dir, "f%04d.png"), "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", process.env.CRF || "20", mp4]);
     console.log(`${mp4}: ${n} frames, ${(n / fps).toFixed(2)} s at ${speed}x (loop ${info.duration.toFixed(2)} s, ${info.view} view)`);
   }
   // Filmstrip: evenly spaced phases of one loop, captioned with the time into the loop.

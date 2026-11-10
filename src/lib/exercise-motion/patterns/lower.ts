@@ -11,6 +11,7 @@ import {
   lm,
   pose,
   rep,
+  repSmooth,
   shoulderLocal,
   solve1D,
   stanceLegs,
@@ -41,16 +42,21 @@ export interface SquatOpts {
   stillPhase?: number;
   /** Shift of the balance point relative to mid-foot (cm, + = toward toes). */
   balanceX?: number;
+  /**
+   * The rebuilt squat mechanics: a tall standing position swaying slightly forward from the ankle, knees travelling
+   * forward early while the hips keep sinking, and a smooth dense-keyed tempo (repSmooth).
+   */
+  natural?: boolean;
 }
 
 /** Arm placement for each way of holding the load (shoulder-local elbow / hand points). */
-function holdArms(p: Pose, load: SquatLoad, s: number): Pose {
+function holdArms(p: Pose, load: SquatLoad, s: number, natural = false): Pose {
   switch (load) {
     case "back": {
       // Hands on the bar at the traps (seen from the side they are at the bar's end), elbows below and a little behind;
       // each arm reaches out to the side, which the side view shows as foreshortening (armThrough).
       const hand = lm(p, "trap");
-      const elbow = add(hand, [-1.5, -27]);
+      const elbow = add(hand, natural ? [-6.5, -23] : [-1.5, -27]);
       return armThrough(armThrough(p, "R", elbow, hand), "L", elbow, hand);
     }
     case "front":
@@ -91,14 +97,16 @@ function barPoint(p: Pose, load: SquatLoad): Vec {
 }
 
 export function squatPose(s: number, o: SquatOpts): Pose {
-  const knee = (o.knee ?? 128) * s + 2;
-  const shin = (o.shin ?? 36) * s + 1;
+  // Natural: standing, the whole body sways a few degrees forward from the ankle (weight over mid-foot, torso tall);
+  // going down, the knees travel forward early and then hold while the hips keep sinking, as in a real squat.
+  const knee = (o.knee ?? 128) * s + (o.natural ? 1 : 2);
+  const shin = o.natural ? 3.5 + ((o.shin ?? 36) - 2.5) * (1 - Math.pow(1 - s, 1.5)) : (o.shin ?? 36) * s + 1;
   let p = pose({ ...stanceLegs(shin, knee, 5 + 30 * s), neck: -6 * s });
   for (let i = 0; i < 3; i++) {
-    p = holdArms(p, o.load, s);
-    p = balanceTrunk(p, (q) => barPoint(holdArms(q, o.load, s), o.load), o.balanceX ?? (o.load === "back" || o.load === "front" || o.load === "overhead" ? 1 : 2), -10, 70);
+    p = holdArms(p, o.load, s, o.natural);
+    p = balanceTrunk(p, (q) => barPoint(holdArms(q, o.load, s, o.natural), o.load), o.balanceX ?? (o.load === "back" || o.load === "front" || o.load === "overhead" ? 1 : 2), -10, 70);
   }
-  p = holdArms(p, o.load, s);
+  p = holdArms(p, o.load, s, o.natural);
   // Keep the head neutral-to-up as the torso leans.
   p.neck = -Math.max(0, p.trunk - 10) * 0.45;
   return p;
@@ -113,7 +121,7 @@ export function squat(o: SquatOpts): MotionDef {
     props.push({ id: "bar", kind: "barbell", at, layer: "front", ...(o.load === "back" ? { orient: "across" as const, size: 17.5 } : {}) });
   } else if (implement === "dumbbell") props.push({ id: "db", kind: "dumbbell", at: { lm: "hands", dy: -3 }, orient: "profile", angle: 90, layer: "near", size: 1.05 });
   else if (implement === "kettlebell") props.push({ id: "kb", kind: "kettlebell", at: { lm: "hands" }, orient: "vertical", layer: "near" });
-  const specs = rep((s) => squatPose(s, o), { down: o.down ?? 2, up: o.up ?? 1, holdBottom: o.holdBottom, holdTop: o.holdTop ?? 0.4 });
+  const specs = (o.natural ? repSmooth : rep)((s) => squatPose(s, o), { down: o.down ?? 2, up: o.up ?? 1, holdBottom: o.holdBottom, holdTop: o.holdTop ?? 0.4 });
   return {
     id: o.id,
     view: "side",

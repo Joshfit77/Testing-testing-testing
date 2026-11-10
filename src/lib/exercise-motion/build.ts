@@ -259,6 +259,19 @@ export function rep(
   ];
 }
 
+/**
+ * One repetition with a smooth, coordinated tempo: the movement is keyed at seven depths per direction, spaced so the
+ * body eases out of each end and moves fastest through the middle (a cosine ease), with the solver run at every key.
+ * Dense keys keep constraints solved at the ends (a bar over mid-foot, planted feet) true all the way through.
+ */
+export function repSmooth(at: (s: number) => Pose, t: { down: number; up: number; holdTop?: number; holdBottom?: number }, n = 6): KeySpec[] {
+  const S = Array.from({ length: n + 1 }, (_, i) => 0.5 - 0.5 * Math.cos((Math.PI * i) / n));
+  const out: KeySpec[] = [];
+  for (let i = 0; i < n; i++) out.push({ pose: at(S[i]!), dur: t.down / n, hold: i === 0 ? (t.holdTop ?? 0.35) : undefined, ease: "spline" });
+  for (let i = n; i > 0; i--) out.push({ pose: at(S[i]!), dur: t.up / n, hold: i === n ? (t.holdBottom ?? 0) : undefined, ease: "spline" });
+  return out;
+}
+
 export function motion(def: Omit<MotionDef, "keyframes"> & { keyframes: Keyframe[] }): MotionDef {
   return def;
 }

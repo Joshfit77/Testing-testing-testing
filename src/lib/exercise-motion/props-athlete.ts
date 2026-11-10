@@ -94,13 +94,14 @@ function cushion(ctx: Ctx, a: Vec, b: Vec, thick = 8) {
 /** A round iron plate face-on: raised rim, recessed face, inner ring, steel hub. */
 export function plateFace(ctx: Ctx, c: Vec, r: number, hub = 2.6) {
   // hub 0: the face away from the viewer (no sleeve end showing).
-  const g = ctx.createRadialGradient(c[0] + r * 0.25, c[1] + r * 0.35, r * 0.1, c[0], c[1], r);
-  g.addColorStop(0, IRON_HI);
-  g.addColorStop(0.65, IRON);
-  g.addColorStop(1, IRON_LO);
-  ctx.fillStyle = g;
+  // Flat iron (no sheen): the face, a darker recessed centre, crisp rings.
+  ctx.fillStyle = IRON;
   ctx.beginPath();
   ctx.arc(c[0], c[1], r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = IRON_LO;
+  ctx.beginPath();
+  ctx.arc(c[0], c[1], r * 0.58, 0, Math.PI * 2);
   ctx.fill();
   // Raised rim: a lighter band with a gold edge.
   ctx.strokeStyle = "rgba(255,255,255,0.07)";
@@ -135,7 +136,7 @@ const PLATE_T = 5; // plate thickness (cm)
 const NEAR_SCALE = 1.08;
 const FAR_SCALE = 0.86;
 /** Opacity of the near plates' iron where they would hide the lifter's head or arms (see plateCover). */
-const GHOST_IRON = 0.26;
+const GHOST_IRON = 0;
 
 /** Distance from p to the segment a–b. */
 function segDist(p: Vec, a: Vec, b: Vec): number {
@@ -276,15 +277,16 @@ function barAcross(ctx: Ctx, at: Vec, r0: number, side: 1 | -1, ghost = 0, shaft
     if (ghost > 0) {
       const a = P(COLLAR);
       const b = P(COLLAR + 2 * PLATE_T);
-      groupAlpha(ctx, [Math.min(a[0], b[0]) - r - 1, at[1] - r - 1, Math.max(a[0], b[0]) + r + 1, at[1] + r + 1], 1 - ghost * (1 - GHOST_IRON), plates);
-      // The outer plate's gold rim and ring stay crisp over the dimmed iron.
-      ctx.lineWidth = Math.max(0.5, r * 0.035);
-      ctx.strokeStyle = `rgba(${GOLD},${0.8 * ghost})`;
+      const iron = 1 - ghost * (1 - GHOST_IRON);
+      if (iron > 0.01) groupAlpha(ctx, [Math.min(a[0], b[0]) - r - 1, at[1] - r - 1, Math.max(a[0], b[0]) + r + 1, at[1] + r + 1], iron, plates);
+      // Where the plates would hide the lifter they are drawn as a cutaway: crisp outline rings only, nothing see-through.
+      ctx.lineWidth = Math.max(0.6, r * 0.04);
+      ctx.strokeStyle = `rgba(${GOLD},${0.95 * ghost})`;
       ctx.beginPath();
       ctx.arc(b[0], b[1], r - 0.2, 0, Math.PI * 2);
       ctx.stroke();
       ctx.lineWidth = 0.4;
-      ctx.strokeStyle = `rgba(${GOLD},${0.3 * ghost})`;
+      ctx.strokeStyle = `rgba(${GOLD},${0.5 * ghost})`;
       ctx.beginPath();
       ctx.arc(b[0], b[1], r * 0.58, 0, Math.PI * 2);
       ctx.stroke();

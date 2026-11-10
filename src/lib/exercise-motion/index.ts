@@ -90,7 +90,7 @@ export function drawExerciseStill(canvas: HTMLCanvasElement, slug: string, opts:
   const c = compileMotion(def);
   const w = opts.width ?? canvas.clientWidth ?? 160;
   const h = opts.height ?? canvas.clientHeight ?? 120;
-  const dpr = Math.min(2.5, (typeof devicePixelRatio === "number" && devicePixelRatio) || 1);
+  const dpr = Math.min(3, (typeof devicePixelRatio === "number" && devicePixelRatio) || 1);
   canvas.width = Math.round(w * dpr);
   canvas.height = Math.round(h * dpr);
   const ctx = canvas.getContext("2d");

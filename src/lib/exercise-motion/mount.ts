@@ -115,9 +115,10 @@ export function mountMotion(host: HTMLElement, def: MotionDef, opts: MountOption
   // Canvas pixel density. The soft-shaded figure looks the same at 2x as at 3x on a phone, and drawing cost grows with
   // the pixel count, so the live player caps it at 2. If frames still run over budget on a slow device (an average draw
   // over ~12 ms), it steps down once to 1.5x rather than dropping frames.
-  let maxDpr = 2;
+  let maxDpr = 3;
   let drawAvg = 0;
   let drawCount = 0;
+  let frameAvg = 0;
   let fullscreen = false;
   const interactive = !still && opts.controls !== false;
 
@@ -349,16 +350,19 @@ export function mountMotion(host: HTMLElement, def: MotionDef, opts: MountOption
     raf = 0;
     if (!playing || !visible || destroyed) return;
     const dt = last ? Math.min(0.1, (now - last) / 1000) : 0;
+    // A running average of the time between frames actually shown (covers the browser's own painting, not only our draw).
+    if (last) frameAvg = frameAvg ? frameAvg * 0.92 + (now - last) * 0.08 : now - last;
     last = now;
     clock = (clock + dt * speed) % compiled.duration;
     const t0 = performance.now();
     draw();
-    // Adaptive quality: a running average of the draw time; step the pixel density down once if it stays high.
+    // Adaptive quality: full Retina density (up to 3x) by default; if drawing stays slow or the shown frame rate stays
+    // under about 48 a second, step the pixel density down once to 2x so the movement stays smooth.
     const ms = performance.now() - t0;
     drawCount++;
     drawAvg = drawCount === 1 ? ms : drawAvg * 0.9 + ms * 0.1;
-    if (drawCount > 45 && drawAvg > 12 && maxDpr > 1.5 && (win.devicePixelRatio || 1) > 1.5) {
-      maxDpr = 1.5;
+    if (drawCount > 60 && (drawAvg > 12 || frameAvg > 21) && maxDpr > 2 && (win.devicePixelRatio || 1) > 2) {
+      maxDpr = 2;
       wrap.setAttribute("data-quality", "reduced");
       resize();
     }

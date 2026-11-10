@@ -85,8 +85,27 @@ describe("barbell back squat (side)", () => {
     for (const f of fr) expect(Math.abs(bar(f)[0] - MID_FOOT)).toBeLessThan(3);
   });
 
-  it("reaches parallel: the hips come down to the knees", () => {
-    expect(bottom.pts.pelvis[1]).toBeLessThan(bottom.pts.kneeR[1] + 1);
+  it("reaches just below parallel: the hips sink under the top of the knees", () => {
+    expect(bottom.pts.pelvis[1]).toBeLessThan(bottom.pts.kneeR[1]);
+    expect(bottom.pts.pelvis[1]).toBeGreaterThan(bottom.pts.kneeR[1] - 8);
+  });
+
+  it("stands tall at the top and leans no more than a high-bar squat does at the bottom", () => {
+    const top = byHeight(fr, (f) => -f.pts.pelvis[1])[0]!;
+    expect(top.pose.trunk).toBeLessThan(10);
+    expect(top.pose.kneeR).toBeLessThan(5);
+    expect(bottom.pose.trunk).toBeGreaterThan(25);
+    expect(bottom.pose.trunk).toBeLessThan(40);
+  });
+
+  it("moves smoothly: the bar never jumps between frames and eases at the top and bottom", () => {
+    const dense = frames(getMotion("back-squat", meta("back-squat")), 240);
+    const ys = dense.map((f) => bar(f)[1]);
+    const steps = ys.map((y, i) => Math.abs(y - ys[(i + 1) % ys.length]!));
+    // 240 frames over 4.15 s: under 2 cm a frame is under 1.2 m/s, a controlled squat.
+    expect(Math.max(...steps)).toBeLessThan(2);
+    // No step is more than 0.35 cm bigger than the one before it: no jerk anywhere in the loop.
+    for (let i = 0; i < steps.length; i++) expect(Math.abs(steps[i]! - steps[(i + 1) % steps.length]!)).toBeLessThan(0.35);
   });
 
   it("keeps the heels down", () => {
@@ -120,9 +139,10 @@ describe("medicine-ball scoop toss", () => {
 });
 
 describe("camera views", () => {
-  it("offers side and front for the squat, deadlift and curl, and one view for the bench press and scoop toss", () => {
-    for (const slug of ["back-squat", "conventional-deadlift", "dumbbell-curl"]) expect(getMotionViews(slug, meta(slug)).map((v) => v.view)).toEqual(["side", "front"]);
-    expect(getMotionViews("bench-press", meta("bench-press")).map((v) => v.view)).toEqual(["side"]);
+  it("offers side and front for the deadlift and curl, and one view for the squat, bench press and scoop toss", () => {
+    for (const slug of ["conventional-deadlift", "dumbbell-curl"]) expect(getMotionViews(slug, meta(slug)).map((v) => v.view)).toEqual(["side", "front"]);
+    // The squat's front view was withdrawn until it can be drawn to the side view's standard (deep-squat foreshortening).
+    for (const slug of ["back-squat", "bench-press"]) expect(getMotionViews(slug, meta(slug)).map((v) => v.view)).toEqual(["side"]);
     expect(getMotionViews("medicine-ball-scoop-toss", meta("medicine-ball-scoop-toss")).map((v) => v.view)).toEqual(["front"]);
   });
 
@@ -147,7 +167,7 @@ describe("camera views", () => {
   });
 
   it("front views match the side view's depth: same pelvis height at the bottom (within 3 cm)", () => {
-    for (const slug of ["back-squat", "conventional-deadlift"]) {
+    for (const slug of ["conventional-deadlift"]) {
       const lowS = Math.min(...side(slug).map((f) => f.pts.pelvis[1] - Math.min(f.pts.soleL[1], f.pts.soleR[1])));
       const lowF = Math.min(...front(slug).map((f) => f.pts.pelvis[1] - Math.min(f.pts.soleL[1], f.pts.soleR[1])));
       expect(Math.abs(lowS - lowF)).toBeLessThan(3);
@@ -196,8 +216,8 @@ describe("player: camera view switch and replay", () => {
     return { host, ctrl: mountExerciseMotion(host, slug, { autoplay: false, meta: meta(slug) }) };
   };
 
-  it("shows Side and Front for the squat, outside the picture, and switching keeps the position in the rep", () => {
-    const { host, ctrl } = mount("back-squat");
+  it("shows Side and Front for the curl, outside the picture, and switching keeps the position in the rep", () => {
+    const { host, ctrl } = mount("dumbbell-curl");
     const sw = host.querySelector("[data-motion-views]")!;
     expect(sw).not.toBeNull();
     expect(host.querySelector("[data-motion-stage]")!.querySelector("button")).toBeNull();

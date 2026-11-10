@@ -13,7 +13,7 @@ test.describe("premium 2D exercise demonstrations", () => {
     await signUpAndConfirm(page, uniqueEmail("p2d"));
     await completeOnboarding(page);
 
-    await page.goto("/train/exercises/back-squat");
+    await page.goto("/train/exercises/dumbbell-curl");
     const player = page.locator("[data-exercise-motion]").first();
     await expect(player).toBeVisible();
     // The demonstration comes before the progress cards.
@@ -40,8 +40,8 @@ test.describe("premium 2D exercise demonstrations", () => {
 
     // The muscle key: primary in gold, secondary in blue, with the honest note.
     const key = page.getByTestId("muscle-key");
-    await expect(key.getByTestId("muscle-key-primary")).toContainText("Quadriceps");
-    await expect(key.getByTestId("muscle-key-secondary")).toContainText("Hamstrings");
+    await expect(key.getByTestId("muscle-key-primary")).toContainText("Biceps");
+    await expect(key.getByTestId("muscle-key-secondary")).toContainText("Forearms");
     await expect(key).toContainText("not a measurement of muscle activity");
 
     // One-view exercises have no switch.
@@ -93,8 +93,9 @@ test.describe("premium 2D exercise demonstrations", () => {
     await expect(info.locator("[data-exercise-motion]")).toBeVisible();
     await info.getByTestId("info-tab-muscles").click();
     await expect(info.getByTestId("muscle-key-primary")).toContainText("Quadriceps");
-    await info.getByRole("button", { name: "Front view" }).click();
-    await expect(info.locator("[data-exercise-motion]")).toHaveAttribute("data-view", "front");
+    // The squat is shown from the side only (its front view was withdrawn until it meets the side view's standard).
+    await expect(info.getByRole("button", { name: "Front view" })).toHaveCount(0);
+    await expect(info.locator("[data-exercise-motion]")).toHaveAttribute("data-view", "side");
     await page.keyboard.press("Escape");
     await expect(info).toBeHidden();
 

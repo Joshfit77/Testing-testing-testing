@@ -8,6 +8,64 @@ is in [`EXERCISE_DEMOS_2D.md`](EXERCISE_DEMOS_2D.md).
 Branch: `claude/premium-2d-exercise-animations`, built on the combined PR #9 + PR #10 tree (both open, not merged), so
 it stays compatible with both. Not merged into `main`.
 
+## 0. Rebuild of 2026-11-10 (owner review: "blurry, glossy, unnatural; squat awkward")
+
+This section supersedes the look described in §2 and the squat in §3–§4. Scope was deliberately narrow: the shared
+athlete, the barbell back squat, the bench press and the dumbbell curl. No exercise was added.
+
+**What caused the softness (investigated, measured)**
+
+| Cause | Before | Now |
+|---|---|---|
+| Shading and muscle highlights were radial gradients (about 60 soft "blobs" per figure) | soft, airbrushed, glossy | none: every mark is a hard-edged vector shape |
+| Canvas pixel density capped at 2x (stepping down to 1.5x) on 3x iPhones | 718 px wide canvas for a 359 pt player | 1077 px (full 3x); steps down once to 2x only if frames run slow |
+| Near plates drawn see-through over the lifter through a scratch canvas | murky iron over the head and arms | cutaway: crisp outline rings, nothing translucent |
+| Plates had a radial sheen | glossy | flat iron with crisp rings |
+| Preview videos sent for review were 640x480 at about 190 kbit/s | soft before the app was even involved | 1080x1080, 60 fps, CRF 12 |
+
+**The athlete (src/lib/exercise-motion/athlete.ts, rewritten painting; same rig)**
+
+- One rigged skeleton with fixed bone lengths (skeleton.ts); the figure is drawn from it every frame, so proportions and
+  appearance are identical in every repetition. Deterministic: no video, no generated frames, no images.
+- Flat base tone per body part inside a dark contour; one hard-edged shadow plane per segment (two-tone shading);
+  ink lines on muscle borders (deltoid, biceps/triceps, pectoral, abdominals, serratus, quadriceps, calf).
+- Lighter neutral skin on the black stage so anatomy reads; black shorts and shoes with gold trim; one thin gold rim line.
+- Working muscles are flat fills in the muscle's place: gold for primary, steel blue for secondary (same colours as the
+  on-screen key). No glow.
+- Upper arm and forearm slimmed about 20% (they were wider than anatomy allows next to the torso).
+
+**Back squat (rebuilt; `natural` option in patterns/lower.ts, used by the back squat only)**
+
+| Check | Before | Now |
+|---|---|---|
+| Torso lean standing | 13° | 8° |
+| Depth (hip joint relative to knee joint at the bottom) | level (parallel) | 1.8 cm below |
+| Torso lean at the bottom | not re-measured | 33° |
+| Bar path | within 3 cm of mid-foot at 3 keyed depths | within 1 cm of mid-foot, solved at 7 depths each way |
+| Tempo | 2 s down, 1 s up, 3 keys, abrupt | 2 s down, 0.15 s pause, 1.4 s up, 0.6 s at the top, cosine-eased |
+| Knees | linear with depth | travel forward early, then hold while the hips keep sinking |
+| Elbows | directly under the bar (arm read as one block) | down and slightly back, forearm and upper arm read apart |
+| Heels | down | down |
+
+The squat's **front view was withdrawn**. At the bottom the thighs point at the camera and the flat figure squashes them;
+it did not meet the standard of the side view, so the squat is side-only until that foreshortening is drawn properly.
+The curl keeps Side and Front. The bench press keeps its side view (motion unchanged from the earlier fix: forearms
+within 9° of vertical, J-shaped bar path) with the new athlete and flat equipment.
+
+**Measured in the app (Chromium, iPhone 15 Pro emulation 393x852 at 3x, software rendering, production build)**
+
+| Exercise | Canvas | Frames per second |
+|---|---|---|
+| Back squat | 1077 x 1122 px | 54 |
+| Bench press | 1077 x 1122 px | 47 |
+| Dumbbell curl | 1077 x 966 px | 60 |
+
+These are from a sandbox without a GPU. The player now also watches the shown frame rate and drops to 2x if it stays
+under about 48 fps. Frame rate on a physical iPhone is still unmeasured.
+
+**Still open**: the squat front view; the other 154 exercises share the new athlete automatically but their movements
+were not re-reviewed in this pass (the owner asked for squat, bench and curl first); real-device checks in §8.
+
 ## 1. Audit (before this work)
 
 | Area | Finding |
