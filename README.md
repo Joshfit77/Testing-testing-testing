@@ -40,3 +40,16 @@ plain anatomy).
   plausible but have not been checked by an anatomist. Biomechanics have not been reviewed by a coach.
 - Rendered in real time with standard lights and shadows; no subsurface scattering, ambient occlusion or studio HDRI.
 - Performance was only observed in headless software rendering; it has not been measured on a phone.
+
+## Second pass (more muscular, better finish)
+
+- **Physique**: the muscular macro at full strength, leaned out, plus MakeHuman's own sculpted details for the chest,
+  lats, V-taper, upper arms, forearms, thighs, calves, glutes, abdominal tone, neck, narrower hips, a squarer head,
+  cheekbones and chin (`src-assets/detail/`, all CC0). Nothing is inflated by hand.
+- **Rendering**: a studio environment for soft fill and reflections, a stronger key light with softer shadows, two gold
+  rim lights, a warm backdrop glow, a matte floor. Muscle definition is baked from the mesh's own curvature (creases
+  darker, crests lighter) and shadowed skin keeps a warm tone.
+- **Design**: eyebrows, eyes with a proper iris, a short haircut with volume and a smooth hairline, shorts and shoes
+  with clean hems and gold trim, hexagonal dumbbells, a three-quarter camera for the curl.
+
+Still true: no skin texture, computed (not captured) motion, linear skinning, unverified anatomy and biomechanics.

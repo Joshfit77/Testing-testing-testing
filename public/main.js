@@ -3,6 +3,7 @@
 // Everything else here is constructed: skin material, shorts, shoes, hair, eyes, equipment, poses and controls.
 import * as THREE from "./vendor/three.module.js";
 import { OrbitControls } from "./vendor/OrbitControls.js";
+import { RoomEnvironment } from "./vendor/RoomEnvironment.js";
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const Qn = () => new THREE.Quaternion();
@@ -15,11 +16,22 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDraw
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 3));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.05;
+renderer.toneMappingExposure = 1.12;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
-scene.background = new THREE.Color("#0a0908");
+// A dark studio backdrop with a soft warm pool of light behind the athlete, and a neutral studio environment for soft
+// fill and believable reflections on skin and steel.
+scene.background = (() => {
+  const c = document.createElement("canvas");
+  c.width = c.height = 512;
+  const g = c.getContext("2d");
+  const r = g.createRadialGradient(256, 235, 10, 256, 256, 380);
+  r.addColorStop(0, "#3a3020"); r.addColorStop(0.35, "#1c1810"); r.addColorStop(1, "#060505");
+  g.fillStyle = r; g.fillRect(0, 0, 512, 512);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+})();
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
 const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 50);
 const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
@@ -30,22 +42,22 @@ controls.maxPolarAngle = Math.PI * 0.52;
 controls.autoRotateSpeed = 2.4;
 
 // Studio: soft sky fill, a key light from the front-left with shadows, a warm gold rim from behind, a dark floor.
-scene.add(new THREE.HemisphereLight("#fff4e2", "#1a1510", 0.75));
-const key = new THREE.DirectionalLight("#fff1dc", 2.6);
-key.position.set(-2.2, 3.6, 3.2);
+scene.add(new THREE.HemisphereLight("#fff4e2", "#1a1510", 0.3));
+const key = new THREE.DirectionalLight("#fff3e0", 2.9);
+key.position.set(-2.4, 3.8, 3.0);
 key.castShadow = true;
 key.shadow.mapSize.set(2048, 2048);
 Object.assign(key.shadow.camera, { left: -2, right: 2, top: 2.4, bottom: -0.4, near: 0.5, far: 12 });
 key.shadow.bias = -0.0004;
 key.shadow.normalBias = 0.012;
+key.shadow.radius = 5;
 scene.add(key);
-const fill = new THREE.DirectionalLight("#cfd8ff", 0.55);
-fill.position.set(3, 1.6, 1.5);
+const fill = new THREE.DirectionalLight("#d6dcff", 0.5);
+fill.position.set(3, 1.4, 2);
 scene.add(fill);
-const rim = new THREE.DirectionalLight("#e2b860", 1.5);
-rim.position.set(1.2, 2.4, -3.4);
-scene.add(rim);
-const floor = new THREE.Mesh(new THREE.CircleGeometry(6, 96), new THREE.MeshStandardMaterial({ color: "#12100d", roughness: 0.92, metalness: 0 }));
+// Two gold rim lights from behind pick out the shoulders, arms and legs against the dark backdrop.
+for (const x of [2.6, -2.6]) { const rim = new THREE.DirectionalLight("#f0c878", 2.1); rim.position.set(x, 2.6, -3.2); scene.add(rim); }
+const floor = new THREE.Mesh(new THREE.CircleGeometry(6, 96), new THREE.MeshStandardMaterial({ color: "#14110d", roughness: 0.88, metalness: 0, envMapIntensity: 0.06 }));
 floor.rotation.x = -Math.PI / 2;
 floor.receiveShadow = true;
 scene.add(floor);
@@ -75,6 +87,7 @@ function skinned(part, material) {
   g.setAttribute("position", new THREE.Float32BufferAttribute(part.pos, 3));
   g.setAttribute("skinIndex", new THREE.Uint16BufferAttribute(part.si, 4));
   g.setAttribute("skinWeight", new THREE.Float32BufferAttribute(part.sw, 4));
+  if (part.m) g.setAttribute("m", new THREE.Float32BufferAttribute(part.m, 1));
   g.setIndex(part.idx);
   g.computeVertexNormals();
   const m = new THREE.SkinnedMesh(g, material);
@@ -87,7 +100,7 @@ function skinned(part, material) {
 /** A shell over part of a skinned mesh: the triangles whose vertices all pass `keep`, pushed out along the normals. */
 function shell(src, keep, offset, extra = {}) {
   const pos = src.geometry.attributes.position, nor = src.geometry.attributes.normal, si = src.geometry.attributes.skinIndex, sw = src.geometry.attributes.skinWeight, idx = src.geometry.index.array;
-  const map = new Map(), out = { pos: [], si: [], sw: [], idx: [] };
+  const map = new Map(), out = { pos: [], si: [], sw: [], idx: [], m: extra.mask ? [] : null };
   const ok = new Uint8Array(pos.count);
   for (let i = 0; i < pos.count; i++) ok[i] = keep(i) ? 1 : 0;
   for (let t = 0; t < idx.length; t += 3) {
@@ -99,6 +112,7 @@ function shell(src, keep, offset, extra = {}) {
         const o = typeof offset === "function" ? offset(i) : offset;
         out.pos.push(pos.getX(i) + nor.getX(i) * o, Math.max(extra.minY ?? -1, pos.getY(i) + nor.getY(i) * o), pos.getZ(i) + nor.getZ(i) * o);
         for (let c = 0; c < 4; c++) { out.si.push(si.getComponent(i, c)); out.sw.push(sw.getComponent(i, c)); }
+        if (extra.mask) out.m.push(extra.mask[i]);
       }
       out.idx.push(map.get(i));
     }
@@ -106,13 +120,25 @@ function shell(src, keep, offset, extra = {}) {
   return out;
 }
 
-const skinMat = new THREE.MeshPhysicalMaterial({ color: "#c98f6b", roughness: 0.68, metalness: 0, sheen: 0.18, sheenColor: new THREE.Color("#ffd0b0"), sheenRoughness: 0.7 });
+const skinMat = new THREE.MeshPhysicalMaterial({ color: "#bd8259", roughness: 0.56, metalness: 0, sheen: 0.22, sheenColor: new THREE.Color("#ffc9a8"), sheenRoughness: 0.55, envMapIntensity: 0.45 });
 const hlUniform = { value: 1 };
 skinMat.onBeforeCompile = (sh) => {
-  // The muscle tint is part of the skin's own colour before lighting, so shading and shadows stay on top of it.
+  // Per-vertex data baked from the mesh: `cav` (creases dark, crests light: muscle definition without a texture), `brow`
+  // (eyebrows) and `hl` (the working-muscle tint). All of it goes into the skin's own colour before lighting, so shading
+  // and shadows stay on top; a little warm light is added back so shadowed skin stays skin-coloured, never grey.
   sh.uniforms.uHL = hlUniform;
-  sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute float hl;\nvarying float vHl;").replace("#include <begin_vertex>", "#include <begin_vertex>\nvHl = hl;");
-  sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform float uHL;\nvarying float vHl;").replace("#include <color_fragment>", "#include <color_fragment>\nfloat k = smoothstep(0.08, 0.9, vHl) * uHL;\ndiffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.62, 0.12), k * 0.62);");
+  sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute float hl;\nattribute float cav;\nattribute float brow;\nvarying float vHl;\nvarying float vCav;\nvarying float vBrow;").replace("#include <begin_vertex>", "#include <begin_vertex>\nvHl = hl; vCav = cav; vBrow = brow;");
+  sh.fragmentShader = sh.fragmentShader
+    .replace("#include <common>", "#include <common>\nuniform float uHL;\nvarying float vHl;\nvarying float vCav;\nvarying float vBrow;")
+    .replace("#include <color_fragment>", `#include <color_fragment>
+      float crease = smoothstep(0.0, 1.0, vCav);
+      float crest = smoothstep(0.0, 1.0, -vCav);
+      diffuseColor.rgb *= mix(vec3(1.0), vec3(0.50, 0.40, 0.36), crease * 0.9);
+      diffuseColor.rgb *= 1.0 + crest * 0.10;
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.07, 0.045, 0.03), smoothstep(0.38, 0.8, vBrow) * 0.72);
+      float k = smoothstep(0.08, 0.9, vHl) * uHL;
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.95, 0.63, 0.12) * (1.0 - crease * 0.45), k * 0.6);`)
+    .replace("#include <emissivemap_fragment>", "#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * vec3(0.95, 0.42, 0.30) * 0.055;");
 };
 const body = skinned(data.body, skinMat);
 scene.add(body);
@@ -127,14 +153,46 @@ const crotchY = H.thigh_l.y - 0.085;
 const inShorts = (i) => P.getY(i) > crotchY - 0.19 && P.getY(i) < H.pelvis.y + 0.075 && wOf(i, /pelvis|thigh|spine_0[12]/) > 0.5;
 const inShoe = (i) => P.getY(i) < H.foot_l.y + 0.035 && wOf(i, /foot|ball/) > 0.5;
 const inHair = (i) => wOf(i, /head/) > 0.7 && P.getY(i) > headTop - 0.19 + Math.max(0, P.getZ(i) + 0.02) * 1.05 && !(Math.abs(P.getX(i)) > 0.064 && P.getZ(i) > -0.025 && P.getY(i) < headTop - 0.1);
-const cloth = new THREE.MeshStandardMaterial({ color: "#131316", roughness: 0.82 });
-const shorts = skinned(shell(body, inShorts, 0.007), cloth);
-const shoes = skinned(shell(body, inShoe, (i) => 0.014 + Math.max(0, P.getZ(i) - 0.08) * 0.12, { minY: 0.001 }), new THREE.MeshStandardMaterial({ color: "#17171b", roughness: 0.6 }));
-const hair = skinned(shell(body, inHair, 0.0045), new THREE.MeshStandardMaterial({ color: "#241710", roughness: 0.95 }));
-scene.add(shorts, shoes, hair);
-// Gold waistband and hems.
-for (let i = 0; i < P.count; i++) if (inShorts(i) || inShoe(i)) { const o = inShoe(i) ? 0.002 : 0.004; P.setXYZ(i, P.getX(i) - N.getX(i) * o, P.getY(i) - N.getY(i) * o, P.getZ(i) - N.getZ(i) * o); }
+// Neighbours of each vertex (for softening masks and measuring curvature).
+const neighbours = Array.from({ length: P.count }, () => new Set());
+{ const ix = body.geometry.index.array; for (let t = 0; t < ix.length; t += 3) for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) if (a !== b) neighbours[ix[t + a]].add(ix[t + b]); }
+function soften(w, passes) {
+  for (let pass = 0; pass < passes; pass++) { const n = new Float32Array(P.count); for (let i = 0; i < P.count; i++) { let s = w[i] * 2, c = 2; for (const j of neighbours[i]) { s += w[j]; c++; } n[i] = s / c; } w = n; }
+  return w;
+}
+const maskOf = (f, passes = 2) => soften(Float32Array.from({ length: P.count }, (_, i) => (f(i) ? 1 : 0)), passes);
+/** A material cut off along a smooth contour of the shell's mask (clean hems and hairline), with an optional gold edge. */
+function masked(mat, trim = 0) {
+  mat.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute float m;\nvarying float vM;").replace("#include <begin_vertex>", "#include <begin_vertex>\nvM = m;");
+    sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nvarying float vM;").replace("#include <color_fragment>", `#include <color_fragment>\nif (vM < 0.5) discard;\n${trim ? `if (vM < ${(0.5 + trim).toFixed(3)}) { diffuseColor.rgb = vec3(0.78, 0.6, 0.24); }` : ""}`);
+  };
+  return mat;
+}
+function garment(region, offset, mat, trim, extra = {}) {
+  const mask = extra.exact ? Float32Array.from({ length: P.count }, (_, i) => region(i)) : maskOf(region);
+  const mesh = skinned(shell(body, (i) => mask[i] > 0.04, offset, { ...extra, mask }), masked(mat, trim));
+  scene.add(mesh);
+  return mask;
+}
+const band = (x) => Math.max(0, Math.min(1, x / 0.03));
+const shortsMask = garment((i) => (wOf(i, /pelvis|thigh|spine_0[12]/) > 0.5 ? Math.min(band(P.getY(i) - (crotchY - 0.2)), band(H.pelvis.y + 0.085 - P.getY(i))) : 0), 0.011, new THREE.MeshStandardMaterial({ color: "#141417", roughness: 0.78, envMapIntensity: 0.35 }), 0.12, { exact: true });
+const shoeMask = garment((i) => (wOf(i, /foot|ball|calf/) > 0.5 ? band(H.foot_l.y + 0.05 - P.getY(i)) : 0), (i) => 0.014 + Math.max(0, P.getZ(i) - 0.07) * 0.16, new THREE.MeshStandardMaterial({ color: "#1a1a1f", roughness: 0.5, envMapIntensity: 0.5 }), 0.1, { minY: 0.001, exact: true });
+const hairMask = maskOf(inHair, 3);
+garment(inHair, (i) => 0.003 + 0.012 * Math.min(1, Math.max(0, (hairMask[i] - 0.5) * 3)), new THREE.MeshStandardMaterial({ color: "#1d120b", roughness: 0.82, envMapIntensity: 0.25 }), 0);
+// Pull the skin in under the clothes so it never shows through.
+for (let i = 0; i < P.count; i++) { const o = shoeMask[i] > 0.6 ? 0.003 : shortsMask[i] > 0.6 ? 0.005 : 0; if (o) P.setXYZ(i, P.getX(i) - N.getX(i) * o, P.getY(i) - N.getY(i) * o, P.getZ(i) - N.getZ(i) * o); }
 P.needsUpdate = true;
+// Muscle definition: how far each vertex sits below (crease) or above (crest) the average of its neighbours.
+{ const cav = new Float32Array(P.count);
+  for (let i = 0; i < P.count; i++) { let x = 0, y = 0, z = 0; for (const j of neighbours[i]) { x += P.getX(j); y += P.getY(j); z += P.getZ(j); } const n = neighbours[i].size || 1; cav[i] = ((x / n - P.getX(i)) * N.getX(i) + (y / n - P.getY(i)) * N.getY(i) + (z / n - P.getZ(i)) * N.getZ(i)) / 0.0016; }
+  const sm = soften(cav, 2);
+  // The face, hands and feet have fine folds that would read as dirt: keep the effect for the body's large forms.
+  for (let i = 0; i < P.count; i++) sm[i] = Math.max(-1, Math.min(1, sm[i])) * (wOf(i, /head|neck|hand|index|middle|ring|pinky|thumb|foot|ball/) > 0.5 ? 0.25 : 1);
+  body.geometry.setAttribute("cav", new THREE.Float32BufferAttribute(sm, 1)); }
+// Eyebrows: a soft dark band on the brow ridge above each eye.
+{ const eyeY = data.eyes[0][1];
+  body.geometry.setAttribute("brow", new THREE.Float32BufferAttribute(maskOf((i) => wOf(i, /head/) > 0.7 && N.getZ(i) > 0.15 && P.getY(i) > eyeY + 0.015 && P.getY(i) < eyeY + 0.031 && Math.abs(P.getX(i)) > 0.008 && Math.abs(P.getX(i)) < 0.052, 1), 1)); }
 
 // Eyes: spheres in the sockets with a drawn iris, carried by the head bone.
 const eyeTex = (() => {
@@ -144,9 +202,9 @@ const eyeTex = (() => {
   g.fillStyle = "#ece6de"; g.fillRect(0, 0, 256, 256);
   // The sphere's texture wraps 360 degrees across and 180 up, so a round iris is drawn half as wide as it is tall.
   g.translate(128, 128); g.scale(0.5, 1);
-  const grd = g.createRadialGradient(0, 0, 2, 0, 0, 30);
+  const grd = g.createRadialGradient(0, 0, 2, 0, 0, 40);
   grd.addColorStop(0, "#0a0605"); grd.addColorStop(0.38, "#0a0605"); grd.addColorStop(0.42, "#5a3a20"); grd.addColorStop(0.9, "#3a2414"); grd.addColorStop(1, "#1a100a");
-  g.fillStyle = grd; g.beginPath(); g.arc(0, 0, 30, 0, 7); g.fill();
+  g.fillStyle = grd; g.beginPath(); g.arc(0, 0, 40, 0, 7); g.fill();
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 })();
 for (const e of data.eyes) {
@@ -176,13 +234,7 @@ const REGION = {
   triceps: (i) => { const s = side(i) > 0 ? "l" : "r"; const d = V(P.getX(i), P.getY(i), P.getZ(i)).sub(H[`upperarm_${s}`]).dot(armAxis(s)); return wOf(i, /upperarm/) > 0.55 && N.getZ(i) < -0.2 && d > 0.07 && d < 0.27; },
   forearms: (i) => { const s = side(i) > 0 ? "l" : "r"; const d = V(P.getX(i), P.getY(i), P.getZ(i)).sub(H[`lowerarm_${s}`]).dot(H[`hand_${s}`].clone().sub(H[`lowerarm_${s}`]).normalize()); return wOf(i, /lowerarm/) > 0.55 && d > 0.02 && d < 0.2; },
 };
-const neighbours = Array.from({ length: P.count }, () => new Set());
-{ const ix = body.geometry.index.array; for (let t = 0; t < ix.length; t += 3) for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) if (a !== b) neighbours[ix[t + a]].add(ix[t + b]); }
-const regionWeights = Object.fromEntries(Object.entries(REGION).map(([name, f]) => {
-  let w = Float32Array.from({ length: P.count }, (_, i) => (f(i) ? 1 : 0));
-  for (let pass = 0; pass < 3; pass++) { const n = new Float32Array(P.count); for (let i = 0; i < P.count; i++) { let s = w[i] * 2, c = 2; for (const j of neighbours[i]) { s += w[j]; c++; } n[i] = s / c; } w = n; }
-  return [name, w];
-}));
+const regionWeights = Object.fromEntries(Object.entries(REGION).map(([name, f]) => [name, maskOf(f, 3)]));
 const hlAttr = new THREE.Float32BufferAttribute(new Float32Array(P.count), 1);
 body.geometry.setAttribute("hl", hlAttr);
 function setMuscles(primary, secondary) {
@@ -299,7 +351,7 @@ const dumbbells = {};
 for (const s of ["l", "r"]) {
   const g = new THREE.Group();
   const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.0135, 0.0135, 0.15, 24), steel); g.add(handle);
-  for (const y of [0.1, -0.1]) { const head = new THREE.Mesh(new THREE.CylinderGeometry(0.062, 0.062, 0.07, 36), iron); head.position.y = y; head.castShadow = true; g.add(head); const band = new THREE.Mesh(new THREE.CylinderGeometry(0.0632, 0.0632, 0.008, 36), goldMat); band.position.y = y; g.add(band); }
+  for (const y of [0.1, -0.1]) { const head = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.075, 6), new THREE.MeshStandardMaterial({ color: "#1c1c20", roughness: 0.62, metalness: 0.2, envMapIntensity: 0.4 })); head.position.y = y; head.castShadow = true; g.add(head); const band = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.079, 24), goldMat); band.position.y = y; g.add(band); }
   const axis = H[`index_01_${s}`].clone().sub(H[`pinky_01_${s}`]).normalize();
   g.quaternion.setFromUnitVectors(V(0, 1, 0), axis);
   g.position.copy(H[`middle_01_${s}`].clone().sub(H[`hand_${s}`]).multiplyScalar(0.82).addScaledVector(PALM[s], 0.03));
@@ -370,14 +422,14 @@ const EX = {
     },
   },
   curl: {
-    label: "Dumbbell biceps curl", muscles: [["biceps"], ["forearms"]], time: [1.2, 0.3, 2, 0.4], target: 0.92, dist: 3.5,
+    label: "Dumbbell biceps curl", muscles: [["biceps"], ["forearms"]], time: [1.2, 0.3, 2, 0.4], target: 0.98, dist: 3.1, quarter: true,
     pose(s) {
-      torso(0);
-      const e = rad(8 + 130 * s);
+      torso(rad(-2));
+      const e = rad(10 + 128 * s);
       for (const [sd, k] of SIDES) {
         leg(sd, H[`foot_${sd}`].clone(), V(k * 0.2, 0, 1));
         const sh = posOf(`upperarm_${sd}`);
-        const elbow = sh.clone().addScaledVector(V(k * 0.1, -1, -0.04 + 0.07 * s).normalize(), LEN[`upperarm_${sd}`]);
+        const elbow = sh.clone().addScaledVector(V(k * 0.13, -1, -0.05 + 0.1 * s).normalize(), LEN[`upperarm_${sd}`]);
         const f = V(k * 0.05, -Math.cos(e), Math.sin(e)).normalize();
         const palm = V(-k * 0.12, Math.sin(e), Math.cos(e));
         aim(`upperarm_${sd}`, elbow.clone().sub(sh), FRONT, FRONT);
@@ -410,7 +462,7 @@ function setView(v, keep) {
   else {
     currentView = v; if (!keep) controls.autoRotate = false;
     const d = EX[state.ex].dist * (innerWidth < innerHeight * 0.8 ? 1.3 : 1), y = EX[state.ex].target + 0.12;
-    const p = v === "front" ? [0.3, y, d] : v === "side" ? [d * 0.9, y, d * 0.42] : [-0.3, y, -d];
+    const p = v === "front" ? (EX[state.ex].quarter ? [d * 0.5, y + 0.05, d * 0.87] : [0.3, y, d]) : v === "side" ? [d * 0.9, y, d * 0.42] : [-0.3, y, -d];
     camera.position.set(...p);
   }
   for (const b of document.querySelectorAll("#view button")) b.setAttribute("aria-pressed", String(b.dataset.v === "spin" ? controls.autoRotate : !controls.autoRotate && b.dataset.v === currentView));

@@ -26,9 +26,19 @@ const apply = (file, w) => {
     if (v) for (let k = 0; k < 3; k++) v[k] += w * +p[k + 1];
   }
 };
-apply("universal-male-young-maxmuscle-averageweight.target.gz", 0.75);
+// Body shape (second pass): the muscular young male macro, leaned out a little, then MakeHuman's own muscle and
+// proportion details for each area. Every change is one of the model's sculpted shapes; nothing is inflated by hand.
+apply("universal-male-young-maxmuscle-averageweight.target.gz", 0.72);
+apply("detail/universal-male-young-maxmuscle-minweight.target.gz", 0.28);
 apply("caucasian-male-young.target.gz", 1);
-apply("ideal.target.gz", 0.5);
+apply("ideal.target.gz", 0.6);
+for (const [name, w] of [
+  ["torso-muscle-pectoral-incr", 0.85], ["torso-muscle-dorsi-incr", 0.9], ["torso-vshape-incr", 0.7],
+  ["l-upperarm-muscle-incr", 0.95], ["r-upperarm-muscle-incr", 0.95], ["l-lowerarm-muscle-incr", 0.75], ["r-lowerarm-muscle-incr", 0.75],
+  ["l-upperleg-muscle-incr", 0.75], ["r-upperleg-muscle-incr", 0.75], ["l-lowerleg-muscle-incr", 0.8], ["r-lowerleg-muscle-incr", 0.8],
+  ["buttocks-volume-incr", 0.3], ["stomach-tone-incr", 1], ["neck-scale-horiz-incr", 0.45], ["hip-scale-horiz-decr", 0.3],
+  ["head-square", 0.5], ["head-fat-decr", 0.45], ["l-cheek-bones-incr", 0.5], ["r-cheek-bones-incr", 0.5], ["chin-prominent-incr", 0.4],
+]) apply(`detail/${name}.target.gz`, w);
 const minY = Math.min(...[...groups.body].map((i) => V[i][1]));
 const P = (v) => [v[0] * 0.1, (v[1] - minY) * 0.1, v[2] * 0.1]; // decimetres -> metres, feet on the floor
 const centre = (name) => {
