@@ -946,8 +946,15 @@ function drawFront(ctx: Ctx, f: Frame, layer: LayerFn, hl: Highlight) {
   render(ctx, items, layer);
 }
 
+/** Preview hook: a candidate character design (athlete-next.ts) painted instead of this one. Unset in the app. */
+let override: ((ctx: Ctx, f: Frame, layer: LayerFn, hl: Highlight) => void) | null = null;
+export function setAthleteOverride(fn: typeof override) {
+  override = fn;
+}
+
 /** Draw the athlete for one frame; `layer` draws the equipment that sits at each depth. */
 export function drawAthlete(ctx: Ctx, f: Frame, layer: LayerFn, hl: Highlight = {}) {
+  if (override) return override(ctx, f, layer, hl);
   if (f.view === "side") drawSide(ctx, f, layer, hl);
   else drawFront(ctx, f, layer, hl);
 }
