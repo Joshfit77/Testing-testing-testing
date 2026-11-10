@@ -41,7 +41,7 @@ interface Design {
   tint: [number, number];
 }
 const DESIGNS: Record<DesignName, Design> = {
-  studio: { mode: "grad", contrast: 1, skin: ["#c7916c", "#8a583e", "#ecc29e"], contourW: 0.5, contourA: 0.6, ink: 0.5, rim: 0, delineate: 0, tint: [0.55, 0.24] },
+  studio: { mode: "grad", contrast: 1, skin: ["#c7916c", "#8a583e", "#ecc29e"], contourW: 0.5, contourA: 0.6, ink: 0.5, rim: 0, delineate: 0, tint: [0.36, 0.17] },
   editorial: { mode: "cel", contrast: 1, skin: ["#c58c66", "#96603f", "#e3b58f"], contourW: 0.85, contourA: 0.92, ink: 0.8, rim: 0.75, delineate: 0, tint: [0.6, 0.26] },
   anatomy: { mode: "grad", contrast: 0.72, skin: ["#bf8d6e", "#8c5e46", "#e2b898"], contourW: 0.5, contourA: 0.7, ink: 0.6, rim: 0, delineate: 0.5, tint: [0.6, 0.26] },
 };
@@ -356,8 +356,8 @@ function render(ctx: Ctx, items: Item[], layer: LayerFn) {
 // Shoulder to elbow: the deltoid cap (widest just below the joint), the groove at its insertion, then the biceps in
 // front and the triceps behind peaking mid-arm, tapering to the elbow.
 const UPPER_ARM: Profile = [
-  [-0.14, 4.0, 4.4],
-  [-0.05, 6.0, 6.4],
+  [-0.05, 5.0, 5.2],
+  [0.02, 6.6, 6.8],
   [0.1, 7.4, 7.2],
   [0.22, 6.9, 6.8],
   [0.32, 5.6, 6.1],
@@ -389,12 +389,35 @@ const THIGH: Profile = [
 // Knee to ankle: the gastrocnemius bulge behind, the shin nearly straight in front, a slim ankle.
 const SHIN: Profile = [
   [0, 5.5, 5.6],
-  [0.08, 5.2, 7.5],
-  [0.24, 4.9, 9.8],
-  [0.4, 4.3, 8.2],
+  [0.08, 5.2, 7.0],
+  [0.26, 4.9, 8.7],
+  [0.42, 4.3, 7.6],
   [0.58, 3.6, 5.1],
   [0.76, 2.9, 3.3],
   [0.95, 2.6, 2.7],
+];
+
+// Front view, [t, outer, inner] (after Richer / Bammes): the vastus lateralis sweeps the outer thigh, the adductors fill
+// the inner thigh high up, the knee is narrow; the outer calf peaks higher than the fuller inner calf; the inner ankle
+// bone sits higher than the outer.
+const THIGH_F: Profile = [
+  [0, 9.6, 8.8],
+  [0.18, 10.6, 9.2],
+  [0.42, 10.0, 7.8],
+  [0.66, 8.4, 6.4],
+  [0.86, 6.4, 5.8],
+  [0.96, 5.8, 5.9],
+  [1, 5.6, 5.8],
+];
+const SHIN_F: Profile = [
+  [0, 5.5, 5.8],
+  [0.1, 5.7, 6.0],
+  [0.22, 6.6, 6.4],
+  [0.36, 6.0, 7.1],
+  [0.52, 4.6, 5.6],
+  [0.72, 3.3, 3.6],
+  [0.9, 2.9, 3.3],
+  [0.97, 3.2, 3.0],
 ];
 
 /** Shoulder to fist as one silhouette: deltoid, upper arm, forearm and the closed hand. */
@@ -410,23 +433,23 @@ function armGroup(ctx: Ctx, sh: Vec, el: Vec, hd: Vec, tone: Tone, hl: Highlight
   const g = fore.b;
   const fn: Vec = [fore.n[0] * sgn, fore.n[1] * sgn];
   const P = (x: number, y: number): Vec => [g[0] + fore.d[0] * x + fn[0] * y, g[1] + fore.d[1] * x + fn[1] * y];
-  const fist = [P(-6.8, 2.4), P(-3.2, 3.6), P(0.6, 4.0), P(3.6, 3.3), P(4.6, 1.0), P(4.4, -1.7), P(2.3, -3.3), P(-2.4, -3.1), P(-6.8, -2.3)];
+  const fist = [P(-7.0, 2.3), P(-4.2, 3.0), P(-1.2, 3.9), P(2.2, 4.1), P(4.2, 3.2), P(4.9, 1.2), P(4.7, -1.2), P(3.4, -3.0), P(0.4, -3.4), P(-3.4, -2.9), P(-7.0, -2.2)];
   const cFore = union(limbOutline(fore, prof(FOREARM), 3.2, 1.4), fist);
-  const cUpper = smooth(limbOutline(upper, ua, 3.2, 3.0));
+  const cUpper = smooth(limbOutline(upper, ua, 1.6, 3.0));
   const path = union(cFore, cUpper);
   const S = (pts: [number, number][]): [number, number][] => pts.map(([t, o]) => [t, o * sgn]);
   return {
     path,
     tone,
     halo,
-    haloSkip: [sh, 7.5],
+    haloSkip: [sh, 11.5],
     shade: () => {
       const I = tone.ink;
       // The upper arm, inside its own outline.
       ctx.save();
       ctx.clip(cUpper);
       curClip = cUpper;
-      form(ctx, upper, 6.2, tone);
+      form(ctx, upper, 5.6, tone, -0.3, 1.3);
       muscleS(ctx, upper, S([[0.3, 1.2], [0.36, 9], [0.8, 9], [0.97, 3], [0.9, 0.6], [0.5, 0.2]]), gk(hl.biceps, k));
       muscleS(ctx, upper, S([[0.27, -1.4], [0.36, -9], [0.84, -9], [0.97, -3], [0.9, -0.8], [0.5, -0.4]]), gk(hl.triceps, k));
       muscleS(ctx, upper, S([[-0.2, 0.6], [-0.1, 10], [0.2, 10], [0.37, 1.2], [0.2, -0.6]]), gk(hl.frontDelts, k));
@@ -444,13 +467,16 @@ function armGroup(ctx: Ctx, sh: Vec, el: Vec, hd: Vec, tone: Tone, hl: Highlight
       curClip = cFore;
       ctx.fillStyle = tone.base;
       ctx.fill(cFore);
-      form(ctx, fore, 4.4, tone, -0.1, 1.3);
+      form(ctx, fore, 5.6, tone, -0.3, 1.3);
       muscleS(ctx, fore, S([[-0.04, 0], [0.06, 8], [0.5, 8], [0.74, 0], [0.5, -8], [0.06, -8]]), gk(hl.forearms, k));
       line(ctx, fore, S([[0.03, 2.4], [0.3, 0.9], [0.58, 0.4]]), I * 0.6, 0.3);
-      lineW(ctx, [P(0.6, 3.8), P(3.3, 2.6), P(4.1, 0.4)], I * 0.8, 0.28);
-      lineW(ctx, [P(-3.2, 3.0), P(-3.4, -2.6)], I * 0.45, 0.26);
-      lineW(ctx, [P(1.4, 3.9), P(1.9, -3.2)], I * 0.4, 0.22);
-      lineW(ctx, [P(2.9, 3.4), P(3.3, -2.6)], I * 0.35, 0.22);
+      // The hand: the wrist crease, the knuckle row, three lines between four curled fingers, and the thumb wrapped
+      // over the handle on the near side.
+      lineW(ctx, [P(-6.2, 2.2), P(-6.6, 0), P(-6.2, -2.1)], I * 0.5, 0.24);
+      lineW(ctx, [P(1.9, 3.9), P(3.9, 2.9), P(4.6, 1.0), P(4.4, -1.2)], I * 0.75, 0.26);
+      for (const y of [2.0, 0.3, -1.4]) lineW(ctx, [P(0.2, y * 0.92), P(4.5, y)], I * 0.6, 0.2);
+      plane(ctx, [P(-4.6, 0.6), P(-2.6, 2.6), P(0.6, 3.0), P(2.4, 2.0), P(2.2, 0.6), P(-0.6, 0.2)], toHex(mix(tone.base, tone.light, 0.28)), 1);
+      lineW(ctx, [P(-4.4, 0.5), P(-1.0, 0.1), P(2.2, 0.5), P(2.6, 1.8), P(1.0, 2.8)], I * 0.75, 0.24);
       flush(ctx);
       ctx.restore();
       curClip = null;
@@ -468,8 +494,8 @@ function legParts(ctx: Ctx, hip: Vec, knee: Vec, ankle: Vec, footRot: number, sk
   const sgn = flipFront ? -1 : 1;
   const prof = (p: Profile): Profile => (flipFront ? p.map(([t, f, b]) => [t, b, f]) : p);
   const S = (pts: [number, number][]): [number, number][] => pts.map(([t, o]) => [t, o * sgn]);
-  const cShin = smooth(limbOutline(shin, prof(SHIN), 3.8, 2));
-  const cThigh = smooth(limbOutline(thigh, prof(THIGH), 8, 3.6));
+  const cShin = smooth(limbOutline(shin, prof(front ? SHIN_F : SHIN), 3.8, 2));
+  const cThigh = smooth(limbOutline(thigh, prof(front ? THIGH_F : THIGH), 8, 3.6));
   const bend = clamp(1 - (dot(thigh.d, shin.d) + 1) / 1.6, 0, 1);
   const skin: Group = {
     path: union(cShin, cThigh),
@@ -480,7 +506,7 @@ function legParts(ctx: Ctx, hip: Vec, knee: Vec, ankle: Vec, footRot: number, sk
       ctx.save();
       ctx.clip(cThigh);
       curClip = cThigh;
-      form(ctx, thigh, 10.4, skinT);
+      form(ctx, thigh, 9.6, skinT, -0.2, 1.3);
       muscleS(ctx, thigh, S([[0.0, 2.6], [0.1, 15], [0.78, 15], [0.99, 7], [0.95, 1.4], [0.5, -0.4], [0.14, 0.4]]), gk(hl.quads, k));
       muscleS(ctx, thigh, S([[0.06, -1.8], [0.5, -2.2], [0.9, -1.6], [0.97, -8], [0.5, -16], [0.08, -16]]), gk(hl.hamstrings, k));
       muscleS(ctx, thigh, front ? S([[0.02, -3], [0.5, -4], [0.56, -14], [0.02, -14]]) : S([[0.03, 1.8], [0.44, 0.9], [0.5, -1.4], [0.03, -2]]), gk(hl.adductors, k * 0.85));
@@ -494,7 +520,7 @@ function legParts(ctx: Ctx, hip: Vec, knee: Vec, ankle: Vec, footRot: number, sk
       curClip = cShin;
       ctx.fillStyle = skinT.base;
       ctx.fill(cShin);
-      form(ctx, shin, 6, skinT, -0.15, 1.1);
+      form(ctx, shin, 9.6, skinT, -0.3, 1.1);
       muscleS(ctx, shin, S([[0.0, -1.4], [0.06, -13], [0.44, -13], [0.68, -3], [0.5, -0.9], [0.2, -0.6]]), gk(hl.calves, k));
       muscleS(ctx, shin, S([[0.03, 0.9], [0.08, 8], [0.6, 8], [0.78, 1.2], [0.4, 0.5]]), gk(hl.shins, k));
       lineW(ctx, [at(shin, -0.04, 4.6 * sgn), at(shin, 0.03, 5.4 * sgn), at(shin, 0.09, 4.2 * sgn)], I * 0.6, 0.3);
@@ -825,8 +851,8 @@ function torsoSideGroup(ctx: Ctx, f: Frame, hl: Highlight): Group {
       // Ink: the pectoral's lower border and its edge at the armpit, the abdominal tendons and the line beside them,
       // the serratus, the latissimus' front edge, the trapezius' edge up the neck, the sternomastoid.
       lineW(ctx, [A(th * 0.44, 16.4), A(th * 0.35, 12), A(th * 0.4, 6.4), A(th * 0.52, 3.6)], I);
-      for (const y of [th * 0.185, th * 0.035, -9.4]) lineW(ctx, [A(y, 7), A(y, 12.4)], I * 0.7, 0.3);
-      lineW(ctx, [A(th * 0.33, 6.6), B(-8, 5.6), B(-21, 6.4)], I * 0.7, 0.3);
+      for (const [y, x1] of [[th * 0.2, 12.2], [th * 0.05, 11.6], [-8.6, 10.8]] as const) lineW(ctx, [A(y - 0.6, 7.6), A(y + 0.5, (7.6 + x1) / 2), A(y - 0.2, x1)], I * 0.5, 0.26);
+      lineW(ctx, [A(th * 0.33, 7.0), A(th * 0.12, 6.4), B(-8, 6.0), B(-20, 7.0)], I * 0.45, 0.26);
       for (const y of [th * 0.3, th * 0.2, th * 0.1]) lineW(ctx, [A(y, 2.2), A(y - 1.6, 5.2)], I * 0.6, 0.3);
       lineW(ctx, [A(th * 0.64, -1.4), A(th * 0.32, -4), B(-9, -5.6), B(-18, -7.6)], I * 0.75);
       lineW(ctx, [A(th * 0.9, -5.6), add(nm, fa, -3.2), add(top, fa, -1.6)], I * 0.55, 0.3);
@@ -911,11 +937,13 @@ function drawFront(ctx: Ctx, f: Frame, layer: LayerFn, hl: Highlight) {
     [add(p.pelvis, u1, -3), 14.2, r1],
     [add(p.pelvis, u1, 7), 14.8, r1],
     [add(p.mid, u1, -6), 14.4, r1],
-    [add(p.mid, u2, th * 0.2), 17.0, r2],
-    [add(p.mid, u2, th * 0.55), 20.0, r2],
-    [add(p.neckBase, u2, -6 * fs), 22.2, r2],
-    [add(p.neckBase, u2, -1), 15.4, r2],
-    [add(p.neckBase, u2, 1.6), 6.6, r2],
+    [add(p.mid, u2, th * 0.2), 16.2, r2],
+    [add(p.mid, u2, th * 0.55), 18.4, r2],
+    [add(p.neckBase, u2, -9 * fs), 18.8, r2],
+    [add(p.neckBase, u2, -4.4 * fs), 21.4, r2],
+    [add(p.neckBase, u2, -1.6 * fs), 17.4, r2],
+    [add(p.neckBase, u2, 0.2), 11.4, r2],
+    [add(p.neckBase, u2, 2.2), 6.4, r2],
   ];
   const ha = f.seg.head;
   const nb = add(p.neckBase, up(ha), -2);
@@ -951,13 +979,20 @@ function drawFront(ctx: Ctx, f: Frame, layer: LayerFn, hl: Highlight) {
       for (const k of [1, -1]) {
         lineW(ctx, [A(th - 2.4 * fs, k * 2.4), A(th - 1.6 * fs, k * 9), A(th - 0.6 * fs, k * 15.6)], I * 0.8);
         lineW(ctx, [A(th * 0.44, k * 1.4), A(th * 0.36, k * 9.6), A(th * 0.46, k * 16.6), A(th * 0.6, k * 19)], I);
-        lineW(ctx, [A(th * 0.33, k * 7.2), B(-lum * 0.4, k * 7), B(-lum * 0.84, k * 5.4)], I * 0.7, 0.3);
-        for (const y of [th * 0.185, th * 0.035, -lum * 0.38]) lineW(ctx, [A(y, k * 1), A(y, k * 6.8)], I * 0.65, 0.3);
+        // The costal arch from the sternum's tip out over the ribs; the rectus' outer border, fading below the navel.
+        lineW(ctx, [A(th * 0.37, k * 1.2), A(th * 0.3, k * 5.4), A(th * 0.16, k * 9.6), A(th * 0.02, k * 12)], I * 0.5, 0.28);
+        lineW(ctx, [A(th * 0.22, k * 7.4), B(-lum * 0.36, k * 7.2), B(-lum * 0.7, k * 5.6)], I * 0.38, 0.26);
+        // Three tendinous intersections: arched, never level with their partner across the midline, the lowest faint.
+        const dy = k > 0 ? 0.9 : -0.5;
+        for (const [y, a] of [[th * 0.2, 0.55], [th * 0.045, 0.5], [-lum * 0.34, 0.34]] as const)
+          lineW(ctx, [A(y + dy - 0.5, k * 0.9), A(y + dy + 0.7, k * 3.4), A(y + dy + 0.2, k * 5.6), A(y + dy - 0.9, k * 6.9)], I * a, 0.26);
         for (const y of [th * 0.3, th * 0.2, th * 0.1]) lineW(ctx, [A(y, k * 13.4), A(y - 1.6, k * 10)], I * 0.6, 0.3);
         lineW(ctx, [add(nt, r2, k * 3.6), add(nb, r2, k * 1.6)], I * 0.55, 0.3);
       }
       lineW(ctx, [A(th * 0.82, 0), A(th * 0.4, 0)], I * 0.75, 0.3);
-      lineW(ctx, [A(th * 0.33, 0), B(-lum * 0.62, 0)], I * 0.7, 0.3);
+      lineW(ctx, [A(th * 0.33, 0), B(-lum * 0.3, 0.2), B(-lum * 0.62, 0)], I * 0.45, 0.26);
+      // The V of the lower abdomen into the hips (inguinal lines).
+      for (const k of [1, -1]) lineW(ctx, [B(-lum * 0.62, k * 12.6), B(-lum * 0.84, k * 8), B(-lum * 1.0, k * 4.4)], I * 0.4, 0.26);
       lineW(ctx, [B(-lum * 0.7, -0.5), B(-lum * 0.74, 0.5)], I, 0.4);
     },
   };
@@ -1062,7 +1097,10 @@ function drawFront(ctx: Ctx, f: Frame, layer: LayerFn, hl: Highlight) {
     },
   };
   const legItems: Item[] = [legs[0]!.skin, legs[1]!.skin, legs[0]!.shoe, legs[1]!.shoe];
-  const arms = (["L", "R"] as const).map((s) => armGroup(ctx, p[`shoulder${s}`], p[`elbow${s}`], p[`hand${s}`], SKIN_NEAR, hl, 1, 0.3, s === "R"));
+  // The shoulder joint sits outside the ribcage: the upper arm is drawn a little further out than the rig's shoulder
+  // point (the hand stays exactly where the rig puts it, on the equipment).
+  const out = (q: Vec, s: "L" | "R", d: number): Vec => add(q, r2, Math.sign(dot([p[`shoulder${s}`][0] - p.neckBase[0], p[`shoulder${s}`][1] - p.neckBase[1]], r2)) * d);
+  const arms = (["L", "R"] as const).map((s) => armGroup(ctx, out(p[`shoulder${s}`], s, 3.6), out(p[`elbow${s}`], s, 2.4), p[`hand${s}`], SKIN_NEAR, hl, 1, 0.3, s === "R"));
   // Opt-in (MotionDef.legsInFront): a body seen from above with its thighs raised toward the viewer has its legs, and the
   // shorts over them, in front of the torso.
   const items: Item[] = f.legsInFront
