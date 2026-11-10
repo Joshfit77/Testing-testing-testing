@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>3D Athlete Prototype</title>
+<style>
+  :root { --bg:#0a0908; --panel:#14120f; --line:#2a251c; --gold:#e2b860; --fg:#f2ede2; --mute:#9a917f; color-scheme: dark; }
+  html,body { height:100%; margin:0; background:var(--bg); color:var(--fg); font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif; overflow:hidden; }
+  #c { position:fixed; inset:0; width:100%; height:100%; display:block; touch-action:none; }
+  .bar { position:fixed; left:0; right:0; display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:center; padding:10px max(12px, env(safe-area-inset-left,0px)); }
+  #top { top:env(safe-area-inset-top,0px); } #bottom { bottom:env(safe-area-inset-bottom,0px); background:linear-gradient(transparent, rgba(10,9,8,.92) 40%); padding-top:26px; }
+  .grp { display:flex; border:1px solid var(--line); border-radius:999px; overflow:hidden; background:rgba(20,18,15,.82); }
+  button { appearance:none; border:0; background:transparent; color:var(--fg); font:inherit; padding:9px 14px; min-height:40px; cursor:pointer; }
+  button[aria-pressed="true"] { background:var(--gold); color:#14110a; font-weight:600; }
+  button:focus-visible { outline:2px solid var(--gold); outline-offset:-2px; }
+  #tag { position:fixed; left:50%; transform:translateX(-50%); top:calc(env(safe-area-inset-top,0px) + 58px); color:var(--mute); font-size:12px; letter-spacing:.14em; text-transform:uppercase; text-align:center; pointer-events:none; }
+  #tag b { color:var(--gold); font-weight:600; }
+  #key { color:var(--mute); font-size:12px; width:100%; text-align:center; min-height:18px; }
+  #key i { display:inline-block; width:10px; height:10px; border-radius:50%; margin:0 5px 0 12px; vertical-align:-1px; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="top" class="bar">
+  <div class="grp" id="ex" role="group" aria-label="Exercise">
+    <button data-ex="stand">Character</button><button data-ex="squat">Back squat</button><button data-ex="bench">Bench press</button><button data-ex="curl">Dumbbell curl</button>
+  </div>
+</div>
+<div id="tag">Experimental prototype · <b>not part of the app</b></div>
+<div id="bottom" class="bar">
+  <div id="key"></div>
+  <div class="grp"><button id="play" aria-label="Play or pause">Pause</button></div>
+  <div class="grp" id="speed" role="group" aria-label="Speed"><button data-s="0.25">¼×</button><button data-s="0.5">½×</button><button data-s="1">1×</button></div>
+  <div class="grp" id="view" role="group" aria-label="View"><button data-v="front">Front</button><button data-v="side">Side</button><button data-v="rear">Rear</button><button data-v="spin">Turn</button></div>
+  <div class="grp"><button id="hl" aria-pressed="true">Muscles</button></div>
+</div>
+<script type="module" src="./main.js"></script>
+</body>
+</html>

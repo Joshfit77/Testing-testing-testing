@@ -1,0 +1,9 @@
+{
+  "name": "ngf-3d-athlete-prototype",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Standalone experiment: a 3D exercise demonstration viewer. Not part of the Narrow Gate Fitness app.",
+  "type": "module",
+  "scripts": { "build": "node build.mjs", "serve": "python3 -m http.server 4173 --directory public" },
+  "devDependencies": { "three": "0.160.0" }
+}
