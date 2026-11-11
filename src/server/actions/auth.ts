@@ -36,6 +36,32 @@ async function perAddress(prefix: string, limit: number, windowMs: number): Prom
   return ip === "unknown" ? [] : [{ key: `${prefix}:ip:${hashKey(ip)}`, limit, windowMs }];
 }
 
+/**
+ * Limits for one email address. The tight limit counts the email together with the client's address, so someone
+ * elsewhere can't use up a member's attempts and lock them out of signing in or resetting a password. A much higher
+ * ceiling on the email alone still bounds an attack spread over many addresses; it is checked last, so attempts the
+ * tight limit already refused never count towards it. When the platform didn't pass the client's address the email
+ * is all there is to count, so the tight limit stays on it. (The limiter counts every attempt as it is checked and
+ * has no way to take one back, so successful sign-ins count too.)
+ */
+async function perEmail(prefix: string, email: string, tight: { limit: number; windowMs: number }, ceiling: { limit: number; windowMs: number }): Promise<Check[]> {
+  const ip = await clientIp();
+  const key = `${prefix}:${hashKey(email)}`;
+  if (ip === "unknown") return [{ key, ...tight }];
+  return [
+    { key: `${key}:ip:${hashKey(ip)}`, ...tight },
+    { key, ...ceiling },
+  ];
+}
+const SIGNIN_EMAIL_LIMITS = [
+  { limit: 10, windowMs: 15 * MINUTE },
+  { limit: 100, windowMs: 15 * MINUTE },
+] as const;
+const EMAIL_SEND_LIMITS = [
+  { limit: 3, windowMs: 15 * MINUTE },
+  { limit: 30, windowMs: 60 * MINUTE },
+] as const;
+
 export async function signUpAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = signUpSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return actionInvalid(parsed.error);
@@ -75,7 +101,7 @@ export async function signInAction(_prev: ActionState, formData: FormData): Prom
   if (
     await authLimited([
       ...(await perAddress("signin", 20, 5 * MINUTE)),
-      { key: `signin:email:${hashKey(parsed.data.email)}`, limit: 10, windowMs: 15 * MINUTE },
+      ...(await perEmail("signin:email", parsed.data.email, ...SIGNIN_EMAIL_LIMITS)),
     ])
   )
     return actionError(TOO_MANY);
@@ -105,7 +131,7 @@ export async function resendConfirmationAction(_prev: ActionState, formData: For
   if (
     await authLimited([
       ...(await perAddress("email", 5, 15 * MINUTE)),
-      { key: `email:addr:${hashKey(email.data)}`, limit: 3, windowMs: 15 * MINUTE },
+      ...(await perEmail("email:addr", email.data, ...EMAIL_SEND_LIMITS)),
     ])
   )
     return actionError(TOO_MANY_EMAILS);
@@ -132,7 +158,7 @@ export async function requestPasswordResetAction(_prev: ActionState, formData: F
   if (
     await authLimited([
       ...(await perAddress("email", 5, 15 * MINUTE)),
-      { key: `email:addr:${hashKey(parsed.data.email)}`, limit: 3, windowMs: 15 * MINUTE },
+      ...(await perEmail("email:addr", parsed.data.email, ...EMAIL_SEND_LIMITS)),
     ])
   )
     return actionError(TOO_MANY_EMAILS);

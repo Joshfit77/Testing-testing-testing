@@ -1,4 +1,4 @@
-import { aiAllowance, APPROVED_PRO_PRICE_CENTS, planFromEntitlement, subscriptionToShow, PUBLIC_PLAN_ORDER, PURCHASABLE_PLANS, canAccessTier, effectivePlanFromSubscription, formatPrice, getPlans, hasFeature, legacyTermsApply, yearlySavingsPercent } from "@/lib/domain/plans";
+import { aiAllowance, APPROVED_PRO_PRICE_CENTS, planFromEntitlement, subscriptionToShow, PUBLIC_PLAN_ORDER, PURCHASABLE_PLANS, canAccessTier, effectivePlanFromSubscription, entitlementFromSubscriptions, periodStartFromEnd, subscriptionAccessEnd, formatPrice, getPlans, hasFeature, legacyTermsApply, yearlySavingsPercent } from "@/lib/domain/plans";
 
 describe("plans & entitlements", () => {
   it("gates features: Free foundation, Pro All Access everything, legacy Plus keeps what it had", () => {
@@ -117,6 +117,50 @@ describe("plans & entitlements", () => {
     // A refunded or disputed current period ends access, whatever Stripe's status says.
     expect(effectivePlanFromSubscription({ plan: "pro", status: "active", current_period_end: future, access_revoked_at: "2026-10-15T00:00:00Z" }, now)).toBe("free");
     expect(effectivePlanFromSubscription({ plan: "pro", status: "active", current_period_end: future, access_revoked_at: null }, now)).toBe("pro");
+  });
+});
+
+describe("a failed renewal (past_due) keeps access for a 14-day grace period only", () => {
+  // The renewal was due on 1 November; Stripe has already moved the period end on to 1 December.
+  const periodEnd = "2026-12-01T00:00:00Z";
+  const started = periodStartFromEnd(periodEnd, "month");
+  const sub = (status: "active" | "past_due") => ({ plan: "pro" as const, status, current_period_end: periodEnd, period_started_at: started });
+
+  it("works out when the unpaid period began from its end and the billing interval", () => {
+    expect(started).toBe("2026-11-01T00:00:00.000Z");
+    expect(periodStartFromEnd("2027-11-01T00:00:00Z", "year")).toBe("2026-11-01T00:00:00.000Z");
+    // Anchored on the 31st: the period before one ending 31 March began on February's last day.
+    expect(periodStartFromEnd("2027-03-31T10:00:00Z", "month")).toBe("2027-02-28T10:00:00.000Z");
+    expect(periodStartFromEnd(null, "month")).toBeNull();
+  });
+
+  it("active: access runs to the period end", () => {
+    expect(effectivePlanFromSubscription(sub("active"), new Date("2026-11-25T00:00:00Z"))).toBe("pro");
+    expect(subscriptionAccessEnd(sub("active"))).toBe(periodEnd);
+  });
+
+  it("past_due within the grace period: still Pro", () => {
+    expect(effectivePlanFromSubscription(sub("past_due"), new Date("2026-11-02T00:00:00Z"))).toBe("pro");
+    expect(effectivePlanFromSubscription(sub("past_due"), new Date("2026-11-14T23:59:59Z"))).toBe("pro");
+  });
+
+  it("past_due beyond the grace period: Free, although the period end lies ahead", () => {
+    expect(effectivePlanFromSubscription(sub("past_due"), new Date("2026-11-15T00:00:01Z"))).toBe("free");
+    expect(effectivePlanFromSubscription(sub("past_due"), new Date("2026-11-30T00:00:00Z"))).toBe("free");
+    // A yearly subscription is capped the same way, not left on Pro for the unpaid year.
+    const yearly = { plan: "pro" as const, status: "past_due" as const, current_period_end: "2027-11-01T00:00:00Z", period_started_at: periodStartFromEnd("2027-11-01T00:00:00Z", "year") };
+    expect(effectivePlanFromSubscription(yearly, new Date("2026-11-10T00:00:00Z"))).toBe("pro");
+    expect(effectivePlanFromSubscription(yearly, new Date("2026-12-01T00:00:00Z"))).toBe("free");
+  });
+
+  it("the entitlement expires when the grace period does, never later than the period end", () => {
+    expect(entitlementFromSubscriptions([sub("past_due")], new Date("2026-11-02T00:00:00Z"))).toMatchObject({ plan: "pro", validUntil: "2026-11-15T00:00:00.000Z" });
+    expect(entitlementFromSubscriptions([sub("past_due")], new Date("2026-11-20T00:00:00Z")).plan).toBe("free");
+    expect(subscriptionAccessEnd({ status: "past_due", current_period_end: "2026-11-05T00:00:00Z", period_started_at: started })).toBe("2026-11-05T00:00:00Z");
+  });
+
+  it("without a period start (App Store / Google Play rows carry the store's own grace period) nothing changes", () => {
+    expect(effectivePlanFromSubscription({ plan: "pro", status: "past_due", current_period_end: periodEnd }, new Date("2026-11-30T00:00:00Z"))).toBe("pro");
   });
 });
 

@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Flag, Loader2, LocateFixed, Pause, PenLine, Play, Save, SignalZero, Trash2, Volume2, VolumeX } from "lucide-react";
-import { APPROVED_PRO_PRICE_CENTS } from "@/lib/domain/plans";
 import { FIRST_FIX_ACCURACY_M, type GpsDiagnostics, type GpsFix, type GpsHint } from "@/lib/domain/gps-track";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -55,10 +54,6 @@ const HINT_TEXT: Record<GpsHint, string> = {
   slow_updates: "Location updates are arriving slowly (more than 5 seconds apart). Keep this screen open and turn off battery or low-power saving for the browser.",
   many_outliers: "Several readings jumped away from your route and were ignored (tall buildings or trees reflect GPS signals).",
 };
-
-const usd = (cents: number) => `$${(cents / 100).toFixed(2)}`;
-/** The approved Pro All Access prices: "$19.99/month or $149.99/year". */
-const PRO_PRICE_LINE = `${usd(APPROVED_PRO_PRICE_CENTS.month)}/month or ${usd(APPROVED_PRO_PRICE_CENTS.year)}/year`;
 
 const fmtM = (m: number, unit: DistanceUnit) => (unit === "mi" ? `${Math.round(m * 3.28084)} ft` : `${Math.round(m)} m`);
 
@@ -112,6 +107,7 @@ export function GpsRecorder({
   initialKind,
   guided,
   canRecord = true,
+  proPriceLine = null,
 }: {
   userId: string;
   units: "metric" | "imperial";
@@ -119,6 +115,8 @@ export function GpsRecorder({
   guided: GuidedSession | null;
   /** Live GPS recording is part of Pro All Access. Without it, an unsaved recording on this device can still be discarded. */
   canRecord?: boolean;
+  /** The configured Pro All Access prices for the upsell, from the server; null in the native app (no web prices there). */
+  proPriceLine?: string | null;
 }) {
   const router = useRouter();
   const unit: DistanceUnit = units === "imperial" ? "mi" : "km";
@@ -488,8 +486,10 @@ export function GpsRecorder({
             </Button>
             <div className="space-y-2 rounded-2xl border border-border bg-card p-4" data-testid="gps-locked">
               <p className="text-sm">
-                <span className="font-semibold">Live GPS recording is included with Pro All Access</span>{" "}
-                <span className="text-muted-foreground">({PRO_PRICE_LINE}): route map, distance, pace and splits. Runs and walks you recorded before stay yours.</span>
+                <span className="font-semibold">Live GPS recording is included with Pro All Access</span>
+                <span className="text-muted-foreground">
+                  {proPriceLine ? ` (${proPriceLine})` : ""}: route map, distance, pace and splits. Runs and walks you recorded before stay yours.
+                </span>
               </p>
               <Button asChild variant="outline" size="sm">
                 <Link href="/profile/billing">See Pro All Access</Link>

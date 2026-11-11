@@ -117,8 +117,18 @@ describe("permission and signal states", () => {
     expect(screen.queryByText(/Waiting for a good GPS fix/)).toBeNull();
   });
 
+  it("the Pro notice shows the price line the server passes, and no price at all without one (the native app)", async () => {
+    const web = render(<GpsRecorder {...props} canRecord={false} proPriceLine="$24.99/month" />);
+    expect(await screen.findByTestId("gps-locked")).toHaveTextContent("Live GPS recording is included with Pro All Access ($24.99/month): route map");
+    web.unmount();
+    render(<GpsRecorder {...props} canRecord={false} proPriceLine={null} />);
+    const locked = await screen.findByTestId("gps-locked");
+    expect(locked).toHaveTextContent("Live GPS recording is included with Pro All Access: route map");
+    expect(locked.textContent).not.toMatch(/\$|\/month|\/year/);
+  });
+
   it("the Free plan sees no Start button and no location request, only the Pro notice and the manual-entry link", async () => {
-    render(<GpsRecorder {...props} canRecord={false} />);
+    render(<GpsRecorder {...props} canRecord={false} proPriceLine="$19.99/month or $149.99/year" />);
     expect(await screen.findByTestId("gps-locked")).toHaveTextContent(/Pro All Access/);
     expect(screen.queryByTestId("gps-start")).toBeNull();
     expect(screen.getByRole("link", { name: "See Pro All Access" })).toHaveAttribute("href", "/profile/billing");

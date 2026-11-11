@@ -42,6 +42,8 @@ export function BibleAsk({ initialThread, initialMessages, remaining }: { initia
       if (!r.ok) {
         setMessages((m) => m.slice(0, -1));
         setQuestion(q);
+        // Sharing was turned off (or the helper switched off) since this page loaded: show the page's own notice.
+        if (r.code === "consent_required" || r.code === "unavailable") router.refresh();
         return toast.error(r.error);
       }
       setLeft((n) => Math.max(0, n - 1));

@@ -3,8 +3,9 @@ import { PageHeader } from "@/components/common/page-header";
 import { GpsRecorder, type GuidedSession } from "@/components/run/gps-recorder";
 import { isRunDay, type RunPrescription } from "@/lib/domain/run-session";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { hasFeature } from "@/lib/domain/plans";
+import { formatPrice, getPlans, hasFeature } from "@/lib/domain/plans";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
+import { getNativePlatform } from "@/server/native";
 import { DemoNote } from "@/components/demo/demo-note";
 
 export const metadata = { title: "Record" };
@@ -39,13 +40,17 @@ export default async function RecordPage({ searchParams }: { searchParams: Promi
   const sp = await searchParams;
   const { user, profile } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
-  const [guided, plan] = await Promise.all([sp.day && sp.up ? loadGuided(supabase, user.id, sp.up, sp.day) : null, getUserPlan(user.id)]);
+  const [guided, plan, native] = await Promise.all([sp.day && sp.up ? loadGuided(supabase, user.id, sp.up, sp.day) : null, getUserPlan(user.id), getNativePlatform()]);
+  // The configured prices, as on the AI Coach and membership screens; never inside the native app (purchases there go
+  // through the App Store or Google Play, which set and show their own prices).
+  const pro = getPlans().pro;
+  const proPriceLine = native ? null : `${formatPrice(pro.priceCents)}/month${pro.yearlyPriceCents ? ` or ${formatPrice(pro.yearlyPriceCents)}/year` : ""}`;
   return (
     <div className="mx-auto max-w-xl space-y-5">
       <BackLink href="/run">Run</BackLink>
       <PageHeader eyebrow="Run" title={guided ? "Guided run" : "Record outdoors"} description="Distance, pace, splits and your route from your phone's GPS." />
       <DemoNote topic="gps" />
-      <GpsRecorder userId={user.id} units={profile.unit_system} initialKind={sp.kind === "walk" ? "walk" : "run"} guided={guided} canRecord={hasFeature(plan, "live_gps")} />
+      <GpsRecorder userId={user.id} units={profile.unit_system} initialKind={sp.kind === "walk" ? "walk" : "run"} guided={guided} canRecord={hasFeature(plan, "live_gps")} proPriceLine={proPriceLine} />
     </div>
   );
 }

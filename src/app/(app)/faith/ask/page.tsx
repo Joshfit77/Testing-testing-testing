@@ -1,20 +1,24 @@
 import { randomUUID } from "node:crypto";
+import Link from "next/link";
 import { Info } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { DemoNote } from "@/components/demo/demo-note";
 import { BackLink } from "@/components/platform/back-link";
 import { BibleAsk, type AskMessage } from "@/components/faith/bible-ask";
+import { AiConsentCard } from "@/components/coach/ai-consent-card";
+import { BIBLE_AI_DISABLED } from "@/lib/bible/ai";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { passageParts, passageText } from "@/server/bible/text";
 import { parseReference } from "@/lib/bible/reference";
+import { isFlagEnabled } from "@/server/flags";
 import { bibleAiRemainingToday } from "@/server/services/bible-ai";
 
 export const metadata = { title: "Ask about the Bible" };
 
 /** The Bible study helper: separate from the fitness coach, free within daily limits. */
 export default async function AskPage() {
-  const { user } = await requireOnboardedUser();
+  const { user, profile } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
   const { data: latest } = await supabase.from("bible_ai_messages").select("thread_id").eq("user_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle();
   const thread = (latest?.thread_id as string | undefined) ?? randomUUID();
@@ -27,7 +31,9 @@ export default async function AskPage() {
       return { reference, text: (ref && passageText(ref)) ?? "", parts: (ref && passageParts(ref)) ?? undefined };
     }),
   }));
-  const remaining = await bibleAiRemainingToday(user.id, await getUserPlan(user.id));
+  const [remaining, aiOn] = await Promise.all([bibleAiRemainingToday(user.id, await getUserPlan(user.id)), isFlagEnabled("ai_coach")]);
+  // The same two conditions the server enforces before anything is sent (bibleAiBlocked in src/server/services/bible-ai.ts).
+  const consented = Boolean(profile.ai_data_consent_at);
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
@@ -40,7 +46,26 @@ export default async function AskPage() {
           This is an AI, not a pastor, and it can be wrong: read the passages for yourself, and bring big questions to your church. Your question is sent to our AI provider to be answered. Your prayer journal and notes are never shared with it.
         </span>
       </p>
-      <BibleAsk initialThread={thread} initialMessages={messages} remaining={remaining} />
+      {!aiOn ? (
+        <p role="status" className="rounded-xl border border-border bg-card p-4 text-sm" data-testid="bible-ask-unavailable">
+          {BIBLE_AI_DISABLED}
+        </p>
+      ) : !consented ? (
+        <div className="space-y-3" data-testid="bible-ask-consent">
+          <p className="rounded-xl border border-border bg-card p-4 text-sm">
+            <span className="font-semibold">Allow AI data sharing to ask a question.</span> The helper sends your question to our AI provider, so it waits for your
+            permission. It is the same AI data-sharing setting the AI Coach uses, described below; the Bible study helper itself only sends your questions and the
+            passages it looks up. You can turn it off any time in{" "}
+            <Link href="/profile" className="text-gold-highlight underline-offset-4 hover:underline">
+              Profile &amp; Settings → Privacy &amp; data
+            </Link>
+            .
+          </p>
+          <AiConsentCard />
+        </div>
+      ) : (
+        <BibleAsk initialThread={thread} initialMessages={messages} remaining={remaining} />
+      )}
     </div>
   );
 }

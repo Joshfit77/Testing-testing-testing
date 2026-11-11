@@ -95,6 +95,22 @@ describe("AI routes read the plan through the authenticated session", () => {
     expect(coachTurn.mock.calls[0]![0]).toMatchObject({ userId: "u-pro", plan: "pro", supabase: session });
   });
 
+  it("every coach turn is given a deadline inside the route's time limit, streamed or not", async () => {
+    const { maxDuration } = await import("@/app/api/ai/chat/route");
+    const { COACH_TURN_DEADLINE_MS, CHAT_REQUEST_OPTIONS } = await import("@/lib/coach/prompt");
+    expect(COACH_TURN_DEADLINE_MS).toBeLessThan(maxDuration * 1000);
+    expect(CHAT_REQUEST_OPTIONS.maxRetries).toBe(1);
+    const session = stubClient({ user_entitlements: { plan: "pro", valid_until: null } });
+    authenticateRequest.mockResolvedValue({ user: { id: "u-pro" }, supabase: session, via: "bearer" });
+    const timeout = vi.spyOn(AbortSignal, "timeout");
+    await chat(chatRequest({ authorization: "Bearer token" }));
+    await chat(chatRequest({ authorization: "Bearer token", accept: "application/x-ndjson" }));
+    expect(timeout).toHaveBeenCalledTimes(2);
+    expect(timeout).toHaveBeenCalledWith(COACH_TURN_DEADLINE_MS);
+    for (const call of coachTurn.mock.calls) expect(call[0].signal).toBeInstanceOf(AbortSignal);
+    timeout.mockRestore();
+  });
+
   it("a cookie session is read the same way, and a lapsed entitlement counts as Free", async () => {
     const session = stubClient({ user_entitlements: { plan: "pro", valid_until: "2026-01-01T00:00:00Z" } });
     authenticateRequest.mockResolvedValue({ user: { id: "u-lapsed" }, supabase: session, via: "cookie" });

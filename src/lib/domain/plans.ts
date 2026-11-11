@@ -204,20 +204,66 @@ export type SubscriptionStatus =
   | "incomplete_expired"
   | "paused";
 
+/** How long access continues after a renewal payment fails (`past_due`), counted from the start of the unpaid period. */
+export const PAST_DUE_GRACE_DAYS = 14;
+
+/**
+ * When the billing period that ends at `periodEnd` began: one interval earlier, on the same day of the month (or
+ * the month's last day when it has no such day, as Stripe anchors renewals).
+ */
+export function periodStartFromEnd(periodEnd: string | null, interval: "month" | "year"): string | null {
+  if (!periodEnd) return null;
+  const end = new Date(periodEnd);
+  if (Number.isNaN(end.getTime())) return null;
+  const start = new Date(end);
+  start.setUTCDate(1);
+  start.setUTCMonth(start.getUTCMonth() - (interval === "year" ? 12 : 1));
+  const lastDay = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0)).getUTCDate();
+  start.setUTCDate(Math.min(end.getUTCDate(), lastDay));
+  return start.toISOString();
+}
+
+interface SubscriptionAccess {
+  plan: Exclude<Plan, "free">;
+  status: SubscriptionStatus;
+  current_period_end: string | null;
+  access_revoked_at?: string | null;
+  /**
+   * When the current billing period began, for a Stripe subscription whose renewal failed. Stripe moves
+   * `current_period_end` on to the end of the new, unpaid period as soon as the renewal is due, so on its own it
+   * would keep a `past_due` member on their plan for a whole further month or year. The stored row has no "payment
+   * failed at" time (and its `updated_at` moves with every webhook), so the start of the unpaid period, which is
+   * when the failed renewal was due, is derived from the period end and the price's interval (billing.ts). Store
+   * subscriptions leave this unset: their period end already is the store's own grace period (revenuecat.ts).
+   */
+  period_started_at?: string | null;
+}
+
+/**
+ * When a subscription's access ends (null = no end): its period end, or for a failed renewal the end of the
+ * PAST_DUE_GRACE_DAYS grace period when that comes first.
+ */
+export function subscriptionAccessEnd(sub: Pick<SubscriptionAccess, "status" | "current_period_end" | "period_started_at">): string | null {
+  if (sub.status !== "past_due" || !sub.period_started_at) return sub.current_period_end;
+  const graceEnd = new Date(sub.period_started_at).getTime() + PAST_DUE_GRACE_DAYS * 86_400_000;
+  if (Number.isNaN(graceEnd)) return sub.current_period_end;
+  if (sub.current_period_end && new Date(sub.current_period_end).getTime() <= graceEnd) return sub.current_period_end;
+  return new Date(graceEnd).toISOString();
+}
+
 /**
  * Decide the effective plan for a subscription. Access continues during `past_due` (Stripe is retrying payment)
- * and, for a subscription set to cancel at the period end, until then (Stripe keeps it `active` meanwhile). A
- * `canceled` subscription has ended: Stripe uses it for immediate cancellations and after failed renewals, when
- * the period end has already moved on although nothing was paid.
+ * for at most PAST_DUE_GRACE_DAYS from the start of the unpaid period, and, for a subscription set to cancel at
+ * the period end, until then (Stripe keeps it `active` meanwhile). A `canceled` subscription has ended: Stripe uses
+ * it for immediate cancellations and after failed renewals, when the period end has already moved on although
+ * nothing was paid.
  */
-export function effectivePlanFromSubscription(
-  sub: { plan: Exclude<Plan, "free">; status: SubscriptionStatus; current_period_end: string | null; access_revoked_at?: string | null } | null,
-  now: Date = new Date(),
-): Plan {
+export function effectivePlanFromSubscription(sub: SubscriptionAccess | null, now: Date = new Date()): Plan {
   if (!sub) return "free";
   // The payment for the current period was fully refunded or disputed: that period's access ends (see billing.ts).
   if (sub.access_revoked_at) return "free";
-  const periodActive = !sub.current_period_end || new Date(sub.current_period_end).getTime() > now.getTime();
+  const end = subscriptionAccessEnd(sub);
+  const periodActive = !end || new Date(end).getTime() > now.getTime();
   switch (sub.status) {
     case "active":
     case "trialing":
@@ -245,9 +291,7 @@ export type BillingInterval = "month" | "year";
  * Best effective plan across all of a user's subscriptions (e.g. an old canceled one plus a new active one, or a
  * web subscription plus an App Store one). `from` is the subscription that grants it.
  */
-export function entitlementFromSubscriptions<
-  T extends { plan: Exclude<Plan, "free">; status: SubscriptionStatus; current_period_end: string | null; access_revoked_at?: string | null },
->(
+export function entitlementFromSubscriptions<T extends SubscriptionAccess>(
   subs: T[],
   now: Date = new Date(),
 ): { plan: Plan; validUntil: string | null; from: T | null } {
@@ -256,15 +300,16 @@ export function entitlementFromSubscriptions<
   let from: T | null = null;
   for (const s of subs) {
     const p = effectivePlanFromSubscription(s, now);
+    const end = subscriptionAccessEnd(s);
     // Same plan from two places (web and App Store): keep the one that lasts longer, so access doesn't end when the
     // earlier one does.
     const later =
       planRank(p) === planRank(best) &&
       p !== "free" &&
-      (s.current_period_end === null || (validUntil !== null && Date.parse(s.current_period_end) > Date.parse(validUntil)));
+      (end === null || (validUntil !== null && Date.parse(end) > Date.parse(validUntil)));
     if (planRank(p) > planRank(best) || later) {
       best = p;
-      validUntil = s.current_period_end;
+      validUntil = end;
       from = s;
     }
   }
@@ -276,9 +321,7 @@ export function entitlementFromSubscriptions<
  * member's plan now, else the newest. Every webhook sync touches `updated_at`, so the newest row alone can be an old,
  * ended subscription that a late Stripe retry just re-synced.
  */
-export function subscriptionToShow<
-  T extends { plan: Exclude<Plan, "free">; status: SubscriptionStatus; current_period_end: string | null; access_revoked_at?: string | null },
->(rows: T[], now: Date = new Date()): T | null {
+export function subscriptionToShow<T extends SubscriptionAccess>(rows: T[], now: Date = new Date()): T | null {
   return entitlementFromSubscriptions(rows, now).from ?? rows[0] ?? null;
 }
 

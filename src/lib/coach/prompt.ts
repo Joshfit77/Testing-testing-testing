@@ -27,6 +27,13 @@ export const MAX_TOOL_ROUNDS = 6;
  * once and the member can try again.
  */
 export const PLAN_REQUEST_OPTIONS = { timeout: 150_000, maxRetries: 0 } as const;
+/**
+ * A chat turn is up to MAX_TOOL_ROUNDS requests, each allowed 120 s, inside the route's 180 s limit. Each request is
+ * retried at most once, and the whole turn is ended at COACH_TURN_DEADLINE_MS (the route passes an AbortSignal),
+ * which leaves time to give the reserved message back and tell the member before the platform ends the function.
+ */
+export const CHAT_REQUEST_OPTIONS = { maxRetries: 1 } as const;
+export const COACH_TURN_DEADLINE_MS = 165_000;
 
 /** Longest reply saved (matches the `ai_messages.content` check, migration 049). */
 export const REPLY_MAX_CHARS = 60_000;

@@ -41,6 +41,8 @@ describe.skipIf(!available)("Bible study helper (server path)", () => {
     process.env.ANTHROPIC_BASE_URL = `http://127.0.0.1:${port}`;
     ({ askBible } = await import("@/server/services/bible-ai"));
     user = await createTestUser("bible-ai");
+    // Nothing is sent to the AI provider until the member allows it.
+    await svc.from("profiles").update({ ai_data_consent_at: new Date().toISOString() }).eq("id", user.id);
   });
   afterAll(async () => {
     await deleteTestUser(user);

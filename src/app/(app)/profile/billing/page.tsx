@@ -14,7 +14,7 @@ import { isServiceRoleConfigured, isStripeConfigured } from "@/server/env";
 import { getNativePlatform } from "@/server/native";
 import { isDemoMode } from "@/server/demo";
 import { getAiAllowance } from "@/server/services/ai-coach";
-import { intervalForPriceId, stripePriceProblems, stripeProPrices } from "@/server/services/billing";
+import { resolvePriceInterval, stripePriceProblems, stripeProPrices } from "@/server/services/billing";
 import { legalLinks, storeProductIds, storePublicKey } from "@/server/services/store-billing";
 
 export const metadata = { title: "Membership" };
@@ -65,7 +65,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   const stripeActive = Boolean(sub && source === "stripe");
 
   // Current membership summary.
-  const interval: BillingInterval | null = storeSub ? intervalForProduct(storeSub.productId, ids) : stripeActive ? intervalForPriceId(sub?.stripe_price_id as string | null) : null;
+  const interval: BillingInterval | null = storeSub ? intervalForProduct(storeSub.productId, ids) : stripeActive ? await resolvePriceInterval(sub?.stripe_price_id as string | null) : null;
   const periodEnd = storeSub?.current_period_end ?? (stripeActive ? (sub?.current_period_end as string | null) : null) ?? (source === "admin" ? (entRes.data?.valid_until as string | null) : null);
   const cancelling = storeSub ? storeSub.cancel_at_period_end : stripeActive ? Boolean(sub?.cancel_at_period_end) : false;
   const storeName = storeSub?.store === "play_store" ? "Google Play" : "the App Store";
