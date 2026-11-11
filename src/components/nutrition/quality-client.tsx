@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Check, Loader2, Plus, Sparkles } from "lucide-react";
 import { BarcodeScanner } from "@/components/nutrition/barcode-scanner";
 import { FoodPickerDialog } from "@/components/nutrition/food-picker";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input, NativeSelect } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { defaultUnit, type FoodChoice } from "@/lib/domain/food-basis";
+import { attemptId, SAVE_FAILED_MESSAGE } from "@/lib/domain/diary";
 import { logItemFor } from "@/lib/domain/food-favorites";
 import { ALLERGENS, NUTRITION_FILTER_LABELS, NUTRITION_FILTERS, type FoodFilters, type NutritionFilter } from "@/lib/food-quality";
 import { EXPLAIN_FOCUS, FOCUS_LABEL, type ExplainFocus, type ProductExplanation } from "@/lib/food-quality-ai";
@@ -36,7 +37,10 @@ export function AddProductToDiary({ choice, date, defaultMeal }: { choice: FoodC
   const [meal, setMeal] = useState<Meal>(defaultMeal);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, start] = useTransition();
-  const initial = { food: choice, ...defaultUnit(choice.basis) };
+  // The amount of a save that didn't get through: the dialog reopens on it, and sending it again reuses its id.
+  const [unsent, setUnsent] = useState<{ quantity: number; unitId: string } | null>(null);
+  const attempt = useRef<{ key: string; id: string } | null>(null);
+  const initial = useMemo(() => ({ food: choice, ...(unsent ?? defaultUnit(choice.basis)) }), [choice, unsent]);
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-end gap-2">
@@ -68,8 +72,19 @@ export function AddProductToDiary({ choice, date, defaultMeal }: { choice: FoodC
         onPick={(food, quantity, unitId) => {
           setOpen(false);
           start(async () => {
-            const r = await logFoodAction({ clientId: crypto.randomUUID(), date, mealType: meal, status: "logged", item: logItemFor(food, quantity, unitId) });
-            setMessage(r.ok ? { ok: true, text: r.message ?? "Added." } : { ok: false, text: r.message ?? "Couldn't add it. Try again." });
+            try {
+              const clientId = attemptId(attempt, `${food.key}|${quantity}|${unitId}|${date}|${meal}`);
+              const r = await logFoodAction({ clientId, date, mealType: meal, status: "logged", item: logItemFor(food, quantity, unitId) });
+              if (r.ok) {
+                attempt.current = null;
+                setUnsent(null);
+              }
+              setMessage(r.ok ? { ok: true, text: r.message ?? "Added." } : { ok: false, text: r.message ?? "Couldn't add it. Try again." });
+            } catch {
+              // Offline, or the request never arrived: keep the amount for the retry.
+              setUnsent({ quantity, unitId });
+              setMessage({ ok: false, text: SAVE_FAILED_MESSAGE });
+            }
           });
         }}
       />

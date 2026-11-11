@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { MAX_DISTANCE_M, MAX_ELAPSED_S, MAX_NOTES } from "@/lib/domain/activities";
-import { haversine, MAX_SPEED_MS } from "@/lib/domain/gps-track";
+import { haversine, MAX_SPEED_MS, SAVE_WINDOW_MS } from "@/lib/domain/gps-track";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { hasFeature } from "@/lib/domain/plans";
 import { getProfile, getUserPlan, requireUser } from "@/server/auth";
@@ -58,7 +58,7 @@ export async function saveGpsActivityAction(input: unknown): Promise<Result> {
   if (!parsed.success) return { ok: false, error: "This recording couldn't be read. Please try saving again." };
   const v = parsed.data;
   const now = Date.now();
-  if (v.startedAt > now + 10 * 60_000 || v.startedAt < now - 2 * 86_400_000) return { ok: false, error: "This recording's start time doesn't look right, so it wasn't saved." };
+  if (v.startedAt > now + 10 * 60_000 || v.startedAt < now - SAVE_WINDOW_MS) return { ok: false, error: "This recording's start time doesn't look right, so it wasn't saved." };
   if (v.finishedAt < v.startedAt || v.movingS > v.elapsedS) return { ok: false, error: "This recording's times don't add up, so it wasn't saved." };
   if (v.distanceM / v.movingS > MAX_SPEED_MS[v.kind] * 1.1) return { ok: false, error: "That speed isn't possible on foot, so it wasn't saved." };
   const points = v.route?.coordinates.reduce((n, l) => n + l.length, 0) ?? 0;

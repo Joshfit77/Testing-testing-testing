@@ -4,8 +4,11 @@ import {
   currentPace,
   finishTrack,
   haversine,
+  isFinishedTooOldToSave,
   isRecoverable,
   isResumable,
+  RECOVERABLE_MS,
+  SAVE_WINDOW_MS,
   movingSecondsAt,
   pauseTrack,
   recoverTrack,
@@ -145,10 +148,24 @@ describe("pauses, gaps and recovery", () => {
     expect(isResumable(saved, T0 + 60_000)).toBe(true);
     expect(isResumable({ ...(saved as TrackState), status: "finished" }, T0 + 60_000)).toBe(false);
     expect(isResumable(saved, T0 + 13 * 3600_000)).toBe(false);
-    // A finished recording whose save failed (offline) is still offered back, until it is too old to matter.
+    // A finished recording whose save failed (offline) is still offered back, for as long as it can be saved.
+    const finished = { ...(saved as TrackState), status: "finished" };
     expect(isRecoverable(saved, T0 + 60_000)).toBe(true);
-    expect(isRecoverable({ ...(saved as TrackState), status: "finished" }, T0 + 60_000)).toBe(true);
-    expect(isRecoverable({ ...(saved as TrackState), status: "finished" }, T0 + 13 * 3600_000)).toBe(false);
+    expect(isRecoverable(finished, T0 + 60_000)).toBe(true);
+    // In progress: offered for 12 hours, then dropped. It was never finished, so there is nothing to tell.
+    expect(isRecoverable(saved, T0 + RECOVERABLE_MS - 1)).toBe(true);
+    expect(isRecoverable(saved, T0 + RECOVERABLE_MS)).toBe(false);
+    expect(isFinishedTooOldToSave(saved, T0 + 3 * 86_400_000)).toBe(false);
+    // Finished: kept past 12 hours, right up to the server's save limit.
+    expect(isRecoverable(finished, T0 + 13 * 3600_000)).toBe(true);
+    expect(isRecoverable(finished, T0 + SAVE_WINDOW_MS - 1)).toBe(true);
+    expect(isFinishedTooOldToSave(finished, T0 + SAVE_WINDOW_MS - 1)).toBe(false);
+    // Finished and beyond the server's limit: no longer offered for saving, and flagged so the member is told.
+    expect(isRecoverable(finished, T0 + SAVE_WINDOW_MS)).toBe(false);
+    expect(isFinishedTooOldToSave(finished, T0 + SAVE_WINDOW_MS)).toBe(true);
+    expect(SAVE_WINDOW_MS).toBe(2 * 86_400_000);
+    expect(isFinishedTooOldToSave(null, T0)).toBe(false);
+    expect(isFinishedTooOldToSave({ version: 3, status: "finished", startedAt: 0 }, T0)).toBe(false);
     expect(isRecoverable(null, T0)).toBe(false);
     expect(isRecoverable({ version: 3, status: "finished", startedAt: T0 }, T0)).toBe(false);
     const r = recoverTrack(saved as TrackState);

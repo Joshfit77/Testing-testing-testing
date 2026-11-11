@@ -143,7 +143,7 @@ export async function createActivityAction(_prev: ActionState, formData: FormDat
   return actionOk(summary(row, data.unit));
 }
 
-/** Edit a manual or treadmill activity. GPS recordings keep their source; this form can't edit them. */
+/** Edit a manual or treadmill activity. GPS recordings keep what was measured: see updateGpsActivityNotesAction. */
 export async function updateActivityAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const res = await parse(formData);
   if ("error" in res) return res.error!;
@@ -163,6 +163,38 @@ export async function updateActivityAction(_prev: ActionState, formData: FormDat
   }
   if (!updated?.length) return actionError("This activity no longer exists.");
   return actionOk(summary(row, data.unit).replace("saved", "updated"));
+}
+
+const gpsNotesSchema = z.object({
+  id: z.string().uuid("Invalid activity id"),
+  effort: z.preprocess(blank, z.coerce.number().int("Pick 1–10").min(1, "Pick 1–10").max(10, "Pick 1–10").optional()),
+  notes: z.preprocess(blank, z.string().trim().max(MAX_NOTES, `Keep notes under ${MAX_NOTES} characters`).optional()),
+});
+
+/**
+ * Edit the notes and perceived effort of a GPS recording. Nothing else is read from the form or written: the distance,
+ * times, splits and route are what the phone measured and stay as recorded. Available on every plan (recording is
+ * Pro; a run recorded earlier stays the member's own), and only ever touches the signed-in member's own row.
+ */
+export async function updateGpsActivityNotesAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const user = await requireUser();
+  const parsed = gpsNotesSchema.safeParse({ id: formData.get("id") ?? undefined, effort: formData.get("effort") ?? undefined, notes: formData.get("notes") ?? undefined });
+  if (!parsed.success) return actionInvalid(parsed.error);
+  const supabase = await getServerSupabase();
+  const { data: updated, error } = await supabase
+    .from("activities")
+    .update({ perceived_effort: parsed.data.effort ?? null, notes: parsed.data.notes ?? null })
+    .eq("id", parsed.data.id)
+    .eq("user_id", user.id)
+    .eq("source", "gps")
+    .is("deleted_at", null)
+    .select("id");
+  if (error) {
+    logError("activities.updateGpsNotes", error);
+    return actionError("Couldn't save your changes. Please try again.");
+  }
+  if (!updated?.length) return actionError("This activity no longer exists.");
+  return actionOk("Notes and effort updated.");
 }
 
 /**

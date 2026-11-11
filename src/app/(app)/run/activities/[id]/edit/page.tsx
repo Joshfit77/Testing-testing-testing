@@ -1,6 +1,7 @@
 import { BackLink } from "@/components/platform/back-link";
 import { notFound } from "next/navigation";
 import { ActivityForm } from "@/components/run/activity-form";
+import { GpsNotesForm } from "@/components/run/gps-notes-form";
 import { Card, CardContent } from "@/components/ui/card";
 import { distanceUnitFor, formatHms, fromMeters, utcToLocalParts } from "@/lib/domain/activities";
 import { isoDateInTz } from "@/lib/domain/dates";
@@ -16,8 +17,21 @@ export default async function EditActivityPage({ params }: { params: Promise<{ i
   const { user, profile } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
   const a = await getActivity(supabase, user.id, id);
-  // GPS recordings aren't edited with the manual form (their source and route must stay intact).
-  if (!a || a.source === "gps") notFound();
+  if (!a) notFound();
+  // A GPS recording keeps what was measured (distance, times, route): only its notes and effort can be changed.
+  if (a.source === "gps") {
+    return (
+      <div className="mx-auto max-w-3xl space-y-5">
+        <BackLink href={`/run/activities/${a.id}`}>Activity</BackLink>
+        <h1 className="font-display text-[1.625rem] font-bold leading-tight">Edit {a.kind}</h1>
+        <Card>
+          <CardContent className="pt-5">
+            <GpsNotesForm id={a.id} effort={a.perceived_effort == null ? "" : String(a.perceived_effort)} notes={a.notes ?? ""} />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
   const tz = profile.timezone || "UTC";
   const unit = distanceUnitFor(profile.unit_system);
   // The form works in the profile's time zone (the server converts with it on save).

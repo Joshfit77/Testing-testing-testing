@@ -570,16 +570,29 @@ export function trackTotals(s: TrackState): { distance_m: number; elapsed_s: num
   return { distance_m: Math.round(s.distanceM * 10) / 10, elapsed_s: elapsed, moving_s: Math.max(1, Math.min(elapsed, movingSecondsAt(s, end))) };
 }
 
-/** How long a draft left on the device is offered back (matches GPS_RESUMABLE_MS in src/lib/opening.ts). */
+/** How long an unfinished draft left on the device is offered back (matches GPS_RESUMABLE_MS in src/lib/opening.ts). */
 export const RECOVERABLE_MS = 12 * 3600_000;
+
+/** How long after it started a recording can still be saved (the server refuses anything older). */
+export const SAVE_WINDOW_MS = 2 * 86_400_000;
+
+function isDraft(s: unknown): s is TrackState {
+  const t = s as TrackState | null;
+  return Boolean(t && (t.version === 1 || t.version === 2) && typeof t.startedAt === "number");
+}
 
 /**
  * Is a saved draft worth offering back: a recording still in progress, or one that was finished but never saved
- * (the save failed offline, or the app was closed on the review screen)? Only recent drafts count.
+ * (the save failed offline, or the app was closed on the review screen)? An unfinished draft is offered for 12 hours.
+ * A finished one is kept for as long as the server would still accept it.
  */
 export function isRecoverable(s: unknown, now: number): s is TrackState {
-  const t = s as TrackState | null;
-  return Boolean(t && (t.version === 1 || t.version === 2) && typeof t.startedAt === "number" && now - t.startedAt < RECOVERABLE_MS);
+  return isDraft(s) && now - s.startedAt < (s.status === "finished" ? SAVE_WINDOW_MS : RECOVERABLE_MS);
+}
+
+/** A finished draft that was never saved and is now too old for the server to accept: say so, don't just drop it. */
+export function isFinishedTooOldToSave(s: unknown, now: number): s is TrackState {
+  return isDraft(s) && s.status === "finished" && now - s.startedAt >= SAVE_WINDOW_MS;
 }
 
 /** Is a saved draft still a recording to offer to continue (not finished, and recent)? */

@@ -82,11 +82,34 @@ describe("a recording left on the device", () => {
     await waitFor(() => expect(location.watchLocation).toHaveBeenCalledTimes(1));
   });
 
-  it("removes only a draft too old to matter", async () => {
-    stored(recorded(13 * 3600_000, true));
+  it("removes an unfinished draft too old to continue", async () => {
+    stored(recorded(13 * 3600_000, false));
     render(<GpsRecorder {...props} />);
     expect(await screen.findByTestId("gps-start")).toBeInTheDocument();
     expect(screen.queryByTestId("gps-recoverable")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("gps-too-old")).not.toBeInTheDocument();
+    expect(localStorage.getItem(KEY)).toBeNull();
+  });
+
+  it("keeps a finished but unsaved run past 12 hours, while it can still be saved", async () => {
+    stored(recorded(30 * 3600_000, true));
+    render(<GpsRecorder {...props} />);
+    expect(await screen.findByTestId("gps-recoverable")).toHaveTextContent(/Your run from .* wasn't saved yet/);
+    expect(localStorage.getItem(KEY)).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Review and save" }));
+    expect(await screen.findByTestId("gps-review")).toBeInTheDocument();
+  });
+
+  it("tells the member when a finished run is too old to save, and removes it only when they say so", async () => {
+    stored(recorded(49 * 3600_000, true));
+    render(<GpsRecorder {...props} />);
+    expect(await screen.findByTestId("gps-too-old")).toHaveTextContent(/Your run from .* was never saved, and it is now too old to save/);
+    expect(screen.queryByTestId("gps-recoverable")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Review and save" })).not.toBeInTheDocument();
+    // Still on the device until the member has seen the notice and removed it.
+    expect(localStorage.getItem(KEY)).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Remove it" }));
+    await waitFor(() => expect(screen.queryByTestId("gps-too-old")).not.toBeInTheDocument());
     expect(localStorage.getItem(KEY)).toBeNull();
   });
 

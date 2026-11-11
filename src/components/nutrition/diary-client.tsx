@@ -9,7 +9,7 @@ import { Input, NativeSelect } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { initialActionState, type ActionState } from "@/lib/action-state";
 import { ACTIVITY_INFO, ACTIVITY_LEVELS, WEEKLY_RATES_KG, type ActivityLevel } from "@/lib/domain/calorie-budget";
-import { paceLabel, shortDate, type LogResult } from "@/lib/domain/diary";
+import { paceLabel, saveFailed, shortDate, type LogResult } from "@/lib/domain/diary";
 import { MEAL_TYPES } from "@/lib/domain/meals";
 import type { UnitSystem } from "@/lib/domain/types";
 import { displayWeight, toKg, weightUnit } from "@/lib/domain/units";
@@ -57,25 +57,30 @@ export function QuickAddDialog({
   const submit = () =>
     start(async () => {
       attempt.current ??= crypto.randomUUID();
-      const res = await logFoodAction({
-        clientId: attempt.current,
-        date,
-        mealType,
-        status: "logged",
-        item: {
-          source: "manual",
-          name: "Quick add",
-          calories: Number(values.calories || 0),
-          protein_g: Number(values.protein_g || 0),
-          carbs_g: Number(values.carbs_g || 0),
-          fat_g: Number(values.fat_g || 0),
-          isEstimate: false,
-        },
-      });
-      setResult(res.ok ? { ...res, message: `Added ${Math.round(Number(values.calories))} kcal to ${mealName}.` } : res);
-      if (res.ok) {
-        attempt.current = null;
-        draft.clear();
+      try {
+        const res = await logFoodAction({
+          clientId: attempt.current,
+          date,
+          mealType,
+          status: "logged",
+          item: {
+            source: "manual",
+            name: "Quick add",
+            calories: Number(values.calories || 0),
+            protein_g: Number(values.protein_g || 0),
+            carbs_g: Number(values.carbs_g || 0),
+            fat_g: Number(values.fat_g || 0),
+            isEstimate: false,
+          },
+        });
+        setResult(res.ok ? { ...res, message: `Added ${Math.round(Number(values.calories))} kcal to ${mealName}.` } : res);
+        if (res.ok) {
+          attempt.current = null;
+          draft.clear();
+        }
+      } catch {
+        // Offline, or the request never arrived: the dialog and the numbers stay, and the retry reuses the id.
+        setResult(saveFailed());
       }
     });
 
@@ -166,6 +171,8 @@ export function QuickAddDialog({
 export function CopyMealButton({ fromDate, toDate, mealType, label }: { fromDate: string; toDate: string; mealType?: string; label: string }) {
   const [result, setResult] = useState<LogResult | null>(null);
   const [pending, start] = useTransition();
+  // One id per attempt: a retry after a dropped connection reuses it, so the meals can't be copied twice.
+  const attempt = useRef<string | null>(null);
   return (
     <span className="inline-flex flex-wrap items-center gap-2">
       <Button
@@ -177,7 +184,14 @@ export function CopyMealButton({ fromDate, toDate, mealType, label }: { fromDate
         aria-busy={pending}
         onClick={() =>
           start(async () => {
-            setResult(await copyMealsAction({ fromDate, toDate, mealType }));
+            attempt.current ??= crypto.randomUUID();
+            try {
+              const res = await copyMealsAction({ fromDate, toDate, mealType, clientId: attempt.current });
+              if (res.ok) attempt.current = null;
+              setResult(res);
+            } catch {
+              setResult(saveFailed());
+            }
           })
         }
       >

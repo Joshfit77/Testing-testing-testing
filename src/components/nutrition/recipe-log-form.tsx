@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input, NativeSelect } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { ActionState } from "@/lib/action-state";
+import { attemptId, saveFailed } from "@/lib/domain/diary";
 import { parseQuantity } from "@/lib/domain/food-units";
 import { MEAL_TYPES } from "@/lib/domain/meals";
 import { formatNutrient, scaleTotals, type NutrientTotals } from "@/lib/domain/recipes";
@@ -21,6 +22,8 @@ export function RecipeLogForm({ recipeId, perServing, today }: { recipeId: strin
   const [date, setDate] = useState(today);
   const [result, setResult] = useState<(ActionState & { date?: string }) | null>(null);
   const [pending, start] = useTransition();
+  // The same servings, meal and day sent again after a failed send reuse the id, so it can't be logged twice.
+  const attempt = useRef<{ key: string; id: string } | null>(null);
   const servings = parseQuantity(qty);
   const ok = Number.isFinite(servings) && servings >= 0.05 && servings <= 20;
   const preview = ok ? scaleTotals(perServing, servings) : null;
@@ -32,9 +35,17 @@ export function RecipeLogForm({ recipeId, perServing, today }: { recipeId: strin
         e.preventDefault();
         if (!ok) return;
         start(async () => {
-          const res = await logRecipeAction({ recipeId, date, mealType, servings });
-          setResult({ ...res, date });
-          if (res.ok) router.refresh();
+          try {
+            const res = await logRecipeAction({ recipeId, date, mealType, servings, clientId: attemptId(attempt, `${recipeId}|${date}|${mealType}|${servings}`) });
+            setResult({ ...res, date });
+            if (res.ok) {
+              attempt.current = null;
+              router.refresh();
+            }
+          } catch {
+            // Offline, or the request never arrived: the form keeps what was entered.
+            setResult(saveFailed());
+          }
         });
       }}
     >

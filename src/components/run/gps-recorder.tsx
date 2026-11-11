@@ -20,6 +20,7 @@ import {
   finishTrack,
   gpsDiagnostics,
   ignoredReadings,
+  isFinishedTooOldToSave,
   isRecoverable,
   pauseTrack,
   recoverTrack,
@@ -99,6 +100,13 @@ function GpsDetails({ d, unit, source }: { d: GpsDiagnostics; unit: DistanceUnit
   );
 }
 
+/** When a draft left on the device started: the time alone for today's, with the day in front for an older one. */
+function draftWhen(startedAt: number): string {
+  const d = new Date(startedAt);
+  const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return d.toDateString() === new Date().toDateString() ? time : `${d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })}, ${time}`;
+}
+
 const ERROR_TEXT: Record<LocationError, string> = {
   denied: "Location permission is off for this app. Turn it on in your browser or phone settings to record a run or walk.",
   unavailable: "Your location isn't available right now. Check that location services are on, or try again outdoors.",
@@ -128,6 +136,8 @@ export function GpsRecorder({
   const [now, setNow] = useState(() => Date.now());
   const [error, setError] = useState<LocationError | null>(null);
   const [recoverable, setRecoverable] = useState<Saved | null>(null);
+  // A finished recording that was never saved and is now older than the server accepts: shown, not silently removed.
+  const [tooOld, setTooOld] = useState<TrackState | null>(null);
   const [voice, setVoice] = useState(false);
   const [effort, setEffort] = useState("");
   const [notes, setNotes] = useState("");
@@ -173,8 +183,8 @@ export function GpsRecorder({
 
   // A recording that kept going while the member was elsewhere in the app comes straight back (watcher and all).
   // Otherwise, a recording left on this device (closed tab, crash, phone restart, or finished but not saved because
-  // the save failed offline): offer it back. Only a draft too old to matter is removed; a finished one is never
-  // thrown away here.
+  // the save failed offline): offer it back. Only an unfinished draft too old to continue is removed; a finished one
+  // is kept for as long as it can still be saved, and after that the member is told before it goes.
   useEffect(() => {
     handOver.current.href = `${window.location.pathname}${window.location.search}`;
     const live = takeBack(storageKey, guided?.programDayId ?? null);
@@ -191,6 +201,7 @@ export function GpsRecorder({
       if (!raw) return;
       const saved = JSON.parse(raw) as Saved;
       if (isRecoverable(saved.track, Date.now()) && (saved.guidedDayId ?? null) === (guided?.programDayId ?? null)) setRecoverable(saved);
+      else if (isFinishedTooOldToSave(saved.track, Date.now())) setTooOld(saved.track);
       else if (!isRecoverable(saved.track, Date.now())) localStorage.removeItem(storageKey);
     } catch {
       /* storage unavailable: nothing to recover */
@@ -385,10 +396,30 @@ export function GpsRecorder({
   if (!track) {
     return (
       <div className="space-y-4">
+        {tooOld && (
+          <Notice tone="warning">
+            <p className="font-semibold" data-testid="gps-too-old">
+              Your {tooOld.kind} from {draftWhen(tooOld.startedAt)} was never saved, and it is now too old to save.
+            </p>
+            <p className="mt-1 text-sm">Recordings can be saved for up to 2 days after they start. You can add it as a manual entry instead, then remove it from this device.</p>
+            <div className="mt-2 flex gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  persist(null);
+                  setTooOld(null);
+                }}
+              >
+                Remove it
+              </Button>
+            </div>
+          </Notice>
+        )}
         {recoverable && (
           <Notice tone="warning">
             <p className="font-semibold" data-testid="gps-recoverable">
-              {recoverable.track.status === "finished" ? "Your" : "You have an unfinished"} {recoverable.track.kind} from {new Date(recoverable.track.startedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+              {recoverable.track.status === "finished" ? "Your" : "You have an unfinished"} {recoverable.track.kind} from {draftWhen(recoverable.track.startedAt)}
               {recoverable.track.status === "finished" ? " wasn't saved yet." : "."}
             </p>
             <p className="mt-1 text-sm">

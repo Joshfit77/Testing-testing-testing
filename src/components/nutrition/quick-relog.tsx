@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useSyncExternalStore, useTransition } from "react";
+import { useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { Plus } from "lucide-react";
 import { LoggedUndo } from "@/components/nutrition/logged-undo";
 import { Button } from "@/components/ui/button";
-import { mealPhrase, quickFoodSummary, type LogResult, type QuickFood } from "@/lib/domain/diary";
+import { attemptId, mealPhrase, quickFoodSummary, saveFailed, type LogResult, type QuickFood } from "@/lib/domain/diary";
 import { mealForTime } from "@/lib/domain/meal-time";
 import { relogItemAction } from "@/server/actions/nutrition";
 
@@ -18,6 +18,8 @@ const subscribeNever = () => () => {};
 export function QuickRelog({ date, recent, frequent, max = 6 }: { date: string; recent: QuickFood[]; frequent: QuickFood[]; max?: number }) {
   const [result, setResult] = useState<LogResult | null>(null);
   const [pending, start] = useTransition();
+  // The same food tapped again after a failed send reuses its id, so it can't be added twice.
+  const attempt = useRef<{ key: string; id: string } | null>(null);
   // The meal comes from the device's clock, which the server can't know (a phone in New York and a server in UTC
   // disagree), so it is read only on the device after hydration; the server and the first client render say nothing.
   const meal = useSyncExternalStore(subscribeNever, () => mealForTime(new Date()), () => null);
@@ -33,7 +35,14 @@ export function QuickRelog({ date, recent, frequent, max = 6 }: { date: string; 
 
   const relog = (itemId: string) =>
     start(async () => {
-      setResult(await relogItemAction({ itemId, date, mealType: mealForTime(new Date()), status: "logged" }));
+      const mealType = mealForTime(new Date());
+      try {
+        const res = await relogItemAction({ itemId, date, mealType, status: "logged", clientId: attemptId(attempt, `${itemId}|${date}|${mealType}`) });
+        if (res.ok) attempt.current = null;
+        setResult(res);
+      } catch {
+        setResult(saveFailed());
+      }
     });
 
   return (

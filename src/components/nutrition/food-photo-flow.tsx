@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { AlertTriangle, Barcode, Camera, Check, ImageUp, Loader2, Pencil, Plus, RotateCcw, Search, Sparkles, Trash2, Undo2 } from "lucide-react";
+import { SAVE_FAILED_MESSAGE } from "@/lib/domain/diary";
 import { FoodPickerDialog, gramsAmount } from "@/components/nutrition/food-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -234,11 +235,17 @@ export function FoodPhotoFlow({ date: initialDate, defaultMeal, myFoods, extras,
               fat_g: n(i.fat_g),
             },
       );
-      const r = await logFoodPhotoItemsAction({ date, mealType: meal, clientId: saveId, items: payload });
-      savingRef.current = false;
-      if (!r.ok) return setError(r.error);
-      setResult(r.message);
-      router.refresh();
+      try {
+        const r = await logFoodPhotoItemsAction({ date, mealType: meal, clientId: saveId, items: payload });
+        if (!r.ok) return setError(r.error);
+        setResult(r.message);
+        router.refresh();
+      } catch {
+        // Offline, or the request never arrived: the reviewed items stay on screen, and the retry reuses `saveId`.
+        setError(SAVE_FAILED_MESSAGE);
+      } finally {
+        savingRef.current = false;
+      }
     });
   };
 
