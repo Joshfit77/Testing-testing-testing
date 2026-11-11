@@ -6,36 +6,11 @@ import { useRouter } from "next/navigation";
 import { BookOpen, CheckCircle2, Circle, CloudOff, HandHeart, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toaster";
-import { DRAFT_PREFIX } from "@/lib/drafts";
+import { CHECKIN_QUEUE_EVENT, flushCheckinQueue, readCheckinQueue, writeCheckinQueue, type CheckinActivity } from "@/lib/faith/checkin-queue";
 import { cn } from "@/lib/utils";
 import { journeyCheckInAction, journeyUndoAction, type CheckInResult } from "@/server/actions/journeys";
 
-type Activity = "reading" | "prayer";
-interface Pending {
-  journeyId: string;
-  activity: Activity;
-  occurredAt: string;
-}
-
-/** Saved under the member's draft prefix, so signing out clears it (src/lib/drafts.ts). Holds no prayer content. */
-const queueKey = (userId: string) => `${DRAFT_PREFIX}${userId}.faith-checkins`;
-
-function readQueue(userId: string): Pending[] {
-  try {
-    const v = JSON.parse(localStorage.getItem(queueKey(userId)) ?? "[]") as Pending[];
-    return Array.isArray(v) ? v : [];
-  } catch {
-    return [];
-  }
-}
-function writeQueue(userId: string, q: Pending[]) {
-  try {
-    if (q.length) localStorage.setItem(queueKey(userId), JSON.stringify(q));
-    else localStorage.removeItem(queueKey(userId));
-  } catch {
-    /* storage unavailable */
-  }
-}
+type Activity = CheckinActivity;
 
 /**
  * Today's two required activities. Each is marked complete only when the member taps it. Without a connection the
@@ -75,40 +50,38 @@ export function JourneyCheckIn({
     }
   }, []);
 
-  const flush = useCallback(async () => {
-    const q = readQueue(userId);
-    if (!q.length || !navigator.onLine) return;
-    const keep: Pending[] = [];
-    for (const p of q) {
-      if (p.journeyId !== journeyId) continue; // a journey that has since ended: nothing to count it toward
-      const r = await send(p.activity, p.occurredAt);
-      if (r === "network") keep.push(p);
-      else if (!r.ok && r.code === "too_late") toast.error(`Your ${p.activity === "reading" ? "Bible reading" : "prayer"} check-in from ${new Date(p.occurredAt).toLocaleString()} reached us too late to count. ${r.error}`);
-      else if (r.ok) toast.success(`${p.activity === "reading" ? "Bible reading" : "Prayer"} you marked offline is saved.`);
-    }
-    writeQueue(userId, keep);
-    setQueued(keep.filter((p) => p.journeyId === journeyId).map((p) => p.activity));
-    if (keep.length !== q.length) router.refresh();
-  }, [journeyId, router, send, userId]);
-
-  useEffect(() => {
+  const showQueued = useCallback(() => {
     setQueued(
-      readQueue(userId)
+      readCheckinQueue(userId)
         .filter((p) => p.journeyId === journeyId)
         .map((p) => p.activity),
     );
+  }, [journeyId, userId]);
+
+  // The app shell sends the queue too (on any screen); both share one run, so nothing is sent or announced twice.
+  const flush = useCallback(async () => {
+    if (!navigator.onLine || !readCheckinQueue(userId).length) return;
+    const r = await flushCheckinQueue(userId, { journeyId, send, notify: (tone, message) => toast[tone](message) });
+    if (r.changed) router.refresh();
+  }, [journeyId, router, send, userId]);
+
+  useEffect(() => {
+    showQueued();
     void flush();
     const onOnline = () => void flush();
     window.addEventListener("online", onOnline);
-    return () => window.removeEventListener("online", onOnline);
-  }, [flush, journeyId, userId]);
+    window.addEventListener(CHECKIN_QUEUE_EVENT, showQueued);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener(CHECKIN_QUEUE_EVENT, showQueued);
+    };
+  }, [flush, showQueued]);
 
   function mark(activity: Activity) {
     const occurredAt = new Date().toISOString();
     const queue = () => {
-      const q = readQueue(userId).filter((p) => !(p.journeyId === journeyId && p.activity === activity));
-      writeQueue(userId, [...q, { journeyId, activity, occurredAt }]);
-      setQueued((s) => [...new Set([...s, activity])]);
+      const q = readCheckinQueue(userId).filter((p) => !(p.journeyId === journeyId && p.activity === activity));
+      writeCheckinQueue(userId, [...q, { journeyId, activity, occurredAt }]);
       toast.info("You're offline. Saved on this device; it will count when you reconnect, if that's before 3 a.m.");
     };
     if (!navigator.onLine) return queue();

@@ -8,6 +8,7 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { signOutAction } from "@/server/actions/auth";
 import { getPlans } from "@/lib/domain/plans";
+import { JourneyCheckinSync } from "@/components/faith/journey-checkin-sync";
 import { NotificationSync } from "@/components/notifications/notification-sync";
 import { getNotificationSyncAction, importDeviceWorkoutReminderAction } from "@/server/actions/notifications";
 import { DemoBar } from "@/components/demo/demo-bar";
@@ -38,6 +39,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <KeyboardAvoidance />
       {/* In the iPhone/Android app: keep this phone's reminders (Faith, workouts, food, recovery) in line with the account. */}
       <NotificationSync load={getNotificationSyncAction} importWorkout={importDeviceWorkoutReminderAction} />
+      {/* Journey check-ins tapped offline are sent from any screen once the connection is back. */}
+      <JourneyCheckinSync userId={user.id} />
       {isDemoMode() && <DemoBar plan={plan} canSwitch={isDemoUser(user)} canReset={isDemoUser(user) && user.email === demoAccount()?.email} aiSimulated={demoAiSimulated()} />}
       <DraftUserProvider userId={user.id}>{children}</DraftUserProvider>
     </AppShell>

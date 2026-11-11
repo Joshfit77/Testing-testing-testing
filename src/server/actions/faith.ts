@@ -65,12 +65,23 @@ export async function saveJournalEntryAction(_prev: ActionState, formData: FormD
   return actionOk(row.share_with_coach ? "Entry saved. Only you and the AI coach (as you chose) can see it." : "Entry saved. Only you can see it.");
 }
 
-export async function deleteJournalEntryAction(formData: FormData): Promise<void> {
+/** What a one-tap action (ActionButton) reports back, so a failure is shown instead of looking like success. */
+export interface TapResult {
+  ok: boolean;
+  error?: string;
+}
+
+export async function deleteJournalEntryAction(formData: FormData): Promise<TapResult> {
   const user = await requireUser();
   const id = uuid.safeParse(formData.get("id"));
-  if (!id.success) return;
+  if (!id.success) return { ok: false, error: "That entry couldn't be found." };
   const supabase = await getServerSupabase();
-  await supabase.from("faith_journal_entries").delete().eq("id", id.data).eq("user_id", user.id);
+  const { error } = await supabase.from("faith_journal_entries").delete().eq("id", id.data).eq("user_id", user.id);
+  if (error) {
+    logError("faith.journal.delete", error);
+    return { ok: false, error: "Couldn't delete your entry. Please try again." };
+  }
+  return { ok: true };
 }
 
 export async function markPrayerAnsweredAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -159,28 +170,48 @@ export async function createCustomPracticeAction(_prev: ActionState, formData: F
 }
 
 /** Check off (or un-check) a practice for one day: today or one of the previous six days. */
-export async function togglePracticeCheckinAction(formData: FormData): Promise<void> {
+export async function togglePracticeCheckinAction(formData: FormData): Promise<TapResult> {
+  const failed = { ok: false, error: "Couldn't update that practice. Please try again." };
   const user = await requireUser();
   const id = uuid.safeParse(formData.get("goalId"));
   const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).safeParse(formData.get("date"));
-  if (!id.success || !day.success) return;
+  if (!id.success || !day.success) return failed;
   const today = await userToday(user.id);
-  if (!canCheckIn(day.data, today)) return;
+  if (!canCheckIn(day.data, today)) return { ok: false, error: "That day can no longer be changed." };
   const supabase = await getServerSupabase();
-  const { data: goal } = await supabase.from("discipline_goals").select("id").eq("id", id.data).eq("user_id", user.id).maybeSingle();
-  if (!goal) return;
-  const { data: existing } = await supabase.from("discipline_checkins").select("goal_id").eq("goal_id", id.data).eq("user_id", user.id).eq("checked_on", day.data).maybeSingle();
-  if (existing) await supabase.from("discipline_checkins").delete().eq("goal_id", id.data).eq("checked_on", day.data).eq("user_id", user.id);
-  else await supabase.from("discipline_checkins").insert({ goal_id: id.data, user_id: user.id, checked_on: day.data });
+  const { data: goal, error: goalErr } = await supabase.from("discipline_goals").select("id").eq("id", id.data).eq("user_id", user.id).maybeSingle();
+  if (goalErr) {
+    logError("faith.practice.toggle", goalErr);
+    return failed;
+  }
+  if (!goal) return { ok: false, error: "That practice no longer exists." };
+  const { data: existing, error: readErr } = await supabase.from("discipline_checkins").select("goal_id").eq("goal_id", id.data).eq("user_id", user.id).eq("checked_on", day.data).maybeSingle();
+  if (readErr) {
+    logError("faith.practice.toggle", readErr);
+    return failed;
+  }
+  const { error } = existing
+    ? await supabase.from("discipline_checkins").delete().eq("goal_id", id.data).eq("checked_on", day.data).eq("user_id", user.id)
+    : await supabase.from("discipline_checkins").insert({ goal_id: id.data, user_id: user.id, checked_on: day.data });
+  if (error) {
+    logError("faith.practice.toggle", error);
+    return failed;
+  }
+  return { ok: true };
 }
 
 /** Remove a practice and its check-off history (confirmed in the UI). */
-export async function removePracticeAction(formData: FormData): Promise<void> {
+export async function removePracticeAction(formData: FormData): Promise<TapResult> {
   const user = await requireUser();
   const id = uuid.safeParse(formData.get("goalId"));
-  if (!id.success) return;
+  if (!id.success) return { ok: false, error: "That practice couldn't be found." };
   const supabase = await getServerSupabase();
-  await supabase.from("discipline_goals").delete().eq("id", id.data).eq("user_id", user.id);
+  const { error } = await supabase.from("discipline_goals").delete().eq("id", id.data).eq("user_id", user.id);
+  if (error) {
+    logError("faith.practice.remove", error);
+    return { ok: false, error: "Couldn't remove that practice. Please try again." };
+  }
+  return { ok: true };
 }
 
 // Faith reminders are saved with every other reminder in src/server/actions/notifications.ts (Profile → Notifications).
