@@ -37,6 +37,13 @@ export interface EditableSession {
   }[];
 }
 
+/** The message when saving edits didn't complete at all (the same wording style as the workout logger's finish). */
+export function editFailureMessage(online: boolean): string {
+  return online
+    ? "We couldn't reach your account, so your changes aren't saved yet. They're still on this screen. If you were signed out, sign in again in another tab and save again."
+    : "You appear to be offline. Your changes are still on this screen — try again when you're connected.";
+}
+
 function toDraft(s: EditableSession): WorkoutDraft {
   const d = createDraft({ name: s.name, now: s.startedAt });
   return {
@@ -79,6 +86,7 @@ export function WorkoutEditor({ session, catalog, units, timezone }: { session: 
   const save = () =>
     startTransition(async () => {
       setError(null);
+      // A request that never completes (offline, or signed out elsewhere) must not lose the edits: they stay on screen.
       const res = await editWorkoutAction({
         sessionId: session.id,
         name: draft.name.trim() || "Workout",
@@ -91,7 +99,7 @@ export function WorkoutEditor({ session, catalog, units, timezone }: { session: 
           skipReason: e.skipReason,
           sets: e.sets.map(({ reps, weightKg, durationSeconds, distanceM, rpe, isWarmup, completed }) => ({ reps, weightKg, durationSeconds, distanceM, rpe, isWarmup, completed })),
         })),
-      });
+      }).catch(() => ({ ok: false as const, error: editFailureMessage(navigator.onLine) }));
       if (!res.ok) return setError(res.error);
       setEditing(false);
       setMessage("Changes saved. Personal records were recalculated.");
@@ -100,7 +108,8 @@ export function WorkoutEditor({ session, catalog, units, timezone }: { session: 
 
   const remove = () =>
     startTransition(async () => {
-      const res = await deleteWorkoutAction(session.id);
+      setError(null);
+      const res = await deleteWorkoutAction(session.id).catch(() => ({ ok: false as const, error: navigator.onLine ? "We couldn't reach your account, so this workout wasn't deleted. Please try again." : "You appear to be offline. This workout wasn't deleted — try again when you're connected." }));
       if (!res.ok) {
         setError(res.error);
         setConfirmDelete(false);

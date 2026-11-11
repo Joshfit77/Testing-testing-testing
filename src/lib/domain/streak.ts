@@ -37,6 +37,20 @@ export function weeklyStreak(trainedDates: string[], today: string, minPerWeek =
   return streak;
 }
 
+/**
+ * Whether history older than what is loaded could still lengthen a streak. `trainedDates` must hold every trained
+ * date from `loadedFrom` up to today. True when the run of trained weeks reaches back to the week of `loadedFrom`
+ * (a day streak can't outrun the week streak, so one check covers both); false once an empty week inside the loaded
+ * span has already ended it.
+ */
+export function streakNeedsOlderHistory(trainedDates: string[], today: string, loadedFrom: string): boolean {
+  const weeks = new Set(trainedDates.map((d) => startOfWeek(d)));
+  let week = startOfWeek(today);
+  if (!weeks.has(week)) week = addDays(week, -7); // an in-progress week doesn't break the streak
+  while (weeks.has(week)) week = addDays(week, -7);
+  return week <= startOfWeek(loadedFrom);
+}
+
 /** Sessions per day for the last 7 days ending today, oldest first. */
 export function lastSevenDays(trainedDates: string[], today: string): { date: string; count: number }[] {
   const counts = new Map<string, number>();

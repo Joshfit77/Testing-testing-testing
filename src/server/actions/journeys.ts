@@ -49,6 +49,18 @@ export async function journeyCheckInAction(activity: "reading" | "prayer", occur
   return { ok: true, day: d.day, reading: d.reading, prayer: d.prayer, source: d.source };
 }
 
+/** The member's active journey, for sending check-ins that were tapped offline (null: none). Throws when it can't be read, so the caller keeps them. */
+export async function activeJourneyIdAction(): Promise<string | null> {
+  const user = await requireUser();
+  const supabase = await getServerSupabase();
+  const { data, error } = await supabase.from("faith_journeys").select("id").eq("user_id", user.id).eq("status", "active").maybeSingle();
+  if (error) {
+    logError("faith.journey.active", error);
+    throw new Error("journey_unavailable");
+  }
+  return (data?.id as string | undefined) ?? null;
+}
+
 /** Undo a mistaken tap (today only). */
 export async function journeyUndoAction(activity: "reading" | "prayer"): Promise<{ ok: boolean }> {
   await requireUser();

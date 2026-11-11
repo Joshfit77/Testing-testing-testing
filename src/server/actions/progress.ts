@@ -34,12 +34,38 @@ export async function logWeightAction(_prev: ActionState, formData: FormData): P
   return actionOk("Bodyweight saved.");
 }
 
-export async function deleteWeightAction(formData: FormData): Promise<void> {
+/** What a one-tap action (ActionButton) reports back, so a failure is shown instead of looking like success. */
+export interface TapResult {
+  ok: boolean;
+  error?: string;
+}
+
+export async function deleteWeightAction(formData: FormData): Promise<TapResult> {
   const { user, supabase } = await ctx();
   const id = z.string().uuid().safeParse(formData.get("id"));
-  if (!id.success) return;
-  await supabase.from("weight_entries").delete().eq("id", id.data).eq("user_id", user.id);
+  if (!id.success) return { ok: false, error: "That entry couldn't be found." };
+  const { error } = await supabase.from("weight_entries").delete().eq("id", id.data).eq("user_id", user.id);
+  if (error) {
+    logError("progress.weight.delete", error);
+    return { ok: false, error: "Couldn't delete that weight entry. Please try again." };
+  }
   revalidatePath("/progress", "layout");
+  revalidatePath("/home");
+  return { ok: true };
+}
+
+/** Remove one body-measurement entry (the member's own only), so a mistaken entry can be logged again correctly. */
+export async function deleteMeasurementAction(formData: FormData): Promise<TapResult> {
+  const { user, supabase } = await ctx();
+  const id = z.string().uuid().safeParse(formData.get("id"));
+  if (!id.success) return { ok: false, error: "That entry couldn't be found." };
+  const { error } = await supabase.from("measurement_entries").delete().eq("id", id.data).eq("user_id", user.id);
+  if (error) {
+    logError("progress.measurement.delete", error);
+    return { ok: false, error: "Couldn't delete those measurements. Please try again." };
+  }
+  revalidatePath("/progress", "layout");
+  return { ok: true };
 }
 
 export async function logMeasurementAction(_prev: ActionState, formData: FormData): Promise<ActionState> {

@@ -3,6 +3,7 @@ import { Award, CheckCircle2, Lock, Target, Trash2, TrendingDown, TrendingUp, Tr
 import { BarSeriesChart, CATEGORICAL, LineSeriesChart } from "@/components/charts/charts";
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState, Notice } from "@/components/common/states";
+import { EntryList } from "@/components/progress/entry-list";
 import { GoalForm, MeasurementForm, WeightForm } from "@/components/progress/progress-forms";
 import { ProgressPhotos } from "@/components/progress/progress-photos";
 import { ActionButton } from "@/components/common/action-button";
@@ -14,7 +15,7 @@ import { displayLength, displayWeight, formatDuration, formatWeight, kgToLb, len
 import { cn, titleCase } from "@/lib/utils";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
-import { deleteWeightAction, setGoalStatusAction } from "@/server/actions/progress";
+import { deleteMeasurementAction, deleteWeightAction, setGoalStatusAction } from "@/server/actions/progress";
 import { BIG_THREE, getNutritionDaily, getPersonalBests, getStrengthSeries, getTrainingBuckets } from "@/server/services/progress";
 import { listProgressPhotos } from "@/server/services/progress-photos";
 import { logError } from "@/server/log";
@@ -67,9 +68,8 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
     getPersonalBests(supabase, user.id),
     supabase.from("fitness_goals").select("*").eq("user_id", user.id).neq("status", "archived").order("created_at", { ascending: false }),
     supabase.from("exercises").select("id, slug, name").eq("is_published", true).eq("is_timed", false).order("name"),
-    advanced
-      ? supabase.from("measurement_entries").select("recorded_on, waist_cm, chest_cm, hips_cm, arm_cm, thigh_cm, body_fat_pct").eq("user_id", user.id).gte("recorded_on", start).order("recorded_on")
-      : Promise.resolve({ data: [] }),
+    // Every plan can log measurements, so every plan can see and delete its own entries; only the trends are Pro.
+    supabase.from("measurement_entries").select("id, recorded_on, waist_cm, chest_cm, hips_cm, arm_cm, thigh_cm, body_fat_pct").eq("user_id", user.id).gte("recorded_on", start).order("recorded_on").order("created_at"),
     photosPromise,
     stepsPromise,
   ]);
@@ -99,7 +99,23 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
   });
   const selectedSeries = selected ? [...(strength.get(selected.id as string)?.entries() ?? [])].sort(([a], [b]) => a.localeCompare(b)).map(([date, v]) => ({ date, e1rm: displayWeight(v as number, units) })) : [];
 
-  const measurements = (measurementsRes.data ?? []).map((m) => ({
+  const lengthLabel = lengthUnit(units);
+  const measurementEntries = [...(measurementsRes.data ?? [])].reverse().map((m) => {
+    const parts = (
+      [
+        ["Waist", m.waist_cm],
+        ["Chest", m.chest_cm],
+        ["Hips", m.hips_cm],
+        ["Arm", m.arm_cm],
+        ["Thigh", m.thigh_cm],
+      ] as const
+    )
+      .filter(([, v]) => v != null)
+      .map(([label, v]) => `${label} ${displayLength(Number(v), units)} ${lengthLabel}`);
+    if (m.body_fat_pct != null) parts.push(`Body fat ${Number(m.body_fat_pct)}%`);
+    return { id: m.id as string, date: m.recorded_on as string, value: parts.join(" · ") || "Notes only" };
+  });
+  const measurements = (advanced ? (measurementsRes.data ?? []) : []).map((m) => ({
     date: m.recorded_on as string,
     waist: m.waist_cm == null ? null : displayLength(Number(m.waist_cm), units),
     chest: m.chest_cm == null ? null : displayLength(Number(m.chest_cm), units),
@@ -263,24 +279,11 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
             Log bodyweight
           </h2>
           <WeightForm units={units} today={today} />
-          {weights.length > 0 && (
-            <details className="mt-4">
-              <summary className="cursor-pointer text-xs text-muted-foreground">Recent entries</summary>
-              <ul className="mt-2 space-y-1">
-                {[...weights].reverse().slice(0, 8).map((w) => (
-                  <li key={w.id} className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">{w.date}</span>
-                    <span className="flex items-center gap-2">
-                      {w.weight} {weightUnit(units)}
-                      <ActionButton action={deleteWeightAction} fields={{ id: w.id }} variant="ghost" size="icon-sm" aria-label={`Delete weight entry for ${w.date}`} confirmMessage={`Delete the weight entry for ${w.date}?`} confirmLabel="Delete">
-                        <Trash2 className="size-3.5" />
-                      </ActionButton>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </details>
-          )}
+          <EntryList
+            entries={[...weights].reverse().map((w) => ({ id: w.id, date: w.date, value: `${w.weight} ${weightUnit(units)}` }))}
+            action={deleteWeightAction}
+            noun="weight entry"
+          />
         </section>
       </div>
 
@@ -528,6 +531,7 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
           )}
           <section className="rounded-2xl border border-border bg-card p-5">
             <MeasurementForm units={units} today={today} />
+            <EntryList entries={measurementEntries} action={deleteMeasurementAction} noun="measurements" />
           </section>
         </div>
       </section>

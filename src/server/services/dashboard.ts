@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { addDays, isoDateInTz } from "@/lib/domain/dates";
 import { sumMacros } from "@/lib/domain/nutrition";
 import { readinessBand, readinessNote } from "@/lib/domain/readiness";
-import { dailyStreak, lastSevenDays, weeklyStreak } from "@/lib/domain/streak";
+import { dailyStreak, lastSevenDays, streakNeedsOlderHistory, weeklyStreak } from "@/lib/domain/streak";
 import { startOfWeek } from "@/lib/domain/dates";
 
 export interface DashboardData {
@@ -18,6 +18,37 @@ export interface DashboardData {
   nutrition: { calories: number; protein_g: number; goalCalories: number | null; goalProtein: number | null; goalIsEstimate: boolean };
   records: { exercise: string; recordType: string; value: number; weightKg: number | null; reps: number | null; achievedAt: string }[];
   readiness: { score: number; band: "high" | "moderate" | "low"; note: string; checkedOn: string } | null;
+}
+
+const STREAK_PAGE = 1000;
+
+/**
+ * The trained dates the streaks are counted from. The dashboard loads the last 120 days; on their own they capped the
+ * week streak at about 18 and the day streak at 120, while badges count the full history. Older session times are
+ * read (newest first, a page at a time) only while the streak still runs back to the oldest date loaded, so a member
+ * whose streak ends inside the window costs no extra request.
+ */
+export async function streakDates(supabase: SupabaseClient, userId: string, timezone: string, today: string, since: string, recent: string[]): Promise<string[]> {
+  const dates = [...recent];
+  // Sessions before `since` (UTC midnight) may fall on `since` in the member's time zone: complete from the day after.
+  let loadedFrom = addDays(since, 1);
+  for (let from = 0; streakNeedsOlderHistory(dates, today, loadedFrom); from += STREAK_PAGE) {
+    const { data, error } = await supabase
+      .from("workout_sessions")
+      .select("started_at")
+      .eq("user_id", userId)
+      .eq("status", "completed")
+      .lt("started_at", `${since}T00:00:00Z`)
+      .order("started_at", { ascending: false })
+      .order("id")
+      .range(from, from + STREAK_PAGE - 1);
+    if (error || !data?.length) break;
+    const page = data.map((s) => isoDateInTz(new Date(s.started_at as string), timezone));
+    dates.push(...page);
+    if (data.length < STREAK_PAGE) break;
+    loadedFrom = page[page.length - 1]!;
+  }
+  return dates;
 }
 
 export async function getDashboardData(supabase: SupabaseClient, userId: string, timezone: string): Promise<DashboardData> {
@@ -35,6 +66,7 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string,
   ]);
 
   const sessionDates = (sessionsRes.data ?? []).map((s) => isoDateInTz(new Date(s.started_at as string), timezone));
+  const allDates = await streakDates(supabase, userId, timezone, today, since, sessionDates);
   const weekStart = startOfWeek(today);
   const totals = sumMacros((itemsRes.data ?? []) as { calories: number; protein_g: number }[]);
   const checkin = checkinRes.data;
@@ -46,8 +78,8 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string,
     last7: lastSevenDays(sessionDates, today),
     workoutsThisWeek: sessionDates.filter((d) => d >= weekStart).length,
     workoutsTotal: totalRes.count ?? 0,
-    dayStreak: dailyStreak(sessionDates, today),
-    weekStreak: weeklyStreak(sessionDates, today, 1),
+    dayStreak: dailyStreak(allDates, today),
+    weekStreak: weeklyStreak(allDates, today, 1),
     weights: (weightsRes.data ?? []).map((w) => ({ date: w.recorded_on as string, weightKg: Number(w.weight_kg) })),
     nutrition: {
       calories: totals.calories,

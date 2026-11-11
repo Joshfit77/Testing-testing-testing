@@ -401,12 +401,31 @@ export async function editWorkout(supabase: SupabaseClient, userId: string, inpu
   return { volumeKg };
 }
 
+/**
+ * Delete a workout and make the records truthful again. The records the workout earned are removed first: deleting
+ * the session only clears their session link (on delete set null), so if the rebuild then failed they stayed behind
+ * for good, and a retry found no workout. A retry now still rebuilds: with the workout already gone, any records left
+ * without a session (from such a half-finished delete) are rebuilt before "not found" is reported.
+ */
 export async function deleteWorkout(supabase: SupabaseClient, userId: string, sessionId: string): Promise<void> {
   const { data: exs } = await supabase.from("workout_exercises").select("exercise_id").eq("session_id", sessionId).eq("user_id", userId);
+  const { data: held, error: heldErr } = await supabase.from("personal_records").select("exercise_id").eq("session_id", sessionId).eq("user_id", userId);
+  if (heldErr) throw new WorkoutError(heldErr.message);
+  const affected = new Set<string>([...(exs ?? []), ...(held ?? [])].map((r) => r.exercise_id as string));
+  if (held?.length) {
+    const { error: prErr } = await supabase.from("personal_records").delete().eq("session_id", sessionId).eq("user_id", userId);
+    if (prErr) throw new WorkoutError(prErr.message);
+  }
   const { error, count } = await supabase.from("workout_sessions").delete({ count: "exact" }).eq("id", sessionId).eq("user_id", userId);
   if (error) throw new WorkoutError(error.message);
-  if (!count) throw new WorkoutError("Workout not found", "not_found");
-  await rebuildRecords(supabase, userId, [...new Set((exs ?? []).map((e) => e.exercise_id as string))]);
+  if (!count) {
+    const { data: orphans, error: orphanErr } = await supabase.from("personal_records").select("exercise_id").eq("user_id", userId).is("session_id", null);
+    if (orphanErr) throw new WorkoutError(orphanErr.message);
+    for (const o of orphans ?? []) affected.add(o.exercise_id as string);
+    await rebuildRecords(supabase, userId, [...affected]);
+    throw new WorkoutError("Workout not found", "not_found");
+  }
+  await rebuildRecords(supabase, userId, [...affected]);
 }
 
 export interface HistoryItem {
