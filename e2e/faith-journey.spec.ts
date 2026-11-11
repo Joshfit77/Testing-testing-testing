@@ -171,6 +171,9 @@ test.describe("Faith discipleship", () => {
       await completeOnboarding(page);
       await page.goto("/faith/ask");
       await expect(page.getByText(/This is an AI, not a pastor/)).toBeVisible();
+      // Nothing is sent to the AI provider until the member allows it: no question box before consent.
+      await expect(page.getByText("10 questions left today")).toHaveCount(0);
+      await page.getByRole("button", { name: "Allow and continue" }).click();
       await expect(page.getByText("10 questions left today")).toBeVisible();
       await page.getByLabel("Your question").fill("What does John 3:16 mean?");
       await page.getByRole("button", { name: "Ask" }).click();
