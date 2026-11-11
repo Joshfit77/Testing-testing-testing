@@ -51,6 +51,21 @@ describe("draft storage", () => {
     expect(localStorage.getItem("run.recording.u2")).toBeNull();
   });
 
+  it("also removes the workout in progress and the discarded-workout list, for that user only", () => {
+    for (const u of ["u1", "u2"]) {
+      localStorage.setItem(`ngf.workout.draft.${u}`, JSON.stringify({ exercises: [] }));
+      localStorage.setItem(`ngf.workout.discarded.${u}`, JSON.stringify([{ id: "w1", done: false }]));
+    }
+    expect(clearAllDrafts("u1")).toBe(2);
+    expect(localStorage.getItem("ngf.workout.draft.u1")).toBeNull();
+    expect(localStorage.getItem("ngf.workout.discarded.u1")).toBeNull();
+    expect(localStorage.getItem("ngf.workout.draft.u2")).not.toBeNull();
+    expect(localStorage.getItem("ngf.workout.discarded.u2")).not.toBeNull();
+    expect(clearAllDrafts()).toBe(2);
+    expect(localStorage.getItem("ngf.workout.draft.u2")).toBeNull();
+    expect(localStorage.getItem("ngf.workout.discarded.u2")).toBeNull();
+  });
+
   it("treats empty forms as blank", () => {
     expect(isBlankDraft("  ")).toBe(true);
     expect(isBlankDraft({ name: "", calories: "", isEstimate: true })).toBe(true);

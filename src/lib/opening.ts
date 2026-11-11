@@ -51,6 +51,8 @@ export const OPENING_SKIP_PATHS = /^\/(login|signup|forgot-password|reset-passwo
 export const OPENING_CRITICAL_PATHS = /^\/(train\/workout|run\/record|progress\/body-scan\/new|nutrition\/scanner|progress\/sleep\/alarm)(\/|$)/;
 /** Workout drafts (src/lib/workout-storage.ts) and GPS recordings (src/components/run/gps-recorder.tsx), per user. */
 export const WORKOUT_DRAFT_PREFIX = "ngf.workout.draft.";
+/** The member's list of workouts discarded on this device (src/lib/workout-storage.ts). */
+export const WORKOUT_DISCARDED_PREFIX = "ngf.workout.discarded.";
 export const GPS_RECORDING_PREFIX = "run.recording.";
 /** A recording older than this can't be resumed (matches isResumable in src/lib/domain/gps-track.ts). */
 export const GPS_RESUMABLE_MS = 12 * 3600_000;

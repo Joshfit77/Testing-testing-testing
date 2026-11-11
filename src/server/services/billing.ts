@@ -2,7 +2,7 @@ import "server-only";
 import Stripe from "stripe";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { publicEnv } from "@/lib/env";
-import { entitlementFromSubscriptions, getPlans, legacyTermsApply, type BillingInterval, type LegacyAiTerms, type SubscriptionStatus } from "@/lib/domain/plans";
+import { entitlementFromSubscriptions, getPlans, legacyTermsApply, periodStartFromEnd, type BillingInterval, type LegacyAiTerms, type SubscriptionStatus } from "@/lib/domain/plans";
 import type { Plan } from "@/lib/domain/types";
 import { storeRowAsSubscription } from "@/lib/billing/revenuecat";
 import { isServiceRoleConfigured, serverEnv } from "@/server/env";
@@ -91,12 +91,40 @@ export function planForPriceId(priceId: string | null | undefined): PaidPlan | n
   return null;
 }
 
-/** Whether a Stripe price renews monthly or yearly (current and legacy prices). */
+/**
+ * Whether a Stripe price renews monthly or yearly, where this server's configuration says so: the current monthly
+ * and yearly prices. A legacy price (STRIPE_PRICE_*_LEGACY) is only a list of ids, monthly and yearly alike, so its
+ * interval isn't known here: null, rather than a guess (see resolvePriceInterval).
+ */
 export function intervalForPriceId(priceId: string | null | undefined): BillingInterval | null {
   if (!priceId) return null;
   if ([serverEnv.stripePriceProYearly, serverEnv.stripePricePlusYearly].some((p) => p && p === priceId)) return "year";
-  if (planForPriceId(priceId)) return "month";
+  if ([serverEnv.stripePricePro, serverEnv.stripePricePlus].some((p) => p && p === priceId)) return "month";
   return null;
+}
+
+const priceIntervalCache = new Map<string, BillingInterval>();
+
+/**
+ * The interval of any Stripe price: from the configuration when it says, otherwise (a legacy price) as Stripe holds
+ * it, remembered for the life of the server (a price's interval never changes). Null when Stripe isn't configured or
+ * can't be read, so nothing is labelled with a guess.
+ */
+export async function resolvePriceInterval(priceId: string | null | undefined): Promise<BillingInterval | null> {
+  const known = intervalForPriceId(priceId);
+  if (known || !priceId || !serverEnv.stripeSecretKey) return known;
+  const cached = priceIntervalCache.get(priceId);
+  if (cached) return cached;
+  try {
+    const recurring = (await getStripe().prices.retrieve(priceId)).recurring?.interval;
+    const interval: BillingInterval | null = recurring === "year" ? "year" : recurring === "month" ? "month" : null;
+    if (!interval) return null;
+    priceIntervalCache.set(priceId, interval);
+    return interval;
+  } catch (err) {
+    logError("billing.price", err, { price: priceId });
+    return null;
+  }
 }
 
 async function getOrCreateCustomer(userId: string, email: string | undefined): Promise<string> {
@@ -240,7 +268,7 @@ export async function recomputeEntitlement(userId: string): Promise<Plan> {
     if (verErr) throw verErr;
     const version = Number(ver?.version ?? 0);
     const [stripeRes, storeRes] = await Promise.all([
-      admin.from("subscriptions").select("plan, status, current_period_end, access_revoked_at").eq("user_id", userId),
+      admin.from("subscriptions").select("plan, status, current_period_end, access_revoked_at, stripe_price_id").eq("user_id", userId),
       admin
         .from("store_subscriptions")
         .select("store, plan, purchased_at, expires_at, grace_period_expires_at, unsubscribe_detected_at, billing_issue_detected_at, refunded_at, is_sandbox")
@@ -248,12 +276,28 @@ export async function recomputeEntitlement(userId: string): Promise<Plan> {
     ]);
     if (stripeRes.error) throw stripeRes.error;
     if (storeRes.error) throw storeRes.error;
-    const candidates: { plan: PaidPlan; status: SubscriptionStatus; current_period_end: string | null; access_revoked_at?: string | null; source: EntitlementSource }[] = [
-      ...((stripeRes.data ?? []) as { plan: PaidPlan; status: SubscriptionStatus; current_period_end: string | null; access_revoked_at: string | null }[]).map((s) => ({
-        ...s,
-        source: "stripe" as const,
-      })),
-    ];
+    const candidates: {
+      plan: PaidPlan;
+      status: SubscriptionStatus;
+      current_period_end: string | null;
+      access_revoked_at?: string | null;
+      period_started_at?: string | null;
+      source: EntitlementSource;
+    }[] = [];
+    for (const { stripe_price_id, ...s } of (stripeRes.data ?? []) as {
+      plan: PaidPlan;
+      status: SubscriptionStatus;
+      current_period_end: string | null;
+      access_revoked_at: string | null;
+      stripe_price_id: string | null;
+    }[]) {
+      // A failed renewal: Stripe has already moved the period end on, so access is capped at a grace period counted
+      // from the start of that unpaid period (see SubscriptionAccess.period_started_at in plans.ts). If the price's
+      // interval can't be read, a month is assumed: the shortest interval sold, so the member is never cut off
+      // before a real grace period has run.
+      const period_started_at = s.status === "past_due" ? periodStartFromEnd(s.current_period_end, (await resolvePriceInterval(stripe_price_id)) ?? "month") : null;
+      candidates.push({ ...s, period_started_at, source: "stripe" });
+    }
     const storeRows = (storeRes.data ?? []) as (Parameters<typeof storeRowAsSubscription>[0] & { store: string; is_sandbox: boolean })[];
     // A stored sandbox purchase grants only while the member is still allowed sandbox purchases: removing a tester
     // from the allow-list (or the entry expiring) ends it at the next recompute, without waiting for RevenueCat.

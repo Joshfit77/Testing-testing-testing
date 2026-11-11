@@ -101,4 +101,12 @@ export const BIBLE_AI_LIMITS = {
   pro: { perMinute: 5, daily: 40, monthly: 400 },
 } as const;
 export const BIBLE_AI_MAX_QUESTION = 600;
-export const BIBLE_AI_MAX_TOKENS = 700;
+/** Room for a full answer with its quotations (the instructions ask for under 250 words; this is only the ceiling). */
+export const BIBLE_AI_MAX_TOKENS = 2000;
+/** Added to an answer the model had to stop before finishing (stop reason `max_tokens`). */
+export const BIBLE_AI_CUT_SHORT_NOTE = "(This answer was cut short. Ask a follow-up question to hear the rest.)";
+/** Shown when the model declines to answer (stop reason `refusal`); the question isn't counted. */
+export const BIBLE_AI_REFUSAL = "The helper can't answer that one. Try asking about a passage, a person or a theme in the Bible.";
+/** The helper sends the question to the AI provider, so it waits for the same permission as every other AI feature. */
+export const BIBLE_AI_CONSENT_REQUIRED = "Allow AI data sharing first: choose Allow on the Ask about the Bible screen. You can turn it off any time in Profile & Settings → Privacy & data.";
+export const BIBLE_AI_DISABLED = "The Bible study helper is temporarily unavailable. The Bible itself is always free to read and search.";

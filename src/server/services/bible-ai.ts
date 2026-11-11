@@ -2,9 +2,13 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import {
+  BIBLE_AI_CONSENT_REQUIRED,
+  BIBLE_AI_CUT_SHORT_NOTE,
+  BIBLE_AI_DISABLED,
   BIBLE_AI_LIMITS,
   BIBLE_AI_MAX_QUESTION,
   BIBLE_AI_MAX_TOKENS,
+  BIBLE_AI_REFUSAL,
   BIBLE_AI_SYSTEM,
   buildBibleAiMessage,
   checkCitations,
@@ -19,6 +23,7 @@ import { getPassage, passageParts, passageText, searchBible } from "@/server/bib
 import type { TextPart } from "@/lib/bible/red-letter";
 import { isDemoMode } from "@/server/demo";
 import { isAiConfigured, serverEnv } from "@/server/env";
+import { isFlagEnabled } from "@/server/flags";
 import { logError } from "@/server/log";
 
 /*
@@ -67,12 +72,31 @@ export interface BibleAnswer {
   citations: { reference: string; text: string; parts?: TextPart[] }[];
   unverified: string[];
 }
-export type BibleAskResult = BibleAnswer | { ok: false; code: "unavailable" | "rate_limited" | "quota" | "invalid" | "error"; error: string };
+export type BibleAskResult = BibleAnswer | { ok: false; code: "unavailable" | "consent_required" | "rate_limited" | "quota" | "invalid" | "refused" | "error"; error: string };
+
+/**
+ * Whether the helper may send anything to the AI provider for this member, checked before any quota is reserved:
+ * the AI kill switch (the `ai_coach` flag turns every AI feature off) and the member's own AI data-sharing consent,
+ * the same two conditions as the coach (assertAiAllowed and coachTurn in ai-coach.ts). Null when it may.
+ */
+export async function bibleAiBlocked(userId: string): Promise<Extract<BibleAskResult, { ok: false }> | null> {
+  if (!(await isFlagEnabled("ai_coach"))) return { ok: false, code: "unavailable", error: BIBLE_AI_DISABLED };
+  const { data: consent, error } = await getServiceSupabase().from("profiles").select("ai_data_consent_at").eq("id", userId).maybeSingle();
+  if (error) {
+    // Not knowing must never read as "allowed".
+    logError("bible_ai.consent", error);
+    return { ok: false, code: "error", error: "Couldn't ask right now. Please try again." };
+  }
+  if (!consent?.ai_data_consent_at) return { ok: false, code: "consent_required", error: BIBLE_AI_CONSENT_REQUIRED };
+  return null;
+}
 
 export async function askBible(userId: string, plan: Plan, questionRaw: string, threadId: string): Promise<BibleAskResult> {
   const question = questionRaw.trim().slice(0, BIBLE_AI_MAX_QUESTION);
   if (question.length < 3) return { ok: false, code: "invalid", error: "Ask a question about the Bible." };
   if (!isAiConfigured() || isDemoMode()) return { ok: false, code: "unavailable", error: "The Bible study helper isn't available yet." };
+  const blocked = await bibleAiBlocked(userId);
+  if (blocked) return blocked;
   const limits = plan === "pro" ? BIBLE_AI_LIMITS.pro : BIBLE_AI_LIMITS.free;
   const service = getServiceSupabase();
   const { data: usageId, error: quotaError } = await service.rpc("reserve_bible_ai_usage", { p_user_id: userId, p_per_minute: limits.perMinute, p_daily: limits.daily, p_monthly: limits.monthly });
@@ -96,13 +120,21 @@ export async function askBible(userId: string, plan: Plan, questionRaw: string, 
         { role: "user" as const, content: buildBibleAiMessage(question, passages) },
       ],
     });
+    if (msg.stop_reason === "refusal") {
+      // The model declined: nothing is saved, and the reservation is given back (a failed row isn't counted).
+      const { error: releaseError } = await service.from("bible_ai_usage").update({ status: "failed", model }).eq("id", usageId as number);
+      if (releaseError) logError("bible_ai.usage", releaseError);
+      return { ok: false, code: "refused", error: BIBLE_AI_REFUSAL };
+    }
     const raw = msg.content
       .filter((b) => b.type === "text")
       .map((b) => (b as { text: string }).text)
       .join("\n")
       .trim();
     const check = checkCitations(raw, (r) => getPassage(r).length > 0);
-    const answer = markUnverified(raw || "I couldn't answer that. Try asking it another way.", check.unverified);
+    const marked = markUnverified(raw || "I couldn't answer that. Try asking it another way.", check.unverified);
+    // Out of room mid-answer: what was written is still shown, and said to be incomplete.
+    const answer = msg.stop_reason === "max_tokens" ? `${marked}\n\n${BIBLE_AI_CUT_SHORT_NOTE}` : marked;
     const citations = check.verified.slice(0, 12).map((r) => ({ reference: formatReference(r), text: passageText(r) ?? "", parts: passageParts(r) ?? undefined }));
     // (Every row names every column: in a multi-row insert a column one row leaves out is sent as null, not its default.)
     // Explicit, distinct times: a default now() is the same for both rows of one insert, so the question and its answer

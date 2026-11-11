@@ -3,6 +3,7 @@ import { aiChatRequestSchema } from "@/lib/validation/schemas";
 import { authenticateRequest, planForAuth } from "@/server/api-auth";
 import { AI_ERROR_STATUS, AiError, coachTurn, type CoachEvent, type CoachTurnResult } from "@/server/services/ai-coach";
 import { logError } from "@/server/log";
+import { COACH_TURN_DEADLINE_MS } from "@/lib/coach/prompt";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 180;
@@ -37,9 +38,13 @@ export async function POST(request: NextRequest) {
   const plan = await planForAuth(auth).catch(() => null);
   if (!plan) return NextResponse.json({ error: "server_error", message: "Something went wrong. Please try again." }, { status: 500 });
 
+  // Ends the turn before the platform's limit (maxDuration) would end the function mid-answer: the coach gives the
+  // reserved message back and the member is told it took too long.
+  const signal = AbortSignal.timeout(COACH_TURN_DEADLINE_MS);
+
   if (!wantsStream) {
     try {
-      const result = await coachTurn({ supabase: auth.supabase, userId: auth.user.id, plan, ...parsed.data });
+      const result = await coachTurn({ supabase: auth.supabase, userId: auth.user.id, plan, ...parsed.data, signal });
       return NextResponse.json(result);
     } catch (err) {
       const e = errorBody(err);
@@ -83,6 +88,7 @@ export async function POST(request: NextRequest) {
     userId: auth.user.id,
     plan,
     ...parsed.data,
+    signal,
     onEvent: (e: CoachEvent) => {
       resolveStarted();
       send(e);

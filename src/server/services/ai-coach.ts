@@ -9,7 +9,7 @@ import { aiAllowance } from "@/lib/domain/plans";
 import type { Plan } from "@/lib/domain/types";
 import { aiPlanOutputSchema, validateAiPlan, type AiPlan } from "@/lib/validation/ai";
 import { formatAthleteContext, type AthleteSnapshot } from "@/lib/coach/context";
-import { buildSystemBlocks, CHAT_MAX_TOKENS, fallbackParams, fitStoredReply, MAX_TOOL_ROUNDS, PLAN_MAX_TOKENS, PLAN_REQUEST_OPTIONS, sanitizeAssistantContent } from "@/lib/coach/prompt";
+import { buildSystemBlocks, CHAT_MAX_TOKENS, CHAT_REQUEST_OPTIONS, fallbackParams, fitStoredReply, MAX_TOOL_ROUNDS, PLAN_MAX_TOKENS, PLAN_REQUEST_OPTIONS, sanitizeAssistantContent } from "@/lib/coach/prompt";
 import { coachModelIds, routeCoachRequest, type ModelTier } from "@/lib/coach/routing";
 import { coachToolDefinitions, toolActivityLabel, type CoachProposal } from "@/lib/coach/tools";
 import { formatMemoriesForContext } from "@/lib/coach/memory";
@@ -231,6 +231,13 @@ function isOverloaded(err: unknown): boolean {
   return err instanceof Anthropic.APIError && err.status === 529;
 }
 
+const TIMEOUT_MESSAGE = "The coach took too long to answer. Please try again.";
+
+/** The signal was ended by a deadline (AbortSignal.timeout), not by someone cancelling. */
+function deadlinePassed(signal: AbortSignal | undefined): boolean {
+  return Boolean(signal?.aborted) && (signal?.reason as { name?: string } | undefined)?.name === "TimeoutError";
+}
+
 const REFUSAL_REPLY ="I can't help with that request. I'm happy to help with training, technique, recovery or general nutrition questions instead.";
 
 interface ChatLoopResult {
@@ -271,7 +278,7 @@ async function runChatLoop(params: {
         output_config: { effort: "medium" },
         ...fallbackParams(model),
       },
-      { signal },
+      { signal, ...CHAT_REQUEST_OPTIONS },
     );
     let roundText = "";
     stream.on("text", (delta) => {
@@ -514,6 +521,8 @@ export async function coachTurn(params: {
     // duplicate it.
     await releaseUsage(reservation.usageId);
     await supabase.from("ai_messages").delete().eq("id", userRow.id);
+    // The route's deadline passed, or one provider request ran out its own time: said as such (not "cancelled").
+    if (deadlinePassed(params.signal) || err instanceof Anthropic.APIConnectionTimeoutError) throw new AiError("provider", TIMEOUT_MESSAGE);
     if (err instanceof Anthropic.APIUserAbortError) throw new AiError("provider", "The request was cancelled.");
     if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
       logError("ai.provider_auth", err, { status: err.status ?? null });
