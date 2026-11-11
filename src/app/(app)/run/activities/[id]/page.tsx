@@ -143,13 +143,11 @@ export default async function ActivityDetailPage({ params, searchParams }: { par
       )}
 
       <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
-        {a.source !== "gps" && (
-          <Button asChild variant="secondary" className="w-full sm:flex-1">
-            <Link href={`/run/activities/${a.id}/edit`}>
-              <Pencil aria-hidden /> Edit
-            </Link>
-          </Button>
-        )}
+        <Button asChild variant="secondary" className="w-full sm:flex-1">
+          <Link href={`/run/activities/${a.id}/edit`}>
+            <Pencil aria-hidden /> {a.source === "gps" ? "Edit notes and effort" : "Edit"}
+          </Link>
+        </Button>
         <DeleteActivityButton id={a.id} label={label.toLowerCase()} />
       </div>
     </div>

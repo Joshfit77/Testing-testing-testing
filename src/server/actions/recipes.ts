@@ -146,6 +146,8 @@ const logSchema = z.object({
   date: isoDate,
   mealType: mealTypeSchema,
   servings: z.number().min(0.05, "Enter at least 0.05 servings.").max(20, "That's more than 20 servings."),
+  /** Generated on the device per attempt, so a retried or double-sent request can't log the serving twice. */
+  clientId: uuid.optional(),
 });
 
 /**
@@ -157,7 +159,7 @@ export async function logRecipeAction(input: unknown): Promise<ActionState> {
     const { user, supabase } = await ctx();
     const parsed = logSchema.safeParse(input);
     if (!parsed.success) return actionError(parsed.error.issues[0]?.message ?? "Enter how many servings you ate.");
-    const { recipeId, date, mealType, servings } = parsed.data;
+    const { recipeId, date, mealType, servings, clientId } = parsed.data;
     const recipe = await loadRecipe(supabase, user.id, recipeId);
     if (!recipe) return actionError("That recipe couldn't be found. It may have been deleted.");
     if (!recipe.ingredients.length) return actionError("Add ingredients to this recipe before logging it.");
@@ -173,9 +175,11 @@ export async function logRecipeAction(input: unknown): Promise<ActionState> {
       name: recipe.name.slice(0, 160),
       is_estimate: recipe.anyEstimate,
       source: `recipe:${recipe.id}`,
+      client_id: clientId ?? null,
       ...cols,
     });
-    if (error) throw error;
+    // The same attempt arriving twice: the first insert won, so this one is already done.
+    if (error && !(error.code === "23505" && clientId)) throw error;
     return actionOk(`Logged ${cols.amount_label} of ${recipe.name}.`);
   } catch (err) {
     return guard(err, "recipes.log");

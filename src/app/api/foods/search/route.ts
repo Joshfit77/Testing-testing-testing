@@ -5,7 +5,7 @@ import type { FoodChoice } from "@/lib/domain/food-basis";
 import { isFoodSearchConfigured } from "@/server/env";
 import { isFlagEnabled } from "@/server/flags";
 import { rateLimit } from "@/server/rate-limit";
-import { searchFoods } from "@/server/services/food-database";
+import { externalFoodBasis, searchFoods } from "@/server/services/food-database";
 import { browseCategory, popularFoods, searchUsda, type LocalFood } from "@/server/services/usda-local";
 import { logError } from "@/server/log";
 
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
             ref: f.fdcId,
             name: f.name,
             detail: [f.brand, "USDA FoodData Central", f.householdServing ? `label serving ${f.householdServing}` : null].filter(Boolean).join(" · "),
-            basis: { per100: { calories: f.calories, protein_g: f.protein_g, carbs_g: f.carbs_g, fat_g: f.fat_g, fiber_g: f.fiber_g } },
+            basis: externalFoodBasis(f),
           }));
       } catch (err) {
         logError("foods.search.remote", err);

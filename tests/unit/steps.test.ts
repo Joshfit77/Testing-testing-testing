@@ -7,8 +7,25 @@ import {
   MAX_DAILY_STEPS,
   stepGoalPct,
   stepsByDay,
+  syncableDays,
   syncPayload,
 } from "@/lib/domain/steps";
+
+describe("syncableDays", () => {
+  const synced = [
+    { day: "2026-11-07", steps: 4000 },
+    { day: "2026-11-08", steps: 9000 },
+    { day: "2026-11-09", steps: 1200 },
+  ];
+  it("leaves out days the member entered by hand, so a Health sync never replaces them", () => {
+    expect(syncableDays(synced, ["2026-11-08"])).toEqual([synced[0], synced[2]]);
+    expect(syncableDays(synced, new Set(["2026-11-07", "2026-11-08", "2026-11-09"]))).toEqual([]);
+  });
+  it("writes every day when none was entered by hand (including days a sync wrote before)", () => {
+    expect(syncableDays(synced, [])).toEqual(synced);
+    expect(syncableDays(synced, ["2026-10-01"])).toEqual(synced);
+  });
+});
 
 describe("lastNDates", () => {
   it("returns n dates ending today, oldest first, across a month boundary", () => {

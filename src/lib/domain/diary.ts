@@ -158,6 +158,20 @@ export interface LogResult extends ActionState {
   itemIds?: string[];
 }
 
+/** Shown in place when a save never reached the server (offline, dropped connection): what was entered stays put. */
+export const SAVE_FAILED_MESSAGE = "Couldn't save — check your connection and try again.";
+export const saveFailed = (): LogResult => ({ ok: false, message: SAVE_FAILED_MESSAGE, at: Date.now() });
+
+/**
+ * The id sent with an attempt to log something, held in a ref: trying the same thing again (same `key`) reuses the
+ * id, so a retry after a dropped connection can't log it twice; a different thing gets a new id. Clear the ref
+ * (`ref.current = null`) once the server confirms, so the next tap is a new entry.
+ */
+export function attemptId(ref: { current: { key: string; id: string } | null }, key: string): string {
+  if (ref.current?.key !== key) ref.current = { key, id: crypto.randomUUID() };
+  return ref.current.id;
+}
+
 /** How long "Undo" stays next to the confirmation after food is logged. */
 export const UNDO_LOG_MS = 8000;
 

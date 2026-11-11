@@ -153,6 +153,105 @@ describe("logging returns the ids it added", () => {
   });
 });
 
+describe("calories are stored as whole kcal", () => {
+  it("rounds a manual or Quick add entry on write, so the day's total equals the rows shown", async () => {
+    withMeal((op) => (op.table === "meal_items" && kind(op) === "insert" ? { data: { id: NEW_ID }, error: null } : { data: null, error: null }));
+    const stored: number[] = [];
+    for (const calories of [100.4, 100.4, 100.4, 99.5]) {
+      db.ops.length = 0;
+      await logFoodAction({ date: "2026-11-09", mealType: "snack", status: "logged", item: { source: "manual", name: "Quick add", calories, protein_g: 0, carbs_g: 0, fat_g: 0, isEstimate: false } });
+      const [insert] = opsOn("meal_items", "insert");
+      stored.push((insert!.calls.find(([n]) => n === "insert")![1][0] as { calories: number }).calories);
+    }
+    expect(stored).toEqual([100, 100, 100, 100]);
+    // Unrounded, the rows would each show 100 while the total (400.7) showed 401.
+    expect(Math.round(stored.reduce((a, b) => a + b, 0))).toBe(stored.map(Math.round).reduce((a, b) => a + b, 0));
+  });
+});
+
+describe("retries of re-log, saved meal and copy are logged once", () => {
+  const rowOf = (op: Op) => op.calls.find(([n]) => n === "insert")![1][0];
+
+  it("re-log: stores the attempt's id, and a repeat returns the first row instead of adding another", async () => {
+    let inserts = 0;
+    withMeal((op) => {
+      if (op.table === "meal_items" && kind(op) === "insert") return inserts++ === 0 ? { data: { id: NEW_ID }, error: null } : { data: null, error: { code: "23505" } };
+      if (op.table === "meal_items" && kind(op) === "select" && op.calls.some(([n]) => n === "in")) return { data: [{ id: NEW_ID }], error: null };
+      if (op.table === "meal_items" && kind(op) === "select") return { data: { name: "Rice", amount_label: "1 cup" }, error: null };
+      return { data: null, error: null };
+    });
+    const input = { itemId: OTHER_ID, date: "2026-11-09", mealType: "dinner", status: "logged", clientId: CLIENT_ID };
+    const first = await relogItemAction(input);
+    const second = await relogItemAction(input);
+    expect(first).toMatchObject({ ok: true, itemIds: [NEW_ID] });
+    expect(second).toMatchObject({ ok: true, message: first.message, itemIds: [NEW_ID] });
+    expect(opsOn("meal_items", "insert").map((op) => (rowOf(op) as { client_id: string }).client_id)).toEqual([CLIENT_ID, CLIENT_ID]);
+    const lookup = opsOn("meal_items", "select").find((op) => op.calls.some(([n]) => n === "in"))!;
+    expect(has(lookup, "eq", "user_id", USER)).toBe(true);
+    expect(has(lookup, "in", "client_id", [CLIENT_ID])).toBe(true);
+  });
+
+  it("re-log without an id still works (older clients), with no client id stored", async () => {
+    withMeal((op) => {
+      if (op.table === "meal_items" && kind(op) === "select") return { data: { name: "Rice", amount_label: null }, error: null };
+      if (op.table === "meal_items" && kind(op) === "insert") return { data: { id: NEW_ID }, error: null };
+      return { data: null, error: null };
+    });
+    expect(await relogItemAction({ itemId: OTHER_ID, date: "2026-11-09", mealType: "dinner" })).toMatchObject({ ok: true, itemIds: [NEW_ID] });
+    expect((rowOf(opsOn("meal_items", "insert")[0]!) as { client_id: unknown }).client_id).toBeNull();
+  });
+
+  it("saved meal: each row gets its own id derived from the attempt's, the same on a retry, and a repeat adds nothing", async () => {
+    const run = async (conflict: boolean) => {
+      db.ops.length = 0;
+      let mealsReads = 0;
+      db.state.respond = (op) => {
+        if (op.table === "meals" && kind(op) === "select") return mealsReads++ === 0 ? { data: { id: TEMPLATE_ID, name: "Chili", yield_servings: 1 }, error: null } : { data: { id: "meal-1" }, error: null };
+        if (op.table === "meal_items" && kind(op) === "insert") return conflict ? { data: null, error: { code: "23505" } } : { data: [{ id: NEW_ID }, { id: NEW_ID_2 }], error: null };
+        if (op.table === "meal_items" && kind(op) === "select" && op.calls.some(([n]) => n === "in")) return { data: [{ id: NEW_ID }, { id: NEW_ID_2 }], error: null };
+        if (op.table === "meal_items" && kind(op) === "select") return { data: [{ name: "Beans", calories: 200 }, { name: "Beef", calories: 300 }], error: null };
+        return { data: null, error: null };
+      };
+      const fd = new FormData();
+      for (const [k, v] of Object.entries({ templateId: TEMPLATE_ID, date: "2026-11-09", mealType: "lunch", servings: "1", status: "logged", clientId: CLIENT_ID })) fd.set(k, v);
+      const res = await logTemplateAction({ ok: false }, fd);
+      return { res, ids: (rowOf(opsOn("meal_items", "insert")[0]!) as { client_id: string }[]).map((r) => r.client_id) };
+    };
+    const first = await run(false);
+    const retry = await run(true);
+    expect(first.res).toMatchObject({ ok: true, itemIds: [NEW_ID, NEW_ID_2] });
+    expect(retry.res).toMatchObject({ ok: true, message: first.res.message, itemIds: [NEW_ID, NEW_ID_2] });
+    expect(first.ids).toHaveLength(2);
+    expect(new Set([...first.ids, CLIENT_ID]).size).toBe(3);
+    for (const id of first.ids) expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+    expect(retry.ids).toEqual(first.ids);
+  });
+
+  it("copy a day: a meal an earlier send already copied is counted, not copied again", async () => {
+    db.state.respond = (op) => {
+      if (op.table === "meals" && kind(op) === "select" && has(op, "eq", "eaten_on", "2026-11-08")) return { data: [{ meal_type: "lunch", meal_items: [{ name: "Soup" }] }], error: null };
+      if (op.table === "meals" && kind(op) === "select") return { data: { id: "meal-1" }, error: null };
+      if (op.table === "meal_items" && kind(op) === "insert") return { data: null, error: { code: "23505" } };
+      if (op.table === "meal_items" && kind(op) === "select") return { data: [{ id: NEW_ID }], error: null };
+      return { data: null, error: null };
+    };
+    const res = await copyMealsAction({ fromDate: "2026-11-08", toDate: "2026-11-09", mealType: "lunch", clientId: CLIENT_ID });
+    expect(res).toMatchObject({ ok: true, message: "Copied 1 item.", itemIds: [NEW_ID] });
+    const [row] = rowOf(opsOn("meal_items", "insert")[0]!) as { client_id: string }[];
+    expect(row!.client_id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(row!.client_id).not.toBe(CLIENT_ID);
+  });
+
+  it("a duplicate-key error with no client id is still an error", async () => {
+    withMeal((op) => {
+      if (op.table === "meal_items" && kind(op) === "select") return { data: { name: "Rice", amount_label: null }, error: null };
+      if (op.table === "meal_items" && kind(op) === "insert") return { data: null, error: { code: "23505" } };
+      return { data: null, error: null };
+    });
+    expect(await relogItemAction({ itemId: OTHER_ID, date: "2026-11-09", mealType: "dinner" })).toMatchObject({ ok: false });
+  });
+});
+
 describe("undo removes exactly those rows", () => {
   it("refuses a malformed request without touching the database", async () => {
     expect(await undoLoggedItemsAction({ ids: [] })).toMatchObject({ ok: false });

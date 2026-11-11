@@ -5,7 +5,7 @@ import { barcodeLookupCandidates } from "@/lib/barcode";
 import { basisFromFoodRow, basisUnits, type FoodBasis } from "@/lib/domain/food-basis";
 import { basisFromOffProduct } from "@/lib/open-food-facts";
 import { isFoodSearchConfigured } from "@/server/env";
-import { getFood } from "@/server/services/food-database";
+import { externalFoodBasis, getFood } from "@/server/services/food-database";
 import { lookupBarcode } from "@/server/services/open-food-facts";
 import { getLocalFood } from "@/server/services/usda-local";
 
@@ -93,7 +93,7 @@ export async function resolvePickedFood(supabase: SupabaseClient, userId: string
     return {
       ok: true,
       food: {
-        basis: { per100: { calories: ext.calories, protein_g: ext.protein_g, carbs_g: ext.carbs_g, fat_g: ext.fat_g, fiber_g: ext.fiber_g } },
+        basis: externalFoodBasis(ext),
         food_id: cached.id as string,
         name: ext.name,
         is_estimate: false,

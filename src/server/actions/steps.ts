@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { actionError, actionInvalid, actionOk, type ActionState } from "@/lib/action-state";
 import { addDays, isoDateInTz } from "@/lib/domain/dates";
-import { formatSteps, MAX_DAILY_STEPS, MAX_SYNC_DAYS, STEP_GOAL_MAX, STEP_GOAL_MIN, STEP_SOURCE_LABELS } from "@/lib/domain/steps";
+import { formatSteps, MAX_DAILY_STEPS, MAX_SYNC_DAYS, STEP_GOAL_MAX, STEP_GOAL_MIN, STEP_SOURCE_LABELS, syncableDays } from "@/lib/domain/steps";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getProfile, requireUser } from "@/server/auth";
 import { logError } from "@/server/log";
@@ -73,15 +73,31 @@ export async function syncStepsAction(input: unknown): Promise<ActionState> {
   const latest = addDays(today, 1);
   const earliest = addDays(today, -MAX_SYNC_DAYS);
   if (days.some((d) => d.day > latest || d.day < earliest)) return actionError("Some synced days are outside the last month.");
-  const { error } = await supabase.from("daily_steps").upsert(
-    days.map((d) => ({ user_id: user.id, day: d.day, steps: d.steps, source })),
-    { onConflict: "user_id,day" },
-  );
-  if (error) {
-    logError("steps.sync", error);
+  // A day the member entered by hand keeps that count: a sync only fills in or refreshes days it wrote itself.
+  const { data: manual, error: readError } = await supabase
+    .from("daily_steps")
+    .select("day")
+    .eq("user_id", user.id)
+    .eq("source", "manual")
+    .in("day", days.map((d) => d.day));
+  if (readError) {
+    logError("steps.sync", readError);
     return actionError("Couldn't save your synced steps. Please try again.");
   }
-  return actionOk(`Synced ${days.length} ${days.length === 1 ? "day" : "days"} from ${STEP_SOURCE_LABELS[source]}.`);
+  const write = syncableDays(days, ((manual ?? []) as { day: string }[]).map((r) => r.day));
+  const kept = days.length - write.length;
+  if (write.length) {
+    const { error } = await supabase.from("daily_steps").upsert(
+      write.map((d) => ({ user_id: user.id, day: d.day, steps: d.steps, source })),
+      { onConflict: "user_id,day" },
+    );
+    if (error) {
+      logError("steps.sync", error);
+      return actionError("Couldn't save your synced steps. Please try again.");
+    }
+  }
+  const keptNote = kept ? ` ${kept} ${kept === 1 ? "day" : "days"} you entered by hand ${kept === 1 ? "was" : "were"} kept.` : "";
+  return actionOk(`Synced ${write.length} ${write.length === 1 ? "day" : "days"} from ${STEP_SOURCE_LABELS[source]}.${keptNote}`);
 }
 
 const goalSchema = z.object({

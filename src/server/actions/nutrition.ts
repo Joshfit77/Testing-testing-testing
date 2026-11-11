@@ -11,7 +11,7 @@ import { assertFeature, EntitlementError, requireUser } from "@/server/auth";
 import { OffUnavailableError } from "@/server/services/open-food-facts";
 import { basisFromLegacyItem, sanitizeBasis } from "@/lib/domain/food-basis";
 import { amountFields, pickedFoodSchema, resolvePickedFood } from "@/server/services/food-resolve";
-import { amountColumns, findOrCreateMeal, ITEM_COLUMNS, LIMITS_ERROR, scaleItem, withinLimits, type MealItemRow } from "@/server/services/diary-write";
+import { amountColumns, derivedClientId, findOrCreateMeal, ITEM_COLUMNS, LIMITS_ERROR, scaleItem, withinLimits, type MealItemRow } from "@/server/services/diary-write";
 import { logError } from "@/server/log";
 import { estimateAndSaveTargets } from "@/server/services/nutrition-targets";
 import { FAVORITE_KEY_PATTERN } from "@/lib/domain/food-favorites";
@@ -34,6 +34,12 @@ function guard(err: unknown, scope: string): ActionState {
 }
 
 const amount = amountFields;
+
+/** The diary rows an earlier send of the same attempt already added (looked up by the client ids it was given). */
+async function alreadyLogged(supabase: Awaited<ReturnType<typeof getServerSupabase>>, userId: string, clientIds: string[]): Promise<string[]> {
+  const { data } = await supabase.from("meal_items").select("id").eq("user_id", userId).in("client_id", clientIds);
+  return ((data ?? []) as { id: string }[]).map((r) => r.id);
+}
 
 const logFoodInput = z.union([
   pickedFoodSchema,
@@ -75,7 +81,8 @@ export async function logFoodAction(input: unknown): Promise<LogResult> {
         name: item.name,
         servings: 1,
         is_estimate: item.isEstimate,
-        calories: item.calories,
+        // Whole kcal, as every diary row is shown: the day's total then always equals the sum of the rows on screen.
+        calories: Math.round(item.calories),
         protein_g: item.protein_g,
         carbs_g: item.carbs_g,
         fat_g: item.fat_g,
@@ -330,26 +337,28 @@ export async function logTemplateAction(_prev: ActionState, formData: FormData):
   try {
     const { user, supabase } = await nutritionCtx();
     const parsed = z
-      .object({ templateId: uuid, date: isoDate, mealType: mealTypeSchema, servings: z.coerce.number().positive().max(50), status: z.enum(["logged", "planned"]) })
+      .object({ templateId: uuid, date: isoDate, mealType: mealTypeSchema, servings: z.coerce.number().positive().max(50), status: z.enum(["logged", "planned"]), clientId: uuid.optional() })
       .safeParse(Object.fromEntries(formData));
     if (!parsed.success) return actionInvalid(parsed.error);
-    const { templateId, date, mealType, servings, status } = parsed.data;
+    const { templateId, date, mealType, servings, status, clientId } = parsed.data;
     const { data: tpl } = await supabase.from("meals").select("id, name, yield_servings").eq("id", templateId).eq("user_id", user.id).eq("is_template", true).maybeSingle();
     if (!tpl) return actionError("Saved meal not found.");
     const { data: items } = await supabase.from("meal_items").select(ITEM_COLUMNS).eq("meal_id", tpl.id);
     const factor = servings / Number(tpl.yield_servings);
     const mealId = await findOrCreateMeal(supabase, user.id, date, mealType, status);
+    // One id per row, derived from the attempt's id: a retry of the same attempt can't add the meal twice.
+    const clientIds = clientId ? (items ?? []).map((_, n) => derivedClientId(clientId, String(n))) : null;
     const { data: inserted, error } = await supabase
       .from("meal_items")
-      .insert(((items ?? []) as Record<string, unknown>[]).map((i) => ({ ...scaleItem(i, factor), meal_id: mealId, user_id: user.id })))
+      .insert(((items ?? []) as Record<string, unknown>[]).map((i, n) => ({ ...scaleItem(i, factor), meal_id: mealId, user_id: user.id, client_id: clientIds?.[n] ?? null })))
       .select("id");
+    const message = loggedMessage({ name: tpl.name as string, amount: `${servings} ${servings === 1 ? "serving" : "servings"}`, mealType, planned: status === "planned" });
+    // The same attempt arriving twice: the first insert won (all rows go in together), so this one is already done.
+    if (error?.code === "23505" && clientIds) return { ...actionOk(message), itemIds: await alreadyLogged(supabase, user.id, clientIds) };
     if (error) throw error;
     revalidatePath("/nutrition");
     revalidatePath("/home");
-    return {
-      ...actionOk(loggedMessage({ name: tpl.name as string, amount: `${servings} ${servings === 1 ? "serving" : "servings"}`, mealType, planned: status === "planned" })),
-      itemIds: ((inserted ?? []) as { id: string }[]).map((r) => r.id),
-    };
+    return { ...actionOk(message), itemIds: ((inserted ?? []) as { id: string }[]).map((r) => r.id) };
   } catch (err) {
     return guard(err, "nutrition.log_template");
   }
@@ -441,9 +450,9 @@ export async function updateGoalsAction(_prev: ActionState, formData: FormData):
 export async function copyMealsAction(input: unknown): Promise<LogResult> {
   try {
     const { user, supabase } = await nutritionCtx();
-    const parsed = z.object({ fromDate: isoDate, toDate: isoDate, mealType: mealTypeSchema.optional() }).safeParse(input);
+    const parsed = z.object({ fromDate: isoDate, toDate: isoDate, mealType: mealTypeSchema.optional(), clientId: uuid.optional() }).safeParse(input);
     if (!parsed.success) return actionError("Choose a day to copy from.");
-    const { fromDate, toDate, mealType } = parsed.data;
+    const { fromDate, toDate, mealType, clientId } = parsed.data;
     if (fromDate === toDate) return actionError("Choose a different day to copy from.");
     let q = supabase
       .from("meals")
@@ -462,12 +471,16 @@ export async function copyMealsAction(input: unknown): Promise<LogResult> {
     for (const type of [...new Set(source.map((m) => m.meal_type))]) {
       const items = source.filter((m) => m.meal_type === type).flatMap((m) => m.meal_items);
       const mealId = await findOrCreateMeal(supabase, user.id, toDate, type, "logged");
+      // One id per row, derived from the attempt's id: a retry of the same attempt can't copy a meal twice.
+      const clientIds = clientId ? items.map((_, n) => derivedClientId(clientId, `${type}:${n}`)) : null;
       const { data: inserted, error } = await supabase
         .from("meal_items")
-        .insert(items.map((i) => ({ ...i, meal_id: mealId, user_id: user.id })))
+        .insert(items.map((i, n) => ({ ...i, meal_id: mealId, user_id: user.id, client_id: clientIds?.[n] ?? null })))
         .select("id");
-      if (error) throw error;
-      itemIds.push(...((inserted ?? []) as { id: string }[]).map((r) => r.id));
+      // This meal was already copied by an earlier send of the same attempt: count it as done and carry on.
+      if (error?.code === "23505" && clientIds) itemIds.push(...(await alreadyLogged(supabase, user.id, clientIds)));
+      else if (error) throw error;
+      else itemIds.push(...((inserted ?? []) as { id: string }[]).map((r) => r.id));
       copied += items.length;
     }
     revalidatePath("/nutrition");
@@ -482,24 +495,26 @@ export async function copyMealsAction(input: unknown): Promise<LogResult> {
 export async function relogItemAction(input: unknown): Promise<LogResult> {
   try {
     const { user, supabase } = await nutritionCtx();
-    const parsed = z.object({ itemId: uuid, date: isoDate, mealType: mealTypeSchema, status: z.enum(["logged", "planned"]).default("logged") }).safeParse(input);
+    const parsed = z
+      .object({ itemId: uuid, date: isoDate, mealType: mealTypeSchema, status: z.enum(["logged", "planned"]).default("logged"), clientId: uuid.optional() })
+      .safeParse(input);
     if (!parsed.success) return actionError("Choose a food to add.");
-    const { itemId, date, mealType, status } = parsed.data;
+    const { itemId, date, mealType, status, clientId } = parsed.data;
     const { data: item } = await supabase.from("meal_items").select(ITEM_COLUMNS).eq("id", itemId).eq("user_id", user.id).maybeSingle();
     if (!item) return actionError("That food couldn't be found. It may have been deleted.");
     const mealId = await findOrCreateMeal(supabase, user.id, date, mealType, status);
     const { data: inserted, error } = await supabase
       .from("meal_items")
-      .insert({ ...item, meal_id: mealId, user_id: user.id })
+      .insert({ ...item, meal_id: mealId, user_id: user.id, client_id: clientId ?? null })
       .select("id")
       .single();
+    const message = loggedMessage({ name: item.name as string, amount: item.amount_label as string | null, mealType, planned: status === "planned" });
+    // The same attempt arriving twice: the first insert won, so this one is already done (and Undo removes that row).
+    if (error?.code === "23505" && clientId) return { ...actionOk(message), itemIds: await alreadyLogged(supabase, user.id, [clientId]) };
     if (error) throw error;
     revalidatePath("/nutrition");
     revalidatePath("/home");
-    return {
-      ...actionOk(loggedMessage({ name: item.name as string, amount: item.amount_label as string | null, mealType, planned: status === "planned" })),
-      itemIds: inserted ? [inserted.id as string] : [],
-    };
+    return { ...actionOk(message), itemIds: inserted ? [inserted.id as string] : [] };
   } catch (err) {
     return guard(err, "nutrition.relog");
   }

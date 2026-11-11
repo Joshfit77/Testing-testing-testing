@@ -23,7 +23,7 @@ import { prepareEntry, rankFoods } from "@/lib/domain/food-search";
 import { initialActionState } from "@/lib/action-state";
 import { MEAL_TYPES } from "@/lib/domain/meals";
 import { caloriesFromMacros } from "@/lib/domain/nutrition";
-import { quickFoodSummary, shortDate, waterLitres, type LogResult, type QuickFood } from "@/lib/domain/diary";
+import { attemptId, quickFoodSummary, saveFailed, shortDate, waterLitres, type LogResult, type QuickFood } from "@/lib/domain/diary";
 import { LoggedUndo } from "@/components/nutrition/logged-undo";
 import { cn } from "@/lib/utils";
 import {
@@ -313,12 +313,17 @@ export function AddFoodDialog({
   const submit = (item: unknown, onOk?: () => void) =>
     startTransition(async () => {
       attempt.current ??= crypto.randomUUID();
-      const res = await logFoodAction({ clientId: attempt.current, date, mealType, status, item });
-      setResult(res);
-      if (res.ok) {
-        attempt.current = null;
-        setPicked(null);
-        onOk?.();
+      try {
+        const res = await logFoodAction({ clientId: attempt.current, date, mealType, status, item });
+        setResult(res);
+        if (res.ok) {
+          attempt.current = null;
+          setPicked(null);
+          onOk?.();
+        }
+      } catch {
+        // Offline, or the request never arrived: the dialog, the food and its amount stay, and the retry reuses the id.
+        setResult(saveFailed());
       }
     });
 
@@ -331,9 +336,17 @@ export function AddFoodDialog({
     setPicked(f);
   };
 
+  // Re-logs and saved meals: the same tap again after a failed send reuses its id (see attemptId).
+  const again = useRef<{ key: string; id: string } | null>(null);
   const relog = (itemId: string) =>
     startTransition(async () => {
-      setResult(await relogItemAction({ itemId, date, mealType, status }));
+      try {
+        const res = await relogItemAction({ itemId, date, mealType, status, clientId: attemptId(again, `relog|${itemId}|${date}|${mealType}|${status}`) });
+        if (res.ok) again.current = null;
+        setResult(res);
+      } catch {
+        setResult(saveFailed());
+      }
     });
 
   // One serving of a saved meal into the meal chosen above (the meal for the time of day unless changed).
@@ -345,7 +358,14 @@ export function AddFoodDialog({
       fd.set("mealType", mealType);
       fd.set("servings", "1");
       fd.set("status", status);
-      setResult(await logTemplateAction(initialActionState, fd));
+      fd.set("clientId", attemptId(again, `saved|${templateId}|${date}|${mealType}|${status}`));
+      try {
+        const res = await logTemplateAction(initialActionState, fd);
+        if (res.ok) again.current = null;
+        setResult(res);
+      } catch {
+        setResult(saveFailed());
+      }
     });
 
   const quickRow = (f: QuickFood, showCount: boolean) => (

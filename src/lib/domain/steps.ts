@@ -20,6 +20,15 @@ export interface DaySteps {
   steps: number;
 }
 
+/**
+ * The days a Health sync may write: every synced day except those the member entered by hand. A hand-entered count is
+ * the member's own correction (the phone was left behind, a treadmill walk), so a sync never replaces it.
+ */
+export function syncableDays<T extends { day: string }>(days: T[], manualDays: Iterable<string>): T[] {
+  const manual = new Set(manualDays);
+  return days.filter((d) => !manual.has(d.day));
+}
+
 /** The last `n` ISO dates ending with `today`, oldest first. */
 export function lastNDates(today: string, n: number): string[] {
   const count = Math.max(0, Math.floor(n));
