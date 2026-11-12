@@ -53,7 +53,8 @@ describe.skipIf(!available)("account deletion removes the account, its rows and 
   });
 
   it("deletes the auth user, every personal row and stored files, and leaves other users alone", async () => {
-    const accessToken = (await carol.client.auth.getSession()).data.session!.access_token;
+    const session = (await carol.client.auth.getSession()).data.session!;
+    const accessToken = session.access_token;
     const r = await deleteUserAccount(carol.id, { admin: serviceClient(), cancelSubscriptions: async () => undefined, deleteStripeCustomer: null, log: noLog });
     expect(r).toEqual({ ok: true, stripeCustomerDeleted: null });
 
@@ -71,6 +72,17 @@ describe.skipIf(!available)("account deletion removes the account, its rows and 
     // The old access token no longer identifies a user.
     const { data: who } = await anonClient().auth.getUser(accessToken);
     expect(who.user).toBeNull();
+    // The sign-in is revoked: the refresh token can't start a new session.
+    const refreshed = await anonClient().auth.refreshSession({ refresh_token: session.refresh_token });
+    expect(refreshed.data.session).toBeNull();
+    expect(refreshed.error).not.toBeNull();
+    // A request still carrying the deleted member's (unexpired) access token reads nothing and can't write.
+    for (const table of ["faith_journal_entries", "weight_entries", "workout_sessions", "progress_photos", "profiles"]) {
+      const { data } = await carol.client.from(table).select("*").limit(5);
+      expect(data ?? [], table).toEqual([]);
+    }
+    expect((await carol.client.from("weight_entries").insert({ user_id: carol.id, recorded_on: "2026-10-02", weight_kg: 71 })).error).not.toBeNull();
+    expect((await carol.client.storage.from(BUCKET).list(carol.id)).data ?? []).toEqual([]);
 
     const { count: daveRows } = await svc.from("faith_journal_entries").select("*", { count: "exact", head: true }).eq("user_id", dave.id);
     expect(daveRows).toBe(1);
