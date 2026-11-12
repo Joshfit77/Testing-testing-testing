@@ -1,14 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Droplets, Dumbbell, Footprints, HandHeart, Moon, Plus, Scale, Utensils } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SubmitButton } from "@/components/common/form-status";
-import { initialActionState } from "@/lib/action-state";
 import { DRAFT_EVENT, loadLocalDraft } from "@/lib/workout-storage";
-import { addWaterAction } from "@/server/actions/nutrition";
+import { useAddWater } from "@/components/nutrition/use-add-water";
 import { cn } from "@/lib/utils";
 import type { TodayWorkoutLink } from "@/app/(app)/home/today-workout/link";
 
@@ -27,7 +26,7 @@ export function QuickAddButton({ userId, today, todayWorkout, className }: { use
   const [draftName, setDraftName] = useState<string | null>(null);
   const [fetched, setFetched] = useState<TodayWorkoutLink | null>(null);
   const program = todayWorkout ?? fetched;
-  const [water, addWater] = useActionState(addWaterAction, initialActionState);
+  const { state: water, add: addWater } = useAddWater(today);
 
   useEffect(() => {
     const refresh = () => setDraftName(loadLocalDraft(userId)?.name ?? null);
@@ -95,9 +94,7 @@ export function QuickAddButton({ userId, today, todayWorkout, className }: { use
             <Link href="/nutrition?add=1" onClick={close} className={tile}>
               <Utensils className="size-6 text-gold" aria-hidden /> Food
             </Link>
-            <form action={addWater} className="contents">
-              <input type="hidden" name="date" value={today} />
-              <input type="hidden" name="amountMl" value="250" />
+            <form action={() => addWater(250)} className="contents">
               <SubmitButton variant="ghost" className={cn(tile, "h-auto whitespace-normal")} pendingLabel="Adding…" aria-label="Water: add 250 ml">
                 <Droplets className="size-6 text-[#4A86C0]" aria-hidden /> Water +250 ml
               </SubmitButton>

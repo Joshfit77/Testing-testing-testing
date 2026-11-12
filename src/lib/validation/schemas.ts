@@ -295,7 +295,12 @@ export const nutritionGoalsSchema = z.object({
   water_ml: z.coerce.number().int().min(0).max(10000),
 });
 
-export const waterSchema = z.object({ date: isoDate, amountMl: z.coerce.number().int().min(1).max(5000) });
+export const waterSchema = z.object({
+  date: isoDate,
+  amountMl: z.coerce.number().int().min(1).max(5000),
+  /** Generated on the device per tap and reused on retry, so a lost response can't add the water twice. */
+  clientId: z.string().uuid().optional(),
+});
 
 export const savedMealSchema = z.object({
   name: z.string().trim().min(1).max(120),

@@ -7,7 +7,7 @@ import { getServerSupabase } from "@/lib/supabase/server";
 
 export const metadata = { title: "New recipe" };
 
-const MY_FOOD_COLUMNS = "id, name, brand, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g, is_estimate, source";
+const MY_FOOD_COLUMNS = "id, name, brand, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g, is_estimate, source, basis";
 
 export default async function NewRecipePage() {
   const { user, allowed } = await nutritionPageUser("meal_planning");

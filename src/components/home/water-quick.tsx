@@ -1,14 +1,12 @@
 "use client";
 
-import { useActionState } from "react";
 import { Droplets } from "lucide-react";
 import { SubmitButton } from "@/components/common/form-status";
-import { initialActionState } from "@/lib/action-state";
-import { addWaterAction } from "@/server/actions/nutrition";
+import { useAddWater } from "@/components/nutrition/use-add-water";
 
 /** Home's water line: today's total against the goal and one +250 ml tap (the same action as the Nutrition tab). */
 export function WaterQuick({ date, totalMl, goalMl }: { date: string; totalMl: number; goalMl: number }) {
-  const [state, action] = useActionState(addWaterAction, initialActionState);
+  const { state, add } = useAddWater(date);
   const pct = goalMl ? Math.min(100, Math.round((totalMl / goalMl) * 100)) : 0;
   return (
     <div className="flex items-center gap-3" data-testid="home-water">
@@ -29,9 +27,7 @@ export function WaterQuick({ date, totalMl, goalMl }: { date: string; totalMl: n
           </p>
         )}
       </div>
-      <form action={action}>
-        <input type="hidden" name="date" value={date} />
-        <input type="hidden" name="amountMl" value="250" />
+      <form action={() => add(250)}>
         <SubmitButton size="sm" variant="secondary" pendingLabel="…" className="min-h-11">
           +250 ml
         </SubmitButton>

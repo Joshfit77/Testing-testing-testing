@@ -9,7 +9,7 @@ import { loadRecipe } from "@/server/services/recipes";
 
 export const metadata = { title: "Edit recipe" };
 
-const MY_FOOD_COLUMNS = "id, name, brand, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g, is_estimate, source";
+const MY_FOOD_COLUMNS = "id, name, brand, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g, is_estimate, source, basis";
 
 export default async function EditRecipePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

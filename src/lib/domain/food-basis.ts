@@ -89,8 +89,25 @@ export function parseServingWeight(size: number, unitText: string): { grams: num
 }
 
 /**
- * Basis for a row of the `foods` table (a saved / built-in / cached food), whose values are for one
- * serving of `serving_size` `serving_unit`.
+ * The basis stored on a `foods` row (`foods.basis`, written when a barcode / USDA lookup is cached), or null when
+ * there is none or it isn't a well-formed basis: an object whose `per100` has a finite number for calories and each
+ * macro. Anything else (old rows, hand-edited or truncated JSON) falls back to the column rebuild in basisFromFoodRow.
+ */
+export function storedFoodBasis(raw: unknown): FoodBasis | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const p = (raw as { per100?: unknown }).per100;
+  if (!p || typeof p !== "object" || Array.isArray(p)) return null;
+  const per100 = p as Record<string, unknown>;
+  const keys = ["calories", ...MACRO_KEYS];
+  if (!keys.every((k) => typeof per100[k] === "number" && Number.isFinite(per100[k]))) return null;
+  return sanitizeBasis(raw);
+}
+
+/**
+ * Basis for a row of the `foods` table (a saved / built-in / cached food). A cached barcode / USDA food keeps the
+ * full basis it was looked up with (`basis`: label serving, sugar, sodium and the macros the source didn't list),
+ * which is used when valid. Otherwise (custom and built-in foods, rows cached before `basis` existed) it is rebuilt
+ * from the columns, whose values are for one serving of `serving_size` `serving_unit`.
  */
 export function basisFromFoodRow(f: {
   serving_size: number;
@@ -100,7 +117,10 @@ export function basisFromFoodRow(f: {
   carbs_g: number;
   fat_g: number;
   fiber_g?: number | null;
+  basis?: unknown;
 }): FoodBasis {
+  const stored = storedFoodBasis(f.basis);
+  if (stored) return stored;
   const size = Number(f.serving_size);
   const values: Per100 = {
     calories: Number(f.calories),

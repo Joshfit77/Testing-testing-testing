@@ -5330,6 +5330,66 @@ comment on column public.profiles.layout_prefs is 'Home and Faith dashboard layo
 -- Self-editable like the other display preferences (column-level grant; row access stays owner-only by RLS).
 grant update (layout_prefs) on public.profiles to authenticated;
 
+-- ===== supabase/migrations/20261112000058_water_entries_client_id.sql =====
+-- ROLLBACK (run in this order; loses no pre-existing data — every row written before this migration has
+-- client_id null, and dropping the column only removes the idempotency keys of water logged after it):
+--   drop index if exists public.water_entries_user_client_uidx;
+--   alter table public.water_entries drop column if exists client_id;
+-- Roll back the app code first (or together): the current addWaterAction writes client_id.
+--
+-- Water logging idempotency (N7): the device sends one id per tap and reuses it when that tap is retried, so a
+-- request whose response was lost can't add the same glass twice. The same pattern as meal_items.client_id
+-- (20261024000040_review_hardening.sql). Existing rows keep client_id null and are unaffected; inserts without a
+-- client id (older clients) behave exactly as before, since the unique index only covers non-null ids.
+--
+-- Additive and live-safe: adding a nullable column with no default is a catalog-only change (no table rewrite).
+-- The index is a plain `create unique index`, like every index in these migrations, because the migration runner
+-- (supabase db push / migration up, and the bundled setup-all.sql in the SQL editor) runs each file inside a
+-- transaction, and `create index concurrently` cannot run inside a transaction block. A plain build holds a SHARE
+-- lock on water_entries (writes wait, reads continue) only while it runs; on a small table that is milliseconds.
+-- On a large production table, build it first outside a transaction so writes never block:
+--   create unique index concurrently if not exists water_entries_user_client_uidx
+--     on public.water_entries (user_id, client_id) where client_id is not null;
+-- and this file's `if not exists` then makes the statement below a no-op. (If a concurrent build fails it leaves an
+-- INVALID index: drop it and rerun.) No existing row can violate it: all existing client_ids are null.
+
+alter table public.water_entries add column if not exists client_id uuid;
+
+create unique index if not exists water_entries_user_client_uidx
+  on public.water_entries (user_id, client_id) where client_id is not null;
+
+comment on column public.water_entries.client_id is 'Per-tap id sent by the device; a retried request with the same id is not counted twice (null for older entries).';
+
+-- ===== supabase/migrations/20261112000059_foods_basis.sql =====
+-- ROLLBACK (loses no pre-existing data — every row written before this migration has basis null, and the columns
+-- the app fell back to before are untouched and still written on every cache upsert):
+--   alter table public.foods drop column if exists basis;
+-- The constraint below is attached to the column and goes with it. Roll back the app code first (or together):
+-- the current food-resolve cache upsert and the My foods queries name the basis column.
+--
+-- Full nutrition basis for cached foods (N5): a barcode (Open Food Facts) or USDA food is cached in foods when it
+-- is logged, but the columns hold one serving of plain numbers with unlisted macros stored as 0, so a re-log from
+-- My foods lost the `missing` list (totals no longer read "at least"), sugar, sodium and the label serving. The
+-- basis as built at lookup time is now stored alongside, in the same format and with the same check as
+-- meal_items.basis (20261019000008_food_amounts.sql); the app prefers it when it is valid and otherwise rebuilds
+-- from the columns exactly as before, so rows without a basis (custom, built-in, and foods cached earlier) log
+-- with the same numbers as today. A cached row gets its basis the next time that product is looked up again.
+--
+-- Additive and live-safe: a nullable column with no default is a catalog-only change (no rewrite). The CHECK is
+-- validated against existing rows, which are all null, under a brief ACCESS EXCLUSIVE lock. No index is added.
+-- RLS: the foods policies are row-level (owner_id), not column lists, and there are no column grants on foods, so
+-- the column is readable / writable exactly where the row already is. Cached rows are per user (owner_id = the
+-- member); built-in rows (owner_id null) never get a basis. Account deletion cascades on owner_id, and the data
+-- export reads foods with select * by owner_id (src/server/services/account.ts), so both already cover it.
+
+alter table public.foods
+  add column if not exists basis jsonb check (
+    basis is null
+    or coalesce(jsonb_typeof(basis) = 'object' and jsonb_typeof(basis -> 'per100') = 'object' and octet_length(basis::text) <= 8000, false)
+  );
+
+comment on column public.foods.basis is 'Nutrition basis as looked up (per 100 g/ml or per serving, label serving, sugar, sodium, missing macros) for cached barcode / USDA foods; null = rebuild from the columns.';
+
 -- ===== supabase/seed.sql =====
 -- AUTO-GENERATED by scripts/generate-seed.ts — do not edit by hand.
 -- Exercise descriptions are general fitness education, not medical advice.

@@ -25,9 +25,9 @@ import { MEAL_TYPES } from "@/lib/domain/meals";
 import { caloriesFromMacros } from "@/lib/domain/nutrition";
 import { attemptId, quickFoodSummary, saveFailed, shortDate, waterLitres, type LogResult, type QuickFood } from "@/lib/domain/diary";
 import { LoggedUndo } from "@/components/nutrition/logged-undo";
+import { useAddWater } from "@/components/nutrition/use-add-water";
 import { cn } from "@/lib/utils";
 import {
-  addWaterAction,
   createCustomFoodAction,
   logFoodAction,
   logTemplateAction,
@@ -51,6 +51,8 @@ export interface MyFood {
   fat_g: number;
   is_estimate: boolean;
   source: string;
+  /** Full basis stored with a cached barcode / USDA food (foods.basis); null for other foods. */
+  basis?: unknown;
   /** Built-in foods only: whether it fits the user's diet style. */
   fitsDiet?: boolean;
 }
@@ -852,7 +854,7 @@ export function CustomFoodForm() {
 }
 
 export function WaterCard({ date, totalMl, goalMl }: { date: string; totalMl: number; goalMl: number }) {
-  const [state, action] = useActionState(addWaterAction, initialActionState);
+  const { state, add } = useAddWater(date);
   const pct = goalMl ? Math.min(100, Math.round((totalMl / goalMl) * 100)) : 0;
   const water = waterLitres(totalMl, goalMl);
   return (
@@ -868,9 +870,7 @@ export function WaterCard({ date, totalMl, goalMl }: { date: string; totalMl: nu
       </div>
       <div className="flex flex-wrap gap-2">
         {[250, 500, 750].map((ml) => (
-          <form key={ml} action={action}>
-            <input type="hidden" name="date" value={date} />
-            <input type="hidden" name="amountMl" value={ml} />
+          <form key={ml} action={() => add(ml)}>
             <SubmitButton size="sm" variant="secondary" className="min-h-11" pendingLabel="…">
               +{ml} ml
             </SubmitButton>

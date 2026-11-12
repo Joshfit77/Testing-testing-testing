@@ -373,15 +373,40 @@ export async function deleteTemplateAction(formData: FormData): Promise<void> {
   revalidatePath("/nutrition");
 }
 
-export async function addWaterAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+/** A water log's result: the entry that holds this tap and the day's total after it. */
+export interface WaterResult extends ActionState {
+  entryId?: string;
+  totalMl?: number;
+}
+
+/**
+ * Adds water to a day. The device sends `clientId` (one per tap, reused when that tap is retried), so a retry after
+ * a lost response finds the entry the first send already added (unique on user_id + client_id) instead of adding
+ * the water again. Calls without a client id (older clients) insert as before.
+ */
+export async function addWaterAction(_prev: ActionState, formData: FormData): Promise<WaterResult> {
   try {
     const { user, supabase } = await nutritionCtx();
     const parsed = waterSchema.safeParse(Object.fromEntries(formData));
     if (!parsed.success) return actionInvalid(parsed.error);
-    const { error } = await supabase.from("water_entries").insert({ user_id: user.id, recorded_on: parsed.data.date, amount_ml: parsed.data.amountMl });
-    if (error) throw error;
+    const { date, amountMl, clientId } = parsed.data;
+    const { data: inserted, error } = await supabase
+      .from("water_entries")
+      .insert({ user_id: user.id, recorded_on: date, amount_ml: amountMl, client_id: clientId ?? null })
+      .select("id, recorded_on, amount_ml")
+      .single();
+    let entry = inserted as { id: string; recorded_on: string; amount_ml: number } | null;
+    // The same tap arriving twice: the first insert won, so this one is already done.
+    if (error?.code === "23505" && clientId) {
+      const { data: first, error: readErr } = await supabase.from("water_entries").select("id, recorded_on, amount_ml").eq("user_id", user.id).eq("client_id", clientId).maybeSingle();
+      if (readErr) throw readErr;
+      entry = first as typeof entry;
+    } else if (error) throw error;
+    const day = entry?.recorded_on ?? date;
+    const { data: rows } = await supabase.from("water_entries").select("amount_ml").eq("user_id", user.id).eq("recorded_on", day);
+    const totalMl = ((rows ?? []) as { amount_ml: number }[]).reduce((s, r) => s + Number(r.amount_ml), 0);
     revalidatePath("/nutrition");
-    return actionOk(`Added ${parsed.data.amountMl} ml.`);
+    return { ...actionOk(`Added ${entry?.amount_ml ?? amountMl} ml.`), entryId: entry?.id, totalMl };
   } catch (err) {
     return guard(err, "nutrition.water");
   }
