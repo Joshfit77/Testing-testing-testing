@@ -125,3 +125,7 @@ New findings while writing evidence tests for the release candidate:
 Acceptance for R1: four simultaneous finishes of one workout, with and without a saved draft, leave one completed
 session, one exercise, two sets and no repeated record type; a later retry returns "already saved" and adds nothing.
 
+
+Usability review at 320, 375 and 430 px and at 200% text (scripted browser, not a person): 2 High, both fixed (U-H1,
+workout screen at 200% text; U-H2, water offline). 6 Medium and 13 Low are open. Each Medium has an acceptance
+criterion in `docs/quality/RC_VERIFICATION_2026-11-12.md` (section 4); U-M4 is the owner decision T8.
