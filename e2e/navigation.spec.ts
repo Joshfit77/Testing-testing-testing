@@ -5,6 +5,11 @@ test.describe("navigation shell", () => {
   test("five tabs, AI Coach and profile in every main header, text size and Home Scripture settings", async ({ page }) => {
     await signUpAndConfirm(page, uniqueEmail("nav"));
     await completeOnboarding(page);
+    // Settings save through a server action as they change; wait for that save to answer (not a fixed delay) before
+    // a full page load, which would cancel a save still in flight on a slow browser.
+    const saved = async (click: () => Promise<void>) => {
+      await Promise.all([page.waitForResponse((r) => r.request().method() === "POST" && !!r.request().headers()["next-action"]), click()]);
+    };
 
     // Exactly five bottom tabs, in order, each with a visible label.
     const tabs = page.getByRole("navigation", { name: "Main sections" }).last().getByRole("link");
@@ -91,18 +96,14 @@ test.describe("navigation shell", () => {
     // Customize Home (its own screen under You): hide the verse module, Home drops it; reset brings it back.
     await page.getByRole("navigation", { name: "Your sections" }).getByRole("link", { name: /Customize Home/ }).click();
     await page.waitForURL(/\/profile\/customize/);
-    await page.getByRole("button", { name: "Hide Verse of the day on Home" }).click();
-    await page.waitForTimeout(800);
+    await saved(() => page.getByRole("button", { name: "Hide Verse of the day on Home" }).click());
     await page.goto("/home");
     await expect(page.getByRole("link", { name: /^Verse of the day/ })).toHaveCount(0);
     // Train and Nutrition sections can be hidden and reordered too; reset puts everything back.
     await page.goto("/profile/customize");
-    await page.getByRole("button", { name: "Hide Run & walk on Train" }).click();
-    await page.waitForTimeout(800);
-    await page.getByRole("button", { name: "Move More tools up" }).click();
-    await page.waitForTimeout(800);
-    await page.getByRole("button", { name: "Hide Water on Nutrition" }).click();
-    await page.waitForTimeout(800);
+    await saved(() => page.getByRole("button", { name: "Hide Run & walk on Train" }).click());
+    await saved(() => page.getByRole("button", { name: "Move More tools up" }).click());
+    await saved(() => page.getByRole("button", { name: "Hide Water on Nutrition" }).click());
     await page.goto("/train");
     await expect(page.getByRole("navigation", { name: "Training sections" }).getByRole("link")).toHaveText([/Programs/, /Exercises/, /Training calendar/]);
     await page.goto("/nutrition");
@@ -112,8 +113,7 @@ test.describe("navigation shell", () => {
     expect(groupIds.indexOf("tools")).toBeGreaterThanOrEqual(0);
     expect(groupIds.indexOf("tools")).toBeLessThan(groupIds.indexOf("saved"));
     await page.goto("/profile/customize");
-    await page.getByRole("button", { name: "Reset to the default for my goal" }).click();
-    await page.waitForTimeout(800);
+    await saved(() => page.getByRole("button", { name: "Reset to the default for my goal" }).click());
     await page.goto("/home");
     await expect(page.getByRole("link", { name: /^Verse of the day/ })).toBeVisible();
     await page.goto("/train");
@@ -123,9 +123,8 @@ test.describe("navigation shell", () => {
     await page.goto("/profile");
 
     // Text size applies immediately and persists across reloads.
-    await page.getByRole("radio", { name: "Large", exact: true }).click();
+    await saved(() => page.getByRole("radio", { name: "Large", exact: true }).click());
     await expect(page.locator("html")).toHaveAttribute("data-text-size", "large");
-    await page.waitForTimeout(800);
     await page.reload();
     await expect(page.locator("html")).toHaveAttribute("data-text-size", "large");
     await expect(page.getByRole("radio", { name: "Large", exact: true })).toHaveAttribute("aria-checked", "true");
@@ -133,8 +132,7 @@ test.describe("navigation shell", () => {
     await expect(page.locator("html")).not.toHaveAttribute("data-text-size", /.+/);
 
     // Hiding the Home Scripture card keeps the Faith tab.
-    await page.getByRole("switch", { name: "Scripture card on Home" }).click();
-    await page.waitForTimeout(800);
+    await saved(() => page.getByRole("switch", { name: "Scripture card on Home" }).click());
     await page.goto("/home");
     await expect(page.getByRole("link", { name: /^Verse of the day/ })).toHaveCount(0);
     await expect(page.getByRole("navigation", { name: "Main sections" }).last().getByRole("link", { name: "Faith" })).toBeVisible();
