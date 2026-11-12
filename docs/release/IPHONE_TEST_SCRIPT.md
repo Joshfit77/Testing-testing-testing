@@ -638,9 +638,9 @@ Health · **High**
 Health · **Medium** (see note)
 - **Steps:** On the Steps card, enter today's steps by hand (a number clearly different from Health's) and save. Note
   the label. Tap Sync Apple Health.
-- **Expected (current design):** After the hand entry the label says "Entered by hand". After the sync, **today's number
-  is replaced by Health's** and the label says "Apple Health". The code does this deliberately: a synced day with steps
-  replaces a hand entry.
+- **Expected:** After the hand entry the label says "Entered by hand". After the sync, **the hand-entered number is
+  kept** (the sync skips days entered by hand: `syncableDays` in `src/lib/domain/steps.ts`, `syncStepsAction` in
+  `src/server/actions/steps.ts`) and the app says how many hand-entered days it kept. Other days take Health's numbers.
 - **Note for the owner (decision needed):** the test brief expects a hand entry **not** to be overwritten by a sync. The
   code does the opposite. Either confirm the current behaviour (then this case passes as written) or treat it as a
   change request. Record what happened either way.
@@ -1251,7 +1251,7 @@ needs a Mac with Xcode for at least part of it.
 | IP-HLT-04 | Steps import matches Health | | High | |
 | IP-HLT-05 | Sleep import matches Health | Watch | High | |
 | IP-HLT-06 | Re-sync adds no duplicates | | High | |
-| IP-HLT-07 | Manual step entry, then a sync (owner decision) | | Medium | |
+| IP-HLT-07 | Manual step entry kept after a sync | | Medium | |
 | IP-HLT-08 | Manual sleep overlapping an imported night | Watch | Medium | |
 | IP-HLT-09 | Access revoked in Health | | High | |
 | IP-HLT-10 | Disconnect; nothing written to Health | | High | |
