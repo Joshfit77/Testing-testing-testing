@@ -28,17 +28,19 @@ purchase was made.**
 | Production build | pass | sandbox |
 | Browser suite, production build, phone-size Chromium | 125 passed, 0 failed, 99 skipped | sandbox |
 | Demo-mode browser suite (8 specs, the 58 demo tests) | 57 passed, 0 failed, 1 skipped | sandbox |
-| CI workflow (`ci.yml`) | pass on 927e878; rerun queued on b879ef1 | GitHub Actions |
-| iOS: unsigned compile, Release archive check, app in the iOS Simulator (launch, Enter, relaunch, background) | pass on 927e878 | GitHub Actions, macOS |
-| iOS: opening and navigation in WebKit | 20 passed, 1 failed on 927e878 (see note); rerun queued on b879ef1 | GitHub Actions |
-| Every iPhone size in WebKit (device matrix) | pass on 927e878; rerun queued on b879ef1 | GitHub Actions |
+| CI workflow (`ci.yml`) | pass on bed1f32 (run 144) | GitHub Actions |
+| iOS: unsigned compile, Release archive check, app in the iOS Simulator (launch, Enter, relaunch, background) | pass on bed1f32 (iOS run 92) | GitHub Actions, macOS |
+| iOS: opening and navigation in WebKit | pass on bed1f32 (iOS run 92); failed on 927e878 and b879ef1 (see note) | GitHub Actions |
+| Every iPhone size in WebKit (device matrix) | pass on b879ef1 (iOS run 91), which includes the 200%-text layout change | GitHub Actions |
 
 Notes:
 - The one skipped demo test (`ux-progress-sleep.spec.ts:47`, stage-chart labels) skips when the newest sample night
   has no sleep stages. The seeded data has none on that night, so there was nothing to check, not a failure.
-- The WebKit failure on 927e878 was the navigation test reloading Home before the "hide Verse of the day" setting had
-  saved: it waited a fixed 800 ms. The test now waits for the save to answer (b879ef1). Until the rerun passes, that
-  check counts as not yet verified in WebKit.
+- The WebKit failure on 927e878 and b879ef1 was a real defect, not timing: hiding "Verse of the day" in Customize
+  Home never hid it (R3). It reproduced in Chromium in 3 of 8 runs under load. Fixed in bed1f32; the navigation test
+  then passed 8 of 8 locally and in WebKit on CI.
+- On b879ef1 two opening-gate tests failed once in WebKit and passed on retry (animation timing and a redirect during
+  page load). On bed1f32 they passed first time. They are left as known flaky in CI; neither reproduced locally.
 
 ## 3. Branch review
 
