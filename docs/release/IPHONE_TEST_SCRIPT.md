@@ -635,7 +635,7 @@ Health · **High**
 - ☐ Pass ☐ Fail ☐ Blocked · Detail: DT-HEALTH-08
 
 #### IP-HLT-07 · Manual step entry, then a sync
-Health · **Medium** (see note)
+Health · **Medium**
 - **Steps:** On the Steps card, enter today's steps by hand (a number clearly different from Health's) and save. Note
   the label. Tap Sync Apple Health.
 - **Expected:** After the hand entry the label says "Entered by hand". After the sync, **the hand-entered number is
