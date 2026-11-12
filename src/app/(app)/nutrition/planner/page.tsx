@@ -50,7 +50,7 @@ export default async function PlannerPage() {
   }
   const [dishes, { data: foodRows }] = await Promise.all([
     targets ? plannerDishes(supabase, user.id, prefs.includeApp) : Promise.resolve([]),
-    supabase.from("foods").select("id, name, brand, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g, is_estimate, source").eq("owner_id", user.id).order("name"),
+    supabase.from("foods").select("id, name, brand, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g, is_estimate, source, basis").eq("owner_id", user.id).order("name"),
   ]);
   const myFoods = (foodRows ?? []) as MyFood[];
   // AI meal plans (Pro): the draft waiting for review, with every number computed now from the database values.

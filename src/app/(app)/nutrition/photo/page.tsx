@@ -96,7 +96,7 @@ export default async function FoodPhotoPage({ searchParams }: { searchParams: Pr
   const date = isValidIsoDate(sp.date) && sp.date <= today ? sp.date : today;
   const hour = Number(new Intl.DateTimeFormat("en-US", { hour: "numeric", hourCycle: "h23", timeZone: profile.timezone || "UTC" }).format(new Date()));
   const [{ data: foodRows }, extras] = await Promise.all([
-    supabase.from("foods").select("id, name, brand, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g, is_estimate, source").eq("owner_id", user.id).order("name"),
+    supabase.from("foods").select("id, name, brand, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g, is_estimate, source, basis").eq("owner_id", user.id).order("name"),
     Promise.all(
       HIDDEN_EXTRAS.map(async (x): Promise<HiddenExtra | null> => {
         const f = await getLocalFood(Number(x.fdcId));

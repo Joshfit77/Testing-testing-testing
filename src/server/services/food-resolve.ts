@@ -2,7 +2,7 @@ import "server-only";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { barcodeLookupCandidates } from "@/lib/barcode";
-import { basisFromFoodRow, basisUnits, type FoodBasis } from "@/lib/domain/food-basis";
+import { basisFromFoodRow, basisUnits, sanitizeBasis, type FoodBasis } from "@/lib/domain/food-basis";
 import { basisFromOffProduct } from "@/lib/open-food-facts";
 import { isFoodSearchConfigured } from "@/server/env";
 import { externalFoodBasis, getFood } from "@/server/services/food-database";
@@ -67,6 +67,7 @@ export async function resolvePickedFood(supabase: SupabaseClient, userId: string
     if (!isFoodSearchConfigured()) return { ok: false, error: "That food isn't in the food database." };
     const ext = await getFood(item.fdcId);
     if (!ext) return { ok: false, error: "That food couldn't be loaded from the food database." };
+    const basis = externalFoodBasis(ext);
     const { data: cached, error: cErr } = await supabase
       .from("foods")
       .upsert(
@@ -84,6 +85,8 @@ export async function resolvePickedFood(supabase: SupabaseClient, userId: string
           source: "usda",
           source_ref: ext.fdcId,
           is_estimate: false,
+          // The full basis, so a re-log from My foods keeps what the columns can't hold (e.g. `missing`).
+          basis: sanitizeBasis(basis),
         },
         { onConflict: "owner_id,source,source_ref" },
       )
@@ -93,7 +96,7 @@ export async function resolvePickedFood(supabase: SupabaseClient, userId: string
     return {
       ok: true,
       food: {
-        basis: externalFoodBasis(ext),
+        basis,
         food_id: cached.id as string,
         name: ext.name,
         is_estimate: false,
@@ -130,6 +133,9 @@ export async function resolvePickedFood(supabase: SupabaseClient, userId: string
         source_ref: p.code,
         // Crowd-sourced label data, not a guess; the UI labels it "Open Food Facts (community data) — check the label".
         is_estimate: false,
+        // The full basis as looked up (label serving, sugar, sodium, unlisted macros under `missing`): the columns
+        // above store unlisted macros as 0, so a re-log from My foods reads this instead (basisFromFoodRow).
+        basis: sanitizeBasis(basis),
       },
       { onConflict: "owner_id,source,source_ref" },
     )

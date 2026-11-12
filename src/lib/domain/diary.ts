@@ -172,6 +172,14 @@ export function attemptId(ref: { current: { key: string; id: string } | null }, 
   return ref.current.id;
 }
 
+/**
+ * The `attemptId` key for a water tap: the same amount on the same day again after a failed send is a retry of that
+ * tap (same id, so it can't be counted twice); once a tap is confirmed the ref is cleared and the next is a new entry.
+ */
+export function waterAttemptKey(date: string, amountMl: number): string {
+  return `water|${date}|${amountMl}`;
+}
+
 /** How long "Undo" stays next to the confirmation after food is logged. */
 export const UNDO_LOG_MS = 8000;
 

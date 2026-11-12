@@ -153,7 +153,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
       .order("created_at"),
     supabase.from("nutrition_goals").select("*").eq("user_id", user.id).maybeSingle(),
     supabase.from("water_entries").select("amount_ml").eq("user_id", user.id).eq("recorded_on", date),
-    supabase.from("foods").select("id, name, brand, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g, is_estimate, source").eq("owner_id", user.id).order("name"),
+    supabase.from("foods").select("id, name, brand, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g, is_estimate, source, basis").eq("owner_id", user.id).order("name"),
     supabase.from("meals").select("id, name, yield_servings, meal_items(calories, protein_g)").eq("user_id", user.id).eq("is_template", true).order("name"),
     supabase
       .from("meals")
