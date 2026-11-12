@@ -12,6 +12,7 @@ import { OffUnavailableError } from "@/server/services/open-food-facts";
 import { basisFromLegacyItem, sanitizeBasis } from "@/lib/domain/food-basis";
 import { amountFields, pickedFoodSchema, resolvePickedFood } from "@/server/services/food-resolve";
 import { amountColumns, derivedClientId, findOrCreateMeal, ITEM_COLUMNS, LIMITS_ERROR, scaleItem, withinLimits, type MealItemRow } from "@/server/services/diary-write";
+import { isRepeatOf } from "@/server/services/idempotency";
 import { logError } from "@/server/log";
 import { estimateAndSaveTargets } from "@/server/services/nutrition-targets";
 import { FAVORITE_KEY_PATTERN } from "@/lib/domain/food-favorites";
@@ -115,7 +116,7 @@ export async function logFoodAction(input: unknown): Promise<LogResult> {
       .single();
     const message = loggedMessage({ name: row.name, amount: row.amount_label, mealType, planned: status === "planned" });
     // The same attempt arriving twice: the first insert won, so this one is already done (and Undo removes that row).
-    if (error?.code === "23505" && clientId) {
+    if (isRepeatOf(error, clientId)) {
       const { data: first } = await supabase.from("meal_items").select("id").eq("user_id", user.id).eq("client_id", clientId).maybeSingle();
       return { ...actionOk(message), itemIds: first ? [first.id as string] : [] };
     }
@@ -354,7 +355,7 @@ export async function logTemplateAction(_prev: ActionState, formData: FormData):
       .select("id");
     const message = loggedMessage({ name: tpl.name as string, amount: `${servings} ${servings === 1 ? "serving" : "servings"}`, mealType, planned: status === "planned" });
     // The same attempt arriving twice: the first insert won (all rows go in together), so this one is already done.
-    if (error?.code === "23505" && clientIds) return { ...actionOk(message), itemIds: await alreadyLogged(supabase, user.id, clientIds) };
+    if (clientIds && isRepeatOf(error, clientIds[0])) return { ...actionOk(message), itemIds: await alreadyLogged(supabase, user.id, clientIds) };
     if (error) throw error;
     revalidatePath("/nutrition");
     revalidatePath("/home");
@@ -397,7 +398,7 @@ export async function addWaterAction(_prev: ActionState, formData: FormData): Pr
       .single();
     let entry = inserted as { id: string; recorded_on: string; amount_ml: number } | null;
     // The same tap arriving twice: the first insert won, so this one is already done.
-    if (error?.code === "23505" && clientId) {
+    if (isRepeatOf(error, clientId)) {
       const { data: first, error: readErr } = await supabase.from("water_entries").select("id, recorded_on, amount_ml").eq("user_id", user.id).eq("client_id", clientId).maybeSingle();
       if (readErr) throw readErr;
       entry = first as typeof entry;
@@ -503,7 +504,7 @@ export async function copyMealsAction(input: unknown): Promise<LogResult> {
         .insert(items.map((i, n) => ({ ...i, meal_id: mealId, user_id: user.id, client_id: clientIds?.[n] ?? null })))
         .select("id");
       // This meal was already copied by an earlier send of the same attempt: count it as done and carry on.
-      if (error?.code === "23505" && clientIds) itemIds.push(...(await alreadyLogged(supabase, user.id, clientIds)));
+      if (clientIds && isRepeatOf(error, clientIds[0])) itemIds.push(...(await alreadyLogged(supabase, user.id, clientIds)));
       else if (error) throw error;
       else itemIds.push(...((inserted ?? []) as { id: string }[]).map((r) => r.id));
       copied += items.length;
@@ -535,7 +536,7 @@ export async function relogItemAction(input: unknown): Promise<LogResult> {
       .single();
     const message = loggedMessage({ name: item.name as string, amount: item.amount_label as string | null, mealType, planned: status === "planned" });
     // The same attempt arriving twice: the first insert won, so this one is already done (and Undo removes that row).
-    if (error?.code === "23505" && clientId) return { ...actionOk(message), itemIds: await alreadyLogged(supabase, user.id, [clientId]) };
+    if (clientId && isRepeatOf(error, clientId)) return { ...actionOk(message), itemIds: await alreadyLogged(supabase, user.id, [clientId]) };
     if (error) throw error;
     revalidatePath("/nutrition");
     revalidatePath("/home");

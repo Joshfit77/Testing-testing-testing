@@ -15,7 +15,7 @@ import {
   type MatchedEstimate,
 } from "@/lib/domain/food-photo";
 import { initialItems } from "@/components/nutrition/food-photo-flow";
-import { rowClientId } from "@/server/services/diary-write";
+import { derivedClientId, isRepeatOf } from "@/server/services/idempotency";
 import { searchUsda } from "@/server/services/usda-local";
 
 const item = (over: Partial<FoodPhotoOutput["items"][number]> = {}): FoodPhotoOutput["items"][number] => ({
@@ -168,8 +168,17 @@ describe("food photo estimates", () => {
     expect(isLoggableDate("2026-02-30", now)).toBe(false);
     expect(isLoggableDate("1999-12-31", now)).toBe(false);
     const id = "6f9619ff-8b86-4011-b42d-00c04fc964ff";
-    expect(rowClientId(id, 0)).toBe(rowClientId(id, 0));
-    expect(rowClientId(id, 0)).not.toBe(rowClientId(id, 1));
-    expect(rowClientId(id, 2)).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(derivedClientId(id, 0)).toBe(derivedClientId(id, 0));
+    expect(derivedClientId(id, 0)).not.toBe(derivedClientId(id, 1));
+    expect(derivedClientId(id, 2)).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-8[0-9a-f]{3}-[0-9a-f]{12}$/);
+  });
+});
+
+describe("isRepeatOf", () => {
+  it("is a repeat only for a unique-index refusal on a save that carried an id", () => {
+    expect(isRepeatOf({ code: "23505" }, "6f9619ff-8b86-4011-b42d-00c04fc964ff")).toBe(true);
+    expect(isRepeatOf({ code: "23505" }, null)).toBe(false);
+    expect(isRepeatOf({ code: "23503" }, "id")).toBe(false);
+    expect(isRepeatOf(null, "id")).toBe(false);
   });
 });

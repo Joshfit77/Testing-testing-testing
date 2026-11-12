@@ -8,6 +8,7 @@ import { mealTypeSchema } from "@/lib/validation/schemas";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { assertFeature, EntitlementError, requireUser } from "@/server/auth";
 import { amountColumns, findOrCreateMeal, LIMITS_ERROR, withinLimits } from "@/server/services/diary-write";
+import { isRepeatOf } from "@/server/services/idempotency";
 import { logError } from "@/server/log";
 
 type Result = { ok: true; message: string } | { ok: false; error: string };
@@ -69,7 +70,7 @@ export async function logLabelFoodAction(input: unknown): Promise<Result> {
     const { error } = await supabase
       .from("meal_items")
       .insert({ meal_id: mealId, user_id: user.id, client_id: clientId ?? null, food_id: null, name: name.slice(0, 160), is_estimate: false, source: "custom", ...row });
-    if (error?.code === "23505" && clientId) return { ok: true, message: `Added ${name} to ${mealType}.` };
+    if (isRepeatOf(error, clientId)) return { ok: true, message: `Added ${name} to ${mealType}.` };
     if (error) throw error;
   } catch (err) {
     logError("label.log", err);

@@ -1,5 +1,4 @@
 import "server-only";
-import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { scaleMacros, type Macros } from "@/lib/domain/nutrition";
 import { computeAmount, sanitizeBasis, unitIdForLabel, type FoodBasis } from "@/lib/domain/food-basis";
@@ -73,15 +72,8 @@ export function withinLimits(c: AmountColumns): boolean {
   return c.calories <= 99_999 && c.protein_g <= 9_999 && c.carbs_g <= 9_999 && c.fat_g <= 9_999 && (c.grams == null || c.grams <= 20_000) && c.servings <= 99_999;
 }
 
-/**
- * One attempt that adds several diary rows (a saved meal, a copied day) has a single id from the device, but
- * `meal_items` allows a client id once per member. Each row gets its own id derived from the attempt's, the same on
- * every retry, so the existing unique index refuses a repeat of the whole attempt.
- */
-export function derivedClientId(clientId: string, part: string): string {
-  const h = createHash("sha256").update(`${clientId}:${part}`).digest("hex");
-  return `${h.slice(0, 8)}-${h.slice(8, 12)}-5${h.slice(13, 16)}-8${h.slice(17, 20)}-${h.slice(20, 32)}`;
-}
+/** Re-exported from the shared retry helpers (src/server/services/idempotency.ts). */
+export { derivedClientId } from "@/server/services/idempotency";
 
 export const ITEM_COLUMNS = "food_id, name, servings, calories, protein_g, carbs_g, fat_g, is_estimate, fiber_g, sugar_g, sodium_mg, grams, quantity, unit_label, amount_label, source, basis";
 
@@ -107,10 +99,4 @@ export function scaleItem(i: Record<string, unknown>, factor: number): Record<st
     quantity: opt(i.quantity, 3),
     amount_label: null,
   };
-}
-
-/** The diary row id for item `index` of one save: the same save always gets the same ids. */
-export function rowClientId(clientId: string, index: number): string {
-  const h = createHash("sha256").update(`${clientId}:${index}`).digest("hex");
-  return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-${((parseInt(h[16]!, 16) & 0x3) | 0x8).toString(16)}${h.slice(17, 20)}-${h.slice(20, 32)}`;
 }

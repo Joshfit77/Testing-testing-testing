@@ -9,6 +9,7 @@ import { assertFeature, EntitlementError, requireUser } from "@/server/auth";
 import { logError } from "@/server/log";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { amountColumns, findOrCreateMeal, LIMITS_ERROR, withinLimits } from "@/server/services/diary-write";
+import { isRepeatOf } from "@/server/services/idempotency";
 import { amountFields, pickedFoodSchema, resolvePickedFood } from "@/server/services/food-resolve";
 import { loadRecipe } from "@/server/services/recipes";
 import { OffUnavailableError } from "@/server/services/open-food-facts";
@@ -179,7 +180,7 @@ export async function logRecipeAction(input: unknown): Promise<ActionState> {
       ...cols,
     });
     // The same attempt arriving twice: the first insert won, so this one is already done.
-    if (error && !(error.code === "23505" && clientId)) throw error;
+    if (error && !isRepeatOf(error, clientId)) throw error;
     return actionOk(`Logged ${cols.amount_label} of ${recipe.name}.`);
   } catch (err) {
     return guard(err, "recipes.log");

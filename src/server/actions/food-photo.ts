@@ -6,7 +6,8 @@ import { mealTypeSchema } from "@/lib/validation/schemas";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { assertFeature, EntitlementError, getUserPlan, requireUser } from "@/server/auth";
 import { getAiAllowance } from "@/server/services/ai-coach";
-import { amountColumns, findOrCreateMeal, LIMITS_ERROR, rowClientId, withinLimits, type MealItemRow } from "@/server/services/diary-write";
+import { isRepeatOf } from "@/server/services/idempotency";
+import { amountColumns, findOrCreateMeal, LIMITS_ERROR, derivedClientId, withinLimits, type MealItemRow } from "@/server/services/diary-write";
 import { isLoggableDate } from "@/lib/domain/food-photo";
 import { pickedFoodSchema, resolvePickedFood } from "@/server/services/food-resolve";
 import { logError } from "@/server/log";
@@ -111,9 +112,9 @@ export async function logFoodPhotoItemsAction(input: unknown): Promise<Result> {
 
   try {
     const mealId = await findOrCreateMeal(supabase, user.id, date, mealType, "logged");
-    const { error } = await supabase.from("meal_items").insert(rows.map((r, i) => ({ meal_id: mealId, user_id: user.id, client_id: clientId ? rowClientId(clientId, i) : null, ...r })));
+    const { error } = await supabase.from("meal_items").insert(rows.map((r, i) => ({ meal_id: mealId, user_id: user.id, client_id: clientId ? derivedClientId(clientId, i) : null, ...r })));
     // Already saved by an earlier attempt of this same save (the whole insert is one statement: all rows or none).
-    if (error?.code === "23505" && clientId) return { ok: true, message: `Added ${rows.length} item${rows.length === 1 ? "" : "s"} to ${mealType}.` };
+    if (isRepeatOf(error, clientId)) return { ok: true, message: `Added ${rows.length} item${rows.length === 1 ? "" : "s"} to ${mealType}.` };
     if (error) throw error;
   } catch (err) {
     logError("food_photo.log", err);
