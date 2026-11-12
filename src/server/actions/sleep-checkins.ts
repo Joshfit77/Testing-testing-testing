@@ -1,5 +1,6 @@
 "use server";
 
+import { safeNextPath } from "@/lib/safe-redirect";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -88,7 +89,7 @@ export async function saveSleepCheckinAction(_prev: ActionState, formData: FormD
     return actionError("Couldn't save your check-in. Please try again.");
   }
   refresh();
-  const to = v.returnTo && v.returnTo.startsWith("/progress/sleep") ? v.returnTo : "/progress/sleep";
+  const to = v.returnTo && safeNextPath(v.returnTo, "") === v.returnTo && v.returnTo.startsWith("/progress/sleep") ? v.returnTo : "/progress/sleep";
   redirect(`${to}${to.includes("?") ? "&" : "?"}saved=${empty ? "cleared" : "checkin"}`);
 }
 

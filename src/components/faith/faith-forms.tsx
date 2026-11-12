@@ -150,7 +150,8 @@ export function JournalForm({ today, entry, defaultRef, defaultKind, onSaved }: 
             <Bot className="size-4 text-gold" aria-hidden /> Share with AI Coach
           </span>
           <span className="block text-xs text-muted-foreground">
-            Off by default. When on, the coach can read this entry (a short excerpt) to encourage you. You can turn it off any time.
+            Off by default. When on, the coach can read this entry (a short excerpt) to encourage you, while Faith-inspired
+            coaching is switched on in your profile. You can turn it off any time.
           </span>
         </span>
       </label>

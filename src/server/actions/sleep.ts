@@ -1,5 +1,6 @@
 "use server";
 
+import { safeNextPath } from "@/lib/safe-redirect";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -199,7 +200,7 @@ export async function saveSleepSessionAction(_prev: ActionState, formData: FormD
     return actionError("Couldn't save this sleep. Please try again.");
   }
   refresh();
-  redirect(v.returnTo && v.returnTo.startsWith("/progress/sleep") ? `${v.returnTo}${v.returnTo.includes("?") ? "&" : "?"}saved=1` : "/progress/sleep?saved=1");
+  redirect(v.returnTo && safeNextPath(v.returnTo, "") === v.returnTo && v.returnTo.startsWith("/progress/sleep") ? `${v.returnTo}${v.returnTo.includes("?") ? "&" : "?"}saved=1` : "/progress/sleep?saved=1");
 }
 
 const goalSchema = z.object({

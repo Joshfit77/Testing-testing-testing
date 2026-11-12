@@ -178,14 +178,17 @@ export async function loadAthleteSnapshot(supabase: SupabaseClient, userId: stri
       .maybeSingle(),
     getActiveProgramRef(supabase, userId),
     loadBudgetContext(supabase, userId).catch(() => null),
-    // Prayer journal: private by default. Only entries the user explicitly shared with the coach are read.
-    supabase
-      .from("faith_journal_entries")
-      .select("entry_date, kind, title, scripture_ref, body, answered_on, share_with_coach")
-      .eq("user_id", userId)
-      .eq("share_with_coach", true)
-      .order("entry_date", { ascending: false })
-      .limit(COACH_JOURNAL_LIMIT),
+    // Prayer journal: private by default. Only entries the user explicitly shared with the coach are read, and only
+    // while faith features are on: turning them off stops every journal excerpt reaching the AI provider.
+    profile?.faith_enabled
+      ? supabase
+          .from("faith_journal_entries")
+          .select("entry_date, kind, title, scripture_ref, body, answered_on, share_with_coach")
+          .eq("user_id", userId)
+          .eq("share_with_coach", true)
+          .order("entry_date", { ascending: false })
+          .limit(COACH_JOURNAL_LIMIT)
+      : Promise.resolve({ data: [] as never[] }),
     // Coaching memory: read only while the athlete has it switched on.
     profile?.coach_memory_enabled
       ? supabase.from("coach_memories").select("id, category, content, source, created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(MEMORY_LIMIT)

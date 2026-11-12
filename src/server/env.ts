@@ -1,6 +1,6 @@
 import "server-only";
 import { demoModeOn, demoModeRefused } from "@/lib/demo/mode";
-import { localStandIn } from "@/server/test-overrides";
+import { isProductionDeployment, localStandIn } from "@/server/test-overrides";
 
 if (demoModeRefused()) {
   console.warn("DEMO_MODE=true is ignored: this is a production or live-payments deployment (src/lib/demo/mode.ts).");
@@ -23,11 +23,11 @@ function stripeSecretKey(raw: string | undefined): string {
 }
 
 /**
- * A deployment approved for real charges is production: there, blanket acceptance of free sandbox / Test Store
+ * A production deployment (Vercel production, or approved for real Stripe charges) is production: there, blanket acceptance of free sandbox / Test Store
  * purchases is ignored (anyone with a TestFlight build could otherwise get Pro). Individual App Review and TestFlight
  * accounts use the per-account sandbox tester list (migration 052) instead.
  */
-const realMoneyDeployment = process.env.STRIPE_LIVE_APPROVED === "true";
+const realMoneyDeployment = isProductionDeployment();
 
 /** Store-billing secrets are ignored in a demo deployment, so in-app purchases can't run there either. */
 function storeSecret(raw: string | undefined): string {

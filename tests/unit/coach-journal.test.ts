@@ -39,6 +39,7 @@ describe("prayer journal and the AI coach", () => {
 
   it("the snapshot loader asks only for shared entries and drops anything unshared it gets back", async () => {
     const { client, log } = fakeSupabase({
+      profiles: { data: { faith_enabled: true }, error: null },
       // Even if the database returned unshared rows, they must not reach the coach.
       faith_journal_entries: { data: [row({ share_with_coach: false }), row({ share_with_coach: false, body: "secret" })], error: null },
     });
@@ -47,6 +48,19 @@ describe("prayer journal and the AI coach", () => {
     expect(formatAthleteContext(snap)).not.toMatch(/surgeons|secret/);
     const q = log.find((l) => l.table === "faith_journal_entries");
     expect(q?.calls).toEqual(expect.arrayContaining([["eq", ["share_with_coach", true]], ["eq", ["user_id", USER]]]));
+  });
+});
+
+describe("faith features off", () => {
+  it("no journal entry is even read for the coach, shared or not (review finding: privacy after turning faith off)", async () => {
+    const { client, log } = fakeSupabase({
+      profiles: { data: { faith_enabled: false }, error: null },
+      faith_journal_entries: { data: [row({ share_with_coach: true, body: "shared before faith was turned off" })], error: null },
+    });
+    const snap = await loadAthleteSnapshot(client, USER);
+    expect(snap.sharedJournal).toEqual([]);
+    expect(formatAthleteContext(snap)).not.toMatch(/shared before faith/);
+    expect(log.find((l) => l.table === "faith_journal_entries")).toBeUndefined();
   });
 });
 

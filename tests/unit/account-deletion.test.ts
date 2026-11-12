@@ -2,11 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { deleteUserAccount, deletionFailureMessage, type DeletionDeps } from "@/server/services/account-deletion";
 
-function fakeAdmin(opts: { customerId?: string | null; deleteError?: unknown } = {}) {
+function fakeAdmin(opts: { customerId?: string | null; deleteError?: unknown; readError?: unknown } = {}) {
   const calls: string[] = [];
   const admin = {
     from: () => ({
-      select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: opts.customerId ? { stripe_customer_id: opts.customerId } : null }) }) }),
+      select: () => ({ eq: () => ({ maybeSingle: async () => (opts.readError ? { data: null, error: opts.readError } : { data: opts.customerId ? { stripe_customer_id: opts.customerId } : null, error: null }) }) }),
     }),
     auth: {
       admin: {
@@ -31,6 +31,13 @@ function deps(over: Partial<DeletionDeps> & { calls: string[]; admin: SupabaseCl
 }
 
 describe("account deletion order and failures", () => {
+  it("stops before touching anything when the Stripe customer can't be read (no subscription may outlive the account)", async () => {
+    const { admin, calls } = fakeAdmin({ readError: { message: "timeout" } });
+    const r = await deleteUserAccount("u1", deps({ admin, calls }));
+    expect(r).toEqual({ ok: false, stage: "billing", subscriptionsCancelled: false, filesRemoved: false });
+    expect(calls).toEqual([]);
+  });
+
   it("cancels billing, removes files, deletes the user, then removes the Stripe customer", async () => {
     const { admin, calls } = fakeAdmin({ customerId: "cus_123" });
     const r = await deleteUserAccount("u1", deps({ admin, calls }));

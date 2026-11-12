@@ -39,7 +39,13 @@ export async function deleteUserAccount(userId: string, deps: DeletionDeps): Pro
   const removeStorage = deps.removeStorage ?? removeUserStorage;
 
   // Read the Stripe customer id before the row cascades away with the user.
-  const { data: customer } = await deps.admin.from("billing_customers").select("stripe_customer_id").eq("user_id", userId).maybeSingle();
+  // A failed read must stop the deletion: without the customer id the Stripe customer (and any subscription that
+  // hasn't reached the local table yet) would outlive the account.
+  const { data: customer, error: customerErr } = await deps.admin.from("billing_customers").select("stripe_customer_id").eq("user_id", userId).maybeSingle();
+  if (customerErr) {
+    deps.log("account.delete.billing_customer", customerErr);
+    return { ok: false, stage: "billing", subscriptionsCancelled: false, filesRemoved: false };
+  }
   const customerId = (customer?.stripe_customer_id as string | undefined) ?? null;
 
   try {

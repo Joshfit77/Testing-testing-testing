@@ -7,8 +7,11 @@ create unique index if not exists meal_items_user_client_uidx on public.meal_ite
 
 alter table public.training_adjustments
   add constraint training_adjustments_changes_size_check check (octet_length(changes::text) <= 20000);
+-- NOT VALID: enforced on every new or changed row, but an existing over-long value (the column had no limit before)
+-- can't make this migration fail on a production database. Validate later with
+-- `alter table public.profiles validate constraint profiles_avatar_path_check;` once such rows are cleaned.
 alter table public.profiles
-  add constraint profiles_avatar_path_check check (avatar_path is null or char_length(avatar_path) <= 300);
+  add constraint profiles_avatar_path_check check (avatar_path is null or char_length(avatar_path) <= 300) not valid;
 
 create index if not exists workout_sets_user_idx on public.workout_sets (user_id);
 create index if not exists meal_items_user_idx on public.meal_items (user_id);

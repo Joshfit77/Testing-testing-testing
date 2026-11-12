@@ -7,7 +7,7 @@ import { WebMembership } from "@/components/profile/web-membership";
 import { intervalForProduct, type BillingSource } from "@/lib/billing/paywall";
 import { storeRowAsSubscription } from "@/lib/billing/revenuecat";
 import { membershipComparison } from "@/lib/domain/membership";
-import { getPlans, subscriptionToShow, yearlySavingsCents, yearlySavingsPercent, type BillingInterval } from "@/lib/domain/plans";
+import { APPROVED_PRO_PRICE_CENTS, getPlans, subscriptionToShow, yearlySavingsCents, yearlySavingsPercent, type BillingInterval } from "@/lib/domain/plans";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { isServiceRoleConfigured, isStripeConfigured } from "@/server/env";
@@ -74,7 +74,8 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   // Web prices: the amounts Stripe will actually charge. Checkout is offered only for a price that matches the
   // approved price shown on this page.
   const stripe = !native && isStripeConfigured() && isServiceRoleConfigured() ? await stripeProPrices() : {};
-  const approved = { month: plans.pro.priceCents, year: plans.pro.yearlyPriceCents ?? 0 };
+  // Checkout is offered only at the owner-approved price, whatever the display override says.
+  const approved = { month: APPROVED_PRO_PRICE_CENTS.month, year: plans.pro.yearlyPriceCents ? APPROVED_PRO_PRICE_CENTS.year : 0 };
   const okFor = (i: BillingInterval) => Boolean(stripe[i]) && stripePriceProblems(stripe[i], i, approved[i]).length === 0;
   const checkoutOk = { month: okFor("month"), year: approved.year > 0 && okFor("year") };
   // The saving is worked out from the very amounts shown (and charged), so the two can never disagree.

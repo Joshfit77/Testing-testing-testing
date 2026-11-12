@@ -18,7 +18,7 @@ describe.skipIf(!available)("AI consent gates every provider call", () => {
   const svc = serviceClient();
   let pro: TestUser;
   const usageCount = async () => (await svc.from("ai_usage_events").select("id", { count: "exact", head: true }).eq("user_id", pro.id)).count ?? 0;
-  const setConsent = async (fields: { ai_data_consent_at?: string | null; food_photo_consent_at?: string | null }) => {
+  const setConsent = async (fields: { ai_data_consent_at?: string | null; food_photo_consent_at?: string | null; faith_enabled?: boolean }) => {
     // The member's own session, as the consent switches on the AI Coach and photo screens do it.
     const { error } = await pro.client.from("profiles").update(fields).eq("id", pro.id);
     if (error) throw error;
@@ -114,6 +114,16 @@ describe.skipIf(!available)("AI consent gates every provider call", () => {
 
     answer = () => ({ blocks: [{ type: "text", text: "Keep going: three sets of five." }] });
     await setConsent({ ai_data_consent_at: new Date().toISOString() });
+    // Faith-inspired coaching off (the default): even a shared entry stays out of the prompt.
+    await setConsent({ faith_enabled: false });
+    const offBefore = api.requests.length;
+    await coachTurn({ supabase: pro.client, userId: pro.id, plan: "pro", conversationId: null, message: "How should I train this week?", mode: "chat" });
+    const offSent = JSON.stringify(api.requests.slice(offBefore));
+    expect(offSent.length).toBeGreaterThan(2);
+    expect(offSent).not.toContain(sharedMarker);
+    expect(offSent).not.toContain(privateMarker);
+    // Faith-inspired coaching on: only the shared entry is sent.
+    await setConsent({ faith_enabled: true });
     const before = api.requests.length;
     const result = await coachTurn({ supabase: pro.client, userId: pro.id, plan: "pro", conversationId: null, message: "How should I train this week?", mode: "chat" });
     expect(result.assistantMessage.content).toContain("three sets of five");

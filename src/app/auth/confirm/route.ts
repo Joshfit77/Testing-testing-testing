@@ -4,7 +4,8 @@ import { redirectToPath } from "@/lib/relative-redirect";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { safeNextPath } from "@/lib/safe-redirect";
 
-const TYPES: EmailOtpType[] = ["signup", "recovery", "email_change", "email", "invite", "magiclink"];
+// Only the link types our own emails use (supabase/templates): fewer ways to slip someone a session-swapping link.
+const TYPES: EmailOtpType[] = ["signup", "recovery", "email"];
 
 /**
  * Token-hash verification: where the sign-up confirmation and password-reset emails link (supabase/templates).

@@ -2,7 +2,7 @@ import "server-only";
 import Stripe from "stripe";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { publicEnv } from "@/lib/env";
-import { entitlementFromSubscriptions, getPlans, legacyTermsApply, periodStartFromEnd, type BillingInterval, type LegacyAiTerms, type SubscriptionStatus } from "@/lib/domain/plans";
+import { APPROVED_PRO_PRICE_CENTS, entitlementFromSubscriptions, legacyTermsApply, periodStartFromEnd, type BillingInterval, type LegacyAiTerms, type SubscriptionStatus } from "@/lib/domain/plans";
 import type { Plan } from "@/lib/domain/types";
 import { storeRowAsSubscription } from "@/lib/billing/revenuecat";
 import { isServiceRoleConfigured, serverEnv } from "@/server/env";
@@ -147,9 +147,12 @@ export class PriceMismatchError extends Error {
   }
 }
 
+/**
+ * The owner-approved price ($19.99 / $149.99), fixed in code. An environment override of the display price
+ * (PLAN_PRO_PRICE_CENTS) can't make an unapproved Stripe price pass: changing what members pay is a code change.
+ */
 function approvedCents(interval: BillingInterval): number {
-  const pro = getPlans().pro;
-  return interval === "year" ? (pro.yearlyPriceCents ?? 0) : pro.priceCents;
+  return APPROVED_PRO_PRICE_CENTS[interval];
 }
 
 /** Thrown when a checkout would create a second subscription for the same customer. */
@@ -168,6 +171,18 @@ async function openStripeSubscriptions(customer: string): Promise<string[]> {
   return list.data.filter((s) => OPEN_STATUSES.has(s.status)).map((s) => s.id);
 }
 
+async function expireOpenCheckouts(customer: string): Promise<void> {
+  const open = await getStripe().checkout.sessions.list({ customer, status: "open", limit: 20 });
+  for (const s of open.data) {
+    try {
+      await getStripe().checkout.sessions.expire(s.id);
+    } catch (err) {
+      // Completed or expired in the meantime: nothing left to pay twice.
+      if (!isStripeMissing(err) && (err as { code?: string }).code !== "resource_missing") logError("billing.checkout.expire", err);
+    }
+  }
+}
+
 export async function createCheckoutSession(userId: string, email: string | undefined, plan: PaidPlan, interval: BillingInterval = "month"): Promise<string> {
   const price = priceIdForPlan(plan, interval);
   if (!price) throw new Error(`No Stripe price configured for ${plan}/${interval}`);
@@ -178,6 +193,9 @@ export async function createCheckoutSession(userId: string, email: string | unde
   const customer = await getOrCreateCustomer(userId, email);
   // Two tabs, or a retry before the webhook lands, must not create a second subscription.
   if ((await openStripeSubscriptions(customer)).length) throw new AlreadySubscribedError();
+  // A checkout left open in another tab (valid for 24 h) could otherwise be paid as well, billing the member twice:
+  // only the newest checkout can be completed.
+  await expireOpenCheckouts(customer);
   const session = await getStripe().checkout.sessions.create({
     mode: "subscription",
     customer,
@@ -548,7 +566,8 @@ export async function cancelStripeSubscriptionsForUser(userId: string): Promise<
   if (error) throw error;
   const ids = new Set((data ?? []).map((s) => s.stripe_subscription_id as string));
   // Stripe's own list too, in case a subscription never reached the local table.
-  const { data: customerRow } = await getServiceSupabase().from("billing_customers").select("stripe_customer_id").eq("user_id", userId).maybeSingle();
+  const { data: customerRow, error: customerErr } = await getServiceSupabase().from("billing_customers").select("stripe_customer_id").eq("user_id", userId).maybeSingle();
+  if (customerErr) throw customerErr;
   if (customerRow?.stripe_customer_id) for (const id of await openStripeSubscriptions(customerRow.stripe_customer_id as string)) ids.add(id);
   for (const id of ids) {
     try {
