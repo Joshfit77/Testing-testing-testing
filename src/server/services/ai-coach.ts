@@ -573,9 +573,10 @@ export async function withAiRequest<T>(
   params: { supabase: SupabaseClient; userId: string; plan: Plan; kind: Exclude<AiUsageKind, "chat" | "plan">; tier?: ModelTier },
   run: (ctx: { client: Anthropic; model: string }) => Promise<{ value: T; inputTokens: number; outputTokens: number }>,
 ): Promise<T> {
-  const usage = await assertAiAllowed(params.userId, params.plan, "chat");
+  // Consent first: a member who hasn't allowed AI use is told so, and their request doesn't count against the rate limit.
   const { data: consent } = await params.supabase.from("profiles").select("ai_data_consent_at").eq("id", params.userId).maybeSingle();
   if (!consent?.ai_data_consent_at) throw new AiError("consent_required", "Allow the AI features to use your data first (on the AI Coach screen).");
+  const usage = await assertAiAllowed(params.userId, params.plan, "chat");
   const reservation = await reserveUsage(params.userId, params.kind, params.tier ?? "fast", usage);
   const model = coachModelIds(process.env)[reservation.tier];
   let result: { value: T; inputTokens: number; outputTokens: number };

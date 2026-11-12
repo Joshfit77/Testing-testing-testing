@@ -88,4 +88,21 @@ describe.skipIf(!available)("finishing the same workout concurrently saves it on
     const types = (records ?? []).map((r) => r.record_type as string);
     expect(new Set(types).size).toBe(types.length);
   });
+  it("a claim left by a save that died mid-way is taken over once stale, and its partial rows are replaced", async () => {
+    const clientId = crypto.randomUUID();
+    const startedAt = "2026-08-03T10:00:00Z";
+    await saveDraftSnapshot(user.client, user.id, { clientId, name: "Race session", startedAt, userProgramId: null, programDayId: null, draft: { version: 2 } });
+    const { data: s } = await svc.from("workout_sessions").select("id").eq("user_id", user.id).eq("client_id", clientId).single();
+    // A dead attempt: claimed three minutes ago, one exercise written, never completed.
+    await svc.from("workout_sessions").update({ finish_claim: crypto.randomUUID(), finish_claimed_at: new Date(Date.now() - 180_000).toISOString() }).eq("id", s!.id);
+    await svc.from("workout_exercises").insert({ session_id: s!.id, user_id: user.id, exercise_id: squat, position: 0 });
+    const res = await finishWorkout(user.client, user.id, input(clientId, startedAt));
+    expect(res.alreadyCompleted).toBe(false);
+    const c = await counts(clientId);
+    expect(c.sessions).toEqual([expect.objectContaining({ status: "completed" })]);
+    expect(c.exercises).toBe(1);
+    expect(c.sets).toBe(2);
+    const { data: after } = await svc.from("workout_sessions").select("finish_claim").eq("id", s!.id).single();
+    expect(after!.finish_claim).toBeNull();
+  });
 });

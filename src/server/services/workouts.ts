@@ -241,18 +241,74 @@ export async function finishWorkout(
     draft: null,
   };
 
+  // Claim the session before writing: two finishes of the same workout at once (a double tap, a retry while the
+  // first request is still running) would otherwise both clear and re-write the exercises and save every set twice.
+  // Only the request that wins the claim writes; the others wait for it and report the workout as already saved.
+  const claim = crypto.randomUUID();
+  const claimedRow = { ...row, finish_claim: claim, finish_claimed_at: new Date().toISOString() };
   let sessionId: string;
   if (existing) {
     sessionId = existing.id as string;
-    const { error } = await supabase.from("workout_sessions").update(row).eq("id", sessionId);
+    const staleBefore = new Date(Date.now() - FINISH_CLAIM_TTL_MS).toISOString();
+    const { data: won, error } = await supabase
+      .from("workout_sessions")
+      .update(claimedRow)
+      .eq("id", sessionId)
+      .eq("status", "in_progress")
+      .or(`finish_claim.is.null,finish_claimed_at.lt."${staleBefore}"`)
+      .select("id");
     if (error) throw new WorkoutError(error.message);
-    // Clear any rows from a previous partial attempt.
-    await supabase.from("workout_exercises").delete().eq("session_id", sessionId);
+    if (!won?.length) return awaitOtherFinish(supabase, userId, input.clientId);
   } else {
-    const { data, error } = await supabase.from("workout_sessions").insert(row).select("id").single();
+    const { data, error } = await supabase.from("workout_sessions").insert(claimedRow).select("id").single();
+    // Another request created it first (unique user + client id): it holds the claim.
+    if (error?.code === "23505") return awaitOtherFinish(supabase, userId, input.clientId);
     if (error || !data) throw new WorkoutError(error?.message ?? "Insert failed", error?.code === "23503" ? "invalid" : "db");
     sessionId = data.id as string;
   }
+
+  try {
+    return await writeClaimedFinish(supabase, userId, sessionId, input, userProgramId, volumeKg);
+  } catch (e) {
+    // Let the client's retry take over straight away instead of waiting for the claim to go stale.
+    await supabase.from("workout_sessions").update({ finish_claim: null, finish_claimed_at: null }).eq("id", sessionId).eq("finish_claim", claim);
+    throw e;
+  }
+}
+
+/** A claim older than this is treated as abandoned (the server died mid-save), so a retry can take it over. */
+const FINISH_CLAIM_TTL_MS = 120_000;
+
+/** Another request is finishing this workout: wait for it, then answer as a retry would. */
+async function awaitOtherFinish(supabase: SupabaseClient, userId: string, clientId: string) {
+  for (let i = 0; i < 40; i++) {
+    const { data } = await supabase
+      .from("workout_sessions")
+      .select("id, status, total_volume_kg")
+      .eq("user_id", userId)
+      .eq("client_id", clientId)
+      .maybeSingle();
+    if (data?.status === "completed") {
+      const records = await recordsOfSession(supabase, userId, data.id as string).catch(() => []);
+      return { sessionId: data.id as string, volumeKg: Number(data.total_volume_kg), records, alreadyCompleted: true };
+    }
+    if (data && data.status !== "in_progress") break;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  throw new WorkoutError("This workout is still being saved. Try again in a moment.", "conflict");
+}
+
+async function writeClaimedFinish(
+  supabase: SupabaseClient,
+  userId: string,
+  sessionId: string,
+  input: FinishWorkoutInput,
+  userProgramId: string | null,
+  volumeKg: number,
+): Promise<{ sessionId: string; volumeKg: number; records: NewRecord[]; alreadyCompleted: boolean }> {
+  // Clear anything a previous partial attempt left (an in-progress session owns no saved exercises or records).
+  await supabase.from("workout_exercises").delete().eq("session_id", sessionId);
+  await supabase.from("personal_records").delete().eq("user_id", userId).eq("session_id", sessionId);
 
   // If this throws, the session stays in progress so the client can retry safely.
   await insertExercises(supabase, userId, sessionId, input.exercises);
@@ -285,7 +341,7 @@ export async function finishWorkout(
 
   const { error: doneErr } = await supabase
     .from("workout_sessions")
-    .update({ status: "completed", ended_at: input.endedAt, draft: null })
+    .update({ status: "completed", ended_at: input.endedAt, draft: null, finish_claim: null, finish_claimed_at: null })
     .eq("id", sessionId);
   if (doneErr) throw new WorkoutError(doneErr.message);
 

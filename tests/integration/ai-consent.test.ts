@@ -108,7 +108,7 @@ describe.skipIf(!available)("AI consent gates every provider call", () => {
     const { error } = await svc.from("faith_journal_entries").insert([
       { user_id: pro.id, body: `Grateful for strength today ${sharedMarker}`, share_with_coach: true },
       { user_id: pro.id, body: `A private prayer ${privateMarker}`, share_with_coach: false },
-      { user_id: pro.id, body: `Another private prayer ${privateMarker}` },
+      { user_id: pro.id, body: `Another private prayer ${privateMarker}`, share_with_coach: false },
     ]);
     if (error) throw error;
 
