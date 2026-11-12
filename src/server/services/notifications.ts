@@ -5,6 +5,7 @@ import { FAITH_REMINDER_KINDS, faithReminderFromRow, type FaithReminder } from "
 import { APP_REMINDER_KINDS, appReminderFromRow, type AppReminder } from "@/lib/notifications/catalog";
 import { DEFAULT_NOTIFICATION_PREFS, type NotificationPrefs, type PlannerContext } from "@/lib/notifications/planner";
 import { loadProgramSchedule } from "@/server/services/schedule";
+import { journeyZoneAt } from "@/server/services/journeys";
 
 export interface NotificationSettings {
   faith: FaithReminder[];
@@ -50,7 +51,7 @@ export async function loadPlannerContext(
   const today = isoDateInTz(new Date(), tz);
   const since = `${addDays(today, -1)}T00:00:00Z`;
   const [journeyRes, goalsRes, workoutsRes, readRes, prayedRes, openRes, mealsRes, waterRes, goalRes, schedule] = await Promise.all([
-    supabase.from("faith_journeys").select("id").eq("user_id", userId).eq("status", "active").maybeSingle(),
+    supabase.from("faith_journeys").select("id, timezone, previous_timezone, timezone_since, pending_timezone, timezone_switch_at").eq("user_id", userId).eq("status", "active").maybeSingle(),
     supabase.from("faith_daily_goals").select("kind").eq("user_id", userId).eq("goal_date", today),
     supabase.from("workout_sessions").select("started_at").eq("user_id", userId).eq("status", "completed").gte("started_at", since).limit(20),
     supabase.from("bible_reading_history").select("id").eq("user_id", userId).eq("read_on", today).limit(1),
@@ -68,8 +69,11 @@ export async function loadPlannerContext(
     loadProgramSchedule(supabase, userId, tz).catch(() => null),
   ]);
   const journeyId = journeyRes.data?.id as string | undefined;
+  // A journey's day follows its own time zone (migration 061), which may differ from the profile's.
+  const journeyTz = journeyRes.data ? journeyZoneAt(journeyRes.data as Parameters<typeof journeyZoneAt>[0], new Date(), tz) : tz;
+  const journeyToday = isoDateInTz(new Date(), journeyTz);
   const { data: checkin } = journeyId
-    ? await supabase.from("faith_journey_checkins").select("reading_completed_at, prayer_completed_at").eq("journey_id", journeyId).eq("check_date", today).maybeSingle()
+    ? await supabase.from("faith_journey_checkins").select("reading_completed_at, prayer_completed_at").eq("journey_id", journeyId).eq("check_date", journeyToday).maybeSingle()
     : { data: null };
   const goals = new Set((goalsRes.data ?? []).map((g) => g.kind as string));
   const workout = (workoutsRes.data ?? []).some((w) => isoDateInTz(new Date(w.started_at as string), tz) === today);
@@ -82,6 +86,7 @@ export async function loadPlannerContext(
     timezone: tz,
     faithEnabled: profile.faith_enabled !== false,
     journeyActive: Boolean(journeyId),
+    journey: journeyId ? { timezone: journeyTz, today: journeyToday } : undefined,
     done: {
       // A journey counts only what's marked on it (its rule); otherwise any reading or prayer today.
       reading: journeyId ? Boolean(checkin?.reading_completed_at) : (readRes.data ?? []).length > 0,

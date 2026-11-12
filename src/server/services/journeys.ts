@@ -38,7 +38,10 @@ export interface JourneyView {
   /** The attempt in progress (the latest one for a finished journey). */
   attempt: AttemptView;
   today: string;
+  /** The zone the journey's days follow now. */
   timezone: string;
+  /** A requested change that hasn't taken effect yet. */
+  pendingTimezone: { timezone: string; switchAt: string } | null;
   /** Today's schedule day in the current attempt (1…duration), or null before Day 1. */
   day: number | null;
   todayPlan: PlanDay | null;
@@ -59,6 +62,25 @@ interface JourneyRow {
   status: JourneyView["status"];
   created_at: string;
   ended_at: string | null;
+  timezone: string | null;
+  previous_timezone: string | null;
+  timezone_since: string | null;
+  pending_timezone: string | null;
+  timezone_switch_at: string | null;
+}
+
+/**
+ * The time zone a journey's days follow at an instant (the same rule as public.faith_journey_zone_at, migration 061):
+ * a requested change applies from its switch moment, the previous zone before the last change, else the journey's own.
+ */
+export function journeyZoneAt(
+  row: Pick<JourneyRow, "timezone" | "previous_timezone" | "timezone_since" | "pending_timezone" | "timezone_switch_at">,
+  at: Date,
+  fallback = "UTC",
+): string {
+  if (row.pending_timezone && row.timezone_switch_at && at.getTime() >= Date.parse(row.timezone_switch_at)) return row.pending_timezone;
+  if (row.previous_timezone && row.timezone_since && at.getTime() < Date.parse(row.timezone_since)) return row.previous_timezone;
+  return row.timezone ?? fallback;
 }
 
 const toAttempt = (r: Record<string, unknown>): AttemptView => ({
@@ -72,7 +94,7 @@ const toAttempt = (r: Record<string, unknown>): AttemptView => ({
   endedAt: (r.ended_at as string | null) ?? null,
 });
 
-const JOURNEY_COLS = "id, plan_kind, plan_param, duration_days, start_on, status, created_at, ended_at";
+const JOURNEY_COLS = "id, plan_kind, plan_param, duration_days, start_on, status, created_at, ended_at, timezone, previous_timezone, timezone_since, pending_timezone, timezone_switch_at";
 
 /** Apply the daily rule for the member now (the scheduled job does the same every 15 minutes). */
 export async function settleMyJourney(supabase: SupabaseClient): Promise<void> {
@@ -80,10 +102,12 @@ export async function settleMyJourney(supabase: SupabaseClient): Promise<void> {
   if (error) logError("faith.journey.settle", error);
 }
 
-async function buildView(supabase: SupabaseClient, row: JourneyRow, timezone: string): Promise<JourneyView | null> {
+async function buildView(supabase: SupabaseClient, row: JourneyRow, profileTimezone: string): Promise<JourneyView | null> {
   const spec = validPlanSpec(row.plan_kind, row.plan_param);
   const plan = spec ? journeyPlan(spec, row.duration_days) : null;
   if (!spec || !plan) return null;
+  // The journey's own time zone (fixed when it started), not the profile's: changing the profile never moves its days.
+  const timezone = journeyZoneAt(row, new Date(), profileTimezone);
   const today = isoDateInTz(new Date(), timezone);
   const [attemptsRes, checkinsRes] = await Promise.all([
     supabase.from("faith_journey_attempts").select("id, attempt_number, started_on, status, interrupted_on, interruption_reason, days_completed, ended_at").eq("journey_id", row.id).order("attempt_number", { ascending: false }),
@@ -128,6 +152,7 @@ async function buildView(supabase: SupabaseClient, row: JourneyRow, timezone: st
     attempt,
     today,
     timezone,
+    pendingTimezone: row.pending_timezone && row.timezone_switch_at && Date.now() < Date.parse(row.timezone_switch_at) ? { timezone: row.pending_timezone, switchAt: row.timezone_switch_at } : null,
     day,
     todayPlan: day ? (plan.schedule[day - 1] ?? null) : null,
     reading,

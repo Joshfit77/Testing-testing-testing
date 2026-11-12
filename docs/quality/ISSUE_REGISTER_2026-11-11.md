@@ -69,7 +69,7 @@ filtering; Free view and delete of runs; sleep import duplicates; reminder plann
 | T7 | L | Workout editor loses unsaved edits on a network failure | `src/components/workout/workout-editor.tsx:79-110` | Catch and keep edits | Fixed |
 | T8 | L | First workout: reps prefilled, weight blank, so one tap can log a zero-load set on a barbell lift | `src/lib/domain/workout-draft.ts:110-114`, `src/lib/domain/strength.ts:60-61` | Prompt for weight or prefill a starter load | Owner decision |
 | T9 | L | Personal bests table reads only the newest 1,000 record rows | `src/server/services/progress.ts:124-129` | Page the query | Fixed |
-| T10 | L | Changing the profile time zone mid-journey reopens a closed day | migration 053 (`faith_journey_check_in_at`), `src/server/actions/profile.ts:35-47` | Snapshot the zone on the journey (schema change, touches the strict rule) | Owner decision |
+| T10 | L | Changing the profile time zone mid-journey reopens a closed day | migration 053 (`faith_journey_check_in_at`), `src/server/actions/profile.ts:35-47` | Snapshot the zone on the journey (schema change, touches the strict rule) | Fixed (migration 061): owner decided 2026-11-12 — a journey keeps the zone it started in; explicit changes wait for a shared midnight |
 
 Checked clean: all five reading-plan lengths cover the whole Bible once with no gaps or duplicates; the strict restart
 rule is shown and acknowledged before starting, enforced on the server and in the database, and keeps history; workout

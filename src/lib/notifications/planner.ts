@@ -47,6 +47,8 @@ export interface PlannerContext {
    * reminders are always available). */
   faithEnabled: boolean;
   journeyActive: boolean;
+  /** An active journey's own time zone and date (migration 061): its reminders follow its midnight. */
+  journey?: { timezone: string; today: string };
   done: DoneToday;
   /** Program training days in the next week, when a program is active. */
   training: { hasProgram: boolean; workoutDates: string[] };
@@ -203,7 +205,7 @@ export function planNotifications(input: PlanInput): PlannedNotification[] {
     weekly.push({ id: n.id, ...base(n.kind, "faith", n.title, n.body, faithUrl(n.kind, ctx.journeyActive), time), date: null, on: onDevice(wd, time, ctx) });
   }
   const faithDone = { reading: ctx.done.reading, prayer: ctx.done.prayer, challenge: ctx.done.challenge, fitness: ctx.done.fitness };
-  for (const n of buildDatedFaithNotifications(faith, { today: ctx.today, timezone: ctx.timezone, now: ctx.now, done: faithDone, journeyActive: ctx.journeyActive, quiet, days: horizon })) {
+  for (const n of buildDatedFaithNotifications(faith, { today: ctx.journeyActive && ctx.journey ? ctx.journey.today : ctx.today, timezone: ctx.journeyActive && ctx.journey ? ctx.journey.timezone : ctx.timezone, now: ctx.now, done: faithDone, journeyActive: ctx.journeyActive, quiet, days: horizon })) {
     dated.push({ id: n.id, ...base(n.kind, "faith", n.title, n.body, faithUrl(n.kind, ctx.journeyActive), faithTime.get(n.kind)!), date: n.date, at: n.at });
   }
 

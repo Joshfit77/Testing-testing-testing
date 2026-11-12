@@ -4,6 +4,7 @@ import { ActionButton } from "@/components/common/action-button";
 import { PageHeader } from "@/components/common/page-header";
 import { BackLink } from "@/components/platform/back-link";
 import { JourneyCheckIn } from "@/components/faith/journey-checkin";
+import { JourneyTimezone } from "@/components/faith/journey-timezone";
 import { NotificationTodaySync } from "@/components/notifications/notification-sync";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { Button } from "@/components/ui/button";
@@ -191,7 +192,7 @@ export default async function JourneyPage({ searchParams }: { searchParams: Prom
         <p className="font-semibold">The daily rule</p>
         <p className="mt-1">{JOURNEY_RULE}</p>
         <p className="mt-1">{RULE_GRACE}</p>
-        <p className="mt-1 text-sm text-muted-foreground">Days follow your time zone ({view.timezone}).</p>
+        <JourneyTimezone timezone={view.timezone} profileTimezone={tz} pending={view.pendingTimezone} />
       </section>
 
       {view.attempts.length > 1 && (

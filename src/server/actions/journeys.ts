@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getServerSupabase } from "@/lib/supabase/server";
@@ -103,4 +104,28 @@ export async function endJourneyAction(): Promise<void> {
   const supabase = await getServerSupabase();
   const { error } = await supabase.rpc("faith_journey_end");
   if (error) logError("faith.journey.end", error);
+}
+
+export type JourneyTimezoneResult = { ok: true; timezone: string; pending: string | null; switchAt: string | null } | { ok: false; error: string };
+
+/**
+ * Change (or cancel a pending change of) the time zone the active journey's days follow. The change waits for a day
+ * boundary that both zones share, so no day is skipped, repeated or given extra time (migration 061).
+ */
+export async function setJourneyTimezoneAction(timezone: string): Promise<JourneyTimezoneResult> {
+  await requireUser();
+  const tz = z.string().min(1).max(64).safeParse(timezone);
+  if (!tz.success) return { ok: false, error: "Choose a time zone from the list." };
+  const supabase = await getServerSupabase();
+  const { data, error } = await supabase.rpc("faith_journey_set_timezone", { p_tz: tz.data });
+  if (error) {
+    if (error.message?.includes("faith_invalid_timezone")) return { ok: false, error: "That time zone isn't recognised. Choose one from the list." };
+    if (error.message?.includes("faith_timezone_jump")) return { ok: false, error: "Those time zones are a full day or more apart, so the change would skip a day. Change it in two steps, a day apart." };
+    if (error.message?.includes("faith_no_journey")) return { ok: false, error: "You don't have an active journey." };
+    logError("faith.journey.timezone", error);
+    return { ok: false, error: "Couldn't change the time zone. Please try again." };
+  }
+  const r = (data ?? {}) as { timezone?: string; pending?: string | null; switch_at?: string | null };
+  revalidatePath("/faith/journey");
+  return { ok: true, timezone: r.timezone ?? timezone, pending: r.pending ?? null, switchAt: r.switch_at ?? null };
 }
