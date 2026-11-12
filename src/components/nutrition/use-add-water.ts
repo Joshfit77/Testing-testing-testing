@@ -19,6 +19,12 @@ export function useAddWater(date: string) {
     fd.set("date", date);
     fd.set("amountMl", String(amountMl));
     fd.set("clientId", attemptId(attempt, waterAttemptKey(date, amountMl)));
+    // Offline, a server action call fails inside the router and replaces the whole page with the error screen, so
+    // don't send it: say it wasn't saved and keep the id for the retry.
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setState(saveFailed());
+      return;
+    }
     try {
       const res = await addWaterAction(initialActionState, fd);
       if (res.ok) attempt.current = null;

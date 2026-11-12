@@ -89,4 +89,17 @@ describe("water quick-add that never reaches the server", () => {
     expect(other!.amountMl).toBe("750");
     expect(other!.clientId).not.toBe(first!.clientId);
   });
+  it("offline: doesn't send at all (a failed action call replaces the page), says so, and the retry keeps the id", async () => {
+    const onLine = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    actions.addWaterAction.mockResolvedValue({ ok: true, message: "Added 250 ml.", entryId: "e1", totalMl: 250, at: 3 });
+    render(<WaterQuick date="2026-11-12" totalMl={0} goalMl={2500} />);
+    fireEvent.click(screen.getByRole("button", { name: "+250 ml" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(SAVE_FAILED_MESSAGE);
+    expect(actions.addWaterAction).not.toHaveBeenCalled();
+    onLine.mockReturnValue(true);
+    await waitFor(() => expect(screen.getByRole("button", { name: "+250 ml" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "+250 ml" }));
+    await waitFor(() => expect(actions.addWaterAction).toHaveBeenCalledTimes(1));
+    onLine.mockRestore();
+  });
 });
