@@ -869,7 +869,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
       {/* Sticky header. On phones it starts at the very top of the screen (pulled up over the page's own top
           padding) and pads itself below the status bar, so nothing scrolls into view above or behind it. */}
       <div className="sticky top-0 z-20 -mx-4 -mt-[calc(env(safe-area-inset-top)+0.25rem)] border-b border-border bg-background/90 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-xl md:-mx-8 md:mt-0 md:px-8 md:pt-3">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-2">
           <div className="min-w-0 flex-1">
             <label htmlFor="workout-name" className="sr-only">
               Workout name

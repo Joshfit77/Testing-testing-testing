@@ -387,7 +387,8 @@ export function CurrentSetCard({
 
   return (
     <section className="card-gold space-y-4 rounded-2xl p-4" aria-label="Current set" data-testid="current-set-card">
-      <div className="flex items-start gap-3">
+      {/* Wraps under the picture at large text sizes so the name never squeezes to one letter per line. */}
+      <div className="flex flex-wrap items-start gap-3">
         <button
           type="button"
           onClick={() => setInfoOpen(true)}
@@ -396,12 +397,12 @@ export function CurrentSetCard({
         >
           <ExerciseDemo slug={exercise.slug} name={exercise.name} muscles={form ? { primary: form.primary, secondary: form.secondary } : undefined} controls={false} className="pointer-events-none h-full w-full" />
         </button>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-[8rem] flex-1 basis-[8rem]">
           <p className="text-xs font-semibold uppercase tracking-widest text-gold">
             Exercise {info.exerciseNumber} of {info.exerciseCount}
             {exercise.supersetId ? " · superset" : ""}
           </p>
-          <h2 className="line-clamp-2 break-words font-display text-[1.75rem] font-bold leading-tight [text-wrap:balance]" data-testid="current-exercise">
+          <h2 className="line-clamp-3 break-words font-display text-[1.75rem] font-bold leading-tight [text-wrap:balance]" data-testid="current-exercise">
             {exercise.name}
           </h2>
           {target && <p className="text-sm text-gold-highlight">{target}</p>}
@@ -474,7 +475,7 @@ export function CurrentSetCard({
       )}
 
       {set && simple && (
-        <div className={cn("grid gap-3", exercise.isTimed ? "grid-cols-1" : "grid-cols-2")}>
+        <div className={cn("grid gap-3", exercise.isTimed ? "grid-cols-1" : "set-steppers")}>
           {exercise.isTimed ? (
             <Stepper
               label="Time"
@@ -562,7 +563,7 @@ export function CurrentSetCard({
           </Button>
         )}
       </div>
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         {onSkipExercise && set ? (
           <Button size="sm" variant="ghost" className="shrink-0" onClick={() => onSkipExercise(exercise.id)} data-testid="skip-exercise">
             Skip exercise…

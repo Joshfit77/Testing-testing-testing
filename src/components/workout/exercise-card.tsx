@@ -346,7 +346,7 @@ export function ExerciseCard({
       <header className="mb-3 flex items-start justify-between gap-2">
         <ExerciseDemoMini slug={exercise.slug} name={exercise.name} animate={current} className="h-[60px] w-20" />
         <div className="min-w-0 flex-1">
-          <h3 id={`ex-${exercise.id}`} className="font-display text-lg font-semibold uppercase leading-tight">
+          <h3 id={`ex-${exercise.id}`} className="font-display text-lg font-semibold uppercase leading-tight [overflow-wrap:anywhere]">
             <Link href={`/train/exercises/${exercise.slug}?from=workout`} className="hover:text-gold-highlight">
               {exercise.name}
             </Link>
@@ -411,6 +411,8 @@ export function ExerciseCard({
         </DropdownMenu.Root>
       </header>
 
+      {/* At large text sizes the five columns can be wider than the phone: they scroll here, not the whole page. */}
+      <div className="overflow-x-auto">
       <div
         className={cn(
           "grid gap-2 px-1 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground",
@@ -429,8 +431,9 @@ export function ExerciseCard({
           <SetRow key={s.id} exercise={exercise} set={s} index={i} units={units} dispatch={dispatch} showComplete={showComplete} isNext={s.id === nextSetId} />
         ))}
       </ol>
-      <div className="mt-2 flex gap-2">
-        <Button type="button" size="sm" variant="secondary" className="flex-1" onClick={() => dispatch({ type: "addSet", exerciseKey: exercise.id })}>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <Button type="button" size="sm" variant="secondary" className="h-auto min-h-9 flex-1 whitespace-normal" onClick={() => dispatch({ type: "addSet", exerciseKey: exercise.id })}>
           <Plus aria-hidden /> Add set
         </Button>
         {exercise.sets.length > 0 && showComplete && (
@@ -438,6 +441,7 @@ export function ExerciseCard({
             type="button"
             size="sm"
             variant="ghost"
+            className="h-auto min-h-9 max-w-full whitespace-normal"
             onClick={async () => {
               const last = exercise.sets[exercise.sets.length - 1]!;
               if (last.completed) {
