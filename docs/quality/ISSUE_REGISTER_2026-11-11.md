@@ -47,9 +47,9 @@ tools are read-only or proposals that need explicit confirmation.
 | N2 | M | GPS-recorded runs cannot be edited at all (notes and effort are promised to stay editable) | `src/app/(app)/run/activities/[id]/edit/page.tsx:20`, `src/server/actions/activities.ts:157` | Notes/effort-only edit path for GPS runs | Fixed |
 | N3 | M | Food logging loses the entry (and its retry id) when the save fails offline | `nutrition-client.tsx:313-349`, `diary-client.tsx:57-80`, `quick-relog.tsx:36-39`, `recipe-log-form.tsx:33-37`, `food-photo-flow.tsx:222-241` | Catch, keep the dialog and id, inline retry message | Fixed |
 | N4 | M | USDA foods store missing macros as real zeros | `src/server/services/food-database.ts:63-65`, `src/app/api/foods/search/route.ts:60`, `src/server/services/food-resolve.ts:96` | Record them in `basis.missing` | Fixed |
-| N5 | L/M | Barcode products re-logged from My foods lose their missing-value flags, sugar, sodium and label serving | `food-resolve.ts:114-137`, `src/lib/domain/food-basis.ts:103-134` | Store the basis on `foods` (schema change) | Open |
+| N5 | L/M | Barcode products re-logged from My foods lose their missing-value flags, sugar, sodium and label serving | `food-resolve.ts:114-137`, `src/lib/domain/food-basis.ts:103-134` | Store the basis on `foods` (schema change) | Fixed on `claude/rc-verification` (migration 059) |
 | N6 | L/M | A Health sync overwrites a hand-entered step count | `src/server/actions/steps.ts:76-79` | Keep manual days | Fixed |
-| N7 | L | Retries of relog, saved-meal, copy-day, recipe and water logging are not idempotent | `src/server/actions/nutrition.ts:329,367,441,482`, `recipes.ts:157` | Client ids where the schema already supports them | Fixed for relog, saved meal, copy day and recipe; water still open (needs a schema change) |
+| N7 | L | Retries of relog, saved-meal, copy-day, recipe and water logging are not idempotent | `src/server/actions/nutrition.ts:329,367,441,482`, `recipes.ts:157` | Client ids where the schema already supports them | Fixed for relog, saved meal, copy day and recipe; water fixed on `claude/rc-verification` (migration 058) |
 | N8 | L | Daily calories can differ from the visible rows by 1 kcal | `nutrition.ts:43,78`, `nutrition/page.tsx:133,291` | Round on write | Fixed |
 
 Checked clean: serving and unit maths; kcal vs kJ; barcode unknown / no-nutrition / network-failure / camera-denied
@@ -105,4 +105,23 @@ Fixes not exercised end to end here (covered by unit tests and code reading only
 a real Stripe failed renewal; the chat deadline firing against the real provider; the offline food-logging retry in a
 browser; the GPS notes edit against the live-GPS database trigger for a Free member.
 
-Still open: B1 (needs a Play sandbox), B7, N5, water idempotency in N7, and the owner decisions T8 and T10.
+Still open at the end of finalization: B1 (needs a Play sandbox), B7, N5, water idempotency in N7, and the owner
+decisions T8 and T10.
+
+## Release-candidate verification, 2026-11-12 (branch `claude/rc-verification`)
+
+Reconciliation: 29 findings in the finalization pass. 24 were fixed there (N7 counted as fixed although its water
+part was still open). N5 and the water part of N7 are now fixed, so 25 are fully fixed. Still open: B1 (needs a Play
+sandbox), B7 (membership screen), T8 and T10 (owner decisions). Schema changes: N5 (migration 059), N7 water
+(migration 058), and T10 when it is decided. Each migration states its rollback at the top of the file.
+
+New findings while writing evidence tests for the release candidate:
+
+| # | Sev | Defect | Evidence | Repair | Status |
+|---|---|---|---|---|---|
+| R1 | M | Two finishes of the same workout at once (double tap, or a retry while the first request is still running) both rewrote the exercises, saving every set twice | `tests/integration/workout-finish-concurrency.test.ts` failed (2 exercises, 4 sets, expected 1 and 2); `src/server/services/workouts.ts` `finishWorkout` | Claim the session with a conditional update before writing (migration 060, additive); other requests wait and report "already saved"; a claim older than two minutes can be taken over | Fixed; 3 integration tests |
+| R2 | L | An AI request from a member who had not allowed AI use was counted against the burst rate limit before it was refused | `tests/integration/ai-consent.test.ts`; `src/server/services/ai-coach.ts` `withAiRequest` | Check consent before the rate limit | Fixed; 5 integration tests |
+
+Acceptance for R1: four simultaneous finishes of one workout, with and without a saved draft, leave one completed
+session, one exercise, two sets and no repeated record type; a later retry returns "already saved" and adds nothing.
+
