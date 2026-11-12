@@ -12,11 +12,28 @@ export async function getEmailLink(to: string, pattern: RegExp, timeoutMs = 20_0
       const msg = (await (await fetch(`${MAILPIT}/api/v1/message/${list.messages[0]!.ID}`)).json()) as { HTML: string; Text: string };
       const body = `${msg.HTML}\n${msg.Text}`.replace(/&amp;/g, "&");
       const link = body.match(pattern)?.[0];
-      if (link) return link;
+      if (link) return retargetAppLink(link);
     }
     await new Promise((r) => setTimeout(r, 500));
   }
   throw new Error(`No email for ${to}`);
+}
+
+/**
+ * Supabase builds e-mail links from its own `site_url` (http://localhost:3000 locally). When the suite runs against an
+ * app on another port (E2E_BASE_URL), a link into the app is re-pointed at that server; Supabase's own /auth/v1/verify
+ * links are left alone.
+ */
+export function retargetAppLink(link: string): string {
+  const base = process.env.E2E_BASE_URL;
+  if (!base) return link;
+  const target = new URL(base);
+  const url = new URL(link);
+  if (url.hostname !== "localhost" && url.hostname !== "127.0.0.1") return link;
+  if (url.port === "54321") return link;
+  url.protocol = target.protocol;
+  url.host = target.host;
+  return url.toString();
 }
 
 export function uniqueEmail(prefix = "e2e") {
@@ -24,6 +41,12 @@ export function uniqueEmail(prefix = "e2e") {
 }
 
 export const PASSWORD = "Gate-Strong-2026";
+
+/**
+ * The sign-up confirmation link: the app's own /auth/confirm (supabase/templates/confirmation.html, so it works in
+ * any browser), or Supabase's /auth/v1/verify on a stack still using the default template.
+ */
+export const CONFIRMATION_LINK = /http:\/\/(?:localhost:3000\/auth\/confirm|127\.0\.0\.1:54321\/auth\/v1\/verify)[^"'\s<]+/;
 
 /** Sign up, confirm via email, and land on onboarding. */
 export async function signUpAndConfirm(page: Page, email: string, name = "Test Athlete") {
@@ -33,37 +56,114 @@ export async function signUpAndConfirm(page: Page, email: string, name = "Test A
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await page.getByLabel("I confirm I am 18 years of age or older.").check();
   await page.getByRole("checkbox", { name: /I agree to the/ }).check();
+  await page.getByRole("checkbox", { name: /I understand that exercise and outdoor activity carry a risk of injury/ }).check();
   await page.getByRole("button", { name: "Create account" }).click();
   await page.getByText("Check your inbox").waitFor();
-  const link = await getEmailLink(email, /http:\/\/127\.0\.0\.1:54321\/auth\/v1\/verify[^"'\s<]+/);
-  await page.goto(link);
+  const link = await getEmailLink(email, CONFIRMATION_LINK);
+  // Supabase's site_url is http://localhost:3000; when the suite runs against another port (E2E_BASE_URL), follow the
+  // app's confirmation link on that server instead (the token is verified by Supabase, not by the origin).
+  await page.goto(link.replace(/^http:\/\/localhost:3000(?=\/)/, new URL(page.url()).origin));
 }
 
-export async function completeOnboarding(page: Page) {
+export interface OnboardingAnswers {
+  goal?: string;
+  sex?: "Male" | "Female" | "Prefer not to say";
+  age?: string;
+  feet?: string;
+  inches?: string;
+  weightLb?: string;
+  goalWeightLb?: string;
+  pace?: RegExp;
+  activity?: RegExp;
+  experience?: string;
+  equipment?: RegExp;
+  diet?: RegExp;
+  /** Optional second-goal step (skipped when not given). */
+  secondGoal?: string;
+  /** Optional display step (skipped when not given). */
+  textSize?: "Default" | "Large" | "Extra large";
+  reduceMotion?: boolean;
+  /** Called on every screen just before Continue / Build my plan (layout checks at large text sizes). */
+  onEachStep?: (step: string) => Promise<void>;
+}
+
+/**
+ * Answer the guided sign-up questionnaire (one question per screen) and submit it. Ends on the plan summary.
+ * Quick path: goal, experience, schedule, equipment, about you, then "Build my plan" on the Ready screen. The optional
+ * questions (second goal, goal weight and pace, daily activity, diet, display) are answered only when a test asks for
+ * one of them, through "Personalise more"; otherwise their defaults apply (lightly active, balanced diet).
+ */
+export async function answerOnboarding(page: Page, a: OnboardingAnswers = {}) {
+  let step = 0;
+  const next = async () => {
+    await a.onEachStep?.(`step ${++step}`);
+    await page.getByRole("button", { name: /^Continue/ }).click();
+  };
+  const skip = () => page.getByRole("button", { name: "Skip", exact: true }).click();
   await page.waitForURL(/\/onboarding/);
-  await page.getByLabel("Age").fill("34");
-  await page.getByRole("button", { name: "Male", exact: true }).click();
-  await page.getByLabel("Height (ft)").fill("5");
-  await page.getByLabel("Height (in)").fill("10");
-  await page.getByLabel(/Bodyweight/).fill("185");
-  await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByRole("button", { name: "Build strength" }).click();
-  await page.getByRole("button", { name: "1–3 years" }).click();
-  await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByRole("button", { name: "Home gym" }).click();
-  await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByRole("button", { name: "Build my plan" }).click();
+  await page.getByRole("button", { name: a.goal ?? "Build strength", exact: true }).click();
+  await next();
+  await page.getByRole("button", { name: a.experience ?? "1–3 years", exact: true }).click();
+  await next();
+  await next(); // schedule: 3 days × 45 min by default
+  await page.getByRole("button", { name: a.equipment ?? /^Home gym/ }).click();
+  await next();
+  // About you: sex, age, height and weight on one screen.
+  await page.getByRole("button", { name: a.sex ?? "Male", exact: true }).click();
+  await page.getByLabel("Age").fill(a.age ?? "34");
+  await page.getByLabel("Height (ft)").fill(a.feet ?? "5");
+  await page.getByLabel("Height (in)").fill(a.inches ?? "10");
+  await page.getByLabel(/Current weight/).fill(a.weightLb ?? "185");
+  await next();
+  const more = a.secondGoal || a.goalWeightLb || a.pace || a.activity || a.diet || a.textSize || a.reduceMotion;
+  if (more) {
+    await page.getByRole("button", { name: "Personalise more" }).click();
+    if (a.secondGoal) {
+      await page.getByRole("group", { name: "Second goal" }).getByRole("button", { name: a.secondGoal, exact: true }).click();
+      await next();
+    } else await skip();
+    if (a.goalWeightLb || a.pace) {
+      if (a.goalWeightLb) await page.getByLabel(/Goal weight/).fill(a.goalWeightLb);
+      if (a.pace) await page.getByRole("button", { name: a.pace }).click();
+      await next();
+    } else await skip();
+    if (a.activity) {
+      await page.getByRole("button", { name: a.activity }).click();
+      await next();
+    } else await skip();
+    if (a.diet) {
+      await page.getByRole("button", { name: a.diet }).click();
+      await next();
+    } else await skip();
+    // Display (the last optional screen): set what was asked, then build.
+    if (a.textSize) await page.getByRole("radio", { name: new RegExp(a.textSize + "$") }).click();
+    if (a.reduceMotion) await page.getByRole("switch", { name: "Reduce motion" }).click();
+  }
+  // The main action must be fully on screen at phone width (three buttons in one row once pushed it off the edge).
+  await a.onEachStep?.("ready");
+  const build = page.getByRole("button", { name: "Build my plan" });
+  const box = await build.boundingBox();
+  const width = page.viewportSize()?.width ?? 0;
+  if (box && width && box.x + box.width > width + 1) throw new Error(`"Build my plan" runs off the screen (${Math.round(box.x + box.width)}px > ${width}px)`);
+  await build.click();
+  await page.waitForURL(/\/plan/, { timeout: 60_000 });
+}
+
+/** Default onboarding (strength, male, 34, 5 ft 10 in, 185 lb, lightly active, home gym), then go Home. */
+export async function completeOnboarding(page: Page) {
+  await answerOnboarding(page);
+  await page.getByRole("link", { name: /Go to Home/ }).click();
   await page.waitForURL(/\/home/, { timeout: 30_000 });
 }
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321";
+export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321";
 // The local Supabase CLI's standard demo service-role key (public, local-only). Never a real secret.
-const LOCAL_SERVICE_KEY =
+export const LOCAL_SERVICE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY ??
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU";
 
 /** Test-only: grant a plan directly in the local database (stands in for a completed Stripe checkout). */
-export async function grantPlan(email: string, plan: "plus" | "pro") {
+export async function grantPlan(email: string, plan: "plus" | "pro", source: "admin" | "stripe" | "app_store" | "play_store" = "admin") {
   const headers = { apikey: LOCAL_SERVICE_KEY, Authorization: `Bearer ${LOCAL_SERVICE_KEY}`, "Content-Type": "application/json" };
   const users = (await (await fetch(`${SUPABASE_URL}/auth/v1/admin/users?per_page=1000`, { headers })).json()) as { users: { id: string; email: string }[] };
   const user = users.users.find((u) => u.email === email);
@@ -71,7 +171,53 @@ export async function grantPlan(email: string, plan: "plus" | "pro") {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/user_entitlements`, {
     method: "POST",
     headers: { ...headers, Prefer: "resolution=merge-duplicates" },
-    body: JSON.stringify({ user_id: user.id, plan, source: "admin" }),
+    body: JSON.stringify({ user_id: user.id, plan, source }),
   });
   if (!res.ok) throw new Error(`grantPlan failed: ${res.status} ${await res.text()}`);
+}
+
+/** Test-only: insert rows for a user directly in the local database (seeding state a test doesn't build by hand). */
+export async function seedRows(email: string, table: string, rows: Record<string, unknown>[]) {
+  const headers = { apikey: LOCAL_SERVICE_KEY, Authorization: `Bearer ${LOCAL_SERVICE_KEY}`, "Content-Type": "application/json" };
+  const users = (await (await fetch(`${SUPABASE_URL}/auth/v1/admin/users?per_page=1000`, { headers })).json()) as { users: { id: string; email: string }[] };
+  const user = users.users.find((u) => u.email === email);
+  if (!user) throw new Error(`No user ${email}`);
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, { method: "POST", headers, body: JSON.stringify(rows.map((r) => ({ user_id: user.id, ...r }))) });
+  if (!res.ok) throw new Error(`seedRows ${table} failed: ${res.status} ${await res.text()}`);
+}
+
+/** Test-only: the auth user id for an email (local database). */
+export async function userIdFor(email: string): Promise<string> {
+  const headers = { apikey: LOCAL_SERVICE_KEY, Authorization: `Bearer ${LOCAL_SERVICE_KEY}` };
+  const users = (await (await fetch(`${SUPABASE_URL}/auth/v1/admin/users?per_page=1000`, { headers })).json()) as { users: { id: string; email: string }[] };
+  const user = users.users.find((u) => u.email === email);
+  if (!user) throw new Error(`No user ${email}`);
+  return user.id;
+}
+
+/** Test-only: a service-role REST call against the local database (reading or seeding state). */
+export async function serviceRest<T = unknown>(path: string, init: { method?: string; body?: unknown; prefer?: string } = {}): Promise<T> {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    method: init.method ?? "GET",
+    headers: {
+      apikey: LOCAL_SERVICE_KEY,
+      Authorization: `Bearer ${LOCAL_SERVICE_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: init.prefer ?? "return=representation",
+    },
+    body: init.body === undefined ? undefined : JSON.stringify(init.body),
+  });
+  if (!res.ok) throw new Error(`${init.method ?? "GET"} ${path} failed: ${res.status} ${await res.text()}`);
+  const text = await res.text();
+  return (text ? JSON.parse(text) : null) as T;
+}
+
+/**
+ * Hide what only the demo shows (the demo bar and the "Demo: …" notices), so a "first screen" check measures what a
+ * production member sees. Call after each navigation.
+ */
+export async function hideDemoChrome(page: Page) {
+  await page.addStyleTag({
+    content: `[data-testid="demo-bar"], *:has(> [data-testid^="demo-note-"]), *:has(> [data-testid="demo-ai-simulated"]), *:has(> [data-testid="demo-purchases-off"]) { display: none !important; }`,
+  });
 }

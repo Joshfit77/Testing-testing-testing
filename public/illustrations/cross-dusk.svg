@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 420" preserveAspectRatio="xMidYMid slice">
+  <!-- Original artwork for Narrow Gate Fitness: a cross on a rocky hill at dusk in the brand palette. -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0b0906"/>
+      <stop offset="0.4" stop-color="#2a2013"/>
+      <stop offset="0.72" stop-color="#7a5c2c"/>
+      <stop offset="0.9" stop-color="#c9a54c"/>
+      <stop offset="1" stop-color="#e3c98a"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.62" cy="0.6" r="0.5">
+      <stop offset="0" stop-color="#fff0c4" stop-opacity="0.85"/>
+      <stop offset="0.18" stop-color="#f1dfa8" stop-opacity="0.45"/>
+      <stop offset="0.6" stop-color="#8c6a2f" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#8c6a2f" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="hills" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3b2d18"/>
+      <stop offset="1" stop-color="#16110a"/>
+    </linearGradient>
+    <linearGradient id="rock" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1b150d"/>
+      <stop offset="1" stop-color="#060504"/>
+    </linearGradient>
+    <linearGradient id="cross" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#0e0b07"/>
+      <stop offset="0.7" stop-color="#1f1810"/>
+      <stop offset="1" stop-color="#5c4520"/>
+    </linearGradient>
+    <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#070707" stop-opacity="0.55"/>
+      <stop offset="0.35" stop-color="#070707" stop-opacity="0"/>
+      <stop offset="0.7" stop-color="#070707" stop-opacity="0"/>
+      <stop offset="1" stop-color="#070707" stop-opacity="0.9"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="420" fill="url(#sky)"/>
+  <rect width="800" height="420" fill="url(#glow)"/>
+  <g stroke="#f1dfa8" stroke-opacity="0.08" stroke-width="2">
+    <line x1="496" y1="250" x2="120" y2="40"/>
+    <line x1="496" y1="250" x2="300" y2="0"/>
+    <line x1="496" y1="250" x2="560" y2="0"/>
+    <line x1="496" y1="250" x2="780" y2="30"/>
+  </g>
+  <path d="M0 290 L90 262 L170 280 L260 246 L340 272 L420 250 L520 276 L600 252 L690 272 L800 256 V420 H0 Z" fill="url(#hills)" opacity="0.9"/>
+  <path d="M300 420 L360 360 L400 346 L430 320 L470 306 L520 300 L560 312 L600 330 L640 344 L700 372 L760 420 Z" fill="url(#rock)"/>
+  <path d="M430 320 L470 306 L520 300 L560 312 L548 316 L512 308 L474 314 Z" fill="#c9a54c" opacity="0.28"/>
+  <g>
+    <rect x="507" y="148" width="14" height="160" rx="2" fill="url(#cross)"/>
+    <rect x="474" y="184" width="80" height="13" rx="2" fill="url(#cross)"/>
+    <rect x="519" y="148" width="2" height="160" fill="#e2c477" opacity="0.55"/>
+    <rect x="474" y="184" width="80" height="2" fill="#e2c477" opacity="0.45"/>
+  </g>
+  <path d="M0 420 L0 372 L80 356 L160 372 L240 350 L300 368 L300 420 Z" fill="#070605"/>
+  <rect width="800" height="420" fill="url(#fade)"/>
+</svg>

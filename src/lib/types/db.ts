@@ -10,9 +10,34 @@ export interface ProfileRow {
   sex: "male" | "female" | "unspecified" | null;
   faith_enabled: boolean;
   wellness_consent_at: string | null;
+  /** When the user allowed the AI coach to send their data to the AI provider (null = not allowed). */
+  ai_data_consent_at?: string | null;
   onboarding_completed_at: string | null;
   timezone: string;
+  step_goal: number;
   avatar_path: string | null;
+  /** Added in 20261020000009_ui_prefs; optional so older rows/mocks still type-check. */
+  text_size?: "default" | "large" | "xlarge";
+  reduce_motion?: boolean;
+  home_scripture?: boolean;
+  bible_red_letters?: boolean;
+  bible_page_theme?: "dark" | "light";
+  /** Added in 20261106000057_layout_prefs: Home/Faith dashboard layout (null = default for the member's goal). */
+  layout_prefs?: unknown;
+  rest_timer_sound?: boolean;
+  rest_timer_vibrate?: boolean;
+  /** Added in 20261024000034_sleep (4–12 hours, default 8). */
+  sleep_goal_minutes?: number;
+  /** Added in 20261024000036_sleep_imports: whether health-platform sleep import is switched on. */
+  sleep_import_enabled?: boolean;
+  /** Added in 20261024000037_sleep_schedule: "HH:MM:SS" wake time to keep, or null for the typical one; dismissed tip keys. */
+  sleep_target_wake?: string | null;
+  sleep_tips_dismissed?: string[];
+  /** Added in 20261024000038_sleep_alarm: validated by `alarmConfigSchema`, or null. */
+  sleep_alarm?: unknown;
+  /** Added in 20261024000041_sleep_vitals: the health platform the member connected for sleep, and when. */
+  sleep_import_source?: "apple_health" | "health_connect" | null;
+  sleep_import_connected_at?: string | null;
   created_at: string;
 }
 
@@ -27,6 +52,9 @@ export interface OnboardingRow {
   limitations: string | null;
   dietary_preferences: string[];
   diet_type: string;
+  goal_weight_kg: number | null;
+  weekly_change_kg: number | null;
+  activity_level: "sedentary" | "light" | "active" | "very_active" | null;
 }
 
 export interface ExerciseRow {
@@ -67,6 +95,7 @@ export interface ProgramRow {
   warmup: string[];
   cooldown: string[];
   low_impact: boolean;
+  needs_specialist_review: boolean;
   is_published: boolean;
   owner_id: string | null;
   source: "curated" | "starter" | "ai" | "custom";

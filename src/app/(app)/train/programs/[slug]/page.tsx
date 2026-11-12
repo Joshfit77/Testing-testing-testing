@@ -1,16 +1,20 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Clock, Flame, Lock, Play, Repeat, Snowflake, TrendingUp } from "lucide-react";
+import { CheckCircle2, Clock, Dumbbell, Flag, Flame, Lock, Play, Repeat, ShieldAlert, Snowflake, TrendingUp } from "lucide-react";
 import { Notice } from "@/components/common/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ProgramActions } from "@/components/train/program-actions";
 import { canAccessTier } from "@/lib/domain/plans";
+import { completionRequirement, equipmentSummary, requiredSessions } from "@/lib/domain/program-catalog";
+import { EQUIPMENT_LABELS, type Equipment } from "@/lib/domain/types";
+import { getProgramSeed } from "@/data/programs";
 import { formatDuration } from "@/lib/domain/units";
 import type { ProgramRow } from "@/lib/types/db";
 import { cn, titleCase } from "@/lib/utils";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
+import { BackLink } from "@/components/platform/back-link";
 
 export const metadata = { title: "Program" };
 
@@ -38,6 +42,20 @@ interface PeRow {
   exercise: { id: string; slug: string; name: string } | null;
 }
 
+/** Split a long description into its opening (about two sentences) and the rest, which sits behind "More". */
+function splitIntro(text: string): [string, string] {
+  const t = text.trim();
+  if (t.length <= 240) return [t, ""];
+  const sentences = t.match(/[^.!?]+[.!?]+(\s+|$)/g) ?? [t];
+  let lead = "";
+  for (const sentence of sentences) {
+    if (lead && lead.length + sentence.length > 200) break;
+    lead += sentence;
+  }
+  const rest = t.slice(lead.length).trim();
+  return rest ? [lead.trim(), rest] : [t, ""];
+}
+
 export default async function ProgramDetailPage({
   params,
   searchParams,
@@ -61,6 +79,12 @@ export default async function ProgramDetailPage({
     program.category_id ? supabase.from("program_categories").select("name, slug").eq("id", program.category_id).maybeSingle() : Promise.resolve({ data: null }),
   ]);
   const userProgram = upRes.data;
+  // Completion progress: sessions logged against this program run.
+  const { count: loggedSessions } = userProgram
+    ? await supabase.from("workout_sessions").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("user_program_id", userProgram.id).eq("status", "completed")
+    : { count: 0 };
+  const { total: totalSessions, required: requiredCount } = requiredSessions(program.days_per_week, program.duration_weeks);
+  const completionText = completionRequirement(program, program.source === "curated" ? getProgramSeed(program.slug)?.completion : null);
   const weeks = weeksRes.data ?? [];
   const locked = program.owner_id !== user.id && !canAccessTier(plan, program.tier);
   const isActive = userProgram?.status === "active";
@@ -102,16 +126,31 @@ export default async function ProgramDetailPage({
 
   return (
     <div className="space-y-6">
-      <Link href="/train" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="size-4" aria-hidden /> Train
-      </Link>
+      <BackLink href="/train/programs">Programs</BackLink>
 
       <header className="bg-card-gradient rounded-3xl border border-border p-5 md:p-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gold">
+        <p className="text-sm font-semibold text-gold">
           {(categoryRes.data?.name as string) ?? (program.source === "ai" ? "AI-generated" : "Personal program")}
         </p>
         <h1 className="mt-2 font-display text-4xl font-bold uppercase leading-none md:text-5xl">{program.name}</h1>
-        <p className="mt-3 max-w-3xl text-sm text-muted-foreground md:text-base">{program.description || program.summary}</p>
+        {(() => {
+          // The first sentence or two up front; the rest one tap away.
+          const [lead, rest] = splitIntro(program.description || program.summary);
+          return (
+            <div className="mt-3 max-w-3xl text-sm text-muted-foreground md:text-base">
+              <p>{lead}</p>
+              {rest && (
+                <details className="group">
+                  <summary className="inline-flex min-h-11 cursor-pointer list-none items-center font-semibold text-gold-highlight [&::-webkit-details-marker]:hidden">
+                    <span className="group-open:hidden">More</span>
+                    <span className="hidden group-open:inline">Less</span>
+                  </summary>
+                  <p>{rest}</p>
+                </details>
+              )}
+            </div>
+          );
+        })()}
         <div className="mt-4 flex flex-wrap gap-2">
           <Badge variant="secondary">{titleCase(program.difficulty)}</Badge>
           <Badge variant="secondary">
@@ -129,13 +168,60 @@ export default async function ProgramDetailPage({
           ))}
         </div>
         <div className="mt-6">
-          <ProgramActions programId={program.id} locked={locked} isActive={isActive} isSaved={Boolean(userProgram)} />
+          <ProgramActions
+            programId={program.id}
+            locked={locked}
+            isActive={isActive}
+            isSaved={Boolean(userProgram)}
+            pausedWeek={userProgram?.status === "paused" ? (userProgram.current_week as number) : null}
+          />
         </div>
       </header>
 
+      {program.needs_specialist_review && (
+        <Notice tone="warning">
+          <ShieldAlert className="mr-1 inline size-4 text-gold" aria-hidden /> <strong>Not yet reviewed by a qualified coach.</strong> This is specialist
+          programming ({program.low_impact ? "active aging" : "competition or combat preparation"}). It follows published methods but hasn&apos;t been checked
+          by a qualified coach{program.low_impact ? " or physiotherapist" : ""} yet — work with one if you can.
+        </Notice>
+      )}
+
+      <section className="grid gap-4 md:grid-cols-2" aria-label="Equipment and completion">
+        <div className="rounded-2xl border border-border bg-card p-5">
+          <h2 className="flex items-center gap-2 font-display text-lg font-semibold uppercase">
+            <Dumbbell className="size-4 text-gold" aria-hidden /> Equipment needed
+          </h2>
+          {program.equipment.length === 0 && <p className="mt-2 text-sm text-muted-foreground">{equipmentSummary(program.equipment)}</p>}
+          {program.equipment.length > 0 && (
+            <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Equipment list">
+              {program.equipment.map((e) => (
+                <li key={e}>
+                  <Badge variant="secondary">{EQUIPMENT_LABELS[e as Equipment] ?? titleCase(e)}</Badge>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div className="rounded-2xl border border-border bg-card p-5">
+          <h2 className="flex items-center gap-2 font-display text-lg font-semibold uppercase">
+            <Flag className="size-4 text-gold" aria-hidden /> To complete it
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground">{completionText}</p>
+          {userProgram && (
+            <p className="mt-2 flex items-center gap-1.5 text-sm" aria-live="polite">
+              {(loggedSessions ?? 0) >= requiredCount && <CheckCircle2 className="size-4 text-success" aria-hidden />}
+              <span>
+                You&apos;ve logged <strong>{loggedSessions ?? 0}</strong> of {totalSessions} sessions
+                {(loggedSessions ?? 0) >= requiredCount ? " — requirement met." : ` (${requiredCount} needed).`}
+              </span>
+            </p>
+          )}
+        </div>
+      </section>
+
       {locked && (
         <Notice tone="info">
-          <Lock className="mr-1 inline size-4 text-gold" aria-hidden /> You&apos;re viewing the program outline. Upgrade to Plus to see every
+          <Lock className="mr-1 inline size-4 text-gold" aria-hidden /> You&apos;re viewing the program outline. Upgrade to Pro All Access to see every
           exercise, set, rep and intensity target — and to start the program.
         </Notice>
       )}
@@ -190,7 +276,8 @@ export default async function ProgramDetailPage({
                 aria-current={w.week_number === weekNumber ? "page" : undefined}
                 scroll={false}
                 className={cn(
-                  "flex size-11 shrink-0 items-center justify-center rounded-xl border text-sm font-semibold",
+                  // relative: keeps the sr-only "Week" inside the scrolling bar (an absolute box placed by the page widened it).
+                  "relative flex size-11 shrink-0 items-center justify-center rounded-xl border text-sm font-semibold",
                   w.week_number === weekNumber ? "border-gold bg-gold/10 text-gold-highlight" : "border-border text-muted-foreground hover:text-foreground",
                 )}
               >
@@ -220,7 +307,7 @@ export default async function ProgramDetailPage({
                     </p>
                   </div>
                   {!locked && (
-                    <Button asChild size="sm" variant={isNext ? "default" : "secondary"}>
+                    <Button asChild variant={isNext ? "default" : "secondary"} className="shrink-0">
                       <Link href={`/train/workout?day=${d.id}${userProgram ? `&up=${userProgram.id}` : ""}`}>
                         <Play aria-hidden /> Start
                       </Link>
@@ -232,7 +319,7 @@ export default async function ProgramDetailPage({
                     {exs.map((e) => (
                       <li key={e.id} className="py-3">
                         <div className="flex items-start justify-between gap-3">
-                          <Link href={`/train/exercises/${e.exercise?.slug}`} className="font-semibold hover:text-gold-highlight">
+                          <Link href={`/train/exercises/${e.exercise?.slug}`} className="-my-2.5 inline-block py-2.5 font-semibold hover:text-gold-highlight">
                             {e.exercise?.name}
                           </Link>
                           <span className="shrink-0 font-display text-base font-semibold text-gold-highlight">

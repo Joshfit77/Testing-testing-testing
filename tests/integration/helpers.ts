@@ -48,3 +48,9 @@ export async function exerciseIds(slugs: string[]): Promise<Record<string, strin
   const { data } = await serviceClient().from("exercises").select("id, slug").in("slug", slugs);
   return Object.fromEntries((data ?? []).map((e) => [e.slug as string, e.id as string]));
 }
+
+/** Give a test user a plan (as an admin grant), for tests of paid features: the database checks the plan too. */
+export async function grantPlan(user: TestUser, plan: "plus" | "pro"): Promise<void> {
+  const { error } = await serviceClient().from("user_entitlements").upsert({ user_id: user.id, plan, source: "admin" }, { onConflict: "user_id" });
+  if (error) throw error;
+}

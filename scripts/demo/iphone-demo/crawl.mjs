@@ -1,0 +1,336 @@
+// Captures the real Narrow Gate Fitness app (demo mode, sample data) at iPhone size for the clickable iPhone demo:
+// every screen as a full-page picture at 3x (PHONE_W x 3 px wide) with the tappable links' boxes, the fixed tab bar on its
+// own, and the scripted states of the workout flow and the AI coach. Output: <out>/s/*.png + <out>/screens.json.
+//   BASE=http://localhost:3000 node crawl.mjs <out> [maxScreens]
+import { chromium, devices } from "playwright";
+import fs from "node:fs";
+import path from "node:path";
+
+const BASE = process.env.BASE ?? "http://localhost:3000";
+const out = process.argv[2] ?? "cap";
+const MAX = Number(process.argv[3] ?? 240);
+// The phone's screen in points: iPhone 15 Pro (393 x 852) unless PHONE_W / PHONE_H say otherwise.
+const W = Number(process.env.PHONE_W ?? 393), H = Number(process.env.PHONE_H ?? 852);
+fs.mkdirSync(path.join(out, "s"), { recursive: true });
+const log = (s) => console.log(`${new Date().toISOString().slice(11, 19)} ${s}`);
+
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM });
+const { defaultBrowserType: _d, ...iPhone } = devices["iPhone 15 Pro"];
+const ctx = await b.newContext({ ...iPhone, viewport: { width: W, height: H }, deviceScaleFactor: 3, timezoneId: "America/New_York", reducedMotion: "reduce" });
+ctx.setDefaultTimeout(45000);
+const page = await ctx.newPage();
+const errors = [];
+page.on("pageerror", (e) => errors.push(`page: ${e.message.split("\n")[0]}`));
+
+// The fixed tab bar is captured once per tab and drawn by the viewer; the pages are captured without it.
+await ctx.addInitScript(() => {
+  const st = document.createElement("style");
+  st.id = "ng-cap";
+  st.textContent = `nav[data-hide-with-keyboard]{visibility:hidden!important} *{caret-color:transparent!important} *,*::before,*::after{animation-duration:0s!important;transition-duration:0s!important}`;
+  const root = document.head || document.documentElement;
+  if (root) root.append(st);
+});
+const navHidden = (hidden) => page.evaluate((h) => document.querySelectorAll("nav[data-hide-with-keyboard]").forEach((n) => (n.style.visibility = h ? "hidden" : "")), hidden);
+
+const screens = [];
+const byKey = new Map();
+let n = 0;
+const id = () => `s${String(++n).padStart(3, "0")}`;
+
+const INTERNAL = (href) => href.startsWith("/") && !href.startsWith("//");
+const SKIP = [/^\/admin/, /^\/logout/, /^\/api\//, /^\/legal\/.*#/, /sign-?out/i, /^\/profile\/delete/, /^\/auth\//, /\.(pdf|png|jpg)$/];
+const CAPS = [[/^\/train\/exercises\/[^/]+$/, 170], [/^\/train\/exercises\/[^/]+\/history/, 6], [/^\/calendar\?/, 6], [/^\/faith\/practices\?/, 6], [/^\/train\/workout\?/, 6], [/^\/nutrition\?date/, 4], [/^\/nutrition\/photo\?/, 3], [/^\/train\/programs\?category/, 13], [/^\/nutrition\/scanner\//, 10], [/^\/train\/programs\/[^/]+/, 12], [/^\/faith\/day/, 6], [/^\/train\/history\//, 6], [/^\/nutrition\/recipes\//, 8], [/^\/progress\/badges\//, 10], [/^\/supplements\//, 6], [/^\/nutrition\/foods?\//, 6]];
+const counts = new Map();
+const PRIORITY = ["/train/exercises/kettlebell-swing", "/train/exercises/dumbbell-curl", "/train/exercises/inverted-row", "/train/exercises/cable-chest-fly", "/train/exercises/sled-push"];
+
+function normalize(href) {
+  try {
+    const u = new URL(href, BASE);
+    if (u.origin !== new URL(BASE).origin) return null;
+    let k = u.pathname.replace(/\/+$/, "") || "/";
+    if (u.search) k += u.search;
+    return k;
+  } catch { return null; }
+}
+const capKey = (r, k) => (r.source.includes("\\?") ? k : k.split("?")[0]);
+function allowed(k) {
+  const p = k.split("?")[0];
+  if (SKIP.some((r) => r.test(p))) return false;
+  for (const [r, cap] of CAPS) if (r.test(capKey(r, k))) { const c = counts.get(r) ?? 0; if (c >= cap && !PRIORITY.includes(p)) return false; }
+  return true;
+}
+function count(k) { for (const [r] of CAPS) if (r.test(capKey(r, k))) counts.set(r, (counts.get(r) ?? 0) + 1); }
+const FLOWS = process.env.FLOWS === "1";  // only the scripted flows, keeping the crawled screens
+const CONTINUE = (process.env.CONTINUE === "1" || FLOWS) && fs.existsSync(path.join(out, "screens.json"));
+let prior = null;
+if (CONTINUE) {
+  prior = JSON.parse(fs.readFileSync(path.join(out, "screens.json"), "utf8"));
+  const NO_FLOWS = process.env.NO_FLOWS === "1";
+  for (const sc of prior.screens) if (!sc.key.startsWith("state:") || sc.key === "state:opening" || NO_FLOWS) { screens.push(sc); byKey.set(sc.key, sc); n = Math.max(n, Number(sc.id.slice(1))); }
+  for (const [a, k] of Object.entries(prior.alias)) if (byKey.has(k)) byKey.set(a, byKey.get(k));
+  for (const sc of screens) count(sc.key);
+  log(`continuing from ${screens.length} screens`);
+}
+
+async function settle(ms = 900) {
+  await page.waitForLoadState("domcontentloaded");
+  try { await page.waitForLoadState("networkidle", { timeout: 4000 }); } catch {}
+  // Let lazy content below the fold render, then back to the top.
+  await page.evaluate(async () => { const h = document.documentElement.scrollHeight; for (let y = 0; y < h; y += 700) { window.scrollTo(0, y); await new Promise((r) => setTimeout(r, 60)); } window.scrollTo(0, 0); });
+  await page.waitForTimeout(ms);
+  await page.evaluate(() => window.scrollTo(0, 0));
+}
+
+/** The tappable targets on the page as boxes in the picture's space (CSS px at the phone's width): document space for a
+ * full-page picture, the screen for a picture of the screen (a dialog or menu over a scrolled page). */
+async function hotspots(scope, onScreen = false) {
+  return page.evaluate(({ scope, onScreen }) => {
+    const dy = onScreen ? 0 : scrollY;
+    const root = scope ? (Array.from(document.querySelectorAll(scope)).pop() || document) : document;
+    const els = Array.from(root.querySelectorAll("a[href], button, [role=button], [role=tab], [role=menuitem], summary, input[type=submit], label"));
+    const res = [];
+    const seen = new Set();
+    for (const el of els) {
+      if (el.closest("nav[data-hide-with-keyboard]")) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width < 8 || r.height < 8) continue;
+      const cs = getComputedStyle(el);
+      if (cs.visibility === "hidden" || cs.display === "none" || cs.opacity === "0") continue;
+      const href = el.getAttribute("href");
+      const label = (el.getAttribute("aria-label") || el.textContent || "").trim().replace(/\s+/g, " ").slice(0, 60);
+      const key = `${Math.round(r.left)},${Math.round(r.top + dy)},${Math.round(r.width)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      res.push({ x: Math.round(r.left), y: Math.round(r.top + dy), w: Math.round(r.width), h: Math.round(r.height), label, href: href ?? null, kind: el.tagName.toLowerCase(), testid: el.getAttribute("data-testid"), pressed: el.getAttribute("aria-pressed") });
+    }
+    return res;
+  }, { scope, onScreen });
+}
+
+async function capture(key, { title, full = true, group, tab, extraHot = [], scope } = {}) {
+  if (!full && !scope) scope = "[role=dialog], [role=menu], [role=alertdialog]";
+  const sid = id();
+  const file = `s/${sid}.png`;
+  if (full) await page.evaluate(() => window.scrollTo(0, 0));
+  await navHidden(true);
+  await page.screenshot({ path: path.join(out, file), fullPage: full, timeout: 120000, animations: "disabled" });
+  const h = full ? await page.evaluate(() => Math.max(document.documentElement.scrollHeight, document.body.scrollHeight)) : H;
+  const t = title ?? (await page.title()).replace(/ [·|–-] Narrow Gate.*$/, "");
+  const hot = (await hotspots(scope, !full)).map((x) => ({ ...x, to: x.href ? normalize(x.href) : null }));
+  const rec = { id: sid, key, title: t, h, file, tab: tab ?? tabOf(key), group, hot: [...extraHot, ...hot] };
+  screens.push(rec);
+  byKey.set(key, rec);
+  log(`${sid} ${key} (${h}px, ${hot.length} targets)`);
+  return rec;
+}
+const tabOf = (k) => (k.startsWith("/home") || k.startsWith("/calendar") || k.startsWith("/search") ? "/home" : k.startsWith("/train") || k.startsWith("/run") ? "/train" : k.startsWith("/nutrition") ? "/nutrition" : k.startsWith("/faith") ? "/faith" : k.startsWith("/coach") || k.startsWith("/progress") || k.startsWith("/profile") ? "/profile" : "hidden");
+
+// ---- 1. Opening and welcome -------------------------------------------------------------------------------------
+await page.goto(`${BASE}/`);
+const opening = page.getByRole("dialog", { name: "Narrow Gate Fitness opening" });
+let openingRec = null;
+try {
+  await opening.waitFor({ timeout: 8000 });
+  await page.waitForTimeout(2500);
+  if (!CONTINUE) openingRec = await capture("state:opening", { title: "Opening", full: false, group: "Welcome", tab: "hidden" });
+  const enter = opening.getByRole("button", { name: /Enter the narrow gate|Enter Narrow Gate|Enter|Skip intro/i }).first();
+  await enter.click({ timeout: 8000 }).catch(() => opening.getByRole("button", { name: "Skip intro" }).click({ timeout: 8000 }));
+} catch (e) { log(`opening: ${String(e.message).split("\n")[0].slice(0, 100)}`); }
+await opening.waitFor({ state: "hidden", timeout: 30000 }).catch(() => {});
+if (CONTINUE) {
+  await page.getByTestId("demo-entry").waitFor();
+  try { await page.waitForLoadState("networkidle", { timeout: 8000 }); } catch {}
+  await page.waitForTimeout(1500);
+  // The button is wired once the page has hydrated: click until the app answers.
+  for (let i = 0; i < 6 && !/\/home/.test(page.url()); i++) {
+    await page.getByRole("button", { name: "Explore with sample data" }).click();
+    await page.waitForURL(/\/home/, { timeout: 10000 }).catch(() => {});
+  }
+  if (!/\/home/.test(page.url())) throw new Error("demo sign-in did not reach /home");
+  await page.getByTestId("demo-bar").waitFor();
+}
+if (!CONTINUE) {
+await page.getByTestId("demo-entry").waitFor();
+await settle();
+const welcome = await capture("/", { title: "Welcome", group: "Welcome", tab: "hidden" });
+if (openingRec) for (const hs of openingRec.hot) hs.to = "/";
+// Explore with sample data → /home (the demo sign-in).
+const explore = welcome.hot.find((x) => /Explore with sample data/i.test(x.label));
+await page.getByRole("button", { name: "Explore with sample data" }).click();
+await page.waitForURL(/\/home/);
+await page.getByTestId("demo-bar").waitFor();
+if (explore) explore.to = "/home";
+}
+
+// ---- 2. The tab bar, once per tab (and once with no tab active) ----------------------------------------------------
+const nav = page.locator("nav[data-hide-with-keyboard]");
+const navBox = await nav.boundingBox();
+async function navShot(name) {
+  await opening.waitFor({ state: "hidden", timeout: 40000 }).catch(() => log("opening still showing at the tab-bar shot"));
+  await navHidden(false);
+  await page.waitForTimeout(150);
+  const box = await nav.boundingBox();
+  await page.screenshot({ path: path.join(out, `s/nav-${name}.png`), clip: { x: 0, y: box.y, width: W, height: box.height }, timeout: 60000 });
+  await navHidden(true);
+  return box.height;
+}
+const TABS = [["/home", "home"], ["/train", "train"], ["/nutrition", "nutrition"], ["/faith", "faith"], ["/profile", "profile"]];
+let navH = navBox?.height ?? 64;
+if (!FLOWS) for (const [href, name] of TABS) { await page.goto(`${BASE}${href}`); await page.locator("main").waitFor(); await page.waitForTimeout(600); navH = await navShot(name); }
+const navHot = await page.evaluate(() => Array.from(document.querySelectorAll("nav[data-hide-with-keyboard] a")).map((a) => { const r = a.getBoundingClientRect(); return { x: Math.round(r.left), w: Math.round(r.width), label: a.textContent.trim(), to: new URL(a.href).pathname }; }));
+log(`tab bar ${navH}px: ${navHot.map((x) => x.label).join(", ")}`);
+
+// ---- 3. Breadth-first over the app's own links -------------------------------------------------------------------
+// FIRST=/a,/b captures those pages before anything else (with CONTINUE, to re-capture a few pages after a change).
+const FIRST = (process.env.FIRST ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+const queue = [...FIRST, "/home", "/train", "/run", "/nutrition", "/faith", "/coach", "/progress", "/profile", "/train/exercises", ...PRIORITY];
+const queued = new Set(queue);
+if (CONTINUE) for (const sc of screens) for (const hs of sc.hot) { const t = hs.to && !hs.to.startsWith("state:") ? hs.to.split("#")[0] : null; if (t && !byKey.has(t) && !queued.has(t) && INTERNAL(t)) { queued.add(t); queue.push(t); } }
+while (!FLOWS && queue.length && screens.length < MAX) {
+  const k = queue.shift();
+  if (byKey.has(k) || !allowed(k)) continue;
+  try {
+    const resp = await page.goto(`${BASE}${k}`, { waitUntil: "domcontentloaded" });
+    if (!resp || resp.status() >= 400) { log(`skip ${k}: ${resp?.status()}`); continue; }
+    const landed = normalize(page.url());
+    if (landed !== k && byKey.has(landed)) { byKey.set(k, byKey.get(landed)); continue; }
+    await page.locator("main, [role=main], body").first().waitFor();
+    if (/^\/train\/exercises\/[^/]+$/.test(k)) {
+      // An exercise page: give the animated 2D demonstration a moment to draw (reduced motion keeps it at rest).
+      await page.locator('[data-testid="exercise-demo"] canvas[data-motion-canvas]').first().waitFor({ timeout: 8000 }).catch(() => log(`no demonstration canvas on ${k}`));
+    }
+    await settle();
+    const rec = await capture(landed ?? k);
+    if (landed && landed !== k) byKey.set(k, rec);
+    count(landed ?? k);
+    for (const hs of rec.hot) {
+      if (!hs.to) continue;
+      const p = hs.to.split("#")[0];
+      hs.to = p;
+      if (!queued.has(p) && allowed(p) && INTERNAL(p)) { queued.add(p); queue.push(p); }
+    }
+  } catch (e) {
+    log(`FAILED ${k}: ${String(e.message).split("\n")[0].slice(0, 160)}`);
+  }
+}
+log(`crawl: ${screens.length} screens, ${queue.length} left in the queue`);
+
+// ---- 4. Scripted states: the workout flow and the AI coach --------------------------------------------------------
+const SKIP_FLOWS = process.env.NO_FLOWS === "1";
+async function state(key, title, opts = {}) { const r = await capture(key, { title, group: opts.group ?? "Workout", tab: opts.tab ?? "/train", full: opts.full ?? true, extraHot: opts.extraHot ?? [] }); if (opts.closeTo) r.closeTo = opts.closeTo; return r; }
+const link = (rec, test, to) => { const hs = rec.hot.find((x) => test.test(x.label)); if (hs) hs.to = to; else log(`  no target "${test}" on ${rec.key}`); };
+if (!SKIP_FLOWS) try {
+  await page.goto(`${BASE}/train`);
+  const start = page.locator("main").getByRole("link", { name: /Start workout|Start today's workout|Resume workout/ }).first();
+  await start.waitFor();
+  const startHref = normalize(await start.getAttribute("href"));
+  await start.click();
+  await page.waitForURL(/\/train\/workout/);
+  await page.getByLabel(/set 1 weight in lb/).first().waitFor();
+  await settle();
+  const started = await state("state:workout-started", "Workout started");
+  if (byKey.has("/train")) link(byKey.get("/train"), /Start workout|Start today's workout|Resume workout/, "state:workout-started");
+  if (startHref) byKey.set(startHref, started);
+  // The demonstration dialog (the illustration for this exercise).
+  const larger = page.getByRole("button", { name: /Show the .* demonstration larger/ }).first();
+  await larger.click();
+  const dialog = page.getByRole("dialog");
+  await dialog.waitFor();
+  await page.waitForTimeout(1500);
+  const demoDlg = await state("state:demo-dialog", "Exercise demonstration", { full: false, closeTo: "state:workout-started" });
+  for (const hs of demoDlg.hot) if (/close|done|back/i.test(hs.label)) hs.to = "state:workout-started";
+  link(started, /Show the .* demonstration larger/, "state:demo-dialog");
+  link(started, /^Exercise info$/, "state:demo-dialog");
+  // The dialog's Setup / Execution / Mistakes tabs: one state each, wired to one another.
+  const tabStates = { Setup: demoDlg };
+  for (const [tab, key] of [["Execution", "state:demo-dialog-execution"], ["Mistakes", "state:demo-dialog-mistakes"]]) {
+    await dialog.getByRole("tab", { name: tab }).click();
+    await page.waitForTimeout(500);
+    const rec = await state(key, `Exercise demonstration: ${tab.toLowerCase()}`, { full: false, closeTo: "state:workout-started" });
+    for (const hs of rec.hot) if (/close|done|back/i.test(hs.label)) hs.to = "state:workout-started";
+    tabStates[tab] = rec;
+  }
+  const tabKey = { Setup: "state:demo-dialog", Execution: "state:demo-dialog-execution", Mistakes: "state:demo-dialog-mistakes" };
+  for (const rec of Object.values(tabStates)) for (const [tab, key] of Object.entries(tabKey)) {
+    const hs = rec.hot.find((x) => x.label === tab); if (hs) hs.to = key;
+  }
+  await page.keyboard.press("Escape");
+  await dialog.waitFor({ state: "hidden" });
+  // Log set 1 on the current-set card at the top (the main path: big steppers, one Complete set button), set 2 in the
+  // exercise card below.
+  const card = page.getByTestId("current-set-card");
+  await card.getByLabel("Weight (lb)").fill("135");
+  await card.getByLabel("Reps", { exact: true }).fill("8");
+  await card.getByTestId("complete-set").click();
+  await page.waitForTimeout(800);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const set1 = await state("state:set-1-logged", "Set 1 logged: rest timer and Undo");
+  link(started, /Complete set/, "state:set-1-logged");
+  link(started, /Mark .* set 1 complete/, "state:set-1-logged");
+  for (const hs of started.hot) if (hs.kind === "input" || /weight|reps/i.test(hs.label)) hs.to = "state:set-1-logged";
+  const w2 = page.getByLabel(/set 2 weight in lb/).first();
+  if (await w2.count()) { await w2.fill("145"); await page.getByLabel(/set 2 reps/).first().fill("6"); await page.getByRole("button", { name: /Mark .* set 2 complete/ }).first().click(); await page.waitForTimeout(800); }
+  const set2 = await state("state:set-2-logged", "Two sets logged");
+  link(set1, /Mark .* set 2 complete/, "state:set-2-logged");
+  link(set1, /Complete set/, "state:set-2-logged");
+  // Substitute the second exercise.
+  await page.getByRole("button", { name: /^Options for / }).nth(1).click();
+  await page.waitForTimeout(400);
+  const menu = await state("state:exercise-options", "Exercise options", { full: false, closeTo: "state:set-2-logged" });
+  link(set2, /^Options for /, "state:exercise-options");
+  await page.getByRole("menuitem", { name: "Substitute exercise" }).click();
+  const picker = page.getByRole("dialog", { name: "Substitute exercise" });
+  await picker.waitFor();
+  await page.waitForTimeout(600);
+  const pick = await state("state:substitute-picker", "Substitute exercise", { full: false, closeTo: "state:set-2-logged" });
+  link(menu, /Substitute exercise/, "state:substitute-picker");
+  const choice = picker.getByRole("button").filter({ hasText: /Row|Press|Pulldown|Curl/ }).filter({ hasNotText: /Search|Close|Cancel/ }).first();
+  const chosenLabel = (await choice.textContent())?.trim().split("\n")[0];
+  await choice.click({ timeout: 10000 }).catch(() => choice.dispatchEvent("click"));
+  await picker.waitFor({ state: "hidden" });
+  await page.getByText(/Substituted for/).first().waitFor();
+  await page.waitForTimeout(600);
+  const subd = await state("state:substituted", `Substituted: ${chosenLabel}`);
+  for (const hs of pick.hot) if (hs.kind === "button" && !/Search|Close|Cancel/.test(hs.label)) hs.to = "state:substituted"; else if (/Close|Cancel/.test(hs.label)) hs.to = "state:set-2-logged";
+  // Finish.
+  await page.getByRole("button", { name: "Finish" }).click();
+  await page.waitForTimeout(500);
+  const confirm = await state("state:finish-confirm", "Finish early?", { full: false, closeTo: "state:substituted" });
+  for (const hs of confirm.hot) if (/cancel|keep|continue|back/i.test(hs.label) && !/Finish/.test(hs.label)) hs.to = "state:substituted";
+  link(subd, /^Finish$/, "state:finish-confirm");
+  link(set2, /^Finish$/, "state:finish-confirm");
+  link(set1, /^Finish$/, "state:finish-confirm");
+  await page.getByRole("button", { name: "Finish & save" }).click();
+  await page.getByRole("heading", { name: "Workout complete" }).waitFor();
+  await settle(1500);
+  const summary = await state("state:workout-summary", "Workout complete");
+  link(confirm, /Finish & save/, "state:workout-summary");
+  for (const hs of summary.hot) if (hs.to && !byKey.has(hs.to) && allowed(hs.to) && screens.length < MAX + 20) { try { await page.goto(`${BASE}${hs.to}`); await page.locator("main").waitFor(); await settle(); await capture(hs.to); } catch {} }
+  await page.goto(`${BASE}/train/workout`).catch(() => {});
+} catch (e) { log(`workout flow FAILED: ${String(e.message).split("\n")[0].slice(0, 200)}`); errors.push(`workout: ${e.message.split("\n")[0]}`); }
+
+if (!SKIP_FLOWS) try {
+  await page.goto(`${BASE}/coach`);
+  await page.getByTestId("demo-ai-simulated").waitFor();
+  const coach = byKey.get("/coach");
+  const box = page.getByLabel("Message the AI coach");
+  await box.scrollIntoViewIfNeeded();
+  for (let i = 0; i < 20; i++) { await box.fill("Review my training this week"); await page.waitForTimeout(500); if ((await box.inputValue()) === "Review my training this week" && (await page.getByRole("button", { name: "Send message" }).isEnabled())) break; }
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(300);
+  const typed = await state("state:coach-typed", "Question typed", { group: "AI Coach", tab: "/profile" });
+  if (coach) for (const hs of coach.hot) if (/Message the AI coach|textarea/i.test(hs.label) || hs.kind === "textarea") hs.to = "state:coach-typed";
+  await page.getByRole("button", { name: "Send message" }).click();
+  await page.getByTestId("coach-reply").last().waitFor({ timeout: 30000 });
+  await settle(1200);
+  await state("state:coach-reply", "The coach's reply (simulated in the demo)", { group: "AI Coach", tab: "/profile" });
+  link(typed, /Send message/, "state:coach-reply");
+  if (coach) link(coach, /Send message/, "state:coach-typed");
+} catch (e) { log(`coach flow FAILED: ${String(e.message).split("\n")[0].slice(0, 200)}`); errors.push(`coach: ${e.message.split("\n")[0]}`); }
+
+// Any label-less textarea/input targets: send them to the same screen (a tap just focuses them in the real app).
+const alias = {};
+for (const [k, rec] of byKey) if (rec.key !== k) alias[k] = rec.key;
+fs.writeFileSync(path.join(out, "screens.json"), JSON.stringify({ base: BASE, date: new Date().toISOString(), phone: { w: W, h: H }, navH, navHot, screens, alias, errors }, null, 1));
+log(`done: ${screens.length} screens; errors ${errors.length}`);
+await b.close();

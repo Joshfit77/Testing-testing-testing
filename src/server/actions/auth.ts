@@ -4,38 +4,108 @@ import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { publicEnv } from "@/lib/env";
 import { actionError, actionInvalid, actionOk, type ActionState } from "@/lib/action-state";
+import { isValidTimeZone } from "@/lib/domain/dates";
 import { safeNextPath } from "@/lib/safe-redirect";
 import { emailSchema, newPasswordSchema, resetRequestSchema, signInSchema, signUpSchema } from "@/lib/validation/schemas";
+import { signupAcceptances } from "@/lib/legal/versions";
 import { isFlagEnabled } from "@/server/flags";
+import { registerLegalVersions } from "@/server/legal";
 import { logError } from "@/server/log";
+import { clientIp, hashKey, rateLimitAll } from "@/server/rate-limit";
+import { authRateLimitScale } from "@/server/test-overrides";
+
+const MINUTE = 60_000;
+const TOO_MANY = "Too many attempts. Please wait a few minutes and try again.";
+const TOO_MANY_EMAILS = "Please wait a few minutes before requesting another email.";
+
+/**
+ * App-level limits on the sign-in and email actions. These run on our servers, so Supabase's own per-address auth
+ * limits see the server's address; these use the client's (hashed) address and the (hashed) email instead, shared
+ * across every server instance. AUTH_RATE_LIMIT_SCALE can only raise the limits (automated test runs sign up many
+ * accounts from one machine); production leaves it unset.
+ */
+type Check = { key: string; limit: number; windowMs: number };
+const SCALE = authRateLimitScale();
+
+async function authLimited(checks: Check[]): Promise<boolean> {
+  return !(await rateLimitAll(checks.map((c) => ({ ...c, limit: c.limit * SCALE })))).ok;
+}
+
+/** A per-address check, or none when the platform didn't pass the client's address (so unrelated people never share one counter). */
+async function perAddress(prefix: string, limit: number, windowMs: number): Promise<Check[]> {
+  const ip = await clientIp();
+  return ip === "unknown" ? [] : [{ key: `${prefix}:ip:${hashKey(ip)}`, limit, windowMs }];
+}
+
+/**
+ * Limits for one email address. The tight limit counts the email together with the client's address, so someone
+ * elsewhere can't use up a member's attempts and lock them out of signing in or resetting a password. A much higher
+ * ceiling on the email alone still bounds an attack spread over many addresses; it is checked last, so attempts the
+ * tight limit already refused never count towards it. When the platform didn't pass the client's address the email
+ * is all there is to count, so the tight limit stays on it. (The limiter counts every attempt as it is checked and
+ * has no way to take one back, so successful sign-ins count too.)
+ */
+async function perEmail(prefix: string, email: string, tight: { limit: number; windowMs: number }, ceiling: { limit: number; windowMs: number }): Promise<Check[]> {
+  const ip = await clientIp();
+  const key = `${prefix}:${hashKey(email)}`;
+  if (ip === "unknown") return [{ key, ...tight }];
+  return [
+    { key: `${key}:ip:${hashKey(ip)}`, ...tight },
+    { key, ...ceiling },
+  ];
+}
+const SIGNIN_EMAIL_LIMITS = [
+  { limit: 10, windowMs: 15 * MINUTE },
+  { limit: 100, windowMs: 15 * MINUTE },
+] as const;
+const EMAIL_SEND_LIMITS = [
+  { limit: 3, windowMs: 15 * MINUTE },
+  { limit: 30, windowMs: 60 * MINUTE },
+] as const;
 
 export async function signUpAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = signUpSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return actionInvalid(parsed.error);
   if (!(await isFlagEnabled("signups"))) return actionError("New registrations are temporarily paused. Please try again later.");
+  if (await authLimited(await perAddress("signup", 5, 10 * MINUTE))) return actionError(TOO_MANY);
 
+  // The database records only listed document versions; make sure this server's are listed (never blocks sign-up).
+  await registerLegalVersions().catch((err) => logError("legal.register", err));
   const supabase = await getServerSupabase();
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
       emailRedirectTo: `${publicEnv.siteUrl}/auth/callback?next=/onboarding`,
-      data: { display_name: parsed.data.displayName },
+      // Recorded with the account by a database trigger (legal_acceptances): what was accepted, which version, when.
+      data: { display_name: parsed.data.displayName, legal_acceptances: signupAcceptances() },
     },
   });
   if (error) {
     if (error.status === 429) return actionError("Too many attempts. Please wait a minute and try again.");
+    // An address that already has an account: the same answer as a new sign-up, so the form never says who is
+    // registered (Supabase itself answers this way when configured to obfuscate; some stacks return this error instead).
+    if (error.code === "user_already_exists" || /already registered/i.test(error.message)) return actionOk(SIGNUP_SENT);
     if (/password/i.test(error.message)) return actionError(error.message, { password: error.message });
     logError("auth.signup", error);
     return actionError("We couldn't create your account. Please try again.");
   }
   if (data.session) redirect("/onboarding");
-  return actionOk("Check your inbox to confirm your email address, then sign in.");
+  return actionOk(SIGNUP_SENT);
 }
+
+const SIGNUP_SENT = "Check your inbox to confirm your email address, then sign in. Already have an account? Sign in instead.";
 
 export async function signInAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = signInSchema.safeParse({ email: formData.get("email"), password: formData.get("password") });
   if (!parsed.success) return actionInvalid(parsed.error);
+  if (
+    await authLimited([
+      ...(await perAddress("signin", 20, 5 * MINUTE)),
+      ...(await perEmail("signin:email", parsed.data.email, ...SIGNIN_EMAIL_LIMITS)),
+    ])
+  )
+    return actionError(TOO_MANY);
   const supabase = await getServerSupabase();
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
   if (error) {
@@ -45,12 +115,27 @@ export async function signInAction(_prev: ActionState, formData: FormData): Prom
     if (error.status === 429) return actionError("Too many attempts. Please wait a minute and try again.");
     return actionError("Incorrect email or password.");
   }
+  // A profile that never learned its time zone (accounts from before it was captured) takes the device's now.
+  const tz = formData.get("timezone");
+  if (isValidTimeZone(tz)) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) await supabase.from("profiles").update({ timezone: tz }).eq("id", user.id).eq("timezone", "UTC");
+  }
   redirect(safeNextPath(formData.get("next")));
 }
 
 export async function resendConfirmationAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const email = emailSchema.safeParse(formData.get("email"));
   if (!email.success) return actionError("Enter the email address you signed up with.");
+  if (
+    await authLimited([
+      ...(await perAddress("email", 5, 15 * MINUTE)),
+      ...(await perEmail("email:addr", email.data, ...EMAIL_SEND_LIMITS)),
+    ])
+  )
+    return actionError(TOO_MANY_EMAILS);
   const supabase = await getServerSupabase();
   const { error } = await supabase.auth.resend({
     type: "signup",
@@ -71,6 +156,13 @@ export async function signOutAction(): Promise<void> {
 export async function requestPasswordResetAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = resetRequestSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return actionInvalid(parsed.error);
+  if (
+    await authLimited([
+      ...(await perAddress("email", 5, 15 * MINUTE)),
+      ...(await perEmail("email:addr", parsed.data.email, ...EMAIL_SEND_LIMITS)),
+    ])
+  )
+    return actionError(TOO_MANY_EMAILS);
   const supabase = await getServerSupabase();
   const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
     redirectTo: `${publicEnv.siteUrl}/auth/callback?next=/reset-password`,
@@ -86,10 +178,16 @@ export async function updatePasswordAction(_prev: ActionState, formData: FormDat
   const supabase = await getServerSupabase();
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) return actionError("Your reset link has expired. Please request a new one.");
+  if (await authLimited([{ key: `password-update:${userData.user.id}`, limit: 10, windowMs: 15 * MINUTE }])) return actionError(TOO_MANY);
   const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
   if (error) {
     if (/different from the old/i.test(error.message)) return actionError("Choose a password you haven't used before.", { password: error.message });
-    return actionError(error.message || "We couldn't update your password.");
+    // secure_password_change: an older session must sign in again before changing the password.
+    if (error.code === "reauthentication_needed" || /reauthenticat/i.test(error.message)) {
+      return actionError("For your security, sign out and sign in again, then change your password.");
+    }
+    logError("auth.update_password", error);
+    return actionError("We couldn't update your password. Please try again.");
   }
   redirect("/home?password=updated");
 }

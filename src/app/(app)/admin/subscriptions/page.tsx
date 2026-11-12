@@ -4,7 +4,13 @@ import { Notice } from "@/components/common/states";
 import { Badge } from "@/components/ui/badge";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { requireAdmin } from "@/server/auth";
-import { isServiceRoleConfigured } from "@/server/env";
+import { isServiceRoleConfigured, serverEnv } from "@/server/env";
+import { ActionForm } from "@/components/admin/action-form";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { addSandboxTesterAction, removeSandboxTesterAction } from "@/server/actions/admin-sandbox-testers";
+import { listSandboxTesters } from "@/server/services/sandbox-testers";
 
 export const metadata = { title: "Admin · Subscriptions" };
 
@@ -29,6 +35,7 @@ export default async function AdminSubscriptionsPage() {
   const ids = [...new Set((subs ?? []).map((s) => s.user_id as string))];
   const { data: profiles } = ids.length ? await admin.from("profiles").select("id, display_name").in("id", ids) : { data: [] };
   const names = new Map((profiles ?? []).map((p) => [p.id as string, (p.display_name as string) ?? "—"]));
+  const testers = await listSandboxTesters();
   const counts = (subs ?? []).reduce<Record<string, number>>((m, s) => ({ ...m, [s.status as string]: (m[s.status as string] ?? 0) + 1 }), {});
 
   return (
@@ -76,6 +83,53 @@ export default async function AdminSubscriptionsPage() {
           </tbody>
         </table>
       </div>
+
+      <section className="mt-8 rounded-2xl border border-border bg-card p-5" aria-labelledby="sandbox-title">
+        <h2 id="sandbox-title" className="font-display text-lg font-semibold uppercase">
+          Sandbox testers
+        </h2>
+        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+          App Store and Google Play <strong>sandbox</strong> purchases (development builds, TestFlight, App Review) are free. They unlock a plan only for the accounts listed here,
+          matched by user id. Production purchases are not affected.
+          {serverEnv.revenueCatAllowSandbox && (
+            <strong className="text-gold-highlight"> REVENUECAT_ALLOW_SANDBOX=true is set on this server, so every account&apos;s sandbox purchases count and this list is not needed here.</strong>
+          )}
+        </p>
+        <ul className="mt-4 divide-y divide-border text-sm" aria-label="Sandbox testers">
+          {testers.map((t) => (
+            <li key={t.userId} className="flex flex-wrap items-center justify-between gap-3 py-2">
+              <span className="min-w-0">
+                <span className="font-semibold">{t.displayName ?? "—"}</span> <span className="text-muted-foreground">· {t.note}</span>
+                <span className="block font-mono text-xs text-muted-foreground">{t.userId}</span>
+                <span className="block text-xs text-muted-foreground">
+                  Added {new Date(t.createdAt).toLocaleDateString()} · {t.expiresAt ? `${t.active ? "until" : "expired"} ${new Date(t.expiresAt).toLocaleDateString()}` : "no end date"}
+                </span>
+              </span>
+              <form action={removeSandboxTesterAction}>
+                <input type="hidden" name="userId" value={t.userId} />
+                <Button type="submit" size="sm" variant="outline" aria-label={`Remove ${t.displayName ?? t.userId} from sandbox testers`}>
+                  Remove
+                </Button>
+              </form>
+            </li>
+          ))}
+          {testers.length === 0 && <li className="py-3 text-muted-foreground">No sandbox testers. Sandbox purchases unlock nothing.</li>}
+        </ul>
+        <ActionForm action={addSandboxTesterAction} submitLabel="Add tester" className="mt-4 grid gap-3 sm:grid-cols-3" resetOnSuccess>
+          <div className="space-y-1">
+            <Label htmlFor="st-account">Account email or user id</Label>
+            <Input id="st-account" name="account" required autoComplete="off" />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="st-note">Who and why</Label>
+            <Input id="st-note" name="note" required maxLength={200} placeholder="App Review demo account" />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="st-expires">Ends on (optional)</Label>
+            <Input id="st-expires" name="expiresOn" type="date" />
+          </div>
+        </ActionForm>
+      </section>
     </div>
   );
 }

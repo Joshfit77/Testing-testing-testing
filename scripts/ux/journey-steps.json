@@ -1,0 +1,77 @@
+[
+ {
+  "id": "j01",
+  "title": "Find and start today's workout",
+  "target": "under 30 s"
+ },
+ {
+  "id": "j02",
+  "title": "Log one set (from the workout screen)",
+  "target": "2\u20133 interactions"
+ },
+ {
+  "id": "j03",
+  "title": "Log a familiar food",
+  "target": "under 15 s"
+ },
+ {
+  "id": "j04",
+  "title": "Start outdoor GPS recording",
+  "target": "under 15 s after permission"
+ },
+ {
+  "id": "j05",
+  "title": "Log a treadmill session",
+  "target": "(no target set)"
+ },
+ {
+  "id": "j06",
+  "title": "Find the Sleep dashboard",
+  "target": "2 taps or fewer"
+ },
+ {
+  "id": "j07",
+  "title": "Log last night's sleep by hand",
+  "target": "(no target set)"
+ },
+ {
+  "id": "j08",
+  "title": "Continue today's Bible reading",
+  "target": "1\u20132 taps"
+ },
+ {
+  "id": "j09",
+  "title": "Write a private prayer",
+  "target": "(no target set)"
+ },
+ {
+  "id": "j10",
+  "title": "Ask the AI Coach a suggested question",
+  "target": "(no target set)"
+ },
+ {
+  "id": "j11",
+  "title": "Find membership and billing",
+  "target": "(no target set)"
+ },
+ {
+  "id": "j12",
+  "title": "Find My Progress",
+  "target": "(no target set)"
+ },
+ {
+  "id": "j13",
+  "title": "Find training programs",
+  "target": "(no target set)"
+ },
+ {
+  "id": "j14",
+  "title": "Log last night's sleep from Quick add",
+  "target": "(no target set)"
+ },
+ {
+  "id": "j15",
+  "title": "Undo a food just logged",
+  "target": "(no target set)"
+ }
+]

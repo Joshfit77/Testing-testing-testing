@@ -1,0 +1,247 @@
+name: BSB Scripture text
+
+# Downloads the official Berean Standard Bible plain-text file (public domain) from the links on
+# https://berean.bible/downloads.htm, extracts the passages listed in scripts/bsb-references.json with
+# scripts/extract-bsb.mjs, and publishes the result as the "bsb-text" release for the app to use.
+# The app itself reads the copy committed at src/data/bsb-passages.json, not the release.
+#
+# Least privilege: the download and extraction run with a read-only token. Only the publish job can
+# write to the repository. It runs no repository code: it downloads the extracted file, checks it
+# against the SHA-256 the extract job recorded, and replaces the release.
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Replace the bsb-text release (a manual run only extracts and keeps bsb-passages.json as a run artifact unless ticked)"
+        type: boolean
+        default: false
+      dry_run:
+        description: "Run the publish job without changing the release (downloads and checks the file only)"
+        type: boolean
+        default: false
+      bible_data_branch:
+        description: "Commit the complete Bible built by this run (bsb-bible artifact) to the bsb-bible-data branch, for the in-app reader"
+        type: boolean
+        default: false
+  push:
+    branches: [main, claude/sharp-cray-8y0uuv, claude/security-nasb-deletion, claude/badges-27]
+    paths:
+      - "scripts/extract-bsb.mjs"
+      - "scripts/build-bsb-bible.mjs"
+      - "scripts/bsb-references.json"
+      - ".github/workflows/bsb-text.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bsb-text
+  cancel-in-progress: false
+
+jobs:
+  extract:
+    name: Download, check and extract (read-only token)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      sha256: ${{ steps.hash.outputs.sha256 }}
+    env:
+      # SHA-256 of the official BSB plain-text file the app's passages come from (https://bereanbible.com/bsb.txt,
+      # downloaded 2026-10-22; recorded as fileSha256 in src/data/bsb-passages.json). Any other content is refused.
+      # If the Berean Bible publishes a revised text, review the changes first, then update this value and
+      # regenerate src/data/bsb-passages.json.
+      BSB_SHA256: 2ac3af1de52d4e68261cba91d85c320b7eadc6560e830d99e591767b8ff5ca96
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+      - name: Download the official BSB text (HTTPS only, must match the pinned SHA-256)
+        run: |
+          set -euo pipefail
+          fetch() { curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --max-filesize 52428800 -o "$2" "$1"; }
+          candidates=""
+          if fetch https://berean.bible/downloads.htm downloads.htm; then
+            echo "Plain-text links on the downloads page:"
+            for link in $(grep -oiE 'href="[^"]+\.txt"' downloads.htm | sed -E 's/href="([^"]+)"/\1/I' | grep -iE 'bsb\.txt$' || true); do
+              case "$link" in https://*) ;; http://*) link="https://${link#http://}" ;; //*) link="https:$link" ;; /*) link="https://berean.bible$link" ;; *) link="https://berean.bible/$link" ;; esac
+              echo "  $link"
+              candidates="$candidates $link"
+            done
+          else
+            echo "The downloads page didn't load; trying the known file locations."
+          fi
+          src=""
+          for url in $candidates https://bereanbible.com/bsb.txt https://openbible.com/textfiles/bsb.txt; do
+            rm -f bsb.txt
+            if fetch "$url" bsb.txt && [ -s bsb.txt ]; then
+              got=$(sha256sum bsb.txt | cut -d' ' -f1)
+              if [ "$got" = "$BSB_SHA256" ]; then src="$url"; echo "OK: $url matches the pinned SHA-256"; break; fi
+              echo "Skipped $url: its SHA-256 is $got, not the pinned file."
+            fi
+          done
+          if [ -z "$src" ]; then
+            rm -f bsb.txt
+            echo "::error::No source served the pinned BSB text. If the Berean Bible published a revised file, review it, then update BSB_SHA256 in this workflow and regenerate src/data/bsb-passages.json."
+            exit 1
+          fi
+          echo "BSB_SOURCE=$src" >> "$GITHUB_ENV"
+          head -5 bsb.txt
+          wc -l bsb.txt
+      - name: Extract the app's passages
+        run: node scripts/extract-bsb.mjs bsb.txt scripts/bsb-references.json bsb-passages.json "$BSB_SOURCE"
+      - name: Build and validate the complete Bible for the reader (66 books, 1,189 chapters)
+        run: node scripts/build-bsb-bible.mjs bsb.txt src/data/bible/books.json bsb-bible "$BSB_SOURCE"
+      - name: Mark the words of Jesus (red letter) from an official USFM edition of the BSB
+        env:
+          # SHA-256 of the publisher's USFM edition the red-letter data comes from (https://bereanbible.com/bsb_usfm.zip,
+          # first downloaded 2026-11-03 by run 41639831204: 66 books, words of Jesus marked with \wj). Any other
+          # content is refused; if the publisher revises the file, review it, then update this value.
+          BSB_USFM_SHA256: f0c56438eb89c98e8f62c5c00461e25cc35b098ad5b179bc350cede759ee5f87
+        run: |
+          set -euo pipefail
+          fetch() { curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --max-filesize 104857600 -o "$2" "$1"; }
+          candidates=""
+          if [ -s downloads.htm ]; then
+            echo "Links on the downloads page:"
+            grep -oiE 'href="[^"]+"' downloads.htm | sed -E 's/href="([^"]+)"/\1/I' | sort -u | sed 's/^/  /' || true
+            for link in $(grep -oiE 'href="[^"]+\.zip"' downloads.htm | sed -E 's/href="([^"]+)"/\1/I' | grep -iE 'usfm|sfm' || true); do
+              case "$link" in https://*) ;; http://*) link="https://${link#http://}" ;; //*) link="https:$link" ;; /*) link="https://berean.bible$link" ;; *) link="https://berean.bible/$link" ;; esac
+              candidates="$candidates $link"
+            done
+          fi
+          src=""
+          for url in $candidates https://bereanbible.com/bsb_usfm.zip https://ebible.org/Scriptures/engbsb_usfm.zip; do
+            rm -rf usfm usfm.zip
+            mkdir usfm
+            if fetch "$url" usfm.zip && unzip -q -o usfm.zip -d usfm; then
+              sha=$(sha256sum usfm.zip | cut -d' ' -f1)
+              n=$(grep -rlE '\\\+?wj ' usfm | wc -l || true)
+              echo "$url: $(find usfm -type f | wc -l) files, $n with words of Jesus marked (\\wj), SHA-256 $sha"
+              if [ -n "$BSB_USFM_SHA256" ] && [ "$sha" != "$BSB_USFM_SHA256" ]; then echo "  skipped: not the pinned file"; continue; fi
+              if [ "$n" -gt 0 ]; then src="$url"; break; fi
+            else
+              echo "$url: not available"
+            fi
+          done
+          if [ -z "$src" ]; then
+            echo "::error::No official USFM edition of the BSB with the words of Jesus marked was found."
+            exit 1
+          fi
+          mkdir usfm-flat
+          find usfm -type f \( -iname '*.usfm' -o -iname '*.sfm' -o -iname '*.ptx' \) -exec cp {} usfm-flat/ \;
+          node scripts/build-bsb-red-letter.mjs usfm-flat bsb-bible bsb-bible/wj.json "$src" "$(sha256sum usfm.zip | cut -d' ' -f1)"
+      - name: Compare the red letters with an independent red-letter Bible (information only)
+        # A cross-check for a person to review: lists every verse where the BSB publisher's marking and the World
+        # English Bible's (eBible.org) disagree. It changes nothing and never fails the run.
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --max-filesize 104857600 -o web.zip https://ebible.org/Scriptures/engwebp_usfm.zip
+          rm -rf web && mkdir web && unzip -q -o web.zip -d web
+          echo "World English Bible USFM SHA-256: $(sha256sum web.zip | cut -d' ' -f1)"
+          node scripts/compare-red-letter.mjs bsb-bible/wj.json web "World English Bible (eBible.org)"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: bsb-bible
+          path: bsb-bible
+          if-no-files-found: error
+      - name: Compare with the copy the app ships (information only)
+        run: |
+          node -e '
+            const fs = require("fs");
+            const made = JSON.parse(fs.readFileSync("bsb-passages.json", "utf8"));
+            const app = JSON.parse(fs.readFileSync("src/data/bsb-passages.json", "utf8"));
+            const same = JSON.stringify(made.passages) === JSON.stringify(app.passages) && made.fileSha256 === app.fileSha256;
+            console.log(same ? "Passages and source checksum are identical to src/data/bsb-passages.json." : "Differs from src/data/bsb-passages.json (expected when bsb-references.json changed).");
+          '
+      - name: Record the extracted file's SHA-256
+        id: hash
+        run: |
+          set -euo pipefail
+          sha=$(sha256sum bsb-passages.json | cut -d' ' -f1)
+          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
+          echo "bsb-passages.json SHA-256: $sha"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: bsb-passages
+          path: bsb-passages.json
+          if-no-files-found: error
+
+  publish:
+    name: Publish as the bsb-text release
+    needs: extract
+    # Pushes to the listed branches publish as before; a manual run publishes only when asked.
+    if: github.event_name == 'push' || inputs.publish == true || inputs.dry_run == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # replace the release
+      actions: read # download this run's artifact
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Download the extracted file and check its SHA-256
+        env:
+          RUN_ID: ${{ github.run_id }}
+          EXPECTED_SHA256: ${{ needs.extract.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          test -n "$EXPECTED_SHA256"
+          gh run download "$RUN_ID" --name bsb-passages --dir out
+          echo "$EXPECTED_SHA256  out/bsb-passages.json" | sha256sum --check --strict
+          echo "BSB_SOURCE=$(jq -r .source out/bsb-passages.json)" >> "$GITHUB_ENV"
+      - name: Dry run (nothing changed)
+        if: inputs.dry_run == true
+        run: |
+          gh release view bsb-text --json tagName,publishedAt || echo "No bsb-text release yet."
+          echo "Dry run: the file was downloaded and checked; the release was left as it is."
+      - name: Replace the bsb-text release
+        if: inputs.dry_run != true
+        env:
+          TARGET_SHA: ${{ github.sha }}
+        run: |
+          gh release delete bsb-text --yes --cleanup-tag || true
+          gh release create bsb-text out/bsb-passages.json --target "$TARGET_SHA" --prerelease \
+            --title "BSB passages used in the app" \
+            --notes "Extracted by scripts/extract-bsb.mjs from the official Berean Standard Bible text ($BSB_SOURCE), public domain. See bsb-passages.json for the file's SHA-256."
+
+  bible-data:
+    name: Commit the complete Bible to the bsb-bible-data branch
+    needs: extract
+    # Manual runs only, when asked. Runs no repository code: downloads this run's validated bsb-bible artifact and
+    # commits it, unchanged, as the only content of a separate branch the app's branch copies the files from.
+    if: inputs.bible_data_branch == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # push the bsb-bible-data branch
+      actions: read # download this run's artifact
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Download the validated Bible
+        env:
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          gh run download "$RUN_ID" --name bsb-bible --dir bible
+          test "$(ls bible/books | wc -l)" = 66
+          jq -e '.totals.books == 66 and .totals.chapters == 1189' bible/meta.json
+          jq -e '.totals.verses > 1000 and .bibleContentSha256 != ""' bible/wj.json
+      - name: Commit it as the only content of the bsb-bible-data branch
+        run: |
+          set -euo pipefail
+          cd bible
+          git init -q -b bsb-bible-data
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -qm "BSB Bible data from $(jq -r .source meta.json) (file SHA-256 $(jq -r .fileSha256 meta.json), content SHA-256 $(jq -r .contentSha256 meta.json))"
+          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GH_REPO}.git" HEAD:refs/heads/bsb-bible-data

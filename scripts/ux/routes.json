@@ -1,0 +1,465 @@
+[
+ {
+  "area": "home",
+  "id": "home",
+  "path": "/home"
+ },
+ {
+  "area": "home",
+  "id": "calendar",
+  "path": "/calendar"
+ },
+ {
+  "area": "home",
+  "id": "search",
+  "path": "/search"
+ },
+ {
+  "area": "home",
+  "id": "plan",
+  "path": "/plan"
+ },
+ {
+  "area": "train",
+  "id": "train",
+  "path": "/train"
+ },
+ {
+  "area": "train",
+  "id": "train-programs",
+  "path": "/train/programs"
+ },
+ {
+  "area": "train",
+  "id": "train-build",
+  "path": "/train/build"
+ },
+ {
+  "area": "train",
+  "id": "train-templates",
+  "path": "/train/templates"
+ },
+ {
+  "area": "train",
+  "id": "train-templates-new",
+  "path": "/train/templates/new"
+ },
+ {
+  "area": "train",
+  "id": "train-history",
+  "path": "/train/history"
+ },
+ {
+  "area": "train",
+  "id": "train-review",
+  "path": "/train/review"
+ },
+ {
+  "area": "train",
+  "id": "train-recovery",
+  "path": "/train/recovery"
+ },
+ {
+  "area": "train",
+  "id": "train-exercises",
+  "path": "/train/exercises"
+ },
+ {
+  "area": "train",
+  "id": "program-detail",
+  "path": "/train/programs/powerbuilding-4-day"
+ },
+ {
+  "area": "train",
+  "id": "template-detail",
+  "from": "/train/templates",
+  "link": "main a[href^=\"/train/templates/\"]:not([href$=\"/new\"])"
+ },
+ {
+  "area": "train",
+  "id": "history-detail",
+  "from": "/train/history",
+  "link": "main a[href^=\"/train/history/\"]"
+ },
+ {
+  "area": "train",
+  "id": "exercise",
+  "path": "/train/exercises/back-squat"
+ },
+ {
+  "area": "train",
+  "id": "exercise-history",
+  "path": "/train/exercises/back-squat/history"
+ },
+ {
+  "area": "train",
+  "id": "workout",
+  "path": "/train/workout"
+ },
+ {
+  "area": "run",
+  "id": "run",
+  "path": "/run"
+ },
+ {
+  "area": "run",
+  "id": "run-tab=log",
+  "path": "/run?tab=log"
+ },
+ {
+  "area": "run",
+  "id": "run-tab=history",
+  "path": "/run?tab=history"
+ },
+ {
+  "area": "run",
+  "id": "run-record-kind=run",
+  "path": "/run/record?kind=run"
+ },
+ {
+  "area": "run",
+  "id": "run-record-kind=walk",
+  "path": "/run/record?kind=walk"
+ },
+ {
+  "area": "run",
+  "id": "activity",
+  "from": "/run?tab=history",
+  "link": "a[href^=\"/run/activities/\"]"
+ },
+ {
+  "area": "nutrition",
+  "id": "nutrition",
+  "path": "/nutrition"
+ },
+ {
+  "area": "nutrition",
+  "id": "nutrition-add=1",
+  "path": "/nutrition?add=1"
+ },
+ {
+  "area": "nutrition",
+  "id": "nutrition-scanner",
+  "path": "/nutrition/scanner"
+ },
+ {
+  "area": "nutrition",
+  "id": "nutrition-photo",
+  "path": "/nutrition/photo"
+ },
+ {
+  "area": "nutrition",
+  "id": "nutrition-label",
+  "path": "/nutrition/label"
+ },
+ {
+  "area": "nutrition",
+  "id": "nutrition-insights",
+  "path": "/nutrition/insights"
+ },
+ {
+  "area": "nutrition",
+  "id": "nutrition-compare",
+  "path": "/nutrition/compare"
+ },
+ {
+  "area": "nutrition",
+  "id": "nutrition-recipes",
+  "path": "/nutrition/recipes"
+ },
+ {
+  "area": "nutrition",
+  "id": "nutrition-recipes-new",
+  "path": "/nutrition/recipes/new"
+ },
+ {
+  "area": "nutrition",
+  "id": "nutrition-planner",
+  "path": "/nutrition/planner"
+ },
+ {
+  "area": "nutrition",
+  "id": "nutrition-grocery",
+  "path": "/nutrition/grocery"
+ },
+ {
+  "area": "nutrition",
+  "id": "nutrition-saved-meals",
+  "path": "/nutrition/saved-meals"
+ },
+ {
+  "area": "nutrition",
+  "id": "nutrition-supplements",
+  "path": "/nutrition/supplements"
+ },
+ {
+  "area": "nutrition",
+  "id": "nutrition-diets",
+  "path": "/nutrition/diets"
+ },
+ {
+  "area": "nutrition",
+  "id": "app-recipe",
+  "path": "/nutrition/recipes/app/oatmeal-banana-peanut-butter"
+ },
+ {
+  "area": "nutrition",
+  "id": "product",
+  "path": "/nutrition/product/3017620422003"
+ },
+ {
+  "area": "faith",
+  "id": "faith",
+  "path": "/faith"
+ },
+ {
+  "area": "faith",
+  "id": "faith-journey",
+  "path": "/faith/journey"
+ },
+ {
+  "area": "faith",
+  "id": "faith-journey-new",
+  "path": "/faith/journey/new"
+ },
+ {
+  "area": "faith",
+  "id": "faith-journey-schedule",
+  "path": "/faith/journey/schedule"
+ },
+ {
+  "area": "faith",
+  "id": "faith-bible",
+  "path": "/faith/bible"
+ },
+ {
+  "area": "faith",
+  "id": "faith-bible-john",
+  "path": "/faith/bible/john"
+ },
+ {
+  "area": "faith",
+  "id": "faith-bible-john-3",
+  "path": "/faith/bible/john/3"
+ },
+ {
+  "area": "faith",
+  "id": "faith-bible-search",
+  "path": "/faith/bible/search"
+ },
+ {
+  "area": "faith",
+  "id": "faith-bible-history",
+  "path": "/faith/bible/history"
+ },
+ {
+  "area": "faith",
+  "id": "faith-bible-saved",
+  "path": "/faith/bible/saved"
+ },
+ {
+  "area": "faith",
+  "id": "faith-journal",
+  "path": "/faith/journal"
+ },
+ {
+  "area": "faith",
+  "id": "faith-journal-new",
+  "path": "/faith/journal/new"
+ },
+ {
+  "area": "faith",
+  "id": "faith-studies",
+  "path": "/faith/studies"
+ },
+ {
+  "area": "faith",
+  "id": "faith-memory",
+  "path": "/faith/memory"
+ },
+ {
+  "area": "faith",
+  "id": "faith-practices",
+  "path": "/faith/practices"
+ },
+ {
+  "area": "faith",
+  "id": "faith-reminders",
+  "path": "/faith/reminders"
+ },
+ {
+  "area": "faith",
+  "id": "faith-ask",
+  "path": "/faith/ask"
+ },
+ {
+  "area": "faith",
+  "id": "journal-entry",
+  "from": "/faith/journal",
+  "link": "main a[href^=\"/faith/journal/\"]:not([href*=\"new\"])"
+ },
+ {
+  "area": "faith",
+  "id": "study",
+  "from": "/faith/studies",
+  "link": "main a[href^=\"/faith/studies/\"]"
+ },
+ {
+  "area": "faith",
+  "id": "study-gospel",
+  "path": "/faith/studies/gospel"
+ },
+ {
+  "area": "faith",
+  "id": "study-lesson",
+  "from": "/faith/studies/gospel",
+  "link": "main a[href^=\"/faith/studies/gospel/\"]"
+ },
+ {
+  "area": "faith",
+  "id": "memory-verse",
+  "from": "/faith/memory",
+  "link": "main a[href^=\"/faith/memory/\"]"
+ },
+ {
+  "area": "progress",
+  "id": "progress",
+  "path": "/progress"
+ },
+ {
+  "area": "progress",
+  "id": "progress-overview",
+  "path": "/progress/overview"
+ },
+ {
+  "area": "progress",
+  "id": "progress-badges",
+  "path": "/progress/badges"
+ },
+ {
+  "area": "progress",
+  "id": "progress-body-map",
+  "path": "/progress/body-map"
+ },
+ {
+  "area": "progress",
+  "id": "progress-body-scan",
+  "path": "/progress/body-scan"
+ },
+ {
+  "area": "progress",
+  "id": "progress-body-scan-new",
+  "path": "/progress/body-scan/new"
+ },
+ {
+  "area": "sleep",
+  "id": "progress-sleep",
+  "path": "/progress/sleep"
+ },
+ {
+  "area": "sleep",
+  "id": "progress-sleep-history",
+  "path": "/progress/sleep/history"
+ },
+ {
+  "area": "sleep",
+  "id": "progress-sleep-debt",
+  "path": "/progress/sleep/debt"
+ },
+ {
+  "area": "sleep",
+  "id": "progress-sleep-energy",
+  "path": "/progress/sleep/energy"
+ },
+ {
+  "area": "sleep",
+  "id": "progress-sleep-schedule",
+  "path": "/progress/sleep/schedule"
+ },
+ {
+  "area": "sleep",
+  "id": "progress-sleep-training",
+  "path": "/progress/sleep/training"
+ },
+ {
+  "area": "sleep",
+  "id": "progress-sleep-checkin",
+  "path": "/progress/sleep/checkin"
+ },
+ {
+  "area": "sleep",
+  "id": "progress-sleep-log",
+  "path": "/progress/sleep/log"
+ },
+ {
+  "area": "sleep",
+  "id": "progress-sleep-alarm",
+  "path": "/progress/sleep/alarm"
+ },
+ {
+  "area": "sleep",
+  "id": "progress-sleep-method",
+  "path": "/progress/sleep/method"
+ },
+ {
+  "area": "sleep",
+  "id": "progress-sleep-settings",
+  "path": "/progress/sleep/settings"
+ },
+ {
+  "area": "sleep",
+  "id": "sleep-night",
+  "from": "/progress/sleep",
+  "link": "a[href^=\"/progress/sleep/night/\"]"
+ },
+ {
+  "area": "coach",
+  "id": "coach",
+  "path": "/coach"
+ },
+ {
+  "area": "coach",
+  "id": "coach-memory",
+  "path": "/coach/memory"
+ },
+ {
+  "area": "you",
+  "id": "profile",
+  "path": "/profile"
+ },
+ {
+  "area": "you",
+  "id": "profile-preferences",
+  "path": "/profile/preferences"
+ },
+ {
+  "area": "you",
+  "id": "profile-notifications",
+  "path": "/profile/notifications"
+ },
+ {
+  "area": "you",
+  "id": "profile-customize",
+  "path": "/profile/customize"
+ },
+ {
+  "area": "you",
+  "id": "profile-billing",
+  "path": "/profile/billing"
+ },
+ {
+  "area": "you",
+  "id": "legal-privacy",
+  "path": "/legal/privacy"
+ },
+ {
+  "area": "you",
+  "id": "legal-terms",
+  "path": "/legal/terms"
+ },
+ {
+  "area": "you",
+  "id": "legal-notices",
+  "path": "/legal/notices"
+ }
+]

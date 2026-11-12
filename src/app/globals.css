@@ -7,18 +7,37 @@
  * The app is dark-first; all tokens are defined for the dark surface.
  */
 :root {
-  --background: #090909;
-  --card: #171717;
-  --elevated: #232323;
+  /* Surfaces: black page, charcoal cards with a subtle 1px border. */
+  --background: #070707;
+  --card: #151515;
+  --elevated: #1e1e1e;
+  --border: #2b2824;
+  /* Metallic gold: champagne highlight → gold → bronze shadow. Never bright yellow. */
+  --champagne: #f1dfa8;
   --gold: #c9a54c;
-  --gold-highlight: #e6c76e;
-  --gold-muted: #8c7139;
+  --gold-highlight: #e2c477;
+  --bronze: #8c6a2f;
+  --gold-muted: #8c6a2f;
+  --bronze-shadow: 0 10px 24px -14px rgba(140, 106, 47, 0.9);
   --foreground: #ffffff;
-  --muted-foreground: #b7b7b7;
-  --border: #35302a;
-  --success: #37956d;
+  --muted-foreground: #b3b0aa;
+  --success: #3fa077;
   --destructive: #d45c5c;
-  --radius: 1rem;
+  --destructive-foreground: #f08a8a;
+  /* Solid red button fill: white text on it reads at 5.6:1 (the lighter --destructive is for text and borders on black). */
+  --destructive-solid: #b93a3a;
+  /* Words of Jesus in Scripture ("red letter"). At least 4.5:1 on the page, cards and every highlight colour. */
+  --red-letter: #f0736a;
+  /* Radii: 12px cards, 10px inputs, full pills. */
+  --radius: 0.75rem;
+}
+
+/*
+ * Red Letters off (Bible reader setting, account-wide): the words of Jesus take the normal text colour. A custom
+ * property, so the nearest ancestor that sets it wins (the reader overrides it on its page for an instant switch).
+ */
+.red-letters-off {
+  --red-letter: currentColor;
 }
 
 @theme inline {
@@ -34,6 +53,9 @@
   --color-gold: var(--gold);
   --color-gold-highlight: var(--gold-highlight);
   --color-gold-muted: var(--gold-muted);
+  --color-champagne: var(--champagne);
+  --color-bronze: var(--bronze);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-secondary: var(--elevated);
   --color-secondary-foreground: var(--foreground);
   --color-muted: var(--elevated);
@@ -41,19 +63,25 @@
   --color-accent: var(--elevated);
   --color-accent-foreground: var(--foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-solid: var(--destructive-solid);
   --color-success: var(--success);
+  --color-red-letter: var(--red-letter);
   --color-border: var(--border);
   --color-input: var(--border);
   --color-ring: var(--gold);
 
-  --radius-sm: calc(var(--radius) - 8px);
-  --radius-md: calc(var(--radius) - 4px);
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+  --radius-3xl: 1.25rem;
 
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-oswald), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  /* Headings: a clean geometric sans in mixed case. */
+  --font-display: var(--font-heading), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  /* Scripture and brand wordmark. */
+  --font-serif: var(--font-serif-face), ui-serif, Georgia, serif;
 
   --animate-fade-up: fade-up 0.35s ease-out both;
   --animate-shimmer: shimmer 1.6s linear infinite;
@@ -67,6 +95,8 @@
   --animate-toast-out: toast-out 0.2s ease-in both;
   --animate-page-in: page-in 0.32s cubic-bezier(0.2, 0.8, 0.3, 1) both;
   --animate-bounce-in: bounce-in 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
+  /* For full-width cards: grows to its own size and never past it, so it can't push the page wider than the phone. */
+  --animate-card-in: card-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 
   @keyframes fade-up {
     from {
@@ -75,7 +105,9 @@
     }
     to {
       opacity: 1;
-      transform: translateY(0);
+      /* "none", not translateY(0): a transform left in place keeps the element on its own compositing layer,
+         which Safari can redraw images in at reduced quality. */
+      transform: none;
     }
   }
   @keyframes fade-in {
@@ -173,6 +205,16 @@
       transform: scale(1);
     }
   }
+  @keyframes card-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px) scale(0.94);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
   @keyframes shimmer {
     from {
       background-position: -400px 0;
@@ -189,6 +231,8 @@
   }
   html {
     color-scheme: dark;
+    /* Percentages keep the user's system/browser text size as the base. */
+    font-size: 100%;
     -webkit-tap-highlight-color: transparent;
     scroll-behavior: smooth;
   }
@@ -213,23 +257,78 @@
   }
 }
 
+/* Text-size preference (Profile & Settings). Scales every rem-based size on top of the system setting. */
+html[data-text-size="large"] {
+  font-size: 112.5%;
+}
+html[data-text-size="xlarge"] {
+  font-size: 125%;
+}
+
+/* Headings everywhere use mixed case; legacy "uppercase" on display text is neutralised for readability. */
+.font-display {
+  letter-spacing: -0.01em;
+}
+.font-display.uppercase {
+  text-transform: none;
+}
+
 @layer utilities {
   .text-gold-gradient {
-    background: linear-gradient(135deg, var(--gold-highlight) 0%, var(--gold) 45%, var(--gold-muted) 100%);
+    background: linear-gradient(135deg, var(--champagne) 0%, var(--gold) 50%, var(--bronze) 100%);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
   }
   .bg-gold-gradient {
-    background: linear-gradient(135deg, var(--gold-highlight) 0%, var(--gold) 50%, var(--gold-muted) 100%);
+    background: linear-gradient(180deg, var(--champagne) 0%, var(--gold) 55%, var(--bronze) 130%);
+  }
+  .shadow-bronze {
+    box-shadow: var(--bronze-shadow);
+  }
+  /* Elevated charcoal card with a faint top highlight. */
+  .surface {
+    background: linear-gradient(180deg, #1a1a1a 0%, var(--card) 100%);
+    border: 1px solid var(--border);
   }
   .bg-card-gradient {
     background: radial-gradient(120% 140% at 0% 0%, rgba(201, 165, 76, 0.12) 0%, rgba(23, 23, 23, 0) 55%), var(--card);
+  }
+  /* A charcoal card with a thin gold-gradient edge and a soft gold glow: the day's workout, a new record, the Pro
+     benefits. The border is painted by a second background layer, so the radius and padding stay ordinary. */
+  .card-gold {
+    border: 1.5px solid transparent;
+    background:
+      linear-gradient(180deg, #1a160e 0%, #121009 100%) padding-box,
+      linear-gradient(135deg, #f1dfa8 0%, #c9a54c 45%, #8c6a2f 100%) border-box;
+    box-shadow: 0 14px 40px -24px rgba(201, 165, 76, 0.7);
+  }
+  .card-gold-strong {
+    border: 2px solid transparent;
+    background:
+      linear-gradient(180deg, #221a0c 0%, #15110a 100%) padding-box,
+      linear-gradient(135deg, #f5d27e 0%, #c9a54c 50%, #a3802f 100%) border-box;
+    box-shadow: 0 0 36px -10px rgba(230, 199, 110, 0.55);
+  }
+  /* A round gold play / action button. */
+  .btn-gold-round {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    background: linear-gradient(180deg, var(--champagne) 0%, var(--gold) 55%, var(--bronze) 130%);
+    color: #0b0b0b;
+    box-shadow: 0 10px 24px -10px rgba(201, 165, 76, 0.9);
   }
   .hero-glow {
     background:
       radial-gradient(60% 60% at 80% 0%, rgba(230, 199, 110, 0.16) 0%, rgba(9, 9, 9, 0) 70%),
       radial-gradient(50% 50% at 0% 100%, rgba(140, 113, 57, 0.18) 0%, rgba(9, 9, 9, 0) 70%);
+  }
+  /* The welcome page is the place beyond the gate: the light the opening walks into settles here as a soft glow from
+     above (the gate itself is drawn only once, by the opening). */
+  .beyond-gate {
+    background: radial-gradient(95% 60% at 50% -14%, rgba(255, 246, 222, 0.15) 0%, rgba(201, 165, 76, 0.06) 45%, rgba(9, 9, 9, 0) 78%);
   }
   .safe-bottom {
     padding-bottom: env(safe-area-inset-bottom);
@@ -299,3 +398,914 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* In-app "Reduce motion" setting mirrors the system preference. */
+html[data-motion="reduce"],
+html[data-motion="reduce"] *,
+html[data-motion="reduce"] *::before,
+html[data-motion="reduce"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* ---------------------------------------------------------------- Rank badge animations (badge-art.tsx)
+   Only a badge with .badge-animate moves (the one in focus); reduced motion stops all of it (rule above). */
+/* fill-box only on the animated parts: on everything it would shift shapes drawn with a rotate(…) attribute. */
+.badge-art :is(.ba-shimmer, .ba-flicker, .ba-ember, .ba-glow, .ba-twinkle, .ba-sway, .ba-wings, .ba-leaf) {
+  transform-box: fill-box;
+}
+.badge-animate .ba-shimmer {
+  animation: ba-shimmer 5.5s ease-in-out infinite;
+}
+.badge-animate .ba-flicker {
+  transform-origin: 50% 100%;
+  animation: ba-flicker 1.6s ease-in-out infinite alternate;
+}
+.badge-animate .ba-ember {
+  animation: ba-ember 3.2s linear infinite;
+}
+.badge-animate .ba-glow {
+  animation: ba-glow 3.6s ease-in-out infinite alternate;
+}
+.badge-animate .ba-twinkle {
+  transform-origin: 50% 50%;
+  animation: ba-twinkle 2.8s ease-in-out infinite;
+}
+.badge-animate .ba-sway {
+  transform-origin: 50% 100%;
+  animation: ba-sway 5s ease-in-out infinite alternate;
+}
+.badge-animate .ba-wings {
+  transform-origin: 50% 80%;
+  animation: ba-wings 2.4s ease-in-out infinite alternate;
+}
+.badge-animate .ba-leaf {
+  animation: ba-leaf 7s ease-in infinite;
+}
+.ba-leaf {
+  opacity: 0;
+}
+@keyframes ba-shimmer {
+  0%, 55% { transform: skewX(-18deg) translateX(0); }
+  100% { transform: skewX(-18deg) translateX(190px); }
+}
+@keyframes ba-flicker {
+  0% { transform: scale(1, 1) skewX(0deg); }
+  35% { transform: scale(0.96, 1.05) skewX(1.5deg); }
+  70% { transform: scale(1.03, 0.97) skewX(-1.5deg); }
+  100% { transform: scale(0.98, 1.03) skewX(0.8deg); }
+}
+@keyframes ba-ember {
+  0% { transform: translateY(0); opacity: 0; }
+  15% { opacity: 1; }
+  100% { transform: translateY(-26px); opacity: 0; }
+}
+@keyframes ba-glow {
+  from { opacity: 0.7; }
+  to { opacity: 1; }
+}
+@keyframes ba-twinkle {
+  0%, 70%, 100% { transform: scale(0.6); opacity: 0.5; }
+  80% { transform: scale(1.15); opacity: 1; }
+}
+@keyframes ba-sway {
+  from { transform: rotate(-1.2deg); }
+  to { transform: rotate(1.2deg); }
+}
+@keyframes ba-wings {
+  from { transform: scaleY(1); }
+  to { transform: scaleY(0.92); }
+}
+@keyframes ba-leaf {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+  10% { opacity: 1; }
+  100% { transform: translate(-14px, 34px) rotate(160deg); opacity: 0; }
+}
+/* Unlock reveal: a gold flash and a settle, once. */
+.badge-reveal {
+  animation: badge-reveal 1.1s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+.badge-reveal-ring {
+  animation: badge-reveal-ring 1.4s ease-out both;
+}
+@keyframes badge-reveal {
+  0% { transform: scale(0.6) rotate(-8deg); opacity: 0; filter: brightness(2.2); }
+  60% { transform: scale(1.06) rotate(1deg); opacity: 1; filter: brightness(1.3); }
+  /* Ends with no transform or filter, so the art is drawn plainly once the reveal settles. */
+  100% { transform: none; filter: none; }
+}
+/* Unlock reveal colours by category (rank-board.tsx RankReveal). */
+.reveal-fitness .badge-reveal-ring { border-color: rgba(233, 185, 85, 0.7); }
+.reveal-fitness .badge-reveal-ring.is-second { border-color: rgba(246, 220, 140, 0.5); }
+.reveal-fitness .reveal-glow { background: rgba(201, 165, 76, 0.2); }
+.reveal-food .badge-reveal-ring { border-color: rgba(255, 140, 40, 0.75); }
+.reveal-food .badge-reveal-ring.is-second { border-color: rgba(255, 196, 90, 0.6); }
+.reveal-food .reveal-glow { background: rgba(255, 110, 30, 0.22); }
+.reveal-faith .badge-reveal-ring { border-color: rgba(190, 210, 110, 0.7); }
+.reveal-faith .badge-reveal-ring.is-second { border-color: rgba(246, 230, 160, 0.55); }
+.reveal-faith .reveal-glow { background: rgba(170, 200, 90, 0.2); }
+.reveal-fitness .reveal-glow.is-top { background: rgba(201, 165, 76, 0.35); }
+.reveal-food .reveal-glow.is-top { background: rgba(255, 110, 30, 0.38); }
+.reveal-faith .reveal-glow.is-top { background: rgba(200, 220, 120, 0.34); }
+.badge-reveal-rays {
+  background: repeating-conic-gradient(rgba(255, 244, 200, 0.16) 0deg 6deg, transparent 6deg 18deg);
+  -webkit-mask-image: radial-gradient(closest-side, #000 30%, transparent);
+  mask-image: radial-gradient(closest-side, #000 30%, transparent);
+  animation: badge-reveal-rays 2.4s ease-out both;
+}
+@keyframes badge-reveal-rays {
+  0% { opacity: 0; transform: scale(0.5) rotate(-20deg); }
+  40% { opacity: 1; }
+  100% { opacity: 0.55; transform: none; }
+}
+@keyframes badge-reveal-ring {
+  0% { transform: scale(0.4); opacity: 0.9; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+/* With reduced motion, badges show their still artwork (not the last animation frame). */
+html[data-motion="reduce"] .badge-art *,
+html[data-motion="reduce"] .badge-reveal,
+html[data-motion="reduce"] .badge-reveal-ring,
+html[data-motion="reduce"] .badge-reveal-rays {
+  animation: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .badge-art *,
+  .badge-reveal,
+  .badge-reveal-ring,
+  .badge-reveal-rays {
+    animation: none !important;
+  }
+}
+
+/* Painted badge images: a 2 : 1 frame showing the whole image. */
+.badge-img {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  max-width: 100%;
+  aspect-ratio: 2 / 1;
+  overflow: hidden;
+  border-radius: 14px;
+}
+.badge-img.is-locked > img { opacity: 0.85; }
+.badge-img > img {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: 50% 50%;
+}
+/* The badge in focus (current rank, detail view, unlock reveal; never the whole list) gets its category's light:
+   Fitness a gold glow and a metallic sheen with gem sparkles, Food flickering firelight with rising embers,
+   Faith soft sun rays with drifting light motes. Only opacity and transform animate. */
+.badge-img-live::before {
+  content: "";
+  position: absolute;
+  inset: 0 12%;
+  background: radial-gradient(closest-side, rgba(241, 180, 80, 0.32), transparent);
+  animation: badge-img-glow 3.6s ease-in-out infinite alternate;
+}
+.badge-img-live::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  inset: -20%;
+  background: linear-gradient(105deg, transparent 42%, rgba(255, 244, 214, 0.16) 50%, transparent 58%);
+  transform: translateX(-120%);
+  animation: badge-img-sweep 6.5s ease-in-out infinite;
+  pointer-events: none;
+}
+/* Food: firelight that flickers over the art instead of a metal sheen. */
+.badge-live-food::before { background: radial-gradient(closest-side, rgba(255, 128, 32, 0.36), transparent); animation: badge-fire-glow 2.4s ease-in-out infinite; }
+.badge-live-food::after {
+  inset: 0;
+  transform: none;
+  background: radial-gradient(70% 60% at 50% 75%, rgba(255, 150, 60, 0.16), transparent 70%);
+  mix-blend-mode: screen;
+  animation: badge-fire-flicker 1.7s steps(1, end) infinite;
+}
+/* Faith: soft rays of light from above, slowly breathing. */
+.badge-live-faith::before { background: radial-gradient(closest-side, rgba(214, 226, 140, 0.28), transparent); }
+.badge-live-faith::after {
+  inset: -40% -10% 10%;
+  transform: none;
+  background: repeating-conic-gradient(from 180deg at 50% 0%, rgba(255, 246, 210, 0.11) 0deg 5deg, transparent 5deg 15deg);
+  -webkit-mask-image: radial-gradient(60% 80% at 50% 0%, #000, transparent 75%);
+  mask-image: radial-gradient(60% 80% at 50% 0%, #000, transparent 75%);
+  transform-origin: 50% 0%;
+  animation: badge-rays 7s ease-in-out infinite alternate;
+}
+.badge-fx { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+.badge-fx > span { position: absolute; display: block; border-radius: 999px; opacity: 0; }
+/* Fitness gem sparkles: tiny four-point glints. */
+.badge-fx-spark {
+  width: 9px;
+  height: 9px;
+  background: radial-gradient(closest-side, #fff, rgba(255, 236, 180, 0.6) 40%, transparent),
+    linear-gradient(90deg, transparent 45%, rgba(255, 255, 255, 0.9) 50%, transparent 55%),
+    linear-gradient(0deg, transparent 45%, rgba(255, 255, 255, 0.9) 50%, transparent 55%);
+  animation: badge-sparkle 3.2s ease-in-out infinite;
+}
+.badge-fx-spark.badge-fx-1 { left: 41%; top: 30%; }
+.badge-fx-spark.badge-fx-2 { left: 58%; top: 52%; animation-delay: 1.1s; }
+.badge-fx-spark.badge-fx-3 { left: 47%; top: 72%; animation-delay: 2.2s; }
+/* Food embers rising from the fire. */
+.badge-fx-ember { bottom: 12%; width: 3px; height: 3px; background: #ffb347; box-shadow: 0 0 6px 2px rgba(255, 120, 30, 0.75); animation: badge-ember 2.8s ease-out infinite; }
+.badge-fx-ember.badge-fx-1 { left: 38%; }
+.badge-fx-ember.badge-fx-2 { left: 47%; animation-delay: 0.6s; }
+.badge-fx-ember.badge-fx-3 { left: 55%; animation-delay: 1.3s; }
+.badge-fx-ember.badge-fx-4 { left: 62%; animation-delay: 1.9s; }
+.badge-fx-ember.badge-fx-5 { left: 44%; animation-delay: 2.4s; }
+/* Faith: motes of light drifting slowly through the rays. */
+.badge-fx-mote { width: 4px; height: 4px; background: rgba(255, 248, 214, 0.9); box-shadow: 0 0 6px 2px rgba(240, 230, 160, 0.5); animation: badge-mote 6s ease-in-out infinite; }
+.badge-fx-mote.badge-fx-1 { left: 32%; top: 40%; }
+.badge-fx-mote.badge-fx-2 { left: 60%; top: 30%; animation-delay: 1.5s; }
+.badge-fx-mote.badge-fx-3 { left: 52%; top: 62%; animation-delay: 3s; }
+.badge-fx-mote.badge-fx-4 { left: 70%; top: 55%; animation-delay: 4.5s; }
+@keyframes badge-img-glow {
+  from { opacity: 0.55; }
+  to { opacity: 1; }
+}
+@keyframes badge-img-sweep {
+  0%, 55% { transform: translateX(-120%); }
+  100% { transform: translateX(120%); }
+}
+@keyframes badge-fire-glow {
+  0%, 100% { opacity: 0.7; }
+  30% { opacity: 1; }
+  55% { opacity: 0.8; }
+  75% { opacity: 0.95; }
+}
+@keyframes badge-fire-flicker {
+  0% { opacity: 0.7; }
+  20% { opacity: 1; }
+  35% { opacity: 0.8; }
+  60% { opacity: 0.95; }
+  80% { opacity: 0.75; }
+}
+@keyframes badge-rays {
+  from { opacity: 0.55; transform: rotate(-3deg); }
+  to { opacity: 1; transform: rotate(3deg); }
+}
+@keyframes badge-sparkle {
+  0%, 70%, 100% { opacity: 0; transform: scale(0.3) rotate(0deg); }
+  80% { opacity: 1; transform: scale(1) rotate(45deg); }
+}
+@keyframes badge-ember {
+  0% { opacity: 0; transform: translate(0, 0) scale(1); }
+  15% { opacity: 1; }
+  100% { opacity: 0; transform: translate(6px, -60px) scale(0.4); }
+}
+@keyframes badge-mote {
+  0%, 100% { opacity: 0; transform: translate(0, 0); }
+  30%, 70% { opacity: 0.9; }
+  50% { transform: translate(5px, -8px); }
+}
+/* Reduced motion (the phone's setting or the app's own): still artwork, no effects. */
+html[data-motion="reduce"] .badge-img-live::before,
+html[data-motion="reduce"] .badge-img-live::after {
+  animation: none !important;
+}
+html[data-motion="reduce"] .badge-img-live::after,
+html[data-motion="reduce"] .badge-fx { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .badge-img-live::before,
+  .badge-img-live::after {
+    animation: none !important;
+  }
+  .badge-img-live::after,
+  .badge-fx { display: none; }
+}
+
+/* ---------------------------------------------------------------- Rank ladder (rank-ladder.tsx)
+   Laid out like the owner's badge design: ornate gold frame, engraved gold capitals, numbered rows. */
+.rank-frame {
+  position: relative;
+  padding: 18px 10px 12px;
+  border-radius: 18px;
+  background:
+    radial-gradient(120% 60% at 50% 0%, rgba(201, 165, 76, 0.1), transparent 60%),
+    linear-gradient(180deg, #0d0b08, #070605);
+  border: 1.5px solid #b98a32;
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.9),
+    inset 0 0 0 3px rgba(201, 165, 76, 0.35),
+    0 0 24px -6px rgba(233, 185, 85, 0.45);
+}
+.rank-corner {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  border: 2px solid #e2b24f;
+  pointer-events: none;
+  filter: drop-shadow(0 0 4px rgba(233, 185, 85, 0.7));
+}
+.rank-corner-tl { top: -3px; left: -3px; border-right: 0; border-bottom: 0; border-top-left-radius: 16px; }
+.rank-corner-tr { top: -3px; right: -3px; border-left: 0; border-bottom: 0; border-top-right-radius: 16px; }
+.rank-corner-bl { bottom: -3px; left: -3px; border-right: 0; border-top: 0; border-bottom-left-radius: 16px; }
+.rank-corner-br { bottom: -3px; right: -3px; border-left: 0; border-top: 0; border-bottom-right-radius: 16px; }
+.rank-head {
+  text-align: center;
+  padding-bottom: 12px;
+  margin-bottom: 4px;
+  background: linear-gradient(90deg, transparent, #d9a740 20%, #f6dc8c 50%, #d9a740 80%, transparent) bottom / 100% 1.5px no-repeat;
+}
+.rank-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-engraved), var(--font-serif);
+  font-weight: 800;
+  font-size: 2.1rem;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  background: linear-gradient(180deg, #fff1bf 0%, #f1c862 40%, #c48a26 70%, #f5d27a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 2px 6px rgba(233, 185, 85, 0.35));
+}
+.rank-crest { width: 2rem; height: 2rem; stroke-width: 2.2; }
+.rank-crest-fitness { color: #f1c862; }
+.rank-crest-food { color: #ff7a1f; filter: drop-shadow(0 0 6px rgba(255, 122, 31, 0.7)); }
+.rank-crest-faith { color: #6cc24a; filter: drop-shadow(0 0 6px rgba(108, 194, 74, 0.6)); }
+.rank-subtitle {
+  margin-top: 6px;
+  font-family: var(--font-engraved), var(--font-serif);
+  font-weight: 600;
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #d8d2c4;
+}
+.rank-rows { display: flex; flex-direction: column; }
+.rank-rows > li + li .rank-row {
+  background-image: linear-gradient(90deg, transparent, rgba(217, 167, 64, 0.85) 15%, #f6dc8c 50%, rgba(217, 167, 64, 0.85) 85%, transparent);
+  background-size: 100% 1.5px;
+  background-repeat: no-repeat;
+  background-position: top;
+}
+.rank-row {
+  position: relative;
+  display: grid;
+  /* number | art | text. The art column is 2 : 1 and every image is exactly 2 : 1, so nothing is cropped
+     or stretched; the number, art and text share one vertical centre line. */
+  grid-template-columns: 2.4rem minmax(0, 1.04fr) minmax(0, 1fr);
+  align-items: center;
+  column-gap: 10px;
+  width: 100%;
+  /* Tall enough for a two-line theme, so rows share one height; only the longest texts on the narrowest
+     phones grow past it. */
+  min-height: 122px;
+  padding: 10px 6px;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  background-color: transparent;
+  border: 0;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.rank-row:hover { background-color: rgba(201, 165, 76, 0.06); }
+.rank-row:focus-visible { outline: 2px solid #f1c862; outline-offset: 2px; }
+.rank-row.is-current {
+  background-color: rgba(201, 165, 76, 0.09);
+  box-shadow: inset 0 0 0 1px rgba(241, 200, 98, 0.55), 0 0 14px -6px rgba(241, 200, 98, 0.5);
+}
+/* The rank number sits in a gold hexagon, as on the posters. */
+.rank-num {
+  display: grid;
+  place-items: center;
+  width: 2.4rem;
+  height: 2.7rem;
+  font-family: var(--font-engraved), var(--font-serif);
+  font-weight: 700;
+  font-size: 1.45rem;
+  line-height: 1;
+  text-align: center;
+  background: var(--rank-hex) center / contain no-repeat;
+}
+.rank-num > span {
+  /* Optical centring: Cinzel's figures sit slightly high in their line box. */
+  transform: translateY(1px);
+  background: linear-gradient(180deg, #fff1bf, #e9b955 55%, #a8701c);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.rank-frame {
+  --rank-hex: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 46 52'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23fff1bf'/%3E%3Cstop offset='.5' stop-color='%23e9b955'/%3E%3Cstop offset='1' stop-color='%238a5a14'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M23 2 43 13.5v25L23 50 3 38.5v-25Z' fill='%23100d08' stroke='url(%23g)' stroke-width='2.4'/%3E%3Cpath d='M23 6.5 39 15.8v20.4L23 45.5 7 36.2V15.8Z' fill='none' stroke='%23a8701c' stroke-opacity='.55' stroke-width='1'/%3E%3C/svg%3E");
+}
+/* The painted art: a fixed 2 : 1 tile, the same shape as every image, so it is shown whole, never cropped or
+   stretched. Tiles have crisp rounded corners and a faint gold edge (drawn over the image, not as a filter or
+   mask, so the pixels are drawn as they are); the glow is a separate layer behind. The tile stops growing at
+   136 px (408 device pixels on a 3x iPhone), close to the art's own width, so wider phones don't enlarge it
+   into blur; it then sits centred in its column. */
+.rank-art { position: relative; display: block; justify-self: center; width: 100%; max-width: 136px; aspect-ratio: 2 / 1; }
+.rank-art img {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: 50% 50%;
+  display: block;
+  border-radius: 10px;
+  background: #0b0a07;
+}
+.rank-art::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px rgba(241, 200, 98, 0.28);
+  pointer-events: none;
+}
+.rank-row.is-earned .rank-art::after { box-shadow: inset 0 0 0 1px rgba(241, 200, 98, 0.6); }
+.rank-row.is-earned .rank-art::before {
+  content: "";
+  position: absolute;
+  inset: -8% 14%;
+  background: radial-gradient(closest-side, rgba(241, 180, 80, 0.2), transparent);
+  pointer-events: none;
+}
+/* Locked art is dimmed a little with opacity (not a filter), so the ladder stays bright; the lock marks it. */
+.rank-row.is-locked .rank-art img { opacity: 0.85; }
+.rank-lock {
+  position: absolute;
+  z-index: 3;
+  right: 6px;
+  bottom: 4px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(8, 7, 5, 0.9);
+  border: 1px solid rgba(201, 165, 76, 0.55);
+  color: #e2c27a;
+}
+.rank-lock svg { width: 12px; height: 12px; }
+.rank-text { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+.rank-name {
+  font-family: var(--font-engraved), var(--font-serif);
+  font-weight: 800;
+  font-size: clamp(0.75rem, 0.1rem + 3.1vw, 1.05rem);
+  line-height: 1.15;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  background: linear-gradient(180deg, #fff1bf, #f1c862 45%, #c48a26);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.rank-ref, .rank-theme { font-family: var(--font-serif); font-size: 0.78rem; line-height: 1.3; color: #ece6d8; }
+.rank-ref { color: #f0dfb0; }
+.rank-theme { color: #cfc8b8; }
+.rank-state { margin-top: 4px; font-size: 0.75rem; line-height: 1.2; color: #a9a294; display: inline-flex; align-items: center; gap: 4px; font-variant-numeric: tabular-nums; }
+/* Progress towards a locked rank. */
+.rank-bar { display: block; height: 4px; margin-top: 5px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.rank-bar > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #a8701c, #f1c862); }
+.rank-bar.is-full > span { background: linear-gradient(90deg, #c48a26, #f6dc8c); }
+.rank-state.is-done { color: #f1c862; font-weight: 600; }
+.rank-state svg { width: 12px; height: 12px; }
+/* The detail view's art: centred in a gold-edged panel that fits around it. The art stops at the size it can
+   fill sharply (BADGE_MAX_SHARP_WIDTH, 191 px), rather than being stretched to the dialog's width. */
+.rank-detail-art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+  /* Clear of the dialog's close button. */
+  margin-top: 28px;
+  padding: 14px 30px;
+  border-radius: 16px;
+  border: 1px solid rgba(201, 165, 76, 0.3);
+  background: radial-gradient(60% 75% at 50% 50%, rgba(201, 165, 76, 0.12), transparent 70%), #0b0a07;
+}
+.rank-detail-art.is-earned {
+  border-color: rgba(241, 200, 98, 0.6);
+  box-shadow: 0 0 20px -10px rgba(241, 200, 98, 0.7);
+}
+.rank-detail-lock {
+  position: absolute;
+  z-index: 3;
+  bottom: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(8, 7, 5, 0.85);
+  border: 1px solid rgba(201, 165, 76, 0.5);
+  color: #e2c27a;
+}
+.rank-detail-lock svg { width: 12px; height: 12px; }
+/* An earned rank's verse, under its row. */
+.rank-verse {
+  margin: 0 6px 10px calc(2.4rem + 16px);
+  padding: 8px 12px;
+  border-left: 2px solid #e9b955;
+  border-radius: 0 8px 8px 0;
+  background: linear-gradient(90deg, rgba(201, 165, 76, 0.12), rgba(201, 165, 76, 0.02));
+}
+.rank-verse-text { display: block; font-family: var(--font-serif); font-size: 0.86rem; line-height: 1.5; color: #f1ead6; }
+.rank-verse-ref { display: block; margin-top: 4px; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; color: #f1c862; }
+/* The smallest phones (320 px): a little more room for the text. */
+@media (max-width: 359px) {
+  .rank-row { grid-template-columns: 2.1rem minmax(0, 0.92fr) minmax(0, 1fr); column-gap: 7px; padding-inline: 4px; }
+  .rank-num { width: 2.1rem; height: 2.4rem; font-size: 1.25rem; }
+  .rank-verse { margin-left: calc(2.1rem + 11px); }
+}
+@media (min-width: 640px) {
+  .rank-row { min-height: 120px; column-gap: 16px; }
+  /* Tablets and desktops are 2x screens, where the art stays sharp up to about half its own width. */
+  .rank-art { max-width: 190px; }
+  .rank-name { font-size: 1.35rem; }
+  .rank-ref, .rank-theme { font-size: 0.9rem; }
+}
+
+/*
+ * Narrow Gate opening: plays on every full load of the app (see src/lib/opening.ts for when and why). State is on
+ * <html data-intro>: "play" → "entering" (Enter Narrow Gate, or the end of the sequence) or "leaving" (Skip intro,
+ * Escape) → "done"; or "off". The gate is a rendered scene (.ngs-*, NarrowGateArt). Timeline: dark, then the logo
+ * (0.15 s); the scene fades up with light leaking round the shut door (0.45 s); the door opens on its hinge and soft
+ * white light pours out (1.3–2.9 s); the verse (1.7 s) and Enter Narrow Gate (2.15 s). At 3.85 s, or as soon as Enter
+ * is pressed, the camera moves forward through the doorway into the light, the light fills the screen and settles
+ * into the app beyond (gone at about 5 s; 1.5 s after Enter). Enter first finishes opening the door and brightening its
+ * light from wherever they are (OPENING_SCRIPT), so the camera never passes a half-open door. Skip intro just fades
+ * it out. This is the app's only gate: no page draws it again.
+ */
+.ngo {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: none;
+  overflow: hidden;
+  background: #050505;
+  color: #f1ead6;
+  --ngs-bg: #050505;
+}
+html:is([data-intro="play"], [data-intro="entering"], [data-intro="leaving"]) .ngo { display: block; }
+html:is([data-intro="play"], [data-intro="entering"], [data-intro="leaving"]) body { overflow: hidden; }
+html[data-intro="play"] .ngo { animation: ngo-exit 0.4s ease-out 4.65s forwards; }
+html[data-intro="entering"] .ngo { animation: ngo-enter-out 0.55s cubic-bezier(0.3, 0, 0.2, 1) 0.95s forwards; }
+html[data-intro="leaving"] .ngo { animation: ngo-leave 0.35s ease-in forwards; }
+.ngo:focus { outline: none; }
+/* The gate's pictures are still arriving (OPENING_SCRIPT waits at most 1.2 s): the whole sequence waits with them, on
+   black like the launch screen, so the door never opens before it has been drawn and nothing pops in. */
+html[data-intro-art="loading"] :is(.ngo, .ngo *, .ngo *::before, .ngo *::after) { animation-play-state: paused !important; }
+
+/* ---- The scene. Sized by the screen's height so the gate sits between the logo and the verse on every phone. */
+.ngs {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  /* The doorway (with its architrave) takes about 40% of the scene's height: size the scene so it fits the space
+     between the logo (top ~150 px) and the verse (bottom ~290 px), and centre it in that space. */
+  --scene-h: clamp(60svh, calc((100svh - 440px) * 2.25), min(118svh, 1150px));
+  --scene-top: calc((100svh - 140px) / 2 + 8px - var(--scene-h) * 0.4325);
+  --scene-x: 50%;
+}
+.ngs-push,
+.ngs-drift { position: absolute; inset: 0; transform-origin: var(--scene-x) calc(var(--scene-top) + var(--scene-h) * var(--gate-y)); }
+.ngs-drift { animation: ngs-drift 3.6s cubic-bezier(0.25, 0.1, 0.25, 1) 0.3s both; }
+.ngs-box {
+  position: absolute;
+  top: var(--scene-top);
+  left: var(--scene-x);
+  height: var(--scene-h);
+  aspect-ratio: 2 / 3;
+  transform: translateX(-50%);
+  container-type: size;
+}
+.ngs-scene { position: absolute; inset: 0; perspective: var(--persp); perspective-origin: var(--po); animation: ngo-fade 0.95s cubic-bezier(0.3, 0.1, 0.3, 1) 0.45s both; }
+.ngs-base,
+.ngs-light { position: absolute; inset: 0; background: url(/opening/gate-base.webp) center / 100% 100% no-repeat; }
+.ngs-light { background-image: url(/opening/gate-light.webp); }
+/* What the open door lets out, added to the shut scene: light on the floor and the reveal, lit haze, bloom. */
+.ngs-light { mix-blend-mode: plus-lighter; opacity: 0; animation: ngo-fade 1.65s cubic-bezier(0.4, 0, 0.2, 1) 1.35s both; }
+/* Older WebKit has no plus-lighter: screen looks almost the same over this dark scene. */
+@supports not (mix-blend-mode: plus-lighter) { .ngs-light { mix-blend-mode: screen; } }
+.ngs-door {
+  position: absolute;
+  left: var(--door-l);
+  top: var(--door-t);
+  width: var(--door-w);
+  height: var(--door-h);
+  overflow: hidden;
+  border-radius: 50% 50% 0 0 / var(--door-r) var(--door-r) 0 0;
+  background: url(/opening/gate-door.webp) center / 100% 100% no-repeat;
+  transform-origin: 0 50%;
+  backface-visibility: hidden;
+  animation: ngs-open 1.6s cubic-bezier(0.55, 0.05, 0.3, 1) 1.3s both;
+}
+/* The leaf darkens as it turns away from the little light in front of it. */
+.ngs-door::after { content: ""; position: absolute; inset: 0; background: #000; opacity: 0; animation: ngs-shade 1.6s cubic-bezier(0.55, 0.05, 0.3, 1) 1.3s both; }
+.ngs-haze {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  mix-blend-mode: screen;
+  opacity: 0;
+  -webkit-mask: radial-gradient(ellipse 30% 27% at 50% 47%, #000 18%, transparent 78%);
+  mask: radial-gradient(ellipse 30% 27% at 50% 47%, #000 18%, transparent 78%);
+  animation: ngs-haze 1.8s ease-out 1.6s both;
+}
+.ngs-haze::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 200%;
+  background: url(/opening/gate-haze.webp) 0 0 / 50% auto repeat;
+  animation: ngs-mist 26s linear infinite;
+}
+.ngs-dust { position: absolute; inset: 0; pointer-events: none; }
+.ngs-dust i {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 252, 244, 0.95), rgba(255, 252, 244, 0) 70%);
+  opacity: 0;
+  animation: ngs-mote-in 1.4s ease-out both, ngs-mote 7s ease-in-out infinite alternate;
+}
+/* Fade the picture's edges into the page. */
+.ngs-edge {
+  position: absolute;
+  inset: -1px;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, var(--ngs-bg) 0%, transparent 16%, transparent 84%, var(--ngs-bg) 100%),
+    linear-gradient(0deg, var(--ngs-bg) 0%, transparent 9%),
+    linear-gradient(180deg, var(--ngs-bg) 0%, transparent 6%);
+}
+/* The move into the light: the camera eases forward through the doorway, faster as it nears the light. */
+.ngo .ngs-push { will-change: transform; }
+html[data-intro="play"] .ngo .ngs-push { animation: ngs-push 0.9s cubic-bezier(0.55, 0, 0.9, 0.4) 3.85s both; }
+html[data-intro="entering"] .ngo .ngs-push { animation: ngs-push-now 1.05s cubic-bezier(0.5, 0, 0.85, 0.45) both; }
+
+/* A picture failed to load: a drawn gate instead (a lit arch in a bronze frame, the door a dark leaf turning on its
+   hinge), on the same timeline, so the entrance still reads and Enter still works. */
+html[data-intro-art="missing"] :is(.ngs-base, .ngs-light, .ngs-haze) { display: none; }
+html[data-intro-art="missing"] .ngs-scene::before {
+  content: "";
+  position: absolute;
+  left: var(--door-l);
+  top: var(--door-t);
+  width: var(--door-w);
+  height: var(--door-h);
+  border-radius: 50% 50% 0 0 / var(--door-r) var(--door-r) 0 0;
+  background: radial-gradient(ellipse 70% 60% at 50% 62%, #fffdf6 0%, #f4e9cf 45%, #d6b875 100%);
+  box-shadow: 0 0 0 0.6cqh #8a6d2e, 0 0 0 1.2cqh #2a2014, 0 0 9cqh 3cqh rgba(255, 238, 196, 0.3);
+}
+html[data-intro-art="missing"] .ngs-door { background: linear-gradient(90deg, #17110a, #2c2317 60%, #17110a); box-shadow: inset 0 0 0 0.4cqh #5a4520; }
+
+/* ---- Words and buttons */
+.ngo-scrim {
+  position: absolute;
+  inset: auto 0 0;
+  height: 48%;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(5, 5, 5, 0), rgba(5, 5, 5, 0.6) 36%, rgba(5, 5, 5, 0.86));
+  animation: ngo-fade 0.8s ease 1.5s both;
+}
+.ngo-ui { position: absolute; inset: 0; pointer-events: none; }
+html[data-intro="play"] .ngo-ui { animation: ngo-out 0.25s ease-in 3.85s forwards; }
+html[data-intro="entering"] .ngo-ui { animation: ngo-hide 0.25s ease-in forwards; }
+html[data-intro="play"] .ngo-scrim { animation: ngo-fade 0.8s ease 1.5s both, ngo-out 0.25s ease-in 3.85s forwards; }
+html[data-intro="entering"] .ngo-scrim { animation: ngo-fade 0.8s ease 1.5s both, ngo-hide 0.25s ease-in forwards; }
+.ngo-skip,
+.ngo-enter { pointer-events: auto; cursor: pointer; }
+.ngo-skip {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 12px);
+  right: calc(env(safe-area-inset-right) + 14px);
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(201, 165, 76, 0.45);
+  background: rgba(12, 11, 9, 0.6);
+  padding: 0 16px;
+  font: 600 0.8125rem/1 var(--font-inter), system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  color: #e9cf86;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: ngo-fade 0.5s ease 0.3s both;
+}
+.ngo-skip:hover { border-color: #c9a54c; color: #f7e7b4; }
+.ngo-skip:focus-visible,
+.ngo-enter:focus-visible { outline: 2px solid #f7e7b4; outline-offset: 3px; }
+.ngo-brand {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 62px);
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  animation: ngo-rise 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) 0.15s both;
+}
+.ngo-brand svg { width: 40px; height: 40px; }
+.ngo-word { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 0; line-height: 1; white-space: nowrap; }
+.ngo-word b {
+  font: 600 1.06rem/1 var(--font-serif-face), Georgia, serif;
+  letter-spacing: 0.22em;
+  padding-left: 0.22em;
+  text-transform: uppercase;
+  background: linear-gradient(100deg, #f4e4b4, #c9a54c 55%, #a07a35);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.ngo-word small { font: 600 0.62rem/1 var(--font-inter), system-ui, sans-serif; letter-spacing: 0.55em; padding-left: 0.55em; text-transform: uppercase; color: #a39c8f; }
+.ngo-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(env(safe-area-inset-bottom) + 22px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 0 20px;
+  text-align: center;
+}
+.ngo-verse { margin: 0; max-width: 31em; animation: ngo-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) 1.7s both; }
+.ngo-verse blockquote {
+  margin: 0;
+  font: 500 clamp(0.98rem, 0.92rem + 0.3vw, 1.18rem)/1.58 var(--font-serif-face), Georgia, serif;
+  color: #f2ede2;
+  text-wrap: pretty;
+  text-shadow: 0 1px 14px rgba(0, 0, 0, 0.65);
+}
+.ngo-verse figcaption { margin-top: 10px; font: 700 0.72rem/1 var(--font-inter), system-ui, sans-serif; letter-spacing: 0.22em; text-transform: uppercase; color: #c9a54c; }
+.ngo-enter {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  border: 1px solid #e8d49a;
+  background: linear-gradient(180deg, #f1e3b8, #cfae5c 58%, #a8863e);
+  padding: 0 26px;
+  font: 800 0.8125rem/1 var(--font-heading), system-ui, sans-serif;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #120e06;
+  box-shadow: 0 8px 24px -14px rgba(241, 223, 168, 0.7);
+  animation: ngo-rise-in 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) 2.15s both;
+}
+.ngo-enter:hover { filter: brightness(1.06); }
+/* The light the camera moves into: soft, warm white, not pure. */
+.ngo-white {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(ellipse 85% 70% at 50% 42%, #fffdf8 0%, #f7f3ea 55%, #ece6da 100%);
+  will-change: opacity;
+}
+html[data-intro="play"] .ngo-white { animation: ngo-fade 0.55s cubic-bezier(0.5, 0, 0.6, 1) 4.1s both; }
+html[data-intro="entering"] .ngo-white { animation: ngo-flood 0.65s cubic-bezier(0.45, 0, 0.55, 1) 0.32s both; }
+
+
+/* Short landscape screens: the gate on the left, the words on the right. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .ngs { --scene-h: 135svh; --scene-top: calc(50svh - 135svh * 0.4416); --scene-x: 27%; }
+  .ngo-brand { left: 50%; top: calc(env(safe-area-inset-top) + 18px); flex-direction: row; }
+  .ngo-brand svg { width: 32px; height: 32px; }
+  .ngo-bottom { left: 50%; right: 3%; bottom: calc(env(safe-area-inset-bottom) + 14px); gap: 12px; }
+  .ngo-verse blockquote { font-size: 0.94rem; line-height: 1.5; }
+  .ngo-scrim { display: none; }
+}
+/* Very short portrait screens (iPhone SE 1st gen, zoomed display). */
+@media (orientation: portrait) and (max-height: 600px) {
+  .ngo-brand { top: calc(env(safe-area-inset-top) + 58px); gap: 6px; }
+  .ngo-brand svg { width: 32px; height: 32px; }
+  .ngo-bottom { gap: 12px; bottom: calc(env(safe-area-inset-bottom) + 14px); }
+  .ngo-verse blockquote { font-size: 0.94rem; line-height: 1.45; }
+}
+
+@keyframes ngo-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ngo-out { to { opacity: 0; } }
+/* Enter Narrow Gate starts these mid-sequence: they need names of their own (an animation that keeps its name keeps
+   its start time, so it would jump straight to its end). */
+@keyframes ngo-hide { to { opacity: 0; } }
+@keyframes ngo-flood { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ngo-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes ngo-rise-in { from { opacity: 0; transform: translateY(10px); visibility: hidden; } to { opacity: 1; transform: none; visibility: visible; } }
+@keyframes ngs-drift { from { transform: scale(1); } to { transform: scale(1.04); } }
+@keyframes ngs-open { from { transform: rotateY(0deg); } to { transform: rotateY(80deg); } }
+@keyframes ngs-shade { from { opacity: 0; } to { opacity: 0.55; } }
+@keyframes ngs-haze { from { opacity: 0; } to { opacity: 0.85; } }
+@keyframes ngs-mist { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes ngs-mote-in { from { opacity: 0; } to { opacity: 0.45; } }
+@keyframes ngs-mote { from { transform: translate(0, 0); } to { transform: translate(1.4cqh, -5cqh); } }
+@keyframes ngs-push { from { transform: scale(1); } to { transform: scale(4.6); } }
+@keyframes ngs-push-now { from { transform: scale(1); } to { transform: scale(4.6); } }
+@keyframes ngo-exit { from { opacity: 1; } to { opacity: 0; visibility: hidden; pointer-events: none; } }
+@keyframes ngo-enter-out { from { opacity: 1; } to { opacity: 0; visibility: hidden; pointer-events: none; } }
+@keyframes ngo-leave { from { opacity: 1; } to { opacity: 0; visibility: hidden; pointer-events: none; } }
+
+/* Reduced motion (device or in-app setting): nothing moves. The door is shown open and the light on, everything
+   fades in once; Enter, Skip and the end of the sequence fade it out, without the move into the light. */
+@media (prefers-reduced-motion: reduce) {
+  :is(.ngs-drift, .ngs-push) { animation: none !important; }
+  .ngs-haze::before { animation: none !important; }
+  .ngs-door { animation: none !important; transform: rotateY(80deg); }
+  .ngs-door::after { animation: none !important; opacity: 0.55; }
+  :is(.ngs-scene, .ngs-light, .ngo-brand, .ngo-verse, .ngo-scrim) { animation: ngo-fade 0.4s ease 0.1s both !important; }
+  .ngo-enter { animation: ngo-fade 0.4s ease 0.1s both !important; }
+  .ngs-haze { animation: none !important; opacity: 0.85; }
+  :is(.ngs-dust, .ngo-white) { display: none; }
+  html[data-intro="play"] .ngo-ui { animation: none !important; }
+  html[data-intro="entering"] .ngo { animation: ngo-enter-out 0.4s ease-out forwards !important; }
+}
+html[data-motion="reduce"] :is(.ngs-drift, .ngs-push) { animation: none !important; }
+html[data-motion="reduce"] .ngs-haze::before { animation: none !important; }
+html[data-motion="reduce"] .ngs-door { animation: none !important; transform: rotateY(80deg); }
+html[data-motion="reduce"] .ngs-door::after { animation: none !important; opacity: 0.55; }
+html[data-motion="reduce"] :is(.ngs-scene, .ngs-light, .ngo-brand, .ngo-verse, .ngo-scrim) { animation: ngo-fade 0.4s ease 0.1s both !important; }
+html[data-motion="reduce"] .ngo-enter { animation: ngo-fade 0.4s ease 0.1s both !important; }
+html[data-motion="reduce"] .ngs-haze { animation: none !important; opacity: 0.85; }
+html[data-motion="reduce"] :is(.ngs-dust, .ngo-white) { display: none; }
+html[data-motion="reduce"][data-intro="play"] .ngo-ui { animation: none !important; }
+html[data-motion="reduce"][data-intro="entering"] .ngo { animation: ngo-enter-out 0.4s ease-out forwards !important; }
+
+/* Bible reader: the verse a link pointed to glows gold for a moment (src/components/bible/chapter-reader.tsx). */
+@keyframes verse-focus {
+  0%,
+  40% {
+    background-color: color-mix(in srgb, var(--gold) 30%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+/* Distraction-free workout (Focus in the workout header): the tab bar steps aside; Show everything brings it back. */
+html[data-workout-focus="1"] nav[aria-label="Main sections"] {
+  display: none;
+}
+
+/* Milestone reached (workout complete): one soft ring of gold light from the medallion and one sheen across the card,
+   played once. Reduced motion (device or in-app setting): nothing moves; the card is shown as it ends. */
+.milestone-medal::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 9999px;
+  border: 2px solid rgba(230, 199, 110, 0.85);
+  opacity: 0;
+  animation: milestone-ring 1.4s cubic-bezier(0.2, 0.7, 0.3, 1) 0.35s 1 both;
+  pointer-events: none;
+}
+.milestone-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 233, 170, 0.16) 50%, transparent 65%);
+  transform: translateX(-110%);
+  animation: milestone-sheen 1.6s ease-out 0.5s 1 both;
+  pointer-events: none;
+}
+.milestone-card {
+  animation: card-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) 0.15s both;
+}
+@keyframes milestone-ring {
+  0% { opacity: 0.9; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.9); }
+}
+@keyframes milestone-sheen {
+  to { transform: translateX(110%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .milestone-card,
+  .milestone-card::before,
+  .milestone-medal::after { animation: none !important; }
+  .milestone-card::before { display: none; }
+}
+html[data-motion="reduce"] .milestone-card,
+html[data-motion="reduce"] .milestone-medal::after { animation: none !important; }
+html[data-motion="reduce"] .milestone-card::before { display: none; }
+
+/* Weight and reps side by side; sized in rem so they stack only when the member's text size is large (200% text
+   left each box about 12px wide). At normal text two columns fit from 320px up. */
+/* Weight and reps side by side when each row (48px −, number, 48px +) fits; stacked on narrow phones. */
+.set-steppers { grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); }

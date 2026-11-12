@@ -4,19 +4,30 @@ import { Bot, Check, Dumbbell, HeartPulse, LineChart, Salad, ShieldCheck } from 
 import { Logo } from "@/components/common/logo";
 import { Button } from "@/components/ui/button";
 import { isSupabaseConfigured } from "@/lib/env";
-import { formatPrice, getPlans, PLAN_ORDER, yearlySavingsPercent } from "@/lib/domain/plans";
+import { formatPrice, getPlans, PUBLIC_PLAN_ORDER, yearlySavingsPercent } from "@/lib/domain/plans";
 import { getCurrentUser } from "@/server/auth";
+import { ForgetDeviceData } from "@/components/platform/forget-device-data";
+import { TRANSLATION } from "@/data/content";
+import { scriptureText } from "@/data/scripture";
+import { DemoEntry } from "@/components/demo/demo-entry";
+import { isDemoMode } from "@/server/demo";
+
+const GATE_VERSE = scriptureText(
+  "Matthew 7:13–14",
+  "Enter through the narrow gate. For wide is the gate and broad is the way that leads to destruction, and many enter through it. But small is the gate and narrow the way that leads to life, and only a few find it.",
+);
 
 const FEATURES = [
   { icon: Dumbbell, title: "Programs that adapt", body: "Strength, hypertrophy, strongman, combat conditioning, mobility and more — matched to your goals and equipment." },
   { icon: HeartPulse, title: "Log every rep", body: "A fast workout logger with rest timer, substitutions and personal records. Your session survives reloads." },
-  { icon: Bot, title: "AI coach", body: "Ask about technique, progression and recovery. Plan changes are always previewed before they're saved." },
-  { icon: Salad, title: "Food tracking", body: "Log meals from 90+ common foods or your own, and track calories, macros and water. Estimates are clearly labeled." },
+  { icon: Bot, title: "AI coach (Pro)", body: "Ask about technique, progression and recovery using your own log. Suggested changes are saved only when you approve them." },
+  { icon: Salad, title: "Free food tracking", body: "Search a USDA-based food database, scan barcodes and track calories, macros and water — free. Estimates are clearly labeled." },
   { icon: LineChart, title: "Progress you can see", body: "Bodyweight, lift trends, volume and consistency charts with 7-day to 1-year views." },
   { icon: ShieldCheck, title: "Private by design", body: "Your data is isolated to your account. Export or delete it any time." },
 ];
 
-export default async function LandingPage() {
+export default async function LandingPage({ searchParams }: { searchParams: Promise<{ deleted?: string }> }) {
+  const { deleted } = await searchParams;
   if (isSupabaseConfigured()) {
     const user = await getCurrentUser();
     if (user) redirect("/home");
@@ -25,60 +36,46 @@ export default async function LandingPage() {
 
   return (
     <div className="min-h-dvh">
-      <header className="safe-top mx-auto flex h-20 max-w-6xl items-center justify-between px-4 md:px-8">
-        <Logo />
-        <nav className="flex items-center gap-2">
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/login">Sign in</Link>
-          </Button>
-          <Button asChild size="sm">
-            <Link href="/signup">Start free</Link>
-          </Button>
-        </nav>
+      {/* After account deletion, also forget the drafts and workout copy kept on this device. */}
+      {deleted === "1" && <ForgetDeviceData />}
+      <header className="safe-top mx-auto flex h-16 max-w-6xl items-center justify-between px-4 md:h-20 md:px-8">
+        <Link href="/" aria-label="Narrow Gate Fitness">
+          <Logo compact className="md:hidden" />
+          <Logo className="hidden md:inline-flex" />
+        </Link>
+        <Button asChild variant="ghost" size="sm">
+          <Link href="/login">Sign in</Link>
+        </Button>
       </header>
 
       <main>
-        <section className="hero-glow relative overflow-hidden">
-          <div className="mx-auto max-w-6xl px-4 pb-20 pt-14 md:px-8 md:pb-28 md:pt-24">
-            <figure className="animate-fade-up mb-10 max-w-2xl rounded-2xl border border-gold-muted/60 bg-card-gradient p-5 shadow-[0_20px_60px_-30px_rgba(201,165,76,0.6)] md:p-6">
-              <blockquote className="font-serif text-lg leading-relaxed text-[#f1ead6] md:text-xl">
-                &ldquo;Enter ye in at the strait gate: for wide is the gate, and broad is the way, that leadeth to destruction, and many there be which go in
-                thereat: Because strait is the gate, and narrow is the way, which leadeth unto life, and few there be that find it.&rdquo;
-              </blockquote>
-              <figcaption className="mt-3 text-sm font-semibold text-gold">Matthew 7:13–14 (KJV)</figcaption>
-            </figure>
-            <p className="animate-fade-up text-xs font-semibold uppercase tracking-[0.4em] text-gold">Welcome · Rooted in faith. Built for strength.</p>
-            <h1 className="animate-fade-up mt-4 max-w-3xl font-display text-5xl font-bold uppercase leading-[0.95] tracking-tight md:text-7xl">
-              Choose the <span className="text-gold-gradient">narrow way</span>. Train with purpose.
+        {/* The place beyond the gate. The opening (root layout) is the app's one entrance: it plays over this page on a
+            launch and walks through the doorway into the light, so this page doesn't draw the gate again. It keeps the
+            brand, Matthew 7:13–14 and the two ways in, with the light settling from above. */}
+        <section className="beyond-gate relative overflow-hidden" aria-labelledby="welcome-title">
+          <div className="mx-auto flex max-w-2xl flex-col items-center px-4 pb-16 pt-6 text-center md:pb-24 md:pt-12">
+            <h1 id="welcome-title" className="animate-fade-up flex flex-col items-center gap-2 leading-none">
+              <span className="whitespace-nowrap pl-[0.2em] font-serif text-[1.55rem] font-semibold uppercase tracking-[0.2em] text-gold-gradient md:text-[2rem]">Narrow Gate</span>{" "}
+              <span className="pl-[0.55em] text-[0.68rem] font-semibold uppercase tracking-[0.55em] text-muted-foreground md:text-xs">Fitness</span>
             </h1>
-            <p className="animate-fade-up mt-6 max-w-xl text-base text-muted-foreground md:text-lg">
-              Premium training programs, precise workout tracking, nutrition and an AI coach — for every athlete, whatever you
+            <p className="animate-fade-up mt-3 text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-gold md:text-xs">Rooted in faith. Built for strength.</p>
+            <figure className="animate-fade-up mt-10 max-w-[34rem] [animation-delay:80ms] md:mt-14 [@media(max-height:700px)]:mt-7">
+              <blockquote className="font-serif text-[1.03rem] leading-[1.62] text-[#f1ead6] md:text-xl">&ldquo;{GATE_VERSE}&rdquo;</blockquote>
+              <figcaption className="mt-3 text-[0.72rem] font-bold uppercase tracking-[0.22em] text-gold">Matthew 7:13–14 ({TRANSLATION.code})</figcaption>
+            </figure>
+            <div className="animate-fade-up mt-8 grid w-full max-w-sm grid-cols-2 gap-3 [animation-delay:140ms] [@media(max-height:700px)]:mt-5">
+              <Button asChild size="lg">
+                <Link href="/signup">Start free</Link>
+              </Button>
+              <Button asChild size="lg" variant="outline">
+                <Link href="/login">Sign in</Link>
+              </Button>
+            </div>
+            {isDemoMode() && <DemoEntry className="animate-fade-up mt-6 w-full max-w-sm [animation-delay:160ms]" />}
+            <p className="mt-6 max-w-md text-sm text-muted-foreground">
+              Premium training programs, precise workout tracking, nutrition and an AI coach, for every athlete, whatever you
               believe. An optional faith and discipline section is there if you want it.
             </p>
-            <form action="/signup" method="get" className="animate-fade-up mt-8 max-w-xl rounded-2xl border border-gold-muted/50 bg-card/80 p-3 backdrop-blur [animation-delay:120ms] sm:flex sm:items-center sm:gap-2">
-              <label htmlFor="welcome-email" className="sr-only">
-                Email
-              </label>
-              <input
-                id="welcome-email"
-                name="email"
-                type="email"
-                required
-                autoComplete="email"
-                placeholder="Enter your email"
-                className="h-13 w-full rounded-xl border border-border bg-background px-4 text-base outline-none focus-visible:border-gold sm:flex-1"
-              />
-              <Button type="submit" size="lg" className="mt-2 w-full sm:mt-0 sm:w-auto">
-                Sign up free
-              </Button>
-            </form>
-            <p className="mt-4 text-sm text-muted-foreground">
-              Already have an account?{" "}
-              <Link href="/login" className="font-semibold text-gold-highlight hover:underline">
-                Sign in
-              </Link>
-            </p>
-
           </div>
         </section>
 
@@ -101,10 +98,11 @@ export default async function LandingPage() {
           <h2 id="pricing-title" className="font-display text-3xl font-bold uppercase tracking-wide">
             Simple plans
           </h2>
-          <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {PLAN_ORDER.map((id) => {
+          <p className="mt-2 text-sm text-muted-foreground">Free to build your foundation. One membership for every premium feature.</p>
+          <div className="mt-8 grid max-w-4xl gap-4 md:grid-cols-2">
+            {PUBLIC_PLAN_ORDER.map((id) => {
               const p = plans[id];
-              const featured = id === "plus";
+              const featured = id === "pro";
               return (
                 <div
                   key={id}
@@ -115,6 +113,12 @@ export default async function LandingPage() {
                     {formatPrice(p.priceCents)}
                     {p.priceCents > 0 && <span className="text-sm font-normal text-muted-foreground"> / month</span>}
                   </p>
+                  {p.yearlyPriceCents ? (
+                    <p className="text-sm">
+                      or {formatPrice(p.yearlyPriceCents)} / year <span className="text-muted-foreground">(save {yearlySavingsPercent(p.priceCents, p.yearlyPriceCents)}%)</span>
+                    </p>
+                  ) : null}
+                  {featured && <p className="mt-1 text-xs text-muted-foreground">Renews automatically until cancelled. Monthly and yearly include the same features.</p>}
                   <p className="mt-1 text-sm text-muted-foreground">{p.tagline}</p>
                   <ul className="mt-5 space-y-2 text-sm">
                     {p.highlights.map((h) => (
@@ -126,23 +130,6 @@ export default async function LandingPage() {
                 </div>
               );
             })}
-            {plans.pro.yearlyPriceCents ? (
-              <div className="rounded-2xl border border-gold-muted bg-card-gradient p-6">
-                <p className="font-display text-xl font-semibold uppercase tracking-wider text-gold-highlight">All Access Yearly</p>
-                <p className="mt-2 text-3xl font-bold">
-                  {formatPrice(plans.pro.yearlyPriceCents)}
-                  <span className="text-sm font-normal text-muted-foreground"> / year</span>
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">Everything, billed once a year. Save {yearlySavingsPercent(plans.pro.priceCents, plans.pro.yearlyPriceCents)}%.</p>
-                <ul className="mt-5 space-y-2 text-sm">
-                  {["Everything in Pro", "All programs, food tracking & analytics", "Full AI coaching & plan generation"].map((h) => (
-                    <li key={h} className="flex gap-2">
-                      <Check className="mt-0.5 size-4 shrink-0 text-gold" aria-hidden /> {h}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
           </div>
         </section>
       </main>
@@ -156,6 +143,9 @@ export default async function LandingPage() {
             </Link>
             <Link href="/legal/terms" className="hover:text-foreground">
               Terms
+            </Link>
+            <Link href="/legal/notices" className="hover:text-foreground">
+              Notices
             </Link>
           </nav>
         </div>

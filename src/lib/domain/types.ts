@@ -100,6 +100,14 @@ export const GOAL_LABELS: Record<PrimaryGoal, string> = {
   mobility: "Mobility & flexibility",
 };
 
+/**
+ * Optional second goal (onboarding). Recorded with your answers and shown on the plan; the starter
+ * program is still built around the main goal.
+ */
+export const SECONDARY_GOALS = [...PRIMARY_GOALS, "run_5k"] as const;
+export type SecondaryGoal = (typeof SECONDARY_GOALS)[number];
+export const SECONDARY_GOAL_LABELS: Record<SecondaryGoal, string> = { ...GOAL_LABELS, run_5k: "Train for a 5K" };
+
 export const EXPERIENCE_LEVELS = ["new", "beginner", "intermediate", "advanced"] as const;
 export type ExperienceLevel = (typeof EXPERIENCE_LEVELS)[number];
 

@@ -1,25 +1,84 @@
-import { canAccessTier, effectivePlanFromSubscription, formatPrice, getPlans, hasFeature, yearlySavingsPercent } from "@/lib/domain/plans";
+import { aiAllowance, APPROVED_PRO_PRICE_CENTS, planFromEntitlement, subscriptionToShow, PUBLIC_PLAN_ORDER, PURCHASABLE_PLANS, canAccessTier, effectivePlanFromSubscription, entitlementFromSubscriptions, periodStartFromEnd, subscriptionAccessEnd, formatPrice, getPlans, hasFeature, legacyTermsApply, yearlySavingsCents, yearlySavingsPercent } from "@/lib/domain/plans";
 
 describe("plans & entitlements", () => {
-  it("gates features by plan", () => {
-    expect(hasFeature("free", "workout_logging")).toBe(true);
-    expect(hasFeature("free", "nutrition_tracking")).toBe(false);
-    expect(hasFeature("plus", "nutrition_tracking")).toBe(true);
-    expect(hasFeature("plus", "ai_plan_generation")).toBe(false);
-    expect(hasFeature("pro", "ai_plan_generation")).toBe(true);
+  it("gates features: Free foundation, Pro All Access everything, legacy Plus keeps what it had", () => {
+    for (const f of ["workout_logging", "starter_programs", "basic_progress", "nutrition_tracking"] as const) expect(hasFeature("free", f), f).toBe(true);
+    for (const f of ["full_program_library", "custom_program_builder", "unlimited_templates", "meal_planning", "advanced_analytics", "advanced_calendar", "food_comparisons", "sleep_analytics", "live_gps"] as const) {
+      expect(hasFeature("free", f), f).toBe(false);
+      expect(hasFeature("plus", f), f).toBe(true);
+      expect(hasFeature("pro", f), f).toBe(true);
+    }
+    for (const f of ["ai_coach", "ai_plan_generation", "advanced_recommendations", "food_goal_analysis", "sleep_ai_coaching"] as const) {
+      expect(hasFeature("free", f), f).toBe(false);
+      expect(hasFeature("plus", f), f).toBe(false);
+      expect(hasFeature("pro", f), f).toBe(true);
+    }
+  });
+  it("live GPS recording is Pro; manual run and walk logging stays free", () => {
+    expect(hasFeature("free", "live_gps")).toBe(false);
+    expect(hasFeature("pro", "live_gps")).toBe(true);
+    // Manual logging is part of basic progress, which every plan has.
+    expect(hasFeature("free", "basic_progress")).toBe(true);
   });
   it("orders tiers", () => {
     expect(canAccessTier("free", "plus")).toBe(false);
     expect(canAccessTier("pro", "plus")).toBe(true);
     expect(canAccessTier("plus", "free")).toBe(true);
   });
-  it("uses default prices and AI limits", () => {
+  it("offers new customers only Free and Pro All Access at the approved prices", () => {
     const plans = getPlans();
-    expect(plans.plus.priceCents).toBe(999);
-    expect(plans.pro.priceCents).toBe(3000);
-    expect(plans.pro.yearlyPriceCents).toBe(20000);
-    expect(plans.pro.aiMonthlyLimit).toBeGreaterThan(plans.plus.aiMonthlyLimit);
+    expect(PUBLIC_PLAN_ORDER).toEqual(["free", "pro"]);
+    expect(PURCHASABLE_PLANS).toEqual(["pro"]);
+    expect(plans.plus.purchasable).toBe(false);
+    expect(plans.pro.purchasable).toBe(true);
+    expect(plans.pro.name).toBe("Pro All Access");
+    expect(APPROVED_PRO_PRICE_CENTS).toEqual({ month: 1999, year: 14999 });
+    expect(plans.free.priceCents).toBe(0);
+    expect(plans.pro.priceCents).toBe(1999);
+    expect(plans.pro.yearlyPriceCents).toBe(14999);
+    expect(formatPrice(plans.pro.priceCents)).toBe("$19.99");
+    expect(formatPrice(plans.pro.yearlyPriceCents!)).toBe("$149.99");
+    // Yearly saves about 37% against twelve monthly payments.
+    expect(yearlySavingsPercent(1999, 14999)).toBe(37);
+    // B7: the saving in dollars, from the approved prices: 12 × $19.99 − $149.99 = $89.89.
+    expect(yearlySavingsCents(1999, 14999)).toBe(8989);
+    expect(yearlySavingsCents(1999, 0)).toBe(0);
+    expect(yearlySavingsCents(1999, 30000)).toBe(0);
+    expect(plans.free.yearlyPriceCents).toBeUndefined();
+    expect(plans.plus.yearlyPriceCents).toBeUndefined();
+  });
+  it("keeps the approved AI limits and template limits", () => {
+    const plans = getPlans();
     expect(plans.free.aiMonthlyLimit).toBe(0);
+    expect(plans.plus.aiMonthlyLimit).toBe(0);
+    expect(plans.pro.aiMonthlyLimit).toBe(150);
+    expect(plans.pro.aiPlanMonthlyLimit).toBe(15);
+    expect(plans.pro.aiSmartMonthlyLimit).toBe(15);
+    expect(plans.free.templateLimit).toBe(5);
+    expect(plans.plus.templateLimit).toBeNull();
+    expect(plans.pro.templateLimit).toBeNull();
+  });
+  it("keeps legacy AI terms only while their subscription stays on the same plan", () => {
+    const now = new Date("2026-10-22T00:00:00Z");
+    const future = "2026-11-22T00:00:00Z";
+    const terms = { plan: "plus" as const, ends_at: null };
+    expect(legacyTermsApply(terms, { plan: "plus", status: "active", current_period_end: future }, now)).toBe(true);
+    // Set to cancel at the period end: Stripe keeps it active until then.
+    expect(legacyTermsApply(terms, { plan: "plus", status: "active", current_period_end: future }, now)).toBe(true);
+    // Cancelled outright: the terms end with it.
+    expect(legacyTermsApply(terms, { plan: "plus", status: "canceled", current_period_end: future }, now)).toBe(false);
+    expect(legacyTermsApply(terms, { plan: "plus", status: "canceled", current_period_end: "2026-10-01T00:00:00Z" }, now)).toBe(false);
+    expect(legacyTermsApply(terms, { plan: "pro", status: "active", current_period_end: future }, now)).toBe(false);
+    expect(legacyTermsApply({ plan: "plus", ends_at: "2026-10-21T00:00:00Z" }, { plan: "plus", status: "active", current_period_end: future }, now)).toBe(false);
+  });
+  it("computes the AI allowance: none on Plus, 150 on Pro, legacy terms raise it", () => {
+    expect(aiAllowance("free")).toEqual({ chatLimit: 0, planLimit: 0, smartLimit: 0, legacy: false });
+    expect(aiAllowance("plus")).toEqual({ chatLimit: 0, planLimit: 0, smartLimit: 0, legacy: false });
+    expect(aiAllowance("pro")).toEqual({ chatLimit: 150, planLimit: 15, smartLimit: 15, legacy: false });
+    const legacyPlus = { plan: "plus" as const, aiMonthlyLimit: 60, aiPlanMonthlyLimit: 0, aiSmartMonthlyLimit: 6 };
+    expect(aiAllowance("plus", [legacyPlus])).toEqual({ chatLimit: 60, planLimit: 0, smartLimit: 6, legacy: true });
+    const legacyPro = { plan: "pro" as const, aiMonthlyLimit: 400, aiPlanMonthlyLimit: 20, aiSmartMonthlyLimit: 40 };
+    expect(aiAllowance("pro", [legacyPro])).toEqual({ chatLimit: 400, planLimit: 20, smartLimit: 40, legacy: true });
   });
   it("formats prices and yearly savings", () => {
     expect(formatPrice(0)).toBe("Free");
@@ -27,12 +86,25 @@ describe("plans & entitlements", () => {
     expect(formatPrice(3000)).toBe("$30");
     expect(formatPrice(20000)).toBe("$200");
     expect(yearlySavingsPercent(3000, 20000)).toBe(44);
+    expect(yearlySavingsPercent(1499, 11999)).toBe(33);
+    expect(formatPrice(1499)).toBe("$14.99");
+    expect(formatPrice(11999)).toBe("$119.99");
     expect(yearlySavingsPercent(0, 20000)).toBe(0);
   });
   it("respects env overrides", () => {
-    process.env.PLAN_PLUS_AI_MONTHLY_LIMIT = "5";
-    expect(getPlans().plus.aiMonthlyLimit).toBe(5);
-    delete process.env.PLAN_PLUS_AI_MONTHLY_LIMIT;
+    process.env.PLAN_PRO_AI_MONTHLY_LIMIT = "200";
+    process.env.PLAN_PRO_YEARLY_PRICE_CENTS = "19999";
+    process.env.PLAN_FREE_TEMPLATE_LIMIT = "8";
+    try {
+      expect(getPlans().pro.aiMonthlyLimit).toBe(200);
+      expect(getPlans().pro.aiSmartMonthlyLimit).toBe(20);
+      expect(getPlans().pro.yearlyPriceCents).toBe(19999);
+      expect(getPlans().free.templateLimit).toBe(8);
+    } finally {
+      delete process.env.PLAN_PRO_AI_MONTHLY_LIMIT;
+      delete process.env.PLAN_PRO_YEARLY_PRICE_CENTS;
+      delete process.env.PLAN_FREE_TEMPLATE_LIMIT;
+    }
   });
   it("derives effective plans from subscription state", () => {
     const now = new Date("2026-10-16T00:00:00Z");
@@ -41,9 +113,95 @@ describe("plans & entitlements", () => {
     expect(effectivePlanFromSubscription(null, now)).toBe("free");
     expect(effectivePlanFromSubscription({ plan: "pro", status: "active", current_period_end: future }, now)).toBe("pro");
     expect(effectivePlanFromSubscription({ plan: "plus", status: "past_due", current_period_end: future }, now)).toBe("plus");
-    expect(effectivePlanFromSubscription({ plan: "plus", status: "canceled", current_period_end: future }, now)).toBe("plus");
+    // A cancelled subscription has ended, even if its period end lies ahead (immediate or dunning cancellation).
+    expect(effectivePlanFromSubscription({ plan: "plus", status: "canceled", current_period_end: future }, now)).toBe("free");
     expect(effectivePlanFromSubscription({ plan: "plus", status: "canceled", current_period_end: past }, now)).toBe("free");
     expect(effectivePlanFromSubscription({ plan: "pro", status: "unpaid", current_period_end: future }, now)).toBe("free");
     expect(effectivePlanFromSubscription({ plan: "pro", status: "active", current_period_end: past }, now)).toBe("free");
+    // A refunded or disputed current period ends access, whatever Stripe's status says.
+    expect(effectivePlanFromSubscription({ plan: "pro", status: "active", current_period_end: future, access_revoked_at: "2026-10-15T00:00:00Z" }, now)).toBe("free");
+    expect(effectivePlanFromSubscription({ plan: "pro", status: "active", current_period_end: future, access_revoked_at: null }, now)).toBe("pro");
+  });
+});
+
+describe("a failed renewal (past_due) keeps access for a 14-day grace period only", () => {
+  // The renewal was due on 1 November; Stripe has already moved the period end on to 1 December.
+  const periodEnd = "2026-12-01T00:00:00Z";
+  const started = periodStartFromEnd(periodEnd, "month");
+  const sub = (status: "active" | "past_due") => ({ plan: "pro" as const, status, current_period_end: periodEnd, period_started_at: started });
+
+  it("works out when the unpaid period began from its end and the billing interval", () => {
+    expect(started).toBe("2026-11-01T00:00:00.000Z");
+    expect(periodStartFromEnd("2027-11-01T00:00:00Z", "year")).toBe("2026-11-01T00:00:00.000Z");
+    // Anchored on the 31st: the period before one ending 31 March began on February's last day.
+    expect(periodStartFromEnd("2027-03-31T10:00:00Z", "month")).toBe("2027-02-28T10:00:00.000Z");
+    expect(periodStartFromEnd(null, "month")).toBeNull();
+  });
+
+  it("active: access runs to the period end", () => {
+    expect(effectivePlanFromSubscription(sub("active"), new Date("2026-11-25T00:00:00Z"))).toBe("pro");
+    expect(subscriptionAccessEnd(sub("active"))).toBe(periodEnd);
+  });
+
+  it("past_due within the grace period: still Pro", () => {
+    expect(effectivePlanFromSubscription(sub("past_due"), new Date("2026-11-02T00:00:00Z"))).toBe("pro");
+    expect(effectivePlanFromSubscription(sub("past_due"), new Date("2026-11-14T23:59:59Z"))).toBe("pro");
+  });
+
+  it("past_due beyond the grace period: Free, although the period end lies ahead", () => {
+    expect(effectivePlanFromSubscription(sub("past_due"), new Date("2026-11-15T00:00:01Z"))).toBe("free");
+    expect(effectivePlanFromSubscription(sub("past_due"), new Date("2026-11-30T00:00:00Z"))).toBe("free");
+    // A yearly subscription is capped the same way, not left on Pro for the unpaid year.
+    const yearly = { plan: "pro" as const, status: "past_due" as const, current_period_end: "2027-11-01T00:00:00Z", period_started_at: periodStartFromEnd("2027-11-01T00:00:00Z", "year") };
+    expect(effectivePlanFromSubscription(yearly, new Date("2026-11-10T00:00:00Z"))).toBe("pro");
+    expect(effectivePlanFromSubscription(yearly, new Date("2026-12-01T00:00:00Z"))).toBe("free");
+  });
+
+  it("the entitlement expires when the grace period does, never later than the period end", () => {
+    expect(entitlementFromSubscriptions([sub("past_due")], new Date("2026-11-02T00:00:00Z"))).toMatchObject({ plan: "pro", validUntil: "2026-11-15T00:00:00.000Z" });
+    expect(entitlementFromSubscriptions([sub("past_due")], new Date("2026-11-20T00:00:00Z")).plan).toBe("free");
+    expect(subscriptionAccessEnd({ status: "past_due", current_period_end: "2026-11-05T00:00:00Z", period_started_at: started })).toBe("2026-11-05T00:00:00Z");
+  });
+
+  it("without a period start (App Store / Google Play rows carry the store's own grace period) nothing changes", () => {
+    expect(effectivePlanFromSubscription({ plan: "pro", status: "past_due", current_period_end: periodEnd }, new Date("2026-11-30T00:00:00Z"))).toBe("pro");
+  });
+});
+
+describe("database plan checks match the app", () => {
+  it("the Free saved-workout limit in the database equals the app's default", async () => {
+    const { readFileSync } = await import("node:fs");
+    const sql = readFileSync("supabase/migrations/20261023000024_plan_enforcement.sql", "utf8");
+    const m = sql.match(/from public\.workout_templates where user_id = new\.user_id\) >= (\d+)/);
+    expect(Number(m?.[1])).toBe(getPlans().free.templateLimit);
+  });
+});
+
+describe("planFromEntitlement", () => {
+  const now = new Date("2026-10-22T00:00:00Z");
+  it("grants the plan until valid_until passes, then Free", () => {
+    expect(planFromEntitlement(null, now)).toBe("free");
+    expect(planFromEntitlement({ plan: "pro", valid_until: null }, now)).toBe("pro");
+    expect(planFromEntitlement({ plan: "plus", valid_until: "2026-11-01T00:00:00Z" }, now)).toBe("plus");
+    expect(planFromEntitlement({ plan: "plus", valid_until: "2026-10-01T00:00:00Z" }, now)).toBe("free");
+    expect(planFromEntitlement({ plan: "gold", valid_until: null }, now)).toBe("free");
+  });
+});
+
+describe("subscriptionToShow (Plans & billing's current membership)", () => {
+  const now = new Date("2026-10-31T00:00:00Z");
+  // Rows as the page reads them: newest `updated_at` first. Every webhook sync bumps `updated_at`, so a late event
+  // for an old, cancelled subscription can put it first although another subscription grants the plan.
+  const oldCancelled = { id: "old", plan: "pro" as const, status: "canceled" as const, current_period_end: "2026-09-30T00:00:00Z", access_revoked_at: null };
+  const current = { id: "current", plan: "pro" as const, status: "active" as const, current_period_end: "2026-11-30T00:00:00Z", access_revoked_at: null };
+
+  it("describes the subscription that grants the plan, not the one touched last", () => {
+    expect(subscriptionToShow([oldCancelled, current], now)?.id).toBe("current");
+  });
+
+  it("falls back to the newest row when none grants access (ended, refunded), and to nothing without rows", () => {
+    const refunded = { ...current, id: "refunded", access_revoked_at: "2026-10-20T00:00:00Z" };
+    expect(subscriptionToShow([refunded, oldCancelled], now)?.id).toBe("refunded");
+    expect(subscriptionToShow([], now)).toBeNull();
   });
 });

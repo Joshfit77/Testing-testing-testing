@@ -1,26 +1,38 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
+import { simulatedFetch } from "@/lib/demo/simulated-ai";
+import { isDemoMode } from "@/server/demo";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getServiceSupabase } from "@/lib/supabase/server";
-import { getPlans, hasFeature } from "@/lib/domain/plans";
-import type { Plan, UnitSystem } from "@/lib/domain/types";
-import { displayWeight, weightUnit } from "@/lib/domain/units";
+import { aiAllowance } from "@/lib/domain/plans";
+import type { Plan } from "@/lib/domain/types";
 import { aiPlanOutputSchema, validateAiPlan, type AiPlan } from "@/lib/validation/ai";
+import { formatAthleteContext, type AthleteSnapshot } from "@/lib/coach/context";
+import { buildSystemBlocks, CHAT_MAX_TOKENS, CHAT_REQUEST_OPTIONS, fallbackParams, fitStoredReply, MAX_TOOL_ROUNDS, PLAN_MAX_TOKENS, PLAN_REQUEST_OPTIONS, sanitizeAssistantContent } from "@/lib/coach/prompt";
+import { coachModelIds, routeCoachRequest, type ModelTier } from "@/lib/coach/routing";
+import { coachToolDefinitions, toolActivityLabel, type CoachProposal } from "@/lib/coach/tools";
+import { formatMemoriesForContext } from "@/lib/coach/memory";
+import { loadAthleteSnapshot } from "@/server/coach/snapshot";
+import { executeCoachTool, type ToolContext } from "@/server/coach/tools";
 import { isAiConfigured, isServiceRoleConfigured, serverEnv } from "@/server/env";
+import { getLegacyAiTerms } from "@/server/services/billing";
 import { isFlagEnabled } from "@/server/flags";
 import { rateLimit } from "@/server/rate-limit";
 import { logError } from "@/server/log";
+import { anthropicBaseUrl } from "@/server/test-overrides";
 
 export type AiErrorCode =
   | "not_configured"
   | "disabled"
   | "not_entitled"
+  | "consent_required"
   | "plan_not_entitled"
   | "quota"
   | "rate_limited"
   | "metering_unavailable"
   | "not_found"
+  | "in_progress"
   | "provider";
 
 export class AiError extends Error {
@@ -38,47 +50,42 @@ export const AI_ERROR_STATUS: Record<AiErrorCode, number> = {
   not_configured: 503,
   disabled: 503,
   not_entitled: 403,
+  consent_required: 403,
   plan_not_entitled: 403,
   quota: 429,
   rate_limited: 429,
   metering_unavailable: 503,
   not_found: 404,
+  in_progress: 409,
   provider: 502,
 };
 
-const SYSTEM_PROMPT = `You are the Narrow Gate Fitness AI coach: a knowledgeable, encouraging strength and conditioning coach inside a fitness app.
-
-What you help with: personalized training plans, exercise technique and form cues, exercise alternatives, progressive overload, adjusting difficulty, recovery and deload guidance, organizing training schedules, realistic goal setting, basic nutrition concepts (protein, calories, hydration, meal timing), and reviewing the user's logged progress and consistency.
-
-Boundaries — always follow these:
-- You are not a doctor, physical therapist or dietitian. Never diagnose injuries or medical conditions, and never present advice as medical treatment or rehabilitation. If the user describes pain, injury, dizziness, chest pain, or other symptoms, recommend they stop the aggravating activity and consult a qualified healthcare professional; you may suggest pain-free alternatives in general terms.
-- Do not provide extreme dieting guidance (e.g. very-low-calorie diets, prolonged fasting for weight loss, dehydration or weight-cutting protocols), unproven "detox" or "cleanse" claims, or protocols for anabolic steroids, SARMs, prohormones, stimulant stacks or other unsafe supplements. Basic, evidence-supported information (e.g. creatine monohydrate, caffeine moderation, protein intake) is fine with a note to check with a professional if they have health conditions.
-- Keep calorie recommendations moderate (a deficit of roughly 10–20% below maintenance at most) and never recommend fewer than 1,200 kcal/day.
-- Don't reference religion unless the user brings it up first. Treat every user respectfully regardless of background.
-- Base advice on the athlete context provided. If information is missing, make a reasonable assumption and say so briefly. Use the user's preferred units.
-- Be concise and practical: short paragraphs, bullet lists for steps, specific sets/reps/RPE where helpful.
-- You cannot change the user's program directly. If they want a new or modified plan, tell them to switch to "Plan" mode so you can draft one for them to review and approve.`;
-
-const PLAN_INSTRUCTIONS = `Create a training plan for this user as structured output.
+const PLAN_INSTRUCTIONS = `Plan mode: create a training plan for this athlete as structured output.
 Rules:
-- Use ONLY exercise slugs from the provided catalog list, and only exercises the user's equipment allows.
-- 1–7 days per week (match the user's available days unless they asked otherwise), 3–8 exercises per day, realistic for their session length.
+- Use ONLY exercise slugs from the provided catalog list, and only exercises the athlete's equipment allows.
+- 1–7 days per week (match the athlete's available days unless they asked otherwise), 3–8 exercises per day, realistic for their session length.
 - reps as a string like "5", "8-12", "10 per side" or "AMRAP"; use seconds (and reps null) for timed exercises.
 - rest_seconds 30–240 typically; rpe 5–9 (null for mobility/timed work).
 - weeks 1–12. Include a clear progression description (how to add load/reps, when to deload).
-- Respect stated limitations by avoiding aggravating movements, without diagnosing anything.
-- In "reply", briefly explain the plan's logic in 3–6 sentences. Remind the user they can skip anything that causes pain.`;
+- Apply the coaching principles above: sensible weekly volume per muscle for their experience, main lifts first, progression and a deload.
+- Respect stated limitations and logged pain skips by avoiding aggravating movements, without diagnosing anything.
+- In "reply", briefly explain the plan's logic in 3–6 sentences. Remind the athlete they can skip anything that causes pain.`;
+
+/** Longest earlier message sent back to the model as history (new messages are limited to 4,000 characters). */
+const HISTORY_MESSAGE_CHARS = 8_000;
+/** Total characters of earlier turns sent back per request, newest first; older turns beyond this are dropped. */
+const HISTORY_TOTAL_CHARS = 24_000;
 
 let client: Anthropic | null = null;
 function getClient(): Anthropic {
-  if (!client) client = new Anthropic({ apiKey: serverEnv.anthropicApiKey, maxRetries: 2, timeout: 90_000 });
+  if (!client) {
+    client = isDemoMode()
+      ? // Demo mode: answered in-process by a script whose replies say they're simulated; nothing leaves the server.
+        new Anthropic({ apiKey: "demo-simulated", baseURL: "https://demo.invalid", fetch: simulatedFetch, maxRetries: 0 })
+      : // A local mock in tests (ANTHROPIC_BASE_URL on this machine only), otherwise Anthropic's API.
+        new Anthropic({ apiKey: serverEnv.anthropicApiKey, baseURL: anthropicBaseUrl(), maxRetries: 2, timeout: 120_000 });
+  }
   return client;
-}
-
-/** Models that accept server-side refusal fallbacks ("default" routing). */
-const FALLBACK_MODELS = new Set(["claude-opus-5-5", "claude-opus-5", "claude-fable-5-1", "claude-sonnet-5-5"]);
-function fallbackParams(model: string) {
-  return FALLBACK_MODELS.has(model) ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {};
 }
 
 function monthStartIso(): string {
@@ -86,114 +93,122 @@ function monthStartIso(): string {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)).toISOString();
 }
 
+/** The user's monthly AI allowance: their plan's, raised by any legacy terms their subscription kept. */
+export async function getAiAllowance(userId: string, plan: Plan) {
+  return aiAllowance(plan, await getLegacyAiTerms(userId));
+}
+
+/**
+ * This month's AI usage against the user's allowance. `chatUsed` counts every request (chat and plan),
+ * `planUsed` plan generations and `smartUsed` requests served by the larger model.
+ */
 export async function getAiUsage(userId: string, plan: Plan) {
-  const plans = getPlans();
-  if (!isServiceRoleConfigured()) return { chatUsed: 0, planUsed: 0, chatLimit: plans[plan].aiMonthlyLimit, planLimit: plans[plan].aiPlanMonthlyLimit };
+  const allowance = await getAiAllowance(userId, plan);
+  const limits = { chatLimit: allowance.chatLimit, planLimit: allowance.planLimit, smartLimit: allowance.smartLimit, legacy: allowance.legacy };
+  if (!isServiceRoleConfigured()) return { chatUsed: 0, planUsed: 0, smartUsed: 0, ...limits };
   const admin = getServiceSupabase();
   const since = monthStartIso();
-  const [chat, gen] = await Promise.all([
-    admin.from("ai_usage_events").select("id", { count: "exact", head: true }).eq("user_id", userId).gte("created_at", since),
-    admin.from("ai_usage_events").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("kind", "plan").gte("created_at", since),
+  const count = (q: ReturnType<typeof admin.from>) => q.select("id", { count: "exact", head: true }).eq("user_id", userId).gte("created_at", since);
+  const [chat, gen, smart] = await Promise.all([
+    count(admin.from("ai_usage_events")),
+    count(admin.from("ai_usage_events")).eq("kind", "plan"),
+    count(admin.from("ai_usage_events")).eq("model_tier", "smart"),
   ]);
-  return { chatUsed: chat.count ?? 0, planUsed: gen.count ?? 0, chatLimit: plans[plan].aiMonthlyLimit, planLimit: plans[plan].aiPlanMonthlyLimit };
+  // Not knowing the usage must never read as "nothing used".
+  const failed = chat.error ?? gen.error ?? smart.error;
+  if (failed) {
+    logError("ai.usage_count", failed);
+    throw new AiError("metering_unavailable", "AI usage can't be checked right now. Please try again shortly.");
+  }
+  return { chatUsed: chat.count ?? 0, planUsed: gen.count ?? 0, smartUsed: smart.count ?? 0, ...limits };
 }
 
 /** All server-side eligibility checks for an AI request. Throws AiError when not allowed. */
 export async function assertAiAllowed(userId: string, plan: Plan, mode: "chat" | "plan") {
   if (!isAiConfigured()) throw new AiError("not_configured", "The AI coach isn't configured on this server.");
   if (!(await isFlagEnabled("ai_coach"))) throw new AiError("disabled", "The AI coach is temporarily unavailable.");
-  if (!hasFeature(plan, "ai_coach")) throw new AiError("not_entitled", "AI coaching is included with Plus and Pro.");
+  const allowance = await getAiAllowance(userId, plan);
+  if (allowance.chatLimit <= 0) throw new AiError("not_entitled", "AI coaching is included with Pro All Access.");
   if (mode === "plan") {
-    if (!hasFeature(plan, "ai_plan_generation")) throw new AiError("plan_not_entitled", "Personalized plan generation is included with Pro.");
+    if (allowance.planLimit <= 0) throw new AiError("plan_not_entitled", "Personalized plan generation is included with Pro All Access.");
     if (!(await isFlagEnabled("ai_plan_generation"))) throw new AiError("disabled", "Plan generation is temporarily unavailable.");
   }
   // Durable metering requires the service role (users cannot write their own usage rows).
   if (!isServiceRoleConfigured()) throw new AiError("metering_unavailable", "AI usage metering isn't configured on this server.");
-  const perMinute = Number.parseInt(process.env.AI_RATE_LIMIT_PER_MINUTE ?? "6", 10) || 6;
-  const burst = rateLimit(`ai:${userId}`, perMinute, 60_000);
+  const burst = await rateLimit(`ai:${userId}`, aiPerMinute(), 60_000);
   if (!burst.ok) throw new AiError("rate_limited", "You're sending messages quickly — please wait a moment.", burst.retryAfterSeconds);
+  // The in-memory limiter is per server instance; reserveUsage enforces the same limit across instances.
   const usage = await getAiUsage(userId, plan);
   if (usage.chatUsed >= usage.chatLimit) throw new AiError("quota", `You've used all ${usage.chatLimit} AI messages for this month.`);
-  if (mode === "plan" && usage.planUsed >= usage.planLimit) throw new AiError("quota", `You've used all ${usage.planLimit} plan generations for this month.`);
+  if (mode === "plan" && (usage.planUsed >= usage.planLimit || usage.smartUsed >= usage.smartLimit)) {
+    throw new AiError("quota", `You've used this month's plan generations. They reset on the 1st.`);
+  }
   return usage;
 }
 
-async function recordUsage(userId: string, kind: "chat" | "plan", inputTokens: number, outputTokens: number) {
-  const { error } = await getServiceSupabase().from("ai_usage_events").insert({ user_id: userId, kind, input_tokens: inputTokens, output_tokens: outputTokens });
+function aiPerMinute(): number {
+  return Number.parseInt(process.env.AI_RATE_LIMIT_PER_MINUTE ?? "6", 10) || 6;
+}
+
+/**
+ * Reserve one request against the member's limits before the provider is called. The database re-checks every
+ * limit under a per-member lock, so requests sent at the same moment can't overshoot, and a request is counted
+ * even if saving its reply later fails. Returns the usage row and the tier allowed (a chat that wanted the larger
+ * model falls back to the fast one once that share is used up).
+ */
+export type AiUsageKind = "chat" | "plan" | "meal_plan" | "food_photo" | "food_explain";
+
+async function reserveUsage(
+  userId: string,
+  kind: AiUsageKind,
+  tier: ModelTier,
+  usage: { chatLimit: number; planLimit: number; smartLimit: number },
+): Promise<{ usageId: string; tier: ModelTier }> {
+  const { data, error } = await getServiceSupabase().rpc("reserve_ai_usage", {
+    p_user_id: userId,
+    p_kind: kind,
+    p_tier: tier,
+    p_chat_limit: usage.chatLimit,
+    p_plan_limit: usage.planLimit,
+    p_smart_limit: usage.smartLimit,
+    p_per_minute: aiPerMinute(),
+  });
+  const row = (data as { usage_id: string; model_tier: ModelTier }[] | null)?.[0];
+  if (error || !row) {
+    const msg = error?.message ?? "";
+    if (msg.includes("ai_rate_limited")) throw new AiError("rate_limited", "You're sending messages quickly — please wait a moment.", 60);
+    if (msg.includes("ai_quota_plan")) throw new AiError("quota", "You've used this month's plan generations. They reset on the 1st.");
+    if (msg.includes("ai_quota_photo")) throw new AiError("quota", "You've analysed 20 meal photos in the last 24 hours. Try again later, or log this meal by search.");
+    if (msg.includes("ai_quota")) throw new AiError("quota", `You've used all ${usage.chatLimit} AI messages for this month.`);
+    logError("ai.usage_reserve", error ?? new Error("No reservation returned"));
+    throw new AiError("metering_unavailable", "AI usage can't be checked right now. Please try again shortly.");
+  }
+  return { usageId: row.usage_id, tier: row.model_tier };
+}
+
+/** Fill in what a reserved request actually used. */
+async function finalizeUsage(usageId: string, model: string, inputTokens: number, outputTokens: number) {
+  const { error } = await getServiceSupabase().from("ai_usage_events").update({ model, input_tokens: inputTokens, output_tokens: outputTokens }).eq("id", usageId);
   if (error) logError("ai.usage_record", error);
 }
 
-/** Summarize the user's authorized training data for the model. Faith content is never included. */
-export async function buildAthleteContext(supabase: SupabaseClient, userId: string): Promise<{ text: string; units: UnitSystem; goal: string | null; equipment: string[] }> {
-  const [profileRes, answersRes, sessionsRes, prsRes, weightsRes, programRes, readinessRes, goalsRes] = await Promise.all([
-    supabase.from("profiles").select("unit_system, birth_year, height_cm, wellness_consent_at").eq("id", userId).single(),
-    supabase.from("onboarding_answers").select("*").eq("user_id", userId).maybeSingle(),
-    supabase
-      .from("workout_sessions")
-      .select("name, started_at, total_volume_kg, workout_exercises(skipped, skip_reason, exercise:exercises!workout_exercises_exercise_id_fkey(name), sets:workout_sets(reps, weight_kg, duration_seconds, rpe, completed, is_warmup))")
-      .eq("user_id", userId)
-      .eq("status", "completed")
-      .order("started_at", { ascending: false })
-      .limit(8),
-    supabase.from("personal_records").select("record_type, value, exercise:exercises(name)").eq("user_id", userId).eq("record_type", "estimated_1rm").order("value", { ascending: false }).limit(10),
-    supabase.from("weight_entries").select("recorded_on, weight_kg").eq("user_id", userId).order("recorded_on", { ascending: false }).limit(6),
-    supabase.from("user_programs").select("current_week, current_day, program:training_programs(name, duration_weeks)").eq("user_id", userId).eq("status", "active").maybeSingle(),
-    supabase.from("recovery_checkins").select("checked_on, readiness_score").eq("user_id", userId).order("checked_on", { ascending: false }).limit(1).maybeSingle(),
-    supabase.from("nutrition_goals").select("calories, protein_g, is_estimate").eq("user_id", userId).maybeSingle(),
-  ]);
-  const units = (profileRes.data?.unit_system as UnitSystem) ?? "imperial";
-  const u = weightUnit(units);
-  const w = (kg: number) => `${displayWeight(kg, units)} ${u}`;
-  const a = answersRes.data;
-  const lines: string[] = [`Units: ${units === "imperial" ? "pounds / inches" : "kilograms / centimetres"}`];
-  if (profileRes.data?.birth_year) lines.push(`Age: about ${new Date().getUTCFullYear() - (profileRes.data.birth_year as number)}`);
-  if (a) {
-    lines.push(
-      `Primary goal: ${a.primary_goal}`,
-      `Experience: ${a.experience}`,
-      `Availability: ${a.days_per_week} days/week, ~${a.session_minutes} minutes per session`,
-      `Equipment: ${(a.equipment as string[]).join(", ") || "bodyweight only"}`,
-      `Preferred training styles: ${(a.preferred_types as string[]).join(", ") || "none stated"}`,
-      `Dietary preferences: ${(a.dietary_preferences as string[]).join(", ")}`,
-    );
-    if (a.limitations && profileRes.data?.wellness_consent_at) lines.push(`User-reported limitations (consented; do not diagnose): ${a.limitations as string}`);
-  }
-  const prog = programRes.data?.program as unknown as { name: string; duration_weeks: number } | null;
-  if (prog) lines.push(`Active program: ${prog.name}, week ${programRes.data!.current_week}/${prog.duration_weeks}, next day ${programRes.data!.current_day}`);
-  const weights = weightsRes.data ?? [];
-  if (weights.length) lines.push(`Recent bodyweight: ${weights.map((x) => `${x.recorded_on as string}: ${w(Number(x.weight_kg))}`).join("; ")}`);
-  if (readinessRes.data) lines.push(`Latest readiness check-in: ${readinessRes.data.readiness_score}/100 on ${readinessRes.data.checked_on}`);
-  if (goalsRes.data) lines.push(`Nutrition targets: ${goalsRes.data.calories} kcal, ${goalsRes.data.protein_g} g protein${goalsRes.data.is_estimate ? " (estimated)" : ""}`);
-  const prs = prsRes.data ?? [];
-  if (prs.length) lines.push(`Best estimated 1RMs: ${prs.map((p) => `${(p.exercise as unknown as { name: string } | null)?.name}: ${w(Number(p.value))}`).join("; ")}`);
-  const sessions = (sessionsRes.data ?? []) as unknown as {
-    name: string;
-    started_at: string;
-    workout_exercises: { skipped: boolean; skip_reason: string | null; exercise: { name: string } | null; sets: { reps: number | null; weight_kg: number | null; duration_seconds: number | null; rpe: number | null; completed: boolean; is_warmup: boolean }[] }[];
-  }[];
-  if (sessions.length) {
-    lines.push(`Recent workouts (newest first, ${sessions.length}):`);
-    for (const s of sessions) {
-      const parts = s.workout_exercises.map((e) => {
-        if (e.skipped) return `${e.exercise?.name} (skipped${e.skip_reason ? `: ${e.skip_reason}` : ""})`;
-        const done = e.sets.filter((x) => x.completed && !x.is_warmup);
-        const top = done.reduce<(typeof done)[number] | null>((best, x) => (!best || (x.weight_kg ?? 0) > (best.weight_kg ?? 0) ? x : best), null);
-        const desc = top ? (top.duration_seconds ? `${top.duration_seconds}s` : `${top.weight_kg ? w(Number(top.weight_kg)) : "BW"} × ${top.reps ?? 0}${top.rpe ? ` @RPE ${top.rpe}` : ""}`) : "no completed sets";
-        return `${e.exercise?.name} ${done.length} sets, top ${desc}`;
-      });
-      lines.push(`- ${s.started_at.slice(0, 10)} ${s.name}: ${parts.join("; ")}`);
-    }
-  } else {
-    lines.push("No completed workouts logged yet.");
-  }
-  return { text: lines.join("\n"), units, goal: (a?.primary_goal as string) ?? null, equipment: (a?.equipment as string[]) ?? [] };
+/** Give back a reservation when the provider call itself failed, so members aren't charged for errors. */
+async function releaseUsage(usageId: string) {
+  const { error } = await getServiceSupabase().from("ai_usage_events").delete().eq("id", usageId);
+  if (error) logError("ai.usage_release", error);
+}
+
+/** Summarize the user's authorized data for the model (used by plan mode and the chat). */
+export async function buildAthleteContext(supabase: SupabaseClient, userId: string): Promise<{ text: string; snapshot: AthleteSnapshot }> {
+  const snapshot = await loadAthleteSnapshot(supabase, userId);
+  return { text: formatAthleteContext(snapshot), snapshot };
 }
 
 export interface CoachMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
-  proposal: AiPlan | null;
+  proposal: AiPlan | CoachProposal | null;
   proposal_status: "proposed" | "applied" | "dismissed" | null;
   created_at: string;
 }
@@ -205,6 +220,155 @@ export interface CoachTurnResult {
   usage: { used: number; limit: number };
 }
 
+/** Streamed progress for the chat UI. */
+export type CoachEvent =
+  | { type: "status"; text: string }
+  | { type: "tool"; name: string; label: string }
+  | { type: "text"; delta: string }
+  | { type: "reset" };
+
+/** Anthropic's "overloaded" answer (HTTP 529): the service is busy, which the member is told as such. */
+function isOverloaded(err: unknown): boolean {
+  return err instanceof Anthropic.APIError && err.status === 529;
+}
+
+const TIMEOUT_MESSAGE = "The coach took too long to answer. Please try again.";
+
+/** The signal was ended by a deadline (AbortSignal.timeout), not by someone cancelling. */
+function deadlinePassed(signal: AbortSignal | undefined): boolean {
+  return Boolean(signal?.aborted) && (signal?.reason as { name?: string } | undefined)?.name === "TimeoutError";
+}
+
+const REFUSAL_REPLY ="I can't help with that request. I'm happy to help with training, technique, recovery or general nutrition questions instead.";
+
+interface ChatLoopResult {
+  reply: string;
+  proposal: CoachProposal | null;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+/** The streaming tool-use loop for chat mode. */
+async function runChatLoop(params: {
+  model: string;
+  system: Anthropic.Beta.BetaTextBlockParam[];
+  messages: Anthropic.Beta.BetaMessageParam[];
+  toolCtx: ToolContext;
+  onEvent: (e: CoachEvent) => void;
+  signal?: AbortSignal;
+}): Promise<ChatLoopResult> {
+  const { model, system, toolCtx, onEvent, signal } = params;
+  const messages = [...params.messages];
+  const tools = coachToolDefinitions();
+  const texts: string[] = [];
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let jsonRetries = 0;
+
+  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    const lastRound = round === MAX_TOOL_ROUNDS - 1;
+    const stream = getClient().beta.messages.stream(
+      {
+        model,
+        max_tokens: CHAT_MAX_TOKENS,
+        system,
+        messages,
+        tools,
+        // On the last allowed round, ask for a final answer without more tool calls.
+        tool_choice: lastRound ? { type: "none" } : { type: "auto" },
+        output_config: { effort: "medium" },
+        ...fallbackParams(model),
+      },
+      { signal, ...CHAT_REQUEST_OPTIONS },
+    );
+    let roundText = "";
+    stream.on("text", (delta) => {
+      roundText += delta;
+      onEvent({ type: "text", delta });
+    });
+    let message: Anthropic.Beta.BetaMessage;
+    try {
+      message = await stream.finalMessage();
+      jsonRetries = 0;
+    } catch (err) {
+      // With eager input streaming, an unparseable tool input rejects here; re-issue that turn (capped).
+      if (err instanceof Anthropic.APIError || err instanceof Anthropic.APIUserAbortError || jsonRetries++ >= 2) throw err;
+      if (roundText) onEvent({ type: "reset" });
+      onEvent({ type: "status", text: "Retrying…" });
+      round--;
+      continue;
+    }
+    inputTokens += (message.usage.input_tokens ?? 0) + (message.usage.cache_read_input_tokens ?? 0) + (message.usage.cache_creation_input_tokens ?? 0);
+    outputTokens += message.usage.output_tokens ?? 0;
+
+    if (message.stop_reason === "refusal") {
+      onEvent({ type: "reset" });
+      return { reply: REFUSAL_REPLY, proposal: null, inputTokens, outputTokens };
+    }
+    const text = message.content
+      .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")
+      .map((b) => b.text)
+      .join("")
+      .trim();
+    if (text) texts.push(text);
+
+    const toolUses = message.content.filter((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === "tool_use");
+    if (message.stop_reason === "pause_turn") {
+      messages.push({ role: "assistant", content: sanitizeAssistantContent(message.content) });
+      continue;
+    }
+    if (!toolUses.length) {
+      if (message.stop_reason === "max_tokens") texts.push("_(Response shortened — ask me to continue.)_");
+      break;
+    }
+    if (message.stop_reason === "max_tokens") {
+      // A truncated tool input can still parse; never run it.
+      texts.push("_(I ran out of room while checking your data — please ask again, maybe more specifically.)_");
+      break;
+    }
+
+    messages.push({ role: "assistant", content: sanitizeAssistantContent(message.content) });
+    if (text) onEvent({ type: "text", delta: "\n\n" });
+    const results: Anthropic.Beta.BetaToolResultBlockParam[] = [];
+    for (const call of toolUses) {
+      onEvent({ type: "tool", name: call.name, label: toolActivityLabel(call.name, call.input) });
+      const outcome = await executeCoachTool(toolCtx, call.name, call.input);
+      if (outcome.proposal && !toolCtx.proposal) toolCtx.proposal = outcome.proposal;
+      results.push({ type: "tool_result", tool_use_id: call.id, content: outcome.content, ...(outcome.isError ? { is_error: true } : {}) });
+    }
+    // All results for one assistant turn go back in a single user message.
+    messages.push({ role: "user", content: results });
+  }
+
+  return { reply: texts.join("\n\n").trim(), proposal: toolCtx.proposal, inputTokens, outputTokens };
+}
+
+const IN_PROGRESS_MESSAGE = "Your last message is still being answered. Give it a moment, then try again.";
+/** A request still unanswered after this long is taken as abandoned (the route's limit is 180 s). */
+const REQUEST_ABANDONED_MS = 4 * 60_000;
+
+/**
+ * The saved answer to an earlier request with this id, if there is one. Throws `in_progress` while the first request
+ * is still being answered; a question left unanswered for longer than any request can run is removed, so the retry
+ * is answered afresh (and charged once, as the abandoned attempt gave its reservation back or never made one).
+ */
+async function replayRequest(supabase: SupabaseClient, userId: string, plan: Plan, requestId: string): Promise<CoachTurnResult | null> {
+  const columns = "id, role, content, proposal, proposal_status, created_at, conversation_id";
+  const { data: rows, error } = await supabase.from("ai_messages").select(columns).eq("user_id", userId).eq("request_id", requestId);
+  if (error) throw error;
+  const question = rows?.find((r) => r.role === "user");
+  const answer = rows?.find((r) => r.role === "assistant");
+  if (!question) return null;
+  if (!answer) {
+    if (Date.now() - Date.parse(question.created_at as string) < REQUEST_ABANDONED_MS) throw new AiError("in_progress", IN_PROGRESS_MESSAGE, 15);
+    await supabase.from("ai_messages").delete().eq("id", question.id).eq("user_id", userId);
+    return null;
+  }
+  const usage = await getAiUsage(userId, plan);
+  const strip = ({ conversation_id: _c, ...m }: Record<string, unknown>) => m as unknown as CoachMessage;
+  return { conversationId: question.conversation_id as string, userMessage: strip(question), assistantMessage: strip(answer), usage: { used: usage.chatUsed, limit: usage.chatLimit } };
+}
+
 export async function coachTurn(params: {
   supabase: SupabaseClient;
   userId: string;
@@ -212,18 +376,38 @@ export async function coachTurn(params: {
   conversationId: string | null;
   message: string;
   mode: "chat" | "plan";
+  /** For a new conversation: don't remember anything from it (Pro coaching memory). */
+  memoryOff?: boolean;
+  /** The client's id for this message: a retry with the same id gets the saved reply instead of a second answer. */
+  requestId?: string;
+  onEvent?: (e: CoachEvent) => void;
+  signal?: AbortSignal;
 }): Promise<CoachTurnResult> {
   const { supabase, userId, plan, message, mode } = params;
+  const requestId = params.requestId ?? null;
+  const onEvent = params.onEvent ?? (() => {});
+  // A retry of a message that was already answered (the reply was saved but never reached the device): the saved
+  // reply, with no second answer and no second charge. Checked before the allowance, which that first answer may
+  // have used up.
+  if (requestId) {
+    const replay = await replayRequest(supabase, userId, plan, requestId);
+    if (replay) return replay;
+  }
   const usage = await assertAiAllowed(userId, plan, mode);
+  // Nothing goes to the AI provider until the user has allowed it (and only while they keep it allowed).
+  const { data: consent } = await supabase.from("profiles").select("ai_data_consent_at").eq("id", userId).maybeSingle();
+  if (!consent?.ai_data_consent_at) throw new AiError("consent_required", "Allow the AI Coach to use your data first (on the AI Coach screen).");
 
   let conversationId = params.conversationId;
+  let chatMemoryOff = Boolean(params.memoryOff);
   if (conversationId) {
-    const { data } = await supabase.from("ai_conversations").select("id").eq("id", conversationId).eq("user_id", userId).maybeSingle();
+    const { data } = await supabase.from("ai_conversations").select("id, memory_off").eq("id", conversationId).eq("user_id", userId).maybeSingle();
     if (!data) throw new AiError("not_found", "Conversation not found.");
+    chatMemoryOff = Boolean(data.memory_off);
   } else {
     const { data, error } = await supabase
       .from("ai_conversations")
-      .insert({ user_id: userId, title: message.replace(/\s+/g, " ").slice(0, 60) || "New conversation" })
+      .insert({ user_id: userId, title: message.replace(/\s+/g, " ").slice(0, 60) || "New conversation", memory_off: chatMemoryOff })
       .select("id")
       .single();
     if (error || !data) throw error ?? new Error("Conversation insert failed");
@@ -234,69 +418,89 @@ export async function coachTurn(params: {
     .from("ai_messages")
     .select("role, content")
     .eq("conversation_id", conversationId)
+    .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(20);
 
   const { data: userRow, error: umErr } = await supabase
     .from("ai_messages")
-    .insert({ conversation_id: conversationId, user_id: userId, role: "user", content: message })
+    .insert({ conversation_id: conversationId, user_id: userId, role: "user", content: message, request_id: requestId })
     .select("id, role, content, proposal, proposal_status, created_at")
     .single();
+  // The same request id arrived twice at once: the first one is answering it (and this one's new, empty
+  // conversation is removed again).
+  if (umErr?.code === "23505" && requestId) {
+    if (!params.conversationId) await supabase.from("ai_conversations").delete().eq("id", conversationId).eq("user_id", userId);
+    throw new AiError("in_progress", IN_PROGRESS_MESSAGE, 15);
+  }
   if (umErr || !userRow) throw umErr ?? new Error("Message insert failed");
 
+  onEvent({ type: "status", text: "Reading your training log…" });
+  const { data: tzRow } = await supabase.from("profiles").select("timezone").eq("id", userId).maybeSingle();
   const context = await buildAthleteContext(supabase, userId);
-  const messages: Anthropic.Beta.BetaMessageParam[] = [
-    ...((history ?? []).reverse().map((m) => ({ role: m.role as "user" | "assistant", content: m.content as string })) as Anthropic.Beta.BetaMessageParam[]),
-    { role: "user", content: message },
-  ];
-  // The API requires alternating roles starting with a user turn; drop a leading assistant message if present.
+  // Earlier turns, each capped and the whole set budgeted, so stored history can never make one request much
+  // larger than intended. `history` is newest first.
+  const earlier: Anthropic.Beta.BetaMessageParam[] = [];
+  let budget = HISTORY_TOTAL_CHARS;
+  for (const m of history ?? []) {
+    const content = (m.content as string).slice(0, HISTORY_MESSAGE_CHARS);
+    if (content.length > budget) break;
+    budget -= content.length;
+    earlier.push({ role: m.role as "user" | "assistant", content });
+  }
+  earlier.reverse();
+  const messages: Anthropic.Beta.BetaMessageParam[] = [...earlier, { role: "user", content: message }];
+  // The API requires a user turn first; drop a leading assistant message if present.
   while (messages.length && messages[0]!.role !== "user") messages.shift();
 
-  const model = serverEnv.aiModel;
-  const system: Anthropic.Beta.BetaTextBlockParam[] = [
-    { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
-    { type: "text", text: `Athlete context (from the user's own logged data):\n${context.text}` },
-  ];
+  const route = routeCoachRequest({ mode, message, smartUsed: usage.smartUsed, smartLimit: usage.smartLimit, env: process.env });
+  let reservation: { usageId: string; tier: ModelTier };
+  try {
+    reservation = await reserveUsage(userId, mode, route.tier, usage);
+  } catch (err) {
+    await supabase.from("ai_messages").delete().eq("id", userRow.id);
+    throw err;
+  }
+  const model = reservation.tier === route.tier ? route.model : coachModelIds(process.env)[reservation.tier];
+  const memory = context.snapshot.memory;
+  const system = buildSystemBlocks({
+    faithEnabled: context.snapshot.faithEnabled,
+    contextText: context.text,
+    memoryText: memory?.enabled
+      ? formatMemoriesForContext(memory.items, { wellnessConsent: memory.wellnessConsent, chatMemoryOff })
+      : "Coaching memory: switched off by the athlete. Don't offer to remember anything; they can turn it on in AI Coach → Memory.",
+  });
 
   let reply = "";
-  let proposal: AiPlan | null = null;
+  let proposal: AiPlan | CoachProposal | null = null;
   let inputTokens = 0;
   let outputTokens = 0;
   try {
     if (mode === "chat") {
-      const res = await getClient().beta.messages.create({
-        model,
-        max_tokens: 2000,
-        system,
-        messages,
-        output_config: { effort: "low" },
-        ...fallbackParams(model),
-      });
-      inputTokens = res.usage.input_tokens;
-      outputTokens = res.usage.output_tokens;
-      if (res.stop_reason === "refusal") {
-        reply = "I can't help with that request. I'm happy to help with training, technique, recovery or general nutrition questions instead.";
-      } else {
-        reply = res.content
-          .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")
-          .map((b) => b.text)
-          .join("\n")
-          .trim();
-        if (res.stop_reason === "max_tokens") reply += "\n\n_(Response shortened — ask me to continue.)_";
-      }
+      const toolCtx: ToolContext = { supabase, userId, timeZone: (tzRow?.timezone as string) || "UTC", snapshot: context.snapshot, proposal: null, chatMemoryOff };
+      onEvent({ type: "status", text: "Thinking…" });
+      const r = await runChatLoop({ model, system, messages, toolCtx, onEvent, signal: params.signal });
+      reply = r.reply;
+      proposal = r.proposal;
+      inputTokens = r.inputTokens;
+      outputTokens = r.outputTokens;
     } else {
+      onEvent({ type: "status", text: "Drafting your plan — this can take a little while…" });
       const { data: exRows } = await supabase.from("exercises").select("slug, name, equipment, difficulty, is_timed").eq("is_published", true);
       const catalog = (exRows ?? []).map((e) => `${e.slug} | ${e.name} | equipment: ${(e.equipment as string[]).join("/")} | ${e.difficulty}${e.is_timed ? " | timed" : ""}`);
       const knownSlugs = new Set((exRows ?? []).map((e) => e.slug as string));
-      const res = await getClient().beta.messages.parse({
-        model,
-        max_tokens: 12000,
-        system: [...system, { type: "text", text: `${PLAN_INSTRUCTIONS}\n\nExercise catalog (slug | name | equipment | difficulty):\n${catalog.join("\n")}` }],
-        messages,
-        output_config: { effort: "medium", format: betaZodOutputFormat(aiPlanOutputSchema) },
-        ...fallbackParams(model),
-      });
-      inputTokens = res.usage.input_tokens;
+      const res = await getClient().beta.messages.parse(
+        {
+          model,
+          max_tokens: PLAN_MAX_TOKENS,
+          system: [...system, { type: "text", text: `${PLAN_INSTRUCTIONS}\n\nExercise catalog (slug | name | equipment | difficulty):\n${catalog.join("\n")}` }],
+          messages,
+          output_config: { effort: "medium", format: betaZodOutputFormat(aiPlanOutputSchema) },
+          ...fallbackParams(model),
+        },
+        { signal: params.signal, ...PLAN_REQUEST_OPTIONS },
+      );
+      inputTokens = res.usage.input_tokens + (res.usage.cache_read_input_tokens ?? 0) + (res.usage.cache_creation_input_tokens ?? 0);
       outputTokens = res.usage.output_tokens;
       if (res.stop_reason === "refusal") {
         reply = "I can't create a plan for that request. Try describing your goal, schedule and equipment, and I'll draft one.";
@@ -314,9 +518,18 @@ export async function coachTurn(params: {
       }
     }
   } catch (err) {
-    // Remove the orphaned user message so retries don't duplicate it.
+    // The provider call failed: give the request back and remove the orphaned user message, so retries don't
+    // duplicate it.
+    await releaseUsage(reservation.usageId);
     await supabase.from("ai_messages").delete().eq("id", userRow.id);
-    if (err instanceof Anthropic.RateLimitError) throw new AiError("rate_limited", "The AI service is busy. Please try again shortly.", 30);
+    // The route's deadline passed, or one provider request ran out its own time: said as such (not "cancelled").
+    if (deadlinePassed(params.signal) || err instanceof Anthropic.APIConnectionTimeoutError) throw new AiError("provider", TIMEOUT_MESSAGE);
+    if (err instanceof Anthropic.APIUserAbortError) throw new AiError("provider", "The request was cancelled.");
+    if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
+      logError("ai.provider_auth", err, { status: err.status ?? null });
+      throw new AiError("not_configured", "The AI coach isn't configured correctly on this server (the AI provider rejected its key).");
+    }
+    if (err instanceof Anthropic.RateLimitError || isOverloaded(err)) throw new AiError("rate_limited", "The AI service is busy. Please try again shortly.", 30);
     if (err instanceof Anthropic.APIConnectionError) throw new AiError("provider", "Couldn't reach the AI service. Please try again.");
     if (err instanceof Anthropic.APIError) {
       logError("ai.provider", err, { status: err.status ?? null });
@@ -325,21 +538,24 @@ export async function coachTurn(params: {
     throw err;
   }
 
-  const { data: assistantRow, error: amErr } = await supabase
+  // Counted before anything else can fail.
+  await finalizeUsage(reservation.usageId, model, inputTokens, outputTokens);
+  // Replies are written by the server (members can only insert their own questions).
+  const { data: assistantRow, error: amErr } = await getServiceSupabase()
     .from("ai_messages")
     .insert({
       conversation_id: conversationId,
       user_id: userId,
       role: "assistant",
-      content: reply || "Sorry — I didn't get a response. Please try again.",
+      content: fitStoredReply(reply || "Sorry — I didn't get a response. Please try again."),
       proposal,
       proposal_status: proposal ? "proposed" : null,
+      request_id: requestId,
     })
     .select("id, role, content, proposal, proposal_status, created_at")
     .single();
   if (amErr || !assistantRow) throw amErr ?? new Error("Assistant message insert failed");
   await supabase.from("ai_conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
-  await recordUsage(userId, mode, inputTokens, outputTokens);
 
   return {
     conversationId,
@@ -347,4 +563,42 @@ export async function coachTurn(params: {
     assistantMessage: assistantRow as CoachMessage,
     usage: { used: usage.chatUsed + 1, limit: usage.chatLimit },
   };
+}
+
+/**
+ * One AI request outside the coach chat (meal plans, food photos, food explanations), under the same rules as the
+ * chat: the member's AI allowance and rate limits, their AI data consent, a reservation counted before the provider
+ * is called (given back if the call fails), and token counts recorded afterwards. `run` makes the provider call.
+ */
+export async function withAiRequest<T>(
+  params: { supabase: SupabaseClient; userId: string; plan: Plan; kind: Exclude<AiUsageKind, "chat" | "plan">; tier?: ModelTier },
+  run: (ctx: { client: Anthropic; model: string }) => Promise<{ value: T; inputTokens: number; outputTokens: number }>,
+): Promise<T> {
+  // Consent first: a member who hasn't allowed AI use is told so, and their request doesn't count against the rate limit.
+  const { data: consent } = await params.supabase.from("profiles").select("ai_data_consent_at").eq("id", params.userId).maybeSingle();
+  if (!consent?.ai_data_consent_at) throw new AiError("consent_required", "Allow the AI features to use your data first (on the AI Coach screen).");
+  const usage = await assertAiAllowed(params.userId, params.plan, "chat");
+  const reservation = await reserveUsage(params.userId, params.kind, params.tier ?? "fast", usage);
+  const model = coachModelIds(process.env)[reservation.tier];
+  let result: { value: T; inputTokens: number; outputTokens: number };
+  try {
+    result = await run({ client: getClient(), model });
+  } catch (err) {
+    await releaseUsage(reservation.usageId);
+    if (err instanceof AiError) throw err;
+    if (err instanceof Anthropic.APIUserAbortError) throw new AiError("provider", "The request was cancelled.");
+    if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
+      logError("ai.provider_auth", err, { status: err.status ?? null });
+      throw new AiError("not_configured", "The AI service isn't configured correctly on this server.");
+    }
+    if (err instanceof Anthropic.RateLimitError || isOverloaded(err)) throw new AiError("rate_limited", "The AI service is busy. Please try again shortly.", 30);
+    if (err instanceof Anthropic.APIConnectionError) throw new AiError("provider", "Couldn't reach the AI service. Please try again.");
+    if (err instanceof Anthropic.APIError) {
+      logError("ai.provider", err, { status: err.status ?? null, kind: params.kind });
+      throw new AiError("provider", "The AI service returned an error. Please try again.");
+    }
+    throw err;
+  }
+  await finalizeUsage(reservation.usageId, model, result.inputTokens, result.outputTokens);
+  return result.value;
 }

@@ -1,15 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, Check, ChevronDown, MessageSquare, Pause, Play, Plus, Repeat2, SkipForward, Trash2, Undo2, X } from "lucide-react";
+import { Fragment, useEffect, useRef, useState } from "react";
+import { ArrowDown, ArrowUp, Check, ChevronDown, Crosshair, History, Link2, Unlink, MessageSquare, Pause, Play, Plus, Repeat2, SkipForward, Trash2, Undo2, X } from "lucide-react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { confirmDialog } from "@/components/ui/confirm";
 import { Textarea } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { ExerciseDemoMini } from "@/components/train/exercise-demo";
 import { displayWeight, formatDuration, toKg, weightUnit } from "@/lib/domain/units";
 import type { UnitSystem } from "@/lib/domain/types";
-import type { DraftAction, DraftExercise, DraftSet } from "@/lib/domain/workout-draft";
+import { setCanComplete, type DraftAction, type DraftExercise, type DraftSet } from "@/lib/domain/workout-draft";
+import { distanceMode, distanceUnit, formatDistance, fromMetres, toMetres } from "@/lib/domain/exercise-tracking";
 
 function parseNum(v: string): number | null {
   if (v.trim() === "") return null;
@@ -102,6 +105,44 @@ function Stopwatch({ onStop, label }: { onStop: (seconds: number) => void; label
   );
 }
 
+/** Column layout of the set rows: distance work and reps use two equal inputs, plain timed sets a timer. */
+function gridFor(exercise: DraftExercise): string {
+  return exercise.isTimed && !exercise.usesDistance ? "grid-cols-[2rem_1fr_3.2rem_3.4rem_2.75rem]" : "grid-cols-[2rem_1fr_1fr_3.4rem_2.75rem]";
+}
+
+/**
+ * What to do the first time, when there is no history to suggest a number from. No working weight is invented for a
+ * beginner: they choose a light one (or an easier version) that leaves a few reps in reserve, and what they log
+ * becomes the starting point the app progresses from.
+ */
+/** "4 × 6-8 · RPE 8": the program's prescription for this exercise, or null outside a program. */
+export function exerciseTargetText(exercise: Pick<DraftExercise, "target">, units: UnitSystem): string | null {
+  const t = exercise.target;
+  return t
+    ? [
+        `${t.sets} × ${t.reps ?? (t.distanceM ? formatDistance(t.distanceM, units) : t.seconds ? formatDuration(t.seconds) : "")}`,
+        t.intensity,
+        t.rpe ? `RPE ${t.rpe}` : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : null;
+}
+
+export function firstTimeTip(exercise: Pick<DraftExercise, "isTimed" | "usesDistance">): string {
+  if (exercise.usesDistance) return "First time: go at an easy, steady pace you could keep up. Log what you did.";
+  if (exercise.isTimed) return "First time: an easy, steady effort. Stop early if your form slips, and log the time you did.";
+  return "First time: start light. Use a weight, or an easier version, that leaves at least 3 reps in reserve. Your next session builds from what you log.";
+}
+
+function columnLabels(exercise: DraftExercise, units: UnitSystem): [string, string] {
+  const mode = exercise.usesDistance ? distanceMode(exercise.slug) : null;
+  if (mode === "loaded") return [weightUnit(units), distanceUnit(mode, units)];
+  if (mode === "cardio") return ["Seconds", distanceUnit(mode, units)];
+  if (exercise.isTimed) return ["Seconds", "Timer"];
+  return [weightUnit(units), "Reps"];
+}
+
 function SetRow({
   exercise,
   set,
@@ -109,6 +150,7 @@ function SetRow({
   units,
   dispatch,
   showComplete,
+  isNext = false,
 }: {
   exercise: DraftExercise;
   set: DraftSet;
@@ -116,27 +158,63 @@ function SetRow({
   units: UnitSystem;
   dispatch: (a: DraftAction) => void;
   showComplete: boolean;
+  isNext?: boolean;
 }) {
   const label = `${exercise.name} set ${index + 1}`;
   const update = (patch: Partial<DraftSet>) => dispatch({ type: "updateSet", exerciseKey: exercise.id, setId: set.id, patch });
+  const mode = exercise.usesDistance ? distanceMode(exercise.slug) : null;
+  const dUnit = mode ? distanceUnit(mode, units) : null;
+  const distanceCell = dUnit && (
+    <NumberCell
+      value={set.distanceM == null ? null : fromMetres(set.distanceM, dUnit)}
+      onCommit={(n) => update({ distanceM: n == null ? null : toMetres(n, dUnit) })}
+      label={`${label} distance in ${dUnit}`}
+      placeholder={dUnit}
+    />
+  );
   return (
     <li
       className={cn(
         "grid items-center gap-2 rounded-xl px-1 py-1.5 transition-colors",
-        exercise.isTimed ? "grid-cols-[2rem_1fr_3.2rem_3.4rem_2.75rem]" : "grid-cols-[2rem_1fr_1fr_3.4rem_2.75rem]",
+        gridFor(exercise),
         set.completed && "bg-success/10",
+        set.skipped && !set.completed && "opacity-50",
+        isNext && !set.completed && "ring-1 ring-gold-muted",
       )}
+      data-skipped={set.skipped && !set.completed ? "" : undefined}
     >
-      <button
-        type="button"
-        onClick={() => update({ isWarmup: !set.isWarmup })}
-        className={cn("h-11 rounded-lg text-sm font-bold", set.isWarmup ? "text-gold" : "text-muted-foreground")}
-        aria-label={set.isWarmup ? `${label}: warm-up set. Mark as working set` : `${label}: working set. Mark as warm-up`}
-        title="Tap to toggle warm-up"
-      >
-        {set.isWarmup ? "W" : index + 1}
-      </button>
-      {exercise.isTimed ? (
+      {set.isDrop ? (
+        // A drop set stays a drop set (removing it is in the set menu); it is never turned into a warm-up.
+        <span className="flex h-11 items-center justify-center text-sm font-bold text-gold" aria-label={`${label}: drop set`} title="Drop set: no rest after the set before it">
+          D
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={() => update({ isWarmup: !set.isWarmup })}
+          className={cn("h-11 rounded-lg text-sm font-bold", set.isWarmup ? "text-gold" : "text-muted-foreground")}
+          aria-label={set.isWarmup ? `${label}: warm-up set. Mark as working set` : `${label}: working set. Mark as warm-up`}
+          title="Tap to toggle warm-up"
+        >
+          {set.isWarmup ? "W" : index + 1}
+        </button>
+      )}
+      {mode === "loaded" ? (
+        <>
+          <NumberCell
+            value={set.weightKg == null ? null : displayWeight(set.weightKg, units)}
+            onCommit={(n) => update({ weightKg: n == null ? null : toKg(n, units) })}
+            label={`${label} weight in ${weightUnit(units)}`}
+            placeholder={weightUnit(units)}
+          />
+          {distanceCell}
+        </>
+      ) : mode === "cardio" ? (
+        <>
+          <NumberCell value={set.durationSeconds} onCommit={(n) => update({ durationSeconds: n == null ? null : Math.round(n) })} label={`${label} seconds`} inputMode="numeric" placeholder="sec" />
+          {distanceCell}
+        </>
+      ) : exercise.isTimed ? (
         <>
           <NumberCell value={set.durationSeconds} onCommit={(n) => update({ durationSeconds: n == null ? null : Math.round(n) })} label={`${label} seconds`} inputMode="numeric" placeholder="sec" />
           <Stopwatch label={label} onStop={(s) => update({ durationSeconds: s })} />
@@ -170,10 +248,21 @@ function SetRow({
           type="button"
           onClick={() => dispatch({ type: "toggleSetComplete", exerciseKey: exercise.id, setId: set.id, now: new Date().toISOString() })}
           aria-pressed={set.completed}
-          aria-label={set.completed ? `${label} completed. Mark incomplete` : `Mark ${label} complete`}
+          aria-disabled={!set.completed && !setCanComplete(exercise, set)}
+          aria-label={
+            set.completed
+              ? `${label} completed. Mark incomplete`
+              : `${set.skipped ? `${label} skipped. ` : ""}${
+                  setCanComplete(exercise, set)
+                    ? `Mark ${label} complete`
+                    : `${label}: enter ${exercise.usesDistance ? "the distance" : exercise.isTimed ? "the seconds" : "reps"} to mark it complete`
+                }`
+          }
+          title={!set.completed && !setCanComplete(exercise, set) ? `Enter ${exercise.usesDistance ? "the distance" : exercise.isTimed ? "the seconds" : "reps"} first` : undefined}
           className={cn(
             "flex size-11 items-center justify-center rounded-lg border transition-colors",
             set.completed ? "border-success bg-success text-white" : "border-border bg-elevated text-muted-foreground hover:border-gold-muted",
+            !set.completed && !setCanComplete(exercise, set) && "opacity-40",
           )}
         >
           <Check className="size-5" aria-hidden />
@@ -201,6 +290,14 @@ export function ExerciseCard({
   onSubstitute,
   onSkip,
   showComplete = true,
+  current = false,
+  lastTime = null,
+  coachTarget = null,
+  firstTime = false,
+  loaded = false,
+  weightAsk = null,
+  nextSetId = null,
+  superset = null,
 }: {
   exercise: DraftExercise;
   index: number;
@@ -210,13 +307,26 @@ export function ExerciseCard({
   onSubstitute: () => void;
   onSkip: () => void;
   showComplete?: boolean;
+  /** The exercise the athlete is on now: its demo loops inline. */
+  current?: boolean;
+  /** "Last time: 3×5 @ 225 lb". */
+  lastTime?: string | null;
+  /** "Your target: 102.5 kg × 5 reps" (accepted from the training review or the AI coach). */
+  coachTarget?: string | null;
+  /** Never logged before and no coach target: a starting tip instead of a number the app can't know yet. */
+  firstTime?: boolean;
+  /** The set to do next (highlighted). */
+  nextSetId?: string | null;
+  /** Superset placement: its letter, this exercise's place in it, and whether the next exercise can be joined. */
+  superset?: { letter: string | null; position: number; size: number; canLinkNext: boolean } | null;
+  /** A loaded exercise (T8): a set needs its weight, or "no added weight", before it's logged. */
+  loaded?: boolean;
+  /** The set the logger just refused to complete without a weight: ask for it there. */
+  weightAsk?: string | null;
 }) {
   const [notesOpen, setNotesOpen] = useState(Boolean(exercise.notes));
   const done = exercise.sets.filter((s) => s.completed).length;
-  const t = exercise.target;
-  const targetText = t
-    ? [`${t.sets} × ${t.reps ?? (t.seconds ? formatDuration(t.seconds) : "")}`, t.intensity, t.rpe ? `RPE ${t.rpe}` : null].filter(Boolean).join(" · ")
-    : null;
+  const targetText = exerciseTargetText(exercise, units);
 
   if (exercise.skipped) {
     return (
@@ -232,20 +342,44 @@ export function ExerciseCard({
     );
   }
 
+  const [col1, col2] = columnLabels(exercise, units);
+  const inSuperset = Boolean(superset?.letter);
   return (
-    <section className="rounded-2xl border border-border bg-card p-4" aria-labelledby={`ex-${exercise.id}`}>
+    <section
+      className={cn("rounded-2xl border border-border bg-card p-4", inSuperset && "border-l-4 border-l-gold", current && "border-gold-muted")}
+      aria-labelledby={`ex-${exercise.id}`}
+      data-superset={superset?.letter ?? undefined}
+    >
+      {inSuperset && (
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gold">
+          Superset {superset!.letter} · {superset!.position + 1} of {superset!.size}
+          <span className="font-normal normal-case tracking-normal text-muted-foreground"> — alternate sets, rest after each round</span>
+        </p>
+      )}
       <header className="mb-3 flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <h3 id={`ex-${exercise.id}`} className="font-display text-lg font-semibold uppercase leading-tight">
-            <Link href={`/train/exercises/${exercise.slug}`} target="_blank" className="hover:text-gold-highlight">
+        <ExerciseDemoMini slug={exercise.slug} name={exercise.name} animate={current} className="h-[60px] w-20" />
+        <div className="min-w-0 flex-1">
+          <h3 id={`ex-${exercise.id}`} className="font-display text-lg font-semibold uppercase leading-tight [overflow-wrap:anywhere]">
+            <Link href={`/train/exercises/${exercise.slug}?from=workout`} className="hover:text-gold-highlight">
               {exercise.name}
             </Link>
           </h3>
           {exercise.substitutedFromName && <p className="text-xs text-muted-foreground">Substituted for {exercise.substitutedFromName}</p>}
           <p className="text-xs text-muted-foreground">
             {targetText && <span className="text-gold-highlight">Target {targetText} · </span>}
-            {done}/{exercise.sets.length} sets · rest {exercise.restSeconds}s
+            {done}/{exercise.sets.length} sets · rest {exercise.restSeconds}s{inSuperset && superset!.position < superset!.size - 1 ? " after the round" : ""}
           </p>
+          {lastTime && (
+            <p className="mt-0.5 flex items-center gap-1 text-xs text-foreground/85" data-testid="last-time">
+              <History className="size-3.5 shrink-0 text-gold" aria-hidden /> {lastTime}
+            </p>
+          )}
+          {coachTarget && (
+            <p className="mt-0.5 flex items-center gap-1 text-xs text-gold-highlight" data-testid="coach-target">
+              <Crosshair className="size-3.5 shrink-0 text-gold" aria-hidden /> {coachTarget}
+            </p>
+          )}
+          {firstTime && !coachTarget && !lastTime && <p className="mt-0.5 text-xs text-foreground/85" data-testid="first-time-tip">{firstTimeTip(exercise)}</p>}
         </div>
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>
@@ -259,9 +393,23 @@ export function ExerciseCard({
                 { label: "Substitute exercise", icon: Repeat2, onSelect: onSubstitute },
                 { label: "Skip exercise", icon: SkipForward, onSelect: onSkip },
                 { label: notesOpen ? "Hide notes" : "Add notes", icon: MessageSquare, onSelect: () => setNotesOpen((o) => !o) },
+                ...(superset?.canLinkNext ? [{ label: inSuperset ? "Add next exercise to superset" : "Superset with next exercise", icon: Link2, onSelect: () => dispatch({ type: "linkSuperset", exerciseKey: exercise.id }) }] : []),
+                ...(inSuperset ? [{ label: "Remove from superset", icon: Unlink, onSelect: () => dispatch({ type: "unlinkSuperset", exerciseKey: exercise.id }) }] : []),
                 ...(index > 0 ? [{ label: "Move up", icon: ArrowUp, onSelect: () => dispatch({ type: "moveExercise", exerciseKey: exercise.id, direction: -1 }) }] : []),
                 ...(index < total - 1 ? [{ label: "Move down", icon: ArrowDown, onSelect: () => dispatch({ type: "moveExercise", exerciseKey: exercise.id, direction: 1 }) }] : []),
-                { label: "Remove exercise", icon: Trash2, onSelect: () => dispatch({ type: "removeExercise", exerciseKey: exercise.id }), danger: true },
+                {
+                  label: "Remove exercise",
+                  icon: Trash2,
+                  onSelect: async () => {
+                    // Logged work is never thrown away on one tap.
+                    if (done > 0) {
+                      const ok = await confirmDialog({ title: `Remove ${exercise.name}?`, message: `The ${done} ${done === 1 ? "set" : "sets"} you logged for it will be deleted from this workout.`, confirmLabel: "Remove", destructive: true });
+                      if (!ok) return;
+                    }
+                    dispatch({ type: "removeExercise", exerciseKey: exercise.id });
+                  },
+                  danger: true,
+                },
               ].map((item) => (
                 <DropdownMenu.Item
                   key={item.label}
@@ -276,35 +424,50 @@ export function ExerciseCard({
         </DropdownMenu.Root>
       </header>
 
+      {/* At large text sizes the five columns can be wider than the phone: they scroll here, not the whole page. */}
+      <div className="overflow-x-auto">
       <div
         className={cn(
-          "grid gap-2 px-1 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground",
-          exercise.isTimed ? "grid-cols-[2rem_1fr_3.2rem_3.4rem_2.75rem]" : "grid-cols-[2rem_1fr_1fr_3.4rem_2.75rem]",
+          "grid gap-2 px-1 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground",
+          gridFor(exercise),
         )}
         aria-hidden
       >
         <span className="text-center">Set</span>
-        {exercise.isTimed ? (
-          <>
-            <span className="text-center">Seconds</span>
-            <span className="text-center">Timer</span>
-          </>
-        ) : (
-          <>
-            <span className="text-center">{weightUnit(units)}</span>
-            <span className="text-center">Reps</span>
-          </>
-        )}
+        <span className="text-center">{col1}</span>
+        <span className="text-center">{col2}</span>
         <span className="text-center">RPE</span>
         <span className="text-center">{showComplete ? "Done" : ""}</span>
       </div>
       <ol className="space-y-1">
         {exercise.sets.map((s, i) => (
-          <SetRow key={s.id} exercise={exercise} set={s} index={i} units={units} dispatch={dispatch} showComplete={showComplete} />
+          <Fragment key={s.id}>
+            <SetRow exercise={exercise} set={s} index={i} units={units} dispatch={dispatch} showComplete={showComplete} isNext={s.id === nextSetId} />
+            {loaded && weightAsk === s.id && !s.completed && !exercise.noWeightConfirmed && (
+              <li className="space-y-2 rounded-xl border border-gold-muted bg-gold/10 p-3 text-sm" role="alert" data-testid="weight-first-row">
+                <p>
+                  <span className="font-semibold">How much weight?</span> Enter it for this set, then tick it done. We never guess a weight for you.
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  className="min-h-11"
+                  onClick={() => {
+                    dispatch({ type: "confirmNoWeight", exerciseKey: exercise.id });
+                    dispatch({ type: "toggleSetComplete", exerciseKey: exercise.id, setId: s.id, now: new Date().toISOString() });
+                  }}
+                >
+                  No added weight – log reps only
+                </Button>
+              </li>
+            )}
+          </Fragment>
         ))}
       </ol>
-      <div className="mt-2 flex gap-2">
-        <Button type="button" size="sm" variant="secondary" className="flex-1" onClick={() => dispatch({ type: "addSet", exerciseKey: exercise.id })}>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <Button type="button" size="sm" variant="secondary" className="h-auto min-h-9 flex-1 whitespace-normal" onClick={() => dispatch({ type: "addSet", exerciseKey: exercise.id })}>
           <Plus aria-hidden /> Add set
         </Button>
         {exercise.sets.length > 0 && showComplete && (
@@ -312,8 +475,13 @@ export function ExerciseCard({
             type="button"
             size="sm"
             variant="ghost"
-            onClick={() => {
+            className="h-auto min-h-9 max-w-full whitespace-normal"
+            onClick={async () => {
               const last = exercise.sets[exercise.sets.length - 1]!;
+              if (last.completed) {
+                const ok = await confirmDialog({ title: `Remove set ${exercise.sets.length}?`, message: "That set is marked done; removing it deletes what you logged.", confirmLabel: "Remove", destructive: true });
+                if (!ok) return;
+              }
               dispatch({ type: "removeSet", exerciseKey: exercise.id, setId: last.id });
             }}
             aria-label={`Remove last set of ${exercise.name}`}

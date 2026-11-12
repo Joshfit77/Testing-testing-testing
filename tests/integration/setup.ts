@@ -16,7 +16,18 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = process.env.TEST_SUPABASE_SERVICE_ROLE_K
 // Dummy credentials: these tests never call Stripe or Anthropic over the network.
 process.env.STRIPE_SECRET_KEY = "sk_test_integration_dummy";
 process.env.STRIPE_WEBHOOK_SECRET = "whsec_integration_dummy";
+// Scheduled billing reconciliation (tests/integration/billing-integrity.test.ts).
+process.env.CRON_SECRET = "cron-integration-secret-0123456789";
 process.env.STRIPE_PRICE_PLUS = "price_test_plus";
 process.env.STRIPE_PRICE_PRO = "price_test_pro";
 process.env.STRIPE_PRICE_PRO_YEARLY = "price_test_pro_yearly";
+process.env.STRIPE_PRICE_PLUS_YEARLY = "price_test_plus_yearly";
+process.env.STRIPE_PRICE_PLUS_LEGACY = "price_old_plus_a, price_old_plus_b";
+process.env.STRIPE_PRICE_PRO_LEGACY = "price_old_pro";
 process.env.ANTHROPIC_API_KEY = "sk-ant-integration-dummy";
+// A local stand-in for Stripe's API (started by entitlements.test.ts); nothing reaches Stripe.
+process.env.STRIPE_API_BASE_URL = "http://127.0.0.1:4613";
+// RevenueCat: a local stand-in for its REST API (started by store-billing.test.ts); nothing reaches RevenueCat.
+process.env.REVENUECAT_SECRET_API_KEY = "sk_rc_integration_dummy";
+process.env.REVENUECAT_WEBHOOK_AUTH = "Bearer rc-webhook-integration";
+process.env.REVENUECAT_API_BASE_URL = "http://127.0.0.1:4611";

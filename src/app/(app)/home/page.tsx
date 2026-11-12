@@ -1,96 +1,357 @@
 import Link from "next/link";
-import { BookOpenText, Bot, CalendarCheck, ChevronRight, Dumbbell, Flame, HeartPulse, Lock, Medal, Play, Sparkles, Trophy, Wand2 } from "lucide-react";
-import { AreaSeriesChart, BarSeriesChart } from "@/components/charts/charts";
+import { Suspense } from "react";
+import { TodaysRemindersSection } from "@/components/notifications/todays-reminders-section";
+import { BarChart3, BookOpen, Bot, CalendarDays, ChevronRight, Footprints, HandHeart, HeartPulse, Moon, ScanBarcode, SlidersHorizontal, Sparkles, Utensils, Wand2 } from "lucide-react";
+import { SceneHero } from "@/components/common/scene-hero";
+import { LogoMark } from "@/components/common/logo";
+import { StatTile } from "@/components/ui/stat-tile";
+import { CoachButton, SearchButton } from "@/components/shell/main-header";
+import { QuickAddButton } from "@/components/shell/quick-add";
+import { readinessBand } from "@/lib/domain/readiness";
+import { isDemoMode } from "@/server/demo";
 import { Notice } from "@/components/common/states";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ProgressRing } from "@/components/ui/progress-ring";
-import { scriptureForDate } from "@/data/content";
+import { TodayWorkoutAction } from "@/components/home/today-workout-action";
+import { WaterQuick } from "@/components/home/water-quick";
+import { WeekBars } from "@/components/home/week-bars";
+import { ProgressBar } from "@/components/ui/progress-bar";
+import { TRANSLATION, scriptureForDate } from "@/data/content";
 import { progressPct } from "@/lib/domain/nutrition";
 import { hasFeature } from "@/lib/domain/plans";
-import { recommendPrograms } from "@/lib/domain/program-generator";
-import type { Equipment, ExperienceLevel, PrimaryGoal, ProgramType } from "@/lib/domain/types";
-import { displayWeight, formatDuration, formatWeight, weightUnit } from "@/lib/domain/units";
+import type { ExperienceLevel, PrimaryGoal } from "@/lib/domain/types";
+import { homeLayout, parseLayoutPrefs, type HomeModule } from "@/lib/layout-prefs";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
-import { getTodaysDevotional } from "@/server/services/challenge";
+import { logError } from "@/server/log";
+import { getWeeklyActivity, type WeeklyActivity } from "@/server/services/activity-summary";
 import { getDashboardData } from "@/server/services/dashboard";
 import { getActiveProgram } from "@/server/services/training";
+import { listSleepSessions } from "@/server/services/sleep";
+import { formatDuration, SLEEP_SOURCE_LABELS, summarizeNights } from "@/lib/domain/sleep";
+import { addDays, isoDateInTz } from "@/lib/domain/dates";
+import { loadProgramSchedule } from "@/server/services/schedule";
+import { buildWeeklyActivity } from "@/lib/domain/activity-week";
+import { verseExcerpt } from "@/lib/domain/scripture";
+import { todayWorkoutLink } from "./today-workout/link";
+import { scriptureParts } from "@/server/bible/text";
+import { ScriptureText } from "@/components/bible/scripture-text";
+import { loadReadingState } from "@/server/services/bible";
+import { loadActiveJourney } from "@/server/services/journeys";
+import { todayReadingLink } from "@/lib/faith/today-reading";
 
 export const metadata = { title: "Home" };
 
-const RECORD_LABEL: Record<string, string> = {
-  estimated_1rm: "Est. 1RM",
-  max_weight: "Heaviest set",
-  max_reps: "Most reps",
-  max_duration: "Longest hold",
-};
+const card = "rounded-2xl border border-border bg-card";
+const row = `${card} flex min-h-14 items-center gap-3 px-4 py-3 hover:border-gold-muted`;
 
-function greeting(hour: number) {
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
-}
-
+/**
+ * Home: the day's essentials on the first screen, in an order that follows the member's own goal and schedule
+ * (src/lib/layout-prefs.ts), which they can reorder or hide from You → Customize Home. Everything else lives in its
+ * own tab; nothing was removed, only moved.
+ */
 export default async function HomePage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const sp = await searchParams;
   const { user, profile } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
-  const [plan, data, active, answersRes, programsRes] = await Promise.all([
+  const weeklyPromise: Promise<WeeklyActivity> = getWeeklyActivity(user.id, profile.timezone).catch((err: unknown) => {
+    logError("home.weekly", err);
+    return buildWeeklyActivity(new Date(), profile.timezone, { workouts: [] });
+  });
+  const todayIso = isoDateInTz(new Date(), profile.timezone);
+  const [plan, data, active, weekly, inProgressRes, answersRes, schedule, waterRes, goalsRes, reading, readinessRes, journey] = await Promise.all([
     getUserPlan(user.id),
     getDashboardData(supabase, user.id, profile.timezone),
     getActiveProgram(supabase, user.id),
-    supabase.from("onboarding_answers").select("*").eq("user_id", user.id).maybeSingle(),
-    supabase.from("training_programs").select("slug, name, summary, goals, equipment, difficulty, tier, days_per_week, low_impact").eq("is_published", true),
+    weeklyPromise,
+    supabase.from("workout_sessions").select("name").eq("user_id", user.id).eq("status", "in_progress").order("started_at", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("onboarding_answers").select("primary_goal, experience, days_per_week, session_minutes").eq("user_id", user.id).maybeSingle(),
+    loadProgramSchedule(supabase, user.id, profile.timezone).catch((err: unknown) => {
+      logError("home.schedule", err);
+      return null;
+    }),
+    supabase.from("water_entries").select("amount_ml").eq("user_id", user.id).eq("recorded_on", todayIso),
+    supabase.from("nutrition_goals").select("water_ml").eq("user_id", user.id).maybeSingle(),
+    loadReadingState(supabase, user.id).catch(() => null),
+    supabase.from("recovery_checkins").select("readiness_score, checked_on").eq("user_id", user.id).order("checked_on", { ascending: false }).limit(1).maybeSingle(),
+    loadActiveJourney(supabase, user.id, profile.timezone).catch((err: unknown) => {
+      logError("home.journey", err);
+      return null;
+    }),
   ]);
-  const units = profile.unit_system;
-  const hour = Number(new Intl.DateTimeFormat("en-US", { hour: "numeric", hour12: false, timeZone: profile.timezone }).format(new Date()));
-  const nutritionEnabled = hasFeature(plan, "nutrition_tracking");
+  // One answer to "what should I read now?", shared with the Faith tab: today's journey passage, else the last chapter.
+  const read = todayReadingLink(journey, reading);
+  // Last night's sleep: only after wellness consent, and never blocking the page.
+  const lastNight = profile.wellness_consent_at
+    ? await listSleepSessions(supabase, user.id, { fromNight: addDays(todayIso, -1), toNight: todayIso })
+        .then((rows) => summarizeNights(rows)[0] ?? null)
+        .catch((err: unknown) => {
+          logError("home.sleep", err);
+          return null;
+        })
+    : null;
+  const answers = answersRes.data as { primary_goal: PrimaryGoal; experience: ExperienceLevel; days_per_week: number; session_minutes: number } | null;
   const name = profile.display_name ?? "Athlete";
+  const firstName = name.trim().split(/\s+/)[0] || name;
+  // The greeting follows the member's clock, like the reference screens ("Good morning, …").
+  const hour = Number(new Intl.DateTimeFormat("en-US", { hour: "numeric", hour12: false, timeZone: profile.timezone }).format(new Date()));
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const readiness = readinessRes.data ? { score: readinessRes.data.readiness_score as number, on: readinessRes.data.checked_on as string } : null;
+  const readinessToday = readiness?.on === todayIso || readiness?.on === isoDateInTz(new Date(Date.now() - 86400000), profile.timezone);
+  const readinessLabel = !readiness || !readinessToday ? "Check in" : readinessBand(readiness.score) === "high" ? "Ready" : readinessBand(readiness.score) === "moderate" ? "Go easy" : "Rest";
+  const showScripture = profile.home_scripture ?? true;
+  const verse = scriptureForDate(data.today);
+  const todayWorkout = todayWorkoutLink(active, schedule, data.today);
+  const startHref = todayWorkout.href;
+  const weeklyTarget = active?.daysPerWeek ?? answers?.days_per_week ?? null;
+  const sessionsThisWeek = weekly.workouts.length;
+  const todayLong = new Date(`${data.today}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
+  const today = active?.today ?? null;
+  const next = schedule?.planned[0] && today && schedule.planned[0].dayId === today.id ? schedule.planned[0] : null;
+  const plannedLater = next && next.date > data.today ? next : null;
+  const plannedLabel = plannedLater ? new Date(`${plannedLater.date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" }) : null;
+  const water = (waterRes.data ?? []).reduce((s, w) => s + (w.amount_ml as number), 0);
+  const waterGoal = (goalsRes.data?.water_ml as number | undefined) ?? 2500;
+  const layout = homeLayout(
+    {
+      goal: answers?.primary_goal ?? null,
+      experience: answers?.experience ?? null,
+      daysPerWeek: answers?.days_per_week ?? null,
+      sessionMinutes: answers?.session_minutes ?? null,
+      faithEnabled: profile.faith_enabled ?? true,
+      homeScripture: showScripture,
+    },
+    parseLayoutPrefs(profile.layout_prefs),
+  );
 
-  const programs = programsRes.data ?? [];
-  const answers = answersRes.data;
-  const recs = answers
-    ? recommendPrograms(
-        {
-          primary_goal: answers.primary_goal as PrimaryGoal,
-          experience: answers.experience as ExperienceLevel,
-          days_per_week: answers.days_per_week as number,
-          session_minutes: answers.session_minutes as number,
-          equipment: answers.equipment as Equipment[],
-          preferred_types: answers.preferred_types as ProgramType[],
-        },
-        programs.map((p) => ({
-          slug: p.slug as string,
-          goals: (p.goals as string[]).filter((g) => !g.startsWith("type:")) as PrimaryGoal[],
-          types: (p.goals as string[]).filter((g) => g.startsWith("type:")).map((g) => g.slice(5)) as ProgramType[],
-          equipment: p.equipment as Equipment[],
-          difficulty: p.difficulty as "beginner",
-          tier: p.tier as "free",
-          days: Array.from({ length: p.days_per_week as number }, () => ({ name: "", focus: "", minutes: 0, exercises: [] })),
-          lowImpact: p.low_impact as boolean,
-        })),
-        plan,
-      ).slice(0, 3)
-    : [];
-  const programBySlug = new Map(programs.map((p) => [p.slug as string, p]));
-
-  const weights = data.weights.map((w) => ({ date: w.date, weight: displayWeight(w.weightKg, units) }));
-  const latestWeight = data.weights.at(-1);
-  const firstWeight = data.weights[0];
-  const weightDelta = latestWeight && firstWeight ? displayWeight(latestWeight.weightKg - firstWeight.weightKg, units) : null;
-  const lowReadiness = data.readiness?.band === "low";
-  const trainedYesterdayAndToday = data.dayStreak >= 3;
-  const verse = profile.faith_enabled ? scriptureForDate(data.today) : null;
-  const todaysDevotional = profile.faith_enabled ? await getTodaysDevotional(supabase, user.id, data.today) : null;
-  const startHref = active?.today ? `/train/workout?day=${active.today.id}&up=${active.userProgramId}` : "/train/workout";
+  const modules: Record<HomeModule, React.ReactNode> = {
+    workout: (
+      <section key="workout" className="space-y-3" aria-labelledby="today-title" data-testid="home-workout">
+        <div className="card-gold rounded-2xl p-4">
+          <Link href={active ? `/train/programs/${active.programSlug}` : "/train"} className="block min-w-0 rounded-xl hover:bg-white/5">
+            <span className="flex items-center gap-2">
+              <h2 id="today-title" className="font-display text-xl font-bold">
+                Today&apos;s Workout
+              </h2>
+              {plannedLater && (
+                <span className="rounded-full border border-gold/50 bg-black/30 px-2 py-0.5 text-xs font-semibold text-gold-highlight" data-testid="today-rest">
+                  Rest day today
+                </span>
+              )}
+            </span>
+            <span className="mt-0.5 block truncate text-lg font-semibold text-foreground/95">{today ? today.name : active ? "Program complete" : "No program yet"}</span>
+            <span className="block text-sm text-muted-foreground" data-testid="today-detail">
+              {today && active && plannedLater
+                ? `Week ${active.currentWeek} · Day ${active.currentDay} of ${active.daysPerWeek} · planned for ${plannedLabel}${plannedLater.moved ? " (moved)" : ""}`
+                : today && active
+                  ? [today.estimated_minutes ? `${today.estimated_minutes} min` : null, `${today.exercises.length} exercise${today.exercises.length === 1 ? "" : "s"}`, `Week ${active.currentWeek} of ${active.durationWeeks}`, `Day ${active.currentDay} of ${active.daysPerWeek}`]
+                      .filter(Boolean)
+                      .join(" • ")
+                  : active
+                    ? "Choose your next program in Train"
+                    : "Log a free workout or pick a program"}
+            </span>
+          </Link>
+          <div className="mt-3">
+            <TodayWorkoutAction
+              userId={user.id}
+              startHref={startHref}
+              serverInProgress={(inProgressRes.data?.name as string | undefined) ?? null}
+              startLabel={plannedLater ? "Start workout early" : today ? "Start today's workout" : "Start workout"}
+              detail={today?.estimated_minutes ? `${today.estimated_minutes} min` : null}
+            />
+          </div>
+          {(next || !active) && (
+            <div className="mt-2 flex flex-wrap items-center gap-x-4">
+              {next && (
+                <Link href={`/calendar?day=${next.date}`} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-gold-highlight hover:underline">
+                  <CalendarDays className="size-4" aria-hidden /> {plannedLater ? "Change the date" : "Move to another day"}
+                </Link>
+              )}
+              {!active && (
+                <Link href={hasFeature(plan, "custom_program_builder") ? "/train/build" : "/train/programs"} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-gold-highlight hover:underline">
+                  <Wand2 className="size-4" aria-hidden /> {hasFeature(plan, "custom_program_builder") ? "Build my program" : "Choose a program"}
+                </Link>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="grid grid-cols-2 gap-3" aria-label="Recovery and progress">
+          <StatTile icon={HeartPulse} label="Recovery" value={readinessLabel} tone={readinessLabel === "Ready" ? "good" : "default"} href="/train/recovery" testId="home-recovery" />
+          <StatTile icon={BarChart3} label="Week streak" value={data.weekStreak === 1 ? "1 week" : `${data.weekStreak} weeks`} tone={data.weekStreak > 0 ? "good" : "default"} href="/progress" testId="home-progress" />
+        </div>
+      </section>
+    ),
+    nutrition: (
+      <section key="nutrition" className={`${card} p-4`} aria-labelledby="home-nutrition" data-testid="home-nutrition-card">
+        <div className="flex items-center justify-between gap-2">
+          <h2 id="home-nutrition" className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+            <Utensils className="size-4 text-gold" aria-hidden /> Today&apos;s nutrition
+          </h2>
+          <Link href="/nutrition" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-gold-highlight hover:underline">
+            Nutrition <ChevronRight className="size-4" aria-hidden />
+          </Link>
+        </div>
+        <div className="mt-2 grid grid-cols-2 gap-3">
+          <div>
+            <p className="text-xl font-bold tabular-nums">
+              {Math.round(data.nutrition.calories).toLocaleString()}
+              {data.nutrition.goalCalories ? <span className="text-sm font-medium text-muted-foreground"> / {data.nutrition.goalCalories.toLocaleString()}</span> : null}
+            </p>
+            <p className="text-sm text-muted-foreground">calories</p>
+            {data.nutrition.goalCalories ? <ProgressBar className="mt-1.5" value={progressPct(data.nutrition.calories, data.nutrition.goalCalories)} label="Calories eaten of daily budget" /> : null}
+          </div>
+          <div>
+            <p className="text-xl font-bold tabular-nums">
+              {Math.round(data.nutrition.protein_g)}
+              {data.nutrition.goalProtein ? <span className="text-sm font-medium text-muted-foreground"> / {data.nutrition.goalProtein} g</span> : <span className="text-sm font-medium text-muted-foreground"> g</span>}
+            </p>
+            <p className="text-sm text-muted-foreground">protein</p>
+            {data.nutrition.goalProtein ? <ProgressBar className="mt-1.5" value={progressPct(data.nutrition.protein_g, data.nutrition.goalProtein)} label="Protein eaten of daily target" /> : null}
+          </div>
+        </div>
+        {!data.nutrition.goalCalories && <p className="mt-1 text-xs text-muted-foreground">No daily target set: log what you like, or set targets in Nutrition.</p>}
+        <div className="mt-3 border-t border-border pt-3">
+          <WaterQuick date={todayIso} totalMl={water} goalMl={waterGoal} />
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <Link href="/nutrition?add=1" className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-gold/70 bg-gold/10 text-sm font-semibold text-gold-highlight hover:bg-gold/15">
+            <Utensils className="size-4" aria-hidden /> Log food
+          </Link>
+          <Link href="/nutrition/scanner" className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border bg-elevated/60 text-sm font-semibold hover:border-gold-muted">
+            <ScanBarcode className="size-4 text-gold" aria-hidden /> Scan barcode
+          </Link>
+        </div>
+      </section>
+    ),
+    faith: (
+      <section key="faith" className={`${card} p-4`} aria-labelledby="home-faith" data-testid="home-faith-card">
+        <h2 id="home-faith" className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+          <BookOpen className="size-4 text-gold" aria-hidden /> Faith today
+        </h2>
+        <Link href={read.href} className="mt-2 flex min-h-14 items-center gap-3 rounded-xl hover:bg-elevated/50" data-testid="home-reading-link">
+          <span className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-border bg-elevated text-gold">
+            <BookOpen className="size-6" aria-hidden />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-lg font-semibold">{read.title}</span>
+            <span className="block truncate text-sm text-muted-foreground">
+              {read.detail} · {TRANSLATION.name}
+            </span>
+          </span>
+          <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
+        </Link>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <Link href="/faith#todays-devotional" className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border bg-elevated/60 text-sm font-semibold hover:border-gold-muted">
+            <Sparkles className="size-4 text-gold" aria-hidden /> Today&apos;s devotional
+          </Link>
+          <Link href="/faith/journal/new?kind=daily" className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border bg-elevated/60 text-sm font-semibold hover:border-gold-muted">
+            <HandHeart className="size-4 text-gold" aria-hidden /> Pray
+          </Link>
+        </div>
+      </section>
+    ),
+    quick: (
+      <nav key="quick" aria-label="Quick actions" className="grid grid-cols-3 gap-2">
+        {[
+          { href: "/run/record?kind=run", icon: Footprints, label: "Run" },
+          { href: "/nutrition?add=1", icon: Utensils, label: "Log food" },
+          { href: "/coach", icon: Bot, label: "AI Coach" },
+        ].map((l) => (
+          <Link key={l.href} href={l.href} className={`${card} flex min-h-16 flex-col items-center justify-center gap-1 px-1 py-2 text-sm font-semibold hover:border-gold-muted`}>
+            <l.icon className="size-5 shrink-0 text-gold" aria-hidden /> {l.label}
+          </Link>
+        ))}
+      </nav>
+    ),
+    verse: null,
+    week: (
+      <section key="week" className={`${card} p-4`} aria-labelledby="home-week" data-testid="home-week">
+        <Link href="/progress" className="flex items-center justify-between gap-3 rounded-xl hover:bg-elevated/40">
+          <span className="min-w-0">
+            <h2 id="home-week" className="font-display text-xl font-bold">
+              This Week
+            </h2>
+            <span className="block text-base text-foreground/90">
+              <span className="font-semibold tabular-nums">{sessionsThisWeek}</span>
+              {weeklyTarget ? <span className="tabular-nums"> of {weeklyTarget}</span> : null} workouts
+              {data.weekStreak > 0 ? <span className="text-muted-foreground"> · {data.weekStreak} week streak</span> : null}
+            </span>
+          </span>
+          <span className="flex shrink-0 items-center gap-1 text-sm font-semibold text-gold-highlight">
+            My Progress <ChevronRight className="size-5" aria-hidden />
+          </span>
+        </Link>
+        <ProgressBar className="mt-3 h-3" value={weeklyTarget ? Math.min(100, (sessionsThisWeek / weeklyTarget) * 100) : sessionsThisWeek > 0 ? 100 : 0} label="Workouts done this week" />
+        <WeekBars days={weekly.days} className="mt-4" />
+      </section>
+    ),
+    sleep: (
+      <Link key="sleep" href="/progress/sleep" className={row} data-testid="home-sleep-card">
+        <Moon className="size-5 text-gold" aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="block text-base font-semibold">Sleep &amp; Recovery</span>
+          <span className="block truncate text-sm text-muted-foreground">
+            {lastNight
+              ? `Last night ${formatDuration(lastNight.asleepMinutes)}${lastNight.asleepEstimated ? " in bed" : " asleep"} · ${lastNight.sources.map((s) => SLEEP_SOURCE_LABELS[s]).join(", ")}`
+              : profile.wellness_consent_at
+                ? "Nothing for last night yet · sync your watch or log it by hand"
+                : "Sleep from your watch or by hand: scores, debt, schedule and energy"}
+          </span>
+        </span>
+        <ChevronRight className="size-5 text-gold" aria-hidden />
+      </Link>
+    ),
+    calendar: (
+      <Link key="calendar" href="/calendar" className={row}>
+        <CalendarDays className="size-5 text-gold" aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="block text-base font-semibold">Training calendar</span>
+          <span className="block truncate text-sm text-muted-foreground">Workouts, runs, walks and planned sessions</span>
+        </span>
+        <ChevronRight className="size-5 text-gold" aria-hidden />
+      </Link>
+    ),
+  };
 
   return (
-    <div className="space-y-6">
-      {sp.welcome && (
-        <Notice tone="success">Welcome to Narrow Gate Fitness, {name}! Your starter program is ready — today&apos;s session is below.</Notice>
-      )}
+    <div className="space-y-3">
+      <SceneHero className={isDemoMode() ? "-mx-4 rounded-2xl md:mx-0" : "-mx-4 -mt-[calc(env(safe-area-inset-top)+0.25rem)] pt-[env(safe-area-inset-top)] md:mx-0 md:mt-0 md:rounded-2xl"} minHeight="min-h-[21rem]">
+        <div className="flex flex-col px-4 pb-6 pt-3">
+          <header className="flex items-center justify-between gap-2 @container">
+            {/* The buttons never shrink (they were pushed past the screen edge); the wordmark wraps instead. */}
+            <span className="inline-flex min-w-0 items-center gap-2">
+              <LogoMark className="size-8 shrink-0" />
+              <span className="min-w-0 font-serif text-sm font-semibold uppercase leading-none tracking-[0.18em] text-champagne [text-shadow:0_1px_6px_rgba(0,0,0,0.7)]">Narrow Gate Fitness</span>
+            </span>
+            <span className="flex shrink-0 items-center gap-0.5">
+              <SearchButton />
+              <QuickAddButton userId={user.id} today={data.today} todayWorkout={todayWorkout} />
+              <CoachButton compact />
+            </span>
+          </header>
+          <h1 className="mt-14 font-display text-[2.125rem] font-bold leading-[1.1] tracking-tight text-white [text-shadow:0_2px_12px_rgba(0,0,0,0.7)] [text-wrap:balance]">
+            {greeting},
+            <br />
+            {firstName}
+          </h1>
+          <p className="mt-2 text-sm text-white/80 [text-shadow:0_1px_6px_rgba(0,0,0,0.7)]">{todayLong}</p>
+          {/* The verse lives in the hero; it shows while the layout keeps the "verse" module (hidden by Customize Home
+              or by the Scripture card switch). */}
+          {layout.includes("verse") && (
+            <Link href="/faith#todays-devotional" className="group mt-4 block max-w-[22rem] rounded-lg focus-visible:ring-2 focus-visible:ring-gold-highlight">
+              <span className="sr-only">Verse of the day: </span>
+              <blockquote className="font-serif text-[1.0625rem] italic leading-snug text-white [text-shadow:0_1px_8px_rgba(0,0,0,0.75)]">
+                &ldquo;<ScriptureText parts={scriptureParts(verse.reference, verseExcerpt(verse.text))} />&rdquo;
+              </blockquote>
+              <span className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-white/90 [text-shadow:0_1px_6px_rgba(0,0,0,0.7)]">
+                {verse.reference} ({TRANSLATION.code}) <ChevronRight className="size-4 text-gold-highlight transition-transform group-hover:translate-x-0.5" aria-hidden />
+              </span>
+              <span className="sr-only">. Open today&apos;s devotional.</span>
+            </Link>
+          )}
+        </div>
+      </SceneHero>
+
+      {sp.welcome && <Notice tone="success">Welcome to Narrow Gate Fitness, {name}! Your starter program is ready — today&apos;s session is below.</Notice>}
       {sp.password === "updated" && <Notice tone="success">Your password was updated.</Notice>}
       {sp.built && active && (
         <Notice tone="success">
@@ -101,317 +362,17 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         </Notice>
       )}
 
-      {/* Hero: today's workout */}
-      <section className="bg-card-gradient relative overflow-hidden rounded-3xl border border-border p-5 md:p-8" aria-labelledby="today-title">
-        <div className="hero-glow pointer-events-none absolute inset-0" aria-hidden />
-        <div className="relative flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-          <div className="animate-fade-up">
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gold">
-              {greeting(hour)}, {name}
-            </p>
-            {active?.today ? (
-              <>
-                <h1 id="today-title" className="mt-2 font-display text-4xl font-bold uppercase leading-none md:text-5xl">
-                  {active.today.name}
-                </h1>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {active.programName} · Week {active.currentWeek} of {active.durationWeeks} · Day {active.currentDay}
-                  {active.isDeload && " · Deload week"}
-                </p>
-                <ul className="mt-4 flex flex-wrap gap-2" aria-label="Exercises today">
-                  {active.today.exercises.slice(0, 5).map((e) => (
-                    <li key={e.id}>
-                      <Badge variant="secondary">
-                        {e.exercise.name} · {e.sets}×{e.reps ?? (e.duration_seconds ? formatDuration(e.duration_seconds) : "")}
-                      </Badge>
-                    </li>
-                  ))}
-                  {active.today.exercises.length > 5 && <Badge variant="outline">+{active.today.exercises.length - 5} more</Badge>}
-                </ul>
-              </>
-            ) : (
-              <>
-                <h1 id="today-title" className="mt-2 font-display text-4xl font-bold uppercase leading-none md:text-5xl">
-                  Ready when you are
-                </h1>
-                <p className="mt-2 max-w-md text-sm text-muted-foreground">
-                  {active ? "You've completed your program — choose a new one or log a free session." : "Pick a program or log a free-form workout."}
-                </p>
-              </>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Button asChild size="lg">
-              <Link href={startHref}>
-                <Play aria-hidden /> Start workout
-              </Link>
-            </Button>
-            {active?.today ? (
-              <Button asChild size="lg" variant="secondary">
-                <Link href="/train">Programs</Link>
-              </Button>
-            ) : (
-              <Button asChild size="lg" variant="secondary">
-                <Link href="/train/build">
-                  <Wand2 aria-hidden /> Build my program
-                </Link>
-              </Button>
-            )}
-          </div>
-          {active?.today && (
-            <Link href="/train/build" className="relative inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-gold-highlight hover:underline md:absolute md:right-8 md:top-6">
-              <Wand2 className="size-4" aria-hidden /> Build a custom program
-            </Link>
-          )}
-        </div>
-      </section>
+      {layout.map((m) => modules[m])}
 
-      {/* Stat tiles */}
-      <section className="stagger grid grid-cols-2 gap-3 md:grid-cols-4" aria-label="Training summary">
-        {[
-          { icon: CalendarCheck, label: "This week", value: String(data.workoutsThisWeek), sub: "workouts" },
-          { icon: Dumbbell, label: "All time", value: String(data.workoutsTotal), sub: "workouts completed" },
-          { icon: Flame, label: "Day streak", value: String(data.dayStreak), sub: data.dayStreak === 1 ? "day" : "days" },
-          { icon: Medal, label: "Week streak", value: String(data.weekStreak), sub: data.weekStreak === 1 ? "week" : "weeks" },
-        ].map((t) => (
-          <div key={t.label} className="lift rounded-2xl border border-border bg-card p-4">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              <t.icon className="size-4 text-gold" aria-hidden />
-              {t.label}
-            </div>
-            <p className="mt-2 font-display text-4xl font-bold leading-none">{t.value}</p>
-            <p className="mt-1 text-xs text-muted-foreground">{t.sub}</p>
-          </div>
-        ))}
-      </section>
+      <Suspense fallback={null}>
+        <TodaysRemindersSection supabase={supabase} userId={user.id} profile={profile} />
+      </Suspense>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <BarSeriesChart
-          className="lg:col-span-2"
-          title="Weekly activity"
-          description="Completed workouts, last 7 days"
-          data={data.last7.map((d) => ({ date: d.date, workouts: d.count }))}
-          xKey="date"
-          xFormat="weekday"
-          series={[{ key: "workouts", label: "Workouts" }]}
-          decimals={0}
-          emptyMessage="No workouts in the last 7 days. Today is a great day to start."
-        />
-
-        {/* Nutrition rings */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Today&apos;s nutrition</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {nutritionEnabled ? (
-              data.nutrition.goalCalories ? (
-                <div className="flex flex-col items-center gap-4">
-                  <div className="flex justify-center gap-4">
-                    <ProgressRing
-                      ariaLabel="Calories"
-                      value={progressPct(data.nutrition.calories, data.nutrition.goalCalories)}
-                      label={Math.round(data.nutrition.calories)}
-                      sublabel={`/ ${data.nutrition.goalCalories} kcal`}
-                    />
-                    <ProgressRing
-                      ariaLabel="Protein"
-                      value={progressPct(data.nutrition.protein_g, data.nutrition.goalProtein ?? 0)}
-                      label={`${Math.round(data.nutrition.protein_g)}g`}
-                      sublabel={`/ ${data.nutrition.goalProtein ?? 0}g protein`}
-                    />
-                  </div>
-                  {data.nutrition.goalIsEstimate && <p className="text-center text-[11px] text-muted-foreground">Targets are estimates — adjust them in Food.</p>}
-                  <Button asChild variant="secondary" size="sm" className="w-full">
-                    <Link href="/nutrition">Log food</Link>
-                  </Button>
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Set your targets in <Link href="/nutrition" className="text-gold-highlight underline">Food</Link>.
-                </p>
-              )
-            ) : (
-              <div className="flex flex-col items-center gap-3 py-4 text-center">
-                <Lock className="size-6 text-gold" aria-hidden />
-                <p className="text-sm text-muted-foreground">Calorie and protein tracking is included with Plus and Pro.</p>
-                <Button asChild size="sm" variant="outline">
-                  <Link href="/profile/billing">See plans</Link>
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <AreaSeriesChart
-            title="Bodyweight"
-            description={
-              weightDelta != null && data.weights.length > 1
-                ? `${weightDelta > 0 ? "+" : ""}${weightDelta} ${weightUnit(units)} over the last 90 days`
-                : "Last 90 days"
-            }
-            data={weights}
-            xKey="date"
-            xFormat="date"
-            valueSuffix={` ${weightUnit(units)}`}
-            series={[{ key: "weight", label: "Bodyweight" }]}
-            emptyMessage="Log your bodyweight in Progress to see your trend."
-          />
-        </div>
-
-        <Card>
-          <CardHeader className="flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Trophy className="size-4 text-gold" aria-hidden /> Latest PRs
-            </CardTitle>
-            <Link href="/progress#records" className="text-xs text-gold-highlight hover:underline">
-              All
-            </Link>
-          </CardHeader>
-          <CardContent>
-            {data.records.length ? (
-              <ul className="space-y-3">
-                {data.records.map((r, i) => (
-                  <li key={i} className="flex items-center justify-between gap-3 rounded-xl bg-elevated/60 px-3 py-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold">{r.exercise}</p>
-                      <p className="text-xs text-muted-foreground">{RECORD_LABEL[r.recordType] ?? r.recordType}</p>
-                    </div>
-                    <p className="shrink-0 font-display text-lg font-semibold text-gold-highlight">
-                      {r.recordType === "max_duration"
-                        ? formatDuration(r.value)
-                        : r.recordType === "max_reps"
-                          ? `${r.value} reps`
-                          : formatWeight(r.value, units)}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-muted-foreground">Complete a workout to start setting personal records.</p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-3">
-        {/* Recovery recommendation */}
-        <Card className="flex flex-col">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <HeartPulse className="size-4 text-gold" aria-hidden /> Recovery
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-1 flex-col justify-between gap-4">
-            {data.readiness ? (
-              <div>
-                <p className="text-sm">
-                  Readiness <span className="font-display text-2xl font-semibold text-gold-highlight">{data.readiness.score}</span>
-                  <span className="text-muted-foreground"> / 100</span>
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">{data.readiness.note}</p>
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">Check in on sleep, energy and soreness to get a readiness note.</p>
-            )}
-            <p className="text-sm">
-              {lowReadiness || trainedYesterdayAndToday
-                ? "Recommended: a 15–20 minute mobility flow or an easy walk today."
-                : "Recommended: 10 minutes of mobility after your next session."}
-            </p>
-            <Button asChild variant="secondary" size="sm">
-              <Link href="/train/recovery">Open recovery</Link>
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* AI coach shortcut */}
-        <Card className="flex flex-col">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Bot className="size-4 text-gold" aria-hidden /> AI coach
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-1 flex-col justify-between gap-3">
-            <ul className="space-y-2">
-              {["How should I progress my squat?", "Suggest a 20-minute hotel workout", "Review my consistency this month"].map((q) => (
-                <li key={q}>
-                  <Link
-                    href={`/coach?q=${encodeURIComponent(q)}`}
-                    className="flex items-center justify-between gap-2 rounded-xl border border-border bg-elevated/60 px-3 py-2 text-sm hover:border-gold-muted"
-                  >
-                    {q} <ChevronRight className="size-4 shrink-0 text-gold" aria-hidden />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-            {!hasFeature(plan, "ai_coach") && <p className="text-xs text-muted-foreground">AI coaching is included with Plus and Pro.</p>}
-          </CardContent>
-        </Card>
-
-        {/* Program recommendations */}
-        <Card className="flex flex-col">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Sparkles className="size-4 text-gold" aria-hidden /> Recommended
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {recs.length ? (
-              recs.map((r) => {
-                const p = programBySlug.get(r.slug);
-                return (
-                  <Link key={r.slug} href={`/train/programs/${r.slug}`} className="block rounded-xl border border-border bg-elevated/60 px-3 py-2 hover:border-gold-muted">
-                    <span className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-semibold">{p?.name as string}</span>
-                      {r.locked && <Lock className="size-3.5 shrink-0 text-gold" aria-label="Requires upgrade" />}
-                    </span>
-                    <span className="mt-0.5 block text-xs text-muted-foreground">{r.reasons[0] ?? (p?.summary as string)}</span>
-                  </Link>
-                );
-              })
-            ) : (
-              <p className="text-sm text-muted-foreground">Browse the program library to find your next block.</p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {verse && (
-        <aside className="rounded-2xl border border-gold-muted/40 bg-gold/5 p-5" aria-label="Verse of the day">
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gold">Verse of the day</p>
-          <blockquote className="mt-2 text-sm italic text-foreground/90">&ldquo;{verse.text}&rdquo;</blockquote>
-          <p className="mt-2 text-xs text-muted-foreground">
-            {verse.reference} (KJV) ·{" "}
-            <Link href="/faith" className="text-gold-highlight hover:underline">
-              Reflect
-            </Link>
-          </p>
-        </aside>
-      )}
-
-      {todaysDevotional && (
-        <Link
-          href="/faith#todays-devotional"
-          className="flex min-h-11 items-center justify-between gap-3 rounded-2xl border border-border bg-card px-4 py-3 hover:border-gold-muted"
-        >
-          <span className="flex min-w-0 items-center gap-3">
-            <BookOpenText className="size-5 shrink-0 text-gold" aria-hidden />
-            <span className="min-w-0">
-              <span className="block text-xs font-semibold uppercase tracking-[0.2em] text-gold">
-                Today&apos;s devotional{todaysDevotional.challengeDay ? ` · Day ${todaysDevotional.challengeDay} of 40` : ""}
-              </span>
-              <span className="block truncate text-sm font-semibold">
-                {todaysDevotional.devotional.title} · {todaysDevotional.devotional.reference}
-              </span>
-            </span>
-          </span>
-          <ChevronRight className="size-4 shrink-0 text-gold" aria-hidden />
+      <p className="text-center">
+        <Link href="/profile/customize" className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground">
+          <SlidersHorizontal className="size-4" aria-hidden /> Customize Home
         </Link>
-      )}
+      </p>
     </div>
   );
 }

@@ -1,256 +1,222 @@
 import Link from "next/link";
-import { BookOpen, ChevronRight, Clock, HeartPulse, History, Lock, Pause, Play, Plus, Trash2, Wand2 } from "lucide-react";
-import { PageHeader } from "@/components/common/page-header";
-import { EmptyState } from "@/components/common/states";
-import { Badge } from "@/components/ui/badge";
+import { Activity, BarChart3, BookmarkCheck, CalendarDays, ChevronDown, ChevronRight, Dumbbell, Footprints, HeartPulse, History, Pause, Plus, Wand2 } from "lucide-react";
 import { ActionButton } from "@/components/common/action-button";
+import { TodayWorkoutAction } from "@/components/home/today-workout-action";
+import { MainHeader } from "@/components/shell/main-header";
 import { Button } from "@/components/ui/button";
-import { canAccessTier } from "@/lib/domain/plans";
-import type { Plan } from "@/lib/domain/types";
-import { cn, titleCase } from "@/lib/utils";
+import { formatDuration } from "@/lib/domain/units";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
-import { pauseActiveProgramAction, removeSavedProgramAction } from "@/server/actions/programs";
+import { hasFeature } from "@/lib/domain/plans";
+import { pauseActiveProgramAction } from "@/server/actions/programs";
 import { getActiveProgram } from "@/server/services/training";
+import { getAiAllowance } from "@/server/services/ai-coach";
+import { loadProgramSchedule } from "@/server/services/schedule";
+import { isoDateInTz } from "@/lib/domain/dates";
+import { parseLayoutPrefs, sectionLayout, TRAIN_SECTIONS, type TrainSection } from "@/lib/layout-prefs";
 
 export const metadata = { title: "Train" };
 
-interface ProgramCardRow {
-  id: string;
-  slug: string;
-  name: string;
-  summary: string;
-  difficulty: string;
-  duration_weeks: number;
-  days_per_week: number;
-  session_minutes: number;
-  tier: Plan;
-  category_id: string | null;
-}
+const card = "rounded-2xl border border-border bg-card";
+const row = `${card} flex min-h-14 items-center gap-3 px-4 py-3 hover:border-gold-muted`;
 
-export default async function TrainPage({ searchParams }: { searchParams: Promise<{ category?: string }> }) {
-  const { category } = await searchParams;
-  const { user } = await requireOnboardedUser();
+/**
+ * Train: today's session with Start on the first screen, then running (GPS runs and walks live here now), the
+ * program, the exercise library and the calendar. Builder, history, templates, recovery and the training review are
+ * one tap further, under "More training tools" (nothing was removed).
+ */
+export default async function TrainPage() {
+  const { user, profile } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
-  const [plan, active, categoriesRes, programsRes, mineRes] = await Promise.all([
-    getUserPlan(user.id),
+  const tz = profile.timezone ?? "UTC";
+  const [active, schedule, inProgressRes, plan] = await Promise.all([
     getActiveProgram(supabase, user.id),
-    supabase.from("program_categories").select("id, slug, name").order("sort_order"),
-    supabase
-      .from("training_programs")
-      .select("id, slug, name, summary, difficulty, duration_weeks, days_per_week, session_minutes, tier, category_id")
-      .eq("is_published", true)
-      .order("name"),
-    supabase
-      .from("user_programs")
-      .select("id, status, current_week, program:training_programs(id, slug, name, duration_weeks, source)")
-      .eq("user_id", user.id)
-      .neq("status", "active")
-      .order("updated_at", { ascending: false }),
+    loadProgramSchedule(supabase, user.id, tz),
+    supabase.from("workout_sessions").select("name").eq("user_id", user.id).eq("status", "in_progress").order("started_at", { ascending: false }).limit(1).maybeSingle(),
+    getUserPlan(user.id),
   ]);
-  const categories = categoriesRes.data ?? [];
-  const selected = categories.find((c) => c.slug === category);
-  const programs = ((programsRes.data ?? []) as ProgramCardRow[]).filter((p) => !selected || p.category_id === selected.id);
-  const categoryName = new Map(categories.map((c) => [c.id as string, c.name as string]));
-  const mine = (mineRes.data ?? []) as unknown as {
-    id: string;
-    status: string;
-    current_week: number;
-    program: { id: string; slug: string; name: string; duration_weeks: number; source: string } | null;
-  }[];
+  const canBuild = hasFeature(plan, "custom_program_builder");
+  // Same gate as /train/review: Pro, or a subscription that kept its AI allowance.
+  const canReview = (await getAiAllowance(user.id, plan)).chatLimit > 0;
+  const today = active?.today ?? null;
+  const todayIso = isoDateInTz(new Date(), tz);
+  const first = schedule?.planned[0];
+  const next = first && today && first.dayId === today.id ? first : null;
+  const plannedLater = next && next.date > todayIso ? next : null;
+  const plannedLabel = plannedLater ? new Date(`${plannedLater.date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" }) : null;
+  const startHref = today && active ? `/train/workout?day=${today.id}&up=${active.userProgramId}` : "/train/workout?blank=1";
+
+  const sections = sectionLayout(TRAIN_SECTIONS, parseLayoutPrefs(profile.layout_prefs).train);
+  const tools = [
+    { href: "/train/build", icon: Wand2, label: canBuild ? "Program builder" : "Program builder (Pro)" },
+    { href: "/train/history", icon: History, label: "Workout history" },
+    { href: "/train/templates", icon: BookmarkCheck, label: "My workouts" },
+    { href: "/train/workout?blank=1", icon: Plus, label: "Empty workout" },
+    { href: "/train/recovery", icon: HeartPulse, label: "Recovery" },
+    { href: "/train/review", icon: Activity, label: canReview ? "Training review" : "Training review (Pro)" },
+  ];
+
+  const rows: Record<Exclude<TrainSection, "tools">, React.ReactNode> = {
+    run: (
+        <Link key="/run" href="/run" className={row}>
+          <Footprints className="size-5 shrink-0 text-gold" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Run &amp; walk</span>
+            <span className="block truncate text-sm text-muted-foreground">GPS runs and walks, running plans, records</span>
+          </span>
+          <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
+        </Link>
+    ),
+    programs: (
+        <Link key="/train/programs" href="/train/programs" className={row}>
+          <BarChart3 className="size-5 shrink-0 text-gold" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Programs</span>
+            <span className="block truncate text-sm text-muted-foreground">{active ? `Active: ${active.programName}` : "Strength, muscle, conditioning, sport and running plans"}</span>
+          </span>
+          <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
+        </Link>
+    ),
+    exercises: (
+        <Link key="/train/exercises" href="/train/exercises" className={row}>
+          <Dumbbell className="size-5 shrink-0 text-gold" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Exercises</span>
+            <span className="block truncate text-sm text-muted-foreground">The library, with demonstrations and your history for each</span>
+          </span>
+          <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
+        </Link>
+    ),
+    calendar: (
+        <Link key="/calendar" href="/calendar" className={row}>
+          <CalendarDays className="size-5 shrink-0 text-gold" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Training calendar</span>
+            <span className="block truncate text-sm text-muted-foreground">Workouts, runs, walks, planned sessions and rest days</span>
+          </span>
+          <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
+        </Link>
+    ),
+  };
 
   return (
-    <div className="space-y-8">
-      <PageHeader
-        eyebrow="Train"
-        title="Training"
-        description="Your program, the full library, exercise guides and your workout history."
-        actions={
-          <Button asChild>
-            <Link href="/train/workout?blank=1">
-              <Plus aria-hidden /> Empty workout
-            </Link>
-          </Button>
-        }
-      />
+    <div className="space-y-4">
+      <MainHeader title="Train" />
 
-      {active ? (
-        <section className="bg-card-gradient rounded-2xl border border-gold-muted/50 p-5" aria-labelledby="active-title">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <Badge>Active program</Badge>
-              <h2 id="active-title" className="mt-2 font-display text-2xl font-bold uppercase">
-                {active.programName}
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                Week {active.currentWeek} of {active.durationWeeks} · Next: {active.today?.name ?? "Program complete"}
-                {active.weekFocus && ` · ${active.weekFocus}`}
-              </p>
+      <section aria-labelledby="today-title" className={`${card} overflow-hidden`}>
+        <div className="px-4 pt-4">
+          <h2 id="today-title" className="text-sm font-semibold text-muted-foreground">
+            Today&apos;s workout
+          </h2>
+          {active && (
+            <Link href={`/train/programs/${active.programSlug}`} className="mt-1 flex min-h-11 items-center gap-2 text-sm font-semibold text-gold-highlight hover:underline">
+              <span className="min-w-0 truncate">{active.programName}</span>
+              <span className="shrink-0 text-muted-foreground">
+                · Week {active.currentWeek} of {active.durationWeeks}
+                {active.isDeload ? " · Deload" : ""}
+              </span>
+              <ChevronRight className="size-4 shrink-0" aria-hidden />
+            </Link>
+          )}
+        </div>
+        {today ? (
+          <>
+            <div className="flex items-center gap-3 px-4 py-3">
+              <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-gold/12 text-gold">
+                <Dumbbell className="size-6" aria-hidden />
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-lg font-semibold">{today.name}</span>
+                <span className="block text-sm text-muted-foreground">
+                  {[today.estimated_minutes ? `${today.estimated_minutes} min` : null, `${today.exercises.length} exercise${today.exercises.length === 1 ? "" : "s"}`].filter(Boolean).join(" · ")}
+                </span>
+              </span>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {active.today && (
-                <Button asChild>
-                  <Link href={`/train/workout?day=${active.today.id}&up=${active.userProgramId}`}>
-                    <Play aria-hidden /> Start {active.today.name}
+            <div className="px-4">
+              <TodayWorkoutAction userId={user.id} startHref={startHref} serverInProgress={(inProgressRes.data?.name as string | undefined) ?? null} {...(plannedLater ? { startLabel: "Start workout early" } : {})} />
+              {plannedLater && (
+                <p className="pt-2 text-center text-sm text-muted-foreground">
+                  Planned for {plannedLabel}
+                  {plannedLater.moved ? " (moved)" : ""} ·{" "}
+                  <Link href={`/calendar?day=${plannedLater.date}`} className="inline-flex min-h-11 items-center rounded-lg px-3 font-semibold text-gold-highlight underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-gold-highlight">
+                    Open calendar
                   </Link>
-                </Button>
+                </p>
               )}
-              <Button asChild variant="secondary">
-                <Link href={`/train/programs/${active.programSlug}`}>View plan</Link>
-              </Button>
-              <ActionButton action={pauseActiveProgramAction} fields={{  }} variant="ghost">
-<Pause aria-hidden /> Pause
-              </ActionButton>
+            </div>
+            <details className="group mt-2 border-t border-border">
+              <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-4 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+                <span>{today.exercises.length} exercises in this session</span>
+                <ChevronDown className="size-5 text-gold transition-transform group-open:rotate-180" aria-hidden />
+              </summary>
+              <ul className="divide-y divide-border border-t border-border" aria-label="Exercises">
+                {today.exercises.map((e, i) => (
+                  <li key={e.id}>
+                    <Link href={`/train/exercises/${e.exercise.slug}`} className="flex min-h-14 items-center gap-3 px-4 py-2 hover:bg-elevated/50">
+                      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-elevated text-sm font-semibold tabular-nums text-muted-foreground" aria-hidden>
+                        {i + 1}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium">{e.exercise.name}</span>
+                        <span className="block text-sm text-muted-foreground">
+                          {e.sets} {e.sets === 1 ? "set" : "sets"} × {e.reps ? `${e.reps} reps` : e.duration_seconds ? formatDuration(e.duration_seconds) : "—"}
+                        </span>
+                      </span>
+                      <ChevronRight className="size-4 shrink-0 text-gold" aria-hidden />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+              <div className="p-3">
+                <ActionButton action={pauseActiveProgramAction} fields={{}} variant="ghost" className="w-full" confirmMessage="Pause this program? You can resume it from Programs.">
+                  <Pause aria-hidden /> Pause program
+                </ActionButton>
+              </div>
+            </details>
+          </>
+        ) : (
+          <div className="p-4 pt-2">
+            <p className="text-sm text-muted-foreground">
+              {active ? "You've finished this program. Choose your next one, or log a free workout." : "No active program. Build one around your goals, start one from the library, or log a free workout."}
+            </p>
+            <div className="mt-3 space-y-2">
+              <TodayWorkoutAction userId={user.id} startHref={startHref} serverInProgress={(inProgressRes.data?.name as string | undefined) ?? null} />
+              {/* The builder is Pro; Free members get the program library first (it has free programs). */}
+              <div className="grid grid-cols-2 gap-2">
+                <Button asChild variant={canBuild ? "default" : "secondary"}>
+                  <Link href="/train/build">{canBuild ? "Build my program" : "Build (Pro)"}</Link>
+                </Button>
+                <Button asChild variant={canBuild ? "secondary" : "default"}>
+                  <Link href="/train/programs">Browse programs</Link>
+                </Button>
+              </div>
             </div>
           </div>
-        </section>
-      ) : (
-        <EmptyState
-          title="No active program"
-          description="Build a custom program, start one from the library below, or log a free-form workout."
-          action={
-            <div className="flex flex-wrap justify-center gap-2">
-              <Button asChild>
-                <Link href="/train/build">Build my program</Link>
-              </Button>
-              <Button asChild variant="secondary">
-                <Link href="#library">Browse programs</Link>
-              </Button>
-            </div>
-          }
-        />
-      )}
-
-      <Link
-        href="/train/build"
-        className="group relative flex items-center gap-4 overflow-hidden rounded-2xl border border-gold-muted/60 bg-gold/5 p-5 transition-all hover:-translate-y-0.5 hover:border-gold"
-      >
-        <span className="rounded-2xl bg-gold-gradient p-3 text-primary-foreground">
-          <Wand2 className="size-6" aria-hidden />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block font-display text-xl font-bold uppercase leading-tight">Build my program</span>
-          <span className="mt-0.5 block text-sm text-muted-foreground">
-            Strength, powerlifting, bench, squat or deadlift only, MMA, cardio, bodybuilding, show prep, strongman, speed or agility —
-            built around your numbers, goals and equipment. Free on every plan.
-          </span>
-        </span>
-        <ChevronRight className="size-5 shrink-0 text-gold transition-transform group-hover:translate-x-0.5" aria-hidden />
-      </Link>
-
-      <section className="grid gap-3 sm:grid-cols-3" aria-label="Training tools">
-        {[
-          { href: "/train/exercises", icon: BookOpen, title: "Exercise library", body: "Technique, cues and alternatives" },
-          { href: "/train/history", icon: History, title: "History", body: "Past workouts, edits and volume" },
-          { href: "/train/recovery", icon: HeartPulse, title: "Recovery & mobility", body: "Check-ins, routines, rest days" },
-        ].map((l) => (
-          <Link key={l.href} href={l.href} className="group rounded-2xl border border-border bg-card p-4 transition-colors hover:border-gold-muted">
-            <l.icon className="size-5 text-gold" aria-hidden />
-            <p className="mt-3 font-semibold">{l.title}</p>
-            <p className="text-xs text-muted-foreground">{l.body}</p>
-          </Link>
-        ))}
+        )}
       </section>
 
-      {mine.length > 0 && (
-        <section aria-labelledby="mine-title">
-          <h2 id="mine-title" className="mb-3 font-display text-xl font-bold uppercase">
-            My programs
-          </h2>
-          <ul className="grid gap-3 md:grid-cols-2">
-            {mine.map(
-              (m) =>
-                m.program && (
-                  <li key={m.id} className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-4">
-                    <Link href={`/train/programs/${m.program.slug}`} className="min-w-0 hover:text-gold-highlight">
-                      <p className="truncate font-semibold">{m.program.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {titleCase(m.status)}
-                        {m.program.source !== "curated" &&
-                          ` · ${m.program.source === "ai" ? "AI-generated" : m.program.source === "custom" ? "Custom built" : "Personal starter"}`}
-                        {m.status === "paused" && ` · week ${m.current_week}`}
-                      </p>
-                    </Link>
-                    <ActionButton action={removeSavedProgramAction} fields={{ userProgramId: m.id }} variant="ghost" size="icon-sm" aria-label={`Remove ${m.program.name} from my programs`}>
-<Trash2 aria-hidden />
-                    </ActionButton>
-                  </li>
-                ),
-            )}
-          </ul>
-        </section>
+      {/* The sections in the member's order (You → Customize); a hidden one is still one tap away in Search. */}
+      {sections.some((x) => x !== "tools") && (
+        <nav aria-label="Training sections" className="space-y-2">
+          {sections.filter((x): x is Exclude<TrainSection, "tools"> => x !== "tools").map((x) => rows[x])}
+        </nav>
       )}
-
-      <section id="library" aria-labelledby="library-title" className="scroll-mt-24">
-        <h2 id="library-title" className="mb-3 font-display text-xl font-bold uppercase">
-          Program library
-        </h2>
-        <nav aria-label="Program categories" className="scrollbar-none -mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1">
-          <Link
-            href="/train#library"
-            aria-current={!selected ? "page" : undefined}
-            className={cn(
-              "shrink-0 rounded-full border px-3.5 py-2 text-xs font-semibold",
-              !selected ? "border-gold bg-gold/10 text-gold-highlight" : "border-border text-muted-foreground hover:text-foreground",
-            )}
-          >
-            All
-          </Link>
-          {categories.map((c) => (
-            <Link
-              key={c.id as string}
-              href={`/train?category=${c.slug}#library`}
-              aria-current={selected?.id === c.id ? "page" : undefined}
-              className={cn(
-                "shrink-0 rounded-full border px-3.5 py-2 text-xs font-semibold",
-                selected?.id === c.id ? "border-gold bg-gold/10 text-gold-highlight" : "border-border text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {c.name as string}
+      {sections.includes("tools") && (
+      <details className={`group ${card}`} data-testid="train-tools">
+        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between px-4 text-[0.9375rem] font-semibold [&::-webkit-details-marker]:hidden">
+          <span>More training tools</span>
+          <ChevronDown className="size-5 text-gold transition-transform group-open:rotate-180" aria-hidden />
+        </summary>
+        <nav aria-label="Training tools" className="grid grid-cols-2 gap-2 px-3 pb-3">
+          {tools.map((t) => (
+            <Link key={t.href} href={t.href} className="flex min-h-14 items-center gap-2.5 rounded-xl border border-border bg-elevated/50 px-3 py-2 text-[0.9375rem] font-medium leading-tight hover:border-gold-muted">
+              <t.icon className="size-5 shrink-0 text-gold" aria-hidden />
+              <span className="min-w-0 flex-1">{t.label}</span>
             </Link>
           ))}
         </nav>
-        {programs.length === 0 ? (
-          <EmptyState title="No programs in this category yet" description="Check back soon, or explore another category." />
-        ) : (
-          <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {programs.map((p) => {
-              const locked = !canAccessTier(plan, p.tier);
-              return (
-                <li key={p.id}>
-                  <Link
-                    href={`/train/programs/${p.slug}`}
-                    className="bg-card-gradient flex h-full flex-col rounded-2xl border border-border p-5 transition-all hover:-translate-y-0.5 hover:border-gold-muted"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="text-[11px] font-semibold uppercase tracking-widest text-gold">{p.category_id ? categoryName.get(p.category_id) : "Program"}</p>
-                      {locked ? (
-                        <Badge>
-                          <Lock className="size-3" aria-hidden /> {titleCase(p.tier)}
-                        </Badge>
-                      ) : (
-                        p.tier === "free" && <Badge variant="success">Free</Badge>
-                      )}
-                    </div>
-                    <h3 className="mt-2 font-display text-xl font-bold uppercase leading-tight">{p.name}</h3>
-                    <p className="mt-2 flex-1 text-sm text-muted-foreground">{p.summary}</p>
-                    <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                      <Badge variant="secondary">{titleCase(p.difficulty)}</Badge>
-                      <Badge variant="secondary">
-                        {p.duration_weeks} {p.duration_weeks === 1 ? "week" : "weeks"}
-                      </Badge>
-                      <Badge variant="secondary">{p.days_per_week}×/week</Badge>
-                      <Badge variant="secondary">
-                        <Clock className="size-3" aria-hidden /> {p.session_minutes} min
-                      </Badge>
-                    </div>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
+      </details>
+      )}
     </div>
   );
 }

@@ -1,10 +1,9 @@
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { DietPicker } from "@/components/nutrition/diet-picker";
 import { isDietType } from "@/lib/domain/diets";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
+import { BackLink } from "@/components/platform/back-link";
 
 export const metadata = { title: "Diets" };
 
@@ -15,9 +14,7 @@ export default async function DietsPage() {
   const current = isDietType(data?.diet_type) ? data.diet_type : null;
   return (
     <div className="space-y-6">
-      <Link href="/nutrition" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="size-4" aria-hidden /> Food
-      </Link>
+      <BackLink href="/nutrition">Food</BackLink>
       <PageHeader
         eyebrow="Food"
         title="Diets"

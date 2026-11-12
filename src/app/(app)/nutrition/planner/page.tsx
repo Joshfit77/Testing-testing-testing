@@ -1,0 +1,224 @@
+import Link from "next/link";
+import { ChevronDown, Trash2 } from "lucide-react";
+import { ActionButton } from "@/components/common/action-button";
+import { PageHeader } from "@/components/common/page-header";
+import { Notice } from "@/components/common/states";
+import { BackLink } from "@/components/platform/back-link";
+import { FoodToolsNav, NutritionLocked, nutritionPageUser } from "@/components/nutrition/nutrition-page";
+import { GeneratePlanForm, PlanDays, PlannerSettingsForm, type PlanDayView } from "@/components/nutrition/planner-client";
+import { Button } from "@/components/ui/button";
+import { isoDateInTz } from "@/lib/domain/dates";
+import { DIETS } from "@/lib/domain/diets";
+import { dayFit, eligibleCandidates, exclusionReason, slotsForMeals } from "@/lib/domain/meal-planner";
+import { getServerSupabase } from "@/lib/supabase/server";
+import { deletePlanAction } from "@/server/actions/meal-plan";
+import { logError } from "@/server/log";
+import { loadCurrentPlan, loadPlannerPrefs, loadPlannerTargets, plannerSettings, planDays } from "@/server/services/meal-plan";
+import { plannerDishes } from "@/server/services/recipes";
+import type { MyFood } from "@/components/nutrition/nutrition-client";
+import { AiMealPlanPanel, type AiDraftView } from "@/components/nutrition/ai-meal-plan";
+import { getUserPlan } from "@/server/auth";
+import { getAiAllowance } from "@/server/services/ai-coach";
+import { draftView, loadDraft } from "@/server/services/ai-meal-plan";
+
+export const metadata = { title: "Meal planner" };
+
+const SUMMARY = "flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden";
+
+const dayTitle = (iso: string, today: string) =>
+  `${iso === today ? "Today · " : ""}${new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" })}`;
+
+export default async function PlannerPage() {
+  const { user, profile, allowed } = await nutritionPageUser("meal_planning");
+  if (!allowed) return <NutritionLocked title="Meal planner" description="Plan a week of meals around your calorie and macro targets, diet, allergies and budget, then build a grocery list." />;
+  const supabase = await getServerSupabase();
+  const today = isoDateInTz(new Date(), profile.timezone);
+  let failed = false;
+  const [prefs, targets, plan] = await Promise.all([loadPlannerPrefs(supabase, user.id), loadPlannerTargets(supabase, user.id), loadCurrentPlan(supabase, user.id, today)]).catch((err) => {
+    logError("planner.page", err);
+    failed = true;
+    return [null, null, null] as const;
+  });
+  if (failed || !prefs) {
+    return (
+      <div className="space-y-6">
+        <BackLink href="/nutrition">Food</BackLink>
+        <PageHeader eyebrow="Food" title="Meal planner" />
+        <Notice tone="error">The planner couldn&apos;t be loaded right now. Refresh the page to try again.</Notice>
+      </div>
+    );
+  }
+  const [dishes, { data: foodRows }] = await Promise.all([
+    targets ? plannerDishes(supabase, user.id, prefs.includeApp) : Promise.resolve([]),
+    supabase.from("foods").select("id, name, brand, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g, is_estimate, source, basis").eq("owner_id", user.id).order("name"),
+  ]);
+  const myFoods = (foodRows ?? []) as MyFood[];
+  // AI meal plans (Pro): the draft waiting for review, with every number computed now from the database values.
+  const aiEntitled = (await getAiAllowance(user.id, await getUserPlan(user.id))).chatLimit > 0;
+  const draft = aiEntitled ? await loadDraft(supabase, user.id).catch(() => null) : null;
+  const draftDays = draft ? draftView(draft, dishes) : [];
+  const aiDraft: AiDraftView | null = draft
+    ? {
+        focus: draft.focus,
+        notes: draft.notes,
+        summary: draft.summary,
+        targets: draft.targets,
+        days: draftDays.map((d) => {
+          const specs = slotsForMeals(draft.settings.mealsPerDay);
+          return {
+            date: d.date,
+            title: dayTitle(d.date, today),
+            fit: dayFit(d.meals, draft.targets.calories),
+            meals: d.meals.map((m, i) => ({ label: specs[i]?.label ?? "Meal", meal: m ? { name: m.name, portion: m.portion, nutrition: m.nutrition, complete: m.complete, by: m.by } : null })),
+          };
+        }),
+      }
+    : null;
+  const settings = targets ? plannerSettings(targets, prefs) : null;
+  const eligible = settings ? eligibleCandidates(dishes, settings) : [];
+  const excluded = settings ? dishes.map((d) => exclusionReason(d, settings)).filter(Boolean).length : 0;
+
+  const days: PlanDayView[] = plan
+    ? planDays(plan).map((d) => {
+        const specs = slotsForMeals(plan.settings.mealsPerDay);
+        return {
+          date: d.date,
+          title: dayTitle(d.date, today),
+          fit: dayFit(d.meals, plan.targets.calories),
+          meals: d.entries.map((e, i) => ({
+            label: e?.label ?? specs[i]?.label ?? "Meal",
+            meal: e
+              ? {
+                  entryId: e.id,
+                  label: e.label,
+                  name: e.name,
+                  href: e.source_key.startsWith("recipe:") ? `/nutrition/recipes/${e.source_key.slice(7)}` : e.source_key.startsWith("app:") ? `/nutrition/recipes/app/${e.source_key.slice(4)}` : "/nutrition/saved-meals",
+                  origin: e.source_key.startsWith("app:") ? "app" : e.source_key.startsWith("recipe:") ? "recipe" : "saved_meal",
+                  portion: Number(e.portion),
+                  nutrition: d.meals[i]!.nutrition,
+                  complete: d.meals[i]!.complete,
+                  logged: Boolean(e.logged_at),
+                  ingredients: (e.ingredients ?? []).map((i) => i.name),
+                }
+              : null,
+          })),
+        };
+      })
+    : [];
+
+  return (
+    <div className="space-y-6">
+      <BackLink href="/nutrition">Food</BackLink>
+      <PageHeader eyebrow="Food" title="Meal planner" description="A week of meals from your recipes and saved meals (and the app's simple recipes), sized to your calorie and macro targets." />
+      <FoodToolsNav current="/nutrition/planner" />
+
+      <Notice tone="info">
+        The plan is an estimate. Portions are rounded to quarter servings and nutrition comes from the ingredients&apos; database and label values, so real meals will differ. It isn&apos;t medical or dietetic advice.
+      </Notice>
+
+      {!targets ? (
+        <Notice tone="warning">
+          Set your daily calorie and macro targets on the{" "}
+          <Link href="/nutrition#targets-title" className="font-semibold underline">
+            Food screen
+          </Link>{" "}
+          first; the planner builds around them.
+        </Notice>
+      ) : (
+        <section aria-labelledby="targets-title" className="rounded-2xl border border-border bg-card p-4">
+          <h2 id="targets-title" className="text-lg font-semibold">
+            Planning for
+          </h2>
+          <p className="mt-1 text-[0.9375rem] tabular-nums">
+            {targets.calories.toLocaleString()} kcal · protein {targets.protein_g} g · carbs {targets.carbs_g} g · fat {targets.fat_g} g
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {targets.origin === "custom" ? "Your custom targets" : "Your estimated calorie budget"} · {DIETS[targets.diet].name} diet (
+            <Link href="/nutrition/diets" className="inline-flex min-h-11 items-center underline">
+              change
+            </Link>
+            ) · {prefs.mealsPerDay} meals a day · {prefs.budget} budget
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground" data-testid="planner-pool">
+            {eligible.length} of {dishes.length} dishes fit your settings{excluded ? ` (${excluded} left out by diet, allergies, dislikes or budget)` : ""}.
+          </p>
+        </section>
+      )}
+
+      {/* One primary action: generate a week. The AI draft and the settings open on demand. */}
+      {targets && (
+        <section aria-labelledby="generate-title" className="rounded-2xl border border-gold-muted/60 bg-card-gradient p-4">
+          <h2 id="generate-title" className="mb-3 text-lg font-semibold">
+            {plan ? "Plan another week" : "Make a plan"}
+          </h2>
+          <GeneratePlanForm defaultStart={today} hasPlan={Boolean(plan)} />
+          <p className="mt-2 text-sm text-muted-foreground">Generating for a start date that already has a plan replaces it. Meals you already logged stay in your diary.</p>
+        </section>
+      )}
+
+      {plan && (
+        <section aria-labelledby="plan-title" className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 id="plan-title" className="text-lg font-semibold">
+              Week of {dayTitle(plan.start_date, "").trim()}
+            </h2>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild variant="secondary" size="sm">
+                <Link href="/nutrition/grocery">Grocery list</Link>
+              </Button>
+              <ActionButton
+                action={deletePlanAction}
+                fields={{ id: plan.id }}
+                size="sm"
+                variant="ghost"
+                confirmMessage="Delete this meal plan?"
+                confirmDetail="Meals you already logged stay in your diary."
+                confirmLabel="Delete"
+              >
+                <Trash2 aria-hidden /> Delete plan
+              </ActionButton>
+            </div>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Planned meals aren&apos;t in your diary until you tap <span className="font-semibold text-foreground">Log this meal</span>. Built for {plan.targets.calories.toLocaleString()} kcal a day.
+          </p>
+          <PlanDays days={days} target={plan.targets} myFoods={myFoods} />
+        </section>
+      )}
+
+      {targets && (
+        // Open while an AI draft waits for review, so it can't be missed.
+        <details className="group rounded-2xl border border-border bg-card" open={Boolean(aiDraft)} data-testid="ai-plan-disclosure">
+          <summary className={SUMMARY}>
+            <span>
+              <span className="block font-semibold">{aiEntitled ? "Draft with AI instead" : "Draft with AI"}</span>
+              <span className="block text-sm text-muted-foreground">{aiDraft ? "A draft is waiting for your review" : aiEntitled ? "You review it before anything is saved" : "Pro adds AI-arranged plans"}</span>
+            </span>
+            <ChevronDown className="size-5 shrink-0 text-gold transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
+          </summary>
+          <div className="border-t border-border p-3">
+            <AiMealPlanPanel entitled={aiEntitled} defaultStart={today} draft={aiDraft} />
+          </div>
+        </details>
+      )}
+
+      <details className="group rounded-2xl border border-border bg-card" data-testid="planner-settings">
+        <summary className={SUMMARY}>
+          <span>
+            <span id="settings-title" className="block font-semibold">
+              Planner settings
+            </span>
+            <span className="block text-sm text-muted-foreground">
+              {prefs.mealsPerDay} meals a day · {prefs.budget} budget
+              {prefs.allergies.length ? ` · ${prefs.allergies.length} ${prefs.allergies.length === 1 ? "allergy" : "allergies"}` : ""}
+            </span>
+          </span>
+          <ChevronDown className="size-5 shrink-0 text-gold transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
+        </summary>
+        <div className="border-t border-border p-4">
+          <PlannerSettingsForm prefs={prefs} />
+        </div>
+      </details>
+    </div>
+  );
+}

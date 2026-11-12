@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { anonClient, createTestUser, deleteTestUser, exerciseIds, serviceClient, stackAvailable, type TestUser } from "./helpers";
+import { anonClient, createTestUser, deleteTestUser, exerciseIds, serviceClient, stackAvailable, type TestUser, grantPlan } from "./helpers";
 
 const available = await stackAvailable();
 
@@ -14,6 +14,8 @@ describe.skipIf(!available)("row level security & data isolation", () => {
 
   beforeAll(async () => {
     [alice, bob, admin] = await Promise.all([createTestUser("alice"), createTestUser("bob"), createTestUser("admin")]);
+    // Alice saves an AI plan below, a Pro feature the database checks.
+    await grantPlan(alice, "pro");
     await serviceClient().from("profiles").update({ role: "admin" }).eq("id", admin.id);
     ex = await exerciseIds(["back-squat", "bench-press"]);
 
@@ -85,9 +87,12 @@ describe.skipIf(!available)("row level security & data isolation", () => {
     expect(subErr).not.toBeNull();
     const { data: after } = await serviceClient().from("user_entitlements").select("plan").eq("user_id", bob.id).single();
     expect(after?.plan).toBe("free");
+    // Members hold no write privilege on their usage rows at all: delete and insert are both refused.
+    await serviceClient().from("ai_usage_events").insert({ user_id: bob.id, kind: "chat" });
     const { error: usageErr } = await bob.client.from("ai_usage_events").delete().eq("user_id", bob.id);
-    // Delete is silently a no-op (no policy); insert is denied.
-    expect(usageErr).toBeNull();
+    expect(usageErr).not.toBeNull();
+    const { count: kept } = await serviceClient().from("ai_usage_events").select("id", { count: "exact", head: true }).eq("user_id", bob.id);
+    expect(kept).toBe(1);
     const { error: usageIns } = await bob.client.from("ai_usage_events").insert({ user_id: bob.id, kind: "chat" });
     expect(usageIns).not.toBeNull();
   });

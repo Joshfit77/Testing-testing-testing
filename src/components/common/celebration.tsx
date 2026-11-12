@@ -13,6 +13,7 @@ export function Celebration({ fire = true, pieces = 120 }: { fire?: boolean; pie
   useEffect(() => {
     if (!fire) return;
     if (typeof window === "undefined" || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    if (document.documentElement.dataset.motion === "reduce") return; // in-app "Reduce motion" setting
     const canvas = ref.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;

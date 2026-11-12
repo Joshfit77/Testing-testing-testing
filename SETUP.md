@@ -55,17 +55,18 @@ AI_RATE_LIMIT_PER_MINUTE=6
 ```
 
 - The AI coach needs `SUPABASE_SERVICE_ROLE_KEY`, because usage is metered in `ai_usage_events`, which users can't write to.
-- Monthly limits per plan: `PLAN_*_AI_MONTHLY_LIMIT` and `PLAN_PRO_AI_PLAN_MONTHLY_LIMIT`.
+- The coach is Pro only. Monthly limits: `PLAN_PRO_AI_MONTHLY_LIMIT` (150), `PLAN_PRO_AI_PLAN_MONTHLY_LIMIT` (15) and `PLAN_PRO_AI_SMART_MONTHLY_LIMIT` (15 on the larger model). Models: `COACH_MODEL_FAST` (default Claude Haiku) and `COACH_MODEL_SMART` (default Claude Sonnet); see `docs/MEMBERSHIPS.md`.
 - Requests use Anthropic's server-side refusal fallback where the model supports it. Model output is validated with Zod before anything is shown, and plans are saved only after explicit user approval.
 
 ### Stripe subscriptions
 
-1. Create recurring prices in Stripe — Plus ($9.99/month), Pro ($30/month) and, optionally, All Access Yearly ($200/year, which grants Pro) — and set:
+1. Create recurring prices in Stripe — Pro All Access monthly ($19.99) and yearly ($149.99); a Plus price only if you have existing legacy Plus subscribers — and set:
    ```
    STRIPE_SECRET_KEY=sk_test_...
    STRIPE_PRICE_PLUS=price_...
    STRIPE_PRICE_PRO=price_...
-   STRIPE_PRICE_PRO_YEARLY=price_...   # optional; the yearly card shows "not configured" without it
+   STRIPE_PRICE_PLUS_YEARLY=price_...  # optional, with BILLING_YEARLY_ENABLED=true
+   STRIPE_PRICE_PRO_YEARLY=price_...   # optional, with BILLING_YEARLY_ENABLED=true
    ```
 2. Enable the **Customer portal** in Stripe (Settings → Billing → Customer portal), including plan switching and cancellation.
 3. Webhook endpoint: `https://<your-domain>/api/stripe/webhook`, with these events:
@@ -76,11 +77,11 @@ AI_RATE_LIMIT_PER_MINUTE=6
    Set `STRIPE_WEBHOOK_SECRET=whsec_...`.
 4. Local testing: run `stripe listen --forward-to localhost:3000/api/stripe/webhook` and use the printed secret. Test card: `4242 4242 4242 4242`.
 
-Display prices default to $9.99/month (Plus), $30/month (Pro) and $200/year (All Access Yearly). Override them with `PLAN_PLUS_PRICE_CENTS`, `PLAN_PRO_PRICE_CENTS` and `PLAN_PRO_YEARLY_PRICE_CENTS`. Keep them in sync with your Stripe prices.
+Display prices default to $19.99/month and $149.99/year (Pro All Access) and $11.99/month for the legacy Plus plan. Override them with `PLAN_PRO_PRICE_CENTS`, `PLAN_PRO_YEARLY_PRICE_CENTS` and `PLAN_PLUS_PRICE_CENTS`. When you replace a Stripe price, list the old ID in `STRIPE_PRICE_PLUS_LEGACY` / `STRIPE_PRICE_PRO_LEGACY` so existing subscribers keep their plan. Keep them in sync with your Stripe prices.
 
 ### Food search (USDA FoodData Central)
 
-Get a free key at https://fdc.nal.usda.gov/api-key-signup.html and set `USDA_FDC_API_KEY`. Without it, users can still log custom foods and manual entries.
+Food search works without a key: it uses the bundled USDA SR Legacy database (public domain). A free key from https://fdc.nal.usda.gov/api-key-signup.html set as `USDA_FDC_API_KEY` additionally searches branded and survey foods from the FoodData Central API.
 
 ### Barcode scanning (Open Food Facts)
 
@@ -117,8 +118,14 @@ To make a consistent set of AI-generated demo clips:
    psql "$PROD_DB_URL" -f supabase/seed.sql   # catalog seed (idempotent)
    ```
 3. **Auth → URL configuration**: set the Site URL to your domain and add `https://<your-domain>/**` to the redirect URLs.
-4. **Auth → Email**: keep "Confirm email" enabled. Configure custom SMTP for production email delivery.
-5. Optional: change the email templates to link to `/auth/confirm?token_hash={{ .TokenHash }}&type=signup` (or `type=recovery` with `next=/reset-password`). The default `{{ .ConfirmationURL }}` flow also works through `/auth/callback`.
+4. **Auth → Email**: keep "Confirm email" enabled. Configure custom SMTP for production email delivery (Supabase's
+   built-in sender is rate-limited and meant for testing, so beta testers' confirmation and reset emails may not arrive).
+5. **Auth → Email Templates (required)**: use the templates in `supabase/templates/` for "Confirm signup"
+   (`confirmation.html`) and "Reset password" (`recovery.html`) by pasting them in the dashboard (do **not** run `npx supabase config push` against a hosted project: it would also push the local `site_url` and localhost redirect URLs from `supabase/config.toml`). They link to
+   `/auth/confirm?token_hash={{ .TokenHash }}&type=…`, which works in any browser. Supabase's default
+   `{{ .ConfirmationURL }}` link ends in a code exchange that only works in the browser that asked for the email, so a
+   password reset requested in the iPhone app fails when the link opens in Safari
+   (`tests/integration/auth-email-links.test.ts`).
 
 ### Vercel
 
@@ -157,6 +164,8 @@ npm run cap:sync
 `CAP_APP_ID` is read when the config is evaluated. For a permanent change, edit `appId` in `capacitor.config.ts`. Also update the bundle identifier in Xcode and the `applicationId` in `android/app/build.gradle`.
 
 To test on a device against your dev machine, use `CAP_SERVER_URL=http://<LAN-IP>:3000 CAP_ALLOW_CLEARTEXT=true npm run cap:sync`. Never ship cleartext.
+
+`CAP_SERVER_URL` has no default: syncing stops with an error if it is missing, a placeholder (`.example`, `.invalid`, `.test`) or plain `http://` without `CAP_ALLOW_CLEARTEXT=true`. The step-by-step TestFlight guide is [docs/TESTFLIGHT.md](docs/TESTFLIGHT.md).
 
 ### iOS (App Store)
 

@@ -1,0 +1,153 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { Lock, Trophy } from "lucide-react";
+import { LineSeriesChart } from "@/components/charts/charts";
+import { EmptyState } from "@/components/common/states";
+import { BackLink } from "@/components/platform/back-link";
+import { Button } from "@/components/ui/button";
+import type { BestSet } from "@/lib/domain/exercise-history";
+import { activityKindFor, exerciseMilestone } from "@/lib/domain/exercise-milestones";
+import { ExerciseMilestoneCard } from "@/components/train/exercise-milestone";
+import { loadExerciseHistory, loadMilestoneActivities } from "@/server/services/exercise-history";
+import { RECORD_TERMS } from "@/lib/domain/record-labels";
+import { formatDistance } from "@/lib/domain/exercise-tracking";
+import { hasFeature } from "@/lib/domain/plans";
+import { summarizeSets } from "@/lib/domain/previous-performance";
+import type { UnitSystem } from "@/lib/domain/types";
+import { displayWeight, formatDuration, formatWeight, weightUnit } from "@/lib/domain/units";
+import { getServerSupabase } from "@/lib/supabase/server";
+import { getUserPlan, requireOnboardedUser } from "@/server/auth";
+
+export const metadata = { title: "Exercise history" };
+
+/**
+ * The history's headline best, in the app's shared terms. For weight × reps sets it is the best estimated 1RM, a
+ * calculation, so it is labelled as one and shows the set it came from; the heaviest weight actually lifted is the
+ * milestone card's "Heaviest lift" above it, so the two never compete for the same name.
+ */
+function bestHeadline(b: BestSet, units: UnitSystem): { title: string; value: string; from: string | null } {
+  switch (b.kind) {
+    case "e1rm":
+      return { title: `Best ${RECORD_TERMS.estimated_1rm}`, value: formatWeight(b.e1rmKg, units), from: `Calculated from ${formatWeight(b.weightKg, units)} × ${b.reps}` };
+    case "reps":
+      return { title: RECORD_TERMS.max_reps, value: `${b.reps} reps`, from: null };
+    case "duration":
+      return { title: RECORD_TERMS.max_duration, value: formatDuration(b.seconds), from: null };
+    case "distance":
+      return { title: RECORD_TERMS.max_distance, value: formatDistance(b.metres, units), from: b.weightKg ? `With ${formatWeight(b.weightKg, units)}` : null };
+  }
+}
+
+export default async function ExerciseHistoryPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const { user, profile } = await requireOnboardedUser();
+  const supabase = await getServerSupabase();
+  const { data: ex } = await supabase.from("exercises").select("id, slug, name, is_timed").eq("slug", slug).maybeSingle();
+  if (!ex) notFound();
+  const actKind = activityKindFor(ex.slug as string);
+  const [plan, history, activities] = await Promise.all([
+    getUserPlan(user.id),
+    loadExerciseHistory(supabase, user.id, ex.id as string),
+    actKind ? loadMilestoneActivities(supabase, user.id, actKind) : Promise.resolve([]),
+  ]);
+  const units = profile.unit_system;
+  const milestone = exerciseMilestone(history.sessions, { slug: ex.slug as string, name: ex.name as string }, units, { activities });
+  const advanced = hasFeature(plan, "advanced_analytics");
+  const tz = profile.timezone ?? "UTC";
+  const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: tz });
+
+  return (
+    <div className="space-y-5">
+      <BackLink href={`/train/exercises/${ex.slug}`}>{ex.name as string}</BackLink>
+      <header>
+        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gold">Your history</p>
+        <h1 className="mt-1 font-display text-3xl font-bold uppercase leading-tight">{ex.name as string}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {history.sessions.length} {history.sessions.length === 1 ? "session" : "sessions"} logged · completed working sets only
+        </p>
+      </header>
+
+      <ExerciseMilestoneCard milestone={milestone} name={ex.name as string} timeZone={tz} />
+
+      {history.sessions.length === 0 ? (
+        <EmptyState
+          title="No sets logged yet"
+          description="Log this exercise in a workout and your heaviest lift, estimated 1RM trend and recent sessions will appear here."
+          action={
+            <Button asChild variant="secondary">
+              <Link href="/train/workout?blank=1">Start a workout</Link>
+            </Button>
+          }
+        />
+      ) : (
+        <>
+          {history.best &&
+            (() => {
+              const h = bestHeadline(history.best, units);
+              return (
+                <section className="rounded-2xl border border-gold-muted/60 bg-gold/5 p-4" aria-labelledby="best-title">
+                  <h2 id="best-title" className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-gold-highlight">
+                    <Trophy className="size-4" aria-hidden /> {h.title}
+                  </h2>
+                  <p className="mt-1 text-lg font-semibold" data-testid="best-set">
+                    {h.value}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {h.from ? `${h.from} · ` : ""}
+                    {fmtDate(history.best.date)}
+                  </p>
+                </section>
+              );
+            })()}
+
+          {history.trend.length > 0 &&
+            (advanced ? (
+              <LineSeriesChart
+                title="Estimated 1RM trend"
+                description="Best estimated 1RM per session (Epley formula)"
+                data={history.trend.map((t) => ({ date: t.date.slice(0, 10), e1rm: displayWeight(t.e1rmKg, units) }))}
+                xKey="date"
+                xFormat="date"
+                valueSuffix={` ${weightUnit(units)}`}
+                series={[{ key: "e1rm", label: "Estimated 1RM" }]}
+                emptyMessage="No sets that allow a 1RM estimate yet."
+              />
+            ) : (
+              <section className="rounded-2xl border border-border bg-card p-4">
+                <h2 className="font-semibold">Estimated 1RM trend</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  <Lock className="mr-1 inline size-3.5 text-gold" aria-hidden />
+                  Trend charts are part of Pro All Access. Your best estimated 1RM for each session is listed below.
+                </p>
+                <Button asChild size="sm" variant="secondary" className="mt-2">
+                  <Link href="/profile/billing">See plans</Link>
+                </Button>
+              </section>
+            ))}
+
+          <section aria-labelledby="recent-title">
+            <h2 id="recent-title" className="mb-2 text-lg font-semibold">
+              Recent sessions
+            </h2>
+            <ul className="space-y-2">
+              {history.sessions.slice(0, 20).map((s) => (
+                <li key={s.sessionId}>
+                  <Link href={`/train/history/${s.sessionId}`} className="flex items-start justify-between gap-3 rounded-2xl border border-border bg-card p-3 hover:border-gold-muted">
+                    <span className="min-w-0">
+                      <span className="block truncate font-semibold">{s.name}</span>
+                      <span className="block text-xs text-muted-foreground">{fmtDate(s.date)}</span>
+                    </span>
+                    <span className="shrink-0 text-right text-sm tabular-nums">
+                      {summarizeSets(s.sets, units, Boolean(ex.is_timed)) ?? "—"}
+                      {s.e1rmKg != null && <span className="block text-xs text-muted-foreground">e1RM {formatWeight(s.e1rmKg, units)}</span>}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </>
+      )}
+    </div>
+  );
+}

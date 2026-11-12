@@ -9,10 +9,10 @@ test.describe("authentication, onboarding and workout logging", () => {
 
     // Dashboard shows today's starter-program session.
     await expect(page.getByText(/Your starter program is ready/)).toBeVisible();
-    await expect(page.getByRole("link", { name: /Start workout/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: /^Start (Today's Workout|workout)/i })).toBeVisible();
 
     // Start the program session.
-    await page.getByRole("link", { name: /Start workout/ }).click();
+    await page.getByRole("link", { name: /^Start (Today's Workout|workout)/i }).click();
     await page.waitForURL(/\/train\/workout/);
     const firstWeight = page.getByLabel(/set 1 weight in lb/).first();
     await firstWeight.fill("135");
@@ -27,6 +27,13 @@ test.describe("authentication, onboarding and workout logging", () => {
     await expect(page.getByLabel(/set 1 weight in lb/).first()).toHaveValue("135");
     await expect(page.getByRole("button", { name: /set 1 completed/ }).first()).toBeVisible();
 
+    // Switching to Home mid-workout offers Resume, which returns to the same session.
+    await page.getByRole("navigation", { name: "Main sections" }).last().getByRole("link", { name: "Home" }).click();
+    await page.waitForURL(/\/home/);
+    await page.getByRole("link", { name: /^Resume workout/ }).click();
+    await page.waitForURL(/\/train\/workout/);
+    await expect(page.getByLabel(/set 1 weight in lb/).first()).toHaveValue("135");
+
     // Pause/resume.
     await page.getByRole("button", { name: "Pause workout" }).click();
     await expect(page.getByText("Paused", { exact: true })).toBeVisible();
@@ -36,7 +43,13 @@ test.describe("authentication, onboarding and workout logging", () => {
     await page.getByRole("button", { name: "Finish" }).click();
     await page.getByRole("button", { name: "Finish & save" }).click();
     await expect(page.getByRole("heading", { name: "Workout complete" })).toBeVisible();
-    await expect(page.getByText("New personal records")).toBeVisible();
+    // A first workout sets baselines (there is nothing to beat yet); the summary says what comes next in the program.
+    await expect(page.getByText("Baselines set")).toBeVisible();
+    await expect(page.getByText("Up next")).toBeVisible();
+    // Sets done this session; a first workout has no "last time" to compare with, and Faith content is off here.
+    await expect(page.locator("dt", { hasText: /^Sets$/ })).toBeVisible();
+    await expect(page.getByTestId("compared-with-last-time")).toHaveCount(0);
+    await expect(page.getByTestId("workout-reflection")).toHaveCount(0);
 
     // History shows the workout.
     await page.getByRole("link", { name: "View history" }).click();

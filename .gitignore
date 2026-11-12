@@ -4,6 +4,7 @@ out
 .env
 .env.local
 .env*.local
+.demo-credentials*
 *.tsbuildinfo
 next-env.d.ts
 coverage
@@ -17,3 +18,40 @@ screenshots/
 # Local agent worktrees
 .claude/worktrees/
 downloads/
+
+# Python bytecode (scripts/badge-art)
+__pycache__/
+
+# Badge master artwork (large; keep in Git LFS or a shared drive)
+assets/badge-masters/*
+!assets/badge-masters/README.md
+
+# Written by capacitor.config.ts at `npx cap sync` (the deployed address for the offline page)
+native-shell/server-url.js
+# Copied from public/ by capacitor.config.ts at `npx cap sync` (the offline Bible).
+native-shell/bible/
+native-shell/bible-offline.html
+native-shell/bible-offline.js
+
+# Secrets and signing material must never be committed (environment files other than the example, Apple and
+# Android signing keys, service-account credentials).
+.env.*
+!.env.example
+*.p8
+*.p12
+*.pfx
+*.pem
+*.cer
+*.mobileprovision
+*.provisionprofile
+*.keystore
+*.jks
+keystore.properties
+service-account*.json
+
+# AI coach evaluation runs (scripts/ai-eval): transcripts and model output, kept local
+ai-eval-results/
+
+# UX measurement tooling: local sign-in for the seeded occasional member, and run output
+scripts/ux/occasional.env
+scripts/ux/out/

@@ -1,5 +1,6 @@
 "use client";
 
+import { EQUIPMENT_PRESETS } from "@/lib/domain/equipment-presets";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -26,11 +27,13 @@ import { Button } from "@/components/ui/button";
 import { Input, NativeSelect } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ProgressBar } from "@/components/ui/progress-bar";
+import { COMBINE_GOALS, COMBINE_LABELS, type CombineGoal } from "@/lib/domain/combined-goals";
+import { planChanges, summarizeSeed, type PlanSummary } from "@/lib/domain/plan-preview";
 import {
   buildCustomProgram,
+  COMBINABLE_TYPES,
   CARDIO_MODALITIES,
   CARDIO_MODALITY_LABELS,
-  CUSTOM_PROGRAM_TYPES,
   CUSTOM_TYPES,
   MAIN_LIFT_LABELS,
   resolveGoalMaxes,
@@ -43,6 +46,7 @@ import {
   type MainLift,
   type ShowDivision,
 } from "@/lib/domain/custom-programs";
+import { DISCIPLINES } from "@/lib/domain/disciplines";
 import { intensityLabel } from "@/lib/domain/program-expansion";
 import type { CatalogExercise } from "@/lib/domain/program-generator";
 import { estimateOneRepMax } from "@/lib/domain/strength";
@@ -91,12 +95,6 @@ const RECOMMENDED_EQUIPMENT: Record<CustomProgramType, Equipment[]> = {
   agility: [],
 };
 
-const EQUIPMENT_PRESETS: { label: string; items: Equipment[] }[] = [
-  { label: "Full gym", items: EQUIPMENT.filter((e) => e !== "heavy_bag" && e !== "strongman_implements") as Equipment[] },
-  { label: "Home gym", items: ["barbell", "rack", "bench", "dumbbell", "pull_up_bar", "band", "kettlebell"] },
-  { label: "Dumbbells only", items: ["dumbbell", "bench", "band"] },
-  { label: "Bodyweight only", items: ["bodyweight", "mat"] },
-];
 
 const MINUTE_OPTIONS = [20, 30, 40, 45, 50, 60, 75, 90, 120];
 
@@ -163,10 +161,13 @@ export function ProgramBuilder({
   initial,
   initialType,
   catalog,
+  current = null,
 }: {
   initial: BuilderInitial;
   initialType: CustomProgramType | null;
   catalog: CatalogExercise[];
+  /** The active program, for the "what changes" preview on the review step. */
+  current?: PlanSummary | null;
 }) {
   const units = initial.units;
   const unit = weightUnit(units);
@@ -185,6 +186,8 @@ export function ProgramBuilder({
   const [minutes, setMinutes] = useState<number>(() => (initialType ? CUSTOM_TYPES[initialType].defaultMinutes : (initial.sessionMinutes ?? 45)));
   const [weeks, setWeeks] = useState<number>(() => (initialType ? weeksRange(initialType, CUSTOM_TYPES[initialType].goals[0]!.id).default : 8));
   const [division, setDivision] = useState<ShowDivision | null>(null);
+  const [combineGoal, setCombineGoal] = useState<CombineGoal | null>(null);
+  const [combineDays, setCombineDays] = useState(2);
 
   const [age, setAge] = useState(initial.age ? String(initial.age) : "");
   const initFt = initial.heightCm ? cmToFeetInches(initial.heightCm) : null;
@@ -226,6 +229,7 @@ export function ProgramBuilder({
     setMinutes(c.defaultMinutes);
     setWeeks(weeksRange(t, g.id).default);
     if (t !== "show_prep") setDivision(null);
+    if (!COMBINABLE_TYPES.includes(t)) setCombineGoal(null);
     setError(null);
   };
 
@@ -281,6 +285,7 @@ export function ProgramBuilder({
       if (!goalCfg) return "Choose a goal.";
       if (type === "show_prep" && !division) return "Choose your division.";
       if (weeks < wr.min || weeks > wr.max) return `Choose ${wr.min}–${wr.max} weeks.`;
+      if (combineGoal && days + combineDays > 7) return `${days} lifting days plus ${combineDays} run days is more than a week holds. Choose fewer days.`;
     }
     if (id === "numbers") {
       for (const l of cfg?.lifts ?? []) {
@@ -322,6 +327,7 @@ export function ProgramBuilder({
       cardio: cfg?.cardioInput ? { modality: goal === "first_5k" ? "run" : modality, continuousMinutes: continuous.trim() ? Math.round(num(continuous)) : 0 } : null,
       division: type === "show_prep" ? division : null,
       equipment: [...new Set(equipment)],
+      combine: combineGoal && COMBINABLE_TYPES.includes(type) ? { goal: combineGoal, days: combineDays } : null,
     };
   };
 
@@ -348,6 +354,7 @@ export function ProgramBuilder({
           cardio: p.cardio ?? null,
           division: p.division ?? null,
           equipment: p.equipment,
+          combine: p.combine ?? null,
         },
         catalog,
       );
@@ -356,7 +363,8 @@ export function ProgramBuilder({
     }
     // payload() reads the state listed here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, type, goal, experience, days, minutes, weeks, age, feet, inches, cm, weight, lifts, modality, continuous, division, equipment, catalog, units]);
+  }, [step, type, goal, experience, days, minutes, weeks, age, feet, inches, cm, weight, lifts, modality, continuous, division, equipment, catalog, units, combineGoal, combineDays]);
+  const changes = useMemo(() => (preview ? planChanges(current, summarizeSeed(preview)) : []), [preview, current]);
   const [previewWeek, setPreviewWeek] = useState(1);
   const names = useMemo(() => new Map(catalog.map((e) => [e.slug, e.name])), [catalog]);
 
@@ -415,7 +423,7 @@ export function ProgramBuilder({
           <span className="text-gold">{STEP_LABELS[step]}</span>
         </div>
         <ProgressBar value={((stepIndex + 1) / steps.length) * 100} label="Program builder progress" />
-        <ol className="mt-3 hidden gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground sm:flex" aria-label="Steps">
+        <ol className="mt-3 hidden gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:flex" aria-label="Steps">
           {steps.map((s, i) => (
             <li key={s} aria-current={i === stepIndex ? "step" : undefined} className={cn("flex-1 truncate", i === stepIndex && "text-gold-highlight", i < stepIndex && "text-foreground/80")}>
               {i + 1}. {STEP_LABELS[s]}
@@ -435,32 +443,45 @@ export function ProgramBuilder({
         </h2>
 
         {step === "type" && (
-          <div className="grid gap-3 sm:grid-cols-2" role="group" aria-label="Program type">
-            {CUSTOM_PROGRAM_TYPES.map((t) => {
-              const c = CUSTOM_TYPES[t];
-              const Icon = TYPE_ICONS[t];
-              const selected = type === t;
-              return (
-                <button
-                  key={t}
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => chooseType(t)}
-                  className={cn(
-                    "flex min-h-20 items-start gap-3 rounded-2xl border p-4 text-left transition-all hover:-translate-y-0.5",
-                    selected ? "border-gold bg-gold/10 shadow-[0_8px_24px_-16px_rgba(201,165,76,0.8)]" : "border-border bg-elevated hover:border-gold-muted",
-                  )}
-                >
-                  <span className={cn("rounded-xl p-2.5", selected ? "bg-gold text-primary-foreground" : "bg-gold/10 text-gold")}>
-                    <Icon className="size-5" aria-hidden />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block font-display text-lg font-bold uppercase leading-tight">{c.label}</span>
-                    <span className="mt-0.5 block text-xs text-muted-foreground">{c.description}</span>
-                  </span>
-                </button>
-              );
-            })}
+          <div className="space-y-6" role="group" aria-label="Program type">
+            {DISCIPLINES.filter((dsc) => dsc.customTypes.length > 0).map((dsc) => (
+              <section key={dsc.id} aria-labelledby={`pb-dsc-${dsc.id}`}>
+                <h3 id={`pb-dsc-${dsc.id}`} className="text-xs font-semibold uppercase tracking-widest text-gold">
+                  {dsc.label}
+                </h3>
+                <p className="mb-2 mt-0.5 text-xs text-muted-foreground">{dsc.whoFor}</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {dsc.customTypes.map((t) => {
+                    const c = CUSTOM_TYPES[t];
+                    const Icon = TYPE_ICONS[t];
+                    const selected = type === t;
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() => chooseType(t)}
+                        className={cn(
+                          "flex min-h-20 items-start gap-3 rounded-2xl border p-4 text-left transition-all hover:-translate-y-0.5",
+                          selected ? "border-gold bg-gold/10 shadow-[0_8px_24px_-16px_rgba(201,165,76,0.8)]" : "border-border bg-elevated hover:border-gold-muted",
+                        )}
+                      >
+                        <span className={cn("rounded-xl p-2.5", selected ? "bg-gold text-primary-foreground" : "bg-gold/10 text-gold")}>
+                          <Icon className="size-5" aria-hidden />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block font-display text-lg font-bold uppercase leading-tight">{c.label}</span>
+                          <span className="mt-0.5 block text-xs text-muted-foreground">{c.description}</span>
+                          <span className="mt-1.5 block text-xs leading-snug text-muted-foreground/90">
+                            <span className="font-semibold text-foreground/80">A typical week:</span> {c.typicalWeek}
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
           </div>
         )}
 
@@ -499,6 +520,9 @@ export function ProgramBuilder({
 
         {step === "goals" && cfg && (
           <div className="space-y-6">
+            <p className="rounded-xl border border-border bg-elevated px-4 py-3 text-xs text-muted-foreground">
+              <span className="font-semibold text-foreground">Who it&apos;s for:</span> {cfg.whoFor}
+            </p>
             <fieldset className="space-y-3">
               <legend className="text-sm font-semibold">Your goal</legend>
               <div className="grid gap-2">
@@ -527,6 +551,38 @@ export function ProgramBuilder({
                   Nutrition, water and peak-week decisions should be guided by a qualified coach or registered dietitian. This builder
                   covers training, conditioning and posing practice only.
                 </p>
+              </fieldset>
+            )}
+
+            {type && COMBINABLE_TYPES.includes(type) && (
+              <fieldset className="space-y-3">
+                <legend className="text-sm font-semibold">Add a second goal (optional)</legend>
+                <div className="grid grid-cols-3 gap-2" role="group" aria-label="Second goal">
+                  <Choice selected={!combineGoal} onClick={() => setCombineGoal(null)}>
+                    None
+                  </Choice>
+                  {COMBINE_GOALS.map((g) => (
+                    <Choice key={g} selected={combineGoal === g} onClick={() => setCombineGoal(g)}>
+                      {COMBINE_LABELS[g]}
+                    </Choice>
+                  ))}
+                </div>
+                {combineGoal && (
+                  <div className="space-y-2">
+                    <Label htmlFor="pb-combine-days">{combineGoal === "5k" ? "Run days per week" : "Conditioning days per week"}</Label>
+                    <NativeSelect id="pb-combine-days" value={combineDays} onChange={(e) => setCombineDays(Number(e.target.value))}>
+                      {[2, 3].map((d) => (
+                        <option key={d} value={d}>
+                          {d} days
+                        </option>
+                      ))}
+                    </NativeSelect>
+                    <p className="text-xs text-muted-foreground">
+                      {combineGoal === "5k" ? "Run days come from the first-5K run/walk plan" : "Sessions come from the endurance plan (one interval day, easy zone 2)"}. They go on
+                      their own days, and a hard run is never on or next to a heavy leg day.
+                    </p>
+                  </div>
+                )}
               </fieldset>
             )}
 
@@ -712,6 +768,32 @@ export function ProgramBuilder({
                   </div>
                 </div>
 
+                <section aria-labelledby="pb-changes" className="rounded-xl border border-gold-muted/50 bg-gold/5 p-4">
+                  <h3 id="pb-changes" className="text-sm font-semibold">
+                    {current ? "What changes from your current program" : "Your new plan"}
+                  </h3>
+                  {changes.length === 0 ? (
+                    <p className="mt-1 text-sm text-muted-foreground">Same schedule and session length as {current?.name}.</p>
+                  ) : (
+                    <ul className="mt-2 space-y-1 text-sm" data-testid="plan-changes">
+                      {changes.map((c) => (
+                        <li key={c.key} className="flex flex-wrap justify-between gap-x-3">
+                          <span className="text-muted-foreground">{c.label}</span>
+                          <span className="font-semibold tabular-nums">
+                            {c.before} → <span className="text-gold-highlight">{c.after}</span>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {preview.sessionMinutes > minutes && (
+                    <p className="mt-2 text-xs text-gold-highlight">
+                      The shortest version of these sessions takes about {preview.sessionMinutes} minutes, more than the {minutes} you chose. Choose a longer
+                      session or a lighter style.
+                    </p>
+                  )}
+                </section>
+
                 <div>
                   <p className="mb-2 text-sm font-semibold">Your block</p>
                   <ol className="grid grid-cols-4 gap-1.5 sm:grid-cols-8" aria-label="Weeks">
@@ -728,7 +810,7 @@ export function ProgramBuilder({
                           )}
                         >
                           <span className="text-xs font-semibold">W{i + 1}</span>
-                          <span className="w-full truncate text-[10px] text-muted-foreground">{w.focus.split(":")[0]}</span>
+                          <span className="w-full truncate text-xs text-muted-foreground">{w.focus.split(":")[0]}</span>
                         </button>
                       </li>
                     ))}

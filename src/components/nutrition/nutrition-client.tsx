@@ -1,22 +1,37 @@
 "use client";
 
-import { useActionState, useEffect, useState, useTransition } from "react";
-import { Droplets, Loader2, Plus, Search, Undo2 } from "lucide-react";
+import Link from "next/link";
+import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { ChevronDown, Droplets, Loader2, Plus, ScanBarcode, Search, Undo2, X } from "lucide-react";
 import { FieldError, FormMessage, SubmitButton } from "@/components/common/form-status";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input, NativeSelect } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { mealForTime } from "@/lib/domain/meal-time";
 import { BarcodeScanner } from "@/components/nutrition/barcode-scanner";
-import { initialActionState, type ActionState } from "@/lib/action-state";
+import { AmountPicker, basisSummary } from "@/components/nutrition/food-amount";
+import { FavoriteStar } from "@/components/nutrition/favorite-star";
+import { SourceBadge } from "@/components/nutrition/source-badge";
+import { DraftRestoredNotice } from "@/components/drafts/draft-notice";
+import { logItemFor } from "@/lib/domain/food-favorites";
+import { useDraft } from "@/lib/use-draft";
+import { useSessionState } from "@/lib/nav-memory";
+import { basisFromFoodRow, defaultUnit, type FoodChoice } from "@/lib/domain/food-basis";
+import { prepareEntry, rankFoods } from "@/lib/domain/food-search";
+import { initialActionState } from "@/lib/action-state";
 import { MEAL_TYPES } from "@/lib/domain/meals";
 import { caloriesFromMacros } from "@/lib/domain/nutrition";
+import { attemptId, quickFoodSummary, saveFailed, shortDate, waterLitres, type LogResult, type QuickFood } from "@/lib/domain/diary";
+import { LoggedUndo } from "@/components/nutrition/logged-undo";
+import { useAddWater } from "@/components/nutrition/use-add-water";
+import { cn } from "@/lib/utils";
 import {
-  addWaterAction,
   createCustomFoodAction,
   logFoodAction,
   logTemplateAction,
+  relogItemAction,
   saveMealTemplateAction,
   undoWaterAction,
   updateGoalsAction,
@@ -36,20 +51,10 @@ export interface MyFood {
   fat_g: number;
   is_estimate: boolean;
   source: string;
+  /** Full basis stored with a cached barcode / USDA food (foods.basis); null for other foods. */
+  basis?: unknown;
   /** Built-in foods only: whether it fits the user's diet style. */
   fitsDiet?: boolean;
-}
-
-interface SearchFood {
-  fdcId: string;
-  name: string;
-  brand: string | null;
-  dataType: string;
-  calories: number;
-  protein_g: number;
-  carbs_g: number;
-  fat_g: number;
-  householdServing: string | null;
 }
 
 function MealControls({ mealType, setMealType, status, setStatus, idPrefix }: { mealType: string; setMealType: (v: string) => void; status: string; setStatus: (v: string) => void; idPrefix: string }) {
@@ -76,289 +81,749 @@ function MealControls({ mealType, setMealType, status, setStatus, idPrefix }: { 
   );
 }
 
-export function AddFoodDialog({ date, myFoods, commonFoods, searchEnabled, dietName }: { date: string; myFoods: MyFood[]; commonFoods: MyFood[]; searchEnabled: boolean; dietName?: string }) {
-  const [open, setOpen] = useState(false);
-  const [mealType, setMealType] = useState("breakfast");
-  const [status, setStatus] = useState("logged");
-  const [result, setResult] = useState<ActionState | null>(null);
-  const [pending, startTransition] = useTransition();
-  const [tab, setTab] = useState("search");
+export function foodChoice(f: MyFood, kind: "mine" | "common"): FoodChoice {
+  const tag = f.source === "usda" ? "USDA" : f.source === "openfoodfacts" ? "Open Food Facts (community data) — check the label" : kind === "common" ? "Built-in food · typical values" : "My food";
+  return {
+    key: `food:${f.id}`,
+    kind: "food",
+    ref: f.id,
+    name: f.name,
+    detail: [f.brand, tag].filter(Boolean).join(" · "),
+    basis: basisFromFoodRow(f),
+    isEstimate: f.is_estimate,
+  };
+}
 
-  // Search state
-  const [q, setQ] = useState("");
-  const [results, setResults] = useState<SearchFood[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
-  const [grams, setGrams] = useState<Record<string, string>>({});
-  // My foods
-  const [servings, setServings] = useState<Record<string, string>>({});
+type SearchState = { kind: "idle" } | { kind: "loading" } | { kind: "error"; message: string } | { kind: "done" };
+
+export function searchErrorMessage(status: number, error?: string): string {
+  if (error === "rate_limited") return "Too many searches — wait a moment.";
+  if (error === "upgrade_required") return "Food search isn't available on your account right now.";
+  if (error === "unauthorized") return "Your session expired — sign in again.";
+  return status >= 500 ? "Search is unavailable right now." : "Search failed.";
+}
+
+export function ChoiceRow({
+  food,
+  onPick,
+  badge,
+  favorite,
+  onFavorite,
+}: {
+  food: FoodChoice;
+  onPick: (f: FoodChoice) => void;
+  badge?: React.ReactNode;
+  /** Undefined hides the star. */
+  favorite?: boolean;
+  onFavorite?: (food: FoodChoice, on: boolean) => void;
+}) {
+  return (
+    <li className="flex items-center rounded-xl border border-border bg-elevated/50">
+      <button type="button" className="min-w-0 flex-1 rounded-xl px-3 py-2 text-left hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/40" onClick={() => onPick(food)}>
+        <span className="block text-sm font-semibold">
+          {food.name}
+          {food.isEstimate && <span className="ml-1 text-xs font-normal text-gold">(typical values)</span>} <SourceBadge source={food.key} isEstimate={Boolean(food.isEstimate)} />
+          {badge}
+        </span>
+        {food.detail && <span className="block text-xs text-muted-foreground">{food.detail}</span>}
+        <span className="block text-xs text-muted-foreground">{basisSummary(food.basis)}</span>
+      </button>
+      {favorite !== undefined && <FavoriteStar food={food} initial={favorite} onChange={(on) => onFavorite?.(food, on)} className="mr-1" />}
+    </li>
+  );
+}
+
+/** A saved meal for the Add food sheet's "Saved meals" tab: one serving's numbers. */
+export interface SavedMealChoice {
+  id: string;
+  name: string;
+  calories: number;
+  protein_g: number;
+}
+
+const TAB_IDS = ["recent", "search", "scan", "saved", "favorites", "mine", "manual"] as const;
+/** Tabs keep their full label and scroll sideways rather than squeeze ("M…"). */
+const TAB_CLASS = "grow shrink-0";
+/** The big logging tiles on the diary's first screen. */
+const TILE_CLASS =
+  "h-auto min-h-[4.75rem] w-full flex-col gap-1.5 whitespace-normal rounded-2xl border-border bg-card px-1 py-3 text-center text-sm hover:border-gold-muted [&_svg]:size-6 [&_svg]:text-gold";
+
+export function AddFoodDialog({
+  date,
+  dayLabel,
+  myFoods,
+  commonFoods,
+  remoteSearch,
+  categories,
+  dietName,
+  recent = [],
+  frequent = [],
+  favorites = [],
+  savedMeals = [],
+  autoOpen = false,
+  initialTab,
+  scanTile = false,
+}: {
+  date: string;
+  /** "Today", or the day in words ("Mon, Nov 9"); defaults to the date in words. */
+  dayLabel?: string;
+  myFoods: MyFood[];
+  commonFoods: MyFood[];
+  /** USDA FoodData Central API (branded foods) is configured in addition to the built-in database. */
+  remoteSearch: boolean;
+  /** USDA food groups for "Browse by type". */
+  categories: string[];
+  dietName?: string;
+  recent?: QuickFood[];
+  frequent?: QuickFood[];
+  /** Starred foods (newest first). */
+  favorites?: FoodChoice[];
+  /** The member's saved meals, logged one serving at a time from the "Saved meals" tab. */
+  savedMeals?: SavedMealChoice[];
+  /** Open the dialog as soon as the page loads (the Quick Add sheet links to /nutrition?add=1). */
+  autoOpen?: boolean;
+  /** With autoOpen: the tab to open on (e.g. /nutrition?add=1&tab=scan). */
+  initialTab?: string;
+  /** Also render a "Scan barcode" tile that opens this sheet on its Scan tab (logging, not the product analyser). */
+  scanTile?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  // A tab asked for by how the sheet was opened (the Scan barcode tile, ?tab=scan). It wins over the remembered
+  // tab for this opening only, so the next plain "Add food" opens where the member left off.
+  const [forcedTab, setForcedTab] = useState<string | null>(null);
+  useEffect(() => {
+    if (!autoOpen) return;
+    setOpen(true);
+    if (initialTab && (TAB_IDS as readonly string[]).includes(initialTab)) setForcedTab(initialTab);
+  }, [autoOpen, initialTab]);
+  const [mealType, setMealType] = useState("breakfast");
+  // Each time the food search opens, start on the meal for the time of day (on this device's clock).
+  useEffect(() => {
+    if (open) setMealType(mealForTime(new Date()));
+  }, [open]);
+  const [status, setStatus] = useState("logged");
+  const [result, setResult] = useState<LogResult | null>(null);
+  const [pending, startTransition] = useTransition();
+  const hasRecent = recent.length > 0;
+  const hasSaved = savedMeals.length > 0;
+  // The tab, search text and food type are remembered for this browser tab (sessionStorage), so they
+  // survive switching app sections and reopening the dialog.
+  // null = not chosen yet: then the default follows the data (Recent once you've logged something).
+  const [chosenTab, setChosenTab] = useSessionState<string | null>("food.add.tab", null);
+  const setTab = (t: string | null) => {
+    setForcedTab(null);
+    setChosenTab(t);
+  };
+  const [picked, setPicked] = useState<FoodChoice | null>(null);
+  // Favorites: server list plus optimistic stars/un-stars made in this dialog.
+  const [favOverrides, setFavOverrides] = useState<Record<string, FoodChoice | null>>({});
+  useEffect(() => setFavOverrides({}), [favorites]);
+  const favList = useMemo(() => {
+    const base = favorites.filter((f) => favOverrides[f.key] !== null);
+    const added = Object.values(favOverrides).filter((f): f is FoodChoice => Boolean(f) && !favorites.some((x) => x.key === f!.key));
+    return [...added, ...base];
+  }, [favorites, favOverrides]);
+  const favKeys = useMemo(() => new Set(favList.map((f) => f.key)), [favList]);
+  // A new member (nothing logged, nothing starred) starts on Search, which shows Popular foods first.
+  // A tab that has nothing in it (no recent foods, no saved meals) is never shown.
+  const usable = (t: string | null) => (t && !(t === "recent" && !hasRecent) && !(t === "saved" && !hasSaved) ? t : null);
+  const tab = usable(forcedTab) ?? usable(chosenTab) ?? (hasRecent ? "recent" : favList.length ? "favorites" : "search");
+  // Keep the chosen tab in view in the scrolling tab row (e.g. Scan, opened from the tile).
+  const tabListRef = useRef<HTMLDivElement>(null);
+  const [tabsAtEnd, setTabsAtEnd] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const t = setTimeout(() => {
+      const list = tabListRef.current;
+      if (!list) return;
+      list.querySelector<HTMLElement>('[data-state="active"]')?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+      setTabsAtEnd(list.scrollLeft + list.clientWidth >= list.scrollWidth - 4);
+    }, 0);
+    return () => clearTimeout(t);
+  }, [open, tab]);
+  const onFavorite = (food: FoodChoice, on: boolean) => setFavOverrides((o) => ({ ...o, [food.key]: on ? food : null }));
+
+  // Search / browse state
+  const [q, setQ] = useSessionState("food.add.q", "");
+  const [cat, setCat] = useSessionState<number | null>("food.add.cat", null);
+  const [results, setResults] = useState<FoodChoice[]>([]);
+  const [remote, setRemote] = useState<FoodChoice[]>([]);
+  const [remoteError, setRemoteError] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [search, setSearch] = useState<SearchState>({ kind: "idle" });
+  const [moreLoading, setMoreLoading] = useState(false);
   const [filter, setFilter] = useState("");
   const [dietOnly, setDietOnly] = useState(false);
-  // Manual
-  const [manual, setManual] = useState({ name: "", calories: "", protein_g: "", carbs_g: "", fat_g: "", isEstimate: true });
+  // Manual entry: an unsent entry is kept as a draft on this device until it's logged.
+  const manualDraft = useDraft("food.manual", { name: "", calories: "", protein_g: "", carbs_g: "", fat_g: "", isEstimate: true });
+  const manual = manualDraft.value;
+  const setManual = manualDraft.setValue;
 
+  const term = q.trim();
   useEffect(() => {
-    if (!searchEnabled || q.trim().length < 2) {
-      setResults([]);
-      return;
-    }
+    if (!open || tab !== "search") return;
     const ctrl = new AbortController();
-    const t = setTimeout(async () => {
-      setSearching(true);
-      setSearchError(null);
-      try {
-        const res = await fetch(`/api/foods/search?q=${encodeURIComponent(q.trim())}`, { signal: ctrl.signal });
-        const json = (await res.json()) as { foods?: SearchFood[]; error?: string };
-        if (!res.ok) setSearchError(json.error === "rate_limited" ? "Too many searches — wait a moment." : "Search is unavailable right now.");
-        setResults(json.foods ?? []);
-      } catch (e) {
-        if ((e as Error).name !== "AbortError") setSearchError("Search failed. Check your connection.");
-      } finally {
-        setSearching(false);
-      }
-    }, 350);
+    const params = new URLSearchParams();
+    if (cat != null) params.set("cat", String(cat));
+    if (term.length >= 2 || cat != null) params.set("q", term);
+    const t = setTimeout(
+      async () => {
+        setSearch({ kind: "loading" });
+        try {
+          const res = await fetch(`/api/foods/search?${params}`, { signal: ctrl.signal });
+          const json = (await res.json().catch(() => ({}))) as { foods?: FoodChoice[]; remote?: FoodChoice[]; remoteError?: boolean; total?: number; error?: string };
+          if (!res.ok) {
+            setSearch({ kind: "error", message: searchErrorMessage(res.status, json.error) });
+            return;
+          }
+          setResults(json.foods ?? []);
+          setRemote(json.remote ?? []);
+          setRemoteError(Boolean(json.remoteError));
+          setTotal(json.total ?? 0);
+          setSearch({ kind: "done" });
+        } catch (e) {
+          if ((e as Error).name !== "AbortError")
+            setSearch({ kind: "error", message: typeof navigator !== "undefined" && !navigator.onLine ? "You're offline — search needs a connection." : "Search failed. Check your connection." });
+        }
+      },
+      term ? 250 : 0,
+    );
     return () => {
       clearTimeout(t);
       ctrl.abort();
     };
-  }, [q, searchEnabled]);
+  }, [term, cat, open, tab]);
 
-  const submit = (item: unknown) =>
+  const loadMore = async () => {
+    if (cat == null) return;
+    setMoreLoading(true);
+    try {
+      const params = new URLSearchParams({ cat: String(cat), q: term, offset: String(results.length) });
+      const res = await fetch(`/api/foods/search?${params}`);
+      const json = (await res.json().catch(() => ({}))) as { foods?: FoodChoice[]; error?: string };
+      if (res.ok) setResults((r) => [...r, ...(json.foods ?? [])]);
+      else setSearch({ kind: "error", message: searchErrorMessage(res.status, json.error) });
+    } catch {
+      setSearch({ kind: "error", message: "Couldn't load more. Check your connection." });
+    } finally {
+      setMoreLoading(false);
+    }
+  };
+
+  // One id per attempt: a retry after a timeout reuses it, so the item can't be logged twice.
+  const attempt = useRef<string | null>(null);
+  const submit = (item: unknown, onOk?: () => void) =>
     startTransition(async () => {
-      const res = await logFoodAction({ date, mealType, status, item });
-      setResult(res);
+      attempt.current ??= crypto.randomUUID();
+      try {
+        const res = await logFoodAction({ clientId: attempt.current, date, mealType, status, item });
+        setResult(res);
+        if (res.ok) {
+          attempt.current = null;
+          setPicked(null);
+          onOk?.();
+        }
+      } catch {
+        // Offline, or the request never arrived: the dialog, the food and its amount stay, and the retry reuses the id.
+        setResult(saveFailed());
+      }
     });
+
+  // After a food is logged the search box starts fresh next time (the tab and food type are kept).
+  const logPicked = (food: FoodChoice, quantity: number, unitId: string) => submit(logItemFor(food, quantity, unitId), () => setQ(""));
+  const star = (food: FoodChoice) => (favKeys.has(food.key) ? true : false);
+
+  const pick = (f: FoodChoice) => {
+    setResult(null);
+    setPicked(f);
+  };
+
+  // Re-logs and saved meals: the same tap again after a failed send reuses its id (see attemptId).
+  const again = useRef<{ key: string; id: string } | null>(null);
+  const relog = (itemId: string) =>
+    startTransition(async () => {
+      try {
+        const res = await relogItemAction({ itemId, date, mealType, status, clientId: attemptId(again, `relog|${itemId}|${date}|${mealType}|${status}`) });
+        if (res.ok) again.current = null;
+        setResult(res);
+      } catch {
+        setResult(saveFailed());
+      }
+    });
+
+  // One serving of a saved meal into the meal chosen above (the meal for the time of day unless changed).
+  const logSaved = (templateId: string) =>
+    startTransition(async () => {
+      const fd = new FormData();
+      fd.set("templateId", templateId);
+      fd.set("date", date);
+      fd.set("mealType", mealType);
+      fd.set("servings", "1");
+      fd.set("status", status);
+      fd.set("clientId", attemptId(again, `saved|${templateId}|${date}|${mealType}|${status}`));
+      try {
+        const res = await logTemplateAction(initialActionState, fd);
+        if (res.ok) again.current = null;
+        setResult(res);
+      } catch {
+        setResult(saveFailed());
+      }
+    });
+
+  const quickRow = (f: QuickFood, showCount: boolean) => (
+    <li key={f.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-elevated/50 px-3 py-2">
+      <span className="min-w-0">
+        <span className="block truncate text-sm font-semibold">{f.name}</span>
+        <span className="text-sm text-muted-foreground">
+          {quickFoodSummary(f)}
+          {showCount ? ` · logged ${f.count}×` : ""}
+        </span>
+      </span>
+      <Button size="sm" className="min-h-11 shrink-0" disabled={pending} onClick={() => relog(f.id)} aria-label={`Add ${f.name} again`}>
+        <Plus aria-hidden /> Add
+      </Button>
+    </li>
+  );
 
   const manualCalories = Number(manual.calories || 0);
   const macroCalories = caloriesFromMacros({ protein_g: Number(manual.protein_g || 0), carbs_g: Number(manual.carbs_g || 0), fat_g: Number(manual.fat_g || 0) });
   const mismatch = manual.calories && macroCalories > 0 && Math.abs(macroCalories - manualCalories) > Math.max(30, manualCalories * 0.2);
-  const filtered = myFoods.filter((f) => !filter || f.name.toLowerCase().includes(filter.toLowerCase()));
-  const terms = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const myChoices = myFoods.map((f) => foodChoice(f, "mine"));
+  const filtered = filter.trim() ? rankFoods(myChoices, filter, (c) => prepareEntry(c.name), 100) : myChoices;
+  const searching = term.length >= 2 && cat == null;
+  const myMatches = searching ? rankFoods(myChoices, term, (c) => prepareEntry(c.name), 5) : [];
   const pool = dietOnly ? commonFoods.filter((f) => f.fitsDiet) : commonFoods;
-  const commonMatches = (terms.length ? pool.filter((f) => terms.every((w) => f.name.toLowerCase().includes(w))) : pool).slice(0, terms.length ? 30 : 12);
-
-  const foodRow = (f: MyFood, tag?: string) => (
-    <li key={f.id} className="rounded-xl border border-border bg-elevated/50 p-3">
-      <p className="text-sm font-semibold">
-        {f.name} {f.is_estimate && <span className="text-[11px] font-normal text-gold">({tag ?? "estimate"})</span>}
-        {f.fitsDiet && dietName && <span className="ml-1.5 rounded-full border border-[#2f5a3d] px-2 py-0.5 align-middle text-[10px] font-semibold text-[#8fd3a5]">Fits {dietName}</span>}
-      </p>
-      <p className="text-xs text-muted-foreground">
-        {f.serving_size} {f.serving_unit}: {Number(f.calories)} kcal · P {Number(f.protein_g)}g · C {Number(f.carbs_g)}g · F {Number(f.fat_g)}g
-        {f.source === "usda" ? " · USDA" : f.source === "openfoodfacts" ? " · Open Food Facts (community data) — check the label" : ""}
-      </p>
-      <div className="mt-2 flex items-center gap-2">
-        <Input
-          type="number"
-          inputMode="decimal"
-          step="0.25"
-          min="0.25"
-          aria-label={`Servings of ${f.name}`}
-          value={servings[f.id] ?? "1"}
-          onChange={(e) => setServings((s) => ({ ...s, [f.id]: e.target.value }))}
-          className="h-10 w-20"
-        />
-        <span className="text-xs text-muted-foreground">servings</span>
-        <Button size="sm" className="ml-auto" disabled={pending || !(Number(servings[f.id] ?? 1) > 0)} onClick={() => submit({ source: "food", foodId: f.id, servings: Number(servings[f.id] ?? 1) })}>
-          Add
-        </Button>
-      </div>
-    </li>
-  );
+  const commonMatches = searching ? rankFoods(pool, term, (f) => prepareEntry(f.name), 8) : [];
+  const loading = search.kind === "loading";
+  const fitsBadge = (f: MyFood) =>
+    f.fitsDiet && dietName ? <span className="ml-1.5 rounded-full border border-[#2f5a3d] px-2 py-0.5 align-middle text-xs font-semibold text-[#8fd3a5]">Fits {dietName}</span> : null;
+  const sectionTitle = "text-xs font-semibold uppercase tracking-widest text-muted-foreground";
 
   return (
     <>
-      <Button onClick={() => { setOpen(true); setResult(null); }}>
+      <Button
+        variant="secondary"
+        className={TILE_CLASS}
+        onClick={() => {
+          setOpen(true);
+          setResult(null);
+          setPicked(null);
+          setForcedTab(null);
+          // A remembered tab that has nothing in it any more falls back to the default.
+          if ((chosenTab === "recent" && !hasRecent) || (chosenTab === "favorites" && !favList.length) || (chosenTab === "saved" && !hasSaved)) setTab(null);
+        }}
+      >
         <Plus aria-hidden /> Add food
       </Button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent side="bottom" className="max-h-[92dvh]">
+      {scanTile && (
+        <Button
+          variant="secondary"
+          className={TILE_CLASS}
+          data-testid="scan-tile"
+          onClick={() => {
+            setResult(null);
+            setPicked(null);
+            setForcedTab("scan");
+            setOpen(true);
+          }}
+        >
+          <ScanBarcode aria-hidden /> Scan barcode
+        </Button>
+      )}
+      <Dialog
+        open={open}
+        onOpenChange={(o) => {
+          setOpen(o);
+          if (!o) setForcedTab(null);
+        }}
+      >
+        <DialogContent side="bottom" className="max-h-[92dvh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Add food</DialogTitle>
-            <DialogDescription>For {date}</DialogDescription>
+            <DialogTitle>{picked ? "How much?" : "Add food"}</DialogTitle>
+            <DialogDescription>For {dayLabel ?? shortDate(date)}</DialogDescription>
           </DialogHeader>
-          <MealControls mealType={mealType} setMealType={setMealType} status={status} setStatus={setStatus} idPrefix="add" />
-          {result?.message && (
-            <p role={result.ok ? "status" : "alert"} className={result.ok ? "mt-3 text-sm text-[#5fc49a]" : "mt-3 text-sm text-[#f08a8a]"}>
-              {result.message}
-            </p>
-          )}
-          <Tabs value={tab} onValueChange={setTab} className="mt-4">
-            <TabsList className="w-full">
-              <TabsTrigger value="search" className="flex-1">
-                Search
-              </TabsTrigger>
-              <TabsTrigger value="scan" className="flex-1">
-                Scan
-              </TabsTrigger>
-              <TabsTrigger value="mine" className="flex-1">
-                My foods
-              </TabsTrigger>
-              <TabsTrigger value="manual" className="flex-1">
-                Manual
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="search">
-              <label className="relative block">
-                <span className="sr-only">Search foods</span>
-                <Search className="pointer-events-none absolute left-3 top-3.5 size-4 text-muted-foreground" aria-hidden />
-                <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. chicken, banana, rice" className="pl-9" />
-              </label>
-              {dietName && (
-                <label className="mt-2 flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={dietOnly} onChange={(e) => setDietOnly(e.target.checked)} className="size-5 accent-[#C9A54C]" />
-                  Only show foods that fit {dietName}
-                </label>
-              )}
-              <div className="mt-2 max-h-96 space-y-3 overflow-y-auto" aria-live="polite" aria-busy={searching}>
-                <section aria-label="Common foods">
-                  <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">{terms.length ? "Common foods" : "Popular foods"}</p>
-                  {commonMatches.length ? (
-                    <ul className="mt-2 space-y-2">{commonMatches.map((f) => foodRow(f, "typical values"))}</ul>
-                  ) : (
-                    <p className="py-2 text-sm text-muted-foreground">{commonFoods.length ? "No common foods match." : "No built-in foods are loaded on this server yet."}</p>
-                  )}
-                  <p className="mt-2 text-[11px] text-muted-foreground">Typical values; check the label when you have it.</p>
-                </section>
-                {searchEnabled && terms.length > 0 && (
-                  <section aria-label="Food database">
-                    <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">USDA food database · per 100 g</p>
-                    {searchError && <p className="mt-2 text-sm text-[#f08a8a]">{searchError}</p>}
-                    <ul className="mt-2 space-y-2">
-                      {searching && (
-                        <li className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
-                          <Loader2 className="size-4 animate-spin" aria-hidden /> Searching…
-                        </li>
-                      )}
-                      {!searching && q.trim().length >= 2 && results.length === 0 && !searchError && <li className="py-2 text-sm text-muted-foreground">No matches.</li>}
-                      {results.map((f) => (
-                        <li key={f.fdcId} className="rounded-xl border border-border bg-elevated/50 p-3">
-                          <p className="text-sm font-semibold">{f.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {f.brand ? `${f.brand} · ` : ""}
-                            {f.calories} kcal · P {f.protein_g}g · C {f.carbs_g}g · F {f.fat_g}g per 100 g
-                            {f.householdServing ? ` · label serving ${f.householdServing}` : ""}
-                          </p>
-                          <div className="mt-2 flex items-center gap-2">
-                            <Input
-                              type="number"
-                              inputMode="decimal"
-                              aria-label={`Grams of ${f.name}`}
-                              value={grams[f.fdcId] ?? "100"}
-                              onChange={(e) => setGrams((g) => ({ ...g, [f.fdcId]: e.target.value }))}
-                              className="h-10 w-24"
-                            />
-                            <span className="text-xs text-muted-foreground">g</span>
-                            <Button size="sm" className="ml-auto" disabled={pending} onClick={() => submit({ source: "usda", fdcId: f.fdcId, grams: Number(grams[f.fdcId] ?? 100) })}>
-                              Add
-                            </Button>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </section>
-                )}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="scan">
-              <BarcodeScanner
+          <LoggedUndo result={result} className="mt-3" />
+          {picked ? (
+            <div className="mt-3">
+              <AmountPicker
+                key={picked.key}
+                food={picked}
+                initialQuantity={defaultUnit(picked.basis).quantity}
+                initialUnitId={defaultUnit(picked.basis).unitId}
+                mealType={mealType}
+                onMealType={setMealType}
                 pending={pending}
-                onLog={submit}
-                onEnterManually={(name) => {
-                  if (name) setManual((m) => ({ ...m, name: name.slice(0, 160), isEstimate: false }));
-                  setTab("manual");
-                }}
-              />
-            </TabsContent>
-
-            <TabsContent value="mine">
-              {myFoods.length === 0 ? (
-                <p className="py-4 text-sm text-muted-foreground">No saved foods yet. Create one below the food log, or use Search.</p>
-              ) : (
-                <>
-                  <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter my foods" aria-label="Filter my foods" />
-                  <ul className="mt-2 max-h-80 space-y-2 overflow-y-auto">{filtered.map((f) => foodRow(f))}
-                  </ul>
-                </>
-              )}
-            </TabsContent>
-
-            <TabsContent value="manual">
-              <form
-                className="space-y-3"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  submit({
-                    source: "manual",
-                    name: manual.name,
-                    calories: Number(manual.calories || 0),
-                    protein_g: Number(manual.protein_g || 0),
-                    carbs_g: Number(manual.carbs_g || 0),
-                    fat_g: Number(manual.fat_g || 0),
-                    isEstimate: manual.isEstimate,
-                  });
-                }}
+                submitLabel={status === "planned" ? "Plan it" : "Log food"}
+                onSubmit={(quantity, unitId) => logPicked(picked, quantity, unitId)}
+                onBack={() => setPicked(null)}
+                idPrefix="add-amount"
+                headerAction={<FavoriteStar food={picked} initial={favKeys.has(picked.key)} onChange={(on) => onFavorite(picked, on)} />}
               >
                 <div className="space-y-1">
-                  <Label htmlFor="man-name">Food</Label>
-                  <Input id="man-name" required maxLength={160} value={manual.name} onChange={(e) => setManual({ ...manual, name: e.target.value })} />
+                  <Label htmlFor="add-amount-status">Log as</Label>
+                  <NativeSelect id="add-amount-status" value={status} onChange={(e) => setStatus(e.target.value)}>
+                    <option value="logged">Eaten</option>
+                    <option value="planned">Planned</option>
+                  </NativeSelect>
                 </div>
-                <div className="grid grid-cols-4 gap-2">
-                  {(
-                    [
-                      ["calories", "kcal"],
-                      ["protein_g", "Protein g"],
-                      ["carbs_g", "Carbs g"],
-                      ["fat_g", "Fat g"],
-                    ] as const
-                  ).map(([k, l]) => (
-                    <div key={k} className="space-y-1">
-                      <Label htmlFor={`man-${k}`} className="text-xs">
-                        {l}
-                      </Label>
-                      <Input id={`man-${k}`} type="number" inputMode="decimal" min={0} required={k === "calories"} value={manual[k]} onChange={(e) => setManual({ ...manual, [k]: e.target.value })} />
+              </AmountPicker>
+            </div>
+          ) : (
+            <>
+              <MealControls mealType={mealType} setMealType={setMealType} status={status} setStatus={setStatus} idPrefix="add" />
+              <Tabs value={tab} onValueChange={setTab} className="mt-4">
+                {/* The tabs scroll sideways on a phone; a fade on the right edge shows there are more. */}
+                <div className="relative">
+                  <TabsList
+                    ref={tabListRef}
+                    className="w-full justify-start overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                    onScroll={(e) => {
+                      const el = e.currentTarget;
+                      setTabsAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 4);
+                    }}
+                  >
+                    {hasRecent && (
+                      <TabsTrigger value="recent" className={TAB_CLASS}>
+                        Recent
+                      </TabsTrigger>
+                    )}
+                    <TabsTrigger value="search" className={TAB_CLASS}>
+                      Search
+                    </TabsTrigger>
+                    <TabsTrigger value="scan" className={TAB_CLASS}>
+                      Scan
+                    </TabsTrigger>
+                    {hasSaved && (
+                      <TabsTrigger value="saved" className={TAB_CLASS}>
+                        Saved meals
+                      </TabsTrigger>
+                    )}
+                    <TabsTrigger value="favorites" className={TAB_CLASS}>
+                      Favorites
+                    </TabsTrigger>
+                    <TabsTrigger value="mine" className={TAB_CLASS}>
+                      My foods
+                    </TabsTrigger>
+                    <TabsTrigger value="manual" className={TAB_CLASS}>
+                      Manual
+                    </TabsTrigger>
+                  </TabsList>
+                  <span
+                    aria-hidden
+                    data-testid="tabs-more-cue"
+                    className={cn(
+                      "pointer-events-none absolute inset-y-px right-px w-10 rounded-r-xl bg-gradient-to-l from-card to-transparent transition-opacity motion-reduce:transition-none",
+                      tabsAtEnd ? "opacity-0" : "opacity-100",
+                    )}
+                  />
+                </div>
+
+                {hasRecent && (
+                  <TabsContent value="recent">
+                    <div className="space-y-4">
+                      {frequent.length > 0 && (
+                        <section aria-label="Frequent foods">
+                          <p className={sectionTitle}>Frequent</p>
+                          <ul className="mt-2 space-y-2">{frequent.map((f) => quickRow(f, true))}</ul>
+                        </section>
+                      )}
+                      <section aria-label="Recent foods">
+                        <p className={sectionTitle}>Recent</p>
+                        <ul className="mt-2 space-y-2">{recent.map((f) => quickRow(f, false))}</ul>
+                      </section>
+                      <p className="text-xs text-muted-foreground">One tap adds the amount shown to the meal chosen above.</p>
                     </div>
-                  ))}
-                </div>
-                {mismatch && <p className="text-xs text-gold">Heads up: these macros add up to about {macroCalories} kcal.</p>}
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={manual.isEstimate} onChange={(e) => setManual({ ...manual, isEstimate: e.target.checked })} className="size-5 accent-[#C9A54C]" />
-                  These values are my estimate (not from a label)
-                </label>
-                <Button type="submit" className="w-full" disabled={pending}>
-                  {pending && <Loader2 className="animate-spin" aria-hidden />} Add entry
-                </Button>
-              </form>
-            </TabsContent>
-          </Tabs>
+                  </TabsContent>
+                )}
+
+                {hasSaved && (
+                  <TabsContent value="saved">
+                    <section aria-label="Saved meals">
+                      <ul className="space-y-2">
+                        {savedMeals.map((m) => (
+                          <li key={m.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-elevated/50 px-3 py-2">
+                            <span className="min-w-0">
+                              <span className="block truncate text-sm font-semibold">{m.name}</span>
+                              <span className="text-sm text-muted-foreground">
+                                1 serving · {Math.round(m.calories)} kcal · P {Math.round(m.protein_g)} g
+                              </span>
+                            </span>
+                            <Button size="sm" className="min-h-11 shrink-0" disabled={pending} onClick={() => logSaved(m.id)} aria-label={`Add ${m.name}`}>
+                              <Plus aria-hidden /> Add
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="mt-2 text-xs text-muted-foreground">One tap adds one serving to the meal chosen above.</p>
+                      <Link href="/nutrition/saved-meals" className="inline-flex min-h-11 items-center text-sm font-semibold text-gold-highlight underline">
+                        More servings, another day, or manage saved meals
+                      </Link>
+                    </section>
+                  </TabsContent>
+                )}
+
+                <TabsContent value="favorites">
+                  {favList.length === 0 ? (
+                    <p className="py-4 text-sm text-muted-foreground">
+                      No favorites yet. Tap the star next to any food in Search, Scan, My foods or your diary to keep it here.
+                    </p>
+                  ) : (
+                    <section aria-label="Favorite foods">
+                      <ul className="space-y-2">
+                        {favList.map((f) => (
+                          <ChoiceRow key={f.key} food={f} onPick={pick} favorite onFavorite={onFavorite} />
+                        ))}
+                      </ul>
+                      <p className="mt-2 text-xs text-muted-foreground">Tap a food to choose the amount. Values are re-checked from the source when you log it.</p>
+                    </section>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="search">
+                  {cat != null && (
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold">{categories[cat]}</p>
+                      <Button type="button" size="sm" variant="ghost" className="min-h-11" onClick={() => setCat(null)}>
+                        <X aria-hidden /> All types
+                      </Button>
+                    </div>
+                  )}
+                  <Label htmlFor="food-search" className="mb-1 block">
+                    {cat != null ? `Search ${categories[cat]}` : "Search foods"}
+                  </Label>
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-3.5 size-4 text-muted-foreground" aria-hidden />
+                    <Input
+                      id="food-search"
+                      value={q}
+                      onChange={(e) => setQ(e.target.value)}
+                      placeholder={cat != null ? `Search ${categories[cat]}` : "e.g. chicken, banana, rice"}
+                      className="pl-9"
+                    />
+                  </div>
+                  {dietName && searching && (
+                    <label className="mt-2 flex min-h-11 items-center gap-2 text-sm">
+                      <input type="checkbox" checked={dietOnly} onChange={(e) => setDietOnly(e.target.checked)} className="size-5 accent-[#C9A54C]" />
+                      Only show built-in foods that fit {dietName}
+                    </label>
+                  )}
+                  <div className="mt-3 space-y-4" aria-live="polite" aria-busy={loading}>
+                    {search.kind === "error" && (
+                      <p role="alert" className="text-sm text-[#f08a8a]">
+                        {search.message}
+                      </p>
+                    )}
+
+                    {searching && myMatches.length > 0 && (
+                      <section aria-label="My foods matches">
+                        <p className={sectionTitle}>My foods</p>
+                        <ul className="mt-2 space-y-2">
+                          {myMatches.map((f) => (
+                            <ChoiceRow key={f.key} food={f} onPick={pick} favorite={star(f)} onFavorite={onFavorite} />
+                          ))}
+                        </ul>
+                      </section>
+                    )}
+
+                    <section aria-label={cat != null ? categories[cat] : searching ? "Food database" : "Popular foods"}>
+                      <p className={sectionTitle}>{cat != null ? `USDA · ${total} foods` : searching ? "USDA food database" : "Popular foods"}</p>
+                      {loading && results.length === 0 ? (
+                        <p className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+                          <Loader2 className="size-4 animate-spin" aria-hidden /> {cat != null || searching ? "Searching…" : "Loading…"}
+                        </p>
+                      ) : search.kind === "done" && results.length === 0 ? (
+                        <p className="py-2 text-sm text-muted-foreground">No matches. Try fewer or different words, or add it under Manual.</p>
+                      ) : (
+                        <ul className="mt-2 space-y-2">
+                          {results.map((f) => (
+                            <ChoiceRow key={f.key} food={f} onPick={pick} favorite={star(f)} onFavorite={onFavorite} />
+                          ))}
+                        </ul>
+                      )}
+                      {cat != null && results.length < total && search.kind === "done" && (
+                        <Button type="button" variant="secondary" size="sm" className="mt-2 w-full" disabled={moreLoading} onClick={() => void loadMore()}>
+                          {moreLoading && <Loader2 className="animate-spin" aria-hidden />} Show more ({total - results.length} left)
+                        </Button>
+                      )}
+                      <p className="mt-2 text-xs text-muted-foreground">USDA FoodData Central (SR Legacy, public domain). Values per 100 g; pick any amount next.</p>
+                    </section>
+
+                    {/* The 25 USDA food groups, closed until asked for: a new member sees Popular foods first. */}
+                    {cat == null && !searching && (
+                      <details className="group rounded-xl border border-border" data-testid="browse-by-type">
+                        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+                          Browse by type
+                          <ChevronDown className="size-4 shrink-0 text-gold transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
+                        </summary>
+                        <section aria-label="Browse by type" className="flex flex-wrap gap-1.5 border-t border-border p-3">
+                          {categories.map((c, i) => (
+                            <button
+                              key={c}
+                              type="button"
+                              onClick={() => {
+                                setCat(i);
+                                setQ("");
+                                setResults([]);
+                              }}
+                              className="min-h-11 rounded-full border border-border bg-elevated/60 px-3 py-1.5 text-sm hover:border-gold-muted hover:text-gold-highlight"
+                            >
+                              {c}
+                            </button>
+                          ))}
+                        </section>
+                      </details>
+                    )}
+
+                    {searching && (
+                      <section aria-label="Common foods">
+                        <p className={sectionTitle}>Built-in common foods</p>
+                        {commonMatches.length ? (
+                          <ul className="mt-2 space-y-2">
+                            {commonMatches.map((f) => (
+                              <ChoiceRow key={f.id} food={foodChoice(f, "common")} onPick={pick} badge={fitsBadge(f)} favorite={favKeys.has(`food:${f.id}`)} onFavorite={onFavorite} />
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="py-2 text-sm text-muted-foreground">{commonFoods.length ? "No built-in foods match." : "No built-in foods are loaded on this server yet."}</p>
+                        )}
+                        <p className="mt-2 text-xs text-muted-foreground">Typical values; check the label when you have it.</p>
+                      </section>
+                    )}
+
+                    {searching && remoteSearch && (remote.length > 0 || remoteError) && (
+                      <section aria-label="Branded foods">
+                        <p className={sectionTitle}>More from USDA FoodData Central</p>
+                        {remoteError ? (
+                          <p className="mt-2 text-sm text-muted-foreground">Branded-food search isn&apos;t responding right now; the results above still work.</p>
+                        ) : (
+                          <ul className="mt-2 space-y-2">
+                            {remote.map((f) => (
+                              <ChoiceRow key={f.key} food={f} onPick={pick} favorite={star(f)} onFavorite={onFavorite} />
+                            ))}
+                          </ul>
+                        )}
+                      </section>
+                    )}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="scan">
+                  <BarcodeScanner
+                    onFound={pick}
+                    onEnterManually={(name) => {
+                      if (name) setManual((m) => ({ ...m, name: name.slice(0, 160), isEstimate: false }));
+                      setTab("manual");
+                    }}
+                  />
+                </TabsContent>
+
+                <TabsContent value="mine">
+                  {myFoods.length === 0 ? (
+                    <p className="py-4 text-sm text-muted-foreground">No saved foods yet. Create one below the food log, or use Search.</p>
+                  ) : (
+                    <>
+                      <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter my foods" aria-label="Filter my foods" />
+                      <ul className="mt-2 space-y-2">
+                        {filtered.map((f) => (
+                          <ChoiceRow key={f.key} food={f} onPick={pick} favorite={star(f)} onFavorite={onFavorite} />
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="manual">
+                  <form
+                    className="space-y-3"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      submit(
+                        {
+                          source: "manual",
+                          name: manual.name,
+                          calories: Number(manual.calories || 0),
+                          protein_g: Number(manual.protein_g || 0),
+                          carbs_g: Number(manual.carbs_g || 0),
+                          fat_g: Number(manual.fat_g || 0),
+                          isEstimate: manual.isEstimate,
+                        },
+                        manualDraft.clear,
+                      );
+                    }}
+                  >
+                    {manualDraft.restored && <DraftRestoredNotice onDiscard={manualDraft.clear} onDismiss={manualDraft.dismissRestored} />}
+                    <div className="space-y-1">
+                      <Label htmlFor="man-name">Food</Label>
+                      <Input id="man-name" required maxLength={160} value={manual.name} onChange={(e) => setManual({ ...manual, name: e.target.value })} />
+                    </div>
+                    <div className="grid grid-cols-4 gap-2">
+                      {(
+                        [
+                          ["calories", "kcal"],
+                          ["protein_g", "Protein g"],
+                          ["carbs_g", "Carbs g"],
+                          ["fat_g", "Fat g"],
+                        ] as const
+                      ).map(([k, l]) => (
+                        <div key={k} className="space-y-1">
+                          <Label htmlFor={`man-${k}`} className="text-xs">
+                            {l}
+                          </Label>
+                          <Input id={`man-${k}`} type="number" inputMode="decimal" min={0} required={k === "calories"} value={manual[k]} onChange={(e) => setManual({ ...manual, [k]: e.target.value })} />
+                        </div>
+                      ))}
+                    </div>
+                    {mismatch && <p className="text-xs text-gold">Heads up: these macros add up to about {macroCalories} kcal.</p>}
+                    <label className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" checked={manual.isEstimate} onChange={(e) => setManual({ ...manual, isEstimate: e.target.checked })} className="size-5 accent-[#C9A54C]" />
+                      These values are my estimate (not from a label)
+                    </label>
+                    <Button type="submit" className="w-full" disabled={pending}>
+                      {pending && <Loader2 className="animate-spin" aria-hidden />} Add entry
+                    </Button>
+                  </form>
+                </TabsContent>
+              </Tabs>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </>
   );
 }
 
+const BLANK_CUSTOM_FOOD = { name: "", brand: "", servingSize: "1", servingUnit: "serving", calories: "", protein_g: "0", carbs_g: "0", fat_g: "0", isEstimate: false };
+
 export function CustomFoodForm() {
   const [state, action] = useActionState(createCustomFoodAction, initialActionState);
+  // Unsaved values are kept on this device until the food is saved.
+  const draft = useDraft("food.custom", BLANK_CUSTOM_FOOD);
+  const v = draft.value;
+  const set = (k: keyof typeof BLANK_CUSTOM_FOOD) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    draft.setValue((d) => ({ ...d, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value }));
+  const clearDraft = draft.clear;
+  useEffect(() => {
+    if (state.ok && state.at) clearDraft();
+  }, [state.ok, state.at, clearDraft]);
   return (
-    <form action={action} className="space-y-3" key={state.ok ? state.at : "form"}>
+    <form action={action} className="space-y-3">
+      {draft.restored && <DraftRestoredNotice onDiscard={draft.clear} onDismiss={draft.dismissRestored} />}
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2 space-y-1 sm:col-span-1">
           <Label htmlFor="cf-name">Name</Label>
-          <Input id="cf-name" name="name" required maxLength={160} aria-invalid={Boolean(state.fieldErrors?.name)} />
+          <Input id="cf-name" name="name" required maxLength={160} value={v.name} onChange={set("name")} aria-invalid={Boolean(state.fieldErrors?.name)} />
         </div>
         <div className="col-span-2 space-y-1 sm:col-span-1">
           <Label htmlFor="cf-brand">Brand (optional)</Label>
-          <Input id="cf-brand" name="brand" maxLength={120} />
+          <Input id="cf-brand" name="brand" maxLength={120} value={v.brand} onChange={set("brand")} />
         </div>
         <div className="space-y-1">
           <Label htmlFor="cf-size">Serving size</Label>
-          <Input id="cf-size" name="servingSize" type="number" inputMode="decimal" step="any" required defaultValue="1" />
+          <Input id="cf-size" name="servingSize" type="number" inputMode="decimal" step="any" required value={v.servingSize} onChange={set("servingSize")} />
         </div>
         <div className="space-y-1">
           <Label htmlFor="cf-unit">Unit</Label>
-          <Input id="cf-unit" name="servingUnit" required defaultValue="serving" maxLength={30} />
+          <Input id="cf-unit" name="servingUnit" required maxLength={30} value={v.servingUnit} onChange={set("servingUnit")} />
         </div>
       </div>
       <div className="grid grid-cols-4 gap-2">
@@ -374,12 +839,12 @@ export function CustomFoodForm() {
             <Label htmlFor={`cf-${k}`} className="text-xs">
               {l}
             </Label>
-            <Input id={`cf-${k}`} name={k} type="number" inputMode="decimal" step="any" min={0} required defaultValue={k === "calories" ? "" : "0"} />
+            <Input id={`cf-${k}`} name={k} type="number" inputMode="decimal" step="any" min={0} required value={v[k]} onChange={set(k)} />
           </div>
         ))}
       </div>
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" name="isEstimate" className="size-5 accent-[#C9A54C]" />
+      <label className="flex min-h-11 items-center gap-2 text-sm">
+        <input type="checkbox" name="isEstimate" checked={v.isEstimate} onChange={set("isEstimate")} className="size-5 accent-[#C9A54C]" />
         Values are an estimate (not copied from a label)
       </label>
       <FormMessage state={state} />
@@ -389,13 +854,14 @@ export function CustomFoodForm() {
 }
 
 export function WaterCard({ date, totalMl, goalMl }: { date: string; totalMl: number; goalMl: number }) {
-  const [state, action] = useActionState(addWaterAction, initialActionState);
+  const { state, add } = useAddWater(date);
   const pct = goalMl ? Math.min(100, Math.round((totalMl / goalMl) * 100)) : 0;
+  const water = waterLitres(totalMl, goalMl);
   return (
     <div className="space-y-3">
       <div className="flex items-end justify-between">
-        <p className="font-display text-3xl font-bold">
-          {(totalMl / 1000).toFixed(2)} <span className="text-base text-muted-foreground">/ {(goalMl / 1000).toFixed(1)} L</span>
+        <p className="font-display text-3xl font-bold tabular-nums" data-testid="water-total">
+          {water.total} <span className="text-base text-muted-foreground">of {water.goal} L</span>
         </p>
         <Droplets className="size-6 text-[#4A86C0]" aria-hidden />
       </div>
@@ -404,10 +870,8 @@ export function WaterCard({ date, totalMl, goalMl }: { date: string; totalMl: nu
       </div>
       <div className="flex flex-wrap gap-2">
         {[250, 500, 750].map((ml) => (
-          <form key={ml} action={action}>
-            <input type="hidden" name="date" value={date} />
-            <input type="hidden" name="amountMl" value={ml} />
-            <SubmitButton size="sm" variant="secondary" pendingLabel="…">
+          <form key={ml} action={() => add(ml)}>
+            <SubmitButton size="sm" variant="secondary" className="min-h-11" pendingLabel="…">
               +{ml} ml
             </SubmitButton>
           </form>
@@ -415,7 +879,7 @@ export function WaterCard({ date, totalMl, goalMl }: { date: string; totalMl: nu
         {totalMl > 0 && (
           <form action={undoWaterAction}>
             <input type="hidden" name="date" value={date} />
-            <Button type="submit" size="sm" variant="ghost" aria-label="Undo last water entry">
+            <Button type="submit" size="sm" variant="ghost" className="min-h-11" aria-label="Undo last water entry">
               <Undo2 aria-hidden /> Undo
             </Button>
           </form>
@@ -460,7 +924,7 @@ export function GoalsForm({ goals }: { goals: { calories: number; protein_g: num
           Re-estimate
         </SubmitButton>
       </div>
-      <p className="text-[11px] text-muted-foreground">
+      <p className="text-xs text-muted-foreground">
         Estimates are general guidance, not dietary advice. If you have a medical condition, are pregnant, or have a history of disordered eating, consult a
         registered dietitian or physician.
       </p>
@@ -475,17 +939,17 @@ export function SaveMealForm({ mealId, defaultName }: { mealId: string; defaultN
       <input type="hidden" name="mealId" value={mealId} />
       <div className="min-w-40 flex-1 space-y-1">
         <Label htmlFor={`sm-${mealId}`} className="text-xs">
-          Save as meal / recipe
+          Save as meal
         </Label>
-        <Input id={`sm-${mealId}`} name="name" defaultValue={defaultName} maxLength={120} required className="h-9" />
+        <Input id={`sm-${mealId}`} name="name" defaultValue={defaultName} maxLength={120} required className="h-11" />
       </div>
       <div className="w-24 space-y-1">
         <Label htmlFor={`sy-${mealId}`} className="text-xs">
           Makes (servings)
         </Label>
-        <Input id={`sy-${mealId}`} name="yieldServings" type="number" inputMode="decimal" min={1} step="0.5" defaultValue="1" className="h-9" />
+        <Input id={`sy-${mealId}`} name="yieldServings" type="number" inputMode="decimal" min={1} step="0.5" defaultValue="1" className="h-11" />
       </div>
-      <SubmitButton size="sm" variant="secondary">
+      <SubmitButton size="sm" variant="secondary" className="min-h-11">
         Save
       </SubmitButton>
       <div className="w-full">
@@ -497,7 +961,10 @@ export function SaveMealForm({ mealId, defaultName }: { mealId: string; defaultN
 
 export function LogTemplateForm({ templateId, date }: { templateId: string; date: string }) {
   const [state, action] = useActionState(logTemplateAction, initialActionState);
+  // Starts on the meal for the time of day, as the Add food sheet does. Read on the device after hydration (the
+  // server's clock and time zone can differ from the phone's); the member can change it.
   const [mealType, setMealType] = useState("dinner");
+  useEffect(() => setMealType(mealForTime(new Date())), []);
   const [status, setStatus] = useState("logged");
   return (
     <form action={action} className="space-y-2">
@@ -517,12 +984,12 @@ export function LogTemplateForm({ templateId, date }: { templateId: string; date
         <Label htmlFor={`td-${templateId}`} className="text-xs">
           Date
         </Label>
-        <Input id={`td-${templateId}`} name="date" type="date" defaultValue={date} className="h-9 w-40" />
-        <SubmitButton size="sm" className="ml-auto">
+        <Input id={`td-${templateId}`} name="date" type="date" defaultValue={date} className="h-11 w-40" />
+        <SubmitButton size="sm" className="ml-auto min-h-11">
           Add
         </SubmitButton>
       </div>
-      <FormMessage state={state} />
+      <LoggedUndo result={state.message ? state : null} />
     </form>
   );
 }

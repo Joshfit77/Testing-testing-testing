@@ -1,0 +1,531 @@
+{
+ "reviewed": "2026-11-04",
+ "method": "Each exercise rendered in the athlete look at six phases of its loop (start, early, middle, deepest/peak, return, end) and reviewed by eye against its written instructions, with doubtful ones re-rendered at 300-800 px and their joint and equipment positions read from the motion engine (hand-to-equipment distance, floor contact, travel, joint angles). Phase 2 (2026-11-04): the 31 pose-frame and placeholder exercises and hip abduction were rebuilt, bars and equipment restyled, and see-through near plates added where a plate would hide the head or arms; each rebuilt exercise was checked by the agent that rebuilt it (six phases plus 1x and 0.5x frame strips) and again at six phases by the reviewer, then all 157 were re-rendered from the merged code and reviewed again; motion fingerprints confirm only the 32 intended exercises changed movement. Automated motion checks: tests/unit/exercise-*.test.ts. Reviewed by Claude (AI); not reviewed by a coach and not approved by the owner.",
+ "ownerApproved": [],
+ "exercises": {
+  "90-90-hip-switch": {
+   "readiness": "animated",
+   "note": "Drawn from slightly above and in front, on a mat; the feet slide and pivot on the mat during the switch."
+  },
+  "a-skip": {
+   "readiness": "animated"
+  },
+  "ab-wheel-rollout": {
+   "readiness": "animated"
+  },
+  "acceleration-sprint": {
+   "readiness": "animated"
+  },
+  "agility-ladder-drills": {
+   "readiness": "animated",
+   "note": "Shows only the two-feet-in-each-box pattern; from the side, the two feet in a box overlap."
+  },
+  "air-bike-sprint": {
+   "readiness": "animated",
+   "note": "Each handle is drawn going back as the same-side pedal comes forward (as on most air bikes); check against the real machine."
+  },
+  "ankle-knee-to-wall": {
+   "readiness": "animated"
+  },
+  "arm-over-arm-sled-pull": {
+   "readiness": "animated",
+   "note": "At the end of each loop the sled fades back to its starting distance."
+  },
+  "atlas-stone-load": {
+   "readiness": "animated",
+   "note": "Loop resets by fading out with the stone on the platform and fading back in at the floor."
+  },
+  "axle-clean-and-press": {
+   "readiness": "animated"
+  },
+  "back-extension": {
+   "readiness": "animated"
+  },
+  "back-squat": {
+   "readiness": "animated"
+  },
+  "band-assisted-pull-up": {
+   "readiness": "animated",
+   "note": "Grip direction cannot be drawn; the label names it."
+  },
+  "band-external-rotation": {
+   "readiness": "animated"
+  },
+  "band-neck-training": {
+   "readiness": "animated",
+   "note": "Shows the extension setup (facing the anchor, band behind the head) only."
+  },
+  "band-pass-through": {
+   "readiness": "animated",
+   "note": "Side view: the band is seen end-on as a small gold hook at the hands."
+  },
+  "band-pull-apart": {
+   "readiness": "animated"
+  },
+  "band-row": {
+   "readiness": "animated"
+  },
+  "barbell-row": {
+   "readiness": "animated"
+  },
+  "battle-rope-waves": {
+   "readiness": "animated"
+  },
+  "bear-crawl": {
+   "readiness": "animated",
+   "note": "Heels are drawn quite high so the ankle stays within its range with the knees that low."
+  },
+  "bench-press": {
+   "readiness": "animated"
+  },
+  "bike-intervals": {
+   "readiness": "animated"
+  },
+  "bird-dog": {
+   "readiness": "animated"
+  },
+  "block-pull": {
+   "readiness": "animated"
+  },
+  "bodyweight-squat": {
+   "readiness": "animated"
+  },
+  "bounding": {
+   "readiness": "animated"
+  },
+  "box-jump": {
+   "readiness": "animated",
+   "note": "Returns to the floor by a cross-fade rather than showing the step-down (neutral, the instructions say to step down)."
+  },
+  "box-squat": {
+   "readiness": "animated"
+  },
+  "box-squat-to-chair": {
+   "readiness": "animated"
+  },
+  "brisk-walk": {
+   "readiness": "animated"
+  },
+  "broad-jump": {
+   "readiness": "animated",
+   "note": "Loop resets with a fade back to the start line after the landing."
+  },
+  "bulgarian-split-squat": {
+   "readiness": "animated"
+  },
+  "burpee": {
+   "readiness": "animated"
+  },
+  "cable-chest-fly": {
+   "readiness": "animated"
+  },
+  "cable-crunch": {
+   "readiness": "animated",
+   "note": "The pulley sits above the top of the frame."
+  },
+  "cable-lateral-raise": {
+   "readiness": "animated"
+  },
+  "cable-woodchop": {
+   "readiness": "animated",
+   "note": "Front view cannot show the hip/torso turn or back-foot pivot; written cues cover it."
+  },
+  "cat-cow": {
+   "readiness": "animated"
+  },
+  "chest-supported-row": {
+   "readiness": "animated"
+  },
+  "childs-pose": {
+   "readiness": "animated"
+  },
+  "chin-up": {
+   "readiness": "animated",
+   "note": "Grip direction cannot be drawn (coach-flagged); the label names it."
+  },
+  "close-grip-bench-press": {
+   "readiness": "animated"
+  },
+  "conventional-deadlift": {
+   "readiness": "animated",
+   "note": "Coach-flagged: start torso on the flat side of normal."
+  },
+  "copenhagen-plank": {
+   "readiness": "animated"
+  },
+  "couch-stretch": {
+   "readiness": "animated"
+  },
+  "dead-bug": {
+   "readiness": "animated"
+  },
+  "dead-hang": {
+   "readiness": "animated"
+  },
+  "deep-squat-hold": {
+   "readiness": "animated"
+  },
+  "deficit-deadlift": {
+   "readiness": "animated"
+  },
+  "dips": {
+   "readiness": "animated",
+   "note": "Coach-flagged: shoulder position at the bottom."
+  },
+  "dumbbell-bench-press": {
+   "readiness": "animated"
+  },
+  "dumbbell-curl": {
+   "readiness": "animated"
+  },
+  "face-pull": {
+   "readiness": "animated"
+  },
+  "farmers-carry": {
+   "readiness": "animated"
+  },
+  "figure-four-stretch": {
+   "readiness": "animated",
+   "note": "Seen from above, the pulled thigh points at the camera, so the pull mostly shows as the '4' moving toward the chest."
+  },
+  "flying-sprint": {
+   "readiness": "animated"
+  },
+  "front-squat": {
+   "readiness": "animated",
+   "note": "Side view: the near plate is drawn see-through where it would hide the face and front rack."
+  },
+  "glute-bridge": {
+   "readiness": "animated"
+  },
+  "goblet-squat": {
+   "readiness": "animated"
+  },
+  "good-morning": {
+   "readiness": "animated"
+  },
+  "hack-squat": {
+   "readiness": "animated",
+   "note": "The rear support frame is visually heavy."
+  },
+  "hammer-curl": {
+   "readiness": "animated"
+  },
+  "hanging-knee-raise": {
+   "readiness": "animated"
+  },
+  "heavy-bag-rounds": {
+   "readiness": "animated"
+  },
+  "hip-abduction": {
+   "readiness": "animated",
+   "note": "At the widest point the forearms are drawn over the thighs."
+  },
+  "hip-escape": {
+   "readiness": "animated",
+   "note": "Seen from above: the torso stays drawn face-up while turning onto the side; the knees, hips, C-shape and travel along the mat carry the movement."
+  },
+  "hip-thrust": {
+   "readiness": "animated"
+  },
+  "incline-dumbbell-curl": {
+   "readiness": "animated"
+  },
+  "incline-dumbbell-press": {
+   "readiness": "animated"
+  },
+  "incline-push-up": {
+   "readiness": "animated"
+  },
+  "inverted-row": {
+   "readiness": "animated"
+  },
+  "jump-rope": {
+   "readiness": "animated",
+   "note": "The rope is drawn as a loop; edge-on it reads as a thin line, and when in front it crosses the forearms. Small hop."
+  },
+  "keg-carry": {
+   "readiness": "animated"
+  },
+  "kettlebell-swing": {
+   "readiness": "animated"
+  },
+  "landmine-press": {
+   "readiness": "animated",
+   "note": "The plate covers part of the chest at the start of the press."
+  },
+  "landmine-rotation": {
+   "readiness": "animated"
+  },
+  "lat-pulldown": {
+   "readiness": "animated"
+  },
+  "lateral-bound": {
+   "readiness": "animated",
+   "note": "From the front, the free leg can't be shown crossing behind the landing leg."
+  },
+  "lateral-raise": {
+   "readiness": "animated"
+  },
+  "lateral-shuffle": {
+   "readiness": "animated",
+   "note": "From the front a bent knee is drawn by shortening the thigh, so the low stance looks slightly bow-legged."
+  },
+  "leg-curl": {
+   "readiness": "animated",
+   "note": "Fixed 2026-11-04: the lever and ankle pad are now drawn in front of the legs (machineLever prop), so the resisted curl reads clearly."
+  },
+  "leg-extension": {
+   "readiness": "animated"
+  },
+  "leg-press": {
+   "readiness": "animated"
+  },
+  "log-press": {
+   "readiness": "animated"
+  },
+  "machine-chest-press": {
+   "readiness": "animated"
+  },
+  "medicine-ball-rotational-throw": {
+   "readiness": "animated",
+   "note": "Seen from the front, the trunk's turn shows through the hips, back knee and arms rather than the chest turning."
+  },
+  "medicine-ball-scoop-toss": {
+   "readiness": "animated",
+   "note": "Seen from the front, the trunk's turn shows through the hips, back knee and arms rather than the chest turning."
+  },
+  "medicine-ball-shot-put": {
+   "readiness": "animated",
+   "note": "Seen from the front, the punch carries the throwing arm across the chest, because the torso can't be drawn turning to the wall."
+  },
+  "medicine-ball-slam": {
+   "readiness": "animated"
+  },
+  "mountain-climber": {
+   "readiness": "animated"
+  },
+  "neck-isometrics": {
+   "readiness": "animated",
+   "note": "Only the front and back holds can be seen from the side; the side holds are in the text."
+  },
+  "nordic-hamstring-curl": {
+   "readiness": "animated"
+  },
+  "one-arm-dumbbell-push-press": {
+   "readiness": "animated"
+  },
+  "one-arm-dumbbell-row": {
+   "readiness": "animated"
+  },
+  "overhead-press": {
+   "readiness": "animated"
+  },
+  "overhead-triceps-extension": {
+   "readiness": "animated"
+  },
+  "pallof-press": {
+   "readiness": "animated",
+   "note": "Weakest read of its batch: the press comes straight toward the camera, so it shows as the arms straightening and shortening in front of the chest rather than the hands travelling across the picture; the cable from the side carries it."
+  },
+  "pause-squat": {
+   "readiness": "animated"
+  },
+  "paused-bench-press": {
+   "readiness": "animated"
+  },
+  "pike-push-up": {
+   "readiness": "animated",
+   "note": "The steep inverted V assumes fairly flexible hamstrings."
+  },
+  "pin-press": {
+   "readiness": "animated"
+  },
+  "plank": {
+   "readiness": "animated"
+  },
+  "pogo-jumps": {
+   "readiness": "animated",
+   "note": "Hops are only a few centimetres, so at thumbnail size the figure looks almost still."
+  },
+  "posing-practice": {
+   "readiness": "animated"
+  },
+  "power-clean": {
+   "readiness": "animated",
+   "note": "Side view: the near plate is drawn see-through in the catch; bar turnover is very quick but plausible."
+  },
+  "pro-agility-shuttle": {
+   "readiness": "animated",
+   "note": "Shown facing you, so the run between the lines is drawn as fast shuffle pushes rather than a turn-and-sprint; distances are shortened."
+  },
+  "pull-up": {
+   "readiness": "animated",
+   "note": "Grip direction cannot be drawn (coach-flagged); the label names it."
+  },
+  "push-press": {
+   "readiness": "animated",
+   "note": "Side view: the near plate is drawn see-through where it would hide the face and front rack."
+  },
+  "push-up": {
+   "readiness": "animated"
+  },
+  "reactive-mirror-drill": {
+   "readiness": "animated",
+   "note": "The partner isn't drawn (you are the partner), and the sequence is a fixed loop rather than random."
+  },
+  "rear-delt-fly": {
+   "readiness": "animated",
+   "note": "Shown from the front: the forward hinge shows only as a shorter torso and dumbbells hanging at knee height, so at a glance it can look like a lateral raise."
+  },
+  "reverse-lunge": {
+   "readiness": "animated"
+  },
+  "romanian-deadlift": {
+   "readiness": "animated"
+  },
+  "rowing-intervals": {
+   "readiness": "animated"
+  },
+  "run-walk-intervals": {
+   "readiness": "animated",
+   "note": "Only the running part is drawn; the walk recovery is in the text."
+  },
+  "running-intervals": {
+   "readiness": "animated"
+  },
+  "sandbag-bear-hug-carry": {
+   "readiness": "animated"
+  },
+  "sandbag-load-over-bar": {
+   "readiness": "animated",
+   "note": "Loop resets by fading out with the bag on the platform and fading back in at the floor."
+  },
+  "sandbag-to-shoulder": {
+   "readiness": "animated"
+  },
+  "seated-cable-row": {
+   "readiness": "animated"
+  },
+  "seated-calf-raise": {
+   "readiness": "animated"
+  },
+  "seated-dumbbell-shoulder-press": {
+   "readiness": "animated"
+  },
+  "seated-leg-curl": {
+   "readiness": "animated",
+   "note": "Sits tall off the back pad as cued, so a small gap shows at the shoulders."
+  },
+  "shadowboxing": {
+   "readiness": "animated"
+  },
+  "side-plank": {
+   "readiness": "animated"
+  },
+  "single-leg-balance": {
+   "readiness": "animated"
+  },
+  "single-leg-rdl": {
+   "readiness": "animated"
+  },
+  "sled-drag": {
+   "readiness": "animated"
+  },
+  "sled-push": {
+   "readiness": "animated"
+  },
+  "sprawl": {
+   "readiness": "animated"
+  },
+  "stair-climb": {
+   "readiness": "animated"
+  },
+  "standing-calf-raise": {
+   "readiness": "animated"
+  },
+  "standing-march": {
+   "readiness": "animated"
+  },
+  "step-back-burpee": {
+   "readiness": "animated"
+  },
+  "step-up": {
+   "readiness": "animated"
+  },
+  "straight-arm-pulldown": {
+   "readiness": "animated"
+  },
+  "strongman-farmers-walk": {
+   "readiness": "animated"
+  },
+  "suitcase-carry": {
+   "readiness": "animated"
+  },
+  "sumo-deadlift": {
+   "readiness": "animated",
+   "note": "Coach-flagged: start torso may be lower than many coaches teach."
+  },
+  "supine-hamstring-stretch": {
+   "readiness": "animated"
+  },
+  "t-drill": {
+   "readiness": "animated",
+   "note": "Distances are shortened, and the sprint toward you and the backpedal are shown by the figure growing and shrinking."
+  },
+  "tempo-squat": {
+   "readiness": "animated"
+  },
+  "thoracic-open-book": {
+   "readiness": "animated",
+   "note": "Weakest of the floor stretches: drawn from a raised front camera, the chest's rotation can't be shown (the torso stays front-facing), and at small sizes the start can look like all fours."
+  },
+  "three-cone-drill": {
+   "readiness": "animated",
+   "note": "Weakest of the agility drills: a side-on figure can't be drawn mid-turn, so each 180-degree turn is a quick fade; the leg to the far cone is seen nearly end-on, so the strides look short there; distances are shortened."
+  },
+  "trap-bar-carry": {
+   "readiness": "animated",
+   "note": "From the side the trap bar is edge-on, so at thumbnail size it reads close to a barbell."
+  },
+  "trap-bar-deadlift": {
+   "readiness": "animated"
+  },
+  "trap-bar-jump": {
+   "readiness": "animated",
+   "note": "The dip is a fairly deep hinge rather than a quarter squat; from the side the trap bar reads close to a barbell."
+  },
+  "triceps-pushdown": {
+   "readiness": "animated"
+  },
+  "walking-lunge": {
+   "readiness": "animated"
+  },
+  "wall-drill": {
+   "readiness": "animated",
+   "note": "The driven thigh stops about 20 degrees short of level."
+  },
+  "wall-push-up": {
+   "readiness": "animated"
+  },
+  "worlds-greatest-stretch": {
+   "readiness": "animated",
+   "note": "In the final hamstring step the front knee keeps about 30 degrees of bend."
+  },
+  "yoke-carry": {
+   "readiness": "animated",
+   "note": "Seen from the side: the yoke's two uprights overlap; readable but stylised."
+  },
+  "zercher-carry": {
+   "readiness": "animated",
+   "note": "Side view: the near plate is drawn see-through so the elbow cradle shows."
+  },
+  "zercher-squat": {
+   "readiness": "animated",
+   "note": "Side view: the near plate is drawn see-through so the elbow cradle shows."
+  },
+  "zone-2-run": {
+   "readiness": "animated"
+  }
+ }
+}

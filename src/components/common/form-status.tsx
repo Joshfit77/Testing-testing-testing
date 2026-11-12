@@ -8,7 +8,8 @@ import { useActionToast } from "@/components/ui/toaster";
 export function SubmitButton({ children, pendingLabel, ...props }: ButtonProps & { pendingLabel?: string }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending || props.disabled} aria-busy={pending} {...props}>
+    // The pending lock comes last, so a caller's own `disabled` can't re-enable the button while it submits.
+    <Button type="submit" {...props} disabled={pending || props.disabled} aria-busy={pending}>
       {pending && <Loader2 className="animate-spin" aria-hidden />}
       {pending ? (pendingLabel ?? "Saving…") : children}
     </Button>

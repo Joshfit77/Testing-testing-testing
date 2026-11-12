@@ -1,0 +1,173 @@
+{
+  "runs": 5,
+  "cpuThrottle": 4,
+  "viewport": "412x915 @2.625 (Pixel 7)",
+  "summary": {
+    "domContentLoaded": {
+      "old": 1304,
+      "new": 1050
+    },
+    "load": {
+      "old": 1313,
+      "new": 1087
+    },
+    "interactive": {
+      "old": 1516,
+      "new": 1364
+    },
+    "firstChartDrawn": {
+      "old": 2922,
+      "new": 2863
+    },
+    "longTaskMs": {
+      "old": 1875,
+      "new": 1595
+    },
+    "jsBeforeLoadKB": {
+      "old": 454,
+      "new": 341
+    },
+    "jsTotalKB": {
+      "old": 454,
+      "new": 455
+    },
+    "charts": {
+      "old": 5,
+      "new": 4
+    },
+    "tableToggleMs": {
+      "old": 32,
+      "new": 47
+    },
+    "tableRows": {
+      "old": 21,
+      "new": 21
+    }
+  },
+  "raw": {
+    "old": [
+      {
+        "domContentLoaded": 1304,
+        "load": 1313,
+        "interactive": 1516,
+        "firstChartDrawn": 2890,
+        "longTaskMs": 1875,
+        "jsBeforeLoadKB": 454,
+        "jsTotalKB": 454,
+        "charts": 5,
+        "tableToggleMs": 30,
+        "tableRows": 21
+      },
+      {
+        "domContentLoaded": 1335,
+        "load": 1344,
+        "interactive": 1539,
+        "firstChartDrawn": 2922,
+        "longTaskMs": 1849,
+        "jsBeforeLoadKB": 454,
+        "jsTotalKB": 454,
+        "charts": 5,
+        "tableToggleMs": 29,
+        "tableRows": 21
+      },
+      {
+        "domContentLoaded": 457,
+        "load": 1057,
+        "interactive": 1300,
+        "firstChartDrawn": 3036,
+        "longTaskMs": 2091,
+        "jsBeforeLoadKB": 454,
+        "jsTotalKB": 454,
+        "charts": 5,
+        "tableToggleMs": 32,
+        "tableRows": 21
+      },
+      {
+        "domContentLoaded": 1523,
+        "load": 1533,
+        "interactive": 1750,
+        "firstChartDrawn": 3140,
+        "longTaskMs": 2011,
+        "jsBeforeLoadKB": 454,
+        "jsTotalKB": 454,
+        "charts": 5,
+        "tableToggleMs": 44,
+        "tableRows": 21
+      },
+      {
+        "domContentLoaded": 482,
+        "load": 1126,
+        "interactive": 1402,
+        "firstChartDrawn": 2782,
+        "longTaskMs": 1782,
+        "jsBeforeLoadKB": 454,
+        "jsTotalKB": 454,
+        "charts": 5,
+        "tableToggleMs": 35,
+        "tableRows": 21
+      }
+    ],
+    "new": [
+      {
+        "domContentLoaded": 1050,
+        "load": 1059,
+        "interactive": 1242,
+        "firstChartDrawn": 2541,
+        "longTaskMs": 1452,
+        "jsBeforeLoadKB": 341,
+        "jsTotalKB": 455,
+        "charts": 4,
+        "tableToggleMs": 42,
+        "tableRows": 21
+      },
+      {
+        "domContentLoaded": 1153,
+        "load": 1163,
+        "interactive": 1430,
+        "firstChartDrawn": 2863,
+        "longTaskMs": 1625,
+        "jsBeforeLoadKB": 341,
+        "jsTotalKB": 455,
+        "charts": 4,
+        "tableToggleMs": 50,
+        "tableRows": 21
+      },
+      {
+        "domContentLoaded": 1464,
+        "load": 1474,
+        "interactive": 1793,
+        "firstChartDrawn": 3180,
+        "longTaskMs": 1711,
+        "jsBeforeLoadKB": 341,
+        "jsTotalKB": 455,
+        "charts": 4,
+        "tableToggleMs": 47,
+        "tableRows": 21
+      },
+      {
+        "domContentLoaded": 532,
+        "load": 1087,
+        "interactive": 1364,
+        "firstChartDrawn": 3007,
+        "longTaskMs": 1595,
+        "jsBeforeLoadKB": 341,
+        "jsTotalKB": 455,
+        "charts": 4,
+        "tableToggleMs": 39,
+        "tableRows": 21
+      },
+      {
+        "domContentLoaded": 465,
+        "load": 948,
+        "interactive": 1253,
+        "firstChartDrawn": 2759,
+        "longTaskMs": 1471,
+        "jsBeforeLoadKB": 341,
+        "jsTotalKB": 455,
+        "charts": 4,
+        "tableToggleMs": 62,
+        "tableRows": 21
+      }
+    ]
+  }
+}

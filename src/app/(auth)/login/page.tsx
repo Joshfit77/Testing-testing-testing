@@ -1,27 +1,36 @@
 import Link from "next/link";
 import { SignInForm } from "@/components/auth/auth-forms";
+import { DeviceCleanup } from "@/components/platform/device-cleanup";
 import { Notice } from "@/components/common/states";
 import { safeNextPath } from "@/lib/safe-redirect";
+import { authLinkMessage } from "@/lib/auth-messages";
+import { DemoEntry } from "@/components/demo/demo-entry";
+import { isDemoMode } from "@/server/demo";
 
 export const metadata = { title: "Sign in" };
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const sp = await searchParams;
+  // Only the fixed messages of the auth link routes; never text taken from the address.
+  const error = authLinkMessage(sp.error);
+  const notice = authLinkMessage(sp.notice);
   return (
     <div className="animate-fade-up pt-6">
       <h1 className="font-display text-4xl font-bold uppercase">Welcome back</h1>
       <p className="mt-2 text-sm text-muted-foreground">Sign in to continue your training.</p>
-      {sp.error && (
+      {error && (
         <Notice tone="error" className="mt-4">
-          {sp.error.slice(0, 200)}
+          {error}
         </Notice>
       )}
-      {sp.notice && (
+      {notice && (
         <Notice tone="info" className="mt-4">
-          {sp.notice.slice(0, 200)}
+          {notice}
         </Notice>
       )}
+      {isDemoMode() && <DemoEntry className="mt-6" />}
       <div className="mt-6 rounded-2xl border border-border bg-card p-5">
+        <DeviceCleanup />
         <SignInForm next={safeNextPath(sp.next)} />
       </div>
       <p className="mt-6 text-center text-sm text-muted-foreground">

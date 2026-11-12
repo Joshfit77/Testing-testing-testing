@@ -1,0 +1,132 @@
+name: Food database
+
+# Downloads the USDA FoodData Central "SR Legacy" dataset (public domain), converts it to the compact
+# JSON the app uses (scripts/build-food-db.mjs) and publishes it as the "food-db" release.
+# The app itself reads the copy committed at src/data/usda-foods.json, not the release.
+#
+# Least privilege: the download and conversion run with a read-only token. Only the publish job can
+# write to the repository. It runs no repository code: it downloads the converted file, checks it
+# against the SHA-256 the build job recorded, and replaces the release.
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Replace the food-db release (a manual run only builds and keeps usda-foods.json as a run artifact unless ticked)"
+        type: boolean
+        default: false
+      dry_run:
+        description: "Run the publish job without changing the release (downloads and checks the file only)"
+        type: boolean
+        default: false
+  push:
+    branches: [main, claude/sharp-cray-8y0uuv]
+    paths:
+      - "scripts/build-food-db.mjs"
+      - ".github/workflows/food-db.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: food-db
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Download, check and convert (read-only token)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    outputs:
+      sha256: ${{ steps.hash.outputs.sha256 }}
+    env:
+      # The SR Legacy release the app's food list was built from (the 2018-04 CSV zip), and its SHA-256.
+      # Any other content is refused. To move to a newer USDA release, review it first, then update both
+      # values and regenerate src/data/usda-foods.json.
+      SR_LEGACY_URL: https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_sr_legacy_food_csv_2018-04.zip
+      # Pinned from the first checked download on GitHub's runner (2026-11-02); the file built from it is compared
+      # with the app's copy below.
+      SR_LEGACY_SHA256: b80817294b8850530aaedf2e515c02593b1824f763a0ff356e5c2081643e6fd0
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+      - name: Download SR Legacy (HTTPS only, must match the pinned SHA-256)
+        run: |
+          set -euo pipefail
+          curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --max-filesize 209715200 -o sr.zip "$SR_LEGACY_URL"
+          got=$(sha256sum sr.zip | cut -d' ' -f1)
+          echo "Downloaded $SR_LEGACY_URL, SHA-256 $got"
+          if [ -z "$SR_LEGACY_SHA256" ]; then
+            echo "::error::SR_LEGACY_SHA256 is not set. Review the download, then pin $got in this workflow."
+            exit 1
+          fi
+          if [ "$got" != "$SR_LEGACY_SHA256" ]; then
+            echo "::error::The SR Legacy download doesn't match the pinned SHA-256 (got $got). If USDA republished the file, review it before updating the pin."
+            exit 1
+          fi
+          unzip -q sr.zip -d sr
+          find sr -name '*.csv' | head -20
+      - name: Build usda-foods.json
+        run: node scripts/build-food-db.mjs sr usda-foods.json
+      - name: Compare with the copy the app ships (information only)
+        run: |
+          if cmp -s usda-foods.json src/data/usda-foods.json; then
+            echo "Byte-identical to src/data/usda-foods.json."
+          else
+            echo "Differs from src/data/usda-foods.json (expected when scripts/build-food-db.mjs changed)."
+          fi
+      - name: Record the converted file's SHA-256
+        id: hash
+        run: |
+          set -euo pipefail
+          sha=$(sha256sum usda-foods.json | cut -d' ' -f1)
+          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
+          echo "usda-foods.json SHA-256: $sha"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: usda-foods
+          path: usda-foods.json
+          if-no-files-found: error
+
+  publish:
+    name: Publish as the food-db release
+    needs: build
+    # Pushes to the listed branches publish as before; a manual run publishes only when asked.
+    if: github.event_name == 'push' || inputs.publish == true || inputs.dry_run == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # replace the release
+      actions: read # download this run's artifact
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Download the converted file and check its SHA-256
+        env:
+          RUN_ID: ${{ github.run_id }}
+          EXPECTED_SHA256: ${{ needs.build.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          test -n "$EXPECTED_SHA256"
+          gh run download "$RUN_ID" --name usda-foods --dir out
+          echo "$EXPECTED_SHA256  out/usda-foods.json" | sha256sum --check --strict
+      - name: Dry run (nothing changed)
+        if: inputs.dry_run == true
+        run: |
+          gh release view food-db --json tagName,publishedAt || echo "No food-db release yet."
+          echo "Dry run: the file was downloaded and checked; the release was left as it is."
+      - name: Replace the food-db release
+        if: inputs.dry_run != true
+        env:
+          TARGET_SHA: ${{ github.sha }}
+        run: |
+          gh release delete food-db --yes --cleanup-tag || true
+          gh release create food-db out/usda-foods.json --target "$TARGET_SHA" --prerelease \
+            --title "Food database (USDA SR Legacy)" \
+            --notes "Generated by scripts/build-food-db.mjs from USDA FoodData Central SR Legacy (public domain). Nutrients per 100 g plus USDA household portions."

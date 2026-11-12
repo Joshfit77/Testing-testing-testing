@@ -9,7 +9,28 @@ import { logError } from "@/server/log";
 import { badgesUnlockedBySession, type BadgeIconName, type BadgeTier } from "@/lib/domain/achievements";
 import { isoDateInTz } from "@/lib/domain/dates";
 import { getAchievementStats } from "@/server/services/achievements";
-import { deleteWorkout, discardDraft, editWorkout, finishWorkout, saveDraftSnapshot, WorkoutError, type NewRecord } from "@/server/services/workouts";
+import {
+  deleteWorkout,
+  discardDraft,
+  editWorkout,
+  finishWorkout,
+  getExerciseTargets,
+  getPreviousPerformance,
+  previousComparableSession,
+  saveDraftSnapshot,
+  WorkoutError,
+  type ExerciseTarget,
+  type NewRecord,
+  type PreviousSession,
+} from "@/server/services/workouts";
+import { scriptureForDate } from "@/data/content";
+import type { TextPart } from "@/lib/bible/red-letter";
+import { scriptureParts } from "@/server/bible/text";
+import { nextSessionSummary, type NextSession } from "@/server/services/schedule";
+import type { PreviousPerformance } from "@/lib/domain/previous-performance";
+import { reachedMilestones, type ReachedMilestone } from "@/lib/domain/exercise-milestones";
+import type { UnitSystem } from "@/lib/domain/types";
+import { loadExerciseHistories } from "@/server/services/exercise-history";
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -61,9 +82,40 @@ async function unlockedBadges(supabase: Awaited<ReturnType<typeof getServerSupab
   }
 }
 
-export async function finishWorkoutAction(
-  input: unknown,
-): Promise<Result<{ sessionId: string; volumeKg: number; records: NewRecord[]; badges: UnlockedBadge[] }>> {
+export type { NextSession } from "@/server/services/schedule";
+export type { PreviousSession } from "@/server/services/workouts";
+
+/** An optional verse to close the session with (only for members who let workouts draw on Scripture). */
+export interface Reflection {
+  reference: string;
+  parts: TextPart[];
+  prompt: string;
+}
+
+/** For each exercise in a just-saved session, the milestones its sets reached (all-time history, paged). */
+async function milestonesReached(supabase: Awaited<ReturnType<typeof getServerSupabase>>, userId: string, sessionId: string, exerciseIds: string[], units: UnitSystem): Promise<ReachedMilestone[]> {
+  const ids = [...new Set(exerciseIds)];
+  if (!ids.length) return [];
+  const [{ data: exs }, histories] = await Promise.all([supabase.from("exercises").select("id, slug, name").in("id", ids), loadExerciseHistories(supabase, userId, ids)]);
+  return reachedMilestones(
+    ((exs ?? []) as { id: string; slug: string; name: string }[]).map((e) => ({ ...e, sessions: histories.get(e.id)?.sessions ?? [] })),
+    sessionId,
+    units,
+  );
+}
+
+export async function finishWorkoutAction(input: unknown): Promise<
+  Result<{
+    sessionId: string;
+    volumeKg: number;
+    records: NewRecord[];
+    badges: UnlockedBadge[];
+    milestones: ReachedMilestone[];
+    next: NextSession | null;
+    previous: PreviousSession | null;
+    reflection: Reflection | null;
+  }>
+> {
   const user = await requireUser();
   const parsed = finishWorkoutSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Some workout values are invalid. Check weights, reps and RPE." };
@@ -73,9 +125,45 @@ export async function finishWorkoutAction(
   try {
     const supabase = await getServerSupabase();
     const res = await finishWorkout(supabase, user.id, parsed.data);
-    const badges = res.alreadyCompleted ? [] : await unlockedBadges(supabase, user.id, res.sessionId);
+    // Badges are worked out from the saved sessions, so a retried finish (first response lost) shows them too.
+    const badges = await unlockedBadges(supabase, user.id, res.sessionId);
+    const profile = await getProfile(user.id);
+    // Milestones this session reached, from the saved history (so a retried finish shows them too). Never blocks the save.
+    const milestones = await milestonesReached(
+      supabase,
+      user.id,
+      res.sessionId,
+      parsed.data.exercises.filter((e) => !e.skipped).map((e) => e.exerciseId),
+      profile?.unit_system ?? "imperial",
+    ).catch((err: unknown) => {
+      logError("workouts.finish.milestones", err);
+      return [] as ReachedMilestone[];
+    });
+    const tz = profile?.timezone ?? "UTC";
+    // What the program has next, also after a workout outside it (never blocks the save: the summary goes without).
+    const programId =
+      parsed.data.userProgramId ??
+      ((await supabase.from("user_programs").select("id").eq("user_id", user.id).eq("status", "active").maybeSingle()).data?.id as string | undefined) ??
+      null;
+    const next = programId
+      ? await nextSessionSummary(supabase, user.id, programId, tz).catch((err: unknown) => {
+          logError("workouts.finish.next", err);
+          return null;
+        })
+      : null;
+    const previous = await previousComparableSession(supabase, user.id, {
+      sessionId: res.sessionId,
+      startedAt: parsed.data.startedAt,
+      programDayId: parsed.data.programDayId,
+      name: parsed.data.name,
+    }).catch((err: unknown) => {
+      logError("workouts.finish.previous", err);
+      return null;
+    });
+    const verse = profile?.faith_enabled ? scriptureForDate(isoDateInTz(new Date(), tz)) : null;
+    const reflection = verse ? { reference: verse.reference, parts: scriptureParts(verse.reference, verse.text), prompt: verse.reflection } : null;
     revalidatePath("/", "layout");
-    return { ok: true, data: { sessionId: res.sessionId, volumeKg: res.volumeKg, records: res.records, badges } };
+    return { ok: true, data: { sessionId: res.sessionId, volumeKg: res.volumeKg, records: res.records, badges, milestones, next, previous, reflection } };
   } catch (err) {
     logError("workouts.finish", err);
     return { ok: false, error: err instanceof WorkoutError && err.code === "invalid" ? "One of the exercises is no longer available." : "We couldn't save your workout. It's still on this device — please try again." };
@@ -110,5 +198,20 @@ export async function deleteWorkoutAction(sessionId: string): Promise<Result<nul
   } catch (err) {
     logError("workouts.delete", err);
     return { ok: false, error: "We couldn't delete this workout." };
+  }
+}
+
+/** Previous performance for exercises added during a workout (the page preloads the ones it starts with). */
+export async function previousPerformanceAction(exerciseIds: unknown): Promise<Result<Record<string, PreviousPerformance>> & { targets?: Record<string, ExerciseTarget> }> {
+  const user = await requireUser();
+  const ids = z.array(z.string().uuid()).max(40).safeParse(exerciseIds);
+  if (!ids.success) return { ok: false, error: "Invalid exercises" };
+  try {
+    const supabase = await getServerSupabase();
+    const [data, targets] = await Promise.all([getPreviousPerformance(supabase, user.id, ids.data), getExerciseTargets(supabase, user.id, ids.data).catch(() => ({}))]);
+    return { ok: true, data, targets };
+  } catch (err) {
+    logError("workouts.previous", err);
+    return { ok: false, error: "Couldn't load your previous sets." };
   }
 }

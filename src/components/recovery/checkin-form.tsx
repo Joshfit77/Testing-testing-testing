@@ -30,7 +30,7 @@ export function CheckinForm({ needsConsent }: { needsConsent: boolean }) {
               </label>
             ))}
           </div>
-          <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
+          <div className="mt-1 flex justify-between text-xs text-muted-foreground">
             <span>{s.low}</span>
             <span>{s.high}</span>
           </div>
@@ -43,8 +43,8 @@ export function CheckinForm({ needsConsent }: { needsConsent: boolean }) {
         <Textarea id="checkin-notes" name="notes" maxLength={500} className="mt-2 min-h-16" placeholder="Anything worth remembering about today" />
       </div>
       {needsConsent && (
-        <label className="flex items-start gap-3 rounded-xl border border-border bg-elevated/50 p-3 text-sm">
-          <input type="checkbox" name="consent" className="mt-0.5 size-5 accent-[#C9A54C]" />
+        <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-xl border border-border bg-elevated/50 p-3 text-sm">
+          <input type="checkbox" name="consent" className="mt-0.5 size-6 shrink-0 cursor-pointer accent-[#C9A54C]" />
           <span>I consent to storing optional recovery and wellness information to personalize my training. I can delete it at any time.</span>
         </label>
       )}

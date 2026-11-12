@@ -1,0 +1,46 @@
+{
+  "status": "review",
+  "version": 2,
+  "source": "Corrected 2026-10-30 from the owner's clip (original-owner.mp4; dumbbell-curl.mp4, 540x788, 30 fps, 7.47 s, H.264 High, no audio, sha256 07e8da80fb965e192f5dc826e2eb722ad06d67062b903196855fc30ea7e3dc33) with scripts/exercise-demos/correct.py: frames 43-92 (his left arm's clean lift and top hold, 1.4-3.0 s) played forward then the same real frames in reverse for the lowering, graded toward character-reference.png (dark graphite body, black shorts, near-black backdrop, gold kept). No frame is invented or blended.",
+  "fit": "native",
+  "encode": "copy",
+  "loop": true,
+  "thumbCrop": [
+    0,
+    40,
+    540,
+    405
+  ],
+  "highlighted": [
+    "biceps"
+  ],
+  "note": "New demonstration, awaiting the owner's review.",
+  "review": {
+    "character": "PASS",
+    "form": "PASS",
+    "equipment": "FAIL",
+    "highlighting": "PASS",
+    "playback": "PASS",
+    "mobile": "NOT TESTED"
+  },
+  "flags": [
+    "Kept from the source: a doubled dumbbell outline for about 8 frames (0.27 s) at the fastest part of the lift, and again on the way down (the lowering is the lift reversed).",
+    "The lowering is the lift's own frames played backwards, so it takes as long as the lift (about 0.6 s); a slower, controlled lowering needs a new clip.",
+    "Only his left arm curls; his right-arm reps in the source had the elbow drifting forward and were cut.",
+    "Removed by the correction: the elbow drift (0.0-1.2 s, 4.6-5.6 s), the stitch between two takes at 3.9 s, the dumbbell smears at 5.8-6.4 s, and the light skin / olive shorts / lit backdrop (graded).",
+    "Tried and rejected: a crossfade loop (left a second faint dumbbell) and a motion-interpolated slow-down to 3.3 s (warped the dumbbell)."
+  ],
+  "verified": "2026-10-30 (version 2, with the 0.5x file and touch controls): 36/36 checks in headless Chromium at iPhone 15 size with touch emulation (scripts/exercise-demos/verify-curl.mjs): plays, loops, Start/Top, Normal and the real 0.5x file, pause, tap to play/pause, finger scrub, page scroll, position bar, arrow keys, replay, enlarge, full screen, workout screen, library/search card, Reduced Motion, still fallback, slow network. Chromium played the WebM; iPhone Safari plays the MP4 and was not tested on a device.",
+  "phases": [
+    {
+      "label": "Start",
+      "t": 0
+    },
+    {
+      "label": "Top",
+      "t": 1.4
+    }
+  ],
+  "tracker": "FAILED",
+  "trackerReason": "Dumbbell shows a doubled outline for about 0.27 s at the fastest part of the lift (in the source footage), seen again on the reversed lowering. Needs a regenerated clip; this corrected version is the interim."
+}

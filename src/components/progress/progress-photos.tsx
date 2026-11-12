@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState, useTransition } from "react";
+import Link from "next/link";
+import { useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, Check, Columns2, ImageOff, ImagePlus, Loader2, Lock, Trash2, X } from "lucide-react";
 import { EmptyState } from "@/components/common/states";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input, Textarea } from "@/components/ui/input";
+import { useDraft } from "@/lib/use-draft";
 import { Label } from "@/components/ui/label";
 import { compressImage } from "@/lib/image-compress";
 import {
@@ -53,8 +55,11 @@ function UploadDialog({ open, onOpenChange, userId, units, today }: { open: bool
   const [preview, setPreview] = useState<string | null>(null);
   const [takenOn, setTakenOn] = useState(today);
   const [pose, setPose] = useState<PhotoPose>("front");
-  const [weight, setWeight] = useState("");
-  const [note, setNote] = useState("");
+  // The note and weight are kept as a draft on this device until the photo is saved (the image isn't).
+  const draft = useDraft("progress.photo", { weight: "", note: "" });
+  const { weight, note } = draft.value;
+  const setWeight = (w: string) => draft.setValue((d) => ({ ...d, weight: w }));
+  const setNote = (n: string) => draft.setValue((d) => ({ ...d, note: n }));
   const [stage, setStage] = useState<Stage>("idle");
   const [error, setError] = useState<string | null>(null);
   const busy = stage !== "idle";
@@ -66,18 +71,22 @@ function UploadDialog({ open, onOpenChange, userId, units, today }: { open: bool
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
-  const reset = () => {
+  /** Closing keeps the typed note/weight as a draft; `saved` also forgets it. */
+  const reset = (saved = false) => {
     setFile(null);
     setTakenOn(today);
     setPose("front");
-    setWeight("");
-    setNote("");
+    if (saved) draft.clear();
     setError(null);
   };
 
+  // An upload whose save we couldn't confirm (connection lost): retries reuse the same file, and the server treats a
+  // second save of the same file as already done, so a retry never makes a second entry or loses the image.
+  const pending = useRef<{ file: File; path: string } | null>(null);
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) return setError("Choose a photo first.");
+    if (pending.current?.file !== file) pending.current = null;
     setError(null);
     setStage("compressing");
     let blob: Blob;
@@ -93,21 +102,31 @@ function UploadDialog({ open, onOpenChange, userId, units, today }: { open: bool
     }
     setStage("uploading");
     const supabase = getBrowserSupabase();
-    const path = photoPathFor(userId, crypto.randomUUID());
-    const { error: upErr } = await supabase.storage.from(PROGRESS_PHOTO_BUCKET).upload(path, blob, { contentType: "image/jpeg", upsert: false, cacheControl: "3600" });
-    if (upErr) {
-      setStage("idle");
-      return setError("Upload failed. Check your connection and try again.");
+    const path = pending.current?.path ?? photoPathFor(userId, crypto.randomUUID());
+    if (!pending.current) {
+      const { error: upErr } = await supabase.storage.from(PROGRESS_PHOTO_BUCKET).upload(path, blob, { contentType: "image/jpeg", upsert: false, cacheControl: "3600" });
+      if (upErr) {
+        setStage("idle");
+        return setError("Upload failed. Check your connection and try again.");
+      }
+      pending.current = { file, path };
     }
     setStage("saving");
-    const res = await saveProgressPhotoAction({ path, takenOn, pose, note, weight }).catch(() => ({ ok: false as const, error: "You appear to be offline. Please try again." }));
+    const res = await saveProgressPhotoAction({ path, takenOn, pose, note, weight }).catch(() => null);
+    if (!res) {
+      // The server may have saved it: keep the file and let a retry confirm (no second entry).
+      setStage("idle");
+      return setError("We couldn't confirm the save. Check your connection and tap Save again.");
+    }
     if (!res.ok) {
       await supabase.storage.from(PROGRESS_PHOTO_BUCKET).remove([path]).catch(() => null);
+      pending.current = null;
       setStage("idle");
       return setError(res.error);
     }
+    pending.current = null;
     setStage("idle");
-    reset();
+    reset(true);
     onOpenChange(false);
     router.refresh();
   };
@@ -347,7 +366,20 @@ function CompareDialog({ pair, units, onClose }: { pair: [ProgressPhotoView, Pro
   );
 }
 
-export function ProgressPhotos({ photos, userId, units, today }: { photos: ProgressPhotoView[]; userId: string; units: UnitSystem; today: string }) {
+export function ProgressPhotos({
+  photos,
+  userId,
+  units,
+  today,
+  canCompare,
+}: {
+  photos: ProgressPhotoView[];
+  userId: string;
+  units: UnitSystem;
+  today: string;
+  /** Side-by-side comparisons are a Pro feature; adding and viewing photos is free. */
+  canCompare: boolean;
+}) {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [comparing, setComparing] = useState(false);
@@ -379,9 +411,16 @@ export function ProgressPhotos({ photos, userId, units, today }: { photos: Progr
           </p>
         </div>
         <div className="flex gap-2">
-          {photos.length >= 2 && !comparing && (
+          {photos.length >= 2 && !comparing && canCompare && (
             <Button variant="secondary" onClick={() => setComparing(true)}>
               <Columns2 aria-hidden /> Compare
+            </Button>
+          )}
+          {photos.length >= 2 && !canCompare && (
+            <Button asChild variant="secondary">
+              <Link href="/profile/billing">
+                <Columns2 aria-hidden /> Compare with Pro
+              </Link>
             </Button>
           )}
           {!comparing && (
@@ -426,7 +465,7 @@ export function ProgressPhotos({ photos, userId, units, today }: { photos: Progr
                   )}
                 >
                   <PhotoImage photo={p} alt="" className="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
-                  <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-2 pb-1.5 pt-5 text-left text-[11px] leading-tight text-white">
+                  <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-2 pb-1.5 pt-5 text-left text-xs leading-tight text-white">
                     <span className="block font-semibold">{formatDate(p.takenOn)}</span>
                     <span className="block text-white/70">{titleCase(p.pose)}</span>
                   </span>

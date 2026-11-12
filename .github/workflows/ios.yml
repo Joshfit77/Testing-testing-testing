@@ -1,51 +1,83 @@
 name: iOS
 
-# 1) "simulator" (runs on every push to the paths below): proves the iPhone app compiles, using the
-#    offline edition. No Apple account needed. Produces an .app for the iOS Simulator on a Mac.
-# 2) "testflight" (manual only): signs and uploads a build to App Store Connect / TestFlight.
-#    Needs an Apple Developer account and these repository secrets:
+# Two kinds of run (step-by-step guide: docs/TESTFLIGHT.md):
+#
+# 1) checks — every push to the branches below, or "Run workflow" with job = checks. No Apple account needed.
+#    - compile: the iPhone project compiles (offline edition, unsigned).
+#    - app-in-simulator: the FULL online app is built and served on the build Mac, the iPhone app is pointed at it
+#      and run in the iOS Simulator, and an XCUITest (scripts/ios-verify) films a fresh launch left alone, taps Enter
+#      Narrow Gate, relaunches the app, and checks the opening doesn't replay when the app returns from the
+#      background. The log ends with a CHECK line per filmed step; screenshots are in the "opening-in-simulator"
+#      artifact.
+#    - webkit: the opening and navigation browser tests in WebKit (Safari's engine) at iPhone size, signed in
+#      against a local Supabase.
+#    - webkit-iphones (manual only, job = webkit-matrix): every signed-in screen at every iPhone size in Playwright's
+#      device list, in WebKit (e2e/device-matrix.spec.ts with E2E_DEVICE_MATRIX=ios). Linux only, no Mac minutes.
+#
+# 2) testflight — manual only. Builds the ONLINE app (it loads server_url; never the offline edition), signs it
+#    with your App Store Connect API key, and uploads it to App Store Connect only when upload = true.
+#    Repository secrets (Settings > Secrets and variables > Actions; never paste them anywhere else):
 #      APPLE_TEAM_ID       10-character Team ID (developer.apple.com > Membership)
-#      ASC_KEY_ID          App Store Connect API key ID
-#      ASC_ISSUER_ID       App Store Connect API issuer ID
-#      ASC_KEY_P8_BASE64   the .p8 key file, base64-encoded
-#    Also create the app record in App Store Connect with bundle ID com.narrowgatefitness.app
-#    (or change CAP_APP_ID / the Xcode bundle ID to one you own first).
+#      ASC_KEY_ID          App Store Connect API key ID (Users and Access > Integrations > App Store Connect API)
+#      ASC_ISSUER_ID       issuer ID shown on the same page
+#      ASC_KEY_P8_BASE64   the downloaded AuthKey_XXXX.p8 file, base64-encoded
 on:
   workflow_dispatch:
     inputs:
       job:
-        description: "simulator = compile check only; testflight = sign and upload (needs secrets)"
+        description: "checks = compile + full app in the Simulator + WebKit tests; testflight = signed build; webkit-matrix = every iPhone size in WebKit"
         type: choice
-        options: [simulator, testflight]
-        default: simulator
-      edition:
-        description: "offline = everything on the phone; online = loads your deployed site"
-        type: choice
-        options: [offline, online]
-        default: offline
+        options: [checks, testflight, webkit-matrix]
+        default: checks
       server_url:
-        description: "Deployed site URL (only for the online edition), e.g. https://app.yourdomain.com"
+        description: "testflight: https:// address of the deployed app (the iPhone app loads it)"
         required: false
+      upload:
+        description: "testflight: upload to App Store Connect (unticked = archive and sign only, nothing leaves GitHub)"
+        type: boolean
+        default: false
+      bundle_id:
+        description: "testflight: bundle ID registered in your Apple Developer account"
+        required: false
+        default: com.narrowgatefitness.app
+      marketing_version:
+        description: "testflight: version shown in TestFlight"
+        required: false
+        default: "1.0.0"
   push:
-    branches: [main, claude/sharp-cray-8y0uuv]
+    branches: [main, claude/sharp-cray-8y0uuv, claude/testflight-prep, "release/**"]
     paths:
       - "standalone/**"
       - "ios/**"
+      - "src/**"
+      - "public/**"
+      - "e2e/opening-gate.spec.ts"
+      - "e2e/navigation.spec.ts"
+      - "scripts/ios-verify/**"
       - "capacitor.config.ts"
+      - "playwright.config.ts"
+      - "package-lock.json"
       - ".github/workflows/ios.yml"
 
 concurrency:
-  group: ios-${{ github.ref }}
-  cancel-in-progress: true
+  # A push never cancels a TestFlight build.
+  group: ios-${{ github.ref }}-${{ inputs.job || 'checks' }}
+  cancel-in-progress: ${{ inputs.job != 'testflight' }}
+
+permissions:
+  contents: read
 
 jobs:
-  simulator:
-    if: github.event_name == 'push' || inputs.job == 'simulator'
+  compile:
+    name: Compile check (offline edition, unsigned)
+    if: github.event_name == 'push' || inputs.job == 'checks'
     runs-on: macos-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
@@ -62,66 +94,392 @@ jobs:
         run: |
           cd build/Build/Products/Debug-iphonesimulator
           ditto -c -k --keepParent App.app "$GITHUB_WORKSPACE/NarrowGateFitness-iOS-Simulator.zip"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: NarrowGateFitness-iOS-Simulator
           path: NarrowGateFitness-iOS-Simulator.zip
 
-  testflight:
-    if: github.event_name == 'workflow_dispatch' && inputs.job == 'testflight'
+  archive-check:
+    # The TestFlight build without the Apple account: the online app, Release, for a real iPhone (arm64, iPhoneOS SDK),
+    # archived unsigned and checked against what App Store Connect requires (scripts/ios-verify/check-archive.py).
+    # Nothing is signed, kept or uploaded. The address is a reserved documentation domain: this build is never installed.
+    name: Device archive check (online app, Release, unsigned)
+    if: github.event_name == 'push' || inputs.job == 'checks'
     runs-on: macos-latest
-    timeout-minutes: 60
+    timeout-minutes: 45
     env:
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-      ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+      # App Store Connect's minimum since April 28, 2026: Xcode 26 with the iOS 26 SDK (iOS 27 SDK from April 2027).
+      MIN_IOS_SDK: "26"
     steps:
-      - name: Check secrets
-        run: |
-          for v in APPLE_TEAM_ID ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8_BASE64; do
-            if [ -z "${!v}" ]; then echo "::error::Missing repository secret $v (see the comment at the top of ios.yml)"; exit 1; fi
-          done
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Sync the chosen edition
+      - name: Xcode and the iOS SDK meet App Store Connect's minimum
+        run: |
+          xcodebuild -version
+          echo "Selected: $(xcode-select -p)"
+          sdk=$(xcrun --sdk iphoneos --show-sdk-version)
+          echo "iPhoneOS SDK: $sdk"
+          case "$(xcode-select -p)" in *beta*|*Beta*) echo "::error::The selected Xcode is a beta: App Store Connect only takes builds from released Xcode versions"; exit 1 ;; esac
+          [ "${sdk%%.*}" -ge "$MIN_IOS_SDK" ] || { echo "::error::iOS SDK $sdk is older than App Store Connect's minimum ($MIN_IOS_SDK)"; exit 1; }
+      - name: Configure the online app (as the TestFlight job does)
+        run: |
+          CAP_SERVER_URL=https://example.com npx cap sync ios
+          python3 - <<'PY'
+          import json
+          c = json.load(open("ios/App/App/capacitor.config.json"))
+          assert c.get("server", {}).get("url") == "https://example.com", c.get("server")
+          assert c.get("webDir") != "standalone", "the offline edition is configured"
+          print("Online app configured")
+          PY
+      - name: Archive for iPhone (Release, unsigned)
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" archive -quiet
+      - name: Check the archive against App Store Connect's requirements
+        run: python3 scripts/ios-verify/check-archive.py "$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app" "$MIN_IOS_SDK"
+
+  app-in-simulator:
+    name: Full app in the iOS Simulator (opening)
+    if: github.event_name == 'push' || inputs.job == 'checks'
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # No Supabase in this job: the signed-out pages (the opening and the welcome page) work without it. The
+      # signed-in screens are covered by the webkit job.
+      - name: Build the web app
+        run: npm run build
+      - name: Serve it on this Mac and check the page carries the opening
+        run: |
+          nohup npx next start -H 127.0.0.1 -p 3000 > "$RUNNER_TEMP/next.log" 2>&1 &
+          for i in $(seq 1 60); do curl -fsS -o /dev/null http://127.0.0.1:3000/api/health && break; sleep 2; done
+          curl -fsS http://127.0.0.1:3000/api/health; echo
+          curl -fsS http://127.0.0.1:3000/ -o "$RUNNER_TEMP/home.html"
+          for marker in 'data-intro-enter' 'Enter Narrow Gate' '/opening/gate-base.webp' 'small is the gate and narrow the way'; do
+            grep -q -- "$marker" "$RUNNER_TEMP/home.html" || { echo "::error::The served page has no '$marker'"; exit 1; }
+          done
+      - name: Point the iPhone app at it and build for the Simulator
+        run: |
+          CAP_SERVER_URL=http://127.0.0.1:3000 CAP_ALLOW_CLEARTEXT=true npx cap sync ios
+          xcodebuild -version
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO build -quiet
+      - name: Boot an iPhone simulator and install the app
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          best = None
+          for runtime, devices in json.load(sys.stdin)["devices"].items():
+              if ".iOS-" not in runtime:
+                  continue
+              version = tuple(int(x) for x in runtime.rsplit("iOS-", 1)[1].split("-"))
+              for d in devices:
+                  name = d["name"]
+                  if not name.startswith("iPhone") or " SE" in name:
+                      continue
+                  score = (version, "Pro" in name and "Max" not in name, name)
+                  if best is None or score > best[0]:
+                      best = (score, d["udid"])
+          print(best[1])
+          print("Simulator:", best[0][2], "iOS", ".".join(map(str, best[0][0])), file=sys.stderr)
+          ')
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl list devices available | grep -E "^[[:space:]]+iPhone" | sed 's/^ *//' | cut -d'(' -f1 | sort -u | tr '\n' ',' | sed 's/,$/\n/' | sed 's/^/iPhones available here: /' | tee -a "$RUNNER_TEMP/machine.log"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 || true
+          xcrun simctl install "$UDID" build/Build/Products/Debug-iphonesimulator/App.app
+      - name: Wait for the Mac and the simulator to settle
+        run: |
+          # A freshly booted simulator indexes and migrates for a while, and a shared runner can be busy: the opening's
+          # few seconds need a quiet machine. Wait until the CPU has been mostly idle for three readings (at most about 2 min).
+          # Best effort: the tests run either way.
+          quiet=0
+          for i in $(seq 1 60); do
+            # iostat's second report is the last 2 s; its "id" column sits before the three load averages.
+            raw=$(iostat -c 2 -w 2 2>&1 || true)
+            idle=$(printf '%s\n' "$raw" | awk 'NF >= 6 && $(NF-3) ~ /^[0-9]+$/ { v = $(NF-3) } END { print v + 0 }')
+            [ "$i" -eq 1 ] && printf '%s\n' "$raw" | tail -3
+            echo "$(date +%T) CPU idle ${idle:-?}%"
+            if [ "${idle:-0}" -ge 50 ]; then quiet=$((quiet + 1)); else quiet=0; fi
+            if [ "$quiet" -ge 3 ]; then break; fi
+          done
+          if [ "$quiet" -ge 3 ]; then msg="settled after about $((i * 2)) s (CPU idle ${idle}%)"; else msg="still busy after about $((i * 2)) s (CPU idle ${idle}%); carrying on"; fi
+          echo "$msg"; echo "$(date +%T) Before the warm-up launch: $msg" >> "$RUNNER_TEMP/machine.log"
+      - name: Open the app once, so the tests start on a warm simulator
+        run: |
+          # The first launch after installing takes 30–60+ s to show the page on a CI simulator (a phone that has run
+          # the app before starts in a few seconds). Wait here until the screen stops being dark, then close the app.
+          python3 -m venv "$RUNNER_TEMP/venv" && "$RUNNER_TEMP/venv/bin/pip" install --quiet pillow
+          xcrun simctl launch "$UDID" com.narrowgatefitness.app
+          shown=""
+          for i in $(seq 1 60); do
+            sleep 2
+            xcrun simctl io "$UDID" screenshot "$RUNNER_TEMP/warm.png" > /dev/null 2>&1 || continue
+            mean=$("$RUNNER_TEMP/venv/bin/python" -c 'import sys; from PIL import Image, ImageStat; print(int(ImageStat.Stat(Image.open(sys.argv[1]).convert("L")).mean[0]))' "$RUNNER_TEMP/warm.png")
+            if [ "$mean" -ge 15 ]; then shown="after about $((i * 2)) s (brightness $mean)"; break; fi
+          done
+          echo "First launch: the page showed ${shown:-not within 120 s}"
+          echo "$(date +%T) First launch: the page showed ${shown:-not within 120 s}" >> "$RUNNER_TEMP/machine.log"
+          sleep 8
+          xcrun simctl terminate "$UDID" com.narrowgatefitness.app || true
+      - name: Let it settle again after the first launch
+        run: |
+          # A freshly booted simulator indexes and migrates for a while, and a shared runner can be busy: the opening's
+          # few seconds need a quiet machine. Wait until the CPU has been mostly idle for three readings (at most about 2 min).
+          # Best effort: the tests run either way.
+          quiet=0
+          for i in $(seq 1 60); do
+            # iostat's second report is the last 2 s; its "id" column sits before the three load averages.
+            raw=$(iostat -c 2 -w 2 2>&1 || true)
+            idle=$(printf '%s\n' "$raw" | awk 'NF >= 6 && $(NF-3) ~ /^[0-9]+$/ { v = $(NF-3) } END { print v + 0 }')
+            [ "$i" -eq 1 ] && printf '%s\n' "$raw" | tail -3
+            echo "$(date +%T) CPU idle ${idle:-?}%"
+            if [ "${idle:-0}" -ge 50 ]; then quiet=$((quiet + 1)); else quiet=0; fi
+            if [ "$quiet" -ge 3 ]; then break; fi
+          done
+          if [ "$quiet" -ge 3 ]; then msg="settled after about $((i * 2)) s (CPU idle ${idle}%)"; else msg="still busy after about $((i * 2)) s (CPU idle ${idle}%); carrying on"; fi
+          echo "$msg"; echo "$(date +%T) After the warm-up launch: $msg" >> "$RUNNER_TEMP/machine.log"
+      - name: Launch, Enter Narrow Gate, relaunch, return from the background (XCUITest)
+        run: |
+          brew install xcodegen
+          cd scripts/ios-verify
+          xcodegen generate
+          set +e
+          # A shared CI simulator can be slow enough to miss the opening's few seconds: retry a failed test up to twice.
+          TEST_RUNNER_SHOTS_DIR="$GITHUB_WORKSPACE/sim-shots" xcodebuild test -project GateCheck.xcodeproj -scheme GateCheck \
+            -destination "id=$UDID" -resultBundlePath "$RUNNER_TEMP/GateCheck.xcresult" \
+            -retry-tests-on-failure -test-iterations 3 > "$RUNNER_TEMP/xcodebuild-test.log" 2>&1
+          status=$?
+          [ $status -eq 0 ] || tail -80 "$RUNNER_TEMP/xcodebuild-test.log"
+          exit $status
+      # Last, so the end of the log has everything: the test results, then what each frame showed.
+      - name: Results and screenshots (contact sheets in the artifact)
+        if: always()
+        run: |
+          mkdir -p sim-shots
+          cp "$RUNNER_TEMP/next.log" "$RUNNER_TEMP/xcodebuild-test.log" sim-shots/ 2>/dev/null || true
+          [ -x "$RUNNER_TEMP/venv/bin/python" ] || { python3 -m venv "$RUNNER_TEMP/venv" && "$RUNNER_TEMP/venv/bin/pip" install --quiet pillow; }
+          grep -A60 "accessibility tree:" "$RUNNER_TEMP/xcodebuild-test.log" | cut -c1-200 | head -130 || true
+          echo "== This machine"; cat "$RUNNER_TEMP/machine.log" 2>/dev/null || true
+          echo "== Tests"
+          grep -E "GATECHECK|Test Case .*(passed|failed)|error:|TEST (SUCCEEDED|FAILED)|Executed" "$RUNNER_TEMP/xcodebuild-test.log" | cut -c1-400 || true
+          # Ends with one CHECK line per filmed step; fails the job if the opening didn't play as it should.
+          "$RUNNER_TEMP/venv/bin/python" scripts/ios-verify/contact-sheet.py sim-shots
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: opening-in-simulator
+          path: sim-shots
+          if-no-files-found: warn
+
+  webkit:
+    name: Opening and navigation tests in WebKit (iPhone size)
+    if: github.event_name == 'push' || inputs.job == 'checks'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Start Supabase (local, throwaway)
+        run: npx supabase start
+      - name: Point the app at it
+        run: |
+          eval "$(npx supabase status -o env | grep -E '^(API_URL|ANON_KEY|SERVICE_ROLE_KEY)=')"
+          echo "::add-mask::$ANON_KEY"
+          echo "::add-mask::$SERVICE_ROLE_KEY"
+          {
+            echo "NEXT_PUBLIC_SITE_URL=http://localhost:3000"
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+            # The tests sign up many accounts from this one machine: raise (never lower) the app's auth rate limits.
+            echo "AUTH_RATE_LIMIT_SCALE=50"
+          } > .env.local
+      - run: npm run build
+      - run: npx playwright install --with-deps webkit
+      - name: Opening and navigation tests (WebKit, iPhone 15)
+        run: E2E_WEBKIT=1 npx playwright test e2e/opening-gate.spec.ts e2e/navigation.spec.ts --project=iphone-webkit
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: failure()
+        with:
+          name: webkit-test-results
+          path: test-results
+          if-no-files-found: ignore
+
+  webkit-iphones:
+    name: Every iPhone size in WebKit (device matrix)
+    if: github.event_name == 'workflow_dispatch' && inputs.job == 'webkit-matrix'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Start Supabase (local, throwaway)
+        run: npx supabase start
+      - name: Point the app at it
+        run: |
+          eval "$(npx supabase status -o env | grep -E '^(API_URL|ANON_KEY|SERVICE_ROLE_KEY)=')"
+          echo "::add-mask::$ANON_KEY"
+          echo "::add-mask::$SERVICE_ROLE_KEY"
+          {
+            echo "NEXT_PUBLIC_SITE_URL=http://localhost:3000"
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+            # The matrix signs up one account per iPhone size from this one machine: raise (never lower) the limits.
+            echo "AUTH_RATE_LIMIT_SCALE=50"
+          } > .env.local
+      - run: npm run build
+      - run: npx playwright install --with-deps webkit
+      - name: Device matrix, every iPhone (WebKit)
+        run: E2E_WEBKIT=1 E2E_DEVICE_MATRIX=ios E2E_MATRIX_OUT=test-results/device-matrix npx playwright test e2e/device-matrix.spec.ts --project=iphone-webkit --workers=2
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: webkit-iphones
+          path: test-results
+          if-no-files-found: ignore
+
+  testflight:
+    name: TestFlight build (online app, signed; uploaded only if asked)
+    if: github.event_name == 'workflow_dispatch' && inputs.job == 'testflight'
+    runs-on: macos-latest
+    timeout-minutes: 60
+    # The App Store Connect secrets are set only on the steps that use them, so npm ci's install scripts and cap sync
+    # never have them in their environment.
+    env:
+      SERVER_URL: ${{ inputs.server_url }}
+      BUNDLE_ID: ${{ inputs.bundle_id || 'com.narrowgatefitness.app' }}
+      MARKETING_VERSION: ${{ inputs.marketing_version || '1.0.0' }}
+    steps:
+      - name: Check secrets
         env:
-          SERVER_URL: ${{ inputs.server_url }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
         run: |
-          if [ "${{ inputs.edition }}" = "online" ]; then
-            if [ -z "$SERVER_URL" ]; then echo "::error::server_url is required for the online edition"; exit 1; fi
-            CAP_SERVER_URL="$SERVER_URL" npx cap sync ios
-          else
-            CAP_MODE=standalone npx cap sync ios
+          for v in APPLE_TEAM_ID ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8_BASE64; do
+            if [ -z "${!v}" ]; then echo "::error::Missing repository secret $v (see docs/TESTFLIGHT.md)"; exit 1; fi
+          done
+      - name: Check the deployed app the iPhone app will load
+        run: |
+          case "$SERVER_URL" in
+            https://*) ;;
+            *) echo "::error::server_url must be the https:// address of the deployed app (got '$SERVER_URL')"; exit 1 ;;
+          esac
+          base="${SERVER_URL%/}"
+          host=$(python3 -c 'import sys, urllib.parse; print(urllib.parse.urlparse(sys.argv[1]).hostname or "")' "$base")
+          case "$host" in
+            ""|localhost|127.*|*.example|*.invalid|*.test|*.localhost) echo "::error::server_url ($host) is a placeholder or local address"; exit 1 ;;
+          esac
+          health=$(curl -fsS --max-time 20 "$base/api/health") || { echo "::error::$base/api/health did not answer: deploy the app there first"; exit 1; }
+          echo "Deployed app: $health"
+          curl -fsS --max-time 20 "$base/" -o "$RUNNER_TEMP/home.html"
+          for marker in 'data-intro-enter' 'Enter Narrow Gate' 'small is the gate and narrow the way'; do
+            grep -q -- "$marker" "$RUNNER_TEMP/home.html" || { echo "::error::$base doesn't serve the current opening ('$marker' missing): deploy claude/testflight-prep (or later) there first"; exit 1; }
+          done
+          commit=$(printf '%s' "$health" | python3 -c 'import json, sys; print(json.load(sys.stdin)["data"].get("commit") or "")')
+          if [ -n "$commit" ] && [ "$commit" != "$GITHUB_SHA" ]; then
+            echo "::warning::The site serves commit $commit; this build is from $GITHUB_SHA. The app shows whatever the site serves."
           fi
-      - name: Write the App Store Connect key
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          # No shared npm cache in the job that signs and uploads the build (zizmor: cache-poisoning); npm ci still
+          # checks every package against package-lock.json. v5 and later cache by default unless this is false.
+          package-manager-cache: false
+      - run: npm ci
+      - name: Point the iPhone app at the deployed app
         run: |
+          CAP_SERVER_URL="$SERVER_URL" npx cap sync ios
+          python3 - <<'PY'
+          import json, os
+          c = json.load(open("ios/App/App/capacitor.config.json"))
+          url = c.get("server", {}).get("url", "")
+          assert url == os.environ["SERVER_URL"].rstrip("/"), f"the app would load {url!r}"
+          assert c.get("webDir") != "standalone", "the offline edition is configured"
+          print("The app will load", url)
+          PY
+      - name: Xcode and the iOS SDK meet App Store Connect's minimum
+        run: |
+          xcodebuild -version
+          sdk=$(xcrun --sdk iphoneos --show-sdk-version)
+          echo "iPhoneOS SDK: $sdk ($(xcode-select -p))"
+          case "$(xcode-select -p)" in *beta*|*Beta*) echo "::error::The selected Xcode is a beta: App Store Connect only takes builds from released Xcode versions"; exit 1 ;; esac
+          # Xcode 26 with the iOS 26 SDK since April 28, 2026; the iOS 27 SDK from April 2027.
+          [ "${sdk%%.*}" -ge 26 ] || { echo "::error::iOS SDK $sdk is older than App Store Connect's minimum (26)"; exit 1; }
+      - name: Write the App Store Connect key
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+        run: |
+          umask 077
           mkdir -p "$RUNNER_TEMP/asc"
           echo "$ASC_KEY_P8_BASE64" | base64 --decode > "$RUNNER_TEMP/asc/AuthKey_${ASC_KEY_ID}.p8"
       - name: Archive (automatic signing with the API key)
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: |
           xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
             -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/App.xcarchive" \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic \
-            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" \
+            MARKETING_VERSION="$MARKETING_VERSION" CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
             -allowProvisioningUpdates \
             -authenticationKeyPath "$RUNNER_TEMP/asc/AuthKey_${ASC_KEY_ID}.p8" \
             -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             archive
-      - name: Upload to App Store Connect (TestFlight)
+      - name: ${{ inputs.upload && 'Sign and upload to App Store Connect (TestFlight)' || 'Sign only (no upload)' }}
+        env:
+          DESTINATION: ${{ inputs.upload && 'upload' || 'export' }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: |
           cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0"><dict>
             <key>method</key><string>app-store-connect</string>
-            <key>destination</key><string>upload</string>
+            <key>destination</key><string>${DESTINATION}</string>
             <key>teamID</key><string>${APPLE_TEAM_ID}</string>
             <key>signingStyle</key><string>automatic</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
           </dict></plist>
           PLIST
           xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/App.xcarchive" \
@@ -129,3 +487,12 @@ jobs:
             -allowProvisioningUpdates \
             -authenticationKeyPath "$RUNNER_TEMP/asc/AuthKey_${ASC_KEY_ID}.p8" \
             -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+          if [ "$DESTINATION" = upload ]; then
+            echo "Uploaded build ${{ github.run_number }} (version $MARKETING_VERSION). It appears in App Store Connect > TestFlight after Apple finishes processing."
+          else
+            ls -la "$RUNNER_TEMP/export"
+            echo "Signed for App Store Connect, not uploaded. The .ipa is not kept (it is not published as an artifact)."
+          fi
+      - name: Remove the key
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/asc" "$RUNNER_TEMP/export"

@@ -6,10 +6,18 @@ import {
   EXPERIENCE_LEVELS,
   PRIMARY_GOALS,
   PROGRAM_TYPES,
+  SECONDARY_GOALS,
 } from "@/lib/domain/types";
-import { CARDIO_MODALITIES, CUSTOM_PROGRAM_TYPES, CUSTOM_TYPES, SHOW_DIVISIONS, weeksRange } from "@/lib/domain/custom-programs";
+import { CARDIO_MODALITIES, COMBINABLE_TYPES, CUSTOM_PROGRAM_TYPES, CUSTOM_TYPES, SHOW_DIVISIONS, weeksRange } from "@/lib/domain/custom-programs";
+import { COMBINE_GOALS } from "@/lib/domain/combined-goals";
+import { ACTIVITY_LEVELS, isWeeklyRate } from "@/lib/domain/calorie-budget";
+import { isValidIsoDate } from "@/lib/domain/dates";
+import { SESSION_MINUTES } from "@/lib/domain/starter-program";
+import { FAITH_REMINDER_KINDS } from "@/lib/faith-reminders";
+import { APP_REMINDER_KINDS, WATER_INTERVALS } from "@/lib/notifications/catalog";
 
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
+// A real calendar date, not just the shape of one: "2026-02-30" used to pass and fail only at the database.
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD").refine(isValidIsoDate, "Use a real calendar date (YYYY-MM-DD)");
 const optionalNumber = (min: number, max: number) =>
   z.preprocess((v) => (v === "" || v === null || v === undefined ? null : Number(v)), z.number().min(min).max(max).nullable());
 
@@ -30,6 +38,7 @@ export const signUpSchema = z.object({
   displayName: z.string().trim().min(1, "Tell us what to call you").max(60),
   ageConfirmed: z.literal("on", { message: "You must be 18 or older to create an account" }),
   termsAccepted: z.literal("on", { message: "Please accept the terms and privacy policy" }),
+  riskAcknowledged: z.literal("on", { message: "Please read and acknowledge the health and AI notice" }),
 });
 
 export const signInSchema = z.object({ email: emailSchema, password: z.string().min(1, "Enter your password").max(128) });
@@ -58,12 +67,60 @@ export const onboardingSchema = z
     sex: z.enum(["male", "female", "unspecified"], { message: "Choose male, female or prefer not to say" }),
     dietType: z.enum(DIET_TYPES).default("balanced"),
     faithEnabled: z.boolean().default(false),
+    secondaryGoal: z.enum(SECONDARY_GOALS).nullable().optional(),
+    textSize: z.enum(["default", "large", "xlarge"]).optional(),
+    reduceMotion: z.boolean().optional(),
   })
+  .refine((v) => !v.secondaryGoal || v.secondaryGoal !== v.primaryGoal, { message: "Pick a second goal that's different from your main goal", path: ["secondaryGoal"] })
   .refine((v) => !v.limitations || v.wellnessConsent, {
     message: "Please consent to storing limitation notes, or leave them blank",
     path: ["limitations"],
   });
 export type OnboardingInput = z.infer<typeof onboardingSchema>;
+
+/** Weekly weight change in kg: one of WEEKLY_RATES_KG. */
+export const weeklyRateSchema = z.coerce.number().refine(isWeeklyRate, "Choose a weekly pace");
+const goalWeightSchema = z.preprocess(
+  (v) => (v === "" || v === null || v === undefined ? null : Number(v)),
+  z.number().min(25, "Check your goal weight").max(400, "Check your goal weight").nullable(),
+);
+
+/** The guided sign-up questionnaire (one question per screen, submitted once at the end). */
+export const onboardingPlanSchema = z.object({
+  displayName: z.string().trim().min(1, "Please enter your name").max(60),
+  primaryGoal: z.enum(PRIMARY_GOALS, { message: "Choose your main goal" }),
+  sex: z.enum(["male", "female", "unspecified"], { message: "Choose male, female or prefer not to say" }),
+  age: z.coerce.number().int().min(18, "Narrow Gate Fitness is available to adults (18+) at launch.").max(100, "Check your age"),
+  unitSystem: unitSystemSchema,
+  heightCm: z.coerce.number().min(90, "Check your height").max(260, "Check your height"),
+  weightKg: z.coerce.number().min(25, "Check your weight").max(400, "Check your weight"),
+  goalWeightKg: goalWeightSchema,
+  weeklyChangeKg: weeklyRateSchema,
+  activityLevel: z.enum(ACTIVITY_LEVELS, { message: "Choose how active you are outside workouts" }),
+  experience: z.enum(EXPERIENCE_LEVELS, { message: "Choose your training experience" }),
+  daysPerWeek: z.coerce.number().int().min(1).max(7),
+  sessionMinutes: z.coerce
+    .number()
+    .int()
+    .refine((m) => (SESSION_MINUTES as readonly number[]).includes(m), "Choose a session length"),
+  equipment: z.array(z.enum(EQUIPMENT)).min(1, "Choose your equipment").max(EQUIPMENT.length),
+  dietType: z.enum(DIET_TYPES).default("balanced"),
+  faithEnabled: z.boolean().default(false),
+  /** Optional steps: a second goal, and text size / reduce motion (written to the profile). */
+  secondaryGoal: z.enum(SECONDARY_GOALS).nullable().optional(),
+  textSize: z.enum(["default", "large", "xlarge"]).optional(),
+  reduceMotion: z.boolean().optional(),
+  /** The device's time zone (IANA name); "today" is reckoned in it from then on. */
+  timeZone: z.string().max(64).optional(),
+}).refine((v) => !v.secondaryGoal || v.secondaryGoal !== v.primaryGoal, { message: "Pick a second goal that's different from your main goal", path: ["secondaryGoal"] });
+export type OnboardingPlanInput = z.input<typeof onboardingPlanSchema>;
+
+/** Goal weight, pace and activity used to recalculate the calorie budget from the Food page. */
+export const budgetSettingsSchema = z.object({
+  goalWeightKg: goalWeightSchema,
+  weeklyChangeKg: weeklyRateSchema,
+  activityLevel: z.enum(ACTIVITY_LEVELS, { message: "Choose an activity level" }),
+});
 
 export const profileUpdateSchema = z.object({
   displayName: z.string().trim().min(1).max(60),
@@ -99,8 +156,13 @@ export const customProgramSchema = z
     cardio: z.object({ modality: z.enum(CARDIO_MODALITIES), continuousMinutes: z.number().int().min(0).max(180) }).nullable().optional(),
     division: z.enum(SHOW_DIVISIONS).nullable().optional(),
     equipment: z.array(z.enum(EQUIPMENT)).max(EQUIPMENT.length),
+    combine: z.object({ goal: z.enum(COMBINE_GOALS), days: z.number().int().min(2).max(3) }).nullable().optional(),
   })
   .superRefine((v, ctx) => {
+    if (v.combine) {
+      if (!COMBINABLE_TYPES.includes(v.type)) ctx.addIssue({ code: "custom", path: ["combine"], message: "A second goal can be added to strength or bodybuilding programs" });
+      if (v.daysPerWeek + v.combine.days > 7) ctx.addIssue({ code: "custom", path: ["combine"], message: "Strength and run days together can't be more than 7 a week" });
+    }
     const cfg = CUSTOM_TYPES[v.type];
     if (!cfg.goals.some((g) => g.id === v.goal)) ctx.addIssue({ code: "custom", path: ["goal"], message: "Choose a goal for this program type" });
     if (v.daysPerWeek < cfg.days.min || v.daysPerWeek > cfg.days.max)
@@ -116,10 +178,14 @@ const setSchema = z.object({
   reps: z.number().int().min(0).max(1000).nullable(),
   weightKg: z.number().min(0).max(1500).nullable(),
   durationSeconds: z.number().int().min(0).max(86400).nullable(),
+  // Optional so clients from before distance logging still validate.
+  distanceM: z.number().min(0).max(1000000).nullable().optional(),
   rpe: z.number().min(1).max(10).nullable(),
   isWarmup: z.boolean(),
   completed: z.boolean(),
-});
+  // A drop set (no rest after the set before it). Optional so clients from before drop sets still validate.
+  isDrop: z.boolean().optional(),
+}).refine((s) => !(s.isDrop && s.isWarmup), { message: "A warm-up can't be a drop set." });
 
 export const workoutExerciseSchema = z.object({
   exerciseId: z.string().uuid(),
@@ -231,7 +297,12 @@ export const nutritionGoalsSchema = z.object({
   water_ml: z.coerce.number().int().min(0).max(10000),
 });
 
-export const waterSchema = z.object({ date: isoDate, amountMl: z.coerce.number().int().min(1).max(5000) });
+export const waterSchema = z.object({
+  date: isoDate,
+  amountMl: z.coerce.number().int().min(1).max(5000),
+  /** Generated on the device per tap and reused on retry, so a lost response can't add the water twice. */
+  clientId: z.string().uuid().optional(),
+});
 
 export const savedMealSchema = z.object({
   name: z.string().trim().min(1).max(120),
@@ -244,15 +315,76 @@ export const FAITH_THEMES = ["perseverance", "humility", "discipline", "self_con
 
 export const journalEntrySchema = z.object({
   entryDate: isoDate,
+  kind: z.enum(["daily", "request", "intercession", "praise", "confession", "reflection"]).default("reflection"),
   theme: z.enum(FAITH_THEMES).nullable(),
   scriptureRef: z.string().trim().max(80).optional().default(""),
   title: z.string().trim().max(120).optional().default(""),
   body: z.string().trim().min(1, "Write something to save").max(10000),
+  /** Off unless the user ticks "Share with AI Coach" on this entry. */
+  shareWithCoach: z.boolean().default(false),
 });
 
-export const disciplineGoalSchema = z.object({
-  title: z.string().trim().min(1).max(120),
-  cadence: z.enum(["daily", "weekly"]),
+export const prayerAnsweredSchema = z.object({
+  id: z.string().uuid(),
+  answeredOn: isoDate,
+  note: z.string().trim().max(2000).optional().default(""),
+});
+
+export const customPracticeSchema = z.object({
+  title: z.string().trim().min(1, "Name your practice").max(120),
+});
+
+export const faithReminderSchema = z.object({
+  kind: z.enum(FAITH_REMINDER_KINDS),
+  enabled: z.boolean(),
+  time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Choose a time"),
+  weekdays: z.array(z.number().int().min(0).max(6)).max(7),
+});
+export const faithRemindersSchema = z
+  .array(faithReminderSchema)
+  .min(1)
+  .max(FAITH_REMINDER_KINDS.length)
+  .refine((list) => new Set(list.map((r) => r.kind)).size === list.length, "Each reminder once")
+  .refine((list) => list.every((r) => !r.enabled || r.weekdays.length > 0), "Pick at least one day for each reminder that's on.");
+
+// --------------------------------------------------------------------------- Notifications (Profile → Notifications)
+const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Choose a time");
+export const appReminderSchema = z
+  .object({
+    kind: z.enum(APP_REMINDER_KINDS),
+    enabled: z.boolean(),
+    time: hhmm,
+    weekdays: z.array(z.number().int().min(0).max(6)).max(7),
+    intervalMinutes: z
+      .number()
+      .int()
+      .refine((m) => (WATER_INTERVALS as readonly number[]).includes(m), "Choose how often")
+      .nullable(),
+    endTime: hhmm.nullable(),
+    style: z.enum(["friendly", "faith"]),
+  })
+  .refine((r) => !r.enabled || r.weekdays.length > 0, "Pick at least one day for each reminder that's on.")
+  .refine((r) => r.kind !== "water" || !r.endTime || r.endTime > r.time, "Water reminders need to end after they start.");
+export const notificationSettingsSchema = z.object({
+  faith: faithRemindersSchema,
+  app: z
+    .array(appReminderSchema)
+    .min(1)
+    .max(APP_REMINDER_KINDS.length)
+    .refine((list) => new Set(list.map((r) => r.kind)).size === list.length, "Each reminder once"),
+  prefs: z
+    .object({
+      paused: z.boolean(),
+      quiet: z.object({ start: hhmm, end: hhmm }).nullable(),
+      dailyLimit: z.number().int().min(1).max(20),
+    })
+    .refine((p) => !p.quiet || p.quiet.start !== p.quiet.end, "Quiet hours need different start and end times."),
+});
+export const notificationDeviceSchema = z.object({
+  key: z.string().regex(/^[A-Za-z0-9-]{16,64}$/),
+  platform: z.enum(["ios", "android"]),
+  timezone: z.string().max(64).nullable(),
+  permission: z.enum(["granted", "denied", "prompt", "unknown"]),
 });
 
 // --------------------------------------------------------------------------- AI
@@ -260,6 +392,10 @@ export const aiChatRequestSchema = z.object({
   conversationId: z.string().uuid().nullable(),
   message: z.string().trim().min(1, "Type a message").max(4000),
   mode: z.enum(["chat", "plan"]).default("chat"),
+  /** New conversations only: don't remember anything from this chat. */
+  memoryOff: z.boolean().optional(),
+  /** The client's id for this message, reused when it retries the same message. */
+  requestId: z.string().uuid().optional(),
 });
 
 // --------------------------------------------------------------------------- Admin
@@ -312,3 +448,29 @@ export function fieldErrors(error: z.ZodError): Record<string, string> {
   }
   return out;
 }
+
+// --------------------------------------------------------------------------- Saved workout templates
+export const templateExerciseSchema = z
+  .object({
+    exerciseId: z.string().uuid(),
+    sets: z.number().int().min(1).max(20),
+    target: z.enum(["reps", "time", "distance"]),
+    reps: z.string().trim().min(1).max(20).nullable(),
+    durationSeconds: z.number().int().min(5).max(7200).nullable(),
+    distanceM: z.number().positive().max(100000).nullable(),
+    restSeconds: z.number().int().min(0).max(900),
+    supersetGroup: z.number().int().min(1).max(20).nullable(),
+    notes: z.string().trim().max(500).nullable(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.target === "reps" && !v.reps) ctx.addIssue({ code: "custom", path: ["reps"], message: "Enter reps" });
+    if (v.target === "time" && !v.durationSeconds) ctx.addIssue({ code: "custom", path: ["durationSeconds"], message: "Enter a time" });
+    if (v.target === "distance" && !v.distanceM) ctx.addIssue({ code: "custom", path: ["distanceM"], message: "Enter a distance" });
+  });
+
+export const templateSchema = z.object({
+  name: z.string().trim().min(1, "Name your workout").max(120),
+  notes: z.string().trim().max(2000).nullable(),
+  exercises: z.array(templateExerciseSchema).min(1, "Add at least one exercise").max(40),
+});
+export type TemplateFormInput = z.infer<typeof templateSchema>;

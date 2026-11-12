@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { Logo } from "@/components/common/logo";
 import { SetupRequired } from "@/components/common/setup-required";
-import { OnboardingWizard } from "@/components/onboarding/onboarding-wizard";
+import { OnboardingQuestionnaire } from "@/components/onboarding/onboarding-questionnaire";
 import { isSupabaseConfigured } from "@/lib/env";
 import { getProfile, requireUser } from "@/server/auth";
 
@@ -17,12 +17,19 @@ export default async function OnboardingPage() {
     <div className="hero-glow min-h-dvh">
       <div className="mx-auto max-w-2xl px-4 pb-16 pt-6">
         <Logo />
-        <h1 className="mt-8 font-display text-4xl font-bold uppercase">Let&apos;s build your plan</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          A few questions so we can match programs to your goals, schedule and equipment. You can change any answer later.
-        </p>
-        <div className="mt-8">
-          <OnboardingWizard initial={{ displayName: profile?.display_name ?? "" }} />
+        <h1 className="mt-6 font-display text-4xl font-bold uppercase">Let&apos;s build your plan</h1>
+        {/* The intro is read once, on the first question; later questions start straight under the heading. */}
+        <div className="mt-4">
+          <OnboardingQuestionnaire
+            userId={user.id}
+            initialName={profile?.display_name ?? ""}
+            intro={
+              <p className="text-sm text-muted-foreground">
+                Five quick questions, then your plan: your first training program and a daily calorie budget. A few more are optional, and you can change any answer
+                later.
+              </p>
+            }
+          />
         </div>
       </div>
     </div>

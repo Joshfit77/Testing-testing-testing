@@ -1,91 +1,238 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { actionError, actionInvalid, actionOk, type ActionState } from "@/lib/action-state";
-import { isoDateInTz, startOfWeek } from "@/lib/domain/dates";
-import { disciplineGoalSchema, journalEntrySchema } from "@/lib/validation/schemas";
+import { isoDateInTz } from "@/lib/domain/dates";
+import { ANSWERABLE_KINDS, isAnswerable } from "@/lib/domain/journal";
+import { canCheckIn, isPresetPractice, PRACTICE_INFO } from "@/lib/domain/practices";
+import { customPracticeSchema, journalEntrySchema, prayerAnsweredSchema } from "@/lib/validation/schemas";
 import { getProfile, requireUser } from "@/server/auth";
 import { logError } from "@/server/log";
 
-const uuid = z.string().uuid();
+/*
+ * Faith actions. Every query is scoped to the signed-in user (RLS plus an explicit user_id filter).
+ * Clients call router.refresh() after a successful action (no revalidatePath; see IMPLEMENTATION_STATUS
+ * "Loading boundaries").
+ */
 
-export async function setFaithEnabledAction(formData: FormData): Promise<void> {
-  const user = await requireUser();
-  const supabase = await getServerSupabase();
-  await supabase.from("profiles").update({ faith_enabled: formData.get("enabled") === "true" }).eq("id", user.id);
-  revalidatePath("/", "layout");
+const uuid = z.string().uuid();
+const MAX_PRACTICES = 12;
+
+async function userToday(userId: string): Promise<string> {
+  const profile = await getProfile(userId);
+  return isoDateInTz(new Date(), profile?.timezone ?? "UTC");
 }
+
+// ---------------------------------------------------------------------------- Prayer journal
 
 export async function saveJournalEntryAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireUser();
   const raw = Object.fromEntries(formData);
-  const parsed = journalEntrySchema.safeParse({ ...raw, theme: raw.theme ? raw.theme : null });
+  const parsed = journalEntrySchema.safeParse({
+    ...raw,
+    theme: raw.theme ? raw.theme : null,
+    kind: raw.kind ? raw.kind : "reflection",
+    shareWithCoach: raw.shareWithCoach === "on" || raw.shareWithCoach === "true",
+  });
   if (!parsed.success) return actionInvalid(parsed.error);
   const id = uuid.safeParse(formData.get("id"));
   const supabase = await getServerSupabase();
   const row = {
     entry_date: parsed.data.entryDate,
+    kind: parsed.data.kind,
     theme: parsed.data.theme,
     scripture_ref: parsed.data.scriptureRef || null,
     title: parsed.data.title || null,
     body: parsed.data.body,
+    share_with_coach: parsed.data.shareWithCoach,
   };
-  const { error } = id.success
-    ? await supabase.from("faith_journal_entries").update(row).eq("id", id.data).eq("user_id", user.id)
-    : await supabase.from("faith_journal_entries").insert({ ...row, user_id: user.id });
+  if (id.success) {
+    // An answered prayer stays answered only while it is a prayer request.
+    const patch = isAnswerable(row.kind) ? row : { ...row, answered_on: null, answered_note: null };
+    const { data, error } = await supabase.from("faith_journal_entries").update(patch).eq("id", id.data).eq("user_id", user.id).select("id");
+    if (error || !data?.length) {
+      if (error) logError("faith.journal", error);
+      return actionError("Couldn't save your entry.");
+    }
+    return actionOk("Entry updated.");
+  }
+  const { error } = await supabase.from("faith_journal_entries").insert({ ...row, user_id: user.id });
   if (error) {
     logError("faith.journal", error);
     return actionError("Couldn't save your entry.");
   }
-  revalidatePath("/faith");
-  return actionOk(id.success ? "Entry updated." : "Entry saved. Only you can see it.");
+  return actionOk(row.share_with_coach ? "Entry saved. Only you and the AI coach (as you chose) can see it." : "Entry saved. Only you can see it.");
 }
 
-export async function deleteJournalEntryAction(formData: FormData): Promise<void> {
+/** What a one-tap action (ActionButton) reports back, so a failure is shown instead of looking like success. */
+export interface TapResult {
+  ok: boolean;
+  error?: string;
+}
+
+export async function deleteJournalEntryAction(formData: FormData): Promise<TapResult> {
+  const user = await requireUser();
+  const id = uuid.safeParse(formData.get("id"));
+  if (!id.success) return { ok: false, error: "That entry couldn't be found." };
+  const supabase = await getServerSupabase();
+  const { error } = await supabase.from("faith_journal_entries").delete().eq("id", id.data).eq("user_id", user.id);
+  if (error) {
+    logError("faith.journal.delete", error);
+    return { ok: false, error: "Couldn't delete your entry. Please try again." };
+  }
+  return { ok: true };
+}
+
+export async function markPrayerAnsweredAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const user = await requireUser();
+  const parsed = prayerAnsweredSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return actionInvalid(parsed.error);
+  const today = await userToday(user.id);
+  if (parsed.data.answeredOn > today) return actionError("The answered date can't be in the future.", { answeredOn: "Choose today or an earlier date" });
+  const supabase = await getServerSupabase();
+  const { data, error } = await supabase
+    .from("faith_journal_entries")
+    .update({ answered_on: parsed.data.answeredOn, answered_note: parsed.data.note || null })
+    .eq("id", parsed.data.id)
+    .eq("user_id", user.id)
+    .in("kind", [...ANSWERABLE_KINDS])
+    .select("id");
+  if (error || !data?.length) {
+    if (error) logError("faith.answered", error);
+    return actionError("Couldn't mark this prayer answered.");
+  }
+  return actionOk("Marked as answered. Praise God!");
+}
+
+export async function clearPrayerAnsweredAction(formData: FormData): Promise<void> {
   const user = await requireUser();
   const id = uuid.safeParse(formData.get("id"));
   if (!id.success) return;
   const supabase = await getServerSupabase();
-  await supabase.from("faith_journal_entries").delete().eq("id", id.data).eq("user_id", user.id);
-  revalidatePath("/faith");
+  await supabase.from("faith_journal_entries").update({ answered_on: null, answered_note: null }).eq("id", id.data).eq("user_id", user.id);
 }
 
-export async function createDisciplineGoalAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+/** Archive (hide from the journal without deleting) or restore an entry. */
+export async function setJournalArchivedAction(formData: FormData): Promise<void> {
   const user = await requireUser();
-  const parsed = disciplineGoalSchema.safeParse(Object.fromEntries(formData));
+  const id = uuid.safeParse(formData.get("id"));
+  if (!id.success) return;
+  const supabase = await getServerSupabase();
+  await supabase
+    .from("faith_journal_entries")
+    .update({ archived_at: formData.get("archived") === "true" ? new Date().toISOString() : null })
+    .eq("id", id.data)
+    .eq("user_id", user.id);
+}
+
+export async function setJournalShareAction(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const id = uuid.safeParse(formData.get("id"));
+  if (!id.success) return;
+  const supabase = await getServerSupabase();
+  await supabase.from("faith_journal_entries").update({ share_with_coach: formData.get("share") === "true" }).eq("id", id.data).eq("user_id", user.id);
+}
+
+// ---------------------------------------------------------------------------- Daily practices
+
+async function activePracticeCount(userId: string): Promise<number> {
+  const supabase = await getServerSupabase();
+  const { count } = await supabase.from("discipline_goals").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("is_active", true);
+  return count ?? 0;
+}
+
+/** Add a preset practice (Scripture, prayer, …) if it isn't chosen yet. */
+export async function addPresetPracticeAction(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const practice = formData.get("practice");
+  if (!isPresetPractice(practice)) return;
+  const supabase = await getServerSupabase();
+  const { data: existing } = await supabase.from("discipline_goals").select("id").eq("user_id", user.id).eq("practice", practice).eq("is_active", true).maybeSingle();
+  if (existing) return;
+  if ((await activePracticeCount(user.id)) >= MAX_PRACTICES) return;
+  const { error } = await supabase.from("discipline_goals").insert({ user_id: user.id, title: PRACTICE_INFO[practice].label, cadence: "daily", practice });
+  if (error) logError("faith.practice.add", error);
+}
+
+export async function createCustomPracticeAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const user = await requireUser();
+  const parsed = customPracticeSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return actionInvalid(parsed.error);
+  if ((await activePracticeCount(user.id)) >= MAX_PRACTICES) return actionError(`You can choose up to ${MAX_PRACTICES} practices.`);
   const supabase = await getServerSupabase();
-  const { count } = await supabase.from("discipline_goals").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("is_active", true);
-  if ((count ?? 0) >= 12) return actionError("You can have up to 12 active discipline goals.");
-  const { error } = await supabase.from("discipline_goals").insert({ user_id: user.id, ...parsed.data });
-  if (error) return actionError("Couldn't add the goal.");
-  revalidatePath("/faith");
-  return actionOk("Goal added.");
+  const { error } = await supabase.from("discipline_goals").insert({ user_id: user.id, title: parsed.data.title, cadence: "daily", practice: "custom" });
+  if (error) {
+    logError("faith.practice.custom", error);
+    return actionError("Couldn't add the practice.");
+  }
+  return actionOk("Practice added.");
 }
 
-export async function toggleDisciplineCheckinAction(formData: FormData): Promise<void> {
+/** Check off (or un-check) a practice for one day: today or one of the previous six days. */
+export async function togglePracticeCheckinAction(formData: FormData): Promise<TapResult> {
+  const failed = { ok: false, error: "Couldn't update that practice. Please try again." };
   const user = await requireUser();
   const id = uuid.safeParse(formData.get("goalId"));
-  if (!id.success) return;
-  const profile = await getProfile(user.id);
+  const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).safeParse(formData.get("date"));
+  if (!id.success || !day.success) return failed;
+  const today = await userToday(user.id);
+  if (!canCheckIn(day.data, today)) return { ok: false, error: "That day can no longer be changed." };
   const supabase = await getServerSupabase();
-  const { data: goal } = await supabase.from("discipline_goals").select("cadence").eq("id", id.data).eq("user_id", user.id).maybeSingle();
-  if (!goal) return;
-  const today = isoDateInTz(new Date(), profile?.timezone ?? "UTC");
-  const day = goal.cadence === "weekly" ? startOfWeek(today) : today;
-  const { data: existing } = await supabase.from("discipline_checkins").select("goal_id").eq("goal_id", id.data).eq("checked_on", day).maybeSingle();
-  if (existing) await supabase.from("discipline_checkins").delete().eq("goal_id", id.data).eq("checked_on", day).eq("user_id", user.id);
-  else await supabase.from("discipline_checkins").insert({ goal_id: id.data, user_id: user.id, checked_on: day });
-  revalidatePath("/faith");
+  const { data: goal, error: goalErr } = await supabase.from("discipline_goals").select("id").eq("id", id.data).eq("user_id", user.id).maybeSingle();
+  if (goalErr) {
+    logError("faith.practice.toggle", goalErr);
+    return failed;
+  }
+  if (!goal) return { ok: false, error: "That practice no longer exists." };
+  const { data: existing, error: readErr } = await supabase.from("discipline_checkins").select("goal_id").eq("goal_id", id.data).eq("user_id", user.id).eq("checked_on", day.data).maybeSingle();
+  if (readErr) {
+    logError("faith.practice.toggle", readErr);
+    return failed;
+  }
+  const { error } = existing
+    ? await supabase.from("discipline_checkins").delete().eq("goal_id", id.data).eq("checked_on", day.data).eq("user_id", user.id)
+    : await supabase.from("discipline_checkins").insert({ goal_id: id.data, user_id: user.id, checked_on: day.data });
+  if (error) {
+    logError("faith.practice.toggle", error);
+    return failed;
+  }
+  return { ok: true };
 }
 
-export async function archiveDisciplineGoalAction(formData: FormData): Promise<void> {
+/** Remove a practice and its check-off history (confirmed in the UI). */
+export async function removePracticeAction(formData: FormData): Promise<TapResult> {
   const user = await requireUser();
   const id = uuid.safeParse(formData.get("goalId"));
-  if (!id.success) return;
+  if (!id.success) return { ok: false, error: "That practice couldn't be found." };
   const supabase = await getServerSupabase();
-  await supabase.from("discipline_goals").delete().eq("id", id.data).eq("user_id", user.id);
-  revalidatePath("/faith");
+  const { error } = await supabase.from("discipline_goals").delete().eq("id", id.data).eq("user_id", user.id);
+  if (error) {
+    logError("faith.practice.remove", error);
+    return { ok: false, error: "Couldn't remove that practice. Please try again." };
+  }
+  return { ok: true };
+}
+
+// Faith reminders are saved with every other reminder in src/server/actions/notifications.ts (Profile → Notifications).
+
+// ---------------------------------------------------------------------------- Daily goals (optional)
+
+/**
+ * Tick or untick today's optional Faith challenge or Fitness goal (the member's own local date). These are tracked on
+ * their own and never affect a reading journey.
+ */
+export async function toggleDailyGoalAction(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const kind = formData.get("kind");
+  if (kind !== "faith_challenge" && kind !== "fitness") return;
+  const today = await userToday(user.id);
+  const supabase = await getServerSupabase();
+  const { data } = await supabase.from("faith_daily_goals").select("kind").eq("user_id", user.id).eq("goal_date", today).eq("kind", kind).maybeSingle();
+  if (data) {
+    await supabase.from("faith_daily_goals").delete().eq("user_id", user.id).eq("goal_date", today).eq("kind", kind);
+    return;
+  }
+  const { error } = await supabase.from("faith_daily_goals").insert({ user_id: user.id, goal_date: today, kind });
+  if (error && error.code !== "23505") logError("faith.daily_goal", error);
 }

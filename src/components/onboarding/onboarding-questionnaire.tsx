@@ -1,0 +1,722 @@
+"use client";
+
+import { useEffect, useRef, useState, useTransition } from "react";
+import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { ProgressBar } from "@/components/ui/progress-bar";
+import { Notice } from "@/components/common/states";
+import { cn } from "@/lib/utils";
+import { cmToFeetInches, displayWeight, feetInchesToCm, toKg, weightUnit } from "@/lib/domain/units";
+import {
+  EXPERIENCE_LABELS,
+  EXPERIENCE_LEVELS,
+  GOAL_LABELS,
+  PRIMARY_GOALS,
+  SECONDARY_GOAL_LABELS,
+  SECONDARY_GOALS,
+  type ExperienceLevel,
+  type PrimaryGoal,
+  type SecondaryGoal,
+  type UnitSystem,
+} from "@/lib/domain/types";
+import { applyDisplayPrefs, type TextSize } from "@/components/shell/app-shell";
+import {
+  ACTIVITY_INFO,
+  ACTIVITY_LEVELS,
+  defaultWeeklyRate,
+  rateTowardGoal,
+  WEEKLY_RATES_KG,
+  type ActivityLevel,
+  type WeeklyRateKg,
+} from "@/lib/domain/calorie-budget";
+import { SESSION_MINUTES } from "@/lib/domain/starter-program";
+import { EQUIPMENT_PRESETS } from "@/lib/domain/equipment-presets";
+import { bmi, paceLabel, paceOptions } from "@/lib/domain/diary";
+import { DIET_TYPES, DIETS, type DietType } from "@/lib/domain/diets";
+import type { Sex } from "@/lib/domain/nutrition";
+import { completeOnboardingAction } from "@/server/actions/onboarding";
+
+/** Goals where a target bodyweight matters; for the rest the goal-weight question starts hidden. */
+const WEIGHT_GOALS: PrimaryGoal[] = ["lose_fat", "build_muscle", "general_health"];
+
+/**
+ * The quick path is the first six screens: what the first program needs (goal, experience, schedule, equipment),
+ * then the basics for safety and the calorie budget (about you: 18+ only), then a name. "Build my plan" is on that
+ * sixth screen. The rest is optional personalisation, reached with "Personalise more" and skippable one by one;
+ * skipped answers use the defaults named on screen and can be changed later (Profile, Food).
+ */
+const STEPS = [
+  { id: "goal", title: "Main goal" },
+  { id: "experience", title: "Experience" },
+  { id: "schedule", title: "Schedule" },
+  { id: "equipment", title: "Equipment" },
+  // Sex, age, height and weight on one screen: the same four answers, three fewer screens to tap through.
+  { id: "body", title: "About you" },
+  { id: "finish", title: "Ready" },
+  { id: "second", title: "Second goal (optional)" },
+  { id: "target", title: "Weight goal (optional)" },
+  { id: "activity", title: "Daily activity (optional)" },
+  { id: "diet", title: "Diet style (optional)" },
+  { id: "comfort", title: "Display (optional)" },
+] as const;
+type StepId = (typeof STEPS)[number]["id"];
+/** Screens 1–6: everything the first plan needs. */
+const QUICK_STEPS = STEPS.findIndex((s) => s.id === "finish") + 1;
+/** Steps that can be skipped without an answer (each has a default). */
+const OPTIONAL_STEPS: readonly StepId[] = ["second", "target", "activity", "diet", "comfort"];
+/** Used when "Daily activity" is skipped; shown on the Ready screen and changeable in Profile. */
+const DEFAULT_ACTIVITY: ActivityLevel = "light";
+/** In-progress answers survive a reload of this tab (session storage; cleared when the plan is built). */
+const PROGRESS_KEY = "ngf.onboarding.progress.v1";
+
+const TEXT_SIZES: { value: TextSize; label: string; sample: string }[] = [
+  { value: "default", label: "Default", sample: "text-base" },
+  { value: "large", label: "Large", sample: "text-lg" },
+  { value: "xlarge", label: "Extra large", sample: "text-xl" },
+];
+
+function Choice({
+  selected,
+  onClick,
+  title,
+  description,
+  badge,
+}: {
+  selected: boolean;
+  onClick: () => void;
+  title: string;
+  description?: string;
+  badge?: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      onClick={onClick}
+      className={cn(
+        "flex min-h-12 w-full min-w-0 flex-col items-start gap-0.5 break-words rounded-xl border px-4 py-3 text-left transition-colors",
+        selected ? "border-gold bg-gold/12" : "border-border bg-elevated hover:border-gold-muted",
+      )}
+    >
+      <span className={cn("flex items-center gap-2 text-sm font-semibold", selected && "text-gold-highlight")}>
+        {selected && <Check className="size-4 shrink-0" aria-hidden />}
+        {title}
+        {badge && <span className="rounded-full border border-gold-muted px-2 py-0.5 text-xs font-semibold uppercase tracking-wider text-gold">{badge}</span>}
+      </span>
+      {description && <span className="text-xs text-muted-foreground">{description}</span>}
+    </button>
+  );
+}
+
+/** The device's time zone, so "today" in the app is the member's today. */
+function deviceTimeZone(): string | undefined {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function Question({ title, help, children }: { title: string; help?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    // min-w-0: a fieldset is min-content wide by default, which at large text sizes pushed the page sideways.
+    <fieldset className="min-w-0 space-y-4">
+      <legend className="font-display text-2xl font-bold uppercase leading-tight md:text-3xl">{title}</legend>
+      {help && <p className="text-sm text-muted-foreground">{help}</p>}
+      {children}
+    </fieldset>
+  );
+}
+
+/**
+ * The guided sign-up questionnaire: one question per screen with a progress bar and Back/Continue.
+ * Answers stay in client state; one server action at the end saves everything and builds the plan.
+ */
+export function OnboardingQuestionnaire({ userId, initialName, intro }: { userId: string; initialName: string; /** Shown above the first question only. */ intro?: React.ReactNode }) {
+  const [step, setStep] = useState(0);
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  const [goal, setGoal] = useState<PrimaryGoal | null>(null);
+  const [sex, setSex] = useState<Sex | null>(null);
+  const [age, setAge] = useState("");
+  const [units, setUnits] = useState<UnitSystem>("imperial");
+  const [feet, setFeet] = useState("");
+  const [inches, setInches] = useState("");
+  const [cm, setCm] = useState("");
+  const [weight, setWeight] = useState("");
+  const [goalWeight, setGoalWeight] = useState("");
+  const [showGoalWeight, setShowGoalWeight] = useState(false);
+  const [pace, setPace] = useState<WeeklyRateKg>(0);
+  const [activity, setActivity] = useState<ActivityLevel | null>(null);
+  const [experience, setExperience] = useState<ExperienceLevel | null>(null);
+  const [days, setDays] = useState(3);
+  const [minutes, setMinutes] = useState<number>(45);
+  const [preset, setPreset] = useState<string | null>(null);
+  const [dietType, setDietType] = useState<DietType>("balanced");
+  const [name, setName] = useState(initialName);
+  const [faith, setFaith] = useState(false);
+  const [secondGoal, setSecondGoal] = useState<SecondaryGoal | null>(null);
+  const [textSize, setTextSize] = useState<TextSize>("default");
+  const [reduceMotion, setReduceMotion] = useState(false);
+
+  // Save the answers so far for this tab, so a reload or an accidental back-swipe doesn't start over. They are tied
+  // to this account: someone else signing up in the same tab never sees them (age and weight are health data).
+  const saving = useRef(true);
+  const restored = useRef(false);
+  useEffect(() => {
+    if (restored.current) return;
+    restored.current = true;
+    try {
+      const raw = window.sessionStorage.getItem(PROGRESS_KEY);
+      if (!raw) return;
+      const p = JSON.parse(raw) as Partial<Record<string, unknown>>;
+      if (p.owner !== userId) {
+        window.sessionStorage.removeItem(PROGRESS_KEY);
+        return;
+      }
+      const str = (v: unknown) => (typeof v === "string" ? v : "");
+      if (typeof p.step === "number" && p.step >= 0 && p.step < STEPS.length) setStep(p.step);
+      if (typeof p.goal === "string" && (PRIMARY_GOALS as readonly string[]).includes(p.goal)) setGoal(p.goal as PrimaryGoal);
+      if (p.sex === "male" || p.sex === "female" || p.sex === "unspecified") setSex(p.sex as Sex);
+      setAge(str(p.age));
+      if (p.units === "metric" || p.units === "imperial") setUnits(p.units);
+      setFeet(str(p.feet));
+      setInches(str(p.inches));
+      setCm(str(p.cm));
+      setWeight(str(p.weight));
+      setGoalWeight(str(p.goalWeight));
+      if (typeof p.showGoalWeight === "boolean") setShowGoalWeight(p.showGoalWeight);
+      if (typeof p.pace === "number" && (WEEKLY_RATES_KG as readonly number[]).includes(p.pace)) setPace(p.pace as WeeklyRateKg);
+      if (typeof p.activity === "string" && (ACTIVITY_LEVELS as readonly string[]).includes(p.activity)) setActivity(p.activity as ActivityLevel);
+      if (typeof p.experience === "string" && (EXPERIENCE_LEVELS as readonly string[]).includes(p.experience)) setExperience(p.experience as ExperienceLevel);
+      if (typeof p.days === "number" && p.days >= 1 && p.days <= 7) setDays(p.days);
+      if (typeof p.minutes === "number" && (SESSION_MINUTES as readonly number[]).includes(p.minutes)) setMinutes(p.minutes);
+      if (typeof p.preset === "string" && EQUIPMENT_PRESETS.some((e) => e.label === p.preset)) setPreset(p.preset);
+      if (typeof p.dietType === "string" && (DIET_TYPES as readonly string[]).includes(p.dietType)) setDietType(p.dietType as DietType);
+      if (typeof p.name === "string" && p.name.trim()) setName(p.name);
+      if (typeof p.faith === "boolean") setFaith(p.faith);
+    } catch {
+      /* unreadable or blocked storage: start fresh */
+    }
+  }, [userId]);
+  useEffect(() => {
+    if (!saving.current || !restored.current) return;
+    try {
+      window.sessionStorage.setItem(
+        PROGRESS_KEY,
+        JSON.stringify({ owner: userId, step, goal, sex, age, units, feet, inches, cm, weight, goalWeight, showGoalWeight, pace, activity, experience, days, minutes, preset, dietType, name, faith }),
+      );
+    } catch {
+      /* storage full or blocked: the questionnaire still works, it just won't survive a reload */
+    }
+  }, [userId, step, goal, sex, age, units, feet, inches, cm, weight, goalWeight, showGoalWeight, pace, activity, experience, days, minutes, preset, dietType, name, faith]);
+
+  const current: StepId = STEPS[step]!.id;
+  const unit = weightUnit(units);
+
+  const heightCm = (): number | null => {
+    if (units === "metric") return cm ? Number(cm) : null;
+    if (!feet) return null;
+    return feetInchesToCm(Number(feet), Number(inches || 0));
+  };
+  const weightKg = (): number | null => (weight && Number(weight) > 0 ? toKg(Number(weight), units) : null);
+  const goalWeightKg = (): number | null => (showGoalWeight && goalWeight && Number(goalWeight) > 0 ? toKg(Number(goalWeight), units) : null);
+
+  // Pace options follow the goal weight's direction; keep the chosen pace if it still fits.
+  const options = paceOptions(WEEKLY_RATES_KG, weightKg(), goalWeightKg());
+  const toward = rateTowardGoal(weightKg() ?? 0, goalWeightKg(), pace);
+  const effectivePace: WeeklyRateKg = options.includes(pace)
+    ? pace
+    : options.includes(toward)
+      ? toward
+      : (options.find((r) => Math.abs(r) === 0.5) ?? options[0] ?? 0);
+  const recommended = goal ? defaultWeeklyRate(goal) : null;
+
+  const switchUnits = (next: UnitSystem) => {
+    if (next === units) return;
+    const h = heightCm();
+    const w = weightKg();
+    const gw = goalWeight && Number(goalWeight) > 0 ? toKg(Number(goalWeight), units) : null;
+    setUnits(next);
+    if (h) {
+      if (next === "metric") setCm(String(Math.round(h)));
+      else {
+        const fi = cmToFeetInches(h);
+        setFeet(String(fi.feet));
+        setInches(String(fi.inches));
+      }
+    }
+    if (w) setWeight(String(displayWeight(w, next)));
+    if (gw) setGoalWeight(String(displayWeight(gw, next)));
+  };
+
+  const chooseGoal = (g: PrimaryGoal) => {
+    setGoal(g);
+    if (secondGoal === g) setSecondGoal(null);
+    setPace(defaultWeeklyRate(g));
+    setShowGoalWeight(WEIGHT_GOALS.includes(g));
+  };
+
+  const validateBody = (): string | null => {
+    if (!sex) return "Please choose male, female or prefer not to say.";
+    const a = Number(age);
+    if (!age || !Number.isInteger(a)) return "Please enter your age in whole years.";
+    if (a < 18) return "Narrow Gate Fitness is available to adults (18+) at launch.";
+    if (a > 100) return "Please check your age.";
+    if (units === "imperial" && inches && (Number(inches) < 0 || Number(inches) > 11)) return "Inches should be between 0 and 11.";
+    const h = heightCm();
+    if (!h || h < 90 || h > 260) return "Please enter a valid height.";
+    const w = weightKg();
+    return !w || w < 25 || w > 400 ? "Please enter a valid weight." : null;
+  };
+
+  const validate = (id: StepId): string | null => {
+    switch (id) {
+      case "goal":
+        return goal ? null : "Choose your main goal.";
+      case "second":
+        return secondGoal && secondGoal === goal ? "Pick a different second goal, or skip." : null;
+      case "comfort":
+        return null;
+      case "body":
+        return validateBody();
+      case "target": {
+        if (!showGoalWeight || !goalWeight) return null;
+        const g = goalWeightKg();
+        return !g || g < 25 || g > 400 ? "Please enter a valid goal weight, or skip it." : null;
+      }
+      case "activity":
+        return null;
+      case "experience":
+        return experience ? null : "Choose your training experience.";
+      case "schedule":
+        return days >= 1 && days <= 7 && (SESSION_MINUTES as readonly number[]).includes(minutes) ? null : "Choose your days per week and session length.";
+      case "equipment":
+        return preset ? null : "Choose the equipment you have.";
+      case "diet":
+        return null;
+      case "finish":
+        return name.trim() ? null : "Please enter your name.";
+    }
+  };
+
+  const next = () => {
+    const msg = validate(current);
+    setError(msg);
+    if (!msg) setStep((s) => Math.min(STEPS.length - 1, s + 1));
+  };
+
+  const skip = () => {
+    if (current === "second") setSecondGoal(null);
+    if (current === "target") {
+      setGoalWeight("");
+      if (goal) setPace(defaultWeeklyRate(goal));
+    }
+    if (current === "activity") setActivity(null);
+    if (current === "diet") setDietType("balanced");
+    if (current === "comfort") {
+      setTextSize("default");
+      setReduceMotion(false);
+      applyDisplayPrefs("default", false);
+    }
+    setError(null);
+    setStep((s) => Math.min(STEPS.length - 1, s + 1));
+  };
+
+  const chooseTextSize = (t: TextSize) => {
+    setTextSize(t);
+    applyDisplayPrefs(t, reduceMotion);
+  };
+  const chooseReduceMotion = (on: boolean) => {
+    setReduceMotion(on);
+    applyDisplayPrefs(textSize, on);
+  };
+
+  const back = () => {
+    setError(null);
+    setStep((s) => Math.max(0, s - 1));
+  };
+
+  const submit = () => {
+    for (const s of STEPS) {
+      const msg = validate(s.id);
+      if (msg) {
+        setError(msg);
+        setStep(STEPS.findIndex((x) => x.id === s.id));
+        return;
+      }
+    }
+    setError(null);
+    saving.current = false;
+    try {
+      window.sessionStorage.removeItem(PROGRESS_KEY);
+    } catch {
+      /* storage unavailable: nothing to clear */
+    }
+    const equipment = EQUIPMENT_PRESETS.find((p) => p.label === preset)!.items;
+    startTransition(async () => {
+      const res = await completeOnboardingAction({
+        displayName: name.trim(),
+        primaryGoal: goal!,
+        sex: sex!,
+        age: Number(age),
+        unitSystem: units,
+        heightCm: Math.round((heightCm() ?? 0) * 10) / 10,
+        weightKg: weightKg()!,
+        goalWeightKg: goalWeightKg(),
+        weeklyChangeKg: effectivePace,
+        activityLevel: activity ?? DEFAULT_ACTIVITY,
+        experience: experience!,
+        daysPerWeek: days,
+        sessionMinutes: minutes,
+        equipment,
+        dietType,
+        faithEnabled: faith,
+        secondaryGoal: secondGoal,
+        textSize,
+        reduceMotion,
+        timeZone: deviceTimeZone(),
+      });
+      // On success the action redirects to the plan summary; we only get here on failure.
+      if (res && !res.ok) {
+        saving.current = true;
+        setError(res.message ?? "Something went wrong. Please try again.");
+      }
+    });
+  };
+
+  const unitsToggle = (
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,7rem),1fr))] gap-2" role="group" aria-label="Units">
+      <Choice selected={units === "imperial"} onClick={() => switchUnits("imperial")} title="lb / ft" />
+      <Choice selected={units === "metric"} onClick={() => switchUnits("metric")} title="kg / cm" />
+    </div>
+  );
+
+  const gwKg = goalWeightKg();
+  const h = heightCm();
+  const lowGoal = gwKg && h ? bmi(gwKg, h) < 18.5 : false;
+  const last = step === STEPS.length - 1;
+  // The Ready screen builds the plan straight away; "Personalise more" goes on to the optional questions.
+  const ready = current === "finish";
+  const optionalIndex = step - QUICK_STEPS;
+
+  return (
+    <div className="space-y-6">
+      {step === 0 && intro}
+      <div>
+        <div className="mb-2 flex justify-between text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          {/* The quick part is five questions and the Ready screen; the counter counts only the questions (the welcome
+              page promises five). */}
+          <span>{optionalIndex >= 0 ? `Optional ${optionalIndex + 1} of ${STEPS.length - QUICK_STEPS}` : ready ? `All ${QUICK_STEPS - 1} answered` : `Question ${step + 1} of ${QUICK_STEPS - 1}`}</span>
+          <span className="text-gold">{STEPS[step]!.title}</span>
+        </div>
+        <ProgressBar value={optionalIndex >= 0 ? 100 : ((step + 1) / QUICK_STEPS) * 100} label="Onboarding progress" />
+      </div>
+
+      <form
+        noValidate
+        className="rounded-2xl border border-border bg-card p-5 md:p-6"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (last || ready) submit();
+          else next();
+        }}
+      >
+        {current === "goal" && (
+          <Question title="What's your main goal?" help="We'll build your first program and calorie budget around it.">
+            <div className="grid gap-2 sm:grid-cols-2">
+              {PRIMARY_GOALS.map((g) => (
+                <Choice key={g} selected={goal === g} onClick={() => chooseGoal(g)} title={GOAL_LABELS[g]} />
+              ))}
+            </div>
+          </Question>
+        )}
+
+        {current === "second" && (
+          <Question
+            title="Anything else you're working toward?"
+            help="Optional. Your program is built around your main goal; we'll note this one on your plan so you can keep it in view. Skip if there's nothing else."
+          >
+            <div className="grid gap-2 sm:grid-cols-2" role="group" aria-label="Second goal">
+              {SECONDARY_GOALS.filter((g) => g !== goal).map((g) => (
+                <Choice key={g} selected={secondGoal === g} onClick={() => setSecondGoal(secondGoal === g ? null : g)} title={SECONDARY_GOAL_LABELS[g]} />
+              ))}
+            </div>
+          </Question>
+        )}
+
+        {current === "comfort" && (
+          <Question title="Make it comfortable to read" help="Optional. Changes apply right away, and you can change them later in the You tab.">
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,5.5rem),1fr))] gap-2" role="radiogroup" aria-label="Text size">
+              {TEXT_SIZES.map((t) => (
+                <button
+                  key={t.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={textSize === t.value}
+                  onClick={() => chooseTextSize(t.value)}
+                  className={cn(
+                    "flex min-h-14 flex-col items-center justify-center rounded-xl border px-2 py-2 text-center",
+                    textSize === t.value ? "border-gold bg-gold/12 text-gold-highlight" : "border-border bg-elevated hover:border-gold-muted",
+                  )}
+                >
+                  <span className={cn("font-semibold leading-none", t.sample)} aria-hidden>
+                    Aa
+                  </span>
+                  <span className="mt-1 text-xs">{t.label}</span>
+                </button>
+              ))}
+            </div>
+            <div className="flex min-h-11 items-center justify-between gap-4 rounded-xl border border-border bg-elevated/40 p-4">
+              <div className="min-w-0 flex-1 break-words">
+                <p id="ob-motion-label" className="text-sm font-semibold">
+                  Reduce motion
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">Turns off animations and transitions.</p>
+              </div>
+              <Switch checked={reduceMotion} onCheckedChange={chooseReduceMotion} aria-labelledby="ob-motion-label" />
+            </div>
+          </Question>
+        )}
+
+        {current === "body" && (
+          <Question title="About you" help="Used to confirm you're an adult and to estimate your daily calories. Never shared.">
+            <div className="space-y-2">
+              <p id="ob-sex-label" className="text-sm font-medium">
+                Sex
+              </p>
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,7rem),1fr))] gap-2" role="group" aria-label="Sex">
+                <Choice selected={sex === "male"} onClick={() => setSex("male")} title="Male" />
+                <Choice selected={sex === "female"} onClick={() => setSex("female")} title="Female" />
+                <Choice selected={sex === "unspecified"} onClick={() => setSex("unspecified")} title="Prefer not to say" />
+              </div>
+              <p className="text-xs text-muted-foreground">Only for the calorie estimate (men and women burn different amounts at rest).</p>
+            </div>
+            <div className="max-w-40 space-y-2">
+              <Label htmlFor="ob-age">Age</Label>
+              <Input id="ob-age" type="number" inputMode="numeric" min={18} max={100} value={age} onChange={(e) => setAge(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Units</p>
+              {unitsToggle}
+              <p className="text-xs text-muted-foreground">Also how weights show across the app (you can change it later).</p>
+            </div>
+            {units === "imperial" ? (
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,6rem),1fr))] max-w-72 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="ob-ft">Height (ft)</Label>
+                  <Input id="ob-ft" type="number" inputMode="numeric" min={3} max={8} value={feet} onChange={(e) => setFeet(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ob-in">Height (in)</Label>
+                  <Input id="ob-in" type="number" inputMode="numeric" min={0} max={11} value={inches} onChange={(e) => setInches(e.target.value)} />
+                </div>
+              </div>
+            ) : (
+              <div className="max-w-40 space-y-2">
+                <Label htmlFor="ob-cm">Height (cm)</Label>
+                <Input id="ob-cm" type="number" inputMode="decimal" min={90} max={260} value={cm} onChange={(e) => setCm(e.target.value)} />
+              </div>
+            )}
+            <div className="max-w-48 space-y-2">
+              <Label htmlFor="ob-weight">Current weight ({unit})</Label>
+              <Input id="ob-weight" type="number" inputMode="decimal" step="0.1" value={weight} onChange={(e) => setWeight(e.target.value)} />
+              <p className="text-xs text-muted-foreground">Saved as your first bodyweight entry so you can track progress.</p>
+            </div>
+          </Question>
+        )}
+
+        {current === "target" && (
+          <Question
+            title="Your weight goal"
+            help={
+              goal && WEIGHT_GOALS.includes(goal)
+                ? "Optional. Set a goal weight and a weekly pace. Slower paces are easier to stick to."
+                : "For your goal, holding your weight steady is a good default. You can still choose to lose or gain."
+            }
+          >
+            {showGoalWeight ? (
+              <div className="space-y-2">
+                <Label htmlFor="ob-goal-weight">Goal weight ({unit}, optional)</Label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Input id="ob-goal-weight" type="number" inputMode="decimal" step="0.1" value={goalWeight} onChange={(e) => setGoalWeight(e.target.value)} className="max-w-40" />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setGoalWeight("");
+                      setShowGoalWeight(false);
+                    }}
+                  >
+                    Skip goal weight
+                  </Button>
+                </div>
+                {lowGoal && (
+                  <Notice tone="warning">That goal weight is below the healthy BMI range for your height. Consider talking with your doctor before aiming for it.</Notice>
+                )}
+              </div>
+            ) : (
+              <Button type="button" variant="outline" size="sm" onClick={() => setShowGoalWeight(true)}>
+                Add a goal weight
+              </Button>
+            )}
+            <div className="space-y-2" role="group" aria-label="Weekly pace">
+              <p className="text-sm font-medium">Weekly pace</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {options.map((r) => (
+                  <Choice key={r} selected={effectivePace === r} onClick={() => setPace(r)} title={paceLabel(r, units)} badge={r === recommended ? "Suggested" : undefined} />
+                ))}
+              </div>
+              {gwKg && options.length < WEEKLY_RATES_KG.length && (
+                <p className="text-xs text-muted-foreground">Only paces that move you toward your goal weight are shown.</p>
+              )}
+            </div>
+          </Question>
+        )}
+
+        {current === "activity" && (
+          <Question title="How active are you outside workouts?" help="Your normal day: job, chores, walking. Workouts are added on top when you log them.">
+            <div className="grid gap-2">
+              {ACTIVITY_LEVELS.map((a) => (
+                <Choice key={a} selected={activity === a} onClick={() => setActivity(a)} title={ACTIVITY_INFO[a].label} description={ACTIVITY_INFO[a].description} />
+              ))}
+            </div>
+          </Question>
+        )}
+
+        {current === "experience" && (
+          <Question title="How long have you been training?">
+            <div className="grid gap-2 sm:grid-cols-2">
+              {EXPERIENCE_LEVELS.map((x) => (
+                <Choice key={x} selected={experience === x} onClick={() => setExperience(x)} title={EXPERIENCE_LABELS[x]} />
+              ))}
+            </div>
+          </Question>
+        )}
+
+        {current === "schedule" && (
+          <Question title="How often can you train?" help="We'll fit your program to the days this goal supports.">
+            <div className="space-y-2" role="group" aria-label="Days per week">
+              <p className="text-sm font-medium">Days per week</p>
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,4.75rem),1fr))] gap-2">
+                {[1, 2, 3, 4, 5, 6, 7].map((d) => (
+                  <Choice key={d} selected={days === d} onClick={() => setDays(d)} title={`${d} ${d === 1 ? "day" : "days"}`} />
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2" role="group" aria-label="Session length">
+              <p className="text-sm font-medium">Session length</p>
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,5.5rem),1fr))] gap-2">
+                {SESSION_MINUTES.map((m) => (
+                  <Choice key={m} selected={minutes === m} onClick={() => setMinutes(m)} title={`${m} min`} />
+                ))}
+              </div>
+            </div>
+          </Question>
+        )}
+
+        {current === "equipment" && (
+          <Question title="What equipment do you have?" help="You can fine-tune this later in the program builder.">
+            <div className="grid gap-2 sm:grid-cols-2">
+              {EQUIPMENT_PRESETS.map((p) => (
+                <Choice key={p.label} selected={preset === p.label} onClick={() => setPreset(p.label)} title={p.label} description={p.description} />
+              ))}
+            </div>
+          </Question>
+        )}
+
+        {current === "diet" && (
+          <Question title="Pick a diet style" help="Sets how your calories split into protein, carbs and fat, and marks foods that fit. Change it any time in Food.">
+            <div className="grid gap-2 sm:grid-cols-2">
+              {DIET_TYPES.map((d) => (
+                <Choice key={d} selected={dietType === d} onClick={() => setDietType(d)} title={DIETS[d].name} description={DIETS[d].tagline} />
+              ))}
+            </div>
+            {DIETS[dietType].caution && <Notice tone="warning">{DIETS[dietType].caution}</Notice>}
+          </Question>
+        )}
+
+        {current === "finish" && (
+          <Question title="Ready to build your plan">
+            <div className="space-y-2">
+              <Label htmlFor="ob-name">What should we call you?</Label>
+              <Input id="ob-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} autoComplete="given-name" />
+            </div>
+            <div className="flex items-start justify-between gap-4 rounded-xl border border-border bg-elevated/40 p-4">
+              <div className="min-w-0 flex-1 break-words">
+                <p id="faith-label" className="text-sm font-semibold">
+                  Faith-inspired coaching and reminders
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Let the AI coach and workout reminders draw on Scripture and faith language. The Faith tab is always available either way. You can change this any time.
+                </p>
+              </div>
+              <Switch className="shrink-0" checked={faith} onCheckedChange={setFaith} aria-labelledby="faith-label" />
+            </div>
+            <p className="text-sm text-muted-foreground" data-testid="onboarding-defaults">
+              Until you change them, we&apos;ll assume you&apos;re <strong className="text-foreground">{ACTIVITY_INFO[activity ?? DEFAULT_ACTIVITY].label.toLowerCase()}</strong> outside
+              workouts and eat a <strong className="text-foreground">{DIETS[dietType].name.toLowerCase()}</strong> diet
+              {goalWeight ? "" : ", with no goal weight"}. These only affect your calorie budget: answer them now with Personalise more, or later in
+              the You and Nutrition tabs.
+            </p>
+          </Question>
+        )}
+
+        {error && (
+          <div className="mt-5">
+            <Notice tone="error">{error}</Notice>
+          </div>
+        )}
+
+        {ready ? (
+          // The Ready screen: building the plan is the main action, full width; the optional questions are secondary.
+          // (Three buttons in one row ran off the side of a phone.) The keys keep React from reusing these buttons for the
+          // next screen's: "Personalise more" turning into that screen's Continue (a submit button) during its own click
+          // would submit the form too and skip a question.
+          <div key="ready-actions" className="mt-6 space-y-2">
+            <Button type="submit" size="lg" className="w-full" disabled={pending} aria-busy={pending}>
+              {pending && <Loader2 className="animate-spin" aria-hidden />}
+              {pending ? "Building your plan…" : "Build my plan"}
+            </Button>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <Button type="button" variant="ghost" onClick={back} disabled={pending} className="px-3">
+                <ArrowLeft aria-hidden /> Back
+              </Button>
+              <Button type="button" variant="ghost" onClick={next} disabled={pending} className="h-auto min-h-11 whitespace-normal">
+                Personalise more <ArrowRight aria-hidden />
+              </Button>
+            </div>
+          </div>
+        ) : (
+        <div key="step-actions" className="mt-6 flex flex-wrap items-center justify-between gap-3">
+          <Button type="button" variant="ghost" onClick={back} disabled={step === 0 || pending} className="px-3">
+            <ArrowLeft aria-hidden /> <span className={OPTIONAL_STEPS.includes(current) ? "sr-only sm:not-sr-only" : undefined}>Back</span>
+          </Button>
+          {last ? (
+            <Button type="submit" disabled={pending} aria-busy={pending}>
+              {pending && <Loader2 className="animate-spin" aria-hidden />}
+              {pending ? "Building your plan…" : "Build my plan"}
+            </Button>
+          ) : (
+            <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
+              {OPTIONAL_STEPS.includes(current) && (
+                <Button type="button" variant="ghost" onClick={skip}>
+                  Skip
+                </Button>
+              )}
+              <Button type="submit">
+                Continue <ArrowRight aria-hidden />
+              </Button>
+            </div>
+          )}
+        </div>
+        )}
+      </form>
+    </div>
+  );
+}

@@ -46,7 +46,7 @@ export default async function AdminProgramEditPage({ params, searchParams }: { p
               <Label htmlFor="tier">Tier</Label>
               <NativeSelect id="tier" name="tier" defaultValue={p.tier as string}>
                 <option value="free">Free</option>
-                <option value="plus">Plus</option>
+                <option value="plus">Paid library (Pro; legacy Plus)</option>
                 <option value="pro">Pro</option>
               </NativeSelect>
             </div>

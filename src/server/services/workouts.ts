@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { bestsFromSets, detectNewRecords, totalVolume, type LoggedSet, type PersonalBest, type RecordType } from "@/lib/domain/strength";
 import type { EditWorkoutInput, FinishWorkoutInput } from "@/lib/validation/schemas";
+import { preferSameSession, type PreviousPerformance, type PreviousRow, type SessionSlot } from "@/lib/domain/previous-performance";
 import { advanceProgram } from "./training";
 
 export class WorkoutError extends Error {
@@ -106,8 +107,10 @@ async function insertExercises(supabase: SupabaseClient, userId: string, session
       reps: s.reps,
       weight_kg: s.weightKg,
       duration_seconds: s.durationSeconds,
+      distance_m: s.distanceM ?? null,
       rpe: s.rpe,
       is_warmup: s.isWarmup,
+      is_drop: Boolean(s.isDrop),
       completed: s.completed,
     })),
   );
@@ -134,6 +137,66 @@ async function currentBests(supabase: SupabaseClient, userId: string, exerciseId
 
 export interface NewRecord extends PersonalBest {
   exerciseId: string;
+  /** The first value ever logged for this exercise and record type: a baseline, not an improvement. */
+  first: boolean;
+}
+
+/**
+ * The personal records a finished session set, as finishWorkout first reported them (`first`: no earlier record of
+ * that type for the exercise, so it was a baseline rather than an improvement).
+ */
+export async function recordsOfSession(supabase: SupabaseClient, userId: string, sessionId: string): Promise<NewRecord[]> {
+  const { data } = await supabase
+    .from("personal_records")
+    .select("exercise_id, record_type, value, weight_kg, reps, achieved_at")
+    .eq("user_id", userId)
+    .eq("session_id", sessionId);
+  const rows = data ?? [];
+  if (!rows.length) return [];
+  const { data: others } = await supabase
+    .from("personal_records")
+    .select("exercise_id, record_type, achieved_at")
+    .eq("user_id", userId)
+    .in("exercise_id", [...new Set(rows.map((r) => r.exercise_id as string))])
+    .or(`session_id.is.null,session_id.neq.${sessionId}`);
+  return rows.map((r) => ({
+    exerciseId: r.exercise_id as string,
+    recordType: r.record_type as NewRecord["recordType"],
+    value: Number(r.value),
+    weightKg: r.weight_kg == null ? null : Number(r.weight_kg),
+    reps: r.reps == null ? null : Number(r.reps),
+    first: !(others ?? []).some((o) => o.exercise_id === r.exercise_id && o.record_type === r.record_type && String(o.achieved_at) <= String(r.achieved_at)),
+  }));
+}
+
+/** Names a workout gets when the member doesn't name it: too generic to compare "last time" against. */
+const GENERIC_NAME = /^\s*((morning|afternoon|evening|night|quick|empty|new)\s+)?workout\s*$/i;
+
+export interface PreviousSession {
+  startedAt: string;
+  volumeKg: number;
+}
+
+/**
+ * The member's previous completed session of the same kind, for a "compared with last time" line: the same program
+ * day, or (outside a program) a workout with the same, non-generic name. Null when there isn't one.
+ */
+export async function previousComparableSession(
+  supabase: SupabaseClient,
+  userId: string,
+  s: { sessionId: string; startedAt: string; programDayId: string | null; name: string },
+): Promise<PreviousSession | null> {
+  if (!s.programDayId && GENERIC_NAME.test(s.name)) return null;
+  let q = supabase
+    .from("workout_sessions")
+    .select("started_at, total_volume_kg")
+    .eq("user_id", userId)
+    .eq("status", "completed")
+    .neq("id", s.sessionId)
+    .lt("started_at", s.startedAt);
+  q = s.programDayId ? q.eq("program_day_id", s.programDayId) : q.eq("name", s.name.trim());
+  const { data } = await q.order("started_at", { ascending: false }).limit(1).maybeSingle();
+  return data ? { startedAt: data.started_at as string, volumeKg: Number(data.total_volume_kg ?? 0) } : null;
 }
 
 /**
@@ -152,7 +215,9 @@ export async function finishWorkout(
     .eq("client_id", input.clientId)
     .maybeSingle();
   if (existing?.status === "completed") {
-    return { sessionId: existing.id as string, volumeKg: Number(existing.total_volume_kg), records: [], alreadyCompleted: true };
+    // A retry after the first response was lost (gym Wi-Fi): show the same records the first attempt saved.
+    const records = await recordsOfSession(supabase, userId, existing.id as string).catch(() => []);
+    return { sessionId: existing.id as string, volumeKg: Number(existing.total_volume_kg), records, alreadyCompleted: true };
   }
 
   // Only link to a program the user actually owns a record for.
@@ -177,18 +242,74 @@ export async function finishWorkout(
     draft: null,
   };
 
+  // Claim the session before writing: two finishes of the same workout at once (a double tap, a retry while the
+  // first request is still running) would otherwise both clear and re-write the exercises and save every set twice.
+  // Only the request that wins the claim writes; the others wait for it and report the workout as already saved.
+  const claim = crypto.randomUUID();
+  const claimedRow = { ...row, finish_claim: claim, finish_claimed_at: new Date().toISOString() };
   let sessionId: string;
   if (existing) {
     sessionId = existing.id as string;
-    const { error } = await supabase.from("workout_sessions").update(row).eq("id", sessionId);
+    const staleBefore = new Date(Date.now() - FINISH_CLAIM_TTL_MS).toISOString();
+    const { data: won, error } = await supabase
+      .from("workout_sessions")
+      .update(claimedRow)
+      .eq("id", sessionId)
+      .eq("status", "in_progress")
+      .or(`finish_claim.is.null,finish_claimed_at.lt."${staleBefore}"`)
+      .select("id");
     if (error) throw new WorkoutError(error.message);
-    // Clear any rows from a previous partial attempt.
-    await supabase.from("workout_exercises").delete().eq("session_id", sessionId);
+    if (!won?.length) return awaitOtherFinish(supabase, userId, input.clientId);
   } else {
-    const { data, error } = await supabase.from("workout_sessions").insert(row).select("id").single();
+    const { data, error } = await supabase.from("workout_sessions").insert(claimedRow).select("id").single();
+    // Another request created it first (unique user + client id): it holds the claim.
+    if (error?.code === "23505") return awaitOtherFinish(supabase, userId, input.clientId);
     if (error || !data) throw new WorkoutError(error?.message ?? "Insert failed", error?.code === "23503" ? "invalid" : "db");
     sessionId = data.id as string;
   }
+
+  try {
+    return await writeClaimedFinish(supabase, userId, sessionId, input, userProgramId, volumeKg);
+  } catch (e) {
+    // Let the client's retry take over straight away instead of waiting for the claim to go stale.
+    await supabase.from("workout_sessions").update({ finish_claim: null, finish_claimed_at: null }).eq("id", sessionId).eq("finish_claim", claim);
+    throw e;
+  }
+}
+
+/** A claim older than this is treated as abandoned (the server died mid-save), so a retry can take it over. */
+const FINISH_CLAIM_TTL_MS = 120_000;
+
+/** Another request is finishing this workout: wait for it, then answer as a retry would. */
+async function awaitOtherFinish(supabase: SupabaseClient, userId: string, clientId: string) {
+  for (let i = 0; i < 40; i++) {
+    const { data } = await supabase
+      .from("workout_sessions")
+      .select("id, status, total_volume_kg")
+      .eq("user_id", userId)
+      .eq("client_id", clientId)
+      .maybeSingle();
+    if (data?.status === "completed") {
+      const records = await recordsOfSession(supabase, userId, data.id as string).catch(() => []);
+      return { sessionId: data.id as string, volumeKg: Number(data.total_volume_kg), records, alreadyCompleted: true };
+    }
+    if (data && data.status !== "in_progress") break;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  throw new WorkoutError("This workout is still being saved. Try again in a moment.", "conflict");
+}
+
+async function writeClaimedFinish(
+  supabase: SupabaseClient,
+  userId: string,
+  sessionId: string,
+  input: FinishWorkoutInput,
+  userProgramId: string | null,
+  volumeKg: number,
+): Promise<{ sessionId: string; volumeKg: number; records: NewRecord[]; alreadyCompleted: boolean }> {
+  // Clear anything a previous partial attempt left (an in-progress session owns no saved exercises or records).
+  await supabase.from("workout_exercises").delete().eq("session_id", sessionId);
+  await supabase.from("personal_records").delete().eq("user_id", userId).eq("session_id", sessionId);
 
   // If this throws, the session stays in progress so the client can retry safely.
   await insertExercises(supabase, userId, sessionId, input.exercises);
@@ -200,7 +321,8 @@ export async function finishWorkout(
   const records: NewRecord[] = [];
   for (const id of exerciseIds) {
     const sets = active.filter((e) => e.exerciseId === id).flatMap((e) => toLogged(e.sets));
-    for (const r of detectNewRecords(prior.get(id) ?? [], bestsFromSets(sets))) records.push({ ...r, exerciseId: id });
+    const before = prior.get(id) ?? [];
+    for (const r of detectNewRecords(before, bestsFromSets(sets))) records.push({ ...r, exerciseId: id, first: !before.some((b) => b.recordType === r.recordType) });
   }
   if (records.length) {
     const { error } = await supabase.from("personal_records").insert(
@@ -220,7 +342,7 @@ export async function finishWorkout(
 
   const { error: doneErr } = await supabase
     .from("workout_sessions")
-    .update({ status: "completed", ended_at: input.endedAt, draft: null })
+    .update({ status: "completed", ended_at: input.endedAt, draft: null, finish_claim: null, finish_claimed_at: null })
     .eq("id", sessionId);
   if (doneErr) throw new WorkoutError(doneErr.message);
 
@@ -236,13 +358,22 @@ export async function finishWorkout(
  */
 export async function rebuildRecords(supabase: SupabaseClient, userId: string, exerciseIds: string[]): Promise<void> {
   if (!exerciseIds.length) return;
-  const { data, error } = await supabase
-    .from("workout_exercises")
-    .select("exercise_id, skipped, session:workout_sessions!inner(id, status, started_at, ended_at), sets:workout_sets(reps, weight_kg, duration_seconds, completed, is_warmup)")
-    .eq("user_id", userId)
-    .in("exercise_id", exerciseIds)
-    .eq("session.status", "completed");
-  if (error) throw new WorkoutError(error.message);
+  // Paged (the API returns at most 1,000 rows per request): an unpaged read dropped older sessions for members with a
+  // long history, and the rebuild then deleted records those sessions held.
+  const data: unknown[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data: page, error } = await supabase
+      .from("workout_exercises")
+      .select("id, exercise_id, skipped, session:workout_sessions!inner(id, status, started_at, ended_at), sets:workout_sets(reps, weight_kg, duration_seconds, completed, is_warmup)")
+      .eq("user_id", userId)
+      .in("exercise_id", exerciseIds)
+      .eq("session.status", "completed")
+      .order("id")
+      .range(from, from + 999);
+    if (error) throw new WorkoutError(error.message);
+    data.push(...(page ?? []));
+    if (!page || page.length < 1000) break;
+  }
 
   type Row = {
     exercise_id: string;
@@ -301,9 +432,23 @@ export async function editWorkout(supabase: SupabaseClient, userId: string, inpu
   const affected = new Set<string>([...(before ?? []).map((b) => b.exercise_id as string), ...input.exercises.map((e) => e.exerciseId)]);
 
   const volumeKg = computeSessionVolume(input.exercises);
-  const { error: delErr } = await supabase.from("workout_exercises").delete().eq("session_id", input.sessionId);
-  if (delErr) throw new WorkoutError(delErr.message);
-  await insertExercises(supabase, userId, input.sessionId, input.exercises);
+  // Write the new exercises first and only then remove the old ones, so a failed save never leaves the workout
+  // empty: on failure the partly written new rows are removed and the old ones stay.
+  const { data: oldRows, error: oldErr } = await supabase.from("workout_exercises").select("id").eq("session_id", input.sessionId).eq("user_id", userId);
+  if (oldErr) throw new WorkoutError(oldErr.message);
+  const oldIds = (oldRows ?? []).map((r) => r.id as string);
+  try {
+    await insertExercises(supabase, userId, input.sessionId, input.exercises);
+  } catch (err) {
+    let cleanup = supabase.from("workout_exercises").delete().eq("session_id", input.sessionId).eq("user_id", userId);
+    if (oldIds.length) cleanup = cleanup.not("id", "in", `(${oldIds.join(",")})`);
+    await cleanup;
+    throw err;
+  }
+  if (oldIds.length) {
+    const { error: delErr } = await supabase.from("workout_exercises").delete().in("id", oldIds).eq("user_id", userId);
+    if (delErr) throw new WorkoutError(delErr.message);
+  }
   const { error } = await supabase
     .from("workout_sessions")
     .update({ name: input.name, notes: input.notes || null, total_volume_kg: volumeKg })
@@ -313,12 +458,31 @@ export async function editWorkout(supabase: SupabaseClient, userId: string, inpu
   return { volumeKg };
 }
 
+/**
+ * Delete a workout and make the records truthful again. The records the workout earned are removed first: deleting
+ * the session only clears their session link (on delete set null), so if the rebuild then failed they stayed behind
+ * for good, and a retry found no workout. A retry now still rebuilds: with the workout already gone, any records left
+ * without a session (from such a half-finished delete) are rebuilt before "not found" is reported.
+ */
 export async function deleteWorkout(supabase: SupabaseClient, userId: string, sessionId: string): Promise<void> {
   const { data: exs } = await supabase.from("workout_exercises").select("exercise_id").eq("session_id", sessionId).eq("user_id", userId);
+  const { data: held, error: heldErr } = await supabase.from("personal_records").select("exercise_id").eq("session_id", sessionId).eq("user_id", userId);
+  if (heldErr) throw new WorkoutError(heldErr.message);
+  const affected = new Set<string>([...(exs ?? []), ...(held ?? [])].map((r) => r.exercise_id as string));
+  if (held?.length) {
+    const { error: prErr } = await supabase.from("personal_records").delete().eq("session_id", sessionId).eq("user_id", userId);
+    if (prErr) throw new WorkoutError(prErr.message);
+  }
   const { error, count } = await supabase.from("workout_sessions").delete({ count: "exact" }).eq("id", sessionId).eq("user_id", userId);
   if (error) throw new WorkoutError(error.message);
-  if (!count) throw new WorkoutError("Workout not found", "not_found");
-  await rebuildRecords(supabase, userId, [...new Set((exs ?? []).map((e) => e.exercise_id as string))]);
+  if (!count) {
+    const { data: orphans, error: orphanErr } = await supabase.from("personal_records").select("exercise_id").eq("user_id", userId).is("session_id", null);
+    if (orphanErr) throw new WorkoutError(orphanErr.message);
+    for (const o of orphans ?? []) affected.add(o.exercise_id as string);
+    await rebuildRecords(supabase, userId, [...affected]);
+    throw new WorkoutError("Workout not found", "not_found");
+  }
+  await rebuildRecords(supabase, userId, [...affected]);
 }
 
 export interface HistoryItem {
@@ -351,4 +515,45 @@ export async function listHistory(supabase: SupabaseClient, userId: string, limi
     paused_seconds: s.paused_seconds as number,
     exercise_count: (s.workout_exercises as unknown as { count: number }[])[0]?.count ?? 0,
   }));
+}
+
+/**
+ * The most recent completed performance of each exercise ("Last time: 3×5 @ 225 lb"), for the logger.
+ * Owner-scoped by user id (and RLS). Reads the newest rows only, so it stays cheap for long histories.
+ */
+export async function getPreviousPerformance(
+  supabase: SupabaseClient,
+  userId: string,
+  exerciseIds: string[],
+  /** Today's program day, when the workout is one: its earlier sessions are preferred (see preferSameSession). */
+  slot?: SessionSlot | null,
+): Promise<Record<string, PreviousPerformance>> {
+  const ids = [...new Set(exerciseIds)].slice(0, 40);
+  if (!ids.length) return {};
+  const { data, error } = await supabase
+    .from("workout_exercises")
+    .select(
+      "exercise_id, skipped, session:workout_sessions!inner(id, started_at, status, program_day:program_days(day_number, week:program_weeks(program_id, is_deload))), sets:workout_sets(set_number, reps, weight_kg, duration_seconds, distance_m, is_warmup, is_drop, completed)",
+    )
+    .eq("user_id", userId)
+    .in("exercise_id", ids)
+    .eq("session.status", "completed")
+    .order("created_at", { ascending: false })
+    .limit(Math.min(400, ids.length * 12));
+  if (error) throw new WorkoutError(error.message);
+  return Object.fromEntries(preferSameSession((data ?? []) as unknown as PreviousRow[], slot));
+}
+
+export interface ExerciseTarget {
+  weightKg: number | null;
+  reps: number | null;
+}
+
+/** Target loads the member accepted from the training review or the AI coach (Pro), by exercise id. */
+export async function getExerciseTargets(supabase: SupabaseClient, userId: string, exerciseIds: string[]): Promise<Record<string, ExerciseTarget>> {
+  const ids = [...new Set(exerciseIds)].slice(0, 40);
+  if (!ids.length) return {};
+  const { data, error } = await supabase.from("exercise_targets").select("exercise_id, weight_kg, reps").eq("user_id", userId).in("exercise_id", ids);
+  if (error) throw new WorkoutError(error.message);
+  return Object.fromEntries((data ?? []).map((t) => [t.exercise_id as string, { weightKg: t.weight_kg == null ? null : Number(t.weight_kg), reps: (t.reps as number | null) ?? null }]));
 }

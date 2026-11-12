@@ -1,10 +1,12 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import { WorkoutEditor, type EditableSession } from "@/components/workout/workout-editor";
 import type { CatalogItem } from "@/components/workout/exercise-picker";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
+import { BackLink } from "@/components/platform/back-link";
+import Link from "next/link";
+import { Repeat } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export const metadata = { title: "Workout" };
 
@@ -16,7 +18,7 @@ export default async function WorkoutDetailPage({ params }: { params: Promise<{ 
   const { data: session } = await supabase
     .from("workout_sessions")
     .select(
-      "id, name, notes, started_at, ended_at, paused_seconds, total_volume_kg, status, workout_exercises(id, position, notes, skipped, skip_reason, substituted_from_id, exercise:exercises!workout_exercises_exercise_id_fkey(id, slug, name, is_timed), sets:workout_sets(set_number, reps, weight_kg, duration_seconds, rpe, is_warmup, completed))",
+      "id, name, notes, started_at, ended_at, paused_seconds, total_volume_kg, status, workout_exercises(id, position, notes, skipped, skip_reason, substituted_from_id, exercise:exercises!workout_exercises_exercise_id_fkey(id, slug, name, is_timed), sets:workout_sets(set_number, reps, weight_kg, duration_seconds, distance_m, rpe, is_warmup, is_drop, completed))",
     )
     .eq("id", id)
     .eq("user_id", user.id)
@@ -42,7 +44,7 @@ export default async function WorkoutDetailPage({ params }: { params: Promise<{ 
     skip_reason: "pain" | "equipment" | "time" | "other" | null;
     substituted_from_id: string | null;
     exercise: { id: string; slug: string; name: string; is_timed: boolean };
-    sets: { set_number: number; reps: number | null; weight_kg: number | null; duration_seconds: number | null; rpe: number | null; is_warmup: boolean; completed: boolean }[];
+    sets: { set_number: number; reps: number | null; weight_kg: number | null; duration_seconds: number | null; distance_m: number | null; rpe: number | null; is_warmup: boolean; is_drop?: boolean; completed: boolean }[];
   };
   const exercises = ((session.workout_exercises ?? []) as unknown as WE[]).sort((a, b) => a.position - b.position);
   const editable: EditableSession = {
@@ -68,8 +70,10 @@ export default async function WorkoutDetailPage({ params }: { params: Promise<{ 
           reps: s.reps,
           weightKg: s.weight_kg == null ? null : Number(s.weight_kg),
           durationSeconds: s.duration_seconds,
+          distanceM: s.distance_m == null ? null : Number(s.distance_m),
           rpe: s.rpe == null ? null : Number(s.rpe),
           isWarmup: s.is_warmup,
+          isDrop: Boolean(s.is_drop),
           completed: s.completed,
         })),
     })),
@@ -77,10 +81,16 @@ export default async function WorkoutDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div className="space-y-6">
-      <Link href="/train/history" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="size-4" aria-hidden /> History
-      </Link>
+      <BackLink href="/train/history">History</BackLink>
       <WorkoutEditor session={editable} catalog={catalog} units={profile.unit_system} timezone={profile.timezone} />
+      {session.status === "completed" && editable.exercises.some((e) => !e.skipped) && (
+        // Starts a new workout with the same exercises and set counts; this one is left exactly as it was.
+        <Button asChild size="lg" className="w-full" data-testid="repeat-workout">
+          <Link href={`/train/workout?repeat=${editable.id}`}>
+            <Repeat aria-hidden /> Do this workout again
+          </Link>
+        </Button>
+      )}
     </div>
   );
 }

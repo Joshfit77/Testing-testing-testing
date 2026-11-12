@@ -1,14 +1,25 @@
 import { expect, test } from "@playwright/test";
-import { completeOnboarding, signUpAndConfirm, uniqueEmail } from "./helpers";
+import { completeOnboarding, grantPlan, signUpAndConfirm, uniqueEmail } from "./helpers";
 
 test.describe("Build my program", () => {
   test("builds a bench press specialization from a best set and makes it the active program", async ({ page }) => {
-    await signUpAndConfirm(page, uniqueEmail("builder"));
+    const email = uniqueEmail("builder");
+    await signUpAndConfirm(page, email);
     await completeOnboarding(page);
+    // The program builder is a Plus feature.
+    await grantPlan(email, "plus");
 
-    await page.goto("/train");
+    await page.goto("/train/programs");
+    // The library is organized by the spec's categories; the type picker by discipline.
+    await expect(page.getByRole("heading", { name: "Strongman", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "MMA, boxing & grappling" })).toBeVisible();
+    await page.getByRole("navigation", { name: "Program categories" }).getByRole("link", { name: "Bodybuilding & muscle", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Bodybuilding & muscle" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Strongman", exact: true })).toHaveCount(0);
     await page.getByRole("link", { name: /Build my program/ }).first().click();
     await page.waitForURL(/\/train\/build/);
+    await expect(page.getByRole("heading", { name: "Strength & Powerlifting" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Combat Sports" })).toBeVisible();
 
     const next = () => page.getByRole("button", { name: /^Next/ }).click();
     await page.getByRole("button", { name: /Bench Press Only/ }).click();
@@ -30,6 +41,9 @@ test.describe("Build my program", () => {
     await next(); // equipment (prefilled)
 
     await expect(page.getByText("Review your program")).toBeVisible();
+    // What changes compared with the active (onboarding) program, before anything is applied.
+    await expect(page.getByRole("heading", { name: "What changes from your current program" })).toBeVisible();
+    await expect(page.getByTestId("plan-changes")).toContainText("→");
     await expect(page.getByText(/70% · 185 lb/).first()).toBeVisible();
     await page.getByRole("button", { name: "Build & start program" }).click();
 

@@ -1,0 +1,739 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Flag, Loader2, LocateFixed, Pause, PenLine, Play, Save, SignalZero, Trash2, Volume2, VolumeX } from "lucide-react";
+import { FIRST_FIX_ACCURACY_M, type GpsDiagnostics, type GpsFix, type GpsHint } from "@/lib/domain/gps-track";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { NativeSelect, Textarea } from "@/components/ui/input";
+import { Notice } from "@/components/common/states";
+import { confirmDialog } from "@/components/ui/confirm";
+import { RouteMap } from "@/components/run/route-map";
+import { formatDistance, formatHms, formatPace, paceSecondsPer, type ActivityKind, type DistanceUnit } from "@/lib/domain/activities";
+import {
+  addFix,
+  currentPace,
+  currentPosition,
+  finishTrack,
+  gpsDiagnostics,
+  ignoredReadings,
+  isFinishedTooOldToSave,
+  isRecoverable,
+  pauseTrack,
+  recoverTrack,
+  resumeTrack,
+  routeForSave,
+  startTrack,
+  suspendAwareTicker,
+  trackTotals,
+  type TrackState,
+} from "@/lib/domain/gps-track";
+import { buildScript, completedSets, phaseAt, scriptSeconds, type RunPrescription } from "@/lib/domain/run-session";
+import { canOpenLocationSettings, hasNativeBackgroundLocation, keepScreenOn, locationSourceLabel, openLocationSettings, watchLocation, type LocationError } from "@/lib/native/location";
+import { attachScreen, keepRecording, routeError, routeFix, shouldKeep, takeBack } from "@/lib/run/live-recording";
+import { saveGpsActivityAction } from "@/server/actions/gps-activities";
+
+export interface GuidedSession {
+  userProgramId: string;
+  programDayId: string;
+  dayName: string;
+  programName: string;
+  prescriptions: RunPrescription[];
+}
+
+interface Saved {
+  track: TrackState;
+  guidedDayId: string | null;
+}
+
+const HINT_TEXT: Record<GpsHint, string> = {
+  precise_off:
+    "Your device is only sharing an approximate location (hundreds of metres), which can't measure a run or walk. Turn on Precise Location for this browser or app — iPhone: Settings › Privacy & Security › Location Services › your browser › Precise Location. Android: long-press the app › App info › Permissions › Location › Use precise location.",
+  weak_signal: "The GPS signal is weak here, so some readings are being ignored. Open sky away from tall buildings helps.",
+  slow_updates: "Location updates are arriving slowly (more than 5 seconds apart). Keep this screen open and turn off battery or low-power saving for the browser.",
+  many_outliers: "Several readings jumped away from your route and were ignored (tall buildings or trees reflect GPS signals).",
+};
+
+const fmtM = (m: number, unit: DistanceUnit) => (unit === "mi" ? `${Math.round(m * 3.28084)} ft` : `${Math.round(m)} m`);
+
+/**
+ * "GPS details": what the GPS is doing right now, for the member (or support) to see why distance looks the way it
+ * does. Accuracies, timings and counts only: positions are never shown here and nothing is logged.
+ */
+function GpsDetails({ d, unit, source }: { d: GpsDiagnostics; unit: DistanceUnit; source: string }) {
+  const rows: [string, string][] = [
+    ["Source", source],
+    ["Last reading", d.lastFixAgeS == null ? "None yet" : d.lastFixAgeS <= 1 ? "Just now" : `${d.lastFixAgeS} s ago`],
+    ["Accuracy now", d.lastAccuracy == null ? "—" : `±${fmtM(d.lastAccuracy, unit)}`],
+    ["Best / worst", d.bestAccuracy == null ? "—" : `±${fmtM(d.bestAccuracy, unit)} / ±${fmtM(d.worstAccuracy ?? d.bestAccuracy, unit)}`],
+    ["Update interval", d.meanIntervalS == null ? "—" : `${d.meanIntervalS} s average, ${d.maxIntervalS} s longest`],
+    ["Readings used", `${d.accepted} of ${d.received}${d.ignored.standingStill ? ` (${d.ignored.standingStill} while standing still, no distance)` : ""}`],
+    ["Ignored", `${d.ignored.inaccurate + d.ignored.waiting} imprecise, ${d.ignored.outliers} off-route, ${d.ignored.outOfOrder} late or repeated`],
+    ["Signal gaps", d.gaps ? `${d.gaps}${d.uncountedGapM ? ` (≈${fmtM(d.uncountedGapM, unit)} straight-line not counted)` : ""}` : "None"],
+    ["Speed now", d.speedMs == null ? "—" : unit === "mi" ? `${(d.speedMs * 2.23694).toFixed(1)} mph` : `${(d.speedMs * 3.6).toFixed(1)} km/h`],
+  ];
+  if (d.restarts) rows.push(["Track restarts", `${d.restarts} (a run of off-route readings turned out to be right)`]);
+  return (
+    <details className="rounded-xl border border-border bg-card px-3 py-2 text-sm" data-testid="gps-details">
+      <summary className="cursor-pointer select-none font-semibold">GPS details</summary>
+      <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+        {rows.map(([k, v]) => (
+          <div key={k} className="contents">
+            <dt className="text-muted-foreground">{k}</dt>
+            <dd className="tabular-nums" data-testid={`gps-detail-${k.toLowerCase().replace(/[^a-z]+/g, "-")}`}>
+              {v}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Distance is measured along a smoothed track: each reading is weighted by its accuracy, readings far off your route are ignored, and standing still adds nothing. Nothing is counted across a pause or a gap.
+      </p>
+    </details>
+  );
+}
+
+/** When a draft left on the device started: the time alone for today's, with the day in front for an older one. */
+function draftWhen(startedAt: number): string {
+  const d = new Date(startedAt);
+  const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return d.toDateString() === new Date().toDateString() ? time : `${d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })}, ${time}`;
+}
+
+const ERROR_TEXT: Record<LocationError, string> = {
+  denied: "Location permission is off for this app. Turn it on in your browser or phone settings to record a run or walk.",
+  unavailable: "Your location isn't available right now. Check that location services are on, or try again outdoors.",
+  unsupported: "This browser can't share its location. Try another browser or the app.",
+  timeout: "Still waiting for a GPS fix. Move to an open area away from tall buildings.",
+};
+
+export function GpsRecorder({
+  userId,
+  units,
+  initialKind,
+  guided,
+  canRecord = true,
+  proPriceLine = null,
+}: {
+  userId: string;
+  units: "metric" | "imperial";
+  initialKind: ActivityKind;
+  guided: GuidedSession | null;
+  /** Live GPS recording is part of Pro All Access. Without it, an unsaved recording on this device can still be discarded. */
+  canRecord?: boolean;
+  /** The configured Pro All Access prices for the upsell, from the server; null in the native app (no web prices there). */
+  proPriceLine?: string | null;
+}) {
+  const router = useRouter();
+  const unit: DistanceUnit = units === "imperial" ? "mi" : "km";
+  const storageKey = `run.recording.${userId}`;
+  const [kind, setKind] = useState<ActivityKind>(guided ? "run" : initialKind);
+  const [track, setTrack] = useState<TrackState | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const [error, setError] = useState<LocationError | null>(null);
+  const [recoverable, setRecoverable] = useState<Saved | null>(null);
+  // A finished recording that was never saved and is now older than the server accepts: shown, not silently removed.
+  const [tooOld, setTooOld] = useState<TrackState | null>(null);
+  const [voice, setVoice] = useState(false);
+  const [effort, setEffort] = useState("");
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const stopRef = useRef<(() => void) | null>(null);
+  const wakeRef = useRef<(() => void) | null>(null);
+  // Two taps in the same frame both see `saving` as false; the ref stops the second one.
+  const savingRef = useRef(false);
+  const lastSaveRef = useRef(0);
+  const script = useMemo(() => (guided ? buildScript(guided.prescriptions) : null), [guided]);
+  const lastPhaseRef = useRef<number>(-1);
+
+  // The latest track, key and session, for handing a recording over when the screen closes mid-recording.
+  const trackRef = useRef<TrackState | null>(null);
+  trackRef.current = track;
+  const pendingFixes = useRef<GpsFix[]>([]);
+  const handOver = useRef({ key: storageKey, guidedDayId: guided?.programDayId ?? null, href: "" });
+  handOver.current.key = storageKey;
+  handOver.current.guidedDayId = guided?.programDayId ?? null;
+
+  // Fixes reach this screen while it is open (src/lib/run/live-recording.ts routes them).
+  useEffect(
+    () =>
+      attachScreen({
+        fix: (fix) => {
+          // A fix means the signal is back: drop a warning left by a brief loss (tunnels, tall buildings).
+          setError(null);
+          // Until React applies it, the fix waits here, so a hand-over in that instant still carries it.
+          pendingFixes.current.push(fix);
+          setTrack((t) => {
+            const i = pendingFixes.current.indexOf(fix);
+            if (i >= 0) pendingFixes.current.splice(i, 1);
+            const next = t ? addFix(t, fix).state : t;
+            trackRef.current = next;
+            return next;
+          });
+        },
+        error: (e) => setError(e as LocationError),
+      }),
+    [],
+  );
+
+  // A recording that kept going while the member was elsewhere in the app comes straight back (watcher and all).
+  // Otherwise, a recording left on this device (closed tab, crash, phone restart, or finished but not saved because
+  // the save failed offline): offer it back. Only an unfinished draft too old to continue is removed; a finished one
+  // is kept for as long as it can still be saved, and after that the member is told before it goes.
+  useEffect(() => {
+    handOver.current.href = `${window.location.pathname}${window.location.search}`;
+    const live = takeBack(storageKey, guided?.programDayId ?? null);
+    if (live) {
+      setKind(live.track.kind);
+      setTrack(live.track);
+      setNow(Date.now());
+      stopRef.current = live.stop;
+      wakeRef.current = live.wake;
+      return;
+    }
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as Saved;
+      if (isRecoverable(saved.track, Date.now()) && (saved.guidedDayId ?? null) === (guided?.programDayId ?? null)) setRecoverable(saved);
+      else if (isFinishedTooOldToSave(saved.track, Date.now())) setTooOld(saved.track);
+      else if (!isRecoverable(saved.track, Date.now())) localStorage.removeItem(storageKey);
+    } catch {
+      /* storage unavailable: nothing to recover */
+    }
+  }, [storageKey, guided?.programDayId]);
+
+  const persist = useCallback(
+    (t: TrackState | null, force = false) => {
+      try {
+        if (!t) {
+          localStorage.removeItem(storageKey);
+          return;
+        }
+        if (!force && Date.now() - lastSaveRef.current < 5000) return;
+        lastSaveRef.current = Date.now();
+        localStorage.setItem(storageKey, JSON.stringify({ track: t, guidedDayId: guided?.programDayId ?? null } satisfies Saved));
+      } catch {
+        /* storage full or blocked: the recording continues in memory */
+      }
+    },
+    [storageKey, guided?.programDayId],
+  );
+
+  // Bumped by every stop: a watcher that finishes starting after a stop (Pause, Discard, Finish or leaving the page
+  // while the native permission prompt was up) is stopped at once instead of being kept and leaking GPS use.
+  const watchGen = useRef(0);
+
+  const stopWatching = useCallback(() => {
+    watchGen.current += 1;
+    stopRef.current?.();
+    stopRef.current = null;
+    wakeRef.current?.();
+    wakeRef.current = null;
+  }, []);
+
+  const beginWatching = useCallback(async () => {
+    setError(null);
+    stopWatching();
+    const gen = watchGen.current;
+    const stop = await watchLocation(routeFix, routeError);
+    if (gen !== watchGen.current) {
+      stop();
+      return;
+    }
+    stopRef.current = stop;
+    if (!hasNativeBackgroundLocation()) {
+      const wake = await keepScreenOn();
+      if (gen !== watchGen.current) wake?.();
+      else wakeRef.current = wake;
+    }
+  }, [stopWatching]);
+
+  // Leaving the screen mid-recording (another tab, the workout, the Bible) doesn't stop the recording: the watcher
+  // and the track are handed to the keeper, and a "Recording" pill leads back. Anything else stops the GPS.
+  useEffect(
+    () => () => {
+      let t = trackRef.current;
+      const stop = stopRef.current;
+      if (t && stop && shouldKeep(t)) {
+        for (const fix of pendingFixes.current.splice(0)) t = addFix(t, fix).state;
+        keepRecording({ ...handOver.current, track: t, stop, wake: wakeRef.current });
+        stopRef.current = null;
+        wakeRef.current = null;
+        return;
+      }
+      stopWatching();
+    },
+    [stopWatching],
+  );
+
+  // Clock: elapsed time, signal-loss detection and the guided script. It runs through a pause too: total time includes
+  // pauses (only moving time stops), and tick() leaves a paused track alone.
+  const active = track && track.status !== "finished";
+  useEffect(() => {
+    if (!active) return;
+    // Suspend-aware: after the phone was locked, fixes queued meanwhile arrive late and must not be read as a gap.
+    const step = suspendAwareTicker();
+    const timer = setInterval(() => {
+      const t = Date.now();
+      setNow(t);
+      setTrack((cur) => (cur ? step(cur, t) : cur));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [active]);
+
+  useEffect(() => {
+    if (track) persist(track, track.status !== "recording");
+  }, [track, persist]);
+
+  const moving = track ? Math.round(((): number => {
+    let ms = 0;
+    for (const p of track.periods) ms += Math.max(0, (p.end ?? now) - p.start);
+    return ms / 1000;
+  })()) : 0;
+  const elapsed = track ? Math.max(0, Math.round(((track.finishedAt ?? now) - track.startedAt) / 1000)) : 0;
+  const phase = script ? phaseAt(script, moving) : null;
+
+  // Cue each phase change (vibration where supported, optional voice).
+  useEffect(() => {
+    if (!phase || !track || track.status !== "recording") return;
+    if (phase.index === lastPhaseRef.current) return;
+    lastPhaseRef.current = phase.index;
+    try {
+      navigator.vibrate?.([200, 100, 200]);
+      if (voice && "speechSynthesis" in window) {
+        const text = phase.phase ? `${phase.phase.label}, ${Math.round(phase.phase.seconds / 60) || phase.phase.seconds} ${phase.phase.seconds >= 60 ? "minutes" : "seconds"}` : "Session complete. Well done.";
+        window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+      }
+    } catch {
+      /* cues are optional */
+    }
+  }, [phase, track, voice]);
+
+  const start = async () => {
+    const t = startTrack({ id: crypto.randomUUID(), kind, unit, now: Date.now() });
+    lastPhaseRef.current = -1;
+    setTrack(t);
+    setNow(Date.now());
+    persist(t, true);
+    await beginWatching();
+  };
+
+  const continueRecording = async () => {
+    if (!recoverable) return;
+    const t = recoverTrack(recoverable.track);
+    setKind(t.kind);
+    setTrack(t);
+    setRecoverable(null);
+    // A finished recording goes straight back to the review screen; location is not needed for that.
+    if (t.status !== "paused" && t.status !== "finished") await beginWatching();
+  };
+
+  const discard = async () => {
+    const ok = await confirmDialog({ title: `Discard this ${kind}?`, message: "The recording is deleted from this device and nothing is saved.", confirmLabel: "Discard", destructive: true });
+    if (!ok) return;
+    stopWatching();
+    setTrack(null);
+    setRecoverable(null);
+    persist(null);
+  };
+
+  const finish = () => {
+    stopWatching();
+    setTrack((t) => (t ? finishTrack(t, Date.now()) : t));
+  };
+
+  const save = async () => {
+    if (!track || savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
+    setSaveError(null);
+    const totals = trackTotals(track);
+    try {
+      const res = await saveGpsActivityAction({
+        id: track.id,
+        kind: track.kind,
+        startedAt: track.startedAt,
+        finishedAt: track.finishedAt ?? Date.now(),
+        distanceM: totals.distance_m,
+        elapsedS: totals.elapsed_s,
+        movingS: totals.moving_s,
+        splits: track.splits,
+        route: routeForSave(track),
+        gpsQuality: { gaps: track.gaps, rejected: ignoredReadings(track), lastAccuracy: track.lastAccuracy, uncountedGapM: Math.round(track.stats?.uncountedGapM ?? 0) },
+        effort: effort ? Number(effort) : null,
+        notes: notes.trim() || null,
+        program: guided && script ? { userProgramId: guided.userProgramId, programDayId: guided.programDayId, completedSets: completedSets(script, guided.prescriptions.length, totals.moving_s) } : null,
+      });
+      if (!res.ok) {
+        setSaveError(res.error);
+        return;
+      }
+      persist(null);
+      router.push(`/run/activities/${res.id}?saved=1`);
+      router.refresh();
+    } catch {
+      setSaveError(navigator.onLine ? "Couldn't reach the server. Your recording is still on this device: try again." : "You're offline. Your recording is kept on this device: save it when you're back online.");
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  };
+
+  const distance = track?.distanceM ?? 0;
+  const pace = track ? currentPace(track, now) : null;
+  const avgPace = paceSecondsPer(distance, Math.max(1, moving), unit);
+  const route = track ? routeForSave(track, 600) : null;
+  const diag = track ? gpsDiagnostics(track, now) : null;
+  const source = locationSourceLabel();
+
+  // ------------------------------------------------------------------ Not started
+  if (!track) {
+    return (
+      <div className="space-y-4">
+        {tooOld && (
+          <Notice tone="warning">
+            <p className="font-semibold" data-testid="gps-too-old">
+              Your {tooOld.kind} from {draftWhen(tooOld.startedAt)} was never saved, and it is now too old to save.
+            </p>
+            <p className="mt-1 text-sm">Recordings can be saved for up to 2 days after they start. You can add it as a manual entry instead, then remove it from this device.</p>
+            <div className="mt-2 flex gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  persist(null);
+                  setTooOld(null);
+                }}
+              >
+                Remove it
+              </Button>
+            </div>
+          </Notice>
+        )}
+        {recoverable && (
+          <Notice tone="warning">
+            <p className="font-semibold" data-testid="gps-recoverable">
+              {recoverable.track.status === "finished" ? "Your" : "You have an unfinished"} {recoverable.track.kind} from {draftWhen(recoverable.track.startedAt)}
+              {recoverable.track.status === "finished" ? " wasn't saved yet." : "."}
+            </p>
+            <p className="mt-1 text-sm">
+              {!canRecord
+                ? "Saving live GPS recordings is included with Pro All Access. It stays on this phone until you discard it, or until you have Pro All Access to finish and save it."
+                : recoverable.track.status === "finished"
+                  ? "It is still on this device: review and save it, or discard it."
+                  : "Continue it, or discard it. Any time the app was closed is kept as a gap: no distance is guessed for it."}
+            </p>
+            <div className="mt-2 flex gap-2">
+              {canRecord && (
+                <Button size="sm" onClick={continueRecording}>
+                  {recoverable.track.status === "finished" ? "Review and save" : "Continue recording"}
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  persist(null);
+                  setRecoverable(null);
+                }}
+              >
+                Discard it
+              </Button>
+            </div>
+          </Notice>
+        )}
+        {guided && script && (
+          <section className="rounded-2xl border border-gold-muted/60 bg-card p-4" aria-labelledby="guided-title">
+            <h2 id="guided-title" className="font-semibold">
+              {guided.dayName} <span className="text-sm font-normal text-muted-foreground">· {guided.programName}</span>
+            </h2>
+            <p className="text-sm text-muted-foreground">Guided: about {Math.round(scriptSeconds(script) / 60)} minutes including a 5-minute warm-up and cool-down. Cues tell you when to run and walk.</p>
+            <ol className="mt-2 max-h-40 space-y-0.5 overflow-y-auto text-sm">
+              {script.map((p, i) => (
+                <li key={i} className="flex justify-between gap-2">
+                  <span>{p.label}</span>
+                  <span className="tabular-nums text-muted-foreground">{formatHms(p.seconds)}</span>
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
+        {!guided && canRecord && (
+          <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Activity">
+            {(["run", "walk"] as const).map((k) => (
+              <button
+                key={k}
+                type="button"
+                role="radio"
+                aria-checked={kind === k}
+                onClick={() => setKind(k)}
+                className={`rounded-2xl border p-4 text-left ${kind === k ? "border-gold bg-gold/10" : "border-border bg-card"}`}
+              >
+                <span className="block font-display text-xl font-bold uppercase">Outdoor {k}</span>
+                <span className="text-xs text-muted-foreground">{k === "run" ? "Distance, pace and splits" : "Distance, pace and your route"}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {canRecord && (
+          <ul className="space-y-1 text-sm text-muted-foreground">
+            <li className="flex gap-2">
+              <LocateFixed className="mt-0.5 size-4 shrink-0 text-gold" aria-hidden /> {locationSourceLabel()}.{" "}
+              {!hasNativeBackgroundLocation() && "Browsers stop location updates when the screen locks; any time without a signal is kept as a gap, never guessed."}
+            </li>
+            <li>Location is used only while you record, and your route is private to you.</li>
+          </ul>
+        )}
+        {error && (
+          <Notice tone="error">
+            {ERROR_TEXT[error]}
+            {error === "denied" && canOpenLocationSettings() && (
+              <Button size="sm" variant="secondary" className="mt-2" onClick={() => void openLocationSettings()}>
+                Open Settings
+              </Button>
+            )}
+          </Notice>
+        )}
+        {canRecord ? (
+          <>
+            <Button className="h-14 w-full text-lg" size="lg" onClick={start} data-testid="gps-start">
+              <Play aria-hidden /> Start {guided ? "guided run" : kind}
+            </Button>
+            <p className="text-center text-sm text-muted-foreground">
+              No GPS? <Link href="/run?tab=log" className="inline-flex min-h-11 items-center underline">Log a run or walk by hand</Link>.
+            </p>
+          </>
+        ) : (
+          <>
+            {/* Free: the free way to log comes first, so this screen is never a dead end. Saving stays enforced on the server. */}
+            <Button asChild className="h-14 w-full text-lg" data-testid="gps-log-by-hand">
+              <Link href="/run?tab=log">
+                <PenLine aria-hidden /> Log a run or walk by hand (free)
+              </Link>
+            </Button>
+            <div className="space-y-2 rounded-2xl border border-border bg-card p-4" data-testid="gps-locked">
+              <p className="text-sm">
+                <span className="font-semibold">Live GPS recording is included with Pro All Access</span>
+                <span className="text-muted-foreground">
+                  {proPriceLine ? ` (${proPriceLine})` : ""}: route map, distance, pace and splits. Runs and walks you recorded before stay yours.
+                </span>
+              </p>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/profile/billing">See Pro All Access</Link>
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // ------------------------------------------------------------------ Finished: review and save
+  if (track.status === "finished") {
+    const totals = trackTotals(track);
+    return (
+      <div className="space-y-4" data-testid="gps-review">
+        <h2 className="font-display text-2xl font-bold uppercase">{track.kind === "run" ? "Run" : "Walk"} complete</h2>
+        <dl className="grid grid-cols-2 gap-2">
+          {(
+            [
+              ["Distance", formatDistance(totals.distance_m, unit)],
+              ["Moving time", formatHms(totals.moving_s)],
+              ["Avg pace", formatPace(paceSecondsPer(totals.distance_m, totals.moving_s, unit), unit)],
+              ["Total time", formatHms(totals.elapsed_s)],
+            ] as const
+          ).map(([label, value]) => (
+            <div key={label} className="rounded-xl bg-elevated px-3 py-2">
+              <dt className="text-xs uppercase tracking-wider text-muted-foreground">{label}</dt>
+              <dd className="font-display text-xl font-bold" data-testid={`review-${label.toLowerCase().replace(/ /g, "-")}`}>
+                {value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+        {route && <RouteMap coordinates={route.coordinates} className="w-full" unit={unit} />}
+        {track.gaps > 0 && (
+          <p className="text-sm text-muted-foreground" data-testid="gps-gap-note">
+            The signal dropped {track.gaps} time{track.gaps === 1 ? "" : "s"}; no distance was added for those stretches
+            {diag && diag.uncountedGapM > 0 ? ` (about ${fmtM(diag.uncountedGapM, unit)} in a straight line)` : ""}.
+          </p>
+        )}
+        {diag && <GpsDetails d={diag} unit={unit} source={source} />}
+        <label className="block text-sm">
+          How hard was it? (optional)
+          <NativeSelect value={effort} onChange={(e) => setEffort(e.target.value)} className="mt-1">
+            <option value="">—</option>
+            {Array.from({ length: 10 }, (_, i) => (
+              <option key={i + 1} value={i + 1}>
+                {i + 1} {i === 0 ? "(very easy)" : i === 9 ? "(all out)" : ""}
+              </option>
+            ))}
+          </NativeSelect>
+        </label>
+        <label className="block text-sm">
+          Notes (optional)
+          <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={2000} rows={2} className="mt-1" />
+        </label>
+        {saveError && <Notice tone="error">{saveError}</Notice>}
+        <div className="flex gap-2">
+          <Button className="flex-1" onClick={save} disabled={saving} data-testid="gps-save">
+            {saving ? <Loader2 className="animate-spin" aria-hidden /> : <Save aria-hidden />} Save {track.kind}
+          </Button>
+          <Button variant="ghost" onClick={discard} disabled={saving}>
+            <Trash2 aria-hidden /> Discard
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // ------------------------------------------------------------------ Recording / paused
+  return (
+    <div className="space-y-4" data-testid="gps-recording">
+      <div className="flex items-center justify-between gap-2">
+        <Badge variant={track.status === "paused" ? "secondary" : "success"} className="px-3 py-1 text-sm">
+          {track.status === "acquiring" ? "Waiting for GPS" : track.status === "paused" ? "Paused" : "Recording"}
+        </Badge>
+        {(() => {
+          const good = track.lastAccuracy != null && !track.signalLost && track.lastAccuracy <= FIRST_FIX_ACCURACY_M;
+          return (
+            <Badge variant={track.lastAccuracy == null ? "outline" : good ? "success" : "destructive"} className="px-3 py-1 text-sm tabular-nums" data-testid="gps-accuracy">
+              {track.lastAccuracy == null ? "No GPS fix yet" : track.signalLost ? "GPS lost" : `GPS ${good ? "good" : "weak"} ±${track.lastAccuracy} m`}
+            </Badge>
+          );
+        })()}
+      </div>
+      {track.status === "acquiring" && !diag?.hints.includes("precise_off") && (
+        <Notice tone="info">Waiting for a good GPS fix (within 20 m). Time is running; distance starts with the first good fix.</Notice>
+      )}
+      {diag?.hints.includes("precise_off") && (
+        <Notice tone="warning">
+          <span data-testid="gps-hint-precise">{HINT_TEXT.precise_off}</span>
+        </Notice>
+      )}
+      {track.status === "recording" &&
+        diag?.hints
+          .filter((h) => h !== "precise_off")
+          .slice(0, 1)
+          .map((h) => (
+            <p key={h} className="text-sm text-muted-foreground" data-testid={`gps-hint-${h}`}>
+              {HINT_TEXT[h]}
+            </p>
+          ))}
+      {track.signalLost && track.status === "recording" && (
+        <Notice tone="warning">
+          <span className="flex items-center gap-2">
+            <SignalZero className="size-4" aria-hidden /> GPS signal lost. Time keeps running; no distance is added until the signal returns.
+          </span>
+        </Notice>
+      )}
+      {error && <Notice tone="error">{ERROR_TEXT[error]}</Notice>}
+
+      {phase && (
+        <section className="rounded-2xl border border-gold-muted/60 bg-card-gradient p-4 text-center" aria-live="polite" data-testid="guided-phase">
+          {phase.phase ? (
+            <>
+              <p className="font-display text-3xl font-bold uppercase">{phase.phase.label}</p>
+              <p className="font-display text-5xl font-bold tabular-nums">{formatHms(phase.remaining)}</p>
+              {script && script[phase.index + 1] && <p className="text-sm text-muted-foreground">Next: {script[phase.index + 1]!.label}</p>}
+            </>
+          ) : (
+            <p className="font-display text-2xl font-bold uppercase">Session complete — finish when you&apos;re ready</p>
+          )}
+          <Button type="button" size="sm" variant="ghost" className="mt-1" onClick={() => setVoice((v) => !v)} aria-pressed={voice}>
+            {voice ? <Volume2 aria-hidden /> : <VolumeX aria-hidden />} Voice cues {voice ? "on" : "off"}
+          </Button>
+        </section>
+      )}
+
+      <dl className="grid grid-cols-2 gap-2">
+        <div className="col-span-2 rounded-2xl bg-elevated px-4 py-3 text-center">
+          <dt className="text-xs uppercase tracking-wider text-muted-foreground">Distance</dt>
+          <dd className="font-display text-5xl font-bold tabular-nums" data-testid="gps-distance">
+            {formatDistance(distance, unit)}
+          </dd>
+        </div>
+        {(
+          [
+            ["Time", formatHms(elapsed), "gps-elapsed"],
+            ["Moving", formatHms(moving), "gps-moving"],
+            ["Pace now", formatPace(pace, unit), "gps-pace"],
+            ["Avg pace", formatPace(avgPace, unit), "gps-avg-pace"],
+          ] as const
+        ).map(([label, value, testId]) => (
+          <div key={label} className="rounded-xl bg-elevated px-3 py-2 text-center">
+            <dt className="text-xs uppercase tracking-wider text-muted-foreground">{label}</dt>
+            <dd className="font-display text-2xl font-bold tabular-nums" data-testid={testId}>
+              {value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+
+      {route && <RouteMap coordinates={route.coordinates} className="w-full" unit={unit} current={currentPosition(track)} />}
+
+      {diag && <GpsDetails d={diag} unit={unit} source={source} />}
+
+      {track.splits.length > 0 && (
+        <section aria-labelledby="splits-title">
+          <h2 id="splits-title" className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">
+            Splits
+          </h2>
+          <ol className="mt-1 divide-y divide-border rounded-xl border border-border text-sm">
+            {track.splits.map((s) => (
+              <li key={s.index} className="flex justify-between px-3 py-1.5 tabular-nums">
+                <span>
+                  {s.index} {unit}
+                </span>
+                <span>{formatHms(s.split_s)}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+
+      <div className="sticky bottom-[calc(5.5rem+env(safe-area-inset-bottom))] flex gap-2 rounded-2xl border border-border bg-background/95 p-2 backdrop-blur">
+        {track.status === "paused" ? (
+          <Button
+            className="h-14 flex-1 text-lg"
+            onClick={async () => {
+              setTrack((t) => (t ? resumeTrack(t, Date.now()) : t));
+              await beginWatching();
+            }}
+          >
+            <Play aria-hidden /> Resume
+          </Button>
+        ) : (
+          <Button
+            className="h-14 flex-1 text-lg"
+            variant="secondary"
+            onClick={() => {
+              stopWatching();
+              setTrack((t) => (t ? pauseTrack(t, Date.now()) : t));
+            }}
+          >
+            <Pause aria-hidden /> Pause
+          </Button>
+        )}
+        <Button
+          className="h-14 flex-1 text-lg"
+          onClick={async () => {
+            const ok = await confirmDialog({ title: `Finish this ${track.kind}?`, message: "You'll review it before saving.", confirmLabel: "Finish" });
+            if (ok) finish();
+          }}
+        >
+          <Flag aria-hidden /> Finish
+        </Button>
+        {track.status === "paused" && (
+          <Button variant="ghost" size="icon" className="size-14" aria-label="Discard recording" onClick={discard}>
+            <Trash2 aria-hidden />
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}

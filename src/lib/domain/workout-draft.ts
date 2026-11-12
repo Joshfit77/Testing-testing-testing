@@ -1,4 +1,5 @@
 import { totalVolume } from "./strength";
+import { usesDistance } from "./exercise-tracking";
 
 /**
  * In-progress workout state. This is a pure reducer so it can be unit tested and
@@ -11,15 +12,28 @@ export interface DraftSet {
   reps: number | null;
   weightKg: number | null;
   durationSeconds: number | null;
+  /** Metres, for carries, sleds and cardio intervals (draft v2). */
+  distanceM: number | null;
   rpe: number | null;
   isWarmup: boolean;
   completed: boolean;
+  /**
+   * Passed over on purpose ("Skip set"): not done, not counted, and not offered as the next set. Undo, or completing it
+   * after all, brings it back. Sent to the server like any unfinished set (completed: false). Missing on older drafts.
+   */
+  skipped?: boolean;
+  /**
+   * A drop set: done straight after the set before it, at a lower weight, with no rest in between. A working set in
+   * every count (volume, records); kept out of the "Set 2 of 3" numbering. Missing on older drafts (a normal set).
+   */
+  isDrop?: boolean;
 }
 
 export interface DraftTarget {
   sets: number;
   reps?: string | null;
   seconds?: number | null;
+  distanceM?: number | null;
   rpe?: number | null;
   intensity?: string | null;
 }
@@ -30,6 +44,13 @@ export interface DraftExercise {
   slug: string;
   name: string;
   isTimed: boolean;
+  /** Logs distance (carries, sleds, runs, rows). */
+  usesDistance: boolean;
+  /**
+   * Exercises sharing a superset id (and next to each other) are done as a superset: one set of each in turn,
+   * with rest only after the round.
+   */
+  supersetId: string | null;
   substitutedFromId: string | null;
   substitutedFromName: string | null;
   notes: string;
@@ -38,14 +59,26 @@ export interface DraftExercise {
   restSeconds: number;
   target: DraftTarget | null;
   sets: DraftSet[];
+  /**
+   * Last time's numbers (or an accepted target) were filled in once already. Never filled again, so a value the member
+   * cleared on purpose (bodyweight) doesn't come back when the workout is resumed. Missing on older drafts.
+   */
+  prefilled?: boolean;
+  /** The member said this loaded exercise has no added weight today (T8): sets may be logged without one. */
+  noWeightConfirmed?: boolean;
 }
 
+/** Current persisted format. v1 drafts (no distance, no supersets) are migrated by migrateDraft. */
+export const DRAFT_VERSION = 2;
+
 export interface WorkoutDraft {
-  version: 1;
+  version: 2;
   clientId: string;
   name: string;
   userProgramId: string | null;
   programDayId: string | null;
+  /** The saved template this workout was started from, if any. */
+  templateId: string | null;
   startedAt: string;
   pausedAt: string | null;
   pausedSeconds: number;
@@ -53,6 +86,8 @@ export interface WorkoutDraft {
   exercises: DraftExercise[];
   rest: { endsAt: string | null; durationSeconds: number; pausedRemaining: number | null };
   updatedAt: string;
+  /** When the member first tapped Finish: a retry (offline, a lost reply) keeps this end time, not the retry's. */
+  finishRequestedAt?: string | null;
 }
 
 export interface ExerciseRef {
@@ -62,10 +97,82 @@ export interface ExerciseRef {
   isTimed: boolean;
 }
 
+export interface PreviousSetValues {
+  reps: number | null;
+  weightKg: number | null;
+  durationSeconds: number | null;
+  distanceM: number | null;
+}
+
+/** A draft last touched this long ago is shown as "unfinished from earlier" rather than resumed silently. */
+export const STALE_DRAFT_HOURS = 6;
+
+/** Hours since the draft was last touched. */
+export function draftAgeHours(draft: Pick<WorkoutDraft, "updatedAt">, now: string): number {
+  return Math.max(0, (Date.parse(now) - Date.parse(draft.updatedAt)) / 3_600_000);
+}
+
+/** Whether a set has what it needs to count as done: reps for a rep set, time for a timed one, distance for distance
+ *  work (a loaded carry needs its distance; the weight is optional, bodyweight work has none). */
+export function setCanComplete(exercise: Pick<DraftExercise, "isTimed" | "usesDistance">, set: DraftSet): boolean {
+  if (exercise.usesDistance) return (set.distanceM ?? 0) > 0;
+  if (exercise.isTimed) return (set.durationSeconds ?? 0) > 0;
+  return (set.reps ?? 0) > 0;
+}
+
+/** A set still to do: not done and not skipped. */
+export function setPending(set: Pick<DraftSet, "completed" | "skipped">): boolean {
+  return !set.completed && !set.skipped;
+}
+
+/** The last set done before `setId` on the same exercise (the one "Same as last set" copies), or null. */
+export function lastDoneBefore(exercise: Pick<DraftExercise, "sets">, setId: string): DraftSet | null {
+  const idx = exercise.sets.findIndex((s) => s.id === setId);
+  if (idx < 0) return null;
+  for (let i = idx - 1; i >= 0; i--) if (exercise.sets[i]!.completed) return exercise.sets[i]!;
+  return null;
+}
+
+/**
+ * A drop set can follow a completed working set or drop set (never a warm-up, an unfinished set, a superset member, or
+ * past the 50-set limit). Supersets alternate exercises round by round, which an extra set would throw out of step.
+ */
+export function canAddDropSet(exercise: Pick<DraftExercise, "sets" | "supersetId" | "skipped">, afterSetId: string): boolean {
+  if (exercise.skipped || exercise.supersetId || exercise.sets.length >= 50) return false;
+  const set = exercise.sets.find((s) => s.id === afterSetId);
+  return Boolean(set && set.completed && !set.isWarmup);
+}
+
+/** The working set a drop set belongs to (the nearest set before it that isn't a drop), or the set itself. */
+function mainSetOf(sets: DraftSet[], index: number): DraftSet | undefined {
+  for (let i = index; i >= 0; i--) if (!sets[i]!.isDrop) return sets[i];
+  return sets[index];
+}
+
+/** Whether two sets carry the same numbers (what "Same as last set" would change). */
+export function sameNumbers(a: DraftSet, b: DraftSet): boolean {
+  return a.weightKg === b.weightKg && a.reps === b.reps && a.durationSeconds === b.durationSeconds && (a.distanceM ?? null) === (b.distanceM ?? null);
+}
+
+/** "8-10" / "8–10 reps" → {lo: 8, hi: 10}; "10" → {lo: 10, hi: 10}; null when there's no number. */
+export function targetRepRange(reps: string | null | undefined): { lo: number; hi: number } | null {
+  if (!reps) return null;
+  const range = reps.match(/(\d+)\s*(?:-|–|—|to)\s*(\d+)/);
+  if (range) {
+    const a = Number.parseInt(range[1]!, 10);
+    const b = Number.parseInt(range[2]!, 10);
+    return { lo: Math.min(a, b), hi: Math.max(a, b) };
+  }
+  const n = parseTargetReps(reps);
+  return n == null ? null : { lo: n, hi: n };
+}
+
 export type DraftAction =
   | { type: "rename"; name: string }
   | { type: "setNotes"; notes: string }
-  | { type: "addExercise"; exercise: ExerciseRef; restSeconds?: number; target?: DraftTarget | null }
+  | { type: "addExercise"; exercise: ExerciseRef; restSeconds?: number; target?: DraftTarget | null; supersetId?: string | null }
+  | { type: "linkSuperset"; exerciseKey: string }
+  | { type: "unlinkSuperset"; exerciseKey: string }
   | { type: "removeExercise"; exerciseKey: string }
   | { type: "moveExercise"; exerciseKey: string; direction: -1 | 1 }
   | { type: "substituteExercise"; exerciseKey: string; replacement: ExerciseRef }
@@ -73,9 +180,22 @@ export type DraftAction =
   | { type: "unskipExercise"; exerciseKey: string }
   | { type: "setExerciseNotes"; exerciseKey: string; notes: string }
   | { type: "addSet"; exerciseKey: string }
+  /** Add a drop set straight after a working set just done (and after any drops already following it); ends the rest. */
+  | { type: "addDropSet"; exerciseKey: string; afterSetId: string }
   | { type: "removeSet"; exerciseKey: string; setId: string }
   | { type: "updateSet"; exerciseKey: string; setId: string; patch: Partial<Omit<DraftSet, "id">> }
   | { type: "toggleSetComplete"; exerciseKey: string; setId: string; now: string }
+  | { type: "confirmNoWeight"; exerciseKey: string }
+  /** Fills the empty fields of the sets not yet done from the last time this exercise was logged (never overwrites). */
+  | { type: "prefillFromPrevious"; exerciseKey: string; sets: PreviousSetValues[] }
+  /** Pass over a set without doing it (it stays in the workout, not counted). */
+  | { type: "skipSet"; exerciseKey: string; setId: string }
+  | { type: "unskipSet"; exerciseKey: string; setId: string }
+  /** The set takes the numbers of the last set done before it on the same exercise ("Same as set 1"). */
+  | { type: "repeatLastSet"; exerciseKey: string; setId: string }
+  /** Coming back to a draft last touched a while ago: the time away counts as paused, not as training. */
+  | { type: "continueAfterGap"; now: string }
+  | { type: "requestFinish"; now: string }
   | { type: "startRest"; seconds: number; now: string }
   | { type: "adjustRest"; deltaSeconds: number; now: string }
   | { type: "clearRest" }
@@ -97,6 +217,7 @@ function emptySet(previous?: DraftSet): DraftSet {
     reps: previous?.reps ?? null,
     weightKg: previous?.weightKg ?? null,
     durationSeconds: previous?.durationSeconds ?? null,
+    distanceM: previous?.distanceM ?? null,
     rpe: null,
     isWarmup: false,
     completed: false,
@@ -115,14 +236,17 @@ export function createDraft(input: {
   clientId?: string;
   userProgramId?: string | null;
   programDayId?: string | null;
-  exercises?: { exercise: ExerciseRef; restSeconds?: number; target?: DraftTarget | null }[];
+  templateId?: string | null;
+  /** `supersetGroup`: exercises with the same number (next to each other) become one superset. */
+  exercises?: { exercise: ExerciseRef; restSeconds?: number; target?: DraftTarget | null; supersetGroup?: number | null }[];
 }): WorkoutDraft {
   let draft: WorkoutDraft = {
-    version: 1,
+    version: 2,
     clientId: input.clientId ?? newId(),
     name: input.name,
     userProgramId: input.userProgramId ?? null,
     programDayId: input.programDayId ?? null,
+    templateId: input.templateId ?? null,
     startedAt: input.now,
     pausedAt: null,
     pausedSeconds: 0,
@@ -131,10 +255,14 @@ export function createDraft(input: {
     rest: { endsAt: null, durationSeconds: 0, pausedRemaining: null },
     updatedAt: input.now,
   };
+  const groupIds = new Map<number, string>();
   for (const e of input.exercises ?? []) {
-    draft = workoutReducer(draft, { type: "addExercise", exercise: e.exercise, restSeconds: e.restSeconds, target: e.target });
+    const g = e.supersetGroup ?? null;
+    if (g !== null && !groupIds.has(g)) groupIds.set(g, newId());
+    // The raw reducer: groups are only complete once every member is added, so normalize at the end.
+    draft = reduce(draft, { type: "addExercise", exercise: e.exercise, restSeconds: e.restSeconds, target: e.target, supersetId: g === null ? null : groupIds.get(g)! });
   }
-  return draft;
+  return { ...draft, exercises: normalizeSupersets(draft.exercises) };
 }
 
 function mapExercise(draft: WorkoutDraft, key: string, fn: (e: DraftExercise) => DraftExercise): WorkoutDraft {
@@ -143,7 +271,83 @@ function mapExercise(draft: WorkoutDraft, key: string, fn: (e: DraftExercise) =>
 
 export function workoutReducer(state: WorkoutDraft, action: DraftAction): WorkoutDraft {
   const next = reduce(state, action);
-  return next === state ? state : { ...next, updatedAt: "now" in action ? action.now : new Date().toISOString() };
+  if (next === state) return state;
+  const structural = ["addExercise", "removeExercise", "moveExercise", "linkSuperset", "unlinkSuperset"].includes(action.type);
+  // More work logged after a Finish that did not go through: the end time is asked for again.
+  const training = ["toggleSetComplete", "addSet", "updateSet", "addExercise"].includes(action.type);
+  return {
+    ...next,
+    exercises: structural ? normalizeSupersets(next.exercises) : next.exercises,
+    updatedAt: "now" in action ? action.now : new Date().toISOString(),
+    ...(training && next.finishRequestedAt ? { finishRequestedAt: null } : {}),
+  };
+}
+
+/**
+ * Superset groups must be runs of two or more neighbouring exercises. Anything else (a lone member after a
+ * removal, or a member moved away from its group) is split off.
+ */
+export function normalizeSupersets(exercises: DraftExercise[]): DraftExercise[] {
+  const out = exercises.map((e) => ({ ...e }));
+  const used = new Set<string>();
+  let i = 0;
+  while (i < out.length) {
+    const id = out[i]!.supersetId;
+    if (!id) {
+      i++;
+      continue;
+    }
+    let j = i;
+    while (j + 1 < out.length && out[j + 1]!.supersetId === id) j++;
+    if (j === i) out[i]!.supersetId = null;
+    else if (used.has(id)) {
+      // A second run sharing an id (a member was moved away and back elsewhere) becomes its own superset.
+      const fresh = newId();
+      for (let k = i; k <= j; k++) out[k]!.supersetId = fresh;
+      used.add(fresh);
+    } else used.add(id);
+    i = j + 1;
+  }
+  return out;
+}
+
+/** The exercises in the same superset as `key`, in order (just that exercise when it isn't in one). */
+export function supersetMembers(draft: Pick<WorkoutDraft, "exercises">, key: string): DraftExercise[] {
+  const ex = draft.exercises.find((e) => e.id === key);
+  if (!ex) return [];
+  if (!ex.supersetId) return [ex];
+  return draft.exercises.filter((e) => e.supersetId === ex.supersetId);
+}
+
+/**
+ * The order a superset is performed in: round 1 of every member, then round 2, and so on. Members with
+ * fewer sets drop out of the later rounds. Skipped members are left out.
+ */
+export function supersetRoundOrder(members: DraftExercise[]): { exerciseKey: string; setId: string; round: number }[] {
+  const active = members.filter((m) => !m.skipped);
+  const rounds = Math.max(0, ...active.map((m) => m.sets.length));
+  const out: { exerciseKey: string; setId: string; round: number }[] = [];
+  for (let r = 0; r < rounds; r++) for (const m of active) if (m.sets[r]) out.push({ exerciseKey: m.id, setId: m.sets[r]!.id, round: r });
+  return out;
+}
+
+/**
+ * The next set to do: the first exercise (or superset) with work left. Inside a superset this alternates —
+ * A1, B1, A2, B2 — instead of finishing one exercise first.
+ */
+export function nextUp(draft: Pick<WorkoutDraft, "exercises">): { exerciseKey: string; setId: string | null } | null {
+  for (const e of draft.exercises) {
+    if (e.skipped) continue;
+    if (e.sets.length === 0) return { exerciseKey: e.id, setId: null };
+    if (e.supersetId) {
+      const next = supersetRoundOrder(supersetMembers(draft, e.id)).find((x) => setPending(draft.exercises.find((m) => m.id === x.exerciseKey)!.sets.find((s) => s.id === x.setId)!));
+      if (next) return { exerciseKey: next.exerciseKey, setId: next.setId };
+      continue;
+    }
+    const set = e.sets.find(setPending);
+    if (set) return { exerciseKey: e.id, setId: set.id };
+  }
+  return null;
 }
 
 function reduce(state: WorkoutDraft, action: DraftAction): WorkoutDraft {
@@ -160,6 +364,7 @@ function reduce(state: WorkoutDraft, action: DraftAction): WorkoutDraft {
         ...emptySet(),
         reps: action.exercise.isTimed ? null : reps,
         durationSeconds: action.exercise.isTimed ? (target?.seconds ?? null) : null,
+        distanceM: target?.distanceM ?? null,
       }));
       const ex: DraftExercise = {
         id: newId(),
@@ -167,6 +372,8 @@ function reduce(state: WorkoutDraft, action: DraftAction): WorkoutDraft {
         slug: action.exercise.slug,
         name: action.exercise.name,
         isTimed: action.exercise.isTimed,
+        usesDistance: usesDistance(action.exercise.slug),
+        supersetId: action.supersetId ?? null,
         substitutedFromId: null,
         substitutedFromName: null,
         notes: "",
@@ -180,6 +387,20 @@ function reduce(state: WorkoutDraft, action: DraftAction): WorkoutDraft {
     }
     case "removeExercise":
       return { ...state, exercises: state.exercises.filter((e) => e.id !== action.exerciseKey) };
+    case "linkSuperset": {
+      // Join this exercise and the next one into a superset (or add the next one to this exercise's superset).
+      const idx = state.exercises.findIndex((e) => e.id === action.exerciseKey);
+      const next = state.exercises[idx + 1];
+      if (idx < 0 || !next) return state;
+      const id = state.exercises[idx]!.supersetId ?? next.supersetId ?? newId();
+      const old = next.supersetId;
+      return {
+        ...state,
+        exercises: state.exercises.map((e, i) => (i === idx || i === idx + 1 || (old && e.supersetId === old) ? { ...e, supersetId: id } : e)),
+      };
+    }
+    case "unlinkSuperset":
+      return mapExercise(state, action.exerciseKey, (e) => (e.supersetId ? { ...e, supersetId: null } : e));
     case "moveExercise": {
       const idx = state.exercises.findIndex((e) => e.id === action.exerciseKey);
       const to = idx + action.direction;
@@ -189,25 +410,46 @@ function reduce(state: WorkoutDraft, action: DraftAction): WorkoutDraft {
       list.splice(to, 0, item!);
       return { ...state, exercises: list };
     }
-    case "substituteExercise":
-      return mapExercise(state, action.exerciseKey, (e) => ({
+    case "substituteExercise": {
+      // The sets already done stay logged under the exercise they were done on; only the sets still to do move to the
+      // replacement (reps kept, the load cleared: a different exercise takes a different weight).
+      const idx = state.exercises.findIndex((e) => e.id === action.exerciseKey);
+      const e = state.exercises[idx];
+      if (!e) return state;
+      const replace = (sets: DraftSet[]): DraftExercise => ({
         ...e,
+        id: e.sets.some((s) => s.completed) ? newId() : e.id,
         substitutedFromId: e.substitutedFromId ?? e.exerciseId,
         substitutedFromName: e.substitutedFromName ?? e.name,
         exerciseId: action.replacement.id,
         slug: action.replacement.slug,
         name: action.replacement.name,
         isTimed: action.replacement.isTimed,
-        sets: e.sets.map((s) => ({
+        usesDistance: usesDistance(action.replacement.slug),
+        notes: "",
+        sets: sets.map((s) => ({
           ...s,
           weightKg: null,
           completed: false,
           reps: action.replacement.isTimed ? null : s.reps,
           durationSeconds: action.replacement.isTimed ? (s.durationSeconds ?? e.target?.seconds ?? 30) : null,
         })),
-      }));
+      });
+      const done = e.sets.filter((s) => s.completed);
+      if (!done.length) return { ...state, exercises: state.exercises.map((x, i) => (i === idx ? replace(e.sets) : x)) };
+      const left = e.sets.filter((s) => !s.completed);
+      const kept: DraftExercise = { ...e, sets: done, target: e.target ? { ...e.target, sets: done.length } : null };
+      // (At least one set to do on the replacement, so the member is not left with an empty card.)
+      const moved = replace(left.length ? left : [emptySet(done[done.length - 1])]);
+      if (moved.target) moved.target = { ...moved.target, sets: moved.sets.length };
+      const list = [...state.exercises];
+      list.splice(idx, 1, kept, moved);
+      return { ...state, exercises: list };
+    }
     case "skipExercise":
       return mapExercise(state, action.exerciseKey, (e) => ({ ...e, skipped: true, skipReason: action.reason ?? "other" }));
+    case "confirmNoWeight":
+      return mapExercise(state, action.exerciseKey, (e) => ({ ...e, noWeightConfirmed: true }));
     case "unskipExercise":
       return mapExercise(state, action.exerciseKey, (e) => ({ ...e, skipped: false, skipReason: null }));
     case "setExerciseNotes":
@@ -216,6 +458,17 @@ function reduce(state: WorkoutDraft, action: DraftAction): WorkoutDraft {
       return mapExercise(state, action.exerciseKey, (e) =>
         e.sets.length >= 50 ? e : { ...e, sets: [...e.sets, emptySet(e.sets[e.sets.length - 1])] },
       );
+    case "addDropSet": {
+      const ex = state.exercises.find((e) => e.id === action.exerciseKey);
+      if (!ex || !canAddDropSet(ex, action.afterSetId)) return state;
+      let at = ex.sets.findIndex((s) => s.id === action.afterSetId) + 1;
+      while (at < ex.sets.length && ex.sets[at]!.isDrop) at++;
+      // Empty on purpose: the lower weight is the member's to enter (never guessed), and so are the reps.
+      const drop: DraftSet = { id: newId(), reps: null, weightKg: null, durationSeconds: null, distanceM: null, rpe: null, isWarmup: false, completed: false, isDrop: true };
+      const next = mapExercise(state, action.exerciseKey, (e) => ({ ...e, sets: [...e.sets.slice(0, at), drop, ...e.sets.slice(at)] }));
+      // The point of a drop set is no rest: the countdown the set just done started is ended.
+      return { ...next, rest: { endsAt: null, durationSeconds: 0, pausedRemaining: null } };
+    }
     case "removeSet":
       return mapExercise(state, action.exerciseKey, (e) => ({ ...e, sets: e.sets.filter((s) => s.id !== action.setId) }));
     case "updateSet":
@@ -226,20 +479,51 @@ function reduce(state: WorkoutDraft, action: DraftAction): WorkoutDraft {
     case "toggleSetComplete": {
       let completedNow = false;
       let rest = 0;
+      let round = -1;
+      let blocked = false;
       const toggled = mapExercise(state, action.exerciseKey, (e) => {
         rest = e.restSeconds;
-        return {
-          ...e,
-          sets: e.sets.map((s) => {
-            if (s.id !== action.setId) return s;
-            completedNow = !s.completed;
-            return { ...s, completed: !s.completed };
-          }),
-        };
+        const sets = e.sets.map((s, i) => {
+          if (s.id !== action.setId) return s;
+          if (!s.completed && !setCanComplete(e, s)) {
+            blocked = true;
+            return s;
+          }
+          completedNow = !s.completed;
+          round = i;
+          return { ...s, completed: !s.completed, skipped: false };
+        });
+        // The numbers just logged become the next set's starting point, where it has none yet. A drop set starts
+        // empty (its lower weight is the member's to enter), and the set after a drop starts from the main set.
+        if (completedNow && round >= 0) {
+          const done = mainSetOf(sets, round)!;
+          const next = sets.findIndex((s, i) => i > round && setPending(s));
+          if (next >= 0 && !sets[next]!.isDrop) {
+            const n = sets[next]!;
+            sets[next] = {
+              ...n,
+              weightKg: n.weightKg ?? done.weightKg,
+              reps: n.reps ?? done.reps,
+              durationSeconds: n.durationSeconds ?? done.durationSeconds,
+              distanceM: n.distanceM ?? done.distanceM,
+            };
+          }
+        }
+        return { ...e, sets };
       });
-      if (completedNow && rest > 0 && !state.pausedAt) {
-        return reduce(toggled, { type: "startRest", seconds: rest, now: action.now });
+      if (blocked) return state;
+      if (!completedNow || state.pausedAt) return toggled;
+      // A drop set waiting straight after this one: go on with no rest.
+      const after = toggled.exercises.find((e) => e.id === action.exerciseKey)?.sets[round + 1];
+      if (after?.isDrop && setPending(after)) return { ...toggled, rest: { endsAt: null, durationSeconds: 0, pausedRemaining: null } };
+      const members = supersetMembers(toggled, action.exerciseKey).filter((m) => !m.skipped);
+      if (members.length > 1) {
+        // Superset: no rest between exercises — rest once the whole round is done, for the longest member rest.
+        const roundDone = members.every((m) => !m.sets[round] || m.sets[round]!.completed);
+        if (!roundDone) return { ...toggled, rest: { endsAt: null, durationSeconds: 0, pausedRemaining: null } };
+        rest = Math.max(...members.map((m) => m.restSeconds));
       }
+      if (rest > 0) return reduce(toggled, { type: "startRest", seconds: rest, now: action.now });
       return toggled;
     }
     case "startRest":
@@ -262,6 +546,65 @@ function reduce(state: WorkoutDraft, action: DraftAction): WorkoutDraft {
     }
     case "clearRest":
       return { ...state, rest: { endsAt: null, durationSeconds: 0, pausedRemaining: null } };
+    case "prefillFromPrevious": {
+      const ex = state.exercises.find((e) => e.id === action.exerciseKey);
+      if (!ex || ex.prefilled || !action.sets.length) return state;
+      // Today's working sets take last time's working sets in order (the last one repeats for any extra sets); warm-up
+      // sets keep their own lighter numbers. Only empty fields are filled — except reps the program prescribed as a
+      // range, which take last time's reps when those fell inside the range (3 × 8–10 after 10, 8, 8 shows 10, 8, 8).
+      const range = targetRepRange(ex.target?.reps);
+      const untouched = !ex.sets.some((s) => s.completed);
+      let working = -1;
+      const next = mapExercise(state, action.exerciseKey, (e) => ({
+        ...e,
+        prefilled: true,
+        sets: e.sets.map((s) => {
+          if (s.isWarmup) return s;
+          working++;
+          if (s.completed) return s;
+          const p = action.sets[Math.min(working, action.sets.length - 1)]!;
+          const inRange = range && range.hi > range.lo && untouched && s.reps === range.lo && p.reps != null && p.reps >= range.lo && p.reps <= range.hi;
+          return {
+            ...s,
+            weightKg: s.weightKg ?? p.weightKg,
+            reps: inRange ? p.reps : (s.reps ?? p.reps),
+            durationSeconds: e.isTimed || e.usesDistance ? (s.durationSeconds ?? p.durationSeconds) : s.durationSeconds,
+            distanceM: e.usesDistance ? (s.distanceM ?? p.distanceM) : s.distanceM,
+          };
+        }),
+      }));
+      return next;
+    }
+    case "skipSet":
+      return mapExercise(state, action.exerciseKey, (e) => ({
+        ...e,
+        sets: e.sets.map((s) => (s.id === action.setId && !s.completed ? { ...s, skipped: true } : s)),
+      }));
+    case "unskipSet":
+      return mapExercise(state, action.exerciseKey, (e) => ({
+        ...e,
+        sets: e.sets.map((s) => (s.id === action.setId && s.skipped ? { ...s, skipped: false } : s)),
+      }));
+    case "repeatLastSet": {
+      const ex = state.exercises.find((e) => e.id === action.exerciseKey);
+      const set = ex?.sets.find((s) => s.id === action.setId);
+      const from = ex ? lastDoneBefore(ex, action.setId) : null;
+      if (!ex || !set || set.completed || !from || sameNumbers(set, from)) return state;
+      return mapExercise(state, action.exerciseKey, (e) => ({
+        ...e,
+        sets: e.sets.map((s) =>
+          s.id === action.setId ? { ...s, weightKg: from.weightKg, reps: from.reps, durationSeconds: from.durationSeconds, distanceM: from.distanceM ?? null } : s,
+        ),
+      }));
+    }
+    case "continueAfterGap": {
+      if (state.pausedAt) return state;
+      const gap = Math.max(0, Math.round((Date.parse(action.now) - Date.parse(state.updatedAt)) / 1000));
+      if (gap < 60) return state;
+      return { ...state, pausedSeconds: state.pausedSeconds + gap, rest: { endsAt: null, durationSeconds: 0, pausedRemaining: null } };
+    }
+    case "requestFinish":
+      return state.finishRequestedAt ? state : { ...state, finishRequestedAt: action.now };
     case "pause": {
       if (state.pausedAt) return state;
       const remaining = state.rest.endsAt ? Math.max(0, Math.round((Date.parse(state.rest.endsAt) - Date.parse(action.now)) / 1000)) : null;
@@ -295,9 +638,12 @@ function sanitizeNumber(v: number | null, min: number, max: number): number | nu
 function sanitizeSet(s: DraftSet): DraftSet {
   return {
     ...s,
+    // A set marked as a warm-up stops being a drop set (the two never go together).
+    ...(s.isWarmup && s.isDrop ? { isDrop: false } : {}),
     reps: sanitizeNumber(s.reps, 0, 1000),
     weightKg: sanitizeNumber(s.weightKg, 0, 1500),
     durationSeconds: sanitizeNumber(s.durationSeconds, 0, 86400),
+    distanceM: sanitizeNumber(s.distanceM ?? null, 0, 1000000),
     rpe: sanitizeNumber(s.rpe, 1, 10),
   };
 }
@@ -317,20 +663,107 @@ export function restRemaining(draft: WorkoutDraft, now: string): number {
 export function draftSummary(draft: WorkoutDraft) {
   const active = draft.exercises.filter((e) => !e.skipped);
   const allSets = active.flatMap((e) => e.sets);
+  const working = allSets.filter((s) => !s.isWarmup);
   return {
     exercises: active.length,
     completedSets: allSets.filter((s) => s.completed).length,
     totalSets: allSets.length,
+    /** Sets passed over with "Skip set" (not done, not counted, not still to do). */
+    skippedSets: allSets.filter((s) => s.skipped && !s.completed).length,
+    /** Working sets only: what counts toward volume, records and the completion summary. */
+    workingCompleted: working.filter((s) => s.completed).length,
+    workingTotal: working.length,
+    /** Working sets neither done nor skipped: when any are left, finishing now is finishing early. */
+    workingRemaining: working.filter(setPending).length,
     volumeKg: totalVolume(allSets),
   };
 }
 
-/** Basic structural validation for restoring a draft from storage. */
+/** What the focused "current set" card shows: the set nextUp points at, numbered the way a person counts. */
+export interface CurrentSetInfo {
+  exercise: DraftExercise;
+  /** Null when the exercise has no sets yet. */
+  set: DraftSet | null;
+  /** 1-based, among the exercises not skipped. */
+  exerciseNumber: number;
+  exerciseCount: number;
+  warmup: boolean;
+  /** A drop set (after the working set before it, no rest). */
+  drop: boolean;
+  /** 1-based among the drops following the same working set (null when not a drop). */
+  dropNumber: number | null;
+  /** 1-based among the exercise's working sets (null for a warm-up or drop set). */
+  workingNumber: number | null;
+  workingCount: number;
+  /** 1-based among its warm-up sets (null for a working set). */
+  warmupNumber: number | null;
+  warmupCount: number;
+}
+
+export function currentSetInfo(draft: Pick<WorkoutDraft, "exercises">): CurrentSetInfo | null {
+  const up = nextUp(draft);
+  if (!up) return null;
+  const active = draft.exercises.filter((e) => !e.skipped);
+  const exercise = active.find((e) => e.id === up.exerciseKey);
+  if (!exercise) return null;
+  const set = up.setId ? (exercise.sets.find((s) => s.id === up.setId) ?? null) : null;
+  const working = exercise.sets.filter((s) => !s.isWarmup && !s.isDrop);
+  const warmups = exercise.sets.filter((s) => s.isWarmup);
+  let dropNumber: number | null = null;
+  if (set?.isDrop) {
+    dropNumber = 0;
+    for (let i = exercise.sets.indexOf(set); i >= 0 && exercise.sets[i]!.isDrop; i--) dropNumber++;
+  }
+  return {
+    exercise,
+    set,
+    exerciseNumber: active.indexOf(exercise) + 1,
+    exerciseCount: active.length,
+    warmup: Boolean(set?.isWarmup),
+    drop: Boolean(set?.isDrop),
+    dropNumber,
+    workingNumber: set && !set.isWarmup && !set.isDrop ? working.indexOf(set) + 1 : null,
+    workingCount: working.length,
+    warmupNumber: set && set.isWarmup ? warmups.indexOf(set) + 1 : null,
+    warmupCount: warmups.length,
+  };
+}
+
+/**
+ * What comes after the current set, worked out as if the current set were done (so superset order and skipped sets
+ * are followed the same way): the "Then: …" line on the current-set card. Null when the current set is the last one.
+ */
+export function afterCurrent(draft: Pick<WorkoutDraft, "exercises">): CurrentSetInfo | null {
+  const up = nextUp(draft);
+  if (!up?.setId) return null;
+  const passed = {
+    exercises: draft.exercises.map((e) => (e.id === up.exerciseKey ? { ...e, sets: e.sets.map((s) => (s.id === up.setId ? { ...s, skipped: true } : s)) } : e)),
+  };
+  return currentSetInfo(passed);
+}
+
+/** Totals for the completion screen, from the sets actually marked complete (warm-ups excluded). */
+export function completionTotals(draft: Pick<WorkoutDraft, "exercises">) {
+  const active = draft.exercises.filter((e) => !e.skipped);
+  const working = active.flatMap((e) => e.sets.filter((s) => !s.isWarmup));
+  const done = working.filter((s) => s.completed);
+  return {
+    /** Exercises with at least one completed working set. */
+    exercisesDone: active.filter((e) => e.sets.some((s) => s.completed && !s.isWarmup)).length,
+    exercisesPlanned: active.length,
+    setsDone: done.length,
+    setsPlanned: working.length,
+    /** Reps of completed working sets (timed and distance sets have none). */
+    reps: done.reduce((n, s) => n + (s.reps ?? 0), 0),
+  };
+}
+
+/** Basic structural validation for restoring a draft from storage (current format only; see migrateDraft). */
 export function isWorkoutDraft(value: unknown): value is WorkoutDraft {
   if (!value || typeof value !== "object") return false;
   const v = value as Partial<WorkoutDraft>;
   return (
-    v.version === 1 &&
+    v.version === DRAFT_VERSION &&
     typeof v.clientId === "string" &&
     typeof v.name === "string" &&
     typeof v.startedAt === "string" &&
@@ -338,6 +771,114 @@ export function isWorkoutDraft(value: unknown): value is WorkoutDraft {
     typeof v.rest === "object" &&
     v.rest !== null
   );
+}
+
+/**
+ * Read a persisted draft of any known version and bring it up to the current format. Version 1 drafts
+ * (saved before distance and supersets existed) gain `distanceM: null` on every set, `usesDistance` from the
+ * exercise, no supersets and no template. Returns null for anything that isn't a draft.
+ */
+export function migrateDraft(value: unknown): WorkoutDraft | null {
+  if (!value || typeof value !== "object") return null;
+  const v = value as Record<string, unknown> & { version?: unknown };
+  if (v.version === DRAFT_VERSION) return isWorkoutDraft(v) ? v : null;
+  if (v.version !== 1) return null;
+  const candidate = { ...v, version: DRAFT_VERSION } as Partial<WorkoutDraft>;
+  if (!isWorkoutDraft(candidate)) return null;
+  return {
+    ...candidate,
+    templateId: null,
+    exercises: (candidate.exercises as unknown as Record<string, unknown>[]).map((e) => {
+      const ex = e as unknown as DraftExercise;
+      return {
+        ...ex,
+        usesDistance: typeof ex.usesDistance === "boolean" ? ex.usesDistance : usesDistance(String(ex.slug ?? "")),
+        supersetId: null,
+        sets: (Array.isArray(ex.sets) ? ex.sets : []).map((s) => ({ ...s, distanceM: s.distanceM ?? null })),
+      };
+    }),
+  };
+}
+
+/**
+ * The message when the finish request itself didn't complete. Online, the usual cause is an ended session (signed out
+ * on another device: the request is redirected to sign-in), so "you appear to be offline" would have the member retry
+ * forever. The workout stays on the device either way and resumes after signing in.
+ */
+export function finishFailureMessage(online: boolean): string {
+  return online
+    ? "We couldn't reach your account, so the workout isn't saved yet. It's kept on this device. If you were signed out, sign in again and finish it from Resume."
+    : "You appear to be offline. Your workout is saved on this device — try again when you're connected.";
+}
+
+/**
+ * What the logger sends to the server as the in-progress backup. The name is trimmed first: the server trims it and
+ * requires a character, so a name of only spaces used to make every backup be rejected.
+ */
+export function draftSnapshot(d: WorkoutDraft) {
+  return {
+    clientId: d.clientId,
+    name: d.name.trim() || "Workout",
+    startedAt: d.startedAt,
+    userProgramId: d.userProgramId,
+    programDayId: d.programDayId,
+    draft: d as unknown as Record<string, unknown>,
+  };
+}
+
+/**
+ * What Finish sends to the server: every exercise and set as logged. Sets not done (unfinished or skipped) go as
+ * `completed: false`, so they are kept with the session but never count toward volume, records or badges.
+ */
+export function finishPayload(d: WorkoutDraft, endedAt: string) {
+  return {
+    clientId: d.clientId,
+    name: d.name.trim() || "Workout",
+    userProgramId: d.userProgramId,
+    programDayId: d.programDayId,
+    startedAt: d.startedAt,
+    endedAt,
+    pausedSeconds: d.pausedSeconds,
+    notes: d.notes,
+    exercises: d.exercises.map((e) => ({
+      exerciseId: e.exerciseId,
+      substitutedFromId: e.substitutedFromId,
+      notes: e.notes,
+      skipped: e.skipped,
+      skipReason: e.skipReason,
+      sets: e.sets.map((s) => ({
+        reps: s.reps,
+        weightKg: s.weightKg,
+        durationSeconds: s.durationSeconds,
+        distanceM: s.distanceM ?? null,
+        rpe: s.rpe,
+        isWarmup: s.isWarmup,
+        // Sent only when set, so the payload of a workout without drop sets is exactly as before.
+        ...(s.isDrop ? { isDrop: true } : {}),
+        completed: s.completed,
+      })),
+    })),
+  };
+}
+
+/**
+ * The draft to restore when the logger opens: the newer of the local and server drafts, leaving out any the
+ * member discarded on this device (an offline discard can't delete the server copy until the device is online).
+ */
+export function restorableDraft(local: WorkoutDraft | null, server: WorkoutDraft | null, discarded: ReadonlySet<string>): WorkoutDraft | null {
+  const keep = (d: WorkoutDraft | null) => (d && !discarded.has(d.clientId) ? d : null);
+  return newerDraft(keep(local), keep(server));
+}
+
+/**
+ * Another tab or window of the same account saved this workout: the copy to switch to, or null to keep this tab's.
+ * Only the same workout counts (a different one is handled by the restore logic when the logger opens), and only
+ * when the other copy is strictly newer, so the two tabs converge on the latest sets instead of the slower tab
+ * writing its older draft over the other's.
+ */
+export function draftFromOtherTab(mine: WorkoutDraft | null, other: WorkoutDraft | null): WorkoutDraft | null {
+  if (!mine || !other || mine.clientId !== other.clientId) return null;
+  return Date.parse(other.updatedAt) > Date.parse(mine.updatedAt) ? other : null;
 }
 
 /** Pick whichever draft was modified most recently (local vs server). */

@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { ArrowLeft, ChevronRight, Dumbbell } from "lucide-react";
+import { ChevronRight, Dumbbell } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/states";
 import { Button } from "@/components/ui/button";
-import { addDays, isoDateInTz } from "@/lib/domain/dates";
-import { formatDuration, formatWeight } from "@/lib/domain/units";
+import { addDays, daysBetween, isoDateInTz } from "@/lib/domain/dates";
+import { formatDuration, formatVolume } from "@/lib/domain/units";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
 import { listHistory } from "@/server/services/workouts";
@@ -23,11 +23,16 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
   const since = addDays(today, -29);
   const { data: last30 } = await supabase
     .from("workout_sessions")
-    .select("total_volume_kg")
+    .select("total_volume_kg, started_at")
     .eq("user_id", user.id)
     .eq("status", "completed")
     .gte("started_at", `${since}T00:00:00Z`);
   const volume30 = (last30 ?? []).reduce((s, r) => s + Number(r.total_volume_kg), 0);
+  // Per week over the days since the first of these workouts (at least a week), so a member in their first days is
+  // not told they train 0.2 times a week.
+  const first = (last30 ?? []).map((r) => isoDateInTz(new Date(r.started_at as string), profile.timezone)).sort()[0];
+  const spanDays = first ? Math.max(7, daysBetween(first, today) + 1) : 30;
+  const perWeek = ((last30 ?? []).length / spanDays) * 7;
 
   const groups = new Map<string, typeof items>();
   for (const it of items) {
@@ -37,23 +42,23 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
 
   return (
     <div className="space-y-6">
-      <Link href="/train" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="size-4" aria-hidden /> Train
-      </Link>
-      <PageHeader title="Workout history" description="Review, edit or delete past sessions." />
+      <PageHeader back={{ href: "/train", label: "Train" }} title="Workout history" description="Review, edit or delete past sessions." />
 
-      <section className="grid grid-cols-2 gap-3" aria-label="Last 30 days">
-        <div className="rounded-2xl border border-border bg-card p-4">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground">Workouts · 30 days</p>
-          <p className="mt-1 font-display text-3xl font-bold">{(last30 ?? []).length}</p>
-          <p className="text-xs text-muted-foreground">≈ {((last30 ?? []).length / 30 * 7).toFixed(1)} per week</p>
-        </div>
-        <div className="rounded-2xl border border-border bg-card p-4">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground">Volume · 30 days</p>
-          <p className="mt-1 font-display text-3xl font-bold">{formatWeight(Math.round(volume30), units)}</p>
-          <p className="text-xs text-muted-foreground">weight × reps, completed sets</p>
-        </div>
-      </section>
+      {/* No zeros for a member who hasn't trained yet: the tiles appear with the first workout. */}
+      {((last30 ?? []).length > 0 || items.length > 0 || Boolean(before)) && (
+        <section className="grid grid-cols-2 gap-3" aria-label="Last 30 days">
+          <div className="min-w-0 rounded-2xl border border-border bg-card p-4">
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">Workouts · 30 days</p>
+            <p className="mt-1 font-display text-2xl font-bold sm:text-3xl">{(last30 ?? []).length}</p>
+            <p className="text-xs text-muted-foreground">≈ {perWeek.toFixed(1)} per week</p>
+          </div>
+          <div className="min-w-0 rounded-2xl border border-border bg-card p-4">
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">Volume · 30 days</p>
+            <p className="mt-1 break-words font-display text-2xl font-bold sm:text-3xl">{formatVolume(volume30, units)}</p>
+            <p className="text-xs text-muted-foreground">weight × reps, completed sets</p>
+          </div>
+        </section>
+      )}
 
       {items.length === 0 ? (
         <EmptyState
@@ -83,7 +88,7 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
                           <p className="truncate font-semibold">{w.name}</p>
                           <p className="text-xs text-muted-foreground">
                             {new Date(w.started_at).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: profile.timezone })} ·{" "}
-                            {formatDuration(dur)} · {w.exercise_count} exercises · {formatWeight(w.total_volume_kg, units)}
+                            {formatDuration(dur)} · {w.exercise_count} exercises · {formatVolume(w.total_volume_kg, units)}
                           </p>
                         </div>
                         <ChevronRight className="size-4 shrink-0 text-gold" aria-hidden />

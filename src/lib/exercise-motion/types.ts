@@ -1,0 +1,347 @@
+/**
+ * Types for the animated exercise demonstrations.
+ *
+ * Conventions (all angles in degrees, lengths in "cm" of a ~180 cm figure, world y is up, floor is y = 0):
+ *
+ * Side view (sagittal plane): the figure faces +x. "R" limbs are the near side (drawn in front, brighter),
+ * "L" limbs the far side (drawn behind, darker).
+ *  - trunk:  lean of the pelvis→mid-back segment from vertical, + = forward. Prone = 90, supine = -90.
+ *  - spine:  flexion of the upper back relative to the lower back, + = rounding forward, - = arching.
+ *  - neck:   head relative to the upper back, + = chin to chest.
+ *  - hip:    hip flexion relative to the lower back, + = thigh forward / up. 0 = standing.
+ *  - knee:   knee flexion, >= 0.
+ *  - ankle:  dorsiflexion relative to a foot that is square to the shin, + = shin over toes, - = pointing the toes.
+ *  - sh:     shoulder flexion relative to the upper back, 0 = arm along the body, 90 = forward, 180 = overhead,
+ *            - = extension (arm behind the body).
+ *  - el:     elbow flexion, >= 0.
+ *
+ * Front (frontal) view: the figure faces the viewer. "L" (the figure's left) is drawn on screen right.
+ *  - trunk / spine: lateral lean, + = toward screen right.
+ *  - sh: shoulder abduction (0 = at the side, 90 = out to the side, 180 = overhead).  el: elbow bend in that plane.
+ *  - hip: hip abduction.  knee: knee bend (drawn by foreshortening the thigh / shin).  ankle: shin tilt from the knee.
+ *
+ * Depth fields foreshorten a segment that points toward / away from the viewer (0 = in the picture plane); `trunkD` does
+ * the same for the whole torso in the front view (a lifter bending forward toward the camera).
+ */
+export interface Pose {
+  trunk: number;
+  spine: number;
+  neck: number;
+  hipL: number;
+  hipR: number;
+  kneeL: number;
+  kneeR: number;
+  ankleL: number;
+  ankleR: number;
+  shL: number;
+  shR: number;
+  elL: number;
+  elR: number;
+  /** Upper-arm foreshortening (degrees out of the picture plane). */
+  armDL: number;
+  armDR: number;
+  /** Forearm foreshortening. */
+  foreDL: number;
+  foreDR: number;
+  /** Thigh foreshortening. */
+  legDL: number;
+  legDR: number;
+  /** Shin foreshortening (front view). */
+  shinDL: number;
+  shinDR: number;
+  /** Forward lean of the trunk toward the viewer (front view only): foreshortens the torso. 0 = upright. */
+  trunkD: number;
+}
+
+export type PoseKey = keyof Pose;
+
+export type View = "side" | "front";
+
+export type Vec = [number, number];
+
+export type Side = "L" | "R";
+
+/** Named points on the figure that roots, IK targets and equipment can refer to. */
+export type Landmark =
+  | "pelvis"
+  | "mid"
+  | "neckBase"
+  | "shoulder"
+  | "shoulderL"
+  | "shoulderR"
+  | "head"
+  | "headTop"
+  | "hipL"
+  | "hipR"
+  | "kneeL"
+  | "kneeR"
+  | "kneeCapL"
+  | "kneeCapR"
+  | "ankleL"
+  | "ankleR"
+  | "heelL"
+  | "heelR"
+  | "ballL"
+  | "ballR"
+  | "toeL"
+  | "toeR"
+  | "soleL"
+  | "soleR"
+  | "elbowL"
+  | "elbowR"
+  | "handL"
+  | "handR"
+  | "hands"
+  | "trap"
+  | "rack"
+  | "chest"
+  | "belly"
+  | "hipCrease"
+  | "upperBack"
+  | "lowBack"
+  | "butt"
+  | "forearmL"
+  | "forearmR"
+  | "elbowPadL"
+  | "elbowPadR"
+  | "shinL"
+  | "shinR"
+  | "thighL"
+  | "thighR"
+  | "foreheadFront"
+  | "headBack"
+  | "waist";
+
+/** A point: fixed world coordinates, or a landmark of the current frame plus an offset. */
+export type Anchor = Vec | { lm: Landmark; dx?: number; dy?: number; /** Absolute height (overrides the landmark y). */ y?: number };
+
+/** How the whole figure is placed in the world for a keyframe. */
+export type RootRule =
+  /** Translate so that a landmark sits exactly at a world point (feet planted, hands on a bar, back on a bench...). */
+  | { pin: Landmark; at: Vec }
+  /** Pelvis at world x; lowest body point rests on the floor (raised by `lift` for flight phases). */
+  | { ground: number; lift?: number };
+
+export type Ease = "inOut" | "in" | "out" | "linear" | "spline";
+
+export interface Keyframe {
+  pose: Pose;
+  root: RootRule;
+  /** Limbs placed by inverse kinematics (their angles in `pose` are then ignored). */
+  ik?: Partial<Record<"handL" | "handR" | "footL" | "footR", Anchor>>;
+  /** Per-keyframe positions for movable equipment (e.g. a thrown ball), by prop id. */
+  props?: Record<string, Anchor>;
+  /** Per-keyframe drawing layer for movable equipment, by prop id (e.g. a sandbag that ends up behind the head). */
+  layers?: Record<string, NonNullable<PropDef["layer"]>>;
+  /** Seconds to travel from this keyframe to the next. */
+  dur: number;
+  /** Seconds to hold this keyframe before moving on. */
+  hold?: number;
+  ease?: Ease;
+  /** Overall opacity (used to reset travelling movements between loops). */
+  alpha?: number;
+  /**
+   * In the air (a jump's peak): nothing supports the body here. From the last supported keyframe before it to the first
+   * one after it the body flies on one smooth path, leaving the floor at the speed of the push and landing at the speed
+   * the landing absorbs (see flightPath in timeline.ts); this keyframe's root sets where the path passes.
+   */
+  air?: boolean;
+  /**
+   * Perspective (opt-in): the figure is drawn at this scale, about the floor point at `MotionDef.zoomAt`, as if this far
+   * from the camera (1 = the normal distance, smaller = farther away). Used by drills that run toward or away from the
+   * viewer; keyframes without it are drawn at 1.
+   */
+  zoom?: number;
+  /**
+   * Facing (opt-in, side view): -1 draws the figure mirrored about its pelvis, facing -x, from this keyframe until the
+   * next one (a drill that turns round). The pose is authored facing +x as usual; landmarks are reported mirrored.
+   */
+  facing?: 1 | -1;
+}
+
+export type PropKind =
+  | "barbell"
+  | "plate"
+  | "dumbbell"
+  | "kettlebell"
+  | "bench"
+  | "inclineBench"
+  | "rack"
+  | "pullupBar"
+  | "dipBars"
+  | "cableTower"
+  | "cable"
+  | "band"
+  | "box"
+  | "chair"
+  | "wall"
+  | "sled"
+  | "sandbag"
+  | "medball"
+  | "yoke"
+  | "farmerHandle"
+  | "trapBar"
+  | "stone"
+  | "platform"
+  | "log"
+  | "keg"
+  | "jumpRope"
+  | "heavyBag"
+  | "battleRope"
+  | "rower"
+  | "bike"
+  | "landmine"
+  | "abWheel"
+  | "mat"
+  /**
+   * A mat lying on the floor, seen from above or from a raised camera (floor-level drills drawn in those views): `at` =
+   * its centre, `w` × `h` its size on screen, `angle` an optional turn (degrees), `size` the spacing of floor-tile joins
+   * across it (cm of world x; 0 = none).
+   */
+  | "floorMat"
+  | "legPress"
+  | "hackSquat"
+  | "legExtension"
+  | "legCurl"
+  | "seatedLegCurl"
+  /** A leg machine's lever arm and roller pad (`at` = pivot, `to` = pad), drawn in front of the leg it loads. */
+  | "machineLever"
+  | "chestPress"
+  | "latPulldown"
+  | "cableRowSeat"
+  | "calfMachine"
+  | "cone"
+  | "ladder"
+  | "stairs"
+  | "rope"
+  | "hurdleLine"
+  | "pad"
+  | "hyper";
+
+/** Equipment / scenery drawn with the figure. */
+export interface PropDef {
+  id: string;
+  kind: PropKind;
+  /** Where it is drawn (keyframes may override via `props`). */
+  at: Anchor;
+  /** Second point for things that span two points (cables, bands, landmine, ropes). */
+  to?: Anchor;
+  /** Drawing layer. */
+  layer?: "back" | "far" | "mid" | "near" | "front";
+  /** Kind-specific size / style parameters. */
+  size?: number;
+  w?: number;
+  h?: number;
+  angle?: number;
+  /**
+   * For dumbbells: "end" = seen end-on (pronated / supinated grip), "profile" = neutral grip seen from the side.
+   * For a barbell: "across" = across the shoulders (side view: its end at the traps, near plates drawn as a cut-away).
+   */
+  orient?: "end" | "profile" | "vertical" | "across";
+  /** Rotate with the forearm of this hand (dumbbell profile / kettlebell hang). */
+  follow?: "handL" | "handR";
+  variant?: string;
+}
+
+export interface MotionDef {
+  /** Exercise slug (or pattern id for fallbacks). */
+  id: string;
+  view: View;
+  keyframes: Keyframe[];
+  props?: PropDef[];
+  /** World distance travelled per loop (the camera follows; the floor scrolls). */
+  travel?: number;
+  /** Plain-language description of the movement used as the accessible label. */
+  label: string;
+  /** Feet that must stay planted (same spot on the floor) throughout the loop. */
+  planted?: Side[];
+  /** True when at least one foot stays on the floor the whole loop (no jumps / lying / hanging). */
+  footGrounded?: boolean;
+  /** Phase (0..1 of the loop) shown as the still image for reduced motion / thumbnails. */
+  stillPhase?: number;
+  /** Mirror horizontally (face left). */
+  mirror?: boolean;
+  /** Floor style. */
+  floor?: "plain" | "mat" | "none";
+  /**
+   * Front view only, opt-in: draw the legs (and shorts) in front of the torso instead of behind it, for a body seen from
+   * above or from a raised camera whose thighs come up toward the viewer (a knee pulled to the chest, a leg crossed
+   * over the other, knees bent toward the camera while lying on one side).
+   */
+  legsInFront?: boolean;
+  /** Joint-limit checks to skip for deliberately stylised poses (documented in the definition). */
+  allowLimits?: PoseKey[];
+  /**
+   * Running: the body travels at an even speed on a smooth up-and-down path (lowest at mid-stance, airborne between
+   * steps) and the support foot is held where it landed. Right foot lands at the start of the loop, left half-way.
+   */
+  run?: RunPath;
+  /** World x of the camera's axis for keyframe `zoom` (perspective): the figure shrinks toward this line. */
+  zoomAt?: number;
+}
+
+export interface RunPath {
+  /** Fraction of each step (half the loop) with the foot on the floor. */
+  stance: number;
+  /** Pelvis height at touchdown and at toe-off (cm). */
+  land: number;
+  push: number;
+}
+
+/** A fully computed frame. */
+export interface Frame {
+  view: View;
+  pose: Pose;
+  pts: Record<Landmark, Vec>;
+  props: ResolvedProp[];
+  alpha: number;
+  cameraX: number;
+  /** How far the floor clamp had to raise the whole figure (diagnostic; ~0 for well-authored motions). */
+  lifted?: number;
+  /** Copied from MotionDef.legsInFront (front view: legs drawn in front of the torso). */
+  legsInFront?: boolean;
+  /** Perspective scale of the figure (only for motions whose keyframes set `zoom`): drawn s times its size about (x, 0). */
+  zoom?: { s: number; x: number };
+  /** Set when the figure faces -x (keyframe `facing`): the pelvis x it is mirrored about. `pts` are already mirrored. */
+  flipX?: number;
+  /** Absolute (screen-plane) segment directions in degrees, down-angle convention. */
+  seg: {
+    T1: number;
+    T2: number;
+    head: number;
+    thighL: number;
+    thighR: number;
+    shinL: number;
+    shinR: number;
+    footL: number;
+    footR: number;
+    armL: number;
+    armR: number;
+    foreL: number;
+    foreR: number;
+  };
+}
+
+export interface ResolvedProp {
+  def: PropDef;
+  at: Vec;
+  to?: Vec;
+  /** Layer for this frame when a keyframe overrides the definition's. */
+  layer?: PropDef["layer"];
+  /**
+   * While the prop changes layer: a second copy in the nearer of the two layers, at this opacity (0 → 1 as it comes
+   * forward, 1 → 0 as it goes back), over the copy drawn in `layer` (the deeper one). A limb it passes then dissolves
+   * behind it or out from behind it instead of vanishing in one frame.
+   */
+  fade?: { layer: NonNullable<PropDef["layer"]>; alpha: number };
+}
+
+/** Minimal exercise info used to choose a pattern-based fallback for slugs without a hand-made motion. */
+export interface ExerciseMeta {
+  slug: string;
+  name?: string;
+  pattern?: string;
+  category?: string;
+  equipment?: readonly string[];
+  timed?: boolean;
+}

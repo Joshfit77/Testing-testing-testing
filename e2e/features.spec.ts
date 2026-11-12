@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { completeOnboarding, grantPlan, signUpAndConfirm, uniqueEmail } from "./helpers";
+import { completeOnboarding, signUpAndConfirm, uniqueEmail } from "./helpers";
 
 test.describe("feature access, subscriptions and core sections", () => {
   let email = "";
@@ -10,15 +10,24 @@ test.describe("feature access, subscriptions and core sections", () => {
 
   test("onboarding blocks under-18 users", async ({ page }) => {
     await page.waitForURL(/\/onboarding/);
+    const next = () => page.getByRole("button", { name: /^Continue/ }).click();
+    await page.getByRole("button", { name: "Build strength", exact: true }).click();
+    await next();
+    await page.getByRole("button", { name: "1–3 years", exact: true }).click();
+    await next();
+    await next(); // schedule (defaults)
+    await page.getByRole("button", { name: /^Home gym/ }).click();
+    await next();
+    // About you comes before the plan is built; the optional questions come after it.
+    await page.getByRole("button", { name: "Female", exact: true }).click();
     await page.getByLabel("Age").fill("16");
-    await page.getByLabel("Height (ft)").fill("5");
-    await page.getByLabel("Height (in)").fill("6");
-    await page.getByLabel(/Bodyweight/).fill("140");
-    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByRole("button", { name: /^Continue/ }).click();
     await expect(page.getByText(/available to adults \(18\+\)/)).toBeVisible();
+    // Still on the About you question.
+    await expect(page.getByLabel("Age")).toBeVisible();
   });
 
-  test("free plan: premium programs, nutrition and AI are locked server-side; billing explains state", async ({ page }) => {
+  test("free plan: premium programs, meal planning and AI are locked server-side; food logging is open; billing explains state", async ({ page }) => {
     await completeOnboarding(page);
 
     await page.goto("/train/programs/powerlifting-base-block");
@@ -31,20 +40,27 @@ test.describe("feature access, subscriptions and core sections", () => {
     await expect(page.getByRole("button", { name: /Start program/ })).toBeVisible();
 
     await page.goto("/nutrition");
-    await expect(page.getByText("Included with Plus and Pro")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Add food" })).toBeVisible();
+    await page.goto("/nutrition/planner");
+    await expect(page.getByText("Included with Pro All Access")).toBeVisible();
 
     await page.goto("/coach");
-    await expect(page.getByText(/isn't configured on this server|included with Plus and Pro/).first()).toBeVisible();
-    await expect(page.getByRole("button", { name: "Send message" })).toBeDisabled();
+    // Free: one card with what the coach does, the Pro prices and a link to the plans; no disabled chat.
+    await expect(page.getByTestId("coach-upsell")).toBeVisible();
+    await expect(page.getByTestId("coach-upsell-price")).toContainText("Faith stays free");
+    await expect(page.getByRole("link", { name: "See plans" })).toHaveAttribute("href", "/profile/billing");
+    await expect(page.getByRole("button", { name: "Send message" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "New chat" })).toHaveCount(0);
 
     await page.goto("/profile/billing");
     await expect(page.getByRole("heading", { name: "Plans & billing" })).toBeVisible();
-    await expect(page.getByText("Current plan")).toBeVisible();
+    await expect(page.getByText("Current membership")).toBeVisible();
+    await expect(page.getByTestId("current-plan")).toHaveText("Free");
   });
 
   test("progress: log bodyweight and create a goal; recovery check-in requires consent", async ({ page }) => {
     await completeOnboarding(page);
-    await page.goto("/progress?range=7d");
+    await page.goto("/progress/overview?range=7d");
     await page.getByLabel(/^Weight \(lb\)/).fill("182.5");
     await page.getByRole("button", { name: "Save weight" }).click();
     await expect(page.getByText("Bodyweight saved.")).toBeVisible();
@@ -62,34 +78,52 @@ test.describe("feature access, subscriptions and core sections", () => {
     await expect(page.getByText(/^Readiness \d+\/100/)).toBeVisible();
   });
 
-  test("optional faith section is opt-in and journal entries save privately", async ({ page }) => {
+  test("Faith is always available and journal entries save privately", async ({ page }) => {
     await completeOnboarding(page);
     await page.goto("/faith");
-    await page.getByRole("button", { name: /Turn on Faith/ }).click();
+    await expect(page.getByRole("heading", { name: "Faith", level: 1 })).toBeVisible();
     await expect(page.getByText("Verse of the day")).toBeVisible();
-    await page.getByRole("textbox", { name: "Reflection" }).fill("Grateful for strength today.");
+    await page.getByRole("navigation", { name: "Faith quick actions" }).getByRole("link", { name: /Write a prayer/ }).click();
+    await page.waitForURL(/\/faith\/journal\/new/);
+    await page.getByRole("textbox", { name: "Prayer", exact: true }).fill("Grateful for strength today.");
     await page.getByRole("button", { name: "Save entry" }).click();
-    await expect(page.getByText("Entry saved. Only you can see it.")).toBeVisible();
+    await page.waitForURL(/\/faith\/journal$/);
+    await expect(page.getByText("Grateful for strength today.")).toBeVisible();
   });
 
-  test("food log: search built-in foods and log a serving (Plus)", async ({ page }) => {
+  test("food log on the Free plan: search built-in foods and log a serving", async ({ page }) => {
     await completeOnboarding(page);
-    await grantPlan(email, "plus");
     await page.goto("/nutrition");
-    await expect(page.getByRole("heading", { name: "Food", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Nutrition", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Add food" }).click();
     await page.getByPlaceholder("e.g. chicken, banana, rice").fill("banana");
-    const row = page.getByRole("listitem").filter({ hasText: "Banana" }).first();
-    await row.getByLabel("Servings of Banana").fill("2");
-    await row.getByRole("button", { name: "Add" }).click();
-    await expect(page.getByText("Logged Banana.")).toBeVisible();
+    await page.getByRole("region", { name: "Common foods" }).getByRole("button", { name: /^Banana/ }).first().click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByLabel("Unit", { exact: true })).toHaveValue("serving");
+    await dialog.getByLabel("Amount", { exact: true }).fill("2");
+    await expect(dialog.getByTestId("amount-calories")).toHaveText("210");
+    await dialog.getByRole("button", { name: "Log food" }).click();
+    await expect(page.getByText(/Logged Banana \(2 × 1 medium/)).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(page.getByText("Banana").first()).toBeVisible();
     await expect(page.getByText("210").first()).toBeVisible();
 
     await page.goto("/profile/billing");
-    await expect(page.getByText("All Access Yearly")).toBeVisible();
-    await expect(page.getByText("$200")).toBeVisible();
-    await expect(page.getByText(/^\$30\s*\/ month$/)).toBeVisible();
+    // Faith being free is on the first screen, before any scrolling.
+    await expect(page.getByTestId("faith-free")).toBeInViewport();
+    // Only Free and Pro All Access are offered, at the approved prices; Plus is never offered.
+    await expect(page.getByTestId("plan-free")).toContainText("$0");
+    await expect(page.getByTestId("pro-price")).toHaveText("$19.99 / month");
+    await page.getByRole("radio", { name: /Yearly|Annual/ }).click();
+    await expect(page.getByTestId("pro-price")).toHaveText("$149.99 / year");
+    await expect(page.getByText("About $12.49 a month, billed yearly.")).toBeVisible();
+    await expect(page.getByRole("radio", { name: /Save 37%/ })).toBeVisible();
+    // The full comparison is folded under "Compare Free and Pro".
+    await page.getByText("Compare Free and Pro").click();
+    await expect(page.getByText("150 requests / month")).toBeVisible();
+    await expect(page.getByText(/\$11\.99|\$24\.99|\$249\.99/)).toHaveCount(0);
+    // No Stripe keys in this test environment: no checkout is offered, and nothing pretends to be one.
+    await expect(page.getByText("Online checkout isn't available right now. You haven't been charged.")).toBeVisible();
+    await expect(page.getByRole("button", { name: /Start Pro All Access/ })).toHaveCount(0);
   });
 });

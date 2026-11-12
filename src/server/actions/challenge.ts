@@ -20,11 +20,11 @@ const checkinSchema = z.object({
   note: z.string().trim().max(1000, "Keep your note under 1,000 characters").optional().default(""),
 });
 
-/** The challenge lives in the optional Faith section: every action requires faith to be enabled. */
+/** Faith is always available (SPEC §12): every signed-in user can take part in the challenge. */
 async function requireFaithUser() {
   const user = await requireUser();
   const profile = await getProfile(user.id);
-  if (!profile?.faith_enabled) return null;
+  if (!profile) return null;
   return { user, timezone: profile.timezone || "UTC" };
 }
 
@@ -35,7 +35,7 @@ function revalidate() {
 
 export async function startChallengeAction(_formData: FormData): Promise<ActionState> {
   const ctx = await requireFaithUser();
-  if (!ctx) return actionError("Turn on Faith & Discipline to join the challenge.");
+  if (!ctx) return actionError("Please sign in again to join the challenge.");
   const supabase = await getServerSupabase();
   const { data: existing } = await supabase
     .from("challenge_enrollments")
@@ -73,7 +73,7 @@ async function abandonActive(userId: string): Promise<boolean> {
 
 export async function leaveChallengeAction(_formData: FormData): Promise<ActionState> {
   const ctx = await requireFaithUser();
-  if (!ctx) return actionError("Turn on Faith & Discipline to manage the challenge.");
+  if (!ctx) return actionError("Please sign in again to manage the challenge.");
   if (!(await abandonActive(ctx.user.id))) return actionError("Couldn't leave the challenge. Please try again.");
   revalidate();
   return actionOk("You've left the challenge. You can start again any time.");
@@ -81,14 +81,14 @@ export async function leaveChallengeAction(_formData: FormData): Promise<ActionS
 
 export async function restartChallengeAction(formData: FormData): Promise<ActionState> {
   const ctx = await requireFaithUser();
-  if (!ctx) return actionError("Turn on Faith & Discipline to manage the challenge.");
+  if (!ctx) return actionError("Please sign in again to manage the challenge.");
   if (!(await abandonActive(ctx.user.id))) return actionError("Couldn't restart the challenge. Please try again.");
   return startChallengeAction(formData);
 }
 
 export async function saveChallengeCheckinAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const ctx = await requireFaithUser();
-  if (!ctx) return actionError("Turn on Faith & Discipline to use the challenge.");
+  if (!ctx) return actionError("Please sign in again to use the challenge.");
   const parsed = checkinSchema.safeParse({
     enrollmentId: formData.get("enrollmentId"),
     dayNumber: formData.get("dayNumber"),

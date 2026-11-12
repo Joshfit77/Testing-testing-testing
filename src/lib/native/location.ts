@@ -1,0 +1,129 @@
+"use client";
+
+/**
+ * Where GPS fixes come from while a run or walk is recording.
+ *
+ *   - Native app (iOS / Android) with @capacitor-community/background-geolocation synced into the build: its watcher
+ *     keeps delivering fixes with the screen locked (iOS background location mode; an Android foreground service with
+ *     a "Recording your run" notification). NOT VERIFIED ON A DEVICE YET: see docs/RUN_TRACKING_PLAN.md.
+ *   - Browser / PWA: navigator.geolocation.watchPosition, which only works while the page is visible. The recorder
+ *     says so, and any time without fixes is recorded as a gap, never as movement.
+ *
+ * Location is requested only when the member taps Start, and every watcher stops at Pause-to-Finish or Discard.
+ */
+import { Capacitor, registerPlugin } from "@capacitor/core";
+import type { GpsFix } from "@/lib/domain/gps-track";
+
+export type LocationError = "denied" | "unavailable" | "unsupported" | "timeout";
+
+interface BgLocation {
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+  time: number | null;
+  simulated?: boolean;
+}
+interface BgPlugin {
+  addWatcher(
+    options: { backgroundMessage?: string; backgroundTitle?: string; requestPermissions?: boolean; stale?: boolean; distanceFilter?: number },
+    callback: (location?: BgLocation, error?: { code?: string; message?: string }) => void,
+  ): Promise<string>;
+  removeWatcher(options: { id: string }): Promise<void>;
+  openSettings(): Promise<void>;
+}
+
+const BackgroundGeolocation = registerPlugin<BgPlugin>("BackgroundGeolocation");
+
+/** True when the native background watcher is part of this app build. */
+export function hasNativeBackgroundLocation(): boolean {
+  return Capacitor.isNativePlatform() && Capacitor.isPluginAvailable("BackgroundGeolocation");
+}
+
+export function locationSourceLabel(): string {
+  return hasNativeBackgroundLocation() ? "Native GPS (background recording; not yet verified on a phone)" : "Browser location (keep this screen open)";
+}
+
+/** Current permission state in the browser, when the browser can tell without asking. */
+export async function browserLocationPermission(): Promise<"granted" | "denied" | "prompt" | "unknown"> {
+  try {
+    if (typeof navigator === "undefined" || !navigator.permissions) return "unknown";
+    const s = await navigator.permissions.query({ name: "geolocation" as PermissionName });
+    return s.state;
+  } catch {
+    return "unknown";
+  }
+}
+
+/** True in the phone app, where the system settings page for this app can be opened after a refusal. */
+export function canOpenLocationSettings(): boolean {
+  return hasNativeBackgroundLocation();
+}
+
+/** Open this app's page in the phone's Settings (where location access is switched on). No-op in a browser. */
+export async function openLocationSettings(): Promise<void> {
+  if (!hasNativeBackgroundLocation()) return;
+  try {
+    await BackgroundGeolocation.openSettings();
+  } catch {
+    /* nothing to open */
+  }
+}
+
+/**
+ * Android 13+ shows the "Recording your run" foreground-service notification only once the app holds the
+ * POST_NOTIFICATIONS runtime permission, and the location plugin asks only for location. Ask (once) before the
+ * watcher starts; a refusal only hides the notification, the recording still runs.
+ */
+async function ensureAndroidNotificationPermission(): Promise<void> {
+  if (Capacitor.getPlatform() !== "android") return;
+  try {
+    const { LocalNotifications } = await import("@capacitor/local-notifications");
+    const { display } = await LocalNotifications.checkPermissions();
+    if (display === "prompt" || display === "prompt-with-rationale") await LocalNotifications.requestPermissions();
+  } catch {
+    /* plugin unavailable: the watcher still starts */
+  }
+}
+
+/** Start delivering fixes. Returns a stop function. */
+export async function watchLocation(onFix: (fix: GpsFix) => void, onError: (e: LocationError) => void): Promise<() => void> {
+  if (hasNativeBackgroundLocation()) {
+    await ensureAndroidNotificationPermission();
+    const id = await BackgroundGeolocation.addWatcher(
+      { backgroundTitle: "Recording your run", backgroundMessage: "Narrow Gate Fitness is recording your route. Tap to return.", requestPermissions: true, stale: false, distanceFilter: 0 },
+      (location, error) => {
+        if (error) {
+          onError(error.code === "NOT_AUTHORIZED" ? "denied" : "unavailable");
+          return;
+        }
+        if (!location || location.simulated) return;
+        onFix({ lat: location.latitude, lng: location.longitude, accuracy: location.accuracy, t: location.time ?? Date.now() });
+      },
+    );
+    return () => {
+      void BackgroundGeolocation.removeWatcher({ id });
+    };
+  }
+  if (typeof navigator === "undefined" || !navigator.geolocation) {
+    onError("unsupported");
+    return () => undefined;
+  }
+  const watchId = navigator.geolocation.watchPosition(
+    (p) => onFix({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy, t: p.timestamp || Date.now() }),
+    (err) => onError(err.code === err.PERMISSION_DENIED ? "denied" : err.code === err.TIMEOUT ? "timeout" : "unavailable"),
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 30_000 },
+  );
+  return () => navigator.geolocation.clearWatch(watchId);
+}
+
+/** Keep the screen awake while recording in the browser, where supported (optional; drains the battery). */
+export async function keepScreenOn(): Promise<(() => void) | null> {
+  try {
+    const nav = navigator as Navigator & { wakeLock?: { request(type: "screen"): Promise<{ release(): Promise<void> }> } };
+    if (!nav.wakeLock) return null;
+    const lock = await nav.wakeLock.request("screen");
+    return () => void lock.release();
+  } catch {
+    return null;
+  }
+}
