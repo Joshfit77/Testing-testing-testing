@@ -377,6 +377,36 @@ describe.skipIf(!available)("cross-user isolation sweep: every user-owned table 
     expect(problems).toEqual([]);
   });
 
+  // The two hand-written write probes above pick one plausible edit or row per table. These two go over EVERY
+  // user-owned table generically (USER_TABLES, kept in step with the migrations by account-coverage.test.ts), so a
+  // table added later with an over-broad UPDATE or INSERT policy fails here even if nobody adds it to those lists.
+  it("another member cannot take over (re-own) any other member's row, in every user-owned table", async () => {
+    const problems: string[] = [];
+    for (const { table, column } of USER_TABLES) {
+      const before = await snapshot(table, column);
+      const { data } = await bob.client.from(table).update({ [column]: bob.id }).eq(column, alice.id).select(column);
+      if (data?.length) problems.push(`${table}: ${data.length} row(s) moved to another member`);
+      if ((await snapshot(table, column)) !== before) problems.push(`${table}: Alice's rows changed`);
+    }
+    expect(problems).toEqual([]);
+  });
+
+  it("another member cannot write a row in Alice's name, in every user-owned table", async () => {
+    const problems: string[] = [];
+    for (const { table, column } of USER_TABLES) {
+      // A copy of one of Alice's real rows (so it satisfies the table's own checks), without its row id.
+      const { data: rows, error: readErr } = await svc.from(table).select("*").eq(column, alice.id).limit(1);
+      if (readErr) throw new Error(`${table}: ${readErr.message}`);
+      const row = { ...(rows?.[0] as Record<string, unknown>) };
+      if (column !== "id") delete row.id;
+      const before = await count(table, column);
+      const { error } = await bob.client.from(table).insert(row);
+      if (!error) problems.push(`${table}: a row was written in Alice's name`);
+      if ((await count(table, column)) !== before) problems.push(`${table}: Alice's row count changed`);
+    }
+    expect(problems).toEqual([]);
+  });
+
   it("another member cannot list, read, sign, replace or delete Alice's files in any private bucket", async () => {
     const problems: string[] = [];
     for (const bucket of USER_STORAGE_BUCKETS) {
