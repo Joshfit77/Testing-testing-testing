@@ -286,7 +286,7 @@ Leave these unset (they must stay off):
 | `FOOD_IQ_SCORE` | Unset or `off`; only `on` shows it (`src/lib/food-iq.ts`). |
 | `LEGAL_TERMS_URL`, `LEGAL_PRIVACY_URL` | Unset until counsel-reviewed documents exist. The app links its drafts, marked as drafts. |
 | `LEGAL_REACCEPT_REQUIRED` | Unset or `false`. |
-| `AUTH_RATE_LIMIT_SCALE`, `AI_RATE_LIMIT_PER_MINUTE`, `COACH_MODEL_FAST`, `COACH_MODEL_SMART`, `BIBLE_AI_MODEL`, `OFF_API_BASE_URL`, `REVENUECAT_API_BASE_URL`, `STRIPE_API_BASE_URL` | Defaults are correct; the base URLs are for tests. |
+| `AUTH_RATE_LIMIT_SCALE`, `AI_RATE_LIMIT_PER_MINUTE`, `COACH_MODEL_FAST`, `COACH_MODEL_SMART`, `BIBLE_AI_MODEL`, `OFF_API_BASE_URL`, `REVENUECAT_API_BASE_URL`, `STRIPE_API_BASE_URL` | Defaults are correct; the base URLs are for tests. The app only honours a base URL that points at this machine (localhost), and ignores `AUTH_RATE_LIMIT_SCALE` on a production deployment (`src/server/test-overrides.ts`), so a stray value can't redirect keys or loosen sign-in limits. |
 | `NGF_BUILD_SHA` | Only for a non-Vercel host. Set it to the deployed commit, so `/api/health` reports it. |
 
 **Note on `REVENUECAT_ALLOW_SANDBOX`.** The docs disagree (see §10). With `false`, TestFlight purchases unlock Pro only

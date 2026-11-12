@@ -12,6 +12,7 @@ import { isFlagEnabled } from "@/server/flags";
 import { registerLegalVersions } from "@/server/legal";
 import { logError } from "@/server/log";
 import { clientIp, hashKey, rateLimitAll } from "@/server/rate-limit";
+import { authRateLimitScale } from "@/server/test-overrides";
 
 const MINUTE = 60_000;
 const TOO_MANY = "Too many attempts. Please wait a few minutes and try again.";
@@ -24,7 +25,7 @@ const TOO_MANY_EMAILS = "Please wait a few minutes before requesting another ema
  * accounts from one machine); production leaves it unset.
  */
 type Check = { key: string; limit: number; windowMs: number };
-const SCALE = Math.max(1, Number(process.env.AUTH_RATE_LIMIT_SCALE) || 1);
+const SCALE = authRateLimitScale();
 
 async function authLimited(checks: Check[]): Promise<boolean> {
   return !(await rateLimitAll(checks.map((c) => ({ ...c, limit: c.limit * SCALE })))).ok;

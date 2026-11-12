@@ -25,6 +25,7 @@ import { isDemoMode } from "@/server/demo";
 import { isAiConfigured, serverEnv } from "@/server/env";
 import { isFlagEnabled } from "@/server/flags";
 import { logError } from "@/server/log";
+import { anthropicBaseUrl } from "@/server/test-overrides";
 
 /*
  * The Bible study helper. Its own quota (bible_ai_usage; the fitness coach's allowance is untouched), its own history
@@ -38,7 +39,7 @@ const MAX_CONTEXT_VERSES = 80;
 const HISTORY_TURNS = 6;
 
 let client: Anthropic | null = null;
-const getClient = () => (client ??= new Anthropic({ apiKey: serverEnv.anthropicApiKey, maxRetries: 1, timeout: 60_000 }));
+const getClient = () => (client ??= new Anthropic({ apiKey: serverEnv.anthropicApiKey, baseURL: anthropicBaseUrl(), maxRetries: 1, timeout: 60_000 }));
 
 /** Passages for a question: any references it names, then verses containing its distinctive words. */
 export function retrievePassages(question: string): ContextPassage[] {

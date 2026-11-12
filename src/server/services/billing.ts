@@ -9,14 +9,16 @@ import { isServiceRoleConfigured, serverEnv } from "@/server/env";
 import { logError, logInfo } from "@/server/log";
 import { claimWebhookEvent, processClaimedEvent, type WebhookOutcome } from "@/server/services/webhook-events";
 import { sandboxPurchasesAllowed } from "@/server/services/sandbox-testers";
+import { localStandIn } from "@/server/test-overrides";
 
 let stripeClient: Stripe | null = null;
 
 export function getStripe(): Stripe {
   if (!serverEnv.stripeSecretKey) throw new Error("Stripe is not configured");
   if (!stripeClient) {
-    // STRIPE_API_BASE_URL points the client at a local stand-in in tests; production always uses Stripe.
-    const base = process.env.STRIPE_API_BASE_URL ? new URL(process.env.STRIPE_API_BASE_URL) : null;
+    // STRIPE_API_BASE_URL points the client at a local stand-in in tests; any other host is ignored (test-overrides.ts).
+    const standIn = localStandIn(process.env.STRIPE_API_BASE_URL);
+    const base = standIn ? new URL(standIn) : null;
     stripeClient = new Stripe(serverEnv.stripeSecretKey, {
       appInfo: { name: "Narrow Gate Fitness" },
       ...(base ? { host: base.hostname, port: Number(base.port), protocol: base.protocol.replace(":", "") as "http" | "https" } : {}),

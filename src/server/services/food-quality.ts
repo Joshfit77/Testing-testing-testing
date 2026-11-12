@@ -3,13 +3,14 @@ import { barcodeLookupCandidates, type RetailBarcodeFormat } from "@/lib/barcode
 import { normalizeOffProduct, type BarcodeProduct } from "@/lib/open-food-facts";
 import { normalizeQualityProduct, OFF_QUALITY_FIELDS, type OffQualityResponse, type QualityProduct } from "@/lib/food-quality";
 import { OFF_USER_AGENT, OffUnavailableError } from "@/server/services/open-food-facts";
+import { openFoodFactsOrigin } from "@/server/test-overrides";
 
 /**
  * Open Food Facts reads for Narrow Gate Food IQ. Product reads are cached for a day (OFF data changes slowly);
  * category searches for alternatives and name searches are cached and throttled together to stay well under OFF's
  * published search limit (10 searches a minute per app). Nothing is copied into the app's own food tables.
  */
-const ORIGIN = /^https?:\/\//.test(process.env.OFF_API_BASE_URL ?? "") ? process.env.OFF_API_BASE_URL!.replace(/\/+$/, "") : "https://world.openfoodfacts.org";
+const ORIGIN = openFoodFactsOrigin();
 
 async function getJson(url: string): Promise<unknown | null> {
   let res: Response;

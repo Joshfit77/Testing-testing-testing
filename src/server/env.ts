@@ -1,5 +1,6 @@
 import "server-only";
 import { demoModeOn, demoModeRefused } from "@/lib/demo/mode";
+import { localStandIn } from "@/server/test-overrides";
 
 if (demoModeRefused()) {
   console.warn("DEMO_MODE=true is ignored: this is a production or live-payments deployment (src/lib/demo/mode.ts).");
@@ -59,7 +60,8 @@ export const serverEnv = {
   revenueCatSecretKey: storeSecret(process.env.REVENUECAT_SECRET_API_KEY),
   /** The exact Authorization header value set for the webhook in the RevenueCat dashboard. */
   revenueCatWebhookAuth: storeSecret(process.env.REVENUECAT_WEBHOOK_AUTH),
-  revenueCatApiBaseUrl: (process.env.REVENUECAT_API_BASE_URL ?? "https://api.revenuecat.com").replace(/\/$/, ""),
+  // A local stand-in in tests only; any other host is ignored so the secret key only ever goes to RevenueCat.
+  revenueCatApiBaseUrl: localStandIn(process.env.REVENUECAT_API_BASE_URL) ?? "https://api.revenuecat.com",
   revenueCatEntitlementPlus: process.env.REVENUECAT_ENTITLEMENT_PLUS || "plus",
   revenueCatEntitlementPro: process.env.REVENUECAT_ENTITLEMENT_PRO || "pro",
   /** Count purchases made with RevenueCat's Test Store (development builds only). Never enable in production. */

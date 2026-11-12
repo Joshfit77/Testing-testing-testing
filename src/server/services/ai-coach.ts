@@ -20,6 +20,7 @@ import { getLegacyAiTerms } from "@/server/services/billing";
 import { isFlagEnabled } from "@/server/flags";
 import { rateLimit } from "@/server/rate-limit";
 import { logError } from "@/server/log";
+import { anthropicBaseUrl } from "@/server/test-overrides";
 
 export type AiErrorCode =
   | "not_configured"
@@ -81,8 +82,8 @@ function getClient(): Anthropic {
     client = isDemoMode()
       ? // Demo mode: answered in-process by a script whose replies say they're simulated; nothing leaves the server.
         new Anthropic({ apiKey: "demo-simulated", baseURL: "https://demo.invalid", fetch: simulatedFetch, maxRetries: 0 })
-      : // baseURL comes from the SDK's standard ANTHROPIC_BASE_URL env var when set (e2e tests point it at a local mock).
-        new Anthropic({ apiKey: serverEnv.anthropicApiKey, maxRetries: 2, timeout: 120_000 });
+      : // A local mock in tests (ANTHROPIC_BASE_URL on this machine only), otherwise Anthropic's API.
+        new Anthropic({ apiKey: serverEnv.anthropicApiKey, baseURL: anthropicBaseUrl(), maxRetries: 2, timeout: 120_000 });
   }
   return client;
 }
