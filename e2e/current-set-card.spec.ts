@@ -87,4 +87,44 @@ test.describe("current set card", () => {
     await expect(again.getByTestId("current-last-time")).toContainText("95");
     await expect(again.getByLabel("Weight (lb)")).toHaveValue("95");
   });
+  test("a loaded lift asks for its weight first; 'no added weight' is an explicit, remembered choice (T8)", async ({ page }) => {
+    await signUpAndConfirm(page, uniqueEmail("t8"));
+    await completeOnboarding(page);
+    await page.goto("/home");
+    await page.getByRole("link", { name: /^Start (Today's Workout|workout)/i }).click();
+    await page.waitForURL(/\/train\/workout\?day=/);
+    const card = page.getByTestId("current-set-card");
+    await expect(card).toBeVisible();
+
+    // The starter session opens on a barbell lift: no weight is invented, and Complete asks for one.
+    await expect(card.getByLabel("Weight (lb)")).toHaveValue("");
+    await card.getByLabel("Reps", { exact: true }).fill("5");
+    await card.getByTestId("complete-set").click();
+    await expect(card.getByTestId("weight-first")).toBeVisible();
+    await expect(card.getByTestId("current-set-label")).toHaveText(/^Set 1 of/i);
+    await expect(card.getByTestId("set-undo")).toHaveCount(0);
+
+    // Entering the weight logs the set normally.
+    await card.getByLabel("Weight (lb)").fill("45");
+    await card.getByTestId("complete-set").click();
+    await expect(card.getByTestId("set-undo")).toContainText("logged");
+    await expect(card.getByTestId("current-set-label")).toHaveText(/^Set 2 of/i);
+
+    // Set 2 has no weight entered: it asks again (after the card's 0.7 s double-tap window, as a real next tap would be);
+    // the explicit "no added weight" logs it and is remembered for this exercise.
+    await expect(card.getByLabel("Weight (lb)")).toHaveValue("45");
+    await card.getByLabel("Weight (lb)").fill("");
+    await card.getByLabel("Weight (lb)").blur();
+    await page.waitForTimeout(800);
+    await card.getByTestId("complete-set").click();
+    await expect(card.getByTestId("weight-first")).toBeVisible();
+    await card.getByTestId("no-added-weight").click();
+    await expect(card.getByTestId("current-set-label")).toHaveText(/^Set 3 of/i);
+    await card.getByLabel("Weight (lb)").fill("");
+    await card.getByLabel("Weight (lb)").blur();
+    await page.waitForTimeout(800);
+    await card.getByTestId("complete-set").click();
+    await expect(card.getByTestId("weight-first")).toHaveCount(0);
+    await expect(card.getByTestId("current-set-label")).toHaveText(/^Set 4 of/i);
+  });
 });

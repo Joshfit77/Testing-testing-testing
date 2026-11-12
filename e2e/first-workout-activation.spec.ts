@@ -91,11 +91,18 @@ test.describe("first-workout activation (measured)", () => {
       await firstSet.waitFor();
       await mark("loggerOpen");
 
-      // The first exercise is on screen without scrolling, and nothing asks a beginner for a working weight.
+      // The first exercise is on screen without scrolling. A loaded lift asks for a weight instead of logging it at zero.
       const firstSetVisibleWithoutScrolling = await inView(await firstSet.boundingBox());
       const firstTimeTipShown = (await page.getByTestId("first-time-tip").count()) > 0;
 
       await firstSet.click();
+      // A loaded lift asks for its weight before the set is logged (owner decision T8): the app never invents one. A
+      // beginner types a starting weight (here 10), then completes the set.
+      if (await page.getByTestId("weight-first-row").isVisible().catch(() => false)) {
+        await page.getByRole("textbox", { name: /set 1 weight in (lb|kg)$/ }).first().fill("10");
+        await page.getByRole("textbox", { name: /set 1 weight in (lb|kg)$/ }).first().blur();
+        await firstSet.click();
+      }
       await expect(page.getByRole("button", { name: /completed\. Mark incomplete$/ }).first()).toBeVisible();
       await mark("firstSet");
 

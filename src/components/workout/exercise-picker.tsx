@@ -13,6 +13,8 @@ export interface CatalogItem {
   isTimed: boolean;
   category: string;
   primary: string[];
+  /** Needs a weight before a set is logged (T8; src/lib/domain/load.ts). */
+  loaded?: boolean;
   /** Muscles worked secondarily (they glow softly on the demonstration). */
   secondary?: string[];
   /** Set-up steps, form cues and common mistakes, shown on the workout's current-set card and its demonstration. */

@@ -59,6 +59,8 @@ export interface DraftExercise {
    * cleared on purpose (bodyweight) doesn't come back when the workout is resumed. Missing on older drafts.
    */
   prefilled?: boolean;
+  /** The member said this loaded exercise has no added weight today (T8): sets may be logged without one. */
+  noWeightConfirmed?: boolean;
 }
 
 /** Current persisted format. v1 drafts (no distance, no supersets) are migrated by migrateDraft. */
@@ -160,6 +162,7 @@ export type DraftAction =
   | { type: "removeSet"; exerciseKey: string; setId: string }
   | { type: "updateSet"; exerciseKey: string; setId: string; patch: Partial<Omit<DraftSet, "id">> }
   | { type: "toggleSetComplete"; exerciseKey: string; setId: string; now: string }
+  | { type: "confirmNoWeight"; exerciseKey: string }
   /** Fills the empty fields of the sets not yet done from the last time this exercise was logged (never overwrites). */
   | { type: "prefillFromPrevious"; exerciseKey: string; sets: PreviousSetValues[] }
   /** Pass over a set without doing it (it stays in the workout, not counted). */
@@ -422,6 +425,8 @@ function reduce(state: WorkoutDraft, action: DraftAction): WorkoutDraft {
     }
     case "skipExercise":
       return mapExercise(state, action.exerciseKey, (e) => ({ ...e, skipped: true, skipReason: action.reason ?? "other" }));
+    case "confirmNoWeight":
+      return mapExercise(state, action.exerciseKey, (e) => ({ ...e, noWeightConfirmed: true }));
     case "unskipExercise":
       return mapExercise(state, action.exerciseKey, (e) => ({ ...e, skipped: false, skipReason: null }));
     case "setExerciseNotes":

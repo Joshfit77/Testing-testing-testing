@@ -1,3 +1,5 @@
+import { requiresWeight } from "@/lib/domain/load";
+import { usesDistance } from "@/lib/domain/exercise-tracking";
 import { z } from "zod";
 import { WorkoutLogger, type WorkoutTemplate } from "@/components/workout/workout-logger";
 import type { CatalogItem } from "@/components/workout/exercise-picker";
@@ -21,7 +23,7 @@ export default async function WorkoutPage({ searchParams }: { searchParams: Prom
   const supabase = await getServerSupabase();
 
   const [exRes, altRes, serverDraft] = await Promise.all([
-    supabase.from("exercises").select("id, slug, name, is_timed, category, primary_muscles, secondary_muscles, instructions, form_cues, common_mistakes").eq("is_published", true).order("name"),
+    supabase.from("exercises").select("id, slug, name, is_timed, category, equipment, primary_muscles, secondary_muscles, instructions, form_cues, common_mistakes").eq("is_published", true).order("name"),
     supabase.from("exercise_alternatives").select("exercise_id, alternative_id"),
     getServerDraft(supabase, user.id),
   ]);
@@ -31,6 +33,7 @@ export default async function WorkoutPage({ searchParams }: { searchParams: Prom
     name: e.name as string,
     isTimed: e.is_timed as boolean,
     category: e.category as string,
+    loaded: requiresWeight(e.equipment as string[] | null, { isTimed: e.is_timed as boolean, usesDistance: usesDistance(e.slug as string) }),
     primary: e.primary_muscles as string[],
     secondary: (e.secondary_muscles as string[] | null) ?? [],
     steps: (e.instructions as string[] | null) ?? [],

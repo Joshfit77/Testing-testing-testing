@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Check, ChevronDown, Crosshair, History, Link2, Unlink, MessageSquare, Pause, Play, Plus, Repeat2, SkipForward, Trash2, Undo2, X } from "lucide-react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Button } from "@/components/ui/button";
@@ -287,6 +287,8 @@ export function ExerciseCard({
   lastTime = null,
   coachTarget = null,
   firstTime = false,
+  loaded = false,
+  weightAsk = null,
   nextSetId = null,
   superset = null,
 }: {
@@ -310,6 +312,10 @@ export function ExerciseCard({
   nextSetId?: string | null;
   /** Superset placement: its letter, this exercise's place in it, and whether the next exercise can be joined. */
   superset?: { letter: string | null; position: number; size: number; canLinkNext: boolean } | null;
+  /** A loaded exercise (T8): a set needs its weight, or "no added weight", before it's logged. */
+  loaded?: boolean;
+  /** The set the logger just refused to complete without a weight: ask for it there. */
+  weightAsk?: string | null;
 }) {
   const [notesOpen, setNotesOpen] = useState(Boolean(exercise.notes));
   const done = exercise.sets.filter((s) => s.completed).length;
@@ -428,7 +434,28 @@ export function ExerciseCard({
       </div>
       <ol className="space-y-1">
         {exercise.sets.map((s, i) => (
-          <SetRow key={s.id} exercise={exercise} set={s} index={i} units={units} dispatch={dispatch} showComplete={showComplete} isNext={s.id === nextSetId} />
+          <Fragment key={s.id}>
+            <SetRow exercise={exercise} set={s} index={i} units={units} dispatch={dispatch} showComplete={showComplete} isNext={s.id === nextSetId} />
+            {loaded && weightAsk === s.id && !s.completed && !exercise.noWeightConfirmed && (
+              <li className="space-y-2 rounded-xl border border-gold-muted bg-gold/10 p-3 text-sm" role="alert" data-testid="weight-first-row">
+                <p>
+                  <span className="font-semibold">How much weight?</span> Enter it for this set, then tick it done. We never guess a weight for you.
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  className="min-h-11"
+                  onClick={() => {
+                    dispatch({ type: "confirmNoWeight", exerciseKey: exercise.id });
+                    dispatch({ type: "toggleSetComplete", exerciseKey: exercise.id, setId: s.id, now: new Date().toISOString() });
+                  }}
+                >
+                  No added weight – log reps only
+                </Button>
+              </li>
+            )}
+          </Fragment>
         ))}
       </ol>
       </div>

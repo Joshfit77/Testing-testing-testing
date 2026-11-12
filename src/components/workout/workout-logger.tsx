@@ -43,6 +43,7 @@ import {
   type ExerciseRef,
   type WorkoutDraft,
 } from "@/lib/domain/workout-draft";
+import { needsWeightFirst } from "@/lib/domain/load";
 import { canVibrate, cancelRestNotification, hapticSuccess, scheduleRestNotification, vibrate } from "@/lib/native";
 import { cancelDoneToday, deviceToday } from "@/lib/native-notifications";
 import { clearLocalDraft, discardedWorkoutIds, loadLocalDraft, localDraftKey, rememberDiscard, saveLocalDraft } from "@/lib/workout-storage";
@@ -253,6 +254,10 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
   const [sameSession, setSameSession] = useState(false);
 
   const catalogById = useMemo(() => new Map(catalog.map((c) => [c.id, c])), [catalog]);
+  // Exercises that need a weight before a set is logged (T8), read inside the reducer guard below.
+  const loadedIds = useRef(new Set<string>());
+  loadedIds.current = useMemo(() => new Set(catalog.filter((c) => c.loaded).map((c) => c.id)), [catalog]);
+  const [weightAsk, setWeightAsk] = useState<{ exerciseKey: string; setId: string } | null>(null);
 
   const freshFromTemplate = useCallback((): WorkoutDraft => {
     const nowIso = new Date().toISOString();
@@ -452,7 +457,22 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
     }
     if (action.type === "toggleSetComplete" || action.type === "skipSet" || action.type === "unskipSet") saveNow.current = true;
     touched.current = true;
-    setDraft((d) => (d ? workoutReducer(d, action) : d));
+    setDraft((d) => {
+      if (!d) return d;
+      // T8: a loaded exercise's set is never logged without its weight or an explicit "no added weight".
+      if (action.type === "toggleSetComplete") {
+        const ex = d.exercises.find((e) => e.id === action.exerciseKey);
+        const set = ex?.sets.find((x) => x.id === action.setId);
+        if (ex && set && needsWeightFirst(ex, set, loadedIds.current.has(ex.exerciseId))) {
+          // A refused tap isn't a completion: the next tap (after the weight is entered) must not look like a double tap.
+          lastToggle.current.delete(set.id);
+          queueMicrotask(() => setWeightAsk({ exerciseKey: ex.id, setId: set.id }));
+          return d;
+        }
+      }
+      if (action.type === "confirmNoWeight" || action.type === "updateSet") queueMicrotask(() => setWeightAsk(null));
+      return workoutReducer(d, action);
+    });
   }, []);
 
   // Undo on the current-set card is a deliberate second control, not a double tap: it always applies, and it resets
@@ -970,6 +990,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
       {draft.exercises.length > 0 && (
         <div ref={observeCard}>
           <CurrentSetCard
+            loaded={current ? loadedIds.current.has(current.exercise.exerciseId) : false}
             info={current}
             units={units}
             dispatch={dispatch}
@@ -1043,6 +1064,8 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
         return (
           <ExerciseCard
             key={e.id}
+            loaded={loadedIds.current.has(e.exerciseId)}
+            weightAsk={weightAsk?.exerciseKey === e.id ? weightAsk.setId : null}
             current={e.id === currentKey}
             exercise={e}
             index={i}

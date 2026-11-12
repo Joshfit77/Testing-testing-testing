@@ -9,6 +9,7 @@ import { ExerciseDemo } from "@/components/train/exercise-demo";
 import { ExerciseInfoDialog } from "@/components/train/exercise-info-dialog";
 import type { UnitSystem } from "@/lib/domain/types";
 import { lastDoneBefore, sameNumbers, setCanComplete, type CurrentSetInfo, type DraftAction, type DraftExercise, type DraftSet } from "@/lib/domain/workout-draft";
+import { needsWeightFirst } from "@/lib/domain/load";
 
 /**
  * After a completion, the Complete button moves on to the next set, so the per-set double-tap guard in the logger
@@ -188,6 +189,8 @@ export interface CurrentSetCardProps {
   onSubstitute?: (exerciseKey: string) => void;
   /** Pause or resume the workout clock (the rest countdown pauses with it). */
   onTogglePause?: () => void;
+  /** A loaded exercise: the weight is entered, or "no added weight" confirmed, before a set is logged (T8). */
+  loaded?: boolean;
 }
 
 /**
@@ -216,10 +219,13 @@ export function CurrentSetCard({
   form = null,
   onSubstitute,
   onTogglePause,
+  loaded = false,
 }: CurrentSetCardProps) {
   const [infoOpen, setInfoOpen] = useState(false);
   const [undo, setUndo] = useState<{ exerciseKey: string; setId: string; label: string; kind: "done" | "skipped" } | null>(null);
   const [blocked, setBlocked] = useState(false);
+  // T8: the weight was asked for (a loaded exercise, no weight entered yet).
+  const [askWeight, setAskWeight] = useState(false);
   const lastComplete = useRef(0);
   // Anything else touched between two taps on Complete (a number changed, the rest skipped) shows the next tap is
   // deliberate, not a bounce: the double-tap guard lets it through.
@@ -232,7 +238,10 @@ export function CurrentSetCard({
     const t = setTimeout(() => setUndo(null), 12_000);
     return () => clearTimeout(t);
   }, [undo]);
-  useEffect(() => setBlocked(false), [info?.set?.id]);
+  useEffect(() => {
+    setBlocked(false);
+    setAskWeight(false);
+  }, [info?.set?.id]);
 
   const resting = rest > 0;
   const restRow = resting ? (
@@ -372,6 +381,12 @@ export function CurrentSetCard({
     if (Date.now() - lastComplete.current < CARD_DOUBLE_TAP_MS) return;
     if (!setCanComplete(exercise, set)) {
       setBlocked(true);
+      return;
+    }
+    // Never log a loaded lift at zero by accident: ask for the weight (or an explicit "no added weight") first.
+    if (needsWeightFirst(exercise, set, loaded)) {
+      setAskWeight(true);
+      document.querySelector<HTMLInputElement>('[data-testid="current-weight"] input')?.focus();
       return;
     }
     settled();
@@ -535,9 +550,32 @@ export function CurrentSetCard({
           <Plus aria-hidden /> Add a set
         </Button>
       )}
+      {askWeight && needsWeightFirst(exercise, set ?? { weightKg: 1, completed: true }, loaded) && (
+        <div className="space-y-2 rounded-xl border border-gold-muted bg-gold/10 p-3" role="alert" data-testid="weight-first">
+          <p className="font-semibold">How much weight?</p>
+          <p className="text-sm">Enter the weight above, then complete the set. We never guess a weight for you.</p>
+          <Button
+            type="button"
+            variant="secondary"
+            className="min-h-11 w-full"
+            data-testid="no-added-weight"
+            onClick={() => {
+              dispatch({ type: "confirmNoWeight", exerciseKey: exercise.id });
+              setAskWeight(false);
+              if (set) {
+                settled();
+                dispatch({ type: "toggleSetComplete", exerciseKey: exercise.id, setId: set.id, now: new Date().toISOString() });
+                setUndo({ exerciseKey: exercise.id, setId: set.id, label: `${exercise.name}, ${setLabel.toLowerCase()}`, kind: "done" });
+              }
+            }}
+          >
+            No added weight – log reps only
+          </Button>
+        </div>
+      )}
       {blocked && (
         <p className="text-sm text-gold" role="alert">
-          {exercise.isTimed ? "Enter the time you held it for, then complete the set." : "Enter your reps, then complete the set. Leave the weight empty for bodyweight."}
+          {exercise.isTimed ? "Enter the time you held it for, then complete the set." : loaded ? "Enter your reps, then complete the set." : "Enter your reps, then complete the set. Leave the weight empty for bodyweight."}
         </p>
       )}
       {/* Right under the button just tapped, where the thumb already is. */}
