@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/toaster";
 import {
   FAITH_SECTION_LABELS,
+  DEFAULT_HIDDEN_HOME,
   FAITH_SECTIONS,
   HOME_MODULE_LABELS,
   NUTRITION_SECTION_LABELS,
@@ -139,7 +140,8 @@ export function CustomizeLayout({ defaultOrder, prefs }: { defaultOrder: HomeMod
   };
   const reset = () => {
     setOrder(defaultOrder);
-    setHidden(new Set());
+    // The same default as a saved-nothing layout (parseLayoutPrefs): quick actions start hidden.
+    setHidden(new Set(DEFAULT_HIDDEN_HOME));
     setFaithHidden(new Set());
     setTrain({ order: [...TRAIN_SECTIONS], hidden: new Set() });
     setNutrition({ order: [...NUTRITION_SECTIONS], hidden: new Set() });

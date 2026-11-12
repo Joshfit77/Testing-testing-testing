@@ -334,7 +334,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             {firstName}
           </h1>
           <p className="mt-2 text-sm text-white/80 [text-shadow:0_1px_6px_rgba(0,0,0,0.7)]">{todayLong}</p>
-          {showScripture && (
+          {/* The verse lives in the hero; it shows while the layout keeps the "verse" module (hidden by Customize Home
+              or by the Scripture card switch). */}
+          {layout.includes("verse") && (
             <Link href="/faith#todays-devotional" className="group mt-4 block max-w-[22rem] rounded-lg focus-visible:ring-2 focus-visible:ring-gold-highlight">
               <span className="sr-only">Verse of the day: </span>
               <blockquote className="font-serif text-[1.0625rem] italic leading-snug text-white [text-shadow:0_1px_8px_rgba(0,0,0,0.75)]">

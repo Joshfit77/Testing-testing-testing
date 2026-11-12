@@ -10,8 +10,8 @@ purchase was made.**
 
 **Ready for a private TestFlight build, once the owner approves it. Not ready for a public launch.**
 
-- No open Critical or High defect. Four defects found during this pass were fixed with tests: a duplicate-save race
-  when a workout was finished twice, the AI-consent check order, water logging offline, and the workout screen at
+- No open Critical or High defect. Five defects found during this pass were fixed with tests: a duplicate-save race
+  when a workout was finished twice, the AI-consent check order, the Customize Home verse setting, water logging offline, and the workout screen at
   200% text.
 - What remains for TestFlight is owner work: approve the build, Apple signing secrets, a deployed server URL. See
   `docs/release/` for the steps.
@@ -79,6 +79,7 @@ Found and fixed in this pass:
 |---|---|---|---|---|
 | R1 | M | Two finishes of one workout at once saved every set twice | Conditional claim on the session (migration 060); others wait and report "already saved"; a claim older than 2 min can be taken over | 4 simultaneous finishes, with and without a draft: 1 session, 1 exercise, 2 sets, no repeated record type; a later retry adds nothing (`tests/integration/workout-finish-concurrency.test.ts`, 3 tests) |
 | R2 | L | An AI request without consent used up the burst rate limit | Consent checked first | `tests/integration/ai-consent.test.ts` (5 tests) |
+| R3 | M | Hiding "Verse of the day" in Customize Home did nothing (the hero verse ignored that setting) | Hero verse follows the Home layout; Reset matches the saved default | Hide it, reload Home: gone; navigation test 8 of 8 locally |
 | U-H2 | H | Water tapped offline replaced the Nutrition page with the error screen and lost the tap | Offline taps aren't sent; "Couldn't save" in place; retry keeps the id | Diary stays; one retry online adds exactly one glass (2.35 → 2.60 L, same after reload); unit test |
 | U-H1 | H | At 200% text the workout screen was 545 px wide on a 375 px phone, the name showed one letter per line, the inputs were about 12 px | Name wraps under the picture; weight and reps stack (rem-sized); button rows wrap; set table scrolls in its own box | At 375 px and 200%: page 375 px wide, inputs 128 px, name wraps; 320/375/430 at normal text unchanged |
 
