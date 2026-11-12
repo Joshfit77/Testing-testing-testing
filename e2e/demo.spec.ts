@@ -256,6 +256,8 @@ test.describe("demo flows", () => {
     await answerOnboarding(page, { experience: "Brand new to training", equipment: /^Dumbbells only/ });
     await page.getByRole("link", { name: /^Start (my first workout|today.s workout)/i }).first().click();
     await page.waitForURL(/\/train\/workout/);
+    // A loaded lift asks for its weight before a set is logged (owner decision T8): the member enters it.
+    await page.getByLabel(/set 1 weight in lb/).first().fill("20");
     await page.getByRole("button", { name: /^Mark .+ complete$/ }).first().click();
     await page.getByRole("button", { name: "Finish", exact: true }).click();
     await page.getByRole("button", { name: "Finish & save" }).click();
