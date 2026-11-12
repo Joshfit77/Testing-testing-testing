@@ -641,9 +641,6 @@ Health · **Medium** (see note)
 - **Expected:** After the hand entry the label says "Entered by hand". After the sync, **the hand-entered number is
   kept** (the sync skips days entered by hand: `syncableDays` in `src/lib/domain/steps.ts`, `syncStepsAction` in
   `src/server/actions/steps.ts`) and the app says how many hand-entered days it kept. Other days take Health's numbers.
-- **Note for the owner (decision needed):** the test brief expects a hand entry **not** to be overwritten by a sync. The
-  code does the opposite. Either confirm the current behaviour (then this case passes as written) or treat it as a
-  change request. Record what happened either way.
 - **Evidence:** Screenshots before and after.
 - ☐ Pass ☐ Fail ☐ Blocked · Detail: DT-HEALTH-03
 
