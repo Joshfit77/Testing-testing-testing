@@ -1010,6 +1010,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
             form={current ? formOf(catalogById.get(current.exercise.exerciseId)) : null}
             onSubstitute={(key) => setSubstituteKey(key)}
             onTogglePause={() => dispatch({ type: paused ? "resume" : "pause", now: new Date().toISOString() })}
+            exerciseByKey={(key) => draft.exercises.find((e) => e.id === key) ?? null}
           />
         </div>
       )}

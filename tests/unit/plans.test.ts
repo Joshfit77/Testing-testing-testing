@@ -1,4 +1,4 @@
-import { aiAllowance, APPROVED_PRO_PRICE_CENTS, planFromEntitlement, subscriptionToShow, PUBLIC_PLAN_ORDER, PURCHASABLE_PLANS, canAccessTier, effectivePlanFromSubscription, entitlementFromSubscriptions, periodStartFromEnd, subscriptionAccessEnd, formatPrice, getPlans, hasFeature, legacyTermsApply, yearlySavingsPercent } from "@/lib/domain/plans";
+import { aiAllowance, APPROVED_PRO_PRICE_CENTS, planFromEntitlement, subscriptionToShow, PUBLIC_PLAN_ORDER, PURCHASABLE_PLANS, canAccessTier, effectivePlanFromSubscription, entitlementFromSubscriptions, periodStartFromEnd, subscriptionAccessEnd, formatPrice, getPlans, hasFeature, legacyTermsApply, yearlySavingsCents, yearlySavingsPercent } from "@/lib/domain/plans";
 
 describe("plans & entitlements", () => {
   it("gates features: Free foundation, Pro All Access everything, legacy Plus keeps what it had", () => {
@@ -40,6 +40,10 @@ describe("plans & entitlements", () => {
     expect(formatPrice(plans.pro.yearlyPriceCents!)).toBe("$149.99");
     // Yearly saves about 37% against twelve monthly payments.
     expect(yearlySavingsPercent(1999, 14999)).toBe(37);
+    // B7: the saving in dollars, from the approved prices: 12 × $19.99 − $149.99 = $89.89.
+    expect(yearlySavingsCents(1999, 14999)).toBe(8989);
+    expect(yearlySavingsCents(1999, 0)).toBe(0);
+    expect(yearlySavingsCents(1999, 30000)).toBe(0);
     expect(plans.free.yearlyPriceCents).toBeUndefined();
     expect(plans.plus.yearlyPriceCents).toBeUndefined();
   });

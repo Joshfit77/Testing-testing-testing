@@ -19,6 +19,8 @@ export interface MembershipPrices {
   yearPerMonth: string | null;
   /** Whole-percent saving of yearly over 12 monthly payments, when known. */
   savingsPercent: number | null;
+  /** The same saving in money, e.g. "$89.89", when known. */
+  yearSaving?: string | null;
 }
 
 const PRO_HIGHLIGHTS = [
@@ -94,11 +96,18 @@ export function MembershipPlans({
               )}
             >
               {i === "year" && prices.savingsPercent ? (
-                <span className="absolute right-3 top-3 rounded-full bg-gold-gradient px-2 py-0.5 text-xs font-bold text-black">Save {prices.savingsPercent}%</span>
+                <span className="absolute right-3 top-3 rounded-full bg-gold-gradient px-2 py-0.5 text-xs font-bold text-black" data-testid="year-saving-badge">
+                  Save {prices.savingsPercent}%
+                </span>
               ) : null}
               <span className="text-sm font-semibold text-muted-foreground">{i === "month" ? "Monthly" : "Annual"}</span>
               <span className="mt-1 font-display text-2xl font-bold tabular-nums">{i === "month" ? (prices.month ?? "—") : (prices.year ?? "—")}</span>
               <span className="text-xs text-muted-foreground">{i === "month" ? "per month" : prices.yearPerMonth ? `per year · about ${prices.yearPerMonth}/mo` : "per year"}</span>
+              {i === "year" && prices.yearSaving ? (
+                <span className="text-xs font-semibold text-gold-highlight" data-testid="year-saving">
+                  {prices.yearSaving} less than 12 monthly payments
+                </span>
+              ) : null}
             </button>
           ))}
         </div>

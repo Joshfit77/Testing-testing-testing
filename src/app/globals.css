@@ -1307,4 +1307,5 @@ html[data-motion="reduce"] .milestone-card::before { display: none; }
 
 /* Weight and reps side by side; sized in rem so they stack only when the member's text size is large (200% text
    left each box about 12px wide). At normal text two columns fit from 320px up. */
-.set-steppers { grid-template-columns: repeat(auto-fit, minmax(min(100%, 7rem), 1fr)); }
+/* Weight and reps side by side when each row (48px −, number, 48px +) fits; stacked on narrow phones. */
+.set-steppers { grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); }

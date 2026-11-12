@@ -99,12 +99,28 @@ export function renewalTerms(platform: "ios" | "android" | "web"): string {
 }
 
 /** The store's own prices for the membership screen (localized strings from the App Store / Google Play). */
-export function storePrices(options: PaywallOptions): { month: string | null; year: string | null; yearPerMonth: string | null; savingsPercent: number | null } {
+export function storePrices(options: PaywallOptions): {
+  month: string | null;
+  year: string | null;
+  yearPerMonth: string | null;
+  savingsPercent: number | null;
+  yearSaving: string | null;
+} {
   const m = options.month?.product;
   const y = options.year?.product;
   let savingsPercent: number | null = null;
+  let yearSaving: string | null = null;
   if (m?.price && y?.price && (!m.currencyCode || m.currencyCode === y.currencyCode)) {
     savingsPercent = Math.max(0, Math.floor((1 - y.price / (m.price * 12)) * 100)) || null;
+    // The saving in the store's own currency, from the store's own prices (never a price of ours).
+    const saved = Math.round((m.price * 12 - y.price) * 100) / 100;
+    if (saved > 0 && y.currencyCode) {
+      try {
+        yearSaving = new Intl.NumberFormat(undefined, { style: "currency", currency: y.currencyCode }).format(saved);
+      } catch {
+        yearSaving = null;
+      }
+    }
   }
-  return { month: m?.priceString ?? null, year: y?.priceString ?? null, yearPerMonth: y?.pricePerMonthString ?? null, savingsPercent };
+  return { month: m?.priceString ?? null, year: y?.priceString ?? null, yearPerMonth: y?.pricePerMonthString ?? null, savingsPercent, yearSaving };
 }

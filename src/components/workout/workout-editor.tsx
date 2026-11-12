@@ -33,7 +33,7 @@ export interface EditableSession {
     notes: string;
     skipped: boolean;
     skipReason: "pain" | "equipment" | "time" | "other" | null;
-    sets: { reps: number | null; weightKg: number | null; durationSeconds: number | null; distanceM: number | null; rpe: number | null; isWarmup: boolean; completed: boolean }[];
+    sets: { reps: number | null; weightKg: number | null; durationSeconds: number | null; distanceM: number | null; rpe: number | null; isWarmup: boolean; isDrop?: boolean; completed: boolean }[];
   }[];
 }
 
@@ -97,7 +97,7 @@ export function WorkoutEditor({ session, catalog, units, timezone }: { session: 
           notes: e.notes,
           skipped: e.skipped,
           skipReason: e.skipReason,
-          sets: e.sets.map(({ reps, weightKg, durationSeconds, distanceM, rpe, isWarmup, completed }) => ({ reps, weightKg, durationSeconds, distanceM, rpe, isWarmup, completed })),
+          sets: e.sets.map(({ reps, weightKg, durationSeconds, distanceM, rpe, isWarmup, isDrop, completed }) => ({ reps, weightKg, durationSeconds, distanceM, rpe, isWarmup, isDrop: Boolean(isDrop), completed })),
         })),
       }).catch(() => ({ ok: false as const, error: editFailureMessage(navigator.onLine) }));
       if (!res.ok) return setError(res.error);
@@ -211,7 +211,7 @@ export function WorkoutEditor({ session, catalog, units, timezone }: { session: 
                 <ol className="mt-2 space-y-1 text-sm">
                   {e.sets.map((s, j) => (
                     <li key={j} className="flex items-center justify-between rounded-lg bg-elevated/50 px-3 py-1.5">
-                      <span className="text-muted-foreground">{s.isWarmup ? "Warm-up" : `Set ${j + 1}`}</span>
+                      <span className="text-muted-foreground">{s.isWarmup ? "Warm-up" : s.isDrop ? "Drop set" : `Set ${j + 1}`}</span>
                       <span className={s.completed ? "tabular-nums" : "tabular-nums text-muted-foreground line-through"}>
                         {e.isTimed
                           ? [s.weightKg != null && usesDistance(e.slug) ? formatWeight(s.weightKg, units) : null, s.distanceM != null ? formatDistance(s.distanceM, units) : null, formatDuration(s.durationSeconds ?? 0)].filter(Boolean).join(" · ")

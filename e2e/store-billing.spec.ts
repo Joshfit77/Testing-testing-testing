@@ -33,7 +33,9 @@ test.describe("App Store / Google Play billing", () => {
     await page.goto("/profile/billing");
     await expect(page.getByTestId("current-plan")).toHaveText("Pro All Access");
     await expect(page.getByTestId("current-plan-detail")).toHaveText(/^Billed through the App Store · Monthly · Ends /);
-    await expect(page.getByText(/billed through the App Store. Manage or cancel it on your phone in your Apple Account/)).toBeVisible();
+    await expect(page.getByText(/billed through the App Store. Manage or cancel it in your Apple Account subscription settings/)).toBeVisible();
+    // B7: a direct way to Apple's own subscription page, from the website too.
+    await expect(page.getByTestId("store-manage-link")).toHaveAttribute("href", "https://apps.apple.com/account/subscriptions");
     await expect(page.getByText(/Your membership is set to cancel. You keep Pro All Access until .* and won't be charged again/)).toBeVisible();
     await expect(page.getByRole("button", { name: "Manage billing" })).toHaveCount(0);
     // Billed by the App Store: the website never offers a second purchase.

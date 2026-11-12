@@ -280,6 +280,12 @@ export function formatPrice(cents: number): string {
 }
 
 /** Percentage saved by paying yearly instead of 12 monthly payments (rounded down). */
+/** What paying yearly saves over 12 monthly payments, in cents (0 when it saves nothing). $19.99 / $149.99 → 8989. */
+export function yearlySavingsCents(monthlyCents: number, yearlyCents: number): number {
+  if (monthlyCents <= 0 || yearlyCents <= 0) return 0;
+  return Math.max(0, monthlyCents * 12 - yearlyCents);
+}
+
 export function yearlySavingsPercent(monthlyCents: number, yearlyCents: number): number {
   if (monthlyCents <= 0 || yearlyCents <= 0) return 0;
   return Math.max(0, Math.floor((1 - yearlyCents / (monthlyCents * 12)) * 100));

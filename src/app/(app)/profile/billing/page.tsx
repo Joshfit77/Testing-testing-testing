@@ -7,7 +7,7 @@ import { WebMembership } from "@/components/profile/web-membership";
 import { intervalForProduct, type BillingSource } from "@/lib/billing/paywall";
 import { storeRowAsSubscription } from "@/lib/billing/revenuecat";
 import { membershipComparison } from "@/lib/domain/membership";
-import { getPlans, subscriptionToShow, yearlySavingsPercent, type BillingInterval } from "@/lib/domain/plans";
+import { getPlans, subscriptionToShow, yearlySavingsCents, yearlySavingsPercent, type BillingInterval } from "@/lib/domain/plans";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { isServiceRoleConfigured, isStripeConfigured } from "@/server/env";
@@ -77,11 +77,15 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   const approved = { month: plans.pro.priceCents, year: plans.pro.yearlyPriceCents ?? 0 };
   const okFor = (i: BillingInterval) => Boolean(stripe[i]) && stripePriceProblems(stripe[i], i, approved[i]).length === 0;
   const checkoutOk = { month: okFor("month"), year: approved.year > 0 && okFor("year") };
+  // The saving is worked out from the very amounts shown (and charged), so the two can never disagree.
+  const monthCents = okFor("month") ? stripe.month!.unitAmount! : approved.month;
+  const yearCents = approved.year > 0 ? (okFor("year") ? stripe.year!.unitAmount! : approved.year) : 0;
   const webPrices = {
-    month: money(okFor("month") ? stripe.month!.unitAmount! : approved.month),
-    year: approved.year > 0 ? money(okFor("year") ? stripe.year!.unitAmount! : approved.year) : null,
-    yearPerMonth: approved.year > 0 ? money(Math.floor(approved.year / 12)) : null,
-    savingsPercent: approved.year > 0 ? yearlySavingsPercent(approved.month, approved.year) : null,
+    month: money(monthCents),
+    year: yearCents > 0 ? money(yearCents) : null,
+    yearPerMonth: yearCents > 0 ? money(Math.floor(yearCents / 12)) : null,
+    savingsPercent: yearCents > 0 ? yearlySavingsPercent(monthCents, yearCents) || null : null,
+    yearSaving: yearCents > 0 && yearlySavingsCents(monthCents, yearCents) > 0 ? money(yearlySavingsCents(monthCents, yearCents)) : null,
   };
 
   return (

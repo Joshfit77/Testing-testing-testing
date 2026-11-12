@@ -183,7 +183,9 @@ const setSchema = z.object({
   rpe: z.number().min(1).max(10).nullable(),
   isWarmup: z.boolean(),
   completed: z.boolean(),
-});
+  // A drop set (no rest after the set before it). Optional so clients from before drop sets still validate.
+  isDrop: z.boolean().optional(),
+}).refine((s) => !(s.isDrop && s.isWarmup), { message: "A warm-up can't be a drop set." });
 
 export const workoutExerciseSchema = z.object({
   exerciseId: z.string().uuid(),

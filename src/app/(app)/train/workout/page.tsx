@@ -11,13 +11,14 @@ import { getProgramDay } from "@/server/services/training";
 import { getExerciseTargets, getPreviousPerformance, getServerDraft } from "@/server/services/workouts";
 import { getTemplate } from "@/server/services/templates";
 import { migrateDraft } from "@/lib/domain/workout-draft";
+import { repeatFromSession, type RepeatSource } from "@/lib/domain/workout-templates";
 import type { SessionSlot } from "@/lib/domain/previous-performance";
 
 export const metadata = { title: "Workout" };
 
 const uuid = z.string().uuid();
 
-export default async function WorkoutPage({ searchParams }: { searchParams: Promise<{ day?: string; up?: string; template?: string }> }) {
+export default async function WorkoutPage({ searchParams }: { searchParams: Promise<{ day?: string; up?: string; template?: string; repeat?: string }> }) {
   const sp = await searchParams;
   const { user, profile } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
@@ -103,6 +104,25 @@ export default async function WorkoutPage({ searchParams }: { searchParams: Prom
       };
     } else {
       notice = "That workout template wasn't found. Starting an empty workout instead.";
+    }
+  }
+
+  // "Do this workout again": a completed workout of the member's own (RLS and the user filter make another member's
+  // id look like a missing one), started as a fresh workout with the same exercises and set counts.
+  const repeatId = uuid.safeParse(sp.repeat);
+  if (!template && repeatId.success) {
+    const { data: past } = await supabase
+      .from("workout_sessions")
+      .select("name, workout_exercises(position, skipped, exercise:exercises!workout_exercises_exercise_id_fkey(id, slug, name, is_timed), sets:workout_sets(set_number, reps, duration_seconds, distance_m, is_warmup, is_drop, completed))")
+      .eq("id", repeatId.data)
+      .eq("user_id", user.id)
+      .eq("status", "completed")
+      .maybeSingle();
+    const again = past ? repeatFromSession({ name: past.name as string, exercises: (past.workout_exercises ?? []) as unknown as RepeatSource["exercises"] }) : null;
+    if (again && again.exercises.length) {
+      template = { name: again.name, userProgramId: null, programDayId: null, warmup: [], cooldown: [], exercises: again.exercises };
+    } else {
+      notice = "That workout wasn't found. Starting an empty workout instead.";
     }
   }
 

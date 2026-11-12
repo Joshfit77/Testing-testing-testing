@@ -164,3 +164,55 @@ export function toEditorValue(
   };
 }
 
+
+/** A saved workout as read back for "Do this workout again". */
+export interface RepeatSource {
+  name: string;
+  exercises: {
+    position: number;
+    skipped: boolean;
+    exercise: { id: string; slug: string; name: string; is_timed: boolean };
+    sets: { set_number: number; reps: number | null; duration_seconds: number | null; distance_m: number | string | null; is_warmup: boolean; is_drop?: boolean | null; completed: boolean }[];
+  }[];
+}
+
+/** One exercise of a repeated workout, in the shape the logger starts from. */
+export interface RepeatExercise {
+  exercise: { id: string; slug: string; name: string; isTimed: boolean };
+  restSeconds: number;
+  target: { sets: number; reps: string | null; seconds: number | null; distanceM: number | null };
+}
+
+/** Rest between sets when repeating a workout (sessions don't store the rest that was used). */
+export const REPEAT_REST_SECONDS = 90;
+
+/**
+ * "Do this workout again": the same exercises in the same order with the same number of working sets (drop sets and
+ * warm-ups aside; a workout finished early is repeated as it was planned, not cut short), aiming at the reps / time /
+ * distance of the first working set done. Skipped exercises are left out.
+ * No weights here: the logger fills those from the member's own last time, as for any workout, and never invents one.
+ */
+export function repeatFromSession(source: RepeatSource): { name: string; exercises: RepeatExercise[] } {
+  const exercises = [...source.exercises]
+    .sort((a, b) => a.position - b.position)
+    .filter((e) => !e.skipped)
+    .map((e) => {
+      const sets = [...e.sets].sort((a, b) => a.set_number - b.set_number);
+      const working = sets.filter((s) => !s.is_warmup && !s.is_drop);
+      const done = working.filter((s) => s.completed);
+      const ref = done[0] ?? working[0] ?? null;
+      const distance = ref?.distance_m == null ? null : Number(ref.distance_m);
+      return {
+        exercise: { id: e.exercise.id, slug: e.exercise.slug, name: e.exercise.name, isTimed: e.exercise.is_timed },
+        restSeconds: REPEAT_REST_SECONDS,
+        target: {
+          sets: Math.max(1, Math.min(20, working.length || 1)),
+          reps: !e.exercise.is_timed && ref?.reps ? String(ref.reps) : null,
+          seconds: e.exercise.is_timed ? (ref?.duration_seconds ?? null) : null,
+          distanceM: distance && distance > 0 ? distance : null,
+        },
+      };
+    })
+    .slice(0, 40);
+  return { name: (source.name.trim() || "My workout").slice(0, 120), exercises };
+}

@@ -83,6 +83,8 @@ export interface OnboardingAnswers {
   /** Optional display step (skipped when not given). */
   textSize?: "Default" | "Large" | "Extra large";
   reduceMotion?: boolean;
+  /** Called on every screen just before Continue / Build my plan (layout checks at large text sizes). */
+  onEachStep?: (step: string) => Promise<void>;
 }
 
 /**
@@ -92,7 +94,11 @@ export interface OnboardingAnswers {
  * one of them, through "Personalise more"; otherwise their defaults apply (lightly active, balanced diet).
  */
 export async function answerOnboarding(page: Page, a: OnboardingAnswers = {}) {
-  const next = () => page.getByRole("button", { name: /^Continue/ }).click();
+  let step = 0;
+  const next = async () => {
+    await a.onEachStep?.(`step ${++step}`);
+    await page.getByRole("button", { name: /^Continue/ }).click();
+  };
   const skip = () => page.getByRole("button", { name: "Skip", exact: true }).click();
   await page.waitForURL(/\/onboarding/);
   await page.getByRole("button", { name: a.goal ?? "Build strength", exact: true }).click();
@@ -134,6 +140,7 @@ export async function answerOnboarding(page: Page, a: OnboardingAnswers = {}) {
     if (a.reduceMotion) await page.getByRole("switch", { name: "Reduce motion" }).click();
   }
   // The main action must be fully on screen at phone width (three buttons in one row once pushed it off the edge).
+  await a.onEachStep?.("ready");
   const build = page.getByRole("button", { name: "Build my plan" });
   const box = await build.boundingBox();
   const width = page.viewportSize()?.width ?? 0;

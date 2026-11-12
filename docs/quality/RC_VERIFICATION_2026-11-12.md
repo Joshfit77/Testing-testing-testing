@@ -85,17 +85,17 @@ Found and fixed in this pass:
 | U-H2 | H | Water tapped offline replaced the Nutrition page with the error screen and lost the tap | Offline taps aren't sent; "Couldn't save" in place; retry keeps the id | Diary stays; one retry online adds exactly one glass (2.35 → 2.60 L, same after reload); unit test |
 | U-H1 | H | At 200% text the workout screen was 545 px wide on a 375 px phone, the name showed one letter per line, the inputs were about 12 px | Name wraps under the picture; weight and reps stack (rem-sized); button rows wrap; set table scrolls in its own box | At 375 px and 200%: page 375 px wide, inputs 128 px, name wraps; 320/375/430 at normal text unchanged |
 
-Usability findings not fixed in this pass. Each has an acceptance criterion so it can be picked up as it stands.
+Usability findings from this review and how each was closed (owner approval 2026-11-12, Phase 2).
 Screenshots are in the sandbox usability folder, not in the repo.
 
 | # | Sev | Finding | Accept when |
 |---|---|---|---|
-| U-M1 | M | Onboarding is 524–643 px wide at 200% text; Continue is partly off-screen | No sideways scroll at 200% on every onboarding screen |
-| U-M2 | M | At 375 and 320 px, "Complete set" is below the bottom bar on first view; at 320 the weight field is too | Weight, reps and Complete set visible without scrolling at 375 × 667 |
-| U-M3 | M | After logging a set the rest timer has scrolled 72–121 px above the top | Countdown and Skip rest visible right after logging |
-| U-M4 | M | One tap logs a barbell set with no weight (owner decision T8) | A loaded lift asks for weight, or confirms bodyweight, before logging |
-| U-M5 | M | Food entries aren't kept offline, but the offline banner says data "keeps saving on this device" | The banner says only workouts are kept, or food is queued |
-| U-M6 | M | Weight and reps −/+ buttons are 26 × 44 px | ≥ 44 × 44 px without making the inputs unusable at 320 px |
+| U-M1 | M | Onboarding is 524–643 px wide at 200% text; Continue is partly off-screen | Fixed: choice grids reflow (auto-fit), the question fieldset and switch rows can shrink, buttons wrap, the logo wraps. `e2e/usability-medium.spec.ts` checks every quick-path screen at 375 px and 200% text |
+| U-M2 | M | At 375 and 320 px, "Complete set" is below the bottom bar on first view; at 320 the weight field is too | Fixed: the set list moved under Complete set. Weight, reps and Complete set fully visible on first view at 375 × 667; weight at 320 × 568 (e2e) |
+| U-M3 | M | After logging a set the rest timer has scrolled 72–121 px above the top | Fixed: when a rest starts off screen, the countdown scrolls in under the header (instant with reduced motion); countdown and Skip rest on screen after logging from lower down (e2e) |
+| U-M4 | M | One tap logs a barbell set with no weight (owner decision T8) | Fixed by T8: a loaded lift asks for its weight or an explicit 'no added weight' |
+| U-M5 | M | Food entries aren't kept offline, but the offline banner says data "keeps saving on this device" | Fixed: banner names what is kept (workouts, runs, journey check-ins) and says food and water need a connection; re-checks on return to the app so it doesn't stay up after reconnecting (e2e) |
+| U-M6 | M | Weight and reps −/+ buttons are 26 × 44 px | Fixed: 48 × 48 px, never squeezed; weight and reps stack on narrow phones so each number field stays ≥ 72 px wide at 320 px (e2e) |
 | U-L1–13 | L | 13 Low items, for example: Continue below the fold on 3 of 5 onboarding screens at 375, a stale offline banner after reconnecting, 4.37:1 contrast on "You're all set", no h1 on the workout screen | Per item |
 
 Checked clean in the same review:

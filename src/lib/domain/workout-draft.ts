@@ -22,6 +22,11 @@ export interface DraftSet {
    * after all, brings it back. Sent to the server like any unfinished set (completed: false). Missing on older drafts.
    */
   skipped?: boolean;
+  /**
+   * A drop set: done straight after the set before it, at a lower weight, with no rest in between. A working set in
+   * every count (volume, records); kept out of the "Set 2 of 3" numbering. Missing on older drafts (a normal set).
+   */
+  isDrop?: boolean;
 }
 
 export interface DraftTarget {
@@ -128,6 +133,22 @@ export function lastDoneBefore(exercise: Pick<DraftExercise, "sets">, setId: str
   return null;
 }
 
+/**
+ * A drop set can follow a completed working set or drop set (never a warm-up, an unfinished set, a superset member, or
+ * past the 50-set limit). Supersets alternate exercises round by round, which an extra set would throw out of step.
+ */
+export function canAddDropSet(exercise: Pick<DraftExercise, "sets" | "supersetId" | "skipped">, afterSetId: string): boolean {
+  if (exercise.skipped || exercise.supersetId || exercise.sets.length >= 50) return false;
+  const set = exercise.sets.find((s) => s.id === afterSetId);
+  return Boolean(set && set.completed && !set.isWarmup);
+}
+
+/** The working set a drop set belongs to (the nearest set before it that isn't a drop), or the set itself. */
+function mainSetOf(sets: DraftSet[], index: number): DraftSet | undefined {
+  for (let i = index; i >= 0; i--) if (!sets[i]!.isDrop) return sets[i];
+  return sets[index];
+}
+
 /** Whether two sets carry the same numbers (what "Same as last set" would change). */
 export function sameNumbers(a: DraftSet, b: DraftSet): boolean {
   return a.weightKg === b.weightKg && a.reps === b.reps && a.durationSeconds === b.durationSeconds && (a.distanceM ?? null) === (b.distanceM ?? null);
@@ -159,6 +180,8 @@ export type DraftAction =
   | { type: "unskipExercise"; exerciseKey: string }
   | { type: "setExerciseNotes"; exerciseKey: string; notes: string }
   | { type: "addSet"; exerciseKey: string }
+  /** Add a drop set straight after a working set just done (and after any drops already following it); ends the rest. */
+  | { type: "addDropSet"; exerciseKey: string; afterSetId: string }
   | { type: "removeSet"; exerciseKey: string; setId: string }
   | { type: "updateSet"; exerciseKey: string; setId: string; patch: Partial<Omit<DraftSet, "id">> }
   | { type: "toggleSetComplete"; exerciseKey: string; setId: string; now: string }
@@ -435,6 +458,17 @@ function reduce(state: WorkoutDraft, action: DraftAction): WorkoutDraft {
       return mapExercise(state, action.exerciseKey, (e) =>
         e.sets.length >= 50 ? e : { ...e, sets: [...e.sets, emptySet(e.sets[e.sets.length - 1])] },
       );
+    case "addDropSet": {
+      const ex = state.exercises.find((e) => e.id === action.exerciseKey);
+      if (!ex || !canAddDropSet(ex, action.afterSetId)) return state;
+      let at = ex.sets.findIndex((s) => s.id === action.afterSetId) + 1;
+      while (at < ex.sets.length && ex.sets[at]!.isDrop) at++;
+      // Empty on purpose: the lower weight is the member's to enter (never guessed), and so are the reps.
+      const drop: DraftSet = { id: newId(), reps: null, weightKg: null, durationSeconds: null, distanceM: null, rpe: null, isWarmup: false, completed: false, isDrop: true };
+      const next = mapExercise(state, action.exerciseKey, (e) => ({ ...e, sets: [...e.sets.slice(0, at), drop, ...e.sets.slice(at)] }));
+      // The point of a drop set is no rest: the countdown the set just done started is ended.
+      return { ...next, rest: { endsAt: null, durationSeconds: 0, pausedRemaining: null } };
+    }
     case "removeSet":
       return mapExercise(state, action.exerciseKey, (e) => ({ ...e, sets: e.sets.filter((s) => s.id !== action.setId) }));
     case "updateSet":
@@ -459,11 +493,12 @@ function reduce(state: WorkoutDraft, action: DraftAction): WorkoutDraft {
           round = i;
           return { ...s, completed: !s.completed, skipped: false };
         });
-        // The numbers just logged become the next set's starting point, where it has none yet.
+        // The numbers just logged become the next set's starting point, where it has none yet. A drop set starts
+        // empty (its lower weight is the member's to enter), and the set after a drop starts from the main set.
         if (completedNow && round >= 0) {
-          const done = sets[round]!;
+          const done = mainSetOf(sets, round)!;
           const next = sets.findIndex((s, i) => i > round && setPending(s));
-          if (next >= 0) {
+          if (next >= 0 && !sets[next]!.isDrop) {
             const n = sets[next]!;
             sets[next] = {
               ...n,
@@ -478,6 +513,9 @@ function reduce(state: WorkoutDraft, action: DraftAction): WorkoutDraft {
       });
       if (blocked) return state;
       if (!completedNow || state.pausedAt) return toggled;
+      // A drop set waiting straight after this one: go on with no rest.
+      const after = toggled.exercises.find((e) => e.id === action.exerciseKey)?.sets[round + 1];
+      if (after?.isDrop && setPending(after)) return { ...toggled, rest: { endsAt: null, durationSeconds: 0, pausedRemaining: null } };
       const members = supersetMembers(toggled, action.exerciseKey).filter((m) => !m.skipped);
       if (members.length > 1) {
         // Superset: no rest between exercises — rest once the whole round is done, for the longest member rest.
@@ -600,6 +638,8 @@ function sanitizeNumber(v: number | null, min: number, max: number): number | nu
 function sanitizeSet(s: DraftSet): DraftSet {
   return {
     ...s,
+    // A set marked as a warm-up stops being a drop set (the two never go together).
+    ...(s.isWarmup && s.isDrop ? { isDrop: false } : {}),
     reps: sanitizeNumber(s.reps, 0, 1000),
     weightKg: sanitizeNumber(s.weightKg, 0, 1500),
     durationSeconds: sanitizeNumber(s.durationSeconds, 0, 86400),
@@ -648,7 +688,11 @@ export interface CurrentSetInfo {
   exerciseNumber: number;
   exerciseCount: number;
   warmup: boolean;
-  /** 1-based among the exercise's working sets (null for a warm-up set). */
+  /** A drop set (after the working set before it, no rest). */
+  drop: boolean;
+  /** 1-based among the drops following the same working set (null when not a drop). */
+  dropNumber: number | null;
+  /** 1-based among the exercise's working sets (null for a warm-up or drop set). */
   workingNumber: number | null;
   workingCount: number;
   /** 1-based among its warm-up sets (null for a working set). */
@@ -663,15 +707,22 @@ export function currentSetInfo(draft: Pick<WorkoutDraft, "exercises">): CurrentS
   const exercise = active.find((e) => e.id === up.exerciseKey);
   if (!exercise) return null;
   const set = up.setId ? (exercise.sets.find((s) => s.id === up.setId) ?? null) : null;
-  const working = exercise.sets.filter((s) => !s.isWarmup);
+  const working = exercise.sets.filter((s) => !s.isWarmup && !s.isDrop);
   const warmups = exercise.sets.filter((s) => s.isWarmup);
+  let dropNumber: number | null = null;
+  if (set?.isDrop) {
+    dropNumber = 0;
+    for (let i = exercise.sets.indexOf(set); i >= 0 && exercise.sets[i]!.isDrop; i--) dropNumber++;
+  }
   return {
     exercise,
     set,
     exerciseNumber: active.indexOf(exercise) + 1,
     exerciseCount: active.length,
     warmup: Boolean(set?.isWarmup),
-    workingNumber: set && !set.isWarmup ? working.indexOf(set) + 1 : null,
+    drop: Boolean(set?.isDrop),
+    dropNumber,
+    workingNumber: set && !set.isWarmup && !set.isDrop ? working.indexOf(set) + 1 : null,
     workingCount: working.length,
     warmupNumber: set && set.isWarmup ? warmups.indexOf(set) + 1 : null,
     warmupCount: warmups.length,
@@ -802,6 +853,8 @@ export function finishPayload(d: WorkoutDraft, endedAt: string) {
         distanceM: s.distanceM ?? null,
         rpe: s.rpe,
         isWarmup: s.isWarmup,
+        // Sent only when set, so the payload of a workout without drop sets is exactly as before.
+        ...(s.isDrop ? { isDrop: true } : {}),
         completed: s.completed,
       })),
     })),

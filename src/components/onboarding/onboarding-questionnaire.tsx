@@ -97,7 +97,7 @@ function Choice({
       aria-pressed={selected}
       onClick={onClick}
       className={cn(
-        "flex min-h-12 w-full flex-col items-start gap-0.5 rounded-xl border px-4 py-3 text-left transition-colors",
+        "flex min-h-12 w-full min-w-0 flex-col items-start gap-0.5 break-words rounded-xl border px-4 py-3 text-left transition-colors",
         selected ? "border-gold bg-gold/12" : "border-border bg-elevated hover:border-gold-muted",
       )}
     >
@@ -122,7 +122,8 @@ function deviceTimeZone(): string | undefined {
 
 function Question({ title, help, children }: { title: string; help?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <fieldset className="space-y-4">
+    // min-w-0: a fieldset is min-content wide by default, which at large text sizes pushed the page sideways.
+    <fieldset className="min-w-0 space-y-4">
       <legend className="font-display text-2xl font-bold uppercase leading-tight md:text-3xl">{title}</legend>
       {help && <p className="text-sm text-muted-foreground">{help}</p>}
       {children}
@@ -389,7 +390,7 @@ export function OnboardingQuestionnaire({ userId, initialName, intro }: { userId
   };
 
   const unitsToggle = (
-    <div className="grid grid-cols-2 gap-2" role="group" aria-label="Units">
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,7rem),1fr))] gap-2" role="group" aria-label="Units">
       <Choice selected={units === "imperial"} onClick={() => switchUnits("imperial")} title="lb / ft" />
       <Choice selected={units === "metric"} onClick={() => switchUnits("metric")} title="kg / cm" />
     </div>
@@ -450,7 +451,7 @@ export function OnboardingQuestionnaire({ userId, initialName, intro }: { userId
 
         {current === "comfort" && (
           <Question title="Make it comfortable to read" help="Optional. Changes apply right away, and you can change them later in the You tab.">
-            <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Text size">
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,5.5rem),1fr))] gap-2" role="radiogroup" aria-label="Text size">
               {TEXT_SIZES.map((t) => (
                 <button
                   key={t.value}
@@ -471,7 +472,7 @@ export function OnboardingQuestionnaire({ userId, initialName, intro }: { userId
               ))}
             </div>
             <div className="flex min-h-11 items-center justify-between gap-4 rounded-xl border border-border bg-elevated/40 p-4">
-              <div>
+              <div className="min-w-0 flex-1 break-words">
                 <p id="ob-motion-label" className="text-sm font-semibold">
                   Reduce motion
                 </p>
@@ -488,7 +489,7 @@ export function OnboardingQuestionnaire({ userId, initialName, intro }: { userId
               <p id="ob-sex-label" className="text-sm font-medium">
                 Sex
               </p>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" role="group" aria-label="Sex">
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,7rem),1fr))] gap-2" role="group" aria-label="Sex">
                 <Choice selected={sex === "male"} onClick={() => setSex("male")} title="Male" />
                 <Choice selected={sex === "female"} onClick={() => setSex("female")} title="Female" />
                 <Choice selected={sex === "unspecified"} onClick={() => setSex("unspecified")} title="Prefer not to say" />
@@ -505,7 +506,7 @@ export function OnboardingQuestionnaire({ userId, initialName, intro }: { userId
               <p className="text-xs text-muted-foreground">Also how weights show across the app (you can change it later).</p>
             </div>
             {units === "imperial" ? (
-              <div className="grid max-w-72 grid-cols-2 gap-3">
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,6rem),1fr))] max-w-72 gap-3">
                 <div className="space-y-2">
                   <Label htmlFor="ob-ft">Height (ft)</Label>
                   <Input id="ob-ft" type="number" inputMode="numeric" min={3} max={8} value={feet} onChange={(e) => setFeet(e.target.value)} />
@@ -602,7 +603,7 @@ export function OnboardingQuestionnaire({ userId, initialName, intro }: { userId
           <Question title="How often can you train?" help="We'll fit your program to the days this goal supports.">
             <div className="space-y-2" role="group" aria-label="Days per week">
               <p className="text-sm font-medium">Days per week</p>
-              <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,4.75rem),1fr))] gap-2">
                 {[1, 2, 3, 4, 5, 6, 7].map((d) => (
                   <Choice key={d} selected={days === d} onClick={() => setDays(d)} title={`${d} ${d === 1 ? "day" : "days"}`} />
                 ))}
@@ -610,7 +611,7 @@ export function OnboardingQuestionnaire({ userId, initialName, intro }: { userId
             </div>
             <div className="space-y-2" role="group" aria-label="Session length">
               <p className="text-sm font-medium">Session length</p>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,5.5rem),1fr))] gap-2">
                 {SESSION_MINUTES.map((m) => (
                   <Choice key={m} selected={minutes === m} onClick={() => setMinutes(m)} title={`${m} min`} />
                 ))}
@@ -647,7 +648,7 @@ export function OnboardingQuestionnaire({ userId, initialName, intro }: { userId
               <Input id="ob-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} autoComplete="given-name" />
             </div>
             <div className="flex items-start justify-between gap-4 rounded-xl border border-border bg-elevated/40 p-4">
-              <div>
+              <div className="min-w-0 flex-1 break-words">
                 <p id="faith-label" className="text-sm font-semibold">
                   Faith-inspired coaching and reminders
                 </p>
@@ -655,7 +656,7 @@ export function OnboardingQuestionnaire({ userId, initialName, intro }: { userId
                   Let the AI coach and workout reminders draw on Scripture and faith language. The Faith tab is always available either way. You can change this any time.
                 </p>
               </div>
-              <Switch checked={faith} onCheckedChange={setFaith} aria-labelledby="faith-label" />
+              <Switch className="shrink-0" checked={faith} onCheckedChange={setFaith} aria-labelledby="faith-label" />
             </div>
             <p className="text-sm text-muted-foreground" data-testid="onboarding-defaults">
               Until you change them, we&apos;ll assume you&apos;re <strong className="text-foreground">{ACTIVITY_INFO[activity ?? DEFAULT_ACTIVITY].label.toLowerCase()}</strong> outside
@@ -682,17 +683,17 @@ export function OnboardingQuestionnaire({ userId, initialName, intro }: { userId
               {pending && <Loader2 className="animate-spin" aria-hidden />}
               {pending ? "Building your plan…" : "Build my plan"}
             </Button>
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <Button type="button" variant="ghost" onClick={back} disabled={pending} className="px-3">
                 <ArrowLeft aria-hidden /> Back
               </Button>
-              <Button type="button" variant="ghost" onClick={next} disabled={pending}>
+              <Button type="button" variant="ghost" onClick={next} disabled={pending} className="h-auto min-h-11 whitespace-normal">
                 Personalise more <ArrowRight aria-hidden />
               </Button>
             </div>
           </div>
         ) : (
-        <div key="step-actions" className="mt-6 flex items-center justify-between gap-3">
+        <div key="step-actions" className="mt-6 flex flex-wrap items-center justify-between gap-3">
           <Button type="button" variant="ghost" onClick={back} disabled={step === 0 || pending} className="px-3">
             <ArrowLeft aria-hidden /> <span className={OPTIONAL_STEPS.includes(current) ? "sr-only sm:not-sr-only" : undefined}>Back</span>
           </Button>
@@ -702,7 +703,7 @@ export function OnboardingQuestionnaire({ userId, initialName, intro }: { userId
               {pending ? "Building your plan…" : "Build my plan"}
             </Button>
           ) : (
-            <div className="flex flex-wrap items-center gap-1">
+            <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
               {OPTIONAL_STEPS.includes(current) && (
                 <Button type="button" variant="ghost" onClick={skip}>
                   Skip

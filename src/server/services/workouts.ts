@@ -110,6 +110,7 @@ async function insertExercises(supabase: SupabaseClient, userId: string, session
       distance_m: s.distanceM ?? null,
       rpe: s.rpe,
       is_warmup: s.isWarmup,
+      is_drop: Boolean(s.isDrop),
       completed: s.completed,
     })),
   );
@@ -532,7 +533,7 @@ export async function getPreviousPerformance(
   const { data, error } = await supabase
     .from("workout_exercises")
     .select(
-      "exercise_id, skipped, session:workout_sessions!inner(id, started_at, status, program_day:program_days(day_number, week:program_weeks(program_id, is_deload))), sets:workout_sets(set_number, reps, weight_kg, duration_seconds, distance_m, is_warmup, completed)",
+      "exercise_id, skipped, session:workout_sessions!inner(id, started_at, status, program_day:program_days(day_number, week:program_weeks(program_id, is_deload))), sets:workout_sets(set_number, reps, weight_kg, duration_seconds, distance_m, is_warmup, is_drop, completed)",
     )
     .eq("user_id", userId)
     .in("exercise_id", ids)

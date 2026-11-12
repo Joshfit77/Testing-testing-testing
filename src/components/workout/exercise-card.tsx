@@ -183,15 +183,22 @@ function SetRow({
       )}
       data-skipped={set.skipped && !set.completed ? "" : undefined}
     >
-      <button
-        type="button"
-        onClick={() => update({ isWarmup: !set.isWarmup })}
-        className={cn("h-11 rounded-lg text-sm font-bold", set.isWarmup ? "text-gold" : "text-muted-foreground")}
-        aria-label={set.isWarmup ? `${label}: warm-up set. Mark as working set` : `${label}: working set. Mark as warm-up`}
-        title="Tap to toggle warm-up"
-      >
-        {set.isWarmup ? "W" : index + 1}
-      </button>
+      {set.isDrop ? (
+        // A drop set stays a drop set (removing it is in the set menu); it is never turned into a warm-up.
+        <span className="flex h-11 items-center justify-center text-sm font-bold text-gold" aria-label={`${label}: drop set`} title="Drop set: no rest after the set before it">
+          D
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={() => update({ isWarmup: !set.isWarmup })}
+          className={cn("h-11 rounded-lg text-sm font-bold", set.isWarmup ? "text-gold" : "text-muted-foreground")}
+          aria-label={set.isWarmup ? `${label}: warm-up set. Mark as working set` : `${label}: working set. Mark as warm-up`}
+          title="Tap to toggle warm-up"
+        >
+          {set.isWarmup ? "W" : index + 1}
+        </button>
+      )}
       {mode === "loaded" ? (
         <>
           <NumberCell

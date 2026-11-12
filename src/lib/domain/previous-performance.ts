@@ -35,7 +35,7 @@ export interface PreviousRow {
     /** The program day the session was (for preferring the same kind of session; absent outside programs). */
     program_day?: { day_number: number; week: { program_id: string; is_deload?: boolean | null } | null } | null;
   } | null;
-  sets: { set_number: number; reps: number | null; weight_kg: number | string | null; duration_seconds: number | null; distance_m: number | string | null; is_warmup: boolean; completed: boolean }[];
+  sets: { set_number: number; reps: number | null; weight_kg: number | string | null; duration_seconds: number | null; distance_m: number | string | null; is_warmup: boolean; is_drop?: boolean | null; completed: boolean }[];
 }
 
 /**
@@ -47,7 +47,9 @@ export function latestPerformances(rows: PreviousRow[], excludeSessionId?: strin
   usable.sort((a, b) => b.session!.started_at.localeCompare(a.session!.started_at));
   const out = new Map<string, PreviousPerformance>();
   for (const r of usable) {
+    // Drop sets are left out: "last time" lines up set by set with the sets to do now, which never start as drops.
     const sets: PreviousSet[] = [...r.sets]
+      .filter((s) => !s.is_drop)
       .sort((a, b) => a.set_number - b.set_number)
       .map((s) => ({
         reps: s.reps,
