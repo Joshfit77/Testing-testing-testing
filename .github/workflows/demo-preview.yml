@@ -156,7 +156,9 @@ jobs:
           echo "::add-mask::$secret"
           npx playwright install --with-deps chromium >/dev/null
           status=0
-          E2E_DEMO=1 E2E_BASE_URL="$DEMO_URL" E2E_VERCEL_BYPASS="$secret" npx playwright test e2e/demo.spec.ts --project mobile || status=$?
+          # Every spec written for a demo server (E2E_DEMO), one at a time: they share the one sample account.
+          specs=$(grep -l "E2E_DEMO" e2e/*.spec.ts | tr '\n' ' ')
+          E2E_DEMO=1 E2E_BASE_URL="$DEMO_URL" E2E_VERCEL_BYPASS="$secret" npx playwright test $specs --project mobile --workers=1 --trace off || status=$?
           curl -fsS -X PATCH "https://api.vercel.com/v1/projects/$VERCEL_PROJECT/protection-bypass$q" -H "Authorization: Bearer $VERCEL_TOKEN" \
             -H "Content-Type: application/json" -d "{\"revoke\":{\"secret\":\"$secret\",\"regenerate\":false}}" >/dev/null || echo "::warning::Revoke the automation bypass in Vercel > Settings > Deployment Protection."
           exit $status
