@@ -69,11 +69,24 @@ describe("coaching memory rules", () => {
     ];
     const text = formatMemoriesForContext(items, { wellnessConsent: false, chatMemoryOff: false });
     expect(text.indexOf("short, direct")).toBeLessThan(text.indexOf("dumbbell"));
-    expect(text).toContain(`[${memoryRef(ID2)}] Coaching style: Wants short, direct answers. (2026-10-10)`);
+    expect(text).toContain(`[${memoryRef(ID2)}] Coaching style: Wants short, direct answers. (2026-10-10, your suggestion, approved by the athlete)`);
     expect(text).toMatch(/never invent memories/);
+    expect(text).toMatch(/not verified records/);
 
     const many = Array.from({ length: 80 }, (_, i) => mem(`00000000-0000-4000-8000-${String(i).padStart(12, "0")}`, `Note ${i} ${"x".repeat(250)}`));
     expect(formatMemoriesForContext(many, { wellnessConsent: true, chatMemoryOff: false }).length).toBeLessThan(MEMORY_CONTEXT_CHARS + 400);
+  });
+
+  it("labels each memory with its source: the member's own words, an approved coach suggestion, or an approved change", () => {
+    const text = formatMemoriesForContext(
+      [
+        mem(ID1, "Has a home gym with dumbbells to 30 kg.", { source: "member", created_at: "2026-10-01T00:00:00Z" }),
+        mem(ID2, "2026-10-02: approved swapping Barbell Row for Chest-Supported Row.", { source: "approved_change", category: "training_changes", created_at: "2026-10-02T00:00:00Z" }),
+      ],
+      { wellnessConsent: false, chatMemoryOff: false },
+    );
+    expect(text).toContain("(2026-10-01, the athlete's own words)");
+    expect(text).toContain("(2026-10-02, approved change)");
   });
 
   it("only uses recovery notes while wellness sharing is on, and says when a chat is off the record", () => {

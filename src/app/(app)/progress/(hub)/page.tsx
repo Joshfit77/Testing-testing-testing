@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Award, ChevronRight, History, LineChart, Moon, PersonStanding, ScanLine } from "lucide-react";
+import { Award, CalendarCheck, ChevronRight, History, LineChart, Moon, PersonStanding, ScanLine } from "lucide-react";
 import { MainHeader } from "@/components/shell/main-header";
 import { BackLink } from "@/components/platform/back-link";
 import { StepsCard } from "@/components/steps/steps-card";
@@ -37,6 +37,12 @@ export default async function ProgressHubPage() {
       icon: LineChart,
       title: "Overview",
       body: `${data.workoutsTotal} workout${data.workoutsTotal === 1 ? "" : "s"} · records and trends`,
+    },
+    {
+      href: "/progress/reports",
+      icon: CalendarCheck,
+      title: "Weekly reports",
+      body: hasFeature(plan, "weekly_reports") ? "Your week every Sunday evening, with next steps" : "Pro: your week every Sunday, with next steps",
     },
     {
       href: "/progress/sleep",

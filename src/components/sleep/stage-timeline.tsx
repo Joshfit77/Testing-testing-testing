@@ -4,16 +4,17 @@ import type { SleepStageRow } from "@/server/services/sleep";
 import { cn } from "@/lib/utils";
 
 export type StageKey = SleepStageRow["stage"];
-export const STAGE_LABEL: Record<StageKey, string> = { awake: "Awake", light: "Light", deep: "Deep", rem: "REM", asleep: "Asleep (stage not given)", unknown: "Unknown" };
+export const STAGE_LABEL: Record<StageKey, string> = { awake: "Awake", light: "Light / core", deep: "Deep", rem: "REM", asleep: "Asleep (stage not given)", unknown: "Unknown" };
 /** Deep sits lowest and darkest, awake highest and palest, as sleep charts conventionally draw them. */
 const STAGE_ROW: Record<StageKey, number> = { awake: 0, rem: 1, light: 2, asleep: 2, unknown: 2, deep: 3 };
+/** Awake light gray, REM purple, light/core blue, deep darker blue (see .stage-* in globals.css). */
 const STAGE_FILL: Record<StageKey, string> = {
-  awake: "bg-champagne/70",
-  rem: "bg-gold-highlight",
-  light: "bg-gold/80",
+  awake: "stage-awake",
+  rem: "stage-rem",
+  light: "stage-light",
   asleep: "bg-gold/60",
   unknown: "bg-elevated",
-  deep: "bg-bronze",
+  deep: "stage-deep",
 };
 
 export interface StageTotals {

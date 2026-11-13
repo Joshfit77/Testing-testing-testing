@@ -274,6 +274,20 @@ html[data-text-size="xlarge"] {
 }
 
 @layer utilities {
+  /* Sleep stages (owner spec): awake light gray, REM purple, light/core blue, deep darker blue. Each is at least 3:1
+     against the charcoal card so the bars stay distinguishable (WCAG 1.4.11). Labels always accompany the colours. */
+  .stage-awake {
+    background-color: #c8c4bc;
+  }
+  .stage-rem {
+    background-color: #b18cff;
+  }
+  .stage-light {
+    background-color: #8fc4ff;
+  }
+  .stage-deep {
+    background-color: #3d74e0;
+  }
   .text-gold-gradient {
     background: linear-gradient(135deg, var(--champagne) 0%, var(--gold) 50%, var(--bronze) 100%);
     -webkit-background-clip: text;

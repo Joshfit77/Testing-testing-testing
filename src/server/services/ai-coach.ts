@@ -156,7 +156,7 @@ function aiPerMinute(): number {
  * even if saving its reply later fails. Returns the usage row and the tier allowed (a chat that wanted the larger
  * model falls back to the fast one once that share is used up).
  */
-export type AiUsageKind = "chat" | "plan" | "meal_plan" | "food_photo" | "food_explain";
+export type AiUsageKind = "chat" | "plan" | "meal_plan" | "food_photo" | "food_explain" | "weekly_report";
 
 async function reserveUsage(
   userId: string,

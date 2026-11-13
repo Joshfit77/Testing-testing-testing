@@ -52,6 +52,7 @@ export const USER_TABLES: { table: string; column: string }[] = [
   { table: "notification_devices", column: "user_id" },
   { table: "ai_usage_events", column: "user_id" },
   { table: "coach_memories", column: "user_id" },
+  { table: "weekly_reports", column: "user_id" },
   { table: "exercise_targets", column: "user_id" },
   { table: "training_adjustments", column: "user_id" },
   { table: "training_recommendation_decisions", column: "user_id" },

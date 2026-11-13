@@ -43,6 +43,8 @@ export const FEATURES = [
   "food_goal_analysis",
   // AI sleep coaching and sleep-and-training insights.
   "sleep_ai_coaching",
+  // Weekly progress report (training, nutrition, running, sleep, body weight) every Sunday.
+  "weekly_reports",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 
@@ -172,6 +174,7 @@ export function getPlans(): Record<Plan, PlanConfig> {
       highlights: [
         "Everything in Free",
         `AI personal coaching: ${proAi} AI requests a month`,
+        "A weekly progress report every Sunday",
         "The complete workout library & custom program builder",
         "Live GPS runs & walks with route maps and splits",
         "Recipes, meal planning, grocery lists & food comparisons",

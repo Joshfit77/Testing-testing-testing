@@ -141,6 +141,17 @@ export function checkProposedMemory(
  * The memory block for the AI context, newest first, capped by count and characters. Recovery notes are only
  * included while the member allows wellness data to be shared with the coach.
  */
+/**
+ * Where a note came from, so the coach can tell a member's own statement from a suggestion it made (which the member
+ * approved, but which is not a verified record) and from a change the member applied. None of these is a logged
+ * record: workouts, food, sleep and measurements come from the structured data, never from memory.
+ */
+export const MEMORY_SOURCE_LABEL: Record<CoachMemory["source"], string> = {
+  member: "the athlete's own words",
+  coach: "your suggestion, approved by the athlete",
+  approved_change: "approved change",
+};
+
 export function formatMemoriesForContext(memories: CoachMemory[], opts: { wellnessConsent: boolean; chatMemoryOff: boolean }): string {
   const usable = [...memories]
     .filter((m) => m.category !== "recovery" || opts.wellnessConsent)
@@ -149,14 +160,14 @@ export function formatMemoriesForContext(memories: CoachMemory[], opts: { wellne
   const lines: string[] = [];
   let chars = 0;
   for (const m of usable) {
-    const line = `- [${memoryRef(m.id)}] ${MEMORY_CATEGORY_LABELS[m.category]}: ${m.content} (${m.created_at.slice(0, 10)}${m.source === "approved_change" ? ", approved change" : ""})`;
+    const line = `- [${memoryRef(m.id)}] ${MEMORY_CATEGORY_LABELS[m.category]}: ${m.content} (${m.created_at.slice(0, 10)}, ${MEMORY_SOURCE_LABEL[m.source]})`;
     if (chars + line.length > MEMORY_CONTEXT_CHARS) break;
     lines.push(line);
     chars += line.length;
   }
   const head = opts.chatMemoryOff
     ? "Coaching memory: the athlete asked you not to remember anything from THIS chat (use the notes below, but don't suggest new memories)."
-    : "Coaching memory: notes the athlete chose to keep. Use them when relevant; never invent memories. The structured data above is the source of truth if they disagree.";
+    : "Coaching memory: notes the athlete chose to keep, each labelled with where it came from. They are statements and preferences, not verified records: use them when relevant, never invent memories, and treat the structured data above as the source of truth if they disagree.";
   return lines.length ? `${head}\n${lines.join("\n")}` : `${head}\n(No memories saved yet.)`;
 }
 

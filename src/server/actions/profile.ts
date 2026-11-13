@@ -81,7 +81,9 @@ export async function setAiDataConsentAction(allow: boolean): Promise<ActionStat
   const supabase = await getServerSupabase();
   const { error } = await supabase
     .from("profiles")
-    .update({ ai_data_consent_at: allow ? new Date().toISOString() : null })
+    // Withdrawing AI consent also switches coaching memory off: saved notes stay (the member can view or delete them
+    // under AI Coach > Memory) but nothing is used or added until both are allowed again.
+    .update(allow ? { ai_data_consent_at: new Date().toISOString() } : { ai_data_consent_at: null, coach_memory_enabled: false })
     .eq("id", user.id);
   if (error) {
     logError("profile.ai_consent", error);
@@ -89,7 +91,7 @@ export async function setAiDataConsentAction(allow: boolean): Promise<ActionStat
   }
   revalidatePath("/coach");
   revalidatePath("/profile");
-  return actionOk(allow ? "AI Coach turned on." : "AI Coach data sharing turned off. The coach won't send anything until you allow it again.");
+  return actionOk(allow ? "AI Coach turned on." : "AI Coach data sharing turned off, and coaching memory with it. Nothing is sent until you allow it again; your saved memories stay until you delete them.");
 }
 
 export async function deleteAccountAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
