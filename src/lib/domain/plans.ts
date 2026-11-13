@@ -45,6 +45,9 @@ export const FEATURES = [
   "sleep_ai_coaching",
   // Weekly progress report (training, nutrition, running, sleep, body weight) every Sunday.
   "weekly_reports",
+  // The AI Bible study helper (Pro since 2026-11-13: Free has no generative AI; reading, prayer, journeys and the
+  // 40-day challenge stay free).
+  "ai_bible_study",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

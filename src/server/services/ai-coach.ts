@@ -21,7 +21,8 @@ import { isFlagEnabled } from "@/server/flags";
 import { rateLimit } from "@/server/rate-limit";
 import { logError } from "@/server/log";
 import { anthropicBaseUrl } from "@/server/test-overrides";
-import { costMicros, expectedCostMicros, REQUEST_CEILING_MICROS, tokenUsage } from "@/lib/domain/ai-economics";
+import { costMicros, EXPECTED_COST_MICROS, expectedCostMicros, REQUEST_CEILING_MICROS, tokenUsage } from "@/lib/domain/ai-economics";
+import { allowanceRenewsOn, downgradeNotice, type DowngradeReason } from "@/lib/domain/ai-allowance";
 import { aiBudgetConfig, notifyBudgetAlerts, type BudgetAlert } from "@/server/services/ai-budget";
 
 export type AiErrorCode =
@@ -118,7 +119,8 @@ export async function getAiUsage(userId: string, plan: Plan) {
   const since = monthStartIso();
   const count = (q: ReturnType<typeof admin.from>) => q.select("id", { count: "exact", head: true }).eq("user_id", userId).gte("created_at", since);
   const [chat, gen, smart] = await Promise.all([
-    count(admin.from("ai_usage_events")),
+    // The automatic weekly report doesn't use up the member's requests (it still counts against the money budgets).
+    count(admin.from("ai_usage_events")).neq("kind", "weekly_report"),
     count(admin.from("ai_usage_events")).eq("kind", "plan"),
     count(admin.from("ai_usage_events")).eq("model_tier", "smart"),
   ]);
@@ -164,14 +166,14 @@ function aiPerMinute(): number {
  * even if saving its reply later fails. Returns the usage row and the tier allowed (a chat that wanted the larger
  * model falls back to the fast one once that share is used up).
  */
-export type AiUsageKind = "chat" | "plan" | "meal_plan" | "food_photo" | "food_explain" | "weekly_report";
+export type AiUsageKind = "chat" | "plan" | "meal_plan" | "food_photo" | "food_explain" | "weekly_report" | "bible_study";
 
 async function reserveUsage(
   userId: string,
   kind: AiUsageKind,
   tier: ModelTier,
   usage: { chatLimit: number; planLimit: number; smartLimit: number },
-): Promise<{ usageId: string; tier: ModelTier }> {
+): Promise<{ usageId: string; tier: ModelTier; downgradeReason: DowngradeReason | null }> {
   const budget = aiBudgetConfig();
   const { data, error } = await getServiceSupabase().rpc("reserve_ai_usage", {
     p_user_id: userId,
@@ -188,8 +190,11 @@ async function reserveUsage(
     p_max_inflight_user: budget.maxInflightPerMember,
     p_max_inflight_global: budget.maxInflightGlobal,
     p_inflight_seconds: budget.inflightSeconds,
+    // What one standard request is expected to cost: the larger model is only used while the member's budget still
+    // covers every standard request they have left.
+    p_fast_estimate_micros: EXPECTED_COST_MICROS.chat_fast,
   });
-  const row = (data as { usage_id: string; model_tier: ModelTier }[] | null)?.[0];
+  const row = (data as { usage_id: string; model_tier: ModelTier; downgrade_reason: DowngradeReason | null }[] | null)?.[0];
   if (error || !row) {
     const msg = error?.message ?? "";
     // Running out of AI never touches the rest of the app; the messages say so.
@@ -200,13 +205,18 @@ async function reserveUsage(
       throw new AiError("budget_global", "AI features are paused for everyone for the rest of this month. Everything else in the app keeps working as usual.");
     if (msg.includes("ai_busy")) throw new AiError("busy", "The AI coach is busy right now. Please try again in a minute.", 30);
     if (msg.includes("ai_rate_limited")) throw new AiError("rate_limited", "You're sending messages quickly — please wait a moment.", 60);
-    if (msg.includes("ai_quota_plan")) throw new AiError("quota", "You've used this month's plan generations. They reset on the 1st.");
+    const renews = allowanceRenewsOn(new Date());
+    if (msg.includes("ai_quota_plan_member_budget"))
+      throw new AiError("quota", `A program generation needs an advanced request, and the rest of this month's allowance is needed for your standard requests. Advanced requests renew on ${renews}.`);
+    if (msg.includes("ai_quota_plan_global_budget"))
+      throw new AiError("budget_global", "Program generation is paused for everyone until AI capacity frees up. Your own allowance is unaffected, and everything else in the app keeps working.");
+    if (msg.includes("ai_quota_plan")) throw new AiError("quota", `You've used this month's advanced requests, which program generation needs. They renew on ${renews}.`);
     if (msg.includes("ai_quota_photo")) throw new AiError("quota", "You've analysed 20 meal photos in the last 24 hours. Try again later, or log this meal by search.");
-    if (msg.includes("ai_quota")) throw new AiError("quota", `You've used all ${usage.chatLimit} AI messages for this month.`);
+    if (msg.includes("ai_quota")) throw new AiError("quota", `You've used all ${usage.chatLimit} AI requests for this month. They renew on ${renews}; everything else in the app keeps working.`);
     logError("ai.usage_reserve", error ?? new Error("No reservation returned"));
     throw new AiError("metering_unavailable", "AI usage can't be checked right now. Please try again shortly.");
   }
-  return { usageId: row.usage_id, tier: row.model_tier };
+  return { usageId: row.usage_id, tier: row.model_tier, downgradeReason: row.downgrade_reason ?? null };
 }
 
 /**
@@ -229,9 +239,13 @@ async function finalizeUsage(usageId: string, model: string, inputTokens: number
   if (alerts.length) await notifyBudgetAlerts(alerts);
 }
 
-/** Give back a reservation when the provider call itself failed, so members aren't charged for errors. */
-async function releaseUsage(usageId: string) {
-  const { error } = await getServiceSupabase().rpc("release_ai_usage", { p_usage_id: usageId });
+/**
+ * Give back a reservation when the request failed, so members aren't charged or counted for errors. `chargeMicros` is
+ * what the provider may still have billed (completed tool rounds, or a request cut off after it was sent): it goes into
+ * the global accounting only, never the member's.
+ */
+async function releaseUsage(usageId: string, chargeMicros = 0) {
+  const { error } = await getServiceSupabase().rpc("release_ai_usage", { p_usage_id: usageId, p_charge_micros: Math.max(0, Math.ceil(chargeMicros)) });
   if (error) logError("ai.usage_release", error);
 }
 
@@ -296,6 +310,8 @@ async function runChatLoop(params: {
   signal?: AbortSignal;
   /** Most this one request may cost; once reached, the next round must answer without more tool calls. */
   ceilingMicros: number;
+  /** Running cost, kept up to date round by round so a failure part-way can still be accounted. */
+  meter?: { costMicros: number };
 }): Promise<ChatLoopResult> {
   const { model, system, toolCtx, onEvent, signal } = params;
   const messages = [...params.messages];
@@ -342,6 +358,7 @@ async function runChatLoop(params: {
     inputTokens += (message.usage.input_tokens ?? 0) + (message.usage.cache_read_input_tokens ?? 0) + (message.usage.cache_creation_input_tokens ?? 0);
     outputTokens += message.usage.output_tokens ?? 0;
     cost += costMicros(model, tokenUsage(message.usage));
+    if (params.meter) params.meter.costMicros = cost;
 
     if (message.stop_reason === "refusal") {
       onEvent({ type: "reset" });
@@ -496,7 +513,7 @@ export async function coachTurn(params: {
   while (messages.length && messages[0]!.role !== "user") messages.shift();
 
   const route = routeCoachRequest({ mode, message, smartUsed: usage.smartUsed, smartLimit: usage.smartLimit, env: process.env });
-  let reservation: { usageId: string; tier: ModelTier };
+  let reservation: { usageId: string; tier: ModelTier; downgradeReason: DowngradeReason | null };
   try {
     reservation = await reserveUsage(userId, mode, route.tier, usage);
   } catch (err) {
@@ -518,11 +535,12 @@ export async function coachTurn(params: {
   let inputTokens = 0;
   let outputTokens = 0;
   let cost = 0;
+  const meter = { costMicros: 0 };
   try {
     if (mode === "chat") {
       const toolCtx: ToolContext = { supabase, userId, timeZone: (tzRow?.timezone as string) || "UTC", snapshot: context.snapshot, proposal: null, chatMemoryOff };
       onEvent({ type: "status", text: "Thinking…" });
-      const r = await runChatLoop({ model, system, messages, toolCtx, onEvent, signal: params.signal, ceilingMicros: REQUEST_CEILING_MICROS[reservation.tier] });
+      const r = await runChatLoop({ model, system, messages, toolCtx, onEvent, signal: params.signal, ceilingMicros: REQUEST_CEILING_MICROS[reservation.tier], meter });
       reply = r.reply;
       proposal = r.proposal;
       inputTokens = r.inputTokens;
@@ -564,8 +582,10 @@ export async function coachTurn(params: {
     }
   } catch (err) {
     // The provider call failed: give the request back and remove the orphaned user message, so retries don't
-    // duplicate it.
-    await releaseUsage(reservation.usageId);
+    // duplicate it. Rounds that completed, and a request cut off after it was sent, may still be billed: that goes
+    // into the global accounting (not the member's).
+    const cutOff = deadlinePassed(params.signal) || err instanceof Anthropic.APIConnectionTimeoutError || err instanceof Anthropic.APIUserAbortError;
+    await releaseUsage(reservation.usageId, meter.costMicros + (cutOff ? expectedCostMicros(mode, reservation.tier) : 0));
     await supabase.from("ai_messages").delete().eq("id", userRow.id);
     // The route's deadline passed, or one provider request ran out its own time: said as such (not "cancelled").
     if (deadlinePassed(params.signal) || err instanceof Anthropic.APIConnectionTimeoutError) throw new AiError("provider", TIMEOUT_MESSAGE);
@@ -585,6 +605,9 @@ export async function coachTurn(params: {
 
   // Counted before anything else can fail.
   await finalizeUsage(reservation.usageId, model, inputTokens, outputTokens, cost);
+  // Never a silent downgrade: when a request that called for the advanced model ran on the standard one, say why.
+  const notice = mode === "chat" && route.tier === "smart" && reservation.tier === "fast" ? downgradeNotice(reservation.downgradeReason ?? "advanced_used", new Date()) : route.reason === "smart_budget_used" ? downgradeNotice("chat_share_used", new Date()) : null;
+  if (notice && reply) reply = `${reply}\n\n_${notice}_`;
   // Replies are written by the server (members can only insert their own questions).
   const { data: assistantRow, error: amErr } = await getServiceSupabase()
     .from("ai_messages")
@@ -629,7 +652,8 @@ export async function withAiRequest<T>(
   try {
     result = await run({ client: getClient(), model });
   } catch (err) {
-    await releaseUsage(reservation.usageId);
+    const cutOff = err instanceof Anthropic.APIConnectionTimeoutError || err instanceof Anthropic.APIUserAbortError;
+    await releaseUsage(reservation.usageId, cutOff ? expectedCostMicros(params.kind, reservation.tier) : 0);
     if (err instanceof AiError) throw err;
     if (err instanceof Anthropic.APIUserAbortError) throw new AiError("provider", "The request was cancelled.");
     if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {

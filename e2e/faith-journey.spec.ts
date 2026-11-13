@@ -1,6 +1,6 @@
 import { createServer, type Server } from "node:http";
 import { expect, test } from "@playwright/test";
-import { completeOnboarding, serviceRest, signUpAndConfirm, uniqueEmail, userIdFor } from "./helpers";
+import { completeOnboarding, grantPlan, serviceRest, signUpAndConfirm, uniqueEmail, userIdFor } from "./helpers";
 
 /**
  * The discipleship features end to end, on a Free account: choosing a reading journey (daily load shown first, the
@@ -167,14 +167,20 @@ test.describe("Faith discipleship", () => {
       test.skip(true, `port ${BIBLE_MOCK_PORT} is in use (another AI mock is running)`);
     }
     try {
-      await signUpAndConfirm(page, uniqueEmail("ask"));
+      const askEmail = uniqueEmail("ask");
+      await signUpAndConfirm(page, askEmail);
       await completeOnboarding(page);
+      // Free has no generative AI: the helper is Pro, while reading the Bible stays free.
       await page.goto("/faith/ask");
+      await expect(page.getByTestId("bible-ask-pro")).toBeVisible();
+      await expect(page.getByLabel("Your question")).toHaveCount(0);
+      await grantPlan(askEmail, "pro");
+      await page.reload();
       await expect(page.getByText(/This is an AI, not a pastor/)).toBeVisible();
       // Nothing is sent to the AI provider until the member allows it: no question box before consent.
-      await expect(page.getByText("10 questions left today")).toHaveCount(0);
+      await expect(page.getByText("40 questions left today")).toHaveCount(0);
       await page.getByRole("button", { name: "Allow and continue" }).click();
-      await expect(page.getByText("10 questions left today")).toBeVisible();
+      await expect(page.getByText("40 questions left today")).toBeVisible();
       await page.getByLabel("Your question").fill("What does John 3:16 mean?");
       await page.getByRole("button", { name: "Ask" }).click();
       const answer = page.getByRole("list", { name: "Conversation" }).getByRole("listitem").last();
@@ -182,7 +188,7 @@ test.describe("Faith discipleship", () => {
       await expect(answer).toContainText("Psalm 151:2 [reference not found in the BSB]");
       await expect(answer).toContainText("Passages cited · BSB");
       await expect(answer).toContainText("For God so loved the world that He gave His one and only Son");
-      await expect(page.getByText("9 questions left today")).toBeVisible();
+      await expect(page.getByText("39 questions left today")).toBeVisible();
       // What the AI received: the question and verified passages; no journal, no account details.
       const sent = JSON.parse(seen.at(-1)!) as { system: string; messages: { content: string }[] };
       expect(sent.system).toMatch(/Bible study helper/);

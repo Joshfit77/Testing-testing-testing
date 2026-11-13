@@ -52,6 +52,8 @@ interface Props {
   disabledReason: string | null;
   canGeneratePlans: boolean;
   usage: { used: number; limit: number };
+  /** Advanced (larger-model) requests this month, shown before a program generation uses one. */
+  advanced?: { used: number; limit: number };
   exerciseNames: Record<string, string>;
   /** Starter questions built from the user's own data. */
   suggestions?: string[];
@@ -240,7 +242,7 @@ type StreamEvent =
   | { type: "done"; result: { conversationId: string; userMessage: ChatMessage; assistantMessage: ChatMessage; usage: { used: number; limit: number } } }
   | { type: "error"; message?: string };
 
-function CoachChatView({ conversationId: initialId, initialMessages, initialQuestion, enabled, disabledReason, canGeneratePlans, usage: initialUsage, exerciseNames, suggestions, memory, feedbackEnabled, readOnly = false, onCreated }: Props & { onCreated: (id: string) => void }) {
+function CoachChatView({ conversationId: initialId, initialMessages, initialQuestion, enabled, disabledReason, canGeneratePlans, usage: initialUsage, advanced, exerciseNames, suggestions, memory, feedbackEnabled, readOnly = false, onCreated }: Props & { onCreated: (id: string) => void }) {
   const router = useRouter();
   const [conversationId, setConversationId] = useState(initialId);
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
@@ -418,9 +420,9 @@ function CoachChatView({ conversationId: initialId, initialMessages, initialQues
         )}
         <div className="flex items-center gap-3">
           {usage.limit > 0 && (
-            <span className="text-xs text-muted-foreground">
-              {usage.used}/{usage.limit} messages this month
-            </span>
+            <Link href="/coach/usage" className="inline-flex min-h-11 items-center text-xs text-muted-foreground underline-offset-4 hover:underline">
+              {usage.used}/{usage.limit} AI requests this month
+            </Link>
           )}
           {conversationId && (
             <Button
@@ -571,6 +573,13 @@ function CoachChatView({ conversationId: initialId, initialMessages, initialQues
               }}
             />
           </div>
+        )}
+        {mode === "plan" && advanced && advanced.limit > 0 && (
+          <p className="mb-2 text-center text-xs text-muted-foreground" data-testid="advanced-notice">
+            {advanced.used >= advanced.limit
+              ? "Program generation needs an advanced request, and this month's are used up. They renew on the 1st."
+              : `Generating a program uses 1 advanced request: ${advanced.limit - advanced.used} of ${advanced.limit} left this month.`}
+          </p>
         )}
         <form
           className="flex items-end gap-2 rounded-[1.75rem] border border-border bg-[#101010] p-1.5 pl-4 focus-within:border-gold-muted"

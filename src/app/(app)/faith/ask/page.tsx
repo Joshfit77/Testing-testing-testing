@@ -9,14 +9,16 @@ import { AiConsentCard } from "@/components/coach/ai-consent-card";
 import { BIBLE_AI_DISABLED } from "@/lib/bible/ai";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
+import { hasFeature } from "@/lib/domain/plans";
+import { Button } from "@/components/ui/button";
 import { passageParts, passageText } from "@/server/bible/text";
 import { parseReference } from "@/lib/bible/reference";
 import { isFlagEnabled } from "@/server/flags";
-import { bibleAiRemainingToday } from "@/server/services/bible-ai";
+import { BIBLE_AI_PRO_ONLY, bibleAiRemainingToday } from "@/server/services/bible-ai";
 
 export const metadata = { title: "Ask about the Bible" };
 
-/** The Bible study helper: separate from the fitness coach, free within daily limits. */
+/** The AI Bible study helper: separate from the fitness coach; a Pro AI feature (reading the Bible stays free). */
 export default async function AskPage() {
   const { user, profile } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
@@ -31,7 +33,9 @@ export default async function AskPage() {
       return { reference, text: (ref && passageText(ref)) ?? "", parts: (ref && passageParts(ref)) ?? undefined };
     }),
   }));
-  const [remaining, aiOn] = await Promise.all([bibleAiRemainingToday(user.id, await getUserPlan(user.id)), isFlagEnabled("ai_coach")]);
+  const plan = await getUserPlan(user.id);
+  const entitled = hasFeature(plan, "ai_bible_study");
+  const [remaining, aiOn] = await Promise.all([bibleAiRemainingToday(user.id, plan), isFlagEnabled("ai_coach")]);
   // The same two conditions the server enforces before anything is sent (bibleAiBlocked in src/server/services/bible-ai.ts).
   const consented = Boolean(profile.ai_data_consent_at);
 
@@ -46,7 +50,19 @@ export default async function AskPage() {
           This is an AI, not a pastor, and it can be wrong: read the passages for yourself, and bring big questions to your church. Your question is sent to our AI provider to be answered. Your prayer journal and notes are never shared with it.
         </span>
       </p>
-      {!aiOn ? (
+      {!entitled ? (
+        <div className="space-y-3 rounded-xl border border-border bg-card p-4 text-sm" data-testid="bible-ask-pro">
+          <p>{BIBLE_AI_PRO_ONLY}</p>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild>
+              <Link href="/profile/billing">See Pro All Access</Link>
+            </Button>
+            <Button asChild variant="secondary">
+              <Link href="/faith/bible">Read the Bible (free)</Link>
+            </Button>
+          </div>
+        </div>
+      ) : !aiOn ? (
         <p role="status" className="rounded-xl border border-border bg-card p-4 text-sm" data-testid="bible-ask-unavailable">
           {BIBLE_AI_DISABLED}
         </p>

@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { Bot, Brain, MessageSquarePlus } from "lucide-react";
+import { Bot, Brain, MessageSquarePlus, Gauge } from "lucide-react";
 import { AiConsentCard } from "@/components/coach/ai-consent-card";
 import { CoachChat, type ChatMessage } from "@/components/coach/coach-chat";
 import { PageHeader } from "@/components/common/page-header";
+import { allowanceRenewsOn } from "@/lib/domain/ai-allowance";
 import { BackButton } from "@/components/common/back-button";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -109,7 +110,7 @@ export default async function CoachPage({
   if (!entitled) disabledReason = "AI coaching is included with Pro All Access.";
   else if (!isAiConfigured() || !flag || !isServiceRoleConfigured()) disabledReason = unavailable;
   else if (usage.chatUsed >= usage.chatLimit)
-    disabledReason = `You've used all ${usage.chatLimit} AI messages for this month. Your allowance resets on the 1st.`;
+    disabledReason = `You've used all ${usage.chatLimit} AI requests for this month. They renew on ${allowanceRenewsOn(new Date())}; everything else in the app keeps working.`;
 
   // Pro members are asked once before the coach sends anything to the AI provider.
   const needsConsent =
@@ -140,6 +141,11 @@ export default async function CoachPage({
               <Button asChild variant="secondary">
                 <Link href="/coach/memory">
                   <Brain aria-hidden /> Memory
+                </Link>
+              </Button>
+              <Button asChild variant="secondary">
+                <Link href="/coach/usage">
+                  <Gauge aria-hidden /> Usage
                 </Link>
               </Button>
               <Button asChild variant="secondary">
@@ -236,6 +242,7 @@ export default async function CoachPage({
             canGeneratePlans={usage.planLimit > 0}
             feedbackEnabled={entitled && (await isFlagOn(COACH_FEEDBACK_FLAG))}
             usage={{ used: usage.chatUsed, limit: usage.chatLimit }}
+            advanced={{ used: usage.smartUsed, limit: usage.smartLimit }}
             suggestions={suggestions}
             memory={
               entitled

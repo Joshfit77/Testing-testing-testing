@@ -18,7 +18,9 @@ describe("membership comparison", () => {
   it("keeps the whole Faith & Discipline section, the exercise demos and manual run logging free", () => {
     const faith = rows.filter((r) => r.section === "Faith & Discipline");
     expect(faith.length).toBeGreaterThan(0);
-    for (const r of faith) expect(r.free).not.toBe(false);
+    // Everything in Faith is free except the AI Bible study helper (Free has no generative AI, 2026-11-13).
+    for (const r of faith.filter((x) => x.feature !== "ai_bible_study")) expect(r.free).not.toBe(false);
+    expect(faith.find((x) => x.feature === "ai_bible_study")).toMatchObject({ free: false, pro: true });
     expect(rows.find((r) => /200\+ exercises with demonstrations/.test(r.label))?.free).toBe(true);
     // Structured programs are Pro (owner rule 2026-11-13); a member's own starter plan and workouts stay free.
     expect(rows.find((r) => /Every structured program/.test(r.label))).toMatchObject({ free: false, feature: "full_program_library" });

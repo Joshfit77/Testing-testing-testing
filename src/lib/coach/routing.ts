@@ -15,8 +15,8 @@
 export const DEFAULT_COACH_MODELS = { fast: "claude-haiku-5-5", smart: "claude-sonnet-5-5" } as const;
 export type ModelTier = keyof typeof DEFAULT_COACH_MODELS;
 
-/** Larger-model requests held back from chat escalation each month, so plan generation stays available. */
-export const PLAN_RESERVE = 5;
+/** Advanced requests held back from chat each month, so program generation stays available (documented in ai-allowance.ts). */
+export const PLAN_RESERVE = 2;
 
 export function coachModelIds(env: Record<string, string | undefined>): Record<ModelTier, string> {
   return { fast: env.COACH_MODEL_FAST || DEFAULT_COACH_MODELS.fast, smart: env.COACH_MODEL_SMART || DEFAULT_COACH_MODELS.smart };
@@ -30,14 +30,17 @@ const CARE_WORDS =
 
 export type CoachTaskKind = "quick" | "complex";
 
-/** Classify a chat message. Long or multi-part requests also count as complex. */
+/**
+ * Classify a chat message by what it asks for, never by its length: a long message about a simple question stays on
+ * the fast model. Complex: designing or restructuring a program, reviewing trends over weeks (plateaus, stalls), and
+ * anything about pain, injury or a medical condition, where careful judgment matters most.
+ */
 export function classifyCoachMessage(message: string): CoachTaskKind {
   const text = message.trim();
   if (!text) return "quick";
   if (CARE_WORDS.test(text)) return "complex";
   if (PROGRAM_WORDS.test(text) && DESIGN_VERBS.test(text)) return "complex";
   if (REVIEW_WORDS.test(text)) return "complex";
-  if (text.length > 700) return "complex";
   return "quick";
 }
 

@@ -38,7 +38,8 @@ describe("coach model routing", () => {
       expect(classifyCoachMessage(m), m).toBe("complex");
       expect(route(m)).toMatchObject({ tier: "smart", model: "claude-sonnet-5-5", reason: "complex" });
     }
-    expect(classifyCoachMessage("x".repeat(701))).toBe("complex");
+    // Length alone never buys the larger model.
+    expect(classifyCoachMessage(`What should I eat before a morning workout? ${"I usually wake up at six and train at seven. ".repeat(30)}`)).toBe("quick");
   });
 
   it("plan generation always uses the larger model", () => {

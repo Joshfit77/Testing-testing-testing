@@ -136,25 +136,67 @@ describe.skipIf(!available)("AI spending caps", () => {
     await clear(a);
   });
 
-  it("switches chat to the fast model when the member's or the app's budget runs low, but never plans", async () => {
+  it("keeps advanced requests from eating the money the rest of the allowance needs, and says why it downgrades", async () => {
     await clear(a);
     await resetMonth(1_000_000_000);
-    const smart = (over: Record<string, unknown> = {}) => reserve(a, { p_tier: "smart", p_estimate_micros: 0, p_user_budget_micros: 1_000_000, ...over });
-    const tierOf = (r: { data: unknown }) => (r.data as { model_tier: string }[])[0]!.model_tier;
-    expect(tierOf(await smart())).toBe("smart");
-    // The member has used 75% of their own budget.
-    const used = await reserve(a, { p_estimate_micros: 750_000 });
-    await finalize(usageId(used), 750_000);
-    expect(tierOf(await smart())).toBe("fast");
-    expect(tierOf(await smart({ p_kind: "plan" }))).toBe("smart");
+    // A real Pro member: 150 requests, 10 advanced, $1.40.
+    const pro = { p_chat_limit: 150, p_smart_limit: 10, p_plan_limit: 10, p_user_budget_micros: 1_400_000, p_fast_estimate_micros: 3400 };
+    const ask = (over: Record<string, unknown> = {}) => reserve(a, { ...pro, p_tier: "smart", p_estimate_micros: 80_000, ...over });
+    const row = (r: { data: unknown }) => (r.data as { model_tier: string; downgrade_reason: string | null }[])[0]!;
+    // A fresh month: 80,000 + 149 × 3,400 = 586,600 ≤ 1,400,000, so the larger model is allowed.
+    const first = await ask();
+    expect(row(first)).toMatchObject({ model_tier: "smart", downgrade_reason: null });
+    await finalize(usageId(first), 80_000);
+    // Spend so far 900,000: 900,000 + 80,000 + 148 × 3,400 > 1,400,000, so chat runs on the standard model, with the
+    // reason, and holds the standard model's estimate.
+    const big = await reserve(a, { ...pro, p_estimate_micros: 820_000 });
+    await finalize(usageId(big), 820_000);
+    const downgraded = await ask();
+    expect(row(downgraded)).toMatchObject({ model_tier: "fast", downgrade_reason: "member_budget" });
+    expect((await svc.from("ai_usage_events").select("reserved_micros").eq("id", usageId(downgraded)).single()).data?.reserved_micros).toBe(3400);
+    await finalize(usageId(downgraded), 3000);
+    // A program generation is refused rather than run on the wrong model.
+    expect((await ask({ p_kind: "plan" })).error?.message).toContain("ai_quota_plan_member_budget");
     await clear(a);
-    // The app has used 90% of the global budget.
+
+    // Advanced share used up: chat says so.
+    await svc.from("ai_usage_events").insert(Array.from({ length: 10 }, () => ({ user_id: a.id, kind: "chat", model_tier: "smart", created_at: new Date(Date.now() - 5 * 60_000).toISOString(), finalized_at: new Date().toISOString() })));
+    expect(row(await ask())).toMatchObject({ model_tier: "fast", downgrade_reason: "advanced_used" });
+    expect((await ask({ p_kind: "plan" })).error?.message).toContain("ai_quota_plan");
+    await clear(a);
+
+    // The app at 90% of its budget: chat runs on the standard model, with that reason.
     await svc.from("ai_budget_months").update({ spent_micros: 900_000, budget_micros: 1_000_000 }).eq("month", month);
-    expect(tierOf(await smart({ p_global_budget_micros: 1_000_000 }))).toBe("fast");
-    await svc.from("ai_budget_months").update({ spent_micros: 899_000 }).eq("month", month);
+    expect(row(await ask({ p_global_budget_micros: 1_000_000 }))).toMatchObject({ model_tier: "fast", downgrade_reason: "global_budget" });
     await clear(a);
-    expect(tierOf(await smart({ p_global_budget_micros: 1_000_000 }))).toBe("smart");
+  });
+
+  it("doesn't use up a request for the automatic weekly report, and meters the Bible helper like everything else", async () => {
     await clear(a);
+    await resetMonth(1_000_000_000);
+    const opts = { p_chat_limit: 2, p_estimate_micros: 1000 };
+    const w = await reserve(a, { ...opts, p_kind: "weekly_report" });
+    expect(w.error).toBeNull();
+    await finalize(usageId(w), 900);
+    const b = await reserve(a, { ...opts, p_kind: "bible_study" });
+    expect(b.error).toBeNull();
+    await finalize(usageId(b), 900);
+    const c = await reserve(a, opts);
+    expect(c.error).toBeNull();
+    await finalize(usageId(c), 900);
+    // Two counted requests (Bible + chat) fill an allowance of 2; the weekly report didn't count.
+    expect((await reserve(a, opts)).error?.message).toContain("ai_quota");
+    expect((await reserve(a, { ...opts, p_kind: "weekly_report" })).error).toBeNull();
+    await clear(a);
+  });
+
+  it("gives a failed request back to the member but keeps what the provider may have billed in the global figures", async () => {
+    await clear(a);
+    await resetMonth(1_000_000_000);
+    const r = await reserve(a, { p_estimate_micros: 5000 });
+    expect((await svc.rpc("release_ai_usage", { p_usage_id: usageId(r), p_charge_micros: 4200 })).error).toBeNull();
+    expect(await monthRow()).toMatchObject({ spent_micros: 4200, reserved_micros: 0 });
+    expect((await svc.from("ai_usage_events").select("id", { count: "exact", head: true }).eq("user_id", a.id)).count).toBe(0);
   });
 
   it("limits requests running at once, per member and across the app", async () => {
