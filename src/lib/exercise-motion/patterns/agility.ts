@@ -8,7 +8,7 @@
  * travels across the frame (the camera is fixed: the drills go out and come back, so each loop closes on itself).
  */
 import { BODY, add, cos, depthMix, down, forwardKinematics, frontOf, len, solveTwoBone, sub, up } from "../skeleton";
-import { armThrough, pose, solve1D, type Keyframe, type MotionDef, type Pose, type PropDef, type Side, type Vec } from "../build";
+import { armThrough, armTo, mix, plantLeg, pose, solve1D, type Keyframe, type MotionDef, type Pose, type PropDef, type Side, type Vec } from "../build";
 
 /** Narrowest stance while shuffling: about shoulder width between the feet (cm). */
 const NARROW = 44;
@@ -399,50 +399,347 @@ export function reactiveMirrorDrill(id: string, label: string): MotionDef {
 
 // ------------------------------------------------------------------------------------------------ 5-10-5
 
+/** Position fraction 0 → 1 of a run whose speed rises and falls as u^a (1-u)^b (starts and ends at rest). */
+function speedRamp(a: number, b: number, n = 400): (u: number) => number {
+  const cum = [0];
+  for (let i = 1; i <= n; i++) {
+    const u = (i - 0.5) / n;
+    cum.push(cum[i - 1]! + Math.pow(u, a) * Math.pow(1 - u, b));
+  }
+  const total = cum[n]!;
+  return (u: number) => {
+    const x = clamp01(u) * n;
+    const i = Math.min(n - 1, Math.floor(x));
+    return (cum[i]! + (cum[i + 1]! - cum[i]!) * (x - i)) / total;
+  };
+}
+
 /**
- * 5-10-5 pro agility shuttle, compressed to fit the frame: three lines (with markers behind them) 5 yards apart, drawn
- * here 1.2 m apart. From a low stance straddling the middle line the athlete drives to screen right with long, fast
- * shuffle pushes, plants the outside foot at the line, drops the hips and touches the line with the outside hand,
- * drives 10 yards to the far line, plants and touches it with the other hand, then drives back through the middle line,
- * slows down, and walks back into the start stance for the next rep. Seen from the front, the athlete stays facing the
- * viewer (square to the lines) the whole time.
+ * Plant a foot by the ball (side view), rolling the heel up just enough that the ankle never bends past `maxDorsi`
+ * degrees of dorsiflexion.
+ */
+function plantBall(p: Pose, s: Side, pelvis: Vec, ball: Vec, maxDorsi: number, rotMax: number): Pose {
+  let rot = rotMax;
+  let out = plantLeg(p, s, pelvis, ball, rot);
+  for (let it = 0; it < 6; it++) {
+    const shin = out[`hip${s}`] - out.trunk - out[`knee${s}`];
+    const want = Math.min(rotMax, shin + maxDorsi);
+    if (Math.abs(want - rot) < 0.05) break;
+    rot = want;
+    out = plantLeg(p, s, pelvis, ball, rot);
+  }
+  return out;
+}
+
+/** The three lines of the 5-10-5, 5 yards apart, drawn this far apart (cm; the distances are shortened to fit). */
+export const PRO_AGILITY_LINE = 190;
+
+/**
+ * 5-10-5 pro agility shuttle, side view (the camera in front of the drill, so the athlete runs across the picture), the
+ * distances shortened to fit: three lines 5 yards apart. The athlete sets in a three-point stance straddling the middle
+ * line, one hand on the floor; explodes out to screen right with a strong forward lean, chops the last steps short and
+ * plants the outside foot at the line with the hips dropping low and the hand touching the line; turns, drives 10 yards
+ * the other way, plants and touches the far line; turns again and sprints back through the middle line, easing off
+ * after it. Each run builds speed over the first steps and brakes hard into the plant (the feet land ahead of the hips,
+ * the body sinks). A profile figure cannot be drawn mid-turn (in the drill the athlete's chest faces the camera at each
+ * line), so each 180° turn is a brief fade while the athlete is low at the line; after the finish the athlete fades
+ * out and is back in the stance for the next rep. A planted foot never slides.
  */
 export function proAgilityDrill(id: string, label: string): MotionDef {
-  const Lx = 120;
-  const sc = new FrontScript(NARROW / 2, -NARROW / 2);
-  const d = 36;
-  const C = 0.25;
-  const lift = 4.5;
-  sc.wait(0.45);
-  // 5 yards to the right: the outside (left) foot plants just past the line; the left hand touches the line.
-  let land = driveTo(sc, 1, Lx + 12, d, C, lift);
-  const tTouch = land + 0.08;
-  touchDown(sc, 1, Lx - 3, tTouch);
-  sc.wait(0.14);
-  // 10 yards to the left line.
-  land = driveTo(sc, -1, -Lx - 12, d, C, lift);
-  touchDown(sc, -1, -Lx + 3, land + 0.08);
-  sc.wait(0.14);
-  // 5 yards back through the middle line, then ease off.
-  for (let i = 0; i < 4; i++) sc.shuffle(1, d, C, lift);
-  sc.shuffle(1, 22, 0.3, 3);
-  sc.shuffle(1, 12, 0.34, 2.5);
-  sc.wait(0.3);
-  // Walk back into the start stance, straddling the middle line.
-  const back = (sc.x.L - NARROW / 2) / 2;
-  sc.shuffle(-1, back, 0.45, 2.5);
-  sc.shuffle(-1, back, 0.45, 2.5);
-  settleTo(sc, NARROW / 2, -NARROW / 2, 0.24);
-  sc.wait(0.35);
-  const T = sc.t;
-  const keyframes = frontKeyframes(sc, T, { height: 74, hinge: 22, sigma: 0.05 });
+  const L = PRO_AGILITY_LINE;
+  const REACH = 50; // the pelvis stops this far short of a line the hand touches
+  const FDT = 0.005;
+  // ---- The route: pelvis x over time, facing, touches, turns and the fade between reps.
+  interface Row {
+    t: number;
+    x: number;
+    facing: 1 | -1;
+    alpha: number;
+  }
+  const rows: Row[] = [];
+  let cur: Row = { t: 0, x: -26, facing: 1, alpha: 1 };
+  const push = (r: Partial<Row>) => {
+    cur = { ...cur, ...r, t: cur.t + FDT };
+    rows.push(cur);
+  };
+  const hold = (dur: number, f: (u: number) => Partial<Row> = () => ({})) => {
+    for (let i = 0, n = Math.round(dur / FDT); i < n; i++) push(f((i + 1) / n));
+  };
+  interface Run {
+    t0: number;
+    t1: number;
+    dir: 1 | -1;
+    /** Where the run ends: a plant at a line (its x), or a run-through. */
+    plantAt?: number;
+  }
+  const runs: Run[] = [];
+  const run = (x1: number, dur: number, a: number, b: number, plantAt?: number) => {
+    const x0 = cur.x;
+    const f = speedRamp(a, b);
+    const t0 = cur.t;
+    for (let i = 0, n = Math.round(dur / FDT); i < n; i++) push({ x: x0 + (x1 - x0) * f((i + 1) / n) });
+    runs.push({ t0, t1: cur.t, dir: x1 > x0 ? 1 : -1, plantAt });
+  };
+  const touches: { t: number; line: number }[] = [];
+  const turns: { t: number; facing: 1 | -1 }[] = [];
+  // At a line: the hand reaches the line as the body bottoms out, holds it for an instant, comes off, and the body
+  // turns round (the fade) while still low.
+  const touchTurn = (line: number, facing: 1 | -1) => {
+    const tc = cur.t + 0.07;
+    touches.push({ t: tc, line });
+    turns.push({ t: tc + 0.17, facing });
+    hold(0.24);
+  };
+  const T_SET = 0.55;
+  hold(T_SET);
+  // 5 yards to screen right: drives hard for most of it, brakes over the last two steps.
+  run(L - REACH, 1.02, 1.1, 0.85, L);
+  touchTurn(L, -1);
+  // 10 yards to the far line.
+  run(-L + REACH, 1.68, 1.1, 0.8, -L);
+  touchTurn(-L, 1);
+  // 5 yards back through the middle line at speed, easing off after it.
+  run(0.55 * L, 1.5, 1.0, 2.3);
+  hold(0.14);
+  // Fade out, back into the stance unseen, fade in.
+  hold(0.26, (u) => ({ alpha: 1 - mj(u) }));
+  // Unseen, the body goes back to the start and settles into the stance (over a few frames, so no joint snaps).
+  const tReset = cur.t;
+  const xEnd = cur.x;
+  hold(0.3, (u) => ({ x: xEnd + (-26 - xEnd) * mj(u), alpha: 0 }));
+  hold(0.3, (u) => ({ alpha: mj(u) }));
+  const T = cur.t;
+  // Facing and the fade at each turn.
+  for (const r of rows) {
+    let f: 1 | -1 = 1;
+    let a = 1;
+    for (const tn of turns) {
+      if (r.t >= tn.t) f = tn.facing;
+      const d = Math.abs(r.t - tn.t);
+      a = Math.min(a, d < 0.035 ? 0 : d < 0.12 ? mj((d - 0.035) / 0.085) : 1);
+    }
+    r.facing = f;
+    r.alpha *= a;
+  }
+  const R = (t: number): Row => rows[Math.max(0, Math.min(rows.length - 1, Math.round(t / FDT) - 1))]!;
+  const vel = (t: number) => (R(t + 0.01).x - R(t - 0.01).x) / 0.02;
+  const accel = (t: number) => (vel(t + 0.05) - vel(t - 0.05)) / 0.1;
+
+  // ---- Feet: every landing (time, world x of the ball of the foot), per foot.
+  interface Fall {
+    t: number;
+    x: number;
+    /** The foot does not leave the floor for this step before this time (the push begins). */
+    from?: number;
+  }
+  const falls: Record<Side, Fall[]> = { L: [], R: [] };
+  // The stance: near (R) foot forward just past the middle line, far (L) foot back; the R hand on the floor ahead.
+  const SET_R = 14;
+  const SET_L = -44;
+  falls.R.push({ t: -1, x: SET_R });
+  falls.L.push({ t: -1, x: SET_L });
+  const last = (s: Side) => falls[s][falls[s].length - 1]!;
+  /** Each run: steps from a cadence that rises with speed, the last one planting at the line. */
+  const stepTimes: { t: number; side: Side }[] = [];
+  for (const rn of runs) {
+    // The first step is taken by the foot that is behind in the new direction.
+    let side: Side = (last("R").x - last("L").x) * rn.dir < 0 ? "R" : "L";
+    // Steps are spaced by phase: cadence (steps / s) rises with speed (3.3 at a standstill, ~4.5 at full speed).
+    const cad = (t: number) => 3.7 + Math.min(0.8, Math.abs(vel(t)) / 300);
+    const start = rn.t0 + 0.07;
+    let ph = 0;
+    const ts: number[] = [];
+    for (let t = start; t < rn.t1; t += FDT) {
+      ph += cad(t) * FDT;
+      if (ph >= 1) {
+        ph -= 1;
+        ts.push(t);
+      }
+    }
+    // A plant run ends with the plant foot landing at the line just as the body stops (the last step is stretched or
+    // squeezed onto that moment); a run-through ends with a short stopping step.
+    if (rn.plantAt !== undefined) {
+      if (ts.length && rn.t1 - ts[ts.length - 1]! < 0.13) ts.pop();
+      ts.push(rn.t1 - 0.03);
+    } else ts.push(rn.t1 + 0.04);
+    // The first step comes quickly out of the stance or the plant.
+    ts[0] = Math.min(ts[0]!, rn.t0 + 0.22);
+    for (const [i, t] of ts.entries()) {
+      const isLast = i === ts.length - 1;
+      const v = Math.abs(vel(t));
+      const braking = Math.max(0, Math.min(1, (-accel(t) * rn.dir) / 900));
+      // Accelerating, the foot lands under the hips (the ball just ahead of them); braking, well ahead of them.
+      let x = R(t).x + rn.dir * (2 + v * 0.02 + 36 * braking);
+      if (isLast && rn.plantAt !== undefined) x = rn.plantAt - rn.dir * 7;
+      // The step before the plant lands a long stride behind it: a wide, low base to stop on.
+      if (i === ts.length - 2 && rn.plantAt !== undefined) x = rn.plantAt - rn.dir * 62;
+      if (isLast && rn.plantAt === undefined) x = R(t).x + rn.dir * 16;
+      // The first step drives the back foot through, past the other foot.
+      const otherX = last(side === "R" ? "L" : "R").x;
+      if (i === 0) x = rn.dir > 0 ? Math.max(x, otherX + 4) : Math.min(x, otherX - 4);
+      falls[side].push({ t, x, ...(i === 0 ? { from: rn.t0 + 0.02 } : {}) });
+      stepTimes.push({ t, side });
+      side = side === "R" ? "L" : "R";
+    }
+  }
+  // The other foot catches up on the stop after the run-through, then both are in the stance again after the reset.
+  const lastStep = stepTimes[stepTimes.length - 1]!;
+  const other: Side = lastStep.side === "R" ? "L" : "R";
+  const catchUp = last(lastStep.side).x - 12;
+  if (catchUp > last(other).x + 4) falls[other].push({ t: lastStep.t + 0.22, x: catchUp });
+  falls.R.push({ t: tReset + 0.28, x: SET_R, from: tReset + 0.005 });
+  falls.L.push({ t: tReset + 0.28, x: SET_L, from: tReset + 0.005 });
+  for (const s of ["L", "R"] as const) falls[s].sort((a, b) => a.t - b.t);
+  /** Sole angle of a planted foot (on the ball, the heel rising as the hips run past it), from its offset ahead. */
+  const plantedRot = (rel: number) => -6 - 0.8 * Math.max(0, -rel - 6);
+  /** Where a foot is: world x of its ball, its height, and the sole's angle (+ = toes up). */
+  const footAt = (s: Side, t: number): { x: number; lift: number; airborne: boolean; u?: number; rot0?: number } => {
+    const F = falls[s];
+    let k = 0;
+    while (k + 1 < F.length && F[k + 1]!.t <= t) k++;
+    const prev = F[k]!;
+    const next = F[k + 1];
+    if (!next) return { x: prev.x, lift: 0, airborne: false };
+    // The swing starts a swing-time before the landing (a sprint has a short flight between steps), never before the
+    // foot has had a short stance.
+    const sw = Math.min(0.34, Math.max(0.2, (next.t - prev.t) * 0.62));
+    let t0 = Math.max(next.t - sw, prev.t + 0.08, next.from ?? -Infinity);
+    // ...and the foot comes off the floor once the hips have run well past it (the leg cannot stretch further).
+    for (let tt = Math.max(prev.t, 0); tt < t0; tt += FDT) {
+      const r = R(tt);
+      if ((r.x - prev.x) * r.facing > 24) {
+        t0 = tt;
+        break;
+      }
+    }
+    if (t < t0) return { x: prev.x, lift: 0, airborne: false };
+    const u = (t - t0) / (next.t - t0);
+    // A sprinter's swing: the heel folds up under the hips first (the higher, the longer the stride), then the knee
+    // drives forward and the foot comes down onto the ball.
+    const hi = Math.min(38, 6 + Math.abs(next.x - prev.x) * 0.3);
+    const lift = hi * Math.pow(Math.sin(Math.PI * Math.pow(u, 0.85)), 1.5);
+    // The sole leaves the floor at the angle it had rolled to.
+    const r0 = R(t0);
+    const rot0 = plantedRot((prev.x - r0.x) * r0.facing);
+    return { x: prev.x + (next.x - prev.x) * mj(Math.pow(u, 1.25)), lift, airborne: true, u, rot0 };
+  };
+
+  // ---- Smooth body targets: pelvis height and trunk lean.
+  const touchW = (t: number) => {
+    let w = 0;
+    for (const tc of touches) w = Math.max(w, bumpAt({ t0: tc.t - 0.03, t1: tc.t + 0.05, rin: 0.24, rout: 0.17, v: 1 }, t));
+    return w;
+  };
+  const lowW = (t: number) => {
+    let w = 0;
+    for (const tc of touches) w = Math.max(w, bumpAt({ t0: tc.t - 0.05, t1: tc.t + 0.1, rin: 0.3, rout: 0.3, v: 1 }, t));
+    return w;
+  };
+  const setW = (t: number) => (t < T_SET ? 1 : t < T_SET + 0.3 ? 1 - mj((t - T_SET) / 0.3) : t > tReset ? mj((t - tReset) / 0.28) : 0);
+  // Driving out of the stance or a plant: low and leaning hard over the first steps, rising as the speed builds.
+  const driveW = (t: number) => {
+    let w = 0;
+    for (const rn of runs) w = Math.max(w, bumpAt({ t0: rn.t0, t1: rn.t0 + 0.12, rin: 0.12, rout: 0.42, v: 1 }, t));
+    return w;
+  };
+  const yRaw = (t: number) => {
+    const v = Math.abs(vel(t));
+    const run = 84 + Math.min(4, v / 80) - 5 * driveW(t);
+    const low = 49;
+    const set = 59;
+    const s = setW(t);
+    return (run + (low - run) * lowW(t)) * (1 - s) + set * s;
+  };
+  const leanRaw = (t: number) => {
+    const r = R(t);
+    // Leaning into the acceleration, upright while braking.
+    const a = accel(t) * r.facing;
+    const lean = Math.max(3, Math.min(42, 24 + a * 0.025)) + 12 * driveW(t);
+    const s = setW(t);
+    return (lean + (68 - lean) * touchW(t)) * (1 - s) + 79 * s;
+  };
+  const yS = smoothLoop(yRaw, T, 0.05);
+  const leanS = smoothLoop(leanRaw, T, 0.045);
+
+  // ---- Poses.
+  const n = Math.round(T / KEY_DT);
+  const dt = T / n;
+  const keyframes: Keyframe[] = [];
+  /** The pose at time t, the feet and hand placed in the body's own frame for `facing`. */
+  const poseAt = (t: number, facing: 1 | -1): Pose => {
+    const r = R(t);
+    const pel: Vec = [r.x, yS(t)];
+    const T1 = leanS(t);
+    const s = setW(t);
+    const tw = touchW(t);
+    const spine = 6 + 8 * Math.max(tw, s);
+    let p = pose({ trunk: T1, spine, neck: Math.max(-44, -(T1 + spine) * 0.62) });
+    // Arms pump opposite the legs (the arm opposite the forward foot swings forward), bigger at speed; still in the
+    // stance.
+    const relOf = (sd: Side) => (footAt(sd, t).x - r.x) * facing;
+    const sw = Math.tanh((relOf("R") - relOf("L")) / 30);
+    const amp = 52 * Math.min(1, Math.abs(vel(t)) / 230) * (1 - s);
+    const T2 = T1 + spine;
+    p = { ...p, shR: T2 + 8 - amp * sw, shL: T2 + 8 + amp * sw, elR: 92, elL: 92 };
+    // Legs: each foot on its spot (in the body's own frame: mirrored when facing -x).
+    for (const sd of ["L", "R"] as const) {
+      const f = footAt(sd, t);
+      const rel = (f.x - r.x) * facing;
+      // On the balls of the feet while running; a planted foot rolls its heel up as the hips pass it.
+      const e = mj(f.u ?? 0);
+      const rot = f.airborne ? (f.rot0 ?? -8) * (1 - e) - 8 * e - 34 * Math.min(1, f.lift / 30) * (1 - (f.u ?? 0)) : plantedRot(rel);
+      p = plantBall(p, sd, [0, pel[1]], [rel, f.lift], 38, Math.max(-60, rot));
+    }
+    // The near hand: on the floor in the stance; reaching the line in a touch.
+    const P = forwardKinematics(p, "side", [0, pel[1]]).pts;
+    // The arm turns from its swing to the reach (its joint angles blend, so it unfolds smoothly however fast the body
+    // is moving), the hand ending on the target or as near as a straight arm allows.
+    const reach = (target: Vec, w: number) => {
+      let hand = target;
+      const d: Vec = [hand[0] - P.shoulder[0], hand[1] - P.shoulder[1]];
+      const Ld = Math.hypot(d[0], d[1]);
+      const max = (BODY.upperArm + BODY.forearm) * 0.97;
+      if (Ld > max) hand = [P.shoulder[0] + (d[0] * max) / Ld, P.shoulder[1] + (d[1] * max) / Ld];
+      const q = armTo(p, "R", [hand[0], hand[1] - pel[1]]);
+      p = { ...p, shR: p.shR + (q.shR - p.shR) * w, elR: p.elR + (q.elR - p.elR) * w };
+    };
+    if (s > 0) {
+      reach([SET_R + 16 - r.x, BODY.r.hand + 0.4], s);
+      // The other arm cocked back, ready to drive.
+      p = { ...p, shL: p.shL + (T2 - 40 - p.shL) * s, elL: p.elL + (80 - p.elL) * s };
+    }
+    if (tw > 0) {
+      const tc = touches.reduce((a, b) => (Math.abs(b.t - t) < Math.abs(a.t - t) ? b : a));
+      reach([(tc.line - r.x) * facing, BODY.r.hand + 0.4], tw);
+      p = { ...p, shL: p.shL + (T2 - 25 - p.shL) * tw, elL: p.elL + (60 - p.elL) * tw };
+    }
+    return p;
+  };
+  for (let i = 0; i < n; i++) {
+    const t = i * dt;
+    const r = R(t);
+    const pel: Vec = [r.x, yS(t)];
+    let p = poseAt(t, r.facing);
+    // Turning round (the figure is mirrored from the turn on) the planted feet and the hand on the line swap sides of
+    // the body: while the figure is faded out, the limbs blend from one solution to the other over a few frames, so no
+    // joint snaps.
+    const tn = turns.find((x) => Math.abs(t - x.t) < 0.09);
+    if (tn) {
+      const w = mj((t - (tn.t - 0.09)) / 0.18);
+      p = mix(poseAt(t, (tn.facing * -1) as 1 | -1), poseAt(t, tn.facing), w);
+    }
+    const kf: Keyframe = { pose: p, root: { pin: "pelvis", at: pel }, dur: dt, ease: "spline" };
+    if (r.facing === -1) kf.facing = -1;
+    if (r.alpha < 1) kf.alpha = r.alpha;
+    keyframes.push(kf);
+  }
   const props: PropDef[] = [];
-  for (const [i, x] of [-Lx, 0, Lx].entries()) {
+  for (const [i, x] of [-L, 0, L].entries()) {
     props.push({ id: `line${i}`, kind: "hurdleLine", variant: "agility", at: [x, 0], layer: "back" });
-    props.push({ id: `cone${i}`, kind: "cone", variant: "agility", at: [x, 0], size: 0.62, layer: "back" });
+    props.push({ id: `cone${i}`, kind: "cone", variant: "agility", at: [x + 22, 0], size: 0.7, layer: "back" });
   }
   // Still image: the hand on the first line.
-  return { id, view: "front", label, keyframes, props, footGrounded: false, stillPhase: (tTouch + 0.03) / T };
+  return { id, view: "side", label, keyframes, props, footGrounded: false, stillPhase: (touches[0]!.t + 0.02) / T };
 }
 
 // ------------------------------------------------------------------------------------------------ T-drill

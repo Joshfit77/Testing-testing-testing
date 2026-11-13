@@ -250,7 +250,7 @@ export const EXERCISE_MOTIONS: Record<string, Builder> = {
   "running-intervals": (id) => gait({ id, kind: "jog", cycle: 0.68, stride: 1.1, lean: 10, label: `${S}Faster running stride for hard intervals.` }),
   "stair-climb": (id) => stepUp(id, `${S}Steps up onto a stair with one foot, drives to stand tall, and steps down (stair-climb pattern).`, { boxH: 22 }),
   "pro-agility-shuttle": (id) =>
-    proAgilityDrill(id, `${F}5-10-5, distances shortened to fit: from a low stance straddling the middle line, drives 5 yards to one side, plants the outside foot and touches the line with that hand, drives 10 yards to the far line and touches it with the other hand, then drives back through the middle.`),
+    proAgilityDrill(id, `${S}5-10-5, distances shortened to fit: from a three-point stance straddling the middle line, sprints 5 yards to one side, brakes with short steps, plants the outside foot at the line with the hips low and touches the line with the hand, turns and sprints 10 yards to the far line, plants and touches it, then turns and sprints 5 yards back through the middle line.`),
   "t-drill": (id) =>
     tDrill(id, `${F}Seen from the top of the T, distances shortened: sprints forward from the start cone to the middle cone and touches it, shuffles left and touches, shuffles right past the middle and touches, shuffles back to the middle, then backpedals to the start, staying low without crossing the feet.`),
   "three-cone-drill": (id) =>
