@@ -69,7 +69,7 @@ describe("habit program content", () => {
     expect(faith.map((p) => p.slug).sort()).toEqual(["faith-fitness-foundations", "strength-and-scripture"]);
     for (const p of faith) expect(p.faithNote).toMatch(/never a measure of your spiritual standing/);
     expect(getHabitProgram("faith-fitness-foundations")?.linkedProgramSlug).toBe("full-body-fitness-foundations");
-    expect(getHabitProgram("strength-and-scripture")?.linkedProgramSlug).toBe("intermediate-strength-builder");
+    expect(getHabitProgram("strength-and-scripture")?.linkedProgramSlug).toBe("intermediate-strength-builder-upper-lower");
     expect(activities("faith-fitness-foundations").find((a) => a.kind === "workout")?.onDays).toEqual([1, 3, 5]);
     expect(activities("strength-and-scripture").find((a) => a.kind === "workout")?.onDays).toEqual([1, 2, 4, 5]);
     for (const p of HABIT_PROGRAMS) {

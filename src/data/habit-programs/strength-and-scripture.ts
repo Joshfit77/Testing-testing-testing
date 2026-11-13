@@ -116,7 +116,7 @@ export const STRENGTH_AND_SCRIPTURE: HabitProgram = {
     { key: "water_ml", label: "Water", unit: "ml/day", min: 1000, max: 5000, default: 2500, help: "More on training days and in hot weather." },
   ],
   completion: COMPLETION_80,
-  linkedProgramSlug: "intermediate-strength-builder",
+  linkedProgramSlug: "intermediate-strength-builder-upper-lower",
   faithNote: FAITH_NOTE,
   weeks: [
     week(1, {
