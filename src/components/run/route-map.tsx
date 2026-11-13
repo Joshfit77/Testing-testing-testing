@@ -1,4 +1,5 @@
 import { useId } from "react";
+import { tileConfigFromEnv, tilesForBounds, tileUrl, tileZoom, type TileConfig } from "@/lib/domain/map-tiles";
 
 type LngLat = [number, number];
 
@@ -35,7 +36,9 @@ export function distanceMarkers(lines: LngLat[][], unit: "km" | "mi"): { n: numb
 }
 
 /**
- * The recorded route drawn from its own GPS points (no map tiles: nothing about the route is sent to a map service).
+ * The recorded route drawn from its own GPS points. By default there are no map tiles, so nothing about the route is
+ * sent to a map service, and a scale grid (one square per scale-bar length) gives the route a background. When the
+ * owner configures a tile provider (see map-tiles.ts), its map is drawn underneath, dimmed so the route stays legible.
  * Each unbroken stretch is a solid line; a pause or a stretch without signal shows as a faint dashed join that is not
  * counted. Start and finish are marked, with a marker at each kilometre or mile and a scale bar. North is up.
  * While recording, `current` adds where the smoothed track puts you now, with its uncertainty.
@@ -46,12 +49,15 @@ export function RouteMap({
   label,
   unit = "km",
   current,
+  tiles = tileConfigFromEnv(),
 }: {
   coordinates: LngLat[][];
   className?: string;
   label?: string;
   unit?: "km" | "mi";
   current?: { lat: number; lng: number; accuracy: number } | null;
+  /** Map tiles to draw underneath; defaults to the environment's configuration (off unless the owner sets one). */
+  tiles?: TileConfig | null;
 }) {
   const id = useId();
   const lines = coordinates.filter((l) => l.length >= 2);
@@ -114,12 +120,46 @@ export function RouteMap({
   const every = markers.length > 10 ? Math.ceil(markers.length / 10) : 1;
   const breaks = lines.slice(1).map((l, i) => [pt(lines[i]!.at(-1)!), pt(l[0]!)] as const);
   const here = current ? pt([current.lng, current.lat]) : null;
+  // The map area in [lng, lat], from the drawing's corners.
+  const toLngLat = (sx: number, sy: number): LngLat => [((sx - ox) / scale + minX) / (k * M), -((sy - oy) / scale + minY) / M];
+  const [west, north] = toLngLat(0, 0);
+  const [east, south] = toLngLat(W, H);
+  const mapTiles = tiles ? tilesForBounds([west, south, east, north], tileZoom(scale, lat0, tiles.maxZoom)) : [];
+  // Grid lines one scale-bar length apart, anchored to the start so the squares stay put as the route grows.
+  const grid = !mapTiles.length && barPx >= 12 ? { x: (start[0] % barPx) - barPx, y: (start[1] % barPx) - barPx } : null;
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className={className} role="img" aria-labelledby={`${id}-t`} data-testid="route-map">
       {/* One string: React server-renders a title element only from a single string child, so two children came out
           empty on the server and filled in the browser (hydration error #418 on every run's page). */}
       <title id={`${id}-t`}>{`${label ?? `Route map with ${lines.length} recorded ${lines.length === 1 ? "stretch" : "stretches"}`}${markers.length ? `, ${markers.length} ${unit} marker${markers.length === 1 ? "" : "s"}` : ""}`}</title>
-      <rect x="0" y="0" width={W} height={H} rx="14" fill="#100f0d" stroke="#2a261f" />
+      <defs>
+        <clipPath id={`${id}-clip`}>
+          <rect x="0" y="0" width={W} height={H} rx="14" />
+        </clipPath>
+      </defs>
+      <rect x="0" y="0" width={W} height={H} rx="14" fill="#100f0d" />
+      {mapTiles.length > 0 && tiles && (
+        <g clipPath={`url(#${id}-clip)`} data-testid="route-tiles">
+          {mapTiles.map((t) => {
+            const [x0, y0] = pt(t.nw);
+            const [x1, y1] = pt(t.se);
+            // A hair of overlap hides the seams between neighbouring tiles.
+            return <image key={`${t.z}/${t.x}/${t.y}`} href={tileUrl(tiles.url, t)} x={x0} y={y0} width={x1 - x0 + 0.5} height={y1 - y0 + 0.5} preserveAspectRatio="none" />;
+          })}
+          <rect x="0" y="0" width={W} height={H} fill="#100f0d" fillOpacity="0.45" />
+        </g>
+      )}
+      {grid && (
+        <g clipPath={`url(#${id}-clip)`} stroke="#C9A54C" strokeOpacity="0.09" strokeWidth="1" data-testid="route-grid" aria-hidden>
+          {Array.from({ length: Math.ceil(W / barPx) + 2 }, (_, i) => grid.x + i * barPx).map((x) => (
+            <line key={`gx${x}`} x1={x} y1="0" x2={x} y2={H} />
+          ))}
+          {Array.from({ length: Math.ceil(H / barPx) + 2 }, (_, i) => grid.y + i * barPx).map((y) => (
+            <line key={`gy${y}`} x1="0" y1={y} x2={W} y2={y} />
+          ))}
+        </g>
+      )}
+      <rect x="0.5" y="0.5" width={W - 1} height={H - 1} rx="14" fill="none" stroke="#2a261f" />
       {breaks.map(([a, b], i) => (
         <line key={`b${i}`} x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke="#a39a86" strokeOpacity="0.55" strokeWidth="1.5" strokeDasharray="3 4" data-testid="route-break">
           <title>Break in the recording (a pause or no GPS signal): not counted</title>
@@ -166,6 +206,11 @@ export function RouteMap({
       <text x={pad} y={H - 8} fontSize="10" fill="#a39a86">
         N ↑
       </text>
+      {mapTiles.length > 0 && tiles && (
+        <text x={W - 8} y="12" textAnchor="end" fontSize="7" fill="#f4f1ea" fillOpacity="0.8" data-testid="route-attribution">
+          {tiles.attribution}
+        </text>
+      )}
     </svg>
   );
 }

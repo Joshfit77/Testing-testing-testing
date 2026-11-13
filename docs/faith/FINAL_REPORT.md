@@ -100,6 +100,9 @@ account data. The privacy policy draft is version-locked and was not edited; pro
 Every Faith e2e test signs up a new Free account: reader, offline, journeys, restart, goals, memory, studies, journal
 and the Bible helper (free quota: 10 a day, 60 a month).
 
+> Update 2026-11-13 (added later; the report above describes 2026-11-03): the Bible helper is now Pro only, like every
+> AI feature. Bible reading, journeys, prayer and the rest of Faith & Discipleship stay free. See `docs/MEMBERSHIPS.md`.
+
 ## 13. Automated test results (this environment, local Supabase, production build)
 
 | Check | Result |

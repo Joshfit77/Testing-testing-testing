@@ -19,7 +19,7 @@ involves AI was tested with the local mock provider.
 
 * **Money budgets enforced in the database before any provider call** (migration 066):
   * a per-member monthly budget, $1.40 by default;
-  * a global monthly budget covering every AI feature, including the free Bible helper ($100 by default; `0` switches AI off).
+  * a global monthly budget covering every AI feature, including the Bible helper ($100 by default; `0` switches AI off). The Bible helper is Pro only since this overhaul, like every AI feature: Free has no AI.
   * Each request holds its expected cost while it runs. When it finishes, the hold is replaced by the real cost, worked out from the provider's usage report. Failed calls give the hold back. A crashed request is closed after 6 minutes and charged at its estimate.
 * **Alerts at 50%, 75%, 90% and 100%** of the global budget, each once per month. They go to the server log and, optionally, a webhook (`AI_BUDGET_ALERT_WEBHOOK_URL`). Alerts contain totals only, never member data.
 * **Concurrency:** at most 2 requests in flight per member and 20 across the app (`AI_MAX_CONCURRENT`).

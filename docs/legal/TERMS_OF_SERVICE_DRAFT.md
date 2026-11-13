@@ -65,11 +65,11 @@ Pro All Access costs **$17.99 per month** or **$119.99 per year**. Both billing 
 - advanced analytics;
 - the AI Coach.
 
-Prices are in U.S. dollars. They do not include any taxes, which may be added where required. Prices in the App Store or Google Play are set and displayed by the store in your local currency and may differ from these amounts. [ATTORNEY REVIEW: confirm that the prices in these Terms match the configured Stripe, App Store and Play prices on the publication date. The code is mid-migration: committed HEAD still lists Plus $11.99 and Pro $24.99, while the uncommitted working tree on 2026-10-26 implements Pro at $17.99 / $119.99. Consider stating prices only "as shown at checkout," to avoid conflicts.]
+Prices are in U.S. dollars. They do not include any taxes, which may be added where required. Prices in the App Store or Google Play are set and displayed by the store in your local currency and may differ from these amounts. [ATTORNEY REVIEW: confirm that the prices in these Terms match the configured Stripe, App Store and Play prices on the publication date. The code is mid-migration: committed HEAD still lists Plus $11.99 and Pro $24.99, while the uncommitted working tree on 2026-10-26 implements Pro at $19.99 / $149.99. Consider stating prices only "as shown at checkout," to avoid conflicts.] [Added 2026-11-13, not part of the note above: the owner has since approved launch prices of $17.99 / $119.99, which Section 3.2 now states. The note above records the code as it stood on 2026-10-26 and is kept unchanged.]
 
 ### 3.3 AI Coach allowance
 
-Pro includes **150 AI requests per calendar month**. Up to **15** of these may be AI plan generations.
+Pro includes **150 AI requests per calendar month**. Up to **10** of these may use our more advanced AI model, which handles AI plan generations and more complex questions; the rest use a faster model. The Free plan does not include AI features.
 
 The following count against the 150-request allowance:
 - AI Coach messages;
@@ -82,7 +82,8 @@ The following count against the 150-request allowance:
 Some other limits also apply:
 - rate limits;
 - a daily limit on food photos;
-- a cap on requests that use the larger AI model.
+- the cap of 10 requests a month that use the more advanced AI model;
+- a monthly limit on our AI cost per member (about $1.40 at launch). If it is reached before the request allowance, further AI requests that month may be declined. [ATTORNEY REVIEW / OWNER: decide whether to disclose the cost limit as a dollar figure or only as "fair-use limits"; the code enforces it either way (`AI_MEMBER_MONTHLY_BUDGET_USD`).]
 
 Unused requests do not roll over to the next month. The allowance resets at the start of each calendar month [ATTORNEY REVIEW / OWNER: confirm which time zone the reset uses]. We may change the AI models we use. [ATTORNEY REVIEW: if the allowance or features are reduced for current subscribers, give notice and apply the change at the next renewal; see Section 24.]
 

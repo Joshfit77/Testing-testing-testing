@@ -7,7 +7,12 @@
 import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { basisFromFoodRow, basisUnits, computeAmount } from "@/lib/domain/food-basis";
+import { mergeGroceries, type GroceryInput } from "@/lib/domain/grocery";
+import { generatePlan } from "@/lib/domain/meal-planner";
+import { toKg } from "@/lib/domain/units";
 import { removeUserStorage, USER_TABLES } from "@/server/services/account";
+import { loadPlannerPrefs, loadPlannerTargets, planEntryRow, plannerSettings } from "@/server/services/meal-plan";
+import { plannerDishes, type GroceryIngredient } from "@/server/services/recipes";
 
 const TZ = "America/New_York";
 const SAMPLE = "Sample data for the demo";
@@ -51,7 +56,6 @@ async function idsBySlug(table: string, slugs: string[]): Promise<Map<string, st
   if (missing.length) fail(`${table} not found: ${missing.join(", ")} (is the database seeded?)`);
   return map;
 }
-const round = (kg: number, step = 2.5) => Math.round(kg / step) * step;
 const topReps = (reps: string | null) => Math.max(...(reps ?? "8").replace(/ per side/i, "").split("-").map(Number).filter(Number.isFinite), 1);
 
 
@@ -61,7 +65,8 @@ export async function seedSampleProfile(id: string): Promise<void> {
   const { error: pErr } = await db
     .from("profiles")
     .update({
-      display_name: "Demo Athlete",
+      // A fictional sample member with an ordinary name, so the demo reads like a real account.
+      display_name: "Jordan Hayes",
       unit_system: "imperial",
       sex: "male",
       // 28 years old (fictional sample member).
@@ -95,7 +100,7 @@ export async function seedSampleProfile(id: string): Promise<void> {
     equipment: ["barbell", "dumbbell", "bench", "rack", "pull_up_bar", "cable", "machine"],
     diet_type: "high_protein",
     activity_level: "active",
-    goal_weight_kg: 82,
+    goal_weight_kg: seedLoadKg(180),
     weekly_change_kg: -0.25,
   }, "user_id");
   await insert("nutrition_goals", { user_id: id, calories: 2600, protein_g: 185, carbs_g: 290, fat_g: 78 }, "user_id");
@@ -106,31 +111,39 @@ export async function seedSampleProfile(id: string): Promise<void> {
 
 // ---------- Training: eight weeks of the Powerbuilding 4-Day program
 
-const START_KG: Record<string, [number, number]> = {
-  // slug: [load eight weeks ago in kg, gain per week]
-  "bench-press": [82.5, 1.25],
-  "barbell-row": [70, 1.25],
-  "seated-dumbbell-shoulder-press": [22, 0.5],
-  "lat-pulldown": [60, 1.25],
-  "triceps-pushdown": [27.5, 0.6],
-  "face-pull": [20, 0.6],
-  "back-squat": [115, 2.5],
-  "romanian-deadlift": [95, 2],
-  "leg-press": [180, 5],
-  "seated-leg-curl": [45, 1.25],
-  "standing-calf-raise": [70, 2.5],
-  "incline-dumbbell-press": [28, 0.6],
-  "chest-supported-row": [26, 0.6],
-  "cable-chest-fly": [15, 0.6],
-  "lateral-raise": [9, 0.3],
-  "incline-dumbbell-curl": [12, 0.3],
-  "overhead-triceps-extension": [22.5, 0.6],
-  "conventional-deadlift": [150, 2.5],
-  "bulgarian-split-squat": [20, 0.6],
-  "hip-thrust": [120, 3],
-  "leg-extension": [50, 1.25],
-  "seated-calf-raise": [40, 1.25],
+// Loads are chosen in pounds (the sample member trains in pounds) in steps a gym actually has: 5 lb for barbells,
+// machines and dumbbells. They're stored in kilograms the same way the app stores a weight a member types (to 0.01 kg),
+// so every set reads back as the round number that was lifted: 185 lb, not 181.9 lb.
+const START_LB: Record<string, [number, number]> = {
+  // slug: [load eight weeks ago in lb, gain per week in lb] (dumbbell loads are per hand)
+  "bench-press": [185, 2.5],
+  "barbell-row": [155, 2.5],
+  "seated-dumbbell-shoulder-press": [50, 1.25],
+  "lat-pulldown": [130, 2.5],
+  "triceps-pushdown": [60, 1.25],
+  "face-pull": [45, 1.25],
+  "back-squat": [255, 5],
+  "romanian-deadlift": [205, 5],
+  "leg-press": [400, 10],
+  "seated-leg-curl": [100, 2.5],
+  "standing-calf-raise": [155, 5],
+  "incline-dumbbell-press": [60, 1.25],
+  "chest-supported-row": [55, 1.25],
+  "cable-chest-fly": [35, 1.25],
+  "lateral-raise": [20, 0.6],
+  "incline-dumbbell-curl": [25, 0.6],
+  "overhead-triceps-extension": [50, 1.25],
+  "conventional-deadlift": [315, 5],
+  "bulgarian-split-squat": [45, 1.25],
+  "hip-thrust": [265, 5],
+  "leg-extension": [110, 2.5],
+  "seated-calf-raise": [90, 2.5],
 };
+
+/** A load in pounds, rounded to the plate or pin step, stored as the app stores a typed weight. */
+export function seedLoadKg(lb: number): number {
+  return toKg(Math.round(lb / 5) * 5, "imperial");
+}
 
 interface DayPlan {
   id: string;
@@ -182,11 +195,13 @@ async function seedTraining(userId: string) {
   const foundations = await idsBySlug("training_programs", ["foundations-full-body", "5k-training"]);
   await insert("user_programs", [...foundations.values()].map((program_id) => ({ user_id: userId, program_id, status: "saved" })));
 
-  // Mon/Tue/Thu/Sat, eight weeks back, a few missed days so consistency looks real.
+  // Mon/Tue/Thu/Sat, eight weeks back up to yesterday, a few missed days long ago so consistency looks real. This
+  // week's sessions before today are logged too: leaving them out made the program report them as missed.
   const skip = new Set(["7-3", "4-1", "2-4"]);
+  let doneThisWeek = 0;
   const best = new Map<string, { exerciseId: string; e1rm: number; weight: number; reps: number; sessionId: string; at: string }>();
   let sessions = 0;
-  for (let week = 8; week >= 1; week--) {
+  for (let week = 8; week >= 0; week--) {
     const progress = 8 - week;
     for (const [i, offset] of [0, 1, 3, 5].entries()) {
       const day = days[i]!;
@@ -197,6 +212,7 @@ async function seedTraining(userId: string) {
       const started = at(date, 6, 5 + ((week * 7 + i) % 20));
       const minutes = 58 + ((week + i) % 4) * 6;
       const inProgram = week <= 2;
+      if (week === 0) doneThisWeek++;
       let volume = 0;
       const [session] = await insert("workout_sessions", {
         user_id: userId,
@@ -213,8 +229,8 @@ async function seedTraining(userId: string) {
       for (const [position, ex] of day.exercises.entries()) {
         const [we] = await insert("workout_exercises", { session_id: session!.id, user_id: userId, exercise_id: ex.exerciseId, position });
         const reps = topReps(ex.reps) - (progress < 3 ? 1 : 0);
-        const [base, gain] = START_KG[ex.slug] ?? [20, 0.5];
-        const weight = ex.bodyweight ? null : round(base + gain * progress, ex.slug.includes("dumbbell") || base < 30 ? 1 : 2.5);
+        const [base, gain] = START_LB[ex.slug] ?? [45, 1.25];
+        const weight = ex.bodyweight ? null : seedLoadKg(base + gain * progress);
         const sets = Array.from({ length: ex.sets }, (_, s) => ({
           workout_exercise_id: we!.id,
           user_id: userId,
@@ -240,6 +256,14 @@ async function seedTraining(userId: string) {
       if (error) fail(`session volume: ${error.message}`);
     }
   }
+  // The program pointer sits on the next session after this week's logged ones.
+  {
+    const { error } = await db
+      .from("user_programs")
+      .update(doneThisWeek >= 4 ? { current_week: 4, current_day: 1 } : { current_week: 3, current_day: doneThisWeek + 1 })
+      .eq("id", up!.id);
+    if (error) fail(`program pointer: ${error.message}`);
+  }
   const prs = ["bench-press", "back-squat", "conventional-deadlift", "barbell-row", "romanian-deadlift", "hip-thrust"].flatMap((slug) => {
     const b = best.get(slug);
     if (!b) return [];
@@ -252,9 +276,9 @@ async function seedTraining(userId: string) {
 
   const lifts = await idsBySlug("exercises", ["bench-press", "conventional-deadlift"]);
   await insert("fitness_goals", [
-    { user_id: userId, title: "Bench press 265 lb", goal_type: "strength", exercise_id: lifts.get("bench-press"), start_value: 100, target_value: 120, unit: "kg", target_date: dayOffset(120), status: "active" },
-    { user_id: userId, title: "Deadlift 405 lb", goal_type: "strength", exercise_id: lifts.get("conventional-deadlift"), start_value: 160, target_value: 184, unit: "kg", target_date: dayOffset(240), status: "active" },
-    { user_id: userId, title: "Reach 181 lb", goal_type: "bodyweight", start_value: 86.2, target_value: 82, unit: "kg", target_date: dayOffset(90), status: "active" },
+    { user_id: userId, title: "Bench press 225 lb", goal_type: "strength", exercise_id: lifts.get("bench-press"), start_value: seedLoadKg(185), target_value: seedLoadKg(225), unit: "kg", target_date: dayOffset(120), status: "active" },
+    { user_id: userId, title: "Deadlift 405 lb", goal_type: "strength", exercise_id: lifts.get("conventional-deadlift"), start_value: seedLoadKg(315), target_value: seedLoadKg(405), unit: "kg", target_date: dayOffset(240), status: "active" },
+    { user_id: userId, title: "Reach 180 lb", goal_type: "bodyweight", start_value: seedLoadKg(190), target_value: seedLoadKg(180), unit: "kg", target_date: dayOffset(90), status: "active" },
     { user_id: userId, title: "Train 4 days a week", goal_type: "frequency", target_value: 4, unit: "sessions", status: "active" },
   ]);
 
@@ -377,6 +401,105 @@ async function seedFood(userId: string) {
   }
 }
 
+// ---------- Recipes, a week's meal plan and the grocery list, built by the app's own planner
+
+/** The sample member's recipes, from the same foods as their diary: [name, servings, [food, amount, unit]]. */
+const RECIPES: [string, number, string, [string, number, "g" | "ml"][]][] = [
+  [
+    "Chicken rice bowl",
+    2,
+    "Batch-cooked for two lunches. Season the chicken with garlic, paprika and a squeeze of lemon.",
+    [["Chicken breast, skinless, cooked", 300, "g"], ["White rice, cooked", 370, "g"], ["Broccoli, cooked", 180, "g"], ["Olive oil", 14, "g"]],
+  ],
+  [
+    "Overnight protein oats",
+    1,
+    "Stir the oats, milk and protein together the night before; add the blueberries in the morning.",
+    [["Oats, rolled, dry", 80, "g"], ["Milk, 2%", 240, "ml"], ["Whey protein powder", 30, "g"], ["Blueberries", 75, "g"]],
+  ],
+  [
+    "Salmon, sweet potato and spinach",
+    2,
+    "Roast the sweet potato at 400 °F for 35 minutes, add the salmon for the last 12, wilt the spinach in the pan.",
+    [["Salmon, Atlantic, cooked", 340, "g"], ["Sweet potato, baked", 400, "g"], ["Spinach, raw", 120, "g"], ["Olive oil", 14, "g"]],
+  ],
+];
+
+async function seedMealPlanning(userId: string) {
+  const names = [...new Set(RECIPES.flatMap(([, , , items]) => items.map(([n]) => n)))];
+  const { data: foods, error } = await db.from("foods").select("*").is("owner_id", null).in("name", names);
+  if (error) fail(`recipe foods: ${error.message}`);
+  const byName = new Map((foods ?? []).map((f) => [f.name as string, f]));
+  for (const [name, servings, notes, items] of RECIPES) {
+    const [recipe] = await insert("recipes", { user_id: userId, name, servings, notes });
+    await insert(
+      "recipe_ingredients",
+      items.map(([foodName, amount, unit], position) => {
+        const food = byName.get(foodName);
+        if (!food) fail(`recipe food not found: ${foodName}`);
+        const basis = basisFromFoodRow(food as Parameters<typeof basisFromFoodRow>[0]);
+        // Weigh in grams where the food allows it, millilitres for a liquid: the same units the recipe editor offers.
+        const unitId = basisUnits(basis).some((u) => u.id === unit) ? unit : basisUnits(basis)[0]!.id;
+        const r = computeAmount(basis, amount, unitId);
+        if (!r) fail(`no amount for ${foodName}`);
+        return {
+          recipe_id: recipe!.id,
+          user_id: userId,
+          position,
+          name: foodName,
+          source: `food:${food.id as string}`,
+          quantity: amount,
+          unit_label: r.unit.label.slice(0, 100),
+          grams: r.grams,
+          amount_label: r.amountLabel.slice(0, 160),
+          basis,
+        };
+      }),
+    );
+  }
+
+  // The planner exactly as "Generate plan" runs it, for the seven days from today.
+  await insert("meal_plan_settings", { user_id: userId, meals_per_day: 4, budget: "any", include_app_recipes: true }, "user_id");
+  const [targets, prefs] = await Promise.all([loadPlannerTargets(db, userId), loadPlannerPrefs(db, userId)]);
+  if (!targets) fail("planner: no nutrition targets");
+  const settings = plannerSettings(targets, prefs);
+  const dishes = await plannerDishes(db, userId, prefs.includeApp);
+  const dates = Array.from({ length: 7 }, (_, i) => dayOffset(i));
+  const plan = generatePlan(dishes, settings, dates);
+  const [created] = await insert("meal_plans", {
+    user_id: userId,
+    start_date: dates[0],
+    days: 7,
+    targets: { calories: settings.calories, protein_g: settings.protein_g, carbs_g: settings.carbs_g, fat_g: settings.fat_g },
+    settings: { mealsPerDay: settings.mealsPerDay, diet: settings.diet, budget: settings.budget, allergies: settings.allergies, dislikes: settings.dislikes },
+  });
+  const byKey = new Map(dishes.map((d) => [d.key, d]));
+  const entries = plan.flatMap((d) => d.meals.flatMap((m) => (m ? [planEntryRow(created!.id, userId, d.date, m, byKey.get(m.key)!)] : [])));
+  if (!entries.length) fail("planner: nothing planned");
+  await insert("meal_plan_entries", entries);
+
+  // The grocery list for the week's plan, as "Build list" makes it, plus two things added by hand.
+  const groceries: GroceryInput[] = entries.flatMap((e) =>
+    (e.ingredients as GroceryIngredient[]).map((i) => ({ key: i.key, name: i.name, quantity: Number(i.quantity) * Number(e.portion), unitLabel: i.unitLabel, gramsPerUnit: i.gramsPerUnit ?? null })),
+  );
+  const lines = mergeGroceries(groceries, "imperial");
+  await insert("grocery_items", [
+    ...lines.map((l, i) => ({
+      user_id: userId,
+      name: l.name.slice(0, 160),
+      quantity: l.quantity > 0 ? l.quantity : null,
+      unit: l.unit.slice(0, 60),
+      note: l.note?.slice(0, 300) ?? null,
+      origin: "plan",
+      ingredient_key: l.key.slice(0, 80),
+      position: i,
+    })),
+    { user_id: userId, name: "Coffee beans", quantity: 1, unit: "bag", origin: "manual", position: lines.length },
+    { user_id: userId, name: "Sparkling water", quantity: 12, unit: "cans", origin: "manual", position: lines.length + 1 },
+  ]);
+  await insert("grocery_lists", { user_id: userId, from_date: dates[0], to_date: dates.at(-1), generated_at: new Date().toISOString() }, "user_id");
+}
+
 // ---------- Runs: hand-logged runs plus GPS runs on clearly labelled sample routes
 
 /** A loop route around a park as recorded points (lng, lat), with per-mile splits. */
@@ -391,14 +514,18 @@ function sampleRoute(distanceM: number, movingS: number, startLat: number, start
     const east = (loopM / (2 * Math.PI)) * (1 - Math.cos(a)) * 0.75;
     points.push([Number((startLng + east / (111_195 * Math.cos((startLat * Math.PI) / 180))).toFixed(5)), Number((startLat + north / 111_195).toFixed(5))]);
   }
+  // Same shape the GPS recorder stores: distance and moving time are cumulative at each split, split_s is the split's
+  // own time. The last split may be shorter than a mile (a 3.11-mile run ends with a 0.11-mile split).
   const mile = 1609.344;
   const splits = [];
   let covered = 0;
+  let moving = 0;
   for (let index = 1; covered < distanceM - 1; index++) {
     const d = Math.min(mile, distanceM - covered);
-    const s = Math.round((movingS * d) / distanceM * (1 + ((index % 3) - 1) * 0.02));
-    splits.push({ index, unit: "mi", distance_m: Math.round(d), moving_s: s, elapsed_s: s + (index === 2 ? 12 : 0), split_s: s });
+    const s = Math.round(((movingS * d) / distanceM) * (1 + ((index % 3) - 1) * 0.02));
     covered += d;
+    moving += s;
+    splits.push({ index, unit: "mi", distance_m: Math.round(covered), moving_s: moving, elapsed_s: moving + (index >= 2 ? 12 : 0), split_s: s });
   }
   return { route: { type: "MultiLineString", coordinates: [points] }, splits };
 }
@@ -723,6 +850,7 @@ export function setSeedClient(client: SupabaseClient): void {
 export async function seedSampleData(userId: string): Promise<{ sessions: number; discipleship: string }> {
   const sessions = await seedTraining(userId);
   await seedFood(userId);
+  await seedMealPlanning(userId);
   await seedRuns(userId);
   await seedSleep(userId);
   await seedFaith(userId);

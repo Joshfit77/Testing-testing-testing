@@ -81,6 +81,17 @@ describe.skipIf(!available)("muscle map and strength ranks", async () => {
     expect(map.overall.rank).not.toBeNull();
   });
 
+  it("uses the standards that match the member's sex when they haven't chosen a table, so muscles aren't left 'Not assessed'", async () => {
+    await other.client.from("profiles").update({ sex: "female", strength_standards: null }).eq("id", other.id);
+    expect((await loadBodyMap(other.client, other.id)).table).toBe("women");
+    await other.client.from("profiles").update({ sex: "male" }).eq("id", other.id);
+    expect((await loadBodyMap(other.client, other.id)).table).toBe("men");
+    // An explicit choice wins over sex.
+    await other.client.from("profiles").update({ strength_standards: "women" }).eq("id", other.id);
+    expect((await loadBodyMap(other.client, other.id)).table).toBe("women");
+    await other.client.from("profiles").update({ sex: null, strength_standards: null }).eq("id", other.id);
+  });
+
   it("sees nothing of another member", async () => {
     const map = await loadBodyMap(other.client, lifter.id);
     expect(map.sessionsCounted).toBe(0);

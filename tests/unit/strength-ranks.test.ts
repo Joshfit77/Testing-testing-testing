@@ -160,3 +160,14 @@ describe("muscle map statistics", () => {
     expect(allRegionStats({ sessions: [], records: [], today: TODAY })).toHaveLength(12);
   });
 });
+
+describe("which strength table the ranks use", () => {
+  it("defaults from the sex given at sign-up, so ranks show without an extra question", async () => {
+    const { effectiveStandardsTable } = await import("@/lib/domain/strength-ranks");
+    expect(effectiveStandardsTable(null, "male")).toBe("men");
+    expect(effectiveStandardsTable(null, "female")).toBe("women");
+    expect(effectiveStandardsTable("women", "male")).toBe("women"); // the member's own choice wins
+    expect(effectiveStandardsTable(null, "unspecified")).toBeNull(); // asked only when they chose not to say
+    expect(effectiveStandardsTable(null, null)).toBeNull();
+  });
+});

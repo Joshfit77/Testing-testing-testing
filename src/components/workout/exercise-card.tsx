@@ -44,9 +44,14 @@ function NumberCell({
     <input
       type="text"
       inputMode={inputMode}
+      // The phone keyboard shows "Done", and Enter closes it: no hunting for a way out of the number pad.
+      enterKeyHint="done"
       aria-label={label}
       placeholder={placeholder}
       value={text}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") e.currentTarget.blur();
+      }}
       onFocus={(e) => {
         focused.current = true;
         e.currentTarget.select();
@@ -230,19 +235,27 @@ function SetRow({
           <NumberCell value={set.reps} onCommit={(n) => update({ reps: n == null ? null : Math.round(n) })} label={`${label} reps`} inputMode="numeric" placeholder="reps" />
         </>
       )}
-      <select
-        aria-label={`${label} RPE`}
-        value={set.rpe ?? ""}
-        onChange={(e) => update({ rpe: e.target.value ? Number(e.target.value) : null })}
-        className="h-11 w-full rounded-lg border border-border bg-elevated px-1 text-center text-sm text-foreground"
-      >
-        <option value="">RPE</option>
-        {[5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10].map((r) => (
-          <option key={r} value={r}>
-            {r}
-          </option>
-        ))}
-      </select>
+      {/* How hard a set felt is answered after it, so RPE appears once the set is done (or already has one): a set
+          still to do shows only what's needed to do it. */}
+      {set.completed || set.rpe != null ? (
+        <select
+          aria-label={`${label} RPE`}
+          value={set.rpe ?? ""}
+          onChange={(e) => update({ rpe: e.target.value ? Number(e.target.value) : null })}
+          className="h-11 w-full rounded-lg border border-border bg-elevated px-1 text-center text-sm text-foreground"
+        >
+          <option value="">RPE</option>
+          {[5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10].map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <span aria-hidden className="text-center text-sm text-muted-foreground/50" data-testid="rpe-later">
+          –
+        </span>
+      )}
       {showComplete ? (
         <button
           type="button"

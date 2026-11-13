@@ -213,17 +213,31 @@ export function formatMinutes(min: number): string {
   return h ? `${h} h ${String(m).padStart(2, "0")} min` : `${m} min`;
 }
 
-export function formatPace(secPerKm: number): string {
-  const m = Math.floor(secPerKm / 60);
-  const s = Math.round(secPerKm % 60);
-  return `${m}:${String(s).padStart(2, "0")} /km`;
+/** Distances are stored in kilometres; members see them in their own units ("3.1 mi" or "5 km"). */
+export type ReportDistanceUnit = "km" | "mi";
+const KM_PER_MI = 1.609344;
+
+export function formatDistance(km: number, unit: ReportDistanceUnit = "km"): string {
+  const v = unit === "mi" ? km / KM_PER_MI : km;
+  return `${Math.round(v * 10) / 10} ${unit}`;
+}
+
+export function formatPace(secPerKm: number, unit: ReportDistanceUnit = "km"): string {
+  const sec = unit === "mi" ? secPerKm * KM_PER_MI : secPerKm;
+  let m = Math.floor(sec / 60);
+  let s = Math.round(sec % 60);
+  if (s === 60) {
+    m += 1;
+    s = 0;
+  }
+  return `${m}:${String(s).padStart(2, "0")} /${unit}`;
 }
 
 /**
  * Rule-based analysis: plain observations from the numbers, three recommendations for next week. Nothing in it is a
  * diagnosis, and a section without records only ever produces "log it" style advice.
  */
-export function ruleBasedAnalysis(m: WeeklyMetrics): ReportAnalysis {
+export function ruleBasedAnalysis(m: WeeklyMetrics, unit: ReportDistanceUnit = "km"): ReportAnalysis {
   const wentWell: string[] = [];
   const toImprove: string[] = [];
   const recovery: string[] = [];
@@ -264,8 +278,8 @@ export function ruleBasedAnalysis(m: WeeklyMetrics): ReportAnalysis {
 
   const r = m.running;
   if (r.runs > 0) {
-    const vsPrior = r.priorDistanceKm !== null && r.priorDistanceKm > 0 ? ` (${r.distanceKm >= r.priorDistanceKm ? "up" : "down"} from ${r.priorDistanceKm} km)` : "";
-    wentWell.push(`${r.runs} run${r.runs === 1 ? "" : "s"}, ${r.distanceKm} km in total${vsPrior}.`);
+    const vsPrior = r.priorDistanceKm !== null && r.priorDistanceKm > 0 ? ` (${r.distanceKm >= r.priorDistanceKm ? "up" : "down"} from ${formatDistance(r.priorDistanceKm, unit)})` : "";
+    wentWell.push(`${r.runs} run${r.runs === 1 ? "" : "s"}, ${formatDistance(r.distanceKm, unit)} in total${vsPrior}.`);
     if (r.priorDistanceKm && r.distanceKm > r.priorDistanceKm * 1.3 && r.priorDistanceKm >= 5) {
       recovery.push("Your running distance rose by more than 30% on last week. Many runners build up more gradually; consider holding this distance next week.");
     }
@@ -304,9 +318,11 @@ export function ruleBasedAnalysis(m: WeeklyMetrics): ReportAnalysis {
 }
 
 /** The numbers sent to the AI for the written analysis: aggregates only, no free text, no journal, no names of people. */
-export function metricsForAi(m: WeeklyMetrics): string {
+export function metricsForAi(m: WeeklyMetrics, unit: ReportDistanceUnit = "km"): string {
   return JSON.stringify({
     week: `${m.period.weekStart} to ${m.period.weekEnd}`,
+    // The numbers are in km; the member reads miles or kilometres. 1 mi = 1.609 km.
+    writeDistancesIn: unit === "mi" ? "miles" : "kilometres",
     training: m.training,
     nutrition: m.nutrition,
     running: m.running,
@@ -317,16 +333,17 @@ export function metricsForAi(m: WeeklyMetrics): string {
 
 export const REPORT_AI_INSTRUCTIONS = `You write the analysis part of a member's weekly fitness report for the Narrow Gate Fitness app.
 You are given this week's numbers as JSON. Use only those numbers: never invent workouts, foods, records, measurements, feelings or health conditions.
+Running distances in the JSON are in kilometres: write them in the unit named by writeDistancesIn (1 mile = 1.609 km).
 A section whose coverage is "none" has no records: say nothing about it except, at most, suggesting the member log it. Coverage "partial" means some days are missing; say so when you use those numbers.
 Write short, encouraging, specific sentences in second person. Observations must be things the numbers show. Mark anything inferred as possible ("may", "could").
 You are not a medical professional: no diagnoses, no injury or illness claims, no supplement or medication advice. For anything that sounds like a health concern, suggest speaking to a qualified professional.
 Return wentWell (up to 4), toImprove (up to 4, including possible plateaus), recovery (up to 3 recovery considerations), and exactly 3 practical recommendations for next week.`;
 
 /** A plain-text summary the member can copy or share. Only headline numbers: no foods, notes, journal or photos. */
-export function shareText(m: WeeklyMetrics): string {
+export function shareText(m: WeeklyMetrics, unit: ReportDistanceUnit = "km"): string {
   const lines = [`My week ${m.period.weekStart} to ${m.period.weekEnd} (Narrow Gate Fitness)`];
   if (m.training.workouts) lines.push(`Workouts: ${m.training.workouts}${m.training.prs.length ? `, ${m.training.prs.length} personal record${m.training.prs.length === 1 ? "" : "s"}` : ""}`);
-  if (m.running.runs) lines.push(`Running: ${m.running.distanceKm} km in ${m.running.runs} run${m.running.runs === 1 ? "" : "s"}`);
+  if (m.running.runs) lines.push(`Running: ${formatDistance(m.running.distanceKm, unit)} in ${m.running.runs} run${m.running.runs === 1 ? "" : "s"}`);
   if (m.sleep.avgAsleepMinutes !== null) lines.push(`Sleep: ${formatMinutes(m.sleep.avgAsleepMinutes)} a night on average`);
   if (m.nutrition.loggedDays) lines.push(`Food logged on ${m.nutrition.loggedDays} of 7 days`);
   return lines.join("\n");

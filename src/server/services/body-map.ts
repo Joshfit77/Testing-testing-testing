@@ -2,7 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { allRegionStats, type MapRecord, type MapSession, type RegionStats } from "@/lib/domain/body-map";
 import { addDays, isoDateInTz } from "@/lib/domain/dates";
-import { rankAll, type OverallRank, type RegionRank, type StandardsTable } from "@/lib/domain/strength-ranks";
+import { effectiveStandardsTable, rankAll, type OverallRank, type RegionRank, type StandardsTable } from "@/lib/domain/strength-ranks";
 import type { UnitSystem } from "@/lib/domain/types";
 
 export interface BodyMapData {
@@ -28,7 +28,7 @@ type SessionRow = {
 
 /** Everything the muscle map shows, from the member's own completed workouts in the last 12 months. */
 export async function loadBodyMap(supabase: SupabaseClient, userId: string): Promise<BodyMapData> {
-  const { data: profile } = await supabase.from("profiles").select("timezone, unit_system, strength_standards").eq("id", userId).maybeSingle();
+  const { data: profile } = await supabase.from("profiles").select("timezone, unit_system, strength_standards, sex").eq("id", userId).maybeSingle();
   const timeZone = (profile?.timezone as string) || "UTC";
   const today = isoDateInTz(new Date(), timeZone);
   const since = addDays(today, -365);
@@ -77,7 +77,7 @@ export async function loadBodyMap(supabase: SupabaseClient, userId: string): Pro
   const w = weightRes.data as { weight_kg: number | string; recorded_on: string } | null;
   const recent = w && w.recorded_on >= since;
   const bodyweight = w && recent ? { kg: Number(w.weight_kg), date: w.recorded_on } : null;
-  const table = (profile?.strength_standards as StandardsTable | null) ?? null;
+  const table = effectiveStandardsTable(profile?.strength_standards as string | null, profile?.sex as string | null);
 
   const records: MapRecord[] = (
     (recordsRes.data ?? []) as unknown as { record_type: MapRecord["recordType"]; value: number | string; weight_kg: number | string | null; reps: number | null; achieved_at: string; exercise: { slug: string; name: string; primary_muscles: string[] | null } | null }[]

@@ -33,7 +33,8 @@ test.describe("memberships", () => {
       ["/progress/body-map", "See my progress", /\/progress\/overview/],
       ["/progress/body-scan", "Add a progress photo", /\/progress\/overview/],
       ["/nutrition/compare", "Check one product", /\/nutrition\/scanner/],
-      ["/train/build", "Browse free programs", /\/train\/programs/],
+      // The library has no free programs, so the builder's free step is the free starter program, not the library.
+      ["/train/build", "Rebuild my free starter program", /\/profile\/preferences/],
       ["/train/review", "See my workout history", /\/train\/history/],
     ] as const) {
       await page.goto(path);

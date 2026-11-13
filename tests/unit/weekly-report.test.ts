@@ -8,6 +8,10 @@ import {
   ruleBasedAnalysis,
   shareText,
   type WeeklyReportInput,
+  formatDistance,
+  formatPace,
+  metricsForAi,
+  REPORT_AI_INSTRUCTIONS,
 } from "@/lib/domain/weekly-report";
 
 const period = { weekStart: "2026-11-02", weekEnd: "2026-11-08" };
@@ -141,5 +145,25 @@ describe("weekly metrics come only from records", () => {
     expect(text).toContain("Workouts: 1");
     expect(text).toContain("Running: 5 km in 1 run");
     expect(text).not.toMatch(/kg|calorie|protein|weight/i);
+  });
+});
+
+describe("weekly report distances follow the member's units", () => {
+  it("a miles member reads miles everywhere: analysis, share text and the AI's instructions", () => {
+    const m = buildWeeklyMetrics(input({ runs: [{ distanceM: 5000, movingS: 1500 }, { distanceM: 1400, movingS: 480 }] }));
+    expect(m.running.distanceKm).toBe(6.4);
+    const text = ruleBasedAnalysis(m, "mi").wentWell.join(" ");
+    expect(text).toContain("4 mi in total");
+    expect(text).not.toMatch(/\bkm\b/);
+    expect(shareText(m, "mi")).toContain("Running: 4 mi in 2 runs");
+    expect(JSON.parse(metricsForAi(m, "mi")).writeDistancesIn).toBe("miles");
+    expect(REPORT_AI_INSTRUCTIONS).toContain("writeDistancesIn");
+  });
+
+  it("kilometres stay the default, and pace converts per unit", () => {
+    expect(formatDistance(6.4)).toBe("6.4 km");
+    expect(formatDistance(6.4, "mi")).toBe("4 mi");
+    expect(formatPace(300)).toBe("5:00 /km");
+    expect(formatPace(300, "mi")).toBe("8:03 /mi");
   });
 });

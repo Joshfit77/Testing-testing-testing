@@ -8,6 +8,19 @@ import type { NightSummary } from "@/lib/domain/sleep";
 export const RATING_FIELDS = ["restedness", "energy_morning", "energy_afternoon", "energy_evening", "mood", "stress", "sleep_quality"] as const;
 export type RatingField = (typeof RATING_FIELDS)[number];
 
+/**
+ * The daily recovery check-in also answers three sleep-journal questions, so the journal never asks them twice. This
+ * is the row written into that day's sleep journal: only these three columns, so the journal's other answers
+ * (restedness, energy later in the day, mood, habits, disturbances) are never cleared by an upsert.
+ */
+export function sleepJournalFromRecoveryCheckin(
+  userId: string,
+  day: string,
+  v: { sleepQuality: number; energy: number; stress: number },
+): { user_id: string; day: string; sleep_quality: number; energy_morning: number; stress: number } {
+  return { user_id: userId, day, sleep_quality: v.sleepQuality, energy_morning: v.energy, stress: v.stress };
+}
+
 export const RATING_LABELS: Record<RatingField, { label: string; low: string; high: string }> = {
   restedness: { label: "How rested do you feel?", low: "Exhausted", high: "Fully rested" },
   sleep_quality: { label: "How was your sleep?", low: "Terrible", high: "Great" },

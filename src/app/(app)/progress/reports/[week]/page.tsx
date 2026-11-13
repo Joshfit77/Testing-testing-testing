@@ -4,7 +4,7 @@ import { BackLink } from "@/components/platform/back-link";
 import { formatWeek } from "@/components/reports/format";
 import { ReportActions } from "@/components/reports/report-actions";
 import { formatWeight } from "@/lib/domain/units";
-import { formatMinutes, formatPace, isValidWeekStart, shareText, type Coverage } from "@/lib/domain/weekly-report";
+import { formatDistance, formatMinutes, formatPace, isValidWeekStart, shareText, type Coverage } from "@/lib/domain/weekly-report";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
 import { getWeeklyReport } from "@/server/services/weekly-reports";
@@ -62,6 +62,7 @@ export default async function WeeklyReportPage({ params }: { params: Promise<{ w
   const m = report.metrics;
   const a = report.analysis;
   const units = profile.unit_system ?? "metric";
+  const dist = units === "imperial" ? "mi" : "km";
   const stageTotal = m.sleep.stages ? m.sleep.stages.rem + m.sleep.stages.deep + m.sleep.stages.light + m.sleep.stages.awake : 0;
 
   return (
@@ -124,9 +125,9 @@ export default async function WeeklyReportPage({ params }: { params: Promise<{ w
           <p className="text-sm text-muted-foreground">No runs this week.</p>
         ) : (
           <div className="grid grid-cols-3 gap-2">
-            <Stat label="Distance" value={`${m.running.distanceKm} km`} note={m.running.priorDistanceKm !== null ? `last week ${m.running.priorDistanceKm} km` : undefined} />
+            <Stat label="Distance" value={formatDistance(m.running.distanceKm, dist)} note={m.running.priorDistanceKm !== null ? `last week ${formatDistance(m.running.priorDistanceKm, dist)}` : undefined} />
             <Stat label="Runs" value={String(m.running.runs)} />
-            <Stat label="Avg pace" value={m.running.avgPaceSecPerKm ? formatPace(m.running.avgPaceSecPerKm) : "—"} />
+            <Stat label="Avg pace" value={m.running.avgPaceSecPerKm ? formatPace(m.running.avgPaceSecPerKm, dist) : "—"} />
           </div>
         )}
       </Section>
@@ -175,7 +176,7 @@ export default async function WeeklyReportPage({ params }: { params: Promise<{ w
       <section className="rounded-2xl border border-border bg-card p-5">
         <h2 className="font-display text-lg font-bold uppercase">Share or delete</h2>
         <div className="mt-3">
-          <ReportActions weekStart={report.week_start} summary={shareText(m)} />
+          <ReportActions weekStart={report.week_start} summary={shareText(m, dist)} />
         </div>
       </section>
     </div>

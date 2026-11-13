@@ -41,6 +41,17 @@ export type StandardsTable = "men" | "women";
 export const STANDARDS_LABELS: Record<StandardsTable, string> = { men: "Men's table", women: "Women's table" };
 
 /**
+ * The table the ranks use: the member's own choice, else the one matching the sex they gave at sign-up. Only a member
+ * who chose not to say (or never answered) is asked to pick.
+ */
+export function effectiveStandardsTable(chosen: string | null | undefined, sex: string | null | undefined): StandardsTable | null {
+  if (chosen === "men" || chosen === "women") return chosen;
+  if (sex === "male") return "men";
+  if (sex === "female") return "women";
+  return null;
+}
+
+/**
  *   - `load_ratio`: estimated 1RM ÷ body weight, from the logged load.
  *   - `bodyweight_ratio`: (body weight + added weight) as an estimated 1RM ÷ body weight; 1 rep with no added
  *     weight is 1.0, 10 reps is about 1.33. Sets over 12 reps count as 12.

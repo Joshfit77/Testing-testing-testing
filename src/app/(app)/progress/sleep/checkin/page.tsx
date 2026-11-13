@@ -12,7 +12,7 @@ import { requireOnboardedUser } from "@/server/auth";
 import { deleteSleepCheckinAction } from "@/server/actions/sleep-checkins";
 import { getSleepCheckin } from "@/server/services/sleep";
 
-export const metadata = { title: "Sleep check-in" };
+export const metadata = { title: "Sleep journal" };
 
 export default async function SleepCheckinPage({ searchParams }: { searchParams: Promise<{ day?: string }> }) {
   const { user, profile } = await requireOnboardedUser();
@@ -29,8 +29,8 @@ export default async function SleepCheckinPage({ searchParams }: { searchParams:
       <BackLink href="/progress/sleep">Sleep & Recovery</BackLink>
       <PageHeader
         eyebrow="Sleep & Recovery"
-        title={day === today ? "Today's check-in" : `Check-in for ${formatNightDate(day)}`}
-        description="Twenty seconds, all optional. Over time these show which habits go with your better and worse nights."
+        title={day === today ? "Sleep journal" : `Sleep journal for ${formatNightDate(day)}`}
+        description="Optional. How rested you feel, energy through the day and the habits that can affect sleep. Over time it shows what goes with your better nights."
         actions={
           checkin ? (
             <ActionButton action={deleteSleepCheckinAction} fields={{ day }} variant="secondary" navigateTo="/progress/sleep" confirmMessage="Clear this day's check-in?" confirmLabel="Clear">

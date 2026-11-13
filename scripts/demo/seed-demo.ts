@@ -85,7 +85,7 @@ async function createMember(password: string): Promise<string> {
     password,
     email_confirm: true,
     app_metadata: { demo: true },
-    user_metadata: { display_name: "Demo Athlete", legal_acceptances: signupAcceptances() },
+    user_metadata: { display_name: "Jordan Hayes", legal_acceptances: signupAcceptances() },
   });
   if (error || !data.user) fail(`creating the demo account: ${error?.message}`);
   const id = data.user.id;

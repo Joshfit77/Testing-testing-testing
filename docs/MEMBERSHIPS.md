@@ -54,8 +54,12 @@ GPS recording left unsaved on the phone stays there until it's saved (with Pro) 
 
 ## AI allowance and cost
 
-- Pro: 150 AI requests a calendar month, at most 15 of them plan generations, and at most 15 on the larger model
-  (`PLAN_PRO_AI_*`). Every AI feature reserves one request in the database before calling the model
+- Free: no AI features (the AI coach, AI plans, food-photo analysis and other AI tools are Pro only).
+- Pro: 150 AI requests a calendar month, at most 10 of them on the advanced model (plan generations and complex
+  questions; plan generations are capped at 10 as well), the rest on the fast model (`PLAN_PRO_AI_*`). On top of the
+  request counts, a per-member AI cost budget of about $1.40 a month (`AI_MEMBER_MONTHLY_BUDGET_USD`, default from
+  `sustainableAiBudget()` in `src/lib/domain/ai-economics.ts`) stops further AI calls if a member's measured spend
+  reaches it first. Every AI feature reserves one request in the database before calling the model
   (`reserve_ai_usage`), so the limit holds across server instances. One coach message counts once, even when it makes
   several model calls for tools; its tokens are recorded.
 - Routing (`src/lib/coach/routing.ts`): plan generation and complex questions use Claude Sonnet 5.5, everything else

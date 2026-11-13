@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/common/page-header";
 import { BackLink } from "@/components/platform/back-link";
 import { hasFeature } from "@/lib/domain/plans";
 import { DEFAULT_SLEEP_GOAL_MINUTES } from "@/lib/domain/sleep";
-import { latestDuePeriod } from "@/lib/domain/weekly-report";
+import { formatDistance, latestDuePeriod } from "@/lib/domain/weekly-report";
 import { isValidTimeZone } from "@/lib/domain/dates";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
@@ -71,7 +71,7 @@ export default async function WeeklyReportsPage() {
                 </span>
                 <span className="mt-1 block text-sm text-muted-foreground">
                   {r.metrics.training.workouts} workout{r.metrics.training.workouts === 1 ? "" : "s"}
-                  {r.metrics.running.runs ? ` · ${r.metrics.running.distanceKm} km run` : ""}
+                  {r.metrics.running.runs ? ` · ${formatDistance(r.metrics.running.distanceKm, profile.unit_system === "imperial" ? "mi" : "km")} run` : ""}
                   {r.metrics.sleep.nights ? ` · ${r.metrics.sleep.nights} night${r.metrics.sleep.nights === 1 ? "" : "s"} of sleep` : ""}
                   {r.metrics.nutrition.loggedDays ? ` · food on ${r.metrics.nutrition.loggedDays} days` : ""}
                 </span>

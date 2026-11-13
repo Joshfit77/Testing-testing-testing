@@ -191,17 +191,17 @@ export default async function TrainPage() {
         ) : (
           <div className="p-4 pt-2">
             <p className="text-sm text-muted-foreground">
-              {active ? "You've finished this program. Choose your next one, or log a free workout." : "No active program. Build one around your goals, start one from the library, or log a free workout."}
+              {active ? "You've finished this program. Choose your next one, or log a free workout." : canBuild ? "No active program. Build one around your goals, start one from the library, or log a free workout." : "No active program. Rebuild your free starter program from your answers, or log a free workout."}
             </p>
             <div className="mt-3 space-y-2">
               <TodayWorkoutAction userId={user.id} startHref={startHref} serverInProgress={(inProgressRes.data?.name as string | undefined) ?? null} />
-              {/* The builder is Pro; Free members get the program library first (it has free programs). */}
+              {/* The builder and the library are Pro; Free members rebuild their free starter program instead. */}
               <div className="grid grid-cols-2 gap-2">
                 <Button asChild variant={canBuild ? "default" : "secondary"}>
-                  <Link href="/train/build">{canBuild ? "Build my program" : "Build (Pro)"}</Link>
+                  {canBuild ? <Link href="/train/build">Build my program</Link> : <Link href="/profile/preferences" data-testid="rebuild-starter">Rebuild starter program</Link>}
                 </Button>
-                <Button asChild variant={canBuild ? "secondary" : "default"}>
-                  <Link href="/train/programs">Browse programs</Link>
+                <Button asChild variant="secondary">
+                  <Link href="/train/programs">{canBuild ? "Browse programs" : "Programs (Pro)"}</Link>
                 </Button>
               </div>
             </div>

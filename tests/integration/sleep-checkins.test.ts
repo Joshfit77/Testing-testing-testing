@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { sleepJournalFromRecoveryCheckin } from "@/lib/domain/sleep-checkins";
 import { createTestUser, deleteTestUser, stackAvailable, type TestUser } from "./helpers";
 
 const available = await stackAvailable();
@@ -36,6 +37,21 @@ describe.skipIf(!available)("sleep check-ins", () => {
     expect((await owner.client.from("sleep_checkins").upsert({ user_id: owner.id, day: "2026-10-23", restedness: 5 }, { onConflict: "user_id,day" })).error).toBeNull();
     const { data } = await owner.client.from("sleep_checkins").select("restedness, disturbances").eq("day", "2026-10-23").single();
     expect(data).toEqual({ restedness: 5, disturbances: ["noise", "worry"] });
+  });
+
+  it("the daily recovery check-in fills the shared answers without clearing the rest of the sleep journal", async () => {
+    expect(
+      (await other.client.from("sleep_checkins").insert({ user_id: other.id, day: "2026-10-26", restedness: 3, mood: 4, disturbances: ["noise"] })).error,
+    ).toBeNull();
+    // Exactly the row the recovery check-in action writes.
+    const mirror = sleepJournalFromRecoveryCheckin(other.id, "2026-10-26", { sleepQuality: 2, energy: 3, stress: 5 });
+    expect((await other.client.from("sleep_checkins").upsert(mirror, { onConflict: "user_id,day" })).error).toBeNull();
+    const { data } = await other.client
+      .from("sleep_checkins")
+      .select("restedness, mood, disturbances, sleep_quality, energy_morning, stress")
+      .eq("day", "2026-10-26");
+    // Still one row for the day, carrying both the journal's own answers and the check-in's.
+    expect(data).toEqual([{ restedness: 3, mood: 4, disturbances: ["noise"], sleep_quality: 2, energy_morning: 3, stress: 5 }]);
   });
 
   it("keeps reading and deleting after consent is withdrawn", async () => {

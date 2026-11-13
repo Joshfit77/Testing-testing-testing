@@ -96,6 +96,7 @@ function Stepper({
         <input
           type="text"
           inputMode={inputMode}
+          enterKeyHint="done"
           aria-label={unit ? `${label} (${unit})` : label}
           value={text}
           placeholder="—"

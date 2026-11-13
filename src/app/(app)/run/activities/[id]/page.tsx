@@ -1,3 +1,4 @@
+import { splitRows } from "@/lib/domain/run-splits";
 import Link from "next/link";
 import { BackLink } from "@/components/platform/back-link";
 import { notFound } from "next/navigation";
@@ -99,17 +100,12 @@ export default async function ActivityDetailPage({ params, searchParams }: { par
           <CardContent className="pt-5">
             <h2 className="mb-1 text-xs font-semibold uppercase tracking-[0.25em] text-gold">Splits</h2>
             <ol className="divide-y divide-border text-sm" data-testid="activity-splits">
-              {gps.splits.map((sp, i) => {
-                const prev = gps.splits![i - 1]?.moving_s ?? 0;
-                return (
-                  <li key={sp.index} className="flex justify-between py-1.5 tabular-nums">
-                    <span>
-                      {sp.index} {sp.unit}
-                    </span>
-                    <span>{formatDuration(sp.split_s ?? sp.moving_s - prev)}</span>
-                  </li>
-                );
-              })}
+              {splitRows(gps.splits).map((row) => (
+                <li key={row.key} className="flex justify-between py-1.5 tabular-nums" data-partial={row.partial || undefined}>
+                  <span className={row.partial ? "text-muted-foreground" : undefined}>{row.label}</span>
+                  <span>{formatDuration(row.seconds)}</span>
+                </li>
+              ))}
             </ol>
           </CardContent>
         </Card>

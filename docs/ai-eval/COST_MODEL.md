@@ -108,6 +108,14 @@ decide; not built:
    and alerts the owner past a set amount.
 4. A workspace spend limit on the API key in the Anthropic Console, as the last backstop.
 
+> **Update 2026-11-13 (added later; the table and "Gap" above describe the code when this model was written).**
+> The limits are now: 150 requests a month on Pro, at most 10 of them on the larger model (plan generations included,
+> also capped at 10), and no AI at all on Free. Proposals 1 and 3 above were built as money budgets enforced in the
+> database before every provider call: a per-member monthly budget (about $1.40 by default,
+> `AI_MEMBER_MONTHLY_BUDGET_USD`) and an app-wide monthly budget with alerts (`AI_GLOBAL_MONTHLY_BUDGET_USD`, $100 by
+> default). See `docs/pro/AI_COST.md` and `docs/MEMBERSHIPS.md` for the current figures. Proposal 4 (a Console spend
+> limit) is still the owner's to set.
+
 ## Performance
 
 Not measured: there was no live call. The self-test only times the local plumbing, about 0.1 s per turn with no

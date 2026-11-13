@@ -912,18 +912,24 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
               </span>
               {/* The separator only when there is a sync status after it (none before the first save). */}
               {sync !== "idle" && <span aria-hidden>·</span>}
-              <span className="inline-flex items-center gap-1 whitespace-nowrap" role="status">
+              {/* An icon beside the timer, with its words for screen readers and on long press: the words were
+                  clipped off narrow phones. Being offline also shows a full-width notice below. */}
+              <span
+                className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap"
+                role="status"
+                title={sync === "synced" ? "Synced" : sync === "saving" ? "Saving" : sync === "local" ? "Saved on device" : undefined}
+              >
                 {sync === "synced" ? (
                   <>
-                    <Cloud className="size-3.5" aria-hidden /> Synced
+                    <Cloud className="size-3.5" aria-hidden /> <span className="sr-only">Synced</span>
                   </>
                 ) : sync === "saving" ? (
                   <>
-                    <Loader2 className="size-3.5 animate-spin" aria-hidden /> Saving
+                    <Loader2 className="size-3.5 animate-spin" aria-hidden /> <span className="sr-only">Saving</span>
                   </>
                 ) : sync === "local" ? (
                   <>
-                    <CloudOff className="size-3.5" aria-hidden /> Saved on device
+                    <CloudOff className="size-3.5 text-gold" aria-hidden /> <span className="sr-only">Saved on device</span>
                   </>
                 ) : null}
               </span>

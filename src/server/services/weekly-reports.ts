@@ -10,6 +10,7 @@ import {
   buildWeeklyMetrics,
   latestDuePeriod,
   metricsForAi,
+  type ReportDistanceUnit,
   REPORT_AI_INSTRUCTIONS,
   reportAnalysisSchema,
   ruleBasedAnalysis,
@@ -131,7 +132,7 @@ function aiAnalysisEnabled(): boolean {
   return Boolean(serverEnv.anthropicApiKey) && process.env.WEEKLY_REPORT_AI !== "off";
 }
 
-async function aiAnalysis(supabase: SupabaseClient, userId: string, plan: Plan, metrics: WeeklyMetrics): Promise<{ analysis: ReportAnalysis; model: string } | null> {
+async function aiAnalysis(supabase: SupabaseClient, userId: string, plan: Plan, metrics: WeeklyMetrics, unit: ReportDistanceUnit): Promise<{ analysis: ReportAnalysis; model: string } | null> {
   if (!aiAnalysisEnabled() || !hasFeature(plan, "ai_coach")) return null;
   try {
     return await withAiRequest({ supabase, userId, plan, kind: "weekly_report", tier: "fast" }, async ({ client, model }) => {
@@ -139,7 +140,7 @@ async function aiAnalysis(supabase: SupabaseClient, userId: string, plan: Plan, 
         model,
         max_tokens: 1_500,
         system: [{ type: "text", text: REPORT_AI_INSTRUCTIONS, cache_control: { type: "ephemeral" } }],
-        messages: [{ role: "user", content: metricsForAi(metrics) }],
+        messages: [{ role: "user", content: metricsForAi(metrics, unit) }],
         output_config: { format: betaZodOutputFormat(reportAnalysisSchema) },
       });
       const inputTokens = res.usage.input_tokens + (res.usage.cache_read_input_tokens ?? 0) + (res.usage.cache_creation_input_tokens ?? 0);
@@ -172,10 +173,13 @@ export async function ensureWeeklyReport(
   if (existing.data) return existing.data as unknown as WeeklyReportRow;
 
   const metrics = buildWeeklyMetrics(await collectWeeklyInput(readClient, userId, period, tz, sleepGoalMinutes));
+  // Running distances are stored in km; the written analysis uses the member's own units.
+  const prefs = await service.from("profiles").select("unit_system").eq("id", userId).maybeSingle();
+  const unit: ReportDistanceUnit = prefs.data?.unit_system === "imperial" ? "mi" : "km";
   const inserted = await service
     .from("weekly_reports")
     .upsert(
-      { user_id: userId, week_start: period.weekStart, time_zone: tz, metrics, analysis: ruleBasedAnalysis(metrics), analysis_source: "rules", model: null },
+      { user_id: userId, week_start: period.weekStart, time_zone: tz, metrics, analysis: ruleBasedAnalysis(metrics, unit), analysis_source: "rules", model: null },
       { onConflict: "user_id,week_start", ignoreDuplicates: true },
     )
     .select(REPORT_COLUMNS);
@@ -188,7 +192,7 @@ export async function ensureWeeklyReport(
     return again.data as unknown as WeeklyReportRow;
   }
 
-  const ai = await aiAnalysis(readClient, userId, plan, metrics);
+  const ai = await aiAnalysis(readClient, userId, plan, metrics, unit);
   if (!ai) return mine;
   const upgraded = await service
     .from("weekly_reports")

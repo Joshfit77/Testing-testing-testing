@@ -8,7 +8,7 @@ needs, so it can be scoped and approved separately.
 | Area | Status | Evidence |
 |---|---|---|
 | Who gets it | Pro, plus existing subscribers who kept their earlier allowance | `aiAllowance` (`src/lib/domain/plans.ts`); `tests/integration/entitlements.test.ts` |
-| Monthly limits | 150 requests, 15 plan generations, 15 on the larger model | `getPlans()`; the database reserves each request (below) |
+| Monthly limits | 150 requests, at most 10 on the advanced (larger) model, plan generations included (also capped at 10); a per-member AI cost budget of about $1.40 a month; no AI on Free | `getPlans()`, `src/server/services/ai-budget.ts`; the database reserves each request (below) |
 | Limits enforced on the server, race-free | A usage row is reserved before every provider call under a per-member lock that re-checks every limit (monthly, plans, larger-model share, per minute); token counts are filled in afterwards; provider failures give the reservation back | `supabase/migrations/20261023000025_ai_usage_reservation.sql`; `tests/integration/ai-limits.test.ts` (10 simultaneous requests at 147/150 → exactly 3 succeed) |
 | Haiku / Sonnet routing | Everyday questions on Claude Haiku; plan generation and complex questions on Claude Sonnet, capped at about 10 % | `src/lib/coach/routing.ts`; `tests/unit/coach-routing.test.ts`; e2e checks which model served each request |
 | Streaming | NDJSON stream with tool-activity status; a failed send keeps the unsent text and offers retry | `e2e/coach.spec.ts` (mock Messages API) |

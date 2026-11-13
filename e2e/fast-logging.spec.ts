@@ -103,6 +103,9 @@ test.describe("fast workout logging", () => {
     await expect(card.getByTestId("set-undo")).toContainText("skipped");
     await expect(card.getByTestId("current-set-label")).toHaveText(/^Set 2 of 3$/i);
     await expect(page.getByRole("progressbar", { name: /Workout progress: 3 of 5 sets done/ })).toBeVisible();
+    // Fewer controls per set: how hard a set felt is asked once it's done, so a set still to do has no RPE picker.
+    await expect(page.getByLabel("Barbell Bench Press set 1 RPE")).toBeVisible();
+    await expect(page.getByLabel("Barbell Back Squat set 2 RPE")).toHaveCount(0);
 
     // Leave and come back (the app was closed, the phone restarted): the same workout, at the same set.
     await expect(page.getByText("Synced", { exact: true })).toBeVisible();

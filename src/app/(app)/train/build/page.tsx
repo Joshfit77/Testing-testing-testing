@@ -21,8 +21,8 @@ export default async function BuildProgramPage({ searchParams }: { searchParams:
         back={{ href: "/train", label: "Train" }}
         eyebrow="Build my program"
         title="Your custom program"
-        freeAlternative={{ href: "/train/programs", label: "Browse free programs" }}
-        description="Build a periodized program around your goal, numbers, schedule and equipment — strength, bodybuilding, running and more. Your starter program and the free programs stay available on every plan."
+        freeAlternative={{ href: "/profile/preferences", label: "Rebuild my free starter program" }}
+        description="Build a periodized program around your goal, numbers, schedule and equipment — strength, bodybuilding, running and more. Your starter program, built from your onboarding answers, stays free on every plan."
       />
     );
   }

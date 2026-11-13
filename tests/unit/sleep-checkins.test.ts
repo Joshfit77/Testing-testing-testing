@@ -1,5 +1,5 @@
 import { summarizeNights, type SleepSession } from "@/lib/domain/sleep";
-import { associations, clockToMinutes, describeAssociation, factorPresent, isEmptyCheckin, type Disturbance, type SleepCheckin } from "@/lib/domain/sleep-checkins";
+import { associations, clockToMinutes, sleepJournalFromRecoveryCheckin, describeAssociation, factorPresent, isEmptyCheckin, type Disturbance, type SleepCheckin } from "@/lib/domain/sleep-checkins";
 
 const empty = (day: string): SleepCheckin => ({
   day,
@@ -74,5 +74,14 @@ describe("associations", () => {
     const checkins = days.map((d, i) => ({ ...empty(d), disturbances: i < 3 ? (["noise"] as Disturbance[]) : [] }));
     const out = associations(summarizeNights(sessions), checkins);
     expect(out[0]).toMatchObject({ key: "disturbed", withCount: 3, withoutCount: 7, asleepDeltaMinutes: -90, restednessDelta: null });
+  });
+});
+
+describe("one daily check-in", () => {
+  it("the recovery check-in fills only the three shared sleep-journal answers", () => {
+    const row = sleepJournalFromRecoveryCheckin("u1", "2026-11-13", { sleepQuality: 4, energy: 3, stress: 2 });
+    expect(row).toEqual({ user_id: "u1", day: "2026-11-13", sleep_quality: 4, energy_morning: 3, stress: 2 });
+    // Nothing else the journal holds is in the row, so an upsert can never clear it.
+    expect(Object.keys(row).sort()).toEqual(["day", "energy_morning", "sleep_quality", "stress", "user_id"]);
   });
 });

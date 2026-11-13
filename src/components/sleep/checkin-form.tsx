@@ -65,7 +65,18 @@ export function SleepCheckinForm({ day, checkin, returnTo }: { day: string; chec
           This morning
         </h2>
         <Rating name="restedness" value={checkin?.restedness ?? null} />
-        <Rating name="sleep_quality" value={checkin?.sleep_quality ?? null} />
+        {/* Sleep quality, morning energy and stress are answered once, in the daily check-in (Train › Recovery), which
+            fills them in here. They're carried through unchanged so saving this journal never clears them. */}
+        <input type="hidden" name="sleep_quality" value={checkin?.sleep_quality ?? ""} />
+        <input type="hidden" name="energy_morning" value={checkin?.energy_morning ?? ""} />
+        <input type="hidden" name="stress" value={checkin?.stress ?? ""} />
+        <p className="text-sm text-muted-foreground" data-testid="from-daily-checkin">
+          Sleep quality, morning energy and stress come from your{" "}
+          <a href="/train/recovery" className="font-semibold text-gold-highlight underline-offset-4 hover:underline">
+            daily check-in
+          </a>
+          {checkin?.sleep_quality ? `: sleep ${checkin.sleep_quality}/5${checkin.energy_morning ? `, energy ${checkin.energy_morning}/5` : ""}${checkin.stress ? `, stress ${checkin.stress}/5` : ""}.` : "."}
+        </p>
       </section>
 
       <section className={section} aria-labelledby="ci-day">
@@ -73,11 +84,9 @@ export function SleepCheckinForm({ day, checkin, returnTo }: { day: string; chec
           Through the day
         </h2>
         <p className="-mt-3 text-xs text-muted-foreground">Come back later to fill these in, or skip them.</p>
-        <Rating name="energy_morning" value={checkin?.energy_morning ?? null} />
         <Rating name="energy_afternoon" value={checkin?.energy_afternoon ?? null} />
         <Rating name="energy_evening" value={checkin?.energy_evening ?? null} />
         <Rating name="mood" value={checkin?.mood ?? null} />
-        <Rating name="stress" value={checkin?.stress ?? null} />
       </section>
 
       <section className={section} aria-labelledby="ci-evening">
