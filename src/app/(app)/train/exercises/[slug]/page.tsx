@@ -20,6 +20,7 @@ import { activityKindFor, exerciseMilestone } from "@/lib/domain/exercise-milest
 import { ExerciseMilestoneCard } from "@/components/train/exercise-milestone";
 import { loadExerciseHistory, loadMilestoneActivities } from "@/server/services/exercise-history";
 import { BackLink } from "@/components/platform/back-link";
+import { exerciseDetails, LIBRARY_GROUP_LABELS } from "@/data/exercise-details";
 
 export const metadata = { title: "Exercise" };
 
@@ -48,6 +49,7 @@ export default async function ExerciseDetailPage({ params, searchParams }: { par
   const demo = shownDemoAsset(ex.slug);
   const muscles = { primary: ex.primary_muscles ?? [], secondary: ex.secondary_muscles ?? [] };
   const readiness = demoReadiness(ex.slug);
+  const details = exerciseDetails(ex.slug);
   const mediaUrl = (m: (typeof media)[number]) =>
     (m.external_url as string | null) ?? exerciseMediaPublicUrl(publicEnv.supabaseUrl, m.storage_path as string);
 
@@ -59,11 +61,18 @@ export default async function ExerciseDetailPage({ params, searchParams }: { par
         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gold">{titleCase(ex.category)}</p>
         <h1 className="mt-1 font-display text-4xl font-bold uppercase md:text-5xl">{ex.name}</h1>
         <p className="mt-2 max-w-2xl text-muted-foreground">{ex.description}</p>
+        {details && details.aliases.length > 0 && (
+          <p className="mt-1 text-sm text-muted-foreground" data-testid="exercise-aliases">
+            Also called: {details.aliases.join(", ")}
+          </p>
+        )}
         <div className="mt-4 flex flex-wrap gap-2">
           <Badge variant="secondary">{titleCase(ex.difficulty)}</Badge>
           {ex.mechanics && <Badge variant="outline">{titleCase(ex.mechanics)}</Badge>}
           {ex.is_timed && <Badge variant="outline">Timed</Badge>}
           {ex.low_impact && <Badge variant="success">Low impact</Badge>}
+          {details && <Badge variant="outline">{LIBRARY_GROUP_LABELS[details.group]}</Badge>}
+          {details?.home && <Badge variant="outline">Home-friendly</Badge>}
         </div>
       </header>
 
@@ -175,6 +184,12 @@ export default async function ExerciseDetailPage({ params, searchParams }: { par
         <h2 id="how-title" className="font-display text-xl font-bold uppercase">
           How to do it
         </h2>
+        {details && (
+          <p className="mt-3 text-sm" data-testid="exercise-start">
+            <span className="font-semibold">Starting position: </span>
+            {details.start}
+          </p>
+        )}
         <ol className="mt-3 space-y-3">
           {ex.instructions.map((step, i) => (
             <li key={i} className="flex gap-3 text-sm">
@@ -184,6 +199,34 @@ export default async function ExerciseDetailPage({ params, searchParams }: { par
           ))}
         </ol>
       </section>
+
+      {details && (
+        <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="technique-title" data-testid="exercise-technique">
+          <h2 id="technique-title" className="font-display text-lg font-semibold uppercase">
+            Breathing, range & setup
+          </h2>
+          <dl className="mt-3 space-y-3 text-sm">
+            <div>
+              <dt className="font-semibold">Breathing</dt>
+              <dd className="text-muted-foreground">{details.breathing}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold">Range of motion</dt>
+              <dd className="text-muted-foreground">{details.rangeOfMotion}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold">Setup & equipment</dt>
+              <dd>
+                <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
+                  {details.setup.map((t) => (
+                    <li key={t}>{t}</li>
+                  ))}
+                </ul>
+              </dd>
+            </div>
+          </dl>
+        </section>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2">
         <section className="rounded-2xl border border-border bg-card p-5" aria-labelledby="cues-title">

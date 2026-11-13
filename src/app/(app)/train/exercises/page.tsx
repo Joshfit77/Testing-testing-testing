@@ -4,7 +4,9 @@ import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/states";
 import { Input, NativeSelect } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { EQUIPMENT, EQUIPMENT_LABELS } from "@/lib/domain/types";
+import { EQUIPMENT, EQUIPMENT_LABELS, MOVEMENT_PATTERNS } from "@/lib/domain/types";
+import { exerciseDetails } from "@/data/exercise-details";
+import { searchExercises, suggestExercises } from "@/lib/domain/exercise-search";
 import { cn, titleCase } from "@/lib/utils";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
@@ -27,7 +29,7 @@ const CATEGORIES = [
 ] as const;
 
 /** The library URL for a set of filters (empty ones left out). */
-function libraryHref(f: { q?: string; category?: string; difficulty?: string; equipment?: string; muscle?: string }) {
+function libraryHref(f: { q?: string; category?: string; difficulty?: string; equipment?: string; muscle?: string; pattern?: string; where?: string }) {
   const params = new URLSearchParams();
   for (const [k, v] of Object.entries(f)) if (v) params.set(k, v);
   const qs = params.toString();
@@ -43,7 +45,7 @@ const chip = (active: boolean) =>
 export default async function ExercisesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; category?: string; equipment?: string; muscle?: string; difficulty?: string }>;
+  searchParams: Promise<{ q?: string; category?: string; equipment?: string; muscle?: string; difficulty?: string; pattern?: string; where?: string }>;
 }) {
   const sp = await searchParams;
   await requireOnboardedUser();
@@ -56,7 +58,9 @@ export default async function ExercisesPage({
     .eq("is_published", true)
     .order("name");
   const q = (sp.q ?? "").trim().slice(0, 60);
-  if (q) query = query.ilike("name", `%${q.replace(/[%_]/g, "")}%`);
+  const pattern = sp.pattern && (MOVEMENT_PATTERNS as readonly string[]).includes(sp.pattern) ? sp.pattern : "";
+  const where = sp.where === "home" || sp.where === "gym" ? sp.where : "";
+  if (pattern) query = query.eq("movement_pattern", pattern);
   if (sp.category && (CATEGORIES as readonly string[]).includes(sp.category))
     query = query.eq("category", sp.category);
   if (sp.equipment && (EQUIPMENT as readonly string[]).includes(sp.equipment))
@@ -65,12 +69,17 @@ export default async function ExercisesPage({
   if (group) query = query.overlaps("primary_muscles", [...group.muscles]);
   if (sp.difficulty && (DIFFICULTIES as readonly string[]).includes(sp.difficulty)) query = query.eq("difficulty", sp.difficulty);
   const { data, error } = await query;
-  const exercises = data ?? [];
+  // Name, alternate-name and shorthand search, and home/gym availability, run on the ~220 rows in memory.
+  const rows = (data ?? [])
+    .map((e) => ({ ...e, slug: e.slug as string, name: e.name as string, primary: (e.primary_muscles as string[] | null) ?? [], aliases: exerciseDetails(e.slug as string)?.aliases ?? [] }))
+    .filter((e) => !where || (where === "home" ? exerciseDetails(e.slug)?.home === true : exerciseDetails(e.slug)?.home !== true));
+  const exercises = searchExercises(rows, q);
+  const suggestions = q && exercises.length === 0 ? suggestExercises(rows, q, 4) : [];
   // Only valid values are carried into links and the form.
   const category = sp.category && (CATEGORIES as readonly string[]).includes(sp.category) ? sp.category : "";
   const difficulty = sp.difficulty && (DIFFICULTIES as readonly string[]).includes(sp.difficulty) ? sp.difficulty : "";
   const equipment = sp.equipment && (EQUIPMENT as readonly string[]).includes(sp.equipment) ? sp.equipment : "";
-  const moreFilters = [category, difficulty, equipment].filter(Boolean).length;
+  const moreFilters = [category, difficulty, equipment, pattern, where].filter(Boolean).length;
 
   return (
     <div className="space-y-6">
@@ -114,6 +123,19 @@ export default async function ExercisesPage({
                 </option>
               ))}
             </NativeSelect>
+            <NativeSelect name="pattern" defaultValue={pattern} aria-label="Movement type">
+              <option value="">Any movement</option>
+              {MOVEMENT_PATTERNS.map((p) => (
+                <option key={p} value={p}>
+                  {titleCase(p)}
+                </option>
+              ))}
+            </NativeSelect>
+            <NativeSelect name="where" defaultValue={where} aria-label="Home or gym">
+              <option value="">Home or gym</option>
+              <option value="home">Home-friendly</option>
+              <option value="gym">Gym equipment</option>
+            </NativeSelect>
             <NativeSelect name="equipment" defaultValue={equipment} aria-label="Equipment" className="col-span-2 sm:col-span-1">
               <option value="">Any equipment</option>
               {EQUIPMENT.map((e) => (
@@ -138,11 +160,11 @@ export default async function ExercisesPage({
 
       {/* Muscle group: one tap, no submit (keeps the search and the other filters). */}
       <nav aria-label="Muscles" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
-        <Link href={libraryHref({ q, category, difficulty, equipment })} aria-current={!group ? "page" : undefined} className={chip(!group)}>
+        <Link href={libraryHref({ q, category, difficulty, equipment, pattern, where })} aria-current={!group ? "page" : undefined} className={chip(!group)}>
           All
         </Link>
         {MUSCLE_GROUPS.map((g) => (
-          <Link key={g.id} href={libraryHref({ q, category, difficulty, equipment, muscle: g.id })} aria-current={group?.id === g.id ? "page" : undefined} className={chip(group?.id === g.id)}>
+          <Link key={g.id} href={libraryHref({ q, category, difficulty, equipment, pattern, where, muscle: g.id })} aria-current={group?.id === g.id ? "page" : undefined} className={chip(group?.id === g.id)}>
             {g.label}
           </Link>
         ))}
@@ -154,10 +176,26 @@ export default async function ExercisesPage({
           description="Please try again in a moment."
         />
       ) : exercises.length === 0 ? (
-        <EmptyState
-          title="No exercises match"
-          description="Try a different search or clear the filters."
-        />
+        <div className="space-y-3">
+          <EmptyState
+            title="No exercises match"
+            description="Try a different search or clear the filters."
+          />
+          {suggestions.length > 0 && (
+            <div data-testid="search-suggestions">
+              <p className="text-sm text-muted-foreground">Did you mean:</p>
+              <ul className="mt-2 flex flex-wrap gap-2">
+                {suggestions.map((s) => (
+                  <li key={s.slug}>
+                    <Link href={`/train/exercises/${s.slug}`} className={chip(false)}>
+                      {s.name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
       ) : (
         <>
           <p className="text-xs text-muted-foreground" aria-live="polite">
