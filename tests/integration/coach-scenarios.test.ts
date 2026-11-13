@@ -17,7 +17,7 @@ const DAY = 86_400_000;
 
 /** The tool results the coach sent back to the model in a request, parsed. */
 function toolResults(body: MockRequestBody): unknown[] {
-  return body.messages.flatMap((m) => (Array.isArray(m.content) ? m.content : []).filter((c) => c.type === "tool_result").map((c) => JSON.parse(String((c as { content: unknown }).content))));
+  return body.messages.flatMap((m) => (Array.isArray(m.content) ? m.content : []).filter((c) => c.type === "tool_result").map((c) => JSON.parse(String((c as unknown as { content: unknown }).content))));
 }
 /** A scripted turn: call one tool, then answer. */
 function toolThenAnswer(tool: string, input: Record<string, unknown>, text: string): Handler {
@@ -128,7 +128,7 @@ describe.skipIf(!available)("AI coach scenarios (synthetic members, scripted pro
     const last = api.requests.at(-1)!;
     const systemText = JSON.stringify(last.system);
     expect(systemText).toContain("Coaching memory: switched off by the athlete");
-    const toolResult = last.messages.flatMap((m) => (Array.isArray(m.content) ? m.content : [])).find((c) => c.type === "tool_result") as { content: string; is_error?: boolean };
+    const toolResult = last.messages.flatMap((m) => (Array.isArray(m.content) ? m.content : [])).find((c) => c.type === "tool_result") as unknown as { content: string; is_error?: boolean };
     expect(toolResult.is_error).toBe(true);
     expect(toolResult.content).toMatch(/memory is off/i);
   });
