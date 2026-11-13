@@ -11,6 +11,7 @@ import {
   mix,
   pose,
   rep,
+  repSmooth,
   solve1D,
   stanceLegs,
   worldPts,
@@ -22,6 +23,7 @@ import {
   type Vec,
 } from "../build";
 import { handsTo, legsTo, toLocal } from "./upper";
+import { backBarArms, backBarProp } from "./lower";
 
 export type SplitKind = "split" | "reverse" | "walking" | "bulgarian";
 export type HandLoad = "none" | "dumbbells" | "hips";
@@ -158,7 +160,7 @@ export function seatSquat(id: string, label: string, opts: { seat?: number; chai
     const knee = 3 + 112 * s;
     const shin = 2 + 8 * s;
     let p = pose({ ...stanceLegs(shin, knee, 4 + 36 * s) });
-    const hold = (q: Pose) => (opts.barbell ? armsLocal(q, [-10, -17], [-6.5, 1]) : armsLocal(q, [16, -6 + 10 * s], [44, -6 + 16 * s]));
+    const hold = (q: Pose) => (opts.barbell ? backBarArms(q) : armsLocal(q, [16, -6 + 10 * s], [44, -6 + 16 * s]));
     for (let i = 0; i < 3; i++) {
       p = hold(p);
       const base = p;
@@ -180,12 +182,14 @@ export function seatSquat(id: string, label: string, opts: { seat?: number; chai
       ? { id: "chair", kind: "chair", at: [Wb.butt[0] + 12, seatH], layer: "back" }
       : { id: "box", kind: "box", at: [Wb.butt[0] - 6, 0], w: 40, h: seatH, layer: "back" },
   ];
-  if (opts.barbell) props.push({ id: "bar", kind: "barbell", at: { lm: "trap" }, layer: "front" });
+  // The bar held and drawn as in the back squat (35 cm plates across the shoulders).
+  if (opts.barbell) props.push(backBarProp());
   return {
     id,
     view: "side",
     label,
-    keyframes: keys(FEET, rep(P, { down: 2, up: 1, holdBottom: 0.5, holdTop: 0.4 })),
+    // Dense keys (as the squats), so the bar stays over the feet between keys and the tempo eases at both ends.
+    keyframes: keys(FEET, repSmooth(P, { down: 2, up: 1, holdBottom: 0.5, holdTop: 0.4 })),
     props,
     planted: ["L", "R"],
     footGrounded: true,

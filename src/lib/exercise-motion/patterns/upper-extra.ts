@@ -2,32 +2,13 @@
  * More upper-body patterns (library expansion of 2026-11-13): lying dumbbell fly, lying triceps extension, dumbbell
  * kickback, bench dip, decline bench press and knee push-up. Built on the same primitives as ./upper.ts.
  */
-import { BODY, ankleForSole, normFlex } from "../skeleton";
-import { FEET, armThrough, both, keys, pose, repSmooth, solve1D, stanceLegs, worldPts, type KeySpec, type MotionDef, type Pose, type PropDef, type RootRule, type Side, type Vec } from "../build";
+import { BODY, ankleForSole } from "../skeleton";
+import { FEET, arm3D, armThrough, both, keys, pose, repSmooth, solve1D, stanceLegs, worldPts, type KeySpec, type MotionDef, type Pose, type PropDef, type RootRule, type Side, type V3, type Vec } from "../build";
 import { handsTo, ik2, legsTo, toLocal } from "./upper";
 
 const ARM = BODY.upperArm + BODY.forearm;
 const BENCH_TOP = 44;
 const DEG = 180 / Math.PI;
-
-/** A direction in the upper back's frame: forward (out of the chest), up (along the spine toward the head), lateral. */
-type V3 = [number, number, number];
-
-/**
- * Set a side-view arm from the real directions of its upper arm and forearm (upper-back frame). The part of each
- * segment in the picture plane gives the drawn shoulder and elbow angles, the part out of it the foreshortening.
- */
-function arm3D(p: Pose, s: Side, upper: V3, fore: V3): Pose {
-  const n = (v: V3): V3 => {
-    const l = Math.hypot(v[0], v[1], v[2]) || 1;
-    return [v[0] / l, v[1] / l, v[2] / l];
-  };
-  const u = n(upper);
-  const f = n(fore);
-  const sh = Math.atan2(u[0], -u[1]) * DEG;
-  const fa = Math.atan2(f[0], -f[1]) * DEG;
-  return { ...p, [`sh${s}`]: sh, [`armD${s}`]: Math.asin(u[2]) * DEG, [`el${s}`]: normFlex(fa - sh), [`foreD${s}`]: Math.asin(f[2]) * DEG };
-}
 
 /** Lying on a flat (incline 0) or inclined bench, feet flat on the floor: the base pose and its root. */
 function lying(incline: number): { base: Pose; root: RootRule; feet: Vec } {

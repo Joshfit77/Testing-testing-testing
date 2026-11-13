@@ -58,7 +58,7 @@ const VIEW_LABEL: Record<View, string> = { side: "Side", front: "Front" };
  */
 export function getMotionViews(slug: string, meta?: ExerciseMeta): MotionView[] {
   const main = getMotion(slug, meta);
-  const out: MotionView[] = [{ view: main.view, label: VIEW_LABEL[main.view], def: main }];
+  const out: MotionView[] = [{ view: main.view, label: main.viewLabel ?? VIEW_LABEL[main.view], def: main }];
   for (const [view, build] of Object.entries(EXERCISE_MOTION_VIEWS[slug] ?? {}) as [View, (id: string) => MotionDef][]) {
     if (view === main.view) continue;
     const key = `${slug}@${view}`;
@@ -67,7 +67,7 @@ export function getMotionViews(slug: string, meta?: ExerciseMeta): MotionView[] 
       def = build(slug);
       cache.set(key, def);
     }
-    out.push({ view, label: VIEW_LABEL[view], def });
+    out.push({ view, label: def.viewLabel ?? VIEW_LABEL[view], def });
   }
   return out;
 }

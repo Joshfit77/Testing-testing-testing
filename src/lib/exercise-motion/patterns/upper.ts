@@ -10,6 +10,9 @@ import {
   lm,
   mix,
   pose,
+  arm3D,
+  centerOfMass,
+  repSmooth,
   shoulderLocal,
   solve1D,
   stanceLegs,
@@ -20,6 +23,7 @@ import {
   type PropDef,
   type RootRule,
   type Side,
+  type V3,
   type Vec,
 } from "../build";
 
@@ -382,7 +386,8 @@ export function overheadPress(o: PressOpts): MotionDef {
     props.push({ id: "dbR", kind: o.implement === "kettlebell" ? "kettlebell" : "dumbbell", at: { lm: "handR" }, orient: "end", layer: "front" });
     if (!o.oneArm) props.push({ id: "dbL", kind: "dumbbell", at: { lm: "handL" }, orient: "end", layer: "far" });
   } else if (o.implement === "log") props.push({ id: "log", kind: "log", at: { lm: "hands", dx: -2 }, layer: "front", size: 15 });
-  else props.push({ id: "bar", kind: "barbell", at: { lm: "hands" }, layer: "front", variant: o.implement === "axle" ? "axle" : undefined, size: o.implement === "axle" ? 20 : undefined });
+  // 35 cm plates on a pressed barbell (as on the squats): the face and the racked hands stay readable at the shoulders.
+  else props.push({ id: "bar", kind: "barbell", at: { lm: "hands" }, layer: "front", variant: o.implement === "axle" ? "axle" : undefined, size: o.implement === "axle" ? 20 : 17.5 });
   if (seated) props.push({ id: "bench", kind: "inclineBench", at: [W.butt[0] - 6, 46], angle: 86, w: 70, h: 26, layer: "mid" });
 
   const specs: KeySpec[] = [];
@@ -401,12 +406,60 @@ export function overheadPress(o: PressOpts): MotionDef {
       { pose: P(lockout), dur: 1.2, hold: 0.5, ease: "inOut", ik: ik(lockout) },
     );
   } else {
-    specs.push(
-      { pose: P(rack), dur: 0.5, hold: 0.4, ease: "spline", ik: ik(rack) },
-      { pose: P(face, { trunk: -5, neck: -16 }), dur: 0.5, ease: "spline", ik: ik(face) },
-      { pose: P(lockout), dur: 0.9, hold: 0.45, ease: "spline", ik: ik(lockout) },
-      { pose: P(face, { trunk: -5, neck: -16 }), dur: 0.9, ease: "spline", ik: ik(face) },
-    );
+    // A strict press, keyed densely (repSmooth: seven depths each way, cosine-spaced) so the bar eases off the shoulders
+    // and into lockout and the elbows straighten smoothly; with three keys the elbows snapped straight at lockout (up to
+    // 10° in one frame). The bar travels in a near-vertical line: from the rack it drifts back over mid-foot by the time it
+    // reaches the forehead, then goes straight up. A bar in front of the face cannot pass through the head, so while it
+    // passes the chin, nose and forehead the head moves back out of its way (the torso leans back a few degrees from the
+    // ankles and the chin lifts) and comes forward "through the window" under the bar at lockout.
+    const bar = (s: number): Vec => {
+      const k = Math.min(1, s / 0.55);
+      const x = rack[0] + (lockout[0] - rack[0]) * (k * k * (3 - 2 * k));
+      return [x, rack[1] + (lockout[1] - rack[1]) * s];
+    };
+    const inFront = o.implement !== "dumbbell" && o.implement !== "kettlebell";
+    // Lean (degrees) applied as trunk lean-back and chin lift; the head's clearance from the bar's near edge (cm).
+    const lean = (L: number): Partial<Pose> => ({ trunk: stand.trunk - 0.45 * L, neck: -1.6 * L });
+    const BAR_R = o.implement === "log" ? 15 : 2;
+    const clearance = (L: number, b: Vec) => {
+      const Wp = worldPts(P(b, lean(L)), root);
+      // Points of the face that can meet the bar: forehead, nose line (head centre forward) and chin.
+      const face = [Wp.foreheadFront, Wp.head, Wp.headTop];
+      let worst = Infinity;
+      for (const q of face) if (Math.abs(q[1] - b[1]) < BAR_R + 9) worst = Math.min(worst, b[0] - BAR_R - q[0]);
+      return worst;
+    };
+    // The lean the head needs at a bar height (0 when the bar is below the chin or above the head).
+    const need = (s: number) => {
+      if (!inFront) return 0;
+      const b = bar(s);
+      if (clearance(0, b) >= 3) return 0;
+      return solve1D((L) => clearance(L, b) - 3, 0, 14);
+    };
+    // The largest lean on the way up, applied on a smooth bump around the head so the head eases back and forward again.
+    let peak = 0;
+    let peakS = 0.5;
+    for (let s = 0; s <= 1.0001; s += 0.05) {
+      const L = need(s);
+      if (L > peak) {
+        peak = L;
+        peakS = s;
+      }
+    }
+    const bump = (s: number) => {
+      const d = Math.abs(s - peakS) / 0.42;
+      return d >= 1 ? 0 : 0.5 + 0.5 * Math.cos(Math.PI * d);
+    };
+    const at = (s: number): Pose => P(bar(s), lean(Math.max(need(s), peak * bump(s))));
+    // repSmooth runs from its "top" (here lockout, u = 0) down to its "bottom" (the rack, u = 1) and back: lowering
+    // 1.6 s, pressing 1.1 s. Rotated so the loop starts with the bar on the shoulders.
+    const rep = repSmooth((u) => at(1 - u), { down: 1.6, up: 1.1, holdTop: 0.45, holdBottom: 0.4 });
+    const half = rep.length / 2;
+    for (const k of [...rep.slice(half), ...rep.slice(0, half)]) {
+      const b = worldPts(k.pose, root);
+      const h: Vec = o.oneArm ? b.handR : b.hands;
+      specs.push({ ...k, ik: ik(h) });
+    }
   }
   if (o.clean) {
     // Lift from the floor to the rack first: deadlift to the hips, then roll to the chest.
@@ -583,26 +636,72 @@ export function pullUp(o: HangOpts): MotionDef {
   };
 }
 
-/** Seated lat pulldown. */
+/**
+ * Seated lat pulldown, wide grip, seen from the side. The bar comes straight down in front of the face to the upper
+ * chest while the torso leans back a little (about 4° → 16°) from fixed thighs, and goes back up to straight arms.
+ * The forearms stay in line with the cable (near vertical, the elbows drawn a little back at the bottom), so the side
+ * view shows the upper arm swinging down out to the side (foreshortened). Keyed densely (repSmooth) with the bar placed
+ * at every key: three hand-placed keys let the shoulder angle swing 7.7° in one frame as the arm passed through the
+ * foreshortened middle, and the bar wobbled in front of the face.
+ */
 export function latPulldown(id: string, label: string): MotionDef {
   const root: RootRule = { pin: "butt", at: [0, 48] };
+  const feet = ankleForSole(36, 0);
   let base = pose({ trunk: -4, ...both({ hip: 95, knee: 95, ankle: 0, armD: 30 }) });
-  base = legsTo(base, root, ankleForSole(36, 0));
-  const top = { ...base, ...both({ sh: 172, el: 6 }) };
-  let bottom = { ...base, trunk: -16, neck: -6, hipL: base.hipL - 12, hipR: base.hipR - 12 };
-  bottom = armsLocal(bottom, [-6, -16], [9, 4]);
-  let mid = mix(top, bottom, 0.5);
-  mid = armsLocal(mid, [-3, -6], [9, 26]);
+  base = legsTo(base, root, feet);
+  const smooth = (t: number) => t * t * (3 - 2 * t);
+  const body = (s: number): Pose => {
+    const d = -12 * smooth(s);
+    return { ...base, trunk: base.trunk + d, hipL: base.hipL + d, hipR: base.hipR + d, neck: -6 * s };
+  };
+  const W0 = worldPts(body(0), root);
+  const W1 = worldPts(body(1), root);
+  // Top: arms reaching up and out to the bar (foreshortened by the wide grip). Bottom: the bar at the upper chest.
+  const reachTop = ARM * Math.cos((30 * Math.PI) / 180) - 2;
+  const top: Vec = [W0.shoulder[0] + 4, W0.shoulder[1] + reachTop];
+  const bottom: Vec = [W1.chest[0] + 7, W1.chest[1] + 9];
+  const fore = BODY.forearm * Math.cos((28 * Math.PI) / 180);
+  const P = (s: number, h: Vec): Pose => {
+    const b = body(s);
+    const sh = worldPts(b, root).shoulder;
+    let elbow: Vec = [h[0] - 4 * s, h[1] - fore];
+    // An elbow out of the upper arm's reach (arms nearly straight overhead) is placed by two-bone IK instead.
+    if (Math.hypot(elbow[0] - sh[0], elbow[1] - sh[1]) > BODY.upperArm - 0.5) return handsTo(b, root, h);
+    let p = b;
+    for (const sd of ["L", "R"] as const) p = armThrough(p, sd, toLocal(p, root, elbow), toLocal(p, root, h));
+    return p;
+  };
+  // The bar's path: a straight line from the top to the chest, moved forward where it passes the face so it never cuts
+  // through the head (at least 4 cm in front of the forehead, nose and chin).
+  const line = (s: number): Vec => [top[0] + (bottom[0] - top[0]) * s, top[1] + (bottom[1] - top[1]) * s];
+  const clear = (s: number, dx: number) => {
+    const h: Vec = [line(s)[0] + dx, line(s)[1]];
+    const W = worldPts(P(s, h), root);
+    let worst = Infinity;
+    for (const q of [W.foreheadFront, W.head, W.headTop]) if (Math.abs(q[1] - h[1]) < 11) worst = Math.min(worst, h[0] - 2 - q[0]);
+    return worst;
+  };
+  let peak = 0;
+  let peakS = 0.6;
+  for (let s = 0; s <= 1.0001; s += 0.05) {
+    if (clear(s, 0) >= 4) continue;
+    const dx = solve1D((v) => clear(s, v) - 4, 0, 25);
+    if (dx > peak) {
+      peak = dx;
+      peakS = s;
+    }
+  }
+  const bump = (s: number) => {
+    const d = Math.abs(s - peakS) / 0.45;
+    return d >= 1 ? 0 : 0.5 + 0.5 * Math.cos(Math.PI * d);
+  };
+  const bar = (s: number): Vec => [line(s)[0] + peak * bump(s), line(s)[1]];
+  const at = (s: number) => P(s, bar(s));
   return {
     id,
     view: "side",
     label,
-    keyframes: keys(root, [
-      { pose: top, dur: 0.6, hold: 0.3, ease: "spline" },
-      { pose: mid, dur: 0.6, ease: "spline" },
-      { pose: bottom, dur: 1, hold: 0.3, ease: "spline" },
-      { pose: mid, dur: 1, ease: "spline" },
-    ]),
+    keyframes: keys(root, repSmooth(at, { down: 1.1, up: 1.8, holdTop: 0.35, holdBottom: 0.3 })),
     props: [{ id: "m", kind: "latPulldown", at: [-2, 48], to: { lm: "hands" }, layer: "mid" }],
     stillPhase: 0.6,
   };
@@ -948,27 +1047,57 @@ export function armIsolation(o: CurlOpts): MotionDef {
   };
 }
 
-/** Rear-delt fly: bent over, arms sweep out to the sides (seen foreshortened from the side). */
+/**
+ * Bent-over rear-delt fly, seen from the side: hinged about 60° from upright with a flat back and soft knees (the
+ * stance solved so the body and the dumbbells balance over mid-foot), the dumbbells hanging under the chest. The arms
+ * sweep out to the sides on a real arc, from hanging to level with the shoulders, the elbows slightly bent and leading;
+ * seen from the side the arms come up toward the camera (foreshortened), which the picture shows as the dumbbells
+ * rising beside the torso. Timing matches the front view (rearDeltFlyFront): about 1.1 s up, a 0.5 s squeeze, 1.65 s
+ * down, so switching views keeps the position in the rep.
+ */
 export function rearDeltFly(id: string, label: string): MotionDef {
-  const base = pose({ ...stanceLegs(4, 22, 62), neck: -18 });
-  const T2 = base.trunk;
-  const down0 = { ...base, ...both({ sh: T2 + 4, el: 14, armD: 0 }) };
-  const up = { ...base, ...both({ sh: T2 + 10, el: 14, armD: 78, foreD: 70 }) };
+  const TRUNK = 60;
+  const KNEE = 22;
+  // Arm direction in the upper-back frame (forward, up, lateral): hanging straight down to the floor, then out to the
+  // side, level. The forearm trails 14° (soft elbow, elbows leading).
+  const armAt = (p: Pose, th: number): Pose => {
+    const T2 = ((p.trunk + p.spine) * Math.PI) / 180;
+    const down: V3 = [Math.sin(T2), -Math.cos(T2), 0];
+    const dir = (a: number): V3 => {
+      const r = (a * Math.PI) / 180;
+      return [down[0] * Math.cos(r), down[1] * Math.cos(r), Math.sin(r)];
+    };
+    const a = -4 + 88 * th;
+    return arm3D(arm3D(p, "L", dir(a), dir(a - 14)), "R", dir(a), dir(a - 14));
+  };
+  // Stance: shins leaned so the centre of mass (with the dumbbells) is over mid-foot at the bottom of the arc.
+  const stance = (shin: number) => armAt(pose({ ...stanceLegs(shin, KNEE, TRUNK), neck: -20 }), 0);
+  const shin = solve1D((sh) => {
+    const q = stance(sh);
+    return centerOfMass(q, [{ at: lm(q, "hands"), mass: 0.08 }])[0] - lm(q, "soleR")[0];
+  }, -15, 25);
+  const base = pose({ ...stanceLegs(shin, KNEE, TRUNK), neck: -20 });
+  const at = (th: number) => armAt(base, th);
+  const ease = (x: number) => 0.5 - 0.5 * Math.cos(Math.PI * x);
   return {
     id,
     view: "side",
     label,
     keyframes: keys(FEET, [
-      { pose: down0, dur: 1, hold: 0.3, ease: "inOut" },
-      { pose: up, dur: 1.8, hold: 0.3, ease: "inOut" },
+      { pose: at(0), dur: 0.36, hold: 0.35, ease: "inOut" },
+      { pose: at(ease(1 / 3)), dur: 0.36, ease: "inOut" },
+      { pose: at(ease(2 / 3)), dur: 0.36, ease: "inOut" },
+      { pose: at(1), dur: 0.55, hold: 0.5, ease: "inOut" },
+      { pose: at(ease(2 / 3)), dur: 0.55, ease: "inOut" },
+      { pose: at(ease(1 / 3)), dur: 0.55, ease: "inOut" },
     ]),
     props: [
-      { id: "dbL", kind: "dumbbell", at: { lm: "handL" }, orient: "end", layer: "far" },
-      { id: "dbR", kind: "dumbbell", at: { lm: "handR" }, orient: "end", layer: "front" },
+      { id: "dbL", kind: "dumbbell", at: { lm: "handL" }, orient: "end", layer: "far", size: 0.85 },
+      { id: "dbR", kind: "dumbbell", at: { lm: "handR" }, orient: "end", layer: "front", size: 0.85 },
     ],
     planted: ["L", "R"],
     footGrounded: true,
-    stillPhase: 0.5,
+    stillPhase: 0.4,
   };
 }
 

@@ -247,6 +247,11 @@ export interface MotionDef {
   /** Exercise slug (or pattern id for fallbacks). */
   id: string;
   view: View;
+  /**
+   * Name of this camera angle in the player's view switch, when "Side" / "Front" would be wrong (a front-view drawing of
+   * a body seen from above, e.g. "Above"). Optional; defaults to the view's name.
+   */
+  viewLabel?: string;
   keyframes: Keyframe[];
   props?: PropDef[];
   /** World distance travelled per loop (the camera follows; the floor scrolls). */

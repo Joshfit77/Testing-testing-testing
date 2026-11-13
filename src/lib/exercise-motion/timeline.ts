@@ -1,4 +1,4 @@
-import { BODY, applyLimbIK, forwardKinematics, lerp, lerpV, type Skeleton } from "./skeleton";
+import { BODY, applyLimbIK, forwardKinematics, lerp, lerpV, yawShift, type Skeleton } from "./skeleton";
 import type { Anchor, Ease, Frame, Keyframe, Landmark, MotionDef, Pose, PoseKey, PropDef, ResolvedProp, RootRule, RunPath, Vec, View } from "./types";
 
 export interface CompiledMotion {
@@ -643,7 +643,7 @@ export function motionBounds(c: CompiledMotion, samples = 48): { x0: number; x1:
       y0 = Math.min(y0, p[1] - 4);
     }
     for (const pr of f.props) {
-      const b = propExtent(pr);
+      const b = propExtent(pr, f.view);
       if (!b) continue;
       x0 = Math.min(x0, b[0] - f.cameraX);
       x1 = Math.max(x1, b[2] - f.cameraX);
@@ -654,8 +654,18 @@ export function motionBounds(c: CompiledMotion, samples = 48): { x0: number; x1:
   return { x0, x1, y0, y1 };
 }
 
+/**
+ * A side-view barbell as the athlete look draws it (props-athlete.ts barAcross): seen with the camera's yaw, its near
+ * half (plates scaled 1.08) reaches about 85 cm toward the viewer, which lands 24 cm behind the lifter on screen, and the
+ * far half (0.86) 19 cm ahead. Framing only the bar's centre let the near plates run off the picture's edge (a skull
+ * crusher's bar behind the head was cut in half at the bottom of the rep).
+ */
+const BAR_END = 85;
+const BAR_NEAR = 1.08;
+const BAR_FAR = 0.86;
+
 /** Rough extent of a prop for framing: [x0, y0, x1, y1] or null to ignore (very large scenery). */
-function propExtent(p: ResolvedProp): [number, number, number, number] | null {
+function propExtent(p: ResolvedProp, view: View = "side"): [number, number, number, number] | null {
   const { def, at } = p;
   const s = def.size ?? 0;
   switch (def.kind) {
@@ -678,6 +688,11 @@ function propExtent(p: ResolvedProp): [number, number, number, number] | null {
     case "stone": {
       const r = s || 22.5;
       if (def.kind === "barbell" && def.variant === "front") return [at[0] - 110, at[1] - r, at[0] + 110, at[1] + r];
+      if (def.kind === "barbell" && view === "side" && (!def.variant || def.variant === "axle")) {
+        const near = at[0] + yawShift(BAR_END) * BAR_NEAR;
+        const far = at[0] - yawShift(BAR_END) * BAR_FAR;
+        return [Math.min(near - r * BAR_NEAR, at[0] - r), at[1] - r * BAR_NEAR, Math.max(far + r * BAR_FAR, at[0] + r), at[1] + r * BAR_NEAR];
+      }
       return [at[0] - r, at[1] - r, at[0] + r, at[1] + r];
     }
     default: {
