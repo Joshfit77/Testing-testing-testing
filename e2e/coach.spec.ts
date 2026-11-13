@@ -64,6 +64,10 @@ function reply(req: MockRequest): { blocks: Block[]; stop: string; delayMs: numb
       // Held back like a real model's thinking time, so the "Reviewing…" activity line can be seen.
       return { delayMs: 1500, stop: "end_turn", blocks: [{ type: "text", text: `Review: ${data.consistency?.sessionsLast28 ?? "?"} sessions in 4 weeks. Gaps: ${data.data_gaps?.length ?? 0}.` }] };
     }
+    if (call?.name === "get_program_recommendations") {
+      const data = JSON.parse(String(toolResult.content)) as { training_programs?: { slug: string }[]; habit_programs?: unknown[] };
+      return { delayMs: 0, stop: "end_turn", blocks: [{ type: "text", text: `Found ${data.training_programs?.length ?? 0} training and ${data.habit_programs?.length ?? 0} habit programs. Top: ${data.training_programs?.[0]?.slug ?? "none"}.` }] };
+    }
     if (call?.name === "get_exercise_history") {
       const data = JSON.parse(String(toolResult.content)) as { sessions_found?: number; error?: string };
       return {
@@ -83,6 +87,16 @@ function reply(req: MockRequest): { blocks: Block[]; stop: string; delayMs: numb
   const system = req.system.map((b) => b.text).join("\n");
   if (text.includes("review my training")) {
     return { delayMs: 0, stop: "tool_use", blocks: [{ type: "tool_use", id: `toolu_e2e_${++seq}`, name: "get_training_review", input: {} }] };
+  }
+  if (text.includes("which program")) {
+    return { delayMs: 0, stop: "tool_use", blocks: [{ type: "tool_use", id: `toolu_e2e_${++seq}`, name: "get_program_recommendations", input: {} }] };
+  }
+  if (text.includes("start that program")) {
+    return {
+      delayMs: 0,
+      stop: "tool_use",
+      blocks: [{ type: "tool_use", id: `toolu_e2e_${++seq}`, name: "propose_program", input: { program_slug: "full-body-fitness-foundations", reason: "Three full-body days fit your week." } }],
+    };
   }
   if (text.includes("recovery week")) {
     return {
@@ -393,6 +407,8 @@ test.describe("AI coach", () => {
       "propose_volume_change",
       "propose_memory",
       "propose_forget_memory",
+      "get_program_recommendations",
+      "propose_program",
     ]);
     expect(first.tools.every((t) => t.strict === true)).toBe(true);
     expect(first.system[0]!.cache_control).toEqual({ type: "ephemeral" });
@@ -627,6 +643,48 @@ test.describe("AI coach", () => {
     await expect(change).toContainText("from the AI coach");
     await change.getByRole("button", { name: "Undo" }).click();
     await expect(page.getByRole("status")).toContainText("Undone:");
+  });
+
+  test("programs: the coach recommends from the app's ranking and a program starts only when the member taps Start", async ({ page }) => {
+    test.skip(!MOCK_PORT, "set E2E_ANTHROPIC_MOCK_PORT and start the app with ANTHROPIC_BASE_URL pointing at it");
+    const email = uniqueEmail("coach-program");
+    await signUpAndConfirm(page, email);
+    await completeOnboarding(page);
+    await grantPlan(email, "pro");
+    await page.goto("/coach");
+    await page.getByRole("button", { name: "Allow and continue" }).click();
+    const box = page.getByLabel("Message the AI coach");
+    const sendMessage = async (text: string) => {
+      await expect(async () => {
+        await box.fill(text);
+        await page.waitForTimeout(250);
+        await expect(box).toHaveValue(text, { timeout: 500 });
+      }).toPass({ timeout: 15_000 });
+      await page.getByRole("button", { name: "Send message" }).click();
+    };
+
+    await sendMessage("Which program should I follow?");
+    await expect(page.getByTestId("coach-reply").last()).toContainText(/Found [1-9]\d* training and 7 habit programs/, { timeout: 30_000 });
+
+    await sendMessage("OK, start that program");
+    const card = page.getByTestId("coach-suggestion").last();
+    await expect(card.getByTestId("program-proposal")).toContainText("Full Body Fitness Foundations", { timeout: 30_000 });
+    // The onboarding starter plan is active, so the card says it would be paused, not deleted.
+    await expect(card.getByTestId("program-proposal")).toContainText("would be paused, never deleted");
+    // Nothing has started yet: the member has no run of that program.
+    const uid = await userIdFor(email);
+    const runs = () => serviceRest<{ status: string; program: { slug: string } }[]>(`user_programs?user_id=eq.${uid}&select=status,program:training_programs(slug)`);
+    expect((await runs()).some((r) => r.program.slug === "full-body-fitness-foundations")).toBe(false);
+    await card.getByRole("button", { name: "Start program" }).click();
+    await expect(card.getByRole("status")).toContainText("Started Full Body Fitness Foundations");
+    await expect(card.getByRole("status")).toContainText("paused with all its history");
+    // The new program is active and the starter plan is paused, not deleted.
+    const after = await runs();
+    expect(after.find((r) => r.program.slug === "full-body-fitness-foundations")?.status).toBe("active");
+    expect(after.filter((r) => r.program.slug !== "full-body-fitness-foundations").every((r) => r.status === "paused" || r.status === "saved")).toBe(true);
+    expect(after.length).toBeGreaterThanOrEqual(2);
+    await page.goto("/home");
+    await expect(page.getByTestId("home-workout")).toContainText(/Full Body Fitness Foundations|Day 1/);
   });
 
   test("AI meal plan: drafts from the member's dishes, the app computes the numbers, nothing saved until approved; ingredients can be replaced", async ({ page }) => {
