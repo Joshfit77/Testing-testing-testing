@@ -540,7 +540,7 @@ export async function coachTurn(params: {
   const meter = { costMicros: 0 };
   try {
     if (mode === "chat") {
-      const toolCtx: ToolContext = { supabase, userId, timeZone: (tzRow?.timezone as string) || "UTC", snapshot: context.snapshot, proposal: null, chatMemoryOff };
+      const toolCtx: ToolContext = { supabase, userId, timeZone: (tzRow?.timezone as string) || "UTC", snapshot: context.snapshot, proposal: null, chatMemoryOff, conversationId };
       onEvent({ type: "status", text: "Thinking…" });
       const r = await runChatLoop({ model, system, messages, toolCtx, onEvent, signal: params.signal, ceilingMicros: REQUEST_CEILING_MICROS[reservation.tier], meter });
       reply = r.reply;

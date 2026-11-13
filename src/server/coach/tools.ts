@@ -42,6 +42,8 @@ export interface ToolContext {
   proposal: CoachProposal | null;
   /** The athlete asked not to remember anything from this conversation. */
   chatMemoryOff?: boolean;
+  /** The conversation this turn belongs to (left out of recall_conversations). */
+  conversationId?: string;
 }
 
 export interface ToolOutcome {
@@ -528,6 +530,43 @@ async function proposeProgram(ctx: ToolContext, input: ToolInput<"propose_progra
 }
 
 /** Validate and run one tool call. Never throws for bad input: errors go back to the model. */
+/**
+ * Earlier conversations, retrieved only when relevant (the model asks): never the whole history in every prompt.
+ * Respects the member's memory controls: nothing while coaching memory is off, and never a chat they marked
+ * "don't remember". Snippets are short and labelled as what was said then.
+ */
+async function recallConversations(ctx: ToolContext, input: ToolInput<"recall_conversations">): Promise<ToolOutcome> {
+  if (!ctx.snapshot.memory?.enabled) return fail("Coaching memory is off, so earlier conversations aren't available. The athlete can turn it on in AI Coach → Memory.");
+  let convs = ctx.supabase.from("ai_conversations").select("id, title, updated_at").eq("user_id", ctx.userId).eq("memory_off", false).order("updated_at", { ascending: false }).limit(25);
+  if (ctx.conversationId) convs = convs.neq("id", ctx.conversationId);
+  const { data: list, error } = await convs;
+  if (error) return fail("Couldn't load earlier conversations.");
+  const ids = (list ?? []).map((c) => c.id as string);
+  if (!ids.length) return ok({ conversations: [], note: "No earlier conversations." });
+  const q = ctx.supabase.from("ai_messages").select("conversation_id, role, content, created_at").eq("user_id", ctx.userId).in("conversation_id", ids).order("created_at", { ascending: true }).limit(400);
+  const term = input.query?.replace(/[%_,()]/g, " ").trim();
+  const { data: msgs, error: mErr } = await q;
+  if (mErr) return fail("Couldn't load earlier conversations.");
+  const byConv = new Map<string, { role: string; content: string; created_at: string }[]>();
+  for (const m of msgs ?? []) {
+    const arr = byConv.get(m.conversation_id as string) ?? [];
+    arr.push({ role: m.role as string, content: m.content as string, created_at: m.created_at as string });
+    byConv.set(m.conversation_id as string, arr);
+  }
+  const clip = (t: string, n: number) => (t.length > n ? `${t.slice(0, n).trimEnd()}…` : t);
+  const found = (list ?? [])
+    .map((c) => {
+      const ms = byConv.get(c.id as string) ?? [];
+      const question = term ? ms.find((m) => m.role === "user" && m.content.toLowerCase().includes(term.toLowerCase())) : ms.find((m) => m.role === "user");
+      if (!question) return null;
+      const answer = ms.find((m) => m.role === "assistant" && m.created_at >= question.created_at);
+      return { date: isoDateInTz(new Date(question.created_at), ctx.timeZone), title: c.title as string, athlete_asked: clip(question.content, 240), coach_answered: answer ? clip(answer.content, 360) : null };
+    })
+    .filter(Boolean)
+    .slice(0, 5);
+  return ok({ conversations: found, note: "What was said at the time; check current data before relying on it." });
+}
+
 export async function executeCoachTool(ctx: ToolContext, name: string, rawInput: unknown): Promise<ToolOutcome> {
   if (!isToolName(name)) return fail(`Unknown tool "${name}".`);
   const v = validateToolInput(name as ToolName, rawInput);
@@ -566,6 +605,8 @@ export async function executeCoachTool(ctx: ToolContext, name: string, rawInput:
         return ok(await loadRunningSummary(analysisCtx(ctx), (input as ToolInput<"get_running_summary">).weeks ?? ANALYSIS_DEFAULTS.runWeeks));
       case "get_recovery_summary":
         return ok(await loadRecoverySummary(analysisCtx(ctx), (input as ToolInput<"get_recovery_summary">).days ?? ANALYSIS_DEFAULTS.recoveryDays));
+      case "recall_conversations":
+        return await recallConversations(ctx, input as ToolInput<"recall_conversations">);
       case "propose_target_load":
         return await proposeTargetLoad(ctx, input as ToolInput<"propose_target_load">);
       case "propose_deload_week":

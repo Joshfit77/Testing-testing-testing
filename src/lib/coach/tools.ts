@@ -86,6 +86,9 @@ export const TOOL_INPUT_SCHEMAS = {
   get_recovery_summary: z.strictObject({
     days: z.number().int().min(7).max(42).nullable(),
   }),
+  recall_conversations: z.strictObject({
+    query: z.string().trim().min(2).max(80).nullable(),
+  }),
   propose_target_load: z.strictObject({
     exercise_slug: slug,
     weight: z.number().positive().max(2000),
@@ -283,6 +286,12 @@ const DEFINITIONS: { name: ToolName; description: string; input_schema: JsonSche
     input_schema: obj({ days: nullable(int("Days to cover, 7–42; null = 14.")) }),
   },
   {
+    name: "recall_conversations",
+    description:
+      "Look up the athlete's earlier coach conversations (not this one), newest first: date, title, their question and the start of your answer. Only when coaching memory is on; chats they marked 'don't remember' are never included. Use it when they refer back to an earlier conversation. Quote it as what was said then, not as current data.",
+    input_schema: obj({ query: nullable(str("A word or two to search their past questions for; null for the most recent.")) }),
+  },
+  {
     name: "propose_target_load",
     description:
       "Suggest a target load (and reps) for the athlete's next session of one exercise, e.g. after they hit all their reps, or a reset after a stall. Shown beside the exercise in the workout logger once they accept. Nothing changes until they tap Accept (they can adjust it). Base it on their logged sets; don't jump more than one sensible step.",
@@ -397,6 +406,8 @@ export function toolActivityLabel(name: string, input: unknown): string {
       return `Checking your runs from the last ${Number(i.weeks) || 8} weeks…`;
     case "get_recovery_summary":
       return `Checking your recovery over the last ${Number(i.days) || 14} days…`;
+    case "recall_conversations":
+      return "Looking back at our earlier conversations…";
     case "propose_target_load":
       return "Preparing a target load for you to review…";
     case "propose_deload_week":

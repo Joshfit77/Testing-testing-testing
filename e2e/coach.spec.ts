@@ -405,6 +405,7 @@ test.describe("AI coach", () => {
       "analyze_lift_progress",
       "get_running_summary",
       "get_recovery_summary",
+      "recall_conversations",
       "propose_target_load",
       "propose_deload_week",
       "propose_volume_change",
