@@ -66,8 +66,11 @@ test.describe("Train & Run, first-time fixes", () => {
     await page.goto("/train/exercises");
     await expect(page.getByText(`${EXERCISES.length} exercises`)).toBeVisible();
     await expect(page.locator("main ul li").filter({ hasText: /^Demo/ })).toHaveCount(0);
+    // Opened plain, the library starts with the core lifts; the full list follows A–Z.
+    await expect(page.getByTestId("exercises-start-here").locator("li").first()).toContainText("Barbell Back Squat");
     await page.getByRole("navigation", { name: "Muscles" }).getByRole("link", { name: "Chest", exact: true }).click();
     await page.waitForURL(/muscle=chest/);
+    await expect(page.getByTestId("exercises-start-here")).toHaveCount(0);
     await expect(page.getByRole("link", { name: /Barbell Back Squat/ })).toHaveCount(0);
     await page.getByText("More filters").click();
     await page.getByLabel("Difficulty").selectOption("beginner");

@@ -42,6 +42,26 @@ const chip = (active: boolean) =>
     active ? "bg-gold-gradient text-black shadow-bronze" : "border border-border bg-[#101010] text-foreground/85 hover:text-foreground",
   );
 
+/**
+ * Opened with no search or filter, the library starts with the lifts most programs are built on, so a member's first
+ * look is the core movements (and their demonstrations), not whatever sorts first alphabetically. Every exercise is
+ * still listed below, A to Z.
+ */
+const START_HERE = [
+  "back-squat",
+  "bench-press",
+  "conventional-deadlift",
+  "overhead-press",
+  "barbell-row",
+  "romanian-deadlift",
+  "pull-up",
+  "lat-pulldown",
+  "push-up",
+  "goblet-squat",
+  "hip-thrust",
+  "plank",
+];
+
 export default async function ExercisesPage({
   searchParams,
 }: {
@@ -80,6 +100,38 @@ export default async function ExercisesPage({
   const difficulty = sp.difficulty && (DIFFICULTIES as readonly string[]).includes(sp.difficulty) ? sp.difficulty : "";
   const equipment = sp.equipment && (EQUIPMENT as readonly string[]).includes(sp.equipment) ? sp.equipment : "";
   const moreFilters = [category, difficulty, equipment, pattern, where].filter(Boolean).length;
+  const browsing = !q && !group && moreFilters === 0;
+  const startHere = browsing ? START_HERE.flatMap((slug) => exercises.filter((e) => e.slug === slug)) : [];
+
+  const renderItem = (e: (typeof exercises)[number]) => {
+              const poses = demoReadiness(e.slug as string) === "poses";
+              return (
+                <li key={e.slug as string} className="min-w-0">
+                  <Link href={`/train/exercises/${e.slug}`} className="flex min-h-14 items-center gap-3 rounded-xl border border-border bg-card px-3 py-1.5 hover:border-gold-muted">
+                    <div className="relative h-11 w-14 shrink-0 overflow-hidden rounded-md border border-border" aria-hidden>
+                      <ExerciseThumb
+                        slug={e.slug as string}
+                        name={e.name as string}
+                        meta={{
+                          name: e.name as string,
+                          pattern: e.movement_pattern as string,
+                          category: e.category as string,
+                          equipment: e.equipment as string[],
+                        }}
+                        muscles={{ primary: (e.primary_muscles as string[] | null) ?? [], secondary: (e.secondary_muscles as string[] | null) ?? [] }}
+                        className="h-full w-full"
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-semibold">{e.name as string}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {[(e.primary_muscles as string[]).map(titleCase).join(", "), titleCase(e.category as string), poses ? "Poses" : null].filter(Boolean).join(" · ")}
+                      </p>
+                    </div>
+                  </Link>
+                </li>
+              );
+  };
 
   return (
     <div className="space-y-6">
@@ -201,36 +253,19 @@ export default async function ExercisesPage({
           <p className="text-xs text-muted-foreground" aria-live="polite">
             {exercises.length} exercises
           </p>
-          <ul className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
-            {exercises.map((e) => {
-              const poses = demoReadiness(e.slug as string) === "poses";
-              return (
-                <li key={e.slug as string} className="min-w-0">
-                  <Link href={`/train/exercises/${e.slug}`} className="flex min-h-14 items-center gap-3 rounded-xl border border-border bg-card px-3 py-1.5 hover:border-gold-muted">
-                    <div className="relative h-11 w-14 shrink-0 overflow-hidden rounded-md border border-border" aria-hidden>
-                      <ExerciseThumb
-                        slug={e.slug as string}
-                        name={e.name as string}
-                        meta={{
-                          name: e.name as string,
-                          pattern: e.movement_pattern as string,
-                          category: e.category as string,
-                          equipment: e.equipment as string[],
-                        }}
-                        muscles={{ primary: (e.primary_muscles as string[] | null) ?? [], secondary: (e.secondary_muscles as string[] | null) ?? [] }}
-                        className="h-full w-full"
-                      />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-semibold">{e.name as string}</p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {[(e.primary_muscles as string[]).map(titleCase).join(", "), titleCase(e.category as string), poses ? "Poses" : null].filter(Boolean).join(" · ")}
-                      </p>
-                    </div>
-                  </Link>
-                </li>
-              );
-            })}
+          {startHere.length > 0 && (
+            <section aria-labelledby="start-here" className="space-y-2" data-testid="exercises-start-here">
+              <h2 id="start-here" className="text-sm font-semibold uppercase tracking-wider text-gold">
+                Start here: the core lifts
+              </h2>
+              <ul className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">{startHere.map(renderItem)}</ul>
+            </section>
+          )}
+          {startHere.length > 0 && (
+            <h2 className="pt-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">All exercises, A–Z</h2>
+          )}
+          <ul className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3" data-testid="exercises-all">
+            {exercises.map(renderItem)}
           </ul>
         </>
       )}
