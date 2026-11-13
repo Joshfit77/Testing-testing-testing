@@ -447,8 +447,8 @@ const RECOVERY_WEEKS = flexibilityRecoveryWeeks();
 export const CATALOG_ENDURANCE_MOBILITY: ProgramSeed[] = [
   {
     slug: "beginner-run-walk-5k-10-week",
-    name: "Beginner Run/Walk to 5K: 10 Weeks",
-    summary: "Three run/walk sessions a week for ten weeks — a slower build than most couch-to-5K plans, finishing with 30 minutes of continuous easy running.",
+    name: "Beginner Run/Walk to 5K",
+    summary: "For new runners aiming at a first 5K: three run/walk sessions a week and a gentle build, with two easier weeks, to 30 minutes of continuous running.",
     description:
       "For complete beginners, heavier or returning runners, and anyone who found faster plans too steep. Week 1 alternates 60 seconds of easy running " +
       "with 90 seconds of walking; the running bouts lengthen and the walk breaks shrink a little each week, so your weekly running time rises by no more " +
@@ -495,8 +495,8 @@ export const CATALOG_ENDURANCE_MOBILITY: ProgramSeed[] = [
   },
   {
     slug: "hybrid-strength-run-12-week",
-    name: "Hybrid Strength + Running: 12-Week Strength-Priority Plan",
-    summary: "Three strength sessions and two runs a week for 12 weeks, with hard days separated and a lighter week every fourth week.",
+    name: "Hybrid: Strength Focus",
+    summary: "For lifters who also run: three strength sessions and two runs a week, with hard days separated and a lighter week every fourth week.",
     description:
       "For lifters who want to keep getting stronger while building real running fitness. We chose three strength days and two runs (rather than two and " +
       "three): three full sessions train every major muscle at least twice a week and let the main lifts progress, while one interval run and one long " +
@@ -547,7 +547,7 @@ export const CATALOG_ENDURANCE_MOBILITY: ProgramSeed[] = [
   {
     slug: "conditioning-intervals-8-week",
     name: "Conditioning & Intervals: Bike, Rower and Kettlebell",
-    summary: "Three interval sessions a week — bike, kettlebell-and-bodyweight circuits and rower — with work:rest ratios that tighten over eight weeks.",
+    summary: "For conditioning on a bike and rower: three interval sessions a week — bike, kettlebell-and-bodyweight circuit, rower — with work:rest ratios that tighten.",
     description:
       "For people who already train and want a bigger engine: better repeat-effort fitness, faster recovery between hard efforts and more work done in less " +
       "time. Each week has a bike power session (short hard intervals, from 1:3 to 1:1 work:rest), a kettlebell and bodyweight circuit (from 20:40 to 40:20) " +
@@ -590,8 +590,8 @@ export const CATALOG_ENDURANCE_MOBILITY: ProgramSeed[] = [
   },
   {
     slug: "full-body-mobility-6-week",
-    name: "Full-Body Mobility: 6-Week Routine",
-    summary: "Five short mobility sessions a week (or four) for hips, spine, shoulders and ankles, with holds that grow every week.",
+    name: "Full-Body Mobility",
+    summary: "For anyone who feels stiff: short sessions five days a week (or four) for hips, spine, shoulders and ankles, with holds that grow every week.",
     description:
       "For all levels: 15–25 minutes of mobility work you can do on its own or after training. Each session targets one region — hips and hamstrings, spine " +
       "and shoulders, ankles and squat, a full-body flow and a long-hold session — and the time you spend in each position grows every week, because " +
@@ -636,7 +636,7 @@ export const CATALOG_ENDURANCE_MOBILITY: ProgramSeed[] = [
   },
   {
     slug: "core-strength-stability-8-week",
-    name: "Core Strength & Stability: 8 Weeks",
+    name: "Core Strength & Stability",
     summary: "Three sessions a week of anti-extension, anti-rotation and anti-lateral-flexion work, from planks and dead bugs to rollouts and Copenhagen planks.",
     description:
       "For beginners to intermediates who want a strong, stable trunk for lifting, running and everyday life. The core's main job is to resist unwanted " +
@@ -682,7 +682,7 @@ export const CATALOG_ENDURANCE_MOBILITY: ProgramSeed[] = [
   {
     slug: "movement-quality-foundations",
     name: "Movement Quality Foundations: Squat, Hinge, Lunge, Push, Pull, Carry",
-    summary: "Three slow-tempo sessions a week that teach the six basic movement patterns with bodyweight first, then light dumbbells.",
+    summary: "For complete beginners or anyone returning after a long break: slow-tempo sessions that teach the six basic movement patterns, bodyweight first, then light dumbbells.",
     description:
       "For true beginners, people returning after a long break, or lifters who want to clean up their technique. Every session practises the basic " +
       "patterns — squat, hip hinge, lunge, push, pull and carry — at a slow 3-1-1 tempo so you feel each position. Weeks 1–2 use bodyweight only; weeks " +
@@ -725,7 +725,7 @@ export const CATALOG_ENDURANCE_MOBILITY: ProgramSeed[] = [
   {
     slug: "flexibility-recovery-routines",
     name: "Flexibility & Recovery Routines",
-    summary: "Four gentle sessions a week (five optional) of easy walking or cycling and relaxed stretching to help you feel looser and recover between workouts.",
+    summary: "For easy days between hard training: four gentle sessions a week of easy walking or cycling and relaxed stretching.",
     description:
       "For anyone at any level who wants a calm, structured routine of gentle stretching and easy aerobic activity — alongside a training plan, on a lighter " +
       "phase, or on its own. Two sessions pair 15–24 minutes of easy walking or cycling with lower-body stretches, one works the spine and shoulders, and one " +

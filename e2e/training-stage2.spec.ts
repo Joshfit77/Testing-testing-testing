@@ -31,7 +31,7 @@ test.describe("training stage 2B", () => {
     await page.waitForURL(/equipment=none/);
     expect(page.url()).toMatch(/days=3/);
     expect(page.url()).toMatch(/minutes=45/);
-    await expect(page.getByRole("heading", { name: "First 5K: Run/Walk to 30 Minutes" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Beginner Run/Walk to 5K" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Dumbbell Home Strength" })).toHaveCount(0);
     await page.reload();
     await expect(page.getByLabel("Equipment I have")).toHaveValue("none");

@@ -14,9 +14,9 @@ import { getActiveProgram } from "@/server/services/training";
 export const metadata = { title: "Recovery & mobility" };
 
 const ROUTINES = [
-  { slug: "daily-mobility-flow", title: "Daily Mobility Flow", body: "Four 15–20 minute routines for hips, spine, shoulders and ankles." },
+  { slug: "full-body-mobility-6-week", title: "Full-Body Mobility", body: "Short routines for hips, spine, shoulders and ankles, with holds that grow every week." },
   { slug: "recovery-deload-week", title: "Recovery & Deload Week", body: "A planned easy week of light lifting, easy cardio and mobility." },
-  { slug: "active-aging-low-impact", title: "Low-Impact Strength & Balance", body: "Joint-friendly sessions you can do next to a sturdy support." },
+  { slug: "active-aging-strength-and-balance", title: "Low-Impact Strength & Balance", body: "Joint-friendly sessions you can do next to a sturdy support." },
 ];
 
 export default async function RecoveryPage() {

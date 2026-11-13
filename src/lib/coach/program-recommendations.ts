@@ -1,5 +1,6 @@
 import { HABIT_PROGRAMS, getHabitProgram } from "@/data/habit-programs";
 import { PROGRAMS } from "@/data/programs";
+import { isListedProgram, programRetirement } from "@/data/program-retirements";
 import { hasFeature } from "@/lib/domain/plans";
 import { recommendPrograms, type GeneratorAnswers } from "@/lib/domain/program-generator";
 import type { Plan } from "@/lib/domain/types";
@@ -22,7 +23,8 @@ export interface ProgramSuggestionContext {
 
 export function programRecommendationsForCoach(ctx: ProgramSuggestionContext) {
   const pro = hasFeature(ctx.plan, "full_program_library");
-  const library = PROGRAMS.filter((p) => p.category !== "custom");
+  // Retired programs are never suggested (members already on one keep it).
+  const library = PROGRAMS.filter((p) => p.category !== "custom" && isListedProgram(p.slug));
   const ranked = ctx.answers ? recommendPrograms(ctx.answers, library, ctx.plan).slice(0, TOP_TRAINING) : [];
   const bySlug = new Map(library.map((p) => [p.slug, p]));
   return {
@@ -67,6 +69,8 @@ export function buildProgramProposal(
   current: { activeProgram: string | null; activeHabitPrograms: string[] },
 ): { ok: true; proposal: Extract<CoachProposal, { kind: "program_start" }> } | { ok: false; error: string } {
   const training = PROGRAMS.find((p) => p.slug === slug && p.category !== "custom");
+  const retired = training ? programRetirement(training.slug) : undefined;
+  if (training && retired) return { ok: false, error: `${training.name} has been retired from the library; suggest ${retired.replacedBy} instead.` };
   if (training) {
     if (current.activeProgram === training.name) return { ok: false, error: `${training.name} is already their active program.` };
     return {

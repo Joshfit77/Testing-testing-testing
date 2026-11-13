@@ -3,6 +3,7 @@ import { buildProgramProposal, programRecommendationsForCoach } from "@/lib/coac
 import { coachProposalSchema, validateToolInput } from "@/lib/coach/tools";
 import { HABIT_PROGRAMS } from "@/data/habit-programs";
 import { PROGRAMS } from "@/data/programs";
+import { isListedProgram } from "@/data/program-retirements";
 import { executeCoachTool, type ToolContext } from "@/server/coach/tools";
 import { athleteFixture, fakeSupabase } from "./fixtures/coach-fixtures";
 
@@ -38,7 +39,7 @@ describe("AI coach program recommendations", () => {
 });
 
 describe("AI coach program proposals", () => {
-  const training = PROGRAMS.find((p) => p.category !== "custom")!;
+  const training = PROGRAMS.find((p) => p.category !== "custom" && isListedProgram(p.slug))!;
   const habit = HABIT_PROGRAMS[0]!;
 
   it("builds a confirmation card that names the program it would pause", () => {

@@ -749,7 +749,7 @@ function halfMarathonWeeks(): ProgramWeekSeed[] {
   });
 }
 
-/** Walk to Run: six gentle weeks from brisk walking to 20 minutes of easy jogging (before the First 5K plan). */
+/** Walk to Run: six gentle weeks from brisk walking to 20 minutes of easy jogging (before the Beginner Run/Walk to 5K plan). */
 function walkToRunWeeks(): ProgramWeekSeed[] {
   // [jog seconds, walk seconds, rounds] per week; the last day of week 6 is continuous.
   const plan = [
@@ -1765,7 +1765,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
   {
     slug: "active-aging-strength-2-day",
     name: "Strong for Life: 2-Day Strength (50+)",
-    summary: "Two progressive strength sessions a week that build from light sets of 12 to heavier sets of 6–8.",
+    summary: "For adults 50+ who can train twice a week: dumbbell strength that builds from light sets of 12 to heavier sets of 6–8.",
     description:
       "For active adults over 50 who want real strength, not just movement. Research such as the LIFTMOR trial shows that supervised, progressive, " +
       "genuinely challenging lifting is safe for many older adults and improves bone density and function — so this plan moves from learning sets of " +
@@ -1817,7 +1817,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
   {
     slug: "recovery-deload-week",
     name: "Recovery & Deload Week",
-    summary: "A planned easy week: lighter loads, mobility and easy cardio.",
+    summary: "For one planned easy week between training blocks: lighter loads, mobility and easy cardio, then back to your program.",
     description:
       "Use this after a hard block or when check-ins show low readiness. Keep loads at roughly 50–60% of normal and stop every set with plenty " +
       "in reserve — coaches deload by cutting volume and effort, not by stopping entirely. Leave each session feeling better than when you started.",
@@ -1859,7 +1859,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
   {
     slug: "barbell-strength-foundations",
     name: "Novice Linear Progression: 3×5 Barbell",
-    summary: "Alternate two short barbell workouts three times a week and add weight every session.",
+    summary: "For brand-new barbell lifters who want the simplest plan: alternate two short workouts three times a week and add weight every session.",
     description:
       "The classic way new lifters get strong fastest, in the style of Starting Strength and StrongLifts: squat every session, alternate bench press " +
       "and overhead press, deadlift once or twice a week, and add a small amount of weight every time you train. Three work sets of five are heavy " +
@@ -1914,7 +1914,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
   {
     slug: "womens-strength-progression",
     name: "Strong Foundations: Women's Strength",
-    summary: "A full-body strength plan that progresses load — not just reps — three days a week.",
+    summary: "For women who want to get genuinely strong: a full-body barbell and dumbbell plan that progresses load — not just reps — three days a week.",
     description:
       "Shaped by feedback from women lifters who wanted real strength progression rather than 'toning' circuits. Research shows women gain muscle at a " +
       "similar relative rate to men and often gain upper-body strength faster, so nothing here assumes you should lift light: heavy compound lifts, " +
@@ -1961,7 +1961,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
   {
     slug: "intermediate-weekly-undulating",
     name: "Weekly Undulating Strength: Volume, Light & Heavy Days",
-    summary: "Three days a week — a volume day, a recovery day and a heavy day — with weekly records instead of session-to-session jumps.",
+    summary: "For lifters whose session-to-session gains have stalled: three days a week — a volume day, a recovery day and a heavy day — with weekly records instead.",
     description:
       "For lifters whose novice progression has stalled. In the style of the Texas Method from Rippetoe and Kilgore's Practical Programming: Monday's " +
       "5 × 5 at about 90% of Friday's weight builds the stress, Wednesday's light day lets you recover, and Friday you set a new rep record. Progress " +
@@ -1986,8 +1986,8 @@ const BASE_PROGRAMS: ProgramSeed[] = [
   },
   {
     slug: "wave-strength-training-max",
-    name: "4-Week Wave Strength: Training-Max Method",
-    summary: "One main lift a day in 4-week waves of 65–95% of a training max, with 5×10 or 5×5 supplemental work and a deload every fourth week.",
+    name: "Wave Strength: Training-Max Method",
+    summary: "For intermediates who want slow, steady strength gains: two 4-week training-max waves (8 weeks), one main lift a day at 65–95%, the last set for max good reps, and a deload ending each wave.",
     description:
       "In the style of Jim Wendler's 5/3/1. You base everything on a training max — 90% of your true 1RM — so the work is always a little easier than " +
       "you think, which is why it keeps working for years. Week 1 is sets of 5 (65/75/85%), week 2 triples (70/80/90%), week 3 is 5/3/1 (75/85/95%), " +
@@ -2014,7 +2014,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
   {
     slug: "powerbuilding-4-day",
     name: "Powerbuilding 4-Day: Strength + Size",
-    summary: "Two heavy days and two hypertrophy days a week: get stronger on the big lifts while building muscle everywhere.",
+    summary: "For intermediates who want strength and size together on four days: two heavy days and two hypertrophy days a week, in two waves.",
     description:
       "Powerbuilding blends a powerlifter's heavy compound work with a bodybuilder's volume. Strength days use 4–6 reps on the squat, bench and rows; " +
       "hypertrophy days use 8–20 reps, machines, cables and lengthened-position exercises. Weekly volume lands around 10–20 hard sets per major muscle " +
@@ -2334,8 +2334,8 @@ const BASE_PROGRAMS: ProgramSeed[] = [
   // =========================================================== Bodybuilding & physique
   {
     slug: "full-body-hypertrophy-3-day",
-    name: "Full-Body Hypertrophy: 3 Days",
-    summary: "Three full-body sessions a week: every muscle trained three times with about 10 hard sets per muscle that build through the block.",
+    name: "Full-Body Hypertrophy: 3-Day",
+    summary: "For lifters with some gym experience who want size on three days: every muscle three times a week, about 10 hard sets each, building through the block.",
     description:
       "The most time-efficient way to build muscle for beginners and busy lifters. Research shows growth depends mostly on weekly hard sets taken " +
       "close to failure, and that training each muscle at least twice a week is a sensible default — full-body sessions three times a week hit both. " +
@@ -2361,7 +2361,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
   {
     slug: "womens-glute-strength",
     name: "Glutes & Strength: 4-Day Upper/Lower",
-    summary: "Two glute-focused lower days and two upper days — heavy hip thrusts and squats plus real upper-body strength.",
+    summary: "For beginners prioritising glutes: two glute-focused lower days — heavy hip thrusts and squats — and two upper days for real upper-body strength.",
     description:
       "A glute-specialization program that doesn't skip strength. Lower days pair heavy hip thrusts, squats and deadlifts with split squats, back " +
       "extensions and abduction work for the upper glutes; upper days build pressing and pulling strength (including your first chin-up). Glutes get " +
@@ -2434,8 +2434,8 @@ const BASE_PROGRAMS: ProgramSeed[] = [
   },
   {
     slug: "push-pull-legs-6-day",
-    name: "Push / Pull / Legs: 6 Days",
-    summary: "Push, pull and legs twice a week: a heavy lift with a last-set rep target, then bodybuilding volume.",
+    name: "Push/Pull/Legs: Strength & Size",
+    summary: "For intermediates on six days who want their main lifts to climb: a heavy lift with a last-set rep target each session, then bodybuilding volume.",
     description:
       "In the style of the popular Reddit PPL by u/metallicadpa: each day opens with a main lift (deadlift, bench, squat, row or overhead press) and " +
       "a last set for as many reps as possible, then moves to 8–20 rep accessories. Six days give every muscle two sessions a week with about 12–18 " +
@@ -2460,7 +2460,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
   {
     slug: "power-hypertrophy-5-day",
     name: "Power-Hypertrophy 5-Day",
-    summary: "Two heavy power days and three body-part hypertrophy days with speed work — high volume for experienced lifters.",
+    summary: "For experienced lifters with five days: two heavy power days plus three body-part hypertrophy days with speed work.",
     description:
       "In the style of Layne Norton's PHAT: an upper and a lower power day early in the week, then back-and-shoulders, legs, and chest-and-arms " +
       "hypertrophy days that open with explosive speed sets at 65–70% of your power-day weights. It's a lot of volume — about 15–20 hard sets for the " +
@@ -2514,8 +2514,8 @@ const BASE_PROGRAMS: ProgramSeed[] = [
   // =========================================================== Combat sports
   {
     slug: "mma-off-camp-2-day",
-    name: "Off-Camp Strength for Fighters (2 Days)",
-    summary: "Two short strength & power sessions a week that build a base without stealing from skills training.",
+    name: "Fighter Off-Camp Strength: 2-Day",
+    summary: "For fighters between camps: two short strength and power sessions a week that build a base without stealing from skills training.",
     description:
       "Between fight camps, most of your energy should go to skills. Two full-body sessions a week are enough to build and keep strength, power and " +
       "resilience: jumps and throws first, then a heavy lower-body lift, pressing and pulling, hamstring and groin injury-prevention work, and neck " +
@@ -2630,7 +2630,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
   {
     slug: "mma-fight-conditioning",
     name: "MMA Fight Conditioning",
-    summary: "Strength and energy-system work to support skill training — not replace it.",
+    summary: "For fighters with no fight booked yet: three sessions a week of strength and energy-system work that support skill training, not replace it.",
     description:
       "Designed to sit alongside 2–4 skill sessions a week. Day 1 builds strength and alactic power, day 2 develops anaerobic capacity with round-based " +
       "intervals, and day 3 builds the aerobic base — MMA's longer rounds lean on the aerobic system more than most combat sports. Keep the hardest " +
@@ -2678,8 +2678,8 @@ const BASE_PROGRAMS: ProgramSeed[] = [
   },
   {
     slug: "mma-fight-camp-3-day",
-    name: "MMA Fight Camp: 8 Weeks (3 Days)",
-    summary: "Three S&C sessions a week periodized into a fight: base, specific preparation, peak and fight week.",
+    name: "MMA Fight Camp: 8-Week Countdown",
+    summary: "For fighters with a fight eight weeks out: three S&C sessions a week periodized into the fight — base, specific preparation, peak and fight week.",
     description:
       "Fight-camp S&C that fits around skills and sparring. Weeks 1–3 build a strength base and aerobic power; weeks 4–6 move to heavy triples, " +
       "5-minute fight-pace rounds and glycolytic intervals; week 7 converts strength to power with full fight simulations; fight week is short and sharp. " +
@@ -2777,7 +2777,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
   {
     slug: "lean-and-conditioned",
     name: "Lean & Conditioned",
-    summary: "Strength to protect muscle plus sustainable cardio to support fat loss.",
+    summary: "For beginners losing fat who like variety: two dumbbell strength circuits, one steady cardio day and one interval day a week.",
     description:
       "Fat loss is driven mainly by a modest, sustainable calorie deficit; this program supports that with resistance training to maintain muscle and " +
       "a mix of steady and interval cardio. It is not a substitute for medical advice on weight management.",
@@ -2801,7 +2801,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
   {
     slug: "functional-engine",
     name: "Functional Engine",
-    summary: "Varied mixed-modal workouts that build strength and a big engine.",
+    summary: "For experienced trainees who like mixed-modal workouts: barbell strength plus varied conditioning to build a big engine.",
     description:
       "Inspired by functional fitness training: a strength piece followed by a timed conditioning circuit. Scale every movement to keep good form — " +
       "intensity should never outrun technique.",
@@ -2873,10 +2873,10 @@ const BASE_PROGRAMS: ProgramSeed[] = [
   },
   {
     slug: "walk-to-run-beginner",
-    name: "Walk to Run: 6 Weeks to Your First 20-Minute Jog",
-    summary: "Three gentle sessions a week take you from brisk walking with short jogs to 20 minutes of continuous easy jogging.",
+    name: "Walk to Run: Your First 20-Minute Jog",
+    summary: "For non-runners starting from walking: brisk walks with short jogs that build to 20 minutes of continuous easy jogging.",
     description:
-      "For complete beginners or anyone returning after a long break, before the First 5K plan. Two walk/jog interval sessions and one brisk walk " +
+      "For complete beginners or anyone returning after a long break, before the Beginner Run/Walk to 5K plan. Two walk/jog interval sessions and one brisk walk " +
       "each week; the jogging bits grow from 30 seconds to 3 minutes, and the last session is 20 minutes of easy, continuous jogging. Everything is " +
       "conversational. Repeat any week that leaves you sore or out of breath, and stop if anything hurts.",
     category: "cardiovascular",
@@ -2899,7 +2899,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
   {
     slug: "5k-training",
     name: "5K Training: Run Your Best 5K",
-    summary: "Eight weeks, three runs a week: easy running, one quality session, a long run, a cutback week and a race-week taper.",
+    summary: "For runners who can already run 30 minutes: easy running, one quality session, a long run, a cutback week and a race-week taper.",
     description:
       "For runners who can already run 25–30 minutes without stopping. Most running is easy and conversational; one session a week sharpens your " +
       "5K pace with short repeats, then longer 5K-effort repeats. The long run builds to about 55 minutes. Week 4 cuts back, and week 8 tapers into a " +
@@ -3131,7 +3131,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
   {
     slug: "dumbbell-home-strength",
     name: "Dumbbell Home Strength",
-    summary: "Three full-body sessions a week with a pair of adjustable dumbbells and a bench.",
+    summary: "For beginners training at home with adjustable dumbbells and a bench: three full-body sessions a week.",
     description:
       "A complete strength plan for a home setup: squat, hinge, lunge, press, row and carry patterns with dumbbells only. Sets stay 1–3 reps short of " +
       "failure, which builds muscle and strength with modest loads. No bench? Do floor presses and supported rows on a sturdy chair.",
@@ -3177,7 +3177,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
   {
     slug: "band-bodyweight-total-body",
     name: "Bands & Bodyweight Total Body",
-    summary: "Three 30–35-minute sessions a week with resistance bands and your bodyweight — travel- and apartment-friendly.",
+    summary: "For home or travel with only resistance bands: three 30–35-minute total-body sessions a week with bands and your bodyweight.",
     description:
       "Resistance bands supply the pulling and isolation work that bodyweight alone can't; push-ups, squats, lunges and bridges cover the rest. " +
       "Bands get harder as they stretch, so control the return. A set of loop bands (light, medium, heavy) and a door anchor is enough.",
@@ -3223,7 +3223,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
   {
     slug: "kettlebell-circuit-intervals",
     name: "Kettlebell & Bodyweight Circuits",
-    summary: "Three interval-circuit sessions a week: every-minute-on-the-minute strength, timed work:rest rounds and a short finisher.",
+    summary: "For conditioning with a kettlebell at home or in the gym: every-minute-on-the-minute strength, timed work:rest rounds and a short finisher.",
     description:
       "Functional conditioning without a full gym: kettlebell swings, goblet squats, push-ups, rows and carries arranged as timed circuits. EMOM blocks " +
       "keep strength moves crisp; work:rest intervals (40:20, then 45:15) build work capacity. Stop a round early if form breaks — the clock serves the " +
@@ -3268,8 +3268,8 @@ const BASE_PROGRAMS: ProgramSeed[] = [
   },
   {
     slug: "hybrid-strength-and-run",
-    name: "Hybrid: Strength & 5K–10K Running",
-    summary: "Two full-body strength days and three runs a week, spaced so hard runs never land next to heavy leg days.",
+    name: "Hybrid: Running Focus",
+    summary: "For runners who also lift: three runs (easy, intervals, long) and two full-body strength days a week, spaced so hard sessions never collide.",
     description:
       "Concurrent training for people who want to stay strong and run well. Interference is smallest when strength and running stay moderate in volume " +
       "and hard sessions are spread out, so the week runs Monday strength, Tuesday easy run, Thursday intervals, Friday strength (upper emphasis), " +
@@ -3295,7 +3295,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
   {
     slug: "seated-strength-mobility",
     name: "Seated Strength & Mobility",
-    summary: "Three chair-based sessions a week for strength, posture and mobility when standing exercise is hard.",
+    summary: "For anyone who needs or prefers to exercise seated: three chair-based sessions a week for strength, posture and mobility.",
     description:
       "For adults who need or prefer to exercise seated — after illness, with balance or joint limits, or as a first step back. Every exercise is done " +
       "on a sturdy chair without wheels (sit-to-stands use the chair as a target). Move slowly, breathe out on the effort and stop if anything causes " +

@@ -240,7 +240,7 @@ export interface RecoveryActivity {
 
 export const REST_DAY_ACTIVITIES: RecoveryActivity[] = [
   { title: "Easy walk", minutes: 20, description: "A conversational-pace walk outdoors promotes blood flow without adding fatigue." },
-  { title: "Mobility flow", minutes: 15, description: "Run the Daily Mobility Flow — hips, spine and shoulders through comfortable ranges." },
+  { title: "Mobility flow", minutes: 15, description: "A Full-Body Mobility session — hips, spine and shoulders through comfortable ranges." },
   { title: "Breathing reset", minutes: 5, description: "Slow nasal breathing: inhale 4 seconds, exhale 6 seconds. Helps you downshift after stress." },
   { title: "Light bike or swim", minutes: 20, description: "Very easy cardio. You should finish feeling fresher than when you started." },
   { title: "Sleep focus", minutes: 0, description: "Aim for a consistent bedtime and wake time. Sleep is the most powerful recovery tool available." },

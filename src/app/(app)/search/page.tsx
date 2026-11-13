@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { APP_RECIPES } from "@/data/app-recipes";
 import { COMMON_FOODS } from "@/data/foods";
 import { PROGRAMS } from "@/data/programs";
+import { isListedProgram } from "@/data/program-retirements";
 import { prepareEntry, rankFoods } from "@/lib/domain/food-search";
 import { hasFeature } from "@/lib/domain/plans";
 import { getServerSupabase } from "@/lib/supabase/server";
@@ -116,7 +117,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
       title: e.name,
       body: [e.category, ...(e.primary_muscles ?? []).slice(0, 2)].filter(Boolean).join(" · "),
     }));
-    programs = rankFoods(PROGRAMS, query, (p) => prepareEntry(`${p.name} ${p.summary} ${p.category}`), 5).map((p) => ({ href: `/train/programs/${p.slug}`, title: p.name, body: p.summary }));
+    programs = rankFoods(PROGRAMS.filter((p) => isListedProgram(p.slug)), query, (p) => prepareEntry(`${p.name} ${p.summary} ${p.category}`), 5).map((p) => ({ href: `/train/programs/${p.slug}`, title: p.name, body: p.summary }));
     foods = rankFoods(COMMON_FOODS, query, (f) => prepareEntry(f.name), 5).map((f) => ({
       href: "/nutrition?add=1",
       title: f.name,

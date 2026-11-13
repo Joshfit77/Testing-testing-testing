@@ -1,6 +1,7 @@
 # Pro program catalog (40 programs)
 
-Branch `claude/pro-premium`, 2026-11-13. Nothing here is merged, deployed or live.
+Branch `claude/pro-premium`, 2026-11-13. Nothing here is merged, deployed or live. Names below follow the 2026-11-14
+library clean-up (docs/programs/PROGRAM_LIBRARY_AUDIT.md); slugs are unchanged.
 
 ## Status in one paragraph
 
@@ -25,7 +26,7 @@ session length), not that the programming is right for any individual.
 | 7 | Power and Athletic Strength | `power-and-athletic-strength-10-week` | New | 10 weeks | 3 days/week | intermediate | Pro | Unverified (automated checks only) |
 | 8 | Beginner Muscle Builder | `beginner-muscle-builder` | New | 8 weeks | 3 days/week | beginner | Pro | Unverified (automated checks only) |
 | 9 | Upper/Lower Hypertrophy | `upper-lower-hypertrophy-12-week` | New | 12 weeks | 4 days/week | intermediate | Pro | Unverified (automated checks only) |
-| 10 | Push/Pull/Legs | `push-pull-legs-12-week` | New | 12 weeks | 6 days/week | intermediate | Pro | Unverified (automated checks only) |
+| 10 | Push/Pull/Legs: Hypertrophy | `push-pull-legs-12-week` | New | 12 weeks | 6 days/week | intermediate | Pro | Unverified (automated checks only) |
 | 11 | Advanced Bodybuilding | `advanced-bodybuilding-5-day` | New | 12 weeks | 5 days/week | advanced | Pro | Unverified (automated checks only) |
 | 12 | Upper Body Specialization | `upper-body-specialization` | New | 8 weeks | 4 days/week | intermediate | Pro | Unverified (automated checks only) |
 | 13 | Lower Body and Glute Development | `lower-body-glute-development` | New | 10 weeks | 4 days/week | intermediate | Pro | Unverified (automated checks only) |
@@ -37,15 +38,15 @@ session length), not that the programming is right for any individual.
 | 19 | Calisthenics Foundations | `calisthenics-foundations` | Existing program, adopted | 8 weeks | 3 days/week | beginner | Pro | Unverified (automated checks only) |
 | 20 | Busy Schedule: 30-Minute Workouts | `busy-schedule-30-minute-workouts` | New | 8 weeks | 3 days/week | beginner | Pro | Unverified (automated checks only) |
 | 21 | Active Aging Strength and Balance | `active-aging-strength-and-balance` | New | 12 weeks | 3 days/week | beginner | Pro | Unverified: needs a qualified coach's review |
-| 22 | Beginner Run/Walk to 5K: 10 Weeks | `beginner-run-walk-5k-10-week` | New | 10 weeks | 3 days/week | beginner | Pro | Unverified (automated checks only) |
+| 22 | Beginner Run/Walk to 5K | `beginner-run-walk-5k-10-week` | New | 10 weeks | 3 days/week | beginner | Pro | Unverified (automated checks only) |
 | 23 | 5K Training: Run Your Best 5K | `5k-training` | Existing program, adopted | 8 weeks | 3 days/week | intermediate | Pro (legacy Plus tier) | Unverified (automated checks only) |
 | 24 | 10K Training: Build to 10 Kilometres | `10k-training` | Existing program, adopted | 10 weeks | 4 days/week | intermediate | Pro (legacy Plus tier) | Unverified (automated checks only) |
 | 25 | Half Marathon: 80/20 Base to Race | `half-marathon-base-80-20` | Existing program, adopted | 12 weeks | 4 days/week | intermediate | Pro (legacy Plus tier) | Unverified (automated checks only) |
-| 26 | Aerobic Endurance Builder: 8 Weeks | `aerobic-endurance-builder-8-week` | New (owner decision 2026-11-13) | 8 weeks | 3 days/week + up to 2 optional easy days | beginner | Pro | Unverified (automated checks only) |
-| 27 | Hybrid Strength + Running: 12-Week Strength-Priority Plan | `hybrid-strength-run-12-week` | New | 12 weeks | 5 days/week | intermediate | Pro | Unverified (automated checks only) |
+| 26 | Aerobic Endurance Builder | `aerobic-endurance-builder-8-week` | New (owner decision 2026-11-13) | 8 weeks | 3 days/week + up to 2 optional easy days | beginner | Pro | Unverified (automated checks only) |
+| 27 | Hybrid: Strength Focus | `hybrid-strength-run-12-week` | New | 12 weeks | 5 days/week | intermediate | Pro | Unverified (automated checks only) |
 | 28 | Conditioning & Intervals: Bike, Rower and Kettlebell | `conditioning-intervals-8-week` | New | 8 weeks | 3 days/week | intermediate | Pro | Unverified (automated checks only) |
-| 29 | Full-Body Mobility: 6-Week Routine | `full-body-mobility-6-week` | New | 6 weeks | 5 days/week | beginner | Pro | Unverified (automated checks only) |
-| 30 | Core Strength & Stability: 8 Weeks | `core-strength-stability-8-week` | New | 8 weeks | 3 days/week | beginner | Pro | Unverified (automated checks only) |
+| 29 | Full-Body Mobility | `full-body-mobility-6-week` | New | 6 weeks | 5 days/week | beginner | Pro | Unverified (automated checks only) |
+| 30 | Core Strength & Stability | `core-strength-stability-8-week` | New | 8 weeks | 3 days/week | beginner | Pro | Unverified (automated checks only) |
 | 31 | Movement Quality Foundations: Squat, Hinge, Lunge, Push, Pull, Carry | `movement-quality-foundations` | New | 6 weeks | 3 days/week | beginner | Pro | Unverified (automated checks only) |
 | 32 | Flexibility & Recovery Routines | `flexibility-recovery-routines` | New | 6 weeks | 4 days/week | beginner | Pro | Unverified (automated checks only) |
 | 33 | Nutrition Foundations | `nutrition-foundations` | New (habit program) | 28 days | Daily habits for 4 weeks, plus a short lesson and check-in each week | beginner | Pro | Unverified: needs registered dietitian review |
@@ -111,8 +112,9 @@ starts until the member taps Start, the server re-checks access, and the current
    sessions (easy + 20-second strides, easy with steady tempo from week 5, long easy), effort by talk test and RPE 3–6,
    no paces; bike, rower or incline walk count the same; up to two optional 20-minute easy days (not counted toward
    completion); cutback in week 4, easier final week with a 30-minute check against week 1. Week-to-week growth is
-   capped at 10%, and a test keeps it distinct from #22. The earlier mapping ("First 5K: Run/Walk to 30 Minutes") stays
-   in the library unchanged, without a catalog number.
+   capped at 10%, and a test keeps it distinct from #22. The earlier mapping ("First 5K: Run/Walk to 30 Minutes") has
+   since been retired from browsing as a near-duplicate of #22 (members who started it keep it; see
+   docs/programs/PROGRAM_LIBRARY_AUDIT.md).
 2. **Professional review (decided: all programs stay marked not professionally reviewed until they are).** Before release, a qualified strength coach should review 1–32, a physiotherapist 21 and
    29–32 (and anything aimed at older adults), and a registered dietitian 33–36 and 40.
 3. **Faith & Fitness programs as Pro (confirmed 2026-11-13).** 38–40 are Pro; the existing rule that the Faith section is always

@@ -100,9 +100,8 @@ const meanMinutes = (days: ProgramDaySeed[]) => toFive(days.reduce((s, d) => s +
 export const CATALOG_AEROBIC_ENDURANCE: ProgramSeed[] = [
   {
     slug: "aerobic-endurance-builder-8-week",
-    name: "Aerobic Endurance Builder: 8 Weeks",
-    summary:
-      "Three core aerobic sessions a week plus up to two optional easy days: about 45% more weekly endurance time in eight weeks, mostly at talk-test effort — run, ride, row or walk.",
+    name: "Aerobic Endurance Builder",
+    summary: "For building an aerobic base on any machine or on foot: about 45% more weekly endurance time in eight weeks, mostly at talk-test effort.",
     description:
       "For people who can already run, cycle or walk briskly without stopping for about 20–30 minutes and want a bigger aerobic base. This is not a " +
       "couch-to-5K: there are no run/walk intervals. Each week has an easy session with a few relaxed strides, a second easy session that gains short " +

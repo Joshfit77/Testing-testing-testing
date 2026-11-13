@@ -43,7 +43,7 @@ export const metadata = { title: "Run" };
 /** Running programs in the library (linked, never duplicated). Start one, then record its runs with GPS from here. */
 const RUN_PROGRAMS = [
   { slug: "walk-to-run-beginner", blurb: "Brisk walking with short jogs, to a 20-minute jog in 6 weeks." },
-  { slug: "aerobic-base-run-walk", blurb: "Run/walk intervals for beginners, couch to 5K in 8 weeks." },
+  { slug: "beginner-run-walk-5k-10-week", blurb: "Run/walk intervals for beginners, to 30 minutes of running in 10 weeks." },
   { slug: "5k-training", blurb: "8 weeks to your best 5K: easy runs, one quality session, a taper." },
   { slug: "10k-training", blurb: "10 weeks, four runs a week, threshold work and a taper." },
   { slug: "half-marathon-base-80-20", blurb: "12 weeks of mostly easy running with one quality session." },

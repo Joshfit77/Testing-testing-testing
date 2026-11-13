@@ -17,7 +17,7 @@ test.describe("program library", () => {
     expect(peak).toBeGreaterThan(novice);
 
     // Structured programs are Pro for new enrollments: Free sees the outline and an upgrade link in every discipline...
-    const perDiscipline = ["barbell-strength-foundations", "strongman-foundations", "full-body-hypertrophy-3-day", "mma-off-camp-2-day", "aerobic-base-run-walk", "agility-footwork", "foundations-full-body"];
+    const perDiscipline = ["barbell-strength-foundations", "strongman-foundations", "full-body-hypertrophy-3-day", "mma-off-camp-2-day", "beginner-run-walk-5k-10-week", "agility-footwork", "first-30-days-in-the-gym"];
     for (const slug of perDiscipline) {
       await page.goto(`/train/programs/${slug}`);
       await expect(page.getByRole("link", { name: /Upgrade to unlock/ }), slug).toBeVisible();

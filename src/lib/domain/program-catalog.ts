@@ -7,17 +7,17 @@ import { EQUIPMENT_LABELS, type Equipment, type PrimaryGoal, PRIMARY_GOALS, GOAL
 export const SPEC_CATEGORY_IDS = [
   "beginner",
   "strength",
-  "big-three",
   "bodybuilding",
-  "strongman",
-  "combat",
   "functional",
-  "athletic",
   "endurance",
   "home",
-  "calisthenics",
   "active-aging",
   "mobility",
+  "big-three",
+  "calisthenics",
+  "athletic",
+  "combat",
+  "strongman",
 ] as const;
 export type SpecCategoryId = (typeof SPEC_CATEGORY_IDS)[number];
 
@@ -30,19 +30,20 @@ export interface SpecCategory {
 
 /** SPEC §5: the 13 categories that form the browse structure. Each library category maps to exactly one. */
 export const SPEC_CATEGORIES: SpecCategory[] = [
+  // General goals first, in the order most members look for them; specialist disciplines after.
   { id: "beginner", label: "Beginner & general fitness", categories: ["beginner"] },
   { id: "strength", label: "Strength & powerlifting", categories: ["strength", "womens-strength", "powerbuilding", "powerlifting"] },
-  { id: "big-three", label: "Bench, squat & deadlift", categories: ["bench-press", "squat-specialization", "deadlift-specialization"] },
   { id: "bodybuilding", label: "Bodybuilding & muscle", categories: ["hypertrophy", "show-prep"] },
-  { id: "strongman", label: "Strongman", categories: ["strongman"] },
-  { id: "combat", label: "MMA, boxing & grappling", categories: ["mma-conditioning", "boxing-conditioning", "grappling-conditioning"] },
-  { id: "functional", label: "Functional, circuits & intervals", categories: ["functional-conditioning", "weight-loss-cardio"] },
-  { id: "athletic", label: "Speed, agility & power", categories: ["athletic-performance", "speed", "agility"] },
-  { id: "endurance", label: "Endurance & hybrid", categories: ["cardiovascular", "hybrid-training"] },
+  { id: "functional", label: "Fat loss, circuits & conditioning", categories: ["weight-loss-cardio", "functional-conditioning"] },
+  { id: "endurance", label: "Running, endurance & hybrid", categories: ["cardiovascular", "hybrid-training"] },
   { id: "home", label: "Home, dumbbell, band & bodyweight", categories: ["home-workouts"] },
-  { id: "calisthenics", label: "Calisthenics", categories: ["calisthenics"] },
   { id: "active-aging", label: "Active aging, seated & low-impact", categories: ["active-aging"] },
   { id: "mobility", label: "Mobility, warm-ups & recovery", categories: ["mobility-flexibility", "recovery-deload"] },
+  { id: "big-three", label: "Bench, squat & deadlift", categories: ["bench-press", "squat-specialization", "deadlift-specialization"] },
+  { id: "calisthenics", label: "Calisthenics", categories: ["calisthenics"] },
+  { id: "athletic", label: "Speed, agility & power", categories: ["athletic-performance", "speed", "agility"] },
+  { id: "combat", label: "MMA, boxing & grappling", categories: ["mma-conditioning", "boxing-conditioning", "grappling-conditioning"] },
+  { id: "strongman", label: "Strongman", categories: ["strongman"] },
 ];
 
 const BY_ID = new Map(SPEC_CATEGORIES.map((c) => [c.id, c]));
