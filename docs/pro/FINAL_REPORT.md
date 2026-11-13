@@ -28,7 +28,7 @@
 | Unit (`vitest --project unit`) | 221 files, 4,285 tests passed on the final commit |
 | Integration, affected suites (pro-programs, weekly-reports, plan-enforcement, custom-programs, workouts) | 26 passed |
 | E2E, production build, mobile project | pro-programs (4), program-library (1), features (5), memberships, store-billing, recipes-planner, training-review: all passed |
-| E2E with the local mock AI (no real model) | coach suite: 10 passed, 1 skipped by design (needs no AI key) |
+| E2E with the local mock AI (no real model) | coach suite: 8 passed in the full run; the 2 that failed (an outdated tool list, and my new test) passed when re-run after the fix; 1 skipped by design |
 | Not run here | Demo-mode e2e (needs `npm run demo`), WebKit/iPhone project (browser not installed here), anything on a device |
 
 ## Owner decisions needed
