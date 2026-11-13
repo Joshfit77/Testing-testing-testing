@@ -78,6 +78,30 @@ describe("grocery merging", () => {
     expect(mass.note).toMatch(/5 large/);
   });
 
+  it("adds cups of an ingredient to its weight when the cup's weight is known", () => {
+    // From the demo's plan: 0.5 cup of blueberries (148 g a cup) in one meal, 75 g in a recipe.
+    const lines = mergeGroceries(
+      [
+        { key: "food:blueberries", name: "Blueberries", quantity: 0.5, unitLabel: "1 cup", gramsPerUnit: 148 },
+        { key: "food:blueberries", name: "Blueberries", quantity: 75, unitLabel: "g", gramsPerUnit: 1 },
+      ],
+      "metric",
+    );
+    expect(lines).toEqual([{ key: "food:blueberries", name: "Blueberries", quantity: 149, unit: "g", note: null }]);
+    // Without a weight for the cup, they stay apart with a note, as before.
+    const apart = mergeGroceries(
+      [
+        { key: "food:blueberries", name: "Blueberries", quantity: 0.5, unitLabel: "1 cup" },
+        { key: "food:blueberries", name: "Blueberries", quantity: 75, unitLabel: "g" },
+      ],
+      "metric",
+    );
+    expect(apart).toHaveLength(2);
+    // An ingredient needed only by volume stays in cups.
+    const cups = mergeGroceries([{ key: "food:rice", name: "Rice", quantity: 1.5, unitLabel: "1 cup", gramsPerUnit: 158 }], "imperial");
+    expect(cups[0]).toMatchObject({ unit: "cups" });
+  });
+
   it("only combines counted units with the same unit", () => {
     const lines = mergeGroceries(
       [

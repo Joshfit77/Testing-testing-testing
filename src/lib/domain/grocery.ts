@@ -122,10 +122,14 @@ export function mergeGroceries(items: GroceryInput[], units: UnitSystem): Grocer
     base: number;
   }
   const groups = new Map<string, Acc>();
+  // Ingredients that are also needed by weight: a cup or a piece of them with a known weight is added to that weight,
+  // so the list says "Blueberries 8 oz" once instead of "0.5 cup" and "2.6 oz" on two lines.
+  const byWeight = new Set(items.filter((i) => i.quantity > 0 && classifyUnit(i.unitLabel).dim === "mass").map((i) => i.key));
   for (const i of items) {
     if (!(i.quantity > 0)) continue;
     let u = classifyUnit(i.unitLabel);
     if (u.dim === "count" && i.gramsPerUnit && i.gramsPerUnit > 0 && UNSHOPPABLE.test(u.label)) u = { dim: "mass", factor: i.gramsPerUnit };
+    else if (u.dim !== "mass" && i.gramsPerUnit && i.gramsPerUnit > 0 && byWeight.has(i.key)) u = { dim: "mass", factor: i.gramsPerUnit };
     const label = u.dim === "count" ? u.label.toLowerCase() : "";
     const gk = `${i.key}|${u.dim}|${label}`;
     const acc = groups.get(gk) ?? { key: i.key, name: i.name, dim: u.dim, countLabel: u.dim === "count" ? u.label : "", base: 0 };
