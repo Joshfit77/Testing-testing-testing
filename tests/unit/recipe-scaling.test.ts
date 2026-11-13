@@ -28,7 +28,7 @@ describe("scaling a recipe to more or fewer servings (display only)", () => {
     // Each ingredient's calories are rounded to whole kcal before adding up, so allow up to 1 kcal.
     expect(Math.abs(fromIngredients.calories.value - fromTotals.calories.value)).toBeLessThanOrEqual(1);
     expect(Math.abs(fromIngredients.protein_g.value - fromTotals.protein_g.value)).toBeLessThanOrEqual(0.5);
-    expect(Math.abs(ingredientNutrition(scaled[1]!)!.calories - ingredientNutrition(ings[1]!)!.calories * 1.5)).toBeLessThanOrEqual(1);
+    expect(Math.abs(ingredientNutrition(scaled[1]!)!.calories! - ingredientNutrition(ings[1]!)!.calories! * 1.5)).toBeLessThanOrEqual(1);
   });
 
   it("a factor of 1 returns the ingredient unchanged", () => {

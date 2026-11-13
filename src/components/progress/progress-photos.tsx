@@ -31,7 +31,7 @@ function formatDate(iso: string): string {
   return new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" });
 }
 
-function PhotoImage({ photo, className, alt }: { photo: ProgressPhotoView; className?: string; alt: string }) {
+function PhotoImage({ photo, className, alt, style }: { photo: ProgressPhotoView; className?: string; alt: string; style?: React.CSSProperties }) {
   if (!photo.url) {
     return (
       <span className={cn("flex items-center justify-center bg-elevated text-muted-foreground", className)}>
@@ -42,7 +42,7 @@ function PhotoImage({ photo, className, alt }: { photo: ProgressPhotoView; class
   }
   // Signed, short-lived URLs to a private bucket — next/image optimisation doesn't apply.
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={photo.url} alt={alt} className={className} loading="lazy" decoding="async" />;
+  return <img src={photo.url} alt={alt} className={className} style={style} loading="lazy" decoding="async" />;
 }
 
 type Stage = "idle" | "compressing" | "uploading" | "saving";
@@ -325,9 +325,27 @@ function ViewerDialog({ photo, units, onClose }: { photo: ProgressPhotoView | nu
   );
 }
 
+/** Alignment guides over a comparison photo: thirds and a centre line, to check both photos were framed the same way. */
+function AlignmentGuides() {
+  return (
+    <span aria-hidden className="pointer-events-none absolute inset-0" data-testid="photo-guides">
+      {[33.333, 66.666].map((y) => (
+        <span key={`h${y}`} className="absolute inset-x-0 border-t border-dashed border-gold/60" style={{ top: `${y}%` }} />
+      ))}
+      {[33.333, 50, 66.666].map((x) => (
+        <span key={`v${x}`} className={cn("absolute inset-y-0 border-l border-dashed", x === 50 ? "border-gold" : "border-gold/60")} style={{ left: `${x}%` }} />
+      ))}
+    </span>
+  );
+}
+
 function CompareDialog({ pair, units, onClose }: { pair: [ProgressPhotoView, ProgressPhotoView] | null; units: UnitSystem; onClose: () => void }) {
   const cmp = pair ? comparePhotos(pair[0], pair[1]) : null;
   const delta = cmp?.weightDeltaKg;
+  const [mode, setMode] = useState<"side" | "overlay">("side");
+  const [afterOpacity, setAfterOpacity] = useState(50);
+  const [guides, setGuides] = useState(false);
+  const differentPose = Boolean(cmp && cmp.before.pose !== cmp.after.pose);
   return (
     <Dialog open={Boolean(cmp)} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-4xl">
@@ -341,23 +359,80 @@ function CompareDialog({ pair, units, onClose }: { pair: [ProgressPhotoView, Pro
                   ` · ${delta === 0 ? "no weight change" : `${delta > 0 ? "+" : "−"}${displayWeight(Math.abs(delta), units)} ${weightUnit(units)}`}`}
               </DialogDescription>
             </DialogHeader>
-            <div className="grid grid-cols-2 gap-2 sm:gap-4">
+            <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Comparison view">
               {(
                 [
-                  ["Before", cmp.before],
-                  ["After", cmp.after],
+                  ["side", "Side by side"],
+                  ["overlay", "Overlay"],
                 ] as const
-              ).map(([label, p]) => (
-                <figure key={label} className="space-y-2">
-                  <PhotoImage photo={p} alt={`${label}: ${p.pose} pose, ${formatDate(p.takenOn)}`} className="aspect-[3/4] w-full rounded-xl bg-black object-contain" />
-                  <figcaption className="text-center text-xs sm:text-sm">
-                    <span className="block font-semibold uppercase tracking-wider text-gold-highlight">{label}</span>
-                    <span className="block text-muted-foreground">{formatDate(p.takenOn)}</span>
-                    <span className="block text-muted-foreground">{p.weightKg != null ? formatWeight(p.weightKg, units) : "No weight"}</span>
-                  </figcaption>
-                </figure>
+              ).map(([m, label]) => (
+                <Button key={m} size="sm" variant={mode === m ? "default" : "secondary"} aria-pressed={mode === m} onClick={() => setMode(m)}>
+                  {label}
+                </Button>
               ))}
+              <label className="ml-auto inline-flex min-h-11 items-center gap-2 text-sm">
+                <input type="checkbox" checked={guides} onChange={(e) => setGuides(e.target.checked)} className="size-5 accent-[var(--gold)]" />
+                Alignment guides
+              </label>
             </div>
+            {differentPose && (
+              <p className="text-xs text-gold">
+                These photos are different poses ({cmp.before.pose} and {cmp.after.pose}), so they won&apos;t line up.
+              </p>
+            )}
+            {mode === "overlay" ? (
+              <div className="space-y-2" data-testid="photo-overlay">
+                <div className="relative mx-auto aspect-[3/4] w-full max-w-md overflow-hidden rounded-xl bg-black">
+                  <PhotoImage photo={cmp.before} alt={`Before: ${cmp.before.pose} pose, ${formatDate(cmp.before.takenOn)}`} className="absolute inset-0 size-full object-contain" />
+                  <PhotoImage
+                    photo={cmp.after}
+                    alt={`After: ${cmp.after.pose} pose, ${formatDate(cmp.after.takenOn)}`}
+                    className="absolute inset-0 size-full object-contain"
+                    style={{ opacity: afterOpacity / 100 }}
+                  />
+                  {guides && <AlignmentGuides />}
+                </div>
+                <label className="mx-auto block max-w-md text-sm">
+                  <span className="flex justify-between text-xs text-muted-foreground">
+                    <span>Before {formatDate(cmp.before.takenOn)}</span>
+                    <span>After {formatDate(cmp.after.takenOn)}</span>
+                  </span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={afterOpacity}
+                    onChange={(e) => setAfterOpacity(Number(e.target.value))}
+                    aria-label="Blend between before and after"
+                    className="mt-1 h-11 w-full accent-[var(--gold)]"
+                  />
+                </label>
+                <p className="mx-auto max-w-md text-center text-xs text-muted-foreground">
+                  The photos only line up as well as they were taken: same distance, height, pose and lighting. Nothing is measured from them.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 sm:gap-4">
+                {(
+                  [
+                    ["Before", cmp.before],
+                    ["After", cmp.after],
+                  ] as const
+                ).map(([label, p]) => (
+                  <figure key={label} className="space-y-2">
+                    <span className="relative block">
+                      <PhotoImage photo={p} alt={`${label}: ${p.pose} pose, ${formatDate(p.takenOn)}`} className="aspect-[3/4] w-full rounded-xl bg-black object-contain" />
+                      {guides && <AlignmentGuides />}
+                    </span>
+                    <figcaption className="text-center text-xs sm:text-sm">
+                      <span className="block font-semibold uppercase tracking-wider text-gold-highlight">{label}</span>
+                      <span className="block text-muted-foreground">{formatDate(p.takenOn)}</span>
+                      <span className="block text-muted-foreground">{p.weightKg != null ? formatWeight(p.weightKg, units) : "No weight"}</span>
+                    </figcaption>
+                  </figure>
+                ))}
+              </div>
+            )}
             {delta == null && <p className="mt-3 text-center text-xs text-muted-foreground">Add a weight to both photos (or log bodyweight on those days) to see the change.</p>}
           </>
         )}

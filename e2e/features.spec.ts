@@ -36,8 +36,10 @@ test.describe("feature access, subscriptions and core sections", () => {
     // Prescriptions are not rendered for locked programs.
     await expect(page.getByText(/Rest \d/)).toHaveCount(0);
 
+    // Every structured library program is Pro for new enrollments (owner rule 2026-11-13), including the former Free ones.
     await page.goto("/train/programs/foundations-full-body");
-    await expect(page.getByRole("button", { name: /Start program/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Upgrade to unlock/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Start program/ })).toHaveCount(0);
 
     await page.goto("/nutrition");
     await expect(page.getByRole("button", { name: "Add food" })).toBeVisible();

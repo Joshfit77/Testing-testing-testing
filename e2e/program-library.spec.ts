@@ -2,12 +2,12 @@ import { expect, test } from "@playwright/test";
 import { completeOnboarding, grantPlan, signUpAndConfirm, uniqueEmail } from "./helpers";
 
 test.describe("program library", () => {
-  test("free programs in every discipline, beginner-first ordering, and week-by-week templates", async ({ page }) => {
+  test("every discipline in the library, beginner-first ordering, Pro to start, and week-by-week templates", async ({ page }) => {
     const email = uniqueEmail("library");
     await signUpAndConfirm(page, email);
     await completeOnboarding(page);
 
-    // Strength discipline: the novice program is free, listed before advanced programs.
+    // Strength discipline: the novice program is listed before advanced programs.
     await page.goto("/train/programs?discipline=strength");
     const cards = page.locator("ul li h4");
     const names = await cards.allTextContents();
@@ -16,8 +16,15 @@ test.describe("program library", () => {
     expect(novice).toBeGreaterThanOrEqual(0);
     expect(peak).toBeGreaterThan(novice);
 
-    // A free program per discipline is startable on the free plan.
-    for (const slug of ["barbell-strength-foundations", "strongman-foundations", "full-body-hypertrophy-3-day", "mma-off-camp-2-day", "aerobic-base-run-walk", "agility-footwork", "foundations-full-body"]) {
+    // Structured programs are Pro for new enrollments: Free sees the outline and an upgrade link in every discipline...
+    const perDiscipline = ["barbell-strength-foundations", "strongman-foundations", "full-body-hypertrophy-3-day", "mma-off-camp-2-day", "aerobic-base-run-walk", "agility-footwork", "foundations-full-body"];
+    for (const slug of perDiscipline) {
+      await page.goto(`/train/programs/${slug}`);
+      await expect(page.getByRole("link", { name: /Upgrade to unlock/ }), slug).toBeVisible();
+    }
+    // ...and Pro can start any of them.
+    await grantPlan(email, "pro");
+    for (const slug of perDiscipline) {
       await page.goto(`/train/programs/${slug}`);
       await expect(page.getByRole("button", { name: /Start program/ }), slug).toBeVisible();
     }
@@ -26,12 +33,7 @@ test.describe("program library", () => {
     await page.goto("/train/programs/barbell-strength-foundations?week=2");
     await expect(page.locator("ol li h3").first()).toHaveText(/Workout B/i);
 
-    // Premium templates are locked on the free plan...
-    await page.goto("/train/programs/wave-strength-training-max");
-    await expect(page.getByRole("link", { name: /Upgrade to unlock/ })).toBeVisible();
-
-    // ...and show their training-max percentages and deload once unlocked.
-    await grantPlan(email, "plus");
+    // Templates show their training-max percentages and deload.
     await page.goto("/train/programs/wave-strength-training-max?week=1");
     await expect(page.getByText("65% / 75% / 85% TM").first()).toBeVisible();
     await page.goto("/train/programs/wave-strength-training-max?week=4");
