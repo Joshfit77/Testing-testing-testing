@@ -11,14 +11,14 @@ import { RecipeLogForm } from "@/components/nutrition/recipe-log-form";
 import { SourceBadge } from "@/components/nutrition/source-badge";
 import { Button } from "@/components/ui/button";
 import { isoDateInTz } from "@/lib/domain/dates";
-import { ingredientNutrition } from "@/lib/domain/recipes";
+import { ingredientNutrition, MAX_SCALED_SERVINGS, parseScaledServings, scaleIngredient, scaleTotals } from "@/lib/domain/recipes";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { deleteRecipeAction } from "@/server/actions/recipes";
 import { loadRecipe } from "@/server/services/recipes";
 
 export const metadata = { title: "Recipe" };
 
-export default async function RecipePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ saved?: string }> }) {
+export default async function RecipePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ saved?: string; makes?: string }> }) {
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const { user, profile, allowed } = await nutritionPageUser("meal_planning");
   if (!allowed) return <NutritionLocked title="Recipe" description="Recipes are included with Pro All Access." />;
@@ -27,6 +27,12 @@ export default async function RecipePage({ params, searchParams }: { params: Pro
   const recipe = await loadRecipe(supabase, user.id, id);
   if (!recipe) notFound();
   const today = isoDateInTz(new Date(), profile.timezone);
+  // "Make N servings": the ingredient amounts and totals shown for a different batch size. Display only; the saved
+  // recipe, its per-serving nutrition and anything already logged stay as they are.
+  const makes = parseScaledServings(sp.makes);
+  const factor = makes && makes !== recipe.servings ? makes / recipe.servings : 1;
+  const ingredients = recipe.ingredients.map((i) => scaleIngredient(i, factor));
+  const totals = factor === 1 ? recipe.totals : scaleTotals(recipe.totals, factor);
 
   return (
     <div className="space-y-6">
@@ -73,16 +79,43 @@ export default async function RecipePage({ params, searchParams }: { params: Pro
         <h2 id="nutrition-title" className="mb-2 text-lg font-semibold">
           Nutrition
         </h2>
-        <NutrientTable totals={recipe.totals} perServing={recipe.perServing} servings={recipe.servings} />
+        <NutrientTable totals={totals} perServing={recipe.perServing} servings={factor === 1 ? recipe.servings : makes!} />
         {recipe.anyEstimate && <p className="mt-2 text-sm text-gold">Includes estimated values (marked “Estimate” below).</p>}
       </section>
 
       <section aria-labelledby="ingredients-title" className="space-y-2">
-        <h2 id="ingredients-title" className="text-lg font-semibold">
-          Ingredients
-        </h2>
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <h2 id="ingredients-title" className="text-lg font-semibold">
+            Ingredients{factor !== 1 ? ` for ${makes} servings` : ""}
+          </h2>
+          <form action={`/nutrition/recipes/${recipe.id}`} className="flex items-end gap-2" data-testid="scale-recipe">
+            <label className="text-xs font-semibold text-muted-foreground">
+              Make servings
+              <input
+                name="makes"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={MAX_SCALED_SERVINGS}
+                defaultValue={makes ?? recipe.servings}
+                className="mt-1 block h-11 w-20 rounded-xl border border-border bg-elevated px-3 text-base text-foreground"
+              />
+            </label>
+            <Button type="submit" variant="secondary" className="min-h-11">
+              Scale
+            </Button>
+          </form>
+        </div>
+        {factor !== 1 && (
+          <p className="text-sm text-muted-foreground" data-testid="scaled-note">
+            Amounts scaled from {recipe.servings} to {makes} servings for shopping and cooking. The saved recipe isn&apos;t changed.{" "}
+            <Link href={`/nutrition/recipes/${recipe.id}`} className="font-semibold text-gold-highlight underline-offset-4 hover:underline">
+              Back to {recipe.servings}
+            </Link>
+          </p>
+        )}
         <ul className="divide-y divide-border rounded-2xl border border-border bg-card">
-          {recipe.ingredients.map((i) => {
+          {ingredients.map((i) => {
             const n = ingredientNutrition(i);
             return (
               <li key={i.id} className="px-4 py-2.5">

@@ -136,3 +136,23 @@ export function servingBasis(totals: NutrientTotals, servings: number, label: st
     ...(missing.length ? { missing } : {}),
   };
 }
+
+/** The servings a recipe view can be scaled to (display only; the saved recipe is not changed). */
+export const MAX_SCALED_SERVINGS = 50;
+
+/** Parse a requested serving count: a whole number from 1 to MAX_SCALED_SERVINGS, else null. */
+export function parseScaledServings(raw: unknown): number | null {
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 1 && n <= MAX_SCALED_SERVINGS ? n : null;
+}
+
+/**
+ * One ingredient scaled by a factor (e.g. 6 servings of a 4-serving recipe = 1.5), with its amount re-described in the
+ * same unit. Nutrition comes from the same food data, so nothing is estimated beyond what the recipe already had.
+ */
+export function scaleIngredient<T extends IngredientAmount & { amountLabel: string }>(i: T, factor: number): T {
+  if (factor === 1) return i;
+  const quantity = Math.round(i.quantity * factor * 100) / 100;
+  const amount = computeAmount(i.basis, quantity, i.unitId);
+  return { ...i, quantity, amountLabel: amount?.amountLabel ?? i.amountLabel };
+}
