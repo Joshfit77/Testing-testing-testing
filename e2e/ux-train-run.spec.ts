@@ -47,12 +47,12 @@ test.describe("Train & Run, first-time fixes", () => {
     await page.waitForURL(/\/run\?tab=log/);
   });
 
-  test("program library: 3 per category with See all, no misleading Complete line, far shorter", async ({ page }) => {
+  test("program library: 2 per category with See all, no misleading Complete line, far shorter", async ({ page }) => {
     await page.goto("/train/programs");
     await hideDemoChrome(page); // measure the length a production member scrolls
     await expect(page.locator("main").getByText(/^Complete:/)).toHaveCount(0);
     for (const section of await page.locator("section[aria-labelledby^='cat-']").all()) {
-      expect(await section.locator("ul > li").count()).toBeLessThanOrEqual(3);
+      expect(await section.locator("ul > li").count()).toBeLessThanOrEqual(2);
     }
     expect(await screens(page)).toBeLessThan(12);
     const seeAll = page.getByRole("link", { name: /^See all \d+/ }).first();

@@ -87,3 +87,25 @@ describe("90/90 hip switch", () => {
     expect(Math.min(mid.kneeL[1], mid.kneeR[1])).toBeGreaterThan(25);
   });
 });
+
+describe("bench dip", () => {
+  // Reviewed as wrong: the athlete read as sitting on the bench. In a bench dip the hands are on the edge behind the
+  // hips and the hips are in front of the bench, lowering below its top as the elbows bend back.
+  const { def, frames } = played("bench-dip");
+  const bench = def.props?.find((p) => p.id === "bench") as { at: [number, number]; w: number; h: number } | undefined;
+  it("keeps the hips in front of the bench edge and lowers them below the bench top", () => {
+    expect(bench).toBeDefined();
+    const front = bench!.at[0] + bench!.w / 2;
+    // The seat of the shorts reaches about 10 units behind the hip joint: the joint has to be at least 12 in front of
+    // the edge for the hips to be clear of the bench (the old drawing had it 10–14 in front, so it sat on the seat).
+    for (const f of frames) expect(f.pts.pelvis[0], "hips clear of the bench edge").toBeGreaterThan(front + 12);
+    const lowest = Math.min(...frames.map((f) => f.pts.pelvis[1]));
+    const highest = Math.max(...frames.map((f) => f.pts.pelvis[1]));
+    expect(lowest, "hips drop below the bench top at the bottom").toBeLessThan(bench!.h);
+    expect(highest - lowest, "a real range of motion").toBeGreaterThan(12);
+  });
+  it("keeps the hands on the bench edge, behind the hips", () => {
+    expect(range(frames.map((f) => f.pts.handR[0]))).toBeLessThan(0.5);
+    for (const f of frames) expect(f.pts.handR[0]).toBeLessThan(f.pts.pelvis[0]);
+  });
+});

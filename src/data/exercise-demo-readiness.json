@@ -580,9 +580,9 @@
    "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
   },
   "bench-dip": {
-   "readiness": "placeholder",
-   "note": "Added 2026-11-13. The drawing reads as sitting on the bench rather than dipping off its edge with the hips in front; written steps carry it until the motion is redrawn."
-  },
+      "readiness": "animated",
+      "note": "Redrawn 2026-11-13: hands on the bench edge behind the hips, hips in front of the bench and lowering below its top, elbows bending back to about 90°. Needs review by a qualified coach."
+    },
   "wide-grip-pull-up": {
    "readiness": "animated",
    "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."

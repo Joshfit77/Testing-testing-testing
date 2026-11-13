@@ -35,8 +35,11 @@ import { removeSavedProgramAction } from "@/server/actions/programs";
 
 export const metadata = { title: "Programs" };
 
-/** Programs shown per category before "See all" when browsing the whole library. */
-const PER_CATEGORY = 3;
+/**
+ * Programs shown per category before "See all" when browsing the whole library. Two, with 13 categories: three made the
+ * page about 13 phone screens long; every category's full list is one tap away.
+ */
+const PER_CATEGORY = 2;
 
 interface ProgramCardRow {
   id: string;

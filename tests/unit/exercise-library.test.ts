@@ -48,8 +48,8 @@ describe("exercise library", () => {
   it("gives every exercise its own motion and never presents an unreviewed demo as approved", () => {
     for (const e of EXERCISES) expect(EXERCISE_MOTIONS[e.slug], e.slug).toBeTypeOf("function");
     for (const e of EXERCISES) expect(ownerApproved(e.slug)).toBe(false);
-    // The bench dip's drawing is not accurate yet, so it shows the labelled placeholder.
-    expect(demoReadiness("bench-dip")).toBe("placeholder");
+    // The bench dip was redrawn (hips in front of the bench, see exercise-mobility-drills), so no demo is a placeholder.
+    expect(EXERCISES.filter((e) => demoReadiness(e.slug) === "placeholder").map((e) => e.slug)).toEqual([]);
   });
 
   it("keeps distinct lifts distinct (conventional deadlift, RDL and back squat each have their own motion)", () => {

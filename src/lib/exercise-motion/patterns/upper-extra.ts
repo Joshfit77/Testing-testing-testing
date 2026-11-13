@@ -178,7 +178,7 @@ export function benchDip(id: string, label: string): MotionDef {
   const benchW = 34;
   const edge: Vec = [benchX + benchW / 2 - 3, BENCH_TOP + BODY.r.hand - 1];
   const root: RootRule = { pin: "handR", at: edge };
-  const make = (s: number): Pose => pose({ trunk: 2 + 6 * s, neck: -2, ...both({ sh: -16 - 46 * s, el: 2 + 86 * s, armD: 14 }) });
+  const make = (s: number): Pose => pose({ trunk: 4 + 6 * s, neck: -2, ...both({ sh: -34 - 40 * s, el: 2 + 88 * s, armD: 14 }) });
   // Feet planted where they are with the knees at about 90° at the top.
   const W0 = worldPts(make(0), root);
   const feet = ankleForSole(W0.pelvis[0] + 50, 0);
