@@ -10,6 +10,8 @@ applied to the local Supabase stack and exercised by the integration tests named
 | `20261113000063_weekly_reports.sql` | `weekly_reports` table (one row per member per Monday-start week, unique), RLS: members read and delete their own and may only mark them read; only the server writes. Adds `weekly_report` to the AI usage kinds. | New table only. | Drop the table and restore the previous `ai_usage_events_kind_check` list. |
 | `20261113000064_habit_programs.sql` | `habit_program_enrollments` and `habit_program_checkins`, RLS: own rows only; new enrollments and check-ins need `has_plan('pro')`; one active run per program; no future-day rules live in the server action. | New tables only. | Drop both tables (roll back the app first: `/train/habits` uses them). |
 | `20261113000065_program_enrollment_grandfather.sql` | `can_use_program` also allows a member with an existing `user_programs` row for that program, so nobody loses a program part-way through when library programs became Pro-only. | Function only. | Restore the previous function body (in the file header). |
+| `20261113000066_ai_cost_controls.sql` | AI metered in money: `ai_usage_events` gains `cost_micros`, `reserved_micros`, `finalized_at` (existing rows backfilled and closed); `ai_budget_months` and `ai_budget_alerts` (service role only); `reserve_ai_usage` replaced (13 arguments: member and global budgets, in-flight limits, fast-model switch, stale-hold sweep); new `finalize_ai_usage`, `release_ai_usage`, `ai_budget_settle`, `ai_budget_check`. | Columns added with defaults; one function replaced. The app must be deployed with it (the old 7-argument call no longer exists). | Header of the file: drop the new functions and tables, drop the columns, re-apply `reserve_ai_usage` from `20261024000032_food_photos.sql`. Roll back the app first. |
+| `20261113000067_accountability_partners.sql` | Accountability partners: invites, partnerships, per-partner shares, fixed-message nudges, six functions; flag `accountability_partners` inserted **off**. | New tables only. | Header of the file (tested inside a transaction). |
 
 Tests: `tests/integration/weekly-reports.test.ts`, `tests/integration/pro-programs.test.ts` (Free can't enroll or forge
 an earlier enrollment, a kept enrollment still works, switching keeps history, habit-program RLS), plus the existing
@@ -53,7 +55,7 @@ them, set `is_published = false` rather than deleting, so no member's history is
 ## Deployment order (when approved)
 
 1. Back up the database.
-2. Apply migrations 063, 064, 065 (`supabase db push` against staging first).
+2. Apply migrations 063–067 (`supabase db push` against staging first). 066 and the app code that calls it must go out together.
 3. Run the regenerated `supabase/seed.sql` on staging; check a member with a logged program workout still sees it
    linked to its day.
 4. Deploy the app build from this branch to staging; run the integration and e2e suites against it.
