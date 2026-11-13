@@ -84,7 +84,8 @@ export default async function ProgramDetailPage({
     ? await supabase.from("workout_sessions").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("user_program_id", userProgram.id).eq("status", "completed")
     : { count: 0 };
   const { total: totalSessions, required: requiredCount } = requiredSessions(program.days_per_week, program.duration_weeks);
-  const completionText = completionRequirement(program, program.source === "curated" ? getProgramSeed(program.slug)?.completion : null);
+  const seed = program.source === "curated" ? getProgramSeed(program.slug) : undefined;
+  const completionText = completionRequirement(program, seed?.completion ?? null);
   const weeks = weeksRes.data ?? [];
   // A member who already enrolled in or saved this program keeps it (library programs became Pro-only in 2026-11).
   const locked = program.owner_id !== user.id && !canAccessTier(plan, program.tier) && !userProgram;
@@ -255,6 +256,37 @@ export default async function ProgramDetailPage({
           </ul>
         </div>
       </section>
+
+      {(seed?.instructions?.length || seed?.milestones?.length) && (
+        <section className="grid gap-4 md:grid-cols-2" aria-label="How to follow this program" data-testid="program-guide">
+          {seed?.instructions?.length ? (
+            <div className="rounded-2xl border border-border bg-card p-5">
+              <h2 className="flex items-center gap-2 font-display text-lg font-semibold uppercase">
+                <CheckCircle2 className="size-4 text-gold" aria-hidden /> Before you start
+              </h2>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                {seed.instructions.map((i) => (
+                  <li key={i}>{i}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {seed?.milestones?.length ? (
+            <div className="rounded-2xl border border-border bg-card p-5">
+              <h2 className="flex items-center gap-2 font-display text-lg font-semibold uppercase">
+                <Flag className="size-4 text-gold" aria-hidden /> Weekly milestones
+              </h2>
+              <ol className="mt-2 space-y-1 text-sm text-muted-foreground">
+                {seed.milestones.map((m, i) => (
+                  <li key={i} className={cn(isActive && i + 1 === (userProgram?.current_week as number) && "font-semibold text-foreground")}>
+                    <span className="font-semibold">Week {i + 1}:</span> {m}
+                  </li>
+                ))}
+              </ol>
+            </div>
+          ) : null}
+        </section>
+      )}
 
       <section aria-labelledby="schedule-title">
         <div className="mb-3 flex flex-wrap items-end justify-between gap-2">

@@ -18,6 +18,7 @@ import {
   filterCatalog,
   GOAL_FILTERS,
   MINUTES_FILTERS,
+  WEEKS_FILTERS,
   parseCatalogFilters,
   SPEC_CATEGORIES,
   specCategoriesFor,
@@ -197,7 +198,7 @@ export default async function ProgramsPage({ searchParams }: { searchParams: Pro
             <summary className="flex min-h-11 cursor-pointer items-center gap-2 px-4 text-sm font-semibold">
               <SlidersHorizontal className="size-4 text-gold" aria-hidden /> Filters{nFilters > 0 ? ` (${nFilters})` : ""}
             </summary>
-            <div className="grid grid-cols-2 gap-2 px-4 pb-4 sm:grid-cols-3 lg:grid-cols-5">
+            <div className="grid grid-cols-2 gap-2 px-4 pb-4 sm:grid-cols-3 lg:grid-cols-6">
               <label className="space-y-1 text-xs font-semibold text-muted-foreground">
                 Goal
                 <NativeSelect name="goal" defaultValue={filters.goal ?? ""} aria-label="Goal">
@@ -253,7 +254,18 @@ export default async function ProgramsPage({ searchParams }: { searchParams: Pro
                   ))}
                 </NativeSelect>
               </label>
-              <div className="col-span-2 flex gap-2 sm:col-span-3 lg:col-span-5">
+              <label className="space-y-1 text-xs font-semibold text-muted-foreground">
+                Program length
+                <NativeSelect name="weeks" defaultValue={filters.weeks ?? ""} aria-label="Program length">
+                  <option value="">Any</option>
+                  {WEEKS_FILTERS.map((w) => (
+                    <option key={w} value={w}>
+                      Up to {w} weeks
+                    </option>
+                  ))}
+                </NativeSelect>
+              </label>
+              <div className="col-span-2 flex gap-2 sm:col-span-3 lg:col-span-6">
                 <Button type="submit" className="flex-1 sm:flex-none">
                   Apply filters
                 </Button>

@@ -80,6 +80,8 @@ export const EXPERIENCE_FILTERS = ["beginner", "intermediate", "advanced"] as co
 export const DAYS_FILTERS = [2, 3, 4, 5, 6] as const;
 /** "Sessions up to N minutes." */
 export const MINUTES_FILTERS = [30, 45, 60, 90] as const;
+/** Program length: "up to N weeks". */
+export const WEEKS_FILTERS = [4, 8, 12, 16] as const;
 export const GOAL_FILTERS: { id: PrimaryGoal; label: string }[] = PRIMARY_GOALS.map((id) => ({ id, label: GOAL_LABELS[id] }));
 
 export interface CatalogFilters {
@@ -90,6 +92,7 @@ export interface CatalogFilters {
   equipment?: EquipmentFilterId;
   days?: number;
   minutes?: number;
+  weeks?: number;
 }
 
 export interface CatalogProgram {
@@ -99,6 +102,7 @@ export interface CatalogProgram {
   difficulty: string;
   days_per_week: number;
   session_minutes: number;
+  duration_weeks?: number;
   goals: string[];
   equipment: string[];
   /** Library category slug. */
@@ -132,13 +136,15 @@ export function parseCatalogFilters(sp: Record<string, string | string[] | undef
   if (days) out.days = days;
   const minutes = num(one("minutes"), MINUTES_FILTERS);
   if (minutes) out.minutes = minutes;
+  const weeks = num(one("weeks"), WEEKS_FILTERS);
+  if (weeks) out.weeks = weeks;
   return out;
 }
 
 /** Back to a query string (stable order), e.g. for links that change one filter. */
 export function catalogQuery(f: CatalogFilters): string {
   const params = new URLSearchParams();
-  for (const k of ["q", "category", "goal", "experience", "equipment", "days", "minutes"] as const) {
+  for (const k of ["q", "category", "goal", "experience", "equipment", "days", "minutes", "weeks"] as const) {
     const v = f[k];
     if (v !== undefined && v !== "") params.set(k, String(v));
   }
@@ -147,7 +153,7 @@ export function catalogQuery(f: CatalogFilters): string {
 }
 
 export function activeFilterCount(f: CatalogFilters): number {
-  return (["goal", "experience", "equipment", "days", "minutes"] as const).filter((k) => f[k] !== undefined).length;
+  return (["goal", "experience", "equipment", "days", "minutes", "weeks"] as const).filter((k) => f[k] !== undefined).length;
 }
 
 const words = (s: string) =>
@@ -185,6 +191,7 @@ export function filterCatalog<T extends CatalogProgram>(programs: T[], f: Catalo
     if (equipment && !p.equipment.every((e) => equipment.has(e))) return false;
     if (f.days && p.days_per_week > f.days) return false;
     if (f.minutes && p.session_minutes > f.minutes) return false;
+    if (f.weeks && p.duration_weeks !== undefined && p.duration_weeks > f.weeks) return false;
     if (f.q && !matchesSearch(p, f.q)) return false;
     return true;
   });

@@ -19,6 +19,7 @@ const catalog: CatalogProgram[] = PROGRAMS.map((p) => ({
   difficulty: p.difficulty,
   days_per_week: p.days.length,
   session_minutes: p.sessionMinutes,
+  duration_weeks: p.weeks,
   goals: [...p.goals, ...p.types.map((t) => `type:${t}`)],
   equipment: p.equipment,
   category: p.category,
@@ -75,6 +76,15 @@ describe("filters", () => {
     expect(f).toEqual({ q: "glute", category: "home", goal: "lose_fat", equipment: "bands", days: 3 });
     expect(catalogQuery(f)).toBe("?q=glute&category=home&goal=lose_fat&equipment=bands&days=3");
     expect(catalogQuery({})).toBe("");
+  });
+
+  it("filters by program length (up to N weeks) and ignores lengths it doesn't offer", () => {
+    expect(parseCatalogFilters({ weeks: "8" }).weeks).toBe(8);
+    expect(parseCatalogFilters({ weeks: "7" }).weeks).toBeUndefined();
+    const short = filterCatalog(catalog, { weeks: 4 });
+    expect(short.length).toBeGreaterThan(0);
+    for (const p of short) expect(p.duration_weeks).toBeLessThanOrEqual(4);
+    expect(catalogQuery({ weeks: 12 })).toBe("?weeks=12");
   });
 });
 
