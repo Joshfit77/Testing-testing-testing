@@ -1,3 +1,4 @@
+import { EXERCISES } from "../src/data/exercises";
 import { devices, expect, test, type Page } from "@playwright/test";
 import { hideDemoChrome } from "./helpers";
 
@@ -63,7 +64,7 @@ test.describe("Train & Run, first-time fixes", () => {
 
   test("exercise library: one-tap muscle chips, other filters under More filters, every exercise reachable", async ({ page }) => {
     await page.goto("/train/exercises");
-    await expect(page.getByText("157 exercises")).toBeVisible();
+    await expect(page.getByText(`${EXERCISES.length} exercises`)).toBeVisible();
     await expect(page.locator("main ul li").filter({ hasText: /^Demo/ })).toHaveCount(0);
     await page.getByRole("navigation", { name: "Muscles" }).getByRole("link", { name: "Chest", exact: true }).click();
     await page.waitForURL(/muscle=chest/);

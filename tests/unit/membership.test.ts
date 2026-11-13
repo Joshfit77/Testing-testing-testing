@@ -19,7 +19,10 @@ describe("membership comparison", () => {
     const faith = rows.filter((r) => r.section === "Faith & Discipline");
     expect(faith.length).toBeGreaterThan(0);
     for (const r of faith) expect(r.free).not.toBe(false);
-    expect(rows.find((r) => /157 exercise demonstrations/.test(r.label))?.free).toBe(true);
+    expect(rows.find((r) => /200\+ exercises with demonstrations/.test(r.label))?.free).toBe(true);
+    // Structured programs are Pro (owner rule 2026-11-13); a member's own starter plan and workouts stay free.
+    expect(rows.find((r) => /Every structured program/.test(r.label))).toMatchObject({ free: false, feature: "full_program_library" });
+    expect(rows.find((r) => /personal starter plan/.test(r.label))?.free).toBe(true);
     expect(rows.find((r) => /Manual run and walk logging/.test(r.label))?.free).toBe(true);
     expect(rows.find((r) => /Live GPS/.test(r.label))).toMatchObject({ free: false, feature: "live_gps" });
   });

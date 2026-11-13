@@ -1,3 +1,4 @@
+import { EXERCISES } from "../src/data/exercises";
 import { devices, expect, test, type Page } from "@playwright/test";
 import { PRESENTER_STEPS } from "../src/lib/demo/presenter";
 import { answerOnboarding } from "./helpers";
@@ -46,7 +47,7 @@ for (const size of sizes) {
       await expect(page.locator("main").getByText(/Upper Strength|Lower Strength/).first()).toBeVisible();
 
       await page.goto("/train/exercises");
-      await expect(page.getByText("157 exercises")).toBeVisible();
+      await expect(page.getByText(`${EXERCISES.length} exercises`)).toBeVisible();
 
       await page.goto("/train/programs/powerbuilding-4-day");
       await expect(page.locator("main").getByText(/Powerbuilding/i).first()).toBeVisible();

@@ -35,10 +35,11 @@ export function membershipComparison(): ComparisonSection[] {
       title: "Training",
       rows: [
         { label: "Workout logging, history and personal records", free: true, pro: true },
-        { label: "All 157 exercise demonstrations", free: true, pro: true },
-        { label: "Starter training programs", free: true, pro: true },
+        { label: "Exercise library: 200+ exercises with demonstrations and form guides", free: true, pro: true },
+        { label: "A personal starter plan built from your answers, plus your own workouts", free: true, pro: true },
         { label: "Saved workout templates", free: String(free.templateLimit ?? "Unlimited"), pro: "Unlimited", feature: "unlimited_templates" },
-        { label: "Complete program library: strength, bodybuilding, powerlifting, athletic, combat sports, calisthenics, running", free: false, pro: true, feature: "full_program_library" },
+        { label: "Every structured program: strength, hypertrophy, powerlifting, running, mobility, combat sports, calisthenics and more, with week-by-week progression", free: false, pro: true, feature: "full_program_library" },
+        { label: "Habit programs: nutrition, faith-and-fitness and a 90-day journey", free: false, pro: true, feature: "full_program_library" },
         { label: "Custom program builder", free: false, pro: true, feature: "custom_program_builder" },
         { label: "Training calendar", free: "View", pro: "Schedule & reschedule", feature: "advanced_calendar" },
         { label: "Strength progression and advanced workout analytics", free: false, pro: true, feature: "advanced_analytics" },
@@ -74,6 +75,7 @@ export function membershipComparison(): ComparisonSection[] {
         { label: "Weight, measurements and progress history", free: true, pro: true },
         { label: "Every Fitness, Food and Faith badge", free: true, pro: true },
         { label: "Progress-photo comparisons and detailed progress analytics", free: false, pro: true, feature: "advanced_analytics" },
+        { label: "A weekly progress report every Sunday", free: false, pro: true, feature: "weekly_reports" },
         // Body Scan has its own check (canUseBodyScan, and has_plan('pro') with consent in the database).
         { label: "Body Scan with private, consent-based photo storage", free: false, pro: true },
       ],
