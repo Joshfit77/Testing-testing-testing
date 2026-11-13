@@ -1,5 +1,6 @@
 import type { Difficulty, Equipment, Plan, PrimaryGoal, ProgramType } from "@/lib/domain/types";
 import { CATALOG_PROGRAMS } from "./program-catalog";
+import { ADOPTED_CATALOG } from "./program-catalog/adopted";
 import {
   STANDARD_WARMUP,
   STANDARD_COOLDOWN,
@@ -3343,7 +3344,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
 ];
 
 /** The full library: the original programs plus the 2026-11 Pro catalog additions (src/data/program-catalog). */
-export const PROGRAMS: ProgramSeed[] = [...BASE_PROGRAMS, ...CATALOG_PROGRAMS];
+export const PROGRAMS: ProgramSeed[] = [...BASE_PROGRAMS.map((p) => (ADOPTED_CATALOG[p.slug] ? { ...p, ...ADOPTED_CATALOG[p.slug] } : p)), ...CATALOG_PROGRAMS];
 
 export function getProgramSeed(slug: string): ProgramSeed | undefined {
   return PROGRAMS.find((p) => p.slug === slug);
