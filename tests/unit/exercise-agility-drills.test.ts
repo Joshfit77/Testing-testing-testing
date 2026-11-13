@@ -8,6 +8,7 @@
  */
 import { EXERCISES } from "@/data/exercises";
 import { getMotion } from "@/lib/exercise-motion";
+import { PRO_AGILITY_LINE } from "@/lib/exercise-motion/patterns/agility";
 import { BODY } from "@/lib/exercise-motion/skeleton";
 import { compileMotion, evaluate } from "@/lib/exercise-motion/timeline";
 import type { ExerciseMeta, Frame, MotionDef, Vec } from "@/lib/exercise-motion/types";
@@ -63,21 +64,85 @@ describe("reactive mirror drill", () => {
 });
 
 describe("5-10-5 pro agility shuttle", () => {
+  // Reviewed as wrong: the athlete shuffled sideways facing the camera the whole way. The drill is three sprints (5, 10
+  // and 5 yards) with a plant, a hand touch and a change of direction at each outer line.
   const { def, frames } = played("pro-agility-shuttle");
+  const L = PRO_AGILITY_LINE;
   const lines = (def.props ?? []).filter((p) => p.kind === "hurdleLine").map((p) => (p.at as Vec)[0]);
-  it("draws three lines and travels to both outer ones", () => {
-    expect(lines.sort((a, b) => a - b)).toEqual([-120, 0, 120]);
-    expect(Math.min(...frames.map((f) => f.pts.soleR[0]))).toBeLessThan(-120);
-    expect(Math.max(...frames.map((f) => f.pts.soleL[0]))).toBeGreaterThan(120);
+  const visible = (f: Frame) => f.alpha > 0.999;
+  it("is seen from the side, with three lines 5 yards apart (shortened) and the athlete running across the picture", () => {
+    expect(def.view).toBe("side");
+    expect(lines.sort((a, b) => a - b)).toEqual([-L, 0, L]);
+    const xs = frames.filter(visible).map((f) => f.pts.pelvis[0]);
+    expect(Math.max(...xs) - Math.min(...xs), "lateral displacement").toBeGreaterThan(2 * L - 110);
   });
-  it("touches each outer line with the outside hand, hips dropped", () => {
-    for (const [s, x] of [
-      ["L", 120],
-      ["R", -120],
-    ] as const) {
-      const touch = frames.filter((f) => handDown(f, s) < 2 && Math.abs(f.pts[`hand${s}`][0] - x) < 8);
-      expect(touch.length, `hand ${s} on the line at ${x}`).toBeGreaterThan(0);
-      for (const f of touch) expect(f.pts.pelvis[1]).toBeLessThan(62);
+  it("starts in a three-point stance straddling the middle line, a hand on the floor", () => {
+    const f = frames[0]!;
+    expect(Math.min(f.pts.ballL[0], f.pts.ballR[0])).toBeLessThan(0);
+    expect(Math.max(f.pts.ballL[0], f.pts.ballR[0])).toBeGreaterThan(0);
+    expect(handDown(f, "R"), "hand on the floor").toBeLessThan(1.5);
+    expect(f.pts.pelvis[1], "hips low").toBeLessThan(66);
+  });
+  it("runs out, back and out again: two changes of direction, each at an outer line during a turn", () => {
+    // Direction of travel while visibly moving (> 1 m/s), in order.
+    const dirs: number[] = [];
+    const reversalsAt: number[] = [];
+    for (let i = 1; i < frames.length; i++) {
+      const a = frames[i - 1]!;
+      const b = frames[i]!;
+      if (!visible(a) || !visible(b)) continue;
+      const v = (b.pts.pelvis[0] - a.pts.pelvis[0]) * 60;
+      if (Math.abs(v) < 100) continue;
+      const d = Math.sign(v);
+      if (dirs.length && dirs[dirs.length - 1] !== d) reversalsAt.push(b.pts.pelvis[0]);
+      if (!dirs.length || dirs[dirs.length - 1] !== d) dirs.push(d);
+    }
+    expect(dirs).toEqual([1, -1, 1]);
+    expect(reversalsAt[0]).toBeGreaterThan(L - 80);
+    expect(reversalsAt[1]).toBeLessThan(-L + 80);
+    // The figure turns round (drawn mirrored) only while faded out, and faces the way it runs.
+    let flips = 0;
+    for (let i = 1; i < frames.length; i++) {
+      const a = frames[i - 1]!;
+      const b = frames[i]!;
+      if ((a.flipX === undefined) !== (b.flipX === undefined)) {
+        flips++;
+        expect(Math.min(a.alpha, b.alpha), "turns happen while faded").toBeLessThan(0.05);
+      }
+      if (visible(a) && visible(b)) {
+        const v = b.pts.pelvis[0] - a.pts.pelvis[0];
+        if (Math.abs(v) * 60 > 100) expect(b.flipX === undefined ? 1 : -1, "faces the way it runs").toBe(Math.sign(v));
+      }
+    }
+    expect(flips).toBe(2);
+  });
+  it("plants and touches each outer line with the hand, hips low", () => {
+    for (const x of [L, -L]) {
+      const touch = frames.filter((f) => visible(f) && handDown(f, "R") < 2 && Math.abs(f.pts.handR[0] - x) < 8);
+      expect(touch.length, `hand on the line at ${x}`).toBeGreaterThan(3);
+      for (const f of touch) {
+        expect(f.pts.pelvis[1], "hips low").toBeLessThan(56);
+        // The outside foot planted at the line, the other a long stride back: a wide base.
+        const balls = [f.pts.ballL[0], f.pts.ballR[0]].map((b) => Math.abs(b - x)).sort((a, b) => a - b);
+        expect(balls[0], "a foot at the line").toBeLessThan(12);
+        expect(balls[1], "the other well back").toBeGreaterThan(45);
+      }
+    }
+  });
+  it("sprints back through the middle line at speed", () => {
+    const i = frames.findIndex((f, k) => k > frames.length / 2 && visible(f) && f.pts.pelvis[0] >= 0 && frames[k - 1]!.pts.pelvis[0] < 0);
+    expect(i).toBeGreaterThan(0);
+    expect((frames[i]!.pts.pelvis[0] - frames[i - 1]!.pts.pelvis[0]) * 60, "cm/s").toBeGreaterThan(200);
+    // Leaning into the sprint, not upright.
+    expect(frames[i]!.pose.trunk).toBeGreaterThan(12);
+  });
+  it("keeps planted feet still (outside the turns)", () => {
+    for (let i = 1; i < frames.length; i++) {
+      const a = frames[i - 1]!;
+      const b = frames[i]!;
+      if (Math.min(a.alpha, b.alpha) < 0.999 || (a.flipX === undefined) !== (b.flipX === undefined)) continue;
+      for (const k of ["ballL", "ballR"] as const)
+        if (a.pts[k][1] < 0.4 && b.pts[k][1] < 0.4) expect(Math.abs(b.pts[k][0] - a.pts[k][0]), `${k} at ${i}`).toBeLessThan(0.5);
     }
   });
 });

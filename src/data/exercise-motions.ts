@@ -250,7 +250,7 @@ export const EXERCISE_MOTIONS: Record<string, Builder> = {
   "running-intervals": (id) => gait({ id, kind: "jog", cycle: 0.68, stride: 1.1, lean: 10, label: `${S}Faster running stride for hard intervals.` }),
   "stair-climb": (id) => stepUp(id, `${S}Steps up onto a stair with one foot, drives to stand tall, and steps down (stair-climb pattern).`, { boxH: 22 }),
   "pro-agility-shuttle": (id) =>
-    proAgilityDrill(id, `${F}5-10-5, distances shortened to fit: from a low stance straddling the middle line, drives 5 yards to one side, plants the outside foot and touches the line with that hand, drives 10 yards to the far line and touches it with the other hand, then drives back through the middle.`),
+    proAgilityDrill(id, `${S}5-10-5, distances shortened to fit: from a three-point stance straddling the middle line, sprints 5 yards to one side, brakes with short steps, plants the outside foot at the line with the hips low and touches the line with the hand, turns and sprints 10 yards to the far line, plants and touches it, then turns and sprints 5 yards back through the middle line.`),
   "t-drill": (id) =>
     tDrill(id, `${F}Seen from the top of the T, distances shortened: sprints forward from the start cone to the middle cone and touches it, shuffles left and touches, shuffles right past the middle and touches, shuffles back to the middle, then backpedals to the start, staying low without crossing the feet.`),
   "three-cone-drill": (id) =>
@@ -263,7 +263,7 @@ export const EXERCISE_MOTIONS: Record<string, Builder> = {
   // ------------------------------------------------------------------ Mobility
   "cat-cow": (id) => coreMove(id, `${S}On hands and knees: arches the back with the head up, then rounds the spine with the chin tucked.`, "cat-cow"),
   "worlds-greatest-stretch": (id) => coreMove(id, `${S}Deep lunge with one hand down: drops the elbow toward the front foot, then reaches that arm up toward the ceiling.`, "worlds-greatest"),
-  "90-90-hip-switch": (id) => coreMove(id, `${F}Seen from slightly above: sits tall with the hands on the mat behind, one leg in front and one to the side with both knees bent 90°, then lifts both knees and rotates them over so the legs switch sides.`, "90-90"),
+  "90-90-hip-switch": (id) => coreMove(id, `${F}Seen from slightly above: sits tall with the hands on the mat behind and the feet set wide in front, both knees bent about 90° and lowered to one side (the front leg turned out, the back leg turned in); keeping the feet in place and the hips on the mat, lifts both knees and swings them over together to the other side, like windscreen wipers.`, "90-90"),
   "thoracic-open-book": (id) => coreMove(id, `${F}Seen from slightly above: lying on one side with the hips and knees bent to 90° and the knees stacked, arms straight out in front; the top arm opens up and over to the floor behind, the head and eyes following the hand, then returns.`, "open-book"),
   "couch-stretch": (id) => coreMove(id, `${S}Back knee on the floor against a wall with the shin up the wall: tall torso, gently pushes the hips forward.`, "couch-stretch"),
   "supine-hamstring-stretch": (id) => coreMove(id, `${S}Lying on the back: a band around one foot draws the straight leg up toward vertical.`, "hamstring-stretch"),

@@ -263,13 +263,14 @@ export function medBallScoopToss(id: string, label: string): MotionDef {
   const gScoop = { L: [8, -8, -3] as V3, R: [-2, -11, 4] as V3 };
   const gCatch = { L: [9, 3, -5] as V3, R: [-1, -10, 5] as V3 };
   const keysT: ThrowKey[] = [
-    // Loaded: slight squat into the back hip, ball low beside the back pocket.
-    { dur: 0.18, hold: 0.4, st: { pelvis: [6, 80], trunk: 8, out: [10, 8] }, ball: [33, 76, -6], grip: gPocket, pole: low },
-    // Hips drive round first; the ball starts down and forward.
-    { dur: 0.12, st: { pelvis: [0, 82], trunk: 4, out: [0, 7] }, ball: [24, 74, 6], grip: gPocket, pole: low },
-    // The scoop: under and through, in front of the hips.
-    { dur: 0.05, st: { pelvis: [-6, 85], trunk: -2, out: [-9, 6] }, ball: [-2, 84, 26], grip: gScoop, pole: scoop },
-    { dur: 0.05, st: { pelvis: [-8.3, 86.6], trunk: -4.5, out: [-11, 6] }, ball: [-24, 97, 27], grip: gScoop, pole: scoop },
+    // Loaded: a real squat with the hips back (the chest leaning toward the viewer) and the weight in the back hip, the
+    // ball low beside the back knee.
+    { dur: 0.18, hold: 0.4, st: { pelvis: [6, 68], trunk: 9, trunkD: 32, out: [12, 9] }, ball: [27, 63, 2], grip: gPocket, pole: low },
+    // Legs and hips drive first (the body rising and turning toward the wall); the ball starts forward, still low.
+    { dur: 0.12, st: { pelvis: [0, 73], trunk: 5, trunkD: 25, out: [0, 7] }, ball: [19, 65, 10], grip: gPocket, pole: low },
+    // The scoop: under and through, in front of the hips, rising as the legs extend.
+    { dur: 0.05, st: { pelvis: [-6, 81], trunk: -2, trunkD: 12, out: [-9, 6] }, ball: [-2, 78, 26], grip: gScoop, pole: scoop },
+    { dur: 0.05, st: { pelvis: [-8.3, 86], trunk: -4.5, trunkD: 4, out: [-11, 6] }, ball: [-24, 95, 27], grip: gScoop, pole: scoop },
     // Release rising, at about chest height on the wall side.
     { dur: 0.09, st: { pelvis: [-10, 88], trunk: -7, out: [-13, 6] }, ball: [-44, 112, 26], grip: gScoop, pole: up },
     // In flight to the wall (chest height); the arms finish high toward it.
@@ -278,9 +279,9 @@ export function medBallScoopToss(id: string, label: string): MotionDef {
     // Rebound dropping back to the hands.
     { dur: 0.2, st: { pelvis: [-10, 88], trunk: -6, out: [-12, 6] }, ball: [-100, 122, 18], free: { L: [-40, 115, 26], R: [-46, 104, 30] }, pole: up },
     { dur: 0.3, st: { pelvis: [-9, 87.5], trunk: -5, out: [-10, 6] }, ball: [-36, 106, 26], grip: gCatch, pole: up },
-    // Reset: carry it back down to the back pocket.
-    { dur: 0.4, st: { pelvis: [-2, 85], trunk: 0, out: [-2, 6] }, ball: [-6, 96, 22], grip: gCatch, pole: scoop },
-    { dur: 0.35, st: { pelvis: [4, 81.5], trunk: 6, out: [8, 7] }, ball: [24, 82, 6], grip: gPocket, pole: low },
+    // Reset: carry it back down past the hips and sit back into the next squat.
+    { dur: 0.4, st: { pelvis: [-2, 83], trunk: 0, trunkD: 8, out: [-2, 6] }, ball: [-6, 92, 22], grip: gCatch, pole: scoop },
+    { dur: 0.4, st: { pelvis: [4, 73], trunk: 6, trunkD: 24, out: [8, 8] }, ball: [22, 70, 8], grip: gPocket, pole: low },
   ];
   return throwMotion(id, label, { soles, wallX, keys: keysT, stillPhase: 0.2 });
 }
