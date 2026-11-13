@@ -25,6 +25,8 @@ import { Button } from "@/components/ui/button";
 import { addDays, isoDateInTz } from "@/lib/domain/dates";
 import { clockMinutesInTz, DEFAULT_SLEEP_GOAL_MINUTES, formatClock, formatDuration, summarizeNights, type SleepSession } from "@/lib/domain/sleep";
 import { nightlyScore } from "@/lib/domain/sleep-score";
+import { ThirtyDaySummaryCard } from "@/components/sleep/thirty-day-summary";
+import { thirtyDaySummary } from "@/lib/domain/sleep-summary";
 import { averageAsleepMinutes, goalPct, nightSlots, scheduleStats, STEADINESS_TEXT } from "@/lib/domain/sleep-stats";
 import { DEBT_BAND_TEXT, sleepDebt } from "@/lib/domain/sleep-debt";
 import { hasFeature } from "@/lib/domain/plans";
@@ -114,6 +116,7 @@ export default async function SleepPage({ searchParams }: { searchParams: Promis
   const tips = sleepTips({ nights: fortnight, naps, checkins, goalMinutes: goal, debtMinutes: debt && debt.nightsWithData ? debt.debtMinutes : null, windows, dismissed });
   const [tip, ...moreTips] = tips;
   const alarm = parseAlarmConfig(profile.sleep_alarm);
+  const month = thirtyDaySummary(nights, goal, today);
   const links = [
     { href: "/progress/sleep/history", icon: History, title: "Sleep history", body: "Every night, with averages over 7 days to a year" },
     {
@@ -321,6 +324,8 @@ export default async function SleepPage({ searchParams }: { searchParams: Promis
                 )}
               </section>
             </div>
+
+            <ThirtyDaySummaryCard summary={month} goalMinutes={goal} />
 
             <nav aria-label="More about your sleep" className="space-y-2">
               {links.map((l) => (

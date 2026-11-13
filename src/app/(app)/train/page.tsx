@@ -3,6 +3,7 @@ import { Activity, BarChart3, BookmarkCheck, CalendarDays, ChevronDown, ChevronR
 import { ActionButton } from "@/components/common/action-button";
 import { TodayWorkoutAction } from "@/components/home/today-workout-action";
 import { MainHeader } from "@/components/shell/main-header";
+import { MissedSessionsCard } from "@/components/calendar/missed-sessions-card";
 import { Button } from "@/components/ui/button";
 import { formatDuration } from "@/lib/domain/units";
 import { getServerSupabase } from "@/lib/supabase/server";
@@ -102,6 +103,19 @@ export default async function TrainPage() {
   return (
     <div className="space-y-4">
       <MainHeader title="Train" />
+
+      {schedule && schedule.missed.missed.length > 0 && (
+        <MissedSessionsCard
+          view={{
+            missed: schedule.missed.missed.map((m) => ({ dayId: m.dayId, name: m.name, wasDue: m.wasDue })),
+            resume: schedule.missed.resumeAt ? { name: schedule.missed.resumeAt.name, date: schedule.missed.resumeAt.date } : null,
+            canSkip: schedule.missed.canSkip,
+          }}
+          today={todayIso}
+          canReschedule={hasFeature(plan, "advanced_calendar")}
+          startHref={startHref}
+        />
+      )}
 
       <section aria-labelledby="today-title" className={`${card} overflow-hidden`}>
         <div className="px-4 pt-4">

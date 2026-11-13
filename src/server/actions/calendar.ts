@@ -7,7 +7,8 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { hasFeature } from "@/lib/domain/plans";
 import { getProfile, getUserPlan, requireUser } from "@/server/auth";
 import { logError } from "@/server/log";
-import { loadProgramSchedule } from "@/server/services/schedule";
+import { loadProgramSchedule, skipMissedSessions } from "@/server/services/schedule";
+import { revalidatePath } from "next/cache";
 
 const moveSchema = z.object({
   dayId: z.string().uuid(),
@@ -64,4 +65,29 @@ export async function resetPlannedSessionAction(formData: FormData): Promise<voi
   if (!dayId.success) return;
   const supabase = await getServerSupabase();
   await supabase.from("planned_session_overrides").delete().eq("user_id", user.id).eq("program_day_id", dayId.data);
+}
+
+/**
+ * Skip the sessions missed since the last workout and carry on with the program on its usual days. Only on the
+ * member's tap (the missed-session card, after a confirmation that names what happens). Pro, like moving sessions.
+ */
+export async function skipMissedSessionsAction(input: { firstMissedDayId: string }): Promise<ActionState> {
+  const user = await requireUser();
+  if (!hasFeature(await getUserPlan(user.id), "advanced_calendar")) return actionError("Rescheduling sessions is included with Pro All Access.");
+  const id = z.string().uuid().safeParse(input.firstMissedDayId);
+  if (!id.success) return actionError("Refresh and try again.");
+  const profile = await getProfile(user.id);
+  const supabase = await getServerSupabase();
+  try {
+    const r = await skipMissedSessions(supabase, user.id, profile?.timezone ?? "UTC", id.data);
+    if (!r.ok) return actionError(r.reason);
+    revalidatePath("/train");
+    revalidatePath("/calendar");
+    revalidatePath("/home");
+    const label = new Date(`${r.resumeDate}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" });
+    return actionOk(`Skipped ${r.skipped} session${r.skipped === 1 ? "" : "s"}. Next: ${r.resumeName}, ${label}.`);
+  } catch (err) {
+    logError("calendar.skip_missed", err);
+    return actionError("Couldn't update your schedule. Please try again.");
+  }
 }

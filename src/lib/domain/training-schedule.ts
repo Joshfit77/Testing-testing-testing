@@ -135,3 +135,35 @@ export function checkMove(schedule: PlannedSession[], overrides: ScheduleInput["
   const clear = schedule.filter((x) => x.index > s.index && map.has(x.dayId) && map.get(x.dayId)! < to).map((x) => x.dayId);
   return { ok: true, store: to === s.defaultDate ? null : to, clear };
 }
+
+// ------------------------------------------------------------------------------------------------- Missed sessions
+
+/** Most sessions the member may skip in one go (about a week of a 3–4 day program). Longer gaps: resume instead. */
+export const MAX_SKIPPABLE_MISSED = 3;
+
+export interface MissedSession extends PendingSession {
+  /** The date it was due, had the member kept training on the program's days. */
+  wasDue: string;
+}
+
+export interface MissedSessions {
+  missed: MissedSession[];
+  /** The first session that was not yet due: where "skip and stay on schedule" resumes. Null when every remaining
+   *  session is already overdue (skipping would end the program, so it isn't offered). */
+  resumeAt: PlannedSession | null;
+  canSkip: boolean;
+}
+
+/**
+ * Sessions the member missed: the ones that would already have happened had they kept training on the program's days
+ * after their last completed session (their own moves respected). The calendar quietly rolls these forward to today;
+ * this tells the member, so they can choose what happens next. Nothing is missed before the first session, so a member
+ * who hasn't started has nothing overdue.
+ */
+export function missedSessions(input: ScheduleInput): MissedSessions {
+  if (!input.lastCompleted || input.lastCompleted >= input.today) return { missed: [], resumeAt: null, canSkip: false };
+  const unrolled = planSchedule({ ...input, today: input.lastCompleted });
+  const missed = unrolled.filter((s) => s.date < input.today).map(({ date, defaultDate: _d, moved: _m, index: _i, ...s }) => ({ ...s, wasDue: date }));
+  const resumeAt = unrolled[missed.length] ?? null;
+  return { missed, resumeAt, canSkip: missed.length > 0 && missed.length <= MAX_SKIPPABLE_MISSED && resumeAt !== null };
+}

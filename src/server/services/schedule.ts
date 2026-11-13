@@ -1,7 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isoDateInTz } from "@/lib/domain/dates";
-import { planSchedule, type PendingSession, type PlannedSession } from "@/lib/domain/training-schedule";
+import { missedSessions, planSchedule, type MissedSessions, type PendingSession, type PlannedSession } from "@/lib/domain/training-schedule";
 
 /** How many pending sessions get dates (enough for ~2 months of a 7-day program). */
 export const SCHEDULE_HORIZON_SESSIONS = 56;
@@ -15,6 +15,8 @@ export interface ProgramSchedule {
   planned: PlannedSession[];
   /** program_day_id → date, as stored (including stale entries for completed days, which planSchedule ignores). */
   overrides: Record<string, string>;
+  /** Sessions that came and went since the last workout (the calendar rolls them forward; the member decides). */
+  missed: MissedSessions;
 }
 
 /** What the member's program has next: the finish screen's "Up next". */
@@ -107,5 +109,44 @@ export async function loadProgramSchedule(supabase: SupabaseClient, userId: stri
     today,
     planned: planSchedule({ pending, overrides, today, daysPerWeek: program.days_per_week, lastCompleted }),
     overrides,
+    missed: missedSessions({ pending, overrides, today, daysPerWeek: program.days_per_week, lastCompleted }),
   };
+}
+
+export type SkipResult = { ok: true; resumeName: string; resumeDate: string; skipped: number } | { ok: false; reason: string };
+
+/**
+ * Skip the sessions the member missed, so the program carries on from the session due next, on its usual days. Only
+ * on the member's explicit request (the missed-session card), only for a short gap, and only if the schedule is still
+ * the one they saw (`firstMissedDayId`). Workout history is untouched: the skipped sessions simply aren't logged, and the
+ * program's position moves past them. Moves the member made for the skipped sessions are removed.
+ */
+export async function skipMissedSessions(supabase: SupabaseClient, userId: string, timezone: string, firstMissedDayId: string): Promise<SkipResult> {
+  const schedule = await loadProgramSchedule(supabase, userId, timezone);
+  if (!schedule) return { ok: false, reason: "There's no active program." };
+  const { missed, resumeAt, canSkip } = schedule.missed;
+  if (!missed.length || missed[0]!.dayId !== firstMissedDayId) return { ok: false, reason: "Your schedule has changed. Refresh to see it." };
+  if (!canSkip || !resumeAt) return { ok: false, reason: "That's too many sessions to skip. Pick up where you left off instead." };
+  const from = missed[0]!;
+  // Only if the program is still where the member saw it (another device may have logged a workout meanwhile).
+  const { data, error } = await supabase
+    .from("user_programs")
+    .update({ current_week: resumeAt.week, current_day: resumeAt.day })
+    .eq("id", schedule.userProgramId)
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .eq("current_week", from.week)
+    .eq("current_day", from.day)
+    .select("id");
+  if (error) throw error;
+  if (!data?.length) return { ok: false, reason: "Your schedule has changed. Refresh to see it." };
+  const skippedIds = missed.map((m) => m.dayId);
+  await supabase.from("planned_session_overrides").delete().eq("user_id", userId).eq("user_program_id", schedule.userProgramId).in("program_day_id", skippedIds);
+  // Pin the next session to the day it was due on, so the program really stays on its usual days (otherwise the
+  // calendar would pull it forward to today) and it isn't reported as missed again.
+  const { error: pinErr } = await supabase
+    .from("planned_session_overrides")
+    .upsert({ user_id: userId, user_program_id: schedule.userProgramId, program_day_id: resumeAt.dayId, planned_date: resumeAt.date }, { onConflict: "user_program_id,program_day_id" });
+  if (pinErr) throw pinErr;
+  return { ok: true, resumeName: resumeAt.name, resumeDate: resumeAt.date, skipped: missed.length };
 }
