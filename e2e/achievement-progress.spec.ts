@@ -124,14 +124,17 @@ test.describe("milestone celebration at iPhone size", () => {
     const target = value(await page.getByTestId("exercise-milestone").getByTestId("milestone-target").textContent());
     expect(target).toBeGreaterThan(0);
 
-    await page.goto("/train");
-    await page.locator("main").getByRole("link", { name: /Start workout|Start today's workout|Start/ }).first().click();
-    await page.waitForURL(/\/train\/workout/);
-    const card = page.getByTestId("current-set-card");
-    await expect(card).toContainText(/Bench Press/);
-    await card.getByLabel("Weight (lb)").fill(String(target));
-    await card.getByLabel("Reps", { exact: true }).fill("1");
-    await card.getByTestId("complete-set").click();
+    // A blank workout with the bench press, so the test doesn't depend on which program day falls on today
+    // (milestones are worked out for any saved workout).
+    await page.goto("/train/workout?blank=1");
+    await page.getByRole("button", { name: "Add exercise" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByPlaceholder("Search by name or muscle").fill("Barbell Bench Press");
+    await dialog.getByRole("button", { name: /^Barbell Bench Press/ }).first().click();
+    await expect(dialog).toBeHidden();
+    await page.getByLabel("Barbell Bench Press set 1 weight in lb").fill(String(target));
+    await page.getByLabel("Barbell Bench Press set 1 reps").fill("1");
+    await page.getByRole("button", { name: "Mark Barbell Bench Press set 1 complete" }).click();
     await page.getByRole("button", { name: "Finish", exact: true }).click();
 
     // Watch the page width on every frame while the completion screen and its cards animate in.
