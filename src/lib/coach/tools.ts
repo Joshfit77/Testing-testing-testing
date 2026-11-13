@@ -76,6 +76,16 @@ export const TOOL_INPUT_SCHEMAS = {
   get_sleep_summary: z.strictObject({
     days: z.number().int().min(7).max(90),
   }),
+  analyze_lift_progress: z.strictObject({
+    exercise: z.string().trim().min(2).max(80),
+    weeks: z.number().int().min(4).max(26).nullable(),
+  }),
+  get_running_summary: z.strictObject({
+    weeks: z.number().int().min(2).max(26).nullable(),
+  }),
+  get_recovery_summary: z.strictObject({
+    days: z.number().int().min(7).max(42).nullable(),
+  }),
   propose_target_load: z.strictObject({
     exercise_slug: slug,
     weight: z.number().positive().max(2000),
@@ -106,6 +116,9 @@ export const TOOL_INPUT_SCHEMAS = {
     reason: z.string().trim().min(3).max(300),
   }),
 } as const;
+
+/** Defaults for the analysis tools' optional windows (null in the input). */
+export const ANALYSIS_DEFAULTS = { liftWeeks: 12, runWeeks: 8, recoveryDays: 14 } as const;
 
 export type ToolName = keyof typeof TOOL_INPUT_SCHEMAS;
 export type ToolInput<N extends ToolName> = z.infer<(typeof TOOL_INPUT_SCHEMAS)[N]>;
@@ -249,6 +262,27 @@ const DEFINITIONS: { name: ToolName; description: string; input_schema: JsonSche
     input_schema: obj({ days: int("Nights to cover, 7–90 (14 is typical).") }),
   },
   {
+    name: "analyze_lift_progress",
+    description:
+      "Analyze one lift over N weeks from logged sets: weekly best e1RM, change, frequency, hard sets, RPE (incl. at the same load), records and sessions since, gap weeks, program attendance and sleep/check-in context, each with its data count. Returns rule-based findings with evidence (plateau, progressing, low_frequency, volume_dropped/volume_rose, inconsistent, rpe_rising_at_same_load, gap_weeks, short_sleep, insufficient_data) and missing data. Call this before explaining why a lift stalls or how it is progressing.",
+    input_schema: obj({
+      exercise: str("Exercise slug (preferred, e.g. 'bench-press') or a name like 'bench'."),
+      weeks: nullable(int("Weeks to analyze, 4–26; null = 12.")),
+    }),
+  },
+  {
+    name: "get_running_summary",
+    description:
+      "Summarize the athlete's recorded runs over N weeks: weekly distance and runs, average pace (runs with distance and time only), longest run, pace trend for similar-distance runs, weekly distance change (flags a rise above 10%), days since the last run, each run's source (gps, treadmill, manual) and missing data. No heart rate is stored for runs. Call this for questions about their running.",
+    input_schema: obj({ weeks: nullable(int("Weeks to cover, 2–26; null = 8.")) }),
+  },
+  {
+    name: "get_recovery_summary",
+    description:
+      "Summarize recovery over N days: recovery check-in averages and readiness trend (with counts), logged sleep labelled recorded, self-reported or time-in-bed only, training load (sessions and hard sets per week; last 7 days vs the 28-day average only with 3+ weeks of data), neutral observations and missing data. Not a diagnosis. Call this for questions about recovery, fatigue or readiness.",
+    input_schema: obj({ days: nullable(int("Days to cover, 7–42; null = 14.")) }),
+  },
+  {
     name: "propose_target_load",
     description:
       "Suggest a target load (and reps) for the athlete's next session of one exercise, e.g. after they hit all their reps, or a reset after a stall. Shown beside the exercise in the workout logger once they accept. Nothing changes until they tap Accept (they can adjust it). Base it on their logged sets; don't jump more than one sensible step.",
@@ -355,6 +389,14 @@ export function toolActivityLabel(name: string, input: unknown): string {
       return "Reviewing your recent training…";
     case "get_sleep_summary":
       return `Checking your sleep from the last ${Number(i.days) || 14} nights…`;
+    case "analyze_lift_progress": {
+      const ex = String(i.exercise ?? "lift").replace(/-/g, " ");
+      return `Analyzing your ${ex} over the last ${Number(i.weeks) || 12} weeks…`;
+    }
+    case "get_running_summary":
+      return `Checking your runs from the last ${Number(i.weeks) || 8} weeks…`;
+    case "get_recovery_summary":
+      return `Checking your recovery over the last ${Number(i.days) || 14} days…`;
     case "propose_target_load":
       return "Preparing a target load for you to review…";
     case "propose_deload_week":

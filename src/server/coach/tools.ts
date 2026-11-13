@@ -8,6 +8,7 @@ import { PRIMARY_GOALS, type PrimaryGoal } from "@/lib/domain/types";
 import { displayWeight, KG_PER_LB, weightUnit } from "@/lib/domain/units";
 import { describeSet, liftTrends, topSet, type AthleteSnapshot } from "@/lib/coach/context";
 import {
+  ANALYSIS_DEFAULTS,
   checkNutritionTargets,
   isToolName,
   runCalculation,
@@ -23,6 +24,7 @@ import { buildProgramProposal, programRecommendationsForCoach } from "@/lib/coac
 import { planFromEntitlement } from "@/lib/domain/plans";
 import type { GeneratorAnswers } from "@/lib/domain/program-generator";
 import { buildSleepSummary } from "./sleep-summary";
+import { loadLiftAnalysis, loadRecoverySummary, loadRunningSummary, type AnalysisContext } from "./analysis";
 import { getActiveProgramRef, loadProgramWeek, mapWorkouts, WORKOUT_SELECT } from "./snapshot";
 
 /**
@@ -413,6 +415,14 @@ async function getTrainingReviewTool(ctx: ToolContext): Promise<ToolOutcome> {
   return ok({ unit: weightUnit(input.units), ...describeReviewForCoach(analyzeTraining(input), input.units) });
 }
 
+const analysisCtx = (ctx: ToolContext): AnalysisContext => ({ supabase: ctx.supabase, userId: ctx.userId, timeZone: ctx.timeZone, today: ctx.snapshot.today, units: ctx.snapshot.units });
+
+async function analyzeLiftProgressTool(ctx: ToolContext, input: ToolInput<"analyze_lift_progress">): Promise<ToolOutcome> {
+  const ex = await resolveExercise(ctx, input.exercise);
+  if (!ex) return fail(`No exercise matches "${input.exercise}". Try search_exercises to find the slug.`);
+  return ok(await loadLiftAnalysis(analysisCtx(ctx), ex, input.weeks ?? ANALYSIS_DEFAULTS.liftWeeks));
+}
+
 const proposed = (proposal: CoachProposal, extra: Record<string, unknown> = {}): ToolOutcome => ({
   content: JSON.stringify({ status: "shown_to_athlete_for_approval", applied: false, note: "The card lets the athlete accept, adjust or decline it; it can be undone later. Explain the evidence briefly.", ...extra }),
   isError: false,
@@ -550,6 +560,12 @@ export async function executeCoachTool(ctx: ToolContext, name: string, rawInput:
         return await getTrainingReviewTool(ctx);
       case "get_sleep_summary":
         return ok(await buildSleepSummary(ctx.supabase, ctx.userId, ctx.timeZone, (input as ToolInput<"get_sleep_summary">).days));
+      case "analyze_lift_progress":
+        return await analyzeLiftProgressTool(ctx, input as ToolInput<"analyze_lift_progress">);
+      case "get_running_summary":
+        return ok(await loadRunningSummary(analysisCtx(ctx), (input as ToolInput<"get_running_summary">).weeks ?? ANALYSIS_DEFAULTS.runWeeks));
+      case "get_recovery_summary":
+        return ok(await loadRecoverySummary(analysisCtx(ctx), (input as ToolInput<"get_recovery_summary">).days ?? ANALYSIS_DEFAULTS.recoveryDays));
       case "propose_target_load":
         return await proposeTargetLoad(ctx, input as ToolInput<"propose_target_load">);
       case "propose_deload_week":
