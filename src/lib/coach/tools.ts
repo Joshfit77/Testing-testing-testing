@@ -100,6 +100,11 @@ export const TOOL_INPUT_SCHEMAS = {
   propose_forget_memory: z.strictObject({
     memory_ref: z.string().trim().regex(/^m-[0-9a-f]{8}$/, "Use the memory's reference, like m-1a2b3c4d."),
   }),
+  get_program_recommendations: z.strictObject({}),
+  propose_program: z.strictObject({
+    program_slug: slug,
+    reason: z.string().trim().min(3).max(300),
+  }),
 } as const;
 
 export type ToolName = keyof typeof TOOL_INPUT_SCHEMAS;
@@ -114,6 +119,7 @@ export const PROPOSAL_TOOLS = [
   "propose_volume_change",
   "propose_memory",
   "propose_forget_memory",
+  "propose_program",
 ] as const satisfies readonly ToolName[];
 export const isToolName = (v: string): v is ToolName => v in TOOL_INPUT_SCHEMAS;
 
@@ -289,6 +295,21 @@ const DEFINITIONS: { name: ToolName; description: string; input_schema: JsonSche
       "Offer to delete one saved memory when the athlete asks you to forget it or says it's no longer true. Nothing is deleted unless they tap Forget. Use the reference shown in the Coaching memory list.",
     input_schema: obj({ memory_ref: str("The memory's reference, like m-1a2b3c4d.") }),
   },
+  {
+    name: "get_program_recommendations",
+    description:
+      "Get the app's ranked program suggestions for this athlete: training programs matched to their goal, experience, equipment, days per week and preferred training types (with the reasons and whether their plan includes each), and the habit programs (nutrition, faith & fitness, lifestyle). Also returns their active program, if any. Call this before recommending a program; recommend only programs it returns, and explain the fit in terms of their own goals, schedule, equipment, history and any limitations they told you.",
+    input_schema: obj({}),
+  },
+  {
+    name: "propose_program",
+    description:
+      "Suggest starting a specific program from get_program_recommendations. Nothing starts until the athlete taps Confirm; starting a training program pauses their current one (its completed workouts and history stay) and they can switch back. Only when the athlete asked for a program or agreed to change.",
+    input_schema: obj({
+      program_slug: str("Slug of a program returned by get_program_recommendations."),
+      reason: str("One or two sentences the athlete will see on the card: why this program fits them."),
+    }),
+  },
 ];
 
 /** Tool list for the Messages API (strict schemas, eager input streaming for streamed requests). */
@@ -322,6 +343,8 @@ export function toolActivityLabel(name: string, input: unknown): string {
       return `Looking up ${String(i.query ?? "that food").slice(0, 40)} in the USDA database…`;
     case "calculate":
       return "Crunching the numbers…";
+    case "get_program_recommendations":
+      return "Looking for programs that fit you…";
     case "propose_exercise_swap":
       return "Preparing a suggested exercise swap…";
     case "propose_nutrition_targets":
@@ -355,7 +378,8 @@ export type CoachProposal =
   | { kind: "bodyweight_log"; weightKg: number; date: string; display: string; reason: string }
   | { kind: "training_change"; change: TrainingChange; summary: string; reason: string; units: "metric" | "imperial" }
   | { kind: "memory"; category: MemoryCategory; content: string }
-  | { kind: "memory_forget"; memoryId: string; category: MemoryCategory; content: string };
+  | { kind: "memory_forget"; memoryId: string; category: MemoryCategory; content: string }
+  | { kind: "program_start"; programType: "training" | "habit"; slug: string; name: string; summary: string; reason: string; replaces: string | null };
 
 export const coachProposalSchema = z.discriminatedUnion("kind", [
   z.object({
@@ -380,6 +404,7 @@ export const coachProposalSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("training_change"), change: trainingChangeSchema, summary: z.string().max(300), reason: z.string().max(300), units: z.enum(["metric", "imperial"]) }),
   z.object({ kind: z.literal("memory"), category: z.enum(MEMORY_CATEGORIES), content: z.string().min(3).max(MEMORY_MAX_CHARS) }),
   z.object({ kind: z.literal("memory_forget"), memoryId: z.string().uuid(), category: z.enum(MEMORY_CATEGORIES), content: z.string().max(MEMORY_MAX_CHARS) }),
+  z.object({ kind: z.literal("program_start"), programType: z.enum(["training", "habit"]), slug: z.string().regex(/^[a-z0-9-]{1,64}$/), name: z.string().max(120), summary: z.string().max(300), reason: z.string().max(300), replaces: z.string().max(120).nullable() }),
 ]);
 
 export function isCoachProposal(v: unknown): v is CoachProposal {

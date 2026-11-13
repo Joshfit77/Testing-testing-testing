@@ -49,7 +49,7 @@ export function SuggestionCard({ messageId, proposal, status, onChange }: { mess
   };
 
   const canApply = proposal.kind !== "exercise_swap" || proposal.editable;
-  const Icon = proposal.kind === "exercise_swap" ? Dumbbell : proposal.kind === "nutrition_targets" ? Utensils : proposal.kind === "bodyweight_log" ? Scale : proposal.kind === "training_change" ? Activity : Brain;
+  const Icon = proposal.kind === "exercise_swap" ? Dumbbell : proposal.kind === "nutrition_targets" ? Utensils : proposal.kind === "bodyweight_log" ? Scale : proposal.kind === "training_change" || proposal.kind === "program_start" ? Activity : Brain;
   const title = {
     exercise_swap: "Suggested exercise swap",
     nutrition_targets: "Suggested nutrition targets",
@@ -57,11 +57,12 @@ export function SuggestionCard({ messageId, proposal, status, onChange }: { mess
     training_change: "Suggested training change",
     memory: "Remember this?",
     memory_forget: "Forget this memory?",
+    program_start: proposal.kind === "program_start" && proposal.replaces ? "Suggested program change" : "Suggested program",
   }[proposal.kind];
   const isMemory = proposal.kind === "memory" || proposal.kind === "memory_forget";
-  const confirmLabel = proposal.kind === "memory" ? "Save to memory" : proposal.kind === "memory_forget" ? "Forget" : proposal.kind === "training_change" ? (editing ? "Apply my version" : "Accept") : "Confirm";
+  const confirmLabel = proposal.kind === "memory" ? "Save to memory" : proposal.kind === "memory_forget" ? "Forget" : proposal.kind === "training_change" ? (editing ? "Apply my version" : "Accept") : proposal.kind === "program_start" ? "Start program" : "Confirm";
   const declineLabel = proposal.kind === "memory" ? "Don't save" : proposal.kind === "memory_forget" ? "Keep it" : "Not now";
-  const appliedLabel = proposal.kind === "memory" ? "saved" : proposal.kind === "memory_forget" ? "forgotten" : "applied";
+  const appliedLabel = proposal.kind === "memory" ? "saved" : proposal.kind === "memory_forget" ? "forgotten" : proposal.kind === "program_start" ? "started" : "applied";
   const declinedLabel = proposal.kind === "memory" ? "not saved" : proposal.kind === "memory_forget" ? "kept" : "dismissed";
 
   return (
@@ -120,6 +121,21 @@ export function SuggestionCard({ messageId, proposal, status, onChange }: { mess
         <p className="mt-2 text-sm">
           <strong>{proposal.display}</strong> on {proposal.date}
         </p>
+      )}
+
+      {proposal.kind === "program_start" && (
+        <div className="mt-2 space-y-1 text-sm" data-testid="program-proposal">
+          <p className="font-semibold">{proposal.name}</p>
+          <p className="text-muted-foreground">{proposal.summary}</p>
+          <p className="text-xs text-muted-foreground">
+            {proposal.replaces
+              ? `Nothing changes unless you tap Start. ${proposal.replaces} would be paused, never deleted: its completed workouts and progress stay, and you can switch back.`
+              : "Nothing starts unless you tap Start."}{" "}
+            <a href={proposal.programType === "habit" ? `/train/habits/${proposal.slug}` : `/train/programs/${proposal.slug}`} className="text-gold-highlight underline-offset-4 hover:underline">
+              See the full program
+            </a>
+          </p>
+        </div>
       )}
 
       {proposal.kind === "memory" &&

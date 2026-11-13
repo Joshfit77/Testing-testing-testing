@@ -19,6 +19,9 @@ import {
 import { checkProposedMemory, memoryInputSchema, memoryRef } from "@/lib/coach/memory";
 import { analyzeTraining, describeReviewForCoach, type TrainingChange } from "@/lib/domain/adaptive-training";
 import { loadReviewInput, upcomingWeek } from "@/server/services/adaptive-training";
+import { buildProgramProposal, programRecommendationsForCoach } from "@/lib/coach/program-recommendations";
+import { planFromEntitlement } from "@/lib/domain/plans";
+import type { GeneratorAnswers } from "@/lib/domain/program-generator";
 import { buildSleepSummary } from "./sleep-summary";
 import { getActiveProgramRef, loadProgramWeek, mapWorkouts, WORKOUT_SELECT } from "./snapshot";
 
@@ -482,6 +485,38 @@ function proposeForgetMemory(ctx: ToolContext, input: ToolInput<"propose_forget_
   return { content: JSON.stringify({ status: "shown_to_athlete_for_confirmation", deleted: false }), isError: false, proposal };
 }
 
+async function currentPrograms(ctx: ToolContext) {
+  const [ref, { data: habits }] = await Promise.all([
+    getActiveProgramRef(ctx.supabase, ctx.userId),
+    ctx.supabase.from("habit_program_enrollments").select("program_slug").eq("user_id", ctx.userId).eq("status", "active"),
+  ]);
+  return { activeProgram: ref?.name ?? null, activeHabitPrograms: (habits ?? []).map((h) => h.program_slug as string) };
+}
+
+async function getProgramRecommendations(ctx: ToolContext): Promise<ToolOutcome> {
+  const [{ data: answers }, { data: ent }, current] = await Promise.all([
+    ctx.supabase.from("onboarding_answers").select("primary_goal, experience, days_per_week, session_minutes, equipment, preferred_types").eq("user_id", ctx.userId).maybeSingle(),
+    ctx.supabase.from("user_entitlements").select("plan, valid_until").eq("user_id", ctx.userId).maybeSingle(),
+    currentPrograms(ctx),
+  ]);
+  const plan = planFromEntitlement((ent as { plan: string; valid_until: string | null } | null) ?? null);
+  return ok(programRecommendationsForCoach({ answers: (answers as GeneratorAnswers | null) ?? null, plan, ...current }));
+}
+
+async function proposeProgram(ctx: ToolContext, input: ToolInput<"propose_program">): Promise<ToolOutcome> {
+  const built = buildProgramProposal(input.program_slug, input.reason, await currentPrograms(ctx));
+  if (!built.ok) return fail(built.error);
+  return {
+    content: JSON.stringify({
+      status: "shown_to_athlete_for_confirmation",
+      started: false,
+      note: "Nothing starts unless they tap Start on the card. Their current program is paused, never deleted, and its history stays.",
+    }),
+    isError: false,
+    proposal: built.proposal,
+  };
+}
+
 /** Validate and run one tool call. Never throws for bad input: errors go back to the model. */
 export async function executeCoachTool(ctx: ToolContext, name: string, rawInput: unknown): Promise<ToolOutcome> {
   if (!isToolName(name)) return fail(`Unknown tool "${name}".`);
@@ -525,6 +560,10 @@ export async function executeCoachTool(ctx: ToolContext, name: string, rawInput:
         return proposeMemory(ctx, input as ToolInput<"propose_memory">);
       case "propose_forget_memory":
         return proposeForgetMemory(ctx, input as ToolInput<"propose_forget_memory">);
+      case "get_program_recommendations":
+        return await getProgramRecommendations(ctx);
+      case "propose_program":
+        return await proposeProgram(ctx, input as ToolInput<"propose_program">);
     }
   } catch (err) {
     if (err instanceof Error && / is required for /.test(err.message)) return fail(err.message);

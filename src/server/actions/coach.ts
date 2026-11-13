@@ -14,7 +14,9 @@ import type { Sex } from "@/lib/domain/nutrition";
 import { getActiveProgramRef } from "@/server/coach/snapshot";
 import { approvedChangeMemory, findDuplicateMemory, MEMORY_LIMIT, memoryInputSchema } from "@/lib/coach/memory";
 import { applyModification, trainingModifySchema } from "@/lib/domain/adaptive-training";
-import type { UnitSystem } from "@/lib/domain/types";
+import type { Plan, UnitSystem } from "@/lib/domain/types";
+import { canAccessTier, hasFeature } from "@/lib/domain/plans";
+import { getHabitProgram } from "@/data/habit-programs";
 import { applyTrainingChange, TrainingChangeError } from "@/server/services/adaptive-training";
 import { programDays, programExercisesOnDays } from "@/server/services/training";
 import type { CoachProposal } from "@/lib/coach/tools";
@@ -206,7 +208,31 @@ export async function applyCoachProposalAction(messageId: string, edited?: Recor
         const { error, count } = await supabase.from("coach_memories").delete({ count: "exact" }).eq("id", p.memoryId).eq("user_id", user.id);
         if (error) throw error;
         message = count ? "Forgotten." : "That memory was already deleted.";
-      } else {
+      } else if (p.kind === "program_start") {
+        // Same access rules as the program pages: structured programs are Pro, except one the member started before.
+        const plan = await getUserPlan(user.id);
+        if (p.programType === "training") {
+          const { data: program } = await supabase.from("training_programs").select("id, tier, owner_id").eq("slug", p.slug).is("owner_id", null).maybeSingle();
+          if (!program) return { ok: false, error: "That program is no longer available." };
+          const { data: earlier } = await supabase.from("user_programs").select("id").eq("user_id", user.id).eq("program_id", program.id).limit(1).maybeSingle();
+          if (!canAccessTier(plan, program.tier as Plan) && !earlier) return { ok: false, error: "Structured programs are included with Pro." };
+          // Pauses the current program (its workouts and progress stay) and resumes this one if it was started before.
+          await activateProgram(supabase, user.id, program.id as string);
+          message = p.replaces ? `Started ${p.name}. ${p.replaces} is paused with all its history; you can switch back any time in Train → Programs.` : `Started ${p.name}.`;
+        } else {
+          if (!hasFeature(plan, "full_program_library")) return { ok: false, error: "Structured programs are included with Pro." };
+          const program = getHabitProgram(p.slug);
+          if (!program) return { ok: false, error: "That program is no longer available." };
+          const { data: prof } = await supabase.from("profiles").select("timezone").eq("id", user.id).maybeSingle();
+          const goals = Object.fromEntries(program.goalFields.map((g) => [g.key, g.default]));
+          const { error } = await supabase.from("habit_program_enrollments").insert({ user_id: user.id, program_slug: p.slug, started_on: isoDateInTz(new Date(), (prof?.timezone as string) || "UTC"), goals });
+          if (error) {
+            if (error.code === "23505") return { ok: false, error: "You're already doing this program." };
+            throw error;
+          }
+          message = `Started ${p.name}. Find it in Train → Habit programs.`;
+        }
+    } else {
         const { data: prof } = await supabase.from("profiles").select("timezone").eq("id", user.id).maybeSingle();
         const today = isoDateInTz(new Date(), (prof?.timezone as string) || "UTC");
         if (p.date > today || p.date < addDays(today, -365)) return { ok: false, error: "That date can't be logged." };
