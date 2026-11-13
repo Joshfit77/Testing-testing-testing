@@ -58,7 +58,7 @@ source for counsel, not merged.
 
 | Area | Source of truth | In the RC | Evidence |
 | --- | --- | --- | --- |
-| Free / Pro $19.99 / $149.99, legacy Plus | free-pro-membership → payment-hardening | Yes | `APPROVED_PRO_PRICE_CENTS` in `src/lib/domain/plans.ts`; `tests/unit/plans.test.ts` |
+| Free / Pro $17.99 / $119.99, legacy Plus | free-pro-membership → payment-hardening | Yes | `APPROVED_PRO_PRICE_CENTS` in `src/lib/domain/plans.ts`; `tests/unit/plans.test.ts` |
 | RevenueCat (App Store / Play) | stage2-store-billing → payment-hardening | Yes | `src/app/api/revenuecat/webhook/route.ts`, `src/server/services/store-billing.ts`; `tests/integration/store-billing.test.ts` |
 | Stripe web checkout | payment-hardening | Yes (test mode only) | `tests/integration/billing-integrity.test.ts`, `entitlements.test.ts` |
 | Server-side Pro enforcement | payment-hardening | Yes | `tests/integration/pro-bypass.test.ts`, `plan-enforcement.test.ts` |
@@ -265,7 +265,7 @@ iOS Simulator checks pass on the final code. What remains is the owner's: the Te
 | P1 | Billing reconciliation: switch on | `.github/workflows/billing-reconcile.yml` (added, dormant) | Owner: merge to `main` when approved, set variable `BILLING_RECONCILE_URL` and secret `CRON_SECRET` (`docs/ERROR_MONITORING.md`) | Run log shows HTTP 200 with counts |
 | P1 | Error monitoring: switch on | `src/instrumentation.ts`, `/api/client-errors` (added, redacted, off by default) | Owner: set `ERROR_REPORTING=on` and `NEXT_PUBLIC_ERROR_REPORTING=on`; point a log drain/alert at `"level":"error"` lines | A forced error appears in the log drain |
 | P1 | Live AI evaluation | `docs/LIVE_AI_TEST_PLAN.md` | Owner: key in a spend-limited workspace + budget approval; then `--live --confirm-spend --max-usd 8` | Report in `docs/ai-eval/`, transcripts reviewed by a person |
-| P1 | App Store products and RevenueCat project | `docs/TESTFLIGHT_SETUP_GUIDE.md` §5–6 | Create the two Pro products at $19.99/$149.99 and map them in RevenueCat | Sandbox purchase on a device unlocks Pro; refund in sandbox revokes |
+| P1 | App Store products and RevenueCat project | `docs/TESTFLIGHT_SETUP_GUIDE.md` §5–6 | Create the two Pro products at $17.99/$119.99 and map them in RevenueCat | Sandbox purchase on a device unlocks Pro; refund in sandbox revokes |
 | P2 | Health endpoint is liveness only | `src/app/api/health/route.ts` | Add a database check behind the cron secret | Returns 503 when Supabase is down |
 | P1 | Owner review of the 2D demonstrations | Review sheet (section K); `src/data/exercise-demo-readiness.json` `ownerApproved` | All 157 are animated and engineering-reviewed; none is owner-approved. Owner marks Approve / Needs work per exercise; approvals are copied into `ownerApproved` only on the owner's word; Needs-work notes become motion fixes | Each approved slug in `ownerApproved`; the five weakest reads looked at first |
 | P3 | Exercise videos (157) | `docs/EXERCISE_DEMOS_STATUS.md` | Backlog, after the 2D demos; clips must match the 2D character and need the owner's tools | Owner approval per clip |

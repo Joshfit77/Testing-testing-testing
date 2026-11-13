@@ -84,7 +84,8 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   const webPrices = {
     month: money(monthCents),
     year: yearCents > 0 ? money(yearCents) : null,
-    yearPerMonth: yearCents > 0 ? money(Math.floor(yearCents / 12)) : null,
+    // $119.99 / 12 = $9.9992: rounded to the nearest cent ($10.00), as the stores do, never shown as a monthly charge.
+    yearPerMonth: yearCents > 0 ? money(Math.round(yearCents / 12)) : null,
     savingsPercent: yearCents > 0 ? yearlySavingsPercent(monthCents, yearCents) || null : null,
     yearSaving: yearCents > 0 && yearlySavingsCents(monthCents, yearCents) > 0 ? money(yearlySavingsCents(monthCents, yearCents)) : null,
   };

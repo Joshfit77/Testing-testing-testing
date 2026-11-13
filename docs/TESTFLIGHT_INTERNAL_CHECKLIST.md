@@ -25,7 +25,7 @@ Phones: at least one small (iPhone SE / 13 mini) and one large (Pro Max), on the
 
 ## 2. Purchases (sandbox only)
 
-- [ ] Profile → Plans & billing shows Free vs Pro and the two prices exactly as configured ($19.99/month, $149.99/year).
+- [ ] Profile → Plans & billing shows Free vs Pro and the two prices exactly as configured ($17.99/month, $119.99/year).
 - [ ] Buy monthly with a Sandbox Apple ID: Apple's sheet appears (no web checkout inside the iPhone app); Pro unlocks after purchase.
 - [ ] Pro stays unlocked after closing/reopening the app and after signing in on a second phone.
 - [ ] Restore Purchases on a fresh install restores Pro.

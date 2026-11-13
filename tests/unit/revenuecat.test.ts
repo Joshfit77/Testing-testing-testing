@@ -1,5 +1,5 @@
 import { affectedAppUserIds, normalizeStore, revenueCatSubscriberSchema, revenueCatWebhookSchema, storeRowAsSubscription, storeRowsFromSubscriber } from "@/lib/billing/revenuecat";
-import { entitlementFromSubscriptions } from "@/lib/domain/plans";
+import { aiAllowance, entitlementFromSubscriptions, FEATURES, hasFeature } from "@/lib/domain/plans";
 
 const U1 = "3f1c6a52-1b2c-4d3e-8f90-123456789abc";
 const U2 = "9a8b7c6d-5e4f-4a3b-9c2d-0123456789ab";
@@ -130,5 +130,28 @@ describe("RevenueCat customer → stored subscriptions", () => {
     const store = { ...storeRowAsSubscription(row({ plan: "pro" }), now)!, source: "app_store" };
     const web = { plan: "plus" as const, status: "active" as const, current_period_end: future, source: "stripe" };
     expect(entitlementFromSubscriptions([web, store], now)).toMatchObject({ plan: "pro", from: { source: "app_store" } });
+  });
+});
+
+describe("monthly and yearly Pro grant identical entitlements", () => {
+  const yearOut = "2027-10-22T12:00:00Z";
+  it.each([
+    ["App Store monthly", "ngf_pro_monthly", "app_store", future],
+    ["App Store yearly", "ngf_pro_yearly", "app_store", yearOut],
+    ["Google Play monthly", "ngf_pro:monthly", "play_store", future],
+    ["Google Play yearly", "ngf_pro:yearly", "play_store", yearOut],
+  ])("%s unlocks Pro, with every Pro feature and the same AI allowance", (_name, product, store, expires) => {
+    const rows = storeRowsFromSubscriber(
+      customer({ [product]: { store, purchase_date: past, expires_date: expires, is_sandbox: false, period_type: "normal" } }, { pro: { product_identifier: product, expires_date: expires } }),
+      ids,
+      new Map(),
+    );
+    const subs = rows.map((r) => storeRowAsSubscription(r as Parameters<typeof storeRowAsSubscription>[0], now)!).filter(Boolean);
+    const ent = entitlementFromSubscriptions(subs, now);
+    expect(ent.plan).toBe("pro");
+    // Features and AI limits depend on the plan only, never on the billing period.
+    expect(aiAllowance(ent.plan)).toEqual(aiAllowance("pro"));
+    expect(FEATURES.filter((f) => hasFeature(ent.plan, f))).toEqual(FEATURES.filter((f) => hasFeature("pro", f)));
+    expect(FEATURES.filter((f) => hasFeature(ent.plan, f)).length).toBeGreaterThan(10);
   });
 });

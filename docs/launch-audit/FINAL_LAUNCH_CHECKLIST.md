@@ -24,7 +24,7 @@ legal clearance. Status as of 2026-10-26, branch `claude/free-pro-membership`.
 | Debug APK compiles (offline edition) | ✓ Done in CI | `android-apk.yml` |
 | Release bundle (.aab) builds; 16 KB alignment and merged permissions checked | ✓ in CI (offline edition) | `android-play.yml`; see `FINAL_TEST_RESULTS.md` |
 | Signed bundle of the online app | ✗ Blocked | Needs your upload key in GitHub secrets and a deployed site |
-| Play Console: subscription `ngf_pro` ($19.99 monthly / $149.99 yearly base plans), Data safety, Health apps and foreground-service declarations, listing | ✗ Not started | Draft answers in `ANDROID_READINESS.md` |
+| Play Console: subscription `ngf_pro` ($17.99 monthly / $119.99 yearly base plans), Data safety, Health apps and foreground-service declarations, listing | ✗ Not started | Draft answers in `ANDROID_READINESS.md` |
 | Closed test (12 testers, 14 days, for a new personal account) | ✗ Not started | Your account type decides |
 | Installed and tested on an Android phone | ✗ Not started | Never claimed; nothing has run on hardware |
 
@@ -63,7 +63,7 @@ Everything in B, plus:
 |---|---|
 | Final Terms of Service, Privacy Policy, consumer-health-data policy (WA/NV), auto-renewal terms; published by you after counsel review | ✗ Drafts in `docs/legal/` |
 | Re-acceptance switched on if final terms differ materially (`LEGAL_REACCEPT_REQUIRED=true`) | ✗ Your decision |
-| Stripe live mode approved (`STRIPE_LIVE_APPROVED=true`), live prices at $19.99 / $149.99, receipt and renewal-reminder emails on | ✗ Your approval |
+| Stripe live mode approved (`STRIPE_LIVE_APPROVED=true`), live prices at $17.99 / $119.99, receipt and renewal-reminder emails on | ✗ Your approval |
 | Store products live at the approved prices, localized prices reviewed | ✗ You |
 | Trademark search and filing decision for NARROW GATE FITNESS; review of "Narrow Gate Nutrition Score" next to Nutri-Score grades | ✗ Trademark counsel (`FINAL_TRADEMARK_REVIEW.md`) |
 | Patent claims read by counsel (Fitbod '760, Amazon '629/'693 first) | ✗ Patent counsel (`FINAL_PATENT_REVIEW.md`) |

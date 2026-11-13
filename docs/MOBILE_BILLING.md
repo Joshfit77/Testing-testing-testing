@@ -40,12 +40,12 @@
 
 1. **App Store Connect:** use the app's real bundle id (`CAP_APP_ID`).
    - Create one *subscription group* with two auto-renewable subscriptions, both "Pro All Access" at the same level:
-     - `ngf_pro_monthly` $19.99 (US price; Apple sets other storefronts' prices from it unless you change them)
-     - `ngf_pro_yearly` $149.99
+     - `ngf_pro_monthly` $17.99 (US price; Apple sets other storefronts' prices from it unless you change them)
+     - `ngf_pro_yearly` $119.99
    - Plus is no longer sold: create no Plus products. If Plus products already exist with subscribers, leave them in the group below Pro (so an upgrade is immediate) and remove them from sale.
    - Add review screenshots and descriptions.
    - Create **Sandbox tester** accounts.
-2. **Google Play Console**: create the subscription `ngf_pro` with two auto-renewing base plans, `monthly` ($19.99, billing period 1 month) and `yearly` ($149.99, 1 year). RevenueCat reports them as `ngf_pro:monthly` and `ngf_pro:yearly`, which the app's defaults already match; set `REVENUECAT_PRODUCTS_PRO_*` only if you use different ids.
+2. **Google Play Console**: create the subscription `ngf_pro` with two auto-renewing base plans, `monthly` ($17.99, billing period 1 month) and `yearly` ($119.99, 1 year). RevenueCat reports them as `ngf_pro:monthly` and `ngf_pro:yearly`, which the app's defaults already match; set `REVENUECAT_PRODUCTS_PRO_*` only if you use different ids.
 3. **RevenueCat:**
    - Create a project and add the iOS app (App Store Connect API key / in-app purchase key) and the Android app.
    - Create the entitlement `pro` and attach both Pro All Access products. Keep an entitlement `plus` only for existing Plus store products, if any.

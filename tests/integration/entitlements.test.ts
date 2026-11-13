@@ -16,7 +16,7 @@ const stripeInvoiceByIntent = new Map<string, string>();
 function fakePayment(subscriptionId: string, over: { refunded?: boolean; amount_refunded?: number } = {}) {
   const key = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
   const invoice = { id: `in_${key}`, object: "invoice", status: "paid", parent: { type: "subscription_details", subscription_details: { subscription: subscriptionId } } };
-  const charge = { id: `ch_${key}`, object: "charge", amount: 1999, amount_refunded: over.amount_refunded ?? 0, refunded: over.refunded ?? false, payment_intent: `pi_${key}` };
+  const charge = { id: `ch_${key}`, object: "charge", amount: 1799, amount_refunded: over.amount_refunded ?? 0, refunded: over.refunded ?? false, payment_intent: `pi_${key}` };
   stripeInvoices.set(invoice.id, invoice);
   stripeCharges.set(charge.id, charge);
   stripeInvoiceByIntent.set(charge.payment_intent, invoice.id);
@@ -254,7 +254,7 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
       expect(await ent()).toBe("pro");
 
       // A full refund of the current period's payment ends that period's access, whatever Stripe's status says.
-      stripeCharges.set(first.charge.id, { ...first.charge, amount_refunded: 1999, refunded: true });
+      stripeCharges.set(first.charge.id, { ...first.charge, amount_refunded: 1799, refunded: true });
       await send("charge.refunded", stripeCharges.get(first.charge.id));
       expect(await ent()).toBe("free");
       const row = (await serviceClient().from("subscriptions").select("status, access_revoked_reason, revoked_invoice_id").eq("stripe_subscription_id", sub.id).single()).data;
@@ -287,7 +287,7 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
       expect(await ent()).toBe("pro");
 
       // Refunding last year's payment doesn't touch the year the member has paid for now.
-      stripeCharges.set(old.charge.id, { ...old.charge, amount_refunded: 1999, refunded: true });
+      stripeCharges.set(old.charge.id, { ...old.charge, amount_refunded: 1799, refunded: true });
       await send("charge.refunded", stripeCharges.get(old.charge.id));
       expect(await ent()).toBe("pro");
 

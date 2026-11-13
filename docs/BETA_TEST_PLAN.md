@@ -48,7 +48,7 @@ and at least one phone with text size set to the largest.
 | 11 | Barcode scan, meal photo | Camera opens, a product resolves, a photo is analysed or clearly refused |
 | 12 | Apple Health / Health Connect | Permission sheet, then steps or sleep import |
 | 13 | GPS walk outdoors, 10 minutes | Route and distance look right; pause/resume |
-| 14 | Membership screen | Both plans visible ($19.99/month, $149.99/year); sandbox purchase and restore work; Faith stays free |
+| 14 | Membership screen | Both plans visible ($17.99/month, $119.99/year); sandbox purchase and restore work; Faith stays free |
 | 15 | iPad | Billing shows the App Store path, never the web checkout or Google Play |
 
 Anything that fails here is fixed before the 15 testers get the build.

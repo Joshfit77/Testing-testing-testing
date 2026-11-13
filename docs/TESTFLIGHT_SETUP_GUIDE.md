@@ -58,8 +58,8 @@ Monetization → Subscriptions → create a group **Pro All Access**, then two a
 
 | Reference name | Product ID | Duration | Price (U.S.) |
 |---|---|---|---|
-| Pro Monthly | `ngf_pro_monthly` | 1 month | $19.99 |
-| Pro Yearly | `ngf_pro_yearly` | 1 year | $149.99 |
+| Pro Monthly | `ngf_pro_monthly` | 1 month | $17.99 |
+| Pro Yearly | `ngf_pro_yearly` | 1 year | $119.99 |
 
 Use exactly these product IDs; the server maps them to Pro. Don't create Plus products. Before the first
 subscription can be sold, Apple requires the Paid Apps agreement, banking and tax forms (Business section). Sandbox

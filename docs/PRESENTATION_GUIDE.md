@@ -57,7 +57,7 @@ One take, about 30 seconds. Start on the opening.
 | 0:08 | **Explore with sample data** | Training · Nutrition · Faith | "One home screen: today's workout, food and recovery." |
 | 0:14 | Train tab › **Start workout early** (or **Start Today's Workout**), tick set 1 | Log every set | "Programs you can follow, and a logger that's one tap per set." |
 | 0:22 | Faith tab | Faith: free for every member | "Daily Bible reading and prayer, free for everyone." |
-| 0:27 | Back to Home | Pro All Access: $149.99 a year | "Pro unlocks the rest. $149.99 a year." |
+| 0:27 | Back to Home | Pro All Access: $119.99 a year | "Pro unlocks the rest. $119.99 a year." |
 
 ## 2-minute version
 
@@ -70,7 +70,7 @@ One take, about 30 seconds. Start on the opening.
 | 0:55 | 7 Nutrition | Nutrition tab | Food diary | "The food diary counts against the member's own targets." |
 | 1:10 | 9 Ingredients | **Nutrition Score** › **Search by name**, or Nutrition › More tools › Check a label | Ingredients explained | "Ingredients are explained with what regulators say and how strong the evidence is. Presence isn't treated as proof of harm." |
 | 1:25 | 13 Faith | Faith tab | Faith: free | "The Faith section is free: a reading plan with a daily Bible reading and prayer." |
-| 1:40 | 19 Free vs Pro | Profile › **Plans & billing**, tap **Yearly** | $149.99 a year · $19.99 a month | "Free to start. Pro All Access is $149.99 a year, or $19.99 a month. Nothing is charged in this demo." |
+| 1:40 | 19 Free vs Pro | Profile › **Plans & billing**, tap **Yearly** | $119.99 a year · $17.99 a month | "Free to start. Pro All Access is $119.99 a year, or $17.99 a month. Nothing is charged in this demo." |
 | 1:55 | 20 Close | Home | | "That's Narrow Gate Fitness." |
 
 ## 4–6 minute version (main script, about 5:00)
@@ -152,7 +152,7 @@ yet:** rehearse it twice; at a calm pace it should fit inside 90 seconds, but ch
 ### 4:50–5:20 · Free vs Pro (stop 19)
 
 - Profile › **Plans & billing**. Tap **Yearly**.
-- **Voiceover:** "Free is $0 and includes the Faith section. Pro All Access is $149.99 a year, or $19.99 a month; same
+- **Voiceover:** "Free is $0 and includes the Faith section. Pro All Access is $119.99 a year, or $17.99 a month; same
   features either way. Nothing is charged in this demo."
 - **Optional:** in the demo bar, tap **Free**, then Run › **Outdoor run**: live GPS recording shows as a Pro feature.
   Tap **Pro** to switch back. "This switch only exists in the demo."

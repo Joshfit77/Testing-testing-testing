@@ -35,7 +35,7 @@ Checked against the native project on 2026-11-12. Only features in this list are
 | GPS with the screen locked | Yes | `UIBackgroundModes: location`; When-In-Use and Always purpose strings; `@capacitor-community/background-geolocation` 1.2.26 (`src/lib/native/location.ts`) |
 | Apple Health: **read** steps, sleep, overnight heart rate, HRV, respiratory rate | Yes | HealthKit entitlement; `NSHealthShareUsageDescription`; `@capgo/capacitor-health` 8.11.4 (`src/lib/native-health.ts`, `src/lib/native-sleep.ts`) |
 | Local notifications (reminders, rest timer, wake-up alarm) | Yes | `@capacitor/local-notifications` (`src/lib/native-notifications.ts`, `src/lib/native-alarm.ts`, `src/lib/native.ts`) |
-| In-app purchases (RevenueCat, App Store) | Yes | `@revenuecat/purchases-capacitor` 13.7.3; products `ngf_pro_monthly` ($19.99) and `ngf_pro_yearly` ($149.99) (`docs/MOBILE_BILLING.md`) |
+| In-app purchases (RevenueCat, App Store) | Yes | `@revenuecat/purchases-capacitor` 13.7.3; products `ngf_pro_monthly` ($17.99) and `ngf_pro_yearly` ($119.99) (`docs/MOBILE_BILLING.md`) |
 | Haptics, keyboard, status bar, splash screen | Yes | Capacitor plugins in `ios/App/CapApp-SPM/Package.swift` |
 
 ### Not in this build
@@ -842,8 +842,8 @@ Sign-in · **High** (App Store guideline 4.8 applies if any social sign-in appea
 
 ### 8. In-app purchases (TestFlight sandbox)
 
-Plans & billing: **You → Plans & billing**. Products: Pro All Access monthly (`ngf_pro_monthly`, **$19.99** in the US
-storefront) and yearly (`ngf_pro_yearly`, **$149.99**). Prices come from the App Store, in your storefront's currency.
+Plans & billing: **You → Plans & billing**. Products: Pro All Access monthly (`ngf_pro_monthly`, **$17.99** in the US
+storefront) and yearly (`ngf_pro_yearly`, **$119.99**). Prices come from the App Store, in your storefront's currency.
 Before starting, the owner confirms the accounts are on the sandbox tester list.
 
 **"Nothing charged" check (applies to every purchase case):** each Apple sheet must say it is a TestFlight or Sandbox
@@ -855,8 +855,8 @@ Purchases · [TF] · **High** (Blocker if a price is wrong)
 - **Preconditions:** A on Free. iPhone's App Store region = United States (Settings → your name → Media & Purchases →
   View Account → Country/Region). In another region, record the local prices.
 - **Steps:** You → Plans & billing. Switch monthly ↔ yearly. Scroll to the end.
-- **Expected:** "Loading App Store prices…" briefly, then **$19.99/month** and **$149.99/year** (if a saving is shown,
-  it's 37%). Auto-renew terms ("renews automatically… unless cancelled at least 24 hours before the end of the current
+- **Expected:** "Loading App Store prices…" briefly, then **$17.99/month** and **$119.99/year** (if a saving is shown,
+  it's 44%). Auto-renew terms ("renews automatically… unless cancelled at least 24 hours before the end of the current
   period… Manage or cancel any time in your Apple Account settings…"), Terms and Privacy links, and **Restore purchases**
   are all present. **No website or card checkout** anywhere in the app.
 - **Evidence:** Screenshots of the whole screen.
@@ -1266,7 +1266,7 @@ needs a Mac with Xcode for at least part of it.
 | IP-NTF-12 | Completion cancels today's reminder | | Medium | |
 | IP-NTF-13 | Lock-screen privacy and sign-out clean-up | | Blocker / High | |
 | IP-SIWA-01 | No third-party sign-in offered (Sign in with Apple not in build) | | High | |
-| IP-IAP-01 | Plans & billing screen and prices ($19.99 / $149.99) | TF | High (Blocker if price wrong) | |
+| IP-IAP-01 | Plans & billing screen and prices ($17.99 / $119.99) | TF | High (Blocker if price wrong) | |
 | IP-IAP-02 | Buy monthly | TF, Owner | Blocker | |
 | IP-IAP-03 | Cancel the purchase sheet | TF | High | |
 | IP-IAP-04 | Buy annual | TF, Owner | Blocker | |

@@ -59,21 +59,31 @@ export function tokenUsage(u: ProviderUsage | null | undefined): TokenUsage {
 
 // --------------------------------------------------------------------------------------------- What a member pays us
 
-/** The fees between the price and what reaches us. Stripe's standard US card fee; store rates as Apple/Google publish. */
+/**
+ * The fees between the price and what reaches us, per provider (checked 2026-11-13; re-check before launch):
+ * - Stripe (web): 2.9% + 30¢ per US card payment, plus Stripe Billing at 0.7% of recurring volume (pay-as-you-go).
+ * - Apple App Store: 30% in a subscriber's first year, 15% after a year of paid service or for every subscription
+ *   under the App Store Small Business Program (under $1M a year, on application).
+ * - Google Play: 15% on subscriptions from the first day.
+ * - RevenueCat (store purchases only): free up to $2,500 of monthly tracked revenue, then 1% of tracked revenue.
+ *   Counted at 1% throughout, the conservative case.
+ */
 export const FEES = {
   stripePercent: 0.029,
   stripeFixedCents: 30,
-  /** App Store / Google Play: 15% (Small Business Program, or subscriptions after their first year), else 30%. */
-  storeReduced: 0.15,
-  storeStandard: 0.3,
+  stripeBillingPercent: 0.007,
+  appleStandard: 0.3,
+  appleReduced: 0.15,
+  google: 0.15,
+  revenueCatPercent: 0.01,
 } as const;
 
 export interface Channel {
   key: string;
   label: string;
-  /** What a member is charged per month on this channel (yearly ÷ 12). */
+  /** What a member is charged per month on this channel (yearly ÷ 12: a yearly member pays once a year). */
   grossMonthlyCents: number;
-  /** What reaches us per member-month after fees. */
+  /** What reaches us per member-month after the store or payment fees. */
   netMonthlyCents: number;
 }
 
@@ -85,42 +95,78 @@ export interface Channel {
 export function revenueChannels(prices: { monthCents: number; yearCents: number } = { monthCents: APPROVED_PRO_PRICE_CENTS.month, yearCents: APPROVED_PRO_PRICE_CENTS.year }): Channel[] {
   const m = prices.monthCents;
   const y = prices.yearCents;
-  const stripe = (cents: number) => cents - (cents * FEES.stripePercent + FEES.stripeFixedCents);
+  const stripe = (cents: number) => cents - (cents * (FEES.stripePercent + FEES.stripeBillingPercent) + FEES.stripeFixedCents);
+  const store = (cents: number, commission: number) => cents * (1 - commission - FEES.revenueCatPercent);
   return [
-    { key: "web_month", label: "Web, monthly (Stripe)", grossMonthlyCents: m, netMonthlyCents: stripe(m) },
-    { key: "web_year", label: "Web, yearly (Stripe)", grossMonthlyCents: y / 12, netMonthlyCents: stripe(y) / 12 },
-    { key: "store_month_15", label: "App Store / Play, monthly at 15%", grossMonthlyCents: m, netMonthlyCents: m * (1 - FEES.storeReduced) },
-    { key: "store_year_15", label: "App Store / Play, yearly at 15%", grossMonthlyCents: y / 12, netMonthlyCents: (y * (1 - FEES.storeReduced)) / 12 },
-    { key: "store_month_30", label: "App Store / Play, monthly at 30%", grossMonthlyCents: m, netMonthlyCents: m * (1 - FEES.storeStandard) },
-    { key: "store_year_30", label: "App Store / Play, yearly at 30%", grossMonthlyCents: y / 12, netMonthlyCents: (y * (1 - FEES.storeStandard)) / 12 },
+    { key: "web_month", label: "Web, monthly (Stripe + Stripe Billing)", grossMonthlyCents: m, netMonthlyCents: stripe(m) },
+    { key: "web_year", label: "Web, yearly (Stripe + Stripe Billing)", grossMonthlyCents: y / 12, netMonthlyCents: stripe(y) / 12 },
+    { key: "google_month", label: "Google Play, monthly (15%)", grossMonthlyCents: m, netMonthlyCents: store(m, FEES.google) },
+    { key: "google_year", label: "Google Play, yearly (15%)", grossMonthlyCents: y / 12, netMonthlyCents: store(y, FEES.google) / 12 },
+    { key: "apple_month_15", label: "App Store, monthly at 15% (Small Business Program, or after year one)", grossMonthlyCents: m, netMonthlyCents: store(m, FEES.appleReduced) },
+    { key: "apple_year_15", label: "App Store, yearly at 15% (Small Business Program, or after year one)", grossMonthlyCents: y / 12, netMonthlyCents: store(y, FEES.appleReduced) / 12 },
+    { key: "apple_month_30", label: "App Store, monthly at 30% (first year, no Small Business Program)", grossMonthlyCents: m, netMonthlyCents: store(m, FEES.appleStandard) },
+    { key: "apple_year_30", label: "App Store, yearly at 30% (first year, no Small Business Program)", grossMonthlyCents: y / 12, netMonthlyCents: store(y, FEES.appleStandard) / 12 },
   ].map((c) => ({ ...c, grossMonthlyCents: Math.round(c.grossMonthlyCents * 100) / 100, netMonthlyCents: Math.round(c.netMonthlyCents * 100) / 100 }));
 }
 
 /**
- * Assumptions for everything that isn't AI (owner to confirm; overridable by env without a deploy):
- * - other operating cost per Pro member-month: hosting, database, storage, email, error monitoring and support
- *   tools, $1.00 (an estimate, not a measured bill);
- * - AI may use at most 20% of what's left of the lowest-net channel's revenue, so the rest covers margin, refunds,
- *   chargebacks, taxes not included above and growth.
+ * Everything that isn't AI, per Pro member-month (estimates, not measured bills; owner to confirm, overridable):
+ * hosting $0.35, database $0.30, storage $0.10, email and monitoring $0.10, support and other tools $0.15 = $1.00,
+ * plus 2% of the price set aside for refunds and chargebacks. AI should use at most 20% of the lowest net.
  */
-export const ECONOMICS_DEFAULTS = { opsCostPerMemberCents: 100, aiShareOfNet: 0.2 } as const;
+export const OPERATING_COST_CENTS = { hosting: 35, database: 30, storage: 10, emailAndMonitoring: 10, supportAndOther: 15 } as const;
+export const ECONOMICS_DEFAULTS = {
+  opsCostPerMemberCents: Object.values(OPERATING_COST_CENTS).reduce((a, b) => a + b, 0),
+  refundShareOfGross: 0.02,
+  aiShareOfNet: 0.2,
+  /** The owner's AI spending target per Pro member-month (brief 2026-11-13): the enforced member budget. */
+  aiTargetMicros: 1_400_000,
+} as const;
 
 export interface AiBudget {
-  /** The channel the budget is sized against (the one that leaves us least). */
+  /** The channel that leaves us least. */
   worstChannel: Channel;
-  /** Per Pro member per calendar month, micro-USD. */
+  /** The enforced budget per Pro member per calendar month, micro-USD (the owner's target). */
   perMemberMonthlyMicros: number;
+  /** What the guideline (20% of the lowest net, after other costs and refunds) would allow, for comparison. */
+  derivedMicros: number;
 }
 
-/** The sustainable monthly AI budget per Pro member, sized for the lowest-net way of paying. */
-export function sustainableAiBudget(opts: { prices?: { monthCents: number; yearCents: number }; opsCostPerMemberCents?: number; aiShareOfNet?: number } = {}): AiBudget {
+/** The monthly AI budget per Pro member: the owner's target, with what the lowest-net channel would sustain. */
+export function sustainableAiBudget(opts: { prices?: { monthCents: number; yearCents: number }; opsCostPerMemberCents?: number; aiShareOfNet?: number; targetMicros?: number } = {}): AiBudget {
   const channels = revenueChannels(opts.prices);
   const worst = channels.reduce((a, b) => (b.netMonthlyCents < a.netMonthlyCents ? b : a));
   const ops = opts.opsCostPerMemberCents ?? ECONOMICS_DEFAULTS.opsCostPerMemberCents;
   const share = opts.aiShareOfNet ?? ECONOMICS_DEFAULTS.aiShareOfNet;
-  const afterOps = Math.max(0, worst.netMonthlyCents - ops);
-  const cents = Math.min(afterOps, worst.netMonthlyCents * share);
-  return { worstChannel: worst, perMemberMonthlyMicros: Math.floor(cents * 10_000) };
+  const refunds = worst.grossMonthlyCents * ECONOMICS_DEFAULTS.refundShareOfGross;
+  const afterCosts = Math.max(0, worst.netMonthlyCents - ops - refunds);
+  const derivedMicros = Math.floor(Math.min(afterCosts, worst.netMonthlyCents * share) * 10_000);
+  const target = opts.targetMicros ?? ECONOMICS_DEFAULTS.aiTargetMicros;
+  // Never more than the channel can pay for after its other costs.
+  return { worstChannel: worst, perMemberMonthlyMicros: Math.min(target, Math.floor(afterCosts * 10_000)), derivedMicros };
+}
+
+export interface ChannelEconomics extends Channel {
+  refundsCents: number;
+  opsCents: number;
+  /** AI at the given monthly cost, and what's left. */
+  aiCents: number;
+  marginCents: number;
+  aiShareOfNetPct: number;
+  /** AI above 20% of net, or a margin under $1: worth the owner's attention. */
+  flagged: boolean;
+}
+
+/** Per-channel monthly economics for a member who spends `aiMicros` on AI (e.g. the full $1.40 target). */
+export function channelEconomics(aiMicros: number, prices?: { monthCents: number; yearCents: number }): ChannelEconomics[] {
+  return revenueChannels(prices).map((c) => {
+    const refundsCents = Math.round(c.grossMonthlyCents * ECONOMICS_DEFAULTS.refundShareOfGross * 100) / 100;
+    const opsCents = ECONOMICS_DEFAULTS.opsCostPerMemberCents;
+    const aiCents = aiMicros / 10_000;
+    const marginCents = Math.round((c.netMonthlyCents - refundsCents - opsCents - aiCents) * 100) / 100;
+    const aiShareOfNetPct = Math.round((aiCents / c.netMonthlyCents) * 1000) / 10;
+    return { ...c, refundsCents, opsCents, aiCents, marginCents, aiShareOfNetPct, flagged: aiShareOfNetPct > ECONOMICS_DEFAULTS.aiShareOfNet * 100 || marginCents < 100 };
+  });
 }
 
 // ------------------------------------------------------------------------------------- Expected cost of each request

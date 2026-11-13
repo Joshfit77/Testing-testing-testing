@@ -29,9 +29,9 @@ involves AI was tested with the local mock provider.
 * **Cheaper models by default:** routine requests run on Haiku. Chat switches automatically to the fast model when a member has used 75% of their budget, or the app 90% of the global budget. Plan generation is never downgraded.
 * **When a limit is reached, it fails gracefully:** clear messages, each saying that everything else in the app keeps working. Nothing is charged extra, and no non-AI feature is affected.
 * **Allowance derived from the economics** (`src/lib/domain/ai-economics.ts`):
-  * It uses the $17.99 and $119.99 prices, Stripe at 2.9% + 30¢, and store commission at 15% or 30%.
+  * It uses the $17.99 and $119.99 prices, Stripe at 2.9% + 30¢ plus Stripe Billing's 0.7%, store commission at 15% or 30%, and RevenueCat's 1% (updated 2026-11-13; see `AI_COST.md`).
   * Yearly subscriptions are spread over 12 months, and budgets are enforced month by month.
-  * Assumptions: $1.00 of other operating cost per member, and AI capped at 20% of the lowest net (App Store/Play yearly at 30%: $7.00 a month).
+  * Assumptions: $1.00 of other operating cost per member, and AI capped at 20% of the lowest net (App Store yearly at 30%: $6.90 a month), with 2% of gross held for refunds. The owner's $1.40 target is kept; on that one channel it is 20.3% of net (flagged in `AI_COST.md`).
 * **Changed business rule (stated plainly):** the Pro larger-model share went from **15 to 10 a month**. Plan generations also share this limit, so they are effectively 10 a month. The membership comparison now reads "Up to 10 / month". The 150-request allowance and the prices are unchanged. To restore 15, set `PLAN_PRO_AI_SMART_MONTHLY_LIMIT=15`.
 
 ### Priority 2

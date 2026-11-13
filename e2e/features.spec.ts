@@ -118,7 +118,8 @@ test.describe("feature access, subscriptions and core sections", () => {
     await expect(page.getByTestId("pro-price")).toHaveText("$17.99 / month");
     await page.getByRole("radio", { name: /Yearly|Annual/ }).click();
     await expect(page.getByTestId("pro-price")).toHaveText("$119.99 / year");
-    await expect(page.getByText("About $9.99 a month, billed yearly.")).toBeVisible();
+    await expect(page.getByText("Billed $119.99 once a year (about $10.00 a month). Save approximately 44% compared with monthly billing.")).toBeVisible();
+    await expect(page.getByTestId("annual-savings-line")).toHaveText("Save 44% with annual billing");
     await expect(page.getByRole("radio", { name: /Save 44%/ })).toBeVisible();
     // The full comparison is folded under "Compare Free and Pro".
     await page.getByText("Compare Free and Pro").click();

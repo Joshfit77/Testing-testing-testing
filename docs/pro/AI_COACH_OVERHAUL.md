@@ -109,7 +109,8 @@ Monthly AI cost at a 30% light / 50% typical / 20% heavy mix (Free members now c
 | 10,000 | $6,860 | $3,550 | $14,000 |
 
 The shared prefix is cached across members, so larger fleets move toward the warm column. For comparison, the lowest
-net revenue per member is $7.00 a month (yearly through a store at 30%).
+net revenue per member is $6.90 a month (App Store yearly at 30%, after RevenueCat's 1%); the per-channel table with
+Stripe, store, RevenueCat, operating and refund costs is in `AI_COST.md` (updated for $17.99 / $119.99 on 2026-11-13).
 
 ## 6. Test results (local stack, scripted provider)
 

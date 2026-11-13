@@ -5,10 +5,10 @@ import {
   ECONOMICS_DEFAULTS,
   EXPECTED_COST_MICROS,
   expectedCostMicros,
-  MICROS_PER_USD,
   priceFor,
   REQUEST_CEILING_MICROS,
   revenueChannels,
+  channelEconomics,
   sustainableAiBudget,
   sustainableAllowance,
   tokenUsage,
@@ -52,26 +52,43 @@ describe("what a Pro member pays us", () => {
   it("uses the approved prices and spreads the yearly price over 12 months", () => {
     const web = channels.find((c) => c.key === "web_month")!;
     expect(web.grossMonthlyCents).toBe(APPROVED_PRO_PRICE_CENTS.month);
+    expect(APPROVED_PRO_PRICE_CENTS).toEqual({ month: 1799, year: 11999 });
     const year = channels.find((c) => c.key === "web_year")!;
     expect(year.grossMonthlyCents).toBeCloseTo(APPROVED_PRO_PRICE_CENTS.year / 12, 2);
-    // Stripe: 2.9% + 30¢ on the charge, once a year for yearly.
-    expect(web.netMonthlyCents).toBeCloseTo(1799 - (1799 * 0.029 + 30), 2);
-    expect(year.netMonthlyCents).toBeCloseTo((11999 - (11999 * 0.029 + 30)) / 12, 2);
+    // Stripe: 2.9% + 30¢ on the charge plus Stripe Billing's 0.7%, once a year for yearly.
+    expect(web.netMonthlyCents).toBeCloseTo(1799 - (1799 * 0.036 + 30), 2);
+    expect(year.netMonthlyCents).toBeCloseTo((11999 - (11999 * 0.036 + 30)) / 12, 2);
   });
 
-  it("sizes the AI budget for the lowest-net channel: yearly through a store at 30%", () => {
+  it("charges each store its own fee: Google 15% from day one, Apple 30% or 15%, plus RevenueCat's 1%", () => {
+    const net = (k: string) => channels.find((c) => c.key === k)!.netMonthlyCents;
+    expect(net("google_month")).toBeCloseTo(1799 * 0.84, 1);
+    expect(net("google_year")).toBeCloseTo((11999 * 0.84) / 12, 1);
+    expect(net("apple_month_30")).toBeCloseTo(1799 * 0.69, 1);
+    expect(net("apple_month_15")).toBeCloseTo(1799 * 0.84, 1);
+    expect(net("apple_year_30")).toBeCloseTo((11999 * 0.69) / 12, 1);
+  });
+
+  it("keeps the owner's $1.40 AI target, and shows what the lowest-net channel would sustain", () => {
     const b = sustainableAiBudget();
-    expect(b.worstChannel.key).toBe("store_year_30");
-    expect(b.worstChannel.netMonthlyCents).toBeCloseTo((11999 * 0.7) / 12, 1);
-    // 20% of $6.9994 net, less than what's left after $1.00 other costs.
-    expect(b.perMemberMonthlyMicros).toBe(Math.floor(b.worstChannel.netMonthlyCents * ECONOMICS_DEFAULTS.aiShareOfNet * 10_000));
-    expect(b.perMemberMonthlyMicros / MICROS_PER_USD).toBeGreaterThan(1.3);
-    expect(b.perMemberMonthlyMicros / MICROS_PER_USD).toBeLessThan(1.5);
+    expect(b.worstChannel.key).toBe("apple_year_30");
+    expect(b.worstChannel.netMonthlyCents).toBeCloseTo((11999 * 0.69) / 12, 1); // $6.90
+    expect(b.perMemberMonthlyMicros).toBe(ECONOMICS_DEFAULTS.aiTargetMicros);
+    // 20% of $6.90 = $1.38: the target is slightly above the guideline on that one channel.
+    expect(b.derivedMicros).toBe(Math.floor(b.worstChannel.netMonthlyCents * 0.2 * 10_000));
+    expect(b.derivedMicros).toBeLessThan(b.perMemberMonthlyMicros);
   });
 
-  it("follows a price change and never goes negative", () => {
-    expect(sustainableAiBudget({ prices: { monthCents: 999, yearCents: 5999 } }).perMemberMonthlyMicros).toBeLessThan(sustainableAiBudget().perMemberMonthlyMicros);
+  it("flags only the channel where AI at the full target passes 20% of net, and every channel stays profitable", () => {
+    const rows = channelEconomics(1_400_000);
+    expect(rows.filter((r) => r.flagged).map((r) => r.key)).toEqual(["apple_year_30"]);
+    expect(Math.min(...rows.map((r) => r.marginCents))).toBeGreaterThan(400);
+    expect(channelEconomics(700_000).some((r) => r.flagged)).toBe(false);
+  });
+
+  it("never budgets more AI than a channel can pay for after its other costs", () => {
     expect(sustainableAiBudget({ prices: { monthCents: 50, yearCents: 100 } }).perMemberMonthlyMicros).toBe(0);
+    expect(sustainableAiBudget({ prices: { monthCents: 999, yearCents: 5999 } }).derivedMicros).toBeLessThan(sustainableAiBudget().derivedMicros);
   });
 
   it("the Pro allowance fits inside the budget at expected costs", () => {

@@ -7,11 +7,19 @@ enforced on the server (and, where members write directly to the database, by da
 | Membership | Price | Who can buy it |
 |---|---|---|
 | Free | $0 | Everyone |
-| Pro All Access, monthly | $19.99 / month | New and existing members |
-| Pro All Access, yearly | $149.99 / year (saves 37% against 12 monthly payments) | New and existing members |
+| Pro All Access, monthly | $17.99 / month | New and existing members |
+| Pro All Access, yearly | $119.99 / year (saves 44% against 12 monthly payments) | New and existing members |
 | Plus (legacy) | What the subscriber already pays | Nobody new: kept only for subscriptions that already exist |
 
 Monthly and yearly Pro unlock exactly the same features.
+
+**Price history.** The launch prices above were approved on 2026-11-13 and replace $19.99 / $149.99 (approved
+2026-10-26), which replaced $24.99 / $249.99. 12 × $17.99 = $215.88; $215.88 − $119.99 = $95.89 saved, 44.4% (shown as
+"Save 44%"); $119.99 / 12 = $9.9992 ≈ $10.00 a month, but a yearly membership is **one charge a year**, never a monthly
+charge. Dated reports and audits written before 2026-11-13 (`docs/quality/*`, `docs/audit*`, `docs/launch-audit/FINAL_*`
+reports, `VISUAL_COMPARISON_2026-11-07.md`, `LAUNCH_AUDIT_2026-11-08.md`, migration comments) record the prices in force
+when they were written and were deliberately left unchanged. No store or Stripe product has been created or changed
+by this update; see `docs/pro/PRICING_UPDATE_2026-11-13.md` for the owner checklist.
 
 ## What each membership includes
 

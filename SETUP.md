@@ -60,7 +60,7 @@ AI_RATE_LIMIT_PER_MINUTE=6
 
 ### Stripe subscriptions
 
-1. Create recurring prices in Stripe — Pro All Access monthly ($19.99) and yearly ($149.99); a Plus price only if you have existing legacy Plus subscribers — and set:
+1. Create recurring prices in Stripe — Pro All Access monthly ($17.99) and yearly ($119.99); a Plus price only if you have existing legacy Plus subscribers — and set:
    ```
    STRIPE_SECRET_KEY=sk_test_...
    STRIPE_PRICE_PLUS=price_...
@@ -77,7 +77,7 @@ AI_RATE_LIMIT_PER_MINUTE=6
    Set `STRIPE_WEBHOOK_SECRET=whsec_...`.
 4. Local testing: run `stripe listen --forward-to localhost:3000/api/stripe/webhook` and use the printed secret. Test card: `4242 4242 4242 4242`.
 
-Display prices default to $19.99/month and $149.99/year (Pro All Access) and $11.99/month for the legacy Plus plan. Override them with `PLAN_PRO_PRICE_CENTS`, `PLAN_PRO_YEARLY_PRICE_CENTS` and `PLAN_PLUS_PRICE_CENTS`. When you replace a Stripe price, list the old ID in `STRIPE_PRICE_PLUS_LEGACY` / `STRIPE_PRICE_PRO_LEGACY` so existing subscribers keep their plan. Keep them in sync with your Stripe prices.
+Display prices default to $17.99/month and $119.99/year (Pro All Access) and $11.99/month for the legacy Plus plan. Override them with `PLAN_PRO_PRICE_CENTS`, `PLAN_PRO_YEARLY_PRICE_CENTS` and `PLAN_PLUS_PRICE_CENTS`. When you replace a Stripe price, list the old ID in `STRIPE_PRICE_PLUS_LEGACY` / `STRIPE_PRICE_PRO_LEGACY` so existing subscribers keep their plan. Keep them in sync with your Stripe prices.
 
 ### Food search (USDA FoodData Central)
 

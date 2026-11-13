@@ -11,15 +11,15 @@ export type BillingInterval = "month" | "year";
 
 /** The prices to show. On the website they come from Stripe; in the app from the App Store or Google Play. */
 export interface MembershipPrices {
-  /** e.g. "$19.99", or null while loading / not offered. */
+  /** e.g. "$17.99", or null while loading / not offered. */
   month: string | null;
-  /** e.g. "$149.99", or null when yearly isn't offered here. */
+  /** e.g. "$119.99", or null when yearly isn't offered here. */
   year: string | null;
-  /** e.g. "$12.49" for the yearly price spread over 12 months, when known. */
+  /** e.g. "$10.00" for the yearly price spread over 12 months, when known (an equivalent, never a monthly charge). */
   yearPerMonth: string | null;
   /** Whole-percent saving of yearly over 12 monthly payments, when known. */
   savingsPercent: number | null;
-  /** The same saving in money, e.g. "$89.89", when known. */
+  /** The same saving in money, e.g. "$95.89", when known. */
   yearSaving?: string | null;
 }
 
@@ -76,8 +76,8 @@ export function MembershipPlans({
 
   return (
     <section className="space-y-4" aria-labelledby="membership-title">
-      <h2 id="membership-title" className="sr-only">
-        Memberships
+      <h2 id="membership-title" className="font-display text-sm font-semibold text-gold-highlight">
+        Narrow Gate Fitness Pro
       </h2>
 
       {yearOffered && (
@@ -92,7 +92,7 @@ export function MembershipPlans({
               onClick={() => onIntervalChange(i)}
               className={cn(
                 "relative flex min-h-[6.5rem] flex-col items-start justify-end rounded-2xl p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-highlight",
-                shown === i ? "card-gold-strong" : "border border-border bg-card hover:border-gold-muted",
+                shown === i ? "card-gold-strong" : i === "year" ? "border border-gold-muted bg-card hover:border-gold" : "border border-border bg-card hover:border-gold-muted",
               )}
             >
               {i === "year" && prices.savingsPercent ? (
@@ -102,7 +102,7 @@ export function MembershipPlans({
               ) : null}
               <span className="text-sm font-semibold text-muted-foreground">{i === "month" ? "Monthly" : "Annual"}</span>
               <span className="mt-1 font-display text-2xl font-bold tabular-nums">{i === "month" ? (prices.month ?? "—") : (prices.year ?? "—")}</span>
-              <span className="text-xs text-muted-foreground">{i === "month" ? "per month" : prices.yearPerMonth ? `per year · about ${prices.yearPerMonth}/mo` : "per year"}</span>
+              <span className="text-xs text-muted-foreground">{i === "month" ? "per month, billed monthly" : "per year, billed once a year"}</span>
               {i === "year" && prices.yearSaving ? (
                 <span className="text-xs font-semibold text-gold-highlight" data-testid="year-saving">
                   {prices.yearSaving} less than 12 monthly payments
@@ -110,6 +110,11 @@ export function MembershipPlans({
               ) : null}
             </button>
           ))}
+          {prices.savingsPercent ? (
+            <p className="col-span-2 text-center text-sm font-semibold text-gold" data-testid="annual-savings-line">
+              Save {prices.savingsPercent}% with annual billing
+            </p>
+          ) : null}
         </div>
       )}
 
@@ -154,7 +159,7 @@ export function MembershipPlans({
             {price && <span className="text-base font-normal text-muted-foreground"> / {shown === "year" ? "year" : "month"}</span>}
           </p>
           <p className="mt-1 min-h-5 text-sm text-muted-foreground">
-            {shown === "year" && prices.yearPerMonth ? `About ${prices.yearPerMonth} a month, billed yearly.` : shown === "month" && prices.year ? `Or ${prices.year} a year.` : ""}
+            {billingLine(shown, prices)}
           </p>
           <p className="mt-2 font-display text-sm font-semibold uppercase tracking-[0.18em] text-gold">One membership. Every premium feature.</p>
           <ul className="mt-5 grid gap-x-4 gap-y-2.5 text-sm sm:grid-cols-2">
@@ -219,6 +224,20 @@ export function MembershipPlans({
       {footer}
     </section>
   );
+}
+
+/**
+ * What the member will be charged, and how often, in words. A yearly membership is one charge a year: the
+ * per-month figure is shown only as an equivalent, never as a monthly charge.
+ */
+export function billingLine(shown: BillingInterval, prices: MembershipPrices): string {
+  if (shown === "year" && prices.year) {
+    const save = prices.savingsPercent ? ` Save approximately ${prices.savingsPercent}% compared with monthly billing.` : "";
+    const equiv = prices.yearPerMonth ? ` (about ${prices.yearPerMonth} a month)` : "";
+    return `Billed ${prices.year} once a year${equiv}.${save}`;
+  }
+  if (shown === "month" && prices.month) return `Billed ${prices.month} every month.${prices.year ? ` Or ${prices.year} a year.` : ""}`;
+  return "";
 }
 
 function Cell({ value, pro }: { value: boolean | string; pro?: boolean }) {

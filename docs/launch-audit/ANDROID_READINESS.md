@@ -23,7 +23,7 @@ Limitation of the backup change: a member who moves to a new phone signs in agai
 ## Google Play Billing (Task 5.4)
 
 - Plugin: `@revenuecat/purchases-capacitor` 13.7.3, now wired. The same code path as iOS: the server reads entitlements from RevenueCat's API and webhook; the app never decides what was bought (`docs/MOBILE_BILLING.md`).
-- Product: one Play subscription `ngf_pro` (Pro All Access) with base plans `monthly` ($19.99) and `yearly` ($149.99). RevenueCat reports them as `ngf_pro:monthly` / `ngf_pro:yearly`, which the app matches by default (`storeProductIds`, tested). No Plus product is created. A monthly↔yearly change passes the old product id so Play replaces the subscription.
+- Product: one Play subscription `ngf_pro` (Pro All Access) with base plans `monthly` ($17.99) and `yearly` ($119.99). RevenueCat reports them as `ngf_pro:monthly` / `ngf_pro:yearly`, which the app matches by default (`storeProductIds`, tested). No Plus product is created. A monthly↔yearly change passes the old product id so Play replaces the subscription.
 - Live billing stays off: `REVENUECAT_ALLOW_SANDBOX=false` and `REVENUECAT_ALLOW_TEST_STORE=false` by default; no Play products exist yet. Owner steps: create the subscription and base plans in Play Console, the RevenueCat Play app with its service-account credentials, licence testers, then sandbox-test purchase, restore, switch, cancel, expiry and refund on a device.
 
 ## General checks (Task 5.5)
@@ -96,7 +96,7 @@ Everything is encrypted in transit (HTTPS). Members can request deletion (in the
 1. Your Google Play developer account (personal accounts: the 12-tester, 14-day closed test).
 2. Upload key: create it in Android Studio or with `keytool`, keep it safe, add the four `ANDROID_UPLOAD_*` secrets in GitHub (never in chat), enrol in Play App Signing.
 3. A deployed HTTPS site; then run Actions › Android Play bundle with `edition: online` and your `server_url`, download the `.aab`, upload it to an internal or closed test track yourself.
-4. Play Console: the subscription `ngf_pro` with `monthly` $19.99 and `yearly` $149.99 base plans, licence testers, RevenueCat Play app with service-account credentials.
+4. Play Console: the subscription `ngf_pro` with `monthly` $17.99 and `yearly` $119.99 base plans, licence testers, RevenueCat Play app with service-account credentials.
 5. App content forms above, store listing assets.
 6. Device testing on an Android phone (list above) and the Play Billing sandbox run.
 7. Optional: a native notification for the rest timer (in-page only today).

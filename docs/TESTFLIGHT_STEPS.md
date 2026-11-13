@@ -33,8 +33,8 @@ GitHub reports this repository as **public** (checked 2026-11-04), so anything c
 | What the app loads | the `server_url` you give the workflow, which becomes `server.url`. Navigation is limited to that host (`allowNavigation: [host]`). | `capacitor.config.ts`; `ios.yml` |
 | Workflow and job | Actions → **iOS** → job input `testflight` (job name "TestFlight build (online app, signed; uploaded only if asked)") | `.github/workflows/ios.yml` |
 | GitHub secrets | `APPLE_TEAM_ID`, `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8_BASE64` | `ios.yml` step "Check secrets" |
-| Store product IDs | `ngf_pro_monthly` ($19.99/month), `ngf_pro_yearly` ($149.99/year) | `src/server/services/store-billing.ts` `storeProductIds()`; `.env.example`; `docs/TESTFLIGHT_SETUP_GUIDE.md` §5 |
-| Approved prices in code | `APPROVED_PRO_PRICE_CENTS = { month: 1999, year: 14999 }` | `src/lib/domain/plans.ts` |
+| Store product IDs | `ngf_pro_monthly` ($17.99/month), `ngf_pro_yearly` ($119.99/year) | `src/server/services/store-billing.ts` `storeProductIds()`; `.env.example`; `docs/TESTFLIGHT_SETUP_GUIDE.md` §5 |
+| Approved prices in code | `APPROVED_PRO_PRICE_CENTS = { month: 1799, year: 11999 }` | `src/lib/domain/plans.ts` |
 | RevenueCat entitlement | `pro` (default of `REVENUECAT_ENTITLEMENT_PRO`) | `src/server/env.ts` |
 | RevenueCat webhook | `POST https://<staging-domain>/api/revenuecat/webhook`. The `Authorization` header must equal `REVENUECAT_WEBHOOK_AUTH` exactly. | `src/app/api/revenuecat/webhook/route.ts`; `src/server/services/store-billing.ts` `webhookAuthorized` |
 | Health check | `https://<staging-domain>/api/health`, which answers `{"data":{"app":"narrow-gate-fitness","commit":"<sha>"}}` | `src/app/api/health/route.ts` |
@@ -272,7 +272,7 @@ Optional:
 | `USDA_FDC_API_KEY` | blank. Search then uses the bundled USDA database. |
 | `STRIPE_SECRET_KEY` | blank, or a **`sk_test_…`** key only |
 | `STRIPE_WEBHOOK_SECRET` | blank, or from the **test-mode** endpoint `https://<staging-domain>/api/stripe/webhook` |
-| `STRIPE_PRICE_PRO` / `STRIPE_PRICE_PRO_YEARLY` | blank, or **test-mode** prices of exactly $19.99/month and $149.99/year. Checkout refuses any other amount. |
+| `STRIPE_PRICE_PRO` / `STRIPE_PRICE_PRO_YEARLY` | blank, or **test-mode** prices of exactly $17.99/month and $119.99/year. Checkout refuses any other amount. |
 
 Leave these unset (they must stay off):
 
@@ -404,8 +404,8 @@ profiles Xcode created for the App ID.
 
 | Reference name | Product ID (exact) | Duration | Price (U.S.) |
 |---|---|---|---|
-| Pro Monthly | `ngf_pro_monthly` | 1 month | **$19.99** |
-| Pro Yearly | `ngf_pro_yearly` | 1 year | **$149.99** |
+| Pro Monthly | `ngf_pro_monthly` | 1 month | **$17.99** |
+| Pro Yearly | `ngf_pro_yearly` | 1 year | **$119.99** |
 
 3. Put both at the same level in the group (`docs/MOBILE_BILLING.md`: "both 'Pro All Access' at the same level").
 4. Create **no Plus products** (setup guide §5).
@@ -691,7 +691,7 @@ address" (setup guide §14).
    - return to the app and **sign in with the password**.
    - This is the expected behaviour (`DEVICE_TEST_SCRIPT.md`, Accounts row A).
 3. **Plans & billing:**
-   - Profile → **Plans & billing** shows Apple's prices for Pro All Access ($19.99/month and $149.99/year in the
+   - Profile → **Plans & billing** shows Apple's prices for Pro All Access ($17.99/month and $119.99/year in the
      U.S. storefront) and **Restore purchases**;
    - there is no website checkout inside the app;
    - "In-app purchases aren't available right now" means §9.4.

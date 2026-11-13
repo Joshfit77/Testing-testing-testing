@@ -109,7 +109,7 @@ The full talk track, tap by tap, is in `docs/PRESENTATION_GUIDE.md`.
 | Faith: Bible (BSB, words of Jesus in red), highlights, notes, reading journeys, prayer journal, memory verses, studies, 40-day challenge, practices | **Live**, Free. Study commentary that hasn't been reviewed stays hidden, as in the real app |
 | Bible study assistant (Faith › Ask) | **Simulated** (labelled) |
 | Notification settings and the Next 24 hours preview | **Live** settings; **delivery needs the phone app** |
-| Free / Pro comparison, $19.99 / $149.99 prices | **Live**; purchases turned off |
+| Free / Pro comparison, $17.99 / $119.99 prices | **Live**; purchases turned off |
 | AI Coach, AI meal plans, food-photo estimates, label-photo reading, product explanations | **Simulated** (labelled). The coach's real tools still run on the sample data, and suggestions still wait for approval |
 | Runs with routes | **Sample routes** (labelled), not real recordings |
 | Live GPS recording | **Needs the phone app** outdoors |

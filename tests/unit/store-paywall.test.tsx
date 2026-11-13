@@ -69,7 +69,8 @@ describe("in-app membership screen", () => {
     fireEvent.click(await screen.findByRole("radio", { name: /Yearly|Annual/ }));
     expect(screen.getByRole("radio", { name: /Save 44%/ })).toHaveAttribute("aria-checked", "true");
     expect(screen.getByTestId("pro-price")).toHaveTextContent("$119.99 / year");
-    expect(screen.getByText("About $9.99 a month, billed yearly.")).toBeInTheDocument();
+    expect(screen.getByText("Billed $119.99 once a year (about $9.99 a month). Save approximately 44% compared with monthly billing.")).toBeInTheDocument();
+    expect(screen.getByTestId("annual-savings-line")).toHaveTextContent("Save 44% with annual billing");
     sync.mockResolvedValue({ ok: true, plan: "pro" });
     fireEvent.click(screen.getByRole("button", { name: "Start Pro All Access · $119.99 / year" }));
     await waitFor(() => expect(store.purchase).toHaveBeenCalledWith(expect.objectContaining({ identifier: "ngf_pro_yearly" }), { oldProductId: undefined }));

@@ -61,8 +61,11 @@ members. A "warm" cache means steady traffic keeps it cached.
 | Typical | 54 fast + 4 larger + 2 plans | $0.70 | $0.37 |
 | Heavy (at the Pro limits) | 135 fast + 10 larger + 5 plans | $1.74 | $0.91 |
 
-For scale, the price of Pro is $19.99 a month. After Apple's 15% (Small Business Program) or 30% commission, that
-leaves $16.99 or $13.99. A typical member costs well under 5% of that.
+For scale, the price of Pro is $17.99 a month or $119.99 a year (launch prices approved 2026-11-13; previously
+$19.99 / $149.99). After Apple's 15% (Small Business Program) or 30% commission, a monthly member leaves $15.29 or
+$12.59; a yearly member, spread over 12 months, $8.50 or $7.00 (before RevenueCat's 1%). A typical member costs well
+under 10% of that. The per-channel table, with Stripe, RevenueCat, operating costs and refunds, is in
+`docs/pro/AI_COST.md`.
 
 Across members, 100 typical members cost about $37–70 a month and 1,000 cost about $365–696.
 
@@ -73,8 +76,8 @@ request is in the same range as a fast chat turn.
 
 The worst case is a member who makes every request as expensive as the app allows: every one of the 150 monthly
 requests runs 6 model rounds, each at the 12,000-token output cap, with maximum history. That member costs about
-$0.06 per fast request and $1.26 per larger-model request, about **$22 a month**. That is more than the $19.99 price,
-and well above the net after commission.
+$0.06 per fast request and $1.26 per larger-model request, about **$22 a month**. That is more than the $17.99 price,
+and well above the net after commission. (Since migration 066 a per-member money budget of $1.40 a month stops this.)
 
 What the server enforces today (verified in code and by `tests/integration/ai-limits.test.ts`, `ai-route-limits.test.ts`
 and `coach-provider-limits.test.ts`):

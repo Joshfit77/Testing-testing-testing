@@ -11,15 +11,15 @@ import math
 # ---------------------------------------------------------------------------
 # 0. Approved prices (fixed by the owner; not modelled as variables)
 # ---------------------------------------------------------------------------
-PRICE_MONTHLY = 19.99      # Pro All Access, per month
-PRICE_ANNUAL = 149.99      # Pro All Access, per year (identical features)
+PRICE_MONTHLY = 17.99      # Pro All Access, per month (launch price approved 2026-11-13; was 19.99)
+PRICE_ANNUAL = 119.99      # Pro All Access, per year (identical features; was 149.99)
 ANNUAL_MRR = PRICE_ANNUAL / 12
 
 # AI allowance per Pro member per month (from the brief, matches src/lib/domain/plans.ts limits)
 ALLOWANCE = 150
-PLAN_LIMIT = 15
-SMART_LIMIT = 15
-PLAN_RESERVE = 5           # src/lib/coach/routing.ts: complex chat stops escalating 5 early
+PLAN_LIMIT = 10            # PLAN_PRO_AI_PLAN_MONTHLY_LIMIT default
+SMART_LIMIT = 10           # PLAN_PRO_AI_SMART_MONTHLY_LIMIT default (was 15)
+PLAN_RESERVE = 2           # src/lib/coach/routing.ts: complex chat stops escalating 2 early (was 5)
 
 # ---------------------------------------------------------------------------
 # 1. Third-party prices (see FORECAST.md for source URLs and access dates, 2026-10-26)
@@ -212,8 +212,8 @@ FEATURES = {
 
 # Monthly usage mixes (requests). Every kind counts against the 150 allowance; Sonnet capped at 15.
 MIX_FULL_REALISTIC = {"chat_fast": 100, "chat_smart": 10, "plan": 5, "food_photo": 15, "meal_plan": 5, "food_explain": 15}
-MIX_FULL_WORST_A = {"chat_fast": 135, "chat_smart": SMART_LIMIT - PLAN_RESERVE, "plan": PLAN_RESERVE}
-MIX_FULL_WORST_B = {"chat_fast": 135, "plan": PLAN_LIMIT}
+MIX_FULL_WORST_A = {"chat_fast": ALLOWANCE - SMART_LIMIT, "chat_smart": SMART_LIMIT - PLAN_RESERVE, "plan": PLAN_RESERVE}
+MIX_FULL_WORST_B = {"chat_fast": ALLOWANCE - PLAN_LIMIT, "plan": PLAN_LIMIT}
 
 
 def mix_cost(mix, prof, scale=1.0):
@@ -339,12 +339,12 @@ def section_ai_per_user():
         ["Full (100% = 150), realistic mix", "100 quick chats, 10 complex, 5 plans, 15 photos, 5 meal plans, 15 explains",
          m(mix_cost(MIX_FULL_REALISTIC, "typical")), pct(mix_cost(MIX_FULL_REALISTIC, "typical") / PRICE_MONTHLY),
          pct(mix_cost(MIX_FULL_REALISTIC, "typical") / ANNUAL_MRR)],
-        ["**Full (100%), most expensive legal mix** (used as 'AI full')", "135 quick chats + 15 Sonnet (worst of 10 chats+5 plans / 15 plans)",
+        ["**Full (100%), most expensive legal mix** (used as 'AI full')", f"{ALLOWANCE - SMART_LIMIT} quick chats + {SMART_LIMIT} Sonnet (worst of {SMART_LIMIT - PLAN_RESERVE} chats+{PLAN_RESERVE} plans / {PLAN_LIMIT} plans)",
          m(AI_FULL), pct(AI_FULL / PRICE_MONTHLY), pct(AI_FULL / ANNUAL_MRR)],
         ["Stress: full + heavy requests near code caps", "same mix, long history, 4-6 tool rounds", m(AI_STRESS),
          pct(AI_STRESS / PRICE_MONTHLY), pct(AI_STRESS / ANNUAL_MRR)],
     ]
-    print(md(["Usage level", "Mix", "AI cost / month", "% of $19.99", "% of $12.50 (annual/12)"], rows))
+    print(md(["Usage level", "Mix", "AI cost / month", f"% of ${PRICE_MONTHLY}", f"% of {m(ANNUAL_MRR)} (annual/12)"], rows))
     print()
 
 
@@ -396,7 +396,7 @@ def scenario_row(n, monthly_share, apple_case, ai):
 def section_scenarios():
     print("## F. Forecast at 100 / 250 / 500 / 750 / 1,000 active paying subscribers (steady-state month, estimates)\n")
     print("Active subscribers are the paying base in a month; 'new subs needed' is the replacement for churn and "
-          "non-renewal only (no growth). MRR counts annual plans at $149.99/12. 'Annual cash' is the steady-state "
+          "non-renewal only (no growth). MRR counts annual plans at $119.99/12. 'Annual cash' is the steady-state "
           "average of upfront annual payments landing per month (it is lumpy in reality, see section H).\n")
     sizes = [100, 250, 500, 750, 1000]
     for mix_name, ms in PLAN_MIXES.items():

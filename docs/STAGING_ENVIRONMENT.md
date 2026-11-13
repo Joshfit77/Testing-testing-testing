@@ -53,7 +53,7 @@ Deploy the branch you want to test. The iPhone app shows whatever this deploymen
 | `STRIPE_SECRET_KEY` | **`sk_test_…` only** | live key only after you approve real charges |
 | `STRIPE_LIVE_APPROVED` | **unset** (a live key is then ignored) | `true` only with your approval |
 | `STRIPE_WEBHOOK_SECRET` | from the test-mode webhook endpoint `https://<staging-domain>/api/stripe/webhook` | live endpoint's |
-| `STRIPE_PRICE_PRO`, `STRIPE_PRICE_PRO_YEARLY` | test-mode prices of exactly $19.99/month and $149.99/year (checkout refuses any other amount) | live prices |
+| `STRIPE_PRICE_PRO`, `STRIPE_PRICE_PRO_YEARLY` | test-mode prices of exactly $17.99/month and $119.99/year (checkout refuses any other amount) | live prices |
 | `STRIPE_PRICE_PLUS*`, `STRIPE_PRICE_*_LEGACY` | unset (Plus isn't sold; only for existing Plus subscribers) | only if Plus subscribers exist |
 | `REVENUECAT_SECRET_API_KEY` | RevenueCat secret key (server only) | same project or a production one |
 | `REVENUECAT_WEBHOOK_AUTH` | the exact Authorization header you set on the RevenueCat webhook to `https://<staging-domain>/api/revenuecat/webhook` | own value |

@@ -55,7 +55,7 @@ The Free plan includes:
 
 ### 3.2 Pro All Access
 
-Pro All Access costs **$19.99 per month** or **$149.99 per year**. Both billing periods include the same features. In addition to everything in Free, Pro includes:
+Pro All Access costs **$17.99 per month** or **$119.99 per year**. Both billing periods include the same features. In addition to everything in Free, Pro includes:
 - the full program library and the custom program builder;
 - live GPS run and walk recording, with route maps;
 - recipes, meal planning and grocery lists;
@@ -65,7 +65,7 @@ Pro All Access costs **$19.99 per month** or **$149.99 per year**. Both billing 
 - advanced analytics;
 - the AI Coach.
 
-Prices are in U.S. dollars. They do not include any taxes, which may be added where required. Prices in the App Store or Google Play are set and displayed by the store in your local currency and may differ from these amounts. [ATTORNEY REVIEW: confirm that the prices in these Terms match the configured Stripe, App Store and Play prices on the publication date. The code is mid-migration: committed HEAD still lists Plus $11.99 and Pro $24.99, while the uncommitted working tree on 2026-10-26 implements Pro at $19.99 / $149.99. Consider stating prices only "as shown at checkout," to avoid conflicts.]
+Prices are in U.S. dollars. They do not include any taxes, which may be added where required. Prices in the App Store or Google Play are set and displayed by the store in your local currency and may differ from these amounts. [ATTORNEY REVIEW: confirm that the prices in these Terms match the configured Stripe, App Store and Play prices on the publication date. The code is mid-migration: committed HEAD still lists Plus $11.99 and Pro $24.99, while the uncommitted working tree on 2026-10-26 implements Pro at $17.99 / $119.99. Consider stating prices only "as shown at checkout," to avoid conflicts.]
 
 ### 3.3 AI Coach allowance
 
