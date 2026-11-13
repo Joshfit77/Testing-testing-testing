@@ -71,4 +71,53 @@ test.describe("Pro programs", () => {
     await page.waitForURL(/lighter=1/);
     await expect(page.getByText(/Lighter session: one set fewer per exercise/)).toBeVisible();
   });
+
+  test("progress photos: Pro compares two photos side by side or as an overlay with alignment guides", async ({ page }) => {
+    const email = uniqueEmail("photos");
+    await signUpAndConfirm(page, email);
+    await completeOnboarding(page);
+    await grantPlan(email, "pro");
+
+    // Two small generated images (a drawn rectangle at slightly different places), uploaded through the real dialog.
+    const png = async (x: number) =>
+      Buffer.from(
+        await page.evaluate(async (offset) => {
+          const c = document.createElement("canvas");
+          c.width = 300;
+          c.height = 400;
+          const g = c.getContext("2d")!;
+          g.fillStyle = "#222";
+          g.fillRect(0, 0, 300, 400);
+          g.fillStyle = "#c9a227";
+          g.fillRect(100 + offset, 80, 100, 260);
+          const blob: Blob = await new Promise((r) => c.toBlob((b) => r(b!), "image/png"));
+          return Array.from(new Uint8Array(await blob.arrayBuffer()));
+        }, x),
+      );
+    await page.goto("/progress/overview#photos");
+    for (const [i, x] of [0, 12].entries()) {
+      await page.getByRole("button", { name: "Add photo" }).click();
+      await page.locator('input[type="file"][accept="image/*"]').setInputFiles({ name: `p${i}.png`, mimeType: "image/png", buffer: await png(x) });
+      await page.getByRole("button", { name: "Save photo" }).click();
+      await expect(page.getByRole("dialog")).toHaveCount(0, { timeout: 20_000 });
+    }
+
+    await page.getByRole("button", { name: "Compare", exact: true }).click();
+    const tiles = page.locator("#photos ul li button");
+    await tiles.nth(0).click();
+    await tiles.nth(1).click();
+    await page.getByRole("button", { name: "Compare", exact: true }).last().click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByText("Before & after")).toBeVisible();
+    await dialog.getByRole("button", { name: "Overlay" }).click();
+    const overlay = dialog.getByTestId("photo-overlay");
+    await expect(overlay.locator("img")).toHaveCount(2);
+    const blend = dialog.getByLabel("Blend between before and after");
+    await blend.fill("80");
+    await expect(overlay.locator("img").nth(1)).toHaveAttribute("style", /opacity: 0\.8/);
+    await dialog.getByLabel("Alignment guides").check();
+    await expect(dialog.getByTestId("photo-guides")).toHaveCount(1);
+    await dialog.getByRole("button", { name: "Side by side" }).click();
+    await expect(dialog.getByTestId("photo-guides")).toHaveCount(2);
+  });
 });
