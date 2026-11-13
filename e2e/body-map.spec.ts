@@ -46,11 +46,10 @@ test.describe("Strength & Body Map", () => {
 
     await page.goto("/progress/body-map");
     await expect(page.getByRole("heading", { name: "Strength & Body Map", level: 1 })).toBeVisible();
-    // Before a table is chosen nothing is ranked, and the page says why.
-    await expect(page.getByTestId("overall-rank")).toContainText("Not assessed");
-    await expect(page.getByTestId("standards-chooser")).toContainText("Which strength table should your ranks use?");
-    await page.getByTestId("standards-chooser").getByRole("button", { name: "Men's table", exact: true }).click();
+    // The member gave their sex at onboarding, so ranks use the matching table straight away (no "Not assessed"
+    // until a table is picked); the chooser still lets them switch.
     await expect(page.getByTestId("standards-chooser")).toContainText("Comparing with the men's table.");
+    await expect(page.getByTestId("overall-rank")).not.toContainText("Not assessed");
 
     // Chest 1.18 Gold, upper back 1.27 Silver, shoulders Gold, quads/glutes/lower back/hamstrings Platinum → middle of 7 = Platinum.
     const overall = page.getByTestId("overall-rank");
