@@ -44,7 +44,8 @@ export interface SquatOpts {
   balanceX?: number;
   /**
    * The rebuilt squat mechanics: a tall standing position swaying slightly forward from the ankle, knees travelling
-   * forward early while the hips keep sinking, and a smooth dense-keyed tempo (repSmooth).
+   * forward early while the hips keep sinking, and a smooth dense-keyed tempo (repSmooth). On by default for every
+   * squat (2026-11-13); `natural: false` keeps the older four-key version.
    */
   natural?: boolean;
 }
@@ -83,6 +84,14 @@ function holdArms(p: Pose, load: SquatLoad, s: number, natural = false): Pose {
   }
 }
 
+/**
+ * A bar on the upper back held as in the back squat (hands at the bar's end over the traps, elbows down and a little
+ * back), with the bar prop drawn the same way: across the shoulders with 35 cm plates. Shared by every movement with the
+ * bar on the back (back squat, box squat, good morning) so they all hold and show it alike.
+ */
+export const backBarArms = (p: Pose): Pose => holdArms(p, "back", 0, true);
+export const backBarProp = (): PropDef => ({ id: "bar", kind: "barbell", at: { lm: "trap" }, layer: "front", orient: "across", size: 17.5 });
+
 function barPoint(p: Pose, load: SquatLoad): Vec {
   switch (load) {
     case "back":
@@ -112,13 +121,17 @@ export function squatPose(s: number, o: SquatOpts): Pose {
   return p;
 }
 
-export function squat(o: SquatOpts): MotionDef {
+export function squat(opts: SquatOpts): MotionDef {
+  // One set of squat mechanics for every squat (back, front, Zercher, overhead, goblet, bodyweight): previously only the
+  // back squat had the rebuilt ones and its pause and tempo variants still used the old four-key version.
+  const o: SquatOpts = { ...opts, natural: opts.natural ?? true };
   const implement = o.implement ?? (o.load === "back" || o.load === "front" || o.load === "overhead" ? "barbell" : o.load === "zercher" ? "barbell" : "none");
   const props: PropDef[] = [...(o.props ?? [])];
   if (implement === "barbell") {
     const at = o.load === "back" ? { lm: "trap" as const } : o.load === "front" ? { lm: "rack" as const } : o.load === "zercher" ? { lm: "elbowR" as const, dx: 3, dy: 6 } : { lm: "hands" as const };
-    // Bar on the back: 35 cm plates (its height is set by the lifter, not the plates), so the head stays readable.
-    props.push({ id: "bar", kind: "barbell", at, layer: "front", ...(o.load === "back" ? { orient: "across" as const, size: 17.5 } : {}) });
+    // 35 cm plates for every squat (the bar's height is set by the lifter, not the plates), so the head, the racked
+    // hands and the elbows stay readable; a 45 cm plate hid the face of the front, Zercher and overhead squats.
+    props.push({ id: "bar", kind: "barbell", at, layer: "front", size: 17.5, ...(o.load === "back" ? { orient: "across" as const } : {}) });
   } else if (implement === "dumbbell") props.push({ id: "db", kind: "dumbbell", at: { lm: "hands", dy: -3 }, orient: "profile", angle: 90, layer: "near", size: 1.05 });
   else if (implement === "kettlebell") props.push({ id: "kb", kind: "kettlebell", at: { lm: "hands" }, orient: "vertical", layer: "near" });
   const specs = (o.natural ? repSmooth : rep)((s) => squatPose(s, o), { down: o.down ?? 2, up: o.up ?? 1, holdBottom: o.holdBottom, holdTop: o.holdTop ?? 0.4 });
@@ -358,14 +371,14 @@ export function goodMorning(id: string, label: string): MotionDef {
     const knee = 4 + 16 * s;
     let p = pose({ ...stanceLegs(0, knee, T) });
     for (let i = 0; i < 3; i++) {
-      p = armsLocal(p, [-10, -17], [-6.5, 1]);
+      p = backBarArms(p);
       // Shift the shin (ankle angle) so the bar stays over mid-foot.
       const base = p;
       const shin = solve1D((sh) => {
-        const q = armsLocal(pose({ ...base, ...stanceLegs(sh, knee, T) }), [-10, -17], [-6.5, 1]);
+        const q = backBarArms(pose({ ...base, ...stanceLegs(sh, knee, T) }));
         return lm(q, "trap")[0] - lm(q, "soleR")[0] - 1;
       }, -20, 25);
-      p = armsLocal(pose({ ...base, ...stanceLegs(shin, knee, T) }), [-10, -17], [-6.5, 1]);
+      p = backBarArms(pose({ ...base, ...stanceLegs(shin, knee, T) }));
     }
     p.neck = -T * 0.35;
     return p;
@@ -374,8 +387,9 @@ export function goodMorning(id: string, label: string): MotionDef {
     id,
     view: "side",
     label,
-    keyframes: keys(FEET, rep(at, { down: 2, up: 1.2, holdTop: 0.4 })),
-    props: [{ id: "bar", kind: "barbell", at: { lm: "trap" }, layer: "front" }],
+    // Dense keys (as the squats): the bar stays over mid-foot all the way down and up, not only at four keys.
+    keyframes: keys(FEET, repSmooth(at, { down: 2, up: 1.2, holdTop: 0.4 })),
+    props: [backBarProp()],
     planted: ["L", "R"],
     footGrounded: true,
     stillPhase: 0.45,

@@ -251,3 +251,15 @@ These belong in `docs/release/TESTFLIGHT_ACCEPTANCE.md` area 11 (and area 1 for 
 - **Filmstrips:** `side-*-strip.webp` and `front-*-strip.webp`, eight evenly spaced moments of one loop.
 
 To regenerate, run `node scripts/exercise-review/render-motion.mjs <slugs> --style=athlete [--view=front]`.
+
+## 12. Library audit and corrections (2026-11-13)
+
+All 218 exercises were audited from their frames and measured motion: see
+[`animation/ANIMATION_AUDIT.md`](animation/ANIMATION_AUDIT.md) (and `animation/animation-audit.json`). The athlete's
+look was not changed. Corrections were made in the shared patterns: one set of squat mechanics for every squat, a
+densely keyed strict press whose head moves out of the bar's way, a pulldown with a straight bar path in front of the
+face, a bent-over rear-delt fly seen from the side, an *Above* view for the flat and incline dumbbell flyes
+(`MotionDef.viewLabel` names a view in the switch), floor-contact fixes for the bridges and seated hip abduction, and
+framing that keeps a side-view barbell's plates inside the picture. Regression checks:
+`tests/unit/exercise-motion-biomechanics.test.ts`. The audit lists 64 exercises that still need review by a qualified
+strength coach or physiotherapist.

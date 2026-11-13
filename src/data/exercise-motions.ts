@@ -56,14 +56,14 @@ import {
 } from "../lib/exercise-motion/patterns/power";
 import { lateralBoundDrill, lateralShuffleDrill, proAgilityDrill, reactiveMirrorDrill, tDrill } from "../lib/exercise-motion/patterns/agility";
 import { agilityLadderDrill, bearCrawlDrill, threeConeDrill, walkingLungeDrill, wallDrillStraight } from "../lib/exercise-motion/patterns/drills";
-import { curlFront, deadliftFront } from "../lib/exercise-motion/patterns/front-views";
+import { curlFront, deadliftFront, dumbbellFlyAbove } from "../lib/exercise-motion/patterns/front-views";
 import { pose, stanceLegs, both } from "../lib/exercise-motion/build";
 import { ADDED_MOTIONS } from "./exercise-batches";
 import type { ExerciseMeta, MotionDef, View } from "../lib/exercise-motion/types";
 
 type Builder = (id: string) => MotionDef;
 
-/** Shared by the back squat's side and front views, so both show the same depth, lean and timing. */
+/** Shared by the back squat's side and front views and its pause and tempo variants: the same depth, lean and bar path. */
 const BACK_SQUAT = { load: "back" as const, natural: true, balanceX: -1, knee: 133, shin: 38, down: 2, up: 1.4, holdBottom: 0.15, holdTop: 0.6 };
 
 const S = "Side view. ";
@@ -81,8 +81,8 @@ export const EXERCISE_MOTIONS: Record<string, Builder> = {
   "bodyweight-squat": (id) => squat({ id, load: "arms-forward", label: `${S}Arms reach forward as the hips sit back and down to parallel, heels down, then stands tall.` }),
   "box-squat-to-chair": (id) => seatSquat(id, `${S}Reaches the arms forward and slowly sits back until lightly touching the chair, then leans forward and stands.`, { chair: true }),
   "leg-press": (id) => legPress(id, `${S}Seated in a 45° leg press: lowers the sled by bending the knees toward the chest, then presses back to straight-but-soft knees.`),
-  "pause-squat": (id) => squat({ id, load: "back", holdBottom: 1.5, label: `${S}Back squat with a full pause at the bottom before driving up.` }),
-  "tempo-squat": (id) => squat({ id, load: "back", down: 3, holdBottom: 0.6, label: `${S}Back squat with a slow three-second descent and a short pause at the bottom.` }),
+  "pause-squat": (id) => squat({ id, ...BACK_SQUAT, holdBottom: 1.5, label: `${S}Back squat with a full pause at the bottom before driving up.` }),
+  "tempo-squat": (id) => squat({ id, ...BACK_SQUAT, down: 3, holdBottom: 0.6, label: `${S}Back squat with a slow three-second descent and a short pause at the bottom.` }),
   "box-squat": (id) => seatSquat(id, `${S}Barbell on the back: sits back to the box, pauses, and drives up keeping the shins near vertical.`, { barbell: true, seat: 50 }),
   "zercher-squat": (id) => squat({ id, load: "zercher", knee: 130, label: `${S}Bar held in the crook of the elbows: squats with an upright torso and stands.` }),
   "hack-squat": (id) => hackSquat(id, `${S}Back against the hack-squat pad: squats deep along the sled's path and presses back up.`),
@@ -150,7 +150,7 @@ export const EXERCISE_MOTIONS: Record<string, Builder> = {
   // ------------------------------------------------------------------ Shoulders / arms
   "lateral-raise": (id) => frontArms({ id, kind: "lateral-raise", label: `${F}Raises the dumbbells out to the sides to shoulder height with slightly bent elbows, then lowers slowly.` }),
   "cable-lateral-raise": (id) => frontArms({ id, kind: "cable-lateral-raise", label: `${F}One arm raises the cable handle from the opposite hip out to shoulder height and lowers.` }),
-  "rear-delt-fly": (id) => rearDeltFlyFront(id, `${F}Hinged forward toward the camera with a flat back and soft knees, dumbbells hanging under the chest: raises them out to the sides with slightly bent elbows, leading with the elbows, until the arms are level with the shoulders, pauses, and lowers slowly.`),
+  "rear-delt-fly": (id) => rearDeltFly(id, `${S}Hinged forward about 60° with a flat back and soft knees, dumbbells hanging under the chest: raises them out to the sides with slightly bent elbows, leading with the elbows, until the arms are level with the shoulders, pauses, and lowers slowly. The arms come out toward the camera, so the Front view shows the width of the arc.`),
   "triceps-pushdown": (id) => armIsolation({ id, kind: "pushdown", label: `${S}Elbows pinned at the sides: pushes the cable down until the arms are straight, then lets it rise to about 90°.` }),
   "overhead-triceps-extension": (id) => armIsolation({ id, kind: "overhead-extension", label: `${S}Dumbbell held overhead: bends the elbows to lower it behind the head and extends back up.` }),
   "dumbbell-curl": (id) => armIsolation({ id, kind: "curl", label: `${S}Elbows by the sides: curls the dumbbells up toward the shoulders and lowers them slowly.` }),
@@ -298,6 +298,17 @@ export const EXERCISE_MOTION_VIEWS: Record<string, Partial<Record<View, Builder>
   // figure cannot yet draw that foreshortening to the standard of the side view (backSquatFront is kept for that work).
   "conventional-deadlift": {
     front: (id) => deadliftFront(id, `${F}Feet about hip width, hands just outside the legs with straight arms: the bar rises over the feet to a tall lockout, then lowers under control.`),
+  },
+  // A bent-over rear-delt fly: the side view shows the hinge, the front view the width of the arc.
+  "rear-delt-fly": {
+    front: (id) => rearDeltFlyFront(id, `${F}Hinged forward toward the camera with a flat back and soft knees, dumbbells hanging under the chest: raises them out to the sides with slightly bent elbows, leading with the elbows, until the arms are level with the shoulders, pauses, and lowers slowly.`),
+  },
+  // A fly's arc points at a side camera: seen from above, the arms visibly open out to the sides and close again.
+  "dumbbell-fly": {
+    front: (id) => dumbbellFlyAbove(id, "View from above. Lying on a flat bench, dumbbells together over the chest: the arms open out to the sides in a wide arc with a slight, fixed elbow bend until they are about level with the torso, then sweep back together."),
+  },
+  "incline-dumbbell-fly": {
+    front: (id) => dumbbellFlyAbove(id, "View from above. Lying on a bench inclined about 30°, dumbbells together over the upper chest: the arms open out to the sides in a wide arc with a slight, fixed elbow bend, then sweep back together.", 30),
   },
   "dumbbell-curl": {
     front: (id) => curlFront(id, `${F}Palms forward and upper arms still at the sides: curls both dumbbells up toward the shoulders and lowers them slowly.`),

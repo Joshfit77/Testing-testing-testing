@@ -151,6 +151,27 @@ export function armThrough(p: Pose, s: Side, elbow: Vec, hand: Vec, view: View =
   return out;
 }
 
+/** A direction in the upper back's frame: forward (out of the chest), up (along the spine toward the head), lateral. */
+export type V3 = [number, number, number];
+
+/**
+ * Set a side-view arm from the real directions of its upper arm and forearm (upper-back frame). The part of each
+ * segment in the picture plane gives the drawn shoulder and elbow angles, the part out of it the foreshortening.
+ * (Moved here from patterns/upper-extra.ts so every pattern can pose an arm that leaves the picture plane the same way.)
+ */
+export function arm3D(p: Pose, s: Side, upper: V3, fore: V3): Pose {
+  const n = (v: V3): V3 => {
+    const l = Math.hypot(v[0], v[1], v[2]) || 1;
+    return [v[0] / l, v[1] / l, v[2] / l];
+  };
+  const u = n(upper);
+  const f = n(fore);
+  const D = 180 / Math.PI;
+  const sh = Math.atan2(u[0], -u[1]) * D;
+  const fa = Math.atan2(f[0], -f[1]) * D;
+  return { ...p, [`sh${s}`]: sh, [`armD${s}`]: Math.asin(u[2]) * D, [`el${s}`]: normFlex(fa - sh), [`foreD${s}`]: Math.asin(f[2]) * D };
+}
+
 /** Arm (both sides) through shoulder-local elbow / hand points. */
 export function armsLocal(p: Pose, elbow: [number, number], hand: [number, number], sides: Side[] = ["L", "R"]): Pose {
   let out = p;

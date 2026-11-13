@@ -8,8 +8,9 @@
  * the position in the rep (both views share the same keyframe timing).
  */
 import { BODY, forwardKinematics } from "../skeleton";
-import { FEET, armThrough, both, keys, lm, pose, type KeySpec, type MotionDef, type Pose, type PropDef, type Vec } from "../build";
+import { FEET, armThrough, both, keys, lm, pose, repSmooth, type KeySpec, type MotionDef, type Pose, type PropDef, type Vec } from "../build";
 import { pullPose, squatPose, type PullOpts, type SquatOpts } from "./lower";
+import { frontPose, limb3, project, type Body3, type FloorCam, type V3 } from "./floor";
 
 const ARM = BODY.upperArm + BODY.forearm;
 /** Ankle joint height above the floor (cm), as in the sumo deadlift's front view. */
@@ -227,5 +228,90 @@ export function curlFront(id: string, label: string): MotionDef {
     planted: ["L", "R"],
     footGrounded: true,
     stillPhase: 0.4,
+  };
+}
+
+// ------------------------------------------------------------------------------------------------ Dumbbell fly
+
+/**
+ * Lying dumbbell fly seen from above (a camera straight over the bench), the view that shows what a fly is: the arms
+ * open in a wide arc out to the sides and close again over the chest. From the side the same arc points at the camera,
+ * so the dumbbells only drop and rise over the chest and the side view looks like a press. Same arc, elbow bend, bench
+ * angle and timing as the side view (upper-extra.ts dumbbellFly: from 9 degrees past vertical to level, elbows bent
+ * about 22 degrees, 2.2 s down, 1.6 s up), so switching views keeps the position in the rep.
+ *
+ * The body is posed in 3D lying on the bench (joint centres about 10 cm over the pad, feet on the floor either side)
+ * and drawn with the front-view athlete through the floor drills' projection (floor.ts frontPose).
+ */
+export function dumbbellFlyAbove(id: string, label: string, incline = 0): MotionDef {
+  const cam: FloorCam = { pitch: 90 };
+  const r = (d: number) => (d * Math.PI) / 180;
+  const Y = 54;
+  const inc = r(incline);
+  // Along the torso toward the head (y up, -z toward the top of the picture) and out of the chest.
+  const t: V3 = [0, Math.sin(inc), -Math.cos(inc)];
+  const n: V3 = [0, Math.cos(inc), Math.sin(inc)];
+  const at3 = (o: V3, d: V3, l: number): V3 => [o[0] + d[0] * l, o[1] + d[1] * l, o[2] + d[2] * l];
+  const pelvis: V3 = [0, Y, 0];
+  const neckBase = at3(pelvis, t, BODY.lumbar + BODY.thorax);
+  const BEND = 22;
+  const U = BODY.upperArm;
+  const F = BODY.forearm;
+  const reach = Math.sqrt(U * U + F * F + 2 * U * F * Math.cos(r(BEND)));
+  const body = (phi: number): Body3 => {
+    const b: Record<string, V3> = { pelvis, neckBase, head: at3(neckBase, t, 20) };
+    for (const s of ["L", "R"] as const) {
+      const k = s === "L" ? 1 : -1;
+      const hip: V3 = [k * BODY.hipHalf, Y, 0];
+      const knee: V3 = [k * (BODY.hipHalf + 3), Y - 8, Math.sqrt(BODY.thigh ** 2 - 9 - 64)];
+      const drop = knee[1] - ANKLE_H;
+      const flat = Math.sqrt(Math.max(0, BODY.shin ** 2 - drop * drop));
+      const ankle: V3 = [knee[0] + k * 10, ANKLE_H, knee[2] + Math.sqrt(Math.max(0, flat * flat - 100))];
+      const shoulder: V3 = [k * BODY.shoulderHalf, neckBase[1] - 2 * Math.cos(inc), neckBase[2] + 4 * Math.cos(inc)];
+      // The arm's direction: from "up" (phi = 0) to straight out to the side (phi = 90). "Up" is out of the chest, tilted
+      // a little toward the feet on a flat bench and back toward the head on an incline (by 0.7 of the bench angle), as in
+      // the side view, so the dumbbells meet over the nipples or over the upper chest.
+      const p = r(phi);
+      const a = incline ? r(incline * 0.7) : -0.1;
+      const up: V3 = [0, n[1] * Math.cos(a) + t[1] * Math.sin(a), n[2] * Math.cos(a) + t[2] * Math.sin(a)];
+      const dir: V3 = [k * Math.sin(p), up[1] * Math.cos(p), up[2] * Math.cos(p)];
+      const hand = at3(shoulder, dir, reach);
+      const [elbow, h] = limb3(shoulder, hand, U, F, [k, -0.6 * Math.cos(inc), 0.2]);
+      b[`hip${s}`] = hip;
+      b[`knee${s}`] = knee;
+      b[`ankle${s}`] = ankle;
+      b[`shoulder${s}`] = shoulder;
+      b[`elbow${s}`] = elbow;
+      b[`hand${s}`] = h;
+    }
+    return b as unknown as Body3;
+  };
+  const origin: Vec = [0, 82];
+  const at = (s: number): Pose => frontPose(cam, body(-9 + 99 * s));
+  const specs = repSmooth(at, { down: 2.2, up: 1.6, holdTop: 0.35, holdBottom: 0.15 });
+  // The bench pad under the back and hips, seen from above.
+  const padTop = project(cam, at3(neckBase, t, 14));
+  const padEnd = project(cam, [0, Y, 34]);
+  const pad: PropDef = {
+    id: "bench",
+    kind: "floorMat",
+    at: [origin[0], origin[1] + (padTop[1] + padEnd[1]) / 2],
+    w: 30,
+    h: Math.abs(padTop[1] - padEnd[1]),
+    layer: "back",
+  };
+  return {
+    id,
+    view: "front",
+    viewLabel: "Above",
+    label,
+    keyframes: keys({ pin: "pelvis", at: origin }, specs),
+    props: [
+      pad,
+      { id: "dbL", kind: "dumbbell", at: { lm: "handL" }, orient: "profile", angle: 90, layer: "front", size: 0.9 },
+      { id: "dbR", kind: "dumbbell", at: { lm: "handR" }, orient: "profile", angle: 90, layer: "front", size: 0.9 },
+    ],
+    floor: "none",
+    stillPhase: 0.5,
   };
 }
