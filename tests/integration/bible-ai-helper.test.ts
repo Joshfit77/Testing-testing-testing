@@ -1,6 +1,6 @@
 import { createServer, type Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createTestUser, deleteTestUser, serviceClient, stackAvailable, type TestUser } from "./helpers";
+import { createTestUser, deleteTestUser, grantPlan, serviceClient, stackAvailable, type TestUser } from "./helpers";
 
 /**
  * The Bible study helper's whole server path against the real database, with a local stand-in for the AI API:
@@ -41,6 +41,8 @@ describe.skipIf(!available)("Bible study helper (server path)", () => {
     process.env.ANTHROPIC_BASE_URL = `http://127.0.0.1:${port}`;
     ({ askBible } = await import("@/server/services/bible-ai"));
     user = await createTestUser("bible-ai");
+    // The helper is a Pro AI feature (Free has no generative AI, 2026-11-13).
+    await grantPlan(user, "pro");
     // Nothing is sent to the AI provider until the member allows it.
     await svc.from("profiles").update({ ai_data_consent_at: new Date().toISOString() }).eq("id", user.id);
   });
@@ -51,7 +53,7 @@ describe.skipIf(!available)("Bible study helper (server path)", () => {
 
   it("answers from retrieved BSB passages, marks references that don't exist, and saves both turns", async () => {
     const thread = crypto.randomUUID();
-    const r = await askBible(user.id, "free", "What does John 3:16 mean?", thread);
+    const r = await askBible(user.id, "pro", "What does John 3:16 mean?", thread);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.answer).toBe("John 3:16 speaks of God's love. See also Psalm 151:2 [reference not found in the BSB].");
@@ -69,12 +71,15 @@ describe.skipIf(!available)("Bible study helper (server path)", () => {
 
   it("sends the conversation so far, and stops at the per-minute limit with a clear message", async () => {
     const thread = crypto.randomUUID();
-    expect((await askBible(user.id, "free", "Who wrote Romans?", thread)).ok).toBe(true);
-    expect((await askBible(user.id, "free", "And to whom?", thread)).ok).toBe(true);
+    expect((await askBible(user.id, "pro", "Who wrote Romans?", thread)).ok).toBe(true);
+    expect((await askBible(user.id, "pro", "And to whom?", thread)).ok).toBe(true);
     // The second question went with the first turn as history.
     expect(requests.at(-1)!.messages.map((m) => m.role)).toEqual(["user", "assistant", "user"]);
-    // Three in the last minute (free plan's per-minute limit).
-    const limited = await askBible(user.id, "free", "One more?", thread);
+    // The Pro per-minute limit (5 questions, counting the earlier test's) stops the next ones with a clear message.
+    const results = [];
+    for (let i = 0; i < 4; i++) results.push(await askBible(user.id, "pro", `One more ${i}?`, thread));
+    const limited = results.find((r) => !r.ok);
     expect(limited).toMatchObject({ ok: false, code: "rate_limited" });
+    expect(results.filter((r) => r.ok).length).toBeLessThanOrEqual(2);
   });
 });

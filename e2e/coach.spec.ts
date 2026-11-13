@@ -325,7 +325,7 @@ test.describe("AI coach", () => {
     await expect(reply.getByRole("cell", { name: "3×5 @ RPE 7" })).toBeVisible();
     await expect(reply.getByText("Here's your bench plan.")).toBeVisible();
     await expect(reply).toContainText("I checked 0 logged bench sessions.");
-    await expect(page.getByText("1/150 messages this month")).toBeVisible();
+    await expect(page.getByText("1/150 AI requests this month")).toBeVisible();
     await reply.getByRole("button", { name: "Copy reply" }).click();
     await expect(reply.getByRole("button", { name: "Copied" })).toBeVisible();
 
