@@ -8,6 +8,8 @@ import { STANDARD_COOLDOWN, STANDARD_WARMUP } from "@/data/programs";
 import { readinessBand, readinessNote } from "@/lib/domain/readiness";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
+import { isoDateInTz } from "@/lib/domain/dates";
+import { getActiveProgram } from "@/server/services/training";
 
 export const metadata = { title: "Recovery & mobility" };
 
@@ -28,6 +30,10 @@ export default async function RecoveryPage() {
     .limit(7);
   const latest = checkins?.[0];
   const band = latest ? readinessBand(latest.readiness_score as number) : null;
+  // After a low or moderate check-in today, offer today's program session in a lighter form (that session only).
+  const checkedToday = latest?.checked_on === isoDateInTz(new Date(), profile.timezone);
+  const active = checkedToday && band !== "high" ? await getActiveProgram(supabase, user.id).catch(() => null) : null;
+  const lighterHref = active?.today ? `/train/workout?day=${active.today.id}&up=${active.userProgramId}&lighter=1` : null;
 
   return (
     <div className="space-y-6">
@@ -59,6 +65,14 @@ export default async function RecoveryPage() {
                   <span className="text-muted-foreground"> / 100 · {latest.checked_on as string}</span>
                 </p>
                 <p className="mt-2 text-sm text-muted-foreground">{readinessNote(band)}</p>
+                {lighterHref && (
+                  <div className="mt-3 flex flex-wrap gap-2" data-testid="lighter-session">
+                    <Button asChild size="sm">
+                      <Link href={lighterHref}>Start today&apos;s session lighter</Link>
+                    </Button>
+                    <span className="self-center text-xs text-muted-foreground">One set fewer per exercise, effort up to RPE 7. Your program stays as it is.</span>
+                  </div>
+                )}
                 <p className="mt-1 text-xs text-muted-foreground">Worked out from your four answers (sleep quality, energy, soreness, stress), not from any measurement.</p>
               </>
             ) : (

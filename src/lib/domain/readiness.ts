@@ -32,3 +32,19 @@ export function readinessNote(band: ReadinessBand): string {
       return "Recovery looks low today. Consider a lighter session, mobility, an easy walk, or a rest day. If you feel unwell or have pain, rest and consult a qualified professional.";
   }
 }
+
+export interface SessionTarget {
+  sets: number;
+  rpe?: number | null;
+}
+
+/** The lighter-session targets: RPE never above this. */
+export const LIGHTER_RPE_CAP = 7;
+
+/**
+ * Today's session made lighter, for this workout only (the program is not changed): one set fewer per exercise
+ * (never below one) and target effort capped at RPE 7. Loads are never prescribed here; the member picks them.
+ */
+export function lighterTargets<T extends SessionTarget>(target: T): T {
+  return { ...target, sets: Math.max(1, target.sets - 1), rpe: target.rpe == null ? LIGHTER_RPE_CAP : Math.min(target.rpe, LIGHTER_RPE_CAP) };
+}

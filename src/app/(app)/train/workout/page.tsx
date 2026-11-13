@@ -1,3 +1,4 @@
+import { lighterTargets } from "@/lib/domain/readiness";
 import { requiresWeight } from "@/lib/domain/load";
 import { usesDistance } from "@/lib/domain/exercise-tracking";
 import { z } from "zod";
@@ -18,7 +19,7 @@ export const metadata = { title: "Workout" };
 
 const uuid = z.string().uuid();
 
-export default async function WorkoutPage({ searchParams }: { searchParams: Promise<{ day?: string; up?: string; template?: string; repeat?: string }> }) {
+export default async function WorkoutPage({ searchParams }: { searchParams: Promise<{ day?: string; up?: string; template?: string; repeat?: string; lighter?: string }> }) {
   const sp = await searchParams;
   const { user, profile } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
@@ -62,8 +63,10 @@ export default async function WorkoutPage({ searchParams }: { searchParams: Prom
       const enrolled = program ? Boolean((await supabase.from("user_programs").select("id").eq("user_id", user.id).eq("program_id", program.id).limit(1).maybeSingle()).data) : false;
       if (program && (program.owner_id === user.id || canAccessTier(plan, program.tier) || enrolled)) {
         const up = uuid.safeParse(sp.up);
+        // "Lighter today" (offered after a low recovery check-in): this session only, the program is unchanged.
+        const lighter = sp.lighter === "1";
         template = {
-          name: day.name,
+          name: lighter ? `${day.name} (lighter)` : day.name,
           userProgramId: up.success ? up.data : null,
           programDayId: day.id,
           warmup: day.warmup,
@@ -71,9 +74,12 @@ export default async function WorkoutPage({ searchParams }: { searchParams: Prom
           exercises: day.exercises.map((e) => ({
             exercise: { id: e.exercise.id, slug: e.exercise.slug, name: e.exercise.name, isTimed: e.exercise.is_timed },
             restSeconds: e.rest_seconds,
-            target: { sets: e.sets, reps: e.reps, seconds: e.duration_seconds, rpe: e.rpe, intensity: e.intensity },
+            target: lighter
+              ? lighterTargets({ sets: e.sets, reps: e.reps, seconds: e.duration_seconds, rpe: e.rpe, intensity: e.intensity })
+              : { sets: e.sets, reps: e.reps, seconds: e.duration_seconds, rpe: e.rpe, intensity: e.intensity },
           })),
         };
+        if (lighter) notice = "Lighter session: one set fewer per exercise and effort up to RPE 7. Your program isn't changed.";
       } else {
         notice = "That session is part of a program your plan doesn't include. Starting an empty workout instead.";
       }
