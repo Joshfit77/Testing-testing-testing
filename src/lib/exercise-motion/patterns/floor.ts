@@ -152,15 +152,22 @@ function keys3(cam: FloorCam, origin: Vec, ks: Key3[]): ReturnType<typeof keys> 
 
 // ---------------------------------------------------------------------------------------------------------- 90/90
 
-/**
- * 90/90 hip switch, seen from in front and a little above (so the legs on the mat show their 90° bends): sitting tall
- * with the hands on the mat behind, one leg in front (thigh forward, shin across) and the other to the side (thigh out,
- * shin back). Both knees lift and rotate over to the other side, passing through knees-up in the middle, the feet
- * pivoting and sliding round on the mat, and settle into the mirror image.
- */
-export function hip9090(id: string, label: string): MotionDef {
-  const cam: FloorCam = { pitch: 38 };
-  const H = 10; // hip joint height, sitting
+/** Geometry of the 90/90 hip switch, shared with its tests. */
+export const HIP_9090 = {
+  /** Hip joint height, sitting on the mat (cm). */
+  hipY: 10,
+  /** Each ankle's offset from its hip: out to the side and forward (cm), so the knee bends to about 90°. */
+  ankleOut: 44,
+  ankleFwd: 44,
+  ankleY: 6,
+  /** Knee centre height when the knee rests on the mat. */
+  kneeY: 6,
+};
+
+/** The 90/90 hip switch's 3D body part-way through the switch, s = 0 (knees over to the right) … 1 (to the left). */
+export function hip9090Body(s: number): Body3 {
+  const G = HIP_9090;
+  const H = G.hipY;
   const pelvis: V3 = [0, H, 0];
   const hip = (k: number): V3 => [k * BODY.hipHalf, H, 0];
   const neckBase: V3 = [0, H + BODY.lumbar + BODY.thorax - 1.5, -6];
@@ -168,50 +175,77 @@ export function hip9090(id: string, label: string): MotionDef {
   const sh = (k: number): V3 => add3(neckBase, [k * BODY.shoulderHalf, -5, 0]);
   // Hands flat on the mat behind and outside the hips, elbows soft and pointing back.
   const arm = (k: number): [V3, V3] => limb3(sh(k), [k * 31, BODY.r.hand, -26], BODY.upperArm, BODY.forearm, [k * 0.4, 0, -1]);
-  // One leg in front (k = side): thigh forward, shin across toward the other side; the other leg out to the side with
-  // its shin back. Knees and feet rest on the mat.
-  const KNEE_Y = 6;
-  const ANK_Y = 5;
-  const front = (k: number): [V3, V3] => {
-    const knee = toward(hip(k), [-k * 0.16, (KNEE_Y - H) / BODY.thigh, 1], BODY.thigh);
-    return [knee, toward(knee, [-k * 1, (ANK_Y - KNEE_Y) / BODY.shin, 0.16], BODY.shin)];
+  // The feet stay planted, wide and in front.
+  const ankle = (k: number): V3 => [k * (BODY.hipHalf + G.ankleOut), G.ankleY, G.ankleFwd];
+  /**
+   * The knee of side k (1 = left, screen right) turned `phi` degrees about its hip-to-ankle axis: 0 = straight up,
+   * + = toward the athlete's left (screen right). The thigh and shin keep their lengths, so the knee keeps its bend.
+   */
+  const knee = (k: number, phi: number): V3 => {
+    const a = hip(k);
+    const c = ankle(k);
+    const ac = sub3(c, a);
+    const d = len3(ac);
+    const u = unit3(ac);
+    const cosA = (BODY.thigh * BODY.thigh + d * d - BODY.shin * BODY.shin) / (2 * BODY.thigh * d);
+    const sinA = Math.sqrt(Math.max(0, 1 - cosA * cosA));
+    const centre = add3(a, mul3(u, BODY.thigh * cosA));
+    const w1 = unit3(sub3([0, 1, 0], mul3(u, u[1])));
+    // Horizontal, at right angles to the axis, pointing toward +x.
+    let w2: V3 = unit3([u[2], 0, -u[0]]);
+    if (w2[0] < 0) w2 = mul3(w2, -1);
+    const r = BODY.thigh * sinA;
+    return add3(centre, add3(mul3(w1, r * Math.cos(phi * RAD)), mul3(w2, r * Math.sin(phi * RAD))));
   };
-  const back = (k: number): [V3, V3] => {
-    const knee = toward(hip(k), [k * 1, (KNEE_Y - H) / BODY.thigh, -0.1], BODY.thigh);
-    return [knee, toward(knee, [k * 0.1, (ANK_Y - KNEE_Y) / BODY.shin, -1], BODY.shin)];
+  // How far each knee turns from upright to rest on the mat, toward each side.
+  const down = (k: number, dir: 1 | -1): number => {
+    let lo = 0;
+    let hi = 150;
+    for (let i = 0; i < 50; i++) {
+      const m = (lo + hi) / 2;
+      if (knee(k, dir * m)[1] > G.kneeY) lo = m;
+      else hi = m;
+    }
+    return dir * lo;
   };
-  // Knees up in the middle, feet on the mat in front and a little wider than the hips.
-  const up = (k: number): [V3, V3] => {
-    const foot: V3 = [k * 30, ANK_Y, 36];
-    return limb3(hip(k), foot, BODY.thigh, BODY.shin, [k * 0.35, 1, 0.2]);
-  };
-  // Side A: right leg in front (k = -1 is the right side). A's legs per side, the middle, and B (mirror).
-  const legsA = { R: front(-1), L: back(1) };
-  const legsB = { R: back(-1), L: front(1) };
-  const legsM = { R: up(-1), L: up(1) };
-  // A quadratic path through the middle position at s = 0.5 (knees and feet travel on smooth arcs).
-  const via = (a: V3, m: V3, b: V3, s: number): V3 => {
-    const c = sub3(mul3(m, 2), mul3(add3(a, b), 0.5));
-    return add3(add3(mul3(a, (1 - s) * (1 - s)), mul3(c, 2 * s * (1 - s))), mul3(b, s * s));
-  };
-  const body = (s: number): Body3 => {
-    const [eL, hL] = arm(1);
-    const [eR, hR] = arm(-1);
-    const leg = (side: "L" | "R"): [V3, V3] => {
-      const k = side === "L" ? 1 : -1;
-      const ankle = via(legsA[side][1], legsM[side][1], legsB[side][1], s);
-      const kneeHint = via(legsA[side][0], legsM[side][0], legsB[side][0], s);
-      return limb3(hip(k), ankle, BODY.thigh, BODY.shin, sub3(kneeHint, lerp3(hip(k), ankle, 0.5)));
-    };
-    const [kL, aL] = leg("L");
-    const [kR, aR] = leg("R");
-    return { pelvis, neckBase, head, hipL: hip(1), hipR: hip(-1), kneeL: kL, kneeR: kR, ankleL: aL, ankleR: aR, shoulderL: sh(1), shoulderR: sh(-1), elbowL: eL, elbowR: eR, handL: hL, handR: hR };
-  };
-  const STEPS = 6;
-  const step = 2.4 / STEPS;
+  // Side A: knees over to the athlete's right (screen left): the right leg in front, turned out; the left leg behind,
+  // turned in. Side B is the mirror image.
+  const phiA = { L: down(1, -1), R: down(-1, -1) };
+  const phiB = { L: down(1, 1), R: down(-1, 1) };
+  const [eL, hL] = arm(1);
+  const [eR, hR] = arm(-1);
+  // Each knee on its circle; the shin runs from it to the planted ankle (exactly a shin's length).
+  const kL = knee(1, phiA.L + (phiB.L - phiA.L) * s);
+  const kR = knee(-1, phiA.R + (phiB.R - phiA.R) * s);
+  return { pelvis, neckBase, head, hipL: hip(1), hipR: hip(-1), kneeL: kL, kneeR: kR, ankleL: ankle(1), ankleR: ankle(-1), shoulderL: sh(1), shoulderR: sh(-1), elbowL: eL, elbowR: eR, handL: hL, handR: hR };
+}
+
+/**
+ * 90/90 hip switch, seen from in front and a little above. Sitting tall on the mat, the hands on the mat behind, the
+ * feet set wide in front. In each end position both knees are bent about 90° and lie on the mat to one side: the
+ * front leg turned out (outer thigh and shin on the mat, its shin across in front of the body) and the back leg turned
+ * in (inner knee on the mat, its shin out to the side and back). To switch, the feet stay where they are and both knees
+ * lift and swing over together to the other side, like windscreen wipers: each knee turns about the line from its hip to
+ * its ankle (so it keeps its bend), passing knees-up in the middle, and lowers into the mirror image. The pelvis stays on
+ * the mat and the torso stays upright.
+ */
+export function hip9090(id: string, label: string): MotionDef {
+  const cam: FloorCam = { pitch: 38 };
+  const body = hip9090Body;
+  // Hold each side, then swing over smoothly (sampled on a minimum-jerk path so the knees ease off and onto the mat).
+  const SWITCH = 1.6;
+  const STEPS = 32;
   const ks: Key3[] = [];
-  for (let i = 0; i < STEPS; i++) ks.push({ body: body(i / STEPS), dur: step, hold: i === 0 ? 0.9 : undefined });
-  for (let i = 0; i < STEPS; i++) ks.push({ body: body(1 - i / STEPS), dur: step, hold: i === 0 ? 0.9 : undefined });
+  for (const [from, to] of [
+    [0, 1],
+    [1, 0],
+  ] as const) {
+    for (let i = 0; i < STEPS; i++) {
+      const u = i / STEPS;
+      const ease = u * u * u * (10 - 15 * u + 6 * u * u);
+      ks.push({ body: body(from + (to - from) * ease), dur: SWITCH / STEPS, hold: i === 0 ? 1.1 : undefined });
+    }
+  }
   const origin: Vec = [0, 58];
   return {
     id,
