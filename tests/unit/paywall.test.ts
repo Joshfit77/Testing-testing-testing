@@ -21,31 +21,31 @@ const pkg = (id: string, price: string, extra: Partial<PaywallPackage["product"]
 });
 
 describe("in-app paywall: Free and Pro All Access only", () => {
-  const packages = [pkg("ngf_plus_monthly", "$11.99"), pkg("ngf_plus_yearly", "$99.99"), pkg("ngf_pro_monthly", "$19.99"), pkg("ngf_pro_yearly", "$149.99")];
+  const packages = [pkg("ngf_plus_monthly", "$11.99"), pkg("ngf_plus_yearly", "$99.99"), pkg("ngf_pro_monthly", "$17.99"), pkg("ngf_pro_yearly", "$119.99")];
 
   it("offers Pro All Access monthly and yearly, and never a Plus product", () => {
     const opts = paywallOptions(packages, ids);
-    expect(opts.month?.product.priceString).toBe("$19.99");
-    expect(opts.year?.product.priceString).toBe("$149.99");
+    expect(opts.month?.product.priceString).toBe("$17.99");
+    expect(opts.year?.product.priceString).toBe("$119.99");
     expect(JSON.stringify(opts)).not.toContain("ngf_plus");
   });
 
   it("shows the store's own localized prices, per-month equivalent and saving", () => {
     const opts = paywallOptions(
-      [pkg("ngf_pro_monthly", "19,99 €", { price: 19.99, currencyCode: "EUR" }), pkg("ngf_pro_yearly", "149,99 €", { price: 149.99, currencyCode: "EUR", pricePerMonthString: "12,49 €" })],
+      [pkg("ngf_pro_monthly", "17,99 €", { price: 17.99, currencyCode: "EUR" }), pkg("ngf_pro_yearly", "119,99 €", { price: 119.99, currencyCode: "EUR", pricePerMonthString: "9,99 €" })],
       ids,
     );
     const eur = storePrices(opts);
-    expect(eur).toMatchObject({ month: "19,99 €", year: "149,99 €", yearPerMonth: "12,49 €", savingsPercent: 37 });
-    // The money saved, in the store's currency: 12 × 19.99 − 149.99 = 89.89 (formatting follows the device locale).
-    expect(eur.yearSaving).toMatch(/89[.,]89/);
+    expect(eur).toMatchObject({ month: "17,99 €", year: "119,99 €", yearPerMonth: "9,99 €", savingsPercent: 44 });
+    // The money saved, in the store's currency: 12 × 17.99 − 119.99 = 95.89 (formatting follows the device locale).
+    expect(eur.yearSaving).toMatch(/95[.,]89/);
     expect(eur.yearSaving).toMatch(/€|EUR/);
     // Yearly not offered by the store yet: no yearly price and no made-up saving.
-    expect(storePrices(paywallOptions([pkg("ngf_pro_monthly", "$19.99", { price: 19.99 })], ids))).toEqual({ month: "$19.99", year: null, yearPerMonth: null, savingsPercent: null, yearSaving: null });
+    expect(storePrices(paywallOptions([pkg("ngf_pro_monthly", "$17.99", { price: 17.99 })], ids))).toEqual({ month: "$17.99", year: null, yearPerMonth: null, savingsPercent: null, yearSaving: null });
   });
 
   it("understands Google Play's subscription:base-plan ids and legacy Plus products", () => {
-    const opts = paywallOptions([pkg("ngf_pro_monthly:monthly", "$19.99")], ids);
+    const opts = paywallOptions([pkg("ngf_pro_monthly:monthly", "$17.99")], ids);
     expect(opts.month?.product.identifier).toBe("ngf_pro_monthly:monthly");
     expect(planForProduct("ngf_plus:monthly", ids)).toBe("plus");
     expect(planForProduct("ngf_pro_yearly", ids)).toBe("pro");
@@ -91,9 +91,9 @@ describe("default store product ids", () => {
   it("match the App Store products and Google Play's ngf_pro base plans, each to its own interval", async () => {
     const { storeProductIds } = await import("@/server/services/store-billing");
     const defaults = storeProductIds();
-    const store = [pkg("ngf_pro:monthly", "$19.99"), pkg("ngf_pro:yearly", "$149.99")];
+    const store = [pkg("ngf_pro:monthly", "$17.99"), pkg("ngf_pro:yearly", "$119.99")];
     expect(paywallOptions(store, defaults)).toMatchObject({ month: { product: { identifier: "ngf_pro:monthly" } }, year: { product: { identifier: "ngf_pro:yearly" } } });
-    const apple = [pkg("ngf_pro_monthly", "$19.99"), pkg("ngf_pro_yearly", "$149.99")];
+    const apple = [pkg("ngf_pro_monthly", "$17.99"), pkg("ngf_pro_yearly", "$119.99")];
     expect(paywallOptions(apple, defaults)).toMatchObject({ month: { product: { identifier: "ngf_pro_monthly" } }, year: { product: { identifier: "ngf_pro_yearly" } } });
     for (const id of ["ngf_pro:monthly", "ngf_pro_monthly"]) expect(intervalForProduct(id, defaults)).toBe("month");
     for (const id of ["ngf_pro:yearly", "ngf_pro_yearly"]) expect(intervalForProduct(id, defaults)).toBe("year");

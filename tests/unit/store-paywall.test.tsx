@@ -41,8 +41,8 @@ beforeEach(() => {
   connectStore.mockResolvedValue(store);
   store.packages.mockResolvedValue([
     pkg("ngf_plus_monthly", "$11.99"),
-    pkg("ngf_pro_monthly", "$19.99", { price: 19.99, currencyCode: "USD" }),
-    pkg("ngf_pro_yearly", "$149.99", { price: 149.99, currencyCode: "USD", pricePerMonthString: "$12.49" }),
+    pkg("ngf_pro_monthly", "$17.99", { price: 17.99, currencyCode: "USD" }),
+    pkg("ngf_pro_yearly", "$119.99", { price: 119.99, currencyCode: "USD", pricePerMonthString: "$9.99" }),
   ]);
   store.purchase.mockResolvedValue(undefined);
   store.restore.mockResolvedValue(undefined);
@@ -51,9 +51,9 @@ beforeEach(() => {
 describe("in-app membership screen", () => {
   it("shows only Free and Pro All Access with the store's prices, terms, Terms/Privacy and Restore", async () => {
     render(<StorePaywall {...props} />);
-    expect(await screen.findByRole("button", { name: "Start Pro All Access · $19.99 / month" })).toBeEnabled();
+    expect(await screen.findByRole("button", { name: "Start Pro All Access · $17.99 / month" })).toBeEnabled();
     expect(screen.getByTestId("plan-free")).toHaveTextContent("$0");
-    expect(screen.getByTestId("pro-price")).toHaveTextContent("$19.99 / month");
+    expect(screen.getByTestId("pro-price")).toHaveTextContent("$17.99 / month");
     expect(screen.queryByText("$11.99")).not.toBeInTheDocument();
     expect(screen.queryByText(/^Plus$/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Restore purchases" })).toBeEnabled();
@@ -67,18 +67,18 @@ describe("in-app membership screen", () => {
   it("switches to yearly with the per-month equivalent and the saving", async () => {
     render(<StorePaywall {...props} />);
     fireEvent.click(await screen.findByRole("radio", { name: /Yearly|Annual/ }));
-    expect(screen.getByRole("radio", { name: /Save 37%/ })).toHaveAttribute("aria-checked", "true");
-    expect(screen.getByTestId("pro-price")).toHaveTextContent("$149.99 / year");
-    expect(screen.getByText("About $12.49 a month, billed yearly.")).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Save 44%/ })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByTestId("pro-price")).toHaveTextContent("$119.99 / year");
+    expect(screen.getByText("About $9.99 a month, billed yearly.")).toBeInTheDocument();
     sync.mockResolvedValue({ ok: true, plan: "pro" });
-    fireEvent.click(screen.getByRole("button", { name: "Start Pro All Access · $149.99 / year" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start Pro All Access · $119.99 / year" }));
     await waitFor(() => expect(store.purchase).toHaveBeenCalledWith(expect.objectContaining({ identifier: "ngf_pro_yearly" }), { oldProductId: undefined }));
   });
 
   it("buys, then asks the server for the membership", async () => {
     sync.mockResolvedValue({ ok: true, plan: "pro" });
     render(<StorePaywall {...props} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Start Pro All Access · $19.99 / month" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Start Pro All Access · $17.99 / month" }));
     expect(await screen.findByText("Welcome to Pro All Access. Thank you!")).toBeInTheDocument();
     expect(store.purchase).toHaveBeenCalledWith(expect.objectContaining({ identifier: "ngf_pro_monthly" }), { oldProductId: undefined });
     expect(sync).toHaveBeenCalledTimes(1);
@@ -88,7 +88,7 @@ describe("in-app membership screen", () => {
   it("never claims success when the server hasn't confirmed the purchase", async () => {
     sync.mockResolvedValue({ ok: true, plan: "free" });
     render(<StorePaywall {...props} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Start Pro All Access · $19.99 / month" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Start Pro All Access · $17.99 / month" }));
     expect(await screen.findByText(/Purchase received. Your membership will update in a moment/)).toBeInTheDocument();
     expect(screen.queryByText(/Welcome to Pro/)).not.toBeInTheDocument();
   });
@@ -97,12 +97,12 @@ describe("in-app membership screen", () => {
     // The store took the payment; then the server call fails (connection lost) or the server reports an error.
     sync.mockRejectedValueOnce(new Error("Failed to fetch"));
     render(<StorePaywall {...props} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Start Pro All Access · $19.99 / month" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Start Pro All Access · $17.99 / month" }));
     expect(await screen.findByText(/Purchase received. Your membership will update shortly; if it hasn't in a few minutes, tap Restore purchases/)).toBeInTheDocument();
     expect(screen.queryByText(/haven't been charged/)).not.toBeInTheDocument();
     expect(refresh).toHaveBeenCalled();
     sync.mockResolvedValueOnce({ ok: false, error: "Too many requests." });
-    fireEvent.click(screen.getByRole("button", { name: "Start Pro All Access · $19.99 / month" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start Pro All Access · $17.99 / month" }));
     expect(await screen.findByText(/Purchase received. Your membership will update shortly/)).toBeInTheDocument();
     expect(screen.queryByText(/haven't been charged/)).not.toBeInTheDocument();
   });
@@ -110,11 +110,11 @@ describe("in-app membership screen", () => {
   it("says plainly when a purchase is cancelled or pending", async () => {
     store.purchase.mockRejectedValueOnce({ code: "1", userCancelled: true });
     render(<StorePaywall {...props} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Start Pro All Access · $19.99 / month" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Start Pro All Access · $17.99 / month" }));
     expect(await screen.findByText("Purchase cancelled. You haven't been charged.")).toBeInTheDocument();
     expect(sync).not.toHaveBeenCalled();
     store.purchase.mockRejectedValueOnce({ code: "20" });
-    fireEvent.click(screen.getByRole("button", { name: "Start Pro All Access · $19.99 / month" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start Pro All Access · $17.99 / month" }));
     expect(await screen.findByText(/waiting for approval/)).toBeInTheDocument();
   });
 
@@ -130,10 +130,10 @@ describe("in-app membership screen", () => {
 
   it("upgrades a legacy Plus subscription, naming the old product for Google Play, and offers manage", async () => {
     sync.mockResolvedValue({ ok: true, plan: "pro" });
-    store.packages.mockResolvedValue([pkg("ngf_plus:monthly", "$11.99"), pkg("ngf_pro:monthly", "$19.99")]);
+    store.packages.mockResolvedValue([pkg("ngf_plus:monthly", "$11.99"), pkg("ngf_pro:monthly", "$17.99")]);
     const ids = { plus: { month: ["ngf_plus"], year: [] }, pro: { month: ["ngf_pro"], year: [] } };
     render(<StorePaywall {...props} platform="android" currentPlan="plus" source="play_store" currentProductId="ngf_plus:monthly" currentInterval="month" productIds={ids} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Upgrade to Pro All Access · $19.99 / month" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Upgrade to Pro All Access · $17.99 / month" }));
     await waitFor(() => expect(store.purchase).toHaveBeenCalledWith(expect.objectContaining({ identifier: "ngf_pro:monthly" }), { oldProductId: "ngf_plus:monthly" }));
     expect(screen.getByRole("button", { name: "Manage subscription" })).toBeInTheDocument();
   });
@@ -142,7 +142,7 @@ describe("in-app membership screen", () => {
     render(<StorePaywall {...props} currentPlan="pro" source="app_store" currentProductId="ngf_pro_monthly" currentInterval="month" />);
     expect(await screen.findByText("This is your current membership.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("radio", { name: /Yearly|Annual/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Switch to yearly · $149.99" }));
+    fireEvent.click(screen.getByRole("button", { name: "Switch to yearly · $119.99" }));
     await waitFor(() => expect(store.purchase).toHaveBeenCalledWith(expect.objectContaining({ identifier: "ngf_pro_yearly" }), { oldProductId: "ngf_pro_monthly" }));
   });
 

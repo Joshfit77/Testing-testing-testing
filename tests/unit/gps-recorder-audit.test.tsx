@@ -128,7 +128,7 @@ describe("permission and signal states", () => {
   });
 
   it("the Free plan sees no Start button and no location request, only the Pro notice and the manual-entry link", async () => {
-    render(<GpsRecorder {...props} canRecord={false} proPriceLine="$19.99/month or $149.99/year" />);
+    render(<GpsRecorder {...props} canRecord={false} proPriceLine="$17.99/month or $119.99/year" />);
     expect(await screen.findByTestId("gps-locked")).toHaveTextContent(/Pro All Access/);
     expect(screen.queryByTestId("gps-start")).toBeNull();
     expect(screen.getByRole("link", { name: "See Pro All Access" })).toHaveAttribute("href", "/profile/billing");
@@ -136,7 +136,7 @@ describe("permission and signal states", () => {
     // The free way comes first, the run/walk picker (a choice they can't use) is gone, and the price is said once.
     expect(screen.getByTestId("gps-log-by-hand").compareDocumentPosition(screen.getByTestId("gps-locked")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.queryByRole("radiogroup", { name: "Activity" })).toBeNull();
-    expect(screen.getByTestId("gps-locked")).toHaveTextContent("$19.99/month or $149.99/year");
+    expect(screen.getByTestId("gps-locked")).toHaveTextContent("$17.99/month or $119.99/year");
     expect(location.watchLocation).not.toHaveBeenCalled();
   });
 });

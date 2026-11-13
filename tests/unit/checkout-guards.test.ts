@@ -3,11 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Checkout guards from the 2026-11-12 independent billing review:
- * - the price check uses the owner-approved price fixed in code ($19.99), so an environment override of the display
+ * - the price check uses the owner-approved price fixed in code ($17.99), so an environment override of the display
  *   price can't make an unapproved Stripe price chargeable;
  * - a checkout left open in another tab is expired before a new one is created, so a member can't pay twice.
  */
-const state = { unitAmount: 1999, open: [{ id: "cs_old_1" }, { id: "cs_old_2" }] as { id: string }[] };
+const state = { unitAmount: 1799, open: [{ id: "cs_old_1" }, { id: "cs_old_2" }] as { id: string }[] };
 const expire = vi.fn(async (id: string) => ({ id }));
 const create = vi.fn(async () => ({ url: "https://checkout.stripe.com/c/pay/cs_new" }));
 vi.mock("stripe", () => ({
@@ -39,7 +39,7 @@ beforeEach(() => {
 
 describe("checkout guards", () => {
   it("expires every open checkout of the customer before creating the new one", async () => {
-    state.unitAmount = 1999;
+    state.unitAmount = 1799;
     const { createCheckoutSession } = await import("@/server/services/billing");
     await expect(createCheckoutSession("u1", "a@example.test", "pro", "month")).resolves.toContain("checkout.stripe.com");
     expect(expire.mock.calls.map((c) => c[0])).toEqual(["cs_old_1", "cs_old_2"]);
@@ -47,7 +47,7 @@ describe("checkout guards", () => {
     expect(expire.mock.invocationCallOrder.at(-1)!).toBeLessThan(create.mock.invocationCallOrder[0]!);
   });
 
-  it("refuses a Stripe price other than $19.99 even when the display price is overridden to match it", async () => {
+  it("refuses a Stripe price other than $17.99 even when the display price is overridden to match it", async () => {
     state.unitAmount = 2499;
     process.env.PLAN_PRO_PRICE_CENTS = "2499";
     const { createCheckoutSession, PriceMismatchError } = await import("@/server/services/billing");

@@ -28,7 +28,7 @@ describe("legal texts and their fingerprints", () => {
   });
 
   it("states the price and period in the auto-renewal consent", () => {
-    expect(autoRenewalText("$19.99", "month")).toBe("I agree that Pro All Access renews automatically at $19.99 per month until I cancel, and that I can cancel any time in Manage billing.");
-    expect(autoRenewalText("$149.99", "year")).toMatch(/\$149\.99 per year/);
+    expect(autoRenewalText("$17.99", "month")).toBe("I agree that Pro All Access renews automatically at $17.99 per month until I cancel, and that I can cancel any time in Manage billing.");
+    expect(autoRenewalText("$119.99", "year")).toMatch(/\$119\.99 per year/);
   });
 });

@@ -148,7 +148,7 @@ export class PriceMismatchError extends Error {
 }
 
 /**
- * The owner-approved price ($19.99 / $149.99), fixed in code. An environment override of the display price
+ * The owner-approved price ($17.99 / $119.99), fixed in code. An environment override of the display price
  * (PLAN_PRO_PRICE_CENTS) can't make an unapproved Stripe price pass: changing what members pay is a code change.
  */
 function approvedCents(interval: BillingInterval): number {

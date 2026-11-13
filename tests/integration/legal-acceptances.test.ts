@@ -90,7 +90,7 @@ describe.skipIf(!available)("legal acceptance records", () => {
 
   it("records auto-renewal consent from checkout with what was agreed to, only from checkout and only with details", async () => {
     const { recordAcceptances } = await import("@/server/legal");
-    const details = autoRenewalText("$19.99", "month");
+    const details = autoRenewalText("$17.99", "month");
     await recordAcceptances(member.id, [{ document: "auto_renewal", version: AUTO_RENEWAL_CONSENT.version, sha256: AUTO_RENEWAL_CONSENT.sha256, details }], "checkout");
     const { data } = await member.client.from("legal_acceptances").select("details, source").eq("document", "auto_renewal");
     expect(data).toEqual([{ details, source: "checkout" }]);

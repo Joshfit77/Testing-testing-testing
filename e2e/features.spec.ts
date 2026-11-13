@@ -113,11 +113,11 @@ test.describe("feature access, subscriptions and core sections", () => {
     await expect(page.getByTestId("faith-free")).toBeInViewport();
     // Only Free and Pro All Access are offered, at the approved prices; Plus is never offered.
     await expect(page.getByTestId("plan-free")).toContainText("$0");
-    await expect(page.getByTestId("pro-price")).toHaveText("$19.99 / month");
+    await expect(page.getByTestId("pro-price")).toHaveText("$17.99 / month");
     await page.getByRole("radio", { name: /Yearly|Annual/ }).click();
-    await expect(page.getByTestId("pro-price")).toHaveText("$149.99 / year");
-    await expect(page.getByText("About $12.49 a month, billed yearly.")).toBeVisible();
-    await expect(page.getByRole("radio", { name: /Save 37%/ })).toBeVisible();
+    await expect(page.getByTestId("pro-price")).toHaveText("$119.99 / year");
+    await expect(page.getByText("About $9.99 a month, billed yearly.")).toBeVisible();
+    await expect(page.getByRole("radio", { name: /Save 44%/ })).toBeVisible();
     // The full comparison is folded under "Compare Free and Pro".
     await page.getByText("Compare Free and Pro").click();
     await expect(page.getByText("150 requests / month")).toBeVisible();

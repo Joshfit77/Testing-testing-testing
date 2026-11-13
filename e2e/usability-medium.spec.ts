@@ -8,7 +8,7 @@ import { answerOnboarding, completeOnboarding, signUpAndConfirm, uniqueEmail } f
  * - M3: right after logging a set the rest countdown and Skip rest are in view.
  * - M5: the offline banner names what is kept offline and says food and water need a connection.
  * - M6: the weight and reps −/+ buttons are at least 44 × 44 px, and the inputs stay usable at 320 px.
- * - B7: the membership screen shows the yearly saving in dollars ($89.89, 37%) and offers Restore purchases.
+ * - B7: the membership screen shows the yearly saving in dollars ($95.89, 44%) and offers Restore purchases.
  */
 
 /** Where `testId` sits on screen, and whether it is wholly visible between the sticky header and the bottom tab bar, in px. */
@@ -127,10 +127,10 @@ test.describe("Medium usability fixes", () => {
     await signUpAndConfirm(page, uniqueEmail());
     await completeOnboarding(page);
     await page.goto("/profile/billing");
-    await expect(page.getByTestId("interval-month")).toContainText("$19.99");
-    await expect(page.getByTestId("interval-year")).toContainText("$149.99");
-    await expect(page.getByTestId("year-saving-badge")).toHaveText("Save 37%");
-    await expect(page.getByTestId("year-saving")).toHaveText("$89.89 less than 12 monthly payments");
+    await expect(page.getByTestId("interval-month")).toContainText("$17.99");
+    await expect(page.getByTestId("interval-year")).toContainText("$119.99");
+    await expect(page.getByTestId("year-saving-badge")).toHaveText("Save 44%");
+    await expect(page.getByTestId("year-saving")).toHaveText("$95.89 less than 12 monthly payments");
     await expect(page.getByTestId("web-restore")).toBeVisible();
   });
 });

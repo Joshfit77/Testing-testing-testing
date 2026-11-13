@@ -32,18 +32,18 @@ describe("plans & entitlements", () => {
     expect(plans.plus.purchasable).toBe(false);
     expect(plans.pro.purchasable).toBe(true);
     expect(plans.pro.name).toBe("Pro All Access");
-    expect(APPROVED_PRO_PRICE_CENTS).toEqual({ month: 1999, year: 14999 });
+    expect(APPROVED_PRO_PRICE_CENTS).toEqual({ month: 1799, year: 11999 });
     expect(plans.free.priceCents).toBe(0);
-    expect(plans.pro.priceCents).toBe(1999);
-    expect(plans.pro.yearlyPriceCents).toBe(14999);
-    expect(formatPrice(plans.pro.priceCents)).toBe("$19.99");
-    expect(formatPrice(plans.pro.yearlyPriceCents!)).toBe("$149.99");
-    // Yearly saves about 37% against twelve monthly payments.
-    expect(yearlySavingsPercent(1999, 14999)).toBe(37);
-    // B7: the saving in dollars, from the approved prices: 12 × $19.99 − $149.99 = $89.89.
-    expect(yearlySavingsCents(1999, 14999)).toBe(8989);
-    expect(yearlySavingsCents(1999, 0)).toBe(0);
-    expect(yearlySavingsCents(1999, 30000)).toBe(0);
+    expect(plans.pro.priceCents).toBe(1799);
+    expect(plans.pro.yearlyPriceCents).toBe(11999);
+    expect(formatPrice(plans.pro.priceCents)).toBe("$17.99");
+    expect(formatPrice(plans.pro.yearlyPriceCents!)).toBe("$119.99");
+    // Yearly saves about 44% against twelve monthly payments.
+    expect(yearlySavingsPercent(1799, 11999)).toBe(44);
+    // B7: the saving in dollars, from the approved prices: 12 × $17.99 − $119.99 = $95.89.
+    expect(yearlySavingsCents(1799, 11999)).toBe(9589);
+    expect(yearlySavingsCents(1799, 0)).toBe(0);
+    expect(yearlySavingsCents(1799, 30000)).toBe(0);
     expect(plans.free.yearlyPriceCents).toBeUndefined();
     expect(plans.plus.yearlyPriceCents).toBeUndefined();
   });

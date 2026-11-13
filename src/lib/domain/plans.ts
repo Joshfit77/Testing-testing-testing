@@ -12,7 +12,7 @@ import type { Plan } from "./types";
  *                     unlimited templates, scheduling, live GPS run and walk recording with route maps and splits,
  *                     recipes, meal planning and grocery lists, food comparisons and filters, advanced sleep and
  *                     recovery analytics, Body Scan, progress-photo comparisons, advanced analytics and the AI coach
- *                     (a monthly allowance). Monthly ($19.99) and yearly ($149.99) unlock exactly the same features.
+ *                     (a monthly allowance). Monthly ($17.99) and yearly ($119.99) unlock exactly the same features.
  *
  *   Plus (legacy)   — no longer sold. Kept only so that members who subscribed to Plus before the change keep exactly
  *                     the access they paid for (including live GPS, which every plan had then) until their
@@ -93,11 +93,14 @@ function envInt(name: string, fallback: number): number {
 }
 
 /**
- * Approved Pro All Access prices (US cents), owner decision of 2026-10-26. These are the prices shown when the
- * store or Stripe price can't be read; the in-app paywall always shows the store's own localized price, and web
+ * Approved Pro All Access prices (US cents): $17.99 a month and $119.99 a year (owner pricing proposal of 2026-11-13,
+ * replacing $19.99 / $149.99 from 2026-10-26). Changed in code and test configuration only: the live App Store, Google
+ * Play and Stripe products still need the owner's approval to change, and until the Stripe price matches, web checkout
+ * refuses to start (see approvedCents in src/server/services/billing.ts) rather than charge a different amount.
+ * These are the prices shown when the store or Stripe price can't be read; the in-app paywall always shows the store's own localized price, and web
  * checkout shows the amount of the configured Stripe price (see src/server/services/billing.ts).
  */
-export const APPROVED_PRO_PRICE_CENTS = { month: 1999, year: 14999 } as const;
+export const APPROVED_PRO_PRICE_CENTS = { month: 1799, year: 11999 } as const;
 
 /** Paid plans offered to new customers. */
 export const PURCHASABLE_PLANS = ["pro"] as const;
@@ -280,7 +283,7 @@ export function formatPrice(cents: number): string {
 }
 
 /** Percentage saved by paying yearly instead of 12 monthly payments (rounded down). */
-/** What paying yearly saves over 12 monthly payments, in cents (0 when it saves nothing). $19.99 / $149.99 → 8989. */
+/** What paying yearly saves over 12 monthly payments, in cents (0 when it saves nothing). $17.99 / $119.99 → 9589. */
 export function yearlySavingsCents(monthlyCents: number, yearlyCents: number): number {
   if (monthlyCents <= 0 || yearlyCents <= 0) return 0;
   return Math.max(0, monthlyCents * 12 - yearlyCents);

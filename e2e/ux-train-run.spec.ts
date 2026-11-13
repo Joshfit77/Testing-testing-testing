@@ -38,7 +38,7 @@ test.describe("Train & Run, first-time fixes", () => {
     await expect(byHand).toHaveAttribute("href", "/run?tab=log");
     expect((await byHand.boundingBox())!.height).toBeGreaterThanOrEqual(52);
     const locked = page.getByTestId("gps-locked");
-    await expect(locked).toContainText("$19.99/month or $149.99/year");
+    await expect(locked).toContainText("$17.99/month or $119.99/year");
     expect((await byHand.boundingBox())!.y).toBeLessThan((await locked.boundingBox())!.y);
     await expect(page.getByRole("radiogroup", { name: "Activity" })).toHaveCount(0);
     await expect(page.getByTestId("gps-start")).toHaveCount(0);

@@ -43,7 +43,7 @@ export const serverEnv = {
   anthropicApiKey: demoModeOn() ? "" : (process.env.ANTHROPIC_API_KEY ?? ""),
   stripeSecretKey: stripeSecretKey(process.env.STRIPE_SECRET_KEY),
   stripeWebhookSecret: storeSecret(process.env.STRIPE_WEBHOOK_SECRET),
-  /** Pro All Access: $19.99 a month and $149.99 a year (the only prices sold to new customers). */
+  /** Pro All Access: $17.99 a month and $119.99 a year (the only prices sold to new customers). */
   stripePricePro: process.env.STRIPE_PRICE_PRO ?? "",
   stripePriceProYearly: process.env.STRIPE_PRICE_PRO_YEARLY ?? "",
   /** Plus prices existing Plus subscriptions are on. Plus isn't sold any more; these only map renewals to Plus. */

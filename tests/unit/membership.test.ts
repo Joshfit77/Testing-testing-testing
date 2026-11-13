@@ -26,7 +26,7 @@ describe("membership comparison", () => {
 
   it("states the AI allowance and the approved prices", () => {
     expect(rows.find((r) => r.label === "AI fitness coach")?.pro).toBe("150 requests / month");
-    expect(proPriceSummary()).toEqual({ monthCents: 1999, yearCents: 14999, savingsPercent: 37 });
+    expect(proPriceSummary()).toEqual({ monthCents: 1799, yearCents: 11999, savingsPercent: 44 });
   });
 
   it("the database's live-GPS rule uses the same plan rank as the app (legacy Plus and Pro)", () => {

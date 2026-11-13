@@ -81,9 +81,9 @@ for (const size of sizes) {
       await page.goto("/profile/billing");
       await expect(page.getByTestId("demo-purchases-off")).toBeVisible();
       await expect(page.getByTestId("plan-free")).toContainText("$0");
-      await expect(page.getByTestId("pro-price")).toContainText("$19.99");
+      await expect(page.getByTestId("pro-price")).toContainText("$17.99");
       await page.getByTestId("interval-year").click();
-      await expect(page.getByTestId("pro-price")).toContainText("$149.99");
+      await expect(page.getByTestId("pro-price")).toContainText("$119.99");
       await fitsWidth(page);
 
       // The server-held switch: as Free, Pro can't be bought (checkout is off). Free locks live GPS, Pro unlocks
