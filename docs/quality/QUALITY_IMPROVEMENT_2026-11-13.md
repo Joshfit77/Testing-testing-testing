@@ -94,22 +94,42 @@ Done by a sub-agent; merged in 2c21dac. Details are in `docs/programs/PROGRAM_LI
 
 ## Validation (actual results)
 
+Final run, after every merge (animation, program library, bench dip) and before the walkthrough was recorded. App code
+as of 95f8458; the later commits change tests only.
+
 | Check | Result |
 |---|---|
-| `tsc --noEmit`, eslint on changed files | Clean |
-| Unit suite | 4,453 of 4,454 passed. The one failure was a 5 s timeout in `exercise-motion-quality` under heavy CPU load from the animation renders; it passes alone (13/13 and 45/45 with the new drills). |
+| `tsc --noEmit`, eslint | Clean |
+| Unit suite | 4,501 of 4,501 passed (239 files) |
 | Integration suite | 432 passed, 1 skipped, 0 failed |
-| Production e2e (changed areas: memberships, fast logging, program library, training, workout data preservation) | 12 passed, 0 failed |
-| Demo e2e (`demo.spec`, `ux-train-run`) | 20 passed and 3 failed (see below). The new-member flow failed in the full run and passed on its own re-run. |
+| Production build | Built |
+| Production e2e (whole suite) | 144 passed, 0 failed: 135 in the full run, plus `body-map` (updated, see below) and the 8 tests that need the Open Food Facts stand-in or no AI provider, run separately with that set-up |
+| Demo e2e (all demo-only specs) | 57 passed, 0 failed, 1 not run (the sleep-stage label test skips itself: the sample's latest night has no stage data) |
+| Opt-in audits (device matrix, button sweep) | Not run (40 tests) |
 | Real-app checks (`fixes.mjs`, 16 checks on the demo server) | 16 passed, 0 page errors |
-| Walkthrough (16 sections) | 16/16 ok, 0 console errors |
+| Walkthrough (16 sections) | 16/16 ok, 0 errors |
+
+Two tests were changed, not the app:
+
+- `e2e/body-map.spec.ts` still expected "Not assessed" until a table was picked, which was bug 5. It now expects the
+  table that matches the member's sex.
+- `e2e/achievement-progress.spec.ts` assumed today's program day starts with the bench press. With this week logged,
+  today is the deadlift day. It now logs the bench press in a blank workout; the celebration and page-width checks are
+  unchanged.
+
+## Fixed after the first validation run
+
+1. **Bench Dip "Demo soon".** Redrawn (hands on the bench edge behind the hips, hips in front of the bench and lowering
+   below its top). There are no placeholders left. Regression test in `tests/unit/exercise-mobility-drills.test.ts`.
+   It still needs a coach's review.
+2. **Program library length.** The library lists 2 programs per category with See all (12.95 iPhone screens before).
+   The `ux-train-run` demo test passes.
 
 ## Open problems (not fixed)
 
-1. **Demo e2e: exercise library.** "Bench Dip" still shows "Demo soon": it has no animation yet (a placeholder since it
-   was added in 2d99a3f). The test that forbids placeholders in the list fails.
-2. **Demo e2e: program library length.** The library page measures 12.95 iPhone-15 screens against a limit of 12. It
-   was not confirmed whether this is new.
-3. **Live AI quality, accuracy and personalization: not tested** (no key).
-4. **Map tiles are off.** Turning them on is an owner decision: privacy policy update, provider terms and attribution.
-5. **Workout header.** The workout name still truncates beside three header buttons.
+1. **Live AI quality, accuracy and personalization: not tested** (no key).
+2. **Map tiles are off.** Turning them on is an owner decision: privacy policy update, provider terms and attribution.
+3. **Workout header.** The workout name still truncates beside three header buttons.
+4. **Professional review.** 64 exercise animations are flagged for a coach or physiotherapist
+   (`docs/animation/ANIMATION_AUDIT.md`). Every program is still marked "not yet reviewed".
+5. **Dense explanatory copy** on many screens was not reduced in this pass.
