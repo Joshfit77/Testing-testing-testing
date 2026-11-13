@@ -1,12 +1,12 @@
 import type { Difficulty, Equipment, Plan, PrimaryGoal, ProgramType } from "@/lib/domain/types";
-import {
 import { CATALOG_PROGRAMS } from "./program-catalog";
+import {
   STANDARD_WARMUP,
   STANDARD_COOLDOWN,
   LOW_IMPACT_WARMUP,
   CONDITIONING_WARMUP,
   SPRINT_WARMUP,
-  BuildEx,
+  type BuildEx,
   R,
   T,
   joinNotes,
@@ -14,8 +14,8 @@ import { CATALOG_PROGRAMS } from "./program-catalog";
   weeksOf,
   pct,
   repeatWeeks,
-  DayPlan,
-  BlockWeek,
+  type DayPlan,
+  type BlockWeek,
   hypertrophyWeeks,
   HYPERTROPHY_6,
   HYPERTROPHY_8,
