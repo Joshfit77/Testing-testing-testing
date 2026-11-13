@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { isListedProgram } from "@/data/program-retirements";
 import { canAccessTier, planFromEntitlement } from "@/lib/domain/plans";
 import type { Plan } from "@/lib/domain/types";
 import { authenticateRequest } from "@/server/api-auth";
@@ -16,5 +17,6 @@ export async function GET(request: NextRequest) {
   ]);
   if (error) return apiError(500, "server_error");
   const plan = planFromEntitlement(ent as { plan: string; valid_until: string | null } | null);
-  return apiOk((programs ?? []).map((p) => ({ ...p, locked: !canAccessTier(plan, p.tier as Plan) })));
+  // Retired programs stay published for the members who started them but aren't listed (as in the app).
+  return apiOk((programs ?? []).filter((p) => isListedProgram(p.slug)).map((p) => ({ ...p, locked: !canAccessTier(plan, p.tier as Plan) })));
 }

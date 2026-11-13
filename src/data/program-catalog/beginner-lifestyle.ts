@@ -117,7 +117,7 @@ const FIRST_30_WEEKS = first30Weeks();
 const FIRST_30_DAYS_PROGRAM: ProgramSeed = {
   slug: "first-30-days-in-the-gym",
   name: "First 30 Days in the Gym",
-  summary: "A calm four-week introduction to a commercial gym: machines and dumbbells, two easy sets to start, technique before load.",
+  summary: "For your first month in a gym: a calm introduction to machines and dumbbells — two easy sets to start, technique before load.",
   description:
     "For complete beginners who feel unsure where to start in a gym. Goal: learn how the machines, dumbbells and cardio equipment work, practise the " +
     "basic squat, hinge, push and pull patterns, and build a three-day habit. Volume and effort rise very gradually — week 1 is two sets of each " +
@@ -237,7 +237,7 @@ const FOUNDATIONS_WEEKS = foundationsWeeks();
 const FULL_BODY_FOUNDATIONS_PROGRAM: ProgramSeed = {
   slug: "full-body-fitness-foundations",
   name: "Full Body Fitness Foundations",
-  summary: "Eight weeks of three full-body strength sessions, each ending with a short conditioning finisher — dumbbells, machines and bodyweight.",
+  summary: "For beginners who want all-round fitness: three full-body strength sessions a week on dumbbells and machines, each ending with a short conditioning finisher.",
   description:
     "Goal: build all-round strength and fitness in one plan. Each session trains a squat or leg press, a hinge, a push and a pull (every major muscle " +
     "twice a week, in line with ACSM guidance), then finishes with 4–7 minutes of bike, rower or bodyweight intervals. For beginners who know their way " +
@@ -381,7 +381,7 @@ const FAT_LOSS_WEEKS = fatLossWeeks();
 const STRENGTH_FOR_FAT_LOSS_PROGRAM: ProgramSeed = {
   slug: "strength-for-fat-loss",
   name: "Strength for Fat-Loss Goals",
-  summary: "Twelve weeks of four strength-first sessions a week to keep your muscle while you diet, each with low-impact conditioning.",
+  summary: "For beginners dieting who want to keep their muscle: four strength-first gym sessions a week, each with low-impact conditioning.",
   description:
     "Goal: hold on to — or build — muscle and strength while you lose body fat. Fat loss itself comes from a moderate, sustainable calorie deficit: " +
     "use your app's calorie and protein targets and don't cut further for this program. Heavy-enough strength work is the main signal to keep muscle " +
@@ -520,7 +520,7 @@ const BUSY_WEEKS = busyWeeks();
 const BUSY_SCHEDULE_PROGRAM: ProgramSeed = {
   slug: "busy-schedule-30-minute-workouts",
   name: "Busy Schedule: 30-Minute Workouts",
-  summary: "Three dumbbell sessions a week that fit in 30 minutes including the warm-up — supersets and a short finisher circuit.",
+  summary: "For busy weeks with a pair of dumbbells: three sessions that fit in 30 minutes including the warm-up — supersets and a short finisher circuit.",
   description:
     "Goal: real full-body strength and fitness in the time you actually have. Every session — warm-up, two dumbbell supersets, a short finisher circuit " +
     "and a minute of cool-down — fits in 30 minutes. Pairing exercises that don't compete (a squat with a press, a hinge with a row) lets one muscle " +
@@ -661,7 +661,7 @@ const AGING_WEEKS = agingWeeks();
 const ACTIVE_AGING_PROGRAM: ProgramSeed = {
   slug: "active-aging-strength-and-balance",
   name: "Active Aging Strength and Balance",
-  summary: "Twelve weeks of low-impact strength with balance practice every session and sit-to-stand progressions from supported to loaded.",
+  summary: "For older adults starting out: three low-impact sessions a week with balance practice every time and sit-to-stand progressions from supported to loaded.",
   description:
     "Goal: stronger legs, steadier balance and easier everyday tasks — getting out of a chair, climbing stairs, carrying shopping. For older adults " +
     "and anyone returning to exercise who wants a gentle, progressive start. WHO guidelines suggest adults 65+ do balance and strength work on three or " +

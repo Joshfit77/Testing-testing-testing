@@ -192,7 +192,7 @@ async function seedTraining(userId: string) {
     current_day: 1,
     started_at: at(dayOffset(-15), 6, 0).toISOString(),
   });
-  const foundations = await idsBySlug("training_programs", ["foundations-full-body", "5k-training"]);
+  const foundations = await idsBySlug("training_programs", ["dumbbell-home-strength", "5k-training"]);
   await insert("user_programs", [...foundations.values()].map((program_id) => ({ user_id: userId, program_id, status: "saved" })));
 
   // Mon/Tue/Thu/Sat, eight weeks back up to yesterday, a few missed days long ago so consistency looks real. This

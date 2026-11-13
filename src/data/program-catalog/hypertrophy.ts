@@ -859,7 +859,7 @@ export const CATALOG_HYPERTROPHY: ProgramSeed[] = [
   {
     slug: "beginner-muscle-builder",
     name: "Beginner Muscle Builder",
-    summary: "Three full-body sessions a week on machines, dumbbells and cables, plus squats and Romanian deadlifts — your first eight weeks of building muscle.",
+    summary: "For beginners whose main goal is muscle: three full-body sessions a week on machines, dumbbells and cables, plus squats and Romanian deadlifts.",
     description:
       "Goal: build muscle and learn the core gym movements with a plan that is simple to follow. Each full-body session trains every major muscle " +
       "with about 9–11 hard sets a week for most major muscles to start, rising to about 11–15 by the end, because weekly hard sets taken close to failure are the main " +
@@ -903,7 +903,7 @@ export const CATALOG_HYPERTROPHY: ProgramSeed[] = [
   {
     slug: "upper-lower-hypertrophy-12-week",
     name: "Upper/Lower Hypertrophy",
-    summary: "Four sessions a week for 12 weeks: three mesocycles of three loading weeks and a deload, with new exercise variations each mesocycle.",
+    summary: "For intermediates who want size on four days: an upper/lower split in three 4-week mesocycles, with new exercise variations each one.",
     description:
       "Goal: steady muscle gain for lifters past the beginner stage. Each muscle is trained twice a week on an upper/lower split with roughly 9–16 hard sets " +
       "per major muscle in the first week of each mesocycle, building to about 12–20 by its third week as reps in reserve fall from about 3 to 1. Every " +
@@ -950,8 +950,8 @@ export const CATALOG_HYPERTROPHY: ProgramSeed[] = [
   },
   {
     slug: "push-pull-legs-12-week",
-    name: "Push/Pull/Legs",
-    summary: "Push, pull and legs twice a week for 12 weeks: two six-week blocks that build volume and end in deloads, with a 3-day option.",
+    name: "Push/Pull/Legs: Hypertrophy",
+    summary: "For intermediates on six days with muscle as the main goal: two 6-week volume blocks, each ending in a deload, with a 3-day option.",
     description:
       "Goal: muscle gain with high frequency. Each muscle is trained twice a week across six focused sessions with about 10–17 hard sets per major muscle " +
       "in week 1, rising to about 14–21 by each block's peak week. Block 2 rotates the main variations (incline-led push days, chin-ups, front squats and " +
@@ -1000,7 +1000,7 @@ export const CATALOG_HYPERTROPHY: ProgramSeed[] = [
   {
     slug: "advanced-bodybuilding-5-day",
     name: "Advanced Bodybuilding",
-    summary: "Five days a week for experienced lifters: three four-week blocks, each prioritising different muscles — back and delts, then chest and arms, then legs.",
+    summary: "For experienced lifters on five days: three 4-week blocks, each prioritising different muscles — back and delts, then chest and arms, then legs.",
     description:
       "Goal: keep growing when you've been training for years. Experienced lifters often progress best by giving one or two muscle groups extra volume " +
       "for a block while the rest stay at a solid working level, then rotating. Block 1 prioritises back and delts, block 2 chest and arms, block 3 quads, " +
@@ -1093,7 +1093,7 @@ export const CATALOG_HYPERTROPHY: ProgramSeed[] = [
   {
     slug: "lower-body-glute-development",
     name: "Lower Body and Glute Development",
-    summary: "Ten weeks, two lower-body days and two upper days a week: glutes, hamstrings and quads get most of the volume and build through two blocks, with a 3-day option.",
+    summary: "For intermediates prioritising glutes, hamstrings and quads: two lower and two upper days a week, building through two blocks, with a 3-day option.",
     description:
       "Goal: bigger, stronger glutes and legs, for anyone. Lower days pair heavy hip thrusts, squats and Romanian deadlifts with split squats, lunges, back " +
       "extensions, abduction and leg curls, so glutes and hamstrings (counted together) start around 17–18 hard sets a week and quads around 11, building into the low 20s and to about 13 by each block's peak. " +

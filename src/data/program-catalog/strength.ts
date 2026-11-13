@@ -493,7 +493,7 @@ export const CATALOG_STRENGTH: ProgramSeed[] = [
   {
     slug: "beginner-strength-foundations-8-week",
     name: "Beginner Strength Foundations",
-    summary: "Eight weeks of three full-body barbell sessions: learn the squat, bench, deadlift, press, rows and chin-ups, then test a new 5-rep best.",
+    summary: "For beginners who'd rather progress by effort than add weight every session: learn the squat, bench, deadlift, press, rows and chin-ups, then test a new 5-rep best.",
     description:
       "Goal: get measurably stronger on the basic barbell lifts while learning to judge effort. Focus: squat and bench twice a week, deadlift and " +
       "overhead press once, rows, pulldowns and chin-ups every session. Reps come down from 8 to 6 to 5 while the reps you keep in reserve shrink " +
@@ -541,7 +541,7 @@ export const CATALOG_STRENGTH: ProgramSeed[] = [
   {
     slug: "intermediate-strength-builder-upper-lower",
     name: "Intermediate Strength Builder",
-    summary: "Twelve weeks of 4-day upper/lower training in three waves — accumulate, intensify, realize — from a training max, ending with a top-set test.",
+    summary: "For intermediates who want a 12-week block that peaks: 4-day upper/lower in three waves — accumulate, intensify, realize — from a training max, ending with a top-set test.",
     description:
       "Goal: a measurable jump in squat, bench, deadlift and overhead press for lifters who no longer progress session to session. Focus: one main " +
       "lift per day on an upper/lower split, each run as a percentage of a training max (TM, 90% of your 1RM) with an RPE check, plus a secondary " +
@@ -593,7 +593,7 @@ export const CATALOG_STRENGTH: ProgramSeed[] = [
   {
     slug: "power-and-athletic-strength-10-week",
     name: "Power and Athletic Strength",
-    summary: "Ten weeks, three days: jumps, throws and power cleans at full rest paired with squat, bench and trap-bar strength, with a deload and a test week.",
+    summary: "For athletes who want to jump, sprint and throw harder: jumps, throws and power cleans at full rest paired with squat, bench and trap-bar strength, ending in a test week.",
     description:
       "Goal: produce force faster — jump farther, throw harder and get stronger at the same time. Focus: each session opens with a small dose of " +
       "power work (box jumps, trap-bar jumps, broad jumps, medicine-ball throws, power cleans) done fresh with full rest, then strength lifts " +

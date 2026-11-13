@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input, NativeSelect } from "@/components/ui/input";
 import { ActionButton } from "@/components/common/action-button";
 import { BackLink } from "@/components/platform/back-link";
+import { isListedProgram } from "@/data/program-retirements";
 import { compareLibraryPrograms } from "@/lib/domain/disciplines";
 import {
   activeFilterCount,
@@ -89,7 +90,8 @@ export default async function ProgramsPage({ searchParams }: { searchParams: Pro
   const categories = (categoriesRes.data ?? []) as { id: string; slug: string; name: string }[];
   const categorySlug = new Map(categories.map((c) => [c.id, c.slug]));
   const categoryName = new Map(categories.map((c) => [c.id, c.name]));
-  const all = ((programsRes.data ?? []) as ProgramCardRow[]).map((p) => ({
+  // Retired programs stay published (members who started one keep it) but aren't offered when browsing.
+  const all = ((programsRes.data ?? []) as ProgramCardRow[]).filter((p) => isListedProgram(p.slug)).map((p) => ({
     ...p,
     category: p.category_id ? (categorySlug.get(p.category_id) ?? null) : null,
     categoryName: p.category_id ? (categoryName.get(p.category_id) ?? null) : null,

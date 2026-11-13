@@ -9,6 +9,7 @@ import { canAccessTier } from "@/lib/domain/plans";
 import { completionRequirement, equipmentSummary, requiredSessions } from "@/lib/domain/program-catalog";
 import { EQUIPMENT_LABELS, type Equipment } from "@/lib/domain/types";
 import { getProgramSeed } from "@/data/programs";
+import { programRetirement } from "@/data/program-retirements";
 import { formatDuration } from "@/lib/domain/units";
 import type { ProgramRow } from "@/lib/types/db";
 import { cn, titleCase } from "@/lib/utils";
@@ -85,6 +86,9 @@ export default async function ProgramDetailPage({
     : { count: 0 };
   const { total: totalSessions, required: requiredCount } = requiredSessions(program.days_per_week, program.duration_weeks);
   const seed = program.source === "curated" ? getProgramSeed(program.slug) : undefined;
+  // Retired from browsing in the 2026-11 clean-up: still fully usable here by members who started or saved it.
+  const retirement = program.source === "curated" ? programRetirement(program.slug) : undefined;
+  const replacement = retirement ? getProgramSeed(retirement.replacedBy) : undefined;
   const completionText = completionRequirement(program, seed?.completion ?? null);
   const weeks = weeksRes.data ?? [];
   // A member who already enrolled in or saved this program keeps it (library programs became Pro-only in 2026-11).
@@ -179,6 +183,17 @@ export default async function ProgramDetailPage({
           />
         </div>
       </header>
+
+      {retirement && replacement && (
+        <Notice>
+          <strong>Retired from the library:</strong>{" "}
+          <Link href={`/train/programs/${replacement.slug}`} className="font-semibold text-gold-highlight underline underline-offset-4">
+            {replacement.name}
+          </Link>{" "}
+          covers {retirement.reason}{" "}
+          {userProgram ? "Your copy of this program, its progress and your logged workouts stay exactly as they are." : "If you're choosing a new program, start there."}
+        </Notice>
+      )}
 
       {program.needs_specialist_review && (
         <Notice tone="warning">

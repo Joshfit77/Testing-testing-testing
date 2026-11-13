@@ -29,7 +29,7 @@ against a production build). Nothing has been tested on a physical device, with 
 | Program adjustments with approval and history | Built (unverified on device) | Coach and Training review propose load, deload and volume changes; the member accepts, edits or declines; changes are recorded and can be undone. New: program recommendations and approval-only program switches from the coach (history kept). New (2026-11-13): missed sessions are detected from history and the member chooses: train today, move, or skip and stay on schedule (Pro; tested unit + integration + e2e). Nothing is rescheduled without a tap. |
 | Nutrition and grocery planning | Partial | Recipes, meal planner, grocery list, AI meal plans with approval. New: scale a recipe to any number of servings. New (2026-11-13): meal-prep batching for a planned week at `/nutrition/planner/prep` (batches by recipe, prep sessions with a 4-day refrigerated limit, optional freezing, scaled amounts; tested unit + e2e). Freeze choices live in the link only. |
 | Progress-photo comparison | Built | Side by side, plus a new overlay with a blend slider and alignment guides. Photos aren't analysed or measured, and the app says so. |
-| 40 Pro programs | Built (unverified by professionals) | See `PROGRAM_CATALOG.md`. 32 training programs, 7 habit programs and the existing 40-day challenge. |
+| 40 Pro programs | Built (unverified by professionals) | See `PROGRAM_CATALOG.md`. 32 training programs, 7 habit programs and the existing 40-day challenge. Library clean-up (2026-11-14, `docs/programs/PROGRAM_LIBRARY_AUDIT.md`): 10 near-duplicates retired from browsing (kept for members who started them), 13 renamed incl. the Wave Strength duration fix; 64 of 74 training programs listed. |
 
 ## Priority 3
 
