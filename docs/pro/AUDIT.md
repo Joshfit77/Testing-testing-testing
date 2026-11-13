@@ -35,7 +35,7 @@ against a production build). Nothing has been tested on a physical device, with 
 
 | Item | Status | Notes |
 |---|---|---|
-| Form analysis | Not built | Design and limits in `FORM_ANALYSIS.md`. Not shipped: a camera feature that judges form needs on-device pose estimation, validation against coached lifts, and clear safety wording. |
+| Form analysis | Not built (measurement core in development) | Design and limits in `FORM_ANALYSIS.md`. A pure measurement core exists in `src/lib/form-analysis` behind `FORM_ANALYSIS_ENABLED = false`, tested on synthetic data only; no camera, pose model or UI. Not shipped: a camera feature that judges form needs on-device pose estimation, validation against coached lifts, and clear safety wording. |
 | Wearables | Needs a device | HealthKit and Health Connect sleep, steps and workouts are coded; no Apple Watch workout import, no background sync verified (`docs/WEARABLES.md`). |
 | Accountability (opt-in) | Not built | Needs an owner decision on sharing scope (partner, group, church) and moderation. |
 | Mobility | Built | Programs 29–32 and 15 mobility exercises. Not presented as rehabilitation. |
