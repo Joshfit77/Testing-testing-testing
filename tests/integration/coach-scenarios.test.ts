@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 import { startMockMessagesApi, type MockAnswer, type MockApi, type MockRequestBody } from "../../scripts/ai-eval/mock-api";
 import { createTestUser, deleteTestUser, exerciseIds, grantPlan, serviceClient, stackAvailable, type TestUser } from "./helpers";
 

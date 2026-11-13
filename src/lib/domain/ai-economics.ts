@@ -152,9 +152,10 @@ export function expectedCostMicros(kind: string, tier: "fast" | "smart"): number
 
 /**
  * The most one chat request may spend before the coach must answer with what it has (no further tool rounds).
- * About 6× the expected cost: room for real multi-step questions, while a runaway loop is cut off.
+ * Fast: about 4× the expected cost (room for a multi-tool question; a runaway loop is cut off, so a long request
+ * can't eat many standard requests' worth of budget). Larger: 5×.
  */
-export const REQUEST_CEILING_MICROS = { fast: 25_000, smart: 400_000 } as const;
+export const REQUEST_CEILING_MICROS = { fast: 15_000, smart: 400_000 } as const;
 
 /**
  * Request allowance that fits the budget: the larger-model share first (plans and complex questions), the rest on

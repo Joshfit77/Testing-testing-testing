@@ -41,7 +41,7 @@ describe("AI cost of a request", () => {
     expect(expectedCostMicros("plan", "smart")).toBe(EXPECTED_COST_MICROS.plan);
     expect(expectedCostMicros("meal_plan", "smart")).toBe(EXPECTED_COST_MICROS.meal_plan * 20);
     expect(expectedCostMicros("something_new", "fast")).toBeGreaterThan(0);
-    expect(REQUEST_CEILING_MICROS.fast).toBeGreaterThan(EXPECTED_COST_MICROS.chat_fast * 5);
+    expect(REQUEST_CEILING_MICROS.fast).toBeGreaterThan(EXPECTED_COST_MICROS.chat_fast * 4);
     expect(REQUEST_CEILING_MICROS.smart).toBeGreaterThan(EXPECTED_COST_MICROS.chat_smart * 4);
   });
 });

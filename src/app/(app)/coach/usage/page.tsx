@@ -84,6 +84,13 @@ export default async function AiUsagePage() {
           <p className="text-sm text-muted-foreground" data-testid="ai-renews">
             Renews on {renews} (the 1st of every month, for monthly and yearly memberships alike).
           </p>
+          {usage.budgetUsedPct >= 75 && left > 0 && (
+            <p role="status" className={`${card} text-sm`} data-testid="ai-capacity-note">
+              {usage.budgetUsedPct >= 100
+                ? `This month's AI capacity is used up early, because of several unusually long requests. It renews on ${renews}. Nothing extra is charged.`
+                : "Some of your requests this month were unusually long, so your remaining requests may run out a little early. Shorter, focused questions go further."}
+            </p>
+          )}
           {left === 0 && (
             <p role="status" className={`${card} text-sm`}>
               You&apos;ve used this month&apos;s AI requests. They renew on {renews}. Nothing extra is charged, and everything else in the app keeps working.

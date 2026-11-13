@@ -115,7 +115,7 @@ export async function getAiAllowance(userId: string, plan: Plan) {
 export async function getAiUsage(userId: string, plan: Plan) {
   const allowance = await getAiAllowance(userId, plan);
   const limits = { chatLimit: allowance.chatLimit, planLimit: allowance.planLimit, smartLimit: allowance.smartLimit, legacy: allowance.legacy };
-  if (!isServiceRoleConfigured()) return { chatUsed: 0, planUsed: 0, smartUsed: 0, ...limits };
+  if (!isServiceRoleConfigured()) return { chatUsed: 0, planUsed: 0, smartUsed: 0, budgetUsedPct: 0, ...limits };
   const admin = getServiceSupabase();
   const since = monthStartIso();
   const count = (q: ReturnType<typeof admin.from>) => q.select("id", { count: "exact", head: true }).eq("user_id", userId).gte("created_at", since);
@@ -131,7 +131,12 @@ export async function getAiUsage(userId: string, plan: Plan) {
     logError("ai.usage_count", failed);
     throw new AiError("metering_unavailable", "AI usage can't be checked right now. Please try again shortly.");
   }
-  return { chatUsed: chat.count ?? 0, planUsed: gen.count ?? 0, smartUsed: smart.count ?? 0, ...limits };
+  // How much of this month's money budget is used (as a share, never in money): when unusually long requests use it
+  // up before the request count, the usage screen says so.
+  const { data: spentRows } = await admin.from("ai_usage_events").select("cost_micros, reserved_micros, finalized_at").eq("user_id", userId).gte("created_at", since);
+  const spent = (spentRows ?? []).reduce((acc, r) => acc + Number(r.finalized_at ? r.cost_micros : r.reserved_micros), 0);
+  const budgetUsedPct = Math.min(100, Math.floor((spent * 100) / Math.max(1, aiBudgetConfig().memberMonthlyMicros)));
+  return { chatUsed: chat.count ?? 0, planUsed: gen.count ?? 0, smartUsed: smart.count ?? 0, budgetUsedPct, ...limits };
 }
 
 /** All server-side eligibility checks for an AI request. Throws AiError when not allowed. */
@@ -198,15 +203,15 @@ async function reserveUsage(
   const row = (data as { usage_id: string; model_tier: ModelTier; downgrade_reason: DowngradeReason | null }[] | null)?.[0];
   if (error || !row) {
     const msg = error?.message ?? "";
+    const renews = allowanceRenewsOn(new Date());
     // Running out of AI never touches the rest of the app; the messages say so.
     if (msg.includes("ai_in_flight")) throw new AiError("in_progress", "Your previous AI request is still being answered. Please wait for it to finish.", 15);
     if (msg.includes("ai_budget_user"))
-      throw new AiError("budget_member", "You've reached this month's AI allowance. It resets on the 1st, and everything else in the app keeps working as usual.");
+      throw new AiError("budget_member", `This month's AI capacity is used up early, because of several unusually long requests. It renews on ${renews}; nothing extra is charged and everything else in the app keeps working.`);
     if (msg.includes("ai_budget_global"))
       throw new AiError("budget_global", "AI features are paused for everyone for the rest of this month. Everything else in the app keeps working as usual.");
     if (msg.includes("ai_busy")) throw new AiError("busy", "The AI coach is busy right now. Please try again in a minute.", 30);
     if (msg.includes("ai_rate_limited")) throw new AiError("rate_limited", "You're sending messages quickly — please wait a moment.", 60);
-    const renews = allowanceRenewsOn(new Date());
     if (msg.includes("ai_quota_plan_member_budget"))
       throw new AiError("quota", `A program generation needs an advanced request, and the rest of this month's allowance is needed for your standard requests. Advanced requests renew on ${renews}.`);
     if (msg.includes("ai_quota_plan_global_budget"))
