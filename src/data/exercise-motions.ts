@@ -58,6 +58,7 @@ import { lateralBoundDrill, lateralShuffleDrill, proAgilityDrill, reactiveMirror
 import { agilityLadderDrill, bearCrawlDrill, threeConeDrill, walkingLungeDrill, wallDrillStraight } from "../lib/exercise-motion/patterns/drills";
 import { curlFront, deadliftFront } from "../lib/exercise-motion/patterns/front-views";
 import { pose, stanceLegs, both } from "../lib/exercise-motion/build";
+import { ADDED_MOTIONS } from "./exercise-batches";
 import type { ExerciseMeta, MotionDef, View } from "../lib/exercise-motion/types";
 
 type Builder = (id: string) => MotionDef;
@@ -70,6 +71,8 @@ const F = "Front view. ";
 
 /** Hand-tuned motion per catalog exercise. */
 export const EXERCISE_MOTIONS: Record<string, Builder> = {
+  // Library expansion of 2026-11-13 (src/data/exercise-batches/*.motions.ts).
+  ...ADDED_MOTIONS,
   // ------------------------------------------------------------------ Squat
   "back-squat": (id) =>
     squat({ id, ...BACK_SQUAT, label: `${S}Barbell on the upper back: sits down between the hips to just below parallel over two seconds, bar staying over mid-foot, then drives up a little faster than it went down.`, props: [{ id: "rack", kind: "rack", at: [-70, 140], layer: "back" }] }),

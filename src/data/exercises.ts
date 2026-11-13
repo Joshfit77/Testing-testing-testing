@@ -1,4 +1,5 @@
 import type { Difficulty, Equipment, ExerciseCategory, MovementPattern } from "@/lib/domain/types";
+import { ADDED_EXERCISES } from "./exercise-batches";
 
 export interface ExerciseSeed {
   slug: string;
@@ -24,7 +25,7 @@ export interface ExerciseSeed {
  * and are not medical advice. No demonstration media is bundled — media must be
  * added by an admin with a recorded license.
  */
-export const EXERCISES: ExerciseSeed[] = [
+const BASE_EXERCISES: ExerciseSeed[] = [
   // ------------------------------------------------------------------ Squat
   {
     slug: "back-squat",
@@ -3399,5 +3400,8 @@ export const EXERCISES: ExerciseSeed[] = [
     alternatives: ["romanian-deadlift", "glute-bridge", "good-morning"],
   },
 ];
+
+/** The full catalog: the original 157 plus the library expansion (src/data/exercise-batches). Order is stable. */
+export const EXERCISES: ExerciseSeed[] = [...BASE_EXERCISES, ...ADDED_EXERCISES];
 
 export const EXERCISE_SLUGS = new Set(EXERCISES.map((e) => e.slug));
