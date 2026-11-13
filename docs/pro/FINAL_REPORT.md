@@ -25,7 +25,7 @@
 | Suite | Result |
 |---|---|
 | Typecheck, lint | Clean |
-| Unit (`vitest --project unit`) | 220 files, 4,281 tests passed (run before the last four commits; their own unit tests pass) |
+| Unit (`vitest --project unit`) | 221 files, 4,285 tests passed on the final commit |
 | Integration, affected suites (pro-programs, weekly-reports, plan-enforcement, custom-programs, workouts) | 26 passed |
 | E2E, production build, mobile project | pro-programs (4), program-library (1), features (5), memberships, store-billing, recipes-planner, training-review: all passed |
 | E2E with the local mock AI (no real model) | coach suite: 10 passed, 1 skipped by design (needs no AI key) |
