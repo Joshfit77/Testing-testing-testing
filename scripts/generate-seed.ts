@@ -74,10 +74,11 @@ for (const e of EXERCISES) {
 }
 lines.push("");
 
-lines.push("-- Training programs (curated library). Weeks/days/exercises are rebuilt on every seed.");
+lines.push("-- Training programs (curated library). Weeks and days are updated in place under stable ids, so members' logged");
+lines.push("-- workouts and calendar moves keep pointing at their program day; only the exercise rows are rebuilt. Weeks or days");
+lines.push("-- a program no longer has are removed (their workouts stay, unlinked from the day).");
 for (const p of PROGRAMS) {
   const pid = stableUuid(`program:${p.slug}`);
-  lines.push(`delete from public.program_weeks where program_id = ${q(pid)};`);
   lines.push(
     `insert into public.training_programs (id, slug, name, summary, description, category_id, difficulty, duration_weeks, days_per_week, session_minutes, goals, equipment, tier, progression, warmup, cooldown, low_impact, needs_specialist_review, is_published, source) values (` +
       [
@@ -104,16 +105,20 @@ for (const p of PROGRAMS) {
       ].join(", ") +
       `) on conflict (slug) do update set name = excluded.name, summary = excluded.summary, description = excluded.description, category_id = excluded.category_id, difficulty = excluded.difficulty, duration_weeks = excluded.duration_weeks, days_per_week = excluded.days_per_week, session_minutes = excluded.session_minutes, goals = excluded.goals, equipment = excluded.equipment, tier = excluded.tier, progression = excluded.progression, warmup = excluded.warmup, cooldown = excluded.cooldown, low_impact = excluded.low_impact, needs_specialist_review = excluded.needs_specialist_review, is_published = true;`,
   );
-  for (const week of expandProgram(p)) {
+  const weeks = expandProgram(p);
+  lines.push(`delete from public.program_weeks where program_id = ${q(pid)} and week_number > ${weeks.length};`);
+  for (const week of weeks) {
     const wid = stableUuid(`week:${p.slug}:${week.weekNumber}`);
     lines.push(
-      `insert into public.program_weeks (id, program_id, week_number, focus, is_deload) values (${q(wid)}, ${q(pid)}, ${week.weekNumber}, ${q(week.focus)}, ${bool(week.isDeload)});`,
+      `insert into public.program_weeks (id, program_id, week_number, focus, is_deload) values (${q(wid)}, ${q(pid)}, ${week.weekNumber}, ${q(week.focus)}, ${bool(week.isDeload)}) on conflict (id) do update set focus = excluded.focus, is_deload = excluded.is_deload;`,
     );
+    lines.push(`delete from public.program_days where week_id = ${q(wid)} and day_number > ${week.days.length};`);
     for (const day of week.days) {
       const did = stableUuid(`day:${p.slug}:${week.weekNumber}:${day.dayNumber}`);
       lines.push(
-        `insert into public.program_days (id, week_id, day_number, name, focus, estimated_minutes, warmup, cooldown) values (${q(did)}, ${q(wid)}, ${day.dayNumber}, ${q(day.name)}, ${q(day.focus)}, ${num(day.minutes)}, ${arr(day.warmup)}, ${arr(day.cooldown)});`,
+        `insert into public.program_days (id, week_id, day_number, name, focus, estimated_minutes, warmup, cooldown) values (${q(did)}, ${q(wid)}, ${day.dayNumber}, ${q(day.name)}, ${q(day.focus)}, ${num(day.minutes)}, ${arr(day.warmup)}, ${arr(day.cooldown)}) on conflict (id) do update set name = excluded.name, focus = excluded.focus, estimated_minutes = excluded.estimated_minutes, warmup = excluded.warmup, cooldown = excluded.cooldown;`,
       );
+      lines.push(`delete from public.program_exercises where day_id = ${q(did)};`);
       for (const ex of day.exercises) {
         lines.push(
           `insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values (${q(did)}, ${q(stableUuid(`ex:${ex.ex}`))}, ${ex.position}, ${ex.sets}, ${q(ex.reps ?? null)}, ${num(ex.seconds)}, ${ex.rest}, ${q(ex.intensity ?? null)}, ${num(ex.rpe)}, ${q(ex.notes ?? null)});`,
