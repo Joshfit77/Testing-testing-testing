@@ -24,6 +24,7 @@ import { logError, logInfo } from "@/server/log";
 import { AiError, withAiRequest } from "@/server/services/ai-coach";
 import { getNutritionDaily } from "@/server/services/progress";
 import { listSleepSessions, listSleepStages } from "@/server/services/sleep";
+import { costMicros, tokenUsage } from "@/lib/domain/ai-economics";
 
 export interface WeeklyReportRow {
   id: string;
@@ -143,7 +144,7 @@ async function aiAnalysis(supabase: SupabaseClient, userId: string, plan: Plan, 
       });
       const inputTokens = res.usage.input_tokens + (res.usage.cache_read_input_tokens ?? 0) + (res.usage.cache_creation_input_tokens ?? 0);
       if (res.stop_reason === "refusal" || !res.parsed_output) throw new AiError("provider", "No analysis returned.");
-      return { value: { analysis: res.parsed_output, model }, inputTokens, outputTokens: res.usage.output_tokens };
+      return { value: { analysis: res.parsed_output, model }, inputTokens, outputTokens: res.usage.output_tokens, costMicros: costMicros(model, tokenUsage(res.usage)) };
     });
   } catch (err) {
     // No consent, no allowance left, or the provider failed: the report keeps its rule-based analysis.

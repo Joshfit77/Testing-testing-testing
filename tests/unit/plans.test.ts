@@ -52,8 +52,8 @@ describe("plans & entitlements", () => {
     expect(plans.free.aiMonthlyLimit).toBe(0);
     expect(plans.plus.aiMonthlyLimit).toBe(0);
     expect(plans.pro.aiMonthlyLimit).toBe(150);
-    expect(plans.pro.aiPlanMonthlyLimit).toBe(15);
-    expect(plans.pro.aiSmartMonthlyLimit).toBe(15);
+    expect(plans.pro.aiPlanMonthlyLimit).toBe(10);
+    expect(plans.pro.aiSmartMonthlyLimit).toBe(10);
     expect(plans.free.templateLimit).toBe(5);
     expect(plans.plus.templateLimit).toBeNull();
     expect(plans.pro.templateLimit).toBeNull();
@@ -74,7 +74,7 @@ describe("plans & entitlements", () => {
   it("computes the AI allowance: none on Plus, 150 on Pro, legacy terms raise it", () => {
     expect(aiAllowance("free")).toEqual({ chatLimit: 0, planLimit: 0, smartLimit: 0, legacy: false });
     expect(aiAllowance("plus")).toEqual({ chatLimit: 0, planLimit: 0, smartLimit: 0, legacy: false });
-    expect(aiAllowance("pro")).toEqual({ chatLimit: 150, planLimit: 15, smartLimit: 15, legacy: false });
+    expect(aiAllowance("pro")).toEqual({ chatLimit: 150, planLimit: 10, smartLimit: 10, legacy: false });
     const legacyPlus = { plan: "plus" as const, aiMonthlyLimit: 60, aiPlanMonthlyLimit: 0, aiSmartMonthlyLimit: 6 };
     expect(aiAllowance("plus", [legacyPlus])).toEqual({ chatLimit: 60, planLimit: 0, smartLimit: 6, legacy: true });
     const legacyPro = { plan: "pro" as const, aiMonthlyLimit: 400, aiPlanMonthlyLimit: 20, aiSmartMonthlyLimit: 40 };
@@ -97,11 +97,15 @@ describe("plans & entitlements", () => {
     process.env.PLAN_FREE_TEMPLATE_LIMIT = "8";
     try {
       expect(getPlans().pro.aiMonthlyLimit).toBe(200);
-      expect(getPlans().pro.aiSmartMonthlyLimit).toBe(20);
+      // The larger-model share is sized from the AI budget (ai-economics), not from the request count.
+      expect(getPlans().pro.aiSmartMonthlyLimit).toBe(10);
+      process.env.PLAN_PRO_AI_SMART_MONTHLY_LIMIT = "15";
+      expect(getPlans().pro.aiSmartMonthlyLimit).toBe(15);
       expect(getPlans().pro.yearlyPriceCents).toBe(19999);
       expect(getPlans().free.templateLimit).toBe(8);
     } finally {
       delete process.env.PLAN_PRO_AI_MONTHLY_LIMIT;
+      delete process.env.PLAN_PRO_AI_SMART_MONTHLY_LIMIT;
       delete process.env.PLAN_PRO_YEARLY_PRICE_CENTS;
       delete process.env.PLAN_FREE_TEMPLATE_LIMIT;
     }

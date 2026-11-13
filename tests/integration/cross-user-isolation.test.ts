@@ -152,6 +152,11 @@ describe.skipIf(!available)("cross-user isolation sweep: every user-owned table 
     await seed("ai_message_feedback", { user_id: u, message_id: reply.id, rating: "partially", comment: "Private feedback" });
     await seed("ai_usage_events", { user_id: u, kind: "chat" });
     await seed("coach_memories", { user_id: u, category: "schedule", content: "Trains at 6am", source: "member" });
+    // Weekly reports and habit programs (migrations 063, 064).
+    await seed("weekly_reports", { user_id: u, week_start: "2026-10-05", time_zone: "UTC", metrics: { workouts: 1 }, analysis: { summary: "Private week" }, analysis_source: "rules" });
+    const habit = await seed("habit_program_enrollments", { user_id: u, program_slug: "iso-habit", started_on: "2026-10-01" });
+    parents.habit_program_enrollments = habit.id!;
+    await seed("habit_program_checkins", { enrollment_id: habit.id, user_id: u, day_number: 1, activity_key: "water", checked_on: "2026-10-01" });
 
     // Faith.
     await seed("faith_journal_entries", { user_id: u, body: "Private prayer" });
@@ -434,7 +439,9 @@ describe.skipIf(!available)("cross-user isolation sweep: every user-owned table 
   it("members cannot call the privileged database functions", async () => {
     expect((await bob.client.rpc("plan_of", { p_user_id: alice.id })).error).not.toBeNull();
     expect((await anonClient().rpc("plan_of", { p_user_id: alice.id })).error).not.toBeNull();
-    expect((await bob.client.rpc("reserve_ai_usage", { p_user_id: bob.id, p_kind: "chat", p_tier: "fast", p_chat_limit: 1000, p_plan_limit: 1000, p_smart_limit: 1000, p_per_minute: 1000 })).error).not.toBeNull();
+    expect((await bob.client.rpc("reserve_ai_usage", { p_user_id: bob.id, p_kind: "chat", p_tier: "fast", p_chat_limit: 1000, p_plan_limit: 1000, p_smart_limit: 1000, p_per_minute: 1000, p_estimate_micros: 0, p_user_budget_micros: 1_000_000, p_global_budget_micros: 1_000_000, p_max_inflight_user: 9, p_max_inflight_global: 99, p_inflight_seconds: 180 })).error).not.toBeNull();
+    expect((await bob.client.rpc("finalize_ai_usage", { p_usage_id: crypto.randomUUID(), p_model: "x", p_input_tokens: 0, p_output_tokens: 0, p_cost_micros: 0 })).error).not.toBeNull();
+    expect((await bob.client.rpc("release_ai_usage", { p_usage_id: crypto.randomUUID() })).error).not.toBeNull();
     expect((await bob.client.rpc("admin_usage_metrics")).error).not.toBeNull();
     expect((await bob.client.rpc("record_signup_acceptances")).error).not.toBeNull();
   });

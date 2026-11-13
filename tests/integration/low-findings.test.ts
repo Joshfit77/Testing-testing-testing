@@ -39,8 +39,9 @@ describe.skipIf(!available)("Low findings: enrolments, error messages, links, pr
     [a, b, pro] = await Promise.all([createTestUser("low-a"), createTestUser("low-b"), createTestUser("low-pro")]);
     await grantPlan(pro, "pro");
     const { data: programs } = await svc.from("training_programs").select("id, tier").eq("is_published", true);
-    freeProgram = programs!.find((p) => p.tier === "free")!.id;
-    paidProgram = programs!.find((p) => p.tier !== "free")!.id;
+    // Every catalog program is Pro for new enrolments; Free members keep programs they joined earlier.
+    freeProgram = programs![0]!.id; // the one A and B were already enrolled in
+    paidProgram = programs!.find((p) => p.id !== freeProgram)!.id;
     const { data: priv } = await svc
       .from("training_programs")
       .insert({ owner_id: a.id, slug: `low-${crypto.randomUUID().slice(0, 8)}`, name: "A's own", source: "starter", tier: "free", is_published: false, difficulty: "beginner", duration_weeks: 4, days_per_week: 3, session_minutes: 45 })
@@ -66,8 +67,10 @@ describe.skipIf(!available)("Low findings: enrolments, error messages, links, pr
   });
 
   it("F14: an enrolment can't be repointed at a paid program or someone's private program; other changes still work", async () => {
-    const { data: mine, error } = await b.client.from("user_programs").insert({ user_id: b.id, program_id: freeProgram, status: "active" }).select("id").single();
+    const { data: mine, error } = await svc.from("user_programs").insert({ user_id: b.id, program_id: freeProgram, status: "active" }).select("id").single();
     expect(error).toBeNull();
+    // A Free member can't start a catalog program themselves.
+    expect((await b.client.from("user_programs").insert({ user_id: b.id, program_id: paidProgram, status: "paused" })).error).not.toBeNull();
     for (const target of [paidProgram, privateProgram]) {
       const res = await b.client.from("user_programs").update({ program_id: target }).eq("id", mine!.id);
       expect(res.error?.code).toBe(RLS);

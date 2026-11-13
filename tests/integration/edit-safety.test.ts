@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createTestUser, deleteTestUser, exerciseIds, stackAvailable, type TestUser } from "./helpers";
+import { createTestUser, deleteTestUser, exerciseIds, grantPlan, stackAvailable, type TestUser } from "./helpers";
 
 const available = await stackAvailable();
 
@@ -57,7 +57,9 @@ describe.skipIf(!available)("resuming a paused program keeps its place", async (
 
   it("resume keeps the week and day; restart goes back to week 1", async () => {
     const { serviceClient } = await import("./helpers");
-    const { data: prog } = await serviceClient().from("training_programs").select("id").eq("is_published", true).eq("tier", "free").limit(1).single();
+    // Every catalog program is Pro for new enrolments.
+    await grantPlan(user, "pro");
+    const { data: prog } = await serviceClient().from("training_programs").select("id").eq("is_published", true).limit(1).single();
     const id = await activateProgram(user.client, user.id, prog!.id as string);
     await user.client.from("user_programs").update({ current_week: 3, current_day: 2, status: "paused" }).eq("id", id);
     await activateProgram(user.client, user.id, prog!.id as string);

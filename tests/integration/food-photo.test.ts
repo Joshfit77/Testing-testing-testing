@@ -18,7 +18,7 @@ describe.skipIf(!available)("AI food photos", async () => {
   });
 
   const reserve = (kind: string) =>
-    serviceClient().rpc("reserve_ai_usage", { p_user_id: pro.id, p_kind: kind, p_tier: "fast", p_chat_limit: 1000, p_plan_limit: 15, p_smart_limit: 15, p_per_minute: 1000 });
+    serviceClient().rpc("reserve_ai_usage", { p_user_id: pro.id, p_kind: kind, p_tier: "fast", p_chat_limit: 1000, p_plan_limit: 15, p_smart_limit: 15, p_per_minute: 1000, p_estimate_micros: 0, p_user_budget_micros: 1_000_000_000, p_global_budget_micros: 1_000_000_000_000, p_max_inflight_user: 1000, p_max_inflight_global: 100000, p_inflight_seconds: 180 });
 
   it("refuses to analyse anything before the member agrees to send photos", async () => {
     await expect(analyzeFoodPhoto(pro.client, pro.id, "pro", { base64: "AAAA", mediaType: "image/jpeg" }, "")).rejects.toMatchObject({ code: "consent_required" });

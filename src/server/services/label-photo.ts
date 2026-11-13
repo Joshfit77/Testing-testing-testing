@@ -8,6 +8,7 @@ import type { Plan } from "@/lib/domain/types";
 import { AiError, withAiRequest } from "@/server/services/ai-coach";
 import { hasFoodPhotoConsent } from "@/server/services/food-photo";
 import { logError } from "@/server/log";
+import { costMicros, tokenUsage } from "@/lib/domain/ai-economics";
 
 /**
  * Transcribe a food label from one photo. The image is held in memory for this request only and never stored.
@@ -47,7 +48,7 @@ export async function readLabelPhoto(supabase: SupabaseClient, userId: string, p
     }
     const inputTokens = res.usage.input_tokens + (res.usage.cache_read_input_tokens ?? 0) + (res.usage.cache_creation_input_tokens ?? 0);
     if (res.stop_reason === "refusal" || !res.parsed_output) throw new AiError("provider", "The AI couldn't read that label. Try another photo, or type the ingredients.");
-    return { value: res.parsed_output, inputTokens, outputTokens: res.usage.output_tokens };
+    return { value: res.parsed_output, inputTokens, outputTokens: res.usage.output_tokens, costMicros: costMicros(model, tokenUsage(res.usage)) };
   });
   return normalizeLabelPhoto(output);
 }

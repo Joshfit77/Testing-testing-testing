@@ -5990,6 +5990,309 @@ as $$
   );
 $$;
 
+-- ===== supabase/migrations/20261113000066_ai_cost_controls.sql =====
+-- ROLLBACK (restores request-count metering only; member data, conversations and usage history are untouched):
+--   drop function if exists public.release_ai_usage(uuid);
+--   drop function if exists public.ai_budget_check(bigint);
+--   drop function if exists public.finalize_ai_usage(uuid, text, integer, integer, bigint);
+--   drop function if exists public.ai_budget_settle(date, bigint, bigint);
+--   drop function if exists public.reserve_ai_usage(uuid, text, text, integer, integer, integer, integer, bigint, bigint, bigint, integer, integer, integer);
+--   drop table if exists public.ai_budget_alerts;
+--   drop table if exists public.ai_budget_months;
+--   alter table public.ai_usage_events drop column if exists cost_micros, drop column if exists reserved_micros,
+--     drop column if exists finalized_at;
+--   then re-apply reserve_ai_usage from 20261024000032_food_photos.sql. Roll back the app code first: it calls the
+--   new functions.
+--
+-- AI cost controls. Until now the server counted requests; it now also accounts in money (micro-USD):
+--   * each request holds its expected cost while it runs (reserved_micros) and records its real cost when done;
+--   * a per-member monthly budget and a global monthly budget are checked under locks before any provider call;
+--   * operators are alerted once per month at 50%, 75%, 90% and 100% of the global budget (ai_budget_alerts);
+--   * a member may have a small number of requests in flight, and the whole app a capped number at once;
+--   * the reservation tells the app to use the fast model when a member's or the app's budget is running low.
+-- Nothing here touches non-AI features: running out of AI budget only stops AI requests.
+
+alter table public.ai_usage_events
+  add column cost_micros bigint not null default 0 check (cost_micros >= 0),
+  add column reserved_micros bigint not null default 0 check (reserved_micros >= 0),
+  add column finalized_at timestamptz;
+
+-- Rows written before this migration are finished requests. Their cost is estimated from the tokens recorded
+-- (input tokens at the full input price, which over-counts cached reads: a conservative figure).
+update public.ai_usage_events
+set finalized_at = created_at,
+    cost_micros = case
+      when model like 'claude-haiku%' then ceil(input_tokens * 0.10 + output_tokens * 0.50)
+      when model like 'claude-sonnet%' then ceil(input_tokens * 2 + output_tokens * 10)
+      else ceil(input_tokens * 4 + output_tokens * 20)
+    end::bigint;
+
+create index ai_usage_events_inflight_idx on public.ai_usage_events (created_at) where finalized_at is null;
+
+-- One row per calendar month (UTC): the budget in force and what has been spent and is being held.
+create table public.ai_budget_months (
+  month date primary key check (extract(day from month) = 1),
+  budget_micros bigint not null check (budget_micros >= 0),
+  spent_micros bigint not null default 0 check (spent_micros >= 0),
+  reserved_micros bigint not null default 0 check (reserved_micros >= 0),
+  updated_at timestamptz not null default now()
+);
+
+-- Each threshold alerts once per month.
+create table public.ai_budget_alerts (
+  month date not null,
+  threshold integer not null check (threshold in (50, 75, 90, 100)),
+  spent_micros bigint not null,
+  budget_micros bigint not null,
+  fired_at timestamptz not null default now(),
+  primary key (month, threshold)
+);
+
+alter table public.ai_budget_months enable row level security;
+alter table public.ai_budget_alerts enable row level security;
+-- No policies: members can't read or write these; only the service role (server) does.
+revoke all on public.ai_budget_months, public.ai_budget_alerts from anon, authenticated;
+
+-- The old reservation function (7 arguments) is replaced.
+drop function if exists public.reserve_ai_usage(uuid, text, text, integer, integer, integer, integer);
+
+create or replace function public.reserve_ai_usage(
+  p_user_id uuid,
+  p_kind text,
+  p_tier text,
+  p_chat_limit integer,
+  p_plan_limit integer,
+  p_smart_limit integer,
+  p_per_minute integer,
+  p_estimate_micros bigint,
+  p_user_budget_micros bigint,
+  p_global_budget_micros bigint,
+  p_max_inflight_user integer,
+  p_max_inflight_global integer,
+  p_inflight_seconds integer
+)
+returns table (usage_id uuid, model_tier text, user_spent_micros bigint, global_percent integer)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_month timestamptz := date_trunc('month', now() at time zone 'utc') at time zone 'utc';
+  v_month_date date := date_trunc('month', now() at time zone 'utc')::date;
+  v_total integer;
+  v_plans integer;
+  v_smart integer;
+  v_recent integer;
+  v_user_spent bigint;
+  v_inflight_user integer;
+  v_inflight_global integer;
+  v_global_spent bigint;
+  v_global_reserved bigint;
+  v_tier text := p_tier;
+  v_estimate bigint := greatest(p_estimate_micros, 0);
+begin
+  -- Per member first (one lock per member), then the shared budget (one global lock, held for milliseconds).
+  perform pg_advisory_xact_lock(hashtextextended('ai_usage:' || p_user_id::text, 0));
+
+  select count(*), count(*) filter (where e.kind = 'plan'), count(*) filter (where e.model_tier = 'smart'),
+         coalesce(sum(case when e.finalized_at is null then e.reserved_micros else e.cost_micros end), 0)
+    into v_total, v_plans, v_smart, v_user_spent
+    from public.ai_usage_events e where e.user_id = p_user_id and e.created_at >= v_month;
+  select count(*) into v_recent from public.ai_usage_events e where e.user_id = p_user_id and e.created_at >= now() - interval '60 seconds';
+  select count(*) into v_inflight_user from public.ai_usage_events e
+    where e.user_id = p_user_id and e.finalized_at is null and e.created_at >= now() - make_interval(secs => p_inflight_seconds);
+
+  if v_inflight_user >= p_max_inflight_user then
+    raise exception 'ai_in_flight' using errcode = 'P0001';
+  end if;
+  if v_recent >= p_per_minute then
+    raise exception 'ai_rate_limited' using errcode = 'P0001';
+  end if;
+  if v_total >= p_chat_limit then
+    raise exception 'ai_quota' using errcode = 'P0001';
+  end if;
+  if p_kind = 'plan' and (v_plans >= p_plan_limit or v_smart >= p_smart_limit) then
+    raise exception 'ai_quota_plan' using errcode = 'P0001';
+  end if;
+  if p_kind = 'food_photo' and (
+    select count(*) from public.ai_usage_events e
+    where e.user_id = p_user_id and e.kind = 'food_photo' and e.created_at >= now() - interval '24 hours'
+  ) >= 20 then
+    raise exception 'ai_quota_photo' using errcode = 'P0001';
+  end if;
+  -- The member's money budget: spent plus what is held for running requests plus this one.
+  if v_user_spent + v_estimate > p_user_budget_micros then
+    raise exception 'ai_budget_user' using errcode = 'P0001';
+  end if;
+
+  perform pg_advisory_xact_lock(hashtextextended('ai_budget:global', 0));
+  -- A request whose server died before it could record its cost would hold budget for ever. After twice the in-flight
+  -- window it is closed and charged at its estimate (never at zero: the provider may still have billed it).
+  with stale as (
+    update public.ai_usage_events e set finalized_at = now(), cost_micros = e.reserved_micros
+      where e.finalized_at is null and e.created_at < now() - make_interval(secs => p_inflight_seconds * 2)
+      returning e.reserved_micros as held, date_trunc('month', e.created_at at time zone 'utc')::date as m
+  )
+  update public.ai_budget_months bm
+    set spent_micros = bm.spent_micros + s.total, reserved_micros = greatest(0, bm.reserved_micros - s.total), updated_at = now()
+    from (select stale.m, sum(stale.held)::bigint as total from stale group by stale.m) s
+    where bm.month = s.m;
+  insert into public.ai_budget_months (month, budget_micros) values (v_month_date, p_global_budget_micros)
+    on conflict (month) do update set budget_micros = excluded.budget_micros, updated_at = now();
+  select spent_micros, reserved_micros into v_global_spent, v_global_reserved from public.ai_budget_months where month = v_month_date;
+  if v_global_spent + v_global_reserved + v_estimate > p_global_budget_micros then
+    raise exception 'ai_budget_global' using errcode = 'P0001';
+  end if;
+  select count(*) into v_inflight_global from public.ai_usage_events e
+    where e.finalized_at is null and e.created_at >= now() - make_interval(secs => p_inflight_seconds);
+  if v_inflight_global >= p_max_inflight_global then
+    raise exception 'ai_busy' using errcode = 'P0001';
+  end if;
+
+  -- The larger model only while the member's share lasts and both budgets have room.
+  if v_tier = 'smart' and (
+    v_smart >= p_smart_limit
+    or (p_kind <> 'plan' and v_user_spent * 100 >= p_user_budget_micros * 75)
+    or (p_kind <> 'plan' and (v_global_spent + v_global_reserved) * 100 >= p_global_budget_micros * 90)
+  ) then
+    v_tier := 'fast';
+  end if;
+
+  insert into public.ai_usage_events (user_id, kind, model_tier, reserved_micros)
+    values (p_user_id, p_kind, v_tier, v_estimate)
+    returning id into usage_id;
+  update public.ai_budget_months set reserved_micros = reserved_micros + v_estimate, updated_at = now() where month = v_month_date;
+
+  model_tier := v_tier;
+  user_spent_micros := v_user_spent + v_estimate;
+  global_percent := case when p_global_budget_micros > 0
+    then floor((v_global_spent + v_global_reserved + v_estimate) * 100.0 / p_global_budget_micros)::integer else 100 end;
+  return next;
+end;
+$$;
+revoke all on function public.reserve_ai_usage(uuid, text, text, integer, integer, integer, integer, bigint, bigint, bigint, integer, integer, integer) from public, anon, authenticated;
+grant execute on function public.reserve_ai_usage(uuid, text, text, integer, integer, integer, integer, bigint, bigint, bigint, integer, integer, integer) to service_role;
+
+-- Move spend into this month's global figures and return the alert thresholds it crossed (each fires once per
+-- month). Shared by the coach, the other AI features and the free Bible study helper.
+create or replace function public.ai_budget_settle(p_month date, p_held bigint, p_cost bigint)
+returns table (threshold integer, spent_micros bigint, budget_micros bigint)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_before bigint;
+  v_after bigint;
+  v_budget bigint;
+  v_cost bigint := greatest(p_cost, 0);
+  t integer;
+begin
+  perform pg_advisory_xact_lock(hashtextextended('ai_budget:global', 0));
+  select m.spent_micros, m.budget_micros into v_before, v_budget from public.ai_budget_months m where m.month = p_month;
+  if not found then
+    return;
+  end if;
+  update public.ai_budget_months m
+    set spent_micros = m.spent_micros + v_cost, reserved_micros = greatest(0, m.reserved_micros - greatest(p_held, 0)), updated_at = now()
+    where m.month = p_month;
+  v_after := v_before + v_cost;
+  foreach t in array array[50, 75, 90, 100] loop
+    if v_budget > 0 and v_before * 100 < v_budget * t and v_after * 100 >= v_budget * t then
+      insert into public.ai_budget_alerts (month, threshold, spent_micros, budget_micros)
+        values (p_month, t, v_after, v_budget)
+        on conflict do nothing;
+      if found then
+        threshold := t;
+        spent_micros := v_after;
+        budget_micros := v_budget;
+        return next;
+      end if;
+    end if;
+  end loop;
+end;
+$$;
+revoke all on function public.ai_budget_settle(date, bigint, bigint) from public, anon, authenticated;
+grant execute on function public.ai_budget_settle(date, bigint, bigint) to service_role;
+
+-- Is there room in this month's global budget? For AI that has its own per-member limits and isn't counted per
+-- request here (the free Bible study helper): it checks before calling the provider and settles its real cost after.
+create or replace function public.ai_budget_check(p_global_budget_micros bigint)
+returns date
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_month_date date := date_trunc('month', now() at time zone 'utc')::date;
+  v_used bigint;
+begin
+  insert into public.ai_budget_months (month, budget_micros) values (v_month_date, p_global_budget_micros)
+    on conflict (month) do update set budget_micros = excluded.budget_micros, updated_at = now();
+  select spent_micros + reserved_micros into v_used from public.ai_budget_months where month = v_month_date;
+  if v_used >= p_global_budget_micros then
+    raise exception 'ai_budget_global' using errcode = 'P0001';
+  end if;
+  return v_month_date;
+end;
+$$;
+revoke all on function public.ai_budget_check(bigint) from public, anon, authenticated;
+grant execute on function public.ai_budget_check(bigint) to service_role;
+
+-- Record what a request really used, move its hold to spent, and return the global alert thresholds this request
+-- crossed. Calling it twice for the same request changes nothing the second time.
+create or replace function public.finalize_ai_usage(
+  p_usage_id uuid,
+  p_model text,
+  p_input_tokens integer,
+  p_output_tokens integer,
+  p_cost_micros bigint
+)
+returns table (threshold integer, spent_micros bigint, budget_micros bigint)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_reserved bigint;
+  v_created timestamptz;
+  v_cost bigint := greatest(p_cost_micros, 0);
+begin
+  update public.ai_usage_events e
+    set model = p_model, input_tokens = p_input_tokens, output_tokens = p_output_tokens, cost_micros = v_cost, finalized_at = now()
+    where e.id = p_usage_id and e.finalized_at is null
+    returning e.reserved_micros, e.created_at into v_reserved, v_created;
+  if not found then
+    return;
+  end if;
+  return query select * from public.ai_budget_settle(date_trunc('month', v_created at time zone 'utc')::date, v_reserved, v_cost);
+end;
+$$;
+revoke all on function public.finalize_ai_usage(uuid, text, integer, integer, bigint) from public, anon, authenticated;
+grant execute on function public.finalize_ai_usage(uuid, text, integer, integer, bigint) to service_role;
+
+-- A request that failed before the provider answered: give back its hold and its count.
+create or replace function public.release_ai_usage(p_usage_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_reserved bigint;
+  v_created timestamptz;
+begin
+  delete from public.ai_usage_events e where e.id = p_usage_id and e.finalized_at is null
+    returning e.reserved_micros, e.created_at into v_reserved, v_created;
+  if not found then
+    return;
+  end if;
+  perform public.ai_budget_settle(date_trunc('month', v_created at time zone 'utc')::date, v_reserved, 0);
+end;
+$$;
+revoke all on function public.release_ai_usage(uuid) from public, anon, authenticated;
+grant execute on function public.release_ai_usage(uuid) to service_role;
+
 -- ===== supabase/seed.sql =====
 -- AUTO-GENERATED by scripts/generate-seed.ts — do not edit by hand.
 -- Exercise descriptions are general fitness education, not medical advice.
@@ -21448,6 +21751,107 @@ insert into public.program_exercises (day_id, exercise_id, position, sets, reps,
 insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('26de6c1e-5a56-5a60-9d1c-ba7fbe00571e', '40d84c3e-5194-5aaa-8ba0-5f74903b28ba', 1, 2, null, 90, 10, null, null, 'One hold per side. Gentle: a mild stretch, never pain.');
 insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('26de6c1e-5a56-5a60-9d1c-ba7fbe00571e', '23f9503b-882b-5ac2-88c9-7542b301ba3c', 2, 2, null, 90, 10, null, null, 'One hold per side. Gentle: a mild stretch, never pain.');
 insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('26de6c1e-5a56-5a60-9d1c-ba7fbe00571e', '57fb2ce8-405e-5a57-b3af-60d3e93b5aa2', 3, 2, null, 60, 10, null, null, 'One hold per side — the gentle version with the back knee on a cushion, torso upright. Gentle: a mild stretch, never pain.');
+insert into public.training_programs (id, slug, name, summary, description, category_id, difficulty, duration_weeks, days_per_week, session_minutes, goals, equipment, tier, progression, warmup, cooldown, low_impact, needs_specialist_review, is_published, source) values ('73b9ccc2-c7b7-5e02-87db-dc8d54641f63', 'aerobic-endurance-builder-8-week', 'Aerobic Endurance Builder: 8 Weeks', 'Three core aerobic sessions a week plus up to two optional easy days: about 45% more weekly endurance time in eight weeks, mostly at talk-test effort — run, ride, row or walk.', 'For people who can already run, cycle or walk briskly without stopping for about 20–30 minutes and want a bigger aerobic base. This is not a couch-to-5K: there are no run/walk intervals. Each week has an easy session with a few relaxed strides, a second easy session that gains short blocks of steady tempo from week 5, and one longer easy session that grows from 35 to 55 minutes. Almost all of the work is at an easy, conversational effort (RPE 3–4, often called zone 2), set by the talk test rather than pace. Weekly time on the three core sessions rises from about 85 to about 125 minutes, never more than about 10% above the previous full week, with a cutback in week 4 and an easier final week that ends with a 30-minute aerobic check against your week 1 baseline. Running is the default, but a bike, rower or brisk incline walk works for any session, and one or two optional easy cross-training days let you train three to five days a week.', 'd4e79e61-b816-5c53-a64a-537abe13101d', 'beginner', 8, 3, 40, array['improve_conditioning', 'general_health', 'type:cardio']::text[], array['bodyweight']::text[], 'pro', 'Core weekly time goes about 86 → 95 → 104 minutes, drops about 25% in the week 4 cutback, then 107 → 117 → 125 minutes — never more than about 10% above the previous full week. The long session grows from 35 to 55 minutes, Monday''s easy session from 25 to 32 minutes with 4 → 6 strides, and from week 5 Wednesday adds steady tempo at RPE 6 (2 × 5 → 3 × 5 → 2 × 8 minutes). Week 8 is easier and ends with a 30-minute aerobic check. Repeat a week if the long session left you sore or drained the next day.', array['5 minutes of brisk walking, or very easy pedalling or rowing', 'Leg swings × 10 each leg', 'Ankle circles × 10 each direction', 'Start the session slower than you need to; settle into the effort over the first 5 minutes']::text[], array['5 minutes of easy walking or spinning', 'Calf stretch — 30 seconds per side', 'Hip flexor stretch — 30 seconds per side']::text[], false, false, true, 'curated') on conflict (slug) do update set name = excluded.name, summary = excluded.summary, description = excluded.description, category_id = excluded.category_id, difficulty = excluded.difficulty, duration_weeks = excluded.duration_weeks, days_per_week = excluded.days_per_week, session_minutes = excluded.session_minutes, goals = excluded.goals, equipment = excluded.equipment, tier = excluded.tier, progression = excluded.progression, warmup = excluded.warmup, cooldown = excluded.cooldown, low_impact = excluded.low_impact, needs_specialist_review = excluded.needs_specialist_review, is_published = true;
+delete from public.program_weeks where program_id = '73b9ccc2-c7b7-5e02-87db-dc8d54641f63' and week_number > 8;
+insert into public.program_weeks (id, program_id, week_number, focus, is_deload) values ('ece2bf6e-ae08-5566-a83f-a293e03db93f', '73b9ccc2-c7b7-5e02-87db-dc8d54641f63', 1, 'Week 1: about 86 minutes of easy aerobic work — find your talk-test effort; optional easy days up to 20 minutes each', false) on conflict (id) do update set focus = excluded.focus, is_deload = excluded.is_deload;
+delete from public.program_days where week_id = 'ece2bf6e-ae08-5566-a83f-a293e03db93f' and day_number > 3;
+insert into public.program_days (id, week_id, day_number, name, focus, estimated_minutes, warmup, cooldown) values ('37b2c39d-2d41-5061-9976-e04452c267a5', 'ece2bf6e-ae08-5566-a83f-a293e03db93f', 1, 'Mon · Easy Aerobic + Strides', 'Easy, conversational aerobic work, then a few relaxed strides', 40, array['5 minutes of brisk walking, or very easy pedalling or rowing', 'Leg swings × 10 each leg', 'Ankle circles × 10 each direction', 'Start the session slower than you need to; settle into the effort over the first 5 minutes']::text[], array['5 minutes of easy walking or spinning', 'Calf stretch — 30 seconds per side', 'Hip flexor stretch — 30 seconds per side']::text[]) on conflict (id) do update set name = excluded.name, focus = excluded.focus, estimated_minutes = excluded.estimated_minutes, warmup = excluded.warmup, cooldown = excluded.cooldown;
+delete from public.program_exercises where day_id = '37b2c39d-2d41-5061-9976-e04452c267a5';
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('37b2c39d-2d41-5061-9976-e04452c267a5', '66025b63-53b7-5ff1-826c-f453bb5b1281', 0, 1, null, 1500, 0, null, 4, '25 minutes at RPE 3–4 — you can talk in full sentences. Running is the default; a bike, rower or brisk incline walk for the same time at the same effort counts the same.');
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('37b2c39d-2d41-5061-9976-e04452c267a5', '4cb3891d-4641-5c34-a598-f8954f2d52f2', 1, 4, null, 20, 60, null, 6, 'Strides: 4 × 20 s quick and relaxed — smooth, not a sprint — with an easy walk back (the rest). On a bike or rower, 20 s at a brisker cadence; walkers, 20 s of faster walking.');
+insert into public.program_days (id, week_id, day_number, name, focus, estimated_minutes, warmup, cooldown) values ('f4b63191-f44c-5012-bdc4-73f0e40f2113', 'ece2bf6e-ae08-5566-a83f-a293e03db93f', 2, 'Wed · Easy Aerobic', 'Continuous easy aerobic work', 35, array['5 minutes of brisk walking, or very easy pedalling or rowing', 'Leg swings × 10 each leg', 'Ankle circles × 10 each direction', 'Start the session slower than you need to; settle into the effort over the first 5 minutes']::text[], array['5 minutes of easy walking or spinning', 'Calf stretch — 30 seconds per side', 'Hip flexor stretch — 30 seconds per side']::text[]) on conflict (id) do update set name = excluded.name, focus = excluded.focus, estimated_minutes = excluded.estimated_minutes, warmup = excluded.warmup, cooldown = excluded.cooldown;
+delete from public.program_exercises where day_id = 'f4b63191-f44c-5012-bdc4-73f0e40f2113';
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('f4b63191-f44c-5012-bdc4-73f0e40f2113', '66025b63-53b7-5ff1-826c-f453bb5b1281', 0, 1, null, 1500, 0, null, 4, '25 minutes at RPE 3–4 — you can talk in full sentences. Running is the default; a bike, rower or brisk incline walk for the same time at the same effort counts the same.');
+insert into public.program_days (id, week_id, day_number, name, focus, estimated_minutes, warmup, cooldown) values ('2cc0eb8c-3df7-5ea2-a31a-c21db3bae0d4', 'ece2bf6e-ae08-5566-a83f-a293e03db93f', 3, 'Sat · Long Easy Session', '35 minutes at easy effort', 45, array['5 minutes of brisk walking, or very easy pedalling or rowing', 'Leg swings × 10 each leg', 'Ankle circles × 10 each direction', 'Start the session slower than you need to; settle into the effort over the first 5 minutes']::text[], array['5 minutes of easy walking or spinning', 'Calf stretch — 30 seconds per side', 'Hip flexor stretch — 30 seconds per side']::text[]) on conflict (id) do update set name = excluded.name, focus = excluded.focus, estimated_minutes = excluded.estimated_minutes, warmup = excluded.warmup, cooldown = excluded.cooldown;
+delete from public.program_exercises where day_id = '2cc0eb8c-3df7-5ea2-a31a-c21db3bae0d4';
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('2cc0eb8c-3df7-5ea2-a31a-c21db3bae0d4', '66025b63-53b7-5ff1-826c-f453bb5b1281', 0, 1, null, 2100, 0, null, 4, '35 minutes at RPE 3–4 — you can talk in full sentences. Baseline: note the distance you have covered at 30 minutes (and average heart rate if you wear a monitor) — week 8 repeats this check. Running is the default; a bike, rower or brisk incline walk for the same time at the same effort counts the same.');
+insert into public.program_weeks (id, program_id, week_number, focus, is_deload) values ('9bc56ac9-edf8-5dc7-944f-4b72d90e5783', '73b9ccc2-c7b7-5e02-87db-dc8d54641f63', 2, 'Week 2: about 95 minutes of easy aerobic work and a 38-minute long session; optional easy days up to 20 minutes each', false) on conflict (id) do update set focus = excluded.focus, is_deload = excluded.is_deload;
+delete from public.program_days where week_id = '9bc56ac9-edf8-5dc7-944f-4b72d90e5783' and day_number > 3;
+insert into public.program_days (id, week_id, day_number, name, focus, estimated_minutes, warmup, cooldown) values ('e2fc13cf-de66-5244-b713-1c66b32e1498', '9bc56ac9-edf8-5dc7-944f-4b72d90e5783', 1, 'Mon · Easy Aerobic + Strides', 'Easy, conversational aerobic work, then a few relaxed strides', 45, array['5 minutes of brisk walking, or very easy pedalling or rowing', 'Leg swings × 10 each leg', 'Ankle circles × 10 each direction', 'Start the session slower than you need to; settle into the effort over the first 5 minutes']::text[], array['5 minutes of easy walking or spinning', 'Calf stretch — 30 seconds per side', 'Hip flexor stretch — 30 seconds per side']::text[]) on conflict (id) do update set name = excluded.name, focus = excluded.focus, estimated_minutes = excluded.estimated_minutes, warmup = excluded.warmup, cooldown = excluded.cooldown;
+delete from public.program_exercises where day_id = 'e2fc13cf-de66-5244-b713-1c66b32e1498';
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('e2fc13cf-de66-5244-b713-1c66b32e1498', '66025b63-53b7-5ff1-826c-f453bb5b1281', 0, 1, null, 1620, 0, null, 4, '27 minutes at RPE 3–4 — you can talk in full sentences. Running is the default; a bike, rower or brisk incline walk for the same time at the same effort counts the same.');
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('e2fc13cf-de66-5244-b713-1c66b32e1498', '4cb3891d-4641-5c34-a598-f8954f2d52f2', 1, 5, null, 20, 60, null, 6, 'Strides: 5 × 20 s quick and relaxed — smooth, not a sprint — with an easy walk back (the rest). On a bike or rower, 20 s at a brisker cadence; walkers, 20 s of faster walking.');
+insert into public.program_days (id, week_id, day_number, name, focus, estimated_minutes, warmup, cooldown) values ('10bb73c0-cef3-578a-b21a-858d53d48b8b', '9bc56ac9-edf8-5dc7-944f-4b72d90e5783', 2, 'Wed · Easy Aerobic', 'Continuous easy aerobic work', 40, array['5 minutes of brisk walking, or very easy pedalling or rowing', 'Leg swings × 10 each leg', 'Ankle circles × 10 each direction', 'Start the session slower than you need to; settle into the effort over the first 5 minutes']::text[], array['5 minutes of easy walking or spinning', 'Calf stretch — 30 seconds per side', 'Hip flexor stretch — 30 seconds per side']::text[]) on conflict (id) do update set name = excluded.name, focus = excluded.focus, estimated_minutes = excluded.estimated_minutes, warmup = excluded.warmup, cooldown = excluded.cooldown;
+delete from public.program_exercises where day_id = '10bb73c0-cef3-578a-b21a-858d53d48b8b';
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('10bb73c0-cef3-578a-b21a-858d53d48b8b', '66025b63-53b7-5ff1-826c-f453bb5b1281', 0, 1, null, 1680, 0, null, 4, '28 minutes at RPE 3–4 — you can talk in full sentences. Running is the default; a bike, rower or brisk incline walk for the same time at the same effort counts the same.');
+insert into public.program_days (id, week_id, day_number, name, focus, estimated_minutes, warmup, cooldown) values ('18e556d4-391d-50b6-8881-34057d088708', '9bc56ac9-edf8-5dc7-944f-4b72d90e5783', 3, 'Sat · Long Easy Session', '38 minutes at easy effort', 50, array['5 minutes of brisk walking, or very easy pedalling or rowing', 'Leg swings × 10 each leg', 'Ankle circles × 10 each direction', 'Start the session slower than you need to; settle into the effort over the first 5 minutes']::text[], array['5 minutes of easy walking or spinning', 'Calf stretch — 30 seconds per side', 'Hip flexor stretch — 30 seconds per side']::text[]) on conflict (id) do update set name = excluded.name, focus = excluded.focus, estimated_minutes = excluded.estimated_minutes, warmup = excluded.warmup, cooldown = excluded.cooldown;
+delete from public.program_exercises where day_id = '18e556d4-391d-50b6-8881-34057d088708';
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('18e556d4-391d-50b6-8881-34057d088708', '66025b63-53b7-5ff1-826c-f453bb5b1281', 0, 1, null, 2280, 0, null, 4, '38 minutes at RPE 3–4 — you can talk in full sentences. The week''s longest session — easy all the way; slow down rather than push. Running is the default; a bike, rower or brisk incline walk for the same time at the same effort counts the same.');
+insert into public.program_weeks (id, program_id, week_number, focus, is_deload) values ('91739a9c-cd57-5e7e-bbed-618afc869429', '73b9ccc2-c7b7-5e02-87db-dc8d54641f63', 3, 'Week 3: about 104 minutes of easy aerobic work and a 42-minute long session; optional easy days up to 20 minutes each', false) on conflict (id) do update set focus = excluded.focus, is_deload = excluded.is_deload;
+delete from public.program_days where week_id = '91739a9c-cd57-5e7e-bbed-618afc869429' and day_number > 3;
+insert into public.program_days (id, week_id, day_number, name, focus, estimated_minutes, warmup, cooldown) values ('dfa47df5-1f17-5dff-ba7b-4ae780f43865', '91739a9c-cd57-5e7e-bbed-618afc869429', 1, 'Mon · Easy Aerobic + Strides', 'Easy, conversational aerobic work, then a few relaxed strides', 50, array['5 minutes of brisk walking, or very easy pedalling or rowing', 'Leg swings × 10 each leg', 'Ankle circles × 10 each direction', 'Start the session slower than you need to; settle into the effort over the first 5 minutes']::text[], array['5 minutes of easy walking or spinning', 'Calf stretch — 30 seconds per side', 'Hip flexor stretch — 30 seconds per side']::text[]) on conflict (id) do update set name = excluded.name, focus = excluded.focus, estimated_minutes = excluded.estimated_minutes, warmup = excluded.warmup, cooldown = excluded.cooldown;
+delete from public.program_exercises where day_id = 'dfa47df5-1f17-5dff-ba7b-4ae780f43865';
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('dfa47df5-1f17-5dff-ba7b-4ae780f43865', '66025b63-53b7-5ff1-826c-f453bb5b1281', 0, 1, null, 1800, 0, null, 4, '30 minutes at RPE 3–4 — you can talk in full sentences. Running is the default; a bike, rower or brisk incline walk for the same time at the same effort counts the same.');
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('dfa47df5-1f17-5dff-ba7b-4ae780f43865', '4cb3891d-4641-5c34-a598-f8954f2d52f2', 1, 6, null, 20, 60, null, 6, 'Strides: 6 × 20 s quick and relaxed — smooth, not a sprint — with an easy walk back (the rest). On a bike or rower, 20 s at a brisker cadence; walkers, 20 s of faster walking.');
+insert into public.program_days (id, week_id, day_number, name, focus, estimated_minutes, warmup, cooldown) values ('50b50cf8-5850-56e7-b6d3-ee1b15b72e6a', '91739a9c-cd57-5e7e-bbed-618afc869429', 2, 'Wed · Easy Aerobic', 'Continuous easy aerobic work', 40, array['5 minutes of brisk walking, or very easy pedalling or rowing', 'Leg swings × 10 each leg', 'Ankle circles × 10 each direction', 'Start the session slower than you need to; settle into the effort over the first 5 minutes']::text[], array['5 minutes of easy walking or spinning', 'Calf stretch — 30 seconds per side', 'Hip flexor stretch — 30 seconds per side']::text[]) on conflict (id) do update set name = excluded.name, focus = excluded.focus, estimated_minutes = excluded.estimated_minutes, warmup = excluded.warmup, cooldown = excluded.cooldown;
+delete from public.program_exercises where day_id = '50b50cf8-5850-56e7-b6d3-ee1b15b72e6a';
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('50b50cf8-5850-56e7-b6d3-ee1b15b72e6a', '66025b63-53b7-5ff1-826c-f453bb5b1281', 0, 1, null, 1800, 0, null, 4, '30 minutes at RPE 3–4 — you can talk in full sentences. Running is the default; a bike, rower or brisk incline walk for the same time at the same effort counts the same.');
+insert into public.program_days (id, week_id, day_number, name, focus, estimated_minutes, warmup, cooldown) values ('3d72958b-dfd5-5276-b9fc-e5dc966c6097', '91739a9c-cd57-5e7e-bbed-618afc869429', 3, 'Sat · Long Easy Session', '42 minutes at easy effort', 55, array['5 minutes of brisk walking, or very easy pedalling or rowing', 'Leg swings × 10 each leg', 'Ankle circles × 10 each direction', 'Start the session slower than you need to; settle into the effort over the first 5 minutes']::text[], array['5 minutes of easy walking or spinning', 'Calf stretch — 30 seconds per side', 'Hip flexor stretch — 30 seconds per side']::text[]) on conflict (id) do update set name = excluded.name, focus = excluded.focus, estimated_minutes = excluded.estimated_minutes, warmup = excluded.warmup, cooldown = excluded.cooldown;
+delete from public.program_exercises where day_id = '3d72958b-dfd5-5276-b9fc-e5dc966c6097';
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('3d72958b-dfd5-5276-b9fc-e5dc966c6097', '66025b63-53b7-5ff1-826c-f453bb5b1281', 0, 1, null, 2520, 0, null, 4, '42 minutes at RPE 3–4 — you can talk in full sentences. The week''s longest session — easy all the way; slow down rather than push. Running is the default; a bike, rower or brisk incline walk for the same time at the same effort counts the same.');
+insert into public.program_weeks (id, program_id, week_number, focus, is_deload) values ('53ba58bb-0e97-5a84-8af2-f769e45bd8c0', '73b9ccc2-c7b7-5e02-87db-dc8d54641f63', 4, 'Cutback week: about 75 minutes, roughly 25% less than week 3 — no optional extra days, let your body absorb the work', true) on conflict (id) do update set focus = excluded.focus, is_deload = excluded.is_deload;
+delete from public.program_days where week_id = '53ba58bb-0e97-5a84-8af2-f769e45bd8c0' and day_number > 3;
+insert into public.program_days (id, week_id, day_number, name, focus, estimated_minutes, warmup, cooldown) values ('45ac962f-d98e-5f8a-b547-1e20ddc74196', '53ba58bb-0e97-5a84-8af2-f769e45bd8c0', 1, 'Mon · Easy Aerobic + Strides', 'Easy, conversational aerobic work, then a few relaxed strides', 40, array['5 minutes of brisk walking, or very easy pedalling or rowing', 'Leg swings × 10 each leg', 'Ankle circles × 10 each direction', 'Start the session slower than you need to; settle into the effort over the first 5 minutes']::text[], array['5 minutes of easy walking or spinning', 'Calf stretch — 30 seconds per side', 'Hip flexor stretch — 30 seconds per side']::text[]) on conflict (id) do update set name = excluded.name, focus = excluded.focus, estimated_minutes = excluded.estimated_minutes, warmup = excluded.warmup, cooldown = excluded.cooldown;
+delete from public.program_exercises where day_id = '45ac962f-d98e-5f8a-b547-1e20ddc74196';
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('45ac962f-d98e-5f8a-b547-1e20ddc74196', '66025b63-53b7-5ff1-826c-f453bb5b1281', 0, 1, null, 1320, 0, null, 4, '22 minutes at RPE 3–4 — you can talk in full sentences. Running is the default; a bike, rower or brisk incline walk for the same time at the same effort counts the same.');
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('45ac962f-d98e-5f8a-b547-1e20ddc74196', '4cb3891d-4641-5c34-a598-f8954f2d52f2', 1, 4, null, 20, 60, null, 6, 'Strides: 4 × 20 s quick and relaxed — smooth, not a sprint — with an easy walk back (the rest). On a bike or rower, 20 s at a brisker cadence; walkers, 20 s of faster walking.');
+insert into public.program_days (id, week_id, day_number, name, focus, estimated_minutes, warmup, cooldown) values ('32706159-5de6-590e-bd33-2ddc2049cf97', '53ba58bb-0e97-5a84-8af2-f769e45bd8c0', 2, 'Wed · Easy Aerobic', 'Continuous easy aerobic work', 35, array['5 minutes of brisk walking, or very easy pedalling or rowing', 'Leg swings × 10 each leg', 'Ankle circles × 10 each direction', 'Start the session slower than you need to; settle into the effort over the first 5 minutes']::text[], array['5 minutes of easy walking or spinning', 'Calf stretch — 30 seconds per side', 'Hip flexor stretch — 30 seconds per side']::text[]) on conflict (id) do update set name = excluded.name, focus = excluded.focus, estimated_minutes = excluded.estimated_minutes, warmup = excluded.warmup, cooldown = excluded.cooldown;
+delete from public.program_exercises where day_id = '32706159-5de6-590e-bd33-2ddc2049cf97';
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('32706159-5de6-590e-bd33-2ddc2049cf97', '66025b63-53b7-5ff1-826c-f453bb5b1281', 0, 1, null, 1320, 0, null, 4, '22 minutes at RPE 3–4 — you can talk in full sentences. Running is the default; a bike, rower or brisk incline walk for the same time at the same effort counts the same.');
+insert into public.program_days (id, week_id, day_number, name, focus, estimated_minutes, warmup, cooldown) values ('a3488698-d120-5e39-8ac7-fd63cc7fd66c', '53ba58bb-0e97-5a84-8af2-f769e45bd8c0', 3, 'Sat · Long Easy Session', '30 minutes at easy effort', 40, array['5 minutes of brisk walking, or very easy pedalling or rowing', 'Leg swings × 10 each leg', 'Ankle circles × 10 each direction', 'Start the session slower than you need to; settle into the effort over the first 5 minutes']::text[], array['5 minutes of easy walking or spinning', 'Calf stretch — 30 seconds per side', 'Hip flexor stretch — 30 seconds per side']::text[]) on conflict (id) do update set name = excluded.name, focus = excluded.focus, estimated_minutes = excluded.estimated_minutes, warmup = excluded.warmup, cooldown = excluded.cooldown;
+delete from public.program_exercises where day_id = 'a3488698-d120-5e39-8ac7-fd63cc7fd66c';
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('a3488698-d120-5e39-8ac7-fd63cc7fd66c', '66025b63-53b7-5ff1-826c-f453bb5b1281', 0, 1, null, 1800, 0, null, 4, '30 minutes at RPE 3–4 — you can talk in full sentences. The week''s longest session — easy all the way; slow down rather than push. Running is the default; a bike, rower or brisk incline walk for the same time at the same effort counts the same.');
+insert into public.program_weeks (id, program_id, week_number, focus, is_deload) values ('f5dcc945-4c81-5762-8236-db0c536b03b0', '73b9ccc2-c7b7-5e02-87db-dc8d54641f63', 5, 'Week 5: about 107 minutes, with 2 × 5 minutes of steady tempo on Wednesday; optional easy days up to 20 minutes each', false) on conflict (id) do update set focus = excluded.focus, is_deload = excluded.is_deload;
+delete from public.program_days where week_id = 'f5dcc945-4c81-5762-8236-db0c536b03b0' and day_number > 3;
+insert into public.program_days (id, week_id, day_number, name, focus, estimated_minutes, warmup, cooldown) values ('b427472c-7133-5122-bc50-4a26f18e36e1', 'f5dcc945-4c81-5762-8236-db0c536b03b0', 1, 'Mon · Easy Aerobic + Strides', 'Easy, conversational aerobic work, then a few relaxed strides', 50, array['5 minutes of brisk walking, or very easy pedalling or rowing', 'Leg swings × 10 each leg', 'Ankle circles × 10 each direction', 'Start the session slower than you need to; settle into the effort over the first 5 minutes']::text[], array['5 minutes of easy walking or spinning', 'Calf stretch — 30 seconds per side', 'Hip flexor stretch — 30 seconds per side']::text[]) on conflict (id) do update set name = excluded.name, focus = excluded.focus, estimated_minutes = excluded.estimated_minutes, warmup = excluded.warmup, cooldown = excluded.cooldown;
+delete from public.program_exercises where day_id = 'b427472c-7133-5122-bc50-4a26f18e36e1';
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('b427472c-7133-5122-bc50-4a26f18e36e1', '66025b63-53b7-5ff1-826c-f453bb5b1281', 0, 1, null, 1800, 0, null, 4, '30 minutes at RPE 3–4 — you can talk in full sentences. Running is the default; a bike, rower or brisk incline walk for the same time at the same effort counts the same.');
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('b427472c-7133-5122-bc50-4a26f18e36e1', '4cb3891d-4641-5c34-a598-f8954f2d52f2', 1, 6, null, 20, 60, null, 6, 'Strides: 6 × 20 s quick and relaxed — smooth, not a sprint — with an easy walk back (the rest). On a bike or rower, 20 s at a brisker cadence; walkers, 20 s of faster walking.');
+insert into public.program_days (id, week_id, day_number, name, focus, estimated_minutes, warmup, cooldown) values ('b3ef6e11-60c3-524e-a202-a59d0143f669', 'f5dcc945-4c81-5762-8236-db0c536b03b0', 2, 'Wed · Easy + Steady Tempo', 'Easy aerobic work with 2 × 5 min of steady tempo', 45, array['5 minutes of brisk walking, or very easy pedalling or rowing', 'Leg swings × 10 each leg', 'Ankle circles × 10 each direction', 'Start the session slower than you need to; settle into the effort over the first 5 minutes']::text[], array['5 minutes of easy walking or spinning', 'Calf stretch — 30 seconds per side', 'Hip flexor stretch — 30 seconds per side']::text[]) on conflict (id) do update set name = excluded.name, focus = excluded.focus, estimated_minutes = excluded.estimated_minutes, warmup = excluded.warmup, cooldown = excluded.cooldown;
+delete from public.program_exercises where day_id = 'b3ef6e11-60c3-524e-a202-a59d0143f669';
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('b3ef6e11-60c3-524e-a202-a59d0143f669', '66025b63-53b7-5ff1-826c-f453bb5b1281', 0, 1, null, 1200, 0, null, 4, '20 minutes at RPE 3–4 — you can talk in full sentences. Do this before the tempo blocks.');
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('b3ef6e11-60c3-524e-a202-a59d0143f669', '4cb3891d-4641-5c34-a598-f8954f2d52f2', 1, 2, null, 300, 120, null, 6, 'Steady tempo: 2 × 5 minutes at RPE 6 — comfortably moderate, short phrases only, never a race — with 2 minutes easy between. Same effort on a bike or rower.');
+insert into public.program_days (id, week_id, day_number, name, focus, estimated_minutes, warmup, cooldown) values ('5e8e3cba-2757-58a3-a5a2-a7296139eefe', 'f5dcc945-4c81-5762-8236-db0c536b03b0', 3, 'Sat · Long Easy Session', '45 minutes at easy effort', 55, array['5 minutes of brisk walking, or very easy pedalling or rowing', 'Leg swings × 10 each leg', 'Ankle circles × 10 each direction', 'Start the session slower than you need to; settle into the effort over the first 5 minutes']::text[], array['5 minutes of easy walking or spinning', 'Calf stretch — 30 seconds per side', 'Hip flexor stretch — 30 seconds per side']::text[]) on conflict (id) do update set name = excluded.name, focus = excluded.focus, estimated_minutes = excluded.estimated_minutes, warmup = excluded.warmup, cooldown = excluded.cooldown;
+delete from public.program_exercises where day_id = '5e8e3cba-2757-58a3-a5a2-a7296139eefe';
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('5e8e3cba-2757-58a3-a5a2-a7296139eefe', '66025b63-53b7-5ff1-826c-f453bb5b1281', 0, 1, null, 2700, 0, null, 4, '45 minutes at RPE 3–4 — you can talk in full sentences. The week''s longest session — easy all the way; slow down rather than push. Running is the default; a bike, rower or brisk incline walk for the same time at the same effort counts the same.');
+insert into public.program_weeks (id, program_id, week_number, focus, is_deload) values ('6ce1a896-b051-5dd2-8c3c-13223be0946f', '73b9ccc2-c7b7-5e02-87db-dc8d54641f63', 6, 'Week 6: about 117 minutes, with 3 × 5 minutes of steady tempo on Wednesday; optional easy days up to 20 minutes each', false) on conflict (id) do update set focus = excluded.focus, is_deload = excluded.is_deload;
+delete from public.program_days where week_id = '6ce1a896-b051-5dd2-8c3c-13223be0946f' and day_number > 3;
+insert into public.program_days (id, week_id, day_number, name, focus, estimated_minutes, warmup, cooldown) values ('0283556a-115a-5573-aed8-3c57f76c7fb5', '6ce1a896-b051-5dd2-8c3c-13223be0946f', 1, 'Mon · Easy Aerobic + Strides', 'Easy, conversational aerobic work, then a few relaxed strides', 50, array['5 minutes of brisk walking, or very easy pedalling or rowing', 'Leg swings × 10 each leg', 'Ankle circles × 10 each direction', 'Start the session slower than you need to; settle into the effort over the first 5 minutes']::text[], array['5 minutes of easy walking or spinning', 'Calf stretch — 30 seconds per side', 'Hip flexor stretch — 30 seconds per side']::text[]) on conflict (id) do update set name = excluded.name, focus = excluded.focus, estimated_minutes = excluded.estimated_minutes, warmup = excluded.warmup, cooldown = excluded.cooldown;
+delete from public.program_exercises where day_id = '0283556a-115a-5573-aed8-3c57f76c7fb5';
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('0283556a-115a-5573-aed8-3c57f76c7fb5', '66025b63-53b7-5ff1-826c-f453bb5b1281', 0, 1, null, 1800, 0, null, 4, '30 minutes at RPE 3–4 — you can talk in full sentences. Running is the default; a bike, rower or brisk incline walk for the same time at the same effort counts the same.');
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('0283556a-115a-5573-aed8-3c57f76c7fb5', '4cb3891d-4641-5c34-a598-f8954f2d52f2', 1, 6, null, 20, 60, null, 6, 'Strides: 6 × 20 s quick and relaxed — smooth, not a sprint — with an easy walk back (the rest). On a bike or rower, 20 s at a brisker cadence; walkers, 20 s of faster walking.');
+insert into public.program_days (id, week_id, day_number, name, focus, estimated_minutes, warmup, cooldown) values ('ac36c984-9a62-55a7-8f65-4f859d299cab', '6ce1a896-b051-5dd2-8c3c-13223be0946f', 2, 'Wed · Easy + Steady Tempo', 'Easy aerobic work with 3 × 5 min of steady tempo', 50, array['5 minutes of brisk walking, or very easy pedalling or rowing', 'Leg swings × 10 each leg', 'Ankle circles × 10 each direction', 'Start the session slower than you need to; settle into the effort over the first 5 minutes']::text[], array['5 minutes of easy walking or spinning', 'Calf stretch — 30 seconds per side', 'Hip flexor stretch — 30 seconds per side']::text[]) on conflict (id) do update set name = excluded.name, focus = excluded.focus, estimated_minutes = excluded.estimated_minutes, warmup = excluded.warmup, cooldown = excluded.cooldown;
+delete from public.program_exercises where day_id = 'ac36c984-9a62-55a7-8f65-4f859d299cab';
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('ac36c984-9a62-55a7-8f65-4f859d299cab', '66025b63-53b7-5ff1-826c-f453bb5b1281', 0, 1, null, 1200, 0, null, 4, '20 minutes at RPE 3–4 — you can talk in full sentences. Do this before the tempo blocks.');
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('ac36c984-9a62-55a7-8f65-4f859d299cab', '4cb3891d-4641-5c34-a598-f8954f2d52f2', 1, 3, null, 300, 120, null, 6, 'Steady tempo: 3 × 5 minutes at RPE 6 — comfortably moderate, short phrases only, never a race — with 2 minutes easy between. Same effort on a bike or rower.');
+insert into public.program_days (id, week_id, day_number, name, focus, estimated_minutes, warmup, cooldown) values ('3b258716-84f0-5413-af38-a021a6e6db6e', '6ce1a896-b051-5dd2-8c3c-13223be0946f', 3, 'Sat · Long Easy Session', '50 minutes at easy effort', 60, array['5 minutes of brisk walking, or very easy pedalling or rowing', 'Leg swings × 10 each leg', 'Ankle circles × 10 each direction', 'Start the session slower than you need to; settle into the effort over the first 5 minutes']::text[], array['5 minutes of easy walking or spinning', 'Calf stretch — 30 seconds per side', 'Hip flexor stretch — 30 seconds per side']::text[]) on conflict (id) do update set name = excluded.name, focus = excluded.focus, estimated_minutes = excluded.estimated_minutes, warmup = excluded.warmup, cooldown = excluded.cooldown;
+delete from public.program_exercises where day_id = '3b258716-84f0-5413-af38-a021a6e6db6e';
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('3b258716-84f0-5413-af38-a021a6e6db6e', '66025b63-53b7-5ff1-826c-f453bb5b1281', 0, 1, null, 3000, 0, null, 4, '50 minutes at RPE 3–4 — you can talk in full sentences. The week''s longest session — easy all the way; slow down rather than push. Running is the default; a bike, rower or brisk incline walk for the same time at the same effort counts the same.');
+insert into public.program_weeks (id, program_id, week_number, focus, is_deload) values ('222bce0a-2810-551f-bf29-2c6f08f4782f', '73b9ccc2-c7b7-5e02-87db-dc8d54641f63', 7, 'Week 7: about 125 minutes, with 2 × 8 minutes of steady tempo on Wednesday; optional easy days up to 20 minutes each', false) on conflict (id) do update set focus = excluded.focus, is_deload = excluded.is_deload;
+delete from public.program_days where week_id = '222bce0a-2810-551f-bf29-2c6f08f4782f' and day_number > 3;
+insert into public.program_days (id, week_id, day_number, name, focus, estimated_minutes, warmup, cooldown) values ('6b1cebf2-eb06-5fa1-a76d-3d180757b0e8', '222bce0a-2810-551f-bf29-2c6f08f4782f', 1, 'Mon · Easy Aerobic + Strides', 'Easy, conversational aerobic work, then a few relaxed strides', 50, array['5 minutes of brisk walking, or very easy pedalling or rowing', 'Leg swings × 10 each leg', 'Ankle circles × 10 each direction', 'Start the session slower than you need to; settle into the effort over the first 5 minutes']::text[], array['5 minutes of easy walking or spinning', 'Calf stretch — 30 seconds per side', 'Hip flexor stretch — 30 seconds per side']::text[]) on conflict (id) do update set name = excluded.name, focus = excluded.focus, estimated_minutes = excluded.estimated_minutes, warmup = excluded.warmup, cooldown = excluded.cooldown;
+delete from public.program_exercises where day_id = '6b1cebf2-eb06-5fa1-a76d-3d180757b0e8';
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('6b1cebf2-eb06-5fa1-a76d-3d180757b0e8', '66025b63-53b7-5ff1-826c-f453bb5b1281', 0, 1, null, 1920, 0, null, 4, '32 minutes at RPE 3–4 — you can talk in full sentences. Running is the default; a bike, rower or brisk incline walk for the same time at the same effort counts the same.');
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('6b1cebf2-eb06-5fa1-a76d-3d180757b0e8', '4cb3891d-4641-5c34-a598-f8954f2d52f2', 1, 6, null, 20, 60, null, 6, 'Strides: 6 × 20 s quick and relaxed — smooth, not a sprint — with an easy walk back (the rest). On a bike or rower, 20 s at a brisker cadence; walkers, 20 s of faster walking.');
+insert into public.program_days (id, week_id, day_number, name, focus, estimated_minutes, warmup, cooldown) values ('4eac14dc-babb-538f-b9d6-cb1c655d490b', '222bce0a-2810-551f-bf29-2c6f08f4782f', 2, 'Wed · Easy + Steady Tempo', 'Easy aerobic work with 2 × 8 min of steady tempo', 50, array['5 minutes of brisk walking, or very easy pedalling or rowing', 'Leg swings × 10 each leg', 'Ankle circles × 10 each direction', 'Start the session slower than you need to; settle into the effort over the first 5 minutes']::text[], array['5 minutes of easy walking or spinning', 'Calf stretch — 30 seconds per side', 'Hip flexor stretch — 30 seconds per side']::text[]) on conflict (id) do update set name = excluded.name, focus = excluded.focus, estimated_minutes = excluded.estimated_minutes, warmup = excluded.warmup, cooldown = excluded.cooldown;
+delete from public.program_exercises where day_id = '4eac14dc-babb-538f-b9d6-cb1c655d490b';
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('4eac14dc-babb-538f-b9d6-cb1c655d490b', '66025b63-53b7-5ff1-826c-f453bb5b1281', 0, 1, null, 1200, 0, null, 4, '20 minutes at RPE 3–4 — you can talk in full sentences. Do this before the tempo blocks.');
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('4eac14dc-babb-538f-b9d6-cb1c655d490b', '4cb3891d-4641-5c34-a598-f8954f2d52f2', 1, 2, null, 480, 120, null, 6, 'Steady tempo: 2 × 8 minutes at RPE 6 — comfortably moderate, short phrases only, never a race — with 2 minutes easy between. Same effort on a bike or rower.');
+insert into public.program_days (id, week_id, day_number, name, focus, estimated_minutes, warmup, cooldown) values ('fcf60c73-89b8-5c91-9a7f-2fac50b040e7', '222bce0a-2810-551f-bf29-2c6f08f4782f', 3, 'Sat · Long Easy Session', '55 minutes at easy effort', 65, array['5 minutes of brisk walking, or very easy pedalling or rowing', 'Leg swings × 10 each leg', 'Ankle circles × 10 each direction', 'Start the session slower than you need to; settle into the effort over the first 5 minutes']::text[], array['5 minutes of easy walking or spinning', 'Calf stretch — 30 seconds per side', 'Hip flexor stretch — 30 seconds per side']::text[]) on conflict (id) do update set name = excluded.name, focus = excluded.focus, estimated_minutes = excluded.estimated_minutes, warmup = excluded.warmup, cooldown = excluded.cooldown;
+delete from public.program_exercises where day_id = 'fcf60c73-89b8-5c91-9a7f-2fac50b040e7';
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('fcf60c73-89b8-5c91-9a7f-2fac50b040e7', '66025b63-53b7-5ff1-826c-f453bb5b1281', 0, 1, null, 3300, 0, null, 4, '55 minutes at RPE 3–4 — you can talk in full sentences. The week''s longest session — easy all the way; slow down rather than push. Running is the default; a bike, rower or brisk incline walk for the same time at the same effort counts the same.');
+insert into public.program_weeks (id, program_id, week_number, focus, is_deload) values ('08140994-5339-5f24-b786-d4380653dc10', '73b9ccc2-c7b7-5e02-87db-dc8d54641f63', 8, 'Easier final week: about 81 minutes, no optional extra days, then the 30-minute aerobic check on Saturday', true) on conflict (id) do update set focus = excluded.focus, is_deload = excluded.is_deload;
+delete from public.program_days where week_id = '08140994-5339-5f24-b786-d4380653dc10' and day_number > 3;
+insert into public.program_days (id, week_id, day_number, name, focus, estimated_minutes, warmup, cooldown) values ('2ec4e133-f702-5fc4-b87a-c6c2757afd62', '08140994-5339-5f24-b786-d4380653dc10', 1, 'Mon · Easy Aerobic + Strides', 'Easy, conversational aerobic work, then a few relaxed strides', 40, array['5 minutes of brisk walking, or very easy pedalling or rowing', 'Leg swings × 10 each leg', 'Ankle circles × 10 each direction', 'Start the session slower than you need to; settle into the effort over the first 5 minutes']::text[], array['5 minutes of easy walking or spinning', 'Calf stretch — 30 seconds per side', 'Hip flexor stretch — 30 seconds per side']::text[]) on conflict (id) do update set name = excluded.name, focus = excluded.focus, estimated_minutes = excluded.estimated_minutes, warmup = excluded.warmup, cooldown = excluded.cooldown;
+delete from public.program_exercises where day_id = '2ec4e133-f702-5fc4-b87a-c6c2757afd62';
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('2ec4e133-f702-5fc4-b87a-c6c2757afd62', '66025b63-53b7-5ff1-826c-f453bb5b1281', 0, 1, null, 1500, 0, null, 4, '25 minutes at RPE 3–4 — you can talk in full sentences. Running is the default; a bike, rower or brisk incline walk for the same time at the same effort counts the same.');
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('2ec4e133-f702-5fc4-b87a-c6c2757afd62', '4cb3891d-4641-5c34-a598-f8954f2d52f2', 1, 4, null, 20, 60, null, 6, 'Strides: 4 × 20 s quick and relaxed — smooth, not a sprint — with an easy walk back (the rest). On a bike or rower, 20 s at a brisker cadence; walkers, 20 s of faster walking.');
+insert into public.program_days (id, week_id, day_number, name, focus, estimated_minutes, warmup, cooldown) values ('296a242b-092b-5234-9241-105769a7f14c', '08140994-5339-5f24-b786-d4380653dc10', 2, 'Wed · Easy Aerobic', 'Continuous easy aerobic work', 35, array['5 minutes of brisk walking, or very easy pedalling or rowing', 'Leg swings × 10 each leg', 'Ankle circles × 10 each direction', 'Start the session slower than you need to; settle into the effort over the first 5 minutes']::text[], array['5 minutes of easy walking or spinning', 'Calf stretch — 30 seconds per side', 'Hip flexor stretch — 30 seconds per side']::text[]) on conflict (id) do update set name = excluded.name, focus = excluded.focus, estimated_minutes = excluded.estimated_minutes, warmup = excluded.warmup, cooldown = excluded.cooldown;
+delete from public.program_exercises where day_id = '296a242b-092b-5234-9241-105769a7f14c';
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('296a242b-092b-5234-9241-105769a7f14c', '66025b63-53b7-5ff1-826c-f453bb5b1281', 0, 1, null, 1500, 0, null, 4, '25 minutes at RPE 3–4 — you can talk in full sentences. Running is the default; a bike, rower or brisk incline walk for the same time at the same effort counts the same.');
+insert into public.program_days (id, week_id, day_number, name, focus, estimated_minutes, warmup, cooldown) values ('a5218ddd-fdb8-5aed-a915-c326a44e66c2', '08140994-5339-5f24-b786-d4380653dc10', 3, 'Sat · 30-Minute Aerobic Check', '30 minutes continuous at easy effort — compare with week 1', 40, array['5 minutes of brisk walking, or very easy pedalling or rowing', 'Leg swings × 10 each leg', 'Ankle circles × 10 each direction', 'Start the session slower than you need to; settle into the effort over the first 5 minutes']::text[], array['5 minutes of easy walking or spinning', 'Calf stretch — 30 seconds per side', 'Hip flexor stretch — 30 seconds per side']::text[]) on conflict (id) do update set name = excluded.name, focus = excluded.focus, estimated_minutes = excluded.estimated_minutes, warmup = excluded.warmup, cooldown = excluded.cooldown;
+delete from public.program_exercises where day_id = 'a5218ddd-fdb8-5aed-a915-c326a44e66c2';
+insert into public.program_exercises (day_id, exercise_id, position, sets, reps, duration_seconds, rest_seconds, intensity, rpe, notes) values ('a5218ddd-fdb8-5aed-a915-c326a44e66c2', '66025b63-53b7-5ff1-826c-f453bb5b1281', 0, 1, null, 1800, 0, null, 4, '30 minutes at RPE 3–4 — you can talk in full sentences. Aerobic check: 30 minutes without stopping at the same easy effort, on the route or machine you used for week 1''s long session. Note your distance and compare it with week 1.');
 
 -- Feature flags
 insert into public.feature_flags (key, enabled, description) values ('ai_coach', true, 'Enable the AI coach for eligible plans.') on conflict (key) do update set description = excluded.description;

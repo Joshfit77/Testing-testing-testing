@@ -15,6 +15,13 @@ describe.skipIf(!available)("AI usage reservations and coach message integrity",
       p_plan_limit: 15,
       p_smart_limit: 15,
       p_per_minute: 100,
+      // Money and concurrency limits are generous here; ai-budget.test.ts covers them.
+      p_estimate_micros: 0,
+      p_user_budget_micros: 1_000_000_000,
+      p_global_budget_micros: 1_000_000_000_000,
+      p_max_inflight_user: 1000,
+      p_max_inflight_global: 100000,
+      p_inflight_seconds: 180,
       ...over,
     });
 
@@ -48,7 +55,7 @@ describe.skipIf(!available)("AI usage reservations and coach message integrity",
   });
 
   it("members can't reserve or write usage themselves", async () => {
-    const { error } = await user.client.rpc("reserve_ai_usage", { p_user_id: user.id, p_kind: "chat", p_tier: "fast", p_chat_limit: 999, p_plan_limit: 9, p_smart_limit: 9, p_per_minute: 99 });
+    const { error } = await user.client.rpc("reserve_ai_usage", { p_user_id: user.id, p_kind: "chat", p_tier: "fast", p_chat_limit: 999, p_plan_limit: 9, p_smart_limit: 9, p_per_minute: 99, p_estimate_micros: 0, p_user_budget_micros: 1_000_000_000, p_global_budget_micros: 1_000_000_000_000, p_max_inflight_user: 1000, p_max_inflight_global: 100000, p_inflight_seconds: 180 });
     expect(error).not.toBeNull();
     expect((await user.client.from("ai_usage_events").insert({ user_id: user.id, kind: "chat" })).error).not.toBeNull();
   });

@@ -45,11 +45,11 @@ describe("coach model routing", () => {
     expect(route("anything", 0, "plan")).toMatchObject({ tier: "smart", reason: "plan" });
   });
 
-  it("caps the larger model at about 10% of Pro's monthly allowance and keeps some for plan generation", () => {
+  it("caps the larger model at 10 requests a month (sized to the AI budget) and keeps some for plan generation", () => {
     const pro = getPlans().pro;
     expect(pro.aiMonthlyLimit).toBe(150);
-    expect(pro.aiSmartMonthlyLimit).toBe(15);
-    expect(pro.aiSmartMonthlyLimit / pro.aiMonthlyLimit).toBeCloseTo(0.1);
+    expect(pro.aiSmartMonthlyLimit).toBe(10);
+    expect(pro.aiSmartMonthlyLimit / pro.aiMonthlyLimit).toBeLessThanOrEqual(0.1);
     const complex = "Review my last month of training";
     const lastForChat = pro.aiSmartMonthlyLimit - PLAN_RESERVE - 1;
     expect(route(complex, lastForChat).tier).toBe("smart");

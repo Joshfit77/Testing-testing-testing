@@ -222,25 +222,4 @@ export const ADOPTED_CATALOG: Record<string, AdoptedCatalogEntry> = {
       STOP_RUNNING,
     ],
   },
-
-  "aerobic-base-run-walk": {
-    catalogNumber: 26,
-    milestones: [
-      "Completed three run/walk sessions: 8 × 1 min of easy running twice, then 7 × 90 s, with brisk walking in between.",
-      "Ran 8 × 90 s with 90-second walks twice and finished the week with 7 × 2 min at an easy, conversational effort.",
-      "Completed 8 × 2 min with 1-minute walks twice, then 6 × 3 min runs with 90-second walk breaks.",
-      "Ran 5 × 3 min twice and finished with 4 × 5 min of easy running with short walk breaks.",
-      "Completed 4 × 5 min twice and ran 3 × 8 min easy with 2-minute walks.",
-      "Ran 2 × 10 min twice and finished with two 15-minute easy runs separated by a 2-minute walk.",
-      "Ran 18 minutes without stopping twice and finished the week with 22 minutes of continuous easy running.",
-      "Goal week: two easier 15-minute runs, then 30 minutes of continuous easy running.",
-    ],
-    instructions: [
-      "Run at a talk-test pace: you should be able to speak in full sentences throughout, so slow down — even to a shuffle — whenever you can't, and treat the walk breaks as part of the plan.",
-      "Run three days a week with at least one rest day between runs, for example Mon/Wed/Fri or Tue/Thu/Sat.",
-      RUN_TRACKING,
-      "Missed a session? Carry on with the next session in order rather than doubling up; if you miss two or more sessions in a week, or the last session felt too hard, repeat that week before moving on.",
-      STOP_RUNNING,
-    ],
-  },
 };

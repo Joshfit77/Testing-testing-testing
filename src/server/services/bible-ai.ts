@@ -25,6 +25,8 @@ import { isDemoMode } from "@/server/demo";
 import { isAiConfigured, serverEnv } from "@/server/env";
 import { isFlagEnabled } from "@/server/flags";
 import { logError } from "@/server/log";
+import { aiBudgetConfig, notifyBudgetAlerts, type BudgetAlert } from "@/server/services/ai-budget";
+import { costMicros, tokenUsage } from "@/lib/domain/ai-economics";
 import { anthropicBaseUrl } from "@/server/test-overrides";
 
 /*
@@ -100,6 +102,19 @@ export async function askBible(userId: string, plan: Plan, questionRaw: string, 
   if (blocked) return blocked;
   const limits = plan === "pro" ? BIBLE_AI_LIMITS.pro : BIBLE_AI_LIMITS.free;
   const service = getServiceSupabase();
+  // The helper is free, so it has its own question limits; its cost still counts toward the app's monthly AI budget.
+  const { data: budgetMonth, error: budgetError } = await service.rpc("ai_budget_check", { p_global_budget_micros: aiBudgetConfig().globalMonthlyMicros });
+  if (budgetError) {
+    if (budgetError.message?.includes("ai_budget_global")) return { ok: false, code: "unavailable", error: "The Bible study helper is paused for the rest of this month. The Bible itself is always free to read and search." };
+    logError("bible_ai.budget", budgetError);
+    return { ok: false, code: "error", error: "Couldn't ask right now. Please try again." };
+  }
+  /** The provider bills every answered call, refusals included. Never throws. */
+  const settle = async (usage: Parameters<typeof tokenUsage>[0]) => {
+    const { data: alerts, error } = await service.rpc("ai_budget_settle", { p_month: budgetMonth, p_held: 0, p_cost: costMicros(model, tokenUsage(usage)) });
+    if (error) logError("bible_ai.budget_settle", error);
+    else if ((alerts as BudgetAlert[] | null)?.length) await notifyBudgetAlerts(alerts as BudgetAlert[]);
+  };
   const { data: usageId, error: quotaError } = await service.rpc("reserve_bible_ai_usage", { p_user_id: userId, p_per_minute: limits.perMinute, p_daily: limits.daily, p_monthly: limits.monthly });
   if (quotaError) {
     if (quotaError.message?.includes("bible_ai_rate_limited")) return { ok: false, code: "rate_limited", error: "That's a lot of questions at once. Please wait a minute." };
@@ -121,6 +136,7 @@ export async function askBible(userId: string, plan: Plan, questionRaw: string, 
         { role: "user" as const, content: buildBibleAiMessage(question, passages) },
       ],
     });
+    await settle(msg.usage);
     if (msg.stop_reason === "refusal") {
       // The model declined: nothing is saved, and the reservation is given back (a failed row isn't counted).
       const { error: releaseError } = await service.from("bible_ai_usage").update({ status: "failed", model }).eq("id", usageId as number);

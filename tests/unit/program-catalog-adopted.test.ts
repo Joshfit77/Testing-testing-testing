@@ -19,7 +19,6 @@ const EXPECTED_TIERS: Record<string, ProgramSeed["tier"]> = {
   "5k-training": "plus",
   "10k-training": "plus",
   "half-marathon-base-80-20": "plus",
-  "aerobic-base-run-walk": "pro",
 };
 
 /** The library as it would be without any adopted metadata, to prove adoption changes nothing else. */
@@ -35,7 +34,7 @@ async function unadoptedPrograms(): Promise<ProgramSeed[]> {
 }
 
 describe("adopted catalog programs", () => {
-  it("adopts the ten expected programs", () => {
+  it("adopts the nine expected programs", () => {
     expect(Object.keys(ADOPTED_CATALOG).sort()).toEqual(Object.keys(EXPECTED_TIERS).sort());
   });
 

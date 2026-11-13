@@ -36,9 +36,10 @@ describe.skipIf(!available)("prayer journal, practices, faith reminders and plan
     const { error: rErr } = await c.from("faith_reminders").insert({ user_id: alice.id, kind: "prayer", enabled: true, remind_at: "12:00", weekdays: [1, 3, 5] });
     if (rErr) throw rErr;
 
-    // A free published program with at least two days in week 1.
+    // A published program with at least two days in week 1 (every catalog program is Pro, so Alice gets Pro).
+    await grantPlan(alice, "pro");
     const svc = serviceClient();
-    const { data: prog } = await svc.from("training_programs").select("id, program_weeks!inner(week_number, program_days(id, day_number))").eq("is_published", true).eq("tier", "free").eq("program_weeks.week_number", 1).limit(1).single();
+    const { data: prog } = await svc.from("training_programs").select("id, program_weeks!inner(week_number, program_days(id, day_number))").eq("is_published", true).eq("program_weeks.week_number", 1).limit(1).single();
     const days = ((prog!.program_weeks as unknown as { program_days: { id: string; day_number: number }[] }[])[0]!.program_days ?? []).sort((a, b) => a.day_number - b.day_number);
     dayId = days[0]!.id;
     otherDayId = days[1]!.id;

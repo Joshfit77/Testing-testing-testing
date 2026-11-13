@@ -8,6 +8,7 @@ import type { Plan } from "@/lib/domain/types";
 import { AiError, withAiRequest } from "@/server/services/ai-coach";
 import { searchUsda } from "@/server/services/usda-local";
 import { logError } from "@/server/log";
+import { costMicros, tokenUsage } from "@/lib/domain/ai-economics";
 
 /**
  * Look up each item's search term in the bundled USDA database (no network, no AI; rules in `matchStrength`). A strong
@@ -83,7 +84,7 @@ export async function analyzeFoodPhoto(
     }
     const inputTokens = res.usage.input_tokens + (res.usage.cache_read_input_tokens ?? 0) + (res.usage.cache_creation_input_tokens ?? 0);
     if (res.stop_reason === "refusal" || !res.parsed_output) throw new AiError("provider", "The AI couldn't read that photo. Try another photo, or log the meal by search.");
-    return { value: res.parsed_output, inputTokens, outputTokens: res.usage.output_tokens };
+    return { value: res.parsed_output, inputTokens, outputTokens: res.usage.output_tokens, costMicros: costMicros(model, tokenUsage(res.usage)) };
   });
   const analysis = normalizeFoodPhoto(output);
   return { ...analysis, items: await matchToUsda(analysis.items) };

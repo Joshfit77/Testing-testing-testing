@@ -115,7 +115,8 @@ export const PUBLIC_PLAN_ORDER: Plan[] = ["free", "pro"];
  */
 export function getPlans(): Record<Plan, PlanConfig> {
   const proAi = envInt("PLAN_PRO_AI_MONTHLY_LIMIT", 150);
-  const proPlans = envInt("PLAN_PRO_AI_PLAN_MONTHLY_LIMIT", 15);
+  // Plan generations run on the larger model, so they are also bounded by aiSmartMonthlyLimit.
+  const proPlans = envInt("PLAN_PRO_AI_PLAN_MONTHLY_LIMIT", 10);
   const proYearly = envInt("PLAN_PRO_YEARLY_PRICE_CENTS", APPROVED_PRO_PRICE_CENTS.year);
   return {
     free: {
@@ -169,7 +170,9 @@ export function getPlans(): Record<Plan, PlanConfig> {
       features: [...FEATURES],
       aiMonthlyLimit: proAi,
       aiPlanMonthlyLimit: Math.min(proAi, proPlans),
-      aiSmartMonthlyLimit: Math.min(proAi, envInt("PLAN_PRO_AI_SMART_MONTHLY_LIMIT", Math.round(proAi * 0.1))),
+      // 10 larger-model requests (plans and complex questions): with 140 fast requests this fits the sustainable
+      // monthly AI budget per member even with a cold cache (sustainableAllowance in ai-economics.ts, AI_COST.md).
+      aiSmartMonthlyLimit: Math.min(proAi, envInt("PLAN_PRO_AI_SMART_MONTHLY_LIMIT", 10)),
       templateLimit: null,
       highlights: [
         "Everything in Free",

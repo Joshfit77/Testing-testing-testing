@@ -41,7 +41,7 @@ session length), not that the programming is right for any individual.
 | 23 | 5K Training: Run Your Best 5K | `5k-training` | Existing program, adopted | 8 weeks | 3 days/week | intermediate | Pro (legacy Plus tier) | Unverified (automated checks only) |
 | 24 | 10K Training: Build to 10 Kilometres | `10k-training` | Existing program, adopted | 10 weeks | 4 days/week | intermediate | Pro (legacy Plus tier) | Unverified (automated checks only) |
 | 25 | Half Marathon: 80/20 Base to Race | `half-marathon-base-80-20` | Existing program, adopted | 12 weeks | 4 days/week | intermediate | Pro (legacy Plus tier) | Unverified (automated checks only) |
-| 26 | First 5K: Run/Walk to 30 Minutes | `aerobic-base-run-walk` | Existing program, adopted | 8 weeks | 3 days/week | beginner | Pro | Unverified (automated checks only) |
+| 26 | Aerobic Endurance Builder: 8 Weeks | `aerobic-endurance-builder-8-week` | New (owner decision 2026-11-13) | 8 weeks | 3 days/week + up to 2 optional easy days | beginner | Pro | Unverified (automated checks only) |
 | 27 | Hybrid Strength + Running: 12-Week Strength-Priority Plan | `hybrid-strength-run-12-week` | New | 12 weeks | 5 days/week | intermediate | Pro | Unverified (automated checks only) |
 | 28 | Conditioning & Intervals: Bike, Rower and Kettlebell | `conditioning-intervals-8-week` | New | 8 weeks | 3 days/week | intermediate | Pro | Unverified (automated checks only) |
 | 29 | Full-Body Mobility: 6-Week Routine | `full-body-mobility-6-week` | New | 6 weeks | 5 days/week | beginner | Pro | Unverified (automated checks only) |
@@ -107,11 +107,13 @@ starts until the member taps Start, the server re-checks access, and the current
 
 ## Decisions for the owner
 
-1. **#26 Aerobic Endurance Builder.** Mapped to the existing "First 5K: Run/Walk to 30 Minutes" (8 weeks, 3 days),
-   which overlaps #22 (new 10-week run/walk to 5K). A dedicated 8-week, 3–5 day aerobic base program for people who
-   already run would match the brief better. Recommend: build it as a new program and keep the existing one as an
-   extra; say if you want that.
-2. **Professional review.** Before release, a qualified strength coach should review 1–32, a physiotherapist 21 and
+1. **#26 Aerobic Endurance Builder (decided 2026-11-13: build a dedicated program).** Built: 8 weeks, three core
+   sessions (easy + 20-second strides, easy with steady tempo from week 5, long easy), effort by talk test and RPE 3–6,
+   no paces; bike, rower or incline walk count the same; up to two optional 20-minute easy days (not counted toward
+   completion); cutback in week 4, easier final week with a 30-minute check against week 1. Week-to-week growth is
+   capped at 10%, and a test keeps it distinct from #22. The earlier mapping ("First 5K: Run/Walk to 30 Minutes") stays
+   in the library unchanged, without a catalog number.
+2. **Professional review (decided: all programs stay marked not professionally reviewed until they are).** Before release, a qualified strength coach should review 1–32, a physiotherapist 21 and
    29–32 (and anything aimed at older adults), and a registered dietitian 33–36 and 40.
-3. **Faith & Fitness programs as Pro.** The brief makes 38–40 Pro; the existing rule that the Faith section is always
+3. **Faith & Fitness programs as Pro (confirmed 2026-11-13).** 38–40 are Pro; the existing rule that the Faith section is always
    free is unchanged (#37, Scripture, devotionals, journal and journeys stay free).

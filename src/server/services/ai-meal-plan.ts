@@ -21,6 +21,7 @@ import { AiError, withAiRequest } from "@/server/services/ai-coach";
 import { addDaysIso, loadPlannerPrefs, loadPlannerTargets, planEntryRow, plannerSettings } from "@/server/services/meal-plan";
 import { loadBudgetContext } from "@/server/services/nutrition-targets";
 import { plannerDishes, type PlannerDish } from "@/server/services/recipes";
+import { costMicros, tokenUsage } from "@/lib/domain/ai-economics";
 
 export interface StoredDraft {
   start_date: string;
@@ -95,7 +96,7 @@ export async function draftAiMealPlan(
     });
     const inputTokens = res.usage.input_tokens + (res.usage.cache_read_input_tokens ?? 0) + (res.usage.cache_creation_input_tokens ?? 0);
     if (res.stop_reason === "refusal" || !res.parsed_output) throw new AiError("provider", "The AI couldn't draft a plan that time. Please try again.");
-    return { value: { output: res.parsed_output, model }, inputTokens, outputTokens: res.usage.output_tokens };
+    return { value: { output: res.parsed_output, model }, inputTokens, outputTokens: res.usage.output_tokens, costMicros: costMicros(model, tokenUsage(res.usage)) };
   });
 
   const draft = buildDraftFromAi(result.output, dishes, settings, dates);
