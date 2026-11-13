@@ -434,7 +434,7 @@ export function overheadPress(o: PressOpts): MotionDef {
       if (!inFront) return 0;
       const b = bar(s);
       if (clearance(0, b) >= 4) return 0;
-      return solve1D((L) => clearance(L, b) - 4, 0, 16);
+      return solve1D((L) => clearance(L, b) - 4, 0, 16, 14);
     };
     // The largest lean on the way up, applied on a smooth bump around the head so the head eases back and forward again.
     let peak = 0;
@@ -685,7 +685,7 @@ export function latPulldown(id: string, label: string): MotionDef {
   let peakS = 0.6;
   for (let s = 0; s <= 1.0001; s += 0.05) {
     if (clear(s, 0) >= 4) continue;
-    const dx = solve1D((v) => clear(s, v) - 4, 0, 25);
+    const dx = solve1D((v) => clear(s, v) - 4, 0, 25, 14);
     if (dx > peak) {
       peak = dx;
       peakS = s;
