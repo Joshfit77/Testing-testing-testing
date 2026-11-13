@@ -39,15 +39,44 @@ const JOG: Table = [
   [0.76, 44, 74, 0],
   [0.9, 32, 32, 4],
 ];
+// Top-speed sprinting. Touchdown with the shin close to vertical, the foot a little ahead of the hips (about 35 cm):
+// the lower leg swings out late in the recovery and is pulled back down and under ("pawing"), it does not reach out
+// on a straight knee (overstriding, a braking step).
 const SPRINT: Table = [
-  [0, 42, 24, 6],
-  [0.1, 28, 40, 16],
+  [0, 36, 26, 6],
+  [0.1, 24, 40, 16],
   [0.22, 0, 26, 6],
   [0.32, -22, 18, -26],
   [0.45, 8, 112, -14],
   [0.6, 62, 132, -4],
-  [0.75, 80, 82, 0],
-  [0.9, 62, 34, 6],
+  [0.75, 78, 92, 0],
+  [0.9, 56, 52, 6],
+];
+// Acceleration (the first steps of a sprint, body leaning well forward): longer ground contacts, the foot landing under
+// the hips with the shin angled forward (knee ahead of the ankle), a full push to an extended back leg, and a low,
+// quick recovery driving the knee forward. Hip angles are from vertical, as in the other tables.
+const ACCEL: Table = [
+  [0, 26, 56, 20],
+  [0.12, 12, 46, 24],
+  [0.26, -12, 26, 10],
+  [0.38, -28, 12, -22],
+  [0.5, -2, 88, -12],
+  [0.64, 42, 112, -4],
+  [0.78, 58, 98, 2],
+  [0.9, 44, 72, 12],
+];
+// Bounding: exaggerated running strides. A short, stiff ground contact under the hips with a full push to an extended
+// back leg, then a long flight held in a split (the lead knee driven up to about hip height, the push leg trailing
+// long behind) before the lead foot reaches down to land under the body.
+const BOUND: Table = [
+  [0, 26, 20, 6],
+  [0.1, 6, 34, 14],
+  [0.25, -22, 16, -24],
+  [0.38, -28, 28, -22],
+  [0.48, -20, 58, -12],
+  [0.62, 24, 112, -4],
+  [0.76, 76, 92, 0],
+  [0.88, 58, 50, 6],
 ];
 const MARCH: Table = [
   [0, 0, 2, 0],
@@ -122,14 +151,15 @@ function armHold(p: Pose, hold: CarryHold, hipR: number, hipL: number, k: number
 }
 
 export function gait(o: GaitOpts): MotionDef {
-  const table = o.kind === "walk" ? WALK : o.kind === "jog" || o.kind === "ladder" ? JOG : o.kind === "march" ? MARCH : o.kind === "askip" ? ASKIP : SPRINT;
+  const accelRun = o.kind === "accel" && (o.hold ?? "run") === "run";
+  const table = o.kind === "walk" ? WALK : o.kind === "jog" || o.kind === "ladder" ? JOG : o.kind === "march" ? MARCH : o.kind === "askip" ? ASKIP : accelRun ? ACCEL : o.kind === "bound" ? BOUND : SPRINT;
   const lean = o.lean ?? (o.kind === "walk" ? 3 : o.kind === "jog" || o.kind === "ladder" ? 8 : o.kind === "accel" ? 38 : o.kind === "march" ? 0 : o.kind === "askip" ? 2 : 12);
   const cycle = o.cycle ?? (o.kind === "walk" ? 1.15 : o.kind === "jog" ? 0.76 : o.kind === "ladder" ? 0.5 : o.kind === "march" ? 1.2 : o.kind === "askip" ? 0.9 : o.kind === "bound" ? 1 : 0.58);
   const hold = o.hold ?? (o.kind === "walk" || o.kind === "march" ? "swing" : "run");
   const k = o.stride ?? (o.kind === "ladder" ? 0.55 : o.kind === "bound" ? 1.15 : 1);
   const N = o.kind === "march" || o.kind === "askip" ? 8 : 10;
   // Stance windows (fraction of the stride from right-foot contact).
-  const stanceEnd = o.kind === "walk" || o.kind === "march" ? 0.5 : o.kind === "jog" || o.kind === "ladder" ? 0.34 : o.kind === "askip" ? 0.5 : 0.32;
+  const stanceEnd = o.kind === "walk" || o.kind === "march" ? 0.5 : o.kind === "jog" || o.kind === "ladder" ? 0.34 : o.kind === "askip" ? 0.5 : accelRun ? 0.36 : o.kind === "bound" ? 0.25 : 0.32;
   const frames: StepFrame[] = [];
   for (let i = 0; i < N; i++) {
     const ph = i / N;
@@ -331,6 +361,8 @@ export function aSkip(id: string, label: string): MotionDef {
 export function carry(id: string, label: string, hold: CarryHold): MotionDef {
   const props: PropDef[] = [];
   const shortStride = hold === "yoke" || hold === "keg" || hold === "zercher" || hold === "hug";
+  // Heavy implements at the sides: short, quick, controlled steps (a long, loping stride lets the load swing).
+  const sideLoad = hold === "farmer" || hold === "suitcase" || hold === "trap" || hold === "handles";
   switch (hold) {
     case "farmer":
       props.push(
@@ -376,8 +408,8 @@ export function carry(id: string, label: string, hold: CarryHold): MotionDef {
     label,
     kind: hold === "sled-push" ? "accel" : "walk",
     hold,
-    cycle: hold === "sled-push" ? 1.1 : shortStride ? 1.2 : 1.15,
-    stride: hold === "sled-push" ? 0.7 : shortStride ? 0.7 : 0.85,
+    cycle: hold === "sled-push" ? 1.1 : shortStride ? 1.2 : sideLoad ? 1.04 : 1.15,
+    stride: hold === "sled-push" ? 0.7 : shortStride ? 0.7 : sideLoad ? 0.72 : 0.85,
     lean: hold === "sled-push" ? 45 : hold === "strap" ? 14 : hold === "yoke" ? 2 : 3,
     props,
   });

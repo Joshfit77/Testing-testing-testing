@@ -353,16 +353,24 @@ export function coreMove(id: string, label: string, kind: CoreKind): MotionDef {
       ], { props: [{ id: "wall", kind: "wall", at: [wallX, 0], layer: "back" }], planted: ["R"], footGrounded: true });
     }
     case "pass-through": {
+      // Wide grip, arms straight: the band comes up in front, over the head and on down behind the body to the lower
+      // back, then back the same way. Seen from the side, the wide arms point partly out of the picture (drawn
+      // shortened) and the shoulder angle keeps turning past overhead (180°) to behind the body (about 320°), hence
+      // allowLimits below.
       const s = pose({ ...stanceLegs(1, 3, 0), ...both({ el: 0 }) });
-      const front = { ...s, ...both({ sh: 20, armD: 30 }) };
-      const over = { ...s, ...both({ sh: 175, armD: 55 }) };
-      const back = { ...s, ...both({ sh: 188, armD: 70 }), neck: 4 };
-      return M(FEET, [
-        { pose: front, dur: 1.4, hold: 0.2, ease: "inOut" },
-        { pose: over, dur: 1, ease: "linear" },
-        { pose: back, dur: 1, hold: 0.3, ease: "inOut" },
-        { pose: over, dur: 1.4, ease: "linear" },
-      ], { planted: ["L", "R"], footGrounded: true, props: [{ id: "band", kind: "band", at: { lm: "handL", dx: -6 }, to: { lm: "handR", dx: 6 }, layer: "near", variant: "gold" }] });
+      const arms = (sh: number, armD: number, extra: Partial<Pose> = {}): Pose => ({ ...s, ...both({ sh, armD, foreD: armD }), ...extra });
+      const front = arms(14, 35);
+      const up = arms(95, 45);
+      const over = arms(178, 58, { neck: 2 });
+      const passing = arms(245, 74, { neck: 4 });
+      const behind = arms(318, 52, { neck: 2, spine: -2 });
+      const k = (p: Pose, dur: number, hold?: number): KeySpec => ({ pose: p, dur, hold, ease: "inOut" });
+      return M(FEET, [k(front, 0.8, 0.4), k(up, 0.7), k(over, 0.6), k(passing, 0.6), k(behind, 0.8, 0.5), k(passing, 0.6), k(over, 0.6), k(up, 0.7)], {
+        planted: ["L", "R"],
+        footGrounded: true,
+        allowLimits: ["shL", "shR"],
+        props: [{ id: "band", kind: "band", at: { lm: "handL", dx: -6 }, to: { lm: "handR", dx: 6 }, layer: "near", variant: "gold" }],
+      });
     }
     case "deep-squat": {
       const p = squatPose(1, { id, label, load: "chest-crossed", knee: 142, shin: 38 });
