@@ -164,6 +164,9 @@ export default async function PlannerPage() {
             </h2>
             <div className="flex flex-wrap gap-2">
               <Button asChild variant="secondary" size="sm">
+                <Link href={`/nutrition/planner/prep?week=${plan.start_date}`}>Prep plan</Link>
+              </Button>
+              <Button asChild variant="secondary" size="sm">
                 <Link href="/nutrition/grocery">Grocery list</Link>
               </Button>
               <ActionButton
