@@ -7,6 +7,8 @@ import { findDuplicateMemory, MEMORY_LIMIT, memoryInputSchema } from "@/lib/coac
 import { getUserPlan, requireUser } from "@/server/auth";
 import { getAiAllowance } from "@/server/services/ai-coach";
 import { logError } from "@/server/log";
+import { memoryEncryptionReady, openMemories, sealMemory } from "@/server/crypto/memory-crypto";
+import { COACH_STYLE_LABELS, parseCoachStyle } from "@/lib/coach/style";
 
 type Result = { ok: true; message: string } | { ok: false; error: string };
 
@@ -43,9 +45,10 @@ export async function addCoachMemoryAction(raw: { category: string; content: str
     supabase.from("coach_memories").select("content").eq("user_id", user.id),
   ]);
   if (!prof?.coach_memory_enabled) return { ok: false, error: "Turn memory on first." };
-  const dup = findDuplicateMemory(input.data.content, existing ?? []);
+  if (!memoryEncryptionReady()) return { ok: false, error: "Coaching memory isn't available yet. Please try again later." };
+  const dup = findDuplicateMemory(input.data.content, openMemories(existing ?? [], user.id));
   if (dup) return { ok: false, error: `Already remembered: "${dup.content}"` };
-  const { error } = await supabase.from("coach_memories").insert({ user_id: user.id, ...input.data, source: "member" });
+  const { error } = await supabase.from("coach_memories").insert({ user_id: user.id, category: input.data.category, content: sealMemory(input.data.content, user.id), source: "member" });
   if (error) {
     if (error.message.includes("coach_memory_limit")) return { ok: false, error: `You can keep up to ${MEMORY_LIMIT} memories. Delete some first.` };
     logError("coach_memory.add", error);
@@ -62,8 +65,14 @@ export async function updateCoachMemoryAction(id: string, raw: { category: strin
   if (!memoryId.success) return { ok: false, error: "Memory not found." };
   if (!input.success) return { ok: false, error: input.error.issues[0]?.message ?? "Invalid memory." };
   if (!(await hasAiCoach(user.id))) return { ok: false, error: "Editing memories is included with Pro. You can still delete them." };
+  if (!memoryEncryptionReady()) return { ok: false, error: "Coaching memory isn't available yet. Please try again later." };
   const supabase = await getServerSupabase();
-  const { data, error } = await supabase.from("coach_memories").update(input.data).eq("id", memoryId.data).eq("user_id", user.id).select("id");
+  const { data, error } = await supabase
+    .from("coach_memories")
+    .update({ category: input.data.category, content: sealMemory(input.data.content, user.id) })
+    .eq("id", memoryId.data)
+    .eq("user_id", user.id)
+    .select("id");
   if (error) {
     logError("coach_memory.update", error);
     return { ok: false, error: "Couldn't save that change. Turn memory on to edit memories." };
@@ -112,4 +121,19 @@ export async function setConversationMemoryOffAction(conversationId: string, off
     return { ok: false, error: "Couldn't change this chat's memory setting." };
   }
   return { ok: true, message: off ? "Nothing from this chat will be remembered." : "The coach may suggest things to remember from this chat." };
+}
+
+/** The member's coaching style (tone and depth only; every style follows the same rules). Null resets to the default. */
+export async function setCoachStyleAction(style: string | null): Promise<Result> {
+  const user = await requireUser();
+  const parsed = style === null ? null : parseCoachStyle(style);
+  if (style !== null && !parsed) return { ok: false, error: "Choose one of the styles." };
+  const supabase = await getServerSupabase();
+  const { error } = await supabase.from("profiles").update({ coach_style: parsed }).eq("id", user.id);
+  if (error) {
+    logError("coach_style.update", error);
+    return { ok: false, error: "Couldn't save that. Please try again." };
+  }
+  revalidatePath("/coach/memory");
+  return { ok: true, message: parsed ? `Coaching style: ${COACH_STYLE_LABELS[parsed].label}.` : "Back to the standard coaching voice." };
 }

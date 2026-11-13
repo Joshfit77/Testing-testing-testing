@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { BODY_SCAN_BUCKET } from "@/lib/domain/body-scan";
 import { PROGRESS_PHOTO_BUCKET } from "@/lib/domain/progress-photos";
+import { openMemories } from "@/server/crypto/memory-crypto";
 
 /** How long the photo download links in an export stay valid. */
 const EXPORT_PHOTO_URL_TTL_SECONDS = 60 * 60;
@@ -140,7 +141,8 @@ export async function exportUserData(supabase: SupabaseClient, userId: string, e
       rows.push(...(data ?? []));
       if (!data || data.length < 1000) break;
     }
-    out[table] = rows;
+    // Coaching memories are sealed at rest; the member's export carries them readable.
+    out[table] = table === "coach_memories" ? openMemories(rows as { content: string }[], userId) : rows;
   }
   // Programs you built: weeks, days and prescribed exercises live in child tables without a user column.
   const ownedPrograms = ((out.training_programs as { id: string }[]) ?? []).map((p) => p.id);

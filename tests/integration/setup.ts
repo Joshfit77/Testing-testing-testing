@@ -25,6 +25,8 @@ process.env.STRIPE_PRICE_PLUS_YEARLY = "price_test_plus_yearly";
 process.env.STRIPE_PRICE_PLUS_LEGACY = "price_old_plus_a, price_old_plus_b";
 process.env.STRIPE_PRICE_PRO_LEGACY = "price_old_pro";
 process.env.ANTHROPIC_API_KEY = "sk-ant-integration-dummy";
+// A test-only key so integration tests exercise memory encryption (never used outside tests).
+process.env.MEMORY_ENCRYPTION_KEY = "dGVzdC1vbmx5LW1lbW9yeS1rZXktMzItYnl0ZXMhISE=";
 // A local stand-in for Stripe's API (started by entitlements.test.ts); nothing reaches Stripe.
 process.env.STRIPE_API_BASE_URL = "http://127.0.0.1:4613";
 // RevenueCat: a local stand-in for its REST API (started by store-billing.test.ts); nothing reaches RevenueCat.

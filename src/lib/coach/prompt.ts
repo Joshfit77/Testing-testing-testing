@@ -51,12 +51,12 @@ export function fitStoredReply(reply: string, max = REPLY_MAX_CHARS): string {
   return `${(cut > room * 0.8 ? head.slice(0, cut) : head).trimEnd()}\n\n${SHORTENED_NOTE}`;
 }
 
-export function buildSystemBlocks(opts: { faithEnabled: boolean; contextText: string; memoryText?: string | null }): Anthropic.Beta.BetaTextBlockParam[] {
+export function buildSystemBlocks(opts: { faithEnabled: boolean; contextText: string; memoryText?: string | null; styleText?: string | null }): Anthropic.Beta.BetaTextBlockParam[] {
   const blocks: Anthropic.Beta.BetaTextBlockParam[] = [{ type: "text", text: COACH_STATIC_PROMPT, cache_control: { type: "ephemeral" } }];
   if (opts.faithEnabled) blocks.push({ type: "text", text: FAITH_ENABLED_INSTRUCTIONS, cache_control: { type: "ephemeral" } });
   blocks.push({
     type: "text",
-    text: [opts.faithEnabled ? null : FAITH_DISABLED_INSTRUCTIONS, PRO_PLAN_NOTE, `Athlete context (this user's own logged data, loaded just now):\n${opts.contextText}`, opts.memoryText ?? null]
+    text: [opts.faithEnabled ? null : FAITH_DISABLED_INSTRUCTIONS, PRO_PLAN_NOTE, opts.styleText ?? null, `Athlete context (this user's own logged data, loaded just now):\n${opts.contextText}`, opts.memoryText ?? null]
       .filter(Boolean)
       .join("\n\n"),
   });

@@ -9,6 +9,7 @@ import type { AthleteSnapshot, SnapshotProgram, SnapshotProgramDay, SnapshotWork
 import { journalEntriesForCoach, COACH_JOURNAL_LIMIT } from "@/lib/domain/journal";
 import { loadBudgetContext } from "@/server/services/nutrition-targets";
 import { MEMORY_LIMIT, type CoachMemory } from "@/lib/coach/memory";
+import { openMemories } from "@/server/crypto/memory-crypto";
 
 /**
  * Load the athlete snapshot for the AI coach. Every query uses the caller's own Supabase session (RLS)
@@ -283,7 +284,8 @@ export async function loadAthleteSnapshot(supabase: SupabaseClient, userId: stri
     memory: {
       enabled: Boolean(profile?.coach_memory_enabled),
       wellnessConsent: Boolean(profile?.wellness_consent_at),
-      items: profile?.coach_memory_enabled ? ((memoryRes.data ?? []) as CoachMemory[]) : [],
+      // Sealed at rest (memory-crypto.ts); opened here for the member they belong to only.
+      items: profile?.coach_memory_enabled ? openMemories((memoryRes.data ?? []) as CoachMemory[], userId) : [],
     },
   };
 }

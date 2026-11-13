@@ -22,6 +22,7 @@ import { addDaysIso, loadPlannerPrefs, loadPlannerTargets, planEntryRow, planner
 import { loadBudgetContext } from "@/server/services/nutrition-targets";
 import { plannerDishes, type PlannerDish } from "@/server/services/recipes";
 import { costMicros, tokenUsage } from "@/lib/domain/ai-economics";
+import { openMemories } from "@/server/crypto/memory-crypto";
 
 export interface StoredDraft {
   start_date: string;
@@ -69,7 +70,7 @@ export async function draftAiMealPlan(
   let memoryNotes: string[] = [];
   if (profile?.coach_memory_enabled) {
     const { data } = await supabase.from("coach_memories").select("content").eq("user_id", userId).eq("category", "nutrition").limit(20);
-    memoryNotes = (data ?? []).map((m) => m.content as string);
+    memoryNotes = openMemories((data ?? []) as { content: string }[], userId).map((m) => m.content);
   }
 
   const notes = mealPlanNotesForAi(input.notes);

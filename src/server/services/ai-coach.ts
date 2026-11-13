@@ -24,6 +24,7 @@ import { anthropicBaseUrl } from "@/server/test-overrides";
 import { costMicros, EXPECTED_COST_MICROS, expectedCostMicros, REQUEST_CEILING_MICROS, tokenUsage } from "@/lib/domain/ai-economics";
 import { allowanceRenewsOn, downgradeNotice, type DowngradeReason } from "@/lib/domain/ai-allowance";
 import { aiBudgetConfig, notifyBudgetAlerts, type BudgetAlert } from "@/server/services/ai-budget";
+import { coachStyleInstruction, parseCoachStyle } from "@/lib/coach/style";
 
 export type AiErrorCode =
   | "not_configured"
@@ -495,7 +496,7 @@ export async function coachTurn(params: {
   if (umErr || !userRow) throw umErr ?? new Error("Message insert failed");
 
   onEvent({ type: "status", text: "Reading your training log…" });
-  const { data: tzRow } = await supabase.from("profiles").select("timezone").eq("id", userId).maybeSingle();
+  const { data: tzRow } = await supabase.from("profiles").select("timezone, coach_style").eq("id", userId).maybeSingle();
   const context = await buildAthleteContext(supabase, userId);
   // Earlier turns, each capped and the whole set budgeted, so stored history can never make one request much
   // larger than intended. `history` is newest first.
@@ -523,6 +524,7 @@ export async function coachTurn(params: {
   const model = reservation.tier === route.tier ? route.model : coachModelIds(process.env)[reservation.tier];
   const memory = context.snapshot.memory;
   const system = buildSystemBlocks({
+    styleText: coachStyleInstruction(parseCoachStyle(tzRow?.coach_style)),
     faithEnabled: context.snapshot.faithEnabled,
     contextText: context.text,
     memoryText: memory?.enabled

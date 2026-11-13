@@ -21,6 +21,7 @@ import { applyTrainingChange, TrainingChangeError } from "@/server/services/adap
 import { programDays, programExercisesOnDays } from "@/server/services/training";
 import type { CoachProposal } from "@/lib/coach/tools";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { memoryEncryptionReady, openMemories, sealMemory } from "@/server/crypto/memory-crypto";
 
 type Result = { ok: true; message: string; programSlug?: string } | { ok: false; error: string };
 
@@ -195,10 +196,13 @@ export async function applyCoachProposalAction(messageId: string, edited?: Recor
         if (!input.success) return { ok: false, error: input.error.issues[0]?.message ?? "Invalid memory." };
         const { data: prof } = await supabase.from("profiles").select("coach_memory_enabled").eq("id", user.id).maybeSingle();
         if (!prof?.coach_memory_enabled) return { ok: false, error: "Memory is switched off. Turn it on in AI Coach → Memory first." };
+        if (!memoryEncryptionReady()) return { ok: false, error: "Coaching memory isn't available yet. Please try again later." };
         const { data: existing } = await supabase.from("coach_memories").select("content").eq("user_id", user.id);
-        const dup = findDuplicateMemory(input.data.content, existing ?? []);
+        const dup = findDuplicateMemory(input.data.content, openMemories(existing ?? [], user.id));
         if (dup) return { ok: false, error: `Already remembered: "${dup.content}"` };
-        const { error } = await supabase.from("coach_memories").insert({ user_id: user.id, ...input.data, source: "coach", source_message_id: msg.id });
+        const { error } = await supabase
+          .from("coach_memories")
+          .insert({ user_id: user.id, category: input.data.category, content: sealMemory(input.data.content, user.id), source: "coach", source_message_id: msg.id });
         if (error) {
           if (error.message.includes("coach_memory_limit")) return { ok: false, error: `You can keep up to ${MEMORY_LIMIT} memories. Delete some in AI Coach → Memory first.` };
           throw error;
@@ -276,7 +280,8 @@ async function rememberApprovedChange(
         : { kind: "nutrition_targets", calories: p.calories, protein_g: p.protein_g, reason: p.reason },
       date,
     );
-    const { error } = await supabase.from("coach_memories").insert({ user_id: userId, ...note, source: "approved_change" });
+    if (!memoryEncryptionReady()) return;
+    const { error } = await supabase.from("coach_memories").insert({ user_id: userId, category: note.category, content: sealMemory(note.content, userId), source: "approved_change" });
     if (error && !error.message.includes("coach_memory_limit")) logError("coach.remember_change", error);
   } catch (err) {
     logError("coach.remember_change", err);

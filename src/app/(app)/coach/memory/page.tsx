@@ -1,10 +1,13 @@
 import { PageHeader } from "@/components/common/page-header";
 import { BackLink } from "@/components/platform/back-link";
 import { MemoryManager } from "@/components/coach/memory-manager";
+import { CoachStyleForm } from "@/components/coach/coach-style-form";
+import { parseCoachStyle } from "@/lib/coach/style";
 import { getServerSupabase } from "@/lib/supabase/server";
 import type { CoachMemory } from "@/lib/coach/memory";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { getAiAllowance } from "@/server/services/ai-coach";
+import { openMemories } from "@/server/crypto/memory-crypto";
 
 export const metadata = { title: "Coaching memory" };
 
@@ -13,7 +16,7 @@ export default async function CoachMemoryPage() {
   const supabase = await getServerSupabase();
   const [allowance, { data: profile }, { data: memories }] = await Promise.all([
     getAiAllowance(user.id, await getUserPlan(user.id)),
-    supabase.from("profiles").select("coach_memory_enabled, coach_memory_consent_at, wellness_consent_at").eq("id", user.id).maybeSingle(),
+    supabase.from("profiles").select("coach_memory_enabled, coach_memory_consent_at, wellness_consent_at, coach_style").eq("id", user.id).maybeSingle(),
     supabase.from("coach_memories").select("id, category, content, source, created_at, updated_at").eq("user_id", user.id).order("created_at", { ascending: false }),
   ]);
 
@@ -30,8 +33,9 @@ export default async function CoachMemoryPage() {
         enabled={Boolean(profile?.coach_memory_enabled)}
         consentAt={(profile?.coach_memory_consent_at as string | null) ?? null}
         wellnessConsent={Boolean(profile?.wellness_consent_at)}
-        memories={(memories ?? []) as CoachMemory[]}
+        memories={openMemories((memories ?? []) as CoachMemory[], user.id)}
       />
+      {allowance.chatLimit > 0 && <CoachStyleForm current={parseCoachStyle(profile?.coach_style)} />}
     </div>
   );
 }
