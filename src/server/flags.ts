@@ -21,6 +21,9 @@ export async function isFlagEnabled(key: string): Promise<boolean> {
 /** TestFlight "Was this coaching advice useful?" under coach replies (migration 050): collects new data, so strict. */
 export const COACH_FEEDBACK_FLAG = "coach_feedback";
 
+/** Accountability partners (migration 067): shares data with another member, so strict (off until the owner approves). */
+export const ACCOUNTABILITY_FLAG = "accountability_partners";
+
 /**
  * For features that must stay off until the owner turns them on (e.g. anything that collects new data): on only when
  * the flag exists and is enabled. A missing flag, or flags that can't be read, mean off.

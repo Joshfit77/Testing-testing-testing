@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Award, BellRing, Brain, Camera, ChevronRight, CreditCard, Download, HandHeart, HeartPulse, KeyRound, LayoutGrid, LogOut, MapPin, Moon, ScanLine, ShieldCheck, Target, TrendingUp } from "lucide-react";
+import { Award, BellRing, Brain, Camera, ChevronRight, CreditCard, Download, HandHeart, HeartPulse, KeyRound, LayoutGrid, LogOut, MapPin, Moon, ScanLine, ShieldCheck, Target, TrendingUp, Users } from "lucide-react";
 import { MainHeader } from "@/components/shell/main-header";
 import { DisplaySettings } from "@/components/profile/display-settings";
 import { DeleteAccountForm, ProfileForm, WithdrawConsentForm, AiConsentOffForm } from "@/components/profile/profile-forms";
@@ -12,6 +12,7 @@ import { SignOutForm } from "@/components/shell/sign-out-form";
 import { LegalLinks } from "@/components/profile/legal-links";
 import { legalLinks } from "@/server/services/store-billing";
 import { getDashboardData } from "@/server/services/dashboard";
+import { ACCOUNTABILITY_FLAG, isFlagOn } from "@/server/flags";
 
 export const metadata = { title: "You" };
 
@@ -51,9 +52,11 @@ export default async function ProfilePage() {
   const plan = await getUserPlan(user.id);
   const plans = getPlans();
   const supabase = await getServerSupabase();
-  const [{ data: ent }, dashboard] = await Promise.all([
+  const [{ data: ent }, dashboard, accountabilityOn] = await Promise.all([
     supabase.from("user_entitlements").select("source").eq("user_id", user.id).maybeSingle(),
     getDashboardData(supabase, user.id, profile.timezone).catch(() => null),
+    // Accountability partners stay hidden until the owner switches the flag on (migration 067).
+    isFlagOn(ACCOUNTABILITY_FLAG),
   ]);
   // Account deletion can't cancel an App Store or Google Play subscription (App Store guideline 5.1.1(v)).
   const storeBilled = plan !== "free" && (ent?.source === "app_store" || ent?.source === "play_store") ? (ent.source === "app_store" ? "App Store" : "Google Play") : null;
@@ -65,6 +68,7 @@ export default async function ProfilePage() {
       <nav aria-label="Your sections" className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
         <Row href="/progress" icon={TrendingUp} title="My Progress" body={dashboard ? `${dashboard.workoutsThisWeek} workout${dashboard.workoutsThisWeek === 1 ? "" : "s"} this week · ${dashboard.weekStreak} week streak · overview, body map, photos` : "Overview, body map, photos and history"} />
         <Row href="/progress/badges" icon={Award} title="Badges" body="Milestones you've earned and what's next" />
+        {accountabilityOn && <Row href="/profile/accountability" icon={Users} title="Accountability partners" body="Invite up to 3 friends; you choose what each one sees" />}
         <Row href="/progress/sleep" icon={Moon} title="Sleep & Recovery" body="Nightly reports, sleep debt, schedule and energy" />
         <Row href="/profile/preferences" icon={Target} title="Goals & training preferences" body="Goals, experience, schedule, equipment, diet and body" />
         <Row href="/profile/notifications" icon={BellRing} title="Notifications" body="Reminders for Faith, workouts, food, water and recovery; quiet hours" />

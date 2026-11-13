@@ -61,6 +61,10 @@ describe("account export and deletion coverage", () => {
       const col = exported.get(l.table)!;
       expect(links.some((x) => x.table === l.table && x.column === col), `${l.table}.${col}`).toBe(true);
     }
+    // A second column (rows belonging to either of two members) must be a user column too.
+    for (const t of USER_TABLES.filter((x) => x.orColumn)) {
+      expect(links.some((x) => x.table === t.table && x.column === t.orColumn), `${t.table}.${t.orColumn}`).toBe(true);
+    }
   });
 
   it("has no stale entries", () => {

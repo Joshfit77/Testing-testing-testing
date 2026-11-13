@@ -738,9 +738,10 @@ export async function seedSampleData(userId: string): Promise<{ sessions: number
  */
 export async function resetSampleAccount(client: SupabaseClient, userId: string): Promise<void> {
   setSeedClient(client);
-  for (const { table, column } of USER_TABLES) {
+  for (const { table, column, orColumn } of USER_TABLES) {
     if (table === "profiles") continue; // kept (and rewritten by seedSampleProfile): other rows reference it
-    const { error } = await client.from(table).delete().eq(column, userId);
+    const del = client.from(table).delete();
+    const { error } = await (orColumn ? del.or(`${column}.eq.${userId},${orColumn}.eq.${userId}`) : del.eq(column, userId));
     if (error) fail(`${table}: ${error.message}`);
   }
   await removeUserStorage(client, userId);

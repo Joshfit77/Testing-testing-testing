@@ -11,7 +11,14 @@ const EXPORT_PHOTO_URL_TTL_SECONDS = 60 * 60;
  * belong to a user (a column referencing auth.users ... on delete cascade) must be listed here or in
  * NOT_EXPORTED below — tests/unit/account-coverage.test.ts checks this against supabase/migrations.
  */
-export const USER_TABLES: { table: string; column: string }[] = [
+export interface UserTable {
+  table: string;
+  column: string;
+  /** A second user column (e.g. the other member of a partnership): rows matching either column are the user's. */
+  orColumn?: string;
+}
+
+export const USER_TABLES: UserTable[] = [
   { table: "profiles", column: "id" },
   { table: "onboarding_answers", column: "user_id" },
   { table: "fitness_goals", column: "user_id" },
@@ -55,6 +62,12 @@ export const USER_TABLES: { table: string; column: string }[] = [
   { table: "weekly_reports", column: "user_id" },
   { table: "habit_program_enrollments", column: "user_id" },
   { table: "habit_program_checkins", column: "user_id" },
+  // Accountability partners (migration 067): my invites, partnerships I'm in, my own share switches, and the
+  // encouragements I sent or received (fixed messages). Never the partner's share switches or anything they shared.
+  { table: "accountability_invites", column: "inviter_id" },
+  { table: "accountability_partnerships", column: "user_a", orColumn: "user_b" },
+  { table: "accountability_shares", column: "user_id" },
+  { table: "accountability_nudges", column: "sender_id", orColumn: "recipient_id" },
   { table: "exercise_targets", column: "user_id" },
   { table: "training_adjustments", column: "user_id" },
   { table: "training_recommendation_decisions", column: "user_id" },
@@ -117,11 +130,12 @@ export async function exportUserData(supabase: SupabaseClient, userId: string, e
     format: "narrow-gate-fitness/export@1",
     account: { id: userId, email },
   };
-  for (const { table, column } of USER_TABLES) {
+  for (const { table, column, orColumn } of USER_TABLES) {
     const rows: unknown[] = [];
     // Page through large tables.
     for (let from = 0; ; from += 1000) {
-      const { data, error } = await supabase.from(table).select("*").eq(column, userId).range(from, from + 999);
+      const query = supabase.from(table).select("*");
+      const { data, error } = await (orColumn ? query.or(`${column}.eq.${userId},${orColumn}.eq.${userId}`) : query.eq(column, userId)).range(from, from + 999);
       if (error) throw error;
       rows.push(...(data ?? []));
       if (!data || data.length < 1000) break;

@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { LEGAL_PAGES } from "@/lib/legal/versions";
 import { anonClient, createTestUser, deleteTestUser, exerciseIds, grantPlan, serviceClient, stackAvailable, type TestUser } from "./helpers";
 import { removeUserStorage, USER_STORAGE_BUCKETS, USER_TABLES } from "@/server/services/account";
+import { generateInviteCode } from "@/lib/domain/accountability";
 
 /**
  * One sweep over EVERY user-owned table (USER_TABLES, which tests/unit/account-coverage.test.ts keeps in step with
@@ -25,6 +26,8 @@ describe.skipIf(!available)("cross-user isolation sweep: every user-owned table 
   let alice: TestUser;
   let bob: TestUser;
   let admin: TestUser;
+  /** Alice's accountability partner: a third member, so Bob and the admin stay strangers to the partnership. */
+  let carol: TestUser | undefined;
   /** Alice's object in each private bucket. */
   const objects: Record<string, string> = {};
   /** Parent rows of Alice's, for the "attach a child row to someone else's parent" probes. */
@@ -204,6 +207,20 @@ describe.skipIf(!available)("cross-user isolation sweep: every user-owned table 
       expires_at: new Date(Date.now() + 30 * 86_400_000).toISOString(),
     });
 
+    // Accountability partners (migration 067). Alice must be user_a (the lower id of the pair) so that the probes
+    // below, which filter on USER_TABLES' first column, reach her partnership.
+    for (let i = 0; i < 20 && !(carol && carol.id > u); i++) {
+      if (carol) await deleteTestUser(carol);
+      carol = await createTestUser("iso-carol");
+    }
+    if (!carol || carol.id <= u) throw new Error("couldn't create a partner with a higher id than Alice");
+    await seed("accountability_invites", { inviter_id: u, code: generateInviteCode() });
+    const partnership = await seed("accountability_partnerships", { user_a: u, user_b: carol.id });
+    parents.accountability_partnerships = partnership.id!;
+    await seed("accountability_shares", { partnership_id: partnership.id, user_id: u });
+    await seed("accountability_shares", { partnership_id: partnership.id, user_id: carol.id });
+    await seed("accountability_nudges", { partnership_id: partnership.id, sender_id: u, recipient_id: carol.id, message_key: "proud" });
+
     // Photos: the uploads use Alice's own session, like the app does; the rows are written by the server.
     const photoPath = `${u}/${crypto.randomUUID()}.jpg`;
     const { error: upErr } = await alice.client.storage.from("progress-photos").upload(photoPath, jpeg(), { contentType: "image/jpeg" });
@@ -226,7 +243,7 @@ describe.skipIf(!available)("cross-user isolation sweep: every user-owned table 
 
   afterAll(async () => {
     for (const u of [alice, bob, admin]) if (u) await removeUserStorage(svc, u.id).catch(() => null);
-    await Promise.all([deleteTestUser(alice), deleteTestUser(bob), deleteTestUser(admin)]);
+    await Promise.all([deleteTestUser(alice), deleteTestUser(bob), deleteTestUser(admin), deleteTestUser(carol)]);
   });
 
   it("seeds a row owned by Alice in every user-owned table, so no probe below is vacuous", async () => {
@@ -472,10 +489,10 @@ describe.skipIf(!available)("cross-user isolation sweep: every user-owned table 
     const { exportUserData } = await import("@/server/services/account");
     const out = (await exportUserData(alice.client, alice.id, alice.email)) as Record<string, unknown>;
     const problems: string[] = [];
-    for (const { table, column } of USER_TABLES) {
+    for (const { table, column, orColumn } of USER_TABLES) {
       const rows = out[table] as Record<string, unknown>[];
       if (!rows?.length) problems.push(`${table}: missing from the export`);
-      else if (rows.some((r) => r[column] !== alice.id)) problems.push(`${table}: holds another member's row`);
+      else if (rows.some((r) => r[column] !== alice.id && (!orColumn || r[orColumn] !== alice.id))) problems.push(`${table}: holds another member's row`);
     }
     expect(problems).toEqual([]);
     const photoLinks = (out.progress_photo_files as { files: { download_url: string | null }[] }).files;
