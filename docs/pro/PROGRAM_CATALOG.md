@@ -4,7 +4,7 @@ Branch `claude/pro-premium`, 2026-11-13. Nothing here is merged, deployed or liv
 
 ## Status in one paragraph
 
-All 40 catalog entries exist in the app. 32 are structured training programs (24 new, 10 existing ones adopted with
+All 40 catalog entries exist in the app. 32 are structured training programs (22 new, 10 existing ones adopted with
 their prescriptions unchanged), 7 are new habit programs (nutrition, faith and fitness, a 90-day journey) and #37 is the
 existing 40-day discipline challenge, left exactly as it was. Every structured program is Pro for new enrollments; Free
 members keep manual logging, their own workouts and templates, and the personal starter plan built at onboarding.
