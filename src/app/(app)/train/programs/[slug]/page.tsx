@@ -86,7 +86,8 @@ export default async function ProgramDetailPage({
   const { total: totalSessions, required: requiredCount } = requiredSessions(program.days_per_week, program.duration_weeks);
   const completionText = completionRequirement(program, program.source === "curated" ? getProgramSeed(program.slug)?.completion : null);
   const weeks = weeksRes.data ?? [];
-  const locked = program.owner_id !== user.id && !canAccessTier(plan, program.tier);
+  // A member who already enrolled in or saved this program keeps it (library programs became Pro-only in 2026-11).
+  const locked = program.owner_id !== user.id && !canAccessTier(plan, program.tier) && !userProgram;
   const isActive = userProgram?.status === "active";
   const defaultWeek = isActive ? (userProgram?.current_week as number) : 1;
   const weekNumber = Math.min(Math.max(1, Number(weekParam) || defaultWeek), Math.max(1, weeks.length));

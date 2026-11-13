@@ -526,6 +526,250 @@
   },
   "zone-2-run": {
    "readiness": "animated"
+  },
+  "incline-barbell-bench-press": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "tempo-bench-press": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "dumbbell-squeeze-press": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "tempo-push-up": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "dumbbell-fly": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "incline-dumbbell-fly": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "decline-bench-press": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "decline-dumbbell-press": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "knee-push-up": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "close-grip-push-up": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "ez-bar-skull-crusher": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "dumbbell-lying-triceps-extension": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "dumbbell-kickback": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "bench-dip": {
+   "readiness": "placeholder",
+   "note": "Added 2026-11-13. The drawing reads as sitting on the bench rather than dipping off its edge with the hips in front; written steps carry it until the motion is redrawn."
+  },
+  "wide-grip-pull-up": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "band-assisted-chin-up": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "wide-grip-lat-pulldown": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "dumbbell-bent-over-row": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "reverse-grip-barbell-row": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "bent-over-band-row": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "standing-cable-row": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "reverse-grip-inverted-row": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "barbell-curl": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "ez-bar-curl": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "cable-curl": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "band-curl": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "zottman-curl": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "reverse-grip-curl": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "cable-rope-hammer-curl": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "incline-hammer-curl": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "standing-dumbbell-shoulder-press": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "seated-barbell-shoulder-press": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "single-arm-dumbbell-shoulder-press": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "seated-single-arm-dumbbell-shoulder-press": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "kettlebell-overhead-press": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "dumbbell-push-press": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "strict-log-press": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "dumbbell-front-raise": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "incline-y-raise": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "crunch": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "sit-up": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "lying-leg-raise": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "high-plank": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "incline-plank": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "hollow-body-hold": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "reverse-crunch": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "v-up": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "hanging-leg-raise": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "overhead-squat": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "single-leg-hip-thrust": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "barbell-glute-bridge": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "single-leg-glute-bridge": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "wall-sit": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "stiff-leg-deadlift": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "kettlebell-deadlift": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "b-stance-romanian-deadlift": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "deficit-romanian-deadlift": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "single-leg-calf-raise": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "standing-quad-stretch": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "half-kneeling-hip-flexor-stretch": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
+  },
+  "wall-calf-stretch": {
+   "readiness": "animated",
+   "note": "Added 2026-11-13. Passed the automated motion checks and an AI review of the six rendered phases; not yet reviewed by a coach or the owner."
   }
  }
 }

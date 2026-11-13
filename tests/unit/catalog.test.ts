@@ -49,9 +49,9 @@ describe("program library", () => {
       }
     }
   });
-  it("has some free starter programs and some paid ones", () => {
-    expect(PROGRAMS.filter((p) => p.tier === "free").length).toBeGreaterThanOrEqual(3);
-    expect(PROGRAMS.filter((p) => p.tier !== "free").length).toBeGreaterThanOrEqual(5);
+  it("structured library programs are Pro (owner decision 2026-11-13); Free members keep manual logging and their own workouts", () => {
+    expect(PROGRAMS.filter((p) => p.tier === "free")).toEqual([]);
+    expect(PROGRAMS.length).toBeGreaterThanOrEqual(51);
   });
   it("expands weeks with a final deload when configured", () => {
     const p = PROGRAMS.find((x) => x.slug === "bench-press-specialist")!;

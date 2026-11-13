@@ -16,7 +16,7 @@ export const HABIT_PROGRAMS: HabitProgram[] = [
   FAITH_FITNESS_FOUNDATIONS,
   STRENGTH_AND_SCRIPTURE,
   HEALTHY_HABITS_90,
-].filter((p): p is HabitProgram => p !== null);
+];
 
 export function getHabitProgram(slug: string): HabitProgram | undefined {
   return HABIT_PROGRAMS.find((p) => p.slug === slug);

@@ -53,12 +53,14 @@ export default async function WorkoutPage({ searchParams }: { searchParams: Prom
       // Make sure the user is entitled to the program this day belongs to (server-side check).
       const { data: owner } = await supabase
         .from("program_days")
-        .select("week:program_weeks(program:training_programs(tier, owner_id))")
+        .select("week:program_weeks(program:training_programs(id, tier, owner_id))")
         .eq("id", day.id)
         .maybeSingle();
-      const program = (owner?.week as unknown as { program: { tier: Plan; owner_id: string | null } } | null)?.program;
+      const program = (owner?.week as unknown as { program: { id: string; tier: Plan; owner_id: string | null } } | null)?.program;
       const plan = await getUserPlan(user.id);
-      if (program && (program.owner_id === user.id || canAccessTier(plan, program.tier))) {
+      // Enrolled before library programs became Pro-only: the member keeps the program.
+      const enrolled = program ? Boolean((await supabase.from("user_programs").select("id").eq("user_id", user.id).eq("program_id", program.id).limit(1).maybeSingle()).data) : false;
+      if (program && (program.owner_id === user.id || canAccessTier(plan, program.tier) || enrolled)) {
         const up = uuid.safeParse(sp.up);
         template = {
           name: day.name,

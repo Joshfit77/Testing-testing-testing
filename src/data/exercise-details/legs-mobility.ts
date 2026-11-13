@@ -1,3 +1,141 @@
 import type { ExerciseDetails } from "./types";
 
-export const DETAILS_LEGS_MOBILITY: Record<string, ExerciseDetails> = {};
+export const DETAILS_LEGS_MOBILITY: Record<string, ExerciseDetails> = {
+  // ------------------------------------------------------------------ Quads & glutes
+  "overhead-squat": {
+    group: "quads_glutes",
+    aliases: ["OHS", "barbell overhead squat", "snatch-grip overhead squat"],
+    start: "Standing tall with the barbell locked out overhead on a wide grip, arms straight and the bar stacked over the middle of the feet.",
+    breathing: "Breathe in and brace at the top, hold it through the descent and the bottom, breathe out as you finish standing.",
+    rangeOfMotion: "From standing down to at least parallel, or as deep as you can keep the bar over mid-foot, the arms locked and the back neutral.",
+    setup: [
+      "Take the bar out of a rack at shoulder height, or press it overhead from behind the neck with a wide grip.",
+      "Learn it with a PVC pipe or empty bar first; it is limited by mobility long before strength.",
+      "Train with bumper plates and room to drop the bar forward or backward if a rep is lost.",
+    ],
+    home: false,
+  },
+  "single-leg-hip-thrust": {
+    group: "quads_glutes",
+    aliases: ["single-leg glute thrust", "one-leg hip thrust", "SL hip thrust"],
+    start: "Seated on the floor with the bottom of the shoulder blades on a bench edge, one foot flat and the other knee lifted toward the chest.",
+    breathing: "Breathe in at the bottom, breathe out as you drive the hips up, breathe in as you lower.",
+    rangeOfMotion: "From the hips just above the floor up to the torso level with the bench and the hip fully extended, without arching the lower back.",
+    setup: [
+      "Use a bench that will not slide; push it against a wall or set it lengthwise if it moves.",
+      "Place the working foot so the shin is vertical at the top of the rep.",
+    ],
+    home: true,
+  },
+  "barbell-glute-bridge": {
+    group: "quads_glutes",
+    aliases: ["loaded glute bridge", "barbell hip bridge", "floor hip thrust"],
+    start: "Lying on the back with the knees bent, feet flat about hip width, and the barbell resting in the hip crease, held in place by both hands.",
+    breathing: "Breathe in and brace at the bottom, breathe out as the hips rise, breathe in as they lower.",
+    rangeOfMotion: "From the hips on the floor up to a straight line from shoulders to knees; the top is set by full hip extension, not by arching the back.",
+    setup: [
+      "Use a bar pad or folded mat across the hips.",
+      "Full-size plates (45 cm) let you roll the bar over the legs and start with it just above the hips.",
+      "Set the feet so the shins are close to vertical at the top.",
+    ],
+    home: false,
+  },
+  "single-leg-glute-bridge": {
+    group: "quads_glutes",
+    aliases: ["one-leg glute bridge", "single-leg hip bridge", "SL glute bridge"],
+    start: "Lying on the back with one foot flat and the knee bent, the other leg held straight in line with that thigh, arms on the floor.",
+    breathing: "Breathe out as you lift the hips, breathe in as you lower.",
+    rangeOfMotion: "From the hips just off the floor up to a straight line from shoulder to knee, keeping the pelvis level.",
+    setup: ["A mat under the back and head.", "Keep the arms flat on the floor for balance until the hips stay level easily."],
+    home: true,
+  },
+  "wall-sit": {
+    group: "quads_glutes",
+    aliases: ["wall squat", "wall squat hold", "isometric wall sit"],
+    start: "Back flat against a wall, slid down until the thighs are level with the floor and the knees bent about 90° over the ankles.",
+    breathing: "Breathe steadily throughout the hold; do not hold your breath.",
+    rangeOfMotion: "A static hold with the thighs level; sit higher on the wall to make it easier.",
+    setup: ["Wear shoes with grip or stand on a non-slip surface so the feet do not slide away from the wall.", "Use a timer and stop when you can no longer keep the position."],
+    home: true,
+  },
+
+  // ------------------------------------------------------------------ Hamstrings & calves
+  "stiff-leg-deadlift": {
+    group: "hamstrings_calves",
+    aliases: ["SLDL", "stiff-legged deadlift", "straight-leg deadlift"],
+    start: "Standing tall holding the bar or dumbbells in front of the thighs, feet about hip width and the knees just unlocked.",
+    breathing: "Breathe in and brace at the top, hold it as you lower, breathe out as you return to standing.",
+    rangeOfMotion: "From standing down until the hamstrings stop you, often around mid-shin, with the knee angle and a flat back kept the whole time.",
+    setup: ["Start well lighter than your Romanian deadlift.", "Standing on the floor is enough; only add a platform once you reach the floor with a flat back."],
+    home: true,
+  },
+  "kettlebell-deadlift": {
+    group: "hamstrings_calves",
+    aliases: ["KB deadlift", "kettlebell hinge", "bell deadlift"],
+    start: "Standing with the feet hip to shoulder width and a kettlebell on the floor between them, in line with the ankles.",
+    breathing: "Breathe in and brace before you lift, breathe out as you stand tall, breathe in as you lower.",
+    rangeOfMotion: "From the bell on the floor to standing tall with the hips fully extended; reach the handle by hinging, not by rounding the back.",
+    setup: ["If you cannot reach the handle with a flat back, raise the bell on a step or plates.", "Wear flat shoes or go barefoot for a stable base."],
+    home: true,
+  },
+  "b-stance-romanian-deadlift": {
+    group: "hamstrings_calves",
+    aliases: ["kickstand RDL", "B-stance RDL", "staggered-stance RDL"],
+    start: "Standing with dumbbells in front of the thighs, one foot flat and the other back on its toes level with the front heel.",
+    breathing: "Breathe in and brace at the top, hold it as you lower, breathe out as you stand.",
+    rangeOfMotion: "From standing until a strong stretch in the front hamstring, usually just below the knee, with a flat back and square hips.",
+    setup: ["Dumbbells or kettlebells are easiest to hold close to the working leg.", "Keep the back foot light; it is there for balance, not to push."],
+    home: true,
+  },
+  "deficit-romanian-deadlift": {
+    group: "hamstrings_calves",
+    aliases: ["deficit RDL", "RDL off a platform", "elevated Romanian deadlift"],
+    start: "Standing on a sturdy platform 5–10 cm high, holding the bar in front of the thighs with soft knees.",
+    breathing: "Breathe in and brace at the top, hold it through the descent, breathe out as you drive back up.",
+    rangeOfMotion: "From standing down past the knees to around mid-shin, only as low as a flat back allows.",
+    setup: [
+      "Use a stable platform or stacked plates that cannot tip or slide.",
+      "Smaller plates on the bar let it travel below the level of your feet.",
+      "Master the regular Romanian deadlift first.",
+    ],
+    home: false,
+  },
+  "single-leg-calf-raise": {
+    group: "hamstrings_calves",
+    aliases: ["one-leg calf raise", "single-leg heel raise", "unilateral calf raise"],
+    start: "Standing on one foot, on the floor or with the ball of the foot on a step edge, the other knee bent so that foot is off the floor.",
+    breathing: "Breathe out as you rise, breathe in as you lower.",
+    rangeOfMotion: "From the heel lowered into a stretch (below the step if using one) up to as high on the ball of the foot as you can go.",
+    setup: ["Lightly hold a wall, rail or doorframe for balance.", "A sturdy step lets the heel drop below the toes for more range."],
+    home: true,
+  },
+
+  // ------------------------------------------------------------------ Mobility
+  "standing-quad-stretch": {
+    group: "mobility",
+    aliases: ["standing quadriceps stretch", "standing thigh stretch", "heel-to-butt stretch"],
+    start: "Standing tall on one leg with the other knee bent and that ankle held behind you in the same-side hand.",
+    breathing: "Breathe slowly and steadily; let the stretch ease a little on each breath out.",
+    rangeOfMotion: "Draw the heel toward the glute until you feel a stretch at the front of the thigh, knees side by side; tuck the pelvis to deepen it.",
+    setup: ["Hold a wall or chair with the free hand if balance is a problem.", "Use a strap around the foot if you cannot reach the ankle."],
+    home: true,
+  },
+  "half-kneeling-hip-flexor-stretch": {
+    group: "mobility",
+    aliases: ["kneeling hip flexor stretch", "half-kneeling lunge stretch", "low lunge stretch"],
+    start: "Half-kneeling with the back knee on a pad, the top of that foot on the floor, and the front foot flat with the knee bent about 90°.",
+    breathing: "Breathe slowly and steadily throughout the hold.",
+    rangeOfMotion: "Tuck the pelvis and squeeze the back glute until you feel the front of that hip stretch; shift the hips forward only a little more if needed.",
+    setup: ["Put a folded mat or cushion under the down knee.", "Hold a wall or a stick for balance if you wobble."],
+    home: true,
+  },
+  "wall-calf-stretch": {
+    group: "mobility",
+    aliases: ["standing calf stretch", "gastrocnemius stretch", "runner's calf stretch"],
+    start: "Facing a wall with both hands on it at shoulder height, one foot forward with the knee bent and the other foot back with the leg straight.",
+    breathing: "Breathe slowly and steadily throughout the hold.",
+    rangeOfMotion: "Lean the hips toward the wall until you feel a stretch in the back calf, keeping that heel down and that knee straight.",
+    setup: ["Wear shoes with grip or go barefoot on a non-slip floor.", "Point both feet straight at the wall."],
+    home: true,
+  },
+};

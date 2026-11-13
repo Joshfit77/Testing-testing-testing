@@ -1657,7 +1657,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
     sessionMinutes: 40,
     goals: ["general_health", "build_strength", "build_muscle", "lose_fat"],
     equipment: ["dumbbell", "bodyweight", "bench", "band"],
-    tier: "free",
+    tier: "pro",
     progression:
       "Double progression: when you complete every set at the top of the rep range with good form and 2+ reps still in the tank, add the " +
       "smallest available weight next session. Target effort rises from about 4 reps in reserve to about 2. Week 6 is a lighter consolidation week.",
@@ -1681,7 +1681,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
     sessionMinutes: 35,
     goals: ["general_health", "build_strength", "lose_fat"],
     equipment: ["bodyweight", "mat", "band"],
-    tier: "free",
+    tier: "pro",
     progression:
       "Weeks 1–2: add 1–2 reps per set each session. Weeks 3–4: one extra set on most exercises. Once you reach the top of every range, slow the " +
       "lowering phase to 3 seconds or progress the variation (incline push-up → push-up → feet-elevated push-up).",
@@ -1728,7 +1728,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
     sessionMinutes: 40,
     goals: ["general_health", "mobility", "build_strength"],
     equipment: ["bodyweight", "dumbbell", "band"],
-    tier: "free",
+    tier: "pro",
     needsSpecialistReview: true,
     lowImpact: true,
     progression:
@@ -1803,7 +1803,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
     sessionMinutes: 15,
     goals: ["mobility", "general_health"],
     equipment: ["mat", "band", "bodyweight"],
-    tier: "free",
+    tier: "pro",
     lowImpact: true,
     progression: "Hold times grow by about 5 seconds each week as positions become more comfortable.",
     progressionModel: "steady",
@@ -1827,7 +1827,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
     sessionMinutes: 25,
     goals: ["general_health", "mobility"],
     equipment: ["bodyweight", "dumbbell", "band", "bike"],
-    tier: "free",
+    tier: "pro",
     lowImpact: true,
     progression: "No progression this week — return to your regular program next week.",
     progressionModel: "steady",
@@ -1871,7 +1871,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
     sessionMinutes: 45,
     goals: ["build_strength", "build_muscle"],
     equipment: ["barbell", "rack", "bench", "pull_up_bar"],
-    tier: "free",
+    tier: "pro",
     progression:
       "Every session: if you made all your reps, add weight next time — about 2.5 kg / 5 lb on squats, presses and rows and 5 kg / 10 lb on deadlifts, " +
       "using smaller jumps on the presses once they slow down. Missed reps? Repeat the weight next session. Miss the same weight three sessions in a " +
@@ -2272,7 +2272,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
     sessionMinutes: 55,
     goals: ["build_strength", "athletic_performance"],
     equipment: ["barbell", "rack", "sandbag", "sled", "dumbbell", "kettlebell"],
-    tier: "free",
+    tier: "pro",
     progression:
       "Moving events progress by load: when every run beats the target time with good posture, add weight next week. Pressing and pulling follow RPE " +
       "progression (capped at RPE 9). Week 6 deloads volume by about 40%.",
@@ -2347,7 +2347,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
     sessionMinutes: 45,
     goals: ["build_muscle", "build_strength"],
     equipment: ["barbell", "rack", "bench", "dumbbell", "cable", "machine"],
-    tier: "free",
+    tier: "pro",
     progression:
       "Double progression: add reps until every set reaches the top of the range at the week's reps-in-reserve target, then add the smallest load jump. " +
       "Weeks 1–2 build effort, weeks 3–5 add a set to key exercises, week 6 is a deload. Repeat the block a little heavier.",
@@ -2527,7 +2527,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
     sessionMinutes: 35,
     goals: ["combat_sports", "build_strength", "athletic_performance"],
     equipment: ["barbell", "trap_bar", "dumbbell", "medicine_ball", "box", "pull_up_bar", "bench", "rack"],
-    tier: "free",
+    tier: "pro",
     needsSpecialistReview: true,
     progression:
       "Weeks 1–3: sets of 5, adding a set and a little load. Week 4 deloads. Weeks 5–7: heavier triples at the same low soreness. Week 8 deloads. " +
@@ -2762,7 +2762,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
     sessionMinutes: 30,
     goals: ["improve_conditioning", "general_health", "lose_fat"],
     equipment: ["bodyweight"],
-    tier: "free",
+    tier: "pro",
     progression:
       "Each week the run portions get longer and the walk breaks shorter. Leave at least one rest day between runs. Week 8 starts lighter and ends with " +
       "30 minutes of continuous easy running — roughly a 5K for many runners.",
@@ -2885,7 +2885,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
     sessionMinutes: 30,
     goals: ["improve_conditioning", "general_health", "lose_fat"],
     equipment: ["bodyweight"],
-    tier: "free",
+    tier: "pro",
     lowImpact: true,
     progression: "Jog intervals lengthen each week (30 s → 3 min) while walk breaks shorten; the brisk walk grows to 40 minutes. Week 6 ends with a 20-minute jog.",
     progressionModel: "steady",
@@ -2955,7 +2955,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
     sessionMinutes: 35,
     goals: ["athletic_performance"],
     equipment: ["bodyweight", "dumbbell", "box", "band"],
-    tier: "free",
+    tier: "pro",
     progression:
       "Cone drills add a rep every two weeks (4 → 6) while every rep stays sharp; rest stays long enough (60–90 s) that each rep is fast. Week 6 reduces " +
       "volume — time your 5-10-5 at the end of it.",
@@ -3092,7 +3092,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
     sessionMinutes: 45,
     goals: ["build_strength", "build_muscle", "general_health"],
     equipment: ["bodyweight", "pull_up_bar", "band", "mat"],
-    tier: "free",
+    tier: "pro",
     progression:
       "Double progression on every movement: when you reach the top of the rep range on all sets, move to the next progression and start again " +
       "at the bottom of the range (band-assisted → negatives → full pull-ups; incline → floor → feet-elevated push-ups). Week 4 and week 8 are lighter.",
@@ -3306,7 +3306,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
     sessionMinutes: 30,
     goals: ["general_health", "mobility", "build_strength"],
     equipment: ["bodyweight", "dumbbell", "band"],
-    tier: "free",
+    tier: "pro",
     lowImpact: true,
     needsSpecialistReview: true,
     progression:

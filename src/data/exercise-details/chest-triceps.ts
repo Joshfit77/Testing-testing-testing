@@ -1,3 +1,172 @@
 import type { ExerciseDetails } from "./types";
 
-export const DETAILS_CHEST_TRICEPS: Record<string, ExerciseDetails> = {};
+export const DETAILS_CHEST_TRICEPS: Record<string, ExerciseDetails> = {
+  "incline-barbell-bench-press": {
+    group: "chest",
+    aliases: ["incline bench", "incline bench press", "incline barbell press"],
+    start: "Lying on a bench set to about 30 degrees with eyes under the bar, feet flat and shoulder blades pinned, holding the unracked bar over the shoulders.",
+    breathing: "Breathe in and brace before lowering; breathe out as you press through the hardest part or at the top.",
+    rangeOfMotion: "From straight arms over the shoulders down to a light touch on the upper chest just below the collarbones, then back to lockout.",
+    setup: [
+      "Set the bench to roughly 30 degrees; steeper angles turn the lift into more of a shoulder press.",
+      "Set the rack hooks so you unrack with a slight elbow bend, and use safety arms or a spotter for heavy sets.",
+    ],
+    home: false,
+  },
+  "tempo-bench-press": {
+    group: "chest",
+    aliases: ["tempo bench", "slow eccentric bench press", "3-second bench press"],
+    start: "Lying on a flat bench with eyes under the bar, shoulder blades squeezed back and down, feet planted, holding the bar over the shoulders.",
+    breathing: "Breathe in and brace before the descent and hold the brace through the slow count; breathe out as you press up.",
+    rangeOfMotion: "A three-second descent from lockout to a brief touch on the lower chest, then a normal-speed press back to straight arms.",
+    setup: [
+      "Use a lighter load than your normal bench press — roughly what you could lift for several more reps at normal speed.",
+      "Set safety arms just below chest height or use a spotter.",
+    ],
+    home: false,
+  },
+  "dumbbell-squeeze-press": {
+    group: "chest",
+    aliases: ["crush press", "dumbbell crush press", "squeeze press"],
+    start: "Lying on a flat bench, arms straight over the chest, two dumbbells pressed together with palms facing each other.",
+    breathing: "Breathe in as you lower the dumbbells; breathe out as you press them up while still squeezing.",
+    rangeOfMotion: "From straight arms down to the dumbbells lightly touching the middle of the chest, keeping them pressed together throughout.",
+    setup: [
+      "Hexagonal dumbbells sit flat against each other and are the easiest to keep together.",
+      "Choose a lighter weight than for a regular dumbbell bench press so you can keep squeezing.",
+    ],
+    home: true,
+  },
+  "tempo-push-up": {
+    group: "chest",
+    aliases: ["slow push-up", "eccentric push-up", "3-second push-up"],
+    start: "A high plank with hands slightly wider than shoulders and a straight line from head to heels.",
+    breathing: "Breathe in during the slow lowering; breathe out as you push back up.",
+    rangeOfMotion: "From straight arms down to the chest just above the floor over about three seconds, then back up to straight arms.",
+    setup: [
+      "Count out loud or use a metronome app to keep the descent even.",
+      "If the full version is too hard, use the same tempo with your hands on a bench (incline push-up).",
+    ],
+    home: true,
+  },
+  "close-grip-push-up": {
+    group: "triceps",
+    aliases: ["narrow push-up", "triceps push-up", "close push-up"],
+    start: "A high plank with hands directly under the shoulders, about shoulder width apart, and the body in one straight line.",
+    breathing: "Breathe in as you lower; breathe out as you press up.",
+    rangeOfMotion: "From straight arms down until the chest is just above the floor, elbows staying close to the ribs, then back to full lockout.",
+    setup: [
+      "Hands about shoulder width apart is narrow enough; much closer bends the wrists awkwardly.",
+      "Raise the hands on a bench or box to make it easier while keeping the elbows tucked.",
+    ],
+    home: true,
+  },
+  "dumbbell-fly": {
+    group: "chest",
+    aliases: ["dumbbell flye", "flat dumbbell fly", "chest fly"],
+    start: "Lying on a flat bench, feet planted, dumbbells together over the chest with palms facing each other and elbows slightly bent.",
+    breathing: "Breathe in as the arms open; breathe out as you bring the dumbbells back together.",
+    rangeOfMotion: "From the dumbbells meeting over the chest to the upper arms about level with the torso, the elbow bend unchanged throughout.",
+    setup: [
+      "Use noticeably lighter dumbbells than for a dumbbell press; the long arms make the same weight much harder.",
+      "Bring the dumbbells to the start position by pressing them up, and finish a set by bending the elbows and lowering them to the chest.",
+    ],
+    home: true,
+  },
+  "incline-dumbbell-fly": {
+    group: "chest",
+    aliases: ["incline flye", "incline chest fly"],
+    start: "Lying on a bench set to about 30 degrees, dumbbells together over the upper chest with palms facing and elbows slightly bent.",
+    breathing: "Breathe in as the arms open; breathe out as you bring them back together.",
+    rangeOfMotion: "From the dumbbells meeting over the upper chest to the upper arms about level with the torso, elbow bend fixed.",
+    setup: [
+      "Set the bench to roughly 30 degrees; a steeper angle shifts the work toward the front shoulders.",
+      "Choose lighter dumbbells than for the incline press.",
+    ],
+    home: true,
+  },
+  "decline-bench-press": {
+    group: "chest",
+    aliases: ["decline bench", "decline press"],
+    start: "Lying on a decline bench, head lower than the hips, legs hooked under the roller pads, holding the unracked bar over the shoulders.",
+    breathing: "Breathe in and brace before lowering; breathe out as you press through the hardest part or at the top.",
+    rangeOfMotion: "From straight arms over the shoulders down to a light touch on the lower chest, then back to lockout.",
+    setup: [
+      "Most decline benches sit about 15–20 degrees; lock your legs under the pads before lying back.",
+      "A spotter for the hand-off and re-rack is strongly recommended, as the bar is harder to reach from a decline.",
+    ],
+    home: false,
+  },
+  "decline-dumbbell-press": {
+    group: "chest",
+    aliases: ["decline db press", "decline dumbbell bench press"],
+    start: "Lying on a decline bench with legs hooked under the roller pads, dumbbells pressed up over the shoulders.",
+    breathing: "Breathe in as you lower the dumbbells; breathe out as you press.",
+    rangeOfMotion: "From straight arms down until the dumbbells are level with the lower chest, then back to straight arms.",
+    setup: [
+      "Get into position by holding the dumbbells on your thighs and lying back slowly, keeping them close to the chest.",
+      "To finish, bring the dumbbells to the chest before sitting up, or have a partner take them.",
+    ],
+    home: false,
+  },
+  "knee-push-up": {
+    group: "chest",
+    aliases: ["kneeling push-up", "modified push-up", "half push-up"],
+    start: "Kneeling on a mat, hands on the floor slightly wider than the shoulders, body straight from the knees to the head, feet lifted.",
+    breathing: "Breathe in as you lower; breathe out as you push up.",
+    rangeOfMotion: "From straight arms down until the chest is just above the floor, then back to straight arms.",
+    setup: [
+      "Kneel on a mat or folded towel for comfort.",
+      "Progress toward full push-ups by adding reps, then by doing the lowering phase from the toes.",
+    ],
+    home: true,
+  },
+  "ez-bar-skull-crusher": {
+    group: "triceps",
+    aliases: ["skull crusher", "lying triceps extension", "french press", "ez bar lying extension"],
+    start: "Lying on a flat bench holding an EZ-bar on the angled grips, arms straight over the shoulders and tilted slightly back toward the head.",
+    breathing: "Breathe in as you lower the bar; breathe out as you extend the elbows.",
+    rangeOfMotion: "From straight arms to the elbows bent until the bar is just above the forehead, upper arms not moving.",
+    setup: [
+      "Start lighter than you expect; the bar travels close to the face.",
+      "Pick the bar up from the floor or have it handed to you, and press it to the start position before the first rep.",
+    ],
+    home: false,
+  },
+  "dumbbell-lying-triceps-extension": {
+    group: "triceps",
+    aliases: ["dumbbell skull crusher", "lying dumbbell extension", "neutral-grip skull crusher"],
+    start: "Lying on a flat bench, a dumbbell in each hand with palms facing, arms straight over the shoulders and tilted slightly back toward the head.",
+    breathing: "Breathe in as you lower the dumbbells; breathe out as you extend.",
+    rangeOfMotion: "From straight arms down until the dumbbells are beside the head, then back to full lockout, upper arms fixed.",
+    setup: [
+      "Hexagonal or fixed dumbbells are easiest to hold steady in a neutral grip.",
+      "It works on the floor too (a floor version) when no bench is available.",
+    ],
+    home: true,
+  },
+  "dumbbell-kickback": {
+    group: "triceps",
+    aliases: ["triceps kickback", "kickback", "bent-over kickback"],
+    start: "Hinged forward with soft knees and a flat back, a dumbbell in each hand, upper arms level with the floor beside the torso and elbows bent about 90 degrees.",
+    breathing: "Breathe out as you straighten the arms; breathe in as you bend them.",
+    rangeOfMotion: "From elbows bent about 90 degrees to arms fully straight behind, without the upper arms moving.",
+    setup: [
+      "Use light dumbbells: the lever is long at lockout.",
+      "For more support, do one arm at a time with the other hand and knee on a bench.",
+    ],
+    home: true,
+  },
+  "bench-dip": {
+    group: "triceps",
+    aliases: ["triceps dip", "chair dip", "bench triceps dip"],
+    start: "Hands on the edge of a bench beside the hips with fingers forward, hips just in front of the bench, knees bent about 90 degrees and feet flat.",
+    breathing: "Breathe in as you lower; breathe out as you press up.",
+    rangeOfMotion: "From straight arms down until the upper arms are about level with the floor, then back to straight arms.",
+    setup: [
+      "Use a bench or chair that cannot slide or tip; put it against a wall if needed.",
+      "Make it easier with the feet closer to the bench, harder with the legs straight.",
+    ],
+    home: true,
+  },
+};

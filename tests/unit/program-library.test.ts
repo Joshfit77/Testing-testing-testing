@@ -156,12 +156,11 @@ describe("program library structure", () => {
 });
 
 describe("tiers and organisation", () => {
-  it("offers at least one free program in every discipline", () => {
+  it("offers programs in every discipline, all of them Pro since 2026-11-13 (members already enrolled keep theirs)", () => {
     for (const d of DISCIPLINES) {
-      const free = PROGRAMS.filter((p) => disciplineForCategory(p.category).id === d.id && p.tier === "free");
-      expect(free.length, d.label).toBeGreaterThanOrEqual(1);
+      expect(PROGRAMS.filter((p) => disciplineForCategory(p.category).id === d.id).length, d.label).toBeGreaterThanOrEqual(1);
     }
-    expect(PROGRAMS.filter((p) => p.tier !== "free").length).toBeGreaterThanOrEqual(20);
+    expect(PROGRAMS.every((p) => p.tier !== "free")).toBe(true);
   });
 
   it("sorts each discipline beginner → advanced", () => {
