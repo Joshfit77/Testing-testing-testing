@@ -139,6 +139,14 @@ export default async function ProgramsPage({ searchParams }: { searchParams: Pro
       {/* Pro: the builder leads. Free: the free library comes first and the builder follows it. */}
       {canBuild && builder}
 
+      <Link href="/train/habits" className="flex min-h-14 items-center gap-3 rounded-2xl border border-border bg-card p-4 hover:border-gold-muted" data-testid="habit-programs-link">
+        <span className="min-w-0 flex-1">
+          <span className="block font-semibold">Nutrition, faith & habit programs</span>
+          <span className="block text-sm text-muted-foreground">Daily and weekly habits: nutrition foundations, fat-loss and muscle-gain habits, meal prep, faith and fitness.</span>
+        </span>
+        <ChevronRight className="size-5 shrink-0 text-gold" aria-hidden />
+      </Link>
+
       {mine.length > 0 && (
         <section aria-labelledby="mine-title">
           <h2 id="mine-title" className="mb-2 text-lg font-semibold">
