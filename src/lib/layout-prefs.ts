@@ -9,7 +9,7 @@
  */
 import type { ExperienceLevel, PrimaryGoal } from "@/lib/domain/types";
 
-export const HOME_MODULES = ["workout", "nutrition", "faith", "quick", "verse", "week", "sleep", "calendar"] as const;
+export const HOME_MODULES = ["workout", "nutrition", "faith", "quick", "verse", "week", "report", "sleep", "calendar"] as const;
 export type HomeModule = (typeof HOME_MODULES)[number];
 
 export const HOME_MODULE_LABELS: Record<HomeModule, { title: string; body: string }> = {
@@ -19,6 +19,7 @@ export const HOME_MODULE_LABELS: Record<HomeModule, { title: string; body: strin
   quick: { title: "Quick actions", body: "Run, log food, AI Coach" },
   verse: { title: "Verse of the day", body: "Today's Scripture" },
   week: { title: "This week", body: "Workouts this week and My Progress" },
+  report: { title: "Weekly report", body: "Your Sunday progress report (Pro)" },
   sleep: { title: "Sleep & Recovery", body: "Last night, from your watch or by hand" },
   calendar: { title: "Training calendar", body: "Planned sessions, runs and rest days" },
 };
@@ -153,11 +154,11 @@ export interface HomeProfile {
 export function defaultHomeOrder(p: HomeProfile): HomeModule[] {
   const busy = (p.daysPerWeek ?? 7) <= 3 && (p.sessionMinutes ?? 60) <= 30;
   let order: HomeModule[];
-  if (busy) order = ["workout", "nutrition", "faith", "verse", "week", "calendar", "sleep"];
-  else if (p.goal === "lose_fat" || p.goal === "general_health") order = ["workout", "nutrition", "faith", "verse", "week", "sleep", "calendar"];
-  else if (p.goal === "build_muscle" || p.goal === "build_strength") order = ["workout", "nutrition", "sleep", "faith", "verse", "week", "calendar"];
-  else if (p.goal === "improve_conditioning" || p.goal === "athletic_performance" || p.goal === "combat_sports") order = ["workout", "nutrition", "sleep", "faith", "verse", "week", "calendar"];
-  else order = ["workout", "nutrition", "faith", "verse", "week", "sleep", "calendar"];
+  if (busy) order = ["workout", "nutrition", "faith", "verse", "week", "report", "calendar", "sleep"];
+  else if (p.goal === "lose_fat" || p.goal === "general_health") order = ["workout", "nutrition", "faith", "verse", "week", "report", "sleep", "calendar"];
+  else if (p.goal === "build_muscle" || p.goal === "build_strength") order = ["workout", "nutrition", "sleep", "faith", "verse", "week", "report", "calendar"];
+  else if (p.goal === "improve_conditioning" || p.goal === "athletic_performance" || p.goal === "combat_sports") order = ["workout", "nutrition", "sleep", "faith", "verse", "week", "report", "calendar"];
+  else order = ["workout", "nutrition", "faith", "verse", "week", "report", "sleep", "calendar"];
   if (!p.faithEnabled) order = [...order.filter((m) => m !== "faith" && m !== "verse"), "faith", "verse"];
   return [...order, "quick"];
 }

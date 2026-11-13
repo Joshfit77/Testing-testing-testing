@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { TodaysRemindersSection } from "@/components/notifications/todays-reminders-section";
-import { BarChart3, BookOpen, Bot, CalendarDays, ChevronRight, Footprints, HandHeart, HeartPulse, Moon, ScanBarcode, SlidersHorizontal, Sparkles, Utensils, Wand2 } from "lucide-react";
+import { BarChart3, BookOpen, Bot, CalendarDays, ChevronRight, FileText, Footprints, HandHeart, HeartPulse, Moon, ScanBarcode, SlidersHorizontal, Sparkles, Utensils, Wand2 } from "lucide-react";
 import { SceneHero } from "@/components/common/scene-hero";
 import { LogoMark } from "@/components/common/logo";
 import { StatTile } from "@/components/ui/stat-tile";
@@ -37,6 +37,7 @@ import { ScriptureText } from "@/components/bible/scripture-text";
 import { loadReadingState } from "@/server/services/bible";
 import { loadActiveJourney } from "@/server/services/journeys";
 import { todayReadingLink } from "@/lib/faith/today-reading";
+import { latestDuePeriod } from "@/lib/domain/weekly-report";
 
 export const metadata = { title: "Home" };
 
@@ -77,6 +78,18 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       return null;
     }),
   ]);
+  // Weekly report card: Pro sees the latest due report (built on open of the reports page); after Pro ends, past
+  // reports stay readable, so the card stays while there are any. Nobody else sees an advert here.
+  const reportsPro = hasFeature(plan, "weekly_reports");
+  const latestReport = await supabase
+    .from("weekly_reports")
+    .select("week_start, read_at")
+    .eq("user_id", user.id)
+    .order("week_start", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+    .then((r) => (r.data as { week_start: string; read_at: string | null } | null) ?? null, () => null);
+  const duePeriod = latestDuePeriod(new Date(), profile.timezone);
   // One answer to "what should I read now?", shared with the Faith tab: today's journey passage, else the last chapter.
   const read = todayReadingLink(journey, reading);
   // Last night's sleep: only after wellness consent, and never blocking the page.
@@ -300,6 +313,25 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         <ChevronRight className="size-5 text-gold" aria-hidden />
       </Link>
     ),
+    report:
+      reportsPro || latestReport ? (
+        <Link key="report" href={latestReport?.week_start === duePeriod.weekStart ? `/progress/reports/${duePeriod.weekStart}` : "/progress/reports"} className={row} data-testid="home-report-card">
+          <FileText className="size-5 text-gold" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span className="block text-base font-semibold">Weekly report</span>
+            <span className="block truncate text-sm text-muted-foreground">
+              {!reportsPro
+                ? "Your past reports"
+                : latestReport?.week_start === duePeriod.weekStart
+                  ? latestReport.read_at
+                    ? "Last week's report · read again or share"
+                    : "Last week's report is ready"
+                  : "Last week's report · tap to open"}
+            </span>
+          </span>
+          <ChevronRight className="size-5 text-gold" aria-hidden />
+        </Link>
+      ) : null,
     calendar: (
       <Link key="calendar" href="/calendar" className={row}>
         <CalendarDays className="size-5 text-gold" aria-hidden />

@@ -48,7 +48,7 @@ describe("Home layout by member", () => {
   });
   it("moves Faith last, never removes it, when Faith was switched off in onboarding", () => {
     const order = defaultHomeOrder({ ...base, faithEnabled: false });
-    expect(order).toHaveLength(8);
+    expect(order).toHaveLength(9);
     expect(order.slice(-3)).toEqual(["faith", "verse", "quick"]);
   });
   it("applies the member's own order and hidden modules, appends new modules, and never hides the workout", () => {
@@ -56,7 +56,7 @@ describe("Home layout by member", () => {
     expect(layout.slice(0, 2)).toEqual(["faith", "nutrition"]);
     expect(layout).toContain("workout");
     expect(layout).not.toContain("sleep");
-    expect(layout).toHaveLength(7);
+    expect(layout).toHaveLength(8);
   });
   it("hides the verse when the Scripture-on-Home setting is off", () => {
     expect(homeLayout({ ...base, homeScripture: false }, {})).not.toContain("verse");
