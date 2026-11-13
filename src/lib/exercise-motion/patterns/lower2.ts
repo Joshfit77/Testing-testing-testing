@@ -269,7 +269,8 @@ export function bridge(id: string, label: string, opts: { bench?: boolean; barbe
     } else if (!opts.bench) {
       // Arms flat on the floor beside the body.
       const W = worldPts(p, root);
-      p = handsTo(p, root, [W.shoulder[0] + BODY.upperArm + BODY.forearm - 2, BODY.r.hand]);
+      const hy = BODY.r.hand + 4;
+      p = handsTo(p, root, [W.shoulder[0] + Math.sqrt((BODY.upperArm + BODY.forearm - 0.3) ** 2 - (W.shoulder[1] - hy) ** 2), hy]);
     } else p = armsLocal(p, [-6, -14], [16, -18]);
     return p;
   };
@@ -280,7 +281,12 @@ export function bridge(id: string, label: string, opts: { bench?: boolean; barbe
   if (opts.bench) props.push({ id: "bench", kind: "bench", at: [-44, benchH], w: 90, layer: "back" });
   else props.push({ id: "mat", kind: "mat", at: [20, 0], w: 200, layer: "back" });
   if (opts.barbell) props.push({ id: "bar", kind: "barbell", at: { lm: "hipCrease", dy: 4 }, layer: "front" });
-  const handPt: Vec = [worldPts(at(-90), root).shoulder[0] + BODY.upperArm + BODY.forearm - 2, BODY.r.hand + 4];
+  // Floor bridge: the arms lie straight along the floor (the hand a straight arm's reach from the shoulder). With the hand
+  // 2 cm short of it the elbow bent down through the floor as the hips rose, and the floor clamp lifted the whole body
+  // (and the planted feet) 2.8 cm off the floor.
+  const sh0 = worldPts(at(-90), root).shoulder;
+  const handY = BODY.r.hand + 4;
+  const handPt: Vec = [sh0[0] + Math.sqrt((BODY.upperArm + BODY.forearm - 0.3) ** 2 - (sh0[1] - handY) ** 2), handY];
   const ik = !opts.bench && !opts.barbell ? { footL: ankle, footR: ankle, handL: handPt, handR: handPt } : { footL: ankle, footR: ankle };
   return {
     id,
@@ -564,15 +570,26 @@ export function hipAbduction(id: string, label: string): MotionDef {
     }
     return out;
   };
-  const at = (abd: number) =>
-    arms(pose({ trunk: 0, trunkD: 8, neck: -4, hipL: 84, hipR: 84, legDL: 90 - abd, legDR: 90 - abd, kneeL: 0, kneeR: 0, ankleL: abd * 0.25, ankleR: abd * 0.25 }));
+  const legs = (abd: number, shinD: number) =>
+    arms(pose({ trunk: 0, trunkD: 8, neck: -4, hipL: 84, hipR: 84, legDL: 90 - abd, legDR: 90 - abd, kneeL: 0, kneeR: 0, ankleL: abd * 0.25, ankleR: abd * 0.25, shinDL: shinD, shinDR: shinD }));
+  // The feet stay flat on the floor: as the knees open the shins tilt out, which would push the soles through the floor
+  // (the floor clamp then lifted the whole athlete 1.9 cm off the bench); the shins angle a little toward the camera
+  // (feet slightly forward) by exactly what keeps the soles on the floor.
+  const soleY = (p: Pose) => Math.min(worldPts(p, root, "front").soleL[1], worldPts(p, root, "front").soleR[1]);
+  const at = (abd: number) => {
+    const p0 = legs(abd, 0);
+    if (soleY(p0) >= 0) return p0;
+    return legs(abd, solve1D((d) => soleY(legs(abd, d)), 0, 60));
+  };
   return {
     id,
     view: "front",
     label,
     keyframes: keys(root, [
-      { pose: at(8), dur: 1.4, hold: 0.3, ease: "inOut" },
-      { pose: at(42), dur: 1.2, hold: 0.8, ease: "inOut" },
+      { pose: at(8), dur: 0.7, hold: 0.3, ease: "spline" },
+      { pose: at(25), dur: 0.7, ease: "spline" },
+      { pose: at(42), dur: 0.6, hold: 0.8, ease: "spline" },
+      { pose: at(25), dur: 0.6, ease: "spline" },
     ]),
     props: [
       { id: "seat", kind: "box", at: [0, 0], w: SEAT_W, h: 44, layer: "far" },

@@ -3,7 +3,7 @@
  * kickback, bench dip, decline bench press and knee push-up. Built on the same primitives as ./upper.ts.
  */
 import { BODY, ankleForSole } from "../skeleton";
-import { FEET, arm3D, armThrough, both, keys, pose, repSmooth, solve1D, stanceLegs, worldPts, type KeySpec, type MotionDef, type Pose, type PropDef, type RootRule, type Side, type V3, type Vec } from "../build";
+import { FEET, arm3D, armThrough, both, keys, pose, repSmooth, solve1D, stanceLegs, worldPts, type KeySpec, type MotionDef, type Pose, type PropDef, type RootRule, type V3, type Vec } from "../build";
 import { handsTo, ik2, legsTo, toLocal } from "./upper";
 
 const ARM = BODY.upperArm + BODY.forearm;

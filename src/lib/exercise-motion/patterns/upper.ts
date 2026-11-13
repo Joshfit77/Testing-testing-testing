@@ -433,8 +433,8 @@ export function overheadPress(o: PressOpts): MotionDef {
     const need = (s: number) => {
       if (!inFront) return 0;
       const b = bar(s);
-      if (clearance(0, b) >= 3) return 0;
-      return solve1D((L) => clearance(L, b) - 3, 0, 14);
+      if (clearance(0, b) >= 4) return 0;
+      return solve1D((L) => clearance(L, b) - 4, 0, 16);
     };
     // The largest lean on the way up, applied on a smooth bump around the head so the head eases back and forward again.
     let peak = 0;
@@ -664,7 +664,7 @@ export function latPulldown(id: string, label: string): MotionDef {
   const P = (s: number, h: Vec): Pose => {
     const b = body(s);
     const sh = worldPts(b, root).shoulder;
-    let elbow: Vec = [h[0] - 4 * s, h[1] - fore];
+    const elbow: Vec = [h[0] - 4 * s, h[1] - fore];
     // An elbow out of the upper arm's reach (arms nearly straight overhead) is placed by two-bone IK instead.
     if (Math.hypot(elbow[0] - sh[0], elbow[1] - sh[1]) > BODY.upperArm - 0.5) return handsTo(b, root, h);
     let p = b;
