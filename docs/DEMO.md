@@ -126,19 +126,20 @@ for accounts the server created as demo accounts, only when the server runs in d
 
 ## The clickable iPhone demo (captured screens)
 
-Rebuilt 2026-11-09 (page version 26) from the redesigned build, commit `b4f7b99` of this branch, by
-`scripts/demo/iphone-demo/` (see its README): a private page that opens on an iPhone in Safari and fills the screen.
-Published in place as **Narrow Gate iPhone Demo**, https://claude.ai/artifact/L1eCXFJ1a3UjtQuta3nzRU (private: only the
-owner and whoever the owner shares it with). The stale pictures of version 22 were removed, not left behind.
+Rebuilt 2026-11-14 (page version 30) from the tested build of this branch (app code of `95f8458`; every test suite
+passed on it the day before, see `docs/quality/QUALITY_IMPROVEMENT_2026-11-13.md`), by `scripts/demo/iphone-demo/`
+(see its README): a private page that opens on an iPhone in Safari and fills the screen. Published in place as
+**Narrow Gate iPhone Demo**, https://claude.ai/artifact/L1eCXFJ1a3UjtQuta3nzRU (private: only the owner and whoever the
+owner shares it with). The 117 pictures of version 26 that the new set no longer uses were removed, not left behind.
 
 | | |
 | --- | --- |
-| What it is | **Pictures of the real app**, captured in demo mode (sample data, purchases off, AI simulated) at iPhone 15 Pro size (393 CSS px at 3×, 1179 px wide, one WebP q88 pass), joined by the real tap targets: 557 screens captured, 462 kept, 5,379 taps (4,045 land on a captured screen; the rest say the screen was not captured). The ten redesigned reference screens (Home, Workout in progress, Exercise demonstration, Workout complete, AI Coach, Nutrition, Programs, Progress, Faith, Narrow Gate Pro), the five tabs, Quick Add, Search, Customize, Run (GPS run and walk, the treadmill log, history), Sleep & Recovery (45 screens), Faith and the Bible (58), 146 of the 157 exercise pages (the page's hosting allows 511 files, so 11 of the library's later pages are left out), My Progress, the settings and the membership screen. |
-| What is live | The 2D exercise demonstrations draw and move on all 146 captured exercise pages and on all three tabs of the workout's demonstration dialog (Setup, Execution, Mistakes); everything else is a picture. |
-| Captured step by step | The workout flow (start, demonstration dialog with its Setup / Execution / Mistakes tabs, log set 1 with the rest timer, set 2, exercise options, substitute picker, substituted, finish, Workout Complete), the AI coach (question typed, simulated reply), the Run log with Treadmill chosen, and the new-member path (five questions as asked and answered, Ready, the plan, the first workout, the new member's own tabs). |
+| What it is | **Pictures of the real app**, captured in demo mode (sample member Jordan, purchases off, AI simulated) at iPhone 15 Pro size (393 CSS px at 3×, 1179 px wide, one WebP q88 pass), joined by the real tap targets: 557 screens captured, 466 kept (the page's hosting allows 511 files), 5,922 taps (4,177 land on a captured screen; the rest say the screen was not captured). |
+| What is live | The opening, and the 2D exercise demonstrations on all 150 exercise pages kept and on the three tabs of the workout's demonstration dialog (Setup, Execution, Mistakes); everything else is a picture. |
+| Captured step by step | The workout flow (start, demonstration dialog and its tabs, log set 1 with the rest timer, set 2, exercise options, substitute, finish, Workout Complete), the AI coach (question typed, simulated reply), the Run log with Treadmill chosen, and the new-member path (five questions, Ready, the plan, the first workout, that member's own tabs). |
 | Not live | Typing, timers, GPS, the camera, Apple Health, purchases, and any screen not among the captured ones (a tap says so). |
-| On a phone | The page never scrolls itself: only the captured screen does, at the full width in portrait and centred at its captured width in landscape, with the phone's safe areas applied once. |
-| Checks | `verify.mjs` on the page as downloaded from the published artifact (2026-11-09, `PUBLISHED=1`): 44 of 44 checks (opening → welcome → sample data → the five tabs → back → the whole workout flow → the three demonstration tabs → menu → coach → Run log → Treadmill → new member; live demonstrations draw and move on 146/146 exercise pages and the three dialog tabs; every picture present; every tap target inside its screen; no page errors; no missing files; fills 39 of 39 iPhone and Android viewports, 74 models). The published file list (508 files) matched the local build byte for byte on the files sampled. |
+| Fixed in this rebuild | The demonstration dialog showed two rows of player controls: its live player was placed where another exercise's dialog had been measured (the dialog is centred, and its height depends on the exercise). The crawl now records the player's box with the picture itself (`liveBoxes`), and `live.mjs` uses it. |
+| Checks | `verify.mjs` on the page as downloaded from the published artifact (2026-11-14, `PUBLISHED=1`): 44 of 44 checks (opening, welcome, sample data, the five tabs, back, the whole workout flow, the three demonstration tabs, menu, coach, Run log, Treadmill, new member; live demonstrations draw and move on 150/150 exercise pages and the three dialog tabs; every picture present; every tap target inside its screen; no page errors; no missing files; fills 39 of 39 iPhone and Android viewports, 74 models). The published version holds 509 files; the page and the sampled pictures match the local build byte for byte. |
 
 It is not the live app on the phone: that is the private preview deployment above, which waits on the owner's
 one-time setup (the six repository secrets) and a `demo-preview-*` tag, and the TestFlight build after it. The

@@ -82,7 +82,17 @@ log(`exercise pages ${report.pages}, live boxes ${report.live}, no box ${report.
 
 // The workout's demonstration dialog.
 const dlg = data.screens.find((s) => s.key === "state:demo-dialog");
-if (dlg) {
+const dlgKeys = ["state:demo-dialog", "state:demo-dialog-execution", "state:demo-dialog-mistakes"];
+if (dlg?.liveBoxes?.length) {
+  // Measured by the crawl with the picture itself (the dialog is centred and its height depends on the exercise, so
+  // a box measured now, on whatever workout this pass opens, would not line up with the captured dialog).
+  for (const key of dlgKeys) {
+    const t = data.screens.find((s) => s.key === key);
+    const list = t?.liveBoxes?.length ? t.liveBoxes : dlg.liveBoxes;
+    if (t) apply(t, list.map((x) => ({ ...x })));
+  }
+  log(`demonstration dialog (from the crawl): ${JSON.stringify(dlg.liveBoxes)}`);
+} else if (dlg) {
   await page.goto(`${BASE}/train`);
   const start = page.locator("main").getByRole("link", { name: /Start workout|Start today's workout|Resume workout/ }).first();
   await start.click();

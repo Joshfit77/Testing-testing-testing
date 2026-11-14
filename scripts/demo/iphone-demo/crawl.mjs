@@ -218,6 +218,19 @@ log(`crawl: ${screens.length} screens, ${queue.length} left in the queue`);
 // ---- 4. Scripted states: the workout flow and the AI coach --------------------------------------------------------
 const SKIP_FLOWS = process.env.NO_FLOWS === "1";
 async function state(key, title, opts = {}) { const r = await capture(key, { title, group: opts.group ?? "Workout", tab: opts.tab ?? "/train", full: opts.full ?? true, extraHot: opts.extraHot ?? [] }); if (opts.closeTo) r.closeTo = opts.closeTo; return r; }
+// Where the animated demonstration sits in the open dialog, measured with the picture just taken (viewport
+// coordinates). live.mjs places the live player there: the dialog is centred and its height depends on the exercise
+// (a camera-view switch, how many steps), so a box measured later on another exercise's dialog would not line up.
+const dialogDemoBoxes = () => page.evaluate(() => {
+  const root = Array.from(document.querySelectorAll("[role=dialog]")).pop();
+  if (!root) return [];
+  return Array.from(root.querySelectorAll('[data-testid="exercise-demo"][data-demo-readiness="animated"]')).map((el) => {
+    const r = el.getBoundingClientRect();
+    const lab = el.querySelector("[aria-label^='Animated demonstration of']")?.getAttribute("aria-label") || "";
+    const name = (lab.match(/^Animated demonstration of (.+?)\. /) || [])[1] || null;
+    return { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height), name, controls: r.width >= 200 };
+  }).filter((x) => x.w >= 40 && x.h >= 30);
+});
 const link = (rec, test, to) => { const hs = rec.hot.find((x) => test.test(x.label)); if (hs) hs.to = to; else log(`  no target "${test}" on ${rec.key}`); };
 if (!SKIP_FLOWS) try {
   await page.goto(`${BASE}/train`);
@@ -238,6 +251,7 @@ if (!SKIP_FLOWS) try {
   await dialog.waitFor();
   await page.waitForTimeout(1500);
   const demoDlg = await state("state:demo-dialog", "Exercise demonstration", { full: false, closeTo: "state:workout-started" });
+  demoDlg.liveBoxes = await dialogDemoBoxes();
   for (const hs of demoDlg.hot) if (/close|done|back/i.test(hs.label)) hs.to = "state:workout-started";
   link(started, /Show the .* demonstration larger/, "state:demo-dialog");
   link(started, /^Exercise info$/, "state:demo-dialog");
@@ -247,6 +261,7 @@ if (!SKIP_FLOWS) try {
     await dialog.getByRole("tab", { name: tab }).click();
     await page.waitForTimeout(500);
     const rec = await state(key, `Exercise demonstration: ${tab.toLowerCase()}`, { full: false, closeTo: "state:workout-started" });
+    rec.liveBoxes = await dialogDemoBoxes();
     for (const hs of rec.hot) if (/close|done|back/i.test(hs.label)) hs.to = "state:workout-started";
     tabStates[tab] = rec;
   }
