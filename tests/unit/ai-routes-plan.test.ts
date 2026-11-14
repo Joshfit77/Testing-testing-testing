@@ -48,11 +48,16 @@ vi.mock("@/lib/supabase/server", () => ({
   getServiceSupabase: () => stubClient({}),
   getTokenSupabase: () => stubClient({}),
 }));
-vi.mock("@/server/services/ai-coach", () => ({
-  AiError,
-  AI_ERROR_STATUS: { not_entitled: 403, quota: 429, provider: 502, not_configured: 503 },
-  coachTurn: (...args: unknown[]) => coachTurn(...args),
-}));
+vi.mock("@/server/services/ai-coach", async () => {
+  const { aiAllowance } = await import("@/lib/domain/plans");
+  return {
+    AiError,
+    AI_ERROR_STATUS: { not_entitled: 403, quota: 429, provider: 502, not_configured: 503 },
+    coachTurn: (...args: unknown[]) => coachTurn(...args),
+    // The photo routes check the plan's AI allowance before reading the upload (ai-photo-guard.ts): the real rule, no legacy terms.
+    getAiAllowance: async (_userId: string, plan: Parameters<typeof aiAllowance>[0]) => aiAllowance(plan),
+  };
+});
 vi.mock("@/server/services/food-photo", () => ({ analyzeFoodPhoto: (...args: unknown[]) => analyzeFoodPhoto(...args) }));
 vi.mock("@/server/log", () => ({ logError: vi.fn(), logInfo: vi.fn() }));
 
@@ -146,6 +151,18 @@ describe("AI routes read the plan through the authenticated session", () => {
     expect(analyzeFoodPhoto.mock.calls[0]![1]).toBe("u-photo");
     expect(analyzeFoodPhoto.mock.calls[0]![2]).toBe("pro");
     expect(analyzeFoodPhoto.mock.calls[0]![3]).toMatchObject({ mediaType: "image/jpeg" });
+  });
+
+  it("a Free member's upload is refused on the plan before the photo is read or decoded", async () => {
+    const session = stubClient({ user_entitlements: { plan: "free", valid_until: null } });
+    authenticateRequest.mockResolvedValue({ user: { id: "u-free-photo" }, supabase: session, via: "bearer" });
+    const request = photoRequest(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]));
+    const formData = vi.spyOn(request, "formData");
+    const res = await foodPhoto(request);
+    expect(res.status).toBe(403);
+    expect((await res.json()).error).toBe("not_entitled");
+    expect(formData).not.toHaveBeenCalled();
+    expect(analyzeFoodPhoto).not.toHaveBeenCalled();
   });
 
   it("refuses a file that only looks like an image, without calling the AI", async () => {

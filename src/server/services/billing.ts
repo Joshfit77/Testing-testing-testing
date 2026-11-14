@@ -437,8 +437,10 @@ async function applyStripeEvent(event: Stripe.Event): Promise<void> {
       const invoice = event.data.object as Stripe.Invoice;
       const subId = subscriptionOfInvoice(invoice);
       if (subId) {
-        // A newer period paid for after a refund or dispute restores access; the revoked period stays revoked.
-        if (event.type === "invoice.paid" && invoice.id) await clearRevocation(subId, (row) => row.revoked_invoice_id !== invoice.id);
+        // A newer period paid for after a refund or dispute restores access; the revoked period stays revoked, and so
+        // does access when this is the payment of an earlier invoice arriving late (invoiceIsNewerThan).
+        if (event.type === "invoice.paid" && invoice.id)
+          await clearRevocation(subId, async (row) => row.revoked_invoice_id !== invoice.id && (await invoiceIsNewerThan(stripe, invoice, row.revoked_invoice_id)));
         const { sub, fetchedAt } = await fetchSubscription(stripe, subId);
         await syncSubscription(sub, fetchedAt);
       }
@@ -522,8 +524,30 @@ async function revokeForCharge(stripe: Stripe, charge: Stripe.Charge, reason: "r
   if (data?.user_id) await recomputeEntitlement(data.user_id as string);
 }
 
+/**
+ * Whether a paid invoice is newer than the invoice whose refund or dispute ended access. Stripe delivers events in
+ * any order and retries a failed delivery for days, so "invoice.paid" for an earlier invoice can arrive after a later
+ * one was refunded; that is not a new period paid for and must not restore access. Both times are Stripe's own
+ * (`created`). When either can't be read the invoice counts as newer, so a paying member is never left without
+ * access over a missing field.
+ */
+async function invoiceIsNewerThan(stripe: Stripe, paid: Stripe.Invoice, revokedInvoiceId: string | null): Promise<boolean> {
+  if (!revokedInvoiceId || typeof paid.created !== "number") return true;
+  let revoked: Stripe.Invoice;
+  try {
+    revoked = await stripe.invoices.retrieve(revokedInvoiceId);
+  } catch (err) {
+    if (isStripeMissing(err)) return true;
+    throw err;
+  }
+  return typeof revoked.created !== "number" || paid.created > revoked.created;
+}
+
 /** Restore access ended by a refund or dispute, when `when` says the stored revocation no longer applies. */
-async function clearRevocation(subscriptionId: string, when: (row: { revoked_invoice_id: string | null; access_revoked_reason: string | null }) => boolean): Promise<void> {
+async function clearRevocation(
+  subscriptionId: string,
+  when: (row: { revoked_invoice_id: string | null; access_revoked_reason: string | null }) => boolean | Promise<boolean>,
+): Promise<void> {
   const admin = getServiceSupabase();
   const { data, error } = await admin
     .from("subscriptions")
@@ -531,7 +555,7 @@ async function clearRevocation(subscriptionId: string, when: (row: { revoked_inv
     .eq("stripe_subscription_id", subscriptionId)
     .maybeSingle();
   if (error) throw error;
-  if (!data?.access_revoked_at || !when(data as { revoked_invoice_id: string | null; access_revoked_reason: string | null })) return;
+  if (!data?.access_revoked_at || !(await when(data as { revoked_invoice_id: string | null; access_revoked_reason: string | null }))) return;
   const { error: upErr } = await admin
     .from("subscriptions")
     .update({ access_revoked_at: null, access_revoked_reason: null, revoked_invoice_id: null })
@@ -555,8 +579,24 @@ async function currentSubscription(stripe: Stripe, snapshot: Stripe.Subscription
   }
 }
 
+/** Thrown when a member's open Stripe subscription can't be cancelled because this deployment can't use Stripe. */
+export class StripeUnavailableError extends Error {
+  constructor() {
+    super("Stripe is not configured on this deployment, but the member has an open Stripe subscription");
+    this.name = "StripeUnavailableError";
+  }
+}
+
+/**
+ * Cancels every open Stripe subscription of a member (the first step of account deletion; it throws when anything
+ * may be left running, and the deletion then stops). A deployment that can't use Stripe (no key, or a live key not
+ * approved for charges: src/server/env.ts) can't cancel anything: there, a member with an open subscription on
+ * record is refused rather than deleted, because the subscription would go on charging them with no account,
+ * customer link or subscription row left to trace it by.
+ */
 export async function cancelStripeSubscriptionsForUser(userId: string): Promise<void> {
-  if (!serverEnv.stripeSecretKey || !isServiceRoleConfigured()) return;
+  if (!isServiceRoleConfigured()) return;
+  if (!serverEnv.stripeSecretKey) return assertNothingToCancelWithoutStripe(userId);
   const { data, error } = await getServiceSupabase()
     .from("subscriptions")
     .select("stripe_subscription_id, status")
@@ -578,6 +618,23 @@ export async function cancelStripeSubscriptionsForUser(userId: string): Promise<
       throw err;
     }
   }
+}
+
+/** Without Stripe: nothing on record is fine; an open subscription on record stops the deletion (see above). */
+async function assertNothingToCancelWithoutStripe(userId: string): Promise<void> {
+  const admin = getServiceSupabase();
+  const { count, error } = await admin
+    .from("subscriptions")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .in("status", [...OPEN_STATUSES]);
+  if (error) throw error;
+  if (count) throw new StripeUnavailableError();
+  const { data: customerRow, error: customerErr } = await admin.from("billing_customers").select("stripe_customer_id").eq("user_id", userId).maybeSingle();
+  if (customerErr) throw customerErr;
+  // Nothing open here, but their Stripe customer (name, email, payment methods) can't be checked or removed from this
+  // deployment: logged with the customer id so it can be removed by hand.
+  if (customerRow?.stripe_customer_id) logError("billing.delete_without_stripe", new Error("Stripe customer left in place: Stripe is not configured"), { customerId: customerRow.stripe_customer_id as string });
 }
 
 /** Removes the Stripe customer (name, email, saved payment methods) after the account is deleted. */

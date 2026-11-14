@@ -12,6 +12,12 @@ import { AUTO_RENEWAL_CONSENT, autoRenewalText } from "@/lib/legal/versions";
 import { recordAcceptances } from "@/server/legal";
 import { createCheckoutSession, createPortalSession, AlreadySubscribedError, PriceMismatchError, stripeProPrices } from "@/server/services/billing";
 import { logError } from "@/server/log";
+import { rateLimit } from "@/server/rate-limit";
+
+/** Checkout starts and billing-portal openings allowed per member in the window below. */
+const BILLING_ATTEMPTS = 10;
+const BILLING_WINDOW_MS = 10 * 60_000;
+const TOO_MANY_BILLING = "Too many attempts. Please wait a few minutes and try again.";
 
 export async function startCheckoutAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireUser();
@@ -24,6 +30,9 @@ export async function startCheckoutAction(_prev: ActionState, formData: FormData
   if (await getNativePlatform()) return actionError("In the app, memberships are bought through the App Store or Google Play (Profile → Plans & billing).");
   if (!isStripeConfigured() || !isServiceRoleConfigured()) return actionError("Payments aren't configured on this server yet.");
   if (interval.data === "year" && (!getPlans().pro.yearlyPriceCents || !isYearlyBillingConfigured())) return actionError("Yearly billing isn't offered right now.");
+  // Each checkout makes several Stripe calls with the account's key and records a consent: far more than anyone
+  // needs, far fewer than would eat into the Stripe request allowance the webhooks rely on.
+  if (!(await rateLimit(`checkout:${user.id}`, BILLING_ATTEMPTS, BILLING_WINDOW_MS)).ok) return actionError(TOO_MANY_BILLING);
   const current = await getUserPlan(user.id);
   if (current !== "free") {
     // One paid membership per person: a second purchase would bill them twice.
@@ -58,6 +67,7 @@ export async function startCheckoutAction(_prev: ActionState, formData: FormData
 export async function openBillingPortalAction(_prev: ActionState): Promise<ActionState> {
   const user = await requireUser();
   if (!isStripeConfigured() || !isServiceRoleConfigured()) return actionError("Payments aren't configured on this server yet.");
+  if (!(await rateLimit(`billing-portal:${user.id}`, BILLING_ATTEMPTS, BILLING_WINDOW_MS)).ok) return actionError(TOO_MANY_BILLING);
   let url: string;
   try {
     url = await createPortalSession(user.id);
