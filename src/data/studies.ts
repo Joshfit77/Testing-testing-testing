@@ -60,13 +60,13 @@ export const STUDIES: readonly Study[] = [
         context:
           "Mark's account opens without a birth story. It moves straight from the prophets' promises to John the Baptist in the wilderness and to Jesus beginning His public ministry in Galilee, under Roman rule and in a land waiting for God to act.",
         explanation:
-          "Mark calls his whole account “the gospel of Jesus Christ, the Son of God” (v. 1). John prepares the way by calling people to repent. At Jesus' baptism the Father speaks and the Spirit descends, marking out Jesus as the beloved Son. Jesus is tested in the wilderness, then proclaims that the time is fulfilled and the kingdom of God is near, and He calls people to repent and believe the gospel (v. 15).",
+          "Mark calls his whole account “the gospel of Jesus Christ, the Son of God” (v. 1). John prepares the way by calling people to repent. At Jesus' baptism the Father speaks and the Spirit descends, marking out Jesus as the beloved Son. Jesus is tested in the wilderness, then proclaims that the time is fulfilled and the kingdom of God is near, and He calls people to repent and believe in the gospel (v. 15).",
         themes: ["The gospel is about a person, Jesus", "God keeps His promises", "Repentance and faith are the response"],
         questions: [
           "What does Mark tell us about Jesus in the first verse?",
           "Why do you think John's message began with repentance?",
           "What two things does Jesus call people to do in verse 15?",
-          "What would it mean for you to “believe the gospel” today?",
+          "What would it mean for you to “believe in the gospel” today?",
         ],
         application:
           "The gospel is first news to believe, not advice to follow. Before asking what you must do, notice what God has done in sending His Son. Then answer Jesus' call personally: turn from what you know is wrong, and trust Him.",
