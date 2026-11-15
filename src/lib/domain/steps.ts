@@ -88,6 +88,18 @@ export function fillStepDays(dates: string[], rows: DaySteps[]): DaySteps[] {
 }
 
 /**
+ * Average steps a day over the days that have a count. A day with nothing recorded is unknown (not synced yet, the
+ * phone left at home), not a day of zero steps, so it is left out instead of pulling the average down: three synced
+ * days of 9,000 are "9,000 a day over 3 days", not 900 a day over a month. `recordedDays` is the number of stored days
+ * when the caller knows it; otherwise days with any steps are counted. Null when no day has a count.
+ */
+export function stepAverage(days: { steps: number }[], recordedDays?: number): { average: number | null; days: number } {
+  const total = days.reduce((t, d) => t + (Number.isFinite(d.steps) ? d.steps : 0), 0);
+  const n = Math.min(days.length, recordedDays ?? days.filter((d) => d.steps > 0).length);
+  return n > 0 ? { average: Math.round(total / n), days: n } : { average: null, days: 0 };
+}
+
+/**
  * Days to send to the server after a health sync, clamped. Days with no steps are left out so a
  * sync never wipes a count the user entered by hand (iOS reports denied access as "no data").
  */

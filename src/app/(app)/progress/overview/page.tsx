@@ -20,7 +20,7 @@ import { BIG_THREE, getNutritionDaily, getPersonalBests, getStrengthSeries, getT
 import { listProgressPhotos } from "@/server/services/progress-photos";
 import { logError } from "@/server/log";
 import type { ProgressPhotoView } from "@/lib/domain/progress-photos";
-import { DEFAULT_STEP_GOAL, formatSteps } from "@/lib/domain/steps";
+import { DEFAULT_STEP_GOAL, formatSteps, stepAverage } from "@/lib/domain/steps";
 import { getStepsDaily, type StepsSummary } from "@/server/services/steps";
 
 export const metadata = { title: "Progress overview" };
@@ -84,6 +84,8 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
     advanced && nutrition ? getNutritionDaily(supabase, user.id, start, today) : Promise.resolve([]),
   ]);
 
+  // Averaged over the days that have a count: a day with nothing recorded is unknown, not zero steps.
+  const stepsAvg = steps ? stepAverage(steps.days, steps.recordedDays) : null;
   const weights = (weightsRes.data ?? []).map((w) => ({ id: w.id as string, date: w.recorded_on as string, weight: displayWeight(Number(w.weight_kg), units) }));
   const latestWeightKg = weightsRes.data?.length ? Number(weightsRes.data[weightsRes.data.length - 1]!.weight_kg) : null;
 
@@ -290,7 +292,7 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
       {steps && (
         <BarSeriesChart
           title="Steps"
-          description={`Last 30 days · ${formatSteps(steps.days.reduce((t, d) => t + d.steps, 0) / steps.days.length)} a day on average · goal ${formatSteps(profile.step_goal ?? DEFAULT_STEP_GOAL)}`}
+          description={`Last 30 days · ${stepsAvg?.average == null ? "no steps recorded yet" : `${formatSteps(stepsAvg.average)} a day on average over the ${stepsAvg.days} ${stepsAvg.days === 1 ? "day" : "days"} with steps`} · goal ${formatSteps(profile.step_goal ?? DEFAULT_STEP_GOAL)}`}
           data={steps.days.map((d) => ({ date: d.day, steps: d.steps }))}
           xKey="date"
           xFormat="date"

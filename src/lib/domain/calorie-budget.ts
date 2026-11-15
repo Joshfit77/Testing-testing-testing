@@ -25,6 +25,9 @@ export type WeeklyRateKg = (typeof WEEKLY_RATES_KG)[number];
 /** Energy in 1 kg of body weight change (≈3,500 kcal per lb). */
 export const KCAL_PER_KG = 7700;
 
+/** The highest daily target that can be saved (the nutrition_goals check constraint and the targets form). */
+export const MAX_CALORIE_TARGET = 8000;
+
 /** Lowest daily budget we will suggest without medical supervision. */
 export function calorieFloor(sex: Sex | null | undefined): number {
   return sex === "male" ? 1500 : sex === "female" ? 1200 : 1350;
@@ -93,6 +96,7 @@ export function calorieBudget(input: BudgetInput): CalorieBudget {
   const floor = calorieFloor(input.sex);
   const floored = calories < floor;
   if (floored) calories = floor;
+  calories = Math.min(calories, MAX_CALORIE_TARGET);
   const dailyAdjustment = calories - maintenance;
   const proteinPerKg = input.goal === "lose_fat" || input.goal === "build_muscle" || input.goal === "build_strength" ? 1.8 : 1.4;
   const split = macroSplitForDiet(calories, input.weightKg, input.diet ?? "balanced", proteinPerKg);

@@ -100,6 +100,7 @@ export default async function ProgressHubPage() {
             todaySteps={steps.days.at(-1)?.steps ?? 0}
             todaySource={steps.lastSource}
             week={steps.days}
+            recordedDays={steps.recordedDays}
           />
         </div>
       )}

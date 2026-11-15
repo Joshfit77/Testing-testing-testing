@@ -242,4 +242,19 @@ export function summarizeVitals(
   return { heartRate, hrv: hrvStat ? { avgMs: hrvStat.avg, samples: hrvStat.samples, method: hrvMethod } : null, respiratoryRate };
 }
 
+/** How much longer a re-read record must be before it replaces the stored one (smaller differences are sampling noise). */
+export const FULLER_RECORD_MIN_MINUTES = 10;
+
+/**
+ * Is `incoming` a fuller record of the same sleep as `stored`? Only when it covers the stored record from start to
+ * end and is at least `minExtraMinutes` longer: a night imported while it was still going on, or before the watch
+ * had passed its data to the phone, read again later. A record that is shorter, shifted or merely overlapping is
+ * not: that stays a conflict and nothing is replaced.
+ */
+export function isFullerRecord(stored: { startedAt: string; endedAt: string }, incoming: { startedAt: string; endedAt: string }, minExtraMinutes = FULLER_RECORD_MIN_MINUTES): boolean {
+  const [ss, se, is, ie] = [ms(stored.startedAt), ms(stored.endedAt), ms(incoming.startedAt), ms(incoming.endedAt)];
+  if (![ss, se, is, ie].every(Number.isFinite) || se <= ss || ie <= is) return false;
+  return is <= ss && ie >= se && ie - is - (se - ss) >= minExtraMinutes * 60_000;
+}
+
 export const IMPORT_SOURCE_LABEL: Record<Extract<SleepSource, "apple_health" | "health_connect">, string> = { apple_health: "Apple Health", health_connect: "Health Connect" };

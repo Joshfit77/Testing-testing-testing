@@ -113,12 +113,28 @@ export interface SleepStageRow {
   ended_at: string;
 }
 
-/** Stage intervals of imported sessions, in time order. Empty for the app's own entries. */
+/**
+ * Stage intervals of imported sessions, in time order. Empty for the app's own entries. Paged: the API returns at most
+ * 1,000 rows per request, and thirty nights from a watch that writes 40 intervals a night are 1,200, so a single
+ * request left the newest nights out of the stage mix.
+ */
 export async function listSleepStages(supabase: SupabaseClient, userId: string, sessionIds: string[]): Promise<SleepStageRow[]> {
   if (!sessionIds.length) return [];
-  const { data, error } = await supabase.from("sleep_stages").select("session_id, stage, started_at, ended_at").eq("user_id", userId).in("session_id", sessionIds).order("started_at");
-  if (error) throw error;
-  return (data ?? []) as unknown as SleepStageRow[];
+  const PAGE = 1000;
+  const out: SleepStageRow[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from("sleep_stages")
+      .select("session_id, stage, started_at, ended_at")
+      .eq("user_id", userId)
+      .in("session_id", sessionIds)
+      .order("started_at")
+      .order("id")
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    out.push(...((data ?? []) as unknown as SleepStageRow[]));
+    if (!data || data.length < PAGE) return out;
+  }
 }
 
 export interface SleepImportRun {
