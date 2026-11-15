@@ -11,8 +11,9 @@ export interface LoggedSet {
 }
 
 /**
- * Estimated one-rep max using the Epley formula, which is reasonably accurate for
- * sets of roughly 1–10 reps. Returns null when an estimate would be unreliable.
+ * Estimated one-rep max using the Epley formula: weight × (1 + reps / 30). It is an estimate, most trustworthy for
+ * sets of about 1–10 reps; sets of up to 12 reps are still estimated, and anything longer returns null (a 20-rep
+ * set says little about a single). One rep returns the weight itself. Always shown as "estimated", never as a lift.
  */
 export function estimateOneRepMax(weightKg: number, reps: number): number | null {
   if (!Number.isFinite(weightKg) || !Number.isFinite(reps)) return null;
@@ -77,6 +78,26 @@ export function detectNewRecords(previous: PersonalBest[], candidates: PersonalB
     const prev = prevMap.get(c.recordType);
     return prev === undefined || c.value > prev + 1e-9;
   });
+}
+
+export interface StrengthTrend {
+  /** The most recent value. */
+  latest: number;
+  /** Last minus first, to one decimal; null when there is only one session, because one point is not a trend. */
+  change: number | null;
+  sessions: number;
+}
+
+/**
+ * The change across a series of per-session values (oldest first, already in the member's unit). One session has a
+ * value but no change: showing "0 over 30 days" for it would read as "no progress" when there is simply not enough
+ * data yet. Null when there are no sessions.
+ */
+export function strengthTrend(values: number[]): StrengthTrend | null {
+  const pts = values.filter((v) => Number.isFinite(v));
+  if (!pts.length) return null;
+  const latest = pts[pts.length - 1]!;
+  return { latest, change: pts.length < 2 ? null : Math.round((latest - pts[0]!) * 10) / 10, sessions: pts.length };
 }
 
 function round2(n: number): number {

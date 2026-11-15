@@ -15,10 +15,10 @@ import { Clock3, Dumbbell, Layers, Repeat } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSessionState } from "@/lib/nav-memory";
 import type { UnitSystem } from "@/lib/domain/types";
-import { RECORD_TYPE_LABEL } from "@/lib/domain/record-labels";
+import { formatRecordValue, RECORD_TYPE_LABEL } from "@/lib/domain/record-labels";
 import type { ReachedMilestone } from "@/lib/domain/exercise-milestones";
 import { MilestoneCelebration } from "@/components/train/milestone-celebration";
-import { formatDuration, formatWeight, formatVolume } from "@/lib/domain/units";
+import { formatDuration, formatVolume } from "@/lib/domain/units";
 import {
   afterCurrent,
   completionTotals,
@@ -328,7 +328,23 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
     return () => window.removeEventListener("storage", onStorage);
   }, [phase, userId]);
 
+  // The workout was discarded or finished, or this screen was left: nothing more is backed up from here. Without
+  // this, a retry timer set by a failed backup outlived the workout, sent the old draft again minutes later, and the
+  // server (which no longer had the workout) created it afresh: a discarded workout came back as "Resume workout".
+  const closed = useRef(false);
+  const stopBackups = useCallback(() => {
+    closed.current = true;
+    pushAgain.current = false;
+    if (syncTimer.current) clearTimeout(syncTimer.current);
+    syncTimer.current = null;
+  }, []);
+  useEffect(() => {
+    closed.current = false;
+    return stopBackups;
+  }, [stopBackups]);
+
   const pushToServer = useCallback(async (d: WorkoutDraft) => {
+    if (closed.current) return;
     if (!navigator.onLine) {
       setSync("local");
       return;
@@ -341,6 +357,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
     setSync("saving");
     const res = await syncWorkoutDraftAction(draftSnapshot(d)).catch(() => ({ ok: false as const, error: "offline" }));
     pushing.current = false;
+    if (closed.current) return;
     if (pushAgain.current) {
       // Changes arrived while this one was on its way: send the latest now (it supersedes this result either way).
       pushAgain.current = false;
@@ -365,7 +382,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
   // Persist every change locally immediately, and to the server (debounced), once the member has done something.
   useEffect(() => {
     latest.current = draft;
-    if (!draft || phase !== "active" || !touched.current) return;
+    if (!draft || phase !== "active" || !touched.current || closed.current) return;
     const ok = saveLocalDraft(userId, draft);
     if (!ok) setError("This device couldn't store your workout locally. Keep this tab open until you finish.");
     if (syncTimer.current) clearTimeout(syncTimer.current);
@@ -408,7 +425,9 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
   useEffect(() => {
     if (!draft || phase !== "active") return;
     for (const e of draft.exercises) {
-      if (e.prefilled || prefilled.current.has(e.id)) continue;
+      // Keyed by the exercise too: after a substitution the card keeps its id but is a different exercise.
+      const fillKey = `${e.id}:${e.exerciseId}`;
+      if (e.prefilled || prefilled.current.has(fillKey)) continue;
       const p = prev[e.exerciseId];
       const t = targets[e.exerciseId];
       const working = p
@@ -419,7 +438,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
           ? [{ reps: t.reps, weightKg: deload ? null : t.weightKg, durationSeconds: null, distanceM: null }]
           : [];
       if (!working.length) continue;
-      prefilled.current.add(e.id);
+      prefilled.current.add(fillKey);
       setDraft((d) => (d ? workoutReducer(d, { type: "prefillFromPrevious", exerciseKey: e.id, sets: working }) : d));
     }
   }, [draft, prev, targets, phase, deload]);
@@ -663,7 +682,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
               {result.records.filter((r) => !r.first).map((r, i) => (
                 <li key={i}>
                   <strong>{catalogById.get(r.exerciseId)?.name ?? "Exercise"}</strong> – {RECORD_LABEL[r.recordType] ?? r.recordType}:{" "}
-                  {r.recordType === "max_duration" ? formatDuration(r.value) : r.recordType === "max_reps" ? `${r.value} reps` : formatWeight(r.value, units)}
+                  {formatRecordValue(r.recordType, r.value, units)}
                 </li>
               ))}
             </ul>
@@ -738,7 +757,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
                 return (
                   <li key={id}>
                     <strong>{catalogById.get(id)?.name ?? "Exercise"}</strong> — {RECORD_LABEL[best.recordType] ?? best.recordType}:{" "}
-                    {best.recordType === "max_duration" ? formatDuration(best.value) : best.recordType === "max_reps" ? `${best.value} reps` : formatWeight(best.value, units)}
+                    {formatRecordValue(best.recordType, best.value, units)}
                   </li>
                 );
               })}
@@ -862,6 +881,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
       setFinishOpen(false);
       return;
     }
+    stopBackups();
     clearLocalDraft(userId);
     void cancelRestNotification();
     // Today's workout reminder (and the Faith fitness-goal one) aren't needed any more on this phone.
@@ -1239,8 +1259,12 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
             <Button
               variant="destructive"
               onClick={async () => {
+                // No backup may land after the discard (a backup already on its way finishes first: requests go in order).
+                stopBackups();
                 const res = await discardWorkoutAction(draft.clientId).catch(() => ({ ok: false as const, error: "offline" }));
                 if (!res.ok && navigator.onLine) {
+                  // Not discarded: the workout carries on and is backed up again from the next change.
+                  closed.current = false;
                   setError("Couldn't discard on the server. Please try again.");
                   setDiscardOpen(false);
                   return;

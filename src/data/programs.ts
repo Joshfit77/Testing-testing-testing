@@ -1999,7 +1999,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
     weeks: 8,
     sessionMinutes: 55,
     goals: ["build_strength", "build_muscle"],
-    equipment: ["barbell", "rack", "bench", "pull_up_bar", "dumbbell", "cable", "dip_station"],
+    equipment: ["barbell", "rack", "bench", "pull_up_bar", "dumbbell", "cable", "dip_station", "machine", "ab_wheel"],
     tier: "plus",
     progression:
       "Set your training max (TM) at 90% of your 1RM. After each deload, add 2.5 kg / 5 lb to the bench and press TMs and 5 kg / 10 lb to the squat " +
@@ -2050,7 +2050,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
     weeks: 8,
     sessionMinutes: 50,
     goals: ["build_strength"],
-    equipment: ["barbell", "rack", "bench", "dumbbell", "cable"],
+    equipment: ["barbell", "rack", "bench", "dumbbell", "cable", "ab_wheel"],
     tier: "plus",
     progression:
       "Percentages of your current 1RM rise 2.5% a week. If a set is more than 1 RPE above target, keep the weight for the rest of that session. " +
@@ -2125,7 +2125,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
     weeks: 8,
     sessionMinutes: 45,
     goals: ["build_strength", "build_muscle"],
-    equipment: ["barbell", "rack", "bench", "dumbbell", "machine", "pull_up_bar"],
+    equipment: ["barbell", "rack", "bench", "dumbbell", "machine", "pull_up_bar", "ab_wheel"],
     tier: "plus",
     progression:
       "Target RPE rises by about 0.5 a week (capped at RPE 9 for multi-set work). Add 2.5–5 kg / 5–10 lb to the heavy squat when every set is " +
@@ -2219,7 +2219,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
     weeks: 8,
     sessionMinutes: 50,
     goals: ["build_strength"],
-    equipment: ["barbell", "rack", "bench", "box", "dumbbell", "cable", "machine", "pull_up_bar", "sled"],
+    equipment: ["barbell", "rack", "bench", "box", "dumbbell", "cable", "machine", "sled", "ab_wheel"],
     tier: "plus",
     progression:
       "Max-effort days: beat your previous best on that variation, and rotate the exercise every 2 weeks. Dynamic-effort days run in 3-week waves " +
@@ -2245,7 +2245,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
     weeks: 12,
     sessionMinutes: 50,
     goals: ["build_strength"],
-    equipment: ["barbell", "rack", "bench", "dumbbell", "cable", "machine", "pull_up_bar"],
+    equipment: ["barbell", "rack", "bench", "dumbbell", "cable", "machine", "ab_wheel"],
     tier: "plus",
     needsSpecialistReview: true,
     progression:
@@ -2272,7 +2272,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
     weeks: 6,
     sessionMinutes: 55,
     goals: ["build_strength", "athletic_performance"],
-    equipment: ["barbell", "rack", "sandbag", "sled", "dumbbell", "kettlebell"],
+    equipment: ["barbell", "rack", "sandbag", "sled", "dumbbell", "kettlebell", "cable", "pull_up_bar"],
     tier: "pro",
     progression:
       "Moving events progress by load: when every run beats the target time with good posture, add weight next week. Pressing and pulling follow RPE " +
@@ -2319,7 +2319,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
     weeks: 8,
     sessionMinutes: 55,
     goals: ["build_strength", "athletic_performance"],
-    equipment: ["barbell", "rack", "bench", "strongman_implements", "sled", "cable", "pull_up_bar"],
+    equipment: ["barbell", "rack", "bench", "strongman_implements", "sled", "cable", "pull_up_bar", "dumbbell", "ab_wheel"],
     tier: "plus",
     progression:
       "Static lifts follow RPE targets that rise through each wave (triples in weeks 1–3, doubles and a heavy single in weeks 5–7). Events progress by " +
@@ -2498,7 +2498,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
     weeks: 12,
     sessionMinutes: 65,
     goals: ["build_muscle", "lose_fat"],
-    equipment: ["barbell", "rack", "bench", "dumbbell", "cable", "machine", "pull_up_bar", "bike"],
+    equipment: ["barbell", "rack", "bench", "dumbbell", "cable", "machine", "bike"],
     tier: "plus",
     needsSpecialistReview: true,
     progression:
@@ -2552,7 +2552,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
     weeks: 4,
     sessionMinutes: 45,
     goals: ["combat_sports", "improve_conditioning", "lose_fat"],
-    equipment: ["jump_rope", "heavy_bag", "dumbbell", "medicine_ball", "bodyweight"],
+    equipment: ["jump_rope", "heavy_bag", "dumbbell", "medicine_ball", "bodyweight", "band"],
     tier: "plus",
     needsSpecialistReview: true,
     progression: "Conditioning adds a round or cuts 10 seconds of rest each week; strength work holds at about RPE 7. Week 4 keeps rounds but lowers intensity.",
@@ -2641,7 +2641,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
     weeks: 6,
     sessionMinutes: 50,
     goals: ["combat_sports", "improve_conditioning", "athletic_performance"],
-    equipment: ["barbell", "trap_bar", "kettlebell", "medicine_ball", "bike", "jump_rope", "heavy_bag", "pull_up_bar", "mat", "sandbag", "landmine"],
+    equipment: ["barbell", "trap_bar", "kettlebell", "medicine_ball", "bike", "rower", "heavy_bag", "pull_up_bar", "mat", "sandbag", "landmine"],
     tier: "plus",
     needsSpecialistReview: true,
     progression:
@@ -2787,7 +2787,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
     weeks: 6,
     sessionMinutes: 40,
     goals: ["lose_fat", "general_health", "improve_conditioning"],
-    equipment: ["dumbbell", "bodyweight", "bike", "rower", "band"],
+    equipment: ["dumbbell", "bodyweight", "bike", "band"],
     tier: "plus",
     progression:
       "Steady cardio grows by 5 minutes every other week (30 → 40), intervals add a round a week (6 → 9), and the main lifts go from 3 to 4 sets in " +
@@ -2955,7 +2955,7 @@ const BASE_PROGRAMS: ProgramSeed[] = [
     weeks: 6,
     sessionMinutes: 35,
     goals: ["athletic_performance"],
-    equipment: ["bodyweight", "dumbbell", "box", "band"],
+    equipment: ["bodyweight", "dumbbell", "box"],
     tier: "pro",
     progression:
       "Cone drills add a rep every two weeks (4 → 6) while every rep stays sharp; rest stays long enough (60–90 s) that each rep is fast. Week 6 reduces " +
