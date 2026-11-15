@@ -20,6 +20,11 @@ separate ideas and are shown separately._
   **night a session belongs to: the local date the member got up**. Naps are listed under their own date and never
   counted in nightly figures. A night logged as two sessions (woke, got up, went back) is added up.
 - Overlapping sessions are refused by the database, whatever their source. Imported records are unique per source.
+- A re-import never merges: a record overlapping stored sleep is skipped. The one exception (2026-11-14): an earlier
+  import of the same night **from the same platform** that the new record covers from start to end and adds to (at
+  least 10 minutes longer, or stage intervals where none were stored) is replaced by the fuller record, stages
+  included. This is the night imported at 3 AM, or before the watch had passed its data to the phone. A member's own
+  entry is never replaced, and neither is a record that is shorter, shifted, or would run into another session.
 
 ## Recorded nights: stages and overnight measurements (`sleep-import.ts`, migration `20261024000041_sleep_vitals.sql`)
 

@@ -62,13 +62,23 @@ function table(name: string) {
   });
   function run() {
     if (name === "sleep_sessions") {
-      if (op === "select") return { data: db.sessions.filter((r) => r.user_id === filters.user_id && r.source === filters.source && r.source_id).map((r) => ({ source_id: r.source_id })), error: null };
+      if (op === "select") return { data: db.sessions.filter((r) => r.user_id === filters.user_id && r.source === filters.source && r.source_id).map((r) => ({ id: r.id, source_id: r.source_id, started_at: r.started_at, ended_at: r.ended_at })), error: null };
       if (op === "insert") {
         const row = payload as Row;
         if (db.sessions.some((r) => r.user_id === row.user_id && r.source === row.source && r.source_id === row.source_id)) return { error: { code: "23505" } };
         if (db.sessions.some((r) => r.user_id === row.user_id && overlaps({ startedAt: r.started_at, endedAt: r.ended_at }, { startedAt: row.started_at, endedAt: row.ended_at }))) return { error: { code: "23P01" } };
         db.sessions.push(row);
         return { error: null };
+      }
+      if (op === "update" && filters.id) {
+        // A row replaced by id (a fuller record of the same night): the database's own rules still apply.
+        const row = db.sessions.find((r) => r.id === filters.id && r.user_id === filters.user_id && r.source === filters.source);
+        if (!row) return { data: [], error: null };
+        const next = { ...row, ...(payload as Partial<Row>) };
+        if (db.sessions.some((r) => r !== row && r.user_id === row.user_id && overlaps({ startedAt: r.started_at, endedAt: r.ended_at }, { startedAt: next.started_at, endedAt: next.ended_at }))) return { data: null, error: { code: "23P01" } };
+        if (db.sessions.some((r) => r !== row && r.user_id === row.user_id && r.source === row.source && r.source_id === next.source_id)) return { data: null, error: { code: "23505" } };
+        Object.assign(row, payload);
+        return { data: [{ id: row.id }], error: null };
       }
       if (op === "update") {
         const hits = db.sessions.filter((r) => r.user_id === filters.user_id && r.source === filters.source && r.source_id === filters.source_id && isNull.every((k) => r[k as keyof Row] == null));
@@ -80,6 +90,11 @@ function table(name: string) {
       db.stages.push(...(payload as { session_id: string; stage: string }[]));
       return { error: null };
     }
+    if (name === "sleep_stages" && op === "delete") {
+      for (let i = db.stages.length - 1; i >= 0; i--) if (db.stages[i]!.session_id === filters.session_id) db.stages.splice(i, 1);
+      return { error: null };
+    }
+    if (name === "sleep_stages" && op === "select") return { data: null, count: db.stages.filter((st) => st.session_id === filters.session_id).length, error: null };
     if (name === "sleep_import_runs") {
       if (op === "insert") {
         db.runs.push(payload as Record<string, unknown>);
@@ -211,6 +226,102 @@ describe("importSleepAction", () => {
       ["p:night-1", "night"],
       ["p:nap", "nap"],
     ]);
+  });
+
+  describe("a night imported before it was complete (audit 2026-11-14)", () => {
+    /** The night as the platform had it at 3 AM: 11 PM to 3 AM, two stage intervals. */
+    const partial = () =>
+      record({
+        endedAt: at(1, "03:00"),
+        finalWakeAt: null,
+        awakeMinutes: 0,
+        awakenings: 0,
+        stages: [
+          { stage: "light", startedAt: at(2, "23:20"), endedAt: at(1, "01:00") },
+          { stage: "deep", startedAt: at(1, "01:00"), endedAt: at(1, "03:00") },
+        ],
+      });
+
+    it("the same platform record read again once the night is over replaces the 4-hour version with the 8-hour one", async () => {
+      await importSleepAction(payload([partial()]));
+      expect(db.sessions[0]).toMatchObject({ started_at: at(2, "23:00"), ended_at: at(1, "03:00") });
+      expect(db.stages).toHaveLength(2);
+
+      const res = await importSleepAction(payload([record()]));
+      expect(res).toMatchObject({ added: 0, duplicates: 0, conflicts: 0, refreshed: 1 });
+      expect(db.sessions).toHaveLength(1);
+      expect(db.sessions[0]).toMatchObject({ started_at: at(2, "23:00"), ended_at: at(1, "07:00"), source_id: "p:night-1", awake_minutes: 15, awakenings: 2 });
+      // The stages are the full night's, not the two old ones plus four new ones.
+      expect(db.stages.map((s) => s.stage)).toEqual(["light", "deep", "awake", "rem"]);
+      expect(res.message).toContain("1 replaced with a fuller record of the same night");
+      expect(db.runs.at(-1)).toMatchObject({ added: 0, duplicates: 0, conflicts: 0, updated: 1 });
+
+      // A third read of the complete night changes nothing.
+      const again = await importSleepAction(payload([record()]));
+      expect(again).toMatchObject({ added: 0, duplicates: 1, refreshed: 0 });
+      expect(db.stages).toHaveLength(4);
+    });
+
+    it("the phone's bare record imported first is replaced when the watch's record of that night arrives under a new id", async () => {
+      const phoneFirst = { sourceId: "p:phone-9", startedAt: at(2, "23:10"), endedAt: at(1, "06:40"), onsetAt: null, finalWakeAt: null, awakeMinutes: null, awakenings: null, stages: [], deviceName: "iPhone", vitals: null };
+      await importSleepAction(payload([phoneFirst]));
+      const res = await importSleepAction(payload([record({ sourceId: "p:watch-1" })]));
+      expect(res).toMatchObject({ added: 0, conflicts: 0, refreshed: 1 });
+      expect(db.sessions).toHaveLength(1);
+      expect(db.sessions[0]).toMatchObject({ source_id: "p:watch-1", started_at: at(2, "23:00"), ended_at: at(1, "07:00"), device_name: "Apple Watch" });
+      expect(db.stages).toHaveLength(4);
+    });
+
+    it("the same span with stages replaces a stored record that had none, but not one that already has stages", async () => {
+      const bare = record({ sourceId: "p:bare", stages: [], onsetAt: null, finalWakeAt: null, awakeMinutes: null, awakenings: null, deviceName: "iPhone" });
+      await importSleepAction(payload([bare]));
+      const withStages = await importSleepAction(payload([record({ sourceId: "p:staged" })]));
+      expect(withStages).toMatchObject({ refreshed: 1, conflicts: 0 });
+      expect(db.stages).toHaveLength(4);
+      // Another id for the same span, when stages are already stored: left alone.
+      const other = await importSleepAction(payload([record({ sourceId: "p:another" })]));
+      expect(other).toMatchObject({ refreshed: 0, conflicts: 1 });
+      expect(db.sessions[0]!.source_id).toBe("p:staged");
+    });
+
+    it("never replaces the member's own entry, a shorter or shifted record, or a night whose new span would run into another one", async () => {
+      // A hand entry: a longer platform record covering it is still a conflict.
+      db.sessions.push({ id: "hand", user_id: ME, kind: "night", started_at: at(2, "23:30"), ended_at: at(1, "06:00"), source: "manual", source_id: null, hr_avg: null, hrv_avg_ms: null, rr_avg: null, device_name: null });
+      expect(await importSleepAction(payload([record()]))).toMatchObject({ added: 0, conflicts: 1, refreshed: 0 });
+      expect(db.sessions).toHaveLength(1);
+      expect(db.sessions[0]).toMatchObject({ source: "manual", ended_at: at(1, "06:00") });
+
+      // A stored full night, then the same id read back shorter (the platform trimmed it): kept as stored.
+      db.sessions.length = 0;
+      await importSleepAction(payload([record()]));
+      expect(await importSleepAction(payload([partial()]))).toMatchObject({ duplicates: 1, refreshed: 0 });
+      expect(db.sessions[0]!.ended_at).toBe(at(1, "07:00"));
+      // A new id that starts later and ends later (shifted, not a superset): a conflict.
+      const shifted = record({ sourceId: "p:shifted", startedAt: at(2, "23:30"), endedAt: at(1, "08:00"), onsetAt: null, finalWakeAt: null, stages: [] });
+      expect(await importSleepAction(payload([shifted]))).toMatchObject({ conflicts: 1, refreshed: 0 });
+
+      // Growing into a nap the member logged that morning: the stored night stays as it was.
+      db.sessions.length = 0;
+      db.stages.length = 0;
+      await importSleepAction(payload([partial()]));
+      db.sessions.push({ id: "nap", user_id: ME, kind: "nap", started_at: at(1, "06:30"), ended_at: at(1, "06:55"), source: "manual", source_id: null, hr_avg: null, hrv_avg_ms: null, rr_avg: null, device_name: null });
+      expect(await importSleepAction(payload([record()]))).toMatchObject({ refreshed: 0, duplicates: 1 });
+      expect(db.sessions[0]!.ended_at).toBe(at(1, "03:00"));
+      expect(db.stages).toHaveLength(2);
+    });
+
+    it("measurements already stored stay when the fuller record brings none, and are taken when it brings its own", async () => {
+      const hr = { heartRate: { avg: 54, min: 48, max: 70, samples: 120 }, hrv: null, respiratoryRate: null };
+      await importSleepAction(payload([{ ...partial(), vitals: hr }]));
+      await importSleepAction(payload([record()]));
+      expect(db.sessions[0]).toMatchObject({ ended_at: at(1, "07:00"), hr_avg: 54 });
+      db.sessions.length = 0;
+      db.stages.length = 0;
+      await importSleepAction(payload([{ ...partial(), vitals: hr }]));
+      const res = await importSleepAction(payload([record({ vitals: { heartRate: { avg: 52, min: 45, max: 72, samples: 400 }, hrv: null, respiratoryRate: null } })]));
+      expect(res).toMatchObject({ refreshed: 1, withVitals: 1 });
+      expect(db.sessions[0]!.hr_avg).toBe(52);
+    });
   });
 
   it("refuses without wellness consent, when import is switched off, and when the payload can't be read", async () => {

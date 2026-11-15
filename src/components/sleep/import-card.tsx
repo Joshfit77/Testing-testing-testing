@@ -24,7 +24,7 @@ export function SleepImportCard({ enabled }: { enabled: boolean }) {
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
-        Reads the last 14 days of sleep from {appName}, including stages where your watch recorded them. Records already imported are skipped, and anything overlapping an entry you made is left out rather than merged. Nothing is written back to {appName}.
+        Reads the last 14 days of sleep from {appName}, including stages where your watch recorded them. Records already imported are skipped; a night that was imported before it was complete is replaced by the fuller record. Anything overlapping an entry you made is left out rather than merged. Nothing is written back to {appName}.
       </p>
       <Button
         type="button"

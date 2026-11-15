@@ -293,6 +293,14 @@ export function addFix(s: TrackState, fix: GpsFix): { state: TrackState; accepte
   if (s.status === "acquiring" && fix.accuracy > FIRST_FIX_ACCURACY_M) return reject(withAcc, "waiting_for_fix");
   if (s.lastFixAt != null && fix.t <= s.lastFixAt) return reject(withAcc, "out_of_order");
 
+  // A stretch longer than the signal-loss window without an accepted fix is a gap by the fixes' own timestamps,
+  // whether or not the clock noticed. A frozen browser page runs no clock and queues no fixes, and a phone that dropped
+  // the fixes recorded while locked delivers one fresh one: without this, the straight line across the whole stretch
+  // was counted as distance. Fixes queued while locked arrive with their own (seconds-apart) times, so they still count.
+  if (s.status === "recording" && !s.signalLost && s.lines.length > 0 && s.lastFixAt != null && fix.t - s.lastFixAt > SIGNAL_LOST_MS) {
+    return startLine({ ...withAcc, signalLost: true, breakReason: "signal", gaps: s.gaps + 1 }, fix);
+  }
+
   // First good fix, or the first after a pause or a signal gap: start a new line, count nothing yet.
   const prev = lastPoint(s);
   const f = s.filter;
@@ -568,6 +576,24 @@ export function trackTotals(s: TrackState): { distance_m: number; elapsed_s: num
   const end = s.finishedAt ?? s.periods.at(-1)?.end ?? s.lastFixAt ?? s.startedAt;
   const elapsed = Math.max(1, Math.round((end - s.startedAt) / 1000));
   return { distance_m: Math.round(s.distanceM * 10) / 10, elapsed_s: elapsed, moving_s: Math.max(1, Math.min(elapsed, movingSecondsAt(s, end))) };
+}
+
+/** A last stretch shorter than this is the rounding at the end of a whole split, not a row of its own (m). */
+const MIN_PARTIAL_SPLIT_M = 20;
+
+/**
+ * The split table as saved: the whole splits recorded live, then the last partial stretch (the 0.11 mi of a 3.11-mile
+ * run) with its own distance and time, so the rows add up to the activity's moving time. The activity page labels a
+ * short last row by its real length (run-splits.ts). A run shorter than one whole split has no table.
+ */
+export function splitsForSave(s: TrackState): TrackSplit[] {
+  const last = s.splits.at(-1);
+  if (!last) return s.splits;
+  const totals = trackTotals(s);
+  const restM = totals.distance_m - last.distance_m;
+  const restS = totals.moving_s - last.moving_s;
+  if (restM < MIN_PARTIAL_SPLIT_M || restS < 1) return s.splits;
+  return [...s.splits, { index: last.index + 1, unit: last.unit, distance_m: Math.round(totals.distance_m), moving_s: totals.moving_s, elapsed_s: totals.elapsed_s, split_s: restS }];
 }
 
 /** How long an unfinished draft left on the device is offered back (matches GPS_RESUMABLE_MS in src/lib/opening.ts). */

@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { ProgressRing } from "@/components/ui/progress-ring";
 import { toast } from "@/components/ui/toaster";
 import { initialActionState, type ActionState } from "@/lib/action-state";
-import { formatSteps, STEP_GOAL_MAX, STEP_GOAL_MIN, STEP_SOURCE_LABELS, stepGoalPct, type StepSource } from "@/lib/domain/steps";
+import { formatSteps, STEP_GOAL_MAX, STEP_GOAL_MIN, STEP_SOURCE_LABELS, stepAverage, stepGoalPct, type StepSource } from "@/lib/domain/steps";
 import { HEALTH_APP_NAME, healthSyncPlatform, readRecentSteps, type HealthPlatform } from "@/lib/native-health";
 import { cn } from "@/lib/utils";
 import { saveStepsManualAction, syncStepsAction, updateStepGoalAction } from "@/server/actions/steps";
@@ -23,21 +23,24 @@ export interface StepsCardProps {
   todaySource: StepSource | null;
   /** Last 7 days, oldest first, today last. */
   week: { day: string; steps: number }[];
+  /** How many of those days have a stored count; days without one are unknown and stay out of the average. */
+  recordedDays?: number;
 }
 
 const weekday = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" });
 
-function WeekBars({ week, goal, today }: { week: StepsCardProps["week"]; goal: number; today: string }) {
+function WeekBars({ week, goal, today, recordedDays }: { week: StepsCardProps["week"]; goal: number; today: string; recordedDays?: number }) {
   const max = Math.max(goal, ...week.map((d) => d.steps), 1);
   const goalPct = (goal / max) * 100;
-  const total = week.reduce((s, d) => s + d.steps, 0);
+  // Over the days that have a count, never the seven calendar days: an unsynced day is unknown, not zero steps.
+  const avg = stepAverage(week, recordedDays);
   const daysHit = week.filter((d) => d.steps >= goal).length;
   return (
     <figure aria-labelledby="steps-week-title">
       <figcaption id="steps-week-title" className="mb-2 flex items-baseline justify-between text-xs text-muted-foreground">
         <span className="font-semibold uppercase tracking-wider">Last 7 days</span>
         <span>
-          {formatSteps(Math.round(total / Math.max(1, week.length)))} avg · goal hit {daysHit}/{week.length}
+          <span data-testid="steps-week-avg">{avg.average == null ? "No steps recorded" : `${formatSteps(avg.average)} avg over ${avg.days} ${avg.days === 1 ? "day" : "days"}`}</span> · goal hit {daysHit}/{week.length}
         </span>
       </figcaption>
       <div className="relative h-24" aria-hidden>
@@ -166,7 +169,7 @@ function GoalForm({ goal, onDone }: { goal: number; onDone: () => void }) {
   );
 }
 
-export function StepsCard({ today, goal, todaySteps, todaySource, week }: StepsCardProps) {
+export function StepsCard({ today, goal, todaySteps, todaySource, week, recordedDays }: StepsCardProps) {
   const [state, action] = useActionState(saveStepsManualAction, initialActionState);
   const [editingGoal, setEditingGoal] = useState(false);
   useRefreshOnSuccess(state);
@@ -226,7 +229,7 @@ export function StepsCard({ today, goal, todaySteps, todaySource, week }: StepsC
         </div>
 
         <div className="flex min-w-0 flex-col justify-between gap-4">
-          <WeekBars week={week} goal={goal} today={today} />
+          <WeekBars week={week} goal={goal} today={today} recordedDays={recordedDays} />
           <HealthSync />
         </div>
       </CardContent>
