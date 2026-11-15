@@ -26,7 +26,7 @@ import {
 import type { UnitSystem } from "@/lib/domain/types";
 import { displayWeight, formatDuration, formatWeight, weightUnit } from "@/lib/domain/units";
 import { cn } from "@/lib/utils";
-import { RECORD_TYPE_LABEL } from "@/lib/domain/record-labels";
+import { formatRecordValue, RECORD_TYPE_LABEL } from "@/lib/domain/record-labels";
 import { setStrengthStandardsAction } from "@/server/actions/body-map";
 import { BodyFigure, type FigureView, type RegionPaint } from "./body-figure";
 import { BELOW_BRONZE_COLOR, RANK_COLORS, StrengthRankEmblem } from "./strength-rank-emblem";
@@ -453,7 +453,7 @@ function RegionDetail({ rank, stats, table, bodyweight, units }: { rank: RegionR
                       {r.name} · {RECORD_LABELS[r.recordType]}
                     </span>
                     <span className="shrink-0 tabular-nums text-muted-foreground">
-                      {r.recordType === "max_reps" ? `${r.value} reps` : r.recordType === "max_duration" ? formatDuration(r.value) : r.recordType === "max_set_volume" ? `${displayWeight(r.value, units, 0)} ${u}` : formatWeight(r.value, units)}
+                      {formatRecordValue(r.recordType, r.value, units)}
                       {r.recordType === "estimated_1rm" ? " (est.)" : ""} · {shortDate(r.date)}
                     </span>
                   </li>

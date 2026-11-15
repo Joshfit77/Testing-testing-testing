@@ -12,6 +12,7 @@ import { ProgressBar } from "@/components/ui/progress-bar";
 import { addDays, isoDateInTz, parseRange, RANGES, rangeStart, type RangeKey } from "@/lib/domain/dates";
 import { hasFeature } from "@/lib/domain/plans";
 import { displayLength, displayWeight, formatDuration, formatWeight, kgToLb, lengthUnit, weightUnit, formatVolume } from "@/lib/domain/units";
+import { strengthTrend } from "@/lib/domain/strength";
 import { cn, titleCase } from "@/lib/utils";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
@@ -179,19 +180,27 @@ export default async function ProgressPage({ searchParams }: { searchParams: Pro
         const pick = selected ? { id: selected.id as string, name: selected.name as string } : BIG_THREE.map((b) => ({ id: exBySlug.get(b.slug)?.id as string | undefined, name: b.label })).find((b) => b.id && (strength.get(b.id)?.size ?? 0) > 0);
         const pts = pick?.id ? [...(strength.get(pick.id)?.entries() ?? [])].sort(([a], [b]) => a.localeCompare(b)) : [];
         if (!pick || pts.length === 0) return null;
-        const first = displayWeight(pts[0]![1] as number, units);
-        const last = displayWeight(pts[pts.length - 1]![1] as number, units);
-        const delta = Math.round((last - first) * 10) / 10;
+        // One session in the range has a value but no change to report (it isn't "0 lb of progress").
+        const trend = strengthTrend(pts.map(([, v]) => displayWeight(v as number, units)));
+        if (!trend) return null;
+        const last = trend.latest;
+        const delta = trend.change ?? 0;
         const unit = weightUnit(units);
         return (
           <section className="card-gold rounded-2xl p-4" aria-label="Strength trend" data-testid="strength-trend">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="truncate font-semibold">{pick.name} (1RM)</p>
+                <p className="truncate font-semibold">{pick.name} (estimated 1RM)</p>
                 <p className={cn("mt-0.5 flex items-center gap-1 text-sm font-semibold", delta > 0 ? "text-[#58d68d]" : delta < 0 ? "text-[#f0a35a]" : "text-muted-foreground")}>
                   {delta > 0 ? <TrendingUp className="size-4" aria-hidden /> : delta < 0 ? <TrendingDown className="size-4" aria-hidden /> : null}
-                  {delta > 0 ? "+" : ""}
-                  {delta} {unit} over {RANGES[range].label}
+                  {trend.change == null ? (
+                    <span data-testid="strength-trend-single">1 session in this range. Log it again to see a change.</span>
+                  ) : (
+                    <>
+                      {delta > 0 ? "+" : ""}
+                      {delta} {unit} over {RANGES[range].label}
+                    </>
+                  )}
                 </p>
               </div>
               <p className="shrink-0 font-display text-[1.75rem] font-bold leading-none text-gold-gradient tabular-nums">

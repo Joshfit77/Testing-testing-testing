@@ -427,6 +427,10 @@ function reduce(state: WorkoutDraft, action: DraftAction): WorkoutDraft {
         isTimed: action.replacement.isTimed,
         usesDistance: usesDistance(action.replacement.slug),
         notes: "",
+        // What was said or filled in for the old exercise doesn't apply to the new one: "no added weight" is asked
+        // again (a loaded replacement is never logged at zero silently), and its own last-time numbers may fill in.
+        prefilled: false,
+        noWeightConfirmed: false,
         sets: sets.map((s) => ({
           ...s,
           weightKg: null,

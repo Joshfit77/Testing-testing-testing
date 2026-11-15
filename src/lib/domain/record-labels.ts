@@ -1,3 +1,6 @@
+import type { UnitSystem } from "./types";
+import { formatDuration, formatVolume, formatWeight } from "./units";
+
 /**
  * One set of words for personal bests across the app (milestones, records, workout summary, progress, muscle map).
  *
@@ -31,3 +34,15 @@ export const RECORD_TYPE_LABEL: Record<string, string> = {
   max_set_volume: RECORD_TERMS.max_set_volume,
   max_duration: RECORD_TERMS.max_duration,
 };
+
+/**
+ * A stored record value as the member reads it: a weight in their unit ("225 lb"), reps ("12 reps"), a hold
+ * ("1:15"), or a set volume as a whole number ("1,080 lb"). Set volumes are weight × reps summed in kilograms, so
+ * one decimal of pounds would show a conversion tail nobody lifted (1079.9 lb for 135 lb × 8).
+ */
+export function formatRecordValue(recordType: string, value: number, units: UnitSystem): string {
+  if (recordType === "max_duration") return formatDuration(value);
+  if (recordType === "max_reps") return `${value} ${value === 1 ? "rep" : "reps"}`;
+  if (recordType === "max_set_volume") return formatVolume(value, units);
+  return formatWeight(value, units);
+}

@@ -210,13 +210,20 @@ export async function finishWorkout(
 ): Promise<{ sessionId: string; volumeKg: number; records: NewRecord[]; alreadyCompleted: boolean }> {
   const { data: existing } = await supabase
     .from("workout_sessions")
-    .select("id, status, total_volume_kg")
+    .select("id, status, total_volume_kg, user_program_id, program_day_id")
     .eq("user_id", userId)
     .eq("client_id", input.clientId)
     .maybeSingle();
   if (existing?.status === "completed") {
     // A retry after the first response was lost (gym Wi-Fi): show the same records the first attempt saved.
     const records = await recordsOfSession(supabase, userId, existing.id as string).catch(() => []);
+    // Saving the workout and moving the program on are separate writes. If the first attempt saved the workout but
+    // never reached the second, the program stayed on the day just done and offered it again. advanceProgram only
+    // moves a pointer that is still on that day, so repeating it here is safe (no double advance). Best-effort, from
+    // what the saved session says (not from the retry's payload).
+    if (existing.user_program_id && existing.program_day_id) {
+      await advanceProgram(supabase, userId, existing.user_program_id as string, existing.program_day_id as string).catch(() => undefined);
+    }
     return { sessionId: existing.id as string, volumeKg: Number(existing.total_volume_kg), records, alreadyCompleted: true };
   }
 
