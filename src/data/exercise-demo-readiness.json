@@ -357,7 +357,7 @@
   },
   "pro-agility-shuttle": {
    "readiness": "animated",
-   "note": "Shown facing you, so the run between the lines is drawn as fast shuffle pushes rather than a turn-and-sprint; distances are shortened."
+   "note": "Side view, distances shortened to fit: a three-point start, three sprints with a plant and a hand touch at each line. A side-on figure cannot be drawn mid-turn, so each 180-degree turn is a brief fade while the athlete is low at the line."
   },
   "pull-up": {
    "readiness": "animated",

@@ -132,7 +132,7 @@ Method: Each exercise rendered in the athlete look at six phases of its loop (st
 | 2 | Sandbag to Shoulder (`sandbag-to-shoulder`) | 2 | MMA / conditioning, strength | Animated | pending |  |
 | 2 | Straight-Arm Pulldown (`straight-arm-pulldown`) | 2 | bodybuilding | Animated | pending |  |
 | 2 | Zercher Squat (`zercher-squat`) | 2 | strength | Animated | pending | Side view: the near plate is drawn see-through so the elbow cradle shows. |
-| 2 | 5-10-5 Pro Agility Shuttle (`pro-agility-shuttle`) | 1 | MMA / conditioning | Animated | pending | Shown facing you, so the run between the lines is drawn as fast shuffle pushes rather than a turn-and-sprint; distances are shortened. |
+| 2 | 5-10-5 Pro Agility Shuttle (`pro-agility-shuttle`) | 1 | MMA / conditioning | Animated | pending | Side view, distances shortened to fit: a three-point start, three sprints with a plant and a hand touch at each line. A side-on figure cannot be drawn mid-turn, so each 180-degree turn is a brief fade while the athlete is low at the line. |
 | 2 | A-Skip (`a-skip`) | 1 | MMA / conditioning | Animated | pending |  |
 | 2 | Acceleration Sprint (`acceleration-sprint`) | 1 | MMA / conditioning | Animated | pending |  |
 | 2 | Acceleration Wall Drill (`wall-drill`) | 1 | MMA / conditioning | Animated | pending | The driven thigh stops about 20 degrees short of level. |
