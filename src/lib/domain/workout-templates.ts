@@ -3,6 +3,7 @@
  * or distance), rest and optional supersets. Pure helpers shared by the template editor, the logger ("Save as
  * template") and the server.
  */
+import { loggedByTime } from "./timed-sets";
 import { distanceMode, distanceUnit, fromMetres, usesDistance } from "./exercise-tracking";
 import type { UnitSystem } from "./types";
 import type { WorkoutDraft } from "./workout-draft";
@@ -202,13 +203,15 @@ export function repeatFromSession(source: RepeatSource): { name: string; exercis
       const done = working.filter((s) => s.completed);
       const ref = done[0] ?? working[0] ?? null;
       const distance = ref?.distance_m == null ? null : Number(ref.distance_m);
+      // A rep exercise that was logged by time last time (a program prescribed seconds) repeats by time.
+      const timed = loggedByTime(e.exercise.is_timed, working.map((s) => ({ reps: s.reps, durationSeconds: s.duration_seconds })));
       return {
-        exercise: { id: e.exercise.id, slug: e.exercise.slug, name: e.exercise.name, isTimed: e.exercise.is_timed },
+        exercise: { id: e.exercise.id, slug: e.exercise.slug, name: e.exercise.name, isTimed: timed },
         restSeconds: REPEAT_REST_SECONDS,
         target: {
           sets: Math.max(1, Math.min(20, working.length || 1)),
-          reps: !e.exercise.is_timed && ref?.reps ? String(ref.reps) : null,
-          seconds: e.exercise.is_timed ? (ref?.duration_seconds ?? null) : null,
+          reps: !timed && ref?.reps ? String(ref.reps) : null,
+          seconds: timed ? (ref?.duration_seconds ?? null) : null,
           distanceM: distance && distance > 0 ? distance : null,
         },
       };

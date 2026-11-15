@@ -328,7 +328,7 @@ export function BarcodeScanner({
       )}
 
       {camera.kind === "error" && (
-        <p role="alert" className="rounded-xl border border-[#f08a8a]/40 bg-[#f08a8a]/10 p-3 text-sm text-[#f08a8a]">
+        <p role="alert" className="rounded-xl border border-destructive-foreground/40 bg-destructive-foreground/10 p-3 text-sm text-destructive-foreground">
           {camera.message}
         </p>
       )}
@@ -341,7 +341,7 @@ export function BarcodeScanner({
 
       {lookup.kind === "error" && (
         <div className="space-y-2 rounded-xl border border-border bg-elevated/50 p-3">
-          <p role="alert" className="text-sm text-[#f08a8a]">
+          <p role="alert" className="text-sm text-destructive-foreground">
             {lookup.message}
           </p>
           <div className="flex flex-wrap gap-2">
@@ -434,7 +434,7 @@ export function BarcodeScanner({
                 </Button>
               </div>
               {typedError && (
-                <p id="bc-typed-error" className="text-xs text-[#f08a8a]">
+                <p id="bc-typed-error" className="text-xs text-destructive-foreground">
                   {typedError}
                 </p>
               )}

@@ -115,7 +115,7 @@ export function MissedSessionsCard({ view, today, canReschedule, startHref }: { 
         </Button>
       </div>
       {status && (
-        <p role={status.ok ? "status" : "alert"} className={status.ok ? "mt-2 text-sm text-[#5fc49a]" : "mt-2 text-sm text-[#f08a8a]"}>
+        <p role={status.ok ? "status" : "alert"} className={status.ok ? "mt-2 text-sm text-success-foreground" : "mt-2 text-sm text-destructive-foreground"}>
           {status.text}
         </p>
       )}

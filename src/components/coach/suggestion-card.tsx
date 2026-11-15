@@ -261,7 +261,7 @@ export function SuggestionCard({ messageId, proposal, status, onChange }: { mess
         </div>
       )}
       {result && (
-        <p role={result.ok ? "status" : "alert"} className={cn("mt-2 text-sm", result.ok ? "text-[#5fc49a]" : "text-[#f08a8a]")}>
+        <p role={result.ok ? "status" : "alert"} className={cn("mt-2 text-sm", result.ok ? "text-success-foreground" : "text-destructive-foreground")}>
           {result.text}
         </p>
       )}

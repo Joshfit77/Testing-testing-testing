@@ -58,7 +58,7 @@ export function AddProductToDiary({ choice, date, defaultMeal }: { choice: FoodC
         </Button>
       </div>
       {message && (
-        <p role={message.ok ? "status" : "alert"} className={cn("text-sm", message.ok ? "text-[#5fc49a]" : "text-[#f08a8a]")}>
+        <p role={message.ok ? "status" : "alert"} className={cn("text-sm", message.ok ? "text-success-foreground" : "text-destructive-foreground")}>
           {message.text}
         </p>
       )}
@@ -129,7 +129,7 @@ export function ExplainProduct({ code }: { code: string }) {
       </Button>
       <p className="text-xs text-muted-foreground">Uses 1 AI message. Only the product data shown here, the app&apos;s reviewed ingredient notes and your goals and targets are sent. The AI can&apos;t add its own claims about ingredients.</p>
       {error && (
-        <p role="alert" className="text-sm text-[#f08a8a]">
+        <p role="alert" className="text-sm text-destructive-foreground">
           {error}
         </p>
       )}
@@ -226,7 +226,7 @@ export function FiltersEditor({ initial }: { initial: FoodFilters }) {
         {pending ? <Loader2 className="animate-spin" aria-hidden /> : <Check aria-hidden />} Save filters
       </Button>
       {message && (
-        <p role={message.ok ? "status" : "alert"} className={cn("text-sm", message.ok ? "text-[#5fc49a]" : "text-[#f08a8a]")}>
+        <p role={message.ok ? "status" : "alert"} className={cn("text-sm", message.ok ? "text-success-foreground" : "text-destructive-foreground")}>
           {message.text}
         </p>
       )}

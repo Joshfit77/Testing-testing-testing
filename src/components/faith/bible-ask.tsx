@@ -59,7 +59,7 @@ export function BibleAsk({ initialThread, initialMessages, remaining }: { initia
           {messages.map((m, i) => (
             <li key={i} className={m.role === "user" ? "ml-8 rounded-2xl bg-gold/10 p-3" : "mr-2 rounded-2xl border border-border bg-card p-3"}>
               <p className="mb-1 text-xs font-semibold text-muted-foreground">{m.role === "user" ? "You" : "Bible study helper (AI)"}</p>
-              <p className="whitespace-pre-wrap text-[0.9375rem]">{m.content}</p>
+              <p className="whitespace-pre-wrap text-body">{m.content}</p>
               {m.citations && m.citations.length > 0 && (
                 <div className="mt-3 space-y-2 border-t border-border pt-2">
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gold">Passages cited · BSB</p>

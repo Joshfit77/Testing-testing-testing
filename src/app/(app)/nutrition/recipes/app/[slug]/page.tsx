@@ -37,7 +37,7 @@ export default async function AppRecipePage({ params }: { params: Promise<{ slug
         </h2>
         <ul className="divide-y divide-border rounded-2xl border border-border bg-card">
           {r.ingredients.map((i) => (
-            <li key={`${i.source}-${i.unitId}`} className="px-4 py-2.5 text-[0.9375rem]">
+            <li key={`${i.source}-${i.unitId}`} className="px-4 py-2.5 text-body">
               <span className="font-semibold">{i.name}</span> <SourceBadge source={i.source} isEstimate={false} />
               <span className="block text-sm text-muted-foreground">{i.amountLabel}</span>
             </li>
@@ -48,7 +48,7 @@ export default async function AppRecipePage({ params }: { params: Promise<{ slug
         <h2 id="steps-title" className="mb-2 text-lg font-semibold">
           Steps
         </h2>
-        <ol className="list-decimal space-y-1 pl-5 text-[0.9375rem]">
+        <ol className="list-decimal space-y-1 pl-5 text-body">
           {r.steps.map((s) => (
             <li key={s}>{s}</li>
           ))}

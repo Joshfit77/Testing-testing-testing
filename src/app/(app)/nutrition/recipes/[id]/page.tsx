@@ -119,7 +119,7 @@ export default async function RecipePage({ params, searchParams }: { params: Pro
             const n = ingredientNutrition(i);
             return (
               <li key={i.id} className="px-4 py-2.5">
-                <p className="text-[0.9375rem] font-semibold">
+                <p className="text-body font-semibold">
                   {i.name} <SourceBadge source={i.source} isEstimate={i.isEstimate} />
                 </p>
                 <p className="text-sm text-muted-foreground">
@@ -137,7 +137,7 @@ export default async function RecipePage({ params, searchParams }: { params: Pro
           <h2 id="notes-title" className="mb-1 text-lg font-semibold">
             Notes
           </h2>
-          <p className="whitespace-pre-line text-[0.9375rem] text-muted-foreground">{recipe.notes}</p>
+          <p className="whitespace-pre-line text-body text-muted-foreground">{recipe.notes}</p>
         </section>
       )}
     </div>

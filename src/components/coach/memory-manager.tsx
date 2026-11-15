@@ -77,7 +77,7 @@ function MemoryForm({
         />
       </label>
       {error && (
-        <p role="alert" className="text-sm text-[#f08a8a]">
+        <p role="alert" className="text-sm text-destructive-foreground">
           {error}
         </p>
       )}

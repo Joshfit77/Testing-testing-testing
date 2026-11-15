@@ -47,7 +47,7 @@ const bundle = await build({
   logLevel: "silent",
 });
 const js = bundle.outputFiles[0].text;
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || "/opt/pw-browsers/chromium-1194/chrome-linux/chrome" });
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || process.env.CHROMIUM || "/opt/pw-browsers/chromium" });
 const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
 await page.setContent(`<html><body style="margin:0;background:#070707"><canvas id=c width=${W} height=${H} style="width:${W}px;height:${H}px"></canvas><script>${js}</script></body></html>`);
 

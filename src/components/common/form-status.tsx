@@ -21,7 +21,7 @@ export function FormMessage({ state }: { state: ActionState }) {
   useActionToast(state);
   if (!state.message || state.ok) return null;
   return (
-    <p role="alert" className="animate-fade-in text-sm text-[#f08a8a]">
+    <p role="alert" className="animate-fade-in text-sm text-destructive-foreground">
       {state.message}
     </p>
   );
@@ -30,7 +30,7 @@ export function FormMessage({ state }: { state: ActionState }) {
 export function FieldError({ message, id }: { message?: string; id?: string }) {
   if (!message) return null;
   return (
-    <p id={id} className="text-xs text-[#f08a8a]">
+    <p id={id} className="text-xs text-destructive-foreground">
       {message}
     </p>
   );

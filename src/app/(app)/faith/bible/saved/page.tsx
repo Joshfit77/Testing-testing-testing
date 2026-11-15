@@ -20,7 +20,7 @@ type Tab = keyof typeof TABS;
 const LIMIT = 300;
 const order = new Map(BIBLE_BOOKS.map((b) => [b.id, b.order]));
 const verseText = (bookId: string, chapter: number, verse: number) => getChapter(bookId, chapter)?.find(([v]) => v === verse)?.[1] ?? "";
-const COLOR_DOT: Record<string, string> = { gold: "bg-[#C9A54C]", sage: "bg-[#7FA37A]", sky: "bg-[#6E9CC4]", rose: "bg-[#C47A86]" };
+const COLOR_DOT: Record<string, string> = { gold: "bg-gold", sage: "bg-[#7FA37A]", sky: "bg-[#6E9CC4]", rose: "bg-[#C47A86]" };
 
 export default async function SavedPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const sp = await searchParams;
@@ -42,7 +42,7 @@ export default async function SavedPage({ searchParams }: { searchParams: Promis
               <Link href={chapterHref(book, r.chapter as number, verse ?? undefined)} className="min-w-0 flex-1 p-3">
                 <span className="block text-sm font-semibold text-gold-highlight">{verse ? selectionReference(book.id, r.chapter as number, [verse]) : chapterLabel(book, r.chapter as number)}</span>
                 {verse && (
-                  <span className="mt-0.5 line-clamp-2 block font-serif text-[0.9375rem] text-muted-foreground">
+                  <span className="mt-0.5 line-clamp-2 block font-serif text-body text-muted-foreground">
                     <ScriptureText text={verseText(book.id, r.chapter as number, verse)} jesus={wordsOfJesus(book.id, r.chapter as number, verse)} />
                   </span>
                 )}
@@ -71,7 +71,7 @@ export default async function SavedPage({ searchParams }: { searchParams: Promis
                   <span className={cn("size-3 rounded-full", COLOR_DOT[r.color as string])} aria-hidden />
                   {selectionReference(book.id, r.chapter as number, [r.verse as number])}
                 </span>
-                <span className="mt-0.5 line-clamp-3 block font-serif text-[0.9375rem]">
+                <span className="mt-0.5 line-clamp-3 block font-serif text-body">
                   <ScriptureText text={verseText(book.id, r.chapter as number, r.verse as number)} jesus={wordsOfJesus(book.id, r.chapter as number, r.verse as number)} />
                 </span>
               </Link>
@@ -96,7 +96,7 @@ export default async function SavedPage({ searchParams }: { searchParams: Promis
             <li key={r.id as string} className="flex items-start gap-1 rounded-2xl border border-border bg-card">
               <Link href={chapterHref(book, r.chapter as number, r.verse_start as number)} className="min-w-0 flex-1 p-3">
                 <span className="block text-sm font-semibold text-gold-highlight">{selectionReference(book.id, r.chapter as number, verseRange(r.verse_start as number, r.verse_end as number))}</span>
-                <span className="mt-0.5 line-clamp-4 block whitespace-pre-wrap text-[0.9375rem]">{r.body as string}</span>
+                <span className="mt-0.5 line-clamp-4 block whitespace-pre-wrap text-body">{r.body as string}</span>
                 <span className="mt-1 block text-xs text-muted-foreground">{new Date(r.updated_at as string).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
               </Link>
               <ActionButton action={deleteBibleNoteFormAction} fields={{ id: r.id as string }} variant="ghost" size="icon" aria-label="Delete note" confirmMessage="Delete this note?" confirmLabel="Delete">

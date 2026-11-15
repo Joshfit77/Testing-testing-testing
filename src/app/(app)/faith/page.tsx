@@ -223,7 +223,7 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
             </span>
             <ChevronRight className="size-4 shrink-0 text-gold transition-transform [details[open]_&]:rotate-90" aria-hidden />
           </summary>
-          <div className="space-y-3 px-4 pb-4 text-[0.9375rem]">
+          <div className="space-y-3 px-4 pb-4 text-body">
             <blockquote className="font-serif text-lg leading-relaxed">
               &ldquo;
               <ScriptureText parts={scriptureParts(verse.reference, verse.text)} />

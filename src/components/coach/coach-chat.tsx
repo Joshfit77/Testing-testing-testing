@@ -173,7 +173,7 @@ function PlanPreview({ message, names, onChange }: { message: ChatMessage; names
         </div>
       )}
       {result && (
-        <p role={result.ok ? "status" : "alert"} className={cn("mt-2 text-sm", result.ok ? "text-[#5fc49a]" : "text-[#f08a8a]")}>
+        <p role={result.ok ? "status" : "alert"} className={cn("mt-2 text-sm", result.ok ? "text-success-foreground" : "text-destructive-foreground")}>
           {result.text}{" "}
           {result.slug && (
             <Link href={`/train/programs/${result.slug}`} className="underline">
@@ -616,7 +616,7 @@ function CoachChatView({ conversationId: initialId, initialMessages, initialQues
             <label className="inline-flex min-h-11 items-center gap-2">
               <input
                 type="checkbox"
-                className="size-4 accent-[#C9A54C]"
+                className="size-4 accent-gold"
                 checked={!memoryOff}
                 onChange={async (e) => {
                   const off = !e.target.checked;
@@ -635,7 +635,7 @@ function CoachChatView({ conversationId: initialId, initialMessages, initialQues
             <Link href="/coach/memory" className="inline-flex min-h-11 items-center px-1 underline">
               Memory
             </Link>
-            {memoryNote && <span role="alert" className="text-[#f08a8a]">{memoryNote}</span>}
+            {memoryNote && <span role="alert" className="text-destructive-foreground">{memoryNote}</span>}
           </div>
         )}
         <details className="mt-1 text-xs text-muted-foreground" data-testid="coach-disclaimer">

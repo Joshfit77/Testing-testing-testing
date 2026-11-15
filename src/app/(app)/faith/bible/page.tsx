@@ -63,7 +63,7 @@ export default async function BiblePage() {
             {state.verse ? `:${state.verse}` : ""}
           </span>
           {preview && state && (
-            <span className="mt-1 line-clamp-2 block font-serif text-[0.9375rem] text-muted-foreground">
+            <span className="mt-1 line-clamp-2 block font-serif text-body text-muted-foreground">
               <ScriptureText text={preview[1]} jesus={wordsOfJesus(state.book.id, state.chapter, preview[0])} />
             </span>
           )}

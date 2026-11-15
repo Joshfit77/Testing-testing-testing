@@ -34,7 +34,7 @@ export interface ReaderNote {
 }
 
 const COLORS: { id: HighlightColor; label: string; swatch: string; mark: string }[] = [
-  { id: "gold", label: "Gold", swatch: "bg-[#C9A54C]", mark: "bg-[#C9A54C]/25" },
+  { id: "gold", label: "Gold", swatch: "bg-gold", mark: "bg-gold/25" },
   { id: "sage", label: "Sage", swatch: "bg-[#7FA37A]", mark: "bg-[#7FA37A]/25" },
   { id: "sky", label: "Sky", swatch: "bg-[#6E9CC4]", mark: "bg-[#6E9CC4]/25" },
   { id: "rose", label: "Rose", swatch: "bg-[#C47A86]", mark: "bg-[#C47A86]/25" },
@@ -448,7 +448,7 @@ export function ChapterReader(props: {
             {(viewNotes ? (notesByVerse.get(viewNotes) ?? []) : []).map((n) => (
               <li key={n.id} className="rounded-xl bg-elevated p-3">
                 <p className="text-xs font-semibold text-gold">{selectionReference(bookId, chapter, verseRange(n.verseStart, n.verseEnd))}</p>
-                <p className="mt-1 whitespace-pre-wrap text-[0.9375rem]">{n.body}</p>
+                <p className="mt-1 whitespace-pre-wrap text-body">{n.body}</p>
                 <div className="mt-2 flex gap-2">
                   <Button
                     type="button"

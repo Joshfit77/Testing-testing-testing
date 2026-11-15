@@ -23,7 +23,7 @@ export function DayMarkControls({ date, mark, hasFood }: { date: string; mark: "
       if (res.ok) router.refresh();
     });
   const error = state?.message && !state.ok && (
-    <p role="alert" className="mt-1 text-sm text-[#f08a8a]">
+    <p role="alert" className="mt-1 text-sm text-destructive-foreground">
       {state.message}
     </p>
   );
@@ -41,8 +41,8 @@ export function DayMarkControls({ date, mark, hasFood }: { date: string; mark: "
     <div className="rounded-2xl border border-border bg-card px-4 py-3" data-testid="day-mark">
       {mark ? (
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="flex items-center gap-2 text-[0.9375rem]">
-            <CheckCircle2 className="size-4 text-[#5fc49a]" aria-hidden />
+          <p className="flex items-center gap-2 text-body">
+            <CheckCircle2 className="size-4 text-success-foreground" aria-hidden />
             {mark === "fasted" ? "Logged as a day you ate nothing (counts as 0 in insights)." : "Day marked complete."}
           </p>
           <Button type="button" size="sm" variant="ghost" className="min-h-11" disabled={pending} onClick={() => set(null)}>

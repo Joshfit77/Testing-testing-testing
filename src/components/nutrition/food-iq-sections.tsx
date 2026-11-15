@@ -7,11 +7,11 @@ import type { QualityProduct } from "@/lib/food-quality";
 import { cn } from "@/lib/utils";
 
 const BAND_STYLE: Record<Band, string> = {
-  excellent: "text-[#5fc49a] border-[#5fc49a]/60",
+  excellent: "text-success-foreground border-success-foreground/60",
   good: "text-[#9fd68a] border-[#9fd68a]/60",
   moderate: "text-gold border-gold/60",
   poor: "text-[#e9a066] border-[#e9a066]/60",
-  very_poor: "text-[#f08a8a] border-[#f08a8a]/60",
+  very_poor: "text-destructive-foreground border-destructive-foreground/60",
 };
 const BAND_STROKE: Record<Band, string> = { excellent: "#5fc49a", good: "#9fd68a", moderate: "#c9a54c", poor: "#e9a066", very_poor: "#f08a8a" };
 
@@ -56,7 +56,7 @@ function PointList({ items, tone }: { items: NutrientClass[]; tone: "positive" |
     <ul className="space-y-1">
       {items.map((c) => (
         <li key={c.id} className="flex items-start gap-1.5 text-sm">
-          <Icon className={cn("mt-0.5 size-4 shrink-0", tone === "positive" ? "text-[#5fc49a]" : "text-[#f08a8a]")} aria-hidden />
+          <Icon className={cn("mt-0.5 size-4 shrink-0", tone === "positive" ? "text-success-foreground" : "text-destructive-foreground")} aria-hidden />
           <span>{c.label}</span>
         </li>
       ))}
@@ -179,10 +179,10 @@ export function FoodIqBreakdown({ score }: { score: FoodIqScore }) {
 }
 
 const EVIDENCE_STYLE: Record<EvidenceClass, string> = {
-  regulatory: "border-[#f08a8a]/60 text-[#f08a8a]",
+  regulatory: "border-destructive-foreground/60 text-destructive-foreground",
   established: "border-[#e9a066]/60 text-[#e9a066]",
   mixed: "border-gold/60 text-gold",
-  no_concern: "border-[#5fc49a]/60 text-[#5fc49a]",
+  no_concern: "border-success-foreground/60 text-success-foreground",
   insufficient: "border-border text-muted-foreground",
 };
 const EVIDENCE_ICON: Record<EvidenceClass, typeof ShieldAlert> = { regulatory: ShieldAlert, established: AlertTriangle, mixed: CircleHelp, no_concern: ShieldCheck, insufficient: CircleHelp };
@@ -328,7 +328,7 @@ export function IngredientAlertsSection({
   );
 }
 
-const TONE_STYLE = { positive: "text-[#5fc49a]", neutral: "text-champagne", attention: "text-[#f08a8a]" } as const;
+const TONE_STYLE = { positive: "text-success-foreground", neutral: "text-champagne", attention: "text-destructive-foreground" } as const;
 
 /** Protein, carbs, fat, calories, sugar, fibre and sodium in plain words, each marked legal / guidance / informal. */
 export function MacroAnalysis({ p, classes }: { p: QualityProduct; classes: NutrientClass[] }) {
@@ -422,7 +422,7 @@ export function FitsYourGoals({ fit, allowed, hasAi }: { fit: GoalFit | null; al
           {fit.conflicts.length > 0 && (
             <ul className="space-y-1" data-testid="goal-conflicts">
               {fit.conflicts.map((c) => (
-                <li key={c} className="flex items-start gap-1.5 text-sm text-[#f08a8a]">
+                <li key={c} className="flex items-start gap-1.5 text-sm text-destructive-foreground">
                   <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
                   {c}
                 </li>

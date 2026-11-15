@@ -76,7 +76,7 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
             <ChevronLeft aria-hidden />
           </Link>
         </Button>
-        <p className="text-center text-[0.9375rem] font-semibold">
+        <p className="text-center text-body font-semibold">
           {dayLabel(start)} – {dayLabel(end)}
         </p>
         {end < today ? (
@@ -120,7 +120,7 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
             })}
           </dl>
         ) : (
-          <p className="mt-2 text-[0.9375rem] text-muted-foreground">Nothing logged this week, so there&apos;s no average yet.</p>
+          <p className="mt-2 text-body text-muted-foreground">Nothing logged this week, so there&apos;s no average yet.</p>
         )}
         {week.averageIncomplete.length > 0 && (
           <p className="mt-2 text-sm text-muted-foreground">
@@ -135,7 +135,7 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
         </h2>
         {week.days.every((d) => d.state === "not_logged") ? (
           <div className="rounded-2xl border border-dashed border-border p-4">
-            <p className="text-[0.9375rem] text-muted-foreground">Nothing logged this week yet.</p>
+            <p className="text-body text-muted-foreground">Nothing logged this week yet.</p>
             <Button asChild className="mt-3 min-h-11">
               <Link href="/nutrition?add=1">
                 <Plus aria-hidden /> Add food
@@ -196,7 +196,7 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
             ) : (
               <ol className="space-y-2">
                 {list.map((s) => (
-                  <li key={s.name} className="text-[0.9375rem]">
+                  <li key={s.name} className="text-body">
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="min-w-0 truncate font-medium">{s.name}</span>
                       <span className="shrink-0 tabular-nums text-muted-foreground">

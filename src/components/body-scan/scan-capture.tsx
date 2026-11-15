@@ -178,7 +178,7 @@ export function ScanCapture({ userId, units, previous, lastWeight }: { userId: s
             </div>
             <p className="text-xs text-muted-foreground">Your weight is also saved as today&apos;s body weight, and measurements go into your measurement history.</p>
             {error && (
-              <p role="alert" className="text-sm text-[#f08a8a]">
+              <p role="alert" className="text-sm text-destructive-foreground">
                 {error}
               </p>
             )}
@@ -346,12 +346,12 @@ function PoseStep({ pose, shot, ghost, onShot, onNext, optional }: { pose: ScanP
               )}
             </div>
             {cam.kind === "error" && (
-              <p role="alert" className="text-sm text-[#f08a8a]">
+              <p role="alert" className="text-sm text-destructive-foreground">
                 {cam.message}
               </p>
             )}
             {error && (
-              <p role="alert" className="text-sm text-[#f08a8a]">
+              <p role="alert" className="text-sm text-destructive-foreground">
                 {error}
               </p>
             )}

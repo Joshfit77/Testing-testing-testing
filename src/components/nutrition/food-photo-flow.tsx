@@ -253,7 +253,7 @@ export function FoodPhotoFlow({ date: initialDate, defaultMeal, myFoods, extras,
     return (
       <Card data-testid="food-photo-done">
         <CardContent className="space-y-3 pt-5">
-          <p role="status" className="font-semibold text-[#5fc49a]">
+          <p role="status" className="font-semibold text-success-foreground">
             {result}
           </p>
           <p className="text-sm text-muted-foreground">Photo estimates, and amounts judged from the photo, are marked as estimates in your diary. The photo wasn&apos;t kept.</p>
@@ -312,7 +312,7 @@ export function FoodPhotoFlow({ date: initialDate, defaultMeal, myFoods, extras,
               </div>
             </div>
             {error && (
-              <p role="alert" className="text-sm text-[#f08a8a]">
+              <p role="alert" className="text-sm text-destructive-foreground">
                 {error}
               </p>
             )}
@@ -532,7 +532,7 @@ export function FoodPhotoFlow({ date: initialDate, defaultMeal, myFoods, extras,
                 Total: <span className="font-semibold tabular-nums">{Math.round(sum.calories)} kcal</span> · P {r1(sum.protein_g)} g · C {r1(sum.carbs_g)} g · F {r1(sum.fat_g)} g, added to {MEALS.find(([v]) => v === meal)![1].toLowerCase()} on {date}
               </p>
               {error && (
-                <p role="alert" className="text-sm text-[#f08a8a]">
+                <p role="alert" className="text-sm text-destructive-foreground">
                   {error}
                 </p>
               )}

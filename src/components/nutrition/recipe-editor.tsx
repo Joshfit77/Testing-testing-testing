@@ -126,7 +126,7 @@ export function RecipeEditor({ recipeId, initial, myFoods }: { recipeId?: string
               return (
                 <li key={i.uid} className="flex items-center gap-2 px-3 py-2">
                   <div className="min-w-0 flex-1">
-                    <p className="text-[0.9375rem] font-semibold">
+                    <p className="text-body font-semibold">
                       {i.food.name} <SourceBadge source={i.food.key} isEstimate={Boolean(i.food.isEstimate)} />
                     </p>
                     <p className="text-sm text-muted-foreground">
@@ -168,7 +168,7 @@ export function RecipeEditor({ recipeId, initial, myFoods }: { recipeId?: string
       </section>
 
       {error && (
-        <p role="alert" className="text-sm text-[#f08a8a]">
+        <p role="alert" className="text-sm text-destructive-foreground">
           {error}
         </p>
       )}

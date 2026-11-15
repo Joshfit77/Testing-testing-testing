@@ -302,7 +302,7 @@ export function CurrentSetCard({
       <div className="grid grid-cols-3 gap-2">
         <Button
           variant="secondary"
-          className="h-12 rounded-full border-border bg-[#171512] px-2 text-[0.9375rem] font-semibold"
+          className="h-12 rounded-full border-border bg-[#171512] px-2 text-body font-semibold"
           onClick={() => {
             deliberate();
             dispatch({ type: "adjustRest", deltaSeconds: -30, now: new Date().toISOString() });
@@ -313,7 +313,7 @@ export function CurrentSetCard({
         </Button>
         <Button
           variant="secondary"
-          className="h-12 rounded-full border-border bg-[#171512] px-2 text-[0.9375rem] font-semibold"
+          className="h-12 rounded-full border-border bg-[#171512] px-2 text-body font-semibold"
           onClick={() => {
             deliberate();
             dispatch({ type: "adjustRest", deltaSeconds: 30, now: new Date().toISOString() });
@@ -323,7 +323,7 @@ export function CurrentSetCard({
           <Plus aria-hidden /> 30s
         </Button>
         <Button
-          className="h-12 rounded-full px-2 text-[0.9375rem]"
+          className="h-12 rounded-full px-2 text-body"
           onClick={() => {
             deliberate();
             dispatch({ type: "clearRest" });
@@ -608,7 +608,7 @@ export function CurrentSetCard({
                 <li
                   key={row.id}
                   className={cn(
-                    "flex min-h-11 items-center gap-3 rounded-xl px-3 text-[0.9375rem]",
+                    "flex min-h-11 items-center gap-3 rounded-xl px-3 text-body",
                     active ? "bg-gold-gradient font-semibold text-black shadow-bronze" : row.completed ? "bg-[#101010] text-foreground" : "bg-[#101010] text-muted-foreground",
                     row.skipped && !active && "line-through opacity-60",
                   )}

@@ -73,7 +73,7 @@ export function RecipeLogForm({ recipeId, perServing, today }: { recipeId: strin
         {preview ? `${formatNutrient(preview.calories, "calories")} · protein ${formatNutrient(preview.protein_g, "protein_g")}` : "Enter servings like 1, 0.5, 1/3 or 1 1/2."}
       </p>
       {result?.message && (
-        <p role={result.ok ? "status" : "alert"} className={result.ok ? "text-sm text-[#5fc49a]" : "text-sm text-[#f08a8a]"}>
+        <p role={result.ok ? "status" : "alert"} className={result.ok ? "text-sm text-success-foreground" : "text-sm text-destructive-foreground"}>
           {result.message}{" "}
           {result.ok && result.date && (
             <Link href={`/nutrition?date=${result.date}`} className="font-semibold text-gold-highlight underline">

@@ -603,13 +603,13 @@ export function AddFoodDialog({
                   </div>
                   {dietName && searching && (
                     <label className="mt-2 flex min-h-11 items-center gap-2 text-sm">
-                      <input type="checkbox" checked={dietOnly} onChange={(e) => setDietOnly(e.target.checked)} className="size-5 accent-[#C9A54C]" />
+                      <input type="checkbox" checked={dietOnly} onChange={(e) => setDietOnly(e.target.checked)} className="size-5 accent-gold" />
                       Only show built-in foods that fit {dietName}
                     </label>
                   )}
                   <div className="mt-3 space-y-4" aria-live="polite" aria-busy={loading}>
                     {search.kind === "error" && (
-                      <p role="alert" className="text-sm text-[#f08a8a]">
+                      <p role="alert" className="text-sm text-destructive-foreground">
                         {search.message}
                       </p>
                     )}
@@ -775,7 +775,7 @@ export function AddFoodDialog({
                     </div>
                     {mismatch && <p className="text-xs text-gold">Heads up: these macros add up to about {macroCalories} kcal.</p>}
                     <label className="flex items-center gap-2 text-sm">
-                      <input type="checkbox" checked={manual.isEstimate} onChange={(e) => setManual({ ...manual, isEstimate: e.target.checked })} className="size-5 accent-[#C9A54C]" />
+                      <input type="checkbox" checked={manual.isEstimate} onChange={(e) => setManual({ ...manual, isEstimate: e.target.checked })} className="size-5 accent-gold" />
                       These values are my estimate (not from a label)
                     </label>
                     <Button type="submit" className="w-full" disabled={pending}>
@@ -844,7 +844,7 @@ export function CustomFoodForm() {
         ))}
       </div>
       <label className="flex min-h-11 items-center gap-2 text-sm">
-        <input type="checkbox" name="isEstimate" checked={v.isEstimate} onChange={set("isEstimate")} className="size-5 accent-[#C9A54C]" />
+        <input type="checkbox" name="isEstimate" checked={v.isEstimate} onChange={set("isEstimate")} className="size-5 accent-gold" />
         Values are an estimate (not copied from a label)
       </label>
       <FormMessage state={state} />

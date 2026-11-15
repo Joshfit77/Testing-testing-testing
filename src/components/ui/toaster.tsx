@@ -76,7 +76,7 @@ export function Toaster() {
               t.leaving ? "animate-toast-out" : "animate-toast-in",
             )}
           >
-            <Icon className={cn("mt-0.5 size-5 shrink-0", t.tone === "success" ? "text-gold" : t.tone === "error" ? "text-[#f08a8a]" : "text-muted-foreground")} aria-hidden />
+            <Icon className={cn("mt-0.5 size-5 shrink-0", t.tone === "success" ? "text-gold" : t.tone === "error" ? "text-destructive-foreground" : "text-muted-foreground")} aria-hidden />
             <p className="flex-1 leading-snug">{t.message}</p>
             <button type="button" onClick={() => dismiss(t.id)} className="-m-1 rounded-lg p-1 text-muted-foreground hover:text-foreground" aria-label="Dismiss">
               <X className="size-4" />

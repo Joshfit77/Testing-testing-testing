@@ -100,7 +100,7 @@ export function AppShell({ children, userId, displayName, isAdmin, plan, textSiz
 
   const sideLink = (active: boolean) =>
     cn(
-      "group flex h-11 items-center gap-3 rounded-xl px-3 text-[0.9375rem] font-semibold transition-colors",
+      "group flex h-11 items-center gap-3 rounded-xl px-3 text-body font-semibold transition-colors",
       active ? "bg-gold/12 text-gold-highlight" : "text-muted-foreground hover:bg-elevated hover:text-foreground",
       collapsed && "justify-center px-0",
     );

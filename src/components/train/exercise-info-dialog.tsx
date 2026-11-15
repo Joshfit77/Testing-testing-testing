@@ -109,7 +109,7 @@ export function ExerciseInfoDialog({
                 </div>
               )
             ) : (
-            <ul className="space-y-2.5 text-[0.9375rem] leading-snug" data-testid={`info-${tab}`} role="tabpanel">
+            <ul className="space-y-2.5 text-body leading-snug" data-testid={`info-${tab}`} role="tabpanel">
               {lists[tab].length === 0 ? (
                 <li className="text-sm text-muted-foreground">{empty[tab]}</li>
               ) : (

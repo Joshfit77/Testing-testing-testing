@@ -71,7 +71,7 @@ export default async function AdminProgramEditPage({ params, searchParams }: { p
             <Textarea id="description" name="description" defaultValue={p.description as string} className="min-h-32" />
           </div>
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" name="isPublished" defaultChecked={p.is_published as boolean} className="size-5 accent-[#C9A54C]" /> Published
+            <input type="checkbox" name="isPublished" defaultChecked={p.is_published as boolean} className="size-5 accent-gold" /> Published
           </label>
         </ActionForm>
       </section>

@@ -28,7 +28,7 @@ import {
 function Message({ state }: { state: ActionState | null }) {
   if (!state?.message) return null;
   return (
-    <p role={state.ok ? "status" : "alert"} className={state.ok ? "text-sm text-[#5fc49a]" : "text-sm text-[#f08a8a]"}>
+    <p role={state.ok ? "status" : "alert"} className={state.ok ? "text-sm text-success-foreground" : "text-sm text-destructive-foreground"}>
       {state.message}
     </p>
   );
@@ -102,8 +102,8 @@ export function PlannerSettingsForm({ prefs }: { prefs: PlannerPrefsView }) {
       <p className="text-sm text-muted-foreground">
         Separate items with commas. Matching uses ingredient names (and groups like “dairy”, “gluten”, “nuts”), so it isn&apos;t a substitute for reading labels if you have a serious allergy.
       </p>
-      <label className="flex min-h-11 items-center gap-3 text-[0.9375rem]">
-        <input type="checkbox" checked={includeApp} onChange={(e) => setIncludeApp(e.target.checked)} className="size-5 accent-[#C9A54C]" />
+      <label className="flex min-h-11 items-center gap-3 text-body">
+        <input type="checkbox" checked={includeApp} onChange={(e) => setIncludeApp(e.target.checked)} className="size-5 accent-gold" />
         Include the app&apos;s simple recipes as well as mine
       </label>
       <Message state={state} />
@@ -179,7 +179,7 @@ function FitLine({ fit, target }: { fit: DayFit; target: PlanNutrition }) {
           <span className="font-semibold">{fit.totals.calories.toLocaleString()}</span> of {target.calories.toLocaleString()} kcal ({sign}
           {Math.abs(fit.calorieDiff)})
         </span>
-        <span className={fit.status === "close" ? "text-[#5fc49a]" : "text-gold"}>
+        <span className={fit.status === "close" ? "text-success-foreground" : "text-gold"}>
           {fit.status === "close" ? "Close to target" : fit.status === "under" ? `${fit.percentOff}% under` : `${fit.percentOff}% over`}
         </span>
       </div>
@@ -212,7 +212,7 @@ function MealRow({ label, meal, myFoods }: { label: string; meal: PlanMealView; 
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-gold">{label}</p>
-          <p className="text-[0.9375rem] font-semibold" data-testid="plan-meal-name">
+          <p className="text-body font-semibold" data-testid="plan-meal-name">
             {meal.href ? (
               <Link href={meal.href} className="hover:underline">
                 {meal.name}
@@ -346,7 +346,7 @@ function SwapDialog({ open, onOpenChange, entryId, current, label }: { open: boo
         </DialogHeader>
         <div className="mt-3 space-y-2" aria-live="polite">
           {error && (
-            <p role="alert" className="text-sm text-[#f08a8a]">
+            <p role="alert" className="text-sm text-destructive-foreground">
               {error}
             </p>
           )}
@@ -360,7 +360,7 @@ function SwapDialog({ open, onOpenChange, entryId, current, label }: { open: boo
             {options?.map((o) => (
               <li key={o.key} className="flex items-center gap-2 rounded-xl border border-border bg-elevated/50 px-3 py-2">
                 <span className="min-w-0 flex-1">
-                  <span className="block text-[0.9375rem] font-semibold">{o.name}</span>
+                  <span className="block text-body font-semibold">{o.name}</span>
                   <span className="block text-sm tabular-nums text-muted-foreground">
                     {fmtPortion(o.portion)} · {o.calories} kcal{o.complete ? "" : " (at least)"} · P {o.protein_g} g · {ORIGIN_LABEL[o.origin]}
                   </span>

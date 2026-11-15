@@ -18,7 +18,7 @@ export function JournalEntryCard({ entry }: { entry: Pick<JournalRow, "id" | "en
           <span aria-hidden>·</span>
           <span>{formatJournalDate(entry.entry_date)}</span>
           {answered ? (
-            <span className="inline-flex items-center gap-1 rounded-full border border-[#5fc49a]/50 px-2 py-0.5 font-semibold text-[#5fc49a]">
+            <span className="inline-flex items-center gap-1 rounded-full border border-success-foreground/50 px-2 py-0.5 font-semibold text-success-foreground">
               <CheckCircle2 className="size-3" aria-hidden /> Answered
             </span>
           ) : isAnswerable(entry.kind) ? (

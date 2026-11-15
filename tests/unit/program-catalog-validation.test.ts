@@ -160,10 +160,11 @@ describe("program catalog: level matches content (listed programs)", () => {
   });
 });
 
-describe("program catalog: time prescriptions on exercises the logger counts in reps (open finding P-3)", () => {
+describe("program catalog: time prescriptions on exercises the catalog counts in reps (finding P-3, fixed 2026-11-15)", () => {
   it("is limited to the known programs", () => {
-    // The workout logger asks for reps on these sets although the program prescribes seconds (see the audit
-    // document). Pinned so new programs don't add to it unnoticed; fixing the logger empties this list's meaning.
+    // These programs prescribe seconds on exercises the catalog counts in reps. The logger now logs such a set by
+    // time (src/lib/domain/timed-sets.ts, tests/unit/timed-sets.test.ts). The list stays pinned so it is known which
+    // programs rely on that.
     const affected = listed
       .filter((p) => all(p).some((e) => e.seconds && !e.reps && bySlug.get(e.ex) && !bySlug.get(e.ex)!.timed))
       .map((p) => p.slug)

@@ -251,7 +251,7 @@ export function EditableMealItem({ item }: { item: EditableItem }) {
             </DialogDescription>
           </DialogHeader>
           {result?.message && !result.ok && (
-            <p role="alert" className="text-sm text-[#f08a8a]">
+            <p role="alert" className="text-sm text-destructive-foreground">
               {result.message}
             </p>
           )}

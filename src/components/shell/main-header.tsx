@@ -82,7 +82,7 @@ export function MainHeader({ title, subtitle, right, className }: { title: React
           <ProfileButton className="hidden md:inline-flex" />
         </div>
       </div>
-      {subtitle && <div className="mt-0.5 text-[0.9375rem] text-muted-foreground">{subtitle}</div>}
+      {subtitle && <div className="mt-0.5 text-body text-muted-foreground">{subtitle}</div>}
     </header>
   );
 }

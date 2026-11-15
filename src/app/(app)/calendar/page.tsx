@@ -22,7 +22,7 @@ const fmt = (d: string, o: Intl.DateTimeFormatOptions) => new Date(`${d}T12:00:0
 const KIND_META: Record<CalendarEntry["kind"], { label: string; dot: string; icon: typeof Dumbbell }> = {
   workout: { label: "Workout", dot: "bg-gold", icon: Dumbbell },
   run: { label: "Run", dot: "bg-[#7fb3d5]", icon: Footprints },
-  walk: { label: "Walk", dot: "bg-[#5fc49a]", icon: PersonStanding },
+  walk: { label: "Walk", dot: "bg-success-foreground", icon: PersonStanding },
   planned: { label: "Planned session", dot: "border border-gold bg-transparent", icon: CalendarClock },
   rest: { label: "Rest day", dot: "bg-muted-foreground/40", icon: Moon },
 };

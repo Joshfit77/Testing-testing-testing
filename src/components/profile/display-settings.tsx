@@ -42,7 +42,7 @@ export function DisplaySettings({ initial }: { initial: { textSize: TextSize; re
   return (
     <div className="space-y-5" aria-busy={pending}>
       <fieldset>
-        <legend className="text-[0.9375rem] font-semibold">Text size</legend>
+        <legend className="text-body font-semibold">Text size</legend>
         <p className="mb-2 text-sm text-muted-foreground">Builds on your phone&apos;s text-size setting.</p>
         <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Text size">
           {SIZES.map((s) => (
@@ -68,7 +68,7 @@ export function DisplaySettings({ initial }: { initial: { textSize: TextSize; re
 
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p id="pref-motion" className="text-[0.9375rem] font-semibold">
+          <p id="pref-motion" className="text-body font-semibold">
             Reduce motion
           </p>
           <p className="text-sm text-muted-foreground">Turns off page animations and celebration confetti.</p>
@@ -89,7 +89,7 @@ export function DisplaySettings({ initial }: { initial: { textSize: TextSize; re
 
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p id="pref-scripture" className="text-[0.9375rem] font-semibold">
+          <p id="pref-scripture" className="text-body font-semibold">
             Scripture card on Home
           </p>
           <p className="text-sm text-muted-foreground">Shows the verse of the day on Home. The Faith tab stays either way.</p>

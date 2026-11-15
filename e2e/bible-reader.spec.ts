@@ -83,7 +83,7 @@ test.describe("Bible reader", () => {
     await expect(page.getByRole("status").filter({ hasText: "Note saved. Only you can see it." })).toBeVisible();
 
     await page.reload();
-    await expect(page.locator("#v16").getByRole("button")).toHaveClass(/bg-\[#C9A54C\]/);
+    await expect(page.locator("#v16").getByRole("button")).toHaveClass(/bg-gold\//);
     await expect(page.locator("#v16").getByLabel("Bookmarked")).toBeVisible();
     await page.locator("#v17").getByRole("button", { name: "Note", exact: true }).click();
     await expect(page.getByRole("dialog").getByText("God's love gives, and keeps.")).toBeVisible();
@@ -122,7 +122,7 @@ test.describe("Bible reader", () => {
     await expect(page.getByTestId("bible-text")).toHaveAttribute("data-page-theme", "light");
     await expect(page.locator("#v16 [data-words-of-jesus]")).toHaveCSS("color", "rgb(155, 28, 36)");
     // The highlight made earlier still shows on the light page.
-    await expect(page.locator("#v16").getByRole("button")).toHaveClass(/bg-\[#C9A54C\]/);
+    await expect(page.locator("#v16").getByRole("button")).toHaveClass(/bg-gold\//);
     await displayOptions(page);
     save = whenSaved(page);
     await page.getByRole("button", { name: "Dark", exact: true }).click();

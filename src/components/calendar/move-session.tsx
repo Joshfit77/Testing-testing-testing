@@ -54,7 +54,7 @@ export function MoveSession({ dayId, name, date, minDate }: { dayId: string; nam
         </form>
       )}
       {status && (
-        <p role={status.ok ? "status" : "alert"} className={status.ok ? "mt-1 text-sm text-[#5fc49a]" : "mt-1 text-sm text-[#f08a8a]"}>
+        <p role={status.ok ? "status" : "alert"} className={status.ok ? "mt-1 text-sm text-success-foreground" : "mt-1 text-sm text-destructive-foreground"}>
           {status.text}
         </p>
       )}

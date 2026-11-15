@@ -26,7 +26,7 @@ export function CheckoutButton({
       <input type="hidden" name="plan" value={plan} />
       <input type="hidden" name="interval" value={interval} />
       <label className="flex items-start gap-3 text-left text-xs leading-relaxed text-muted-foreground">
-        <input type="checkbox" name="renewalConsent" className="mt-0.5 size-5 shrink-0 accent-[#C9A54C]" />
+        <input type="checkbox" name="renewalConsent" className="mt-0.5 size-5 shrink-0 accent-gold" />
         <span>{autoRenewalText(price, interval)}</span>
       </label>
       <SubmitButton className="w-full" variant={featured ? "default" : "secondary"} pendingLabel="Opening checkout…">

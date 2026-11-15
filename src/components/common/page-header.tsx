@@ -27,7 +27,7 @@ export function PageHeader({
         )}
         {eyebrow && <p className="mb-1 text-sm font-semibold text-gold">{eyebrow}</p>}
         <h1 className="font-display text-[1.625rem] font-bold leading-tight tracking-tight md:text-[1.75rem]">{title}</h1>
-        {description && <p className="mt-1.5 max-w-2xl text-[0.9375rem] text-muted-foreground">{description}</p>}
+        {description && <p className="mt-1.5 max-w-2xl text-body text-muted-foreground">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
     </header>

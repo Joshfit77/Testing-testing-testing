@@ -331,7 +331,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
                 </div>
                 <span className="text-muted-foreground" aria-hidden>=</span>
                 <div>
-                  <p className={`font-display text-xl font-bold tabular-nums sm:text-2xl ${remaining < 0 ? "text-[#f08a8a]" : "text-gold-highlight"}`} data-testid="budget-remaining">
+                  <p className={`font-display text-xl font-bold tabular-nums sm:text-2xl ${remaining < 0 ? "text-destructive-foreground" : "text-gold-highlight"}`} data-testid="budget-remaining">
                     {remaining}
                   </p>
                   <p className="text-xs text-muted-foreground">Remaining</p>
@@ -544,13 +544,13 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
             <BookMarked className="size-5 text-gold" aria-hidden /> Saved meals
           </h3>
           <p className="mb-3 text-xs text-muted-foreground">Save any logged meal above with “Save as meal”, then log or plan it for any date.</p>
-          <Link href="/nutrition/saved-meals" className="flex min-h-11 items-center justify-between gap-2 rounded-xl border border-border bg-elevated/40 px-3 py-2 text-[0.9375rem] hover:border-gold-muted">
+          <Link href="/nutrition/saved-meals" className="flex min-h-11 items-center justify-between gap-2 rounded-xl border border-border bg-elevated/40 px-3 py-2 text-body hover:border-gold-muted">
             <span>
               {templates.length ? `${templates.length} saved ${templates.length === 1 ? "meal" : "meals"}` : "No saved meals yet"}
             </span>
             <ChevronRight className="size-4 text-gold" aria-hidden />
           </Link>
-          <Link href="/nutrition/recipes" className="mt-2 flex min-h-11 items-center justify-between gap-2 rounded-xl border border-border bg-elevated/40 px-3 py-2 text-[0.9375rem] hover:border-gold-muted">
+          <Link href="/nutrition/recipes" className="mt-2 flex min-h-11 items-center justify-between gap-2 rounded-xl border border-border bg-elevated/40 px-3 py-2 text-body hover:border-gold-muted">
             <span className="min-w-0 flex-1">Recipes: build from ingredients with servings</span>
             {!planningIncluded && <ProTag />}
             <ChevronRight className="size-4 shrink-0 text-gold" aria-hidden />
@@ -610,7 +610,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
           >
             <ScanBarcode className="size-5 shrink-0 text-gold" aria-hidden />
             <span className="min-w-0 flex-1">
-              <span className="block text-[0.9375rem] font-semibold">{NUTRITION_SCORE_LABEL}</span>
+              <span className="block text-body font-semibold">{NUTRITION_SCORE_LABEL}</span>
               <span className="block text-sm text-muted-foreground">Check a packaged food&apos;s label and ingredients. It reads the label; it doesn&apos;t test the food.</span>
             </span>
             <ChevronRight className="size-4 shrink-0 text-gold" aria-hidden />
@@ -624,7 +624,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
               ["/nutrition/supplements", "Supplements", Pill, false],
             ] as const
           ).map(([href, text, Icon, pro]) => (
-            <Link key={href} href={href} className="flex min-h-12 items-center gap-2 rounded-xl border border-border bg-elevated/40 px-3 text-[0.9375rem] font-medium hover:border-gold-muted">
+            <Link key={href} href={href} className="flex min-h-12 items-center gap-2 rounded-xl border border-border bg-elevated/40 px-3 text-body font-medium hover:border-gold-muted">
               <Icon className="size-4 shrink-0 text-gold" aria-hidden />
               <span className="min-w-0 flex-1">{text}</span>
               {pro && <ProTag />}
@@ -734,7 +734,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
                 ["Fat", totals.fat_g, goals?.fat_g, "fat_g", "bg-[#b48cff]"],
               ] as const
             ).map(([l, v, g, key, bar]) => (
-              <div key={l} className="flex flex-wrap items-baseline justify-between gap-x-2 text-[0.9375rem]">
+              <div key={l} className="flex flex-wrap items-baseline justify-between gap-x-2 text-body">
                 <dt className="font-semibold">{l}</dt>
                 <dd className="tabular-nums text-muted-foreground" data-incomplete={incomplete.includes(key) ? "true" : undefined}>
                   {incomplete.includes(key) ? <span title="At least: some entries don't list this macro">≥ </span> : null}
@@ -750,7 +750,7 @@ export default async function NutritionPage({ searchParams }: { searchParams: Pr
         </div>
         {goals && remaining != null && (
           <p className="mt-3 text-sm text-muted-foreground">
-            <span className={`font-semibold tabular-nums ${remaining < 0 ? "text-[#f08a8a]" : "text-gold-highlight"}`}>{remaining}</span> kcal remaining today
+            <span className={`font-semibold tabular-nums ${remaining < 0 ? "text-destructive-foreground" : "text-gold-highlight"}`}>{remaining}</span> kcal remaining today
             {exercise ? ` (after ${exercise} from exercise)` : ""}.
           </p>
         )}

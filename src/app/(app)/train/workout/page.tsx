@@ -1,3 +1,4 @@
+import { prescribedByTime } from "@/lib/domain/timed-sets";
 import { lighterTargets } from "@/lib/domain/readiness";
 import { requiresWeight } from "@/lib/domain/load";
 import { usesDistance } from "@/lib/domain/exercise-tracking";
@@ -72,7 +73,8 @@ export default async function WorkoutPage({ searchParams }: { searchParams: Prom
           warmup: day.warmup,
           cooldown: day.cooldown,
           exercises: day.exercises.map((e) => ({
-            exercise: { id: e.exercise.id, slug: e.exercise.slug, name: e.exercise.name, isTimed: e.exercise.is_timed },
+            // Prescribed by time ("kettlebell swings, 30 s"): logged by time in this workout, so one tap completes the set.
+            exercise: { id: e.exercise.id, slug: e.exercise.slug, name: e.exercise.name, isTimed: prescribedByTime(e.exercise.is_timed, { reps: e.reps, seconds: e.duration_seconds }) },
             restSeconds: e.rest_seconds,
             target: lighter
               ? lighterTargets({ sets: e.sets, reps: e.reps, seconds: e.duration_seconds, rpe: e.rpe, intensity: e.intensity })

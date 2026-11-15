@@ -143,7 +143,7 @@ export function JournalForm({ today, entry, defaultRef, defaultKind, onSaved }: 
           name="shareWithCoach"
           checked={Boolean(v.share)}
           onChange={(e) => draft.setValue((d) => ({ ...d, share: e.target.checked }))}
-          className="mt-0.5 size-5 shrink-0 accent-[#C9A54C]"
+          className="mt-0.5 size-5 shrink-0 accent-gold"
         />
         <span>
           <span className="flex items-center gap-1.5 font-semibold">

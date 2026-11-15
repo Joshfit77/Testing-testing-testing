@@ -427,7 +427,7 @@ export function ExerciseCard({
                 <DropdownMenu.Item
                   key={item.label}
                   onSelect={item.onSelect}
-                  className={cn("flex h-10 cursor-pointer items-center gap-2 rounded-lg px-3 outline-none data-[highlighted]:bg-card", "danger" in item && item.danger && "text-[#f08a8a]")}
+                  className={cn("flex h-10 cursor-pointer items-center gap-2 rounded-lg px-3 outline-none data-[highlighted]:bg-card", "danger" in item && item.danger && "text-destructive-foreground")}
                 >
                   <item.icon className="size-4" aria-hidden /> {item.label}
                 </DropdownMenu.Item>

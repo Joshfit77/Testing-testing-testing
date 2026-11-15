@@ -52,7 +52,7 @@ export function RunningGoals({ goals, unit }: { goals: GoalView[]; unit: Distanc
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-semibold">
-                    {g.title} {g.met && <span className="text-[#5fc49a]">✓</span>}
+                    {g.title} {g.met && <span className="text-success-foreground">✓</span>}
                   </p>
                   <p className="text-sm text-muted-foreground">{g.detail}</p>
                 </div>
@@ -122,7 +122,7 @@ export function RunningGoals({ goals, unit }: { goals: GoalView[]; unit: Distanc
         </div>
       </form>
       {message && (
-        <p role={message.ok ? "status" : "alert"} className={message.ok ? "text-sm text-[#5fc49a]" : "text-sm text-[#f08a8a]"}>
+        <p role={message.ok ? "status" : "alert"} className={message.ok ? "text-sm text-success-foreground" : "text-sm text-destructive-foreground"}>
           <Target className="mr-1 inline size-3.5" aria-hidden />
           {message.text}
         </p>

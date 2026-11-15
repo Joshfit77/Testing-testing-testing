@@ -35,7 +35,7 @@ function ScheduleDay({ view, d, isDone }: { view: JourneyView; d: PlanDay; isDon
           <ul className="mt-1 flex flex-wrap gap-x-3">
             {d.refs.map((r) => (
               <li key={formatReference(r)}>
-                <Link href={chapterHref(r.bookId, r.chapter, r.verseStart)} className="inline-flex min-h-11 items-center text-[0.9375rem] font-semibold text-gold-highlight hover:underline">
+                <Link href={chapterHref(r.bookId, r.chapter, r.verseStart)} className="inline-flex min-h-11 items-center text-body font-semibold text-gold-highlight hover:underline">
                   {formatReference(r)}
                 </Link>
               </li>

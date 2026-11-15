@@ -1,3 +1,4 @@
+import { loggedByTime } from "@/lib/domain/timed-sets";
 import { notFound } from "next/navigation";
 import { WorkoutEditor, type EditableSession } from "@/components/workout/workout-editor";
 import type { CatalogItem } from "@/components/workout/exercise-picker";
@@ -59,7 +60,7 @@ export default async function WorkoutDetailPage({ params }: { params: Promise<{ 
       exerciseId: e.exercise.id,
       slug: e.exercise.slug,
       name: e.exercise.name,
-      isTimed: e.exercise.is_timed,
+      isTimed: loggedByTime(e.exercise.is_timed, e.sets.map((s) => ({ reps: s.reps, durationSeconds: s.duration_seconds }))),
       substitutedFromId: e.substituted_from_id,
       notes: e.notes ?? "",
       skipped: e.skipped,

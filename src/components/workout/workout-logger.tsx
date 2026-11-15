@@ -678,7 +678,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
             <h2 id="prs-title" className="flex items-center gap-2 font-display text-lg font-bold text-gold-gradient">
               <Trophy className="size-5 text-gold" aria-hidden /> New Personal Record!
             </h2>
-            <ul className="mt-1 space-y-1 text-[0.9375rem]">
+            <ul className="mt-1 space-y-1 text-body">
               {result.records.filter((r) => !r.first).map((r, i) => (
                 <li key={i}>
                   <strong>{catalogById.get(r.exerciseId)?.name ?? "Exercise"}</strong> – {RECORD_LABEL[r.recordType] ?? r.recordType}:{" "}
@@ -1120,7 +1120,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
       </Button>
 
       <details className="group rounded-2xl border border-border bg-card" data-testid="workout-more">
-        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-2 px-4 text-[0.9375rem] font-semibold [&::-webkit-details-marker]:hidden">
+        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-2 px-4 text-body font-semibold [&::-webkit-details-marker]:hidden">
           <span>More: rest alerts, notes, discard</span>
           <ChevronDown className="size-5 text-gold transition-transform group-open:rotate-180" aria-hidden />
         </summary>
@@ -1151,7 +1151,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
             <Textarea id="workout-notes" className="mt-2" value={draft.notes} onChange={(e) => dispatch({ type: "setNotes", notes: e.target.value })} placeholder="How did the session feel?" maxLength={2000} />
           </section>
 
-          <Button variant="ghost" className="w-full text-[#f08a8a]" onClick={() => setDiscardOpen(true)}>
+          <Button variant="ghost" className="w-full text-destructive-foreground" onClick={() => setDiscardOpen(true)}>
             <Trash2 aria-hidden /> Discard workout
           </Button>
         </div>

@@ -37,7 +37,7 @@ export default async function MemoryPage() {
             <span className="font-semibold text-gold-highlight">{formatReference(ref)}</span>
             <span className="text-xs text-muted-foreground">{r.status === "memorized" ? "Memorized" : LEVEL_LABELS[r.level]}</span>
           </span>
-          <span className="mt-0.5 line-clamp-2 block font-serif text-[0.9375rem] text-muted-foreground">
+          <span className="mt-0.5 line-clamp-2 block font-serif text-body text-muted-foreground">
             <ScriptureText parts={passageParts(ref)} />
           </span>
           {r.next_review_on && r.next_review_on > today && <span className="mt-1 block text-xs text-muted-foreground">Next practice {formatShortDate(r.next_review_on)}</span>}

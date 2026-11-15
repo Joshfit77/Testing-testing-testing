@@ -24,12 +24,12 @@ export function JourneyEnrollForm({ kind, param, days, today, maxStart, replacin
       </div>
       <div className="rounded-2xl border border-gold-muted bg-gold/8 p-4">
         <p className="font-semibold">The daily rule</p>
-        <p className="mt-1 text-[0.9375rem]">Each day: read that day&rsquo;s passage and pray, and mark both complete.</p>
+        <p className="mt-1 text-body">Each day: read that day&rsquo;s passage and pray, and mark both complete.</p>
         {/* The rule and its grace line together, with equal weight. */}
-        <p className="mt-2 text-[0.9375rem]">{JOURNEY_RULE}</p>
-        <p className="mt-2 text-[0.9375rem]">{RULE_GRACE}</p>
+        <p className="mt-2 text-body">{JOURNEY_RULE}</p>
+        <p className="mt-2 text-body">{RULE_GRACE}</p>
         <p className="mt-2 text-sm text-muted-foreground">Days end at midnight in your time zone.</p>
-        <label className="mt-3 flex min-h-11 items-start gap-3 text-[0.9375rem]">
+        <label className="mt-3 flex min-h-11 items-start gap-3 text-body">
           <input type="checkbox" name="accept" required className="mt-1 size-5 shrink-0 accent-[var(--gold)]" />
           <span>I understand that missing a day&rsquo;s reading or prayer restarts this journey at Day 1.</span>
         </label>

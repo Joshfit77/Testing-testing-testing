@@ -11,11 +11,11 @@ export function AcceptTermsForm() {
   return (
     <form action={action} className="space-y-4 text-foreground">
       <label className="flex items-start gap-3 text-sm">
-        <input type="checkbox" name="termsAccepted" className="mt-0.5 size-5 accent-[#C9A54C]" />
+        <input type="checkbox" name="termsAccepted" className="mt-0.5 size-5 accent-gold" />
         <span>I agree to the updated Terms of Service and have read the updated Privacy Policy.</span>
       </label>
       <label className="flex items-start gap-3 text-sm">
-        <input type="checkbox" name="riskAcknowledged" className="mt-0.5 size-5 accent-[#C9A54C]" />
+        <input type="checkbox" name="riskAcknowledged" className="mt-0.5 size-5 accent-gold" />
         <span>{RISK_ACKNOWLEDGMENT.text}</span>
       </label>
       <FormMessage state={state} />

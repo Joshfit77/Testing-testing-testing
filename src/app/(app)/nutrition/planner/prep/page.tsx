@@ -60,7 +60,7 @@ export default async function PrepPage({ searchParams }: { searchParams: Promise
         <Link href={prepHref(addDays(week, -7), [])} className="inline-flex min-h-11 items-center gap-1 rounded-xl px-3 text-sm text-muted-foreground hover:text-foreground">
           <ChevronLeft className="size-4" aria-hidden /> Earlier
         </Link>
-        <p className="text-center text-[0.9375rem] font-semibold" data-testid="prep-week">
+        <p className="text-center text-body font-semibold" data-testid="prep-week">
           {range(week, addDays(week, 6))}
         </p>
         <Link href={prepHref(addDays(week, 7), [])} className="inline-flex min-h-11 items-center gap-1 rounded-xl px-3 text-sm text-muted-foreground hover:text-foreground">
@@ -99,7 +99,7 @@ function PrepContent({ plan, week, freeze, today }: { plan: PrepPlan; week: stri
     return (
       <section className="space-y-2 rounded-2xl border border-border bg-card p-4" data-testid="prep-empty">
         <h2 className="text-lg font-semibold">Nothing to prep this week</h2>
-        <p className="text-[0.9375rem] text-muted-foreground">
+        <p className="text-body text-muted-foreground">
           There are no planned meals left in these dates.{" "}
           <Link href="/nutrition/planner" className="font-semibold text-gold-highlight underline">
             Make or open a plan
@@ -125,7 +125,7 @@ function PrepContent({ plan, week, freeze, today }: { plan: PrepPlan; week: stri
               <li key={s.index} className="rounded-2xl border border-gold-muted/60 bg-card-gradient p-4" data-testid="prep-session">
                 <p className="text-sm font-semibold text-gold">{s.prepDate === today ? "Today" : prepDayLabel(s.prepDate)}</p>
                 <h3 className="text-[1.0625rem] font-semibold">Prep for {range(s.from, s.to)}</h3>
-                <ul className="mt-2 space-y-1 text-[0.9375rem]">
+                <ul className="mt-2 space-y-1 text-body">
                   {s.cooks.map((c) => (
                     <li key={c.key} className="flex flex-wrap items-baseline justify-between gap-x-3">
                       <span>{c.name}</span>
@@ -162,7 +162,7 @@ function PrepContent({ plan, week, freeze, today }: { plan: PrepPlan; week: stri
           <ul className="divide-y divide-border">
             {plan.notBatched.map((n) => (
               <li key={n.key} className="py-2">
-                <p className="text-[0.9375rem] font-semibold">
+                <p className="text-body font-semibold">
                   {n.name} <span className="font-normal text-muted-foreground">· {servingsText(n.servings)}</span>
                 </p>
                 <p className="text-sm text-muted-foreground">{n.meals.map((m) => `${prepDayLabel(m.date)} ${m.label.toLowerCase()}`).join(" · ")}</p>
@@ -212,7 +212,7 @@ function BatchCard({ batch: b, week, freeze, today }: { batch: PrepBatch; week: 
             </Link>
           )}
         </h3>
-        <p className="text-[0.9375rem] tabular-nums">
+        <p className="text-body tabular-nums">
           <span className="font-semibold" data-testid="prep-batch-servings">
             {servingsText(b.totalServings)}
           </span>{" "}
@@ -244,7 +244,7 @@ function BatchCard({ batch: b, week, freeze, today }: { batch: PrepBatch; week: 
 
       {b.cooks.map((c) => (
         <div key={c.sessionIndex} className="border-t border-border p-4" data-testid="prep-cook">
-          <p className="text-[0.9375rem] font-semibold">
+          <p className="text-body font-semibold">
             Cook {c.prepDate === today ? "today" : `on ${prepDayLabel(c.prepDate)}`}: <span data-testid="prep-cook-servings">{servingsText(c.servings)}</span>
           </p>
           <p className="text-sm text-muted-foreground">

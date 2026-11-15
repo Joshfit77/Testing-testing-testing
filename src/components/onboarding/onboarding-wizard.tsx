@@ -417,7 +417,7 @@ export function OnboardingWizard({ initial, mode = "create" }: { initial: Onboar
               </p>
               <Textarea value={limitations} onChange={(e) => setLimitations(e.target.value)} maxLength={1000} aria-label="Physical limitations" aria-invalid={Boolean(fieldErrors.limitations)} />
               <label className="flex items-start gap-3 text-sm">
-                <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 size-5 accent-[#C9A54C]" />
+                <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 size-5 accent-gold" />
                 <span>I consent to Narrow Gate Fitness storing this optional wellness information to personalize my training.</span>
               </label>
             </fieldset>
@@ -460,7 +460,7 @@ export function OnboardingWizard({ initial, mode = "create" }: { initial: Onboar
             </div>
             {mode === "edit" && (
               <label className="flex items-start gap-3 rounded-xl border border-gold-muted/50 bg-gold/5 p-4 text-sm">
-                <input type="checkbox" checked={rebuild} onChange={(e) => setRebuild(e.target.checked)} className="mt-0.5 size-5 accent-[#C9A54C]" />
+                <input type="checkbox" checked={rebuild} onChange={(e) => setRebuild(e.target.checked)} className="mt-0.5 size-5 accent-gold" />
                 <span>Rebuild my starter program from these answers and make it my active program.</span>
               </label>
             )}

@@ -129,7 +129,7 @@ export default async function PlannerPage() {
           <h2 id="targets-title" className="text-lg font-semibold">
             Planning for
           </h2>
-          <p className="mt-1 text-[0.9375rem] tabular-nums">
+          <p className="mt-1 text-body tabular-nums">
             {targets.calories.toLocaleString()} kcal · protein {targets.protein_g} g · carbs {targets.carbs_g} g · fat {targets.fat_g} g
           </p>
           <p className="text-sm text-muted-foreground">

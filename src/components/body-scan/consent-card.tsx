@@ -38,7 +38,7 @@ export function BodyScanConsentCard() {
           <span>I agree to Narrow Gate Fitness storing my body scan photos and measurements as described above.</span>
         </label>
         {error && (
-          <p role="alert" className="text-sm text-[#f08a8a]">
+          <p role="alert" className="text-sm text-destructive-foreground">
             {error}
           </p>
         )}

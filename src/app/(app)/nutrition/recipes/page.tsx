@@ -51,7 +51,7 @@ export default async function RecipesPage() {
         {loadFailed ? (
           <Notice tone="error">Your recipes couldn&apos;t be loaded right now. Refresh the page to try again.</Notice>
         ) : recipes.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-border p-4 text-[0.9375rem] text-muted-foreground">
+          <p className="rounded-2xl border border-dashed border-border p-4 text-body text-muted-foreground">
             No recipes yet. Tap <span className="font-semibold text-foreground">New recipe</span> to add ingredients and servings.
           </p>
         ) : (

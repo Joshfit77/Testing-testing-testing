@@ -217,13 +217,13 @@ export default async function TrainPage() {
       )}
       {sections.includes("tools") && (
       <details className={`group ${card}`} data-testid="train-tools">
-        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between px-4 text-[0.9375rem] font-semibold [&::-webkit-details-marker]:hidden">
+        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between px-4 text-body font-semibold [&::-webkit-details-marker]:hidden">
           <span>More training tools</span>
           <ChevronDown className="size-5 text-gold transition-transform group-open:rotate-180" aria-hidden />
         </summary>
         <nav aria-label="Training tools" className="grid grid-cols-2 gap-2 px-3 pb-3">
           {tools.map((t) => (
-            <Link key={t.href} href={t.href} className="flex min-h-14 items-center gap-2.5 rounded-xl border border-border bg-elevated/50 px-3 py-2 text-[0.9375rem] font-medium leading-tight hover:border-gold-muted">
+            <Link key={t.href} href={t.href} className="flex min-h-14 items-center gap-2.5 rounded-xl border border-border bg-elevated/50 px-3 py-2 text-body font-medium leading-tight hover:border-gold-muted">
               <t.icon className="size-5 shrink-0 text-gold" aria-hidden />
               <span className="min-w-0 flex-1">{t.label}</span>
             </Link>

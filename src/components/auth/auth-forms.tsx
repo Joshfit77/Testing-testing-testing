@@ -130,12 +130,12 @@ export function SignUpForm({ defaultEmail = "" }: { defaultEmail?: string }) {
         </ul>
       </section>
       <label className="flex items-start gap-3 text-sm">
-        <input type="checkbox" name="ageConfirmed" className="mt-0.5 size-5 accent-[#C9A54C]" aria-describedby="age-error" />
+        <input type="checkbox" name="ageConfirmed" className="mt-0.5 size-5 accent-gold" aria-describedby="age-error" />
         <span>I confirm I am 18 years of age or older.</span>
       </label>
       <FieldError id="age-error" message={fe.ageConfirmed} />
       <label className="flex items-start gap-3 text-sm">
-        <input type="checkbox" name="termsAccepted" className="mt-0.5 size-5 accent-[#C9A54C]" aria-describedby="terms-error" />
+        <input type="checkbox" name="termsAccepted" className="mt-0.5 size-5 accent-gold" aria-describedby="terms-error" />
         <span>
           I agree to the{" "}
           <Link href="/legal/terms" className="text-gold-highlight underline" target="_blank">
@@ -150,7 +150,7 @@ export function SignUpForm({ defaultEmail = "" }: { defaultEmail?: string }) {
       </label>
       <FieldError id="terms-error" message={fe.termsAccepted} />
       <label className="flex items-start gap-3 text-sm">
-        <input type="checkbox" name="riskAcknowledged" className="mt-0.5 size-5 accent-[#C9A54C]" aria-describedby="risk-error" />
+        <input type="checkbox" name="riskAcknowledged" className="mt-0.5 size-5 accent-gold" aria-describedby="risk-error" />
         <span>{RISK_ACKNOWLEDGMENT.text}</span>
       </label>
       <FieldError id="risk-error" message={fe.riskAcknowledged} /> 

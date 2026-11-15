@@ -56,7 +56,7 @@ function LoggedUndoLine({ result, className, onUndone }: { result: LogResult; cl
 
   if (!result.ok) {
     return (
-      <p ref={line} role="alert" className={cn("text-sm text-[#f08a8a]", className)}>
+      <p ref={line} role="alert" className={cn("text-sm text-destructive-foreground", className)}>
         {result.message}
       </p>
     );
@@ -64,7 +64,7 @@ function LoggedUndoLine({ result, className, onUndone }: { result: LogResult; cl
   const shown = undone ?? result;
   return (
     <div ref={line} className={cn("flex flex-wrap items-center gap-x-2 gap-y-1", className)}>
-      <p role={shown.ok ? "status" : "alert"} className={cn("text-sm", shown.ok ? "text-[#5fc49a]" : "text-[#f08a8a]")}>
+      <p role={shown.ok ? "status" : "alert"} className={cn("text-sm", shown.ok ? "text-success-foreground" : "text-destructive-foreground")}>
         {shown.message}
       </p>
       {canUndo && !expired && !undone?.ok && (

@@ -205,7 +205,7 @@ function StandardsChooser({ table }: { table: StandardsTable | null }) {
         </>
       )}
       {msg && (
-        <p role="alert" className="text-sm text-[#f08a8a]">
+        <p role="alert" className="text-sm text-destructive-foreground">
           {msg.text}
         </p>
       )}

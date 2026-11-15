@@ -119,7 +119,7 @@ function HealthSync() {
         {pending ? "Syncing…" : `Sync ${appName}`}
       </Button>
       {error && (
-        <p role="alert" className="text-xs text-[#f08a8a]">
+        <p role="alert" className="text-xs text-destructive-foreground">
           {error}
         </p>
       )}

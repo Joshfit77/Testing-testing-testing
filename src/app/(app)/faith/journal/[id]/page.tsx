@@ -50,7 +50,7 @@ export default async function JournalEntryPage({ params, searchParams }: { param
       ) : (
         <>
           <article className="rounded-2xl border border-border bg-card p-4">
-            <p className="whitespace-pre-wrap text-[0.9375rem] leading-relaxed">{e.body}</p>
+            <p className="whitespace-pre-wrap text-body leading-relaxed">{e.body}</p>
             {(e.scripture_ref || e.theme) && (
               <p className="mt-3 text-sm text-muted-foreground">
                 {[e.scripture_ref, e.theme ? THEME_LABELS[e.theme as FaithTheme] : null].filter(Boolean).join(" · ")}
@@ -60,8 +60,8 @@ export default async function JournalEntryPage({ params, searchParams }: { param
 
           {isAnswerable(e.kind) &&
             (e.answered_on ? (
-              <section className="rounded-2xl border border-[#5fc49a]/40 bg-[#5fc49a]/5 p-4" aria-labelledby="answered-title">
-                <h2 id="answered-title" className="flex items-center gap-2 font-semibold text-[#5fc49a]">
+              <section className="rounded-2xl border border-success-foreground/40 bg-success-foreground/5 p-4" aria-labelledby="answered-title">
+                <h2 id="answered-title" className="flex items-center gap-2 font-semibold text-success-foreground">
                   <CheckCircle2 className="size-5" aria-hidden /> Answered on {formatJournalDate(e.answered_on)}
                 </h2>
                 {e.answered_note && <p className="mt-2 whitespace-pre-wrap text-sm">{e.answered_note}</p>}

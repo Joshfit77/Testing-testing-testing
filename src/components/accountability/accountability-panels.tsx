@@ -274,7 +274,7 @@ export function PartnerCard({ partner }: { partner: PartnerView }) {
           return (
             <div key={o.key} className="flex items-start justify-between gap-4">
               <div>
-                <p id={id} className="text-[0.9375rem] font-semibold">
+                <p id={id} className="text-body font-semibold">
                   {o.label}
                 </p>
                 <p className="text-sm text-muted-foreground">{o.detail}</p>

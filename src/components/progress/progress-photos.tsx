@@ -229,7 +229,7 @@ function UploadDialog({ open, onOpenChange, userId, units, today }: { open: bool
           </div>
           {!weight && <p className="text-xs text-muted-foreground">Leave weight blank to use your logged bodyweight for that day, if any.</p>}
           {error && (
-            <p role="alert" className="text-sm text-[#f08a8a]">
+            <p role="alert" className="text-sm text-destructive-foreground">
               {error}
             </p>
           )}
@@ -284,12 +284,12 @@ function ViewerDialog({ photo, units, onClose }: { photo: ProgressPhotoView | nu
               <PhotoImage photo={photo} alt={`Progress photo, ${photo.pose} pose, ${formatDate(photo.takenOn)}`} className="max-h-[65dvh] min-h-48 w-full rounded-xl bg-black object-contain" />
               {photo.note && <p className="mt-3 whitespace-pre-wrap text-sm">{photo.note}</p>}
               {error && (
-                <p role="alert" className="mt-3 text-sm text-[#f08a8a]">
+                <p role="alert" className="mt-3 text-sm text-destructive-foreground">
                   {error}
                 </p>
               )}
               <div className="mt-4 flex justify-end">
-                <Button variant="ghost" className="text-[#f08a8a]" onClick={() => setConfirmOpen(true)}>
+                <Button variant="ghost" className="text-destructive-foreground" onClick={() => setConfirmOpen(true)}>
                   <Trash2 aria-hidden /> Delete photo
                 </Button>
               </div>
@@ -304,7 +304,7 @@ function ViewerDialog({ photo, units, onClose }: { photo: ProgressPhotoView | nu
             <DialogDescription>It will be permanently removed. This can&apos;t be undone.</DialogDescription>
           </DialogHeader>
           {error && (
-            <p role="alert" className="mb-3 text-sm text-[#f08a8a]">
+            <p role="alert" className="mb-3 text-sm text-destructive-foreground">
               {error}
             </p>
           )}

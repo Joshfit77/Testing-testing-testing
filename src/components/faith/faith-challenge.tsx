@@ -334,11 +334,11 @@ function DayView({
         <input type="hidden" name="dayNumber" value={day.day} />
         <p className="text-sm font-semibold">{isToday ? "Check in for today" : `Catch up on day ${day.day}`}</p>
         <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-border bg-elevated/50 px-3 py-2">
-          <input type="checkbox" name="devotionalDone" defaultChecked={checkin?.devotional_done ?? false} className="size-5 accent-[#C9A54C]" />
+          <input type="checkbox" name="devotionalDone" defaultChecked={checkin?.devotional_done ?? false} className="size-5 accent-gold" />
           <span className="text-sm">{isToday ? "Read today's devotional" : "Read this devotional"}</span>
         </label>
         <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-border bg-elevated/50 px-3 py-2">
-          <input type="checkbox" name="workoutDone" defaultChecked={checkin?.workout_done ?? suggestWorkout} className="size-5 accent-[#C9A54C]" />
+          <input type="checkbox" name="workoutDone" defaultChecked={checkin?.workout_done ?? suggestWorkout} className="size-5 accent-gold" />
           <span className="text-sm">{isToday ? "Trained today" : `Trained on ${formatDate(day.date)}`}</span>
         </label>
         {suggestWorkout && (

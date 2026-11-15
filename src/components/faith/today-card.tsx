@@ -75,7 +75,7 @@ export function TodayCard({ userId, journey, goals }: { userId: string; journey:
           <h2 id="today-journey-title" className="font-display text-xl font-bold">
             Begin a reading journey
           </h2>
-          <p className="mt-1 text-[0.9375rem] text-muted-foreground">Read through Scripture in 30 to 365 days, with Bible reading and prayer each day.</p>
+          <p className="mt-1 text-body text-muted-foreground">Read through Scripture in 30 to 365 days, with Bible reading and prayer each day.</p>
           <Button asChild className="mt-3" size="sm">
             <Link href="/faith/journey/new">
               <Plus aria-hidden /> Choose a journey
@@ -91,7 +91,7 @@ export function TodayCard({ userId, journey, goals }: { userId: string; journey:
             <Sparkles className="mt-0.5 size-5 shrink-0 text-gold" aria-hidden />
             <div className="min-w-0 flex-1">
               <p className="font-semibold">Faith challenge</p>
-              <p className="text-[0.9375rem]">{goals.challenge.text}</p>
+              <p className="text-body">{goals.challenge.text}</p>
               {goals.challenge.verseText && (
                 <p className="mt-1 font-serif text-sm text-muted-foreground">
                   &ldquo;
@@ -110,7 +110,7 @@ export function TodayCard({ userId, journey, goals }: { userId: string; journey:
             <Dumbbell className="mt-0.5 size-5 shrink-0 text-gold" aria-hidden />
             <div className="min-w-0 flex-1">
               <p className="font-semibold">Fitness</p>
-              <p className="text-[0.9375rem]">
+              <p className="text-body">
                 {fit.kind === "workout"
                   ? `${fit.sessionName}${fit.minutes ? ` · about ${fit.minutes} min` : ""}`
                   : fit.kind === "rest"

@@ -47,7 +47,7 @@ const PHASES = [
   ["End", 5 / 6],
 ];
 
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || "/opt/pw-browsers/chromium-1194/chrome-linux/chrome" });
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || process.env.CHROMIUM || "/opt/pw-browsers/chromium" });
 const page = await browser.newPage({ viewport: { width: 260 + 6 * (W + 4), height: 900 }, deviceScaleFactor: 1 });
 await page.setContent(`<html><body style="margin:0;background:#070707;color:#f4f1ea;font:13px system-ui"><div id=root></div><script>${js}</script></body></html>`);
 const slugs = await page.evaluate((only) => EM.EXERCISES.map((e) => e.slug).filter((s) => !only.length || only.includes(s)), only);

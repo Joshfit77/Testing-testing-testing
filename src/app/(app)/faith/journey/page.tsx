@@ -63,9 +63,9 @@ export default async function JourneyPage({ searchParams }: { searchParams: Prom
         )}
         <section className="rounded-2xl border border-border bg-card p-4">
           <p className="font-semibold">How a journey works</p>
-          <p className="mt-1 text-[0.9375rem]">Each day has a Bible reading and time for prayer. Mark each one complete when you&rsquo;ve done it.</p>
+          <p className="mt-1 text-body">Each day has a Bible reading and time for prayer. Mark each one complete when you&rsquo;ve done it.</p>
           {/* The rule and its grace line together, with equal weight. */}
-          <div className="mt-2 space-y-2 rounded-xl border border-gold-muted bg-gold/8 p-3 text-[0.9375rem]">
+          <div className="mt-2 space-y-2 rounded-xl border border-gold-muted bg-gold/8 p-3 text-body">
             <p>{JOURNEY_RULE}</p>
             <p>{RULE_GRACE}</p>
           </div>
@@ -104,7 +104,7 @@ export default async function JourneyPage({ searchParams }: { searchParams: Prom
           </h2>
           <p className="mt-1 font-serif text-lg">{RESTART_MESSAGE}</p>
           <p className="text-sm font-semibold text-gold">— {RESTART_REFERENCE}</p>
-          {lam && <p className="mt-2 font-serif text-[0.9375rem] text-muted-foreground">&ldquo;{lam}&rdquo; ({RESTART_REFERENCE}, BSB)</p>}
+          {lam && <p className="mt-2 font-serif text-body text-muted-foreground">&ldquo;{lam}&rdquo; ({RESTART_REFERENCE}, BSB)</p>}
           <p className="mt-2 text-sm text-muted-foreground">
             On {formatLongDate(view.restart.missedOn)}, {REASON_TEXT[view.restart.reason]}, so the journey restarted at Day 1 after {view.restart.previousDays} completed day{view.restart.previousDays === 1 ? "" : "s"}. Your reading history, notes and prayers are all still saved.
           </p>
@@ -188,7 +188,7 @@ export default async function JourneyPage({ searchParams }: { searchParams: Prom
         </section>
       )}
 
-      <section className="rounded-2xl border border-border bg-card p-4 text-[0.9375rem]">
+      <section className="rounded-2xl border border-border bg-card p-4 text-body">
         <p className="font-semibold">The daily rule</p>
         <p className="mt-1">{JOURNEY_RULE}</p>
         <p className="mt-1">{RULE_GRACE}</p>

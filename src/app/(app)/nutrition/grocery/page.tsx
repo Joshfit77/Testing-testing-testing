@@ -55,7 +55,7 @@ export default async function GroceryPage() {
         {plan ? (
           <GenerateGroceryForm defaultFrom={defaultFrom < defaultTo ? defaultFrom : plan.start_date} defaultTo={defaultTo} />
         ) : (
-          <p className="text-[0.9375rem] text-muted-foreground">
+          <p className="text-body text-muted-foreground">
             No meal plan yet.{" "}
             <Link href="/nutrition/planner" className="font-semibold text-gold-highlight underline">
               Make a plan
@@ -92,7 +92,7 @@ export default async function GroceryPage() {
         {itemsRes.error ? (
           <Notice tone="error">Your list couldn&apos;t be loaded right now. Refresh the page to try again.</Notice>
         ) : items.length === 0 ? (
-          <p className="text-[0.9375rem] text-muted-foreground">Your grocery list is empty.</p>
+          <p className="text-body text-muted-foreground">Your grocery list is empty.</p>
         ) : (
           <GroceryItems items={items} />
         )}

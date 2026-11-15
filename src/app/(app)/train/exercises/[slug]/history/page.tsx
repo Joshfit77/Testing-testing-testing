@@ -1,3 +1,4 @@
+import { loggedByTime } from "@/lib/domain/timed-sets";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Lock, Trophy } from "lucide-react";
@@ -138,7 +139,7 @@ export default async function ExerciseHistoryPage({ params }: { params: Promise<
                       <span className="block text-xs text-muted-foreground">{fmtDate(s.date)}</span>
                     </span>
                     <span className="shrink-0 text-right text-sm tabular-nums">
-                      {summarizeSets(s.sets, units, Boolean(ex.is_timed)) ?? "—"}
+                      {summarizeSets(s.sets, units, loggedByTime(Boolean(ex.is_timed), s.sets)) ?? "—"}
                       {s.e1rmKg != null && <span className="block text-xs text-muted-foreground">e1RM {formatWeight(s.e1rmKg, units)}</span>}
                     </span>
                   </Link>

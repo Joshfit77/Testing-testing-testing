@@ -79,7 +79,7 @@ export default async function LessonPage({ params }: { params: Promise<{ study: 
                   <Link href={chapterHref(r.bookId, r.chapter, r.verseStart)} className="text-sm font-semibold text-gold-highlight hover:underline">
                     {x}
                   </Link>
-                  <p className="mt-0.5 line-clamp-4 font-serif text-[0.9375rem] text-muted-foreground">
+                  <p className="mt-0.5 line-clamp-4 font-serif text-body text-muted-foreground">
                     <ScriptureText parts={parts} />
                   </p>
                 </li>
@@ -101,15 +101,15 @@ export default async function LessonPage({ params }: { params: Promise<{ study: 
           </h2>
           <div>
             <h3 className="font-semibold">Background</h3>
-            <p className="mt-1 text-[0.9375rem]">{notes.context}</p>
+            <p className="mt-1 text-body">{notes.context}</p>
           </div>
           <div>
             <h3 className="font-semibold">The passage</h3>
-            <p className="mt-1 text-[0.9375rem]">{notes.explanation}</p>
+            <p className="mt-1 text-body">{notes.explanation}</p>
           </div>
           <div>
             <h3 className="font-semibold">Themes</h3>
-            <ul className="mt-1 list-disc space-y-0.5 pl-5 text-[0.9375rem]">
+            <ul className="mt-1 list-disc space-y-0.5 pl-5 text-body">
               {notes.themes.map((t) => (
                 <li key={t}>{t}</li>
               ))}
@@ -117,7 +117,7 @@ export default async function LessonPage({ params }: { params: Promise<{ study: 
           </div>
           <div>
             <h3 className="font-semibold">Questions</h3>
-            <ol className="mt-1 list-decimal space-y-1 pl-5 text-[0.9375rem]">
+            <ol className="mt-1 list-decimal space-y-1 pl-5 text-body">
               {notes.questions.map((q) => (
                 <li key={q}>{q}</li>
               ))}
@@ -125,11 +125,11 @@ export default async function LessonPage({ params }: { params: Promise<{ study: 
           </div>
           <div>
             <h3 className="font-semibold">Living it out</h3>
-            <p className="mt-1 text-[0.9375rem]">{notes.application}</p>
+            <p className="mt-1 text-body">{notes.application}</p>
           </div>
           <div>
             <h3 className="font-semibold">Prayer</h3>
-            <p className="mt-1 font-serif text-[0.9375rem] italic">{notes.prayer}</p>
+            <p className="mt-1 font-serif text-body italic">{notes.prayer}</p>
           </div>
         </section>
       ) : (

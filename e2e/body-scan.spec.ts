@@ -2,10 +2,10 @@ import { existsSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import { completeOnboarding, grantPlan, signUpAndConfirm, uniqueEmail } from "./helpers";
 
-const chromium = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+const chromium = [process.env.CHROMIUM, "/opt/pw-browsers/chromium", "/opt/pw-browsers/chromium-1194/chrome-linux/chrome"].find((p) => p && existsSync(p)) ?? "";
 // Chromium's built-in fake camera (a moving test pattern) stands in for a phone camera.
 test.use({
-  launchOptions: { ...(existsSync(chromium) ? { executablePath: chromium } : {}), args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"] },
+  launchOptions: { ...(chromium ? { executablePath: chromium } : {}), args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"] },
 });
 
 const PHOTO = "public/icons/icon-512.png";

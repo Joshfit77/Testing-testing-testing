@@ -34,7 +34,7 @@ export function TodaysReminders({ items }: { items: TodayReminder[] }) {
         {items.map((i) => (
           <li key={i.kind}>
             <Link href={i.url} className="flex min-h-12 items-center gap-3 py-2">
-              {i.status === "done" ? <CheckCircle2 className="size-5 shrink-0 text-[#5fc49a]" aria-hidden /> : <Circle className="size-5 shrink-0 text-gold" aria-hidden />}
+              {i.status === "done" ? <CheckCircle2 className="size-5 shrink-0 text-success-foreground" aria-hidden /> : <Circle className="size-5 shrink-0 text-gold" aria-hidden />}
               <span className="min-w-0 flex-1">
                 <span className={i.status === "done" ? "block text-muted-foreground line-through" : "block font-semibold"}>{i.title}</span>
                 <span className="block text-xs text-muted-foreground">

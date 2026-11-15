@@ -38,7 +38,7 @@ function libraryHref(f: { q?: string; category?: string; difficulty?: string; eq
 
 const chip = (active: boolean) =>
   cn(
-    "inline-flex min-h-11 shrink-0 items-center rounded-full px-4 text-[0.9375rem] font-semibold transition-colors",
+    "inline-flex min-h-11 shrink-0 items-center rounded-full px-4 text-body font-semibold transition-colors",
     active ? "bg-gold-gradient text-black shadow-bronze" : "border border-border bg-[#101010] text-foreground/85 hover:text-foreground",
   );
 

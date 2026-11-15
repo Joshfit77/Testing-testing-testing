@@ -23,7 +23,7 @@ export function ActionForm({
     <form action={formAction} className={className ?? "space-y-3"} key={resetOnSuccess && state.ok ? state.at : undefined}>
       {children}
       {state.fieldErrors && Object.keys(state.fieldErrors).length > 0 && (
-        <ul className="text-xs text-[#f08a8a]">
+        <ul className="text-xs text-destructive-foreground">
           {Object.entries(state.fieldErrors).map(([k, v]) => (
             <li key={k}>
               {k}: {v}

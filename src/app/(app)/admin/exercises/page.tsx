@@ -121,10 +121,10 @@ export default async function AdminExercisesPage({ searchParams }: { searchParam
               </div>
               <div className="flex gap-6 text-sm">
                 <label className="flex items-center gap-2">
-                  <input type="checkbox" name="isPublished" defaultChecked={ex?.is_published ?? false} className="size-5 accent-[#C9A54C]" /> Published
+                  <input type="checkbox" name="isPublished" defaultChecked={ex?.is_published ?? false} className="size-5 accent-gold" /> Published
                 </label>
                 <label className="flex items-center gap-2">
-                  <input type="checkbox" name="isTimed" defaultChecked={ex?.is_timed ?? false} className="size-5 accent-[#C9A54C]" /> Timed exercise
+                  <input type="checkbox" name="isTimed" defaultChecked={ex?.is_timed ?? false} className="size-5 accent-gold" /> Timed exercise
                 </label>
               </div>
             </ActionForm>
@@ -185,7 +185,7 @@ export default async function AdminExercisesPage({ searchParams }: { searchParam
                   <Input id="altText" name="altText" required />
                 </div>
                 <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" name="confirm" className="size-5 accent-[#C9A54C]" /> I confirm we have the right to use this media.
+                  <input type="checkbox" name="confirm" className="size-5 accent-gold" /> I confirm we have the right to use this media.
                 </label>
               </ActionForm>
             </section>

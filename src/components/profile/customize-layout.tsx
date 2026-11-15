@@ -35,7 +35,7 @@ function SectionList<T extends string>({ order, hidden, labels, always, place, o
         return (
           <li key={m} className={cn("flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2", off && "opacity-60")}>
             <span className="min-w-[9rem] flex-1">
-              <span className="block text-[0.9375rem] font-semibold">{labels[m].title}</span>
+              <span className="block text-body font-semibold">{labels[m].title}</span>
               <span className="block text-sm text-muted-foreground">{labels[m].body}</span>
             </span>
             <Button type="button" variant="ghost" size="icon" onClick={() => onMove(m, -1)} disabled={i === 0} aria-label={`Move ${labels[m].title} up`}>
@@ -154,29 +154,29 @@ export function CustomizeLayout({ defaultOrder, prefs }: { defaultOrder: HomeMod
   return (
     <div className="space-y-5" aria-busy={pending} data-testid="customize-layout">
       <div>
-        <p className="text-[0.9375rem] font-semibold">Home</p>
+        <p className="text-body font-semibold">Home</p>
         <p className="mb-2 text-sm text-muted-foreground">Move what matters to you to the top, or hide what you don&apos;t use. Today&apos;s workout always stays.</p>
         <SectionList order={order} hidden={hidden} labels={HOME_MODULE_LABELS} always="workout" place="Home" onMove={moveHome} onToggle={toggleHome} />
       </div>
       <div>
-        <p className="text-[0.9375rem] font-semibold">Train</p>
+        <p className="text-body font-semibold">Train</p>
         <p className="mb-2 text-sm text-muted-foreground">The sections under today&apos;s workout on the Train tab. Anything hidden is still one tap away in Search.</p>
         <SectionList order={train.order} hidden={train.hidden} labels={TRAIN_SECTION_LABELS} place="Train" onMove={moveTrain} onToggle={toggleTrain} />
       </div>
       <div>
-        <p className="text-[0.9375rem] font-semibold">Nutrition</p>
+        <p className="text-body font-semibold">Nutrition</p>
         <p className="mb-2 text-sm text-muted-foreground">
           The sections of the Nutrition tab. Add food, Scan, Meal photo, the daily totals and the meals always stay; Recent foods and Water keep their place above the meals, the rest follow your order under More.
         </p>
         <SectionList order={nutrition.order} hidden={nutrition.hidden} labels={NUTRITION_SECTION_LABELS} place="Nutrition" onMove={moveNutrition} onToggle={toggleNutrition} />
       </div>
       <div>
-        <p className="text-[0.9375rem] font-semibold">Faith</p>
+        <p className="text-body font-semibold">Faith</p>
         <p className="mb-2 text-sm text-muted-foreground">Sections of the Faith tab. Bible reading, the journey and the quick actions are always there.</p>
         <ul className="divide-y divide-border rounded-xl border border-border">
           {FAITH_SECTIONS.map((s) => (
             <li key={s} className="flex min-h-12 items-center justify-between gap-3 px-3 py-2">
-              <span id={`faith-section-${s}`} className="text-[0.9375rem]">
+              <span id={`faith-section-${s}`} className="text-body">
                 {FAITH_SECTION_LABELS[s]}
               </span>
               <Switch checked={!faithHidden.has(s)} aria-labelledby={`faith-section-${s}`} onCheckedChange={() => toggleFaith(s)} />

@@ -22,6 +22,8 @@
   --foreground: #ffffff;
   --muted-foreground: #b3b0aa;
   --success: #3fa077;
+  /* Success text on dark surfaces (AA on the card and elevated tones). */
+  --success-foreground: #5fc49a;
   --destructive: #d45c5c;
   --destructive-foreground: #f08a8a;
   /* Solid red button fill: white text on it reads at 5.6:1 (the lighter --destructive is for text and borders on black). */
@@ -65,6 +67,7 @@
   --color-destructive: var(--destructive);
   --color-destructive-solid: var(--destructive-solid);
   --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
   --color-red-letter: var(--red-letter);
   --color-border: var(--border);
   --color-input: var(--border);
@@ -76,6 +79,9 @@
   --radius-xl: 0.75rem;
   --radius-2xl: 1rem;
   --radius-3xl: 1.25rem;
+
+  /* Body size for controls and running text in cards: 15 px, between text-sm and text-base. */
+  --text-body: 0.9375rem;
 
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   /* Headings: a clean geometric sans in mixed case. */

@@ -52,7 +52,7 @@ export default async function SavedMealsPage() {
       <BackLink href="/nutrition">Food</BackLink>
       <PageHeader eyebrow="Food" title="Saved meals" description="Meals you saved from your diary. Log or plan one for any day in a single step." />
       <FoodToolsNav current="/nutrition/saved-meals" planningIncluded={planningIncluded} />
-      <p className="text-[0.9375rem] text-muted-foreground">
+      <p className="text-body text-muted-foreground">
         To save a meal, log it in the{" "}
         <Link href="/nutrition" className="font-semibold text-gold-highlight underline">
           diary
@@ -66,7 +66,7 @@ export default async function SavedMealsPage() {
       {error ? (
         <Notice tone="error">Your saved meals couldn&apos;t be loaded right now. Refresh the page to try again.</Notice>
       ) : templates.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-border p-4 text-[0.9375rem] text-muted-foreground">No saved meals yet.</p>
+        <p className="rounded-2xl border border-dashed border-border p-4 text-body text-muted-foreground">No saved meals yet.</p>
       ) : (
         <ul className="space-y-4">
           {templates.map((t) => {

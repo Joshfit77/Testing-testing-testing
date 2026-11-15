@@ -34,7 +34,7 @@ export function Segmented({
   const pill = (active: boolean, disabled?: boolean) =>
     cn(
       "flex min-w-0 flex-1 items-center justify-center rounded-full px-3 text-center font-semibold transition-colors",
-      size === "sm" ? "min-h-9 text-sm" : "min-h-11 text-[0.9375rem]",
+      size === "sm" ? "min-h-9 text-sm" : "min-h-11 text-body",
       active ? "bg-gold-gradient text-black shadow-bronze" : "text-foreground/85 hover:text-foreground",
       disabled && "opacity-50",
     );

@@ -88,7 +88,7 @@ function ReminderRow({
       <legend className="sr-only">{label} reminder</legend>
       <div className="flex min-h-11 items-center justify-between gap-3">
         <div className="min-w-0">
-          <label htmlFor={sw} className="block text-[0.9375rem] font-semibold">
+          <label htmlFor={sw} className="block text-body font-semibold">
             {label}
           </label>
           <p className="text-xs text-muted-foreground">{value.enabled ? describe(cadence, value, asWater) : description}</p>
@@ -175,7 +175,7 @@ function ReminderRow({
             Shows: <span className="font-semibold text-foreground">{title}</span> · <span className="italic">{body}</span>
           </p>
           {(cadence === "interval" && asWater ? waterTimes(asWater).every((t) => inQuietHours(t, quiet)) : inQuietHours(value.time, quiet)) && (
-            <p className="text-xs text-[#f08a8a]">This time is inside your quiet hours, so this reminder won&rsquo;t be sent.</p>
+            <p className="text-xs text-destructive-foreground">This time is inside your quiet hours, so this reminder won&rsquo;t be sent.</p>
           )}
         </div>
       )}
@@ -416,7 +416,7 @@ export function NotificationSettingsForm({
           <dl className="grid gap-1 text-sm">
             <div className="flex justify-between gap-3">
               <dt className="text-muted-foreground">Notifications</dt>
-              <dd className={cn("font-semibold", permission === "granted" ? "text-[#5fc49a]" : permission === "denied" ? "text-[#f08a8a]" : "")} data-testid="notif-permission">
+              <dd className={cn("font-semibold", permission === "granted" ? "text-success-foreground" : permission === "denied" ? "text-destructive-foreground" : "")} data-testid="notif-permission">
                 {permission === "granted" ? "Allowed" : permission === "denied" ? "Not allowed" : "Not asked yet"}
               </dd>
             </div>
@@ -429,7 +429,7 @@ export function NotificationSettingsForm({
           </dl>
         )}
         {native && permission === "denied" && (
-          <p className="text-sm text-[#f08a8a]">Notifications are off for Narrow Gate Fitness. To get reminders, allow them in your device&rsquo;s Settings app under Notifications.</p>
+          <p className="text-sm text-destructive-foreground">Notifications are off for Narrow Gate Fitness. To get reminders, allow them in your device&rsquo;s Settings app under Notifications.</p>
         )}
         <p className="text-sm text-muted-foreground">
           Times follow your account&rsquo;s time zone, <span className="font-semibold text-foreground">{timezone}</span> (the same clock as your reading journey&rsquo;s day).
@@ -491,7 +491,7 @@ export function NotificationSettingsForm({
           <legend className="sr-only">Quiet hours</legend>
           <div className="flex min-h-11 items-center justify-between gap-3">
             <div className="min-w-0">
-              <label htmlFor="notif-quiet" className="flex items-center gap-2 text-[0.9375rem] font-semibold">
+              <label htmlFor="notif-quiet" className="flex items-center gap-2 text-body font-semibold">
                 <MoonStar className="size-4 text-gold" aria-hidden /> Quiet hours
               </label>
               <p className="text-xs text-muted-foreground">{prefs.quiet ? `No reminders from ${fmt12(prefs.quiet.start)} to ${fmt12(prefs.quiet.end)}.` : "Choose times when no reminder is sent."}</p>
@@ -518,7 +518,7 @@ export function NotificationSettingsForm({
 
         <div className="flex min-h-14 items-center justify-between gap-3 rounded-xl border border-border p-3">
           <div className="min-w-0">
-            <label htmlFor="notif-limit" className="block text-[0.9375rem] font-semibold">
+            <label htmlFor="notif-limit" className="block text-body font-semibold">
               Daily limit
             </label>
             <p className="text-xs text-muted-foreground">On a busy day, the most important reminders are kept and the rest are skipped.</p>
@@ -538,7 +538,7 @@ export function NotificationSettingsForm({
         </div>
 
         <div className="rounded-xl border border-border p-3" data-testid="notif-preview">
-          <p className="flex items-center gap-2 text-[0.9375rem] font-semibold">
+          <p className="flex items-center gap-2 text-body font-semibold">
             <BellRing className="size-4 text-gold" aria-hidden /> Next 24 hours
           </p>
           {preview.length === 0 ? (
@@ -557,7 +557,7 @@ export function NotificationSettingsForm({
         </div>
 
         <div className="rounded-xl border border-border p-3" data-testid="notif-devices">
-          <p className="text-[0.9375rem] font-semibold">Devices</p>
+          <p className="text-body font-semibold">Devices</p>
           {devices.length === 0 ? (
             <p className="text-xs text-muted-foreground">No phone has connected yet. Sign in to the Narrow Gate Fitness app on your phone and it will appear here.</p>
           ) : (
@@ -607,7 +607,7 @@ export function NotificationSettingsForm({
 
       <div className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-10 space-y-2 rounded-2xl border border-gold-muted bg-[#0b0b0b]/95 p-3 backdrop-blur md:bottom-4">
         {status && (
-          <p role={status.tone === "success" ? "status" : "alert"} className={cn("text-sm", status.tone === "success" ? "text-[#5fc49a]" : "text-[#f08a8a]")}>
+          <p role={status.tone === "success" ? "status" : "alert"} className={cn("text-sm", status.tone === "success" ? "text-success-foreground" : "text-destructive-foreground")}>
             {status.text}
           </p>
         )}

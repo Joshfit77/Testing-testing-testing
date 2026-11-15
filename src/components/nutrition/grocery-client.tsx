@@ -14,7 +14,7 @@ import { addGroceryItemAction, generateGroceryAction, removeGroceryItemAction, t
 function Message({ state }: { state: ActionState | null }) {
   if (!state?.message) return null;
   return (
-    <p role={state.ok ? "status" : "alert"} className={state.ok ? "text-sm text-[#5fc49a]" : "text-sm text-[#f08a8a]"}>
+    <p role={state.ok ? "status" : "alert"} className={state.ok ? "text-sm text-success-foreground" : "text-sm text-destructive-foreground"}>
       {state.message}
     </p>
   );
@@ -88,9 +88,9 @@ export function GroceryItems({ items }: { items: GroceryItemView[] }) {
   const row = (i: GroceryItemView) => (
     <li key={i.id} className="flex items-start gap-2 py-1.5" data-testid="grocery-item">
       <label className="flex min-h-11 flex-1 cursor-pointer items-start gap-3 py-1.5">
-        <input type="checkbox" checked={isChecked(i)} onChange={(e) => void toggle(i.id, e.target.checked)} className="mt-0.5 size-5 shrink-0 accent-[#C9A54C]" aria-label={`${i.name}${i.amount ? `, ${i.amount}` : ""}`} />
+        <input type="checkbox" checked={isChecked(i)} onChange={(e) => void toggle(i.id, e.target.checked)} className="mt-0.5 size-5 shrink-0 accent-gold" aria-label={`${i.name}${i.amount ? `, ${i.amount}` : ""}`} />
         <span className="min-w-0">
-          <span className={isChecked(i) ? "text-[0.9375rem] text-muted-foreground line-through" : "text-[0.9375rem]"}>
+          <span className={isChecked(i) ? "text-body text-muted-foreground line-through" : "text-body"}>
             <span className="font-semibold">{i.name}</span>
             {i.amount && <span className="tabular-nums"> · {i.amount}</span>}
           </span>
@@ -106,7 +106,7 @@ export function GroceryItems({ items }: { items: GroceryItemView[] }) {
   return (
     <div className="space-y-3">
       {error && (
-        <p role="alert" className="text-sm text-[#f08a8a]">
+        <p role="alert" className="text-sm text-destructive-foreground">
           {error}
         </p>
       )}

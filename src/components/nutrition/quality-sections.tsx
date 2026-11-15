@@ -31,7 +31,7 @@ const GRADE_STYLE: Record<Grade, string> = {
   d: "bg-[#d9772f] text-black",
   e: "bg-[#c6452c] text-white",
 };
-const LEVEL_STYLE: Record<Level, string> = { low: "text-[#5fc49a]", medium: "text-gold", high: "text-[#f08a8a]" };
+const LEVEL_STYLE: Record<Level, string> = { low: "text-success-foreground", medium: "text-gold", high: "text-destructive-foreground" };
 
 export function Unavailable() {
   return <span className="text-muted-foreground">Not available</span>;
@@ -247,7 +247,7 @@ export function AllergensSection({ p }: { p: QualityProduct }) {
 }
 
 const STATUS_ICON = { conflict: XCircle, caution: AlertTriangle, unknown: CircleHelp, not_declared: Info, ok: CheckCircle2 } as const;
-const STATUS_STYLE = { conflict: "text-[#f08a8a]", caution: "text-gold", unknown: "text-muted-foreground", not_declared: "text-muted-foreground", ok: "text-[#5fc49a]" } as const;
+const STATUS_STYLE = { conflict: "text-destructive-foreground", caution: "text-gold", unknown: "text-muted-foreground", not_declared: "text-muted-foreground", ok: "text-success-foreground" } as const;
 const STATUS_SR = { conflict: "Doesn't match: ", caution: "Caution: ", unknown: "Unknown: ", not_declared: "Not declared: ", ok: "Matches: " } as const;
 
 export function FilterResults({ results }: { results: FilterResult[] }) {
@@ -342,7 +342,7 @@ export function CompareTable({ a, b, scores }: { a: QualityProduct; b: QualityPr
                   {r.label}
                 </th>
                 {(["a", "b"] as const).map((side) => (
-                  <td key={side} className={cn("py-1.5 tabular-nums", win === side && "font-semibold text-[#5fc49a]")}>
+                  <td key={side} className={cn("py-1.5 tabular-nums", win === side && "font-semibold text-success-foreground")}>
                     {fmt((side === "a" ? a : b).per100[r.key], r.unit)}
                     {win === side && <span className="sr-only"> (better)</span>}
                   </td>

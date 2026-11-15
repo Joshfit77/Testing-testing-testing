@@ -8,7 +8,7 @@ export function NutrientTable({ totals, perServing, servings, testId = "recipe-n
   const gaps = NUTRIENT_KEYS.filter((k) => totals[k].total > 0 && !isComplete(totals[k]));
   return (
     <div data-testid={testId}>
-      <table className="w-full text-[0.9375rem]">
+      <table className="w-full text-body">
         <thead>
           <tr className="text-left text-sm text-muted-foreground">
             <th scope="col" className="py-1.5 font-medium">

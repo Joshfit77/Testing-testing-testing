@@ -28,7 +28,7 @@ export function FoodPhotoConsentCard() {
         <span>I agree to send the meal and label photos I choose to the AI provider for analysis.</span>
       </label>
       {error && (
-        <p role="alert" className="text-sm text-[#f08a8a]">
+        <p role="alert" className="text-sm text-destructive-foreground">
           {error}
         </p>
       )}

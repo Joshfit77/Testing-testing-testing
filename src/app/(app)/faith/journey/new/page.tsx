@@ -159,7 +159,7 @@ export default async function NewJourneyPage({ searchParams }: { searchParams: P
         </h2>
         <ol className="space-y-1.5">
           {plan.schedule.slice(0, 5).map((d) => (
-            <li key={d.day} className={cn("flex items-baseline justify-between gap-3 text-[0.9375rem]")}>
+            <li key={d.day} className={cn("flex items-baseline justify-between gap-3 text-body")}>
               <span className="min-w-0">
                 <span className="text-muted-foreground">Day {d.day}:</span> <span className="font-semibold">{d.label}</span>
               </span>

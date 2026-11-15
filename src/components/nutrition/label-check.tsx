@@ -209,7 +209,7 @@ export function LabelCheck({ photo, date: initialDate, defaultMeal }: { photo: {
             </div>
           </details>
           {error && (
-            <p role="alert" className="text-sm text-[#f08a8a]">
+            <p role="alert" className="text-sm text-destructive-foreground">
               {error}
             </p>
           )}
@@ -268,7 +268,7 @@ export function LabelCheck({ photo, date: initialDate, defaultMeal }: { photo: {
             <CardContent className="space-y-3">
               {saved ? (
                 <div className="space-y-2" data-testid="label-saved">
-                  <p role="status" className="flex items-center gap-2 font-semibold text-[#5fc49a]">
+                  <p role="status" className="flex items-center gap-2 font-semibold text-success-foreground">
                     <Check className="size-4" aria-hidden /> {saved}
                   </p>
                   <Link href={`/nutrition?date=${date}`} className="text-sm font-semibold text-gold-highlight underline">
@@ -300,7 +300,7 @@ export function LabelCheck({ photo, date: initialDate, defaultMeal }: { photo: {
                     </div>
                   </div>
                   {saveError && (
-                    <p role="alert" className="text-sm text-[#f08a8a]">
+                    <p role="alert" className="text-sm text-destructive-foreground">
                       {saveError}
                     </p>
                   )}

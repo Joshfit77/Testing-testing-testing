@@ -123,7 +123,7 @@ function RecommendationCard({ rec, units, onDone }: { rec: Recommendation; units
         </Button>
       </div>
       {error && (
-        <p role="alert" className="mt-2 text-sm text-[#f08a8a]">
+        <p role="alert" className="mt-2 text-sm text-destructive-foreground">
           {error}
         </p>
       )}
@@ -219,7 +219,7 @@ export function TrainingReviewView({
             {review.lifts.slice(0, 10).map((l) => (
               <li key={l.slug} className="flex items-center justify-between gap-3 py-2">
                 <span className="min-w-0 truncate">{l.name}</span>
-                <span className={cn("flex shrink-0 items-center gap-1", l.changePct > 0 ? "text-[#5fc49a]" : l.changePct < 0 ? "text-[#f08a8a]" : "text-muted-foreground")}>
+                <span className={cn("flex shrink-0 items-center gap-1", l.changePct > 0 ? "text-success-foreground" : l.changePct < 0 ? "text-destructive-foreground" : "text-muted-foreground")}>
                   {l.changePct >= 0 ? <TrendingUp className="size-4" aria-hidden /> : <TrendingDown className="size-4" aria-hidden />}
                   {w(l.firstE1rmKg)} → {w(l.lastE1rmKg)} ({l.changePct >= 0 ? "+" : ""}
                   {l.changePct}%){l.plateau && <Badge variant="secondary">stalled</Badge>}

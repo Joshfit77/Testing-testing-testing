@@ -1,7 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
 import { existsSync } from "node:fs";
 
-const chromium = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+// A preinstalled Chromium on the cloud machine (its path differs between machine images), or CHROMIUM when set.
+// Without one, Playwright's own downloaded browser is used.
+const chromium = [process.env.CHROMIUM, "/opt/pw-browsers/chromium", "/opt/pw-browsers/chromium-1194/chrome-linux/chrome"].find((p) => p && existsSync(p)) ?? "";
 
 const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
 
@@ -23,7 +25,7 @@ export default defineConfig({
     storageState: { cookies: [], origins: [{ origin: new URL(baseURL).origin, localStorage: [{ name: "ngf.e2e.noIntro", value: "1" }] }] },
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
-    launchOptions: existsSync(chromium) ? { executablePath: chromium } : {},
+    launchOptions: chromium ? { executablePath: chromium } : {},
     // A protected Vercel preview (the demo-preview workflow) is reached with its automation bypass secret.
     ...(process.env.E2E_VERCEL_BYPASS ? { extraHTTPHeaders: { "x-vercel-protection-bypass": process.env.E2E_VERCEL_BYPASS, "x-vercel-set-bypass-cookie": "true" } } : {}),
   },

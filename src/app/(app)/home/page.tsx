@@ -373,7 +373,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           {layout.includes("verse") && (
             <Link href="/faith#todays-devotional" className="group mt-4 block max-w-[16.5rem] rounded-lg focus-visible:ring-2 focus-visible:ring-gold-highlight sm:max-w-[22rem]">
               <span className="sr-only">Verse of the day: </span>
-              <blockquote className="font-serif text-[1.0625rem] italic leading-snug text-white [text-shadow:0_1px_8px_rgba(0,0,0,0.75)]">
+              {/* Three lines at most on a phone, so today's workout stays in view; the whole verse opens with a tap. */}
+              <blockquote className="line-clamp-3 font-serif text-[1.0625rem] italic leading-snug text-white [text-shadow:0_1px_8px_rgba(0,0,0,0.75)] sm:line-clamp-none">
                 &ldquo;<ScriptureText parts={scriptureParts(verse.reference, verseExcerpt(verse.text))} />&rdquo;
               </blockquote>
               <span className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-white/90 [text-shadow:0_1px_6px_rgba(0,0,0,0.7)]">

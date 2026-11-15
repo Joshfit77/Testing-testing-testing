@@ -23,7 +23,7 @@ export function MilestoneCelebration({ milestones }: { milestones: ReachedMilest
           <p className="text-sm text-muted-foreground">{many ? "Each one a step on the narrow road." : "A step on the narrow road."}</p>
         </div>
       </div>
-      <ul className="mt-3 space-y-1.5 text-[0.9375rem]">
+      <ul className="mt-3 space-y-1.5 text-body">
         {milestones.map((m, i) => (
           <li key={`${m.exerciseId}-${m.kind}-${i}`} className="flex items-baseline justify-between gap-3">
             <span className="min-w-0">

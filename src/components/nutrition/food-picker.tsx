@@ -142,7 +142,7 @@ export function FoodPickerDialog({
               </label>
               <div className="mt-3" aria-live="polite" aria-busy={state.kind === "loading"}>
                 {state.kind === "error" && (
-                  <p role="alert" className="text-sm text-[#f08a8a]">
+                  <p role="alert" className="text-sm text-destructive-foreground">
                     {state.message}
                   </p>
                 )}

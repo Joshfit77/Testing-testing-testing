@@ -29,7 +29,7 @@ export interface AiDraftView {
 function Message({ state }: { state: ActionState | null }) {
   if (!state?.message) return null;
   return (
-    <p role={state.ok ? "status" : "alert"} className={state.ok ? "text-sm text-[#5fc49a]" : "text-sm text-[#f08a8a]"}>
+    <p role={state.ok ? "status" : "alert"} className={state.ok ? "text-sm text-success-foreground" : "text-sm text-destructive-foreground"}>
       {state.message}
     </p>
   );
