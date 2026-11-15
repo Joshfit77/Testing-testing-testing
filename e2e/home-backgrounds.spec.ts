@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { completeOnboarding, signUpAndConfirm, uniqueEmail } from "./helpers";
+import { HOME_BACKGROUND_PHOTOS_READY as PHOTOS } from "../src/lib/home-backgrounds";
 
 /**
  * Home shows one background for each day of the week (docs/design/HOME_BACKGROUNDS.md). The picture follows the
@@ -7,13 +8,13 @@ import { completeOnboarding, signUpAndConfirm, uniqueEmail } from "./helpers";
  * connection. The greeting and the verse stay readable over every picture.
  */
 const WEEK = [
-  ["2026-11-09", "monday", "Strength through Christ"],
-  ["2026-11-10", "tuesday", "Discipline"],
-  ["2026-11-11", "wednesday", "Faith first"],
-  ["2026-11-12", "thursday", "The narrow gate"],
+  ["2026-11-09", "monday", "Strength"],
+  ["2026-11-10", "tuesday", "Faith first"],
+  ["2026-11-11", "wednesday", "Prayer"],
+  ["2026-11-12", "thursday", "Endurance"],
   ["2026-11-13", "friday", "Perseverance"],
-  ["2026-11-14", "saturday", "Endurance"],
-  ["2026-11-15", "sunday", "Rest and worship"],
+  ["2026-11-14", "saturday", "Rest and worship"],
+  ["2026-11-15", "sunday", "The cross"],
 ] as const;
 
 const hero = (page: Page) => page.getByTestId("home-hero");
@@ -28,7 +29,7 @@ async function openHome(page: Page) {
   await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
 }
 
-async function pictureLoaded(page: Page, day: string) {
+async function pictureLoaded(page: Page, day: string, opts: { noPicture?: boolean } = {}) {
   // On a slow machine the page can take seconds to become interactive; it checks the date then, and again whenever it
   // becomes visible (as on a phone). Ask until it shows the test clock's day.
   await expect
@@ -41,6 +42,8 @@ async function pictureLoaded(page: Page, day: string) {
       { message: `the hero shows ${day}`, timeout: 30_000 },
     )
     .toBe(day);
+  // Until the owner's photographs are in, the hero is a plain panel: there is no picture to wait for.
+  if (!PHOTOS || opts.noPicture) return;
   await expect
     .poll(() => hero(page).locator("img").evaluate((img: HTMLImageElement) => (img.complete && img.naturalWidth > 0 ? img.currentSrc : "")), { message: `the ${day} picture is drawn` })
     .toContain(`/home-backgrounds/${day}.webp`);
@@ -138,7 +141,7 @@ test("Home: a different background each day of the week, with readable text over
     await pictureLoaded(page, day);
     await expect(page.getByTestId("home-theme")).toHaveText(theme);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-    seen.add(await hero(page).locator("img").evaluate((img: HTMLImageElement) => img.currentSrc));
+    seen.add(PHOTOS ? await hero(page).locator("img").evaluate((img: HTMLImageElement) => img.currentSrc) : day);
     const contrast = await worstContrast(page);
     report[day] = contrast;
     for (const line of contrast) {
@@ -162,16 +165,17 @@ test("Home: the picture changes at local midnight and when the app comes back on
   await pictureLoaded(page, "friday");
   await page.clock.fastForward(15_000);
   await pictureLoaded(page, "saturday");
-  await expect(page.getByTestId("home-theme")).toHaveText("Endurance");
+  await expect(page.getByTestId("home-theme")).toHaveText("Rest and worship");
 
   // The app sat in the background until Monday afternoon: nothing ran in between, then it becomes visible again.
   await page.clock.setSystemTime(new Date("2026-11-16T15:00:00"));
   await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
   await pictureLoaded(page, "monday");
-  await expect(page.getByTestId("home-theme")).toHaveText("Strength through Christ");
+  await expect(page.getByTestId("home-theme")).toHaveText("Strength");
 });
 
 test("Home: without a connection the next day's picture still shows", async ({ page, context }) => {
+  test.skip(!PHOTOS, "no photographs yet (HOME_BACKGROUND_PHOTOS_READY)");
   await signUpAndConfirm(page, uniqueEmail("bg"));
   await completeOnboarding(page);
   const fetched = new Set<string>();
@@ -199,6 +203,7 @@ test.describe("without a service worker (as in the native app)", () => {
   test.use({ serviceWorkers: "block" });
 
   test("Home: the next day's picture comes from the browser cache when offline", async ({ page, context }) => {
+    test.skip(!PHOTOS, "no photographs yet (HOME_BACKGROUND_PHOTOS_READY)");
     await signUpAndConfirm(page, uniqueEmail("bg"));
     await completeOnboarding(page);
     const fetched = new Set<string>();
@@ -224,8 +229,8 @@ test.describe("without a service worker (as in the native app)", () => {
     await completeOnboarding(page);
     await page.route("**/home-backgrounds/**", (r) => r.abort());
     await page.clock.setFixedTime(new Date("2026-11-13T08:00:00"));
-    await page.goto("/home");
-    await expect(hero(page)).toHaveAttribute("data-day", "friday");
+    await openHome(page);
+    await pictureLoaded(page, "friday", { noPicture: true });
     await expect(hero(page).locator("img")).toHaveCount(0);
     await expect(page.getByTestId("home-theme")).toHaveText("Perseverance");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();

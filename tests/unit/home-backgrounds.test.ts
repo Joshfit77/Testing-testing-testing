@@ -1,26 +1,23 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { HOME_BACKGROUNDS, deviceIsoDate, homeBackgroundForDate, msUntilNextLocalMidnight, weekdayOfIsoDate } from "@/lib/home-backgrounds";
+import { HOME_BACKGROUNDS, HOME_BACKGROUND_PHOTOS_READY, deviceIsoDate, homeBackgroundForDate, msUntilNextLocalMidnight, weekdayOfIsoDate } from "@/lib/home-backgrounds";
 
 describe("Home backgrounds: one for each day of the week", () => {
   it("has seven different pictures, in Date#getDay order, each with a theme", () => {
     expect(HOME_BACKGROUNDS.map((b) => b.key)).toEqual(["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]);
     expect(new Set(HOME_BACKGROUNDS.map((b) => b.src)).size).toBe(7);
     expect(new Set(HOME_BACKGROUNDS.map((b) => b.theme)).size).toBe(7);
-    // The owner's themes, Monday to Sunday.
-    expect(HOME_BACKGROUNDS.slice(1).concat(HOME_BACKGROUNDS[0]!).map((b) => b.theme)).toEqual([
-      "Strength through Christ",
-      "Discipline",
-      "Faith first",
-      "The narrow gate",
-      "Perseverance",
-      "Endurance",
-      "Rest and worship",
-    ]);
+    // Monday to Sunday, for the owner's scenes of 2026-11-15.
+    expect(HOME_BACKGROUNDS.slice(1).concat(HOME_BACKGROUNDS[0]!).map((b) => b.theme)).toEqual(["Strength", "Faith first", "Prayer", "Endurance", "Perseverance", "Rest and worship", "The cross"]);
   });
 
-  it("each picture is a separate WebP file in public/, small enough for a phone", () => {
+  it("no picture is shipped until the owner's photographs are approved", () => {
+    if (HOME_BACKGROUND_PHOTOS_READY) return;
+    for (const b of HOME_BACKGROUNDS) expect(existsSync(join(process.cwd(), "public", b.src.split("?")[0]!)), `${b.key}: a file is present but the switch is off`).toBe(false);
+  });
+
+  it.skipIf(!HOME_BACKGROUND_PHOTOS_READY)("each picture is a separate WebP file in public/, small enough for a phone", () => {
     const sums = new Set<string>();
     for (const b of HOME_BACKGROUNDS) {
       const file = join(process.cwd(), "public", b.src.split("?")[0]!);

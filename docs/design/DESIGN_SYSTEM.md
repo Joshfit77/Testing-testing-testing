@@ -75,7 +75,7 @@ with `scripts/ux/capture.mjs` before any screen change. They are not stored in t
 | Screen | Observation | Measure |
 |---|---|---|
 | Home | The verse ran to five lines on a phone and pushed today's workout down | **Fixed**: three lines, whole verse on tap |
-| Home | The background pictures are rejected placeholders | Blocked on owner-approved images |
+| Home | The code-drawn background pictures were rejected | **Removed**; a plain dark panel until the owner supplies seven real photographs |
 | Home | Header button reads "Coach" here and "AI Coach" on every other tab | Open |
 | Nutrition | Calories and macros sit below the quick actions and the recent-foods list; 4.5 screens long, 1,061 words, 120 controls | Open (phase 3); the order is member-customisable, so the default is an owner choice |
 | Faith | 4.6 screens long; 6 controls under 44 px | Open (phase 3) |

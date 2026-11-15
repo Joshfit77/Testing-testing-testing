@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { HOME_BACKGROUNDS, deviceIsoDate, homeBackgroundForDate, msUntilNextLocalMidnight, type HomeBackground } from "@/lib/home-backgrounds";
+import { HOME_BACKGROUNDS, HOME_BACKGROUND_PHOTOS_READY, deviceIsoDate, homeBackgroundForDate, msUntilNextLocalMidnight, type HomeBackground } from "@/lib/home-backgrounds";
 
 const Ctx = createContext<HomeBackground | null>(null);
 
@@ -68,6 +68,7 @@ export function DailyHero({ today, children, className, minHeight = "min-h-[21re
   // Fetch the other six pictures once the page is idle (about 230 kB in total), so the next day's picture is already
   // on the phone at midnight or after a resume without a connection.
   useEffect(() => {
+    if (!HOME_BACKGROUND_PHOTOS_READY) return;
     const warm = () => { for (const b of HOME_BACKGROUNDS) new Image().src = b.src; };
     if (typeof requestIdleCallback === "function") {
       const id = requestIdleCallback(warm, { timeout: 5000 });
@@ -90,7 +91,7 @@ export function DailyHero({ today, children, className, minHeight = "min-h-[21re
       <div className={cn("relative isolate overflow-hidden bg-[#0a0705]", minHeight, className)} data-testid="home-hero" data-day={bg.key}>
         {/* Shown if the picture can't load (offline before it was ever fetched): the same warm light, drawn in CSS. */}
         <div aria-hidden className="absolute inset-0 bg-[radial-gradient(60%_70%_at_72%_36%,rgba(214,160,74,0.34),rgba(120,70,20,0.12)_45%,transparent_75%)]" />
-        {!failed && (
+        {HOME_BACKGROUND_PHOTOS_READY && !failed && (
           // eslint-disable-next-line @next/next/no-img-element -- a fixed-size local asset behind text; next/image adds nothing here
           <img
             key={bg.key}
