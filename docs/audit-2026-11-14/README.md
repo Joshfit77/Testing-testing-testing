@@ -173,7 +173,7 @@ mailbox, or with a real payment.
 | Item | Blocked on |
 |---|---|
 | Privacy Policy and Terms | Attorney review (L1) |
-| Photographic Home backgrounds | Seven licensed photographs or generated images; brief in `docs/design/HOME_BACKGROUNDS.md` |
+| Home backgrounds | **The owner rejected the seven illustrations on 2026-11-15.** They are placeholders until seven photorealistic images are generated or supplied and approved; art direction and prompts in `docs/design/HOME_BACKGROUNDS.md` |
 | App Store / Google Play purchases, restore, refund, expiry | Store accounts, RevenueCat project, sandbox testers |
 | Live AI answer quality and real cost per member | An API key with a spend limit; plan in `docs/LIVE_AI_TEST_PLAN.md` |
 | Production settings (auth limits, SMTP, environment switches, headers, cookies) | Access to the production project |
@@ -237,6 +237,6 @@ hip switch, A-skip, 5-10-5 shuttle, three-cone drill, agility ladder.
 4. Run the sandbox purchase plan (`docs/MOBILE_BILLING.md`) on that build.
 5. Fix P-3 (timed exercises in the logger) and decide B-2 and B-4 with a coach.
 6. Get the animation review and the theological review done; record sign-offs in `exercise-demo-readiness.json`.
-7. Supply photographs for the seven Home backgrounds, or accept the illustrations.
+7. Produce and approve seven photorealistic Home backgrounds (the illustrations were rejected).
 8. Verify production settings (O1 and O4 in the security report), then re-run this audit's test commands against
    staging.

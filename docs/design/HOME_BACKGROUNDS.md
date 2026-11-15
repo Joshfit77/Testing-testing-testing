@@ -2,6 +2,74 @@
 
 Added 2026-11-14 (application audit, Part 4).
 
+## Status: the illustrations were rejected (owner, 2026-11-15)
+
+The owner reviewed the seven illustrations below and rejected them: they read as generic minimalist wallpapers, not
+premium Christian fitness imagery. They are placeholders only. The rotation, caching and offline code stays as it is;
+only the seven picture files are to be replaced, and only after the owner has approved the new pictures.
+
+No image generator is available in the environment where this work is done (no image tool, no image-API key, no GPU),
+so the new pictures were **not** made there. Nothing procedural is to be substituted for them.
+
+### Art direction for the replacements (owner's brief)
+
+Premium athletic campaign photography combined with Christian faith, in the black-and-gold identity. Cinematic,
+realistic, powerful, detailed. Photorealistic or very high-end cinematic illustration.
+
+Must have: seven distinct compositions; realistic anatomy and exercise form; detailed environments; charcoal, black
+and warm gold grading; strong contrast without crushing detail into black; room for the Home text; the same quality
+on all seven days.
+
+Must not have: cartoon silhouettes; floating equipment; cheap glowing symbols; a generic AI-wallpaper look; any text
+in the picture; third-party athletic brand logos.
+
+| Day | Theme | Scene |
+|---|---|---|
+| Monday | Strength | A muscular athlete preparing for a heavy deadlift in a premium dark gym, a large cross subtly lit behind him |
+| Tuesday | Discipline | An athlete performing a heavy barbell squat, realistic equipment, dramatic shadows, subtle Christian symbolism |
+| Wednesday | Faith | An open Bible beside a loaded barbell on a gym bench, golden sunlight on the pages |
+| Thursday | The Narrow Gate | An athletic figure walking toward a beautiful ancient stone gateway, gym equipment subtly part of the setting |
+| Friday | Perseverance | An exhausted athlete kneeling in prayer beside a barbell after hard training, golden light through a cross-shaped window |
+| Saturday | Endurance | An athlete running uphill toward a distant cross at sunrise, outdoors |
+| Sunday | Rest | A peaceful, detailed gym with an open Bible, training shoes and a cross lit by warm morning sunlight |
+
+### Prompts for an image generator
+
+Use the shared style line with each scene line. Generate each day separately at full resolution (never a collage).
+
+**Shared style:** "Cinematic photograph, premium athletic campaign, shot on a full-frame camera with a 35mm lens,
+shallow depth of field, low-key lighting with one warm golden key light and soft fill so shadow detail is kept, rich
+charcoal and black tones with warm gold highlights, fine film grain, realistic skin, sweat and chalk, realistic steel
+and rubber gym equipment with no brand names or logos, no text or lettering anywhere, landscape 3:2. Composition: the
+subject sits in the right third of the frame; the left half is darker, uncluttered background for overlaid text."
+
+1. **Monday:** "A muscular male athlete in plain black training clothes, chalked hands gripping a loaded barbell on the
+   floor, hips set and back flat, about to deadlift, in a dark high-end gym with concrete walls. On the wall behind him
+   a large plain wooden cross is softly lit from above. Low camera angle from the front quarter."
+2. **Tuesday:** "An athlete at the bottom of a heavy barbell back squat inside a steel power rack, bar across the upper
+   back, knees over toes, chest up, thighs below parallel, visible effort. Hard side light casts long shadows across a
+   dark gym; the window frame behind throws a faint cross-shaped shadow on the far wall."
+3. **Wednesday:** "A still life on a black leather gym bench: an open leather-bound Bible with thin gilt-edged pages,
+   beside it a loaded barbell resting in the rack, steel plates in soft focus. A shaft of golden morning sunlight from
+   a high window falls across the open pages, dust in the light."
+4. **Thursday:** "Seen from behind, an athletic figure in training clothes with a gym bag over one shoulder walks along
+   a narrow stone path toward an ancient weathered stone gateway with a narrow arched opening, warm sunrise light
+   coming through the arch. Beside the path, an old iron kettlebell and a stack of steel plates rest against the stone
+   wall as part of the place."
+5. **Friday:** "An exhausted athlete, drenched in sweat, kneeling on one knee on a rubber gym floor beside a loaded
+   barbell, head bowed, hands clasped in prayer, chalk on the hands. Behind, a tall window in the shape of a cross lets
+   in golden late-afternoon light that rakes across the floor."
+6. **Saturday:** "A powerful runner mid-stride climbing a steep mountain trail at sunrise, seen from behind and slightly
+   below, breath visible in cold air. On the distant ridge ahead a wooden cross stands against a gold and charcoal
+   sky, mist in the valleys."
+7. **Sunday:** "A quiet, empty premium gym in early morning. In the foreground on a wooden bench: an open Bible and a
+   pair of worn training shoes set neatly beside it. On the far wall a plain wooden cross is lit by warm sunlight
+   coming through tall windows, racks and dumbbells in soft focus."
+
+Check every result before use: hands and fingers, the number of plates and that the bar is straight, squat and
+deadlift positions, no stray lettering or logos, and that the left half is dark enough for text. Then crop to
+1600 × 1040 as described below and run the contrast test.
+
 ## What is in the app today
 
 The Home screen's hero shows a different background each day, Monday to Sunday:
