@@ -103,7 +103,12 @@ export function DailyHero({ today, children, className, minHeight = "min-h-[21re
             onError={() => setFailedKey(bg.key)}
             // A fixed height, not the hero's: the hero grows with the verse, and a picture that grew with it would be
             // cropped differently every day. Its lower edge fades into the panel.
-            className="absolute inset-x-0 top-0 h-[26rem] w-full object-cover object-[70%_40%] [mask-image:linear-gradient(to_bottom,black_72%,transparent)] motion-safe:animate-[fade-in_0.5s_ease-out]"
+            className={cn(
+              "absolute inset-x-0 top-0 h-[26rem] w-full object-cover object-[70%_40%] [mask-image:linear-gradient(to_bottom,black_72%,transparent)]",
+              // Fade only when the day changes under an open page. The first picture is in the server's HTML and is the
+              // largest thing on screen; fading it in held back the page's largest paint by the length of the fade.
+              date !== today && "motion-safe:animate-[fade-in_0.5s_ease-out]",
+            )}
           />
         )}
         <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/10 to-[#070707]" />

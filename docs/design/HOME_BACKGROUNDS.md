@@ -92,6 +92,9 @@ The daily verse logic (`scriptureForDate`) was not changed.
 4. The same with service workers blocked, as in the native app (browser cache).
 5. With every picture request failing, the hero shows its dark panel and the text passes the same contrast check.
 
+The picture does not fade in on first load (it fades only when the day changes under an open page): fading held the
+page's largest paint at about 700 ms on a local server; without it the median was 312 ms.
+
 `tests/unit/home-backgrounds.test.ts` checks the seven files exist, differ, are WebP under 150 kB, and that dates map
 to the right weekday (including a leap day).
 
