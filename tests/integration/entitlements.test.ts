@@ -13,9 +13,16 @@ const stripeDisputes = new Map<string, unknown>();
 const stripeInvoiceByIntent = new Map<string, string>();
 
 /** A paid invoice for a subscription, its PaymentIntent and charge, as Stripe would hold them. */
-function fakePayment(subscriptionId: string, over: { refunded?: boolean; amount_refunded?: number } = {}) {
+function fakePayment(subscriptionId: string, over: { refunded?: boolean; amount_refunded?: number; created?: number } = {}) {
   const key = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
-  const invoice = { id: `in_${key}`, object: "invoice", status: "paid", parent: { type: "subscription_details", subscription_details: { subscription: subscriptionId } } };
+  const invoice = {
+    id: `in_${key}`,
+    object: "invoice",
+    status: "paid",
+    // When Stripe created the invoice (seconds), where a test is about the order of invoices.
+    ...(over.created === undefined ? {} : { created: over.created }),
+    parent: { type: "subscription_details", subscription_details: { subscription: subscriptionId } },
+  };
   const charge = { id: `ch_${key}`, object: "charge", amount: 1799, amount_refunded: over.amount_refunded ?? 0, refunded: over.refunded ?? false, payment_intent: `pi_${key}` };
   stripeInvoices.set(invoice.id, invoice);
   stripeCharges.set(charge.id, charge);
@@ -268,6 +275,43 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
       const second = fakePayment(sub.id);
       stripeSubs.set(sub.id, { ...sub, latest_invoice: second.invoice.id } as Stripe.Subscription);
       await send("invoice.paid", second.invoice);
+      expect(await ent()).toBe("pro");
+    } finally {
+      await deleteTestUser(u);
+    }
+  });
+
+  it("a late invoice.paid for an earlier invoice can't restore a refunded period; a newer paid invoice does", async () => {
+    // Stripe delivers events in any order and retries failed deliveries for days, so "invoice.paid" for an earlier
+    // invoice can arrive after the latest invoice was refunded. It is not a newer period that was paid for.
+    const u = await createTestUser("refund-late-paid");
+    const ent = async () => (await serviceClient().from("user_entitlements").select("plan").eq("user_id", u.id).single()).data?.plan;
+    const send = (type: string, object: unknown) => handleStripeEvent({ id: `evt_${crypto.randomUUID()}`, object: "event", type, data: { object } } as unknown as Stripe.Event);
+    const nowS = Math.floor(Date.now() / 1000);
+    try {
+      const sub = fakeSubscription({ metadata: { user_id: u.id }, items: { object: "list", data: [{ id: "si_1", price: { id: "price_test_pro_yearly" }, current_period_end: nowS + 300 * 86400 }] } });
+      // The member subscribed monthly, then switched to yearly an hour later: two paid invoices, the yearly one latest.
+      const first = fakePayment(sub.id, { created: nowS - 7200 });
+      const upgrade = fakePayment(sub.id, { created: nowS - 3600 });
+      stripeSubs.set(sub.id, { ...sub, latest_invoice: upgrade.invoice.id } as Stripe.Subscription);
+      await syncSubscription(stripeSubs.get(sub.id)!);
+      expect(await ent()).toBe("pro");
+
+      // The yearly payment is refunded in full: that period's access ends.
+      stripeCharges.set(upgrade.charge.id, { ...upgrade.charge, amount_refunded: 1799, refunded: true });
+      await send("charge.refunded", stripeCharges.get(upgrade.charge.id));
+      expect(await ent()).toBe("free");
+
+      // The first invoice's "paid" event, delivered late (its first delivery failed and Stripe retried it).
+      await send("invoice.paid", first.invoice);
+      expect(await ent()).toBe("free");
+      const row = (await serviceClient().from("subscriptions").select("access_revoked_reason, revoked_invoice_id").eq("stripe_subscription_id", sub.id).single()).data;
+      expect(row).toEqual({ access_revoked_reason: "refund", revoked_invoice_id: upgrade.invoice.id });
+
+      // A newer invoice paid afterwards is a new period: access returns.
+      const renewal = fakePayment(sub.id, { created: nowS + 60 });
+      stripeSubs.set(sub.id, { ...sub, latest_invoice: renewal.invoice.id } as Stripe.Subscription);
+      await send("invoice.paid", renewal.invoice);
       expect(await ent()).toBe("pro");
     } finally {
       await deleteTestUser(u);

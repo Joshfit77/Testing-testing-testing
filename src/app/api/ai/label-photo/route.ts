@@ -5,6 +5,8 @@ import { authenticateRequest, planForAuth } from "@/server/api-auth";
 import { AI_ERROR_STATUS, AiError } from "@/server/services/ai-coach";
 import { prepareImageForAi, UnreadableImageError } from "@/server/services/image-prep";
 import { readLabelPhoto } from "@/server/services/label-photo";
+import { refusePhotoUpload } from "@/server/services/ai-photo-guard";
+import type { Plan } from "@/lib/domain/types";
 import { logError } from "@/server/log";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +24,17 @@ export async function POST(request: NextRequest) {
   const lengthHeader = request.headers.get("content-length");
   if (!lengthHeader || !/^\d+$/.test(lengthHeader)) return NextResponse.json({ error: "invalid_request", message: "Send the photo as a form upload." }, { status: 411 });
   if (Number(lengthHeader) > FOOD_PHOTO_MAX_BYTES + 64 * 1024) return NextResponse.json({ error: "too_large", message: "That photo is too large. Try a smaller one." }, { status: 413 });
+
+  // Plan and upload limit before the upload is read: buffering and decoding a photo is the costly part of this route.
+  let plan: Plan;
+  try {
+    plan = await planForAuth(auth);
+    const refused = await refusePhotoUpload(auth.user.id, plan);
+    if (refused) return refused;
+  } catch (err) {
+    logError("ai.label_photo.guard", err);
+    return NextResponse.json({ error: "server_error", message: "Something went wrong. Please try again." }, { status: 500 });
+  }
 
   let form: FormData;
   try {
@@ -45,7 +58,6 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const plan = await planForAuth(auth);
     const reading = await readLabelPhoto(auth.supabase, auth.user.id, plan, { base64: Buffer.from(prepared.bytes).toString("base64"), mediaType: prepared.mediaType });
     return NextResponse.json(reading, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {
