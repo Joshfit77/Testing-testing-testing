@@ -96,7 +96,7 @@ export async function draftAiMealPlan(
       output_config: { format: betaZodOutputFormat(aiMealPlanOutputSchema) },
     });
     const inputTokens = res.usage.input_tokens + (res.usage.cache_read_input_tokens ?? 0) + (res.usage.cache_creation_input_tokens ?? 0);
-    if (res.stop_reason === "refusal" || !res.parsed_output) throw new AiError("provider", "The AI couldn't draft a plan that time. Please try again.");
+    if (res.stop_reason === "refusal" || !res.parsed_output) throw new AiError("provider", "The AI couldn't draft a plan that time. Please try again.", undefined, costMicros(model, tokenUsage(res.usage)));
     return { value: { output: res.parsed_output, model }, inputTokens, outputTokens: res.usage.output_tokens, costMicros: costMicros(model, tokenUsage(res.usage)) };
   });
 

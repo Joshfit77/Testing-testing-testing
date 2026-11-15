@@ -47,6 +47,12 @@ export class AiError extends Error {
     public code: AiErrorCode,
     message: string,
     public retryAfterSeconds?: number,
+    /**
+     * What the provider billed for a request that still failed for the member (a refusal, an answer cut short), in
+     * micro-USD. The member isn't counted or charged for it; it goes into the app's own spend figures so the global
+     * budget sees real cost (withAiRequest).
+     */
+    public billedMicros?: number,
   ) {
     super(message);
     this.name = "AiError";
@@ -660,8 +666,18 @@ export async function withAiRequest<T>(
     result = await run({ client: getClient(), model });
   } catch (err) {
     const cutOff = err instanceof Anthropic.APIConnectionTimeoutError || err instanceof Anthropic.APIUserAbortError;
-    await releaseUsage(reservation.usageId, cutOff ? expectedCostMicros(params.kind, reservation.tier) : 0);
+    // The provider answered (and billed), but the SDK couldn't read the structured output it sent back.
+    const unreadable = err instanceof Anthropic.AnthropicError && !(err instanceof Anthropic.APIError);
+    // The member gets the request back either way. What the provider billed, or may have billed, still goes into the
+    // app's spend figures (never the member's): a refusal or a cut-off answer reports its real cost
+    // (AiError.billedMicros); a request cut off after it was sent, or an unreadable answer, counts at the expected cost.
+    const billed = err instanceof AiError && Number.isFinite(err.billedMicros) ? Math.max(0, err.billedMicros ?? 0) : 0;
+    await releaseUsage(reservation.usageId, billed + (cutOff || unreadable ? expectedCostMicros(params.kind, reservation.tier) : 0));
     if (err instanceof AiError) throw err;
+    if (unreadable) {
+      logError("ai.unreadable_output", err, { kind: params.kind });
+      throw new AiError("provider", "The AI's answer couldn't be read. Please try again.");
+    }
     if (err instanceof Anthropic.APIUserAbortError) throw new AiError("provider", "The request was cancelled.");
     if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
       logError("ai.provider_auth", err, { status: err.status ?? null });

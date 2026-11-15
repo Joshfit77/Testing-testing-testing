@@ -260,12 +260,19 @@ export function planNotifications(input: PlanInput): PlannedNotification[] {
   const rank = (a: PlannedNotification, b: PlannedNotification) => a.priority - b.priority || a.time.localeCompare(b.time);
   const keptIds = new Set<number>();
   const coveredWeekdays = new Set<number>();
-  for (let i = 0; i < horizon; i++) {
-    const date = addDaysIso(ctx.today, i);
+  const horizonDates = Array.from({ length: horizon }, (_, i) => addDaysIso(ctx.today, i));
+  // A journey keeps its own time zone (migration 061), so its reminders can be dated a day before or after the
+  // account's own dates: late in the journey's evening it is already tomorrow on the account's clock. Those days are
+  // limited too, never dropped (the before-midnight reminder of a strict journey must not go missing).
+  const otherDates = [...new Set(kept.map((n) => n.date!))].filter((d) => !horizonDates.includes(d));
+  for (const date of horizonDates) {
     const wd = toCapacitorWeekday(weekdayOf(date));
     coveredWeekdays.add(wd);
     const day = [...kept.filter((n) => n.date === date), ...weekly.filter((n) => n.on!.weekday === wd)].sort(rank).slice(0, limit);
     for (const n of day) keptIds.add(n.id);
+  }
+  for (const date of otherDates) {
+    for (const n of kept.filter((x) => x.date === date).sort(rank).slice(0, limit)) keptIds.add(n.id);
   }
   // Weekdays beyond a short horizon: the weekly ones alone, up to the limit.
   for (const wd of new Set(weekly.map((n) => n.on!.weekday))) {

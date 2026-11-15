@@ -8,7 +8,7 @@ import type { Plan } from "@/lib/domain/types";
 import { AiError, withAiRequest } from "@/server/services/ai-coach";
 import { searchUsda } from "@/server/services/usda-local";
 import { logError } from "@/server/log";
-import { costMicros, tokenUsage } from "@/lib/domain/ai-economics";
+import { costMicros, expectedCostMicros, tokenUsage } from "@/lib/domain/ai-economics";
 
 /**
  * Look up each item's search term in the bundled USDA database (no network, no AI; rules in `matchStrength`). A strong
@@ -73,17 +73,19 @@ export async function analyzeFoodPhoto(
         { timeout: FOOD_PHOTO_TIMEOUT_MS, maxRetries: 0 },
       );
     } catch (err) {
-      // Failures here release the reservation (withAiRequest), so a timeout or an unreadable answer isn't charged.
-      if (err instanceof Anthropic.APIConnectionTimeoutError) throw new AiError("provider", "The analysis took too long. Try again, or log the meal by search.");
+      // Failures here release the reservation (withAiRequest), so a timeout or an unreadable answer isn't charged to the
+      // member. The request was sent, so what it may have cost still goes into the app's own spend figures.
+      if (err instanceof Anthropic.APIConnectionTimeoutError) throw new AiError("provider", "The analysis took too long. Try again, or log the meal by search.", undefined, expectedCostMicros("food_photo", "fast"));
       if (err instanceof Anthropic.APIError) throw err;
       if (err instanceof Anthropic.AnthropicError) {
         logError("ai.food_photo.parse", err);
-        throw new AiError("provider", "The AI's answer couldn't be read. Try again, or log the meal by search.");
+        throw new AiError("provider", "The AI's answer couldn't be read. Try again, or log the meal by search.", undefined, expectedCostMicros("food_photo", "fast"));
       }
       throw err;
     }
     const inputTokens = res.usage.input_tokens + (res.usage.cache_read_input_tokens ?? 0) + (res.usage.cache_creation_input_tokens ?? 0);
-    if (res.stop_reason === "refusal" || !res.parsed_output) throw new AiError("provider", "The AI couldn't read that photo. Try another photo, or log the meal by search.");
+    // Answered and billed, but nothing the member can use: given back to them, its real cost kept in the app's figures.
+    if (res.stop_reason === "refusal" || !res.parsed_output) throw new AiError("provider", "The AI couldn't read that photo. Try another photo, or log the meal by search.", undefined, costMicros(model, tokenUsage(res.usage)));
     return { value: res.parsed_output, inputTokens, outputTokens: res.usage.output_tokens, costMicros: costMicros(model, tokenUsage(res.usage)) };
   });
   const analysis = normalizeFoodPhoto(output);
