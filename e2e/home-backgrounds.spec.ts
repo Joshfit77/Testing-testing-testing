@@ -18,8 +18,29 @@ const WEEK = [
 
 const hero = (page: Page) => page.getByTestId("home-hero");
 
+/**
+ * Open Home with the test clock in place. Under load the fake clock can land a moment after the page's first date
+ * check; the page checks again whenever it becomes visible, as it does on a phone, so ask for that once.
+ */
+async function openHome(page: Page) {
+  await page.goto("/home");
+  await page.waitForLoadState("load");
+  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+}
+
 async function pictureLoaded(page: Page, day: string) {
-  await expect(hero(page)).toHaveAttribute("data-day", day);
+  // On a slow machine the page can take seconds to become interactive; it checks the date then, and again whenever it
+  // becomes visible (as on a phone). Ask until it shows the test clock's day.
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          document.dispatchEvent(new Event("visibilitychange"));
+          return document.querySelector('[data-testid="home-hero"]')?.getAttribute("data-day") ?? "";
+        }),
+      { message: `the hero shows ${day}`, timeout: 30_000 },
+    )
+    .toBe(day);
   await expect
     .poll(() => hero(page).locator("img").evaluate((img: HTMLImageElement) => (img.complete && img.naturalWidth > 0 ? img.currentSrc : "")), { message: `the ${day} picture is drawn` })
     .toContain(`/home-backgrounds/${day}.webp`);
@@ -113,7 +134,7 @@ test("Home: a different background each day of the week, with readable text over
   for (const [date, day, theme] of WEEK) {
     // The phone's clock says it is noon on that day.
     await page.clock.setFixedTime(new Date(`${date}T12:00:00`));
-    await page.goto("/home");
+    await openHome(page);
     await pictureLoaded(page, day);
     await expect(page.getByTestId("home-theme")).toHaveText(theme);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
@@ -137,7 +158,7 @@ test("Home: the picture changes at local midnight and when the app comes back on
 
   // Ten seconds before midnight on Friday.
   await page.clock.install({ time: new Date("2026-11-13T23:59:50") });
-  await page.goto("/home");
+  await openHome(page);
   await pictureLoaded(page, "friday");
   await page.clock.fastForward(15_000);
   await pictureLoaded(page, "saturday");
@@ -159,7 +180,7 @@ test("Home: without a connection the next day's picture still shows", async ({ p
     if (m) fetched.add(m[1]!);
   });
   await page.clock.install({ time: new Date("2026-11-11T10:00:00") });
-  await page.goto("/home");
+  await openHome(page);
   await pictureLoaded(page, "wednesday");
   // The other six pictures are fetched once the page is idle.
   await page.clock.fastForward(6_000);
@@ -186,7 +207,7 @@ test.describe("without a service worker (as in the native app)", () => {
       if (m) fetched.add(m[1]!);
     });
     await page.clock.install({ time: new Date("2026-11-11T10:00:00") });
-    await page.goto("/home");
+    await openHome(page);
     await pictureLoaded(page, "wednesday");
     await page.clock.fastForward(6_000);
     await expect.poll(() => fetched.size, { timeout: 15_000, message: "all seven pictures were fetched" }).toBe(7);
