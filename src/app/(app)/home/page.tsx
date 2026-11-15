@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { TodaysRemindersSection } from "@/components/notifications/todays-reminders-section";
 import { BarChart3, BookOpen, Bot, CalendarDays, ChevronRight, FileText, Footprints, HandHeart, HeartPulse, Moon, ScanBarcode, SlidersHorizontal, Sparkles, Utensils, Wand2 } from "lucide-react";
-import { SceneHero } from "@/components/common/scene-hero";
+import { DailyHero, DailyTheme } from "@/components/home/daily-hero";
 import { LogoMark } from "@/components/common/logo";
 import { StatTile } from "@/components/ui/stat-tile";
 import { CoachButton, SearchButton } from "@/components/shell/main-header";
@@ -346,7 +346,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
   return (
     <div className="space-y-3">
-      <SceneHero className={isDemoMode() ? "-mx-4 rounded-2xl md:mx-0" : "-mx-4 -mt-[calc(env(safe-area-inset-top)+0.25rem)] pt-[env(safe-area-inset-top)] md:mx-0 md:mt-0 md:rounded-2xl"} minHeight="min-h-[21rem]">
+      <DailyHero today={data.today} className={isDemoMode() ? "-mx-4 rounded-2xl md:mx-0" : "-mx-4 -mt-[calc(env(safe-area-inset-top)+0.25rem)] pt-[env(safe-area-inset-top)] md:mx-0 md:mt-0 md:rounded-2xl"}>
         <div className="flex flex-col px-4 pb-6 pt-3">
           <header className="flex items-center justify-between gap-2 @container">
             {/* The buttons never shrink (they were pushed past the screen edge); the wordmark wraps instead. */}
@@ -360,7 +360,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               <CoachButton compact />
             </span>
           </header>
-          <h1 className="mt-14 font-display text-[2.125rem] font-bold leading-[1.1] tracking-tight text-white [text-shadow:0_2px_12px_rgba(0,0,0,0.7)] [text-wrap:balance]">
+          {/* The day's theme names the picture behind (one for each weekday). */}
+          <DailyTheme className="mt-12 text-[0.6875rem] font-semibold uppercase leading-none tracking-[0.22em] text-gold-highlight [text-shadow:0_1px_6px_rgba(0,0,0,0.8)]" />
+          <h1 className="mt-2 font-display text-[2.125rem] font-bold leading-[1.1] tracking-tight text-white [text-shadow:0_2px_12px_rgba(0,0,0,0.7)] [text-wrap:balance]">
             {greeting},
             <br />
             {firstName}
@@ -369,7 +371,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           {/* The verse lives in the hero; it shows while the layout keeps the "verse" module (hidden by Customize Home
               or by the Scripture card switch). */}
           {layout.includes("verse") && (
-            <Link href="/faith#todays-devotional" className="group mt-4 block max-w-[22rem] rounded-lg focus-visible:ring-2 focus-visible:ring-gold-highlight">
+            <Link href="/faith#todays-devotional" className="group mt-4 block max-w-[16.5rem] rounded-lg focus-visible:ring-2 focus-visible:ring-gold-highlight sm:max-w-[22rem]">
               <span className="sr-only">Verse of the day: </span>
               <blockquote className="font-serif text-[1.0625rem] italic leading-snug text-white [text-shadow:0_1px_8px_rgba(0,0,0,0.75)]">
                 &ldquo;<ScriptureText parts={scriptureParts(verse.reference, verseExcerpt(verse.text))} />&rdquo;
@@ -381,7 +383,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             </Link>
           )}
         </div>
-      </SceneHero>
+      </DailyHero>
 
       {sp.welcome && <Notice tone="success">Welcome to Narrow Gate Fitness, {name}! Your starter program is ready — today&apos;s session is below.</Notice>}
       {sp.password === "updated" && <Notice tone="success">Your password was updated.</Notice>}

@@ -9,14 +9,26 @@
  *   answered from that cache, and a Bible page opened without a connection shows the offline reader. The cache holds
  *   Scripture only, never account data, and survives service-worker updates (it is versioned on its own).
  */
-const VERSION = "ngf-v1";
+const VERSION = "ngf-v2";
 const STATIC_CACHE = `${VERSION}-static`;
 const OFFLINE_URL = "/offline.html";
 const BIBLE_CACHE = "ngf-bible-v1";
+// The seven Home backgrounds (about 25 kB each), so the day's picture is there offline whatever day the app opens.
+const HOME_BACKGROUNDS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"].map((d) => `/home-backgrounds/${d}.webp`);
 const PRECACHE = [OFFLINE_URL, "/icons/icon-192.png", "/icons/icon-512.png", "/icons/icon.svg", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(STATIC_CACHE).then((cache) => cache.addAll(PRECACHE)).then(() => self.skipWaiting()));
+  event.waitUntil(
+    caches
+      .open(STATIC_CACHE)
+      .then((cache) =>
+        cache.addAll(PRECACHE).then(() =>
+          // Best effort: a picture that fails to download must not stop the service worker from installing.
+          Promise.all(HOME_BACKGROUNDS.map((u) => cache.addAll([u]).catch(() => undefined))),
+        ),
+      )
+      .then(() => self.skipWaiting()),
+  );
 });
 
 self.addEventListener("activate", (event) => {
@@ -50,10 +62,12 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  const isStatic = url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/icons/") || /\.(?:woff2?|png|svg|ico)$/.test(url.pathname);
+  const isBackground = url.pathname.startsWith("/home-backgrounds/");
+  const isStatic = url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/icons/") || isBackground || /\.(?:woff2?|png|svg|ico)$/.test(url.pathname);
   if (isStatic) {
     event.respondWith(
-      caches.match(request).then(
+      // The pictures carry a ?v= version; match without it so the precached copy answers.
+      caches.match(request, { ignoreSearch: isBackground }).then(
         (cached) =>
           cached ||
           fetch(request).then((response) => {

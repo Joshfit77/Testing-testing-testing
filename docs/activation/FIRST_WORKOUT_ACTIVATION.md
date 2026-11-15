@@ -41,13 +41,18 @@ Account creation and onboarding come from columns that already exist: `profiles.
 - **Return activity** counts members who trained (started or finished a workout) on day 1, day 7 and day 14 after
   sign-up, plus anywhere in days 1–7. Days are the member's own calendar days, in their time zone. A member counts as
   "eligible" only once that day is over, so a three-day-old account is never counted as a day-7 drop-off.
+- **Second workout and day 30** (migration `20261115000075`, added 2026-11-14): how many new members finished a
+  second workout, the median days between the first and second, and members who trained on day 30 or on any of days
+  24–30. A member is eligible for the day-30 figures only once their day 30 is over, so the admin page reads them
+  from accounts created in the last 90 days rather than the last 30.
 - **Abandonment** reports workouts started; workouts discarded; workouts left "in progress" and untouched for 24 hours
   or more; and members whose *first* workout was abandoned.
 - **Returning members** are older accounts that completed a workout in the window, reported separately from new
   members.
 - With only a few new accounts, these aggregates describe individuals. The admin page says so.
 
-Tests: `tests/integration/activation-events.test.ts` (6 tests):
+Tests: `tests/integration/activation-events.test.ts` (7 tests):
+- the second finished workout and day-30 return activity, on a backdated account;
 - once-only recording, with repeated saves and a retried finish;
 - the offline-finish path;
 - discard versus deleting a finished workout;

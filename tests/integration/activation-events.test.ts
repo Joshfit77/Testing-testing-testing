@@ -142,6 +142,51 @@ describe.skipIf(!available)("activation events", () => {
     expect(m.return_activity.day1!.eligible).toBe(0);
   });
 
+  it("reports the second finished workout and day-30 return activity (migration 075)", async () => {
+    // An account 35 days old (UTC) that finished a workout on its sign-up day and another on day 30.
+    const veteran = await createTestUser("activation-day30");
+    try {
+      const created = new Date(Date.now() - 35 * 86_400_000);
+      created.setUTCHours(12, 0, 0, 0);
+      const moved = await svc.from("profiles").update({ created_at: created.toISOString(), timezone: "UTC" }).eq("id", veteran.id);
+      expect(moved.error).toBeNull();
+      const at = (days: number) => new Date(created.getTime() + days * 86_400_000).toISOString();
+      const rows = [0, 30].flatMap((d) => {
+        const id = crypto.randomUUID();
+        return [
+          { user_id: veteran.id, event: "workout_started", workout_client_id: id, occurred_at: at(d), source: "backfill" },
+          { user_id: veteran.id, event: "workout_completed", workout_client_id: id, occurred_at: at(d), source: "backfill" },
+        ];
+      });
+      expect((await svc.from("activation_events").insert(rows)).error).toBeNull();
+
+      const from = new Date(created.getTime() - 86_400_000).toISOString();
+      const to = new Date(created.getTime() + 86_400_000).toISOString();
+      const { data, error } = await admin.client.rpc("admin_activation_metrics", { p_from: from, p_to: to, p_include_test: true });
+      expect(error).toBeNull();
+      const m = data as {
+        new_members: Record<string, number>;
+        median_days: { first_to_second_workout_completed: number | null };
+        return_activity: Record<string, { eligible: number; returned: number }>;
+      };
+      // Only accounts created in that two-day window 35 days ago are in the cohort; this file made exactly one.
+      expect(m.new_members.completed_second_workout).toBeGreaterThanOrEqual(1);
+      expect(m.new_members.completed_second_workout).toBeLessThanOrEqual(m.new_members.completed_first_workout!);
+      expect(m.median_days.first_to_second_workout_completed).not.toBeNull();
+      expect(m.return_activity.day30!.eligible).toBeGreaterThanOrEqual(1);
+      expect(m.return_activity.day30!.returned).toBeGreaterThanOrEqual(1);
+      expect(m.return_activity.days24to30!.returned).toBeGreaterThanOrEqual(m.return_activity.day30!.returned);
+      expect(m.return_activity.day30!.returned).toBeLessThanOrEqual(m.return_activity.day30!.eligible);
+
+      // A member with one finished workout is not counted as having a second, and a young cohort has no day-30 figures.
+      const young = (await admin.client.rpc("admin_activation_metrics", { p_from: since, p_include_test: true })).data as typeof m;
+      expect(young.return_activity.day30!.eligible).toBe(0);
+      expect(young.new_members.completed_second_workout).toBeLessThanOrEqual(young.new_members.completed_first_workout!);
+    } finally {
+      await deleteTestUser(veteran);
+    }
+  });
+
   it("deleting an account with a workout in progress removes its events and records no abandonment", async () => {
     const leaving = await createTestUser("activation-leaving");
     await saveDraftSnapshot(leaving.client, leaving.id, draft(crypto.randomUUID(), [true]));

@@ -13,6 +13,10 @@ const nextConfig: NextConfig = {
     return [
       { source: "/:path*", headers: securityHeaders({ supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL, production, https }) },
       { source: "/sw.js", headers: [{ key: "Cache-Control", value: "no-cache" }] },
+      // The seven Home backgrounds are requested with a version (?v=N, src/lib/home-backgrounds.ts), so they can be
+      // kept for a year. That is what lets tomorrow's picture show in the native app without a connection (the
+      // native app has no service worker).
+      { source: "/home-backgrounds/:file*", headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }] },
       // The offline Bible reader is a static page the middleware doesn't see, so it carries its own fixed policy.
       { source: "/bible-offline.html", headers: [{ key: "Content-Security-Policy", value: OFFLINE_BIBLE_CSP }] },
     ];
