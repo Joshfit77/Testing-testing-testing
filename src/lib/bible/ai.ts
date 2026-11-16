@@ -95,7 +95,7 @@ export function markUnverified(answer: string, unverified: string[]): string {
   return out;
 }
 
-/** Quotas: the Bible helper is free for everyone, within limits that keep its cost bounded. */
+/** Quotas: the Bible helper (Pro since 2026-11-13) runs within limits that keep its cost bounded. */
 export const BIBLE_AI_LIMITS = {
   free: { perMinute: 3, daily: 10, monthly: 60 },
   pro: { perMinute: 5, daily: 40, monthly: 400 },
@@ -109,4 +109,4 @@ export const BIBLE_AI_CUT_SHORT_NOTE = "(This answer was cut short. Ask a follow
 export const BIBLE_AI_REFUSAL = "The helper can't answer that one. Try asking about a passage, a person or a theme in the Bible.";
 /** The helper sends the question to the AI provider, so it waits for the same permission as every other AI feature. */
 export const BIBLE_AI_CONSENT_REQUIRED = "Allow AI data sharing first: choose Allow on the Ask about the Bible screen. You can turn it off any time in Profile & Settings → Privacy & data.";
-export const BIBLE_AI_DISABLED = "The Bible study helper is temporarily unavailable. The Bible itself is always free to read and search.";
+export const BIBLE_AI_DISABLED = "The Bible study helper is temporarily unavailable. The Bible is free to read and search.";

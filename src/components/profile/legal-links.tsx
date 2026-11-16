@@ -9,6 +9,7 @@ export function LegalLinks({ legal }: { legal: { termsUrl: string; privacyUrl: s
     { href: legal.privacyUrl, label: "Privacy Policy" },
     { href: legal.termsUrl, label: "Terms of Service" },
     { href: "/legal/notices", label: "Notices & licenses" },
+    { href: "/legal/delete-account", label: "How to delete your account" },
   ];
   return (
     <div>

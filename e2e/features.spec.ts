@@ -49,7 +49,7 @@ test.describe("feature access, subscriptions and core sections", () => {
     await page.goto("/coach");
     // Free: one card with what the coach does, the Pro prices and a link to the plans; no disabled chat.
     await expect(page.getByTestId("coach-upsell")).toBeVisible();
-    await expect(page.getByTestId("coach-upsell-price")).toContainText("Faith stays free");
+    await expect(page.getByTestId("coach-upsell-price")).toContainText("Bible and prayer journal are in Free");
     await expect(page.getByRole("link", { name: "See plans" })).toHaveAttribute("href", "/profile/billing");
     await expect(page.getByRole("button", { name: "Send message" })).toHaveCount(0);
     await expect(page.getByRole("link", { name: "New chat" })).toHaveCount(0);

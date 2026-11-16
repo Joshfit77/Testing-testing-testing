@@ -66,7 +66,8 @@ export interface WeeklyReportInput {
   /** Running distance of the week before, in metres, or null if none. */
   priorRunDistanceM: number | null;
   /** Finished nights inside the week. */
-  sleep: { asleepMinutes: number; estimated: boolean; recorded: boolean; stages: { rem: number; deep: number; light: number; awake: number } | null }[];
+  /** `imported`: any part of the night came from a health platform or wearable (see health-ai-sharing.ts). */
+  sleep: { asleepMinutes: number; estimated: boolean; recorded: boolean; imported?: boolean; stages: { rem: number; deep: number; light: number; awake: number } | null }[];
   sleepGoalMinutes: number;
   /** Sleep schedule steadiness for the week, when at least three nights exist. */
   sleepSteadiness: "steady" | "variable" | "irregular" | null;

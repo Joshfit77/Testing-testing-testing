@@ -85,8 +85,8 @@ export default async function JournalEntryPage({ params, searchParams }: { param
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
               {e.share_with_coach
-                ? "The AI coach can read a short excerpt of this entry. Administrators can't."
-                : "Only you can see this entry. It isn't shared with the AI coach or administrators."}
+                ? "The AI coach can read a short excerpt of this entry. The app gives administrators no way to view it."
+                : "This entry is private to your account. It isn't sent to the AI coach, and the app gives administrators no way to view it."}
             </p>
             <ActionButton action={setJournalShareAction} fields={{ id: e.id, share: e.share_with_coach ? "false" : "true" }} variant="secondary" size="sm" className="mt-3">
               {e.share_with_coach ? "Stop sharing with AI Coach" : "Share with AI Coach"}

@@ -45,7 +45,7 @@ export const PRESENTER_STEPS: readonly PresenterStep[] = [
   { n: 10, title: "GPS", href: "/run", match: /^\/run(\/|$)/, label: "preview", show: "Runs on sample routes; live recording needs the phone app outdoors." },
   { n: 11, title: "Progress", href: "/progress", match: /^\/progress(\/(overview|badges|body-map|body-scan)(\/.*)?)?$/, label: "sample", show: "Strength records, bodyweight trend, badges; body scan is a walk-through." },
   { n: 12, title: "Health & recovery", href: "/progress/sleep", match: /^\/(progress\/sleep|train\/recovery)(\/|$)/, label: "sample", show: "Sleep and recovery from sample nights (pretend Apple Health imports)." },
-  { n: 13, title: "Faith dashboard", href: "/faith", match: /^\/faith$/, label: "live", show: "Free for every member: today's reading, prayer and practices." },
+  { n: 13, title: "Faith dashboard", href: "/faith", match: /^\/faith$/, label: "live", show: "In the Free plan: today's reading, prayer and practices." },
   { n: 14, title: "Bible", href: "/faith/bible/matthew/7", match: /^\/faith\/bible(\/|$)/, label: "live", show: "The BSB with the words of Jesus in red, highlights and notes." },
   { n: 15, title: "Journeys", href: "/faith/journey", match: /^\/faith\/journey(\/|$)/, label: "live", show: "A 90-day Gospels journey on day 21: read and pray each day." },
   { n: 16, title: "Prayer journal", href: "/faith/journal", match: /^\/faith\/(journal|memory)(\/|$)/, label: "live", show: "Requests, an answered prayer, and memory verses." },

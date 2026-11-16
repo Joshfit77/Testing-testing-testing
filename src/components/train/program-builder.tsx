@@ -861,7 +861,7 @@ export function ProgramBuilder({
                   <p className="mt-3 text-xs text-muted-foreground">{preview.description}</p>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Building replaces your current active program (it stays in My programs, paused). Custom programs are free on every plan.
+                  Building replaces your current active program (it stays in My programs, paused). A program you&apos;ve built stays yours on every plan.
                 </p>
               </>
             ) : (

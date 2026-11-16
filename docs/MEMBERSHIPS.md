@@ -26,7 +26,7 @@ by this update; see `docs/pro/PRICING_UPDATE_2026-11-13.md` for the owner checkl
 | Feature | Free | Pro | Enforced by |
 |---|---|---|---|
 | Workout logging, history, records, rest timers, substitutions | ✓ | ✓ | `workout_logging` |
-| All 157 exercise demonstrations and instructions | ✓ | ✓ | never gated |
+| All 218 exercise demonstrations and instructions | ✓ | ✓ | never gated |
 | Starter programs | ✓ | ✓ | `training_programs.tier = 'free'` |
 | Saved workout templates | 5 | Unlimited | `templateLimit`, database trigger |
 | Training calendar | View | Schedule & reschedule | `advanced_calendar`, database policy |
@@ -46,7 +46,8 @@ by this update; see `docs/pro/PRICING_UPDATE_2026-11-13.md` for the owner checkl
 | Progress-photo comparisons | — | ✓ | `advanced_analytics` |
 | Body Scan | — | ✓ | `canUseBodyScan`, database `has_plan('pro')` and consent |
 | AI coach, AI plans, AI meal plans, food-photo analysis, AI sleep coaching | — | ✓ | `ai_coach`, `assertAiAllowed`, `withAiRequest` |
-| The entire Faith & Discipline section | ✓ | ✓ | never gated |
+| Faith & Discipline: Bible reading, prayer journal, devotionals, reading journeys and challenges | ✓ | ✓ | never gated |
+| AI Bible study helper | — | ✓ | `ai_bible_study` |
 
 **Nothing a member made or recorded is removed when they move to Free.** Templates, programs, recipes, plans, photos,
 scans, runs and routes stay theirs to view, edit, export and delete; only new paid-feature writes are refused. A live

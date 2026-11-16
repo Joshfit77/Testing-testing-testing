@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Award, BellRing, Brain, Camera, ChevronRight, CreditCard, Download, HandHeart, HeartPulse, KeyRound, LayoutGrid, LogOut, MapPin, Moon, ScanLine, ShieldCheck, Target, TrendingUp, Users } from "lucide-react";
 import { MainHeader } from "@/components/shell/main-header";
 import { DisplaySettings } from "@/components/profile/display-settings";
-import { DeleteAccountForm, ProfileForm, WithdrawConsentForm, AiConsentOffForm } from "@/components/profile/profile-forms";
+import { DeleteAccountForm, ProfileForm, WithdrawConsentForm, AiConsentOffForm, HealthAiShareForm } from "@/components/profile/profile-forms";
 import { Button } from "@/components/ui/button";
 import { getPlans } from "@/lib/domain/plans";
 import { getServerSupabase } from "@/lib/supabase/server";
@@ -151,7 +151,10 @@ export default async function ProfilePage() {
               : "Off. The AI Coach (a Pro feature) asks before it sends anything to the AI provider."}
           </p>
           {profile.ai_data_consent_at ? (
-            <AiConsentOffForm />
+            <div className="space-y-4">
+              <HealthAiShareForm on={Boolean(profile.health_ai_share_consent_at)} />
+              <AiConsentOffForm />
+            </div>
           ) : (
             <Link href="/coach" className="text-sm text-gold-highlight underline-offset-4 hover:underline">
               Review what&apos;s shared on the AI Coach screen

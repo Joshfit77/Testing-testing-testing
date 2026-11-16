@@ -10,7 +10,7 @@ import { initialActionState } from "@/lib/action-state";
 import { cmToFeetInches, feetInchesToCm } from "@/lib/domain/units";
 import { initialTimeZoneOptions, timeZoneOptions } from "@/lib/time-zone-options";
 import type { UnitSystem } from "@/lib/domain/types";
-import { deleteAccountAction, updateProfileAction, withdrawWellnessConsentAction, setAiDataConsentAction } from "@/server/actions/profile";
+import { deleteAccountAction, updateProfileAction, withdrawWellnessConsentAction, setAiDataConsentAction, setHealthAiShareAction } from "@/server/actions/profile";
 
 export function ProfileForm({
   initial,
@@ -130,6 +130,28 @@ export function AiConsentOffForm() {
     <form action={action} className="space-y-2">
       <SubmitButton variant="secondary" pendingLabel="Turning off…" className="h-auto min-h-11 w-full whitespace-normal py-2">
         Turn off AI Coach data sharing
+      </SubmitButton>
+      <FormMessage state={state} />
+    </form>
+  );
+}
+
+/**
+ * The separate permission for Apple Health / Health Connect data and the AI provider (migration 079). Off by default.
+ * WORDING PENDING OWNER AND COUNSEL APPROVAL (docs/legal-audit-2026-11-16/18_HEALTH_DATA_AI_REVIEW.md).
+ */
+export function HealthAiShareForm({ on }: { on: boolean }) {
+  const [state, action] = useActionState(async () => setHealthAiShareAction(!on), initialActionState);
+  return (
+    <form action={action} className="space-y-2" data-testid="health-ai-share">
+      <p className="text-sm font-semibold">Apple Health and Health Connect data</p>
+      <p className="text-sm text-muted-foreground">
+        {on
+          ? "On. When you ask the AI Coach about sleep, recovery or activity, it can use data imported from Apple Health or Health Connect: step counts, and sleep your watch or ring recorded (time asleep, stages, overnight heart rate, heart-rate variability and breathing rate). This is sent to Anthropic, the AI provider. Your device's name is never sent."
+          : "Off. Nothing imported from Apple Health or Health Connect is sent to the AI provider. The AI Coach can still use steps and sleep you entered yourself. Turn this on if you want the coach to use your watch or ring data too."}
+      </p>
+      <SubmitButton variant="secondary" pendingLabel="Saving…" className="h-auto min-h-11 w-full whitespace-normal py-2">
+        {on ? "Stop sharing health-platform data with the AI Coach" : "Share Apple Health / Health Connect data with the AI Coach"}
       </SubmitButton>
       <FormMessage state={state} />
     </form>

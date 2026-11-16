@@ -1,4 +1,5 @@
 import "server-only";
+import { healthAiSharingAllowed, withoutHealthPlatformData } from "@/lib/domain/health-ai-sharing";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CHALLENGE_DAYS, CHALLENGE_NAME, CHALLENGE_SLUG } from "@/data/devotionals";
 import { getSupplement } from "@/data/supplements";
@@ -134,7 +135,7 @@ export async function loadProgramWeek(supabase: SupabaseClient, programId: strin
 export async function loadAthleteSnapshot(supabase: SupabaseClient, userId: string): Promise<AthleteSnapshot> {
   const { data: profile } = await supabase
     .from("profiles")
-    .select("unit_system, birth_year, height_cm, sex, faith_enabled, wellness_consent_at, timezone, step_goal, coach_memory_enabled")
+    .select("unit_system, birth_year, height_cm, sex, faith_enabled, wellness_consent_at, timezone, step_goal, coach_memory_enabled, ai_data_consent_at, health_ai_share_consent_at")
     .eq("id", userId)
     .maybeSingle();
   const tz = (profile?.timezone as string) || "UTC";
@@ -167,7 +168,7 @@ export async function loadAthleteSnapshot(supabase: SupabaseClient, userId: stri
       .eq("meal.status", "logged")
       .gte("meal.eaten_on", since7)
       .lte("meal.eaten_on", today),
-    supabase.from("daily_steps").select("day, steps").eq("user_id", userId).gte("day", since7).order("day"),
+    supabase.from("daily_steps").select("day, steps, source").eq("user_id", userId).gte("day", since7).order("day"),
     supabase.from("supplement_stack").select("supplement_id").eq("user_id", userId),
     supabase.from("recovery_checkins").select("checked_on, readiness_score").eq("user_id", userId).order("checked_on", { ascending: false }).limit(1).maybeSingle(),
     supabase
@@ -273,7 +274,9 @@ export async function loadAthleteSnapshot(supabase: SupabaseClient, userId: stri
       return { name: ex?.name ?? "Exercise", slug: ex?.slug ?? "", e1rmKg: Number(r.value), achievedOn: (r.achieved_at as string).slice(0, 10) };
     }),
     weights: (weightsRes.data ?? []).map((w) => ({ date: w.recorded_on as string, kg: Number(w.weight_kg) })),
-    steps: (stepsRes.data ?? []).map((s) => ({ date: s.day as string, steps: s.steps as number })),
+    // Step counts imported from Apple Health or Health Connect go to the AI provider only with the member's separate
+    // permission (migration 079); typed-in counts are covered by the general AI consent.
+    steps: withoutHealthPlatformData((stepsRes.data ?? []) as { day: string; steps: number; source: string | null }[], healthAiSharingAllowed(profile)).map((s) => ({ date: s.day, steps: s.steps })),
     stepGoal: (profile?.step_goal as number) ?? null,
     supplements: (suppRes.data ?? []).map((s) => getSupplement(s.supplement_id as string)?.name ?? (s.supplement_id as string)),
     readiness: readinessRes.data ? { score: readinessRes.data.readiness_score as number, date: readinessRes.data.checked_on as string } : null,

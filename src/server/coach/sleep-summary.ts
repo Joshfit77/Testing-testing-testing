@@ -8,6 +8,7 @@ import { sleepDebt } from "@/lib/domain/sleep-debt";
 import { averageScore, nightlyScore } from "@/lib/domain/sleep-score";
 import { sleepWindows } from "@/lib/domain/sleep-schedule";
 import { averageAsleepMinutes, scheduleStats } from "@/lib/domain/sleep-stats";
+import { fromHealthPlatform, HEALTH_SHARING_OFF_NOTE, healthAiSharingAllowed, withoutHealthPlatformData } from "@/lib/domain/health-ai-sharing";
 import { listSleepCheckins, listSleepSessions, listSleepStages } from "@/server/services/sleep";
 
 /**
@@ -15,19 +16,30 @@ import { listSleepCheckins, listSleepSessions, listSleepStages } from "@/server/
  * Sleep & Recovery pages use; the model explains and interprets, it never produces a figure of its own.
  */
 export async function buildSleepSummary(supabase: SupabaseClient, userId: string, timeZone: string, days: number) {
-  const { data: profile } = await supabase.from("profiles").select("wellness_consent_at, sleep_goal_minutes, sleep_target_wake").eq("id", userId).maybeSingle();
+  const { data: profile } = await supabase.from("profiles").select("wellness_consent_at, sleep_goal_minutes, sleep_target_wake, ai_data_consent_at, health_ai_share_consent_at").eq("id", userId).maybeSingle();
   if (!profile?.wellness_consent_at) {
     return { available: false, note: "The athlete hasn't allowed sleep logging (optional wellness information), so there is no sleep data. Don't guess; they can turn it on under My Progress > Sleep & Recovery." };
   }
   const today = isoDateInTz(new Date(), timeZone);
   const start = addDays(today, -(days - 1));
   const goal = (profile.sleep_goal_minutes as number | null) ?? DEFAULT_SLEEP_GOAL_MINUTES;
-  const [sessions, checkins] = await Promise.all([listSleepSessions(supabase, userId, { fromNight: addDays(start, -14), toNight: today }), listSleepCheckins(supabase, userId, start, today)]);
+  const [allSessions, checkins] = await Promise.all([listSleepSessions(supabase, userId, { fromNight: addDays(start, -14), toNight: today }), listSleepCheckins(supabase, userId, start, today)]);
+  // Nights a health platform or wearable supplied are left out unless the member has allowed sharing them with the AI
+  // provider (migration 079). The coach is told how many were left out so it doesn't guess.
+  const shareHealth = healthAiSharingAllowed(profile);
+  const sessions = withoutHealthPlatformData(allSessions, shareHealth);
+  const withheld = shareHealth ? 0 : new Set(allSessions.filter((s) => fromHealthPlatform(s.source) && s.nightOf >= start).map((s) => s.nightOf)).size;
   const all = summarizeNights(sessions);
   const nights = all.filter((n) => n.nightOf >= start);
   const fortnight = all.filter((n) => n.nightOf >= addDays(today, -13));
   if (!nights.length) {
-    return { available: true, nights_logged: 0, goal: formatDuration(goal), note: `No nights logged in the last ${days} days. Say so plainly and suggest the sleep timer or entering a night by hand; don't estimate their sleep.` };
+    return {
+      available: true,
+      nights_logged: 0,
+      goal: formatDuration(goal),
+      note: `No nights logged in the last ${days} days. Say so plainly and suggest the sleep timer or entering a night by hand; don't estimate their sleep.`,
+      ...(withheld ? { health_platform_nights_not_shared: withheld, health_platform_note: HEALTH_SHARING_OFF_NOTE } : {}),
+    };
   }
   const pattern = scheduleStats(fortnight);
   const windows = sleepWindows(fortnight, goal, clockToMinutes((profile.sleep_target_wake as string | null) ?? null));
@@ -55,7 +67,7 @@ export async function buildSleepSummary(supabase: SupabaseClient, userId: string
     nights_at_goal: nights.filter((n) => n.asleepMinutes >= goal).length,
     shortest: formatDuration(Math.min(...nights.map((n) => n.asleepMinutes))),
     longest: formatDuration(Math.max(...nights.map((n) => n.asleepMinutes))),
-    last_night: { date: last.nightOf, asleep: formatDuration(last.asleepMinutes), in_bed_only: last.asleepEstimated, bed: formatClock(clockMinutesInTz(last.bedAt, last.timezone)), source: last.sources.join(", "), recorded_by: last.recorded ? (last.deviceName ?? "a wearable") : null },
+    last_night: { date: last.nightOf, asleep: formatDuration(last.asleepMinutes), in_bed_only: last.asleepEstimated, bed: formatClock(clockMinutesInTz(last.bedAt, last.timezone)), source: last.sources.join(", "), recorded_by_wearable: last.recorded },
     recorded,
     typical_times: pattern.typicalBed === null ? null : { bedtime: formatClock(pattern.typicalBed), wake: formatClock(pattern.typicalWake!), bedtime_moves_minutes: pattern.bedSpread, wake_moves_minutes: pattern.wakeSpread, steadiness: pattern.steadiness },
     average_nightly_score: scoreAverage.average === null ? null : Math.round(scoreAverage.average),
@@ -65,6 +77,7 @@ export async function buildSleepSummary(supabase: SupabaseClient, userId: string
     checkin_patterns: associations(nights, checkins).map(describeAssociation),
     checkins_logged: checkins.length,
     data_gaps: gaps,
+    ...(withheld ? { health_platform_nights_not_shared: withheld, health_platform_note: HEALTH_SHARING_OFF_NOTE } : {}),
     rules: "Use these figures as they are. They describe logged sleep; they are not medical measurements. Stages and overnight heart rate, HRV and breathing, where present, are the wearable's own readings shared through the health platform: quote them as the device's, compare HRV and heart rate only with the athlete's own earlier nights (never with population norms), and never call any of them a recovery score or a sign of illness. Don't diagnose insomnia, apnoea or any disorder; for persistent problems suggest a doctor or sleep specialist. Any training change you suggest goes through a proposal card the athlete must accept.",
   };
 }
@@ -103,10 +116,8 @@ async function describeRecorded(supabase: SupabaseClient, userId: string, record
   const method = sample.find((n) => n.vitals?.hrv)?.vitals?.hrv?.method;
   return {
     nights_recorded: recordedNights.length,
-    devices: [...new Set(recordedNights.map((n) => n.deviceName).filter((d): d is string => Boolean(d)))],
     latest_night: {
       date: latest.nightOf,
-      device: latest.deviceName,
       in_bed: formatDuration(latest.inBedMinutes),
       stages: shares(stages.filter((s) => latestIds.has(s.session_id))),
       overnight_heart_rate_bpm: latest.vitals?.heartRate ? { avg: latest.vitals.heartRate.avg, min: latest.vitals.heartRate.min, max: latest.vitals.heartRate.max } : null,

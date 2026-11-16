@@ -143,7 +143,7 @@ function UploadDialog({ open, onOpenChange, userId, units, today }: { open: bool
       <DialogContent side="bottom">
         <DialogHeader>
           <DialogTitle>Add progress photo</DialogTitle>
-          <DialogDescription>Only you can see your photos. They&apos;re resized on this device before upload and location data is removed.</DialogDescription>
+          <DialogDescription>Stored privately with our hosting provider; only your account can open them. Never sent to the AI Coach or to anyone else. They&apos;re resized on this device before upload and location data is removed.</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
           <div>
@@ -482,7 +482,7 @@ export function ProgressPhotos({
             <Camera className="size-5 text-gold" aria-hidden /> Progress photos
           </h2>
           <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Lock className="size-3.5 text-gold" aria-hidden /> Only you can see your photos.
+            <Lock className="size-3.5 text-gold" aria-hidden /> Stored privately; only your account can open them.
           </p>
         </div>
         <div className="flex gap-2">

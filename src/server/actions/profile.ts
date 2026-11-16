@@ -83,7 +83,8 @@ export async function setAiDataConsentAction(allow: boolean): Promise<ActionStat
     .from("profiles")
     // Withdrawing AI consent also switches coaching memory off: saved notes stay (the member can view or delete them
     // under AI Coach > Memory) but nothing is used or added until both are allowed again.
-    .update(allow ? { ai_data_consent_at: new Date().toISOString() } : { ai_data_consent_at: null, coach_memory_enabled: false })
+    // It also switches off sharing of Apple Health / Health Connect data: that permission only has meaning with this one.
+    .update(allow ? { ai_data_consent_at: new Date().toISOString() } : { ai_data_consent_at: null, coach_memory_enabled: false, health_ai_share_consent_at: null })
     .eq("id", user.id);
   if (error) {
     logError("profile.ai_consent", error);
@@ -138,4 +139,28 @@ async function verifyPassword(email: string, password: string): Promise<"ok" | "
   // "local" only drops this throwaway client's tokens; the default ("global") would sign the person out everywhere.
   if (data.session) await client.auth.signOut({ scope: "local" }).catch(() => null);
   return "ok";
+}
+
+/**
+ * Turn sharing of Apple Health / Health Connect data with the AI provider on or off (migration 079). Off by default.
+ * It needs the general AI consent first; turning it off takes effect on the next message.
+ */
+export async function setHealthAiShareAction(allow: boolean): Promise<ActionState> {
+  const user = await requireUser();
+  const supabase = await getServerSupabase();
+  if (allow) {
+    const { data } = await supabase.from("profiles").select("ai_data_consent_at").eq("id", user.id).maybeSingle();
+    if (!data?.ai_data_consent_at) return actionError("Turn on the AI Coach first.");
+  }
+  const { error } = await supabase
+    .from("profiles")
+    .update({ health_ai_share_consent_at: allow ? new Date().toISOString() : null })
+    .eq("id", user.id);
+  if (error) {
+    logError("profile.health_ai_share", error);
+    return actionError("Couldn't save your choice. Please try again.");
+  }
+  revalidatePath("/coach");
+  revalidatePath("/profile");
+  return actionOk(allow ? "Health data sharing with the AI Coach turned on." : "Health data sharing with the AI Coach turned off. Nothing from Apple Health or Health Connect is sent from now on.");
 }

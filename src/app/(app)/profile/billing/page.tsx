@@ -161,12 +161,12 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
                   .join(" · ")}
               </p>
             )}
-            {plan === "free" && <p className="text-sm text-muted-foreground">Everything you need to build your foundation, free for as long as you like.</p>}
+            {plan === "free" && <p className="text-sm text-muted-foreground">Everything you need to build your foundation. No card required.</p>}
           </div>
           {stripeActive && isStripeConfigured() && !native && <PortalButton />}
         </div>
         <p className="mt-3 flex items-center gap-2 border-t border-border pt-3 text-sm text-foreground/90" data-testid="faith-free">
-          <BookOpen className="size-4 shrink-0 text-gold" aria-hidden /> Faith is always free: the Bible, devotionals and prayer journal.
+          <BookOpen className="size-4 shrink-0 text-gold" aria-hidden /> Included in the Free plan: Bible reading, the prayer journal, devotionals and reading journeys. The AI Bible study helper is part of Pro.
         </p>
         {cancelling && periodEnd && (
           <p className="mt-3 text-sm text-[#e2c477]">Your membership is set to cancel. You keep {plans[plan].name} until {dateFmt(periodEnd)} and won&apos;t be charged again.</p>

@@ -156,7 +156,7 @@ export function JournalForm({ today, entry, defaultRef, defaultKind, onSaved }: 
         </span>
       </label>
       <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Lock className="size-3.5 shrink-0" aria-hidden /> {v.share ? "Visible to you and, as you chose, the AI coach. Never to administrators." : "Private to you. Never visible to administrators or the AI coach."}
+        <Lock className="size-3.5 shrink-0" aria-hidden /> {v.share ? "Visible to you and, as you chose, the AI coach. The app gives administrators no way to view it." : "Private to you. Not sent to the AI coach, and the app gives administrators no way to view it."}
       </p>
       <FormMessage state={state} />
       <SubmitButton>{entry ? "Update entry" : "Save entry"}</SubmitButton>

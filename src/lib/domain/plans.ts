@@ -140,7 +140,7 @@ export function getPlans(): Record<Plan, PlanConfig> {
         "Manual run & walk logging",
         "Basic sleep logging, weight and progress history",
         "Every Fitness, Food & Faith badge",
-        "The complete Faith & Discipline section, always free",
+        "Bible reading, prayer journal, devotionals and reading journeys (the AI Bible study helper is part of Pro)",
       ],
     },
     plus: {

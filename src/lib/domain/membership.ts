@@ -83,7 +83,7 @@ export function membershipComparison(): ComparisonSection[] {
     {
       title: "Faith & Discipline",
       rows: [
-        { label: "Scripture, daily devotionals, prayer journal, challenges and the 40-day challenge", free: "Always free", pro: true },
+        { label: "Scripture, daily devotionals, prayer journal, challenges and the 40-day challenge", free: true, pro: true },
         { label: "AI Bible study helper (answers from Scripture, every passage shown)", free: false, pro: true, feature: "ai_bible_study" },
       ],
     },
