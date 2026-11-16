@@ -246,7 +246,7 @@ export function OnboardingWizard({ initial, mode = "create" }: { initial: Onboar
                   Prefer not to say
                 </Chip>
               </div>
-              <p className="text-xs text-muted-foreground">Only used to estimate your daily calories. Never shared.</p>
+              <p className="text-xs text-muted-foreground">Used to estimate your daily calories.</p>
             </div>
             {units === "imperial" ? (
               <div className="grid grid-cols-2 gap-3">

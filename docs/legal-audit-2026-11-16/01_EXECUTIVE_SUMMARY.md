@@ -5,8 +5,8 @@ Date: 2026-11-16. Not legal advice; see `README.md` for the limits of this audit
 ## The position in one paragraph
 
 The software is in good technical order, and its access controls hold up under test. The business is not yet in a
-position to launch publicly or take investment. There is no evidenced legal entity, no written chain of title to the
-code or artwork, no cleared brand, and no final Terms or Privacy Policy. Several statements shown to members
+position to launch publicly or take investment. The legal drafts name no operating party or contact, ownership of the
+code and artwork is not yet documented, the brand has not been searched, and no final Terms or Privacy Policy. Several statements shown to members
 contradict what the code does. Two data-licensing and health-data questions need a lawyer's decision. None of the
 trademark or patent research in this package, or in the earlier reports, was done against an official register,
 because none could be reached.
@@ -18,8 +18,8 @@ because none could be reached.
 | E1 | No official trademark register has been searched, in this audit or the earlier ones. Every trademark fact is from mirror sites or search summaries | Critical | Confirmed | 02 (F-01) | Y | Y (counsel) |
 | E2 | Other "Narrow Gate" fitness businesses appear to be operating (Narrow Gate Strength & Conditioning; Narrow Gate Club, Greensboro NC, faith, fitness and nutrition) | High | Suspected (secondary sources) | 02 (F-02) | Y | Counsel |
 | E3 | No patent claim text was obtained for any patent; all claim charts are provisional. Features counsel should look at first: adaptive training and coach proposals (Fitbod family), Body Scan (Amazon), sleep (Oura), food matching and meal photos | High | Confirmed (the limit); suspected (relevance) | 03 (P1–P8) | Y | Counsel |
-| E4 | No legal entity, address or contact is evidenced; the draft Terms say the owner is an individual. Members currently accept placeholder legal pages (version recorded as `2026-10-26-placeholder`); the drafts have 111 bracketed blanks and 17 open owner decisions, and do not cover sharing between members | High | Confirmed | 07, 09, 11 | Y | Y |
-| E5 | No chain of title: every visible commit is authored by an AI assistant; there is no assignment, contractor agreement, licence receipt or release in the repository | High | Confirmed (what the repo shows) | 04, 11 | Y | Counsel; blocks investment diligence |
+| E4 | No operating party (individual or company), address or contact is named in the legal drafts; they say the owner is an individual. Members currently accept placeholder legal pages (version recorded as `2026-10-26-placeholder`); the drafts have 111 bracketed blanks and 17 open owner decisions, and do not cover sharing between members | High | Confirmed | 07, 09, 11 | Y | Y |
+| E5 | Ownership is undocumented: the visible commits are authored by an AI assistant at the founder's direction, and no record of that direction, of the tool terms, or of any assignment, contractor agreement, licence receipt or release is in the repository. This does not mean ownership is lacking; it means it is not yet evidenced (file 11) | High | Confirmed (what the repo shows) | 04, 11 | Y | Counsel; blocks investment diligence |
 | E6 | Badge artwork (27 images) is cropped from three phone screenshots with no creator, tool or licence record | High | Confirmed (no record); suspected (AI-generated) | 04 | Y | Counsel |
 | E7 | Open Food Facts product data is saved into the app's own food tables and mixed with other data; two code comments said otherwise (now corrected). Whether the database licence's share-alike terms apply is undecided | High | Confirmed (the storage) | 05 | Y | Counsel |
 | E8 | Apple Health / Health Connect data (steps, sleep) can reach the AI provider through the coach, after the member's AI consent. Both platforms restrict sharing of health data | Medium–High | Confirmed (the flow) | 05, 06, 09 | Y | Counsel |
@@ -55,11 +55,11 @@ comments and stale figures were corrected.
 | Stage | Assessment | What stands in the way |
 |---|---|---|
 | Internal development testing | **Ready** | Nothing found that prevents it |
-| Private TestFlight (invited testers) | **Not ready; close** | A real contact address; counsel's view on testers accepting placeholder Terms and Privacy pages; a legal entity for the Apple account (Apple expects one for apps handling sensitive data); correct the statements in E9; a first device pass |
+| Private TestFlight (invited testers) | **Not ready; close** | A working support contact; corrected member-facing statements (file 15); a first pass on a physical iPhone; a decision on testers accepting draft Terms and Privacy pages. An individual Apple Developer account is permitted for TestFlight; a company is not required. See `19_TESTFLIGHT_CHECKLIST.md` |
 | Public Free launch | **Not ready** | E1–E7, E9–E12: counsel's trademark search and decision, final Terms and Privacy Policy, entity and contacts, asset ownership records, the Open Food Facts and health-data decisions, device testing, store listing and reviewer account, professional review of safety content |
 | Paid subscription launch | **Not ready** | Everything above, plus store products created and purchase, restore, cancel and refund run end to end; subscription disclosures reviewed against auto-renewal law; live AI cost and quality measured |
 | Trademark filing | **Not ready** | No official search, no owner entity, no use in commerce yet. Counsel can advise on an intent-to-use filing once the search is done |
-| Investor due diligence | **Not ready** | E4, E5, E6 and the checklist in file 11: entity, written IP assignment, account ownership, AI-use record, counsel's trademark and patent review |
+| Investor due diligence | **Not ready** | E4, E5, E6 and the checklist in file 11: a documented owner, the founder's authorship record, account ownership, counsel's trademark and patent review |
 
 No item in this package is an all-clear. Where the audit found nothing, that means nothing was found by the methods
 and within the access described, not that nothing exists.

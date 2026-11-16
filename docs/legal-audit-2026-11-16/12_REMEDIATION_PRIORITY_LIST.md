@@ -44,9 +44,9 @@ at its top.
 
 | Priority | Action | Who | Blocks |
 |---|---|---|---|
-| 1 | Form or confirm the legal entity; assign all existing IP to it in writing; move the repository, domains and accounts into its name | Owner + counsel | TestFlight (entity), investment |
+| 1 | Decide with counsel who will own and operate the product (the founder as an individual, or a company). Document the founder's authorship and direction of the work (file 11). If a company is formed, assign the rights to it in writing | Owner + counsel | Public launch (a named operating party in the Terms); investment. **Not required for private TestFlight**, which an individual Apple account can run |
 | 2 | Commission a full trademark search (federal, state, common law, app stores, design) and decide on the name, tagline, "Nutrition Score" and "Food IQ" | Trademark counsel | Public launch, filing |
-| 3 | Finalise the Terms and Privacy Policy from the drafting facts in file 07; decide the 17 open owner decisions; provide a real support and privacy contact | Owner + counsel | TestFlight (contact), public launch |
+| 3 | Finalise the Terms and Privacy Policy from the drafting facts in file 07; decide the 17 open owner decisions; provide a working support and privacy contact | Owner + counsel | TestFlight (contact only), public launch |
 | 4 | Approve or amend patches B1–B6 | Owner + counsel | Public launch |
 | 5 | Decide the Open Food Facts question (E7) and the health-data-to-AI question (E8) | Counsel | Public launch |
 | 6 | Establish who made the badge artwork and the supplied exercise clip, and under what terms; replace what cannot be documented | Owner | Public launch (counsel) |
@@ -56,3 +56,6 @@ at its top.
 | 10 | Device test plan; store products; reviewer demo account; store listings, privacy labels and data-safety form | Owner | Public and paid launch |
 | 11 | Before Friends is switched on: moderation process and response time, a staff suspend tool, a username filter, the Terms and Privacy sections for sharing between members, patches B7 and B10 | Owner + counsel | Switching Friends on |
 | 12 | Record of AI-tool use and the applicable terms; insurance | Owner | Investment |
+
+Superseded in part by `17_PRIORITIZED_ACTION_PLAN.md`, which is the current plan; wording items B1 and B5 were
+applied in part and B6 withdrawn, as recorded in `15_WORDING_CORRECTIONS_BEFORE_AFTER.md`.
