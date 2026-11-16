@@ -19,7 +19,8 @@ const available = await stackAvailable();
 const jpeg = () => new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0xff, 0xd9])], { type: "image/jpeg" });
 
 /** Tables where an admin legitimately sees other members' rows: the shared catalog (private programs are not personal data). */
-const ADMIN_MAY_SEE = new Set(["training_programs"]);
+// (user_reports: administrators review the reports members send, migration 076.)
+const ADMIN_MAY_SEE = new Set(["training_programs", "user_reports"]);
 
 describe.skipIf(!available)("cross-user isolation sweep: every user-owned table and private bucket", () => {
   const svc = serviceClient();
@@ -220,6 +221,15 @@ describe.skipIf(!available)("cross-user isolation sweep: every user-owned table 
     await seed("accountability_shares", { partnership_id: partnership.id, user_id: u });
     await seed("accountability_shares", { partnership_id: partnership.id, user_id: carol.id });
     await seed("accountability_nudges", { partnership_id: partnership.id, sender_id: u, recipient_id: carol.id, message_key: "proud" });
+
+    // Friends (migration 076). Carol has the higher id, so Alice is user_a of the friendship.
+    await seed("social_profiles", { user_id: u, username: `iso_${u.replace(/-/g, "").slice(0, 14)}` });
+    await seed("social_profiles", { user_id: carol.id, username: `iso_${carol.id.replace(/-/g, "").slice(0, 14)}` });
+    await seed("friend_requests", { sender_id: u, recipient_id: carol.id });
+    await seed("friendships", { user_a: u, user_b: carol.id });
+    await seed("user_blocks", { blocker_id: u, blocked_id: carol.id });
+    await seed("user_reports", { reporter_id: u, reported_id: carol.id, reason: "spam", details: "Alice's private report" });
+    await seed("friend_invites", { inviter_id: u, code: generateInviteCode() });
 
     // Photos: the uploads use Alice's own session, like the app does; the rows are written by the server.
     const photoPath = `${u}/${crypto.randomUUID()}.jpg`;

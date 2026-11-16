@@ -24,6 +24,9 @@ export const COACH_FEEDBACK_FLAG = "coach_feedback";
 /** Accountability partners (migration 067): shares data with another member, so strict (off until the owner approves). */
 export const ACCOUNTABILITY_FLAG = "accountability_partners";
 
+/** Friends & Challenges (migration 076): members find and share with each other, so strict (off until the owner approves). */
+export const FRIENDS_FLAG = "friends_challenges";
+
 /**
  * For features that must stay off until the owner turns them on (e.g. anything that collects new data): on only when
  * the flag exists and is enabled. A missing flag, or flags that can't be read, mean off.
