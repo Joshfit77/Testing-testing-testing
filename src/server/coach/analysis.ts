@@ -7,6 +7,7 @@ import { analyzeLiftProgress, windowStart, type AnalysisSet, type CheckinInput, 
 import { summarizeRunning, type RunRecord } from "@/lib/coach/running-summary";
 import { summarizeRecovery } from "@/lib/coach/recovery-summary";
 import type { ActivitySource } from "@/lib/domain/activities";
+import { healthAiSharingAllowed, withoutHealthPlatformData } from "@/lib/domain/health-ai-sharing";
 import { listSleepSessions } from "@/server/services/sleep";
 import { getActiveProgramRef } from "./snapshot";
 
@@ -40,7 +41,7 @@ const workingSets = (sets: RawSet[] | null | undefined): AnalysisSet[] =>
 /** Sleep nights (only with wellness consent) and recovery check-ins from `from` to today. */
 async function loadRecoveryInputs(ctx: AnalysisContext, from: string): Promise<{ sleep: SleepNightInput[] | null; goalMinutes: number; checkins: CheckinInput[] }> {
   const [{ data: profile }, { data: rows }] = await Promise.all([
-    ctx.supabase.from("profiles").select("wellness_consent_at, sleep_goal_minutes").eq("id", ctx.userId).maybeSingle(),
+    ctx.supabase.from("profiles").select("wellness_consent_at, sleep_goal_minutes, ai_data_consent_at, health_ai_share_consent_at").eq("id", ctx.userId).maybeSingle(),
     ctx.supabase.from("recovery_checkins").select("checked_on, sleep_quality, energy, soreness, stress, readiness_score").eq("user_id", ctx.userId).gte("checked_on", from).lte("checked_on", ctx.today).order("checked_on"),
   ]);
   const checkins = (rows ?? []).map((r) => ({
@@ -54,7 +55,9 @@ async function loadRecoveryInputs(ctx: AnalysisContext, from: string): Promise<{
   const goalMinutes = (profile?.sleep_goal_minutes as number | null) ?? DEFAULT_SLEEP_GOAL_MINUTES;
   // Sleep is wellness data: without consent it is not used, as on every sleep screen.
   if (!profile?.wellness_consent_at) return { sleep: null, goalMinutes, checkins };
-  const sessions = await listSleepSessions(ctx.supabase, ctx.userId, { fromNight: from, toNight: ctx.today });
+  // Everything here goes to the AI provider (coach tools): nights a health platform or wearable supplied are left out
+  // unless the member has allowed sharing them (migration 079).
+  const sessions = withoutHealthPlatformData(await listSleepSessions(ctx.supabase, ctx.userId, { fromNight: from, toNight: ctx.today }), healthAiSharingAllowed(profile));
   const sleep = summarizeNights(sessions).map((n) => ({ date: n.nightOf, asleepMinutes: n.asleepMinutes, recorded: n.recorded, estimated: n.asleepEstimated }));
   return { sleep, goalMinutes, checkins };
 }

@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildSleepSummary } from "@/server/coach/sleep-summary";
 import { loadAthleteSnapshot } from "@/server/coach/snapshot";
+import { loadRecoverySummary } from "@/server/coach/analysis";
+import { loadReviewInput } from "@/server/services/adaptive-training";
 import { createTestUser, deleteTestUser, serviceClient, stackAvailable, type TestUser } from "./helpers";
 
 /**
@@ -80,6 +82,21 @@ describe.skipIf(!available)("health-platform data reaches the AI provider only w
     expect(parsed.recorded.window.hrv_ms_avg).toBe(60);
     for (const leaked of [DEVICE, "Jordan", "Apple Watch"]) expect(s, leaked).not.toContain(leaked);
     expect(ctx).not.toContain("Jordan Reyes's Apple Watch");
+  });
+
+  it("the coach's training-review and recovery tools follow the same rule; the member's own review keeps every night", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const ctx = { supabase: u.client, userId: u.id, timeZone: "UTC", today, units: "metric" as const };
+    const reviewNights = async (forAiProvider: boolean) => (await loadReviewInput(u.client, u.id, { forAiProvider })).input.sleep?.nights ?? [];
+    await setConsents(true, false);
+    expect((await reviewNights(true)).length).toBe(1);
+    expect((await reviewNights(true)).some((n) => n.recorded || n.hrAvg != null || n.hrvAvgMs != null)).toBe(false);
+    expect((await reviewNights(false)).length).toBe(3);
+    const sleepOf = async () => (await loadRecoverySummary(ctx, 14)).sleep as { nights?: number };
+    expect((await sleepOf()).nights).toBe(1);
+    await setConsents(true, true);
+    expect((await reviewNights(true)).length).toBe(3);
+    expect((await sleepOf()).nights).toBe(3);
   });
 
   it("the health permission alone does nothing without the general AI consent", async () => {

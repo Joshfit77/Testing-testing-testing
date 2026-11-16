@@ -413,7 +413,8 @@ function proposeBodyweightLog(ctx: ToolContext, input: ToolInput<"propose_bodywe
 }
 
 async function getTrainingReviewTool(ctx: ToolContext): Promise<ToolOutcome> {
-  const { input } = await loadReviewInput(ctx.supabase, ctx.userId);
+  // Goes to the AI provider: imported sleep only with the member's separate permission (migration 079).
+  const { input } = await loadReviewInput(ctx.supabase, ctx.userId, { forAiProvider: true });
   return ok({ unit: weightUnit(input.units), ...describeReviewForCoach(analyzeTraining(input), input.units) });
 }
 
