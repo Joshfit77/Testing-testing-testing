@@ -244,6 +244,7 @@ export const FRIENDS_ERRORS: Record<string, string> = {
   invite_used: "That invite link has already been used. Ask your friend for a new one.",
   invite_expired: "That invite link has expired. Ask your friend for a new one.",
   own_invite: "That's your own invite link. Send it to a friend instead.",
+  invite_rate_limited: "You've tried several invite links. Please wait a few minutes and try again.",
   unknown_reason: "Choose a reason.",
   details_too_long: `Keep the details under ${REPORT_DETAILS_MAX} characters.`,
   report_limit: "You've sent several reports today. Thank you; we'll review them.",

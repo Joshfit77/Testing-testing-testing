@@ -8,7 +8,9 @@ import { openFoodFactsOrigin } from "@/server/test-overrides";
 /**
  * Open Food Facts reads for Narrow Gate Food IQ. Product reads are cached for a day (OFF data changes slowly);
  * category searches for alternatives and name searches are cached and throttled together to stay well under OFF's
- * published search limit (10 searches a minute per app). Nothing is copied into the app's own food tables.
+ * published search limit (10 searches a minute per app). These reads are held in the server's cache only. Separately,
+ * when a member logs a scanned product, its name, brand, serving and nutrition ARE saved to the app's food tables
+ * (`foods` with source "open_food_facts", then the member's diary): see docs/legal-audit-2026-11-16/05_SBOM_AND_DATA_LICENSES.md.
  */
 const ORIGIN = openFoodFactsOrigin();
 

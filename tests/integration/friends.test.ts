@@ -41,6 +41,11 @@ describe.skipIf(!available)("friends", () => {
   const profileOf = async (viewer: TestUser, target: TestUser) => (await viewer.client.rpc("friend_profile", { p_user_id: target.id })).data as Record<string, unknown> | null;
   const overview = async (u: TestUser) => (await u.client.rpc("friends_overview")).data as Record<string, { user_id: string; request_id?: string; username?: string }[]>;
   const search = async (u: TestUser, q: string) => ((await u.client.rpc("search_users", { p_query: q })).data ?? []) as { user_id: string; username: string; relation: string }[];
+  /** What using an invite code did: "ok", "not_found" (the function returns null, migration 077) or the error's name. */
+  const inviteOutcome = async (u: TestUser, code: string) => {
+    const r = await u.client.rpc("accept_friend_invite", { p_code: code });
+    return r.error?.message ?? (r.data === null ? "not_found" : "ok");
+  };
   const friendsCount = async (u: TestUser) => (await svc.from("friendships").select("user_a", { count: "exact", head: true }).or(`user_a.eq.${u.id},user_b.eq.${u.id}`)).count ?? 0;
 
   beforeAll(async () => {
@@ -139,8 +144,10 @@ describe.skipIf(!available)("friends", () => {
   });
 
   it("a friend sees the name and the training numbers the other shares, and nothing else", async () => {
+    // B trained today and yesterday (UTC). On a Monday, yesterday falls in the previous week: a two-week streak.
+    const weeksExpected = new Date().getUTCDay() === 1 ? 2 : 1;
     const p = await profileOf(a, b);
-    expect(p).toMatchObject({ user_id: b.id, username: uname("b"), display_name: "Bea Private-Name", profile_visible: true, workouts_last_7_days: 2, streak_days: 2, streak_weeks: 1 });
+    expect(p).toMatchObject({ user_id: b.id, username: uname("b"), display_name: "Bea Private-Name", profile_visible: true, workouts_last_7_days: 2, streak_days: 2, streak_weeks: weeksExpected });
     expect(Object.keys(p!).sort()).toEqual(["display_name", "profile_visible", "since", "streak_days", "streak_weeks", "user_id", "username", "workouts_last_7_days"]);
     // Still no direct access to B's rows.
     expect((await a.client.from("workout_sessions").select("id").eq("user_id", b.id)).data).toEqual([]);
@@ -207,7 +214,7 @@ describe.skipIf(!available)("friends", () => {
     const r = await (await as(d)).acceptFriendInviteAction(`${created.code.slice(0, 5)}-${created.code.slice(5).toLowerCase()}`);
     expect(r).toEqual({ ok: true, friendId: b.id });
     expect(await rpcError(c, "accept_friend_invite", { p_code: created.code })).toBe("invite_used");
-    expect(await rpcError(c, "accept_friend_invite", { p_code: "ZZZZZZZZZZ" })).toBe("invite_not_found");
+    expect(await inviteOutcome(c, "ZZZZZZZZZZ")).toBe("not_found");
     await svc.from("friend_invites").update({ created_at: new Date(Date.now() - 9 * 86_400_000).toISOString(), expires_at: new Date(Date.now() - 2 * 86_400_000).toISOString(), used_at: null }).eq("code", created.code);
     expect(await rpcError(c, "accept_friend_invite", { p_code: created.code })).toBe("invite_expired");
     // A member can't mint a code that never expires, or one for someone else.
@@ -242,7 +249,7 @@ describe.skipIf(!available)("friends", () => {
     // An invite link between them is refused the same way.
     const inv = await (await as(a)).createFriendInviteAction();
     if (!inv.ok) throw new Error(inv.error);
-    expect(await rpcError(b, "accept_friend_invite", { p_code: inv.code })).toBe("invite_not_found");
+    expect(await inviteOutcome(b, inv.code)).toBe("not_found");
     // B can't lift A's block.
     await b.client.rpc("unblock_user", { p_user_id: a.id });
     await b.client.from("user_blocks").delete().eq("blocked_id", b.id);
@@ -277,8 +284,10 @@ describe.skipIf(!available)("friends", () => {
     expect((await c.client.from("user_reports").select("id")).data).toEqual([]);
     expect((await a.client.rpc("admin_user_reports", { p_status: "open" })).error?.code).toBe("42501");
     // The reporter can't close or rewrite it.
-    await b.client.from("user_reports").update({ status: "dismissed", admin_note: "x" }).eq("id", first[0]!.id);
-    expect((await svc.from("user_reports").select("status, admin_note").eq("id", first[0]!.id).single()).data).toEqual({ status: "open", admin_note: null });
+    await b.client.from("user_reports").update({ status: "dismissed" }).eq("id", first[0]!.id);
+    expect((await svc.from("user_reports").select("status, reviewed_at").eq("id", first[0]!.id).single()).data).toEqual({ status: "open", reviewed_at: null });
+    // There is no administrators' note for a reporter to read (removed in migration 077).
+    expect((await b.client.from("user_reports").select("admin_note")).error).not.toBeNull();
     const listed = ((await admin.client.rpc("admin_user_reports", { p_status: "open" })).data ?? []) as { id: string; reporter_username: string; reported_username: string; open_reports_against: number }[];
     expect(listed.find((x) => x.id === first[0]!.id)).toMatchObject({ reporter_username: uname("b"), reported_username: uname("a"), open_reports_against: 1 });
     expect((await admin.client.from("user_reports").update({ status: "actioned", reviewed_at: new Date().toISOString() }).eq("id", first[0]!.id).select("id")).data?.length).toBe(1);
@@ -291,6 +300,23 @@ describe.skipIf(!available)("friends", () => {
       expect(await rpcError(b, "report_user", { p_user_id: extra.id, p_reason: "spam", p_details: null })).toBe("report_limit");
     } finally {
       await deleteTestUser(extra);
+    }
+  });
+
+  it("the database itself limits searches and invite-code attempts, whatever calls it", async () => {
+    const probe = await createTestUser("fr-probe");
+    try {
+      await probe.client.rpc("claim_username", { p_username: uname("p") });
+      let found = 0;
+      for (let i = 0; i < 70; i++) found += (await search(probe, uname("c"))).length;
+      // 60 searches a minute are answered; the rest return nothing.
+      expect(found).toBe(60);
+      const outcomes: string[] = [];
+      for (let i = 0; i < 22; i++) outcomes.push(await inviteOutcome(probe, "ZZZZZZZZZZ"));
+      expect(outcomes.slice(0, 20).every((e) => e === "not_found")).toBe(true);
+      expect(outcomes.slice(20)).toEqual(["invite_rate_limited", "invite_rate_limited"]);
+    } finally {
+      await deleteTestUser(probe);
     }
   });
 

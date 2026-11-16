@@ -52,13 +52,13 @@ Chromium at phone size. No physical phone.
 | Rule | Value |
 |---|---|
 | Username | 3 to 20 lower-case letters, digits, underscores; unique; names that pass for staff are refused; one change in 30 days |
-| Search | By the start of a username, at least 3 characters, 10 results, 30 searches a minute; returns the username only |
+| Search | By the start of a username, at least 3 characters, 10 results; 30 searches a minute in the app and 60 a minute enforced by the database itself (migration 077); returns the username only |
 | Display name | Shown between friends only |
 | Friends | 200 per member |
-| Requests | 20 per sender in 24 hours; one pending per pair; a declined request can't be repeated for 30 days and the decline isn't shown to the sender |
+| Requests | 20 per sender in 24 hours; one pending per pair; a declined request can't be repeated for 30 days. The sender isn't told of a decline, but can infer it: the request leaves their list and a new one is refused for 30 days (audit finding F-04) |
 | Invite links | Single use, 7 days, 5 open at a time; opening one makes the two friends |
-| Block | Ends the friendship, any pending request and any accountability partnership between the two; each disappears from the other's search; the blocked member is told nothing (requests look like "not found") |
-| Reports | Fixed reasons, optional detail up to 500 characters, one open report per pair, 5 per reporter in 24 hours |
+| Block | Ends the friendship, any pending request and any accountability partnership between the two; each disappears from the other's search. The blocked member isn't told, but can infer it: a member they could see before now reads as "not found" (audit finding F-03). No policy should say a block cannot be detected |
+| Reports | Fixed reasons, optional detail up to 500 characters, one open report per pair, 5 per reporter in 24 hours. No administrators' note is stored (migration 077) |
 | With the flag off | Removing, blocking, unblocking, reporting, declining, withdrawing and switching sharing off still work |
 
 ### What a friend can see

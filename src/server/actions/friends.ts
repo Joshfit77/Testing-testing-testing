@@ -224,6 +224,8 @@ export async function acceptFriendInviteAction(input: string): Promise<Result<{ 
   const supabase = await getServerSupabase();
   const { data, error } = await supabase.rpc("accept_friend_invite", { p_code: code });
   if (error) return failure("friends.accept", error, "Couldn't add your friend. Please try again.");
+  // A code that isn't found (or belongs to someone who blocked this member) comes back as null (migration 077).
+  if (typeof data !== "string") return { ok: false, error: friendsErrorMessage("invite_not_found")! };
   revalidatePath(PAGE, "layout");
   return { ok: true, friendId: data as string };
 }
