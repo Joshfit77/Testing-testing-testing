@@ -227,7 +227,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
           <span className="text-foreground">Android (Google Play):</span> Google Play › your profile › Payments &amp; subscriptions › Subscriptions ›
           Narrow Gate Fitness › Cancel.
         </p>
-        <p>Deleting the app or your Narrow Gate account cancels a website subscription for you, but not one billed by Apple or Google: cancel those in your store account.</p>
+        <p>Deleting your Narrow Gate account cancels a website subscription for you, but not one billed by Apple or Google: cancel those in your store account. Removing the app from your phone doesn&apos;t cancel any subscription.</p>
       </section>
     </div>
   );
