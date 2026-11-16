@@ -4,10 +4,10 @@ import { PlanLocked } from "@/components/common/plan-locked";
 import { Notice } from "@/components/common/states";
 import { BackLink } from "@/components/platform/back-link";
 import { CompareWith } from "@/components/nutrition/quality-client";
-import { CompareTable } from "@/components/nutrition/quality-sections";
+import { CompareTable, OffDataNotice } from "@/components/nutrition/quality-sections";
 import { hasFeature } from "@/lib/domain/plans";
 import { foodIqScoreEnabled, NUTRITION_FEATURE_TITLE, NUTRITION_SCORE_LABEL, scoreFoodIq } from "@/lib/food-iq";
-import { comparable, OFF_DATA_NOTICE } from "@/lib/food-quality";
+import { comparable } from "@/lib/food-quality";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { getQualityProduct } from "@/server/services/food-quality";
 import { logError } from "@/server/log";
@@ -82,7 +82,7 @@ export default async function CompareProductsPage({ searchParams }: { searchPara
       ) : (
         <CompareWith base={a} />
       )}
-      <p className="text-xs text-muted-foreground">{OFF_DATA_NOTICE}</p>
+      <OffDataNotice />
     </div>
   );
 }

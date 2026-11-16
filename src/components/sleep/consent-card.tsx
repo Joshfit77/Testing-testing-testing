@@ -15,7 +15,7 @@ export function SleepConsentCard() {
         <ShieldCheck className="size-5 text-gold" aria-hidden /> Before you start
       </h2>
       <p className="mt-2 text-sm text-muted-foreground">
-        Sleep times, naps and check-ins are optional wellness information. They are stored in your account, shown only to you and deleted with your account. If you have allowed the AI Coach, a summary of your sleep is sent to its AI provider when you ask it about sleep or recovery, and your week&apos;s sleep totals are sent for your weekly progress report. You can delete any entry at any time.
+        Sleep times, naps and check-ins are optional wellness information. They are stored in your account, shown only to you and deleted with your account. If you have allowed the AI Coach, a summary of the sleep you logged yourself and your check-ins is sent to its AI provider when you ask it about sleep or recovery, and your week&apos;s sleep totals are sent for your weekly progress report. Sleep your watch or ring recorded is sent only if you turn that on separately under You → Privacy &amp; data. You can delete any entry at any time.
       </p>
       <div className="mt-3 rounded-xl bg-elevated p-3 text-sm">
         <p className="font-semibold">Once it&apos;s on, you can</p>

@@ -48,8 +48,13 @@ export const OFF_QUALITY_FIELDS = [
   "last_modified_t",
 ] as const;
 
+/** Where the Open Food Facts credit links to: the database, its licence, and the app's own notices page. */
+export const OFF_HOME_URL = "https://world.openfoodfacts.org";
+export const OFF_LICENSE_URL = "https://opendatacommons.org/licenses/odbl/1-0/";
+export const NOTICES_PATH = "/legal/notices";
+/** The credit in plain text. Screens show it with links: OffDataNotice in src/components/nutrition/quality-sections.tsx. */
 export const OFF_DATA_NOTICE =
-  "Product data and images: Open Food Facts, a free database built by volunteers (database under the Open Database License, images under CC BY-SA). Data may be incomplete or out of date: always check the package.";
+  "Product data from Open Food Facts (Open Database License); product images under CC BY-SA. Data may be incomplete or out of date: always check the package.";
 
 export type Grade = "a" | "b" | "c" | "d" | "e";
 export type Tri = "yes" | "no" | "maybe" | "unknown";

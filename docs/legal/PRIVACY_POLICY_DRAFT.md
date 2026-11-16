@@ -249,6 +249,9 @@ We require our service providers to protect personal information in a way consis
 ## 8. Your choices and rights
 
 **For everyone, in the app:**
+
+("Profile" in this Policy is the screen labelled **You** in the app; its **Privacy & data** section holds the controls below.)
+
 - **Access / export:** Profile → Privacy & data → **Export**. This downloads one JSON file with the data in your account (limited to 3 exports per hour). Coaching memories are included in readable form. Progress photos and Body Scan photos are not inside the file: it contains download links to them that work for one hour.
 
   **Not in the export:** your avatar image file (only its location); sign-in records held by our authentication provider beyond your ID and email; anything held by Stripe, RevenueCat or Anthropic; server logs; and a small number of internal records (the administrator audit log, internal billing-state and store-sync records, and the list of test accounts).
@@ -259,6 +262,8 @@ We require our service providers to protect personal information in a way consis
   4. We ask Stripe and RevenueCat to delete your customer record. If either request fails, the failure is logged for us to follow up.
 
   **We cannot cancel App Store or Google Play subscriptions.** Cancel those in your store account to stop charges. Removing the app from your phone does not delete your account or cancel anything.
+
+  **On the web.** A public page, `/legal/delete-account` [DELETE-ACCOUNT PAGE URL — full web address to be supplied once the production domain is confirmed], explains these steps without signing in. Deleting still requires signing in with your password. [OWNER TO CONFIRM: a contact address for people who can no longer sign in — none exists yet.]
 
   **What is not deleted when you delete your account:**
   - an App Store or Google Play subscription, which keeps billing until you cancel it in the store;

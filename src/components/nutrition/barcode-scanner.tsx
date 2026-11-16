@@ -307,7 +307,14 @@ export function BarcodeScanner({
           <ScanBarcode className="mx-auto size-10 text-gold" aria-hidden />
           <p className="mt-2 text-sm font-semibold">Scan a packaged food</p>
           <p className="mx-auto mt-1 max-w-xs text-xs text-muted-foreground">
-            Point your camera at the barcode (EAN or UPC). Serving sizes and nutrition come from Open Food Facts, a community database.
+            Point your camera at the barcode (EAN or UPC). Product data from{" "}
+            <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener noreferrer" className="underline">
+              Open Food Facts
+            </a>{" "}
+            (Open Database License), a community database: check the label.{" "}
+            <a href="/legal/notices" className="underline">
+              Notices &amp; attributions
+            </a>
           </p>
           {native ? (
             <Button type="button" className="mt-4" disabled={nativeBusy} onClick={() => void startNative()}>

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, CircleHelp, Info, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -10,9 +11,12 @@ import {
   describeAdditive,
   hasNoAllergenData,
   LEVELS_INFO,
+  NOTICES_PATH,
   NOVA_INFO,
   NUTRI_SCORE_INFO,
   nutrientLevels,
+  OFF_HOME_URL,
+  OFF_LICENSE_URL,
   percentOfReference,
   tagLabel,
   thresholdsMet,
@@ -32,6 +36,30 @@ const GRADE_STYLE: Record<Grade, string> = {
   e: "bg-[#c6452c] text-white",
 };
 const LEVEL_STYLE: Record<Level, string> = { low: "text-success-foreground", medium: "text-gold", high: "text-destructive-foreground" };
+
+/**
+ * The Open Food Facts credit shown under product data, with links to the database, its licence and the app's
+ * notices page. Same wording as OFF_DATA_NOTICE (src/lib/food-quality.ts). `children` follows it (the product link).
+ */
+export function OffDataNotice({ children }: { children?: ReactNode }) {
+  return (
+    <p className="text-xs text-muted-foreground" data-testid="off-data-notice">
+      Product data from{" "}
+      <a href={OFF_HOME_URL} target="_blank" rel="noopener noreferrer" className="underline">
+        Open Food Facts
+      </a>{" "}
+      (
+      <a href={OFF_LICENSE_URL} target="_blank" rel="noopener noreferrer" className="underline">
+        Open Database License
+      </a>
+      ); product images under CC BY-SA. Data may be incomplete or out of date: always check the package.{" "}
+      <Link href={NOTICES_PATH} className="underline">
+        Notices &amp; attributions
+      </Link>
+      {children ? <> {children}</> : null}
+    </p>
+  );
+}
 
 export function Unavailable() {
   return <span className="text-muted-foreground">Not available</span>;

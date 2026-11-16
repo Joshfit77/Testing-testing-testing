@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/common/page-header";
 import { Notice } from "@/components/common/states";
 import { BackLink } from "@/components/platform/back-link";
 import { AddProductToDiary, CompareWith, ExplainProduct, ProductImage } from "@/components/nutrition/quality-client";
-import { AllergensSection, AlternativesList, FilterResults, Indicators, IngredientsSection, NutritionTable } from "@/components/nutrition/quality-sections";
+import { AllergensSection, AlternativesList, FilterResults, Indicators, IngredientsSection, NutritionTable, OffDataNotice } from "@/components/nutrition/quality-sections";
 import { FitsYourGoals, FoodIqBreakdown, FoodIqSummary, IngredientAlertsSection, MacroAnalysis } from "@/components/nutrition/food-iq-sections";
 import { ingredientAlerts } from "@/lib/additive-evidence";
 import { DIET_TYPES, type DietType } from "@/lib/domain/diets";
@@ -15,7 +15,7 @@ import { isoDateInTz } from "@/lib/domain/dates";
 import type { FoodChoice } from "@/lib/domain/food-basis";
 import { mealForTime } from "@/lib/domain/meal-time";
 import { hasFeature } from "@/lib/domain/plans";
-import { checkFilters, dataIssues, OFF_DATA_NOTICE, pickAlternatives, sanitizeFilters, tagLabel } from "@/lib/food-quality";
+import { checkFilters, dataIssues, pickAlternatives, sanitizeFilters, tagLabel } from "@/lib/food-quality";
 import { basisFromOffProduct, OFF_ATTRIBUTION } from "@/lib/open-food-facts";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
@@ -264,12 +264,11 @@ export default async function ProductQualityPage({ params, searchParams }: { par
         <CardContent>{ai ? <ExplainProduct code={p.code} /> : <p className="text-sm text-muted-foreground">Asking the AI about a product (how it fits your goals, how it compares, how to fit it into a meal plan) is included with Pro All Access.</p>}</CardContent>
       </Card>
 
-      <p className="text-xs text-muted-foreground">
-        {OFF_DATA_NOTICE}{" "}
+      <OffDataNotice>
         <a href={`https://world.openfoodfacts.org/product/${p.code}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 underline">
           View or improve this product on Open Food Facts <ExternalLink className="size-3" aria-hidden />
         </a>
-      </p>
+      </OffDataNotice>
     </div>
   );
 }

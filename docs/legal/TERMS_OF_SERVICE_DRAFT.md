@@ -1,9 +1,11 @@
 # Narrow Gate Fitness — Terms of Service (DRAFT)
 
-Version: [DRAFT 2026-10-26]
+Version: [DRAFT 2026-10-26; factual descriptions revised 2026-11-16]
 Effective date: [EFFECTIVE DATE — set when published]
 
 > **DRAFT FOR ATTORNEY REVIEW — NOT LEGAL ADVICE AND NOT IN FORCE.** This document was prepared as research and drafting support for review by a qualified attorney licensed in the relevant jurisdiction(s). It has not been reviewed or approved by counsel. Nothing in it is a statement that any clause is enforceable or that the service complies with any law. Every bracketed placeholder must be completed, and every "[ATTORNEY REVIEW: …]" marker resolved, before publication. Remove this box and all markers before publishing.
+>
+> **Revision note, 2026-11-16.** The factual descriptions (plans, prices, what each plan includes, billing, cancellation, AI features and feature behaviour) were revised against the TestFlight release candidate, using the legal audit in `docs/legal-audit-2026-11-16/`. The reviser is not a lawyer. No legal wording was approved in this revision, no attorney has reviewed it, and no placeholder was filled with an invented fact. New draft provisions are marked **[DRAFT FOR ATTORNEY REVIEW]**. Earlier attorney notes are kept as written; where the code has since changed, a dated update follows the note. Everything still missing is listed in `docs/legal/REMAINING_INFORMATION_NEEDED.md`.
 
 ---
 
@@ -17,7 +19,7 @@ They govern your use of the Narrow Gate Fitness website, the iOS and Android app
 
 ### 1.1 How you accept these Terms
 
-You accept these Terms by checking the box that says you agree to the Terms and Privacy Policy and then creating an account. If you do not agree, do not create an account or use the Service. [ATTORNEY REVIEW: the sign-up form (`src/components/auth/auth-forms.tsx`) uses an unchecked, required checkbox with links to both documents, which supports clickwrap formation under *Meyer v. Uber* (2d Cir. 2017) and *Berman v. Freedom Financial* (9th Cir. 2022). However, the app does not currently record which version was accepted or when. Recommend storing `terms_version` and `terms_accepted_at` per account before relying on arbitration or other protective clauses.]
+You accept these Terms when you create an account. The sign-up form has three boxes, all unticked and all required: one confirming you are 18 or older, one saying "I agree to the Terms of Service and have read the Privacy Policy" (with links to both), and one accepting the health and AI risk acknowledgment. If you do not agree, do not create an account or use the Service. [ATTORNEY REVIEW: the sign-up form (`src/components/auth/auth-forms.tsx`) uses an unchecked, required checkbox with links to both documents, which supports clickwrap formation under *Meyer v. Uber* (2d Cir. 2017) and *Berman v. Freedom Financial* (9th Cir. 2022). However, the app does not currently record which version was accepted or when. Recommend storing `terms_version` and `terms_accepted_at` per account before relying on arbitration or other protective clauses.] [Update 2026-11-16, not part of the note above: the app now records each acceptance of the Terms, the Privacy Policy and the risk acknowledgment with the document version, a SHA-256 fingerprint of the text shown and a database-set time (`src/lib/legal/versions.ts`; table `legal_acceptances`). Three points remain for counsel: (1) the version members accept today is `2026-10-26-placeholder` — the short in-app placeholder page, shown under a banner saying it is "not legally binding", not this draft; (2) the "18 or older" tick is not recorded; (3) the acceptance record is deleted when the account is deleted. A re-acceptance screen exists and is switched off (`LEGAL_REACCEPT_REQUIRED`).]
 
 ### 1.2 Other documents that form part of these Terms
 
@@ -32,7 +34,7 @@ If these Terms conflict with a store's mandatory terms on matters the store cont
 
 ### 2.1 Adults only
 
-You must be **at least 18 years old**, and old enough to form a binding contract where you live, to create an account or use the Service. The Service is not directed to children. When you sign up, you confirm that you are 18 or older, and onboarding asks for your age and refuses ages under 18. If we learn that an account belongs to someone under 18, we will close it and delete its data as described in the Privacy Policy. [ATTORNEY REVIEW: confirm that the minimum age stays at 18. A lower age would bring in COPPA (under 13) and minors' contract-disaffirmance issues, and would require reworking the health and AI terms.]
+You must be **at least 18 years old**, and old enough to form a binding contract where you live, to create an account or use the Service. The Service is not directed to children. When you sign up, you must tick a box confirming that you are 18 or older, and onboarding asks for your age and refuses ages under 18. Age is self-declared; we do not verify it. If we learn that an account belongs to someone under 18, we will close it and delete its data as described in the Privacy Policy. [ATTORNEY REVIEW: confirm that the minimum age stays at 18. A lower age would bring in COPPA (under 13) and minors' contract-disaffirmance issues, and would require reworking the health and AI terms. Facts as of 2026-11-16: an account already exists by the time an under-18 age is refused at onboarding, and no routine closes or deletes such an account, so the "we will close it" sentence above describes a manual step. Some in-app messages say adults only "at launch". [OWNER DECISION: age policy — confirm 18 and decide what happens to an under-age account.]]
 
 ### 2.2 Your account
 
@@ -45,27 +47,39 @@ You must be **at least 18 years old**, and old enough to form a binding contract
 
 ### 3.1 Free plan ($0)
 
-The Free plan includes:
+The Free plan costs **$0**. It currently includes:
 - workout logging, starter programs and all exercise demonstrations;
-- up to 5 saved workout templates;
-- food diary, calories and macros, barcode scanning and food search;
-- manual run and walk logging, and basic sleep logging;
+- up to 5 saved workout templates, with basic history and calendar viewing;
+- food diary, calories and macros, barcode scanning, food search, manual entry, saved meals and basic insights;
+- manual run and walk logging;
+- basic sleep logging and sleep goals;
 - weight and basic progress tracking, and badges;
-- the entire **Faith & Discipline** section: Scripture, devotionals, prayer journal and the 40-day challenge.
+- the core **Faith & Discipline** features: Bible reading, devotionals, the prayer journal, reading journeys and the 40-day challenge.
+
+The Free plan does **not** include any AI feature. The **AI Bible study helper is part of Pro**, not Free.
+
+This list describes the Free plan as it is today. It is not a promise that the Free plan, or any feature in it, will stay free or stay available indefinitely; Section 3.5 covers changes. [OWNER: one in-app plan description still reads "The complete Faith & Discipline section, always free" (`src/lib/domain/plans.ts`, Free plan highlights). It is inaccurate, because the AI Bible study helper is Pro, and "always free" is an open-ended promise. It was outside the scope of this revision and is unchanged.]
 
 ### 3.2 Pro All Access
 
-Pro All Access costs **$17.99 per month** or **$119.99 per year**. Both billing periods include the same features. In addition to everything in Free, Pro includes:
+Pro All Access costs:
+- **$17.99 per month**, billed every month; or
+- **$119.99 per year**, billed once a year as a single payment.
+
+Both Pro options unlock exactly the same features. **No free trial is offered.** In addition to everything in Free, Pro includes:
 - the full program library and the custom program builder;
-- live GPS run and walk recording, with route maps;
+- unlimited saved workout templates and calendar scheduling;
+- live GPS run and walk recording, with route maps and splits;
 - recipes, meal planning and grocery lists;
 - food comparisons and filters;
 - advanced sleep and recovery analytics;
 - Body Scan and progress-photo comparisons;
 - advanced analytics;
-- the AI Coach.
+- the AI Coach and the other AI features in Section 7, within the monthly allowance in Section 3.3;
+- a weekly progress report;
+- the AI Bible study helper.
 
-Prices are in U.S. dollars. They do not include any taxes, which may be added where required. Prices in the App Store or Google Play are set and displayed by the store in your local currency and may differ from these amounts. [ATTORNEY REVIEW: confirm that the prices in these Terms match the configured Stripe, App Store and Play prices on the publication date. The code is mid-migration: committed HEAD still lists Plus $11.99 and Pro $24.99, while the uncommitted working tree on 2026-10-26 implements Pro at $19.99 / $149.99. Consider stating prices only "as shown at checkout," to avoid conflicts.] [Added 2026-11-13, not part of the note above: the owner has since approved launch prices of $17.99 / $119.99, which Section 3.2 now states. The note above records the code as it stood on 2026-10-26 and is kept unchanged.]
+Prices are in U.S. dollars. They do not include any taxes, which may be added where required. Prices in the App Store or Google Play are set and displayed by the store in your local currency and may differ from these amounts. [ATTORNEY REVIEW: confirm that the prices in these Terms match the configured Stripe, App Store and Play prices on the publication date. The code is mid-migration: committed HEAD still lists Plus $11.99 and Pro $24.99, while the uncommitted working tree on 2026-10-26 implements Pro at $19.99 / $149.99. Consider stating prices only "as shown at checkout," to avoid conflicts.] [Added 2026-11-13, not part of the note above: the owner has since approved launch prices of $17.99 / $119.99, which Section 3.2 now states. The note above records the code as it stood on 2026-10-26 and is kept unchanged.] [Update 2026-11-16: $17.99 and $119.99 are the prices in code (`src/lib/domain/plans.ts`, `APPROVED_PRO_PRICE_CENTS`). Web checkout refuses to start if the configured Stripe price differs. [TO BE CONFIRMED — the prices actually configured in Stripe, App Store Connect and Google Play Console; they could not be checked from the repository.]]
 
 ### 3.3 AI Coach allowance
 
@@ -75,17 +89,20 @@ The following count against the 150-request allowance:
 - AI Coach messages;
 - AI plan generations;
 - AI meal plans;
-- food-photo analysis;
+- food-photo and food-label-photo analysis;
 - "Ask AI about this food";
-- AI sleep coaching.
+- AI sleep coaching;
+- AI Bible study questions;
+- the AI analysis in your weekly progress report.
 
 Some other limits also apply:
 - rate limits;
-- a daily limit on food photos;
+- a daily limit on food photos (20 a day at launch);
+- the AI Bible study helper's own per-minute, daily and monthly question limits;
 - the cap of 10 requests a month that use the more advanced AI model;
 - a monthly limit on our AI cost per member (about $1.40 at launch). If it is reached before the request allowance, further AI requests that month may be declined. [ATTORNEY REVIEW / OWNER: decide whether to disclose the cost limit as a dollar figure or only as "fair-use limits"; the code enforces it either way (`AI_MEMBER_MONTHLY_BUDGET_USD`).]
 
-Unused requests do not roll over to the next month. The allowance resets at the start of each calendar month [ATTORNEY REVIEW / OWNER: confirm which time zone the reset uses]. We may change the AI models we use. [ATTORNEY REVIEW: if the allowance or features are reduced for current subscribers, give notice and apply the change at the next renewal; see Section 24.]
+Unused requests do not roll over to the next month. The allowance resets at the start of each calendar month [ATTORNEY REVIEW / OWNER: confirm which time zone the reset uses] [Update 2026-11-16: in code the allowance renews on the 1st of each month in UTC (`src/lib/domain/ai-allowance.ts`), so for members in the United States the reset falls on the evening of the last day of the month.]. We may change the AI models we use. [ATTORNEY REVIEW: if the allowance or features are reduced for current subscribers, give notice and apply the change at the next renewal; see Section 24.]
 
 ### 3.4 Existing Plus and earlier Pro subscribers
 
@@ -144,6 +161,8 @@ You decide whether, how and how hard to exercise, and you are responsible for th
 
 The exercise demonstrations are computer-generated animations meant to illustrate movement. They may not show every technique detail or suit your body or abilities.
 
+Some programs are marked in the app as "Not yet reviewed by a qualified coach" (or by another named kind of professional). Treat that label as meaning what it says. Some exercise pages may include a video from YouTube or Vimeo that one of our administrators linked; those videos are made by third parties and are labelled as not reviewed by us.
+
 ### 4.5 Estimates are estimates
 
 The Service produces approximations from the information you or your devices provide. They may be inaccurate, especially if inputs are incomplete or wrong. These estimates include:
@@ -180,9 +199,11 @@ Exercise, running, walking, strength training, dietary change and weight change 
 The AI Coach and the related features use a large language model provided by a third party, currently Anthropic's Claude. These features are:
 - AI training plans;
 - AI meal plans;
-- food-photo estimates;
+- food-photo and food-label-photo estimates;
 - "Ask AI about this food";
-- AI sleep coaching.
+- AI sleep coaching;
+- the AI Bible study helper;
+- the AI analysis in the weekly progress report.
 
 AI output is generated automatically. **It is not written or reviewed by a human or by a licensed professional before you see it.** You are interacting with an AI, not a person.
 
@@ -209,7 +230,13 @@ AI output is generated automatically. **It is not written or reviewed by a human
 
 ### 7.3 Your consent and data
 
-AI features send the information they need to our AI provider **only after you allow it** on the AI consent screen. Meal photos need a **separate** consent. Health data shared with AI also requires the consents described in the Privacy Policy. You can withdraw AI consent at any time in Profile → Privacy & data. Withdrawing turns AI features off. The Privacy Policy describes what is sent.
+- AI features send the information they need to our AI provider **only after you allow it** on the AI consent screen.
+- Meal photos and food-label photos need a **separate** consent. They are sent for that request only and are not stored by us.
+- Data imported from Apple Health or Health Connect (imported steps, and sleep, sleep stages, overnight heart rate, heart-rate variability and breathing rate recorded by a watch, ring or phone) is sent to the AI provider **only if you turn on a separate setting**, "Share Apple Health / Health Connect data with the AI Coach", which is off by default. The name of your device is never sent.
+- Sleep information and physical-limitation notes are sent only if you also gave wellness consent.
+- A prayer-journal entry is sent only if you marked that entry "Share with AI Coach".
+- You can withdraw AI consent at any time in Profile → Privacy & data. Withdrawing turns AI features off. It stops future sending; **it cannot recall what was already sent**.
+- The Privacy Policy (Section 5) lists exactly what is sent. How long the AI provider keeps what it receives: [TO BE CONFIRMED — the AI provider's retention terms].
 
 ### 7.4 Acceptable AI use
 
@@ -237,17 +264,18 @@ As between you and us, you may use AI output for your personal, non-commercial p
   - food quality information.
 - **Do not use these features to manage a medical condition** unless a qualified professional supervising your care has approved it. Examples include diabetes, kidney disease, food allergies requiring strict avoidance, celiac disease, pregnancy, and eating disorders. [ATTORNEY REVIEW: state dietetics-licensure laws vary. Some states, such as Florida (Fla. Stat. ch. 468, part X), Ohio and Alabama, are characterized as strict. Keep features to general, non-individualized-MNT information, and do not use the titles "dietitian," "nutritionist" or "nutrition counselor."]
 - **Calorie floor.** The Service does not set calorie targets below a minimum floor, and it caps deficits. Do not eat below safe levels without medical supervision.
-- **Food data comes from third parties and users.** Product and nutrient data comes from Open Food Facts (a volunteer-maintained database) and USDA FoodData Central. Barcode, label and nutrient data may be missing, outdated or wrong.
+- **Food data comes from third parties and users.** Product data for barcode scans, product searches and comparisons comes from Open Food Facts, a database built by volunteers. Generic food data comes from USDA FoodData Central. Other entries are foods written for the app or entered by you. Barcode, label and nutrient data may be missing, outdated or wrong, and a nutrient that a source does not list may be shown as zero. Always check the package.
+- **Photo estimates are rough.** A calorie or macro estimate from a meal photo or a label photo is produced by AI from the image. It cannot see hidden ingredients, cooking fats or exact portions. Check and correct every item before you save it.
 - **Allergens: no guarantee.** Allergy and dislike filters work by matching ingredient names. **Ingredient screening never guarantees that a food, recipe or meal plan is free of an allergen.** Allergen data may be incomplete, and products may contain undeclared allergens or cross-contact. **Always read the product label and confirm ingredients yourself.** If you have a serious allergy, follow your clinician's advice.
 - **Supplements.** Any supplement information is general. Talk to a doctor or pharmacist before taking supplements, especially if you take medication, are pregnant or have a health condition.
 
 ## 9. GPS run and walk recording; outdoor safety
 
-- Live GPS recording (Pro) uses your device's location **only while a recording you started is running**, including while your phone is locked if you allow it.
+- Live GPS recording (Pro) uses your device's location **only while a recording you started is running**, including while your phone is locked or the app is in the background if you allow background location. It stops when you stop the recording. The Service keeps no location history outside your recorded runs and walks. [OWNER TO CONFIRM: recording with the screen locked was not verified on a physical phone (audit file 07, I-9).]
 - **Stay aware of your surroundings.** Do not look at or interact with your phone while running or walking near traffic, crossing streets or on uneven ground. Obey traffic laws. Use well-lit, safe routes. Wear visible clothing. Tell someone where you are going, and carry identification.
 - GPS distance, pace, splits and route maps are **estimates**. They can be affected by signal loss, buildings, trees, weather and device limits. They are not suitable for navigation, emergencies or competition timing.
 - The Service is **not a safety or emergency-location service**. It does not share your live location with anyone and cannot summon help.
-- Route maps are drawn from your recorded points without a third-party map background. Do not rely on them for directions.
+- Route maps are drawn from your recorded points. By default there is no third-party map background. [OWNER TO CONFIRM: a map-tile provider can be switched on by configuration (`NEXT_PUBLIC_MAP_TILE_URL`); none is configured in the repository.] Do not rely on route maps for directions.
 
 ## 10. Sleep, wearables and health-platform data
 
@@ -256,15 +284,16 @@ As between you and us, you may use AI output for your personal, non-commercial p
   - sleep records;
   - overnight heart rate, heart-rate variability and respiratory rate.
 - Third-party watches, rings and apps produce this data. We do not control its accuracy, completeness or availability. Sleep scores and readiness indicators are wellness estimates, not medical assessments. They cannot detect sleep disorders, heart conditions or other illnesses.
-- You can disconnect at any time in your device settings. You can delete imported data in the app.
+- You can disconnect at any time in your device settings. Disconnecting stops new imports; it does not delete what was already imported. You can delete imported sleep data in the app (Sleep & Recovery → Goal & privacy). Imported step counts are deleted when you delete your account.
+- Health-platform data is not used for advertising and is not sold. It is sent to our AI provider only if you turn on the separate setting described in Section 7.3.
 - Apple, Google and device makers are not responsible for the Service. Their own terms govern your use of their products.
 
 ## 11. Body Scan and progress photos
 
 - Body Scan and progress photos are **optional** Pro features.
 - Body Scan requires your separate consent before your first scan.
-- Photos are stored in private storage that only your account can open. Before upload, they are resized on your device and location metadata is removed.
-- Photos are **not** sent to the AI Coach or any other analysis service.
+- Photos are stored in private storage at our hosting and storage provider (Supabase). In the app, only your account can open them, through short-lived links; administrator accounts in the app have no access to them. Before upload, they are resized on your device and location metadata is removed.
+- Photos are **not** sent to the AI Coach or the AI provider, and no software analyses them. Body Scan stores your photos and shows them side by side; the on-screen outline is a fixed drawing.
 - Body Scan **does not estimate body fat, body composition or any medical measurement**. It does not identify you by facial or body geometry. Measurements are the ones you enter yourself.
 - Upload only photos **of yourself** that you have the right to use. Do not upload photos of other people, of minors, or of illegal content.
 - You can delete individual photos or scans, or withdraw Body Scan consent to delete all scans, at any time.
@@ -272,11 +301,12 @@ As between you and us, you may use AI output for your personal, non-commercial p
 
 ## 12. Faith & Discipline content
 
-- The Faith & Discipline section is **optional and free**. You can use every fitness and nutrition feature without it, and you can turn faith content off.
-- It includes Scripture, devotionals, prayer journal and the 40-day challenge.
-- Scripture quotations are from the **Berean Standard Bible (BSB)**, which has been dedicated to the public domain.
+- The Faith & Discipline section is **optional**. You can use every fitness and nutrition feature without it, and you can turn faith content off.
+- Its core features are included in the Free plan: the Bible reader (with reading history, highlights, bookmarks and notes), devotionals, studies, memory verses, the prayer journal, reading journeys, discipline practices, reminders and the 40-day challenge.
+- The **AI Bible study helper is a Pro feature** and counts against the AI allowance in Section 3.3. Like all AI output, its answers can be wrong; check them against Scripture itself.
+- Scripture quotations are from the **Berean Standard Bible (BSB)**, which has been dedicated to the public domain. [TO BE CONFIRMED — the BSB's public-domain dedication could not be checked against the publisher's own page during the 2026-11-16 audit (file 05, F-7).]
 - Devotional and reflection content reflects a Christian perspective. It is offered for encouragement, not as pastoral counseling or as a substitute for your church community or a qualified counselor.
-- **Prayer journal entries are private.** Our administrators have no access path to them. An entry is shared with the AI Coach only if you mark that entry "Share with AI Coach."
+- **Prayer journal entries are private.** Administrator accounts in the app have no access to them. An entry is shared with the AI Coach only if you mark that entry "Share with AI Coach."
 - Please use faith features respectfully. Do not use them to post content that is hateful toward any person or faith.
 - [ATTORNEY REVIEW: confirm that religious content and the "Narrow Gate" branding raise no consumer-protection or trademark issues (see `docs/launch-audit/C_TRADEMARKS.md`).]
 
@@ -295,6 +325,26 @@ You agree **not** to:
 - misrepresent your age or identity, or create accounts in bulk;
 - use the Service to develop a competing product or to train AI models.
 
+### 13.1 Friends: conduct between members — [DRAFT FOR ATTORNEY REVIEW — NOT YET IN FORCE]
+
+> **Not in force.** The Friends feature is switched off and its code is not part of the current release. Challenges between members have not been built. These terms are a draft for counsel. They take effect only if the owner switches Friends on after counsel has approved them and members have accepted them. Facts: audit file 08. Procedure: `docs/legal/MODERATION_AND_USER_CONTENT_POLICY_DRAFT.md`.
+
+If Friends is switched on, the following would apply.
+
+- **What other members can see.** Your username; between friends, your display name; and, while your "show workouts" switch is on, the number of workouts you completed in the last 7 days and your streaks. The Privacy Policy (Section 16) has the full description. Members cannot send each other free text.
+- **Usernames and display names.** Your username and display name must not:
+  - impersonate another person, or suggest you are Narrow Gate Fitness staff, support or an administrator;
+  - contain hateful, harassing, sexually explicit, threatening or unlawful words;
+  - contain someone else's personal information, or contact details meant to move a conversation elsewhere;
+  - advertise or promote a product or service.
+- **Requests and invites.** Do not send repeated friend requests to someone who has not accepted. Do not post an invite link publicly: whoever opens it and signs in becomes your friend at once.
+- **Harassment.** Do not use search, requests, invites, blocks or reports to harass, stalk, pressure or single out another member.
+- **Reports.** Report only in good faith. Do not file false or repeated reports. Do not put another person's sensitive information in a report beyond what is needed to explain the problem.
+- **Minors.** The Service is for adults only (Section 2.1). Do not use Friends to contact anyone you believe is under 18; report the account instead.
+- **What we may do.** We may change or remove a username or display name that breaks these rules, remove a friendship, restrict a member's use of Friends, or suspend or close an account under Section 18. [OWNER DECISION: which of these actions will actually be offered. As of 2026-11-16 the app has no in-app tool to suspend a member or change a name; administrators can only read and close reports.]
+- **Blocking.** You can block any member. They are not told. We do not promise that a blocked member cannot work out that they were blocked.
+- **No duty to monitor.** [ATTORNEY REVIEW: decide what, if anything, to say about monitoring, response times and liability for other members' conduct. No response time has been decided: [OWNER DECISION: report review and response times]. Apple guideline 1.2 and Google Play's user-generated-content policy set expectations for reporting, blocking, filtering and published contact details (audit file 09).]
+
 ## 14. Subscriptions, auto-renewal and billing
 
 ### 14.1 Automatic renewal
@@ -305,7 +355,7 @@ You agree **not** to:
 - that the subscription renews automatically;
 - how to cancel.
 
-[ATTORNEY REVIEW: ROSCA (15 U.S.C. §8403) and state ARLs require clear and conspicuous disclosure **before** billing information is obtained, plus express informed consent. California additionally requires an acknowledgment, simple online cancellation, annual reminders and verification of consent (Bus. & Prof. Code §§17600–17606, as amended by AB 2863, effective July 1, 2025). On committed HEAD the renewal language is a footnote below the plan cards. The in-progress redesign (`src/components/profile/web-membership.tsx`) puts the price on the button and the renewal terms and Terms links in the plan footer. Neither version records consent or sends an acknowledgment email or an annual reminder. See FINAL_PRIVACY_AND_LEGAL.md §6.]
+[ATTORNEY REVIEW: ROSCA (15 U.S.C. §8403) and state ARLs require clear and conspicuous disclosure **before** billing information is obtained, plus express informed consent. California additionally requires an acknowledgment, simple online cancellation, annual reminders and verification of consent (Bus. & Prof. Code §§17600–17606, as amended by AB 2863, effective July 1, 2025). On committed HEAD the renewal language is a footnote below the plan cards. The in-progress redesign (`src/components/profile/web-membership.tsx`) puts the price on the button and the renewal terms and Terms links in the plan footer. Neither version records consent or sends an acknowledgment email or an annual reminder. See FINAL_PRIVACY_AND_LEGAL.md §6.] [Update 2026-11-16, not part of the note above: website checkout now requires an unticked box reading "I agree that Pro All Access renews automatically at {price} per {period} until I cancel, and that I can cancel any time in Manage billing", and records the agreed text with the plan, price and period. Still true: the app sends no purchase acknowledgment email and no renewal reminder, and it records nothing for App Store or Google Play purchases, which use the store's own purchase sheet. The auto-renewal record is deleted when the account is deleted.]
 
 ### 14.2 Where you buy determines who bills you
 
@@ -317,12 +367,15 @@ You agree **not** to:
 
 If you subscribe through more than one channel, each subscription bills separately. Cancel the one you do not want. The app tries to prevent duplicate purchases but cannot cancel a subscription bought through a different channel.
 
+**Restore Purchases.** If you subscribed through the App Store or Google Play and your Pro access does not appear (for example on a new phone or after reinstalling), use **Restore purchases** on the plans screen in the app, or on the website's Plans & billing page. It re-checks your store purchases and updates your plan. It does not charge you and does not start a new subscription. The plans screen in the app also has a **Manage subscription** link that opens your store's subscription settings.
+
 ### 14.3 Cancellation
 
 - You can cancel at any time.
 - Cancellation stops future renewals. You keep Pro access until the end of the period you have already paid for.
 - For App Store subscriptions, cancel at least 24 hours before the period ends to avoid the next renewal, under Apple's rules.
-- **Deleting the app from your phone does not cancel a subscription.**
+- **Where to cancel:** an App Store subscription in your Apple Account; a Google Play subscription in Google Play; a website subscription through the **Manage billing** link on the website (Profile → Plans & billing), which opens the Stripe customer portal.
+- **Removing the app from your phone cancels nothing.** It does not cancel a website subscription or a store subscription, and it does not delete your account.
 
 ### 14.4 Account deletion and subscriptions
 
@@ -350,7 +403,7 @@ The new price applies from your next renewal after the notice period. You can ca
 
 ### 14.8 Promotions and trials
 
-If we offer a free trial or promotional price, its terms will be shown before you sign up. These include:
+**No free trial is offered today.** Website checkout accepts promotion codes. If we offer a free trial or promotional price, its terms will be shown before you sign up. These include:
 - its length;
 - the price after it ends;
 - when you will first be charged;
@@ -373,7 +426,9 @@ You are responsible for any applicable sales, use or similar taxes, unless we ar
   - Open Food Facts;
   - USDA FoodData Central;
   - our hosting provider [HOSTING PROVIDER];
-  - YouTube, through an optional "search for form videos" link that opens outside the app.
+  - our email delivery provider for account emails [EMAIL DELIVERY PROVIDER — OWNER TO CONFIRM; not yet chosen];
+  - YouTube, through an optional "search for form videos" link that opens outside the app;
+  - YouTube or Vimeo, where an exercise page includes an embedded video that one of our administrators linked.
 - We are not responsible for third-party services, their availability, or their content. Your use of them may be subject to their own terms and privacy policies.
 
 ## 16. Your content and data
@@ -384,8 +439,9 @@ You are responsible for any applicable sales, use or similar taxes, unless we ar
   - photos;
   - notes and messages.
 - **License to us.** You give us a limited, non-exclusive, worldwide, royalty-free license to host, store, process, transmit and display your content. This license is **only** to operate, secure and provide the Service to you, as described in the Privacy Policy. It ends when you delete the content or your account, except for backups kept for the limited time stated in the Privacy Policy. We do not sell your content. We do not use it for advertising or to train AI models. [ATTORNEY REVIEW / OWNER: confirm "no AI training." Anthropic's Commercial Terms (effective June 17, 2025) state that Anthropic may not train models on customer content from its services.]
-- **Export and deletion.** You can export your data (Profile → Privacy & data → Export) and delete your account at any time. The Privacy Policy explains how.
+- **Export and deletion.** You can export your data (Profile → Privacy & data → Export) and delete your account at any time. The Privacy Policy explains how, and so does the public page `/legal/delete-account` [DELETE-ACCOUNT PAGE URL — full web address to be supplied once the production domain is confirmed].
 - **Responsibility.** You are responsible for content you upload, and for having the rights to it.
+- **Who can see your content.** Today, everything you create in the Service is private to your account; no other member can see any of it. If the Friends feature is switched on, a username, your display name and limited workout figures would be visible to other members as described in Section 13.1 and the Privacy Policy.
 
 ## 17. Our intellectual property
 
@@ -402,11 +458,11 @@ You are responsible for any applicable sales, use or similar taxes, unless we ar
 - **Third-party materials.** The Service includes third-party materials under their own licenses:
   - Berean Standard Bible text (public domain);
   - Open Food Facts data (Open Database License; the database contents are under the Database Contents License; images under CC BY-SA);
-  - USDA FoodData Central data (CC0 / public domain);
+  - USDA FoodData Central data (CC0 / public domain) [TO BE CONFIRMED — the USDA licence and citation terms could not be checked against USDA's own pages during the 2026-11-16 audit (file 05, F-7)]. USDA does not endorse the Service;
   - open-source software components;
   - bundled fonts (SIL Open Font License).
 
-  Attribution and license notices are available at [ATTRIBUTIONS / OPEN-SOURCE NOTICES URL OR IN-APP SCREEN]. [ATTORNEY REVIEW: an in-app notices screen is recommended. `@capgo/capacitor-health` is MPL-2.0, which carries file-level source-availability obligations.]
+  Attribution and license notices are available in the app at Profile → Notices & licenses (the `/legal/notices` page). [ATTRIBUTIONS / OPEN-SOURCE NOTICES URL — the public web address of that page is to be supplied once the production domain is confirmed.] [ATTORNEY REVIEW: audit file 05 found the notices page incomplete (for example, no copy of or link to the MPL-2.0 text, and open-source licence notices are not reproduced); how Open Food Facts data kept in members' diaries and the app's food tables should be classified under the Open Database License is an open question for counsel (file 05, F-2).] [ATTORNEY REVIEW: an in-app notices screen is recommended. `@capgo/capacitor-health` is MPL-2.0, which carries file-level source-availability obligations.]
 - **Feedback.** If you send us suggestions, we may use them without obligation to you.
 - **Copyright complaints.** Send notices of claimed infringement to [DMCA AGENT NAME AND ADDRESS]. [ATTORNEY REVIEW: register a DMCA designated agent with the U.S. Copyright Office if user uploads are hosted. Uploads here are private, so the benefit of registering is limited, but registration is inexpensive.]
 
