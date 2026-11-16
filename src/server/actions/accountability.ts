@@ -15,6 +15,7 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { requireUser } from "@/server/auth";
 import { ACCOUNTABILITY_FLAG, isFlagOn } from "@/server/flags";
 import { logError } from "@/server/log";
+import { rateLimit } from "@/server/rate-limit";
 
 /**
  * Accountability partners (migration 067). Every action except ending a partnership is refused while the
@@ -76,10 +77,12 @@ export async function withdrawInviteAction(inviteId: string): Promise<Result> {
 
 /** Enter a friend's code: you become partners (each of you then chooses what to share). */
 export async function acceptInviteAction(input: string): Promise<Result<{ partnershipId: string }>> {
-  const { on } = await signedInAndOn();
+  const { user, on } = await signedInAndOn();
   if (!on) return { ok: false, error: OFF };
   const code = normalizeInviteCode(typeof input === "string" ? input : "");
   if (!code) return { ok: false, error: "Codes are 10 letters and numbers, like ABCDE-FGH23." };
+  // Slows down guessing codes (the same limit as friend invite links).
+  if (!(await rateLimit(`accountability-invite:${user.id}`, 10, 10 * 60_000)).ok) return { ok: false, error: "You're doing that a lot. Please wait a few minutes and try again." };
   const supabase = await getServerSupabase();
   const { data, error } = await supabase.rpc("accept_accountability_invite", { p_code: code });
   if (error) return failure("accountability.accept", error, "Couldn't add your partner. Please try again.");

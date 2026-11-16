@@ -44,11 +44,15 @@ export function normalizeSearch(input: string): string | null {
 export type PrivacyKey = "searchable" | "profile_visible" | "show_workouts" | "show_records" | "show_body" | "show_nutrition" | "show_faith" | "show_in_leaderboards";
 export type PrivacySettings = Record<PrivacyKey, boolean>;
 
-/** Defaults for a new member of Friends (migration 076). Body, nutrition and Faith are private unless turned on. */
+/**
+ * Defaults for a new member of Friends (the column defaults of social_profiles, migrations 076 and 078). A new member
+ * shares nothing with a friend but their username and name until they switch workouts on. `show_in_leaderboards` is
+ * stored as on but nothing reads it yet (see PRIVACY_OPTIONS).
+ */
 export const DEFAULT_PRIVACY: PrivacySettings = {
   searchable: true,
   profile_visible: true,
-  show_workouts: true,
+  show_workouts: false,
   show_records: false,
   show_body: false,
   show_nutrition: false,
@@ -62,17 +66,42 @@ export function isPrivacyKey(key: string): key is PrivacyKey {
   return Object.prototype.hasOwnProperty.call(DEFAULT_PRIVACY, key);
 }
 
+export interface PrivacyOption {
+  key: PrivacyKey;
+  label: string;
+  detail: string;
+  sensitive?: boolean;
+  group: "finding" | "friends";
+  /**
+   * False: no database function reads this switch yet, so it is not offered on any screen and can't be switched on
+   * (a choice made before the sharing exists, and before its content is known, isn't a real choice). The key and its
+   * column stay so nothing breaks when the sharing ships; it must be asked afresh then.
+   */
+  active: boolean;
+}
+
 /** Each switch in the member's words. `sensitive` ones are off by default and say so. */
-export const PRIVACY_OPTIONS: { key: PrivacyKey; label: string; detail: string; sensitive?: boolean; group: "finding" | "friends" }[] = [
-  { key: "searchable", group: "finding", label: "Let people find me by username", detail: "Off: only people you send a request or an invite link to can connect with you." },
-  { key: "profile_visible", group: "friends", label: "Show my profile to friends", detail: "Off: friends see your name and username, nothing else." },
-  { key: "show_workouts", group: "friends", label: "Workouts and streak", detail: "How many workouts you completed in the last 7 days and your streaks. Numbers only, never what you did." },
-  { key: "show_records", group: "friends", label: "Personal records", detail: "Your best lifts, for comparing the same exercise with a friend." },
-  { key: "show_in_leaderboards", group: "friends", label: "Appear in friend rankings", detail: "Off: you're left out of comparisons between friends." },
-  { key: "show_body", group: "friends", sensitive: true, label: "Weight and body measurements", detail: "Private unless you turn this on." },
-  { key: "show_nutrition", group: "friends", sensitive: true, label: "Nutrition", detail: "Private unless you turn this on." },
-  { key: "show_faith", group: "friends", sensitive: true, label: "Faith and discipline activity", detail: "Reading and prayer streaks only. Private unless you turn this on." },
+export const PRIVACY_OPTIONS: PrivacyOption[] = [
+  { key: "searchable", group: "finding", active: true, label: "Let people find me by username", detail: "Off: only people you send a request or an invite link to can connect with you." },
+  { key: "profile_visible", group: "friends", active: true, label: "Show my profile to friends", detail: "Off: friends see your name and username, nothing else." },
+  { key: "show_workouts", group: "friends", active: true, label: "Workouts and streak", detail: "How many workouts you completed in the last 7 days and your streaks. Numbers only, never what you did. Off until you turn it on." },
+  { key: "show_records", group: "friends", active: false, label: "Personal records", detail: "Your best lifts, for comparing the same exercise with a friend." },
+  { key: "show_in_leaderboards", group: "friends", active: false, label: "Appear in friend rankings", detail: "Off: you're left out of comparisons between friends." },
+  { key: "show_body", group: "friends", active: false, sensitive: true, label: "Weight and body measurements", detail: "Private unless you turn this on." },
+  { key: "show_nutrition", group: "friends", active: false, sensitive: true, label: "Nutrition", detail: "Private unless you turn this on." },
+  { key: "show_faith", group: "friends", active: false, sensitive: true, label: "Faith and discipline activity", detail: "Reading and prayer streaks only. Private unless you turn this on." },
 ];
+
+/** The switches a member is offered: the ones something reads today. */
+export const ACTIVE_PRIVACY_OPTIONS = PRIVACY_OPTIONS.filter((o) => o.active);
+
+/** Whether a switch does anything yet. Inactive ones can be switched off but never on. */
+export function isActivePrivacyKey(key: PrivacyKey): boolean {
+  return ACTIVE_PRIVACY_OPTIONS.some((o) => o.key === key);
+}
+
+/** Shown on the Friends and Privacy & sharing screens: what no switch shares today. */
+export const FRIENDS_NOT_SHARED_NOTE = "Weight, measurements, nutrition and Faith activity are not shared with friends at all.";
 
 /** Never visible to a friend, whatever the switches say. */
 export const FRIENDS_NEVER_SHARED = ["Prayer journal and Faith notes", "Sleep", "Progress photos and body scans", "AI Coach conversations", "Individual exercises, sets and workout notes", "Your email address"] as const;

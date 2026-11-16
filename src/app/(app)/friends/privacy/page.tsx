@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { EyeOff } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { BlockedList, PrivacySwitches, UsernameForm } from "@/components/friends/friends-panels";
-import { FRIENDS_NEVER_SHARED } from "@/lib/domain/friends";
+import { FRIENDS_NEVER_SHARED, FRIENDS_NOT_SHARED_NOTE } from "@/lib/domain/friends";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
 import { FRIENDS_FLAG, isFlagOn } from "@/server/flags";
@@ -29,7 +29,11 @@ export default async function FriendsPrivacyPage() {
         <h2 id="privacy-friends-title" className="text-lg font-semibold">
           What friends can see
         </h2>
+        <p className="mt-1 text-sm text-muted-foreground">Friends always see your username and the name on your profile. Anything else is shared only if you switch it on.</p>
         <PrivacySwitches initial={me.privacy} group="friends" />
+        <p className="mt-1 text-sm text-muted-foreground" data-testid="privacy-not-shared">
+          {FRIENDS_NOT_SHARED_NOTE}
+        </p>
         <p className="mt-3 flex items-center gap-2 text-sm font-semibold">
           <EyeOff className="size-4 text-gold" aria-hidden /> Never shared
         </p>

@@ -5,7 +5,7 @@ import { EmptyState } from "@/components/common/states";
 import { PageHeader } from "@/components/common/page-header";
 import { Avatar } from "@/components/friends/avatar";
 import { FriendSearch, IncomingRequests, InviteLinks, OutgoingRequests, UsernameForm } from "@/components/friends/friends-panels";
-import { FRIENDS_NEVER_SHARED, MAX_FRIENDS } from "@/lib/domain/friends";
+import { FRIENDS_NEVER_SHARED, FRIENDS_NOT_SHARED_NOTE, MAX_FRIENDS } from "@/lib/domain/friends";
 import { publicEnv } from "@/lib/env";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
@@ -35,14 +35,14 @@ export default async function FriendsPage() {
           <h2 id="friends-start-title" className="mb-1 text-lg font-semibold">
             Choose your username
           </h2>
-          <p className="mb-3 text-sm text-muted-foreground">This is how friends find you. Nothing is shared with anyone until you accept them as a friend.</p>
+          <p className="mb-3 text-sm text-muted-foreground">This is how friends find you. Nothing is shared with anyone until you become friends. A friend then sees your username and the name on your profile, and nothing else unless you switch it on.</p>
           <UsernameForm submitLabel="Get started" />
         </section>
         <section className={section} aria-labelledby="friends-private-title">
           <h2 id="friends-private-title" className="mb-2 flex items-center gap-2 text-lg font-semibold">
             <ShieldCheck className="size-5 text-gold" aria-hidden /> Private by default
           </h2>
-          <p className="mb-2 text-sm text-muted-foreground">Friends see only what you switch on. Weight, measurements, nutrition and Faith activity start switched off. These are never shared:</p>
+          <p className="mb-2 text-sm text-muted-foreground">Your workout count and streaks stay private until you switch them on in Privacy &amp; sharing. {FRIENDS_NOT_SHARED_NOTE} These are never shared either:</p>
           <p className="text-sm text-muted-foreground">{FRIENDS_NEVER_SHARED.join(" · ")}.</p>
         </section>
       </div>

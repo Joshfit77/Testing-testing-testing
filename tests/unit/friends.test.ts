@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  ACTIVE_PRIVACY_OPTIONS,
   DEFAULT_PRIVACY,
+  FRIENDS_NOT_SHARED_NOTE,
   friendInviteShareText,
   friendsErrorMessage,
   initials,
   inviteUrl,
+  isActivePrivacyKey,
   normalizeSearch,
   normalizeUsername,
   parseFriendProfile,
@@ -43,6 +46,25 @@ describe("friends: privacy defaults", () => {
       expect(typeof DEFAULT_PRIVACY[o.key], o.key).toBe("boolean");
       if (o.sensitive) expect(DEFAULT_PRIVACY[o.key], o.key).toBe(false);
     }
+  });
+  it("a new member shares no activity: workouts start off, like everything else a friend could see", () => {
+    expect(DEFAULT_PRIVACY.show_workouts).toBe(false);
+    // The only defaults that are on among the switches a member is offered: being findable, and having a profile
+    // (which by itself shows a friend the username and name only).
+    expect(ACTIVE_PRIVACY_OPTIONS.filter((o) => DEFAULT_PRIVACY[o.key]).map((o) => o.key).sort()).toEqual(["profile_visible", "searchable"]);
+  });
+  it("only the switches something reads are offered; the rest are kept but inactive", () => {
+    expect(ACTIVE_PRIVACY_OPTIONS.map((o) => o.key).sort()).toEqual(["profile_visible", "searchable", "show_workouts"]);
+    expect(PRIVACY_OPTIONS.filter((o) => !o.active).map((o) => o.key).sort()).toEqual(["show_body", "show_faith", "show_in_leaderboards", "show_nutrition", "show_records"]);
+    // No sensitive switch is offered.
+    expect(ACTIVE_PRIVACY_OPTIONS.some((o) => o.sensitive)).toBe(false);
+    for (const o of PRIVACY_OPTIONS) expect(isActivePrivacyKey(o.key), o.key).toBe(o.active);
+    // Every key still has an option and a default, so the stored columns keep working.
+    expect(PRIVACY_OPTIONS.map((o) => o.key).sort()).toEqual(Object.keys(DEFAULT_PRIVACY).sort());
+  });
+  it("the screen says what is not shared at all, and no option says a block or decline can't be detected", () => {
+    expect(FRIENDS_NOT_SHARED_NOTE).toBe("Weight, measurements, nutrition and Faith activity are not shared with friends at all.");
+    for (const o of ACTIVE_PRIVACY_OPTIONS) expect(`${o.label} ${o.detail}`, o.key).not.toMatch(/can't tell|never revealed|on by default/i);
   });
 });
 

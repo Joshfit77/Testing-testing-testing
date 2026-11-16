@@ -3,11 +3,14 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createTestUser, deleteTestUser, serviceClient, stackAvailable, type TestUser } from "./helpers";
 
 /**
- * Friends (migration 076), against the real database: off until the owner switches the flag on; usernames are unique
- * and can't pass for staff; a stranger sees a username and nothing else; a request must be accepted before anything is
- * shared; a friend sees only what the other switched on; removing or blocking takes effect at once and a block is
- * never revealed; no member can write a friendship, a request or a block directly; reports reach administrators only;
- * deleting an account removes every trace.
+ * Friends (migrations 076 to 078), against the real database: off until the owner switches the flag on; usernames are
+ * unique and can't pass for staff; a stranger sees a username and nothing else; a request must be accepted before
+ * anything is shared; a new friend sees the username and name only, and after that only what the other switched on;
+ * removing or blocking takes effect at once; no member can write a friendship, a request or a block directly; reports
+ * reach administrators only; deleting an account removes every trace.
+ *
+ * A block or a decline is not notified to the other member. Neither is concealed: the other member can infer it
+ * (audit findings F-03 and F-04), and nothing here claims otherwise.
  */
 let signedIn: SupabaseClient;
 vi.mock("next/headers", () => ({ cookies: async () => ({ getAll: () => [], set: () => {} }), headers: async () => new Headers() }));
@@ -143,7 +146,28 @@ describe.skipIf(!available)("friends", () => {
     expect(await rpcError(b, "respond_friend_request", { p_request_id: id, p_accept: true })).toBe("request_not_found");
   });
 
+  it("a brand-new friend sees the username and name only: becoming a friend shares no activity by itself", async () => {
+    // B never touched a switch: these are the column defaults (migration 078).
+    expect((await svc.from("social_profiles").select("searchable, profile_visible, show_workouts, show_records, show_body, show_nutrition, show_faith").eq("user_id", b.id).single()).data).toEqual({
+      searchable: true,
+      profile_visible: true,
+      show_workouts: false,
+      show_records: false,
+      show_body: false,
+      show_nutrition: false,
+      show_faith: false,
+    });
+    // B has two completed workouts, and A, now a friend, sees none of it.
+    const p = await profileOf(a, b);
+    expect(Object.keys(p!).sort()).toEqual(["display_name", "profile_visible", "since", "user_id", "username"]);
+    expect(p).toMatchObject({ user_id: b.id, username: uname("b"), display_name: "Bea Private-Name", profile_visible: true });
+    // The same in the other direction.
+    expect(Object.keys((await profileOf(b, a))!).sort()).toEqual(["display_name", "profile_visible", "since", "user_id", "username"]);
+  });
+
   it("a friend sees the name and the training numbers the other shares, and nothing else", async () => {
+    // B switches workouts on (off by default).
+    expect((await (await as(b)).updatePrivacyAction({ key: "show_workouts", value: true })).ok).toBe(true);
     // B trained today and yesterday (UTC). On a Monday, yesterday falls in the previous week: a two-week streak.
     const weeksExpected = new Date().getUTCDay() === 1 ? 2 : 1;
     const p = await profileOf(a, b);
@@ -170,6 +194,12 @@ describe.skipIf(!available)("friends", () => {
     await a.client.from("social_profiles").update({ show_body: true }).eq("user_id", b.id);
     expect((await svc.from("social_profiles").select("show_body").eq("user_id", b.id).single()).data?.show_body).toBe(false);
     expect((await (await as(a)).updatePrivacyAction({ key: "username" as never, value: true })).ok).toBe(false);
+    // A switch that nothing reads yet can't be switched on ahead of time; switching it off is always allowed.
+    for (const key of ["show_records", "show_in_leaderboards", "show_body", "show_nutrition", "show_faith"] as const) {
+      expect(await (await as(b)).updatePrivacyAction({ key, value: true }), key).toEqual({ ok: false, error: "That setting isn't available yet." });
+      expect((await (await as(b)).updatePrivacyAction({ key, value: false })).ok, key).toBe(true);
+    }
+    expect((await svc.from("social_profiles").select("show_records, show_body, show_nutrition, show_faith").eq("user_id", b.id).single()).data).toEqual({ show_records: false, show_body: false, show_nutrition: false, show_faith: false });
     // Turning search off hides a member from strangers, not from friends.
     expect((await (await as(b)).updatePrivacyAction({ key: "searchable", value: false })).ok).toBe(true);
     expect(await search(c, uname("b"))).toEqual([]);
@@ -177,13 +207,33 @@ describe.skipIf(!available)("friends", () => {
     expect((await (await as(b)).updatePrivacyAction({ key: "searchable", value: true })).ok).toBe(true);
   });
 
-  it("two requests that cross make a friendship; a decline isn't shown to the sender and can't be repeated at once", async () => {
+  it("a member who switched search off can't be sent a request, even by someone holding their account id, unless they asked first", async () => {
+    const [hidden, seeker] = await Promise.all([createTestUser("fr-hid"), createTestUser("fr-seek")]);
+    try {
+      await hidden.client.rpc("claim_username", { p_username: uname("h") });
+      await seeker.client.rpc("claim_username", { p_username: uname("s") });
+      signedIn = hidden.client;
+      expect((await (await actions()).updatePrivacyAction({ key: "searchable", value: false })).ok).toBe(true);
+      expect(await search(seeker, uname("h"))).toEqual([]);
+      expect(await rpcError(seeker, "send_friend_request", { p_user_id: hidden.id })).toBe("user_not_found");
+      expect((await svc.from("friend_requests").select("id", { count: "exact", head: true }).eq("recipient_id", hidden.id)).count).toBe(0);
+      // The hidden member reaches out; the other's request then meets it.
+      expect((await hidden.client.rpc("send_friend_request", { p_user_id: seeker.id })).data).toBe("requested");
+      expect((await seeker.client.rpc("send_friend_request", { p_user_id: hidden.id })).data).toBe("accepted");
+      expect(await friendsCount(hidden)).toBe(1);
+    } finally {
+      await Promise.all([deleteTestUser(hidden), deleteTestUser(seeker)]);
+    }
+  });
+
+  it("two requests that cross make a friendship; the sender isn't notified of a decline (but can infer it) and can't repeat it at once", async () => {
     expect((await a.client.rpc("send_friend_request", { p_user_id: c.id })).data).toBe("requested");
     const id = (await overview(c)).incoming![0]!.request_id!;
     expect((await (await as(c)).respondFriendRequestAction(id, false)).ok).toBe(true);
     expect(await friendsCount(c)).toBe(0);
     expect((await a.client.from("friend_requests").select("status").eq("id", id)).data).toEqual([]);
     expect((await overview(a)).outgoing).toEqual([]);
+    // Not concealed: the cooldown tells the sender what happened (audit finding F-04).
     expect(await rpcError(a, "send_friend_request", { p_user_id: c.id })).toBe("request_cooldown");
     // C changes their mind and asks A; A's own request then meets it.
     expect((await c.client.rpc("send_friend_request", { p_user_id: a.id })).data).toBe("requested");
@@ -232,7 +282,7 @@ describe.skipIf(!available)("friends", () => {
     expect(await profileOf(a, b)).not.toBeNull();
   });
 
-  it("blocking ends the friendship and any request, hides each from the other, and is never revealed", async () => {
+  it("blocking ends the friendship and any request and hides each from the other; the blocked member isn't notified (but can infer it)", async () => {
     expect((await d.client.rpc("send_friend_request", { p_user_id: a.id })).data).toBe("requested");
     expect((await (await as(a)).blockUserAction(b.id)).ok).toBe(true);
     expect((await (await as(a)).blockUserAction(d.id)).ok).toBe(true);
@@ -241,7 +291,8 @@ describe.skipIf(!available)("friends", () => {
     expect((await overview(a)).incoming).toEqual([]);
     expect(await search(b, uname("a"))).toEqual([]);
     expect(await search(a, uname("b"))).toEqual([]);
-    // To the blocked member it looks like A doesn't exist; nothing says "blocked".
+    // Nothing says "blocked": to the blocked member A now reads as "not found". That is not concealment: a member
+    // they could see a moment ago has vanished, and they can work out why (audit finding F-03).
     expect(await rpcError(b, "send_friend_request", { p_user_id: a.id })).toBe("user_not_found");
     expect((await b.client.from("user_blocks").select("blocker_id")).data).toEqual([]);
     expect((await overview(a)).blocked!.map((x) => x.user_id).sort()).toEqual([b.id, d.id].sort());
@@ -258,6 +309,20 @@ describe.skipIf(!available)("friends", () => {
     expect((await (await as(a)).unblockUserAction(b.id)).ok).toBe(true);
     expect(await profileOf(a, b)).toBeNull();
     expect((await b.client.rpc("send_friend_request", { p_user_id: a.id })).data).toBe("requested");
+  });
+
+  it("accepting a request from a member with a block between them is refused, and no friendship is made", async () => {
+    // A still blocks D. block_user closes pending requests, so one can only exist here if it is planted.
+    const { data: planted, error } = await svc.from("friend_requests").insert({ sender_id: d.id, recipient_id: a.id }).select("id").single();
+    if (error) throw error;
+    const before = await friendsCount(a);
+    expect(await rpcError(a, "respond_friend_request", { p_request_id: planted!.id, p_accept: true })).toBe("request_not_found");
+    expect(await friendsCount(a)).toBe(before);
+    expect(await profileOf(d, a)).toBeNull();
+    // Declining it still works.
+    expect(await rpcError(a, "respond_friend_request", { p_request_id: planted!.id, p_accept: false })).toBeNull();
+    expect((await svc.from("friend_requests").select("status").eq("id", planted!.id).single()).data?.status).toBe("declined");
+    await svc.from("friend_requests").delete().eq("id", planted!.id);
   });
 
   it("blocking also ends an accountability partnership between the two", async () => {
@@ -335,9 +400,17 @@ describe.skipIf(!available)("friends", () => {
       expect(error?.code, fn).toBe("42501");
       expect(data).toBeNull();
     }
-    for (const table of ["social_profiles", "friend_requests", "friendships", "user_blocks", "user_reports", "friend_invites"]) {
-      expect((await anon.from(table).select("*").limit(1)).data ?? [], table).toEqual([]);
+    // Not only zero rows: the signed-out role holds no privilege on these tables at all (migration 078).
+    for (const table of ["social_profiles", "friend_requests", "friendships", "user_blocks", "user_reports", "friend_invites", "accountability_partnerships", "accountability_invites", "accountability_shares", "accountability_nudges"]) {
+      const res = await anon.from(table).select("*").limit(1);
+      expect(res.error?.code, table).toBe("42501");
+      expect(res.data ?? [], table).toEqual([]);
+      expect((await anon.from(table).delete().neq("created_at", "1970-01-01T00:00:00Z")).error?.code, table).toBe("42501");
     }
+    // A visitor still reads the feature flags (the app needs them) but can't write one.
+    expect((await anon.from("feature_flags").select("key").eq("key", FLAG)).data).toEqual([{ key: FLAG }]);
+    expect((await anon.from("feature_flags").update({ enabled: true }).eq("key", FLAG)).error?.code).toBe("42501");
+    expect((await anon.from("feature_flags").insert({ key: `visitor_${tag}`, enabled: true })).error?.code).toBe("42501");
   });
 
   it("with the flag switched off again, nothing is shared, but removing and blocking still work", async () => {

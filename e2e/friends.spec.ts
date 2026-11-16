@@ -2,8 +2,9 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
 import { LOCAL_SERVICE_KEY, PASSWORD, serviceRest, SUPABASE_URL, uniqueEmail } from "./helpers";
 
 /**
- * Friends (migration 076) in the real app, with two members in two browsers: hidden while the flag is off; choosing a
- * username; finding a friend by username; request, accept, the friend's profile; switching sharing off; removing.
+ * Friends (migrations 076 to 078) in the real app, with two members in two browsers: hidden while the flag is off;
+ * choosing a username; finding a friend by username; request, accept, the friend's profile (name only until the friend
+ * switches workouts on); switching sharing on and off; removing.
  * Members are created through the local auth admin API with onboarding already finished.
  */
 const FLAG = "friends_challenges";
@@ -66,7 +67,7 @@ test.describe("friends", () => {
   test.beforeAll(async () => {
     flagBefore = (await serviceRest<{ enabled: boolean }[]>(`feature_flags?key=eq.${FLAG}&select=enabled`))[0]?.enabled === true;
     [jordan, sam] = await Promise.all([createMember("Jordan Reyes"), createMember("Sam Carter")]);
-    // Sam already uses Friends and trained three days running.
+    // Sam already uses Friends (with the default switches: workouts not shared) and trained three days running.
     await serviceRest("social_profiles", { method: "POST", body: { user_id: sam.id, username: samName } });
     const now = Date.now();
     await serviceRest("workout_sessions", {
@@ -137,22 +138,39 @@ test.describe("friends", () => {
     await expect(sp.getByTestId("friends-list")).toContainText("Jordan Reyes");
     await shot(sp, "06-friends-list");
 
-    // Jordan opens Sam's profile: name, username and the training numbers Sam shares.
+    // Jordan opens Sam's profile: name and username only. Becoming friends shares no training by itself.
     await jp.reload();
     await jp.getByTestId("friends-list").getByRole("link", { name: /Sam Carter/ }).click();
     await expect(jp.getByRole("heading", { name: "Sam Carter", level: 1 })).toBeVisible();
+    await expect(jp.getByTestId("friend-private")).toContainText("keeps their training private");
+    await expect(jp.getByTestId("friend-stats")).toHaveCount(0);
+    await shot(jp, "07a-friend-profile-default");
+
+    // Sam opens Privacy & sharing: workouts are off, and only the switches that do something are offered.
+    await sp.goto("/friends/privacy");
+    await expect(sp.getByRole("heading", { name: "What friends can see" })).toBeVisible();
+    await expect(sp.getByTestId("privacy-profile_visible")).toHaveAttribute("data-state", "checked");
+    await expect(sp.getByTestId("privacy-show_workouts")).toHaveAttribute("data-state", "unchecked");
+    await expect(sp.getByTestId("privacy-searchable")).toHaveAttribute("data-state", "checked");
+    for (const hidden of ["show_records", "show_in_leaderboards", "show_body", "show_nutrition", "show_faith"]) {
+      await expect(sp.getByTestId(`privacy-${hidden}`)).toHaveCount(0);
+    }
+    await expect(sp.getByTestId("privacy-not-shared")).toHaveText("Weight, measurements, nutrition and Faith activity are not shared with friends at all.");
+    await noSidewaysScroll(sp);
+
+    // Sam switches workouts on: Jordan now sees the training numbers.
+    await sp.getByTestId("privacy-show_workouts").click();
+    await expect(sp.getByTestId("privacy-show_workouts")).toHaveAttribute("data-state", "checked");
+    await expect.poll(async () => (await serviceRest<{ show_workouts: boolean }[]>(`social_profiles?user_id=eq.${sam.id}&select=show_workouts`))[0]?.show_workouts).toBe(true);
+    await jp.reload();
     const stats = jp.getByTestId("friend-stats");
     await expect(stats).toContainText("Workouts, last 7 days");
     await expect(stats).toContainText("3 days");
+    await expect(jp.getByTestId("friend-private")).toHaveCount(0);
     await noSidewaysScroll(jp);
     await shot(jp, "07-friend-profile");
 
-    // Sam switches workouts off: Jordan's view changes on the next load.
-    await sp.goto("/friends/privacy");
-    await expect(sp.getByTestId("privacy-show_body")).toHaveAttribute("data-state", "unchecked");
-    await expect(sp.getByTestId("privacy-show_nutrition")).toHaveAttribute("data-state", "unchecked");
-    await expect(sp.getByTestId("privacy-show_faith")).toHaveAttribute("data-state", "unchecked");
-    await noSidewaysScroll(sp);
+    // Sam switches workouts off again: Jordan's view changes on the next load.
     await shot(sp, "08-privacy");
     if (SHOTS) {
       await sp.getByRole("heading", { name: "Finding you" }).scrollIntoViewIfNeeded();

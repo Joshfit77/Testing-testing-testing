@@ -12,11 +12,11 @@ import { Input, Textarea } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/toaster";
 import {
+  ACTIVE_PRIVACY_OPTIONS,
   friendInviteShareText,
   inviteUrl,
   MAX_OPEN_FRIEND_INVITES,
   normalizeUsername,
-  PRIVACY_OPTIONS,
   REPORT_DETAILS_MAX,
   REPORT_REASON_KEYS,
   REPORT_REASONS,
@@ -372,9 +372,9 @@ export function PrivacySwitches({ initial, group }: { initial: PrivacySettings; 
   const profileOff = !settings.profile_visible;
   return (
     <ul className="divide-y divide-border">
-      {PRIVACY_OPTIONS.filter((o) => o.group === group).map((o) => {
+      {ACTIVE_PRIVACY_OPTIONS.filter((o) => o.group === group).map((o) => {
         // With the profile hidden, the items under it have no effect: shown as off and locked.
-        const locked = group === "friends" && profileOff && o.key !== "profile_visible" && o.key !== "show_in_leaderboards";
+        const locked = group === "friends" && profileOff && o.key !== "profile_visible";
         return (
           <li key={o.key} className="flex items-start justify-between gap-4 py-3">
             <span className="min-w-0">

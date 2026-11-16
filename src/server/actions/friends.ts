@@ -7,6 +7,7 @@ import {
   friendsErrorMessage,
   generateInviteCode,
   inviteUrl,
+  isActivePrivacyKey,
   isPrivacyKey,
   isReportReason,
   MAX_OPEN_FRIEND_INVITES,
@@ -167,6 +168,8 @@ export async function updatePrivacyAction(input: { key: PrivacyKey; value: boole
   if (!input || typeof input.key !== "string" || !isPrivacyKey(input.key) || typeof input.value !== "boolean") return { ok: false, error: "Invalid setting." };
   // Sharing less always works, even if the feature has been switched off since; sharing more needs the flag.
   if (input.value && !(await isFlagOn(FRIENDS_FLAG))) return { ok: false, error: OFF };
+  // A switch nothing reads yet (records, rankings, body, nutrition, Faith) can't be switched on ahead of time.
+  if (input.value && !isActivePrivacyKey(input.key)) return { ok: false, error: "That setting isn't available yet." };
   const supabase = await getServerSupabase();
   const { data, error } = await supabase
     .from("social_profiles")
