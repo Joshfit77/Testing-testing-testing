@@ -9,12 +9,15 @@
  *   answered from that cache, and a Bible page opened without a connection shows the offline reader. The cache holds
  *   Scripture only, never account data, and survives service-worker updates (it is versioned on its own).
  */
-const VERSION = "ngf-v2";
+const VERSION = "ngf-v3";
 const STATIC_CACHE = `${VERSION}-static`;
 const OFFLINE_URL = "/offline.html";
 const BIBLE_CACHE = "ngf-bible-v1";
-// The seven Home backgrounds (about 25 kB each), so the day's picture is there offline whatever day the app opens.
-const HOME_BACKGROUNDS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"].map((d) => `/home-backgrounds/${d}.webp`);
+// The seven Home backgrounds, stored so the day's picture is there offline. EMPTY until the owner's photographs exist
+// (docs/design/HOME_BACKGROUNDS.md): asking for files that aren't there left requests pending, the install never
+// finished and nothing worked offline. When the photographs are added, list them here again:
+//   ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"].map((d) => `/home-backgrounds/${d}.webp`)
+const HOME_BACKGROUNDS = [];
 const PRECACHE = [OFFLINE_URL, "/icons/icon-192.png", "/icons/icon-512.png", "/icons/icon.svg", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
