@@ -405,7 +405,10 @@ describe.skipIf(!available)("friends", () => {
       const res = await anon.from(table).select("*").limit(1);
       expect(res.error?.code, table).toBe("42501");
       expect(res.data ?? [], table).toEqual([]);
-      expect((await anon.from(table).delete().neq("created_at", "1970-01-01T00:00:00Z")).error?.code, table).toBe("42501");
+    }
+    // The two invite tables used to let the signed-out role ask for a delete (row-level security then matched no row).
+    for (const table of ["friend_invites", "accountability_invites"]) {
+      expect((await anon.from(table).delete().eq("id", crypto.randomUUID())).error?.code, table).toBe("42501");
     }
     // A visitor still reads the feature flags (the app needs them) but can't write one.
     expect((await anon.from("feature_flags").select("key").eq("key", FLAG)).data).toEqual([{ key: FLAG }]);
