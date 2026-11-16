@@ -87,7 +87,8 @@ conversations, individual exercises, sets and workout notes, the email address.
 | Existing security gates with the new tables | VERIFIED: cross-user isolation sweep, callable-function allow-list (three internal helpers refuse members and visitors), row-security coverage, account deletion and export coverage |
 | Whole integration suite | VERIFIED: 80 files passed, 1 skipped; 484 passed, 1 skipped |
 | Browser, two members in two browsers (`e2e/friends.spec.ts`) | VERIFIED: hidden with the flag off (no entry, 404); username; search; request; accept; friend profile; privacy switch changes the friend's view; report sheet; remove; invite link through sign-in; a used link is refused; no sideways scroll |
-| Whole browser suite | See the commit message for this phase |
+| Whole browser suite (`--project mobile`, stand-ins for the AI provider and the food database) | 148 passed, 101 skipped (demo-only and opt-in audits), **2 failed**: both offline Bible tests. Cause: not Friends. The service worker still asked for the seven Home pictures removed in `56500ff`; some of those requests never finished, the worker never installed and nothing worked offline. Fixed on this branch (`public/sw.js` stores the pictures only once they exist; version `ngf-v3`); both tests and the Home tests then VERIFIED passing. **The release-candidate branch still has this defect** and needs the same fix |
+| iPhone-size screens (393 x 852, Chromium emulation, not Safari) | Captured for review |
 | On an iPhone or Android phone | NOT TESTED |
 | The native share sheet for invite links | NOT TESTED (Chromium copies the text instead) |
 

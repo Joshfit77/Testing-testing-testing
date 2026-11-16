@@ -59,9 +59,14 @@ describe("Home backgrounds: one for each day of the week", () => {
     expect(msUntilNextLocalMidnight(new Date(2026, 10, 14, 23, 59, 59, 999))).toBeGreaterThanOrEqual(1000);
   });
 
-  it("the service worker keeps the seven pictures for offline use", () => {
+  it("the service worker stores the seven pictures only once they exist (a missing file must never stall its install)", () => {
     const sw = readFileSync(join(process.cwd(), "public/sw.js"), "utf8");
-    expect(sw).toContain("/home-backgrounds/${d}.webp");
-    for (const b of HOME_BACKGROUNDS) expect(sw).toContain(`"${b.key}"`);
+    const list = sw.match(/^const HOME_BACKGROUNDS = (.+);$/m)?.[1] ?? "";
+    if (HOME_BACKGROUND_PHOTOS_READY) {
+      expect(list).toContain("/home-backgrounds/${d}.webp");
+      for (const b of HOME_BACKGROUNDS) expect(list).toContain(`"${b.key}"`);
+    } else {
+      expect(list).toBe("[]");
+    }
   });
 });
