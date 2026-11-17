@@ -18,6 +18,7 @@ import {
   type ReportPeriod,
   type WeeklyMetrics,
   type WeeklyReportInput,
+  weeklyInputForProvider,
 } from "@/lib/domain/weekly-report";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { serverEnv } from "@/server/env";
@@ -176,10 +177,12 @@ export async function ensureWeeklyReport(
   const input = await collectWeeklyInput(readClient, userId, period, tz, sleepGoalMinutes);
   const metrics = buildWeeklyMetrics(input);
   // Running distances are stored in km; the written analysis uses the member's own units.
-  const prefs = await service.from("profiles").select("unit_system, ai_data_consent_at, health_ai_share_consent_at").eq("id", userId).maybeSingle();
-  // What the AI provider is given: the same figures, but with nights a health platform or wearable supplied left out
-  // unless the member has allowed sharing them (migration 079). The member's own report page still shows every night.
-  const metricsForProvider = healthAiSharingAllowed(prefs.data) ? metrics : buildWeeklyMetrics({ ...input, sleep: input.sleep.filter((n) => !n.imported) });
+  const prefs = await service.from("profiles").select("unit_system, ai_data_consent_at, health_ai_share_consent_at, wellness_consent_at").eq("id", userId).maybeSingle();
+  // What the AI provider is given: the same figures, but without sleep unless the member allows wellness data, and with
+  // nights a health platform or wearable supplied left out unless the member has allowed sharing them (migration 079).
+  // The member's own report page still shows every night. Unreadable consents read as "not allowed".
+  const providerInput = weeklyInputForProvider(input, { wellness: Boolean(prefs.data?.wellness_consent_at), healthPlatform: healthAiSharingAllowed(prefs.data) });
+  const metricsForProvider = providerInput === input ? metrics : buildWeeklyMetrics(providerInput);
   const unit: ReportDistanceUnit = prefs.data?.unit_system === "imperial" ? "mi" : "km";
   const inserted = await service
     .from("weekly_reports")

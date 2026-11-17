@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { fromHealthPlatform, healthAiSharingAllowed, withoutHealthPlatformData } from "@/lib/domain/health-ai-sharing";
-import { buildWeeklyMetrics, type WeeklyReportInput } from "@/lib/domain/weekly-report";
+import { buildWeeklyMetrics, weeklyInputForProvider, type WeeklyReportInput } from "@/lib/domain/weekly-report";
 
 describe("Apple Health / Health Connect data and the AI provider", () => {
   it("recognises data a health platform or wearable supplied", () => {
@@ -45,5 +45,31 @@ describe("Apple Health / Health Connect data and the AI provider", () => {
     expect(all.sleep.nights).toBe(2);
     expect(forProvider.sleep.nights).toBe(1);
     expect(JSON.stringify(forProvider.sleep)).not.toContain("rem");
+  });
+
+  it("weekly report: what the provider may see (no sleep without wellness consent; imported nights only with the permission)", () => {
+    const input = {
+      sleep: [
+        { asleepMinutes: 433, estimated: true, recorded: false, imported: false, stages: null },
+        { asleepMinutes: 517, estimated: false, recorded: true, imported: true, stages: { rem: 90, deep: 70, light: 300, awake: 20 } },
+        { asleepMinutes: 450, estimated: true, recorded: false, imported: false, stages: null },
+      ],
+      sleepSteadiness: "steady",
+    } as unknown as WeeklyReportInput;
+    // Everything allowed: unchanged (the same object, so nothing is recomputed).
+    expect(weeklyInputForProvider(input, { wellness: true, healthPlatform: true })).toBe(input);
+    // No health permission: the ring's night goes, and the steadiness worked out from it goes with it.
+    const typedOnly = weeklyInputForProvider(input, { wellness: true, healthPlatform: false });
+    expect(typedOnly.sleep.map((n) => n.asleepMinutes)).toEqual([433, 450]);
+    expect(typedOnly.sleepSteadiness).toBeNull();
+    // No wellness consent: no sleep at all, whatever the health permission says.
+    for (const healthPlatform of [true, false]) {
+      const none = weeklyInputForProvider(input, { wellness: false, healthPlatform });
+      expect(none.sleep).toEqual([]);
+      expect(none.sleepSteadiness).toBeNull();
+    }
+    // Nothing imported and wellness allowed: unchanged.
+    const typed = { ...input, sleep: input.sleep.filter((n) => !n.imported) };
+    expect(weeklyInputForProvider(typed, { wellness: true, healthPlatform: false })).toBe(typed);
   });
 });
