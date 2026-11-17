@@ -170,9 +170,8 @@ export async function setHealthAiShareAction(allow: boolean): Promise<ActionStat
 
 /**
  * Turn the separate permission to share prayer-journal entries with the AI Coach on or off (migration 080). Off by
- * default. Turning it on needs the general AI consent and faith features; it shares nothing by itself (each entry must
- * still be marked). Turning it off also clears every entry's share mark, so turning it on again later never resumes
- * sharing old entries without the member choosing them again.
+ * default. Turning it on needs the general AI consent and faith features; it shares nothing by itself: every existing
+ * share mark is cleared, so each entry must be chosen again. Turning it off clears them too.
  */
 export async function setJournalAiShareAction(allow: boolean): Promise<ActionState> {
   const user = await requireUser();
@@ -181,10 +180,11 @@ export async function setJournalAiShareAction(allow: boolean): Promise<ActionSta
     const { data } = await supabase.from("profiles").select("ai_data_consent_at, faith_enabled").eq("id", user.id).maybeSingle();
     if (!data?.ai_data_consent_at) return actionError("Turn on the AI Coach first.");
     if (!data.faith_enabled) return actionError("Turn on faith features first.");
-  } else {
-    const cleared = await clearJournalShareMarks(supabase, user.id);
-    if (!cleared) return actionError("Couldn't save your choice. Please try again.");
   }
+  // Both ways, every entry starts private. Turning it on: any mark that exists now was set without this permission
+  // (before it existed, or directly), and must not start sharing. Turning it off: nothing stays marked.
+  const cleared = await clearJournalShareMarks(supabase, user.id);
+  if (!cleared) return actionError("Couldn't save your choice. Please try again.");
   const { error } = await supabase.from("profiles").update({ journal_ai_consent_at: allow ? new Date().toISOString() : null }).eq("id", user.id);
   if (error) {
     logError("profile.journal_ai_share", error);

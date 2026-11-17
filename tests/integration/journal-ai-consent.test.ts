@@ -72,12 +72,17 @@ describe.skipIf(!available)("prayer journal: separate permission before any entr
     await svc.from("profiles").update({ faith_enabled: true }).eq("id", m.id);
   });
 
-  it("once on, entries can be marked one by one; nothing is marked by turning it on", async () => {
+  it("once on, entries can be marked one by one; turning it on shares nothing, not even an entry marked before it existed", async () => {
     const { setJournalAiShareAction } = await import("@/server/actions/profile");
     const { saveJournalEntryAction, setJournalShareAction } = await import("@/server/actions/faith");
+    const { loadAthleteSnapshot } = await import("@/server/coach/snapshot");
+    // An entry marked before the permission existed (or set directly through the API): it must not start sharing.
+    const { data: legacy } = await svc.from("faith_journal_entries").insert({ user_id: m.id, entry_date: today, body: "LEGACY-MARKED entry", share_with_coach: true }).select("id").single();
     expect((await setJournalAiShareAction(true)).ok).toBe(true);
     expect((await profile()).journal_ai_consent_at).not.toBeNull();
     expect((await entries()).every((e) => !e.share_with_coach)).toBe(true);
+    expect(JSON.stringify((await loadAthleteSnapshot(m.client, m.id)).sharedJournal)).not.toContain("LEGACY-MARKED");
+    await svc.from("faith_journal_entries").delete().eq("id", legacy!.id);
     expect((await saveJournalEntryAction(initialActionState, form({ entryDate: today, kind: "praise", body: "Shared praise", shareWithCoach: "on" }))).ok).toBe(true);
     const [first] = await entries();
     await setJournalShareAction(form({ id: first!.id, share: "true" }));

@@ -72,6 +72,33 @@ describe.skipIf(!available)("Finish after a lost reply keeps every set logged si
     expect(new Set(keys).size).toBe(keys.length);
   });
 
+  it("the retry's later pause time is stored with the later end time (the member paused after the lost reply)", async () => {
+    const clientId = crypto.randomUUID();
+    await finishWorkout(user.client, user.id, payload(clientId, [move("back-squat", [set(5, 60)])]));
+    const later = { ...payload(clientId, [move("back-squat", [set(5, 60), set(5, 60)])], "2026-10-01T11:10:00Z"), pausedSeconds: 300 };
+    await finishWorkout(user.client, user.id, later);
+    const { data } = await user.client.from("workout_sessions").select("ended_at, paused_seconds, finish_claim").eq("client_id", clientId).single();
+    expect(Date.parse(data!.ended_at as string)).toBe(Date.parse("2026-10-01T11:10:00Z"));
+    expect(data!.paused_seconds).toBe(300);
+    expect(data!.finish_claim).toBeNull(); // the claim taken for the edit is released
+  });
+
+  it("two retries with the same later sets at once store them once (the second is told to try again or finds them stored)", async () => {
+    const clientId = crypto.randomUUID();
+    await finishWorkout(user.client, user.id, payload(clientId, [move("back-squat", [set(5, 50), set(5, 50)])]));
+    const later = payload(clientId, [move("back-squat", [set(5, 50), set(5, 50), set(5, 50), set(5, 50)])], "2026-10-01T11:03:00Z");
+    const results = await Promise.allSettled([finishWorkout(user.client, user.id, later), finishWorkout(user.client, user.id, later)]);
+    expect(results.some((r) => r.status === "fulfilled")).toBe(true);
+    for (const r of results) if (r.status === "rejected") expect(r.reason).toMatchObject({ code: "conflict" });
+    const after = await saved(clientId);
+    expect(after.exercises).toHaveLength(1);
+    expect(after.exercises[0]!.sets).toHaveLength(4);
+    expect(Number(after.session.total_volume_kg)).toBe(1000);
+    // A retry after that (the one told to try again) is a plain repeat: nothing changes.
+    await finishWorkout(user.client, user.id, later);
+    expect((await saved(clientId)).exercises[0]!.sets).toHaveLength(4);
+  });
+
   it("a plain repeat of the same Finish changes nothing (the saved rows are left as they are)", async () => {
     const clientId = crypto.randomUUID();
     const body = payload(clientId, [move("back-squat", [set(5, 90), set(5, 90)])]);
