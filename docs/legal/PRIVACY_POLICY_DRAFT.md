@@ -1,11 +1,13 @@
 # Narrow Gate Fitness — Privacy Policy (DRAFT)
 
-Version: [DRAFT 2026-10-26; factual descriptions revised 2026-11-16]
+Version: [DRAFT 2026-10-26; factual descriptions revised 2026-11-16; deletion and retention facts revised 2026-11-17]
 Effective date: [EFFECTIVE DATE — set when published] · Last updated: [DATE]
 
 > **DRAFT FOR ATTORNEY REVIEW — NOT LEGAL ADVICE AND NOT IN FORCE.** This draft was prepared from a read-only review of the code on branch `claude/free-pro-membership` (2026-10-26) for review by a qualified privacy attorney. It does not state or imply that the service complies with any law. Retention periods are marked **[OWNER TO DECIDE]**; none has been decided. Verify every factual statement against the shipped build before publishing. Remove this box and all bracketed notes before publication.
 >
 > **Revision note, 2026-11-16.** The factual descriptions (what is collected, who receives it, what the app does) were revised against the TestFlight release candidate, using the legal audit in `docs/legal-audit-2026-11-16/` (files 05, 06, 07, 08, 09, 10 and 18). The reviser is not a lawyer. No legal wording was approved in this revision, no attorney has reviewed it, and no placeholder was filled with an invented fact. New draft provisions are marked **[DRAFT FOR ATTORNEY REVIEW]**. Everything still missing is listed in `docs/legal/REMAINING_INFORMATION_NEEDED.md`.
+>
+> **Revision note, 2026-11-17.** Sections 2.4, 7 and 8 (deletion and retention) were checked against the code and a test of account deletion on the local database (`tests/integration/account-deletion-closure.test.ts`; record in `docs/launch-readiness/03_ACCOUNT_DELETION_CLOSURE.md`). Factual corrections only; no legal wording was approved, and unknown periods are marked [OWNER DECISION] or [TO BE CONFIRMED WITH PROVIDER].
 
 ---
 
@@ -87,7 +89,8 @@ Two more categories exist in code for features that are **switched off**: report
 - **Hosting and server data.** Our servers and hosting provider process technical data such as IP address, request times and error information in order to deliver and secure the Service.
 - **Error logs.** Our application writes one log line per server error: where it happened, the error name, a code, a status and a redacted message. Some lines also carry your internal account ID or a Stripe customer ID. Logs are designed not to contain your email, health values, journal text or passwords. An optional report of errors from your browser to our own server exists and is off unless we switch it on.
 - **Workout usage events (our own, not a third party's).** For each workout the database records up to four events — started, first set completed, completed, abandoned — with a time and the workout's ID. We use them for totals shown to our administrators (for example, how many workouts were started and finished). You can see your own events in your data export.
-- **Sign-up and sign-in protection.** Rate limits use a hash of the IP address and of the email address.
+- **Sign-up and sign-in protection.** Rate limits use a hash of the IP address and of the email address. Other rate limits (for example on exports, AI requests and account deletion) are counted against your account ID.
+- **Sign-in audit log.** Our authentication provider (Supabase Auth) records sign-up, sign-in and account-deletion events with your account ID and email address. [TO BE CONFIRMED WITH PROVIDER: whether the hosted project records the IP address in this log, and how long Supabase keeps it.]
 - **We do not use advertising identifiers, cross-app tracking, or third-party analytics or crash-reporting SDKs.** [OWNER: keep this true. If any analytics are added, this Policy, the App Store privacy label and the Google Play Data safety form must all change first.]
 
 ## 3. How we use information
@@ -240,10 +243,11 @@ We require our service providers to protect personal information in a way consis
 | Sleep data and wellness information | Limitation notes and recovery check-ins: until you withdraw wellness consent or delete your account. Sleep data: until you delete it or your account | [OWNER DECISION: retention period] |
 | Billing records and webhook event IDs | Billing rows are deleted with the account. A list of processed payment-event IDs (event ID, type and status, with no account reference) is kept. Stripe and RevenueCat customer records are deleted on account deletion, on a best-effort basis | [OWNER DECISION: retention period; tax and accounting records may need to be kept for a legally required period — ATTORNEY REVIEW] |
 | Workout usage events | Until account deletion | [OWNER DECISION: retention period] |
-| Rate-limit counters | Contain an account ID; rows older than two days are removed the next time the limiter runs | [OWNER DECISION: retention period] |
-| Administrator audit log | Kept. An entry can contain a member's account ID (Section 8) | [OWNER DECISION: retention period] |
+| Rate-limit counters | Contain an account ID, or a hash of an email address or IP address. Counters with your account ID or email hash are deleted when you delete your account. Otherwise, rows older than two days are removed by an occasional clean-up (about one in every hundred limiter checks), so they can last longer than two days | [OWNER DECISION: retention period] |
+| Administrator audit log | Kept, including after account deletion. An entry about a member (for example, adding them to the test-account list) keeps that member's account ID and the administrator's note (Section 8). An entry written by an administrator whose account is deleted is kept with the administrator's ID removed | [OWNER DECISION: retention period, and whether entries about a deleted member are anonymised] |
+| Sign-in audit log (Supabase Auth) | Sign-up, sign-in and deletion events with account ID and email. Kept after account deletion; the app does not remove them | [OWNER DECISION: retention period, and whether to remove or anonymise them on account deletion] [TO BE CONFIRMED WITH PROVIDER: Supabase's own retention for the hosted project] |
 | Server and error logs | Held by the hosting provider | [OWNER DECISION: retention period / confirm with provider] |
-| Backups | Held by the database provider | [OWNER DECISION: retention period / confirm with provider] |
+| Backups | Held by the database provider. Deleted data stays in a backup until that backup expires. The backup schedule and how long backups are kept depend on the hosted Supabase plan and settings, which are not in the repository | [OWNER DECISION: retention period / confirm with provider] [TO BE CONFIRMED WITH PROVIDER: backup and point-in-time-recovery retention for the production plan] |
 | Consent records | Each in-app consent is a single timestamp on your profile, erased when you withdraw it. Records of the Terms, Privacy Policy, risk acknowledgment and auto-renewal terms you accepted are **deleted with your account** | [OWNER DECISION: retention period — California ARL requires keeping verification of auto-renewal consent for 3 years or 1 year after the contract ends, whichever is longer — ATTORNEY REVIEW. As built, the record does not survive account deletion] |
 
 ## 8. Your choices and rights
@@ -257,8 +261,8 @@ We require our service providers to protect personal information in a way consis
   **Not in the export:** your avatar image file (only its location); sign-in records held by our authentication provider beyond your ID and email; anything held by Stripe, RevenueCat or Anthropic; server logs; and a small number of internal records (the administrator audit log, internal billing-state and store-sync records, and the list of test accounts).
 - **Delete your account:** Profile → Privacy & data → **Delete account**. You confirm by typing DELETE and re-entering your password. Then, in this order:
   1. Website (Stripe) subscriptions are cancelled. If that fails, nothing is deleted and you are told.
-  2. Your avatar, progress photos and Body Scan photos are removed from storage.
-  3. Your sign-in account is deleted, which deletes every record linked to it: profile, logs, routes, sleep and health data, conversations and memories, faith content, billing rows, usage events, device records and legal acceptances.
+  2. Your avatar, progress photos and Body Scan photos are removed from storage. If that fails, deletion stops: your account and data remain (some photos may already have been removed), and you are asked to try again.
+  3. Your sign-in account is deleted, with its sessions and sign-in tokens, which deletes every record linked to it: profile, logs, routes, sleep and health data, conversations and memories, faith content, billing rows, usage events, device records and legal acceptances. Rate-limit counters keyed by your account ID or email hash are then deleted.
   4. We ask Stripe and RevenueCat to delete your customer record. If either request fails, the failure is logged for us to follow up.
 
   **We cannot cancel App Store or Google Play subscriptions.** Cancel those in your store account to stop charges. Removing the app from your phone does not delete your account or cancel anything.
@@ -269,10 +273,11 @@ We require our service providers to protect personal information in a way consis
   - an App Store or Google Play subscription, which keeps billing until you cancel it in the store;
   - records Stripe, RevenueCat, Apple and Google keep under their own terms;
   - the list of processed payment-event IDs (no account reference);
-  - administrator audit-log entries, which can contain your account ID;
-  - rate-limit counters containing your account ID, for up to about two days;
+  - administrator audit-log entries, which can contain your account ID and an administrator's note about your account;
+  - our authentication provider's sign-in audit log (sign-up, sign-in and deletion events with your account ID and email): [OWNER DECISION: retention period] [TO BE CONFIRMED WITH PROVIDER];
+  - rate-limit counters keyed only by a hash of an IP address, which are not linked to your account, until the limiter's occasional clean-up;
   - server log lines at the hosting provider, some of which carry an account ID or Stripe customer ID;
-  - database backups at the database provider, until they expire: [OWNER DECISION: retention period for backups];
+  - database backups at the database provider, until they expire: [OWNER DECISION: retention period for backups] [TO BE CONFIRMED WITH PROVIDER: backup and point-in-time-recovery retention on the production plan];
   - whatever Anthropic retains of past AI requests under its own terms: [TO BE CONFIRMED].
 - **Correct:** edit your profile and logs at any time.
 - **Withdraw consent:** wellness data, AI sharing, sharing of Apple Health / Health Connect data with AI, food photos, Body Scan, coaching memory, and Apple Health / Health Connect access (in device settings).

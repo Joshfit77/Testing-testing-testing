@@ -30,7 +30,13 @@ export default function DeleteAccountInfoPage() {
       <h2>What is deleted</h2>
       <p>
         Your profile, workouts, runs and routes, food diary, recipes and meal plans, bodyweight and measurements, progress photos, Body Scan photos, sleep and
-        recovery records, AI Coach conversations and memories, prayer journal, Bible highlights and notes, reminders and settings. Deletion can&apos;t be undone.
+        recovery records, AI Coach conversations and memories, prayer journal, Bible highlights and notes, reminders and settings, and your sign-in account and
+        sessions. Deletion can&apos;t be undone.
+      </p>
+      <p>
+        A subscription bought on this website is cancelled first. If it can&apos;t be cancelled, nothing is deleted and you&apos;re told so. If your photos
+        can&apos;t all be removed, deletion stops there and your account stays, so you can try again. We also ask our payment providers (Stripe and
+        RevenueCat) to delete their customer record for you.
       </p>
       <h2>What is not deleted by this step</h2>
       <ul>
@@ -39,6 +45,15 @@ export default function DeleteAccountInfoPage() {
           subscription bought on this website is cancelled for you when you delete your account.
         </li>
         <li>Information already sent to the AI provider while the AI Coach was on cannot be recalled by deleting your account.</li>
+        <li>Records that Stripe, RevenueCat, Apple and Google keep under their own terms.</li>
+        <li>
+          Security records: our sign-in provider&apos;s log of sign-up, sign-in and deletion events (with your account ID and email address), and our
+          administrators&apos; audit log, which can contain your account ID. [OWNER DECISION: how long these are kept] [TO BE CONFIRMED WITH PROVIDER]
+        </li>
+        <li>
+          Copies in database backups and server logs at our hosting providers, until they expire. [TO BE CONFIRMED WITH PROVIDER: how long backups and logs
+          are kept]
+        </li>
       </ul>
       <p>
         See the <Link href="/legal/privacy" className="text-gold-highlight underline">Privacy Policy</Link> for details.
