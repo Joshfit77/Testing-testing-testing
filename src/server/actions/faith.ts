@@ -4,7 +4,7 @@ import { z } from "zod";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { actionError, actionInvalid, actionOk, type ActionState } from "@/lib/action-state";
 import { isoDateInTz } from "@/lib/domain/dates";
-import { ANSWERABLE_KINDS, isAnswerable, journalSharingAllowed } from "@/lib/domain/journal";
+import { ANSWERABLE_KINDS, isAnswerable, JOURNAL_SHARE_NEEDS_CONSENT, journalSharingAllowed } from "@/lib/domain/journal";
 import { canCheckIn, isPresetPractice, PRACTICE_INFO } from "@/lib/domain/practices";
 import { customPracticeSchema, journalEntrySchema, prayerAnsweredSchema } from "@/lib/validation/schemas";
 import { getProfile, requireUser } from "@/server/auth";
@@ -25,10 +25,6 @@ async function userToday(userId: string): Promise<string> {
 }
 
 // ---------------------------------------------------------------------------- Prayer journal
-
-/** Shown when an entry is marked for the AI Coach without the separate journal permission (migration 080). */
-export const JOURNAL_SHARE_NEEDS_CONSENT =
-  "Sharing journal entries with the AI Coach is off. Turn on \"Share prayer journal entries with the AI Coach\" in Profile first.";
 
 /** The server-side check behind every "Share with AI Coach": the client is never trusted for this. */
 async function mayShareJournal(userId: string): Promise<boolean> {

@@ -44,7 +44,8 @@ describe.skipIf(!available)("prayer journal: separate permission before any entr
   });
 
   it("without it, saving an entry marked 'Share with AI Coach' is refused and stores nothing", async () => {
-    const { saveJournalEntryAction, JOURNAL_SHARE_NEEDS_CONSENT } = await import("@/server/actions/faith");
+    const { saveJournalEntryAction } = await import("@/server/actions/faith");
+    const { JOURNAL_SHARE_NEEDS_CONSENT } = await import("@/lib/domain/journal");
     const res = await saveJournalEntryAction(initialActionState, form({ entryDate: today, kind: "daily", body: "A prayer marked shared", shareWithCoach: "on" }));
     expect(res).toMatchObject({ ok: false, message: JOURNAL_SHARE_NEEDS_CONSENT });
     expect(await entries()).toEqual([]);

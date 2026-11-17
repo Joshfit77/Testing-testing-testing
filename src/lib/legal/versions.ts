@@ -13,7 +13,9 @@ export type LegalDocument = "terms" | "privacy" | "risk_acknowledgment" | "auto_
 
 export const LEGAL_PAGES = {
   terms: { version: "2026-10-26-placeholder", sha256: "946063b3f9f9fc2f0c5d5aa0d22fbedd2119743ef7ba460621460b026625027e", path: "src/app/legal/terms/page.tsx" },
-  privacy: { version: "2026-10-26-placeholder", sha256: "8d8a8e0f40273174a44b291eb90fadc7ccb2dd7abae5841df0e1accc4b35646f", path: "src/app/legal/privacy/page.tsx" },
+  // 2026-11-17: the prayer-journal line now names the separate journal permission (migration 080). Still a draft;
+  // re-acceptance is not switched on.
+  privacy: { version: "2026-11-17-placeholder", sha256: "bd285f3a9041f976c889a935084636c62ecce49e318befa75df0404bf0afcf28", path: "src/app/legal/privacy/page.tsx" },
 } as const satisfies Record<"terms" | "privacy", { version: string; sha256: string; path: string }>;
 
 /** Shown above the sign-up boxes and accepted with its own unticked box. */

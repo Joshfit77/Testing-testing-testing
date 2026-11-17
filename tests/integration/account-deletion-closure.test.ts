@@ -272,13 +272,12 @@ describe.skipIf(!available)("account deletion closure: nothing that names the me
 
     // Two accountability partners (user_a is the lower id of a pair): one with a higher id, so the member is user_a,
     // and one with a lower id, so the member is user_b. Nudges both ways.
-    for (let i = 0; i < 40 && !(partner && partner.id > u && lowerPartner && lowerPartner.id < u); i++) {
-      const p = await createTestUser("closure-partner");
-      if (p.id > u && !(partner && partner.id > u)) partner = p;
-      else if (p.id < u && !(lowerPartner && lowerPartner.id < u)) lowerPartner = p;
-      else await deleteTestUser(p);
-    }
-    if (!partner || !lowerPartner) throw new Error("couldn't create partners on both sides of the member's id");
+    // Ids chosen at the two ends of the range (a random member id sits between them), instead of drawing random users
+    // until one lands on each side: that failed when the member's own id happened to be near either end.
+    const tail = () => crypto.randomUUID().slice(-12);
+    partner = await createTestUser("closure-partner", { id: `ffffffff-ffff-4fff-bfff-${tail()}` });
+    lowerPartner = await createTestUser("closure-partner", { id: `00000000-0000-4000-8000-${tail()}` });
+    if (!(partner.id > u && lowerPartner.id < u)) throw new Error("couldn't create partners on both sides of the member's id");
     await seed("accountability_invites", { inviter_id: u, code: generateInviteCode() });
     const partnership = await seed("accountability_partnerships", { user_a: u, user_b: partner.id });
     await seed("accountability_shares", { partnership_id: partnership.id, user_id: u });

@@ -28,11 +28,11 @@ export interface TestUser {
 }
 
 /** Create a confirmed user via the admin API and return a client signed in as them (RLS applies). */
-export async function createTestUser(label: string): Promise<TestUser> {
+export async function createTestUser(label: string, opts: { id?: string } = {}): Promise<TestUser> {
   const admin = serviceClient();
   const email = `it-${label}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`;
   const password = "Integration-Test-1";
-  const { data, error } = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { display_name: label } });
+  const { data, error } = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { display_name: label }, ...(opts.id ? { id: opts.id } : {}) });
   if (error || !data.user) throw error ?? new Error("createUser failed");
   const client = anonClient();
   const { error: signInErr } = await client.auth.signInWithPassword({ email, password });
