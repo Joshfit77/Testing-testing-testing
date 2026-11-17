@@ -176,6 +176,49 @@ test.describe("reliability closure: workouts", () => {
     await expect(entries.first()).toContainText(volume);
   });
 
+  test("Finish saved but its reply lost, then another set logged: the next Finish stores that set too (audit W-5)", async ({ page }) => {
+    const email = uniqueEmail("closure-lost-reply-more");
+    await signUpAndConfirm(page, email);
+    await completeOnboarding(page);
+    await startWorkout(page);
+    await logSet(page, 1, "135");
+    await page.waitForTimeout(800); // a second tap straight after the first counts as the same tap
+    await logSet(page, 2, "135");
+    await expect(syncStatus(page)).toHaveText(/Synced/);
+
+    let attempt = 0;
+    await page.route("**/train/workout**", async (route) => {
+      if (!isFinish(route)) return route.fallback();
+      attempt += 1;
+      if (attempt === 1) {
+        await route.fetch(); // the server saves the workout with two sets ...
+        return route.abort("connectionreset"); // ... and the reply never reaches the phone
+      }
+      return route.fallback();
+    });
+
+    await tapFinish(page);
+    await expect(page.getByText(/isn't saved yet|appear to be offline|couldn't/i).first()).toBeVisible();
+    // The member carries on: a third set, heavier.
+    await page.waitForTimeout(800);
+    await logSet(page, 3, "155");
+    const reps12 = await repsOf(page, 2);
+    const reps3 = Number(await page.getByLabel(/set 3 reps/).first().inputValue());
+    await tapFinish(page);
+    await expect(page.getByRole("heading", { name: /Workout complete/i })).toBeVisible();
+    expect(attempt).toBe(2);
+    // The completion screen reports what the server now holds: all three sets.
+    expect(Math.abs((await savedVolumeLb(page)) - (135 * reps12 + 155 * reps3))).toBeLessThanOrEqual(1);
+
+    const volume = (await page.getByTestId("stat-volume").locator("dd").textContent())!.trim();
+    const entries = await historyEntries(page);
+    await expect(entries).toHaveCount(1);
+    await expect(entries.first()).toContainText(volume);
+    // The saved workout itself lists the third set.
+    await entries.first().click();
+    await expect(page.getByText(/155/).first()).toBeVisible();
+  });
+
   test("the same workout in two tabs: each tab picks up the other's sets, and finishing in one doesn't bring it back in the other", async ({ page, context }) => {
     const email = uniqueEmail("closure-tabs");
     await signUpAndConfirm(page, email);

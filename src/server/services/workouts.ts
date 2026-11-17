@@ -215,7 +215,10 @@ export async function finishWorkout(
     .eq("client_id", input.clientId)
     .maybeSingle();
   if (existing?.status === "completed") {
-    // A retry after the first response was lost (gym Wi-Fi): show the same records the first attempt saved.
+    // A retry after the first response was lost (gym Wi-Fi). If the member logged more sets before retrying, the
+    // retry carries them: store them (as an edit of the saved workout) instead of answering with the first save.
+    const later = await applyLaterSets(supabase, userId, existing.id as string, input);
+    // Show the same records the first attempt saved (or, after the later sets, the records as they now stand).
     const records = await recordsOfSession(supabase, userId, existing.id as string).catch(() => []);
     // Saving the workout and moving the program on are separate writes. If the first attempt saved the workout but
     // never reached the second, the program stayed on the day just done and offered it again. advanceProgram only
@@ -224,7 +227,7 @@ export async function finishWorkout(
     if (existing.user_program_id && existing.program_day_id) {
       await advanceProgram(supabase, userId, existing.user_program_id as string, existing.program_day_id as string).catch(() => undefined);
     }
-    return { sessionId: existing.id as string, volumeKg: Number(existing.total_volume_kg), records, alreadyCompleted: true };
+    return { sessionId: existing.id as string, volumeKg: later ?? Number(existing.total_volume_kg), records, alreadyCompleted: true };
   }
 
   // Only link to a program the user actually owns a record for.
@@ -266,11 +269,11 @@ export async function finishWorkout(
       .or(`finish_claim.is.null,finish_claimed_at.lt."${staleBefore}"`)
       .select("id");
     if (error) throw new WorkoutError(error.message);
-    if (!won?.length) return awaitOtherFinish(supabase, userId, input.clientId);
+    if (!won?.length) return awaitOtherFinish(supabase, userId, input);
   } else {
     const { data, error } = await supabase.from("workout_sessions").insert(claimedRow).select("id").single();
     // Another request created it first (unique user + client id): it holds the claim.
-    if (error?.code === "23505") return awaitOtherFinish(supabase, userId, input.clientId);
+    if (error?.code === "23505") return awaitOtherFinish(supabase, userId, input);
     if (error || !data) throw new WorkoutError(error?.message ?? "Insert failed", error?.code === "23503" ? "invalid" : "db");
     sessionId = data.id as string;
   }
@@ -287,18 +290,46 @@ export async function finishWorkout(
 /** A claim older than this is treated as abandoned (the server died mid-save), so a retry can take it over. */
 const FINISH_CLAIM_TTL_MS = 120_000;
 
+/** Number of completed sets (warm-ups included) in a finish payload. */
+export function completedSetCount(exercises: ExerciseInput[]): number {
+  return exercises.reduce((n, e) => n + e.sets.filter((s) => s.completed).length, 0);
+}
+
+/**
+ * A finish retry for a workout that is already saved. When its first reply was lost (or timed out while the save was
+ * still running), the member may have logged more sets before tapping Finish again; the retry is the device's full,
+ * newer copy. If it has more completed sets than the saved workout, it replaces the saved contents (as an edit from
+ * History would: exercises, sets, volume and records rebuilt; the end time moves to the later Finish). A retry with the
+ * same or fewer completed sets (a plain repeat, or an older copy from another tab) changes nothing. Returns the new
+ * volume, or null when nothing changed. Throws if the edit fails, so the device keeps its copy and can retry.
+ */
+async function applyLaterSets(supabase: SupabaseClient, userId: string, sessionId: string, input: FinishWorkoutInput): Promise<number | null> {
+  const { data, error } = await supabase
+    .from("workout_exercises")
+    .select("sets:workout_sets(completed)")
+    .eq("session_id", sessionId)
+    .eq("user_id", userId);
+  if (error) throw new WorkoutError(error.message);
+  const saved = ((data ?? []) as { sets: { completed: boolean }[] }[]).reduce((n, e) => n + e.sets.filter((s) => s.completed).length, 0);
+  if (completedSetCount(input.exercises) <= saved) return null;
+  const { volumeKg } = await editWorkout(supabase, userId, { sessionId, name: input.name, notes: input.notes, exercises: input.exercises });
+  await supabase.from("workout_sessions").update({ ended_at: input.endedAt }).eq("id", sessionId).eq("user_id", userId).lt("ended_at", input.endedAt);
+  return volumeKg;
+}
+
 /** Another request is finishing this workout: wait for it, then answer as a retry would. */
-async function awaitOtherFinish(supabase: SupabaseClient, userId: string, clientId: string) {
+async function awaitOtherFinish(supabase: SupabaseClient, userId: string, input: FinishWorkoutInput) {
   for (let i = 0; i < 40; i++) {
     const { data } = await supabase
       .from("workout_sessions")
       .select("id, status, total_volume_kg")
       .eq("user_id", userId)
-      .eq("client_id", clientId)
+      .eq("client_id", input.clientId)
       .maybeSingle();
     if (data?.status === "completed") {
+      const later = await applyLaterSets(supabase, userId, data.id as string, input);
       const records = await recordsOfSession(supabase, userId, data.id as string).catch(() => []);
-      return { sessionId: data.id as string, volumeKg: Number(data.total_volume_kg), records, alreadyCompleted: true };
+      return { sessionId: data.id as string, volumeKg: later ?? Number(data.total_volume_kg), records, alreadyCompleted: true };
     }
     if (data && data.status !== "in_progress") break;
     await new Promise((r) => setTimeout(r, 250));
