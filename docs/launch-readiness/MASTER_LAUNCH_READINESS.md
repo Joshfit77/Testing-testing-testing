@@ -168,7 +168,7 @@ No filing or purchase has been made.
 
 | Stage | Decision | Evidence | Conditions or blockers |
 |---|---|---|---|
-| Internal testing (you, on a local or staging build) | **GO** | Section 9: type check, lint, unit, integration, the full browser suite and every opt-in group pass on this branch and on the release candidate (5,507 passed, 0 failed, 4 skipped here) | Use synthetic data |
+| Internal testing (you, on a local or staging build) | **GO** | Section 9: type check, lint, unit, integration, the full browser suite and every opt-in group pass on this branch and on the release candidate (5,534 passed, 0 failed, 4 skipped on the final pull-request build) | Use synthetic data |
 | Private TestFlight | **CONDITIONAL** | Code: all automated suites pass; the four closure passes found and fixed 8 defects; Friends is off; subscriptions not enabled | E1 (your approval to bring this branch into the release candidate), A1, A2, and a pass of the core device tests (E2). Draft legal pages labelled as drafts (L1, counsel's view advised). No device test has been run, so this cannot be GO yet |
 | Public launch, Free plan | **NO-GO** | Engineering is close; the blockers are legal, IP, store and device work | L2–L7, L9, P1–P4, A3, E2–E8 |
 | Paid subscriptions | **NO-GO** | Server-side billing logic passes against stand-ins (02); no native purchase has been tested | Everything for Free, plus E9, A5, L8 |
@@ -182,7 +182,8 @@ as passes. All runs: local stack, fresh production build, freshly reset database
 
 | Build | Type check / lint | Unit | Integration | Browser, all groups incl. opt-in | Remaining skips |
 |---|---|---|---|---|---|
-| `claude/legal-remediation` cda6262 | clean / clean | 4,741 passed, 0 failed | 513 passed, 0 failed | 253 passed, 0 failed | 4: Home photographs (3, assets not supplied), live Open Food Facts (1, you run it) |
+| `claude/legal-remediation` eb47264 (final, 2026-11-17; build of 5a22636, same app code) | clean / clean | 4,752 passed, 0 failed | 528 passed, 0 failed | 254 passed, 0 failed (default 155, demo 58, device matrix 39, button sweep 1, coach without provider 1) | 4: Home photographs (3, assets not supplied), live Open Food Facts (1, you run it) |
+| `claude/legal-remediation` cda6262 (earlier) | clean / clean | 4,741 passed, 0 failed | 513 passed, 0 failed | 253 passed, 0 failed | 4, as above |
 | Release candidate + offline fix 8ea238f | clean / clean | 4,713 passed, 0 failed | 467 passed, 0 failed | 245 passed, 0 failed | 4: as above, plus the stage-chart test, skipped by a test defect fixed in this pass (passes on that build once fixed) |
 
 Not covered by any test here: physical devices, native purchases in the sandbox, live AI behaviour and cost, the
