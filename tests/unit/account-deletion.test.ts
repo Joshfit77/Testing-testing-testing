@@ -24,6 +24,7 @@ function deps(over: Partial<DeletionDeps> & { calls: string[]; admin: SupabaseCl
   return {
     cancelSubscriptions: async () => void over.calls.push("billing"),
     removeStorage: async () => void over.calls.push("storage"),
+    removeRateLimits: async () => void over.calls.push("rate_limits"),
     deleteStripeCustomer: async () => void over.calls.push("customer"),
     log: () => undefined,
     ...over,
@@ -38,11 +39,11 @@ describe("account deletion order and failures", () => {
     expect(calls).toEqual([]);
   });
 
-  it("cancels billing, removes files, deletes the user, then removes the Stripe customer", async () => {
+  it("cancels billing, removes files, deletes the user, clears its rate-limit counters, then removes the Stripe customer", async () => {
     const { admin, calls } = fakeAdmin({ customerId: "cus_123" });
     const r = await deleteUserAccount("u1", deps({ admin, calls }));
     expect(r).toEqual({ ok: true, stripeCustomerDeleted: true });
-    expect(calls).toEqual(["billing", "storage", "auth", "customer"]);
+    expect(calls).toEqual(["billing", "storage", "auth", "rate_limits", "customer"]);
   });
 
   it("deletes nothing when billing can't be cancelled", async () => {
@@ -58,13 +59,19 @@ describe("account deletion order and failures", () => {
     const r = await deleteUserAccount("u1", deps({ admin, calls, removeStorage: async () => Promise.reject(new Error("storage")) }));
     expect(r).toMatchObject({ ok: false, stage: "storage", subscriptionsCancelled: true, filesRemoved: false });
     expect(calls).toEqual(["billing"]);
-    if (!r.ok) expect(deletionFailureMessage(r)).toMatch(/subscription was cancelled, but nothing else was deleted/);
+    if (!r.ok) {
+      // Storage is emptied bucket by bucket, so the message must not claim that no file was touched.
+      expect(deletionFailureMessage(r)).toMatch(/subscription was cancelled, but your account and your data still exist/);
+      expect(deletionFailureMessage(r)).toMatch(/some of your photos may already have been removed/);
+    }
   });
 
   it("reports an auth failure after files were removed", async () => {
     const { admin, calls } = fakeAdmin({ deleteError: new Error("auth") });
     const r = await deleteUserAccount("u1", deps({ admin, calls }));
     expect(r).toMatchObject({ ok: false, stage: "auth", filesRemoved: true });
+    // The account still exists, so its counters (including the delete-attempt limit) stay.
+    expect(calls).toEqual(["billing", "storage", "auth"]);
     if (!r.ok) expect(deletionFailureMessage(r)).toMatch(/photos were removed, but your account/);
   });
 
@@ -81,5 +88,14 @@ describe("account deletion order and failures", () => {
     expect(await deleteUserAccount("u1", deps({ admin: a.admin, calls: a.calls }))).toEqual({ ok: true, stripeCustomerDeleted: null });
     const b = fakeAdmin({ customerId: "cus_1" });
     expect(await deleteUserAccount("u1", deps({ admin: b.admin, calls: b.calls, deleteStripeCustomer: null }))).toEqual({ ok: true, stripeCustomerDeleted: null });
+  });
+
+  it("treats a failed rate-limit clean-up as logged follow-up, not a failed deletion", async () => {
+    const { admin, calls } = fakeAdmin({ customerId: "cus_7" });
+    const log = vi.fn();
+    const r = await deleteUserAccount("u1", deps({ admin, calls, log, removeRateLimits: async () => Promise.reject(new Error("db")) }));
+    expect(r).toEqual({ ok: true, stripeCustomerDeleted: true });
+    expect(calls).toEqual(["billing", "storage", "auth", "customer"]);
+    expect(log).toHaveBeenCalledWith("account.delete.rate_limits", expect.anything(), expect.objectContaining({ userId: "u1" }));
   });
 });

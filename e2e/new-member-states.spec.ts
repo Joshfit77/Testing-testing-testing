@@ -46,7 +46,7 @@ test.describe("a new member's first look", () => {
     await expect(upsell).toBeVisible();
     await expect(upsell.getByRole("list", { name: "Questions you could ask" }).getByRole("listitem")).toHaveCount(3);
     await expect(upsell).toContainText(/How do I start my first week\?/);
-    await expect(page.getByTestId("coach-upsell-price")).toContainText("Faith stays free");
+    await expect(page.getByTestId("coach-upsell-price")).toContainText("Bible and prayer journal are in Free");
     await noBrokenValues(page);
 
     // Badges: every rank not started, the first one a single workout away.

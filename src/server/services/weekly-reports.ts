@@ -18,12 +18,14 @@ import {
   type ReportPeriod,
   type WeeklyMetrics,
   type WeeklyReportInput,
+  weeklyInputForProvider,
 } from "@/lib/domain/weekly-report";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { serverEnv } from "@/server/env";
 import { logError, logInfo } from "@/server/log";
 import { AiError, withAiRequest } from "@/server/services/ai-coach";
 import { getNutritionDaily } from "@/server/services/progress";
+import { fromHealthPlatform, healthAiSharingAllowed } from "@/lib/domain/health-ai-sharing";
 import { listSleepSessions, listSleepStages } from "@/server/services/sleep";
 import { costMicros, tokenUsage } from "@/lib/domain/ai-economics";
 
@@ -106,7 +108,7 @@ export async function collectWeeklyInput(supabase: SupabaseClient, userId: strin
     const stages = parts.length && parts.some((p) => p.rem + p.deep > 0)
       ? parts.reduce((a, p) => ({ rem: a.rem + p.rem, deep: a.deep + p.deep, light: a.light + p.light, awake: a.awake + p.awake }), { rem: 0, deep: 0, light: 0, awake: 0 })
       : null;
-    return { asleepMinutes: n.asleepMinutes, estimated: n.asleepEstimated, recorded: n.recorded, stages };
+    return { asleepMinutes: n.asleepMinutes, estimated: n.asleepEstimated, recorded: n.recorded, imported: n.sources.some((src) => fromHealthPlatform(src)), stages };
   });
 
   const goals = goalsRes.data as { calories: number; protein_g: number } | null;
@@ -172,9 +174,15 @@ export async function ensureWeeklyReport(
   if (existing.error) throw existing.error;
   if (existing.data) return existing.data as unknown as WeeklyReportRow;
 
-  const metrics = buildWeeklyMetrics(await collectWeeklyInput(readClient, userId, period, tz, sleepGoalMinutes));
+  const input = await collectWeeklyInput(readClient, userId, period, tz, sleepGoalMinutes);
+  const metrics = buildWeeklyMetrics(input);
   // Running distances are stored in km; the written analysis uses the member's own units.
-  const prefs = await service.from("profiles").select("unit_system").eq("id", userId).maybeSingle();
+  const prefs = await service.from("profiles").select("unit_system, ai_data_consent_at, health_ai_share_consent_at, wellness_consent_at").eq("id", userId).maybeSingle();
+  // What the AI provider is given: the same figures, but without sleep unless the member allows wellness data, and with
+  // nights a health platform or wearable supplied left out unless the member has allowed sharing them (migration 079).
+  // The member's own report page still shows every night. Unreadable consents read as "not allowed".
+  const providerInput = weeklyInputForProvider(input, { wellness: Boolean(prefs.data?.wellness_consent_at), healthPlatform: healthAiSharingAllowed(prefs.data) });
+  const metricsForProvider = providerInput === input ? metrics : buildWeeklyMetrics(providerInput);
   const unit: ReportDistanceUnit = prefs.data?.unit_system === "imperial" ? "mi" : "km";
   const inserted = await service
     .from("weekly_reports")
@@ -192,7 +200,7 @@ export async function ensureWeeklyReport(
     return again.data as unknown as WeeklyReportRow;
   }
 
-  const ai = await aiAnalysis(readClient, userId, plan, metrics, unit);
+  const ai = await aiAnalysis(readClient, userId, plan, metricsForProvider, unit);
   if (!ai) return mine;
   const upgraded = await service
     .from("weekly_reports")

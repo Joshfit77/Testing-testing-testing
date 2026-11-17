@@ -37,10 +37,12 @@ export function AiConsentCard() {
         <li>Your goals, schedule, equipment and basic details (age, height, sex, units)</li>
         <li>Your current program, recent workouts and personal records</li>
         <li>Your food log, nutrition targets and supplement stack</li>
-        <li>Bodyweight, steps and recovery check-ins</li>
+        <li>Bodyweight, recovery check-ins and step counts you entered yourself</li>
+        <li>When you ask about sleep or recovery: a summary of the sleep you logged yourself and your sleep check-ins</li>
         <li>
-          When you ask about sleep or recovery: a summary of your sleep, including nights your watch or ring recorded through Apple Health or Health
-          Connect (time asleep, stages, overnight heart rate, heart-rate variability and breathing rate)
+          Data imported from Apple Health or Health Connect (imported step counts, and sleep your watch or ring recorded: time asleep, stages, overnight
+          heart rate, heart-rate variability and breathing rate) is <strong>not</strong> sent unless you turn that on separately under You → Privacy &amp;
+          data. Your device&apos;s name is never sent.
         </li>
         <li>Limitation notes, only if you agreed to store wellness information</li>
         <li>Prayer-journal entries, only the ones you mark &ldquo;Share with AI Coach&rdquo;</li>

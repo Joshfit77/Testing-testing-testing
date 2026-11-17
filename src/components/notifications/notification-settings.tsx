@@ -464,7 +464,7 @@ export function NotificationSettingsForm({
 
       <div className={cn("space-y-6", prefs.paused && "opacity-60")}>
         <section id="faith" className="scroll-mt-20 space-y-4" aria-labelledby="faith-title">
-          <GroupHeading id="faith" title="Faith" note="Gentle nudges, never streak warnings. Always free." />
+          <GroupHeading id="faith" title="Faith" note="Gentle nudges, never streak warnings. Included in Free." />
           {FAITH_GROUPS.map((g) => (
             <div key={g.title} className="space-y-3">
               <div>

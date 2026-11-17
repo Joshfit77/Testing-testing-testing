@@ -53,10 +53,10 @@ One take, about 30 seconds. Start on the opening.
 
 | Time | Tap | On-screen text (caption) | Voiceover |
 |---|---|---|---|
-| 0:00 | Fresh tab: the opening plays; tap **Enter Narrow Gate** | Narrow Gate Fitness | "Narrow Gate Fitness: strength training and nutrition, with an optional faith section that's free." |
+| 0:00 | Fresh tab: the opening plays; tap **Enter Narrow Gate** | Narrow Gate Fitness | "Narrow Gate Fitness: strength training and nutrition, with an optional faith section; Bible reading and prayer are in the Free plan." |
 | 0:08 | **Explore with sample data** | Training · Nutrition · Faith | "One home screen: today's workout, food and recovery." |
 | 0:14 | Train tab › **Start workout early** (or **Start Today's Workout**), tick set 1 | Log every set | "Programs you can follow, and a logger that's one tap per set." |
-| 0:22 | Faith tab | Faith: free for every member | "Daily Bible reading and prayer, free for everyone." |
+| 0:22 | Faith tab | Faith: in the Free plan | "Daily Bible reading and prayer, included in the Free plan." |
 | 0:27 | Back to Home | Pro All Access: $119.99 a year | "Pro unlocks the rest. $119.99 a year." |
 
 ## 2-minute version
@@ -69,7 +69,7 @@ One take, about 30 seconds. Start on the opening.
 | 0:45 | 5 Exercise demos | Back, tap **Barbell Back Squat** | Every exercise demonstrated | "Every exercise has an animated demonstration you can slow to half speed." |
 | 0:55 | 7 Nutrition | Nutrition tab | Food diary | "The food diary counts against the member's own targets." |
 | 1:10 | 9 Ingredients | **Nutrition Score** › **Search by name**, or Nutrition › More tools › Check a label | Ingredients explained | "Ingredients are explained with what regulators say and how strong the evidence is. Presence isn't treated as proof of harm." |
-| 1:25 | 13 Faith | Faith tab | Faith: free | "The Faith section is free: a reading plan with a daily Bible reading and prayer." |
+| 1:25 | 13 Faith | Faith tab | Faith: in the Free plan | "Bible reading and prayer are in the Free plan: a reading plan with a daily Bible reading and prayer." |
 | 1:40 | 19 Free vs Pro | Profile › **Plans & billing**, tap **Yearly** | $119.99 a year · $17.99 a month | "Free to start. Pro All Access is $119.99 a year, or $17.99 a month. Nothing is charged in this demo." |
 | 1:55 | 20 Close | Home | | "That's Narrow Gate Fitness." |
 
@@ -121,7 +121,7 @@ yet:** rehearse it twice; at a calm pace it should fit inside 90 seconds, but ch
 
 ### 2:30–3:10 · Training (stops 3–5)
 
-- **Next** › Programs: "51 programs in the library, from beginner strength to strongman and running. Or build your own."
+- **Next** › Programs: "64 programs in the library, from beginner strength to strongman and running. Or build your own."
 - **Next** › Train: "Powerbuilding, week 3 of 8. Today's session, ready to start."
 - **Next** › Barbell Back Squat: tap **0.5×**. "Every exercise has an animated demonstration. It's an illustration,
   not filmed video, and the app says so."
@@ -142,7 +142,7 @@ yet:** rehearse it twice; at a calm pace it should fit inside 90 seconds, but ch
 
 ### 4:10–4:50 · Faith (stops 13–16)
 
-- Faith tab: "The Faith section is free for every member."
+- Faith tab: "Bible reading, the prayer journal and devotionals are in the Free plan. The AI Bible study helper is part of Pro."
 - **Show:** The Gospels, Day 21 of 90; Today's Bible reading; Prayer.
 - **Tap:** **Read** (Matthew, with the words of Jesus in red). Back. **Mark reading complete**.
 - **Voiceover:** "A reading plan through the Gospels, the Berean Standard Bible, with the words of Jesus in red. Each
@@ -152,14 +152,14 @@ yet:** rehearse it twice; at a calm pace it should fit inside 90 seconds, but ch
 ### 4:50–5:20 · Free vs Pro (stop 19)
 
 - Profile › **Plans & billing**. Tap **Yearly**.
-- **Voiceover:** "Free is $0 and includes the Faith section. Pro All Access is $119.99 a year, or $17.99 a month; same
+- **Voiceover:** "Free is $0 and includes Bible reading and the prayer journal. Pro All Access is $119.99 a year, or $17.99 a month; same
   features either way. Nothing is charged in this demo."
 - **Optional:** in the demo bar, tap **Free**, then Run › **Outdoor run**: live GPS recording shows as a Pro feature.
   Tap **Pro** to switch back. "This switch only exists in the demo."
 
 ### 5:20–5:30 · Close (stop 20)
 
-- Home. "That's Narrow Gate Fitness: training, nutrition and recovery, with a faith section that's free."
+- Home. "That's Narrow Gate Fitness: training, nutrition and recovery, with a faith section whose Bible reading and prayer journal are in the Free plan."
 
 ## 10-minute walkthrough
 
@@ -194,7 +194,7 @@ The same 20 stops at about a minute each, plus these deeper moments. Leave 3–4
 
 - **Stop 4, finish the workout:** **Finish** › **Finish & save** › Workout complete, Up next. Then Train › **Workout
   history** to show it saved.
-- **Stop 5:** Train › **Exercises**: the library of 157, with filters.
+- **Stop 5:** Train › **Exercises**: the library of 218, with filters.
 - **Stop 6:** ask "Review my training" and show the app's own tool result behind the simulated wording.
 - **Stop 7:** **Meal planner** and **Grocery list** from the Nutrition page (under More tools).
 - **Stop 9:** with internet, **Scan it** › type the barcode of a product you brought; the product page shows its

@@ -5,7 +5,7 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireUser } from "@/server/auth";
 import { askBible, type BibleAskResult } from "@/server/services/bible-ai";
 
-/** Ask the Bible study helper (free for every member, within daily and monthly limits). */
+/** Ask the Bible study helper (Pro All Access, within daily and monthly limits). */
 export async function askBibleAction(question: string, threadId: string): Promise<BibleAskResult> {
   const user = await requireUser();
   const q = z.string().min(1).max(2000).safeParse(question);

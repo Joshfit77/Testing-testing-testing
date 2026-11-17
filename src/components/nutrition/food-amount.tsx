@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import type { ActionState } from "@/lib/action-state";
 import { basisUnits, computeAmount, type FoodBasis, type FoodChoice } from "@/lib/domain/food-basis";
 import { parseQuantity } from "@/lib/domain/food-units";
+import { OFF_HOME_URL, OFF_LICENSE_URL } from "@/lib/food-quality";
 import { MEAL_TYPES } from "@/lib/domain/meals";
 import { updateMealItemAction } from "@/server/actions/nutrition";
 import { isFavoritableKey } from "@/lib/domain/food-favorites";
@@ -184,6 +185,19 @@ export function AmountPicker({
         )}
       </section>
       {food.note && <p className="text-xs text-gold">{food.note}</p>}
+      {food.kind === "off" && (
+        <p className="text-xs text-muted-foreground" data-testid="off-amount-credit">
+          Product data from{" "}
+          <a href={OFF_HOME_URL} target="_blank" rel="noopener noreferrer" className="underline">
+            Open Food Facts
+          </a>{" "}
+          (
+          <a href={OFF_LICENSE_URL} target="_blank" rel="noopener noreferrer" className="underline">
+            Open Database License
+          </a>
+          ).
+        </p>
+      )}
       {food.kind === "off" && food.ref && (
         <a href={`/nutrition/product/${encodeURIComponent(food.ref)}`} className="block text-sm font-semibold text-gold-highlight underline">
           Food quality details: ingredients, additives, allergens and Nutri-Score

@@ -137,7 +137,7 @@ export function BodyScanDashboard({ scans, trends, units, savedId, canScan }: { 
           <CardTitle className="text-base">Privacy</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
-          <p>Scan photos are in private storage only your account can open, shown through links that expire after 10 minutes. They aren&apos;t sent to the AI coach or any other service, and they&apos;re included in your data export and deleted with your account.</p>
+          <p>Scan photos are stored privately with our hosting provider; only your account can open them, through links that expire after 10 minutes. They aren&apos;t sent to the AI coach or to anyone else, and they&apos;re included in your data export and deleted with your account.</p>
           <Button
             variant="destructive"
             size="sm"

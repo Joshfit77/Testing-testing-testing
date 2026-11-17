@@ -246,7 +246,7 @@ export function OnboardingWizard({ initial, mode = "create" }: { initial: Onboar
                   Prefer not to say
                 </Chip>
               </div>
-              <p className="text-xs text-muted-foreground">Only used to estimate your daily calories. Never shared.</p>
+              <p className="text-xs text-muted-foreground">Used to estimate your daily calories. Kept private to your account. If you turn on the AI Coach, your age, sex, height and weight are sent to its AI provider to personalise answers.</p>
             </div>
             {units === "imperial" ? (
               <div className="grid grid-cols-2 gap-3">
@@ -412,7 +412,7 @@ export function OnboardingWizard({ initial, mode = "create" }: { initial: Onboar
               <legend className="px-1 text-sm font-semibold">Physical limitations (optional)</legend>
               <p className="text-xs text-muted-foreground">
                 Note anything you want your training to work around (e.g. &ldquo;prefer to avoid overhead pressing&rdquo;). This is
-                sensitive wellness information — we only store it with your consent, and it&apos;s never visible to administrators. This
+                sensitive wellness information — we only store it with your consent, and the app gives administrators no way to view it. This
                 app doesn&apos;t diagnose or treat injuries.
               </p>
               <Textarea value={limitations} onChange={(e) => setLimitations(e.target.value)} maxLength={1000} aria-label="Physical limitations" aria-invalid={Boolean(fieldErrors.limitations)} />

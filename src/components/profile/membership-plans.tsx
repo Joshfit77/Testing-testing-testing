@@ -40,7 +40,7 @@ const FREE_HIGHLIGHTS = [
   "Calorie & macro tracking with barcode scanning",
   "Manual run & walk logging",
   "Sleep logging, weight & badges",
-  "The complete Faith & Discipline section, always free",
+  "Bible reading, prayer journal, devotionals and reading journeys (the AI Bible study helper is part of Pro)",
 ];
 
 /**

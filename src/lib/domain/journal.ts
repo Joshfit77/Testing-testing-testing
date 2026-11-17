@@ -68,6 +68,19 @@ export interface SharedJournalEntry {
   answeredOn: string | null;
 }
 
+/**
+ * Whether any prayer-journal entry may reach the AI Coach at all: the separate journal permission (migration 080), the
+ * general AI consent and faith features must all be on. Even then only entries marked "Share with AI Coach" are read
+ * (journalEntriesForCoach). Missing or null values mean no.
+ */
+export function journalSharingAllowed(p: { faith_enabled?: boolean | null; ai_data_consent_at?: string | null; journal_ai_consent_at?: string | null } | null | undefined): boolean {
+  return Boolean(p?.faith_enabled && p.ai_data_consent_at && p.journal_ai_consent_at);
+}
+
+/** Shown when an entry is marked for the AI Coach without the separate journal permission (migration 080). */
+export const JOURNAL_SHARE_NEEDS_CONSENT =
+  "Sharing journal entries with the AI Coach is off. Turn on \"Share prayer journal entries with the AI Coach\" in Profile first.";
+
 /** Most entries the coach ever sees, and how much of each. */
 export const COACH_JOURNAL_LIMIT = 5;
 export const COACH_JOURNAL_EXCERPT = 400;

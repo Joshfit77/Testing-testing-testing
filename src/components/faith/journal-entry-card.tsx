@@ -8,7 +8,7 @@ export function formatJournalDate(iso: string): string {
 }
 
 /** One journal entry in a list; opens the entry. */
-export function JournalEntryCard({ entry }: { entry: Pick<JournalRow, "id" | "entry_date" | "kind" | "title" | "body" | "scripture_ref" | "answered_on" | "share_with_coach"> }) {
+export function JournalEntryCard({ entry, sharingOn = false }: { entry: Pick<JournalRow, "id" | "entry_date" | "kind" | "title" | "body" | "scripture_ref" | "answered_on" | "share_with_coach">; sharingOn?: boolean }) {
   const answered = isAnswerable(entry.kind) && entry.answered_on;
   return (
     <Link href={`/faith/journal/${entry.id}`} className="flex min-h-16 items-start gap-3 rounded-2xl border border-border bg-card p-4 hover:border-gold-muted">
@@ -26,7 +26,8 @@ export function JournalEntryCard({ entry }: { entry: Pick<JournalRow, "id" | "en
               <HandHeart className="size-3" aria-hidden /> Still praying
             </span>
           ) : null}
-          {entry.share_with_coach && (
+          {/* Only while the journal permission is on (migration 080): otherwise nothing is shared, whatever the mark. */}
+          {sharingOn && entry.share_with_coach && (
             <span className="inline-flex items-center gap-1 rounded-full border border-gold-muted/60 px-2 py-0.5">
               <Bot className="size-3" aria-hidden /> Shared with coach
             </span>

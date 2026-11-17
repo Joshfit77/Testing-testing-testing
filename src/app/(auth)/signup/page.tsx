@@ -20,7 +20,7 @@ export default async function SignUpPage({ searchParams }: { searchParams: Promi
         <blockquote className="font-serif text-base text-[#f1ead6]">&ldquo;{SIGNUP_VERSE}&rdquo;</blockquote>
         <figcaption className="mt-1 text-xs font-semibold text-gold">Philippians 4:13 ({TRANSLATION.code})</figcaption>
       </figure>
-      <p className="mt-2 text-sm text-muted-foreground">Free forever plan. No card required. Next, we&apos;ll ask your weight, age, sex and height to set up your plan.</p>
+      <p className="mt-2 text-sm text-muted-foreground">Free plan. No card required. Next, we&apos;ll ask your weight, age, sex and height to set up your plan.</p>
       {isDemoMode() && (
         <Notice tone="info" className="mt-4">
           This is a demo server, so confirmation emails aren&apos;t delivered. To walk through sign-up and onboarding, use{" "}

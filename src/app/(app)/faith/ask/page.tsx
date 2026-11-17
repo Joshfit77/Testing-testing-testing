@@ -47,7 +47,7 @@ export default async function AskPage() {
       <p className="flex items-start gap-2 rounded-xl border border-border bg-elevated/50 p-3 text-sm text-muted-foreground">
         <Info className="mt-0.5 size-4 shrink-0 text-gold" aria-hidden />
         <span>
-          This is an AI, not a pastor, and it can be wrong: read the passages for yourself, and bring big questions to your church. Your question is sent to our AI provider to be answered. Your prayer journal and notes are never shared with it.
+          This is an AI, not a pastor, and it can be wrong: read the passages for yourself, and bring big questions to your church. Your question and the earlier messages in this thread are sent to our AI provider to be answered. This helper is never given your prayer journal or your notes.
         </span>
       </p>
       {!entitled ? (

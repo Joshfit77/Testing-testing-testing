@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { removeUserStorage } from "@/server/services/account";
+import { hashKey } from "@/server/rate-limit";
 
 /**
  * Permanent account deletion, in an order that never leaves a person billed for an account that is gone:
@@ -10,6 +11,9 @@ import { removeUserStorage } from "@/server/services/account";
  *   3. Delete the Supabase auth user. Every personal table references auth.users with `on delete cascade`
  *      (enforced by tests/unit/account-coverage.test.ts), so workouts, nutrition, journals, AI conversations
  *      and everything else go with it.
+ *   3b. Remove the shared rate-limit counters keyed by the account ID or the hashed sign-in email. They have no foreign
+ *      key, so nothing cascades to them; otherwise they would linger until the limiter's occasional clean-up. Best
+ *      effort: a failure is logged, the account is already gone.
  *   4. Delete the Stripe customer record (name, email, payment methods) and the RevenueCat customer (App Store /
  *      Google Play purchase history). Best effort: the account is already gone, so a failure here is logged for
  *      follow-up instead of shown as a failed deletion. Store subscriptions can only be cancelled by the person
@@ -32,6 +36,8 @@ export interface DeletionDeps {
   /** Deletes the RevenueCat customer; null/absent when RevenueCat isn't configured. */
   deleteStoreCustomer?: ((userId: string) => Promise<void>) | null;
   removeStorage?: (admin: SupabaseClient, userId: string) => Promise<void>;
+  /** Removes rate-limit counters keyed by the member (defaults to removeRateLimitCounters). */
+  removeRateLimits?: (admin: SupabaseClient, userId: string, email: string | null) => Promise<void>;
   log: (scope: string, err: unknown, context?: Record<string, string | number | boolean | null>) => void;
 }
 
@@ -62,10 +68,19 @@ export async function deleteUserAccount(userId: string, deps: DeletionDeps): Pro
     return { ok: false, stage: "storage", subscriptionsCancelled: true, filesRemoved: false };
   }
 
+  // The sign-in email, read while the auth user still exists, to find the counters keyed by its hash.
+  const email = await accountEmail(deps.admin, userId);
+
   const { error } = await deps.admin.auth.admin.deleteUser(userId);
   if (error) {
     deps.log("account.delete.auth", error);
     return { ok: false, stage: "auth", subscriptionsCancelled: true, filesRemoved: true };
+  }
+
+  try {
+    await (deps.removeRateLimits ?? removeRateLimitCounters)(deps.admin, userId, email);
+  } catch (err) {
+    deps.log("account.delete.rate_limits", err, { userId });
   }
 
   let stripeCustomerDeleted: boolean | null = null;
@@ -89,6 +104,28 @@ export async function deleteUserAccount(userId: string, deps: DeletionDeps): Pro
   return { ok: true, stripeCustomerDeleted };
 }
 
+async function accountEmail(admin: SupabaseClient, userId: string): Promise<string | null> {
+  try {
+    const { data } = await admin.auth.admin.getUserById(userId);
+    return data.user?.email ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Delete the shared rate-limit counters (`rate_limit_counters`, migration 046) that name this member: keys of the form
+ * `<action>:<account id>` (src/server/rate-limit.ts callers) and `<action>:<hashed email>[:ip:<hashed address>]`
+ * (src/server/actions/auth.ts). Counters keyed only by a hashed IP address can't be tied to the member and are left
+ * to the limiter's own clean-up. Service-role client only.
+ */
+export async function removeRateLimitCounters(admin: SupabaseClient, userId: string, email: string | null): Promise<void> {
+  for (const part of email ? [userId, hashKey(email)] : [userId]) {
+    const { error } = await admin.from("rate_limit_counters").delete().like("key", `%${part}%`);
+    if (error) throw error;
+  }
+}
+
 /** What to tell the person when deletion stops part-way. */
 export function deletionFailureMessage(r: Extract<DeletionResult, { ok: false }>): string {
   if (r.stage === "billing") {
@@ -96,6 +133,7 @@ export function deletionFailureMessage(r: Extract<DeletionResult, { ok: false }>
   }
   const done = r.filesRemoved
     ? "Your subscription was cancelled and your photos were removed, but your account and the rest of your data still exist."
-    : "Your subscription was cancelled, but nothing else was deleted.";
+    : // Storage is emptied bucket by bucket, so a failure part-way can leave some photos already removed.
+      "Your subscription was cancelled, but your account and your data still exist (some of your photos may already have been removed).";
   return `${done} Please try again. If it keeps failing, contact support and we'll finish the deletion for you.`;
 }

@@ -5,12 +5,13 @@ import { Notice } from "@/components/common/states";
 import { BackLink } from "@/components/platform/back-link";
 import { SmallScore } from "@/components/nutrition/food-iq-sections";
 import { FiltersEditor, ProductImage, QualityScanner } from "@/components/nutrition/quality-client";
+import { OffDataNotice } from "@/components/nutrition/quality-sections";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { hasFeature } from "@/lib/domain/plans";
 import { foodIqScoreEnabled, NUTRITION_FEATURE_TITLE, NUTRITION_SCORE_LABEL, scoreFoodIq } from "@/lib/food-iq";
-import { OFF_DATA_NOTICE, sanitizeFilters } from "@/lib/food-quality";
+import { sanitizeFilters } from "@/lib/food-quality";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { rateLimit } from "@/server/rate-limit";
@@ -134,7 +135,7 @@ export default async function FoodIqPage({ searchParams }: { searchParams: Promi
           )}
         </CardContent>
       </Card>
-      <p className="text-xs text-muted-foreground">{OFF_DATA_NOTICE}</p>
+      <OffDataNotice />
     </div>
   );
 }

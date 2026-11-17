@@ -4,6 +4,7 @@ import { MainHeader } from "@/components/shell/main-header";
 import { EmptyState } from "@/components/common/states";
 import { FaithChallenge } from "@/components/faith/faith-challenge";
 import { JournalEntryCard } from "@/components/faith/journal-entry-card";
+import { journalSharingAllowed } from "@/lib/domain/journal";
 import { PracticesPanel } from "@/components/faith/practices-panel";
 import { Badge } from "@/components/ui/badge";
 import { FAITH_MOTIVATIONS, SCRIPTURES, THEME_LABELS, TRANSLATION, scriptureForDate, type FaithTheme } from "@/data/content";
@@ -196,7 +197,7 @@ export default async function FaithPage({ searchParams }: { searchParams: Promis
           <ul className="grid gap-2 md:grid-cols-3">
             {journal.map((j) => (
               <li key={j.id} className="min-w-0">
-                <JournalEntryCard entry={j} />
+                <JournalEntryCard entry={j} sharingOn={journalSharingAllowed(profile)} />
               </li>
             ))}
           </ul>

@@ -66,7 +66,8 @@ export interface WeeklyReportInput {
   /** Running distance of the week before, in metres, or null if none. */
   priorRunDistanceM: number | null;
   /** Finished nights inside the week. */
-  sleep: { asleepMinutes: number; estimated: boolean; recorded: boolean; stages: { rem: number; deep: number; light: number; awake: number } | null }[];
+  /** `imported`: any part of the night came from a health platform or wearable (see health-ai-sharing.ts). */
+  sleep: { asleepMinutes: number; estimated: boolean; recorded: boolean; imported?: boolean; stages: { rem: number; deep: number; light: number; awake: number } | null }[];
   sleepGoalMinutes: number;
   /** Sleep schedule steadiness for the week, when at least three nights exist. */
   sleepSteadiness: "steady" | "variable" | "irregular" | null;
@@ -120,6 +121,18 @@ export interface WeeklyMetrics {
 const round1 = (n: number) => Math.round(n * 10) / 10;
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
 const coverage = (have: number, of: number): Coverage => (have <= 0 ? "none" : have >= of ? "complete" : "partial");
+
+/**
+ * The week's records as the AI provider may see them (the member's own report page always shows everything). Sleep is
+ * wellness data: without that consent none of it is sent, as for the coach's tools (adaptive-training.ts,
+ * coach/analysis.ts, coach/sleep-summary.ts). Nights a health platform or wearable supplied are sent only with the
+ * separate health permission (migration 079). When any night is left out, the schedule steadiness, which was worked
+ * out from every night, is left out too.
+ */
+export function weeklyInputForProvider(input: WeeklyReportInput, allowed: { wellness: boolean; healthPlatform: boolean }): WeeklyReportInput {
+  const sleep = !allowed.wellness ? [] : allowed.healthPlatform ? input.sleep : input.sleep.filter((n) => !n.imported);
+  return sleep.length === input.sleep.length ? input : { ...input, sleep, sleepSteadiness: null };
+}
 
 export function buildWeeklyMetrics(input: WeeklyReportInput): WeeklyMetrics {
   const { weekStart, weekEnd } = input.period;

@@ -49,6 +49,8 @@ test.describe("My Progress and Sleep & Recovery at phone size", () => {
     await page.goto("/progress/sleep");
     await page.getByRole("link", { name: "Nightly report" }).first().click();
     await page.waitForURL(/\/progress\/sleep\/night\//);
+    // The URL changes before the night's page has rendered; count the axis only once its stages section is there.
+    await expect(page.getByRole("heading", { name: "Sleep stages" })).toBeVisible();
     const axis = page.getByTestId("stage-axis");
     test.skip((await axis.count()) === 0, "the latest sample night has no stages");
     const boxes = await axis.locator("span").evaluateAll((els) => els.map((e) => e.getBoundingClientRect()).map((r) => ({ left: r.left, right: r.right })));

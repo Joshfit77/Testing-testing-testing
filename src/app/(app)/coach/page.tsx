@@ -227,8 +227,8 @@ export default async function CoachPage({
             examples={(suggestions ?? []).slice(0, 3)}
             priceLine={
               native || !plans.pro.yearlyPriceCents
-                ? `${plans.pro.name} · Faith stays free`
-                : `Pro · ${money(plans.pro.priceCents)}/month or ${money(plans.pro.yearlyPriceCents)}/year · Faith stays free`
+                ? `${plans.pro.name} · Bible and prayer journal are in Free`
+                : `Pro · ${money(plans.pro.priceCents)}/month or ${money(plans.pro.yearlyPriceCents)}/year · Bible and prayer journal are in Free`
             }
           />
         ) : (

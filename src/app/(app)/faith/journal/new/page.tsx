@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/common/page-header";
 import { NewJournalEntry } from "@/components/faith/faith-forms";
 import { BackLink } from "@/components/platform/back-link";
 import { isoDateInTz } from "@/lib/domain/dates";
-import { JOURNAL_KIND_LABELS, JOURNAL_KINDS, type JournalKind } from "@/lib/domain/journal";
+import { JOURNAL_KIND_LABELS, JOURNAL_KINDS, type JournalKind, journalSharingAllowed } from "@/lib/domain/journal";
 import { requireOnboardedUser } from "@/server/auth";
 
 export const metadata = { title: "New prayer" };
@@ -28,7 +28,7 @@ export default async function NewJournalEntryPage({ searchParams }: { searchPara
         className="mb-2"
       />
       <section className="rounded-2xl border border-border bg-card p-4">
-        <NewJournalEntry today={isoDateInTz(new Date(), profile.timezone)} kind={kind} scriptureRef={sp.ref?.slice(0, 80)} returnTo={returnTo} />
+        <NewJournalEntry today={isoDateInTz(new Date(), profile.timezone)} kind={kind} scriptureRef={sp.ref?.slice(0, 80)} returnTo={returnTo} canShare={journalSharingAllowed(profile)} />
       </section>
     </div>
   );

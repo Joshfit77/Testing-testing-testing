@@ -83,12 +83,16 @@ export async function setAiDataConsentAction(allow: boolean): Promise<ActionStat
     .from("profiles")
     // Withdrawing AI consent also switches coaching memory off: saved notes stay (the member can view or delete them
     // under AI Coach > Memory) but nothing is used or added until both are allowed again.
-    .update(allow ? { ai_data_consent_at: new Date().toISOString() } : { ai_data_consent_at: null, coach_memory_enabled: false })
+    // It also switches off sharing of Apple Health / Health Connect data: that permission only has meaning with this one.
+    // And the prayer-journal permission (migration 080), with every entry's share mark (below).
+    .update(allow ? { ai_data_consent_at: new Date().toISOString() } : { ai_data_consent_at: null, coach_memory_enabled: false, health_ai_share_consent_at: null, journal_ai_consent_at: null })
     .eq("id", user.id);
   if (error) {
     logError("profile.ai_consent", error);
     return actionError("Couldn't save your choice. Please try again.");
   }
+  // With consent off nothing is sent whatever the marks say; clearing them means turning it on again shares nothing old.
+  if (!allow) await clearJournalShareMarks(supabase, user.id);
   revalidatePath("/coach");
   revalidatePath("/profile");
   return actionOk(allow ? "AI Coach turned on." : "AI Coach data sharing turned off, and coaching memory with it. Nothing is sent until you allow it again; your saved memories stay until you delete them.");
@@ -138,4 +142,67 @@ async function verifyPassword(email: string, password: string): Promise<"ok" | "
   // "local" only drops this throwaway client's tokens; the default ("global") would sign the person out everywhere.
   if (data.session) await client.auth.signOut({ scope: "local" }).catch(() => null);
   return "ok";
+}
+
+/**
+ * Turn sharing of Apple Health / Health Connect data with the AI provider on or off (migration 079). Off by default.
+ * It needs the general AI consent first; turning it off takes effect on the next message.
+ */
+export async function setHealthAiShareAction(allow: boolean): Promise<ActionState> {
+  const user = await requireUser();
+  const supabase = await getServerSupabase();
+  if (allow) {
+    const { data } = await supabase.from("profiles").select("ai_data_consent_at").eq("id", user.id).maybeSingle();
+    if (!data?.ai_data_consent_at) return actionError("Turn on the AI Coach first.");
+  }
+  const { error } = await supabase
+    .from("profiles")
+    .update({ health_ai_share_consent_at: allow ? new Date().toISOString() : null })
+    .eq("id", user.id);
+  if (error) {
+    logError("profile.health_ai_share", error);
+    return actionError("Couldn't save your choice. Please try again.");
+  }
+  revalidatePath("/coach");
+  revalidatePath("/profile");
+  return actionOk(allow ? "Health data sharing with the AI Coach turned on." : "Health data sharing with the AI Coach turned off. Nothing from Apple Health or Health Connect is sent from now on.");
+}
+
+/**
+ * Turn the separate permission to share prayer-journal entries with the AI Coach on or off (migration 080). Off by
+ * default. Turning it on needs the general AI consent and faith features; it shares nothing by itself: every existing
+ * share mark is cleared, so each entry must be chosen again. Turning it off clears them too.
+ */
+export async function setJournalAiShareAction(allow: boolean): Promise<ActionState> {
+  const user = await requireUser();
+  const supabase = await getServerSupabase();
+  if (allow) {
+    const { data } = await supabase.from("profiles").select("ai_data_consent_at, faith_enabled").eq("id", user.id).maybeSingle();
+    if (!data?.ai_data_consent_at) return actionError("Turn on the AI Coach first.");
+    if (!data.faith_enabled) return actionError("Turn on faith features first.");
+  }
+  // Both ways, every entry starts private. Turning it on: any mark that exists now was set without this permission
+  // (before it existed, or directly), and must not start sharing. Turning it off: nothing stays marked.
+  const cleared = await clearJournalShareMarks(supabase, user.id);
+  if (!cleared) return actionError("Couldn't save your choice. Please try again.");
+  const { error } = await supabase.from("profiles").update({ journal_ai_consent_at: allow ? new Date().toISOString() : null }).eq("id", user.id);
+  if (error) {
+    logError("profile.journal_ai_share", error);
+    return actionError("Couldn't save your choice. Please try again.");
+  }
+  revalidatePath("/coach");
+  revalidatePath("/profile");
+  revalidatePath("/faith/journal");
+  return actionOk(
+    allow
+      ? "Journal sharing turned on. Nothing is shared until you mark an entry \"Share with AI Coach\"."
+      : "Journal sharing turned off. No journal entry is sent to the AI Coach, and every entry is private again.",
+  );
+}
+
+/** Mark every journal entry private again (journal permission or AI consent withdrawn). */
+async function clearJournalShareMarks(supabase: Awaited<ReturnType<typeof getServerSupabase>>, userId: string): Promise<boolean> {
+  const { error } = await supabase.from("faith_journal_entries").update({ share_with_coach: false }).eq("user_id", userId).eq("share_with_coach", true);
+  if (error) logError("profile.journal_share_clear", error);
+  return !error;
 }

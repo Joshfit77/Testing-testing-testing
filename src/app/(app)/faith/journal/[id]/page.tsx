@@ -9,7 +9,7 @@ import { BackLink } from "@/components/platform/back-link";
 import { Button } from "@/components/ui/button";
 import { THEME_LABELS, type FaithTheme } from "@/data/content";
 import { isoDateInTz } from "@/lib/domain/dates";
-import { isAnswerable, JOURNAL_KIND_LABELS } from "@/lib/domain/journal";
+import { isAnswerable, JOURNAL_KIND_LABELS, journalSharingAllowed } from "@/lib/domain/journal";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
 import { clearPrayerAnsweredAction, deleteJournalEntryAction, setJournalArchivedAction, setJournalShareAction } from "@/server/actions/faith";
@@ -27,6 +27,9 @@ export default async function JournalEntryPage({ params, searchParams }: { param
   const e = data as unknown as JournalRow;
   const today = isoDateInTz(new Date(), profile.timezone);
   const editing = sp.edit === "1";
+  // The separate journal permission (migration 080): without it no entry reaches the AI Coach, whatever its mark says.
+  const canShare = journalSharingAllowed(profile);
+  const shared = canShare && e.share_with_coach;
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
@@ -40,6 +43,7 @@ export default async function JournalEntryPage({ params, searchParams }: { param
       {editing ? (
         <section className="rounded-2xl border border-border bg-card p-4" aria-label="Edit entry">
           <EditJournalEntry
+            canShare={canShare}
             today={today}
             entry={{ id: e.id, entry_date: e.entry_date, kind: e.kind, theme: e.theme, scripture_ref: e.scripture_ref, title: e.title, body: e.body, share_with_coach: e.share_with_coach }}
           />
@@ -80,17 +84,26 @@ export default async function JournalEntryPage({ params, searchParams }: { param
 
           <section className="rounded-2xl border border-border bg-card p-4" aria-labelledby="share-title">
             <h2 id="share-title" className="flex items-center gap-2 font-semibold">
-              {e.share_with_coach ? <Bot className="size-5 text-gold" aria-hidden /> : <Lock className="size-5 text-gold" aria-hidden />}
-              {e.share_with_coach ? "Shared with AI Coach" : "Private"}
+              {shared ? <Bot className="size-5 text-gold" aria-hidden /> : <Lock className="size-5 text-gold" aria-hidden />}
+              {shared ? "Shared with AI Coach" : "Private"}
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              {e.share_with_coach
-                ? "The AI coach can read a short excerpt of this entry. Administrators can't."
-                : "Only you can see this entry. It isn't shared with the AI coach or administrators."}
+              {shared
+                ? "The AI coach can read a short excerpt of this entry. The app gives administrators no way to view it."
+                : "This entry is private to your account. It isn't sent to the AI coach, and the app gives administrators no way to view it."}
             </p>
-            <ActionButton action={setJournalShareAction} fields={{ id: e.id, share: e.share_with_coach ? "false" : "true" }} variant="secondary" size="sm" className="mt-3">
-              {e.share_with_coach ? "Stop sharing with AI Coach" : "Share with AI Coach"}
-            </ActionButton>
+            {canShare ? (
+              <ActionButton action={setJournalShareAction} fields={{ id: e.id, share: e.share_with_coach ? "false" : "true" }} variant="secondary" size="sm" className="mt-3">
+                {e.share_with_coach ? "Stop sharing with AI Coach" : "Share with AI Coach"}
+              </ActionButton>
+            ) : (
+              <p className="mt-2 text-xs text-muted-foreground" data-testid="journal-share-off">
+                Sharing journal entries with the AI Coach is off.{" "}
+                <Link href="/profile" className="text-gold-highlight underline-offset-4 hover:underline">
+                  Change in Profile
+                </Link>
+              </p>
+            )}
           </section>
 
           {e.archived_at && <p className="rounded-xl border border-border bg-elevated/50 p-3 text-sm text-muted-foreground">Archived. It&rsquo;s hidden from your journal but kept; restore it any time.</p>}

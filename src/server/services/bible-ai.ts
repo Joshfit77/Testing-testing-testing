@@ -75,7 +75,7 @@ export interface BibleAnswer {
 }
 export type BibleAskResult = BibleAnswer | { ok: false; code: "unavailable" | "consent_required" | "not_entitled" | "rate_limited" | "quota" | "invalid" | "refused" | "error"; error: string };
 
-export const BIBLE_AI_PRO_ONLY = "The AI Bible study helper is included with Pro All Access. Reading, searching, highlights, journeys, prayer and the 40-day challenge stay free.";
+export const BIBLE_AI_PRO_ONLY = "The AI Bible study helper is included with Pro All Access. Reading, searching, highlights, journeys, prayer and the 40-day challenge are included in the Free plan.";
 
 /**
  * Whether the helper may send anything to the AI provider for this member, checked before any quota is reserved:
@@ -117,7 +117,7 @@ export async function askBible(userId: string, plan: Plan, questionRaw: string, 
       const { data: usageId, error: quotaError } = await service.rpc("reserve_bible_ai_usage", { p_user_id: userId, p_per_minute: limits.perMinute, p_daily: limits.daily, p_monthly: limits.monthly });
       if (quotaError) {
         if (quotaError.message?.includes("bible_ai_rate_limited")) throw new AiError("rate_limited", "That's a lot of questions at once. Please wait a minute.", 60);
-        if (quotaError.message?.includes("bible_ai_quota")) throw new AiError("quota", `You've reached today's limit of ${limits.daily} Bible questions. The Bible itself is always free to read and search.`);
+        if (quotaError.message?.includes("bible_ai_quota")) throw new AiError("quota", `You've reached today's limit of ${limits.daily} Bible questions. The Bible is free to read and search.`);
         logError("bible_ai.reserve", quotaError);
         throw new AiError("metering_unavailable", "Couldn't ask right now. Please try again.");
       }

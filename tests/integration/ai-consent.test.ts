@@ -18,7 +18,7 @@ describe.skipIf(!available)("AI consent gates every provider call", () => {
   const svc = serviceClient();
   let pro: TestUser;
   const usageCount = async () => (await svc.from("ai_usage_events").select("id", { count: "exact", head: true }).eq("user_id", pro.id)).count ?? 0;
-  const setConsent = async (fields: { ai_data_consent_at?: string | null; food_photo_consent_at?: string | null; faith_enabled?: boolean }) => {
+  const setConsent = async (fields: { ai_data_consent_at?: string | null; food_photo_consent_at?: string | null; faith_enabled?: boolean; journal_ai_consent_at?: string | null }) => {
     // The member's own session, as the consent switches on the AI Coach and photo screens do it.
     const { error } = await pro.client.from("profiles").update(fields).eq("id", pro.id);
     if (error) throw error;
@@ -101,7 +101,7 @@ describe.skipIf(!available)("AI consent gates every provider call", () => {
     expect(api.requests.length).toBe(before + 1);
   });
 
-  it("prayer journal text reaches the provider only for entries shared with the coach; withdrawal stops the coach", async () => {
+  it("prayer journal text reaches the provider only with the journal permission and for entries shared with the coach; withdrawal stops the coach", async () => {
     const { coachTurn } = await import("@/server/services/ai-coach");
     const sharedMarker = `SHARED-${crypto.randomUUID().slice(0, 8)}`;
     const privateMarker = `PRIVATE-${crypto.randomUUID().slice(0, 8)}`;
@@ -122,8 +122,16 @@ describe.skipIf(!available)("AI consent gates every provider call", () => {
     expect(offSent.length).toBeGreaterThan(2);
     expect(offSent).not.toContain(sharedMarker);
     expect(offSent).not.toContain(privateMarker);
-    // Faith-inspired coaching on: only the shared entry is sent.
+    // Faith-inspired coaching on, but without the separate journal permission (migration 080): still nothing.
     await setConsent({ faith_enabled: true });
+    const noJournalBefore = api.requests.length;
+    await coachTurn({ supabase: pro.client, userId: pro.id, plan: "pro", conversationId: null, message: "How should I train this week?", mode: "chat" });
+    const noJournalSent = JSON.stringify(api.requests.slice(noJournalBefore));
+    expect(noJournalSent.length).toBeGreaterThan(2);
+    expect(noJournalSent).not.toContain(sharedMarker);
+    expect(noJournalSent).not.toContain(privateMarker);
+    // With the journal permission too: only the shared entry is sent.
+    await setConsent({ journal_ai_consent_at: new Date().toISOString() });
     const before = api.requests.length;
     const result = await coachTurn({ supabase: pro.client, userId: pro.id, plan: "pro", conversationId: null, message: "How should I train this week?", mode: "chat" });
     expect(result.assistantMessage.content).toContain("three sets of five");
@@ -133,7 +141,9 @@ describe.skipIf(!available)("AI consent gates every provider call", () => {
     expect(everything).toContain(sharedMarker);
     expect(everything).not.toContain(privateMarker);
 
-    // Withdrawal: the next message is refused and nothing more is sent.
+    // Withdrawal: the next message is refused and nothing more is sent. (This test sends four messages within a minute;
+    // the per-member burst limit is cleared first so the refusal checked below is the consent one, not the rate limit.)
+    await svc.from("rate_limit_counters").delete().eq("key", `ai:${pro.id}`);
     await setConsent({ ai_data_consent_at: null });
     const afterAllowed = api.requests.length;
     await expect(

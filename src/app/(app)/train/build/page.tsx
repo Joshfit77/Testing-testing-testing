@@ -22,7 +22,7 @@ export default async function BuildProgramPage({ searchParams }: { searchParams:
         eyebrow="Build my program"
         title="Your custom program"
         freeAlternative={{ href: "/profile/preferences", label: "Rebuild my free starter program" }}
-        description="Build a periodized program around your goal, numbers, schedule and equipment — strength, bodybuilding, running and more. Your starter program, built from your onboarding answers, stays free on every plan."
+        description="Build a periodized program around your goal, numbers, schedule and equipment — strength, bodybuilding, running and more. Your starter program, built from your onboarding answers, is included on every plan."
       />
     );
   }

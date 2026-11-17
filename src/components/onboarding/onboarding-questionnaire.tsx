@@ -484,7 +484,7 @@ export function OnboardingQuestionnaire({ userId, initialName, intro }: { userId
         )}
 
         {current === "body" && (
-          <Question title="About you" help="Used to confirm you're an adult and to estimate your daily calories. Never shared.">
+          <Question title="About you" help="Used to confirm you're an adult and to estimate your daily calories. Kept private to your account. If you turn on the AI Coach, your age, sex, height and weight are sent to its AI provider to personalise answers.">
             <div className="space-y-2">
               <p id="ob-sex-label" className="text-sm font-medium">
                 Sex

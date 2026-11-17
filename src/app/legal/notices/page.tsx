@@ -24,9 +24,20 @@ export default function NoticesPage() {
       <ScriptureNotice className="" />
       <h2>Open-source software</h2>
       <p>
-        Narrow Gate Fitness is built with open-source software, including Next.js, React, Supabase, Capacitor and Radix UI (MIT and Apache-2.0 licenses), and
-        the Capacitor Health plugin (<a href="https://github.com/Cap-go/capacitor-health" className="text-gold-highlight underline">@capgo/capacitor-health</a>,
-        Mozilla Public License 2.0, whose source is available at that link). The full license texts are included with each package.
+        Narrow Gate Fitness is built with open-source software, including Next.js, React, Supabase, Capacitor and Radix UI. Most of it is under the MIT, ISC,
+        BSD or Apache-2.0 licenses. The complete list of packages, with each one&apos;s license and license text, is in{" "}
+        <a href="/third-party-notices.txt" className="text-gold-highlight underline">Third-party software notices</a>.
+      </p>
+      <p>
+        The iPhone and Android apps include the Capacitor Health plugin, <code>@capgo/capacitor-health</code> version 8.11.4, under the{" "}
+        <a href="https://www.mozilla.org/en-US/MPL/2.0/" className="text-gold-highlight underline">Mozilla Public License 2.0</a>. Its source code is available at{" "}
+        <a href="https://github.com/Cap-go/capacitor-health" className="text-gold-highlight underline">github.com/Cap-go/capacitor-health</a>.
+      </p>
+      <h2>Fonts</h2>
+      <p>
+        The app uses the Inter, Plus Jakarta Sans, Cinzel and Lora typefaces, each under the{" "}
+        <a href="https://openfontlicense.org" className="text-gold-highlight underline">SIL Open Font License 1.1</a>. Their copyright notices and the license text are
+        in <a href="/third-party-notices.txt" className="text-gold-highlight underline">Third-party software notices</a>.
       </p>
       <h2>Trademarks</h2>
       <p>Apple Health, HealthKit and App Store are trademarks of Apple Inc.; Google Play and Health Connect are trademarks of Google LLC. Other names belong to their owners.</p>

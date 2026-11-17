@@ -48,7 +48,7 @@ export default async function BiblePage() {
   return (
     <div className="space-y-6">
       <BackLink href="/faith">Faith</BackLink>
-      <PageHeader title="Bible" description={`The complete ${meta.name}: ${meta.totals.books} books, ${meta.totals.chapters.toLocaleString("en-US")} chapters. Free to read, always.`} className="mb-2" />
+      <PageHeader title="Bible" description={`The complete ${meta.name}: ${meta.totals.books} books, ${meta.totals.chapters.toLocaleString("en-US")} chapters. Free to read.`} className="mb-2" />
 
       <BibleSearchForm />
 

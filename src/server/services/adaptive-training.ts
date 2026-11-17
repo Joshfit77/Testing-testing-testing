@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { addDays, isoDateInTz } from "@/lib/domain/dates";
+import { healthAiSharingAllowed, withoutHealthPlatformData } from "@/lib/domain/health-ai-sharing";
 import { DEFAULT_SLEEP_GOAL_MINUTES, summarizeNights } from "@/lib/domain/sleep";
 import { rowToSession, SLEEP_SESSION_COLUMNS, type SleepSessionRow } from "@/server/services/sleep";
 import { programDays, programExercisesOnDays } from "@/server/services/training";
@@ -34,8 +35,13 @@ export function upcomingWeek(ref: { currentWeek: number; currentDay: number; dur
   return Math.min(ref.durationWeeks, ref.currentWeek + 1);
 }
 
-export async function loadReviewInput(supabase: SupabaseClient, userId: string): Promise<{ input: ReviewInput; timeZone: string }> {
-  const { data: profile } = await supabase.from("profiles").select("unit_system, timezone, sleep_goal_minutes, wellness_consent_at").eq("id", userId).maybeSingle();
+/**
+ * `forAiProvider`: the input is going to the AI provider (the coach's training-review tool). Nights a health platform
+ * or wearable supplied are then left out unless the member has allowed sharing them (migration 079). The member's own
+ * review screens pass nothing and see every night.
+ */
+export async function loadReviewInput(supabase: SupabaseClient, userId: string, opts: { forAiProvider?: boolean } = {}): Promise<{ input: ReviewInput; timeZone: string }> {
+  const { data: profile } = await supabase.from("profiles").select("unit_system, timezone, sleep_goal_minutes, wellness_consent_at, ai_data_consent_at, health_ai_share_consent_at").eq("id", userId).maybeSingle();
   const timeZone = (profile?.timezone as string) || "UTC";
   const today = isoDateInTz(new Date(), timeZone);
   const since = addDays(today, -56);
@@ -147,7 +153,7 @@ export async function loadReviewInput(supabase: SupabaseClient, userId: string):
       sleep: profile?.wellness_consent_at
         ? {
             goalMinutes: (profile?.sleep_goal_minutes as number | null) ?? DEFAULT_SLEEP_GOAL_MINUTES,
-            nights: summarizeNights(((sleepRes.data ?? []) as unknown as SleepSessionRow[]).map(rowToSession)).map((n) => ({ date: n.nightOf, asleepMinutes: n.asleepMinutes, recorded: n.recorded, hrAvg: n.vitals?.heartRate?.avg ?? null, hrvAvgMs: n.vitals?.hrv?.avgMs ?? null })),
+            nights: summarizeNights(withoutHealthPlatformData(((sleepRes.data ?? []) as unknown as SleepSessionRow[]).map(rowToSession), !opts.forAiProvider || healthAiSharingAllowed(profile))).map((n) => ({ date: n.nightOf, asleepMinutes: n.asleepMinutes, recorded: n.recorded, hrAvg: n.vitals?.heartRate?.avg ?? null, hrvAvgMs: n.vitals?.hrv?.avgMs ?? null })),
           }
         : null,
     },

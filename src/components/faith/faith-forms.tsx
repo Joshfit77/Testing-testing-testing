@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useRef } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bot, ChevronRight, Lock } from "lucide-react";
 import { FieldError, FormMessage, SubmitButton } from "@/components/common/form-status";
@@ -32,7 +33,22 @@ const BODY_LABEL: Record<JournalKind, string> = { daily: "Prayer", request: "Pra
  * Scripture, date and theme sit under "More options" (a new entry is a daily prayer unless opened for another kind).
  * Unsaved text is kept as a device-only draft until it is saved.
  */
-export function JournalForm({ today, entry, defaultRef, defaultKind, onSaved }: { today: string; entry?: JournalEntryInput; defaultRef?: string; defaultKind?: JournalKind; onSaved?: () => void }) {
+export function JournalForm({
+  today,
+  entry,
+  defaultRef,
+  defaultKind,
+  onSaved,
+  canShare = false,
+}: {
+  today: string;
+  entry?: JournalEntryInput;
+  defaultRef?: string;
+  defaultKind?: JournalKind;
+  onSaved?: () => void;
+  /** The separate journal permission is on (migration 080). Without it the share choice isn't offered at all. */
+  canShare?: boolean;
+}) {
   const router = useRouter();
   const [state, action] = useActionState(saveJournalEntryAction, initialActionState);
   const id = entry?.id ?? "new";
@@ -137,6 +153,7 @@ export function JournalForm({ today, entry, defaultRef, defaultKind, onSaved }: 
           </div>
         </div>
       </details>
+      {canShare ? (
       <label className="flex min-h-11 items-start gap-3 rounded-xl border border-border bg-elevated/40 p-3 text-sm">
         <input
           type="checkbox"
@@ -155,8 +172,16 @@ export function JournalForm({ today, entry, defaultRef, defaultKind, onSaved }: 
           </span>
         </span>
       </label>
+      ) : (
+        <p className="text-xs text-muted-foreground" data-testid="journal-share-off">
+          Sharing journal entries with the AI Coach is off, so this entry stays private.{" "}
+          <Link href="/profile" className="text-gold-highlight underline-offset-4 hover:underline">
+            Change in Profile
+          </Link>
+        </p>
+      )}
       <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Lock className="size-3.5 shrink-0" aria-hidden /> {v.share ? "Visible to you and, as you chose, the AI coach. Never to administrators." : "Private to you. Never visible to administrators or the AI coach."}
+        <Lock className="size-3.5 shrink-0" aria-hidden /> {canShare && v.share ? "Visible to you and, as you chose, the AI coach. The app gives administrators no way to view it." : "Private to you. Not sent to the AI coach, and the app gives administrators no way to view it."}
       </p>
       <FormMessage state={state} />
       <SubmitButton>{entry ? "Update entry" : "Save entry"}</SubmitButton>
@@ -209,13 +234,13 @@ export function CustomPracticeForm() {
 }
 
 /** Edit an existing entry, then return to its page. */
-export function EditJournalEntry({ entry, today }: { entry: JournalEntryInput; today: string }) {
+export function EditJournalEntry({ entry, today, canShare }: { entry: JournalEntryInput; today: string; canShare: boolean }) {
   const router = useRouter();
-  return <JournalForm today={today} entry={entry} onSaved={() => router.replace(`/faith/journal/${entry.id}`)} />;
+  return <JournalForm today={today} entry={entry} canShare={canShare} onSaved={() => router.replace(`/faith/journal/${entry.id}`)} />;
 }
 
 /** A new entry on its own screen (e.g. from the journey's "Write a prayer"); returns to `returnTo` once saved. */
-export function NewJournalEntry({ today, kind, scriptureRef, returnTo }: { today: string; kind?: JournalKind; scriptureRef?: string; returnTo: string }) {
+export function NewJournalEntry({ today, kind, scriptureRef, returnTo, canShare }: { today: string; kind?: JournalKind; scriptureRef?: string; returnTo: string; canShare: boolean }) {
   const router = useRouter();
-  return <JournalForm today={today} defaultKind={kind} defaultRef={scriptureRef} onSaved={() => router.replace(returnTo)} />;
+  return <JournalForm today={today} defaultKind={kind} defaultRef={scriptureRef} canShare={canShare} onSaved={() => router.replace(returnTo)} />;
 }

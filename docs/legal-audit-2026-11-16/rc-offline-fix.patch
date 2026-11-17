@@ -1,0 +1,61 @@
+commit 3b9bc44f60b76b1d11b9810499926979bfdbf785
+Author: Claude <noreply@anthropic.com>
+Date:   Mon Nov 16 00:35:47 2026 +0000
+
+    Service worker: don't ask for Home pictures that don't exist yet
+    
+    The worker still precached the seven Home backgrounds removed in 56500ff.
+    Some of those requests never finished, so the worker never installed and the
+    offline Bible stopped working (two bible-reader browser tests timed out).
+    The list is empty until the owner's photographs exist; version ngf-v3.
+    
+    Also records the full browser run for Friends phase 1 in the feature doc.
+    
+    Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>
+    Claude-Session: https://claude.ai/code/session_01LR7kXjsJxADxZ9miLhVwMh
+
+diff --git a/public/sw.js b/public/sw.js
+index c8f197b..8883bca 100644
+--- a/public/sw.js
++++ b/public/sw.js
+@@ -9,12 +9,15 @@
+  *   answered from that cache, and a Bible page opened without a connection shows the offline reader. The cache holds
+  *   Scripture only, never account data, and survives service-worker updates (it is versioned on its own).
+  */
+-const VERSION = "ngf-v2";
++const VERSION = "ngf-v3";
+ const STATIC_CACHE = `${VERSION}-static`;
+ const OFFLINE_URL = "/offline.html";
+ const BIBLE_CACHE = "ngf-bible-v1";
+-// The seven Home backgrounds (about 25 kB each), so the day's picture is there offline whatever day the app opens.
+-const HOME_BACKGROUNDS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"].map((d) => `/home-backgrounds/${d}.webp`);
++// The seven Home backgrounds, stored so the day's picture is there offline. EMPTY until the owner's photographs exist
++// (docs/design/HOME_BACKGROUNDS.md): asking for files that aren't there left requests pending, the install never
++// finished and nothing worked offline. When the photographs are added, list them here again:
++//   ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"].map((d) => `/home-backgrounds/${d}.webp`)
++const HOME_BACKGROUNDS = [];
+ const PRECACHE = [OFFLINE_URL, "/icons/icon-192.png", "/icons/icon-512.png", "/icons/icon.svg", "/manifest.webmanifest"];
+ 
+ self.addEventListener("install", (event) => {
+diff --git a/tests/unit/home-backgrounds.test.ts b/tests/unit/home-backgrounds.test.ts
+index 82ba712..bedc4d3 100644
+--- a/tests/unit/home-backgrounds.test.ts
++++ b/tests/unit/home-backgrounds.test.ts
+@@ -59,9 +59,14 @@ describe("Home backgrounds: one for each day of the week", () => {
+     expect(msUntilNextLocalMidnight(new Date(2026, 10, 14, 23, 59, 59, 999))).toBeGreaterThanOrEqual(1000);
+   });
+ 
+-  it("the service worker keeps the seven pictures for offline use", () => {
++  it("the service worker stores the seven pictures only once they exist (a missing file must never stall its install)", () => {
+     const sw = readFileSync(join(process.cwd(), "public/sw.js"), "utf8");
+-    expect(sw).toContain("/home-backgrounds/${d}.webp");
+-    for (const b of HOME_BACKGROUNDS) expect(sw).toContain(`"${b.key}"`);
++    const list = sw.match(/^const HOME_BACKGROUNDS = (.+);$/m)?.[1] ?? "";
++    if (HOME_BACKGROUND_PHOTOS_READY) {
++      expect(list).toContain("/home-backgrounds/${d}.webp");
++      for (const b of HOME_BACKGROUNDS) expect(list).toContain(`"${b.key}"`);
++    } else {
++      expect(list).toBe("[]");
++    }
+   });
+ });

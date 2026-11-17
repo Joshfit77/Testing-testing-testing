@@ -4,7 +4,7 @@ import { z } from "zod";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { actionError, actionInvalid, actionOk, type ActionState } from "@/lib/action-state";
 import { isoDateInTz } from "@/lib/domain/dates";
-import { ANSWERABLE_KINDS, isAnswerable } from "@/lib/domain/journal";
+import { ANSWERABLE_KINDS, isAnswerable, JOURNAL_SHARE_NEEDS_CONSENT, journalSharingAllowed } from "@/lib/domain/journal";
 import { canCheckIn, isPresetPractice, PRACTICE_INFO } from "@/lib/domain/practices";
 import { customPracticeSchema, journalEntrySchema, prayerAnsweredSchema } from "@/lib/validation/schemas";
 import { getProfile, requireUser } from "@/server/auth";
@@ -26,6 +26,11 @@ async function userToday(userId: string): Promise<string> {
 
 // ---------------------------------------------------------------------------- Prayer journal
 
+/** The server-side check behind every "Share with AI Coach": the client is never trusted for this. */
+async function mayShareJournal(userId: string): Promise<boolean> {
+  return journalSharingAllowed(await getProfile(userId));
+}
+
 export async function saveJournalEntryAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireUser();
   const raw = Object.fromEntries(formData);
@@ -36,6 +41,7 @@ export async function saveJournalEntryAction(_prev: ActionState, formData: FormD
     shareWithCoach: raw.shareWithCoach === "on" || raw.shareWithCoach === "true",
   });
   if (!parsed.success) return actionInvalid(parsed.error);
+  if (parsed.data.shareWithCoach && !(await mayShareJournal(user.id))) return actionError(JOURNAL_SHARE_NEEDS_CONSENT);
   const id = uuid.safeParse(formData.get("id"));
   const supabase = await getServerSupabase();
   const row = {
@@ -130,8 +136,11 @@ export async function setJournalShareAction(formData: FormData): Promise<void> {
   const user = await requireUser();
   const id = uuid.safeParse(formData.get("id"));
   if (!id.success) return;
+  const share = formData.get("share") === "true";
+  // Turning sharing off is always allowed; turning it on needs the separate journal permission.
+  if (share && !(await mayShareJournal(user.id))) return;
   const supabase = await getServerSupabase();
-  await supabase.from("faith_journal_entries").update({ share_with_coach: formData.get("share") === "true" }).eq("id", id.data).eq("user_id", user.id);
+  await supabase.from("faith_journal_entries").update({ share_with_coach: share }).eq("id", id.data).eq("user_id", user.id);
 }
 
 // ---------------------------------------------------------------------------- Daily practices

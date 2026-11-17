@@ -1,0 +1,879 @@
+name,version,license_declared_in_package_json,license_file_present,license_file_names,direct_or_transitive,production_or_dev,installed_on_audit_machine,install_path,notes
+@anthropic-ai/sdk,0.135.0,MIT,Y,LICENSE,direct,production,Y,node_modules/@anthropic-ai/sdk,
+@babel/runtime,7.29.10,MIT,Y,LICENSE,transitive,production,Y,node_modules/@babel/runtime,
+@capacitor-community/background-geolocation,1.2.26,MIT,Y,LICENSE,direct,production,Y,node_modules/@capacitor-community/background-geolocation,JS in web client bundle and/or native code compiled into iOS/Android apps
+@capacitor/android,8.5.3,MIT,Y,LICENSE,direct,production,Y,node_modules/@capacitor/android,JS in web client bundle and/or native code compiled into iOS/Android apps
+@capacitor/app,8.1.2,MIT,Y,LICENSE,direct,production,Y,node_modules/@capacitor/app,JS in web client bundle and/or native code compiled into iOS/Android apps
+@capacitor/barcode-scanner,3.1.2,MIT,Y,LICENSE,direct,production,Y,node_modules/@capacitor/barcode-scanner,JS in web client bundle and/or native code compiled into iOS/Android apps
+@capacitor/core,8.5.3,MIT,Y,LICENSE,direct,production,Y,node_modules/@capacitor/core,JS in web client bundle and/or native code compiled into iOS/Android apps
+@capacitor/haptics,8.0.2,MIT,Y,LICENSE,direct,production,Y,node_modules/@capacitor/haptics,JS in web client bundle and/or native code compiled into iOS/Android apps
+@capacitor/ios,8.5.3,MIT,Y,LICENSE,direct,production,Y,node_modules/@capacitor/ios,JS in web client bundle and/or native code compiled into iOS/Android apps
+@capacitor/keyboard,8.0.6,MIT,Y,LICENSE,direct,production,Y,node_modules/@capacitor/keyboard,JS in web client bundle and/or native code compiled into iOS/Android apps
+@capacitor/local-notifications,8.3.1,MIT,Y,LICENSE,direct,production,Y,node_modules/@capacitor/local-notifications,JS in web client bundle and/or native code compiled into iOS/Android apps
+@capacitor/splash-screen,8.0.2,MIT,Y,LICENSE,direct,production,Y,node_modules/@capacitor/splash-screen,JS in web client bundle and/or native code compiled into iOS/Android apps
+@capacitor/status-bar,8.0.4,MIT,Y,LICENSE,direct,production,Y,node_modules/@capacitor/status-bar,JS in web client bundle and/or native code compiled into iOS/Android apps
+@capgo/capacitor-health,8.11.4,MPL-2.0,Y,LICENSE,direct,production,Y,node_modules/@capgo/capacitor-health,JS in web client bundle; Swift/Kotlin compiled into iOS/Android apps
+@emnapi/runtime,1.11.3,MIT,Y,LICENSE,transitive,production,Y,node_modules/@emnapi/runtime,
+@floating-ui/core,1.8.0,MIT,Y,LICENSE,transitive,production,Y,node_modules/@floating-ui/core,
+@floating-ui/dom,1.8.0,MIT,Y,LICENSE,transitive,production,Y,node_modules/@floating-ui/dom,
+@floating-ui/react-dom,2.1.9,MIT,Y,LICENSE,transitive,production,Y,node_modules/@floating-ui/react-dom,
+@floating-ui/utils,0.2.12,MIT,Y,LICENSE,transitive,production,Y,node_modules/@floating-ui/utils,
+@img/colour,1.1.0,MIT,Y,LICENSE.md,transitive,production,Y,node_modules/@img/colour,
+@img/sharp-darwin-arm64,0.35.5,Apache-2.0 (from package-lock.json),n/a,,transitive,production,N,node_modules/@img/sharp-darwin-arm64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@img/sharp-darwin-x64,0.35.5,Apache-2.0 (from package-lock.json),n/a,,transitive,production,N,node_modules/@img/sharp-darwin-x64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@img/sharp-freebsd-wasm32,0.35.5,Apache-2.0 (from package-lock.json),n/a,,transitive,production,N,node_modules/@img/sharp-freebsd-wasm32,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@img/sharp-libvips-darwin-arm64,1.3.4,LGPL-3.0-or-later (from package-lock.json),n/a,,transitive,production,N,node_modules/@img/sharp-libvips-darwin-arm64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@img/sharp-libvips-darwin-x64,1.3.4,LGPL-3.0-or-later (from package-lock.json),n/a,,transitive,production,N,node_modules/@img/sharp-libvips-darwin-x64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@img/sharp-libvips-linux-arm,1.3.4,LGPL-3.0-or-later (from package-lock.json),n/a,,transitive,production,N,node_modules/@img/sharp-libvips-linux-arm,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@img/sharp-libvips-linux-arm64,1.3.4,LGPL-3.0-or-later (from package-lock.json),n/a,,transitive,production,N,node_modules/@img/sharp-libvips-linux-arm64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@img/sharp-libvips-linux-ppc64,1.3.4,LGPL-3.0-or-later (from package-lock.json),n/a,,transitive,production,N,node_modules/@img/sharp-libvips-linux-ppc64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@img/sharp-libvips-linux-riscv64,1.3.4,LGPL-3.0-or-later (from package-lock.json),n/a,,transitive,production,N,node_modules/@img/sharp-libvips-linux-riscv64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@img/sharp-libvips-linux-s390x,1.3.4,LGPL-3.0-or-later (from package-lock.json),n/a,,transitive,production,N,node_modules/@img/sharp-libvips-linux-s390x,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@img/sharp-libvips-linux-x64,1.3.4,LGPL-3.0-or-later,N,,transitive,production,Y,node_modules/@img/sharp-libvips-linux-x64,"Server-side image processing for Next.js (next/image); prebuilt libvips binaries; runs on the host, not sent to browsers or bundled in the native apps"
+@img/sharp-libvips-linuxmusl-arm64,1.3.4,LGPL-3.0-or-later (from package-lock.json),n/a,,transitive,production,N,node_modules/@img/sharp-libvips-linuxmusl-arm64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@img/sharp-libvips-linuxmusl-x64,1.3.4,LGPL-3.0-or-later,N,,transitive,production,Y,node_modules/@img/sharp-libvips-linuxmusl-x64,"Server-side image processing for Next.js (next/image); prebuilt libvips binaries; runs on the host, not sent to browsers or bundled in the native apps"
+@img/sharp-linux-arm,0.35.5,Apache-2.0 (from package-lock.json),n/a,,transitive,production,N,node_modules/@img/sharp-linux-arm,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@img/sharp-linux-arm64,0.35.5,Apache-2.0 (from package-lock.json),n/a,,transitive,production,N,node_modules/@img/sharp-linux-arm64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@img/sharp-linux-ppc64,0.35.5,Apache-2.0 (from package-lock.json),n/a,,transitive,production,N,node_modules/@img/sharp-linux-ppc64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@img/sharp-linux-riscv64,0.35.5,Apache-2.0 (from package-lock.json),n/a,,transitive,production,N,node_modules/@img/sharp-linux-riscv64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@img/sharp-linux-s390x,0.35.5,Apache-2.0 (from package-lock.json),n/a,,transitive,production,N,node_modules/@img/sharp-linux-s390x,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@img/sharp-linux-x64,0.35.5,Apache-2.0,Y,LICENSE,transitive,production,Y,node_modules/@img/sharp-linux-x64,"Server-side image processing for Next.js (next/image); prebuilt libvips binaries; runs on the host, not sent to browsers or bundled in the native apps"
+@img/sharp-linuxmusl-arm64,0.35.5,Apache-2.0 (from package-lock.json),n/a,,transitive,production,N,node_modules/@img/sharp-linuxmusl-arm64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@img/sharp-linuxmusl-x64,0.35.5,Apache-2.0,Y,LICENSE,transitive,production,Y,node_modules/@img/sharp-linuxmusl-x64,"Server-side image processing for Next.js (next/image); prebuilt libvips binaries; runs on the host, not sent to browsers or bundled in the native apps"
+@img/sharp-wasm32,0.35.5,Apache-2.0 AND LGPL-3.0-or-later AND MIT,Y,LICENSE,transitive,production,Y,node_modules/@img/sharp-wasm32,"Server-side image processing for Next.js (next/image); prebuilt libvips binaries; runs on the host, not sent to browsers or bundled in the native apps"
+@img/sharp-webcontainers-wasm32,0.35.5,Apache-2.0 (from package-lock.json),n/a,,transitive,production,N,node_modules/@img/sharp-webcontainers-wasm32,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@img/sharp-win32-arm64,0.35.5,Apache-2.0 AND LGPL-3.0-or-later (from package-lock.json),n/a,,transitive,production,N,node_modules/@img/sharp-win32-arm64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@img/sharp-win32-ia32,0.35.5,Apache-2.0 AND LGPL-3.0-or-later (from package-lock.json),n/a,,transitive,production,N,node_modules/@img/sharp-win32-ia32,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@img/sharp-win32-x64,0.35.5,Apache-2.0 AND LGPL-3.0-or-later (from package-lock.json),n/a,,transitive,production,N,node_modules/@img/sharp-win32-x64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@next/env,15.5.28,MIT,N,,transitive,production,Y,node_modules/@next/env,
+@next/swc-darwin-arm64,15.5.28,MIT (from package-lock.json),n/a,,transitive,production,N,node_modules/@next/swc-darwin-arm64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@next/swc-darwin-x64,15.5.28,MIT (from package-lock.json),n/a,,transitive,production,N,node_modules/@next/swc-darwin-x64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@next/swc-linux-arm64-gnu,15.5.28,MIT (from package-lock.json),n/a,,transitive,production,N,node_modules/@next/swc-linux-arm64-gnu,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@next/swc-linux-arm64-musl,15.5.28,MIT (from package-lock.json),n/a,,transitive,production,N,node_modules/@next/swc-linux-arm64-musl,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@next/swc-linux-x64-gnu,15.5.28,MIT,N,,transitive,production,Y,node_modules/@next/swc-linux-x64-gnu,Next.js compiler binary (build/server)
+@next/swc-linux-x64-musl,15.5.28,MIT,N,,transitive,production,Y,node_modules/@next/swc-linux-x64-musl,Next.js compiler binary (build/server)
+@next/swc-win32-arm64-msvc,15.5.28,MIT (from package-lock.json),n/a,,transitive,production,N,node_modules/@next/swc-win32-arm64-msvc,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@next/swc-win32-x64-msvc,15.5.28,MIT (from package-lock.json),n/a,,transitive,production,N,node_modules/@next/swc-win32-x64-msvc,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@opentelemetry/api,1.9.1,Apache-2.0,Y,LICENSE,transitive,production,Y,node_modules/@opentelemetry/api,
+@radix-ui/primitive,1.2.0,MIT,Y,LICENSE,transitive,production,Y,node_modules/@radix-ui/primitive,
+@radix-ui/react-arrow,1.1.17,MIT,Y,LICENSE,transitive,production,Y,node_modules/@radix-ui/react-arrow,
+@radix-ui/react-collection,1.2.0,MIT,Y,LICENSE,transitive,production,Y,node_modules/@radix-ui/react-collection,
+@radix-ui/react-compose-refs,1.1.5,MIT,Y,LICENSE,transitive,production,Y,node_modules/@radix-ui/react-compose-refs,
+@radix-ui/react-context,1.3.0,MIT,Y,LICENSE,transitive,production,Y,node_modules/@radix-ui/react-context,
+@radix-ui/react-dialog,1.3.1,MIT,Y,LICENSE,direct,production,Y,node_modules/@radix-ui/react-dialog,
+@radix-ui/react-direction,1.2.0,MIT,Y,LICENSE,transitive,production,Y,node_modules/@radix-ui/react-direction,
+@radix-ui/react-dismissable-layer,1.2.1,MIT,Y,LICENSE,transitive,production,Y,node_modules/@radix-ui/react-dismissable-layer,
+@radix-ui/react-dropdown-menu,2.2.1,MIT,Y,LICENSE,direct,production,Y,node_modules/@radix-ui/react-dropdown-menu,
+@radix-ui/react-focus-guards,1.2.0,MIT,Y,LICENSE,transitive,production,Y,node_modules/@radix-ui/react-focus-guards,
+@radix-ui/react-focus-scope,1.3.1,MIT,Y,LICENSE,transitive,production,Y,node_modules/@radix-ui/react-focus-scope,
+@radix-ui/react-id,1.1.4,MIT,Y,LICENSE,transitive,production,Y,node_modules/@radix-ui/react-id,
+@radix-ui/react-label,2.1.17,MIT,Y,LICENSE,direct,production,Y,node_modules/@radix-ui/react-label,
+@radix-ui/react-menu,2.2.1,MIT,Y,LICENSE,transitive,production,Y,node_modules/@radix-ui/react-menu,
+@radix-ui/react-popper,1.4.0,MIT,Y,LICENSE,transitive,production,Y,node_modules/@radix-ui/react-popper,
+@radix-ui/react-portal,1.2.0,MIT,Y,LICENSE,transitive,production,Y,node_modules/@radix-ui/react-portal,
+@radix-ui/react-presence,1.1.11,MIT,Y,LICENSE,transitive,production,Y,node_modules/@radix-ui/react-presence,
+@radix-ui/react-primitive,2.2.0,MIT,Y,LICENSE,transitive,production,Y,node_modules/@radix-ui/react-primitive,
+@radix-ui/react-roving-focus,1.2.1,MIT,Y,LICENSE,transitive,production,Y,node_modules/@radix-ui/react-roving-focus,
+@radix-ui/react-slot,1.5.0,MIT,Y,LICENSE,direct,production,Y,node_modules/@radix-ui/react-slot,
+@radix-ui/react-switch,1.4.1,MIT,Y,LICENSE,direct,production,Y,node_modules/@radix-ui/react-switch,
+@radix-ui/react-tabs,1.2.1,MIT,Y,LICENSE,direct,production,Y,node_modules/@radix-ui/react-tabs,
+@radix-ui/react-use-callback-ref,1.1.5,MIT,Y,LICENSE,transitive,production,Y,node_modules/@radix-ui/react-use-callback-ref,
+@radix-ui/react-use-controllable-state,1.3.0,MIT,Y,LICENSE,transitive,production,Y,node_modules/@radix-ui/react-use-controllable-state,
+@radix-ui/react-use-effect-event,0.0.5,MIT,Y,LICENSE,transitive,production,Y,node_modules/@radix-ui/react-use-effect-event,
+@radix-ui/react-use-is-hydrated,0.1.3,MIT,Y,LICENSE,transitive,production,Y,node_modules/@radix-ui/react-use-is-hydrated,
+@radix-ui/react-use-layout-effect,1.1.4,MIT,Y,LICENSE,transitive,production,Y,node_modules/@radix-ui/react-use-layout-effect,
+@radix-ui/react-use-rect,1.1.4,MIT,Y,LICENSE,transitive,production,Y,node_modules/@radix-ui/react-use-rect,
+@radix-ui/react-use-size,1.1.5,MIT,Y,LICENSE,transitive,production,Y,node_modules/@radix-ui/react-use-size,
+@radix-ui/rect,1.1.3,MIT,Y,LICENSE,transitive,production,Y,node_modules/@radix-ui/rect,
+@reduxjs/toolkit,2.13.0,MIT,Y,LICENSE,transitive,production,Y,node_modules/@reduxjs/toolkit,
+@revenuecat/purchases-capacitor,13.7.3,MIT,Y,LICENSE,direct,production,Y,node_modules/@revenuecat/purchases-capacitor,JS in web client bundle and/or native code compiled into iOS/Android apps
+@revenuecat/purchases-typescript-internal-esm,19.10.0,MIT,N,,transitive,production,Y,node_modules/@revenuecat/purchases-typescript-internal-esm,JS in web client bundle and/or native code compiled into iOS/Android apps
+@stablelib/base64,1.0.1,MIT,Y,LICENSE,transitive,production,Y,node_modules/@stablelib/base64,
+@standard-schema/spec,1.1.0,MIT,Y,LICENSE,transitive,production,Y,node_modules/@standard-schema/spec,
+@standard-schema/utils,0.3.0,MIT,Y,LICENSE,transitive,production,Y,node_modules/@standard-schema/utils,
+@supabase/auth-js,2.118.0,MIT,Y,LICENSE,transitive,production,Y,node_modules/@supabase/auth-js,
+@supabase/functions-js,2.118.0,MIT,Y,LICENSE,transitive,production,Y,node_modules/@supabase/functions-js,
+@supabase/phoenix,0.4.5,MIT,Y,LICENSE.md,transitive,production,Y,node_modules/@supabase/phoenix,
+@supabase/postgrest-js,2.118.0,MIT,Y,LICENSE,transitive,production,Y,node_modules/@supabase/postgrest-js,
+@supabase/realtime-js,2.118.0,MIT,Y,LICENSE,transitive,production,Y,node_modules/@supabase/realtime-js,
+@supabase/ssr,0.12.7,MIT,Y,LICENSE,direct,production,Y,node_modules/@supabase/ssr,
+@supabase/storage-js,2.118.0,MIT,Y,LICENSE,transitive,production,Y,node_modules/@supabase/storage-js,
+@supabase/supabase-js,2.118.0,MIT,Y,LICENSE,direct,production,Y,node_modules/@supabase/supabase-js,
+@swc/helpers,0.5.15,Apache-2.0,Y,LICENSE,transitive,production,Y,node_modules/@swc/helpers,
+@types/d3-array,3.2.2,MIT,Y,LICENSE,transitive,production,Y,node_modules/@types/d3-array,TypeScript type declarations only (no runtime code)
+@types/d3-color,3.1.3,MIT,Y,LICENSE,transitive,production,Y,node_modules/@types/d3-color,TypeScript type declarations only (no runtime code)
+@types/d3-ease,3.0.2,MIT,Y,LICENSE,transitive,production,Y,node_modules/@types/d3-ease,TypeScript type declarations only (no runtime code)
+@types/d3-interpolate,3.0.4,MIT,Y,LICENSE,transitive,production,Y,node_modules/@types/d3-interpolate,TypeScript type declarations only (no runtime code)
+@types/d3-path,3.1.1,MIT,Y,LICENSE,transitive,production,Y,node_modules/@types/d3-path,TypeScript type declarations only (no runtime code)
+@types/d3-scale,4.0.9,MIT,Y,LICENSE,transitive,production,Y,node_modules/@types/d3-scale,TypeScript type declarations only (no runtime code)
+@types/d3-shape,3.2.0,MIT,Y,LICENSE,transitive,production,Y,node_modules/@types/d3-shape,TypeScript type declarations only (no runtime code)
+@types/d3-time,3.0.4,MIT,Y,LICENSE,transitive,production,Y,node_modules/@types/d3-time,TypeScript type declarations only (no runtime code)
+@types/d3-timer,3.0.2,MIT,Y,LICENSE,transitive,production,Y,node_modules/@types/d3-timer,TypeScript type declarations only (no runtime code)
+@types/use-sync-external-store,0.0.6,MIT,Y,LICENSE,transitive,production,Y,node_modules/@types/use-sync-external-store,TypeScript type declarations only (no runtime code)
+@zxing/browser,0.2.1,MIT,Y,LICENSE,direct,production,Y,node_modules/@zxing/browser,
+@zxing/library,0.23.0,Apache-2.0,Y,LICENSE,direct,production,Y,node_modules/@zxing/library,
+@zxing/text-encoding,0.9.0,(Unlicense OR Apache-2.0),Y,LICENSE.md,transitive,production,Y,node_modules/@zxing/text-encoding,
+aria-hidden,1.2.6,MIT,Y,LICENSE,transitive,production,Y,node_modules/aria-hidden,
+caniuse-lite,1.0.30001816,CC-BY-4.0,Y,LICENSE,transitive,production,Y,node_modules/caniuse-lite,
+class-variance-authority,0.7.1,Apache-2.0,Y,LICENSE,direct,production,Y,node_modules/class-variance-authority,
+client-only,0.0.1,MIT,N,,transitive,production,Y,node_modules/client-only,
+clsx,2.1.1,MIT,Y,license,direct,production,Y,node_modules/clsx,
+cookie,1.1.1,MIT,Y,LICENSE,transitive,production,Y,node_modules/cookie,
+d3-array,3.2.4,ISC,Y,LICENSE,transitive,production,Y,node_modules/d3-array,
+d3-color,3.1.0,ISC,Y,LICENSE,transitive,production,Y,node_modules/d3-color,
+d3-ease,3.0.1,BSD-3-Clause,Y,LICENSE,transitive,production,Y,node_modules/d3-ease,
+d3-format,3.1.2,ISC,Y,LICENSE,transitive,production,Y,node_modules/d3-format,
+d3-interpolate,3.0.1,ISC,Y,LICENSE,transitive,production,Y,node_modules/d3-interpolate,
+d3-path,3.1.0,ISC,Y,LICENSE,transitive,production,Y,node_modules/d3-path,
+d3-scale,4.0.2,ISC,Y,LICENSE,transitive,production,Y,node_modules/d3-scale,
+d3-shape,3.2.0,ISC,Y,LICENSE,transitive,production,Y,node_modules/d3-shape,
+d3-time,3.1.0,ISC,Y,LICENSE,transitive,production,Y,node_modules/d3-time,
+d3-time-format,4.1.0,ISC,Y,LICENSE,transitive,production,Y,node_modules/d3-time-format,
+d3-timer,3.0.1,ISC,Y,LICENSE,transitive,production,Y,node_modules/d3-timer,
+decimal.js-light,2.5.1,MIT,Y,LICENCE.md,transitive,production,Y,node_modules/decimal.js-light,
+detect-node-es,1.1.0,MIT,Y,LICENSE,transitive,production,Y,node_modules/detect-node-es,
+es-toolkit,1.52.0,MIT,Y,LICENSE|NOTICE,transitive,production,Y,node_modules/es-toolkit,
+eventemitter3,5.0.4,MIT,Y,LICENSE,transitive,production,Y,node_modules/eventemitter3,
+fast-sha256,1.3.0,Unlicense,Y,LICENSE,transitive,production,Y,node_modules/fast-sha256,
+get-nonce,1.0.1,MIT,Y,LICENSE,transitive,production,Y,node_modules/get-nonce,
+html5-qrcode,2.3.8,Apache-2.0,Y,LICENSE,transitive,production,Y,node_modules/html5-qrcode,
+iceberg-js,0.8.1,MIT,Y,LICENSE,transitive,production,Y,node_modules/iceberg-js,
+immer,11.1.21,MIT,Y,LICENSE,transitive,production,Y,node_modules/immer,
+internmap,2.0.3,ISC,Y,LICENSE,transitive,production,Y,node_modules/internmap,
+json-schema-to-ts,3.1.1,MIT,Y,LICENSE,transitive,production,Y,node_modules/json-schema-to-ts,
+lucide-react,1.58.0,ISC,Y,LICENSE,direct,production,Y,node_modules/lucide-react,
+nanoid,3.3.20,MIT,Y,LICENSE,transitive,production,Y,node_modules/nanoid,
+next,15.5.28,MIT,Y,license.md,direct,production,Y,node_modules/next,
+picocolors,1.1.1,ISC,Y,LICENSE,transitive,production,Y,node_modules/picocolors,
+postcss,8.5.30,MIT,Y,LICENSE,direct,production,Y,node_modules/postcss,
+react,19.3.1,MIT,Y,LICENSE,direct,production,Y,node_modules/react,
+react-dom,19.3.1,MIT,Y,LICENSE,direct,production,Y,node_modules/react-dom,
+react-is,19.3.1,MIT,Y,LICENSE,transitive,production,Y,node_modules/react-is,
+react-redux,9.3.0,MIT,Y,LICENSE.md,transitive,production,Y,node_modules/react-redux,
+react-remove-scroll,2.7.2,MIT,Y,LICENSE,transitive,production,Y,node_modules/react-remove-scroll,
+react-remove-scroll-bar,2.3.8,MIT,N,,transitive,production,Y,node_modules/react-remove-scroll-bar,
+react-style-singleton,2.2.3,MIT,Y,LICENSE,transitive,production,Y,node_modules/react-style-singleton,
+recharts,3.10.1,MIT,Y,LICENSE,direct,production,Y,node_modules/recharts,
+redux,5.0.1,MIT,Y,LICENSE.md,transitive,production,Y,node_modules/redux,
+redux-thunk,3.1.0,MIT,Y,LICENSE.md,transitive,production,Y,node_modules/redux-thunk,
+reselect,5.2.0,MIT,Y,LICENSE,transitive,production,Y,node_modules/reselect,
+scheduler,0.28.0,MIT,Y,LICENSE,transitive,production,Y,node_modules/scheduler,
+server-only,0.0.1,MIT,N,,direct,production,Y,node_modules/server-only,
+sharp,0.35.5,Apache-2.0,Y,LICENSE,transitive,production,Y,node_modules/sharp,"Server-side image processing for Next.js (next/image); prebuilt libvips binaries; runs on the host, not sent to browsers or bundled in the native apps"
+source-map-js,1.2.2,BSD-3-Clause,Y,LICENSE,transitive,production,Y,node_modules/source-map-js,
+standardwebhooks,1.1.1,MIT,N,,transitive,production,Y,node_modules/standardwebhooks,
+stripe,23.0.0,MIT,Y,LICENSE,direct,production,Y,node_modules/stripe,
+styled-jsx,5.1.6,MIT,Y,license.md,transitive,production,Y,node_modules/styled-jsx,
+tailwind-merge,3.7.0,MIT,Y,LICENSE.md,direct,production,Y,node_modules/tailwind-merge,
+tiny-invariant,1.3.3,MIT,Y,LICENSE,transitive,production,Y,node_modules/tiny-invariant,
+ts-algebra,2.0.0,MIT,Y,LICENSE,transitive,production,Y,node_modules/ts-algebra,
+ts-custom-error,3.3.1,MIT,Y,LICENSE,transitive,production,Y,node_modules/ts-custom-error,
+tslib,2.8.1,0BSD,Y,LICENSE.txt,transitive,production,Y,node_modules/tslib,
+use-callback-ref,1.3.3,MIT,Y,LICENSE,transitive,production,Y,node_modules/use-callback-ref,
+use-sidecar,1.1.3,MIT,Y,LICENSE,transitive,production,Y,node_modules/use-sidecar,
+use-sync-external-store,1.7.0,MIT,Y,LICENSE,transitive,production,Y,node_modules/use-sync-external-store,
+victory-vendor,37.3.6,MIT AND ISC,N,,transitive,production,Y,node_modules/victory-vendor,
+zod,4.6.7,MIT,Y,LICENSE,direct,production,Y,node_modules/zod,
+@adobe/css-tools,4.5.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@adobe/css-tools,
+@alloc/quick-lru,5.3.0,MIT,Y,license,transitive,dev,Y,node_modules/@alloc/quick-lru,
+@asamuzakjp/css-color,5.1.11,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@asamuzakjp/css-color,
+@asamuzakjp/dom-selector,7.1.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@asamuzakjp/dom-selector,
+@asamuzakjp/generational-cache,1.0.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@asamuzakjp/generational-cache,
+@asamuzakjp/nwsapi,2.3.9,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@asamuzakjp/nwsapi,
+@babel/code-frame,7.29.7,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@babel/code-frame,
+@babel/helper-validator-identifier,7.29.7,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@babel/helper-validator-identifier,
+@bramus/specificity,2.4.3,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@bramus/specificity,
+@capacitor/assets,3.0.5,MIT,Y,LICENSE,direct,dev,Y,node_modules/@capacitor/assets,JS in web client bundle and/or native code compiled into iOS/Android apps
+@capacitor/cli,5.7.8,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@capacitor/assets/node_modules/@capacitor/cli,JS in web client bundle and/or native code compiled into iOS/Android apps
+@capacitor/cli,8.5.3,MIT,Y,LICENSE,direct,dev,Y,node_modules/@capacitor/cli,JS in web client bundle and/or native code compiled into iOS/Android apps
+@csstools/color-helpers,6.1.2,MIT-0,Y,LICENSE.md,transitive,dev,Y,node_modules/@csstools/color-helpers,
+@csstools/css-calc,3.4.3,MIT,Y,LICENSE.md,transitive,dev,Y,node_modules/@csstools/css-calc,
+@csstools/css-color-parser,4.2.6,MIT,Y,LICENSE.md,transitive,dev,Y,node_modules/@csstools/css-color-parser,
+@csstools/css-parser-algorithms,4.0.2,MIT,Y,LICENSE.md,transitive,dev,Y,node_modules/@csstools/css-parser-algorithms,
+@csstools/css-syntax-patches-for-csstree,1.1.15,MIT-0,Y,LICENSE.md,transitive,dev,Y,node_modules/@csstools/css-syntax-patches-for-csstree,
+@csstools/css-tokenizer,4.0.2,MIT,Y,LICENSE.md,transitive,dev,Y,node_modules/@csstools/css-tokenizer,
+@ecies/ciphers,0.2.6,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@ecies/ciphers,
+@emnapi/core,1.10.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@emnapi/core,
+@emnapi/runtime,1.10.0,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@unrs/resolver-binding-wasm32-wasi/node_modules/@emnapi/runtime,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@emnapi/wasi-threads,1.2.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@emnapi/wasi-threads,
+@esbuild/aix-ppc64,0.28.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@esbuild/aix-ppc64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@esbuild/android-arm,0.28.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@esbuild/android-arm,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@esbuild/android-arm64,0.28.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@esbuild/android-arm64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@esbuild/android-x64,0.28.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@esbuild/android-x64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@esbuild/darwin-arm64,0.28.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@esbuild/darwin-arm64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@esbuild/darwin-x64,0.28.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@esbuild/darwin-x64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@esbuild/freebsd-arm64,0.28.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@esbuild/freebsd-arm64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@esbuild/freebsd-x64,0.28.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@esbuild/freebsd-x64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@esbuild/linux-arm,0.28.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@esbuild/linux-arm,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@esbuild/linux-arm64,0.28.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@esbuild/linux-arm64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@esbuild/linux-ia32,0.28.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@esbuild/linux-ia32,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@esbuild/linux-loong64,0.28.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@esbuild/linux-loong64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@esbuild/linux-mips64el,0.28.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@esbuild/linux-mips64el,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@esbuild/linux-ppc64,0.28.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@esbuild/linux-ppc64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@esbuild/linux-riscv64,0.28.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@esbuild/linux-riscv64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@esbuild/linux-s390x,0.28.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@esbuild/linux-s390x,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@esbuild/linux-x64,0.28.2,MIT,N,,transitive,dev,Y,node_modules/@esbuild/linux-x64,
+@esbuild/netbsd-arm64,0.28.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@esbuild/netbsd-arm64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@esbuild/netbsd-x64,0.28.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@esbuild/netbsd-x64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@esbuild/openbsd-arm64,0.28.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@esbuild/openbsd-arm64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@esbuild/openbsd-x64,0.28.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@esbuild/openbsd-x64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@esbuild/openharmony-arm64,0.28.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@esbuild/openharmony-arm64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@esbuild/sunos-x64,0.28.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@esbuild/sunos-x64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@esbuild/win32-arm64,0.28.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@esbuild/win32-arm64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@esbuild/win32-ia32,0.28.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@esbuild/win32-ia32,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@esbuild/win32-x64,0.28.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@esbuild/win32-x64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@eslint-community/eslint-utils,4.10.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@eslint-community/eslint-utils,
+@eslint-community/regexpp,4.12.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@eslint-community/regexpp,
+@eslint/config-array,0.21.2,Apache-2.0,Y,LICENSE,transitive,dev,Y,node_modules/@eslint/config-array,
+@eslint/config-helpers,0.4.2,Apache-2.0,Y,LICENSE,transitive,dev,Y,node_modules/@eslint/config-helpers,
+@eslint/core,0.17.0,Apache-2.0,Y,LICENSE,transitive,dev,Y,node_modules/@eslint/core,
+@eslint/eslintrc,3.3.7,MIT,Y,LICENSE,direct,dev,Y,node_modules/@eslint/eslintrc,
+@eslint/js,9.39.5,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@eslint/js,
+@eslint/object-schema,2.1.7,Apache-2.0,Y,LICENSE,transitive,dev,Y,node_modules/@eslint/object-schema,
+@eslint/plugin-kit,0.4.1,Apache-2.0,Y,LICENSE,transitive,dev,Y,node_modules/@eslint/plugin-kit,
+@exodus/bytes,1.16.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@exodus/bytes,
+@humanfs/core,0.19.2,Apache-2.0,Y,LICENSE,transitive,dev,Y,node_modules/@humanfs/core,
+@humanfs/node,0.16.8,Apache-2.0,Y,LICENSE,transitive,dev,Y,node_modules/@humanfs/node,
+@humanfs/types,0.15.0,Apache-2.0,N,,transitive,dev,Y,node_modules/@humanfs/types,
+@humanwhocodes/module-importer,1.0.1,Apache-2.0,Y,LICENSE,transitive,dev,Y,node_modules/@humanwhocodes/module-importer,
+@humanwhocodes/retry,0.4.3,Apache-2.0,Y,LICENSE,transitive,dev,Y,node_modules/@humanwhocodes/retry,
+@ionic/cli-framework-output,2.2.8,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@ionic/cli-framework-output,
+@ionic/utils-array,2.1.6,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@ionic/utils-array,
+@ionic/utils-fs,3.1.7,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@ionic/utils-fs,
+@ionic/utils-object,2.1.6,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@ionic/utils-object,
+@ionic/utils-process,2.1.11,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@capacitor/assets/node_modules/@ionic/utils-process,
+@ionic/utils-process,2.1.11,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@trapezedev/project/node_modules/@ionic/utils-process,
+@ionic/utils-process,2.1.12,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@ionic/utils-process,
+@ionic/utils-stream,3.1.6,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@capacitor/assets/node_modules/@ionic/utils-stream,
+@ionic/utils-stream,3.1.6,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@trapezedev/project/node_modules/@ionic/utils-stream,
+@ionic/utils-stream,3.1.7,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@ionic/utils-stream,
+@ionic/utils-subprocess,2.1.14,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@capacitor/assets/node_modules/@ionic/utils-subprocess,
+@ionic/utils-subprocess,2.1.14,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@trapezedev/project/node_modules/@ionic/utils-subprocess,
+@ionic/utils-subprocess,3.0.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@ionic/utils-subprocess,
+@ionic/utils-terminal,2.3.4,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@capacitor/assets/node_modules/@ionic/utils-terminal,
+@ionic/utils-terminal,2.3.4,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@trapezedev/project/node_modules/@ionic/utils-terminal,
+@ionic/utils-terminal,2.3.5,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@ionic/utils-terminal,
+@isaacs/fs-minipass,4.0.1,ISC,Y,LICENSE,transitive,dev,Y,node_modules/@isaacs/fs-minipass,
+@jridgewell/gen-mapping,0.3.13,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@jridgewell/gen-mapping,
+@jridgewell/remapping,2.3.5,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@jridgewell/remapping,
+@jridgewell/resolve-uri,3.1.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@jridgewell/resolve-uri,
+@jridgewell/sourcemap-codec,1.6.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@jridgewell/sourcemap-codec,
+@jridgewell/trace-mapping,0.3.31,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@jridgewell/trace-mapping,
+@napi-rs/wasm-runtime,1.2.5,MIT,N,,transitive,dev,Y,node_modules/@napi-rs/wasm-runtime,
+@next/eslint-plugin-next,15.5.28,MIT,N,,transitive,dev,Y,node_modules/@next/eslint-plugin-next,
+@noble/ciphers,1.3.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@noble/ciphers,
+@noble/curves,1.9.7,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@noble/curves,
+@noble/hashes,1.8.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@noble/hashes,
+@nodelib/fs.scandir,2.1.5,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@nodelib/fs.scandir,
+@nodelib/fs.stat,2.0.5,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@nodelib/fs.stat,
+@nodelib/fs.walk,1.2.8,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@nodelib/fs.walk,
+@nolyfill/is-core-module,1.0.39,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@nolyfill/is-core-module,
+@oxc-project/types,0.154.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@oxc-project/types,
+@playwright/test,1.64.1,Apache-2.0,Y,LICENSE|NOTICE,direct,dev,Y,node_modules/@playwright/test,devDependency that is also an optional peer of a production package (lockfile flag devOptional); not shipped
+@prettier/plugin-xml,2.2.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@prettier/plugin-xml,
+@rolldown/binding-android-arm-eabi,1.2.14,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@rolldown/binding-android-arm-eabi,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@rolldown/binding-android-arm64,1.2.14,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@rolldown/binding-android-arm64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@rolldown/binding-darwin-arm64,1.2.14,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@rolldown/binding-darwin-arm64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@rolldown/binding-darwin-x64,1.2.14,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@rolldown/binding-darwin-x64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@rolldown/binding-freebsd-x64,1.2.14,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@rolldown/binding-freebsd-x64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@rolldown/binding-linux-arm-gnueabihf,1.2.14,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@rolldown/binding-linux-arm-gnueabihf,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@rolldown/binding-linux-arm64-gnu,1.2.14,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@rolldown/binding-linux-arm64-gnu,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@rolldown/binding-linux-arm64-musl,1.2.14,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@rolldown/binding-linux-arm64-musl,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@rolldown/binding-linux-ppc64-gnu,1.2.14,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@rolldown/binding-linux-ppc64-gnu,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@rolldown/binding-linux-s390x-gnu,1.2.14,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@rolldown/binding-linux-s390x-gnu,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@rolldown/binding-linux-x64-gnu,1.2.14,MIT,N,,transitive,dev,Y,node_modules/@rolldown/binding-linux-x64-gnu,
+@rolldown/binding-linux-x64-musl,1.2.14,MIT,N,,transitive,dev,Y,node_modules/@rolldown/binding-linux-x64-musl,
+@rolldown/binding-openharmony-arm64,1.2.14,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@rolldown/binding-openharmony-arm64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@rolldown/binding-win32-arm64-msvc,1.2.14,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@rolldown/binding-win32-arm64-msvc,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@rolldown/binding-win32-x64-msvc,1.2.14,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@rolldown/binding-win32-x64-msvc,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@rolldown/pluginutils,1.0.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@rolldown/pluginutils,
+@rtsao/scc,1.1.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@rtsao/scc,
+@rushstack/eslint-patch,1.16.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@rushstack/eslint-patch,
+@supabase/cli-darwin-arm64,2.121.0,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@supabase/cli-darwin-arm64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@supabase/cli-darwin-x64,2.121.0,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@supabase/cli-darwin-x64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@supabase/cli-linux-arm64,2.121.0,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@supabase/cli-linux-arm64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@supabase/cli-linux-arm64-musl,2.121.0,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@supabase/cli-linux-arm64-musl,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@supabase/cli-linux-x64,2.121.0,MIT,N,,transitive,dev,Y,node_modules/@supabase/cli-linux-x64,
+@supabase/cli-linux-x64-musl,2.121.0,MIT,N,,transitive,dev,Y,node_modules/@supabase/cli-linux-x64-musl,
+@supabase/cli-windows-arm64,2.121.0,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@supabase/cli-windows-arm64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@supabase/cli-windows-x64,2.121.0,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@supabase/cli-windows-x64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@tailwindcss/node,4.3.3,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@tailwindcss/node,
+@tailwindcss/oxide,4.3.3,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@tailwindcss/oxide,
+@tailwindcss/oxide-android-arm64,4.3.3,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@tailwindcss/oxide-android-arm64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@tailwindcss/oxide-darwin-arm64,4.3.3,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@tailwindcss/oxide-darwin-arm64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@tailwindcss/oxide-darwin-x64,4.3.3,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@tailwindcss/oxide-darwin-x64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@tailwindcss/oxide-freebsd-x64,4.3.3,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@tailwindcss/oxide-freebsd-x64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@tailwindcss/oxide-linux-arm-gnueabihf,4.3.3,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@tailwindcss/oxide-linux-arm-gnueabihf,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@tailwindcss/oxide-linux-arm64-gnu,4.3.3,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@tailwindcss/oxide-linux-arm64-gnu,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@tailwindcss/oxide-linux-arm64-musl,4.3.3,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@tailwindcss/oxide-linux-arm64-musl,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@tailwindcss/oxide-linux-x64-gnu,4.3.3,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@tailwindcss/oxide-linux-x64-gnu,
+@tailwindcss/oxide-linux-x64-musl,4.3.3,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@tailwindcss/oxide-linux-x64-musl,
+@tailwindcss/oxide-wasm32-wasi,4.3.3,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@tailwindcss/oxide-wasm32-wasi,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@tailwindcss/oxide-win32-arm64-msvc,4.3.3,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@tailwindcss/oxide-win32-arm64-msvc,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@tailwindcss/oxide-win32-x64-msvc,4.3.3,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@tailwindcss/oxide-win32-x64-msvc,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@tailwindcss/postcss,4.3.3,MIT,Y,LICENSE,direct,dev,Y,node_modules/@tailwindcss/postcss,
+@testing-library/dom,10.4.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@testing-library/dom,
+@testing-library/jest-dom,7.0.1,MIT,Y,LICENSE,direct,dev,Y,node_modules/@testing-library/jest-dom,
+@testing-library/react,16.3.3,MIT,Y,LICENSE,direct,dev,Y,node_modules/@testing-library/react,
+@trapezedev/gradle-parse,7.1.10,SEE LICENSE,Y,LICENSE,transitive,dev,Y,node_modules/@trapezedev/gradle-parse,
+@trapezedev/project,7.1.10,SEE LICENSE,Y,LICENSE,transitive,dev,Y,node_modules/@trapezedev/project,
+@tybys/wasm-util,0.10.4,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@tybys/wasm-util,
+@types/aria-query,5.0.4,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@types/aria-query,TypeScript type declarations only (no runtime code)
+@types/chai,5.2.3,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@types/chai,TypeScript type declarations only (no runtime code)
+@types/deep-eql,4.0.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@types/deep-eql,TypeScript type declarations only (no runtime code)
+@types/estree,1.0.9,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@types/estree,TypeScript type declarations only (no runtime code)
+@types/fs-extra,8.1.5,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@types/fs-extra,TypeScript type declarations only (no runtime code)
+@types/json-schema,7.0.15,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@types/json-schema,TypeScript type declarations only (no runtime code)
+@types/json5,0.0.29,MIT,N,,transitive,dev,Y,node_modules/@types/json5,TypeScript type declarations only (no runtime code)
+@types/node,26.6.5,MIT,Y,LICENSE,direct,dev,Y,node_modules/@types/node,TypeScript type declarations only (no runtime code)
+@types/react,19.3.0,MIT,Y,LICENSE,direct,dev,Y,node_modules/@types/react,TypeScript type declarations only (no runtime code)
+@types/react-dom,19.3.0,MIT,Y,LICENSE,direct,dev,Y,node_modules/@types/react-dom,TypeScript type declarations only (no runtime code)
+@types/slice-ansi,4.0.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@types/slice-ansi,TypeScript type declarations only (no runtime code)
+@typescript-eslint/eslint-plugin,8.71.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@typescript-eslint/eslint-plugin,
+@typescript-eslint/parser,8.71.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@typescript-eslint/parser,
+@typescript-eslint/project-service,8.71.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@typescript-eslint/project-service,
+@typescript-eslint/scope-manager,8.71.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@typescript-eslint/scope-manager,
+@typescript-eslint/tsconfig-utils,8.71.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@typescript-eslint/tsconfig-utils,
+@typescript-eslint/type-utils,8.71.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@typescript-eslint/type-utils,
+@typescript-eslint/types,8.71.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@typescript-eslint/types,
+@typescript-eslint/typescript-estree,8.71.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@typescript-eslint/typescript-estree,
+@typescript-eslint/utils,8.71.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@typescript-eslint/utils,
+@typescript-eslint/visitor-keys,8.71.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@typescript-eslint/visitor-keys,
+@unrs/resolver-binding-android-arm-eabi,1.12.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@unrs/resolver-binding-android-arm-eabi,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@unrs/resolver-binding-android-arm64,1.12.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@unrs/resolver-binding-android-arm64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@unrs/resolver-binding-darwin-arm64,1.12.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@unrs/resolver-binding-darwin-arm64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@unrs/resolver-binding-darwin-x64,1.12.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@unrs/resolver-binding-darwin-x64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@unrs/resolver-binding-freebsd-x64,1.12.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@unrs/resolver-binding-freebsd-x64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@unrs/resolver-binding-linux-arm-gnueabihf,1.12.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@unrs/resolver-binding-linux-arm-gnueabihf,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@unrs/resolver-binding-linux-arm-musleabihf,1.12.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@unrs/resolver-binding-linux-arm-musleabihf,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@unrs/resolver-binding-linux-arm64-gnu,1.12.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@unrs/resolver-binding-linux-arm64-gnu,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@unrs/resolver-binding-linux-arm64-musl,1.12.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@unrs/resolver-binding-linux-arm64-musl,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@unrs/resolver-binding-linux-loong64-gnu,1.12.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@unrs/resolver-binding-linux-loong64-gnu,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@unrs/resolver-binding-linux-loong64-musl,1.12.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@unrs/resolver-binding-linux-loong64-musl,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@unrs/resolver-binding-linux-ppc64-gnu,1.12.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@unrs/resolver-binding-linux-ppc64-gnu,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@unrs/resolver-binding-linux-riscv64-gnu,1.12.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@unrs/resolver-binding-linux-riscv64-gnu,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@unrs/resolver-binding-linux-riscv64-musl,1.12.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@unrs/resolver-binding-linux-riscv64-musl,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@unrs/resolver-binding-linux-s390x-gnu,1.12.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@unrs/resolver-binding-linux-s390x-gnu,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@unrs/resolver-binding-linux-x64-gnu,1.12.2,MIT,N,,transitive,dev,Y,node_modules/@unrs/resolver-binding-linux-x64-gnu,
+@unrs/resolver-binding-linux-x64-musl,1.12.2,MIT,N,,transitive,dev,Y,node_modules/@unrs/resolver-binding-linux-x64-musl,
+@unrs/resolver-binding-openharmony-arm64,1.12.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@unrs/resolver-binding-openharmony-arm64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@unrs/resolver-binding-wasm32-wasi,1.12.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@unrs/resolver-binding-wasm32-wasi,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@unrs/resolver-binding-win32-arm64-msvc,1.12.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@unrs/resolver-binding-win32-arm64-msvc,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@unrs/resolver-binding-win32-ia32-msvc,1.12.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@unrs/resolver-binding-win32-ia32-msvc,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@unrs/resolver-binding-win32-x64-msvc,1.12.2,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/@unrs/resolver-binding-win32-x64-msvc,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+@vitejs/plugin-react,6.1.2,MIT,Y,LICENSE,direct,dev,Y,node_modules/@vitejs/plugin-react,
+@vitest/mocker,5.0.5,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@vitest/mocker,
+@vitest/spy,5.0.5,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@vitest/spy,
+@xml-tools/parser,1.0.12,Apache-2.0,Y,LICENSE,transitive,dev,Y,node_modules/@xml-tools/parser,
+@xmldom/xmldom,0.9.12,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@xmldom/xmldom,
+acorn,8.19.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/acorn,
+acorn-jsx,5.3.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/acorn-jsx,
+ajv,6.15.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/ajv,
+ansi-regex,5.0.1,MIT,Y,license,transitive,dev,Y,node_modules/ansi-regex,
+ansi-styles,4.3.0,MIT,Y,license,transitive,dev,Y,node_modules/ansi-styles,
+ansi-styles,5.2.0,MIT,Y,license,transitive,dev,Y,node_modules/pretty-format/node_modules/ansi-styles,
+argparse,2.0.1,Python-2.0,Y,LICENSE,transitive,dev,Y,node_modules/argparse,
+aria-query,5.3.0,Apache-2.0,Y,LICENSE,transitive,dev,Y,node_modules/aria-query,
+aria-query,5.3.2,Apache-2.0,Y,LICENSE,transitive,dev,Y,node_modules/eslint-plugin-jsx-a11y/node_modules/aria-query,
+array-buffer-byte-length,1.0.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/array-buffer-byte-length,
+array-includes,3.2.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/array-includes,
+array.prototype.findlast,1.2.5,MIT,Y,LICENSE,transitive,dev,Y,node_modules/array.prototype.findlast,
+array.prototype.findlastindex,1.2.6,MIT,Y,LICENSE,transitive,dev,Y,node_modules/array.prototype.findlastindex,
+array.prototype.flat,1.3.3,MIT,Y,LICENSE,transitive,dev,Y,node_modules/array.prototype.flat,
+array.prototype.flatmap,1.3.3,MIT,Y,LICENSE,transitive,dev,Y,node_modules/array.prototype.flatmap,
+array.prototype.tosorted,1.1.4,MIT,Y,LICENSE,transitive,dev,Y,node_modules/array.prototype.tosorted,
+arraybuffer.prototype.slice,1.0.4,MIT,Y,LICENSE,transitive,dev,Y,node_modules/arraybuffer.prototype.slice,
+assertion-error,2.0.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/assertion-error,
+ast-types-flow,0.0.8,MIT,Y,LICENSE,transitive,dev,Y,node_modules/ast-types-flow,
+astral-regex,2.0.0,MIT,Y,license,transitive,dev,Y,node_modules/astral-regex,
+async-function,1.0.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/async-function,
+at-least-node,1.0.0,ISC,Y,LICENSE,transitive,dev,Y,node_modules/at-least-node,
+available-typed-arrays,1.0.7,MIT,Y,LICENSE,transitive,dev,Y,node_modules/available-typed-arrays,
+axe-core,4.14.0,MPL-2.0,Y,LICENSE|LICENSE-3RD-PARTY.txt,transitive,dev,Y,node_modules/axe-core,
+axobject-query,4.1.0,Apache-2.0,Y,LICENSE,transitive,dev,Y,node_modules/axobject-query,
+b4a,1.9.0,Apache-2.0,Y,LICENSE,transitive,dev,Y,node_modules/b4a,
+balanced-match,1.0.2,MIT,Y,LICENSE.md,transitive,dev,Y,node_modules/balanced-match,
+balanced-match,4.0.4,MIT,Y,LICENSE.md,transitive,dev,Y,node_modules/@typescript-eslint/typescript-estree/node_modules/balanced-match,
+balanced-match,4.0.4,MIT,Y,LICENSE.md,transitive,dev,Y,node_modules/glob/node_modules/balanced-match,
+bare-events,2.9.2,Apache-2.0,Y,LICENSE,transitive,dev,Y,node_modules/bare-events,
+bare-fs,4.8.4,Apache-2.0,Y,LICENSE,transitive,dev,Y,node_modules/bare-fs,
+bare-path,3.1.2,Apache-2.0,Y,LICENSE|NOTICE,transitive,dev,Y,node_modules/bare-path,
+bare-stream,2.13.4,Apache-2.0,Y,LICENSE,transitive,dev,Y,node_modules/bare-stream,
+bare-url,2.5.5,Apache-2.0,Y,LICENSE,transitive,dev,Y,node_modules/bare-url,
+base64-js,1.5.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/base64-js,
+bidi-js,1.1.0,MIT,Y,LICENSE.txt,transitive,dev,Y,node_modules/bidi-js,
+big-integer,1.6.52,Unlicense,Y,LICENSE,transitive,dev,Y,node_modules/big-integer,
+bl,4.1.0,MIT,Y,LICENSE.md,transitive,dev,Y,node_modules/bl,
+boolbase,1.0.0,ISC,N,,transitive,dev,Y,node_modules/boolbase,
+bplist-creator,0.1.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/bplist-creator,
+bplist-parser,0.3.1,MIT,N,,transitive,dev,Y,node_modules/simple-plist/node_modules/bplist-parser,
+bplist-parser,0.3.2,MIT,N,,transitive,dev,Y,node_modules/bplist-parser,
+brace-expansion,1.1.21,MIT,Y,LICENSE,transitive,dev,Y,node_modules/brace-expansion,
+brace-expansion,2.1.7,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@capacitor/assets/node_modules/brace-expansion,
+brace-expansion,5.0.12,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@typescript-eslint/typescript-estree/node_modules/brace-expansion,
+brace-expansion,5.0.12,MIT,Y,LICENSE,transitive,dev,Y,node_modules/glob/node_modules/brace-expansion,
+braces,3.0.3,MIT,Y,LICENSE,transitive,dev,Y,node_modules/braces,
+buffer,5.7.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/buffer,
+buffer-crc32,0.2.13,MIT,Y,LICENSE,transitive,dev,Y,node_modules/buffer-crc32,
+call-bind,1.0.9,MIT,Y,LICENSE,transitive,dev,Y,node_modules/call-bind,
+call-bind-apply-helpers,1.0.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/call-bind-apply-helpers,
+call-bound,1.0.4,MIT,Y,LICENSE,transitive,dev,Y,node_modules/call-bound,
+callsites,3.1.0,MIT,Y,license,transitive,dev,Y,node_modules/callsites,
+chai,6.3.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/chai,
+chalk,4.1.2,MIT,Y,license,transitive,dev,Y,node_modules/chalk,
+chevrotain,7.1.1,Apache-2.0,Y,LICENSE.txt,transitive,dev,Y,node_modules/chevrotain,
+chownr,1.1.4,ISC,Y,LICENSE,transitive,dev,Y,node_modules/prebuild-install/node_modules/chownr,
+chownr,2.0.0,ISC,Y,LICENSE,transitive,dev,Y,node_modules/@capacitor/assets/node_modules/chownr,
+chownr,3.0.0,BlueOak-1.0.0,Y,LICENSE.md,transitive,dev,Y,node_modules/chownr,
+cliui,8.0.1,ISC,Y,LICENSE.txt,transitive,dev,Y,node_modules/cliui,
+color,4.2.3,MIT,Y,LICENSE,transitive,dev,Y,node_modules/color,
+color-convert,2.0.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/color-convert,
+color-name,1.1.4,MIT,Y,LICENSE,transitive,dev,Y,node_modules/color-name,
+color-string,1.9.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/color-string,
+commander,12.1.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@capacitor/cli/node_modules/commander,
+commander,8.3.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/commander,
+commander,9.5.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@capacitor/assets/node_modules/@capacitor/cli/node_modules/commander,
+concat-map,0.0.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/concat-map,
+cross-spawn,7.0.6,MIT,Y,LICENSE,transitive,dev,Y,node_modules/cross-spawn,
+css-select,4.3.0,BSD-2-Clause,Y,LICENSE,transitive,dev,Y,node_modules/css-select,
+css-tree,3.2.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/css-tree,
+css-what,6.2.2,BSD-2-Clause,Y,LICENSE,transitive,dev,Y,node_modules/css-what,
+css.escape,1.5.1,MIT,Y,LICENSE-MIT.txt,transitive,dev,Y,node_modules/css.escape,
+csstype,3.2.3,MIT,Y,LICENSE,transitive,dev,Y,node_modules/csstype,devDependency that is also an optional peer of a production package (lockfile flag devOptional); not shipped
+damerau-levenshtein,1.0.8,BSD-2-Clause,Y,LICENSE,transitive,dev,Y,node_modules/damerau-levenshtein,
+data-urls,7.0.0,MIT,Y,LICENSE.txt,transitive,dev,Y,node_modules/data-urls,
+data-view-buffer,1.0.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/data-view-buffer,
+data-view-byte-length,1.0.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/data-view-byte-length,
+data-view-byte-offset,1.0.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/data-view-byte-offset,
+debug,3.2.7,MIT,Y,LICENSE,transitive,dev,Y,node_modules/eslint-import-resolver-node/node_modules/debug,
+debug,3.2.7,MIT,Y,LICENSE,transitive,dev,Y,node_modules/eslint-module-utils/node_modules/debug,
+debug,3.2.7,MIT,Y,LICENSE,transitive,dev,Y,node_modules/eslint-plugin-import/node_modules/debug,
+debug,4.3.4,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@capacitor/assets/node_modules/debug,
+debug,4.4.3,MIT,Y,LICENSE,transitive,dev,Y,node_modules/debug,
+decimal.js,10.6.0,MIT,Y,LICENCE.md,transitive,dev,Y,node_modules/decimal.js,
+decompress-response,6.0.0,MIT,Y,license,transitive,dev,Y,node_modules/decompress-response,
+deep-extend,0.6.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/deep-extend,
+deep-is,0.1.4,MIT,Y,LICENSE,transitive,dev,Y,node_modules/deep-is,
+define-data-property,1.1.4,MIT,Y,LICENSE,transitive,dev,Y,node_modules/define-data-property,
+define-lazy-prop,2.0.0,MIT,Y,license,transitive,dev,Y,node_modules/define-lazy-prop,
+define-properties,1.2.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/define-properties,
+dequal,2.0.3,MIT,Y,license,transitive,dev,Y,node_modules/dequal,
+detect-libc,2.1.2,Apache-2.0,Y,LICENSE,transitive,dev,Y,node_modules/detect-libc,devDependency that is also an optional peer of a production package (lockfile flag devOptional); not shipped
+diff,5.2.2,BSD-3-Clause,Y,LICENSE,transitive,dev,Y,node_modules/diff,
+doctrine,2.1.0,Apache-2.0,Y,LICENSE|LICENSE.closure-compiler|LICENSE.esprima,transitive,dev,Y,node_modules/doctrine,
+dom-accessibility-api,0.5.16,MIT,Y,LICENSE.md,transitive,dev,Y,node_modules/dom-accessibility-api,
+dom-accessibility-api,0.6.3,MIT,Y,LICENSE.md,transitive,dev,Y,node_modules/@testing-library/jest-dom/node_modules/dom-accessibility-api,
+dom-serializer,1.4.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/dom-serializer,
+domelementtype,2.3.0,BSD-2-Clause,Y,LICENSE,transitive,dev,Y,node_modules/domelementtype,
+domhandler,4.3.1,BSD-2-Clause,Y,LICENSE,transitive,dev,Y,node_modules/domhandler,
+domutils,2.8.0,BSD-2-Clause,Y,LICENSE,transitive,dev,Y,node_modules/domutils,
+dunder-proto,1.0.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/dunder-proto,
+eciesjs,0.5.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/eciesjs,
+elementtree,0.1.7,Apache-2.0,Y,LICENSE.txt|NOTICE,transitive,dev,Y,node_modules/elementtree,
+emoji-regex,8.0.0,MIT,Y,LICENSE-MIT.txt,transitive,dev,Y,node_modules/string-width/node_modules/emoji-regex,
+emoji-regex,9.2.2,MIT,Y,LICENSE-MIT.txt,transitive,dev,Y,node_modules/emoji-regex,
+end-of-stream,1.4.5,MIT,Y,LICENSE,transitive,dev,Y,node_modules/end-of-stream,
+enhanced-resolve,5.26.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/enhanced-resolve,
+entities,2.2.0,BSD-2-Clause,Y,LICENSE,transitive,dev,Y,node_modules/dom-serializer/node_modules/entities,
+entities,8.1.0,BSD-2-Clause,Y,LICENSE,transitive,dev,Y,node_modules/entities,
+env-paths,2.2.1,MIT,Y,license,transitive,dev,Y,node_modules/env-paths,
+es-abstract,1.24.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/es-abstract,
+es-abstract-get,1.0.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/es-abstract-get,
+es-define-property,1.0.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/es-define-property,
+es-errors,1.3.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/es-errors,
+es-iterator-helpers,1.4.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/es-iterator-helpers,
+es-module-lexer,2.3.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/es-module-lexer,
+es-object-atoms,1.1.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/es-object-atoms,
+es-set-tostringtag,2.1.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/es-set-tostringtag,
+es-shim-unscopables,1.1.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/es-shim-unscopables,
+es-to-primitive,1.3.4,MIT,Y,LICENSE,transitive,dev,Y,node_modules/es-to-primitive,
+esbuild,0.28.2,MIT,Y,LICENSE.md,transitive,dev,Y,node_modules/esbuild,
+escalade,3.2.0,MIT,Y,license,transitive,dev,Y,node_modules/escalade,
+escape-string-regexp,4.0.0,MIT,Y,license,transitive,dev,Y,node_modules/escape-string-regexp,
+eslint,9.39.5,MIT,Y,LICENSE,direct,dev,Y,node_modules/eslint,
+eslint-config-next,15.5.28,MIT,N,,direct,dev,Y,node_modules/eslint-config-next,
+eslint-import-resolver-node,0.3.10,MIT,Y,LICENSE,transitive,dev,Y,node_modules/eslint-import-resolver-node,
+eslint-import-resolver-typescript,3.10.1,ISC,Y,LICENSE,transitive,dev,Y,node_modules/eslint-import-resolver-typescript,
+eslint-module-utils,2.14.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/eslint-module-utils,
+eslint-plugin-import,2.32.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/eslint-plugin-import,
+eslint-plugin-jsx-a11y,6.10.2,MIT,Y,LICENSE.md,transitive,dev,Y,node_modules/eslint-plugin-jsx-a11y,
+eslint-plugin-react,7.37.5,MIT,Y,LICENSE,transitive,dev,Y,node_modules/eslint-plugin-react,
+eslint-plugin-react-hooks,5.2.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/eslint-plugin-react-hooks,
+eslint-scope,8.4.0,BSD-2-Clause,Y,LICENSE,transitive,dev,Y,node_modules/eslint-scope,
+eslint-visitor-keys,3.4.3,Apache-2.0,Y,LICENSE,transitive,dev,Y,node_modules/@eslint-community/eslint-utils/node_modules/eslint-visitor-keys,
+eslint-visitor-keys,4.2.1,Apache-2.0,Y,LICENSE,transitive,dev,Y,node_modules/eslint-visitor-keys,
+eslint-visitor-keys,5.0.1,Apache-2.0,Y,LICENSE,transitive,dev,Y,node_modules/@typescript-eslint/visitor-keys/node_modules/eslint-visitor-keys,
+espree,10.4.0,BSD-2-Clause,Y,LICENSE,transitive,dev,Y,node_modules/espree,
+esquery,1.7.0,BSD-3-Clause,Y,license.txt,transitive,dev,Y,node_modules/esquery,
+esrecurse,4.3.0,BSD-2-Clause,N,,transitive,dev,Y,node_modules/esrecurse,
+estraverse,5.3.0,BSD-2-Clause,Y,LICENSE.BSD,transitive,dev,Y,node_modules/estraverse,
+estree-walker,3.0.3,MIT,Y,LICENSE,transitive,dev,Y,node_modules/estree-walker,
+esutils,2.0.3,BSD-2-Clause,Y,LICENSE.BSD,transitive,dev,Y,node_modules/esutils,
+events-universal,1.0.1,Apache-2.0,Y,LICENSE,transitive,dev,Y,node_modules/events-universal,
+expand-template,2.0.3,(MIT OR WTFPL),Y,LICENSE,transitive,dev,Y,node_modules/expand-template,
+expect-type,1.4.0,Apache-2.0,Y,LICENSE,transitive,dev,Y,node_modules/expect-type,
+fast-deep-equal,3.1.3,MIT,Y,LICENSE,transitive,dev,Y,node_modules/fast-deep-equal,
+fast-fifo,1.3.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/fast-fifo,
+fast-glob,3.3.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/fast-glob,
+fast-json-stable-stringify,2.1.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/fast-json-stable-stringify,
+fast-levenshtein,2.0.6,MIT,Y,LICENSE.md,transitive,dev,Y,node_modules/fast-levenshtein,
+fastq,1.20.3,ISC,Y,LICENSE,transitive,dev,Y,node_modules/fastq,
+fd-slicer,1.1.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/fd-slicer,
+fdir,6.5.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/tinyglobby/node_modules/fdir,
+file-entry-cache,8.0.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/file-entry-cache,
+fill-range,7.1.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/fill-range,
+find-up,5.0.0,MIT,Y,license,transitive,dev,Y,node_modules/find-up,
+flat-cache,4.0.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/flat-cache,
+flatted,3.4.4,ISC,Y,LICENSE,transitive,dev,Y,node_modules/flatted,
+for-each,0.3.5,MIT,Y,LICENSE,transitive,dev,Y,node_modules/for-each,
+fs-constants,1.0.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/fs-constants,
+fs-extra,10.1.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/fs-extra,
+fs-extra,11.4.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@capacitor/cli/node_modules/fs-extra,
+fs-extra,9.1.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@ionic/utils-fs/node_modules/fs-extra,
+fs-minipass,2.1.0,ISC,Y,LICENSE,transitive,dev,Y,node_modules/fs-minipass,
+fs.realpath,1.0.0,ISC,Y,LICENSE,transitive,dev,Y,node_modules/fs.realpath,
+fsevents,2.3.3,MIT (from package-lock.json),n/a,,transitive,dev,N,node_modules/fsevents,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+function-bind,1.1.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/function-bind,
+function.prototype.name,1.2.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/function.prototype.name,
+functions-have-names,1.2.3,MIT,Y,LICENSE,transitive,dev,Y,node_modules/functions-have-names,
+generator-function,2.0.1,MIT,Y,LICENSE.md,transitive,dev,Y,node_modules/generator-function,
+get-caller-file,2.0.5,ISC,Y,LICENSE.md,transitive,dev,Y,node_modules/get-caller-file,
+get-intrinsic,1.3.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/get-intrinsic,
+get-proto,1.0.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/get-proto,
+get-symbol-description,1.1.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/get-symbol-description,
+get-tsconfig,4.14.3,MIT,Y,LICENSE,transitive,dev,Y,node_modules/get-tsconfig,
+github-from-package,0.0.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/github-from-package,
+glob,13.0.6,BlueOak-1.0.0,Y,LICENSE.md,transitive,dev,Y,node_modules/glob,
+glob,9.3.5,ISC,Y,LICENSE,transitive,dev,Y,node_modules/@capacitor/assets/node_modules/glob,
+glob-parent,5.1.2,ISC,Y,LICENSE,transitive,dev,Y,node_modules/fast-glob/node_modules/glob-parent,
+glob-parent,6.0.2,ISC,Y,LICENSE,transitive,dev,Y,node_modules/glob-parent,
+globals,14.0.0,MIT,Y,license,transitive,dev,Y,node_modules/globals,
+globalthis,1.0.4,MIT,Y,LICENSE,transitive,dev,Y,node_modules/globalthis,
+gopd,1.2.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/gopd,
+graceful-fs,4.2.11,ISC,Y,LICENSE,transitive,dev,Y,node_modules/graceful-fs,
+gradle-to-js,2.0.1,Apache-2.0,Y,LICENSE,transitive,dev,Y,node_modules/gradle-to-js,
+has-bigints,1.1.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/has-bigints,
+has-flag,4.0.0,MIT,Y,license,transitive,dev,Y,node_modules/has-flag,
+has-property-descriptors,1.0.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/has-property-descriptors,
+has-proto,1.2.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/has-proto,
+has-symbols,1.1.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/has-symbols,
+has-tostringtag,1.0.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/has-tostringtag,
+hasown,2.0.4,MIT,Y,LICENSE,transitive,dev,Y,node_modules/hasown,
+he,1.2.0,MIT,Y,LICENSE-MIT.txt,transitive,dev,Y,node_modules/he,
+html-encoding-sniffer,6.0.0,MIT,Y,LICENSE.txt,transitive,dev,Y,node_modules/html-encoding-sniffer,
+ieee754,1.2.1,BSD-3-Clause,Y,LICENSE,transitive,dev,Y,node_modules/ieee754,
+ignore,5.3.2,MIT,Y,LICENSE-MIT,transitive,dev,Y,node_modules/ignore,
+ignore,7.0.12,MIT,Y,LICENSE-MIT,transitive,dev,Y,node_modules/@typescript-eslint/eslint-plugin/node_modules/ignore,
+import-fresh,3.3.1,MIT,Y,license,transitive,dev,Y,node_modules/import-fresh,
+imurmurhash,0.1.4,MIT,N,,transitive,dev,Y,node_modules/imurmurhash,
+indent-string,4.0.0,MIT,Y,license,transitive,dev,Y,node_modules/indent-string,
+inherits,2.0.4,ISC,Y,LICENSE,transitive,dev,Y,node_modules/inherits,
+ini,1.3.8,ISC,Y,LICENSE,transitive,dev,Y,node_modules/rc/node_modules/ini,
+ini,2.0.0,ISC,Y,LICENSE,transitive,dev,Y,node_modules/ini,
+ini,4.1.3,ISC,Y,LICENSE,transitive,dev,Y,node_modules/native-run/node_modules/ini,
+internal-slot,1.1.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/internal-slot,
+is-array-buffer,3.0.5,MIT,Y,LICENSE,transitive,dev,Y,node_modules/is-array-buffer,
+is-arrayish,0.3.4,MIT,Y,LICENSE,transitive,dev,Y,node_modules/is-arrayish,
+is-async-function,2.1.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/is-async-function,
+is-bigint,1.1.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/is-bigint,
+is-boolean-object,1.2.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/is-boolean-object,
+is-bun-module,2.0.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/is-bun-module,
+is-callable,1.2.7,MIT,Y,LICENSE,transitive,dev,Y,node_modules/is-callable,
+is-core-module,2.17.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/is-core-module,
+is-data-view,1.0.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/is-data-view,
+is-date-object,1.1.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/is-date-object,
+is-docker,2.2.1,MIT,Y,license,transitive,dev,Y,node_modules/is-docker,
+is-document.all,1.0.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/is-document.all,
+is-extglob,2.1.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/is-extglob,
+is-finalizationregistry,1.1.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/is-finalizationregistry,
+is-fullwidth-code-point,3.0.0,MIT,Y,license,transitive,dev,Y,node_modules/is-fullwidth-code-point,
+is-generator-function,1.1.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/is-generator-function,
+is-glob,4.0.3,MIT,Y,LICENSE,transitive,dev,Y,node_modules/is-glob,
+is-map,2.0.3,MIT,Y,LICENSE,transitive,dev,Y,node_modules/is-map,
+is-negative-zero,2.0.3,MIT,Y,LICENSE,transitive,dev,Y,node_modules/is-negative-zero,
+is-number,7.0.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/is-number,
+is-number-object,1.1.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/is-number-object,
+is-potential-custom-element-name,1.0.1,MIT,Y,LICENSE-MIT.txt,transitive,dev,Y,node_modules/is-potential-custom-element-name,
+is-regex,1.2.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/is-regex,
+is-set,2.0.3,MIT,Y,LICENSE,transitive,dev,Y,node_modules/is-set,
+is-shared-array-buffer,1.0.4,MIT,Y,LICENSE,transitive,dev,Y,node_modules/is-shared-array-buffer,
+is-string,1.1.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/is-string,
+is-symbol,1.1.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/is-symbol,
+is-typed-array,1.1.15,MIT,Y,LICENSE,transitive,dev,Y,node_modules/is-typed-array,
+is-weakmap,2.0.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/is-weakmap,
+is-weakref,1.1.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/is-weakref,
+is-weakset,2.0.4,MIT,Y,LICENSE,transitive,dev,Y,node_modules/is-weakset,
+is-wsl,2.2.0,MIT,Y,license,transitive,dev,Y,node_modules/is-wsl,
+isarray,2.0.5,MIT,Y,LICENSE,transitive,dev,Y,node_modules/isarray,
+isexe,2.0.0,ISC,Y,LICENSE,transitive,dev,Y,node_modules/isexe,
+iterator.prototype,1.1.5,MIT,Y,LICENSE,transitive,dev,Y,node_modules/iterator.prototype,
+jiti,2.7.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/jiti,
+jose,6.2.12,MIT,Y,LICENSE.md,transitive,dev,Y,node_modules/jose,
+js-tokens,4.0.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/js-tokens,
+js-yaml,4.3.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/js-yaml,
+jsdom,29.1.1,MIT,Y,LICENSE.txt,direct,dev,Y,node_modules/jsdom,
+json-buffer,3.0.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/json-buffer,
+json-schema-traverse,0.4.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/json-schema-traverse,
+json-stable-stringify-without-jsonify,1.0.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/json-stable-stringify-without-jsonify,
+json5,1.0.2,MIT,Y,LICENSE.md,transitive,dev,Y,node_modules/json5,
+jsonfile,6.2.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/jsonfile,
+jsx-ast-utils,3.3.5,MIT,Y,LICENSE.md,transitive,dev,Y,node_modules/jsx-ast-utils,
+keyv,4.5.4,MIT,N,,transitive,dev,Y,node_modules/keyv,
+kleur,3.0.3,MIT,Y,license,transitive,dev,Y,node_modules/prompts/node_modules/kleur,
+kleur,4.1.5,MIT,Y,license,transitive,dev,Y,node_modules/kleur,
+language-subtag-registry,0.3.23,CC0-1.0,N,,transitive,dev,Y,node_modules/language-subtag-registry,
+language-tags,1.0.9,MIT,N,,transitive,dev,Y,node_modules/language-tags,
+levn,0.4.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/levn,
+lightningcss,1.32.0,MPL-2.0,Y,LICENSE,transitive,dev,Y,node_modules/lightningcss,
+lightningcss,1.33.0,MPL-2.0,Y,LICENSE,transitive,dev,Y,node_modules/vite/node_modules/lightningcss,
+lightningcss-android-arm64,1.32.0,MPL-2.0 (from package-lock.json),n/a,,transitive,dev,N,node_modules/lightningcss-android-arm64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+lightningcss-android-arm64,1.33.0,MPL-2.0 (from package-lock.json),n/a,,transitive,dev,N,node_modules/vite/node_modules/lightningcss-android-arm64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+lightningcss-darwin-arm64,1.32.0,MPL-2.0 (from package-lock.json),n/a,,transitive,dev,N,node_modules/lightningcss-darwin-arm64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+lightningcss-darwin-arm64,1.33.0,MPL-2.0 (from package-lock.json),n/a,,transitive,dev,N,node_modules/vite/node_modules/lightningcss-darwin-arm64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+lightningcss-darwin-x64,1.32.0,MPL-2.0 (from package-lock.json),n/a,,transitive,dev,N,node_modules/lightningcss-darwin-x64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+lightningcss-darwin-x64,1.33.0,MPL-2.0 (from package-lock.json),n/a,,transitive,dev,N,node_modules/vite/node_modules/lightningcss-darwin-x64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+lightningcss-freebsd-x64,1.32.0,MPL-2.0 (from package-lock.json),n/a,,transitive,dev,N,node_modules/lightningcss-freebsd-x64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+lightningcss-freebsd-x64,1.33.0,MPL-2.0 (from package-lock.json),n/a,,transitive,dev,N,node_modules/vite/node_modules/lightningcss-freebsd-x64,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+lightningcss-linux-arm-gnueabihf,1.32.0,MPL-2.0 (from package-lock.json),n/a,,transitive,dev,N,node_modules/lightningcss-linux-arm-gnueabihf,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+lightningcss-linux-arm-gnueabihf,1.33.0,MPL-2.0 (from package-lock.json),n/a,,transitive,dev,N,node_modules/vite/node_modules/lightningcss-linux-arm-gnueabihf,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+lightningcss-linux-arm64-gnu,1.32.0,MPL-2.0 (from package-lock.json),n/a,,transitive,dev,N,node_modules/lightningcss-linux-arm64-gnu,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+lightningcss-linux-arm64-gnu,1.33.0,MPL-2.0 (from package-lock.json),n/a,,transitive,dev,N,node_modules/vite/node_modules/lightningcss-linux-arm64-gnu,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+lightningcss-linux-arm64-musl,1.32.0,MPL-2.0 (from package-lock.json),n/a,,transitive,dev,N,node_modules/lightningcss-linux-arm64-musl,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+lightningcss-linux-arm64-musl,1.33.0,MPL-2.0 (from package-lock.json),n/a,,transitive,dev,N,node_modules/vite/node_modules/lightningcss-linux-arm64-musl,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+lightningcss-linux-x64-gnu,1.32.0,MPL-2.0,Y,LICENSE,transitive,dev,Y,node_modules/lightningcss-linux-x64-gnu,
+lightningcss-linux-x64-gnu,1.33.0,MPL-2.0,Y,LICENSE,transitive,dev,Y,node_modules/vite/node_modules/lightningcss-linux-x64-gnu,
+lightningcss-linux-x64-musl,1.32.0,MPL-2.0,Y,LICENSE,transitive,dev,Y,node_modules/lightningcss-linux-x64-musl,
+lightningcss-linux-x64-musl,1.33.0,MPL-2.0,Y,LICENSE,transitive,dev,Y,node_modules/vite/node_modules/lightningcss-linux-x64-musl,
+lightningcss-win32-arm64-msvc,1.32.0,MPL-2.0 (from package-lock.json),n/a,,transitive,dev,N,node_modules/lightningcss-win32-arm64-msvc,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+lightningcss-win32-arm64-msvc,1.33.0,MPL-2.0 (from package-lock.json),n/a,,transitive,dev,N,node_modules/vite/node_modules/lightningcss-win32-arm64-msvc,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+lightningcss-win32-x64-msvc,1.32.0,MPL-2.0 (from package-lock.json),n/a,,transitive,dev,N,node_modules/lightningcss-win32-x64-msvc,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+lightningcss-win32-x64-msvc,1.33.0,MPL-2.0 (from package-lock.json),n/a,,transitive,dev,N,node_modules/vite/node_modules/lightningcss-win32-x64-msvc,"Platform-specific optional package listed in package-lock.json but not installed on this audit machine (linux-x64); licence taken from the lockfile, not from the package itself"
+locate-path,6.0.0,MIT,Y,license,transitive,dev,Y,node_modules/locate-path,
+lodash,4.18.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/lodash,
+lodash.merge,4.6.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/lodash.merge,
+loose-envify,1.4.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/loose-envify,
+lru-cache,10.4.3,ISC,Y,LICENSE,transitive,dev,Y,node_modules/@capacitor/assets/node_modules/lru-cache,
+lru-cache,11.5.3,BlueOak-1.0.0,Y,LICENSE.md,transitive,dev,Y,node_modules/lru-cache,
+lz-string,1.5.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/lz-string,
+magic-string,0.30.21,MIT,Y,LICENSE,transitive,dev,Y,node_modules/magic-string,
+magic-string,1.4.3,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@vitest/mocker/node_modules/magic-string,
+magic-string,1.4.3,MIT,Y,LICENSE,transitive,dev,Y,node_modules/vitest/node_modules/magic-string,
+math-intrinsics,1.1.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/math-intrinsics,
+mdn-data,2.27.1,CC0-1.0,Y,LICENSE,transitive,dev,Y,node_modules/mdn-data,
+merge2,1.4.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/merge2,
+micromatch,4.0.8,MIT,Y,LICENSE,transitive,dev,Y,node_modules/micromatch,
+mimic-response,3.1.0,MIT,Y,license,transitive,dev,Y,node_modules/mimic-response,
+min-indent,1.0.1,MIT,Y,license,transitive,dev,Y,node_modules/min-indent,
+minimatch,10.2.6,BlueOak-1.0.0,Y,LICENSE.md,transitive,dev,Y,node_modules/@typescript-eslint/typescript-estree/node_modules/minimatch,
+minimatch,10.2.6,BlueOak-1.0.0,Y,LICENSE.md,transitive,dev,Y,node_modules/glob/node_modules/minimatch,
+minimatch,3.1.5,ISC,Y,LICENSE,transitive,dev,Y,node_modules/minimatch,
+minimatch,8.0.7,ISC,Y,LICENSE,transitive,dev,Y,node_modules/@capacitor/assets/node_modules/minimatch,
+minimist,1.2.8,MIT,Y,LICENSE,transitive,dev,Y,node_modules/minimist,
+minipass,3.3.6,ISC,Y,LICENSE,transitive,dev,Y,node_modules/@capacitor/assets/node_modules/minizlib/node_modules/minipass,
+minipass,3.3.6,ISC,Y,LICENSE,transitive,dev,Y,node_modules/fs-minipass/node_modules/minipass,
+minipass,4.2.8,ISC,Y,LICENSE,transitive,dev,Y,node_modules/@capacitor/assets/node_modules/minipass,
+minipass,5.0.0,ISC,Y,LICENSE,transitive,dev,Y,node_modules/@capacitor/assets/node_modules/tar/node_modules/minipass,
+minipass,7.1.3,BlueOak-1.0.0,Y,LICENSE.md,transitive,dev,Y,node_modules/@capacitor/assets/node_modules/path-scurry/node_modules/minipass,
+minipass,7.1.3,BlueOak-1.0.0,Y,LICENSE.md,transitive,dev,Y,node_modules/minipass,
+minizlib,2.1.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@capacitor/assets/node_modules/minizlib,
+minizlib,3.1.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/minizlib,
+mkdirp,1.0.4,MIT,Y,LICENSE,transitive,dev,Y,node_modules/mkdirp,
+mkdirp-classic,0.5.3,MIT,Y,LICENSE,transitive,dev,Y,node_modules/mkdirp-classic,
+ms,2.1.2,MIT,Y,license.md,transitive,dev,Y,node_modules/@capacitor/assets/node_modules/ms,
+ms,2.1.3,MIT,Y,license.md,transitive,dev,Y,node_modules/ms,
+napi-build-utils,2.0.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/napi-build-utils,
+napi-postinstall,0.3.4,MIT,Y,LICENSE,transitive,dev,Y,node_modules/napi-postinstall,
+native-run,2.0.3,MIT,Y,LICENSE,transitive,dev,Y,node_modules/native-run,
+natural-compare,1.4.0,MIT,N,,transitive,dev,Y,node_modules/natural-compare,
+node-abi,3.99.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/node-abi,
+node-addon-api,6.1.0,MIT,Y,LICENSE.md,transitive,dev,Y,node_modules/node-addon-api,
+node-exports-info,1.6.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/node-exports-info,
+node-fetch,2.7.0,MIT,Y,LICENSE.md,transitive,dev,Y,node_modules/node-fetch,
+node-html-parser,5.4.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/node-html-parser,
+nth-check,2.1.1,BSD-2-Clause,Y,LICENSE,transitive,dev,Y,node_modules/nth-check,
+object-assign,4.1.1,MIT,Y,license,transitive,dev,Y,node_modules/object-assign,
+object-inspect,1.13.4,MIT,Y,LICENSE,transitive,dev,Y,node_modules/object-inspect,
+object-keys,1.1.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/object-keys,
+object.assign,4.1.7,MIT,Y,LICENSE,transitive,dev,Y,node_modules/object.assign,
+object.entries,1.1.9,MIT,Y,LICENSE,transitive,dev,Y,node_modules/object.entries,
+object.fromentries,2.0.8,MIT,Y,LICENSE,transitive,dev,Y,node_modules/object.fromentries,
+object.groupby,1.0.3,MIT,Y,LICENSE,transitive,dev,Y,node_modules/object.groupby,
+object.values,1.2.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/object.values,
+obug,3.0.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/obug,
+once,1.4.0,ISC,Y,LICENSE,transitive,dev,Y,node_modules/once,
+open,8.4.2,MIT,Y,license,transitive,dev,Y,node_modules/open,
+optionator,0.9.4,MIT,Y,LICENSE,transitive,dev,Y,node_modules/optionator,
+own-keys,1.0.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/own-keys,
+p-limit,3.1.0,MIT,Y,license,transitive,dev,Y,node_modules/p-limit,
+p-locate,5.0.0,MIT,Y,license,transitive,dev,Y,node_modules/p-locate,
+package-json-from-dist,1.0.1,BlueOak-1.0.0,Y,LICENSE.md,transitive,dev,Y,node_modules/package-json-from-dist,
+parent-module,1.0.1,MIT,Y,license,transitive,dev,Y,node_modules/parent-module,
+parse5,8.0.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/parse5,
+path-exists,4.0.0,MIT,Y,license,transitive,dev,Y,node_modules/path-exists,
+path-key,3.1.1,MIT,Y,license,transitive,dev,Y,node_modules/path-key,
+path-parse,1.0.7,MIT,Y,LICENSE,transitive,dev,Y,node_modules/path-parse,
+path-scurry,1.11.1,BlueOak-1.0.0,Y,LICENSE.md,transitive,dev,Y,node_modules/@capacitor/assets/node_modules/path-scurry,
+path-scurry,2.0.2,BlueOak-1.0.0,Y,LICENSE.md,transitive,dev,Y,node_modules/path-scurry,
+pend,1.2.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/pend,
+picomatch,2.3.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/picomatch,
+picomatch,4.0.7,MIT,Y,LICENSE,transitive,dev,Y,node_modules/tinyglobby/node_modules/picomatch,
+picomatch,4.0.7,MIT,Y,LICENSE,transitive,dev,Y,node_modules/vite/node_modules/picomatch,
+picomatch,4.0.7,MIT,Y,LICENSE,transitive,dev,Y,node_modules/vitest/node_modules/picomatch,
+playwright,1.64.1,Apache-2.0,Y,LICENSE|NOTICE,transitive,dev,Y,node_modules/playwright,devDependency that is also an optional peer of a production package (lockfile flag devOptional); not shipped
+playwright-core,1.64.1,Apache-2.0,Y,LICENSE|NOTICE,transitive,dev,Y,node_modules/playwright-core,devDependency that is also an optional peer of a production package (lockfile flag devOptional); not shipped
+plist,3.1.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/plist,
+possible-typed-array-names,1.1.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/possible-typed-array-names,
+prebuild-install,7.1.3,MIT,Y,LICENSE,transitive,dev,Y,node_modules/prebuild-install,
+prelude-ls,1.2.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/prelude-ls,
+prettier,2.8.8,MIT,Y,LICENSE,transitive,dev,Y,node_modules/prettier,
+pretty-format,27.5.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/pretty-format,
+prompts,2.4.2,MIT,Y,license,transitive,dev,Y,node_modules/prompts,
+prop-types,15.8.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/prop-types,
+pump,3.0.4,MIT,Y,LICENSE,transitive,dev,Y,node_modules/pump,
+punycode,2.3.1,MIT,Y,LICENSE-MIT.txt,transitive,dev,Y,node_modules/punycode,
+queue-microtask,1.2.3,MIT,Y,LICENSE,transitive,dev,Y,node_modules/queue-microtask,
+rc,1.2.8,(BSD-2-Clause OR MIT OR Apache-2.0),Y,LICENSE.APACHE2|LICENSE.BSD|LICENSE.MIT,transitive,dev,Y,node_modules/rc,
+react-is,16.13.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/prop-types/node_modules/react-is,
+react-is,17.0.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/pretty-format/node_modules/react-is,
+readable-stream,3.6.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/readable-stream,
+redent,3.0.0,MIT,Y,license,transitive,dev,Y,node_modules/redent,
+reflect.getprototypeof,1.0.10,MIT,Y,LICENSE,transitive,dev,Y,node_modules/reflect.getprototypeof,
+regexp-to-ast,0.5.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/regexp-to-ast,
+regexp.prototype.flags,1.5.4,MIT,Y,LICENSE,transitive,dev,Y,node_modules/regexp.prototype.flags,
+require-directory,2.1.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/require-directory,
+require-from-string,2.0.2,MIT,Y,license,transitive,dev,Y,node_modules/require-from-string,
+resolve,2.0.0-next.7,MIT,Y,LICENSE,transitive,dev,Y,node_modules/resolve,
+resolve-from,4.0.0,MIT,Y,license,transitive,dev,Y,node_modules/resolve-from,
+resolve-pkg-maps,1.0.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/resolve-pkg-maps,
+reusify,1.1.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/reusify,
+rimraf,4.4.1,ISC,Y,LICENSE,transitive,dev,Y,node_modules/@capacitor/assets/node_modules/rimraf,
+rimraf,6.1.3,BlueOak-1.0.0,Y,LICENSE.md,transitive,dev,Y,node_modules/rimraf,
+rolldown,1.2.14,MIT,Y,LICENSE,transitive,dev,Y,node_modules/rolldown,
+run-parallel,1.2.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/run-parallel,
+safe-array-concat,1.1.4,MIT,Y,LICENSE,transitive,dev,Y,node_modules/safe-array-concat,
+safe-buffer,5.2.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/safe-buffer,
+safe-push-apply,1.0.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/safe-push-apply,
+safe-regex-test,1.1.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/safe-regex-test,
+sax,1.1.4,ISC,Y,LICENSE|LICENSE-W3C.html,transitive,dev,Y,node_modules/sax,
+sax,1.6.1,BlueOak-1.0.0,Y,LICENSE.md,transitive,dev,Y,node_modules/xml-js/node_modules/sax,
+saxes,6.0.0,ISC,N,,transitive,dev,Y,node_modules/saxes,
+semver,6.3.1,ISC,Y,LICENSE,transitive,dev,Y,node_modules/eslint-plugin-import/node_modules/semver,
+semver,6.3.1,ISC,Y,LICENSE,transitive,dev,Y,node_modules/eslint-plugin-react/node_modules/semver,
+semver,6.3.1,ISC,Y,LICENSE,transitive,dev,Y,node_modules/node-exports-info/node_modules/semver,
+semver,7.8.5,ISC,Y,LICENSE,transitive,dev,Y,node_modules/semver,devDependency that is also an optional peer of a production package (lockfile flag devOptional); not shipped
+set-function-length,1.2.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/set-function-length,
+set-function-name,2.0.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/set-function-name,
+set-proto,1.0.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/set-proto,
+sharp,0.32.6,Apache-2.0,Y,LICENSE,transitive,dev,Y,node_modules/@capacitor/assets/node_modules/sharp,"Server-side image processing for Next.js (next/image); prebuilt libvips binaries; runs on the host, not sent to browsers or bundled in the native apps"
+shebang-command,2.0.0,MIT,Y,license,transitive,dev,Y,node_modules/shebang-command,
+shebang-regex,3.0.0,MIT,Y,license,transitive,dev,Y,node_modules/shebang-regex,
+side-channel,1.1.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/side-channel,
+side-channel-list,1.0.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/side-channel-list,
+side-channel-map,1.0.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/side-channel-map,
+side-channel-weakmap,1.0.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/side-channel-weakmap,
+signal-exit,3.0.7,ISC,Y,LICENSE.txt,transitive,dev,Y,node_modules/signal-exit,
+simple-concat,1.0.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/simple-concat,
+simple-get,4.0.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/simple-get,
+simple-plist,1.3.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/simple-plist,
+simple-swizzle,0.2.4,MIT,Y,LICENSE,transitive,dev,Y,node_modules/simple-swizzle,
+sisteransi,1.0.5,MIT,Y,license,transitive,dev,Y,node_modules/sisteransi,
+slice-ansi,4.0.0,MIT,Y,license,transitive,dev,Y,node_modules/slice-ansi,
+split2,4.2.0,ISC,Y,LICENSE,transitive,dev,Y,node_modules/split2,
+stable-hash,0.0.5,MIT,N,,transitive,dev,Y,node_modules/stable-hash,
+std-env,4.3.0,MIT,Y,LICENCE,transitive,dev,Y,node_modules/std-env,
+stop-iteration-iterator,1.1.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/stop-iteration-iterator,
+stream-buffers,2.2.0,Unlicense,Y,UNLICENSE,transitive,dev,Y,node_modules/stream-buffers,
+streamx,2.28.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/streamx,
+string_decoder,1.3.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/string_decoder,
+string-width,4.2.3,MIT,Y,license,transitive,dev,Y,node_modules/string-width,
+string.prototype.includes,2.0.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/string.prototype.includes,
+string.prototype.matchall,4.1.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/string.prototype.matchall,
+string.prototype.repeat,1.0.0,MIT,Y,LICENSE-MIT.txt,transitive,dev,Y,node_modules/string.prototype.repeat,
+string.prototype.trim,1.2.11,MIT,Y,LICENSE,transitive,dev,Y,node_modules/string.prototype.trim,
+string.prototype.trimend,1.0.10,MIT,Y,LICENSE,transitive,dev,Y,node_modules/string.prototype.trimend,
+string.prototype.trimstart,1.0.8,MIT,Y,LICENSE,transitive,dev,Y,node_modules/string.prototype.trimstart,
+strip-ansi,6.0.1,MIT,Y,license,transitive,dev,Y,node_modules/strip-ansi,
+strip-bom,3.0.0,MIT,Y,license,transitive,dev,Y,node_modules/strip-bom,
+strip-indent,3.0.0,MIT,Y,license,transitive,dev,Y,node_modules/strip-indent,
+strip-json-comments,2.0.1,MIT,Y,license,transitive,dev,Y,node_modules/rc/node_modules/strip-json-comments,
+strip-json-comments,3.1.1,MIT,Y,license,transitive,dev,Y,node_modules/strip-json-comments,
+supabase,2.121.0,MIT,N,,direct,dev,Y,node_modules/supabase,
+supports-color,7.2.0,MIT,Y,license,transitive,dev,Y,node_modules/supports-color,
+supports-preserve-symlinks-flag,1.0.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/supports-preserve-symlinks-flag,
+symbol-tree,3.2.4,MIT,Y,LICENSE,transitive,dev,Y,node_modules/symbol-tree,
+tailwindcss,4.3.3,MIT,Y,LICENSE,direct,dev,Y,node_modules/tailwindcss,
+tapable,2.3.3,MIT,Y,LICENSE,transitive,dev,Y,node_modules/tapable,
+tar,6.2.1,ISC,Y,LICENSE,transitive,dev,Y,node_modules/@capacitor/assets/node_modules/tar,
+tar,7.5.22,BlueOak-1.0.0,Y,LICENSE.md,transitive,dev,Y,node_modules/tar,
+tar-fs,2.1.5,MIT,Y,LICENSE,transitive,dev,Y,node_modules/prebuild-install/node_modules/tar-fs,
+tar-fs,3.1.3,MIT,Y,LICENSE,transitive,dev,Y,node_modules/tar-fs,
+tar-stream,2.2.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/prebuild-install/node_modules/tar-stream,
+tar-stream,3.2.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/tar-stream,
+teex,1.0.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/teex,
+text-decoder,1.2.7,Apache-2.0,Y,LICENSE,transitive,dev,Y,node_modules/text-decoder,
+through2,4.0.2,MIT,Y,LICENSE.md,transitive,dev,Y,node_modules/through2,
+tinybench,6.2.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/tinybench,
+tinyexec,1.3.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/tinyexec,
+tinyglobby,0.2.17,MIT,Y,LICENSE,transitive,dev,Y,node_modules/tinyglobby,
+tldts,7.4.18,MIT,Y,LICENSE,transitive,dev,Y,node_modules/tldts,
+tldts-core,7.4.18,MIT,Y,LICENSE,transitive,dev,Y,node_modules/tldts-core,
+to-regex-range,5.0.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/to-regex-range,
+tough-cookie,6.0.2,BSD-3-Clause,Y,LICENSE,transitive,dev,Y,node_modules/tough-cookie,
+tr46,0.0.3,MIT,N,,transitive,dev,Y,node_modules/node-fetch/node_modules/tr46,
+tr46,6.0.0,MIT,Y,LICENSE.md,transitive,dev,Y,node_modules/tr46,
+tree-kill,1.2.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/tree-kill,
+ts-api-utils,2.5.0,MIT,Y,LICENSE.md,transitive,dev,Y,node_modules/ts-api-utils,
+tsconfig-paths,3.15.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/tsconfig-paths,
+tslib,2.6.2,0BSD,Y,LICENSE.txt,transitive,dev,Y,node_modules/@capacitor/assets/node_modules/tslib,
+tsx,4.23.15,MIT,Y,LICENSE,direct,dev,Y,node_modules/tsx,
+tunnel-agent,0.6.0,Apache-2.0,Y,LICENSE,transitive,dev,Y,node_modules/tunnel-agent,
+type-check,0.4.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/type-check,
+typed-array-buffer,1.0.3,MIT,Y,LICENSE,transitive,dev,Y,node_modules/typed-array-buffer,
+typed-array-byte-length,1.0.3,MIT,Y,LICENSE,transitive,dev,Y,node_modules/typed-array-byte-length,
+typed-array-byte-offset,1.0.5,MIT,Y,LICENSE,transitive,dev,Y,node_modules/typed-array-byte-offset,
+typed-array-length,1.0.8,MIT,Y,LICENSE,transitive,dev,Y,node_modules/typed-array-length,
+typescript,6.0.3,Apache-2.0,Y,LICENSE.txt,direct,dev,Y,node_modules/typescript,
+unbox-primitive,1.1.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/unbox-primitive,
+undici,7.30.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/undici,
+undici-types,8.9.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/undici-types,devDependency that is also an optional peer of a production package (lockfile flag devOptional); not shipped
+universalify,2.0.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/universalify,
+unrs-resolver,1.12.2,MIT,N,,transitive,dev,Y,node_modules/unrs-resolver,
+untildify,4.0.0,MIT,Y,license,transitive,dev,Y,node_modules/untildify,
+uri-js,4.4.1,BSD-2-Clause,Y,LICENSE,transitive,dev,Y,node_modules/uri-js,
+util-deprecate,1.0.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/util-deprecate,
+uuid,7.0.3,MIT,Y,LICENSE.md,transitive,dev,Y,node_modules/uuid,
+vite,8.3.4,MIT,Y,LICENSE.md,transitive,dev,Y,node_modules/vite,
+vitest,5.0.5,MIT,Y,LICENSE.md,direct,dev,Y,node_modules/vitest,
+w3c-xmlserializer,5.0.0,MIT,Y,LICENSE.md,transitive,dev,Y,node_modules/w3c-xmlserializer,
+webidl-conversions,3.0.1,BSD-2-Clause,Y,LICENSE.md,transitive,dev,Y,node_modules/node-fetch/node_modules/webidl-conversions,
+webidl-conversions,8.0.1,BSD-2-Clause,Y,LICENSE.md,transitive,dev,Y,node_modules/webidl-conversions,
+whatwg-mimetype,5.0.0,MIT,Y,LICENSE.txt,transitive,dev,Y,node_modules/whatwg-mimetype,
+whatwg-url,16.0.1,MIT,Y,LICENSE.txt,transitive,dev,Y,node_modules/whatwg-url,
+whatwg-url,5.0.0,MIT,Y,LICENSE.txt,transitive,dev,Y,node_modules/node-fetch/node_modules/whatwg-url,
+which,2.0.2,ISC,Y,LICENSE,transitive,dev,Y,node_modules/which,
+which-boxed-primitive,1.1.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/which-boxed-primitive,
+which-builtin-type,1.2.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/which-builtin-type,
+which-collection,1.0.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/which-collection,
+which-typed-array,1.1.24,MIT,Y,LICENSE,transitive,dev,Y,node_modules/which-typed-array,
+why-is-node-running,3.2.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/why-is-node-running,
+word-wrap,1.2.5,MIT,Y,LICENSE,transitive,dev,Y,node_modules/word-wrap,
+wrap-ansi,7.0.0,MIT,Y,license,transitive,dev,Y,node_modules/wrap-ansi,
+wrappy,1.0.2,ISC,Y,LICENSE,transitive,dev,Y,node_modules/wrappy,
+xcode,3.0.1,Apache-2.0,Y,LICENSE|NOTICE,transitive,dev,Y,node_modules/xcode,
+xml-js,1.6.11,MIT,Y,LICENSE,transitive,dev,Y,node_modules/xml-js,
+xml-name-validator,5.0.0,Apache-2.0,Y,LICENSE.txt,transitive,dev,Y,node_modules/xml-name-validator,
+xml2js,0.5.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@capacitor/assets/node_modules/xml2js,
+xml2js,0.6.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/xml2js,
+xmlbuilder,11.0.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/@capacitor/assets/node_modules/xmlbuilder,
+xmlbuilder,11.0.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/xml2js/node_modules/xmlbuilder,
+xmlbuilder,15.1.1,MIT,Y,LICENSE,transitive,dev,Y,node_modules/xmlbuilder,
+xmlchars,2.2.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/xmlchars,
+xpath,0.0.32,MIT,Y,LICENSE,transitive,dev,Y,node_modules/xpath,
+y18n,5.0.8,ISC,Y,LICENSE,transitive,dev,Y,node_modules/y18n,
+yallist,4.0.0,ISC,Y,LICENSE,transitive,dev,Y,node_modules/@capacitor/assets/node_modules/yallist,
+yallist,4.0.0,ISC,Y,LICENSE,transitive,dev,Y,node_modules/fs-minipass/node_modules/yallist,
+yallist,5.0.0,BlueOak-1.0.0,Y,LICENSE.md,transitive,dev,Y,node_modules/yallist,
+yargs,17.7.2,MIT,Y,LICENSE,transitive,dev,Y,node_modules/yargs,
+yargs-parser,21.1.1,ISC,Y,LICENSE.txt,transitive,dev,Y,node_modules/yargs-parser,
+yauzl,2.10.0,MIT,Y,LICENSE,transitive,dev,Y,node_modules/yauzl,
+yocto-queue,0.1.0,MIT,Y,license,transitive,dev,Y,node_modules/yocto-queue,

@@ -54,7 +54,8 @@ function databaseFullOfPrivatePrayer(profile: Record<string, unknown>) {
 
 describe("private prayer content never reaches the coach's prompt", () => {
   it.each([
-    ["Faith-inspired coaching on", { faith_enabled: true, timezone: "America/New_York" }],
+    ["Faith-inspired coaching on", { faith_enabled: true, timezone: "America/New_York", ai_data_consent_at: "2026-11-17T00:00:00Z", journal_ai_consent_at: "2026-11-17T00:00:00Z" }],
+    ["Faith-inspired coaching on, journal permission off", { faith_enabled: true, timezone: "America/New_York", ai_data_consent_at: "2026-11-17T00:00:00Z", journal_ai_consent_at: null }],
     ["Faith-inspired coaching off", { faith_enabled: false, timezone: "America/New_York" }],
   ])("%s: nothing private is in the snapshot, the context text or the system prompt", async (_label, profile) => {
     const { client, log } = databaseFullOfPrivatePrayer(profile);
@@ -69,7 +70,7 @@ describe("private prayer content never reaches the coach's prompt", () => {
     // The only private Faith table the context builder may touch is the journal, and only for entries shared with
     // the coach, of this member, while Faith-inspired coaching is on.
     const touched = log.filter((l) => (PRIVATE_FAITH_TABLES as readonly string[]).includes(l.table));
-    if (profile.faith_enabled) {
+    if (profile.faith_enabled && "journal_ai_consent_at" in profile && profile.journal_ai_consent_at) {
       expect(touched.map((l) => l.table)).toEqual(["faith_journal_entries"]);
       expect(touched[0]!.calls).toEqual(expect.arrayContaining([["eq", ["user_id", USER]], ["eq", ["share_with_coach", true]]]));
     } else {

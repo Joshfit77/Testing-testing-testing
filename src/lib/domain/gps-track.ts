@@ -133,6 +133,8 @@ const PROCESS_Q: Record<ActivityKind, number> = { run: 1.5, walk: 0.15 };
 const OUTLIER_GATE = 16;
 /** Consecutive agreeing outliers after which the filter restarts on them. */
 const RESTART_AFTER = 3;
+/** A fix this much older than the last accepted one means the clock jumped back, not a late delivery. */
+const CLOCK_BACK_MS = 60_000;
 /** A fix older than the start of the recording (a cached position) is ignored. */
 const STALE_MS = 2_000;
 
@@ -291,7 +293,16 @@ export function addFix(s: TrackState, fix: GpsFix): { state: TrackState; accepte
   if (!Number.isFinite(fix.lat) || !Number.isFinite(fix.lng) || !(fix.accuracy >= 0) || fix.accuracy > MAX_ACCURACY_M) return reject(withAcc, "inaccurate");
   if (fix.t < s.startedAt - STALE_MS) return reject(withAcc, "stale");
   if (s.status === "acquiring" && fix.accuracy > FIRST_FIX_ACCURACY_M) return reject(withAcc, "waiting_for_fix");
-  if (s.lastFixAt != null && fix.t <= s.lastFixAt) return reject(withAcc, "out_of_order");
+  if (s.lastFixAt != null && fix.t <= s.lastFixAt) {
+    // Far older than the last fix is not a late delivery (those are seconds late) but a clock that went back, or a
+    // last fix with a bad timestamp from the future. Ignoring it froze the recording until the clock caught up
+    // (an hour of running uncounted, and the signal still shown as fine): start a new line here instead, counting
+    // nothing across the jump.
+    if (s.status === "recording" && s.lines.length > 0 && s.lastFixAt - fix.t > CLOCK_BACK_MS) {
+      return startLine({ ...withAcc, signalLost: true, breakReason: "signal", gaps: s.gaps + 1 }, fix);
+    }
+    return reject(withAcc, "out_of_order");
+  }
 
   // A stretch longer than the signal-loss window without an accepted fix is a gap by the fixes' own timestamps,
   // whether or not the clock noticed. A frozen browser page runs no clock and queues no fixes, and a phone that dropped
@@ -368,9 +379,14 @@ function newSplits(s: TrackState, a: TrackPoint, b: TrackPoint): TrackSplit[] {
     }
     const f = b.d === a.d ? 0 : (target - a.d) / (b.d - a.d);
     const t = a.t + f * (b.t - a.t);
-    const moving = movingSecondsAt(s, t);
-    const prevMoving = out.at(-1)?.moving_s ?? s.splits.at(-1)?.moving_s ?? 0;
-    out.push({ index, unit: s.unit, distance_m: Math.round(target), moving_s: moving, elapsed_s: Math.round((t - s.startedAt) / 1000), split_s: moving - prevMoving });
+    const prev = out.at(-1) ?? s.splits.at(-1);
+    const prevMoving = prev?.moving_s ?? 0;
+    // After the phone's clock went back (addFix starts a new line there), fixes carry earlier times than the splits
+    // already recorded. Split times never go backwards: a negative split could not be saved at all, and the whole run
+    // was refused. The times across such a jump are approximate (device test DV-16); the distance is not affected.
+    const moving = Math.max(movingSecondsAt(s, t), prevMoving);
+    const elapsed = Math.max(Math.round((t - s.startedAt) / 1000), prev?.elapsed_s ?? 0, 0);
+    out.push({ index, unit: s.unit, distance_m: Math.round(target), moving_s: moving, elapsed_s: elapsed, split_s: moving - prevMoving });
     index++;
   }
   return out;
@@ -593,7 +609,7 @@ export function splitsForSave(s: TrackState): TrackSplit[] {
   const restM = totals.distance_m - last.distance_m;
   const restS = totals.moving_s - last.moving_s;
   if (restM < MIN_PARTIAL_SPLIT_M || restS < 1) return s.splits;
-  return [...s.splits, { index: last.index + 1, unit: last.unit, distance_m: Math.round(totals.distance_m), moving_s: totals.moving_s, elapsed_s: totals.elapsed_s, split_s: restS }];
+  return [...s.splits, { index: last.index + 1, unit: last.unit, distance_m: Math.round(totals.distance_m), moving_s: totals.moving_s, elapsed_s: Math.max(totals.elapsed_s, last.elapsed_s), split_s: restS }];
 }
 
 /** How long an unfinished draft left on the device is offered back (matches GPS_RESUMABLE_MS in src/lib/opening.ts). */

@@ -10,8 +10,8 @@ import { giveBodyScanConsentAction } from "@/server/actions/body-scan";
 const POINTS = [
   "Body Scan stores the front, side and optional rear photos you take, plus any measurements you enter.",
   "Photos are resized on this device before upload, and location data is removed.",
-  "They're kept in private storage that only your account can open. Our team and admins can't view them.",
-  "Your photos are never sent to the AI coach or to any other company or service. If that ever changes, we'll ask for your separate consent first.",
+  "They're kept in private storage with our hosting provider that only your account can open. The app gives our team and admins no way to view them.",
+  "Your photos are stored privately with our hosting provider and are never sent to the AI coach or to anyone else. If that ever changes, we'll ask for your separate consent first.",
   "Body Scan does not estimate body fat. A phone camera can't measure body fat or visceral fat, so we don't guess.",
   "Delete any scan at any time, or withdraw this consent to delete every scan at once. Scans are also deleted with your account and included in your data export.",
 ];
