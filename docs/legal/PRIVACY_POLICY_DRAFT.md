@@ -25,7 +25,7 @@ This Privacy Policy explains how [LEGAL ENTITY NAME] ("**we**," "**us**") collec
 - We do **not** share it for targeted advertising. The app contains no advertising software and no third-party analytics or crash-reporting software. We keep a small record of our own of workout events (Section 2.4).
 - Health data from Apple Health or Health Connect is never used for advertising and never sold.
 - We send data to our AI provider **only after you allow it**. Data imported from Apple Health or Health Connect is sent to the AI provider only if you also turn on a **separate setting that is off by default** (Section 5.3).
-- Body Scan photos, progress photos, GPS routes and unshared prayer-journal entries are **never** sent to AI.
+- Body Scan photos, progress photos, GPS routes and unshared prayer-journal entries are **never** sent to AI. No prayer-journal entry is sent at all unless you first turn on the separate "Share prayer journal entries with the AI Coach" permission in Profile.
 - Other members cannot see any of your information. The Friends feature is switched off (Section 16).
 - You can export or delete your data in the app at any time.
 
@@ -133,7 +133,7 @@ Several categories we handle are treated as "sensitive" under various U.S. state
 | Sharing data with AI | **AI consent** card listing the categories, before any data is sent | Profile → Privacy & data (turns AI features off) |
 | Sharing Apple Health / Health Connect data with AI | A **separate setting, off by default**: "Share Apple Health / Health Connect data with the AI Coach" (Section 5.3) | Turn the setting off in Profile → Privacy & data |
 | Coaching memory | **Separate memory consent**; memory must be switched on | Turn memory off; delete memories |
-| Faith interest and prayer-journal entries | You choose to turn on faith features and write entries. An entry goes to AI only if you mark that entry "Share with AI Coach" (off by default) | Turn faith features off; delete entries |
+| Faith interest and prayer-journal entries | You choose to turn on faith features and write entries. An entry goes to AI only if you first turn on the separate journal permission in Profile (off by default) and then mark that entry "Share with AI Coach" (off by default) | Turn the journal permission or faith features off (turning the permission off makes every entry private again); delete entries |
 | Workouts, food diary, bodyweight, measurements, typed-in steps, supplements, allergies | No separate consent step: you choose to enter them | Delete the entries or your account |
 
 **How consents are recorded.** Each consent above is one timestamp on your profile. Withdrawing it erases the timestamp. The app keeps no history of earlier consents and no copy of the wording you were shown for these consents. (The Terms, Privacy Policy, risk acknowledgment and auto-renewal acceptances are recorded separately, with version and text fingerprint: Section 2.1.)
@@ -156,7 +156,7 @@ Our AI features are powered by **Anthropic** (Claude). They are part of Pro. Eve
 - the last 7 days of **step counts you typed in** and your step goal (imported steps: Section 5.3);
 - your latest readiness score and its date; the names of your supplements;
 - your 40-day-challenge name and progress, and whether faith features are on;
-- prayer-journal entries you marked "Share with AI Coach" (date, kind, title, scripture reference and an excerpt), only while faith features are on;
+- prayer-journal entries you marked "Share with AI Coach" (date, kind, title, scripture reference and an excerpt), only while faith features and the separate journal permission are both on;
 - coaching memories, only while memory is on;
 - your coach-style choice and the conversation so far.
 

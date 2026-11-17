@@ -14,6 +14,8 @@ export interface ProfileRow {
   ai_data_consent_at?: string | null;
   /** Separate permission to send Apple Health / Health Connect data to the AI provider (migration 079). */
   health_ai_share_consent_at?: string | null;
+  /** Separate permission to share prayer-journal entries with the AI Coach (migration 080). Null = not allowed. */
+  journal_ai_consent_at?: string | null;
   onboarding_completed_at: string | null;
   timezone: string;
   step_goal: number;

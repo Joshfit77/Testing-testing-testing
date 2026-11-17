@@ -36,7 +36,7 @@ export default function PrivacyPage() {
           our storage provider and are visible only to you; no AI analyses them. A meal photo you choose to send for a calorie estimate is sent to our
           AI provider for that request and is not stored by us.
         </li>
-        <li>Optional faith journal entries — stored on our database provider, readable only by you (our administrators have no access path to them). An entry is sent to the AI coach only if you mark it &ldquo;Share with AI Coach&rdquo;.</li>
+        <li>Optional faith journal entries — stored on our database provider, readable only by you (our administrators have no access path to them). An entry is sent to the AI coach only if you turn on the separate journal permission in Profile and then mark that entry &ldquo;Share with AI Coach&rdquo;.</li>
         <li>
           AI coach conversations, AI meal-plan requests and &ldquo;Ask AI about this food&rdquo; questions, which are sent to our AI provider to generate
           responses together with the parts of your account the feature needs (shown to you before you first allow it; you can withdraw this in Profile →

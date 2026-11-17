@@ -61,7 +61,9 @@ test.describe("Faith first-time UX", () => {
     await page.goto("/faith/journal/new");
     await expect(page.getByRole("textbox", { name: "Prayer", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Save entry" })).toBeInViewport();
-    await expect(page.getByRole("checkbox", { name: /Share with AI Coach/ })).not.toBeChecked();
+    // Private by default: without the separate journal permission (Profile) the share choice isn't offered at all.
+    await expect(page.getByRole("checkbox", { name: /Share with AI Coach/ })).toHaveCount(0);
+    await expect(page.getByTestId("journal-share-off")).toContainText("Sharing journal entries with the AI Coach is off");
     await page.getByText("More options", { exact: true }).click();
     await expect(page.getByRole("radio", { name: "Daily prayer" })).toBeChecked();
     await expect(page.getByLabel("Title (optional)")).toBeVisible();

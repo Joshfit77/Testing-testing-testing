@@ -10,7 +10,7 @@ import { initialActionState } from "@/lib/action-state";
 import { cmToFeetInches, feetInchesToCm } from "@/lib/domain/units";
 import { initialTimeZoneOptions, timeZoneOptions } from "@/lib/time-zone-options";
 import type { UnitSystem } from "@/lib/domain/types";
-import { deleteAccountAction, updateProfileAction, withdrawWellnessConsentAction, setAiDataConsentAction, setHealthAiShareAction } from "@/server/actions/profile";
+import { deleteAccountAction, updateProfileAction, withdrawWellnessConsentAction, setAiDataConsentAction, setHealthAiShareAction, setJournalAiShareAction } from "@/server/actions/profile";
 
 export function ProfileForm({
   initial,
@@ -152,6 +152,28 @@ export function HealthAiShareForm({ on }: { on: boolean }) {
       </p>
       <SubmitButton variant="secondary" pendingLabel="Saving…" className="h-auto min-h-11 w-full whitespace-normal py-2">
         {on ? "Stop sharing health-platform data with the AI Coach" : "Share Apple Health / Health Connect data with the AI Coach"}
+      </SubmitButton>
+      <FormMessage state={state} />
+    </form>
+  );
+}
+
+/**
+ * The separate permission before any prayer-journal entry can be shared with the AI Coach (migration 080). Off by
+ * default. WORDING PENDING OWNER AND COUNSEL APPROVAL.
+ */
+export function JournalAiShareForm({ on }: { on: boolean }) {
+  const [state, action] = useActionState(async () => setJournalAiShareAction(!on), initialActionState);
+  return (
+    <form action={action} className="space-y-2" data-testid="journal-ai-share">
+      <p className="text-sm font-semibold">Prayer journal</p>
+      <p className="text-sm text-muted-foreground">
+        {on
+          ? "On. You can mark individual journal entries \"Share with AI Coach\". Only those entries (a short excerpt of each, up to five) are sent to Anthropic, the AI provider, when you talk to the coach. Every other entry stays private."
+          : "Off. No prayer-journal entry is ever sent to the AI provider, and entries can't be marked for the AI Coach. Turn this on only if you want to choose entries for the coach to read."}
+      </p>
+      <SubmitButton variant="secondary" pendingLabel="Saving…" className="h-auto min-h-11 w-full whitespace-normal py-2">
+        {on ? "Stop sharing prayer journal entries with the AI Coach" : "Share prayer journal entries with the AI Coach"}
       </SubmitButton>
       <FormMessage state={state} />
     </form>

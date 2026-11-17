@@ -279,7 +279,7 @@ describe.skipIf(!available)("what reaches the AI provider: captured request bodi
     bConversation = b.conversation;
     const now = new Date().toISOString();
     // B has allowed everything, including the health permission: none of it may ever show up in A's requests.
-    await setProfile(B, { ai_data_consent_at: now, health_ai_share_consent_at: now });
+    await setProfile(B, { ai_data_consent_at: now, health_ai_share_consent_at: now, journal_ai_consent_at: now });
     // A starts with no AI consent at all.
     await setProfile(A, { ai_data_consent_at: null, health_ai_share_consent_at: null });
     // The Free member has given every consent; only the plan can stop them.
@@ -321,8 +321,18 @@ describe.skipIf(!available)("what reaches the AI provider: captured request bodi
     expect((await svc.from("ai_usage_events").select("id", { count: "exact", head: true }).eq("user_id", F.id)).count).toBe(0);
   });
 
+  it("without the separate journal permission, not even an entry marked 'Share with AI Coach' is sent (migration 080)", async () => {
+    await setProfile(A, { ai_data_consent_at: new Date().toISOString(), journal_ai_consent_at: null });
+    const { result, text } = await sentDuring(() => ask(A, "Encourage me."));
+    expect(result.status).toBe(200);
+    expect(text.length).toBeGreaterThan(2);
+    expectNone(text, ["ZQX-A-SHARED-JOURNAL", "ZQX-A-UNSHARED-JOURNAL"]);
+    // Positive control: the rest of what A allowed is still sent.
+    expectAll(text, ["ZQX-A-LIMITATION"]);
+  });
+
   it("coach chat with every read tool (AI + wellness consent, no health permission): no imported data, device name, unshared journal, notes, photos or B's data", async () => {
-    await setProfile(A, { ai_data_consent_at: new Date().toISOString() });
+    await setProfile(A, { ai_data_consent_at: new Date().toISOString(), journal_ai_consent_at: new Date().toISOString() });
     const { result, bodies, text } = await sentDuring(() => ask(A, "How am I doing overall? Check my sleep, recovery and bench."));
     expect(result.status).toBe(200);
     expect(bodies).toHaveLength(2); // the request that asked for the tools, and the one carrying their results

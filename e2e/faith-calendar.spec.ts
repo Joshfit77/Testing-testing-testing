@@ -55,7 +55,9 @@ test.describe("Stage 2C: faith flows, onboarding additions and the training cale
     await expect(page.getByRole("radio", { name: "Prayer request" })).toBeChecked();
     await page.getByLabel("Title (optional)").fill("Healing for Sam");
     await page.getByRole("textbox", { name: "Prayer", exact: true }).fill("Lord, please bring Sam rest and healing this week.");
-    await expect(page.getByRole("checkbox", { name: /Share with AI Coach/ })).not.toBeChecked();
+    // Private by default: without the separate journal permission (Profile) the share choice isn't offered at all.
+    await expect(page.getByRole("checkbox", { name: /Share with AI Coach/ })).toHaveCount(0);
+    await expect(page.getByTestId("journal-share-off")).toContainText("Sharing journal entries with the AI Coach is off");
     await page.getByRole("button", { name: "Save entry" }).click();
 
     // Saving returns to the journal. Find it by search, open it, mark it answered.

@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/common/page-header";
 import { formatJournalDate, JournalEntryCard } from "@/components/faith/journal-entry-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ANSWERABLE_KINDS, JOURNAL_FILTER_LABELS, JOURNAL_FILTERS, journalSearchPattern, parseJournalFilter } from "@/lib/domain/journal";
+import { ANSWERABLE_KINDS, JOURNAL_FILTER_LABELS, JOURNAL_FILTERS, journalSearchPattern, journalSharingAllowed, parseJournalFilter } from "@/lib/domain/journal";
 import { cn } from "@/lib/utils";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireOnboardedUser } from "@/server/auth";
@@ -17,7 +17,8 @@ const PAGE = 50;
 
 export default async function JournalPage({ searchParams }: { searchParams: Promise<{ q?: string; filter?: string }> }) {
   const sp = await searchParams;
-  const { user } = await requireOnboardedUser();
+  const { user, profile } = await requireOnboardedUser();
+  const sharingOn = journalSharingAllowed(profile);
   const supabase = await getServerSupabase();
   const filter = parseJournalFilter(sp.filter);
   const q = (sp.q ?? "").slice(0, 80);
@@ -114,7 +115,7 @@ export default async function JournalPage({ searchParams }: { searchParams: Prom
                 <li key={e.id} className="relative">
                   <span aria-hidden className="absolute -left-[1.4rem] top-5 size-3 rounded-full border-2 border-gold bg-background" />
                   <p className="mb-1 text-xs font-semibold text-gold">Answered {e.answered_on ? formatJournalDate(e.answered_on) : ""}</p>
-                  <JournalEntryCard entry={e} />
+                  <JournalEntryCard entry={e} sharingOn={sharingOn} />
                 </li>
               ))}
             </ol>
@@ -122,7 +123,7 @@ export default async function JournalPage({ searchParams }: { searchParams: Prom
             <ul className="grid gap-2 md:grid-cols-2">
               {entries.map((e) => (
                 <li key={e.id} className="min-w-0">
-                  <JournalEntryCard entry={e} />
+                  <JournalEntryCard entry={e} sharingOn={sharingOn} />
                 </li>
               ))}
             </ul>

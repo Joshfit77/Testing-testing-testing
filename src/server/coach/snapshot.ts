@@ -7,7 +7,7 @@ import { challengeDayNumber } from "@/lib/domain/challenge";
 import { addDays, isoDateInTz } from "@/lib/domain/dates";
 import type { UnitSystem } from "@/lib/domain/types";
 import type { AthleteSnapshot, SnapshotProgram, SnapshotProgramDay, SnapshotWorkout } from "@/lib/coach/context";
-import { journalEntriesForCoach, COACH_JOURNAL_LIMIT } from "@/lib/domain/journal";
+import { journalEntriesForCoach, journalSharingAllowed, COACH_JOURNAL_LIMIT } from "@/lib/domain/journal";
 import { loadBudgetContext } from "@/server/services/nutrition-targets";
 import { MEMORY_LIMIT, type CoachMemory } from "@/lib/coach/memory";
 import { openMemories } from "@/server/crypto/memory-crypto";
@@ -135,7 +135,7 @@ export async function loadProgramWeek(supabase: SupabaseClient, programId: strin
 export async function loadAthleteSnapshot(supabase: SupabaseClient, userId: string): Promise<AthleteSnapshot> {
   const { data: profile } = await supabase
     .from("profiles")
-    .select("unit_system, birth_year, height_cm, sex, faith_enabled, wellness_consent_at, timezone, step_goal, coach_memory_enabled, ai_data_consent_at, health_ai_share_consent_at")
+    .select("unit_system, birth_year, height_cm, sex, faith_enabled, wellness_consent_at, timezone, step_goal, coach_memory_enabled, ai_data_consent_at, health_ai_share_consent_at, journal_ai_consent_at")
     .eq("id", userId)
     .maybeSingle();
   const tz = (profile?.timezone as string) || "UTC";
@@ -180,9 +180,10 @@ export async function loadAthleteSnapshot(supabase: SupabaseClient, userId: stri
       .maybeSingle(),
     getActiveProgramRef(supabase, userId),
     loadBudgetContext(supabase, userId).catch(() => null),
-    // Prayer journal: private by default. Only entries the user explicitly shared with the coach are read, and only
-    // while faith features are on: turning them off stops every journal excerpt reaching the AI provider.
-    profile?.faith_enabled
+    // Prayer journal: private by default. Read only with the separate journal permission (migration 080), the AI consent
+    // and faith features all on, and then only entries the member marked "Share with AI Coach". Turning any of them
+    // off stops every journal excerpt reaching the AI provider.
+    journalSharingAllowed(profile)
       ? supabase
           .from("faith_journal_entries")
           .select("entry_date, kind, title, scripture_ref, body, answered_on, share_with_coach")

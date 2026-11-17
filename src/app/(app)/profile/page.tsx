@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Award, BellRing, Brain, Camera, ChevronRight, CreditCard, Download, HandHeart, HeartPulse, KeyRound, LayoutGrid, LogOut, MapPin, Moon, ScanLine, ShieldCheck, Target, TrendingUp, Users } from "lucide-react";
 import { MainHeader } from "@/components/shell/main-header";
 import { DisplaySettings } from "@/components/profile/display-settings";
-import { DeleteAccountForm, ProfileForm, WithdrawConsentForm, AiConsentOffForm, HealthAiShareForm } from "@/components/profile/profile-forms";
+import { DeleteAccountForm, ProfileForm, WithdrawConsentForm, AiConsentOffForm, HealthAiShareForm, JournalAiShareForm } from "@/components/profile/profile-forms";
 import { Button } from "@/components/ui/button";
 import { getPlans } from "@/lib/domain/plans";
 import { getServerSupabase } from "@/lib/supabase/server";
@@ -153,6 +153,7 @@ export default async function ProfilePage() {
           {profile.ai_data_consent_at ? (
             <div className="space-y-4">
               <HealthAiShareForm on={Boolean(profile.health_ai_share_consent_at)} />
+              {profile.faith_enabled && <JournalAiShareForm on={Boolean(profile.journal_ai_consent_at)} />}
               <AiConsentOffForm />
             </div>
           ) : (
