@@ -101,9 +101,17 @@ current Android phone; add the older devices from `IPHONE_PLAN_2026-11-15.md` wh
 
 ## 6. Not changed, still open
 
-- **W-5** (2026-11-14 audit): after a Finish whose reply was lost, sets logged before the retry are not stored (the
-  retry returns the first save). Needs a product decision on applying the retry as an edit.
-- No `src/app/global-error.tsx` (section 3, g).
+- ~~**W-5**~~ **Fixed 2026-11-17 (02ca524)** on the owner's instruction: a Finish retry that reaches an already-saved
+  workout and carries more completed sets replaces its contents as an edit (sets, volume, records; end time moved to
+  the later Finish). A plain repeat, or an older copy with fewer sets, changes nothing. Tests:
+  `tests/integration/finish-lost-reply.test.ts` (4; the two lost-reply cases failed before the fix) and the browser
+  test "Finish saved but its reply lost, then another set logged". Edits to existing sets made after a lost reply
+  *without* adding a set are not applied by the retry (the member can edit the workout in History).
+- ~~No `src/app/global-error.tsx`~~ **Added 2026-11-17 (8a78793)**, with `tests/unit/global-error.test.tsx` (5). It
+  cannot be triggered in a browser or device test without a deliberate crash hook, which was not added.
+- **GPS splits after a clock jump (found by the 2026-11-17 code review, fixed in e9320b0):** D3's new line after a
+  clock jump gave the next split a negative time, and the server refused the whole run. Split times now never go
+  backwards; the test "a run whose clock went back can still be saved" failed (−265 s) before the fix.
 - After a clock change: rest countdown inflated; a GPS recording whose clock goes back past its start has wrong times;
   cross-device "newest copy" follows each device's clock (section 3, i). Device tests DV-16.
 - Two tabs editing at the same moment remain last-writer-wins; D5 only stops an *older* copy from overwriting a newer

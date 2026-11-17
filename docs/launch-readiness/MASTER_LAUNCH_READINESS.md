@@ -50,8 +50,8 @@ subscriptions switched on; **Inv** = investment (due diligence and closing).
 |---|---|---|---|---|
 | E1 | Bring `claude/legal-remediation` into the release candidate and rebuild | TF | You approve; then engineering | Section 1 |
 | E2 | No result from a physical device for anything (17 device tests in `04_RELIABILITY_CLOSURE.md` §5, plus the iPhone plan in `docs/release/IPHONE_PLAN_2026-11-15.md`) | TF (core tests DV-01 to DV-08); Free (all) | You, on a device | Background audio/GPS, the camera, Apple Health import, the lock screen and app kills cannot be tested in a browser |
-| E3 | **W-5**: after a Finish whose reply was lost, sets logged before the retry are not stored | Free | You decide; then engineering | Rare (needs a lost reply and more sets before the retry). Needs a product decision: apply the retry as an edit, or block logging until the retry resolves |
-| E4 | No `src/app/global-error.tsx`: an error in the root layout shows Next's default error page | Free | Engineering (small) | Drafts are not affected; they stay on the device |
+| E3 | ~~W-5: sets logged after a lost Finish reply were not stored~~ | — | Done 2026-11-17 (02ca524) | Applied as an edit; tests in `04_RELIABILITY_CLOSURE.md` §6 |
+| E4 | ~~No root error page~~ | — | Done 2026-11-17 (8a78793) | `src/app/global-error.tsx`, unit-tested |
 | E5 | Live AI behaviour (safety rules, prompt injection through shared journal text or food names) and cost per member, measured with a capped staging key | Free (behaviour); Paid (cost) | You provide the key; then engineering | Every AI test so far uses a scripted stand-in |
 | E6 | Live Open Food Facts integration test | Free | You run it (one command, section 9) | The host is allowed in this environment, but running it was refused here by the session's safety policy |
 | E7 | Readiness and check-in scores depend on deletion, not a query-level consent check, to stop reaching the AI after wellness consent is withdrawn | Free (counsel's view) | Counsel decides; engineering | `01_AI_PRIVACY_CLOSURE.md`, "For counsel" 3 |
@@ -71,7 +71,7 @@ subscriptions switched on; **Inv** = investment (due diligence and closing).
 | L6 | Approval of the 27 legally consequential wording changes and the health-data permission wording | Free | You and counsel |
 | L7 | Professional review of the coach's safety rules, programs, supplement notes and demonstrations; theological review of the commentary | Free | Reviewers you engage |
 | L8 | Subscription and auto-renewal disclosures against federal and state law | Paid | Counsel |
-| L9 | Prayer-journal "Share with AI Coach" (D7): keep, change or remove. Today an entry reaches the coach only if it is marked shared **and** faith is on | Free | You |
+| L9 | ~~Prayer-journal sharing (D7)~~ Decided 2026-11-17: excluded by default, separate explicit permission required (migration 080, cb9f843). Counsel to approve the switch wording | Free (wording only) | Counsel |
 
 ### 3.3 Intellectual property and assets
 
@@ -93,6 +93,14 @@ subscriptions switched on; **Inv** = investment (due diligence and closing).
 | A3 | Store listing, privacy label, Data safety form, health declarations, age rating, review notes and demo account, support and deletion URLs | Free | You |
 | A4 | Google Play developer account | Free (Android) | You |
 | A5 | Subscription products at $17.99 monthly and $119.99 yearly; paid apps agreement; tax and banking | Paid | You |
+
+## 3.5 Release order (migrations before code)
+
+Migrations 079 (health-data permission) and 080 (journal permission) must be applied to a hosted database **before**
+the app code from this branch runs against it. If the code runs first: withdrawing AI consent fails (it writes both
+new columns), and the coach's profile read fails and falls back to defaults. Nothing is sent that should not be;
+every new gate fails closed. Both migrations only add a nullable column and a column grant, so applying them ahead of
+the old code is safe.
 
 ## 4. What you must do
 
