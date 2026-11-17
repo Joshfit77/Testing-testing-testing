@@ -106,7 +106,11 @@ current Android phone; add the older devices from `IPHONE_PLAN_2026-11-15.md` wh
   the later Finish). A plain repeat, or an older copy with fewer sets, changes nothing. Tests:
   `tests/integration/finish-lost-reply.test.ts` (4; the two lost-reply cases failed before the fix) and the browser
   test "Finish saved but its reply lost, then another set logged". Edits to existing sets made after a lost reply
-  *without* adding a set are not applied by the retry (the member can edit the workout in History).
+  *without* adding a set are not applied by the retry (the member can edit the workout in History). After the
+  second review (5a22636): the edit takes a claim first (two such retries at once stored the sets twice; reproduced,
+  now once), stores the device's pause time with the later end time, and runs after the program-step repair.
+  Known limit, not changed: if, after the lost reply, the member edits that workout in History *and then* taps
+  Finish again on the phone with more sets, the phone's copy replaces the History edit.
 - ~~No `src/app/global-error.tsx`~~ **Added 2026-11-17 (8a78793)**, with `tests/unit/global-error.test.tsx` (5). It
   cannot be triggered in a browser or device test without a deliberate crash hook, which was not added.
 - **GPS splits after a clock jump (found by the 2026-11-17 code review, fixed in e9320b0):** D3's new line after a

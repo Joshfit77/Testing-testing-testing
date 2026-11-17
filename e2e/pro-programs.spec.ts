@@ -24,6 +24,9 @@ test.describe("Pro programs", () => {
     await expect(first).toHaveAttribute("aria-checked", "false");
     await first.click();
     await expect(first).toHaveAttribute("aria-checked", "true");
+    // The tick shows at once and saves in the background (the box is disabled until the save returns): wait for the
+    // save before reloading, or the reload can overtake it.
+    await expect(first).toBeEnabled();
     // Kept after a reload: it was saved on the server.
     await page.reload();
     await expect(page.getByTestId("habit-day").getByRole("checkbox").first()).toHaveAttribute("aria-checked", "true");

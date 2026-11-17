@@ -110,6 +110,10 @@ No user-facing wording was changed. The 06 map's statement is now true.
 - The existing unit test "the weekly figures given to the AI provider leave imported nights out" returns early inside a
   `try/catch`, so it could pass without checking anything. It was left unchanged; the new tests cover that behaviour.
 
+- **Prayer journal after withdrawal (2026-11-17):** turning the journal permission off stops every entry being read
+  for the coach, but earlier coach replies that quoted an excerpt stay in that conversation and are sent back as
+  history if the member continues it. Deleting the conversation removes them.
+
 ## For counsel
 
 1. Is withholding sleep from the weekly report without wellness consent (D1) the right reading? It matches the coach.
