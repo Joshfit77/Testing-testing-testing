@@ -8,7 +8,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { addFix, startTrack, suspendAwareTicker, trackTotals, type GpsFix, type TrackState } from "@/lib/domain/gps-track";
+import { addFix, finishTrack, splitsForSave, startTrack, suspendAwareTicker, trackTotals, type GpsFix, type TrackState } from "@/lib/domain/gps-track";
 import { createDraft, draftAgeHours, elapsedSeconds, finishPayload, restorableDraft, workoutReducer, type WorkoutDraft } from "@/lib/domain/workout-draft";
 import { finishWorkoutSchema } from "@/lib/validation/schemas";
 
@@ -126,6 +126,29 @@ describe("GPS timestamps that jump", () => {
     expect(d - before).toBeGreaterThan(540 * 0.9);
     expect(d - before).toBeLessThan(540 * 1.05);
     expect(s.gaps).toBe(1);
+  });
+
+  it("a run whose clock went back can still be saved: every split time is whole and never negative, and they never go backwards (review finding)", () => {
+    // 3.6 km in 20 minutes, the clock put back ten minutes, then 540 m more: the 4 km mark is crossed after the jump.
+    let s = feed(fresh(), run(1, 1200));
+    s = feed(s, run(1201, 1380, T0 - 10 * 60_000), suspendAwareTicker());
+    s = finishTrack(s, T0 - 10 * 60_000 + 1381_000);
+    const splits = splitsForSave(s);
+    expect(splits.length).toBeGreaterThanOrEqual(4);
+    // What the server's save schema requires of each split (src/server/actions/gps-activities.ts).
+    for (const sp of splits) {
+      for (const k of ["moving_s", "elapsed_s", "split_s"] as const) {
+        expect(Number.isInteger(sp[k]), `${k} of split ${sp.index}`).toBe(true);
+        expect(sp[k], `${k} of split ${sp.index}`).toBeGreaterThanOrEqual(0);
+      }
+    }
+    for (let i = 1; i < splits.length; i++) {
+      expect(splits[i]!.moving_s).toBeGreaterThanOrEqual(splits[i - 1]!.moving_s);
+      expect(splits[i]!.elapsed_s).toBeGreaterThanOrEqual(splits[i - 1]!.elapsed_s);
+    }
+    const totals = trackTotals(s);
+    expect(totals.moving_s).toBeGreaterThanOrEqual(1);
+    expect(totals.moving_s).toBeLessThanOrEqual(totals.elapsed_s);
   });
 
   it("small late deliveries are still ignored, not treated as a clock change (existing behaviour kept)", () => {

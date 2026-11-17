@@ -379,9 +379,14 @@ function newSplits(s: TrackState, a: TrackPoint, b: TrackPoint): TrackSplit[] {
     }
     const f = b.d === a.d ? 0 : (target - a.d) / (b.d - a.d);
     const t = a.t + f * (b.t - a.t);
-    const moving = movingSecondsAt(s, t);
-    const prevMoving = out.at(-1)?.moving_s ?? s.splits.at(-1)?.moving_s ?? 0;
-    out.push({ index, unit: s.unit, distance_m: Math.round(target), moving_s: moving, elapsed_s: Math.round((t - s.startedAt) / 1000), split_s: moving - prevMoving });
+    const prev = out.at(-1) ?? s.splits.at(-1);
+    const prevMoving = prev?.moving_s ?? 0;
+    // After the phone's clock went back (addFix starts a new line there), fixes carry earlier times than the splits
+    // already recorded. Split times never go backwards: a negative split could not be saved at all, and the whole run
+    // was refused. The times across such a jump are approximate (device test DV-16); the distance is not affected.
+    const moving = Math.max(movingSecondsAt(s, t), prevMoving);
+    const elapsed = Math.max(Math.round((t - s.startedAt) / 1000), prev?.elapsed_s ?? 0, 0);
+    out.push({ index, unit: s.unit, distance_m: Math.round(target), moving_s: moving, elapsed_s: elapsed, split_s: moving - prevMoving });
     index++;
   }
   return out;
@@ -604,7 +609,7 @@ export function splitsForSave(s: TrackState): TrackSplit[] {
   const restM = totals.distance_m - last.distance_m;
   const restS = totals.moving_s - last.moving_s;
   if (restM < MIN_PARTIAL_SPLIT_M || restS < 1) return s.splits;
-  return [...s.splits, { index: last.index + 1, unit: last.unit, distance_m: Math.round(totals.distance_m), moving_s: totals.moving_s, elapsed_s: totals.elapsed_s, split_s: restS }];
+  return [...s.splits, { index: last.index + 1, unit: last.unit, distance_m: Math.round(totals.distance_m), moving_s: totals.moving_s, elapsed_s: Math.max(totals.elapsed_s, last.elapsed_s), split_s: restS }];
 }
 
 /** How long an unfinished draft left on the device is offered back (matches GPS_RESUMABLE_MS in src/lib/opening.ts). */
