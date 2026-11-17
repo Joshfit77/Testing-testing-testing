@@ -315,6 +315,10 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
   // Another tab or window of this account saved the same workout (a `storage` event fires only in the other tabs):
   // switch to its newer copy, so two tabs converge on the latest sets instead of the slower one writing its older draft
   // over the other's on its next change.
+  // The copy taken from another tab. That tab has already saved it on the device and backs it up itself; saving it again
+  // from here raced with that tab's next save (each tab sees the other's writes a moment late) and could put the older
+  // copy back over a set just completed there, on the device and on the account.
+  const fromOtherTab = useRef<WorkoutDraft | null>(null);
   useEffect(() => {
     if (phase !== "active") return;
     const onStorage = (e: StorageEvent) => {
@@ -322,6 +326,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
       const other = draftFromOtherTab(latest.current, loadLocalDraft(userId));
       if (!other) return;
       touched.current = true;
+      fromOtherTab.current = other;
       setDraft(other);
     };
     window.addEventListener("storage", onStorage);
@@ -383,6 +388,15 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
   useEffect(() => {
     latest.current = draft;
     if (!draft || phase !== "active" || !touched.current || closed.current) return;
+    if (draft === fromOtherTab.current) return;
+    // Another tab may have saved a newer copy of this workout since this one last looked (its storage event arrives
+    // later): switch to that copy instead of writing this older one over it on the device.
+    const newer = draftFromOtherTab(draft, loadLocalDraft(userId));
+    if (newer) {
+      fromOtherTab.current = newer;
+      setDraft(newer);
+      return;
+    }
     const ok = saveLocalDraft(userId, draft);
     if (!ok) setError("This device couldn't store your workout locally. Keep this tab open until you finish.");
     if (syncTimer.current) clearTimeout(syncTimer.current);

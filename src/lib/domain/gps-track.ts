@@ -133,6 +133,8 @@ const PROCESS_Q: Record<ActivityKind, number> = { run: 1.5, walk: 0.15 };
 const OUTLIER_GATE = 16;
 /** Consecutive agreeing outliers after which the filter restarts on them. */
 const RESTART_AFTER = 3;
+/** A fix this much older than the last accepted one means the clock jumped back, not a late delivery. */
+const CLOCK_BACK_MS = 60_000;
 /** A fix older than the start of the recording (a cached position) is ignored. */
 const STALE_MS = 2_000;
 
@@ -291,7 +293,16 @@ export function addFix(s: TrackState, fix: GpsFix): { state: TrackState; accepte
   if (!Number.isFinite(fix.lat) || !Number.isFinite(fix.lng) || !(fix.accuracy >= 0) || fix.accuracy > MAX_ACCURACY_M) return reject(withAcc, "inaccurate");
   if (fix.t < s.startedAt - STALE_MS) return reject(withAcc, "stale");
   if (s.status === "acquiring" && fix.accuracy > FIRST_FIX_ACCURACY_M) return reject(withAcc, "waiting_for_fix");
-  if (s.lastFixAt != null && fix.t <= s.lastFixAt) return reject(withAcc, "out_of_order");
+  if (s.lastFixAt != null && fix.t <= s.lastFixAt) {
+    // Far older than the last fix is not a late delivery (those are seconds late) but a clock that went back, or a
+    // last fix with a bad timestamp from the future. Ignoring it froze the recording until the clock caught up
+    // (an hour of running uncounted, and the signal still shown as fine): start a new line here instead, counting
+    // nothing across the jump.
+    if (s.status === "recording" && s.lines.length > 0 && s.lastFixAt - fix.t > CLOCK_BACK_MS) {
+      return startLine({ ...withAcc, signalLost: true, breakReason: "signal", gaps: s.gaps + 1 }, fix);
+    }
+    return reject(withAcc, "out_of_order");
+  }
 
   // A stretch longer than the signal-loss window without an accepted fix is a gap by the fixes' own timestamps,
   // whether or not the clock noticed. A frozen browser page runs no clock and queues no fixes, and a phone that dropped

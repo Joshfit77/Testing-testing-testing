@@ -278,9 +278,19 @@ export function workoutReducer(state: WorkoutDraft, action: DraftAction): Workou
   return {
     ...next,
     exercises: structural ? normalizeSupersets(next.exercises) : next.exercises,
-    updatedAt: "now" in action ? action.now : new Date().toISOString(),
+    updatedAt: laterOf("now" in action ? action.now : new Date().toISOString(), state.updatedAt),
     ...(training && next.finishRequestedAt ? { finishRequestedAt: null } : {}),
   };
+}
+
+/**
+ * A change is always newer than the copy it was made from, even when the phone's clock was put back meanwhile (a manual
+ * change, a wrong clock corrected): restore and the two-tab merge pick the newest copy by `updatedAt`, so without this a
+ * set logged after the clock went back lost to an older backup on the next reload.
+ */
+function laterOf(now: string, previous: string): string {
+  const p = Date.parse(previous);
+  return Number.isFinite(p) && Date.parse(now) <= p ? new Date(p + 1).toISOString() : now;
 }
 
 /**
@@ -772,8 +782,27 @@ export function isWorkoutDraft(value: unknown): value is WorkoutDraft {
     typeof v.name === "string" &&
     typeof v.startedAt === "string" &&
     Array.isArray(v.exercises) &&
+    v.exercises.every(isDraftExerciseShape) &&
     typeof v.rest === "object" &&
     v.rest !== null
+  );
+}
+
+/**
+ * Enough of an exercise for the logger to draw it. A copy damaged on the device, or written by an app version with a
+ * different shape, used to pass the check above and crash the workout screen on every open (the recovery screen's
+ * "Try again" only crashed it again): it is now passed over like any other copy that isn't a draft.
+ */
+function isDraftExerciseShape(e: unknown): boolean {
+  const x = e as Partial<DraftExercise> | null;
+  return (
+    Boolean(x) &&
+    typeof x === "object" &&
+    typeof x!.id === "string" &&
+    typeof x!.exerciseId === "string" &&
+    typeof x!.name === "string" &&
+    Array.isArray(x!.sets) &&
+    x!.sets.every((s) => Boolean(s) && typeof s === "object" && typeof (s as DraftSet).id === "string")
   );
 }
 
@@ -835,6 +864,9 @@ export function draftSnapshot(d: WorkoutDraft) {
  * `completed: false`, so they are kept with the session but never count toward volume, records or badges.
  */
 export function finishPayload(d: WorkoutDraft, endedAt: string) {
+  // The phone's clock put back during the workout would give an end before the start, which the database refuses
+  // (ended_at >= started_at) on every retry: the workout could never be saved. It ends no earlier than it started.
+  if (Date.parse(endedAt) < Date.parse(d.startedAt)) endedAt = d.startedAt;
   return {
     clientId: d.clientId,
     name: d.name.trim() || "Workout",
