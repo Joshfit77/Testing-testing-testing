@@ -1,7 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { addDays, isoDateInTz } from "@/lib/domain/dates";
-import { healthAiSharingAllowed, withoutHealthPlatformData } from "@/lib/domain/health-ai-sharing";
+import { healthAiSharingAllowed, wellnessAiAllowed, withoutHealthPlatformData } from "@/lib/domain/health-ai-sharing";
 import { DEFAULT_SLEEP_GOAL_MINUTES, summarizeNights } from "@/lib/domain/sleep";
 import { rowToSession, SLEEP_SESSION_COLUMNS, type SleepSessionRow } from "@/server/services/sleep";
 import { programDays, programExercisesOnDays } from "@/server/services/training";
@@ -145,7 +145,9 @@ export async function loadReviewInput(supabase: SupabaseClient, userId: string, 
       goalChangedAfterProgramStart: goalChanged,
       workouts,
       program,
-      checkins: (checkinsRes.data ?? []).map((c) => ({ date: c.checked_on as string, readiness: c.readiness_score as number })),
+      // Check-ins are wellness data: for the AI provider they are used only with wellness consent (and the AI consent).
+      // The member's own review screens are unchanged.
+      checkins: opts.forAiProvider && !wellnessAiAllowed(profile) ? [] : (checkinsRes.data ?? []).map((c) => ({ date: c.checked_on as string, readiness: c.readiness_score as number })),
       targets,
       decided: new Set((decisionsRes.data ?? []).map((d) => d.recommendation_key as string)),
       rejected: new Set((decisionsRes.data ?? []).filter((d) => d.decision === "rejected").map((d) => d.recommendation_key as string)),

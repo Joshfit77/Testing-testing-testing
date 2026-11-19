@@ -7,7 +7,7 @@ import { analyzeLiftProgress, windowStart, type AnalysisSet, type CheckinInput, 
 import { summarizeRunning, type RunRecord } from "@/lib/coach/running-summary";
 import { summarizeRecovery } from "@/lib/coach/recovery-summary";
 import type { ActivitySource } from "@/lib/domain/activities";
-import { healthAiSharingAllowed, withoutHealthPlatformData } from "@/lib/domain/health-ai-sharing";
+import { healthAiSharingAllowed, WELLNESS_SHARING_OFF_NOTE, wellnessAiAllowed, withoutHealthPlatformData } from "@/lib/domain/health-ai-sharing";
 import { listSleepSessions } from "@/server/services/sleep";
 import { getActiveProgramRef } from "./snapshot";
 
@@ -38,12 +38,15 @@ const workingSets = (sets: RawSet[] | null | undefined): AnalysisSet[] =>
     .filter((s) => s.completed && !s.is_warmup)
     .map((s) => ({ reps: s.reps, weightKg: s.weight_kg == null ? null : Number(s.weight_kg), rpe: s.rpe == null ? null : Number(s.rpe), seconds: s.duration_seconds }));
 
-/** Sleep nights (only with wellness consent) and recovery check-ins from `from` to today. */
-async function loadRecoveryInputs(ctx: AnalysisContext, from: string): Promise<{ sleep: SleepNightInput[] | null; goalMinutes: number; checkins: CheckinInput[] }> {
-  const [{ data: profile }, { data: rows }] = await Promise.all([
-    ctx.supabase.from("profiles").select("wellness_consent_at, sleep_goal_minutes, ai_data_consent_at, health_ai_share_consent_at").eq("id", ctx.userId).maybeSingle(),
-    ctx.supabase.from("recovery_checkins").select("checked_on, sleep_quality, energy, soreness, stress, readiness_score").eq("user_id", ctx.userId).gte("checked_on", from).lte("checked_on", ctx.today).order("checked_on"),
-  ]);
+/**
+ * Sleep nights and recovery check-ins from `from` to today, for the AI provider. Both are optional wellness data: without
+ * wellness consent (on top of the AI consent) neither is read, and `withheld` says so for the coach.
+ */
+async function loadRecoveryInputs(ctx: AnalysisContext, from: string): Promise<{ sleep: SleepNightInput[] | null; goalMinutes: number; checkins: CheckinInput[]; withheld: boolean }> {
+  const { data: profile } = await ctx.supabase.from("profiles").select("wellness_consent_at, sleep_goal_minutes, ai_data_consent_at, health_ai_share_consent_at").eq("id", ctx.userId).maybeSingle();
+  const goalMinutes = (profile?.sleep_goal_minutes as number | null) ?? DEFAULT_SLEEP_GOAL_MINUTES;
+  if (!wellnessAiAllowed(profile)) return { sleep: null, goalMinutes, checkins: [], withheld: true };
+  const { data: rows } = await ctx.supabase.from("recovery_checkins").select("checked_on, sleep_quality, energy, soreness, stress, readiness_score").eq("user_id", ctx.userId).gte("checked_on", from).lte("checked_on", ctx.today).order("checked_on");
   const checkins = (rows ?? []).map((r) => ({
     date: r.checked_on as string,
     readiness: Number(r.readiness_score),
@@ -52,14 +55,11 @@ async function loadRecoveryInputs(ctx: AnalysisContext, from: string): Promise<{
     stress: Number(r.stress),
     sleepQuality: Number(r.sleep_quality),
   }));
-  const goalMinutes = (profile?.sleep_goal_minutes as number | null) ?? DEFAULT_SLEEP_GOAL_MINUTES;
-  // Sleep is wellness data: without consent it is not used, as on every sleep screen.
-  if (!profile?.wellness_consent_at) return { sleep: null, goalMinutes, checkins };
   // Everything here goes to the AI provider (coach tools): nights a health platform or wearable supplied are left out
   // unless the member has allowed sharing them (migration 079).
   const sessions = withoutHealthPlatformData(await listSleepSessions(ctx.supabase, ctx.userId, { fromNight: from, toNight: ctx.today }), healthAiSharingAllowed(profile));
   const sleep = summarizeNights(sessions).map((n) => ({ date: n.nightOf, asleepMinutes: n.asleepMinutes, recorded: n.recorded, estimated: n.asleepEstimated }));
-  return { sleep, goalMinutes, checkins };
+  return { sleep, goalMinutes, checkins, withheld: false };
 }
 
 export async function loadLiftAnalysis(ctx: AnalysisContext, exercise: { id: string; slug: string; name: string }, weeks: number) {
@@ -94,7 +94,8 @@ export async function loadLiftAnalysis(ctx: AnalysisContext, exercise: { id: str
       completedDates: (done ?? []).map((d) => isoDateInTz(new Date(d.started_at as string), ctx.timeZone)),
     };
   }
-  return analyzeLiftProgress({ exercise, today: ctx.today, weeks, units: ctx.units, sessions, program, sleep: recovery.sleep, checkins: recovery.checkins });
+  const analysis = analyzeLiftProgress({ exercise, today: ctx.today, weeks, units: ctx.units, sessions, program, sleep: recovery.sleep, checkins: recovery.checkins });
+  return recovery.withheld ? { ...analysis, wellness_data: WELLNESS_SHARING_OFF_NOTE } : analysis;
 }
 
 export async function loadRunningSummary(ctx: AnalysisContext, weeks: number) {
@@ -145,5 +146,6 @@ export async function loadRecoverySummary(ctx: AnalysisContext, days: number) {
     date: isoDateInTz(new Date(s.started_at), ctx.timeZone),
     sets: (s.workout_exercises ?? []).filter((e) => !e.skipped).flatMap((e) => workingSets(e.sets)),
   }));
-  return summarizeRecovery({ today: ctx.today, days, checkins: recovery.checkins, sleep: recovery.sleep, sleepGoalMinutes: recovery.goalMinutes, sessions });
+  const summary = summarizeRecovery({ today: ctx.today, days, checkins: recovery.checkins, sleep: recovery.sleep, sleepGoalMinutes: recovery.goalMinutes, sessions });
+  return recovery.withheld ? { ...summary, wellness_data: WELLNESS_SHARING_OFF_NOTE } : summary;
 }

@@ -10,6 +10,7 @@ import { dailyStreak, weeklyStreak } from "@/lib/domain/streak";
 import { estimateOneRepMax } from "@/lib/domain/strength";
 import { displayWeight, weightUnit } from "@/lib/domain/units";
 import type { UnitSystem } from "@/lib/domain/types";
+import { WELLNESS_CONTEXT_OFF_LINE } from "@/lib/domain/health-ai-sharing";
 import { JOURNAL_KIND_LABELS, type SharedJournalEntry } from "@/lib/domain/journal";
 import type { CoachMemory } from "./memory";
 
@@ -102,6 +103,8 @@ export interface AthleteSnapshot {
   stepGoal: number | null;
   supplements: string[];
   readiness: { score: number; date: string } | null;
+  /** False when optional wellness data (check-ins, sleep, limitation notes) is not shared with the AI provider. */
+  wellnessShared?: boolean;
   challenge: { name: string; day: number; completedDays: number; totalDays: number } | null;
   faithEnabled: boolean;
   /**
@@ -339,6 +342,7 @@ export function formatAthleteContext(s: AthleteSnapshot, opts: { maxWorkouts?: n
     lines.push(`Steps: avg ${avg.toLocaleString("en-US")}/day over ${s.steps.length} logged days${s.stepGoal ? ` (goal ${s.stepGoal.toLocaleString("en-US")})` : ""}.`);
   }
   if (s.readiness) lines.push(`Latest readiness check-in: ${s.readiness.score}/100 on ${s.readiness.date}.`);
+  if (s.wellnessShared === false) lines.push(WELLNESS_CONTEXT_OFF_LINE);
   lines.push(`Supplement stack: ${s.supplements.length ? s.supplements.join(", ") : "none"}.`);
   if (s.challenge) lines.push(`Challenge: ${s.challenge.name}, day ${s.challenge.day}/${s.challenge.totalDays}, ${s.challenge.completedDays} days completed.`);
   const shared = (s.sharedJournal ?? []).filter((j) => j.excerpt);

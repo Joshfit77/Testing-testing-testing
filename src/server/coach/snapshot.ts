@@ -1,5 +1,5 @@
 import "server-only";
-import { healthAiSharingAllowed, withoutHealthPlatformData } from "@/lib/domain/health-ai-sharing";
+import { healthAiSharingAllowed, wellnessAiAllowed, withoutHealthPlatformData } from "@/lib/domain/health-ai-sharing";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CHALLENGE_DAYS, CHALLENGE_NAME, CHALLENGE_SLUG } from "@/data/devotionals";
 import { getSupplement } from "@/data/supplements";
@@ -280,7 +280,10 @@ export async function loadAthleteSnapshot(supabase: SupabaseClient, userId: stri
     steps: withoutHealthPlatformData((stepsRes.data ?? []) as { day: string; steps: number; source: string | null }[], healthAiSharingAllowed(profile)).map((s) => ({ date: s.day, steps: s.steps })),
     stepGoal: (profile?.step_goal as number) ?? null,
     supplements: (suppRes.data ?? []).map((s) => getSupplement(s.supplement_id as string)?.name ?? (s.supplement_id as string)),
-    readiness: readinessRes.data ? { score: readinessRes.data.readiness_score as number, date: readinessRes.data.checked_on as string } : null,
+    // Whether optional wellness data (check-ins, sleep, limitations) may reach the coach; the context says so when not.
+    wellnessShared: wellnessAiAllowed(profile),
+    // A check-in is wellness data: sent only with wellness consent on top of the AI consent.
+    readiness: readinessRes.data && wellnessAiAllowed(profile) ? { score: readinessRes.data.readiness_score as number, date: readinessRes.data.checked_on as string } : null,
     challenge,
     faithEnabled: Boolean(profile?.faith_enabled),
     // Filtered again here so nothing unshared can reach the coach even if the query changes.

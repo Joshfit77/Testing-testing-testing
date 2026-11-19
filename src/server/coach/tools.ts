@@ -7,6 +7,7 @@ import type { Sex } from "@/lib/domain/nutrition";
 import { PRIMARY_GOALS, type PrimaryGoal } from "@/lib/domain/types";
 import { displayWeight, KG_PER_LB, weightUnit } from "@/lib/domain/units";
 import { describeSet, liftTrends, topSet, type AthleteSnapshot } from "@/lib/coach/context";
+import { WELLNESS_SHARING_OFF_NOTE } from "@/lib/domain/health-ai-sharing";
 import {
   ANALYSIS_DEFAULTS,
   checkNutritionTargets,
@@ -414,8 +415,10 @@ function proposeBodyweightLog(ctx: ToolContext, input: ToolInput<"propose_bodywe
 
 async function getTrainingReviewTool(ctx: ToolContext): Promise<ToolOutcome> {
   // Goes to the AI provider: imported sleep only with the member's separate permission (migration 079).
+  // Check-ins and sleep only with wellness consent (loadReviewInput leaves them out otherwise).
   const { input } = await loadReviewInput(ctx.supabase, ctx.userId, { forAiProvider: true });
-  return ok({ unit: weightUnit(input.units), ...describeReviewForCoach(analyzeTraining(input), input.units) });
+  const review = { unit: weightUnit(input.units), ...describeReviewForCoach(analyzeTraining(input), input.units) };
+  return ok(ctx.snapshot.wellnessShared === false ? { ...review, wellness_data: WELLNESS_SHARING_OFF_NOTE } : review);
 }
 
 const analysisCtx = (ctx: ToolContext): AnalysisContext => ({ supabase: ctx.supabase, userId: ctx.userId, timeZone: ctx.timeZone, today: ctx.snapshot.today, units: ctx.snapshot.units });
