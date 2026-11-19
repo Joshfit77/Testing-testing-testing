@@ -1,6 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
-
-vi.mock("@/lib/supabase/server", () => ({ getServerSupabase: vi.fn() }));
+import { describe, expect, it } from "vitest";
 
 import { FAIL_CLOSED_FLAGS, flagEnabledIn, flagStateFrom } from "@/server/flags";
 

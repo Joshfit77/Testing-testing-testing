@@ -1,6 +1,7 @@
 import "server-only";
 import { cache } from "react";
-import { getServerSupabase } from "@/lib/supabase/server";
+import { createClient } from "@supabase/supabase-js";
+import { publicEnv } from "@/lib/env";
 
 export interface FlagState {
   flags: Record<string, boolean>;
@@ -14,9 +15,14 @@ export function flagStateFrom(result: { data: { key: unknown; enabled: unknown }
   return { flags: Object.fromEntries(result.data.map((f) => [f.key as string, Boolean(f.enabled)])), readable: true };
 }
 
+/**
+ * Flags are global (no per-member rows) and readable by anyone (policy feature_flags_read), so they are read without a
+ * session: the same answer in a page, an API route, a server action, a scheduled job (the weekly report) or a test.
+ * A cookie-bound client would throw outside a request, which must not read as "AI switched off" (or, before, "on").
+ */
 export const getFlagState = cache(async (): Promise<FlagState> => {
   try {
-    const supabase = await getServerSupabase();
+    const supabase = createClient(publicEnv.supabaseUrl, publicEnv.supabaseAnonKey, { auth: { persistSession: false, autoRefreshToken: false } });
     return flagStateFrom(await supabase.from("feature_flags").select("key, enabled"));
   } catch {
     return { flags: {}, readable: false };
