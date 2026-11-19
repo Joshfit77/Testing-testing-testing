@@ -10,7 +10,7 @@ import type { Plan } from "@/lib/domain/types";
 import { aiPlanOutputSchema, validateAiPlan, type AiPlan } from "@/lib/validation/ai";
 import { formatAthleteContext, type AthleteSnapshot } from "@/lib/coach/context";
 import { buildSystemBlocks, CHAT_MAX_TOKENS, CHAT_REQUEST_OPTIONS, fallbackParams, fitStoredReply, MAX_TOOL_ROUNDS, PLAN_MAX_TOKENS, PLAN_REQUEST_OPTIONS, sanitizeAssistantContent } from "@/lib/coach/prompt";
-import { coachModelIds, routeCoachRequest, type ModelTier } from "@/lib/coach/routing";
+import { coachModelIds, routeCoachRequest, type ModelTier, type Route } from "@/lib/coach/routing";
 import { coachToolDefinitions, toolActivityLabel, type CoachProposal } from "@/lib/coach/tools";
 import { formatMemoriesForContext } from "@/lib/coach/memory";
 import { loadAthleteSnapshot } from "@/server/coach/snapshot";
@@ -21,7 +21,7 @@ import { isFlagEnabled } from "@/server/flags";
 import { rateLimit } from "@/server/rate-limit";
 import { logError } from "@/server/log";
 import { anthropicBaseUrl } from "@/server/test-overrides";
-import { costMicros, EXPECTED_COST_MICROS, expectedCostMicros, REQUEST_CEILING_MICROS, tokenUsage } from "@/lib/domain/ai-economics";
+import { addUsage, costMicros, EXPECTED_COST_MICROS, expectedCostMicros, noCacheCostMicros, REQUEST_CEILING_MICROS, roundOutputBudget, tokenUsage, totalInputTokens, ZERO_USAGE, type ProviderUsage, type TokenUsage } from "@/lib/domain/ai-economics";
 import { allowanceRenewsOn, downgradeNotice, type DowngradeReason } from "@/lib/domain/ai-allowance";
 import { aiBudgetConfig, notifyBudgetAlerts, type BudgetAlert } from "@/server/services/ai-budget";
 import { coachStyleInstruction, parseCoachStyle } from "@/lib/coach/style";
@@ -185,6 +185,8 @@ async function reserveUsage(
   kind: AiUsageKind,
   tier: ModelTier,
   usage: { chatLimit: number; planLimit: number; smartLimit: number },
+  /** Why this tier was asked for (stored for the cost report): the coach's route reason, or "feature". */
+  routeReason: Route["reason"] | "feature",
 ): Promise<{ usageId: string; tier: ModelTier; downgradeReason: DowngradeReason | null }> {
   const budget = aiBudgetConfig();
   const { data, error } = await getServiceSupabase().rpc("reserve_ai_usage", {
@@ -205,6 +207,9 @@ async function reserveUsage(
     // What one standard request is expected to cost: the larger model is only used while the member's budget still
     // covers every standard request they have left.
     p_fast_estimate_micros: EXPECTED_COST_MICROS.chat_fast,
+    // The app-wide daily limit (migration 081), checked with the monthly ones under the same lock.
+    p_global_daily_budget_micros: budget.globalDailyMicros,
+    p_route_reason: routeReason,
   });
   const row = (data as { usage_id: string; model_tier: ModelTier; downgrade_reason: DowngradeReason | null }[] | null)?.[0];
   if (error || !row) {
@@ -214,12 +219,17 @@ async function reserveUsage(
     if (msg.includes("ai_in_flight")) throw new AiError("in_progress", "Your previous AI request is still being answered. Please wait for it to finish.", 15);
     if (msg.includes("ai_budget_user"))
       throw new AiError("budget_member", `This month's AI capacity is used up early, because of several unusually long requests. It renews on ${renews}; nothing extra is charged and everything else in the app keeps working.`);
+    // Checked before "ai_budget_global", which it contains.
+    if (msg.includes("ai_budget_global_daily"))
+      throw new AiError("budget_global", "AI features are paused for everyone for the rest of today (they resume at midnight UTC). Everything else in the app keeps working as usual.");
     if (msg.includes("ai_budget_global"))
       throw new AiError("budget_global", "AI features are paused for everyone for the rest of this month. Everything else in the app keeps working as usual.");
     if (msg.includes("ai_busy")) throw new AiError("busy", "The AI coach is busy right now. Please try again in a minute.", 30);
     if (msg.includes("ai_rate_limited")) throw new AiError("rate_limited", "You're sending messages quickly — please wait a moment.", 60);
     if (msg.includes("ai_quota_plan_member_budget"))
       throw new AiError("quota", `A program generation needs an advanced request, and the rest of this month's allowance is needed for your standard requests. Advanced requests renew on ${renews}.`);
+    if (msg.includes("ai_quota_plan_global_daily_budget"))
+      throw new AiError("budget_global", "Program generation is paused for everyone for the rest of today. Your own allowance is unaffected, and everything else in the app keeps working.");
     if (msg.includes("ai_quota_plan_global_budget"))
       throw new AiError("budget_global", "Program generation is paused for everyone until AI capacity frees up. Your own allowance is unaffected, and everything else in the app keeps working.");
     if (msg.includes("ai_quota_plan")) throw new AiError("quota", `You've used this month's advanced requests, which program generation needs. They renew on ${renews}.`);
@@ -235,13 +245,18 @@ async function reserveUsage(
  * Record what a reserved request actually used and cost, and alert operators when this month's global budget passes
  * 50/75/90/100% (the database decides, so each threshold alerts once).
  */
-async function finalizeUsage(usageId: string, model: string, inputTokens: number, outputTokens: number, cost: number) {
+async function finalizeUsage(usageId: string, model: string, usage: TokenUsage, cost: number) {
   const { data, error } = await getServiceSupabase().rpc("finalize_ai_usage", {
     p_usage_id: usageId,
     p_model: model,
-    p_input_tokens: inputTokens,
-    p_output_tokens: outputTokens,
+    // All input tokens (uncached + cache reads + cache writes), with the cache split recorded beside them.
+    p_input_tokens: totalInputTokens(usage),
+    p_output_tokens: usage.output,
     p_cost_micros: Math.max(0, Math.ceil(cost)),
+    p_cache_read_tokens: usage.cacheRead,
+    p_cache_write_tokens: usage.cacheWrite,
+    // What the same tokens would have cost uncached, so the report measures cache savings.
+    p_no_cache_cost_micros: noCacheCostMicros(model, usage),
   });
   if (error) {
     logError("ai.usage_record", error);
@@ -307,10 +322,13 @@ const REFUSAL_REPLY ="I can't help with that request. I'm happy to help with tra
 interface ChatLoopResult {
   reply: string;
   proposal: CoachProposal | null;
-  inputTokens: number;
-  outputTokens: number;
+  /** Every round's usage added up (uncached input, cache reads and writes, output). */
+  usage: TokenUsage;
   costMicros: number;
 }
+
+/** Smallest output a final answer round gets when the request's ceiling is nearly reached. */
+export const FINAL_ROUND_MIN_TOKENS = 2_000;
 
 /** The streaming tool-use loop for chat mode. */
 async function runChatLoop(params: {
@@ -329,17 +347,22 @@ async function runChatLoop(params: {
   const messages = [...params.messages];
   const tools = coachToolDefinitions();
   const texts: string[] = [];
-  let inputTokens = 0;
-  let outputTokens = 0;
+  let usage: TokenUsage = ZERO_USAGE;
   let cost = 0;
   let jsonRetries = 0;
+  // Input cost of the previous round: the next round sends at least as much, so it is what the next round's input is
+  // expected to cost when sizing its output.
+  let lastInputMicros = 0;
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    const lastRound = round === MAX_TOOL_ROUNDS - 1 || cost >= params.ceilingMicros;
+    // Output for this round is limited to what is left under the request's ceiling, so the ceiling holds within a
+    // round too (it used to be checked only between rounds). Near the ceiling, the round is a short final answer.
+    const budget = roundOutputBudget({ model, ceilingMicros: params.ceilingMicros, spentMicros: cost, expectedInputMicros: lastInputMicros, maxTokens: CHAT_MAX_TOKENS, minTokens: FINAL_ROUND_MIN_TOKENS });
+    const lastRound = round === MAX_TOOL_ROUNDS - 1 || cost >= params.ceilingMicros || budget.finalRound;
     const stream = getClient().beta.messages.stream(
       {
         model,
-        max_tokens: CHAT_MAX_TOKENS,
+        max_tokens: budget.maxTokens,
         system,
         messages,
         tools,
@@ -367,14 +390,15 @@ async function runChatLoop(params: {
       round--;
       continue;
     }
-    inputTokens += (message.usage.input_tokens ?? 0) + (message.usage.cache_read_input_tokens ?? 0) + (message.usage.cache_creation_input_tokens ?? 0);
-    outputTokens += message.usage.output_tokens ?? 0;
-    cost += costMicros(model, tokenUsage(message.usage));
+    const roundUsage = tokenUsage(message.usage);
+    usage = addUsage(usage, roundUsage);
+    cost += costMicros(model, roundUsage);
+    lastInputMicros = costMicros(model, { ...roundUsage, output: 0 });
     if (params.meter) params.meter.costMicros = cost;
 
     if (message.stop_reason === "refusal") {
       onEvent({ type: "reset" });
-      return { reply: REFUSAL_REPLY, proposal: null, inputTokens, outputTokens, costMicros: cost };
+      return { reply: REFUSAL_REPLY, proposal: null, usage, costMicros: cost };
     }
     const text = message.content
       .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")
@@ -411,7 +435,7 @@ async function runChatLoop(params: {
     messages.push({ role: "user", content: results });
   }
 
-  return { reply: texts.join("\n\n").trim(), proposal: toolCtx.proposal, inputTokens, outputTokens, costMicros: cost };
+  return { reply: texts.join("\n\n").trim(), proposal: toolCtx.proposal, usage, costMicros: cost };
 }
 
 const IN_PROGRESS_MESSAGE = "Your last message is still being answered. Give it a moment, then try again.";
@@ -527,7 +551,7 @@ export async function coachTurn(params: {
   const route = routeCoachRequest({ mode, message, smartUsed: usage.smartUsed, smartLimit: usage.smartLimit, env: process.env });
   let reservation: { usageId: string; tier: ModelTier; downgradeReason: DowngradeReason | null };
   try {
-    reservation = await reserveUsage(userId, mode, route.tier, usage);
+    reservation = await reserveUsage(userId, mode, route.tier, usage, route.reason);
   } catch (err) {
     await supabase.from("ai_messages").delete().eq("id", userRow.id);
     throw err;
@@ -545,8 +569,7 @@ export async function coachTurn(params: {
 
   let reply = "";
   let proposal: AiPlan | CoachProposal | null = null;
-  let inputTokens = 0;
-  let outputTokens = 0;
+  let turnUsage: TokenUsage = ZERO_USAGE;
   let cost = 0;
   const meter = { costMicros: 0 };
   try {
@@ -556,8 +579,7 @@ export async function coachTurn(params: {
       const r = await runChatLoop({ model, system, messages, toolCtx, onEvent, signal: params.signal, ceilingMicros: REQUEST_CEILING_MICROS[reservation.tier], meter });
       reply = r.reply;
       proposal = r.proposal;
-      inputTokens = r.inputTokens;
-      outputTokens = r.outputTokens;
+      turnUsage = r.usage;
       cost = r.costMicros;
     } else {
       onEvent({ type: "status", text: "Drafting your plan — this can take a little while…" });
@@ -575,9 +597,8 @@ export async function coachTurn(params: {
         },
         { signal: params.signal, ...PLAN_REQUEST_OPTIONS },
       );
-      inputTokens = res.usage.input_tokens + (res.usage.cache_read_input_tokens ?? 0) + (res.usage.cache_creation_input_tokens ?? 0);
-      outputTokens = res.usage.output_tokens;
-      cost = costMicros(model, tokenUsage(res.usage));
+      turnUsage = tokenUsage(res.usage);
+      cost = costMicros(model, turnUsage);
       if (res.stop_reason === "refusal") {
         reply = "I can't create a plan for that request. Try describing your goal, schedule and equipment, and I'll draft one.";
       } else if (!res.parsed_output) {
@@ -617,7 +638,7 @@ export async function coachTurn(params: {
   }
 
   // Counted before anything else can fail.
-  await finalizeUsage(reservation.usageId, model, inputTokens, outputTokens, cost);
+  await finalizeUsage(reservation.usageId, model, turnUsage, cost);
   // Never a silent downgrade: when a request that called for the advanced model ran on the standard one, say why.
   const notice = mode === "chat" && route.tier === "smart" && reservation.tier === "fast" ? downgradeNotice(reservation.downgradeReason ?? "advanced_used", new Date()) : route.reason === "smart_budget_used" ? downgradeNotice("chat_share_used", new Date()) : null;
   if (notice && reply) reply = `${reply}\n\n_${notice}_`;
@@ -653,15 +674,15 @@ export async function coachTurn(params: {
  */
 export async function withAiRequest<T>(
   params: { supabase: SupabaseClient; userId: string; plan: Plan; kind: Exclude<AiUsageKind, "chat" | "plan">; tier?: ModelTier },
-  run: (ctx: { client: Anthropic; model: string }) => Promise<{ value: T; inputTokens: number; outputTokens: number; costMicros?: number }>,
+  run: (ctx: { client: Anthropic; model: string }) => Promise<{ value: T; inputTokens: number; outputTokens: number; costMicros?: number; usage?: ProviderUsage | null }>,
 ): Promise<T> {
   // Consent first: a member who hasn't allowed AI use is told so, and their request doesn't count against the rate limit.
   const { data: consent } = await params.supabase.from("profiles").select("ai_data_consent_at").eq("id", params.userId).maybeSingle();
   if (!consent?.ai_data_consent_at) throw new AiError("consent_required", "Allow the AI features to use your data first (on the AI Coach screen).");
   const usage = await assertAiAllowed(params.userId, params.plan, "chat");
-  const reservation = await reserveUsage(params.userId, params.kind, params.tier ?? "fast", usage);
+  const reservation = await reserveUsage(params.userId, params.kind, params.tier ?? "fast", usage, "feature");
   const model = coachModelIds(process.env)[reservation.tier];
-  let result: { value: T; inputTokens: number; outputTokens: number; costMicros?: number };
+  let result: { value: T; inputTokens: number; outputTokens: number; costMicros?: number; usage?: ProviderUsage | null };
   try {
     result = await run({ client: getClient(), model });
   } catch (err) {
@@ -691,9 +712,10 @@ export async function withAiRequest<T>(
     }
     throw err;
   }
-  // Callers that report the provider's usage block get the exact cost; otherwise every input token is priced as
-  // uncached input (an over-estimate, never an under-estimate).
-  const cost = result.costMicros ?? costMicros(model, { input: result.inputTokens, cacheWrite: 0, cacheRead: 0, output: result.outputTokens });
-  await finalizeUsage(reservation.usageId, model, result.inputTokens, result.outputTokens, cost);
+  // Callers that pass the provider's usage block get the exact cost and the cache split; otherwise every input token is
+  // priced as uncached input (an over-estimate, never an under-estimate).
+  const tokens: TokenUsage = result.usage ? tokenUsage(result.usage) : { input: result.inputTokens, cacheWrite: 0, cacheRead: 0, output: result.outputTokens };
+  const cost = result.usage ? costMicros(model, tokens) : (result.costMicros ?? costMicros(model, tokens));
+  await finalizeUsage(reservation.usageId, model, tokens, cost);
   return result.value;
 }

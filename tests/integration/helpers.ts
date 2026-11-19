@@ -54,3 +54,29 @@ export async function grantPlan(user: TestUser, plan: "plus" | "pro"): Promise<v
   const { error } = await serviceClient().from("user_entitlements").upsert({ user_id: user.id, plan, source: "admin" }, { onConflict: "user_id" });
   if (error) throw error;
 }
+
+/**
+ * Snapshot today's and this month's global AI budget rows and alerts (migrations 066 and 081) and return a function that
+ * puts them back. Suites that move global spend use it so they don't leave holds or spend behind for later suites.
+ */
+export async function snapshotAiBudgets(now = new Date()): Promise<() => Promise<void>> {
+  const svc = serviceClient();
+  const month = `${now.toISOString().slice(0, 7)}-01`;
+  const day = now.toISOString().slice(0, 10);
+  const [m, ma, d, da] = await Promise.all([
+    svc.from("ai_budget_months").select("*").eq("month", month).maybeSingle(),
+    svc.from("ai_budget_alerts").select("*").eq("month", month),
+    svc.from("ai_budget_days").select("*").eq("day", day).maybeSingle(),
+    svc.from("ai_budget_day_alerts").select("*").eq("day", day),
+  ]);
+  return async () => {
+    await svc.from("ai_budget_alerts").delete().eq("month", month);
+    if (ma.data?.length) await svc.from("ai_budget_alerts").insert(ma.data);
+    if (m.data) await svc.from("ai_budget_months").upsert(m.data);
+    else await svc.from("ai_budget_months").delete().eq("month", month);
+    await svc.from("ai_budget_day_alerts").delete().eq("day", day);
+    if (da.data?.length) await svc.from("ai_budget_day_alerts").insert(da.data);
+    if (d.data) await svc.from("ai_budget_days").upsert(d.data);
+    else await svc.from("ai_budget_days").delete().eq("day", day);
+  };
+}

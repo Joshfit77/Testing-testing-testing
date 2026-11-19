@@ -46,6 +46,43 @@ export function costMicros(model: string, u: TokenUsage): number {
 }
 
 /** Usage block as the Anthropic SDK reports it. */
+/**
+ * What the same tokens would have cost with no prompt caching: every input token (uncached, cache read and cache write)
+ * at the plain input price. `noCacheCostMicros − costMicros` is the cache saving (negative when cache writes cost more
+ * than the reads saved, e.g. a single cold request).
+ */
+export function noCacheCostMicros(model: string, u: TokenUsage): number {
+  const p = priceFor(model);
+  return Math.ceil((u.input + u.cacheRead + u.cacheWrite) * p.input + u.output * p.output);
+}
+
+/** All input tokens of a request (uncached + cache reads + cache writes), as `ai_usage_events.input_tokens` stores them. */
+export function totalInputTokens(u: TokenUsage): number {
+  return u.input + u.cacheRead + u.cacheWrite;
+}
+
+/** Sum of several provider calls' usage (one chat turn is several rounds). */
+export function addUsage(a: TokenUsage, b: TokenUsage): TokenUsage {
+  return { input: a.input + b.input, cacheWrite: a.cacheWrite + b.cacheWrite, cacheRead: a.cacheRead + b.cacheRead, output: a.output + b.output };
+}
+
+export const ZERO_USAGE: TokenUsage = Object.freeze({ input: 0, cacheWrite: 0, cacheRead: 0, output: 0 });
+
+/**
+ * Output tokens one chat round may use so the request stays within its ceiling: what is left of the ceiling, minus what
+ * this round's input is expected to cost (the previous round's input, since the conversation only grows), at the
+ * model's output price, capped at the normal per-round maximum. When less than `minTokens` would be left, the round must
+ * be the final answer (no more tool calls) with `minTokens`, so the member still gets an answer: the most a request can
+ * then go over its ceiling is that one short final round.
+ */
+export function roundOutputBudget(opts: { model: string; ceilingMicros: number; spentMicros: number; expectedInputMicros: number; maxTokens: number; minTokens: number }): { maxTokens: number; finalRound: boolean } {
+  const p = priceFor(opts.model);
+  const left = opts.ceilingMicros - opts.spentMicros - Math.max(0, opts.expectedInputMicros);
+  const affordable = p.output > 0 ? Math.floor(left / p.output) : opts.maxTokens;
+  if (affordable < opts.minTokens) return { maxTokens: opts.minTokens, finalRound: true };
+  return { maxTokens: Math.min(opts.maxTokens, affordable), finalRound: false };
+}
+
 export interface ProviderUsage {
   input_tokens?: number | null;
   output_tokens?: number | null;

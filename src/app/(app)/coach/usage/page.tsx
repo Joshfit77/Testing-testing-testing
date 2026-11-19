@@ -30,9 +30,11 @@ export default async function AiUsagePage() {
   }
   // When the whole app's AI budget is used up, say so plainly: it isn't the member's allowance.
   let paused = false;
+  let pausedToday = false;
   try {
     const g = await globalBudgetStatus(now);
     paused = g.budgetMicros <= 0 || g.spentMicros + g.reservedMicros >= g.budgetMicros;
+    pausedToday = !paused && (g.day.budgetMicros <= 0 || g.day.spentMicros + g.day.reservedMicros >= g.day.budgetMicros);
   } catch (err) {
     logError("ai.usage_page_global", err);
   }
@@ -65,6 +67,12 @@ export default async function AiUsagePage() {
             <p role="status" className={`${card} text-sm`} data-testid="ai-paused">
               AI features are temporarily unavailable for everyone. This isn&apos;t your allowance: your requests below are unchanged, and everything else in the
               app keeps working.
+            </p>
+          )}
+          {pausedToday && (
+            <p role="status" className={`${card} text-sm`} data-testid="ai-paused-today">
+              AI features are paused for everyone for the rest of today and resume at midnight UTC. This isn&apos;t your allowance: your requests below are
+              unchanged, and everything else in the app keeps working.
             </p>
           )}
           <dl className="grid grid-cols-2 gap-3">

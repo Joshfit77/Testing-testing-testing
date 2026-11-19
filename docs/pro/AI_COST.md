@@ -15,13 +15,14 @@ provider is only called after it succeeds.
 |---|---|---|---|
 | Per-member monthly AI budget (money) | $1.40 (the owner target; see below) | `AI_MEMBER_MONTHLY_BUDGET_USD` | AI requests are refused until the 1st: "You've reached this month's AI allowance… everything else in the app keeps working" (HTTP 429) |
 | Global monthly AI budget (money, every member and every AI feature, including the Bible helper) | $100 | `AI_GLOBAL_MONTHLY_BUDGET_USD` | All AI is paused until the budget is raised or the month ends; message says non-AI features are unaffected (HTTP 503). `0` switches AI off |
-| Alerts to operators | 50%, 75%, 90%, 100% of the global budget, once each per month | server log `ai.budget_alert` + optional `AI_BUDGET_ALERT_WEBHOOK_URL` (Slack-style `{text}`) | Totals only, never member data |
+| Global **daily** AI budget (money, the whole app, per UTC day; migration 081) | twice the month's average day ($100 × 2 / 30 ≈ $6.67), never more than the monthly budget | `AI_GLOBAL_DAILY_BUDGET_USD` | All AI is paused until midnight UTC; message says so and that non-AI features are unaffected (HTTP 503). If the app passes no daily figure, the database applies the same default, so there is always a daily limit |
+| Alerts to operators | 50%, 75%, 90%, 100% of the global budget, once each per month; 80% and 100% of the daily budget, once each per day | server log `ai.budget_alert` + optional `AI_BUDGET_ALERT_WEBHOOK_URL` (Slack-style `{text}`) | Totals only, never member data |
 | Requests running at once, per member | 2 | `ai-budget.ts` | "Your previous AI request is still being answered" (HTTP 409) |
 | Requests running at once, whole app | 20 | `AI_MAX_CONCURRENT` | "The AI coach is busy right now. Please try again in a minute." (HTTP 503) |
 | Request count allowance (unchanged) | 150 a month on Pro | `PLAN_PRO_AI_MONTHLY_LIMIT` | as before |
 | Larger-model share | **10 a month (was 15)** | `PLAN_PRO_AI_SMART_MONTHLY_LIMIT` | requests run on the fast model; plan generation (which needs the larger model) stops |
-| Automatic switch to the fast model | when a member has used 75% of their budget, or the app 90% of the global budget | migration 066 | chat continues on Haiku instead of Sonnet; plan generation is not downgraded |
-| Per-request cost ceiling (chat) | $0.025 on the fast model, $0.40 on the larger | `REQUEST_CEILING_MICROS` | the coach must answer with what it has (no further tool rounds) |
+| Automatic switch to the fast model | when a member has used 75% of their budget, or the app 90% of the global monthly budget or 90% of today's | migrations 066, 081 | chat continues on Haiku instead of Sonnet, with a line saying why; plan generation is refused rather than downgraded |
+| Per-request cost ceiling (chat) | $0.015 on the fast model, $0.40 on the larger | `REQUEST_CEILING_MICROS`, `roundOutputBudget` | each round's output is limited to what is left under the ceiling (after the expected input); near it, the round is a short final answer (2,000 tokens, no tools). The most a request can go over is that one short round |
 | Per-minute rate limit (unchanged) | per route | `reserve_ai_usage`, route limits | as before |
 | Request length (unchanged, reviewed) | chat message ≤ 4,000 characters; history ≤ 24,000 characters; ≤ 6 tool rounds; output ≤ 12,000 tokens (chat), 16,000 (plan), 8,000 (meal plan), 2,000–2,500 (photos), 1,500 (weekly report), 1,200 (food explain), 2,000 (Bible helper, question ≤ 600 characters) | `schemas.ts`, `ai-coach.ts`, each service | the request is refused (too long) or the answer is marked "shortened" |
 
@@ -116,9 +117,27 @@ reading, prayer, journeys and the 40-day challenge stay free). `tests/integratio
 point as a Free member and checks that the provider receives nothing and nothing is reserved. Pro members' Bible
 questions go through the same pipeline and count against their monthly allowance (`docs/pro/AI_COACH_OVERHAUL.md`).
 
+## Measuring actual cost (migration 081)
+
+The per-member budget ($1.40) is a **ceiling the server enforces, not an average expense**. Actual cost is measured per
+request and reported separately:
+
+* Every request records its model and tier, all input tokens with the cache-read and cache-write share, output tokens, its
+  real cost, what the same tokens would have cost with no caching (so the cache saving is measured), why the tier was
+  chosen (`route_reason`: quick, complex, plan, smart_budget_used, feature) and why it was lowered (`downgrade_reason`).
+* **Admin → AI costs** (`/admin/ai-costs`) and `scripts/ops/ai-cost-report.ts` show, for this month, the last 7 or 30 days or
+  today: spend, requests, average cost per request, the Haiku/Sonnet split by requests and by cost, cache savings and hit
+  rate, cost by model, feature, routing reason and day, the daily and monthly budget figures, and what members actually
+  cost (average, median, 90th percentile and highest member among members who used AI, and spend divided by current Pro
+  members). Aggregates only: the database function (`admin_ai_cost_report`) returns no member ids and is refused to
+  members and anonymous callers.
+* Requests recorded before migration 081 have no cache split and no routing reason; the report says so.
+
 ## Setting the global budget
 
-The $100 default suits internal testing and a small beta. For a paid launch, a reasonable starting point is:
+The $100 default suits internal testing and a small beta. Set the daily budget with it: by default it is twice the average
+day, so a single bad day (a bug, a burst, abuse) can use at most about 7% of the month. For a paid launch, a reasonable
+starting point is:
 
     global budget ≈ Pro members × $0.70 (typical cold-cache) × 1.5
 
@@ -135,6 +154,15 @@ Anthropic Console as an independent backstop.
 * Provider fees were checked against published pages on 2026-11-13; none of the store or Stripe accounts was inspected.
 
 ## Tests
+
+* `tests/unit/ai-spend-controls.test.ts`: the daily budget default and overrides, daily alert text, the per-round output
+  budget, uncached-equivalent cost, the cost report summary.
+* `tests/integration/ai-daily-budget.test.ts` (local Supabase): the daily limit with running requests counted, other days
+  not counted, the database default, finalize and release settling the day, alerts once per day at 80/100%, the downgrade
+  and the plan refusal at 90%, simultaneous requests can't overshoot, members locked out, and the cost report (refused to
+  members and anonymous callers, aggregates without member ids, measured cache saving).
+* `tests/integration/coach-scenarios.test.ts` 16–18: cache split, uncached cost and route reason recorded on a real coach
+  turn; the daily limit refusing before the provider is called; the per-round ceiling shrinking the final round.
 
 * `tests/unit/ai-economics.test.ts`: prices, rounding, unknown models priced high, channel nets, budget derivation, the Pro
   allowance fitting the budget, thresholds.

@@ -19,7 +19,6 @@ export type UntrustedTag = (typeof UNTRUSTED_TAGS)[number];
 
 const BLOCK_TAG = new RegExp(`<\\s*/?\\s*(?:${UNTRUSTED_TAGS.join("|")})\\b[^>]*>`, "gi");
 // C0/C1 controls, DEL, and the Unicode line and paragraph separators (U+2028, U+2029).
-// eslint-disable-next-line no-control-regex
 const CONTROL = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g;
 
 /** One line of untrusted text: no line breaks or control characters, no angle brackets, at most `max` characters. */

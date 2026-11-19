@@ -12,7 +12,7 @@
  *   gets a monthly allowance, not the year's at once.
  */
 
-export type DowngradeReason = "advanced_used" | "member_budget" | "global_budget" | "chat_share_used";
+export type DowngradeReason = "advanced_used" | "member_budget" | "global_budget" | "global_daily_budget" | "chat_share_used";
 
 /** The first day of next month (UTC), as the member reads it ("December 1"). */
 export function allowanceRenewsOn(now: Date): string {
@@ -36,6 +36,8 @@ export function downgradeNotice(reason: DowngradeReason, now: Date): string {
       return `Answered with the standard model, so the rest of this month's requests stay available to you. Advanced requests renew on ${renews}.`;
     case "global_budget":
       return "Answered with the standard model: advanced AI capacity is limited for the rest of this month. This doesn't use up your allowance any differently.";
+    case "global_daily_budget":
+      return "Answered with the standard model: advanced AI capacity is limited for the rest of today. This doesn't use up your allowance any differently.";
   }
 }
 

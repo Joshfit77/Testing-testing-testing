@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createTestUser, deleteTestUser, serviceClient, stackAvailable, type TestUser } from "./helpers";
+import { createTestUser, deleteTestUser, serviceClient, snapshotAiBudgets, stackAvailable, type TestUser } from "./helpers";
 
 const available = await stackAvailable();
 
@@ -13,8 +13,7 @@ describe.skipIf(!available)("AI spending caps", () => {
   const month = `${new Date().toISOString().slice(0, 7)}-01`;
   let a: TestUser;
   let b: TestUser;
-  let savedMonth: Record<string, unknown> | null = null;
-  let savedAlerts: Record<string, unknown>[] = [];
+  let restoreBudgets: () => Promise<void> = async () => {};
 
   const reserve = (user: TestUser, over: Record<string, unknown> = {}) =>
     svc.rpc("reserve_ai_usage", {
@@ -28,6 +27,8 @@ describe.skipIf(!available)("AI spending caps", () => {
       p_estimate_micros: 1000,
       p_user_budget_micros: 1_000_000_000,
       p_global_budget_micros: 1_000_000_000_000,
+      // These tests are about the monthly limits; the daily limit (migration 081) has its own suite.
+      p_global_daily_budget_micros: 1_000_000_000_000,
       p_max_inflight_user: 1000,
       p_max_inflight_global: 100000,
       p_inflight_seconds: 180,
@@ -48,14 +49,11 @@ describe.skipIf(!available)("AI spending caps", () => {
 
   beforeAll(async () => {
     [a, b] = await Promise.all([createTestUser("budget-a"), createTestUser("budget-b")]);
-    savedMonth = (await svc.from("ai_budget_months").select("*").eq("month", month).maybeSingle()).data;
-    savedAlerts = (await svc.from("ai_budget_alerts").select("*").eq("month", month)).data ?? [];
+    // This month's and today's global figures, put back afterwards (the day's too: migration 081).
+    restoreBudgets = await snapshotAiBudgets();
   });
   afterAll(async () => {
-    await svc.from("ai_budget_alerts").delete().eq("month", month);
-    if (savedAlerts.length) await svc.from("ai_budget_alerts").insert(savedAlerts);
-    if (savedMonth) await svc.from("ai_budget_months").upsert(savedMonth);
-    else await svc.from("ai_budget_months").delete().eq("month", month);
+    await restoreBudgets();
     await Promise.all([deleteTestUser(a), deleteTestUser(b)]);
   });
 

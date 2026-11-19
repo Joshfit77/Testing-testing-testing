@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { startMockMessagesApi, type MockAnswer, type MockApi, type MockRequestBody } from "../../scripts/ai-eval/mock-api";
-import { createTestUser, deleteTestUser, exerciseIds, grantPlan, serviceClient, stackAvailable, type TestUser } from "./helpers";
+import { createTestUser, deleteTestUser, exerciseIds, grantPlan, serviceClient, snapshotAiBudgets, stackAvailable, type TestUser } from "./helpers";
 
 /**
  * The owner's real-world scenarios (brief 2026-11-13, Priority 11), on synthetic members in the local database, with a
@@ -135,14 +135,13 @@ describe.skipIf(!available)("AI coach scenarios (synthetic members, scripted pro
 
   it("12. simultaneous requests near the global limit can't overshoot it", async () => {
     const month = `${new Date().toISOString().slice(0, 7)}-01`;
-    const saved = (await svc.from("ai_budget_months").select("*").eq("month", month).maybeSingle()).data;
-    const savedAlerts = (await svc.from("ai_budget_alerts").select("*").eq("month", month)).data ?? [];
+    const restoreBudgets = await snapshotAiBudgets();
     try {
       const members = await Promise.all(Array.from({ length: 6 }, (_, i) => pro(`sc-burst-${i}`)));
       await svc.from("ai_budget_months").upsert({ month, budget_micros: 10_000, spent_micros: 0, reserved_micros: 0 });
       const results = await Promise.all(
         members.map((m) =>
-          svc.rpc("reserve_ai_usage", { p_user_id: m.id, p_kind: "chat", p_tier: "fast", p_chat_limit: 150, p_plan_limit: 10, p_smart_limit: 10, p_per_minute: 6, p_estimate_micros: 3400, p_user_budget_micros: 1_400_000, p_global_budget_micros: 10_000, p_max_inflight_user: 2, p_max_inflight_global: 20, p_inflight_seconds: 180 }),
+          svc.rpc("reserve_ai_usage", { p_user_id: m.id, p_kind: "chat", p_tier: "fast", p_chat_limit: 150, p_plan_limit: 10, p_smart_limit: 10, p_per_minute: 6, p_estimate_micros: 3400, p_user_budget_micros: 1_400_000, p_global_budget_micros: 10_000, p_global_daily_budget_micros: 1_000_000_000, p_max_inflight_user: 2, p_max_inflight_global: 20, p_inflight_seconds: 180 }),
         ),
       );
       expect(results.filter((r) => !r.error)).toHaveLength(2); // 2 × 3,400 ≤ 10,000 < 3 × 3,400
@@ -151,10 +150,7 @@ describe.skipIf(!available)("AI coach scenarios (synthetic members, scripted pro
       expect(Number(row.spent_micros) + Number(row.reserved_micros)).toBeLessThanOrEqual(10_000);
       for (const m of members) await svc.from("ai_usage_events").delete().eq("user_id", m.id);
     } finally {
-      await svc.from("ai_budget_alerts").delete().eq("month", month);
-      if (savedAlerts.length) await svc.from("ai_budget_alerts").insert(savedAlerts);
-      if (saved) await svc.from("ai_budget_months").upsert(saved);
-      else await svc.from("ai_budget_months").delete().eq("month", month);
+      await restoreBudgets();
     }
   });
 
@@ -174,5 +170,48 @@ describe.skipIf(!available)("AI coach scenarios (synthetic members, scripted pro
     expect(data!.model).toBe("claude-haiku-5-5");
     // Haiku 5.5: $0.10/M input, $0.01/M cache read, $0.50/M output (ai-economics.ts).
     expect(Number(data!.cost_micros)).toBe(Math.ceil(2100 * 0.1 + 12_000 * 0.01 + 180 * 0.5));
+    // Migration 081: the cache split, the uncached-equivalent cost and why the standard model was used.
+    const { data: rec } = await svc.from("ai_usage_events").select("input_tokens, cache_read_tokens, cache_write_tokens, no_cache_cost_micros, route_reason, downgrade_reason").eq("user_id", u.id).single();
+    expect(rec).toMatchObject({ input_tokens: 2100 + 12_000, cache_read_tokens: 12_000, cache_write_tokens: 0, route_reason: "quick", downgrade_reason: null });
+    // Uncached, all 14,100 input tokens would be at the plain input price: the saving is measured, not assumed.
+    expect(Number(rec!.no_cache_cost_micros)).toBe(Math.ceil(14_100 * 0.1 + 180 * 0.5));
+  });
+
+  it("17. the daily app-wide limit: a request that would pass today's limit is refused before the provider is called, and says when it resumes", async () => {
+    const u = await pro("sc-daily");
+    const before = api.requests.length;
+    const prev = process.env.AI_GLOBAL_DAILY_BUDGET_USD;
+    process.env.AI_GLOBAL_DAILY_BUDGET_USD = "0.001"; // 1,000 micro-USD: less than one standard request's hold (3,400)
+    try {
+      await expect(ask(u, "Quick bench cue?")).rejects.toMatchObject({ code: "budget_global", message: expect.stringMatching(/rest of today.*midnight UTC/) });
+      expect(api.requests.length).toBe(before);
+      const { count } = await svc.from("ai_usage_events").select("id", { count: "exact", head: true }).eq("user_id", u.id);
+      expect(count).toBe(0);
+      // The member's question isn't left behind either.
+      const { count: msgs } = await svc.from("ai_messages").select("id", { count: "exact", head: true }).eq("user_id", u.id);
+      expect(msgs).toBe(0);
+    } finally {
+      if (prev === undefined) delete process.env.AI_GLOBAL_DAILY_BUDGET_USD;
+      else process.env.AI_GLOBAL_DAILY_BUDGET_USD = prev;
+    }
+  });
+
+  it("18. the per-request ceiling holds within a round: near the ceiling the next round is a short final answer with no more tools", async () => {
+    const u = await pro("sc-ceiling");
+    const before = api.requests.length;
+    // Round 1 costs 6,000 (60,000 input tokens) + 3,000 (6,000 output) = 9,000 of the standard model's 15,000 ceiling and
+    // asks for a tool. Round 2's input will cost at least 6,000 again, so nothing is left for a normal round.
+    handler = (_body, i) =>
+      i === before
+        ? { blocks: [{ type: "tool_use", id: "t1", name: "get_recent_workouts", input: { days: 14, limit: 5 } }], stop: "tool_use", usage: { input_tokens: 60_000, output_tokens: 6_000 } }
+        : { blocks: [{ type: "text", text: "Here is what I found." }], usage: { input_tokens: 61_000, output_tokens: 200 } };
+    const res = await ask(u, "How was my training this fortnight?");
+    const bodies = api.requests.slice(before) as (MockRequestBody & { tool_choice?: { type: string } })[];
+    expect(bodies).toHaveLength(2);
+    expect(bodies[0]!.max_tokens).toBe(12_000);
+    expect(bodies[0]!.tool_choice?.type).toBe("auto");
+    expect(bodies[1]!.max_tokens).toBe(2_000);
+    expect(bodies[1]!.tool_choice?.type).toBe("none");
+    expect(res.assistantMessage.content).toContain("Here is what I found.");
   });
 });

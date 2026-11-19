@@ -49,7 +49,7 @@ export async function readLabelPhoto(supabase: SupabaseClient, userId: string, p
     const inputTokens = res.usage.input_tokens + (res.usage.cache_read_input_tokens ?? 0) + (res.usage.cache_creation_input_tokens ?? 0);
     // Answered and billed, but nothing usable: given back to the member, its real cost kept in the app's figures.
     if (res.stop_reason === "refusal" || !res.parsed_output) throw new AiError("provider", "The AI couldn't read that label. Try another photo, or type the ingredients.", undefined, costMicros(model, tokenUsage(res.usage)));
-    return { value: res.parsed_output, inputTokens, outputTokens: res.usage.output_tokens, costMicros: costMicros(model, tokenUsage(res.usage)) };
+    return { value: res.parsed_output, inputTokens, outputTokens: res.usage.output_tokens, costMicros: costMicros(model, tokenUsage(res.usage)), usage: res.usage };
   });
   return normalizeLabelPhoto(output);
 }

@@ -137,7 +137,7 @@ export async function askBible(userId: string, plan: Plan, questionRaw: string, 
         await service.from("bible_ai_usage").update({ status: "failed", model }).eq("id", usageId as number);
         throw err;
       }
-      const usage = { inputTokens: msg.usage.input_tokens, outputTokens: msg.usage.output_tokens, costMicros: costMicros(model, tokenUsage(msg.usage)) };
+      const usage = { inputTokens: msg.usage.input_tokens, outputTokens: msg.usage.output_tokens, costMicros: costMicros(model, tokenUsage(msg.usage)), usage: msg.usage };
       if (msg.stop_reason === "refusal") {
         // Nothing is saved and the helper's own question count is given back; the provider call itself is still
         // counted (it was answered, and billed).
