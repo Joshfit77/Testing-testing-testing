@@ -23,6 +23,7 @@ import { loadBudgetContext } from "@/server/services/nutrition-targets";
 import { plannerDishes, type PlannerDish } from "@/server/services/recipes";
 import { costMicros, tokenUsage } from "@/lib/domain/ai-economics";
 import { openMemories } from "@/server/crypto/memory-crypto";
+import { inertText, untrustedBlock } from "@/lib/ai/untrusted";
 
 export interface StoredDraft {
   start_date: string;
@@ -80,8 +81,9 @@ export async function draftAiMealPlan(
     `Daily targets: ${settings.calories} kcal, protein ${settings.protein_g} g, carbs ${settings.carbs_g} g, fat ${settings.fat_g} g.`,
     `Meal slots each day (slot_index: meal, share of calories): ${specs.map((s, i) => `${i}: ${s.label} (${s.slot}, ${Math.round(s.share * 100)}%)`).join("; ")}.`,
     `Diet style: ${settings.diet}. Budget: ${settings.budget}.`,
-    notes.notes ? `Member's notes: ${notes.notes}` : null,
-    memoryNotes.length ? `Food preferences the member saved:\n${memoryNotes.map((m) => `- ${m}`).join("\n")}` : null,
+    // Member-written text, inside <member_notes> (the instructions say it is data, never instructions).
+    notes.notes ? `Member's notes:\n${untrustedBlock("member_notes", inertText(notes.notes, 1000))}` : null,
+    memoryNotes.length ? `Food preferences the member saved:\n${untrustedBlock("member_notes", memoryNotes.map((m) => `- ${inertText(m, 300)}`).join("\n"))}` : null,
     `Dishes (key | name | meals | per serving):\n${dishCatalogForAi(eligible)}`,
   ]
     .filter(Boolean)

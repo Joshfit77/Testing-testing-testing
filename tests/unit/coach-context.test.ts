@@ -19,7 +19,7 @@ describe("coach context builder", () => {
     expect(text).toContain("- Day 2 Bench day (Upper) ← next: Bench Press [bench-press] 4×5 @RPE 8");
     expect(text).toContain("Plank [plank] 3×45s");
     // Top set with e1RM, skips with reasons.
-    expect(text).toContain("- 2026-10-17 Bench day: Bench Press 2s top 100 kg×4 @9 [113.3 kg]; Barbell Row skipped (pain)");
+    expect(text).toContain("- 2026-10-17 Bench day: Bench Press 2s top 100 kg×4 @9 [113.3 kg]; Barbell Row skipped (reason given: \"pain\")");
     expect(text).toMatch(/e1RM trends: .*Bench Press 116\.7 kg→113\.3 kg \(-2\.9% over 3 sessions, no new best in 2 sessions\)/);
     expect(text).toContain("Best e1RMs: Bench Press 116.7 kg (2026-10-08).");
     expect(text).toMatch(/Bodyweight trend: 83 kg now, -1 kg over 24 days/);
@@ -48,7 +48,7 @@ describe("coach context builder", () => {
 
   it("only includes limitations when they were provided (consented upstream)", () => {
     expect(formatAthleteContext(athleteFixture())).not.toContain("limitations");
-    expect(formatAthleteContext(athleteFixture({ limitations: "Old knee injury" }))).toContain("Self-reported limitations (consented; don't diagnose): Old knee injury");
+    expect(formatAthleteContext(athleteFixture({ limitations: "Old knee injury" }))).toContain("Self-reported limitations (consented; don't diagnose; the athlete's own words): <member_text>Old knee injury</member_text>");
   });
 
   it("mentions a library program can't be edited and a deload week", () => {

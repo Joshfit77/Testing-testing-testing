@@ -8,6 +8,7 @@
  * member saves, edits or declines it.
  */
 import { z } from "zod";
+import { inertText, untrustedBlock } from "@/lib/ai/untrusted";
 
 export const MEMORY_CATEGORIES = [
   "goals",
@@ -160,7 +161,8 @@ export function formatMemoriesForContext(memories: CoachMemory[], opts: { wellne
   const lines: string[] = [];
   let chars = 0;
   for (const m of usable) {
-    const line = `- [${memoryRef(m.id)}] ${MEMORY_CATEGORY_LABELS[m.category]}: ${m.content} (${m.created_at.slice(0, 10)}, ${MEMORY_SOURCE_LABEL[m.source]})`;
+    // The note itself is member-approved text: one line, no tags, inside the <memories> block.
+    const line = `- [${memoryRef(m.id)}] ${MEMORY_CATEGORY_LABELS[m.category]}: ${inertText(m.content, MEMORY_MAX_CHARS)} (${m.created_at.slice(0, 10)}, ${MEMORY_SOURCE_LABEL[m.source]})`;
     if (chars + line.length > MEMORY_CONTEXT_CHARS) break;
     lines.push(line);
     chars += line.length;
@@ -168,7 +170,7 @@ export function formatMemoriesForContext(memories: CoachMemory[], opts: { wellne
   const head = opts.chatMemoryOff
     ? "Coaching memory: the athlete asked you not to remember anything from THIS chat (use the notes below, but don't suggest new memories)."
     : "Coaching memory: notes the athlete chose to keep, each labelled with where it came from. They are statements and preferences, not verified records: use them when relevant, never invent memories, and treat the structured data above as the source of truth if they disagree.";
-  return lines.length ? `${head}\n${lines.join("\n")}` : `${head}\n(No memories saved yet.)`;
+  return lines.length ? `${head}\n${untrustedBlock("memories", lines.join("\n"))}` : `${head}\n(No memories saved yet.)`;
 }
 
 /** The note recorded when a member confirms a coach-suggested change (only while memory is on). */

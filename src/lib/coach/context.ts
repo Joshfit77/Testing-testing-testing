@@ -11,6 +11,7 @@ import { estimateOneRepMax } from "@/lib/domain/strength";
 import { displayWeight, weightUnit } from "@/lib/domain/units";
 import type { UnitSystem } from "@/lib/domain/types";
 import { WELLNESS_CONTEXT_OFF_LINE } from "@/lib/domain/health-ai-sharing";
+import { inertText, untrustedBlock } from "@/lib/ai/untrusted";
 import { JOURNAL_KIND_LABELS, type SharedJournalEntry } from "@/lib/domain/journal";
 import type { CoachMemory } from "./memory";
 
@@ -227,7 +228,7 @@ export function adherence(sessionDates: string[], today: string, daysPerWeek: nu
 function describeProgramExercise(e: SnapshotProgramExercise): string {
   const dose = e.reps ? `${e.sets}×${e.reps}` : e.seconds ? `${e.sets}×${e.seconds}s` : `${e.sets} sets`;
   const effort = e.rpe ? ` @RPE ${e.rpe}` : e.intensity ? ` (${e.intensity})` : "";
-  return `${e.name} [${e.slug}] ${dose}${effort}`;
+  return `${inertText(e.name, 80)} [${e.slug}] ${dose}${effort}`;
 }
 
 const label = (v: string | null | undefined) => (v ? v.replace(/_/g, " ") : "not set");
@@ -257,7 +258,8 @@ export function formatAthleteContext(s: AthleteSnapshot, opts: { maxWorkouts?: n
   lines.push(`Goal: ${goalBits.join(", ")}.`);
   if (s.daysPerWeek || s.sessionMinutes) lines.push(`Schedule: ${s.daysPerWeek ?? "?"} days/week, ~${s.sessionMinutes ?? "?"} min.`);
   lines.push(`Equipment: ${s.equipment.length ? s.equipment.map(label).join(", ") : "bodyweight only"}.${s.preferredTypes.length ? ` Likes: ${s.preferredTypes.map(label).join(", ")}.` : ""}`);
-  if (s.limitations) lines.push(`Self-reported limitations (consented; don't diagnose): ${s.limitations}`);
+  // Member-written text: one line, inside <member_text>, so it reads as their note and never as an instruction.
+  if (s.limitations) lines.push(`Self-reported limitations (consented; don't diagnose; the athlete's own words): <member_text>${inertText(s.limitations, 600)}</member_text>`);
 
   // Nutrition
   lines.push(`Diet type: ${label(s.dietType ?? "balanced")}.`);
@@ -293,11 +295,11 @@ export function formatAthleteContext(s: AthleteSnapshot, opts: { maxWorkouts?: n
   const p = s.program;
   if (p) {
     lines.push(
-      `Active program: ${p.name} (${p.source}${p.editable ? ", user's own — swaps can be applied" : ", library program — can't be edited; swaps happen in the workout logger"}), week ${p.week}/${p.durationWeeks}${p.isDeload ? " (deload week)" : ""}${p.weekFocus ? `, focus: ${p.weekFocus}` : ""}. Next workout: day ${p.nextDay}.`,
+      `Active program: ${inertText(p.name, 80)} (${p.source}${p.editable ? ", user's own — swaps can be applied" : ", library program — can't be edited; swaps happen in the workout logger"}), week ${p.week}/${p.durationWeeks}${p.isDeload ? " (deload week)" : ""}${p.weekFocus ? `, focus: ${p.weekFocus}` : ""}. Next workout: day ${p.nextDay}.`,
     );
     for (const d of p.days) {
       const marker = d.dayNumber === p.nextDay ? " ← next" : "";
-      lines.push(`- Day ${d.dayNumber} ${d.name}${d.focus ? ` (${d.focus})` : ""}${marker}: ${d.exercises.map(describeProgramExercise).join("; ") || "no exercises"}`);
+      lines.push(`- Day ${d.dayNumber} ${inertText(d.name, 80)}${d.focus ? ` (${inertText(d.focus, 80)})` : ""}${marker}: ${d.exercises.map(describeProgramExercise).join("; ") || "no exercises"}`);
     }
   } else {
     lines.push("Active program: none.");
@@ -316,25 +318,25 @@ export function formatAthleteContext(s: AthleteSnapshot, opts: { maxWorkouts?: n
     lines.push(`Recent workouts (newest first, top set per exercise, e1RM in brackets):`);
     for (const wo of workouts) {
       const parts = wo.exercises.map((e) => {
-        if (e.skipped) return `${e.name} skipped${e.skipReason ? ` (${e.skipReason})` : ""}`;
+        if (e.skipped) return `${inertText(e.name, 80)} skipped${e.skipReason ? ` (reason given: "${inertText(e.skipReason, 160)}")` : ""}`;
         const top = topSet(e.sets);
-        if (!top) return `${e.name} no sets`;
-        return `${e.name} ${e.sets.length}s top ${describeSet(top, u)}${top.e1rmKg ? ` [${w(top.e1rmKg)}]` : ""}`;
+        if (!top) return `${inertText(e.name, 80)} no sets`;
+        return `${inertText(e.name, 80)} ${e.sets.length}s top ${describeSet(top, u)}${top.e1rmKg ? ` [${w(top.e1rmKg)}]` : ""}`;
       });
-      lines.push(`- ${wo.date} ${wo.name}: ${parts.join("; ")}`);
+      lines.push(`- ${wo.date} ${inertText(wo.name, 80)}: ${parts.join("; ")}`);
     }
     const trends = liftTrends(s.workouts).slice(0, 6);
     if (trends.length) {
       lines.push(
         `e1RM trends: ${trends
-          .map((tr) => `${tr.name} ${w(tr.firstE1rmKg)}→${w(tr.lastE1rmKg)} (${tr.changePct >= 0 ? "+" : ""}${tr.changePct}% over ${tr.sessions} sessions${tr.sessionsSinceBest >= 2 ? `, no new best in ${tr.sessionsSinceBest} sessions` : ""})`)
+          .map((tr) => `${inertText(tr.name, 80)} ${w(tr.firstE1rmKg)}→${w(tr.lastE1rmKg)} (${tr.changePct >= 0 ? "+" : ""}${tr.changePct}% over ${tr.sessions} sessions${tr.sessionsSinceBest >= 2 ? `, no new best in ${tr.sessionsSinceBest} sessions` : ""})`)
           .join("; ")}.`,
       );
     }
   } else {
     lines.push("Workouts: none logged yet.");
   }
-  if (s.prs.length) lines.push(`Best e1RMs: ${s.prs.map((r) => `${r.name} ${w(r.e1rmKg)} (${r.achievedOn})`).join("; ")}.`);
+  if (s.prs.length) lines.push(`Best e1RMs: ${s.prs.map((r) => `${inertText(r.name, 80)} ${w(r.e1rmKg)} (${r.achievedOn})`).join("; ")}.`);
 
   // Other signals
   if (s.steps.length) {
@@ -348,10 +350,11 @@ export function formatAthleteContext(s: AthleteSnapshot, opts: { maxWorkouts?: n
   const shared = (s.sharedJournal ?? []).filter((j) => j.excerpt);
   if (shared.length) {
     lines.push("Journal entries the athlete chose to share with you (private; refer to them gently and only when relevant):");
-    for (const j of shared) {
-      const head = [JOURNAL_KIND_LABELS[j.kind], j.title, j.scriptureRef, j.answeredOn ? `answered ${j.answeredOn}` : null].filter(Boolean).join(", ");
-      lines.push(`- ${j.date} (${head}): ${j.excerpt}`);
-    }
+    const entries = shared.map((j) => {
+      const head = [JOURNAL_KIND_LABELS[j.kind], inertText(j.title, 120), inertText(j.scriptureRef, 60), j.answeredOn ? `answered ${j.answeredOn}` : null].filter(Boolean).join(", ");
+      return `- ${j.date} (${head}): ${inertText(j.excerpt, 600)}`;
+    });
+    lines.push(untrustedBlock("journal_excerpts", entries.join("\n")));
   }
   return lines.join("\n");
 }
