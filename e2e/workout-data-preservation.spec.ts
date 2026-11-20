@@ -63,6 +63,44 @@ test.describe("a workout in progress keeps every set", () => {
     await close();
   });
 
+  test("the sign-in runs out mid-workout: told, kept on screen and device, saved after signing in again", async ({ page, context, browser }) => {
+    const email = uniqueEmail("expired");
+    await signUpAndConfirm(page, email);
+    await completeOnboarding(page);
+    await startWorkout(page);
+    await page.getByLabel(/set 1 weight in lb/).first().fill("135");
+    await page.getByRole("button", { name: /Mark .* set 1 complete/ }).first().click();
+    await expect(syncStatus(page)).toHaveText(/Synced/);
+
+    // The session is gone (signed out elsewhere, or it ran out): the next set can't reach the account.
+    await context.clearCookies();
+    await page.getByLabel(/set 2 weight in lb/).first().fill("155");
+    await page.getByRole("button", { name: /Mark .* set 2 complete/ }).first().click();
+    await expect(page.getByText(/You've been signed out, so this workout isn't saved to your account yet/)).toBeVisible();
+    await expect(syncStatus(page)).toHaveText(/Saved on device/);
+    // Still in the workout (it used to jump to the login page mid-set).
+    await expect(page).toHaveURL(/\/train\/workout/);
+    await expect(page.getByRole("button", { name: /set 2 completed/ }).first()).toBeVisible();
+
+    // Signing in again on this device: the workout comes back with set 2 and reaches the account.
+    await page.goto("/login");
+    await page.getByLabel("Email").fill(email);
+    await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await page.waitForURL(/\/home/);
+    await page.goto("/train/workout");
+    await expect(page.getByRole("button", { name: /set 2 completed/ }).first()).toBeVisible();
+    await expect(page.getByLabel(/set 2 weight in lb/).first()).toHaveValue("155");
+    // Any change sends the restored copy (with set 2) to the account.
+    await page.getByLabel(/set 1 weight in lb/).first().fill("140");
+    await expect(syncStatus(page)).toHaveText(/Synced/, { timeout: 20_000 });
+
+    const { other, close } = await openOnAnotherDevice(browser, email);
+    await expect(other.getByRole("button", { name: /set 2 completed/ }).first()).toBeVisible();
+    await expect(other.getByLabel(/set 2 weight in lb/).first()).toHaveValue("155");
+    await close();
+  });
+
   test("a save the server refuses is kept on the device and retried until it lands", async ({ page, browser }) => {
     const email = uniqueEmail("savefail");
     await signUpAndConfirm(page, email);

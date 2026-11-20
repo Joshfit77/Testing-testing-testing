@@ -72,10 +72,19 @@ then reviews the build briefly, usually within a day).
 copy), paste it into the editor, click **Run**.
 *You should see:* "Success. No rows returned". Run it **only once, only on this new project**. Never run it on any
 other project.
+The file is large (about 6 MB, mostly the exercise and program library), so the page may take a minute or two. If the
+editor shows an error instead (for example about size or a timeout), **don't run it again**: send Claude the exact
+message, and you'll get a version split into smaller parts, or a one-line command to run it from a computer instead.
 
 **Step 11. Sign-in settings.** **Authentication** → **URL Configuration**: leave it for now; you'll fill in the website
 address in step 13. **Authentication** → **Email Templates**: for "Confirm signup" paste the contents of
 `supabase/templates/confirmation.html`, for "Reset password" paste `supabase/templates/recovery.html`.
+**Authentication** → **Sign In / Providers** → **Email** (security settings; names can differ slightly):
+- **Secure password change**: on.
+- **Email OTP expiration**: `1800` seconds (30 minutes) instead of an hour.
+- **Email OTP length**: `8` if offered.
+- Minimum password length: `8` or more.
+Save.
 
 **Step 12. Copy the three connection values.** **Project Settings** → **API**: the **Project URL**, the **anon public**
 key, and the **service_role** key (the service_role key is a master key: it goes only into Vercel in step 13, nowhere
