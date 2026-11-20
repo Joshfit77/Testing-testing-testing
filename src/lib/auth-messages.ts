@@ -7,6 +7,7 @@ export const AUTH_LINK_MESSAGES = {
   link_invalid: "That link is invalid or has expired.",
   link_processed: "Your link was processed. Please sign in to continue.",
   link_busy: "Too many attempts from this connection. Please wait a few minutes, then open the link again.",
+  session_expired: "For your security, you're asked to sign in again every 30 days. Please sign in to continue.",
 } as const;
 
 export type AuthLinkMessage = keyof typeof AUTH_LINK_MESSAGES;

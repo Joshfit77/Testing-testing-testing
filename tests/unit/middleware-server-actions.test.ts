@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  */
 let user: { id: string } | null = null;
 vi.mock("@supabase/ssr", () => ({
-  createServerClient: () => ({ auth: { getUser: async () => ({ data: { user } }) } }),
+  createServerClient: () => ({ auth: { getUser: async () => ({ data: { user } }), getSession: async () => ({ data: { session: null } }) } }),
 }));
 const { updateSession } = await import("@/lib/supabase/middleware");
 const req = (path: string, init: { method?: string; headers?: Record<string, string> } = {}) =>

@@ -3,6 +3,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { openedByRecentEmailLink } from "@/lib/auth/password-reset-session";
+import { sessionMaxAgeDays, sessionTooOld } from "@/lib/auth/session-age";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { hasFeature, planFromEntitlement, type Feature } from "@/lib/domain/plans";
 import type { Plan } from "@/lib/domain/types";
@@ -13,6 +14,9 @@ export const getCurrentUser = cache(async (): Promise<User | null> => {
   const supabase = await getServerSupabase();
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) return null;
+  // A sign-in older than SESSION_MAX_AGE_DAYS counts as signed out (F-14; the middleware also clears it).
+  const token = (await supabase.auth.getSession()).data.session?.access_token;
+  if (sessionTooOld(token, Date.now(), sessionMaxAgeDays(process.env.SESSION_MAX_AGE_DAYS))) return null;
   return data.user;
 });
 

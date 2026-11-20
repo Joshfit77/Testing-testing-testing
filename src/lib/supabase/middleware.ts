@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { publicEnv } from "@/lib/env";
 import { safeNextPath } from "@/lib/safe-redirect";
+import { sessionMaxAgeDays, sessionTooOld } from "@/lib/auth/session-age";
 import { OPENING_LAUNCH_COOKIE, OPENING_LAUNCH_COOKIE_MAX_AGE, RETURNING_COOKIE } from "@/lib/opening";
 
 // Every signed-in area. A signed-out visit is sent to /login with `next` (path + query) so signing in
@@ -44,6 +45,8 @@ export function markLaunch(response: NextResponse, request: NextRequest): NextRe
  */
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
+  // Over HTTPS the session cookies are marked Secure, so a browser never sends them over plain HTTP (F-14).
+  const httpsOnly = request.nextUrl.protocol === "https:";
 
   const supabase = createServerClient(publicEnv.supabaseUrl, publicEnv.supabaseAnonKey, {
     cookies: {
@@ -51,15 +54,36 @@ export async function updateSession(request: NextRequest) {
       setAll: (toSet) => {
         for (const { name, value } of toSet) request.cookies.set(name, value);
         response = NextResponse.next({ request });
-        for (const { name, value, options } of toSet) response.cookies.set(name, value, options);
+        for (const { name, value, options } of toSet) response.cookies.set(name, value, { ...options, secure: httpsOnly || options?.secure });
       },
     },
   });
 
   // getUser() validates the JWT with Supabase Auth rather than trusting the cookie.
-  const {
+  let {
     data: { user },
   } = await supabase.auth.getUser();
+
+  // A sign-in lasts SESSION_MAX_AGE_DAYS (30 by default), however often it is refreshed (F-14): past that, this device
+  // is signed out here and asked to sign in again. The age comes from the token getUser just validated.
+  if (user) {
+    const token = (await supabase.auth.getSession()).data.session?.access_token;
+    if (sessionTooOld(token, Date.now(), sessionMaxAgeDays(process.env.SESSION_MAX_AGE_DAYS))) {
+      await supabase.auth.signOut({ scope: "local" });
+      user = null;
+      const path = request.nextUrl.pathname;
+      const serverAction = request.method === "POST" && request.headers.has("next-action");
+      if (!serverAction && PROTECTED_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`))) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/login";
+        url.search = "";
+        url.searchParams.set("notice", "session_expired");
+        const redirect = NextResponse.redirect(url);
+        for (const c of response.cookies.getAll()) redirect.cookies.set(c);
+        return redirect;
+      }
+    }
+  }
 
   const path = request.nextUrl.pathname;
   const launch = isLaunch(request);

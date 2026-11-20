@@ -4,7 +4,7 @@ import { OPENING_LAUNCH_COOKIE, RETURNING_COOKIE } from "@/lib/opening";
 
 let user: { id: string } | null = null;
 vi.mock("@supabase/ssr", () => ({
-  createServerClient: () => ({ auth: { getUser: async () => ({ data: { user } }) } }),
+  createServerClient: () => ({ auth: { getUser: async () => ({ data: { user } }), getSession: async () => ({ data: { session: null } }) } }),
 }));
 
 const { isLaunch, updateSession } = await import("@/lib/supabase/middleware");
