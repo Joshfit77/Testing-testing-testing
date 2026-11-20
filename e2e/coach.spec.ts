@@ -724,7 +724,8 @@ test.describe("AI coach", () => {
     expect(sent.model).toBe("claude-haiku-5-5");
     const userText = String(sent.messages[0]!.content);
     expect(userText).toContain("Focus: High protein.");
-    expect(userText).toContain("Member's notes: quick breakfasts");
+    // The member's notes arrive inside <member_notes>, marked as data (M0 prompt hardening).
+    expect(userText).toContain("Member's notes:\n<member_notes>\nquick breakfasts\n</member_notes>");
     expect(userText).toMatch(/app:[a-z0-9-]+ \| .+ \| (breakfast|lunch|dinner|snack)/);
 
     await draft.getByRole("button", { name: "Approve & save plan" }).click();

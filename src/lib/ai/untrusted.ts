@@ -7,8 +7,10 @@
  * - `inertText` for one-line fields: whitespace and control characters are collapsed, so the text can't start a line
  *   that looks like a heading or an instruction of ours, and angle brackets are replaced, so it can't open or close a
  *   block.
- * - `untrustedBlock` for longer text: the text goes inside a labelled block, and any opening or closing tag of a block
- *   name inside the text is removed, so it can't end the block early.
+ * - `untrustedBlock` for longer text: the text goes inside a labelled block; any opening or closing tag of a block name
+ *   inside it is removed and every remaining angle bracket is replaced, so even a partial or disguised tag (no closing
+ *   ">", zero-width characters inside the name) can't end the block early. Line breaks are kept.
+ * Both remove invisible formatting characters (zero-width spaces and joiners, direction marks: Unicode category Cf).
  *
  * None of this makes a model immune to manipulation; it makes the boundary unambiguous. What protects member data is
  * server-side: every tool reads only the member's own rows, and nothing is changed without the member's confirmation.
@@ -20,17 +22,27 @@ export type UntrustedTag = (typeof UNTRUSTED_TAGS)[number];
 const BLOCK_TAG = new RegExp(`<\\s*/?\\s*(?:${UNTRUSTED_TAGS.join("|")})\\b[^>]*>`, "gi");
 // C0/C1 controls, DEL, and the Unicode line and paragraph separators (U+2028, U+2029).
 const CONTROL = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g;
+// Invisible formatting characters (zero-width space/joiners, BOM, bidi marks): removed so they can't hide a tag name.
+const FORMAT = /\p{Cf}+/gu;
 
 /** One line of untrusted text: no line breaks or control characters, no angle brackets, at most `max` characters. */
 export function inertText(text: string | null | undefined, max = 500): string {
   if (!text) return "";
-  const flat = text.replace(CONTROL, " ").replace(/\s+/g, " ").trim().replace(/</g, "‹").replace(/>/g, "›");
+  const flat = text.replace(FORMAT, "").replace(CONTROL, " ").replace(/\s+/g, " ").trim().replace(/</g, "‹").replace(/>/g, "›");
   return flat.length > max ? `${flat.slice(0, Math.max(0, max - 1)).trimEnd()}…` : flat;
 }
 
-/** Removes any opening or closing tag of the app's untrusted-block names from text that will sit inside one. */
+/**
+ * Text that will sit inside a block: invisible formatting characters removed, any tag of a block name removed, and
+ * every other angle bracket replaced. Line breaks and tabs are kept; other control characters become spaces.
+ */
 export function withoutBlockTags(text: string): string {
-  return text.replace(BLOCK_TAG, "[tag removed]");
+  return text
+    .replace(FORMAT, "")
+    .replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u2028\u2029]/g, " ")
+    .replace(BLOCK_TAG, "[tag removed]")
+    .replace(/</g, "‹")
+    .replace(/>/g, "›");
 }
 
 /** Untrusted text inside a labelled block. The caller's prompt says what the block is and that it is data. */

@@ -7,7 +7,7 @@ import { hasFeature } from "@/lib/domain/plans";
 import { ingredientAlerts } from "@/lib/additive-evidence";
 import { foodIqScoreEnabled, scoreFoodIq } from "@/lib/food-iq";
 import { pickAlternatives, sanitizeFilters, type FoodFilters, type QualityProduct } from "@/lib/food-quality";
-import { EXPLAIN_FOCUS, FOCUS_INSTRUCTION, PRODUCT_EXPLAIN_INSTRUCTIONS, productExplanationSchema, productFactsForAi, type ProductExplanation } from "@/lib/food-quality-ai";
+import { EXPLAIN_FOCUS, FOCUS_INSTRUCTION, PRODUCT_EXPLAIN_INSTRUCTIONS, productExplanationSchema, productFactsForPrompt, type ProductExplanation } from "@/lib/food-quality-ai";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireUser } from "@/server/auth";
 import { AiError, withAiRequest } from "@/server/services/ai-coach";
@@ -15,7 +15,6 @@ import { getQualityProduct, searchCategory } from "@/server/services/food-qualit
 import { OffUnavailableError } from "@/server/services/open-food-facts";
 import { logError } from "@/server/log";
 import { costMicros, tokenUsage } from "@/lib/domain/ai-economics";
-import { untrustedBlock } from "@/lib/ai/untrusted";
 
 /** Save the member's product filters (Pro, and legacy Plus). */
 export async function setFoodFiltersAction(input: unknown): Promise<{ ok: true; message: string; filters: FoodFilters } | { ok: false; error: string }> {
@@ -58,7 +57,7 @@ export async function explainProductAction(code: unknown, focusInput: unknown = 
       const search = await searchCategory(found.quality.category);
       alternatives = search.status === "ok" ? pickAlternatives(found.quality, search.candidates, filters, 3).map((a) => a.product) : [];
     }
-    const facts = productFactsForAi(found.quality, { score: foodIqScoreEnabled() ? scoreFoodIq(found.quality) : null, alerts: ingredientAlerts(found.quality), alternatives });
+    const facts = productFactsForPrompt(found.quality, { score: foodIqScoreEnabled() ? scoreFoodIq(found.quality) : null, alerts: ingredientAlerts(found.quality), alternatives });
     const member = [
       `Main goal: ${answers?.primary_goal ?? "not set"}. Diet style: ${answers?.diet_type ?? "not set"}.`,
       goals ? `Daily targets: ${goals.calories} kcal, protein ${goals.protein_g} g, carbs ${goals.carbs_g} g, fat ${goals.fat_g} g.` : "Daily targets: not set.",
@@ -74,7 +73,7 @@ export async function explainProductAction(code: unknown, focusInput: unknown = 
         max_tokens: 1_200,
         system: [{ type: "text", text: PRODUCT_EXPLAIN_INSTRUCTIONS }],
         // Product names, brands and ingredients come from Open Food Facts, which anyone can edit: inside <product_data>.
-        messages: [{ role: "user", content: `${untrustedBlock("product_data", facts)}\n\nMember:\n${member}\n\n${FOCUS_INSTRUCTION[focus]}` }],
+        messages: [{ role: "user", content: `${facts}\n\nMember:\n${member}\n\n${FOCUS_INSTRUCTION[focus]}` }],
         output_config: { format: betaZodOutputFormat(productExplanationSchema) },
       });
       const inputTokens = res.usage.input_tokens + (res.usage.cache_read_input_tokens ?? 0) + (res.usage.cache_creation_input_tokens ?? 0);

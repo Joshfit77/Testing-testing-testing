@@ -226,8 +226,9 @@ export function adherence(sessionDates: string[], today: string, daysPerWeek: nu
 }
 
 function describeProgramExercise(e: SnapshotProgramExercise): string {
-  const dose = e.reps ? `${e.sets}×${e.reps}` : e.seconds ? `${e.sets}×${e.seconds}s` : `${e.sets} sets`;
-  const effort = e.rpe ? ` @RPE ${e.rpe}` : e.intensity ? ` (${e.intensity})` : "";
+  // Reps and intensity are free text in a member's own program: neutralized like names.
+  const dose = e.reps ? `${e.sets}×${inertText(e.reps, 20)}` : e.seconds ? `${e.sets}×${e.seconds}s` : `${e.sets} sets`;
+  const effort = e.rpe ? ` @RPE ${e.rpe}` : e.intensity ? ` (${inertText(e.intensity, 60)})` : "";
   return `${inertText(e.name, 80)} [${e.slug}] ${dose}${effort}`;
 }
 
@@ -295,7 +296,7 @@ export function formatAthleteContext(s: AthleteSnapshot, opts: { maxWorkouts?: n
   const p = s.program;
   if (p) {
     lines.push(
-      `Active program: ${inertText(p.name, 80)} (${p.source}${p.editable ? ", user's own — swaps can be applied" : ", library program — can't be edited; swaps happen in the workout logger"}), week ${p.week}/${p.durationWeeks}${p.isDeload ? " (deload week)" : ""}${p.weekFocus ? `, focus: ${p.weekFocus}` : ""}. Next workout: day ${p.nextDay}.`,
+      `Active program: ${inertText(p.name, 80)} (${p.source}${p.editable ? ", user's own — swaps can be applied" : ", library program — can't be edited; swaps happen in the workout logger"}), week ${p.week}/${p.durationWeeks}${p.isDeload ? " (deload week)" : ""}${p.weekFocus ? `, focus: ${inertText(p.weekFocus, 80)}` : ""}. Next workout: day ${p.nextDay}.`,
     );
     for (const d of p.days) {
       const marker = d.dayNumber === p.nextDay ? " ← next" : "";
@@ -345,7 +346,7 @@ export function formatAthleteContext(s: AthleteSnapshot, opts: { maxWorkouts?: n
   }
   if (s.readiness) lines.push(`Latest readiness check-in: ${s.readiness.score}/100 on ${s.readiness.date}.`);
   if (s.wellnessShared === false) lines.push(WELLNESS_CONTEXT_OFF_LINE);
-  lines.push(`Supplement stack: ${s.supplements.length ? s.supplements.join(", ") : "none"}.`);
+  lines.push(`Supplement stack: ${s.supplements.length ? s.supplements.map((x) => inertText(x, 64)).join(", ") : "none"}.`);
   if (s.challenge) lines.push(`Challenge: ${s.challenge.name}, day ${s.challenge.day}/${s.challenge.totalDays}, ${s.challenge.completedDays} days completed.`);
   const shared = (s.sharedJournal ?? []).filter((j) => j.excerpt);
   if (shared.length) {

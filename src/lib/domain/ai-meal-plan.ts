@@ -7,6 +7,7 @@
  * marked as such. Allergy and dislike filtering is by ingredient names (the existing planner rule), which is not a
  * guarantee of allergen safety.
  */
+import { inertText } from "@/lib/ai/untrusted";
 import { z } from "zod";
 import { calorieFloor } from "./calorie-budget";
 import {
@@ -111,7 +112,8 @@ export function dishCatalogForAi(eligible: PlanCandidate[]): string {
   return eligible
     .map((c) => {
       const p = c.perServing;
-      return `${c.key} | ${c.name.replace(/\|/g, "/")} | ${c.slots.join("/")} | ${p.calories} kcal P${r(p.protein_g)} C${r(p.carbs_g)} F${r(p.fat_g)}${c.complete ? "" : " (some values missing)"}`;
+      // Dish names include the member's own recipes and saved meals: one line, no "|" column breaks, no tags.
+      return `${c.key} | ${inertText(c.name, 120).replace(/\|/g, "/")} | ${c.slots.join("/")} | ${p.calories} kcal P${r(p.protein_g)} C${r(p.carbs_g)} F${r(p.fat_g)}${c.complete ? "" : " (some values missing)"}`;
     })
     .join("\n");
 }
