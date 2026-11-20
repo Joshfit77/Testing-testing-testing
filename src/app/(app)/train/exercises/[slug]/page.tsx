@@ -61,6 +61,11 @@ export default async function ExerciseDetailPage({ params, searchParams }: { par
         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gold">{titleCase(ex.category)}</p>
         <h1 className="mt-1 font-display text-4xl font-bold uppercase md:text-5xl">{ex.name}</h1>
         <p className="mt-2 max-w-2xl text-muted-foreground">{ex.description}</p>
+        {!ex.is_published && (
+          <p className="mt-3 max-w-2xl rounded-xl border border-border bg-elevated px-3 py-2 text-sm" role="status" data-testid="exercise-retired">
+            This exercise is no longer in the library or in any program. Your past workouts with it are kept.
+          </p>
+        )}
         {details && details.aliases.length > 0 && (
           <p className="mt-1 text-sm text-muted-foreground" data-testid="exercise-aliases">
             Also called: {details.aliases.join(", ")}

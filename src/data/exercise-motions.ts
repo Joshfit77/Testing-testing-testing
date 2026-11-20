@@ -134,7 +134,7 @@ export const EXERCISE_MOTIONS: Record<string, Builder> = {
   "push-up": (id) => pushUp({ id, label: `${S}Body in a straight plank: lowers the chest to just above the floor with elbows back, then pushes up.` }),
   "incline-push-up": (id) => pushUp({ id, hands: 45, label: `${S}Hands on a box or bench: lowers the chest to the edge in a straight line and pushes away.` }),
   "wall-push-up": (id) => pushUp({ id, hands: "wall", label: `${S}Hands on a wall: leans in with a straight body until the nose nears the wall, then pushes back.` }),
-  "cable-chest-fly": (id) => frontArms({ id, kind: "chest-fly", label: `${F}Standing between two cables: sweeps the arms in a wide arc to meet in front of the chest and opens back up.` }),
+  "cable-chest-fly": (id) => frontArms({ id, kind: "chest-fly", label: `${F}Standing between two cables set at about shoulder height: with a fixed, slight elbow bend the arms sweep in a wide arc until the hands meet in front of the lower chest, then open slowly back to a stretch.` }),
 
   // ------------------------------------------------------------------ Vertical push
   dips: (id) => dips(id, `${S}Supported on parallel bars: bends the elbows to lower until the upper arms are about level, leaning slightly forward, then presses up.`),
@@ -263,7 +263,6 @@ export const EXERCISE_MOTIONS: Record<string, Builder> = {
   // ------------------------------------------------------------------ Mobility
   "cat-cow": (id) => coreMove(id, `${S}On hands and knees: arches the back with the head up, then rounds the spine with the chin tucked.`, "cat-cow"),
   "worlds-greatest-stretch": (id) => coreMove(id, `${S}Deep lunge with one hand down: drops the elbow toward the front foot, then reaches that arm up toward the ceiling.`, "worlds-greatest"),
-  "90-90-hip-switch": (id) => coreMove(id, `${F}Seen from slightly above: sits tall with the hands on the mat behind and the feet set wide in front, both knees bent about 90° and lowered to one side (the front leg turned out, the back leg turned in); keeping the feet in place and the hips on the mat, lifts both knees and swings them over together to the other side, like windscreen wipers.`, "90-90"),
   "thoracic-open-book": (id) => coreMove(id, `${F}Seen from slightly above: lying on one side with the hips and knees bent to 90° and the knees stacked, arms straight out in front; the top arm opens up and over to the floor behind, the head and eyes following the hand, then returns.`, "open-book"),
   "couch-stretch": (id) => coreMove(id, `${S}Back knee on the floor against a wall with the shin up the wall: tall torso, gently pushes the hips forward.`, "couch-stretch"),
   "supine-hamstring-stretch": (id) => coreMove(id, `${S}Lying on the back: a band around one foot draws the straight leg up toward vertical.`, "hamstring-stretch"),
@@ -411,7 +410,6 @@ export function fallbackMotion(meta: ExerciseMeta): MotionDef {
   if (named(m, /hamstring/)) return coreMove(id, L("Hamstring stretch"), "hamstring-stretch");
   if (named(m, /pigeon|figure|glute stretch|piriformis/)) return coreMove(id, L("Glute stretch", F), "figure-four");
   if (named(m, /open book|thoracic|t-spine/)) return coreMove(id, L("Thoracic rotation", F), "open-book");
-  if (named(m, /90.?90/)) return coreMove(id, L("Hip switch", F), "90-90");
   if (named(m, /ankle/)) return coreMove(id, L("Ankle mobility"), "knee-to-wall");
   if (named(m, /pass.?through|dislocat/)) return coreMove(id, L("Shoulder pass-through"), "pass-through");
   if (named(m, /balance|single.?leg stand/)) return coreMove(id, L("Single-leg balance"), "single-leg-balance");

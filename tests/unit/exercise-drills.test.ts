@@ -1,6 +1,6 @@
 /**
- * Regression tests for three corrected drill demonstrations: the A-skip, the 5-10-5 pro agility shuttle and the 90/90
- * hip switch. They check the movement itself (joint positions at the key moments, foot contact, flight, timing and
+ * Regression tests for corrected drill demonstrations: the A-skip and the 5-10-5 pro agility shuttle (the 90/90 hip
+ * switch, once tested here, was retired from the library on 2026-11-20). They check the movement itself (joint positions at the key moments, foot contact, flight, timing and
  * smoothness) on frames sampled exactly as the player draws them, at normal speed and at the 0.5× speed button
  * (which samples the loop twice as densely). They cannot judge how a pose looks: the review sheets and videos
  * (scripts/exercise-review/render-motion.mjs) are for a person, and none of this has been reviewed by a coach.
@@ -53,13 +53,14 @@ function fingerprint(slug: string): string {
  * moved in straight lines, starting and stopping abruptly at each cone); their keyframes are unchanged. Updated again,
  * on purpose, when these four were redrawn as travelling drills (they stepped in place; see
  * tests/unit/exercise-agility-drills.test.ts): they no longer share the lateral-shuffle code, so the pins now guard the
- * new drawings against accidental changes.
+ * new drawings against accidental changes. Updated again, on purpose, when the neck was shortened from 9 to 5.5 cm
+ * (owner review, 2026-11-19): only the head and neck points moved; the same fingerprint taken without them is unchanged.
  */
 const UNCHANGED: Record<string, string> = {
-  "lateral-shuffle": "6dcf0915b3c6e220",
-  "t-drill": "8ed9338e1b7fc01c",
-  "three-cone-drill": "56d22657a39daae9",
-  "reactive-mirror-drill": "522971b454f18159",
+  "lateral-shuffle": "21d0bb1ba5cb7872",
+  "t-drill": "e919a2f763612a4e",
+  "three-cone-drill": "15b566ce9dc2f4ea",
+  "reactive-mirror-drill": "cdbecfd881aea333",
 };
 
 describe("drill corrections do not disturb other exercises", () => {

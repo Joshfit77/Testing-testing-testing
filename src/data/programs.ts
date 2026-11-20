@@ -632,7 +632,7 @@ function fightCampWeeks(): ProgramWeekSeed[] {
             T("shadowboxing", 2, 120, 60, { notes: "Sharp and light — stay fast, stay fresh." }),
             R("medicine-ball-rotational-throw", 2, "4 per side", 60),
           ], { warmup: ["5 minutes easy jump rope or shadowboxing"] }),
-          day("Fight Week — Mobility & Breathing", "Loosen up and stay calm — the work is done", [T("90-90-hip-switch", 2, 45, 15), T("thoracic-open-book", 2, 45, 15), T("childs-pose", 1, 90, 0)], { warmup: [] }),
+          day("Fight Week — Mobility & Breathing", "Loosen up and stay calm — the work is done", [T("thoracic-open-book", 2, 45, 15), T("childs-pose", 1, 90, 0)], { warmup: [] }),
         ],
       };
     }
@@ -1480,7 +1480,6 @@ const MOBILITY_DAYS: ProgramDaySeed[] = [
   day("Hips & Spine", "Lower body mobility", [
     R("cat-cow", 2, "8 breaths", 15),
     R("worlds-greatest-stretch", 2, "4 per side", 15),
-    R("90-90-hip-switch", 2, "8", 15),
     T("couch-stretch", 2, 45, 15, { notes: "Per side." }),
     T("figure-four-stretch", 2, 40, 15),
   ], MOBILITY_FRAME),
@@ -1845,7 +1844,6 @@ const BASE_PROGRAMS: ProgramSeed[] = [
       day("Easy Cardio + Mobility", "Blood flow", [
         T("bike-intervals", 1, 1200, 0, { rpe: 4, notes: "Easy, conversational pace." }),
         R("worlds-greatest-stretch", 2, "3 per side", 15),
-        R("90-90-hip-switch", 2, "8", 15),
       ]),
       day("Mobility Reset", "Restore range", [
         R("cat-cow", 2, "8 breaths", 15),

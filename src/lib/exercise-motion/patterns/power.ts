@@ -129,6 +129,11 @@ export function powerClean(id: string, label: string): MotionDef {
     const p = pose({ ...stanceLegs(-6, 4, -4), ...both({ ankle: -26 }) });
     return armsLocal(p, [-6, 2], [8, -4]);
   })();
+  const hang = (() => {
+    const p = pose({ ...stanceLegs(2, 6, 2) });
+    return { ...p, shL: p.trunk + 6, shR: p.trunk + 6, elL: 6, elR: 6, neck: 0 };
+  })();
+  const chestLow = armsLocal(pose({ ...stanceLegs(2, 6, 1) }), [3, -30], [20, -12]);
   const catchP = squatPose(0.32, { id, label, load: "front" });
   const stand = squatPose(0, { id, label, load: "front" });
   return {
@@ -142,8 +147,15 @@ export function powerClean(id: string, label: string): MotionDef {
       // The turnover: elbows whip round under the bar, fast but accelerating from the pull (not at full speed at once).
       k(pull, 0.22, { props: { bar: { lm: "hands" } } }),
       k(catchP, 0.6, { hold: 0.25, props: { bar: { lm: "rack" } } }),
-      k(stand, 0.4, { hold: 0.5, props: { bar: { lm: "rack" } } }),
-      k(mix(stand, knee, 0.3), 0.8, { props: { bar: { lm: "hands" } } }),
+      k(stand, 0.15, { hold: 0.35, props: { bar: { lm: "rack" } } }),
+      // Lowering (each key's time is to the next key): the bar rolls off the shoulders into the hands, drops down the
+      // front of the chest with the elbows coming down (close to the body, not swung out on straight arms), reaches arm's
+      // length while still standing tall, and only then do the hips hinge back. Leaning forward with the bar still
+      // racked brought the jaw into it.
+      k(stand, 0.3, { props: { bar: { lm: "hands" } } }),
+      k(chestLow, 0.3, { props: { bar: { lm: "hands" } } }),
+      k(hang, 0.45, { props: { bar: { lm: "hands" } } }),
+      k(mix(hang, knee, 0.3), 0.6, { props: { bar: { lm: "hands" } } }),
     ]),
     props: [{ id: "bar", kind: "barbell", at: { lm: "hands" }, layer: "front" }],
     stillPhase: 0.36,

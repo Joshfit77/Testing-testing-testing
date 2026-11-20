@@ -46,15 +46,6 @@ export const DETAILS_BASE_B: Record<string, ExerciseDetails> = {
     setup: ["Use a mat or grass with room for a full lunge.", "Do it as part of the warm-up, moving smoothly rather than bouncing."],
     home: true,
   },
-  "90-90-hip-switch": {
-    group: "mobility",
-    aliases: ["90/90 stretch", "90-90 hip mobility", "hip switches"],
-    start: "Sit on the floor with both knees bent about 90 degrees, one leg in front of you and the other out to the side, torso tall.",
-    breathing: "Breathe slowly and steadily; exhale as you rotate the knees to the new side.",
-    rangeOfMotion: "Rotate both knees from one side to the other through the range you can control, letting the knees lower only as far as they comfortably go.",
-    setup: ["Sit on a mat; place the hands behind you for support while you build mobility.", "A small cushion under the hips helps if sitting tall is hard."],
-    home: true,
-  },
   "thoracic-open-book": {
     group: "mobility",
     aliases: ["open book stretch", "side-lying thoracic rotation", "book openers"],

@@ -1,12 +1,14 @@
-# Exercise library: 218 exercises
+# Exercise library: 217 exercises
 
 Branch `claude/pro-premium`, 2026-11-13. Basic exercise education stays free.
 
 ## Counts
 
-* 218 exercises (157 existing + 61 new); 134 can be done at home.
+* 217 exercises (157 existing + 61 new, less the 90/90 Hip Switch retired on 2026-11-20); 133 can be done at home.
 * By library group: chest 20, back 19, shoulders 25, biceps 11, triceps 8, quads and glutes 26, hamstrings and calves
-  17, core 20, functional 57, mobility 15.
+  17, core 20, functional 57, mobility 14.
+* Retired exercises are listed in `RETIRED_EXERCISES` (src/data/exercises.ts). Their database rows are kept
+  unpublished (migration 082) so members' logged workouts keep their names.
 
 The target distribution in the brief (210) was not met in every group: chest (25), back (30), biceps (15), triceps (15),
 quads/glutes (30) and hamstrings/calves (20) are short, functional is well over. Movements that could not be drawn

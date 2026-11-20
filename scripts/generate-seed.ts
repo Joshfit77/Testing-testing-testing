@@ -5,7 +5,7 @@
 import { createHash } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import path from "node:path";
-import { EXERCISES } from "../src/data/exercises";
+import { EXERCISES, RETIRED_EXERCISES } from "../src/data/exercises";
 import { PROGRAM_CATEGORIES, PROGRAMS } from "../src/data/programs";
 import { FEATURE_FLAGS, SEED_CONTENT } from "../src/data/content";
 import { COMMON_FOODS } from "../src/data/foods";
@@ -62,6 +62,10 @@ for (const e of EXERCISES) {
       `) on conflict (slug) do update set name = excluded.name, primary_muscles = excluded.primary_muscles, secondary_muscles = excluded.secondary_muscles, equipment = excluded.equipment, category = excluded.category, movement_pattern = excluded.movement_pattern, mechanics = excluded.mechanics, difficulty = excluded.difficulty, is_timed = excluded.is_timed, low_impact = excluded.low_impact, description = excluded.description, instructions = excluded.instructions, form_cues = excluded.form_cues, common_mistakes = excluded.common_mistakes;`,
   );
 }
+lines.push("");
+
+lines.push("-- Retired exercises: kept (members' history points at them) but unpublished. Migration 082 does the same.");
+for (const r of RETIRED_EXERCISES) lines.push(`update public.exercises set is_published = false where slug = ${q(r.slug)};`);
 lines.push("");
 
 lines.push("-- Exercise alternatives");

@@ -210,9 +210,10 @@ function fullBodyMobilityWeeks(): ProgramWeekSeed[] {
     const dynamic = (ex: string, notes: string) => T(ex, ds, dyn, 15, { notes: `${secondsLabel(dyn)} of slow, continuous reps. ${notes}`.trim() });
     const frame = { warmup: MOB_WARMUP, cooldown: MOB_COOLDOWN };
     const days = [
-      day("Hips & Hamstrings", "Hip rotation, hip flexors and the back of the legs", [
-        dynamic("90-90-hip-switch", "Sit tall; rotate knees side to side without using your hands if you can."),
-        dynamic("worlds-greatest-stretch", "Alternate sides each rep; pause 2 seconds in each position."),
+      day("Hips & Hamstrings", "Hips, hip flexors and the back of the legs", [
+        // One more round of the world's greatest stretch keeps the session its full length now that the 90/90 hip
+        // switch is retired (2026-11-20); no other movement was added in its place.
+        T("worlds-greatest-stretch", ds + 1, dyn, 15, { notes: `${secondsLabel(dyn)} of slow, continuous reps. Alternate sides each rep; pause 2 seconds in each position.` }),
         static2("couch-stretch", "Squeeze the glute of the back leg; back off if you feel it in the knee."),
         static2("supine-hamstring-stretch", "Band around the foot, knee slightly soft, breathe out to relax into it."),
       ], frame),
@@ -231,7 +232,6 @@ function fullBodyMobilityWeeks(): ProgramWeekSeed[] {
       day("Full-Body Flow", "Linked, slow movement — the day to skip on the 4-day option", [
         dynamic("worlds-greatest-stretch", "Flow side to side without stopping."),
         dynamic("cat-cow", "Slow and breath-led."),
-        dynamic("90-90-hip-switch", "Add a lean over the front shin at each side."),
         dynamic("thoracic-open-book", "Pause and breathe at the open position."),
         T("deep-squat-hold", ps, h, 20, { notes: "Finish in the bottom of the squat, breathing slowly." }),
       ], frame),
@@ -419,7 +419,6 @@ function flexibilityRecoveryWeeks(): ProgramWeekSeed[] {
       ], frame),
       day("Easy Walk + Hips", "Easy aerobic recovery, then hip and squat range", [
         easyWalk("Cycling is a good swap if your legs feel tired."),
-        R("90-90-hip-switch", 2, "6 per side", 15, { notes: "Slow; hands behind you for support." }),
         R("worlds-greatest-stretch", 2, "3 per side", 15, { notes: "Pause 2 breaths in each position." }),
         T("deep-squat-hold", 2, h, 20, { notes: "Hold a doorframe or post; heels on a folded towel if needed." }),
       ], frame),
