@@ -66,7 +66,7 @@ an error, so a build can't point at a placeholder.
    automatic signing to create the distribution certificate). Download the `.p8` file once; note the Key ID and
    Issuer ID.
 2. GitHub > the repository > Settings > Secrets and variables > Actions > New repository secret. Add:
-   `APPLE_TEAM_ID`, `ASC_KEY_ID`, `ASC_ISSUER_ID`, and `ASC_KEY_P8_BASE64` (on a Mac: `base64 -i AuthKey_XXXX.p8 | pbcopy`).
+   `APPLE_TEAM_ID`, `ASC_KEY_ID`, `ASC_ISSUER_ID`, and `ASC_KEY_P8`: the downloaded `AuthKey_XXXX.p8` file's text, pasted as it is (open it in TextEdit and copy everything, including the BEGIN and END lines). The older `ASC_KEY_P8_BASE64` (base64 of the file) still works instead.
    Enter them only there, never in chat, issues or files.
 3. Actions > iOS > Run workflow: the branch deployed to staging, job `testflight`, `server_url` = your deployed
    address, **upload unticked**. This checks the site (health, the current opening) and signs the build without
