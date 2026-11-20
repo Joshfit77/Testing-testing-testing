@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDraft, draftFromOtherTab, workoutReducer, type WorkoutDraft } from "@/lib/domain/workout-draft";
 
 /**
@@ -22,6 +22,15 @@ function withSetDone(d: WorkoutDraft, index: number, now: string): WorkoutDraft 
 }
 
 describe("a workout saved by another tab", () => {
+  // Typing into a set stamps the draft with the wall clock (Date.now), which is later than these fixed times: two drafts
+  // built a millisecond apart then compared by that stamp, not by the times the test sets, so the test failed about one
+  // run in seven. The clock is frozen at NOW, so only the test's own times decide which copy is newer.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(NOW));
+  });
+  afterEach(() => vi.useRealTimers());
+
   it("is adopted when it is the same workout and newer, so the other tab's sets are not written over", () => {
     const a = withSetDone(started(), 0, later(NOW, 10));
     const b = withSetDone(a, 1, later(NOW, 40));
