@@ -80,6 +80,20 @@ describe("plans & entitlements", () => {
     const legacyPro = { plan: "pro" as const, aiMonthlyLimit: 400, aiPlanMonthlyLimit: 20, aiSmartMonthlyLimit: 40 };
     expect(aiAllowance("pro", [legacyPro])).toEqual({ chatLimit: 400, planLimit: 20, smartLimit: 40, legacy: true });
   });
+  it("legacy AI terms never raise the allowance of a member whose access lapsed (F-17)", () => {
+    const legacyPlus = { plan: "plus" as const, aiMonthlyLimit: 60, aiPlanMonthlyLimit: 0, aiSmartMonthlyLimit: 6 };
+    expect(aiAllowance("free", [legacyPlus])).toEqual({ chatLimit: 0, planLimit: 0, smartLimit: 0, legacy: false });
+    const legacyPro = { plan: "pro" as const, aiMonthlyLimit: 400, aiPlanMonthlyLimit: 20, aiSmartMonthlyLimit: 40 };
+    expect(aiAllowance("plus", [legacyPro])).toEqual({ chatLimit: 0, planLimit: 0, smartLimit: 0, legacy: false });
+  });
+  it("legacy terms of a failed renewal end with the plan's 14-day grace period, not the moved-on period end (F-17)", () => {
+    const terms = { plan: "plus" as const, ends_at: null };
+    const now = new Date("2026-11-21T00:00:00Z");
+    // Stripe already moved the period end on to 2026-12-01 although nothing was paid; the unpaid period began 2026-11-01.
+    const sub = { plan: "plus" as const, status: "past_due" as const, current_period_end: "2026-12-01T00:00:00Z" };
+    expect(legacyTermsApply(terms, { ...sub, period_started_at: "2026-11-01T00:00:00Z" }, now)).toBe(false);
+    expect(legacyTermsApply(terms, { ...sub, period_started_at: "2026-11-10T00:00:00Z" }, now)).toBe(true);
+  });
   it("formats prices and yearly savings", () => {
     expect(formatPrice(0)).toBe("Free");
     expect(formatPrice(999)).toBe("$9.99");

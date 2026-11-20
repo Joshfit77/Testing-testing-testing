@@ -655,7 +655,7 @@ export async function getLegacyAiTerms(userId: string, now: Date = new Date()): 
   if (!isServiceRoleConfigured()) return [];
   const { data, error } = await getServiceSupabase()
     .from("legacy_plan_terms")
-    .select("plan, ai_monthly_limit, ai_plan_monthly_limit, ai_smart_monthly_limit, ends_at, subscriptions(plan, status, current_period_end, access_revoked_at)")
+    .select("plan, ai_monthly_limit, ai_plan_monthly_limit, ai_smart_monthly_limit, ends_at, subscriptions(plan, status, current_period_end, access_revoked_at, stripe_price_id)")
     .eq("user_id", userId);
   if (error) {
     logError("billing.legacy_terms", error);
@@ -667,11 +667,20 @@ export async function getLegacyAiTerms(userId: string, now: Date = new Date()): 
     ai_plan_monthly_limit: number;
     ai_smart_monthly_limit: number;
     ends_at: string | null;
-    subscriptions: { plan: PaidPlan; status: SubscriptionStatus; current_period_end: string | null; access_revoked_at: string | null } | null;
+    subscriptions: { plan: PaidPlan; status: SubscriptionStatus; current_period_end: string | null; access_revoked_at: string | null; stripe_price_id: string | null } | null;
   };
-  return ((data ?? []) as unknown as Row[])
-    .filter((r) => r.subscriptions && legacyTermsApply(r, r.subscriptions, now))
-    .map((r) => ({ plan: r.plan, aiMonthlyLimit: r.ai_monthly_limit, aiPlanMonthlyLimit: r.ai_plan_monthly_limit, aiSmartMonthlyLimit: r.ai_smart_monthly_limit }));
+  const out: LegacyAiTerms[] = [];
+  for (const r of (data ?? []) as unknown as Row[]) {
+    if (!r.subscriptions) continue;
+    const { stripe_price_id, ...sub } = r.subscriptions;
+    // A failed renewal gets the same grace period as the plan itself (F-17): counted from the start of the unpaid
+    // period, not up to the period end Stripe has already moved on (which kept the raised AI allowance for a whole
+    // further month or year while unpaid). As in recomputeEntitlement, an unknown interval counts as a month.
+    const period_started_at = sub.status === "past_due" ? periodStartFromEnd(sub.current_period_end, (await resolvePriceInterval(stripe_price_id)) ?? "month") : null;
+    if (!legacyTermsApply(r, { ...sub, period_started_at }, now)) continue;
+    out.push({ plan: r.plan, aiMonthlyLimit: r.ai_monthly_limit, aiPlanMonthlyLimit: r.ai_plan_monthly_limit, aiSmartMonthlyLimit: r.ai_smart_monthly_limit });
+  }
+  return out;
 }
 
 export function isStripeConfigured(): boolean {

@@ -374,6 +374,9 @@ export function aiAllowance(plan: Plan, legacy: LegacyAiTerms[] = []): AiAllowan
   };
   const out = { ...base, legacy: false };
   for (const t of legacy) {
+    // Legacy terms belong to a paid plan the member still has (F-17): never to someone whose access has lapsed to Free,
+    // whatever the terms row says.
+    if (!canAccessTier(plan, t.plan)) continue;
     out.chatLimit = Math.max(out.chatLimit, t.aiMonthlyLimit);
     out.planLimit = Math.max(out.planLimit, t.aiPlanMonthlyLimit);
     out.smartLimit = Math.max(out.smartLimit, t.aiSmartMonthlyLimit);
@@ -385,7 +388,7 @@ export function aiAllowance(plan: Plan, legacy: LegacyAiTerms[] = []): AiAllowan
 /** Legacy terms apply while their subscription still gives access on the same plan and they haven't been ended. */
 export function legacyTermsApply(
   terms: { plan: Exclude<Plan, "free">; ends_at: string | null },
-  sub: { plan: Exclude<Plan, "free">; status: SubscriptionStatus; current_period_end: string | null; access_revoked_at?: string | null },
+  sub: { plan: Exclude<Plan, "free">; status: SubscriptionStatus; current_period_end: string | null; access_revoked_at?: string | null; period_started_at?: string | null },
   now: Date = new Date(),
 ): boolean {
   if (terms.ends_at && new Date(terms.ends_at).getTime() <= now.getTime()) return false;

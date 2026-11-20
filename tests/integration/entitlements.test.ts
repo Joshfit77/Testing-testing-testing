@@ -202,6 +202,40 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
     }
   });
 
+  it("a legacy Plus subscriber whose renewal failed loses the AI allowance when the 14-day grace ends, not a month later (F-17)", async () => {
+    const u = await createTestUser("legacy-pastdue");
+    const entitled = async () => (await serviceClient().from("user_entitlements").select("plan").eq("user_id", u.id).single()).data?.plan;
+    try {
+      const day = 86_400;
+      const nowS = Math.floor(Date.now() / 1000);
+      // A legacy monthly Plus price (Stripe can't say its interval here, so a month is assumed, as in production).
+      const sub = fakeSubscription({ metadata: { user_id: u.id }, items: { object: "list", data: [{ id: "si", price: { id: "price_old_plus_b" }, current_period_end: nowS + 10 * day }] } });
+      const withEnd = (status: string, periodEndS: number) =>
+        ({ ...sub, status, items: { ...sub.items, data: [{ ...sub.items.data[0]!, current_period_end: periodEndS }] } }) as unknown as Stripe.Subscription;
+      await syncSubscription(withEnd("active", nowS + 10 * day));
+      const { error } = await serviceClient()
+        .from("legacy_plan_terms")
+        .insert({ stripe_subscription_id: sub.id, user_id: u.id, plan: "plus", ai_monthly_limit: 60, ai_plan_monthly_limit: 0, ai_smart_monthly_limit: 6 });
+      expect(error).toBeNull();
+      await expect(assertAiAllowed(u.id, "plus", "chat")).resolves.toMatchObject({ chatLimit: 60, legacy: true });
+
+      // The renewal failed 20 days ago: Stripe has moved the period end to about 10 days from now, nothing was paid.
+      await syncSubscription(withEnd("past_due", nowS + 10 * day));
+      // The plan itself has lapsed to Free (14-day grace over)...
+      expect(await entitled()).toBe("free");
+      // ...and so has the raised AI allowance, asked as Free or (a stale plan in the request) as Plus.
+      await expect(assertAiAllowed(u.id, "free", "chat")).rejects.toMatchObject({ code: "not_entitled" });
+      await expect(assertAiAllowed(u.id, "plus", "chat")).rejects.toMatchObject({ code: "not_entitled" });
+
+      // Failed 5 days ago instead: inside the grace period, both continue.
+      await syncSubscription(withEnd("past_due", nowS + 25 * day));
+      expect(await entitled()).toBe("plus");
+      await expect(assertAiAllowed(u.id, "plus", "chat")).resolves.toMatchObject({ chatLimit: 60 });
+    } finally {
+      await deleteTestUser(u);
+    }
+  });
+
   it("keeps an existing Plus subscriber's AI allowance while that subscription stays on Plus", async () => {
     const u = await createTestUser("legacy-ai");
     try {
