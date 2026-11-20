@@ -107,7 +107,7 @@ Every exercise below is **MISSING** for the same reason: No clip yet. Generating
 | 81 | Hip Escape (Shrimp) (`hip-escape`) | conditioning | mat |
 | 82 | Cat-Cow (`cat-cow`) | mobility | mat |
 | 83 | World's Greatest Stretch (`worlds-greatest-stretch`) | mobility | bodyweight |
-| 84 | 90/90 Hip Switch (`90-90-hip-switch`) | mobility | mat |
+| 84 | ~~90/90 Hip Switch (`90-90-hip-switch`)~~ retired 2026-11-20, not in the app | mobility | mat |
 | 85 | Thoracic Open Book (`thoracic-open-book`) | mobility | mat |
 | 86 | Couch Stretch (`couch-stretch`) | mobility | mat |
 | 87 | Supine Hamstring Stretch (`supine-hamstring-stretch`) | mobility | band, mat |

@@ -755,7 +755,7 @@ const OPT = {
   sprawl: ["sprawl", "burpee", "step-back-burpee", "mountain-climber"],
   bikeSprint: ["bike-intervals", "rowing-intervals", "battle-rope-waves", "jump-rope", "burpee"],
   aerobic: ["bike-intervals", "rowing-intervals", "zone-2-run", "brisk-walk"],
-  mobility: ["worlds-greatest-stretch", "90-90-hip-switch", "thoracic-open-book", "couch-stretch"],
+  mobility: ["worlds-greatest-stretch", "thoracic-open-book", "couch-stretch"],
 };
 
 // --------------------------------------------------------------------------- Program builders
@@ -1231,7 +1231,7 @@ function strongmanContestWeek(ctx: Ctx, d: number): ProgramDaySeed[] {
     buildDay(ctx, `Contest Week — Easy Movement${d > 3 ? ` ${n}` : ""}`, "Light sled work and mobility to stay loose", [
       { options: ["sled-drag", "sled-push", "brisk-walk"], sets: 3, reps: "20 m", seconds: 30, rest: 90, notes: "Very light — just get blood moving.", per: { "brisk-walk": { reps: null, seconds: 900, notes: "Easy 15-minute walk." } } },
       { options: OPT.mobility, sets: 2, seconds: 45, rest: 15 },
-      { options: ["90-90-hip-switch", "thoracic-open-book", "couch-stretch"], sets: 2, seconds: 45, rest: 15 },
+      { options: ["thoracic-open-book", "couch-stretch"], sets: 2, seconds: 45, rest: 15 },
     ]);
   const contestNote = "Contest: follow the event's weight, distance and time limit. Warm up with 2–3 light runs or reps per event and keep warm between events.";
   const contestDay = buildDay(ctx, "Contest Day", "Compete — trust your training", [
@@ -1482,7 +1482,7 @@ function mmaDays(ctx: Ctx, goal: GoalOption): DayBuilder[] {
         ].filter((s): s is Slot => s !== null));
   const C: DayBuilder = (wk) =>
     fightWeek(wk)
-      ? buildDay(ctx, "Fight Week — Mobility & Breathing", "Loosen up and stay calm — the work is done", [mobility(), { options: ["90-90-hip-switch", "thoracic-open-book", "childs-pose"], sets: 2, seconds: 45, rest: 15 }])
+      ? buildDay(ctx, "Fight Week — Mobility & Breathing", "Loosen up and stay calm — the work is done", [mobility(), { options: ["thoracic-open-book", "childs-pose"], sets: 2, seconds: 45, rest: 15 }])
       : buildDay(ctx, `${MMA_SC_PREFIX} 3 — Fight-Specific Conditioning`, "Rounds matched to 5-minute fight rounds, sprawls, mat work and neck", [
           rounds(wk),
           sprawls(wk),
@@ -1501,7 +1501,7 @@ function mmaDays(ctx: Ctx, goal: GoalOption): DayBuilder[] {
         per: { "brisk-walk": { notes: "Easy, brisk walk — recovery, not training." } },
       },
       mobility(),
-      { options: ["90-90-hip-switch", "couch-stretch", "thoracic-open-book"], sets: 2, seconds: 45, rest: 15 },
+      { options: ["couch-stretch", "thoracic-open-book"], sets: 2, seconds: 45, rest: 15 },
     ]);
   const E: DayBuilder = (wk) =>
     buildDay(ctx, fightWeek(wk) ? "Fight Week — Rest or Easy Movement" : "Recovery — Prehab & Easy Shadowboxing", "Light technical rounds and injury-prevention work", [

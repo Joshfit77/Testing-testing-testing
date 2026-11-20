@@ -3,10 +3,6 @@
  "method": "Each exercise rendered in the athlete look at six phases of its loop (start, early, middle, deepest/peak, return, end) and reviewed by eye against its written instructions, with doubtful ones re-rendered at 300-800 px and their joint and equipment positions read from the motion engine (hand-to-equipment distance, floor contact, travel, joint angles). Phase 2 (2026-11-04): the 31 pose-frame and placeholder exercises and hip abduction were rebuilt, bars and equipment restyled, and see-through near plates added where a plate would hide the head or arms; each rebuilt exercise was checked by the agent that rebuilt it (six phases plus 1x and 0.5x frame strips) and again at six phases by the reviewer, then all 157 were re-rendered from the merged code and reviewed again; motion fingerprints confirm only the 32 intended exercises changed movement. Automated motion checks: tests/unit/exercise-*.test.ts. Reviewed by Claude (AI); not reviewed by a coach and not approved by the owner.",
  "ownerApproved": [],
  "exercises": {
-  "90-90-hip-switch": {
-   "readiness": "animated",
-   "note": "Drawn from slightly above and in front, on a mat; the feet slide and pivot on the mat during the switch."
-  },
   "a-skip": {
    "readiness": "animated"
   },

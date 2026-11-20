@@ -1,6 +1,6 @@
 /**
- * Regression tests for three corrected drill demonstrations: the A-skip, the 5-10-5 pro agility shuttle and the 90/90
- * hip switch. They check the movement itself (joint positions at the key moments, foot contact, flight, timing and
+ * Regression tests for corrected drill demonstrations: the A-skip and the 5-10-5 pro agility shuttle (the 90/90 hip
+ * switch, once tested here, was retired from the library on 2026-11-20). They check the movement itself (joint positions at the key moments, foot contact, flight, timing and
  * smoothness) on frames sampled exactly as the player draws them, at normal speed and at the 0.5× speed button
  * (which samples the loop twice as densely). They cannot judge how a pose looks: the review sheets and videos
  * (scripts/exercise-review/render-motion.mjs) are for a person, and none of this has been reviewed by a coach.

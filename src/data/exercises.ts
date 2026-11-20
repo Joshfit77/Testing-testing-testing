@@ -1821,28 +1821,7 @@ const BASE_EXERCISES: ExerciseSeed[] = [
     ],
     cues: ["Back leg long", "Rotate through upper back", "Breathe out into each position"],
     mistakes: ["Rushing", "Back knee collapsing", "Forcing range"],
-    alternatives: ["couch-stretch", "thoracic-open-book", "90-90-hip-switch"],
-  },
-  {
-    slug: "90-90-hip-switch",
-    name: "90/90 Hip Switch",
-    primary: ["hip rotators"],
-    secondary: ["glutes", "adductors"],
-    equipment: ["mat"],
-    category: "mobility",
-    pattern: "mobility",
-    difficulty: "beginner",
-    lowImpact: true,
-    description: "Rotating the hips between internal and external rotation while seated.",
-    instructions: [
-      "Sit with both knees bent at about 90 degrees, one leg in front and one to the side.",
-      "Sit tall, using your hands behind you for support if needed.",
-      "Rotate both knees to the other side so the legs switch positions.",
-      "Continue switching slowly and with control.",
-    ],
-    cues: ["Sit tall", "Slow transitions", "Use hands if needed"],
-    mistakes: ["Slumping", "Forcing the knees down", "Moving quickly"],
-    alternatives: ["figure-four-stretch", "worlds-greatest-stretch"],
+    alternatives: ["couch-stretch", "thoracic-open-book"],
   },
   {
     slug: "thoracic-open-book",
@@ -1884,7 +1863,7 @@ const BASE_EXERCISES: ExerciseSeed[] = [
     ],
     cues: ["Squeeze the glute", "Tuck the pelvis", "Pad the knee"],
     mistakes: ["Arching the lower back", "Going too deep too soon", "Bare knee on hard floor"],
-    alternatives: ["worlds-greatest-stretch", "90-90-hip-switch"],
+    alternatives: ["worlds-greatest-stretch"],
   },
   {
     slug: "supine-hamstring-stretch",
@@ -2011,7 +1990,7 @@ const BASE_EXERCISES: ExerciseSeed[] = [
     ],
     cues: ["Flex the top foot", "Head relaxed", "Gentle pull"],
     mistakes: ["Lifting the head", "Pulling too hard", "Holding breath"],
-    alternatives: ["90-90-hip-switch", "childs-pose"],
+    alternatives: ["childs-pose"],
   },
   {
     slug: "single-leg-balance",
@@ -3405,3 +3384,13 @@ const BASE_EXERCISES: ExerciseSeed[] = [
 export const EXERCISES: ExerciseSeed[] = [...BASE_EXERCISES, ...ADDED_EXERCISES];
 
 export const EXERCISE_SLUGS = new Set(EXERCISES.map((e) => e.slug));
+
+/**
+ * Exercises taken out of active use. They are not in EXERCISES, so they are in no search, picker, program, motion
+ * library or AI catalog. Their database rows are kept unpublished (migration 082) so members' logged workouts keep
+ * pointing at them and keep their names; a member can still open one from their own history.
+ */
+export const RETIRED_EXERCISES: readonly { slug: string; name: string; retiredOn: string; reason: string }[] = [
+  { slug: "90-90-hip-switch", name: "90/90 Hip Switch", retiredOn: "2026-11-20", reason: "Owner decision: removed from the app." },
+];
+export const RETIRED_EXERCISE_SLUGS = new Set(RETIRED_EXERCISES.map((e) => e.slug));

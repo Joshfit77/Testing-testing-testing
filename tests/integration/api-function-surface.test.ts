@@ -58,6 +58,7 @@ const MEMBER_CALLABLE = [
   "faith_journey_zone_at",
   "has_ai_coach",
   "is_member_starter_program",
+  "member_references_exercise",
   "send_accountability_nudge",
 ].sort();
 

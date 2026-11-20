@@ -23,7 +23,7 @@ import {
 } from "../build";
 import { handsTo, legsTo, toLocal } from "./upper";
 import { squatPose } from "./lower";
-import { figureFour, hip9090, hipEscape, openBook } from "./floor";
+import { figureFour, hipEscape, openBook } from "./floor";
 
 const ARM = BODY.upperArm + BODY.forearm;
 const breathe = (p: Pose, d = 2): Pose => ({ ...p, spine: p.spine + d });
@@ -62,7 +62,6 @@ export type CoreKind =
   | "hamstring-stretch"
   | "figure-four"
   | "open-book"
-  | "90-90"
   | "worlds-greatest"
   | "knee-to-wall"
   | "pass-through"
@@ -254,9 +253,6 @@ export function coreMove(id: string, label: string, kind: CoreKind): MotionDef {
     case "open-book":
       // Front view from a raised camera of the side-lying athlete, posed in 3D (patterns/floor.ts).
       return openBook(id, label);
-    case "90-90":
-      // Front view from a raised camera, posed in 3D (patterns/floor.ts).
-      return hip9090(id, label);
     case "worlds-greatest": {
       // Deep lunge with the torso low over the front thigh so the far hand rests flat on the floor inside the front
       // foot; the near elbow drops toward the instep, then the torso rotates open and that arm points at the ceiling.
