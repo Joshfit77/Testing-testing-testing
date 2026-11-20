@@ -32,7 +32,7 @@ export function generateNonce(): string {
   return btoa(bin);
 }
 
-export function contentSecurityPolicy({ supabaseUrl, production, https, nonce }: SecurityHeaderOptions & { nonce?: string }): string {
+export function contentSecurityPolicy({ supabaseUrl, production, https, nonce, captcha = false }: SecurityHeaderOptions & { nonce?: string; captcha?: boolean }): string {
   const supabase = origin(supabaseUrl);
   const supabaseWs = supabase ? supabase.replace(/^http/, "ws") : null;
   const list = (...items: (string | null | false | undefined)[]) => items.filter(Boolean).join(" ");
@@ -49,7 +49,8 @@ export function contentSecurityPolicy({ supabaseUrl, production, https, nonce }:
     "img-src": list("'self'", "data:", "blob:", "https:", supabase),
     "media-src": list("'self'", "blob:", supabase),
     "connect-src": list("'self'", supabase, supabaseWs, "https://*.supabase.co", "wss://*.supabase.co"),
-    "frame-src": "https://www.youtube-nocookie.com https://player.vimeo.com",
+    // The bot check (Cloudflare Turnstile) draws in its own frame, only when a site key is configured (F-7).
+    "frame-src": list("https://www.youtube-nocookie.com https://player.vimeo.com", captcha && "https://challenges.cloudflare.com"),
     "worker-src": "'self' blob:",
     "manifest-src": "'self'",
     // Server actions redirect to Stripe Checkout and the billing portal after a form post.

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState, useEffect, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { FieldError, FormMessage, SubmitButton } from "@/components/common/form-status";
+import { CaptchaField } from "@/components/auth/captcha-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RISK_ACKNOWLEDGMENT } from "@/lib/legal/versions";
@@ -67,6 +68,7 @@ export function SignInForm({ next }: { next?: string }) {
           <FieldError id="password-error" message={state.fieldErrors?.password} />
         </div>
         <FormMessage state={state} />
+        <CaptchaField />
         <SubmitButton className="w-full" pendingLabel="Signing in…">
           Sign in
         </SubmitButton>
@@ -74,6 +76,7 @@ export function SignInForm({ next }: { next?: string }) {
       {state.fieldErrors?.unconfirmed && (
         <form action={resendAction} className="space-y-2 rounded-xl border border-border bg-elevated p-3">
           <input type="hidden" name="email" value={email} />
+          <CaptchaField />
           <SubmitButton variant="secondary" className="w-full" pendingLabel="Sending…">
             Resend confirmation email
           </SubmitButton>
@@ -155,6 +158,7 @@ export function SignUpForm({ defaultEmail = "" }: { defaultEmail?: string }) {
       </label>
       <FieldError id="risk-error" message={fe.riskAcknowledged} /> 
       <FormMessage state={state} />
+      <CaptchaField />
       <SubmitButton className="w-full" pendingLabel="Creating account…">
         Create account
       </SubmitButton>
@@ -172,6 +176,7 @@ export function ForgotPasswordForm() {
         <FieldError message={state.fieldErrors?.email} />
       </div>
       <FormMessage state={state} />
+      <CaptchaField />
       <SubmitButton className="w-full" pendingLabel="Sending…">
         Send reset link
       </SubmitButton>

@@ -85,6 +85,12 @@ address in step 13. **Authentication** → **Email Templates**: for "Confirm sig
 - **Email OTP length**: `8` if offered.
 - Minimum password length: `8` or more.
 Save.
+**Authentication** → **Multi-Factor** (MFA): make sure **TOTP / App Authenticator** is enabled (admin tools require it:
+docs/security/ADMIN_MFA.md, including what to do if you lose your phone).
+**Before inviting anyone beyond you and John** (not needed for the first build, when sign-ups are off): **Authentication**
+→ **Attack Protection** → enable **CAPTCHA protection** with **Cloudflare Turnstile** (create a free Turnstile site at
+dash.cloudflare.com; paste its *secret key* here), and in Vercel add `NEXT_PUBLIC_TURNSTILE_SITE_KEY` = its *site key*.
+Switch both on together: with only Supabase's switched on, nobody can sign in.
 
 **Step 12. Copy the three connection values.** **Project Settings** → **API**: the **Project URL**, the **anon public**
 key, and the **service_role** key (the service_role key is a master key: it goes only into Vercel in step 13, nowhere

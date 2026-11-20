@@ -16,6 +16,18 @@ import { clientIp, hashKey, rateLimitAll } from "@/server/rate-limit";
 import { authRateLimitScale } from "@/server/test-overrides";
 
 const MINUTE = 60_000;
+
+/**
+ * The bot check's token from the form (F-7). Supabase verifies it on its own servers when CAPTCHA protection is on
+ * (Authentication > Attack Protection), so sign-up, sign-in and the email requests can't be scripted, even by calling
+ * Supabase directly with the public key. Without a site key the form has no check and no token is sent.
+ */
+function captchaToken(formData: FormData): string | undefined {
+  const t = formData.get("captchaToken");
+  return typeof t === "string" && t.length > 0 && t.length <= 4096 ? t : undefined;
+}
+const CAPTCHA_FAILED = "Please complete the security check, then try again.";
+const captchaFailed = (error: { code?: string; message?: string } | null) => Boolean(error && (error.code === "captcha_failed" || /captcha/i.test(error.message ?? "")));
 const TOO_MANY = "Too many attempts. Please wait a few minutes and try again.";
 const TOO_MANY_EMAILS = "Please wait a few minutes before requesting another email.";
 const RESET_LINK_NEEDED = "For your security, a new password can only be set from the link in a reset email opened in the last 30 minutes. Request a new link from Forgot password.";
@@ -78,12 +90,14 @@ export async function signUpAction(_prev: ActionState, formData: FormData): Prom
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
+      captchaToken: captchaToken(formData),
       emailRedirectTo: `${publicEnv.siteUrl}/auth/callback?next=/onboarding`,
       // Recorded with the account by a database trigger (legal_acceptances): what was accepted, which version, when.
       data: { display_name: parsed.data.displayName, legal_acceptances: signupAcceptances() },
     },
   });
   if (error) {
+    if (captchaFailed(error)) return actionError(CAPTCHA_FAILED);
     if (error.status === 429) return actionError("Too many attempts. Please wait a minute and try again.");
     // An address that already has an account: the same answer as a new sign-up, so the form never says who is
     // registered (Supabase itself answers this way when configured to obfuscate; some stacks return this error instead).
@@ -109,8 +123,9 @@ export async function signInAction(_prev: ActionState, formData: FormData): Prom
   )
     return actionError(TOO_MANY);
   const supabase = await getServerSupabase();
-  const { error } = await supabase.auth.signInWithPassword(parsed.data);
+  const { error } = await supabase.auth.signInWithPassword({ ...parsed.data, options: { captchaToken: captchaToken(formData) } });
   if (error) {
+    if (captchaFailed(error)) return actionError(CAPTCHA_FAILED);
     if (error.code === "email_not_confirmed" || /not confirmed/i.test(error.message)) {
       return actionError("Please confirm your email address first. You can resend the confirmation email below.", { unconfirmed: "1" });
     }
@@ -142,8 +157,9 @@ export async function resendConfirmationAction(_prev: ActionState, formData: For
   const { error } = await supabase.auth.resend({
     type: "signup",
     email: email.data,
-    options: { emailRedirectTo: `${publicEnv.siteUrl}/auth/callback?next=/onboarding` },
+    options: { emailRedirectTo: `${publicEnv.siteUrl}/auth/callback?next=/onboarding`, captchaToken: captchaToken(formData) },
   });
+  if (captchaFailed(error)) return actionError(CAPTCHA_FAILED);
   // Supabase's per-address limit (one email a minute) only applies to addresses that have an unconfirmed account, so a
   // different reply on 429 would tell a stranger the address is registered. Same reply either way; logged for operators.
   if (error?.status === 429) logError("auth.resend_throttled", error);
@@ -170,7 +186,9 @@ export async function requestPasswordResetAction(_prev: ActionState, formData: F
   const supabase = await getServerSupabase();
   const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
     redirectTo: `${publicEnv.siteUrl}/auth/callback?next=/reset-password`,
+    captchaToken: captchaToken(formData),
   });
+  if (captchaFailed(error)) return actionError(CAPTCHA_FAILED);
   // As above: Supabase throttles reset emails only for addresses that have an account, so a 429 gets the same reply
   // as everything else (the member already has a link from under a minute ago).
   if (error) logError(error.status === 429 ? "auth.reset_throttled" : "auth.reset_request", error);

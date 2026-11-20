@@ -11,7 +11,7 @@ export async function middleware(request: NextRequest) {
   // A new nonce for every response. Next.js reads it from the request's CSP header and puts it on its own scripts;
   // the root layout reads x-nonce for its two inline scripts.
   const nonce = generateNonce();
-  const csp = contentSecurityPolicy({ supabaseUrl: publicEnv.supabaseUrl, production, https, nonce });
+  const csp = contentSecurityPolicy({ supabaseUrl: publicEnv.supabaseUrl, production, https, nonce, captcha: Boolean(publicEnv.turnstileSiteKey) });
   request.headers.set("x-nonce", nonce);
   request.headers.set("content-security-policy", csp);
   // (updateSession marks a launch itself; without a database the welcome page is the only destination.)
