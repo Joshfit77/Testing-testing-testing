@@ -167,7 +167,9 @@ describe.skipIf(!available)("auth email links", () => {
     safariCookies.clear();
     const res = await GET(new NextRequest(`${SITE}/auth/confirm?token_hash=${data.properties!.hashed_token}&type=recovery&next=/reset-password`));
     expect(new URL(res.headers.get("location")!, SITE).pathname).toBe("/reset-password");
-    expect([...safariCookies.keys()].some((k) => /^sb-.+-auth-token/.test(k))).toBe(true);
+    // The session reaches the browser as cookies on the route's redirect (held back until the route has checked whose
+    // session it is, F-10).
+    expect(res.cookies.getAll().some((c) => /^sb-.+-auth-token/.test(c.name))).toBe(true);
   });
 
   it.skipIf(!mail)("a sign-up made in the app (PKCE) is confirmed by /auth/confirm with type=email, as the confirmation template links", async () => {
