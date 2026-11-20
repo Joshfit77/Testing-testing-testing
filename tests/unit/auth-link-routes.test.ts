@@ -3,7 +3,21 @@ import { NextRequest } from "next/server";
 
 const exchangeCodeForSession = vi.fn();
 const verifyOtp = vi.fn();
-vi.mock("@/lib/supabase/server", () => ({ getServerSupabase: async () => ({ auth: { exchangeCodeForSession, verifyOtp } }) }));
+/** Who is signed in in the browser opening the link (null: nobody). */
+const signedIn = { id: null as string | null };
+/** The cookie writes the auth client asks for (the routes decide whether they reach the browser). */
+let writeCookies: (c: { name: string; value: string; options?: Record<string, unknown> }[]) => void = () => {};
+vi.mock("@supabase/ssr", () => ({
+  createServerClient: (_url: string, _key: string, opts: { cookies: { setAll: typeof writeCookies } }) => {
+    writeCookies = opts.cookies.setAll;
+    return { auth: { getUser: async () => ({ data: { user: signedIn.id ? { id: signedIn.id } : null } }), exchangeCodeForSession, verifyOtp } };
+  },
+}));
+/** A link that signs in `userId`: the auth client writes that session's cookie, as Supabase does. */
+const signsIn = (userId: string) => async () => {
+  writeCookies([{ name: "sb-test-auth-token", value: `session-of-${userId}`, options: { path: "/" } }]);
+  return { data: { user: { id: userId }, session: { user: { id: userId } } }, error: null };
+};
 
 const { GET: callback } = await import("@/app/auth/callback/route");
 const { GET: confirm } = await import("@/app/auth/confirm/route");
@@ -23,6 +37,32 @@ describe("auth link routes", () => {
   beforeEach(() => {
     exchangeCodeForSession.mockReset();
     verifyOtp.mockReset();
+    signedIn.id = null;
+  });
+
+  it("a link for a different account than the one signed in here doesn't replace this browser's session (F-10)", async () => {
+    signedIn.id = "member-a";
+    verifyOtp.mockImplementation(signsIn("sender-b"));
+    const res = await confirm(at("/auth/confirm?token_hash=t&type=email&next=/onboarding"));
+    expect(location(res)).toBe("/home?link=other_account");
+    expect(res.cookies.get("sb-test-auth-token")).toBeUndefined();
+    exchangeCodeForSession.mockImplementation(signsIn("sender-b"));
+    const viaCode = await callback(at("/auth/callback?code=c&next=/home"));
+    expect(location(viaCode)).toBe("/home?link=other_account");
+    expect(viaCode.cookies.get("sb-test-auth-token")).toBeUndefined();
+  });
+
+  it("a link for the account already signed in, or opened while signed out, signs in as usual (Secure over HTTPS)", async () => {
+    signedIn.id = "member-a";
+    verifyOtp.mockImplementation(signsIn("member-a"));
+    const own = await confirm(at("/auth/confirm?token_hash=t&type=recovery&next=/reset-password"));
+    expect(location(own)).toBe("/reset-password");
+    expect(own.cookies.get("sb-test-auth-token")).toMatchObject({ value: "session-of-member-a", secure: true });
+    signedIn.id = null;
+    verifyOtp.mockImplementation(signsIn("new-member"));
+    const fresh = await confirm(at("/auth/confirm?token_hash=t&type=email&next=/onboarding"));
+    expect(location(fresh)).toBe("/onboarding");
+    expect(fresh.cookies.get("sb-test-auth-token")?.value).toBe("session-of-new-member");
   });
 
   it("a reset link whose code can't be exchanged (opened in another browser) goes to the reset page, not to sign-in", async () => {
@@ -33,11 +73,11 @@ describe("auth link routes", () => {
   });
 
   it("a successful exchange continues to the requested same-site page only", async () => {
-    exchangeCodeForSession.mockResolvedValue({ error: null });
+    exchangeCodeForSession.mockResolvedValue({ data: {}, error: null });
     expect(location(await callback(at("/auth/callback?next=/reset-password&code=abc")))).toBe("/reset-password");
     expect(location(await callback(at("/auth/callback?next=//evil.example&code=abc")))).toBe("/home");
     expect(location(await callback(at("/auth/callback?next=/.//evil.example&code=abc")))).toBe("/home");
-    verifyOtp.mockResolvedValue({ error: null });
+    verifyOtp.mockResolvedValue({ data: {}, error: null });
     expect(location(await confirm(at("/auth/confirm?token_hash=pkce_abc&type=email&next=/a/..//evil.example")))).toBe("/onboarding");
   });
 
@@ -48,7 +88,7 @@ describe("auth link routes", () => {
   });
 
   it("/auth/confirm verifies the token hash and continues; an invalid link goes to sign-in with a fixed message", async () => {
-    verifyOtp.mockResolvedValue({ error: null });
+    verifyOtp.mockResolvedValue({ data: {}, error: null });
     expect(location(await confirm(at("/auth/confirm?token_hash=pkce_abc&type=recovery&next=/reset-password")))).toBe("/reset-password");
     expect(verifyOtp).toHaveBeenCalledWith({ type: "recovery", token_hash: "pkce_abc" });
     expect(location(await confirm(at("/auth/confirm?token_hash=pkce_abc&type=email&next=/onboarding")))).toBe("/onboarding");
@@ -75,7 +115,7 @@ describe("auth link routes", () => {
     expect(verifyOtp).toHaveBeenCalledTimes(AUTH_LINK_LIMIT.limit);
     expect(authLinkMessage("link_busy")).toMatch(/wait a few minutes/);
     // Someone else, elsewhere, is unaffected.
-    verifyOtp.mockResolvedValue({ error: null });
+    verifyOtp.mockResolvedValue({ data: {}, error: null });
     expect(location(await confirm(from("198.51.100.20", "/auth/confirm?token_hash=real&type=signup")))).toBe("/onboarding");
   });
 });

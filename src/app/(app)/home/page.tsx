@@ -388,6 +388,12 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
       {sp.welcome && <Notice tone="success">Welcome to Narrow Gate Fitness, {name}! Your starter program is ready — today&apos;s session is below.</Notice>}
       {sp.password === "updated" && <Notice tone="success">Your password was updated.</Notice>}
+      {sp.link === "other_account" && (
+        <Notice tone="warning">
+          That email link was for a different account, so it wasn&apos;t used: you&apos;re still signed in as yourself. If it was meant for you, sign
+          out first and open it again.
+        </Notice>
+      )}
       {sp.built && active && (
         <Notice tone="success">
           Your custom program &ldquo;{active.programName}&rdquo; is built and active.{" "}
