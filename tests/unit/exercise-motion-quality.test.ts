@@ -51,7 +51,7 @@ describe("movement quality on the frames the player draws", () => {
       if (w.step > SNAP) bad.push(`${e.slug} ${w.key} ${w.step.toFixed(1)}°/frame at frame ${w.at} of ${frames.length}`);
     }
     expect(bad).toEqual([]);
-  });
+  }, 30_000); // Every frame of every exercise (~4.5 s on a 4-core machine, over 5 s under load): the time it needs, not a hang guard.
 
   it("slow exercises (lifts, mobility, core, stretches): no joint moves faster than 720°/s", () => {
     const bad: string[] = [];
