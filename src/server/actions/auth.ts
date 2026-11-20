@@ -142,7 +142,9 @@ export async function resendConfirmationAction(_prev: ActionState, formData: For
     email: email.data,
     options: { emailRedirectTo: `${publicEnv.siteUrl}/auth/callback?next=/onboarding` },
   });
-  if (error?.status === 429) return actionError("Please wait a minute before requesting another email.");
+  // Supabase's per-address limit (one email a minute) only applies to addresses that have an unconfirmed account, so a
+  // different reply on 429 would tell a stranger the address is registered. Same reply either way; logged for operators.
+  if (error?.status === 429) logError("auth.resend_throttled", error);
   // Generic response either way — don't reveal whether an account exists.
   return actionOk("If an unconfirmed account exists for that email, a new confirmation link is on its way.");
 }
@@ -167,8 +169,9 @@ export async function requestPasswordResetAction(_prev: ActionState, formData: F
   const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
     redirectTo: `${publicEnv.siteUrl}/auth/callback?next=/reset-password`,
   });
-  if (error?.status === 429) return actionError("Please wait a minute before requesting another email.");
-  if (error) logError("auth.reset_request", error);
+  // As above: Supabase throttles reset emails only for addresses that have an account, so a 429 gets the same reply
+  // as everything else (the member already has a link from under a minute ago).
+  if (error) logError(error.status === 429 ? "auth.reset_throttled" : "auth.reset_request", error);
   return actionOk("If an account exists for that email, you'll receive a password reset link shortly.");
 }
 
