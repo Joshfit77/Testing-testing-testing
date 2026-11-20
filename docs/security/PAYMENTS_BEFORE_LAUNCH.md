@@ -23,8 +23,8 @@ flow: `docs/MOBILE_BILLING.md`.
    (Sensitive), and `STRIPE_LIVE_APPROVED=true` once approved.
 2. Webhook endpoint `https://<site>/api/stripe/webhook` with the events listed in `docs/TESTFLIGHT_STEPS.md` (Stripe section).
 3. Price ids `STRIPE_PRICE_PRO`, `STRIPE_PRICE_PRO_YEARLY` (and Plus, if sold).
-4. **F-20:** disable "allow promotion codes" on Checkout unless you want codes, and keep the list of active codes
-   short.
+4. **F-20 (fixed in code):** Checkout no longer accepts promotion codes unless `STRIPE_ALLOW_PROMOTION_CODES=true`.
+   Only set it when you run a promotion, and keep the list of active codes in Stripe short.
 5. **F-21:** Billing portal: allow switching only between the prices above (Settings → Billing → Customer portal →
    Products).
 6. Turn on Stripe Radar rules for card testing (Stripe Dashboard → Radar), and 3-D Secure as Stripe recommends.

@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  */
 const state = { unitAmount: 1799, yearAmount: 11999, open: [{ id: "cs_old_1" }, { id: "cs_old_2" }] as { id: string }[] };
 const expire = vi.fn(async (id: string) => ({ id }));
-const create = vi.fn(async () => ({ url: "https://checkout.stripe.com/c/pay/cs_new" }));
+const create = vi.fn(async (_params?: Record<string, unknown>) => ({ url: "https://checkout.stripe.com/c/pay/cs_new" }));
 vi.mock("stripe", () => ({
   default: class {
     prices = {
@@ -19,7 +19,7 @@ vi.mock("stripe", () => ({
       },
     };
     subscriptions = { list: async () => ({ data: [] }) };
-    checkout = { sessions: { list: async () => ({ data: state.open }), expire: (id: string) => expire(id), create: () => create() } };
+    checkout = { sessions: { list: async () => ({ data: state.open }), expire: (id: string) => expire(id), create: (params: Record<string, unknown>) => create(params) } };
   },
 }));
 vi.mock("@/server/env", () => ({
@@ -50,6 +50,18 @@ describe("checkout guards", () => {
     expect(expire.mock.calls.map((c) => c[0])).toEqual(["cs_old_1", "cs_old_2"]);
     expect(create).toHaveBeenCalledTimes(1);
     expect(expire.mock.invocationCallOrder.at(-1)!).toBeLessThan(create.mock.invocationCallOrder[0]!);
+  });
+
+  it("doesn't accept promotion codes unless the owner switches them on (F-20)", async () => {
+    state.unitAmount = 1799;
+    delete process.env.STRIPE_ALLOW_PROMOTION_CODES;
+    const { createCheckoutSession } = await import("@/server/services/billing");
+    await createCheckoutSession("u1", "a@example.test", "pro", "month");
+    expect(create.mock.calls[0]![0]).toMatchObject({ allow_promotion_codes: false });
+    process.env.STRIPE_ALLOW_PROMOTION_CODES = "true";
+    await createCheckoutSession("u1", "a@example.test", "pro", "month");
+    expect(create.mock.calls[1]![0]).toMatchObject({ allow_promotion_codes: true });
+    delete process.env.STRIPE_ALLOW_PROMOTION_CODES;
   });
 
   it("refuses a Stripe price other than $17.99 even when the display price is overridden to match it", async () => {

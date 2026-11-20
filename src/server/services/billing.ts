@@ -202,7 +202,9 @@ export async function createCheckoutSession(userId: string, email: string | unde
     client_reference_id: userId,
     line_items: [{ price, quantity: 1 }],
     subscription_data: { metadata: { user_id: userId } },
-    allow_promotion_codes: true,
+    // Off unless the owner switches codes on (STRIPE_ALLOW_PROMOTION_CODES=true): otherwise any active code in the Stripe
+    // account, including one made for another product or leaked, discounted a subscription here (F-20).
+    allow_promotion_codes: process.env.STRIPE_ALLOW_PROMOTION_CODES === "true",
     success_url: `${publicEnv.siteUrl}/profile/billing?checkout=success`,
     cancel_url: `${publicEnv.siteUrl}/profile/billing?checkout=canceled`,
   });
