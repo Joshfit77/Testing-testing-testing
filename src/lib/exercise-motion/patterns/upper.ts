@@ -341,6 +341,50 @@ export function pikePushUp(id: string, label: string): MotionDef {
 
 /** Radius (cm) of the implement held in front of the face in a press: what the face must clear. */
 export const PRESS_IMPLEMENT_R = (implement: PressOpts["implement"]): number => (implement === "log" ? 15 : implement === "axle" ? 2.5 : 2);
+/**
+ * Minimise cost(a, b, c) over three ranges [lo, hi, step]: a coarse grid, then two finer passes around the best.
+ * Returns null when no candidate is feasible (cost returns null).
+ */
+function searchPose<T extends { cost: number }>(cost: (a: number, b: number, c: number) => T | null, A: [number, number, number], B: [number, number, number], C: [number, number, number]): T | null {
+  let best: { r: T; a: number; b: number; c: number } | null = null;
+  const tryAt = (a: number, b: number, c: number) => {
+    if (a < A[0] || a > A[1] || b < B[0] || b > B[1] || c < C[0] || c > C[1]) return;
+    const r = cost(a, b, c);
+    if (r && (!best || r.cost < best.r.cost)) best = { r, a, b, c };
+  };
+  for (let a = A[0]; a <= A[1]; a += A[2]) for (let b = B[0]; b <= B[1]; b += B[2]) for (let c = C[0]; c <= C[1]; c += C[2]) tryAt(a, b, c);
+  for (const f of [0.5, 0.25]) {
+    if (!best) break;
+    const b0: { a: number; b: number; c: number } = best;
+    for (const da of [-1, 0, 1]) for (const db of [-1, 0, 1]) for (const dc of [-1, 0, 1]) tryAt(b0.a + da * A[2] * f, b0.b + db * B[2] * f, b0.c + dc * C[2] * f);
+  }
+  return best ? (best as { r: T }).r : null;
+}
+
+/** Gap (cm) kept between a log or bar held against the body and the body's surface. */
+const CONTACT_GAP = 3;
+const segDist = (p: Vec, a: Vec, b: Vec) => {
+  const d: Vec = [b[0] - a[0], b[1] - a[1]];
+  const L2 = d[0] * d[0] + d[1] * d[1] || 1;
+  const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * d[0] + (p[1] - a[1]) * d[1]) / L2));
+  return Math.hypot(p[0] - a[0] - t * d[0], p[1] - a[1] - t * d[1]);
+};
+/**
+ * The gap (cm, negative = inside) between a round implement of radius r centred at c and the body in the side view:
+ * shins, thighs, the torso and the head, each as a capsule of its own thickness. Shared with the tests.
+ */
+export function implementBodyGap(W: Record<string, Vec>, c: Vec, r: number): number {
+  const parts = [
+    segDist(c, W.kneeR!, W.ankleR!) - 6.5,
+    segDist(c, W.kneeL!, W.ankleL!) - 6.5,
+    segDist(c, W.hipR!, W.kneeR!) - 9,
+    segDist(c, W.hipL!, W.kneeL!) - 9,
+    segDist(c, W.pelvis!, W.neckBase!) - 12,
+    Math.hypot(c[0] - W.head![0], c[1] - W.head![1]) - BODY.headR,
+  ];
+  return Math.min(...parts) - r;
+}
+
 /** How far (cm) the near edge of a bar or log stays in front of the face as it passes. */
 export const PRESS_FACE_GAP = 4;
 /** The most the head and torso lean back for the bar (degrees of the solver's lean); a log press leans back further. */
@@ -371,8 +415,18 @@ export function overheadPress(o: PressOpts): MotionDef {
   const sh = W.shoulder;
   const midX = seated ? sh[0] + 1 : 1;
   // Rack: bar resting on the front delts (barbell) or dumbbells beside the ears.
-  // A log (30 cm thick) rests on the upper chest under the chin, its centre just below shoulder height and well forward.
-  const rack: Vec = o.implement === "dumbbell" ? [sh[0] + 2, sh[1] + 6] : o.implement === "log" ? [sh[0] + 17, sh[1] - 2] : [sh[0] + 8, sh[1] + 4];
+  // A log (30 cm thick) rests against the upper chest, its centre one radius in front of the chest and just below
+  // shoulder height.
+  const rack: Vec =
+    o.implement === "dumbbell"
+      ? [sh[0] + 2, sh[1] + 6]
+      : o.implement === "log"
+        ? (() => {
+            let x = W.chest[0] + 10;
+            while (implementBodyGap(W, [x, sh[1] - 4], PRESS_IMPLEMENT_R("log")) < CONTACT_GAP) x += 0.25;
+            return [x, sh[1] - 4] as Vec;
+          })()
+        : [sh[0] + 8, sh[1] + 4];
   const reach = ARM * Math.cos((armD * Math.PI) / 180 / 2.2) - 1;
   const lockout: Vec = [midX, sh[1] + reach + 1];
   const P = (h: Vec, extra: Partial<Pose> = {}) => {
@@ -501,26 +555,88 @@ export function overheadPress(o: PressOpts): MotionDef {
     for (const k of [...rep.slice(half), ...rep.slice(0, half)]) specs.push(withIk(k));
   }
   if (o.clean) {
-    // Lift from the floor to the rack first: deadlift to the hips, then roll to the chest.
-    const floorY = o.implement === "log" ? 15 : 20;
-    const hingeP = pose({ ...stanceLegs(14, 75, 50), ...both({ armD }) });
-    let p0 = hingeP;
-    const W0 = worldPts(p0, root);
-    const floor: Vec = [W0.shoulder[0] - 2, floorY];
-    p0 = handsTo(p0, root, floor);
-    const lap = pose({ ...stanceLegs(10, 30, 20), ...both({ armD }) });
-    const W1 = worldPts(lap, root);
-    const lapH: Vec = [W1.hipCrease[0] + 8, W1.hipCrease[1] + 2];
+    // Lift from the floor to the rack first. The implement is held at its centre (a log's handles are inside it), so
+    // every position is solved for its whole round outline: on the floor in front of the shins, up the front of the
+    // thighs to the lap, then rolled up the belly to the chest, touching the body but never inside it.
+    const R = PRESS_IMPLEMENT_R(o.implement);
+    /** Move a centre forward (away from the body) until the implement clears it by CONTACT_GAP. */
+    const clearOf = (q: Pose, c: Vec): Vec => {
+      // The gap grows about as fast as the centre moves forward, so a few corrective steps settle it.
+      const W = worldPts(q, root);
+      let x = c[0];
+      for (let i = 0; i < 12; i++) {
+        const g = implementBodyGap(W, [x, c[1]], R);
+        if (g >= CONTACT_GAP) break;
+        x += Math.max(0.25, CONTACT_GAP - g);
+      }
+      return [x, c[1]];
+    };
+    // How far the hands reach from the shoulder with the arms a little out of the picture plane (as the press uses).
+    // On the floor and the lap the hands hang nearly straight down to the handles (little out of the picture plane).
+    const armC = 12;
+    const maxReach = ARM * Math.cos((armC * Math.PI) / 180 / 2.2) - 2;
+    /** Joint angles a person can hold: hips and knees inside their ranges with a margin. */
+    const humane = (q: Pose) => Math.max(q.hipL, q.hipR) <= 150 && Math.max(q.kneeL, q.kneeR) <= 140 && Math.min(q.ankleL, q.ankleR) >= -35 && Math.max(q.ankleL, q.ankleR) <= 35;
+    const reachOf = (q: Pose, c: Vec) => {
+      const Wq = worldPts(q, root);
+      return Math.hypot(c[0] - Wq.shoulder[0], c[1] - Wq.shoulder[1]);
+    };
+    // Floor: the implement on the floor just in front of the shins, arms long and hanging nearly straight down to it. A
+    // log rests on its own round body; a loaded axle on its plates.
+    const floorY = o.implement === "log" ? R : 20;
+    const floorAt = (shin: number, kn: number, tr: number) => {
+      const q = pose({ ...stanceLegs(shin, kn, tr), ...both({ armD: armC }), neck: -tr * 0.45 });
+      if (!humane(q)) return null;
+      const Wq = worldPts(q, root);
+      const c = clearOf(q, [Wq.ankleR[0], floorY]);
+      const reach = reachOf(q, c);
+      if (reach > maxReach) return null;
+      return { q, c, cost: ((reach - (maxReach - 3)) / 1.5) ** 2 + ((Wq.shoulder[0] - c[0]) / 4) ** 2 - Wq.pelvis[1] / 25 };
+    };
+    const fl = searchPose(floorAt, [4, 30, 6], [50, 140, 10], [20, 75, 6]) ?? { q: pose({ ...stanceLegs(14, 75, 50), ...both({ armD: armC }) }), c: [20, floorY] as Vec, cost: 0 };
+    // Lap: in a half squat with the torso inclined, the implement resting on the thighs near the hips.
+    const lapAt = (shin: number, kn: number, tr: number) => {
+      const q = pose({ ...stanceLegs(shin, kn, tr), ...both({ armD: armC }), neck: -tr * 0.5 });
+      if (!humane(q)) return null;
+      const Wq = worldPts(q, root);
+      // On top of the thighs, about three quarters of the way up to the hips.
+      const t: Vec = [Wq.kneeR[0] + (Wq.hipR[0] - Wq.kneeR[0]) * 0.72, Wq.kneeR[1] + (Wq.hipR[1] - Wq.kneeR[1]) * 0.72];
+      const want: Vec = [t[0], t[1] + 9 + R + CONTACT_GAP];
+      const c = clearOf(q, want);
+      const reach = reachOf(q, c);
+      if (reach > maxReach - 2) return null;
+      return { q, c, cost: ((tr - 32) / 6) ** 2 + ((reach - (maxReach - 12)) / 4) ** 2 + ((c[0] - want[0]) / 2) ** 2 };
+    };
+    const lp = searchPose(lapAt, [4, 26, 6], [30, 100, 10], [10, 50, 6]) ?? { q: pose({ ...stanceLegs(10, 30, 20), ...both({ armD: armC }) }), c: [20, 80] as Vec, cost: 0 };
+    // Belly: standing up with the implement rolled against the belly, about to come up the chest to the rack.
+    const bellyQ = pose({ ...stanceLegs(4, 14, -4), ...both({ armD }), neck: -6 });
+    const Wb = worldPts(bellyQ, root);
+    const bellyC = clearOf(bellyQ, [Wb.belly[0], Wb.belly[1] + 4]);
+    const toward = (q: Pose, c: Vec, extra: Partial<KeySpec> = {}): KeySpec => ({ pose: handsTo(q, root, c), ease: "inOut", ik: ik2(c), dur: 0.3, ...extra });
+    /** Between two keys: the blended body, with the blended centre pushed out of the body. */
+    const between = (qa: Pose, ca: Vec, qb: Pose, cb: Vec, k: number, dur: number): KeySpec => {
+      const q = mix(qa, qb, k);
+      return toward(q, clearOf(q, [ca[0] + (cb[0] - ca[0]) * k, ca[1] + (cb[1] - ca[1]) * k]), { dur });
+    };
+    const rackQ = at(0);
     specs.unshift(
-      { pose: p0, dur: 0.8, hold: 0.35, ease: "inOut", ik: ik2(floor) },
-      { pose: handsTo(lap, root, lapH), dur: 0.6, ease: "inOut", ik: ik2(lapH) },
+      toward(fl.q, fl.c, { dur: 0.35, hold: 0.35 }),
+      between(fl.q, fl.c, lp.q, lp.c, 0.35, 0.3),
+      between(fl.q, fl.c, lp.q, lp.c, 0.7, 0.3),
+      toward(lp.q, lp.c, { dur: 0.3, hold: 0.2 }),
+      between(lp.q, lp.c, bellyQ, bellyC, 0.5, 0.25),
+      toward(bellyQ, bellyC, { dur: 0.25 }),
+      between(bellyQ, bellyC, rackQ, rack, 0.5, 0.25),
     );
-    // After the press, back to the rack (the head still back), down the chest to the belly, then to the lap.
-    const belly: Vec = [rack[0] + 2, rack[1] - 24];
+    // After the press: back to the rack (the head still back), rolled down to the belly, the lap, and the floor.
     specs.push(
-      withIk({ pose: at(0), dur: 0.5, ease: "inOut" }),
-      { pose: P(belly, lean(leanAt(0) * 0.5)), dur: 0.35, ease: "inOut", ik: ik(belly) },
-      { pose: handsTo(lap, root, lapH), dur: 0.55, ease: "inOut", ik: ik2(lapH) },
+      withIk({ pose: rackQ, dur: 0.35, ease: "inOut" }),
+      between(rackQ, rack, bellyQ, bellyC, 0.5, 0.25),
+      toward(bellyQ, bellyC, { dur: 0.3 }),
+      between(bellyQ, bellyC, lp.q, lp.c, 0.5, 0.3),
+      toward(lp.q, lp.c, { dur: 0.35 }),
+      between(lp.q, lp.c, fl.q, fl.c, 0.35, 0.35),
+      between(lp.q, lp.c, fl.q, fl.c, 0.7, 0.35),
     );
   }
   return {

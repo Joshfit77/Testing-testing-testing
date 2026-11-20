@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 import { EXERCISES } from "@/data/exercises";
 import { getMotion, getMotionViews } from "@/lib/exercise-motion";
-import { PRESS_IMPLEMENT_R } from "@/lib/exercise-motion/patterns/upper";
+import { PRESS_IMPLEMENT_R, implementBodyGap } from "@/lib/exercise-motion/patterns/upper";
 import { BODY } from "@/lib/exercise-motion/skeleton";
 import { compileMotion, sampleFrames } from "@/lib/exercise-motion/timeline";
 import type { ExerciseMeta, Frame, MotionDef, PropDef, Vec } from "@/lib/exercise-motion/types";
@@ -124,4 +124,24 @@ describe("log press", () => {
       }
     });
   }
+});
+
+describe("the log never goes into the body (it went 20 cm into the shins, thighs and chest)", () => {
+  for (const slug of ["log-press", "strict-log-press"]) {
+    it(`${slug}: from the floor, up the thighs, rolled to the chest, overhead and back, the log only touches the body`, () => {
+      const def = getMotion(slug, meta(slug));
+      const log = implementOf(def)!;
+      let worst = Infinity;
+      for (const f of [...frames(def), ...frames(def, 120)]) worst = Math.min(worst, implementBodyGap(f.pts, at(f, log), PRESS_IMPLEMENT_R("log")));
+      // A centimetre of give where it rests on the thighs and chest; never further in.
+      expect(worst).toBeGreaterThan(-1);
+    });
+  }
+  it("log press starts with the log on the floor in front of the shins", () => {
+    const def = getMotion("log-press", meta("log-press"));
+    const f = frames(def)[0]!;
+    const c = at(f, implementOf(def)!);
+    expect(c[1]).toBeLessThan(PRESS_IMPLEMENT_R("log") + 1);
+    expect(c[0]).toBeGreaterThan(f.pts.ankleR[0] + PRESS_IMPLEMENT_R("log"));
+  });
 });

@@ -469,6 +469,24 @@ function farmerHandle(g: Gear) {
   }
 }
 
+const segDist2 = (p: Vec, a: Vec, b: Vec) => {
+  const d = sub(b, a);
+  const L2 = d[0] * d[0] + d[1] * d[1] || 1;
+  const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * d[0] + (p[1] - a[1]) * d[1]) / L2));
+  return Math.hypot(p[0] - a[0] - t * d[0], p[1] - a[1] - t * d[1]);
+};
+/** 0..1: how much the log's near half (centre c to end) covers the lifter's torso, head or near arm. */
+function logCover(f: Frame, c: Vec, end: Vec, r: number): number {
+  const P = f.pts;
+  let depth = -Infinity;
+  for (let k = 0; k <= 1.0001; k += 0.25) {
+    const q: Vec = [c[0] + (end[0] - c[0]) * k, c[1] + (end[1] - c[1]) * k];
+    depth = Math.max(depth, r + 12 - segDist2(q, P.pelvis, P.neckBase), r + BODY.headR - len(sub(q, P.head)), r + 5 - segDist2(q, P.shoulder, P.elbowR));
+  }
+  const t = Math.max(0, Math.min(1, (depth - 1) / 8));
+  return t * t * (3 - 2 * t);
+}
+
 /**
  * Strongman log: a thick steel cylinder across the body, the hands on the neutral handles inside it. Seen with the
  * camera, its near end face shows behind the hands and its far end in front.
@@ -482,6 +500,14 @@ function logBar(g: Gear) {
   const sc = half > 0 ? NEAR_SCALE : FAR_SCALE;
   const end: Vec = [c[0] + yawShift(70 * half) * sc, c[1]];
   const r = R * sc;
+  // The near half is drawn as a cutaway where it would hide the lifter (the torso, head or near arm behind it): the
+  // steel dims as one layer and the gold outline stays, as on the barbells' near plates. Solid, it read as a drum stuck
+  // in the chest.
+  const ghost = half > 0 ? logCover(g.f, c, end, r) : 0;
+  if (ghost > 0) {
+    ctx.save();
+    ctx.globalAlpha *= 1 - 0.82 * ghost;
+  }
   // The cylinder's side from its middle to this end.
   rrect(ctx, Math.min(c[0], end[0]), c[1] - r, Math.abs(end[0] - c[0]), 2 * r, 0);
   const gr = ctx.createLinearGradient(0, c[1] + r, 0, c[1] - r);
@@ -518,6 +544,19 @@ function logBar(g: Gear) {
     ctx.beginPath();
     ctx.arc(end[0] - 2.4, end[1], 2.6, 0, Math.PI * 2);
     ctx.fill();
+    if (ghost > 0) {
+      ctx.restore();
+      // The outline: the end face's rim and the cylinder's top and bottom edges back to the middle.
+      ctx.strokeStyle = `rgba(${GOLD},${0.9 * ghost})`;
+      ctx.lineWidth = Math.max(0.6, r * 0.04);
+      ctx.beginPath();
+      ctx.arc(end[0], end[1], r - 0.2, 0, Math.PI * 2);
+      ctx.moveTo(end[0], end[1] - r);
+      ctx.lineTo(c[0], c[1] - r);
+      ctx.moveTo(end[0], end[1] + r);
+      ctx.lineTo(c[0], c[1] + r);
+      ctx.stroke();
+    }
   } else {
     ctx.fillStyle = "#0a0a0b";
     ctx.beginPath();
