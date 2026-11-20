@@ -339,6 +339,13 @@ export function pikePushUp(id: string, label: string): MotionDef {
 
 // ------------------------------------------------------------------------------------- Overhead pressing
 
+/** Radius (cm) of the implement held in front of the face in a press: what the face must clear. */
+export const PRESS_IMPLEMENT_R = (implement: PressOpts["implement"]): number => (implement === "log" ? 15 : implement === "axle" ? 2.5 : 2);
+/** How far (cm) the near edge of a bar or log stays in front of the face as it passes. */
+export const PRESS_FACE_GAP = 4;
+/** The most the head and torso lean back for the bar (degrees of the solver's lean); a log press leans back further. */
+const PRESS_MAX_LEAN = (implement: PressOpts["implement"]) => (implement === "log" ? 22 : 16);
+
 export interface PressOpts {
   id: string;
   label: string;
@@ -364,10 +371,10 @@ export function overheadPress(o: PressOpts): MotionDef {
   const sh = W.shoulder;
   const midX = seated ? sh[0] + 1 : 1;
   // Rack: bar resting on the front delts (barbell) or dumbbells beside the ears.
-  const rack: Vec = o.implement === "dumbbell" ? [sh[0] + 2, sh[1] + 6] : o.implement === "log" ? [sh[0] + 12, sh[1] + 6] : [sh[0] + 8, sh[1] + 4];
+  // A log (30 cm thick) rests on the upper chest under the chin, its centre just below shoulder height and well forward.
+  const rack: Vec = o.implement === "dumbbell" ? [sh[0] + 2, sh[1] + 6] : o.implement === "log" ? [sh[0] + 17, sh[1] - 2] : [sh[0] + 8, sh[1] + 4];
   const reach = ARM * Math.cos((armD * Math.PI) / 180 / 2.2) - 1;
   const lockout: Vec = [midX, sh[1] + reach + 1];
-  const face: Vec = [midX + 3, W.head[1] + 2];
   const P = (h: Vec, extra: Partial<Pose> = {}) => {
     let p = { ...stand, ...extra };
     // Leaning the torso must not tilt the legs: hips are relative to the trunk.
@@ -391,85 +398,107 @@ export function overheadPress(o: PressOpts): MotionDef {
   if (seated) props.push({ id: "bench", kind: "inclineBench", at: [W.butt[0] - 6, 46], angle: 86, w: 70, h: 26, layer: "mid" });
 
   const specs: KeySpec[] = [];
+  // The bar travels in a near-vertical line: from the rack it drifts back over mid-foot by the time it reaches the
+  // forehead, then goes straight up. A bar (or log) in front of the face cannot pass through the head, so while it passes
+  // the chin, nose and forehead the head moves back out of its way (the torso leans back a few degrees and the chin
+  // lifts) and comes forward "through the window" under the bar at lockout. The push presses (leg drive) and the strict
+  // presses share this path and head movement, on the way up and on the way down.
+  // A log is so thick that it must stay forward until it is past the face, then comes back over mid-foot.
+  const [drift0, drift1] = o.implement === "log" ? [0.3, 0.85] : [0, 0.55];
+  const bar = (s: number): Vec => {
+    const k = Math.min(1, Math.max(0, (s - drift0) / (drift1 - drift0)));
+    const x = rack[0] + (lockout[0] - rack[0]) * (k * k * (3 - 2 * k));
+    return [x, rack[1] + (lockout[1] - rack[1]) * s];
+  };
+  const inFront = o.implement !== "dumbbell" && o.implement !== "kettlebell";
+  // Lean (degrees) applied as trunk lean-back and chin lift; the head's clearance from the bar's near edge (cm).
+  const lean = (L: number): Partial<Pose> => ({ trunk: stand.trunk - 0.45 * L, neck: -1.6 * L });
+  const clearance = (L: number, b: Vec) => {
+    const Wp = worldPts(P(b, lean(L)), root);
+    // Points of the face that can meet the bar: forehead, nose line (head centre forward) and chin.
+    const face = [Wp.foreheadFront, Wp.head, Wp.headTop];
+    let worst = Infinity;
+    for (const q of face) if (Math.abs(q[1] - b[1]) < PRESS_IMPLEMENT_R(o.implement) + 9) worst = Math.min(worst, b[0] - PRESS_IMPLEMENT_R(o.implement) - q[0]);
+    // A log is round and as wide as the head is tall: also keep it clear of the whole head (chin and jaw included).
+    if (o.implement === "log") worst = Math.min(worst, Math.hypot(b[0] - Wp.head[0], b[1] - Wp.head[1]) - PRESS_IMPLEMENT_R(o.implement) - BODY.headR);
+    return worst;
+  };
+  // The lean the head needs at a bar height (0 when the bar is below the chin or above the head).
+  const needAt = (s: number) => {
+    if (!inFront) return 0;
+    const b = bar(s);
+    if (clearance(0, b) >= PRESS_FACE_GAP) return 0;
+    return solve1D((L) => clearance(L, b) - PRESS_FACE_GAP, 0, PRESS_MAX_LEAN(o.implement), 14);
+  };
+  // Frames between two keys blend the head's lean and the bar's height separately, so each key leans enough for the
+  // bar anywhere near its own height (the most any bar position within ±NEAR of it needs). With the head at its
+  // natural height (neck 5.5 cm), leaning only for the bar at the key's own height let the bar cut into the forehead
+  // between keys.
+  const NEAR = 0.12;
+  const need = (s: number) => {
+    let L = 0;
+    for (let t = Math.max(0, s - NEAR); t <= Math.min(1, s + NEAR) + 1e-9; t += 0.02) L = Math.max(L, needAt(t));
+    return L;
+  };
+  // The largest lean on the way up, applied on a smooth bump around the head so the head eases back and forward again.
+  let peak = 0;
+  let peakS = 0.5;
+  for (let s = 0; s <= 1.0001; s += 0.05) {
+    const L = need(s);
+    if (L > peak) {
+      peak = L;
+      peakS = s;
+    }
+  }
+  const bump = (s: number) => {
+    const d = Math.abs(s - peakS) / 0.5;
+    return d >= 1 ? 0 : 0.5 + 0.5 * Math.cos(Math.PI * d);
+  };
+  const leanAt = (s: number) => Math.max(need(s), peak * bump(s));
+  const at = (s: number): Pose => P(bar(s), lean(leanAt(s)));
+  const withIk = (k: KeySpec): KeySpec => {
+    const b = worldPts(k.pose, root);
+    return { ...k, ik: ik(o.oneArm ? b.handR : b.hands) };
+  };
   if (o.drive) {
-    const dip = { ...pose({ ...stanceLegs(14, 26, -1) }), ...both({ armD }) };
-    const drive = { ...pose({ ...stanceLegs(-12, 0, -2) }), ...both({ armD }) };
-    const W2 = worldPts(P(rack, dip), root);
-    const rackDip: Vec = [W2.rack[0] + 1, W2.rack[1] + 1];
+    // Push press: a short dip at the knees with the bar on the shoulders, then one drive in which the legs straighten
+    // and launch the bar off the shoulders to about forehead height, and the arms finish the press to lockout. Then the
+    // bar comes down the same path to the shoulders, the head moving back out of its way again.
+    // About an 8 cm dip (knees ~48°), torso upright.
+    const dipLegs = pose({ ...stanceLegs(22, 48, -1) });
+    const legsAt = (k: number): Partial<Pose> => {
+      // k = 0 dipped, 1 standing; trunk lean and hip angles keep the legs' absolute angles when the head leans back.
+      const m = mix({ ...stand, ...dipLegs }, stand, k);
+      return { trunk: m.trunk, hipL: m.hipL, hipR: m.hipR, kneeL: m.kneeL, kneeR: m.kneeR, ankleL: m.ankleL, ankleR: m.ankleR };
+    };
+    const dropOf = (k: number) => worldPts(P(rack, legsAt(k)), root).shoulder[1] - W.shoulder[1];
+    const driveAt = (s: number, k: number): Pose => {
+      const L = leanAt(s);
+      const legs = legsAt(k);
+      const d = -0.45 * L;
+      const b = bar(s);
+      return P([b[0], b[1] + dropOf(k)], { ...legs, trunk: legs.trunk! + d, hipL: legs.hipL! + d, hipR: legs.hipR! + d, neck: -1.6 * L });
+    };
+    const ease = (x: number) => x * x * (3 - 2 * x);
     specs.push(
-      { pose: P(rack), dur: 0.45, hold: 0.4, ease: "inOut", ik: ik(rack) },
-      // One smooth drive from the bottom of the dip through the bar passing the face to lockout: it speeds up out of the
-      // dip and slows into lockout. ("out" started the drive at full speed after the pause in the dip, and "linear"
-      // carried the bar into lockout at full speed, stopping it dead in one frame.)
-      { pose: P(rackDip, dip), dur: 0.25, hold: 0.05, ease: "inOut", ik: ik(rackDip) },
-      { pose: P(face, drive), dur: 0.35, ease: "inOut", ik: ik(face) },
-      { pose: P(lockout), dur: 1.2, hold: 0.5, ease: "inOut", ik: ik(lockout) },
+      withIk({ pose: at(0), dur: 0.45, hold: 0.4, ease: "inOut" }),
+      // The dip: about a quarter squat, bar still on the shoulders.
+      withIk({ pose: driveAt(0, 0), dur: 0.3, hold: 0.05, ease: "inOut" }),
     );
+    // The drive: legs straighten while the bar leaves the shoulders (fast), then the arms press it out (slowing).
+    const up: [number, number, number][] = [[0.08, 0.45, 0.08], [0.16, 0.8, 0.08], [0.24, 0.95, 0.08], [0.32, 1, 0.08], [0.4, 1, 0.08], [0.5, 1, 0.1], [0.6, 1, 0.1], [0.72, 1, 0.12], [0.86, 1, 0.14], [1, 1, 0.18]];
+    for (const [s, k, dur] of up) specs.push(withIk({ pose: driveAt(s, k), dur, ease: "spline", ...(s === 1 ? { hold: 0.5 } : {}) }));
+    // Lowered under control to the shoulders along the same path (about 1.4 s).
+    for (const s of [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1]) specs.push(withIk({ pose: at(ease(s)), dur: 0.155, ease: "spline" }));
   } else {
     // A strict press, keyed densely (repSmooth: seven depths each way, cosine-spaced) so the bar eases off the shoulders
     // and into lockout and the elbows straighten smoothly; with three keys the elbows snapped straight at lockout (up to
-    // 10° in one frame). The bar travels in a near-vertical line: from the rack it drifts back over mid-foot by the time it
-    // reaches the forehead, then goes straight up. A bar in front of the face cannot pass through the head, so while it
-    // passes the chin, nose and forehead the head moves back out of its way (the torso leans back a few degrees from the
-    // ankles and the chin lifts) and comes forward "through the window" under the bar at lockout.
-    const bar = (s: number): Vec => {
-      const k = Math.min(1, s / 0.55);
-      const x = rack[0] + (lockout[0] - rack[0]) * (k * k * (3 - 2 * k));
-      return [x, rack[1] + (lockout[1] - rack[1]) * s];
-    };
-    const inFront = o.implement !== "dumbbell" && o.implement !== "kettlebell";
-    // Lean (degrees) applied as trunk lean-back and chin lift; the head's clearance from the bar's near edge (cm).
-    const lean = (L: number): Partial<Pose> => ({ trunk: stand.trunk - 0.45 * L, neck: -1.6 * L });
-    const BAR_R = o.implement === "log" ? 15 : 2;
-    const clearance = (L: number, b: Vec) => {
-      const Wp = worldPts(P(b, lean(L)), root);
-      // Points of the face that can meet the bar: forehead, nose line (head centre forward) and chin.
-      const face = [Wp.foreheadFront, Wp.head, Wp.headTop];
-      let worst = Infinity;
-      for (const q of face) if (Math.abs(q[1] - b[1]) < BAR_R + 9) worst = Math.min(worst, b[0] - BAR_R - q[0]);
-      return worst;
-    };
-    // The lean the head needs at a bar height (0 when the bar is below the chin or above the head).
-    const needAt = (s: number) => {
-      if (!inFront) return 0;
-      const b = bar(s);
-      if (clearance(0, b) >= 4) return 0;
-      return solve1D((L) => clearance(L, b) - 4, 0, 16, 14);
-    };
-    // Frames between two keys blend the head's lean and the bar's height separately, so each key leans enough for the
-    // bar anywhere near its own height (the most any bar position within ±NEAR of it needs). With the head at its
-    // natural height (neck 5.5 cm), leaning only for the bar at the key's own height let the bar cut into the forehead
-    // between keys.
-    const NEAR = 0.12;
-    const need = (s: number) => {
-      let L = 0;
-      for (let t = Math.max(0, s - NEAR); t <= Math.min(1, s + NEAR) + 1e-9; t += 0.02) L = Math.max(L, needAt(t));
-      return L;
-    };
-    // The largest lean on the way up, applied on a smooth bump around the head so the head eases back and forward again.
-    let peak = 0;
-    let peakS = 0.5;
-    for (let s = 0; s <= 1.0001; s += 0.05) {
-      const L = need(s);
-      if (L > peak) {
-        peak = L;
-        peakS = s;
-      }
-    }
-    const bump = (s: number) => {
-      const d = Math.abs(s - peakS) / 0.42;
-      return d >= 1 ? 0 : 0.5 + 0.5 * Math.cos(Math.PI * d);
-    };
-    const at = (s: number): Pose => P(bar(s), lean(Math.max(need(s), peak * bump(s))));
+    // 10° in one frame).
     // repSmooth runs from its "top" (here lockout, u = 0) down to its "bottom" (the rack, u = 1) and back: lowering
     // 1.6 s, pressing 1.1 s. Rotated so the loop starts with the bar on the shoulders.
     const rep = repSmooth((u) => at(1 - u), { down: 1.6, up: 1.1, holdTop: 0.45, holdBottom: 0.4 });
     const half = rep.length / 2;
-    for (const k of [...rep.slice(half), ...rep.slice(0, half)]) {
-      const b = worldPts(k.pose, root);
-      const h: Vec = o.oneArm ? b.handR : b.hands;
-      specs.push({ ...k, ik: ik(h) });
-    }
+    for (const k of [...rep.slice(half), ...rep.slice(0, half)]) specs.push(withIk(k));
   }
   if (o.clean) {
     // Lift from the floor to the rack first: deadlift to the hips, then roll to the chest.
@@ -486,8 +515,13 @@ export function overheadPress(o: PressOpts): MotionDef {
       { pose: p0, dur: 0.8, hold: 0.35, ease: "inOut", ik: ik2(floor) },
       { pose: handsTo(lap, root, lapH), dur: 0.6, ease: "inOut", ik: ik2(lapH) },
     );
-    // After the press, lower back to the floor.
-    specs.push({ pose: P(rack), dur: 0.7, ease: "inOut", ik: ik(rack) }, { pose: handsTo(lap, root, lapH), dur: 0.7, ease: "inOut", ik: ik2(lapH) });
+    // After the press, back to the rack (the head still back), down the chest to the belly, then to the lap.
+    const belly: Vec = [rack[0] + 2, rack[1] - 24];
+    specs.push(
+      withIk({ pose: at(0), dur: 0.5, ease: "inOut" }),
+      { pose: P(belly, lean(leanAt(0) * 0.5)), dur: 0.35, ease: "inOut", ik: ik(belly) },
+      { pose: handsTo(lap, root, lapH), dur: 0.55, ease: "inOut", ik: ik2(lapH) },
+    );
   }
   return {
     id: o.id,
