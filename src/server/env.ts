@@ -15,11 +15,14 @@ function listEnv(raw: string | undefined): string[] {
  * then checkout and the webhook behave as unconfigured, so a test or TestFlight deployment can't take real money.
  * Test keys (sk_test_) always work.
  */
+/** True for a live-mode Stripe key (secret or restricted); test keys start sk_test_ / rk_test_. */
+export const isLiveStripeKey = (key: string) => /^(sk|rk)_live_/.test(key);
+
 function stripeSecretKey(raw: string | undefined): string {
   // A demo deployment (DEMO_MODE=true) never takes payments, whatever keys it was given.
   if (demoModeOn()) return "";
   const key = raw ?? "";
-  return /^(sk|rk)_live_/.test(key) && process.env.STRIPE_LIVE_APPROVED !== "true" ? "" : key;
+  return isLiveStripeKey(key) && process.env.STRIPE_LIVE_APPROVED !== "true" ? "" : key;
 }
 
 /**

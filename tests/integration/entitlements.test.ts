@@ -89,6 +89,19 @@ describe.skipIf(!available)("subscriptions, webhooks & entitlements", async () =
     expect(await plan()).toMatchObject({ plan: "free" });
   });
 
+  it("ignores a correctly signed event from the other Stripe mode (live event, test key): nothing changes", async () => {
+    const sub = fakeSubscription({ metadata: { user_id: user.id } });
+    stripeSubs.set(sub.id, sub);
+    const event = { id: `evt_${crypto.randomUUID()}`, object: "event", livemode: true, type: "customer.subscription.created", data: { object: sub } };
+    const payload = JSON.stringify(event);
+    const signature = Stripe.webhooks.generateTestHeaderString({ payload, secret: process.env.STRIPE_WEBHOOK_SECRET! });
+    const res = await webhook(new NextRequest("http://localhost/api/stripe/webhook", { method: "POST", body: payload, headers: { "stripe-signature": signature } }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ received: true, ignored: "mode" });
+    expect(await plan()).toMatchObject({ plan: "free" });
+    stripeSubs.delete(sub.id);
+  });
+
   it("upgrades the entitlement from a verified subscription webhook, once per event", async () => {
     const sub = fakeSubscription({ metadata: { user_id: user.id } });
     stripeSubs.set(sub.id, sub);

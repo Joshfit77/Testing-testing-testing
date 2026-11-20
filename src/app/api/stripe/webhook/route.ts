@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getStripe, handleStripeEvent } from "@/server/services/billing";
-import { isServiceRoleConfigured, isStripeWebhookConfigured, serverEnv } from "@/server/env";
+import { isLiveStripeKey, isServiceRoleConfigured, isStripeWebhookConfigured, serverEnv } from "@/server/env";
 import { logError } from "@/server/log";
 import { webhookErrorCode } from "@/server/services/webhook-events";
 
@@ -34,6 +34,13 @@ export async function POST(request: NextRequest) {
   }
   if (!event || typeof event.id !== "string" || typeof event.type !== "string" || !event.data?.object) {
     return NextResponse.json({ error: "Invalid event" }, { status: 400 });
+  }
+  // A test-mode event must never change anything on a live-key deployment, nor a live event on a test one (a webhook
+  // endpoint pointed at the wrong deployment, or a shared signing secret). Acknowledged so Stripe stops retrying, logged,
+  // and ignored.
+  if (typeof event.livemode === "boolean" && event.livemode !== isLiveStripeKey(serverEnv.stripeSecretKey)) {
+    logError("stripe.webhook_mode_mismatch", new Error("event mode doesn't match the configured key"), { type: event.type, livemode: event.livemode });
+    return NextResponse.json({ received: true, ignored: "mode" });
   }
   try {
     const outcome = await handleStripeEvent(event);
