@@ -34,6 +34,7 @@ import {
   migrateDraft,
   nextUp,
   restorableDraft,
+  SIGNED_OUT_WORKOUT_MESSAGE,
   STALE_DRAFT_HOURS,
   supersetMembers,
   restRemaining,
@@ -102,23 +103,11 @@ type SyncState = "idle" | "saving" | "synced" | "local";
 
 /** How long a backup may take before it counts as not saved (the request may still land; the next one supersedes it). */
 export const BACKUP_TIMEOUT_MS = 20_000;
+/** Finishing writes the whole workout; past this it counts as not saved (the device copy stays, Finish can be tapped again). */
+export const FINISH_TIMEOUT_MS = 45_000;
 
-/** Rejects after `ms` if the promise hasn't settled; the promise itself carries on and its result is ignored. */
-export function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error("timeout")), ms);
-    p.then(
-      (v) => {
-        clearTimeout(t);
-        resolve(v);
-      },
-      (e) => {
-        clearTimeout(t);
-        reject(e);
-      },
-    );
-  });
-}
+import { withTimeout } from "@/lib/with-timeout";
+export { withTimeout };
 
 interface FinishResult {
   /** The saved session, for its full summary page. */
@@ -393,10 +382,14 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
     }
     if (res.ok) {
       retryDelay.current = 0;
-      setSync("synced");
+      // "Synced" only when the account has what is on screen: a change made while this one was on its way (still in
+      // the typing debounce) is not on the account yet.
+      setSync(latest.current === d ? "synced" : "local");
       return;
     }
     setSync("local");
+    // Signed out mid-workout: say so (once per message); the copy on the device stays and backups keep trying.
+    if (res.error === SIGNED_OUT_WORKOUT_MESSAGE) setError(SIGNED_OUT_WORKOUT_MESSAGE);
     // Try again later, waiting longer each time (gym Wi-Fi with no internet behind it, a server hiccup) rather than
     // hammering the connection; the next edit tries again sooner.
     retryDelay.current = Math.min(120_000, retryDelay.current ? retryDelay.current * 3 : 5_000);
@@ -421,6 +414,8 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
     }
     const ok = saveLocalDraft(userId, draft);
     if (!ok) setError("This device couldn't store your workout locally. Keep this tab open until you finish.");
+    // This change isn't on the account until a backup confirms it: never leave "Synced" showing meanwhile.
+    else setSync((s) => (s === "synced" || s === "idle" ? "local" : s));
     if (syncTimer.current) clearTimeout(syncTimer.current);
     if (saveNow.current) {
       // A completed (or skipped) set is backed up to the account straight away, not after the typing debounce.
@@ -910,7 +905,9 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
     const endedAt = asked.finishRequestedAt!;
     const finalDraft = asked.pausedAt ? workoutReducer(asked, { type: "resume", now: endedAt }) : asked;
     const payload = finishPayload(finalDraft, endedAt);
-    const res = await finishWorkoutAction(payload).catch(() => ({ ok: false as const, error: finishFailureMessage(navigator.onLine) }));
+    // A Finish that never answers counts as not saved (the device copy stays and Finish can be tapped again; a retry
+    // reuses the same workout id and end time, so a late success of the first can't make two workouts).
+    const res = await withTimeout(finishWorkoutAction(payload), FINISH_TIMEOUT_MS).catch(() => ({ ok: false as const, error: finishFailureMessage(navigator.onLine) }));
     setSaving(false);
     if (!res.ok) {
       setError(res.error);

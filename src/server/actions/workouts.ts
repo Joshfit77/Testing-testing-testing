@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { draftSnapshotSchema, editWorkoutSchema, finishWorkoutSchema } from "@/lib/validation/schemas";
-import { getProfile, requireUser } from "@/server/auth";
+import { getCurrentUser, getProfile, requireUser } from "@/server/auth";
+import { SIGNED_OUT_WORKOUT_MESSAGE } from "@/lib/domain/workout-draft";
 import { logError } from "@/server/log";
 import { badgesUnlockedBySession, type BadgeIconName, type BadgeTier } from "@/lib/domain/achievements";
 import { isoDateInTz } from "@/lib/domain/dates";
@@ -35,7 +36,9 @@ import { loadExerciseHistories } from "@/server/services/exercise-history";
 type Result<T> = { ok: true; data: T } | { ok: false; error: string };
 
 export async function syncWorkoutDraftAction(input: unknown): Promise<Result<null>> {
-  const user = await requireUser();
+  // No redirect when signed out: that pulled the member out of the workout mid-set. The logger keeps the device copy.
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: SIGNED_OUT_WORKOUT_MESSAGE };
   const parsed = draftSnapshotSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Invalid workout snapshot" };
   try {
@@ -116,7 +119,8 @@ export async function finishWorkoutAction(input: unknown): Promise<
     reflection: Reflection | null;
   }>
 > {
-  const user = await requireUser();
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: SIGNED_OUT_WORKOUT_MESSAGE };
   const parsed = finishWorkoutSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Some workout values are invalid. Check weights, reps and RPE." };
   if (!parsed.data.exercises.some((e) => !e.skipped && e.sets.some((s) => s.completed))) {

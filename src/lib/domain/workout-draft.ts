@@ -838,6 +838,13 @@ export function migrateDraft(value: unknown): WorkoutDraft | null {
  * on another device: the request is redirected to sign-in), so "you appear to be offline" would have the member retry
  * forever. The workout stays on the device either way and resumes after signing in.
  */
+/**
+ * What the backup and Finish answer when the sign-in has run out mid-workout. They used to redirect the whole app to
+ * the login page in the middle of a set; now the workout stays on screen and on this device, and the member is told.
+ */
+export const SIGNED_OUT_WORKOUT_MESSAGE =
+  "You've been signed out, so this workout isn't saved to your account yet. It's safe on this device: sign in again, then open Resume workout to save it.";
+
 export function finishFailureMessage(online: boolean): string {
   return online
     ? "We couldn't reach your account, so the workout isn't saved yet. It's kept on this device. If you were signed out, sign in again and finish it from Resume."

@@ -65,6 +65,24 @@ describe("signing out with a workout in progress", () => {
     expect(confirm).toHaveBeenCalledTimes(1);
   });
 
+  it("a backup that never answers can't hang signing out: after 20 s it counts as not saved and the member is asked", async () => {
+    vi.useFakeTimers();
+    try {
+      saveLocalDraft(USER, draft);
+      sync.mockImplementation(() => new Promise(() => {}));
+      confirm.mockResolvedValue(false);
+      const result = workoutSafeToClear(USER);
+      await vi.advanceTimersByTimeAsync(19_000);
+      expect(confirm).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1_000);
+      await expect(result).resolves.toBe(false);
+      expect(confirm).toHaveBeenCalledTimes(1);
+      expect(localStorage.getItem(localDraftKey(USER))).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("a workout the member already discarded doesn't hold up signing out", async () => {
     saveLocalDraft(USER, draft);
     rememberDiscard(USER, "c-1");

@@ -7,7 +7,11 @@ import { draftSnapshot } from "@/lib/domain/workout-draft";
 import { clearDeviceNotifications } from "@/lib/native-notifications";
 import { discardedWorkoutIds, loadLocalDraft } from "@/lib/workout-storage";
 import { confirmDialog } from "@/components/ui/confirm";
+import { withTimeout } from "@/lib/with-timeout";
 import { syncWorkoutDraftAction } from "@/server/actions/workouts";
+
+/** As long as a workout backup may take before it counts as not saved (BACKUP_TIMEOUT_MS in the logger). */
+const SIGN_OUT_SYNC_TIMEOUT_MS = 20_000;
 
 /** The workout in progress on this device that the account may not have yet (none once discarded). */
 function workoutAtRisk(userId: string) {
@@ -25,12 +29,13 @@ export async function workoutSafeToClear(userId: string): Promise<boolean> {
   const draft = workoutAtRisk(userId);
   if (!draft) return true;
   const online = typeof navigator === "undefined" || navigator.onLine !== false;
-  const saved = online ? await syncWorkoutDraftAction(draftSnapshot(draft)).then((r) => r.ok, () => false) : false;
+  // A request that never answers counts as not saved, so signing out can't hang; the member then gets the choice below.
+  const saved = online ? await withTimeout(syncWorkoutDraftAction(draftSnapshot(draft)), SIGN_OUT_SYNC_TIMEOUT_MS).then((r) => r.ok, () => false) : false;
   if (saved) return true;
   return confirmDialog({
     title: "Your workout isn't saved to your account yet",
     message:
-      "The workout in progress is only on this device, because the connection isn't working right now. If you sign out, it will be deleted from this device. Stay signed in and reconnect to keep it.",
+      "The workout in progress is only on this device: the connection isn't working, or your sign-in has run out. If you sign out, it will be deleted from this device. To keep it, cancel, reconnect (or sign in again) and open Resume workout.",
     confirmLabel: "Sign out and delete it",
     destructive: true,
   });
