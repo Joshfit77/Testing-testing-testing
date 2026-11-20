@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { completeOnboarding, PASSWORD, signUpAndConfirm, uniqueEmail } from "./helpers";
+import { completeOnboarding, getEmailLink, PASSWORD, signUpAndConfirm, uniqueEmail } from "./helpers";
 
 test.describe("authentication, onboarding and workout logging", () => {
   test("new athlete can sign up, onboard, log and finish a workout that survives a reload", async ({ page }) => {
@@ -80,5 +80,39 @@ test.describe("authentication, onboarding and workout logging", () => {
     await page.getByLabel("Email").fill(email);
     await page.getByRole("button", { name: "Send reset link" }).click();
     await expect(page.getByText(/you'll receive a password reset link/)).toBeVisible();
+
+    // The link in the email opens the new-password form; the new password then works and the old one doesn't.
+    const link = await getEmailLink(email, /http:\/\/localhost:3000\/auth\/confirm\?[^"'\s<]*type=recovery[^"'\s<]*/);
+    await page.goto(link);
+    await expect(page.getByRole("heading", { name: "New password" })).toBeVisible();
+    const fresh = `${PASSWORD}-new`;
+    await page.getByLabel("New password", { exact: true }).fill(fresh);
+    await page.getByLabel("Confirm new password").fill(fresh);
+    await page.getByRole("button", { name: "Update password" }).click();
+    await page.waitForURL(/\/home/);
+    await page.context().clearCookies();
+    await page.goto("/login");
+    await page.getByLabel("Email").fill(email);
+    await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await expect(page.getByText("Incorrect email or password.")).toBeVisible();
+    await page.getByLabel("Password", { exact: true }).fill(fresh);
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await page.waitForURL(/\/home/);
+  });
+
+  test("an ordinary signed-in session can't set a new password without the reset email (an unlocked phone)", async ({ page }) => {
+    const email = uniqueEmail("reset-guard");
+    await signUpAndConfirm(page, email);
+    await completeOnboarding(page);
+    await page.context().clearCookies();
+    await page.goto("/login");
+    await page.getByLabel("Email").fill(email);
+    await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await page.waitForURL(/\/home/);
+    await page.goto("/reset-password");
+    await expect(page.getByText(/can only be set from the link in a reset email/)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Update password" })).toHaveCount(0);
   });
 });

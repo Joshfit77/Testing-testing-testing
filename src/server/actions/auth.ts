@@ -10,6 +10,7 @@ import { emailSchema, newPasswordSchema, resetRequestSchema, signInSchema, signU
 import { signupAcceptances } from "@/lib/legal/versions";
 import { isFlagEnabled } from "@/server/flags";
 import { registerLegalVersions } from "@/server/legal";
+import { sessionOpenedByRecentEmailLink } from "@/server/auth";
 import { logError } from "@/server/log";
 import { clientIp, hashKey, rateLimitAll } from "@/server/rate-limit";
 import { authRateLimitScale } from "@/server/test-overrides";
@@ -17,6 +18,7 @@ import { authRateLimitScale } from "@/server/test-overrides";
 const MINUTE = 60_000;
 const TOO_MANY = "Too many attempts. Please wait a few minutes and try again.";
 const TOO_MANY_EMAILS = "Please wait a few minutes before requesting another email.";
+const RESET_LINK_NEEDED = "For your security, a new password can only be set from the link in a reset email opened in the last 30 minutes. Request a new link from Forgot password.";
 
 /**
  * App-level limits on the sign-in and email actions. These run on our servers, so Supabase's own per-address auth
@@ -181,6 +183,8 @@ export async function updatePasswordAction(_prev: ActionState, formData: FormDat
   const supabase = await getServerSupabase();
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) return actionError("Your reset link has expired. Please request a new one.");
+  // Only from a reset link opened in the last 30 minutes, never from an ordinary signed-in session (an unlocked phone).
+  if (!(await sessionOpenedByRecentEmailLink())) return actionError(RESET_LINK_NEEDED);
   if (await authLimited([{ key: `password-update:${userData.user.id}`, limit: 10, windowMs: 15 * MINUTE }])) return actionError(TOO_MANY);
   const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
   if (error) {

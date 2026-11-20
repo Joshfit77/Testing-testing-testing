@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
+import { openedByRecentEmailLink } from "@/lib/auth/password-reset-session";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { hasFeature, planFromEntitlement, type Feature } from "@/lib/domain/plans";
 import type { Plan } from "@/lib/domain/types";
@@ -14,6 +15,17 @@ export const getCurrentUser = cache(async (): Promise<User | null> => {
   if (error || !data.user) return null;
   return data.user;
 });
+
+/**
+ * True when this request's session was opened by an emailed link in the last 30 minutes (see
+ * lib/auth/password-reset-session.ts). getClaims verifies the access token before its claims are trusted.
+ */
+export async function sessionOpenedByRecentEmailLink(): Promise<boolean> {
+  const supabase = await getServerSupabase();
+  const { data, error } = await supabase.auth.getClaims();
+  if (error || !data?.claims) return false;
+  return openedByRecentEmailLink(data.claims.amr, Math.floor(Date.now() / 1000));
+}
 
 export async function requireUser(): Promise<User> {
   const user = await getCurrentUser();
