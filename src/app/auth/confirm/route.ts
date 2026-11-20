@@ -3,6 +3,7 @@ import type { EmailOtpType } from "@supabase/supabase-js";
 import { redirectToPath } from "@/lib/relative-redirect";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { safeNextPath } from "@/lib/safe-redirect";
+import { authLinkLimited } from "@/server/auth-link-limit";
 
 // Only the link types our own emails use (supabase/templates): fewer ways to slip someone a session-swapping link.
 const TYPES: EmailOtpType[] = ["signup", "recovery", "email"];
@@ -13,6 +14,7 @@ const TYPES: EmailOtpType[] = ["signup", "recovery", "email"];
  * made in the iPhone app; the PKCE code exchange in /auth/callback only works in the browser that made the request.
  */
 export async function GET(request: NextRequest) {
+  if (await authLinkLimited(request)) return redirectToPath("/login?error=link_busy");
   const url = new URL(request.url);
   const tokenHash = url.searchParams.get("token_hash");
   const type = url.searchParams.get("type") as EmailOtpType | null;

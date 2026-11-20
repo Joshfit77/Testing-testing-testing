@@ -69,7 +69,11 @@ export async function rateLimitAll(checks: { key: string; limit: number; windowM
 
 /** Best-effort client address from the hosting platform's proxy headers (for limits on signed-out requests). */
 export async function clientIp(): Promise<string> {
-  const h = await headers();
+  return clientIpFrom(await headers());
+}
+
+/** The same, from a route handler's own request headers. */
+export function clientIpFrom(h: Headers): string {
   const forwarded = h.get("x-forwarded-for")?.split(",")[0]?.trim();
   return (forwarded || h.get("x-real-ip") || "unknown").slice(0, 64);
 }

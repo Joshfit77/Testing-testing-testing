@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { redirectToPath } from "@/lib/relative-redirect";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { safeNextPath } from "@/lib/safe-redirect";
+import { authLinkLimited } from "@/server/auth-link-limit";
 import type { AuthLinkMessage } from "@/lib/auth-messages";
 
 const toLogin = (param: "error" | "notice", code: AuthLinkMessage) => redirectToPath(`/login?${param}=${code}`);
@@ -11,6 +12,7 @@ const toLogin = (param: "error" | "notice", code: AuthLinkMessage) => redirectTo
  * supabase/templates link to /auth/confirm instead, which works in any browser (see that route).
  */
 export async function GET(request: NextRequest) {
+  if (await authLinkLimited(request)) return redirectToPath("/login?error=link_busy");
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
   const next = safeNextPath(url.searchParams.get("next"), "/home");

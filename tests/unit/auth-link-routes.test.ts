@@ -8,6 +8,7 @@ vi.mock("@/lib/supabase/server", () => ({ getServerSupabase: async () => ({ auth
 const { GET: callback } = await import("@/app/auth/callback/route");
 const { GET: confirm } = await import("@/app/auth/confirm/route");
 const { authLinkMessage } = await import("@/lib/auth-messages");
+const { AUTH_LINK_LIMIT } = await import("@/server/auth-link-limit");
 
 const at = (path: string) => new NextRequest(new URL(path, "https://app.narrowgate.test"));
 // The routes redirect to a path (lib/relative-redirect): the browser resolves it against the address it used.
@@ -62,5 +63,19 @@ describe("auth link routes", () => {
     for (const crafted of ["Your account is locked. Call +1 555 0100", "constructor", "__proto__", "toString", "", undefined, ["link_invalid"]]) {
       expect(authLinkMessage(crafted)).toBeNull();
     }
+  });
+
+  it("too many link openings from one connection are stopped before Supabase is called; other connections are unaffected", async () => {
+    verifyOtp.mockResolvedValue({ error: { message: "Token has expired or is invalid" } });
+    const from = (ip: string, path: string) => new NextRequest(new URL(path, "https://app.narrowgate.test"), { headers: { "x-forwarded-for": ip } });
+    for (let i = 0; i < AUTH_LINK_LIMIT.limit; i++) expect(location(await confirm(from("203.0.113.9", `/auth/confirm?token_hash=guess${i}&type=recovery`)))).toBe("/login?error=link_invalid");
+    expect(verifyOtp).toHaveBeenCalledTimes(AUTH_LINK_LIMIT.limit);
+    expect(location(await confirm(from("203.0.113.9", "/auth/confirm?token_hash=one_more&type=recovery")))).toBe("/login?error=link_busy");
+    expect(location(await callback(from("203.0.113.9", "/auth/callback?code=x")))).toBe("/login?error=link_busy");
+    expect(verifyOtp).toHaveBeenCalledTimes(AUTH_LINK_LIMIT.limit);
+    expect(authLinkMessage("link_busy")).toMatch(/wait a few minutes/);
+    // Someone else, elsewhere, is unaffected.
+    verifyOtp.mockResolvedValue({ error: null });
+    expect(location(await confirm(from("198.51.100.20", "/auth/confirm?token_hash=real&type=signup")))).toBe("/onboarding");
   });
 });
