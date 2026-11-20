@@ -100,6 +100,26 @@ interface LoggerProps {
 type Phase = "loading" | "conflict" | "active" | "finished";
 type SyncState = "idle" | "saving" | "synced" | "local";
 
+/** How long a backup may take before it counts as not saved (the request may still land; the next one supersedes it). */
+export const BACKUP_TIMEOUT_MS = 20_000;
+
+/** Rejects after `ms` if the promise hasn't settled; the promise itself carries on and its result is ignored. */
+export function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error("timeout")), ms);
+    p.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      },
+    );
+  });
+}
+
 interface FinishResult {
   /** The saved session, for its full summary page. */
   sessionId: string;
@@ -360,7 +380,9 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
     }
     pushing.current = true;
     setSync("saving");
-    const res = await syncWorkoutDraftAction(draftSnapshot(d)).catch(() => ({ ok: false as const, error: "offline" }));
+    // A request that hangs (gym Wi-Fi with no internet behind it) must not hold up every later backup, and a timeout is
+    // never taken as saved: it counts as not saved, the copy on the device stays, and the next attempt sends again.
+    const res = await withTimeout(syncWorkoutDraftAction(draftSnapshot(d)), BACKUP_TIMEOUT_MS).catch(() => ({ ok: false as const, error: "offline" }));
     pushing.current = false;
     if (closed.current) return;
     if (pushAgain.current) {
