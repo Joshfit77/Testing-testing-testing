@@ -1265,18 +1265,48 @@ export function rearDeltFly(id: string, label: string): MotionDef {
 
 /** Geometry of the standing cable chest fly (front view), shared with its tests. */
 export const CHEST_FLY = {
-  /** Upper arm's horizontal angle from straight out to the side (negative = behind the body) at the stretch and squeeze. */
-  openDeg: -14,
-  closeDeg: 90,
-  /** How far the plane of the arc tilts below horizontal at the stretch and at the squeeze. */
-  dipOpenDeg: 8,
-  dipCloseDeg: 20,
-  /** The fixed elbow bend. */
-  elbowDeg: 20,
+  /** The hand's horizontal angle round the shoulder from straight out to the side (negative = behind the body). */
+  openDeg: -12,
+  closeDeg: 99,
+  /** How far the hand's arc drops below the shoulder's height (degrees below horizontal) at the stretch and squeeze. */
+  dipOpenDeg: 4,
+  dipCloseDeg: 15,
+  /** The fixed elbow bend (0 = straight arm). */
+  elbowDeg: 30,
+  /** Where the elbow points: out to the side and down, as when hugging a barrel (unnormalised: outward x, up y, forward z). */
+  elbowPole: [1, -0.35, 0] as const,
   /** Tower centres (± x); each pulley rides the tower's inner post. */
   towerX: 118,
   pulleyAboveShoulder: 2,
 };
+
+/**
+ * One arm of the cable fly at t (0 = stretch, 1 = squeeze), as 3D offsets from the shoulder projected into the front
+ * view ([x, y], x outward times k: +1 for the athlete's left on screen-right, -1 for the right), plus the 3D points.
+ */
+export function chestFlyArm(t: number, k: 1 | -1): { elbow: Vec; hand: Vec; elbow3: [number, number, number]; hand3: [number, number, number] } {
+  const D = Math.PI / 180;
+  const a = BODY.upperArm;
+  const b = BODY.forearm;
+  const inner = (180 - CHEST_FLY.elbowDeg) * D;
+  const reach = Math.sqrt(a * a + b * b - 2 * a * b * Math.cos(inner));
+  const phi = (CHEST_FLY.openDeg + (CHEST_FLY.closeDeg - CHEST_FLY.openDeg) * t) * D;
+  const dip = (CHEST_FLY.dipOpenDeg + (CHEST_FLY.dipCloseDeg - CHEST_FLY.dipOpenDeg) * t) * D;
+  // Hand: on the arc (x out to the side, y up, z forward).
+  const u: [number, number, number] = [k * Math.cos(dip) * Math.cos(phi), -Math.sin(dip), Math.cos(dip) * Math.sin(phi)];
+  const hand3: [number, number, number] = [u[0] * reach, u[1] * reach, u[2] * reach];
+  // Elbow: two-bone solution round the shoulder-hand axis, toward the pole.
+  const along = (a * a - b * b + reach * reach) / (2 * reach);
+  const h = Math.sqrt(Math.max(0, a * a - along * along));
+  const [px, py, pz] = CHEST_FLY.elbowPole;
+  const pole: [number, number, number] = [k * px, py, pz];
+  const dot = pole[0] * u[0] + pole[1] * u[1] + pole[2] * u[2];
+  let n: [number, number, number] = [pole[0] - dot * u[0], pole[1] - dot * u[1], pole[2] - dot * u[2]];
+  const nl = Math.hypot(n[0], n[1], n[2]) || 1;
+  n = [n[0] / nl, n[1] / nl, n[2] / nl];
+  const elbow3: [number, number, number] = [u[0] * along + n[0] * h, u[1] * along + n[1] * h, u[2] * along + n[2] * h];
+  return { elbow: [elbow3[0], elbow3[1]], hand: [hand3[0], hand3[1]], elbow3, hand3 };
+}
 
 export interface FrontArmOpts {
   id: string;
@@ -1309,26 +1339,23 @@ export function frontArms(o: FrontArmOpts): MotionDef {
       break;
     case "chest-fly": {
       // Standing mid-cable fly (pulleys at about shoulder height, as the instructions set them), seen from the front.
-      // The arm is posed in 3D and projected: the upper arm sweeps round the shoulder in a plane tilted a little
-      // downward, from slightly behind the body (the stretch) to pointing forward with the hands about 15 cm apart in
-      // front of the lower chest (the squeeze). The elbow keeps the same ~20° bend all the way: a hug, not a press.
-      // Soft knees and a slight forward lean of the trunk; the hands, and so the cables, stay at chest height.
+      // Each arm is posed in 3D and projected. The hand travels on an arc round the shoulder, a fixed distance from it
+      // (the elbow keeps one slight bend: a hug, not a press), from out to the side and a little behind the body (the
+      // stretch) to in front of the lower chest, the hands closing toward each other (the squeeze). The elbows point out
+      // and down, as when hugging a barrel, so the bend shows from the front and the forearms never cross. A raised
+      // camera was tried and dropped: from above, hands reaching forward look as if they drop to the hips.
+      // Soft knees and a slight forward lean of the trunk.
       const base = F({ ...both({ hip: 7, knee: 9, ankle: 4 }), trunkD: 12 });
       const W0 = worldPts(base, root, "front");
-      const D = Math.PI / 180;
       const flyAt = (t: number): Pose => {
         let p = base;
-        const th = (CHEST_FLY.openDeg + (CHEST_FLY.closeDeg - CHEST_FLY.openDeg) * t) * D;
-        const dip = (CHEST_FLY.dipOpenDeg + (CHEST_FLY.dipCloseDeg - CHEST_FLY.dipOpenDeg) * t) * D;
-        const bend = CHEST_FLY.elbowDeg * D;
         for (const side of ["L", "R"] as const) {
           const k = side === "L" ? 1 : -1;
           const sh = W0[`shoulder${side}`];
-          // Projected direction of a segment at horizontal angle a (0 = straight out to the side, 90 = straight ahead).
-          const dir = (a: number): Vec => [k * Math.cos(dip) * Math.cos(a), -Math.sin(dip)];
-          const elbow: Vec = [sh[0] + BODY.upperArm * dir(th)[0], sh[1] + BODY.upperArm * dir(th)[1]];
-          const hand: Vec = [elbow[0] + BODY.forearm * dir(th + bend)[0], elbow[1] + BODY.forearm * dir(th + bend)[1]];
-          p = armThrough(p, side, toLocal(p, root, elbow, "front"), toLocal(p, root, hand, "front"), "front");
+          const { elbow, hand } = chestFlyArm(t, k);
+          const E: Vec = [sh[0] + elbow[0], sh[1] + elbow[1]];
+          const H: Vec = [sh[0] + hand[0], sh[1] + hand[1]];
+          p = armThrough(p, side, toLocal(p, root, E, "front"), toLocal(p, root, H, "front"), "front");
         }
         return p;
       };

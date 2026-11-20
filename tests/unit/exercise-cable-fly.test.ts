@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { EXERCISES } from "@/data/exercises";
 import { getMotion } from "@/lib/exercise-motion";
-import { CHEST_FLY } from "@/lib/exercise-motion/patterns/upper";
+import { CHEST_FLY, chestFlyArm } from "@/lib/exercise-motion/patterns/upper";
 import { compileMotion, evaluate } from "@/lib/exercise-motion/timeline";
 import type { ExerciseMeta, Frame, MotionDef, Vec } from "@/lib/exercise-motion/types";
 
@@ -77,10 +77,28 @@ describe("cable chest fly", () => {
     const reach = dist(widest.pts.shoulderL, widest.pts.handL);
     const full = 32 + 31;
     expect(reach).toBeGreaterThan(full * 0.9);
-    // The upper arm sweeps from slightly behind the body to straight ahead.
+    // The hand sweeps round the shoulder from slightly behind the body to just past straight ahead (toward the midline).
     expect(CHEST_FLY.openDeg).toBeLessThan(0);
-    expect(CHEST_FLY.closeDeg).toBeGreaterThanOrEqual(85);
-    expect(CHEST_FLY.closeDeg).toBeLessThanOrEqual(95);
+    expect(CHEST_FLY.closeDeg).toBeGreaterThanOrEqual(90);
+    expect(CHEST_FLY.closeDeg).toBeLessThanOrEqual(105);
+  });
+
+  it("the elbows point out and down: wider than the hands at the squeeze, below the shoulder-to-hand line at the stretch", () => {
+    const sq = chestFlyArm(1, 1);
+    expect(sq.elbow[0], "elbow outside the hand").toBeGreaterThan(sq.hand[0] + 8);
+    const st = chestFlyArm(0, 1);
+    // At the stretch the elbow sits below the straight line from the shoulder to the hand, so the bend shows.
+    const lineY = (st.hand[1] * st.elbow[0]) / st.hand[0];
+    expect(st.elbow[1]).toBeLessThan(lineY - 3);
+    // The elbow keeps the same bend in 3D all the way.
+    for (const t of [0, 0.25, 0.5, 0.75, 1]) {
+      const a = chestFlyArm(t, 1);
+      const u = a.elbow3;
+      const f = [a.hand3[0] - u[0], a.hand3[1] - u[1], a.hand3[2] - u[2]];
+      const [fx, fy, fz] = f as [number, number, number];
+      const cos = (u[0] * fx + u[1] * fy + u[2] * fz) / (Math.hypot(...u) * Math.hypot(fx, fy, fz));
+      expect((Math.acos(cos) * 180) / Math.PI).toBeCloseTo(CHEST_FLY.elbowDeg, 0);
+    }
   });
 
   it("keeps the hands at chest height through the whole arc (never above the shoulders, never down at the hips)", () => {
