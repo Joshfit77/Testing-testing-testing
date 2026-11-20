@@ -18,8 +18,11 @@ const available = await stackAvailable();
 
 const jpeg = () => new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0xff, 0xd9])], { type: "image/jpeg" });
 
-/** Tables where an admin legitimately sees other members' rows: the shared catalog (private programs are not personal data). */
-const ADMIN_MAY_SEE = new Set(["training_programs"]);
+/**
+ * Tables where an admin legitimately sees other members' rows. None: since migration 083 an admin sees only the shared
+ * program library (programs with no owner), not members' private programs.
+ */
+const ADMIN_MAY_SEE = new Set<string>();
 
 describe.skipIf(!available)("cross-user isolation sweep: every user-owned table and private bucket", () => {
   const svc = serviceClient();
