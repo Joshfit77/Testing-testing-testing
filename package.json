@@ -21,7 +21,7 @@
     "demo:reset": "bash scripts/demo/reset-demo.sh",
     "test:unit": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
-    "icons": "node scripts/render-icons.mjs && capacitor-assets generate --ios --android --iconBackgroundColor '#090909' --splashBackgroundColor '#090909'",
+    "icons": "node scripts/render-icons.mjs && capacitor-assets generate --assetPath resources --ios --android --iconBackgroundColor '#090909' --splashBackgroundColor '#090909'",
     "cap:sync": "cap sync",
     "cap:android": "cap open android",
     "cap:ios": "cap open ios",
@@ -71,7 +71,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@capacitor/assets": "^3.0.5",
+    "@capacitor/assets": "^4.0.0",
     "@capacitor/cli": "^8.5.3",
     "@eslint/eslintrc": "^3.3.7",
     "@playwright/test": "^1.64.1",
