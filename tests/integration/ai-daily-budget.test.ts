@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { anonClient, createTestUser, deleteTestUser, serviceClient, snapshotAiBudgets, stackAvailable, type TestUser } from "./helpers";
+import { anonClient, createTestUser, deleteTestUser, makeAdmin, serviceClient, snapshotAiBudgets, stackAvailable, type TestUser } from "./helpers";
 
 const available = await stackAvailable();
 
@@ -215,7 +215,7 @@ describe.skipIf(!available)("AI cost report (aggregates only)", () => {
   beforeAll(async () => {
     [member, admin] = await Promise.all([createTestUser("report-member"), createTestUser("report-admin")]);
     restore = await snapshotAiBudgets();
-    await svc.from("profiles").update({ role: "admin" }).eq("id", admin.id);
+    await makeAdmin(admin);
   });
   afterAll(async () => {
     await svc.from("ai_usage_events").delete().eq("user_id", member.id);

@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 export const url = () => process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -79,4 +80,36 @@ export async function snapshotAiBudgets(now = new Date()): Promise<() => Promise
     if (d.data) await svc.from("ai_budget_days").upsert(d.data);
     else await svc.from("ai_budget_days").delete().eq("day", day);
   };
+}
+
+/** RFC 6238 time-based one-time code (SHA-1, 30 s, 6 digits), as an authenticator app computes it, for tests. */
+export function totpCode(secretBase32: string, at: number = Date.now()): string {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let bits = "";
+  for (const ch of secretBase32.replace(/=+$/, "").toUpperCase()) {
+    const v = alphabet.indexOf(ch);
+    if (v < 0) continue;
+    bits += v.toString(2).padStart(5, "0");
+  }
+  const key = Buffer.from((bits.match(/.{8}/g) ?? []).map((b) => parseInt(b, 2)));
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(Math.floor(at / 1000 / 30)));
+  const mac = createHmac("sha1", key).update(counter).digest();
+  const offset = mac[mac.length - 1]! & 0x0f;
+  const n = (mac.readUInt32BE(offset) & 0x7fffffff) % 1_000_000;
+  return n.toString().padStart(6, "0");
+}
+
+/**
+ * Make a test user an administrator as the app requires (migration 085): role admin, plus an authenticator enrolled and
+ * verified, so their client's session is at aal2. A password-only session of an admin has no admin rights.
+ */
+export async function makeAdmin(user: TestUser): Promise<{ factorId: string; secret: string }> {
+  const { error: roleErr } = await serviceClient().from("profiles").update({ role: "admin" }).eq("id", user.id);
+  if (roleErr) throw roleErr;
+  const { data, error } = await user.client.auth.mfa.enroll({ factorType: "totp", friendlyName: `test-${crypto.randomUUID().slice(0, 8)}` });
+  if (error || !data) throw error ?? new Error("enroll failed");
+  const { error: vErr } = await user.client.auth.mfa.challengeAndVerify({ factorId: data.id, code: totpCode(data.totp.secret) });
+  if (vErr) throw vErr;
+  return { factorId: data.id, secret: data.totp.secret };
 }

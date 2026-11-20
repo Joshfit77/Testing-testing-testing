@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { anonClient, createTestUser, deleteTestUser, exerciseIds, grantPlan, serviceClient, stackAvailable, type TestUser } from "./helpers";
+import { anonClient, createTestUser, deleteTestUser, exerciseIds, grantPlan, makeAdmin, serviceClient, stackAvailable, type TestUser } from "./helpers";
 
 /**
  * A member's own (unpublished) training program, all the way down: the program, its weeks, days and exercises.
@@ -21,8 +21,7 @@ describe.skipIf(!available)("a member's private training program is invisible an
   beforeAll(async () => {
     [alice, bob, admin] = await Promise.all([createTestUser("prog-alice"), createTestUser("prog-bob"), createTestUser("prog-admin")]);
     await Promise.all([grantPlan(alice, "pro"), grantPlan(bob, "pro")]);
-    const { error: roleErr } = await svc.from("profiles").update({ role: "admin" }).eq("id", admin.id);
-    if (roleErr) throw roleErr;
+    await makeAdmin(admin);
     squat = (await exerciseIds(["back-squat"]))["back-squat"]!;
     const seed = async (table: string, row: Record<string, unknown>) => {
       const { data, error } = await svc.from(table).insert(row).select("id").single();

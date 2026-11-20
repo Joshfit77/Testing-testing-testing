@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createTestUser, deleteTestUser, grantPlan, serviceClient, stackAvailable, type TestUser } from "./helpers";
+import { createTestUser, deleteTestUser, grantPlan, makeAdmin, serviceClient, stackAvailable, type TestUser } from "./helpers";
 
 const available = await stackAvailable();
 const BUCKET = "body-scans";
@@ -19,7 +19,7 @@ describe.skipIf(!available)("body scans: consent, plan and isolation", async () 
   beforeAll(async () => {
     [pro, plus, other, admin] = await Promise.all([createTestUser("scan-pro"), createTestUser("scan-plus"), createTestUser("scan-other"), createTestUser("scan-admin")]);
     await Promise.all([grantPlan(pro, "pro"), grantPlan(plus, "plus"), grantPlan(other, "pro")]);
-    await serviceClient().from("profiles").update({ role: "admin" }).eq("id", admin.id);
+    await makeAdmin(admin);
   });
   afterAll(async () => {
     for (const u of [pro, plus, other, admin]) if (u) await removeUserFolder(serviceClient(), BUCKET, u.id);

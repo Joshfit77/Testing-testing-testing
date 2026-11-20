@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { LEGAL_PAGES } from "@/lib/legal/versions";
-import { createTestUser, deleteTestUser, exerciseIds, grantPlan, serviceClient, stackAvailable, type TestUser } from "./helpers";
+import { createTestUser, deleteTestUser, exerciseIds, grantPlan, makeAdmin, serviceClient, stackAvailable, type TestUser } from "./helpers";
 import { NOT_EXPORTED, removeUserFolder, removeUserStorage, USER_STORAGE_BUCKETS, USER_TABLES } from "@/server/services/account";
 import { generateInviteCode } from "@/lib/domain/accountability";
 
@@ -127,7 +127,7 @@ describe.skipIf(!available)("account deletion closure: nothing that names the me
       .update({ role: "admin", wellness_consent_at: now, ai_data_consent_at: now, body_scan_consent_at: now, food_photo_consent_at: now, coach_memory_enabled: true })
       .eq("id", member.id);
     if (pErr) throw pErr;
-    await svc.from("profiles").update({ role: "admin" }).eq("id", otherAdmin.id);
+    await makeAdmin(otherAdmin);
     const exerciseId = (await exerciseIds(["back-squat"]))["back-squat"]!;
     const u = member.id;
     const seed = async (table: string, row: Record<string, unknown>): Promise<Record<string, string>> => {

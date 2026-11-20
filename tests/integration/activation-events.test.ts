@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { finishWorkout, saveDraftSnapshot, discardDraft, deleteWorkout } from "@/server/services/workouts";
-import { createTestUser, deleteTestUser, exerciseIds, serviceClient, stackAvailable, type TestUser } from "./helpers";
+import { createTestUser, deleteTestUser, exerciseIds, makeAdmin, serviceClient, stackAvailable, type TestUser } from "./helpers";
 
 /**
  * First-workout activation events (migration 051): written by the database from the workouts the server stores,
@@ -60,7 +60,7 @@ describe.skipIf(!available)("activation events", () => {
 
   beforeAll(async () => {
     [member, other, admin] = await Promise.all([createTestUser("activation-member"), createTestUser("activation-other"), createTestUser("activation-admin")]);
-    await svc.from("profiles").update({ role: "admin" }).eq("id", admin.id);
+    await makeAdmin(admin);
     squat = (await exerciseIds(["goblet-squat"]))["goblet-squat"]!;
   });
   afterAll(async () => {

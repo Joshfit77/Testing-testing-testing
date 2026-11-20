@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createTestUser, deleteTestUser, serviceClient, stackAvailable, type TestUser } from "./helpers";
+import { createTestUser, deleteTestUser, makeAdmin, stackAvailable, type TestUser } from "./helpers";
 
 const available = await stackAvailable();
 
@@ -10,7 +10,7 @@ describe.skipIf(!available)("supplement and step tables: RLS & constraints", () 
 
   beforeAll(async () => {
     [alice, bob, admin] = await Promise.all([createTestUser("ss-alice"), createTestUser("ss-bob"), createTestUser("ss-admin")]);
-    await serviceClient().from("profiles").update({ role: "admin" }).eq("id", admin.id);
+    await makeAdmin(admin);
     const writes = await Promise.all([
       alice.client.from("supplement_stack").insert({ user_id: alice.id, supplement_id: "creatine" }),
       alice.client.from("supplement_logs").insert({ user_id: alice.id, supplement_id: "creatine", taken_on: "2026-10-17" }),

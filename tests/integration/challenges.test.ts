@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createTestUser, deleteTestUser, serviceClient, stackAvailable, type TestUser } from "./helpers";
+import { createTestUser, deleteTestUser, makeAdmin, serviceClient, stackAvailable, type TestUser } from "./helpers";
 
 const available = await stackAvailable();
 const SLUG = "narrow-gate-40";
@@ -13,7 +13,7 @@ describe.skipIf(!available)("faith challenge tables: RLS & constraints", () => {
 
   beforeAll(async () => {
     [alice, bob, admin] = await Promise.all([createTestUser("ch-alice"), createTestUser("ch-bob"), createTestUser("ch-admin")]);
-    await serviceClient().from("profiles").update({ role: "admin" }).eq("id", admin.id);
+    await makeAdmin(admin);
 
     const { data: e, error } = await alice.client
       .from("challenge_enrollments")

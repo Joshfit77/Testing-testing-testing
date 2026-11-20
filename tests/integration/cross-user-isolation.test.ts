@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { LEGAL_PAGES } from "@/lib/legal/versions";
-import { anonClient, createTestUser, deleteTestUser, exerciseIds, grantPlan, serviceClient, stackAvailable, type TestUser } from "./helpers";
+import { anonClient, createTestUser, deleteTestUser, exerciseIds, grantPlan, makeAdmin, serviceClient, stackAvailable, type TestUser } from "./helpers";
 import { removeUserStorage, USER_STORAGE_BUCKETS, USER_TABLES } from "@/server/services/account";
 import { generateInviteCode } from "@/lib/domain/accountability";
 
@@ -52,7 +52,7 @@ describe.skipIf(!available)("cross-user isolation sweep: every user-owned table 
     [alice, bob, admin] = await Promise.all([createTestUser("iso-alice"), createTestUser("iso-bob"), createTestUser("iso-admin")]);
     // Bob gets the same plan and consents as Alice, so in the write probes below only ownership can stop him.
     await Promise.all([grantPlan(alice, "pro"), grantPlan(bob, "pro")]);
-    await svc.from("profiles").update({ role: "admin" }).eq("id", admin.id);
+    await makeAdmin(admin);
     const now = new Date().toISOString();
     const { error: pErr } = await svc
       .from("profiles")

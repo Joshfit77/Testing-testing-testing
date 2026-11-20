@@ -49,10 +49,26 @@ export async function requireOnboardedUser(): Promise<{ user: User; profile: Pro
   return { user, profile };
 }
 
+/**
+ * Whether this request's session was verified with a second factor (an authenticator code): aal2 in the verified
+ * access token. The database's is_admin() requires the same (migration 085).
+ */
+export async function sessionHasSecondFactor(): Promise<boolean> {
+  const supabase = await getServerSupabase();
+  const { data, error } = await supabase.auth.getClaims();
+  return !error && data?.claims?.aal === "aal2";
+}
+
+/**
+ * An administrator, signed in with a second factor (F-8). An admin whose session is password-only is sent to
+ * /admin/mfa to enrol an authenticator (first time) or enter its code; nothing admin happens until then. Everyone else
+ * goes Home.
+ */
 export async function requireAdmin(): Promise<{ user: User; profile: ProfileRow }> {
   const user = await requireUser();
   const profile = await getProfile(user.id);
   if (profile?.role !== "admin") redirect("/home");
+  if (!(await sessionHasSecondFactor())) redirect("/admin/mfa");
   return { user, profile: profile! };
 }
 

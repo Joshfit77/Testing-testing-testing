@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createTestUser, deleteTestUser, serviceClient, stackAvailable, type TestUser } from "./helpers";
+import { createTestUser, deleteTestUser, makeAdmin, serviceClient, stackAvailable, type TestUser } from "./helpers";
 
 const available = await stackAvailable();
 const BUCKET = "progress-photos";
@@ -15,7 +15,7 @@ describe.skipIf(!available)("progress photos: row and storage isolation", () => 
 
   beforeAll(async () => {
     [alice, bob, admin] = await Promise.all([createTestUser("photo-alice"), createTestUser("photo-bob"), createTestUser("photo-admin")]);
-    await serviceClient().from("profiles").update({ role: "admin" }).eq("id", admin.id);
+    await makeAdmin(admin);
     alicePath = `${alice.id}/${crypto.randomUUID()}.jpg`;
     const { error: upErr } = await alice.client.storage.from(BUCKET).upload(alicePath, jpeg(), { contentType: "image/jpeg" });
     if (upErr) throw upErr;

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { exportUserData } from "@/server/services/account";
-import { createTestUser, deleteTestUser, serviceClient, stackAvailable, type TestUser } from "./helpers";
+import { createTestUser, deleteTestUser, makeAdmin, serviceClient, stackAvailable, type TestUser } from "./helpers";
 
 const available = await stackAvailable();
 
@@ -13,7 +13,7 @@ describe.skipIf(!available)("food_favorites: RLS, constraints, export and deleti
 
   beforeAll(async () => {
     [alice, bob, admin] = await Promise.all([createTestUser("fav-alice"), createTestUser("fav-bob"), createTestUser("fav-admin")]);
-    await serviceClient().from("profiles").update({ role: "admin" }).eq("id", admin.id);
+    await makeAdmin(admin);
     const { error } = await alice.client.from("food_favorites").insert([
       { user_id: alice.id, food_key: "usda:171477", name: "Chicken breast", basis },
       { user_id: alice.id, food_key: "off:3017620422003", name: "Hazelnut spread", basis, detail: "Open Food Facts" },

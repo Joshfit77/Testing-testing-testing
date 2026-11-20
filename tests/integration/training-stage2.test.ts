@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { exportUserData } from "@/server/services/account";
 import { createTemplate, deleteTemplate, getTemplate, listTemplates, updateTemplate } from "@/server/services/templates";
 import { finishWorkout, getPreviousPerformance } from "@/server/services/workouts";
-import { createTestUser, deleteTestUser, exerciseIds, serviceClient, stackAvailable, type TestUser } from "./helpers";
+import { createTestUser, deleteTestUser, exerciseIds, makeAdmin, serviceClient, stackAvailable, type TestUser } from "./helpers";
 
 const available = await stackAvailable();
 
@@ -16,7 +16,7 @@ describe.skipIf(!available)("training stage 2B: templates, distance, previous pe
 
   beforeAll(async () => {
     [alice, bob, admin] = await Promise.all([createTestUser("tpl-alice"), createTestUser("tpl-bob"), createTestUser("tpl-admin")]);
-    await serviceClient().from("profiles").update({ role: "admin" }).eq("id", admin.id);
+    await makeAdmin(admin);
     ids = await exerciseIds(["bench-press", "one-arm-dumbbell-row", "farmers-carry"]);
     templateId = await createTemplate(alice.client, alice.id, {
       name: "Push pull carry",

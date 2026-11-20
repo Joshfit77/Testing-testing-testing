@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createTestUser, deleteTestUser, serviceClient, stackAvailable, type TestUser } from "./helpers";
+import { createTestUser, deleteTestUser, makeAdmin, stackAvailable, type TestUser } from "./helpers";
 
 const available = await stackAvailable();
 
@@ -23,7 +23,7 @@ describe.skipIf(!available)("sleep sessions: consent, isolation, overlap and imp
 
   beforeAll(async () => {
     [owner, other, admin] = await Promise.all([createTestUser("sleep-owner"), createTestUser("sleep-other"), createTestUser("sleep-admin")]);
-    await serviceClient().from("profiles").update({ role: "admin" }).eq("id", admin.id);
+    await makeAdmin(admin);
   });
   afterAll(async () => {
     await Promise.all([deleteTestUser(owner), deleteTestUser(other), deleteTestUser(admin)]);

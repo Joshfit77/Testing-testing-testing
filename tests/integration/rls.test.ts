@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { anonClient, createTestUser, deleteTestUser, exerciseIds, serviceClient, stackAvailable, type TestUser, grantPlan } from "./helpers";
+import { anonClient, createTestUser, deleteTestUser, exerciseIds, grantPlan, makeAdmin, serviceClient, stackAvailable, type TestUser } from "./helpers";
 
 const available = await stackAvailable();
 
@@ -16,7 +16,7 @@ describe.skipIf(!available)("row level security & data isolation", () => {
     [alice, bob, admin] = await Promise.all([createTestUser("alice"), createTestUser("bob"), createTestUser("admin")]);
     // Alice saves an AI plan below, a Pro feature the database checks.
     await grantPlan(alice, "pro");
-    await serviceClient().from("profiles").update({ role: "admin" }).eq("id", admin.id);
+    await makeAdmin(admin);
     ex = await exerciseIds(["back-squat", "bench-press"]);
 
     const { data: s, error } = await alice.client
