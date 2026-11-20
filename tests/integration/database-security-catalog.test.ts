@@ -70,6 +70,43 @@ describe.skipIf(!available)("database security invariants (live catalog)", () =>
     }
   });
 
+  it("admin rights reach only the shared library and admin tables, never members' own rows", () => {
+    // Every policy that grants anything to admins, by table. Member data must never appear here; where a table mixes
+    // library rows and members' own rows (foods, programs), the admin part is limited to rows with no owner.
+    const ADMIN_SCOPE = ["admin_audit_logs", "content_items", "exercise_alternatives", "exercise_media", "exercises", "feature_flags", "foods", "objects", "program_categories", "training_programs"];
+    const rows = sql(`
+      select tablename, coalesce(qual, '') || ' ' || coalesce(with_check, '') from pg_policies
+      where schemaname in ('public', 'storage') and (qual ilike '%is_admin%' or with_check ilike '%is_admin%')`);
+    for (const [table, expr] of rows) {
+      expect(ADMIN_SCOPE, `admin policy on ${table}`).toContain(table);
+      if (table === "foods" || table === "training_programs") {
+        const uses = expr!.match(/is_admin\(\)/g)?.length ?? 0;
+        const scoped = expr!.match(/owner_id IS NULL\) AND is_admin\(\)/g)?.length ?? 0;
+        expect(scoped, `${table}: every admin grant limited to rows with no owner`).toBe(uses);
+      }
+    }
+  });
+
+  it("admin rights need a second factor in the database itself (is_admin requires aal2, F-8)", () => {
+    const [[def]] = sql(`select replace(pg_get_functiondef('public.is_admin()'::regprocedure), E'\\n', ' ')`) as [[string]];
+    expect(def).toMatch(/'aal2'/);
+  });
+
+  it("members can never write billing or entitlement tables (subscriptions can't be forged)", () => {
+    const BILLING = ["billing_customers", "billing_state_versions", "legacy_plan_terms", "revenuecat_events", "sandbox_testers", "store_subscriptions", "store_sync_state", "stripe_events", "subscriptions", "user_entitlements"];
+    const present = sql(`select relname from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r' and relname = any('{${BILLING.join(",")}}')`).map((r) => r[0]);
+    expect(present.sort()).toEqual([...BILLING].sort());
+    const writes = sql(`select tablename || ' ' || policyname || ' ' || cmd from pg_policies where schemaname = 'public' and tablename = any('{${BILLING.join(",")}}') and cmd <> 'SELECT'`);
+    expect(writes.map((r) => r[0])).toEqual([]);
+  });
+
+  it("no table has a column for payment card or bank details (cards are handled by Stripe and Apple only)", () => {
+    const cols = sql(`
+      select table_name || '.' || column_name from information_schema.columns
+      where table_schema = 'public' and column_name ~* '(card_?number|^card$|cvv|cvc|^pan$|iban|routing_number|account_number|bank_account|expiry_(month|year))'`);
+    expect(cols.map((r) => r[0])).toEqual([]);
+  });
+
   it("only the exercise-media bucket is public; members' photos and scans are private", () => {
     const buckets = Object.fromEntries(sql(`select id, public::text from storage.buckets order by 1`).map(([id, pub]) => [id!, pub === "true"]));
     expect(buckets).toMatchObject({ avatars: false, "progress-photos": false, "body-scans": false, "exercise-media": true });
