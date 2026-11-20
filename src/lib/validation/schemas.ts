@@ -206,6 +206,8 @@ export const finishWorkoutSchema = z.object({
   pausedSeconds: z.number().int().min(0).max(86400 * 2),
   notes: z.string().max(2000),
   exercises: z.array(workoutExerciseSchema).max(40),
+  /** The account revision this device last saw (F-30); null when it never had one; absent from older clients. */
+  baseRev: z.number().int().min(0).nullable().optional(),
 });
 export type FinishWorkoutInput = z.infer<typeof finishWorkoutSchema>;
 
@@ -224,6 +226,8 @@ export const draftSnapshotSchema = z.object({
   userProgramId: z.string().uuid().nullable(),
   programDayId: z.string().uuid().nullable(),
   draft: z.record(z.string(), z.unknown()),
+  /** The account revision this copy was built on (F-30); null for a workout never confirmed on the account. */
+  baseRev: z.number().int().min(0).nullable().optional(),
 });
 
 // --------------------------------------------------------------------------- Body tracking

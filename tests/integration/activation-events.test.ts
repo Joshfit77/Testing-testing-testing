@@ -28,6 +28,14 @@ describe.skipIf(!available)("activation events", () => {
     draft: { version: 2, clientId, exercises: [{ id: "k1", exerciseId: squat, sets: completed.map((c) => ({ id: crypto.randomUUID(), reps: 8, weightKg: null, completed: c })) }] },
   });
 
+  // Each backup names the revision the account gave the previous one (F-30), as the logger does.
+  const revs = new Map<string, number>();
+  const save = async (u: TestUser, snapshot: ReturnType<typeof draft>) => {
+    const res = await saveDraftSnapshot(u.client, u.id, { ...snapshot, baseRev: revs.get(snapshot.clientId) ?? null });
+    if (res.status === "saved") revs.set(snapshot.clientId, res.rev);
+    return res;
+  };
+
   const finish = (u: TestUser, clientId: string) =>
     finishWorkout(u.client, u.id, {
       clientId,
@@ -61,12 +69,12 @@ describe.skipIf(!available)("activation events", () => {
 
   it("a synced workout: started once, first completed set once, completed once — no duplicates from repeated saves", async () => {
     const id = crypto.randomUUID();
-    await saveDraftSnapshot(member.client, member.id, draft(id, [false, false]));
-    await saveDraftSnapshot(member.client, member.id, draft(id, [false, false]));
+    await save(member, draft(id, [false, false]));
+    await save(member, draft(id, [false, false]));
     expect(await events(member)).toEqual([{ event: "workout_started", workout_client_id: id, source: "sync" }]);
 
-    await saveDraftSnapshot(member.client, member.id, draft(id, [true, false]));
-    await saveDraftSnapshot(member.client, member.id, draft(id, [true, true]));
+    await save(member, draft(id, [true, false]));
+    await save(member, draft(id, [true, true]));
     await finish(member, id);
     await finish(member, id); // a retried finish
     expect(await events(member)).toEqual([
@@ -88,7 +96,7 @@ describe.skipIf(!available)("activation events", () => {
 
   it("discarding an in-progress workout is abandonment; deleting a finished one from history is not", async () => {
     const left = crypto.randomUUID();
-    await saveDraftSnapshot(member.client, member.id, draft(left, [true]));
+    await save(member, draft(left, [true]));
     await discardDraft(member.client, member.id, left);
     const done = (await svc.from("workout_sessions").select("id, client_id").eq("user_id", member.id).eq("status", "completed").single()).data!;
     await deleteWorkout(member.client, member.id, done.id as string);
@@ -189,7 +197,7 @@ describe.skipIf(!available)("activation events", () => {
 
   it("deleting an account with a workout in progress removes its events and records no abandonment", async () => {
     const leaving = await createTestUser("activation-leaving");
-    await saveDraftSnapshot(leaving.client, leaving.id, draft(crypto.randomUUID(), [true]));
+    await save(leaving, draft(crypto.randomUUID(), [true]));
     expect((await events(leaving)).length).toBe(2);
     const { error } = await svc.auth.admin.deleteUser(leaving.id);
     expect(error).toBeNull();

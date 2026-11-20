@@ -10,7 +10,7 @@ import type { Plan } from "@/lib/domain/types";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getUserPlan, requireOnboardedUser } from "@/server/auth";
 import { getProgramDay } from "@/server/services/training";
-import { getExerciseTargets, getPreviousPerformance, getServerDraft } from "@/server/services/workouts";
+import { getExerciseTargets, getPreviousPerformance, getServerDrafts } from "@/server/services/workouts";
 import { getTemplate } from "@/server/services/templates";
 import { migrateDraft } from "@/lib/domain/workout-draft";
 import { repeatFromSession, type RepeatSource } from "@/lib/domain/workout-templates";
@@ -25,10 +25,10 @@ export default async function WorkoutPage({ searchParams }: { searchParams: Prom
   const { user, profile } = await requireOnboardedUser();
   const supabase = await getServerSupabase();
 
-  const [exRes, altRes, serverDraft] = await Promise.all([
+  const [exRes, altRes, serverDrafts] = await Promise.all([
     supabase.from("exercises").select("id, slug, name, is_timed, category, equipment, primary_muscles, secondary_muscles, instructions, form_cues, common_mistakes").eq("is_published", true).order("name"),
     supabase.from("exercise_alternatives").select("exercise_id, alternative_id"),
-    getServerDraft(supabase, user.id),
+    getServerDrafts(supabase, user.id),
   ]);
   const catalog: CatalogItem[] = (exRes.data ?? []).map((e) => ({
     id: e.id as string,
@@ -137,7 +137,7 @@ export default async function WorkoutPage({ searchParams }: { searchParams: Prom
   }
 
   // "Last time" for the exercises this workout starts with (more are fetched as exercises are added).
-  const restored = migrateDraft(serverDraft);
+  const restored = migrateDraft(serverDrafts[0]?.draft ?? null);
   const startIds = [...(template?.exercises.map((e) => e.exercise.id) ?? []), ...(restored?.exercises.map((e) => e.exerciseId) ?? [])];
   // Which program day this is (from the link, or the workout being resumed): "last time" prefers the same day of the
   // program, and a deload week doesn't pre-fill last week's weights.
@@ -149,7 +149,7 @@ export default async function WorkoutPage({ searchParams }: { searchParams: Prom
 
   return (
     <>
-      <WorkoutLogger userId={user.id} units={profile.unit_system} catalog={catalog} alternatives={alternatives} serverDraft={serverDraft}
+      <WorkoutLogger userId={user.id} units={profile.unit_system} catalog={catalog} alternatives={alternatives} serverDrafts={serverDrafts}
         notice={notice}
         template={template}
         previous={previous}

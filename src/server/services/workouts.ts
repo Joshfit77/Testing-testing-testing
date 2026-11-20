@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { bestsFromSets, detectNewRecords, totalVolume, type LoggedSet, type PersonalBest, type RecordType } from "@/lib/domain/strength";
 import type { EditWorkoutInput, FinishWorkoutInput } from "@/lib/validation/schemas";
 import { preferSameSession, type PreviousPerformance, type PreviousRow, type SessionSlot } from "@/lib/domain/previous-performance";
+import { mergeFinishedExercises } from "@/lib/domain/workout-merge";
 import { advanceProgram } from "./training";
 
 export class WorkoutError extends Error {
@@ -12,6 +13,20 @@ export class WorkoutError extends Error {
   ) {
     super(message);
     this.name = "WorkoutError";
+  }
+}
+
+/**
+ * Finish was tapped on a copy older than the account's (another device or tab saved this workout since): nothing was
+ * saved; the device combines its copy with `draft` (revision `rev`) and finishes again.
+ */
+export class DraftConflictError extends Error {
+  constructor(
+    public rev: number,
+    public draft: unknown,
+  ) {
+    super("This workout was changed on another device.");
+    this.name = "DraftConflictError";
   }
 }
 
@@ -25,54 +40,109 @@ export function computeSessionVolume(exercises: ExerciseInput[]): number {
   return totalVolume(exercises.filter((e) => !e.skipped).flatMap((e) => toLogged(e.sets)));
 }
 
-/** Persist an in-progress snapshot so a workout can be restored on reload or another device. */
-export async function saveDraftSnapshot(
-  supabase: SupabaseClient,
-  userId: string,
-  input: { clientId: string; name: string; startedAt: string; userProgramId: string | null; programDayId: string | null; draft: Record<string, unknown> },
-): Promise<void> {
-  const { data: existing, error: selErr } = await supabase
-    .from("workout_sessions")
-    .select("id, status")
-    .eq("user_id", userId)
-    .eq("client_id", input.clientId)
-    .maybeSingle();
-  if (selErr) throw new WorkoutError(selErr.message);
-  if (existing && existing.status !== "in_progress") return; // never resurrect a finished/discarded workout
-  if (existing) {
-    const { error } = await supabase
-      .from("workout_sessions")
-      .update({ name: input.name, draft: input.draft })
-      .eq("id", existing.id)
-      .eq("status", "in_progress");
-    if (error) throw new WorkoutError(error.message);
-    return;
-  }
-  const { error } = await supabase.from("workout_sessions").insert({
-    user_id: userId,
-    client_id: input.clientId,
-    name: input.name,
-    started_at: input.startedAt,
-    status: "in_progress",
-    user_program_id: input.userProgramId,
-    program_day_id: input.programDayId,
-    draft: input.draft,
-  });
-  // A concurrent insert of the same client id is fine — the unique constraint protects us.
-  if (error && error.code !== "23505") throw new WorkoutError(error.message);
+/**
+ * What happened to a backup of an unfinished workout (F-29/F-30). Only "saved" means the account now has this copy.
+ *  - saved: stored as revision `rev`.
+ *  - conflict: the account has a different copy (another device or tab saved since this one last looked, or this
+ *    device never saw the account's copy): nothing was stored; `draft` is the account's copy at revision `rev`, which
+ *    the device combines with its own (lib/domain/workout-merge.ts) and sends again on that revision.
+ *  - finished: the workout was finished (on another device); a backup never brings it back. The device keeps its copy
+ *    and its Finish adds any sets the saved workout lacks.
+ *  - discarded: the workout had been backed up before and is gone now (discarded on another device); it is not
+ *    created again.
+ */
+export type DraftSaveResult =
+  | { status: "saved"; rev: number }
+  | { status: "conflict"; rev: number; draft: unknown }
+  | { status: "finished" }
+  | { status: "discarded" };
+
+export interface DraftSnapshotInput {
+  clientId: string;
+  name: string;
+  startedAt: string;
+  userProgramId: string | null;
+  programDayId: string | null;
+  draft: Record<string, unknown>;
+  /** The revision this copy was built on: null for a workout this device has never had confirmed on the account. */
+  baseRev?: number | null;
 }
 
-export async function getServerDraft(supabase: SupabaseClient, userId: string): Promise<unknown | null> {
+/** Persist an in-progress snapshot so a workout can be restored on reload or another device, never over a newer copy. */
+export async function saveDraftSnapshot(supabase: SupabaseClient, userId: string, input: DraftSnapshotInput): Promise<DraftSaveResult> {
+  const current = async () => {
+    const { data, error } = await supabase
+      .from("workout_sessions")
+      .select("id, status, draft, draft_rev")
+      .eq("user_id", userId)
+      .eq("client_id", input.clientId)
+      .maybeSingle();
+    if (error) throw new WorkoutError(error.message);
+    return data as { id: string; status: string; draft: unknown; draft_rev: number } | null;
+  };
+  const answer = (row: { status: string; draft: unknown; draft_rev: number }): DraftSaveResult =>
+    row.status !== "in_progress" ? { status: "finished" } : { status: "conflict", rev: row.draft_rev, draft: row.draft };
+
+  const existing = await current();
+  if (!existing) {
+    // Backed up before (it has a revision) and gone now: discarded elsewhere. Never created again.
+    if (input.baseRev) return { status: "discarded" };
+    const { error } = await supabase.from("workout_sessions").insert({
+      user_id: userId,
+      client_id: input.clientId,
+      name: input.name,
+      started_at: input.startedAt,
+      status: "in_progress",
+      user_program_id: input.userProgramId,
+      program_day_id: input.programDayId,
+      draft: input.draft,
+      draft_rev: 1,
+    });
+    if (!error) return { status: "saved", rev: 1 };
+    if (error.code !== "23505") throw new WorkoutError(error.message);
+    // Another tab or device created it a moment earlier: its copy is the account's now.
+    const raced = await current();
+    if (!raced) throw new WorkoutError("The workout could not be saved. Try again.");
+    return answer(raced);
+  }
+  if (existing.status !== "in_progress") return { status: "finished" }; // never resurrect a finished workout
+  if (input.baseRev === undefined || input.baseRev === null || input.baseRev !== existing.draft_rev) return answer(existing);
+  const { data: stored, error } = await supabase
+    .from("workout_sessions")
+    .update({ name: input.name, draft: input.draft, draft_rev: input.baseRev + 1 })
+    .eq("id", existing.id)
+    .eq("status", "in_progress")
+    .eq("draft_rev", input.baseRev)
+    .select("id");
+  if (error) throw new WorkoutError(error.message);
+  if (stored?.length) return { status: "saved", rev: input.baseRev + 1 };
+  // Changed (or finished) between the read and the write: report what is there now.
+  const now = await current();
+  return now ? answer(now) : { status: "discarded" };
+}
+
+/** One unfinished workout as the account holds it. */
+export interface ServerDraftRow {
+  draft: unknown;
+  rev: number;
+}
+
+/** Every unfinished workout on the account, most recently changed first (a few at most). */
+export async function getServerDrafts(supabase: SupabaseClient, userId: string): Promise<ServerDraftRow[]> {
   const { data } = await supabase
     .from("workout_sessions")
-    .select("draft")
+    .select("draft, draft_rev")
     .eq("user_id", userId)
     .eq("status", "in_progress")
     .not("draft", "is", null)
     .order("updated_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  return data?.draft ?? null;
+    .limit(5);
+  return ((data ?? []) as { draft: unknown; draft_rev: number }[]).map((r) => ({ draft: r.draft, rev: Number(r.draft_rev) || 0 }));
+}
+
+/** The most recently changed unfinished workout (kept for callers that need only one). */
+export async function getServerDraft(supabase: SupabaseClient, userId: string): Promise<unknown | null> {
+  return (await getServerDrafts(supabase, userId))[0]?.draft ?? null;
 }
 
 export async function discardDraft(supabase: SupabaseClient, userId: string, clientId: string): Promise<void> {
@@ -207,13 +277,19 @@ export async function finishWorkout(
   supabase: SupabaseClient,
   userId: string,
   input: FinishWorkoutInput,
-): Promise<{ sessionId: string; volumeKg: number; records: NewRecord[]; alreadyCompleted: boolean }> {
+): Promise<{ sessionId: string; volumeKg: number; records: NewRecord[]; alreadyCompleted: boolean; addedSets: number }> {
   const { data: existing } = await supabase
     .from("workout_sessions")
-    .select("id, status, total_volume_kg, user_program_id, program_day_id")
+    .select("id, status, total_volume_kg, user_program_id, program_day_id, draft, draft_rev")
     .eq("user_id", userId)
     .eq("client_id", input.clientId)
     .maybeSingle();
+  // Another device or tab saved this unfinished workout since this device last looked: finishing this copy would drop
+  // that device's sets. The device combines the two copies first and finishes again (clients from before revisions
+  // send no baseRev and are not checked).
+  if (existing?.status === "in_progress" && input.baseRev !== undefined && existing.draft && (input.baseRev ?? -1) !== Number(existing.draft_rev)) {
+    throw new DraftConflictError(Number(existing.draft_rev), existing.draft);
+  }
   if (existing?.status === "completed") {
     // A retry after the first response was lost (gym Wi-Fi).
     // Saving the workout and moving the program on are separate writes. If the first attempt saved the workout but
@@ -228,7 +304,7 @@ export async function finishWorkout(
     const later = await applyLaterSets(supabase, userId, existing.id as string, input);
     // Show the same records the first attempt saved (or, after the later sets, the records as they now stand).
     const records = await recordsOfSession(supabase, userId, existing.id as string).catch(() => []);
-    return { sessionId: existing.id as string, volumeKg: later ?? Number(existing.total_volume_kg), records, alreadyCompleted: true };
+    return { sessionId: existing.id as string, volumeKg: later?.volumeKg ?? Number(existing.total_volume_kg), records, alreadyCompleted: true, addedSets: later?.added ?? 0 };
   }
 
   // Only link to a program the user actually owns a record for.
@@ -296,22 +372,58 @@ export function completedSetCount(exercises: ExerciseInput[]): number {
   return exercises.reduce((n, e) => n + e.sets.filter((s) => s.completed).length, 0);
 }
 
-/**
- * A finish retry for a workout that is already saved. When its first reply was lost (or timed out while the save was
- * still running), the member may have logged more sets before tapping Finish again; the retry is the device's full,
- * newer copy. If it has more completed sets than the saved workout, it replaces the saved contents (as an edit from
- * History would: exercises, sets, volume and records rebuilt; the end time moves to the later Finish). A retry with the
- * same or fewer completed sets (a plain repeat, or an older copy from another tab) changes nothing. Returns the new
- * volume, or null when nothing changed. Throws if the edit fails, so the device keeps its copy and can retry.
- */
-async function applyLaterSets(supabase: SupabaseClient, userId: string, sessionId: string, input: FinishWorkoutInput): Promise<number | null> {
-  const savedCount = async () => {
-    const { data, error } = await supabase.from("workout_exercises").select("sets:workout_sets(completed)").eq("session_id", sessionId).eq("user_id", userId);
-    if (error) throw new WorkoutError(error.message);
-    return ((data ?? []) as { sets: { completed: boolean }[] }[]).reduce((n, e) => n + e.sets.filter((s) => s.completed).length, 0);
+/** The saved contents of a finished workout, in the shape a Finish sends (sets in order). */
+async function savedExercises(supabase: SupabaseClient, userId: string, sessionId: string): Promise<{ name: string; notes: string; exercises: ExerciseInput[] }> {
+  const [{ data: session, error: sErr }, { data: rows, error }] = await Promise.all([
+    supabase.from("workout_sessions").select("name, notes").eq("id", sessionId).eq("user_id", userId).single(),
+    supabase
+      .from("workout_exercises")
+      .select("position, exercise_id, substituted_from_id, notes, skipped, skip_reason, sets:workout_sets(set_number, reps, weight_kg, duration_seconds, distance_m, rpe, is_warmup, is_drop, completed)")
+      .eq("session_id", sessionId)
+      .eq("user_id", userId)
+      .order("position"),
+  ]);
+  if (sErr || error) throw new WorkoutError((sErr ?? error)!.message);
+  type Row = {
+    exercise_id: string;
+    substituted_from_id: string | null;
+    notes: string | null;
+    skipped: boolean;
+    skip_reason: ExerciseInput["skipReason"];
+    sets: { set_number: number; reps: number | null; weight_kg: number | null; duration_seconds: number | null; distance_m: number | null; rpe: number | null; is_warmup: boolean; is_drop: boolean; completed: boolean }[];
   };
-  const wanted = completedSetCount(input.exercises);
-  if (wanted <= (await savedCount())) return null;
+  const exercises = ((rows ?? []) as unknown as Row[]).map((r) => ({
+    exerciseId: r.exercise_id,
+    substitutedFromId: r.substituted_from_id,
+    notes: r.notes ?? "",
+    skipped: r.skipped,
+    skipReason: r.skipped ? (r.skip_reason ?? "other") : null,
+    sets: [...r.sets]
+      .sort((a, b) => a.set_number - b.set_number)
+      .map((x) => ({
+        reps: x.reps,
+        weightKg: x.weight_kg === null ? null : Number(x.weight_kg),
+        durationSeconds: x.duration_seconds,
+        distanceM: x.distance_m === null ? null : Number(x.distance_m),
+        rpe: x.rpe === null ? null : Number(x.rpe),
+        isWarmup: x.is_warmup,
+        isDrop: x.is_drop,
+        completed: x.completed,
+      })),
+  }));
+  return { name: session.name as string, notes: (session.notes as string | null) ?? "", exercises };
+}
+
+/**
+ * Another Finish for a workout that is already saved: this device's first reply was lost, or the workout was finished
+ * on another device meanwhile. The two copies are combined set by set (lib/domain/workout-merge.ts): every set
+ * completed in either stays completed, so neither device's sets are dropped. (Before, a copy with more completed sets
+ * in total replaced the saved workout, losing sets only the saved copy had.) When the incoming copy adds nothing,
+ * nothing is written. Returns the new volume and the number of sets added, or null when nothing changed. Throws if the
+ * edit fails, so the device keeps its copy and can retry.
+ */
+async function applyLaterSets(supabase: SupabaseClient, userId: string, sessionId: string, input: FinishWorkoutInput): Promise<{ volumeKg: number; added: number } | null> {
+  if (mergeFinishedExercises((await savedExercises(supabase, userId, sessionId)).exercises, input.exercises).added === 0) return null;
 
   // Claim the saved workout first: two such retries at once would otherwise both write the sets (editWorkout adds the
   // new rows before removing the old). The one that loses is told to try again; its device keeps the workout.
@@ -328,8 +440,10 @@ async function applyLaterSets(supabase: SupabaseClient, userId: string, sessionI
   if (claimErr) throw new WorkoutError(claimErr.message);
   if (!won?.length) throw new WorkoutError("This workout is still being saved. Try again in a moment.", "conflict");
   try {
-    // Counted again under the claim: another retry may have stored the same sets just before.
-    if (wanted <= (await savedCount())) return null;
+    // Combined again under the claim: another retry may have stored more sets just before.
+    const saved = await savedExercises(supabase, userId, sessionId);
+    const merged = mergeFinishedExercises(saved.exercises, input.exercises);
+    if (merged.added === 0) return null;
     // The end time moves to the later Finish, with the pause time the device now has (it may have paused since).
     const { error: timeErr } = await supabase
       .from("workout_sessions")
@@ -338,8 +452,8 @@ async function applyLaterSets(supabase: SupabaseClient, userId: string, sessionI
       .eq("user_id", userId)
       .lt("ended_at", input.endedAt);
     if (timeErr) throw new WorkoutError(timeErr.message);
-    const { volumeKg } = await editWorkout(supabase, userId, { sessionId, name: input.name, notes: input.notes, exercises: input.exercises });
-    return volumeKg;
+    const { volumeKg } = await editWorkout(supabase, userId, { sessionId, name: saved.name, notes: saved.notes, exercises: merged.exercises });
+    return { volumeKg, added: merged.added };
   } finally {
     await supabase.from("workout_sessions").update({ finish_claim: null, finish_claimed_at: null }).eq("id", sessionId).eq("finish_claim", claim);
   }
@@ -357,7 +471,7 @@ async function awaitOtherFinish(supabase: SupabaseClient, userId: string, input:
     if (data?.status === "completed") {
       const later = await applyLaterSets(supabase, userId, data.id as string, input);
       const records = await recordsOfSession(supabase, userId, data.id as string).catch(() => []);
-      return { sessionId: data.id as string, volumeKg: later ?? Number(data.total_volume_kg), records, alreadyCompleted: true };
+      return { sessionId: data.id as string, volumeKg: later?.volumeKg ?? Number(data.total_volume_kg), records, alreadyCompleted: true, addedSets: later?.added ?? 0 };
     }
     if (data && data.status !== "in_progress") break;
     await new Promise((r) => setTimeout(r, 250));
@@ -372,7 +486,7 @@ async function writeClaimedFinish(
   input: FinishWorkoutInput,
   userProgramId: string | null,
   volumeKg: number,
-): Promise<{ sessionId: string; volumeKg: number; records: NewRecord[]; alreadyCompleted: boolean }> {
+): Promise<{ sessionId: string; volumeKg: number; records: NewRecord[]; alreadyCompleted: boolean; addedSets: number }> {
   // Clear anything a previous partial attempt left (an in-progress session owns no saved exercises or records).
   await supabase.from("workout_exercises").delete().eq("session_id", sessionId);
   await supabase.from("personal_records").delete().eq("user_id", userId).eq("session_id", sessionId);
@@ -415,7 +529,7 @@ async function writeClaimedFinish(
   if (userProgramId && input.programDayId) {
     await advanceProgram(supabase, userId, userProgramId, input.programDayId);
   }
-  return { sessionId, volumeKg, records, alreadyCompleted: false };
+  return { sessionId, volumeKg, records, alreadyCompleted: false, addedSets: 0 };
 }
 
 /**

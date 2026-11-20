@@ -33,7 +33,6 @@ import {
   finishPayload,
   migrateDraft,
   nextUp,
-  restorableDraft,
   SIGNED_OUT_WORKOUT_MESSAGE,
   STALE_DRAFT_HOURS,
   supersetMembers,
@@ -84,7 +83,10 @@ interface LoggerProps {
   units: UnitSystem;
   catalog: CatalogItem[];
   alternatives: Record<string, string[]>;
-  serverDraft: unknown;
+  /** The account's unfinished workout (older callers): use serverDrafts. */
+  serverDraft?: unknown;
+  /** Every unfinished workout on the account with its revision (F-29/F-30), most recently changed first. */
+  serverDrafts?: { draft: unknown; rev: number }[];
   template: WorkoutTemplate | null;
   /** Latest completed performance per exercise id ("Last time"). */
   previous?: Record<string, PreviousPerformance>;
@@ -98,7 +100,7 @@ interface LoggerProps {
   deload?: boolean;
 }
 
-type Phase = "loading" | "conflict" | "active" | "finished";
+type Phase = "loading" | "conflict" | "choose" | "active" | "finished";
 type SyncState = "idle" | "saving" | "synced" | "local";
 
 /** How long a backup may take before it counts as not saved (the request may still land; the next one supersedes it). */
@@ -106,7 +108,13 @@ export const BACKUP_TIMEOUT_MS = 20_000;
 /** Finishing writes the whole workout; past this it counts as not saved (the device copy stays, Finish can be tapped again). */
 export const FINISH_TIMEOUT_MS = 45_000;
 
+/** The same workout contents, whatever the account revision each copy last had. */
+function sameButRevision(a: WorkoutDraft, b: WorkoutDraft): boolean {
+  return a === b || JSON.stringify({ ...a, baseRev: null }) === JSON.stringify({ ...b, baseRev: null });
+}
+
 import { withTimeout } from "@/lib/with-timeout";
+import { mergeDrafts, restoreCandidates } from "@/lib/domain/workout-merge";
 export { withTimeout };
 
 interface FinishResult {
@@ -124,6 +132,8 @@ interface FinishResult {
   completedSets: number;
   /** The last time the member did this session (same program day, or same named workout). */
   previous: PreviousSession | null;
+  /** How this device's copy was combined with another device's (F-30), if it was. */
+  syncNote?: string | null;
   /** An optional verse to close with, only when the member lets workouts draw on Scripture. */
   reflection: Reflection | null;
 }
@@ -191,11 +201,17 @@ function beep() {
   }
 }
 
-export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraft, template, previous = {}, targets: initialTargets = {}, restAlerts = { sound: true, vibrate: true }, notice = null, deload = false }: LoggerProps) {
+export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraft, serverDrafts, template, previous = {}, targets: initialTargets = {}, restAlerts = { sound: true, vibrate: true }, notice = null, deload = false }: LoggerProps) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>("loading");
   const [draft, setDraft] = useState<WorkoutDraft | null>(null);
   const [pendingExisting, setPendingExisting] = useState<WorkoutDraft | null>(null);
+  // Several unfinished workouts (started on different devices): the member picks one; none is dropped (F-29).
+  const [choices, setChoices] = useState<WorkoutDraft[]>([]);
+  const [choosing, setChoosing] = useState(false);
+  const [choiceError, setChoiceError] = useState<string | null>(null);
+  // What happened when this device's copy met another device's (combined, finished or discarded elsewhere).
+  const [syncNotice, setSyncNotice] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date().toISOString());
   const [sync, setSync] = useState<SyncState>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -255,6 +271,12 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
   const pushAgain = useRef(false);
   // A set was just completed or skipped: back it up to the account now rather than after the usual short wait.
   const saveNow = useRef(false);
+  // The copy last saved on the device: a change of the revision alone is stored, not backed up again.
+  const lastLocal = useRef<WorkoutDraft | null>(null);
+  // The workout was finished or discarded on another device: backups stop (they would go nowhere); Finish still works.
+  const closedElsewhere = useRef<null | "finished" | "discarded">(null);
+  // Conflicts in a row (another device saving at the same moment each time): after a few, wait before trying again.
+  const conflicts = useRef(0);
   const lastToggle = useRef(new Map<string, number>());
   const prefilled = useRef(new Set<string>());
   // "Rest over" on the card for a few seconds after the countdown ends.
@@ -276,13 +298,31 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
     return createDraft({ name: defaultName(), now: nowIso });
   }, [template]);
 
-  // Restore on mount: prefer the most recently updated of local and server drafts.
+  // Restore on mount. Copies of the same workout (this device's and the account's) are combined; different unfinished
+  // workouts are all offered, never one silently dropped for another (F-29).
   useEffect(() => {
+    const discarded = new Set(discardedWorkoutIds(userId));
     const local = loadLocalDraft(userId);
-    // Drafts saved by an older version of the app (v1) are migrated to the current format.
-    const server = migrateDraft(serverDraft);
+    const rows = serverDrafts ?? (serverDraft ? [{ draft: serverDraft, rev: undefined as number | undefined }] : []);
+    // Drafts saved by an older version of the app (v1) are migrated to the current format. A server copy carries the
+    // account's revision, which a backup must name to be accepted.
+    const fromServer = rows.flatMap((r) => {
+      const d = migrateDraft(r.draft);
+      return d ? [{ ...d, baseRev: r.rev ?? null }] : [];
+    });
     // A workout discarded here while offline stays discarded, although its server copy isn't deleted yet.
-    const existing = restorableDraft(local, server, new Set(discardedWorkoutIds(userId)));
+    const keep = (d: WorkoutDraft | null) => (d && !discarded.has(d.clientId) ? d : null);
+    const candidates = restoreCandidates(
+      keep(local),
+      fromServer.filter((d) => keep(d)),
+      new Date().toISOString(),
+    );
+    if (candidates.length > 1) {
+      setChoices(candidates);
+      setPhase("choose");
+      return;
+    }
+    const existing = candidates[0] ?? null;
     if (existing) {
       const wantsDifferentSession = template && (template.programDayId !== existing.programDayId || (template.templateId ?? null) !== (existing.templateId ?? null));
       // A draft from hours or days ago is not resumed silently: the member says whether it is still this workout.
@@ -358,7 +398,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
   }, [stopBackups]);
 
   const pushToServer = useCallback(async (d: WorkoutDraft) => {
-    if (closed.current) return;
+    if (closed.current || closedElsewhere.current) return;
     if (!navigator.onLine) {
       setSync("local");
       return;
@@ -374,22 +414,69 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
     const res = await withTimeout(syncWorkoutDraftAction(draftSnapshot(d)), BACKUP_TIMEOUT_MS).catch(() => ({ ok: false as const, error: "offline" }));
     pushing.current = false;
     if (closed.current) return;
-    if (pushAgain.current) {
-      // Changes arrived while this one was on its way: send the latest now (it supersedes this result either way).
+    // Only "saved" means the account has this copy (older servers answer with no status: saved).
+    const out = res.ok ? (res.data ?? { status: "saved" as const, rev: undefined }) : null;
+    // The account's new revision goes onto this device's copy, and onto whatever was typed since (it was built on the
+    // copy just saved), so the next backup is accepted on it.
+    const newRev = out?.status === "saved" && typeof out.rev === "number" ? out.rev : null;
+    let current = latest.current;
+    if (newRev !== null && current?.clientId === d.clientId && current.baseRev !== newRev) {
+      current = { ...current, baseRev: newRev };
+      latest.current = current;
+      const rev = newRev;
+      setDraft((x) => (x && x.clientId === d.clientId ? { ...x, baseRev: rev } : x));
+    }
+    if (pushAgain.current && (!out || out.status === "saved")) {
+      // Changes arrived while this one was on its way: send the latest now, on the revision just confirmed.
       pushAgain.current = false;
-      if (latest.current) void pushToServer(latest.current);
+      if (current) void pushToServer(current);
       return;
     }
-    if (res.ok) {
+    pushAgain.current = false;
+    if (out?.status === "saved") {
       retryDelay.current = 0;
+      conflicts.current = 0;
       // "Synced" only when the account has what is on screen: a change made while this one was on its way (still in
       // the typing debounce) is not on the account yet.
-      setSync(latest.current === d ? "synced" : "local");
+      setSync(current?.clientId === d.clientId && sameButRevision(current, d) ? "synced" : "local");
+      return;
+    }
+    if (out?.status === "conflict") {
+      // Another device or tab saved this workout since this copy was built: nothing was stored. Combine the account's
+      // copy with this one (no completed set from either is dropped) and send the result on the account's revision.
+      setSync("local");
+      const theirs = migrateDraft(out.draft);
+      const mine = latest.current;
+      if (theirs && mine && theirs.clientId === mine.clientId && conflicts.current < 3) {
+        conflicts.current += 1;
+        const merged = mergeDrafts(mine, theirs, new Date().toISOString());
+        if (merged.fromOther > 0) {
+          setSyncNotice(`Updated with your other device's changes: ${merged.fromOther} ${merged.fromOther === 1 ? "set" : "sets"} added. Nothing from this device was lost.`);
+        } else if (merged.changed) {
+          setSyncNotice("Updated with your other device's changes. Nothing from this device was lost.");
+        }
+        touched.current = true;
+        saveNow.current = true;
+        setDraft({ ...merged.draft, baseRev: out.rev });
+        return;
+      }
+      // Several conflicts in a row: wait a little (the other device is saving too) and try again from the start.
+      conflicts.current = 0;
+    } else if (out?.status === "finished" || out?.status === "discarded") {
+      // Finished or discarded on another device. This device keeps its copy; backups stop (there is nothing to back
+      // up to). Finish adds its sets to the saved workout (or saves it again, if it was discarded).
+      closedElsewhere.current = out.status;
+      setSync("local");
+      setSyncNotice(
+        out.status === "finished"
+          ? "This workout was finished on another device. Tap Finish to add this device's sets to it, or discard this copy."
+          : "This workout was discarded on another device. It's still here: tap Finish to save it, or discard it.",
+      );
       return;
     }
     setSync("local");
     // Signed out mid-workout: say so (once per message); the copy on the device stays and backups keep trying.
-    if (res.error === SIGNED_OUT_WORKOUT_MESSAGE) setError(SIGNED_OUT_WORKOUT_MESSAGE);
+    if (!res.ok && res.error === SIGNED_OUT_WORKOUT_MESSAGE) setError(SIGNED_OUT_WORKOUT_MESSAGE);
     // Try again later, waiting longer each time (gym Wi-Fi with no internet behind it, a server hiccup) rather than
     // hammering the connection; the next edit tries again sooner.
     retryDelay.current = Math.min(120_000, retryDelay.current ? retryDelay.current * 3 : 5_000);
@@ -403,6 +490,13 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
   useEffect(() => {
     latest.current = draft;
     if (!draft || phase !== "active" || !touched.current || closed.current) return;
+    // Only the confirmed revision changed: keep it on the device copy; there is nothing new to back up.
+    const before = lastLocal.current;
+    lastLocal.current = draft;
+    if (before && before.clientId === draft.clientId && before.baseRev !== draft.baseRev && sameButRevision(before, draft)) {
+      saveLocalDraft(userId, draft);
+      return;
+    }
     if (draft === fromOtherTab.current) return;
     // Another tab may have saved a newer copy of this workout since this one last looked (its storage event arrives
     // later): switch to that copy instead of writing this older one over it on the device.
@@ -587,6 +681,105 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
     );
   }
 
+  // Continue one of several unfinished workouts (F-29). This device keeps one workout in progress; if the one it has
+  // now isn't the one chosen and the account doesn't have its latest copy yet, it is saved to the account first, so
+  // switching never drops it. Offline (or refused), the member is told and stays on this screen.
+  const chooseWorkout = async (c: WorkoutDraft) => {
+    setChoiceError(null);
+    const local = loadLocalDraft(userId);
+    if (local && local.clientId !== c.clientId && !discardedWorkoutIds(userId).includes(local.clientId)) {
+      setChoosing(true);
+      let copy = local;
+      let saved = false;
+      for (let attempt = 0; attempt < 3 && !saved; attempt++) {
+        const res = await withTimeout(syncWorkoutDraftAction(draftSnapshot(copy)), BACKUP_TIMEOUT_MS).catch(() => null);
+        const out = res?.ok ? (res.data ?? { status: "saved" as const }) : null;
+        if (out?.status === "saved" || out?.status === "finished") saved = true;
+        else if (out?.status === "conflict") {
+          // The account's copy of that workout moved on: combine and try again (nothing from either is dropped).
+          const theirs = migrateDraft(out.draft);
+          if (!theirs || theirs.clientId !== copy.clientId) break;
+          copy = { ...mergeDrafts(copy, theirs, new Date().toISOString()).draft, baseRev: out.rev };
+          saveLocalDraft(userId, copy);
+        } else break;
+      }
+      setChoosing(false);
+      if (!saved) {
+        setChoiceError(
+          `${local.name} is only on this device and couldn't be saved to your account just now${typeof navigator !== "undefined" && !navigator.onLine ? " (you're offline)" : ""}. Continue it, or try again when you're connected.`,
+        );
+        return;
+      }
+    }
+    const age = draftAgeHours(c, new Date().toISOString());
+    const resumed = age >= STALE_DRAFT_HOURS ? workoutReducer(c, { type: "continueAfterGap", now: new Date().toISOString() }) : c;
+    touched.current = true;
+    setChoices([]);
+    setDraft(resumed);
+    setPhase("active");
+  };
+
+  const discardChoice = async (c: WorkoutDraft) => {
+    const ok = await confirmDialog({
+      title: `Discard ${c.name}?`,
+      message: "This unfinished workout and the sets you logged in it are deleted, on every device. This can't be undone.",
+      confirmLabel: "Discard",
+      destructive: true,
+    });
+    if (!ok) return;
+    setChoosing(true);
+    try {
+      const res = await discardWorkoutAction(c.clientId).catch(() => null);
+      rememberDiscard(userId, c.clientId, Boolean(res?.ok));
+      if (loadLocalDraft(userId)?.clientId === c.clientId) clearLocalDraft(userId);
+      const left = choices.filter((x) => x.clientId !== c.clientId);
+      setChoices(left);
+      if (left.length === 0) {
+        setDraft(freshFromTemplate());
+        setPhase("active");
+      }
+    } finally {
+      setChoosing(false);
+    }
+  };
+
+  if (phase === "choose") {
+    return (
+      <div className="mx-auto max-w-lg space-y-4 rounded-2xl border border-gold-muted/60 bg-card p-6" data-testid="workout-chooser">
+        <h1 className="font-display text-2xl font-bold uppercase">{choices.length > 1 ? "Unfinished workouts" : "Unfinished workout"}</h1>
+        <p className="text-sm text-muted-foreground">
+          {choices.length > 1
+            ? `You have ${choices.length} unfinished workouts, probably started on different devices. All of them are kept: choose the one to continue now. The others stay saved until you finish or discard them.`
+            : "Continue it, or discard it."}
+        </p>
+        {choiceError && <Notice tone="error">{choiceError}</Notice>}
+        <ul className="space-y-3">
+          {choices.map((c) => {
+            const done = draftSummary(c).completedSets;
+            const deviceOnly = c.baseRev === undefined || c.baseRev === null;
+            return (
+              <li key={c.clientId} className="rounded-xl border border-border p-4" data-testid="workout-choice">
+                <p className="font-semibold">{c.name}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Started {new Date(c.startedAt).toLocaleString()} · {done} {done === 1 ? "set" : "sets"} logged
+                  {deviceOnly ? " · on this device only, not on your account yet" : ""}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button disabled={choosing} onClick={() => void chooseWorkout(c)}>
+                    Continue {c.name}
+                  </Button>
+                  <Button variant="secondary" disabled={choosing} onClick={() => void discardChoice(c)}>
+                    Discard
+                  </Button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    );
+  }
+
   if (phase === "conflict" && pendingExisting) {
     const done = draftSummary(pendingExisting).completedSets;
     return (
@@ -655,6 +848,11 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
           <h1 className="font-display text-[2.125rem] font-bold leading-tight text-gold-gradient">Workout Complete!</h1>
           <p className="mt-1 text-lg text-foreground/90">{finishedDraft?.name ?? draft?.name ?? "Workout"}</p>
           <p className="mt-1 text-sm text-muted-foreground">Faithful in the small things. Well done.</p>
+          {result.syncNote && (
+            <p className="mt-2 text-sm text-foreground/90" data-testid="finish-sync-note">
+              {result.syncNote}
+            </p>
+          )}
         </div>
         {(() => {
           const totals = finishedDraft ? completionTotals(finishedDraft) : null;
@@ -904,34 +1102,60 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
     if (asked !== draft) setDraft(asked);
     const endedAt = asked.finishRequestedAt!;
     const finalDraft = asked.pausedAt ? workoutReducer(asked, { type: "resume", now: endedAt }) : asked;
-    const payload = finishPayload(finalDraft, endedAt);
     // A Finish that never answers counts as not saved (the device copy stays and Finish can be tapped again; a retry
     // reuses the same workout id and end time, so a late success of the first can't make two workouts).
-    const res = await withTimeout(finishWorkoutAction(payload), FINISH_TIMEOUT_MS).catch(() => ({ ok: false as const, error: finishFailureMessage(navigator.onLine) }));
+    const attempt = (d: WorkoutDraft) =>
+      withTimeout(finishWorkoutAction(finishPayload(d, endedAt)), FINISH_TIMEOUT_MS).catch(() => ({ ok: false as const, error: finishFailureMessage(navigator.onLine) }));
+    let current = finalDraft;
+    let res = await attempt(current);
+    // The account's copy changed since this one was built (another device or tab): combine them (no completed set from
+    // either is dropped) and finish the combined workout (F-30).
+    let combined = 0;
+    for (let i = 0; i < 3 && !res.ok && "conflict" in res; i++) {
+      const theirs = migrateDraft(res.conflict.draft);
+      if (!theirs || theirs.clientId !== current.clientId) break;
+      const merged = mergeDrafts(current, theirs, new Date().toISOString());
+      combined += merged.fromOther;
+      current = { ...merged.draft, baseRev: res.conflict.rev, finishRequestedAt: current.finishRequestedAt ?? endedAt };
+      saveLocalDraft(userId, current);
+      setDraft(current);
+      res = await attempt(current);
+    }
     setSaving(false);
     if (!res.ok) {
-      setError(res.error);
+      setError("conflict" in res ? "This workout is being changed on another device right now. Your sets are safe here: try Finish again in a moment." : res.error);
       setFinishOpen(false);
       return;
     }
+    const addedSets = res.data.addedSets ?? 0;
+    const syncNote =
+      addedSets > 0
+        ? `This workout had already been finished on another device: ${addedSets} ${addedSets === 1 ? "set" : "sets"} from this device ${addedSets === 1 ? "was" : "were"} added to it.`
+        : res.data.alreadyCompleted && closedElsewhere.current === "finished"
+          ? "This workout had already been finished on another device, with everything this device logged."
+          : combined > 0
+            ? `${combined} ${combined === 1 ? "set" : "sets"} from your other device ${combined === 1 ? "was" : "were"} included.`
+            : null;
+    const finalDraftSaved = current;
     stopBackups();
     clearLocalDraft(userId);
     void cancelRestNotification();
     // Today's workout reminder (and the Faith fitness-goal one) aren't needed any more on this phone.
     void cancelDoneToday(deviceToday(), { workout: true, fitness: true });
-    setFinishedDraft(finalDraft);
-    setTemplateName(finalDraft.name);
+    setFinishedDraft(finalDraftSaved);
+    setTemplateName(finalDraftSaved.name);
     setResult({
       sessionId: res.data.sessionId,
       volumeKg: res.data.volumeKg,
       records: res.data.records,
       badges: res.data.badges ?? [],
       milestones: res.data.milestones ?? [],
-      durationSeconds: elapsedSeconds(finalDraft, endedAt),
+      durationSeconds: elapsedSeconds(finalDraftSaved, endedAt),
       next: res.data.next ?? null,
-      completedSets: finalDraft.exercises.filter((e) => !e.skipped).reduce((n, e) => n + e.sets.filter((s) => s.completed && !s.isWarmup).length, 0),
+      completedSets: finalDraftSaved.exercises.filter((e) => !e.skipped).reduce((n, e) => n + e.sets.filter((s) => s.completed && !s.isWarmup).length, 0),
       previous: res.data.previous ?? null,
       reflection: res.data.reflection ?? null,
+      syncNote,
     });
     setPhase("finished");
     window.scrollTo({ top: 0 });
@@ -1045,6 +1269,11 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
       )}
       {!online && <Notice tone="warning">You&apos;re offline. Keep logging — everything is saved on this device and will sync when you reconnect.</Notice>}
       {error && <Notice tone="error">{error}</Notice>}
+      {syncNotice && (
+        <div data-testid="workout-sync-notice">
+          <Notice tone="info">{syncNotice}</Notice>
+        </div>
+      )}
 
       {draft.exercises.length > 0 && (
         <div ref={observeCard}>

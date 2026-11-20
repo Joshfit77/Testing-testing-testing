@@ -30,7 +30,13 @@ export async function workoutSafeToClear(userId: string): Promise<boolean> {
   if (!draft) return true;
   const online = typeof navigator === "undefined" || navigator.onLine !== false;
   // A request that never answers counts as not saved, so signing out can't hang; the member then gets the choice below.
-  const saved = online ? await withTimeout(syncWorkoutDraftAction(draftSnapshot(draft)), SIGN_OUT_SYNC_TIMEOUT_MS).then((r) => r.ok, () => false) : false;
+  // Only a confirmed save counts: a copy the account refused as older than its own (F-30) is not on the account.
+  const saved = online
+    ? await withTimeout(syncWorkoutDraftAction(draftSnapshot(draft)), SIGN_OUT_SYNC_TIMEOUT_MS).then(
+        (r) => r.ok && (r.data?.status ?? "saved") === "saved",
+        () => false,
+      )
+    : false;
   if (saved) return true;
   return confirmDialog({
     title: "Your workout isn't saved to your account yet",

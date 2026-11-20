@@ -1,5 +1,5 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
-import { PASSWORD, completeOnboarding, signUpAndConfirm, uniqueEmail } from "./helpers";
+import { PASSWORD, completeOnboarding, serviceRest, signUpAndConfirm, uniqueEmail, userIdFor } from "./helpers";
 
 /**
  * A workout in progress loses nothing when the connection drops, when the server refuses a save, or when the member
@@ -99,6 +99,87 @@ test.describe("a workout in progress keeps every set", () => {
     await expect(other.getByRole("button", { name: /set 2 completed/ }).first()).toBeVisible();
     await expect(other.getByLabel(/set 2 weight in lb/).first()).toHaveValue("155");
     await close();
+  });
+
+  test("two devices log the same workout, one of them offline: after reconnecting, both devices' sets are everywhere (F-30)", async ({ page, context, browser }) => {
+    const email = uniqueEmail("twodev");
+    await signUpAndConfirm(page, email);
+    await completeOnboarding(page);
+    await startWorkout(page);
+    await page.getByLabel(/set 1 weight in lb/).first().fill("135");
+    await page.getByRole("button", { name: /Mark .* set 1 complete/ }).first().click();
+    await expect(syncStatus(page)).toHaveText(/Synced/);
+
+    // The phone loses its connection and logs set 2.
+    await context.setOffline(true);
+    await page.getByLabel(/set 2 weight in lb/).first().fill("145");
+    await page.getByRole("button", { name: /Mark .* set 2 complete/ }).first().click();
+    await expect(syncStatus(page)).toHaveText(/Saved on device/);
+
+    // Meanwhile the tablet opens the same workout (set 1 only, from the account) and logs set 3.
+    const { other, close } = await openOnAnotherDevice(browser, email);
+    await expect(other.getByRole("button", { name: /set 1 completed/ }).first()).toBeVisible();
+    await other.getByLabel(/set 3 weight in lb/).first().fill("155");
+    await other.getByRole("button", { name: /Mark .* set 3 complete/ }).first().click();
+    await expect(syncStatus(other)).toHaveText(/Synced/);
+
+    // The phone reconnects: its backup is refused as older, combined with the tablet's copy and saved.
+    await context.setOffline(false);
+    await expect(page.getByTestId("workout-sync-notice")).toContainText(/1 set added/, { timeout: 20_000 });
+    await expect(syncStatus(page)).toHaveText(/Synced/, { timeout: 20_000 });
+    for (const n of [1, 2, 3]) await expect(page.getByRole("button", { name: new RegExp(`set ${n} completed`) }).first()).toBeVisible();
+    await expect(page.getByLabel(/set 3 weight in lb/).first()).toHaveValue("155");
+
+    // The tablet, reopened, has all three too: nothing either device logged was lost.
+    await other.reload();
+    for (const n of [1, 2, 3]) await expect(other.getByRole("button", { name: new RegExp(`set ${n} completed`) }).first()).toBeVisible();
+    await expect(other.getByLabel(/set 2 weight in lb/).first()).toHaveValue("145");
+    await close();
+  });
+
+  test("two different unfinished workouts (started on two devices): both are offered and both are kept (F-29)", async ({ page }) => {
+    const email = uniqueEmail("twowork");
+    await signUpAndConfirm(page, email);
+    await completeOnboarding(page);
+    await startWorkout(page);
+    await page.getByLabel(/set 1 weight in lb/).first().fill("135");
+    await page.getByRole("button", { name: /Mark .* set 1 complete/ }).first().click();
+    await expect(syncStatus(page)).toHaveText(/Synced/);
+
+    // A second workout started on the tablet (as the tablet's backup leaves it on the account).
+    const userId = await userIdFor(email);
+    const clientId = crypto.randomUUID();
+    const startedAt = new Date(Date.now() - 10 * 60_000).toISOString();
+    const tablet = {
+      version: 2,
+      clientId,
+      name: "Tablet mobility",
+      userProgramId: null,
+      programDayId: null,
+      templateId: null,
+      startedAt,
+      pausedAt: null,
+      pausedSeconds: 0,
+      notes: "",
+      exercises: [],
+      rest: { endsAt: null, durationSeconds: 0, pausedRemaining: null },
+      updatedAt: new Date().toISOString(),
+    };
+    await serviceRest("workout_sessions", {
+      method: "POST",
+      body: { user_id: userId, client_id: clientId, name: tablet.name, started_at: startedAt, status: "in_progress", draft: tablet, draft_rev: 1 },
+    });
+
+    await page.goto("/train/workout");
+    await expect(page.getByTestId("workout-chooser")).toBeVisible();
+    await expect(page.getByTestId("workout-choice")).toHaveCount(2);
+    await page.getByRole("button", { name: "Continue Tablet mobility" }).click();
+    await expect(page.getByTestId("workout-chooser")).toHaveCount(0);
+
+    // Both are still unfinished on the account: switching dropped neither.
+    const open = await serviceRest<{ name: string; status: string }[]>(`workout_sessions?user_id=eq.${userId}&status=eq.in_progress&select=name,status`);
+    expect(open).toHaveLength(2);
+    expect(open.map((r) => r.name)).toContain("Tablet mobility");
   });
 
   test("a save the server refuses is kept on the device and retried until it lands", async ({ page, browser }) => {

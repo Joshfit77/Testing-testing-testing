@@ -33,7 +33,14 @@ describe.skipIf(!available)("fast workout logging, saved and read back", async (
       ],
     });
   }
-  const backup = (d: WorkoutDraft) => saveDraftSnapshot(user.client, user.id, draftSnapshot(d));
+  // Each backup names the revision the account confirmed for the previous one (F-30), as the logger does.
+  const revs = new Map<string, number>();
+  const backup = async (d: WorkoutDraft) => {
+    const res = await saveDraftSnapshot(user.client, user.id, { ...draftSnapshot(d), baseRev: revs.get(d.clientId) ?? null });
+    if (res.status !== "saved") throw new Error(`backup not saved: ${res.status}`);
+    revs.set(d.clientId, res.rev);
+    return res;
+  };
 
   it("backs up every completed set, restores it exactly, stores done and skipped sets, and fills the next workout in", async () => {
     const t0 = "2026-11-02T17:00:00.000Z";
@@ -65,7 +72,8 @@ describe.skipIf(!available)("fast workout logging, saved and read back", async (
     expect(nextUp(restored!)).toEqual({ exerciseKey: squat.id, setId: squat.sets[2]!.id });
 
     // Finish early from there: the payload the logger sends is valid, and what was done is what is stored.
-    const payload = finishWorkoutSchema.parse(finishPayload(restored!, "2026-11-02T17:40:00.000Z"));
+    // As the logger does on restore, the copy carries the account's revision of it (F-30), so its Finish is accepted.
+    const payload = finishWorkoutSchema.parse(finishPayload({ ...restored!, baseRev: revs.get(restored!.clientId) ?? null }, "2026-11-02T17:40:00.000Z"));
     const res = await finishWorkout(user.client, user.id, payload);
     expect(res.volumeKg).toBeCloseTo(lb(135) * 10 + lb(155) * 8 * 2 + 100 * 5, 6);
     const { data: rows } = await user.client

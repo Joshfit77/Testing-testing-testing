@@ -38,13 +38,18 @@ describe.skipIf(!available)("workout logging service", async () => {
   it("saves drafts for restore and never resurrects a finished workout", async () => {
     const clientId = crypto.randomUUID();
     const startedAt = "2026-09-01T10:00:00Z";
-    await saveDraftSnapshot(user.client, user.id, { clientId, name: "Draft", startedAt, userProgramId: null, programDayId: null, draft: { version: 1, marker: "first" } });
-    await saveDraftSnapshot(user.client, user.id, { clientId, name: "Draft", startedAt, userProgramId: null, programDayId: null, draft: { version: 1, marker: "second" } });
+    const first = await saveDraftSnapshot(user.client, user.id, { clientId, name: "Draft", startedAt, userProgramId: null, programDayId: null, draft: { version: 1, marker: "first" }, baseRev: null });
+    expect(first).toEqual({ status: "saved", rev: 1 });
+    // The next backup names the revision it was built on (F-30).
+    const second = await saveDraftSnapshot(user.client, user.id, { clientId, name: "Draft", startedAt, userProgramId: null, programDayId: null, draft: { version: 1, marker: "second" }, baseRev: 1 });
+    expect(second).toEqual({ status: "saved", rev: 2 });
     expect(await getServerDraft(user.client, user.id)).toMatchObject({ marker: "second" });
 
     await finishWorkout(user.client, user.id, baseInput(clientId, startedAt, [{ exerciseId: ex["back-squat"]!, substitutedFromId: null, notes: "", skipped: false, skipReason: null, sets: [set(5, 100)] }]));
     expect(await getServerDraft(user.client, user.id)).toBeNull();
-    await saveDraftSnapshot(user.client, user.id, { clientId, name: "Late sync", startedAt, userProgramId: null, programDayId: null, draft: { version: 1, marker: "stale" } });
+    await expect(
+      saveDraftSnapshot(user.client, user.id, { clientId, name: "Late sync", startedAt, userProgramId: null, programDayId: null, draft: { version: 1, marker: "stale" }, baseRev: 2 }),
+    ).resolves.toEqual({ status: "finished" });
     const { data } = await user.client.from("workout_sessions").select("status, draft").eq("client_id", clientId).single();
     expect(data).toMatchObject({ status: "completed", draft: null });
   });

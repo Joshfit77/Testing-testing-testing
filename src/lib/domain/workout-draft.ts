@@ -88,6 +88,12 @@ export interface WorkoutDraft {
   updatedAt: string;
   /** When the member first tapped Finish: a retry (offline, a lost reply) keeps this end time, not the retry's. */
   finishRequestedAt?: string | null;
+  /**
+   * The account's revision of this workout that this copy was last reconciled with (F-30): sent with every backup and
+   * Finish, so the server can refuse a copy built on an older revision instead of letting it replace a newer one.
+   * Null or missing: never confirmed on the account from this copy. Each copy (tab, device) carries its own.
+   */
+  baseRev?: number | null;
 }
 
 export interface ExerciseRef {
@@ -834,17 +840,17 @@ export function migrateDraft(value: unknown): WorkoutDraft | null {
 }
 
 /**
- * The message when the finish request itself didn't complete. Online, the usual cause is an ended session (signed out
- * on another device: the request is redirected to sign-in), so "you appear to be offline" would have the member retry
- * forever. The workout stays on the device either way and resumes after signing in.
- */
-/**
  * What the backup and Finish answer when the sign-in has run out mid-workout. They used to redirect the whole app to
  * the login page in the middle of a set; now the workout stays on screen and on this device, and the member is told.
  */
 export const SIGNED_OUT_WORKOUT_MESSAGE =
   "You've been signed out, so this workout isn't saved to your account yet. It's safe on this device: sign in again, then open Resume workout to save it.";
 
+/**
+ * The message when the finish request itself didn't complete. Online, the usual cause is an ended session (signed out
+ * on another device: the request is redirected to sign-in), so "you appear to be offline" would have the member retry
+ * forever. The workout stays on the device either way and resumes after signing in.
+ */
 export function finishFailureMessage(online: boolean): string {
   return online
     ? "We couldn't reach your account, so the workout isn't saved yet. It's kept on this device. If you were signed out, sign in again and finish it from Resume."
@@ -863,6 +869,7 @@ export function draftSnapshot(d: WorkoutDraft) {
     userProgramId: d.userProgramId,
     programDayId: d.programDayId,
     draft: d as unknown as Record<string, unknown>,
+    baseRev: d.baseRev ?? null,
   };
 }
 
@@ -883,6 +890,8 @@ export function finishPayload(d: WorkoutDraft, endedAt: string) {
     endedAt,
     pausedSeconds: d.pausedSeconds,
     notes: d.notes,
+    // The account revision this copy was reconciled with: a Finish on an older copy is refused and combined first (F-30).
+    baseRev: d.baseRev ?? null,
     exercises: d.exercises.map((e) => ({
       exerciseId: e.exerciseId,
       substitutedFromId: e.substitutedFromId,

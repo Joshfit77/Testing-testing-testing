@@ -19,7 +19,9 @@ import {
   getPreviousPerformance,
   previousComparableSession,
   saveDraftSnapshot,
+  DraftConflictError,
   WorkoutError,
+  type DraftSaveResult,
   type ExerciseTarget,
   type NewRecord,
   type PreviousSession,
@@ -35,7 +37,7 @@ import { loadExerciseHistories } from "@/server/services/exercise-history";
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: string };
 
-export async function syncWorkoutDraftAction(input: unknown): Promise<Result<null>> {
+export async function syncWorkoutDraftAction(input: unknown): Promise<Result<DraftSaveResult>> {
   // No redirect when signed out: that pulled the member out of the workout mid-set. The logger keeps the device copy.
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: SIGNED_OUT_WORKOUT_MESSAGE };
@@ -43,8 +45,11 @@ export async function syncWorkoutDraftAction(input: unknown): Promise<Result<nul
   if (!parsed.success) return { ok: false, error: "Invalid workout snapshot" };
   try {
     const supabase = await getServerSupabase();
-    await saveDraftSnapshot(supabase, user.id, parsed.data);
-    return { ok: true, data: null };
+    const res = await saveDraftSnapshot(supabase, user.id, parsed.data);
+    // A copy from a version of the app without revisions (an old tab) only understands ok: anything but a save is
+    // reported as not saved, so it keeps its copy and the member's next visit (with the current app) combines them.
+    if (parsed.data.baseRev === undefined && res.status !== "saved") return { ok: false, error: "conflict" };
+    return { ok: true, data: res };
   } catch (err) {
     logError("workouts.sync_draft", err);
     return { ok: false, error: "Couldn't sync to the server — your workout is still saved on this device." };
@@ -108,16 +113,21 @@ async function milestonesReached(supabase: Awaited<ReturnType<typeof getServerSu
 }
 
 export async function finishWorkoutAction(input: unknown): Promise<
-  Result<{
-    sessionId: string;
-    volumeKg: number;
-    records: NewRecord[];
-    badges: UnlockedBadge[];
-    milestones: ReachedMilestone[];
-    next: NextSession | null;
-    previous: PreviousSession | null;
-    reflection: Reflection | null;
-  }>
+  | Result<{
+      sessionId: string;
+      volumeKg: number;
+      records: NewRecord[];
+      badges: UnlockedBadge[];
+      milestones: ReachedMilestone[];
+      next: NextSession | null;
+      previous: PreviousSession | null;
+      reflection: Reflection | null;
+      /** This workout had already been finished (another device, or a lost reply); this many sets were added to it. */
+      addedSets?: number;
+      alreadyCompleted?: boolean;
+    }>
+  // The account's copy changed since this device last saw it (F-30): nothing was saved; combine and finish again.
+  | { ok: false; error: "conflict"; conflict: { rev: number; draft: unknown } }
 > {
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: SIGNED_OUT_WORKOUT_MESSAGE };
@@ -167,8 +177,12 @@ export async function finishWorkoutAction(input: unknown): Promise<
     const verse = profile?.faith_enabled ? scriptureForDate(isoDateInTz(new Date(), tz)) : null;
     const reflection = verse ? { reference: verse.reference, parts: scriptureParts(verse.reference, verse.text), prompt: verse.reflection } : null;
     revalidatePath("/", "layout");
-    return { ok: true, data: { sessionId: res.sessionId, volumeKg: res.volumeKg, records: res.records, badges, milestones, next, previous, reflection } };
+    return {
+      ok: true,
+      data: { sessionId: res.sessionId, volumeKg: res.volumeKg, records: res.records, badges, milestones, next, previous, reflection, addedSets: res.addedSets, alreadyCompleted: res.alreadyCompleted },
+    };
   } catch (err) {
+    if (err instanceof DraftConflictError) return { ok: false, error: "conflict", conflict: { rev: err.rev, draft: err.draft } };
     logError("workouts.finish", err);
     return { ok: false, error: err instanceof WorkoutError && err.code === "invalid" ? "One of the exercises is no longer available." : "We couldn't save your workout. It's still on this device — please try again." };
   }
