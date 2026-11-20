@@ -25,14 +25,14 @@ queries against the live local database catalog; `npm audit`; gitleaks over ever
 | Threat | Main control | Left open |
 |---|---|---|
 | One member reading or changing another's data | RLS on every table and bucket; server checks `auth.uid()` | F-19 (admins can read private programs) |
-| Account takeover (stuffing, reset abuse, stolen link) | Supabase Auth, email confirmation, rate limits, no enumeration | F-7, F-8, F-9, F-10, F-13, F-14 |
-| Free member getting paid features | Entitlement decided in the database and server only | F-17; device tampering untested (needs the signed iOS build) |
-| Forged, replayed or out-of-order payment events | Stripe signature + mode check; RevenueCat secret + provider re-read; each event once | F-20, F-21, F-23, F-24 (settings); never run against real sandboxes yet |
+| Account takeover (stuffing, reset abuse, stolen link) | Supabase Auth, email confirmation, rate limits, no enumeration | F-7 (until CAPTCHA is switched on), F-13 (Supabase setting); admin two-step (F-8), reset-link-only passwords (F-9), link swap (F-10) and 30-day sessions (F-14) fixed |
+| Free member getting paid features | Entitlement decided in the database and server only | F-17 fixed; device tampering untested (needs the signed iOS build) |
+| Forged, replayed or out-of-order payment events | Stripe signature + mode check; RevenueCat secret + provider re-read; each event once | F-21, F-23, F-24 (settings; F-20 fixed); never run against real sandboxes yet |
 | Health or journal data leaving the app | Separate consent per category before any AI call; no third-party analytics | F-25 (ids in logs) |
 | Prompt injection through member text | Member and third-party text passed as inert data; tools scoped to the member | Not yet tried against the live model (no key) |
 | AI cost runaway | Per-member, daily and monthly limits; kill switches fail closed; **no AI key on staging** | Real per-member cost not yet measured |
 | Credential leak or CI compromise | gitleaks on every branch; actions pinned to commits; signing secrets only in the manual TestFlight job | F-1 (public repository) |
-| Lost unfinished workout | Device copy on every change, server backup per set, never cleared without confirmation | Not yet on a real iPhone (§5) |
+| Lost unfinished workout | Device copy on every change; revisioned server backup per set; copies from two devices combined; every unfinished workout kept; never cleared without confirmation | Not yet on a real iPhone (§5) |
 
 ## 3. Verified protections (with evidence)
 
@@ -78,31 +78,31 @@ Severity: critical / high / medium / low / info. "Blocks" = the first release st
 | F-4 | next 15.5.28: HttpOnly cookie exposure on Edge routes, SVG bypass, response injection | Moderate | App | **Fixed** (15.5.29) | `npm audit` | — |
 | F-5 | A hung backup blocked later backups | Medium | App | **Fixed** c32b0a67 | unit | — |
 | F-6 | Security scan failed on four harmless values | Info | CI | **Resolved** 9bfe9d73 | gitleaks 12 → 0 | — |
-| F-7 | No CAPTCHA; the app's login/sign-up limits can be skipped by calling Supabase Auth directly with the public anon key (credential stuffing, sign-up and reset spam) | Medium | Auth | Open | review W1 | **External beta.** Internal TestFlight mitigation: turn off "Allow new users to sign up" in Supabase after the two accounts exist; strong unique passwords |
-| F-8 | Admin accounts use a password only (no two-factor; no AAL2 check) | Medium | Auth/admin | Open | review W2 | **External beta.** Mitigation: Josh is the only admin, with a unique strong password |
+| F-7 | No CAPTCHA; the app's login/sign-up limits can be skipped by calling Supabase Auth directly with the public anon key (credential stuffing, sign-up and reset spam) | Medium | Auth | **Prepared** 5a856ae6 (Turnstile check on sign-up, sign-in and email requests; token passed to Supabase). **Open until switched on** in Supabase and Vercel (guide step 11) | `auth-captcha.test.ts` | **External beta** (switch it on). Internal build: sign-ups off in Supabase |
+| F-8 | Admin accounts use a password only (no two-factor; no AAL2 check) | Medium | Auth/admin | **Fixed** 3ecfd0e3: admin tools and the database's is_admin() require a session verified with an authenticator code (aal2); recovery in ADMIN_MFA.md | `admin-mfa.test.ts` (real auth server), `require-admin-mfa.test.ts`, e2e `admin-mfa.spec.ts` | — (owner: enable TOTP in Supabase, approve the recovery procedure) |
 | F-9 | Password could be changed from any signed-in session (an unlocked phone) without the reset email | Low–medium | Auth | **Fixed** 042c2bea: only a session opened by a reset-email link in the last 30 minutes can set a password. Residual: a direct auth-API call with a stolen token is governed by Supabase's "Secure password change" (guide step 11) | `password-reset-session.test.ts`, e2e `core-flow.spec.ts` | — |
-| F-10 | An email link (sign-up or reset) opened by someone else signs them into the sender's account (session swap) | Low–medium | Auth | Open | review W3 | Public launch |
+| F-10 | An email link (sign-up or reset) opened by someone else signs them into the sender's account (session swap) | Low–medium | Auth | **Fixed** 1d1b2578: a link for another account never replaces the session already signed in; Secure cookies | `auth-link-routes.test.ts` | — (residual: someone signed out who opens a stranger's link is signed into that account, as with any email link) |
 | F-11 | Reset / resend replies revealed registered addresses through Supabase's 429 | Low–medium | Auth | **Fixed** 56750e30 | `auth-no-enumeration.test.ts` | — |
 | F-12 | Email-link routes had no rate limit; token guessing could use up Supabase's per-address limit for everyone | Low–medium | Auth | **Fixed** 3b73747e | `auth-link-routes.test.ts` | — |
-| F-13 | Email codes are 6 digits valid for 1 hour (hosted setting) | Low | Supabase config | Open (owner setting: 8+ digits, 15–30 min) | review W7 | External beta |
-| F-14 | Sessions have no maximum age or idle timeout; cookies lack the Secure flag (httpOnly is off by design: the browser reads the session) | Low | Auth | Open | review W9 | Public launch |
+| F-13 | Email codes are 6 digits valid for 1 hour (hosted setting) | Low | Supabase config | Open (owner setting, guide step 11: 30-minute expiry, longer codes) | review W7 | External beta |
+| F-14 | Sessions have no maximum age or idle timeout; cookies lack the Secure flag (httpOnly is off by design: the browser reads the session) | Low | Auth | **Fixed** 2a5ddfe7: sign in again after 30 days (SESSION_MAX_AGE_DAYS), from the token's original sign-in time; Secure cookies over HTTPS | `session-age.test.ts` | — |
 | F-15 | Client address taken from the leftmost forwarded-for header (spoofable only off Vercel) | Low | App | Open (note) | review W8 | Only if hosting moves off Vercel |
 | F-16 | CSP allows images from any https host, any `*.supabase.co`, inline styles; no reporting | Info | App | Open | review W10 | — |
-| F-17 | Legacy Plus members in past-due skip the 14-day cap, keeping AI use (real cost) while unpaid | Low–medium | Billing | Open | review S1 | Paid launch (no Plus sold; payments off for TestFlight) |
+| F-17 | Legacy Plus members in past-due skip the 14-day cap, keeping AI use (real cost) while unpaid | Low–medium | Billing | **Fixed** 8f1f0def: legacy terms follow the 14-day grace and never raise a Free member's allowance | `entitlements.test.ts` (reproduced end to end), `plans.test.ts` | — |
 | F-18 | Isolation sweep didn't cover tables outside its list | Low (test gap) | Tests | **Fixed**: catalog invariants test (every table) and `private-program-isolation.test.ts` (another member and a visitor can't read, add to, change, delete or re-parent any level of a private program) | review S2 | — |
 | F-19 | Admins could read members' private AI and starter programs, and enrol in them | Low (privacy) | DB policy | **Fixed** 3b1b3f81 (migration 083: admins see only the owner-less library) | `private-program-isolation.test.ts`, isolation sweep | — |
-| F-20 | Stripe promotion codes are allowed at checkout (any active code in the Stripe account works) | Low (config) | Billing | Open (owner: restrict codes) | review S4 | Paid launch |
-| F-21 | The Stripe billing portal could let a member switch to a price not on the server's list | Low (config) | Billing | Open (owner: limit portal products) | review S5 | Paid launch |
+| F-20 | Stripe promotion codes are allowed at checkout (any active code in the Stripe account works) | Low (config) | Billing | **Fixed** b7bbf243: promotion codes off unless STRIPE_ALLOW_PROMOTION_CODES=true | `checkout-guards.test.ts` | — |
+| F-21 | The Stripe billing portal could let a member switch to a price not on the server's list | Low (config) | Billing | Open (owner: limit the billing portal to the approved prices, PAYMENTS_BEFORE_LAUNCH.md) | review S5 | Paid launch |
 | F-22 | Test/live Stripe events weren't checked against the key's mode | Low | Billing | **Fixed** 44107eb2 | `entitlements.test.ts` | — |
-| F-23 | `REVENUECAT_ALLOW_SANDBOX=true` on a production host that isn't Vercel production would give TestFlight users free Pro; docs disagree | Low (config) | Billing | Open | review S7 | Paid launch |
-| F-24 | RevenueCat must be set to "Transfer" restore behaviour (legacy alias mode would let one purchase unlock several accounts) | Info (config) | Billing | Open (owner setting) | review S8 | Paid launch |
+| F-23 | `REVENUECAT_ALLOW_SANDBOX=true` on a production host that isn't Vercel production would give TestFlight users free Pro; docs disagree | Low (config) | Billing | Open (owner setting; ignored on Vercel production; PAYMENTS_BEFORE_LAUNCH.md) | review S7 | Paid launch |
+| F-24 | RevenueCat must be set to "Transfer" restore behaviour (legacy alias mode would let one purchase unlock several accounts) | Info (config) | Billing | Open (owner: RevenueCat restore = Transfer; PAYMENTS_BEFORE_LAUNCH.md) | review S8 | Paid launch |
 | F-25 | Member ids appear in some log context fields (outlive account deletion) | Info | Logging | Open | review S9 | Public launch (privacy policy) |
 
 | F-26 | Workout header could read "Synced" while an edit (typing debounce) or a newer change wasn't on the account yet | Medium (false "saved") | Workout logger | **Fixed** a3a3cf10 | `workout-save-status.test.tsx` | — |
 | F-27 | Finish and sign-out had no timeout: a request that never answered left "Saving…" for ever | Medium | Workout logger, sign-out | **Fixed** a3a3cf10 (45 s / 20 s, counted as not saved; device copy kept) | `workout-save-status.test.tsx`, `sign-out-workout.test.tsx` | — |
 | F-28 | A sign-in that ran out mid-workout redirected the whole app to the login page in the middle of a set | Medium (UX; data was kept) | Workout actions | **Fixed** a3a3cf10 (backup and Finish answer "signed out", member told, workout stays) and f60d4c39 (the middleware no longer redirects server-action requests; pages are still guarded) | `workout-signed-out.test.ts`, `middleware-server-actions.test.ts`, e2e `workout-data-preservation.spec.ts` | — |
-| F-29 | Two *different* unfinished workouts on two devices: the app silently opens the newer one; the other device's unsynced workout can then be overwritten on that device | Medium (data loss, multi-device only) | Workout drafts | Open: needs a "you have two unfinished workouts" choice | workout audit 2026-11-20 (`workout-draft.ts` newer-wins rule) | **External beta** |
-| F-30 | Two tabs or devices editing the *same* workout at once: the server keeps whichever backup arrives last, and a second Finish with different sets is ignored while that device shows "complete" | Low–medium | Workout drafts | Open: needs a version check on the server copy | workout audit 2026-11-20 | **External beta** |
+| F-29 | Two *different* unfinished workouts on two devices: the app silently opens the newer one; the other device's unsynced workout can then be overwritten on that device | Medium (data loss, multi-device only) | Workout drafts | **Fixed** 2add177c: every unfinished workout is kept and offered; switching saves the other first (refused offline, with the reason) | `workout-two-devices.test.tsx`, `workout-merge.test.ts`, `workout-revisions.test.ts`, e2e `workout-data-preservation.spec.ts` | — (physical iPhone check pending) |
+| F-30 | Two tabs or devices editing the *same* workout at once: the server keeps whichever backup arrives last, and a second Finish with different sets is ignored while that device shows "complete" | Low–medium | Workout drafts | **Fixed** 2add177c: revisioned backups (an older copy never replaces a newer one), set-by-set combining, Finish combines first, a second Finish of a saved workout adds instead of replacing | same as F-29, plus the e2e two-device test with one device offline | — (physical iPhone check pending) |
 
 Test gaps noted by the reviews (no known defect): `isSameOrigin` for cookie API routes, `signOutAction` itself,
 non-admin calls to every `admin.ts` action. (Now tested: the weekly-report cron secret in `billing-integrity.test.ts`,
@@ -119,9 +119,9 @@ results don't count for these.
 - **Internal TestFlight (Josh and John):** staging project only; test accounts; no payment keys (payments off); no AI key
   (AI off); Supabase sign-ups turned off after the two accounts exist; no open critical finding. **Met by the code;
   the setup steps are the owner's** (docs/TESTFLIGHT_FIRST_BUILD_GUIDE.md).
-- **External beta:** F-7, F-8, F-13, F-29, F-30 closed; isolation sweep re-run on staging; a backup restore
+- **External beta:** F-7 switched on, F-13 set, TOTP enabled in Supabase; isolation sweep re-run on staging; a backup restore
   actually tested on the hosted project; no open critical or high finding affecting testers.
-- **Paid public launch:** F-10, F-14, F-17, F-20, F-21, F-23, F-24, F-25 closed or accepted in writing; real Stripe
+- **Paid public launch:** F-21, F-23, F-24 configured (PAYMENTS_BEFORE_LAUNCH.md), F-25 closed or accepted in writing; real Stripe
   test-mode and App Store sandbox purchase, restore, refund and expiry tests on devices; incident-response plan;
   **independent professional security review** (below).
 
