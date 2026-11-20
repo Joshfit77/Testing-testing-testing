@@ -69,6 +69,38 @@ describe.skipIf(!available)("AI daily spending limit and cost records", () => {
     expect(await dayRow()).toMatchObject({ budget_micros: 1_000_000, spent_micros: 0, reserved_micros: 800_000 });
   });
 
+  it("a billed failure that crosses a threshold alerts too (release returns it)", async () => {
+    await resetDay(0);
+    const r = await reserve(a, { p_estimate_micros: 1_000, p_global_daily_budget_micros: 10_000 });
+    expect(r.error).toBeNull();
+    const rel = await svc.rpc("release_ai_usage", { p_usage_id: usageId(r), p_charge_micros: 8_500 });
+    expect(rel.error).toBeNull();
+    expect((rel.data as { period: string; threshold: number }[]).filter((x) => x.period === "day").map((x) => x.threshold)).toEqual([80]);
+    expect(await dayRow()).toMatchObject({ spent_micros: 8_500, reserved_micros: 0 });
+  });
+
+  it("the first refusal records 'used up' once, though real spend stopped just short of 100%", async () => {
+    await resetDay(0);
+    // Spent is 99.9% of the budget: no request fits, but the 100% threshold was never crossed by spend.
+    await svc.from("ai_budget_days").update({ budget_micros: 10_000, spent_micros: 9_990 }).eq("day", day);
+    expect((await reserve(a, { p_estimate_micros: 3_400, p_global_daily_budget_micros: 10_000 })).error?.message).toContain("ai_budget_global_daily");
+    const first = await svc.rpc("ai_budget_note_exhausted", { p_period: "day" });
+    expect(first.error).toBeNull();
+    expect(first.data).toEqual([{ period: "day", threshold: 100, spent_micros: 9_990, budget_micros: 10_000 }]);
+    const again = await svc.rpc("ai_budget_note_exhausted", { p_period: "day" });
+    expect(again.data).toEqual([]);
+    expect((await a.client.rpc("ai_budget_note_exhausted", { p_period: "day" })).error).not.toBeNull();
+  });
+
+  it("'used up' is recorded even when the refused request was the day's first (its row rolled back)", async () => {
+    await svc.from("ai_budget_days").delete().eq("day", day);
+    await svc.from("ai_budget_day_alerts").delete().eq("day", day);
+    expect((await reserve(a, { p_estimate_micros: 3_400, p_global_daily_budget_micros: 1_000 })).error?.message).toContain("ai_budget_global_daily");
+    expect((await svc.from("ai_budget_days").select("day").eq("day", day)).data).toEqual([]);
+    const note = await svc.rpc("ai_budget_note_exhausted", { p_period: "day", p_budget_micros: 1_000 });
+    expect(note.data).toEqual([{ period: "day", threshold: 100, spent_micros: 0, budget_micros: 1_000 }]);
+  });
+
   it("a different day's spend doesn't count against today", async () => {
     await resetDay(0);
     const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
@@ -191,6 +223,18 @@ describe.skipIf(!available)("AI cost report (aggregates only)", () => {
     await Promise.all([deleteTestUser(member), deleteTestUser(admin)]);
   });
 
+  it("counts only current Pro entitlements", async () => {
+    const { data: before } = await svc.rpc("admin_ai_cost_report", { p_from: from, p_to: to });
+    const n0 = Number((before as { pro_members_now: number }).pro_members_now);
+    await svc.from("user_entitlements").update({ plan: "pro", valid_until: new Date(Date.now() - 86_400_000).toISOString() }).eq("user_id", member.id);
+    const { data: expired } = await svc.rpc("admin_ai_cost_report", { p_from: from, p_to: to });
+    expect(Number((expired as { pro_members_now: number }).pro_members_now)).toBe(n0);
+    await svc.from("user_entitlements").update({ plan: "pro", valid_until: null }).eq("user_id", member.id);
+    const { data: current } = await svc.rpc("admin_ai_cost_report", { p_from: from, p_to: to });
+    expect(Number((current as { pro_members_now: number }).pro_members_now)).toBe(n0 + 1);
+    await svc.from("user_entitlements").update({ plan: "free", valid_until: null }).eq("user_id", member.id);
+  });
+
   it("is refused to members and anonymous callers", async () => {
     expect((await member.client.rpc("admin_ai_cost_report", { p_from: from, p_to: to })).error?.message).toMatch(/Not authorized|permission/i);
     expect((await anonClient().rpc("admin_ai_cost_report", { p_from: from, p_to: to })).error).not.toBeNull();
@@ -220,6 +264,9 @@ describe.skipIf(!available)("AI cost report (aggregates only)", () => {
       expect(r.by_model.some((m) => m.model === "claude-sonnet-5-5" && m.tier === "smart")).toBe(true);
       expect(r.by_route_reason.some((x) => x.route_reason === "complex" && x.tier === "smart")).toBe(true);
       expect(r.by_kind.some((k) => k.kind === "meal_plan")).toBe(true);
+      // Today's budget row (holds included) and the hit-rate denominator over rows that recorded the split.
+      expect(r.today).toMatchObject({ day: new Date().toISOString().slice(0, 10) });
+      expect(Number(r.totals.input_tokens_with_cache_data)).toBeGreaterThanOrEqual(60_000);
       expect(JSON.stringify(r)).not.toContain(member.id);
       expect(JSON.stringify(r)).not.toContain(admin.id);
     }

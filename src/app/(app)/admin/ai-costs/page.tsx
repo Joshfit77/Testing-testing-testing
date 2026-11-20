@@ -42,7 +42,7 @@ export default async function AdminAiCostsPage({ searchParams }: { searchParams:
   const s = report ? summarizeCostReport(report) : null;
   const budget = aiBudgetConfig(now);
   const thisMonth = report?.budget_months.find((m) => m.month === `${now.toISOString().slice(0, 7)}-01`);
-  const today = report?.by_day.find((d) => d.day === now.toISOString().slice(0, 10));
+  const today = report?.today ?? null;
 
   return (
     <div>
@@ -112,7 +112,8 @@ export default async function AdminAiCostsPage({ searchParams }: { searchParams:
               {thisMonth?.reserved_micros ? ` (${usdPrecise(Number(thisMonth.reserved_micros))} held by requests in progress)` : ""}.
             </p>
             <p className="text-sm">
-              Today (UTC): {usdPrecise(Number(today?.budget_spent_micros ?? 0))} spent of {usdPrecise(Number(today?.daily_budget_micros ?? budget.globalDailyMicros))}.
+              Today (UTC): {usdPrecise(Number(today?.spent_micros ?? 0))} spent of {usdPrecise(Number(today?.budget_micros ?? budget.globalDailyMicros))}
+              {today?.reserved_micros ? ` (${usdPrecise(Number(today.reserved_micros))} held by requests in progress)` : ""}.
             </p>
             <p className="text-xs text-muted-foreground">
               Budget figures include what the provider billed for requests that failed and were given back to members; the request tables below count completed

@@ -21,6 +21,8 @@ export interface AiCostReportData {
     cache_read_tokens: number;
     cache_write_tokens: number;
     requests_with_cache_data: number;
+    /** Input tokens of the requests that have cache data (older rows folded cache tokens into input). */
+    input_tokens_with_cache_data?: number;
     no_cache_cost_micros: number;
     cost_micros_with_cache_data: number;
   };
@@ -29,7 +31,10 @@ export interface AiCostReportData {
   by_route_reason: (CostRow & { route_reason: string; tier: "fast" | "smart"; downgrade_reason: string })[];
   by_day: (CostRow & { day: string; fast_requests: number; smart_requests: number; budget_spent_micros: number | null; daily_budget_micros: number | null })[];
   members: { members_using_ai: number; avg_cost_micros: number; median_cost_micros: number; p90_cost_micros: number; max_cost_micros: number; avg_requests: number };
+  /** Current Pro entitlements (expired ones not counted). */
   pro_members_now: number;
+  /** Today's (UTC) global figures as the budget table holds them, holds included. */
+  today?: { day: string; budget_micros: number; spent_micros: number; reserved_micros: number } | null;
   budget_months: { month: string; budget_micros: number; spent_micros: number; reserved_micros: number }[];
   budget_month_alerts: { month: string; threshold: number }[];
   budget_day_alerts: { day: string; threshold: number }[];
@@ -63,7 +68,7 @@ export function summarizeCostReport(r: AiCostReportData): CostSummary {
   const withData = Number(r.totals.cost_micros_with_cache_data) || 0;
   const read = Number(r.totals.cache_read_tokens) || 0;
   const write = Number(r.totals.cache_write_tokens) || 0;
-  const input = Number(r.totals.input_tokens) || 0;
+  const input = Number(r.totals.input_tokens_with_cache_data ?? r.totals.input_tokens) || 0;
   const pro = Number(r.pro_members_now) || 0;
   return {
     requests,
@@ -79,7 +84,7 @@ export function summarizeCostReport(r: AiCostReportData): CostSummary {
       savedPctOfNoCache: pct(noCache - withData, noCache),
       readTokens: read,
       writeTokens: write,
-      // Share of all input tokens that were read from the cache.
+      // Share of input tokens read from the cache, over the requests that recorded the split.
       hitRatePct: pct(read, input),
     },
     members: r.members,

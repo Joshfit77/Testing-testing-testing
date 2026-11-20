@@ -45,6 +45,7 @@ const MEMBER_CALLABLE = [
   "accountability_enabled",
   "accountability_summary",
   "admin_activation_metrics",
+  "admin_ai_cost_report",
   "admin_usage_metrics",
   "can_add_body_scan",
   "can_log_sleep",
@@ -141,5 +142,9 @@ describe.skipIf(!available)("database functions reachable through the public API
       expect(error?.code, name).toBe("42501");
       expect(data, name).toBeNull();
     }
+    // The AI cost report (migration 081): aggregates only, and refused to a member inside the function.
+    const report = await member.client.rpc("admin_ai_cost_report", { p_from: new Date(Date.now() - 86_400_000).toISOString(), p_to: new Date().toISOString() });
+    expect(report.error?.code).toBe("42501");
+    expect(report.data).toBeNull();
   });
 });

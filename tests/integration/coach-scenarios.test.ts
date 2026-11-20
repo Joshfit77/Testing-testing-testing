@@ -181,8 +181,10 @@ describe.skipIf(!available)("AI coach scenarios (synthetic members, scripted pro
     const u = await pro("sc-daily");
     const before = api.requests.length;
     const prev = process.env.AI_GLOBAL_DAILY_BUDGET_USD;
+    const restoreBudgets = await snapshotAiBudgets();
     process.env.AI_GLOBAL_DAILY_BUDGET_USD = "0.001"; // 1,000 micro-USD: less than one standard request's hold (3,400)
     try {
+      await svc.from("ai_budget_day_alerts").delete().eq("day", new Date().toISOString().slice(0, 10));
       await expect(ask(u, "Quick bench cue?")).rejects.toMatchObject({ code: "budget_global", message: expect.stringMatching(/rest of today.*midnight UTC/) });
       expect(api.requests.length).toBe(before);
       const { count } = await svc.from("ai_usage_events").select("id", { count: "exact", head: true }).eq("user_id", u.id);
@@ -190,7 +192,11 @@ describe.skipIf(!available)("AI coach scenarios (synthetic members, scripted pro
       // The member's question isn't left behind either.
       const { count: msgs } = await svc.from("ai_messages").select("id", { count: "exact", head: true }).eq("user_id", u.id);
       expect(msgs).toBe(0);
+      // Operators are told the day's budget is used up, once.
+      const { data: alerts } = await svc.from("ai_budget_day_alerts").select("threshold").eq("day", new Date().toISOString().slice(0, 10));
+      expect(alerts!.map((x) => x.threshold)).toEqual([100]);
     } finally {
+      await restoreBudgets();
       if (prev === undefined) delete process.env.AI_GLOBAL_DAILY_BUDGET_USD;
       else process.env.AI_GLOBAL_DAILY_BUDGET_USD = prev;
     }

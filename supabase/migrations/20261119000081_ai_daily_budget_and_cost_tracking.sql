@@ -1,6 +1,8 @@
 -- ROLLBACK (member data, conversations and usage history are untouched; roll back the app code first, it calls the
 -- new function signatures):
 --   drop function if exists public.admin_ai_cost_report(timestamptz, timestamptz);
+--   drop function if exists public.ai_budget_note_exhausted(text, bigint);
+--   drop function if exists public.release_ai_usage(uuid, bigint);
 --   drop function if exists public.finalize_ai_usage(uuid, text, integer, integer, bigint, integer, integer, bigint);
 --   drop function if exists public.reserve_ai_usage(uuid, text, text, integer, integer, integer, integer, bigint, bigint, bigint, integer, integer, integer, bigint, bigint, text);
 --   drop function if exists public.ai_budget_day_settle(date, bigint, bigint);
@@ -15,7 +17,10 @@
 --   * A global DAILY spending limit, enforced in reserve_ai_usage under the same global lock as the monthly one, before
 --     any provider call. The monthly limits are unchanged. The app passes the daily limit; if it doesn't, the database
 --     uses twice the month's average day (monthly budget x 2 / days in the month), so there is always a daily limit.
---     Days are UTC calendar days. Operators are alerted once per day at 80% and 100%.
+--     Days are UTC calendar days. Operators are alerted once per day at 80% and 100%; "used up" is also recorded the
+--     first time a request is refused for lack of budget (ai_budget_note_exhausted), since requests stop just short of
+--     100% of real spend. This month's days are backfilled from the recorded requests, so holds placed before the
+--     migration are in today's figures when they settle.
 --   * Better cost records per request: cache-read and cache-write input tokens, what the request would have cost with
 --     no prompt caching (so cache savings are measured, not assumed), why the model tier was chosen (route_reason) and
 --     why it was lowered (downgrade_reason).
@@ -109,6 +114,68 @@ end;
 $$;
 revoke all on function public.ai_budget_day_settle(date, bigint, bigint) from public, anon, authenticated;
 grant execute on function public.ai_budget_day_settle(date, bigint, bigint) to service_role;
+
+-- This month's days from the recorded requests (finished: their cost; still running: their hold), so a request reserved
+-- before this migration settles against a day that already counts its hold. Failed requests' billed amounts are only in
+-- the monthly figures (they were never rows), so a backfilled day can read slightly low; days from now on are exact.
+insert into public.ai_budget_days (day, budget_micros, spent_micros, reserved_micros)
+select (e.created_at at time zone 'utc')::date,
+       public.ai_default_daily_budget(coalesce((select bm.budget_micros from public.ai_budget_months bm where bm.month = date_trunc('month', now() at time zone 'utc')::date), 100000000)),
+       coalesce(sum(e.cost_micros) filter (where e.finalized_at is not null), 0),
+       coalesce(sum(e.reserved_micros) filter (where e.finalized_at is null), 0)
+  from public.ai_usage_events e
+  where e.created_at >= date_trunc('month', now() at time zone 'utc') at time zone 'utc'
+  group by 1
+on conflict (day) do nothing;
+
+-- "Used up" for operators the first time a request is refused for lack of global budget (the refusal itself rolls
+-- back, so it can't record anything, not even the period's row). The caller passes the budget in force, so the row is
+-- created or brought up to date here. Returns the alert when it is new, nothing otherwise.
+create or replace function public.ai_budget_note_exhausted(p_period text, p_budget_micros bigint default null)
+returns table (period text, threshold integer, spent_micros bigint, budget_micros bigint)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_day date := (now() at time zone 'utc')::date;
+  v_month date := date_trunc('month', now() at time zone 'utc')::date;
+  v_spent bigint;
+  v_budget bigint;
+begin
+  perform pg_advisory_xact_lock(hashtextextended('ai_budget:global', 0));
+  if p_period = 'day' then
+    if p_budget_micros is not null then
+      insert into public.ai_budget_days (day, budget_micros) values (v_day, greatest(p_budget_micros, 0))
+        on conflict (day) do update set budget_micros = excluded.budget_micros, updated_at = now();
+    end if;
+    select d.spent_micros + d.reserved_micros, d.budget_micros into v_spent, v_budget from public.ai_budget_days d where d.day = v_day;
+    if not found then return; end if;
+    insert into public.ai_budget_day_alerts (day, threshold, spent_micros, budget_micros) values (v_day, 100, v_spent, v_budget)
+      on conflict do nothing;
+  elsif p_period = 'month' then
+    if p_budget_micros is not null then
+      insert into public.ai_budget_months (month, budget_micros) values (v_month, greatest(p_budget_micros, 0))
+        on conflict (month) do update set budget_micros = excluded.budget_micros, updated_at = now();
+    end if;
+    select m.spent_micros + m.reserved_micros, m.budget_micros into v_spent, v_budget from public.ai_budget_months m where m.month = v_month;
+    if not found then return; end if;
+    insert into public.ai_budget_alerts (month, threshold, spent_micros, budget_micros) values (v_month, 100, v_spent, v_budget)
+      on conflict do nothing;
+  else
+    return;
+  end if;
+  if found then
+    period := p_period;
+    threshold := 100;
+    spent_micros := v_spent;
+    budget_micros := v_budget;
+    return next;
+  end if;
+end;
+$$;
+revoke all on function public.ai_budget_note_exhausted(text, bigint) from public, anon, authenticated;
+grant execute on function public.ai_budget_note_exhausted(text, bigint) to service_role;
 
 -- ------------------------------------------------------------------------------------------------- reserve_ai_usage
 -- As in 068, plus: the daily global limit (refused as 'ai_budget_global_daily'; the larger model is not used from 90%
@@ -316,9 +383,11 @@ revoke all on function public.finalize_ai_usage(uuid, text, integer, integer, bi
 grant execute on function public.finalize_ai_usage(uuid, text, integer, integer, bigint, integer, integer, bigint) to service_role;
 
 -- ------------------------------------------------------------------------------------------------- release_ai_usage
--- As in 068 (same signature), now also settling the day.
+-- As in 068 (same arguments), now also settling the day, and returning the alert thresholds a billed failure crossed
+-- (it used to discard them, so such a threshold never alerted).
+drop function if exists public.release_ai_usage(uuid, bigint);
 create or replace function public.release_ai_usage(p_usage_id uuid, p_charge_micros bigint default 0)
-returns void
+returns table (period text, threshold integer, spent_micros bigint, budget_micros bigint)
 language plpgsql
 security definer
 set search_path = public
@@ -326,14 +395,19 @@ as $$
 declare
   v_reserved bigint;
   v_created timestamptz;
+  v_charge bigint := greatest(coalesce(p_charge_micros, 0), 0);
 begin
   delete from public.ai_usage_events e where e.id = p_usage_id and e.finalized_at is null
     returning e.reserved_micros, e.created_at into v_reserved, v_created;
   if not found then
     return;
   end if;
-  perform public.ai_budget_settle(date_trunc('month', v_created at time zone 'utc')::date, v_reserved, greatest(p_charge_micros, 0));
-  perform public.ai_budget_day_settle((v_created at time zone 'utc')::date, v_reserved, greatest(p_charge_micros, 0));
+  return query
+    select 'month'::text, m.threshold, m.spent_micros, m.budget_micros
+      from public.ai_budget_settle(date_trunc('month', v_created at time zone 'utc')::date, v_reserved, v_charge) m
+    union all
+    select d.period, d.threshold, d.spent_micros, d.budget_micros
+      from public.ai_budget_day_settle((v_created at time zone 'utc')::date, v_reserved, v_charge) d;
 end;
 $$;
 revoke all on function public.release_ai_usage(uuid, bigint) from public, anon, authenticated;
@@ -374,6 +448,7 @@ begin
       coalesce(sum(cache_read_tokens), 0)::bigint as cache_read_tokens,
       coalesce(sum(cache_write_tokens), 0)::bigint as cache_write_tokens,
       count(no_cache_cost_micros) as requests_with_cache_data,
+      coalesce(sum(input_tokens) filter (where no_cache_cost_micros is not null), 0)::bigint as input_tokens_with_cache_data,
       coalesce(sum(no_cache_cost_micros), 0)::bigint as no_cache_cost_micros,
       coalesce(sum(cost_micros) filter (where no_cache_cost_micros is not null), 0)::bigint as cost_micros_with_cache_data
     from ev
@@ -408,7 +483,8 @@ begin
         'max_cost_micros', coalesce(max(cost), 0)::bigint,
         'avg_requests', coalesce(round(avg(requests), 1), 0)
       ) from per_member),
-    'pro_members_now', (select count(*) from public.user_entitlements where plan = 'pro'),
+    'pro_members_now', (select count(*) from public.user_entitlements where plan = 'pro' and (valid_until is null or valid_until > now())),
+    'today', (select to_jsonb(bd) from public.ai_budget_days bd where bd.day = (now() at time zone 'utc')::date),
     'budget_months', coalesce((select jsonb_agg(to_jsonb(bm) order by bm.month) from public.ai_budget_months bm
         where bm.month >= date_trunc('month', p_from at time zone 'utc')::date and bm.month < p_to), '[]'::jsonb),
     'budget_month_alerts', coalesce((select jsonb_agg(to_jsonb(a) order by a.month, a.threshold) from public.ai_budget_alerts a

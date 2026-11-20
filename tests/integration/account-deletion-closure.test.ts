@@ -61,6 +61,8 @@ function userForeignKeys(): FkColumn[] {
 /** Public tables with no foreign key to auth.users, and why none of them identifies a member. */
 const PUBLIC_TABLES_WITHOUT_MEMBER_FK: Record<string, string> = {
   ai_budget_alerts: "service-wide monthly AI spend alerts (month, amounts)",
+  ai_budget_day_alerts: "service-wide daily AI spend alerts (day, amounts; migration 081)",
+  ai_budget_days: "service-wide daily AI spend totals (migration 081)",
   ai_budget_months: "service-wide monthly AI spend totals",
   content_items: "editorial catalog",
   exercise_alternatives: "exercise catalog",

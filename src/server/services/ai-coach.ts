@@ -219,11 +219,16 @@ async function reserveUsage(
     if (msg.includes("ai_in_flight")) throw new AiError("in_progress", "Your previous AI request is still being answered. Please wait for it to finish.", 15);
     if (msg.includes("ai_budget_user"))
       throw new AiError("budget_member", `This month's AI capacity is used up early, because of several unusually long requests. It renews on ${renews}; nothing extra is charged and everything else in the app keeps working.`);
-    // Checked before "ai_budget_global", which it contains.
-    if (msg.includes("ai_budget_global_daily"))
+    // Checked before "ai_budget_global", which it contains. The first refusal of the day (or month) tells operators the
+    // budget is used up: requests stop just short of 100% of real spend, so the threshold alert alone wouldn't.
+    if (msg.includes("ai_budget_global_daily")) {
+      await noteBudgetExhausted("day", budget.globalDailyMicros);
       throw new AiError("budget_global", "AI features are paused for everyone for the rest of today (they resume at midnight UTC). Everything else in the app keeps working as usual.");
-    if (msg.includes("ai_budget_global"))
+    }
+    if (msg.includes("ai_budget_global")) {
+      await noteBudgetExhausted("month", budget.globalMonthlyMicros);
       throw new AiError("budget_global", "AI features are paused for everyone for the rest of this month. Everything else in the app keeps working as usual.");
+    }
     if (msg.includes("ai_busy")) throw new AiError("busy", "The AI coach is busy right now. Please try again in a minute.", 30);
     if (msg.includes("ai_rate_limited")) throw new AiError("rate_limited", "You're sending messages quickly — please wait a moment.", 60);
     if (msg.includes("ai_quota_plan_member_budget"))
@@ -266,14 +271,35 @@ async function finalizeUsage(usageId: string, model: string, usage: TokenUsage, 
   if (alerts.length) await notifyBudgetAlerts(alerts);
 }
 
+/** Record (once) that the global day or month budget is used up, and alert operators. Never throws. */
+async function noteBudgetExhausted(period: "day" | "month", budgetMicros: number) {
+  try {
+    const { data, error } = await getServiceSupabase().rpc("ai_budget_note_exhausted", { p_period: period, p_budget_micros: budgetMicros });
+    if (error) {
+      logError("ai.budget_exhausted_note", error);
+      return;
+    }
+    const alerts = (data as BudgetAlert[] | null) ?? [];
+    if (alerts.length) await notifyBudgetAlerts(alerts);
+  } catch (err) {
+    logError("ai.budget_exhausted_note", err);
+  }
+}
+
 /**
  * Give back a reservation when the request failed, so members aren't charged or counted for errors. `chargeMicros` is
  * what the provider may still have billed (completed tool rounds, or a request cut off after it was sent): it goes into
  * the global accounting only, never the member's.
  */
 async function releaseUsage(usageId: string, chargeMicros = 0) {
-  const { error } = await getServiceSupabase().rpc("release_ai_usage", { p_usage_id: usageId, p_charge_micros: Math.max(0, Math.ceil(chargeMicros)) });
-  if (error) logError("ai.usage_release", error);
+  const { data, error } = await getServiceSupabase().rpc("release_ai_usage", { p_usage_id: usageId, p_charge_micros: Math.max(0, Math.ceil(chargeMicros)) });
+  if (error) {
+    logError("ai.usage_release", error);
+    return;
+  }
+  // What the provider still billed can cross a threshold too (migration 081 returns it).
+  const alerts = (data as BudgetAlert[] | null) ?? [];
+  if (alerts.length) await notifyBudgetAlerts(alerts);
 }
 
 /** Summarize the user's authorized data for the model (used by plan mode and the chat). */
