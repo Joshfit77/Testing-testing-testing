@@ -1113,6 +1113,21 @@ export function rearDeltFly(id: string, label: string): MotionDef {
 
 // ------------------------------------------------------------------------------------- Front-view moves
 
+/** Geometry of the standing cable chest fly (front view), shared with its tests. */
+export const CHEST_FLY = {
+  /** Upper arm's horizontal angle from straight out to the side (negative = behind the body) at the stretch and squeeze. */
+  openDeg: -14,
+  closeDeg: 90,
+  /** How far the plane of the arc tilts below horizontal at the stretch and at the squeeze. */
+  dipOpenDeg: 8,
+  dipCloseDeg: 20,
+  /** The fixed elbow bend. */
+  elbowDeg: 20,
+  /** Tower centres (± x); each pulley rides the tower's inner post. */
+  towerX: 118,
+  pulleyAboveShoulder: 2,
+};
+
 export interface FrontArmOpts {
   id: string;
   label: string;
@@ -1126,6 +1141,7 @@ export function frontArms(o: FrontArmOpts): MotionDef {
   const k = (p: Pose, dur: number, hold = 0.25, extra: Partial<KeySpec> = {}): KeySpec => ({ pose: p, dur, hold, ease: "inOut", ...extra });
   let specs: KeySpec[] = [];
   let props: PropDef[] = [];
+  let still = 0.45;
   switch (o.kind) {
     case "lateral-raise":
       specs = [k(F({ ...both({ sh: 12, el: 14 }) }), 1, 0.3), k(F({ ...both({ sh: 88, el: 16 }) }), 2, 0.3)];
@@ -1141,18 +1157,43 @@ export function frontArms(o: FrontArmOpts): MotionDef {
         { id: "cable", kind: "cable", at: [58, 14], to: { lm: "handR" }, layer: "near" },
       ];
       break;
-    case "chest-fly":
-      specs = [
-        k(F({ ...both({ sh: 80, el: 18, armD: 10 }) }), 1, 0.3),
-        k(F({ ...both({ sh: 30, el: -55, armD: 58, foreD: 35 }) }), 2, 0.4),
-      ];
+    case "chest-fly": {
+      // Standing mid-cable fly (pulleys at about shoulder height, as the instructions set them), seen from the front.
+      // The arm is posed in 3D and projected: the upper arm sweeps round the shoulder in a plane tilted a little
+      // downward, from slightly behind the body (the stretch) to pointing forward with the hands about 15 cm apart in
+      // front of the lower chest (the squeeze). The elbow keeps the same ~20° bend all the way: a hug, not a press.
+      // Soft knees and a slight forward lean of the trunk; the hands, and so the cables, stay at chest height.
+      const base = F({ ...both({ hip: 7, knee: 9, ankle: 4 }), trunkD: 12 });
+      const W0 = worldPts(base, root, "front");
+      const D = Math.PI / 180;
+      const flyAt = (t: number): Pose => {
+        let p = base;
+        const th = (CHEST_FLY.openDeg + (CHEST_FLY.closeDeg - CHEST_FLY.openDeg) * t) * D;
+        const dip = (CHEST_FLY.dipOpenDeg + (CHEST_FLY.dipCloseDeg - CHEST_FLY.dipOpenDeg) * t) * D;
+        const bend = CHEST_FLY.elbowDeg * D;
+        for (const side of ["L", "R"] as const) {
+          const k = side === "L" ? 1 : -1;
+          const sh = W0[`shoulder${side}`];
+          // Projected direction of a segment at horizontal angle a (0 = straight out to the side, 90 = straight ahead).
+          const dir = (a: number): Vec => [k * Math.cos(dip) * Math.cos(a), -Math.sin(dip)];
+          const elbow: Vec = [sh[0] + BODY.upperArm * dir(th)[0], sh[1] + BODY.upperArm * dir(th)[1]];
+          const hand: Vec = [elbow[0] + BODY.forearm * dir(th + bend)[0], elbow[1] + BODY.forearm * dir(th + bend)[1]];
+          p = armThrough(p, side, toLocal(p, root, elbow, "front"), toLocal(p, root, hand, "front"), "front");
+        }
+        return p;
+      };
+      // About 1.2 s to bring the handles together, a short squeeze, a slow 2 s return and a brief stretch.
+      specs = repSmooth(flyAt, { down: 1.2, up: 2.0, holdTop: 0.3, holdBottom: 0.5 }, 8);
+      const pulleyY = (W0.shoulderL[1] + W0.shoulderR[1]) / 2 + CHEST_FLY.pulleyAboveShoulder;
       props = [
-        { id: "tL", kind: "cableTower", at: [118, 0], h: 210, layer: "back" },
-        { id: "tR", kind: "cableTower", at: [-118, 0], h: 210, layer: "back" },
-        { id: "cL", kind: "cable", at: [104, 196], to: { lm: "handL" }, layer: "near" },
-        { id: "cR", kind: "cable", at: [-104, 196], to: { lm: "handR" }, layer: "near" },
+        { id: "tL", kind: "cableTower", at: [CHEST_FLY.towerX, 0], h: 210, layer: "back" },
+        { id: "tR", kind: "cableTower", at: [-CHEST_FLY.towerX, 0], h: 210, layer: "back" },
+        { id: "cL", kind: "cable", at: [CHEST_FLY.towerX - 14, pulleyY], to: { lm: "handL" }, layer: "near" },
+        { id: "cR", kind: "cable", at: [-(CHEST_FLY.towerX - 14), pulleyY], to: { lm: "handR" }, layer: "near" },
       ];
+      still = 0.3;
       break;
+    }
     case "pull-apart":
       specs = [
         k(F({ ...both({ sh: 40, el: 0, armD: 80 }) }), 1, 0.3),
@@ -1207,7 +1248,7 @@ export function frontArms(o: FrontArmOpts): MotionDef {
     props,
     footGrounded: true,
     planted: ["L", "R"],
-    stillPhase: 0.45,
+    stillPhase: still,
   };
 }
 

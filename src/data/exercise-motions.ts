@@ -134,7 +134,7 @@ export const EXERCISE_MOTIONS: Record<string, Builder> = {
   "push-up": (id) => pushUp({ id, label: `${S}Body in a straight plank: lowers the chest to just above the floor with elbows back, then pushes up.` }),
   "incline-push-up": (id) => pushUp({ id, hands: 45, label: `${S}Hands on a box or bench: lowers the chest to the edge in a straight line and pushes away.` }),
   "wall-push-up": (id) => pushUp({ id, hands: "wall", label: `${S}Hands on a wall: leans in with a straight body until the nose nears the wall, then pushes back.` }),
-  "cable-chest-fly": (id) => frontArms({ id, kind: "chest-fly", label: `${F}Standing between two cables: sweeps the arms in a wide arc to meet in front of the chest and opens back up.` }),
+  "cable-chest-fly": (id) => frontArms({ id, kind: "chest-fly", label: `${F}Standing between two cables set at about shoulder height: with a fixed, slight elbow bend the arms sweep in a wide arc until the hands meet in front of the lower chest, then open slowly back to a stretch.` }),
 
   // ------------------------------------------------------------------ Vertical push
   dips: (id) => dips(id, `${S}Supported on parallel bars: bends the elbows to lower until the upper arms are about level, leaning slightly forward, then presses up.`),
