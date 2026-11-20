@@ -79,23 +79,22 @@ test("a new member signs up, onboards and finishes a first workout; it is in His
   await next();
   await tap(page.getByRole("button", { name: "Build my plan" }));
   await page.waitForURL(/\/plan/, { timeout: 60_000 });
-  await tap(page.getByRole("link", { name: /Go to Home/ }));
-  await page.waitForURL(/\/home/, { timeout: 30_000 });
-  stage("Onboarding to Home");
+  stage("Onboarding to the plan");
 
-  // 4. Home makes the first workout obvious.
-  const start = page.getByRole("link", { name: /^Start (Today's Workout|workout)/i });
-  await expect(start).toBeVisible();
+  // 4. The plan summary leads with today's session, above the fold: one tap starts it (Home is the secondary choice).
+  const start = page.getByTestId("plan-start-today").getByRole("link", { name: /^Start Today's Workout/i });
+  await expect(start).toBeInViewport();
   await tap(start);
   await page.waitForURL(/\/train\/workout/);
-  stage("Home to the first workout");
+  stage("Plan to the first workout");
 
   // 5. The exercise demonstration is on screen without a tap.
   await expect(page.locator("main canvas").first()).toBeVisible();
 
-  // 6. Log the first set: weight, reps, done. The rest timer starts by itself.
+  // 6. Log the first set: the reps come filled in from the program's target, so only the weight is typed; then done.
+  // The rest timer starts by itself.
+  await expect(page.getByLabel(/set 1 reps/).first()).not.toHaveValue("");
   await type(page.getByLabel(/set 1 weight in lb/).first(), "135");
-  await type(page.getByLabel(/set 1 reps/).first(), "5");
   await tap(page.getByRole("button", { name: /Mark .* set 1 complete/ }).first());
   await expect(page.getByRole("timer", { name: "Rest timer" })).toBeVisible();
   stage("First set logged (rest timer started automatically)");
@@ -112,7 +111,7 @@ test("a new member signs up, onboards and finishes a first workout; it is in His
   await expect(page.locator("main").getByRole("link").filter({ hasText: /exercises/ }).first()).toBeVisible();
   stage("See it in History");
 
-  // 9. Later: back to Home and start another workout.
+  // 9. Later: Home (with the first workout done) and start another workout.
   await page.goto("/home");
   const again = page.getByRole("link", { name: /^Start (Today's Workout|workout|next workout)/i }).first();
   await expect(again).toBeVisible();
