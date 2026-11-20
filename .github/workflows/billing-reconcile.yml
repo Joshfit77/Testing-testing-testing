@@ -6,6 +6,8 @@
 #   - variable BILLING_RECONCILE_URL: the deployed app's HTTPS address, e.g. https://app.example.org
 #   - secret   CRON_SECRET:           the same value as the deployed app's CRON_SECRET (16+ characters)
 # GitHub runs scheduled workflows only from the default branch, so this also needs the owner's approved merge to main.
+# Until the variable is set the job is skipped before a runner starts, so the half-hourly schedule uses no Actions
+# minutes (a private repository pays for every run, rounded up to a whole minute: 48 a day would be ~1,440 a month).
 # It makes no payment and changes no price: the endpoint only re-reads each provider's record of a subscription.
 name: Billing reconciliation
 
@@ -22,6 +24,8 @@ concurrency:
 
 jobs:
   reconcile:
+    # Variables (not secrets) can be read here; the CRON_SECRET check stays in the first step.
+    if: ${{ vars.BILLING_RECONCILE_URL != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
