@@ -89,7 +89,12 @@ export async function updateSession(request: NextRequest) {
   if (launch) markLaunch(response, request);
   const isProtected = PROTECTED_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`));
 
-  if (!user && isProtected) {
+  // A server action (a POST carrying Next's action header) authenticates itself: every action checks the member, and
+  // an action can be called through any page, public ones included, so this redirect never protected one. Redirecting
+  // it sent the whole app to /login in the middle of a workout when the sign-in ran out (the backup's own "signed
+  // out" answer never arrived); the action now answers, and pages are still guarded as before.
+  const serverAction = request.method === "POST" && request.headers.has("next-action");
+  if (!user && isProtected && !serverAction) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.search = "";
