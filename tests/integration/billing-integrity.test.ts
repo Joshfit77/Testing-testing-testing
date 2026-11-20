@@ -452,4 +452,20 @@ describe.skipIf(!available)("billing integrity: concurrency, retries, ordering, 
     expect(JSON.stringify(report)).not.toContain(u.id);
     expect(await ent(u)).toMatchObject({ plan: "pro", source: "stripe" });
   });
+
+  it("the weekly-report job (same cron secret) refuses anyone without it", async () => {
+    const { POST } = await import("@/app/api/reports/weekly/route");
+    const secret = "cron-integration-secret-0123456789";
+    const call = (method: "GET" | "POST", auth?: string) =>
+      POST(new NextRequest("http://localhost/api/reports/weekly", { method, headers: auth ? { authorization: auth } : {} }));
+    // (Leading and trailing spaces are stripped from header values by HTTP itself, so they aren't probed here.)
+    for (const method of ["GET", "POST"] as const) {
+      for (const auth of [undefined, "Bearer wrong-secret-wrong-secret", secret, `bearer ${secret}`, `Bearer  ${secret}`, `Bearer ${secret.slice(0, -1)}`, `Bearer ${secret}x`]) {
+        expect((await call(method, auth)).status, `${method} ${JSON.stringify(auth)}`).toBe(401);
+      }
+    }
+    const ok = await call("POST", `Bearer ${secret}`);
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).not.toHaveProperty("error");
+  });
 });
