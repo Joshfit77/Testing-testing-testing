@@ -430,11 +430,21 @@ export function overheadPress(o: PressOpts): MotionDef {
       return worst;
     };
     // The lean the head needs at a bar height (0 when the bar is below the chin or above the head).
-    const need = (s: number) => {
+    const needAt = (s: number) => {
       if (!inFront) return 0;
       const b = bar(s);
       if (clearance(0, b) >= 4) return 0;
       return solve1D((L) => clearance(L, b) - 4, 0, 16, 14);
+    };
+    // Frames between two keys blend the head's lean and the bar's height separately, so each key leans enough for the
+    // bar anywhere near its own height (the most any bar position within ±NEAR of it needs). With the head at its
+    // natural height (neck 5.5 cm), leaning only for the bar at the key's own height let the bar cut into the forehead
+    // between keys.
+    const NEAR = 0.12;
+    const need = (s: number) => {
+      let L = 0;
+      for (let t = Math.max(0, s - NEAR); t <= Math.min(1, s + NEAR) + 1e-9; t += 0.02) L = Math.max(L, needAt(t));
+      return L;
     };
     // The largest lean on the way up, applied on a smooth bump around the head so the head eases back and forward again.
     let peak = 0;

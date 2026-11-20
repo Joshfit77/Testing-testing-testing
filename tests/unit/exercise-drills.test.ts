@@ -53,13 +53,14 @@ function fingerprint(slug: string): string {
  * moved in straight lines, starting and stopping abruptly at each cone); their keyframes are unchanged. Updated again,
  * on purpose, when these four were redrawn as travelling drills (they stepped in place; see
  * tests/unit/exercise-agility-drills.test.ts): they no longer share the lateral-shuffle code, so the pins now guard the
- * new drawings against accidental changes.
+ * new drawings against accidental changes. Updated again, on purpose, when the neck was shortened from 9 to 5.5 cm
+ * (owner review, 2026-11-19): only the head and neck points moved; the same fingerprint taken without them is unchanged.
  */
 const UNCHANGED: Record<string, string> = {
-  "lateral-shuffle": "6dcf0915b3c6e220",
-  "t-drill": "8ed9338e1b7fc01c",
-  "three-cone-drill": "56d22657a39daae9",
-  "reactive-mirror-drill": "522971b454f18159",
+  "lateral-shuffle": "21d0bb1ba5cb7872",
+  "t-drill": "e919a2f763612a4e",
+  "three-cone-drill": "15b566ce9dc2f4ea",
+  "reactive-mirror-drill": "cdbecfd881aea333",
 };
 
 describe("drill corrections do not disturb other exercises", () => {

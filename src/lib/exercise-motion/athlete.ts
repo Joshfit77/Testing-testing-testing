@@ -617,8 +617,9 @@ function headSideGroups(ctx: Ctx, f: Frame): Group[] {
       tone,
       halo: 0.3,
       shade: () => {
-        // One shadow plane: behind the ear, under the cheekbone and under the jaw.
-        plane(ctx, [W(-11, 6), W(-3.4, 4), W(-0.6, -1.4), W(2.6, -4.2), W(6.6, -7.4), W(9, -11), W(-2, -13), W(-12, -6)], tone.shade, 0.9);
+        // Shadow only where the face turns away from the light: a strip under the jawline (one large plane over the
+        // lower face read as a mask).
+        plane(ctx, [W(-7.4, -1.8), W(-3.6, -3.9), W(-0.6, -6.1), W(2.6, -8.2), W(6.8, -9.4), W(7.4, -9.9), W(4.4, -10.0), W(1.4, -8.6), W(-0.4, -6.4), W(-3.4, -4.6), W(-7.2, -2.0)], tone.shade, 0.6);
         ctx.save();
         ctx.translate(head[0], head[1]);
         ctx.rotate((-a * Math.PI) / 180);
@@ -633,11 +634,17 @@ function headSideGroups(ctx: Ctx, f: Frame): Group[] {
         ctx.beginPath();
         ctx.arc(-1.5, -0.2, 1.1, -1.2, 1.9);
         ctx.stroke();
-        // Eye, brow, nostril, mouth, the jaw line.
+        // Eye (an almond with its upper lid), brow, nostril, lips, the jaw line.
         ctx.fillStyle = "#0b0908";
         ctx.beginPath();
-        ctx.ellipse(7.2, 1.7, 0.9, 0.4, -0.1, 0, Math.PI * 2);
+        ctx.ellipse(7.2, 1.7, 1.05, 0.5, -0.1, 0, Math.PI * 2);
         ctx.fill();
+        ctx.strokeStyle = "rgba(12,9,7,0.8)";
+        ctx.lineWidth = 0.3;
+        ctx.beginPath();
+        ctx.moveTo(6.0, 2.1);
+        ctx.quadraticCurveTo(7.2, 2.75, 8.25, 2.05);
+        ctx.stroke();
         ctx.strokeStyle = "rgba(12,9,7,0.95)";
         ctx.lineWidth = 0.6;
         ctx.lineCap = "round";
@@ -651,6 +658,11 @@ function headSideGroups(ctx: Ctx, f: Frame): Group[] {
         ctx.quadraticCurveTo(9.4, -2.1, 9.6, -2.6);
         ctx.moveTo(8.0, -4.5);
         ctx.lineTo(9.2, -4.55);
+        // The lower lip's shadow and the fold above the chin.
+        ctx.moveTo(8.3, -5.6);
+        ctx.quadraticCurveTo(8.7, -5.9, 9.0, -5.7);
+        ctx.moveTo(7.9, -7.1);
+        ctx.quadraticCurveTo(8.4, -7.4, 8.6, -7.0);
         ctx.moveTo(7.0, -9.0);
         ctx.quadraticCurveTo(3.0, -8.6, 0.6, -5.6);
         ctx.stroke();
@@ -686,12 +698,13 @@ function torsoStationsSide(f: Frame): [Vec, number, number, Vec][] {
     [add(pelvis, u1, 7), 10.2, 9.4, f1],
     [add(pelvis, u1, 14), 10.9, 9.2, f1],
     [m, 12.0, 10.8, fm],
-    [add(m, u2, BODY.thorax * 0.2), 13.2, 13.8, f2],
-    [add(m, u2, BODY.thorax * 0.36), 14.4, 15.4, f2],
-    [add(m, u2, BODY.thorax * 0.52), 17.4, 15.0, f2],
-    [add(m, u2, BODY.thorax * 0.7), 17.0, 14.0, f2],
-    [add(m, u2, BODY.thorax * 0.88), 13.2, 13.0, f2],
-    [add(neckBase, u2, 1.5), 8.0, 11.8, f2],
+    // The chest rises gradually to a broad, flat pectoral (a sudden 3 cm step at mid-chest read as a rounded bust).
+    [add(m, u2, BODY.thorax * 0.2), 13.4, 13.8, f2],
+    [add(m, u2, BODY.thorax * 0.36), 15.0, 15.4, f2],
+    [add(m, u2, BODY.thorax * 0.52), 15.9, 15.0, f2],
+    [add(m, u2, BODY.thorax * 0.7), 16.0, 14.0, f2],
+    [add(m, u2, BODY.thorax * 0.88), 14.2, 13.0, f2],
+    [add(neckBase, u2, 1.5), 8.6, 11.8, f2],
   ];
 }
 
@@ -704,9 +717,13 @@ function torsoSideGroup(ctx: Ctx, f: Frame, hl: Highlight): Group {
   const fa = frontOf(a);
   const fT2 = frontOf(f.seg.T2);
   const base = add(neckBase, up(a), -2);
-  const top = add(head, up(a), -7.6);
+  // A point in the head's own frame (x toward the face, y up from the head's centre), as the profile is drawn.
+  const H = (x: number, y: number): Vec => add(add(head, fa, x), up(a), y);
+  const top = H(0, -7);
   const nm = mid(base, top);
-  const neck = [add(base, fT2, 6.6), add(nm, fa, 5.6), add(top, fa, 5.6), add(top, fa, -3.6), add(nm, fa, -6.2), add(base, fT2, -10.6)];
+  // The neck meets the head the way a real one does: the throat starts behind the chin, under the jaw, and the back
+  // of the neck rises to the base of the skull behind the ear (it used to start at the chin's tip, a straight column).
+  const neck = [add(base, fT2, 6.4), add(nm, fa, 4.8), H(2.2, -9.4), H(-0.6, -6.9), H(-5.6, -3.4), add(nm, fa, -6.4), add(base, fT2, -10.6)];
   const f1 = frontOf(f.seg.T1);
   const f2 = fT2;
   const u1 = up(f.seg.T1);
@@ -730,25 +747,26 @@ function torsoSideGroup(ctx: Ctx, f: Frame, hl: Highlight): Group {
       muscle(ctx, [A(th * 0.62, -3), A(th * 0.62, -24), A(th * 0.9, -24), A(th * 0.9, -5)], gk(hl.upperBack));
       muscle(ctx, [A(th * 0.86, -4), A(th * 0.86, -24), add(nm, fa, -12), add(nm, fa, -2.4)], gk(hl.traps));
       muscle(ctx, [B(-23, -5.4), B(-23, -22), B(-4, -22), B(-4, -6.6)], gk(hl.lowerBack));
-      muscle(ctx, [add(base, fT2, 8), add(top, fa, 7), add(top, fa, -5), add(base, fT2, -4)], gk(hl.neck));
+      muscle(ctx, [add(base, fT2, 6), H(1.6, -8.8), H(-4.6, -3.8), add(base, fT2, -5)], gk(hl.neck));
       // Form: the chest and belly face the light, the back turns away.
       form(ctx, { ...spineLow, n: f1 }, 10.8, tone, 0, 1, 0.3);
       form(ctx, { ...spineHigh, n: f2 }, 14.5, tone, 0, 1, 0.3);
       form(ctx, seg(base, top), 5.8, tone, 0, 1, 0.2);
       const lit2 = clamp(facing(f2) * 1.4, 0, 1);
       // Light planes: the pectoral, three abdominal blocks.
-      plane(ctx, [A(th * 0.46, 9.5), A(th * 0.46, 15.4), A(th * 0.7, 15.2), A(th * 0.8, 10.6), A(th * 0.66, 7.6)], tone.light, 0.8 * lit2);
+      plane(ctx, [A(th * 0.5, 9.5), A(th * 0.5, 14.8), A(th * 0.72, 15.0), A(th * 0.82, 10.6), A(th * 0.68, 7.6)], tone.light, 0.22 * lit2);
       for (const [y0, y1] of [[th * 0.2, th * 0.31], [th * 0.05, th * 0.17], [-8.4, th * 0.02]] as const) plane(ctx, [A(y0, 7.4), A(y0, 11.6), A(y1, 11.8), A(y1, 7.6)], tone.light, 0.55 * lit2);
       const I = tone.ink;
       // Ink: the pectoral's lower border and its edge at the armpit, the abdominal tendons and the line beside them,
       // the serratus, the latissimus' front edge, the trapezius' edge up the neck, the sternomastoid.
-      lineW(ctx, [A(th * 0.44, 16.4), A(th * 0.35, 12), A(th * 0.4, 6.4), A(th * 0.52, 3.6)], I);
+      lineW(ctx, [A(th * 0.47, 15.8), A(th * 0.4, 12), A(th * 0.42, 6.4), A(th * 0.52, 3.6)], I * 0.8);
       for (const y of [th * 0.185, th * 0.035, -9.4]) lineW(ctx, [A(y, 7), A(y, 12.4)], I * 0.7, 0.3);
       lineW(ctx, [A(th * 0.33, 6.6), B(-8, 5.6), B(-21, 6.4)], I * 0.7, 0.3);
       for (const y of [th * 0.3, th * 0.2, th * 0.1]) lineW(ctx, [A(y, 2.2), A(y - 1.6, 5.2)], I * 0.6, 0.3);
       lineW(ctx, [A(th * 0.64, -1.4), A(th * 0.32, -4), B(-9, -5.6), B(-18, -7.6)], I * 0.75);
-      lineW(ctx, [A(th * 0.9, -5.6), add(nm, fa, -3.2), add(top, fa, -1.6)], I * 0.55, 0.3);
-      lineW(ctx, [add(top, fa, 1.2), add(nm, fa, 2.2), add(base, fT2, 3.6)], I * 0.6, 0.3);
+      lineW(ctx, [A(th * 0.9, -5.6), add(nm, fa, -4.6), H(-4.4, -3.8)], I * 0.55, 0.3);
+      // The sternomastoid: from behind the ear, down and forward to the top of the breastbone.
+      lineW(ctx, [H(-2.6, -3.6), add(nm, fa, 1.0), add(base, fT2, 5.4)], I * 0.6, 0.3);
     },
   };
 }

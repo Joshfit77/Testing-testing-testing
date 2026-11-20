@@ -10,7 +10,9 @@ export const BODY = {
   thigh: 45,
   lumbar: 25,
   thorax: 31.5,
-  neck: 9,
+  // C7 to the base of the skull. 9 cm put the chin about 14 cm above the shoulder line, so the neck read as a long
+  // column and the head looked small; 5.5 cm puts it about 9 cm above, as on a real lifter (owner review, 2026-11-19).
+  neck: 5.5,
   headR: 11,
   upperArm: 32,
   /** Elbow to the centre of the gripping hand. */
