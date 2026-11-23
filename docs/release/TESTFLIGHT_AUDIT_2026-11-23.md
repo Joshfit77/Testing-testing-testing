@@ -120,7 +120,16 @@ Earlier GitHub runs on the release candidate (251d68b4):
 - CI 44837084884: green;
 - iOS checks 44837081435: green (compile, unsigned Release archive and archive check, Simulator launch test, WebKit).
 
-Runs on this branch are listed in section 4.
+On this branch (7bc569ee), on GitHub:
+- CI 45198363436: **green** (typecheck, lint, unit, build, integration, dependency audit).
+- iOS checks 45198370348: **green**:
+  - compile;
+  - unsigned Release archive with build number `101.1`, which `check-archive.py` accepted ("build number is
+    numeric (101.1)");
+  - Simulator launch test;
+  - WebKit opening and navigation tests.
+- The signed TestFlight job was skipped by design: it runs only when dispatched with `job = testflight` and needs
+  the owner's Apple secrets.
 
 ### The 12 journeys
 
@@ -266,6 +275,9 @@ Blocking:
 - **Workout sync:** see `src/lib/domain/workout-merge.ts` (combining copies) and `src/server/services/workouts.ts`
   (revisions, `draft_rev`).
 - **Security register:** `docs/security/ASSESSMENT_2026-11-20.md`.
+- **Actions on Node 20:** GitHub warns that the pinned `actions/checkout` and `actions/setup-node` (v4.4.0)
+  target Node 20, which is deprecated; they currently run on Node 24. Update them to current releases, pinned by
+  commit, as routine maintenance.
 
 ## 9. Costs that need your approval
 
