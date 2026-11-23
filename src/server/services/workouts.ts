@@ -127,7 +127,15 @@ export interface ServerDraftRow {
   rev: number;
 }
 
-/** Every unfinished workout on the account, most recently changed first (a few at most). */
+/**
+ * How many unfinished workouts the logger offers at once. Several only arise from several devices (on one device a new
+ * workout replaces the old only when the member discards it), so this is a cap on the page's size, not a rule: was 5,
+ * which hid a sixth unfinished workout from the chooser (external review 2026-11-23). Nothing beyond it is deleted;
+ * the oldest are offered as soon as fewer are left.
+ */
+export const SERVER_DRAFTS_SHOWN = 25;
+
+/** Every unfinished workout on the account (up to SERVER_DRAFTS_SHOWN), most recently changed first. */
 export async function getServerDrafts(supabase: SupabaseClient, userId: string): Promise<ServerDraftRow[]> {
   const { data } = await supabase
     .from("workout_sessions")
@@ -136,7 +144,7 @@ export async function getServerDrafts(supabase: SupabaseClient, userId: string):
     .eq("status", "in_progress")
     .not("draft", "is", null)
     .order("updated_at", { ascending: false })
-    .limit(5);
+    .limit(SERVER_DRAFTS_SHOWN);
   return ((data ?? []) as { draft: unknown; draft_rev: number }[]).map((r) => ({ draft: r.draft, rev: Number(r.draft_rev) || 0 }));
 }
 
@@ -277,7 +285,7 @@ export async function finishWorkout(
   supabase: SupabaseClient,
   userId: string,
   input: FinishWorkoutInput,
-): Promise<{ sessionId: string; volumeKg: number; records: NewRecord[]; alreadyCompleted: boolean; addedSets: number }> {
+): Promise<{ sessionId: string; volumeKg: number; records: NewRecord[]; alreadyCompleted: boolean; addedSets: number; differingSets?: number }> {
   const { data: existing } = await supabase
     .from("workout_sessions")
     .select("id, status, total_volume_kg, user_program_id, program_day_id, draft, draft_rev")
@@ -304,7 +312,7 @@ export async function finishWorkout(
     const later = await applyLaterSets(supabase, userId, existing.id as string, input);
     // Show the same records the first attempt saved (or, after the later sets, the records as they now stand).
     const records = await recordsOfSession(supabase, userId, existing.id as string).catch(() => []);
-    return { sessionId: existing.id as string, volumeKg: later?.volumeKg ?? Number(existing.total_volume_kg), records, alreadyCompleted: true, addedSets: later?.added ?? 0 };
+    return { sessionId: existing.id as string, volumeKg: later.volumeKg ?? Number(existing.total_volume_kg), records, alreadyCompleted: true, addedSets: later.added, differingSets: later.differing };
   }
 
   // Only link to a program the user actually owns a record for.
@@ -422,8 +430,15 @@ async function savedExercises(supabase: SupabaseClient, userId: string, sessionI
  * nothing is written. Returns the new volume and the number of sets added, or null when nothing changed. Throws if the
  * edit fails, so the device keeps its copy and can retry.
  */
-async function applyLaterSets(supabase: SupabaseClient, userId: string, sessionId: string, input: FinishWorkoutInput): Promise<{ volumeKg: number; added: number } | null> {
-  if (mergeFinishedExercises((await savedExercises(supabase, userId, sessionId)).exercises, input.exercises).added === 0) return null;
+async function applyLaterSets(
+  supabase: SupabaseClient,
+  userId: string,
+  sessionId: string,
+  input: FinishWorkoutInput,
+): Promise<{ volumeKg: number | null; added: number; differing: number }> {
+  const first = mergeFinishedExercises((await savedExercises(supabase, userId, sessionId)).exercises, input.exercises);
+  // Nothing to add; sets both devices completed with different numbers are still reported (the saved ones stay).
+  if (first.added === 0) return { volumeKg: null, added: 0, differing: first.differing };
 
   // Claim the saved workout first: two such retries at once would otherwise both write the sets (editWorkout adds the
   // new rows before removing the old). The one that loses is told to try again; its device keeps the workout.
@@ -443,7 +458,7 @@ async function applyLaterSets(supabase: SupabaseClient, userId: string, sessionI
     // Combined again under the claim: another retry may have stored more sets just before.
     const saved = await savedExercises(supabase, userId, sessionId);
     const merged = mergeFinishedExercises(saved.exercises, input.exercises);
-    if (merged.added === 0) return null;
+    if (merged.added === 0) return { volumeKg: null, added: 0, differing: merged.differing };
     // The end time moves to the later Finish, with the pause time the device now has (it may have paused since).
     const { error: timeErr } = await supabase
       .from("workout_sessions")
@@ -453,7 +468,7 @@ async function applyLaterSets(supabase: SupabaseClient, userId: string, sessionI
       .lt("ended_at", input.endedAt);
     if (timeErr) throw new WorkoutError(timeErr.message);
     const { volumeKg } = await editWorkout(supabase, userId, { sessionId, name: saved.name, notes: saved.notes, exercises: merged.exercises });
-    return { volumeKg, added: merged.added };
+    return { volumeKg, added: merged.added, differing: merged.differing };
   } finally {
     await supabase.from("workout_sessions").update({ finish_claim: null, finish_claimed_at: null }).eq("id", sessionId).eq("finish_claim", claim);
   }
@@ -471,7 +486,7 @@ async function awaitOtherFinish(supabase: SupabaseClient, userId: string, input:
     if (data?.status === "completed") {
       const later = await applyLaterSets(supabase, userId, data.id as string, input);
       const records = await recordsOfSession(supabase, userId, data.id as string).catch(() => []);
-      return { sessionId: data.id as string, volumeKg: later?.volumeKg ?? Number(data.total_volume_kg), records, alreadyCompleted: true, addedSets: later?.added ?? 0 };
+      return { sessionId: data.id as string, volumeKg: later.volumeKg ?? Number(data.total_volume_kg), records, alreadyCompleted: true, addedSets: later.added, differingSets: later.differing };
     }
     if (data && data.status !== "in_progress") break;
     await new Promise((r) => setTimeout(r, 250));
@@ -486,7 +501,7 @@ async function writeClaimedFinish(
   input: FinishWorkoutInput,
   userProgramId: string | null,
   volumeKg: number,
-): Promise<{ sessionId: string; volumeKg: number; records: NewRecord[]; alreadyCompleted: boolean; addedSets: number }> {
+): Promise<{ sessionId: string; volumeKg: number; records: NewRecord[]; alreadyCompleted: boolean; addedSets: number; differingSets?: number }> {
   // Clear anything a previous partial attempt left (an in-progress session owns no saved exercises or records).
   await supabase.from("workout_exercises").delete().eq("session_id", sessionId);
   await supabase.from("personal_records").delete().eq("user_id", userId).eq("session_id", sessionId);

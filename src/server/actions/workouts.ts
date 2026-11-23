@@ -124,6 +124,8 @@ export async function finishWorkoutAction(input: unknown): Promise<
       reflection: Reflection | null;
       /** This workout had already been finished (another device, or a lost reply); this many sets were added to it. */
       addedSets?: number;
+      /** Sets both devices completed with different numbers; the numbers saved first were kept. */
+      differingSets?: number;
       alreadyCompleted?: boolean;
     }>
   // The account's copy changed since this device last saw it (F-30): nothing was saved; combine and finish again.
@@ -179,7 +181,7 @@ export async function finishWorkoutAction(input: unknown): Promise<
     revalidatePath("/", "layout");
     return {
       ok: true,
-      data: { sessionId: res.sessionId, volumeKg: res.volumeKg, records: res.records, badges, milestones, next, previous, reflection, addedSets: res.addedSets, alreadyCompleted: res.alreadyCompleted },
+      data: { sessionId: res.sessionId, volumeKg: res.volumeKg, records: res.records, badges, milestones, next, previous, reflection, addedSets: res.addedSets, differingSets: res.differingSets ?? 0, alreadyCompleted: res.alreadyCompleted },
     };
   } catch (err) {
     if (err instanceof DraftConflictError) return { ok: false, error: "conflict", conflict: { rev: err.rev, draft: err.draft } };

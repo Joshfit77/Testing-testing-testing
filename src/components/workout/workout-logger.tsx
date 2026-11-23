@@ -114,7 +114,8 @@ function sameButRevision(a: WorkoutDraft, b: WorkoutDraft): boolean {
 }
 
 import { withTimeout } from "@/lib/with-timeout";
-import { mergeDrafts, restoreCandidates } from "@/lib/domain/workout-merge";
+import { differenceNotice, mergeDrafts, restoreCandidates } from "@/lib/domain/workout-merge";
+import { formatWeight as formatKg } from "@/lib/domain/units";
 export { withTimeout };
 
 interface FinishResult {
@@ -450,10 +451,11 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
       if (theirs && mine && theirs.clientId === mine.clientId && conflicts.current < 3) {
         conflicts.current += 1;
         const merged = mergeDrafts(mine, theirs, new Date().toISOString());
+        const differences = differenceNotice(merged.differing, (kg) => formatKg(kg, units));
         if (merged.fromOther > 0) {
-          setSyncNotice(`Updated with your other device's changes: ${merged.fromOther} ${merged.fromOther === 1 ? "set" : "sets"} added. Nothing from this device was lost.`);
-        } else if (merged.changed) {
-          setSyncNotice("Updated with your other device's changes. Nothing from this device was lost.");
+          setSyncNotice([`Updated with your other device's changes: ${merged.fromOther} ${merged.fromOther === 1 ? "set" : "sets"} added. Nothing from this device was lost.`, differences].filter(Boolean).join(" "));
+        } else if (merged.changed || differences) {
+          setSyncNotice([differences ? "Updated with your other device's changes." : "Updated with your other device's changes. Nothing from this device was lost.", differences].filter(Boolean).join(" "));
         }
         touched.current = true;
         saveNow.current = true;
@@ -484,7 +486,7 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
     syncTimer.current = setTimeout(() => {
       if (latest.current) void pushToServer(latest.current);
     }, retryDelay.current);
-  }, []);
+  }, [units]);
 
   // Persist every change locally immediately, and to the server (debounced), once the member has done something.
   useEffect(() => {
@@ -1111,11 +1113,13 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
     // The account's copy changed since this one was built (another device or tab): combine them (no completed set from
     // either is dropped) and finish the combined workout (F-30).
     let combined = 0;
+    const differing: ReturnType<typeof mergeDrafts>["differing"] = [];
     for (let i = 0; i < 3 && !res.ok && "conflict" in res; i++) {
       const theirs = migrateDraft(res.conflict.draft);
       if (!theirs || theirs.clientId !== current.clientId) break;
       const merged = mergeDrafts(current, theirs, new Date().toISOString());
       combined += merged.fromOther;
+      differing.push(...merged.differing);
       current = { ...merged.draft, baseRev: res.conflict.rev, finishRequestedAt: current.finishRequestedAt ?? endedAt };
       saveLocalDraft(userId, current);
       setDraft(current);
@@ -1128,7 +1132,8 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
       return;
     }
     const addedSets = res.data.addedSets ?? 0;
-    const syncNote =
+    const differingSets = res.data.differingSets ?? 0;
+    const syncNoteMain =
       addedSets > 0
         ? `This workout had already been finished on another device: ${addedSets} ${addedSets === 1 ? "set" : "sets"} from this device ${addedSets === 1 ? "was" : "were"} added to it.`
         : res.data.alreadyCompleted && closedElsewhere.current === "finished"
@@ -1136,6 +1141,17 @@ export function WorkoutLogger({ userId, units, catalog, alternatives, serverDraf
           : combined > 0
             ? `${combined} ${combined === 1 ? "set" : "sets"} from your other device ${combined === 1 ? "was" : "were"} included.`
             : null;
+    // Sets logged with different numbers on two devices are never resolved silently: say which (or how many) to check.
+    const syncNote =
+      [
+        syncNoteMain,
+        differenceNotice(differing, (kg) => formatKg(kg, units)),
+        differingSets > 0
+          ? `${differingSets} ${differingSets === 1 ? "set was" : "sets were"} logged with different numbers on your other device; the numbers saved first were kept. Check ${differingSets === 1 ? "it" : "them"} in History.`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" ") || null;
     const finalDraftSaved = current;
     stopBackups();
     clearLocalDraft(userId);

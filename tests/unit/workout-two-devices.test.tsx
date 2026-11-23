@@ -135,6 +135,25 @@ describe("the same workout changed on another device (F-30)", () => {
   });
 });
 
+describe("the same set completed on both devices with different numbers", () => {
+  it("is kept once (the newer numbers) and the member is told what the other device had", async () => {
+    sync.mockImplementationOnce(async (s: Snapshot) => {
+      const theirs = structuredClone(s.draft);
+      theirs.exercises[0]!.sets[0] = { ...theirs.exercises[0]!.sets[0]!, completed: true, reps: 12 };
+      theirs.updatedAt = new Date(Date.parse(s.draft.updatedAt) + 60_000).toISOString();
+      return { ok: true, data: { status: "conflict", rev: 2, draft: theirs } };
+    });
+    sync.mockResolvedValue({ ok: true, data: { status: "saved", rev: 3 } });
+    render(<WorkoutLogger userId={USER} units="imperial" catalog={catalog} alternatives={{}} serverDrafts={[]} template={template} previous={{}} targets={{}} />);
+    await advance(0);
+    fireEvent.click(screen.getAllByTestId("complete-set")[0]!);
+    await advance(0);
+    await advance(0);
+    expect(loadLocalDraft(USER)!.exercises[0]!.sets[0]).toMatchObject({ completed: true, reps: 12 });
+    expect(screen.getByTestId("workout-sync-notice").textContent).toMatch(/One set was logged differently on your other device\. Push-Up set 1: kept 12 reps, your other device had 8 reps/);
+  });
+});
+
 describe("two different unfinished workouts (F-29)", () => {
   const phoneWorkout = (): WorkoutDraft => {
     const d = createDraft({ name: "Phone workout", now: "2026-11-21T08:00:00.000Z", clientId: "33333333-3333-4333-8333-333333333333", exercises: template.exercises });

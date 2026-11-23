@@ -9,7 +9,9 @@ import type { FinishWorkoutInput } from "@/lib/validation/schemas";
  * in order of importance:
  *   1. A set completed on either side stays completed (with the values of the side that completed it).
  *   2. A set or exercise that exists on only one side is kept, in its place.
- *   3. Where both sides have the same set in the same state, the copy changed most recently wins.
+ *   3. Where both sides have the same set in the same state, the copy changed most recently wins. When both
+ *      completed it with different numbers, the other numbers are reported (`differing`), so the member is told which
+ *      set to check instead of one device's numbers being replaced silently.
  * Deleting a set on one device while the other still has it brings it back: losing a completed set is worse than
  * seeing a removed one again.
  */
@@ -20,7 +22,21 @@ export interface DraftMerge {
   fromOther: number;
   /** The result differs from `mine` in anything but its timestamp. */
   changed: boolean;
+  /** Sets both copies completed with different numbers: which was kept and what the other copy had. */
+  differing: SetDifference[];
 }
+
+export interface SetDifference {
+  exercise: string;
+  /** 1-based position of the set in the exercise. */
+  setNumber: number;
+  kept: SetNumbers;
+  other: SetNumbers;
+}
+export type SetNumbers = Pick<DraftSet, "weightKg" | "reps" | "durationSeconds" | "distanceM">;
+
+const numbers = (s: DraftSet): SetNumbers => ({ weightKg: s.weightKg, reps: s.reps, durationSeconds: s.durationSeconds, distanceM: s.distanceM ?? null });
+const sameNumbers = (a: DraftSet, b: DraftSet) => JSON.stringify(numbers(a)) === JSON.stringify(numbers(b));
 
 const isNewer = (a: { updatedAt: string }, b: { updatedAt: string }) => Date.parse(a.updatedAt) > Date.parse(b.updatedAt);
 
@@ -69,6 +85,20 @@ const withoutTime = (d: WorkoutDraft) => JSON.stringify({ ...d, updatedAt: "" })
 export function mergeDrafts(mine: WorkoutDraft, theirs: WorkoutDraft, now: string): DraftMerge {
   if (mine.clientId !== theirs.clientId) throw new Error("mergeDrafts: different workouts");
   const theirsNewer = isNewer(theirs, mine);
+  const differing: SetDifference[] = [];
+  const theirsExercises = new Map(theirs.exercises.map((e) => [e.id, e]));
+  for (const e of mine.exercises) {
+    const t = theirsExercises.get(e.id);
+    if (!t) continue;
+    const tSets = new Map(t.sets.map((x) => [x.id, x]));
+    e.sets.forEach((m, i) => {
+      const o = tSets.get(m.id);
+      if (o && m.completed && o.completed && !sameNumbers(m, o)) {
+        const [kept, other] = theirsNewer ? [o, m] : [m, o];
+        differing.push({ exercise: (theirsNewer ? t : e).name, setNumber: i + 1, kept: numbers(kept), other: numbers(other) });
+      }
+    });
+  }
   const latest = Math.max(Date.parse(mine.updatedAt), Date.parse(theirs.updatedAt));
   const updatedAt = Date.parse(now) > latest ? now : new Date(latest + 1).toISOString();
   const draft: WorkoutDraft = {
@@ -88,7 +118,7 @@ export function mergeDrafts(mine: WorkoutDraft, theirs: WorkoutDraft, now: strin
   };
   const before = completedIds(mine);
   const fromOther = [...completedIds(draft)].filter((k) => !before.has(k)).length;
-  return { draft, fromOther, changed: withoutTime(draft) !== withoutTime(mine) };
+  return { draft, fromOther, changed: withoutTime(draft) !== withoutTime(mine), differing };
 }
 
 type FinishedExercise = FinishWorkoutInput["exercises"][number];
@@ -96,14 +126,19 @@ type FinishedExercise = FinishWorkoutInput["exercises"][number];
 /**
  * A workout already saved as finished (by another device, or by this one before its reply was lost), and another
  * finished copy of it arriving. Saved sets carry no ids, so exercises are matched by exercise (in order) and sets by
- * position. A set completed in either copy is kept completed; the saved copy wins where both completed it; extra sets
+ * position. A set completed in either copy is kept completed; the saved copy wins where both completed it (counted in
+ * `differing` when the numbers differ, so the member is told); extra sets
  * and exercises are added. `added` counts the completed sets the result gains, 0 when the saved workout already has
  * everything (then nothing should be written).
  */
-export function mergeFinishedExercises(saved: FinishedExercise[], incoming: FinishedExercise[]): { exercises: FinishedExercise[]; added: number } {
+export function mergeFinishedExercises(saved: FinishedExercise[], incoming: FinishedExercise[]): { exercises: FinishedExercise[]; added: number; differing: number } {
   const out = saved.map((e) => ({ ...e, sets: [...e.sets] }));
   const used = new Set<number>();
   let added = 0;
+  // Sets both copies completed with different numbers: the saved ones are kept; the count is reported to the member.
+  let differing = 0;
+  const same = (a: FinishedExercise["sets"][number], b: FinishedExercise["sets"][number]) =>
+    a.reps === b.reps && a.weightKg === b.weightKg && a.durationSeconds === b.durationSeconds && (a.distanceM ?? null) === (b.distanceM ?? null);
   incoming.forEach((inc, i) => {
     // The same exercise at the same place, else its first unmatched occurrence.
     const at = out[i] && !used.has(i) && out[i]!.exerciseId === inc.exerciseId ? i : out.findIndex((e, k) => !used.has(k) && e.exerciseId === inc.exerciseId);
@@ -123,6 +158,8 @@ export function mergeFinishedExercises(saved: FinishedExercise[], incoming: Fini
       } else if (!have.completed && s.completed) {
         target.sets[k] = s;
         if (!target.skipped) added++;
+      } else if (have.completed && s.completed && !same(have, s)) {
+        differing++;
       }
     });
     // A skipped exercise that the other copy actually did is no longer skipped.
@@ -132,7 +169,7 @@ export function mergeFinishedExercises(saved: FinishedExercise[], incoming: Fini
       added += target.sets.filter((s) => s.completed).length;
     }
   });
-  return { exercises: out, added };
+  return { exercises: out, added, differing };
 }
 
 /**
@@ -156,4 +193,22 @@ export function restoreCandidates(local: WorkoutDraft | null, server: WorkoutDra
     if (!out.some((o) => o.clientId === s.clientId)) out.push(s);
   }
   return mine ? [mine, ...out] : out;
+}
+
+/**
+ * What to tell the member about sets both devices completed with different numbers (never silent): which set, what was
+ * kept and what the other device had, so they can correct it. `weight` formats kilograms in the member's units.
+ */
+export function differenceNotice(diffs: SetDifference[], weight: (kg: number) => string): string | null {
+  if (!diffs.length) return null;
+  const show = (n: SetNumbers) =>
+    [n.weightKg !== null ? weight(n.weightKg) : null, n.reps !== null ? `${n.reps} reps` : null, n.durationSeconds !== null ? `${n.durationSeconds} s` : null, n.distanceM !== null ? `${n.distanceM} m` : null]
+      .filter(Boolean)
+      .join(", ") || "no numbers";
+  const listed = diffs
+    .slice(0, 3)
+    .map((d) => `${d.exercise} set ${d.setNumber}: kept ${show(d.kept)}, your other device had ${show(d.other)}`)
+    .join("; ");
+  const more = diffs.length > 3 ? ` (and ${diffs.length - 3} more)` : "";
+  return `${diffs.length === 1 ? "One set was" : `${diffs.length} sets were`} logged differently on your other device. ${listed}${more}. Check ${diffs.length === 1 ? "it" : "them"} and correct if needed.`;
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createDraft, workoutReducer, type WorkoutDraft } from "@/lib/domain/workout-draft";
-import { mergeDrafts, mergeFinishedExercises, restoreCandidates } from "@/lib/domain/workout-merge";
+import { differenceNotice, mergeDrafts, mergeFinishedExercises, restoreCandidates } from "@/lib/domain/workout-merge";
 
 /**
  * F-29 / F-30 (security assessment 2026-11-20): two devices or tabs working on workouts at once. Two copies of one
@@ -66,6 +66,24 @@ describe("mergeDrafts: two copies of one workout", () => {
     expect(m.draft.exercises.map((e) => e.exerciseId)).toEqual([SQUAT.id, BENCH.id]);
   });
 
+  it("the same set completed on both devices with different weights or reps is never resolved silently", () => {
+    const start = base();
+    const phone = logSet(start, 0, 0, 100, 1);
+    // The tablet completed the same set later, heavier and with different reps.
+    let tablet = logSet(start, 0, 0, 105, 4);
+    const ex = tablet.exercises[0]!;
+    tablet = workoutReducer(tablet, { type: "updateSet", exerciseKey: ex.id, setId: ex.sets[0]!.id, patch: { reps: 3 } } as never);
+    const m = mergeDrafts(phone, tablet, at(6));
+    expect(m.draft.exercises[0]!.sets[0]).toMatchObject({ completed: true, weightKg: 105, reps: 3 });
+    expect(m.differing).toEqual([{ exercise: "Back Squat", setNumber: 1, kept: { weightKg: 105, reps: 3, durationSeconds: null, distanceM: null }, other: { weightKg: 100, reps: 5, durationSeconds: null, distanceM: null } }]);
+    expect(differenceNotice(m.differing, (kg) => `${kg} kg`)).toBe(
+      "One set was logged differently on your other device. Back Squat set 1: kept 105 kg, 3 reps, your other device had 100 kg, 5 reps. Check it and correct if needed.",
+    );
+    // Same numbers on both: nothing to report.
+    expect(mergeDrafts(phone, phone, at(7)).differing).toEqual([]);
+    expect(differenceNotice([], String)).toBeNull();
+  });
+
   it("is newer than both copies, refuses two different workouts, and reports no change when there is none", () => {
     const a = logSet(base(), 0, 0, 100, 1);
     const m = mergeDrafts(a, a, at(1));
@@ -115,9 +133,10 @@ describe("mergeFinishedExercises: a second Finish of a workout already saved", (
     expect(m.exercises.map((e) => e.sets.filter((s) => s.completed).map((s) => s.weightKg))).toEqual([[100, 100, 100], [60, 62.5]]);
   });
 
-  it("adds nothing for a plain repeat, keeps saved values where both completed, appends extra sets and exercises", () => {
+  it("adds nothing for a plain repeat, keeps saved values where both completed (and counts them), appends extra sets and exercises", () => {
     const saved = [ex(SQUAT.id, [set(100), set(100)])];
-    expect(mergeFinishedExercises(saved, saved).added).toBe(0);
+    expect(mergeFinishedExercises(saved, saved)).toMatchObject({ added: 0, differing: 0 });
+    expect(mergeFinishedExercises(saved, [ex(SQUAT.id, [set(100), set(95)])])).toMatchObject({ added: 0, differing: 1 });
     const m = mergeFinishedExercises(saved, [ex(SQUAT.id, [set(90), set(90), set(110)]), ex(BENCH.id, [set(60)])]);
     expect(m.exercises[0]!.sets.map((s) => s.weightKg)).toEqual([100, 100, 110]);
     expect(m.exercises[1]!.exerciseId).toBe(BENCH.id);

@@ -109,6 +109,13 @@ describe.skipIf(!available)("workout revisions: two devices at once", async () =
     expect(drafts.every((d) => typeof d.rev === "number" && d.rev >= 1)).toBe(true);
   });
 
+  it("six or more unfinished workouts are all offered, none hidden (external review: the list stopped at five)", async () => {
+    const seven = Array.from({ length: 7 }, () => crypto.randomUUID());
+    for (const [i, id] of seven.entries()) await saveDraftSnapshot(user.client, user.id, snap(id, `w${i}`, null));
+    const offered = (await getServerDrafts(user.client, user.id)).map((d) => (d.draft as { marker: string }).marker);
+    for (let i = 0; i < 7; i++) expect(offered).toContain(`w${i}`);
+  });
+
   it("Finish on an older copy is refused with the account's copy (nothing saved); on the current revision it saves", async () => {
     const id = crypto.randomUUID();
     await saveDraftSnapshot(user.client, user.id, snap(id, "phone", null));
@@ -130,9 +137,12 @@ describe.skipIf(!available)("workout revisions: two devices at once", async () =
     // Phone: all three squat sets. Tablet: one squat set and two bench sets (more in total, but not the phone's squats).
     await finishWorkout(user.client, user.id, finishInput(id, [row(squat, [set(100), set(100), set(100)]), row(bench, [set(60, false), set(60, false)])]));
     const second = await finishWorkout(user.client, user.id, finishInput(id, [row(squat, [set(100), set(0, false), set(0, false)]), row(bench, [set(60), set(62.5)])]));
-    expect(second).toMatchObject({ alreadyCompleted: true, addedSets: 2 });
+    expect(second).toMatchObject({ alreadyCompleted: true, addedSets: 2, differingSets: 0 });
     expect(await savedSets(id)).toEqual([[100, 100, 100], [60, 62.5]]);
     // A plain repeat adds nothing.
-    expect(await finishWorkout(user.client, user.id, finishInput(id, [row(squat, [set(100), set(100), set(100)])]))).toMatchObject({ addedSets: 0 });
+    expect(await finishWorkout(user.client, user.id, finishInput(id, [row(squat, [set(100), set(100), set(100)])]))).toMatchObject({ addedSets: 0, differingSets: 0 });
+    // The same sets completed with different numbers on the other device: the saved numbers stay, and it's reported.
+    expect(await finishWorkout(user.client, user.id, finishInput(id, [row(squat, [set(100), set(105), set(110)])]))).toMatchObject({ addedSets: 0, differingSets: 2 });
+    expect(await savedSets(id)).toEqual([[100, 100, 100], [60, 62.5]]);
   });
 });
