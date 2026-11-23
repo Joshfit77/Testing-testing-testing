@@ -77,8 +77,25 @@ editor shows an error instead (for example about size or a timeout), **don't run
 message, and you'll get a version split into smaller parts, or a one-line command to run it from a computer instead.
 
 **Step 11. Sign-in settings.** **Authentication** → **URL Configuration**: leave it for now; you'll fill in the website
-address in step 13. **Authentication** → **Email Templates**: for "Confirm signup" paste the contents of
-`supabase/templates/confirmation.html`, for "Reset password" paste `supabase/templates/recovery.html`.
+address in step 13.
+
+**Emails on a new free project (Supabase changes, checked 2026-11-23).** Supabase's built-in email sender:
+- **only delivers to members of your Supabase organization.** Invite John: supabase.com → your organization →
+  **Team** → **Invite**, with the email he will sign up with. If Supabase asks for payment to add him, stop and ask
+  Claude;
+- **sends about 2 emails an hour** for the whole project, so space out sign-ups and password resets;
+- **doesn't let a new free project change its email templates** (since 3 June 2026). Skip the "Email Templates"
+  page for the first build. The app works with Supabase's standard emails:
+  - **Confirming a new account:** tap the link in the email. Safari opens and says the link was processed. Go back
+    to the app and sign in.
+  - **Password reset:** ask for it **in Safari**, not in the app. Open your staging address in Safari → **Sign in** →
+    **Forgot password?**, then open the email on the same iPhone. It opens in Safari, where you choose the new
+    password. Then sign in with it in the app. A reset asked for inside the app can't be finished from the email,
+    because the email opens in Safari, not in the app.
+- When you later connect an email service (Supabase → **Authentication** → **SMTP Settings**; needed before inviting
+  more testers), paste the app's templates: "Confirm signup" = `supabase/templates/confirmation.html`, "Reset
+  password" = `supabase/templates/recovery.html`. Resets then work from inside the app too.
+
 **Authentication** → **Sign In / Providers** → **Email** (security settings; names can differ slightly):
 - **Secure password change**: on.
 - **Email OTP expiration**: `1800` seconds (30 minutes) instead of an hour.
@@ -92,9 +109,14 @@ docs/security/ADMIN_MFA.md, including what to do if you lose your phone).
 dash.cloudflare.com; paste its *secret key* here), and in Vercel add `NEXT_PUBLIC_TURNSTILE_SITE_KEY` = its *site key*.
 Switch both on together: with only Supabase's switched on, nobody can sign in.
 
-**Step 12. Copy the three connection values.** **Project Settings** → **API**: the **Project URL**, the **anon public**
-key, and the **service_role** key (the service_role key is a master key: it goes only into Vercel in step 13, nowhere
-else).
+**Step 12. Copy the three connection values.** **Project Settings** → **API Keys** (and **Data API** for the URL):
+- the **Project URL**;
+- the **Publishable key** (starts `sb_publishable_`);
+- the **Secret key** (starts `sb_secret_`). It is a master key: it goes only into Vercel in step 13, nowhere else.
+
+New projects have only these new-style keys. An older project shows the **anon public** and **service_role** keys
+instead, and either kind works. The app was tested with the new kind on 2026-11-23: all integration tests and the main
+browser journeys passed.
 
 ---
 
@@ -106,8 +128,8 @@ else).
 | Name | Value |
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | the Project URL from step 12 |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | the anon public key from step 12 |
-| `SUPABASE_SERVICE_ROLE_KEY` | the service_role key from step 12 (mark it **Sensitive**) |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | the Publishable key (or anon public key) from step 12 |
+| `SUPABASE_SERVICE_ROLE_KEY` | the Secret key (or service_role key) from step 12 (mark it **Sensitive**) |
 | `NEXT_PUBLIC_SITE_URL` | leave for now; set it after the first deploy (below) |
 | `ERROR_REPORTING` | `on` |
 | `NEXT_PUBLIC_ERROR_REPORTING` | `on` |
@@ -214,8 +236,9 @@ workout) or **cosmetic** (looks wrong, works).
    your account yet. Tap Cancel; turn Airplane Mode off; the set is still there.
 9. Move around every tab for a few minutes: no crash, nothing blank.
 10. If you allow Apple Health: the app asks for permission once and shows the data it imported.
-11. **Password reset:** on the sign-in screen tap "Forgot password?", open the email **on the iPhone**, set a new
-    password, sign in with it.
+11. **Password reset** (see step 11 for why it starts in Safari): in **Safari** open your staging address → Sign in →
+    "Forgot password?", open the email **on the iPhone**, set a new password in Safari, then sign in with it **in the
+    app**.
 12. **GPS run or walk:** start a recording outdoors, lock the phone for 5 minutes while walking, unlock, stop: the
     route, distance and time look right. Then check iPhone Settings → Narrow Gate Fitness → Location says what you
     chose.

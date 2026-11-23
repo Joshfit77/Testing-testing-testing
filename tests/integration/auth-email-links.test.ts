@@ -2,6 +2,7 @@ import { createClient, type SupportedStorage } from "@supabase/supabase-js";
 import { NextRequest } from "next/server";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { anonKey, createTestUser, deleteTestUser, serviceClient, stackAvailable, url, type TestUser } from "./helpers";
+import { openedByRecentEmailLink } from "@/lib/auth/password-reset-session";
 
 // The cookies of the browser that opens the link, for the app's own /auth/confirm route (cleared per request).
 const safariCookies = vi.hoisted(() => new Map<string, string>());
@@ -121,6 +122,11 @@ describe.skipIf(!available)("auth email links", () => {
     const same = await browser(appWebView).auth.exchangeCodeForSession(code!);
     expect(same.error).toBeNull();
     expect(same.data.session?.user.id).toBe(pkceMember.id);
+    // ...and that session may choose a new password (F-9 requires a recent emailed-link sign-in). This is the path a
+    // tester uses on a new free Supabase project, whose email templates can't be changed: ask for the reset in Safari
+    // and open the email in Safari (docs/TESTFLIGHT_FIRST_BUILD_GUIDE.md, step 11).
+    const claims = JSON.parse(Buffer.from(same.data.session!.access_token.split(".")[1]!, "base64url").toString("utf8")) as { amr?: unknown };
+    expect(openedByRecentEmailLink(claims.amr, Math.floor(Date.now() / 1000))).toBe(true);
   });
 
   it.skipIf(!mail)("the token hash of a reset the app requested (PKCE) verifies in any other browser", async () => {
