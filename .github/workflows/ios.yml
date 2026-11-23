@@ -434,7 +434,7 @@ jobs:
       - run: npm ci
       - name: Point the iPhone app at the deployed app
         run: |
-          CAP_SERVER_URL="$SERVER_URL" npx cap sync ios
+          CAP_SERVER_URL="$SERVER_URL" CAP_APP_ID="$BUNDLE_ID" npx cap sync ios
           python3 - <<'PY'
           import json, os
           c = json.load(open("ios/App/App/capacitor.config.json"))
@@ -480,6 +480,12 @@ jobs:
             -authenticationKeyPath "$RUNNER_TEMP/asc/AuthKey_${ASC_KEY_ID}.p8" \
             -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             archive
+      # The same checks as the unsigned archive on every push, now on the build that is about to go to Apple: the
+      # staging address, the permission texts, the privacy manifest, the offline Bible. A failure stops the upload.
+      - name: Check this build against App Store Connect's requirements (before anything is uploaded)
+        env:
+          EXPECTED_BUNDLE_ID: ${{ env.BUNDLE_ID }}
+        run: python3 scripts/ios-verify/check-archive.py "$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app" 26
       - name: ${{ inputs.upload && 'Sign and upload to App Store Connect (TestFlight)' || 'Sign only (no upload)' }}
         env:
           DESTINATION: ${{ inputs.upload && 'upload' || 'export' }}

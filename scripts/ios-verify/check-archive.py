@@ -1,8 +1,10 @@
-"""check-archive.py APP_BUNDLE MIN_SDK_MAJOR — checks an unsigned Release archive of the iPhone app (App.app inside
-App.xcarchive/Products/Applications) against what App Store Connect and TestFlight need, without Apple's servers:
+"""check-archive.py APP_BUNDLE MIN_SDK_MAJOR — checks a Release archive of the iPhone app (App.app inside
+App.xcarchive/Products/Applications; unsigned on every push, and the signed TestFlight build before it is uploaded)
+against what App Store Connect and TestFlight need, without Apple's servers:
 the bundle ID, version and build number, the SDK and Xcode it was built with, the deployment target, a 64-bit-only
 binary, the device capability, the permission texts every native feature needs, the privacy manifest, the app icon,
-App Transport Security, and that it loads the online app over HTTPS rather than the offline edition.
+App Transport Security, that it loads the online app over HTTPS rather than the offline edition, and that the offline
+Bible is inside the app. EXPECTED_BUNDLE_ID overrides the bundle ID (default com.narrowgatefitness.app).
 
 Prints one line per check and exits 1 if any fails. It doesn't sign: signing needs the Apple Developer account."""
 import json
@@ -12,6 +14,8 @@ import subprocess
 import sys
 
 app, min_sdk = sys.argv[1], int(sys.argv[2])
+# The TestFlight job passes the bundle ID it signs with (its bundle_id input); the default is the app's own.
+bundle_id = os.environ.get("EXPECTED_BUNDLE_ID") or "com.narrowgatefitness.app"
 info = plistlib.load(open(os.path.join(app, "Info.plist"), "rb"))
 failures: list[str] = []
 
@@ -22,7 +26,7 @@ def check(ok: bool, what: str, detail: str = "") -> None:
         failures.append(what)
 
 
-check(info.get("CFBundleIdentifier") == "com.narrowgatefitness.app", "bundle ID is com.narrowgatefitness.app", str(info.get("CFBundleIdentifier")))
+check(info.get("CFBundleIdentifier") == bundle_id, f"bundle ID is {bundle_id}", str(info.get("CFBundleIdentifier")))
 check(info.get("CFBundleDisplayName") == "Narrow Gate Fitness", "display name", str(info.get("CFBundleDisplayName")))
 version, build = str(info.get("CFBundleShortVersionString", "")), str(info.get("CFBundleVersion", ""))
 check(bool(version) and all(p.isdigit() for p in version.split(".")) and len(version.split(".")) <= 3, "marketing version is numeric (x.y.z)", version)
@@ -83,7 +87,15 @@ check(str(server.get("url", "")).startswith("https://"), "loads the online app o
 check(not server.get("cleartext"), "no cleartext (http) traffic allowed")
 check(server.get("errorPath") == "error.html" and os.path.exists(os.path.join(app, "public", "error.html")), "offline page bundled (shown when the site can't be reached)")
 check(cap.get("webDir") != "standalone" and bool(server.get("url")), "not the offline edition (it has no server address)")
-check(cap.get("appId") == "com.narrowgatefitness.app", "Capacitor appId matches the bundle ID", str(cap.get("appId")))
+check(cap.get("appId") == bundle_id, "Capacitor appId matches the bundle ID", str(cap.get("appId")))
+# With no connection the offline page offers "Read the Bible": the reader and every book must be inside the app, and
+# "Try again" needs the site's address (capacitor.config.ts copies them into native-shell/ on every sync).
+public = os.path.join(app, "public")
+books = os.path.join(public, "bible", "bsb", "books")
+book_count = len([f for f in os.listdir(books) if f.endswith(".json")]) if os.path.isdir(books) else 0
+reader = all(os.path.exists(os.path.join(public, f)) for f in ["bible-offline.html", "bible-offline.js", "bible/bsb/meta.json", "bible/bsb/wj.json"])
+check(reader and book_count == 66, "offline Bible inside the app (reader and all 66 books)", f"{book_count} books")
+check(os.path.exists(os.path.join(public, "server-url.js")), "offline page knows the site's address (its Try again button)")
 
 print()
 print(f"{len(failures)} check(s) failed" if failures else "All archive checks passed.")
