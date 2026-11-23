@@ -1,5 +1,7 @@
 # From LLC to TestFlight on your iPhone: setup guide
 
+> **Superseded (2026-11-23).** For the first TestFlight build follow [TESTFLIGHT_FIRST_BUILD_GUIDE.md](TESTFLIGHT_FIRST_BUILD_GUIDE.md), written for release candidate `claude/rc-testflight-1`. This file is kept for its background; where the two differ, the guide is right (for example: the key secret is `ASC_KEY_P8`, the file's text as it is; the base64 form still works).
+
 Who does each step is marked: **You** (your accounts, money or approval) or **Done** (already in the repository).
 Detailed reference: [TESTFLIGHT.md](TESTFLIGHT.md) (how the build works),
 [STAGING_ENVIRONMENT.md](STAGING_ENVIRONMENT.md) (every setting) and [MOBILE_BILLING.md](MOBILE_BILLING.md).

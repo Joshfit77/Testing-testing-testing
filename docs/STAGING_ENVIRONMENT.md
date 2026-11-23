@@ -1,5 +1,7 @@
 # Staging environment for the first TestFlight build
 
+> **Superseded (2026-11-23).** For the first TestFlight build follow [TESTFLIGHT_FIRST_BUILD_GUIDE.md](TESTFLIGHT_FIRST_BUILD_GUIDE.md), written for release candidate `claude/rc-testflight-1`. This file is kept for its background; where the two differ, the guide is right (for example: the key secret is `ASC_KEY_P8`, the file's text as it is; the base64 form still works).
+
 The internal TestFlight build loads a deployed copy of the web app. Its server address is set when the build is made.
 Use a **separate staging deployment and a separate Supabase project**, never production. The staging deployment uses
 disposable test accounts, Stripe **test mode**, and App Store **sandbox** purchases only. Nothing on this page has been set up

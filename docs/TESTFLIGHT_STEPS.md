@@ -1,5 +1,7 @@
 # Narrow Gate Fitness on real iPhones through TestFlight (internal testing): owner runbook
 
+> **Superseded (2026-11-23).** For the first TestFlight build follow [TESTFLIGHT_FIRST_BUILD_GUIDE.md](TESTFLIGHT_FIRST_BUILD_GUIDE.md), written for release candidate `claude/rc-testflight-1`. This file is kept for its background; where the two differ, the guide is right (for example: the key secret is `ASC_KEY_P8`, the file's text as it is; the base64 form still works).
+
 **Status: ready to follow; nothing in it has been done yet.** Written 2026-11-04 from the release candidate branch
 `release/rc-2026-11-04`; every value names the file it comes from, and anything the repository doesn't contain is
 marked **NOT IN REPO — owner decides**. Where an older document disagrees, follow this runbook; the differences are
@@ -24,7 +26,7 @@ GitHub reports this repository as **public** (checked 2026-11-04), so anything c
 | Bundle ID | `com.narrowgatefitness.app` | `ios/App/App.xcodeproj/project.pbxproj` (`PRODUCT_BUNDLE_IDENTIFIER`, Debug and Release); `capacitor.config.ts` `appId`; `ios.yml` input `bundle_id` default |
 | App name | `Narrow Gate Fitness` | `Info.plist` `CFBundleDisplayName`; `capacitor.config.ts` `appName` |
 | Version shown in TestFlight | `1.0.0` | `project.pbxproj` `MARKETING_VERSION = 1.0.0`; `ios.yml` input `marketing_version` default |
-| Build number | the workflow's run number (`CURRENT_PROJECT_VERSION="${{ github.run_number }}"`). Every run has a higher number than the last, so each upload gets a new build number. | `ios.yml` job `testflight`; GitHub run list |
+| Build number | the workflow's run number and attempt (`BUILD_NUMBER: ${{ github.run_number }}.${{ github.run_attempt }}`, e.g. 57.1, then 57.2 for a re-run, then 58.1). Each upload, re-runs included, gets a new, higher build number. | `ios.yml` job `testflight`; GitHub run list |
 | Minimum iOS | 16.0 | `project.pbxproj` `IPHONEOS_DEPLOYMENT_TARGET = 16.0` |
 | Devices | iPhone and iPad (`TARGETED_DEVICE_FAMILY = "1,2"`), arm64 only | `project.pbxproj`; `Info.plist` `UIRequiredDeviceCapabilities` |
 | Signing | Automatic (`CODE_SIGN_STYLE = Automatic`). No team is in the project (`DEVELOPMENT_TEAM` is passed in by the workflow). | `project.pbxproj`; `ios.yml` |

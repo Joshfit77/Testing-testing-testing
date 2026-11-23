@@ -43,8 +43,9 @@ export function contentSecurityPolicy({ supabaseUrl, production, https, nonce, c
     "frame-ancestors": "'none'",
     // Without a nonce (a response the middleware didn't see), no inline script runs at all.
     "script-src": list("'self'", nonce && `'nonce-${nonce}'`, nonce && "'strict-dynamic'", !production && "'unsafe-eval'"),
-    "style-src": "'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "font-src": "'self' data: https://fonts.gstatic.com",
+    "style-src": "'self' 'unsafe-inline'",
+    // Fonts are bundled with the app (next/font/local): no font host is allowed.
+    "font-src": "'self' data:",
     // The Supabase origin is listed too, so private photos (signed storage links) also load from a local http stack.
     "img-src": list("'self'", "data:", "blob:", "https:", supabase),
     "media-src": list("'self'", "blob:", supabase),

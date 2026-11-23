@@ -162,6 +162,8 @@ GitHub never shows a secret again after you save it.
 → Run workflow.
 *You should see:* a run that takes about 20–30 minutes and ends with a green check. If it's red, open it and send
 Claude the step name and the error line (no secrets are ever printed in the log).
+If a run fails, you can use **Re-run jobs**: each attempt gets its own build number (for example 57.1, then 57.2), so
+App Store Connect never refuses the upload as a repeat.
 
 ---
 

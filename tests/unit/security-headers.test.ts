@@ -18,6 +18,10 @@ describe("security headers", () => {
     expect(csp).toContain("form-action 'self' https://checkout.stripe.com https://billing.stripe.com");
     expect(csp).toContain("upgrade-insecure-requests");
     expect(csp).toContain("img-src 'self' data: blob: https: https://abc.supabase.co");
+    // Fonts are bundled (next/font/local), so no outside font or stylesheet host is allowed (audit 2026-11-23).
+    expect(csp).toContain("style-src 'self' 'unsafe-inline';");
+    expect(csp).toContain("font-src 'self' data:;");
+    expect(csp).not.toMatch(/fonts\.(googleapis|gstatic)\.com/);
   });
 
   it("lets a local http Supabase serve private photos", () => {

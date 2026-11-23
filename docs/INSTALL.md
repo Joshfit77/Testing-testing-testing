@@ -38,7 +38,8 @@ Apple doesn't allow installing an app file directly. The options are:
       - `APPLE_TEAM_ID`
       - `ASC_KEY_ID`
       - `ASC_ISSUER_ID`
-      - `ASC_KEY_P8_BASE64` (the `.p8` file, base64-encoded)
+      - `ASC_KEY_P8` (the `.p8` file's text, pasted as it is; the older `ASC_KEY_P8_BASE64` form also works).
+        Full steps: [TESTFLIGHT_FIRST_BUILD_GUIDE.md](TESTFLIGHT_FIRST_BUILD_GUIDE.md)
    5. Run **Actions → iOS → Run workflow**. In **Use workflow from**, choose **`release/rc-2026-11-04`** (not `main`:
       `main` still has an older iOS workflow that uploads the offline edition straight away). Choose job `testflight`,
       enter the staging server's `https://` address, and tick **upload** only when you want the build sent to App Store
