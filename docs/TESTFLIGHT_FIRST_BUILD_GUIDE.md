@@ -214,5 +214,24 @@ workout) or **cosmetic** (looks wrong, works).
    your account yet. Tap Cancel; turn Airplane Mode off; the set is still there.
 9. Move around every tab for a few minutes: no crash, nothing blank.
 10. If you allow Apple Health: the app asks for permission once and shows the data it imported.
+11. **Password reset:** on the sign-in screen tap "Forgot password?", open the email **on the iPhone**, set a new
+    password, sign in with it.
+12. **GPS run or walk:** start a recording outdoors, lock the phone for 5 minutes while walking, unlock, stop: the
+    route, distance and time look right. Then check iPhone Settings → Narrow Gate Fitness → Location says what you
+    chose.
+13. **Barcode:** Nutrition → scan a packaged food's barcode with the camera: the product appears (or a clear
+    "not found"), and adding it puts it in today's diary.
+14. **Notifications:** allow notifications when asked; turn on a workout reminder in the app for today, a few minutes
+    ahead; it arrives at that time with the app closed. Also start a rest timer and lock the phone: an alert appears
+    when it ends.
+15. **Two devices** (needs two iPhones, or an iPhone and the website): open the same unfinished workout on both,
+    complete the **same** set with different weights, finish on one, then the other: nothing logged is lost, and the
+    app says the set was logged differently on the other device.
+16. **Free and Pro:** a Free test account sees Pro features as locked; a Pro test account (see "Admin and Pro for
+    testing") can use them. **Do not buy anything**: purchases stay off for this build.
+17. **Accessibility:** turn on VoiceOver (Settings → Accessibility) and log one set using it; turn on Larger Text at
+    the biggest size: screens still read correctly and nothing important is cut off.
+18. **Export and delete** (use a throwaway test account): Profile → Privacy & data → export your data (a file
+    arrives); then delete the account: you're signed out and can't sign back in with it.
 
 Simulator and browser tests don't count for this list: only what you see on the real iPhones.
