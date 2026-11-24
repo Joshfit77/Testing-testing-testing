@@ -16,12 +16,18 @@ name: iOS
 #
 # 2) testflight — manual only. Builds the ONLINE app (it loads server_url; never the offline edition), signs it
 #    with your App Store Connect API key, and uploads it to App Store Connect only when upload = true.
-#    Repository secrets (Settings > Secrets and variables > Actions; never paste them anywhere else):
-#      APPLE_TEAM_ID       10-character Team ID (developer.apple.com > Membership)
-#      ASC_KEY_ID          App Store Connect API key ID (Users and Access > Integrations > App Store Connect API)
-#      ASC_ISSUER_ID       issuer ID shown on the same page
-#      ASC_KEY_P8          the downloaded AuthKey_XXXX.p8 file's text, pasted as it is (open it in TextEdit, copy all)
-#                          or, instead, ASC_KEY_P8_BASE64: the same file base64-encoded (older setup; either works)
+#    It runs in the GitHub environment "testflight" (Settings > Environments), which must:
+#      - require your approval (Required reviewers: you): the run waits until you approve it, before anything is
+#        signed or uploaded;
+#      - allow only the release branch (Deployment branches: claude/rc-testflight-1);
+#      - hold the four secrets below as ENVIRONMENT secrets (never as repository secrets, never anywhere else):
+#      TF_APPLE_TEAM_ID    10-character Team ID (developer.apple.com > Membership)
+#      TF_ASC_KEY_ID       App Store Connect API key ID (Users and Access > Integrations > App Store Connect API)
+#      TF_ASC_ISSUER_ID    issuer ID shown on the same page
+#      TF_ASC_KEY_P8       the downloaded AuthKey_XXXX.p8 file's text, pasted as it is (open it in TextEdit, copy all)
+#    Workflows on other branches, and older copies of this file, don't use the environment or these names, so they
+#    can't read the key. Only the owner (Joshfit77) can start this job. The website at server_url must serve exactly the commit being built
+#    (scripts/ios-verify/check-site.py).
 on:
   workflow_dispatch:
     inputs:
@@ -77,10 +83,10 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
@@ -97,7 +103,7 @@ jobs:
         run: |
           cd build/Build/Products/Debug-iphonesimulator
           ditto -c -k --keepParent App.app "$GITHUB_WORKSPACE/NarrowGateFitness-iOS-Simulator.zip"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: NarrowGateFitness-iOS-Simulator
           path: NarrowGateFitness-iOS-Simulator.zip
@@ -114,10 +120,10 @@ jobs:
       # App Store Connect's minimum since April 28, 2026: Xcode 26 with the iOS 26 SDK (iOS 27 SDK from April 2027).
       MIN_IOS_SDK: "26"
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
@@ -155,10 +161,10 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
@@ -285,7 +291,7 @@ jobs:
           grep -E "GATECHECK|Test Case .*(passed|failed)|error:|TEST (SUCCEEDED|FAILED)|Executed" "$RUNNER_TEMP/xcodebuild-test.log" | cut -c1-400 || true
           # Ends with one CHECK line per filmed step; fails the job if the opening didn't play as it should.
           "$RUNNER_TEMP/venv/bin/python" scripts/ios-verify/contact-sheet.py sim-shots
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: opening-in-simulator
@@ -298,10 +304,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
@@ -325,7 +331,7 @@ jobs:
       - run: npx playwright install --with-deps webkit
       - name: Opening and navigation tests (WebKit, iPhone 15)
         run: E2E_WEBKIT=1 npx playwright test e2e/opening-gate.spec.ts e2e/navigation.spec.ts --project=iphone-webkit
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
           name: webkit-test-results
@@ -338,10 +344,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
@@ -365,7 +371,7 @@ jobs:
       - run: npx playwright install --with-deps webkit
       - name: Device matrix, every iPhone (WebKit)
         run: E2E_WEBKIT=1 E2E_DEVICE_MATRIX=ios E2E_MATRIX_OUT=test-results/device-matrix npx playwright test e2e/device-matrix.spec.ts --project=iphone-webkit --workers=2
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: webkit-iphones
@@ -374,9 +380,15 @@ jobs:
 
   testflight:
     name: TestFlight build (online app, signed; uploaded only if asked)
-    if: github.event_name == 'workflow_dispatch' && inputs.job == 'testflight'
+    # Only the owner can start a signed build (works on every GitHub plan, public or private). To let someone else
+    # build, add their GitHub username here in a reviewed change.
+    if: github.event_name == 'workflow_dispatch' && inputs.job == 'testflight' && github.triggering_actor == 'Joshfit77'
     runs-on: macos-latest
     timeout-minutes: 60
+    # The signing secrets exist only in this environment, which requires the owner's approval and allows only the
+    # release branch (Settings > Environments > testflight). Nothing below runs until the run is approved.
+    environment:
+      name: testflight
     # The App Store Connect secrets are set only on the steps that use them, so npm ci's install scripts and cap sync
     # never have them in their environment.
     env:
@@ -387,45 +399,23 @@ jobs:
       BUNDLE_ID: ${{ inputs.bundle_id || 'com.narrowgatefitness.app' }}
       MARKETING_VERSION: ${{ inputs.marketing_version || '1.0.0' }}
     steps:
-      - name: Check secrets
+      - name: Check secrets (environment "testflight")
         env:
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
-          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+          TF_APPLE_TEAM_ID: ${{ secrets.TF_APPLE_TEAM_ID }}
+          TF_ASC_KEY_ID: ${{ secrets.TF_ASC_KEY_ID }}
+          TF_ASC_ISSUER_ID: ${{ secrets.TF_ASC_ISSUER_ID }}
+          TF_ASC_KEY_P8: ${{ secrets.TF_ASC_KEY_P8 }}
         run: |
-          for v in APPLE_TEAM_ID ASC_KEY_ID ASC_ISSUER_ID; do
-            if [ -z "${!v}" ]; then echo "::error::Missing repository secret $v (see docs/TESTFLIGHT_FIRST_BUILD_GUIDE.md)"; exit 1; fi
+          for v in TF_APPLE_TEAM_ID TF_ASC_KEY_ID TF_ASC_ISSUER_ID TF_ASC_KEY_P8; do
+            if [ -z "${!v}" ]; then echo "::error::Missing secret $v in the GitHub environment \"testflight\" (see docs/TESTFLIGHT_FIRST_BUILD_GUIDE.md, step 15)"; exit 1; fi
           done
-          if [ -z "$ASC_KEY_P8" ] && [ -z "$ASC_KEY_P8_BASE64" ]; then
-            echo "::error::Missing repository secret ASC_KEY_P8 (the .p8 key file's text) or ASC_KEY_P8_BASE64 (see docs/TESTFLIGHT_FIRST_BUILD_GUIDE.md)"; exit 1
-          fi
-      - name: Check the deployed app the iPhone app will load
-        run: |
-          case "$SERVER_URL" in
-            https://*) ;;
-            *) echo "::error::server_url must be the https:// address of the deployed app (got '$SERVER_URL')"; exit 1 ;;
-          esac
-          base="${SERVER_URL%/}"
-          host=$(python3 -c 'import sys, urllib.parse; print(urllib.parse.urlparse(sys.argv[1]).hostname or "")' "$base")
-          case "$host" in
-            ""|localhost|127.*|*.example|*.invalid|*.test|*.localhost) echo "::error::server_url ($host) is a placeholder or local address"; exit 1 ;;
-          esac
-          health=$(curl -fsS --max-time 20 "$base/api/health") || { echo "::error::$base/api/health did not answer: deploy the app there first"; exit 1; }
-          echo "Deployed app: $health"
-          curl -fsS --max-time 20 "$base/" -o "$RUNNER_TEMP/home.html"
-          for marker in 'data-intro-enter' 'Enter Narrow Gate' 'small is the gate and narrow the way'; do
-            grep -q -- "$marker" "$RUNNER_TEMP/home.html" || { echo "::error::$base doesn't serve the current opening ('$marker' missing): deploy the release candidate there first"; exit 1; }
-          done
-          commit=$(printf '%s' "$health" | python3 -c 'import json, sys; print(json.load(sys.stdin)["data"].get("commit") or "")')
-          if [ -n "$commit" ] && [ "$commit" != "$GITHUB_SHA" ]; then
-            echo "::warning::The site serves commit $commit; this build is from $GITHUB_SHA. The app shows whatever the site serves."
-          fi
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      # The app loads this website, so the build is only signed and uploaded when the site serves exactly this commit.
+      - name: Check the deployed app the iPhone app will load (same commit as this build)
+        run: python3 scripts/ios-verify/check-site.py "$SERVER_URL" "$GITHUB_SHA"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           # No shared npm cache in the job that signs and uploads the build (zizmor: cache-poisoning); npm ci still
@@ -453,23 +443,22 @@ jobs:
           [ "${sdk%%.*}" -ge 26 ] || { echo "::error::iOS SDK $sdk is older than App Store Connect's minimum (26)"; exit 1; }
       - name: Write the App Store Connect key
         env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
-          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+          ASC_KEY_ID: ${{ secrets.TF_ASC_KEY_ID }}
+          ASC_KEY_P8: ${{ secrets.TF_ASC_KEY_P8 }}
         run: |
           umask 077
           mkdir -p "$RUNNER_TEMP/asc"
           key="$RUNNER_TEMP/asc/AuthKey_${ASC_KEY_ID}.p8"
-          # The key file's own text (pasted as is) is preferred; the base64 form still works.
-          if [ -n "$ASC_KEY_P8" ]; then printf '%s\n' "$ASC_KEY_P8" > "$key"; else echo "$ASC_KEY_P8_BASE64" | base64 --decode > "$key"; fi
+          # The key file's own text, pasted as is.
+          printf '%s\n' "$ASC_KEY_P8" > "$key"
           # A sanity check that never prints the key: an App Store Connect key is a PEM private key.
           grep -q -- "-----BEGIN PRIVATE KEY-----" "$key" && grep -q -- "-----END PRIVATE KEY-----" "$key" \
             || { echo "::error::The App Store Connect key secret isn't a .p8 private key (paste the whole file, including the BEGIN and END lines)"; exit 1; }
       - name: Archive (automatic signing with the API key)
         env:
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.TF_APPLE_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.TF_ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.TF_ASC_ISSUER_ID }}
         run: |
           xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
             -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/App.xcarchive" \
@@ -489,9 +478,9 @@ jobs:
       - name: ${{ inputs.upload && 'Sign and upload to App Store Connect (TestFlight)' || 'Sign only (no upload)' }}
         env:
           DESTINATION: ${{ inputs.upload && 'upload' || 'export' }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.TF_APPLE_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.TF_ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.TF_ASC_ISSUER_ID }}
         run: |
           cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
           <?xml version="1.0" encoding="UTF-8"?>

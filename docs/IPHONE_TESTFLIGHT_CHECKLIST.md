@@ -201,39 +201,51 @@ you see, and nothing secret.
 
 ## Stage 4: GitHub, which builds the iPhone app for you (about 10 minutes, then about 30 minutes of waiting)
 
-### Step 14. Add the four Apple secrets [guide step 15]
-- **Where:** **github.com** → the repository `Testing-testing-testing` → **Settings** → **Secrets and variables** →
-  **Actions**.
-- **Click:** **New repository secret**, four times.
+### Step 14. Make the protected "testflight" place for the Apple key [guide step 15]
+- **Where:** **github.com** → the repository `Testing-testing-testing` → **Settings** → **Environments**.
+- **Click:**
+  1. **New environment** → name it `testflight` → **Configure environment**.
+  2. **Required reviewers:** tick it, type your GitHub name and pick yourself → **Save protection rules**. Leave
+     "Prevent self-review" **unticked**.
+  3. **Deployment branches and tags:** choose **Selected branches and tags** → **Add deployment branch or tag rule**
+     → type `claude/rc-testflight-1` → **Add rule**.
+  4. **Environment secrets** → **Add environment secret**, four times (below).
 - **Enter:**
 
   | Name | Value |
   |---|---|
-  | `APPLE_TEAM_ID` | your Team ID (step 3) |
-  | `ASC_KEY_ID` | the Key ID (step 7) |
-  | `ASC_ISSUER_ID` | the Issuer ID (step 7) |
-  | `ASC_KEY_P8` | open the `.p8` file in **TextEdit** (right-click → Open With → TextEdit), press ⌘A, ⌘C, and paste it all, including the `BEGIN` and `END` lines |
+  | `TF_APPLE_TEAM_ID` | your Team ID (step 3) |
+  | `TF_ASC_KEY_ID` | the Key ID (step 7) |
+  | `TF_ASC_ISSUER_ID` | the Issuer ID (step 7) |
+  | `TF_ASC_KEY_P8` | open the `.p8` file in **TextEdit** (right-click → Open With → TextEdit), press ⌘A, ⌘C, and paste it all, including the `BEGIN` and `END` lines |
 
-- **Cost:** free.
-- **It worked if:** the four names appear under **Repository secrets**. GitHub never shows the values again, which is
-  normal.
+  Put them **only** here, never under "Secrets and variables → Actions". If you ever saved Apple secrets there,
+  delete them.
+- **Cost:** free while the repository is public.
+- **It worked if:** the `testflight` environment shows 1 protection rule, 1 branch rule and 4 secrets. GitHub never
+  shows the secret values again, which is normal.
 
 ### Step 15. A practice build: signed, but not uploaded
 - **Where:** the repository → **Actions** → **iOS** (left list).
-- **Click:** **Run workflow** (right side). Then:
-  1. Choose **Branch** `claude/rc-testflight-1` **first**; the boxes then match that branch.
-  2. **job**: `testflight`.
-  3. **server_url**: your Vercel address, starting `https://`.
-  4. **upload**: leave it **unticked**.
-  5. Click the green **Run workflow**.
+- **Click:**
+  1. **Run workflow** (right side).
+  2. Choose **Branch** `claude/rc-testflight-1` **first**; the boxes then match that branch.
+  3. **job**: `testflight`.
+  4. **server_url**: your Vercel address, starting `https://`.
+  5. **upload**: leave it **unticked**.
+  6. Click the green **Run workflow**.
+  7. The run says **Waiting for review**. Open it → **Review deployments** → tick `testflight` → **Approve and
+     deploy**. Nothing is signed or uploaded before you approve, and only you can start this build.
 - **Cost:** free while the repository is public.
 - **It worked if:** after about 20–30 minutes the run shows a **green check**. Nothing was sent to Apple: this proves
-  your secrets and Apple signing work. If it's red, open it and send Claude the name of the red step and its error
-  line. No secrets are ever printed in the log.
+  your secrets and Apple signing work.
+- **If it's red:** open it and send Claude the name of the red step and its error line. No secrets are ever
+  printed. If the red step is "Check the deployed app…", your website isn't serving the same commit: in Vercel →
+  **Deployments** → newest → **⋯** → **Redeploy**, wait for it to finish, then run the build again.
 
 ### Step 16. The real build: signed and uploaded to TestFlight [guide step 16]
-- **Where and click:** the same as step 15, but tick **upload**.
-- **This is the step that sends the app to Apple.** Only you start it; Claude doesn't.
+- **Where and click:** the same as step 15 (including **Approve and deploy**), but tick **upload**.
+- **This is the step that sends the app to Apple.** Only you start it and approve it; Claude doesn't.
 - **Cost:** free.
 - **It worked if:** the run is green, and its last lines say "Uploaded build … It appears in App Store Connect >
   TestFlight after Apple finishes processing."

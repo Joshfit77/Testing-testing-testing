@@ -54,10 +54,10 @@ jobs:
       # regenerate src/data/bsb-passages.json.
       BSB_SHA256: 2ac3af1de52d4e68261cba91d85c320b7eadc6560e830d99e591767b8ff5ca96
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
       - name: Download the official BSB text (HTTPS only, must match the pinned SHA-256)
@@ -145,7 +145,7 @@ jobs:
           rm -rf web && mkdir web && unzip -q -o web.zip -d web
           echo "World English Bible USFM SHA-256: $(sha256sum web.zip | cut -d' ' -f1)"
           node scripts/compare-red-letter.mjs bsb-bible/wj.json web "World English Bible (eBible.org)"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: bsb-bible
           path: bsb-bible
@@ -166,7 +166,7 @@ jobs:
           sha=$(sha256sum bsb-passages.json | cut -d' ' -f1)
           echo "sha256=$sha" >> "$GITHUB_OUTPUT"
           echo "bsb-passages.json SHA-256: $sha"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: bsb-passages
           path: bsb-passages.json

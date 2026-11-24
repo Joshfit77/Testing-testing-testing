@@ -164,26 +164,40 @@ directly.) To add a tester later, turn it back on for a minute.
 
 ## Part D: GitHub (about 10 minutes)
 
-**Step 15. Add the four secrets.** github.com → the repository → **Settings** → **Secrets and variables** →
-**Actions** → **New repository secret**, four times:
+**Step 15. Make the protected "testflight" environment and put the four secrets in it.** The Apple key only works
+inside this environment: GitHub asks for your approval before every signed build, and only the release branch may
+use it. github.com → the repository → **Settings** → **Environments** → **New environment** → name `testflight` →
+**Configure environment**:
+- **Required reviewers**: tick it, add **yourself** → **Save protection rules**. Leave "Prevent self-review" unticked
+  (otherwise you couldn't approve your own builds).
+- **Deployment branches and tags**: choose **Selected branches and tags** → **Add deployment branch or tag rule** →
+  `claude/rc-testflight-1` → **Add rule**.
+- **Environment secrets** → **Add environment secret**, four times:
 
 | Name | Value |
 |---|---|
-| `APPLE_TEAM_ID` | the Team ID from step 3 |
-| `ASC_KEY_ID` | the Key ID from step 8 |
-| `ASC_ISSUER_ID` | the Issuer ID from step 8 |
-| `ASC_KEY_P8` | open the `.p8` file from step 8 in **TextEdit** (Mac) or **Notepad** (Windows) and copy **everything**, including the lines `-----BEGIN PRIVATE KEY-----` and `-----END PRIVATE KEY-----` |
+| `TF_APPLE_TEAM_ID` | the Team ID from step 3 |
+| `TF_ASC_KEY_ID` | the Key ID from step 8 |
+| `TF_ASC_ISSUER_ID` | the Issuer ID from step 8 |
+| `TF_ASC_KEY_P8` | open the `.p8` file from step 8 in **TextEdit** (Mac) or **Notepad** (Windows) and copy **everything**, including the lines `-----BEGIN PRIVATE KEY-----` and `-----END PRIVATE KEY-----` |
 
-GitHub never shows a secret again after you save it.
+Put them **only** under the environment, never under Settings → Secrets and variables → Actions (repository
+secrets). If you added Apple secrets there earlier (`APPLE_TEAM_ID`, `ASC_…`), delete them. GitHub never shows a secret
+again after you save it.
+*You should see:* the environment `testflight` with 1 protection rule, 1 branch rule and 4 secrets.
 
 **Step 16. Build and upload.** github.com → the repository → **Actions** → **iOS** → **Run workflow** →
 - Branch: `claude/rc-testflight-1` (choose this first: the boxes below then match that branch)
 - job: `testflight`
 - server_url: your staging address from step 13 (starting `https://`)
-- upload: **ticked**
+- upload: **ticked** (unticked = a practice run: signed, nothing sent to Apple)
 → Run workflow.
+The run then waits with **Waiting for review**: open it → **Review deployments** → tick `testflight` → **Approve
+and deploy**. Nothing is signed or uploaded before you approve. Only you (Joshfit77) can start this build.
 *You should see:* a run that takes about 20–30 minutes and ends with a green check. If it's red, open it and send
-Claude the step name and the error line (no secrets are ever printed in the log).
+Claude the step name and the error line (no secrets are ever printed in the log). If it stops at "Check the deployed
+app", the website isn't serving the commit being built: redeploy the release branch in Vercel (Deployments → the
+newest → Redeploy), wait for it to finish, then run the workflow again.
 If a run fails, you can use **Re-run jobs**: each attempt gets its own build number (for example 57.1, then 57.2), so
 App Store Connect never refuses the upload as a repeat.
 
