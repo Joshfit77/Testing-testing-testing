@@ -14,6 +14,7 @@ import { compressImage } from "@/lib/image-compress";
 import {
   comparePhotos,
   PHOTO_MAX_BYTES,
+  photoUploadErrorMessage,
   PHOTO_NOTE_MAX,
   PHOTO_POSES,
   photoPathFor,
@@ -107,7 +108,7 @@ function UploadDialog({ open, onOpenChange, userId, units, today }: { open: bool
       const { error: upErr } = await supabase.storage.from(PROGRESS_PHOTO_BUCKET).upload(path, blob, { contentType: "image/jpeg", upsert: false, cacheControl: "3600" });
       if (upErr) {
         setStage("idle");
-        return setError("Upload failed. Check your connection and try again.");
+        return setError(photoUploadErrorMessage(upErr));
       }
       pending.current = { file, path };
     }

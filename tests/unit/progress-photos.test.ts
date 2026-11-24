@@ -1,4 +1,4 @@
-import { comparePhotos, fitWithin, isOwnPhotoPath, photoPathFor } from "@/lib/domain/progress-photos";
+import { comparePhotos, fitWithin, isOwnPhotoPath, PHOTO_LIMIT_MESSAGE, PHOTO_LIMITS, photoPathFor, photoUploadErrorMessage } from "@/lib/domain/progress-photos";
 
 const UID = "6f1c2a7e-1b2c-4d3e-8f90-0123456789ab";
 const OTHER = "0a1b2c3d-4e5f-4a6b-8c7d-8e9f0a1b2c3d";
@@ -46,5 +46,18 @@ describe("comparePhotos", () => {
   });
   it("has no weight difference when either weight is missing", () => {
     expect(comparePhotos({ takenOn: "2026-10-01", weightKg: null }, { takenOn: "2026-10-02", weightKg: 80 }).weightDeltaKg).toBeNull();
+  });
+});
+
+describe("photoUploadErrorMessage", () => {
+  it("explains the upload limit when storage refuses the upload, and keeps the connection message otherwise", () => {
+    expect(photoUploadErrorMessage({ message: "new row violates row-level security policy", statusCode: "403" })).toBe(PHOTO_LIMIT_MESSAGE);
+    expect(photoUploadErrorMessage({ message: "Unauthorized", statusCode: 403 })).toBe(PHOTO_LIMIT_MESSAGE);
+    expect(photoUploadErrorMessage({ message: "Failed to fetch" })).toBe("Upload failed. Check your connection and try again.");
+    expect(photoUploadErrorMessage(null)).toBe("Upload failed. Check your connection and try again.");
+    // The message states the same numbers the storage rule enforces, and that nothing was removed.
+    expect(PHOTO_LIMITS).toEqual({ total: 500, perDay: 30, totalBytes: 1024 ** 3 });
+    expect(PHOTO_LIMIT_MESSAGE).toMatch(/500 photos, 30 a day, 1 GB/);
+    expect(PHOTO_LIMIT_MESSAGE).toMatch(/all still here/);
   });
 });
