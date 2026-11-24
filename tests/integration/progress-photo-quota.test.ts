@@ -58,9 +58,11 @@ describe.skipIf(!available)("progress photo upload limits", () => {
 
   it("the rule and the app use the same numbers", () => {
     const migration = readFileSync("supabase/migrations/20261124000086_progress_photo_quota.sql", "utf8");
-    expect(migration).toContain(`(select count(*) from mine) < ${PHOTO_LIMITS.total}`);
-    expect(migration).toContain(`where created_at > now() - interval '24 hours') < ${PHOTO_LIMITS.perDay}`);
-    expect(migration).toContain(`(select coalesce(sum(bytes), 0) from mine) < ${PHOTO_LIMITS.totalBytes}`);
+    expect(migration).toContain(`return v_count < ${PHOTO_LIMITS.total} and v_today < ${PHOTO_LIMITS.perDay} and v_bytes < ${PHOTO_LIMITS.totalBytes};`);
+    expect(migration).toContain("count(*) filter (where o.created_at > now() - interval '24 hours')");
+    // Both layers are installed: the storage policy and the trigger on the row actually written.
+    expect(sql(`select count(*) from pg_policies where schemaname = 'storage' and policyname = 'progress_photos_owner_insert' and with_check like '%can_add_progress_photo()%'`)[0]![0]).toBe("1");
+    expect(sql(`select count(*) from pg_trigger where tgname = 'progress_photos_quota' and tgrelid = 'storage.objects'::regclass and tgenabled = 'O'`)[0]![0]).toBe("1");
   });
 
   it("an ordinary member uploads as before, and still can't write into someone else's folder", async () => {
@@ -104,6 +106,19 @@ describe.skipIf(!available)("progress photo upload limits", () => {
     expect((await upload(m)).error).not.toBeNull();
     sql(`update storage.objects set metadata = jsonb_set(metadata, '{size}', '300000') where bucket_id = '${BUCKET}' and name like '${m.id}/seed-%'`);
     expect((await upload(m)).error).toBeNull();
+  });
+
+  it("simultaneous uploads can't slip past the limits (each member's uploads take turns)", async () => {
+    const burst = async (u: TestUser, n: number) => (await Promise.all(Array.from({ length: n }, () => upload(u)))).filter((r) => !r.error).length;
+    // 60 at once from a member with none today: exactly 30 land.
+    const day = await make("photos-burst-day");
+    expect(await burst(day, 60)).toBe(PHOTO_LIMITS.perDay);
+    expect(stored(day.id)).toBe(PHOTO_LIMITS.perDay);
+    // 20 at once with room for 5: exactly 5 land, never more than 500 in total.
+    const total = await make("photos-burst-total");
+    seed(total.id, PHOTO_LIMITS.total - 5);
+    expect(await burst(total, 20)).toBe(5);
+    expect(stored(total.id)).toBe(PHOTO_LIMITS.total);
   });
 
   it("one member at the limit doesn't affect another member", async () => {

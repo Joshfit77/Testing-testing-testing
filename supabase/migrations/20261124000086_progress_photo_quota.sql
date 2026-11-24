@@ -1,4 +1,4 @@
--- Progress photos: a per-member upload limit, enforced by the storage rule itself (a direct API call can't skip it).
+-- Progress photos: a per-member upload limit, enforced by the database itself (a direct API call can't skip it).
 --
 -- Photos go from the device straight to the private "progress-photos" bucket. Before this, the only checks were the
 -- member's own folder, image types and 8 MB per file, so one account could store an unlimited number of files.
@@ -9,26 +9,53 @@
 -- Nothing already stored is removed or changed: the limit only applies to NEW uploads. Viewing, replacing and
 -- deleting are unaffected, and deleting photos frees room. The app says so when an upload is refused
 -- (src/lib/domain/progress-photos.ts, PHOTO_LIMITS).
+--
+-- Two layers, one rule:
+--   1. The storage insert policy calls can_add_progress_photo(): a quick refusal before the file is stored. The
+--      storage service evaluates policies in a transaction it then rolls back, so on its own this can't stop a burst
+--      of simultaneous uploads (measured locally: 60 at once let 36 through a limit of 30).
+--   2. A trigger on the row the storage service really writes (as its own privileged user) takes a per-member lock
+--      for the rest of that transaction and counts again, so simultaneous uploads by one member take turns and a
+--      burst can't slip past the limit. Triggers run whatever the role.
 
-create or replace function public.can_add_progress_photo()
+-- The counts for one member's folder ("<uid>/..."), through the (bucket_id, name) index.
+create or replace function public.progress_photo_quota_ok(p_user uuid)
 returns boolean
-language sql
-stable
+language plpgsql
+volatile
 security definer
 set search_path = ''
 as $$
-  with mine as (
-    -- The member's own folder in the bucket ("<uid>/..."), found through the (bucket_id, name) index.
-    select o.created_at, coalesce((o.metadata ->> 'size')::bigint, 0) as bytes
-    from storage.objects o
-    where o.bucket_id = 'progress-photos'
-      and o.name collate "C" >= ((select auth.uid())::text || '/')
-      and o.name collate "C" < ((select auth.uid())::text || '0')
-  )
-  select (select auth.uid()) is not null
-     and (select count(*) from mine) < 500
-     and (select count(*) from mine where created_at > now() - interval '24 hours') < 30
-     and (select coalesce(sum(bytes), 0) from mine) < 1073741824;
+declare
+  v_count bigint;
+  v_today bigint;
+  v_bytes bigint;
+begin
+  if p_user is null then
+    return false;
+  end if;
+  select count(*),
+         count(*) filter (where o.created_at > now() - interval '24 hours'),
+         coalesce(sum(coalesce((o.metadata ->> 'size')::bigint, 0)), 0)
+    into v_count, v_today, v_bytes
+  from storage.objects o
+  where o.bucket_id = 'progress-photos'
+    and o.name collate "C" >= (p_user::text || '/')
+    and o.name collate "C" < (p_user::text || '0');
+  return v_count < 500 and v_today < 30 and v_bytes < 1073741824;
+end;
+$$;
+revoke all on function public.progress_photo_quota_ok(uuid) from public, anon, authenticated;
+
+-- Layer 1: for the storage policy (the signed-in member only; no arguments).
+create or replace function public.can_add_progress_photo()
+returns boolean
+language sql
+volatile
+security definer
+set search_path = ''
+as $$
+  select public.progress_photo_quota_ok(auth.uid());
 $$;
 
 comment on function public.can_add_progress_photo() is
@@ -46,3 +73,36 @@ create policy progress_photos_owner_insert on storage.objects
     and (storage.foldername(name))[1] = (select auth.uid())::text
     and public.can_add_progress_photo()
   );
+
+-- Layer 2: the row actually written. The member is the folder owner (the policy above already requires the folder to
+-- be the caller's own). The advisory lock lasts until the upload's transaction commits, so the next simultaneous
+-- upload by the same member waits, then counts with this one included.
+create or replace function public.enforce_progress_photo_quota()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_user uuid;
+begin
+  begin
+    v_user := split_part(new.name, '/', 1)::uuid;
+  exception when invalid_text_representation then
+    raise exception 'progress photo limit: not in a member folder' using errcode = '42501';
+  end;
+  perform pg_advisory_xact_lock(hashtextextended('ngf.progress_photos:' || v_user::text, 0));
+  if not public.progress_photo_quota_ok(v_user) then
+    raise exception 'progress photo limit reached (new row violates row-level security policy)' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.enforce_progress_photo_quota() from public, anon, authenticated;
+
+drop trigger if exists progress_photos_quota on storage.objects;
+create trigger progress_photos_quota
+  before insert on storage.objects
+  for each row
+  when (new.bucket_id = 'progress-photos')
+  execute function public.enforce_progress_photo_quota();
