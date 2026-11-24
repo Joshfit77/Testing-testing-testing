@@ -123,7 +123,10 @@ you see, and nothing secret.
 - **Click:** press **⌘A** then **⌘C** to copy it all. In Supabase: **SQL Editor** → **New query** → click in the
   editor → **⌘V** → **Run**.
 - **Cost:** free.
-- **It worked if:** it says **Success. No rows returned**. The file is large, so give it a minute or two.
+- **It worked if:** it says **Success. No rows returned** (the file is large, so give it a minute or two). Then
+  check the photo upload limit is installed: **New query** → paste
+  `select tgname from pg_trigger where tgname = 'progress_photos_quota';` → **Run** → one row,
+  `progress_photos_quota`. If nothing shows, tell Claude.
 - **Do this only once, only in this new project.** If you see an error, don't run it again: send Claude the error
   words.
 
@@ -205,8 +208,9 @@ you see, and nothing secret.
 - **Where:** **github.com** → the repository `Testing-testing-testing` → **Settings** → **Environments**.
 - **Click:**
   1. **New environment** → name it `testflight` → **Configure environment**.
-  2. **Required reviewers:** tick it, type your GitHub name and pick yourself → **Save protection rules**. Leave
-     "Prevent self-review" **unticked**.
+  2. **Required reviewers:** tick it, type your GitHub name and pick yourself. Leave "Prevent self-review"
+     **unticked**. Untick **Allow administrators to bypass configured protection rules**. Then **Save protection
+     rules**.
   3. **Deployment branches and tags:** choose **Selected branches and tags** → **Add deployment branch or tag rule**
      → type `claude/rc-testflight-1` → **Add rule**.
   4. **Environment secrets** → **Add environment secret**, four times (below).

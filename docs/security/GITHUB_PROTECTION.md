@@ -39,8 +39,11 @@ github.com → the repository → **Settings** → **Actions** → **General**:
 ## 3. The "testflight" environment (Apple key)
 
 Set up in [TESTFLIGHT_FIRST_BUILD_GUIDE.md](../TESTFLIGHT_FIRST_BUILD_GUIDE.md), step 15: required reviewer = you,
-deployment branch = `claude/rc-testflight-1`, four `TF_…` environment secrets, and no Apple secrets at repository
-level. The TestFlight job also runs only when you (Joshfit77) start it.
+administrators may **not** bypass the rules, deployment branch = `claude/rc-testflight-1`, four `TF_…` environment
+secrets, and no Apple secrets at repository level. GitHub gives environment secrets only to jobs that name the
+environment, and only after its rules pass
+([GitHub docs](https://docs.github.com/actions/deployment/targeting-different-environments/using-environments-for-deployment));
+no older workflow names it. The TestFlight job also runs only when you (Joshfit77) start it.
 
 ## 4. If the repository becomes private: what still works
 

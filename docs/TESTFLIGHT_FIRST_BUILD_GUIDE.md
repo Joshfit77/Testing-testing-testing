@@ -70,7 +70,9 @@ then reviews the build briefly, usually within a day).
 **Step 10. Create the database.** In the project: **SQL Editor** → **New query**. Open the file
 `supabase/setup-all.sql` from the branch `claude/rc-testflight-1` on GitHub (click the file → **Raw** → select all →
 copy), paste it into the editor, click **Run**.
-*You should see:* "Success. No rows returned". Run it **only once, only on this new project**. Never run it on any
+*You should see:* "Success. No rows returned". Run it **only once, only on this new project**. Then check that the
+progress-photo upload limit is installed: New query → `select tgname from pg_trigger where tgname = 'progress_photos_quota';`
+→ Run. *You should see* one row, `progress_photos_quota`. If it shows nothing, tell Claude before going on. Never run it on any
 other project.
 The file is large (about 6 MB, mostly the exercise and program library), so the page may take a minute or two. If the
 editor shows an error instead (for example about size or a timeout), **don't run it again**: send Claude the exact
@@ -168,8 +170,9 @@ directly.) To add a tester later, turn it back on for a minute.
 inside this environment: GitHub asks for your approval before every signed build, and only the release branch may
 use it. github.com → the repository → **Settings** → **Environments** → **New environment** → name `testflight` →
 **Configure environment**:
-- **Required reviewers**: tick it, add **yourself** → **Save protection rules**. Leave "Prevent self-review" unticked
-  (otherwise you couldn't approve your own builds).
+- **Required reviewers**: tick it, add **yourself**. Leave "Prevent self-review" unticked (otherwise you couldn't
+  approve your own builds). Untick **Allow administrators to bypass configured protection rules**, so every build
+  waits for an approval. → **Save protection rules**.
 - **Deployment branches and tags**: choose **Selected branches and tags** → **Add deployment branch or tag rule** →
   `claude/rc-testflight-1` → **Add rule**.
 - **Environment secrets** → **Add environment secret**, four times:
