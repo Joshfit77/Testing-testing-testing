@@ -48,6 +48,9 @@ const MEMBER_CALLABLE = [
   "admin_ai_cost_report",
   "admin_usage_metrics",
   "can_add_body_scan",
+  // Migration 086: used by the progress-photos storage rule (which runs as the member); no arguments, answers only
+  // whether auth.uid() may upload another photo.
+  "can_add_progress_photo",
   "can_log_sleep",
   "end_accountability_partnership",
   "faith_journey_check_in",
