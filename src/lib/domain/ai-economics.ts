@@ -266,6 +266,40 @@ export function percentOf(spent: number, budget: number): number {
   return Math.floor((spent / budget) * 100);
 }
 
+/** Headroom kept above the members' combined allowance when suggesting an app-wide monthly budget. */
+export const GLOBAL_BUDGET_HEADROOM = 1.2;
+
+export interface GlobalBudgetCoverage {
+  /** How many members could spend their full monthly allowance before the app-wide budget runs out. */
+  coversMembers: number;
+  /** What every current Pro member's full allowance adds up to. */
+  fullAllowanceMicros: number;
+  /** A suggested app-wide budget: the full allowance plus headroom, rounded up to whole dollars. */
+  suggestedMicros: number;
+  /** True when the app-wide budget is below the current members' full allowance, so it could stop the AI for everyone. */
+  short: boolean;
+}
+
+/**
+ * Whether the app-wide monthly AI budget (AI_GLOBAL_MONTHLY_BUDGET_USD) can cover every current Pro member using their
+ * whole monthly allowance. When it can't, the budget may run out before the month ends and the AI then stops for every
+ * member, so the admin AI page warns and suggests a figure. Most members use far less than their allowance; this is
+ * the worst case, which is what the limit has to survive.
+ */
+export function globalBudgetCoverage(opts: { globalMonthlyMicros: number; memberMonthlyMicros: number; proMembers: number }): GlobalBudgetCoverage {
+  const member = Math.max(0, opts.memberMonthlyMicros);
+  const members = Math.max(0, Math.floor(opts.proMembers));
+  const global = Math.max(0, opts.globalMonthlyMicros);
+  const fullAllowanceMicros = member * members;
+  const suggestedMicros = Math.ceil((fullAllowanceMicros * GLOBAL_BUDGET_HEADROOM) / MICROS_PER_USD) * MICROS_PER_USD;
+  return {
+    coversMembers: member > 0 ? Math.floor(global / member) : Number.POSITIVE_INFINITY,
+    fullAllowanceMicros,
+    suggestedMicros,
+    short: members > 0 && global < fullAllowanceMicros,
+  };
+}
+
 /** Thresholds newly crossed when spend moves from `before` to `after`. */
 export function crossedThresholds(beforeMicros: number, afterMicros: number, budgetMicros: number): number[] {
   const b = percentOf(beforeMicros, budgetMicros);

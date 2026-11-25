@@ -5,6 +5,7 @@ import {
   ECONOMICS_DEFAULTS,
   EXPECTED_COST_MICROS,
   expectedCostMicros,
+  globalBudgetCoverage,
   priceFor,
   REQUEST_CEILING_MICROS,
   revenueChannels,
@@ -112,5 +113,26 @@ describe("budget thresholds", () => {
   it("formats dollars", () => {
     expect(usd(1_399_880)).toBe("$1.40");
     expect(usd(50, 4)).toBe("$0.0001");
+  });
+});
+
+describe("app-wide budget coverage", () => {
+  it("the $100 default covers about 70 members at the full $1.40, and warns beyond that", () => {
+    const member = 1_400_000;
+    const global = 100_000_000;
+    expect(globalBudgetCoverage({ globalMonthlyMicros: global, memberMonthlyMicros: member, proMembers: 0 })).toMatchObject({ coversMembers: 71, short: false });
+    expect(globalBudgetCoverage({ globalMonthlyMicros: global, memberMonthlyMicros: member, proMembers: 71 }).short).toBe(false);
+    const c = globalBudgetCoverage({ globalMonthlyMicros: global, memberMonthlyMicros: member, proMembers: 250 });
+    expect(c.short).toBe(true);
+    expect(c.fullAllowanceMicros).toBe(350_000_000);
+    // 250 x $1.40 x 1.2 = $420.
+    expect(c.suggestedMicros).toBe(420_000_000);
+  });
+
+  it("rounds the suggestion up to whole dollars and handles odd inputs", () => {
+    expect(globalBudgetCoverage({ globalMonthlyMicros: 1_000_000_000, memberMonthlyMicros: 1_400_000, proMembers: 1 }).suggestedMicros).toBe(2_000_000);
+    expect(globalBudgetCoverage({ globalMonthlyMicros: 0, memberMonthlyMicros: 1_400_000, proMembers: 1 }).short).toBe(true);
+    expect(globalBudgetCoverage({ globalMonthlyMicros: 100_000_000, memberMonthlyMicros: 0, proMembers: 10 })).toMatchObject({ coversMembers: Number.POSITIVE_INFINITY, short: false });
+    expect(globalBudgetCoverage({ globalMonthlyMicros: 100_000_000, memberMonthlyMicros: 1_400_000, proMembers: -3 }).short).toBe(false);
   });
 });

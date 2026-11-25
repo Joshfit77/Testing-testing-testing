@@ -3,6 +3,7 @@ import { AdminNav } from "@/components/admin/admin-nav";
 import { PageHeader } from "@/components/common/page-header";
 import { Notice } from "@/components/common/states";
 import { DOWNGRADE_REASON_LABEL, ROUTE_REASON_LABEL, summarizeCostReport, usdPrecise, type AiCostReportData } from "@/lib/domain/ai-cost-report";
+import { globalBudgetCoverage } from "@/lib/domain/ai-economics";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireAdmin } from "@/server/auth";
 import { aiBudgetConfig } from "@/server/services/ai-budget";
@@ -43,6 +44,8 @@ export default async function AdminAiCostsPage({ searchParams }: { searchParams:
   const budget = aiBudgetConfig(now);
   const thisMonth = report?.budget_months.find((m) => m.month === `${now.toISOString().slice(0, 7)}-01`);
   const today = report?.today ?? null;
+  const monthBudgetMicros = Number(thisMonth?.budget_micros ?? budget.globalMonthlyMicros);
+  const coverage = s ? globalBudgetCoverage({ globalMonthlyMicros: monthBudgetMicros, memberMonthlyMicros: budget.memberMonthlyMicros, proMembers: s.proMembers }) : null;
 
   return (
     <div>
@@ -107,8 +110,18 @@ export default async function AdminAiCostsPage({ searchParams }: { searchParams:
             <h2 id="budgets" className="font-display text-lg font-semibold uppercase">
               App-wide limits
             </h2>
+            {coverage?.short && (
+              <Notice tone="warning" className="text-sm">
+                <span data-testid="ai-budget-short">
+                  The app-wide limit ({usdPrecise(monthBudgetMicros)} a month) covers {n(coverage.coversMembers)} members using their full{" "}
+                  {usdPrecise(budget.memberMonthlyMicros)} allowance, and there are {n(s.proMembers)} Pro members now ({usdPrecise(coverage.fullAllowanceMicros)} at
+                  their full allowance). When the limit is reached, the AI stops for every member until the month ends. Consider setting
+                  AI_GLOBAL_MONTHLY_BUDGET_USD to about {usdPrecise(coverage.suggestedMicros)} (and AI_GLOBAL_DAILY_BUDGET_USD to match).
+                </span>
+              </Notice>
+            )}
             <p className="text-sm">
-              This month: {usdPrecise(Number(thisMonth?.spent_micros ?? 0))} spent of {usdPrecise(Number(thisMonth?.budget_micros ?? budget.globalMonthlyMicros))}
+              This month: {usdPrecise(Number(thisMonth?.spent_micros ?? 0))} spent of {usdPrecise(monthBudgetMicros)}
               {thisMonth?.reserved_micros ? ` (${usdPrecise(Number(thisMonth.reserved_micros))} held by requests in progress)` : ""}.
             </p>
             <p className="text-sm">
