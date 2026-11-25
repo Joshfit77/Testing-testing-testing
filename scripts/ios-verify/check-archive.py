@@ -73,7 +73,7 @@ if os.path.exists(privacy):
     p = plistlib.load(open(privacy, "rb"))
     check(p.get("NSPrivacyTracking") is False, "privacy manifest: no tracking")
     kinds = {t["NSPrivacyCollectedDataType"] for t in p.get("NSPrivacyCollectedDataTypes", [])}
-    for k in ["Health", "Fitness", "PreciseLocation", "PhotosorVideos", "EmailAddress", "UserID", "PurchaseHistory"]:
+    for k in ["Health", "Fitness", "PreciseLocation", "PhotosorVideos", "EmailAddress", "UserID", "PurchaseHistory", "ProductInteraction"]:
         check(f"NSPrivacyCollectedDataType{k}" in kinds, f"privacy manifest declares {k}")
     check(any(a.get("NSPrivacyAccessedAPIType") == "NSPrivacyAccessedAPICategoryUserDefaults" for a in p.get("NSPrivacyAccessedAPITypes", [])), "privacy manifest gives a reason for UserDefaults")
 

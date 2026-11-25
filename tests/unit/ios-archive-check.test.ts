@@ -56,7 +56,7 @@ function fakeApp(name: string, change: (app: string, info: Record<string, Plist>
   writeFileSync(join(app, "App"), "binary");
   writeFileSync(join(app, "Assets.car"), "");
   writeFileSync(join(app, "AppIcon60x60@2x.png"), "");
-  const kinds = ["Health", "Fitness", "PreciseLocation", "PhotosorVideos", "EmailAddress", "UserID", "PurchaseHistory"];
+  const kinds = ["Health", "Fitness", "PreciseLocation", "PhotosorVideos", "EmailAddress", "UserID", "PurchaseHistory", "ProductInteraction"];
   writeFileSync(
     join(app, "PrivacyInfo.xcprivacy"),
     plist({
