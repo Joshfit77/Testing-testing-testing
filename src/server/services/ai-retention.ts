@@ -1,0 +1,34 @@
+import "server-only";
+import { aiRetentionDays, retentionCutoff } from "@/lib/domain/ai-retention";
+import { getServiceSupabase } from "@/lib/supabase/server";
+import { logInfo } from "@/server/log";
+
+export type AiRetentionReport =
+  | { enabled: false }
+  | { enabled: true; days: number; cutoff: string; coachMessages: number; coachConversations: number; bibleMessages: number };
+
+/**
+ * Deletes AI conversation content past the configured retention (AI_CHAT_RETENTION_DAYS; src/lib/domain/ai-retention.ts):
+ *   1. coach messages created before the cutoff, in any conversation (feedback on them goes with them; training changes
+ *      and memories that came from them keep existing, they just lose the link to the message);
+ *   2. coach conversations with no activity since the cutoff (with anything left in them);
+ *   3. Bible-helper messages created before the cutoff.
+ * Does nothing when retention is off. The report holds counts only, never content.
+ */
+export async function purgeExpiredAiChats(options: { now?: Date; days?: number | null } = {}): Promise<AiRetentionReport> {
+  const days = options.days === undefined ? aiRetentionDays(process.env.AI_CHAT_RETENTION_DAYS) : options.days;
+  if (days === null) return { enabled: false };
+  const cutoff = retentionCutoff(days, options.now).toISOString();
+  const admin = getServiceSupabase();
+
+  const messages = await admin.from("ai_messages").delete({ count: "exact" }).lt("created_at", cutoff);
+  if (messages.error) throw messages.error;
+  const conversations = await admin.from("ai_conversations").delete({ count: "exact" }).lt("updated_at", cutoff);
+  if (conversations.error) throw conversations.error;
+  const bible = await admin.from("bible_ai_messages").delete({ count: "exact" }).lt("created_at", cutoff);
+  if (bible.error) throw bible.error;
+
+  const report = { enabled: true as const, days, cutoff, coachMessages: messages.count ?? 0, coachConversations: conversations.count ?? 0, bibleMessages: bible.count ?? 0 };
+  logInfo("ai_retention.purged", report);
+  return report;
+}
