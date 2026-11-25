@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { canUseBodyScan, compareScans, isOwnScanPath, REQUIRED_POSES, SCAN_GUIDANCE, scanPhotoPath, tiltFromUpright, type ScanSummary } from "@/lib/domain/body-scan";
+import {
+  canUseBodyScan,
+  compareScans,
+  isOwnScanPath,
+  REQUIRED_POSES,
+  SCAN_GUIDANCE,
+  SCAN_PHOTO_LIMIT_MESSAGE,
+  SCAN_PHOTO_LIMITS,
+  scanPhotoPath,
+  scanUploadErrorMessage,
+  tiltFromUpright,
+  type ScanSummary,
+} from "@/lib/domain/body-scan";
 
 const U = "11111111-2222-4333-8444-555555555555";
 const S = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
@@ -42,5 +54,14 @@ describe("body scan", () => {
   it("gives lighting, distance, pose and consistency guidance, and never promises body fat", () => {
     expect(SCAN_GUIDANCE.map((g) => g.title)).toEqual(["Lighting", "Distance and framing", "Pose", "Consistency"]);
     expect(JSON.stringify(SCAN_GUIDANCE)).not.toMatch(/body fat|visceral/i);
+  });
+
+  it("explains a refused upload (the storage limit) differently from a connection problem", () => {
+    expect(SCAN_PHOTO_LIMITS).toEqual({ total: 750, perDay: 30, totalBytes: 2 * 1024 * 1024 * 1024 });
+    expect(SCAN_PHOTO_LIMIT_MESSAGE).toContain("750 photos, 30 a day, 2 GB");
+    expect(scanUploadErrorMessage({ message: "new row violates row-level security policy", statusCode: "403" }, true)).toBe(SCAN_PHOTO_LIMIT_MESSAGE);
+    expect(scanUploadErrorMessage({ message: "Forbidden", statusCode: 403 }, true)).toBe(SCAN_PHOTO_LIMIT_MESSAGE);
+    expect(scanUploadErrorMessage({ message: "Failed to fetch" }, true)).toBe("The upload didn't finish. Your photos are still here: try again.");
+    expect(scanUploadErrorMessage(null, false)).toBe("You're offline. Your photos are still here: save when you're back online.");
   });
 });

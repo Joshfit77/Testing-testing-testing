@@ -124,9 +124,9 @@ you see, and nothing secret.
   editor → **⌘V** → **Run**.
 - **Cost:** free.
 - **It worked if:** it says **Success. No rows returned** (the file is large, so give it a minute or two). Then
-  check the photo upload limit is installed: **New query** → paste
-  `select tgname from pg_trigger where tgname = 'progress_photos_quota';` → **Run** → one row,
-  `progress_photos_quota`. If nothing shows, tell Claude.
+  check the photo upload limits are installed: **New query** → paste
+  `select tgname from pg_trigger where tgname in ('progress_photos_quota', 'body_scan_photos_quota') order by 1;`
+  → **Run** → two rows, `body_scan_photos_quota` and `progress_photos_quota`. If either is missing, tell Claude.
 - **Do this only once, only in this new project.** If you see an error, don't run it again: send Claude the error
   words.
 

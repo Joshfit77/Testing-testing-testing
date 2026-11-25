@@ -18,6 +18,7 @@ import {
   SCAN_POSE_TIPS,
   SCAN_TIMER_SECONDS,
   scanPhotoPath,
+  scanUploadErrorMessage,
   tiltFromUpright,
   type ScanMeasurement,
   type ScanPose,
@@ -83,7 +84,10 @@ export function ScanCapture({ userId, units, previous, lastWeight }: { userId: s
         setSaving(`Uploading photo ${i + 1} of ${poses.length}…`);
         const path = scanPhotoPath(userId, scanId, pose, crypto.randomUUID());
         const { error: upErr } = await supabase.storage.from(BODY_SCAN_BUCKET).upload(path, shots[pose]!.blob, { contentType: "image/jpeg", upsert: false, cacheControl: "60" });
-        if (upErr) throw upErr;
+        if (upErr) {
+          setSaving(null);
+          return setError(scanUploadErrorMessage(upErr, navigator.onLine));
+        }
         uploaded.current[pose] = path;
       }
       setSaving("Saving…");
@@ -97,7 +101,7 @@ export function ScanCapture({ userId, units, previous, lastWeight }: { userId: s
       router.refresh();
     } catch {
       setSaving(null);
-      setError(navigator.onLine ? "The upload didn't finish. Your photos are still here: try again." : "You're offline. Your photos are still here: save when you're back online.");
+      setError(scanUploadErrorMessage(null, navigator.onLine));
     }
   };
 

@@ -48,6 +48,9 @@ const MEMBER_CALLABLE = [
   "admin_ai_cost_report",
   "admin_usage_metrics",
   "can_add_body_scan",
+  // Migration 088: used by the body-scans storage rule (which runs as the member); no arguments, answers only whether
+  // auth.uid() may upload another Body Scan photo.
+  "can_add_body_scan_photo",
   // Migration 086: used by the progress-photos storage rule (which runs as the member); no arguments, answers only
   // whether auth.uid() may upload another photo.
   "can_add_progress_photo",

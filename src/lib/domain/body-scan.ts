@@ -10,6 +10,21 @@ export const SCAN_NOTE_MAX = 280;
 /** Longest edge after downscaling on the device; enough to compare shape, small enough to upload on mobile data. */
 export const SCAN_MAX_DIMENSION = 1600;
 export const SCAN_TIMER_SECONDS = 10;
+/**
+ * Per-member upload limits on the body-scans bucket, enforced by the storage rule (migration 20261125000088,
+ * can_add_body_scan_photo()). Only new uploads are refused; nothing stored is removed, and deleting scans frees room.
+ */
+export const SCAN_PHOTO_LIMITS = { total: 750, perDay: 30, totalBytes: 2 * 1024 * 1024 * 1024 } as const;
+export const SCAN_PHOTO_LIMIT_MESSAGE =
+  "Body Scan couldn't store this photo: you've reached the limit (750 photos, 30 a day, 2 GB in total), or Body Scan isn't available on this account. Your scans are all still here: delete some older scans to add new ones, or try again tomorrow.";
+
+/** What to tell the member when a scan photo upload is refused by the storage rule, or fails for any other reason. */
+export function scanUploadErrorMessage(error: { message?: string; statusCode?: string | number } | null | undefined, online: boolean): string {
+  const message = String(error?.message ?? "").toLowerCase();
+  const status = String(error?.statusCode ?? "");
+  if (message.includes("row-level security") || message.includes("row level security") || status === "403") return SCAN_PHOTO_LIMIT_MESSAGE;
+  return online ? "The upload didn't finish. Your photos are still here: try again." : "You're offline. Your photos are still here: save when you're back online.";
+}
 
 /** Body Scan is a Pro feature (the database checks the same with has_plan('pro')). */
 export function canUseBodyScan(plan: Plan): boolean {

@@ -71,9 +71,10 @@ then reviews the build briefly, usually within a day).
 `supabase/setup-all.sql` from the branch `claude/rc-testflight-1` on GitHub (click the file → **Raw** → select all →
 copy), paste it into the editor, click **Run**.
 *You should see:* "Success. No rows returned". Run it **only once, only on this new project**. Then check that the
-progress-photo upload limit is installed: New query → `select tgname from pg_trigger where tgname = 'progress_photos_quota';`
-→ Run. *You should see* one row, `progress_photos_quota`. If it shows nothing, tell Claude before going on. Never run it on any
-other project.
+photo upload limits are installed: New query →
+`select tgname from pg_trigger where tgname in ('progress_photos_quota', 'body_scan_photos_quota') order by 1;`
+→ Run. *You should see* two rows, `body_scan_photos_quota` and `progress_photos_quota`. If either is missing, tell Claude
+before going on. Never run it on any other project.
 The file is large (about 6 MB, mostly the exercise and program library), so the page may take a minute or two. If the
 editor shows an error instead (for example about size or a timeout), **don't run it again**: send Claude the exact
 message, and you'll get a version split into smaller parts, or a one-line command to run it from a computer instead.
