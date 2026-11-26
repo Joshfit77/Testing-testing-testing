@@ -575,7 +575,12 @@ export interface GpsRoute {
 
 /** The route as stored: one line per unbroken stretch, simplified, at most `maxPoints` points in total. */
 export function routeForSave(s: TrackState, maxPoints = 2000): GpsRoute | null {
-  const lines = s.lines.filter((l) => l.length >= 2);
+  return routeForLines(s.lines, maxPoints);
+}
+
+/** routeForSave from the track's lines alone, so a screen can recompute it only when the lines change. */
+export function routeForLines(allLines: TrackState["lines"], maxPoints = 2000): GpsRoute | null {
+  const lines = allLines.filter((l) => l.length >= 2);
   if (!lines.length) return null;
   let tolerance = 2;
   let simplified = lines.map((l) => simplify(l, tolerance));

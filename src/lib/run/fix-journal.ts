@@ -15,10 +15,17 @@ import { GPS_RECORDING_PREFIX as RECORDING_PREFIX } from "@/lib/opening";
  *
  * Writes are throttled (at most every WRITE_EVERY_MS, plus whenever the page is hidden), so a lost write costs at most
  * a couple of seconds of route, never the stretch since the app was locked.
+ *
+ * Storage is chunked: a small index under JOURNAL_KEY (`{ v: 2, key, first, last }`) and the fixes in chunks of
+ * CHUNK_FIXES under `run.fixjournal.<n>`. A write only rewrites the chunk still filling up (and any just completed), so
+ * an hour with the phone locked writes a few kilobytes every two seconds, not the whole hour's route each time.
  */
 
 const JOURNAL_KEY = "run.fixjournal";
+const CHUNK_PREFIX = `${JOURNAL_KEY}.`;
 const WRITE_EVERY_MS = 2000;
+/** About five minutes at one fix a second (about 12 KB). */
+const CHUNK_FIXES = 300;
 /** About four hours at one fix a second: older fixes than this are always in a full save already. */
 const MAX_FIXES = 15_000;
 
@@ -27,32 +34,93 @@ interface Journal {
   /** The recorder's storage key (`run.recording.<userId>`): a journal is only ever replayed into the same recording. */
   key: string;
   fixes: Row[];
+  /** Chunk number of fixes[0] (fixes[0] is always the first fix of a chunk). */
+  first: number;
+}
+interface Index {
+  v: 2;
+  key: string;
+  first: number;
+  last: number;
 }
 
 let mem: Journal | null = null;
 let lastWrite = 0;
 let dirty = false;
 let listening = false;
+/** Chunks (by number) already on the device exactly as in `mem`; every chunk before the last full one is final. */
+let writtenFull = -1;
+/** The highest chunk number on the device, to remove leftovers when the journal shrinks. */
+let storedLast = -1;
 
-function read(): Journal | null {
+function getItem(k: string): string | null {
   try {
-    const raw = localStorage.getItem(JOURNAL_KEY);
-    if (!raw) return null;
-    const j = JSON.parse(raw) as Journal;
-    return j && typeof j.key === "string" && Array.isArray(j.fixes) ? j : null;
+    return localStorage.getItem(k);
   } catch {
     return null;
   }
 }
 
+function read(): Journal | null {
+  const raw = getItem(JOURNAL_KEY);
+  if (!raw) return null;
+  try {
+    const j = JSON.parse(raw) as Partial<Index> & { fixes?: unknown };
+    if (!j || typeof j.key !== "string") return null;
+    // The earlier single-entry format (a journal written before an update is still replayed).
+    if (Array.isArray(j.fixes)) return { key: j.key, fixes: j.fixes as Row[], first: 0 };
+    if (j.v !== 2 || !Number.isInteger(j.first) || !Number.isInteger(j.last)) return null;
+    const fixes: Row[] = [];
+    for (let n = j.first!; n <= j.last!; n++) {
+      const chunk = JSON.parse(getItem(CHUNK_PREFIX + n) ?? "[]") as unknown;
+      if (Array.isArray(chunk)) fixes.push(...(chunk as Row[]));
+    }
+    return { key: j.key, fixes, first: j.first! };
+  } catch {
+    return null;
+  }
+}
+
+/** Load the journal on the device into memory, remembering what is already written. */
+function load(stored: Journal | null): void {
+  mem = stored;
+  // A journal read from the device is written in full again on the next write (it may be in the old format).
+  writtenFull = -1;
+  storedLast = stored ? stored.first + Math.ceil(stored.fixes.length / CHUNK_FIXES) - 1 : -1;
+}
+
 function write(): void {
   if (!mem) return;
   try {
-    localStorage.setItem(JOURNAL_KEY, JSON.stringify(mem));
+    const full = Math.floor(mem.fixes.length / CHUNK_FIXES);
+    const last = mem.first + Math.ceil(mem.fixes.length / CHUNK_FIXES) - 1;
+    for (let i = 0; i * CHUNK_FIXES < mem.fixes.length; i++) {
+      const n = mem.first + i;
+      if (i < full && n <= writtenFull) continue; // a completed chunk already on the device
+      localStorage.setItem(CHUNK_PREFIX + n, JSON.stringify(mem.fixes.slice(i * CHUNK_FIXES, (i + 1) * CHUNK_FIXES)));
+    }
+    for (let n = Math.max(last + 1, 0); n <= storedLast; n++) localStorage.removeItem(CHUNK_PREFIX + n);
+    const index: Index = { v: 2, key: mem.key, first: mem.first, last };
+    localStorage.setItem(JOURNAL_KEY, JSON.stringify(index));
+    writtenFull = mem.first + full - 1;
+    storedLast = last;
     dirty = false;
     lastWrite = Date.now();
   } catch {
     /* storage full or blocked: the in-memory track still has the fixes */
+  }
+}
+
+function removeAllChunks(): void {
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k?.startsWith(CHUNK_PREFIX)) keys.push(k);
+    }
+    for (const k of keys) localStorage.removeItem(k);
+  } catch {
+    /* nothing stored */
   }
 }
 
@@ -71,10 +139,27 @@ export function journalFix(key: string, fix: GpsFix, now: number = Date.now()): 
   listen();
   if (!mem || mem.key !== key) {
     const stored = read();
-    mem = stored && stored.key === key ? stored : { key, fixes: [] };
+    if (stored && stored.key === key) load(stored);
+    else {
+      if (stored || mem) removeAllChunks();
+      load({ key, fixes: [], first: 0 });
+    }
   }
-  mem.fixes.push([fix.lat, fix.lng, fix.accuracy, fix.t]);
-  if (mem.fixes.length > MAX_FIXES) mem.fixes.splice(0, mem.fixes.length - MAX_FIXES);
+  const j = mem!;
+  j.fixes.push([fix.lat, fix.lng, fix.accuracy, fix.t]);
+  // Past the cap, the oldest whole chunk goes (its fixes are long in a full save), keeping chunk numbers in place.
+  if (j.fixes.length > MAX_FIXES) {
+    const drop = Math.ceil((j.fixes.length - MAX_FIXES) / CHUNK_FIXES);
+    j.fixes.splice(0, drop * CHUNK_FIXES);
+    for (let n = j.first; n < j.first + drop; n++) {
+      try {
+        localStorage.removeItem(CHUNK_PREFIX + n);
+      } catch {
+        /* blocked */
+      }
+    }
+    j.first += drop;
+  }
   dirty = true;
   if (now - lastWrite >= WRITE_EVERY_MS) write();
 }
@@ -90,11 +175,15 @@ export function pruneJournal(key: string, upTo: number | null): void {
   if (!mem || mem.key !== key) {
     const stored = read();
     if (!stored || stored.key !== key) return;
-    mem = stored;
+    load(stored);
   }
-  const before = mem.fixes.length;
-  mem.fixes = mem.fixes.filter((f) => f[3] > upTo);
-  if (mem.fixes.length !== before) {
+  const j = mem!;
+  const before = j.fixes.length;
+  j.fixes = j.fixes.filter((f) => f[3] > upTo);
+  if (j.fixes.length !== before) {
+    // What is left is usually a few seconds of fixes: renumber from the first chunk and write it all again.
+    j.first = 0;
+    writtenFull = -1;
     dirty = true;
     write();
   }
@@ -104,11 +193,14 @@ export function pruneJournal(key: string, upTo: number | null): void {
 export function clearJournal(): void {
   mem = null;
   dirty = false;
+  writtenFull = -1;
+  storedLast = -1;
   try {
     localStorage.removeItem(JOURNAL_KEY);
   } catch {
     /* nothing stored */
   }
+  removeAllChunks();
 }
 
 /**
@@ -155,4 +247,6 @@ export function resetJournalForTests(): void {
   mem = null;
   lastWrite = 0;
   dirty = false;
+  writtenFull = -1;
+  storedLast = -1;
 }

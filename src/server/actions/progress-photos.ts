@@ -9,7 +9,18 @@ import { toKg } from "@/lib/domain/units";
 import { getProfile, requireUser } from "@/server/auth";
 import { logError } from "@/server/log";
 
-type Result = { ok: true } | { ok: false; error: string };
+/** `uncertain`: the save may have gone through (the database didn't answer clearly), so the file is kept for a retry. */
+type Result = { ok: true } | { ok: false; error: string; uncertain?: true };
+
+/**
+ * The database refused this row for good (bad value, a constraint, a permission rule), as opposed to an answer that
+ * never arrived or a timeout, after which the row may still have been written. Only a definite refusal may remove the
+ * uploaded file: removing it after an uncertain failure could leave a saved photo without its image.
+ */
+function definitelyRefused(error: { code?: string }): boolean {
+  const code = error.code ?? "";
+  return (/^2[23]/.test(code) && code !== "23505") || code === "42501";
+}
 
 const savePhotoSchema = z.object({
   path: z.string().min(3).max(300),
@@ -69,8 +80,10 @@ export async function saveProgressPhotoAction(input: unknown): Promise<Result> {
   }
   if (error) {
     logError("progress_photos.insert", error);
-    // Don't leave an orphaned object behind, but never delete a file a saved photo already uses (an earlier attempt
-    // whose reply was lost, retried with different details).
+    // Uncertain (timeout, dropped connection): the row may exist, so the file stays and a retry confirms it.
+    if (!definitelyRefused(error)) return { ok: false, error: "We couldn't confirm the save. Check your connection and tap Save again.", uncertain: true };
+    // Refused: don't leave an orphaned object behind, but never delete a file a saved photo already uses (an earlier
+    // attempt whose reply was lost, retried with different details).
     const { data: inUse, error: useErr } = await supabase.from("progress_photos").select("id").eq("user_id", user.id).eq("storage_path", v.path).limit(1);
     if (!useErr && !inUse?.length) await supabase.storage.from(PROGRESS_PHOTO_BUCKET).remove([v.path]);
     return { ok: false, error: "Couldn't save your photo. Please try again." };

@@ -11,8 +11,10 @@ commit `8fa7c3b5`.
 
 ## Method
 
-- **Script:** `node scripts/perf/load-test.mjs <baseUrl> <supabaseUrl> <anonKey> <serviceKey> <members> <concurrency>
-  <seconds>`. It refuses a non-local Supabase unless `ALLOW_REMOTE_LOAD_TEST=1` (staging only, never production).
+- **Script:** `SUPABASE_ANON_KEY=… SUPABASE_SERVICE_ROLE_KEY=… node scripts/perf/load-test.mjs <baseUrl> <supabaseUrl>
+  <members> <concurrency> <seconds>`. Keys come from the environment, never the command line. Each run uses a random
+  password, and the synthetic members are deleted even if the run fails or is interrupted. It refuses a non-local
+  Supabase unless `ALLOW_REMOTE_LOAD_TEST=1` (staging only, never production).
 - **Setup:** the script creates N synthetic, onboarded members, signs each in, and sends their real session cookie
   (pages) or Bearer token (API).
 - **Load:** C concurrent workers loop over 7 routes:

@@ -24,6 +24,7 @@ import {
   pauseTrack,
   recoverTrack,
   resumeTrack,
+  routeForLines,
   routeForSave,
   splitsForSave,
   startTrack,
@@ -405,7 +406,9 @@ export function GpsRecorder({
   const distance = track?.distanceM ?? 0;
   const pace = track ? currentPace(track, now) : null;
   const avgPace = paceSecondsPer(distance, Math.max(1, moving), unit);
-  const route = track ? routeForSave(track, 600) : null;
+  // The preview route is simplified from every point so far: only redo it when a point was added, not on every clock tick.
+  const lines = track?.lines;
+  const route = useMemo(() => (lines ? routeForLines(lines, 600) : null), [lines]);
   const diag = track ? gpsDiagnostics(track, now) : null;
   const source = locationSourceLabel();
 

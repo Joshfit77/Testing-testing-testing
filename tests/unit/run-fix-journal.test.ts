@@ -67,7 +67,86 @@ describe("GPS fix journal", () => {
     routeFix(f);
     flushJournal();
     expect(got).toEqual([f]);
-    expect(JSON.parse(localStorage.getItem("run.fixjournal")!)).toEqual({ key: KEY, fixes: [[40, -75, 5, T0 + 5000]] });
+    expect(JSON.parse(localStorage.getItem("run.fixjournal")!)).toEqual({ v: 2, key: KEY, first: 0, last: 0 });
+    expect(JSON.parse(localStorage.getItem("run.fixjournal.0")!)).toEqual([[40, -75, 5, T0 + 5000]]);
     detach();
+  });
+});
+
+describe("GPS fix journal storage (chunked)", () => {
+  const chunkKeys = () => Object.keys(localStorage).filter((k) => k.startsWith("run.fixjournal.")).sort();
+
+  it("an hour with the phone locked: each write stores only the chunk still filling up, not the whole hour", () => {
+    const fixes = trace(T0, 3600);
+    for (const f of fixes.slice(0, 3000)) journalFix(KEY, f, f.t);
+    flushJournal();
+    const writes: [string, number][] = [];
+    const real = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (k: string, v: string) {
+      writes.push([k, v.length]);
+      return real.call(this, k, v);
+    };
+    try {
+      // The next minute, written every 2 seconds as it arrives.
+      for (const f of fixes.slice(3000, 3060)) journalFix(KEY, f, f.t);
+      flushJournal();
+    } finally {
+      Storage.prototype.setItem = real;
+    }
+    // Every write touched at most the index and one chunk of at most 300 fixes, never the 3,000 before.
+    const biggest = Math.max(...writes.map(([, n]) => n));
+    expect(biggest).toBeLessThan(300 * 60);
+    expect(new Set(writes.map(([k]) => k))).toEqual(new Set(["run.fixjournal", "run.fixjournal.10"]));
+    // Relaunch: all 3,060 fixes come back, in order.
+    resetJournalForTests();
+    const recovered = replayJournal(KEY, startTrack({ id: "r", kind: "run", unit: "km", now: T0 - 1000 }));
+    expect(recovered.lastFixAt).toBe(fixes[3059]!.t);
+  });
+
+  it("a journal written by the previous version (one entry) is still replayed, then rewritten in chunks", () => {
+    const old = trace(T0, 10).map((f) => [f.lat, f.lng, f.accuracy, f.t]);
+    localStorage.setItem("run.fixjournal", JSON.stringify({ key: KEY, fixes: old }));
+    const track = replayJournal(KEY, startTrack({ id: "r", kind: "run", unit: "km", now: T0 - 1000 }));
+    expect(track.lastFixAt).toBe(T0 + 10_000);
+    journalFix(KEY, { lat: 40.001, lng: -75, accuracy: 5, t: T0 + 11_000 }, T0 + 11_000);
+    flushJournal();
+    expect(JSON.parse(localStorage.getItem("run.fixjournal")!)).toMatchObject({ v: 2, key: KEY, first: 0, last: 0 });
+    expect(JSON.parse(localStorage.getItem("run.fixjournal.0")!)).toHaveLength(12);
+  });
+
+  it("past the four-hour cap the oldest chunk goes, its stored copy too", () => {
+    const fixes = trace(T0, 15_300);
+    for (const f of fixes) journalFix(KEY, f, f.t);
+    flushJournal();
+    const index = JSON.parse(localStorage.getItem("run.fixjournal")!);
+    expect(index.first).toBeGreaterThan(0);
+    expect(localStorage.getItem(`run.fixjournal.${index.first - 1}`)).toBeNull();
+    expect(chunkKeys()).toHaveLength(index.last - index.first + 1);
+    resetJournalForTests();
+    const recovered = replayJournal(KEY, startTrack({ id: "r", kind: "run", unit: "km", now: T0 - 1000 }));
+    expect(recovered.lastFixAt).toBe(fixes.at(-1)!.t);
+  });
+
+  it("a full save prunes the journal and leaves no stale chunks; clearing removes every chunk", () => {
+    const fixes = trace(T0, 1000);
+    for (const f of fixes) journalFix(KEY, f, f.t);
+    flushJournal();
+    expect(chunkKeys()).toHaveLength(4);
+    pruneJournal(KEY, fixes[995]!.t);
+    expect(chunkKeys()).toEqual(["run.fixjournal.0"]);
+    expect(JSON.parse(localStorage.getItem("run.fixjournal.0")!)).toHaveLength(5);
+    clearJournal();
+    expect(chunkKeys()).toEqual([]);
+    expect(localStorage.getItem("run.fixjournal")).toBeNull();
+  });
+
+  it("another member's recording starts a fresh journal and removes the previous one's chunks", () => {
+    for (const f of trace(T0, 700)) journalFix(KEY, f, f.t);
+    flushJournal();
+    expect(chunkKeys().length).toBe(3);
+    journalFix("run.recording.user-2", { lat: 41, lng: -75, accuracy: 5, t: T0 }, T0 + 10_000);
+    flushJournal();
+    expect(chunkKeys()).toEqual(["run.fixjournal.0"]);
+    expect(replayJournal(KEY, startTrack({ id: "x", kind: "run", unit: "km", now: T0 }))).toMatchObject({ lastFixAt: null });
   });
 });

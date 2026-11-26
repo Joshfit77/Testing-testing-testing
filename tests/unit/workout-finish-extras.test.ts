@@ -28,7 +28,10 @@ vi.mock("@/server/services/workouts", () => ({
 vi.mock("@/server/services/schedule", () => ({ nextSessionSummary: (...a: unknown[]) => nextSessionSummary(...a) }));
 vi.mock("@/server/services/achievements", () => ({ getAchievementStats: (...a: unknown[]) => getAchievementStats(...a) }));
 vi.mock("@/server/services/exercise-history", () => ({ loadExerciseHistories: (...a: unknown[]) => loadExerciseHistories(...a) }));
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+const revalidatePath = vi.fn();
+const scriptureForDate = vi.fn();
+vi.mock("next/cache", () => ({ revalidatePath: (...a: unknown[]) => revalidatePath(...a) }));
+vi.mock("@/data/content", async (orig) => ({ ...(await orig<typeof import("@/data/content")>()), scriptureForDate: (...a: unknown[]) => scriptureForDate(...a) }));
 vi.mock("@/server/log", () => ({ logError: vi.fn(), logInfo: vi.fn() }));
 
 const input = {
@@ -50,6 +53,8 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();
+  revalidatePath.mockReset();
+  scriptureForDate.mockReset();
 });
 
 describe("finishWorkoutAction after the save", () => {
@@ -77,6 +82,38 @@ describe("finishWorkoutAction after the save", () => {
     await vi.advanceTimersByTimeAsync(8_000);
     const r = await pending;
     expect(r.ok).toBe(true);
+  });
+
+  it("everything hanging: the reply comes after ONE time limit, not one per phase", async () => {
+    vi.useFakeTimers();
+    const never = new Promise(() => {});
+    getProfile.mockReturnValue(never);
+    previousComparableSession.mockReturnValue(never);
+    nextSessionSummary.mockReturnValue(never);
+    getAchievementStats.mockReturnValue(never);
+    loadExerciseHistories.mockReturnValue(never);
+    const { finishWorkoutAction } = await import("@/server/actions/workouts");
+    let settled = false;
+    const pending = finishWorkoutAction(input).then((r) => ((settled = true), r));
+    await vi.advanceTimersByTimeAsync(8_100);
+    expect(settled).toBe(true);
+    expect((await pending).ok).toBe(true);
+  });
+
+  it("a failing verse or cache refresh still reports the saved workout", async () => {
+    getProfile.mockResolvedValue({ timezone: "UTC", unit_system: "metric", faith_enabled: true });
+    scriptureForDate.mockImplementation(() => {
+      throw new Error("verse data missing");
+    });
+    revalidatePath.mockImplementation(() => {
+      throw new Error("revalidate failed");
+    });
+    for (const extra of [previousComparableSession, nextSessionSummary, getAchievementStats, loadExerciseHistories]) extra.mockRejectedValue(new Error("not under test"));
+    const { finishWorkoutAction } = await import("@/server/actions/workouts");
+    const r = await finishWorkoutAction(input);
+    expect(r).toMatchObject({ ok: true, data: { sessionId: "55555555-5555-4555-8555-555555555555", reflection: null } });
+    expect(scriptureForDate).toHaveBeenCalled();
+    expect(revalidatePath).toHaveBeenCalled();
   });
 
   it("a failed save is still reported as not saved", async () => {

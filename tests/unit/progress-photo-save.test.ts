@@ -55,6 +55,18 @@ describe("saveProgressPhotoAction cleanup", () => {
     expect(remove).toHaveBeenCalledWith([PATH]);
   });
 
+  it.each([
+    ["a timeout", { code: "57014", message: "canceling statement due to statement timeout" }],
+    ["a dropped connection", { code: "", message: "TypeError: fetch failed" }],
+    ["a serialization retry", { code: "40001", message: "could not serialize access" }],
+  ])("after %s (the row may have been written) the file is kept and the reply says so", async (_label, err) => {
+    const { saveProgressPhotoAction } = await import("@/server/actions/progress-photos");
+    insertError = err;
+    const r = await saveProgressPhotoAction(input);
+    expect(r).toMatchObject({ ok: false, uncertain: true });
+    expect(remove).not.toHaveBeenCalled();
+  });
+
   it("a second save of the same file is treated as done", async () => {
     const { saveProgressPhotoAction } = await import("@/server/actions/progress-photos");
     insertError = { code: "23505", message: "duplicate" };

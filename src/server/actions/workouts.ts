@@ -166,31 +166,44 @@ export async function finishWorkoutAction(input: unknown): Promise<
         Promise.resolve(supabase.from("user_programs").select("id").eq("user_id", user.id).eq("status", "active").maybeSingle()).then((r) => (r.data?.id as string | undefined) ?? null),
         null,
       );
-  const [badges, profile, programId, previous] = await Promise.all([
+  // One phase: the milestones and the next session start as soon as the profile (units, time zone) and the program are
+  // known, alongside the rest, so the whole summary waits at most one time limit.
+  const [badges, profile, previous, milestones, next] = await Promise.all([
     // Badges are worked out from the saved sessions, so a retried finish (first response lost) shows them too.
     extra("badges", unlockedBadges(supabase, user.id, sessionId), [] as UnlockedBadge[]),
     profilePromise,
-    programIdPromise,
     extra(
       "previous",
       previousComparableSession(supabase, user.id, { sessionId, startedAt: parsed.data.startedAt, programDayId: parsed.data.programDayId, name: parsed.data.name }),
       null,
     ),
-  ]);
-  const tz = profile?.timezone ?? "UTC";
-  const [milestones, next] = await Promise.all([
     // Milestones this session reached, from the saved history (so a retried finish shows them too).
     extra(
       "milestones",
-      milestonesReached(supabase, user.id, sessionId, parsed.data.exercises.filter((e) => !e.skipped).map((e) => e.exerciseId), profile?.unit_system ?? "imperial"),
+      profilePromise.then((p) => milestonesReached(supabase, user.id, sessionId, parsed.data.exercises.filter((e) => !e.skipped).map((e) => e.exerciseId), p?.unit_system ?? "imperial")),
       [] as ReachedMilestone[],
     ),
     // What the program has next, also after a workout outside it.
-    programId ? extra("next", nextSessionSummary(supabase, user.id, programId, tz), null) : Promise.resolve(null),
+    extra(
+      "next",
+      Promise.all([programIdPromise, profilePromise]).then(([programId, p]) => (programId ? nextSessionSummary(supabase, user.id, programId, p?.timezone ?? "UTC") : null)),
+      null,
+    ),
   ]);
-  const verse = profile?.faith_enabled ? scriptureForDate(isoDateInTz(new Date(), tz)) : null;
-  const reflection = verse ? { reference: verse.reference, parts: scriptureParts(verse.reference, verse.text), prompt: verse.reflection } : null;
-  revalidatePath("/", "layout");
+  const tz = profile?.timezone ?? "UTC";
+  // The verse and the cache refresh can't turn a saved workout into an error either.
+  let reflection: Reflection | null = null;
+  try {
+    const verse = profile?.faith_enabled ? scriptureForDate(isoDateInTz(new Date(), tz)) : null;
+    reflection = verse ? { reference: verse.reference, parts: scriptureParts(verse.reference, verse.text), prompt: verse.reflection } : null;
+  } catch (err) {
+    logError("workouts.finish.reflection", err);
+  }
+  try {
+    revalidatePath("/", "layout");
+  } catch (err) {
+    logError("workouts.finish.revalidate", err);
+  }
   return {
     ok: true,
     data: { sessionId, volumeKg: res.volumeKg, records: res.records, badges, milestones, next, previous, reflection, addedSets: res.addedSets, differingSets: res.differingSets ?? 0, alreadyCompleted: res.alreadyCompleted },

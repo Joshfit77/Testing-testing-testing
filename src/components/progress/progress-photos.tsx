@@ -126,7 +126,7 @@ function UploadDialog({ open, onOpenChange, userId, units, today }: { open: bool
     }
     setStage("saving");
     const res = await saveProgressPhotoAction({ path, takenOn, pose, note, weight }).catch(() => null);
-    if (!res) {
+    if (!res || (!res.ok && res.uncertain)) {
       // The server may have saved it: keep the file and let a retry confirm (no second entry).
       if (pending.current) pending.current.unconfirmed = true;
       setStage("idle");
